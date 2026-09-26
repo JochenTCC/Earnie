@@ -17,7 +17,7 @@ from runtime_store.history_timeline import (
     SLOT_MISSING,
     SLOT_PRESENT,
 )
-from ui.chart_consumer_stack import _chart_flex_consumers, chart_flex_consumers_context
+from ui.chart_consumer_stack import _chart_flex_consumers
 from ui.chart_context import (
     LiveChartContext,
     SLOT_MILP,
@@ -429,9 +429,4 @@ def build_optimization_display_bundle_from_snapshot(
         chart_context=chart_context,
         optimization_matrix=optimization_matrix,
         show_soc_plausibility=True,
-    )
-
-def _bundle_flex_context(bundle: OptimizationDisplayBundle):
-    return chart_flex_consumers_context(
-        list(bundle.flex_consumers) if bundle.flex_consumers else None
     )

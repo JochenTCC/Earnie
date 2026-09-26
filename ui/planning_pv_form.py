@@ -11,7 +11,7 @@ from house_config.label_uniqueness import allocate_unique_label
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import (
     delete_pv_system,
-    get_runtime_scenario_refs,
+    get_live_scenario_refs,
     list_pv_systems,
     load_house_profiles,
     upsert_pv_system,
@@ -116,7 +116,7 @@ def _apply_profile_pv_defaults(session_scope: str, profiles: dict[str, dict]) ->
 
 
 def _default_profile_for_pv(profiles: dict[str, dict]) -> dict:
-    refs = get_runtime_scenario_refs()
+    refs = get_live_scenario_refs()
     profile_id = str(refs.get("house_profile_id", "") or "").strip()
     if profile_id and profile_id in profiles:
         return profiles[profile_id]
@@ -193,7 +193,7 @@ def _apply_pending_pv_select() -> None:
 def _initial_pv_index(system_ids: list[str]) -> int | None:
     if "planning_pv_select" in st.session_state:
         return None
-    refs = get_runtime_scenario_refs().get("pv_system_ids") or []
+    refs = get_live_scenario_refs().get("pv_system_ids") or []
     for pv_id in refs:
         if pv_id in system_ids:
             return system_ids.index(pv_id) + 1
@@ -230,7 +230,7 @@ def _resolve_pv_existing(
         return new_pv_system_template(
             list_pv_systems(),
             source_id=source_id,
-            live_pv_ids=get_runtime_scenario_refs().get("pv_system_ids") or [],
+            live_pv_ids=get_live_scenario_refs().get("pv_system_ids") or [],
         )
     _remember_pv_template_source(selected)
     st.session_state[_SESSION_SELECTED_ID_KEY] = selected

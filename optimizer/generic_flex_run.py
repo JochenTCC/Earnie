@@ -5,10 +5,6 @@ from .generic_flex_context import generic_flex_window
 from .milp_consumers import _min_on_hours
 
 
-def is_generic_flex_consumer(consumer: dict) -> bool:
-    return generic_flex_window(consumer) is not None
-
-
 def continue_on_from_state(
     state: dict,
     consumers: list,
@@ -18,7 +14,7 @@ def continue_on_from_state(
     result: dict[str, bool] = {}
     for consumer in consumers:
         cid = consumer["id"]
-        if not is_generic_flex_consumer(consumer):
+        if generic_flex_window(consumer) is None:
             continue
         entry = run_state.get(cid) or {}
         result[cid] = int(entry.get("block_hours_remaining", 0) or 0) > 0
@@ -31,7 +27,7 @@ def update_generic_flex_run_state(
     power_kw: float,
 ) -> None:
     """Aktualisiert offene min_on-Stunden nach einer ausgeführten Stunde."""
-    if not is_generic_flex_consumer(consumer):
+    if generic_flex_window(consumer) is None:
         return
     cid = consumer["id"]
     min_hours = _min_on_hours(consumer)

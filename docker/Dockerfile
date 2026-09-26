@@ -20,7 +20,16 @@ COPY scripts/ scripts/
 RUN python -c "import re; from pathlib import Path; p=Path('version.py'); t=p.read_text(); m=re.search(r'__version__\s*=\s*[\"\\']([^\"\\']+)[\"\\']', t); raw=(m.group(1) if m else '0.0.0'); semver=re.match(r'(\d+(?:\.\d+)*)', raw); p.write_text('__version__ = \"' + (semver.group(1) if semver else '0.0.0') + '\"\\n')"
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Explicit copies only (S6470) — avoid recursive COPY . . pulling secrets/junk.
+COPY docker/ docker/
+COPY house_config/ house_config/
+COPY settings/ settings/
+COPY ehal/ ehal/
+COPY share/config/ share/config/
+COPY logger_config.py app.py main.py ./
+RUN mkdir -p earnie_env/runtime
+COPY earnie_env/runtime/local_settings.example.json earnie_env/runtime/
+COPY .env.example ./
 
 # Empty BUILD_DATE skips the clock preflight (ad-hoc local builds).
 # scripts/build_container.py always passes a UTC ISO-8601 stamp.

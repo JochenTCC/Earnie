@@ -16,7 +16,7 @@ from house_config.battery_control import (
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import (
     delete_battery,
-    get_runtime_scenario_refs,
+    get_live_scenario_refs,
     list_batteries,
     upsert_battery,
 )
@@ -186,7 +186,7 @@ def _apply_pending_battery_select() -> None:
 def _initial_battery_index(battery_ids: list[str]) -> int | None:
     if "planning_battery_select" in st.session_state:
         return None
-    battery_id = str(get_runtime_scenario_refs().get("battery_id", "") or "").strip()
+    battery_id = str(get_live_scenario_refs().get("battery_id", "") or "").strip()
     if battery_id in battery_ids:
         return battery_ids.index(battery_id) + 1
     return None
@@ -223,7 +223,7 @@ def _resolve_battery_existing(
             list_batteries(),
             source_id=source_id,
             live_battery_id=str(
-                get_runtime_scenario_refs().get("battery_id", "") or ""
+                get_live_scenario_refs().get("battery_id", "") or ""
             ),
         )
     _remember_battery_template_source(selected)

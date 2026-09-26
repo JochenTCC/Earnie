@@ -7,6 +7,7 @@ import config
 from settings.flexible_consumers import flex_kw_lookup
 from .charging_context import (
     apply_horizon_charging_limits,
+    charging_schedule_enabled,
     resolve_charging_contexts,
 )
 
@@ -32,8 +33,7 @@ def consumer_immediate_charge_hover_label(consumer: dict) -> str:
 def _consumer_is_ev(consumer: dict) -> bool:
     if consumer.get("type") == "ev":
         return True
-    sched = consumer.get("charging_schedule")
-    return bool(sched and sched.get("enabled"))
+    return charging_schedule_enabled(consumer)
 
 
 def min_delivery_kwh(consumer: dict, *, dt_h: float | None = None) -> float:

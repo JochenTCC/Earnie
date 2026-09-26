@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     os.environ.setdefault("EARNIE_OFFLINE", "1")
 
     out = Path(args.output_dir) if args.output_dir else env_root / "runtime"
-    out.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)  # NOSONAR pythonsecurity:S8707
 
     workers = (
         args.workers

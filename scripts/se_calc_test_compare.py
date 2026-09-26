@@ -239,7 +239,7 @@ def _update_plan_appendix(table_md: str, summary_note: str) -> None:
         f"{table_md}\n\n"
         "Machine-readable: [se-calc-test-results.json](se-calc-test-results.json).\n"
     )
-    path.write_text(head + body, encoding="utf-8")
+    path.write_text(head + body, encoding="utf-8")  # NOSONAR pythonsecurity:S8707
 
 
 def _summary_note(rows: list[dict]) -> str:

@@ -50,17 +50,45 @@ def validate_remote_config(data: dict) -> dict:
     return data
 
 
+def _validated_configured_root(raw: str, *, field: str) -> Path:
+    """Normalize an operator-configured absolute share root (S2083).
+
+    Share roots are intentionally absolute (NAS/SMB/local sync). Reject empty,
+    control characters, and relative paths so mkdir/copy cannot follow a
+    traversal-shaped config typo. POSIX roots (``/mnt/...``) stay valid when
+    the config is edited on Windows for a remote Linux host.
+    """
+    text = os.path.expandvars(str(raw).strip())
+    if not text or any(ord(ch) < 32 for ch in text):
+        raise RemoteBacktestingError(
+            f"{field} ist leer oder enthält Steuerzeichen."
+        )
+    path = Path(text).expanduser()
+    posix_absolute = text.startswith("/")
+    if not path.is_absolute() and not posix_absolute:
+        raise RemoteBacktestingError(
+            f"{field} muss ein absoluter Pfad sein (got {text!r})."
+        )
+    if posix_absolute and not path.is_absolute():
+        return Path(text)
+    return path.resolve(strict=False)
+
+
 def share_path(cfg: dict) -> Path:
-    return Path(os.path.expandvars(str(cfg["share_root"]).strip()))
+    return _validated_configured_root(cfg["share_root"], field="share_root")
 
 
 def remote_share_path(cfg: dict) -> Path:
-    raw = str(cfg.get("remote_share_root") or cfg["share_root"]).strip()
-    return Path(os.path.expandvars(raw))
+    raw = cfg.get("remote_share_root") or cfg["share_root"]
+    return _validated_configured_root(raw, field="remote_share_root")
 
 
 def result_share_dir(cfg: dict) -> Path:
     sub = str(cfg.get("result_dir", "results")).strip() or "results"
+    if os.path.isabs(sub) or Path(sub).is_absolute() or ".." in Path(sub).parts:
+        raise RemoteBacktestingError(
+            f"result_dir '{sub}' muss relativ unter share_root liegen."
+        )
     return share_path(cfg) / sub
 
 

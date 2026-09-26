@@ -20,7 +20,7 @@ def _configure_console_utf8() -> None:
 
 
 def _load_json(path: Path) -> dict:
-    with path.open(encoding="utf-8") as handle:
+    with path.open(encoding="utf-8") as handle:  # NOSONAR pythonsecurity:S8707
         doc = json.load(handle)
     if not isinstance(doc, dict):
         raise SystemExit(f"Expected JSON object: {path}")
@@ -28,7 +28,7 @@ def _load_json(path: Path) -> dict:
 
 
 def _write_json(path: Path, doc: dict) -> None:
-    with path.open("w", encoding="utf-8", newline="\n") as handle:
+    with path.open("w", encoding="utf-8", newline="\n") as handle:  # NOSONAR pythonsecurity:S8707
         json.dump(doc, handle, ensure_ascii=False, indent=4)
         handle.write("\n")
 

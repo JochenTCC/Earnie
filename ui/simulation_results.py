@@ -56,7 +56,9 @@ def render_optimization_chart1(
     *,
     chart_key: str = "live_power_soc_chart",
 ) -> None:
-    with _bundle_flex_context(bundle):
+    with chart_flex_consumers_context(
+        list(bundle.flex_consumers) if bundle.flex_consumers else None
+    ):
         render_power_soc_chart(
             bundle.display_df,
             bundle.baseline_df,
@@ -104,7 +106,9 @@ def render_optimization_chart2(
 
 
 def render_optimization_results_tail(bundle: OptimizationDisplayBundle) -> None:
-    with _bundle_flex_context(bundle):
+    with chart_flex_consumers_context(
+        list(bundle.flex_consumers) if bundle.flex_consumers else None
+    ):
         if bundle.simulation_table_title:
             table_title = bundle.simulation_table_title
             if bundle.chart_context is not None:
@@ -462,7 +466,6 @@ def persist_simulation_debug(
 
 from ui.simulation_display_bundle import (  # noqa: E402
     OptimizationDisplayBundle,
-    _bundle_flex_context,
     build_optimization_display_bundle,
     build_optimization_display_bundle_from_snapshot,
 )
@@ -471,7 +474,6 @@ from ui.simulation_display_bundle import (  # noqa: E402
 __all__ = [
     "OptimizationDisplayBundle",
     "SESSION_LIVE_DISPLAY_BUNDLE",
-    "_bundle_flex_context",
     "build_optimization_display_bundle",
     "build_optimization_display_bundle_from_snapshot",
     "format_display_data_basis_caption",

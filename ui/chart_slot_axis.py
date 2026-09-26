@@ -227,11 +227,6 @@ def _chart_time_series(times: list[datetime]) -> pd.Series:
     return pd.Series(times)
 
 
-def _anchor_fraction_from_legacy_shift(x_shift: float) -> float:
-    """Legacy Index-Verschiebung (−0.5 = Slotbeginn, 0 = Mitte) → Anteil ab Slotbeginn."""
-    return 0.5 + x_shift
-
-
 def _slot_time_in_chart(
     slots: tuple[datetime, ...] | list[datetime],
     moment: datetime,

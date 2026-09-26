@@ -827,7 +827,7 @@ def test_initial_profile_index_defaults_to_live_when_runtime_empty(monkeypatch):
 
     monkeypatch.setattr(sess.st, "session_state", {})
     monkeypatch.setattr(
-        "ui.house_config_io.get_runtime_scenario_refs",
+        "ui.house_config_io.get_live_scenario_refs",
         lambda: {"house_profile_id": ""},
     )
     ids = ["alpha", "live"]
@@ -840,7 +840,7 @@ def test_initial_profile_index_prefers_runtime_house_profile_id(monkeypatch):
 
     monkeypatch.setattr(sess.st, "session_state", {})
     monkeypatch.setattr(
-        "ui.house_config_io.get_runtime_scenario_refs",
+        "ui.house_config_io.get_live_scenario_refs",
         lambda: {"house_profile_id": "alpha"},
     )
     ids = ["alpha", "live"]

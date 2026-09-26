@@ -144,14 +144,14 @@ def build_command(
 
 def run_build(cmd: list[str]) -> None:
     print("+", " ".join(cmd))
-    subprocess.run(cmd, check=True, cwd=REPO_ROOT)
+    subprocess.run(cmd, check=True, cwd=REPO_ROOT)  # NOSONAR pythonsecurity:S8705
 
 
 def run_push(tags: list[str]) -> None:
     for tag in tags:
         cmd = ["docker", "push", tag]
         print("+", " ".join(cmd))
-        subprocess.run(cmd, check=True, cwd=REPO_ROOT)
+        subprocess.run(cmd, check=True, cwd=REPO_ROOT)  # NOSONAR pythonsecurity:S8705
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

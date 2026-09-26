@@ -23,10 +23,6 @@ def _var_value_at(variables: list, hour_index: int) -> float:
     return value if value is not None else 0.0
 
 
-def _var_value_at_zero(variables: list) -> float:
-    return _var_value_at(variables, 0)
-
-
 def _extract_milp_plan_at(model: MilpHorizonModel, hour_index: int) -> dict[str, float]:
     return {
         "p_grid_buy": _var_value_at(model.p_grid_buy, hour_index),

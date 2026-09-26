@@ -2,6 +2,24 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.0-alpha.4 pre-release (2026-09-26)
+
+- [x] Publish community pre-release **2.6.0-alpha.4** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.4`) — **2.6.r re-check** remediations (Sonar/Actions/Dockerfile harden, dead-code simplify, KPI splits) + README monitor hero image
+
+### 2.6.r re-check — quality gate progress (2026-09-26)
+
+- [x] **2.6.r re-check** on `main` @ `64b151c` (+ local remediations; ships in **2.6.0-alpha.4**) — completed steps; SonarCloud QG re-scan still open in [Backlog.md](Backlog.md) / [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
+  - [x] Coverage baseline — 2638 passed / 14 skipped; overall **81.2%** (`data` 73.6, `ehal` 90.5, `house_config` 81.0, `optimizer` 85.8, `runtime_store` 80.9, `settings` 77.5, `simulation` 87.3); no package &lt; 40% (vs 2.6.r 80.9% / 2500 passed)
+  - [x] Dead-code / obsolete-test audit — `vulture` (confidence 80) clean after re-export keep for `ui_chart_zone_indices`; `pytest --dead-fixtures` clean; health-report flags = expected mock-heavy
+  - [x] Simplification triage — deferred to follow-up item below (no in-gate rewrites this pass); **step 3 applied** in follow-up
+  - [x] KPI mega-files — **0** core/UI files &gt; 600 LOC
+  - [x] KPI functions — split `derive_control_from_milp_plan`, `_add_power_balance_and_soc_dynamics`, `render_ehal_ha_mapping_section` → **0** bodies &gt; 60 LOC
+  - [x] Official docs — `Doc-Review-Checklist.md` §2.6.0 still current; no new Document Review Findings this pass
+- [x] **Simplify redundant / unnecessarily complex / unneeded code** (quality-gate step 3; no behavior change)
+  - **Removed:** `_anchor_fraction_from_legacy_shift`; unused `ui/charts.py` late re-exports (~70) + dead `render_optimization_chart`; `simulate_24h_horizon`; `_var_value_at_zero`; `_consumer_power_now` / `_consumer_pv_follow_now` (+ milp_consumers re-exports); inlined `_optimization_interval_hours`, `is_generic_flex_consumer`, `_bundle_flex_context`; EV schedule checks via `charging_schedule_enabled`; inlined `charge_immediate_io_name` → `marker_charge_immediate`; dropped `get_runtime_scenario_refs` / `save_runtime_scenario_refs` (callers use live_* names)
+  - **Leftover scan:** no large commented-out blocks / `_backup`/`_tmp_*` in `optimizer/`/`simulation/`/`ui/`
+  - **Verify:** 149 chart + 25 generic-flex/horizon + 94 planning/eauto/charge_immediate tests passed
+
 ### 2.6.n — Battery controllability + Huawei force services (2026-09-26)
 
 - [x] **2.6.n — Battery controllability in `house_config` + MILP**

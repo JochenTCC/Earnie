@@ -533,10 +533,11 @@ def _clip_zone_end(start: datetime, end: datetime, boundary: datetime) -> dateti
 
 
 # Re-export zone builders (API stability: from data.planning_window import ui_chart_zones)
-from data.planning_window_zones import (  # noqa: E402
-    ui_chart_zone_indices,
-    ui_chart_zones,
-)
+from data.planning_window_zones import ui_chart_zones  # noqa: E402
+from data.planning_window_zones import ui_chart_zone_indices as ui_chart_zone_indices  # noqa: E402
+
+# Keep public names visible to static analyzers (tests import both from this module).
+_ZONE_REEXPORTS = (ui_chart_zones, ui_chart_zone_indices)
 
 
 def sunrise_anchor_slot_index(window: PlanningWindow) -> int:

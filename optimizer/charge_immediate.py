@@ -27,12 +27,8 @@ logger = logging.getLogger(__name__)
 _SECONDS_PER_HOUR = 3600.0
 
 
-def charge_immediate_io_name(consumer: dict) -> str:
-    return marker_charge_immediate(consumer)
-
-
 def fetch_charge_immediate_switch(consumer: dict) -> bool | None:
-    io_name = charge_immediate_io_name(consumer)
+    io_name = marker_charge_immediate(consumer)
     if not io_name:
         return None
     return parse_binary_value(loxone_client.fetch_loxone_generic_value(io_name))
@@ -132,7 +128,7 @@ def is_immediate_charging_active(
     switch_on: bool | None,
     live_kw: float | None,
 ) -> bool:
-    if not switch_on or not charge_immediate_io_name(consumer):
+    if not switch_on or not marker_charge_immediate(consumer):
         return False
     if base_context.get("plugged_in") is not True:
         return False
@@ -211,7 +207,7 @@ def enrich_context_with_immediate_charge(
     live_kw: float | None,
     horizon: int,
 ) -> dict:
-    if not charge_immediate_io_name(consumer):
+    if not marker_charge_immediate(consumer):
         return context
     if consumer.get("daily_target_source") != "loxone":
         return context
@@ -246,7 +242,7 @@ def enrich_context_with_immediate_charge(
         "%s: Sofort-Laden aktiv (%s=1) – %.2f kW fix für noch %.2f h "
         "(%s s, %s Slots), keine flexible MILP-Planung.",
         consumer["name"],
-        charge_immediate_io_name(consumer),
+        marker_charge_immediate(consumer),
         result["immediate_charge_kw"],
         result["immediate_remaining_hours"],
         int(remaining_seconds),
@@ -459,7 +455,7 @@ def immediate_charging_labels(contexts: dict[str, dict]) -> list[str]:
 
 def _immediate_charge_consumer() -> dict | None:
     for consumer in config.get_flexible_consumers(optimizer_only=True):
-        if charge_immediate_io_name(consumer):
+        if marker_charge_immediate(consumer):
             return consumer
     return None
 

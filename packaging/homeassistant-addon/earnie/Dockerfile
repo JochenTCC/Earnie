@@ -3,7 +3,8 @@
 # Entwicklungsplan-Doku). Die App selbst (Dockerfile/Entrypoint) bleibt die
 # einzige Quelle der Wahrheit in docker/Dockerfile im Hauptrepo.
 ARG EARNIE_VERSION=2.5.3
-FROM ghcr.io/jochentcc/earnie-energy:${EARNIE_VERSION}
+# HA Supervisor add-ons run as root by design (nginx + /data bind mounts).
+FROM ghcr.io/jochentcc/earnie-energy:${EARNIE_VERSION}  # NOSONAR docker:S6471
 
 # run.sh liest /data/options.json (Supervisor) selbst — kein HA-Base-Image
 # hier, daher kein bashio; jq übernimmt das Parsen. nginx terminiert Ingress

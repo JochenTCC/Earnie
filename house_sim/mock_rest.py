@@ -140,7 +140,8 @@ def start_mock_rest(
         _server = server
         _thread = thread
         bound_host, bound_port = server.server_address[:2]
-        base_url = f"http://{bound_host}:{bound_port}"
+        # Local lab mock only — TLS not used on loopback ThreadingHTTPServer.
+        base_url = f"http://{bound_host}:{bound_port}"  # NOSONAR python:S5332
         logger.info("house_sim mock REST listening on %s", base_url)
         return server, base_url
 

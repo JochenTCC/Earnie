@@ -218,10 +218,6 @@ def get_live_scenario_refs() -> dict:
         "house_profile_id": str(settings.get("house_profile_id", "") or "").strip(),
     }
 
-def get_runtime_scenario_refs() -> dict:
-    """Alias für get_live_scenario_refs (API-Stabilität)."""
-    return get_live_scenario_refs()
-
 def save_live_scenario_refs(
     *,
     battery_id: str,
@@ -245,23 +241,6 @@ def save_live_scenario_refs(
 def save_live_scenario_id(scenario_id: str) -> None:
     """Setzt live_scenario_id in config.json."""
     config.set_live_scenario_id(scenario_id.strip())
-
-def save_runtime_scenario_refs(
-    *,
-    battery_id: str,
-    pv_system_ids: list[str],
-    import_tariff_id: str,
-    export_tariff_id: str,
-    house_profile_id: str,
-) -> None:
-    """Alias für save_live_scenario_refs (API-Stabilität)."""
-    save_live_scenario_refs(
-        battery_id=battery_id,
-        pv_system_ids=pv_system_ids,
-        import_tariff_id=import_tariff_id,
-        export_tariff_id=export_tariff_id,
-        house_profile_id=house_profile_id,
-    )
 
 def upsert_scenario(scenario: dict) -> None:
     from ui import house_config_io as _io

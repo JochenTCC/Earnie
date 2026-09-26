@@ -173,6 +173,72 @@ def _add_consumer_var_block(
     return block
 
 
+def _add_slot_power_balance_and_soc(
+    prob: pulp.LpProblem,
+    matrix_row: dict[str, Any],
+    battery_params: dict,
+    grid_vars: _GridBatteryVars,
+    consumer_vars: _ConsumerVarBlock,
+    planned_consumers: list,
+    fixed_flex: float,
+    *,
+    t: int,
+    e_init: float,
+    dt_h: float,
+) -> None:
+    """Energiebilanz, Exklusivität und SOC-Rekursion für einen Slot."""
+    max_power = battery_params["max_power_kw"]
+    efficiency = battery_params["efficiency"]
+    p_grid_buy = grid_vars.p_grid_buy
+    p_grid_sell = grid_vars.p_grid_sell
+    p_charge = grid_vars.p_charge
+    p_discharge = grid_vars.p_discharge
+    e_batt = grid_vars.e_batt
+    delta_charge = grid_vars.delta_charge
+    delta_import = grid_vars.delta_import
+    big_m_grid = grid_vars.big_m_grid
+    p_pv = matrix_row["expected_p_pv"]
+    p_con = effective_p_act(matrix_row, battery_params)
+    p_flex = fixed_flex + pulp.lpSum(
+        _flex_power_at_t(
+            consumer,
+            consumer_vars.consumer_on,
+            consumer_vars.consumer_p,
+            consumer_vars.consumer_milp_charge_kw[consumer["id"]],
+            t,
+        )
+        for consumer in planned_consumers
+    )
+    prob += (
+        p_pv + p_grid_buy[t] + p_discharge[t]
+        == p_con + p_flex + p_grid_sell[t] + p_charge[t]
+    )
+    prob += p_grid_buy[t] <= big_m_grid * delta_import[t]
+    prob += p_grid_sell[t] <= big_m_grid * (1 - delta_import[t])
+    prob += p_charge[t] <= max_power * delta_charge[t]
+    prob += p_discharge[t] <= max_power * (1 - delta_charge[t])
+    _add_control_slot_constraints(
+        prob,
+        battery_params,
+        t=t,
+        p_pv=p_pv,
+        p_con=p_con,
+        p_flex=p_flex,
+        p_grid_buy=p_grid_buy[t],
+        p_grid_sell=p_grid_sell[t],
+        p_charge=p_charge[t],
+        p_discharge=p_discharge[t],
+        delta_import=delta_import[t],
+        max_power=max_power,
+        big_m_grid=big_m_grid,
+    )
+    prev_e = e_init if t == 0 else e_batt[t - 1]
+    prob += (
+        e_batt[t]
+        == prev_e + (p_charge[t] * efficiency - p_discharge[t] / efficiency) * dt_h
+    )
+
+
 def _add_power_balance_and_soc_dynamics(
     prob: pulp.LpProblem,
     matrix: list[dict[str, Any]],
@@ -187,69 +253,20 @@ def _add_power_balance_and_soc_dynamics(
     dt_h: float,
 ) -> None:
     """Energiebilanz, Netz-/Batterie-Exklusivität und SOC-Rekursion je Slot."""
-    max_power = battery_params["max_power_kw"]
-    efficiency = battery_params["efficiency"]
     e_init = (current_soc / 100.0) * battery_params["battery_capacity_kwh"]
-    p_grid_buy = grid_vars.p_grid_buy
-    p_grid_sell = grid_vars.p_grid_sell
-    p_charge = grid_vars.p_charge
-    p_discharge = grid_vars.p_discharge
-    e_batt = grid_vars.e_batt
-    delta_charge = grid_vars.delta_charge
-    delta_import = grid_vars.delta_import
-    big_m_grid = grid_vars.big_m_grid
-    consumer_on = consumer_vars.consumer_on
-    consumer_p = consumer_vars.consumer_p
-    consumer_milp_charge_kw = consumer_vars.consumer_milp_charge_kw
     for t in range(horizon):
-        p_pv = matrix[t]["expected_p_pv"]
-        p_con = effective_p_act(matrix[t], battery_params)
-        fixed_flex = float(fixed_flex_by_t.get(t, 0.0))
-        p_flex = fixed_flex + pulp.lpSum(
-            _flex_power_at_t(
-                consumer,
-                consumer_on,
-                consumer_p,
-                consumer_milp_charge_kw[consumer["id"]],
-                t,
-            )
-            for consumer in planned_consumers
-        )
-        prob += (
-            p_pv + p_grid_buy[t] + p_discharge[t]
-            == p_con + p_flex + p_grid_sell[t] + p_charge[t]
-        )
-        prob += p_grid_buy[t] <= big_m_grid * delta_import[t]
-        prob += p_grid_sell[t] <= big_m_grid * (1 - delta_import[t])
-        prob += p_charge[t] <= max_power * delta_charge[t]
-        prob += p_discharge[t] <= max_power * (1 - delta_charge[t])
-        _add_control_slot_constraints(
+        _add_slot_power_balance_and_soc(
             prob,
+            matrix[t],
             battery_params,
+            grid_vars,
+            consumer_vars,
+            planned_consumers,
+            float(fixed_flex_by_t.get(t, 0.0)),
             t=t,
-            p_pv=p_pv,
-            p_con=p_con,
-            p_flex=p_flex,
-            p_grid_buy=p_grid_buy[t],
-            p_grid_sell=p_grid_sell[t],
-            p_charge=p_charge[t],
-            p_discharge=p_discharge[t],
-            delta_import=delta_import[t],
-            max_power=max_power,
-            big_m_grid=big_m_grid,
+            e_init=e_init,
+            dt_h=dt_h,
         )
-        if t == 0:
-            prob += (
-                e_batt[t]
-                == e_init
-                + (p_charge[t] * efficiency - p_discharge[t] / efficiency) * dt_h
-            )
-        else:
-            prob += (
-                e_batt[t]
-                == e_batt[t - 1]
-                + (p_charge[t] * efficiency - p_discharge[t] / efficiency) * dt_h
-            )
 
 
 def _add_control_slot_constraints(

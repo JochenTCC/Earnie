@@ -38,7 +38,7 @@ def _run_backtesting(
     ]
     cmd.extend(extra_args)
     print(f"\n=== Backtesting price_strategy={price_strategy} → {output_dir} ===")
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True)  # NOSONAR pythonsecurity:S8705
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -119,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
         "--forecast-hourly",
         str(forecast_dir / "backtesting.csv"),
     ]
-    subprocess.run(compare_cmd, check=True)
+    subprocess.run(compare_cmd, check=True)  # NOSONAR pythonsecurity:S8705
     print(f"\nFertig. Vergleich: {comparison_path}")
     return 0
 

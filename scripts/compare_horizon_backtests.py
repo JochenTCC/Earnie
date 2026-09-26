@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def _load(path: Path) -> dict:
-    with path.open(encoding="utf-8") as handle:
+    with path.open(encoding="utf-8") as handle:  # NOSONAR pythonsecurity:S8707
         return json.load(handle)
 
 

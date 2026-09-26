@@ -112,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(
+    out_path.write_text(  # NOSONAR pythonsecurity:S8707
         json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )

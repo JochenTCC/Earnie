@@ -75,7 +75,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 - [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox](https://www.proxmox.com/) LXC oder PC (weitere Systeme folgen bei Bedarf)
 - Persistente Laufzeitdaten für Nachvollziehbarkeit und Debug-Dumps
 
-![Earnie Monitor](docs/assets/Live-Monitoring-Chart1-2.png)
+![Earnie Monitor](docs/assets/Monitor-48h-Vorschau.png)
 *Earnie Monitor: Kompletter Optimierungs-Horizont mit Energiefluss, SOC und Verbraucherverhalten.*
 
 ## Typischer Ablauf

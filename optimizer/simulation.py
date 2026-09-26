@@ -514,25 +514,6 @@ def simulate_horizon(
     return chart_rows
 
 
-def simulate_24h_horizon(
-    optimization_matrix: list,
-    initial_soc: float,
-    consumer_daily_targets_kwh: dict[str, float] | None = None,
-    verbose: bool = True,
-    charging_contexts: dict[str, dict] | None = None,
-    matrix_prepared: bool = False,
-) -> list:
-    """Simuliert den 24-Stunden-Verlauf des SoC."""
-    return simulate_horizon(
-        optimization_matrix[:24],
-        initial_soc,
-        consumer_daily_targets_kwh=consumer_daily_targets_kwh,
-        verbose=verbose,
-        charging_contexts=charging_contexts,
-        matrix_prepared=matrix_prepared,
-    )
-
-
 # Re-Exports für API-Stabilität (from optimizer.simulation import ...)
 __all__ = [
     "_apply_forced_grid_recharge_at_horizon_end",
@@ -565,7 +546,6 @@ __all__ = [
     "hourly_cost_euro_from_rows",
     "hourly_savings_euro_from_rows",
     "resolve_sell_price_cent",
-    "simulate_24h_horizon",
     "simulate_baseline_horizon",
     "simulate_baseline_with_optimized_flex",
     "simulate_horizon",

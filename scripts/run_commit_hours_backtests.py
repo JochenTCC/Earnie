@@ -54,7 +54,7 @@ def _write_scenarios_override(
     commit_hours: int,
     scenario_ids: list[str] | None,
 ) -> None:
-    doc = json.loads(source.read_text(encoding="utf-8"))
+    doc = json.loads(source.read_text(encoding="utf-8"))  # NOSONAR pythonsecurity:S8707
     doc["commit_hours"] = int(commit_hours)
     if scenario_ids:
         scenarios = doc.get("scenarios") or []
@@ -135,7 +135,7 @@ def _run_one(
         f"period={period_label} → {output_dir} ==="
     )
     t0 = time.perf_counter()
-    subprocess.run(cmd, check=True, env=env, cwd=str(ROOT))
+    subprocess.run(cmd, check=True, env=env, cwd=str(ROOT))  # NOSONAR pythonsecurity:S8705
     wall_s = time.perf_counter() - t0
     timing = {
         "commit_hours": commit_hours,

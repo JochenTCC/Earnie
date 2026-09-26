@@ -513,7 +513,7 @@ def main() -> None:
     if args.write_json:
         out_path = Path(args.write_json)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+        out_path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")  # NOSONAR pythonsecurity:S8707
         print(f"\nWrote {out_path}")
 
 

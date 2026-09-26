@@ -6,7 +6,10 @@ import pytest
 from scripts.remote_backtesting_support import (
     RemoteBacktestingError,
     _safe_join,
+    _validated_configured_root,
     build_remote_run_command,
+    result_share_dir,
+    share_path,
     validate_remote_config,
 )
 
@@ -57,6 +60,26 @@ def test_safe_join_keeps_relative_child(tmp_path):
     target = _safe_join(tmp_path, "results/backtesting.csv")
     expected = tmp_path / "results" / "backtesting.csv"
     assert target == expected.resolve()
+
+
+def test_validated_share_root_rejects_relative_and_controls(tmp_path):
+    with pytest.raises(RemoteBacktestingError, match="absolut"):
+        _validated_configured_root("relative/share", field="share_root")
+    with pytest.raises(RemoteBacktestingError, match="Steuerzeichen"):
+        _validated_configured_root(f"{tmp_path}\x00evil", field="share_root")
+    root = _validated_configured_root(str(tmp_path), field="share_root")
+    assert root == tmp_path.resolve()
+
+
+def test_result_share_dir_rejects_escape(tmp_path):
+    cfg = _minimal_config()
+    cfg["share_root"] = str(tmp_path)
+    cfg["result_dir"] = "../outside"
+    with pytest.raises(RemoteBacktestingError, match="result_dir"):
+        result_share_dir(cfg)
+    cfg["result_dir"] = "results"
+    assert share_path(cfg) == tmp_path.resolve()
+    assert result_share_dir(cfg) == tmp_path.resolve() / "results"
 
 
 def test_build_remote_run_command_bash():

@@ -24,11 +24,14 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
 - [ ] **False “Zwangs-Entladen nicht ausgeführt”** (`debug_dump_20260923_201155`) — Fix implemented: deviation uses full-entry `closed_by` (not `by_slot` winners); `battery_power_below_tolerance` = Ist ≤ tol only (S6 “nicht ausgeführt”). Tests: `test_deviation_timeline` / `test_deviation_eval`. Dump evening 19:15–19:45 cleared; live Monitor acceptance still pending. Commit/PATCH when ending session.
-- [ ] **SonarCloud leak-period QG** — Named remediations verified on post-fix scans (`ccebfcf` → e.g. Actions [35350702620](https://github.com/JochenTCC/Earnie/actions/runs/35350702620)); gate still **ERROR** (do not archive until QG OK or explicitly accepted as informational):
-  - [x] Verified cleared: `bump_ha_addon.py` python:S3923; secrets:S7636 (`HA_ADDON_REPO_TOKEN` via `env:`); `.devcontainer` docker:S6471 / shell:S8541; `new_reliability_rating` = A
-  - [ ] Still failing QG: `new_security_rating` = C; `new_coverage` ≈ 76.7% (need ≥ 80%)
-  - Accepted (not separate New Bugs): `release-publish.yml` floating action tags `@v4`/`@v5` (`e796a01`; SHA pins blocked tag runs); `ha-addon-publish.yml` stays SHA-pinned; bulk other new-code findings (Actions smells, `pythonsecurity` on CLI scripts, etc.) — triage only when opening a concrete fix item
-  - Optional follow-ups (open New Bug only if planned): raise new-code coverage; reopen Actions hardening beyond the accepted exception; specific high-signal leftovers (`docker/Dockerfile` root / `ui/chart_trace_segments.py` S3923)
+- [ ] **SonarCloud leak-period QG** — Re-check 2026-09-26 on `main` @ `64b151c` (Actions [36225774457](https://github.com/JochenTCC/Earnie/actions/runs/36225774457)): QG **ERROR** — `new_bugs` **1**, `new_vulnerabilities` **19**, `new_reliability_rating` C, `new_security_rating` C, `new_coverage` ≈ **66%** (need ≥ 80%). Local remediations pending push/scan:
+  - [x] Cleared previously: `bump_ha_addon.py` python:S3923; secrets:S7636; `.devcontainer` docker/shell
+  - [x] Fixed locally (await analysis): `ha_units.py` S1244; Actions SHA pins + job permissions (`qemu-image-smoke` / `release-publish`); `report_repo_stats.py` path/URL guards; intentional NOSONAR for mock HTTP + add-on root
+  - [x] Accepted (CLI threat model): `pythonsecurity:S8707` / `S8705` ignored project-wide via `sonar.issue.ignore.multicriteria` in `sonar-project.properties` (also `scripts.sonar_ignore_llm_cli_rules` + `SONAR_TOKEN` to mirror in SonarCloud Analysis Scope); `# NOSONAR` on scripts/tools remains as belt-and-suspenders until next scan confirms
+  - [x] Dockerfile S6470: replace `COPY . .` with explicit package/app copies; tighten `.dockerignore`
+  - [x] `remote_backtesting_support` S2083: validate absolute share roots + relative `result_dir`
+  - [ ] Still failing / accept after scan: `release-publish.yml` `pip install -r requirements.txt` (S8541 / S8544 — `--only-binary=:all:` breaks local package `.`); `new_coverage` informational
+  - Optional follow-ups: raise new-code coverage; `ui/chart_trace_segments.py` S3923 if still open; confirm S8707/S8705 gone after next Sonar analysis
 - [ ] **Monitor Chart 2 daily Kosten KPIs** — Implemented: SA-day annotation columns (full span = two cols; segment = visible day); plan-based **Ersparnis bisher** line in gray zone (`ui/chart_day_costs.py`). Live Monitor acceptance pending.
 
 

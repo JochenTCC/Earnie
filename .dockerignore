@@ -1,7 +1,11 @@
-# Lokale Secrets und Laufzeitdaten nicht ins Image
+# Lokale Secrets und Laufzeitdaten nicht ins Image (defense in depth vs Dockerfile COPY)
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*credentials*
+*secret*
 earnie_env/config/.env
 earnie_env/config/config.json
 config/.env
@@ -27,5 +31,19 @@ Historical-Data/
 __pycache__/
 *.pyc
 .git/
+.github/
 .pytest_cache/
 .cursor/
+.claude/
+tests/
+tools/
+backlog/
+docs/
+Communication/
+*.md
+!README.md
+house_sim/
+packaging/
+se_calc_test/
+chart_debug_review/
+debug-dumps/

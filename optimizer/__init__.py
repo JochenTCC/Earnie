@@ -61,7 +61,6 @@ from .simulation import (
     calculate_step_cost_parts_from_row as _calculate_step_cost_parts_from_row,
     delivered_flex_kwh_from_rows as _delivered_flex_kwh_from_rows,
     flexible_consumer_power_kw as _flexible_consumer_power_kw,
-    simulate_24h_horizon,
     simulate_baseline_horizon,
     simulate_matched_baseline_horizon,
     simulate_horizon,
@@ -117,7 +116,6 @@ __all__ = [
     "serialize_charging_contexts",
     "serialize_filter_contexts",
     "resolve_horizon_consumer_targets_kwh",
-    "simulate_24h_horizon",
     "simulate_baseline_horizon",
     "simulate_matched_baseline_horizon",
     "simulate_horizon",
@@ -297,11 +295,6 @@ def get_generic_flex_continue_on(
     return continue_on_from_state(state, active)
 
 
-def _optimization_interval_hours() -> float:
-    """Dauer eines Live-Optimierungszyklus in Stunden (Viertelstunde)."""
-    return schedule.optimization_interval_hours()
-
-
 def _book_active_consumer_deliveries(
     active: list,
     consumer_powers: dict[str, float],
@@ -388,7 +381,7 @@ def register_consumer_delivery(
     book_planned: bool = True,
 ) -> dict[str, dict]:
     """Bucht gelieferte Energie und liefert Soll-Ist-Kennzahlen je Verbraucher."""
-    interval_h = _optimization_interval_hours()
+    interval_h = schedule.optimization_interval_hours()
     active = _active_consumers(consumers)
     state = _load_consumer_state(charging_contexts, active)
     delivered = dict(state.get("delivered", {}))

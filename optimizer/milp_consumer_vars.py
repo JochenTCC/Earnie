@@ -230,10 +230,6 @@ def _consumer_pv_follow_at(model: MilpHorizonModel, consumer: dict, hour_index: 
     return 1 if value is not None and value > 0.5 else 0
 
 
-def _consumer_pv_follow_now(model: MilpHorizonModel, consumer: dict) -> int:
-    return _consumer_pv_follow_at(model, consumer, 0)
-
-
 def _consumer_pv_follow_at_all(
     model: MilpHorizonModel, hour_index: int
 ) -> dict[str, int]:
@@ -259,10 +255,6 @@ def _consumer_power_at(
     if on_val is not None and on_val > 0.5:
         return float(model.consumer_milp_charge_kw[cid])
     return 0.0
-
-
-def _consumer_power_now(model: MilpHorizonModel, consumer: dict) -> float:
-    return _consumer_power_at(model, consumer, 0)
 
 
 def _consumer_powers_at(

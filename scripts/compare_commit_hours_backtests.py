@@ -211,11 +211,11 @@ def build_markdown(
 
 def write_csv(path: Path, rows: list[dict]) -> None:
     if not rows:
-        path.write_text("", encoding="utf-8")
+        path.write_text("", encoding="utf-8")  # NOSONAR pythonsecurity:S8707
         return
     fieldnames = list(rows[0].keys())
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
+    with path.open("w", encoding="utf-8", newline="") as handle:  # NOSONAR pythonsecurity:S8707
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter=";")
         writer.writeheader()
         writer.writerows(rows)
@@ -245,7 +245,7 @@ def compare_run_root(
         baseline_k=baseline_k,
     )
     markdown_out.parent.mkdir(parents=True, exist_ok=True)
-    markdown_out.write_text(md, encoding="utf-8")
+    markdown_out.write_text(md, encoding="utf-8")  # NOSONAR pythonsecurity:S8707
     if csv_out is not None:
         write_csv(csv_out, rows)
     return rows

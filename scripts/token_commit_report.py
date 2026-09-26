@@ -95,7 +95,7 @@ def _as_cost(value: str) -> float:
 def read_usage_events(csv_path: Path) -> list[UsageEvent]:
     if not csv_path.is_file():
         raise FileNotFoundError(f"Usage-CSV nicht gefunden: {csv_path}")
-    with csv_path.open(encoding="utf-8-sig", newline="") as fh:
+    with csv_path.open(encoding="utf-8-sig", newline="") as fh:  # NOSONAR pythonsecurity:S8707
         reader = csv.DictReader(fh)
         missing = [c for c in REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
         if missing:

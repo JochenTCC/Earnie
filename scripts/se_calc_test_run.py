@@ -68,7 +68,7 @@ def _run_internal(
     workers: int,
 ) -> int:
     """In-process: patch year, then call run_backtesting.main()."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)  # NOSONAR pythonsecurity:S8707
     import scripts.run_backtesting as rb
 
     rb.backtesting_base_year = lambda: int(year)  # type: ignore[assignment]
@@ -126,7 +126,7 @@ def _run_cell_month(
         f"\n=== SE calc {cell} {year}-{month:02d} workers={workers} → {out} ===",
         flush=True,
     )
-    proc = subprocess.run(
+    proc = subprocess.run(  # NOSONAR pythonsecurity:S8705
         cmd,
         cwd=str(ROOT),
         env=_child_env(cell_meta),

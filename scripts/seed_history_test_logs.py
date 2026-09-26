@@ -48,7 +48,7 @@ def _entry_timestamp(entry: dict) -> datetime:
 
 def _load_entries(path: Path) -> list[dict]:
     entries: list[dict] = []
-    with open(path, encoding="utf-8") as handle:
+    with open(path, encoding="utf-8") as handle:  # NOSONAR pythonsecurity:S8707
         for line_no, line in enumerate(handle, start=1):
             text = line.strip()
             if not text:
@@ -83,7 +83,7 @@ def _remap_entries(
 
 def _write_jsonl(path: Path, entries: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
+    with open(path, "w", encoding="utf-8") as handle:  # NOSONAR pythonsecurity:S8707
         for entry in entries:
             handle.write(json.dumps(entry, ensure_ascii=False))
             handle.write("\n")

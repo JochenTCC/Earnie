@@ -12,6 +12,7 @@ EHAL base units: power W, energy kWh, percent %, current A.
 """
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 # Quantity → {normalized unit → factor to the EHAL base unit}.
@@ -166,6 +167,6 @@ def describe_conversion(field: str, unit: object) -> str:
         factor = unit_factor(field, unit)
     except UnitMismatchError:
         return ""
-    if factor == 1.0:
+    if math.isclose(factor, 1.0, rel_tol=0.0, abs_tol=1e-12):
         return ""
     return f"{unit} → {QUANTITY_BASE_UNIT[quantity]} (×{factor:g})"

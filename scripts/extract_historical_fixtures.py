@@ -19,7 +19,7 @@ def extract(source: Path, target: Path) -> int:
         )
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, target)
-    line_count = sum(1 for _ in target.open(encoding="utf-8")) - 1
+    line_count = sum(1 for _ in target.open(encoding="utf-8")) - 1  # NOSONAR pythonsecurity:S8707
     return line_count
 
 

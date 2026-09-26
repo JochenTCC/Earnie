@@ -298,9 +298,9 @@ def _default_existing_profile_id(profile_ids: list[str]) -> str:
     """Prefer Live-Szenario id, then greenfield ``live``, then first profile."""
     if not profile_ids:
         return ""
-    from ui.house_config_io import get_runtime_scenario_refs
+    from ui.house_config_io import get_live_scenario_refs
 
-    profile_id = str(get_runtime_scenario_refs().get("house_profile_id", "") or "").strip()
+    profile_id = str(get_live_scenario_refs().get("house_profile_id", "") or "").strip()
     if profile_id in profile_ids:
         return profile_id
     if "live" in profile_ids:

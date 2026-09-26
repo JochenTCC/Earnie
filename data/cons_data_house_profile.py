@@ -80,9 +80,9 @@ def hourly_total_kw_for_timestamps(
 
 def resolve_runtime_house_profile() -> dict | None:
     """Aktives Hausprofil aus runtime_settings.house_profile_id."""
-    from ui.house_config_io import get_runtime_scenario_refs, load_house_profiles
+    from ui.house_config_io import get_live_scenario_refs, load_house_profiles
 
-    profile_id = str(get_runtime_scenario_refs().get("house_profile_id", "") or "").strip()
+    profile_id = str(get_live_scenario_refs().get("house_profile_id", "") or "").strip()
     if not profile_id:
         return None
     profiles = load_house_profiles().get("profiles", {})

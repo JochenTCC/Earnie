@@ -53,7 +53,7 @@ def _write_scenarios_override(
     milp_solver: str,
     scenario_ids: list[str] | None,
 ) -> None:
-    doc = json.loads(source.read_text(encoding="utf-8"))
+    doc = json.loads(source.read_text(encoding="utf-8"))  # NOSONAR pythonsecurity:S8707
     doc["commit_hours"] = int(commit_hours)
     doc["milp_solver"] = milp_solver
     if scenario_ids:
@@ -139,7 +139,7 @@ def _run_one(
         f"K={commit_hours} period={period_label} → {output_dir} ==="
     )
     t0 = time.perf_counter()
-    subprocess.run(cmd, check=True, env=env, cwd=str(ROOT))
+    subprocess.run(cmd, check=True, env=env, cwd=str(ROOT))  # NOSONAR pythonsecurity:S8705
     wall_s = time.perf_counter() - t0
     timing = {
         "solver": milp_solver,

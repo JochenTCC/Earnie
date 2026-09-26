@@ -16,22 +16,34 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.3`**.
+**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.4`**.
 
-**Next:** Version **2.6** feature letters done (through **2.6.n**). Next: community/official publish as needed, then **2.7**.
+**Next:** Version **2.6** feature letters done (through **2.6.n**). Next: **2.6.r re-check** (open below) → community/official publish as needed, then **2.7**.
+
+#### 2.6.r re-check — final pre-official quality gate (2026-09-26)
+
+Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (`2.6.r re-check`).
+
+- [ ] **2.6.r re-check** on `main` @ `64b151c` (+ local remediations; no `version.py` bump)
+  - [ ] SonarCloud snapshot — pre-fix QG **ERROR** (`new_reliability_rating` C, `new_security_rating` C, `new_coverage` 66%); remediations applied locally (await push + analysis):
+    - Fixed: `python:S1244` float eq in `integrations/ha_units.py` (new bug)
+    - Fixed: SHA-pin Actions in `release-publish.yml` + `qemu-image-smoke.yml`; job-level permissions (S8233)
+    - Fixed: path/URL hardening in `scripts/report_repo_stats.py` (S8707 / S8703)
+    - Ignore (agentic LLM CLI noise): `pythonsecurity:S8707` + `S8705` via `sonar.issue.ignore.multicriteria` in `sonar-project.properties` (+ optional `python -m scripts.sonar_ignore_llm_cli_rules` with `SONAR_TOKEN` to mirror in SonarCloud UI/API)
+    - Fixed: `docker/Dockerfile` explicit COPY (S6470) + tighter `.dockerignore`; `remote_backtesting_support` share-root validation (S2083)
+    - Marked intentional: mock REST HTTP (`house_sim/mock_rest.py`), HA add-on root (`docker:S6471` NOSONAR)
+    - Still open / accept: `pip install -r requirements.txt` S8541/S8544 (local `.` package cannot use `--only-binary=:all:`); library sinks if ignore does not apply until next scan; Sonar `new_coverage` 66% (informational — do not chase as in-gate)
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
 **Documents:**
 
 - [House simulator spec](../docs/spec/house-sim.md) — HouseSim S1–S4 (archetypes, core, S4 integration)
-- [HA compatibility tests (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — HouseSim S3 / **2.6.n** (done)
-- [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — confirm-before-save; LLM stays out of 2.6 (**2.6.e** done)
 - [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**
-- [Installation hardening (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md) — findings H0–H13, sprint plan, version channels — Sprint 1–4 = **2.6.j** / **2.6.k** / **2.6.l** / **2.6.m** (all done — see [Backlog-Erledigt.md](Backlog-Erledigt.md))
 - [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — add-on packaging items; channel work is now **2.6.k**
-- [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood / HA coupling context
-- [HA-Loxone-Bridge-Builder draft](HA-Loxone-Bridge-Builder-Draft.md) — research item, not 2.6
+
+- [ ] Manual Todo: Review updated docs (at least German ones)
+- [ ] Update documents in Earnie-Projekt repo with current achievements / already implemented features
 
 ### Version 2.7 — Multiple storages and export power limitation
 

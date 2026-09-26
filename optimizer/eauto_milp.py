@@ -12,6 +12,7 @@ from optimizer.charging_context import (
     schedule_indices_for_consumer,
 )
 from optimizer.consumer_power import power_limits_kw, uses_power_setpoint
+from optimizer.charging_schedule import charging_schedule_enabled
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 
 EAUTO_MILP_PARAM_KEYS = (
@@ -63,10 +64,7 @@ def validate_eauto_milp_params(raw: dict) -> dict[str, float]:
 
 def is_ev_milp_consumer(consumer: dict) -> bool:
     """EV mit power_setpoint und aktivem charging_schedule."""
-    if not uses_power_setpoint(consumer):
-        return False
-    sched = consumer.get("charging_schedule")
-    return bool(sched and sched.get("enabled"))
+    return uses_power_setpoint(consumer) and charging_schedule_enabled(consumer)
 
 
 def milp_params_from_consumer(consumer: dict) -> dict[str, float] | None:

@@ -545,21 +545,17 @@ def _persist_ha_ess_force(house: dict, force: dict[str, Any] | None) -> dict:
     return out
 
 
-def render_ehal_ha_mapping_section() -> None:
-    """Entity-picker HITL; persists Pattern B bindings; HA secrets in .env."""
-    _render_ha_mapping_intro()
-
-    config_doc, house = _ensure_ha_migrated()
-    current = _ha_credentials(config_doc)
-    base_url, token, adapter_id = _render_credentials_form(current)
-
-    profile_id = resolve_live_profile_id(house)
-    if not profile_id:
-        st.warning(
-            "Kein Hausprofil im Live-Szenario — bitte zuerst im Szenarienkonfigurator setzen."
-        )
-        return
-
+def _render_entity_mapping_body(
+    *,
+    house: dict[str, Any],
+    config_doc: dict[str, Any],
+    current: dict[str, Any],
+    profile_id: str,
+    base_url: str,
+    token: str,
+    adapter_id: str,
+) -> None:
+    """Entity picker, field selects, plant extras, and save/test actions."""
     entities = build_entity_rows(house, profile_id)
     scan_rows = _render_scan_section(base_url, token)
     entity = _render_entity_picker(entities)
@@ -594,7 +590,6 @@ def render_ehal_ha_mapping_section() -> None:
         sign = _render_sign_selects(current["sign"])
 
     test_clicked, save_clicked = _render_mapping_action_buttons()
-
     if test_clicked:
         _run_telemetry_smoke_test(
             house,
@@ -603,7 +598,6 @@ def render_ehal_ha_mapping_section() -> None:
             ehal_map=ehal_map,
             credentials=(base_url, token),
         )
-
     if save_clicked:
         house_to_save = (
             _persist_ha_ess_force(house, ha_ess_force)
@@ -622,3 +616,29 @@ def render_ehal_ha_mapping_section() -> None:
             sign=sign,
             scan_rows=scan_rows,
         )
+
+
+def render_ehal_ha_mapping_section() -> None:
+    """Entity-picker HITL; persists Pattern B bindings; HA secrets in .env."""
+    _render_ha_mapping_intro()
+
+    config_doc, house = _ensure_ha_migrated()
+    current = _ha_credentials(config_doc)
+    base_url, token, adapter_id = _render_credentials_form(current)
+
+    profile_id = resolve_live_profile_id(house)
+    if not profile_id:
+        st.warning(
+            "Kein Hausprofil im Live-Szenario — bitte zuerst im Szenarienkonfigurator setzen."
+        )
+        return
+
+    _render_entity_mapping_body(
+        house=house,
+        config_doc=config_doc,
+        current=current,
+        profile_id=profile_id,
+        base_url=base_url,
+        token=token,
+        adapter_id=adapter_id,
+    )

@@ -20,15 +20,40 @@ import sys
 import urllib.request
 from datetime import date, timedelta
 from io import StringIO
+from pathlib import Path
+from urllib.parse import urlparse
 
 DEFAULT_URL = "https://raw.githubusercontent.com/JochenTCC/repo-stats-public/main/stats/summary.json"
 
 
+def _safe_local_path(raw: str) -> Path:
+    """Resolve a CLI path and reject escapes outside the current working tree."""
+    path = Path(raw).expanduser().resolve(strict=False)
+    cwd = Path.cwd().resolve(strict=False)
+    try:
+        path.relative_to(cwd)
+    except ValueError as exc:
+        raise SystemExit(
+            f"Refusing path outside working directory: {raw!r} (resolved {path})"
+        ) from exc
+    return path
+
+
+def _safe_https_url(raw: str) -> str:
+    parsed = urlparse(raw)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise SystemExit(f"Only https:// URLs are allowed, got: {raw!r}")
+    return raw
+
+
 def load_summary(url: str | None, input_path: str | None) -> dict:
     if input_path:
-        with open(input_path, encoding="utf-8") as f:
+        path = _safe_local_path(input_path)
+        with path.open(encoding="utf-8") as f:
             return json.load(f)
-    with urllib.request.urlopen(url, timeout=15) as resp:
+    assert url is not None
+    safe_url = _safe_https_url(url)
+    with urllib.request.urlopen(safe_url, timeout=15) as resp:  # noqa: S310
         return json.load(resp)
 
 
@@ -118,9 +143,10 @@ def main() -> int:
     csv_text = render_csv(summary)
 
     if args.output:
-        with open(args.output, "w", encoding="utf-8", newline="") as f:
+        out_path = _safe_local_path(args.output)
+        with out_path.open("w", encoding="utf-8", newline="") as f:
             f.write(csv_text)
-        print(f"Report geschrieben: {args.output}", file=sys.stderr)
+        print(f"Report geschrieben: {out_path}", file=sys.stderr)
     else:
         sys.stdout.write(csv_text)
 

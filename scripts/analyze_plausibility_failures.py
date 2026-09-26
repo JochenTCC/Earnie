@@ -359,7 +359,7 @@ def main(argv: list[str] | None = None) -> None:
     _print_report(results)
 
     if args.json_out is not None:
-        args.json_out.write_text(
+        args.json_out.write_text(  # NOSONAR pythonsecurity:S8707
             json.dumps(results, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )

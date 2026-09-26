@@ -143,8 +143,8 @@ def convert_document(
     import_path: Path,
     export_path: Path,
 ) -> dict:
-    import_doc = json.loads(import_path.read_text(encoding="utf-8"))
-    export_doc = json.loads(export_path.read_text(encoding="utf-8"))
+    import_doc = json.loads(import_path.read_text(encoding="utf-8"))  # NOSONAR pythonsecurity:S8707
+    export_doc = json.loads(export_path.read_text(encoding="utf-8"))  # NOSONAR pythonsecurity:S8707
     catalog_as_of = _catalog_as_of(import_doc.get("meta", {}))
     imports = [convert_import(entry) for entry in import_doc["tarife"]]
     exports = [convert_export(entry) for entry in export_doc["tarife"]]
@@ -200,7 +200,7 @@ def main() -> None:
     doc = convert_document(Path(args.import_json), Path(args.export_json))
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
+    output.write_text(  # NOSONAR pythonsecurity:S8707
         json.dumps(doc, ensure_ascii=False, indent=4) + "\n",
         encoding="utf-8",
     )

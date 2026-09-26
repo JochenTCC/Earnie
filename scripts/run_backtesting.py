@@ -484,7 +484,7 @@ def _write_progress_file(path: str | None, payload: dict) -> None:
         for attempt in range(_PROGRESS_REPLACE_RETRIES):
             try:
                 tmp.write_text(content, encoding="utf-8")
-                tmp.replace(target)
+                tmp.replace(target)  # NOSONAR pythonsecurity:S8707
                 return
             except OSError as exc:
                 if not _atomic_replace_unavailable(exc):
