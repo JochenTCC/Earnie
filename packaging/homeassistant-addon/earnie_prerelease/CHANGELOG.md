@@ -2,6 +2,11 @@
 
 Same image family as `earnie/`. Pre-releases and official releases both bump this tree (`version:` = newest including alpha/rc on pre-release tags; matches stable on official tags).
 
+## 2.6.0-alpha.6
+
+- Pins Earnie `2.6.0-alpha.6` (`ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.6`).
+- Earnie release: [2.6.0-alpha.6](https://github.com/JochenTCC/Earnie/releases/tag/v2.6.0-alpha.6)
+
 ## 2.6.0-alpha.5
 
 - Community **pre-release** of the **2.6** line (supersedes incomplete `2.6.0-alpha.4`). Same **2.6.r re-check** remediations plus HA add-on Dockerfile fix. Pin this tag — **no** `:latest`.

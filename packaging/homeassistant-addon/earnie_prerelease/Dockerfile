@@ -2,7 +2,7 @@
 # (Architektur-Entscheidung "Image-Wrapper" statt Git-Clone-Build, siehe
 # Entwicklungsplan-Doku). Die App selbst (Dockerfile/Entrypoint) bleibt die
 # einzige Quelle der Wahrheit in docker/Dockerfile im Hauptrepo.
-ARG EARNIE_VERSION=2.6.0-alpha.5
+ARG EARNIE_VERSION=2.6.0-alpha.6
 # NOSONAR docker:S6471 — HA Supervisor add-ons run as root by design (nginx + /data bind mounts).
 FROM ghcr.io/jochentcc/earnie-energy:${EARNIE_VERSION}
 

@@ -2,7 +2,7 @@
 # Same prebuilt image family as earnie/; only version:/name/slug differ.
 # Entwicklungsquelle im Hauptrepo; Sync nach ha-addon-earnie bei Releases.
 name: "Earnie (Vorabversion)"
-version: "2.6.0-alpha.5"
+version: "2.6.0-alpha.6"
 slug: earnie_prerelease
 description: "Vorabversion von Earnie (Alpha/RC). Nicht für den Dauerbetrieb. Nach dem Start ca. 20–40 s warten, bis die Web-UI (Ingress) bereit ist. Nie parallel zum stabilen Earnie-Add-on starten."
 url: https://github.com/JochenTCC/Earnie
