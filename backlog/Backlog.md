@@ -47,19 +47,12 @@ Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.a** → **2.7.b** → **2.7.c** → **2.7.d** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6.
+**Order:** **2.7.a** (code done → [Erledigt](Backlog-Erledigt.md)) → **2.7.b** → **2.7.c** → **2.7.d** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6.
 
-- [ ] **2.7.a — Export power limitation** (Live / MILP / EHAL; HK static cap)
-  - In addition to battery working mode, limit power exported to the grid.
-  - See how this is done in HA / evcc and OpenEMS as “best practice”.
-  - **Hard ceilings (kW):** effective export cap = `min` of all active sources (missing source = no cap from that source):
-    1. **Internal (HK):** user parameter — max export power allowed (constant)
-    2. **External (grid → Earnie):** new EHAL **inbound** field (`sens_*` / `get_*`, not `set_*`) — variable grid-side limit
-    3. MILP must respect the effective cap as a constraint
-  - **Soft / economic (not a kW cap):** when dynamic export tariffs are positive (user pays to export), MILP objective should prefer avoiding export — separate from the hard ceiling above.
-  - Optional outbound EHAL `set_*` only if Earnie must command an inverter/feed-in limit southbound; otherwise Live enforces via ESS/mode + MILP only.
-  - Add VI to Loxone VI template; HA binding templates if appropriate; mapping in Loxone productive config (Jochen).
-  - **Follow-up (not this letter):** SE / grid-situation export restriction sim → **2.+1** item (consumes **2.7.a** model).
+- [ ] **2.7.a dogfood — Loxone productive + live test** (after code on `feature/2.7`)
+  - Wire export-limit Merker / VI–VO in the productive Loxone config (`set_grid_export_power_limit`, optional inbound `get_grid_export_power_limit`, Einspeisesperre / mode **3** as needed)
+  - Bind in EHAL-Com; set a HK `plant.max_export_power_kw` and verify Live writes + MILP respect the cap
+  - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (`−1` / unconstrained)
 
 - [ ] **2.7.b — Thermals P2** — Coupled single-node models
   - House ↔ heat storage ↔ solar system

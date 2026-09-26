@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.a — Export power limitation (2026-09-26)
+
+- [x] **2.7.a — Export power limitation** (Live / MILP / EHAL; HK static cap) — code on `feature/2.7` (`46918e8`)
+  - Hard ceilings (kW): effective export cap = `min` of active sources (HK `plant.max_export_power_kw`, inbound EHAL `get_grid_export_power_limit`, pay-to-export → 0); MILP `p_grid_sell` constraint
+  - Soft / economic: positive export tariffs prefer avoiding export (objective), separate from hard ceiling
+  - Outbound `set_grid_export_power_limit` + ESS mode Einspeisesperre (**3**); Loxone VI/VO templates + greenfield/recipe maps; HA/OpenEMS adapters
+  - Helpers: `optimizer/export_power_limit.py`, `optimizer/live_export_limit.py`; HK UI `ui/house_config_plant.py`; tests `test_export_power_limit` / `test_live_export_limit` / `test_milp_export_cap`
+  - **Still open:** productive Loxone wiring + live dogfood → [Backlog.md](Backlog.md) **2.7.a dogfood**
+
 ### 2.6.0-alpha.4 pre-release (2026-09-26)
 
 - [x] Publish community pre-release **2.6.0-alpha.4** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.4`) — **2.6.r re-check** remediations (Sonar/Actions/Dockerfile harden, dead-code simplify, KPI splits) + README monitor hero image
