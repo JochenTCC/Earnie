@@ -2,9 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-### 2.6.0-alpha.4 pre-release (2026-09-26)
+### 2.6.0-alpha.5 pre-release (2026-09-26)
 
-- [x] Publish community pre-release **2.6.0-alpha.4** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.4`) — **2.6.r re-check** remediations (Sonar/Actions/Dockerfile harden, dead-code simplify, KPI splits) + README monitor hero image
+- [x] Publish community pre-release **2.6.0-alpha.5** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.5`) — same payload as failed **alpha.4** plus HA add-on Dockerfile fix (NOSONAR off `FROM` line; BuildKit parse error)
+
+### 2.6.0-alpha.4 pre-release attempt (2026-09-26)
+
+- [x] Tag `v2.6.0-alpha.4` pushed; main GHCR image built; **GitHub Release aborted** — HA add-on H6 step failed on inline `# NOSONAR` after `FROM` (fixed in `d2b8c71`, superseded by **alpha.5**)
 
 ### 2.6.r re-check — quality gate progress (2026-09-26)
 
