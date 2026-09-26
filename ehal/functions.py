@@ -87,10 +87,17 @@ def function_statuses(
     mapped: Mapping[str, object] | Iterable[str],
     *,
     fields: Iterable[str] | None = None,
+    vendor_ess_active: bool = False,
 ) -> list[FunctionStatus]:
     """Status of every function; ``fields`` restricts to functions whose required
-    fields all belong to one mapping entity (e.g. plant vs. EV consumer)."""
+    fields all belong to one mapping entity (e.g. plant vs. EV consumer).
+
+    ``vendor_ess_active``: treat ``set_ess_active_power`` as mapped when a HA
+    vendor force driver (e.g. huawei_solar) is configured.
+    """
     present = _mapped_fields(mapped)
+    if vendor_ess_active:
+        present.add("set_ess_active_power")
     scope = set(fields) if fields is not None else None
     out: list[FunctionStatus] = []
     for function in EHAL_FUNCTIONS:
@@ -116,6 +123,8 @@ def _not_started(function: EhalFunction, present: set[str]) -> bool:
 
 def incomplete_function_fields(
     mapped: Mapping[str, object] | Iterable[str],
+    *,
+    vendor_ess_active: bool = False,
 ) -> set[str]:
     """Required fields of functions that are only partly mapped.
 
@@ -124,14 +133,22 @@ def incomplete_function_fields(
     half-finished function.
     """
     fields: set[str] = set()
-    for status in function_statuses(mapped):
+    for status in function_statuses(mapped, vendor_ess_active=vendor_ess_active):
         if status.state == "incomplete":
             fields.update(status.function.required)
     return fields
 
 
-def available_functions(mapped: Mapping[str, object] | Iterable[str]) -> set[str]:
-    return {s.function.id for s in function_statuses(mapped) if s.state == "available"}
+def available_functions(
+    mapped: Mapping[str, object] | Iterable[str],
+    *,
+    vendor_ess_active: bool = False,
+) -> set[str]:
+    return {
+        s.function.id
+        for s in function_statuses(mapped, vendor_ess_active=vendor_ess_active)
+        if s.state == "available"
+    }
 
 
 def incomplete_function_messages(
@@ -139,11 +156,14 @@ def incomplete_function_messages(
     *,
     fields: Iterable[str] | None = None,
     labels: Mapping[str, str] | None = None,
+    vendor_ess_active: bool = False,
 ) -> list[str]:
     """German warnings for partly mapped functions (UI / log)."""
     names = labels or {}
     messages: list[str] = []
-    for status in function_statuses(mapped, fields=fields):
+    for status in function_statuses(
+        mapped, fields=fields, vendor_ess_active=vendor_ess_active
+    ):
         if status.state != "incomplete":
             continue
         missing = ", ".join(names.get(f, f) for f in status.missing)

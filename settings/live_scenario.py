@@ -300,6 +300,8 @@ def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
         "max_power_kw": get_attr("BATTERY_MAX_POWER_KW", cast=float),
         "efficiency": get_attr("BATTERY_EFFICIENCY", cast=float),
         "standby_power_kw": get_attr("BATTERY_STANDBY_POWER_KW", default=0.0, cast=float),
+        "control": str(get_attr("BATTERY_CONTROL", default="full") or "full").strip().lower()
+        or "full",
     }
 
 

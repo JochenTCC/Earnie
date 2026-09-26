@@ -63,6 +63,8 @@ def test_build_command_assembles_docker_args(tmp_path):
     assert cmd[0:2] == ["docker", "build"]
     assert "--platform" in cmd and "linux/amd64" in cmd
     assert "-t" in cmd and "ghcr.io/example/earnie:test" in cmd
+    assert "--build-arg" in cmd
+    assert any(a.startswith("BUILD_DATE=") for a in cmd)
     assert "--no-cache" in cmd
     assert str(tmp_path) in cmd
 
@@ -82,6 +84,8 @@ def test_build_command_multiarch_uses_buildx_and_push(tmp_path):
 
     assert cmd[0:3] == ["docker", "buildx", "build"]
     assert "--platform" in cmd and bc.MULTIARCH_PLATFORM in cmd
+    assert "--build-arg" in cmd
+    assert any(a.startswith("BUILD_DATE=") for a in cmd)
     assert "--push" in cmd
     assert cmd[1] == "buildx"
 

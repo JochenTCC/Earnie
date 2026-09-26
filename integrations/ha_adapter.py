@@ -81,6 +81,7 @@ class HaConfig:
     entities: dict[str, str] = field(default_factory=dict)
     sign: dict[str, str] = field(default_factory=dict)
     timeout_sec: float = 10.0
+    ha_ess_force: dict[str, Any] | None = None
 
 
 class HaHttpError(RuntimeError):
@@ -133,8 +134,12 @@ class HaAdapter:
     """REST-only Home Assistant ↔ EHAL adapter (no HA libraries)."""
 
     def __init__(self, cfg: HaConfig) -> None:
+        from house_config.ha_ess_force import ha_ess_force_enables_ess_active, normalize_ha_ess_force
+
         entities = canonicalize_ha_entity_keys(dict(cfg.entities))
         sign = canonicalize_ha_entity_keys(dict(cfg.sign))
+        force = normalize_ha_ess_force(cfg.ha_ess_force) if cfg.ha_ess_force else None
+        vendor_ess_active = ha_ess_force_enables_ess_active(force)
         self.cfg = HaConfig(
             base_url=cfg.base_url,
             token=cfg.token,
@@ -142,15 +147,21 @@ class HaAdapter:
             entities=entities,
             sign=sign,
             timeout_sec=cfg.timeout_sec,
+            ha_ess_force=force,
         )
         # A function is only usable when all its fields are mapped (ehal.functions).
-        functions = available_functions(entities)
+        functions = available_functions(entities, vendor_ess_active=vendor_ess_active)
         self._supports_ess_write = "ess_limits" in functions
         self._supports_ess_active = "ess_active" in functions
         self._supports_evcs_current = "evcs_current" in functions
-        for message in incomplete_function_messages(entities):
+        self._vendor_ess_active = vendor_ess_active
+        for message in incomplete_function_messages(
+            entities, vendor_ess_active=vendor_ess_active
+        ):
             logger.warning("HA mapping adapter_id=%s: %s", cfg.adapter_id, message)
-        self._incomplete_fields = incomplete_function_fields(entities)
+        self._incomplete_fields = incomplete_function_fields(
+            entities, vendor_ess_active=vendor_ess_active
+        )
         self._last_write_error: EhalWriteError | None = None
         self._last_skipped: list[str] = []
         self._warned_skips: set[str] = set()
@@ -300,6 +311,21 @@ class HaAdapter:
         outcome: _HaWriteOutcome,
     ) -> None:
         """ESS-Leistung/Grenzen sowie den Modus schreiben (Modus flippt kein Capability)."""
+        if "set_ess_active_power" in doc and self._vendor_ess_active:
+            ok, status, msg = self._write_huawei_force(float(doc["set_ess_active_power"]))
+            if not ok:
+                outcome.failed.append("set_ess_active_power")
+                outcome.messages.append(msg)
+                outcome.hub_status = status or outcome.hub_status
+                outcome.flip_ess = True
+        elif "set_ess_active_power" not in doc and self._vendor_ess_active:
+            ok, status, msg = self._stop_huawei_force()
+            if not ok:
+                outcome.failed.append("set_ess_active_power")
+                outcome.messages.append(msg)
+                outcome.hub_status = status or outcome.hub_status
+                outcome.flip_ess = True
+
         for field_name in (
             "set_ess_active_power",
             "set_ess_charge_power_limit",
@@ -307,6 +333,8 @@ class HaAdapter:
         ):
             if field_name not in doc:
                 continue
+            if field_name == "set_ess_active_power" and self._vendor_ess_active:
+                continue  # already handled via huawei_solar services
             supported = (
                 self._supports_ess_active
                 if field_name == "set_ess_active_power"
@@ -333,6 +361,63 @@ class HaAdapter:
                 outcome.messages.append(msg)
                 outcome.hub_status = status or outcome.hub_status
 
+    def _huawei_force_payload(self, power_w: float) -> dict[str, Any]:
+        force = self.cfg.ha_ess_force or {}
+        duration = int(force.get("duration_min") or 20)
+        return {
+            "device_id": str(force.get("device_id") or ""),
+            "power": int(round(abs(float(power_w)))),
+            "duration": duration,
+        }
+
+    def _write_huawei_force(
+        self, active_power_w: float
+    ) -> tuple[bool, str | None, str]:
+        """Call huawei_solar.forcible_charge or forcible_discharge."""
+        force = self.cfg.ha_ess_force or {}
+        if str(force.get("driver") or "").strip().lower() != "huawei_solar":
+            return False, None, "Unsupported ha_ess_force.driver"
+        payload = self._huawei_force_payload(active_power_w)
+        if not payload["device_id"]:
+            return False, None, "Missing ha_ess_force.device_id"
+        service = (
+            "forcible_discharge" if active_power_w > 0 else "forcible_charge"
+        )
+        try:
+            self.call_service("huawei_solar", service, payload)
+            return True, None, ""
+        except HaHttpError as exc:
+            logger.warning(
+                "HA huawei_solar.%s failed adapter_id=%s: %s",
+                service,
+                self.cfg.adapter_id,
+                exc,
+            )
+            status = str(exc.status_code) if exc.status_code is not None else None
+            return False, status, str(exc)
+
+    def _stop_huawei_force(self) -> tuple[bool, str | None, str]:
+        force = self.cfg.ha_ess_force or {}
+        if str(force.get("driver") or "").strip().lower() != "huawei_solar":
+            return True, None, ""
+        device_id = str(force.get("device_id") or "").strip()
+        if not device_id:
+            return False, None, "Missing ha_ess_force.device_id"
+        try:
+            self.call_service(
+                "huawei_solar",
+                "stop_forcible_charge",
+                {"device_id": device_id},
+            )
+            return True, None, ""
+        except HaHttpError as exc:
+            logger.warning(
+                "HA huawei_solar.stop_forcible_charge failed adapter_id=%s: %s",
+                self.cfg.adapter_id,
+                exc,
+            )
+            status = str(exc.status_code) if exc.status_code is not None else None
+            return False, status, str(exc)
     def _write_evcs_setpoints(
         self,
         doc: dict[str, Any],

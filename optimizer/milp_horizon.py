@@ -223,6 +223,21 @@ def _add_power_balance_and_soc_dynamics(
         prob += p_grid_sell[t] <= big_m_grid * (1 - delta_import[t])
         prob += p_charge[t] <= max_power * delta_charge[t]
         prob += p_discharge[t] <= max_power * (1 - delta_charge[t])
+        _add_control_slot_constraints(
+            prob,
+            battery_params,
+            t=t,
+            p_pv=p_pv,
+            p_con=p_con,
+            p_flex=p_flex,
+            p_grid_buy=p_grid_buy[t],
+            p_grid_sell=p_grid_sell[t],
+            p_charge=p_charge[t],
+            p_discharge=p_discharge[t],
+            delta_import=delta_import[t],
+            max_power=max_power,
+            big_m_grid=big_m_grid,
+        )
         if t == 0:
             prob += (
                 e_batt[t]
@@ -235,6 +250,78 @@ def _add_power_balance_and_soc_dynamics(
                 == e_batt[t - 1]
                 + (p_charge[t] * efficiency - p_discharge[t] / efficiency) * dt_h
             )
+
+
+def _add_control_slot_constraints(
+    prob: pulp.LpProblem,
+    battery_params: dict,
+    *,
+    t: int,
+    p_pv: float,
+    p_con: float,
+    p_flex,
+    p_grid_buy,
+    p_grid_sell,
+    p_charge,
+    p_discharge,
+    delta_import,
+    max_power: float,
+    big_m_grid: float,
+) -> None:
+    """Apply limits_only / read_only envelope (full = no extra constraints)."""
+    from house_config.battery_control import (
+        BATTERY_CONTROL_LIMITS_ONLY,
+        BATTERY_CONTROL_READ_ONLY,
+        control_from_battery_params,
+    )
+
+    control = control_from_battery_params(battery_params)
+    if control not in (BATTERY_CONTROL_LIMITS_ONLY, BATTERY_CONTROL_READ_ONLY):
+        return
+    # No grid charge / no battery export
+    prob += p_charge <= max_power * (1 - delta_import)
+    prob += p_discharge <= max_power * delta_import
+    # Charge from PV only; discharge covers house load only
+    prob += p_charge <= float(p_pv)
+    prob += p_discharge <= p_con + p_flex
+    if control == BATTERY_CONTROL_READ_ONLY:
+        _add_self_consumption_coupling(
+            prob,
+            t=t,
+            p_pv=float(p_pv),
+            p_con=float(p_con),
+            p_flex=p_flex,
+            p_grid_buy=p_grid_buy,
+            p_grid_sell=p_grid_sell,
+            p_charge=p_charge,
+            p_discharge=p_discharge,
+            big_m=max(big_m_grid, max_power, 1.0),
+        )
+
+
+def _add_self_consumption_coupling(
+    prob: pulp.LpProblem,
+    *,
+    t: int,
+    p_pv: float,
+    p_con: float,
+    p_flex,
+    p_grid_buy,
+    p_grid_sell,
+    p_charge,
+    p_discharge,
+    big_m: float,
+) -> None:
+    """Pin battery+grid to residual split (greedy self-consumption accounting)."""
+    surplus = pulp.LpVariable(f"sc_surplus_{t}", lowBound=0)
+    deficit = pulp.LpVariable(f"sc_deficit_{t}", lowBound=0)
+    delta_surplus = pulp.LpVariable(f"sc_delta_surplus_{t}", cat="Binary")
+    residual = p_pv - p_con - p_flex
+    prob += surplus - deficit == residual
+    prob += surplus <= big_m * delta_surplus
+    prob += deficit <= big_m * (1 - delta_surplus)
+    prob += p_charge + p_grid_sell == surplus
+    prob += p_discharge + p_grid_buy == deficit
 
 
 def _build_milp_model(

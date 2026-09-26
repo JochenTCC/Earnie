@@ -102,6 +102,34 @@ Setpoints are **math limits / forced power / modes**, not a full inner-loop cont
 
 Machine schema: [`share/ehal/setpoint.schema.json`](../../share/ehal/setpoint.schema.json).
 
+## Battery controllability (`batteries[].control`, 2.6.n)
+
+Installation property in `components.json` (default `full`). Drives MILP constraints, mode derivation, and whether ESS setpoints are written — independent of the live adapter, so simulation / backtesting / scenario comparison stay consistent.
+
+| `control` | MILP | Modes / writes |
+|-----------|------|----------------|
+| `full` | Bidirectional (grid charge + battery export allowed) | Zwangsladen / Zwangsentladen when planned |
+| `limits_only` | Charge ≤ PV, discharge ≤ load; no charge while importing, no discharge while exporting | Automatik / Entladesperre only (limits) |
+| `read_only` | Self-consumption coupling (residual split) | No ESS setpoints |
+
+**Capability cross-check:** EHAL-Com / Live warn when `control` asks for more than bound functions allow (`ess_limits` / `ess_active`).
+
+### HA vendor force: `plant.ha_ess_force`
+
+When there is no `set_ess_active_power` entity (typical `huawei_solar`), configure:
+
+```json
+"plant": {
+  "ha_ess_force": {
+    "driver": "huawei_solar",
+    "device_id": "<HA device registry id of the LUNA/battery>",
+    "duration_min": 20
+  }
+}
+```
+
+With Elevate permissions enabled in [wlcrs/huawei_solar](https://github.com/wlcrs/huawei_solar), the HA adapter calls `huawei_solar.forcible_charge` / `forcible_discharge` (power W, duration minutes, re-issued each control cycle) and `stop_forcible_charge` on Automatik / Entladesperre. Together with both limit entities this makes `ess_active` available so the plant can use `control: full`. HouseSim archetype `huawei_en` golden map stays limits-only; force is covered by adapter / mock-service tests.
+
 ## Capability-Flags (schema_version 3)
 
 | Field | Required | Meaning |
@@ -218,7 +246,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 - Adapter: `integrations/ha_adapter.py` (REST only: `/api/states`, `/api/services/...`). Prefer HA entities from evcc.
 - Config: `ehal.backend=ha`; URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` under `ehal.ha` in `config.json`. Entity IDs live in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Pattern B, same keys as Loxone). Legacy flat `ehal.ha.entities` is migrated once and cleared. Snippet: `share/config/ehal.ha.snippet.json` (backend / `adapter_id` / `sign` only — no secrets).
 - Compose lab: `docker/compose/ha-lab.yml` (Earnie :8506 + HA :8123 + evcc :7070). Setup: [`ha-lab-setup.md`](ha-lab-setup.md). German A2/B: [`../einrichtung/ha-evcc.md`](../einrichtung/ha-evcc.md).
-- HITL mapping UI: Streamlit EHAL-Com expander → `ui/ehal_ha_mapping.py` (entity picker → scan `/api/states` once per session → **heuristic propose** for empty fields only → user confirms → `apply_entity_bindings` per entity; **no LLM**). Heuristic: `integrations/ha_ehal_mapping.py` (domain / `device_class` / unit / name tokens). Live path: Pattern B / `aggregate_ha_entities` → `HaAdapter`; Live tables use entity-centric Mapping columns like Loxone.
+- HITL mapping UI: Streamlit EHAL-Com expander → `ui/ehal_ha_mapping.py` (entity picker → scan `/api/states` once per session → **heuristic propose** for empty fields only → user confirms → `apply_entity_bindings` per entity; **no LLM**). Heuristic: `integrations/ha_ehal_mapping.py` (domain / `device_class` / unit / token-boundary name hints with vendor synonyms; unique best score or leave empty; physical-quantity filter via `ha_units`). Live path: Pattern B / `aggregate_ha_entities` → `HaAdapter`; Live tables use entity-centric Mapping columns like Loxone.
 - Optional slot-Ist energy maps (not on the EHAL power wire): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on `plant.ehal_bindings` → `integrations/ha_meter_energy.py` + sampler ΔkWh overlay (same contract as Loxone; see [`loxone-meter-energy-slot-ist.md`](loxone-meter-energy-slot-ist.md)).
 - Sign mode per field: `ehal` (already aligned) or `negate` — still in `ehal.ha.sign` (config). Units: kW states converted to W; energy Wh→kWh on the side channel.
 - Setpoints: typically `number.set_value` on mapped entities (Amps for EVCS; W for ESS limits).

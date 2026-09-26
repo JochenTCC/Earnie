@@ -21,6 +21,11 @@ hassio_api: true
 ingress: true
 ingress_port: 8501
 
+# Supervisor restarts the add-on when this URL fails (H4). Port 8501 is nginx
+# (or Streamlit directly when Ingress entry is empty); Streamlit stays on :8502
+# behind nginx. Image HEALTHCHECK uses EARNIE_UI_STREAMLIT_PORT internally.
+watchdog: "http://[HOST]:[PORT:8501]/_stcore/health"
+
 ports:
   8501/tcp: 8501
   8541/tcp: 8541

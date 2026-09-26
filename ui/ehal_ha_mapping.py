@@ -25,7 +25,10 @@ from integrations.ha_ehal_mapping import (
     resolve_field_select_default,
 )
 from runtime_store.ehal_setup import BACKEND_HA, default_adapter_id, resolve_adapter_id
-from ui.ehal_function_status import render_function_status
+from ui.ehal_function_status import (
+    render_control_capability_warnings,
+    render_function_status,
+)
 from ui.ehal_loxone_mapping import (
     PLANT_ENTITY_ID,
     apply_entity_bindings,
@@ -487,6 +490,61 @@ def _run_telemetry_smoke_test(
         st.error(f"Telemetrie-Test fehlgeschlagen: {exc}")
 
 
+def _render_ha_ess_force(house: dict) -> dict[str, Any] | None:
+    """Optional Huawei force-charge via HA services (plant.ha_ess_force)."""
+    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
+    existing = plant.get("ha_ess_force") if isinstance(plant.get("ha_ess_force"), dict) else {}
+    st.markdown("##### Huawei Force (optional)")
+    st.caption(
+        "Wenn kein `set_ess_active_power`-Entity existiert: "
+        "`huawei_solar.forcible_charge` / `forcible_discharge` "
+        "(Elevate permissions in der Integration nötig)."
+    )
+    enabled = st.checkbox(
+        "Huawei Force aktivieren",
+        value=bool(existing.get("device_id")),
+        key="ehal_ha_ess_force_enabled",
+    )
+    if not enabled:
+        return None
+    device_id = st.text_input(
+        "HA device_id (Batterie/LUNA)",
+        value=str(existing.get("device_id") or ""),
+        key="ehal_ha_ess_force_device_id",
+    )
+    duration = st.number_input(
+        "Dauer je Zyklus (min)",
+        min_value=1,
+        max_value=1440,
+        value=int(existing.get("duration_min") or 20),
+        key="ehal_ha_ess_force_duration",
+    )
+    device_id = str(device_id or "").strip()
+    if not device_id:
+        st.warning("device_id fehlt — Force bleibt deaktiviert bis gesetzt.")
+        return None
+    return {
+        "driver": "huawei_solar",
+        "device_id": device_id,
+        "duration_min": int(duration),
+    }
+
+
+def _persist_ha_ess_force(house: dict, force: dict[str, Any] | None) -> dict:
+    """Write or clear plant.ha_ess_force on the house document."""
+    out = dict(house)
+    plant = dict(out.get("plant") or {}) if isinstance(out.get("plant"), dict) else {}
+    if force:
+        plant["ha_ess_force"] = force
+    else:
+        plant.pop("ha_ess_force", None)
+    if plant:
+        out["plant"] = plant
+    elif "plant" in out and not plant:
+        out.pop("plant", None)
+    return out
+
+
 def render_ehal_ha_mapping_section() -> None:
     """Entity-picker HITL; persists Pattern B bindings; HA secrets in .env."""
     _render_ha_mapping_intro()
@@ -509,7 +567,27 @@ def render_ehal_ha_mapping_section() -> None:
         st.session_state.get(_SESSION_PROPOSALS) or {}
     )
     ehal_map = _render_field_selects(entity, scan_rows, proposals)
-    render_function_status(ehal_map, _ha_entity_fields(entity))
+    ha_ess_force = None
+    if str(entity["id"]) == PLANT_ENTITY_ID:
+        ha_ess_force = _render_ha_ess_force(house)
+    from house_config.ha_ess_force import ha_ess_force_enables_ess_active
+
+    vendor = ha_ess_force_enables_ess_active(ha_ess_force)
+    render_function_status(
+        ehal_map, _ha_entity_fields(entity), vendor_ess_active=vendor
+    )
+    try:
+        import config as app_config
+
+        control = str(app_config.get_battery_params().get("control") or "full")
+    except Exception:
+        control = "full"
+    if str(entity["id"]) == PLANT_ENTITY_ID:
+        render_control_capability_warnings(
+            control=control,
+            ehal_map=ehal_map,
+            ha_ess_force=ha_ess_force,
+        )
 
     sign = dict(current["sign"])
     if str(entity["id"]) == PLANT_ENTITY_ID:
@@ -527,8 +605,13 @@ def render_ehal_ha_mapping_section() -> None:
         )
 
     if save_clicked:
+        house_to_save = (
+            _persist_ha_ess_force(house, ha_ess_force)
+            if str(entity["id"]) == PLANT_ENTITY_ID
+            else house
+        )
         _save_entity_mapping(
-            house,
+            house_to_save,
             config_doc,
             profile_id=profile_id,
             entity_id=str(entity["id"]),

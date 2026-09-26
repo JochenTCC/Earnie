@@ -138,8 +138,8 @@ PY
     fi
 }
 
-# x86-64-v2 preflight runs in docker/entrypoint.sh (docker/cpu_check.sh); point
-# its error hint at the add-on docs instead of the generic container docs.
+# x86-64-v2 / writable / clock preflight runs in docker/entrypoint.sh
+# (docker/preflight.sh); point its CPU error hint at the add-on docs.
 export EARNIE_CPU_CHECK_DOCS_URL="https://github.com/JochenTCC/Earnie/blob/main/docs/einrichtung/homeassistant-addon.md#voraussetzungen-gono-go"
 
 _migrate_config_to_addon_config

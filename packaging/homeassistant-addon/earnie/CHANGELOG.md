@@ -9,7 +9,9 @@ Add-on `version:` mirrors the Earnie app release. Official tags bump `earnie` + 
 
 ## Unreleased
 
-- **x86-64-v2 preflight:** image entrypoint (`docker/entrypoint.sh` → `docker/cpu_check.sh`; `run.sh` only sets the add-on docs link) checks `/proc/cpuinfo` on `x86_64` (cx16, lahf_lm, popcnt, pni, sse4_1, sse4_2, ssse3) and exits with an actionable German message (Proxmox CPU type `host`) instead of a NumPy `RuntimeError` / pyarrow SIGILL traceback loop.
+- **Start-Preflight (H1):** `docker/preflight.sh` (CPU x86-64-v2, beschreibbare Config/Runtime, Uhr vs. Build-Datum; Warnung bei wenig RAM/Speicher).
+- **Watchdog / HEALTHCHECK (H4):** Supervisor `watchdog:` auf `/_stcore/health` (Port 8501); Image-HEALTHCHECK + Daemon-Heartbeat in `runtime/daemon_heartbeat.json`.
+- **x86-64-v2 preflight (H0):** image entrypoint (`docker/entrypoint.sh` → `docker/preflight.sh`; `run.sh` only sets the add-on docs link) checks `/proc/cpuinfo` on `x86_64` and exits with an actionable German message (Proxmox CPU type `host`) instead of a NumPy `RuntimeError` / pyarrow SIGILL traceback loop.
 - **`startup: application`:** start after Home Assistant Core; daemon waits for Supervisor Core API (`wait_for_supervisor_core`) before auto-starting `main` (H7).
 - **H12 stopgap:** pre-release tags no longer bump public `ha-addon-earnie` / `earnie` (official tags only).
 - **`ehal_loxone_http_port`:** `run.sh` exports `EARNIE_EHAL_LOXONE_HTTP_PORT` (runtime env precedence over `config.json`, same pattern as Streamlit port).

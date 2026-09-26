@@ -176,6 +176,12 @@ def derive_control_from_milp_plan(
     dt_h: float,
 ) -> tuple[int, float, float]:
     """Leitet Loxone-Modus/Leistung aus MILP-Planwerten einer Stunde ab."""
+    from house_config.battery_control import (
+        BATTERY_CONTROL_FULL,
+        BATTERY_CONTROL_LIMITS_ONLY,
+        BATTERY_CONTROL_READ_ONLY,
+        control_from_battery_params,
+    )
     from .slot_duration import validate_dt_h
 
     dt_h = validate_dt_h(dt_h)
@@ -184,8 +190,12 @@ def derive_control_from_milp_plan(
     max_power = battery_params["max_power_kw"]
     battery_capacity = battery_params["battery_capacity_kwh"]
     efficiency = battery_params["efficiency"]
+    control = control_from_battery_params(battery_params)
 
     if battery_capacity <= 0.0:
+        return MODE_AUTOMATIK, 0.0, round(float(current_soc), 1)
+
+    if control == BATTERY_CONTROL_READ_ONLY:
         return MODE_AUTOMATIK, 0.0, round(float(current_soc), 1)
 
     opt_charge = milp_plan["p_charge"]
@@ -202,7 +212,11 @@ def derive_control_from_milp_plan(
     target_soc = 99.0
     threshold = power_threshold_kw(max_power)
 
-    if opt_charge > threshold and opt_grid_buy > threshold:
+    if (
+        control == BATTERY_CONTROL_FULL
+        and opt_charge > threshold
+        and opt_grid_buy > threshold
+    ):
         mode = MODE_ZWANGS_LADEN
         target_soc = round(max(current_soc, planned_soc), 1)
         target_power = charge_kw_for_hourly_soc(
@@ -215,7 +229,7 @@ def derive_control_from_milp_plan(
             max_soc,
             dt_h=dt_h,
         )
-    elif opt_discharge > threshold:
+    elif control == BATTERY_CONTROL_FULL and opt_discharge > threshold:
         candidate_soc = round(min(current_soc, planned_soc), 1)
         candidate_power = discharge_kw_for_hourly_soc(
             current_soc,
@@ -241,6 +255,14 @@ def derive_control_from_milp_plan(
         target_power = 0.0
         # Ist-SOC: Huawei Register 47100=1 + Ziel 100 % würde sonst Netz-Trickelladen auslösen.
         target_soc = round(current_soc, 1)
+
+    if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (
+        MODE_ZWANGS_LADEN,
+        MODE_ZWANGS_ENTLADEN,
+    ):
+        mode = MODE_AUTOMATIK
+        target_power = 0.0
+        target_soc = round(float(current_soc), 1)
 
     return mode, target_power, target_soc
 

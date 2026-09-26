@@ -367,12 +367,27 @@ def send_huawei_modbus_states(
     mode: int, target_power_kw: float, target_soc: float
 ) -> list[LoxoneWriteRecord]:
     """Übersetzt Optimierungsmodi und schreibt ESS-Steuerwerte (Design C1) an Loxone."""
+    from house_config.battery_control import (
+        BATTERY_CONTROL_LIMITS_ONLY,
+        BATTERY_CONTROL_READ_ONLY,
+        control_from_battery_params,
+    )
     from integrations import loxone_client as lc
 
-    max_kw = float(lc.config.get_battery_params().get("max_power_kw") or 0.0)
+    battery_params = lc.config.get_battery_params()
+    control = control_from_battery_params(battery_params)
+    if control == BATTERY_CONTROL_READ_ONLY:
+        return []
+
+    max_kw = float(battery_params.get("max_power_kw") or 0.0)
+    if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (1, 3):
+        mode = 0
+        target_power_kw = 0.0
     active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
         mode, target_power_kw, max_kw
     )
+    if control == BATTERY_CONTROL_LIMITS_ONLY:
+        active_kw = None
     # target_soc no longer written (2.4.j); kept in signature for call-site compat.
     _ = target_soc
 

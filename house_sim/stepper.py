@@ -28,7 +28,17 @@ __all__ = [
 
 def setpoints_from_store(store: StateStore, package: ArchetypePackage) -> EssSetpoints:
     """Read ESS setpoints from mapped mock entities (unit-aware, EHAL signed W)."""
-    return ess_setpoints_from_lookup(package, store.numeric_state)
+    base = ess_setpoints_from_lookup(package, store.numeric_state)
+    force_w = store.huawei_force_active_w()
+    if force_w is None:
+        return base
+    # Vendor force overrides self-consumption fallback for this tick.
+    return EssSetpoints(
+        active_power_w=float(force_w),
+        charge_limit_w=base.charge_limit_w,
+        discharge_limit_w=base.discharge_limit_w,
+        self_consumption=False,
+    )
 
 
 def step_physics(

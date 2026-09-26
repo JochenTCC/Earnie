@@ -1,6 +1,11 @@
 """Auflösung von batteries[] und pv_systems[] in flache runtime_settings-Felder."""
 from __future__ import annotations
 
+from house_config.battery_control import (
+    DEFAULT_BATTERY_CONTROL,
+    normalize_battery_control,
+)
+
 ZERO_BATTERY_FLAT = {
     "battery_capacity_kwh": 0.0,
     "battery_max_power_kw": 0.0,
@@ -9,6 +14,7 @@ ZERO_BATTERY_FLAT = {
     "battery_max_soc": 100.0,
     "threshold_power": 0.02,
     "standby_power_kw": 0.0,
+    "battery_control": DEFAULT_BATTERY_CONTROL,
 }
 
 ZERO_PV_FLAT = {
@@ -79,6 +85,9 @@ def normalize_battery(raw: dict, index: int) -> dict:
         raise ValueError(
             f"batteries[{index}] ('{battery_id}'): standby_power_kw muss >= 0 sein."
         )
+    control = normalize_battery_control(
+        raw.get("control"), battery_id=battery_id, index=index
+    )
     return {
         "id": battery_id,
         "label": label,
@@ -89,6 +98,7 @@ def normalize_battery(raw: dict, index: int) -> dict:
         "battery_max_soc": float(raw["battery_max_soc"]),
         "threshold_power": threshold,
         "standby_power_kw": standby,
+        "control": control,
         "battery_wear": _normalize_battery_wear(raw.get("battery_wear"), battery_id, index),
     }
 
@@ -191,6 +201,7 @@ def resolve_battery_into_settings(
             "battery_max_soc": bat["battery_max_soc"],
             "threshold_power": bat["threshold_power"],
             "standby_power_kw": bat.get("standby_power_kw", 0.0),
+            "battery_control": bat.get("control", DEFAULT_BATTERY_CONTROL),
         }
     )
     if bat.get("battery_wear") is not None:

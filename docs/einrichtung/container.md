@@ -12,7 +12,7 @@
 
 Auf x86 (`amd64`: Synology, Proxmox, VMware, HA-Add-on) braucht Earnie eine CPU mit dem Befehlssatz **x86-64-v2** (u. a. SSE4.2, POPCNT – jede x86-CPU ab ca. 2009). Die mitgelieferten Bibliotheken NumPy und pyarrow laufen ohne diese Befehle nicht. Auf `arm64` (LoxBerry, Home Assistant Green) spielt das keine Rolle.
 
-Der Container prüft das beim Start (`docker/cpu_check.sh`). Fehlt x86-64-v2, bricht er mit der Meldung `earnie: FEHLER - die CPU unterstützt den Befehlssatz x86-64-v2 nicht` ab, statt mit einem Python-Traceback.
+Der Container prüft das beim Start (`docker/preflight.sh`). Fehlt x86-64-v2, bricht er mit der Meldung `earnie: FEHLER - die CPU unterstützt den Befehlssatz x86-64-v2 nicht` ab, statt mit einem Python-Traceback. Dieselbe Startprüfung bricht ab, wenn Config-/Runtime-Verzeichnis nicht beschreibbar ist oder die Systemuhr vor dem Image-Build-Datum liegt (kurz auf NTP warten). Bei wenig RAM (< 2 GB) oder wenig freiem Speicher (< 500 MB) erscheint nur eine Warnung.
 
 In der Regel liegt das nicht an der Hardware, sondern an einer **VM mit CPU-Typ `kvm64`/`qemu64`** (bei älteren Proxmox-VMs Standard). Abhilfe in Proxmox:
 
@@ -22,6 +22,10 @@ In der Regel liegt das nicht an der Hardware, sondern an einer **VM mit CPU-Typ 
 4. VM wieder starten – ein Neustart aus der VM heraus reicht nicht, sie muss aus- und wieder eingeschaltet werden.
 
 Proxmox-**LXC** nutzt die CPU des Hosts direkt; dort tritt das Problem nur bei sehr alter Hardware auf. Prüfen: `grep -o -w -E 'sse4_2|popcnt' /proc/cpuinfo | sort -u` muss beide Begriffe ausgeben.
+
+## Gesundheitsprüfung (Docker HEALTHCHECK)
+
+Das Image enthält einen `HEALTHCHECK` auf `http://127.0.0.1:<Streamlit-Port>/_stcore/health` (Standard **8501**; im HA-Add-on intern **8502**). Läuft der Optimizer-Daemon (`main.py`), muss zusätzlich die Datei `runtime/daemon_heartbeat.json` frisch sein (sonst `unhealthy`). Compose/Synology: `docker inspect --format='{{.State.Health.Status}}' <container>`.
 
 ## Persistente Daten
 
@@ -100,7 +104,7 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Veröffentlichte Images** kommen von GitHub Releases: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release.yml`](../../.github/workflows/release.yml) und pusht u. a. `ghcr.io/jochentcc/earnie-energy:X.Y.Z` sowie `:latest`. Details für Entwickler: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
-**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und die Image-Tags `:<version>` sowie `:next` — **nicht** `:latest`. Zum Testen `:next` oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.2`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
+**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und die Image-Tags `:<version>` sowie `:next` — **nicht** `:latest`. Zum Testen `:next` oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.3`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
@@ -108,7 +112,7 @@ Eigene Compose-Dateien (nicht in der Prod-YAML): `docker/compose/synology-alpha.
 
 - Container `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`
 - Compose-Projektname `earnie-alpha` (kollidiert nicht mit Prod `earnie-productive`)
-- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.0-alpha.2`)
+- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.0-alpha.3`)
 
 ```powershell
 mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime

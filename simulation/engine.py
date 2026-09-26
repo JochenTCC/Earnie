@@ -201,6 +201,9 @@ def window_slot_datetimes(anchor: datetime) -> list[datetime]:
 
 def _scenario_to_battery_params(scenario_params: dict) -> dict:
     """Übersetzt JSON-Szenario-Parameter in das Format des Optimizers."""
+    from house_config.battery_control import DEFAULT_BATTERY_CONTROL, control_from_battery_params
+
+    control_raw = scenario_params.get("battery_control", scenario_params.get("control"))
     return {
         "battery_capacity_kwh": float(scenario_params["battery_capacity_kwh"]),
         "min_soc": float(scenario_params["battery_min_soc"]),
@@ -209,6 +212,9 @@ def _scenario_to_battery_params(scenario_params: dict) -> dict:
         "efficiency": float(scenario_params["battery_efficiency"]),
         "standby_power_kw": max(
             0.0, float(scenario_params.get("standby_power_kw") or 0.0)
+        ),
+        "control": control_from_battery_params(
+            {"control": control_raw or DEFAULT_BATTERY_CONTROL}
         ),
     }
 

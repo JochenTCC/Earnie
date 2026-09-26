@@ -42,6 +42,7 @@ class BatteryFacts:
     soll_power_kw: float
     soll_plan_kw: float
     ist_power_kw: float
+    control: str = "full"
 
 
 @dataclass(frozen=True)
@@ -203,12 +204,24 @@ def _battery_facts(
     *,
     ist_snapshot: dict[str, Any] | None = None,
 ) -> BatteryFacts:
+    from house_config.battery_control import (
+        DEFAULT_BATTERY_CONTROL,
+        control_from_battery_params,
+    )
+
     snapshot = ist_snapshot if ist_snapshot is not None else (entry.get("consumption_snapshot") or {})
+    control_raw = entry.get("battery_control")
+    if control_raw is None:
+        try:
+            control_raw = config.get_battery_params().get("control")
+        except Exception:
+            control_raw = DEFAULT_BATTERY_CONTROL
     return BatteryFacts(
         soll_mode=int(entry.get("mode", bat.MODE_AUTOMATIK)),
         soll_power_kw=_float_or_zero(entry.get("target_power_kw")),
         soll_plan_kw=_battery_plan_kw(entry),
         ist_power_kw=_float_or_zero(snapshot.get("battery_kw")),
+        control=control_from_battery_params({"control": control_raw}),
     )
 
 

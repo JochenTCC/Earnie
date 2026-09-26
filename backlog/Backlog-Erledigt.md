@@ -2,9 +2,40 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.n — Battery controllability + Huawei force services (2026-09-26)
+
+- [x] **2.6.n — Battery controllability in `house_config` + MILP**
+  - [x] **House config:** `batteries[].control` = `full` \| `limits_only` \| `read_only` (default `full`); schema, normalize/resolve, UI, `battery_params`, backtesting.
+  - [x] **MILP:** `limits_only` envelope (no grid charge / no battery export); `read_only` self-consumption residual coupling; modes Automatik/Entladesperre only for limits; no setpoints for read_only.
+  - [x] **Cross-check:** EHAL-Com warns when `control` exceeds `ess_limits` / `ess_active` (entity or `plant.ha_ess_force`).
+  - [x] **Deviation:** forced-mode predicates gated on `control == full`.
+  - [x] **Huawei HA services:** `plant.ha_ess_force` → `huawei_solar.forcible_charge` / `forcible_discharge` / `stop_forcible_charge` (Elevate permissions); enables `ess_active` without `set_ess_active_power` entity.
+  - [x] Tests: `tests/test_battery_control.py`; docs `ehal.md`, `ehal-com.md`, `batterie-pv.md`; HouseSim `huawei_en` meta note.
+
+### 2.6.e — Stronger HA propose / vendor name recognition (2026-09-26)
+
+- [x] **2.6.e — Stronger propose, still confirm-before-save.** Empty Pattern B map + HouseSim S2 archetypes: token-boundary name hints, longer-hint ranking (uncapped for ties), unique best score or leave empty; vendor vocab (Huawei / Fronius DE / SMA / go-e / KEBA). No LLM; empty-only UI unchanged. Module: `integrations/ha_ehal_mapping.py`.
+  - [x] Hit rates (correct / golden, 0 wrong): `evcc_en` 13/13, `fronius_de` 9/9, `huawei_en` 11/11, `sma_keba` 11/11. Distractors never proposed (`inverter_active_power`, SMA `…_grid_power`, Fronius `leistung_verbrauch`).
+  - [x] Tests: `tests/test_ha_ehal_mapping.py` (all archetypes ⊆ golden; vocab examples; token-boundary unit cases). Spec note: `docs/spec/ehal.md`.
+
+### 2.6.m Sprint 4 — startup checks + runtime monitoring (2026-09-26)
+
+- [x] **2.6.m — Sprint 4: startup checks + runtime monitoring** (ships with the next path **B**/**C** publish).
+  - [x] **H1** `docker/cpu_check.sh` → `docker/preflight.sh`: abort on non-writable config/runtime and clock before image `BUILD_DATE` (NTP wait up to 30 s); warn on RAM < 2 GB / free disk < 500 MB. `ARG BUILD_DATE` + `scripts/build_container.py --build-arg`. Tests: `tests/test_container_cpu_check.py`.
+  - [x] **H4** `HEALTHCHECK` in `docker/Dockerfile` (`/_stcore/health` via `EARNIE_UI_STREAMLIT_PORT`, default 8501 / add-on 8502) + `runtime/daemon_heartbeat.json` from `main.py`; add-on `watchdog:` on both trees; LoxBerry `healthcheck` WARN on `.State.Health.Status=unhealthy`. Tests: `tests/test_daemon_heartbeat.py`.
+
+### 2.6.j H0 — x86-64-v2 preflight shipped (2026-09-26)
+
+- [x] **2.6.j — Sprint 1 complete** (remaining open item was **H0** ship only; code/workflow archived earlier the same day).
+  - [x] **H0** Ship x86-64-v2 preflight with image publish — landed in community **`2.6.0-alpha.2`** / current channel pin **`2.6.0-alpha.3`** (`docker/cpu_check.sh` via `docker/entrypoint.sh`; add-on docs link). Closes the open checkbox under Sprint 1 in [Backlog.md](Backlog.md).
+
+### H11 (verify) Gen2 HTTP vs HTTPS-only (2026-09-26)
+
+- [x] **H11 (verify)** Gen2 Miniserver (live): `http://…/jdev/sps/status` and `http://…/data/LoxAPP3.json` still answer over plain HTTP (401 auth, not TLS-only / refused). Hard-coded `http://` in `integrations/loxone_client.py` remains OK — **no H11 (fix)** / no schema or fingerprint change.
+
 ### 2.6.l Sprint 3 — network Loxone + HA (2026-09-26)
 
-- [x] **2.6.l — Sprint 3: network (Loxone + HA)** (ships in community pre-release **`2.6.0-alpha.2`**). **H11** stays under **2.6.j**.
+- [x] **2.6.l — Sprint 3: network (Loxone + HA)** (ships in community pre-release **`2.6.0-alpha.2`**).
   - [x] **H9 (fix)** `EARNIE_LAN_SUBNET` (+ LoxBerry install sync / compose `.env`); Docker `172.16.0.0/12` gate with SB CIDR prompt; HA add-on host IP via Supervisor `/network/info`.
   - [x] **H10** Last Miniserver callback (time + peer IP) on SB / EHAL-Com (`runtime/loxone_last_callback.json`); docs bridged VM + fixed IP / DHCP reservation.
   - [x] **H8** SB: on Docker bridge (non–add-on) offer HA URL + LLAT instead of empty mDNS-only path; `docs/einrichtung/container.md` § Netzwerk.
@@ -22,7 +53,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.6.j Sprint 1 — installation safeguards (code) (2026-09-26)
 
-- [x] **2.6.j — Sprint 1 code/workflow** (H0 ships on next tag; H11 live verify still open in [Backlog.md](Backlog.md)).
+- [x] **2.6.j — Sprint 1 code/workflow** (H0 ship closed 2026-09-26 with published image — see section above; H11 verify closed 2026-09-26 without code change).
   - [x] **H12 (stopgap)** `release-publish.yml` job `publish_ha_addon` runs only when `prerelease != true`; manual `ha-addon-publish.yml` refuses versions containing `-`. Docs: packaging README, `DEVELOPER.md`, `docs/einrichtung/homeassistant-addon.md`, `ha-addon-earnie` README/BACKLOG. Dual channel = **2.6.k**.
   - [x] **H3** LoxBerry plugin compose `restart: on-failure:3` (`packaging/loxberry/data/docker/docker-compose.yml`).
   - [x] **H5** LoxBerry `TZ: ${TZ:-Europe/Vienna}`; `sync_streamlit_env.sh` + PHP write host `/etc/timezone` into compose `.env`; note in `docs/einrichtung/loxberry-plugin.md`.
@@ -66,7 +97,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - [x] **`numpy<2.4` pin evaluated and rejected** — Image with pin tested under QEMU user-mode `-cpu kvm64-v1`: numpy 2.3.5 / pandas without pyarrow / highspy OK, but **pyarrow 25.0.1 → SIGILL** (pandas 3 auto-imports it; Streamlit hard-depends on it). Pin reverted; x86-64-v2 is now a documented minimum.
   - [x] **Preflight in `docker/cpu_check.sh`**, called from `docker/entrypoint.sh` before bootstrap → covers all container targets (HA add-on, Synology, Proxmox, VMware). `_check_x86_64_v2` reads `/proc/cpuinfo` on `x86_64` (cx16, lahf_lm, popcnt, pni, sse4_1, sse4_2, ssse3) and exits with a German message + Proxmox fix (CPU type `host` / `x86-64-v2-AES`, cold VM restart) instead of a traceback. Add-on `run.sh` only exports `EARNIE_CPU_CHECK_DOCS_URL` (HA docs link; default = `container.md#cpu-voraussetzung-amd64`). Dockerfile strips CRLF from `cpu_check.sh`. Tests: `tests/test_container_cpu_check.py`.
   - [x] **Docs** — `docs/einrichtung/container.md` § CPU-Voraussetzung (amd64); `docs/einrichtung/homeassistant-addon.md` Go/No-Go row + Proxmox steps; add-on `DOCS.md` hint; add-on `CHANGELOG.md` Unreleased.
-  - [ ] **Verification pending** — user reply after switching the VM CPU type; preflight only lands with the next image / add-on release.
+  - [x] **Verification / ship** — preflight in published community images (**`2.6.0-alpha.2`** / **`2.6.0-alpha.3`**); **H0** closed 2026-09-26 (see section above). Live CPU-type switch confirmation from the support-case host remains optional dogfood.
 
 ### Document Review Anwender-TOC / SB German / ehal-com EN (2026-09-26)
 

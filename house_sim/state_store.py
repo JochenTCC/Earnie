@@ -14,6 +14,14 @@ WRITE_SERVICES = frozenset(
     }
 )
 
+HUAWEI_FORCE_SERVICES = frozenset(
+    {
+        ("huawei_solar", "forcible_charge"),
+        ("huawei_solar", "forcible_discharge"),
+        ("huawei_solar", "stop_forcible_charge"),
+    }
+)
+
 
 def _entity_domain(entity_id: str) -> str:
     return str(entity_id).split(".", 1)[0].strip().lower()
@@ -26,6 +34,7 @@ class StateStore:
         self._lock = threading.RLock()
         self._states: dict[str, dict[str, Any]] = {}
         self._force_service_status: int | None = None
+        self._huawei_force_active_w: float | None = None
         for item in entities or []:
             self.upsert(item)
 
@@ -75,6 +84,11 @@ class StateStore:
         with self._lock:
             return self._force_service_status
 
+    def huawei_force_active_w(self) -> float | None:
+        """Signed EHAL active power from last huawei_solar force service, or None."""
+        with self._lock:
+            return self._huawei_force_active_w
+
     def apply_service(
         self, domain: str, service: str, data: dict[str, Any]
     ) -> tuple[int, str]:
@@ -85,6 +99,8 @@ class StateStore:
 
         domain_l = str(domain).strip().lower()
         service_l = str(service).strip().lower()
+        if (domain_l, service_l) in HUAWEI_FORCE_SERVICES:
+            return self._apply_huawei_force(service_l, data)
         if (domain_l, service_l) not in WRITE_SERVICES:
             return 400, f"Unsupported service {domain_l}.{service_l}"
 
@@ -123,6 +139,27 @@ class StateStore:
                 ):
                     return 400, f"Value {value} out of range [{lo}, {hi}] for {entity_id}"
                 current["state"] = str(data["value"])
+            return 200, "ok"
+
+    def _apply_huawei_force(
+        self, service_l: str, data: dict[str, Any]
+    ) -> tuple[int, str]:
+        device_id = str(data.get("device_id") or "").strip()
+        if not device_id:
+            return 400, "Missing device_id"
+        with self._lock:
+            if service_l == "stop_forcible_charge":
+                self._huawei_force_active_w = None
+                return 200, "ok"
+            try:
+                power = abs(float(data.get("power")))
+            except (TypeError, ValueError):
+                return 400, "Missing or non-numeric power"
+            # EHAL sign: + discharge, − charge
+            if service_l == "forcible_discharge":
+                self._huawei_force_active_w = power
+            else:
+                self._huawei_force_active_w = -power
             return 200, "ok"
 
     def numeric_state(self, entity_id: str) -> float | None:

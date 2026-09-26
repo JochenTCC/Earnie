@@ -497,6 +497,11 @@ def _normalize_plant(raw: dict | None) -> dict:
                     cleaned_energy[field] = name
         if cleaned_energy:
             out["loxone_meter_energy"] = cleaned_energy
+    from house_config.ha_ess_force import normalize_ha_ess_force
+
+    force = normalize_ha_ess_force(raw.get("ha_ess_force"))
+    if force:
+        out["ha_ess_force"] = force
     return out
 
 

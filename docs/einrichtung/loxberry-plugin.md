@@ -31,6 +31,8 @@ Gleiche Tabelle wie in [Container — Go/No-Go (LoxBerry)](container.md#gono-go-
 
 Die Plugin-UI zeigt Status (laufende Earnie-Version, Kanal, Update verfügbar), Start/Stop/Neustart, Image-Pull, einen Link zur Streamlit-Oberfläche, die **Kanalwahl** und ein Feld zum Ändern des **Host-Ports** (Compose-Mapping `HOST:8501`; Container-Port bleibt 8501).
 
+Der LoxBerry-**Healthcheck** meldet WARN (Status 4), wenn der Container läuft, Docker aber `.State.Health.Status=unhealthy` meldet (Streamlit oder Optimizer-Heartbeat). Ohne Healthcheck im Image bleibt „running“ weiterhin OK.
+
 ## Datenpfade
 
 Persistenz (überlebt Plugin-Upgrades und Image-Pulls):

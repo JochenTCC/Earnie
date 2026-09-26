@@ -26,11 +26,22 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `battery_max_soc`       | %        | `components.json` → `batteries[]`    | Obere SOC-Grenze                                                                                                                      |
 | `threshold_power`       | Anteil   | `components.json` → `batteries[]`    | Relativ zu `battery_max_power_kw` (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
 | `standby_power_kw`      | kW       | `components.json` → `batteries[]`    | Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch in der Optimierung)                                                          |
+| `control`               | enum     | `components.json` → `batteries[]`    | Steuerbarkeit der Anlage: `full` (Default) = Zwangsladen/-entladen; `limits_only` = nur Lade-/Entladegrenzen (Automatik/Entladesperre); `read_only` = Eigenverbrauch ohne Setpoints. Eigenschaft der Installation — gilt auch für Simulation / Backtesting / Business Case. |
 | `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten; wird aus `land` abgeleitet (`AT`→`Europe/Vienna`, `DE`→`Europe/Berlin`, `CH`→`Europe/Zurich`); siehe `planning_horizon` |
 | `netznutzung_arbeitspreis_cent_kwh` | Cent/kWh | `house_profiles.json` | Netznutzung Arbeitspreis netto (ohne USt); unabhängig vom Lieferantentarif                                                     |
 
 
 Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
+
+## Steuerbarkeit (`control`)
+
+| Wert | MILP | Live-Setpoints |
+|------|------|----------------|
+| `full` | Netzladen und Batterie-Export erlaubt | Zwangsladen / Zwangsentladen / Entladesperre / Automatik |
+| `limits_only` | Nur PV-Überschuss laden, nur Hauslast decken | Nur Automatik / Entladesperre (Lade-/Entladegrenzen) |
+| `read_only` | Eigenverbrauch-Kopplung (kein freier Fahrplan) | Keine ESS-Setpoints |
+
+Wenn `control` mehr verlangt als das EHAL-Mapping hergibt (z. B. `full` ohne `set_ess_active_power` und ohne `plant.ha_ess_force`), warnt EHAL-Com. Huawei ohne Wirkleistungs-Entity: optional `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`) — siehe [EHAL-Spec](../spec/ehal.md) und [EHAL-Com](../ui/ehal-com.md).
 
 
 ## SOC-Verhalten

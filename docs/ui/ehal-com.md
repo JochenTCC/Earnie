@@ -118,6 +118,9 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 | Write ESS discharge limit        | Control value | `set_ess_discharge_power_limit`                                  | `ess0/SetActivePowerLessOrEquals`             |                                    | ESS mode 2 unit 100 reg. **2704** (`ess_max_discharge_power`, W)                                                        | `target_discharge_power_name`                                     |
 | Control command battery / Huawei | Control value | `set_ess_mode (0 = automatic / 1 = forced charge / 2 = forced discharge)` | *(ignored)*                          |                                    | See ESS mode 2/3 ESS write capability                                                                                   | `control_cmd_name`                                                 |
 | ESS write capability             | Capability    | `supports_ess_write`                                             | derived adapter capability                    | derived adapter capability        | ESS mode 2/3 (reg. **2700+** / mode 3 VE.Bus setpoints); see ESS Mode 2/3 Manual                                        | derivable from active/charge/discharge Merker                     |
+| Huawei force (optional)          | Plant config  | `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`) | — | `huawei_solar.forcible_charge` / `forcible_discharge` / `stop_forcible_charge` | Elevate permissions in the integration; use when no `set_ess_active_power` entity exists | — |
+
+**Battery `control` vs mapping:** If `components.json` → `batteries[].control` is `full` but neither `set_ess_active_power` nor `ha_ess_force` is configured (or `limits_only` without both limit entities), EHAL-Com shows a warning. `read_only` needs no ESS write functions.
 
 
 

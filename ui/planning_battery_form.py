@@ -8,6 +8,11 @@ import streamlit as st
 
 from house_config.id_slug import slug_id
 from house_config.label_uniqueness import allocate_unique_label
+from house_config.battery_control import (
+    BATTERY_CONTROL_VALUES,
+    CONTROL_LABELS_DE,
+    DEFAULT_BATTERY_CONTROL,
+)
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import (
     delete_battery,
@@ -66,6 +71,7 @@ def new_battery_template(
         "battery_max_soc": float(source.get("battery_max_soc", 100.0)),
         "threshold_power": float(source.get("threshold_power", 0.05)),
         "standby_power_kw": float(source.get("standby_power_kw", 0.0) or 0.0),
+        "control": str(source.get("control") or "full").strip().lower() or "full",
         "battery_wear": copy.deepcopy(dict(source.get("battery_wear") or {})),
     }
 
@@ -109,6 +115,9 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         max_soc = float(existing.get("battery_max_soc", 100.0))
         threshold_percent = float(existing.get("threshold_power", 0.05)) * 100.0
         standby_power = float(existing.get("standby_power_kw", 0.0) or 0.0)
+        control = str(existing.get("control") or DEFAULT_BATTERY_CONTROL).strip().lower()
+        if control not in BATTERY_CONTROL_VALUES:
+            control = DEFAULT_BATTERY_CONTROL
         wear = existing.get("battery_wear") or {}
         wear_enabled = bool(wear.get("enabled", False))
         wear_replacement_cost = float(wear.get("replacement_cost_euro", 1500.0))
@@ -123,6 +132,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         max_soc = 100.0
         threshold_percent = 5.0
         standby_power = 0.0
+        control = DEFAULT_BATTERY_CONTROL
         wear_enabled = False
         wear_replacement_cost = 1500.0
         wear_expected_cycles = 6000.0
@@ -136,6 +146,9 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_battery_max_soc")] = max_soc
     st.session_state[_scoped_key(session_scope, "planning_battery_threshold")] = threshold_percent
     st.session_state[_scoped_key(session_scope, "planning_battery_standby")] = standby_power
+    st.session_state[_scoped_key(session_scope, "planning_battery_control")] = (
+        CONTROL_LABELS_DE[control]
+    )
     st.session_state[_scoped_key(session_scope, "planning_battery_wear_enabled")] = wear_enabled
     st.session_state[
         _scoped_key(session_scope, "planning_battery_wear_replacement_cost")
@@ -307,11 +320,22 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
         help="Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch).",
         key=_scoped_key(session_scope, "planning_battery_standby"),
     )
+    control_labels = [CONTROL_LABELS_DE[v] for v in sorted(BATTERY_CONTROL_VALUES)]
+    control_label = labeled_selectbox(
+        "Steuerbarkeit",
+        options=control_labels,
+        help="full = Zwangsladen/-entladen; limits_only = nur Grenzen; "
+        "read_only = Eigenverbrauch ohne Setpoints.",
+        key=_scoped_key(session_scope, "planning_battery_control"),
+    )
+    label_to_control = {v: k for k, v in CONTROL_LABELS_DE.items()}
+    control = label_to_control.get(str(control_label), DEFAULT_BATTERY_CONTROL)
     return {
         "min_soc": min_soc,
         "max_soc": max_soc,
         "threshold_percent": threshold_percent,
         "standby_power": standby_power,
+        "control": control,
     }
 
 
@@ -367,6 +391,7 @@ def _battery_save_payload(fields: dict) -> dict:
         "battery_max_soc": fields["max_soc"],
         "threshold_power": fields["threshold_percent"] / 100.0,
         "standby_power_kw": float(fields["standby_power"] or 0.0),
+        "control": fields.get("control") or DEFAULT_BATTERY_CONTROL,
         "battery_wear": fields["battery_wear"],
     }
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from version import __version__
@@ -79,6 +80,11 @@ def is_multiarch(platform: str) -> bool:
     return "," in platform
 
 
+def utc_build_date() -> str:
+    """UTC ISO-8601 stamp for Dockerfile ARG BUILD_DATE (H1 clock preflight)."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def resolve_platform(target: str | None, platform: str | None) -> str:
     if target and platform:
         raise ValueError("Nur --target oder --platform angeben, nicht beides.")
@@ -98,6 +104,7 @@ def build_command(
     context: Path,
     no_cache: bool,
     push: bool,
+    build_date: str | None = None,
 ) -> list[str]:
     if not tags:
         raise ValueError("Mindestens ein Image-Tag ist erforderlich.")
@@ -111,10 +118,14 @@ def build_command(
             "Für lokalen Test: --target synology oder --target loxberry."
         )
 
+    stamp = build_date if build_date is not None else utc_build_date()
+    build_arg = ["--build-arg", f"BUILD_DATE={stamp}"]
+
     if is_multiarch(platform):
         cmd = ["docker", "buildx", "build", "--platform", platform, "-f", str(dockerfile)]
         for tag in tags:
             cmd.extend(["-t", tag])
+        cmd.extend(build_arg)
         if no_cache:
             cmd.append("--no-cache")
         cmd.append("--push")
@@ -124,6 +135,7 @@ def build_command(
     cmd = ["docker", "build", "--platform", platform, "-f", str(dockerfile)]
     for tag in tags:
         cmd.extend(["-t", tag])
+    cmd.extend(build_arg)
     if no_cache:
         cmd.append("--no-cache")
     cmd.append(str(context))

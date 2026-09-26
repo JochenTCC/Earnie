@@ -134,6 +134,10 @@ def _mode_is_forced_charge(
     _tolerances: dict[str, float],
     _params: dict[str, Any],
 ) -> bool:
+    from house_config.battery_control import BATTERY_CONTROL_FULL
+
+    if facts.battery.control != BATTERY_CONTROL_FULL:
+        return False
     return facts.battery.soll_mode == bat.MODE_ZWANGS_LADEN
 
 
@@ -144,6 +148,10 @@ def _mode_is_forced_discharge(
     _tolerances: dict[str, float],
     _params: dict[str, Any],
 ) -> bool:
+    from house_config.battery_control import BATTERY_CONTROL_FULL
+
+    if facts.battery.control != BATTERY_CONTROL_FULL:
+        return False
     return facts.battery.soll_mode == bat.MODE_ZWANGS_ENTLADEN
 
 

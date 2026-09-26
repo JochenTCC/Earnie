@@ -15,6 +15,8 @@ Quellbaum im Repo: [`packaging/homeassistant-addon/earnie/`](../../packaging/hom
 | Home Assistant | HA OS / Supervised, **Supervisor** aktiv | Home Assistant Container/Core ohne Supervisor (dort funktionieren Add-ons grundsätzlich nicht) |
 | Architektur | **aarch64** (z. B. Home Assistant Green) oder `amd64` (Dev/Test-VM) | 32-bit ARM (`armv7`) |
 | CPU (nur `amd64`) | Befehlssatz **x86-64-v2** (SSE4.2, POPCNT; jede x86-CPU ab ca. 2009) | VM mit CPU-Typ `kvm64`/`qemu64` oder sehr alte CPU/Atom |
+| RAM | mind. **4 GB** empfohlen | unter 2 GB |
+| Speicher | SSD/eMMC bevorzugt | nur sehr langsame SD-Karte |
 
 **x86-64-v2 in VMs:** NumPy und pyarrow (von Earnie genutzte Bibliotheken) laufen auf x86 nur mit x86-64-v2. Ältere Proxmox-VMs stehen oft noch auf dem CPU-Typ `kvm64`, der diese Befehle nicht weitergibt – auch wenn die echte CPU sie kann. Das Add-on prüft das beim Start und bricht mit der Meldung `earnie: FEHLER - die CPU unterstützt den Befehlssatz x86-64-v2 nicht` ab. Abhilfe in Proxmox:
 
@@ -24,8 +26,8 @@ Quellbaum im Repo: [`packaging/homeassistant-addon/earnie/`](../../packaging/hom
 4. VM wieder starten – ein Neustart aus Home Assistant heraus reicht nicht, die VM muss aus- und wieder eingeschaltet werden.
 
 Prüfen lässt sich die CPU z. B. im Add-on **Terminal & SSH**: `grep -o -w -E 'sse4_2|popcnt' /proc/cpuinfo | sort -u` muss beide Begriffe ausgeben.
-| RAM | mind. **4 GB** empfohlen | unter 2 GB |
-| Speicher | SSD/eMMC bevorzugt | nur sehr langsame SD-Karte |
+
+Zusätzlich prüft der Image-Entrypoint Schreibrechte unter `/config` und `/data/earnie_env/runtime` sowie die Systemuhr (gegen das Image-Build-Datum). Der Supervisor-**Watchdog** pollt `http://…:8501/_stcore/health` und startet das Add-on neu, wenn die UI nicht antwortet.
 
 ## Installation
 

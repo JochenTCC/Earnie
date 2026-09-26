@@ -167,6 +167,9 @@ class TestDiscoverLoxone:
             def setsockopt(self, *_args):
                 pass
 
+            def bind(self, _addr):
+                pass
+
             def sendto(self, *_args):
                 pass
 
@@ -179,8 +182,9 @@ class TestDiscoverLoxone:
                 pass
 
         with patch("socket.socket", return_value=_FakeSocket()), patch(
-            "time.monotonic", side_effect=[0, 0, 1, 2, 3]
-        ):
+            "integrations.integration_scanner.local_ipv4_address",
+            return_value="192.168.178.137",
+        ), patch("time.monotonic", side_effect=[0, 0, 0, 1, 2, 3, 4]):
             results = scanner.discover_loxone(timeout_sec=3.0)
 
         assert len(results) == 1
@@ -194,13 +198,19 @@ class TestDiscoverLoxone:
             def setsockopt(self, *_args):
                 pass
 
+            def bind(self, _addr):
+                pass
+
             def sendto(self, *_args):
                 raise OSError("network unreachable")
 
             def close(self):
                 pass
 
-        with patch("socket.socket", return_value=_FakeSocket()):
+        with patch("socket.socket", return_value=_FakeSocket()), patch(
+            "integrations.integration_scanner.local_ipv4_address",
+            return_value="192.168.178.137",
+        ):
             assert scanner.discover_loxone(timeout_sec=1.0) == []
 
 

@@ -22,12 +22,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN sed -i 's/\r$//' docker/entrypoint.sh docker/cpu_check.sh && chmod +x docker/entrypoint.sh
+# Empty BUILD_DATE skips the clock preflight (ad-hoc local builds).
+# scripts/build_container.py always passes a UTC ISO-8601 stamp.
+ARG BUILD_DATE=
+RUN printf '%s' "$BUILD_DATE" > docker/BUILD_DATE \
+    && sed -i 's/\r$//' docker/entrypoint.sh docker/preflight.sh docker/healthcheck.sh \
+    && chmod +x docker/entrypoint.sh docker/healthcheck.sh
 
 # Templates + public tariffs catalog live in share/config/ (git). Supplement runtime/.env examples.
 RUN mkdir -p share/config \
     && cp earnie_env/runtime/local_settings.example.json share/config/local_settings.example.json \
     && cp .env.example share/config/.env.example
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD /bin/sh docker/healthcheck.sh
 
 ENTRYPOINT ["/bin/sh", "docker/entrypoint.sh"]
 CMD ["python", "-m", "scripts.run_streamlit"]

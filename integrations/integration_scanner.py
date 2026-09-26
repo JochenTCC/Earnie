@@ -189,22 +189,55 @@ def _ssdp_response_to_backend(host: str, headers: dict[str, str]) -> DiscoveredB
     )
 
 
+def _bind_ssdp_socket(sock: socket.socket) -> str | None:
+    """Bind UDP socket to the LAN IPv4 so unicast SSDP replies are receivable.
+
+    On Windows an unbound datagram socket does not receive SSDP responses to an
+    M-SEARCH (verified live: 0 replies unbound vs. Miniserver hit when bound to
+    the local interface). ``0.0.0.0`` also fails to receive on Windows; use the
+    concrete local IPv4 from :func:`local_ipv4_address`.
+    """
+    local_ip = local_ipv4_address()
+    if not local_ip:
+        return None
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except OSError:
+        pass
+    try:
+        sock.bind((local_ip, 0))
+    except OSError as exc:
+        logger.warning("Loxone SSDP bind to %s failed: %s", local_ip, exc)
+        return None
+    try:
+        sock.setsockopt(
+            socket.IPPROTO_IP,
+            socket.IP_MULTICAST_IF,
+            socket.inet_aton(local_ip),
+        )
+    except OSError:
+        pass
+    return local_ip
+
+
 def discover_loxone(*, timeout_sec: float = 3.0) -> list[DiscoveredBackend]:
     """SSDP M-SEARCH broadcast; Miniservers answer with a ``Loxone`` SERVER header."""
+    import time
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(timeout_sec)
+    # Short recv timeout; overall window is ``deadline`` (same as OpenEMS-style loops).
+    sock.settimeout(min(0.4, timeout_sec))
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
     found: dict[str, DiscoveredBackend] = {}
     try:
+        _bind_ssdp_socket(sock)
         sock.sendto(_SSDP_REQUEST, _SSDP_MULTICAST_ADDR)
-        import time
-
         deadline = time.monotonic() + timeout_sec
         while time.monotonic() < deadline:
             try:
                 data, addr = sock.recvfrom(65535)
             except socket.timeout:
-                break
+                continue
             except OSError:
                 break
             backend = _ssdp_response_to_backend(addr[0], _parse_ssdp_headers(data))

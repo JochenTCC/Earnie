@@ -111,6 +111,12 @@
           "minimum": 0,
           "description": "Dauerhafte AC-Eigenleistung der Batterie (kW), 24/7 als Verbrauch."
         },
+        "control": {
+          "type": "string",
+          "enum": ["full", "limits_only", "read_only"],
+          "default": "full",
+          "description": "Steuerbarkeit: full = Zwangsladen/-entladen; limits_only = nur Lade-/Entladegrenzen; read_only = Eigenverbrauch ohne Setpoints."
+        },
         "battery_wear": {
           "$ref": "#/definitions/battery_wear",
           "description": "Verschleißmodell dieser Batterie."

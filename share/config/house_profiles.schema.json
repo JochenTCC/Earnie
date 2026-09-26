@@ -33,6 +33,28 @@
       "properties": {
         "ehal_bindings": {
           "$ref": "#/definitions/ehal_bindings"
+        },
+        "ha_ess_force": {
+          "type": "object",
+          "description": "Optional HA vendor force-charge/discharge (e.g. huawei_solar services) when no set_ess_active_power entity exists.",
+          "required": ["driver", "device_id"],
+          "properties": {
+            "driver": {
+              "type": "string",
+              "enum": ["huawei_solar"]
+            },
+            "device_id": {
+              "type": "string",
+              "description": "Home Assistant device registry id for the LUNA/battery device."
+            },
+            "duration_min": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440,
+              "default": 20,
+              "description": "Force duration re-issued each control cycle (minutes)."
+            }
+          }
         }
       }
     },

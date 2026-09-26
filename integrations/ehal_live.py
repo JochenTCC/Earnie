@@ -167,6 +167,12 @@ def get_ha_adapter() -> HaAdapter:
     sign = config.get("EHAL_HA_SIGN") or {}
     if not isinstance(sign, dict):
         sign = {}
+    ha_ess_force = None
+    house = load_house_profiles_for_ha()
+    if isinstance(house, dict):
+        plant = house.get("plant")
+        if isinstance(plant, dict) and plant.get("ha_ess_force"):
+            ha_ess_force = plant.get("ha_ess_force")
     cfg = HaConfig(
         base_url=base_url,
         token=token,
@@ -176,6 +182,7 @@ def get_ha_adapter() -> HaAdapter:
         ),
         sign=canonicalize_ha_entity_keys({str(k): str(v) for k, v in sign.items()}),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
+        ha_ess_force=ha_ess_force if isinstance(ha_ess_force, dict) else None,
     )
     if _ha_adapter is not None and _ha_adapter.cfg != cfg:
         _ha_adapter = None
@@ -287,11 +294,29 @@ def write_ess_setpoints_from_control(
     mode: int, target_power_kw: float, max_power_kw: float | None = None
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
     """Map optimizer mode/power to EHAL Design C1 ESS setpoints."""
+    from house_config.battery_control import (
+        BATTERY_CONTROL_LIMITS_ONLY,
+        BATTERY_CONTROL_READ_ONLY,
+        control_from_battery_params,
+    )
+
+    battery_params = config.get_battery_params()
+    control = control_from_battery_params(battery_params)
+    if control == BATTERY_CONTROL_READ_ONLY:
+        return None, []
+
     if max_power_kw is None:
-        max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
+        max_power_kw = float(battery_params.get("max_power_kw") or 0.0)
     active_kw, charge_kw, discharge_kw, control_cmd = loxone_client.map_ess_setpoints(
         mode, target_power_kw, float(max_power_kw)
     )
+    if control == BATTERY_CONTROL_LIMITS_ONLY:
+        active_kw = None
+        if mode in (1, 3):
+            mode = 0
+            active_kw, charge_kw, discharge_kw, control_cmd = (
+                loxone_client.map_ess_setpoints(0, 0.0, float(max_power_kw))
+            )
     adapter = get_network_adapter()
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     charge_w = max(0.0, float(charge_kw) * 1000.0)

@@ -16,56 +16,22 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.2`**.
+**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.3`**.
 
-**Next:** Live **H11** Gen2 check under **2.6.j** (verify → close without change, or **H11 (fix)** in the same chapter). In parallel **2.6.e**. Then **2.6.m**. **H0** ships with the publish after **2.6.m** (or path **B**/**C** then). Then **2.6.n** (battery controllability).
+**Next:** Version **2.6** feature letters done (through **2.6.n**). Next: community/official publish as needed, then **2.7**.
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
 **Documents:**
 
 - [House simulator spec](../docs/spec/house-sim.md) — HouseSim S1–S4 (archetypes, core, S4 integration)
-- [HA compatibility tests (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — HouseSim S3 / **2.6.e** / **2.6.n**
-- [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — **2.6.e** (confirm-before-save; LLM stays out of 2.6)
+- [HA compatibility tests (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — HouseSim S3 / **2.6.n** (done)
+- [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — confirm-before-save; LLM stays out of 2.6 (**2.6.e** done)
 - [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**
-- [Installation hardening (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md) — findings H0–H13, sprint plan, version channels — Sprint 1–4 = **2.6.j** / **2.6.k** / **2.6.l** / **2.6.m**
+- [Installation hardening (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md) — findings H0–H13, sprint plan, version channels — Sprint 1–4 = **2.6.j** / **2.6.k** / **2.6.l** / **2.6.m** (all done — see [Backlog-Erledigt.md](Backlog-Erledigt.md))
 - [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — add-on packaging items; channel work is now **2.6.k**
 - [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood / HA coupling context
 - [HA-Loxone-Bridge-Builder draft](HA-Loxone-Bridge-Builder-Draft.md) — research item, not 2.6
-
-#### Installation hardening (Sprint 1–4 of the concept doc)
-
-Trigger: support case 2026-09-25 (HA add-on crash loop on a `kvm64` VM, see [Backlog-Erledigt.md](Backlog-Erledigt.md)). IDs **H0–H13** refer to the [concept doc](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md).
-
-- [ ] **2.6.j — Sprint 1: quick safeguards + verification** (code done 2026-09-26; see [Backlog-Erledigt.md](Backlog-Erledigt.md))
-  - [ ] **H0** Ship x86-64-v2 preflight with the **next** image publish after **2.6.m** (deferred; not required for community `2.6.0-alpha.2`)
-  - [ ] **H11 (verify)** Gen2 Miniserver set to HTTPS-only vs. hard-coded `http://` in `integrations/loxone_client.py`
-    - **Live checklist (leave open until run):** on Gen2 with Config → Network → „Nur verschlüsselt“ / HTTPS only: (1) `http://<ms-ip>/jdev/sps/status` (or any jdev Earnie uses); (2) `http://<ms-ip>/data/LoxAPP3.json`; (3) optional write path `http://<ms-ip>/dev/sps/io/...`. If all fail (timeout / connection refused / TLS redirect only) → confirm H11 and do **H11 (fix)** below. If HTTP still works → close H11 without code change.
-  - [ ] **H11 (fix, only if verify confirms)** Configurable `http`/`https` for the Miniserver; pin the self-signed certificate by fingerprint instead of `verify=False`
-
-- [ ] **2.6.m — Sprint 4: startup checks + runtime monitoring**
-  - [ ] **H1** Extend `docker/cpu_check.sh` to `preflight.sh`: abort on non-writable data dir and on a clock before the image build date (wait briefly for NTP first); warn on RAM < 2 GB and < 500 MB free disk
-  - [ ] **H4** `HEALTHCHECK` in `docker/Dockerfile` (`/_stcore/health`, add-on internal `:8502`) + daemon heartbeat in `runtime/`; add-on `watchdog:` URL; LoxBerry `healthcheck` evaluates `.State.Health.Status` (WARN on `unhealthy`)
-
-#### Battery controllability
-
-Trigger: HouseSim S2 archetype `huawei_en` (only charge/discharge limits, no active-power entity) and `fronius_de` (read-only). Today Earnie plans Zwangsladen / Zwangsentladen it cannot execute on such installs; since the function-completeness check (see [Backlog-Erledigt.md](Backlog-Erledigt.md) 2026-09-26) the active-power setpoint is skipped instead of degrading ESS writes, but the plan still assumes it.
-
-- [ ] **2.6.n — Battery controllability in `house_config` + MILP**
-  - [ ] **House config:** per battery `control: "full" | "limits_only" | "read_only"` (default `full`, backward compatible). Property of the installation, so simulation / backtesting / scenario comparison (business case) use it without a live adapter.
-  - [ ] **MILP constraints:** `limits_only` → charge only from PV surplus, discharge only up to house load (no grid charging, no battery export); modes derived from the plan are only Automatik / Entladesperre. `read_only` → battery modelled as pure self-consumption, no setpoints.
-  - [ ] **Cross-check with the mapping:** warn in EHAL-Com / Live when `control` says more than the bound functions allow (`ehal.functions`: `ess_limits`, `ess_active`), e.g. `full` without `set_ess_active_power`.
-  - [ ] **Deviation evaluation:** `deviation_eval` must not expect forced modes on `limits_only` / `read_only`.
-  - [ ] **Decision: Huawei forcible charge via HA service.** `huawei_solar` offers force charge/discharge only as a service (plus `storage_power_of_charge_from_grid` / working mode `select`). Evaluate whether the HA adapter should call such vendor services, which would make Huawei `full` again — decides how many users the `limits_only` restriction really hits.
-  - [ ] Tests on HouseSim archetypes `huawei_en` (limits only) and `fronius_de` (read-only); docs `ehal.md`, `ehal-com.md`, house-config docs.
-
-#### HA mapping proposals
-
-- [ ] **2.6.e — Stronger propose, still confirm-before-save.** Replay the HouseSim archetypes with an empty Pattern B map and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). Empty-only propose rules apply to Pattern B bindings.
-  - Prerequisites done 2026-09-26: HouseSim S2 archetypes; physical-quantity filter in `heuristic_propose` (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). HouseSim S3 is not a prerequisite — archetypes replay directly in pytest.
-  - Baseline (correct / golden fields): `evcc_en` 13/13, `fronius_de` 3/9, `huawei_en` 0/11, `sma_keba` 3/9; no wrong-quantity proposals.
-  - [ ] Name recognition for vendor vocabularies, e.g. "state of capacity" → SoC, `power_meter` → grid, `nrg_11` / `charging_power` → wallbox, German Fronius names (`leistung_netz`, `ladezustand`), `metering_total_absorbed` / `…_yield` → grid energy.
-  - [ ] Target (pytest over all archetypes): **no wrong proposal** on any field; unambiguous fields hit; leaving a field empty is fine, a wrong binding is not. Known distractors (`inverter_active_power`, SMA `…_grid_power`, Fronius `leistung_verbrauch`) must not be proposed.
 
 ### Version 2.7 — Multiple storages and export power limitation
 

@@ -1,6 +1,7 @@
-"""HA entity → EHAL field heuristic propose (2.6.b / 2.6.c). No LLM."""
+"""HA entity → EHAL field heuristic propose (2.6.b / 2.6.c / 2.6.e). No LLM."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from integrations.ha_adapter import (
@@ -19,50 +20,115 @@ EHAL_HA_FIELDS = (
 _SENSOR_DOMAINS = frozenset({"sensor"})
 _WRITE_DOMAINS = WRITE_DOMAINS
 _ENERGY_EXCLUDE = ("energy", "ertrag", "kwh", "wh ")
+_HOUSE_LOAD_EXCLUDE = ("leistung_verbrauch", "verbrauch")
 
 # Per-field: name hints, allowed domains, optional device_class / unit boosts.
 _FIELD_RULES: dict[str, dict[str, Any]] = {
     "sens_grid_power_active": {
-        "hints": ("grid", "netz", "bezug", "energieversorger"),
+        "hints": (
+            "power_meter_active_power",
+            "power_meter",
+            "power meter",
+            "netzleistung",
+            "leistung_netz",
+            "grid",
+            "netz",
+            "bezug",
+            "energieversorger",
+        ),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("power",),
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
-        "exclude_hints": _ENERGY_EXCLUDE,
+        "exclude_hints": _ENERGY_EXCLUDE + _HOUSE_LOAD_EXCLUDE,
     },
     "sens_pv_production_active": {
-        "hints": ("pv", "solar", "produktion", "erzeug"),
+        "hints": (
+            "photovoltaik",
+            "input_power",
+            "pv_power",
+            "pv",
+            "solar",
+            "produktion",
+            "erzeug",
+        ),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("power",),
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
-        "exclude_hints": _ENERGY_EXCLUDE,
+        "exclude_hints": _ENERGY_EXCLUDE
+        + _HOUSE_LOAD_EXCLUDE
+        + ("inverter_active", "grid_power", "netz"),
     },
     "sens_ess_soc": {
-        "hints": ("soc", "ladezustand", "battery_soc", "batterie_soc"),
+        "hints": (
+            "state_of_capacity",
+            "state of capacity",
+            "battery_soc",
+            "batterie_soc",
+            "ladezustand",
+            "soc",
+        ),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("battery",),
         "units": ("%", "percent"),
     },
     "sens_ess_power": {
-        "hints": ("battery_power", "batterie", "speicher", "akku", "ess_power"),
-        "domains": _SENSOR_DOMAINS,
-        "device_classes": ("power",),
-        "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
-        "exclude_hints": ("soc", "grid", "pv", "loadpoint", "charge_power")
-        + _ENERGY_EXCLUDE,
-    },
-    "sens_evcs_active_power": {
         "hints": (
-            "loadpoint",
-            "charge_power",
-            "wallbox",
-            "evcs",
-            "e-auto",
-            "eauto",
+            "charge_discharge_power",
+            "charge_discharge",
+            "charge discharge",
+            "batterieleistung",
+            "battery_power",
+            "leistung_batterie",
+            "batterie",
+            "speicher",
+            "akku",
+            "ess_power",
         ),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("power",),
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
-        "exclude_hints": _ENERGY_EXCLUDE,
+        "exclude_hints": (
+            "soc",
+            "grid",
+            "pv",
+            "loadpoint",
+            "charge_power",
+            "charging_power",
+            "nrg_11",
+            "power_charge",
+            "power_discharge",
+            "charge_total",
+            "discharge_total",
+        )
+        + _ENERGY_EXCLUDE,
+    },
+    "sens_evcs_active_power": {
+        "hints": (
+            "nrg_11",
+            "nrg 11",
+            "charging_power",
+            "charging power",
+            "charge_power",
+            "loadpoint",
+            "wallbox",
+            "wattpilot",
+            "keba",
+            "evcs",
+            "e-auto",
+            "eauto",
+            "goe",
+        ),
+        "domains": _SENSOR_DOMAINS,
+        "device_classes": ("power",),
+        "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
+        "exclude_hints": _ENERGY_EXCLUDE
+        + (
+            "battery",
+            "batterie",
+            "charge_discharge",
+            "batteries",
+            "speicher",
+        ),
     },
     "sens_power_consumers": {
         "hints": ("hauslast", "house_load", "house load", "verbraucher", "home_power"),
@@ -72,58 +138,113 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
         "exclude_hints": _ENERGY_EXCLUDE,
     },
     "sens_pv_energy": {
-        "hints": ("pv_energy", "pv energy", "solar energy", "solar_energy", "ertrag"),
+        "hints": (
+            "energie_gesamt",
+            "total_yield",
+            "total yield",
+            "pv_energy",
+            "pv energy",
+            "solar energy",
+            "solar_energy",
+            "ertrag",
+        ),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("energy",),
         "state_classes": ("total_increasing",),
         "units": ("kwh", "wh", "kilowatt-hour", "kilowatt-hours", "watt-hour", "watt-hours"),
-        "exclude_hints": ("grid", "import", "export", "battery", "loadpoint"),
+        "exclude_hints": (
+            "grid",
+            "import",
+            "export",
+            "battery",
+            "loadpoint",
+            "metering",
+            "absorbed",
+            "consumption",
+            "exported",
+            "wirkenergie",
+        ),
     },
     "sens_grid_energy_import": {
         "hints": (
+            "metering_total_absorbed",
+            "wirkenergie_verbraucht",
+            "power_meter_consumption",
             "grid_import",
             "import_energy",
             "grid import",
             "netzbezug",
             "bezug_energy",
             "energy_from_grid",
+            "absorbed",
+            "consumption",
         ),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("energy",),
         "state_classes": ("total_increasing",),
         "units": ("kwh", "wh", "kilowatt-hour", "kilowatt-hours", "watt-hour", "watt-hours"),
-        "exclude_hints": ("export", "einspeis", "pv", "solar", "battery"),
+        "exclude_hints": ("export", "einspeis", "pv", "solar", "battery", "produziert", "exported"),
     },
     "sens_grid_energy_export": {
         "hints": (
+            "metering_total_yield",
+            "wirkenergie_produziert",
+            "power_meter_exported",
             "grid_export",
             "export_energy",
             "grid export",
             "einspeis",
             "feed_in",
             "energy_to_grid",
+            "exported",
+            "produziert",
         ),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("energy",),
         "state_classes": ("total_increasing",),
         "units": ("kwh", "wh", "kilowatt-hour", "kilowatt-hours", "watt-hour", "watt-hours"),
-        "exclude_hints": ("import", "bezug", "pv", "solar", "battery"),
+        "exclude_hints": (
+            "import",
+            "bezug",
+            "pv",
+            "solar",
+            "battery",
+            "absorbed",
+            "consumption",
+            "verbraucht",
+        ),
     },
     "set_ess_active_power": {
         "hints": ("active_power", "sollleistung", "ess setpoint", "ziel leistung"),
         "domains": _WRITE_DOMAINS,
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
-        "exclude_hints": ("charge_limit", "discharge_limit", "max_current", "mode"),
+        "exclude_hints": ("charge_limit", "discharge_limit", "max_current", "mode", "ladegrenze", "entladegrenze"),
     },
     "set_ess_charge_power_limit": {
-        "hints": ("charge_limit", "ladegrenze", "charge limit", "max lade"),
+        "hints": (
+            "maximum_charging_power",
+            "maximum charging",
+            "charge_limit",
+            "ladegrenze",
+            "charge limit",
+            "max lade",
+        ),
         "domains": _WRITE_DOMAINS,
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
+        "exclude_hints": ("discharge", "discharging", "entlade"),
     },
     "set_ess_discharge_power_limit": {
-        "hints": ("discharge_limit", "entladegrenze", "discharge limit", "max entlade"),
+        "hints": (
+            "maximum_discharging_power",
+            "maximum discharging",
+            "discharge_limit",
+            "entladegrenze",
+            "discharge limit",
+            "max entlade",
+        ),
         "domains": _WRITE_DOMAINS,
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
+        "exclude_hints": ("charging", "ladegrenze", "max lade"),
     },
     "set_ess_mode": {
         "hints": ("ess_mode", "mode_hint", "steuerbefehl", "ess mode", "control_cmd"),
@@ -137,9 +258,11 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
             "ladestrom",
             "sollstrom",
             "set current",
+            "amp",
         ),
         "domains": _WRITE_DOMAINS,
         "units": ("a", "amp", "ampere"),
+        "exclude_hints": ("battery", "batterie", "ess", "mode"),
     },
     "set_evcs_mode": {
         "hints": ("evcs_mode", "ev mode", "pv_follow", "charge_immediate", "sofort"),
@@ -210,17 +333,22 @@ def heuristic_propose(
             continue
         best_id = ""
         best_score = 0.0
+        tied = False
         for row in rows:
             score = _score_row(row, rules, field)
             if score > best_score:
                 best_score = score
                 best_id = row["entity_id"]
-        if best_id and best_score >= _MIN_SCORE:
-            proposals[field] = {
-                "entity_id": best_id,
-                "confidence": round(min(0.75, best_score), 2),
-                "source": "heuristic",
-            }
+                tied = False
+            elif score > 0 and score == best_score and row["entity_id"] != best_id:
+                tied = True
+        if tied or not best_id or best_score < _MIN_SCORE:
+            continue
+        proposals[field] = {
+            "entity_id": best_id,
+            "confidence": round(min(0.75, best_score), 2),
+            "source": "heuristic",
+        }
     return proposals
 
 
@@ -255,9 +383,12 @@ def _score_row(row: dict[str, Any], rules: dict[str, Any], field: str = "") -> f
         return 0.0
     exclude = rules.get("exclude_hints") or ()
     for bad in exclude:
-        if bad in row["name_raw"] or bad in row["name_blob"]:
+        if _token_match(row["name_raw"], row["name_blob"], bad):
             return 0.0
-    score = _hint_score(row["name_raw"], row["name_blob"], rules.get("hints") or ())
+    hint_score = _hint_score(row["name_raw"], row["name_blob"], rules.get("hints") or ())
+    if hint_score <= 0:
+        return 0.0
+    score = hint_score
     device_classes = rules.get("device_classes") or ()
     if device_classes and row["device_class"] in device_classes:
         score = max(score, 0.45) + 0.15
@@ -267,15 +398,11 @@ def _score_row(row: dict[str, Any], rules: dict[str, Any], field: str = "") -> f
     units = rules.get("units") or ()
     if units and row["unit"] in units:
         score += 0.10
-    # Name match is required for a proposal — attrs alone are too ambiguous
-    # (many power sensors share device_class=power).
     if score < _MIN_SCORE:
         return 0.0
-    # Ensure at least one name hint contributed (attrs-only would be < 0.35 after
-    # the check above only if we had no hint; boost path can exceed threshold).
-    if _hint_score(row["name_raw"], row["name_blob"], rules.get("hints") or ()) <= 0:
-        return 0.0
-    return min(0.75, score)
+    # Leave uncapped for ranking so longer vendor hints beat bare tokens
+    # (confidence is capped when writing the proposal).
+    return score
 
 
 def _physically_compatible(row: dict[str, Any], field: str) -> bool:
@@ -295,7 +422,25 @@ def _physically_compatible(row: dict[str, Any], field: str) -> bool:
 def _hint_score(name_raw: str, name_blob: str, hints: tuple[str, ...]) -> float:
     score = 0.0
     for hint in hints:
-        low = hint.lower()
-        if low in name_raw or low in name_blob:
-            score = max(score, 0.55 + 0.05 * min(len(low), 4))
+        low = hint.lower().strip()
+        if not low:
+            continue
+        if _token_match(name_raw, name_blob, low):
+            # Longer vendor phrases beat bare tokens (netzleistung > grid).
+            score = max(score, 0.55 + 0.02 * min(len(low), 20))
     return score
+
+
+def _token_match(name_raw: str, name_blob: str, hint: str) -> bool:
+    """True when ``hint`` matches as whole token(s), not a substring of a longer word."""
+    low = hint.lower().strip()
+    if not low:
+        return False
+    blob_hint = " ".join(low.replace(".", " ").replace("_", " ").split())
+    if blob_hint:
+        blob_pat = r"(?:^|\s)" + re.escape(blob_hint) + r"(?:$|\s)"
+        if re.search(blob_pat, name_blob):
+            return True
+    raw_hint = low.replace(" ", "_")
+    raw_pat = r"(?:^|[^a-z0-9])" + re.escape(raw_hint) + r"(?:$|[^a-z0-9])"
+    return re.search(raw_pat, name_raw) is not None

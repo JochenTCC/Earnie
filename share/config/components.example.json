@@ -11,6 +11,7 @@
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "threshold_power": 0.05,
+            "control": "full",
             "battery_wear": {
                 "enabled": true,
                 "replacement_cost_euro": 1500,
@@ -27,6 +28,7 @@
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "threshold_power": 0.02,
+            "control": "full",
             "battery_wear": {
                 "enabled": true,
                 "replacement_cost_euro": 3000,

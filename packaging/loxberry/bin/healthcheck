@@ -17,7 +17,16 @@ case "$ARG" in
   check)
     STATE="$(docker inspect -f '{{.State.Status}}' "$CONTAINER" 2>/dev/null || true)"
     if [ "$STATE" = "running" ]; then
-      echo "Earnie container is running."
+      HEALTH="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$CONTAINER" 2>/dev/null || true)"
+      if [ "$HEALTH" = "unhealthy" ]; then
+        echo "Earnie container is running but Docker reports unhealthy (Streamlit/daemon)."
+        exit 4
+      fi
+      if [ -n "$HEALTH" ] && [ "$HEALTH" != "healthy" ] && [ "$HEALTH" != "starting" ]; then
+        echo "Earnie container health status is '${HEALTH}'."
+        exit 4
+      fi
+      echo "Earnie container is running${HEALTH:+ (health=$HEALTH)}."
       exit 5
     fi
     SVC="$(systemctl show --value --property ActiveState earnie 2>/dev/null || true)"

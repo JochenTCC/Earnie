@@ -578,6 +578,7 @@ if __name__ == "__main__":
         needs_loxone_setup,
     )
     from runtime_store.dotenv_loader import load_app_dotenv
+    from runtime_store.daemon_heartbeat import touch_daemon_heartbeat
     from runtime_store.env_vars import is_planning_offline_gated
     from runtime_store.setup_gate_log import log_setup_gate_wait
     from ui.setup_readiness import is_planning_ready, needs_planning_onboarding
@@ -586,7 +587,12 @@ if __name__ == "__main__":
     _setup_gate_state: dict = {}
     next_trigger = TRIGGER_QUARTER_HOUR
 
+    def _wait_poll() -> None:
+        touch_daemon_heartbeat()
+        power_interval_sampler.tick()
+
     while True:
+        touch_daemon_heartbeat()
         if needs_loxone_setup():
             log_setup_gate_wait(
                 _setup_gate_state,
@@ -698,7 +704,7 @@ if __name__ == "__main__":
             )
             early = wait_until_next_run(
                 total_wait_sec=wait_sec,
-                on_poll=power_interval_sampler.tick,
+                on_poll=_wait_poll,
             )
             if early == TRIGGER_REQUEST_OPTIMIZE:
                 next_trigger = TRIGGER_REQUEST_OPTIMIZE

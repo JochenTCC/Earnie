@@ -3,7 +3,7 @@
   "market": "AT/DE (Huawei sehr verbreitet; go-e: österreichischer Hersteller)",
   "tests": [
     "Hersteller-Vorzeichen: Zähler + = Einspeisen, Batterie + = Laden → sign negate",
-    "Kein Wirkleistungs-Setpoint, nur Lade-/Entladelimits (Force-Charge nur als Service) → Sim-Batterie im Eigenverbrauch",
+    "Kein Wirkleistungs-Setpoint in der golden Map, nur Lade-/Entladelimits → Sim-Batterie im Eigenverbrauch (limits_only). Force-Charge als huawei_solar-Service ist optional via plant.ha_ess_force (nicht in dieser golden Map)",
     "SoC heißt 'state of capacity'; Netz heißt 'power meter'",
     "Batterie-Gesamtzähler mit state_class total (nicht total_increasing)",
     "Distraktor: sensor.inverter_active_power (AC-Ausgang, nicht PV und nicht Netz)",
