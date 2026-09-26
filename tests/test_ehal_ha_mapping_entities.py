@@ -1,13 +1,25 @@
 """UI-adjacent tests for HA entity-centric EHAL mapping (2.6.h)."""
 from __future__ import annotations
 
+import pytest
+
 from integrations.ehal_debug_mapping import (
     expand_ha_telemetry_for_live,
     expand_ha_writes_for_live,
     ha_pattern_b_live_mapping,
 )
-from integrations.ha_adapter import TELEMETRY_ENERGY_OPTIONAL
-from ui.ehal_ha_mapping import _ha_entity_fields
+from integrations.ha_adapter import TELEMETRY_ENERGY_OPTIONAL, TELEMETRY_REQUIRED
+from ui import ehal_ha_mapping as ha_map
+from ui.ehal_ha_mapping import (
+    _NONE,
+    _entity_options,
+    _field_select_caption,
+    _ha_credentials,
+    _ha_entity_fields,
+    _persist_ha_ess_force,
+    _proposed_entity_id,
+    _validate_mapping_save,
+)
 from ui.ehal_loxone_mapping import (
     PLANT_ENTITY_ID,
     apply_entity_bindings,
@@ -51,6 +63,120 @@ def test_ha_plant_fields_include_energy_optional():
     fields = _ha_entity_fields(plant)
     for name in TELEMETRY_ENERGY_OPTIONAL:
         assert name in fields
+
+
+def test_ha_consumer_fields_unchanged():
+    rows = build_entity_rows(_sample_house(), "live")
+    wallbox = next(r for r in rows if r["id"] == "wallbox")
+    assert _ha_entity_fields(wallbox) == tuple(wallbox["fields"])
+    for name in TELEMETRY_ENERGY_OPTIONAL:
+        assert name not in _ha_entity_fields(wallbox)
+
+
+def test_proposed_entity_id_reads_nested_and_ignores_junk():
+    assert _proposed_entity_id({}, "sens_ess_soc") == ""
+    assert _proposed_entity_id({"sens_ess_soc": "sensor.x"}, "sens_ess_soc") == ""
+    assert (
+        _proposed_entity_id(
+            {"sens_ess_soc": {"entity_id": " sensor.soc ", "score": 1}},
+            "sens_ess_soc",
+        )
+        == "sensor.soc"
+    )
+
+
+def test_entity_options_dedupes_and_keeps_current():
+    rows = [{"entity_id": "sensor.a"}, {"entity_id": ""}, {"entity_id": "sensor.b"}]
+    opts = _entity_options(rows, ["sensor.b", "sensor.orphan", ""])
+    assert opts[0] == _NONE
+    assert opts[1:] == ["sensor.a", "sensor.b", "sensor.orphan"]
+
+
+def test_field_select_caption_marks_required():
+    caption = _field_select_caption("sens_ess_soc", required=True)
+    assert "`sens_ess_soc`" in caption
+    assert caption.endswith(" *")
+    assert not _field_select_caption("sens_ess_soc").endswith(" *")
+
+
+def test_validate_mapping_save_requires_plant_telemetry():
+    err = _validate_mapping_save(PLANT_ENTITY_ID, {"sens_ess_soc": "sensor.soc"})
+    assert err is not None and "Pflichtfelder fehlen" in err
+    for name in TELEMETRY_REQUIRED:
+        if name == "sens_ess_soc":
+            continue
+        assert name in err
+    assert (
+        _validate_mapping_save(
+            PLANT_ENTITY_ID,
+            {name: f"sensor.{name}" for name in TELEMETRY_REQUIRED},
+        )
+        is None
+    )
+    assert _validate_mapping_save("wallbox", {}) is None
+
+
+def test_persist_ha_ess_force_write_and_clear():
+    house = {"plant": {"ehal_bindings": {"sens_ess_soc": "sensor.soc"}}}
+    with_force = _persist_ha_ess_force(
+        house,
+        {"driver": "huawei_solar", "device_id": "dev-1", "duration_min": 20},
+    )
+    assert with_force["plant"]["ha_ess_force"]["device_id"] == "dev-1"
+    assert with_force["plant"]["ehal_bindings"]["sens_ess_soc"] == "sensor.soc"
+    cleared = _persist_ha_ess_force(with_force, None)
+    assert "ha_ess_force" not in cleared["plant"]
+    empty = _persist_ha_ess_force({"other": 1}, None)
+    assert "plant" not in empty
+
+
+def test_ha_credentials_reads_sign_and_env(monkeypatch):
+    monkeypatch.setattr(
+        "runtime_store.dotenv_io.read_ha_credentials",
+        lambda: ("http://ha.local:8123", "tok"),
+    )
+    creds = _ha_credentials(
+        {
+            "ehal": {
+                "backend": "ha",
+                "adapter_id": "ha-1",
+                "ha": {"sign": {"sens_grid_power_active": "negate"}},
+            }
+        }
+    )
+    assert creds["backend"] == "ha"
+    assert creds["base_url"] == "http://ha.local:8123"
+    assert creds["token"] == "tok"
+    assert creds["sign"]["sens_grid_power_active"] == "negate"
+
+
+def test_adapter_from_form_requires_resolved_credentials(monkeypatch):
+    monkeypatch.setattr(
+        "integrations.ha_supervisor.resolve_ha_base_url", lambda url: url or None
+    )
+    monkeypatch.setattr(
+        "integrations.ha_supervisor.resolve_ha_token", lambda tok: tok or None
+    )
+    with pytest.raises(ValueError, match="URL und Token"):
+        ha_map._adapter_from_form("", "", {})
+    adapter = ha_map._adapter_from_form(
+        "http://ha.local:8123", "tok", {"sens_ess_soc": "sensor.soc"}
+    )
+    assert adapter.cfg.base_url == "http://ha.local:8123"
+    assert adapter.cfg.entities["sens_ess_soc"] == "sensor.soc"
+
+
+def test_clear_map_widget_keys_drops_session_entries(monkeypatch):
+    state = {
+        "ehal_ha_map_plant_sens_ess_soc": "sensor.soc",
+        "ehal_ha_map_plant_other": "x",
+        "keep": 1,
+    }
+    monkeypatch.setattr(ha_map.st, "session_state", state)
+    ha_map._clear_map_widget_keys("plant", ("sens_ess_soc", "sens_grid_power_active"))
+    assert "ehal_ha_map_plant_sens_ess_soc" not in state
+    assert state["keep"] == 1
+    assert state["ehal_ha_map_plant_other"] == "x"
 
 
 def test_ha_apply_entity_bindings_per_entity():

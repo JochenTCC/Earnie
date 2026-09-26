@@ -78,7 +78,11 @@ markers = [
 
 [tool.coverage.run]
 source = ["optimizer", "data", "house_config", "simulation", "settings", "runtime_store", "ehal"]
-omit = ["tests/*", "scripts/*"]
+omit = [
+    "tests/*",
+    "scripts/*",
+    "**/house_sim/ha_integration/**",
+]
 
 [tool.coverage.report]
 exclude_lines = [
