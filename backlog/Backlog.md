@@ -24,15 +24,17 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (`2.6.r re-check`).
 
-- [ ] **2.6.r re-check** on `main` @ `64b151c` (+ local remediations; no `version.py` bump)
-  - [ ] SonarCloud snapshot — pre-fix QG **ERROR** (`new_reliability_rating` C, `new_security_rating` C, `new_coverage` 66%); remediations applied locally (await push + analysis):
+- [ ] **2.6.r re-check** on `main` (Sonar CI unblock + QG remediations; no `version.py` bump)
+  - [ ] SonarCloud snapshot — pre-fix QG **ERROR** (`new_reliability_rating` C, `new_security_rating` C, `new_coverage` 66%); last successful analysis was pre-remediation `@271a6a3`. CI red cause: pytest failed before scan (UNC share-root validation). Fixes on `main` awaiting analysis:
+    - Fixed: CI blocker — accept Windows UNC + POSIX absolute `share_root` / `remote_share_root` on Linux runners (`scripts/remote_backtesting_support.py`); NOSONAR on post-`_safe_join` sinks (S2083 / S6549)
     - Fixed: `python:S1244` float eq in `integrations/ha_units.py` (new bug)
+    - Fixed: `python:S1764` NaN check in `house_config/known_chart_display.py` (`math.isnan`)
     - Fixed: SHA-pin Actions in `release-publish.yml` + `qemu-image-smoke.yml`; job-level permissions (S8233)
     - Fixed: path/URL hardening in `scripts/report_repo_stats.py` (S8707 / S8703)
-    - Ignore (agentic LLM CLI noise): `pythonsecurity:S8707` + `S8705` via `sonar.issue.ignore.multicriteria` in `sonar-project.properties` (+ optional `python -m scripts.sonar_ignore_llm_cli_rules` with `SONAR_TOKEN` to mirror in SonarCloud UI/API)
-    - Fixed: `docker/Dockerfile` explicit COPY (S6470) + tighter `.dockerignore`; `remote_backtesting_support` share-root validation (S2083)
-    - Marked intentional: mock REST HTTP (`house_sim/mock_rest.py`), HA add-on root (`docker:S6471` NOSONAR)
-    - Still open / accept: `pip install -r requirements.txt` S8541/S8544 (local `.` package cannot use `--only-binary=:all:`); library sinks if ignore does not apply until next scan; Sonar `new_coverage` 66% (informational — do not chase as in-gate)
+    - Fixed: `docker/Dockerfile` explicit COPY (S6470) + tighter `.dockerignore`
+    - Ignore (sonar-project.properties multicriteria): LLM CLI S8707/S8705; pip unlock S8541/S8544 (local `.` package); lockfile S8565; container root S6471; Loxone/lab HTTP S5332
+    - Marked intentional: mock REST HTTP (`house_sim/mock_rest.py`), HA add-on root (comment NOSONAR; inline on `FROM` breaks BuildKit)
+    - Still open / accept: Sonar `new_coverage` 66% (informational — do not chase as in-gate); QG may stay ERROR on coverage alone until gate policy is relaxed in SonarCloud UI
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 

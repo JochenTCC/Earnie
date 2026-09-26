@@ -71,6 +71,15 @@ def test_validated_share_root_rejects_relative_and_controls(tmp_path):
     assert root == tmp_path.resolve()
 
 
+def test_validated_share_root_accepts_unc_and_posix_cross_os():
+    unc = _validated_configured_root(
+        r"\\NAS\EnergyOptimizer\backtesting-sync", field="share_root"
+    )
+    assert str(unc) == r"\\NAS\EnergyOptimizer\backtesting-sync"
+    posix = _validated_configured_root("/mnt/nas/backtesting-sync", field="share_root")
+    assert str(posix).replace("\\", "/") == "/mnt/nas/backtesting-sync"
+
+
 def test_result_share_dir_rejects_escape(tmp_path):
     cfg = _minimal_config()
     cfg["share_root"] = str(tmp_path)
