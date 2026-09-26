@@ -34,6 +34,7 @@ SETPOINT_FIELDS = (
     "set_ess_mode",
     "set_evcs_max_current",
     "set_evcs_mode",
+    "set_grid_export_power_limit",
 )
 
 # Numeric encoding of the Loxone Modus Merker (Pattern B).
@@ -54,6 +55,8 @@ class LoxoneConfig:
     consumers_power_name: str = ""
     evcs_max_current_name: str = ""
     evcs_mode_name: str = ""
+    grid_export_limit_in_name: str = ""
+    grid_export_limit_out_name: str = ""
     timeout_sec: float = 10.0
 
 
@@ -75,6 +78,14 @@ def ehal_limit_w_to_loxone_kw(limit_w: float) -> float:
     return max(0.0, float(limit_w)) / 1000.0
 
 
+def ehal_export_limit_w_to_loxone_kw(limit_w: float) -> float:
+    """EHAL export limit (W) → Loxone Merker (kW). ``-1`` sticky = unconstrained."""
+    value = float(limit_w)
+    if value < 0.0:
+        return -1.0
+    return value / 1000.0
+
+
 def ehal_active_power_w_to_loxone_kw(active_w: float) -> float:
     """EHAL signed active power (W, +discharge) → Loxone Merker (kW, same sign)."""
     return float(active_w) / 1000.0
@@ -91,11 +102,13 @@ class LoxoneAdapter:
             "set_ess_charge_power_limit": cfg.charge_power_name,
             "set_ess_discharge_power_limit": cfg.discharge_power_name,
             "set_evcs_max_current": cfg.evcs_max_current_name,
+            "set_grid_export_power_limit": cfg.grid_export_limit_out_name,
         }
         functions = available_functions(write_map)
         self._supports_ess_write = "ess_limits" in functions
         self._supports_ess_active = "ess_active" in functions
         self._supports_evcs_current = "evcs_current" in functions
+        self._supports_grid_export_limit = "grid_export_limit" in functions
         for message in incomplete_function_messages(write_map):
             logger.warning("Loxone mapping adapter_id=%s: %s", cfg.adapter_id, message)
         self._incomplete_fields = incomplete_function_fields(write_map)
@@ -155,6 +168,16 @@ class LoxoneAdapter:
             "sens_ess_power": ess_w,
             "sens_power_consumers": self._read_or_derive_consumers(pv_w, grid_w, ess_w),
         }
+        if self.cfg.grid_export_limit_in_name:
+            raw = loxone_client.fetch_loxone_generic_value(
+                self.cfg.grid_export_limit_in_name
+            )
+            if raw is not None:
+                try:
+                    # Loxone Merker in kW → EHAL W
+                    doc["get_grid_export_power_limit"] = max(0.0, float(raw)) * 1000.0
+                except (TypeError, ValueError):
+                    pass
         return validate_telemetry(doc)
 
     def write_setpoints(
@@ -247,6 +270,19 @@ class LoxoneAdapter:
                 failed.append("set_ess_discharge_power_limit")
                 messages.append(msg)
                 flip = True
+        if "set_grid_export_power_limit" in doc:
+            if not self.cfg.grid_export_limit_out_name:
+                self._skip("set_grid_export_power_limit")
+            else:
+                ok, msg = self._try_marker_write(
+                    self.cfg.grid_export_limit_out_name,
+                    ehal_export_limit_w_to_loxone_kw(
+                        doc["set_grid_export_power_limit"]
+                    ),
+                )
+                if not ok:
+                    failed.append("set_grid_export_power_limit")
+                    messages.append(msg)
         return flip
 
     def _write_evcs_setpoints(

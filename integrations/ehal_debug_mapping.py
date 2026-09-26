@@ -21,6 +21,7 @@ PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_power_consumers",
     "sens_temperature_outside",
     "sens_absent_mode",
+    "get_grid_export_power_limit",
 )
 
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
@@ -28,6 +29,7 @@ PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
+    "set_grid_export_power_limit",
 )
 
 EV_LIVE_READ_FIELDS: tuple[str, ...] = (
@@ -266,6 +268,18 @@ def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dic
         io_name = str(config.get(cfg_key) or "").strip()
         if io_name:
             index[io_name] = field
+
+    try:
+        from house_config.ehal_bindings import resolve_plant_binding
+        from optimizer.live_export_limit import load_house_doc
+
+        export_io = str(
+            resolve_plant_binding(load_house_doc(), "set_grid_export_power_limit") or ""
+        ).strip()
+        if export_io:
+            index[export_io] = "set_grid_export_power_limit"
+    except Exception:  # noqa: BLE001 — status JSON still works without plant doc
+        pass
 
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()

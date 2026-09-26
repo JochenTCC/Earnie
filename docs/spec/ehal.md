@@ -78,6 +78,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 | `get_evcs_ready_by_time` | no | string | Ready-by deadline (Loxone: AlarmClock SpecialState10 via `/all`, Tna text backup; binding = baustein name) |
 | `get_evcs_limit_soc` | no | % | Charge limit SoC |
 | `get_evcs_soc_min_immediate` | no | % | ASAP min SoC floor; ≤0 or absent = inactive; clamped to limit SoC |
+| `get_grid_export_power_limit` | no | W | Optional inbound max export from grid/HEMS (2.7.a) |
 
 Machine schema: [`share/ehal/telemetry.schema.json`](../../share/ehal/telemetry.schema.json).
 
@@ -94,7 +95,8 @@ Setpoints are **math limits / forced power / modes**, not a full inner-loop cont
 | `set_ess_active_power` | no* | W | Forced ESS power (`+` discharge, `−` charge); **omit** on Automatik (OpenEMS: no Equals) |
 | `set_ess_charge_power_limit` | no* | W | Max charge power (magnitude ≥ 0) |
 | `set_ess_discharge_power_limit` | no* | W | Max discharge power (magnitude ≥ 0) |
-| `set_ess_mode` | no* | string/number | Sticky-backend control (Huawei Steuerbefehl); **0 = Automatik**; OpenEMS ignores |
+| `set_ess_mode` | no* | string/number | Sticky-backend control; **0 = Automatik**; **3 = Einspeisesperre** (2.7.a); OpenEMS ignores |
+| `set_grid_export_power_limit` | no* | W | Max grid export; sticky **−1** = unconstrained / release (2.7.a) |
 | `set_evcs_max_current` | no* | A | EV charge current setpoint / max current |
 | `set_evcs_mode` | no* | enum | `off` \| `pv` \| `now` |
 

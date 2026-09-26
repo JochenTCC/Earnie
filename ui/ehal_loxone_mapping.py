@@ -52,7 +52,7 @@ PLANT_FIELDS: tuple[str, ...] = (
     + tuple(
         f
         for f in SETPOINT_FIELDS
-        if f.startswith("set_ess_")
+        if f.startswith("set_ess_") or f == "set_grid_export_power_limit"
     )
 )
 

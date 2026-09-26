@@ -238,6 +238,10 @@ class OpenemsAdapter:
                 outcome.hub_status = status or outcome.hub_status
                 outcome.flip_ess = True
 
+        if "set_grid_export_power_limit" in doc:
+            # OpenEMS feed-in curtailment channel not wired yet — ignore quietly.
+            pass
+
     def _write_evcs_setpoint(
         self,
         doc: dict[str, Any],

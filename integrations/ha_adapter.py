@@ -39,6 +39,7 @@ TELEMETRY_OPTIONAL = (
     "sens_ess_power",
     "sens_evcs_active_power",
     "sens_power_consumers",
+    "get_grid_export_power_limit",
 )
 # Slot-Ist ΔkWh side channel (2.6.c) — not part of EHAL telemetry wire.
 TELEMETRY_ENERGY_OPTIONAL = (
@@ -53,6 +54,7 @@ SETPOINT_FIELDS = (
     "set_ess_mode",
     "set_evcs_max_current",
     "set_evcs_mode",
+    "set_grid_export_power_limit",
 )
 MAPPABLE_DOMAINS = frozenset({"sensor", "number", "select", "input_number"})
 WRITE_DOMAINS = frozenset({"number", "select", "input_number"})
@@ -361,6 +363,19 @@ class HaAdapter:
                 outcome.messages.append(msg)
                 outcome.hub_status = status or outcome.hub_status
 
+        if "set_grid_export_power_limit" in doc:
+            if not self.cfg.entities.get("set_grid_export_power_limit"):
+                self._skip("set_grid_export_power_limit", outcome)
+            else:
+                ok, status, msg = self._try_setpoint_write(
+                    "set_grid_export_power_limit",
+                    float(doc["set_grid_export_power_limit"]),
+                )
+                if not ok:
+                    outcome.failed.append("set_grid_export_power_limit")
+                    outcome.messages.append(msg)
+                    outcome.hub_status = status or outcome.hub_status
+
     def _huawei_force_payload(self, power_w: float) -> dict[str, Any]:
         force = self.cfg.ha_ess_force or {}
         duration = int(force.get("duration_min") or 20)
@@ -558,6 +573,9 @@ class HaAdapter:
 
     def _to_entity_unit(self, field_name: str, entity_id: str, value: float) -> float:
         """EHAL base unit → target entity unit, read fresh from HA on every write."""
+        # Sticky unconstrained sentinel stays -1 in the entity unit (not -1 W → mW).
+        if field_name == "set_grid_export_power_limit" and float(value) < 0.0:
+            return -1.0
         payload = self.read_state(entity_id)
         attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
         return round(from_ehal(field_name, value, attrs.get("unit_of_measurement")), 6)

@@ -193,7 +193,13 @@ def get_ha_adapter() -> HaAdapter:
 
 def get_loxone_adapter() -> LoxoneAdapter:
     global _loxone_adapter
+    from house_config.ehal_bindings import resolve_plant_binding
+    from optimizer.live_export_limit import load_house_doc
+
     ev = _first_ev_loxone_bindings()
+    house = load_house_doc()
+    export_in = resolve_plant_binding(house, "get_grid_export_power_limit")
+    export_out = resolve_plant_binding(house, "set_grid_export_power_limit")
     cfg = LoxoneConfig(
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "loxone-home"),
         soc_name=str(config.get("LOXONE_SOC_NAME") or ""),
@@ -209,6 +215,8 @@ def get_loxone_adapter() -> LoxoneAdapter:
         consumers_power_name=str(config.get("LOXONE_CONSUMERS_POWER_NAME") or ""),
         evcs_max_current_name=str(ev.get("evcs_max_current_name") or ""),
         evcs_mode_name=str(ev.get("evcs_mode_name") or ""),
+        grid_export_limit_in_name=str(export_in or ""),
+        grid_export_limit_out_name=str(export_out or ""),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
     )
     if _loxone_adapter is not None and _loxone_adapter.cfg != cfg:
@@ -290,15 +298,27 @@ def read_live_power_kw() -> dict[str, float] | None:
     }
 
 
+_OMIT_EXPORT_CAP = object()
+
+
 def write_ess_setpoints_from_control(
-    mode: int, target_power_kw: float, max_power_kw: float | None = None
+    mode: int,
+    target_power_kw: float,
+    max_power_kw: float | None = None,
+    *,
+    export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
-    """Map optimizer mode/power to EHAL Design C1 ESS setpoints."""
+    """Map optimizer mode/power to EHAL Design C1 ESS setpoints.
+
+    When ``export_cap_kw`` is passed (including ``None`` = unconstrained), also write
+    ``set_grid_export_power_limit`` (W; ``-1`` sentinel when unconstrained).
+    """
     from house_config.battery_control import (
         BATTERY_CONTROL_LIMITS_ONLY,
         BATTERY_CONTROL_READ_ONLY,
         control_from_battery_params,
     )
+    from optimizer.export_power_limit import export_limit_setpoint_w
 
     battery_params = config.get_battery_params()
     control = control_from_battery_params(battery_params)
@@ -338,6 +358,11 @@ def write_ess_setpoints_from_control(
         active_w = float(active_kw) * 1000.0
         setpoint["set_ess_active_power"] = active_w
         record_fields["set_ess_active_power"] = active_w
+    if export_cap_kw is not _OMIT_EXPORT_CAP:
+        cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
+        limit_w = export_limit_setpoint_w(cap)
+        setpoint["set_grid_export_power_limit"] = limit_w
+        record_fields["set_grid_export_power_limit"] = limit_w
     error = adapter.write_setpoints(setpoint)
     if error is not None:
         persist_write_error(error)

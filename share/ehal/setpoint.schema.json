@@ -45,6 +45,10 @@
       "type": "string",
       "enum": ["off", "pv", "now"],
       "description": "EV charge mode: off (idle/absent/complete), pv (PV-follow), or now (immediate)."
+    },
+    "set_grid_export_power_limit": {
+      "type": "number",
+      "description": "Max grid export power in W (magnitude). Sticky: -1 = unconstrained / release curtailment."
     }
   },
   "anyOf": [
@@ -53,7 +57,8 @@
     {"required": ["set_ess_discharge_power_limit"]},
     {"required": ["set_ess_mode"]},
     {"required": ["set_evcs_max_current"]},
-    {"required": ["set_evcs_mode"]}
+    {"required": ["set_evcs_mode"]},
+    {"required": ["set_grid_export_power_limit"]}
   ],
   "additionalProperties": false
 }

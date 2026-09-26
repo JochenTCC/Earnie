@@ -65,6 +65,12 @@ EHAL_FUNCTIONS: tuple[EhalFunction, ...] = (
         ("sens_pv_energy", "sens_grid_energy_import", "sens_grid_energy_export"),
         "Teilweise gemappte Zähler würden PV- und Netzbilanz aus verschiedenen Quellen mischen.",
     ),
+    EhalFunction(
+        "grid_export_limit",
+        "Einspeiseleistung begrenzen",
+        ("set_grid_export_power_limit",),
+        "Ohne outbound Limit kann Earnie die Einspeisegrenze nicht an den Hub schreiben.",
+    ),
 )
 
 FUNCTIONS_BY_ID = {f.id: f for f in EHAL_FUNCTIONS}

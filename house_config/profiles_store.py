@@ -467,6 +467,20 @@ def _normalize_plant(raw: dict | None) -> dict:
     if not isinstance(raw, dict):
         return {}
     out: dict = {}
+    max_export = raw.get("max_export_power_kw")
+    if max_export is not None and max_export != "":
+        try:
+            export_kw = float(max_export)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"plant.max_export_power_kw ungültig: {max_export!r}."
+            ) from exc
+        if export_kw <= 0.0:
+            raise ValueError(
+                "plant.max_export_power_kw muss > 0 sein "
+                "(Feld weglassen = keine HK-Einspeisegrenze)."
+            )
+        out["max_export_power_kw"] = export_kw
     bindings = raw.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
         cleaned = {
