@@ -1,0 +1,31 @@
+{
+  "title": "SMA Sunny Tripower Smart Energy + Speicher + KEBA P30, Mischsprache",
+  "market": "DE/AT (SMA in DE Marktführer; KEBA: österreichischer Hersteller)",
+  "tests": [
+    "Mischsprache: SMA/KEBA-Namen fest englisch, selbstgebaute Helfer deutsch",
+    "Leistung in kW (Helfer, KEBA)",
+    "Setpoints in kW (Sollleistung ±10 kW, Lade-/Entladegrenze 0–10 kW) → Earnie muss W→kW umrechnen",
+    "SMA hat kein vorzeichenbehaftetes Netz-/Batteriesignal (supplied/absorbed, charge/discharge getrennt) → Template-Helfer",
+    "Distraktor: sensor.sn_…_grid_power ist die Wechselrichter-AC-Leistung, nicht der Netzanschluss",
+    "Wallbox ohne schreibbaren Strom (nur sensor + lock; Strom nur per Service) → kein set_evcs_max_current",
+    "Keine Wärmepumpen-Entity"
+  ],
+  "sources": [
+    {
+      "integration": "sma (HA Core)",
+      "url": "https://github.com/home-assistant/core/blob/dev/homeassistant/components/sma/sensor.py",
+      "verified": "Sensor-Keys, feste englische Namen mit Gerätename als Präfix, Einheiten W/kWh, getrennte supplied/absorbed- und charge/discharge-Kanäle"
+    },
+    {
+      "integration": "keba (HA Core)",
+      "url": "https://github.com/home-assistant/core/blob/dev/homeassistant/components/keba/sensor.py",
+      "verified": "Charging Power in kW, Total Energy kWh, Max Current als Sensor, Name = '{device_name} {name}', lock-Plattform, Services statt number"
+    }
+  ],
+  "unverified": [
+    "SMA-Gerätename 'SN: <Seriennummer>' (bestimmt das Präfix sn_<serial>) aus Community-Beispielen",
+    "KEBA-Gerätename 'KEBA P30' angenommen",
+    "Helfer-Namen und Modbus-Sollwert sind ein typischer Eigenbau, keine Hersteller-Entity"
+  ],
+  "verified_at": "2026-09-26"
+}

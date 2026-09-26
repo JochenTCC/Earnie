@@ -6,6 +6,7 @@ from house_sim.core.physics import (
     EssSetpoints,
     PhysicsState,
     ScenarioOverlay,
+    ess_setpoints_from_lookup,
     initial_physics,
     resolve_ess_power_w,
     run_ticks as _core_run_ticks,
@@ -26,27 +27,8 @@ __all__ = [
 
 
 def setpoints_from_store(store: StateStore, package: ArchetypePackage) -> EssSetpoints:
-    """Read ESS setpoints from mapped mock entities (EHAL signed W)."""
-    entities = package.ehal_entities
-    active_id = entities.get("set_ess_active_power")
-    active = 0.0
-    if active_id:
-        raw = store.numeric_state(active_id)
-        if raw is not None:
-            active = float(raw)
-    charge_cap = None
-    discharge_cap = None
-    charge_id = entities.get("set_ess_charge_power_limit")
-    if charge_id:
-        charge_cap = store.numeric_state(charge_id)
-    discharge_id = entities.get("set_ess_discharge_power_limit")
-    if discharge_id:
-        discharge_cap = store.numeric_state(discharge_id)
-    return EssSetpoints(
-        active_power_w=active,
-        charge_limit_w=float(charge_cap) if charge_cap is not None else None,
-        discharge_limit_w=float(discharge_cap) if discharge_cap is not None else None,
-    )
+    """Read ESS setpoints from mapped mock entities (unit-aware, EHAL signed W)."""
+    return ess_setpoints_from_lookup(package, store.numeric_state)
 
 
 def step_physics(

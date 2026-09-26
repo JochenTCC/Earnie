@@ -34,7 +34,7 @@ from integrations.ehal_write_test_bounds import (
     probe_value_bounds,
     values_match,
 )
-from integrations.ha_adapter import parse_ha_numeric_state
+from integrations.ha_adapter import parse_ha_field_value
 from integrations.loxone_adapter import EVCS_MODE_VALUES
 from integrations.loxone_ehal_mapping import SETPOINT_FIELDS
 
@@ -298,7 +298,7 @@ def _read_back_ha(field: str) -> Any | None:
     attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
     unit = attrs.get("unit_of_measurement")
     try:
-        return parse_ha_numeric_state(str(state), unit=unit)
+        return parse_ha_field_value(field, str(state), unit=unit)
     except (TypeError, ValueError):
         try:
             return float(state)

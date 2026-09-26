@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
+RUN sed -i 's/\r$//' docker/entrypoint.sh docker/cpu_check.sh && chmod +x docker/entrypoint.sh
 
 # Templates + public tariffs catalog live in share/config/ (git). Supplement runtime/.env examples.
 RUN mkdir -p share/config \

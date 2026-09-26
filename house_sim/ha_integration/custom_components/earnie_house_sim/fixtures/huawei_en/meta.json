@@ -1,0 +1,29 @@
+{
+  "title": "Huawei SUN2000 + LUNA2000 + DTSU666 + go-e Gemini, HA auf Englisch",
+  "market": "AT/DE (Huawei sehr verbreitet; go-e: österreichischer Hersteller)",
+  "tests": [
+    "Hersteller-Vorzeichen: Zähler + = Einspeisen, Batterie + = Laden → sign negate",
+    "Kein Wirkleistungs-Setpoint, nur Lade-/Entladelimits (Force-Charge nur als Service) → Sim-Batterie im Eigenverbrauch",
+    "SoC heißt 'state of capacity'; Netz heißt 'power meter'",
+    "Batterie-Gesamtzähler mit state_class total (nicht total_increasing)",
+    "Distraktor: sensor.inverter_active_power (AC-Ausgang, nicht PV und nicht Netz)",
+    "select.batteries_working_mode ist bewusst nicht als set_ess_mode gemappt (Optionen passen nicht zu EHAL-Modi)"
+  ],
+  "sources": [
+    {
+      "integration": "huawei_solar (HACS, wlcrs)",
+      "url": "https://github.com/wlcrs/huawei_solar",
+      "verified": "Keys, Einheiten, state_class, englische Namen aus translations/en.json, number/select-Entities, Force-Charge nur als Service"
+    },
+    {
+      "integration": "goecharger_api2 (HACS, marq24)",
+      "url": "https://github.com/marq24/ha-goecharger-api2",
+      "verified": "entity_id-Muster, nrg_11 W, amp A 6–32, frc Optionen, englische Namen"
+    }
+  ],
+  "unverified": [
+    "Vorzeichen (Zähler + = Einspeisen, Batterie + = Laden) laut Community-Doku, nicht im Code geprüft",
+    "Gerätenamen Inverter / Power meter / Batteries als Default angenommen (bestimmen die entity_id-Präfixe)"
+  ],
+  "verified_at": "2026-09-26"
+}

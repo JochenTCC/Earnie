@@ -2,6 +2,45 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### HouseSim S2 — Vendor archetypes (2026-09-26)
+
+- [x] **HouseSim S2 — 2–3 more hand-authored archetypes on the same physics; write-back per archetype.** Three archetypes (vendor choice by AT/DE market share), entities checked against the integration source code; provenance, verified and unverified points per archetype in `meta.json`. Spec: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md) § S2.
+  - [x] `fronius_de` — Fronius GEN24 Plus + BYD HVS (Core `fronius`) + Fronius Wattpilot (HACS `goecharger_api2`): German entity ids/names, energy counters in **Wh**, no ESS setpoints (read-only), wallbox mode as `select`.
+  - [x] `huawei_en` — Huawei SUN2000 + LUNA2000 + DTSU666 (HACS `huawei_solar`) + go-e Gemini: vendor sign (meter + = export, battery + = charge → `negate`), only charge/discharge **limits**, SoC as "state of capacity", battery totals `state_class: total`.
+  - [x] `sma_keba` — SMA Sunny Tripower Smart Energy (Core `sma`) + KEBA P30 (Core `keba`): mixed language, **kW** power and kW setpoint/limit helpers (DIY Modbus `input_number`), SMA split channels behind signed template sensors, distractor `…_grid_power`, wallbox without writable current, no heat pump.
+  - [x] Core (`house_sim/core/`): unit-aware (W/kW, Wh/kWh) and vendor-sign projection, unit-aware setpoint read, `ess_fallback: self_consumption`, `derived_entities` for split channels; mock REST rejects out-of-range values / invalid options like HA; S4 `select` platform + `state_class: total`; sync copy updated.
+  - [x] **Bugfix:** grid balance had the wrong battery sign since S1 (`load − pv + ess` → `load − pv − ess`; discharging raised grid import). Regression test added.
+  - [x] Triggered on the Earnie side: HA unit-aware mapping and function completeness check (entries below). Propose baseline for **2.6.e**: `evcc_en` 13/13, `fronius_de` 3/9, `huawei_en` 0/11, `sma_keba` 3/9 correct; no physically impossible proposals.
+  - [x] Tests: `tests/test_house_sim_s2_archetypes.py` (closed loop via mock REST + `HaAdapter` per archetype).
+  - Not included: wallbox writes (`amp` / `frc`) acting on physics — open as **HouseSim wallbox write-back** in [Backlog.md](Backlog.md).
+
+### EHAL function completeness — unavailable until fully mapped (2026-09-26)
+
+- [x] **Function completeness check** (user proposal; robustness). New `ehal/functions.py` (backend-agnostic): a function is `available` only when all its required EHAL fields are mapped, `incomplete` when partly mapped (warning), `not_configured` when nothing is mapped. **Speicher zwingen** stays `not_configured` until `set_ess_active_power` itself is mapped, so a limits-only plant does not warn. Functions: Grundtelemetrie; **Speicher begrenzen** (both limits); **Speicher zwingen** (active power **plus** both limits — without limits Earnie cannot return safely to Automatik); **Wallbox-Ladestrom**; **Slot-Ist aus Energiezählern** (PV + import + export). Becomes available again as soon as the mapping is completed (adapter rebuilt on save).
+  - [x] **Bugfix:** `HaAdapter` treated an unmapped `set_ess_active_power` as a write failure and switched off all ESS writes (Huawei-style limits-only installs lost the working limits after the first Zwangsmodus). Now fields of unavailable functions are **skipped** (logged once per session), only real write failures degrade capabilities.
+  - [x] Adapters: `HaAdapter` and `LoxoneAdapter` derive `supports_ess_write` / `supports_evcs_current` (+ internal active-power flag) from function availability; `last_skipped_fields()` lists only fields of an **incomplete** function. Unmapped mode fields (`set_ess_mode` / `set_evcs_mode`) and never-configured functions are not written and not shown in Live-Schreiben (logged once). Loxone previously failed fast on an unmapped EVCS mode and degraded EVCS. `ha_meter_energy` returns no counter readings unless all three counters are mapped.
+  - [x] Live trace: `build_ehal_write_records(..., skipped=)` marks dropped setpoints of incomplete functions; Live-Schreiben shows **Übersprungen** with „Funktion nicht verfügbar (Mapping unvollständig)“.
+  - [x] Mapping UI (HA + Loxone, `ui/ehal_function_status.py`): warning per incomplete function with missing fields (German labels) and a caption of available functions; saving stays allowed.
+  - [x] HouseSim `sma_keba` got kW charge/discharge limit helpers (complete DIY setup). Existing configs checked (alpha env, greenfield, debug dump, examples): no function lost.
+  - [x] Tests: `tests/test_ehal_functions.py` (states, scope, messages, HA limits-only on `huawei_en`, active-only HA/Loxone, partial counters, skipped records, unmapped modes), `tests/test_loxone_adapter.py` (mode skip). Full suite 2573 passed / 6 skipped.
+  - Follow-up in [Backlog.md](Backlog.md): **2.6.n** battery controllability in `house_config` + MILP.
+
+### HA unit-aware mapping — physical quantity check + runtime conversion (2026-09-26)
+
+- [x] **HA unit-aware mapping** (prep for **2.6.e**; user proposal). Two rules for HA bindings, shared module `integrations/ha_units.py` (EHAL field → quantity power / energy / percent / current; base units W / kWh / % / A):
+  - [x] **Rule 1 — only physically compatible signals.** `unit_check` (unit + `device_class`): W↔kW↔MW ok, kW↔kWh / %↔W / VA rejected. `heuristic_propose` drops incompatible rows (sensors without unit are not proposed for quantity fields; unitless `number`/`input_number` helpers stay allowed). EHAL-Com HA mapping (`ui/ehal_ha_mapping.py`) offers only compatible scan rows per field and refuses to save a mismatching binding (`binding_unit_issues`). Modes/flags stay unconstrained.
+  - [x] **Rule 2 — factor from `unit_of_measurement` at runtime, never stored.** Read: `HaAdapter` converts every mapped field (was kW→W only); a wrong-quantity unit raises `UnitMismatchError` (required field → error, optional → skipped + warning). Write: setpoints are converted EHAL W/A → target entity unit, read fresh from HA before each write (fixes W written into kW helpers); mismatch → write error without service call. Energy counters (`ha_meter_energy`) accept Wh/kWh/MWh and skip non-energy units. EHAL-Com Schreibtest read-back uses the same conversion. UI shows the automatic conversion per binding (e.g. `kW → W (×1000)`).
+  - [x] **Evidence on HouseSim S2 archetypes** (`fronius_de`, `huawei_en`, `sma_keba`): before, propose suggested the Huawei SoC (%) as battery power; now no proposal crosses quantities on any archetype (hit rate unchanged — name hints are **2.6.e** scope). `sma_keba` kW setpoint (`input_number.batterie_sollleistung`) now written as kW (former xfail).
+  - [x] Tests: `tests/test_ha_units.py` (new), `tests/test_ha_adapter.py` (unit GET mocked; kW write, wrong-quantity write/read), `tests/test_ha_meter_energy.py` (MWh, W rejected), `tests/test_house_sim_s2_archetypes.py`. Full suite 2561 passed / 6 skipped.
+
+### Bugfix HA add-on crash loop on CPUs without x86-64-v2 (2026-09-26)
+
+- [x] **HA add-on 2.5.3 crash loop — `RuntimeError: NumPy was built with baseline optimizations (X86_V2)`** (dump 20260925; HA OS VM, most likely Proxmox CPU type `kvm64`). Bootstrap OK, then every start died at `import pandas` → `numpy` (NumPy ≥ 2.4 x86 wheels require x86-64-v2); Supervisor restarted it in a loop. Not fixed in 2.6.0-alpha.1 (same `python:3.14-slim` + unpinned NumPy, ships 2.5.3).
+  - [x] **`numpy<2.4` pin evaluated and rejected** — Image with pin tested under QEMU user-mode `-cpu kvm64-v1`: numpy 2.3.5 / pandas without pyarrow / highspy OK, but **pyarrow 25.0.1 → SIGILL** (pandas 3 auto-imports it; Streamlit hard-depends on it). Pin reverted; x86-64-v2 is now a documented minimum.
+  - [x] **Preflight in `docker/cpu_check.sh`**, called from `docker/entrypoint.sh` before bootstrap → covers all container targets (HA add-on, Synology, Proxmox, VMware). `_check_x86_64_v2` reads `/proc/cpuinfo` on `x86_64` (cx16, lahf_lm, popcnt, pni, sse4_1, sse4_2, ssse3) and exits with a German message + Proxmox fix (CPU type `host` / `x86-64-v2-AES`, cold VM restart) instead of a traceback. Add-on `run.sh` only exports `EARNIE_CPU_CHECK_DOCS_URL` (HA docs link; default = `container.md#cpu-voraussetzung-amd64`). Dockerfile strips CRLF from `cpu_check.sh`. Tests: `tests/test_container_cpu_check.py`.
+  - [x] **Docs** — `docs/einrichtung/container.md` § CPU-Voraussetzung (amd64); `docs/einrichtung/homeassistant-addon.md` Go/No-Go row + Proxmox steps; add-on `DOCS.md` hint; add-on `CHANGELOG.md` Unreleased.
+  - [ ] **Verification pending** — user reply after switching the VM CPU type; preflight only lands with the next image / add-on release.
+
 ### Document Review Anwender-TOC / SB German / ehal-com EN (2026-09-26)
 
 - [x] **`docs/README.md` = landing clone** — Restored German Anwender-TOC with **Erste Schritte** (`#erste-schritte`); paths relative to `docs/`; HA add-on / VMware / SB page linked; HouseSim only under Entwickler-Specs

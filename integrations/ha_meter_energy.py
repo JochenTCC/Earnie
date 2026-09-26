@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
+from ehal.functions import available_functions
+from integrations.ha_units import UnitMismatchError, to_ehal
 from integrations.loxone_meter_energy import CHANNEL_GRID, CHANNEL_PV
 
 logger = logging.getLogger(__name__)
@@ -24,16 +26,17 @@ ENERGY_OPTIONAL = (
 )
 
 
-def parse_ha_energy_kwh(state: str, *, unit: str | None) -> float:
-    """Parse HA energy state; convert Wh → kWh when unit indicates watt-hours."""
+def parse_ha_energy_kwh(
+    state: str, *, unit: str | None, field: str = FIELD_PV_ENERGY
+) -> float:
+    """Parse HA energy state into kWh (Wh / kWh / MWh from the entity unit).
+
+    Raises ``UnitMismatchError`` if the unit is not an energy unit (e.g. W).
+    """
     text = str(state).strip().replace(",", ".")
     if text.lower() in ("", "unavailable", "unknown", "none"):
         raise ValueError(f"HA energy state is not numeric: {state!r}")
-    value = float(text)
-    unit_l = str(unit or "").strip().lower()
-    if unit_l in ("wh", "watt-hour", "watt-hours", "watthour", "watthours"):
-        return value / 1000.0
-    return value
+    return to_ehal(field, float(text), unit)
 
 
 def plant_energy_entity_ids(
@@ -52,6 +55,7 @@ def plant_energy_entity_ids(
 def _read_entity_kwh(
     adapter: Any,
     entity_id: str,
+    field: str = FIELD_PV_ENERGY,
 ) -> float | None:
     try:
         payload = adapter.read_state(entity_id)
@@ -65,7 +69,11 @@ def _read_entity_kwh(
         return parse_ha_energy_kwh(
             str(payload.get("state")),
             unit=attrs.get("unit_of_measurement"),
+            field=field,
         )
+    except UnitMismatchError as exc:
+        logger.warning("ha_meter_energy: %s skipped: %s", entity_id, exc)
+        return None
     except (TypeError, ValueError) as exc:
         logger.debug("ha_meter_energy: parse %s failed: %s", entity_id, exc)
         return None
@@ -76,12 +84,20 @@ def read_plant_energy_readings(
     *,
     entities: dict[str, str] | None = None,
 ) -> dict[str, dict[str, float]]:
-    """Read PV / grid cumulative kWh; omit channels with missing maps or reads."""
+    """Read PV / grid cumulative kWh; omit channels with missing reads.
+
+    Empty unless all three counters are mapped (function ``slot_energy``): a
+    partial map would mix counter-based and sampled values in one slot.
+    """
     mapped = plant_energy_entity_ids(entities if entities is not None else adapter.cfg.entities)
+    if "slot_energy" not in available_functions(mapped):
+        if mapped:
+            logger.debug("ha_meter_energy: counters incomplete %s — slot Ist stays on mean", sorted(mapped))
+        return {}
     readings: dict[str, dict[str, float]] = {}
     pv_id = mapped.get(FIELD_PV_ENERGY)
     if pv_id:
-        total = _read_entity_kwh(adapter, pv_id)
+        total = _read_entity_kwh(adapter, pv_id, FIELD_PV_ENERGY)
         if total is not None:
             readings[CHANNEL_PV] = {"total": float(total)}
 
@@ -89,11 +105,11 @@ def read_plant_energy_readings(
     export_id = mapped.get(FIELD_GRID_EXPORT)
     grid: dict[str, float] = {}
     if import_id:
-        total = _read_entity_kwh(adapter, import_id)
+        total = _read_entity_kwh(adapter, import_id, FIELD_GRID_IMPORT)
         if total is not None:
             grid["total"] = float(total)
     if export_id:
-        total_neg = _read_entity_kwh(adapter, export_id)
+        total_neg = _read_entity_kwh(adapter, export_id, FIELD_GRID_EXPORT)
         if total_neg is not None:
             grid["total_neg"] = float(total_neg)
     if "total" in grid:

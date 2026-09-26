@@ -1,0 +1,224 @@
+{
+  "devices": [
+    {
+      "key": "pv",
+      "name": "Inverter",
+      "manufacturer": "Huawei",
+      "model": "SUN2000-10KTL-M1",
+      "entity_ids": [
+        "sensor.inverter_input_power",
+        "sensor.inverter_active_power",
+        "sensor.inverter_total_yield"
+      ]
+    },
+    {
+      "key": "grid",
+      "name": "Power meter",
+      "manufacturer": "Huawei",
+      "model": "DTSU666-H",
+      "entity_ids": [
+        "sensor.power_meter_active_power",
+        "sensor.power_meter_consumption",
+        "sensor.power_meter_exported"
+      ]
+    },
+    {
+      "key": "battery",
+      "name": "Batteries",
+      "manufacturer": "Huawei",
+      "model": "LUNA2000",
+      "entity_ids": [
+        "sensor.batteries_state_of_capacity",
+        "sensor.batteries_charge_discharge_power",
+        "sensor.batteries_total_charge",
+        "sensor.batteries_total_discharge",
+        "number.batteries_maximum_charging_power",
+        "number.batteries_maximum_discharging_power",
+        "select.batteries_working_mode"
+      ]
+    },
+    {
+      "key": "wallbox",
+      "name": "go-eCharger 204711",
+      "manufacturer": "go-e",
+      "model": "Gemini flex 22kW",
+      "entity_ids": [
+        "sensor.goe_204711_nrg_11",
+        "number.goe_204711_amp",
+        "select.goe_204711_frc"
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "entity_id": "sensor.inverter_input_power",
+      "state": "2000.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "Inverter Input power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.inverter_active_power",
+      "state": "1900.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "Inverter Active power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.inverter_total_yield",
+      "state": "15234.56",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "Inverter Total yield",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.power_meter_active_power",
+      "state": "900.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "Power meter Active power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.power_meter_consumption",
+      "state": "4321.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "Power meter Consumption",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.power_meter_exported",
+      "state": "8765.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "Power meter Exported",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.batteries_state_of_capacity",
+      "state": "60.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "Batteries State of capacity",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.batteries_charge_discharge_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "Batteries Charge/Discharge power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.batteries_total_charge",
+      "state": "2100.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "Batteries Total charge",
+        "state_class": "total"
+      }
+    },
+    {
+      "entity_id": "sensor.batteries_total_discharge",
+      "state": "1950.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "Batteries Total discharge",
+        "state_class": "total"
+      }
+    },
+    {
+      "entity_id": "number.batteries_maximum_charging_power",
+      "state": "5000",
+      "attributes": {
+        "friendly_name": "Batteries Maximum charging power",
+        "unit_of_measurement": "W",
+        "min": 0,
+        "max": 5000,
+        "step": 1
+      }
+    },
+    {
+      "entity_id": "number.batteries_maximum_discharging_power",
+      "state": "5000",
+      "attributes": {
+        "friendly_name": "Batteries Maximum discharging power",
+        "unit_of_measurement": "W",
+        "min": 0,
+        "max": 5000,
+        "step": 1
+      }
+    },
+    {
+      "entity_id": "select.batteries_working_mode",
+      "state": "maximise_self_consumption",
+      "attributes": {
+        "friendly_name": "Batteries Working mode",
+        "options": [
+          "adaptive",
+          "fixed_charge_discharge",
+          "maximise_self_consumption",
+          "time_of_use_luna2000",
+          "fully_fed_to_grid"
+        ]
+      }
+    },
+    {
+      "entity_id": "sensor.goe_204711_nrg_11",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "go-eCharger 204711 Power total now",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "number.goe_204711_amp",
+      "state": "16",
+      "attributes": {
+        "friendly_name": "go-eCharger 204711 Requested current",
+        "unit_of_measurement": "A",
+        "min": 6,
+        "max": 32,
+        "step": 1,
+        "mode": "slider"
+      }
+    },
+    {
+      "entity_id": "select.goe_204711_frc",
+      "state": "0",
+      "attributes": {
+        "friendly_name": "go-eCharger 204711 Force state",
+        "options": [
+          "0",
+          "1",
+          "2"
+        ]
+      }
+    }
+  ]
+}

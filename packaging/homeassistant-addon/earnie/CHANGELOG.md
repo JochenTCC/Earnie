@@ -9,6 +9,7 @@ Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each
 
 ## Unreleased
 
+- **x86-64-v2 preflight:** image entrypoint (`docker/entrypoint.sh` → `docker/cpu_check.sh`; `run.sh` only sets the add-on docs link) checks `/proc/cpuinfo` on `x86_64` (cx16, lahf_lm, popcnt, pni, sse4_1, sse4_2, ssse3) and exits with an actionable German message (Proxmox CPU type `host`) instead of a NumPy `RuntimeError` / pyarrow SIGILL traceback loop.
 - **`ehal_loxone_http_port`:** `run.sh` exports `EARNIE_EHAL_LOXONE_HTTP_PORT` (runtime env precedence over `config.json`, same pattern as Streamlit port).
 
 ## 2.5.3

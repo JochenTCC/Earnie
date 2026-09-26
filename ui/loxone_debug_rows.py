@@ -250,12 +250,18 @@ def build_write_rows_from_trace(
                 field=field,
                 mapping=configured or io_name,
                 value=str(entry.get("value", "")),
-                success="Ja" if entry.get("success") else "Nein",
+                success=_success_label(entry),
                 written_at=str(entry.get("written_at") or ""),
                 message="",
             )
         )
     return rows
+
+def _success_label(entry: dict[str, Any]) -> str:
+    if entry.get("skipped"):
+        return "Übersprungen"
+    return "Ja" if entry.get("success") else "Nein"
+
 
 def build_ehal_write_rows(
     writes: list[dict[str, Any]],
@@ -310,7 +316,7 @@ def build_ehal_write_rows(
                 field=field,
                 mapping=mapped,
                 value=str(entry.get("value", "")),
-                success="Ja" if entry.get("success") else "Nein",
+                success=_success_label(entry),
                 written_at=str(entry.get("written_at") or ""),
                 message=str(entry.get("message") or ""),
             )

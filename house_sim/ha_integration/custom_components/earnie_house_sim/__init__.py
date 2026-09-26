@@ -15,7 +15,7 @@ from .const import DOMAIN
 from .coordinator import HouseSimCoordinator
 from .entity_map import ha_entity_id
 
-PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SWITCH]
+PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SELECT, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

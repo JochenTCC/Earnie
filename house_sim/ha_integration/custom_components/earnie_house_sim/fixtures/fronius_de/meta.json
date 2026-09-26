@@ -1,0 +1,28 @@
+{
+  "title": "Fronius GEN24 Plus + BYD HVS + Fronius Wattpilot, HA auf Deutsch",
+  "market": "AT/DE (Fronius und Wattpilot: österreichische Hersteller)",
+  "tests": [
+    "Deutsche Entity-IDs und Friendly-Names",
+    "Energiezähler in Wh (nicht kWh)",
+    "Keine Speicher-Setpoints (offizielle Fronius-Integration ist nur lesend) → Nur-Lesen/Degrade; Sim-Batterie im Eigenverbrauch",
+    "Wallbox-Setpoint als number (A), Lademodus als select mit Optionen 0/1/2",
+    "Distraktor: sensor.solarnet_leistung_verbrauch (Verbrauch negativ)"
+  ],
+  "sources": [
+    {
+      "integration": "fronius (HA Core)",
+      "url": "https://github.com/home-assistant/core/blob/dev/homeassistant/components/fronius/sensor.py",
+      "verified": "Keys, Einheiten (W, Wh), device_class/state_class, Vorzeichen (Netz + = Bezug, Batterie + = Entladen), keine number/select-Plattform"
+    },
+    {
+      "integration": "goecharger_api2 (HACS, marq24; unterstützt Fronius Wattpilot)",
+      "url": "https://github.com/marq24/ha-goecharger-api2",
+      "verified": "entity_id-Muster {domain}.goe_{serial}_{key}, nrg_11 W, amp A 6–32, frc Optionen 0/1/2, deutsche Namen aus translations/de.json"
+    }
+  ],
+  "unverified": [
+    "Deutsche Fronius-Entity-IDs/Friendly-Names sind geschätzt (Core-Übersetzungen liegen in Lokalise, nicht im Repo)",
+    "Wattpilot-Präfix goe_ und Seriennummer sind angenommen; amp-Maximum 16 A für Wattpilot Home 11 J"
+  ],
+  "verified_at": "2026-09-26"
+}

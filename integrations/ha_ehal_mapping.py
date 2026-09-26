@@ -10,6 +10,7 @@ from integrations.ha_adapter import (
     TELEMETRY_REQUIRED,
     WRITE_DOMAINS,
 )
+from integrations.ha_units import describe_conversion, field_quantity, unit_check
 
 EHAL_HA_FIELDS = (
     TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + TELEMETRY_ENERGY_OPTIONAL + SETPOINT_FIELDS
@@ -149,6 +150,46 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
 _MIN_SCORE = 0.35
 
 
+def compatible_entity_ids(field: str, rows: list[dict[str, Any]]) -> list[str]:
+    """Scan rows that may be bound to ``field`` (drops other physical quantities)."""
+    out: list[str] = []
+    for row in rows:
+        entity_id = str(row.get("entity_id") or "").strip()
+        if not entity_id:
+            continue
+        check = unit_check(field, row.get("unit"), device_class=row.get("device_class"))
+        if check != "mismatch":
+            out.append(entity_id)
+    return out
+
+
+def binding_unit_issues(
+    ehal_map: dict[str, str], rows: list[dict[str, Any]]
+) -> list[str]:
+    """Human-readable problems for bindings whose unit contradicts the field."""
+    by_id = {str(r.get("entity_id") or ""): r for r in rows}
+    issues: list[str] = []
+    for field, entity_id in ehal_map.items():
+        row = by_id.get(str(entity_id))
+        if row is None:
+            continue
+        check = unit_check(field, row.get("unit"), device_class=row.get("device_class"))
+        if check == "mismatch":
+            unit = row.get("unit") or row.get("device_class") or "?"
+            issues.append(
+                f"{field} braucht {field_quantity(field)}, `{entity_id}` liefert {unit}"
+            )
+    return issues
+
+
+def binding_conversion_hint(field: str, entity_id: str, rows: list[dict[str, Any]]) -> str:
+    """Automatic conversion shown next to a binding, e.g. ``kW → W (×1000)``."""
+    for row in rows:
+        if str(row.get("entity_id") or "") == entity_id:
+            return describe_conversion(field, row.get("unit"))
+    return ""
+
+
 def resolve_field_select_default(existing: str, proposed: str) -> str:
     """Prefer saved binding; use heuristic proposal only when unbound."""
     return str(existing or proposed or "")
@@ -170,7 +211,7 @@ def heuristic_propose(
         best_id = ""
         best_score = 0.0
         for row in rows:
-            score = _score_row(row, rules)
+            score = _score_row(row, rules, field)
             if score > best_score:
                 best_score = score
                 best_id = row["entity_id"]
@@ -206,9 +247,11 @@ def _normalize_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _score_row(row: dict[str, Any], rules: dict[str, Any]) -> float:
+def _score_row(row: dict[str, Any], rules: dict[str, Any], field: str = "") -> float:
     allowed = rules.get("domains") or frozenset()
     if row["domain"] not in allowed:
+        return 0.0
+    if not _physically_compatible(row, field):
         return 0.0
     exclude = rules.get("exclude_hints") or ()
     for bad in exclude:
@@ -233,6 +276,20 @@ def _score_row(row: dict[str, Any], rules: dict[str, Any]) -> float:
     if _hint_score(row["name_raw"], row["name_blob"], rules.get("hints") or ()) <= 0:
         return 0.0
     return min(0.75, score)
+
+
+def _physically_compatible(row: dict[str, Any], field: str) -> bool:
+    """Rule 1: only bind entities whose unit / device_class match the field's quantity.
+
+    Sensors must carry a matching unit; write helpers (number / input_number)
+    without a unit are allowed (assumed to be in the EHAL base unit).
+    """
+    check = unit_check(field, row["unit"], device_class=row["device_class"])
+    if check == "mismatch":
+        return False
+    if check == "unknown" and row["domain"] in _SENSOR_DOMAINS:
+        return False
+    return True
 
 
 def _hint_score(name_raw: str, name_blob: str, hints: tuple[str, ...]) -> float:

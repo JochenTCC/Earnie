@@ -1,8 +1,8 @@
 {
   "core": {
-    "__init__.py": "212de9365d44a7cad724db9bb75e55883a21204ae6ca31edd3e0b5895b49d656",
-    "archetype.py": "d7caea3a573f18f8ea803c7f41679cd0280d8bd3ddda0aaaffda9502b0250417",
-    "physics.py": "19bab09af885f98382f70ff3d6dca07083f108e81fcd0c4617e8bbec7e8ce254",
+    "__init__.py": "5c4c00c6fff4f6a937ab23028764ee2963fba1ae3f838f840672515f005fd2c1",
+    "archetype.py": "089fb1674386f05b2e79e43cd5a077f0d6b745ba212d14d5600c665eb8c90be6",
+    "physics.py": "338495ba3c41c7895eb75ab6522c64386d75c06d7e7b1ab0cabbdaf4d462edd1",
     "thermal.py": "1c6e4f971b8c2f8f1ce500180a523ca22973762341de87104e07b64670a78701",
     "weather_pv.py": "b8e991ac3ec7e986e7789a87b1f34eefcc97ea5524b3bebf9e5a6c0af7937612"
   },
@@ -10,6 +10,21 @@
     "evcc_en/ehal.ha.entities.json": "a7372e752c220ee1c47a25b3a95da370f7407157dee814c406696247757b2c4b",
     "evcc_en/entities.json": "e82e24bb23fbbb4435eb44351e35b33cc0d7e16b668d2a17c7672d129d661fb3",
     "evcc_en/house_params.json": "af5d5c4477850103fe51c812b311a1d23113fdfe92c233092e486693bbda037f",
-    "evcc_en/pv_series.json": "bc254957a3ae0ee2b3900d167637e9ab9a23db47c51bd0d7ff377173eb395040"
+    "evcc_en/pv_series.json": "bc254957a3ae0ee2b3900d167637e9ab9a23db47c51bd0d7ff377173eb395040",
+    "fronius_de/ehal.ha.entities.json": "1c408c71f6c820b0bba2db9a947f0a0e92db90d6461fd63452da1a030b58f2fe",
+    "fronius_de/entities.json": "7d90144ef948d25974a29244d1b92ec3a4aaaefd38ae18b085dd1a5295da5651",
+    "fronius_de/house_params.json": "99a125b295fb380812a92f2718ad209556fc0f7a83983250cf30f4917dcd5b1c",
+    "fronius_de/meta.json": "a30beaf71ff6c3e7f2b0852e295fe1e297f99347f3b921e27490014b439bbbe6",
+    "fronius_de/pv_series.json": "91c8b075ff66dda489d8bd8f9ebaaa4611690edb30a186aed5bd376f186c854d",
+    "huawei_en/ehal.ha.entities.json": "fc6c29bafff6a5c9c6b47c946db5b08ba24ce0f270e18e8fedcf2d8a290cbb28",
+    "huawei_en/entities.json": "1bf990dcf218506d12264f998c6101afbe7bfdf456b6af832edb9d5e57018ba8",
+    "huawei_en/house_params.json": "03e1e950ef935caa334977aab7bdbe0a47d529d5095261bdd3175e2aacfe6e2f",
+    "huawei_en/meta.json": "1d7654169f2989b3fdcbb474fb68f2f37374dabfdbcf6884637e683e1686e65c",
+    "huawei_en/pv_series.json": "725b1f96751f9229ddb0d6065344e342561c760cd3c33a6deca5dc3739b0b836",
+    "sma_keba/ehal.ha.entities.json": "2d39f77679d43ee261a58112659a94d1bc5a17981803b0db9a59049536f9fc06",
+    "sma_keba/entities.json": "58ac845d10f3b6fa0434254056bbce2fa3feb8e4d9bbebe8c0ccf2085e10cd1a",
+    "sma_keba/house_params.json": "f90c94fc94d8dcef0402b5ffe16007f86f94a67314ff4396be7184e6e3816c73",
+    "sma_keba/meta.json": "e9335d075f4a7a42fc5e937c2baf8981f7400d1d018624aa78147e1daf8520ac",
+    "sma_keba/pv_series.json": "13bfbed1bd381762b4e6215a634f01a16e1284b9b909faee43ac99f0a13f6d74"
   }
 }

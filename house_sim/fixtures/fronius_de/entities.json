@@ -1,0 +1,163 @@
+{
+  "devices": [
+    {
+      "key": "pv",
+      "name": "SolarNet",
+      "manufacturer": "Fronius",
+      "model": "Symo GEN24 10.0 Plus",
+      "entity_ids": [
+        "sensor.solarnet_leistung_photovoltaik",
+        "sensor.solarnet_leistung_netz",
+        "sensor.solarnet_leistung_batterie",
+        "sensor.solarnet_leistung_verbrauch",
+        "sensor.solarnet_energie_gesamt"
+      ]
+    },
+    {
+      "key": "grid",
+      "name": "Smart Meter TS 65A-3",
+      "manufacturer": "Fronius",
+      "model": "Smart Meter TS 65A-3",
+      "entity_ids": [
+        "sensor.smart_meter_ts_65a_3_wirkenergie_verbraucht",
+        "sensor.smart_meter_ts_65a_3_wirkenergie_produziert"
+      ]
+    },
+    {
+      "key": "battery",
+      "name": "BYD Battery-Box Premium HV",
+      "manufacturer": "BYD",
+      "model": "Battery-Box Premium HVS 10.2",
+      "entity_ids": [
+        "sensor.byd_battery_box_premium_hv_ladezustand"
+      ]
+    },
+    {
+      "key": "wallbox",
+      "name": "Wattpilot",
+      "manufacturer": "Fronius",
+      "model": "Wattpilot Home 11 J",
+      "entity_ids": [
+        "sensor.goe_91234567_nrg_11",
+        "number.goe_91234567_amp",
+        "select.goe_91234567_frc"
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "entity_id": "sensor.solarnet_leistung_netz",
+      "state": "-2100.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SolarNet Leistung Netz",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.solarnet_leistung_photovoltaik",
+      "state": "1500.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SolarNet Leistung Photovoltaik",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.solarnet_leistung_batterie",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SolarNet Leistung Batterie",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.solarnet_leistung_verbrauch",
+      "state": "-900.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SolarNet Leistung Verbrauch",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.solarnet_energie_gesamt",
+      "state": "18234567.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "Wh",
+        "friendly_name": "SolarNet Energie gesamt",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.smart_meter_ts_65a_3_wirkenergie_verbraucht",
+      "state": "9876543.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "Wh",
+        "friendly_name": "Smart Meter TS 65A-3 Wirkenergie verbraucht",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.smart_meter_ts_65a_3_wirkenergie_produziert",
+      "state": "12345678.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "Wh",
+        "friendly_name": "Smart Meter TS 65A-3 Wirkenergie produziert",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.byd_battery_box_premium_hv_ladezustand",
+      "state": "40.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "BYD Battery-Box Premium HV Ladezustand",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.goe_91234567_nrg_11",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "Wattpilot Aktuelle Leistung (total)",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "number.goe_91234567_amp",
+      "state": "16",
+      "attributes": {
+        "friendly_name": "Wattpilot Angeforderter Strom",
+        "unit_of_measurement": "A",
+        "min": 6,
+        "max": 16,
+        "step": 1,
+        "mode": "slider"
+      }
+    },
+    {
+      "entity_id": "select.goe_91234567_frc",
+      "state": "0",
+      "attributes": {
+        "friendly_name": "Wattpilot Manueller Lademodus",
+        "options": [
+          "0",
+          "1",
+          "2"
+        ]
+      }
+    }
+  ]
+}

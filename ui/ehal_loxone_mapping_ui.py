@@ -34,6 +34,7 @@ from house_config.ehal_bindings import (
     strip_migrated_config_keys,
 )
 from integrations.ehal_live import reset_adapter_cache
+from ui.ehal_function_status import render_function_status
 from integrations.loxone_ehal_mapping import (
     FIELD_LABELS,
     SETPOINT_FIELDS,
@@ -199,6 +200,7 @@ def render_ehal_loxone_mapping_section() -> None:
         proposals,
         profile_id=profile_id,
     )
+    render_function_status(ehal_map, entity.get("fields") or ())
     pending = st.session_state.get(_SESSION_PENDING_NEW)
     if isinstance(pending, dict) and str(pending.get("name") or "").strip():
         _confirm_new_marker_dialog(house, config_doc)

@@ -1,0 +1,19 @@
+{
+  "entities": {
+    "sens_grid_power_active": "sensor.power_meter_active_power",
+    "sens_pv_production_active": "sensor.inverter_input_power",
+    "sens_ess_soc": "sensor.batteries_state_of_capacity",
+    "sens_ess_power": "sensor.batteries_charge_discharge_power",
+    "sens_evcs_active_power": "sensor.goe_204711_nrg_11",
+    "sens_pv_energy": "sensor.inverter_total_yield",
+    "sens_grid_energy_import": "sensor.power_meter_consumption",
+    "sens_grid_energy_export": "sensor.power_meter_exported",
+    "set_ess_charge_power_limit": "number.batteries_maximum_charging_power",
+    "set_ess_discharge_power_limit": "number.batteries_maximum_discharging_power",
+    "set_evcs_max_current": "number.goe_204711_amp"
+  },
+  "sign": {
+    "sens_grid_power_active": "negate",
+    "sens_ess_power": "negate"
+  }
+}

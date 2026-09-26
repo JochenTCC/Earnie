@@ -8,6 +8,21 @@
 
 **Docker-Artefakte:** `[docker/README.md](../../docker/README.md)` — Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .`.
 
+## CPU-Voraussetzung (amd64)
+
+Auf x86 (`amd64`: Synology, Proxmox, VMware, HA-Add-on) braucht Earnie eine CPU mit dem Befehlssatz **x86-64-v2** (u. a. SSE4.2, POPCNT – jede x86-CPU ab ca. 2009). Die mitgelieferten Bibliotheken NumPy und pyarrow laufen ohne diese Befehle nicht. Auf `arm64` (LoxBerry, Home Assistant Green) spielt das keine Rolle.
+
+Der Container prüft das beim Start (`docker/cpu_check.sh`). Fehlt x86-64-v2, bricht er mit der Meldung `earnie: FEHLER - die CPU unterstützt den Befehlssatz x86-64-v2 nicht` ab, statt mit einem Python-Traceback.
+
+In der Regel liegt das nicht an der Hardware, sondern an einer **VM mit CPU-Typ `kvm64`/`qemu64`** (bei älteren Proxmox-VMs Standard). Abhilfe in Proxmox:
+
+1. VM herunterfahren (**Shutdown**).
+2. VM → **Hardware** → **Prozessoren** → **Bearbeiten**.
+3. **Typ** `host` wählen (alternativ `x86-64-v2-AES`) → **OK**.
+4. VM wieder starten – ein Neustart aus der VM heraus reicht nicht, sie muss aus- und wieder eingeschaltet werden.
+
+Proxmox-**LXC** nutzt die CPU des Hosts direkt; dort tritt das Problem nur bei sehr alter Hardware auf. Prüfen: `grep -o -w -E 'sse4_2|popcnt' /proc/cpuinfo | sort -u` muss beide Begriffe ausgeben.
+
 ## Persistente Daten
 
 Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Updates:
@@ -62,7 +77,7 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Veröffentlichte Images** kommen von GitHub Releases: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release.yml`](../../.github/workflows/release.yml) und pusht u. a. `ghcr.io/jochentcc/earnie-energy:X.Y.Z` sowie `:latest`. Details für Entwickler: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
-**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und nur den Image-Tag `:<version>` — **nicht** `:latest`. Zum Testen den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.5.0-alpha.9`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
+**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und nur den Image-Tag `:<version>` — **nicht** `:latest`. Zum Testen den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.1`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
@@ -70,7 +85,7 @@ Eigene Compose-Dateien (nicht in der Prod-YAML): `docker/compose/synology-alpha.
 
 - Container `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`
 - Compose-Projektname `earnie-alpha` (kollidiert nicht mit Prod `earnie-productive`)
-- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.5.0-alpha.9`)
+- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.0-alpha.1`)
 
 ```powershell
 mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime

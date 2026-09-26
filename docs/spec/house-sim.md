@@ -86,8 +86,34 @@ $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
   tests/test_house_sim_ha_adapter_loop.py `
   tests/test_house_sim_core_scenarios.py `
   tests/test_house_sim_s4_packaging.py `
+  tests/test_house_sim_s2_archetypes.py `
   tests/test_ha_adapter.py -q --tb=short
 ```
+
+---
+
+## S2 — vendor archetypes
+
+Three more hand-authored archetypes on the same physics (Mode A golden maps). Each has a `meta.json` with sources, what was checked against the integration code, and what is still unverified.
+
+| Archetype | Hardware (HA integration) | What it exercises |
+| --- | --- | --- |
+| `fronius_de` | Fronius GEN24 Plus + BYD HVS (Core `fronius`), Fronius Wattpilot (HACS `goecharger_api2`) | German entity ids/names, energy counters in **Wh**, **no ESS setpoints** (read-only integration), wallbox mode as `select` |
+| `huawei_en` | Huawei SUN2000 + LUNA2000 + DTSU666 (HACS `huawei_solar`), go-e Gemini (HACS `goecharger_api2`) | **Vendor sign** (meter + = export, battery + = charge → `negate`), only charge/discharge **limits** (no active-power entity), SoC named "state of capacity", battery totals with `state_class: total` |
+| `sma_keba` | SMA Sunny Tripower Smart Energy (Core `sma`), KEBA P30 (Core `keba`), user template/Modbus helpers | Mixed language, **kW** power and a **kW setpoint** (`input_number.batterie_sollleistung`), SMA split channels (supplied/absorbed, charge/discharge) behind signed template helpers, distractor `…_grid_power` (inverter AC), wallbox without writable current, no heat pump |
+
+Core behaviour added for S2:
+
+- **Unit-aware projection:** physics is written in each entity's `unit_of_measurement` (W/kW, Wh/kWh); a unit of the wrong quantity (e.g. kWh on a power field) raises. Fixture counter states in Wh are read as kWh.
+- **Vendor sign:** `sign: {field: "negate"}` in the golden map makes the projection write the vendor sign; `HaAdapter` negates back to EHAL.
+- **Unit-aware setpoints:** mapped setpoint entities in kW are read as W by the stepper.
+- **`ess_fallback: "self_consumption"`** (house_params): without a mapped `set_ess_active_power`, the battery follows PV surplus / deficit within limits (`ess_max_charge_w` / `ess_max_discharge_w` or mapped limit entities) and never overshoots 0/100 % SoC. If neither a mapped limit nor the matching house param is set, the step raises — there is no silent kW default.
+- **`derived_entities`** (house_params): `{entity_id: grid_import_power_w | grid_export_power_w | ess_charge_power_w | ess_discharge_power_w | grid_power_w | ess_power_w}` for unsigned split channels.
+- Grid balance uses the EHAL sign: `grid = load − pv − ess` (discharge lowers import). Before S2 the battery term had the wrong sign.
+- Mock REST rejects `number`/`input_number` values outside `min`/`max` and `select` options outside `options`, like HA.
+- S4: `select` platform; sensor `state_class: total`.
+
+Earnie side: HA bindings are unit-aware (`integrations/ha_units.py`) — only physically compatible entities are proposed/saved, and `HaAdapter` converts reads and setpoint writes using the entity's `unit_of_measurement` at runtime, so `sma_keba`'s kW setpoint is written in kW. Known gap: wallbox writes (`amp` / `frc`) do not yet act on physics (wallbox power is still a scenario override).
 
 ---
 
@@ -100,7 +126,7 @@ Dev/dogfood only — **not** shipped with the Earnie add-on. No PyPI package, no
 1. Sync (from the Energy-Optimizer repo root): `python -m scripts.sync_house_sim_integration`
 2. Copy `house_sim/ha_integration/custom_components/earnie_house_sim/` to HA `/config/custom_components/earnie_house_sim/` (Samba / SSH add-on).
 3. Restart Home Assistant → Settings → Devices & services → Add integration → **Earnie House Simulator**.
-4. Config flow: archetype (`evcc_en`), PV source **synthetic** (fixture series) or **weather** (existing `weather.*` entity that exposes `cloud_coverage`; scaled by `pv_kwp` and `sun.sun` elevation). Missing `cloud_coverage` is rejected in the flow.
+4. Config flow: archetype (`evcc_en`, `fronius_de`, `huawei_en`, `sma_keba`), PV source **synthetic** (fixture series) or **weather** (existing `weather.*` entity that exposes `cloud_coverage`; scaled by `pv_kwp` and `sun.sun` elevation). Missing `cloud_coverage` is rejected in the flow.
 5. Point Earnie at that HA (`ehal.backend=ha`, URL/token in `config/.env`). Bind entities with the **2.6.h** EHAL-Com UI (acceptance run). Do **not** paste the golden map blindly for ESS setpoints (see below).
 
 ### Entity ID note (`input_number` → `number`)
@@ -109,7 +135,7 @@ A custom integration cannot register `input_number`. Fixture rows `input_number.
 
 ### Services
 
-Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, `load_spike`, `set_soc`; faults `set_unavailable`, `reject_writes`, `setpoint_lag`, `unit_flip`. Wallbox power is a scenario override only (no EV SoC model in this pass).
+Domain `earnie_house_sim`: scenarios `cloud_pass`, `car_arrives`, `car_leaves`, `load_spike`, `set_soc`; faults `set_unavailable`, `reject_writes`, `setpoint_lag`, `unit_flip` (PV only: a kW entity is shown ×1000, a W entity ÷1000, unit attribute unchanged). Wallbox power is a scenario override only (no EV SoC model in this pass).
 
 ### Persistence
 
@@ -131,8 +157,9 @@ Energy counters (`total_increasing`) and SoC are stored across HA restarts. Afte
 house_sim/fixtures/<name>/
   entities.json           # vendor signature (HA state objects) + optional devices[]
   ehal.ha.entities.json   # golden field→entity_id map + optional sign
-  house_params.json       # battery_kwh, load, optional thermal RC
+  house_params.json       # battery_kwh, load, optional thermal RC, ess_fallback, derived_entities
   pv_series.json          # short synthetic kW series
+  meta.json               # S2+: provenance (sources, verified, unverified)
 ```
 
 `evcc_en` includes `switch.evcc_loadpoint_1_enable` (not mapped — negative case) and no heat-pump entity. Optional `devices` list is used by S4 for HA device registry; the mock loader ignores it for HTTP shape.

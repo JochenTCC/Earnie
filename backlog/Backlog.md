@@ -18,19 +18,72 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.1`**.
 
-**Next:** **HouseSim S2 → S3 → 2.6.e** (mock-bench archetypes / CI / stronger propose).
+**Next:** **2.6.j** first (installation safeguards; H12 stopgap protects existing HA users from auto-updated alphas). In parallel **2.6.e** (stronger propose; HouseSim S2 archetypes done 2026-09-26) — HouseSim S3 (CI) under Version 2.+1. Then **2.6.k → 2.6.l → 2.6.m**. **2.6.n** (battery controllability).
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
 **Documents:**
 
-- [House simulator spec](../docs/spec/house-sim.md) — HouseSim S2–S4 basis
-- [HA compatibility tests (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — HouseSim S2–S3 / **2.6.e**
+- [House simulator spec](../docs/spec/house-sim.md) — HouseSim S1–S4 (archetypes, core, S4 integration)
+- [HA compatibility tests (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — HouseSim S3 / **2.6.e** / **2.6.n**
 - [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — **2.6.e** (confirm-before-save; LLM stays out of 2.6)
 - [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**
-- [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — stable vs pre-release channel (not part of 2.6)
+- [Installation hardening (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md) — findings H0–H13, sprint plan, version channels — Sprint 1–4 = **2.6.j** / **2.6.k** / **2.6.l** / **2.6.m**
+- [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — add-on packaging items; channel work is now **2.6.k**
 - [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood / HA coupling context
 - [HA-Loxone-Bridge-Builder draft](HA-Loxone-Bridge-Builder-Draft.md) — research item, not 2.6
+
+#### Installation hardening (Sprint 1–4 of the concept doc)
+
+Trigger: support case 2026-09-25 (HA add-on crash loop on a `kvm64` VM, see [Backlog-Erledigt.md](Backlog-Erledigt.md)). IDs **H0–H13** refer to the [concept doc](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md).
+
+- [ ] **2.6.j — Sprint 1: quick safeguards + verification**
+  - [ ] **H0** Ship x86-64-v2 preflight (`docker/cpu_check.sh` via `docker/entrypoint.sh`) with the next image / add-on release
+  - [ ] **H12 (stopgap)** Release workflow: pre-releases no longer bump add-on `earnie` in `ha-addon-earnie` (today every alpha reaches all HA users with auto-update)
+  - [ ] **H3** LoxBerry compose `restart: on-failure:3` (was `unless-stopped` → endless crash loop)
+  - [ ] **H5** LoxBerry `TZ` from host instead of hard-coded `Europe/Vienna`
+  - [ ] **H7** Add-on `startup: application` (Core API needed); check daemon waits for `probe_supervisor_core()` with backoff
+  - [ ] **H9 (verify)** Run the SB integration scan inside a bridge-network container: does `local_ipv4_hosts_for_scan()` scan the Docker subnet instead of the LAN?
+  - [ ] **H11 (verify)** Gen2 Miniserver set to HTTPS-only vs. hard-coded `http://` in `integrations/loxone_client.py`
+
+- [ ] **2.6.k — Sprint 2: release pipeline + version channels** (concept doc §3)
+  - [ ] **GHCR `:next`** tag on every release (stable + pre-release) in `release-publish.yml`
+  - [ ] **LoxBerry channels** `stable` (`:latest`) / `prerelease` (`:next`) / `pinned`: `plugin.env` (`EARNIE_CHANNEL`, `EARNIE_PINNED_VERSION`, `EARNIE_AUTO_UPDATE`), `sync_compose_env.sh`, compose `image: …:${EARNIE_IMAGE_TAG:-latest}`, web UI (channel + version list from GitHub releases), daily update timer (not for `pinned`), `postupgrade.sh` default `stable`. Replaces dead `IMAGE` in `plugin.env` (**H13**)
+  - [ ] **HA `addon_config` migration** (concept doc §3.4): `EARNIE_CONFIG_PATH=/config`, runtime stays `/data/earnie_env/runtime`; one-time idempotent copy in `run.sh`, old dir renamed and kept one version; backup/restore test. **Must ship in `earnie` before the first `earnie_prerelease`**
+  - [ ] **HA add-on `earnie_prerelease`** („Earnie (Vorabversion)“) in `ha-addon-earnie`: stable release bumps `earnie` + `earnie_prerelease`, pre-release bumps only `earnie_prerelease` (`scripts/bump_ha_addon.py`); guard against both add-ons running (Supervisor API, `hassio_api: true`); docs „Stabile Version oder Vorabversion“ (**H12** final)
+  - [ ] **H6** Prebuilt add-on images per arch on GHCR + `image:` in `config.yaml` (no on-device build)
+  - [ ] **H2** CI smoke test of app + add-on images under QEMU `-cpu kvm64-v1` and `-cpu cortex-a72` (imports + small HiGHS solve; `OPENBLAS_NUM_THREADS=1`). May slip to **2.6.m** if Sprint 2 gets tight
+  - [ ] **Downgrade warning**: remember last-run version in `runtime/`, warn when an older version starts
+
+- [ ] **2.6.l — Sprint 3: network (Loxone + HA)**
+  - [ ] **H9 (fix)** Scan subnet via `EARNIE_LAN_SUBNET` (LoxBerry sets it at install, compose `.env` for others); detect Docker subnets (`172.16.0.0/12`) and ask in the UI instead of scanning blindly; HA add-on: host IP via Supervisor `/network/info` (`hassio_api: true`)
+  - [ ] **H10** Show „letzter Aufruf vom Miniserver: vor X min von IP Y“ (callback on `:8541`) in SB page / EHAL-Com; docs: bridged VM network (no NAT), fixed IP / DHCP reservation for the Earnie host
+  - [ ] **H8** SB page: when running in a bridge network with HA backend, offer HA URL + long-lived token directly instead of an empty mDNS scan; hint in `docs/einrichtung/container.md`
+  - [ ] **H11 (fix, only if 2.6.j confirms)** Configurable `http`/`https` for the Miniserver; pin the self-signed certificate by fingerprint instead of `verify=False`
+
+- [ ] **2.6.m — Sprint 4: startup checks + runtime monitoring**
+  - [ ] **H1** Extend `docker/cpu_check.sh` to `preflight.sh`: abort on non-writable data dir and on a clock before the image build date (wait briefly for NTP first); warn on RAM < 2 GB and < 500 MB free disk
+  - [ ] **H4** `HEALTHCHECK` in `docker/Dockerfile` (`/_stcore/health`, add-on internal `:8502`) + daemon heartbeat in `runtime/`; add-on `watchdog:` URL; LoxBerry `healthcheck` evaluates `.State.Health.Status` (WARN on `unhealthy`)
+
+#### Battery controllability
+
+Trigger: HouseSim S2 archetype `huawei_en` (only charge/discharge limits, no active-power entity) and `fronius_de` (read-only). Today Earnie plans Zwangsladen / Zwangsentladen it cannot execute on such installs; since the function-completeness check (see [Backlog-Erledigt.md](Backlog-Erledigt.md) 2026-09-26) the active-power setpoint is skipped instead of degrading ESS writes, but the plan still assumes it.
+
+- [ ] **2.6.n — Battery controllability in `house_config` + MILP**
+  - [ ] **House config:** per battery `control: "full" | "limits_only" | "read_only"` (default `full`, backward compatible). Property of the installation, so simulation / backtesting / scenario comparison (business case) use it without a live adapter.
+  - [ ] **MILP constraints:** `limits_only` → charge only from PV surplus, discharge only up to house load (no grid charging, no battery export); modes derived from the plan are only Automatik / Entladesperre. `read_only` → battery modelled as pure self-consumption, no setpoints.
+  - [ ] **Cross-check with the mapping:** warn in EHAL-Com / Live when `control` says more than the bound functions allow (`ehal.functions`: `ess_limits`, `ess_active`), e.g. `full` without `set_ess_active_power`.
+  - [ ] **Deviation evaluation:** `deviation_eval` must not expect forced modes on `limits_only` / `read_only`.
+  - [ ] **Decision: Huawei forcible charge via HA service.** `huawei_solar` offers force charge/discharge only as a service (plus `storage_power_of_charge_from_grid` / working mode `select`). Evaluate whether the HA adapter should call such vendor services, which would make Huawei `full` again — decides how many users the `limits_only` restriction really hits.
+  - [ ] Tests on HouseSim archetypes `huawei_en` (limits only) and `fronius_de` (read-only); docs `ehal.md`, `ehal-com.md`, house-config docs.
+
+#### HA mapping proposals
+
+- [ ] **2.6.e — Stronger propose, still confirm-before-save.** Replay the HouseSim archetypes with an empty Pattern B map and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). Empty-only propose rules apply to Pattern B bindings.
+  - Prerequisites done 2026-09-26: HouseSim S2 archetypes; physical-quantity filter in `heuristic_propose` (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). HouseSim S3 is not a prerequisite — archetypes replay directly in pytest.
+  - Baseline (correct / golden fields): `evcc_en` 13/13, `fronius_de` 3/9, `huawei_en` 0/11, `sma_keba` 3/9; no wrong-quantity proposals.
+  - [ ] Name recognition for vendor vocabularies, e.g. "state of capacity" → SoC, `power_meter` → grid, `nrg_11` / `charging_power` → wallbox, German Fronius names (`leistung_netz`, `ladezustand`), `metering_total_absorbed` / `…_yield` → grid energy.
+  - [ ] Target (pytest over all archetypes): **no wrong proposal** on any field; unambiguous fields hit; leaving a field empty is fine, a wrong binding is not. Known distractors (`inverter_active_power`, SMA `…_grid_power`, Fronius `leistung_verbrauch`) must not be proposed.
 
 ### Version 2.7 — Multiple storages and export power limitation
 
@@ -91,13 +144,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [ ] Heat pump (Prio3) — only indirect control via setpoint adjustment via Loxone setpoint (after **Thermals P2**); distinct from **Thermals P1a** (direct enable/PWM flex from daily HDD budget)
 
 
-### Version 2.+1
+### Version 2.+1 - Improvements for HA HouseSim
 
 **Naming:** simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4"). **HA Lab** now means only the `ha_lab/` Compose stack (Earnie + HAOS + evcc, [ha-lab-setup.md](../docs/spec/ha-lab-setup.md)).
 
-- [ ] **HouseSim S2** — 2–3 more hand-authored archetypes (domain/naming/i18n) on the same physics; write-back per archetype.
-- [ ] **HouseSim S3** — CI harness: short simulated windows, not N live `main.py` days. 
-- [ ] **2.6.e — Stronger propose, still confirm-before-save.** After HouseSim S2. Replay archetypes with empty map and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). Empty-only propose rules apply to Pattern B bindings.
+- [ ] **HouseSim S3** — CI harness: short simulated windows, not N live `main.py` days. Load each archetype → golden map → `HaAdapter` → check criteria of concept doc §3.5 (setpoint effect on next read, degrade on write errors, SoC/PV/temperature in a plausible band) for **all** archetypes; the static 2.6.a fixture stays the fast job. Diagnose-JSON → fixture converter only when support needs it.
+- [ ] **HouseSim wallbox write-back** — Wallbox setpoints act on the simulated physics instead of only the scenario override: `set_evcs_max_current` / mode writes (go-e / Wattpilot `amp` + `frc`, evcc `max_current` + enable) → charge power = current × voltage × phases while an EV is connected (`car_arrives` / `car_leaves`), capped by the EV's acceptance. Mock REST (S1–S3) and S4 integration; tests on `evcc_en`, `fronius_de`, `huawei_en` (`sma_keba` stays the read-only wallbox case). Prerequisite for **HouseSim scenario import**.
+- [ ] **HouseSim scenario import** (idea, after wallbox write-back) — S4 config flow reads a finished Earnie scenario (`house_config` with consumers, PV, batteries) and builds the simulated house from it: one device per configured component with a matching archetype, physics parameters from the scenario instead of manual `house_params`. Consumers beyond battery + PV need their physics in the core first (wallbox: item above; heat pump: open). Concept doc §5 S4 „optional später“.
 
 
 ### Version 2.+1 - Enhance Loxone Auto Binding functionality

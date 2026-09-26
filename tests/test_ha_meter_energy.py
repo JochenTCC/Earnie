@@ -22,6 +22,14 @@ def test_parse_ha_energy_kwh_wh_to_kwh():
     assert parse_ha_energy_kwh("1500", unit="Wh") == pytest.approx(1.5)
     assert parse_ha_energy_kwh("1.5", unit="kWh") == pytest.approx(1.5)
     assert parse_ha_energy_kwh("2,25", unit="kWh") == pytest.approx(2.25)
+    assert parse_ha_energy_kwh("0.5", unit="MWh") == pytest.approx(500.0)
+
+
+def test_parse_ha_energy_kwh_rejects_power_unit():
+    from integrations.ha_units import UnitMismatchError
+
+    with pytest.raises(UnitMismatchError):
+        parse_ha_energy_kwh("1500", unit="W")
 
 
 def test_parse_ha_energy_rejects_unavailable():

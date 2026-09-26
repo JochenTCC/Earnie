@@ -2,6 +2,8 @@
 
 Energiemanagement und Optimierung für Smart Homes, betrieben als Supervisor-Add-on (primär für **Home Assistant Green** / HA OS, `aarch64`; `amd64` zusätzlich für Dev-/Test-VMs).
 
+**`amd64` braucht eine CPU mit x86-64-v2** (SSE4.2, POPCNT). In Proxmox-VMs den CPU-Typ auf `host` (oder `x86-64-v2-AES`) stellen – mit `kvm64`/`qemu64` bricht das Add-on beim Start mit einer entsprechenden Meldung ab. Details: [Voraussetzungen](https://github.com/JochenTCC/Earnie/blob/main/docs/einrichtung/homeassistant-addon.md#voraussetzungen-gono-go).
+
 Dieses Add-on ist ein dünner Wrapper um das bestehende, produktiv genutzte Earnie-Image (`ghcr.io/jochentcc/earnie-energy`) — dieselbe Anwendung wie in den Docker-Compose-Stacks (Synology, LoxBerry, Proxmox), nur verpackt für den HA Supervisor.
 
 ## Installation

@@ -99,14 +99,29 @@ class StateStore:
             if current is None:
                 return 404, f"Unknown entity {entity_id}"
 
+            attrs = current.get("attributes") or {}
             if service_l == "select_option":
                 option = data.get("option")
                 if option is None:
                     return 400, "Missing option"
+                options = attrs.get("options")
+                # Like HA: an option outside the entity's list is rejected.
+                if isinstance(options, list) and str(option) not in [str(o) for o in options]:
+                    return 400, f"Invalid option {option!r} for {entity_id}"
                 current["state"] = str(option)
             else:
                 if "value" not in data:
                     return 400, "Missing value"
+                # Like HA: number/input_number reject values outside min/max.
+                try:
+                    value = float(data["value"])
+                except (TypeError, ValueError):
+                    return 400, f"Non-numeric value for {entity_id}"
+                lo, hi = attrs.get("min"), attrs.get("max")
+                if (lo is not None and value < float(lo)) or (
+                    hi is not None and value > float(hi)
+                ):
+                    return 400, f"Value {value} out of range [{lo}, {hi}] for {entity_id}"
                 current["state"] = str(data["value"])
             return 200, "ok"
 

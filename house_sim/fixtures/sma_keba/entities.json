@@ -1,0 +1,261 @@
+{
+  "devices": [
+    {
+      "key": "pv",
+      "name": "SN: 3012345678",
+      "manufacturer": "SMA",
+      "model": "STP 10.0-3SE-40",
+      "entity_ids": [
+        "sensor.sn_3012345678_pv_power",
+        "sensor.sn_3012345678_grid_power",
+        "sensor.sn_3012345678_total_yield",
+        "sensor.sn_3012345678_metering_power_supplied",
+        "sensor.sn_3012345678_metering_power_absorbed",
+        "sensor.sn_3012345678_metering_total_yield",
+        "sensor.sn_3012345678_metering_total_absorbed",
+        "sensor.sn_3012345678_battery_soc_total",
+        "sensor.sn_3012345678_battery_power_charge_total",
+        "sensor.sn_3012345678_battery_power_discharge_total",
+        "sensor.sn_3012345678_battery_charge_total",
+        "sensor.sn_3012345678_battery_discharge_total"
+      ]
+    },
+    {
+      "key": "helpers",
+      "name": "Helfer (Template / Modbus)",
+      "manufacturer": "Home Assistant",
+      "model": "Template",
+      "entity_ids": [
+        "sensor.netzleistung",
+        "sensor.batterieleistung",
+        "input_number.batterie_sollleistung",
+        "input_number.batterie_ladegrenze",
+        "input_number.batterie_entladegrenze"
+      ]
+    },
+    {
+      "key": "wallbox",
+      "name": "KEBA P30",
+      "manufacturer": "KEBA",
+      "model": "P30 c-series",
+      "entity_ids": [
+        "sensor.keba_p30_charging_power",
+        "sensor.keba_p30_total_energy",
+        "sensor.keba_p30_max_current",
+        "lock.keba_p30_authentication"
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "entity_id": "sensor.sn_3012345678_pv_power",
+      "state": "2500.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SN: 3012345678 PV Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_grid_power",
+      "state": "2400.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SN: 3012345678 Grid Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_total_yield",
+      "state": "31234.5",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "SN: 3012345678 Total Yield",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_metering_power_supplied",
+      "state": "1200.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SN: 3012345678 Metering Power Supplied",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_metering_power_absorbed",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SN: 3012345678 Metering Power Absorbed",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_metering_total_yield",
+      "state": "20111.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "SN: 3012345678 Metering Total Yield",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_metering_total_absorbed",
+      "state": "6543.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "SN: 3012345678 Metering Total Absorbed",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_battery_soc_total",
+      "state": "70.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "SN: 3012345678 Battery SOC Total",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_battery_power_charge_total",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SN: 3012345678 Battery Power Charge Total",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_battery_power_discharge_total",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "SN: 3012345678 Battery Power Discharge Total",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_battery_charge_total",
+      "state": "3100.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "SN: 3012345678 Battery Charge Total",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.sn_3012345678_battery_discharge_total",
+      "state": "2900.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "SN: 3012345678 Battery Discharge Total",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.netzleistung",
+      "state": "-1.2",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "kW",
+        "friendly_name": "Netzleistung",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.batterieleistung",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "kW",
+        "friendly_name": "Batterieleistung",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "input_number.batterie_sollleistung",
+      "state": "0.0",
+      "attributes": {
+        "friendly_name": "Batterie Sollleistung",
+        "unit_of_measurement": "kW",
+        "min": -10,
+        "max": 10,
+        "step": 0.1
+      }
+    },
+    {
+      "entity_id": "input_number.batterie_ladegrenze",
+      "state": "5.0",
+      "attributes": {
+        "friendly_name": "Batterie Ladegrenze",
+        "unit_of_measurement": "kW",
+        "min": 0,
+        "max": 10,
+        "step": 0.1
+      }
+    },
+    {
+      "entity_id": "input_number.batterie_entladegrenze",
+      "state": "5.0",
+      "attributes": {
+        "friendly_name": "Batterie Entladegrenze",
+        "unit_of_measurement": "kW",
+        "min": 0,
+        "max": 10,
+        "step": 0.1
+      }
+    },
+    {
+      "entity_id": "sensor.keba_p30_charging_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "kW",
+        "friendly_name": "KEBA P30 Charging Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.keba_p30_total_energy",
+      "state": "4567.8",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "KEBA P30 Total Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.keba_p30_max_current",
+      "state": "16",
+      "attributes": {
+        "device_class": "current",
+        "unit_of_measurement": "A",
+        "friendly_name": "KEBA P30 Max Current",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "lock.keba_p30_authentication",
+      "state": "locked",
+      "attributes": {
+        "friendly_name": "KEBA P30 Authentication"
+      }
+    }
+  ]
+}

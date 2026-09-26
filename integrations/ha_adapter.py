@@ -20,7 +20,13 @@ from ehal import (
     validate_write_error,
 )
 from ehal.models import canonicalize_ha_entity_keys
+from ehal.functions import (
+    available_functions,
+    incomplete_function_fields,
+    incomplete_function_messages,
+)
 from ehal.validate import EhalValidationError
+from integrations.ha_units import UnitMismatchError, field_quantity, from_ehal, to_ehal
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +70,7 @@ class _HaWriteOutcome:
     hub_status: str | None = None
     flip_ess: bool = False
     flip_evcs: bool = False
+    skipped: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -93,16 +100,29 @@ def apply_sign(value: float, mode: str | None) -> float:
     return float(value)
 
 
-def parse_ha_numeric_state(state: str, *, unit: str | None) -> float:
-    """Parse HA state string; convert kW→W when unit indicates kilowatts."""
+def _parse_ha_number(state: str) -> float:
     text = str(state).strip().replace(",", ".")
     if text.lower() in ("", "unavailable", "unknown", "none"):
         raise ValueError(f"HA state is not numeric: {state!r}")
-    value = float(text)
+    return float(text)
+
+
+def parse_ha_numeric_state(state: str, *, unit: str | None) -> float:
+    """Parse HA state string; convert kW→W when unit indicates kilowatts."""
+    value = _parse_ha_number(state)
     unit_l = str(unit or "").strip().lower()
     if unit_l in ("kw", "kilowatt", "kilowatts"):
         return value * 1000.0
     return value
+
+
+def parse_ha_field_value(field_name: str, state: str, *, unit: str | None) -> float:
+    """Parse HA state for an EHAL field; convert entity unit → EHAL base unit.
+
+    Raises ``UnitMismatchError`` (a ``ValueError``) if the entity's unit belongs
+    to another physical quantity (e.g. kWh bound to a power field).
+    """
+    return to_ehal(field_name, _parse_ha_number(state), unit)
 
 
 def entity_domain(entity_id: str) -> str:
@@ -123,13 +143,17 @@ class HaAdapter:
             sign=sign,
             timeout_sec=cfg.timeout_sec,
         )
-        self._supports_ess_write = bool(
-            entities.get("set_ess_active_power")
-            or entities.get("set_ess_charge_power_limit")
-            or entities.get("set_ess_discharge_power_limit")
-        )
-        self._supports_evcs_current = bool(entities.get("set_evcs_max_current"))
+        # A function is only usable when all its fields are mapped (ehal.functions).
+        functions = available_functions(entities)
+        self._supports_ess_write = "ess_limits" in functions
+        self._supports_ess_active = "ess_active" in functions
+        self._supports_evcs_current = "evcs_current" in functions
+        for message in incomplete_function_messages(entities):
+            logger.warning("HA mapping adapter_id=%s: %s", cfg.adapter_id, message)
+        self._incomplete_fields = incomplete_function_fields(entities)
         self._last_write_error: EhalWriteError | None = None
+        self._last_skipped: list[str] = []
+        self._warned_skips: set[str] = set()
         self._base = cfg.base_url.rstrip("/")
         self._headers = {
             "Authorization": f"Bearer {cfg.token}",
@@ -138,6 +162,24 @@ class HaAdapter:
 
     def last_write_error(self) -> EhalWriteError | None:
         return self._last_write_error
+
+    def last_skipped_fields(self) -> list[str]:
+        """Setpoint fields of the last write dropped because a function is incomplete."""
+        return list(self._last_skipped)
+
+    def _skip(self, field_name: str, outcome: _HaWriteOutcome) -> None:
+        # Live trace only for a half-mapped function. Never-configured fields
+        # (and unmapped modes) are still not written, but not shown as Übersprungen.
+        if field_name in self._incomplete_fields:
+            outcome.skipped.append(field_name)
+        if field_name not in self._warned_skips:
+            self._warned_skips.add(field_name)
+            logger.warning(
+                "HA setpoint %s skipped adapter_id=%s: function not available "
+                "(mapping incomplete or not configured)",
+                field_name,
+                self.cfg.adapter_id,
+            )
 
     def capabilities(self) -> EhalCapabilities:
         doc: dict[str, Any] = {
@@ -263,7 +305,15 @@ class HaAdapter:
             "set_ess_charge_power_limit",
             "set_ess_discharge_power_limit",
         ):
-            if field_name not in doc or not self._supports_ess_write:
+            if field_name not in doc:
+                continue
+            supported = (
+                self._supports_ess_active
+                if field_name == "set_ess_active_power"
+                else self._supports_ess_write
+            )
+            if not supported:
+                self._skip(field_name, outcome)
                 continue
             ok, status, msg = self._try_setpoint_write(field_name, float(doc[field_name]))
             if not ok:
@@ -272,7 +322,9 @@ class HaAdapter:
                 outcome.hub_status = status or outcome.hub_status
                 outcome.flip_ess = True
 
-        if "set_ess_mode" in doc and self.cfg.entities.get("set_ess_mode"):
+        if "set_ess_mode" in doc and not self.cfg.entities.get("set_ess_mode"):
+            self._skip("set_ess_mode", outcome)
+        elif "set_ess_mode" in doc:
             ok, status, msg = self._try_setpoint_write(
                 "set_ess_mode", doc["set_ess_mode"]
             )
@@ -288,9 +340,10 @@ class HaAdapter:
     ) -> None:
         """EVCS-Strom (Ampere) und Modus schreiben, sofern Entities gemappt sind."""
         for field_name in ("set_evcs_max_current", "set_evcs_mode"):
-            if field_name not in doc or not self._supports_evcs_current:
+            if field_name not in doc:
                 continue
-            if not self.cfg.entities.get(field_name):
+            if not self._supports_evcs_current or not self.cfg.entities.get(field_name):
+                self._skip(field_name, outcome)
                 continue
             value = doc[field_name]
             numeric = float(value) if field_name != "set_evcs_mode" else value
@@ -319,6 +372,7 @@ class HaAdapter:
         outcome = _HaWriteOutcome()
         self._write_ess_setpoints(doc, outcome)
         self._write_evcs_setpoints(doc, outcome)
+        self._last_skipped = list(outcome.skipped)
 
         if not outcome.failed:
             self._last_write_error = None
@@ -353,7 +407,17 @@ class HaAdapter:
         payload = self.read_state(entity_id)
         attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
         unit = attrs.get("unit_of_measurement")
-        raw = parse_ha_numeric_state(str(payload.get("state")), unit=unit)
+        try:
+            raw = parse_ha_field_value(field_name, str(payload.get("state")), unit=unit)
+        except UnitMismatchError as exc:
+            logger.warning(
+                "HA unit mismatch adapter_id=%s field=%s entity=%s: %s",
+                self.cfg.adapter_id,
+                field_name,
+                entity_id,
+                exc,
+            )
+            raise
         if field_name == "sens_ess_soc":
             return float(raw)
         return apply_sign(raw, self.cfg.sign.get(field_name))
@@ -368,6 +432,8 @@ class HaAdapter:
         if domain not in WRITE_DOMAINS:
             return False, None, f"Unsupported write domain for {entity_id}"
         try:
+            if domain != "select" and field_quantity(field_name) is not None:
+                value = self._to_entity_unit(field_name, entity_id, float(value))
             if domain == "select":
                 self.call_service(
                     "select",
@@ -387,6 +453,14 @@ class HaAdapter:
                     {"entity_id": entity_id, "value": value},
                 )
             return True, None, ""
+        except UnitMismatchError as exc:
+            logger.warning(
+                "HA setpoint unit mismatch adapter_id=%s field=%s: %s",
+                self.cfg.adapter_id,
+                field_name,
+                exc,
+            )
+            return False, None, f"Unit mismatch for {entity_id}: {exc}"
         except HaHttpError as exc:
             logger.warning(
                 "HA setpoint write failed adapter_id=%s field=%s: %s",
@@ -396,6 +470,12 @@ class HaAdapter:
             )
             status = str(exc.status_code) if exc.status_code is not None else None
             return False, status, str(exc)
+
+    def _to_entity_unit(self, field_name: str, entity_id: str, value: float) -> float:
+        """EHAL base unit → target entity unit, read fresh from HA on every write."""
+        payload = self.read_state(entity_id)
+        attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
+        return round(from_ehal(field_name, value, attrs.get("unit_of_measurement")), 6)
 
     def _record_write_error(
         self,
@@ -409,6 +489,7 @@ class HaAdapter:
     ) -> EhalWriteError:
         if flip_ess:
             self._supports_ess_write = False
+            self._supports_ess_active = False
         if flip_evcs:
             self._supports_evcs_current = False
         payload: dict[str, Any] = {

@@ -18,10 +18,14 @@ from integrations.ha_adapter import (
     HaHttpError,
 )
 from integrations.ha_ehal_mapping import (
+    binding_conversion_hint,
+    binding_unit_issues,
+    compatible_entity_ids,
     heuristic_propose,
     resolve_field_select_default,
 )
 from runtime_store.ehal_setup import BACKEND_HA, default_adapter_id, resolve_adapter_id
+from ui.ehal_function_status import render_function_status
 from ui.ehal_loxone_mapping import (
     PLANT_ENTITY_ID,
     apply_entity_bindings,
@@ -285,7 +289,7 @@ def _render_entity_picker(entities: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _render_field_selects(
     entity: dict[str, Any],
-    options: list[str],
+    scan_rows: list[dict[str, Any]],
     proposals: dict[str, dict[str, Any]],
 ) -> dict[str, str]:
     ehal_map: dict[str, str] = {}
@@ -315,6 +319,11 @@ def _render_field_selects(
                 str(bindings.get(field) or ""),
                 _proposed_entity_id(proposals, field),
             )
+            # Rule 1: only physically compatible entities are offered.
+            options = _entity_options(
+                [{"entity_id": eid} for eid in compatible_entity_ids(field, scan_rows)],
+                [str(bindings.get(field) or "")],
+            )
             mapped = _select_entity(
                 field,
                 entity_id=entity_id,
@@ -324,6 +333,10 @@ def _render_field_selects(
             )
             if mapped:
                 ehal_map[field] = mapped
+                # Rule 2: factor comes from the HA unit at runtime.
+                hint = binding_conversion_hint(field, mapped, scan_rows)
+                if hint:
+                    st.caption(f"Einheit wird automatisch umgerechnet: {hint}")
     return ehal_map
 
 
@@ -345,11 +358,18 @@ def _render_sign_selects(current_sign: dict[str, str]) -> dict[str, str]:
     return sign
 
 
-def _validate_mapping_save(entity_id: str, ehal_map: dict[str, str]) -> str | None:
+def _validate_mapping_save(
+    entity_id: str,
+    ehal_map: dict[str, str],
+    scan_rows: list[dict[str, Any]] | None = None,
+) -> str | None:
     if entity_id == PLANT_ENTITY_ID:
         missing = [name for name in TELEMETRY_REQUIRED if name not in ehal_map]
         if missing:
             return "Pflichtfelder fehlen: " + ", ".join(missing)
+    issues = binding_unit_issues(ehal_map, scan_rows or [])
+    if issues:
+        return "Einheit passt nicht zum Feld: " + "; ".join(issues)
     return None
 
 
@@ -364,12 +384,13 @@ def _save_entity_mapping(
     token: str,
     adapter_id: str,
     sign: dict[str, str],
+    scan_rows: list[dict[str, Any]] | None = None,
 ) -> None:
     from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
     from runtime_store.dotenv_io import write_ha_dotenv
     from runtime_store.dotenv_loader import load_app_dotenv
 
-    error = _validate_mapping_save(entity_id, ehal_map)
+    error = _validate_mapping_save(entity_id, ehal_map, scan_rows)
     if error:
         st.error(error)
         return
@@ -487,8 +508,8 @@ def render_ehal_ha_mapping_section() -> None:
     proposals: dict[str, dict[str, Any]] = dict(
         st.session_state.get(_SESSION_PROPOSALS) or {}
     )
-    options = _entity_options(scan_rows, list(entity["bindings"].values()))
-    ehal_map = _render_field_selects(entity, options, proposals)
+    ehal_map = _render_field_selects(entity, scan_rows, proposals)
+    render_function_status(ehal_map, _ha_entity_fields(entity))
 
     sign = dict(current["sign"])
     if str(entity["id"]) == PLANT_ENTITY_ID:
@@ -516,4 +537,5 @@ def render_ehal_ha_mapping_section() -> None:
             token=token,
             adapter_id=adapter_id,
             sign=sign,
+            scan_rows=scan_rows,
         )

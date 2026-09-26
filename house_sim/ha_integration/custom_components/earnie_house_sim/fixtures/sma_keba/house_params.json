@@ -1,0 +1,16 @@
+{
+  "battery_capacity_kwh": 9.8,
+  "initial_soc_pct": 70.0,
+  "load_kw": 1.3,
+  "initial_evcs_power_w": 0.0,
+  "battery_energy_entities": {
+    "charge": "sensor.sn_3012345678_battery_charge_total",
+    "discharge": "sensor.sn_3012345678_battery_discharge_total"
+  },
+  "derived_entities": {
+    "sensor.sn_3012345678_metering_power_supplied": "grid_export_power_w",
+    "sensor.sn_3012345678_metering_power_absorbed": "grid_import_power_w",
+    "sensor.sn_3012345678_battery_power_charge_total": "ess_charge_power_w",
+    "sensor.sn_3012345678_battery_power_discharge_total": "ess_discharge_power_w"
+  }
+}

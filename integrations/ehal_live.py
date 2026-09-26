@@ -320,6 +320,7 @@ def write_ess_setpoints_from_control(
         record_fields,
         written_at=ts,
         error=error,
+        skipped=_last_skipped(adapter),
     )
     return error, records
 
@@ -433,8 +434,17 @@ def write_evcs_max_current_from_consumers(
         {"set_evcs_max_current": amps_out},
         written_at=ts,
         error=error,
+        skipped=_last_skipped(adapter),
     )
     return error, records
+
+
+SKIPPED_MESSAGE = "Übersprungen: Funktion nicht verfügbar (Mapping unvollständig)"
+
+
+def _last_skipped(adapter: Any) -> list[str]:
+    getter = getattr(adapter, "last_skipped_fields", None)
+    return list(getter()) if callable(getter) else []
 
 
 def build_ehal_write_records(
@@ -442,12 +452,26 @@ def build_ehal_write_records(
     *,
     written_at: str,
     error: EhalWriteError | None,
+    skipped: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Compact write trace rows for optimizer_run_state.ehal_writes."""
     failed = set(error.get("failed_fields") or []) if error else set()
     message = str(error.get("message") or "") if error else ""
+    skipped_set = set(skipped or [])
     rows: list[dict[str, Any]] = []
     for field, value in fields.items():
+        if field in skipped_set:
+            rows.append(
+                {
+                    "field": field,
+                    "value": value,
+                    "success": False,
+                    "skipped": True,
+                    "written_at": written_at,
+                    "message": SKIPPED_MESSAGE,
+                }
+            )
+            continue
         if error is None:
             ok = True
         elif failed:

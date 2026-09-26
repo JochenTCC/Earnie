@@ -17,6 +17,11 @@ from ehal import (
     validate_telemetry,
     validate_write_error,
 )
+from ehal.functions import (
+    available_functions,
+    incomplete_function_fields,
+    incomplete_function_messages,
+)
 from ehal.validate import EhalValidationError
 from integrations import loxone_client
 
@@ -80,16 +85,44 @@ class LoxoneAdapter:
 
     def __init__(self, cfg: LoxoneConfig) -> None:
         self.cfg = cfg
-        self._supports_ess_write = bool(
-            cfg.charge_power_name
-            or cfg.discharge_power_name
-            or cfg.active_power_name
-        )
-        self._supports_evcs_current = bool(cfg.evcs_max_current_name)
+        # A function is only usable when all its fields are mapped (ehal.functions).
+        write_map = {
+            "set_ess_active_power": cfg.active_power_name,
+            "set_ess_charge_power_limit": cfg.charge_power_name,
+            "set_ess_discharge_power_limit": cfg.discharge_power_name,
+            "set_evcs_max_current": cfg.evcs_max_current_name,
+        }
+        functions = available_functions(write_map)
+        self._supports_ess_write = "ess_limits" in functions
+        self._supports_ess_active = "ess_active" in functions
+        self._supports_evcs_current = "evcs_current" in functions
+        for message in incomplete_function_messages(write_map):
+            logger.warning("Loxone mapping adapter_id=%s: %s", cfg.adapter_id, message)
+        self._incomplete_fields = incomplete_function_fields(write_map)
         self._last_write_error: EhalWriteError | None = None
+        self._last_skipped: list[str] = []
+        self._warned_skips: set[str] = set()
 
     def last_write_error(self) -> EhalWriteError | None:
         return self._last_write_error
+
+    def last_skipped_fields(self) -> list[str]:
+        """Setpoint fields of the last write dropped because a function is incomplete."""
+        return list(self._last_skipped)
+
+    def _skip(self, field_name: str) -> None:
+        # Live trace only for a half-mapped function. Never-configured fields
+        # (and unmapped modes) are still not written, but not shown as Übersprungen.
+        if field_name in self._incomplete_fields:
+            self._last_skipped.append(field_name)
+        if field_name not in self._warned_skips:
+            self._warned_skips.add(field_name)
+            logger.warning(
+                "Loxone setpoint %s skipped adapter_id=%s: function not available "
+                "(mapping incomplete or not configured)",
+                field_name,
+                self.cfg.adapter_id,
+            )
 
     def capabilities(self) -> EhalCapabilities:
         doc: dict[str, Any] = {
@@ -148,9 +181,12 @@ class LoxoneAdapter:
         messages: list[str] = []
         flip_ess = False
         flip_evcs = False
+        self._last_skipped = []
 
         flip_ess = self._write_ess_setpoints(doc, failed, messages) or flip_ess
-        if "set_ess_mode" in doc:
+        if "set_ess_mode" in doc and not self.cfg.control_cmd_name:
+            self._skip("set_ess_mode")
+        elif "set_ess_mode" in doc:
             ok, msg = self._try_marker_write(
                 self.cfg.control_cmd_name, float(doc["set_ess_mode"])
             )
@@ -177,7 +213,14 @@ class LoxoneAdapter:
         self, doc: dict[str, Any], failed: list[str], messages: list[str]
     ) -> bool:
         flip = False
-        if "set_ess_active_power" in doc and self.cfg.active_power_name:
+        for field_name, supported in (
+            ("set_ess_active_power", self._supports_ess_active),
+            ("set_ess_charge_power_limit", self._supports_ess_write),
+            ("set_ess_discharge_power_limit", self._supports_ess_write),
+        ):
+            if field_name in doc and not supported:
+                self._skip(field_name)
+        if "set_ess_active_power" in doc and self._supports_ess_active:
             ok, msg = self._try_marker_write(
                 self.cfg.active_power_name,
                 ehal_active_power_w_to_loxone_kw(doc["set_ess_active_power"]),
@@ -211,6 +254,9 @@ class LoxoneAdapter:
     ) -> bool:
         flip = False
         if not self._supports_evcs_current:
+            for field_name in ("set_evcs_max_current", "set_evcs_mode"):
+                if field_name in doc:
+                    self._skip(field_name)
             return flip
         if "set_evcs_max_current" in doc:
             ok, msg = self._try_marker_write(
@@ -221,7 +267,9 @@ class LoxoneAdapter:
                 failed.append("set_evcs_max_current")
                 messages.append(msg)
                 flip = True
-        if "set_evcs_mode" in doc:
+        if "set_evcs_mode" in doc and not self.cfg.evcs_mode_name:
+            self._skip("set_evcs_mode")
+        elif "set_evcs_mode" in doc:
             ok, msg = self._try_evcs_mode_write(str(doc["set_evcs_mode"]))
             if not ok:
                 failed.append("set_evcs_mode")
@@ -291,6 +339,7 @@ class LoxoneAdapter:
     ) -> EhalWriteError:
         if flip_ess:
             self._supports_ess_write = False
+            self._supports_ess_active = False
         if flip_evcs:
             self._supports_evcs_current = False
         payload: dict[str, Any] = {

@@ -1,0 +1,19 @@
+{
+  "entities": {
+    "sens_grid_power_active": "sensor.netzleistung",
+    "sens_pv_production_active": "sensor.sn_3012345678_pv_power",
+    "sens_ess_soc": "sensor.sn_3012345678_battery_soc_total",
+    "sens_ess_power": "sensor.batterieleistung",
+    "sens_evcs_active_power": "sensor.keba_p30_charging_power",
+    "sens_pv_energy": "sensor.sn_3012345678_total_yield",
+    "sens_grid_energy_import": "sensor.sn_3012345678_metering_total_absorbed",
+    "sens_grid_energy_export": "sensor.sn_3012345678_metering_total_yield",
+    "set_ess_active_power": "input_number.batterie_sollleistung",
+    "set_ess_charge_power_limit": "input_number.batterie_ladegrenze",
+    "set_ess_discharge_power_limit": "input_number.batterie_entladegrenze"
+  },
+  "sign": {
+    "sens_grid_power_active": "ehal",
+    "sens_ess_power": "ehal"
+  }
+}

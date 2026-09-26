@@ -168,7 +168,8 @@ def test_write_setpoints_evcs_mode_now_encodes_two(send_mock):
 
 
 @patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_evcs_mode_fails_without_mode_marker(send_mock):
+def test_write_setpoints_evcs_mode_skipped_without_mode_marker(send_mock):
+    """Unmapped mode marker: not written and not a live-trace row; current stays usable."""
     send_mock.return_value = True
     adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A"))
     error = adapter.write_setpoints(
@@ -177,10 +178,30 @@ def test_write_setpoints_evcs_mode_fails_without_mode_marker(send_mock):
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "loxone-home",
             "set_evcs_mode": "pv",
+            "set_evcs_max_current": 10,
         }
     )
-    assert error is not None
-    assert "set_evcs_mode" in error["failed_fields"]
+    assert error is None
+    assert adapter.last_skipped_fields() == []
+    assert adapter.capabilities()["supports_evcs_current"] is True
+    assert ("EV_A", 10.0) in {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
+
+
+@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
+def test_write_setpoints_ess_mode_skipped_without_cmd_marker(send_mock):
+    send_mock.return_value = True
+    adapter = LoxoneAdapter(_cfg(control_cmd_name=""))
+    error = adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-07-28T12:00:00Z",
+            "adapter_id": "loxone-home",
+            "set_ess_mode": 1,
+        }
+    )
+    assert error is None
+    assert adapter.last_skipped_fields() == []
+    send_mock.assert_not_called()
 
 
 @patch("integrations.loxone_adapter.loxone_client.send_loxone_value")

@@ -5,12 +5,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, Callable
 
 from .archetype import (
     ArchetypePackage,
     StateWriter,
     battery_energy_entity_id,
+    entity_unit,
+    native_to_base,
     project_physics_to_store,
 )
 from .thermal import simulate_next_temp_c
@@ -18,11 +20,44 @@ from .thermal import simulate_next_temp_c
 
 @dataclass(frozen=True)
 class EssSetpoints:
-    """Battery setpoints for one tick (EHAL: + discharge, − charge)."""
+    """Battery setpoints for one tick (EHAL: + discharge, − charge).
+
+    ``self_consumption``: the archetype has no active-power setpoint entity, so
+    the battery follows PV surplus / house deficit within the limits (typical
+    vendor default mode, e.g. Huawei "Maximise self consumption").
+    """
 
     active_power_w: float = 0.0
     charge_limit_w: float | None = None
     discharge_limit_w: float | None = None
+    self_consumption: bool = False
+
+
+def ess_setpoints_from_lookup(
+    package: ArchetypePackage,
+    lookup: Callable[[str], float | None],
+) -> EssSetpoints:
+    """Build setpoints from mapped entities; ``lookup(entity_id)`` returns the
+    raw numeric state in the entity's own unit (W or kW)."""
+    entities = package.ehal_entities
+
+    def _watts(field: str) -> float | None:
+        entity_id = entities.get(field)
+        if not entity_id:
+            return None
+        raw = lookup(entity_id)
+        if raw is None:
+            return None
+        return native_to_base(float(raw), quantity="power", unit=entity_unit(package, entity_id))
+
+    fallback = str(package.house_params.get("ess_fallback") or "").strip().lower()
+    self_consumption = not entities.get("set_ess_active_power") and fallback == "self_consumption"
+    return EssSetpoints(
+        active_power_w=float(_watts("set_ess_active_power") or 0.0),
+        charge_limit_w=_watts("set_ess_charge_power_limit"),
+        discharge_limit_w=_watts("set_ess_discharge_power_limit"),
+        self_consumption=self_consumption,
+    )
 
 
 @dataclass
@@ -99,15 +134,17 @@ def _fixture_energy_kwh(package: ArchetypePackage, field: str, default: float) -
 
 
 def _fixture_state_kwh(package: ArchetypePackage, entity_id: str, default: float) -> float:
+    """Initial counter in kWh (fixture state may be in Wh)."""
     if not entity_id:
         return float(default)
     for item in package.entities:
         if str(item.get("entity_id") or "").strip() != entity_id:
             continue
         try:
-            return float(str(item.get("state") or default).replace(",", "."))
+            raw = float(str(item.get("state") or default).replace(",", "."))
         except ValueError:
             return float(default)
+        return native_to_base(raw, quantity="energy", unit=entity_unit(package, entity_id))
     return float(default)
 
 
@@ -149,6 +186,41 @@ def resolve_ess_power_w(setpoints: EssSetpoints) -> float:
     return value
 
 
+def _cap_w(explicit: float | None, params: dict[str, Any], key: str) -> float:
+    """Charge/discharge cap from a mapped limit, else an explicit house param.
+
+    No silent default: a self-consumption archetype must state the cap.
+    """
+    if explicit is not None:
+        return abs(float(explicit))
+    if key not in params:
+        raise ValueError(
+            f"self_consumption needs a mapped limit or house_params[{key!r}]"
+        )
+    return abs(float(params[key]))
+
+
+def _self_consumption_power_w(
+    setpoints: EssSetpoints,
+    *,
+    package: ArchetypePackage,
+    soc_pct: float,
+    surplus_kw: float,
+    capacity_kwh: float,
+    dt_h: float,
+) -> float:
+    """Battery power (EHAL sign) that absorbs surplus / covers deficit."""
+    params = package.house_params
+    charge_cap = _cap_w(setpoints.charge_limit_w, params, "ess_max_charge_w")
+    discharge_cap = _cap_w(setpoints.discharge_limit_w, params, "ess_max_discharge_w")
+    # Energy headroom this tick (no overshoot past 0 / 100 %).
+    room_w = (100.0 - soc_pct) / 100.0 * capacity_kwh / dt_h * 1000.0
+    avail_w = soc_pct / 100.0 * capacity_kwh / dt_h * 1000.0
+    if surplus_kw >= 0:
+        return -min(surplus_kw * 1000.0, charge_cap, room_w)
+    return min(-surplus_kw * 1000.0, discharge_cap, avail_w)
+
+
 def _pv_at_tick(series: list[float], tick: int) -> float:
     if tick < 0:
         return float(series[0])
@@ -182,11 +254,6 @@ def step_physics(
     if overlay is not None and overlay.cloud_pass_remaining_h > 0:
         pv_kw = pv_kw * float(overlay.cloud_pass_scale)
 
-    ess_power_w = resolve_ess_power_w(setpoints)
-    ess_kw = ess_power_w / 1000.0
-    soc = state.soc_pct - (ess_kw * dt_h / capacity_kwh) * 100.0
-    soc = max(0.0, min(100.0, soc))
-
     load_kw = float(package.house_params.get("load_kw", state.load_kw))
     if overlay is not None and overlay.load_spike_remaining_h > 0:
         load_kw = load_kw + float(overlay.load_spike_extra_kw)
@@ -197,7 +264,23 @@ def step_physics(
         evcs_power_w = float(state.evcs_power_w)
     load_kw = load_kw + evcs_power_w / 1000.0
 
-    grid_kw = load_kw - pv_kw + ess_kw
+    if setpoints.self_consumption:
+        ess_power_w = _self_consumption_power_w(
+            setpoints,
+            package=package,
+            soc_pct=state.soc_pct,
+            surplus_kw=pv_kw - load_kw,
+            capacity_kwh=capacity_kwh,
+            dt_h=dt_h,
+        )
+    else:
+        ess_power_w = resolve_ess_power_w(setpoints)
+    ess_kw = ess_power_w / 1000.0
+    soc = state.soc_pct - (ess_kw * dt_h / capacity_kwh) * 100.0
+    soc = max(0.0, min(100.0, soc))
+
+    # EHAL sign: ess + discharge covers load, − charge adds to it; grid + import.
+    grid_kw = load_kw - pv_kw - ess_kw
     grid_power_w = grid_kw * 1000.0
 
     pv_delta = max(0.0, float(pv_kw)) * float(dt_h)

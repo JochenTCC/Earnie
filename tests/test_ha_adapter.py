@@ -50,6 +50,28 @@ def _state(entity_id: str, state, unit=None, *, device_class=None, state_class=N
     }
 
 
+_SETPOINT_UNITS = {
+    "input_number.ess_active_power_w": "W",
+    "number.charge_limit": "W",
+    "number.discharge_limit": "W",
+    "number.max_current": "A",
+}
+
+
+def _setpoint_state_get(units: dict[str, str] | None = None):
+    """``requests.get`` side effect: setpoint entity states with their unit."""
+    table = dict(_SETPOINT_UNITS if units is None else units)
+
+    def _get(url, **_kwargs):
+        entity_id = url.rsplit("/", 1)[-1]
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = _state(entity_id, "0", table.get(entity_id))
+        return response
+
+    return _get
+
+
 def test_apply_sign():
     assert apply_sign(10, "ehal") == 10.0
     assert apply_sign(10, "negate") == -10.0
@@ -91,8 +113,9 @@ def test_read_telemetry_normalizes(get_mock):
     assert telemetry["sens_power_consumers"] == pytest.approx(600.0)
 
 
+@patch("integrations.ha_adapter.requests.get", side_effect=_setpoint_state_get())
 @patch("integrations.ha_adapter.requests.post")
-def test_write_setpoints_number_service(post_mock):
+def test_write_setpoints_number_service(post_mock, _get_mock):
     response = MagicMock()
     response.status_code = 200
     post_mock.return_value = response
@@ -118,8 +141,9 @@ def test_write_setpoints_number_service(post_mock):
     assert values["number.max_current"] == 10
 
 
+@patch("integrations.ha_adapter.requests.get", side_effect=_setpoint_state_get())
 @patch("integrations.ha_adapter.requests.post")
-def test_write_setpoints_active_power(post_mock):
+def test_write_setpoints_active_power(post_mock, _get_mock):
     response = MagicMock()
     response.status_code = 200
     post_mock.return_value = response
@@ -142,8 +166,9 @@ def test_write_setpoints_active_power(post_mock):
     assert values["number.discharge_limit"] == 0
 
 
+@patch("integrations.ha_adapter.requests.get", side_effect=_setpoint_state_get())
 @patch("integrations.ha_adapter.requests.post")
-def test_write_setpoints_degrades_on_403(post_mock):
+def test_write_setpoints_degrades_on_403(post_mock, _get_mock):
     response = MagicMock()
     response.status_code = 403
     post_mock.return_value = response
@@ -185,3 +210,75 @@ def test_list_mappable_entities_filters_domains(get_mock):
     assert grid["device_class"] == "power"
     assert grid["state_class"] == "measurement"
     assert grid["unit"] == "W"
+
+
+@patch("integrations.ha_adapter.requests.get")
+@patch("integrations.ha_adapter.requests.post")
+def test_write_setpoints_converts_to_entity_unit(post_mock, get_mock):
+    get_mock.side_effect = _setpoint_state_get(
+        {**_SETPOINT_UNITS, "input_number.ess_active_power_w": "kW"}
+    )
+    response = MagicMock()
+    response.status_code = 200
+    post_mock.return_value = response
+    adapter = HaAdapter(_cfg())
+    error = adapter.write_setpoints(
+        {
+            "schema_version": 3,
+            "ts": "2026-07-28T12:00:00Z",
+            "adapter_id": "earnie-hems",
+            "set_ess_active_power": -1500,
+        }
+    )
+    assert error is None
+    body = post_mock.call_args.kwargs["json"]
+    assert body == {"entity_id": "input_number.ess_active_power_w", "value": -1.5}
+
+
+@patch("integrations.ha_adapter.requests.get")
+@patch("integrations.ha_adapter.requests.post")
+def test_write_setpoints_rejects_wrong_quantity(post_mock, get_mock):
+    get_mock.side_effect = _setpoint_state_get(
+        {**_SETPOINT_UNITS, "number.charge_limit": "%"}
+    )
+    adapter = HaAdapter(_cfg())
+    error = adapter.write_setpoints(
+        {
+            "schema_version": 3,
+            "ts": "2026-07-28T12:00:00Z",
+            "adapter_id": "earnie-hems",
+            "set_ess_charge_power_limit": 3000,
+        }
+    )
+    assert error is not None
+    assert error["failed_fields"] == ["set_ess_charge_power_limit"]
+    assert "Unit mismatch" in error["message"]
+    post_mock.assert_not_called()
+
+
+@patch("integrations.ha_adapter.requests.get")
+def test_read_telemetry_rejects_energy_entity_on_power_field(get_mock):
+    states = {
+        "sensor.grid_power": _state("sensor.grid_power", "12.5", "kWh", device_class="energy"),
+        "sensor.pv_power": _state("sensor.pv_power", "2", "kW"),
+        "sensor.battery_soc": _state("sensor.battery_soc", "50", "%"),
+    }
+
+    def _get(url, **_kwargs):
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = states[url.rsplit("/", 1)[-1]]
+        return response
+
+    get_mock.side_effect = _get
+    adapter = HaAdapter(
+        _cfg(
+            entities={
+                "sens_grid_power_active": "sensor.grid_power",
+                "sens_pv_production_active": "sensor.pv_power",
+                "sens_ess_soc": "sensor.battery_soc",
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="needs power"):
+        adapter.read_telemetry()

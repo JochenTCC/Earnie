@@ -32,13 +32,15 @@ from .entity_map import ha_entity_id
 
 from ._core.archetype import (
     ArchetypePackage,
-    battery_energy_entity_id,
+    flip_power_reading,
     load_archetype,
+    physics_entity_values,
 )
 from ._core.physics import (
     EssSetpoints,
     PhysicsState,
     ScenarioOverlay,
+    ess_setpoints_from_lookup,
     initial_physics,
     step_physics,
 )
@@ -69,6 +71,7 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
         self.overlay = ScenarioOverlay()
         self.setpoints: dict[str, float] = {}
         self.switch_states: dict[str, bool] = {}
+        self.select_states: dict[str, str] = {}
         self.unavailable_until: dict[str, float] = {}
         self.reject_writes = False
         self.setpoint_lag_s = 0.0
@@ -88,6 +91,8 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
                     self.switch_states[ha_entity_id(eid)] = (
                         str(item.get("state") or "").lower() in ("on", "true", "1")
                     )
+                elif domain == "select":
+                    self.select_states[ha_entity_id(eid)] = str(item.get("state") or "")
                 continue
             try:
                 value = float(str(item.get("state") or "0").replace(",", "."))
@@ -153,19 +158,9 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
         )
 
     def _ess_setpoints(self) -> EssSetpoints:
-        entities = self.package.ehal_entities
-
-        def _num(field: str) -> float | None:
-            fixture_id = entities.get(field)
-            if not fixture_id:
-                return None
-            return self.setpoints.get(ha_entity_id(fixture_id))
-
-        active = _num("set_ess_active_power")
-        return EssSetpoints(
-            active_power_w=float(active or 0.0),
-            charge_limit_w=_num("set_ess_charge_power_limit"),
-            discharge_limit_w=_num("set_ess_discharge_power_limit"),
+        return ess_setpoints_from_lookup(
+            self.package,
+            lambda fixture_id: self.setpoints.get(ha_entity_id(fixture_id)),
         )
 
     def _apply_pending_setpoints(self, now_mono: float) -> None:
@@ -209,28 +204,13 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
             del self.unavailable_until[ha_id]
 
         physics = self.physics
-        pairs = (
-            ("sens_pv_production_active", physics.pv_kw),
-            ("sens_ess_soc", physics.soc_pct),
-            ("sens_ess_power", physics.ess_power_w),
-            ("sens_grid_power_active", physics.grid_power_w),
-            ("sens_evcs_active_power", physics.evcs_power_w),
-            ("sens_pv_energy", physics.pv_energy_kwh),
-            ("sens_grid_energy_import", physics.grid_import_energy_kwh),
-            ("sens_grid_energy_export", physics.grid_export_energy_kwh),
-        )
-        for field_name, value in pairs:
-            mapped = self.package.ehal_entities.get(field_name)
-            if mapped != fixture_entity_id:
-                continue
-            if self.unit_flip and field_name == "sens_pv_production_active":
-                return float(value) * 1000.0
+        values = physics_entity_values(self.package, physics.as_dict())
+        if fixture_entity_id in values:
+            value, unit = values[fixture_entity_id]
+            pv_id = self.package.ehal_entities.get("sens_pv_production_active")
+            if self.unit_flip and fixture_entity_id == pv_id:
+                return flip_power_reading(float(value), unit)
             return value
-
-        if fixture_entity_id == battery_energy_entity_id(self.package, "charge"):
-            return physics.ess_charge_energy_kwh
-        if fixture_entity_id == battery_energy_entity_id(self.package, "discharge"):
-            return physics.ess_discharge_energy_kwh
 
         thermal_id = str(self.package.house_params.get("thermal_entity_id") or "")
         if fixture_entity_id == thermal_id and physics.temp_c is not None:
@@ -240,6 +220,8 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
             return self.setpoints[ha_id]
         if ha_id in self.switch_states:
             return self.switch_states[ha_id]
+        if ha_id in self.select_states:
+            return self.select_states[ha_id]
         return None
 
     def queue_setpoint(self, ha_entity_id_str: str, value: float) -> None:
@@ -258,6 +240,11 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
         if self.reject_writes:
             raise HomeAssistantError("earnie_house_sim reject_writes active")
         self.switch_states[ha_entity_id_str] = bool(is_on)
+
+    def set_select(self, ha_entity_id_str: str, option: str) -> None:
+        if self.reject_writes:
+            raise HomeAssistantError("earnie_house_sim reject_writes active")
+        self.select_states[ha_entity_id_str] = str(option)
 
     async def _async_update_data(self) -> PhysicsState:
         now_mono = self.hass.loop.time()

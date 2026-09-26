@@ -1,0 +1,17 @@
+{
+  "entities": {
+    "sens_grid_power_active": "sensor.solarnet_leistung_netz",
+    "sens_pv_production_active": "sensor.solarnet_leistung_photovoltaik",
+    "sens_ess_soc": "sensor.byd_battery_box_premium_hv_ladezustand",
+    "sens_ess_power": "sensor.solarnet_leistung_batterie",
+    "sens_evcs_active_power": "sensor.goe_91234567_nrg_11",
+    "sens_pv_energy": "sensor.solarnet_energie_gesamt",
+    "sens_grid_energy_import": "sensor.smart_meter_ts_65a_3_wirkenergie_verbraucht",
+    "sens_grid_energy_export": "sensor.smart_meter_ts_65a_3_wirkenergie_produziert",
+    "set_evcs_max_current": "number.goe_91234567_amp"
+  },
+  "sign": {
+    "sens_grid_power_active": "ehal",
+    "sens_ess_power": "ehal"
+  }
+}

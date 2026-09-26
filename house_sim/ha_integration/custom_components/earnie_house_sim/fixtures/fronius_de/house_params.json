@@ -1,0 +1,9 @@
+{
+  "battery_capacity_kwh": 10.24,
+  "initial_soc_pct": 40.0,
+  "load_kw": 0.9,
+  "initial_evcs_power_w": 0.0,
+  "ess_fallback": "self_consumption",
+  "ess_max_charge_w": 6000.0,
+  "ess_max_discharge_w": 6000.0
+}
