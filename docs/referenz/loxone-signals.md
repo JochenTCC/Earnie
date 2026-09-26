@@ -268,14 +268,14 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | `set_ess_active_power`            | Write     | `Earnie_Batterie_Sollleistung`                   | Forced power, kW; `+` discharge, `−` charge                                                 |
 | `set_ess_charge_power_limit`      | Write     | `Earnie_LadeLeistungs-Limit`                     | Max. charge power (true limit)                                                              |
 | `set_ess_discharge_power_limit`   | Write     | `Earnie_EntladeLeistungs-Limit`                  | Max. discharge power (true limit)                                                           |
-| `set_ess_mode`                    | Write     | `Earnie_Steuerbefehl`                            | Sticky: always write; `0` = automatic; `3` = Einspeisesperre; OpenEMS ignores               |
-| `set_grid_export_power_limit`     | Write     | `Earnie_EinspeiseLeistungs-Limit`                | Max export kW; sticky `−1` = unconstrained / release (2.7.a)                                |
+| `set_ess_mode`                    | Write     | `Earnie_Steuerbefehl`                            | Sticky: always write; `0` = automatic; battery only; OpenEMS ignores                        |
+| `set_grid_export_power_limit`     | Write     | `Earnie_EinspeiseLeistungs-Limit`                | Max export kW (magnitude ≥ 0); `0` = no export; unconstrained = PV kWp + max battery discharge kW (2.7.a) |
 | *(watchdog)*                       | Read      | `Earnie_Heartbeat`                               | Pattern B; not an EHAL field                                                                |
 
 
 Legacy role names (`soc_name`, `pv_power_name`, …) in `loxone_blocks` have been removed — only `plant.ehal_bindings` with §C field names.
 
-**Sticky Merker:** Loxone keeps the last written value. Automatic is `set_ess_mode = 0` — Config must not apply the setpoint power in mode 0, even if `Earnie_Batterie_Sollleistung` still holds an old value. For export curtailment: when `set_grid_export_power_limit ≥ 0`, Config must curtail inverter feed-in to that kW; **`−1` releases** the curtailment. Steuerbefehl **`3` = Einspeisesperre** (hard zero export) in addition to writing limit `0`.
+**Sticky Merker:** Loxone keeps the last written value. Automatic is `set_ess_mode = 0` — Config must not apply the setpoint power in mode 0, even if `Earnie_Batterie_Sollleistung` still holds an old value. For export curtailment: `set_grid_export_power_limit` is a non-negative magnitude (kW, like the charge/discharge limits). Config curtails grid feed-in to `min(limit, inverter rating)`; `0` = no export (Einspeisesperre), unconstrained is written as the plant maximum = PV kWp sum + max discharge kW of force-dischargeable batteries (fallback `1000` kW if unknown). `set_ess_mode` / `Earnie_Steuerbefehl` is battery-only and never signals export curtailment.
 
 ## Flexible Consumers — `ehal_bindings` on the Consumer
 

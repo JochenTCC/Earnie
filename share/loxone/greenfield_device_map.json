@@ -76,14 +76,14 @@
       "match": "exact",
       "entity_kind": "plant",
       "ehal_field": "set_ess_mode",
-      "notes": "Sticky-backend control; 0 = Automatik; 3 = Einspeisesperre. OpenEMS ignores."
+      "notes": "Sticky-backend control; 0 = Automatik; battery only. OpenEMS ignores."
     },
     {
       "name": "Earnie_EinspeiseLeistungs-Limit",
       "match": "exact",
       "entity_kind": "plant",
       "ehal_field": "set_grid_export_power_limit",
-      "notes": "2.7.a outbound max export kW; −1 = unconstrained/release curtailment."
+      "notes": "2.7.a outbound max export kW (magnitude ≥ 0); 0 = no export; unconstrained = PV kWp + max battery discharge kW."
     },
     {
       "name": "Earnie_Netz_Einspeisegrenze_In",

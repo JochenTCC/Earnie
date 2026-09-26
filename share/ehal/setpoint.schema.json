@@ -48,7 +48,8 @@
     },
     "set_grid_export_power_limit": {
       "type": "number",
-      "description": "Max grid export power in W (magnitude). Sticky: -1 = unconstrained / release curtailment."
+      "minimum": 0,
+      "description": "Max grid export power in W (non-negative magnitude). 0 = no export; unconstrained = plant maximum (PV kWp + force-discharge ESS kW), fallback 1000000."
     }
   },
   "anyOf": [

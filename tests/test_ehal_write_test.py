@@ -60,6 +60,36 @@ def test_clamp_rejects_oversized_limit():
         )
 
 
+def test_clamp_accepts_export_limit():
+    assert ewt.clamp_probe_value(
+        "set_grid_export_power_limit",
+        1000.0,
+        max_power_kw=5.0,
+    ) == pytest.approx(1000.0)
+    assert ewt.clamp_probe_value(
+        "set_grid_export_power_limit",
+        0.0,
+        max_power_kw=5.0,
+    ) == pytest.approx(0.0)
+    with pytest.raises(ewt.WriteTestClampError, match="set_grid_export_power_limit muss in 0"):
+        ewt.clamp_probe_value(
+            "set_grid_export_power_limit",
+            1_000_001.0,
+            max_power_kw=5.0,
+        )
+
+
+def test_allowed_probe_fields_includes_export_limit():
+    with patch("integrations.ehal_write_test.mapped_write_targets") as mapped:
+        mapped.return_value = {
+            "set_ess_mode": "number.mode",
+            "set_grid_export_power_limit": "number.export_limit",
+        }
+        fields = ewt.allowed_probe_fields(force_ess_active=False)
+    assert "set_grid_export_power_limit" in fields
+    assert fields.index("set_ess_mode") < fields.index("set_grid_export_power_limit")
+
+
 def test_clamp_rejects_oversized_ev_current():
     with pytest.raises(ewt.WriteTestClampError, match="0…6"):
         ewt.clamp_probe_value(

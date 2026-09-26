@@ -37,13 +37,13 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Telemetry (optional)    | `sens_ess_power`                   | no       | **W**; ESS sign **OpenEMS-aligned**: `+` = **discharge**, `-` = **charge**                                     |
 | Telemetry (optional)    | `sens_evcs_active_power`           | no       | **W**; >= 0 (typically 0 when idle)                                                                            |
 | Telemetry (optional)    | `sens_power_consumers`             | no       | **W**; house load; from a Merker if mapped, otherwise derived from grid/PV/ESS                                |
-| Telemetry (optional)    | `get_grid_export_power_limit`      | no       | **W**; inbound max export from grid/HEMS (2.7.a)                                                              |
+| Telemetry (optional)    | `get_grid_export_power_limit`      | no       | **W**; inbound max export from grid/HEMS (magnitude ≥ 0; negative/absent = no cap) (2.7.a)                  |
 | Setpoints (force)       | `set_ess_active_power`             | no*      | **W**; signed; OpenEMS-aligned: `+` = **discharge**, `−` = **charge**; omit for automatic mode (see [sign convention for `set_ess_active_power`](#sign-set_ess_active_power)) |
 | Setpoints (limits)      | `set_ess_charge_power_limit`       | no*      | **W**; non-negative amount (true max. charge power)                                                            |
 | Setpoints (limits)      | `set_ess_discharge_power_limit`    | no*      | **W**; non-negative amount (true max. discharge power)                                                         |
-| Setpoints (limits)      | `set_grid_export_power_limit`      | no*      | **W**; max grid export; sticky **−1** = unconstrained / release curtailment (2.7.a)                             |
+| Setpoints (limits)      | `set_grid_export_power_limit`      | no*      | **W**; non-negative max grid export (magnitude, like ESS limits); `0` = no export; unconstrained = plant maximum (PV kWp sum + max discharge of force-dischargeable ESS; fallback 1 000 000 W) (2.7.a) |
 | Setpoints (limits)      | `set_evcs_max_current`             | no*      | **A**; non-negative amount (EV charging target/max current)                                                    |
-| Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic**; **3 = Einspeisesperre**; OpenEMS ignores it                   |
+| Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores it |
 | Setpoints (extended)    | `set_evcs_mode`                    | no*      | Enum: `off`                                                                                                     |
 | Capability flags        | `supports_ess_write`               | yes      | boolean; ESS setpoints may be written                                                                          |
 | Capability flags        | `supports_evcs_current`            | yes      | boolean; `set_evcs_max_current` may be written                                                                  |
@@ -268,7 +268,7 @@ Unter **Live-Schreiben** liegt der Expander **Schreibtest**: gemappte Probe-Feld
 **Voraussetzungen**
 
 - Silent-Modus **aus** (gleiche Sperre wie der Daemon). Bei Silent sind die Buttons deaktiviert.
-- Nur **gemappte** Probe-Felder: `set_ess_mode`, `set_ess_charge_power_limit`, `set_ess_discharge_power_limit`, `set_evcs_max_current`.
+- Nur **gemappte** Probe-Felder: `set_ess_mode`, `set_ess_charge_power_limit`, `set_ess_discharge_power_limit`, `set_grid_export_power_limit`, `set_evcs_max_current`.
 - Bestätigungsdialog vor jedem Live-Schreiben.
 
 **Grenzen (nützliche / sichere Werte)**
@@ -276,6 +276,7 @@ Unter **Live-Schreiben** liegt der Expander **Schreibtest**: gemappte Probe-Feld
 | Feld | Bereich |
 |------|---------|
 | Limits (Laden/Entladen) | `0 … max_power_kw` (als W auf dem Wire) |
+| `set_grid_export_power_limit` | `0 … 1 000 000` W (Betrag; `0` = keine Einspeisung; Obergrenze = unconstrained-Fallback) |
 | `set_evcs_max_current` | `0 … min(Nennstrom, 6 A)` |
 | `set_ess_mode` | `0` Automatik / `1` Laden / `2` Entladen |
 

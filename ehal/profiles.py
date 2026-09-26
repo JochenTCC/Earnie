@@ -77,7 +77,7 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl (Hinweis)",
     "set_evcs_max_current": "Setpoint Wallbox-Sollstrom (A)",
     "set_evcs_mode": "Setpoint Wallbox-Modus (off|pv|now)",
-    "set_grid_export_power_limit": "Setpoint Einspeisegrenze (W; −1 = frei)",
+    "set_grid_export_power_limit": "Setpoint Einspeisegrenze (W; ≥ 0, frei = PV + Entladeleistung)",
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
     "flex.power_setpoint_name": "Flex Leistungs-Sollwert",

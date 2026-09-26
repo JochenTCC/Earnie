@@ -26,7 +26,7 @@
       "field": "set_grid_export_power_limit",
       "required": false,
       "kind": "setpoint",
-      "notes": "Outbound feed-in curtailment W; sticky −1 = unconstrained (2.7.a)."
+      "notes": "Outbound feed-in curtailment W (magnitude ≥ 0); unconstrained = PV kWp + force-discharge ESS max (fallback 1000000) (2.7.a)."
     }
   ],
   "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."

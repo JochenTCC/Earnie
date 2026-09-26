@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from optimizer.export_power_limit import (
-    EXPORT_LIMIT_UNCONSTRAINED_SENTINEL_W,
+    EXPORT_LIMIT_UNCONSTRAINED_W,
     effective_export_cap_kw,
     export_caps_for_horizon,
     export_limit_setpoint_kw,
     export_limit_setpoint_w,
     inbound_limit_w_to_kw,
+    physical_max_export_kw,
     plant_max_export_power_kw,
 )
 
@@ -32,15 +33,20 @@ def test_pay_to_export_forces_hard_zero() -> None:
 
 def test_inbound_w_to_kw() -> None:
     assert inbound_limit_w_to_kw(3500.0) == 3.5
+    assert inbound_limit_w_to_kw(0.0) == 0.0
     assert inbound_limit_w_to_kw(-1) is None
     assert inbound_limit_w_to_kw(None) is None
+    assert inbound_limit_w_to_kw(EXPORT_LIMIT_UNCONSTRAINED_W) is None
 
 
-def test_setpoint_sentinel() -> None:
-    assert export_limit_setpoint_w(None) == EXPORT_LIMIT_UNCONSTRAINED_SENTINEL_W
+def test_setpoint_is_non_negative_magnitude() -> None:
+    assert export_limit_setpoint_w(None) == EXPORT_LIMIT_UNCONSTRAINED_W
     assert export_limit_setpoint_w(2.0) == 2000.0
-    assert export_limit_setpoint_kw(None) == EXPORT_LIMIT_UNCONSTRAINED_SENTINEL_W
+    assert export_limit_setpoint_w(0.0) == 0.0
+    assert export_limit_setpoint_w(5000.0) == EXPORT_LIMIT_UNCONSTRAINED_W
+    assert export_limit_setpoint_kw(None) == 1000.0
     assert export_limit_setpoint_kw(2.0) == 2.0
+    assert export_limit_setpoint_kw(0.0) == 0.0
 
 
 def test_export_caps_for_horizon_pay_to_export() -> None:
@@ -59,3 +65,17 @@ def test_plant_max_export_power_kw() -> None:
     assert plant_max_export_power_kw({"plant": {"max_export_power_kw": 7.0}}) == 7.0
     assert plant_max_export_power_kw({"plant": {}}) is None
     assert plant_max_export_power_kw(None) is None
+
+
+def test_physical_max_export_is_pv_plus_force_discharge() -> None:
+    assert physical_max_export_kw(9.8, 5.0) == 14.8
+    assert physical_max_export_kw(9.8, None) == 9.8
+    assert physical_max_export_kw(0.0, 0.0) is None
+    assert physical_max_export_kw(None, None) is None
+
+
+def test_setpoint_unconstrained_uses_plant_maximum() -> None:
+    assert export_limit_setpoint_w(None, unconstrained_kw=14.8) == 14800.0
+    assert export_limit_setpoint_kw(None, unconstrained_kw=14.8) == 14.8
+    assert export_limit_setpoint_w(None, unconstrained_kw=None) == EXPORT_LIMIT_UNCONSTRAINED_W
+    assert export_limit_setpoint_w(3.0, unconstrained_kw=14.8) == 3000.0

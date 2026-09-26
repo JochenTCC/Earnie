@@ -7,7 +7,6 @@ MODE_AUTOMATIK = 0
 MODE_ZWANGS_LADEN = 1
 MODE_ENTLADESPERRE = 2
 MODE_ZWANGS_ENTLADEN = 3
-MODE_EINSPEISESPERRE = 4
 SOC_DELTA_THRESHOLD = 0.05
 
 
@@ -38,8 +37,6 @@ def steuerbefehl_for_mode(mode: int, target_power_kw: float = 0.0) -> str:
         return "Entladesperre aktiv"
     if mode == MODE_ZWANGS_ENTLADEN:
         return f"Zwangsentladen ({target_power_kw} kW)"
-    if mode == MODE_EINSPEISESPERRE:
-        return "Einspeisesperre aktiv"
     return "Automatikbetrieb"
 
 

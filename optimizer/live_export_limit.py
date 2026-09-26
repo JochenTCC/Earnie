@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from optimizer.battery import MODE_EINSPEISESPERRE
 from optimizer.export_power_limit import (
     effective_export_cap_kw,
     inbound_limit_w_to_kw,
+    physical_max_export_kw,
     plant_max_export_power_kw,
 )
 
@@ -16,6 +16,27 @@ def load_house_doc() -> dict:
     from runtime_store.persist_paths import resolve_house_profiles_json_path
 
     return load_house_profiles_document(resolve_house_profiles_json_path())
+
+
+def live_unconstrained_export_kw() -> float | None:
+    """Plant export maximum written as "unconstrained" on the export-limit setpoint.
+
+    PV nameplate (sum of all PV systems) + max discharge power of the battery, counted
+    only when it can be force-discharged (``battery_control = full``).
+    TODO(2.7.c): with multiple ESS, sum the discharge power of every battery that
+    supports forced discharge (skip limits_only / read_only / one-way storages).
+    """
+    import config
+    from house_config.battery_control import (
+        BATTERY_CONTROL_FULL,
+        control_from_battery_params,
+    )
+
+    battery_params = config.get_battery_params()
+    discharge_kw = 0.0
+    if control_from_battery_params(battery_params) == BATTERY_CONTROL_FULL:
+        discharge_kw = float(battery_params.get("max_power_kw") or 0.0)
+    return physical_max_export_kw(config.get("PV_KWP", 0.0, float), discharge_kw)
 
 
 def read_inbound_export_limit_kw(telemetry: dict[str, Any] | None) -> float | None:
@@ -47,10 +68,3 @@ def resolve_live_export_context(
         "inbound_export_limit_kw": inbound,
         "effective_export_cap_kw": effective,
     }
-
-
-def apply_einspeisesperre_mode(mode: int, effective_cap_kw: float | None) -> int:
-    """When effective export cap is hard 0, prefer Einspeisesperre mode."""
-    if effective_cap_kw is not None and float(effective_cap_kw) <= 1e-12:
-        return MODE_EINSPEISESPERRE
-    return mode

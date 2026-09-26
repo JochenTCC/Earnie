@@ -311,7 +311,8 @@ def write_ess_setpoints_from_control(
     """Map optimizer mode/power to EHAL Design C1 ESS setpoints.
 
     When ``export_cap_kw`` is passed (including ``None`` = unconstrained), also write
-    ``set_grid_export_power_limit`` (W; ``-1`` sentinel when unconstrained).
+    ``set_grid_export_power_limit`` (W magnitude; plant export maximum = PV kWp + force
+    discharge kW when unconstrained, see ``live_unconstrained_export_kw``).
     """
     from house_config.battery_control import (
         BATTERY_CONTROL_LIMITS_ONLY,
@@ -319,6 +320,7 @@ def write_ess_setpoints_from_control(
         control_from_battery_params,
     )
     from optimizer.export_power_limit import export_limit_setpoint_w
+    from optimizer.live_export_limit import live_unconstrained_export_kw
 
     battery_params = config.get_battery_params()
     control = control_from_battery_params(battery_params)
@@ -360,7 +362,9 @@ def write_ess_setpoints_from_control(
         record_fields["set_ess_active_power"] = active_w
     if export_cap_kw is not _OMIT_EXPORT_CAP:
         cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
-        limit_w = export_limit_setpoint_w(cap)
+        limit_w = export_limit_setpoint_w(
+            cap, unconstrained_kw=live_unconstrained_export_kw()
+        )
         setpoint["set_grid_export_power_limit"] = limit_w
         record_fields["set_grid_export_power_limit"] = limit_w
     error = adapter.write_setpoints(setpoint)

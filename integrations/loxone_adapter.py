@@ -78,13 +78,6 @@ def ehal_limit_w_to_loxone_kw(limit_w: float) -> float:
     return max(0.0, float(limit_w)) / 1000.0
 
 
-def ehal_export_limit_w_to_loxone_kw(limit_w: float) -> float:
-    """EHAL export limit (W) → Loxone Merker (kW). ``-1`` sticky = unconstrained."""
-    value = float(limit_w)
-    if value < 0.0:
-        return -1.0
-    return value / 1000.0
-
 
 def ehal_active_power_w_to_loxone_kw(active_w: float) -> float:
     """EHAL signed active power (W, +discharge) → Loxone Merker (kW, same sign)."""
@@ -172,12 +165,13 @@ class LoxoneAdapter:
             raw = loxone_client.fetch_loxone_generic_value(
                 self.cfg.grid_export_limit_in_name
             )
-            if raw is not None:
-                try:
-                    # Loxone Merker in kW → EHAL W
-                    doc["get_grid_export_power_limit"] = max(0.0, float(raw)) * 1000.0
-                except (TypeError, ValueError):
-                    pass
+            try:
+                limit_kw = None if raw is None else float(raw)
+            except (TypeError, ValueError):
+                limit_kw = None
+            # Loxone Merker in kW → EHAL W; negative = no inbound cap (never a hard 0).
+            if limit_kw is not None and limit_kw >= 0.0:
+                doc["get_grid_export_power_limit"] = limit_kw * 1000.0
         return validate_telemetry(doc)
 
     def write_setpoints(
@@ -276,9 +270,7 @@ class LoxoneAdapter:
             else:
                 ok, msg = self._try_marker_write(
                     self.cfg.grid_export_limit_out_name,
-                    ehal_export_limit_w_to_loxone_kw(
-                        doc["set_grid_export_power_limit"]
-                    ),
+                    ehal_limit_w_to_loxone_kw(doc["set_grid_export_power_limit"]),
                 )
                 if not ok:
                     failed.append("set_grid_export_power_limit")

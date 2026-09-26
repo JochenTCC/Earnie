@@ -50,9 +50,9 @@ Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt
 **Order:** **2.7.a** (code done → [Erledigt](Backlog-Erledigt.md)) → **2.7.b** → **2.7.c** → **2.7.d** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6.
 
 - [ ] **2.7.a dogfood — Loxone productive + live test** (after code on `feature/2.7`)
-  - Wire export-limit Merker / VI–VO in the productive Loxone config (`set_grid_export_power_limit`, optional inbound `get_grid_export_power_limit`, Einspeisesperre / mode **3** as needed)
+  - Wire export-limit Merker / VI–VO in the productive Loxone config (`set_grid_export_power_limit`, optional inbound `get_grid_export_power_limit`; Einspeisesperre = limit `0`, `set_ess_mode` stays battery-only)
   - Bind in EHAL-Com; set a HK `plant.max_export_power_kw` and verify Live writes + MILP respect the cap
-  - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (`−1` / unconstrained)
+  - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (unconstrained = PV kWp sum + battery max discharge kW)
 
 - [ ] **2.7.b — Thermals P2** — Coupled single-node models
   - House ↔ heat storage ↔ solar system
@@ -65,6 +65,7 @@ Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt
   - Isolated battery modes: charging / discharging / standby
   - batt+inverter modes: optimizing / charging / discharging
   - All batteries participate in optimization
+  - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` writes PV kWp sum + max discharge of the single battery (only when `battery_control = full`). With multi-ESS, sum the max discharge power of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / one-way storages from **2.7.d**); update `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md` accordingly
   - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
   - Downstream: Loxone template XML gen and HouseSim scenario import should gain multi-battery support after this letter
 

@@ -270,10 +270,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 consumer["nominal_power_kw"],
                 marker,
             )
-    from optimizer.live_export_limit import (
-        apply_einspeisesperre_mode,
-        resolve_live_export_context,
-    )
+    from optimizer.live_export_limit import resolve_live_export_context
 
     telemetry_for_export = None
     try:
@@ -299,7 +296,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         hk_max_export_kw=export_ctx["hk_max_export_kw"],
         inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
     )
-    mode = apply_einspeisesperre_mode(mode, export_ctx["effective_export_cap_kw"])
+    # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
     export_cap = export_ctx["effective_export_cap_kw"]
     battery_params = config.get_battery_params()
     battery_plan_kw = optimizer.battery_plan_kw_from_control(

@@ -92,7 +92,7 @@ def map_ess_setpoints(
     ``active_power_kw`` uses EHAL sign (+discharge, −charge). ``None`` means Automatik /
     Entladesperre without a forced Equals setpoint. Limits are true caps (kW magnitudes).
     ``mode_hint`` is for Loxone/HA (Huawei Steuerbefehl); OpenEMS ignores it.
-    Steuerbefehl ``3`` = Einspeisesperre (2.7.a).
+    Battery-only: export caps travel on ``set_grid_export_power_limit`` (2.7.a).
     """
     max_kw = max(0.0, abs(float(max_power_kw)))
     target = max(0.0, abs(float(target_power_kw)))
@@ -102,8 +102,6 @@ def map_ess_setpoints(
         return None, max_kw, 0.0, 1
     if mode == 3:  # MODE_ZWANGS_ENTLADEN
         return target, 0.0, max_kw, 2
-    if mode == 4:  # MODE_EINSPEISESPERRE
-        return None, max_kw, max_kw, 3
     return None, max_kw, max_kw, 0
 
 
@@ -366,14 +364,21 @@ def build_sent_loxone_snapshot(
     if export_cap_kw is not _OMIT_EXPORT_CAP:
         from house_config.ehal_bindings import resolve_plant_binding
         from optimizer.export_power_limit import export_limit_setpoint_kw
-        from optimizer.live_export_limit import load_house_doc
+        from optimizer.live_export_limit import (
+            live_unconstrained_export_kw,
+            load_house_doc,
+        )
 
         export_marker = resolve_plant_binding(
             load_house_doc(), "set_grid_export_power_limit"
         )
         if export_marker:
             cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
-            snapshot[str(export_marker)] = float(export_limit_setpoint_kw(cap))
+            snapshot[str(export_marker)] = float(
+                export_limit_setpoint_kw(
+                    cap, unconstrained_kw=live_unconstrained_export_kw()
+                )
+            )
 
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         _write_flexible_consumer_output(
@@ -447,7 +452,10 @@ def send_huawei_modbus_states(
     if export_cap_kw is not _OMIT_EXPORT_CAP:
         from house_config.ehal_bindings import resolve_plant_binding
         from optimizer.export_power_limit import export_limit_setpoint_kw
-        from optimizer.live_export_limit import load_house_doc
+        from optimizer.live_export_limit import (
+            live_unconstrained_export_kw,
+            load_house_doc,
+        )
 
         export_marker = resolve_plant_binding(
             load_house_doc(), "set_grid_export_power_limit"
@@ -457,7 +465,11 @@ def send_huawei_modbus_states(
             records.append(
                 lc._send_loxone_value_traced(
                     str(export_marker),
-                    float(export_limit_setpoint_kw(cap)),
+                    float(
+                        export_limit_setpoint_kw(
+                            cap, unconstrained_kw=live_unconstrained_export_kw()
+                        )
+                    ),
                 )
             )
     return records

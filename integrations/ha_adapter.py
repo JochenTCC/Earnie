@@ -573,12 +573,15 @@ class HaAdapter:
 
     def _to_entity_unit(self, field_name: str, entity_id: str, value: float) -> float:
         """EHAL base unit → target entity unit, read fresh from HA on every write."""
-        # Sticky unconstrained sentinel stays -1 in the entity unit (not -1 W → mW).
-        if field_name == "set_grid_export_power_limit" and float(value) < 0.0:
-            return -1.0
         payload = self.read_state(entity_id)
         attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
-        return round(from_ehal(field_name, value, attrs.get("unit_of_measurement")), 6)
+        converted = from_ehal(field_name, value, attrs.get("unit_of_measurement"))
+        if field_name == "set_grid_export_power_limit":
+            # Unconstrained export = high magnitude; clamp to the number entity's range.
+            entity_max = attrs.get("max")
+            if isinstance(entity_max, (int, float)):
+                converted = min(converted, float(entity_max))
+        return round(converted, 6)
 
     def _record_write_error(
         self,
