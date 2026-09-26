@@ -1,46 +1,47 @@
 # Smarthome-Backend (SB)
 
-The **Smarthome-Backend** page under **Daemon Control** picks and connects the live-environment hub — **Loxone**, **Home Assistant**, or **OpenEMS**. It is the single place backend selection **and credentials** happen; **EHAL-Com** no longer offers a backend switch or Anbindung form, it only shows live read/write and mapping for the backend chosen here.
+Die Seite **Smarthome-Backend** unter **Daemon Control** wählt und verbindet den Hub der Live-Umgebung — **Loxone**, **Home Assistant** oder **OpenEMS**. Hier laufen Backend-Auswahl **und** Zugangsdaten zusammen; **EHAL-Com** bietet keinen Backend-Wechsel und kein Anbindungsformular mehr, sondern nur Live-Lesen/Schreiben und Mapping für das hier gewählte Backend.
 
-## Access
+## Aufruf
 
-1. Start Streamlit: `python -m scripts.run_streamlit`
+1. Streamlit starten: `python -m scripts.run_streamlit`
 2. Navigation: **Daemon Control → Smarthome-Backend**
-3. Once planning is complete and no backend is configured yet, this page also appears as a blocking first-run screen before the rest of the app — same implementation, no separate setup form.
+3. Nach abgeschlossener Planung und ohne konfiguriertes Backend erscheint dieselbe Seite auch als blockierender First-Run-Screen vor dem Rest der App — dieselbe Implementierung, kein separates Setup-Formular.
 
-## Discovery
+## Erkennung (Discovery)
 
-1. **Targeted scan** — if Earnie was installed via the LoxBerry plugin or the Home Assistant add-on (`EARNIE_INSTALL_CONTEXT`, see `runtime_store/install_context.py`), the scan narrows to that backend (SSDP for Loxone; for the HA add-on: Supervisor Core proxy first via `SUPERVISOR_TOKEN` / `http://supervisor/core`, then mDNS). Falls back to a full passive scan if nothing is found.
-2. **Full passive scan** — otherwise, both mDNS (Home Assistant) and SSDP/UPnP (Loxone) run together. In the HA add-on, Supervisor self-discovery still runs first when HA is scanned.
-3. **Extended scan (opt-in)** — an active TCP port scan (8080/8085) for OpenEMS, offered only after a passive scan finds nothing, since it can trigger firewall/IDS alerts on the home network (e.g. UniFi).
-4. **Zero results** — a hint explains that the automatic consumer/EHAL import and other live-environment pages (EHAL-Com, Optimierer-Dienst) stay disabled until a backend is picked manually.
-5. **Multiple results** — pick one from a list; nothing connects automatically.
+1. **Gezielter Scan** — bei Installation über LoxBerry-Plugin oder Home-Assistant-Add-on (`EARNIE_INSTALL_CONTEXT`, siehe `runtime_store/install_context.py`) wird der Scan auf dieses Backend eingegrenzt (SSDP für Loxone; beim HA-Add-on zuerst Supervisor-Core-Proxy über `SUPERVISOR_TOKEN` / `http://supervisor/core`, dann mDNS). Findet nichts → Fallback auf vollen passiven Scan.
+2. **Voller passiver Scan** — sonst laufen mDNS (Home Assistant) und SSDP/UPnP (Loxone) parallel. Im HA-Add-on läuft die Supervisor-Self-Discovery beim HA-Scan weiterhin zuerst.
+3. **Erweiterter Scan (opt-in)** — aktiver TCP-Portscan (8080/8085) für OpenEMS, nur angeboten wenn der passive Scan nichts findet (kann Firewall-/IDS-Alarme im Heimnetz auslösen, z. B. UniFi).
+4. **Keine Treffer** — Hinweis, dass automatischer Verbraucher-/EHAL-Import und weitere Live-Seiten (EHAL-Com, Optimierer-Dienst) deaktiviert bleiben, bis ein Backend manuell gewählt wird.
+5. **Mehrere Treffer** — Auswahl aus einer Liste; nichts verbindet sich automatisch.
 
-See [SB-Identification-Draft](../../backlog/SB-Identification-Draft.md) and [development plan](../spec/smarthome-backend-page.md) for the underlying design.
+Hintergrund: [SB-Identification-Draft](../../backlog/SB-Identification-Draft.md) und [Entwicklungsplan](../spec/smarthome-backend-page.md).
 
-## Anbindung / Credentials
+## Anbindung / Zugangsdaten
 
-Once a backend is connected, this page shows **Anbindung** at the top (re-enter / re-check credentials), then **Backend ändern** (discovery / switch), then **Loxone-Import** when the backend is Loxone.
+Ist ein Backend verbunden, zeigt die Seite oben **Anbindung** (Zugangsdaten erneut eingeben / prüfen), danach **Backend ändern** (Discovery / Wechsel), und bei Loxone den **Loxone-Import**.
 
-Same storage as before, just reached from here now:
+Speicherorte:
 
-| Backend        | Storage                                       |
+| Backend        | Ablage                                       |
 | -------------- | ---------------------------------------------- |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) |
 | Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); `sign` in `config.json` → `ehal.ha` |
 | OpenEMS        | `config.json` → `ehal.openems`                |
 
-For Loxone, `LOXONE_IP` may include an optional HTTP port (`192.168.178.1:85`; default without a port is 80).
+Bei Loxone darf `LOXONE_IP` einen optionalen HTTP-Port enthalten (`192.168.178.1:85`; ohne Port gilt 80).
 
-For Home Assistant and OpenEMS, the HTTP port is part of the Base-URL field (`EHAL_HA_BASE_URL` in `.env` / `ehal.openems.base_url`) — there is no separate port input. Defaults embed `:8123` (HA) and `:8084` (OpenEMS); use e.g. `http://homeassistant:8124` or `http://openems-edge:8085` when the hub listens elsewhere.
+Bei Home Assistant und OpenEMS steckt der HTTP-Port in der Base-URL (`EHAL_HA_BASE_URL` in `.env` bzw. `ehal.openems.base_url`) — kein separates Port-Feld. Defaults enthalten `:8123` (HA) und `:8084` (OpenEMS); z. B. `http://homeassistant:8124` oder `http://openems-edge:8085`, wenn der Hub woanders lauscht.
 
-Saving credentials sets `ehal.backend` and unlocks **EHAL-Com** and **Optimierer-Dienst**.
+Speichern der Zugangsdaten setzt `ehal.backend` und schaltet **EHAL-Com** sowie **Optimierer-Dienst** frei.
 
-## Loxone Import
+## Loxone-Import
 
-The Loxone → house-profile import (formerly on the Hauskonfigurator) now runs from this page once Loxone is connected. After import, check created consumers on the Hauskonfigurator and signal mapping on EHAL-Com.
+Der Loxone → Hausprofil-Import (früher im Hauskonfigurator) läuft von dieser Seite, sobald Loxone verbunden ist. Danach Verbraucherliste im Hauskonfigurator und Signal-Mapping auf EHAL-Com prüfen.
 
-## See Also
+## Siehe auch
 
 - [EHAL-Com](ehal-com.md)
 - [Betriebsmodi](betriebsmodi.md)
+- [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)

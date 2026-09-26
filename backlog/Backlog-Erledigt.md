@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Document Review Anwender-TOC / SB German / ehal-com EN (2026-09-26)
+
+- [x] **`docs/README.md` = landing clone** — Restored German Anwender-TOC with **Erste Schritte** (`#erste-schritte`); paths relative to `docs/`; HA add-on / VMware / SB page linked; HouseSim only under Entwickler-Specs
+- [x] **`docs/ui/smarthome-backend.md`** — Translated to German (user-doc scope)
+- [x] **`docs/ui/ehal-com.md` mostly English** — Kept English by decision; exception noted in `german-user-docs.mdc`
+- [x] **HouseSim absent from German user TOC** — Confirmed intentional (internal only); no Einrichtung pointer; listed under Entwickler-Specs only
+
 ### 2.6.0-alpha.1 pre-release (2026-09-25)
 
 - [x] Publish community pre-release **2.6.0-alpha.1** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.1`)

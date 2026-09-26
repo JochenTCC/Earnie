@@ -31,6 +31,8 @@ End-user documentation is **German**. Do not translate it to English unless the 
 
 - Brief English fragments (UI labels, proper nouns, API names) inside German docs are fine.
 - Do **not** silently anglicize whole sections or migrate user docs to English.
+- **`docs/ui/ehal-com.md`** — intentionally **English** (operator deep-dive / field tables). Do not translate to German unless the user asks.
+- **HouseSim** (`docs/spec/house-sim.md`, `house_sim/`) — internal lab/dev only. Do not add to the German Anwender-TOC under Einrichtung; keep under Entwickler-Specs.
 
 ## Relation to other rules
 

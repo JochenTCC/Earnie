@@ -6,7 +6,7 @@ Updates packaging/homeassistant-addon/earnie/ (build.yaml, config.yaml,
 Dockerfile, CHANGELOG.md) so add-on SemVer mirrors the app version.
 
 Usage:
-  python -m scripts.bump_ha_addon --version 2.5.0-alpha.9
+  python -m scripts.bump_ha_addon --version 2.6.0-alpha.1
   python -m scripts.bump_ha_addon --version 2.5.0 --dry-run
 """
 from __future__ import annotations

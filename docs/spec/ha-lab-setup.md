@@ -3,7 +3,7 @@
 **Status:** current  
 **Purpose:** Bring up and configure the **combined** Compose stack (`earnie` + `homeassistant` + `evcc`) so you can prove Earnie talks to Home Assistant over **REST only** (EHAL / DACH path A2; backlog history **2.4.c**).
 
-**Audience:** Operator of the lab on a Dev-PC or Pi. Containers may already be running; this guide finishes **HA onboarding**, **token**, **evcc**, **Earnie `ehal.ha`**, and a **communication check**.
+**Audience:** Operator of the lab on a Dev-PC or Pi. Containers may already be running; this guide finishes **HA onboarding**, **token**, **evcc**, **Earnie HA Anbindung** (`.env` + Pattern B bindings), and a **communication check**.
 
 **German user overview (A2 vs B):** [`docs/einrichtung/ha-evcc.md`](../einrichtung/ha-evcc.md)
 
@@ -13,7 +13,7 @@
 | --- | --- |
 | [`docker/compose/ha-lab.yml`](../../docker/compose/ha-lab.yml) | Reference Compose |
 | [`ehal.md`](ehal.md) | Frozen EHAL contract + HA adapter notes |
-| [`house-sim.md`](house-sim.md) | **2.6.a / HouseSim S1** mock REST + closed-loop bench (`house_sim/`, not this Compose stack) |
+| [`house-sim.md`](house-sim.md) | HouseSim S1 mock REST + S4 HA integration (`house_sim/`, not this Compose stack); open: S2→S3→**2.6.e** |
 | [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) | Config fragment to merge into Earnie `config.json` |
 | [`ha_lab/evcc/evcc.yaml`](../../ha_lab/evcc/evcc.yaml) | Committed lab stub (const meters / demo charger) |
 | [`ha_lab/evcc/evcc.example.yaml`](../../ha_lab/evcc/evcc.example.yaml) | Commented Earnie-mode template |
@@ -151,10 +151,11 @@ Connection refused → HA not ready or wrong port.
 
 ### 2.3 Where Earnie stores the token
 
-- Prefer Streamlit **EHAL-Com → HA Entity → EHAL Mapping** (writes Pattern B `plant` / `consumers[].ehal_bindings` into `house_profiles.json`; `ehal.backend` / `sign` stay in `config.json`).
-- Or merge [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) and replace `"token"` + confirm `"base_url": "http://homeassistant:8123"`.
+- Prefer Streamlit **Daemon Control → Smarthome-Backend** for `ehal.backend=ha` + URL/token (writes `EHAL_HA_*` into `config/.env`; optional `sign` stays in `config.json` → `ehal.ha`).
+- Entity mapping: **EHAL-Com → HA Entity → EHAL Mapping** (writes Pattern B `plant` / `consumers[].ehal_bindings` into `house_profiles.json`).
+- Or merge [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) for `backend` / `adapter_id` / `sign` only — the snippet has **no** `token` / `base_url` keys after **2.6.i**.
 
-Treat `config.json` as secret-bearing (same as `.env`). Do not commit lab tokens.
+Treat `config/.env` as secret-bearing. Do not commit lab tokens.
 
 ---
 
@@ -340,10 +341,10 @@ Expect on the host:
 
 Either:
 
-1. **UI (preferred):** **Smarthome-Backend** for `ehal.backend=ha` + URL/token; §5 mapping expander for Pattern B entity IDs (`plant` / `consumers[].ehal_bindings`) and optional `ehal.ha.sign`.
-2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json` (backend + `sign` only). Put entity IDs into `house_profiles.json` Pattern B maps — do **not** refill flat `ehal.ha.entities` for new labs (legacy map is one-shot migrated). Fixture golden maps under `house_sim/fixtures/*/ehal.ha.entities.json` are still the field→entity source for the mock bench; merge those keys into plant/consumer bindings when wiring Earnie.
+1. **UI (preferred):** **Smarthome-Backend** for `ehal.backend=ha` + URL/token → `config/.env`; §5 mapping expander for Pattern B entity IDs (`plant` / `consumers[].ehal_bindings`) and optional `ehal.ha.sign`.
+2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json` (backend + `sign` only). Put URL/token into `ha_lab/config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`). Put entity IDs into `house_profiles.json` Pattern B maps — do **not** refill flat `ehal.ha.entities` for new labs (legacy map is one-shot migrated). Fixture golden maps under `house_sim/fixtures/*/ehal.ha.entities.json` are still the field→entity source for the mock bench; merge those keys into plant/consumer bindings when wiring Earnie.
 
-Inside Compose, `base_url` **must** be:
+Inside Compose, `EHAL_HA_BASE_URL` **must** be:
 
 ```text
 http://homeassistant:8123

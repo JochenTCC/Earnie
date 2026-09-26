@@ -2,7 +2,7 @@
 
 Thin Docker wrapper (image-wrapper, not git-clone-build) for the Home Assistant Supervisor, primarily HA Green (`aarch64`; `amd64` for dev/test VMs). Source tree: `earnie/` in this folder — the **development source**. Published add-on repository: [`https://github.com/JochenTCC/ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie).
 
-Add-on `version:` in `earnie/config.yaml` **mirrors** the Earnie app release (`version.py` / GHCR tag) — e.g. app `2.5.0-alpha.9` → add-on `2.5.0-alpha.9`. This is what the Supervisor watches to show **Update available**.
+Add-on `version:` in `earnie/config.yaml` **mirrors** the Earnie app release (`version.py` / GHCR tag) — e.g. app `2.6.0-alpha.1` → add-on `2.6.0-alpha.1`. This is what the Supervisor watches to show **Update available**.
 
 ## Release workflow (automatic)
 
@@ -28,7 +28,7 @@ Repository secret **`HA_ADDON_REPO_TOKEN`** on `JochenTCC/Earnie`:
 **Bump pins locally** (wrapper-only change or retry after a failed publish job):
 
 ```bash
-python -m scripts.bump_ha_addon --version 2.5.0-alpha.9
+python -m scripts.bump_ha_addon --version 2.6.0-alpha.1
 packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-checkout>
 # commit + push both repos
 ```

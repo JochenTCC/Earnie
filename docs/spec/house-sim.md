@@ -55,13 +55,13 @@ Out of scope for S1: `simulation/engine.py::run_simulation()`, `data/pv_forecast
 ### Run the mock, then start Earnie
 
 1. Start the mock (leave this process running).
-2. Start Earnie with `ehal.backend=ha`, set `ehal.ha` URL/token/`sign`, and merge the golden field→entity IDs into **`plant.ehal_bindings`** in `house_profiles.json` (EV keys go on the first EV consumer when present). Do **not** rely on flat `ehal.ha.entities` for new installs.
+2. Start Earnie with `ehal.backend=ha`. Put URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` under `ehal.ha` in `config.json`. Merge the golden field→entity IDs into **`plant.ehal_bindings`** in `house_profiles.json` (EV keys go on the first EV consumer when present). Do **not** rely on flat `ehal.ha.entities` for new installs.
 
 | Setting | Value |
 | --- | --- |
-| Base URL | `http://127.0.0.1:8124` |
-| Token | `house-sim-bench-token` |
-| Golden map | `house_sim/fixtures/evcc_en/ehal.ha.entities.json` |
+| Base URL (`EHAL_HA_BASE_URL`) | `http://127.0.0.1:8124` |
+| Token (`EHAL_HA_TOKEN`) | `house-sim-bench-token` |
+| Golden map | `house_sim/fixtures/evcc_en/ehal.ha.entities.json` (fixture format; merge keys into Pattern B bindings) |
 
 Token constant: `house_sim.mock_rest.DEFAULT_BENCH_TOKEN`.
 
@@ -101,7 +101,7 @@ Dev/dogfood only — **not** shipped with the Earnie add-on. No PyPI package, no
 2. Copy `house_sim/ha_integration/custom_components/earnie_house_sim/` to HA `/config/custom_components/earnie_house_sim/` (Samba / SSH add-on).
 3. Restart Home Assistant → Settings → Devices & services → Add integration → **Earnie House Simulator**.
 4. Config flow: archetype (`evcc_en`), PV source **synthetic** (fixture series) or **weather** (existing `weather.*` entity that exposes `cloud_coverage`; scaled by `pv_kwp` and `sun.sun` elevation). Missing `cloud_coverage` is rejected in the flow.
-5. Point Earnie at that HA (`ehal.backend=ha`, URL/token). Bind entities with the **2.6.h** EHAL-Com UI (acceptance run). Do **not** paste the golden map blindly for ESS setpoints (see below).
+5. Point Earnie at that HA (`ehal.backend=ha`, URL/token in `config/.env`). Bind entities with the **2.6.h** EHAL-Com UI (acceptance run). Do **not** paste the golden map blindly for ESS setpoints (see below).
 
 ### Entity ID note (`input_number` → `number`)
 

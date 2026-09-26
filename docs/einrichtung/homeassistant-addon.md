@@ -87,10 +87,12 @@ Die Add-on-`version:` in `config.yaml` **entspricht der Earnie-App-Version** (z.
 
 Unterschied zum LoxBerry-Plugin: dort zieht die Compose-Datei `:latest`; beim HA-Add-on wird das Release-Image explizit über `build.yaml` / `EARNIE_VERSION` gepinnt.
 
-## Einschränkungen (Version 0.2)
+## Einschränkungen (Feature-Stufe 0.2)
+
+Die Add-on-`version:` folgt der Earnie-App (z. B. `2.6.0-alpha.1`). „0.2“ meint hier den ausgelieferten Options-/Ingress-Umfang, nicht die SemVer-Nummer.
 
 - Add-on-Optionen decken nur die gängigsten Werte ab; volle Haus-/Entity-Konfiguration bleibt in-App bzw. dateibasiert.
-- Kein MQTT Discovery, keine nativen HA-Entitäten, keine Energy-Dashboard-Integration (geplant für Version 1.0).
+- Kein MQTT Discovery, keine nativen HA-Entitäten, keine Energy-Dashboard-Integration (Add-on **1.0** → Earnie-Backlog **Version 2.+1**, nicht Teil von 2.6).
 
 ## Testumgebung
 

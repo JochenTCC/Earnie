@@ -28,7 +28,7 @@ Beim **ersten Start** legt Earnie `config.json` an und setzt im Add-on-Kontext a
 | `auto_start_main` | Startet `main.py` automatisch mit dem Add-on | `true` |
 | `timezone` | Zeitzone (`TZ`) | `Europe/Vienna` |
 
-Loxone-Zugangsdaten gehören in die Earnie-Oberfläche (**Smarthome-Backend**) bzw. in `config.json` — nicht in die Supervisor-Optionen.
+Loxone- und HA-Zugangsdaten gehören in die Earnie-Oberfläche (**Smarthome-Backend**) bzw. in `config/.env` — nicht in die Supervisor-Optionen.
 
 Mit `homeassistant_api: true` spricht Earnie die Core-API über `http://supervisor/core` und `SUPERVISOR_TOKEN` an (kein manuelles Long-Lived Access Token).
 
@@ -48,9 +48,11 @@ Config und Laufzeitdaten liegen unter `/data/earnie_env/` (`EARNIE_ENV_PATH`) �
 
 Dieses Add-on lässt Earnie **innerhalb** von Home Assistant laufen. Der EHAL-HA-Adapter (`ehal.backend=ha`) nutzt im Add-on bevorzugt den Supervisor-Proxy.
 
-## Einschränkungen (Version 0.2)
+## Einschränkungen (Feature-Stufe 0.2)
+
+Die Add-on-`version:` folgt der Earnie-App (z. B. `2.6.0-alpha.1`). „0.2“ meint hier den ausgelieferten Options-/Ingress-Umfang, nicht die SemVer-Nummer.
 
 - Add-on-Optionen decken nur gängige Werte ab; volle Haus-/Entity-Konfiguration bleibt in-App / dateibasiert.
-- Keine MQTT Discovery / native HA-Entitäten / Energy-Dashboard-Integration (geplant für Version 1.0).
+- Keine MQTT Discovery / native HA-Entitäten / Energy-Dashboard-Integration (Add-on **1.0** → Earnie-Backlog **Version 2.+1**, nicht Teil von 2.6).
 
 Ausführliche Anwenderdokumentation: [`docs/einrichtung/homeassistant-addon.md`](https://github.com/JochenTCC/Earnie/blob/main/docs/einrichtung/homeassistant-addon.md) im Hauptrepo.
