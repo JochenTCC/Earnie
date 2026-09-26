@@ -2,6 +2,17 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.k Sprint 2 — release pipeline + version channels (2026-09-26)
+
+- [x] **2.6.k — Sprint 2: release pipeline + version channels** (concept doc §3). Code on `main`; ships with the next publish after **2.6.m** (no mid-sprint tag).
+  - [x] **GHCR `:next`** on every release (stable + pre-release) via `scripts/build_container.default_tags` + `release-publish.yml` notes.
+  - [x] **LoxBerry channels** `stable` / `prerelease` / `pinned` (**H13**): `plugin.env` (`EARNIE_CHANNEL`, `EARNIE_PINNED_VERSION`, `EARNIE_AUTO_UPDATE`), `sync_compose_env.sh`, compose `${EARNIE_IMAGE_TAG}`, Web UI + GitHub releases list, daily `earnie-update.timer`, `postupgrade` default `stable`.
+  - [x] **HA `addon_config` migration** (§3.4): `EARNIE_CONFIG_PATH=/config`, runtime `/data/earnie_env/runtime`, idempotent copy in `run.sh`. Live backup/restore of `addon_config` remains a dogfood gate on next HA install.
+  - [x] **HA add-on `earnie_prerelease`** (**H12** final): dual trees in Earnie packaging + `ha-addon-earnie`; official bumps both, pre-release only prerelease; `hassio_api` mutual-run guard; docs „Stabile Version oder Vorabversion“.
+  - [x] **H6** Prebuilt `ghcr.io/jochentcc/earnie-addon-{arch}:<version>` + `image:` in both `config.yaml` (CI build on release).
+  - [x] **H2** QEMU smoke workflow (`qemu-image-smoke.yml` + `scripts/qemu_image_smoke.py`; called from release with `continue-on-error`).
+  - [x] **Downgrade warning**: `runtime/last_run_version` + log + Streamlit warning (`runtime_store/version_track.py`).
+
 ### 2.6.j Sprint 1 — installation safeguards (code) (2026-09-26)
 
 - [x] **2.6.j — Sprint 1 code/workflow** (H0 ships on next tag; H11 live verify still open in [Backlog.md](Backlog.md)).

@@ -14,6 +14,8 @@ def test_default_tags_follow_version_py():
     tags = bc.default_tags()
     assert f"ghcr.io/jochentcc/earnie-energy:{__version__}" in tags
     assert f"ghcr.io/jochentcc/ernie-energy:{__version__}" in tags
+    assert "ghcr.io/jochentcc/earnie-energy:next" in tags
+    assert "ghcr.io/jochentcc/ernie-energy:next" in tags
     if bc.is_prerelease_version(__version__):
         assert "ghcr.io/jochentcc/earnie-energy:latest" not in tags
         assert "ghcr.io/jochentcc/ernie-energy:latest" not in tags
@@ -31,14 +33,17 @@ def test_is_prerelease_version():
 def test_default_tags_prerelease_omits_latest():
     tags = bc.default_tags("2.2.0-alpha.1")
     assert tags == [
+        "ghcr.io/jochentcc/earnie-energy:next",
         "ghcr.io/jochentcc/earnie-energy:2.2.0-alpha.1",
+        "ghcr.io/jochentcc/ernie-energy:next",
         "ghcr.io/jochentcc/ernie-energy:2.2.0-alpha.1",
     ]
 
 
-def test_default_tags_official_includes_latest():
+def test_default_tags_official_includes_latest_and_next():
     tags = bc.default_tags("2.2.0")
     assert "ghcr.io/jochentcc/earnie-energy:latest" in tags
+    assert "ghcr.io/jochentcc/earnie-energy:next" in tags
     assert "ghcr.io/jochentcc/earnie-energy:2.2.0" in tags
 
 

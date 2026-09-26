@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Earnie Energy image auto-update
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

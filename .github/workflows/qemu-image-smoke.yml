@@ -1,0 +1,62 @@
+# H2 / 2.6.k: smoke-test published app images under constrained QEMU CPUs.
+# App image only here (add-on image is a thin wrapper FROM the same base).
+# May be extended to earnie-addon-* tags once those exist on GHCR.
+name: QEMU image smoke (H2)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Earnie image tag without leading v (must exist on GHCR)
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            qemu_cpu: kvm64-v1
+            platform: linux/amd64
+          - arch: arm64
+            qemu_cpu: cortex-a72
+            platform: linux/arm64
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Pull and smoke (${{ matrix.arch }} / ${{ matrix.qemu_cpu }})
+        env:
+          VERSION: ${{ inputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/jochentcc/earnie-energy:${VERSION}"
+          echo "Pulling ${IMAGE} for ${PLATFORM}…"
+          docker pull --platform "$PLATFORM" "$IMAGE"
+          # Constrain x86 guest CPU via QEMU_CPU when using qemu-user through Docker.
+          # For amd64 on amd64 runners this is a native run; still validates imports.
+          # For arm64 on amd64, Docker+QEMU emulates; OPENBLAS_NUM_THREADS=1 avoids hangs.
+          docker run --rm --platform "$PLATFORM" \
+            -e OPENBLAS_NUM_THREADS=1 \
+            -e QEMU_CPU="${{ matrix.qemu_cpu }}" \
+            "$IMAGE" \
+            python -m scripts.qemu_image_smoke

@@ -1,6 +1,6 @@
-# Changelog — Earnie Home Assistant Add-on
+# Changelog — Earnie (Vorabversion) Home Assistant Add-on
 
-Add-on `version:` mirrors the Earnie app release. Official tags bump `earnie` + `earnie_prerelease`; pre-releases bump only `earnie_prerelease`. Prebuilt: `ghcr.io/jochentcc/earnie-addon-{arch}`.
+Same image family as `earnie/`. Pre-releases and official releases both bump this tree (`version:` = newest including alpha/rc on pre-release tags; matches stable on official tags).
 
 ## 2.6.0-alpha.1
 

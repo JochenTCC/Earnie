@@ -1,12 +1,17 @@
 #!/bin/bash
 # uninstall.sh — runs as ROOT on plugin uninstall only (not on upgrade).
-# Stops the container and removes the systemd unit.
+# Stops the container and removes the systemd unit + update timer.
 # Keeps earnie_env/config + earnie_env/runtime under the plugin data dir
 # until LoxBerry removes plugin directories — if data is under LBPDATA and
 # LoxBerry wipes the plugin data folder, users should copy earnie_env out
 # first. We intentionally do NOT docker rmi the Earnie image.
 
 set -u
+
+systemctl stop earnie-update.timer 2>/dev/null || true
+systemctl disable earnie-update.timer 2>/dev/null || true
+rm -f /etc/systemd/system/earnie-update.timer
+rm -f /etc/systemd/system/earnie-update.service
 
 systemctl stop earnie 2>/dev/null || true
 systemctl disable earnie 2>/dev/null || true

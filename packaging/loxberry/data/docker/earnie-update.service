@@ -1,0 +1,8 @@
+[Unit]
+Description=Earnie Energy image auto-update (channel-aware)
+Requires=docker.service
+After=docker.service network.target
+
+[Service]
+Type=oneshot
+ExecStart=REPLACELBPBINDIR/earnie_ctl.sh auto-pull

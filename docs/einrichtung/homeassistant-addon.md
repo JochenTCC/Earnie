@@ -72,14 +72,18 @@ Direkter LAN-Zugriff nutzt denselben nginx-Port `8501`.
 
 ## Datenpfade
 
-Der Supervisor gibt jedem Add-on ein eigenes Volume unter `/data`, das Add-on-Updates und -Neustarts übersteht (Standard-Add-on-Konvention — **nicht** `/config`, das ist das HA-Core-Konfigurationsverzeichnis):
+Konfiguration liegt im Supervisor-`addon_config`-Ordner (sichtbar per Samba / File Editor). Laufzeitdaten bleiben intern unter `/data`:
 
-| Container-Pfad | Bedeutung |
-|---|---|
-| `/data/earnie_env/config/` | `config.json`, Sidecars, `.env`, `uploads/` |
-| `/data/earnie_env/runtime/` | Laufzeitdaten, Historie, Logs |
+| Container-Pfad | Host (typisch) | Bedeutung |
+|---|---|---|
+| `/config/` | `/addon_configs/<repo-hash>_earnie/` | `config.json`, Sidecars, `.env`, `uploads/` |
+| `/data/earnie_env/runtime/` | Add-on-Datenvolume | Laufzeitdaten, Historie, Logs |
 
-Erreichbar z. B. über das **Samba** oder **SSH & Web Terminal** Add-on (Pfad unter `addon_configs/<slug>` bzw. `addons/data/<slug>`, je nach HA-OS-Version).
+**Hinweis:** `.env` mit Zugangsdaten liegt damit im per Samba sichtbaren Ordner — üblich bei HA (`secrets.yaml` ebenso). Beim Wechsel auf die Vorabversion den Inhalt von `…_earnie/` nach `…_earnie_prerelease/` kopieren (siehe unten).
+
+**Migration von älteren Installs:** Beim ersten Start einer Version mit `addon_config` kopiert `run.sh` einmalig `/data/earnie_env/config/` nach `/config/` und benennt den Altordner in `config.migrated-<datum>` um (eine Version lang aufbewahrt).
+
+Erreichbar z. B. über das **Samba** oder **SSH & Web Terminal** Add-on.
 
 ## Ports
 
@@ -93,11 +97,27 @@ Port-Gesamtübersicht: [`docs/referenz/streamlit-ports.md`](../referenz/streamli
 
 ## Add-on-Update vs. Image-Update
 
-Die Add-on-`version:` in `config.yaml` **entspricht der Earnie-App-Version** bei **offiziellen** Releases (z. B. `2.6.0`). Nur offizielle Tags aktualisieren das Add-on-Repository [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) automatisch — der Supervisor zeigt dann **Update verfügbar**, sobald die neue `version:` im Repository ankommt.
+Die Add-on-`version:` in `config.yaml` **entspricht der Earnie-App-Version**. Es gibt zwei Add-ons im Repository [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie):
 
-**Vorabversionen** (`…-alpha.N` / `…-rc.N`) erscheinen auf GHCR und als GitHub Pre-release, landen aber **nicht** mehr im öffentlichen Add-on `earnie` (Stopgap H12 / Backlog **2.6.j**). Wer Alphas testen will, zieht das Image direkt (`ghcr.io/jochentcc/earnie-energy:<version>`). Ein eigener Add-on-Kanal `earnie_prerelease` folgt in **2.6.k**.
+| Kanal | Add-on | Was landet dort |
+|---|---|---|
+| Stabil | **Earnie** (`earnie`) | nur offizielle Releases (`X.Y.Z`) |
+| Vorab | **Earnie (Vorabversion)** (`earnie_prerelease`) | jedes Release inkl. Alpha/RC; bei offiziellen Releases dieselbe Version wie `earnie` |
 
-Unterschied zum LoxBerry-Plugin: dort zieht die Compose-Datei `:latest`; beim HA-Add-on wird das Release-Image explizit über `build.yaml` / `EARNIE_VERSION` gepinnt.
+Der Supervisor zeigt **Update verfügbar**, sobald die neue `version:` im Repository ankommt. Images kommen vorgebaut von GHCR (`image:` in `config.yaml`) — kein Build auf dem Gerät.
+
+### Stabile Version oder Vorabversion
+
+| | Stabil (`earnie`) | Vorab (`earnie_prerelease`) |
+|---|---|---|
+| Für wen | Normalbetrieb | Tester / Community |
+| Auto-Update | HA-Schalter „Automatische Updates“ | dasselbe |
+| Feste Version | Auto-Update aus; Rückweg nur per HA-Backup | dasselbe |
+| Konfiguration übernehmen | — | Inhalt von `/addon_configs/…_earnie/` nach `…_earnie_prerelease/` kopieren, dann `earnie` stoppen und Vorab starten |
+
+**Nie beide gleichzeitig laufen lassen** — beide würden dieselben Geräte steuern. Beim Start prüft jedes Add-on über die Supervisor-API, ob das andere bereits läuft, und bricht sonst ab.
+
+Unterschied zum LoxBerry-Plugin: dort wählst du den Kanal in der Plugin-UI (`:latest` / `:next` / fest); beim HA-Add-on ist der Kanal, welches Add-on installiert ist.
 
 ## Einschränkungen (Feature-Stufe 0.2)
 
@@ -118,7 +138,8 @@ Auf der HAOS-in-VM-Instanz (Synology):
 2. Charts/Navigation laden (kein „Not found“, kein leeres Blatt, keine Massen-404 unter `/static` oder `_stcore`).
 3. Optional: Direkt `http://<ha-ip>:8501` (nginx) öffnet dieselbe UI.
 4. Frische Daten: Smarthome-Backend zielt auf HA; Supervisor-Proxy-Auth funktioniert.
-5. Neustart: `/data/earnie_env` und gemergte/seeded `config.json` bleiben erhalten.
+5. Neustart: `/config` (addon_config) und `/data/earnie_env/runtime` sowie gemergte/seeded `config.json` bleiben erhalten.
+6. Optional: HA-Backup des Add-ons → Restore — `addon_config` muss `config.json` wiederherstellen (manueller Gate für Sprint 2).
 
 Hinweis: `2.5.3-alpha.4` setzte nur Streamlit-`baseUrlPath` ohne nginx-Pfad-Reinject → Ingress und Host`:8501` meldeten „Not found“.
 

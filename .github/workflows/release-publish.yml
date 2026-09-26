@@ -3,6 +3,7 @@
 #   (e.g. v2.0.0, v2.2.0-alpha.1).
 # Prerequisite: version.py __version__ must equal the tag without the leading "v".
 # Pre-releases (version contains "-"): GitHub --prerelease, no --latest, no Docker :latest.
+# Every release (stable + pre-release) also pushes Docker :next.
 
 name: Release
 
@@ -91,7 +92,29 @@ jobs:
       - name: Build and push multi-arch image
         run: python -m scripts.build_container --target all --push
         # Tariff deploy-gate runs inside build_container when --push is set.
-        # default_tags() omits :latest when version.py is a SemVer pre-release.
+        # default_tags(): every release gets :next + :<version>; official also :latest.
+
+      - name: Build and push HA add-on images (H6)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          CONTEXT="packaging/homeassistant-addon/earnie"
+          for arch in amd64 aarch64; do
+            if [ "$arch" = "amd64" ]; then
+              platform="linux/amd64"
+            else
+              platform="linux/arm64"
+            fi
+            docker buildx build \
+              --platform "$platform" \
+              --build-arg "EARNIE_VERSION=${VERSION}" \
+              -t "ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}" \
+              -f "${CONTEXT}/Dockerfile" \
+              "${CONTEXT}" \
+              --push
+            echo "Pushed ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}"
+          done
 
       - name: Prepare release notes
         id: notes
@@ -111,19 +134,23 @@ jobs:
               if [ "$PRERELEASE" = "true" ]; then
                 echo "### Pre-release (community test)"
                 echo ""
-                echo "This is **not** an official release. Do not use \`:latest\` — pin the version tag."
+                echo "This is **not** an official release. Do not use \`:latest\` — use \`:next\` or pin the version tag."
                 echo ""
                 echo "### Docker images"
                 echo ""
                 echo "- \`ghcr.io/jochentcc/earnie-energy:${VERSION}\`"
-                echo "- Legacy alias: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\`"
+                echo "- \`ghcr.io/jochentcc/earnie-energy:next\`"
+                echo "- Legacy aliases: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\` / \`:next\`"
               else
                 echo "### Docker images"
                 echo ""
                 echo "- \`ghcr.io/jochentcc/earnie-energy:${VERSION}\`"
                 echo "- \`ghcr.io/jochentcc/earnie-energy:latest\`"
-                echo "- Legacy aliases: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\` / \`:latest\`"
+                echo "- \`ghcr.io/jochentcc/earnie-energy:next\`"
+                echo "- Legacy aliases: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\` / \`:latest\` / \`:next\`"
               fi
+              echo ""
+              echo "HA add-on images: \`ghcr.io/jochentcc/earnie-addon-{amd64,aarch64}:${VERSION}\`"
               echo ""
               echo "Deploy: [docs/einrichtung/container.md](https://github.com/${{ github.repository }}/blob/main/docs/einrichtung/container.md)"
               echo ""
@@ -153,12 +180,10 @@ jobs:
           fi
           gh release create "${ARGS[@]}"
 
-  # H12 stopgap: official releases only. Pre-releases must not bump public
-  # ha-addon-earnie/earnie (auto-update would reach all HA users). Dual channel
-  # earnie_prerelease is 2.6.k.
+  # Dual channel (2.6.k / H12 final): official → earnie + earnie_prerelease;
+  # pre-release → earnie_prerelease only. Add-on images already pushed in release job.
   publish_ha_addon:
     needs: release
-    if: needs.release.outputs.prerelease != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -188,20 +213,30 @@ jobs:
           VERSION: ${{ needs.release.outputs.version }}
         run: python -m scripts.bump_ha_addon --version "$VERSION"
 
-      - name: Lint HA add-on configuration
+      - name: Lint HA add-on earnie
+        if: needs.release.outputs.prerelease != 'true'
         uses: frenck/action-addon-linter@v2
         with:
           path: ./packaging/homeassistant-addon/earnie
 
+      - name: Lint HA add-on earnie_prerelease
+        uses: frenck/action-addon-linter@v2
+        with:
+          path: ./packaging/homeassistant-addon/earnie_prerelease
+
       - name: Commit and push Earnie main
         env:
           VERSION: ${{ needs.release.outputs.version }}
-          COMMIT_MSG: "ha-addon: publish ${{ needs.release.outputs.version }} (pins ghcr.io/jochentcc/earnie-energy:${{ needs.release.outputs.version }})"
+          PRERELEASE: ${{ needs.release.outputs.prerelease }}
+          COMMIT_MSG: "ha-addon: publish ${{ needs.release.outputs.version }} (dual channel)"
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packaging/homeassistant-addon/earnie
+          git add packaging/homeassistant-addon/earnie_prerelease
+          if [ "$PRERELEASE" != "true" ]; then
+            git add packaging/homeassistant-addon/earnie
+          fi
           if git diff --staged --quiet; then
             echo "Earnie packaging already pinned to ${VERSION}; skipping main commit."
           else
@@ -212,20 +247,37 @@ jobs:
       - name: Publish ha-addon-earnie
         env:
           VERSION: ${{ needs.release.outputs.version }}
-          COMMIT_MSG: "ha-addon: publish ${{ needs.release.outputs.version }} (pins ghcr.io/jochentcc/earnie-energy:${{ needs.release.outputs.version }})"
+          PRERELEASE: ${{ needs.release.outputs.prerelease }}
+          COMMIT_MSG: "ha-addon: publish ${{ needs.release.outputs.version }} (dual channel)"
           HA_ADDON_REPO_TOKEN: ${{ secrets.HA_ADDON_REPO_TOKEN }}
         run: |
           set -euo pipefail
           git clone "https://x-access-token:${HA_ADDON_REPO_TOKEN}@github.com/JochenTCC/ha-addon-earnie.git" /tmp/ha-addon-earnie
-          rm -rf /tmp/ha-addon-earnie/earnie
-          cp -a packaging/homeassistant-addon/earnie /tmp/ha-addon-earnie/earnie
+          rm -rf /tmp/ha-addon-earnie/earnie_prerelease
+          cp -a packaging/homeassistant-addon/earnie_prerelease /tmp/ha-addon-earnie/earnie_prerelease
+          if [ "$PRERELEASE" != "true" ]; then
+            rm -rf /tmp/ha-addon-earnie/earnie
+            cp -a packaging/homeassistant-addon/earnie /tmp/ha-addon-earnie/earnie
+          fi
           cd /tmp/ha-addon-earnie
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add earnie
+          git add earnie_prerelease
+          if [ "$PRERELEASE" != "true" ]; then
+            git add earnie
+          fi
           if git diff --staged --quiet; then
             echo "ha-addon-earnie already up to date for ${VERSION}."
           else
             git commit -m "$COMMIT_MSG"
             git push origin main
           fi
+
+  # H2: constrained-CPU smoke (does not block add-on publish).
+  qemu_smoke:
+    needs: release
+    uses: ./.github/workflows/qemu-image-smoke.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
+    continue-on-error: true

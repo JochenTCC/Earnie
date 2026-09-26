@@ -16,10 +16,17 @@ if [ -f "$BAK" ]; then
   echo "<INFO> Restored plugin.env"
 fi
 
-SYNC="$PDATA/docker/sync_streamlit_env.sh"
+# shellcheck source=data/docker/migrate_plugin_env.sh
+if [ -f "$PDATA/docker/migrate_plugin_env.sh" ]; then
+  . "$PDATA/docker/migrate_plugin_env.sh"
+  earnie_migrate_plugin_env "$PCONFIG/plugin.env"
+  echo "<INFO> Migrated plugin.env (channel defaults / drop IMAGE)"
+fi
+
+SYNC="$PDATA/docker/sync_compose_env.sh"
 if [ -f "$SYNC" ] && [ -f "$PCONFIG/plugin.env" ]; then
   bash "$SYNC" "$PCONFIG/plugin.env" "$PDATA/docker"
-  echo "<INFO> Synced STREAMLIT_PORT to compose .env"
+  echo "<INFO> Synced STREAMLIT_PORT / EARNIE_IMAGE_TAG to compose .env"
 fi
 
 exit 0

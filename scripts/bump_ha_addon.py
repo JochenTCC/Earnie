@@ -2,12 +2,18 @@
 """
 bump_ha_addon.py — Pin HA add-on wrapper files to an Earnie release version.
 
-Updates packaging/homeassistant-addon/earnie/ (build.yaml, config.yaml,
-Dockerfile, CHANGELOG.md) so add-on SemVer mirrors the app version.
+Updates packaging/homeassistant-addon/earnie/ and/or earnie_prerelease/
+(build.yaml, config.yaml, Dockerfile, CHANGELOG.md) so add-on SemVer mirrors
+the app version.
+
+Channel rules (2.6.k / H12 final):
+  - Official X.Y.Z → bump both earnie and earnie_prerelease
+  - Pre-release (contains "-") → bump earnie_prerelease only
 
 Usage:
   python -m scripts.bump_ha_addon --version 2.6.0-alpha.1
   python -m scripts.bump_ha_addon --version 2.5.0 --dry-run
+  python -m scripts.bump_ha_addon --version 2.5.0 --channel both
 """
 from __future__ import annotations
 
@@ -17,7 +23,9 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ADDON_DIR = REPO_ROOT / "packaging" / "homeassistant-addon" / "earnie"
+ADDON_ROOT = REPO_ROOT / "packaging" / "homeassistant-addon"
+ADDON_DIR = ADDON_ROOT / "earnie"
+PRERELEASE_DIR = ADDON_ROOT / "earnie_prerelease"
 IMAGE_BASE = "ghcr.io/jochentcc/earnie-energy"
 RELEASE_NOTES_DIR = REPO_ROOT / ".github" / "release-notes"
 EARNIE_RELEASE_URL = "https://github.com/JochenTCC/Earnie/releases/tag/v{version}"
@@ -31,8 +39,26 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
+def is_prerelease_version(version: str) -> bool:
+    return "-" in version
+
+
 def image_ref(version: str) -> str:
     return f"{IMAGE_BASE}:{version}"
+
+
+def resolve_channels(version: str, channel: str) -> list[Path]:
+    """Return add-on dirs to bump for *version* / *channel*."""
+    if channel == "earnie":
+        return [ADDON_DIR]
+    if channel == "earnie_prerelease":
+        return [PRERELEASE_DIR]
+    if channel == "both":
+        return [ADDON_DIR, PRERELEASE_DIR]
+    # auto
+    if is_prerelease_version(version):
+        return [PRERELEASE_DIR]
+    return [ADDON_DIR, PRERELEASE_DIR]
 
 
 def bump_build_yaml(content: str, version: str) -> str:
@@ -141,22 +167,42 @@ def bump_addon_files(version: str, *, addon_dir: Path = ADDON_DIR) -> dict[Path,
     return updates
 
 
-def apply_bump(version: str, *, addon_dir: Path = ADDON_DIR, dry_run: bool = False) -> bool:
-    """Apply bump; return True if any file changed."""
-    changes = bump_addon_files(version, addon_dir=addon_dir)
-    if not changes:
-        print(f"HA add-on already pinned to {version}; no changes.")
-        return False
+def apply_bump(
+    version: str,
+    *,
+    addon_dir: Path | None = None,
+    channel: str = "auto",
+    dry_run: bool = False,
+) -> bool:
+    """Apply bump; return True if any file changed.
 
-    for path, (_, after) in changes.items():
-        label = path.name if path.parent == addon_dir else str(path)
-        if dry_run:
-            print(f"[dry-run] would update {label}")
-        else:
-            _write(path, after)
-            print(f"Updated {label}")
+    If *addon_dir* is set, only that directory is bumped (tests / override).
+    Otherwise *channel* selects earnie / earnie_prerelease / both / auto.
+    """
+    if addon_dir is not None:
+        dirs = [addon_dir]
+    else:
+        dirs = resolve_channels(version, channel)
 
-    return True
+    any_changed = False
+    for directory in dirs:
+        if not directory.is_dir():
+            print(f"Add-on directory not found: {directory}", file=sys.stderr)
+            continue
+        changes = bump_addon_files(version, addon_dir=directory)
+        label_root = directory.name
+        if not changes:
+            print(f"HA add-on {label_root} already pinned to {version}; no changes.")
+            continue
+        any_changed = True
+        for path, (_, after) in changes.items():
+            rel = f"{label_root}/{path.name}"
+            if dry_run:
+                print(f"[dry-run] would update {rel}")
+            else:
+                _write(path, after)
+                print(f"Updated {rel}")
+    return any_changed
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -167,10 +213,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Earnie release version (matches version.py / GHCR tag, without leading v).",
     )
     parser.add_argument(
+        "--channel",
+        choices=("auto", "earnie", "earnie_prerelease", "both"),
+        default="auto",
+        help="Which add-on tree(s) to bump (default: auto from SemVer).",
+    )
+    parser.add_argument(
         "--addon-dir",
         type=Path,
-        default=ADDON_DIR,
-        help="Path to packaging/homeassistant-addon/earnie (for tests).",
+        default=None,
+        help="Override: bump only this directory (for tests).",
     )
     parser.add_argument(
         "--dry-run",
@@ -179,11 +231,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if not args.addon_dir.is_dir():
+    if args.addon_dir is not None and not args.addon_dir.is_dir():
         print(f"Add-on directory not found: {args.addon_dir}", file=sys.stderr)
         return 1
 
-    apply_bump(args.version, addon_dir=args.addon_dir, dry_run=args.dry_run)
+    apply_bump(
+        args.version,
+        addon_dir=args.addon_dir,
+        channel=args.channel,
+        dry_run=args.dry_run,
+    )
     return 0
 
 

@@ -1,0 +1,19 @@
+configuration:
+  streamlit_port:
+    name: Streamlit port
+    description: Streamlit listen port (also written to config.json ui.streamlit_port). Prefer HA Ingress for the UI.
+  ehal_loxone_http_port:
+    name: EHAL Loxone HTTP port
+    description: Exported as EARNIE_EHAL_LOXONE_HTTP_PORT and written to config.json system.ehal_loxone_http_port on each add-on start (default 8541).
+  ui_modes:
+    name: UI modes
+    description: Comma-separated list of enabled UI modes (e.g. sunset2sunset,scenario_explorer,live_environment).
+  auto_start_main:
+    name: Auto-start optimizer
+    description: Start the Earnie optimization daemon (main.py) automatically with the add-on.
+  timezone:
+    name: Timezone
+    description: Timezone used for planning and display (e.g. Europe/Vienna).
+network:
+  8501/tcp: Web UI (optional direct; prefer Ingress)
+  8541/tcp: EHAL Loxone-HTTP

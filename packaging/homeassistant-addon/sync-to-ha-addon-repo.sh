@@ -1,19 +1,17 @@
 #!/bin/sh
-# Mirrors packaging/homeassistant-addon/earnie/ (Entwicklungsquelle in diesem
-# Hauptrepo) in einen lokalen Checkout von
-# https://github.com/JochenTCC/ha-addon-earnie — dort muss der Add-on-Ordner
-# direkt im Repo-Root liegen (Supervisor-Repository-Konvention, kein
-# Unterordner-Deeplink möglich).
+# Mirrors packaging/homeassistant-addon/earnie/ and earnie_prerelease/
+# (Entwicklungsquelle in diesem Hauptrepo) in einen lokalen Checkout von
+# https://github.com/JochenTCC/ha-addon-earnie — Add-on-Ordner liegen direkt
+# im Repo-Root (Supervisor-Repository-Konvention).
 #
 # Sync-Mechanik: manueller Kopiervorgang bei lokaler Entwicklung / Recovery.
 # Automatischer Publish: .github/workflows/release-publish.yml → publish_ha_addon
-# (offizielle Tags only; Vorabversionen skippen H12).
-
+# (official → both; pre-release → earnie_prerelease only).
 #
 # Usage: packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-checkout>
 set -e
 
-SRC="$(cd "$(dirname "$0")/earnie" && pwd)"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
 DEST="${1:?Usage: $0 <path-to-ha-addon-earnie-checkout>}"
 
 if [ ! -d "$DEST/.git" ]; then
@@ -21,13 +19,20 @@ if [ ! -d "$DEST/.git" ]; then
     exit 1
 fi
 
-rm -rf "$DEST/earnie"
-mkdir -p "$DEST/earnie"
-cp -r "$SRC/." "$DEST/earnie/"
+for slug in earnie earnie_prerelease; do
+    SRC="$ROOT/$slug"
+    if [ ! -d "$SRC" ]; then
+        echo "Fehler: Quelle fehlt: $SRC" >&2
+        exit 1
+    fi
+    rm -rf "$DEST/$slug"
+    mkdir -p "$DEST/$slug"
+    cp -r "$SRC/." "$DEST/$slug/"
+    echo "Synced $SRC -> $DEST/$slug/"
+done
 
-echo "Synced $SRC -> $DEST/earnie/"
 echo "Vor dem Commit prüfen:"
-echo "  - earnie/config.yaml 'version:' gebumpt?"
-echo "  - earnie/build.yaml EARNIE_VERSION passend zum neuen Earnie-Release?"
-echo "  - earnie/CHANGELOG.md Eintrag ergänzt?"
+echo "  - earnie/ + earnie_prerelease/ config.yaml 'version:'"
+echo "  - build.yaml EARNIE_VERSION / image: ghcr.io/jochentcc/earnie-addon-{arch}"
+echo "  - CHANGELOG.md"
 echo "Danach in $DEST committen und pushen."

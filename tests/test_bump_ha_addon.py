@@ -89,6 +89,34 @@ def test_apply_bump_updates_all_files(tmp_path: Path):
     assert (addon_dir / "Dockerfile").read_text(encoding="utf-8").startswith("ARG EARNIE_VERSION=2.5.0-alpha.9")
 
 
+def test_resolve_channels_auto_official():
+    assert bha.resolve_channels("2.5.0", "auto") == [bha.ADDON_DIR, bha.PRERELEASE_DIR]
+
+
+def test_resolve_channels_auto_prerelease():
+    assert bha.resolve_channels("2.5.0-alpha.1", "auto") == [bha.PRERELEASE_DIR]
+
+
+def test_resolve_channels_explicit_both():
+    assert bha.resolve_channels("2.5.0-alpha.1", "both") == [bha.ADDON_DIR, bha.PRERELEASE_DIR]
+
+
+def test_apply_bump_channel_prerelease_only(tmp_path: Path, monkeypatch):
+    root = tmp_path / "packaging" / "homeassistant-addon"
+    stable = root / "earnie"
+    pre = root / "earnie_prerelease"
+    stable.mkdir(parents=True)
+    pre.mkdir(parents=True)
+    _write_addon_tree(stable)
+    _write_addon_tree(pre)
+    monkeypatch.setattr(bha, "ADDON_DIR", stable)
+    monkeypatch.setattr(bha, "PRERELEASE_DIR", pre)
+    monkeypatch.setattr(bha, "ADDON_ROOT", root)
+    assert bha.apply_bump("2.6.0-alpha.2", channel="auto") is True
+    assert (stable / "config.yaml").read_text(encoding="utf-8") == 'version: "0.1.0"\n'
+    assert (pre / "config.yaml").read_text(encoding="utf-8") == 'version: "2.6.0-alpha.2"\n'
+
+
 def test_release_notes_blurb_uses_first_non_heading_paragraph(tmp_path: Path, monkeypatch):
     notes_dir = tmp_path / "release-notes"
     notes_dir.mkdir()

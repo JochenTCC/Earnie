@@ -15,6 +15,28 @@
         <td><code><?php echo htmlspecialchars($ctr); ?></code></td>
       </tr>
       <tr>
+        <th><?php echo htmlspecialchars($L['MAIN.RUNNING_VERSION']); ?></th>
+        <td><code><?php echo htmlspecialchars($running_ver !== "" ? $running_ver : "—"); ?></code></td>
+      </tr>
+      <tr>
+        <th><?php echo htmlspecialchars($L['MAIN.CHANNEL_CURRENT']); ?></th>
+        <td><?php echo htmlspecialchars($channel_label); ?>
+          (<code><?php echo htmlspecialchars($image_tag); ?></code>)</td>
+      </tr>
+      <tr>
+        <th><?php echo htmlspecialchars($L['MAIN.UPDATE_AVAILABLE']); ?></th>
+        <td><?php
+          if ($earnie_channel === "pinned") {
+            echo htmlspecialchars($L['MAIN.UPDATE_NA_PINNED']);
+          } elseif ($update_available) {
+            echo htmlspecialchars($L['MAIN.UPDATE_YES']) . " — <code>"
+              . htmlspecialchars($channel_latest) . "</code>";
+          } else {
+            echo htmlspecialchars($L['MAIN.UPDATE_NO']);
+          }
+        ?></td>
+      </tr>
+      <tr>
         <th><?php echo htmlspecialchars($L['MAIN.IMAGE_TAG']); ?></th>
         <td><code><?php echo htmlspecialchars($image); ?></code></td>
       </tr>
@@ -33,23 +55,91 @@
     <p><?php echo htmlspecialchars($L['MAIN.UI_DESC']); ?></p>
     <p><a class="lb-btn" href="<?php echo htmlspecialchars($uiurl); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($L['MAIN.BTN_OPEN_UI']); ?></a>
       <code><?php echo htmlspecialchars($uiurl); ?></code></p>
+  </section>
 
-    <?php if ($port_saved) { ?>
-      <p class="lb-ok"><?php echo htmlspecialchars($L['MAIN.PORT_SAVED']); ?></p>
+  <section class="lb-section" style="margin-top:1.5rem;">
+    <h2><?php echo htmlspecialchars($L['MAIN.HEADING_SETTINGS']); ?></h2>
+
+    <?php if ($settings_saved) { ?>
+      <p class="lb-ok"><?php echo htmlspecialchars($L['MAIN.SETTINGS_SAVED']); ?></p>
     <?php } ?>
-    <?php if ($port_error !== "") { ?>
-      <p class="lb-error"><?php echo htmlspecialchars($port_error); ?></p>
+    <?php if ($settings_error !== "") { ?>
+      <p class="lb-error"><?php echo htmlspecialchars($settings_error); ?></p>
     <?php } ?>
 
-    <form method="post" action="index.php" style="margin-top:1rem; display:flex; flex-wrap:wrap; align-items:flex-end; gap:0.5rem;">
-      <label for="streamlit_port"><?php echo htmlspecialchars($L['MAIN.LABEL_PORT']); ?></label>
-      <input type="number" id="streamlit_port" name="streamlit_port"
-             min="1024" max="65535" step="1" required
-             value="<?php echo (int) $streamlit_port; ?>"
-             style="width:7rem;">
-      <button type="submit" name="action" value="save_port" class="lb-btn"><?php echo htmlspecialchars($L['MAIN.BTN_SAVE_PORT']); ?></button>
+    <form method="post" action="index.php" style="margin-top:1rem;">
+      <p>
+        <label for="earnie_channel"><?php echo htmlspecialchars($L['MAIN.LABEL_CHANNEL']); ?></label><br>
+        <select id="earnie_channel" name="earnie_channel" style="min-width:14rem;">
+          <option value="stable"<?php echo $earnie_channel === "stable" ? " selected" : ""; ?>>
+            <?php echo htmlspecialchars($L['MAIN.CHANNEL_STABLE']); ?>
+          </option>
+          <option value="prerelease"<?php echo $earnie_channel === "prerelease" ? " selected" : ""; ?>>
+            <?php echo htmlspecialchars($L['MAIN.CHANNEL_PRERELEASE']); ?>
+          </option>
+          <option value="pinned"<?php echo $earnie_channel === "pinned" ? " selected" : ""; ?>>
+            <?php echo htmlspecialchars($L['MAIN.CHANNEL_PINNED']); ?>
+          </option>
+        </select>
+      </p>
+
+      <div id="earnie_pinned_wrap" style="<?php echo $earnie_channel === "pinned" ? "" : "display:none;"; ?>">
+        <p>
+          <label for="earnie_pinned"><?php echo htmlspecialchars($L['MAIN.LABEL_PINNED']); ?></label><br>
+          <?php if ($releases_ok) { ?>
+            <select id="earnie_pinned" name="earnie_pinned" style="min-width:14rem;">
+              <?php
+              $pin_in_list = false;
+              foreach ($releases as $rel) {
+                $ver = $rel["version"];
+                if ($ver === $earnie_pinned) {
+                  $pin_in_list = true;
+                }
+                $sel = ($ver === $earnie_pinned) ? " selected" : "";
+                $suffix = !empty($rel["prerelease"]) ? " (pre)" : "";
+                echo '<option value="' . htmlspecialchars($ver) . '"' . $sel . ">"
+                  . htmlspecialchars($ver . $suffix) . "</option>\n";
+              }
+              if ($earnie_pinned !== "" && !$pin_in_list) {
+                echo '<option value="' . htmlspecialchars($earnie_pinned)
+                  . '" selected>' . htmlspecialchars($earnie_pinned) . "</option>\n";
+              }
+              ?>
+            </select>
+          <?php } else { ?>
+            <input type="text" id="earnie_pinned" name="earnie_pinned"
+                   value="<?php echo htmlspecialchars($earnie_pinned); ?>"
+                   placeholder="2.5.3" style="min-width:14rem;">
+            <br><span style="font-size:0.9em;"><?php echo htmlspecialchars($L['MAIN.PINNED_FALLBACK']); ?></span>
+          <?php } ?>
+        </p>
+      </div>
+
+      <p id="earnie_auto_wrap" style="<?php echo $earnie_channel === "pinned" ? "display:none;" : ""; ?>">
+        <label>
+          <input type="checkbox" name="earnie_auto_update" value="1"
+            <?php echo $earnie_auto_update === "1" ? " checked" : ""; ?>>
+          <?php echo htmlspecialchars($L['MAIN.LABEL_AUTO_UPDATE']); ?>
+        </label>
+        <br><span style="font-size:0.9em;"><?php echo htmlspecialchars($L['MAIN.AUTO_UPDATE_HINT']); ?></span>
+      </p>
+
+      <p>
+        <label for="streamlit_port"><?php echo htmlspecialchars($L['MAIN.LABEL_PORT']); ?></label><br>
+        <input type="number" id="streamlit_port" name="streamlit_port"
+               min="1024" max="65535" step="1" required
+               value="<?php echo (int) $streamlit_port; ?>"
+               style="width:7rem;">
+      </p>
+      <p style="font-size:0.9em;"><?php echo htmlspecialchars($L['MAIN.PORT_HINT']); ?></p>
+
+      <p>
+        <button type="submit" name="action" value="save_settings" class="lb-btn">
+          <?php echo htmlspecialchars($L['MAIN.BTN_SAVE_SETTINGS']); ?>
+        </button>
+      </p>
+      <p style="font-size:0.9em;"><?php echo htmlspecialchars($L['MAIN.PLUGIN_AUTOUPDATE_NOTE']); ?></p>
     </form>
-    <p style="margin-top:0.5rem; font-size:0.9em;"><?php echo htmlspecialchars($L['MAIN.PORT_HINT']); ?></p>
   </section>
 
   <section class="lb-section" style="margin-top:1.5rem;">
@@ -62,3 +152,18 @@
     </ul>
   </section>
 </div>
+<script type="text/javascript">
+(function () {
+  var sel = document.getElementById("earnie_channel");
+  var pin = document.getElementById("earnie_pinned_wrap");
+  var auto = document.getElementById("earnie_auto_wrap");
+  if (!sel) { return; }
+  function sync() {
+    var pinned = sel.value === "pinned";
+    if (pin) { pin.style.display = pinned ? "" : "none"; }
+    if (auto) { auto.style.display = pinned ? "none" : ""; }
+  }
+  sel.addEventListener("change", sync);
+  sync();
+})();
+</script>

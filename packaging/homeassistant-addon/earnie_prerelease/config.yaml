@@ -1,0 +1,47 @@
+# Earnie (Vorabversion) — Home-Assistant-Add-on Manifest (Supervisor).
+# Same prebuilt image family as earnie/; only version:/name/slug differ.
+# Entwicklungsquelle im Hauptrepo; Sync nach ha-addon-earnie bei Releases.
+name: "Earnie (Vorabversion)"
+version: "2.6.0-alpha.1"
+slug: earnie_prerelease
+description: "Vorabversion von Earnie (Alpha/RC). Nicht für den Dauerbetrieb. Nach dem Start ca. 20–40 s warten, bis die Web-UI (Ingress) bereit ist. Nie parallel zum stabilen Earnie-Add-on starten."
+url: https://github.com/JochenTCC/Earnie
+# Same prebuilt images as stable earnie (H6); Supervisor pulls by version:.
+image: "ghcr.io/jochentcc/earnie-addon-{arch}"
+startup: application
+init: false
+panel_icon: mdi:solar-power-variant
+arch:
+  - aarch64
+  - amd64
+
+homeassistant_api: true
+hassio_api: true
+
+ingress: true
+ingress_port: 8501
+
+ports:
+  8501/tcp: 8501
+  8541/tcp: 8541
+ports_description:
+  8501/tcp: "Earnie Web-UI (optional direct; prefer Ingress)"
+  8541/tcp: "EHAL Loxone-HTTP (optional, nur bei Loxone-Backend)"
+
+map:
+  - type: addon_config
+    read_only: false
+
+options:
+  streamlit_port: 8501
+  ehal_loxone_http_port: 8541
+  ui_modes: "sunset2sunset,scenario_explorer,live_environment"
+  auto_start_main: true
+  timezone: "Europe/Vienna"
+
+schema:
+  streamlit_port: "port?"
+  ehal_loxone_http_port: "port?"
+  ui_modes: "str?"
+  auto_start_main: "bool?"
+  timezone: "str?"

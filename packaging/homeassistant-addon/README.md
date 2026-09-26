@@ -2,17 +2,18 @@
 
 Thin Docker wrapper (image-wrapper, not git-clone-build) for the Home Assistant Supervisor, primarily HA Green (`aarch64`; `amd64` for dev/test VMs). Source tree: `earnie/` in this folder — the **development source**. Published add-on repository: [`https://github.com/JochenTCC/ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie).
 
-Add-on `version:` in `earnie/config.yaml` **mirrors** the Earnie app release (`version.py` / GHCR tag) for **official** releases — e.g. app `2.6.0` → add-on `2.6.0`. This is what the Supervisor watches to show **Update available**.
+Add-on `version:` in `earnie/config.yaml` / `earnie_prerelease/config.yaml` **mirrors** the Earnie app release (`version.py` / GHCR tag). Official releases bump **both** add-ons; pre-releases bump **only** `earnie_prerelease`. The Supervisor watches `version:` to show **Update available**. Prebuilt images: `ghcr.io/jochentcc/earnie-addon-{arch}:<version>` (`image:` in config.yaml — no on-device build).
 
 ## Release workflow (automatic)
 
 Every Earnie git tag triggers [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml):
 
-1. Build and push `ghcr.io/jochentcc/earnie-energy:<version>` (multi-arch).
-2. Create the GitHub Release (pre-releases: `--prerelease`, no `:latest`).
-3. Job **`publish_ha_addon`** (official tags only — **H12 stopgap**): bump `packaging/homeassistant-addon/earnie/`, lint with [`frenck/action-addon-linter`](https://github.com/frenck/action-addon-linter), commit to **`main`** here, mirror to **`ha-addon-earnie` `main`**.
-
-**Pre-releases** (`X.Y.Z-alpha.N` / `-rc.N`) still publish GHCR + GitHub Pre-release, but **do not** bump the public add-on `earnie` (auto-update would reach all HA users). Dual-channel `earnie_prerelease` is planned as Earnie **2.6.k**.
+1. Build and push `ghcr.io/jochentcc/earnie-energy:<version>` (multi-arch; every release also `:next`; official also `:latest`).
+2. Build and push HA add-on images `ghcr.io/jochentcc/earnie-addon-{amd64,aarch64}:<version>` (H6).
+3. Create the GitHub Release (pre-releases: `--prerelease`, no `:latest`).
+4. Job **`publish_ha_addon`**: bump add-on trees (`auto` channel), lint, commit Earnie `main`, mirror to **`ha-addon-earnie` `main`**.
+   - Official → `earnie/` + `earnie_prerelease/`
+   - Pre-release → `earnie_prerelease/` only
 
 **No GitHub Release/tag is needed in `ha-addon-earnie`.** The Supervisor reads the tracked branch and detects updates from `config.yaml` `version:`.
 
@@ -23,19 +24,20 @@ The tagged commit itself does not contain the new add-on pins — the bot commit
 Repository secret **`HA_ADDON_REPO_TOKEN`** on `JochenTCC/Earnie`:
 
 - Fine-grained or classic PAT with **`contents: write`** on **`JochenTCC/Earnie`** and **`JochenTCC/ha-addon-earnie`**
-- Without this secret, an official release still publishes GHCR + GitHub Release, but `publish_ha_addon` fails with a clear error
+- Without this secret, a release still publishes GHCR + GitHub Release, but `publish_ha_addon` fails with a clear error
 
 ### Manual override
 
-**Bump pins locally** (wrapper-only change or retry after a failed publish job; **official** `X.Y.Z` only):
+**Bump pins locally** (wrapper-only change or retry after a failed publish job):
 
 ```bash
-python -m scripts.bump_ha_addon --version 2.6.0
+python -m scripts.bump_ha_addon --version 2.6.0          # both channels
+python -m scripts.bump_ha_addon --version 2.6.0-alpha.2  # prerelease only
 packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-checkout>
 # commit + push both repos
 ```
 
-**Republish without re-tagging:** Actions → **HA Add-on publish** ([`.github/workflows/ha-addon-publish.yml`](../../.github/workflows/ha-addon-publish.yml)) → enter an official Earnie version (must already exist on GHCR). Pre-release version strings are refused (H12).
+**Republish without re-tagging:** Actions → **HA Add-on publish** → enter version (official → both; pre-release → `earnie_prerelease` only). GHCR app + add-on images must already exist.
 
 Dry-run locally:
 
@@ -55,7 +57,14 @@ docker build --build-arg EARNIE_VERSION=2.5.0 -t earnie-addon-test:local .
 docker run -d --name earnie-addon-test -p 18501:8501 -v <host-dir>:/data earnie-addon-test:local
 ```
 
-`<host-dir>` stands in for the Supervisor's per-add-on `/data` volume — mirrors what `run.sh` expects (`EARNIE_ENV_PATH=/data/earnie_env`, options read from `<host-dir>/options.json`).
+`<host-dir>` stands in for the Supervisor's per-add-on `/data` volume (options + runtime). For a realistic `addon_config` test also mount a config dir to `/config`:
+
+```bash
+docker run -d --name earnie-addon-test -p 18501:8501 \
+  -v <host-data>:/data -v <host-config>:/config earnie-addon-test:local
+```
+
+`run.sh` sets `EARNIE_CONFIG_PATH=/config` and `EARNIE_RUNTIME_PATH=/data/earnie_env/runtime`.
 
 Windows / Git Bash: prefix `docker run`/`docker exec` calls that pass `/data`-style paths with `MSYS_NO_PATHCONV=1`, otherwise MSYS mangles the path and silently mounts an empty volume instead of `<host-dir>`.
 
@@ -75,7 +84,7 @@ Full Supervisor-lifecycle verification (restart/update/backup-restore) needs a r
 
 ## Sync mechanism
 
-CI mirrors `earnie/` to [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) on every release tag. For local dev or manual recovery, use:
+CI mirrors `earnie/` and `earnie_prerelease/` to [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) (official → both; pre-release → prerelease only). For local dev or manual recovery:
 
 ```bash
 packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-checkout>
@@ -83,12 +92,12 @@ packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-
 
 ## CI lint
 
-- **Earnie release:** `publish_ha_addon` runs `frenck/action-addon-linter` before push.
-- **`ha-addon-earnie`:** [`.github/workflows/hassfest.yml`](https://github.com/JochenTCC/ha-addon-earnie/blob/main/.github/workflows/hassfest.yml) on push/PR to `main`.
+- **Earnie release:** `publish_ha_addon` runs `frenck/action-addon-linter` on the bumped tree(s) before push.
+- **`ha-addon-earnie`:** [`.github/workflows/hassfest.yml`](https://github.com/JochenTCC/ha-addon-earnie/blob/main/.github/workflows/hassfest.yml) lints both add-ons on push/PR to `main`.
 
 ## Repository split
 
 | Repo | Contents | Purpose |
 |---|---|---|
-| `Earnie` (this repo) | `packaging/homeassistant-addon/earnie/` | Development source, code review via the normal PR process |
-| [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) | `repository.yaml`, `earnie/` (mirrored), `README.md`, `LICENSE.md` | What users actually add as a Supervisor repository URL |
+| `Earnie` (this repo) | `packaging/homeassistant-addon/earnie/` + `earnie_prerelease/` | Development source |
+| [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) | `repository.yaml`, both add-on trees (mirrored), `README.md`, `LICENSE.md` | Supervisor repository URL |

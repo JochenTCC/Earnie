@@ -3,6 +3,7 @@
 *.cfg text eol=lf
 *.yml text eol=lf
 *.service text eol=lf
+*.timer text eol=lf
 *.php text eol=lf
 *.ini text eol=lf
 *.html text eol=lf

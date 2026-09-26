@@ -73,7 +73,7 @@ python -m scripts.build_container
 
 Windows-Wrapper: `.\docker\build-container.ps1`
 
-Standard-Tags from `version.py`: official → `:latest` and `:<version>`; SemVer pre-release (`-alpha.N` / `-rc.N`) → `:<version>` only. Legacy `ernie-energy` aliases follow the same rule.
+Standard-Tags from `version.py`: every release → `:next` and `:<version>`; official also `:latest`. SemVer pre-release (`-alpha.N` / `-rc.N`) omits `:latest`. Legacy `ernie-energy` aliases follow the same rule.
 
 ### Release (tag → GitHub Actions)
 
@@ -93,7 +93,8 @@ git push origin vX.Y.Z-alpha.N
 - Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body).
 - Official: GitHub Latest Release; images `:<version>` and `:latest` (+ legacy aliases).
 - Pre-release (`-` in version): GitHub Pre-release (not Latest); images `:<version>` only (no `:latest`).
-- **HA Add-on:** **official** tags only trigger job `publish_ha_addon` (H12 stopgap) — bumps `packaging/homeassistant-addon/earnie/`, lints, commits Earnie `main`, mirrors [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie). Pre-releases publish GHCR + GitHub Pre-release but **skip** the public add-on (dual channel `earnie_prerelease` = **2.6.k**). Requires repo secret `HA_ADDON_REPO_TOKEN` (PAT `contents:write` on both repos). Manual retry: workflow **HA Add-on publish** (official `X.Y.Z` only). Details: `packaging/homeassistant-addon/README.md`.
+- **HA Add-on:** every tag triggers job `publish_ha_addon` — official bumps `earnie` + `earnie_prerelease`; pre-release bumps only `earnie_prerelease`. Also pushes prebuilt `ghcr.io/jochentcc/earnie-addon-{arch}:<version>` (H6). Requires repo secret `HA_ADDON_REPO_TOKEN`. Manual retry: workflow **HA Add-on publish**. Details: `packaging/homeassistant-addon/README.md`.
+- **GHCR tags:** every release gets `:<version>` and `:next`; official also `:latest` (`scripts/build_container.default_tags`).
 - Publish from `main`; leave the pre-release string on `main` until the next approved bump.
 - Parallel feature work + urgent fix for an already tagged build: [docs/spec/branching-hotfix-playbook.md](docs/spec/branching-hotfix-playbook.md) (`main` + tags; short-lived `hotfix/…` only when needed).
 - **GHCR auth for Actions:** store a classic PAT with `write:packages` (and `read:packages`) as repo secret `GHCR_TOKEN`. Without it, `GITHUB_TOKEN` only works if each package (`earnie-energy`, `ernie-energy`) grants this repository **Write** under Package settings → Manage Actions access. Also set packages **Public** if anonymous `docker pull` is required.

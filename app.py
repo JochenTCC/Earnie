@@ -58,6 +58,14 @@ st.set_page_config(
 render_app_logo()
 
 
+def _render_downgrade_warning() -> None:
+    from runtime_store.version_track import consume_downgrade_warning
+
+    message = consume_downgrade_warning()
+    if message:
+        st.warning(message)
+
+
 def _render_drift_warning() -> None:
     if not should_show_config_drift():
         return
@@ -92,6 +100,7 @@ def main() -> None:
     render_config_pack_sidebar()
     render_setup_progress_notice()
     render_missing_next_month_tariff_sidebar()
+    _render_downgrade_warning()
     _render_drift_warning()
     _render_loxone_auth_warning()
     render_cloud_demo_intro()

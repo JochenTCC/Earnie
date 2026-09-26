@@ -2,7 +2,15 @@
 
 Thin Docker wrapper for LoxBerry **4.x** (aarch64). Source tree: this folder (`packaging/loxberry/`).
 
-Plugin SemVer (`plugin.cfg` `VERSION`) is **independent** of Earnie `version.py`. The compose file always uses `ghcr.io/jochentcc/earnie-energy:latest`. Refresh the image with Plugin Admin → **Image aktualisieren** or `bin/earnie_ctl.sh pull`.
+Plugin SemVer (`plugin.cfg` `VERSION`) is **independent** of Earnie `version.py`. Image tag comes from `plugin.env` channels via `data/docker/sync_compose_env.sh` → compose `.env` `EARNIE_IMAGE_TAG`:
+
+| Channel (`EARNIE_CHANNEL`) | Tag | Auto image pull (`EARNIE_AUTO_UPDATE`) |
+|----------------------------|-----|------------------------------------------|
+| `stable` (default) | `latest` | yes when `1` (systemd timer ~03:30) |
+| `prerelease` | `next` | yes when `1` |
+| `pinned` | SemVer (e.g. `2.5.3`) | never |
+
+Refresh manually: Plugin Admin → **Image aktualisieren** / save settings, or `bin/earnie_ctl.sh pull`. Daily timer runs `earnie_ctl.sh auto-pull` (skips `pinned` and `AUTO_UPDATE=0`). LoxBerry `plugin.cfg` `AUTOMATIC_UPDATES` is **only** the plugin ZIP — separate from the image channel.
 
 ## Manual ZIP for Plugin Admin
 
@@ -54,12 +62,13 @@ LoxBerry rewrites these in text files on install:
 | Tag | Typical use |
 |-----|-------------|
 | `REPLACELBPDATADIR` | Compose volumes, systemd `WorkingDirectory`, ctl compose path |
-| `REPLACELBPBINDIR` | `bin/earnie_ctl.sh`, `sudoers/sudoers` (LoxBerry does **not** install plugin `sbin/` or replace `REPLACELBPSBINDIR`) |
+| `REPLACELBPCONFIGDIR` | `plugin.env` path in `earnie_ctl.sh` / auto-pull |
+| `REPLACELBPBINDIR` | `bin/earnie_ctl.sh`, `sudoers/sudoers`, update timer `ExecStart` (LoxBerry does **not** install plugin `sbin/` or replace `REPLACELBPSBINDIR`) |
 
 PHP uses runtime `$lbpbindir` from `loxberry_system.php` (not a REPLACE tag). Do not hardcode `/opt/loxberry/...` paths in shipped files.
 
 ## Persistence / uninstall
 
 - Runtime data: `$LBPDATA/earnie/earnie_env/{config,runtime}`
-- `uninstall/uninstall.sh` stops/removes the container and systemd unit; it does **not** delete `earnie_env` or the GHCR image
+- `uninstall/uninstall.sh` stops/removes the container, `earnie` unit, and `earnie-update.timer`; it does **not** delete `earnie_env` or the GHCR image
 - LoxBerry may still remove the plugin data directory on uninstall — copy `earnie_env` elsewhere first if you need a backup

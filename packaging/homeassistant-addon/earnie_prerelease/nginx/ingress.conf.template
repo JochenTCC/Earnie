@@ -1,0 +1,67 @@
+worker_processes 1;
+error_log stderr warn;
+pid /tmp/nginx-earnie-ingress.pid;
+
+events {
+    worker_connections 128;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    access_log off;
+    # WebSocket upgrade mapping
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ""      close;
+    }
+
+    server {
+        listen 8501 default_server;
+        listen [::]:8501 default_server;
+        server_name _;
+        client_max_body_size 64m;
+
+        # While Streamlit (:8502) is still booting, proxy fails with 502/503.
+        # Map to HTTP 200 + HTML so HA Ingress shows our note instead of a bare
+        # "502: Bad Gateway" (HA often replaces non-2xx bodies).
+        error_page 502 503 504 =200 /earnie-starting.html;
+        location = /earnie-starting.html {
+            internal;
+            default_type text/html;
+            alias /etc/earnie-addon/nginx/earnie-starting.html;
+        }
+
+        # Direct / asset URLs that already include the Ingress entry path
+        # (Streamlit baseUrlPath). Also covers LAN access after the first HTML load.
+        location ~ ^/api/hassio_ingress/[^/]+ {
+            proxy_pass http://127.0.0.1:8502;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_read_timeout 86400;
+            proxy_buffering off;
+            proxy_connect_timeout 2s;
+        }
+
+        # HA Ingress strips the entry path before the request reaches the add-on.
+        # Re-attach __INGRESS_ENTRY__ so Streamlit (baseUrlPath) sees the full path.
+        # Same rewrite for bare LAN hits on http://host:8501/.
+        location / {
+            rewrite ^ __INGRESS_ENTRY__$request_uri break;
+            proxy_pass http://127.0.0.1:8502;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_read_timeout 86400;
+            proxy_buffering off;
+            proxy_connect_timeout 2s;
+        }
+    }
+}

@@ -1,4 +1,5 @@
 # Manual HA add-on republish (wrapper-only fix or retry after failed publish job).
+# Official X.Y.Z → earnie + earnie_prerelease; pre-release → earnie_prerelease only.
 name: HA Add-on publish
 
 on:
@@ -36,16 +37,16 @@ jobs:
         with:
           python-version: "3.14"
 
-      # H12 stopgap: refuse SemVer pre-releases (alpha/rc) so a manual retry
-      # cannot re-pin the public add-on store. Dual channel is 2.6.k.
-      - name: Refuse pre-release versions
+      - name: Detect channel
+        id: channel
         env:
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           if [[ "$VERSION" == *-* ]]; then
-            echo "::error::Refusing to publish pre-release '${VERSION}' to public add-on earnie (H12 stopgap). Use an official X.Y.Z, or wait for earnie_prerelease (2.6.k)."
-            exit 1
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Bump HA add-on pins
@@ -53,20 +54,30 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: python -m scripts.bump_ha_addon --version "$VERSION"
 
-      - name: Lint HA add-on configuration
+      - name: Lint HA add-on earnie
+        if: steps.channel.outputs.prerelease != 'true'
         uses: frenck/action-addon-linter@b9cfd1bc62ba60d2c4fc96317b5f7ada5923f4a7 # v2.21.1
         with:
           path: ./packaging/homeassistant-addon/earnie
 
+      - name: Lint HA add-on earnie_prerelease
+        uses: frenck/action-addon-linter@b9cfd1bc62ba60d2c4fc96317b5f7ada5923f4a7 # v2.21.1
+        with:
+          path: ./packaging/homeassistant-addon/earnie_prerelease
+
       - name: Commit and push Earnie main
         env:
           VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ steps.channel.outputs.prerelease }}
         run: |
           set -euo pipefail
-          COMMIT_MSG="ha-addon: publish ${VERSION} (pins ghcr.io/jochentcc/earnie-energy:${VERSION})"
+          COMMIT_MSG="ha-addon: publish ${VERSION} (dual channel)"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packaging/homeassistant-addon/earnie
+          git add packaging/homeassistant-addon/earnie_prerelease
+          if [ "$PRERELEASE" != "true" ]; then
+            git add packaging/homeassistant-addon/earnie
+          fi
           if git diff --staged --quiet; then
             echo "Earnie packaging already pinned to ${VERSION}; skipping main commit."
           else
@@ -77,17 +88,25 @@ jobs:
       - name: Publish ha-addon-earnie
         env:
           VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ steps.channel.outputs.prerelease }}
           HA_ADDON_REPO_TOKEN: ${{ secrets.HA_ADDON_REPO_TOKEN }}
         run: |
           set -euo pipefail
-          COMMIT_MSG="ha-addon: publish ${VERSION} (pins ghcr.io/jochentcc/earnie-energy:${VERSION})"
+          COMMIT_MSG="ha-addon: publish ${VERSION} (dual channel)"
           git clone "https://x-access-token:${HA_ADDON_REPO_TOKEN}@github.com/JochenTCC/ha-addon-earnie.git" /tmp/ha-addon-earnie
-          rm -rf /tmp/ha-addon-earnie/earnie
-          cp -a packaging/homeassistant-addon/earnie /tmp/ha-addon-earnie/earnie
+          rm -rf /tmp/ha-addon-earnie/earnie_prerelease
+          cp -a packaging/homeassistant-addon/earnie_prerelease /tmp/ha-addon-earnie/earnie_prerelease
+          if [ "$PRERELEASE" != "true" ]; then
+            rm -rf /tmp/ha-addon-earnie/earnie
+            cp -a packaging/homeassistant-addon/earnie /tmp/ha-addon-earnie/earnie
+          fi
           cd /tmp/ha-addon-earnie
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add earnie
+          git add earnie_prerelease
+          if [ "$PRERELEASE" != "true" ]; then
+            git add earnie
+          fi
           if git diff --staged --quiet; then
             echo "ha-addon-earnie already up to date for ${VERSION}."
           else

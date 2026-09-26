@@ -605,6 +605,10 @@ def run() -> None:
     else:
         logger.debug("bootstrap: alle persistenten Dateien vorhanden.")
 
+    from runtime_store.version_track import check_and_record_version
+
+    check_and_record_version()
+
     from runtime_store.cloud_demo import is_cloud_demo
     from runtime_store.offline_demo_seed import seed_offline_live_scenario
 

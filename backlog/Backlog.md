@@ -18,7 +18,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.1`**.
 
-**Next:** Finish **2.6.j** — publish `2.6.0-alpha.2` (ships **H0**; H12 keeps HA store off alphas), then live **H11** Gen2 check. In parallel **2.6.e**. Then **2.6.k → 2.6.l → 2.6.m**. **2.6.n** (battery controllability).
+**Next:** Live **H11** Gen2 check (closes **2.6.j** with **H0**; no interim publish). In parallel **2.6.e**. Then **2.6.l → 2.6.m**. **One publish after 2.6.m** (ships **H0** + Sprint 2–4; propose path **B** `2.6.0-alpha.N` or **C** official — dual-channel `earnie_prerelease` is done in **2.6.k**). Then **2.6.n** (battery controllability).
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -38,18 +38,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 Trigger: support case 2026-09-25 (HA add-on crash loop on a `kvm64` VM, see [Backlog-Erledigt.md](Backlog-Erledigt.md)). IDs **H0–H13** refer to the [concept doc](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md).
 
 - [ ] **2.6.j — Sprint 1: quick safeguards + verification** (code done 2026-09-26; see [Backlog-Erledigt.md](Backlog-Erledigt.md))
-  - [ ] **H0** Ship x86-64-v2 preflight with the next image publish (`2.6.0-alpha.2` — propose path **B**; H12 skips HA store bump)
+  - [ ] **H0** Ship x86-64-v2 preflight with the **next** image publish (deferred until after **2.6.m**; no interim `alpha.2` for Sprint 1 alone)
   - [ ] **H11 (verify)** Gen2 Miniserver set to HTTPS-only vs. hard-coded `http://` in `integrations/loxone_client.py`
     - **Live checklist (leave open until run):** on Gen2 with Config → Network → „Nur verschlüsselt“ / HTTPS only: (1) `http://<ms-ip>/jdev/sps/status` (or any jdev Earnie uses); (2) `http://<ms-ip>/data/LoxAPP3.json`; (3) optional write path `http://<ms-ip>/dev/sps/io/...`. If all fail (timeout / connection refused / TLS redirect only) → confirm H11 and do **2.6.l H11 (fix)**. If HTTP still works → close H11 without code change.
-
-- [ ] **2.6.k — Sprint 2: release pipeline + version channels** (concept doc §3)
-  - [ ] **GHCR `:next`** tag on every release (stable + pre-release) in `release-publish.yml`
-  - [ ] **LoxBerry channels** `stable` (`:latest`) / `prerelease` (`:next`) / `pinned`: `plugin.env` (`EARNIE_CHANNEL`, `EARNIE_PINNED_VERSION`, `EARNIE_AUTO_UPDATE`), `sync_compose_env.sh`, compose `image: …:${EARNIE_IMAGE_TAG:-latest}`, web UI (channel + version list from GitHub releases), daily update timer (not for `pinned`), `postupgrade.sh` default `stable`. Replaces dead `IMAGE` in `plugin.env` (**H13**)
-  - [ ] **HA `addon_config` migration** (concept doc §3.4): `EARNIE_CONFIG_PATH=/config`, runtime stays `/data/earnie_env/runtime`; one-time idempotent copy in `run.sh`, old dir renamed and kept one version; backup/restore test. **Must ship in `earnie` before the first `earnie_prerelease`**
-  - [ ] **HA add-on `earnie_prerelease`** („Earnie (Vorabversion)“) in `ha-addon-earnie`: stable release bumps `earnie` + `earnie_prerelease`, pre-release bumps only `earnie_prerelease` (`scripts/bump_ha_addon.py`); guard against both add-ons running (Supervisor API, `hassio_api: true`); docs „Stabile Version oder Vorabversion“ (**H12** final)
-  - [ ] **H6** Prebuilt add-on images per arch on GHCR + `image:` in `config.yaml` (no on-device build)
-  - [ ] **H2** CI smoke test of app + add-on images under QEMU `-cpu kvm64-v1` and `-cpu cortex-a72` (imports + small HiGHS solve; `OPENBLAS_NUM_THREADS=1`). May slip to **2.6.m** if Sprint 2 gets tight
-  - [ ] **Downgrade warning**: remember last-run version in `runtime/`, warn when an older version starts
 
 - [ ] **2.6.l — Sprint 3: network (Loxone + HA)**
   - [ ] **H9 (fix)** Scan subnet via `EARNIE_LAN_SUBNET` (LoxBerry sets it at install, compose `.env` for others); detect Docker subnets (`172.16.0.0/12`) and ask in the UI instead of scanning blindly; HA add-on: host IP via Supervisor `/network/info` (`hassio_api: true`)

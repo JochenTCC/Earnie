@@ -59,8 +59,10 @@ def is_prerelease_version(version: str) -> bool:
 def default_tags(version: str | None = None) -> list[str]:
     """Default GHCR tags for *version* (defaults to ``version.__version__``).
 
-    Official releases get ``:latest`` and ``:<version>`` (plus legacy aliases).
-    Pre-releases get only ``:<version>`` so ``:latest`` stays on the last official build.
+    Every release gets ``:next`` and ``:<version>`` (plus legacy aliases).
+    Official releases also get ``:latest``. Pre-releases omit ``:latest`` so
+    it stays on the last official build; ``:next`` always points at the newest
+    build (stable or pre-release).
     """
     ver = __version__ if version is None else version
     include_latest = not is_prerelease_version(ver)
@@ -68,6 +70,7 @@ def default_tags(version: str | None = None) -> list[str]:
     for image in (DEFAULT_REGISTRY_IMAGE, LEGACY_REGISTRY_IMAGE):
         if include_latest:
             tags.append(f"{image}:latest")
+        tags.append(f"{image}:next")
         tags.append(f"{image}:{ver}")
     return tags
 
@@ -153,7 +156,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="IMAGE:TAG",
         help=(
             "Image-Tag (mehrfach). Ohne Angabe: "
-            f"{DEFAULT_REGISTRY_IMAGE}:<version> und ggf. :latest "
+            f"{DEFAULT_REGISTRY_IMAGE}:next / :<version> und ggf. :latest "
             "(kein :latest bei SemVer-Pre-Releases in version.py)"
         ),
     )
