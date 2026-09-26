@@ -2,6 +2,11 @@
 
 Same image family as `earnie/`. Pre-releases and official releases both bump this tree (`version:` = newest including alpha/rc on pre-release tags; matches stable on official tags).
 
+## 2.6.0-alpha.2
+
+- Community **pre-release** of the **2.6** line (follows `2.6.0-alpha.1`). Includes installation-hardening Sprint 1–3 code on `main` (**2.6.j** / **2.6.k** / **2.6.l**). Pin this tag — **no** `:latest`.
+- Earnie release: [2.6.0-alpha.2](https://github.com/JochenTCC/Earnie/releases/tag/v2.6.0-alpha.2)
+
 ## 2.6.0-alpha.1
 
 - First community **pre-release** of the **2.6** HA-coupling line (follows official **2.5.3**). Do **not** continue `2.5.3-alpha.N` — pin this tag.
