@@ -97,6 +97,47 @@ def test_config_path_env_is_directory(monkeypatch, tmp_path: Path) -> None:
     assert Path(resolve_config_json_path()).resolve() == (cfg / "config.json").resolve()
 
 
+def test_config_path_outside_env_root_ignored(monkeypatch, tmp_path: Path) -> None:
+    """Stale CONFIG_PATH outside ENV_PATH must not win (NAS leftover .env case)."""
+    monkeypatch.chdir(tmp_path)
+    stack = tmp_path / "earnie_env"
+    (stack / "config").mkdir(parents=True)
+    (stack / "runtime").mkdir(parents=True)
+    (stack / "config" / "config.json").write_text("{}", encoding="utf-8")
+    outside = tmp_path / "addon_config"
+    outside.mkdir()
+    (outside / "config.json").write_text('{"outside": true}', encoding="utf-8")
+    monkeypatch.setenv("EARNIE_ENV_PATH", str(stack))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(outside))
+    monkeypatch.delenv("EARNIE_INSTALL_CONTEXT", raising=False)
+    _clear_runtime_overrides(monkeypatch)
+    assert Path(config_dir()).resolve() == (stack / "config").resolve()
+    assert Path(resolve_config_json_path()).resolve() == (
+        stack / "config" / "config.json"
+    ).resolve()
+
+
+def test_ha_addon_config_path_outside_env_root_honored(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """HA add-on: /config (addon_config) + runtime under /data/earnie_env."""
+    monkeypatch.chdir(tmp_path)
+    stack = tmp_path / "data" / "earnie_env"
+    (stack / "runtime").mkdir(parents=True)
+    addon_cfg = tmp_path / "config"
+    addon_cfg.mkdir()
+    (addon_cfg / "config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("EARNIE_ENV_PATH", str(stack))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(stack / "runtime"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(addon_cfg))
+    monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+    assert Path(config_dir()).resolve() == addon_cfg.resolve()
+    assert Path(resolve_config_json_path()).resolve() == (
+        addon_cfg / "config.json"
+    ).resolve()
+    assert Path(runtime_dir()).resolve() == (stack / "runtime").resolve()
+
+
 def test_config_prefixed_uploads_co_located(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(tmp_path / "stack" / "config"))

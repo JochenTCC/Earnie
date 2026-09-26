@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.0-alpha.6 pre-release (2026-09-26)
+
+- [x] **HA add-on start crash** (`ModuleNotFoundError: No module named 'config'`): restore `COPY config.py` after S6470 explicit Dockerfile COPY; honor `EARNIE_CONFIG_PATH=/config` when `EARNIE_INSTALL_CONTEXT=homeassistant_addon` (addon_config vs `/data/earnie_env` runtime split)
+- [x] Bump `version.py` + alpha compose pins to **2.6.0-alpha.6** (branch `bugfix/alpha.5-config-module` from `v2.6.0-alpha.5`)
+
 ### 2.6.0-alpha.5 pre-release (2026-09-26)
 
 - [x] Publish community pre-release **2.6.0-alpha.5** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.5`) — same payload as failed **alpha.4** plus HA add-on Dockerfile fix (NOSONAR off `FROM` line; BuildKit parse error)
