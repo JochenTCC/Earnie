@@ -59,11 +59,17 @@ def _effective_config_path_env() -> str:
     CONFIG_PATH from env, ignored when an explicit ENV_PATH scopes the tree
     and CONFIG_PATH points outside that root (e.g. leftover NAS redirect in
     legacy config/.env while launch sets EARNIE_ENV_PATH=earnie_env).
+
+    Exception: Home Assistant add-on keeps config on Supervisor ``addon_config``
+    (``EARNIE_CONFIG_PATH=/config``) and runtime under ``EARNIE_ENV_PATH`` —
+    that split is intentional; do not drop ``/config``.
     """
     env = read_env("CONFIG_PATH")
     if not env:
         return ""
     if not _env_path_explicit():
+        return env
+    if read_env("INSTALL_CONTEXT").strip().lower() == "homeassistant_addon":
         return env
     root = env_root()
     cfg_dir = _config_dir_from_config_path_env(env)
