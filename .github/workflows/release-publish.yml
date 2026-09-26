@@ -274,10 +274,10 @@ jobs:
           fi
 
   # H2: constrained-CPU smoke (does not block add-on publish).
+  # continue-on-error is set inside qemu-image-smoke.yml (not allowed on ``uses:`` jobs).
   qemu_smoke:
     needs: release
     uses: ./.github/workflows/qemu-image-smoke.yml
     with:
       version: ${{ needs.release.outputs.version }}
     secrets: inherit
-    continue-on-error: true

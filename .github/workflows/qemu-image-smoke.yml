@@ -19,6 +19,8 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    # Soft gate when called from release-publish (reusable caller cannot set continue-on-error).
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
