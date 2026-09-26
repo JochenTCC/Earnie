@@ -1,17 +1,34 @@
-# Manual HA add-on republish (wrapper-only fix or retry after failed publish job).
-# Official X.Y.Z → earnie + earnie_prerelease; pre-release → earnie_prerelease only.
+# Manual HA add-on republish (wrapper-only fix, pin recovery, or retry after failed publish).
+# Default channel=auto: official X.Y.Z → earnie + earnie_prerelease; pre-release → earnie_prerelease only.
+# Optional rebuild_images: build/push ghcr.io/jochentcc/earnie-addon-{arch}:<version> (needs base earnie-energy:<version>).
 name: HA Add-on publish
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Earnie release version (without leading v; must exist on GHCR)
+        description: Earnie release version (without leading v; base image must exist on GHCR)
         required: true
         type: string
+      channel:
+        description: Which add-on tree(s) to pin (auto | earnie | earnie_prerelease | both)
+        required: false
+        type: choice
+        options:
+          - auto
+          - earnie
+          - earnie_prerelease
+          - both
+        default: auto
+      rebuild_images:
+        description: Also build and push earnie-addon-{amd64,aarch64} images for this version
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   publish_ha_addon:
@@ -37,30 +54,82 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Detect channel
+      - name: Resolve channel
         id: channel
+        env:
+          VERSION: ${{ inputs.version }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          CHANNEL="${CHANNEL:-auto}"
+          if [ "$CHANNEL" = "auto" ]; then
+            if [[ "$VERSION" == *-* ]]; then
+              CHANNEL="earnie_prerelease"
+            else
+              CHANNEL="both"
+            fi
+          fi
+          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+          case "$CHANNEL" in
+            earnie) echo "bump_earnie=true" >> "$GITHUB_OUTPUT"; echo "bump_prerelease=false" >> "$GITHUB_OUTPUT" ;;
+            earnie_prerelease) echo "bump_earnie=false" >> "$GITHUB_OUTPUT"; echo "bump_prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            both) echo "bump_earnie=true" >> "$GITHUB_OUTPUT"; echo "bump_prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::Invalid channel=${CHANNEL}"; exit 1 ;;
+          esac
+
+      - name: Set up QEMU
+        if: inputs.rebuild_images
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        if: inputs.rebuild_images
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GHCR
+        if: inputs.rebuild_images
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Build and push HA add-on images
+        if: inputs.rebuild_images
         env:
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [[ "$VERSION" == *-* ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          fi
+          CONTEXT="packaging/homeassistant-addon/earnie"
+          for arch in amd64 aarch64; do
+            if [ "$arch" = "amd64" ]; then
+              platform="linux/amd64"
+            else
+              platform="linux/arm64"
+            fi
+            docker buildx build \
+              --platform "$platform" \
+              --build-arg "EARNIE_VERSION=${VERSION}" \
+              -t "ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}" \
+              -f "${CONTEXT}/Dockerfile" \
+              "${CONTEXT}" \
+              --push
+            echo "Pushed ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}"
+          done
 
       - name: Bump HA add-on pins
         env:
           VERSION: ${{ inputs.version }}
-        run: python -m scripts.bump_ha_addon --version "$VERSION"
+          CHANNEL: ${{ steps.channel.outputs.channel }}
+        run: python -m scripts.bump_ha_addon --version "$VERSION" --channel "$CHANNEL"
 
       - name: Lint HA add-on earnie
-        if: steps.channel.outputs.prerelease != 'true'
+        if: steps.channel.outputs.bump_earnie == 'true'
         uses: frenck/action-addon-linter@b9cfd1bc62ba60d2c4fc96317b5f7ada5923f4a7 # v2.21.1
         with:
           path: ./packaging/homeassistant-addon/earnie
 
       - name: Lint HA add-on earnie_prerelease
+        if: steps.channel.outputs.bump_prerelease == 'true'
         uses: frenck/action-addon-linter@b9cfd1bc62ba60d2c4fc96317b5f7ada5923f4a7 # v2.21.1
         with:
           path: ./packaging/homeassistant-addon/earnie_prerelease
@@ -68,18 +137,22 @@ jobs:
       - name: Commit and push Earnie main
         env:
           VERSION: ${{ inputs.version }}
-          PRERELEASE: ${{ steps.channel.outputs.prerelease }}
+          BUMP_EARNIE: ${{ steps.channel.outputs.bump_earnie }}
+          BUMP_PRERELEASE: ${{ steps.channel.outputs.bump_prerelease }}
+          CHANNEL: ${{ steps.channel.outputs.channel }}
         run: |
           set -euo pipefail
-          COMMIT_MSG="ha-addon: publish ${VERSION} (dual channel)"
+          COMMIT_MSG="ha-addon: pin ${VERSION} (channel=${CHANNEL})"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packaging/homeassistant-addon/earnie_prerelease
-          if [ "$PRERELEASE" != "true" ]; then
+          if [ "$BUMP_PRERELEASE" = "true" ]; then
+            git add packaging/homeassistant-addon/earnie_prerelease
+          fi
+          if [ "$BUMP_EARNIE" = "true" ]; then
             git add packaging/homeassistant-addon/earnie
           fi
           if git diff --staged --quiet; then
-            echo "Earnie packaging already pinned to ${VERSION}; skipping main commit."
+            echo "Earnie packaging already pinned for ${VERSION} (${CHANNEL}); skipping main commit."
           else
             git commit -m "$COMMIT_MSG"
             git push origin main
@@ -88,27 +161,33 @@ jobs:
       - name: Publish ha-addon-earnie
         env:
           VERSION: ${{ inputs.version }}
-          PRERELEASE: ${{ steps.channel.outputs.prerelease }}
+          BUMP_EARNIE: ${{ steps.channel.outputs.bump_earnie }}
+          BUMP_PRERELEASE: ${{ steps.channel.outputs.bump_prerelease }}
+          CHANNEL: ${{ steps.channel.outputs.channel }}
           HA_ADDON_REPO_TOKEN: ${{ secrets.HA_ADDON_REPO_TOKEN }}
         run: |
           set -euo pipefail
-          COMMIT_MSG="ha-addon: publish ${VERSION} (dual channel)"
+          COMMIT_MSG="ha-addon: pin ${VERSION} (channel=${CHANNEL})"
           git clone "https://x-access-token:${HA_ADDON_REPO_TOKEN}@github.com/JochenTCC/ha-addon-earnie.git" /tmp/ha-addon-earnie
-          rm -rf /tmp/ha-addon-earnie/earnie_prerelease
-          cp -a packaging/homeassistant-addon/earnie_prerelease /tmp/ha-addon-earnie/earnie_prerelease
-          if [ "$PRERELEASE" != "true" ]; then
+          if [ "$BUMP_PRERELEASE" = "true" ]; then
+            rm -rf /tmp/ha-addon-earnie/earnie_prerelease
+            cp -a packaging/homeassistant-addon/earnie_prerelease /tmp/ha-addon-earnie/earnie_prerelease
+          fi
+          if [ "$BUMP_EARNIE" = "true" ]; then
             rm -rf /tmp/ha-addon-earnie/earnie
             cp -a packaging/homeassistant-addon/earnie /tmp/ha-addon-earnie/earnie
           fi
           cd /tmp/ha-addon-earnie
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add earnie_prerelease
-          if [ "$PRERELEASE" != "true" ]; then
+          if [ "$BUMP_PRERELEASE" = "true" ]; then
+            git add earnie_prerelease
+          fi
+          if [ "$BUMP_EARNIE" = "true" ]; then
             git add earnie
           fi
           if git diff --staged --quiet; then
-            echo "ha-addon-earnie already up to date for ${VERSION}."
+            echo "ha-addon-earnie already up to date for ${VERSION} (${CHANNEL})."
           else
             git commit -m "$COMMIT_MSG"
             git push origin main
