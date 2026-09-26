@@ -37,7 +37,7 @@ x-persist-volumes: &persist-volumes
   - ./earnie_env/runtime:/app/runtime
 
 x-common-env: &common-env
-  TZ: Europe/Vienna
+  TZ: ${TZ:-Europe/Vienna}
   # Volumes mount host …/{config,runtime} → /app/{config,runtime}; ENV_PATH=. derives both (not baked earnie_env/).
   EARNIE_ENV_PATH: .
   EARNIE_STRICT_TARIFF_VALIDATE: "1"

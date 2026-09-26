@@ -42,7 +42,7 @@ Persistenz (überlebt Plugin-Upgrades und Image-Pulls):
 | `…/data/plugins/earnie/earnie_env/runtime/` | `/app/runtime` |
 
 
-Kleine Plugin-Notizdatei: `…/config/plugins/earnie/plugin.env` (kein Geheimnis-Store; Loxone-Zugangsdaten gehören in `earnie_env/config/.env`). Enthält u. a. `STREAMLIT_PORT` (Host-Port, Standard **8501**). Beim Speichern in der Plugin-UI wird derselbe Wert nach `…/data/plugins/earnie/docker/.env` gespiegelt (Compose-Interpolation).
+Kleine Plugin-Notizdatei: `…/config/plugins/earnie/plugin.env` (kein Geheimnis-Store; Loxone-Zugangsdaten gehören in `earnie_env/config/.env`). Enthält u. a. `STREAMLIT_PORT` (Host-Port, Standard **8501**). Beim Speichern in der Plugin-UI wird derselbe Wert nach `…/data/plugins/earnie/docker/.env` gespiegelt (Compose-Interpolation). Dort steht zusätzlich `TZ=…` aus der LoxBerry-Host-Zeitzone (`/etc/timezone`, Fallback `Europe/Vienna`); Override manuell in dieser `.env` möglich.
 
 ## Host-Port (Streamlit)
 

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Sync STREAMLIT_PORT from plugin.env → compose .env (Docker Compose interpolation).
+# Sync STREAMLIT_PORT from plugin.env and host TZ → compose .env
+# (Docker Compose interpolation).
 # Usage: sync_streamlit_env.sh <plugin.env> <compose_dir>
 set -u
 
@@ -19,6 +20,15 @@ if [ -f "$PLUGIN_ENV" ]; then
   fi
 fi
 
+# H5: container TZ follows LoxBerry host (/etc/timezone).
+TZ_VALUE="Europe/Vienna"
+if [ -r /etc/timezone ]; then
+  host_tz=$(tr -d '[:space:]' </etc/timezone)
+  if [ -n "$host_tz" ]; then
+    TZ_VALUE="$host_tz"
+  fi
+fi
+
 mkdir -p "$COMPOSE_DIR"
-printf 'STREAMLIT_PORT=%s\n' "$PORT" > "$COMPOSE_DIR/.env"
+printf 'STREAMLIT_PORT=%s\nTZ=%s\n' "$PORT" "$TZ_VALUE" > "$COMPOSE_DIR/.env"
 exit 0

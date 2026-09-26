@@ -6,7 +6,9 @@
 # Unterordner-Deeplink möglich).
 #
 # Sync-Mechanik: manueller Kopiervorgang bei lokaler Entwicklung / Recovery.
-# Automatischer Publish: .github/workflows/release.yml → publish_ha_addon.
+# Automatischer Publish: .github/workflows/release-publish.yml → publish_ha_addon
+# (offizielle Tags only; Vorabversionen skippen H12).
+
 #
 # Usage: packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-checkout>
 set -e

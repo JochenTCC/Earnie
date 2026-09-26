@@ -6,7 +6,7 @@ version: "2.6.0-alpha.1"
 slug: earnie
 description: "Energiemanagement und Optimierung für Smart Homes. Nach dem Start ca. 20–40 s warten, bis die Web-UI (Ingress) bereit ist."
 url: https://github.com/JochenTCC/Earnie
-startup: services
+startup: application
 init: false
 panel_icon: mdi:solar-power
 arch:

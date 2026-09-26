@@ -87,6 +87,48 @@ class TestIngressBaseUrlPath:
         assert hs.streamlit_base_url_path() == ""
 
 
+class TestWaitForSupervisorCore:
+    def test_noop_outside_addon(self, monkeypatch):
+        monkeypatch.delenv("EARNIE_INSTALL_CONTEXT", raising=False)
+        with patch.object(hs, "probe_supervisor_core") as probe:
+            assert hs.wait_for_supervisor_core(max_wait_sec=1.0) is True
+        probe.assert_not_called()
+
+    def test_success_on_first_probe(self, monkeypatch):
+        monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+        monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+        with patch.object(hs, "probe_supervisor_core", return_value=True) as probe:
+            assert hs.wait_for_supervisor_core(max_wait_sec=5.0) is True
+        probe.assert_called_once()
+
+    def test_retries_then_succeeds(self, monkeypatch):
+        monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+        monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+        with (
+            patch.object(
+                hs, "probe_supervisor_core", side_effect=[False, False, True]
+            ) as probe,
+            patch("time.sleep") as sleep,
+        ):
+            assert hs.wait_for_supervisor_core(
+                max_wait_sec=10.0, interval_sec=0.5
+            ) is True
+        assert probe.call_count == 3
+        assert sleep.call_count == 2
+
+    def test_timeout_returns_false(self, monkeypatch):
+        monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+        monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+        with (
+            patch.object(hs, "probe_supervisor_core", return_value=False),
+            patch("time.sleep"),
+            patch("time.monotonic", side_effect=[0.0, 0.5, 61.0]),
+        ):
+            assert hs.wait_for_supervisor_core(
+                max_wait_sec=60.0, interval_sec=1.0
+            ) is False
+
+
 class TestGetHaAdapterSupervisorResolve:
     def test_uses_supervisor_defaults(self, monkeypatch):
         import integrations.ehal_live as ehal_live

@@ -150,13 +150,34 @@ function earnie_write_plugin_env($path, $port)
 	return file_put_contents($path, implode("\n", $lines) . "\n") !== false;
 }
 
-function earnie_sync_compose_env($compose_dir, $port)
+function earnie_host_tz()
 {
+	$path = "/etc/timezone";
+	if (!is_readable($path)) {
+		return "Europe/Vienna";
+	}
+	$tz = trim((string) file_get_contents($path));
+	return $tz !== "" ? $tz : "Europe/Vienna";
+}
+
+function earnie_sync_compose_env($compose_dir, $port, $plugin_env = null)
+{
+	// Prefer the shell sync script (single writer for STREAMLIT_PORT + TZ).
+	$script = rtrim($compose_dir, "/") . "/sync_streamlit_env.sh";
+	if ($plugin_env !== null && is_executable($script)) {
+		$cmd = "bash " . escapeshellarg($script) . " "
+			. escapeshellarg($plugin_env) . " "
+			. escapeshellarg($compose_dir);
+		shell_exec($cmd);
+		$env_path = rtrim($compose_dir, "/") . "/.env";
+		return is_readable($env_path);
+	}
 	if (!is_dir($compose_dir)) {
 		mkdir($compose_dir, 0755, true);
 	}
 	$path = rtrim($compose_dir, "/") . "/.env";
-	return file_put_contents($path, "STREAMLIT_PORT=" . (int) $port . "\n") !== false;
+	$body = "STREAMLIT_PORT=" . (int) $port . "\nTZ=" . earnie_host_tz() . "\n";
+	return file_put_contents($path, $body) !== false;
 }
 
 function earnie_host_url($port)
@@ -188,7 +209,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 			$log->ERR("invalid STREAMLIT_PORT=$raw");
 		} else {
 			$ok_plugin = earnie_write_plugin_env($earnie_plugin_env, $port);
-			$ok_compose = earnie_sync_compose_env($earnie_compose_dir, $port);
+			$ok_compose = earnie_sync_compose_env(
+				$earnie_compose_dir,
+				$port,
+				$earnie_plugin_env
+			);
 			if ($ok_plugin && $ok_compose) {
 				$log->INF("STREAMLIT_PORT=$port saved; restarting");
 				earnie_ctl("restart");
@@ -205,7 +230,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $streamlit_port = earnie_read_streamlit_port($earnie_plugin_env);
 if (!is_dir($earnie_compose_dir) || !is_readable($earnie_compose_dir . "/.env")) {
-	earnie_sync_compose_env($earnie_compose_dir, $streamlit_port);
+	earnie_sync_compose_env($earnie_compose_dir, $streamlit_port, $earnie_plugin_env);
 }
 $svc = earnie_service_status();
 $ctr = earnie_container_status();

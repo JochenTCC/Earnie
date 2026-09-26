@@ -2,15 +2,17 @@
 
 Thin Docker wrapper (image-wrapper, not git-clone-build) for the Home Assistant Supervisor, primarily HA Green (`aarch64`; `amd64` for dev/test VMs). Source tree: `earnie/` in this folder — the **development source**. Published add-on repository: [`https://github.com/JochenTCC/ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie).
 
-Add-on `version:` in `earnie/config.yaml` **mirrors** the Earnie app release (`version.py` / GHCR tag) — e.g. app `2.6.0-alpha.1` → add-on `2.6.0-alpha.1`. This is what the Supervisor watches to show **Update available**.
+Add-on `version:` in `earnie/config.yaml` **mirrors** the Earnie app release (`version.py` / GHCR tag) for **official** releases — e.g. app `2.6.0` → add-on `2.6.0`. This is what the Supervisor watches to show **Update available**.
 
 ## Release workflow (automatic)
 
-Every Earnie git tag (`vX.Y.Z`, including alpha/rc) triggers [`.github/workflows/release.yml`](../../.github/workflows/release.yml):
+Every Earnie git tag triggers [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml):
 
 1. Build and push `ghcr.io/jochentcc/earnie-energy:<version>` (multi-arch).
-2. Create the GitHub Release.
-3. Job **`publish_ha_addon`** (same workflow): bump `packaging/homeassistant-addon/earnie/`, lint with [`frenck/action-addon-linter`](https://github.com/frenck/action-addon-linter), commit to **`main`** here, mirror to **`ha-addon-earnie` `main`**.
+2. Create the GitHub Release (pre-releases: `--prerelease`, no `:latest`).
+3. Job **`publish_ha_addon`** (official tags only — **H12 stopgap**): bump `packaging/homeassistant-addon/earnie/`, lint with [`frenck/action-addon-linter`](https://github.com/frenck/action-addon-linter), commit to **`main`** here, mirror to **`ha-addon-earnie` `main`**.
+
+**Pre-releases** (`X.Y.Z-alpha.N` / `-rc.N`) still publish GHCR + GitHub Pre-release, but **do not** bump the public add-on `earnie` (auto-update would reach all HA users). Dual-channel `earnie_prerelease` is planned as Earnie **2.6.k**.
 
 **No GitHub Release/tag is needed in `ha-addon-earnie`.** The Supervisor reads the tracked branch and detects updates from `config.yaml` `version:`.
 
@@ -21,19 +23,19 @@ The tagged commit itself does not contain the new add-on pins — the bot commit
 Repository secret **`HA_ADDON_REPO_TOKEN`** on `JochenTCC/Earnie`:
 
 - Fine-grained or classic PAT with **`contents: write`** on **`JochenTCC/Earnie`** and **`JochenTCC/ha-addon-earnie`**
-- Without this secret, the release still publishes GHCR + GitHub Release, but `publish_ha_addon` fails with a clear error
+- Without this secret, an official release still publishes GHCR + GitHub Release, but `publish_ha_addon` fails with a clear error
 
 ### Manual override
 
-**Bump pins locally** (wrapper-only change or retry after a failed publish job):
+**Bump pins locally** (wrapper-only change or retry after a failed publish job; **official** `X.Y.Z` only):
 
 ```bash
-python -m scripts.bump_ha_addon --version 2.6.0-alpha.1
+python -m scripts.bump_ha_addon --version 2.6.0
 packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-checkout>
 # commit + push both repos
 ```
 
-**Republish without re-tagging:** Actions → **HA Add-on publish** ([`.github/workflows/ha-addon-publish.yml`](../../.github/workflows/ha-addon-publish.yml)) → enter the Earnie version (must already exist on GHCR).
+**Republish without re-tagging:** Actions → **HA Add-on publish** ([`.github/workflows/ha-addon-publish.yml`](../../.github/workflows/ha-addon-publish.yml)) → enter an official Earnie version (must already exist on GHCR). Pre-release version strings are refused (H12).
 
 Dry-run locally:
 

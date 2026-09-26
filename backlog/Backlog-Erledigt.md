@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.j Sprint 1 — installation safeguards (code) (2026-09-26)
+
+- [x] **2.6.j — Sprint 1 code/workflow** (H0 ships on next tag; H11 live verify still open in [Backlog.md](Backlog.md)).
+  - [x] **H12 (stopgap)** `release-publish.yml` job `publish_ha_addon` runs only when `prerelease != true`; manual `ha-addon-publish.yml` refuses versions containing `-`. Docs: packaging README, `DEVELOPER.md`, `docs/einrichtung/homeassistant-addon.md`, `ha-addon-earnie` README/BACKLOG. Dual channel = **2.6.k**.
+  - [x] **H3** LoxBerry plugin compose `restart: on-failure:3` (`packaging/loxberry/data/docker/docker-compose.yml`).
+  - [x] **H5** LoxBerry `TZ: ${TZ:-Europe/Vienna}`; `sync_streamlit_env.sh` + PHP write host `/etc/timezone` into compose `.env`; note in `docs/einrichtung/loxberry-plugin.md`.
+  - [x] **H7** Add-on `startup: application`; `wait_for_supervisor_core()` in `integrations/ha_supervisor.py`; daemon `maybe_auto_start` waits before starting `main`. Tests in `tests/test_ha_supervisor.py`.
+  - [x] **H9 (verify)** Confirmed for OpenEMS `full_active`: `local_ipv4_hosts_for_scan()` uses container IP `/24` (unit test mocks `172.17.0.2` → Docker subnet). Loxone/HA discovery is SSDP/mDNS (separate bridge issue). Fix remains **2.6.l H9 (fix)**.
+
 ### HouseSim S2 — Vendor archetypes (2026-09-26)
 
 - [x] **HouseSim S2 — 2–3 more hand-authored archetypes on the same physics; write-back per archetype.** Three archetypes (vendor choice by AT/DE market share), entities checked against the integration source code; provenance, verified and unverified points per archetype in `meta.json`. Spec: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md) § S2.

@@ -228,4 +228,15 @@ def maybe_auto_start() -> DaemonStatus | None:
             current.pid,
         )
         return None
+    # H7: wait for HA Core API before first EHAL cycle (add-on only).
+    try:
+        from integrations.ha_supervisor import (
+            is_homeassistant_addon_context,
+            wait_for_supervisor_core,
+        )
+
+        if is_homeassistant_addon_context():
+            wait_for_supervisor_core()
+    except Exception as exc:  # noqa: BLE001 — never block auto-start on probe errors
+        logger.warning("Supervisor Core wait failed: %s", exc)
     return start()

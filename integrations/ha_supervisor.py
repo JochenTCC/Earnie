@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 import urllib.error
 import urllib.request
 from typing import TYPE_CHECKING
@@ -121,6 +122,48 @@ def probe_supervisor_core(*, timeout_sec: float = _PROBE_TIMEOUT_SEC) -> bool:
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
         logger.info("Supervisor Core API probe failed: %s", exc)
         return False
+
+
+def wait_for_supervisor_core(
+    *,
+    max_wait_sec: float = 60.0,
+    interval_sec: float = 2.0,
+    probe_timeout_sec: float = _PROBE_TIMEOUT_SEC,
+) -> bool:
+    """Poll Core API until ready or ``max_wait_sec`` elapses (add-on H7).
+
+    Returns True when a probe succeeds. On timeout logs a warning and returns
+    False so the daemon/UI can continue (later EHAL cycles may still succeed).
+    Returns True immediately when not in add-on context. Returns False when
+    add-on context lacks ``SUPERVISOR_TOKEN``.
+    """
+    if not is_homeassistant_addon_context():
+        return True
+    if not supervisor_token():
+        logger.warning(
+            "HA add-on context without SUPERVISOR_TOKEN; skipping Core wait"
+        )
+        return False
+    deadline = time.monotonic() + max(0.0, float(max_wait_sec))
+    interval = max(0.1, float(interval_sec))
+    attempt = 0
+    while True:
+        attempt += 1
+        if probe_supervisor_core(timeout_sec=probe_timeout_sec):
+            if attempt > 1:
+                logger.info(
+                    "Supervisor Core API ready after %s probe(s)", attempt
+                )
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            logger.warning(
+                "Supervisor Core API not ready after %.0fs (%s probes); continuing",
+                max_wait_sec,
+                attempt,
+            )
+            return False
+        time.sleep(min(interval, remaining))
 
 
 def discover_home_assistant_via_supervisor(

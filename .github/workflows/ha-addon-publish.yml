@@ -36,6 +36,18 @@ jobs:
         with:
           python-version: "3.14"
 
+      # H12 stopgap: refuse SemVer pre-releases (alpha/rc) so a manual retry
+      # cannot re-pin the public add-on store. Dual channel is 2.6.k.
+      - name: Refuse pre-release versions
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$VERSION" == *-* ]]; then
+            echo "::error::Refusing to publish pre-release '${VERSION}' to public add-on earnie (H12 stopgap). Use an official X.Y.Z, or wait for earnie_prerelease (2.6.k)."
+            exit 1
+          fi
+
       - name: Bump HA add-on pins
         env:
           VERSION: ${{ inputs.version }}

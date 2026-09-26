@@ -153,8 +153,12 @@ jobs:
           fi
           gh release create "${ARGS[@]}"
 
+  # H12 stopgap: official releases only. Pre-releases must not bump public
+  # ha-addon-earnie/earnie (auto-update would reach all HA users). Dual channel
+  # earnie_prerelease is 2.6.k.
   publish_ha_addon:
     needs: release
+    if: needs.release.outputs.prerelease != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

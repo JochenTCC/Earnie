@@ -18,7 +18,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.1`**.
 
-**Next:** **2.6.j** first (installation safeguards; H12 stopgap protects existing HA users from auto-updated alphas). In parallel **2.6.e** (stronger propose; HouseSim S2 archetypes done 2026-09-26) — HouseSim S3 (CI) under Version 2.+1. Then **2.6.k → 2.6.l → 2.6.m**. **2.6.n** (battery controllability).
+**Next:** Finish **2.6.j** — publish `2.6.0-alpha.2` (ships **H0**; H12 keeps HA store off alphas), then live **H11** Gen2 check. In parallel **2.6.e**. Then **2.6.k → 2.6.l → 2.6.m**. **2.6.n** (battery controllability).
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -37,14 +37,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Trigger: support case 2026-09-25 (HA add-on crash loop on a `kvm64` VM, see [Backlog-Erledigt.md](Backlog-Erledigt.md)). IDs **H0–H13** refer to the [concept doc](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md).
 
-- [ ] **2.6.j — Sprint 1: quick safeguards + verification**
-  - [ ] **H0** Ship x86-64-v2 preflight (`docker/cpu_check.sh` via `docker/entrypoint.sh`) with the next image / add-on release
-  - [ ] **H12 (stopgap)** Release workflow: pre-releases no longer bump add-on `earnie` in `ha-addon-earnie` (today every alpha reaches all HA users with auto-update)
-  - [ ] **H3** LoxBerry compose `restart: on-failure:3` (was `unless-stopped` → endless crash loop)
-  - [ ] **H5** LoxBerry `TZ` from host instead of hard-coded `Europe/Vienna`
-  - [ ] **H7** Add-on `startup: application` (Core API needed); check daemon waits for `probe_supervisor_core()` with backoff
-  - [ ] **H9 (verify)** Run the SB integration scan inside a bridge-network container: does `local_ipv4_hosts_for_scan()` scan the Docker subnet instead of the LAN?
+- [ ] **2.6.j — Sprint 1: quick safeguards + verification** (code done 2026-09-26; see [Backlog-Erledigt.md](Backlog-Erledigt.md))
+  - [ ] **H0** Ship x86-64-v2 preflight with the next image publish (`2.6.0-alpha.2` — propose path **B**; H12 skips HA store bump)
   - [ ] **H11 (verify)** Gen2 Miniserver set to HTTPS-only vs. hard-coded `http://` in `integrations/loxone_client.py`
+    - **Live checklist (leave open until run):** on Gen2 with Config → Network → „Nur verschlüsselt“ / HTTPS only: (1) `http://<ms-ip>/jdev/sps/status` (or any jdev Earnie uses); (2) `http://<ms-ip>/data/LoxAPP3.json`; (3) optional write path `http://<ms-ip>/dev/sps/io/...`. If all fail (timeout / connection refused / TLS redirect only) → confirm H11 and do **2.6.l H11 (fix)**. If HTTP still works → close H11 without code change.
 
 - [ ] **2.6.k — Sprint 2: release pipeline + version channels** (concept doc §3)
   - [ ] **GHCR `:next`** tag on every release (stable + pre-release) in `release-publish.yml`

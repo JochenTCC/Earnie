@@ -14,7 +14,7 @@ x-persist-volumes: &persist-volumes
   - REPLACELBPDATADIR/earnie_env/runtime:/app/runtime
 
 x-common-env: &common-env
-  TZ: Europe/Vienna
+  TZ: ${TZ:-Europe/Vienna}
   EARNIE_CONFIG_PATH: config
   EARNIE_RUNTIME_PATH: runtime
   EARNIE_STRICT_TARIFF_VALIDATE: "1"
@@ -33,7 +33,7 @@ services:
       --
       --server.enableCORS false
       --server.enableXsrfProtection false
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "${STREAMLIT_PORT:-8501}:8501"
       # Daemon Earnie_Request_Optimize /alive (VO_Earnie_Status → host:8541).

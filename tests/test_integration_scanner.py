@@ -242,6 +242,17 @@ class TestLocalIpv4HostsForScan:
         assert "192.168.178.1" in hosts
         assert "192.168.178.254" in hosts
 
+    def test_docker_bridge_ip_scans_docker_subnet_not_lan(self):
+        """H9 verify: bridge container IP → OpenEMS /24 is the Docker net."""
+        fake_probe = MagicMock()
+        fake_probe.getsockname.return_value = ("172.17.0.2", 12345)
+        with patch("socket.socket", return_value=fake_probe):
+            hosts = scanner.local_ipv4_hosts_for_scan()
+        assert len(hosts) == 253
+        assert all(h.startswith("172.17.0.") for h in hosts)
+        assert "172.17.0.2" not in hosts
+        assert "192.168.178.1" not in hosts
+
     def test_oserror_returns_empty_list(self):
         fake_probe = MagicMock()
         fake_probe.connect.side_effect = OSError("no route")

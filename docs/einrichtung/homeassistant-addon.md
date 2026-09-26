@@ -93,7 +93,9 @@ Port-Gesamtübersicht: [`docs/referenz/streamlit-ports.md`](../referenz/streamli
 
 ## Add-on-Update vs. Image-Update
 
-Die Add-on-`version:` in `config.yaml` **entspricht der Earnie-App-Version** (z. B. `2.6.0` oder `2.6.0-alpha.1`). Bei jedem Earnie-Release-Tag wird das Add-on-Repository [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) automatisch aktualisiert — der Supervisor zeigt dann **Update verfügbar**, sobald die neue `version:` im Repository ankommt.
+Die Add-on-`version:` in `config.yaml` **entspricht der Earnie-App-Version** bei **offiziellen** Releases (z. B. `2.6.0`). Nur offizielle Tags aktualisieren das Add-on-Repository [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) automatisch — der Supervisor zeigt dann **Update verfügbar**, sobald die neue `version:` im Repository ankommt.
+
+**Vorabversionen** (`…-alpha.N` / `…-rc.N`) erscheinen auf GHCR und als GitHub Pre-release, landen aber **nicht** mehr im öffentlichen Add-on `earnie` (Stopgap H12 / Backlog **2.6.j**). Wer Alphas testen will, zieht das Image direkt (`ghcr.io/jochentcc/earnie-energy:<version>`). Ein eigener Add-on-Kanal `earnie_prerelease` folgt in **2.6.k**.
 
 Unterschied zum LoxBerry-Plugin: dort zieht die Compose-Datei `:latest`; beim HA-Add-on wird das Release-Image explizit über `build.yaml` / `EARNIE_VERSION` gepinnt.
 
