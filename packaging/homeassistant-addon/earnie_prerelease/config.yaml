@@ -8,7 +8,7 @@ description: "Vorabversion von Earnie (Alpha/RC). Nicht für den Dauerbetrieb. N
 url: https://github.com/JochenTCC/Earnie
 # Same prebuilt images as stable earnie (H6); Supervisor pulls by version:.
 image: "ghcr.io/jochentcc/earnie-addon-{arch}"
-startup: application
+# startup defaults to application (H7); omit for hassfest / addon-linter
 init: false
 panel_icon: mdi:solar-power-variant
 arch:

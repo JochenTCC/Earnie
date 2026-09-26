@@ -8,7 +8,7 @@ description: "Energiemanagement und Optimierung für Smart Homes. Nach dem Start
 url: https://github.com/JochenTCC/Earnie
 # Prebuilt per-arch images (H6); Supervisor pulls — no on-device apt build.
 image: "ghcr.io/jochentcc/earnie-addon-{arch}"
-startup: application
+# startup defaults to application (H7); omit for hassfest / addon-linter
 init: false
 panel_icon: mdi:solar-power
 arch:
