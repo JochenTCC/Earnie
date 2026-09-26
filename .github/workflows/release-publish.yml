@@ -3,7 +3,16 @@
 #   (e.g. v2.0.0, v2.2.0-alpha.1).
 # Prerequisite: version.py __version__ must equal the tag without the leading "v".
 # Pre-releases (version contains "-"): GitHub --prerelease, no --latest, no Docker :latest.
-# Every release (stable + pre-release) also pushes Docker :next.
+#
+# Candidate → approve → publish:
+#   1. release         build + push only :<version> images, GitHub Release as *draft*
+#   2. addon_smoke     start earnie-addon-{arch}:<version> like the Supervisor (blocking on amd64)
+#      addon_lint      bump add-on pins in the workspace + addon-linter (no commit)
+#      qemu_smoke      constrained-CPU smoke (soft)
+#   3. promote         environment "release-approval" (required reviewer) — waits for manual
+#                      approval; then :next (+ :latest if official) and publishes the release
+#   4. publish_ha_addon  pins ha-addon-earnie → only now HA offers the update
+# Nothing user-visible happens before step 3. Reject the deployment to drop a bad candidate.
 
 name: Release
 
@@ -26,6 +35,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: write
       packages: write
     outputs:
@@ -75,6 +85,22 @@ jobs:
           echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
           echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE})"
 
+      # A missing environment is auto-created WITHOUT protection rules, so the
+      # promote job would publish immediately — fail before building anything.
+      - name: Approval gate configured (environment release-approval)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! RULES="$(gh api "repos/${GITHUB_REPOSITORY}/environments/release-approval" --jq '[.protection_rules[]?.type] | join(",")')"; then
+            echo "::error::Environment 'release-approval' not found. Create it (Settings → Environments) with yourself as required reviewer."
+            exit 1
+          fi
+          case ",${RULES}," in
+            *,required_reviewers,*) echo "Approval gate OK (${RULES})" ;;
+            *) echo "::error::Environment 'release-approval' has no required reviewers (rules: '${RULES}')."; exit 1 ;;
+          esac
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
@@ -91,10 +117,10 @@ jobs:
           # (write:packages) stored as repo secret GHCR_TOKEN.
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multi-arch image
-        run: python -m scripts.build_container --target all --push
+      - name: Build and push multi-arch image (candidate, :<version> only)
+        run: python -m scripts.build_container --target all --push --versioned-only
         # Tariff deploy-gate runs inside build_container when --push is set.
-        # default_tags(): every release gets :next + :<version>; official also :latest.
+        # :next / :latest are set by the promote job after approval.
 
       - name: Build and push HA add-on images (H6)
         env:
@@ -161,7 +187,7 @@ jobs:
           fi
           echo "path=${OUT}" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (draft until approval)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -174,18 +200,159 @@ jobs:
             "${{ steps.version.outputs.tag }}"
             --title "Earnie ${{ steps.version.outputs.version }}"
             --notes-file "${{ steps.notes.outputs.path }}"
+            --draft
           )
           if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
             ARGS+=(--prerelease)
-          else
-            ARGS+=(--latest)
           fi
           gh release create "${ARGS[@]}"
 
+  # Pre-gate: start the add-on image like the Supervisor would (options.json,
+  # addon_config on /config, no Ingress). amd64 blocks promote; aarch64 runs
+  # under QEMU emulation (slow, informative only).
+  addon_smoke:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            timeout: 240
+            soft: false
+          - arch: aarch64
+            platform: linux/arm64
+            timeout: 720
+            soft: true
+    continue-on-error: ${{ matrix.soft }}
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.14"
+
+      - name: Set up QEMU
+        if: matrix.arch != 'amd64'
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Add-on start smoke (${{ matrix.arch }})
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: >-
+          python -m scripts.ha_addon_smoke
+          --image "ghcr.io/jochentcc/earnie-addon-${{ matrix.arch }}:${VERSION}"
+          --platform "${{ matrix.platform }}"
+          --timeout "${{ matrix.timeout }}"
+
+  # Pre-gate: the pin bump + addon-linter that publish_ha_addon runs after
+  # approval, dry (workspace only, no commit/push).
+  addon_lint:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.14"
+
+      - name: Bump HA add-on pins (workspace only)
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: python -m scripts.bump_ha_addon --version "$VERSION"
+
+      - name: Lint HA add-on earnie
+        if: needs.release.outputs.prerelease != 'true'
+        uses: frenck/action-addon-linter@b9cfd1bc62ba60d2c4fc96317b5f7ada5923f4a7 # v2.21.1
+        with:
+          path: ./packaging/homeassistant-addon/earnie
+
+      - name: Lint HA add-on earnie_prerelease
+        uses: frenck/action-addon-linter@b9cfd1bc62ba60d2c4fc96317b5f7ada5923f4a7 # v2.21.1
+        with:
+          path: ./packaging/homeassistant-addon/earnie_prerelease
+
+  # Approval gate: environment "release-approval" has a required reviewer, so
+  # this job waits in the Actions UI (Review deployments → Approve / Reject).
+  # Test the candidate on your own HA first (local add-on on the :<version> image).
+  # qemu_smoke is soft and deliberately not part of the condition.
+  promote:
+    needs: [release, addon_smoke, addon_lint, qemu_smoke]
+    if: >-
+      ${{ !cancelled()
+      && needs.release.result == 'success'
+      && needs.addon_smoke.result == 'success'
+      && needs.addon_lint.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment: release-approval
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.14"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Promote floating tags (:next, official also :latest)
+        run: python -m scripts.build_container --promote
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release.outputs.tag }}
+          PRERELEASE: ${{ needs.release.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$TAG" --draft=false --prerelease
+          else
+            gh release edit "$TAG" --draft=false --latest
+          fi
+
   # Dual channel (2.6.k / H12 final): official → earnie + earnie_prerelease;
   # pre-release → earnie_prerelease only. Add-on images already pushed in release job.
+  # Runs only after the promote job was approved.
   publish_ha_addon:
-    needs: release
+    needs: [release, promote]
     runs-on: ubuntu-latest
     permissions:
       contents: write

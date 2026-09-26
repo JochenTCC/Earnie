@@ -5,6 +5,8 @@ build_container.py – Kanonischer Docker-Build für Synology (amd64) und LoxBer
 Aufruf:
   python -m scripts.build_container
   python -m scripts.build_container --target all --push
+  python -m scripts.build_container --target all --push --versioned-only   # Release-Kandidat
+  python -m scripts.build_container --promote                              # nach Freigabe
   .\\docker\\build-container.ps1 --target synology --push
 """
 from __future__ import annotations
@@ -74,6 +76,31 @@ def default_tags(version: str | None = None) -> list[str]:
         tags.append(f"{image}:next")
         tags.append(f"{image}:{ver}")
     return tags
+
+
+def versioned_tags(version: str | None = None) -> list[str]:
+    """Immutable ``:<version>`` tags only — the release candidate build pushes these."""
+    ver = __version__ if version is None else version
+    return [tag for tag in default_tags(ver) if tag.endswith(f":{ver}")]
+
+
+def floating_tags(version: str | None = None) -> list[str]:
+    """Moving ``:next`` / ``:latest`` tags — set on release approval (``--promote``).
+
+    Kept off the candidate build so an untested release never reaches users
+    who follow ``:next`` / ``:latest`` (e.g. Watchtower).
+    """
+    ver = __version__ if version is None else version
+    return [tag for tag in default_tags(ver) if not tag.endswith(f":{ver}")]
+
+
+def promote_commands(version: str | None = None) -> list[list[str]]:
+    """Point each floating tag at ``:<version>`` (multi-arch manifest copy, no rebuild)."""
+    ver = __version__ if version is None else version
+    return [
+        ["docker", "buildx", "imagetools", "create", "-t", tag, f"{tag.rsplit(':', 1)[0]}:{ver}"]
+        for tag in floating_tags(ver)
+    ]
 
 
 def is_multiarch(platform: str) -> bool:
@@ -199,12 +226,30 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Image(s) nach Registry pushen (bei --target all implizit im buildx-Lauf)",
     )
     parser.add_argument("--no-cache", action="store_true", help="Docker-Build ohne Cache")
+    parser.add_argument(
+        "--versioned-only",
+        action="store_true",
+        help="Nur :<version>-Tags pushen (Release-Kandidat); :next/:latest setzt --promote",
+    )
+    parser.add_argument(
+        "--promote",
+        action="store_true",
+        help="Kein Build: :next (offiziell auch :latest) auf das gepushte :<version> setzen",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    tags = args.tags or default_tags()
+    if args.promote:
+        try:
+            for cmd in promote_commands():
+                run_build(cmd)
+        except subprocess.CalledProcessError as exc:
+            return exc.returncode or 1
+        print(f"Promoted: {', '.join(floating_tags())}")
+        return 0
+    tags = args.tags or (versioned_tags() if args.versioned_only else default_tags())
     try:
         if args.push:
             _run_deploy_tariff_gate()

@@ -90,6 +90,7 @@ Rules that matter for branching:
 - Tag only when `version.py` on the tagged commit equals the tag without `v`.
 - After an alpha/rc tag, leave that string on `main` until the next approved bump.
 - Before **B**: `synology-alpha.yml` / `loxberry-alpha.yml` / `proxmox-alpha.yml` must pin `ghcr.io/jochentcc/earnie-energy:<version.py>`.
+- **B** and **C** are two-step: the tag builds a *candidate* (`:<version>` images, draft release); users see it only after approving job `promote` (environment `release-approval`) — test on your own HA / LoxBerry in between (DEVELOPER.md → *Candidate → approve → publish*). A rejected candidate is not re-tagged; fix and tag the next version.
 
 ---
 
@@ -101,7 +102,7 @@ Rules that matter for branching:
 4. Get approval for the new `version.py` string (**D**).
 5. If pre-release: sync all three `*-alpha.yml` image lines.
 6. Land the same fix on `main` (merge hotfix branch or cherry-pick). Align `version.py` on `main` only when that string is the next intended publish; for official PATCH while `main` is alpha, port **code** only.
-7. Push commits; push annotated tag → CI (`.github/workflows/release.yml`).
+7. Push commits; push annotated tag → CI (`.github/workflows/release-publish.yml`); test the candidate, then approve `promote`.
 8. Delete the hotfix branch; move bugfix backlog item to **Verifications Pending** until live OK.
 
 ---

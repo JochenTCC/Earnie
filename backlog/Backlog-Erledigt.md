@@ -2,6 +2,12 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Release approval gate — candidate → approve → publish (2026-09-26)
+
+- [x] **`release-publish.yml` two-step release:** tag push builds a candidate only (`build_container --versioned-only` → `:<version>`; GitHub Release as draft); job `promote` (environment `release-approval`, required reviewer) sets `:next` / `:latest` (`build_container --promote`, `buildx imagetools` retag) and publishes the release; `publish_ha_addon` runs only after approval. `release` fails early if the environment has no required-reviewer rule.
+- [x] **Pre-gate checks:** `addon_smoke` (`scripts/ha_addon_smoke.py` — Supervisor-like start of `earnie-addon-{arch}:<version>`, Streamlit health, `config.json` under `/config`; amd64 blocking, aarch64 QEMU soft), `addon_lint` (dry pin bump + addon-linter). Verified locally: alpha.6 OK, alpha.5 FAIL (`No module named 'config'`).
+- [x] Docs: `DEVELOPER.md`, HA add-on README (*Test a release candidate* — local add-on `earnie_dev` on the candidate image), LoxBerry README (pinned channel for candidate tests), branching playbook.
+
 ### 2.6.0-alpha.6 pre-release (2026-09-26)
 
 - [x] **HA add-on start crash** (`ModuleNotFoundError: No module named 'config'`): restore `COPY config.py` after S6470 explicit Dockerfile COPY; honor `EARNIE_CONFIG_PATH=/config` when `EARNIE_INSTALL_CONTEXT=homeassistant_addon` (addon_config vs `/data/earnie_env` runtime split)

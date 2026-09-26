@@ -10,6 +10,8 @@ Plugin SemVer (`plugin.cfg` `VERSION`) is **independent** of Earnie `version.py`
 | `prerelease` | `next` | yes when `1` |
 | `pinned` | SemVer (e.g. `2.5.3`) | never |
 
+`:latest` / `:next` only move when an Earnie release is **approved** (job `promote` in `release-publish.yml`); a tag push alone publishes just `:<version>`. To test a candidate on your own LoxBerry before approving: channel `pinned` + `EARNIE_PINNED_VERSION=<candidate>`, then switch back.
+
 Refresh manually: Plugin Admin → **Image aktualisieren** / save settings, or `bin/earnie_ctl.sh pull`. Daily timer runs `earnie_ctl.sh auto-pull` (skips `pinned` and `AUTO_UPDATE=0`). LoxBerry `plugin.cfg` `AUTOMATIC_UPDATES` is **only** the plugin ZIP — separate from the image channel.
 
 ## Manual ZIP for Plugin Admin
