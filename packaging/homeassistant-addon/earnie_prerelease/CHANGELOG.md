@@ -15,7 +15,7 @@ Same image family as `earnie/`. Pre-releases and official releases both bump thi
 ## Unreleased
 
 - **Start-Preflight (H1):** `docker/preflight.sh` (CPU x86-64-v2, beschreibbare Config/Runtime, Uhr vs. Build-Datum; Warnung bei wenig RAM/Speicher).
-- **Watchdog / HEALTHCHECK (H4):** Supervisor `watchdog:` auf `/_stcore/health` (Port 8501); Image-HEALTHCHECK + Daemon-Heartbeat in `runtime/daemon_heartbeat.json`.
+- **HEALTHCHECK (H4):** Image-`HEALTHCHECK` (`/_stcore/health` + Daemon-Heartbeat in `runtime/daemon_heartbeat.json`). Kein `config.yaml` `watchdog:` (addon-linter: obsolete).
 - **x86-64-v2 preflight (H0):** image entrypoint (`docker/entrypoint.sh` → `docker/preflight.sh`; `run.sh` only sets the add-on docs link) checks `/proc/cpuinfo` on `x86_64` and exits with an actionable German message (Proxmox CPU type `host`) instead of a NumPy `RuntimeError` / pyarrow SIGILL traceback loop.
 - **`startup: application`:** start after Home Assistant Core; daemon waits for Supervisor Core API (`wait_for_supervisor_core`) before auto-starting `main` (H7).
 - **H12 stopgap:** pre-release tags no longer bump public `ha-addon-earnie` / `earnie` (official tags only).

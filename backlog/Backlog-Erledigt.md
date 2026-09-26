@@ -22,7 +22,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **2.6.m — Sprint 4: startup checks + runtime monitoring** (ships with the next path **B**/**C** publish).
   - [x] **H1** `docker/cpu_check.sh` → `docker/preflight.sh`: abort on non-writable config/runtime and clock before image `BUILD_DATE` (NTP wait up to 30 s); warn on RAM < 2 GB / free disk < 500 MB. `ARG BUILD_DATE` + `scripts/build_container.py --build-arg`. Tests: `tests/test_container_cpu_check.py`.
-  - [x] **H4** `HEALTHCHECK` in `docker/Dockerfile` (`/_stcore/health` via `EARNIE_UI_STREAMLIT_PORT`, default 8501 / add-on 8502) + `runtime/daemon_heartbeat.json` from `main.py`; add-on `watchdog:` on both trees; LoxBerry `healthcheck` WARN on `.State.Health.Status=unhealthy`. Tests: `tests/test_daemon_heartbeat.py`.
+  - [x] **H4** `HEALTHCHECK` in `docker/Dockerfile` (`/_stcore/health` via `EARNIE_UI_STREAMLIT_PORT`, default 8501 / add-on 8502) + `runtime/daemon_heartbeat.json` from `main.py`; no `config.yaml` `watchdog:` (addon-linter obsolete — Supervisor uses image HEALTHCHECK); LoxBerry `healthcheck` WARN on `.State.Health.Status=unhealthy`. Tests: `tests/test_daemon_heartbeat.py`.
 
 ### 2.6.j H0 — x86-64-v2 preflight shipped (2026-09-26)
 
