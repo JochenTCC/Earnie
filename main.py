@@ -16,7 +16,11 @@ from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, l
 from data.live_market_prices import fetch_live_day_ahead_prices
 from data.feed_in_prices import k_push_act_for_matrix_row
 from runtime_store import run_state, optimization_history
-from runtime_store.soc_plausibility import sanitize_soc_reading
+from runtime_store.soc_plausibility import (
+    closed_interval_confirms_reported,
+    count_consecutive_reported_soc,
+    sanitize_soc_reading,
+)
 from runtime_store import live_optimization_debug
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
@@ -159,12 +163,29 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     prev_logged_soc = optimization_history.latest_logged_soc_percent()
     if prev_logged_soc is not None:
         battery_kw = float(live_power["battery"]) if live_power else 0.0
+        history_rows = optimization_history._sorted_history_rows(
+            optimization_history._load_jsonl_history()
+        )
+        history_raw = [
+            (row.get("_raw") or row)
+            for row in history_rows
+            if isinstance(row.get("_raw") or row, dict)
+        ]
+        consecutive_reported = count_consecutive_reported_soc(
+            history_raw, reported_soc
+        )
+        closed_confirms = closed_interval_confirms_reported(
+            closed_interval, reported_soc, prev_logged_soc
+        )
+        if closed_confirms:
+            consecutive_reported = max(consecutive_reported, 2)
         current_soc, soc_corrected = sanitize_soc_reading(
             prev_logged_soc,
             reported_soc,
             battery_kw,
+            consecutive_same_reported=consecutive_reported,
         )
-        if soc_corrected:
+        if soc_corrected and abs(float(current_soc) - reported_soc) > 0.05:
             logger.warning(
                 "SoC-Lesung korrigiert: Miniserver %.1f%% → %.1f%% "
                 "(Integration aus %.1f%%, Batterie %.2f kW).",
@@ -172,6 +193,15 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 current_soc,
                 prev_logged_soc,
                 battery_kw,
+            )
+        elif closed_confirms and abs(reported_soc - float(prev_logged_soc)) > 1.0:
+            logger.info(
+                "SoC-Kette verworfen: Miniserver %.1f%% bestätigt durch "
+                "Intervall-Sampler (Start %.1f%% → Ende %.1f%%), Historie war %.1f%%.",
+                reported_soc,
+                float((closed_interval or {}).get("soc_start_percent") or reported_soc),
+                float((closed_interval or {}).get("soc_end_percent") or reported_soc),
+                float(prev_logged_soc),
             )
 
     current_hour = datetime.now().hour
@@ -474,6 +504,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "loxone_writes": loxone_writes,
             "ehal_writes": ehal_writes,
             "soc_percent": round(float(current_soc), 2),
+            "reported_soc_percent": round(float(reported_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
             "market_price_cent": market_price_cent,
             "epex_price_cent": epex_price_cent,

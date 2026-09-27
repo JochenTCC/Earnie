@@ -1,38 +1,29 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Swap Earnie HTTP host in a Loxone Config project (NAS <-> Dev-PC).
+  Toggle Earnie HTTP host in a Loxone Config project (NAS <-> Dev-PC).
 
 .DESCRIPTION
-  Replaces Virtual In/Out base URLs:
+  Detects whether the project currently points at the NAS or Dev-PC host,
+  then swaps all matching Virtual In/Out base URLs to the other host:
     http://DS-KO-DO-2:8541  <->  http://dev-pc:8541
     http://DS-KO-DO-2:8501  <->  http://dev-pc:8501
 
-  -Target pc  -> NAS hostname becomes Dev-PC
-  -Target nas -> Dev-PC hostname becomes NAS
-
-  Supports plain XML/text and .Loxone ZIP projects (rewrites matching
-  entries inside the archive). Creates a .bak next to the file first.
-
-.PARAMETER Target
-  pc | nas
+  Supports plain XML/text and .Loxone ZIP projects. Creates a .bak next to
+  the file before modifying it.
 
 .PARAMETER Path
-  Path to .Loxone project or plain XML/text file containing the URLs.
+  Path to the .Loxone project (default: Haussteuerung-Gen2.Loxone).
 
 .EXAMPLE
-  .\scripts\swap_loxone_earnie_host.ps1 -Target pc -Path "D:\Loxone\Haus.Loxone"
+  .\scripts\swap_loxone_earnie_host.ps1
 
 .EXAMPLE
-  .\scripts\swap_loxone_earnie_host.ps1 nas "D:\Loxone\Haus.Loxone"
+  .\scripts\swap_loxone_earnie_host.ps1 -Path "D:\Loxone\Haus.Loxone"
 #>
 param(
-    [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("pc", "nas")]
-    [string]$Target,
-
-    [Parameter(Mandatory = $true, Position = 1)]
-    [string]$Path
+    [Parameter(Mandatory = $false, Position = 0)]
+    [string]$Path = "C:\Users\joche\Documents\Loxone\Loxone Config\Projects\Haussteuerung-Gen2.Loxone"
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +31,15 @@ $ErrorActionPreference = "Stop"
 $NasHost = "DS-KO-DO-2"
 $PcHost = "dev-pc"
 $Ports = @(8541, 8501)
+
+function Get-HostUrlList {
+    param([string]$HostName)
+    $urls = @()
+    foreach ($port in $Ports) {
+        $urls += "http://${HostName}:${port}"
+    }
+    return $urls
+}
 
 function Get-ReplacementPairs {
     param([string]$Direction)
@@ -57,6 +57,22 @@ function Get-ReplacementPairs {
     return $pairs
 }
 
+function Get-UrlHitCount {
+    param(
+        [string]$Text,
+        [string[]]$Urls
+    )
+    $total = 0
+    foreach ($url in $Urls) {
+        $regex = [regex]::new(
+            [regex]::Escape($url),
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+        )
+        $total += $regex.Matches($Text).Count
+    }
+    return $total
+}
+
 function Invoke-HostSwap {
     param(
         [string]$Text,
@@ -65,9 +81,10 @@ function Invoke-HostSwap {
     $total = 0
     $updated = $Text
     foreach ($pair in $Pairs) {
-        # Case-insensitive host match; keep original path/query after host:port
-        $pattern = [regex]::Escape($pair.From)
-        $regex = [regex]::new($pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        $regex = [regex]::new(
+            [regex]::Escape($pair.From),
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+        )
         $m = $regex.Matches($updated)
         if ($m.Count -gt 0) {
             $total += $m.Count
@@ -89,6 +106,58 @@ function Test-IsZipFile {
     finally {
         $fs.Dispose()
     }
+}
+
+function Get-ProjectTextSamples {
+    param([string]$FilePath)
+    $samples = @()
+    if (Test-IsZipFile -FilePath $FilePath) {
+        Add-Type -AssemblyName System.IO.Compression
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($FilePath)
+        try {
+            foreach ($entry in $zip.Entries) {
+                if ($entry.Length -le 0) { continue }
+                if ($entry.FullName -match '\.(png|jpg|jpeg|gif|bmp|ico|pdf|exe|dll)$') { continue }
+                $reader = New-Object System.IO.StreamReader($entry.Open())
+                try {
+                    $samples += $reader.ReadToEnd()
+                }
+                finally {
+                    $reader.Dispose()
+                }
+            }
+        }
+        finally {
+            $zip.Dispose()
+        }
+    }
+    else {
+        $samples += [System.IO.File]::ReadAllText($FilePath)
+    }
+    return $samples
+}
+
+function Resolve-SwapDirection {
+    param([string]$FilePath)
+    $nasUrls = Get-HostUrlList -HostName $NasHost
+    $pcUrls = Get-HostUrlList -HostName $PcHost
+    $nasHits = 0
+    $pcHits = 0
+    foreach ($sample in (Get-ProjectTextSamples -FilePath $FilePath)) {
+        $nasHits += Get-UrlHitCount -Text $sample -Urls $nasUrls
+        $pcHits += Get-UrlHitCount -Text $sample -Urls $pcUrls
+    }
+    if ($nasHits -gt 0 -and $pcHits -gt 0) {
+        Write-Error ("Ambiguous hosts in project: NAS hits={0}, Dev-PC hits={1}. Fix manually first." -f $nasHits, $pcHits)
+    }
+    if ($nasHits -gt 0) {
+        return @{ Direction = "pc"; FromHost = $NasHost; ToHost = $PcHost; Hits = $nasHits }
+    }
+    if ($pcHits -gt 0) {
+        return @{ Direction = "nas"; FromHost = $PcHost; ToHost = $NasHost; Hits = $pcHits }
+    }
+    Write-Error "No Earnie URLs found for host '$NasHost' or '$PcHost' (ports $($Ports -join ', '))."
 }
 
 function Update-PlainFile {
@@ -123,7 +192,6 @@ function Update-LoxoneZip {
         $entries = @($zip.Entries)
         foreach ($entry in $entries) {
             if ($entry.Length -le 0) { continue }
-            # Skip obvious binaries
             $name = $entry.FullName
             if ($name -match '\.(png|jpg|jpeg|gif|bmp|ico|pdf|exe|dll)$') { continue }
 
@@ -158,14 +226,16 @@ function Update-LoxoneZip {
 }
 
 # --- main ---
-$resolved = Resolve-Path -LiteralPath $Path
-$filePath = $resolved.Path
-if (-not (Test-Path -LiteralPath $filePath -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
     Write-Error "File not found: $Path"
 }
 
-$pairs = Get-ReplacementPairs -Direction $Target
-Write-Host ("Target={0}" -f $Target)
+$filePath = (Resolve-Path -LiteralPath $Path).Path
+$detected = Resolve-SwapDirection -FilePath $filePath
+$pairs = Get-ReplacementPairs -Direction $detected.Direction
+
+Write-Host ("Path: {0}" -f $filePath)
+Write-Host ("Detected host: {0} ({1} hit(s)) -> swap to {2}" -f $detected.FromHost, $detected.Hits, $detected.ToHost)
 foreach ($p in $pairs) {
     Write-Host ("  {0}  ->  {1}" -f $p.From, $p.To)
 }
@@ -185,7 +255,7 @@ else {
 }
 
 if ($count -eq 0) {
-    Write-Warning "No matching Earnie URLs found. File left unchanged (backup kept)."
+    Write-Warning "No replacements applied (backup kept)."
     exit 2
 }
 

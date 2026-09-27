@@ -33,6 +33,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - [ ] Still failing / accept after scan: `release-publish.yml` `pip install -r requirements.txt` (S8541 / S8544 — `--only-binary=:all:` breaks local package `.`); `new_coverage` informational
   - Optional follow-ups: raise new-code coverage; `ui/chart_trace_segments.py` S3923 if still open; confirm S8707/S8705 gone after next Sonar analysis
 - [ ] **Monitor Chart 2 daily Kosten KPIs** — Implemented: SA-day annotation columns (full span = two cols; segment = visible day); plan-based **Ersparnis bisher** line in gray zone (`ui/chart_day_costs.py`). Live Monitor acceptance pending.
+- [ ] **Stale SoC sanitize chain** (`debug_dump_20260927_083552`) — Fix implemented: trust plant SoC when closed-interval sampler confirms against history (`closed_interval_confirms_reported` + `reported_soc_percent` consecutive count). Live acceptance pending.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)

@@ -119,6 +119,64 @@ def _delta_sign(value: float) -> int:
     return 0
 
 
+def closed_interval_confirms_reported(
+    closed_interval: dict | None,
+    reported_soc: float,
+    prev_soc: float | None,
+    battery_params: dict | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
+) -> bool:
+    """
+    True when the power-interval sampler agrees with ``reported_soc`` against a
+    stale sanitized history chain (host swap / marker reconnect).
+
+    Trust when the closed interval end matches the live reading and that reading
+    is beyond the physics envelope from ``prev_soc``, and either:
+    - the interval itself jumped beyond the envelope, or
+    - the whole interval already sits near the reported level (settled).
+    """
+    if prev_soc is None or not isinstance(closed_interval, dict):
+        return False
+    end = closed_interval.get("soc_end_percent")
+    start = closed_interval.get("soc_start_percent")
+    if end is None or start is None:
+        return False
+    reported = round(float(reported_soc), 1)
+    prev = float(prev_soc)
+    end_f = round(float(end), 1)
+    start_f = round(float(start), 1)
+    if abs(end_f - reported) > _SOC_INTEGRATION_TOLERANCE:
+        return False
+    max_delta = max_soc_delta_per_slot(battery_params, dt_h=dt_h)
+    if abs(reported - prev) <= max_delta:
+        return False
+    if abs(end_f - start_f) > max_delta:
+        return True
+    return abs(start_f - reported) <= max_delta
+
+
+def count_consecutive_reported_soc(
+    history_raw_rows: list[dict],
+    reported_soc: float,
+    *,
+    limit: int = 8,
+) -> int:
+    """Trailing count of history rows whose ``reported_soc_percent`` matches."""
+    target = round(float(reported_soc), 1)
+    count = 1
+    for row in reversed(history_raw_rows[-limit:]):
+        if not isinstance(row, dict):
+            break
+        raw = row.get("reported_soc_percent")
+        if raw is None:
+            break
+        if round(float(raw), 1) != target:
+            break
+        count += 1
+    return count
+
+
 def sanitize_soc_reading(
     prev_soc: float | None,
     reported_soc: float,
