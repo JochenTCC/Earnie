@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Docker missing share/ehal (2026-09-27)
+
+- [x] **Docker image missing `share/ehal` schemas** — S6470 explicit COPY only shipped `share/config/`; live EHAL validation failed every ~30s (`EHAL schema not found: /app/share/ehal/telemetry.schema.json`). Fixed in `docker/Dockerfile` (`COPY share/ share/`); verified on NAS with **2.6.0-alpha.8**.
+
 ### Bugfix SonarCloud leak-period QG (2026-09-27)
 
 - [x] **SonarCloud leak-period QG** — Closed as open verification (2026-09-27). Historical: re-check 2026-09-26 on `main` @ `64b151c` (Actions [36225774457](https://github.com/JochenTCC/Earnie/actions/runs/36225774457)): QG **ERROR** — `new_bugs` **1**, `new_vulnerabilities` **19**, `new_reliability_rating` C, `new_security_rating` C, `new_coverage` ≈ **66%**. Remediations verified; remaining follow-ups obsolete:
