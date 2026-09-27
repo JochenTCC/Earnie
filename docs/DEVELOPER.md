@@ -77,7 +77,7 @@ Default tags from `version.py`: official → `:latest` and `:<version>`; SemVer 
 
 ### Release (tag → GitHub Actions)
 
-**Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release.yml`) builds the multi-arch image to GHCR and creates the GitHub Release.
+**Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release-publish.yml`) builds a release candidate (multi-arch image to GHCR, draft GitHub Release) and publishes it after your approval. Per-release checklist: [spec/release-checklist.md](spec/release-checklist.md).
 
 ```powershell
 # Official — after version.py == X.Y.Z is on origin/main:
@@ -93,6 +93,7 @@ git push origin vX.Y.Z-alpha.N
 - Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body).
 - Official: GitHub Latest Release; images `:<version>` and `:latest` (+ legacy aliases).
 - Pre-release (`-` in version): GitHub Pre-release (not Latest); images `:<version>` only (no `:latest`).
+- **Candidate → approve → publish:** the tag pushes only `:<version>` images; `:next` / `:latest`, the published release and the HA add-on pin follow after you approve job `promote` (environment `release-approval`). Details: root [DEVELOPER.md](../DEVELOPER.md) · [spec/release-checklist.md](spec/release-checklist.md).
 - Publish from `main`; leave the pre-release string on `main` until the next approved bump.
 - Parallel feature work + urgent fix for an already tagged build: [docs/spec/branching-hotfix-playbook.md](docs/spec/branching-hotfix-playbook.md) (`main` + tags; short-lived `hotfix/…` only when needed).
 - **GHCR auth for Actions:** store a classic PAT with `write:packages` (and `read:packages`) as repo secret `GHCR_TOKEN`. Without it, `GITHUB_TOKEN` only works if each package (`earnie-energy`, `ernie-energy`) grants this repository **Write** under Package settings → Manage Actions access. Also set packages **Public** if anonymous `docker pull` is required.

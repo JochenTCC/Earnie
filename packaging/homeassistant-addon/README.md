@@ -21,7 +21,7 @@ The tagged commit itself does not contain the new add-on pins — the bot commit
 
 ### Test a release candidate on your own HA (before approving)
 
-While `promote` waits, the candidate images already exist on GHCR but no user is offered them. Install them on your HA as a **local add-on** (visible on this instance only):
+While `promote` waits, the candidate images already exist on GHCR but no user is offered them. Install them on your HA as a **local add-on** (visible on this instance only). Full per-release checklist incl. test points: [docs/spec/release-checklist.md](../../docs/spec/release-checklist.md).
 
 1. Copy `earnie_prerelease/` to `/addons/local/earnie_dev/` on the HA host (Samba or SSH add-on; share `addons`).
 2. In the copy's `config.yaml` set `slug: earnie_dev`, `name: "Earnie (Dev)"` and `version: "<candidate version>"`. Keep `image:` — the Supervisor then **pulls** `earnie-addon-{arch}:<version>`, i.e. exactly the artifact users will get (no local build).

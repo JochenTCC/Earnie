@@ -77,7 +77,7 @@ Standard-Tags from `version.py`: every release → `:next` and `:<version>`; off
 
 ### Release (tag → GitHub Actions)
 
-**Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release.yml`) builds the multi-arch image to GHCR and creates the GitHub Release.
+**Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release-publish.yml`) builds a release candidate (multi-arch image to GHCR, draft GitHub Release) and publishes it after your approval. Per-release checklist: [docs/spec/release-checklist.md](docs/spec/release-checklist.md).
 
 ```powershell
 # Official — after version.py == X.Y.Z is on origin/main:

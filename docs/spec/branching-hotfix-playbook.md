@@ -90,7 +90,7 @@ Rules that matter for branching:
 - Tag only when `version.py` on the tagged commit equals the tag without `v`.
 - After an alpha/rc tag, leave that string on `main` until the next approved bump.
 - Before **B**: `synology-alpha.yml` / `loxberry-alpha.yml` / `proxmox-alpha.yml` must pin `ghcr.io/jochentcc/earnie-energy:<version.py>`.
-- **B** and **C** are two-step: the tag builds a *candidate* (`:<version>` images, draft release); users see it only after approving job `promote` (environment `release-approval`) — test on your own HA / LoxBerry in between (DEVELOPER.md → *Candidate → approve → publish*). A rejected candidate is not re-tagged; fix and tag the next version.
+- **B** and **C** are two-step: the tag builds a *candidate* (`:<version>` images, draft release); users see it only after approving job `promote` (environment `release-approval`) — test on your own HA / LoxBerry in between ([release-checklist.md](release-checklist.md)). A rejected candidate is not re-tagged; fix and tag the next version.
 
 ---
 

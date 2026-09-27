@@ -218,7 +218,7 @@ git push origin vX.Y.Z
 
 ### 2a. User tests the candidate, then approves
 
-Job `promote` (environment `release-approval`) **waits for the user's approval**. Tell the user:
+Job `promote` (environment `release-approval`) **waits for the user's approval**. Point the user to the maintainer checklist [docs/spec/release-checklist.md](../../../docs/spec/release-checklist.md) (steps 3–6) and tell them:
 
 - Actions run URL; wait until the pre-gate checks are green.
 - **HA:** local add-on `earnie_dev` on the candidate image — bump `version:` in `/addons/local/earnie_dev/config.yaml` to `<version>` → *Check for updates* → update/start (stop the regular Earnie add-on first). Setup: `packaging/homeassistant-addon/README.md` → *Test a release candidate*.
