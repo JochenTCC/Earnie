@@ -68,7 +68,7 @@ Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt
   - Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) — `EARNIE_SHADOW=1` only (`runtime_store.shadow.is_shadow_mode()`); implies silent; never a config key
   - **S2:** transport replay (§6.1–6.2), central write block + `shadow_writes.jsonl` (§6.3), config read-only / skip load-time migrations that write (§6.4), startup checks (§4.2), release guard (§4.4); own mandatory runtime dir + optional `scripts.shadow_seed_runtime`
   - Accept Prod’s `earnie_data_model` if in `COMPATIBLE_DATA_MODELS`; never migrate/re-stamp shared config. No Shadow `config_overlay` in v1 (Prod-rejected keys not testable)
-  - **S3:** UI banner + feed health + would-write table; `EARNIE_STREAMLIT_PORT`; German user docs (`docs/einrichtung/`) + `DEVELOPER.md`
+  - **S3:** UI banner + feed health + would-write table; `EARNIE_UI_STREAMLIT_PORT`; German user docs (`docs/einrichtung/`) + `DEVELOPER.md`
   - Tests per spec §10; E2E with HouseSim as Prod backend
   - **Out of scope:** S4 Soll/Soll diff + offline JSONL backtest → **2.+1**; Shadow as 2nd HA add-on (scenario C)
 

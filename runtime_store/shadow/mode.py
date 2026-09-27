@@ -1,4 +1,4 @@
-"""Shadow mode detection (env only). Full Shadow client = 2.7.f."""
+"""Shadow mode detection (env only)."""
 from __future__ import annotations
 
 from runtime_store.env_vars import is_truthy

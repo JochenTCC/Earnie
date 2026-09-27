@@ -147,8 +147,15 @@ def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
     if not io_name:
         return None
 
-    timeout_val = config.get_global_timeout(default=5)
     feed_key = f"loxone:io:{io_name}"
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        from runtime_store.shadow.replay import replay_loxone_io
+
+        return replay_loxone_io(feed_key)
+
+    timeout_val = config.get_global_timeout(default=5)
     try:
         response = requests.get(
             _loxone_jdev_url(io_name),
@@ -251,8 +258,15 @@ def _fetch_loxone_io_all(io_name: str) -> Optional[dict]:
     if not io_name:
         return None
 
-    timeout_val = config.get_global_timeout(default=5)
     feed_key = f"loxone:io_all:{io_name}"
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        from runtime_store.shadow.replay import replay_loxone_io_all
+
+        return replay_loxone_io_all(feed_key)
+
+    timeout_val = config.get_global_timeout(default=5)
     try:
         response = requests.get(
             _loxone_jdev_all_url(io_name),

@@ -292,7 +292,13 @@ def _stamp_pack_jsons_to_current_data_model() -> list[str]:
     Persist CURRENT_DATA_MODEL on pack/sidecar JSONs still tagged older (or missing).
 
     Ensures schemas with const=CURRENT stay valid for local/example files.
+    Skipped in Shadow Mode (shared config is read-only).
     """
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        return []
+
     from runtime_store.data_model import CURRENT_DATA_MODEL
     from settings.json_io import read_json_dict, write_json_dict
 
@@ -556,14 +562,15 @@ def _bootstrap_config_pack_artifacts() -> tuple[list[str], bool]:
     return created, config_just_created
 
 
-def _bootstrap_runtime_data_artifacts() -> list[str]:
+def _bootstrap_runtime_data_artifacts(*, shadow: bool = False) -> list[str]:
     """Local settings, dotenv, cons_data, consumer state, profile CSVs, log."""
     created: list[str] = []
-    for path in _stamp_pack_jsons_to_current_data_model():
-        created.append(path)
+    if not shadow:
+        for path in _stamp_pack_jsons_to_current_data_model():
+            created.append(path)
     if _bootstrap_local_settings_json():
         created.append(resolve_local_settings_json_path())
-    if _bootstrap_dotenv():
+    if not shadow and _bootstrap_dotenv():
         created.append(resolve_dotenv_path())
     if _bootstrap_cons_data_csv():
         created.append(default_cons_data_file())
@@ -585,11 +592,20 @@ def _bootstrap_runtime_data_artifacts() -> list[str]:
 
 def _bootstrap_all_artifacts() -> list[str]:
     """Create missing runtime artifacts; return paths of newly created files."""
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        logger.info(
+            "bootstrap: Shadow Mode — skip config pack / .env writes "
+            "(shared config read-only)"
+        )
+        return _bootstrap_runtime_data_artifacts(shadow=True)
+
     created, config_just_created = _bootstrap_config_pack_artifacts()
     from runtime_store.addon_options import apply_addon_options
 
     apply_addon_options(config_just_created=config_just_created)
-    created.extend(_bootstrap_runtime_data_artifacts())
+    created.extend(_bootstrap_runtime_data_artifacts(shadow=False))
     return created
 
 

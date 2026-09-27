@@ -638,6 +638,9 @@ if __name__ == "__main__":
     reinit_config_or_exit(config)
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
     log_config_drift(logging.getLogger("main"))
+    from runtime_store.shadow import refuse_shadow_startup_or_exit
+
+    refuse_shadow_startup_or_exit()
     try:
         ensure_single_instance("main")
     except SingleInstanceError as exc:
@@ -678,9 +681,10 @@ if __name__ == "__main__":
         touch_daemon_heartbeat()
         if power_interval_sampler.tick():
             try:
-                from runtime_store.shadow import flush_after_sampler
+                from runtime_store.shadow import flush_after_sampler, is_shadow_mode
 
-                flush_after_sampler()
+                if not is_shadow_mode():
+                    flush_after_sampler()
             except Exception:  # noqa: BLE001 — never break wait loop
                 logger.exception("shadow feed sampler flush failed")
 
@@ -756,45 +760,71 @@ if __name__ == "__main__":
         )
 
         if needs_loxone_auth_recovery():
-            ok, detail = probe_current_loxone_credentials()
-            if ok:
+            from runtime_store.shadow.mode import is_shadow_mode as _shadow_now
+
+            if _shadow_now():
                 clear_loxone_auth_error()
             else:
-                if detail.startswith("Loxone auth failed"):
-                    code = 401 if "HTTP 401" in detail else 403
-                    persist_loxone_auth_error(
-                        message=detail,
-                        http_status=code,
-                        source="main_gate",
+                ok, detail = probe_current_loxone_credentials()
+                if ok:
+                    clear_loxone_auth_error()
+                else:
+                    if detail.startswith("Loxone auth failed"):
+                        code = 401 if "HTTP 401" in detail else 403
+                        persist_loxone_auth_error(
+                            message=detail,
+                            http_status=code,
+                            source="main_gate",
+                        )
+                    log_setup_gate_wait(
+                        _setup_gate_state,
+                        "loxone_auth",
+                        "Loxone-Zugang verweigert (%s). "
+                        "Bitte Zugangsdaten in der Streamlit-UI (Port %s) unter "
+                        "Smarthome-Backend prüfen. Erneuter Versuch in %s Sekunden.",
+                        detail,
+                        config.get_ui_streamlit_port(),
+                        _SETUP_WAIT_SEC,
                     )
-                log_setup_gate_wait(
-                    _setup_gate_state,
-                    "loxone_auth",
-                    "Loxone-Zugang verweigert (%s). "
-                    "Bitte Zugangsdaten in der Streamlit-UI (Port %s) unter "
-                    "Smarthome-Backend prüfen. Erneuter Versuch in %s Sekunden.",
-                    detail,
-                    config.get_ui_streamlit_port(),
-                    _SETUP_WAIT_SEC,
-                )
-                time.sleep(_SETUP_WAIT_SEC)
-                load_app_dotenv(override=True)
-                config.reinit_config()
-                continue
+                    time.sleep(_SETUP_WAIT_SEC)
+                    load_app_dotenv(override=True)
+                    config.reinit_config()
+                    continue
 
         _setup_gate_state.clear()
         try:
+            from runtime_store.shadow.mode import is_shadow_mode
+            from runtime_store.shadow import (
+                consume_optimize_trigger,
+                wait_for_prod_cycle,
+            )
+
+            if is_shadow_mode():
+                if consume_optimize_trigger():
+                    next_trigger = TRIGGER_REQUEST_OPTIMIZE
+                cycle_info = wait_for_prod_cycle()
+                if cycle_info.get("skipped"):
+                    logger.warning(
+                        "shadow: cycle skipped (%s) — warte %ss",
+                        cycle_info.get("reason"),
+                        _SETUP_WAIT_SEC,
+                    )
+                    time.sleep(_SETUP_WAIT_SEC)
+                    continue
+
             main(run_trigger=next_trigger)
             clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
             try:
                 from runtime_store.shadow import (
                     flush_after_cycle,
+                    is_shadow_mode as _is_shadow,
                     run_superset_after_cycle,
                 )
 
-                run_superset_after_cycle()
-                flush_after_cycle()
+                if not _is_shadow():
+                    run_superset_after_cycle()
+                    flush_after_cycle()
             except Exception:  # noqa: BLE001 — recorder must never break Prod
                 logger.exception("shadow feed post-cycle failed")
 
@@ -810,6 +840,8 @@ if __name__ == "__main__":
                 on_poll=_wait_poll,
             )
             if early == TRIGGER_REQUEST_OPTIMIZE:
+                next_trigger = TRIGGER_REQUEST_OPTIMIZE
+            elif is_shadow_mode() and consume_optimize_trigger():
                 next_trigger = TRIGGER_REQUEST_OPTIMIZE
 
         except LoxoneAuthError as exc:

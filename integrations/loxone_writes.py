@@ -42,11 +42,22 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
 def _send_loxone_value_traced(input_name: str, value: float) -> LoxoneWriteRecord:
     """Sendet einen Steuerwert und liefert Erfolg plus Zeitstempel."""
     from integrations import loxone_client as lc
+    from runtime_store.shadow.writes import block_write_if_shadow
 
     io_name = str(input_name or "").strip()
     written_at = datetime.now().isoformat(timespec="seconds")
     if not io_name:
         return LoxoneWriteRecord(io_name="", value=float(value), success=False, written_at=written_at)
+
+    if block_write_if_shadow(
+        backend="loxone",
+        target=io_name,
+        value=float(value),
+        source="loxone_writes",
+    ):
+        return LoxoneWriteRecord(
+            io_name=io_name, value=float(value), success=False, written_at=written_at
+        )
 
     url = f"http://{config.get('LOXONE_IP')}/dev/sps/io/{io_name}/{value}"
     timeout_val = config.get_global_timeout(default=5)

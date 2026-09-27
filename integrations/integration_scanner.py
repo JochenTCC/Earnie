@@ -478,6 +478,9 @@ def scan_for_backends(
     - ``full_active``: ``full_passive`` plus the OpenEMS port scan. Callers must
       only reach this mode after explicit user consent (firewall/IDS risk).
     """
+    from runtime_store.shadow.replay import assert_not_shadow_backend
+
+    assert_not_shadow_backend("integration_scanner")
     kinds = set(only_kinds) if only_kinds else None
     run_ha = kinds is None or "home_assistant" in kinds
     run_loxone = kinds is None or "loxone" in kinds

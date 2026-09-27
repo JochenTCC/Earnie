@@ -102,9 +102,22 @@ class OpenemsAdapter:
         return validate_capabilities(doc)
 
     def read_channel(self, component: str, channel: str) -> float | None:
-        url = self._channel_url(component, channel)
         path = f"/rest/channel/{component}/{channel}"
         feed_key = f"openems:get:{path}"
+        from runtime_store.shadow.mode import is_shadow_mode
+
+        if is_shadow_mode():
+            from runtime_store.shadow.replay import replay_openems_get
+
+            payload = replay_openems_get(feed_key)
+            if payload is None:
+                return None
+            value = payload.get("value")
+            if value is None:
+                return None
+            return float(value)
+
+        url = self._channel_url(component, channel)
         try:
             response = requests.get(url, auth=self._auth, timeout=self.cfg.timeout_sec)
         except requests.RequestException as exc:
@@ -136,6 +149,16 @@ class OpenemsAdapter:
         return float(value)
 
     def write_channel(self, component: str, channel: str, value: float) -> None:
+        from runtime_store.shadow.writes import block_write_if_shadow
+
+        target = f"{component}/{channel}"
+        if block_write_if_shadow(
+            backend="openems",
+            target=target,
+            value=float(value),
+            source="openems_adapter.write_channel",
+        ):
+            return
         url = self._channel_url(component, channel)
         try:
             response = requests.post(

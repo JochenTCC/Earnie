@@ -382,9 +382,15 @@ def render_loxone_debug_block() -> None:
     render_status_strip(main_state)
     render_live_reads_section()
     render_last_writes_section(main_state)
-    from ui.ehal_write_test import render_write_test_section
+    from runtime_store.shadow.mode import is_shadow_mode
+    from ui.shadow_banner import render_shadow_would_write_table
 
-    render_write_test_section()
+    if is_shadow_mode():
+        render_shadow_would_write_table()
+    else:
+        from ui.ehal_write_test import render_write_test_section
+
+        render_write_test_section()
     render_last_run_snapshot_expander(main_state)
 
 from ui.loxone_debug_rows import (  # noqa: E402

@@ -39,6 +39,11 @@ def run_loxone_verify_on_startup() -> None:
     EARNIE_VERIFY_LOXONE_ON_START=0 → überspringen
     EARNIE_STRICT_LOXONE_VERIFY=1 → bei Fehler mit Exit-Code 1 abbrechen
     """
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        logger.info("Shadow Mode: Loxone-Verify beim Start übersprungen")
+        return
     if _env_flag("SKIP_LOXONE_VERIFY"):
         logger.info(
             "Loxone-Startup-Prüfung übersprungen (EARNIE_SKIP_LOXONE_VERIFY)."
