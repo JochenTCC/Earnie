@@ -30,7 +30,8 @@ Optional **pre-release** suffix for community test builds only: `MAJOR.MINOR.PAT
 ## Pre-releases (alpha / rc)
 
 - Publish from **`main`**: approve bump → commit → push → annotated tag `vX.Y.Z-alpha.N` (must match `version.py`).
-- CI (`.github/workflows/release.yml`): GitHub Release with `--prerelease` (not `--latest`); GHCR only `:<version>` (no `:latest`) via `scripts/build_container.default_tags`.
+- CI (`.github/workflows/release-publish.yml`): the tag builds a **candidate** (GHCR `:<version>`, draft release). After the user tests it and approves job `promote` (environment `release-approval`): GitHub Release with `--prerelease` (not `--latest`), GHCR `:next` (no `:latest`), HA add-on `earnie_prerelease` pin. Details: skill `session-abschluss` Phase 2.
+- A rejected candidate is never re-tagged — fix, approved bump to the next pre-release (`alpha.N+1`), tag again.
 - Leave the pre-release string on `main` until the next approved bump (`alpha.N+1`, `rc.N`, or final `X.Y.Z`). Do **not** bump back to the previous official version after tagging.
 - Backlog letters stay planning-only; do not invent backlog IDs like `2.2.0-alpha.1`.
 
