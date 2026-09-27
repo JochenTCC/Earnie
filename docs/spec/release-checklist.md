@@ -52,7 +52,7 @@ Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` o
 - [ ] `\\HOMEASSISTANT\addons\earnie_dev\config.yaml` → `version: "<version>"`
 - [ ] HA: Settings → Add-ons → Add-on Store → ⋮ → **Check for updates** → Earnie (Dev) → **Update**
 - [ ] **Stop Earnie (Vorabversion)** (both would drive the same devices; the sibling guard does not cover `earnie_dev`)
-- [ ] Start Earnie (Dev), log shows no traceback; version in the UI = `<version>`
+- [ ] Start Earnie (Dev), log shows no traceback; version in the UI = `<version> (candidate)` for pre-releases (or `<version>` for official)
 - [ ] UI opens via Ingress (sidebar) — no "Not found", no endless starting page
 - [ ] Configuration present (house, components, tariffs) — or deliberately fresh
 - [ ] Smarthome backend / EHAL: HA entities resolve, live values arrive
@@ -66,7 +66,7 @@ In-place pin on the live `earnie-productive` compose (NAS project folder; often 
 
 - [ ] Set `image:` to `ghcr.io/jochentcc/earnie-energy:<version>` (replace `:latest`)
 - [ ] `docker compose --project-directory . -f compose.yaml pull` then `up -d` (adjust `-f` if the file name differs)
-- [ ] UI on port **8501**; version in the UI = `<version>`; no traceback in the container log
+- [ ] UI on port **8501**; version in the UI = `<version> (candidate)` for pre-releases (or `<version>` for official); no traceback in the container log
 - [ ] Daemon runs (auto start) and completes an optimization cycle; plan chart plausible
 - [ ] Loxone / EHAL smoke: live values arrive, control path OK for this release
 - [ ] Feature-specific checks for this release (from the release notes / backlog items): …

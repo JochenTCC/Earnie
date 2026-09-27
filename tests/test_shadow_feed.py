@@ -19,7 +19,8 @@ from tests.config_fixtures import minimal_config_payload, write_minimal_config_t
 @pytest.fixture(autouse=True)
 def _reset_shadow(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_OFFLINE", "1")
-    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    # Prefer "0" over delenv: survives leaked parent/worker EARNIE_SHADOW=1.
+    monkeypatch.setenv("EARNIE_SHADOW", "0")
     monkeypatch.delenv("EARNIE_SHADOW_FEED_PATH", raising=False)
     shadow_feed.reset_for_tests()
     yield
@@ -43,6 +44,7 @@ def _enable_feed(tmp_path, monkeypatch, *, retention_days: int = 14) -> Path:
         encoding="utf-8",
     )
     feed_path = tmp_path / "shadow_feed"
+    monkeypatch.setenv("EARNIE_SHADOW", "0")
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed_path))
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(Path(config_path).parent))
     cfg = config.Config(
@@ -52,6 +54,10 @@ def _enable_feed(tmp_path, monkeypatch, *, retention_days: int = 14) -> Path:
         require_loxone_credentials=False,
     )
     monkeypatch.setattr(config, "CONFIG", cfg)
+    assert cfg.is_shadow_feed_enabled() is True
+    assert is_shadow_mode() is False
+    assert shadow_feed.is_feed_recording_enabled() is True
+    assert shadow_feed.feed_dir() == feed_path
     return feed_path
 
 
@@ -86,7 +92,9 @@ def test_recording_disabled_by_default(tmp_path, monkeypatch):
 def test_shadow_env_disables_recorder(tmp_path, monkeypatch, caplog):
     feed_path = _enable_feed(tmp_path, monkeypatch)
     monkeypatch.setenv("EARNIE_SHADOW", "1")
-    with caplog.at_level(logging.WARNING):
+    feed_logger = logging.getLogger("runtime_store.shadow.feed")
+    with caplog.at_level(logging.WARNING, logger=feed_logger.name):
+        assert is_shadow_mode() is True
         assert shadow_feed.is_feed_recording_enabled() is False
         assert shadow_feed.is_feed_recording_enabled() is False
     record_transport("loxone:io:X", ok=True, payload={"v": 1})
@@ -97,6 +105,8 @@ def test_shadow_env_disables_recorder(tmp_path, monkeypatch, caplog):
 
 def test_record_ok_and_error_jsonl_no_secrets(tmp_path, monkeypatch):
     feed_path = _enable_feed(tmp_path, monkeypatch)
+    assert is_shadow_mode() is False
+    assert shadow_feed.is_feed_recording_enabled() is True
     record_transport(
         "ha:get:/api/states/sensor.x",
         ok=True,
@@ -111,7 +121,9 @@ def test_record_ok_and_error_jsonl_no_secrets(tmp_path, monkeypatch):
     )
     shadow_feed.flush_after_cycle()
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    jsonl = (feed_path / f"feed-{day}.jsonl").read_text(encoding="utf-8")
+    jsonl_path = feed_path / f"feed-{day}.jsonl"
+    assert jsonl_path.is_file(), f"missing {jsonl_path}; feed_dir={shadow_feed.feed_dir()}"
+    jsonl = jsonl_path.read_text(encoding="utf-8")
     assert "Authorization" not in jsonl
     assert "password" not in jsonl.lower()
     assert "token" not in jsonl.lower()
