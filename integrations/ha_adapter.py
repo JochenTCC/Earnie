@@ -474,18 +474,31 @@ class HaAdapter:
 
     def _get_json(self, path: str) -> Any:
         url = f"{self._base}{path}"
+        feed_key = f"ha:get:{path}"
         try:
             response = requests.get(
                 url, headers=self._headers, timeout=self.cfg.timeout_sec
             )
         except requests.RequestException as exc:
+            _ha_shadow_record(feed_key, ok=False, error=str(exc))
             raise HaHttpError(f"HA GET failed: {exc}") from exc
         if response.status_code != 200:
+            _ha_shadow_record(
+                feed_key,
+                ok=False,
+                status=int(response.status_code),
+                payload=_safe_json_or_text(response),
+                error=f"HTTP {response.status_code}",
+            )
             raise HaHttpError(
                 f"HA GET {path} → HTTP {response.status_code}",
                 status_code=response.status_code,
             )
-        return response.json()
+        payload = response.json()
+        _ha_shadow_record(
+            feed_key, ok=True, payload=payload, status=int(response.status_code)
+        )
+        return payload
 
     def _read_mapped_numeric(self, field_name: str) -> float:
         entity_id = self.cfg.entities[field_name]
@@ -590,3 +603,26 @@ class HaAdapter:
         error = validate_write_error(payload)
         self._last_write_error = error
         return error
+
+
+def _safe_json_or_text(response: Any) -> Any:
+    try:
+        return response.json()
+    except ValueError:
+        return getattr(response, "text", None)
+
+
+def _ha_shadow_record(
+    key: str,
+    *,
+    ok: bool,
+    payload: Any = None,
+    status: int | None = None,
+    error: str | None = None,
+) -> None:
+    try:
+        from runtime_store.shadow.hooks import record_transport
+
+        record_transport(key, ok=ok, payload=payload, status=status, error=error)
+    except Exception:  # noqa: BLE001
+        pass

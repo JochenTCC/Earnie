@@ -105,6 +105,7 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
 
     try:
         response = requests.get(url, timeout=config.get_global_timeout())
+        feed_key = f"ext:pv_forecast:{_shadow_url_hash(url)}"
         if response.status_code == 429:
             retry_at = _parse_retry_at(response)
             if retry_at:
@@ -114,13 +115,34 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
                 f"[FEHLER] forecast.solar Rate-Limit (HTTP 429). "
                 f"Nächster API-Aufruf erlaubt ab {retry_msg}."
             )
+            _shadow_ext_record(
+                feed_key,
+                ok=False,
+                status=429,
+                payload=_safe_body(response),
+                error="rate_limited",
+            )
             return _return_cached_or_none(
                 cached, reason="HTTP 429", empty_source="rate_limited"
             )
 
-        response.raise_for_status()
-        data = response.json()
-        hourly_watts = data.get("result", {}).get("watts", {})
+        try:
+            data = response.json()
+        except ValueError:
+            data = response.text
+        if response.status_code >= 400:
+            _shadow_ext_record(
+                feed_key,
+                ok=False,
+                status=int(response.status_code),
+                payload=data,
+                error=f"HTTP {response.status_code}",
+            )
+            response.raise_for_status()
+        _shadow_ext_record(
+            feed_key, ok=True, payload=data, status=int(response.status_code)
+        )
+        hourly_watts = data.get("result", {}).get("watts", {}) if isinstance(data, dict) else {}
         if not hourly_watts:
             print("[FEHLER] forecast.solar: leeres watts-Ergebnis.")
             return _return_cached_or_none(cached, reason="leeres watts")
@@ -133,13 +155,57 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
         print(
             f"[FEHLER] Timeout beim PV-Forecast ({config.get_global_timeout()}s überschritten)."
         )
+        _shadow_ext_record(
+            f"ext:pv_forecast:{_shadow_url_hash(url)}",
+            ok=False,
+            error="timeout",
+        )
         return _return_cached_or_none(cached, reason="Timeout")
     except requests.exceptions.HTTPError as http_err:
         print(f"[FEHLER] HTTP-Fehler beim PV-Forecast-Abruf: {http_err}.")
+        _shadow_ext_record(
+            f"ext:pv_forecast:{_shadow_url_hash(url)}",
+            ok=False,
+            error=str(http_err),
+        )
         return _return_cached_or_none(cached, reason=f"HTTPError:{http_err}")
     except Exception as e:
         print(f"[FEHLER] Unerwarteter Fehler beim PV-Forecast: {e}.")
+        _shadow_ext_record(
+            f"ext:pv_forecast:{_shadow_url_hash(url)}",
+            ok=False,
+            error=str(e),
+        )
         return _return_cached_or_none(cached, reason=f"Exception:{e}")
+
+
+def _shadow_url_hash(url: str) -> str:
+    from runtime_store.shadow.feed import url_hash
+
+    return url_hash(url)
+
+
+def _safe_body(response) -> object:
+    try:
+        return response.json()
+    except ValueError:
+        return getattr(response, "text", None)
+
+
+def _shadow_ext_record(
+    key: str,
+    *,
+    ok: bool,
+    payload: object = None,
+    status: int | None = None,
+    error: str | None = None,
+) -> None:
+    try:
+        from runtime_store.shadow.hooks import record_transport
+
+        record_transport(key, ok=ok, payload=payload, status=status, error=error)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[list, bool]:

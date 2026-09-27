@@ -37,6 +37,11 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] Tariff preview seems to not work with the model - just by mirroring existing tariff data. Check reasons
+
+## Minor changes (no bugs - do not remove this chapter - even if empty)
+
+- [ ] Change order on Monitor side: Place sankey diagram right under Chart 1 - then Chart 2 with cost and consumption - then Simulation Details und Energievergleich
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
 

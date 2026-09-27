@@ -1,7 +1,7 @@
 # Specification: Shadow Mode (Dev instance fed by Prod)
 
-**Version:** 0.1  
-**Status:** Draft (2026-09-27) — not implemented  
+**Version:** 0.2  
+**Status:** Draft (2026-09-27) — not implemented; backlog **2.6.o** (S1) → **2.7.f** (S2+S3) → **2.+1** (S4)  
 **Epic short name:** **Shadow**  
 **Related:** Silent mode (`config.is_silent_mode()`), [EHAL](ehal.md), [Release Checklist](release-checklist.md)
 
@@ -94,9 +94,9 @@ Each record: `{"key", "ts" (UTC ISO), "ok": bool, "status" (HTTP code or null), 
 
 ### 5.3 Superset: what Shadow might need but Prod does not read
 
-Shadow can only see what Prod reads. To cover new sensors used only by the dev build, Prod additionally reads, **once per quarter-hour cycle**:
+Shadow can only see what Prod reads. To cover bindings present in the shared config but not touched in this Prod cycle, Prod additionally reads, **once per quarter-hour cycle**:
 
-- **HA:** one `GET /api/states` (all entities, single call) → key `ha:get:/api/states`. Shadow serves `ha:get:/api/states/<entity>` from it when no direct record exists.
+- **HA (default):** only entities referenced in the shared config bindings (plant / consumers / EHAL map) that were not read in this cycle — one `GET /api/states/<entity>` each → key `ha:get:/api/states/<entity>`. Full `GET /api/states` dump is **not** the default (payload size on SMB); optional later via a local_settings flag if needed.
 - **Loxone:** every IO name referenced in the config bindings (house profiles, consumers, EHAL mapping) that was not read in this cycle. The config is shared, so bindings added for the dev build are included.
 - **OpenEMS:** the configured ESS / EVCS component channels.
 
@@ -114,7 +114,7 @@ Location: `{config_dir}/shadow_feed/` (the config dir is already shared between 
 
 - `feed_schema` starts at `1`; Shadow refuses unknown major versions.
 - Writes are atomic so a reader on SMB never sees a half file; the reader retries once on `JSONDecodeError`.
-- Size guard: `/api/states` payload is stored once per cycle, not per sampler tick.
+- Size guard: large payloads (if any) are stored once per cycle, not per sampler tick.
 
 ### 5.5 Failure isolation
 
@@ -151,7 +151,7 @@ When `is_shadow_mode()`:
 - All config writers raise `ConfigReadOnlyError` when the target is under `config_dir()`: `settings.json_io.write_json_dict`, `.env` writes (`runtime_store.dotenv_io`), uploads, config pack import, bootstrap of config files.
 - Load-time migrations that write back are **skipped** in Shadow (e.g. `apply_ha_secrets_migration_to_disk` in `runtime_store/config_load.py`); Shadow uses the migrated values in memory only.
 - UI: banner "Konfiguration schreibgeschützt (Shadow)"; save buttons disabled.
-- Consequence: config changes for a dev feature are made in Prod's UI / file. The Prod build ignores keys it does not know; keys the Prod build would **reject** cannot be tested this way (→ open question §12.2).
+- Consequence: config changes for a dev feature are made in Prod's UI / file. The Prod build **ignores** keys it does not know. Keys the Prod build would **reject** cannot be tested via Shadow in v1 (no Shadow-only overlay).
 
 ### 6.5 Own runtime dir
 
@@ -216,16 +216,22 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 
 ## 11. Implementation plan
 
-| Step | Content | Ships to Prod? |
-|---|---|---|
-| **S1** | Recorder (§5) behind `shadow_feed_enabled`, feed schema 1, tests | **yes — must be released first**, otherwise Prod cannot feed Shadow |
-| **S2** | `is_shadow_mode()`, replay (§6.1–6.2), write block (§6.3), config read-only (§6.4), startup checks (§4.2), release guard (§4.4) | code ships, inactive without env var |
-| **S3** | UI (§8), `EARNIE_STREAMLIT_PORT`, seed script (§6.5), user docs (German: `docs/einrichtung/`, DEVELOPER.md) | yes |
-| S4 (later) | Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input | — |
+| Step | Content | Backlog | Ships to Prod? |
+|---|---|---|---|
+| **S1** | Recorder (§5) behind `shadow_feed_enabled`, feed schema 1, tests | **2.6.o** | **yes — must be released first**, otherwise Prod cannot feed Shadow |
+| **S2** | `is_shadow_mode()`, replay (§6.1–6.2), write block (§6.3), config read-only (§6.4), startup checks (§4.2), release guard (§4.4) | **2.7.f** | code may ship on `feature/2.7`; inactive without env var |
+| **S3** | UI (§8), `EARNIE_STREAMLIT_PORT`, seed script (§6.5), user docs (German: `docs/einrichtung/`, DEVELOPER.md) | **2.7.f** | with S2 |
+| S4 (later) | Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input | **2.+1** | — |
 
-## 12. Open questions
+## 12. Decisions / remaining open
 
-1. **Superset budget:** is one `/api/states` per cycle acceptable on large HA installations (payload size on SMB)? Alternative: only entities referenced anywhere in the config.
-2. **Config keys unknown to Prod:** config is read-only in Shadow, so a dev feature whose new config keys make the Prod build fail validation cannot be tested. Accept, or allow a Shadow-only overlay file in the Shadow runtime dir (`config_overlay.json`, merged in memory, never written to the shared config)?
-3. **Feed retention default:** 14 days of JSONL — size estimate needed after S1 on the real house.
-4. **Clock skew** between Prod host and dev PC: staleness uses the record `ts` from Prod against Shadow's clock; tolerate ± 30 s or compare against `meta.json.heartbeat_ts` instead.
+**Decided (2026-09-27):**
+
+1. **HA superset (default):** only config-referenced entities (§5.3); no full `/api/states` dump by default.
+2. **Config keys unknown to Prod:** no Shadow overlay in v1. Prod ignores unknown keys; Prod-rejected keys cannot be tested via Shadow.
+3. **Backlog packaging:** S1 recorder = **2.6.o** (before finishing **2.6.r** Sonar); S2+S3 Shadow client = **2.7.f** (first on `feature/2.7`, before **2.7.a–e**). S4 → **2.+1**.
+
+**Still open:**
+
+- **Feed retention default:** 14 days of JSONL — size estimate needed after S1 on the real house.
+- **Clock skew** between Prod host and dev PC: prefer staleness vs `meta.json.heartbeat_ts` (or relative age), not only Shadow wall clock; confirm in S2.

@@ -103,6 +103,12 @@ def load_system_and_ui_params(
         "UI_PRICE_FORECAST_PAGE_ENABLED": system_settings.load_ui_bool(
             raw_config, "price_forecast_page_enabled", False
         ),
+        "SHADOW_FEED_ENABLED": system_settings.load_shadow_feed_enabled(
+            local_settings, local_settings_path
+        ),
+        "SHADOW_FEED_RETENTION_DAYS": system_settings.load_shadow_feed_retention_days(
+            local_settings, local_settings_path
+        ),
     }
 
 

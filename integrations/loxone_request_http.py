@@ -86,6 +86,12 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
                 self.rfile.read(length)
             self._record_peer()
             signal_optimize_request()
+            try:
+                from runtime_store.shadow.hooks import record_event
+
+                record_event("trigger:request_optimize")
+            except Exception:  # noqa: BLE001
+                pass
             logger.info("Earnie_Request_Optimize received — early optimize queued.")
             self.send_response(204)
             self.end_headers()
