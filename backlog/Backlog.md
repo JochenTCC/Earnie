@@ -18,9 +18,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.6`**.
 
-**Next:** **2.6.o** (Shadow recorder) before finishing **2.6.r re-check** → then **2.6.r** / community/official publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**).
+**Next:** **2.6.o** (Shadow recorder) → then community/official **2.6** publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**).
 
-#### 2.6.o — Shadow Mode S1: Prod feed recorder (before 2.6.r finish)
+#### 2.6.o — Shadow Mode S1: Prod feed recorder
 
 Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) (Epic **Shadow**; S1 only here). Must ship in a **2.6** Prod build so Dev can later feed Shadow during **2.7**.
 
@@ -32,22 +32,6 @@ Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) (Epic **Shadow**
   - Failure isolation: recorder never breaks Prod (wrap + rate-limited warnings)
   - Tests: per-primitive ok/error, no secrets, atomic `latest.json`, JSONL rotation/retention, recorder exception does not break `main()`
   - **Not in this letter:** Shadow replay / write block / UI / seed (**2.7.f**); Soll/Soll diff & offline JSONL replay (S4 → **2.+1**)
-
-#### 2.6.r re-check — final pre-official quality gate (2026-09-26)
-
-Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (`2.6.r re-check`).
-
-- [ ] **2.6.r re-check** on `main` (Sonar CI unblock + QG remediations; no `version.py` bump)
-  - [ ] SonarCloud snapshot — pre-fix QG **ERROR** (`new_reliability_rating` C, `new_security_rating` C, `new_coverage` 66%); last successful analysis was pre-remediation `@271a6a3`. CI red cause: pytest failed before scan (UNC share-root validation). Fixes on `main` awaiting analysis:
-    - Fixed: CI blocker — accept Windows UNC + POSIX absolute `share_root` / `remote_share_root` on Linux runners (`scripts/remote_backtesting_support.py`); NOSONAR on post-`_safe_join` sinks (S2083 / S6549)
-    - Fixed: `python:S1244` float eq in `integrations/ha_units.py` (new bug)
-    - Fixed: `python:S1764` NaN check in `house_config/known_chart_display.py` (`math.isnan`)
-    - Fixed: SHA-pin Actions in `release-publish.yml` + `qemu-image-smoke.yml`; job-level permissions (S8233)
-    - Fixed: path/URL hardening in `scripts/report_repo_stats.py` (S8707 / S8703)
-    - Fixed: `docker/Dockerfile` explicit COPY (S6470) + tighter `.dockerignore`
-    - Ignore (sonar-project.properties multicriteria): LLM CLI S8707/S8705; pip unlock S8541/S8544 (local `.` package); lockfile S8565; container root S6471; Loxone/lab HTTP S5332
-    - Marked intentional: mock REST HTTP (`house_sim/mock_rest.py`), HA add-on root (comment NOSONAR; inline on `FROM` breaks BuildKit)
-    - Still open / accept: Sonar `new_coverage` 66% (informational — do not chase as in-gate); QG may stay ERROR on coverage alone until gate policy is relaxed in SonarCloud UI
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
