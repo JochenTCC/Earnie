@@ -7,7 +7,7 @@
 # Candidate → approve → publish:
 #   1. release         build + push only :<version> images, GitHub Release as *draft*
 #   2. addon_smoke     start earnie-addon-{arch}:<version> like the Supervisor (blocking on amd64)
-#      addon_lint      bump add-on pins in the workspace + addon-linter (no commit)
+#      addon_lint      bump add-on pins on the tag checkout + addon-linter (no commit)
 #      qemu_smoke      constrained-CPU smoke (soft)
 #   3. promote         environment "release-approval" (required reviewer) — waits for manual
 #                      approval; then :next (+ :latest if official) and publishes the release
@@ -262,17 +262,18 @@ jobs:
           --timeout "${{ matrix.timeout }}"
 
   # Pre-gate: the pin bump + addon-linter that publish_ha_addon runs after
-  # approval, dry (workspace only, no commit/push).
+  # approval, dry (workspace only, no commit/push). Lints the tagged candidate,
+  # not main — main may have moved on since the tag.
   addon_lint:
     needs: release
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Checkout main
+      - name: Checkout tag
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: main
+          ref: ${{ needs.release.outputs.tag }}
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5

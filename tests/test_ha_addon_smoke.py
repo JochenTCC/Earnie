@@ -91,3 +91,11 @@ def test_release_workflow_gates_user_visible_steps():
     assert "needs: [release, addon_smoke, addon_lint, qemu_smoke]" in text
     assert "needs: [release, promote]" in text
     assert "scripts.ha_addon_smoke" in text
+
+
+def test_release_workflow_addon_lint_checks_out_tag():
+    """addon_lint must lint the tagged candidate, not a main that moved on since the tag."""
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    job = text.split("\n  addon_lint:\n", 1)[1].split("\n  promote:\n", 1)[0]
+    assert "ref: ${{ needs.release.outputs.tag }}" in job
+    assert "ref: main" not in job
