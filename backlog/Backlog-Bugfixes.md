@@ -38,6 +38,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] Earnie is discharging battery although export tariff is negative (around 12:00) - does this make sense? - see dump "debug-dumps\debug_dump_20260927_090524"
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
 

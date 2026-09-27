@@ -77,6 +77,50 @@ def _build_milp_model_with_objective(
             inbound_limit_kw=inbound_export_limit_kw,
             fallback_k_push=k_push,
         )
+    # #region agent log
+    try:
+        import json as _json
+        import time as _time
+        from pathlib import Path as _Path
+
+        _zero = sum(1 for c in caps if c == 0.0)
+        _neg = [
+            {
+                "t": t,
+                "slot": (matrix[t].get("slot_datetime") if t < len(matrix) else None),
+                "k_push": (matrix[t].get("k_push_act") if t < len(matrix) else None),
+                "cap": caps[t],
+            }
+            for t in range(min(len(caps), inputs.horizon))
+            if caps[t] == 0.0
+        ][:12]
+        with _Path("debug-66230d.log").open("a", encoding="utf-8") as _f:
+            _f.write(
+                _json.dumps(
+                    {
+                        "sessionId": "66230d",
+                        "runId": "live",
+                        "hypothesisId": "H2",
+                        "location": "milp.py:_build_milp_model_with_objective",
+                        "message": "export caps applied to MILP",
+                        "data": {
+                            "horizon": inputs.horizon,
+                            "soc": current_soc,
+                            "zero_cap_slots": _zero,
+                            "zero_cap_sample": _neg,
+                            "hk": hk_max_export_kw,
+                            "inbound": inbound_export_limit_kw,
+                        },
+                        "timestamp": int(_time.time() * 1000),
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+    # #endregion
     model = _build_milp_model(
         matrix,
         inputs.horizon,
@@ -102,6 +146,7 @@ def _build_milp_model_with_objective(
         inputs.ev_milp_by_id,
         wear_cent_per_kwh=wear_cent_per_kwh,
     )
+    model._debug_export_caps = caps  # noqa: SLF001 — agent debug
     return model
 
 
@@ -251,6 +296,60 @@ def _solve_milp_to_model(
 
     update_cbc_milp_context_from_row(matrix[0])
     status = solve_with_strict_fallback(model.prob, msg=False, verbose=verbose)
+    # #region agent log
+    try:
+        import json as _json
+        import time as _time
+        from pathlib import Path as _Path
+
+        _caps = getattr(model, "_debug_export_caps", None) or []
+        _bad = []
+        if status == "Optimal":
+            for _t in range(min(model.horizon, len(matrix))):
+                _kpush = matrix[_t].get("k_push_act")
+                try:
+                    _kpush_f = float(_kpush) if _kpush is not None else 0.0
+                except (TypeError, ValueError):
+                    _kpush_f = 0.0
+                _dch = float(model.p_discharge[_t].varValue or 0.0)
+                _sell = float(model.p_grid_sell[_t].varValue or 0.0)
+                if _kpush_f < 0.0 and (_dch > 0.05 or _sell > 0.05):
+                    _bad.append(
+                        {
+                            "t": _t,
+                            "slot": matrix[_t].get("slot_datetime"),
+                            "k_push": _kpush_f,
+                            "cap": _caps[_t] if _t < len(_caps) else None,
+                            "dch": round(_dch, 3),
+                            "sell": round(_sell, 3),
+                        }
+                    )
+        with _Path("debug-66230d.log").open("a", encoding="utf-8") as _f:
+            _f.write(
+                _json.dumps(
+                    {
+                        "sessionId": "66230d",
+                        "runId": "live",
+                        "hypothesisId": "H1",
+                        "location": "milp.py:_solve_milp_to_model",
+                        "message": "MILP solve status vs neg-export discharge/sell",
+                        "data": {
+                            "status": status,
+                            "soc": current_soc,
+                            "horizon": model.horizon,
+                            "neg_export_dch_or_sell": _bad[:20],
+                            "t0_k_push": matrix[0].get("k_push_act") if matrix else None,
+                        },
+                        "timestamp": int(_time.time() * 1000),
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+    # #endregion
     if status != "Optimal":
         record_cbc_event("milp_no_optimal", final_status=status)
         return None

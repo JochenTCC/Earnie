@@ -328,6 +328,44 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
     # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
     export_cap = export_ctx["effective_export_cap_kw"]
+    # #region agent log
+    try:
+        import json as _json
+        import time as _time
+        from pathlib import Path as _Path
+
+        _row0 = optimization_matrix[0] if optimization_matrix else {}
+        with _Path("debug-66230d.log").open("a", encoding="utf-8") as _f:
+            _f.write(
+                _json.dumps(
+                    {
+                        "sessionId": "66230d",
+                        "runId": "live",
+                        "hypothesisId": "H5",
+                        "location": "main.py:live_export_after_milp",
+                        "message": "live t0 decision vs export cap",
+                        "data": {
+                            "mode": mode,
+                            "target_power_kw": target_power,
+                            "target_soc": target_soc,
+                            "soc": current_soc,
+                            "t0_k_push": _row0.get("k_push_act"),
+                            "export_cap_kw": export_cap,
+                            "hk_max_export_kw": export_ctx.get("hk_max_export_kw"),
+                            "inbound_export_limit_kw": export_ctx.get(
+                                "inbound_export_limit_kw"
+                            ),
+                        },
+                        "timestamp": int(_time.time() * 1000),
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+    # #endregion
     battery_params = config.get_battery_params()
     battery_plan_kw = optimizer.battery_plan_kw_from_control(
         mode,
