@@ -86,11 +86,33 @@ def _live_consumers() -> list[dict]:
     return _all_live_consumers()
 
 
+def _unconstrained_export_limit_kw() -> float:
+    """Default for ``set_grid_export_power_limit`` when nothing was sent yet.
+
+    ``0`` would mean Einspeisesperre, so fall back to the same "unconstrained" value
+    the Live write path sends.
+    """
+    from optimizer.export_power_limit import (
+        EXPORT_LIMIT_UNCONSTRAINED_W,
+        export_limit_setpoint_kw,
+    )
+
+    try:
+        from optimizer.live_export_limit import live_unconstrained_export_kw
+
+        return float(
+            export_limit_setpoint_kw(None, unconstrained_kw=live_unconstrained_export_kw())
+        )
+    except Exception:  # noqa: BLE001 — status JSON must never fail on config
+        return EXPORT_LIMIT_UNCONSTRAINED_W / 1000.0
+
+
 def _plant_status_keys(
     loxone_sent: Mapping[str, float],
     io_to_field: Mapping[str, str],
 ) -> dict[str, float]:
     payload = {field: 0.0 for field in PLANT_LIVE_WRITE_FIELDS}
+    payload["set_grid_export_power_limit"] = _unconstrained_export_limit_kw()
     for io_name, value in loxone_sent.items():
         field = str(io_to_field.get(io_name) or "").strip()
         if field in payload:
