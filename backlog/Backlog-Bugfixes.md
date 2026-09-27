@@ -38,7 +38,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Earnie is discharging battery although export tariff is negative (around 12:00) - does this make sense? - see dump "debug-dumps\debug_dump_20260927_090524"
+- [ ] **Negative export tariff + battery discharge** (`debug_dump_20260927_090524`) — Forced grid discharge while `k_push < 0` does **not** make sense. Dump: live 08:23–09:01 `Zwangsentladen` at **positive** `k_push` (~10–14 ct, room-making OK); plan ~13:45–14:15 `Zwangsentladen` + ~5 kW export at **≈ −0.8 ct** (bug). Replay: hard `export_cap=0` → MILP **Infeasible** (no PV curtailment); without caps Optimal still `dch`+`sell` on negative slots. **Parked debug** (commit `97fa9cd`): NDJSON probes in `optimizer/milp.py` + `main.py` → `debug-66230d.log` (`#region agent log`). **Resume:** (1) choose fix path — soft pay-to-export penalty + no discharge beyond load when `k_push<0` / PV curtailment var so hard cap stays feasible / both (aligns 2.7.a dogfood “soft behaviour”); (2) restart Live with instrumented code; (3) clear `debug-66230d.log`, one opt cycle, read log; (4) implement chosen fix, keep probes until post-fix verify; (5) remove instrumentation. Open question: Monitor plan vs live discharge after `k_push` already negative.
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
 
