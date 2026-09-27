@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from optimizer.export_power_limit import (
     EXPORT_LIMIT_UNCONSTRAINED_W,
+    clip_grid_kw_to_export_cap,
     effective_export_cap_kw,
     export_caps_for_horizon,
     export_limit_setpoint_kw,
@@ -29,6 +30,15 @@ def test_pay_to_export_forces_hard_zero() -> None:
     assert effective_export_cap_kw(k_push_act=-0.01) == 0.0
     assert effective_export_cap_kw(hk_max_export_kw=10.0, k_push_act=0.0) == 10.0
     assert effective_export_cap_kw(k_push_act=5.0) is None
+
+
+def test_clip_grid_kw_pay_to_export_removes_chart_export() -> None:
+    assert clip_grid_kw_to_export_cap(-7.37, k_push_act=-0.572) == 0.0
+    assert clip_grid_kw_to_export_cap(-1.61, k_push_act=-0.5) == 0.0
+    assert clip_grid_kw_to_export_cap(2.0, k_push_act=-0.5) == 2.0
+    assert clip_grid_kw_to_export_cap(-3.0, k_push_act=5.0) == -3.0
+    assert clip_grid_kw_to_export_cap(-3.0, export_cap_kw=1.5) == -1.5
+    assert clip_grid_kw_to_export_cap(-3.0, export_cap_kw=0.0) == 0.0
 
 
 def test_inbound_w_to_kw() -> None:

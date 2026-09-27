@@ -145,6 +145,7 @@ MUTED_BATTERY_CHARGE_GRID = blend_hsl(_HSL_BATTERY, _HSL_GRID, 0.6, 35.0)
 MUTED_BATTERY_EXPORT = blend_hsl(_HSL_BATTERY, _HSL_GRID, 0.5, 0.8)
 MUTED_BATTERY_STANDBY = blend_hsl(_HSL_BASELOAD, _HSL_WHITE, 0.15, 35.0)
 MUTED_EXPORT_PV = blend_hsl(_HSL_PV, _HSL_WHITE, 0.1, 25.0)
+MUTED_CURTAIL_PV = blend_hsl(_HSL_BASELOAD, _HSL_WHITE, 0.2, 45.0)
 
 
 # --- Chart 1 — Linien & Overlays ----------------------------------------------

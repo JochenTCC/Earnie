@@ -69,6 +69,39 @@ def effective_export_cap_kw(
     return min(caps)
 
 
+def clip_grid_kw_to_export_cap(
+    p_grid_kw: float,
+    *,
+    k_push_act: object | None = None,
+    export_cap_kw: float | None = None,
+) -> float:
+    """Clip chart/grid power so export does not exceed the effective hard cap.
+
+    ``p_grid_kw``: positive = import, negative = export.
+    Pay-to-export (``k_push_act < 0``) or an explicit ``export_cap_kw`` of 0
+    removes export; a positive cap limits ``|export|``.
+    """
+    grid = float(p_grid_kw)
+    cap = export_cap_kw
+    if cap is None and k_push_act is not None:
+        try:
+            if float(k_push_act) < 0.0:
+                cap = 0.0
+        except (TypeError, ValueError):
+            cap = None
+    if cap is None:
+        return grid
+    try:
+        cap_f = float(cap)
+    except (TypeError, ValueError):
+        return grid
+    if cap_f < 0.0:
+        return grid
+    if grid >= 0.0:
+        return grid
+    return max(grid, -cap_f)
+
+
 def export_caps_for_horizon(
     matrix: Sequence[dict],
     *,
