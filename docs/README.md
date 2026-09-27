@@ -81,4 +81,5 @@ Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) stehen nur hier �
 - [House simulator](spec/house-sim.md) — interne Mock-/Dogfood-Bank (`house_sim/`)
 - [OpenEMS lab setup](spec/openems-lab-setup.md) — Compose + Earnie ↔ OpenEMS
 - [Branching & Hotfix Playbook](spec/branching-hotfix-playbook.md) — Tags, hotfixes, `main`
+- [Shadow Mode](spec/shadow-mode.md) — Dev-Instanz parallel zu Prod, Eingänge aus Prod-Feed, keine Schreibzugriffe (Entwurf)
 - Weitere Specs unter [`docs/spec/`](spec/)
