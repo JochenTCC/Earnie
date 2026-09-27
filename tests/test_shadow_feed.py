@@ -150,6 +150,20 @@ def test_recorder_exception_swallowed(tmp_path, monkeypatch):
     record_transport("loxone:io:Y", ok=True, payload="1")  # must not raise
 
 
+def _patch_ha_superset(monkeypatch, *, adapter, entities: dict[str, str]) -> None:
+    """Route superset to HA without stubbing ``config.get`` (breaks other keys)."""
+    import integrations.ehal_live as ehal_live
+    import runtime_store.shadow.superset as superset_mod
+
+    monkeypatch.setattr(config.CONFIG, "EHAL_BACKEND", "ha", raising=False)
+    monkeypatch.setattr(superset_mod, "_house_profiles_doc", lambda: {})
+    monkeypatch.setattr(
+        "house_config.ha_ehal_bindings.aggregate_ha_entities",
+        lambda _h: entities,
+    )
+    monkeypatch.setattr(ehal_live, "get_ha_adapter", lambda: adapter)
+
+
 def test_superset_ha_fetches_missing(tmp_path, monkeypatch):
     _enable_feed(tmp_path, monkeypatch)
     record_transport(
@@ -160,20 +174,13 @@ def test_superset_ha_fetches_missing(tmp_path, monkeypatch):
     )
     adapter = MagicMock()
     adapter.read_state = MagicMock(return_value={"state": "100", "attributes": {}})
-
-    monkeypatch.setattr(
-        "runtime_store.shadow.superset._house_profiles_doc", lambda: {}
-    )
-    monkeypatch.setattr(
-        "house_config.ha_ehal_bindings.aggregate_ha_entities",
-        lambda _h: {
+    _patch_ha_superset(
+        monkeypatch,
+        adapter=adapter,
+        entities={
             "sens_ess_soc": "sensor.soc",
             "sens_grid_power_active": "sensor.grid",
         },
-    )
-    monkeypatch.setattr("integrations.ehal_live.get_ha_adapter", lambda: adapter)
-    monkeypatch.setattr(
-        config, "get", lambda key, default=None: ("ha" if key == "EHAL_BACKEND" else default)
     )
 
     run_after_cycle(budget_sec=5)
@@ -184,33 +191,20 @@ def test_superset_ha_fetches_missing(tmp_path, monkeypatch):
 
 def test_superset_budget_stops_early(tmp_path, monkeypatch):
     _enable_feed(tmp_path, monkeypatch)
-    house_bindings = {
-        f"sensor.e{i}": f"sensor.e{i}" for i in range(20)
-    }
+    house_bindings = {f"sensor.e{i}": f"sensor.e{i}" for i in range(20)}
+    calls: list[str] = []
+    clock = {"t": 1000.0}
 
-    monkeypatch.setattr(
-        "runtime_store.shadow.superset._house_profiles_doc", lambda: {}
-    )
-    monkeypatch.setattr(
-        "house_config.ha_ehal_bindings.aggregate_ha_entities",
-        lambda _h: house_bindings,
-    )
-    calls = []
-
-    class SlowAdapter:
+    class BudgetAdapter:
         def read_state(self, entity_id):
             calls.append(entity_id)
-            import time
-
-            time.sleep(0.05)
+            clock["t"] += 0.05
             return {"state": "1"}
 
-    monkeypatch.setattr(
-        "integrations.ehal_live.get_ha_adapter", lambda: SlowAdapter()
-    )
-    monkeypatch.setattr(config, "get", lambda key, default=None: (
-        "ha" if key == "EHAL_BACKEND" else default
-    ))
+    import runtime_store.shadow.superset as superset_mod
+
+    monkeypatch.setattr(superset_mod.time, "monotonic", lambda: clock["t"])
+    _patch_ha_superset(monkeypatch, adapter=BudgetAdapter(), entities=house_bindings)
     run_after_cycle(budget_sec=0.12)
     assert 0 < len(calls) < 20
 

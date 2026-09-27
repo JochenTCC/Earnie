@@ -60,6 +60,20 @@ Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` o
 - [ ] Feature-specific checks for this release (from the release notes / backlog items): …
 - [ ] Afterwards: **stop Earnie (Dev), start Earnie (Vorabversion)** again
 
+**Synology (maintainer productive stack)**
+
+In-place pin on the live `earnie-productive` compose (NAS project folder; often `compose.yaml` from `docker/compose/synology_productive.yml`). Candidate images exist as `:<version>` before approval — do **not** use `:next` / `:latest` yet. Do **not** run `earnie-alpha` in parallel if both would write to the same Miniserver / backend.
+
+- [ ] Set `image:` to `ghcr.io/jochentcc/earnie-energy:<version>` (replace `:latest`)
+- [ ] `docker compose --project-directory . -f compose.yaml pull` then `up -d` (adjust `-f` if the file name differs)
+- [ ] UI on port **8501**; version in the UI = `<version>`; no traceback in the container log
+- [ ] Daemon runs (auto start) and completes an optimization cycle; plan chart plausible
+- [ ] Loxone / EHAL smoke: live values arrive, control path OK for this release
+- [ ] Feature-specific checks for this release (from the release notes / backlog items): …
+- [ ] Afterwards:
+  - **Reject** → restore `image: ghcr.io/jochentcc/earnie-energy:latest`, `pull` + `up -d`
+  - **Approve** → leave the pin for now; after step 6 (`:next` / `:latest` updated) switch back to `:latest` (or `:next` if you stay on the pre-release channel) and `pull` + `up -d`
+
 **LoxBerry (optional, if the release touches it)**
 
 - [ ] Plugin settings: channel `pinned`, `EARNIE_PINNED_VERSION=<version>` → *Image aktualisieren*
