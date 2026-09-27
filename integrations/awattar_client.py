@@ -14,6 +14,7 @@ def fetch_awattar_prices(
 
     planning_end: optionales Ende des Planungshorizonts (z. B. zweiter Sonnenuntergang).
     """
+    feed_key = "ext:prices:awattar"
     try:
         start, end = awattar_fetch_window(planning_end)
         start_ms = int(start.timestamp() * 1000)
@@ -23,11 +24,25 @@ def fetch_awattar_prices(
             params={'start': start_ms, 'end': end_ms},
             timeout=config.get_global_timeout(),
         )
-        response.raise_for_status()
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError:
+            data = response.text
+        if response.status_code >= 400:
+            _awattar_shadow_record(
+                feed_key,
+                ok=False,
+                status=int(response.status_code),
+                payload=data,
+                error=f"HTTP {response.status_code}",
+            )
+            response.raise_for_status()
+        _awattar_shadow_record(
+            feed_key, ok=True, payload=data, status=int(response.status_code)
+        )
         
         # Validierung der API-Struktur
-        if 'data' not in data:
+        if not isinstance(data, dict) or 'data' not in data:
             print("🚨 Fehler: Unerwartete API-Struktur von Awattar (Key 'data' fehlt).")
             return None
 
@@ -56,13 +71,32 @@ def fetch_awattar_prices(
 
     except requests.exceptions.Timeout:
         print(f"🚨 Timeout beim Abrufen der Awattar-Preise ({config.get_global_timeout()}s überschritten).")
+        _awattar_shadow_record(feed_key, ok=False, error="timeout")
         return None
     except requests.exceptions.HTTPError as http_err:
         print(f"🚨 HTTP-Fehler beim Abrufen der Awattar-Preise: {http_err}")
+        _awattar_shadow_record(feed_key, ok=False, error=str(http_err))
         return None
     except Exception as e:
         print(f"🚨 Unvorhergesehener Fehler im awattar_client: {e}")
+        _awattar_shadow_record(feed_key, ok=False, error=str(e))
         return None
+
+
+def _awattar_shadow_record(
+    key: str,
+    *,
+    ok: bool,
+    payload: object = None,
+    status: int | None = None,
+    error: str | None = None,
+) -> None:
+    try:
+        from runtime_store.shadow.hooks import record_transport
+
+        record_transport(key, ok=ok, payload=payload, status=status, error=error)
+    except Exception:  # noqa: BLE001
+        pass
 
 if __name__ == "__main__":
     # Schneller Integrationstest bei direkter Ausführung

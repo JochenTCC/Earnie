@@ -1,4 +1,6 @@
 {
   "silent_mode": false,
-  "chart_debug_capture_enabled": false
+  "chart_debug_capture_enabled": false,
+  "shadow_feed_enabled": false,
+  "shadow_feed_retention_days": 14
 }

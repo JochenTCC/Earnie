@@ -26,7 +26,7 @@ COPY house_config/ house_config/
 COPY settings/ settings/
 COPY ehal/ ehal/
 COPY share/config/ share/config/
-COPY logger_config.py app.py main.py ./
+COPY logger_config.py app.py main.py config.py ./
 RUN mkdir -p earnie_env/runtime
 COPY earnie_env/runtime/local_settings.example.json earnie_env/runtime/
 COPY .env.example ./

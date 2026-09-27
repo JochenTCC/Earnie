@@ -1,6 +1,7 @@
 """Chart-1 display peel for earnie_role=known generics (Grundlast → named traces)."""
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Any
 
@@ -67,7 +68,7 @@ def _row_has_logged_ist(row: dict[str, Any]) -> bool:
             number = float(raw)
         except (TypeError, ValueError):
             continue
-        if number == number:  # not NaN
+        if not math.isnan(number):
             return True
     return False
 

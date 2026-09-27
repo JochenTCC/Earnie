@@ -51,12 +51,29 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; u. a. `consumption_snapshot`, optional `closed_interval`) |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
-| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode`, `chart_debug_capture_enabled`)     |
+| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode`, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`)     |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
 
 
 Die App liest diese Dateien **read-only** für Panels und Abgleich.
+
+### Shadow-Feed (Prod-Recorder, optional)
+
+Für eine spätere Dev-/Shadow-Instanz kann die Produktivinstanz Rohantworten der Backend-Reads in ein Feed-Verzeichnis schreiben (Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md)).
+
+In `runtime/local_settings.json` (nicht in der gemeinsamen `config.json`):
+
+```json
+{
+  "shadow_feed_enabled": true,
+  "shadow_feed_retention_days": 14
+}
+```
+
+- Standard: aus (`false` / Schlüssel fehlt) — kein Verhaltensunterschied.
+- Feed-Pfad: `{Config-Verzeichnis}/shadow_feed/` (`meta.json`, `latest.json`, `feed-YYYY-MM-DD.jsonl`). Überschreiben: Umgebungsvariable `EARNIE_SHADOW_FEED_PATH`.
+- Nur auf der Produktivinstanz aktivieren. Mit `EARNIE_SHADOW=1` wird der Recorder ignoriert.
 
 ### Log- und Historiendateien
 
@@ -80,6 +97,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_ENV_PATH`                       | Wurzelverzeichnis für Persistenz (Standard: `earnie_env`). Daraus leiten sich `…/config` und `…/runtime` ab, sofern nicht separat gesetzt. |
 | `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; ältere Ordner: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
 | `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; ältere Ordner: `runtime`). |
+| `EARNIE_SHADOW_FEED_PATH`               | Optional: Verzeichnis für den Prod-Shadow-Feed (sonst `{Config}/shadow_feed/`). Siehe [Shadow-Feed](#shadow-feed-prod-recorder-optional). |
 | `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable: `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Prod-Compose setzt oft `sunset2sunset,live_environment`; Cloud: `scenario_explorer` — siehe [Betriebsmodi](../ui/betriebsmodi.md). |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
 | `EARNIE_EHAL_LOXONE_HTTP_PORT`          | TCP-Port für Daemon-HTTP (`Earnie_Request_Optimize` / `/alive`; überschreibt `system.ehal_loxone_http_port`, Standard **8541**)                                                                                                       |

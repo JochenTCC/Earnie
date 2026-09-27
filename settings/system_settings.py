@@ -118,6 +118,42 @@ def load_ui_chart_debug_capture_enabled(
     return load_ui_bool(raw_config, "chart_debug_capture_enabled", False)
 
 
+def load_shadow_feed_enabled(
+    local_settings: dict,
+    local_settings_path: str,
+) -> bool:
+    """Prod shadow feed recorder (local_settings only; default off)."""
+    if "shadow_feed_enabled" not in local_settings:
+        return False
+    return _validate_ui_bool(
+        local_settings.get("shadow_feed_enabled"),
+        f"{local_settings_path} (shadow_feed_enabled)",
+    )
+
+
+def load_shadow_feed_retention_days(
+    local_settings: dict,
+    local_settings_path: str,
+) -> int:
+    """JSONL retention days for shadow_feed (default 14)."""
+    if "shadow_feed_retention_days" not in local_settings:
+        return 14
+    raw = local_settings.get("shadow_feed_retention_days")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: {local_settings_path} "
+            "(shadow_feed_retention_days) muss eine ganze Zahl sein."
+        ) from exc
+    if value < 1:
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: {local_settings_path} "
+            "(shadow_feed_retention_days) muss mindestens 1 sein."
+        )
+    return value
+
+
 def load_ui_streamlit_port(raw_config: dict) -> int:
     raw = raw_config.get("ui", {}).get("streamlit_port")
     if raw is None:

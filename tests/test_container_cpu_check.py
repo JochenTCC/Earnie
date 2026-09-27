@@ -80,6 +80,8 @@ def test_dockerfile_strips_crlf_and_healthcheck() -> None:
     assert "docker/BUILD_DATE" in text
     assert "HEALTHCHECK" in text
     assert "docker/healthcheck.sh" in text
+    # Explicit COPY (no COPY . .) must still ship the import facade.
+    assert "COPY logger_config.py app.py main.py config.py ./" in text
 
 
 def test_healthcheck_sh_invokes_python_module() -> None:

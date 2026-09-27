@@ -148,30 +148,63 @@ def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
         return None
 
     timeout_val = config.get_global_timeout(default=5)
+    feed_key = f"loxone:io:{io_name}"
     try:
         response = requests.get(
             _loxone_jdev_url(io_name),
             auth=_loxone_auth(),
             timeout=timeout_val,
         )
+        status = int(response.status_code)
+        raw_text = response.text
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = raw_text
         response.raise_for_status()
-        raw_value = response.json().get("LL", {}).get("value", "")
+        raw_value = (
+            payload.get("LL", {}).get("value", "")
+            if isinstance(payload, dict)
+            else ""
+        )
         if raw_value is None or str(raw_value).strip() == "":
             logger.warning("Loxone: Kein value für '%s'", io_name)
+            _shadow_record(feed_key, ok=False, payload=payload, status=status, error="empty value")
             return None
+        _shadow_record(feed_key, ok=True, payload=payload, status=status)
         return str(raw_value).strip()
     except requests.exceptions.Timeout:
         logger.error(
             "Loxone: Timeout (%ss) beim Abrufen von '%s'", timeout_val, io_name
         )
+        _shadow_record(feed_key, ok=False, error=f"timeout {timeout_val}s")
     except requests.exceptions.RequestException as e:
         from integrations.loxone_connectivity import record_loxone_auth_http_error
 
         record_loxone_auth_http_error(e, source="loxone_client.read")
         logger.error("Loxone: Netzwerkfehler bei '%s': %s", io_name, e)
+        status = getattr(getattr(e, "response", None), "status_code", None)
+        _shadow_record(feed_key, ok=False, status=status, error=str(e))
     except (KeyError, TypeError) as e:
         logger.error("Loxone: Antwort-Fehler bei '%s': %s", io_name, e)
+        _shadow_record(feed_key, ok=False, error=str(e))
     return None
+
+
+def _shadow_record(
+    key: str,
+    *,
+    ok: bool,
+    payload: object = None,
+    status: int | None = None,
+    error: str | None = None,
+) -> None:
+    try:
+        from runtime_store.shadow.hooks import record_transport
+
+        record_transport(key, ok=ok, payload=payload, status=status, error=error)
+    except Exception:  # noqa: BLE001 — never break Loxone reads
+        pass
 
 
 # AlarmClock nextEntryTime (SpecialState10): seconds since 2009-01-01.
@@ -219,30 +252,45 @@ def _fetch_loxone_io_all(io_name: str) -> Optional[dict]:
         return None
 
     timeout_val = config.get_global_timeout(default=5)
+    feed_key = f"loxone:io_all:{io_name}"
     try:
         response = requests.get(
             _loxone_jdev_all_url(io_name),
             auth=_loxone_auth(),
             timeout=timeout_val,
         )
+        status = int(response.status_code)
+        try:
+            body = response.json()
+        except ValueError:
+            body = response.text
         response.raise_for_status()
-        ll = response.json().get("LL") or {}
+        ll = (body.get("LL") if isinstance(body, dict) else None) or {}
         if not isinstance(ll, dict):
+            _shadow_record(feed_key, ok=False, payload=body, status=status, error="no LL")
             return None
         if str(ll.get("Code") or "") not in ("", "200"):
+            _shadow_record(
+                feed_key, ok=False, payload=ll, status=status, error=f"code {ll.get('Code')}"
+            )
             return None
+        _shadow_record(feed_key, ok=True, payload=ll, status=status)
         return ll
     except requests.exceptions.Timeout:
         logger.error(
             "Loxone: Timeout (%ss) bei AlarmClock/all '%s'", timeout_val, io_name
         )
+        _shadow_record(feed_key, ok=False, error=f"timeout {timeout_val}s")
     except requests.exceptions.RequestException as e:
         from integrations.loxone_connectivity import record_loxone_auth_http_error
 
         record_loxone_auth_http_error(e, source="loxone_client.read_all")
         logger.error("Loxone: Netzwerkfehler bei AlarmClock/all '%s': %s", io_name, e)
+        status = getattr(getattr(e, "response", None), "status_code", None)
+        _shadow_record(feed_key, ok=False, status=status, error=str(e))
     except (KeyError, TypeError, ValueError) as e:
         logger.error("Loxone: Antwort-Fehler bei AlarmClock/all '%s': %s", io_name, e)
+        _shadow_record(feed_key, ok=False, error=str(e))
     return None
 
 

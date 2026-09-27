@@ -44,17 +44,56 @@ def _fetch_open_meteo_hourly(
         "forecast_days": forecast_days,
         "timezone": "auto",
     }
-    response = requests.get(url, params=params, timeout=config.get_global_timeout())
-    response.raise_for_status()
-    payload = response.json()
-    times = payload.get("hourly", {}).get("time", [])
-    temps = payload.get("hourly", {}).get("temperature_2m", [])
+    from runtime_store.shadow.feed import url_hash
+
+    # Hash path+params only (no secrets).
+    param_key = "&".join(f"{k}={params[k]}" for k in sorted(params))
+    feed_key = f"ext:outdoor:{url_hash(url + '?' + param_key)}"
+    try:
+        response = requests.get(url, params=params, timeout=config.get_global_timeout())
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = response.text
+        if response.status_code >= 400:
+            _outdoor_shadow_record(
+                feed_key,
+                ok=False,
+                status=int(response.status_code),
+                payload=payload,
+                error=f"HTTP {response.status_code}",
+            )
+            response.raise_for_status()
+        _outdoor_shadow_record(
+            feed_key, ok=True, payload=payload, status=int(response.status_code)
+        )
+    except Exception as exc:
+        _outdoor_shadow_record(feed_key, ok=False, error=str(exc))
+        raise
+    times = payload.get("hourly", {}).get("time", []) if isinstance(payload, dict) else []
+    temps = payload.get("hourly", {}).get("temperature_2m", []) if isinstance(payload, dict) else []
     if not times or not temps or len(times) != len(temps):
         raise ValueError("Open-Meteo: hourly temperature_2m unvollständig")
     parsed: list[tuple[datetime, float]] = []
     for ts_text, temp in zip(times, temps):
         parsed.append((datetime.fromisoformat(str(ts_text)), float(temp)))
     return parsed
+
+
+def _outdoor_shadow_record(
+    key: str,
+    *,
+    ok: bool,
+    payload: object = None,
+    status: int | None = None,
+    error: str | None = None,
+) -> None:
+    try:
+        from runtime_store.shadow.hooks import record_transport
+
+        record_transport(key, ok=ok, payload=payload, status=status, error=error)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _map_to_horizon(

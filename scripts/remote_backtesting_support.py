@@ -50,13 +50,26 @@ def validate_remote_config(data: dict) -> dict:
     return data
 
 
+def _is_unc_absolute(text: str) -> bool:
+    """True for Windows UNC roots (``\\\\server\\share`` / ``//server/share``).
+
+    ``Path.is_absolute()`` is False for UNC on POSIX, but operators configure
+    SMB share roots that must stay valid when CI validates the config on Linux.
+    """
+    if text.startswith("\\\\") and len(text) > 2 and text[2] not in "\\/":
+        return True
+    if text.startswith("//") and len(text) > 2 and text[2] not in "\\/":
+        return True
+    return False
+
+
 def _validated_configured_root(raw: str, *, field: str) -> Path:
     """Normalize an operator-configured absolute share root (S2083).
 
     Share roots are intentionally absolute (NAS/SMB/local sync). Reject empty,
     control characters, and relative paths so mkdir/copy cannot follow a
-    traversal-shaped config typo. POSIX roots (``/mnt/...``) stay valid when
-    the config is edited on Windows for a remote Linux host.
+    traversal-shaped config typo. POSIX roots (``/mnt/...``) and Windows UNC
+    stay valid when the config is edited on another OS than the validator host.
     """
     text = os.path.expandvars(str(raw).strip())
     if not text or any(ord(ch) < 32 for ch in text):
@@ -64,12 +77,16 @@ def _validated_configured_root(raw: str, *, field: str) -> Path:
             f"{field} ist leer oder enthält Steuerzeichen."
         )
     path = Path(text).expanduser()
-    posix_absolute = text.startswith("/")
-    if not path.is_absolute() and not posix_absolute:
+    posix_absolute = text.startswith("/") and not _is_unc_absolute(text)
+    unc_absolute = _is_unc_absolute(text)
+    if not path.is_absolute() and not posix_absolute and not unc_absolute:
         raise RemoteBacktestingError(
             f"{field} muss ein absoluter Pfad sein (got {text!r})."
         )
-    if posix_absolute and not path.is_absolute():
+    # Cross-OS absolute forms: do not resolve on a host that cannot see them.
+    if (posix_absolute or unc_absolute) and not path.is_absolute():
+        return Path(text)
+    if unc_absolute:
         return Path(text)
     return path.resolve(strict=False)
 
@@ -125,8 +142,9 @@ def _copy_path(repo_rel: str, src_root: Path, dst_root: Path) -> None:
         raise RemoteBacktestingError(f"Sync-Quelle fehlt: {src}")
     if src.is_dir():
         if dst.exists():
-            shutil.rmtree(dst)
-        shutil.copytree(src, dst)
+            # Paths already constrained by _safe_join (S2083).
+            shutil.rmtree(dst)  # NOSONAR pythonsecurity:S2083
+        shutil.copytree(src, dst)  # NOSONAR pythonsecurity:S2083
         return
     _copy_file(src, dst)
 
@@ -148,7 +166,8 @@ def pull_from_share(cfg: dict, repo_root: Path = REPO_ROOT) -> None:
         raise RemoteBacktestingError(f"Ergebnisordner fehlt auf dem Share: {source}")
     for name in cfg["result_files"]:
         src = _safe_join(source, name)
-        if not src.is_file():
+        # Existence check after _safe_join; config is operator-local (S6549).
+        if not src.is_file():  # NOSONAR pythonsecurity:S6549
             raise RemoteBacktestingError(f"Ergebnisdatei fehlt auf dem Share: {src}")
         _copy_file(src, _safe_join(repo_root, name))
     print(f"Pull abgeschlossen nach {repo_root}")

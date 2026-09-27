@@ -11,9 +11,24 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Helpers: `optimizer/export_power_limit.py`, `optimizer/live_export_limit.py`; HK UI `ui/house_config_plant.py`; tests `test_export_power_limit` / `test_live_export_limit` / `test_milp_export_cap`
   - **Still open:** productive Loxone wiring + live dogfood → [Backlog.md](Backlog.md) **2.7.a dogfood**
 
-### 2.6.0-alpha.4 pre-release (2026-09-26)
+### Release approval gate — candidate → approve → publish (2026-09-26)
 
-- [x] Publish community pre-release **2.6.0-alpha.4** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.4`) — **2.6.r re-check** remediations (Sonar/Actions/Dockerfile harden, dead-code simplify, KPI splits) + README monitor hero image
+- [x] **`release-publish.yml` two-step release:** tag push builds a candidate only (`build_container --versioned-only` → `:<version>`; GitHub Release as draft); job `promote` (environment `release-approval`, required reviewer) sets `:next` / `:latest` (`build_container --promote`, `buildx imagetools` retag) and publishes the release; `publish_ha_addon` runs only after approval. `release` fails early if the environment has no required-reviewer rule.
+- [x] **Pre-gate checks:** `addon_smoke` (`scripts/ha_addon_smoke.py` — Supervisor-like start of `earnie-addon-{arch}:<version>`, Streamlit health, `config.json` under `/config`; amd64 blocking, aarch64 QEMU soft), `addon_lint` (dry pin bump + addon-linter). Verified locally: alpha.6 OK, alpha.5 FAIL (`No module named 'config'`).
+- [x] Docs: `DEVELOPER.md`, HA add-on README (*Test a release candidate* — local add-on `earnie_dev` on the candidate image), LoxBerry README (pinned channel for candidate tests), branching playbook.
+
+### 2.6.0-alpha.6 pre-release (2026-09-26)
+
+- [x] **HA add-on start crash** (`ModuleNotFoundError: No module named 'config'`): restore `COPY config.py` after S6470 explicit Dockerfile COPY; honor `EARNIE_CONFIG_PATH=/config` when `EARNIE_INSTALL_CONTEXT=homeassistant_addon` (addon_config vs `/data/earnie_env` runtime split)
+- [x] Bump `version.py` + alpha compose pins to **2.6.0-alpha.6** (branch `bugfix/alpha.5-config-module` from `v2.6.0-alpha.5`)
+
+### 2.6.0-alpha.5 pre-release (2026-09-26)
+
+- [x] Publish community pre-release **2.6.0-alpha.5** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.5`) — same payload as failed **alpha.4** plus HA add-on Dockerfile fix (NOSONAR off `FROM` line; BuildKit parse error)
+
+### 2.6.0-alpha.4 pre-release attempt (2026-09-26)
+
+- [x] Tag `v2.6.0-alpha.4` pushed; main GHCR image built; **GitHub Release aborted** — HA add-on H6 step failed on inline `# NOSONAR` after `FROM` (fixed in `d2b8c71`, superseded by **alpha.5**)
 
 ### 2.6.r re-check — quality gate progress (2026-09-26)
 

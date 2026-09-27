@@ -6,8 +6,10 @@ description: >-
   commit and push all open changes, then guide the user through publish choices
   (A skip / B community pre-release / C official / D bump version.py first)
   before any tag (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
+  A tag only builds a release candidate; the user tests it on the target platform and
+  approves job promote (environment release-approval) before anything reaches users.
   On version bump / pre-release publish, sync docker/compose/*-alpha.yml image tags to version.py.
-  After a successful tag (B or C), reset branch streamlitcloud to that release tag and push.
+  After the release is approved (B or C), reset branch streamlitcloud to that release tag and push.
   Use for "end session", "backlog sync", "commit and push", or an explicit request to conclude the session.
 ---
 
@@ -115,11 +117,13 @@ Channel if tagged as-is: Official | Pre-release
 (main is the publish branch — no separate alpha branch)
 
 A) Skip publish — stop here (default if unsure)
-B) Community pre-release — GitHub Pre-release + GHCR :<version> only (no :latest)
-C) Official release — GitHub Latest + GHCR :<version> and :latest
+B) Community pre-release — GitHub Pre-release + GHCR :<version> and :next (no :latest)
+C) Official release — GitHub Latest + GHCR :<version>, :next and :latest
 D) Bump version.py first, then publish (you approve the new string)
 
 If B or C with current version: I will tag v<ACTUAL> on main after your OK.
+The tag builds a candidate only — you test it on HA / LoxBerry, then approve
+"promote" in the Actions run; only then do users see it.
 If D: propose the exact new version string and wait for approval before editing version.py.
 ```
 
@@ -186,6 +190,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 - [ ] **If B:** all three `docker/compose/*-alpha.yml` have `image: ghcr.io/jochentcc/earnie-energy:<version.py>`
 - [ ] Optional notes file exists or default notes are OK: `.github/release-notes/v….md`
 - [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)
+- [ ] GitHub environment `release-approval` exists with the user as *Required reviewer* (otherwise job `release` fails early by design)
 
 ### 1. Check version
 
@@ -208,13 +213,30 @@ git push origin vX.Y.Z
 ```
 
 - Tag must match `version.py` exactly.
-- **B:** Actions → `--prerelease`, GHCR `:<version>` only  
-- **C:** Actions → `--latest`, GHCR `:<version>` + `:latest`  
-- Watch Actions; confirm Release page (Pre-release vs Latest) and GHCR tags
+- The tag builds a **candidate only** (`.github/workflows/release-publish.yml`, job `release`): GHCR `:<version>` (app + `earnie-addon-{arch}`), GitHub Release as **draft**. `:next` / `:latest`, the published release and the HA add-on pin are **not** touched yet — no user sees the candidate.
+- Pre-gate checks run automatically: `addon_smoke` (amd64 blocking), `addon_lint`, `qemu_smoke` (soft). If `addon_smoke` / `addon_lint` fail, `promote` is skipped → treat as a failed candidate (§2b).
+
+### 2a. User tests the candidate, then approves
+
+Job `promote` (environment `release-approval`) **waits for the user's approval**. Point the user to the maintainer checklist [docs/spec/release-checklist.md](../../../docs/spec/release-checklist.md) (steps 3–6) and tell them:
+
+- Actions run URL; wait until the pre-gate checks are green.
+- **HA:** local add-on `earnie_dev` on the candidate image — bump `version:` in `/addons/local/earnie_dev/config.yaml` to `<version>` → *Check for updates* → update/start (stop the regular Earnie add-on first). Setup: `packaging/homeassistant-addon/README.md` → *Test a release candidate*.
+- **LoxBerry / Docker:** channel `pinned` + `EARNIE_PINNED_VERSION=<version>` (or image tag `:<version>`), then switch back.
+- Local start test without HA: `python -m scripts.ha_addon_smoke --image ghcr.io/jochentcc/earnie-addon-amd64:<version>`.
+- OK → user clicks **Review deployments → Approve**: `:next` (C also `:latest`), release published (B `--prerelease`, C `--latest`), then `publish_ha_addon` pins the HA add-on.
+
+**Never approve or reject the deployment for the user** (no `gh api …/pending_deployments`, no clicking Approve in a browser) — the approval is the user's platform test sign-off.
+
+### 2b. Failed candidate
+
+- User **rejects** `promote` (or pre-gate checks failed) → nothing user-visible happened; the draft release and `:<version>` images stay unpublished.
+- Fix on `main` → **D** (next version, e.g. `alpha.N+1`; approval required) → tag again. **Never** re-tag or force-push the rejected tag (`branching-hotfix-playbook.mdc`).
+- Optionally delete the draft release of the rejected candidate — only after the user confirms.
 
 ### 3. Reset `streamlitcloud` to the release tag
 
-After the tag is on `origin`, point **`streamlitcloud`** at that tag so the cloud branch matches the just-published release (no extra commits ahead/behind the tag).
+**Only after `promote` was approved** (Phase 2 §2a) — a rejected candidate must not reach Streamlit Cloud. Point **`streamlitcloud`** at that tag so the cloud branch matches the just-published release (no extra commits ahead/behind the tag).
 
 ```powershell
 # <TAG> = e.g. v2.3.0 or v2.3.0-alpha.5 (must match the tag just pushed)
@@ -225,7 +247,7 @@ git push --force-with-lease origin streamlitcloud
 git checkout main
 ```
 
-- Run for **both B and C** (any successful Phase 2 tag).
+- Run for **both B and C** (any approved release).
 - Prefer `--force-with-lease` over bare `--force`. This is the **approved** force-update for `streamlitcloud` in this workflow only — do not use it on `main`.
 - If the lease rejects (remote moved): stop, show divergence, ask the user before retrying.
 - Mention the reset in the Phase 2 report.
@@ -235,14 +257,19 @@ git checkout main
 Only if the user asks to skip CI or Actions is unavailable:
 
 ```powershell
-python -m scripts.build_container --target all --push
+# candidate: :<version> only
+python -m scripts.build_container --target all --push --versioned-only
+# after the user tested and approved: :next (official also :latest)
+python -m scripts.build_container --promote
 ```
 
-Default tags follow `version.py` (pre-release omits `:latest`). Details: `docs/einrichtung/container.md` · `DEVELOPER.md`.
+Plain `--target all --push` (no flag) sets `:next` / `:latest` immediately — **no approval gate**; use only if the user explicitly wants that. The HA add-on pin then goes via Actions → **HA Add-on publish** (manual; starting it is the approval). Details: `docs/einrichtung/container.md` · `DEVELOPER.md`.
 
 ### 5. Phase 2 report (guide the user after publish)
 
-- Tag pushed / Actions run URL
+Report twice: after the tag push (candidate built, §2a instructions, approval pending) and after approval.
+
+- Tag pushed / Actions run URL / state of `promote` (waiting · approved · rejected)
 - Channel + `version.py` value
 - `streamlitcloud` reset to the release tag (or note if skipped/failed)
 - **If B (pre-release):**
@@ -262,3 +289,4 @@ Default tags follow `version.py` (pre-release omits `:latest`). Details: `docs/e
 - No force push without explicit user instruction — **exception:** `streamlitcloud` reset to the release tag in Phase 2 §3 (`--force-with-lease` only)
 - No commit of secrets or gitignored runtime files
 - On hook prompt for `docker push` or tag push: wait for user decision
+- Never approve / reject the `release-approval` deployment on the user's behalf

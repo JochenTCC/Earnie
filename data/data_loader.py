@@ -140,24 +140,60 @@ def _energy_charts_http(
     bzn: str,
     timeout: int,
 ) -> pd.DataFrame:
-    response = requests.get(
-        ENERGY_CHARTS_PRICE_URL,
-        params={
-            'bzn': bzn,
-            'start': start.strftime('%Y-%m-%d'),
-            'end': end.strftime('%Y-%m-%d'),
-        },
-        headers=_ENERGY_CHARTS_HEADERS,
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    payload = response.json()
+    feed_key = "ext:prices:energy_charts"
+    try:
+        response = requests.get(
+            ENERGY_CHARTS_PRICE_URL,
+            params={
+                'bzn': bzn,
+                'start': start.strftime('%Y-%m-%d'),
+                'end': end.strftime('%Y-%m-%d'),
+            },
+            headers=_ENERGY_CHARTS_HEADERS,
+            timeout=timeout,
+        )
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = response.text
+        if response.status_code >= 400:
+            _prices_shadow_record(
+                feed_key,
+                ok=False,
+                status=int(response.status_code),
+                payload=payload,
+                error=f"HTTP {response.status_code}",
+            )
+            response.raise_for_status()
+        _prices_shadow_record(
+            feed_key, ok=True, payload=payload, status=int(response.status_code)
+        )
+    except Exception as exc:
+        if not isinstance(exc, requests.HTTPError):
+            _prices_shadow_record(feed_key, ok=False, error=str(exc))
+        raise
 
-    if 'unix_seconds' not in payload or not payload['unix_seconds']:
+    if not isinstance(payload, dict) or 'unix_seconds' not in payload or not payload['unix_seconds']:
         raise ValueError("Energy-Charts-API lieferte keine Preisdaten für den angefragten Zeitraum.")
 
     timestamps = pd.to_datetime(payload['unix_seconds'], unit='s', utc=True)
     return _prices_to_dataframe(timestamps, pd.Series(payload['price']))
+
+
+def _prices_shadow_record(
+    key: str,
+    *,
+    ok: bool,
+    payload: object = None,
+    status: int | None = None,
+    error: str | None = None,
+) -> None:
+    try:
+        from runtime_store.shadow.hooks import record_transport
+
+        record_transport(key, ok=ok, payload=payload, status=status, error=error)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _prepare_energy_charts_prices(price_csv_path: str) -> pd.DataFrame:

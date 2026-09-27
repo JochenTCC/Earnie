@@ -366,6 +366,12 @@ class Config:
     def get_ui_chart_debug_capture_dir(self) -> str:
         return str(self.get("UI_CHART_DEBUG_CAPTURE_DIR", default="chart_debug"))
 
+    def is_shadow_feed_enabled(self) -> bool:
+        return bool(self.get("SHADOW_FEED_ENABLED", default=False))
+
+    def get_shadow_feed_retention_days(self) -> int:
+        return int(self.get("SHADOW_FEED_RETENTION_DAYS", default=14))
+
     def get_ui_streamlit_port(self) -> int:
         return int(self.get("UI_STREAMLIT_PORT", default=8501))
 
@@ -645,6 +651,14 @@ def get_ui_chart_debug_capture_enabled() -> bool:
 
 def get_ui_chart_debug_capture_dir() -> str:
     return CONFIG.get_ui_chart_debug_capture_dir()
+
+
+def is_shadow_feed_enabled() -> bool:
+    return CONFIG.is_shadow_feed_enabled()
+
+
+def get_shadow_feed_retention_days() -> int:
+    return CONFIG.get_shadow_feed_retention_days()
 
 
 def get_ui_streamlit_port() -> int:

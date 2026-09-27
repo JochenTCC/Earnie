@@ -8,16 +8,30 @@ Add-on `version:` in `earnie/config.yaml` / `earnie_prerelease/config.yaml` **mi
 
 Every Earnie git tag triggers [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml):
 
-1. Build and push `ghcr.io/jochentcc/earnie-energy:<version>` (multi-arch; every release also `:next`; official also `:latest`).
-2. Build and push HA add-on images `ghcr.io/jochentcc/earnie-addon-{amd64,aarch64}:<version>` (H6).
-3. Create the GitHub Release (pre-releases: `--prerelease`, no `:latest`).
-4. Job **`publish_ha_addon`**: bump add-on trees (`auto` channel), lint, commit Earnie `main`, mirror to **`ha-addon-earnie` `main`**.
+1. **Candidate** (job `release`): build and push `ghcr.io/jochentcc/earnie-energy:<version>` (multi-arch, `:<version>` only) and HA add-on images `ghcr.io/jochentcc/earnie-addon-{amd64,aarch64}:<version>` (H6); create the GitHub Release as **draft**.
+2. **Pre-gate checks:** `addon_smoke` (`python -m scripts.ha_addon_smoke` — starts the add-on image with `/data/options.json` + `/config`, waits for Streamlit health, checks `config.json` lands in `/config`; amd64 blocking, aarch64 under QEMU soft), `addon_lint` (pin bump + addon-linter in the workspace, no commit), `qemu_smoke` (soft).
+3. **Approval** (job `promote`, environment `release-approval`): waits until you approve in the Actions run (*Review deployments*). Test the candidate on your own HA first (below). Approve → `:next` (official also `:latest`) and the GitHub Release is published. Reject → nothing user-visible happened.
+4. Job **`publish_ha_addon`** (after approval only): bump add-on trees (`auto` channel), lint, commit Earnie `main`, mirror to **`ha-addon-earnie` `main`** — from this moment HA offers the update.
    - Official → `earnie/` + `earnie_prerelease/`
    - Pre-release → `earnie_prerelease/` only
 
 **No GitHub Release/tag is needed in `ha-addon-earnie`.** The Supervisor reads the tracked branch and detects updates from `config.yaml` `version:`.
 
-The tagged commit itself does not contain the new add-on pins — the bot commit lands on `main` immediately after the release job. That is intentional: pins are add-on metadata, not app source.
+The tagged commit itself does not contain the new add-on pins — the bot commit lands on `main` right after approval. That is intentional: pins are add-on metadata, not app source.
+
+### Test a release candidate on your own HA (before approving)
+
+While `promote` waits, the candidate images already exist on GHCR but no user is offered them. Install them on your HA as a **local add-on** (visible on this instance only). Full per-release checklist incl. test points: [docs/spec/release-checklist.md](../../docs/spec/release-checklist.md).
+
+1. Copy `earnie_prerelease/` to `/addons/local/earnie_dev/` on the HA host (Samba or SSH add-on; share `addons`).
+2. In the copy's `config.yaml` set `slug: earnie_dev`, `name: "Earnie (Dev)"` and `version: "<candidate version>"`. Keep `image:` — the Supervisor then **pulls** `earnie-addon-{arch}:<version>`, i.e. exactly the artifact users will get (no local build).
+3. Apps / Add-on store → ⋮ → *Check for updates* → *Local add-ons* → **Earnie (Dev)** → install/update, start.
+4. Stop the regular Earnie add-on first — `run.sh` only guards the `earnie` ↔ `earnie_prerelease` pair, not `earnie_dev`.
+5. OK → approve `promote`; broken → reject, fix, bump to the next version and tag again.
+
+Next candidate: only bump `version:` in `/addons/local/earnie_dev/config.yaml` and *Check for updates*.
+
+Local smoke without HA (same check as CI): `python -m scripts.ha_addon_smoke --image ghcr.io/jochentcc/earnie-addon-amd64:<version>`.
 
 ### Prerequisites (one-time)
 
@@ -37,7 +51,7 @@ packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-
 # commit + push both repos
 ```
 
-**Republish without re-tagging:** Actions → **HA Add-on publish** → enter version (official → both; pre-release → `earnie_prerelease` only). GHCR app + add-on images must already exist.
+**Republish without re-tagging:** Actions → **HA Add-on publish** → enter version (official → both; pre-release → `earnie_prerelease` only). GHCR app + add-on images must already exist. This manual workflow has **no approval gate** — starting it is the approval.
 
 Dry-run locally:
 

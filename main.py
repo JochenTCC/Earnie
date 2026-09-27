@@ -676,7 +676,13 @@ if __name__ == "__main__":
 
     def _wait_poll() -> None:
         touch_daemon_heartbeat()
-        power_interval_sampler.tick()
+        if power_interval_sampler.tick():
+            try:
+                from runtime_store.shadow import flush_after_sampler
+
+                flush_after_sampler()
+            except Exception:  # noqa: BLE001 — never break wait loop
+                logger.exception("shadow feed sampler flush failed")
 
     while True:
         touch_daemon_heartbeat()
@@ -781,6 +787,16 @@ if __name__ == "__main__":
             main(run_trigger=next_trigger)
             clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
+            try:
+                from runtime_store.shadow import (
+                    flush_after_cycle,
+                    run_superset_after_cycle,
+                )
+
+                run_superset_after_cycle()
+                flush_after_cycle()
+            except Exception:  # noqa: BLE001 — recorder must never break Prod
+                logger.exception("shadow feed post-cycle failed")
 
             wait_sec = optimization_schedule.seconds_until_next_quarter_hour()
             next_run = optimization_schedule.next_quarter_hour_datetime()

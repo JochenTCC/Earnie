@@ -140,6 +140,45 @@ def test_chart_debug_capture_local_settings_overrides_config(tmp_path, monkeypat
     assert cfg.get_ui_chart_debug_capture_enabled() is True
 
 
+def test_shadow_feed_from_local_settings(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(
+        json.dumps(
+            {
+                "silent_mode": True,
+                "shadow_feed_enabled": True,
+                "shadow_feed_retention_days": 7,
+            }
+        ),
+        encoding="utf-8",
+    )
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_shadow_feed_enabled() is True
+    assert cfg.get_shadow_feed_retention_days() == 7
+
+
+def test_shadow_feed_defaults_off(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(json.dumps({"silent_mode": False}), encoding="utf-8")
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_shadow_feed_enabled() is False
+    assert cfg.get_shadow_feed_retention_days() == 14
+
+
 def test_bootstrap_creates_local_settings(tmp_path, monkeypatch):
     from runtime_store import bootstrap
 

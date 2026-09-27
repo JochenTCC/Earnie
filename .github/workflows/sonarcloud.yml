@@ -9,6 +9,8 @@ on:
       - "**/*.yml"
       - "**/*.yaml"
       - "docs/**"
+      # Release dual-channel pin (Dockerfile + yaml + CHANGELOG only) — no app change.
+      - "packaging/homeassistant-addon/**"
   pull_request:
     types: [opened, synchronize, reopened]
     paths-ignore:
@@ -17,7 +19,13 @@ on:
       - "**/*.yml"
       - "**/*.yaml"
       - "docs/**"
+      - "packaging/homeassistant-addon/**"
   workflow_dispatch:
+
+# One analysis per ref: a later push cancels an in-flight scan (avoids overlap).
+concurrency:
+  group: sonarcloud-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   sonarcloud:

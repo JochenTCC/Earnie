@@ -47,6 +47,50 @@ def test_default_tags_official_includes_latest_and_next():
     assert "ghcr.io/jochentcc/earnie-energy:2.2.0" in tags
 
 
+def test_versioned_and_floating_tags_partition_default_tags():
+    for ver in ("2.2.0", "2.2.0-alpha.1"):
+        versioned = bc.versioned_tags(ver)
+        floating = bc.floating_tags(ver)
+        assert sorted(versioned + floating) == sorted(bc.default_tags(ver))
+        assert versioned == [
+            f"ghcr.io/jochentcc/earnie-energy:{ver}",
+            f"ghcr.io/jochentcc/ernie-energy:{ver}",
+        ]
+
+
+def test_floating_tags_prerelease_only_next():
+    assert bc.floating_tags("2.2.0-alpha.1") == [
+        "ghcr.io/jochentcc/earnie-energy:next",
+        "ghcr.io/jochentcc/ernie-energy:next",
+    ]
+
+
+def test_promote_commands_retag_from_version_without_rebuild():
+    cmds = bc.promote_commands("2.2.0")
+    assert [
+        "docker", "buildx", "imagetools", "create",
+        "-t", "ghcr.io/jochentcc/earnie-energy:latest",
+        "ghcr.io/jochentcc/earnie-energy:2.2.0",
+    ] in cmds
+    assert len(cmds) == len(bc.floating_tags("2.2.0"))
+    assert all(cmd[-1].endswith(":2.2.0") for cmd in cmds)
+
+
+def test_main_promote_runs_only_retags(monkeypatch):
+    calls: list[list[str]] = []
+    monkeypatch.setattr(bc, "run_build", calls.append)
+    assert bc.main(["--promote"]) == 0
+    assert calls == bc.promote_commands()
+
+
+def test_main_versioned_only_builds_without_floating_tags(monkeypatch):
+    calls: list[list[str]] = []
+    monkeypatch.setattr(bc, "run_build", calls.append)
+    assert bc.main(["--target", "synology", "--versioned-only"]) == 0
+    tagged = [calls[0][i + 1] for i, arg in enumerate(calls[0]) if arg == "-t"]
+    assert tagged == bc.versioned_tags()
+
+
 def test_build_command_assembles_docker_args(tmp_path):
     dockerfile = tmp_path / "Dockerfile"
     dockerfile.write_text("FROM python:3.14-slim\n", encoding="utf-8")
