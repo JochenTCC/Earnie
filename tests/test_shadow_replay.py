@@ -35,9 +35,16 @@ def _utc(offset_sec: int = 0) -> str:
     return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _write_feed(feed: Path, records: dict, *, heartbeat_offset: int = 0) -> None:
+def _write_feed(
+    feed: Path,
+    records: dict,
+    *,
+    heartbeat_offset: int = 0,
+    cycle_offset: int | None = None,
+) -> None:
     feed.mkdir(parents=True, exist_ok=True)
     hb = _utc(heartbeat_offset)
+    cycle_ts = _utc(heartbeat_offset if cycle_offset is None else cycle_offset)
     (feed / "meta.json").write_text(
         json.dumps(
             {
@@ -53,7 +60,7 @@ def _write_feed(feed: Path, records: dict, *, heartbeat_offset: int = 0) -> None
         encoding="utf-8",
     )
     (feed / "latest.json").write_text(
-        json.dumps({"cycle_seq": 1, "cycle_ts": hb, "records": records}),
+        json.dumps({"cycle_seq": 1, "cycle_ts": cycle_ts, "records": records}),
         encoding="utf-8",
     )
 
@@ -128,6 +135,54 @@ def test_replay_stale_treated_as_missing(monkeypatch, tmp_path):
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
     monkeypatch.setenv("EARNIE_SHADOW_MAX_AGE_SEC", "60")
     assert fetch_loxone_raw_value("Soc") is None
+
+
+def test_replay_keeps_cycle_fresh_when_heartbeat_advances(monkeypatch, tmp_path):
+    """Sampler heartbeat flush must not stale IO recorded at cycle_ts."""
+    feed = tmp_path / "feed"
+    cycle = _utc(-150)
+    _write_feed(
+        feed,
+        {
+            "loxone:io:Earnie_Pool_Temp_Ist": {
+                "key": "loxone:io:Earnie_Pool_Temp_Ist",
+                "ts": cycle,
+                "ok": True,
+                "status": 200,
+                "payload": {"LL": {"value": "37.5"}},
+                "error": None,
+            }
+        },
+        heartbeat_offset=0,
+        cycle_offset=-150,
+    )
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setenv("EARNIE_SHADOW_MAX_AGE_SEC", "120")
+    assert fetch_loxone_raw_value("Earnie_Pool_Temp_Ist") == "37.5"
+
+
+def test_replay_sampler_newer_than_cycle_stays_fresh(monkeypatch, tmp_path):
+    feed = tmp_path / "feed"
+    _write_feed(
+        feed,
+        {
+            "loxone:io:Soc": {
+                "key": "loxone:io:Soc",
+                "ts": _utc(-30),
+                "ok": True,
+                "status": 200,
+                "payload": {"LL": {"value": "55"}},
+                "error": None,
+            }
+        },
+        heartbeat_offset=0,
+        cycle_offset=-200,
+    )
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setenv("EARNIE_SHADOW_MAX_AGE_SEC", "120")
+    assert fetch_loxone_raw_value("Soc") == "55"
 
 
 def test_replay_ha_get(monkeypatch, tmp_path):

@@ -128,7 +128,7 @@ When `is_shadow_mode()`:
 
 - Every transport primitive of §5.2 returns the recorded payload for its key instead of calling the network — **same return types and same exceptions** as a real call (`HaHttpError`, `LoxoneAdapterError`, `None` for Loxone reads, …), so the calling code runs unchanged.
 - **Missing key** → behave like "backend unreachable" for that read + log `shadow: no feed value for <key>` (once per key per hour).
-- **Stale value** (`ts` older than `EARNIE_SHADOW_MAX_AGE_SEC`, default 120 s) → treated as missing.
+- **Stale value** (record `ts` older than `latest.json` `cycle_ts` by more than `EARNIE_SHADOW_MAX_AGE_SEC`, default 120 s; fallback ref: `meta.json.heartbeat_ts`) → treated as missing. Sampler heartbeat flushes must not invalidate cycle-fresh IOs.
 - External data (`ext:*`) comes from the feed. Shadow does **not** call forecast.solar (rate limit is per IP and shared with Prod). Prices / outdoor forecast fall back to an own fetch when missing.
 - No other network I/O to the backend is allowed; any backend call outside the replayed primitives raises `ShadowBackendAccessError` (programming error, surfaces in tests).
 
@@ -234,4 +234,4 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 **Still open:**
 
 - **Feed retention default:** 14 days of JSONL — size estimate needed after S1 on the real house.
-- **Clock skew:** resolved for S2 — staleness uses age vs `meta.json.heartbeat_ts` (fallback: Shadow wall clock), gated by `EARNIE_SHADOW_MAX_AGE_SEC` (default 120).
+- **Clock skew / sampler heartbeat:** staleness uses age vs `latest.json.cycle_ts` (fallback: `meta.json.heartbeat_ts`, then Shadow wall clock), gated by `EARNIE_SHADOW_MAX_AGE_SEC` (default 120). Directed age: records newer than the ref (mid-wait sampler updates) stay fresh.

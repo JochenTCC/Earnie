@@ -59,14 +59,33 @@ def _log_missing(key: str, reason: str) -> None:
     logger.warning("shadow: no feed value for %s (%s)", key, reason)
 
 
-def is_record_stale(record: dict[str, Any], *, heartbeat_ts: str | None) -> bool:
-    """Stale when age vs heartbeat (or wall clock) exceeds max age."""
+def is_record_stale(record: dict[str, Any], *, ref_ts: str | None) -> bool:
+    """Stale when record is older than *ref_ts* (or wall clock) by more than max age.
+
+    Prefer ``latest.json`` ``cycle_ts`` as *ref_ts*: Prod sampler flushes advance
+    ``heartbeat_ts`` without refreshing IO timestamps, which falsely stale'd
+    cycle-fresh values when age was measured vs heartbeat.
+    Records newer than the ref (e.g. mid-wait sampler updates) stay fresh.
+    """
     rec_ts = _parse_utc(record.get("ts") if isinstance(record, dict) else None)
     if rec_ts is None:
         return True
-    ref = _parse_utc(heartbeat_ts) or datetime.now(timezone.utc)
-    age = abs((ref - rec_ts).total_seconds())
+    ref = _parse_utc(ref_ts) or datetime.now(timezone.utc)
+    age = (ref - rec_ts).total_seconds()
     return age > max_age_sec()
+
+
+def _staleness_ref_ts(latest: dict[str, Any] | None, meta: dict[str, Any] | None) -> str | None:
+    """Prefer cycle_ts; fall back to heartbeat_ts for older feeds."""
+    if isinstance(latest, dict):
+        cycle_ts = latest.get("cycle_ts")
+        if isinstance(cycle_ts, str) and cycle_ts.strip():
+            return cycle_ts
+    if isinstance(meta, dict):
+        heartbeat = meta.get("heartbeat_ts")
+        if isinstance(heartbeat, str) and heartbeat.strip():
+            return heartbeat
+    return None
 
 
 def lookup_record(key: str) -> dict[str, Any] | None:
@@ -80,10 +99,11 @@ def lookup_record(key: str) -> dict[str, Any] | None:
     if not isinstance(record, dict):
         _log_missing(key, "missing")
         return None
-    heartbeat = None
-    if isinstance(meta, dict):
-        heartbeat = meta.get("heartbeat_ts")
-    if is_record_stale(record, heartbeat_ts=heartbeat):
+    ref_ts = _staleness_ref_ts(
+        latest if isinstance(latest, dict) else None,
+        meta if isinstance(meta, dict) else None,
+    )
+    if is_record_stale(record, ref_ts=ref_ts):
         _log_missing(key, "stale")
         return None
     return record
