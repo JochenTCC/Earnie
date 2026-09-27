@@ -25,7 +25,9 @@ COPY docker/ docker/
 COPY house_config/ house_config/
 COPY settings/ settings/
 COPY ehal/ ehal/
-COPY share/config/ share/config/
+# Full share/ tree (ehal schemas, loxone templates, hardware_profiles, registry) —
+# not only share/config/. Omitting share/ehal breaks live EHAL JSON Schema validation.
+COPY share/ share/
 COPY logger_config.py app.py main.py config.py ./
 RUN mkdir -p earnie_env/runtime
 COPY earnie_env/runtime/local_settings.example.json earnie_env/runtime/
