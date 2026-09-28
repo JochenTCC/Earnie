@@ -138,6 +138,40 @@
         }
       }
     },
+    "monthly_seed": {
+      "type": "object",
+      "description": "Katalog-Wartung (nicht Runtime): monthly_rates werden aus einer Shared-Kurve berechnet (scripts/update_tariff_curves.py). oemag: OeMAG x arbeitspreis_kwh_cent / monthly_float_reference_cent_kwh - settlement_fee_cent_kwh; econtrol_refmarkt_pv: RefMarkt PV - settlement_fee_cent_kwh.",
+      "required": [
+        "curve"
+      ],
+      "properties": {
+        "curve": {
+          "type": "string",
+          "enum": [
+            "oemag",
+            "econtrol_refmarkt_pv"
+          ]
+        },
+        "arbeitspreis_kwh_cent": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Skalierung fuer curve 'oemag' (Nenner: monthly_float_reference_cent_kwh)."
+        }
+      },
+      "if": {
+        "properties": {
+          "curve": {
+            "const": "oemag"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "arbeitspreis_kwh_cent"
+        ]
+      },
+      "additionalProperties": false
+    },
     "spot_export_pricing": {
       "type": "object",
       "description": "Optional percent haircut / fix offset on hourly EPEX export (e.g. aWATTar SUNNY SPOT).",
@@ -187,6 +221,9 @@
             },
             "monthly_rates": {
               "$ref": "#/definitions/monthly_rates"
+            },
+            "monthly_seed": {
+              "$ref": "#/definitions/monthly_seed"
             }
           }
         }
@@ -224,6 +261,9 @@
             },
             "monthly_rates": {
               "$ref": "#/definitions/monthly_rates"
+            },
+            "monthly_seed": {
+              "$ref": "#/definitions/monthly_seed"
             },
             "feed_in_fee_factor": {
               "type": "number",

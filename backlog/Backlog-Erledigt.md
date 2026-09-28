@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Tariff catalog: monthly curve updater + scan runbook (2026-09-28)
+
+- [x] **`monthly_seed`** on catalog `monthly_table` tariffs (schema + `data/monthly_float_rates.build_seeded_monthly_rates`): OeMAG-proportional floats (OeMAG, Energie AG Team Sonne, EVN, Wien Energie, Tibber) and RefMarkt-based VKW PV-Flex; replaces seed factors that only lived in `notes`
+- [x] **`scripts/update_tariff_curves.py`**: upsert OeMAG / E-Control RefMarkt PV months, recompute seeded tariffs, `--set` for unseeded tables (SUNNY), `--check` drift gate (test asserts the shipped catalog matches its seeds)
+- [x] Catalog caught up: OeMAG 2026-07/08 (6.146 / 8.997), RefMarkt PV 2026-07/08 (6.85 / 9.42, E-Control xlsx), SUNNY 2026-09 (8.989); VKW PV-Flex placeholders replaced; `catalog_as_of` now an ISO date
+- [x] Runbook `docs/spec/tariff-monthly-scan.md` for the monthly cloud routine (first AT working day, 17:00 Vienna; branch + PR, stage B findings report-only)
+
 ### Bugfix Docker missing share/ehal (2026-09-27)
 
 - [x] **Docker image missing `share/ehal` schemas** — S6470 explicit COPY only shipped `share/config/`; live EHAL validation failed every ~30s (`EHAL schema not found: /app/share/ehal/telemetry.schema.json`). Fixed in `docker/Dockerfile` (`COPY share/ share/`); verified on NAS with **2.6.0-alpha.8**.

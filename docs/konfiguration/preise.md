@@ -113,8 +113,8 @@ Monatskonstante Einspeisetarife tragen **eigene** `monthly_rates`. Shared-Kurven
 | `econtrol_referenzmarktwert_pv_monthly`| ≥12 E-Control Referenzmarktwert PV (§ 13 EAG; z. B. VKW Flex-Seed)    |
 
 
-Seed-Formel (nur Wartung, nicht Runtime):  
-`OeMAG_Monat × arbeitspreis / monthly_float_reference_cent_kwh − settlement_fee` (min. 0) — Hilfsfunktion in `[data/monthly_float_rates.py](../../data/monthly_float_rates.py)`.
+Seed-Formel (nur Wartung, nicht Runtime), festgelegt pro Tarif im Feld `monthly_seed`:  
+`OeMAG_Monat × arbeitspreis / monthly_float_reference_cent_kwh − settlement_fee` bzw. `RefMarkt_PV − settlement_fee` — Hilfsfunktionen in [data/monthly_float_rates.py](../../data/monthly_float_rates.py), Pflege mit `python -m scripts.update_tariff_curves` (siehe [Pflegehinweis](../referenz/oemag-referenzmarktwert.md#pflegehinweis)).
 
 Rechtliche Abgrenzung OeMAG vs. RefMarkt: [oemag-referenzmarktwert.md](../referenz/oemag-referenzmarktwert.md).
 
