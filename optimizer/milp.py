@@ -152,12 +152,26 @@ def _add_soc_anchor_constraints(
             )
     elif sunrise_soc_min_index is not None:
         # Floor already via e_batt lowBound; do not force == SOC_min (residual dump).
-        _add_pv_only_charge_through_sunrise(model, matrix, sunrise_soc_min_index)
-        if verbose:
-            logger.info(
-                "MILP SOC-Anker Sonnenaufgang: Slot %d PV-only charge (no hard SOC_min eq)",
-                sunrise_soc_min_index,
-            )
+        min_soc = float(battery_params["min_soc"])
+        below_min = float(current_soc) < min_soc - 1e-9
+        if below_min:
+            # Plant already below SOC_min: PV-only would block grid recovery before
+            # sunrise and make the whole MILP Infeasible (empty EV/flex plan).
+            if verbose:
+                logger.warning(
+                    "MILP SOC-Anker Sonnenaufgang: Slot %d — SoC %.1f%% < min %.1f%%; "
+                    "skip PV-only so grid can recover to SOC_min",
+                    sunrise_soc_min_index,
+                    float(current_soc),
+                    min_soc,
+                )
+        else:
+            _add_pv_only_charge_through_sunrise(model, matrix, sunrise_soc_min_index)
+            if verbose:
+                logger.info(
+                    "MILP SOC-Anker Sonnenaufgang: Slot %d PV-only charge (no hard SOC_min eq)",
+                    sunrise_soc_min_index,
+                )
     elif e_terminal := _terminal_soc_energy_kwh(battery_params, terminal_soc_percent):
         _add_terminal_soc_constraint(model, e_terminal)
         if verbose:
