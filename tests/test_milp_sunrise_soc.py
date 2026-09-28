@@ -164,3 +164,56 @@ def test_hourly_mpc_no_soc_spike_before_sunrise_with_ev():
     assert max(socs) < 35.0
     # Residual SoC must not be forced to min_soc solely by the SA₁ anchor.
     assert socs[3] >= 15.0
+
+
+def test_milp_recovers_when_soc_below_min_before_sunrise():
+    """SoC < min_soc + PV-only would be Infeasible; skip PV-only to recover."""
+    from optimizer.milp import _solve_milp_to_model
+
+    tz = ZoneInfo("Europe/Vienna")
+    start = datetime(2026, 9, 28, 1, 0, tzinfo=tz)
+    sunrise_idx = 24
+    matrix = []
+    for i in range(28):
+        dt = start + timedelta(minutes=15 * i)
+        matrix.append(
+            {
+                "hour": dt.hour,
+                "date": dt.date(),
+                "slot_datetime": dt,
+                "expected_p_pv": 0.0 if i < sunrise_idx else 1.0,
+                "expected_p_act": 0.6,
+                "k_act": 28.0,
+                "k_push_act": 16.0,
+                "expected_flex_kw": {},
+            }
+        )
+    battery_params = {
+        "battery_capacity_kwh": 10.0,
+        "min_soc": 10.0,
+        "max_soc": 100.0,
+        "max_power_kw": 5.0,
+        "efficiency": 0.97,
+        "control": "full",
+    }
+    solved = _solve_milp_to_model(
+        matrix,
+        5.0,
+        battery_params,
+        16.0,
+        False,
+        [],
+        {},
+        None,
+        None,
+        None,
+        None,
+        None,
+        sunrise_idx,
+        None,
+        None,
+    )
+    assert solved is not None
+    model = solved[0]
+    # Grid charge allowed in night slots to climb back to SOC_min.
+    assert float(model.p_charge[0].varValue or 0.0) > 1e-3
