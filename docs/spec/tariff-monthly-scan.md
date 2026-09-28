@@ -4,8 +4,9 @@ Runbook for the scheduled Claude Code cloud routine that keeps the shipped tarif
 (`share/config/tariffs.json`) current. The routine prompt only points here, so changes to the
 procedure go through a normal PR on this file.
 
-Schedule: first Austrian working day of each month, 17:00 Europe/Vienna. The trigger fires on
-days 1–5; step 0 exits early on every other day.
+Schedule: first Austrian working day of each month, 17:00 Europe/Vienna. Routine cron is UTC-only,
+so it fires at 15:00 **and** 16:00 UTC on days 1–5 (`0 15,16 1-5 * *`), which covers 17:00 local in
+both CEST and CET; step 0 exits early on every other fire.
 
 ## Hard rules
 
@@ -39,7 +40,8 @@ def easter(y):  # anonymous Gregorian algorithm
     day = (h + l - 7 * m + 114) % 31 + 1
     return dt.date(y, month, day)
 
-today = dt.datetime.now(ZoneInfo("Europe/Vienna")).date()
+now = dt.datetime.now(ZoneInfo("Europe/Vienna"))
+today = now.date()
 e = easter(today.year)
 holidays = {dt.date(today.year, 1, 1), dt.date(today.year, 1, 6), dt.date(today.year, 5, 1),
             dt.date(today.year, 11, 1), e + dt.timedelta(1), e + dt.timedelta(39),
@@ -47,10 +49,11 @@ holidays = {dt.date(today.year, 1, 1), dt.date(today.year, 1, 6), dt.date(today.
 first = today.replace(day=1)
 while first.weekday() >= 5 or first in holidays:
     first += dt.timedelta(1)
-print("RUN" if today == first else "SKIP")
+print("RUN" if today == first and now.hour == 17 else "SKIP")
 ```
 
-On `SKIP`: stop immediately, no branch, no output beyond one line.
+On `SKIP`: stop immediately, no branch, no output beyond one line. (A manual "run now" outside
+17:xx local also skips; for a manual test run, say so in the prompt and skip step 0.)
 
 ## Step 1 — setup
 
