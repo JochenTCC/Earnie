@@ -166,6 +166,17 @@ def marker_sens_absent_mode(
     return resolve_plant_binding(house_doc, "sens_absent_mode", config_doc)
 
 
+def marker_get_grid_export_power_limit(
+    *,
+    house_doc: dict | None = None,
+    config_doc: dict | None = None,
+) -> str:
+    """Inbound export cap: plant ``get_grid_export_power_limit`` only (kW on Loxone)."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    return resolve_plant_binding(house_doc, "get_grid_export_power_limit", config_doc)
+
+
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:
     """Limit SoC %: optional ``get_evcs_limit_soc`` Merker, else profile percent."""
     from integrations import loxone_client

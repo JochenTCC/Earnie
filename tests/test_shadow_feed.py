@@ -27,6 +27,8 @@ def _reset_shadow(tmp_path, monkeypatch):
 
 
 def _enable_feed(tmp_path, monkeypatch, *, retention_days: int = 14) -> Path:
+    # Prod recorder must not see Shadow env (other tests set EARNIE_SHADOW=1).
+    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(),
@@ -52,6 +54,11 @@ def _enable_feed(tmp_path, monkeypatch, *, retention_days: int = 14) -> Path:
         require_loxone_credentials=False,
     )
     monkeypatch.setattr(config, "CONFIG", cfg)
+    assert shadow_feed.is_feed_recording_enabled(), (
+        "feed recording disabled after _enable_feed "
+        f"(shadow={is_shadow_mode()}, "
+        f"flag={config.is_shadow_feed_enabled()})"
+    )
     return feed_path
 
 
@@ -155,13 +162,17 @@ def _patch_ha_superset(monkeypatch, *, adapter, entities: dict[str, str]) -> Non
     import integrations.ehal_live as ehal_live
     import runtime_store.shadow.superset as superset_mod
 
+    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
     monkeypatch.setattr(config.CONFIG, "EHAL_BACKEND", "ha", raising=False)
+    monkeypatch.setattr(config.CONFIG, "SHADOW_FEED_ENABLED", True, raising=False)
     monkeypatch.setattr(superset_mod, "_house_profiles_doc", lambda: {})
     monkeypatch.setattr(
         "house_config.ha_ehal_bindings.aggregate_ha_entities",
         lambda _h: entities,
     )
     monkeypatch.setattr(ehal_live, "get_ha_adapter", lambda: adapter)
+    assert str(config.get("EHAL_BACKEND") or "").strip().lower() == "ha"
+    assert shadow_feed.is_feed_recording_enabled()
 
 
 def test_superset_ha_fetches_missing(tmp_path, monkeypatch):

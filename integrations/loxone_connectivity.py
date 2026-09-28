@@ -210,6 +210,15 @@ def _power_valid(value: float) -> str | None:
     return None
 
 
+def _export_limit_valid(value: float) -> str | None:
+    """Loxone Merker in kW; negative = no inbound cap; unconstrained often ~1000."""
+    if not math.isfinite(value):
+        return f"Einspeisegrenze nicht numerisch: {value}"
+    if value > 1_000_000.0:
+        return f"Einspeisegrenze unrealistisch hoch: {value} kW"
+    return None
+
+
 def _temperature_valid(value: float) -> str | None:
     if not math.isfinite(value):
         return f"Temperatur nicht numerisch: {value}"
@@ -560,6 +569,7 @@ def _append_thermal_read_checks(
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
     from settings.ehal_marker_resolve import (
+        marker_get_grid_export_power_limit,
         marker_sens_absent_mode,
         marker_sens_temperature_outside,
     )
@@ -602,6 +612,13 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
         "sens_absent_mode",
         absent_io,
         {"validate": _binary_valid},
+    )
+    export_in_io = marker_get_grid_export_power_limit(house_doc=house_doc)
+    _append_io_check(
+        checks,
+        "get_grid_export_power_limit",
+        export_in_io,
+        {"validate": _export_limit_valid},
     )
 
     for consumer in _consumers_for_live_reads():

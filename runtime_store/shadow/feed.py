@@ -180,6 +180,7 @@ def flush_latest(*, bump_cycle: bool = False) -> None:
     """Write atomic latest.json (+ meta). Optionally bump cycle_seq."""
     if not is_feed_recording_enabled():
         return
+    directory: Path | None = None
     try:
         with _lock:
             global _cycle_seq
@@ -199,10 +200,14 @@ def flush_latest(*, bump_cycle: bool = False) -> None:
                 directory / "meta.json",
                 _meta_payload(cycle_seq=seq, heartbeat_ts=heartbeat),
             )
-            if bump_cycle:
-                _prune_retention_unlocked(directory)
     except Exception as exc:  # noqa: BLE001
         _rate_limited_warn("flush", "shadow feed flush failed: %s", exc)
+    if bump_cycle and directory is not None:
+        try:
+            with _lock:
+                _prune_retention_unlocked(directory)
+        except Exception as exc:  # noqa: BLE001
+            _rate_limited_warn("prune", "shadow feed prune failed: %s", exc)
 
 
 def _latest_cycle_ts(seq: int) -> str | None:
