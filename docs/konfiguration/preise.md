@@ -40,11 +40,13 @@ Hausprofil-Feld `netznutzung_arbeitspreis_cent_kwh` (siehe oben) gilt zusätzlic
 
 Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Typ `fixed` kommt `k_push_cent` aus dem Tarif-Eintrag in `tariffs.json`. Geändert wird die Tarif-Referenz im Live-Szenario im **Szenarienkonfigurator**.
 
+**Eigener Festpreis:** Im Szenarienkonfigurator gibt es in den Dropdowns Bezug und Einspeise den Eintrag **Eigener Festpreis**. Die Cent/kWh-Werte speichert Earnie am Szenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, Tarif-ID `__user_fixed__`) — **nicht** in `tariffs.json`. Bezug: Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`); Netznutzung Arbeitspreis aus dem Hausprofil wird weiterhin addiert. Einspeise: eingegebene Vergütung ohne weitere Aufschläge.
+
 **Hinweis:** Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. gewählte `export_tariff_id` aktuell halten.
 
 ## Planung & Backtesting (ab 1.24.f)
 
-Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/config/tariffs.json) mit Root-Feld `catalog_as_of`. Zur Laufzeit nutzt Earnie `earnie_env/config/tariffs.json` (Bootstrap kopiert den Katalog bei Bedarf aus share). Szenarien in `backtesting_scenarios.json` referenzieren `import_tariff_id` und `export_tariff_id`.
+Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/config/tariffs.json) mit Root-Feld `catalog_as_of`. Zur Laufzeit nutzt Earnie `earnie_env/config/tariffs.json` (Bootstrap kopiert den Katalog bei Bedarf aus share). Szenarien in `backtesting_scenarios.json` referenzieren `import_tariff_id` und `export_tariff_id` (oder `__user_fixed__` mit szenario-lokalen Cent-Feldern, siehe oben).
 
 ### Import-Typen
 

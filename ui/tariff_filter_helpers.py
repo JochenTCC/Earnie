@@ -148,8 +148,13 @@ def with_current_tariff(
     current_id: str | None,
 ) -> tuple[list[dict], bool]:
     """Ensure current_id remains in the list. Returns (list, was_outside_filters)."""
+    from house_config.tariffs_store import is_user_fixed_tariff_id
+
     cid = (current_id or "").strip()
     if not cid:
+        return list(filtered), False
+    if is_user_fixed_tariff_id(cid):
+        # Always re-appended via ensure_user_fixed_option — not a filter miss.
         return list(filtered), False
     if any(str(item.get("id", "")).strip() == cid for item in filtered):
         return list(filtered), False

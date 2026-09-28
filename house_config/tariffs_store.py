@@ -51,6 +51,79 @@ _SPOT_EXPORT_FEE_KEYS = (
     "feed_in_fix_cent",
 )
 
+# Scenario-local fixed price (not a tariffs.json catalog id).
+USER_FIXED_TARIFF_ID = "__user_fixed__"
+USER_FIXED_TARIFF_LABEL = "Eigener Festpreis"
+USER_IMPORT_CENT_KEY = "user_import_cent_kwh"
+USER_EXPORT_CENT_KEY = "user_export_cent_kwh"
+
+
+def is_user_fixed_tariff_id(tariff_id: str | None) -> bool:
+    return str(tariff_id or "").strip() == USER_FIXED_TARIFF_ID
+
+
+def user_fixed_pseudo_tariff() -> dict:
+    """Dropdown entry for scenario-local fixed prices (not in tariffs.json)."""
+    return {
+        "id": USER_FIXED_TARIFF_ID,
+        "label": USER_FIXED_TARIFF_LABEL,
+        "type": "fixed_cent",
+        "supplier_id": "user",
+    }
+
+
+def ensure_user_fixed_option(tariffs: list[dict]) -> list[dict]:
+    """Append Eigener Festpreis if missing (always visible in dropdowns)."""
+    if any(is_user_fixed_tariff_id(item.get("id")) for item in tariffs):
+        return list(tariffs)
+    return [*tariffs, user_fixed_pseudo_tariff()]
+
+
+def _parse_user_import_cent(settings: dict) -> float:
+    if USER_IMPORT_CENT_KEY not in settings or settings[USER_IMPORT_CENT_KEY] is None:
+        raise ValueError(
+            f"import_tariff_id '{USER_FIXED_TARIFF_ID}' erfordert {USER_IMPORT_CENT_KEY}."
+        )
+    value = float(settings[USER_IMPORT_CENT_KEY])
+    if value <= 0.0:
+        raise ValueError(f"{USER_IMPORT_CENT_KEY} muss > 0 sein.")
+    return value
+
+
+def _parse_user_export_cent(settings: dict) -> float:
+    if USER_EXPORT_CENT_KEY not in settings or settings[USER_EXPORT_CENT_KEY] is None:
+        raise ValueError(
+            f"export_tariff_id '{USER_FIXED_TARIFF_ID}' erfordert {USER_EXPORT_CENT_KEY}."
+        )
+    value = float(settings[USER_EXPORT_CENT_KEY])
+    if value < 0.0:
+        raise ValueError(f"{USER_EXPORT_CENT_KEY} muss >= 0 sein.")
+    return value
+
+
+def _synthetic_user_import_tariff(cent: float) -> dict:
+    return {
+        "id": USER_FIXED_TARIFF_ID,
+        "label": USER_FIXED_TARIFF_LABEL,
+        "type": "fixed_cent",
+        "fix_cent_kwh": float(cent),
+        "prices_include_vat": True,
+        "vat_percent": 0.0,
+        "supplier_id": "user",
+    }
+
+
+def _synthetic_user_export_tariff(cent: float) -> dict:
+    return {
+        "id": USER_FIXED_TARIFF_ID,
+        "label": USER_FIXED_TARIFF_LABEL,
+        "type": "fixed",
+        "k_push_cent": float(cent),
+        "prices_include_vat": True,
+        "vat_percent": 0.0,
+        "supplier_id": "user",
+    }
+
 
 def resolve_export_tariff_id(tariff_id: str) -> str:
     """Reject renamed export tariff ids; return unchanged when current."""
@@ -333,8 +406,18 @@ def resolve_import_tariff_into_settings(settings: dict, tariffs: dict) -> dict:
     out = dict(settings)
     tariff_id = out.pop("import_tariff_id", None)
     if not tariff_id:
+        out.pop(USER_IMPORT_CENT_KEY, None)
         return out
     tariff_id = str(tariff_id).strip()
+    if is_user_fixed_tariff_id(tariff_id):
+        cent = _parse_user_import_cent(out)
+        out.pop(USER_IMPORT_CENT_KEY, None)
+        tariff = _synthetic_user_import_tariff(cent)
+        out["_import_tariff_spec"] = tariff
+        out["import_tariff_type"] = tariff["type"]
+        out["import_fixed_cent_kwh"] = tariff["fix_cent_kwh"]
+        return out
+    out.pop(USER_IMPORT_CENT_KEY, None)
     import_map = tariffs.get("import_tariffs", {})
     if tariff_id not in import_map:
         raise ValueError(f"Unbekannte import_tariff_id '{tariff_id}'.")
@@ -358,8 +441,18 @@ def resolve_export_tariff_into_settings(
     out = dict(settings)
     tariff_id = out.pop("export_tariff_id", None)
     if not tariff_id:
+        out.pop(USER_EXPORT_CENT_KEY, None)
         return out
     tariff_id = resolve_export_tariff_id(str(tariff_id).strip())
+    if is_user_fixed_tariff_id(tariff_id):
+        cent = _parse_user_export_cent(out)
+        out.pop(USER_EXPORT_CENT_KEY, None)
+        tariff = _synthetic_user_export_tariff(cent)
+        out["_export_tariff_spec"] = tariff
+        out["feed_in_mode"] = "fixed"
+        out["k_push_cent"] = tariff["k_push_cent"]
+        return out
+    out.pop(USER_EXPORT_CENT_KEY, None)
     export_map = tariffs.get("export_tariffs", {})
     if tariff_id not in export_map:
         raise ValueError(f"Unbekannte export_tariff_id '{tariff_id}'.")

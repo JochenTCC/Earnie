@@ -93,11 +93,21 @@
             },
             "import_tariff_id": {
               "type": "string",
-              "description": "Referenz auf import_tariffs[].id in tariffs.json."
+              "description": "Referenz auf import_tariffs[].id in tariffs.json, oder reserved id __user_fixed__ für szenario-lokalen Festpreis."
             },
             "export_tariff_id": {
               "type": "string",
-              "description": "Referenz auf export_tariffs[].id in tariffs.json."
+              "description": "Referenz auf export_tariffs[].id in tariffs.json, oder reserved id __user_fixed__ für szenario-lokalen Festpreis."
+            },
+            "user_import_cent_kwh": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Nur bei import_tariff_id=__user_fixed__: Lieferanten-Arbeitspreis Cent/kWh inkl. USt (nicht in tariffs.json)."
+            },
+            "user_export_cent_kwh": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Nur bei export_tariff_id=__user_fixed__: Einspeisevergütung Cent/kWh (nicht in tariffs.json)."
             },
             "house_profile_id": {
               "type": "string",

@@ -109,6 +109,8 @@ def _render_next_month_rate_entry(
 
 
 def _load_scenario_catalogs() -> dict:
+    from house_config.tariffs_store import ensure_user_fixed_option
+
     scenarios_doc = load_backtesting_scenarios_raw()
     scenarios = scenarios_doc.get("scenarios", [])
     scenario_labels = {
@@ -123,8 +125,8 @@ def _load_scenario_catalogs() -> dict:
     ]
     batteries = list_batteries()
     pv_systems = list_pv_systems()
-    import_tariffs = list_import_tariffs()
-    export_tariffs = list_export_tariffs()
+    import_tariffs = ensure_user_fixed_option(list_import_tariffs())
+    export_tariffs = ensure_user_fixed_option(list_export_tariffs())
     profiles = load_house_profiles().get("profiles", {})
     return {
         "scenarios": scenarios,
@@ -393,6 +395,8 @@ def _render_scenario_tariff_filters(
     current_import_id: str | None,
     current_export_id: str | None,
 ) -> tuple[list, list]:
+    from house_config.tariffs_store import ensure_user_fixed_option
+
     session_scope = ctx["session_scope"]
     land_col, import_type_col, export_type_col = st.columns(3)
     shared_land = render_shared_land_filter(
@@ -420,7 +424,10 @@ def _render_scenario_tariff_filters(
         label_prefix="Einspeise ",
         container=export_type_col,
     )
-    return filtered_imports, filtered_exports
+    return (
+        ensure_user_fixed_option(filtered_imports),
+        ensure_user_fixed_option(filtered_exports),
+    )
 
 
 def _render_scenario_tariff_picks(
@@ -430,6 +437,12 @@ def _render_scenario_tariff_picks(
     current_import_id: str | None,
     current_export_id: str | None,
 ) -> tuple[object, object]:
+    from house_config.tariffs_store import (
+        USER_EXPORT_CENT_KEY,
+        USER_IMPORT_CENT_KEY,
+        is_user_fixed_tariff_id,
+    )
+
     session_scope = ctx["session_scope"]
     import_key = scoped_widget_key(session_scope, "scenario_import")
     export_key = scoped_widget_key(session_scope, "scenario_export")
@@ -450,6 +463,44 @@ def _render_scenario_tariff_picks(
         current_id=current_export_id,
         container=export_pick_col,
     )
+    selected_import = lookup_entity_id(ctx["imp_map"], imp_pick)
+    selected_export = lookup_entity_id(ctx["exp_map"], exp_pick)
+    scenario_settings = ctx["scenario_template"].get("settings") or {}
+    if is_user_fixed_tariff_id(selected_import):
+        imp_cent_key = scoped_widget_key(session_scope, "scenario_user_import_cent")
+        if imp_cent_key not in st.session_state:
+            saved = scenario_settings.get(USER_IMPORT_CENT_KEY)
+            st.session_state[imp_cent_key] = (
+                float(saved) if saved is not None else 20.0
+            )
+        import_pick_col.number_input(
+            "Bezugspreis (Cent/kWh)",
+            min_value=0.01,
+            step=0.1,
+            format="%.2f",
+            key=imp_cent_key,
+            help=(
+                "Lieferanten-Arbeitspreis inkl. USt. "
+                "Netznutzung Arbeitspreis kommt aus dem Hausprofil."
+            ),
+        )
+        import_pick_col.caption(
+            "Lieferanten-Arbeitspreis inkl. USt; Netznutzung aus dem Hausprofil."
+        )
+    if is_user_fixed_tariff_id(selected_export):
+        exp_cent_key = scoped_widget_key(session_scope, "scenario_user_export_cent")
+        if exp_cent_key not in st.session_state:
+            saved = scenario_settings.get(USER_EXPORT_CENT_KEY)
+            st.session_state[exp_cent_key] = (
+                float(saved) if saved is not None else 0.0
+            )
+        export_pick_col.number_input(
+            "Einspeisevergütung (Cent/kWh)",
+            min_value=0.0,
+            step=0.1,
+            format="%.2f",
+            key=exp_cent_key,
+        )
     return imp_pick, exp_pick
 
 
@@ -458,10 +509,12 @@ def _render_scenario_tariff_previews(
     selected_import: str | None,
     selected_export: str | None,
 ) -> tuple[dict | None, dict | None]:
+    from house_config.tariffs_store import is_user_fixed_tariff_id
+
     import_tariff = None
     export_tariff = None
     _, import_param_col, export_param_col = st.columns(3)
-    if selected_import:
+    if selected_import and not is_user_fixed_tariff_id(selected_import):
         import_tariff = next(t for t in ctx["import_tariffs"] if t["id"] == selected_import)
         render_tariff_parameter_preview(
             import_tariff,
@@ -469,7 +522,7 @@ def _render_scenario_tariff_previews(
             kind="import",
             container=import_param_col,
         )
-    if selected_export:
+    if selected_export and not is_user_fixed_tariff_id(selected_export):
         export_tariff = next(t for t in ctx["export_tariffs"] if t["id"] == selected_export)
         render_tariff_parameter_preview(
             export_tariff,
@@ -550,6 +603,8 @@ def _scenario_persist_payload(
     picks: dict,
     tariffs: dict,
 ) -> tuple[str, bool, dict]:
+    from house_config.tariffs_store import is_user_fixed_tariff_id
+
     session_scope = ctx["session_scope"]
     save_id = resolve_scenario_id(
         is_new=ctx["is_new"],
@@ -562,6 +617,22 @@ def _scenario_persist_payload(
         and bool(save_id)
         and bool(str(label or "").strip())
     )
+    import_tariff_id = lookup_entity_id(ctx["imp_map"], tariffs["imp_pick"])
+    export_tariff_id = lookup_entity_id(ctx["exp_map"], tariffs["exp_pick"])
+    user_import_cent = None
+    user_export_cent = None
+    if is_user_fixed_tariff_id(import_tariff_id):
+        raw_imp = st.session_state.get(
+            scoped_widget_key(session_scope, "scenario_user_import_cent")
+        )
+        if raw_imp is not None:
+            user_import_cent = float(raw_imp)
+    if is_user_fixed_tariff_id(export_tariff_id):
+        raw_exp = st.session_state.get(
+            scoped_widget_key(session_scope, "scenario_user_export_cent")
+        )
+        if raw_exp is not None:
+            user_export_cent = float(raw_exp)
     settings = build_scenario_settings(
         battery_id=lookup_entity_id(ctx["bat_map"], picks["battery_pick"]),
         pv_system_ids=[
@@ -569,8 +640,8 @@ def _scenario_persist_payload(
             for pick in picks["pv_picks"]
             if lookup_entity_id(ctx["pv_map"], pick)
         ],
-        import_tariff_id=lookup_entity_id(ctx["imp_map"], tariffs["imp_pick"]),
-        export_tariff_id=lookup_entity_id(ctx["exp_map"], tariffs["exp_pick"]),
+        import_tariff_id=import_tariff_id,
+        export_tariff_id=export_tariff_id,
         house_profile_id=lookup_entity_id(ctx["prof_map"], picks["prof_pick"]),
         use_imported_pv=bool(
             st.session_state.get(
@@ -578,6 +649,8 @@ def _scenario_persist_payload(
                 False,
             )
         ),
+        user_import_cent_kwh=user_import_cent,
+        user_export_cent_kwh=user_export_cent,
     )
     payload = {
         "id": save_id,

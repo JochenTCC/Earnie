@@ -136,6 +136,17 @@ def _seed_scenario_widget_state(
         settings.get("export_tariff_id"),
         allow_none=True,
     )
+    from house_config.tariffs_store import (
+        USER_EXPORT_CENT_KEY,
+        USER_IMPORT_CENT_KEY,
+    )
+
+    imp_cent_key = scoped_widget_key(session_scope, "scenario_user_import_cent")
+    exp_cent_key = scoped_widget_key(session_scope, "scenario_user_export_cent")
+    saved_imp = settings.get(USER_IMPORT_CENT_KEY)
+    saved_exp = settings.get(USER_EXPORT_CENT_KEY)
+    st.session_state[imp_cent_key] = float(saved_imp) if saved_imp is not None else 20.0
+    st.session_state[exp_cent_key] = float(saved_exp) if saved_exp is not None else 0.0
     st.session_state[scoped_widget_key(session_scope, "scenario_use_imported_pv")] = bool(
         settings.get("use_imported_pv")
     )
