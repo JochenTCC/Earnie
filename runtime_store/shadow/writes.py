@@ -115,3 +115,23 @@ def block_write_if_shadow(
         return False
     log_would_write(backend=backend, target=target, value=value, source=source)
     return True
+
+
+def should_invoke_setpoint_writes(*, silent: bool | None = None) -> bool:
+    """
+    Whether the live cycle should call send_*/EHAL write helpers.
+
+    Plain silent skips them. Shadow implies silent but still invokes the
+    primitives so :func:`block_write_if_shadow` can append ``shadow_writes.jsonl``.
+    Startup safe setpoints stay suppressed separately.
+
+    Pass ``silent`` from the caller's config instance when available (tests
+    often patch ``main.config.is_loxone_silent_mode``).
+    """
+    if is_shadow_mode():
+        return True
+    if silent is None:
+        import config as config_mod
+
+        silent = bool(config_mod.is_loxone_silent_mode())
+    return not silent

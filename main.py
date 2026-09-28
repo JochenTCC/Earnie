@@ -62,7 +62,14 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         )
     else:
         logger.info("--- Earnie Live-Abfrage gestartet (v%s) ---", __version__)
-    if config.is_loxone_silent_mode():
+    from runtime_store.shadow.mode import is_shadow_mode as _shadow_startup
+
+    if _shadow_startup():
+        logger.warning(
+            "Shadow: cycle setpoints go through the write path for would-write "
+            "logging only (no backend send; see shadow_writes.jsonl)."
+        )
+    elif config.is_loxone_silent_mode():
         if ehal_live.is_ehal_network_backend():
             logger.warning(
                 "Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf EHAL-Southbound."
@@ -347,7 +354,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     current_market_item = optimization_matrix[0]
 
     ehal_writes: list[dict] | None = None
-    if config.is_loxone_silent_mode():
+    from runtime_store.shadow.writes import should_invoke_setpoint_writes
+
+    if not should_invoke_setpoint_writes(silent=config.is_loxone_silent_mode()):
         if ehal_live.is_ehal_network_backend():
             logger.info(
                 "Silent-Modus: Steuerwerte (EHAL ESS+EVCS) werden nicht gesendet."

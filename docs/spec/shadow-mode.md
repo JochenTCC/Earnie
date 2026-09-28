@@ -169,6 +169,8 @@ When `is_shadow_mode()`:
 | Switch | UI / `local_settings.json` | `EARNIE_SHADOW=1` only |
 | Runtime dir | shared default | own, mandatory |
 
+Shadow implies silent, but the live cycle still **invokes** the setpoint write helpers (ESS / flex / export). The central block at the write primitives prevents any backend send and appends `shadow_writes.jsonl`. Plain silent skips that path entirely. Startup safe setpoints remain suppressed in both.
+
 ## 7. Ports and hosts
 
 - **Daemon listener (8541):** not started in Shadow (§6.3) → no conflict.
