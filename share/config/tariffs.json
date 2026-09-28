@@ -1,7 +1,7 @@
 {
     "$schema": "./tariffs.schema.json",
     "earnie_data_model": 3,
-    "catalog_as_of": "2026",
+    "catalog_as_of": "2026-09-28",
     "oemag_monthly_feed_in_rates": [
         {
             "year": 2025,
@@ -92,6 +92,16 @@
             "year": 2026,
             "month": 6,
             "tariff_cent_kwh": 6.772
+        },
+        {
+            "year": 2026,
+            "month": 7,
+            "tariff_cent_kwh": 6.146
+        },
+        {
+            "year": 2026,
+            "month": 8,
+            "tariff_cent_kwh": 8.997
         }
     ],
     "monthly_float_reference_cent_kwh": 7.15,
@@ -763,6 +773,10 @@
             "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Gesetzlicher Quartals- bzw. Monatsmarktpreis nach § 13 ÖSG. Konstanter Festpreis pro Kalendermonat, Abrechnung ex-post. Seed: OeMAG×7.15/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_seed": {
+                "curve": "oemag",
+                "arbeitspreis_kwh_cent": 7.15
+            },
             "monthly_rates": [
                 {
                     "year": 2025,
@@ -853,6 +867,16 @@
                     "year": 2026,
                     "month": 6,
                     "tariff_cent_kwh": 6.772
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 6.146
+                },
+                {
+                    "year": 2026,
+                    "month": 8,
+                    "tariff_cent_kwh": 8.997
                 }
             ],
             "supplier_id": "oemag"
@@ -868,6 +892,10 @@
             "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Kopplung an den monatlichen PV-Referenzmarktwert nach § 13 EAG abzueglich Bearbeitungsgebuehr. Untergrenze bei 0 Cent. Seed: OeMAG×5.85/7.15−1.5 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_seed": {
+                "curve": "oemag",
+                "arbeitspreis_kwh_cent": 5.85
+            },
             "monthly_rates": [
                 {
                     "year": 2025,
@@ -958,6 +986,16 @@
                     "year": 2026,
                     "month": 6,
                     "tariff_cent_kwh": 4.0407
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 3.5285
+                },
+                {
+                    "year": 2026,
+                    "month": 8,
+                    "tariff_cent_kwh": 5.8612
                 }
             ],
             "supplier_id": "energie_ag_ober_sterreich"
@@ -973,6 +1011,10 @@
             "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Monatlich angepasster Einspeisetarif basierend auf den Großhandelspreisen des Vormonats. Flat über den Tag. Seed: OeMAG×6.4/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_seed": {
+                "curve": "oemag",
+                "arbeitspreis_kwh_cent": 6.4
+            },
             "monthly_rates": [
                 {
                     "year": 2025,
@@ -1063,6 +1105,16 @@
                     "year": 2026,
                     "month": 6,
                     "tariff_cent_kwh": 6.0617
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.5013
+                },
+                {
+                    "year": 2026,
+                    "month": 8,
+                    "tariff_cent_kwh": 8.0533
                 }
             ],
             "supplier_id": "evn"
@@ -1078,6 +1130,10 @@
             "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Monatlicher Index-Einspeisetarif. Verrechnung erfolgt starr pro Monat ohne Intraday-Volatilitaet. Seed: OeMAG×6.95/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_seed": {
+                "curve": "oemag",
+                "arbeitspreis_kwh_cent": 6.95
+            },
             "monthly_rates": [
                 {
                     "year": 2025,
@@ -1168,6 +1224,16 @@
                     "year": 2026,
                     "month": 6,
                     "tariff_cent_kwh": 6.5826
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.9741
+                },
+                {
+                    "year": 2026,
+                    "month": 8,
+                    "tariff_cent_kwh": 8.7453
                 }
             ],
             "supplier_id": "wien_energie"
@@ -1225,6 +1291,10 @@
             "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Gibt den monatlich ermittelten solaren Marktwert der Netzbetreiber (Netztransparenz) direkt an den Kunden weiter. Seed: OeMAG×6.1/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_seed": {
+                "curve": "oemag",
+                "arbeitspreis_kwh_cent": 6.1
+            },
             "monthly_rates": [
                 {
                     "year": 2025,
@@ -1315,6 +1385,16 @@
                     "year": 2026,
                     "month": 6,
                     "tariff_cent_kwh": 5.7775
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.2434
+                },
+                {
+                    "year": 2026,
+                    "month": 8,
+                    "tariff_cent_kwh": 7.6758
                 }
             ],
             "supplier_id": "tibber"
@@ -1462,9 +1542,14 @@
                     "year": 2026,
                     "month": 8,
                     "tariff_cent_kwh": 6.464
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 8.989
                 }
             ],
-            "notes": "Web-Recherche awattar.at/tariffs/sunny + Wayback/Tarifblätter (Cent/kWh netto=brutto). Bekannte Monate: 2024-09..11, 2025-01..04/06/07/10/12, 2026-02..05/07. Lücken (2024-12, 2025-05/08/09/11, 2026-01/06) geschätzt: monthly_sunny × linear interpoliertes web/sunny-Ratio (Pearson≈0.69). Grundgebühr 4,79 €/Monat netto. Nicht mit SUNNY Spot 60min verwechseln.",
+            "notes": "Web-Recherche awattar.at/tariffs/sunny + Wayback/Tarifblätter (Cent/kWh netto=brutto). Bekannte Monate: 2024-09..11, 2025-01..04/06/07/10/12, 2026-02..05/07/09. 2026-08 = Platzhalter (Juli-Wert, Tarifblatt nicht mehr abrufbar). Lücken (2024-12, 2025-05/08/09/11, 2026-01/06) geschätzt: monthly_sunny × linear interpoliertes web/sunny-Ratio (Pearson≈0.69). Grundgebühr 4,79 €/Monat netto. Nicht mit SUNNY Spot 60min verwechseln.",
             "supplier_id": "awattar_at"
         },
         {
@@ -1491,6 +1576,9 @@
             "markup_percent": 0.0,
             "prices_include_vat": false,
             "vat_percent": 0.0,
+            "monthly_seed": {
+                "curve": "econtrol_refmarkt_pv"
+            },
             "monthly_rates": [
                 {
                     "year": 2025,
@@ -1555,12 +1643,12 @@
                 {
                     "year": 2026,
                     "month": 7,
-                    "tariff_cent_kwh": 4.95
+                    "tariff_cent_kwh": 6.25
                 },
                 {
                     "year": 2026,
                     "month": 8,
-                    "tariff_cent_kwh": 4.95
+                    "tariff_cent_kwh": 8.82
                 }
             ],
             "notes": "Vorarlberg, bis 100 kWp. RefMarkt PV (§13 EAG) − 0,60 ct, ohne USt. Seed aus econtrol_referenzmarktwert_pv_monthly. Quelle: vkw.at/pv-einspeisetarif-flex",
@@ -1627,6 +1715,16 @@
             "year": 2026,
             "month": 6,
             "tariff_cent_kwh": 5.55
+        },
+        {
+            "year": 2026,
+            "month": 7,
+            "tariff_cent_kwh": 6.85
+        },
+        {
+            "year": 2026,
+            "month": 8,
+            "tariff_cent_kwh": 9.42
         }
     ]
 }

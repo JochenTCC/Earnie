@@ -187,9 +187,37 @@ def missing_runtime_scenario_items_for(
     export_id = str(live_settings.get("export_tariff_id", "") or "").strip()
     tariffs_doc = _read_json_document(tariffs_path)
     import_map, export_map = _tariff_id_maps_from_doc(tariffs_doc)
-    if not import_id or import_id not in import_map:
+    from house_config.tariffs_store import (
+        USER_EXPORT_CENT_KEY,
+        USER_IMPORT_CENT_KEY,
+        is_user_fixed_tariff_id,
+    )
+
+    if not import_id:
         missing.append("Bezugstarif wählen (Echtzeit-Umgebung)")
-    if not export_id or export_id not in export_map:
+    elif is_user_fixed_tariff_id(import_id):
+        import_cent = live_settings.get(USER_IMPORT_CENT_KEY)
+        try:
+            ok = import_cent is not None and float(import_cent) > 0.0
+        except (TypeError, ValueError):
+            ok = False
+        if not ok:
+            missing.append("Eigenen Bezugspreis (Cent/kWh) eingeben (Echtzeit-Umgebung)")
+    elif import_id not in import_map:
+        missing.append("Bezugstarif wählen (Echtzeit-Umgebung)")
+    if not export_id:
+        missing.append("Einspeisetarif wählen (Echtzeit-Umgebung)")
+    elif is_user_fixed_tariff_id(export_id):
+        export_cent = live_settings.get(USER_EXPORT_CENT_KEY)
+        try:
+            ok = export_cent is not None and float(export_cent) >= 0.0
+        except (TypeError, ValueError):
+            ok = False
+        if not ok:
+            missing.append(
+                "Eigene Einspeisevergütung (Cent/kWh) eingeben (Echtzeit-Umgebung)"
+            )
+    elif export_id not in export_map:
         missing.append("Einspeisetarif wählen (Echtzeit-Umgebung)")
 
     profile_id = str(live_settings.get("house_profile_id", "") or "").strip()

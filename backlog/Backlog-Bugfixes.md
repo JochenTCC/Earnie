@@ -23,7 +23,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **Docker image missing `share/ehal` schemas** — After S6470 explicit COPY, image only had `share/config/`; live EHAL validation failed every ~30s (`EHAL schema not found: /app/share/ehal/telemetry.schema.json`). Fix: `docker/Dockerfile` `COPY share/ share/`. Ships in **2.6.0-alpha.8**. NAS live acceptance pending.
 - [ ] **False “Zwangs-Entladen nicht ausgeführt”** (`debug_dump_20260923_201155`) — Fix implemented: deviation uses full-entry `closed_by` (not `by_slot` winners); `battery_power_below_tolerance` = Ist ≤ tol only (S6 “nicht ausgeführt”). Tests: `test_deviation_timeline` / `test_deviation_eval`. Dump evening 19:15–19:45 cleared; live Monitor acceptance still pending. Commit/PATCH when ending session.
 - [ ] **Monitor Chart 2 daily Kosten KPIs** — Implemented: SA-day annotation columns (full span = two cols; segment = visible day); plan-based **Ersparnis bisher** line in gray zone (`ui/chart_day_costs.py`). Live Monitor acceptance pending.
 
@@ -34,6 +33,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
+- [ ] **SE analysis charts: show volumetric Netznutzung AP on import price** — MILP already includes house-profile `netznutzung_arbeitspreis_cent_kwh` in `k_act`. SE analysis charts currently show the import tariff without that Arbeitspreis; add it to the displayed import price so chart and optimizer match.
 - [ ] Change order on Monitor side: Place sankey diagram right under Chart 1 - then Chart 2 with cost and consumption - then Simulation Details und Energievergleich
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

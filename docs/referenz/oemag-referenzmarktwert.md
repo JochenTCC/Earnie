@@ -29,10 +29,10 @@ In `tariffs.json` liegt die Kurve unter `oemag_monthly_feed_in_rates`. Der Expor
 
 Der Referenzmarktwert ist der **erzeugungsgewichtete** Mittelwert der Day-Ahead-Stundenpreise der österreichischen Gebotszone für eine Technologie (hier: Photovoltaik). Er dient u. a. der Marktprämie und als Bezugsgröße marktorientierter Einspeisetarife (z. B. VKW Flex = RefMarkt − Abschlag).
 
-- Veröffentlichung: monatlich durch die E-Control unter [referenzmarktwert](https://www.e-control.at/referenzmarktwert).
+- Veröffentlichung: monatlich (ca. 2.–9. des Folgemonats) durch die E-Control unter [referenzmarktwert](https://www.e-control.at/referenzmarktwert). Maschinenlesbar mit Veröffentlichungsdatum: [Referenzmarktwert_Entwicklung.xlsx](https://www.e-control.at/documents/1785851/10823410/Referenzmarktwert_Entwicklung.xlsx) (Spalte „Photovoltaikanlagen“).
 - Seit 01.10.2025 liegen Mengen und Preise in Viertelstundenauflösung vor; die E-Control bildet für die Berechnung weiterhin **Stundenaggregate**, solange das EAG Stundenwerte vorschreibt.
 
-In `tariffs.json`: `econtrol_referenzmarktwert_pv_monthly`. Beispiel Jun 2026 PV: **5,55 ct/kWh** (Stand E-Control-Veröffentlichung).
+In `tariffs.json`: `econtrol_referenzmarktwert_pv_monthly`. Beispiel Aug 2026 PV: **9,42 ct/kWh** (E-Control-Veröffentlichung vom 04.09.2026).
 
 ## Referenzmarktpreis (nicht verwechseln)
 
@@ -40,4 +40,22 @@ Der Referenzmarktpreis (§ 12 EAG) ist das **ungewichtete** arithmetische Mittel
 
 ## Pflegehinweis
 
-Monatswerte manuell aus den offiziellen Tabellen/Seiten nachziehen und bei Bedarf die `monthly_rates` der abhängigen Katalog-Tarife neu seeden. Es gibt keine automatische HTML-Abfrage.
+Neue Monatswerte werden aus den offiziellen Seiten übernommen (keine automatische HTML-Abfrage in Earnie) und mit einem Script eingetragen. Das Script rechnet alle abhängigen Katalog-Tarife mit `monthly_seed` für die betroffenen Monate automatisch nach:
+
+```powershell
+python -m scripts.update_tariff_curves --oemag 2026-08=8.997 --refmarkt 2026-08=9.42 --catalog-as-of 2026-09-28
+python -m scripts.update_tariff_curves --check
+```
+
+- `--set export:TARIF_ID:JJJJ-MM=CENT` trägt einen Einzelwert für Monats-Tarife **ohne** `monthly_seed` ein (z. B. aWATTar SUNNY aus dem Tarifblatt).
+- `--check` meldet Abweichungen zwischen Kurven und geseedeten Tarifen und Monate, die nur Platzhalter sind.
+- `--dry-run` zeigt die Änderungen, ohne zu schreiben.
+
+`monthly_seed` am Tarif (nur Katalog-Wartung, die Runtime nutzt weiterhin `monthly_rates`):
+
+| `curve` | Formel |
+| ------- | ------ |
+| `oemag` | OeMAG × `arbeitspreis_kwh_cent` / `monthly_float_reference_cent_kwh` − `settlement_fee_cent_kwh` |
+| `econtrol_refmarkt_pv` | RefMarkt PV − `settlement_fee_cent_kwh` |
+
+Ergibt die Formel ≤ 0 ct, schreibt das Script nichts und gibt eine Warnung aus (`monthly_rates` erlaubt nur Werte > 0).

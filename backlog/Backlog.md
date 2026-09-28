@@ -16,22 +16,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.6`**.
+**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.9`**.
 
-**Next:** **2.6.o** (Shadow recorder) → then community/official **2.6** publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**).
-
-#### 2.6.o — Shadow Mode S1: Prod feed recorder
-
-Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) (Epic **Shadow**; S1 only here). Must ship in a **2.6** Prod build so Dev can later feed Shadow during **2.7**.
-
-- [ ] **2.6.o — Shadow Mode S1 (Prod recorder)**
-  - Opt-in `"shadow_feed_enabled": true` (+ optional `"shadow_feed_retention_days"`, default 14) in Prod `local_settings.json`; default off; ignored + warning if `EARNIE_SHADOW=1`
-  - Record raw backend responses at transport primitives (Loxone `fetch_loxone_raw_value` / `_fetch_loxone_io_all`, HA `HaAdapter._get_json`, OpenEMS GET, `ext:pv_forecast` / prices / outdoor, optimize-trigger events) — no secrets/auth in records
-  - Feed layout under `{config_dir}/shadow_feed/` (`meta.json`, atomic `latest.json`, daily JSONL + retention); override `EARNIE_SHADOW_FEED_PATH`
-  - Superset after cycle writes (soft-fail, ≤10 s budget): **HA default = config-referenced entities only** (not full `/api/states`); Loxone IOs / OpenEMS channels from shared bindings
-  - Failure isolation: recorder never breaks Prod (wrap + rate-limited warnings)
-  - Tests: per-primitive ok/error, no secrets, atomic `latest.json`, JSONL rotation/retention, recorder exception does not break `main()`
-  - **Not in this letter:** Shadow replay / write block / UI / seed (**2.7.f**); Soll/Soll diff & offline JSONL replay (S4 → **2.+1**)
+**Next:** community/official **2.6** publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**). Shadow Prod recorder (**2.6.o**) and user-fixed tariffs are done.
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -183,8 +170,10 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
 - [ ] **Data & tariff fidelity - Part 2**
   - Keep official EPEX unconnected unless a paid/internal use case appears
   - Check possibilities to automatic tariffs.json update to existing installations
+  - Think about possibilites to let user enter own tariff data (beyond fixed ones) in addition to tariffs.json (e.g. on a time-scheduled basis)
+    - Do a first research on different tariff types that are not covered yet
 - [ ] Check possibilities to show decimal numbers according to regional settings (e.g. use "," as decimal sign for Germany)
-- [ ] Simulate restrictions for energy export dependent on current grid situation in SE (and maybe Live) — **after 2.7.a** (consumes Live/MILP/EHAL export-cap model; do not redefine caps here)
+
 
 
 

@@ -2,6 +2,35 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### User-fixed tariffs — Eigener Festpreis (2026-09-28)
+
+- [x] **User-fixed import/export tariffs** — Scenario-local Cent/kWh via dropdown **Eigener Festpreis** (`__user_fixed__`); values in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`), not `tariffs.json`
+  - Store resolve + plausibility + setup readiness; schema fields; Scenario Editor edit fields; German docs (`preise.md`, Benutzer-Handbuch)
+  - Tests: `tests/test_user_fixed_tariffs.py`
+  - Follow-up (open): non-fixed / scheduled own tariffs under **Data & tariff fidelity - Part 2**
+
+### 2.6.o — Shadow Mode S1: Prod feed recorder (2026-09-28)
+
+- [x] **2.6.o — Shadow Mode S1 (Prod recorder)** — Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) (Epic **Shadow**; S1 only). Ships in a **2.6** Prod build so Dev can feed Shadow during **2.7**.
+  - Opt-in `"shadow_feed_enabled": true` (+ optional `"shadow_feed_retention_days"`, default 14) in Prod `local_settings.json`; default off; ignored + warning if `EARNIE_SHADOW=1`
+  - Record raw backend responses at transport primitives (Loxone `fetch_loxone_raw_value` / `_fetch_loxone_io_all`, HA `HaAdapter._get_json`, OpenEMS GET, `ext:pv_forecast` / prices / outdoor, optimize-trigger events) — no secrets/auth in records
+  - Feed layout under `{config_dir}/shadow_feed/` (`meta.json`, atomic `latest.json`, daily JSONL + retention); override `EARNIE_SHADOW_FEED_PATH`
+  - Superset after cycle writes (soft-fail, ≤10 s budget): **HA default = config-referenced entities only** (not full `/api/states`); Loxone IOs / OpenEMS channels from shared bindings
+  - Failure isolation: recorder never breaks Prod (wrap + rate-limited warnings)
+  - Tests: per-primitive ok/error, no secrets, atomic `latest.json`, JSONL rotation/retention, recorder exception does not break `main()`
+  - **Not in this letter:** Shadow replay / write block / UI / seed (**2.7.f**); Soll/Soll diff & offline JSONL replay (S4 → **2.+1**)
+
+### Tariff catalog: monthly curve updater + scan runbook (2026-09-28)
+
+- [x] **`monthly_seed`** on catalog `monthly_table` tariffs (schema + `data/monthly_float_rates.build_seeded_monthly_rates`): OeMAG-proportional floats (OeMAG, Energie AG Team Sonne, EVN, Wien Energie, Tibber) and RefMarkt-based VKW PV-Flex; replaces seed factors that only lived in `notes`
+- [x] **`scripts/update_tariff_curves.py`**: upsert OeMAG / E-Control RefMarkt PV months, recompute seeded tariffs, `--set` for unseeded tables (SUNNY), `--check` drift gate (test asserts the shipped catalog matches its seeds)
+- [x] Catalog caught up: OeMAG 2026-07/08 (6.146 / 8.997), RefMarkt PV 2026-07/08 (6.85 / 9.42, E-Control xlsx), SUNNY 2026-09 (8.989); VKW PV-Flex placeholders replaced; `catalog_as_of` now an ISO date
+- [x] Runbook `docs/spec/tariff-monthly-scan.md` for the monthly cloud routine (first AT working day, 17:00 Vienna; branch + PR, stage B findings report-only)
+
+### Bugfix Docker missing share/ehal (2026-09-27)
+
+- [x] **Docker image missing `share/ehal` schemas** — S6470 explicit COPY only shipped `share/config/`; live EHAL validation failed every ~30s (`EHAL schema not found: /app/share/ehal/telemetry.schema.json`). Fixed in `docker/Dockerfile` (`COPY share/ share/`); verified on NAS with **2.6.0-alpha.8**.
+
 ### Bugfix SonarCloud leak-period QG (2026-09-27)
 
 - [x] **SonarCloud leak-period QG** — Closed as open verification (2026-09-27). Historical: re-check 2026-09-26 on `main` @ `64b151c` (Actions [36225774457](https://github.com/JochenTCC/Earnie/actions/runs/36225774457)): QG **ERROR** — `new_bugs` **1**, `new_vulnerabilities` **19**, `new_reliability_rating` C, `new_security_rating` C, `new_coverage` ≈ **66%**. Remediations verified; remaining follow-ups obsolete:
