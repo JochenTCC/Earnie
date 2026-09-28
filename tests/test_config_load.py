@@ -7,16 +7,19 @@ import sys
 import pytest
 
 
-def _unload_config_modules() -> None:
+def _unload_config_modules(monkeypatch) -> None:
+    """Force a clean re-import of ``config``; monkeypatch restores the
+    original module objects on teardown so the reload doesn't leak into
+    later test files sharing this process (see sys.modules)."""
     for name in list(sys.modules):
         if name == "config" or name.startswith("config."):
-            del sys.modules[name]
+            monkeypatch.delitem(sys.modules, name, raising=False)
 
 
 def test_load_config_or_exit_missing_path(tmp_path, monkeypatch, capsys):
     missing = tmp_path / "missing" / "config.json"
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(missing))
-    _unload_config_modules()
+    _unload_config_modules(monkeypatch)
 
     from runtime_store import config_load
 
