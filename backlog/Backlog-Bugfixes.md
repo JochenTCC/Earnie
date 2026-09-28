@@ -23,6 +23,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **Docker image missing `share/ehal` schemas** — After S6470 explicit COPY, image only had `share/config/`; live EHAL validation failed every ~30s (`EHAL schema not found: /app/share/ehal/telemetry.schema.json`). Same fix as `main` / 2.6.0-alpha.8: `docker/Dockerfile` `COPY share/ share/` + regression assert in `test_dockerfile_strips_crlf_and_healthcheck`. Rebuild/redeploy alpha image; NAS live acceptance pending.
 - [ ] **False “Zwangs-Entladen nicht ausgeführt”** (`debug_dump_20260923_201155`) — Fix implemented: deviation uses full-entry `closed_by` (not `by_slot` winners); `battery_power_below_tolerance` = Ist ≤ tol only (S6 “nicht ausgeführt”). Tests: `test_deviation_timeline` / `test_deviation_eval`. Dump evening 19:15–19:45 cleared; live Monitor acceptance still pending. Commit/PATCH when ending session.
 - [ ] **SonarCloud leak-period QG** — Re-check 2026-09-26 on `main` @ `64b151c` (Actions [36225774457](https://github.com/JochenTCC/Earnie/actions/runs/36225774457)): QG **ERROR** — `new_bugs` **1**, `new_vulnerabilities` **19**, `new_reliability_rating` C, `new_security_rating` C, `new_coverage` ≈ **66%** (need ≥ 80%). Local remediations pending push/scan:
   - [x] Cleared previously: `bump_ha_addon.py` python:S3923; secrets:S7636; `.devcontainer` docker/shell

@@ -82,6 +82,9 @@ def test_dockerfile_strips_crlf_and_healthcheck() -> None:
     assert "docker/healthcheck.sh" in text
     # Explicit COPY (no COPY . .) must still ship the import facade.
     assert "COPY logger_config.py app.py main.py config.py ./" in text
+    # Full share/ tree (not only share/config/) — share/ehal schemas required for Live.
+    assert "COPY share/ share/" in text
+    assert "COPY share/config/ share/config/" not in text
 
 
 def test_healthcheck_sh_invokes_python_module() -> None:
