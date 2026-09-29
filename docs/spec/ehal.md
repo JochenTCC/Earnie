@@ -203,6 +203,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 | `set_ess_discharge_power_limit` | e.g. `SetActivePowerLessOrEquals` |
 | `set_ess_mode` | *(ignored by OpenEMS)* |
 | `set_evcs_max_current` | EVCS Max Current |
+| `sens_absent_mode` | Optional side-channel: `plant.ehal_bindings.sens_absent_mode` = `componentId/ChannelId` (no fixed Edge default; not in core telemetry wire) |
 
 ### Deferred device classes
 
@@ -238,13 +239,14 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 - Compose lab: `docker/compose/openems-lab.yml`. Config snippet: `share/config/ehal.openems.snippet.json`. Step-by-step: [`openems-lab-setup.md`](openems-lab-setup.md).
 - Cadence: Core expects ≥ 60 s telemetry refresh; adapter may poll faster.
 - EVCS: EHAL `set_evcs_max_current` (A) → OpenEMS `evcs0/SetChargePowerLimit` (W) via house-profile V/phases.
+- Optional absent / holiday: set `plant.ehal_bindings.sens_absent_mode` to `componentId/ChannelId` (read via `read_channel`; no HITL plant mapper yet).
 - Southbound silent gate: reuse `loxone_silent_mode` for OpenEMS writes as well.
 - Write failures → `runtime/ehal_write_error.json` + UI banner on EHAL-Com / Daemon page.
 
 ## Implementation notes — Home Assistant + evcc
 
 - Adapter: `integrations/ha_adapter.py` (REST only: `/api/states`, `/api/services/...`). Prefer HA entities from evcc.
-- Config: `ehal.backend=ha`; URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` under `ehal.ha` in `config.json`. Entity IDs live in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Pattern B, same keys as Loxone). Legacy flat `ehal.ha.entities` is migrated once and cleared. Snippet: `share/config/ehal.ha.snippet.json` (backend / `adapter_id` / `sign` only — no secrets).
+- Config: `ehal.backend=ha`; URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` under `ehal.ha` in `config.json`. Entity IDs live in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Pattern B storage, same key names as Loxone). Live aggregation is a **subset** (`house_config/ha_ehal_bindings.py` `HA_ALL_FIELDS`): plant grid/PV/ESS + optional energy counters + ESS setpoints + optional plant `sens_absent_mode` (binary side-channel); first EV only `sens_evcs_active_power` / `set_evcs_max_current` / `set_evcs_mode`. Extra Pattern B keys (outdoor temp, full EV SoC/connected, flex/pool) may be saved in HITL but are ignored by `HaAdapter` until wired. Legacy flat `ehal.ha.entities` is migrated once and cleared. Snippet: `share/config/ehal.ha.snippet.json` (backend / `adapter_id` / `sign` only — no secrets).
 - Compose lab: `docker/compose/ha-lab.yml` (Earnie :8506 + HA :8123 + evcc :7070). Setup: [`ha-lab-setup.md`](ha-lab-setup.md). German A2/B: [`../einrichtung/ha-evcc.md`](../einrichtung/ha-evcc.md).
 - HITL mapping UI: Streamlit EHAL-Com expander → `ui/ehal_ha_mapping.py` (entity picker → scan `/api/states` once per session → **heuristic propose** for empty fields only → user confirms → `apply_entity_bindings` per entity; **no LLM**). Heuristic: `integrations/ha_ehal_mapping.py` (domain / `device_class` / unit / token-boundary name hints with vendor synonyms; unique best score or leave empty; physical-quantity filter via `ha_units`). Live path: Pattern B / `aggregate_ha_entities` → `HaAdapter`; Live tables use entity-centric Mapping columns like Loxone.
 - Optional slot-Ist energy maps (not on the EHAL power wire): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on `plant.ehal_bindings` → `integrations/ha_meter_energy.py` + sampler ΔkWh overlay (same contract as Loxone; see [`loxone-meter-energy-slot-ist.md`](loxone-meter-energy-slot-ist.md)).

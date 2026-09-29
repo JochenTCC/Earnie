@@ -18,7 +18,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.9`**.
 
-**Next:** community/official **2.6** publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**). Shadow Prod recorder (**2.6.o**) and user-fixed tariffs are done.
+**Next:** community/official **2.6** publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**). Shadow Prod recorder (**2.6.o**), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -27,9 +27,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [House simulator spec](../docs/spec/house-sim.md) — HouseSim S1–S4 (archetypes, core, S4 integration)
 - [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**
 - [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — add-on packaging items; channel work is now **2.6.k**
-
-- [ ] Manual Todo: Review updated docs (at least German ones)
-- [ ] Update documents in Earnie-Projekt repo with current achievements / already implemented features
 
 ### Version 2.7 — Multiple storages and export power limitation
 

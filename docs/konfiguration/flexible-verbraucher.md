@@ -29,9 +29,9 @@ Hausprofil-Felder (nur **Live**-Optimierung; Szenario-Explorer unverändert):
 | `absent_mode` | Profil | Earnie-Schalter „Abwesend / Urlaub“ |
 | `absent_mode_enabled` | Verbraucher | „Inaktiv wenn abwesend“ — bei wirksamem Modus: non–Haus-Wärme aus Live-MILP; Haus Wärme mit Absenkung |
 | `absent_temp_reduction_c` | Haus Wärme (`thermal_annual`) | Absenkung in K; Live-Soll = `target_temp_c` − Absenkung; Warmwasser (`persons`) dann 0 |
-| `plant.ehal_bindings.sens_absent_mode` | Plant | Optional `Earnie_Abwesend` (0/1); **ODER** mit `absent_mode` |
+| `plant.ehal_bindings.sens_absent_mode` | Plant | Optional Smarthome-Signal 0/1; **ODER** mit `absent_mode`. Live-Lesen über das aktive EHAL-Backend: Loxone-Merker (Default `Earnie_Abwesend`), HA-Entity (`binary_sensor` / `input_boolean` / …), OpenEMS-Kanal als `componentId/ChannelId` |
 
-Wirksam = HK **oder** EHAL. Opt-in-Verbraucher außer Haus Wärme werden aus der Live-MILP-Liste genommen; Haus Wärme bleibt mit reduzierter Solltemperatur in der Optimierung.
+Wirksam = HK **oder** EHAL-Live (alle Backends). Opt-in-Verbraucher außer Haus Wärme werden aus der Live-MILP-Liste genommen; Haus Wärme bleibt mit reduzierter Solltemperatur in der Optimierung. Der HK-Schalter `absent_mode` wirkt **backend-unabhängig**.
 
 
 

@@ -24,6 +24,14 @@ def test_parse_binary_and_text() -> None:
     assert parse_binary_value(1) is True
     assert parse_binary_value("0") is False
     assert parse_binary_value(None) is None
+    assert parse_binary_value("on") is True
+    assert parse_binary_value("OFF") is False
+    assert parse_binary_value("true") is True
+    assert parse_binary_value("false") is False
+    assert parse_binary_value("home") is False
+    assert parse_binary_value("away") is True
+    assert parse_binary_value(True) is True
+    assert parse_binary_value("nope") is None
     assert parse_text_value("  hi ") == "hi"
     assert parse_analog_value("12.34") == 12.34
     assert parse_analog_value(None) is None

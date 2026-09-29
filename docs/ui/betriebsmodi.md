@@ -37,7 +37,7 @@ Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.8.1). Chart
 
 **Zweck:** Einheitliches Produktiv-Cockpit ohne Grenze zwischen Live und Historie. Vergangenheit aus dem Produktiv-Log (`optimization_history.jsonl`), Gegenwart und Vorausschau aus dem **Produktiv-Snapshot** (`live_optimization_debug.json`, geschrieben von `main.py`). **Desktop:** ein Fenster SA₀→SA₂; **Mobil:** zwei benachbarte Sonnenaufgang-Segmente.
 
-**Abwesenheitsmodus:** Wenn der wirksame Live-Abwesenheitsmodus an ist (Hausprofil-Schalter **oder** Plant-EHAL `sens_absent_mode` / `Earnie_Abwesend`), zeigt die Seite unter dem Titel einen Hinweis „Abwesenheitsmodus aktiv“ (optional mit Quelle Earnie / Smarthome / beide). Konfiguration: [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
+**Abwesenheitsmodus:** Wenn der wirksame Live-Abwesenheitsmodus an ist (Hausprofil-Schalter **oder** Plant-EHAL `sens_absent_mode` am aktiven Backend — Loxone-Merker / HA-Entity / OpenEMS `component/Channel`), zeigt die Seite unter dem Titel einen Hinweis „Abwesenheitsmodus aktiv“ (optional mit Quelle Earnie / Smarthome / beide). Konfiguration: [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
 **Ersetzt:** die früheren Modi **Echtzeit** und **Historischer Tag** sowie den Button **Produktiv-Archiv**. Es gibt **keine Nachrechnung** beliebiger Kalendertage im S-2-Modus (geplant als Dev-Feature in Szenario-Explorer).
 
@@ -92,7 +92,7 @@ PV-, Batterie- und Einspeise-Parameter werden über Entitäts-IDs im **Live-Szen
 | Charts 1 & 2 | Leistung/SoC/Preis; kumulierte Kosten & Verbrauch (Ist vs. Prognose getrennt) |
 | Simulations-Tabelle | Rohdaten des sichtbaren Fensters; orange = fehlende Log-Einträge |
 | Energievergleich | Expander: Baseline vs. Optimierung |
-| Sankey | immer (aktuelle Loxone-Daten) |
+| Sankey | Plant-Leistungen (PV/Netz/Batterie) über aktives EHAL-Backend; Flex-Knoten und EV-SoC-Label heute nur Loxone (siehe [Charts](charts.md#energiefluss-live-sankey)) |
 | Countdown / Optimierungs-Takt | immer |
 | Auto-Refresh | Desktop: Live-Zyklus (`cycle_offset=0`); Mobil: nur Fenster SA₀→SA₁ |
 

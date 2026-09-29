@@ -4,13 +4,37 @@ from __future__ import annotations
 import math
 
 
+_BINARY_TRUE = frozenset({"on", "true", "away", "1", "yes"})
+_BINARY_FALSE = frozenset({"off", "false", "home", "0", "no"})
+
+
 def parse_binary_value(raw) -> bool | None:
-    """Convert a Loxone Merker to True/False; None on read/parse failure."""
+    """Convert a live backend value to True/False; None on read/parse failure.
+
+    Accepts numeric 0/1 (Loxone/OpenEMS) and common HA state strings
+    (on/off, true/false, home/away), case-insensitive.
+    """
     if raw is None:
         return None
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        try:
+            return int(round(float(raw))) == 1
+        except (TypeError, ValueError, OverflowError):
+            return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    # Strip trailing unit suffixes (e.g. Loxone "1.0").
+    lowered = text.lower()
+    if lowered in _BINARY_TRUE:
+        return True
+    if lowered in _BINARY_FALSE:
+        return False
     try:
-        return int(round(float(raw))) == 1
-    except (TypeError, ValueError):
+        return int(round(float(text.split()[0]))) == 1
+    except (TypeError, ValueError, OverflowError, IndexError):
         return None
 
 

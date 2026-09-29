@@ -42,7 +42,7 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Setpoints (limits)      | `set_ess_discharge_power_limit`    | no*      | **W**; non-negative amount (true max. discharge power)                                                         |
 | Setpoints (limits)      | `set_evcs_max_current`             | no*      | **A**; non-negative amount (EV charging target/max current)                                                    |
 | Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic** (even with an old setpoint power); OpenEMS ignores it          |
-| Setpoints (extended)    | `set_evcs_mode`                    | no*      | Enum: `off`                                                                                                     |
+| Setpoints (extended)    | `set_evcs_mode`                    | no*      | Enum: `off` \| `pv` \| `now`                                                                                    |
 | Capability flags        | `supports_ess_write`               | yes      | boolean; ESS setpoints may be written                                                                          |
 | Capability flags        | `supports_evcs_current`            | yes      | boolean; `set_evcs_max_current` may be written                                                                  |
 
@@ -101,7 +101,7 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 | PV production            | Measurement   | `sens_pv_production_active`   | `_sum/ProductionActivePower`    | `meters.pv.power`       | Unit 100 reg. **850** (DC PV, W) resp. AC PV **808–813**; total is often the sum of DC+AC                          | `pv_power_name` / `plant.ehal_bindings`                     |
 | Power to consumers        | Measurement   | `sens_power_consumers`        |                                   |                          |                                                                                                                       | `ehal_bindings.sens_power_consumers` (otherwise derived)    |
 | Outside temperature       | Measurement   | `sens_temperature_outside`    |                                   |                          |                                                                                                                       | `Earnie_Aussentemperatur` / `plant.ehal_bindings`           |
-| Absent / holiday          | Measurement   | `sens_absent_mode`            |                                   |                          |                                                                                                                       | `Earnie_Abwesend` / `plant.ehal_bindings` (0/1; OR with HK) |
+| Absent / holiday          | Measurement   | `sens_absent_mode`            | `plant.ehal_bindings` as `component/Channel` (e.g. holiday controller) |                          |                                                                                                                       | `Earnie_Abwesend` / `plant.ehal_bindings` (0/1; OR with HK) |
 
 
 
@@ -291,7 +291,9 @@ Nach Auto-Roundtrip werden immer sichere Sollwerte geschrieben (ESS Automatik, E
 
 ### HA Entity → EHAL Mapping
 
-Only with backend **Home Assistant**: entity-centric HITL (same Pattern B shape as Loxone **2.4.k**). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials live in `config/.env` (`EHAL_HA_*`); optional **`sign`** (plant) stays in `config.json` → `ehal.ha`.
+Only with backend **Home Assistant**: entity-centric HITL (**Pattern B** storage like Loxone **2.4.k**: `plant` / `consumers[].ehal_bindings`). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials live in `config/.env` (`EHAL_HA_*`); optional **`sign`** (plant) stays in `config.json` → `ehal.ha`.
+
+**Runtime subset:** the live HA adapter aggregates `HA_ALL_FIELDS` (plant grid/PV/ESS powers + optional energy counters + ESS setpoints + optional plant `sens_absent_mode` side-channel; first EV: `sens_evcs_active_power`, `set_evcs_max_current`, `set_evcs_mode`). Extra fields offered in the mapping UI (outdoor temperature, full EV SoC/connected/`get_evcs_*`, flex/pool) may be saved but are **not** read or written on the HA path yet — Loxone remains the more complete Pattern B backend for those.
 
 Workflow: scan `/api/states` once per Streamlit session (button refreshes) → heuristic proposes **empty** fields only → confirm → save. Saved bindings are never overwritten by propose; **no LLM**. After save, Live-Lesen / Live-Schreiben use the same entity-centric `EHAL-Feld` + Mapping column contract as Loxone (`{consumer_id}:field` for consumers).
 

@@ -40,6 +40,10 @@ TELEMETRY_OPTIONAL = (
     "sens_evcs_active_power",
     "sens_power_consumers",
 )
+# Side-channel binary plant sensors (not part of EHAL telemetry wire / numeric read).
+TELEMETRY_BINARY_OPTIONAL = (
+    "sens_absent_mode",
+)
 # Slot-Ist ΔkWh side channel (2.6.c) — not part of EHAL telemetry wire.
 TELEMETRY_ENERGY_OPTIONAL = (
     "sens_pv_energy",
@@ -54,7 +58,9 @@ SETPOINT_FIELDS = (
     "set_evcs_max_current",
     "set_evcs_mode",
 )
-MAPPABLE_DOMAINS = frozenset({"sensor", "number", "select", "input_number"})
+MAPPABLE_DOMAINS = frozenset(
+    {"sensor", "number", "select", "input_number", "binary_sensor", "input_boolean"}
+)
 WRITE_DOMAINS = frozenset({"number", "select", "input_number"})
 _NONNEG_TELEMETRY = frozenset(
     {"sens_pv_production_active", "sens_evcs_active_power", "sens_power_consumers"}

@@ -2,6 +2,19 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.p — Absent / holiday mode via EHAL on all backends (2026-09-29)
+
+- [x] **2.6.p — Absent / holiday mode via EHAL on all backends**
+  - `read_ehal_absent_mode` dispatches on active backend (Loxone Merker / HA entity via aggregate / OpenEMS `component/Channel`); shared binary parse (`on`/`off`/0/1/…)
+  - HA: `TELEMETRY_BINARY_OPTIONAL` → `HA_ALL_FIELDS`; `MAPPABLE_DOMAINS` includes `binary_sensor` / `input_boolean`; not in EhalTelemetry wire schema
+  - Same effective OR semantics (Monitor + live MILP opt-out / Haus-Wärme); OpenEMS HITL plant mapper still out of scope
+  - Tests: `tests/test_absent_mode.py` per-backend reads; docs caveat removed (`flexible-verbraucher.md`, `betriebsmodi.md`, handbook, `ha-evcc.md`, `ehal-com.md`)
+
+### Document Review docs↔code sync (2026-09-29)
+
+- [x] Manual Todo: Review updated docs (German user docs + release/HA wording) — `README.md`, `container.md`, `DEVELOPER.md`, `ehal-com.md`, `loxone-signals.md`, `ha-evcc.md`, `ehal.md`, `doc_links.py`, issue template
+- [x] Update documents in Earnie-Projekt repo with current achievements — `Communication/CLAUDE.md`, Entwicklungsplan (Härting / HA-Kompat / Addon / Master-Plan), Businessplan MCP wording, FB Status-Update historical note
+
 ### User-fixed tariffs — Eigener Festpreis (2026-09-28)
 
 - [x] **User-fixed import/export tariffs** — Scenario-local Cent/kWh via dropdown **Eigener Festpreis** (`__user_fixed__`); values in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`), not `tariffs.json`

@@ -26,6 +26,8 @@ Die Schritt-für-Schritt-Anleitung (Earnie-`ehal`-Block, Simulator-Plant, REST-C
 
 OpenEMS-Plant-Details (Kanal-Tabelle, Pi-Ersttest): [docs/spec/openems-testing-platform-todo.md](../spec/openems-testing-platform-todo.md).
 
+**Abwesenheitsmodus (optional):** In `house_profiles.json` unter `plant.ehal_bindings.sens_absent_mode` einen Kanal als `componentId/ChannelId` eintragen (z. B. `ctrlHoliday0/HolidayMode`). Es gibt noch keinen OpenEMS-HITL-Mapper — Pflege per Hausprofil/JSON. Details: [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
+
 ## Stop
 
 ```powershell
