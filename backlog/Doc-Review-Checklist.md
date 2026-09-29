@@ -43,4 +43,4 @@
 - [x] `ui/doc_links.py` handbook fragments
 - [x] HA live subset wording (`ha-evcc.md`, `ehal-com.md`, `ehal.md`)
 - [x] Earnie-Projekt: CLAUDE.md, Entwicklungsplan status, Businessplan MCP, FB Status-Update historical note
-- [x] `.github/ISSUE_TEMPLATE/bug.yml` placeholder `2.6.0-alpha.9`
+- [x] `.github/ISSUE_TEMPLATE/bug.yml` placeholder `2.6.0-alpha.10`
