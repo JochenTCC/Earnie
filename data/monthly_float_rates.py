@@ -99,3 +99,67 @@ def build_refmarkt_minus_fee_lookup(
         (year, month, round(max(0.0, cent - fee), 4))
         for year, month, cent in refmarkt_rates
     )
+
+
+SEED_CURVE_OEMAG = "oemag"
+SEED_CURVE_REFMARKT_PV = "econtrol_refmarkt_pv"
+
+# monthly_seed.curve → Shared-Kurve in tariffs.json
+SEED_CURVE_KEYS = {
+    SEED_CURVE_OEMAG: "oemag_monthly_feed_in_rates",
+    SEED_CURVE_REFMARKT_PV: "econtrol_referenzmarktwert_pv_monthly",
+}
+
+
+def monthly_seed_curve(tariff: dict) -> str | None:
+    """Kurvenname aus ``monthly_seed`` oder None (Tarif wird nicht geseedet)."""
+    seed = tariff.get("monthly_seed")
+    if seed is None:
+        return None
+    if not isinstance(seed, dict):
+        raise ValueError(f"Tarif '{tariff.get('id')}': monthly_seed muss ein Objekt sein.")
+    curve = str(seed.get("curve", "")).strip()
+    if curve not in SEED_CURVE_KEYS:
+        raise ValueError(
+            f"Tarif '{tariff.get('id')}': monthly_seed.curve muss "
+            f"{' oder '.join(sorted(SEED_CURVE_KEYS))} sein, nicht {curve!r}."
+        )
+    return curve
+
+
+def build_seeded_monthly_rates(
+    tariffs_doc: dict,
+    tariff: dict,
+) -> tuple[tuple[int, int, float], ...]:
+    """
+    Monatswerte eines Katalog-Tarifs aus seinem ``monthly_seed`` (Wartung).
+
+    - ``oemag``: OeMAG × arbeitspreis_kwh_cent / monthly_float_reference_cent_kwh − settlement_fee
+    - ``econtrol_refmarkt_pv``: RefMarkt PV − settlement_fee
+
+    Werte ≤ 0 bleiben 0.0 im Ergebnis; ``monthly_rates`` erlaubt nur > 0, der
+    Aufrufer entscheidet über Sonderbehandlung.
+    """
+    curve = monthly_seed_curve(tariff)
+    if curve is None:
+        raise ValueError(f"Tarif '{tariff.get('id')}' hat kein monthly_seed.")
+    settlement = float(tariff.get("settlement_fee_cent_kwh", 0.0) or 0.0)
+    if curve == SEED_CURVE_OEMAG:
+        seed = tariff["monthly_seed"]
+        if "arbeitspreis_kwh_cent" not in seed:
+            raise ValueError(
+                f"Tarif '{tariff.get('id')}': monthly_seed.arbeitspreis_kwh_cent fehlt "
+                "(Pflicht für curve 'oemag')."
+            )
+        return build_monthly_float_lookup(
+            load_oemag_monthly_reference_rates(tariffs_doc),
+            load_monthly_float_reference_cent(tariffs_doc),
+            {
+                "arbeitspreis_kwh_cent": seed["arbeitspreis_kwh_cent"],
+                "settlement_fee_cent_kwh": settlement,
+            },
+        )
+    return build_refmarkt_minus_fee_lookup(
+        load_econtrol_referenzmarktwert_pv_monthly(tariffs_doc),
+        settlement,
+    )

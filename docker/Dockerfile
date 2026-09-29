@@ -15,9 +15,9 @@ COPY runtime_store/ runtime_store/
 COPY ui/ ui/
 COPY simulation/ simulation/
 COPY scripts/ scripts/
-# Dev-only suffixes in version.py (e.g. "2.0.0 (wip)") break setuptools in the image;
-# normalize inside the build layer — host version.py stays unchanged.
-RUN python -c "import re; from pathlib import Path; p=Path('version.py'); t=p.read_text(); m=re.search(r'__version__\s*=\s*[\"\\']([^\"\\']+)[\"\\']', t); raw=(m.group(1) if m else '0.0.0'); semver=re.match(r'(\d+(?:\.\d+)*)', raw); p.write_text('__version__ = \"' + (semver.group(1) if semver else '0.0.0') + '\"\\n')"
+# Dev-only junk in version.py (e.g. "2.0.0 (wip)") breaks setuptools in the image;
+# keep SemVer pre-releases (-alpha.N / -rc.N). Host file stays unchanged.
+RUN python -c "from version import rewrite_version_file_for_image; rewrite_version_file_for_image()"
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Explicit copies only (S6470) — avoid recursive COPY . . pulling secrets/junk.

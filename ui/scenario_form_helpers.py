@@ -330,7 +330,15 @@ def build_scenario_settings(
     export_tariff_id: str,
     house_profile_id: str,
     use_imported_pv: bool = False,
+    user_import_cent_kwh: float | None = None,
+    user_export_cent_kwh: float | None = None,
 ) -> dict:
+    from house_config.tariffs_store import (
+        USER_EXPORT_CENT_KEY,
+        USER_IMPORT_CENT_KEY,
+        is_user_fixed_tariff_id,
+    )
+
     settings: dict = {}
     if battery_id:
         settings["battery_id"] = battery_id
@@ -343,8 +351,12 @@ def build_scenario_settings(
         settings["pv_system_ids"] = cleaned_pv
     if import_tariff_id:
         settings["import_tariff_id"] = import_tariff_id
+        if is_user_fixed_tariff_id(import_tariff_id) and user_import_cent_kwh is not None:
+            settings[USER_IMPORT_CENT_KEY] = float(user_import_cent_kwh)
     if export_tariff_id:
         settings["export_tariff_id"] = export_tariff_id
+        if is_user_fixed_tariff_id(export_tariff_id) and user_export_cent_kwh is not None:
+            settings[USER_EXPORT_CENT_KEY] = float(user_export_cent_kwh)
     if house_profile_id:
         settings["house_profile_id"] = house_profile_id
     if use_imported_pv:
@@ -352,8 +364,15 @@ def build_scenario_settings(
     return settings
 
 
+def _optional_user_cent(raw_settings: dict, key: str) -> float | None:
+    if key not in raw_settings or raw_settings[key] is None:
+        return None
+    return float(raw_settings[key])
+
+
 def normalize_scenario_form_snapshot(scenario: dict) -> dict:
     from house_config.entity_resolution import normalize_pv_system_ids
+    from house_config.tariffs_store import USER_EXPORT_CENT_KEY, USER_IMPORT_CENT_KEY
 
     raw_settings = scenario.get("settings", {}) or {}
     settings = build_scenario_settings(
@@ -363,6 +382,8 @@ def normalize_scenario_form_snapshot(scenario: dict) -> dict:
         export_tariff_id=str(raw_settings.get("export_tariff_id", "") or "").strip(),
         house_profile_id=str(raw_settings.get("house_profile_id", "") or "").strip(),
         use_imported_pv=bool(raw_settings.get("use_imported_pv")),
+        user_import_cent_kwh=_optional_user_cent(raw_settings, USER_IMPORT_CENT_KEY),
+        user_export_cent_kwh=_optional_user_cent(raw_settings, USER_EXPORT_CENT_KEY),
     )
     out = {
         "label": str(scenario.get("label", "") or "").strip(),
@@ -384,11 +405,18 @@ def read_scenario_form_snapshot(
     import_tariffs: list[dict],
     export_tariffs: list[dict],
 ) -> dict:
+    from house_config.tariffs_store import (
+        ensure_user_fixed_option,
+        is_user_fixed_tariff_id,
+    )
+
     _, prof_map = options_for_entities(list(profiles.values()), allow_none=True)
     _, bat_map = options_for_entities(batteries, allow_none=True)
     _, pv_map = options_for_entities(pv_systems, allow_none=True)
-    _, imp_map = options_for_entities(import_tariffs, allow_none=True)
-    _, exp_map = options_for_entities(export_tariffs, allow_none=True)
+    import_with_user = ensure_user_fixed_option(import_tariffs)
+    export_with_user = ensure_user_fixed_option(export_tariffs)
+    _, imp_map = options_for_entities(import_with_user, allow_none=True)
+    _, exp_map = options_for_entities(export_with_user, allow_none=True)
 
     profile_pick = session_state.get(scoped_widget_key(session_scope, "scenario_profile"))
     battery_pick = session_state.get(scoped_widget_key(session_scope, "scenario_battery"))
@@ -402,15 +430,34 @@ def read_scenario_form_snapshot(
         lookup_entity_id(pv_map, pick) for pick in pv_picks if lookup_entity_id(pv_map, pick)
     ]
 
+    import_tariff_id = lookup_entity_id(imp_map, import_pick)
+    export_tariff_id = lookup_entity_id(exp_map, export_pick)
+    user_import_cent = None
+    user_export_cent = None
+    if is_user_fixed_tariff_id(import_tariff_id):
+        raw_imp = session_state.get(
+            scoped_widget_key(session_scope, "scenario_user_import_cent")
+        )
+        if raw_imp is not None:
+            user_import_cent = float(raw_imp)
+    if is_user_fixed_tariff_id(export_tariff_id):
+        raw_exp = session_state.get(
+            scoped_widget_key(session_scope, "scenario_user_export_cent")
+        )
+        if raw_exp is not None:
+            user_export_cent = float(raw_exp)
+
     settings = build_scenario_settings(
         battery_id=lookup_entity_id(bat_map, battery_pick),
         pv_system_ids=pv_system_ids,
-        import_tariff_id=lookup_entity_id(imp_map, import_pick),
-        export_tariff_id=lookup_entity_id(exp_map, export_pick),
+        import_tariff_id=import_tariff_id,
+        export_tariff_id=export_tariff_id,
         house_profile_id=lookup_entity_id(prof_map, profile_pick),
         use_imported_pv=bool(
             session_state.get(scoped_widget_key(session_scope, "scenario_use_imported_pv"), False)
         ),
+        user_import_cent_kwh=user_import_cent,
+        user_export_cent_kwh=user_export_cent,
     )
     draft_label = str(
         session_state.get(scoped_widget_key(session_scope, "scenario_label"), "") or ""

@@ -10,7 +10,7 @@ import streamlit as st
 
 from runtime_store.env_vars import read_env
 from runtime_store.registry_entitlement import RegistryReport, registry_status
-from version import __version__
+from version import display_version
 
 OFFICIAL_REPO_URL = "https://github.com/JochenTCC/Earnie"
 REQUIRED_PHRASE_NONCOMMERCIAL = "nicht-kommerziell"
@@ -74,7 +74,7 @@ _UNBOUND_COLOR = "#c62828"
 def _attribution_line() -> str:
     return (
         f"**{REQUIRED_PHRASE_PRODUCT}** · privat, {REQUIRED_PHRASE_NONCOMMERCIAL} · "
-        f"[{OFFICIAL_REPO_URL}]({OFFICIAL_REPO_URL}) · Version {__version__}"
+        f"[{OFFICIAL_REPO_URL}]({OFFICIAL_REPO_URL}) · Version {display_version()}"
     )
 
 
@@ -82,7 +82,7 @@ def _unofficial_message() -> str:
     return (
         f"**Inoffizieller / geänderter Build** ({BANNER_LABEL}). "
         f"Offizielles Projekt: [{OFFICIAL_REPO_URL}]({OFFICIAL_REPO_URL}). "
-        f"Privat, {REQUIRED_PHRASE_NONCOMMERCIAL} — Version {__version__}."
+        f"Privat, {REQUIRED_PHRASE_NONCOMMERCIAL} — Version {display_version()}."
     )
 
 
@@ -117,7 +117,7 @@ def colored_attribution_html(report: RegistryReport) -> str:
         f"<strong>{REQUIRED_PHRASE_PRODUCT}</strong> · privat, "
         f"{REQUIRED_PHRASE_NONCOMMERCIAL} · "
         f'<a href="{OFFICIAL_REPO_URL}">{OFFICIAL_REPO_URL}</a> · '
-        f"Version {__version__} {suffix}"
+        f"Version {display_version()} {suffix}"
     )
     return f'<p style="color:{color};font-size:0.875rem;margin:0;">{body}</p>'
 

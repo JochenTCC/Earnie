@@ -40,11 +40,13 @@ Hausprofil-Feld `netznutzung_arbeitspreis_cent_kwh` (siehe oben) gilt zusätzlic
 
 Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Typ `fixed` kommt `k_push_cent` aus dem Tarif-Eintrag in `tariffs.json`. Geändert wird die Tarif-Referenz im Live-Szenario im **Szenarienkonfigurator**.
 
+**Eigener Festpreis:** Im Szenarienkonfigurator gibt es in den Dropdowns Bezug und Einspeise den Eintrag **Eigener Festpreis**. Die Cent/kWh-Werte speichert Earnie am Szenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, Tarif-ID `__user_fixed__`) — **nicht** in `tariffs.json`. Bezug: Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`); Netznutzung Arbeitspreis aus dem Hausprofil wird weiterhin addiert. Einspeise: eingegebene Vergütung ohne weitere Aufschläge.
+
 **Hinweis:** Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. gewählte `export_tariff_id` aktuell halten.
 
 ## Planung & Backtesting (ab 1.24.f)
 
-Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/config/tariffs.json) mit Root-Feld `catalog_as_of`. Zur Laufzeit nutzt Earnie `earnie_env/config/tariffs.json` (Bootstrap kopiert den Katalog bei Bedarf aus share). Szenarien in `backtesting_scenarios.json` referenzieren `import_tariff_id` und `export_tariff_id`.
+Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/config/tariffs.json) mit Root-Feld `catalog_as_of`. Zur Laufzeit nutzt Earnie `earnie_env/config/tariffs.json` (Bootstrap kopiert den Katalog bei Bedarf aus share). Szenarien in `backtesting_scenarios.json` referenzieren `import_tariff_id` und `export_tariff_id` (oder `__user_fixed__` mit szenario-lokalen Cent-Feldern, siehe oben).
 
 ### Import-Typen
 
@@ -113,8 +115,8 @@ Monatskonstante Einspeisetarife tragen **eigene** `monthly_rates`. Shared-Kurven
 | `econtrol_referenzmarktwert_pv_monthly`| ≥12 E-Control Referenzmarktwert PV (§ 13 EAG; z. B. VKW Flex-Seed)    |
 
 
-Seed-Formel (nur Wartung, nicht Runtime):  
-`OeMAG_Monat × arbeitspreis / monthly_float_reference_cent_kwh − settlement_fee` (min. 0) — Hilfsfunktion in `[data/monthly_float_rates.py](../../data/monthly_float_rates.py)`.
+Seed-Formel (nur Wartung, nicht Runtime), festgelegt pro Tarif im Feld `monthly_seed`:  
+`OeMAG_Monat × arbeitspreis / monthly_float_reference_cent_kwh − settlement_fee` bzw. `RefMarkt_PV − settlement_fee` — Hilfsfunktionen in [data/monthly_float_rates.py](../../data/monthly_float_rates.py), Pflege mit `python -m scripts.update_tariff_curves` (siehe [Pflegehinweis](../referenz/oemag-referenzmarktwert.md#pflegehinweis)).
 
 Rechtliche Abgrenzung OeMAG vs. RefMarkt: [oemag-referenzmarktwert.md](../referenz/oemag-referenzmarktwert.md).
 
@@ -145,3 +147,7 @@ Für **Backtesting** (Szenario-Explorer): `scenario_explorer_conf.price_source` 
 ### Monatliche Fixtarife (Backtesting)
 
 Export-Tarif-Typ `monthly_table` in `tariffs.json` liefert die Monatswerte (`monthly_rates`). **Sunset-2-Sunset** (Produktiv) nutzt die aufgelöste Export-Tarif-Referenz aus dem Live-Szenario.
+
+### Preisreihe exportieren (`export_price_series`)
+
+`scenario_explorer_conf.export_price_series` (Standard: `false`). Wenn `true`, schreibt `scripts/run_backtesting.py` die für den Simulationszeitraum geladene, **tarifunabhängige** EPEX-Preisreihe (netto Cent/kWh, QH-Auflösung, vor Markup/Netznutzung/USt) zusätzlich als eigenständige `backtesting_prices.csv` in den Log-Zielordner (`--output-dir`, Standard `.`) — referenziert in `backtesting_log.json` als `price_series_file`. Anders als `backtesting.csv` (pro Szenario, mit bereits verrechnetem `k_act`/`k_push_act`) ist das dieselbe rohe Marktpreisserie, die für **alle** Szenarien eines Laufs gemeinsam gilt, damit sie ohne erneuten Energy-Charts-/aWATTar-Abruf für andere Zwecke weiterverwendet werden kann (z. B. externe Einsparpotenzial-Rechnungen).

@@ -7,10 +7,45 @@ import os
 import jsonschema
 
 from house_config.tariffs_store import (
+    USER_EXPORT_CENT_KEY,
+    USER_IMPORT_CENT_KEY,
+    is_user_fixed_tariff_id,
     load_tariffs_document,
     resolve_export_tariff_id,
 )
 from settings.scenarios import load_backtesting_scenarios_document
+
+
+def _user_fixed_cent_error(
+    *,
+    scenario_id: str,
+    side: str,
+    settings: dict,
+) -> str | None:
+    """Return error text when user-fixed tariff lacks a valid cent value."""
+    if side == "import":
+        key = USER_IMPORT_CENT_KEY
+        label = "import_tariff_id"
+        require_positive = True
+    else:
+        key = USER_EXPORT_CENT_KEY
+        label = "export_tariff_id"
+        require_positive = False
+    if key not in settings or settings[key] is None:
+        return (
+            f"Szenario '{scenario_id}': {label} '__user_fixed__' erfordert {key}."
+        )
+    try:
+        value = float(settings[key])
+    except (TypeError, ValueError):
+        return (
+            f"Szenario '{scenario_id}': {key} muss eine Zahl sein."
+        )
+    if require_positive and value <= 0.0:
+        return f"Szenario '{scenario_id}': {key} muss > 0 sein."
+    if not require_positive and value < 0.0:
+        return f"Szenario '{scenario_id}': {key} muss >= 0 sein."
+    return None
 
 
 def _read_json_object(path: str) -> dict:
@@ -75,14 +110,28 @@ def collect_scenario_tariff_ref_errors(
         export_id = resolve_export_tariff_id(
             str(settings.get("export_tariff_id", "") or "").strip()
         )
-        if import_id and import_id not in import_ids:
-            errors.append(
-                f"Szenario '{scenario_id}': unbekannte import_tariff_id '{import_id}'."
-            )
-        if export_id and export_id not in export_ids:
-            errors.append(
-                f"Szenario '{scenario_id}': unbekannte export_tariff_id '{export_id}'."
-            )
+        if import_id:
+            if is_user_fixed_tariff_id(import_id):
+                err = _user_fixed_cent_error(
+                    scenario_id=scenario_id, side="import", settings=settings
+                )
+                if err:
+                    errors.append(err)
+            elif import_id not in import_ids:
+                errors.append(
+                    f"Szenario '{scenario_id}': unbekannte import_tariff_id '{import_id}'."
+                )
+        if export_id:
+            if is_user_fixed_tariff_id(export_id):
+                err = _user_fixed_cent_error(
+                    scenario_id=scenario_id, side="export", settings=settings
+                )
+                if err:
+                    errors.append(err)
+            elif export_id not in export_ids:
+                errors.append(
+                    f"Szenario '{scenario_id}': unbekannte export_tariff_id '{export_id}'."
+                )
     return errors
 
 

@@ -1002,6 +1002,7 @@ def main(argv: list[str] | None = None):
             sid: breakdown.as_dict()
             for sid, breakdown in fee_breakdown_by_scenario.items()
         },
+        prices=prices if sim_cfg.get("export_price_series", False) else None,
     )
     plausibility_payload = {
         sid: {"consumption_totals": consumption_totals_from_report(rep)}

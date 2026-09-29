@@ -18,7 +18,7 @@ from runtime_store.dotenv_io import (
 )
 from runtime_store.dotenv_loader import load_app_dotenv
 from runtime_store.persist_paths import resolve_dotenv_path
-from version import __version__
+from version import display_version
 
 
 def _save_loxone_credentials(ip: str, user: str, password: str) -> str | None:
@@ -165,6 +165,6 @@ def render_ehal_setup_page() -> None:
     """
     from ui.pages.page_smarthome_backend import render as render_smarthome_backend_page
 
-    st.caption(f"Version {__version__}")
+    st.caption(f"Version {display_version()}")
     render_smarthome_backend_page()
 

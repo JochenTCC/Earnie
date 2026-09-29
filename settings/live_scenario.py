@@ -318,4 +318,5 @@ def scenario_explorer_conf_snapshot(obj: Any) -> dict:
             getattr(obj, "SEASON_MIRROR_TO_LAST_MONTH", False)
         ),
         "energy_charts_bzn": obj.ENERGY_CHARTS_BZN,
+        "export_price_series": bool(getattr(obj, "EXPORT_PRICE_SERIES", False)),
     }
