@@ -34,3 +34,13 @@
 - [x] `.github/ISSUE_TEMPLATE/bug.yml` — version placeholder `2.6.0`
 - [x] Landing `README.md` / `docs/README.md` — EHAL backends already correct; no Pattern B detail needed at landing depth
 - [x] Handbook live-mapping step — already cites `plant.ehal_bindings` / `consumers[].ehal_bindings`
+
+## 2026-09-29 — Doc↔code sync pass (alpha.9)
+
+- [x] `README.md` — PV = forecast.solar + Open-Meteo climate; Optimierer-Dienst shipped (out of Roadmap)
+- [x] `docs/einrichtung/container.md` + `docs/DEVELOPER.md` / root `DEVELOPER.md` — `release-publish.yml` + promote vs local tags
+- [x] `set_evcs_mode` off/pv/now in `ehal-com.md` §B + `loxone-signals.md`
+- [x] `ui/doc_links.py` handbook fragments
+- [x] HA live subset wording (`ha-evcc.md`, `ehal-com.md`, `ehal.md`)
+- [x] Earnie-Projekt: CLAUDE.md, Entwicklungsplan status, Businessplan MCP, FB Status-Update historical note
+- [x] `.github/ISSUE_TEMPLATE/bug.yml` placeholder `2.6.0-alpha.9`

@@ -102,9 +102,9 @@ Legt nur fehlende Dateien an; bestehende bleiben unverändert.
 
 Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/arm64` für LoxBerry). Beide Hosts referenzieren denselben Tag `ghcr.io/jochentcc/earnie-energy:latest`.
 
-**Veröffentlichte Images** kommen von GitHub Releases: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release.yml`](../../.github/workflows/release.yml) und pusht u. a. `ghcr.io/jochentcc/earnie-energy:X.Y.Z` sowie `:latest`. Details für Entwickler: [DEVELOPER.md](../../DEVELOPER.md) § Release.
+**Veröffentlichte Images** kommen über GitHub Actions: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml) und baut zuerst nur den **Release-Kandidaten** `ghcr.io/jochentcc/earnie-energy:X.Y.Z` (kein `:latest` / `:next` am Tag allein). Nach manueller Freigabe des Jobs `promote` (Environment `release-approval`) folgen `:latest` (nur offizielle Versionen) bzw. `:next` sowie die veröffentlichte GitHub Release. Details: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
-**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und die Image-Tags `:<version>` sowie `:next` — **nicht** `:latest`. Zum Testen `:next` oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.9`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
+**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt denselben Ablauf: zuerst Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release** — **nicht** `:latest`. Zum Testen `:next` (nach Freigabe) oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.9`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
@@ -170,10 +170,13 @@ python -m scripts.validate_tariffs --tariffs share/config/tariffs.json --check-c
 
 Bei Fehlern bricht `main.py` mit `EARNIE_STRICT_TARIFF_VALIDATE=1` ab (siehe Compose).
 
-Erzeugt standardmäßig Tags aus `version.py` (kanonisch + Legacy-Alias für Übergang):
+Lokaler `build_container` (ohne CI): Standard-Tags aus `version.py` (kanonisch + Legacy-Alias):
 
-- Offizielle Version (`X.Y.Z`): `:latest` und `:<version>` für `earnie-energy` und Legacy `ernie-energy`
-- Vorabversion (`X.Y.Z-alpha.N` / `-rc.N`): nur `:<version>` (kein `:latest`)
+- Jede Version: `:next` und `:<version>` für `earnie-energy` und Legacy `ernie-energy`
+- Offizielle Version (`X.Y.Z`) zusätzlich: `:latest`
+- Vorabversion (`X.Y.Z-alpha.N` / `-rc.N`): kein `:latest`
+
+Im **CI-Release** (Tag → `release-publish.yml`) gilt abweichend: Tag-Build nur `:<version>`; `:next` / `:latest` erst nach Job `promote`.
 
 Nach `docker login ghcr.io`:
 

@@ -73,7 +73,7 @@ python -m scripts.build_container
 
 Windows wrapper: `.\docker\build-container.ps1`
 
-Default tags from `version.py`: official → `:latest` and `:<version>`; SemVer pre-release (`-alpha.N` / `-rc.N`) → `:<version>` only. Legacy `ernie-energy` aliases follow the same rule.
+Local `build_container` default tags from `version.py`: every version → `:next` and `:<version>`; official also `:latest`; SemVer pre-release omits `:latest`. Legacy `ernie-energy` aliases follow the same rule. **CI** (tag → `release-publish.yml`): candidate is `:<version>` only; `:next` / `:latest` only after job `promote` (see bullet below and root [DEVELOPER.md](../DEVELOPER.md)).
 
 ### Release (tag → GitHub Actions)
 
@@ -91,8 +91,8 @@ git push origin vX.Y.Z-alpha.N
 
 - Tag must match `version.py` exactly (`v2.0.0` ↔ `__version__ = "2.0.0"`; `v2.2.0-alpha.1` ↔ `2.2.0-alpha.1`); mismatch fails the workflow.
 - Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body).
-- Official: GitHub Latest Release; images `:<version>` and `:latest` (+ legacy aliases).
-- Pre-release (`-` in version): GitHub Pre-release (not Latest); images `:<version>` only (no `:latest`).
+- Official (after `promote`): GitHub Latest Release; images `:<version>`, `:next`, and `:latest` (+ legacy aliases).
+- Pre-release (after `promote`): GitHub Pre-release (not Latest); images `:<version>` and `:next` (no `:latest`).
 - **Candidate → approve → publish:** the tag pushes only `:<version>` images; `:next` / `:latest`, the published release and the HA add-on pin follow after you approve job `promote` (environment `release-approval`). Details: root [DEVELOPER.md](../DEVELOPER.md) · [spec/release-checklist.md](spec/release-checklist.md).
 - Publish from `main`; leave the pre-release string on `main` until the next approved bump.
 - Parallel feature work + urgent fix for an already tagged build: [docs/spec/branching-hotfix-playbook.md](docs/spec/branching-hotfix-playbook.md) (`main` + tags; short-lived `hotfix/…` only when needed).

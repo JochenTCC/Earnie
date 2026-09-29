@@ -47,7 +47,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 - Ganzheitliche Optimierung im 15-Minuten-Takt für Speicher und Verbraucher, deren Aktivierung von Earnie oder dem Benutzer gewählt werden kann.
 - Dynamische Strompreise (z. B. [aWATTar](https://www.awattar.at/)) und Preis-Prognose (über die veröffentlichten Preise hinaus)
-- PV-Erzeugungsprognose über [Open-Meteo](https://open-meteo.com/)-Wetterdaten und Grundlast-Modell mit Berücksichtigung der Temperaturen
+- PV-Erzeugungsprognose über [forecast.solar](https://forecast.solar/); Außen-/Klimadaten über [Open-Meteo](https://open-meteo.com/) für thermische Modelle und Grundlast mit Temperaturbezug
 
 
 
@@ -73,6 +73,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 ### Betrieb
 
 - [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox](https://www.proxmox.com/) LXC oder PC (weitere Systeme folgen bei Bedarf)
+- Streamlit-**Optimierer-Dienst**: Start/Stop/Neustart von `main.py` in der UI; ein Docker-Container (`earnie`) mit Auto-Start
 - Persistente Laufzeitdaten für Nachvollziehbarkeit und Debug-Dumps
 
 ![Earnie Monitor](docs/assets/Monitor-48h-Vorschau.png)
@@ -122,11 +123,10 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 
 ## Roadmap (Kurz)
 
-- **2.0** — Stabilisiertes Datenmodell; klarer Projekteinstieg (dieses README)
+- **2.6 / 2.7** — HA-Kopplung vertiefen; Shadow-Client; Exportbegrenzung; Mehrspeicher (siehe Backlog)
 - **Adaptation** — PV- und thermische Parameter-Anpassung über die Zeit
 - **Thermals** — Gekoppelte Haus-/Speicher-/Solar-Modelle
 - **Smartere Geräte-Empfehlungen** — adaptive Leistung und Laufzeit für Haushaltsgeräte
-- **Streamlit-Steuerung von** `main.py` — Start/Stop/Neustart in der UI; ein Docker-Container (`earnie`) mit Auto-Start
 
 Earnie wird weitgehend mit Hilfe von [Cursor](https://cursor.com/) entwickelt.
 

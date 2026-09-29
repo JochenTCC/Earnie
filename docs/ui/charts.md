@@ -11,7 +11,7 @@ Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `u
 | Menü | `st.navigation`: Abschnitte Live-Cockpit, Konfiguration, Daemon Control |
 | Charts | Chart 1 → Navigation ←/→ → Chart 2 |
 | Darunter | Simulations-Tabelle, Energievergleich (Expander) |
-| Sankey | Live-Energiefluss (aktives Smarthome-Backend) |
+| Sankey | Live-Energiefluss: Plant über EHAL-Backend; Flex/EV-SoC siehe unten |
 | Footer | Trennlinie → **Datenbasis** (Expander, Log-Pfad) → Optimierungs-Takt / Countdown |
 
 Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdown + **?**); im Footer zusätzlich **?** beim nächsten main.py-Takt.
@@ -144,7 +144,17 @@ Tabelle je flexiblem Verbraucher über Horizont SA_0-->SA_2:
 
 ## Energiefluss (Live-Sankey)
 
-Sankey aus **aktuellen Live-Leistungswerten** des konfigurierten Smarthome-Backends (Loxone, Home Assistant oder OpenEMS); Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Beim Laden eines E-Autos zeigt der Flex-Knoten den aktuellen SoC in der Knotenbeschriftung.
+<a id="energiefluss-live-sankey"></a>
+
+Aktualisierung ca. alle 10 Sekunden (`STATUS`-Fragment). Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex), sofern ein Lauf vorliegt.
+
+| Teil | Quelle im Code | Backends heute |
+|------|----------------|----------------|
+| PV / Netz / Batterie / Hausleistung | `ehal_live.read_live_power_kw()` → aktiver Adapter | **Loxone, Home Assistant, OpenEMS** |
+| Flex-Leistungen (Verbraucherknoten, Grundlast-Aufteilung) | `live_consumption.fetch_live_flex_kw_for_ui` → `loxone_client.resolve_flexible_consumers_live_power` | **nur Loxone** (bei HA/OpenEMS keine Live-Flex-Aufschlüsselung über Merker) |
+| EV-SoC in der Knotenbeschriftung beim Laden | `fetch_loxone_actual_soc_percent` | **nur Loxone** |
+
+Beim Laden eines E-Autos zeigt der Flex-Knoten den aktuellen SoC in der Beschriftung — nur wenn der Loxone-Pfad den SoC liefert.
 
 ## Footer
 
