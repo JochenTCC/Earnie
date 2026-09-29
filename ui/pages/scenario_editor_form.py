@@ -5,23 +5,25 @@ import streamlit as st
 
 import config
 from ui.house_config_io import reorder_scenarios
-from ui.pages.page_scenario_editor import (
-    _SESSION_FILE_STAMP_KEY,
-    _SESSION_SELECT_PENDING_KEY,
-)
 from ui.pages.scenario_editor_sections import (
-    _next_month_in_planning_tz,
     _persist_or_delete_scenario,
     _prepare_scenario_tab,
-    _render_next_month_rate_entry,
     _render_scenario_entity_picks,
     _render_scenario_identity_fields,
+)
+from ui.pages.scenario_editor_tariffs import (
+    _next_month_in_planning_tz,
+    _render_next_month_rate_entry,
     _render_scenario_tariff_block,
 )
 from ui.scenario_form_helpers import (
     NEW_SCENARIO_OPTION,
     backtesting_scenarios_file_stamp,
 )
+
+# Local copies avoid circular import with page_scenario_editor → form.
+_SESSION_FILE_STAMP_KEY = "scenario_editor_file_stamp"
+_SESSION_SELECT_PENDING_KEY = "scenario_select_pending"
 
 
 def _render_scenario_reorder_controls(

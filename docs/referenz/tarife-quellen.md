@@ -47,6 +47,17 @@ Formel:
 
 Bei Festpreis-Tarifen (`fixed_cent`) ist der Arbeitspreis `fix_cent_kwh` (ebenfalls mit USt-Regel).
 
+### Eigener Festpreis (szenario-lokal)
+
+Im Szenarienkonfigurator gibt es in den Dropdowns Bezug und Einspeise den Eintrag **Eigener Festpreis**. Earnie speichert die Cent/kWh am Szenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, Tarif-ID `__user_fixed__`) — **nicht** in `tariffs.json`.
+
+| Richtung | Bedeutung |
+| -------- | --------- |
+| Bezug | Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`); **Netznutzung Arbeitspreis** aus dem Hausprofil wird weiterhin addiert |
+| Einspeise | eingegebene Vergütung ohne weitere Aufschläge |
+
+Keine Katalog-Vorschau und keine Lieferant-/Netz-Fixkosten aus dem Tarifkatalog — Fixkosten in SE-Gesamtkosten bleiben 0, sofern nicht über andere Szenario-/Hauswerte abgebildet. Details: [Preise & aWATTar](../konfiguration/preise.md).
+
 ### Beispiel: aWATTar HOURLY (AT)
 
 Katalog (`awattar_at`): Aufschlag 1,5 Cent/kWh netto, Markup 3 %, Preise **ohne** USt, USt 20 %.
@@ -70,6 +81,7 @@ Je nach Export-Tariftyp:
 - **Fest** (`fixed`): konstanter Cent/kWh (`k_push_cent`).
 - **Spot** (`spot_hourly`): Börsenpreis minus Abschlag (`settlement_fee_cent_kwh`).
 - **Monatspreis** (`monthly_table`): ein Cent/kWh-Wert für den Kalendermonat (`monthly_rates`).
+- **Eigener Festpreis** (`__user_fixed__`): szenario-lokaler Cent/kWh (`user_export_cent_kwh`), siehe §2.
 
 ### Beispiel: VKW PV-Einspeisetarif Dynamisch
 

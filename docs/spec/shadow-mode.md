@@ -1,9 +1,9 @@
 # Specification: Shadow Mode (Dev instance fed by Prod)
 
 **Version:** 0.2  
-**Status:** Draft (2026-09-27) — not implemented; backlog **2.6.o** (S1) → **2.7.f** (S2+S3) → **2.+1** (S4)  
+**Status:** S1 Prod feed recorder shipped (**2.6.o**, 2026-09); S2+S3 Dev client → backlog **2.7.f**; S4 → **2.+1**  
 **Epic short name:** **Shadow**  
-**Related:** Silent mode (`config.is_silent_mode()`), [EHAL](ehal.md), [Release Checklist](release-checklist.md)
+**Related:** Silent mode (`config.is_silent_mode()`), [EHAL](ehal.md), [Release Checklist](release-checklist.md), user ops [betrieb.md](../einrichtung/betrieb.md)
 
 ## 1. Goal
 

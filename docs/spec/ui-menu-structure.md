@@ -46,7 +46,7 @@ Backlog-Einträge mit `*` = später, hier nur als **funktionsloses Mockup**.
 ```text
 app.py (Router: st.navigation / st.Page)
 └── ui/pages/
-    ├── page_cockpit.py           # bestehender S-2-Block (live_mode + sankey + countdown)
+    ├── page_cockpit.py           # Monitor: live_mode (Chart 1 → nav → Sankey → Chart 2 → Tail) + countdown
     ├── page_devices.py           # Manuelle Geräte + Empfehlungsmodus (Z. 16 + 21)
     ├── page_config.py            # Roh-JSON-Editor für config.json (Z. 17)
     ├── page_backtesting.py       # wrappt ui/backtesting.py, Controls im Body (Z. 18)

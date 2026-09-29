@@ -9,9 +9,8 @@ Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `u
 | Kopf | Seitentitel, **?** mit Modus-Scope (Sunset-2-Sunset / Szenario-Explorer) |
 | Sidebar | Env-/Setup-Hinweise, Fortschritt Ersteinrichtung, **Konfiguration speichern / laden** (ZIP); unten **Info / About** (Banner / Version / Kontakt) — **keine** PV-/Batterie-Parameter (diese auf **Szenarienkonfigurator** / Hauskonfigurator) |
 | Menü | `st.navigation`: Abschnitte Live-Cockpit, Konfiguration, Daemon Control |
-| Charts | Chart 1 → Navigation ←/→ → Chart 2 |
-| Darunter | Simulations-Tabelle, Energievergleich (Expander) |
-| Sankey | Live-Energiefluss: Plant über EHAL-Backend; Flex/EV-SoC siehe unten |
+| Charts | Chart 1 → Navigation ←/→ → Sankey → Chart 2 → Simulations-Tabelle → Energievergleich (Expander) |
+| Sankey | Live-Energiefluss unter Chart 1 (nach Navigation): Plant über EHAL-Backend; Flex/EV-SoC siehe unten |
 | Footer | Trennlinie → **Datenbasis** (Expander, Log-Pfad) → Optimierungs-Takt / Countdown |
 
 Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdown + **?**); im Footer zusätzlich **?** beim nächsten main.py-Takt.
@@ -110,14 +109,14 @@ Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Re
 
 **Rauf/Runter-Balken (Szenarien A–H):** Launch **Streamlit app.py (Flow-Balance-Test)** (`scripts/seed_flow_balance_test_log.py`) oder HTML-Vorschau: `python -m scripts.export_flow_balance_chart_html --open` → `runtime/flow_balance_preview.html`.
 
-## Navigation zwischen Chart 1 und Chart 2
+## Navigation nach Chart 1
 
 | Steuerung | Verhalten |
 |-----------|-----------|
 | ← Zurück | Weitere SA-Zyklen zurück im Produktiv-Log |
 | Vor → | Desktop: einen Zyklus Richtung Live (bei Live deaktiviert). Mobil: SA₀→SA₁ ↔ SA₁→SA₂ bzw. Zyklus Richtung Live |
 
-Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich). Desktop zeigt standardmäßig SA₀→SA₂; Mobil behält die 24h-Segmente.
+Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich), **zwischen Chart 1 und Sankey** (Chart 2 folgt darunter). Desktop zeigt standardmäßig SA₀→SA₂; Mobil behält die 24h-Segmente.
 
 ## Chart 2: Kumulierte Kosten & Verbrauch
 

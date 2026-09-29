@@ -2,6 +2,32 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.r re-check — quality gate before alpha.11 (2026-09-29)
+
+- [x] **2.6.r re-check** on `main` (pre-candidate **2.6.0-alpha.11**; skill `quality-gate`; no `version.py` bump in chapter)
+  - [x] Coverage baseline — **2728** passed / **14** skipped; overall **80.7%** (`data` 72.5, `ehal` 90.7, `house_config` 81.2, `optimizer` 86.0, `runtime_store` 79.8, `settings` 78.1, `simulation` 87.3); no package &lt; 40% (vs prior re-check 81.2% / 2638 passed)
+  - [x] Dead-code / obsolete-test — vulture `--min-confidence 80` **0** hits; `--dead-fixtures` clean (“every declared fixture is being used”)
+  - [x] Simplification — no behavior-changing removals this pass (prior 2.6.r remediations stand); SSRF allowlist in `ha_addon_smoke` is a security fix, not a simplify step
+  - [x] KPI — split `scenario_editor_sections` → `scenario_editor_tariffs` (was **666** LOC); split 5 bodies &gt; 60 (`pv_forecast._check_and_fetch_api_data`, `history_timeline.build_chart_history`, `setup_readiness.missing_runtime_scenario_items_for`, `scenario_form_helpers.read_scenario_form_snapshot`, `page_daemon.render`); **0** files &gt; 600 / **0** bodies &gt; 60 after
+  - [x] Official docs — Doc-Review-Checklist alpha.11 sync (Monitor Sankey order, Silent/Loud, green-zone OLS spec, Festpreis in `tarife-quellen`, German `overview.md`, Shadow S1 status)
+  - [x] SonarCloud snapshot — Actions [36555037600](https://github.com/JochenTCC/Earnie/actions/runs/36555037600) @ `dd10387`: scan **HTTP 403** (informational infra; suite had already passed on previous flaky Open-Meteo runs after mock in PR #22). No new code bugs/vulns recorded this pass; prior SSRF `S8703` fixed locally in this commit
+
+### Document Review Doc↔code sync alpha.11 (2026-09-29)
+
+- [x] Monitor layout: Chart 1 → Nav → Sankey → Chart 2 (`charts.md`, `betriebsmodi.md`, `ui-sunset2sunset.md`, `ui-menu-structure.md`)
+- [x] Handbuch Silent/Loud on Optimierer-Dienst (not „Silent vs Live“ only under EHAL-Com); checklist Silent → Loud
+- [x] Spec green-zone prices: OLS/`forecast` default, Phase 3 live done (`price-forecast-renewables.md`)
+- [x] `betriebsmodi.md` Silent/Loud toggle under Daemon Control; `tarife-quellen.md` Eigener Festpreis / `__user_fixed__`
+- [x] `overview.md` German; Shadow TOC/spec status S1 shipped (S2+S3 → **2.7.f**)
+
+### Bugfix ha_addon_smoke SSRF S8703 (2026-09-29)
+
+- [x] **Remaining SonarQube issue: SSRF via LLM-supplied CLI arguments in `ha_addon_smoke._health_ok()`** (`pythonsecurity:S8703`) — Allowlist scheme/host/path before `urlopen` (`_safe_local_health_url`, `health_check_url`); non-loopback URLs never reach the sink. Tests in `test_ha_addon_smoke.py`. Verified.
+
+### Bugfix SonarCloud coverage failure (2026-09-29)
+
+- [x] **Check last SonarCloud failure during coverage testing on Github** — Checked and verified fixed (remaining open finding tracked separately: SSRF `pythonsecurity:S8703` in `ha_addon_smoke._health_ok()`).
+
 ### Silent toggle affects running daemon (verified) (2026-09-29)
 
 - [x] **Check whether Silent Modus Switch on Optimierer-Dienst impacts a running daemon** — Yes: same `local_settings.json` path (UI write + daemon reload); no process restart needed. Next `main()` cycle after toggle picks up `silent_mode` (`is_silent_mode` false→true across pid 44400 after UI wrote silent). Mid-cycle writes already decided for the current run stay unchanged until that next cycle.

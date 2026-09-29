@@ -29,6 +29,8 @@ In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version
 | **Konfiguration** | Hauskonfigurator, Szenarienkonfigurator, Szenario-Explorer (wenn freigeschaltet) |
 | **Daemon Control** | Smarthome-Backend, Optimierer-Dienst, EHAL-Com |
 
+**Optimierer-Dienst:** Start/Stop/Neustart, Dienst-Log und Umschalter **Silent / Loud** (`silent_mode` in `runtime/local_settings.json`; kein Neustart von `main.py` nötig). Details: [Betrieb](../einrichtung/betrieb.md) · Schreibverhalten: [EHAL-Com](ehal-com.md).
+
 Während der Greenfield-Ersteinrichtung sind zunächst nur **Konfiguration** und **Daemon Control** sichtbar (Daemon-Seiten werden für die Ersteinrichtung auch ohne `live_environment` in der Env erzwungen). Solange kein Smarthome-Backend gewählt ist, zeigt Daemon Control zunächst nur **Smarthome-Backend** — Optimierer-Dienst und EHAL-Com erscheinen erst danach.
 
 Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.8.1). Chart- und Panel-Details: [Charts & Panels](charts.md).
@@ -65,7 +67,7 @@ Immer **Sonnenaufgang** (nicht Sonnenuntergang):
 |-----------|-----------|
 | ← Zurück | Weitere SA-Zyklen zurück, bis `optimization_history.jsonl` reicht |
 | Vor → | Desktop: Zyklus Richtung Live (Live: deaktiviert). Mobil: SA₀→SA₁ ↔ SA₁→SA₂ bzw. Zyklus Richtung Live |
-| Navigation | Kompakte Buttons **zwischen Chart 1 und Chart 2** |
+| Navigation | Kompakte Buttons **zwischen Chart 1 und Sankey** (Chart 2 folgt darunter) |
 
 Beschriftung z. B. „SA₀→SA₂ (Live)“ (Desktop) bzw. „SA₀→SA₁ (Live)“ / „SA₁→SA₂ (Vorausschau)“ (Mobil) plus Datumsbereich. Vertikale Marker **SA₀**, **SA₁**, **SA₂** im Chart; **Jetzt**, sobald die aktuelle Zeit im sichtbaren Fenster liegt.
 
@@ -90,9 +92,9 @@ PV-, Batterie- und Einspeise-Parameter werden über Entitäts-IDs im **Live-Szen
 | Panel | Verhalten |
 |-------|-----------|
 | Charts 1 & 2 | Leistung/SoC/Preis; kumulierte Kosten & Verbrauch (Ist vs. Prognose getrennt) |
+| Sankey | **zwischen Navigation und Chart 2** — Plant-Leistungen (PV/Netz/Batterie) über aktives EHAL-Backend; Flex-Knoten und EV-SoC-Label heute nur Loxone (siehe [Charts](charts.md#energiefluss-live-sankey)) |
 | Simulations-Tabelle | Rohdaten des sichtbaren Fensters; orange = fehlende Log-Einträge |
 | Energievergleich | Expander: Baseline vs. Optimierung |
-| Sankey | Plant-Leistungen (PV/Netz/Batterie) über aktives EHAL-Backend; Flex-Knoten und EV-SoC-Label heute nur Loxone (siehe [Charts](charts.md#energiefluss-live-sankey)) |
 | Countdown / Optimierungs-Takt | immer |
 | Auto-Refresh | Desktop: Live-Zyklus (`cycle_offset=0`); Mobil: nur Fenster SA₀→SA₁ |
 

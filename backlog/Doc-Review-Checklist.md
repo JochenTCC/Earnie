@@ -44,3 +44,14 @@
 - [x] HA live subset wording (`ha-evcc.md`, `ehal-com.md`, `ehal.md`)
 - [x] Earnie-Projekt: CLAUDE.md, Entwicklungsplan status, Businessplan MCP, FB Status-Update historical note
 - [x] `.github/ISSUE_TEMPLATE/bug.yml` placeholder `2.6.0-alpha.10`
+
+## 2026-09-29 — Doc↔code sync pass (alpha.11)
+
+- [x] `docs/ui/charts.md` + `betriebsmodi.md` — Monitor order Chart 1 → Nav → Sankey → Chart 2
+- [x] `docs/user-manual/Benutzer-Handbuch-Earnie.md` — Silent/Loud on Optimierer-Dienst (not „Silent → Live“ under EHAL-Com)
+- [x] `docs/spec/price-forecast-renewables.md` — green zone = OLS/`forecast` default (Phase 3 done)
+- [x] `docs/ui/betriebsmodi.md` — Silent/Loud toggle note under Daemon Control
+- [x] `docs/referenz/tarife-quellen.md` — **Eigener Festpreis** / `__user_fixed__`
+- [x] `docs/konfiguration/overview.md` — German user-doc language
+- [x] `docs/spec/ui-sunset2sunset.md` + `ui-menu-structure.md` — Sankey placement / `page_cockpit`
+- [x] `docs/README.md` + `docs/spec/shadow-mode.md` — S1 shipped; S2+S3 → **2.7.f**

@@ -82,5 +82,5 @@ Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) stehen nur hier �
 - [OpenEMS lab setup](spec/openems-lab-setup.md) — Compose + Earnie ↔ OpenEMS
 - [Branching & Hotfix Playbook](spec/branching-hotfix-playbook.md) — Tags, hotfixes, `main`
 - [Release Checklist](spec/release-checklist.md) — Kandidat → Test auf HA / LoxBerry → Freigabe
-- [Shadow Mode](spec/shadow-mode.md) — Dev-Instanz parallel zu Prod, Eingänge aus Prod-Feed, keine Schreibzugriffe (Entwurf)
+- [Shadow Mode](spec/shadow-mode.md) — Prod-Feed-Recorder (S1) shipped; voller Shadow-Client (S2+S3) → Backlog **2.7.f**
 - Weitere Specs unter [`docs/spec/`](spec/)

@@ -1,7 +1,7 @@
 # Spezifikation: Preisprognose für extrapolierte Slots (EU-Wetter & Erzeugung)
 
-**Version:** 0.3  
-**Status:** Phase 0–2 abgeschlossen (2026-07-06); **2.5.e+:** Live Day-Ahead is QH; forecast **features stay hourly** and are **held onto parent-hour QH slots** (no QH retrain in Version 2.5)  
+**Version:** 0.4  
+**Status:** Phase 0–3 live path done (2026-09-29); **2.5.e+:** Live Day-Ahead is QH; forecast **features stay hourly** and are **held onto parent-hour QH slots** (no QH retrain in Version 2.5)  
 **Epic-Kurzname:** **Preis-Prognose**  
 **Ersetzt:** Backlog-Research „Preis-Spiegelung Mittelung“  
 **Bezug:** [UI Sunset-2-Sunset](ui-sunset2sunset.md) §5 (grüne Zone), `data/market_prices.py` (`resolve_market_slots`), [quarter-hour-slots.md](quarter-hour-slots.md)
@@ -12,10 +12,10 @@ Für Stunden **ohne Day-Ahead-Preis** (grüner Chart-Bereich bis SA₁/SA₂) so
 
 Grundidee: AT-Spotpreise korrelieren mit der **europäischen** erneuerbaren Verfügbarkeit (Wind + Solar). Dafür zwei Feature-Familien parallel:
 
-| Familie | Quelle (Training) | Quelle (Live, später) | Variablen |
-|---------|-------------------|----------------------|-----------|
+| Familie | Quelle (Training) | Quelle (Live) | Variablen |
+|---------|-------------------|---------------|-----------|
 | **Wetter** | Open-Meteo ERA5-Archiv | Open-Meteo Forecast | kapazitätsgewichteter EU-Mittelwert: `wind_speed_10m`, `shortwave_radiation` |
-| **Erzeugung** | Energy-Charts `public_power` | Energy-Charts `public_power_forecast` | summierte EU-MW: `wind_mw`, `solar_mw` |
+| **Erzeugung** | Energy-Charts `public_power` | Stand-in: stündliches EU-Leistungsprofil aus dem letzten Archivtag (Full Energy-Charts Forecast optional später) | summierte EU-MW: `wind_mw`, `solar_mw` |
 
 Zielzone Preise: **AT Day-Ahead** (`bzn=AT`, EPEX-kompatibel).
 
@@ -23,21 +23,22 @@ Zielzone Preise: **AT Day-Ahead** (`bzn=AT`, EPEX-kompatibel).
 
 | Im Epic | Nicht im Epic |
 |---------|----------------|
-| Offline-Training-Dataset (1 Jahr) | Live-Integration in `resolve_market_slots` (Phase 3) |
-| Einfaches Korrelationsmodell (OLS / Binning) | ML-Framework, Gas/Nachfrage-Modell |
-| Evaluation vs. Spiegelung | Änderung MILP-Kern |
-| Explizite Config `missing_price_strategy` | UI-Label „prognostiziert“ (optional Phase 3) |
+| Offline-Training-Dataset (1 Jahr) | ML-Framework, Gas/Nachfrage-Modell |
+| Einfaches Korrelationsmodell (OLS / Binning) | Änderung MILP-Kern |
+| Evaluation vs. Spiegelung | — |
+| Explizite Config `missing_price_strategy` | — |
+| Live-Integration in `resolve_market_slots` (Phase 3) | — |
 
 **Fallback:** Spiegelung bleibt erhalten, wenn Prognose-API oder Modell ausfällt.
 
 ## 3. Grüner Bereich (Kontext)
 
-| Zone | Bedeutung | Preisquelle heute |
-|------|-----------|-------------------|
+| Zone | Bedeutung | Preisquelle |
+|------|-----------|-------------|
 | Neutral | Day-Ahead verfügbar | aWATTar / EPEX |
-| Grün | Kein Day-Ahead | Spiegelung (gleiche Uhrzeit, 1–7 Tage zurück) |
+| Grün | Kein Day-Ahead | **`forecast` (Standard):** OLS → `price_source=predicted`; Fallback Spiegelung bei Modell-/Feature-Ausfall. Alternativ Config `mirror`. |
 
-Prognose ersetzt **nur** grüne Slots. `price_source` wird später `predicted` (neben `day_ahead`, `mirrored`).
+Prognose ersetzt **nur** grüne Slots. Config: `market_prices.missing_price_strategy` = `forecast` \| `mirror`; Modellpfad Default `share/data/price_model_coefficients.json`. User doc: [preise.md](../konfiguration/preise.md).
 
 ## 4. Phase 0 — Scope (festgelegt)
 
@@ -174,27 +175,30 @@ Sidebar-Betriebsmodus (nur wenn `EARNIE_UI_MODES` leer oder `price_forecast` ent
 
 Modul: `ui/price_forecast.py`
 
-### 7.2 Live-Hooks (noch nicht in `resolve_market_slots`)
+### 7.2 Live-Hooks (in `resolve_market_slots`)
 
 | Artefakt | Zweck |
 |----------|--------|
-| `data/price_forecast_live.py` | Config lesen, Modell laden, `PRICE_SOURCE_PREDICTED` |
-| `data/market_prices.py` | Konstante `PRICE_SOURCE_PREDICTED` |
-| `config.market_prices` | `missing_price_strategy`: `mirror` \| `forecast` |
+| `data/price_forecast_live.py` | Config lesen, Modell laden, Live-Features, `PRICE_SOURCE_PREDICTED` |
+| `data/eu_market_features.py` | Open-Meteo Forecast-Wetter + Archiv-Stand-in für EU-Leistung |
+| `data/market_prices.py` | Konstante `PRICE_SOURCE_PREDICTED`; `forecast`-Pfad in `resolve_market_slots` |
+| `config.market_prices` | `missing_price_strategy`: `mirror` \| `forecast` (Default `forecast`) |
+| `share/data/price_model_coefficients.json` | Ship-Modell für Prod/Container |
 | `optimizer/simulation.py` | `is_extrapolated_source()` für Chart-Feld |
 
-### 7.3 Offen (Phase 3 Abschluss)
+### 7.3 Phase 3 Abschluss (2026-09-29)
 
-- `resolve_market_slots`: bei `forecast` fehlende Slots per Modell befüllen, Fallback Spiegelung
-- Feature-Fetch Live (Open-Meteo Forecast / Energy-Charts Prognose)
+- ✅ `resolve_market_slots`: bei `forecast` fehlende Slots per OLS befüllen, Fallback Spiegelung
+- ✅ Live-Features: Open-Meteo Forecast-Wetter + stündliches EU-Leistungs-Stand-in aus dem letzten Archivtag
+- Offen optional: Energy-Charts `public_power_forecast` statt Archiv-Stand-in; monatliches Re-Training
 
-## 8. Architektur (Zielbild Phase 3 Live)
+## 8. Architektur (Phase 3 Live)
 
 ```
 aWATTar (Day-Ahead) ──▶ resolve_market_slots
                               │
-Open-Meteo / Energy-Charts ──▶│ predict missing slots
-                              │     (price_model.json)
+Open-Meteo Forecast ──────────▶│ predict missing slots
+EU power stand-in (archive) ──▶│     (share/data/price_model_coefficients.json)
                               ▼
                        Optimierungs-Matrix
                               │
@@ -208,8 +212,8 @@ Open-Meteo / Energy-Charts ──▶│ predict missing slots
 | **0** | Scope, Länder, Features, Akzeptanz | ✅ festgelegt (§4) |
 | **1** | Dataset-Skript + `eu_market_features` | ✅ umgesetzt |
 | **2** | Modell trainieren, Walk-forward-Backtest vs. Spiegelung | ✅ umgesetzt (Eval auf Jahres-CSV ausstehend) |
-| **3** | Live in `resolve_market_slots`, Config, UI-Eval | 🔄 vorbereitet |
-| **4** | Doku `preise.md`, optional monatliches Re-Training | offen |
+| **3** | Live in `resolve_market_slots`, Config, UI-Eval | ✅ umgesetzt (Default `forecast`) |
+| **4** | Doku `preise.md`, optional monatliches Re-Training | ✅ `preise.md`; Re-Training optional offen |
 
 ## 10. Risiken
 
@@ -228,5 +232,6 @@ Open-Meteo / Energy-Charts ──▶│ predict missing slots
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
+| 2026-09-29 | 0.4 | Phase 3 live: Default `forecast`/OLS; Open-Meteo Features; ship-Modell `share/data/` |
 | 2026-07-06 | 0.2 | Phase 2: OLS-Modell, Evaluation vs. Spiegelung |
 | 2026-07-06 | 0.1 | Initiale Spec; Phase 0 Scope; Phase 1 Pipeline |

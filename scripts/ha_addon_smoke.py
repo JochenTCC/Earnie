@@ -30,10 +30,14 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ADDON_CONFIG_YAML = REPO_ROOT / "packaging" / "homeassistant-addon" / "earnie" / "config.yaml"
 CONTAINER_UI_PORT = 8501
+HEALTH_HOST = "127.0.0.1"
+HEALTH_PATH = "/_stcore/health"
+_ALLOWED_HEALTH_HOSTS = frozenset({"127.0.0.1", "localhost"})
 LEGACY_CONFIG_JSON = Path("earnie_env") / "config" / "config.json"
 
 _OPTION_LINE = re.compile(r"^  ([A-Za-z0-9_]+):\s*(.*?)\s*$")
@@ -115,9 +119,31 @@ def _container_running(name: str) -> bool:
     return result.returncode == 0 and result.stdout.strip() == "true"
 
 
+def health_check_url(host_port: int) -> str:
+    """Build the local Streamlit health URL from a validated host port only."""
+    if isinstance(host_port, bool) or not isinstance(host_port, int):
+        raise ValueError(f"host port must be int, got {type(host_port).__name__}")
+    if not (1 <= host_port <= 65535):
+        raise ValueError(f"host port out of range: {host_port}")
+    return f"http://{HEALTH_HOST}:{host_port}{HEALTH_PATH}"
+
+
+def _safe_local_health_url(url: str) -> str:
+    """Allowlist scheme/host/path before urlopen (Sonar pythonsecurity:S8703)."""
+    parsed = urlparse(url)
+    if parsed.scheme != "http" or parsed.hostname not in _ALLOWED_HEALTH_HOSTS:
+        raise ValueError(f"health URL not allowlisted: {url!r}")
+    if parsed.path != HEALTH_PATH:
+        raise ValueError(f"health URL path not allowed: {url!r}")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError(f"health URL must not carry credentials/query/fragment: {url!r}")
+    return url
+
+
 def _health_ok(url: str) -> bool:
     try:
-        with urllib.request.urlopen(url, timeout=3.0) as resp:
+        safe = _safe_local_health_url(url)
+        with urllib.request.urlopen(safe, timeout=3.0) as resp:
             return 200 <= int(resp.status) < 300
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         return False
@@ -164,7 +190,7 @@ def run_smoke(
         if started.returncode != 0:
             errors.append(f"docker run failed (exit {started.returncode})")
         else:
-            url = f"http://127.0.0.1:{host_port}/_stcore/health"
+            url = health_check_url(host_port)
             failure = _wait_healthy(name, url, timeout_sec)
             if failure:
                 errors.append(failure)

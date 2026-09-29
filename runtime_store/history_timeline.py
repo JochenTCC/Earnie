@@ -291,49 +291,33 @@ def _projected_savings_available(by_slot: dict[datetime, dict[str, Any]]) -> boo
     return any(_entry_savings_snapshot(entry) is not None for entry in by_slot.values())
 
 
-def build_chart_history(
+def _empty_chart_history(
     window_start: datetime,
     window_end_exclusive: datetime,
 ) -> ChartHistoryResult:
-    """
-    Rekonstruiert 15-Min-Ist-Daten für [window_start, window_end_exclusive).
-
-    Fensterende exklusiv = history_boundary_exclusive(now) (Spec ui-sunset2sunset v0.6 §6).
-    """
-    if window_start.tzinfo is None or window_end_exclusive.tzinfo is None:
-        raise ValueError("window_start und window_end_exclusive müssen timezone-aware sein.")
-    if window_end_exclusive <= window_start:
-        return ChartHistoryResult(
-            rows=[],
-            slot_starts=(),
-            slot_qualities=(),
-            slot_costs_euro=[],
-            cumulative_costs_euro=[],
-            slot_consumption_kwh=[],
-            cumulative_consumption_kwh=[],
-            present_slot_count=0,
-            held_slot_count=0,
-            missing_slot_count=0,
-            window_start=window_start,
-            window_end_exclusive=window_end_exclusive,
-            slot_deviation_events=(),
-        )
-    slot_starts = quarter_hour_slots_between(window_start, window_end_exclusive)
-    rows, qualities, present, held, missing, by_slot, closed_by = (
-        _build_rows_for_slot_starts(
-            slot_starts,
-            include_date=True,
-            hold_forward=False,
-        )
+    return ChartHistoryResult(
+        rows=[],
+        slot_starts=(),
+        slot_qualities=(),
+        slot_costs_euro=[],
+        cumulative_costs_euro=[],
+        slot_consumption_kwh=[],
+        cumulative_consumption_kwh=[],
+        present_slot_count=0,
+        held_slot_count=0,
+        missing_slot_count=0,
+        window_start=window_start,
+        window_end_exclusive=window_end_exclusive,
+        slot_deviation_events=(),
     )
-    from optimizer.deviation_timeline import build_slot_deviation_series
 
-    deviation_events = build_slot_deviation_series(
-        by_slot,
-        slot_starts,
-        qualities,
-        closed_by_interval=closed_by,
-    )
+
+def _chart_history_cost_metrics(
+    rows: list[dict[str, Any]],
+    qualities: tuple[str, ...],
+    by_slot: dict,
+    slot_starts: tuple[datetime, ...],
+) -> tuple[list[float], list[float], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
     sell_price_cent = config.get_push_price_cent()
     slot_costs = [
         0.0 if quality == SLOT_MISSING else _slot_cost_euro(row, sell_price_cent)
@@ -351,6 +335,41 @@ def build_chart_history(
     )
     planned_savings = _slot_plan_increments_from_snapshots(
         by_slot, slot_starts, "hourly_savings_euro"
+    )
+    return slot_costs, slot_kwh, planned_matched, planned_optimized, planned_savings
+
+
+def build_chart_history(
+    window_start: datetime,
+    window_end_exclusive: datetime,
+) -> ChartHistoryResult:
+    """
+    Rekonstruiert 15-Min-Ist-Daten für [window_start, window_end_exclusive).
+
+    Fensterende exklusiv = history_boundary_exclusive(now) (Spec ui-sunset2sunset v0.6 §6).
+    """
+    if window_start.tzinfo is None or window_end_exclusive.tzinfo is None:
+        raise ValueError("window_start und window_end_exclusive müssen timezone-aware sein.")
+    if window_end_exclusive <= window_start:
+        return _empty_chart_history(window_start, window_end_exclusive)
+    slot_starts = quarter_hour_slots_between(window_start, window_end_exclusive)
+    rows, qualities, present, held, missing, by_slot, closed_by = (
+        _build_rows_for_slot_starts(
+            slot_starts,
+            include_date=True,
+            hold_forward=False,
+        )
+    )
+    from optimizer.deviation_timeline import build_slot_deviation_series
+
+    deviation_events = build_slot_deviation_series(
+        by_slot,
+        slot_starts,
+        qualities,
+        closed_by_interval=closed_by,
+    )
+    slot_costs, slot_kwh, planned_matched, planned_optimized, planned_savings = (
+        _chart_history_cost_metrics(rows, qualities, by_slot, slot_starts)
     )
     return ChartHistoryResult(
         rows=rows,

@@ -382,7 +382,7 @@ Details dazu: [PV & Batterie](../konfiguration/batterie-pv.md), [Überblick](../
 
 ### EHAL-Com
 
-Unter **Daemon Control → EHAL-Com**: Live-Lesen/Schreiben, Silent- vs. Live-Modus, Mapping-Assistenten. Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend** (Anbindung). Cutover: Lesen OK → Schreiben OK → Monitor plausibel. Plant-Signal für Abwesenheit: `sens_absent_mode` (Loxone-Default-Merker `Earnie_Abwesend`; HA-Entity bzw. OpenEMS `component/Channel` in `plant.ehal_bindings`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
+Unter **Daemon Control → EHAL-Com**: Live-Lesen/Schreiben, Mapping-Assistenten und Status (u. a. Silent/Loud). Umschalten **Silent / Loud** liegt auf **Optimierer-Dienst** (gespeichert in `runtime/local_settings.json`). Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend** (Anbindung). Cutover: Lesen OK → Schreiben OK → Monitor plausibel. Plant-Signal für Abwesenheit: `sens_absent_mode` (Loxone-Default-Merker `Earnie_Abwesend`; HA-Entity bzw. OpenEMS `component/Channel` in `plant.ehal_bindings`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
 
 Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md).
 
@@ -396,7 +396,7 @@ Bei Loxone optional: `python -m scripts.verify_loxone_setup`.
 
 Im Produktivbetrieb läuft der Optimierer dauerhaft (Docker: mit der UI; lokal: `python main.py`) im **15-Minuten-Takt** (oder auf Anforderung durch das Smarthome-Backend). Daemon und Optimierungsalgo nutzen **Viertelstunden-Slots**.
 
-Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart und Dienst-Log (`earnie.log`, Level-Filter, Standard INFO+).
+Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart, Umschalter **Silent / Loud** und Dienst-Log (`earnie.log`, Level-Filter, Standard INFO+). Details: [Betrieb](../einrichtung/betrieb.md).
 
 ### Monitor
 
@@ -432,7 +432,7 @@ Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur mit `live_environment
 3. Szenarienkonfigurator: Live-Szenario + Vergleichsvarianten
 4. Szenario-Explorer: Verbrauch prüfen, Rechnung, Ergebnisse bewerten
 5. Backend auf **Smarthome-Backend** wählen und Zugang speichern ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach Mapping auf **EHAL-Com** prüfen
-6. Live-Szenario + EHAL-Com (Silent → Live)
+6. Live-Szenario + EHAL-Com prüfen; auf **Optimierer-Dienst** von Silent auf Loud wechseln
 7. Daemon dauerhaft laufen lassen, Monitor beobachten, Feintuning
 
 Bei Unklarheiten: Hover-Hilfe in `config.json` (Schema) und [docs/README.md](../README.md).

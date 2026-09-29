@@ -395,20 +395,14 @@ def normalize_scenario_form_snapshot(scenario: dict) -> dict:
     return out
 
 
-def read_scenario_form_snapshot(
-    session_state,
-    session_scope: str,
-    *,
+def _scenario_form_entity_maps(
     profiles: dict[str, dict],
     batteries: list[dict],
     pv_systems: list[dict],
     import_tariffs: list[dict],
     export_tariffs: list[dict],
-) -> dict:
-    from house_config.tariffs_store import (
-        ensure_user_fixed_option,
-        is_user_fixed_tariff_id,
-    )
+) -> tuple[dict, dict, dict, dict, dict]:
+    from house_config.tariffs_store import ensure_user_fixed_option
 
     _, prof_map = options_for_entities(list(profiles.values()), allow_none=True)
     _, bat_map = options_for_entities(batteries, allow_none=True)
@@ -417,7 +411,36 @@ def read_scenario_form_snapshot(
     export_with_user = ensure_user_fixed_option(export_tariffs)
     _, imp_map = options_for_entities(import_with_user, allow_none=True)
     _, exp_map = options_for_entities(export_with_user, allow_none=True)
+    return prof_map, bat_map, pv_map, imp_map, exp_map
 
+
+def _user_cent_from_session(
+    session_state,
+    session_scope: str,
+    *,
+    tariff_id: str,
+    widget_suffix: str,
+) -> float | None:
+    from house_config.tariffs_store import is_user_fixed_tariff_id
+
+    if not is_user_fixed_tariff_id(tariff_id):
+        return None
+    raw = session_state.get(scoped_widget_key(session_scope, widget_suffix))
+    if raw is None:
+        return None
+    return float(raw)
+
+
+def _scenario_settings_from_session(
+    session_state,
+    session_scope: str,
+    *,
+    prof_map: dict,
+    bat_map: dict,
+    pv_map: dict,
+    imp_map: dict,
+    exp_map: dict,
+) -> dict:
     profile_pick = session_state.get(scoped_widget_key(session_scope, "scenario_profile"))
     battery_pick = session_state.get(scoped_widget_key(session_scope, "scenario_battery"))
     pv_picks = session_state.get(scoped_widget_key(session_scope, "scenario_pv")) or []
@@ -429,25 +452,9 @@ def read_scenario_form_snapshot(
     pv_system_ids = [
         lookup_entity_id(pv_map, pick) for pick in pv_picks if lookup_entity_id(pv_map, pick)
     ]
-
     import_tariff_id = lookup_entity_id(imp_map, import_pick)
     export_tariff_id = lookup_entity_id(exp_map, export_pick)
-    user_import_cent = None
-    user_export_cent = None
-    if is_user_fixed_tariff_id(import_tariff_id):
-        raw_imp = session_state.get(
-            scoped_widget_key(session_scope, "scenario_user_import_cent")
-        )
-        if raw_imp is not None:
-            user_import_cent = float(raw_imp)
-    if is_user_fixed_tariff_id(export_tariff_id):
-        raw_exp = session_state.get(
-            scoped_widget_key(session_scope, "scenario_user_export_cent")
-        )
-        if raw_exp is not None:
-            user_export_cent = float(raw_exp)
-
-    settings = build_scenario_settings(
+    return build_scenario_settings(
         battery_id=lookup_entity_id(bat_map, battery_pick),
         pv_system_ids=pv_system_ids,
         import_tariff_id=import_tariff_id,
@@ -456,8 +463,42 @@ def read_scenario_form_snapshot(
         use_imported_pv=bool(
             session_state.get(scoped_widget_key(session_scope, "scenario_use_imported_pv"), False)
         ),
-        user_import_cent_kwh=user_import_cent,
-        user_export_cent_kwh=user_export_cent,
+        user_import_cent_kwh=_user_cent_from_session(
+            session_state,
+            session_scope,
+            tariff_id=import_tariff_id,
+            widget_suffix="scenario_user_import_cent",
+        ),
+        user_export_cent_kwh=_user_cent_from_session(
+            session_state,
+            session_scope,
+            tariff_id=export_tariff_id,
+            widget_suffix="scenario_user_export_cent",
+        ),
+    )
+
+
+def read_scenario_form_snapshot(
+    session_state,
+    session_scope: str,
+    *,
+    profiles: dict[str, dict],
+    batteries: list[dict],
+    pv_systems: list[dict],
+    import_tariffs: list[dict],
+    export_tariffs: list[dict],
+) -> dict:
+    prof_map, bat_map, pv_map, imp_map, exp_map = _scenario_form_entity_maps(
+        profiles, batteries, pv_systems, import_tariffs, export_tariffs
+    )
+    settings = _scenario_settings_from_session(
+        session_state,
+        session_scope,
+        prof_map=prof_map,
+        bat_map=bat_map,
+        pv_map=pv_map,
+        imp_map=imp_map,
+        exp_map=exp_map,
     )
     draft_label = str(
         session_state.get(scoped_widget_key(session_scope, "scenario_label"), "") or ""

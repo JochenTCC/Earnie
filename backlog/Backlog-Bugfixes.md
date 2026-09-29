@@ -27,7 +27,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Check last Sonarcloud failure during coverage testing on Github
 
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)

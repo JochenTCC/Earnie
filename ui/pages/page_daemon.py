@@ -191,30 +191,19 @@ def _render_log_section() -> None:
         st.code(filtered, language="log")
 
 
-def render() -> None:
-    reload_runtime_config()
-    render_page_title_with_help(
-        "🛠️ Optimierer-Dienst",
-        _HELP,
-        key="daemon_help",
-        page_docs_key="optimizer-daemon",
-    )
-    st.caption("Lebenszyklus von `main.py` (Start / Stop / Neustart).")
-
+def _warn_ehal_write_error() -> None:
     from integrations.ehal_live import load_write_error
 
     ehal_err = load_write_error()
-    if ehal_err:
-        st.warning(
-            f"EHAL Schreibfehler: {ehal_err.get('message', '?')} "
-            f"({', '.join(ehal_err.get('failed_fields') or [])})"
-        )
+    if not ehal_err:
+        return
+    st.warning(
+        f"EHAL Schreibfehler: {ehal_err.get('message', '?')} "
+        f"({', '.join(ehal_err.get('failed_fields') or [])})"
+    )
 
-    daemon = status()
-    _render_status(daemon)
-    _render_silent_mode_toggle()
 
-    running = daemon.state == "running"
+def _render_lifecycle_buttons(*, running: bool, stopped: bool) -> tuple[bool, bool, bool]:
     col_start, col_stop, col_restart = st.columns(3)
     with col_start:
         do_start = st.button(
@@ -227,7 +216,7 @@ def render() -> None:
     with col_stop:
         do_stop = st.button(
             "Stop",
-            disabled=daemon.state == "stopped",
+            disabled=stopped,
             width="stretch",
             key="daemon_stop",
         )
@@ -237,7 +226,10 @@ def render() -> None:
             width="stretch",
             key="daemon_restart",
         )
+    return do_start, do_stop, do_restart
 
+
+def _run_lifecycle_actions(*, do_start: bool, do_stop: bool, do_restart: bool) -> None:
     try:
         if do_start:
             with st.spinner("Starte main.py …"):
@@ -257,5 +249,25 @@ def render() -> None:
     except DaemonError as exc:
         st.error(str(exc))
 
+
+def render() -> None:
+    reload_runtime_config()
+    render_page_title_with_help(
+        "🛠️ Optimierer-Dienst",
+        _HELP,
+        key="daemon_help",
+        page_docs_key="optimizer-daemon",
+    )
+    st.caption("Lebenszyklus von `main.py` (Start / Stop / Neustart).")
+    _warn_ehal_write_error()
+
+    daemon = status()
+    _render_status(daemon)
+    _render_silent_mode_toggle()
+    do_start, do_stop, do_restart = _render_lifecycle_buttons(
+        running=daemon.state == "running",
+        stopped=daemon.state == "stopped",
+    )
+    _run_lifecycle_actions(do_start=do_start, do_stop=do_stop, do_restart=do_restart)
     st.divider()
     _render_log_section()

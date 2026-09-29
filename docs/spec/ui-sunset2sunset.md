@@ -116,7 +116,7 @@ Hold-Forward (bisher „hellorange / gehalten“) gilt im S-2-Modus **nicht**. F
 
 | Panel | Verhalten |
 |-------|-----------|
-| Sankey | immer (aktuelle Loxone-Daten) |
+| Sankey | **zwischen Navigation und Chart 2** — Plant über aktives EHAL-Backend; Flex/EV-SoC siehe [charts.md](../ui/charts.md#energiefluss-live-sankey) |
 | Countdown | immer |
 | Auto-Refresh | Desktop: `cycle_offset=0` (SA₀→SA₂); Mobil: nur Fenster SA₀→SA₁ |
 
@@ -129,7 +129,8 @@ Kompaktere Chart-UI; Details in [docs/ui/charts.md](../ui/charts.md).
 | Sidebar (oben) | App-Version als Caption (`app.py`) |
 | Seitentitel | Modus-Scope; Scope-Erklärung im **?** (`ui/help_hint.py`) |
 | Chart 1 | Segment-Label als Überschrift + **?** (Zonen, Navigation); kein separates Segment-Banner |
-| Navigation | ←/→ **zwischen Chart 1 und Chart 2**, schmal, ohne Caption dazwischen |
+| Navigation | ←/→ **zwischen Chart 1 und Sankey**, schmal, ohne Caption dazwischen |
+| Sankey | Live-Energiefluss (Plant EHAL; Flex/SoC-Limits siehe charts.md) |
 | Chart 2 | Überschrift + **?** (Ist vs. Prognose, orange Lücken) statt Caption unter dem Chart |
 | Sync-Wartezeit | Status sichtbar (`st.info`/`st.caption`); Erklärung im **?** (`ui/main_py_sync.py`) |
 | Simulations-Tabelle / Energievergleich | Expander unverändert (Erklär-Texte bleiben im Expander) |
