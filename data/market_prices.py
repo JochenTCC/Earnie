@@ -31,8 +31,16 @@ def normalize_price_slot(dt: datetime) -> datetime:
     return normalize_quarter_hour_slot(aligned)
 
 
-def epex_to_brutto_cent(epex_price_cent: float) -> float:
-    """EPEX Cent/kWh → Endkunden-Bruttopreis laut aufgelöstem Import-Tarif."""
+def epex_to_brutto_cent(
+    epex_price_cent: float,
+    *,
+    slot_datetime: datetime | None = None,
+) -> float:
+    """EPEX Cent/kWh → Endkunden-Bruttopreis laut aufgelöstem Import-Tarif.
+
+    ``slot_datetime`` is required when the resolved import tariff is
+    ``monthly_table`` (month lookup).
+    """
     from data.backtesting_prices import pricing_kwargs_from_resolved
     from data.tariff_pricing import import_cent_kwh
 
@@ -48,6 +56,7 @@ def epex_to_brutto_cent(epex_price_cent: float) -> float:
         float(epex_price_cent),
         spec,
         netzentgelt_override=kwargs.get("netzentgelt_override"),
+        slot_datetime=slot_datetime,
     )
 
 
@@ -150,7 +159,7 @@ def _append_mirrored_slot(
             "price_buy": epex,
             "price_source": PRICE_SOURCE_MIRRORED,
             "mirrored_from": mirror_slot,
-            "k_act": epex_to_brutto_cent(epex),
+            "k_act": epex_to_brutto_cent(epex, slot_datetime=slot),
         }
     )
 
@@ -167,7 +176,7 @@ def _append_predicted_slot(
         "hour": slot.hour,
         "price_buy": round(float(epex_cent), 4),
         "price_source": PRICE_SOURCE_PREDICTED,
-        "k_act": epex_to_brutto_cent(float(epex_cent)),
+        "k_act": epex_to_brutto_cent(float(epex_cent), slot_datetime=slot),
     }
     if forecast_model_path is not None:
         row["forecast_model_path"] = str(forecast_model_path)
@@ -280,7 +289,7 @@ def resolve_market_slots(
                     "hour": slot.hour,
                     "price_buy": epex,
                     "price_source": PRICE_SOURCE_DAY_AHEAD,
-                    "k_act": epex_to_brutto_cent(epex),
+                    "k_act": epex_to_brutto_cent(epex, slot_datetime=slot),
                 }
             )
             continue

@@ -6,6 +6,7 @@ from typing import Any
 
 from integrations.ha_adapter import (
     SETPOINT_FIELDS,
+    TELEMETRY_BINARY_OPTIONAL,
     TELEMETRY_ENERGY_OPTIONAL,
     TELEMETRY_OPTIONAL,
     TELEMETRY_REQUIRED,
@@ -14,10 +15,15 @@ from integrations.ha_adapter import (
 from integrations.ha_units import describe_conversion, field_quantity, unit_check
 
 EHAL_HA_FIELDS = (
-    TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + TELEMETRY_ENERGY_OPTIONAL + SETPOINT_FIELDS
+    TELEMETRY_REQUIRED
+    + TELEMETRY_OPTIONAL
+    + TELEMETRY_BINARY_OPTIONAL
+    + TELEMETRY_ENERGY_OPTIONAL
+    + SETPOINT_FIELDS
 )
 
 _SENSOR_DOMAINS = frozenset({"sensor"})
+_BINARY_DOMAINS = frozenset({"binary_sensor", "input_boolean", "sensor", "input_number"})
 _WRITE_DOMAINS = WRITE_DOMAINS
 _ENERGY_EXCLUDE = ("energy", "ertrag", "kwh", "wh ")
 _HOUSE_LOAD_EXCLUDE = ("leistung_verbrauch", "verbrauch")
@@ -267,6 +273,18 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
     "set_evcs_mode": {
         "hints": ("evcs_mode", "ev mode", "pv_follow", "charge_immediate", "sofort"),
         "domains": _WRITE_DOMAINS,
+    },
+    "sens_absent_mode": {
+        "hints": (
+            "abwesend",
+            "absent",
+            "urlaub",
+            "holiday",
+            "vacation",
+            "abwesenheit",
+            "away",
+        ),
+        "domains": _BINARY_DOMAINS,
     },
 }
 

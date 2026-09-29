@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from scripts import ha_addon_smoke as smoke
 
@@ -80,6 +83,53 @@ def test_check_seeded_config_flags_legacy_path(tmp_path):
     errors = smoke.check_seeded_config(data, config)
     assert any("not seeded under /config" in e for e in errors)
     assert any("legacy" in e for e in errors)
+
+
+def test_health_check_url_builds_local_streamlit_path():
+    assert smoke.health_check_url(18501) == "http://127.0.0.1:18501/_stcore/health"
+
+
+@pytest.mark.parametrize("port", [0, -1, 65536, True])
+def test_health_check_url_rejects_invalid_port(port):
+    with pytest.raises(ValueError):
+        smoke.health_check_url(port)
+
+
+def test_safe_local_health_url_allowlists_loopback():
+    url = "http://127.0.0.1:18501/_stcore/health"
+    assert smoke._safe_local_health_url(url) == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://169.254.169.254/latest/meta-data/",
+        "https://evil.example/steal",
+        "http://127.0.0.1:18501/admin",
+        "http://127.0.0.1:18501/_stcore/health?x=1",
+        "http://user:pass@127.0.0.1:18501/_stcore/health",
+    ],
+)
+def test_safe_local_health_url_rejects_non_allowlisted(url):
+    with pytest.raises(ValueError, match="health URL"):
+        smoke._safe_local_health_url(url)
+
+
+def test_health_ok_does_not_urlopen_non_allowlisted():
+    with patch("urllib.request.urlopen") as urlopen:
+        assert smoke._health_ok("http://evil.example/steal") is False
+        urlopen.assert_not_called()
+
+
+def test_health_ok_urlopens_allowlisted_local_health():
+    resp = MagicMock()
+    resp.status = 200
+    resp.__enter__.return_value = resp
+    resp.__exit__.return_value = False
+    with patch("urllib.request.urlopen", return_value=resp) as urlopen:
+        assert smoke._health_ok("http://127.0.0.1:18501/_stcore/health") is True
+        urlopen.assert_called_once()
+        assert urlopen.call_args.args[0] == "http://127.0.0.1:18501/_stcore/health"
 
 
 def test_release_workflow_gates_user_visible_steps():

@@ -192,6 +192,63 @@ def test_build_display_savings_series_keeps_forecast_and_actual_separate():
     assert view["hourly_optimized_cost_euro"][2] == 1.0
 
 
+def test_build_display_savings_series_overlays_history_plan_in_gray_zone():
+    """Gray slots use log savings_snapshot plan costs — not MILP fill zeros."""
+    slots = (
+        _dt(2026, 6, 15, 10, 0),
+        _dt(2026, 6, 15, 10, 15),
+        _dt(2026, 6, 15, 11, 0),
+    )
+    history = ChartHistoryResult(
+        rows=[{"Uhrzeit": "15.06. 10:00"}, {"Uhrzeit": "15.06. 10:15"}],
+        slot_starts=slots[:2],
+        slot_qualities=(SLOT_PRESENT, SLOT_PRESENT),
+        slot_costs_euro=[0.11, 0.12],
+        cumulative_costs_euro=[0.11, 0.23],
+        slot_consumption_kwh=[0.5, 0.6],
+        cumulative_consumption_kwh=[0.5, 1.1],
+        present_slot_count=2,
+        held_slot_count=0,
+        missing_slot_count=0,
+        window_start=slots[0],
+        window_end_exclusive=slots[2],
+        slot_planned_matched_cost_euro=(0.20, 0.20),
+        slot_planned_optimized_cost_euro=(0.05, 0.05),
+        slot_planned_savings_euro=(0.15, 0.15),
+    )
+    display_ctx = ChartDisplayContext(
+        rows=[],
+        slot_datetimes=slots,
+        slot_qualities=(SLOT_PRESENT, SLOT_PRESENT, "milp"),
+        history_slot_count=2,
+        history_result=history,
+        gap_notice=None,
+        history_only=False,
+    )
+    now = _dt(2026, 6, 15, 14, 0)
+    chart = compute_ui_chart_window(now, LAT, LON, TZ)
+    matrix = [{"slot_datetime": _dt(2026, 6, 15, 11, 0)}]
+    savings_info = {
+        "hourly_matched_baseline_cost_euro": [2.0],
+        "hourly_optimized_cost_euro": [1.0],
+        "hourly_savings_euro": [1.0],
+        "hourly_matched_baseline_consumption_kwh": [3.0],
+        "hourly_optimized_consumption_kwh": [2.0],
+    }
+    view = build_display_savings_series(
+        display_ctx,
+        savings_view_for_chart(savings_info, matrix, chart),
+        matrix,
+        chart,
+        savings_info=savings_info,
+    )
+    assert view["hourly_matched_baseline_cost_euro"][:2] == [0.20, 0.20]
+    assert view["hourly_optimized_cost_euro"][:2] == [0.05, 0.05]
+    assert view["hourly_savings_euro"][:2] == [0.15, 0.15]
+    assert view["hourly_optimized_cost_euro"][2] == 1.0
+    assert view["slot_actual_cost_euro"][:2] == [0.11, 0.12]
+
+
 def test_build_display_savings_series_sa1_sa2_uses_matrix_indexed_values():
     """SA₁→SA₂: Inkremente aus Matrix-Index, nicht aus chart-voralignierter Liste."""
     now = _dt(2026, 6, 15, 14, 0)

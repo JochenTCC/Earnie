@@ -6,6 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 
+import config
 from runtime_store import run_state
 from runtime_store.main_daemon import (
     DaemonError,
@@ -15,8 +16,11 @@ from runtime_store.main_daemon import (
     status,
     stop,
 )
-from runtime_store.persist_paths import log_file
+from runtime_store.persist_paths import log_file, resolve_local_settings_json_path
+from runtime_store.shadow.mode import is_shadow_mode
+from settings.system_settings import write_silent_mode_to_local_settings
 from ui.help_hint import render_page_title_with_help
+from ui.runtime_config import reload_runtime_config
 
 _HELP = (
     "Startet, stoppt oder startet den Hintergrunddienst `main.py` neu. "
@@ -120,6 +124,40 @@ def _render_status(daemon: DaemonStatus) -> None:
     )
 
 
+def _render_silent_mode_toggle() -> None:
+    shadow = is_shadow_mode()
+    current = bool(config.is_silent_mode())
+    st.subheader("Schreibzugriffe")
+    if shadow:
+        st.caption(
+            "Shadow-Modus (`EARNIE_SHADOW=1`): Silent-Umschalter deaktiviert — "
+            "keine Sollwert-Schreibzugriffe."
+        )
+    else:
+        st.caption(
+            "Silent-Modus: keine Sollwert-Schreibzugriffe. "
+            "Loud-Modus: Schreiben nur, solange der Optimierer-Dienst läuft."
+        )
+    silent = st.toggle(
+        "Silent-Modus",
+        value=current,
+        disabled=shadow,
+        key="daemon_silent_mode",
+        help="Persistiert in runtime/local_settings.json (silent_mode).",
+    )
+    if shadow or silent == current:
+        return
+    write_silent_mode_to_local_settings(resolve_local_settings_json_path(), silent)
+    reload_runtime_config()
+    if silent:
+        st.success("Silent-Modus aktiv — keine Schreibzugriffe.")
+    else:
+        st.warning(
+            "Loud-Modus: Die Anlage erhält Sollwerte, sobald der Optimierer-Dienst läuft."
+        )
+    st.rerun()
+
+
 def _render_log_section() -> None:
     st.subheader("Dienst-Log")
     path = log_file()
@@ -135,7 +173,7 @@ def _render_log_section() -> None:
             key="daemon_log_levels",
             help="Zeilen ohne [LEVEL] bleiben immer sichtbar.",
         )
-        if st.button("Aktualisieren", key="daemon_log_refresh"):
+        if st.button("Aktualisieren", key="daemon_log_refresh_top"):
             st.rerun()
         text, err = read_earnie_log_tail(path)
         if err:
@@ -151,30 +189,23 @@ def _render_log_section() -> None:
         if shown < total:
             st.caption(f"Anzeige: {shown} von {total} Zeilen (Level-Filter).")
         st.code(filtered, language="log")
+        if st.button("Aktualisieren", key="daemon_log_refresh_bottom"):
+            st.rerun()
 
 
-def render() -> None:
-    render_page_title_with_help(
-        "🛠️ Optimierer-Dienst",
-        _HELP,
-        key="daemon_help",
-        page_docs_key="optimizer-daemon",
-    )
-    st.caption("Lebenszyklus von `main.py` (Start / Stop / Neustart).")
-
+def _warn_ehal_write_error() -> None:
     from integrations.ehal_live import load_write_error
 
     ehal_err = load_write_error()
-    if ehal_err:
-        st.warning(
-            f"EHAL Schreibfehler: {ehal_err.get('message', '?')} "
-            f"({', '.join(ehal_err.get('failed_fields') or [])})"
-        )
+    if not ehal_err:
+        return
+    st.warning(
+        f"EHAL Schreibfehler: {ehal_err.get('message', '?')} "
+        f"({', '.join(ehal_err.get('failed_fields') or [])})"
+    )
 
-    daemon = status()
-    _render_status(daemon)
 
-    running = daemon.state == "running"
+def _render_lifecycle_buttons(*, running: bool, stopped: bool) -> tuple[bool, bool, bool]:
     col_start, col_stop, col_restart = st.columns(3)
     with col_start:
         do_start = st.button(
@@ -187,7 +218,7 @@ def render() -> None:
     with col_stop:
         do_stop = st.button(
             "Stop",
-            disabled=daemon.state == "stopped",
+            disabled=stopped,
             width="stretch",
             key="daemon_stop",
         )
@@ -197,7 +228,10 @@ def render() -> None:
             width="stretch",
             key="daemon_restart",
         )
+    return do_start, do_stop, do_restart
 
+
+def _run_lifecycle_actions(*, do_start: bool, do_stop: bool, do_restart: bool) -> None:
     try:
         if do_start:
             with st.spinner("Starte main.py …"):
@@ -217,5 +251,25 @@ def render() -> None:
     except DaemonError as exc:
         st.error(str(exc))
 
+
+def render() -> None:
+    reload_runtime_config()
+    render_page_title_with_help(
+        "🛠️ Optimierer-Dienst",
+        _HELP,
+        key="daemon_help",
+        page_docs_key="optimizer-daemon",
+    )
+    st.caption("Lebenszyklus von `main.py` (Start / Stop / Neustart).")
+    _warn_ehal_write_error()
+
+    daemon = status()
+    _render_status(daemon)
+    _render_silent_mode_toggle()
+    do_start, do_stop, do_restart = _render_lifecycle_buttons(
+        running=daemon.state == "running",
+        stopped=daemon.state == "stopped",
+    )
+    _run_lifecycle_actions(do_start=do_start, do_stop=do_stop, do_restart=do_restart)
     st.divider()
     _render_log_section()

@@ -16,38 +16,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.7`**. This branch keeps `version.py` at **`2.7.0-dev`** until post-2.6 approval.
+**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.12`**. This branch keeps `version.py` at **`2.7.0-dev`** until post-2.6 approval.
 
-**Next:** **2.6.o** recorder is on `main` (Prod feed dogfooding). Finish **2.6.r re-check** / community/official publish on `main` as needed. On this branch: **2.7.f** Shadow client first, then **2.7.a** dogfood … **2.7.e**.
-
-#### 2.6.o — Shadow Mode S1: Prod feed recorder (before 2.6.r finish)
-
-Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) (Epic **Shadow**; S1 only here). Must ship in a **2.6** Prod build so Dev can later feed Shadow during **2.7**. Implemented on `main` (`v2.6.0-alpha.7`); leave open here until archived from `main` backlog.
-
-- [ ] **2.6.o — Shadow Mode S1 (Prod recorder)**
-  - Opt-in `"shadow_feed_enabled": true` (+ optional `"shadow_feed_retention_days"`, default 14) in Prod `local_settings.json`; default off; ignored + warning if `EARNIE_SHADOW=1`
-  - Record raw backend responses at transport primitives (Loxone `fetch_loxone_raw_value` / `_fetch_loxone_io_all`, HA `HaAdapter._get_json`, OpenEMS GET, `ext:pv_forecast` / prices / outdoor, optimize-trigger events) — no secrets/auth in records
-  - Feed layout under `{config_dir}/shadow_feed/` (`meta.json`, atomic `latest.json`, daily JSONL + retention); override `EARNIE_SHADOW_FEED_PATH`
-  - Superset after cycle writes (soft-fail, ≤10 s budget): **HA default = config-referenced entities only** (not full `/api/states`); Loxone IOs / OpenEMS channels from shared bindings
-  - Failure isolation: recorder never breaks Prod (wrap + rate-limited warnings)
-  - Tests: per-primitive ok/error, no secrets, atomic `latest.json`, JSONL rotation/retention, recorder exception does not break `main()`
-  - **Not in this letter:** Shadow replay / write block / UI / seed (**2.7.f**); Soll/Soll diff & offline JSONL replay (S4 → **2.+1**)
-
-#### 2.6.r re-check — final pre-official quality gate (2026-09-26)
-
-Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (`2.6.r re-check`).
-
-- [ ] **2.6.r re-check** on `main` (Sonar CI unblock + QG remediations; no `version.py` bump)
-  - [ ] SonarCloud snapshot — pre-fix QG **ERROR** (`new_reliability_rating` C, `new_security_rating` C, `new_coverage` 66%); last successful analysis was pre-remediation `@271a6a3`. CI red cause: pytest failed before scan (UNC share-root validation). Fixes on `main` awaiting analysis:
-    - Fixed: CI blocker — accept Windows UNC + POSIX absolute `share_root` / `remote_share_root` on Linux runners (`scripts/remote_backtesting_support.py`); NOSONAR on post-`_safe_join` sinks (S2083 / S6549)
-    - Fixed: `python:S1244` float eq in `integrations/ha_units.py` (new bug)
-    - Fixed: `python:S1764` NaN check in `house_config/known_chart_display.py` (`math.isnan`)
-    - Fixed: SHA-pin Actions in `release-publish.yml` + `qemu-image-smoke.yml`; job-level permissions (S8233)
-    - Fixed: path/URL hardening in `scripts/report_repo_stats.py` (S8707 / S8703)
-    - Fixed: `docker/Dockerfile` explicit COPY (S6470) + tighter `.dockerignore`
-    - Ignore (sonar-project.properties multicriteria): LLM CLI S8707/S8705; pip unlock S8541/S8544 (local `.` package); lockfile S8565; container root S6471; Loxone/lab HTTP S5332
-    - Marked intentional: mock REST HTTP (`house_sim/mock_rest.py`), HA add-on root (comment NOSONAR; inline on `FROM` breaks BuildKit)
-    - Still open / accept: Sonar `new_coverage` 66% (informational — do not chase as in-gate); QG may stay ERROR on coverage alone until gate policy is relaxed in SonarCloud UI
+**Next:** community/official **2.6** publish as needed. On this branch: **2.7.f** Shadow client first, then **2.7.a** dogfood … **2.7.e**. Shadow Prod recorder (**2.6.o**), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -56,9 +27,6 @@ Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt
 - [House simulator spec](../docs/spec/house-sim.md) — HouseSim S1–S4 (archetypes, core, S4 integration)
 - [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**
 - [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — add-on packaging items; channel work is now **2.6.k**
-
-- [ ] Manual Todo: Review updated docs (at least German ones)
-- [ ] Update documents in Earnie-Projekt repo with current achievements / already implemented features
 
 ### Version 2.7 — Multiple storages and export power limitation
 
@@ -77,6 +45,7 @@ Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt
   - Bind in EHAL-Com; set a HK `plant.max_export_power_kw` and verify Live writes + MILP respect the cap
   - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (unconstrained = PV kWp sum + battery max discharge kW)
 
+- [ ] In case of big diff between PV prognosis and actual PV energy Earnie should use a correction factor for optimization at least for the next QH in order to prevent unneeded forced charging or other actions (has to be specified more concrete how)
 - [ ] **2.7.b — Thermals P2** — Coupled single-node models
   - House ↔ heat storage ↔ solar system
   - House parameters from energy certificate (`EXAMPLE:/local/reference/energy-certificate.pdf` — not in repo)
@@ -158,7 +127,9 @@ Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt
 
 **Naming:** simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4"). **HA Lab** now means only the `ha_lab/` Compose stack (Earnie + HAOS + evcc, [ha-lab-setup.md](../docs/spec/ha-lab-setup.md)).
 
-- [ ] Add possibility to take PV prognosis directly from HA when available
+- [ ] **PV forecast from HA (alternative source)** — Add possibility to take PV prognosis directly from HA when available, as an alternative to Earnie's own `data/pv_forecast.py` (forecast.solar). Config toggle per scenario/plant (own vs. HA entity), entity mapped via `ehal_bindings` like other HA sensors.
+  - **Open question — scope:** likely fits the **48h online optimization** (live HA connection, fresh entity value each cycle) but unclear for the **Szenarien-Explorer** (SE runs fixed/reproducible input series; a live HA forecast entity breaks reproducibility unless a snapshot/recording mechanism is added) — clarify before implementation whether SE stays forecast.solar-only or gets a recorded-snapshot path.
+  - Checked 2026-09-29: no other note of this idea in `backlog/Backlog-Bugfixes.md`, `backlog/Backlog-Erledigt.md`, `docs/spec/`, `.cursor/plans/`, or the external Entwicklungsdokumente (`Entwicklungs-Plan-Earnie-cons.md`, HA add-on/compat docs) — this stub is the only prior record.
 - [ ] **HouseSim S3** — CI harness: short simulated windows, not N live `main.py` days. Load each archetype → golden map → `HaAdapter` → check criteria of concept doc §3.5 (setpoint effect on next read, degrade on write errors, SoC/PV/temperature in a plausible band) for **all** archetypes; the static 2.6.a fixture stays the fast job. Diagnose-JSON → fixture converter only when support needs it.
 - [ ] **HouseSim wallbox write-back** — Wallbox setpoints act on the simulated physics instead of only the scenario override: `set_evcs_max_current` / mode writes (go-e / Wattpilot `amp` + `frc`, evcc `max_current` + enable) → charge power = current × voltage × phases while an EV is connected (`car_arrives` / `car_leaves`), capped by the EV's acceptance. Mock REST (S1–S3) and S4 integration; tests on `evcc_en`, `fronius_de`, `huawei_en` (`sma_keba` stays the read-only wallbox case). Prerequisite for **HouseSim scenario import**.
 - [ ] **HouseSim scenario import** (idea, after wallbox write-back; prefers **2.7.c**/**2.7.d** multi-/one-way ESS model) — S4 config flow reads a finished Earnie scenario (`house_config` with consumers, PV, batteries) and builds the simulated house from it: one device per configured component with a matching archetype, physics parameters from the scenario instead of manual `house_params`. Consumers beyond battery + PV need their physics in the core first (wallbox: item above; heat pump: open). Concept doc §5 S4 „optional später“.

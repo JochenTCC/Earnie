@@ -181,7 +181,6 @@ def _debug_dump_meta_dialog(
         logger.exception("Debug-Dump-Speichern fehlgeschlagen")
         st.error(f"Debug-Dump konnte nicht gespeichert werden: {exc}")
 
-
 def render_chart_debug_capture_controls(
     current_soc: float | None,
     live_power: dict[str, Any] | None = None,

@@ -14,12 +14,19 @@ _LAST_FETCH_SOURCE: str = "api"
 _USING_SYNTHETIC_FALLBACK: bool = False
 
 
+def _as_naive_local(value: datetime) -> datetime:
+    """Normalize aware API timestamps for comparison with ``datetime.now()``."""
+    if value.tzinfo is None:
+        return value
+    return value.astimezone().replace(tzinfo=None)
+
+
 def _parse_retry_at(response: requests.Response) -> Optional[datetime]:
     """Liest Retry-At aus Header oder JSON-Body einer 429-Antwort."""
     header_value = response.headers.get("X-Ratelimit-Retry-At")
     if header_value:
         try:
-            return datetime.fromisoformat(header_value.strip())
+            return _as_naive_local(datetime.fromisoformat(header_value.strip()))
         except ValueError:
             pass
 
@@ -36,7 +43,7 @@ def _parse_retry_at(response: requests.Response) -> Optional[datetime]:
     if not retry_at:
         return None
     try:
-        return datetime.fromisoformat(str(retry_at).strip())
+        return _as_naive_local(datetime.fromisoformat(str(retry_at).strip()))
     except ValueError:
         return None
 
@@ -76,10 +83,120 @@ def _return_cached_or_none(
     return None
 
 
-def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
-    """Prüft Cache-Gültigkeit und holt ggf. neue API-Daten (Cache pro URL)."""
+def _pre_fetch_cached_or_none(
+    now_time: datetime,
+    cached: Optional[dict],
+) -> tuple[bool, Optional[dict]]:
+    """Rate-limit / 15-min cooldown. Returns (should_return, value)."""
+    global _RATE_LIMIT_RETRY_AT
+
+    now_cmp = _as_naive_local(now_time)
+    retry_at = _RATE_LIMIT_RETRY_AT
+    if retry_at is not None:
+        retry_at = _as_naive_local(retry_at)
+        _RATE_LIMIT_RETRY_AT = retry_at
+
+    if retry_at and now_cmp < retry_at:
+        _set_fetch_source("rate_limited")
+        print(
+            f"[cache] forecast.solar Rate-Limit aktiv bis "
+            f"{retry_at.isoformat()}. Nutze lokalen Cache."
+        )
+        return True, cached
+
+    if retry_at and now_cmp >= retry_at:
+        _RATE_LIMIT_RETRY_AT = None
+
+    if _LAST_API_CALL and (now_cmp - _as_naive_local(_LAST_API_CALL)) < timedelta(
+        minutes=15
+    ):
+        if cached is not None:
+            _set_fetch_source("cache")
+            print(
+                "[cache] forecast.solar-Schutz: Letzter API-Aufruf vor weniger als 15 min. "
+                "Nutze lokalen Cache."
+            )
+            return True, cached
+    return False, None
+
+
+def _store_hourly_watts_from_response(
+    url: str,
+    response: requests.Response,
+    cached: Optional[dict],
+    now_time: datetime,
+) -> Optional[dict]:
+    """Parse API response, update URL cache on success, else fall back to cache."""
     global _LAST_API_CALL, _RATE_LIMIT_RETRY_AT
 
+    feed_key = f"ext:pv_forecast:{_shadow_url_hash(url)}"
+    if response.status_code == 429:
+        retry_at = _parse_retry_at(response)
+        if retry_at:
+            _RATE_LIMIT_RETRY_AT = retry_at
+        retry_msg = retry_at.isoformat() if retry_at else "unbekannt"
+        print(
+            f"[FEHLER] forecast.solar Rate-Limit (HTTP 429). "
+            f"Nächster API-Aufruf erlaubt ab {retry_msg}."
+        )
+        _shadow_ext_record(
+            feed_key,
+            ok=False,
+            status=429,
+            payload=_safe_body(response),
+            error="rate_limited",
+        )
+        return _return_cached_or_none(
+            cached, reason="HTTP 429", empty_source="rate_limited"
+        )
+
+    try:
+        data = response.json()
+    except ValueError:
+        data = response.text
+    if response.status_code >= 400:
+        _shadow_ext_record(
+            feed_key,
+            ok=False,
+            status=int(response.status_code),
+            payload=data,
+            error=f"HTTP {response.status_code}",
+        )
+        response.raise_for_status()
+    _shadow_ext_record(
+        feed_key, ok=True, payload=data, status=int(response.status_code)
+    )
+    hourly_watts = data.get("result", {}).get("watts", {}) if isinstance(data, dict) else {}
+    if not hourly_watts:
+        print("[FEHLER] forecast.solar: leeres watts-Ergebnis.")
+        return _return_cached_or_none(cached, reason="leeres watts")
+    _CACHED_HOURLY_WATTS_BY_URL[url] = hourly_watts
+    _LAST_API_CALL = now_time
+    _RATE_LIMIT_RETRY_AT = None
+    _set_fetch_source("api")
+    return hourly_watts
+
+
+def _record_fetch_failure_and_cache(
+    url: str,
+    cached: Optional[dict],
+    *,
+    error: str,
+    reason: str,
+    log_message: str,
+    empty_source: str = "error_no_cache",
+) -> Optional[dict]:
+    print(log_message)
+    _shadow_ext_record(
+        f"ext:pv_forecast:{_shadow_url_hash(url)}",
+        ok=False,
+        error=error,
+    )
+    return _return_cached_or_none(cached, reason=reason, empty_source=empty_source)
+
+
+def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
+    """Prüft Cache-Gültigkeit und holt ggf. neue API-Daten (Cache pro URL)."""
     now_time = datetime.now()
     cached = _CACHED_HOURLY_WATTS_BY_URL.get(url)
 
@@ -103,100 +220,40 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
         _set_fetch_source("shadow_missing")
         return None
 
-    if _RATE_LIMIT_RETRY_AT and now_time < _RATE_LIMIT_RETRY_AT:
-        _set_fetch_source("rate_limited")
-        print(
-            f"[cache] forecast.solar Rate-Limit aktiv bis "
-            f"{_RATE_LIMIT_RETRY_AT.isoformat()}. Nutze lokalen Cache."
-        )
-        return cached
-
-    if _RATE_LIMIT_RETRY_AT and now_time >= _RATE_LIMIT_RETRY_AT:
-        _RATE_LIMIT_RETRY_AT = None
-
-    if _LAST_API_CALL and (now_time - _LAST_API_CALL) < timedelta(minutes=15):
-        if cached is not None:
-            _set_fetch_source("cache")
-            print(
-                "[cache] forecast.solar-Schutz: Letzter API-Aufruf vor weniger als 15 min. "
-                "Nutze lokalen Cache."
-            )
-            return cached
+    should_return, early = _pre_fetch_cached_or_none(now_time, cached)
+    if should_return:
+        return early
 
     try:
         response = requests.get(url, timeout=config.get_global_timeout())
-        feed_key = f"ext:pv_forecast:{_shadow_url_hash(url)}"
-        if response.status_code == 429:
-            retry_at = _parse_retry_at(response)
-            if retry_at:
-                _RATE_LIMIT_RETRY_AT = retry_at
-            retry_msg = retry_at.isoformat() if retry_at else "unbekannt"
-            print(
-                f"[FEHLER] forecast.solar Rate-Limit (HTTP 429). "
-                f"Nächster API-Aufruf erlaubt ab {retry_msg}."
-            )
-            _shadow_ext_record(
-                feed_key,
-                ok=False,
-                status=429,
-                payload=_safe_body(response),
-                error="rate_limited",
-            )
-            return _return_cached_or_none(
-                cached, reason="HTTP 429", empty_source="rate_limited"
-            )
-
-        try:
-            data = response.json()
-        except ValueError:
-            data = response.text
-        if response.status_code >= 400:
-            _shadow_ext_record(
-                feed_key,
-                ok=False,
-                status=int(response.status_code),
-                payload=data,
-                error=f"HTTP {response.status_code}",
-            )
-            response.raise_for_status()
-        _shadow_ext_record(
-            feed_key, ok=True, payload=data, status=int(response.status_code)
-        )
-        hourly_watts = data.get("result", {}).get("watts", {}) if isinstance(data, dict) else {}
-        if not hourly_watts:
-            print("[FEHLER] forecast.solar: leeres watts-Ergebnis.")
-            return _return_cached_or_none(cached, reason="leeres watts")
-        _CACHED_HOURLY_WATTS_BY_URL[url] = hourly_watts
-        _LAST_API_CALL = now_time
-        _RATE_LIMIT_RETRY_AT = None
-        _set_fetch_source("api")
-        return hourly_watts
+        return _store_hourly_watts_from_response(url, response, cached, now_time)
     except requests.exceptions.Timeout:
-        print(
-            f"[FEHLER] Timeout beim PV-Forecast ({config.get_global_timeout()}s überschritten)."
-        )
-        _shadow_ext_record(
-            f"ext:pv_forecast:{_shadow_url_hash(url)}",
-            ok=False,
+        return _record_fetch_failure_and_cache(
+            url,
+            cached,
             error="timeout",
+            reason="Timeout",
+            log_message=(
+                f"[FEHLER] Timeout beim PV-Forecast "
+                f"({config.get_global_timeout()}s überschritten)."
+            ),
         )
-        return _return_cached_or_none(cached, reason="Timeout")
     except requests.exceptions.HTTPError as http_err:
-        print(f"[FEHLER] HTTP-Fehler beim PV-Forecast-Abruf: {http_err}.")
-        _shadow_ext_record(
-            f"ext:pv_forecast:{_shadow_url_hash(url)}",
-            ok=False,
+        return _record_fetch_failure_and_cache(
+            url,
+            cached,
             error=str(http_err),
+            reason=f"HTTPError:{http_err}",
+            log_message=f"[FEHLER] HTTP-Fehler beim PV-Forecast-Abruf: {http_err}.",
         )
-        return _return_cached_or_none(cached, reason=f"HTTPError:{http_err}")
     except Exception as e:
-        print(f"[FEHLER] Unerwarteter Fehler beim PV-Forecast: {e}.")
-        _shadow_ext_record(
-            f"ext:pv_forecast:{_shadow_url_hash(url)}",
-            ok=False,
+        return _record_fetch_failure_and_cache(
+            url,
+            cached,
             error=str(e),
+            reason=f"Exception:{e}",
+            log_message=f"[FEHLER] Unerwarteter Fehler beim PV-Forecast: {e}.",
         )
-        return _return_cached_or_none(cached, reason=f"Exception:{e}")
 
 
 def _shadow_url_hash(url: str) -> str:

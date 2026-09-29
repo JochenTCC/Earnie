@@ -250,7 +250,8 @@ def _edit_and_sync_consumers(session_scope: str, location: dict) -> tuple[list, 
         else:
             merged = dict(original)
         synced_consumers.append(merged)
-    st.session_state[_SESSION_CONSUMERS_KEY] = synced_consumers
+    # Form fields omit thermal_rc lat/lon; keep session geo so expander kWh/a
+    # does not fall back to 0 on the next rerun.
     resolved = _resolve_consumer_ids(synced_consumers, edited)
     resolved_for_preview = _inject_profile_geo(
         resolved,
@@ -258,6 +259,7 @@ def _edit_and_sync_consumers(session_scope: str, location: dict) -> tuple[list, 
         location["longitude"],
         timezone_name=str(location.get("timezone_name") or ""),
     )
+    st.session_state[_SESSION_CONSUMERS_KEY] = resolved_for_preview
     return resolved, resolved_for_preview
 
 

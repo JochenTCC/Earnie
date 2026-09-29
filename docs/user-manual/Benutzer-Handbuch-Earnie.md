@@ -170,7 +170,7 @@ Ein **Hausprofil** beschreibt Standort und „Wer lebt / was verbraucht hier“:
 - **Standort:** Breite, Länge, Land (daraus wird die Zeitzone abgeleitet — wichtig für Sonnenzeiten und PV-Prognose)  
 - **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool, generische Geräte  
 - **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen)
-- **Abwesend / Urlaub:** Profil-Schalter für den Live-Abwesenheitsmodus; je Verbraucher optional **„Inaktiv wenn abwesend“**. Wirksam wird der Modus, wenn der Earnie-Schalter **oder** das Smarthome-Signal `sens_absent_mode` (`Earnie_Abwesend`) an ist. Details: [Flexible Verbraucher — Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
+- **Abwesend / Urlaub:** Profil-Schalter für den Live-Abwesenheitsmodus; je Verbraucher optional **„Inaktiv wenn abwesend“**. Wirksam wird der Modus, wenn der Earnie-Schalter **oder** das Smarthome-Signal `sens_absent_mode` am aktiven Backend an ist (Loxone: z. B. `Earnie_Abwesend`; HA: Entity; OpenEMS: `component/Channel`). Details: [Flexible Verbraucher — Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
 Legen Sie zuerst ein Profil an und ergänzen Sie danach die Geräte. Ein bestehendes Profil entfernen Sie mit **Entfernen** rechts neben der Profilauswahl — das Profil des Live-Szenarios und Profile, die noch von anderen Szenarien referenziert werden, können nicht gelöscht werden. Ohne Standort und sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig. Je mehr Freiheiten sie Earnie beim Verschieben der Aktivierung der verschiedenen Verbraucher geben, umso höher sind die Einsparungspotenziale.
 
@@ -382,7 +382,7 @@ Details dazu: [PV & Batterie](../konfiguration/batterie-pv.md), [Überblick](../
 
 ### EHAL-Com
 
-Unter **Daemon Control → EHAL-Com**: Live-Lesen/Schreiben, Silent- vs. Live-Modus, Mapping-Assistenten. Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend** (Anbindung). Cutover: Lesen OK → Schreiben OK → Monitor plausibel. Plant-Signal für Abwesenheit: `sens_absent_mode` → Default-Merker `Earnie_Abwesend` (siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
+Unter **Daemon Control → EHAL-Com**: Live-Lesen/Schreiben, Mapping-Assistenten und Status (u. a. Silent/Loud). Umschalten **Silent / Loud** liegt auf **Optimierer-Dienst** (gespeichert in `runtime/local_settings.json`). Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend** (Anbindung). Cutover: Lesen OK → Schreiben OK → Monitor plausibel. Plant-Signal für Abwesenheit: `sens_absent_mode` (Loxone-Default-Merker `Earnie_Abwesend`; HA-Entity bzw. OpenEMS `component/Channel` in `plant.ehal_bindings`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
 
 Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md).
 
@@ -396,7 +396,7 @@ Bei Loxone optional: `python -m scripts.verify_loxone_setup`.
 
 Im Produktivbetrieb läuft der Optimierer dauerhaft (Docker: mit der UI; lokal: `python main.py`) im **15-Minuten-Takt** (oder auf Anforderung durch das Smarthome-Backend). Daemon und Optimierungsalgo nutzen **Viertelstunden-Slots**.
 
-Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart und Dienst-Log (`earnie.log`, Level-Filter, Standard INFO+).
+Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart, Umschalter **Silent / Loud** und Dienst-Log (`earnie.log`, Level-Filter, Standard INFO+). Details: [Betrieb](../einrichtung/betrieb.md).
 
 ### Monitor
 
@@ -406,7 +406,7 @@ Earnie Monitor
 
 Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset): einheitliches Cockpit über Vergangenheit, Jetzt und Vorausschau — Desktop als SA₀→SA₂-Fenster, Mobil in Sonnenaufgangs-Segmenten. Chart 1 / SoC-Linien / Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
 
-Ist der **Abwesenheitsmodus** wirksam (Earnie-Schalter und/oder Smarthome `Earnie_Abwesend`), erscheint oben ein Hinweis „Abwesenheitsmodus aktiv“ inkl. Quelle. Opt-in-Verbraucher außer Haus-Wärme fallen dann aus der Live-Optimierung; Haus-Wärme läuft mit Absenktemperatur.
+Ist der **Abwesenheitsmodus** wirksam (Earnie-Schalter und/oder Smarthome `sens_absent_mode`), erscheint oben ein Hinweis „Abwesenheitsmodus aktiv“ inkl. Quelle. Opt-in-Verbraucher außer Haus-Wärme fallen dann aus der Live-Optimierung; Haus-Wärme läuft mit Absenktemperatur.
 Kennzahlen zur Ersparnis in Chart 2 beziehen sich **pro Sonnenaufgangs-Tag** (Mobil: sichtbarer Tag; Desktop: zwei Spalten für SA₀→SA₁ und SA₁→SA₂). Am laufenden Tag sehen Sie **Ersparnis bisher** (seit Sonnenaufgang bis jetzt) und **Ersparnis erwartet** (bis zum nächsten Sonnenaufgang). Der Energievergleich im Expander bleibt auf dem vollen Planungshorizont (Jetzt bis übernächster Sonnenaufgang).
 
 #### Chart 1: SoC-Linien (Plausibilität)
@@ -432,7 +432,7 @@ Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur mit `live_environment
 3. Szenarienkonfigurator: Live-Szenario + Vergleichsvarianten
 4. Szenario-Explorer: Verbrauch prüfen, Rechnung, Ergebnisse bewerten
 5. Backend auf **Smarthome-Backend** wählen und Zugang speichern ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach Mapping auf **EHAL-Com** prüfen
-6. Live-Szenario + EHAL-Com (Silent → Live)
+6. Live-Szenario + EHAL-Com prüfen; auf **Optimierer-Dienst** von Silent auf Loud wechseln
 7. Daemon dauerhaft laufen lassen, Monitor beobachten, Feintuning
 
 Bei Unklarheiten: Hover-Hilfe in `config.json` (Schema) und [docs/README.md](../README.md).

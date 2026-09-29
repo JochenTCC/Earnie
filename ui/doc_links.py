@@ -89,7 +89,7 @@ PAGE_DOCS: dict[str, PageDocs] = {
     "consumer-analysis": PageDocs(
         primary=_handbook(
             "Analyse Verbrauch & Kosten (Benutzer-Handbuch)",
-            "analyse-verbrauch--kosten",
+            "analyse-verbrauch-kosten",
         ),
     ),
     "house-config": PageDocs(
@@ -106,7 +106,10 @@ PAGE_DOCS: dict[str, PageDocs] = {
         ),
     ),
     "scenario-editor": PageDocs(
-        primary=_handbook("Szenarienkonfigurator (Benutzer-Handbuch)", "szenarien-editor"),
+        primary=_handbook(
+            "Szenarienkonfigurator (Benutzer-Handbuch)",
+            "szenarienkonfigurator",
+        ),
         secondaries=(
             DocLink(
                 "Tarife und Preise nachrechnen",
@@ -129,7 +132,7 @@ PAGE_DOCS: dict[str, PageDocs] = {
             DocLink(
                 "Jahres Verbrauch [kWh]",
                 HANDBOOK_REL_PATH,
-                "gesamtkosten-jahres-verbrauch-kwh",
+                "gesamtkosten-und-verbrauch-jahres-verbrauch-kwh",
             ),
             DocLink(
                 "Tarife und Preise nachrechnen",

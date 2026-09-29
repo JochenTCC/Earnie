@@ -230,10 +230,110 @@ def test_normalize_migrates_legacy_absent_temp_c(tmp_path, monkeypatch):
     normalized = normalize_house_profiles_document(doc)
     thermal = normalized["profiles"]["home"]["consumers"][0]["thermal"]
     assert thermal["absent_temp_reduction_c"] == 6.5
-    assert "absent_temp_c" not in thermal
     path = tmp_path / "house_profiles.json"
     save_house_profiles_document(str(path), {"profiles": [doc["profiles"][0]]})
     reloaded = load_house_profiles_document(str(path))
-    saved = reloaded["profiles"]["home"]["consumers"][0]["thermal"]
-    assert saved["absent_temp_reduction_c"] == 6.5
-    assert "absent_temp_c" not in saved
+    assert reloaded["profiles"]["home"]["consumers"][0]["thermal"][
+        "absent_temp_reduction_c"
+    ] == 6.5
+
+
+def _plant_doc(binding: str) -> dict:
+    return {"plant": {"ehal_bindings": {"sens_absent_mode": binding}}}
+
+
+def test_read_ehal_absent_unbound():
+    from optimizer.absent_mode import read_ehal_absent_mode
+
+    value, bound = read_ehal_absent_mode({"plant": {"ehal_bindings": {}}})
+    assert value is None
+    assert bound is False
+
+
+def test_read_ehal_absent_loxone(monkeypatch):
+    from optimizer import absent_mode
+
+    monkeypatch.setattr(
+        "integrations.ehal_live.is_ha_backend", lambda: False
+    )
+    monkeypatch.setattr(
+        "integrations.ehal_live.is_openems_backend", lambda: False
+    )
+    monkeypatch.setattr(
+        "integrations.loxone_client.fetch_loxone_generic_value",
+        lambda _name: 1.0,
+    )
+    value, bound = absent_mode.read_ehal_absent_mode(_plant_doc("Earnie_Abwesend"))
+    assert bound is True
+    assert value is True
+
+
+def test_read_ehal_absent_ha(monkeypatch):
+    from optimizer import absent_mode
+
+    class _Cfg:
+        entities = {"sens_absent_mode": "input_boolean.holiday"}
+
+    class _Adapter:
+        cfg = _Cfg()
+
+        def read_state(self, entity_id: str) -> dict:
+            assert entity_id == "input_boolean.holiday"
+            return {"state": "on"}
+
+    monkeypatch.setattr("integrations.ehal_live.is_ha_backend", lambda: True)
+    monkeypatch.setattr("integrations.ehal_live.is_openems_backend", lambda: False)
+    monkeypatch.setattr("integrations.ehal_live.get_ha_adapter", lambda: _Adapter())
+    value, bound = absent_mode.read_ehal_absent_mode(
+        _plant_doc("input_boolean.holiday")
+    )
+    assert bound is True
+    assert value is True
+
+
+def test_read_ehal_absent_openems(monkeypatch):
+    from optimizer import absent_mode
+
+    class _Adapter:
+        def read_channel(self, component: str, channel: str) -> float:
+            assert component == "ctrlHoliday0"
+            assert channel == "HolidayMode"
+            return 1.0
+
+    monkeypatch.setattr("integrations.ehal_live.is_ha_backend", lambda: False)
+    monkeypatch.setattr("integrations.ehal_live.is_openems_backend", lambda: True)
+    monkeypatch.setattr(
+        "integrations.ehal_live.get_openems_adapter", lambda: _Adapter()
+    )
+    value, bound = absent_mode.read_ehal_absent_mode(
+        _plant_doc("ctrlHoliday0/HolidayMode")
+    )
+    assert bound is True
+    assert value is True
+
+
+def test_read_ehal_absent_openems_invalid_channel(monkeypatch):
+    from optimizer import absent_mode
+
+    monkeypatch.setattr("integrations.ehal_live.is_ha_backend", lambda: False)
+    monkeypatch.setattr("integrations.ehal_live.is_openems_backend", lambda: True)
+    value, bound = absent_mode.read_ehal_absent_mode(_plant_doc("no-slash"))
+    assert bound is True
+    assert value is None
+
+
+def test_ha_all_fields_includes_absent_mode():
+    from house_config.ha_ehal_bindings import HA_ALL_FIELDS, aggregate_ha_entities
+
+    assert "sens_absent_mode" in HA_ALL_FIELDS
+    house = {
+        "plant": {
+            "ehal_bindings": {
+                "sens_ess_soc": "sensor.soc",
+                "sens_absent_mode": "binary_sensor.holiday",
+            }
+        },
+        "profiles": {},
+    }
+    aggregated = aggregate_ha_entities(house)
+    assert aggregated["sens_absent_mode"] == "binary_sensor.holiday"

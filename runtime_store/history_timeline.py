@@ -59,6 +59,10 @@ class ChartHistoryResult:
     window_start: datetime
     window_end_exclusive: datetime
     slot_deviation_events: tuple[tuple[Any, ...], ...] = ()
+    # Plan costs/savings from each hour's savings_snapshot[0] (for Chart 2 Ersparnis bisher)
+    slot_planned_matched_cost_euro: tuple[float, ...] = ()
+    slot_planned_optimized_cost_euro: tuple[float, ...] = ()
+    slot_planned_savings_euro: tuple[float, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -178,6 +182,49 @@ def _entry_savings_snapshot(entry: dict[str, Any]) -> dict[str, Any] | None:
     return snapshot
 
 
+def _snapshot_entry_for_hour(
+    by_slot: dict[datetime, dict[str, Any]],
+    hour_start: datetime,
+) -> dict[str, Any] | None:
+    """Last log entry in ``hour_start``..+1h that carries a savings_snapshot."""
+    step = timedelta(minutes=QUARTER_HOUR_MINUTES)
+    entry = None
+    for quarter in range(4):
+        slot = hour_start + step * quarter
+        candidate = by_slot.get(_coerce_slot_start(slot))
+        if candidate is not None and _entry_savings_snapshot(candidate) is not None:
+            entry = candidate
+    return entry
+
+
+def _slot_plan_increments_from_snapshots(
+    by_slot: dict[datetime, dict[str, Any]],
+    slot_starts: list[datetime] | tuple[datetime, ...],
+    snapshot_key: str,
+) -> tuple[float, ...]:
+    """Spread savings_snapshot[key][0] of each clock-hour across that hour's slots."""
+    from collections import defaultdict
+
+    from data.planning_window import normalize_hour_slot
+
+    hour_indices: dict[datetime, list[int]] = defaultdict(list)
+    for index, slot in enumerate(slot_starts):
+        hour_indices[normalize_hour_slot(slot)].append(index)
+    out = [0.0] * len(slot_starts)
+    for hour_start, indices in hour_indices.items():
+        entry = _snapshot_entry_for_hour(by_slot, hour_start)
+        if entry is None:
+            continue
+        snapshot = _entry_savings_snapshot(entry)
+        assert snapshot is not None
+        values = snapshot.get(snapshot_key) or []
+        hourly = float(values[0]) if values else 0.0
+        share = hourly / len(indices)
+        for index in indices:
+            out[index] = share
+    return tuple(out)
+
+
 def _projected_hourly_savings_from_slots(
     by_slot: dict[datetime, dict[str, Any]],
     slot_starts: list[datetime],
@@ -190,15 +237,9 @@ def _projected_hourly_savings_from_slots(
     """
     hours = len(slot_starts) // 4
     hourly: list[float] = []
-    step = timedelta(minutes=QUARTER_HOUR_MINUTES)
     for hour in range(hours):
         hour_start = slot_starts[hour * 4]
-        entry = None
-        for quarter in range(4):
-            slot = hour_start + step * quarter
-            candidate = by_slot.get(_coerce_slot_start(slot))
-            if candidate is not None and _entry_savings_snapshot(candidate) is not None:
-                entry = candidate
+        entry = _snapshot_entry_for_hour(by_slot, hour_start)
         if entry is None:
             hourly.append(0.0)
             continue
@@ -250,6 +291,54 @@ def _projected_savings_available(by_slot: dict[datetime, dict[str, Any]]) -> boo
     return any(_entry_savings_snapshot(entry) is not None for entry in by_slot.values())
 
 
+def _empty_chart_history(
+    window_start: datetime,
+    window_end_exclusive: datetime,
+) -> ChartHistoryResult:
+    return ChartHistoryResult(
+        rows=[],
+        slot_starts=(),
+        slot_qualities=(),
+        slot_costs_euro=[],
+        cumulative_costs_euro=[],
+        slot_consumption_kwh=[],
+        cumulative_consumption_kwh=[],
+        present_slot_count=0,
+        held_slot_count=0,
+        missing_slot_count=0,
+        window_start=window_start,
+        window_end_exclusive=window_end_exclusive,
+        slot_deviation_events=(),
+    )
+
+
+def _chart_history_cost_metrics(
+    rows: list[dict[str, Any]],
+    qualities: tuple[str, ...],
+    by_slot: dict,
+    slot_starts: tuple[datetime, ...],
+) -> tuple[list[float], list[float], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
+    sell_price_cent = config.get_push_price_cent()
+    slot_costs = [
+        0.0 if quality == SLOT_MISSING else _slot_cost_euro(row, sell_price_cent)
+        for row, quality in zip(rows, qualities)
+    ]
+    slot_kwh = [
+        0.0 if quality == SLOT_MISSING else _slot_consumption_kwh(row)
+        for row, quality in zip(rows, qualities)
+    ]
+    planned_matched = _slot_plan_increments_from_snapshots(
+        by_slot, slot_starts, "hourly_matched_baseline_cost_euro"
+    )
+    planned_optimized = _slot_plan_increments_from_snapshots(
+        by_slot, slot_starts, "hourly_optimized_cost_euro"
+    )
+    planned_savings = _slot_plan_increments_from_snapshots(
+        by_slot, slot_starts, "hourly_savings_euro"
+    )
+    return slot_costs, slot_kwh, planned_matched, planned_optimized, planned_savings
+
+
 def build_chart_history(
     window_start: datetime,
     window_end_exclusive: datetime,
@@ -262,21 +351,7 @@ def build_chart_history(
     if window_start.tzinfo is None or window_end_exclusive.tzinfo is None:
         raise ValueError("window_start und window_end_exclusive müssen timezone-aware sein.")
     if window_end_exclusive <= window_start:
-        return ChartHistoryResult(
-            rows=[],
-            slot_starts=(),
-            slot_qualities=(),
-            slot_costs_euro=[],
-            cumulative_costs_euro=[],
-            slot_consumption_kwh=[],
-            cumulative_consumption_kwh=[],
-            present_slot_count=0,
-            held_slot_count=0,
-            missing_slot_count=0,
-            window_start=window_start,
-            window_end_exclusive=window_end_exclusive,
-            slot_deviation_events=(),
-        )
+        return _empty_chart_history(window_start, window_end_exclusive)
     slot_starts = quarter_hour_slots_between(window_start, window_end_exclusive)
     rows, qualities, present, held, missing, by_slot, closed_by = (
         _build_rows_for_slot_starts(
@@ -293,15 +368,9 @@ def build_chart_history(
         qualities,
         closed_by_interval=closed_by,
     )
-    sell_price_cent = config.get_push_price_cent()
-    slot_costs = [
-        0.0 if quality == SLOT_MISSING else _slot_cost_euro(row, sell_price_cent)
-        for row, quality in zip(rows, qualities)
-    ]
-    slot_kwh = [
-        0.0 if quality == SLOT_MISSING else _slot_consumption_kwh(row)
-        for row, quality in zip(rows, qualities)
-    ]
+    slot_costs, slot_kwh, planned_matched, planned_optimized, planned_savings = (
+        _chart_history_cost_metrics(rows, qualities, by_slot, slot_starts)
+    )
     return ChartHistoryResult(
         rows=rows,
         slot_starts=slot_starts,
@@ -316,6 +385,9 @@ def build_chart_history(
         window_start=window_start,
         window_end_exclusive=window_end_exclusive,
         slot_deviation_events=deviation_events,
+        slot_planned_matched_cost_euro=planned_matched,
+        slot_planned_optimized_cost_euro=planned_optimized,
+        slot_planned_savings_euro=planned_savings,
     )
 
 

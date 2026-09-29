@@ -25,6 +25,7 @@ from ui.help_hint import render_status_with_help
 from ui.main_py_sync import MAIN_PY_SYNC_HELP, main_py_sync_status_message
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
 from ui.chart_debug_capture import render_chart_debug_capture_controls
+from ui.sankey import render_live_power_flow
 from ui.simulation_results import (
     SESSION_LIVE_DISPLAY_BUNDLE,
     build_optimization_display_bundle,
@@ -125,6 +126,7 @@ def render_optimization_savings_and_chart(current_soc: float) -> None:
     _live_optimization_prepare_fragment(current_soc)
     _live_optimization_chart1_fragment(current_soc)
     render_s2_nav_buttons(now=live_now())
+    render_live_power_flow(current_soc)
     _live_optimization_chart2_fragment()
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
     if bundle is not None:

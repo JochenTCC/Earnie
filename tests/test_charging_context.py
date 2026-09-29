@@ -88,7 +88,7 @@ class TestAbsentAvailability:
           ) == cc.next_scheduled_availability(horizon, consumer)
 
   def test_resolve_absent_keeps_open_cycle_after_brief_unplug(self):
-      """Dump 20260808: short unplug before FertigUm must not jump to next evening."""
+      """Dump 20260808: short unplug before same-day FertigUm must not jump to next evening."""
       consumer = _eauto_consumer()
       consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 18
       consumer["charging_schedule"]["weekend"]["car_available_from_hour"] = 20
@@ -106,6 +106,21 @@ class TestAbsentAvailability:
               )
               == horizon
           )
+
+  def test_resolve_absent_ignores_open_cycle_when_fertig_um_next_day(self):
+      """Prod 2026-09-29: next-morning FertigUm latch must not plan EV charge midday."""
+      consumer = _eauto_consumer()
+      consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 18
+      consumer["charging_schedule"]["weekday"]["ready_by_hour"] = 7
+      horizon = datetime(2026, 9, 29, 13, 0)
+      open_deadline = datetime(2026, 9, 30, 6, 15)
+      with patch.object(cc, "_loxone_ready_raw", return_value=None):
+          assert cc.resolve_absent_availability(
+              horizon,
+              consumer,
+              ready_raw=open_deadline.timestamp(),
+              open_cycle_deadline=open_deadline,
+          ) == datetime(2026, 9, 29, 18, 0)
 
   def test_resolve_absent_with_timezone_aware_horizon(self):
       from zoneinfo import ZoneInfo

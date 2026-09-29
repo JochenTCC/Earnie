@@ -258,7 +258,7 @@ def _import_price_cent_from_entry(
         slot_datetime=slot_start,
     )
     if abs(float(expected_push) - float(k_push)) <= 0.05:
-        return round(float(epex_to_brutto_cent(raw)), 4)
+        return round(float(epex_to_brutto_cent(raw, slot_datetime=slot_start)), 4)
     return round(raw, 4)
 
 

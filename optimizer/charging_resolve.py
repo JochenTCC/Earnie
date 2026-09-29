@@ -77,6 +77,24 @@ def _absent_availability_for_day_offset(
     return horizon_start
 
 
+def _open_cycle_keeps_available_now(
+    horizon_start: datetime,
+    open_cycle_deadline: datetime | None,
+) -> bool:
+    """Brief same-day unplug before FertigUm keeps available_from=now.
+
+    A latch whose FertigUm is on a *later* calendar day must not force daytime
+    planning while the car is away (prod 2026-09-29: deadline next morning).
+    """
+    from .charging_session import deadline_reached
+
+    if open_cycle_deadline is None:
+        return False
+    if deadline_reached(horizon_start, open_cycle_deadline):
+        return False
+    return horizon_start.date() == open_cycle_deadline.date()
+
+
 def resolve_absent_availability(
     horizon_start: datetime,
     consumer: dict,
@@ -90,14 +108,11 @@ def resolve_absent_availability(
     Verspätete Rückkehr am selben Tag (Slot vorbei, Auto noch abgehängt) gilt nicht
     als „jetzt verfügbar“ — es wird der nächste car_available_from_hour verwendet.
 
-    open_cycle_deadline: Latch aus flexible_consumers_state — kurzes Unplug vor
-    FertigUm hält den laufenden Ladezyklus offen (available_from = jetzt).
+    open_cycle_deadline: Latch aus flexible_consumers_state — kurzes Unplug am
+    *selben Kalendertag* vor FertigUm hält den laufenden Ladezyklus offen
+    (available_from = jetzt). FertigUm am Folgetag erzwingt kein daytime-now.
     """
-    from .charging_session import deadline_reached
-
-    if open_cycle_deadline is not None and not deadline_reached(
-        horizon_start, open_cycle_deadline
-    ):
+    if _open_cycle_keeps_available_now(horizon_start, open_cycle_deadline):
         return horizon_start
     for day_offset in (0, -1):
         found = _absent_availability_for_day_offset(

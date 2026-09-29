@@ -14,6 +14,7 @@ import config
 
 ENERGY_CHARTS_BASE = "https://api.energy-charts.info"
 OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
+OPEN_METEO_FORECAST = "https://api.open-meteo.com/v1/forecast"
 AT_BIDDING_ZONE = "AT"
 API_RETRY_ATTEMPTS = 5
 API_RETRY_BASE_SECONDS = 2.0
@@ -311,34 +312,167 @@ def _fetch_open_meteo_archive_month(
     )
 
 
-def fetch_eu_weather_hourly(start: date, end: date) -> pd.DataFrame:
-    """Kapazitätsgewichteter EU-Mittelwert Wind und Einstrahlung."""
+def _weighted_eu_weather_from_points(
+    point_frames: dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """Kapazitätsgewichteter EU-Mittelwert aus pro-Gitterpunkt-Frames."""
     wind_sum = None
     solar_sum = None
     wind_weight_total = sum(p.wind_weight for p in WEATHER_GRID)
     solar_weight_total = sum(p.solar_weight for p in WEATHER_GRID)
     for point in WEATHER_GRID:
-        frames: list[pd.DataFrame] = []
-        for chunk_start, chunk_end in month_ranges(start, end):
-            frames.append(_fetch_open_meteo_archive_month(point, chunk_start, chunk_end))
-        point_frame = pd.concat(frames)
+        point_frame = point_frames.get(point.name)
+        if point_frame is None or point_frame.empty:
+            raise ValueError(f"EU-Wetterdaten fehlen für Gitterpunkt {point.name}.")
         point_frame = _dedupe_hourly_mean(point_frame)
-        weighted = pd.DataFrame(index=point_frame.index)
-        weighted["wind"] = point_frame["wind_speed_kmh"] * point.wind_weight
-        weighted["solar"] = point_frame["shortwave_radiation_wm2"] * point.solar_weight
+        weighted_wind = point_frame["wind_speed_kmh"] * point.wind_weight
+        weighted_solar = point_frame["shortwave_radiation_wm2"] * point.solar_weight
         if wind_sum is None:
-            wind_sum = weighted["wind"]
-            solar_sum = weighted["solar"]
+            wind_sum = weighted_wind
+            solar_sum = weighted_solar
         else:
-            wind_sum = wind_sum.add(weighted["wind"], fill_value=0.0)
-            solar_sum = solar_sum.add(weighted["solar"], fill_value=0.0)
+            wind_sum = wind_sum.add(weighted_wind, fill_value=0.0)
+            solar_sum = solar_sum.add(weighted_solar, fill_value=0.0)
     if wind_sum is None or solar_sum is None:
         raise ValueError("EU-Wetterdaten konnten nicht geladen werden.")
     result = pd.DataFrame(index=wind_sum.index)
     result["eu_wind_speed_kmh"] = wind_sum / wind_weight_total
     result["eu_shortwave_radiation_wm2"] = solar_sum / solar_weight_total
+    return result.sort_index()
+
+
+def fetch_eu_weather_hourly(start: date, end: date) -> pd.DataFrame:
+    """Kapazitätsgewichteter EU-Mittelwert Wind und Einstrahlung (Archiv)."""
+    point_frames: dict[str, pd.DataFrame] = {}
+    for point in WEATHER_GRID:
+        frames: list[pd.DataFrame] = []
+        for chunk_start, chunk_end in month_ranges(start, end):
+            frames.append(_fetch_open_meteo_archive_month(point, chunk_start, chunk_end))
+        point_frames[point.name] = pd.concat(frames)
+    result = _weighted_eu_weather_from_points(point_frames)
     mask = (result.index.date >= start) & (result.index.date < end)
     return result.loc[mask].sort_index()
+
+
+def _forecast_days_for_range(start: date, end: date) -> int:
+    """Open-Meteo forecast_days covering [start, end)."""
+    tz = planning_timezone()
+    today = datetime.now(tz).date()
+    last_needed = end - timedelta(days=1)
+    days_ahead = (last_needed - today).days + 1
+    return max(1, min(16, days_ahead))
+
+
+def _hourly_frame_from_open_meteo_payload(payload: dict[str, Any]) -> pd.DataFrame:
+    hourly = payload.get("hourly") or {}
+    times = hourly.get("time") or []
+    wind = hourly.get("wind_speed_10m") or []
+    radiation = hourly.get("shortwave_radiation") or []
+    if not times or len(times) != len(wind) or len(times) != len(radiation):
+        raise ValueError("Open-Meteo Forecast unvollständig.")
+    tz = planning_timezone()
+    index = pd.DatetimeIndex(
+        [
+            normalize_hour_slot(datetime.fromisoformat(str(ts)).replace(tzinfo=tz))
+            for ts in times
+        ]
+    )
+    return pd.DataFrame(
+        {
+            "wind_speed_kmh": wind,
+            "shortwave_radiation_wm2": radiation,
+        },
+        index=index,
+    )
+
+
+def _fetch_open_meteo_forecast_point(
+    point: WeatherGridPoint,
+    *,
+    forecast_days: int,
+) -> pd.DataFrame:
+    payload = _http_get_json(
+        OPEN_METEO_FORECAST,
+        {
+            "latitude": point.latitude,
+            "longitude": point.longitude,
+            "hourly": "wind_speed_10m,shortwave_radiation",
+            "forecast_days": forecast_days,
+            "timezone": config.get_planning_timezone(),
+        },
+    )
+    try:
+        return _hourly_frame_from_open_meteo_payload(payload)
+    except ValueError as exc:
+        raise ValueError(f"{exc} ({point.name})") from exc
+
+
+def _fetch_open_meteo_forecast_grid(*, forecast_days: int) -> dict[str, pd.DataFrame]:
+    """One multi-location Open-Meteo call for the full EU weather grid."""
+    lats = ",".join(str(p.latitude) for p in WEATHER_GRID)
+    lons = ",".join(str(p.longitude) for p in WEATHER_GRID)
+    raw = requests.get(
+        OPEN_METEO_FORECAST,
+        params={
+            "latitude": lats,
+            "longitude": lons,
+            "hourly": "wind_speed_10m,shortwave_radiation",
+            "forecast_days": forecast_days,
+            "timezone": config.get_planning_timezone(),
+        },
+        timeout=config.get_global_timeout(),
+    )
+    raw.raise_for_status()
+    payload = raw.json()
+    locations = payload if isinstance(payload, list) else [payload]
+    if len(locations) != len(WEATHER_GRID):
+        raise ValueError(
+            f"Open-Meteo Forecast: erwartet {len(WEATHER_GRID)} Standorte, "
+            f"erhalten {len(locations)}."
+        )
+    return {
+        point.name: _hourly_frame_from_open_meteo_payload(loc)
+        for point, loc in zip(WEATHER_GRID, locations, strict=True)
+    }
+
+
+def fetch_eu_weather_forecast_hourly(start: date, end: date) -> pd.DataFrame:
+    """Kapazitätsgewichteter EU-Wetterprognose-Mittelwert (Open-Meteo Forecast)."""
+    forecast_days = _forecast_days_for_range(start, end)
+    try:
+        point_frames = _fetch_open_meteo_forecast_grid(forecast_days=forecast_days)
+    except (OSError, ValueError, requests.HTTPError, requests.RequestException):
+        point_frames = {
+            point.name: _fetch_open_meteo_forecast_point(
+                point, forecast_days=forecast_days
+            )
+            for point in WEATHER_GRID
+        }
+    result = _weighted_eu_weather_from_points(point_frames)
+    mask = (result.index.date >= start) & (result.index.date < end)
+    return result.loc[mask].sort_index()
+
+
+def remap_power_by_hour_of_day(
+    power: pd.DataFrame,
+    target_hours: list[datetime],
+) -> pd.DataFrame:
+    """Map archive power rows onto target hours by clock hour (feature stand-in)."""
+    if power.empty:
+        raise ValueError("remap_power_by_hour_of_day: leeres power-DataFrame.")
+    by_hour: dict[int, pd.Series] = {}
+    for slot, row in power.iterrows():
+        by_hour[int(slot.hour)] = row
+    rows: list[pd.Series] = []
+    index: list[datetime] = []
+    for target in target_hours:
+        hour = int(target.hour)
+        if hour not in by_hour:
+            raise ValueError(f"Keine Archiv-Leistungsdaten für Stunde {hour}.")
+        rows.append(by_hour[hour])
+        index.append(normalize_hour_slot(target))
+    remapped = pd.DataFrame(rows, index=pd.DatetimeIndex(index, name=power.index.name))
+    return _dedupe_hourly_mean(remapped).sort_index()
 
 
 def _add_calendar_columns(frame: pd.DataFrame) -> pd.DataFrame:

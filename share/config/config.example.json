@@ -3,7 +3,7 @@
     "earnie_data_model": 3,
     "market_prices": {
         "missing_price_strategy": "forecast",
-        "forecast_model_path": "data/cache/price_model_coefficients.json"
+        "forecast_model_path": "share/data/price_model_coefficients.json"
     },
     "ui": {
         "fragment_refresh_charts_sec": 60,

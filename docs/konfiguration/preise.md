@@ -130,13 +130,13 @@ Block `market_prices` in `config.json`:
 | Feld                     | Bedeutung                                                          |
 | ------------------------ | ------------------------------------------------------------------ |
 | `missing_price_strategy` | `forecast` (Standard) oder `mirror`                                |
-| `forecast_model_path`    | Pfad zu `price_model_coefficients.json` (für Strategie `forecast`) |
+| `forecast_model_path`    | Pfad zu `price_model_coefficients.json` (Default: `share/data/price_model_coefficients.json`; Fallback `data/cache/…`; für Strategie `forecast`) |
 
 
 Wenn die aWATTar-API für späte Stunden des Horizonts noch keine Preise liefert:
 
-- `forecast` (Standard): OLS-Korrelationsmodell (Wind/Solar EU) extrapoliert fehlende Stunden — in Charts als grüner Bereich gekennzeichnet (siehe [Charts](../ui/charts.md)).
-- `mirror`: gleiche Uhrzeit vom Vortag; Fallback auch automatisch, wenn das Forecast-Modell nicht geladen werden kann.
+- `forecast` (Standard): OLS-Korrelationsmodell extrapoliert fehlende Stunden — Live-Features aus Open-Meteo-Wetterprognose plus stündlichem EU-Leistungs-Stand-in aus dem letzten Archivtag; in Charts als grüner Bereich (siehe [Charts](../ui/charts.md)).
+- `mirror`: gleiche Uhrzeit vom Vortag; Fallback auch automatisch, wenn Modell oder Features nicht geladen werden können.
 
 Spec: [Preis-Prognose (Dev)](../spec/price-forecast-renewables.md).
 

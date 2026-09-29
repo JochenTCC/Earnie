@@ -5,7 +5,6 @@ import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -22,9 +21,15 @@ from runtime_store.persist_paths import resolve_runtime_prefixed_path
 
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
 MISSING_PRICE_STRATEGY_FORECAST = "forecast"
-DEFAULT_MODEL_PATH = Path("data/cache/price_model_coefficients.json")
+DEFAULT_MODEL_PATH = Path("share/data/price_model_coefficients.json")
+LEGACY_MODEL_PATH = Path("data/cache/price_model_coefficients.json")
+LIVE_FEATURE_CACHE_TTL_SEC = 45 * 60
 
 logger = logging.getLogger(__name__)
+
+_model_fallback_warned = False
+_live_feature_cache: dict[tuple[str, str, str], tuple[float, pd.DataFrame]] = {}
+_power_day_cache: dict[date, pd.DataFrame] = {}
 
 
 def _feature_load_error_summary(exc: BaseException) -> str:
@@ -53,13 +58,28 @@ def get_missing_price_strategy() -> str:
 
 
 def get_forecast_model_path() -> Path:
+    global _model_fallback_warned
     import config
 
     block = config.Config._read_json_dict(str(config.CONFIG_JSON_PATH)).get("market_prices")
     if isinstance(block, dict) and block.get("forecast_model_path"):
-        configured = str(block["forecast_model_path"])
-        return Path(resolve_runtime_prefixed_path(configured))
-    return DEFAULT_MODEL_PATH
+        configured = Path(resolve_runtime_prefixed_path(str(block["forecast_model_path"])))
+        if configured.exists():
+            return configured
+        for fallback in (DEFAULT_MODEL_PATH, LEGACY_MODEL_PATH):
+            if fallback.exists():
+                if not _model_fallback_warned:
+                    logger.warning(
+                        "Preisprognose: konfiguriertes Modell fehlt (%s) — nutze %s.",
+                        configured,
+                        fallback,
+                    )
+                    _model_fallback_warned = True
+                return fallback
+        return configured
+    if DEFAULT_MODEL_PATH.exists():
+        return DEFAULT_MODEL_PATH
+    return LEGACY_MODEL_PATH
 
 
 def load_configured_model() -> PriceForecastModel | None:
@@ -114,41 +134,131 @@ def _archive_covers_slot_range(slot_datetimes: list) -> bool:
     return max(slot.date() for slot in slots) <= latest_archive_day
 
 
+def _enrich_merged_features(merged: pd.DataFrame) -> pd.DataFrame | None:
+    from data.price_forecast_model import enrich_model_features
+
+    if merged.empty:
+        return None
+    return enrich_model_features(_align_live_feature_index(merged))
+
+
+def _cached_eu_power_day(ref_day: date) -> pd.DataFrame:
+    """Archive EU power for one calendar day (process-local cache)."""
+    from data.eu_market_features import fetch_eu_power_hourly
+
+    cached = _power_day_cache.get(ref_day)
+    if cached is not None:
+        return cached
+    logger.info(
+        "Preisprognose: lade EU-Leistungs-Archiv für %s (einmalig, gecacht)…",
+        ref_day.isoformat(),
+    )
+    frame = fetch_eu_power_hourly(ref_day, ref_day + timedelta(days=1))
+    _power_day_cache[ref_day] = frame
+    return frame
+
+
+def _build_archive_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
+    from data.eu_market_features import fetch_eu_power_hourly, fetch_eu_weather_hourly
+
+    start = min(slot.date() for slot in slots)
+    end = max(slot.date() for slot in slots) + timedelta(days=1)
+    weather = fetch_eu_weather_hourly(start, end)
+    power = fetch_eu_power_hourly(start, end)
+    return _enrich_merged_features(power.join(weather, how="inner"))
+
+
+def _build_forecast_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
+    """Live green-zone features: Open-Meteo forecast weather + hour-of-day archive power."""
+    import time
+
+    from data.eu_market_features import (
+        fetch_eu_weather_forecast_hourly,
+        remap_power_by_hour_of_day,
+    )
+
+    start = min(slot.date() for slot in slots)
+    end = max(slot.date() for slot in slots) + timedelta(days=1)
+    t0 = time.perf_counter()
+    logger.info(
+        "Preisprognose: Live-Features %s..%s (%d Stunden-Slots)…",
+        start.isoformat(),
+        (end - timedelta(days=1)).isoformat(),
+        len(slots),
+    )
+    weather = fetch_eu_weather_forecast_hourly(start, end)
+    t_weather = time.perf_counter() - t0
+    ref_day = _archive_latest_complete_day()
+    power_ref = _cached_eu_power_day(ref_day)
+    power = remap_power_by_hour_of_day(power_ref, slots)
+    merged = power.join(weather, how="inner")
+    frame = _enrich_merged_features(merged)
+    elapsed = time.perf_counter() - t0
+    logger.info(
+        "Preisprognose: Live-Features fertig in %.1fs (Wetter %.1fs, rows=%s).",
+        elapsed,
+        t_weather,
+        0 if frame is None else len(frame),
+    )
+    return frame
+
+
+def _feature_cache_key(slots: list[datetime], mode: str) -> tuple[str, str, str]:
+    start = min(slots).isoformat()
+    end = max(slots).isoformat()
+    return (mode, start, end)
+
+
+def _get_cached_feature_frame(
+    key: tuple[str, str, str],
+) -> pd.DataFrame | None:
+    import time
+
+    entry = _live_feature_cache.get(key)
+    if entry is None:
+        return None
+    stored_at, frame = entry
+    if time.time() - stored_at > LIVE_FEATURE_CACHE_TTL_SEC:
+        _live_feature_cache.pop(key, None)
+        return None
+    return frame
+
+
 def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | None:
     """EU-Features für OLS-Prognose fehlender Day-Ahead-Slots (ohne AT-Preise)."""
-    from data.eu_market_features import fetch_eu_power_hourly, fetch_eu_weather_hourly
+    import time
+
     from data.market_prices import normalize_price_slot
-    from data.price_forecast_model import enrich_model_features
 
     if not slot_datetimes:
         return None
-    if not _archive_covers_slot_range(slot_datetimes):
-        logger.debug(
-            "Preisprognose: Archive-API deckt Live-Slots nicht ab "
-            "(Zukunft/aktueller Tag) — Spiegelung für fehlende Slots."
-        )
-        return None
 
     slots = [normalize_price_slot(dt) for dt in slot_datetimes]
-    start = min(slot.date() for slot in slots)
-    end = max(slot.date() for slot in slots) + timedelta(days=1)
+    # Unique hour parents for cache/remap (QH slots share parent-hour features).
+    hour_slots = sorted({s.replace(minute=0, second=0, microsecond=0) for s in slots})
+    use_archive = _archive_covers_slot_range(slot_datetimes)
+    mode = "archive" if use_archive else "live_forecast"
+    cache_key = _feature_cache_key(hour_slots, mode)
+    cached = _get_cached_feature_frame(cache_key)
+    if cached is not None:
+        return cached
+
     try:
-        weather = fetch_eu_weather_hourly(start, end)
-        power = fetch_eu_power_hourly(start, end)
-        merged = power.join(weather, how="inner")
-        if merged.empty:
-            logger.debug(
-                "Preisprognose: EU-Features leer für %s..%s — Spiegelung.",
-                start.isoformat(),
-                (end - timedelta(days=1)).isoformat(),
-            )
+        frame = (
+            _build_archive_feature_frame(hour_slots)
+            if use_archive
+            else _build_forecast_feature_frame(hour_slots)
+        )
+        if frame is None or frame.empty:
             return None
-        return enrich_model_features(_align_live_feature_index(merged))
-    except (OSError, ValueError, requests.HTTPError) as exc:
+        _live_feature_cache[cache_key] = (time.time(), frame)
+        return frame
+    except (OSError, ValueError, requests.HTTPError, RuntimeError) as exc:
         logger.warning(
-            "Preisprognose: EU-Features nicht ladbar (%s) — "
+            "Preisprognose: EU-Features nicht ladbar (%s, mode=%s) — "
             "Spiegelung als Fallback für fehlende Slots.",
             _feature_load_error_summary(exc),
+            mode,
         )
         return None
 

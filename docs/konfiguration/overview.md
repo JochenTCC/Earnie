@@ -1,80 +1,74 @@
-# Configuration — Overview
+# Konfiguration — Überblick
 
-The central file is `earnie_env/config/config.json`. [`share/config/config.example.json`](../../share/config/config.example.json) serves as the starting point (bootstrap copies missing files). See also [Save / Load](speichern-laden.md) and [Private House Config](../einrichtung/private-env.md).
+Zentrale Datei ist `earnie_env/config/config.json`. Ausgangspunkt: [`share/config/config.example.json`](../../share/config/config.example.json) (Bootstrap kopiert fehlende Dateien). Siehe auch [Speichern / Laden](speichern-laden.md) und [Private Haus-Config](../einrichtung/private-env.md).
 
-## Schema and Editor Help
+## Schema und Editor-Hilfe
 
-At the top of `config.json`:
+Am Anfang von `config.json`:
 
 ```json
 "$schema": "./config.schema.json"
 ```
 
-In Cursor/VS Code, **hover descriptions** from [`share/config/config.schema.json`](../../share/config/config.schema.json) appear for many fields. More detailed context is in the following chapters of this documentation.
+In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`share/config/config.schema.json`](../../share/config/config.schema.json). Mehr Kontext in den folgenden Kapiteln.
 
-## Main Blocks
+## Hauptblöcke
 
+| Block | Zweck |
+| ----- | ----- |
+| `system` | Timeouts für HTTP und den Optimierungszyklus |
+| `market_prices` | Strategie für fehlende Zukunftspreise (`forecast` / `mirror`) — siehe [Preise](preise.md) |
+| `ui` | Streamlit-Port, Refresh-Intervalle, optionale Dev-Seiten |
+| `loxone_blocks` | Optional leer; Mapping nur noch über `plant.ehal_bindings` / Consumer-`ehal_bindings` (EHAL-Com) |
+| `live_scenario_id` | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Default: `live`) |
+| `earnie_env/config/components.json` | Technische Parameter Speicher und PV (`batteries[]`, `pv_systems[]`; Referenz über IDs) |
+| `earnie_env/config/tariffs.json` | Laufzeit-Tarifkatalog (Bezug/Einspeise); Seed aus dem öffentlichen [`share/config/tariffs.json`](../../share/config/tariffs.json) |
+| `earnie_env/config/house_profiles.json` | Standort (Geo/Zeitzone), Netznutzung Arbeitspreis, Planungs-Verbraucher (EV, WP, Waschmaschine, …); Referenz über `house_profile_id` |
+| `earnie_env/config/backtesting_scenarios.json` | **Alle** Szenarien (Live + Varianten); einheitliches `settings`-Format |
+| `scenario_explorer_conf` | Szenario-Explorer / Backtesting: `cons_data.csv`, Preisquelle; Zeitraum aus `cons_data`-Monaten |
+| `flexible_consumers` | Legacy-Overlay (meist leer); Live-Verbraucher liegen in `house_profiles.json` |
+| `appliance_recommendation` | Globale Sterne/Schwellen für manuelle Geräte (keine Geräte-Definitionen) |
+| `planning_horizon` | MILP-Horizont (`sunrise_window` für Live) |
 
-| Block                                           | Purpose                                                                                                                         |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `system`                                          | Timeouts for HTTP and the optimization loop                                                                                   |
-| `market_prices`                                   | Strategy for missing future prices (`forecast` / `mirror`) — see [Prices](preise.md)                                          |
-| `ui`                                               | Streamlit port, refresh intervals, optional dev pages                                                                          |
-| `loxone_blocks`                                   | Optionally empty; mapping now only via `plant.ehal_bindings` / consumer `ehal_bindings` (EHAL-Com)                            |
-| `live_scenario_id`                                | ID of the **live scenario** in `backtesting_scenarios.json` (default: `live`)                                                 |
-| `earnie_env/config/components.json`               | Technical parameters for storage and PV (`batteries[]`, `pv_systems[]`; referenced via IDs)                                    |
-| `earnie_env/config/tariffs.json`                  | Runtime tariff catalog (import/feed-in); seeded from the public [`share/config/tariffs.json`](../../share/config/tariffs.json) |
-| `earnie_env/config/house_profiles.json`           | Location (geo/timezone), grid usage energy price, planning consumers (EV, heat pump, washing machine, …); referenced via `house_profile_id` |
-| `earnie_env/config/backtesting_scenarios.json`    | **All** scenarios (live + variants); uniform `settings` format                                                                |
-| `scenario_explorer_conf`                          | Scenario Explorer / backtesting: `cons_data.csv`, price source; time range derived from `cons_data` months                    |
-| `flexible_consumers`                              | Legacy overlay (usually empty); live consumers are in `house_profiles.json`                                                    |
-| `appliance_recommendation`                        | Global star ratings/thresholds for manual devices (no device definitions)                                                      |
-| `planning_horizon`                                | MILP horizon (`sunrise_window` for live)                                                                                        |
+Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../share/config/backtesting_scenarios.example.json).
 
+## Szenarien (Live und Szenario-Explorer)
 
-Template for scenarios: [`backtesting_scenarios.example.json`](../../share/config/backtesting_scenarios.example.json).
-
-## Scenarios (Live and Scenario Explorer)
-
-- `live_scenario_id` in `config.json` selects the live scenario (default ID: `live`).
-- `backtesting_scenarios.json` contains **all** scenarios in the same format (`id`, `label`, `settings` with entity references or — for what-if — flat parameters).
-- **Live operation** (`main.py`, **Sunset-2-Sunset** mode) and **Scenario Explorer** resolve the same live scenario via `[house_config/scenario_resolution.py](../../house_config/scenario_resolution.py)`.
-- Additional scenarios in the same file are only used for comparison in Scenario Explorer; they do not change production operation.
-
-
+- `live_scenario_id` in `config.json` wählt das Live-Szenario (Default-ID: `live`).
+- `backtesting_scenarios.json` enthält **alle** Szenarien im gleichen Format (`id`, `label`, `settings` mit Entitäts-Referenzen oder — für Was-wäre-wenn — flachen Parametern).
+- **Live-Betrieb** (`main.py`, Modus **Sunset-2-Sunset**) und **Szenario-Explorer** lösen dasselbe Live-Szenario über [`house_config/scenario_resolution.py`](../../house_config/scenario_resolution.py) auf.
+- Weitere Szenarien in derselben Datei dienen nur dem Vergleich im Szenario-Explorer; sie ändern den Produktivbetrieb nicht.
 
 ## `scenario_explorer_conf`
 
+| Feld | Bedeutung |
+| ---- | --------- |
+| `path_cons_data` | Stündliche Verbrauchs-/PV-Baseline (von `main.py` gepflegt); SE-Gesamtzeitraum |
+| `path_price` | Optional: historische Börsenpreise (Energy-Charts-CSV) |
+| `cons_data_retention_months` | Aufbewahrungsdauer der Stundenwerte |
+| `cons_data_write_mode` | Schreibmodus (`hourly`) |
+| `price_source` | `api` = Live-Preise; andere Werte für historische Preise aus CSV |
+| `price_provider` | Legacy; API nutzt zuerst Energy-Charts (aWATTar-Stunden-Fallback) |
+| `price_range` | `last_12_months`: 12 Kalendermonate bis zum letzten **vollständigen** Monat in `cons_data` (rückwärts definiert; Tage chronologisch) |
+| `energy_charts_bzn` | Bidding Zone für die Energy-Charts-CSV (z. B. `DE-LU`) |
 
-| Field                          | Meaning                                                                       |
-| ------------------------------- | -------------------------------------------------------------------------------- |
-| `path_cons_data`               | Hourly consumption/PV baseline (maintained by `main.py`); SE overall time range   |
-| `path_price`                   | Optional: historical exchange prices (Energy-Charts CSV)                          |
-| `cons_data_retention_months`   | How long hourly values are retained                                              |
-| `cons_data_write_mode`         | Write mode (`hourly`)                                                             |
-| `price_source`                 | `api` = live prices; other values for historical prices from CSV                  |
-| `price_provider`               | Legacy; API uses Energy-Charts first (aWATTar hourly fallback)                      |
-| `price_range`                  | `last_12_months`: 12 calendar months up to the last **complete** month in `cons_data` (defined backwards; days chronological) |
-| `energy_charts_bzn`            | Bidding zone for the Energy-Charts CSV (e.g. `DE-LU`)                             |
+**Drei CSV-Ebenen (nicht vermischen):**
 
-**Three CSV levels (don't mix them up):**
+1. **`path_cons_data`** — Laufzeit-Treibstoff für Live und Szenario-Explorer
+2. **Hausprofil-CSVs** (`total_profile_csv` / `pv_profile_csv` / `profile_csv`) — Planung / Ist-vs.-Modell (siehe [Verbrauchs-CSV](verbrauchs-csv.md))
+3. **`path_consumption` / `path_production`** — entfernt (Datenmodell v3); früher Roh-Loxone-Paar-CSVs, nur für Zeitraumgrenzen
 
-1. **`path_cons_data`** — runtime fuel for live and Scenario Explorer
-2. **House-profile CSVs** (`total_profile_csv` / `pv_profile_csv` / `profile_csv`) — planning / actual-vs-model (see [Historical Power Profile CSV](verbrauchs-csv.md))
-3. **`path_consumption` / `path_production`** — removed (data model v3); formerly raw Loxone-pair CSVs, only for time-range bounds
+Details zu Preisen: [Preise & aWATTar](preise.md).
 
-Details on prices: [Prices & aWATTar](preise.md).
+## Szenarienkonfigurator (Live-Szenario)
 
+Im Abschnitt **Konfiguration** pflegt der **Szenarienkonfigurator** das Live-Szenario und weitere Varianten. Szenarien werden aus einer **Liste** gewählt; ↑/↓ daneben ändern die **Reihenfolge** der Nicht-Live-Szenarien (Live bleibt oben) für die Anzeige im Szenario-Explorer. Entitäten (Hausprofil, Batterie, PV, Tarife) wählen Sie per Dropdown (`battery_id`, PV, Tarife, Hausprofil). Pro Szenario steuert **aktiv für Szenario-Explorer** (`enabled`, Default true), ob die Variante in die SE-Rechnung eingeht. **Eigene Referenz ohne Optimierung** (`own_reference`) steuert, ob für das Szenario eine separate nicht-optimierte Referenz gerechnet wird; fehlt der Schalter, gilt Earnies Heuristik (eigene Referenz bei abweichendem Tarif/`pv_kwp`, Batterie-Varianten teilen die Live-Referenz). Vor den Tarif-Dropdowns gibt es einen gemeinsamen **Länder**-Filter (`land`: AT/DE/CH, **immer gesetzt**, kein „alle“; Vorgabe aus dem Standort des Hausprofils) für Bezug und Einspeise sowie getrennte **Typ**-Filter. Beim Einspeise-**Typ** erscheint `monthly_table` als **Monatspreis**. Ein Regionsfilter fehlt noch. Nach Tarifwahl erscheinen die Katalogparameter read-only (inkl. `supplier_id` und ungefährer Monatsgebühr). Zusätzlich: **Eigener Festpreis** (`__user_fixed__` mit `user_import_cent_kwh` / `user_export_cent_kwh` am Szenario — siehe [Preise](preise.md)). IDs landen im jeweiligen Szenario in `backtesting_scenarios.json`. Der **Name** des Live-Szenarios (`live_scenario_id` in `config.json`, Default-ID: `live`) ist fest und lässt sich nicht umbenennen oder entfernen.
 
-## Scenario Configurator (Live Scenario)
+## Weiterlesen
 
-In the **Configuration** section, the **Scenario Configurator** maintains the live scenario and additional variants. Scenarios are chosen from a **list**; ↑/↓ next to it change the **order** of the non-live scenarios (live stays on top) for the display in Scenario Explorer. Entities (house profile, battery, PV, tariffs) are chosen via dropdown (`battery_id`, PV, tariffs, house profile). Per scenario, **active for Scenario Explorer** (`enabled`, default true) controls whether the variant is included in the SE calculation. **Own reference without optimization** (`own_reference`) controls whether a separate non-optimized reference is calculated for the scenario; if not set, Earnie's heuristic applies (own reference for a differing tariff/`pv_kwp`, battery variants share the live reference). Before the tariff dropdowns there is a shared **country** filter (`land`: AT/DE/CH, **always set**, no "all"; preset from the house profile's location) for import and feed-in, plus separate **type** filters. For the feed-in **type**, `monthly_table` appears as **monthly price**. A region filter is not yet available. After choosing a tariff, the catalog parameters appear read-only (including `supplier_id` and the approximate monthly fee). IDs are saved in the respective scenario in `backtesting_scenarios.json`. The live scenario's **name** (`live_scenario_id` in `config.json`, default ID: `live`) is fixed and cannot be renamed or removed.
-
-## Further Reading
-
-- [Save / Load](speichern-laden.md)
-- [PV & Battery](batterie-pv.md)
-- [Flexible Consumers](flexible-verbraucher.md)
-- [Historical Power Profile CSV](verbrauchs-csv.md)
-- [Prices & aWATTar](preise.md)
-- [Loxone Signals](../referenz/loxone-signals.md)
+- [Speichern / Laden](speichern-laden.md)
+- [PV & Batterie](batterie-pv.md)
+- [Flexible Verbraucher](flexible-verbraucher.md)
+- [Verbrauchs-CSV](verbrauchs-csv.md)
+- [Preise & aWATTar](preise.md)
+- [Loxone-Signale](../referenz/loxone-signals.md)

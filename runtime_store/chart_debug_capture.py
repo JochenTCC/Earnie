@@ -28,8 +28,9 @@ def _read_json_file(path: str) -> dict[str, Any] | None:
 
     if not os.path.isfile(path):
         return None
-    with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
+    from settings.json_io import read_json_dict
+
+    return read_json_dict(path)
 
 
 def _dataframe_records(df) -> list[dict[str, Any]]:

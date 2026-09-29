@@ -199,3 +199,60 @@ def test_bootstrap_creates_local_settings(tmp_path, monkeypatch):
     local_path = tmp_path / "runtime" / "local_settings.json"
     assert local_path.is_file()
     assert json.loads(local_path.read_text(encoding="utf-8"))["silent_mode"] is False
+
+
+def test_write_silent_mode_preserves_other_keys(tmp_path):
+    from settings.system_settings import write_silent_mode_to_local_settings
+
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(
+        json.dumps(
+            {
+                "silent_mode": True,
+                "chart_debug_capture_enabled": True,
+                "shadow_feed_enabled": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    write_silent_mode_to_local_settings(str(local_path), False)
+    data = json.loads(local_path.read_text(encoding="utf-8"))
+    assert data["silent_mode"] is False
+    assert data["chart_debug_capture_enabled"] is True
+    assert data["shadow_feed_enabled"] is True
+    assert "loxone_silent_mode" not in data
+    assert "earnie_data_model" not in data
+
+
+def test_write_silent_mode_replaces_legacy_key(tmp_path, monkeypatch):
+    from settings.system_settings import write_silent_mode_to_local_settings
+
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(
+        json.dumps({"loxone_silent_mode": True, "chart_debug_capture_enabled": False}),
+        encoding="utf-8",
+    )
+    write_silent_mode_to_local_settings(str(local_path), False)
+    data = json.loads(local_path.read_text(encoding="utf-8"))
+    assert data == {
+        "chart_debug_capture_enabled": False,
+        "silent_mode": False,
+    }
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_silent_mode() is False
+
+
+def test_write_silent_mode_creates_file_when_missing(tmp_path):
+    from settings.system_settings import write_silent_mode_to_local_settings
+
+    local_path = tmp_path / "runtime" / "local_settings.json"
+    write_silent_mode_to_local_settings(str(local_path), True)
+    assert local_path.is_file()
+    assert json.loads(local_path.read_text(encoding="utf-8")) == {"silent_mode": True}

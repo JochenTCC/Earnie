@@ -91,8 +91,8 @@ git push origin vX.Y.Z-alpha.N
 
 - Tag must match `version.py` exactly (`v2.0.0` ↔ `__version__ = "2.0.0"`; `v2.2.0-alpha.1` ↔ `2.2.0-alpha.1`); mismatch fails the workflow.
 - Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body).
-- Official: GitHub Latest Release; images `:<version>` and `:latest` (+ legacy aliases).
-- Pre-release (`-` in version): GitHub Pre-release (not Latest); images `:<version>` only (no `:latest`).
+- Official (after `promote`): GitHub Latest Release; images `:<version>`, `:next`, and `:latest` (+ legacy aliases).
+- Pre-release (after `promote`): GitHub Pre-release (not Latest); images `:<version>` and `:next` (no `:latest`).
 - **Candidate → approve → publish:** a tag push builds a *candidate* only — `:<version>` images (app + HA add-on), GitHub Release as **draft**. Pre-gate checks: `addon_smoke` (`scripts/ha_addon_smoke.py` starts `earnie-addon-{arch}:<version>` like the Supervisor; amd64 blocking, aarch64 under QEMU soft), `addon_lint` (pin bump + addon-linter, no commit), `qemu_smoke` (soft). Job `promote` then **waits for manual approval** (environment `release-approval`, required reviewer): Actions run → *Review deployments* → **Approve** sets `:next` (official also `:latest`), publishes the release and lets `publish_ha_addon` pin the add-on; **Reject** drops the candidate — nothing user-visible happened (next attempt = next version, no tag rewrite).
   - Before approving, test the candidate yourself: HA → local add-on on the `:<version>` image (`packaging/homeassistant-addon/README.md`, *Test a release candidate*); LoxBerry / Docker → pin `EARNIE_PINNED_VERSION` / image tag to `<version>`.
   - One-time setup: repo Settings → Environments → `release-approval` → *Required reviewers* = you. The `release` job fails early if the environment or its reviewer rule is missing (an unprotected environment would publish without waiting).

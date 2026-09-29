@@ -9,9 +9,8 @@ Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `u
 | Kopf | Seitentitel, **?** mit Modus-Scope (Sunset-2-Sunset / Szenario-Explorer) |
 | Sidebar | Env-/Setup-Hinweise, Fortschritt Ersteinrichtung, **Konfiguration speichern / laden** (ZIP); unten **Info / About** (Banner / Version / Kontakt) — **keine** PV-/Batterie-Parameter (diese auf **Szenarienkonfigurator** / Hauskonfigurator) |
 | Menü | `st.navigation`: Abschnitte Live-Cockpit, Konfiguration, Daemon Control |
-| Charts | Chart 1 → Navigation ←/→ → Chart 2 |
-| Darunter | Simulations-Tabelle, Energievergleich (Expander) |
-| Sankey | Live-Energiefluss (aktives Smarthome-Backend) |
+| Charts | Chart 1 → Navigation ←/→ → Sankey → Chart 2 → Simulations-Tabelle → Energievergleich (Expander) |
+| Sankey | Live-Energiefluss unter Chart 1 (nach Navigation): Plant über EHAL-Backend; Flex/EV-SoC siehe unten |
 | Footer | Trennlinie → **Datenbasis** (Expander, Log-Pfad) → Optimierungs-Takt / Countdown |
 
 Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdown + **?**); im Footer zusätzlich **?** beim nächsten main.py-Takt.
@@ -110,14 +109,14 @@ Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Re
 
 **Rauf/Runter-Balken (Szenarien A–H):** Launch **Streamlit app.py (Flow-Balance-Test)** (`scripts/seed_flow_balance_test_log.py`) oder HTML-Vorschau: `python -m scripts.export_flow_balance_chart_html --open` → `runtime/flow_balance_preview.html`.
 
-## Navigation zwischen Chart 1 und Chart 2
+## Navigation nach Chart 1
 
 | Steuerung | Verhalten |
 |-----------|-----------|
 | ← Zurück | Weitere SA-Zyklen zurück im Produktiv-Log |
 | Vor → | Desktop: einen Zyklus Richtung Live (bei Live deaktiviert). Mobil: SA₀→SA₁ ↔ SA₁→SA₂ bzw. Zyklus Richtung Live |
 
-Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich). Desktop zeigt standardmäßig SA₀→SA₂; Mobil behält die 24h-Segmente.
+Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich), **zwischen Chart 1 und Sankey** (Chart 2 folgt darunter). Desktop zeigt standardmäßig SA₀→SA₂; Mobil behält die 24h-Segmente.
 
 ## Chart 2: Kumulierte Kosten & Verbrauch
 
@@ -144,7 +143,17 @@ Tabelle je flexiblem Verbraucher über Horizont SA_0-->SA_2:
 
 ## Energiefluss (Live-Sankey)
 
-Sankey aus **aktuellen Live-Leistungswerten** des konfigurierten Smarthome-Backends (Loxone, Home Assistant oder OpenEMS); Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Beim Laden eines E-Autos zeigt der Flex-Knoten den aktuellen SoC in der Knotenbeschriftung.
+<a id="energiefluss-live-sankey"></a>
+
+Aktualisierung ca. alle 10 Sekunden (`STATUS`-Fragment). Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex), sofern ein Lauf vorliegt.
+
+| Teil | Quelle im Code | Backends heute |
+|------|----------------|----------------|
+| PV / Netz / Batterie / Hausleistung | `ehal_live.read_live_power_kw()` → aktiver Adapter | **Loxone, Home Assistant, OpenEMS** |
+| Flex-Leistungen (Verbraucherknoten, Grundlast-Aufteilung) | `live_consumption.fetch_live_flex_kw_for_ui` → `loxone_client.resolve_flexible_consumers_live_power` | **nur Loxone** (bei HA/OpenEMS keine Live-Flex-Aufschlüsselung über Merker) |
+| EV-SoC in der Knotenbeschriftung beim Laden | `fetch_loxone_actual_soc_percent` | **nur Loxone** |
+
+Beim Laden eines E-Autos zeigt der Flex-Knoten den aktuellen SoC in der Beschriftung — nur wenn der Loxone-Pfad den SoC liefert.
 
 ## Footer
 

@@ -733,6 +733,45 @@ def test_consumer_expander_title_uses_live_type_from_session():
     assert title.startswith("Verbraucher 2 (E-Auto): Garage — ")
 
 
+def test_live_consumer_for_annual_injects_thermal_rc_geo_from_profile():
+    """Form sync drops thermal_rc lat/lon; expander preview must re-inject Standort."""
+    class _Session(dict):
+        pass
+
+    session = _Session(
+        {
+            "home__house_profile_latitude": 47.404,
+            "home__house_profile_longitude": 9.743,
+            "home__house_profile_land": "AT",
+        }
+    )
+    consumer = {
+        "label": "Pool / SwimSpa",
+        "type": "thermal_rc",
+        "nominal_power_kw": 2.8,
+        "thermal_rc": {
+            "water_volume_liters": 5900.0,
+            "setpoint_c": 36.5,
+            "tolerance_c": 1.0,
+            "heat_loss_kw_per_k": 0.07,
+            "heating_efficiency": 0.99,
+        },
+    }
+    import ui.house_config_profile_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        preview = form._live_consumer_for_annual(consumer, 2, session_scope="home")
+    finally:
+        form.st.session_state = original
+
+    rc = preview["thermal_rc"]
+    assert rc["latitude"] == pytest.approx(47.404)
+    assert rc["longitude"] == pytest.approx(9.743)
+    assert rc["timezone_name"] == "Europe/Vienna"
+
+
 def test_seed_ev_defaults_on_type_switch_overwrites_generic_power():
     class _Session(dict):
         pass

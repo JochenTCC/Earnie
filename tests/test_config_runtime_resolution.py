@@ -8,6 +8,7 @@ import pytest
 
 from config import Config
 from house_config.scenario_resolution import DEFAULT_LIVE_SCENARIO_ID
+from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
 
 def _write_live_scenarios(config_dir, *, settings: dict | None = None) -> None:
@@ -173,6 +174,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
 
 
 def test_config_loads_id_only_live_scenario(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -202,6 +204,7 @@ def test_config_loads_id_only_live_scenario(tmp_path, monkeypatch):
 
 
 def test_battery_wear_requires_entity_config_when_battery_id_set(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -223,6 +226,7 @@ def test_battery_wear_requires_entity_config_when_battery_id_set(tmp_path, monke
 
 
 def test_backtesting_feed_in_settings_uses_resolved_baseline(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -244,6 +248,7 @@ def test_backtesting_feed_in_settings_uses_resolved_baseline(tmp_path, monkeypat
 
 
 def test_live_scenario_in_backtesting_scenarios(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -267,6 +272,7 @@ def test_live_scenario_in_backtesting_scenarios(tmp_path, monkeypatch):
 
 
 def test_config_rejects_legacy_runtime_settings_block(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -310,6 +316,7 @@ def test_config_defers_runtime_params_during_incomplete_greenfield(tmp_path, mon
 
 
 def test_config_loads_full_params_after_planning_complete(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -330,6 +337,7 @@ def test_config_loads_full_params_after_planning_complete(tmp_path, monkeypatch)
 
 
 def test_config_loads_zero_pv_without_pv_system(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -363,6 +371,7 @@ def test_config_loads_zero_pv_without_pv_system(tmp_path, monkeypatch):
 
 
 def test_backtesting_scenario_without_battery_resolves_zero_flat(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -415,6 +424,7 @@ def test_backtesting_scenario_without_battery_resolves_zero_flat(tmp_path, monke
 
 
 def test_update_live_scenario_settings_accepts_id_refs_only(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -448,6 +458,7 @@ def test_update_live_scenario_settings_accepts_id_refs_only(tmp_path, monkeypatc
 
 
 def test_update_live_scenario_settings_rejects_geo_fields(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -470,6 +481,7 @@ def test_update_live_scenario_settings_rejects_geo_fields(tmp_path, monkeypatch)
 
 
 def test_update_live_scenario_settings_rejects_flat_pv_fields(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -492,6 +504,7 @@ def test_update_live_scenario_settings_rejects_flat_pv_fields(tmp_path, monkeypa
 
 
 def test_set_live_scenario_id_persists_and_reloads(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -531,6 +544,7 @@ def test_set_live_scenario_id_persists_and_reloads(tmp_path, monkeypatch):
 
 
 def test_set_live_scenario_id_rejects_unknown(tmp_path, monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)

@@ -172,6 +172,25 @@ def test_write_debug_dump_zip_uses_volume_runtime_when_earnie_env_empty(
         assert "runtime/optimizer_run_state.json" in names
 
 
+def test_write_debug_dump_zip_accepts_utf8_bom_config(tmp_path, monkeypatch):
+    """Windows editors may save config.json with UTF-8 BOM; dump must still work."""
+    with _dump_config(tmp_path, monkeypatch):
+        config_path = Path(os.environ["EARNIE_CONFIG_PATH"])
+        config_path.write_bytes(b"\xef\xbb\xbf" + config_path.read_bytes())
+        _write_history(
+            tmp_path,
+            '{"written_at":"2026-07-16T08:00:00","soc_percent":50}\n',
+        )
+        zip_path = write_debug_dump_zip(
+            title="bom",
+            symptom="utf-8-sig",
+            captured_at=datetime(2026, 7, 16, 8, 0, 0),
+        )
+    assert zip_path.endswith("debug_dump_20260716_080000.zip")
+    with zipfile.ZipFile(zip_path) as archive:
+        assert "runtime/optimization_history.jsonl" in archive.namelist()
+
+
 def test_write_debug_dump_zip_without_chart(tmp_path, monkeypatch):
     with _dump_config(tmp_path, monkeypatch):
         _write_history(

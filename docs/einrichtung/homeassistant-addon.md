@@ -123,7 +123,7 @@ Unterschied zum LoxBerry-Plugin: dort wählst du den Kanal in der Plugin-UI (`:l
 
 ## Einschränkungen (Feature-Stufe 0.2)
 
-Die Add-on-`version:` folgt der Earnie-App (z. B. `2.6.0-alpha.1`). „0.2“ meint hier den ausgelieferten Options-/Ingress-Umfang, nicht die SemVer-Nummer.
+Die Add-on-`version:` folgt der Earnie-App (z. B. `2.6.0-alpha.10`). „0.2“ meint hier den ausgelieferten Options-/Ingress-Umfang, nicht die SemVer-Nummer.
 
 - Add-on-Optionen decken nur die gängigsten Werte ab; volle Haus-/Entity-Konfiguration bleibt in-App bzw. dateibasiert.
 - Kein MQTT Discovery, keine nativen HA-Entitäten, keine Energy-Dashboard-Integration (Add-on **1.0** → Earnie-Backlog **Version 2.+1**, nicht Teil von 2.6).

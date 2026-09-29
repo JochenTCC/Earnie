@@ -101,6 +101,27 @@ def test_enrich_slots_import_prices_matches_matrix():
     assert [slot["k_act"] for slot in resolved_slots] == pytest.approx(expected)
 
 
+def test_se_chart_strompreis_includes_netznutzung():
+    """SE Chart 1 Preis is k_act; k_act already includes house-profile NNE AP."""
+    from optimizer.sim_chart_rows import _chart_price_fields
+
+    resolved = {
+        **_resolved_awattar(),
+        "netzentgelt_cent_kwh": 5.0,
+    }
+    slots = [datetime(2025, 6, 10, 12, 0)]
+    epex = [10.0]
+    with_nne = import_brutto_cent_for_slots(
+        epex, slots, **pricing_kwargs_from_resolved(resolved)
+    )[0]
+    without_nne = import_brutto_cent_for_slots(
+        epex, slots, **pricing_kwargs_from_resolved(_resolved_awattar())
+    )[0]
+    fields = _chart_price_fields({"k_act": with_nne, "price_source": "day_ahead"})
+    assert fields["Strompreis (Cent/kWh)"] == pytest.approx(with_nne)
+    assert with_nne > without_nne
+
+
 def test_monday_of_week_snaps_to_monday():
     wednesday = pd.Timestamp("2025-07-09")
     monday = _monday_of_week(wednesday)

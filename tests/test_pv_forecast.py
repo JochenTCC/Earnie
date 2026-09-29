@@ -65,6 +65,30 @@ def _429_response(*, header: str | None = None, body: dict | None = None) -> Mag
 @patch("data.pv_forecast.config.get_global_timeout", return_value=10)
 @patch("data.pv_forecast.config.get", side_effect=_config_get_side_effect)
 @patch("data.pv_forecast.requests.get")
+def test_429_aware_retry_at_does_not_crash_on_naive_now(
+    get_mock, _config_mock, _timeout_mock
+):
+    """forecast.solar often returns offset-aware Retry-At; now() is naive."""
+    from datetime import timezone
+
+    retry_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    get_mock.return_value = _429_response(header=retry_at.isoformat())
+
+    pf.get_hourly_pv_forecast_for_hours(_target_hours())
+    # Second call hits _pre_fetch_cached_or_none(now_naive < retry_aware_normalized)
+    get_mock.reset_mock()
+    pf.get_hourly_pv_forecast_for_hours(_target_hours())
+
+    assert get_mock.call_count == 0
+    assert pf.get_api_status()["source"] == "rate_limited"
+    stored = pf._RATE_LIMIT_RETRY_AT
+    assert stored is not None
+    assert stored.tzinfo is None
+
+
+@patch("data.pv_forecast.config.get_global_timeout", return_value=10)
+@patch("data.pv_forecast.config.get", side_effect=_config_get_side_effect)
+@patch("data.pv_forecast.requests.get")
 def test_429_header_sets_retry_at_and_blocks_second_http(
     get_mock, _config_mock, _timeout_mock
 ):
@@ -212,4 +236,6 @@ def test_parse_retry_at_prefers_header():
 
     parsed = pf._parse_retry_at(response)
 
-    assert parsed == datetime.fromisoformat("2026-07-15T14:00:00+02:00")
+    aware = datetime.fromisoformat("2026-07-15T14:00:00+02:00")
+    assert parsed == pf._as_naive_local(aware)
+    assert parsed.tzinfo is None

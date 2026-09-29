@@ -1,7 +1,6 @@
 """Gemeinsame Repro-Inputs fuer Debug-Dumps und Prod-Archive."""
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import zipfile
@@ -112,8 +111,9 @@ def _resolve_optional_input_paths() -> dict[str, str]:
 def _read_json_dict(path: str) -> dict:
     if not os.path.isfile(path):
         return {}
-    with open(path, encoding="utf-8") as handle:
-        data = json.load(handle)
+    from settings.json_io import read_json_dict
+
+    data = read_json_dict(path)
     return data if isinstance(data, dict) else {}
 
 
