@@ -141,37 +141,60 @@ def _energy_charts_http(
     timeout: int,
 ) -> pd.DataFrame:
     feed_key = "ext:prices:energy_charts"
-    try:
-        response = requests.get(
-            ENERGY_CHARTS_PRICE_URL,
-            params={
-                'bzn': bzn,
-                'start': start.strftime('%Y-%m-%d'),
-                'end': end.strftime('%Y-%m-%d'),
-            },
-            headers=_ENERGY_CHARTS_HEADERS,
-            timeout=timeout,
-        )
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        from runtime_store.shadow.replay import replay_ext_payload
+
+        payload = replay_ext_payload(feed_key)
+        if not isinstance(payload, dict):
+            try:
+                response = requests.get(
+                    ENERGY_CHARTS_PRICE_URL,
+                    params={
+                        'bzn': bzn,
+                        'start': start.strftime('%Y-%m-%d'),
+                        'end': end.strftime('%Y-%m-%d'),
+                    },
+                    headers=_ENERGY_CHARTS_HEADERS,
+                    timeout=timeout,
+                )
+                payload = response.json()
+                response.raise_for_status()
+            except Exception:
+                raise
+    else:
         try:
-            payload = response.json()
-        except ValueError:
-            payload = response.text
-        if response.status_code >= 400:
-            _prices_shadow_record(
-                feed_key,
-                ok=False,
-                status=int(response.status_code),
-                payload=payload,
-                error=f"HTTP {response.status_code}",
+            response = requests.get(
+                ENERGY_CHARTS_PRICE_URL,
+                params={
+                    'bzn': bzn,
+                    'start': start.strftime('%Y-%m-%d'),
+                    'end': end.strftime('%Y-%m-%d'),
+                },
+                headers=_ENERGY_CHARTS_HEADERS,
+                timeout=timeout,
             )
-            response.raise_for_status()
-        _prices_shadow_record(
-            feed_key, ok=True, payload=payload, status=int(response.status_code)
-        )
-    except Exception as exc:
-        if not isinstance(exc, requests.HTTPError):
-            _prices_shadow_record(feed_key, ok=False, error=str(exc))
-        raise
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = response.text
+            if response.status_code >= 400:
+                _prices_shadow_record(
+                    feed_key,
+                    ok=False,
+                    status=int(response.status_code),
+                    payload=payload,
+                    error=f"HTTP {response.status_code}",
+                )
+                response.raise_for_status()
+            _prices_shadow_record(
+                feed_key, ok=True, payload=payload, status=int(response.status_code)
+            )
+        except Exception as exc:
+            if not isinstance(exc, requests.HTTPError):
+                _prices_shadow_record(feed_key, ok=False, error=str(exc))
+            raise
 
     if not isinstance(payload, dict) or 'unix_seconds' not in payload or not payload['unix_seconds']:
         raise ValueError("Energy-Charts-API lieferte keine Preisdaten für den angefragten Zeitraum.")

@@ -39,6 +39,18 @@ from ui.sankey_produktiv import has_produktiv_run
 
 def status_strip_banner(silent: bool, daemon_running: bool) -> tuple[str, str]:
     """Return (streamlit_level, message) for Silent/Loud × daemon state."""
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        if daemon_running:
+            return (
+                "info",
+                "Shadow-Modus - Optimierer läuft (Feed), keine Backend-Schreibzugriffe",
+            )
+        return (
+            "warning",
+            "Shadow-Modus - Optimierer-Dienst läuft nicht",
+        )
     if silent and daemon_running:
         return (
             "warning",
@@ -388,6 +400,8 @@ def render_status_strip(main_state: dict | None) -> None:
     level, message = status_strip_banner(silent, daemon_running)
     if level == "success":
         st.success(message)
+    elif level == "info":
+        st.info(message)
     else:
         st.warning(message)
 

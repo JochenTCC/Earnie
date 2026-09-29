@@ -175,6 +175,9 @@ def fetch_loxapp3_json(
     timeout_sec: float = 15.0,
 ) -> dict[str, Any]:
     """GET http://{host}/data/LoxAPP3.json with HTTP Basic Auth."""
+    from runtime_store.shadow.replay import assert_not_shadow_backend
+
+    assert_not_shadow_backend("loxone_structure.fetch_loxapp3")
     ip = str(host or "").strip().removeprefix("http://").removeprefix("https://")
     ip = ip.split("/")[0]
     if not ip:

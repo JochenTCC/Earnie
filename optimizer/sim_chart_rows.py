@@ -76,6 +76,8 @@ def _finalize_chart_rows_for_display(
     )
     apply_appliance_schedules_to_chart_rows(chart_rows)
     apply_known_generic_to_chart_rows(chart_rows)
+    for chart_row in chart_rows:
+        sync_chart_row_netzbezug(chart_row)
 
 
 def _format_chart_uhrzeit(row: dict) -> str:
@@ -122,7 +124,12 @@ def _chart_row_from_controls(
         battery_params["max_soc"],
         dt_h=DEFAULT_DT_H,
     )
-    p_grid = con + total_flex_power - pv + round(batt_action, 2)
+    from optimizer.export_power_limit import clip_grid_kw_to_export_cap
+
+    p_grid = clip_grid_kw_to_export_cap(
+        con + total_flex_power - pv + round(batt_action, 2),
+        k_push_act=row.get("k_push_act"),
+    )
     chart_row = {
         "Uhrzeit": _format_chart_uhrzeit(row),
         **_chart_row_slot_field(row),
@@ -237,9 +244,14 @@ def finalize_chart_row_energy(
         battery_params["max_soc"],
         dt_h=DEFAULT_DT_H,
     )
+    from optimizer.export_power_limit import clip_grid_kw_to_export_cap
+
     chart_row[COL_BATTERIE_AKTION] = round(batt_action, 2)
     chart_row[COL_NETZBEZUG] = round(
-        con + total_flex - pv + chart_row[COL_BATTERIE_AKTION],
+        clip_grid_kw_to_export_cap(
+            con + total_flex - pv + chart_row[COL_BATTERIE_AKTION],
+            k_push_act=chart_row.get(COL_EINSPEISEVERGUETUNG),
+        ),
         2,
     )
     return new_soc
@@ -247,8 +259,16 @@ def finalize_chart_row_energy(
 
 def sync_chart_row_netzbezug(chart_row: dict) -> None:
     """Netzbezug aus PV, Last, Flex und Batterie ableiten (Chart-Energiebilanz)."""
+    from optimizer.export_power_limit import clip_grid_kw_to_export_cap
+
     pv = float(chart_row.get(COL_PV_PROGNOSE, 0.0) or 0.0)
     con = float(chart_row.get(COL_VERBRAUCH_PROGNOSE, 0.0) or 0.0)
     batt = float(chart_row.get(COL_BATTERIE_AKTION, 0.0) or 0.0)
     flex_sum = flexible_consumer_power_kw(chart_row)
-    chart_row[COL_NETZBEZUG] = round(con + flex_sum - pv + batt, 2)
+    chart_row[COL_NETZBEZUG] = round(
+        clip_grid_kw_to_export_cap(
+            con + flex_sum - pv + batt,
+            k_push_act=chart_row.get(COL_EINSPEISEVERGUETUNG),
+        ),
+        2,
+    )

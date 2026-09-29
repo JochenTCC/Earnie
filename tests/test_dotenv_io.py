@@ -272,3 +272,27 @@ def test_import_loxone_dotenv_from_copies_credentials(tmp_path, monkeypatch):
     assert written.replace("\\", "/") == "earnie_env/config/.env"
     ip, user, password = dotenv_io.read_loxone_dotenv_file(str(canonical))
     assert (ip, user, password) == ("10.0.0.2", "new", "newpass")
+
+
+def test_dotenv_values_safe_swallows_permission_error(monkeypatch):
+    import dotenv
+
+    def _raising(path, **_kwargs):
+        raise PermissionError(13, "Permission denied", path)
+
+    monkeypatch.setattr(dotenv, "dotenv_values", _raising)
+    assert dotenv_io._dotenv_values_safe(r"\\nas\share\.env") == {}
+    assert dotenv_io.read_loxone_dotenv_file(r"\\nas\share\.env") == ("", "", "")
+    assert dotenv_io.read_ha_dotenv_file(r"\\nas\share\.env") == ("", "")
+
+
+def test_loxone_dotenv_conflict_skips_unreadable_canonical(monkeypatch, tmp_path):
+    env_root = tmp_path / "earnie_env" / "config"
+    env_root.mkdir(parents=True)
+    (env_root / ".env").write_text(
+        'LOXONE_USER="a"\nLOXONE_PASS="b"\nLOXONE_IP=10.0.0.1\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EARNIE_ENV_PATH", str(tmp_path / "earnie_env"))
+    monkeypatch.setattr(dotenv_io, "_dotenv_values_safe", lambda _p: {})
+    assert dotenv_io.loxone_dotenv_conflict() is None

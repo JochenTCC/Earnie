@@ -75,6 +75,35 @@ In `runtime/local_settings.json` (nicht in der gemeinsamen `config.json`):
 - Feed-Pfad: `{Config-Verzeichnis}/shadow_feed/` (`meta.json`, `latest.json`, `feed-YYYY-MM-DD.jsonl`). Überschreiben: Umgebungsvariable `EARNIE_SHADOW_FEED_PATH`.
 - Nur auf der Produktivinstanz aktivieren. Mit `EARNIE_SHADOW=1` wird der Recorder ignoriert.
 
+### Shadow-Modus (Dev-Client)
+
+Eine Entwicklungsinstanz kann parallel zur Produktivinstanz laufen und Eingänge aus dem Shadow-Feed lesen — ohne Backend-Schreibzugriffe und ohne Änderungen an der gemeinsamen Konfiguration. Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md).
+
+Voraussetzungen:
+
+1. Prod mit `shadow_feed_enabled: true` (siehe oben).
+2. Eigenes Runtime-Verzeichnis (`EARNIE_RUNTIME_PATH` oder `EARNIE_ENV_PATH` — Pflicht).
+3. Gemeinsames Config-Verzeichnis (z. B. SMB-Share der HA-Add-on-Config) bzw. `EARNIE_SHADOW_FEED_PATH`.
+
+Beispiel (PowerShell):
+
+```powershell
+$env:EARNIE_SHADOW='1'
+$env:EARNIE_CONFIG_PATH='\\HOMEASSISTANT\addon_configs\<prod-slug>'
+$env:EARNIE_RUNTIME_PATH='C:\earnie-shadow\runtime'
+$env:EARNIE_UI_STREAMLIT_PORT='8532'   # bei gleicher Host-Maschine wie Prod
+$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
+.venv\Scripts\python.exe main.py
+```
+
+Optional: Runtime aus Prod vorbelegen (gelernten Zustand kopieren, ohne Logs/Locks/`local_settings.json`):
+
+```powershell
+.venv\Scripts\python.exe -m scripts.shadow_seed_runtime --from <prod-runtime> --to <shadow-runtime>
+```
+
+Die Streamlit-UI zeigt ein dauerhaftes Shadow-Banner; unter EHAL-Com erscheint die Tabelle der blockierten Schreibvorgänge (`shadow_writes.jsonl`).
+
 ### Log- und Historiendateien
 
 Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-06):
@@ -98,6 +127,8 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; ältere Ordner: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
 | `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; ältere Ordner: `runtime`). |
 | `EARNIE_SHADOW_FEED_PATH`               | Optional: Verzeichnis für den Prod-Shadow-Feed (sonst `{Config}/shadow_feed/`). Siehe [Shadow-Feed](#shadow-feed-prod-recorder-optional). |
+| `EARNIE_SHADOW`                         | `1` = Shadow-Modus (Dev-Client): Eingänge aus Feed, keine Backend-/Config-Schreibzugriffe. Siehe [Shadow-Modus](#shadow-modus-dev-client). |
+| `EARNIE_SHADOW_MAX_AGE_SEC`             | Max. Alter eines Feed-Eintrags relativ zur Prod-`cycle_ts` (Fallback: Heartbeat; Standard 120). |
 | `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable: `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Prod-Compose setzt oft `sunset2sunset,live_environment`; Cloud: `scenario_explorer` — siehe [Betriebsmodi](../ui/betriebsmodi.md). |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
 | `EARNIE_EHAL_LOXONE_HTTP_PORT`          | TCP-Port für Daemon-HTTP (`Earnie_Request_Optimize` / `/alive`; überschreibt `system.ehal_loxone_http_port`, Standard **8541**)                                                                                                       |

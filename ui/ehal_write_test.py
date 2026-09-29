@@ -131,7 +131,7 @@ def render_write_test_section() -> None:
 
         if not fields:
             st.caption(
-                "Keine gemappten Probe-Felder. ESS-/EVCS-Bindings auf EHAL-Com setzen."
+                "Keine gemappten Probe-Felder. ESS-/Export-/EVCS-Bindings auf EHAL-Com setzen."
             )
             return
 

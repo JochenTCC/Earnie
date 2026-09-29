@@ -185,6 +185,7 @@ def _add_slot_power_balance_and_soc(
     t: int,
     e_init: float,
     dt_h: float,
+    export_cap_kw: float | None = None,
 ) -> None:
     """Energiebilanz, Exklusivität und SOC-Rekursion für einen Slot."""
     max_power = battery_params["max_power_kw"]
@@ -214,7 +215,12 @@ def _add_slot_power_balance_and_soc(
         == p_con + p_flex + p_grid_sell[t] + p_charge[t]
     )
     prob += p_grid_buy[t] <= big_m_grid * delta_import[t]
-    prob += p_grid_sell[t] <= big_m_grid * (1 - delta_import[t])
+    sell_upper = big_m_grid
+    if export_cap_kw is not None:
+        sell_upper = min(big_m_grid, max(0.0, float(export_cap_kw)))
+    prob += p_grid_sell[t] <= sell_upper * (1 - delta_import[t])
+    if export_cap_kw is not None:
+        prob += p_grid_sell[t] <= max(0.0, float(export_cap_kw))
     prob += p_charge[t] <= max_power * delta_charge[t]
     prob += p_discharge[t] <= max_power * (1 - delta_charge[t])
     _add_control_slot_constraints(
@@ -251,10 +257,14 @@ def _add_power_balance_and_soc_dynamics(
     *,
     horizon: int,
     dt_h: float,
+    export_caps_kw: list[float | None] | None = None,
 ) -> None:
     """Energiebilanz, Netz-/Batterie-Exklusivität und SOC-Rekursion je Slot."""
     e_init = (current_soc / 100.0) * battery_params["battery_capacity_kwh"]
     for t in range(horizon):
+        cap = None
+        if export_caps_kw is not None and t < len(export_caps_kw):
+            cap = export_caps_kw[t]
         _add_slot_power_balance_and_soc(
             prob,
             matrix[t],
@@ -266,6 +276,7 @@ def _add_power_balance_and_soc_dynamics(
             t=t,
             e_init=e_init,
             dt_h=dt_h,
+            export_cap_kw=cap,
         )
 
 
@@ -353,6 +364,7 @@ def _build_milp_model(
     consumer_continue_on: dict[str, bool] | None = None,
     *,
     dt_h: float = DEFAULT_DT_H,
+    export_caps_kw: list[float | None] | None = None,
 ) -> MilpHorizonModel:
     dt_h = validate_dt_h(dt_h)
     prob = pulp.LpProblem("Energy_Cost_Minimization", pulp.LpMinimize)
@@ -379,6 +391,7 @@ def _build_milp_model(
         _normalize_fixed_flex_by_t(fixed_flex_kw_t0_or_by_t),
         horizon=horizon,
         dt_h=dt_h,
+        export_caps_kw=export_caps_kw,
     )
     return MilpHorizonModel(
         prob=prob,

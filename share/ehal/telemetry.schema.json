@@ -89,6 +89,11 @@
       "minimum": 0,
       "maximum": 100,
       "description": "Optional EV ASAP min SoC floor in %; ≤0 or null = inactive."
+    },
+    "get_grid_export_power_limit": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Optional grid-side max export power in W (inbound ceiling)."
     }
   },
   "additionalProperties": false

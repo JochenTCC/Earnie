@@ -1,7 +1,7 @@
 # Specification: Shadow Mode (Dev instance fed by Prod)
 
-**Version:** 0.2  
-**Status:** Draft (2026-09-27) — not implemented; backlog **2.6.o** (S1) → **2.7.f** (S2+S3) → **2.+1** (S4)  
+**Version:** 0.3  
+**Status:** S1 (Prod recorder) implemented; S2+S3 (Shadow client) implemented on `feature/2.7` — backlog **2.6.o** → **2.7.f** → **2.+1** (S4)  
 **Epic short name:** **Shadow**  
 **Related:** Silent mode (`config.is_silent_mode()`), [EHAL](ehal.md), [Release Checklist](release-checklist.md)
 
@@ -128,7 +128,7 @@ When `is_shadow_mode()`:
 
 - Every transport primitive of §5.2 returns the recorded payload for its key instead of calling the network — **same return types and same exceptions** as a real call (`HaHttpError`, `LoxoneAdapterError`, `None` for Loxone reads, …), so the calling code runs unchanged.
 - **Missing key** → behave like "backend unreachable" for that read + log `shadow: no feed value for <key>` (once per key per hour).
-- **Stale value** (`ts` older than `EARNIE_SHADOW_MAX_AGE_SEC`, default 120 s) → treated as missing.
+- **Stale value** (record `ts` older than `latest.json` `cycle_ts` by more than `EARNIE_SHADOW_MAX_AGE_SEC`, default 120 s; fallback ref: `meta.json.heartbeat_ts`) → treated as missing. Sampler heartbeat flushes must not invalidate cycle-fresh IOs.
 - External data (`ext:*`) comes from the feed. Shadow does **not** call forecast.solar (rate limit is per IP and shared with Prod). Prices / outdoor forecast fall back to an own fetch when missing.
 - No other network I/O to the backend is allowed; any backend call outside the replayed primitives raises `ShadowBackendAccessError` (programming error, surfaces in tests).
 
@@ -169,12 +169,14 @@ When `is_shadow_mode()`:
 | Switch | UI / `local_settings.json` | `EARNIE_SHADOW=1` only |
 | Runtime dir | shared default | own, mandatory |
 
+Shadow implies silent, but the live cycle still **invokes** the setpoint write helpers (ESS / flex / export). The central block at the write primitives prevents any backend send and appends `shadow_writes.jsonl`. Plain silent skips that path entirely. Startup safe setpoints remain suppressed in both.
+
 ## 7. Ports and hosts
 
 - **Daemon listener (8541):** not started in Shadow (§6.3) → no conflict.
 - **Streamlit:** `scripts/run_streamlit.py` binds `--server.address 0.0.0.0` with `ui.streamlit_port` from the (shared) config.
   - Shadow on **another host** (e.g. dev PC, Prod on HA): same port is fine — the ports are per host.
-  - Shadow on the **same host** as Prod: `0.0.0.0` covers all IPs of the host, so the same port conflicts even with several IPs. Because Shadow cannot change the shared config, add an env override `EARNIE_STREAMLIT_PORT` (both modes, wins over `ui.streamlit_port`).
+  - Shadow on the **same host** as Prod: `0.0.0.0` covers all IPs of the host, so the same port conflicts even with several IPs. Because Shadow cannot change the shared config, use the existing env override `EARNIE_UI_STREAMLIT_PORT` (both modes, wins over `ui.streamlit_port`).
 - Ingress (HA add-on) is not involved: Shadow is not an add-on in v1.
 
 ## 8. UI
@@ -220,7 +222,7 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 |---|---|---|---|
 | **S1** | Recorder (§5) behind `shadow_feed_enabled`, feed schema 1, tests | **2.6.o** | **yes — must be released first**, otherwise Prod cannot feed Shadow |
 | **S2** | `is_shadow_mode()`, replay (§6.1–6.2), write block (§6.3), config read-only (§6.4), startup checks (§4.2), release guard (§4.4) | **2.7.f** | code may ship on `feature/2.7`; inactive without env var |
-| **S3** | UI (§8), `EARNIE_STREAMLIT_PORT`, seed script (§6.5), user docs (German: `docs/einrichtung/`, DEVELOPER.md) | **2.7.f** | with S2 |
+| **S3** | UI (§8), `EARNIE_UI_STREAMLIT_PORT`, seed script (§6.5), user docs (German: `docs/einrichtung/`, DEVELOPER.md) | **2.7.f** | with S2 |
 | S4 (later) | Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input | **2.+1** | — |
 
 ## 12. Decisions / remaining open
@@ -234,4 +236,4 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 **Still open:**
 
 - **Feed retention default:** 14 days of JSONL — size estimate needed after S1 on the real house.
-- **Clock skew** between Prod host and dev PC: prefer staleness vs `meta.json.heartbeat_ts` (or relative age), not only Shadow wall clock; confirm in S2.
+- **Clock skew / sampler heartbeat:** staleness uses age vs `latest.json.cycle_ts` (fallback: `meta.json.heartbeat_ts`, then Shadow wall clock), gated by `EARNIE_SHADOW_MAX_AGE_SEC` (default 120). Directed age: records newer than the ref (mid-wait sampler updates) stay fresh.

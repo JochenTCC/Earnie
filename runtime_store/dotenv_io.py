@@ -159,11 +159,20 @@ def validate_loxone_credentials(ip: str, user: str, password: str) -> str | None
     return None
 
 
-def read_loxone_dotenv_file(path: str) -> tuple[str, str, str]:
-    """Return ``(ip, user, password)`` from a specific .env file."""
+def _dotenv_values_safe(path: str) -> dict:
+    """Read dotenv key/values; empty dict if missing or unreadable (e.g. SMB ACL)."""
     from dotenv import dotenv_values
 
-    vals = dotenv_values(path)
+    try:
+        vals = dotenv_values(path)
+    except OSError:
+        return {}
+    return vals if isinstance(vals, dict) else {}
+
+
+def read_loxone_dotenv_file(path: str) -> tuple[str, str, str]:
+    """Return ``(ip, user, password)`` from a specific .env file."""
+    vals = _dotenv_values_safe(path)
     return (
         str(vals.get("LOXONE_IP") or "").strip(),
         str(vals.get("LOXONE_USER") or "").strip().strip('"'),
@@ -173,9 +182,7 @@ def read_loxone_dotenv_file(path: str) -> tuple[str, str, str]:
 
 def read_ha_dotenv_file(path: str) -> tuple[str, str]:
     """Return ``(base_url, token)`` from a specific .env file."""
-    from dotenv import dotenv_values
-
-    vals = dotenv_values(path)
+    vals = _dotenv_values_safe(path)
     return (
         str(vals.get("EHAL_HA_BASE_URL") or "").strip().strip('"'),
         str(vals.get("EHAL_HA_TOKEN") or "").strip().strip('"'),
@@ -319,6 +326,15 @@ def _cleanup_tmp_file(tmp_path: str) -> None:
 
 def _atomic_write_dotenv(content: str) -> str:
     """Atomically write full .env content; returns path."""
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        from runtime_store.shadow.errors import ConfigReadOnlyError
+
+        raise ConfigReadOnlyError(
+            "Shadow Mode: .env / Konfiguration schreibgeschützt"
+        )
+
     path = resolve_dotenv_path()
     parent = os.path.dirname(path)
     if parent:
@@ -365,6 +381,14 @@ def upsert_dotenv_keys(updates: dict[str, str]) -> str:
     """Merge KEY=value updates into the active .env; preserve other keys/lines."""
     if not updates:
         return resolve_dotenv_path()
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        from runtime_store.shadow.errors import ConfigReadOnlyError
+
+        raise ConfigReadOnlyError(
+            "Shadow Mode: .env / Konfiguration schreibgeschützt"
+        )
     path = resolve_dotenv_path()
     existing = _read_text_file(path) if os.path.isfile(path) else None
     content = _merge_dotenv_content(existing, updates)

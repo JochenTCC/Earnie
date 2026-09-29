@@ -75,6 +75,8 @@ FIELD_QUANTITY: dict[str, str] = {
     "set_ess_active_power": "power",
     "set_ess_charge_power_limit": "power",
     "set_ess_discharge_power_limit": "power",
+    "get_grid_export_power_limit": "power",
+    "set_grid_export_power_limit": "power",
     "set_evcs_max_current": "current",
     "get_evcs_nominal_current": "current",
 }

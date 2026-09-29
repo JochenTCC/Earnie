@@ -16,9 +16,38 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.9`**.
+**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.7`**. This branch keeps `version.py` at **`2.7.0-dev`** until post-2.6 approval.
 
-**Next:** community/official **2.6** publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**). Shadow Prod recorder (**2.6.o**) and user-fixed tariffs are done.
+**Next:** **2.6.o** recorder is on `main` (Prod feed dogfooding). Finish **2.6.r re-check** / community/official publish on `main` as needed. On this branch: **2.7.f** Shadow client first, then **2.7.a** dogfood … **2.7.e**.
+
+#### 2.6.o — Shadow Mode S1: Prod feed recorder (before 2.6.r finish)
+
+Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) (Epic **Shadow**; S1 only here). Must ship in a **2.6** Prod build so Dev can later feed Shadow during **2.7**. Implemented on `main` (`v2.6.0-alpha.7`); leave open here until archived from `main` backlog.
+
+- [ ] **2.6.o — Shadow Mode S1 (Prod recorder)**
+  - Opt-in `"shadow_feed_enabled": true` (+ optional `"shadow_feed_retention_days"`, default 14) in Prod `local_settings.json`; default off; ignored + warning if `EARNIE_SHADOW=1`
+  - Record raw backend responses at transport primitives (Loxone `fetch_loxone_raw_value` / `_fetch_loxone_io_all`, HA `HaAdapter._get_json`, OpenEMS GET, `ext:pv_forecast` / prices / outdoor, optimize-trigger events) — no secrets/auth in records
+  - Feed layout under `{config_dir}/shadow_feed/` (`meta.json`, atomic `latest.json`, daily JSONL + retention); override `EARNIE_SHADOW_FEED_PATH`
+  - Superset after cycle writes (soft-fail, ≤10 s budget): **HA default = config-referenced entities only** (not full `/api/states`); Loxone IOs / OpenEMS channels from shared bindings
+  - Failure isolation: recorder never breaks Prod (wrap + rate-limited warnings)
+  - Tests: per-primitive ok/error, no secrets, atomic `latest.json`, JSONL rotation/retention, recorder exception does not break `main()`
+  - **Not in this letter:** Shadow replay / write block / UI / seed (**2.7.f**); Soll/Soll diff & offline JSONL replay (S4 → **2.+1**)
+
+#### 2.6.r re-check — final pre-official quality gate (2026-09-26)
+
+Completed steps (coverage, dead-code, KPI, docs, simplify) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (`2.6.r re-check`).
+
+- [ ] **2.6.r re-check** on `main` (Sonar CI unblock + QG remediations; no `version.py` bump)
+  - [ ] SonarCloud snapshot — pre-fix QG **ERROR** (`new_reliability_rating` C, `new_security_rating` C, `new_coverage` 66%); last successful analysis was pre-remediation `@271a6a3`. CI red cause: pytest failed before scan (UNC share-root validation). Fixes on `main` awaiting analysis:
+    - Fixed: CI blocker — accept Windows UNC + POSIX absolute `share_root` / `remote_share_root` on Linux runners (`scripts/remote_backtesting_support.py`); NOSONAR on post-`_safe_join` sinks (S2083 / S6549)
+    - Fixed: `python:S1244` float eq in `integrations/ha_units.py` (new bug)
+    - Fixed: `python:S1764` NaN check in `house_config/known_chart_display.py` (`math.isnan`)
+    - Fixed: SHA-pin Actions in `release-publish.yml` + `qemu-image-smoke.yml`; job-level permissions (S8233)
+    - Fixed: path/URL hardening in `scripts/report_repo_stats.py` (S8707 / S8703)
+    - Fixed: `docker/Dockerfile` explicit COPY (S6470) + tighter `.dockerignore`
+    - Ignore (sonar-project.properties multicriteria): LLM CLI S8707/S8705; pip unlock S8541/S8544 (local `.` package); lockfile S8565; container root S6471; Loxone/lab HTTP S5332
+    - Marked intentional: mock REST HTTP (`house_sim/mock_rest.py`), HA add-on root (comment NOSONAR; inline on `FROM` breaks BuildKit)
+    - Still open / accept: Sonar `new_coverage` 66% (informational — do not chase as in-gate); QG may stay ERROR on coverage alone until gate policy is relaxed in SonarCloud UI
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -33,27 +62,20 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.f** → **2.7.a** → **2.7.b** → **2.7.c** → **2.7.d** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6. **2.7.f** first so Shadow can dogfood the rest of 2.7 against Prod with **2.6.o** feed.
+**Order:** **2.7.f** → **2.7.a** dogfood → **2.7.b** → **2.7.c** → **2.7.d** → **2.7.g** → **2.7.h** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6. **2.7.f** first so Shadow can dogfood the rest of 2.7 against Prod with **2.6.o** feed.
 
 - [ ] **2.7.f — Shadow Mode S2+S3: Dev client** (depends on Prod running **2.6.o** recorder)
   - Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) — `EARNIE_SHADOW=1` only (`runtime_store.shadow.is_shadow_mode()`); implies silent; never a config key
   - **S2:** transport replay (§6.1–6.2), central write block + `shadow_writes.jsonl` (§6.3), config read-only / skip load-time migrations that write (§6.4), startup checks (§4.2), release guard (§4.4); own mandatory runtime dir + optional `scripts.shadow_seed_runtime`
   - Accept Prod’s `earnie_data_model` if in `COMPATIBLE_DATA_MODELS`; never migrate/re-stamp shared config. No Shadow `config_overlay` in v1 (Prod-rejected keys not testable)
-  - **S3:** UI banner + feed health + would-write table; `EARNIE_STREAMLIT_PORT`; German user docs (`docs/einrichtung/`) + `DEVELOPER.md`
+  - **S3:** UI banner + feed health + would-write table; `EARNIE_UI_STREAMLIT_PORT`; German user docs (`docs/einrichtung/`) + `DEVELOPER.md`
   - Tests per spec §10; E2E with HouseSim as Prod backend
   - **Out of scope:** S4 Soll/Soll diff + offline JSONL backtest → **2.+1**; Shadow as 2nd HA add-on (scenario C)
 
-- [ ] **2.7.a — Export power limitation** (Live / MILP / EHAL; HK static cap)
-  - In addition to battery working mode, limit power exported to the grid.
-  - See how this is done in HA / evcc and OpenEMS as “best practice”.
-  - **Hard ceilings (kW):** effective export cap = `min` of all active sources (missing source = no cap from that source):
-    1. **Internal (HK):** user parameter — max export power allowed (constant)
-    2. **External (grid → Earnie):** new EHAL **inbound** field (`sens_*` / `get_*`, not `set_*`) — variable grid-side limit
-    3. MILP must respect the effective cap as a constraint
-  - **Soft / economic (not a kW cap):** when dynamic export tariffs are positive (user pays to export), MILP objective should prefer avoiding export — separate from the hard ceiling above.
-  - Optional outbound EHAL `set_*` only if Earnie must command an inverter/feed-in limit southbound; otherwise Live enforces via ESS/mode + MILP only.
-  - Add VI to Loxone VI template; HA binding templates if appropriate; mapping in Loxone productive config (Jochen).
-  - **Follow-up (not this letter):** SE / grid-situation export restriction sim → **2.+1** item (consumes **2.7.a** model).
+- [ ] **2.7.a dogfood — Loxone productive + live test** (code done → [Erledigt](Backlog-Erledigt.md); after **2.7.f** preferred for Shadow dogfood)
+  - Wire export-limit Merker / VI–VO in the productive Loxone config (`set_grid_export_power_limit`, optional inbound `get_grid_export_power_limit`; Einspeisesperre = limit `0`, `set_ess_mode` stays battery-only)
+  - Bind in EHAL-Com; set a HK `plant.max_export_power_kw` and verify Live writes + MILP respect the cap
+  - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (unconstrained = PV kWp sum + battery max discharge kW)
 
 - [ ] **2.7.b — Thermals P2** — Coupled single-node models
   - House ↔ heat storage ↔ solar system
@@ -66,6 +88,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Isolated battery modes: charging / discharging / standby
   - batt+inverter modes: optimizing / charging / discharging
   - All batteries participate in optimization
+  - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` writes PV kWp sum + max discharge of the single battery (only when `battery_control = full`). With multi-ESS, sum the max discharge power of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / one-way storages from **2.7.d**); update `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md` accordingly
   - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
   - Downstream: Loxone template XML gen and HouseSim scenario import should gain multi-battery support after this letter
 
@@ -77,6 +100,24 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Feasibility confirmed for EcoFlow Delta 3: HA switch `switch.<device>_grid_bypass` (internal key `ban_bypass_en`) maps 1:1 by boolean identity — switch ON = "grid bypass disabled" = battery-only = EHAL `1`; switch OFF = "grid bypass enabled" (charges from AC, loads pass through) = EHAL `0`. Verified against `hassio-ecoflow-cloud` source (`switch.py::BypassBanScalarSwitch`); note the field name itself is confusingly inverted
   - Schema note: existing HA-adapter `sign: ehal|negate` convention (`share/config/ehal.ha.snippet.json`) only covers **signed power fields**; a boolean/enum field needs a separate invert convention for devices whose polarity doesn't happen to line up
   - Bridging path when Earnie stays on `ehal.backend=loxone` (no native HA southbound): Merker `Earnie_Speicher_Quellenwahl`, written by Earnie via `VI_Earnie_Plant.xml`-style poll, mirrored to HA via a Virtual-Output webhook — same pattern as `set_ess_charge_power_limit` in `docs/referenz/loxone-signals.md`
+
+- [ ] **2.7.g — Powerstation reserve for single-use manual devices** (supersedes parts of **2.7.d**; depends on **2.7.c**; shares data model with **2.7.h**)
+  - Idea: give each `earnie_role: manual` consumer (washing machine, dryer, …) a dedicated energy reserve inside the multi-ESS pool ("virtual powerstation"), pre-charged opportunistically in cheap slots and handed off whenever the device is actually switched on — instead of only showing a start-time recommendation (`optimizer/appliance_recommendation.py`, 1–5 star ranking) that the user must act on manually. Only feasible with at least one storage in the system. Worst case (reserve not sufficient) falls back to today's behaviour: grid draw, no regression.
+  - Reuses the EV **SOC-Min-Sofort** pattern (`docs/konfiguration/flexible-verbraucher.md`, `optimizer/charging_urgent.py`) generalized from "reach X % SoC by `ready_by`" to "keep N kWh reserved, no deadline, ASAP-refill in cheap slots after each trigger" — new per-consumer reserve target (kWh) plus a state machine (empty → charging → standby/full → discharging on trigger → empty), not a single global `min_soc`.
+  - Trigger detection: for consumers with `loxone_inputs.power_name` already configured, a threshold crossing on that existing power signal; for purely manual devices without a meter, the existing **Manuelle Geräte** app button stays the trigger.
+  - Energy-per-run learning: use the `loxone_inputs.power_name` history (already read for `power_source: loxone`) to replace the fixed `default_power_kw` × `default_runtime_h` estimate over time; keep the manual value as fallback.
+  - Multi-reserve prioritization (several manual devices charging reserves at once) deferred to **2.+1** — simple equal-share rule for v1 is enough, since the worst case stays grid draw either way; a later learned/heuristic priority is a pure refinement, not a blocker.
+  - **Converges with 2.7.d:** a real one-way storage (e.g. EcoFlow Delta 3) *is* a physical instance of this same reserve pattern — chargeable on command, handed off automatically to its one dedicated attached consumer without ever needing an explicit discharge command. That covers 2.7.d's core requirement ("MILP must never plan a forced/automatic discharge for `one_way` batteries") as the normal case of the reserve pattern rather than a separate exclusion rule, and makes `set_ess_source_select` / island-mode optional for **this role** (still a hard requirement for the standby-backup role, see **2.7.h**) instead of a blanket 2.7.d blocker. Bonus: the one-way storage's own power sensor (`sens_ess_power` / "Total Out Power", already bridged for the Delta 3) doubles as a free per-consumer meter, feeding the energy-per-run learning above without a separate Loxone power merker.
+  - **Recommendation:** fold `batteries[].direction: "bidirectional" | "one_way"` from **2.7.d** into a shared reserve/powerstation model with a `role` field (`type: powerstation`, `backing: "virtual" | "physical"`, `attached_consumer_id`, `role: "single_use" | "standby_backup"` — this item implements `role: single_use`, **2.7.h** implements `role: standby_backup`) instead of maintaining three separate concepts (SOC-Min-Sofort-style reserve for virtual/single-use, `direction: one_way` for physical, an as-yet-undefined price-switch constraint for standby-backup).
+  - Spec write-up: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.1 in the `Earnie-Projekt` docs repo.
+
+- [ ] **2.7.h — Powerstation smart standby-backup for continuous loads** (`role: standby_backup`; shares data model with **2.7.g**; depends on **2.7.c**, benefits from **2.7.g** landing first)
+  - Idea: for consumers that run more or less continuously (PC, smart-home hub, router, NAS, …) — no single "run" event, no fixed energy-per-run — route their supply between grid and a pre-charged powerstation reserve on a rolling per-slot basis, driven by price: expensive slots draw from the reserve, cheap slots pass through from grid (optionally recharging the reserve in parallel). A price-aware mini-UPS, not just outage backup.
+  - Unlike **2.7.g** (a reserve *target* reached ASAP and drawn down on a trigger), this is a rolling MILP **constraint** per slot — closer to the existing whole-house battery price-arbitrage logic than to the SOC-Min-Sofort pattern, and it needs `set_ess_source_select` as a **hard requirement**, not an optional refinement: Earnie must actively flip the attached consumer(s) between grid pass-through and battery-only island every time the price crosses the threshold.
+  - Reserve sizing is power × number of expensive hours to bridge in the horizon, not an energy-per-run estimate — no energy-per-run learning needed here (unlike **2.7.g**).
+  - **Virtual (main-ESS-backed) instance:** largely redundant with the existing whole-house price optimization — the only real addition is a *protected* minimum reserve carved out for these consumers so general house/export decisions can't draw it down. Needs a go/no-go: for a virtual powerstation, is a per-consumer floor worth it over simply raising the house battery's global `min_soc`?
+  - **Physical (one-way storage) instance:** genuine new value as an independent, dedicated partial UPS — potentially outage resilience (grid/inverter failure) on top of price optimization, depending on hardware. Seamless (no-reboot) transfer switching is a per-device hardware capability to verify — not every powerstation switches sources without a brief interruption.
+  - Spec write-up: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.2 in the `Earnie-Projekt` docs repo.
 
 - [ ] **2.7.e — Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–d**)
   - **Today:** display range depends on device (`ui/s2_viewport.py`: phone = 24 h segments, desktop/tablet = SA₀→SA₂). Charts get only the data of that default range. Panning with the Plotly drag/pan tool beyond it shows an empty chart. Navigation is via buttons / date picker (`ui/history_navigation.py`, `ui/s2_navigation.py`).
@@ -170,10 +211,8 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
 - [ ] **Data & tariff fidelity - Part 2**
   - Keep official EPEX unconnected unless a paid/internal use case appears
   - Check possibilities to automatic tariffs.json update to existing installations
-  - Think about possibilites to let user enter own tariff data (beyond fixed ones) in addition to tariffs.json (e.g. on a time-scheduled basis)
-    - Do a first research on different tariff types that are not covered yet
 - [ ] Check possibilities to show decimal numbers according to regional settings (e.g. use "," as decimal sign for Germany)
-
+- [ ] Simulate restrictions for energy export dependent on current grid situation in SE (and maybe Live) — **after 2.7.a** (consumes Live/MILP/EHAL export-cap model; do not redefine caps here)
 
 
 

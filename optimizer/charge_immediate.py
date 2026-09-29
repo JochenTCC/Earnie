@@ -404,14 +404,9 @@ def apply_immediate_charge_chart_display(
         float(chart_row["Verbrauch-Prognose (kW)"]) - moved_kw,
         2,
     )
-    pv = float(chart_row["PV-Prognose (kW)"])
-    batt = float(chart_row["Geplante Batterie-Aktion (kW)"])
-    flex_sum = sum(
-        float(chart_row.get(consumer_column_name(c), 0.0) or 0.0)
-        for c in config.get_flexible_consumers(optimizer_only=True)
-    )
-    con = float(chart_row["Verbrauch-Prognose (kW)"])
-    chart_row["Netzbezug (kW)"] = round(con + flex_sum - pv + batt, 2)
+    from optimizer.sim_chart_rows import sync_chart_row_netzbezug
+
+    sync_chart_row_netzbezug(chart_row)
 
 
 def apply_immediate_charge_to_chart_rows(

@@ -19,27 +19,45 @@ def fetch_awattar_prices(
         start, end = awattar_fetch_window(planning_end)
         start_ms = int(start.timestamp() * 1000)
         end_ms = int((end + timedelta(hours=1)).timestamp() * 1000)
-        response = requests.get(
-            config.get('AWATTAR_URL'),
-            params={'start': start_ms, 'end': end_ms},
-            timeout=config.get_global_timeout(),
-        )
-        try:
-            data = response.json()
-        except ValueError:
-            data = response.text
-        if response.status_code >= 400:
-            _awattar_shadow_record(
-                feed_key,
-                ok=False,
-                status=int(response.status_code),
-                payload=data,
-                error=f"HTTP {response.status_code}",
+        from runtime_store.shadow.mode import is_shadow_mode
+
+        if is_shadow_mode():
+            from runtime_store.shadow.replay import replay_ext_payload
+
+            data = replay_ext_payload(feed_key)
+            if data is None:
+                response = requests.get(
+                    config.get('AWATTAR_URL'),
+                    params={'start': start_ms, 'end': end_ms},
+                    timeout=config.get_global_timeout(),
+                )
+                try:
+                    data = response.json()
+                except ValueError:
+                    data = response.text
+                response.raise_for_status()
+        else:
+            response = requests.get(
+                config.get('AWATTAR_URL'),
+                params={'start': start_ms, 'end': end_ms},
+                timeout=config.get_global_timeout(),
             )
-            response.raise_for_status()
-        _awattar_shadow_record(
-            feed_key, ok=True, payload=data, status=int(response.status_code)
-        )
+            try:
+                data = response.json()
+            except ValueError:
+                data = response.text
+            if response.status_code >= 400:
+                _awattar_shadow_record(
+                    feed_key,
+                    ok=False,
+                    status=int(response.status_code),
+                    payload=data,
+                    error=f"HTTP {response.status_code}",
+                )
+                response.raise_for_status()
+            _awattar_shadow_record(
+                feed_key, ok=True, payload=data, status=int(response.status_code)
+            )
         
         # Validierung der API-Struktur
         if not isinstance(data, dict) or 'data' not in data:

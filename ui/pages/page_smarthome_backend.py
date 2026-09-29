@@ -277,6 +277,18 @@ def render() -> None:
         key="smarthome_backend_help",
         page_docs_key="smarthome-backend",
     )
+    from runtime_store.shadow.mode import is_shadow_mode
+    from ui.shadow_banner import render_shadow_feed_connection_note
+
+    if is_shadow_mode():
+        render_shadow_feed_connection_note()
+        st.caption(
+            "Struktur-Scan, Greenfield-Import und Backend-Wechsel sind im "
+            "Shadow-Modus deaktiviert (Konfiguration schreibgeschützt)."
+        )
+        if is_sb_configured():
+            _render_configured_summary()
+        return
     if is_sb_configured():
         _render_configured_summary()
         return

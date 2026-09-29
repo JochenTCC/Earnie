@@ -23,6 +23,31 @@ def read_json_dict(path: str) -> dict:
 
 def write_json_dict(path: str, data: dict) -> None:
     from runtime_store.data_model import stamp_data_model
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        from runtime_store.persist_paths import config_dir
+        from runtime_store.shadow.errors import ConfigReadOnlyError
+
+        try:
+            from pathlib import Path
+
+            target = Path(path).resolve()
+            cfg_root = Path(config_dir()).resolve()
+            if target == cfg_root or cfg_root in target.parents:
+                raise ConfigReadOnlyError(
+                    f"Shadow Mode: Konfiguration schreibgeschützt ({path})"
+                )
+        except ConfigReadOnlyError:
+            raise
+        except Exception:
+            # If path resolution fails, still refuse config-dir writes by string check
+            cfg = config_dir().replace("\\", "/").rstrip("/")
+            norm = str(path).replace("\\", "/")
+            if norm == cfg or norm.startswith(cfg + "/"):
+                raise ConfigReadOnlyError(
+                    f"Shadow Mode: Konfiguration schreibgeschützt ({path})"
+                )
 
     stamp_data_model(data)
     with open(path, "w", encoding="utf-8") as f:

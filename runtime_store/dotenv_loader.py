@@ -15,10 +15,18 @@ def load_app_dotenv(*, override: bool = False) -> str | None:
     Returns:
         Pfad der geladenen Datei oder None, wenn keine Datei vorhanden ist.
     """
+    import logging
+
     path = resolve_dotenv_path()
     if os.path.isdir(path):
         return None
     if not os.path.isfile(path):
         return None
-    load_dotenv(path, override=override)
+    try:
+        load_dotenv(path, override=override)
+    except OSError as exc:
+        logging.getLogger(__name__).warning(
+            "Could not load .env from %s: %s", path, exc
+        )
+        return None
     return path

@@ -45,31 +45,48 @@ def _fetch_open_meteo_hourly(
         "timezone": "auto",
     }
     from runtime_store.shadow.feed import url_hash
+    from runtime_store.shadow.mode import is_shadow_mode
 
     # Hash path+params only (no secrets).
     param_key = "&".join(f"{k}={params[k]}" for k in sorted(params))
     feed_key = f"ext:outdoor:{url_hash(url + '?' + param_key)}"
-    try:
-        response = requests.get(url, params=params, timeout=config.get_global_timeout())
+    if is_shadow_mode():
+        from runtime_store.shadow.replay import replay_ext_payload
+
+        payload = replay_ext_payload(feed_key)
+        if not isinstance(payload, dict):
+            # Spec: prices/outdoor may fall back to own fetch when missing.
+            try:
+                response = requests.get(
+                    url, params=params, timeout=config.get_global_timeout()
+                )
+                payload = response.json()
+                response.raise_for_status()
+            except Exception:
+                raise
+        # fall through to parse payload
+    else:
         try:
-            payload = response.json()
-        except ValueError:
-            payload = response.text
-        if response.status_code >= 400:
+            response = requests.get(url, params=params, timeout=config.get_global_timeout())
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = response.text
+            if response.status_code >= 400:
+                _outdoor_shadow_record(
+                    feed_key,
+                    ok=False,
+                    status=int(response.status_code),
+                    payload=payload,
+                    error=f"HTTP {response.status_code}",
+                )
+                response.raise_for_status()
             _outdoor_shadow_record(
-                feed_key,
-                ok=False,
-                status=int(response.status_code),
-                payload=payload,
-                error=f"HTTP {response.status_code}",
+                feed_key, ok=True, payload=payload, status=int(response.status_code)
             )
-            response.raise_for_status()
-        _outdoor_shadow_record(
-            feed_key, ok=True, payload=payload, status=int(response.status_code)
-        )
-    except Exception as exc:
-        _outdoor_shadow_record(feed_key, ok=False, error=str(exc))
-        raise
+        except Exception as exc:
+            _outdoor_shadow_record(feed_key, ok=False, error=str(exc))
+            raise
     times = payload.get("hourly", {}).get("time", []) if isinstance(payload, dict) else []
     temps = payload.get("hourly", {}).get("temperature_2m", []) if isinstance(payload, dict) else []
     if not times or not temps or len(times) != len(temps):

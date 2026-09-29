@@ -123,6 +123,9 @@ def verify_and_restore_loxone_states(
 
 def run_watchdog_cycle() -> list[LoxoneMismatch]:
     """Ein Prüfdurchlauf: run_state laden, vergleichen, ggf. korrigieren."""
+    from runtime_store.shadow.replay import assert_not_shadow_backend
+
+    assert_not_shadow_backend("loxone_watchdog")
     config.reload_config()
     state = run_state.load_run_state()
     expected = expected_loxone_snapshot_from_run_state(state or {})

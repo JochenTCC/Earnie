@@ -8,11 +8,13 @@ from integrations.loxone_adapter import (
     ehal_active_power_w_to_loxone_kw,
     ehal_limit_w_to_loxone_kw,
 )
+from optimizer.export_power_limit import EXPORT_LIMIT_UNCONSTRAINED_W
 
 SAFE_PROBE_FIELDS: tuple[str, ...] = (
     "set_ess_mode",
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
+    "set_grid_export_power_limit",
     "set_evcs_max_current",
 )
 
@@ -24,11 +26,13 @@ DEFAULT_ROUNDTRIP_WAIT_S = 1.5
 LIMIT_FIELDS = frozenset(
     {"set_ess_charge_power_limit", "set_ess_discharge_power_limit"}
 )
+EXPORT_LIMIT_FIELD = "set_grid_export_power_limit"
 LOXONE_KW_WRITE_FIELDS = frozenset(
     {
         "set_ess_active_power",
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",
+        EXPORT_LIMIT_FIELD,
     }
 )
 
@@ -74,6 +78,15 @@ def clamp_probe_value(
 
     if canon in LIMIT_FIELDS:
         max_w = max(0.0, abs(float(max_power_kw)) * 1000.0)
+        raw = float(value)
+        if raw < 0 or raw > max_w + 1e-9:
+            raise WriteTestClampError(
+                f"{canon} muss in 0…{max_w:g} W liegen (angegeben {raw:g})."
+            )
+        return max(0.0, min(max_w, raw))
+
+    if canon == EXPORT_LIMIT_FIELD:
+        max_w = float(EXPORT_LIMIT_UNCONSTRAINED_W)
         raw = float(value)
         if raw < 0 or raw > max_w + 1e-9:
             raise WriteTestClampError(
@@ -139,7 +152,7 @@ def expected_loxone_wire_value(field: str, ehal_value: Any) -> Any:
     canon = canonical_probe_field(field)
     if canon == "set_ess_active_power":
         return ehal_active_power_w_to_loxone_kw(float(ehal_value))
-    if canon in LIMIT_FIELDS:
+    if canon in LIMIT_FIELDS or canon == EXPORT_LIMIT_FIELD:
         return ehal_limit_w_to_loxone_kw(float(ehal_value))
     return ehal_value
 
@@ -158,6 +171,8 @@ def probe_value_bounds(
     if canon in LIMIT_FIELDS:
         max_w = max(0.0, abs(float(max_power_kw)) * 1000.0)
         return 0.0, max_w, "W"
+    if canon == EXPORT_LIMIT_FIELD:
+        return 0.0, float(EXPORT_LIMIT_UNCONSTRAINED_W), "W"
     if canon == "set_evcs_max_current":
         cap = DEFAULT_EVCS_PROBE_CAP_A
         if ev_nominal_a is not None and float(ev_nominal_a) > 0:

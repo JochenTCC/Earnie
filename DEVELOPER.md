@@ -132,6 +132,10 @@ Proxmox: LXC mit `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh` 
 - Laufzeitdaten liegen unter `runtime/` (`EARNIE_RUNTIME_PATH`).
 - Persistenz-Wurzel: `EARNIE_ENV_PATH` (Default `earnie_env`). Config-Verzeichnis: `EARNIE_CONFIG_PATH` (Default `{ENV_PATH}/config`). Laufzeit: `EARNIE_RUNTIME_PATH` bzw. `{ENV_PATH}/runtime`.
 
+## Shadow-Modus (Dev-Client)
+
+Parallele Dev-Instanz mit Eingängen aus dem Prod-Feed (`EARNIE_SHADOW=1`). Details: [`docs/spec/shadow-mode.md`](docs/spec/shadow-mode.md), Anwender: [`docs/einrichtung/betrieb.md`](docs/einrichtung/betrieb.md), englische Entwicklernotiz: [`docs/DEVELOPER.md`](docs/DEVELOPER.md).
+
 ## Roadmap
 
 Offene Features und Epics → **[backlog/Backlog.md](backlog/Backlog.md)**

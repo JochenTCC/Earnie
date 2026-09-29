@@ -2,45 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-### User-fixed tariffs — Eigener Festpreis (2026-09-28)
+### 2.7.a — Export power limitation (2026-09-26)
 
-- [x] **User-fixed import/export tariffs** — Scenario-local Cent/kWh via dropdown **Eigener Festpreis** (`__user_fixed__`); values in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`), not `tariffs.json`
-  - Store resolve + plausibility + setup readiness; schema fields; Scenario Editor edit fields; German docs (`preise.md`, Benutzer-Handbuch)
-  - Tests: `tests/test_user_fixed_tariffs.py`
-  - Follow-up (open): non-fixed / scheduled own tariffs under **Data & tariff fidelity - Part 2**
-
-### 2.6.o — Shadow Mode S1: Prod feed recorder (2026-09-28)
-
-- [x] **2.6.o — Shadow Mode S1 (Prod recorder)** — Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) (Epic **Shadow**; S1 only). Ships in a **2.6** Prod build so Dev can feed Shadow during **2.7**.
-  - Opt-in `"shadow_feed_enabled": true` (+ optional `"shadow_feed_retention_days"`, default 14) in Prod `local_settings.json`; default off; ignored + warning if `EARNIE_SHADOW=1`
-  - Record raw backend responses at transport primitives (Loxone `fetch_loxone_raw_value` / `_fetch_loxone_io_all`, HA `HaAdapter._get_json`, OpenEMS GET, `ext:pv_forecast` / prices / outdoor, optimize-trigger events) — no secrets/auth in records
-  - Feed layout under `{config_dir}/shadow_feed/` (`meta.json`, atomic `latest.json`, daily JSONL + retention); override `EARNIE_SHADOW_FEED_PATH`
-  - Superset after cycle writes (soft-fail, ≤10 s budget): **HA default = config-referenced entities only** (not full `/api/states`); Loxone IOs / OpenEMS channels from shared bindings
-  - Failure isolation: recorder never breaks Prod (wrap + rate-limited warnings)
-  - Tests: per-primitive ok/error, no secrets, atomic `latest.json`, JSONL rotation/retention, recorder exception does not break `main()`
-  - **Not in this letter:** Shadow replay / write block / UI / seed (**2.7.f**); Soll/Soll diff & offline JSONL replay (S4 → **2.+1**)
-
-### Tariff catalog: monthly curve updater + scan runbook (2026-09-28)
-
-- [x] **`monthly_seed`** on catalog `monthly_table` tariffs (schema + `data/monthly_float_rates.build_seeded_monthly_rates`): OeMAG-proportional floats (OeMAG, Energie AG Team Sonne, EVN, Wien Energie, Tibber) and RefMarkt-based VKW PV-Flex; replaces seed factors that only lived in `notes`
-- [x] **`scripts/update_tariff_curves.py`**: upsert OeMAG / E-Control RefMarkt PV months, recompute seeded tariffs, `--set` for unseeded tables (SUNNY), `--check` drift gate (test asserts the shipped catalog matches its seeds)
-- [x] Catalog caught up: OeMAG 2026-07/08 (6.146 / 8.997), RefMarkt PV 2026-07/08 (6.85 / 9.42, E-Control xlsx), SUNNY 2026-09 (8.989); VKW PV-Flex placeholders replaced; `catalog_as_of` now an ISO date
-- [x] Runbook `docs/spec/tariff-monthly-scan.md` for the monthly cloud routine (first AT working day, 17:00 Vienna; branch + PR, stage B findings report-only)
-
-### Bugfix Docker missing share/ehal (2026-09-27)
-
-- [x] **Docker image missing `share/ehal` schemas** — S6470 explicit COPY only shipped `share/config/`; live EHAL validation failed every ~30s (`EHAL schema not found: /app/share/ehal/telemetry.schema.json`). Fixed in `docker/Dockerfile` (`COPY share/ share/`); verified on NAS with **2.6.0-alpha.8**.
-
-### Bugfix SonarCloud leak-period QG (2026-09-27)
-
-- [x] **SonarCloud leak-period QG** — Closed as open verification (2026-09-27). Historical: re-check 2026-09-26 on `main` @ `64b151c` (Actions [36225774457](https://github.com/JochenTCC/Earnie/actions/runs/36225774457)): QG **ERROR** — `new_bugs` **1**, `new_vulnerabilities` **19**, `new_reliability_rating` C, `new_security_rating` C, `new_coverage` ≈ **66%**. Remediations verified; remaining follow-ups obsolete:
-  - [x] Verified — Cleared previously: `bump_ha_addon.py` python:S3923; secrets:S7636; `.devcontainer` docker/shell
-  - [x] Verified — Fixed locally: `ha_units.py` S1244; Actions SHA pins + job permissions (`qemu-image-smoke` / `release-publish`); `report_repo_stats.py` path/URL guards; intentional NOSONAR for mock HTTP + add-on root
-  - [x] Verified — Accepted (CLI threat model): `pythonsecurity:S8707` / `S8705` ignored project-wide via `sonar.issue.ignore.multicriteria` in `sonar-project.properties` (also `scripts.sonar_ignore_llm_cli_rules` + `SONAR_TOKEN` to mirror in SonarCloud Analysis Scope); `# NOSONAR` on scripts/tools remains as belt-and-suspenders
-  - [x] Verified — Dockerfile S6470: replace `COPY . .` with explicit package/app copies; tighten `.dockerignore`
-  - [x] Verified — `remote_backtesting_support` S2083: validate absolute share roots + relative `result_dir`
-  - [x] Obsolete — Still failing / accept after scan: `release-publish.yml` `pip install -r requirements.txt` (S8541 / S8544 — `--only-binary=:all:` breaks local package `.`); `new_coverage` informational
-  - [x] Obsolete — Optional follow-ups: raise new-code coverage; `ui/chart_trace_segments.py` S3923 if still open; confirm S8707/S8705 gone after next Sonar analysis
+- [x] **2.7.a — Export power limitation** (Live / MILP / EHAL; HK static cap) — code on `feature/2.7` (`46918e8`)
+  - Hard ceilings (kW): effective export cap = `min` of active sources (HK `plant.max_export_power_kw`, inbound EHAL `get_grid_export_power_limit`, pay-to-export → 0); MILP `p_grid_sell` constraint
+  - Soft / economic: positive export tariffs prefer avoiding export (objective), separate from hard ceiling
+  - Outbound `set_grid_export_power_limit` + ESS mode Einspeisesperre (**3**); Loxone VI/VO templates + greenfield/recipe maps; HA/OpenEMS adapters
+  - Helpers: `optimizer/export_power_limit.py`, `optimizer/live_export_limit.py`; HK UI `ui/house_config_plant.py`; tests `test_export_power_limit` / `test_live_export_limit` / `test_milp_export_cap`
+  - **Still open:** productive Loxone wiring + live dogfood → [Backlog.md](Backlog.md) **2.7.a dogfood**
 
 ### Release approval gate — candidate → approve → publish (2026-09-26)
 
@@ -63,22 +32,13 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.6.r re-check — quality gate progress (2026-09-26)
 
-- [x] **2.6.r re-check** on `main` @ `64b151c` (+ local remediations; ships in **2.6.0-alpha.4**) — completed steps; SonarCloud snapshot closed 2026-09-27 (also `### Bugfix SonarCloud leak-period QG`)
+- [x] **2.6.r re-check** on `main` @ `64b151c` (+ local remediations; ships in **2.6.0-alpha.4**) — completed steps; SonarCloud QG re-scan still open in [Backlog.md](Backlog.md) / [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [x] Coverage baseline — 2638 passed / 14 skipped; overall **81.2%** (`data` 73.6, `ehal` 90.5, `house_config` 81.0, `optimizer` 85.8, `runtime_store` 80.9, `settings` 77.5, `simulation` 87.3); no package &lt; 40% (vs 2.6.r 80.9% / 2500 passed)
   - [x] Dead-code / obsolete-test audit — `vulture` (confidence 80) clean after re-export keep for `ui_chart_zone_indices`; `pytest --dead-fixtures` clean; health-report flags = expected mock-heavy
   - [x] Simplification triage — deferred to follow-up item below (no in-gate rewrites this pass); **step 3 applied** in follow-up
   - [x] KPI mega-files — **0** core/UI files &gt; 600 LOC
   - [x] KPI functions — split `derive_control_from_milp_plan`, `_add_power_balance_and_soc_dynamics`, `render_ehal_ha_mapping_section` → **0** bodies &gt; 60 LOC
   - [x] Official docs — `Doc-Review-Checklist.md` §2.6.0 still current; no new Document Review Findings this pass
-  - [x] **SonarCloud snapshot** — pre-fix QG **ERROR** (`new_reliability_rating` C, `new_security_rating` C, `new_coverage` 66%); last successful analysis pre-remediation `@271a6a3`; CI red was pytest before scan (UNC share-root). Closed 2026-09-27: remediations verified; coverage / remaining QG noise obsolete (informational — do not chase as in-gate):
-    - [x] Verified — CI blocker: Windows UNC + POSIX absolute `share_root` / `remote_share_root` (`scripts/remote_backtesting_support.py`); NOSONAR on post-`_safe_join` sinks (S2083 / S6549)
-    - [x] Verified — `python:S1244` float eq in `integrations/ha_units.py`; `python:S1764` NaN check in `house_config/known_chart_display.py` (`math.isnan`)
-    - [x] Verified — SHA-pin Actions in `release-publish.yml` + `qemu-image-smoke.yml`; job-level permissions (S8233)
-    - [x] Verified — path/URL hardening in `scripts/report_repo_stats.py` (S8707 / S8703)
-    - [x] Verified — `docker/Dockerfile` explicit COPY (S6470) + tighter `.dockerignore`
-    - [x] Verified — Ignore (sonar-project.properties multicriteria): LLM CLI S8707/S8705; pip unlock S8541/S8544 (local `.` package); lockfile S8565; container root S6471; Loxone/lab HTTP S5332
-    - [x] Verified — Marked intentional: mock REST HTTP (`house_sim/mock_rest.py`), HA add-on root (comment NOSONAR; inline on `FROM` breaks BuildKit)
-    - [x] Obsolete — Sonar `new_coverage` 66% / QG ERROR on coverage alone until gate policy relaxed in SonarCloud UI
 - [x] **Simplify redundant / unnecessarily complex / unneeded code** (quality-gate step 3; no behavior change)
   - **Removed:** `_anchor_fraction_from_legacy_shift`; unused `ui/charts.py` late re-exports (~70) + dead `render_optimization_chart`; `simulate_24h_horizon`; `_var_value_at_zero`; `_consumer_power_now` / `_consumer_pv_follow_now` (+ milp_consumers re-exports); inlined `_optimization_interval_hours`, `is_generic_flex_consumer`, `_bundle_flex_context`; EV schedule checks via `charging_schedule_enabled`; inlined `charge_immediate_io_name` → `marker_charge_immediate`; dropped `get_runtime_scenario_refs` / `save_runtime_scenario_refs` (callers use live_* names)
   - **Leftover scan:** no large commented-out blocks / `_backup`/`_tmp_*` in `optimizer/`/`simulation/`/`ui/`

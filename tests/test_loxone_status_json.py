@@ -41,6 +41,45 @@ def test_status_payload_maps_plant_merker_to_ehal_kw() -> None:
     assert payload["set_ess_mode"] == 1.0
 
 
+def test_status_payload_export_limit_defaults_to_unconstrained(monkeypatch) -> None:
+    """Nothing sent yet must not read as 0 kW (= Einspeisesperre) on the VI."""
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", lambda: 15.0
+    )
+    payload = build_loxone_status_payload(
+        loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
+    )
+    assert payload["set_grid_export_power_limit"] == 15.0
+
+
+def test_status_payload_export_limit_fallback_when_plant_unknown(monkeypatch) -> None:
+    def _boom() -> float:
+        raise RuntimeError("config unavailable")
+
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", _boom
+    )
+    payload = build_loxone_status_payload(
+        loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
+    )
+    assert payload["set_grid_export_power_limit"] == 1000.0
+
+
+def test_status_payload_export_limit_sent_value_wins(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", lambda: 15.0
+    )
+    payload = build_loxone_status_payload(
+        loxone_sent={"Earnie_EinspeiseLeistungs-Limit": 0.0},
+        consumers=[],
+        plant_io_index={
+            "Earnie_EinspeiseLeistungs-Limit": "set_grid_export_power_limit"
+        },
+        now_ts=100.0,
+    )
+    assert payload["set_grid_export_power_limit"] == 0.0
+
+
 def test_status_payload_ev_and_flex_namespaced_keys() -> None:
     consumers = [
         {

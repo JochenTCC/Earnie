@@ -342,7 +342,10 @@ def _render_absent_mode_status(*, profile_absent: bool) -> None:
 
 
 def render_house_profile_tab() -> None:
+    from ui.house_config_plant import render_plant_export_limit
+
     ctx = _render_profile_selector()
+    render_plant_export_limit()
     label, preview_id, annual_kwh, location, absent_mode = _render_profile_identity(ctx)
     resolved, resolved_for_preview = _edit_and_sync_consumers(
         ctx["session_scope"], location

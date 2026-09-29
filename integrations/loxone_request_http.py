@@ -105,6 +105,14 @@ def start_loxone_request_http(
     host: str = "0.0.0.0",
 ) -> ThreadingHTTPServer:
     """Start daemon HTTP listener; idempotent if already running on same port."""
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        logger.info(
+            "Shadow Mode: Loxone request HTTP listener not started (port %s)",
+            port,
+        )
+        return None  # type: ignore[return-value]
     global _server, _thread
     with _lock:
         if _server is not None:

@@ -1,13 +1,25 @@
 {
   "role_id": "grid",
   "label": "Netz (PCC)",
-  "baustein_notes": "Prefer EFM Grid Zähler Bezeichnung as sens_grid_power_active. Recipe name Earnie_Netzleistung is the greenfield fallback Merker when no EFM Grid node exists.",
+  "baustein_notes": "Prefer EFM Grid Zähler Bezeichnung as sens_grid_power_active. Recipe name Earnie_Netzleistung is the greenfield fallback Merker when no EFM Grid node exists. 2.7.a: optional inbound/outbound export power limit Merker.",
   "recommended_markers": [
     {
       "ehal_field": "sens_grid_power_active",
       "loxone_blocks_key": "plant.ehal_bindings.sens_grid_power_active",
       "suggested_name": "Earnie_Netzleistung",
       "notes": "kW; + = Bezug. Maps to EHAL sens_grid_power_active (W)."
+    },
+    {
+      "ehal_field": "get_grid_export_power_limit",
+      "loxone_blocks_key": "plant.ehal_bindings.get_grid_export_power_limit",
+      "suggested_name": "Earnie_Netz_Einspeisegrenze_In",
+      "notes": "Optional inbound max export kW from grid/HEMS → EHAL W; negative = no inbound cap."
+    },
+    {
+      "ehal_field": "set_grid_export_power_limit",
+      "loxone_blocks_key": "plant.ehal_bindings.set_grid_export_power_limit",
+      "suggested_name": "Earnie_EinspeiseLeistungs-Limit",
+      "notes": "Outbound feed-in curtailment kW (magnitude ≥ 0); 0 = no export; unconstrained = PV kWp + max battery discharge kW."
     }
   ],
   "reference": "docs/referenz/loxone-signals.md"

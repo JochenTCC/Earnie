@@ -37,6 +37,7 @@ earnie_env_alpha/runtime/*
 runtime/*
 !runtime/local_settings.example.json
 greenfield/
+earnie_shadow/
 runtime-prod/
 backtesting_log.json
 backtesting_cbc_events.jsonl

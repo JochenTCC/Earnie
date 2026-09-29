@@ -237,6 +237,35 @@ def test_write_setpoints_converts_to_entity_unit(post_mock, get_mock):
 
 @patch("integrations.ha_adapter.requests.get")
 @patch("integrations.ha_adapter.requests.post")
+def test_write_export_limit_unconstrained_clamps_to_entity_max(post_mock, get_mock):
+    def _get(url, **_kwargs):
+        response = MagicMock()
+        response.status_code = 200
+        state = _state("number.export_limit", "0", "kW")
+        state["attributes"]["max"] = 10.0
+        response.json.return_value = state
+        return response
+
+    get_mock.side_effect = _get
+    post_mock.return_value = MagicMock(status_code=200)
+    adapter = HaAdapter(
+        _cfg(entities={"set_grid_export_power_limit": "number.export_limit"})
+    )
+    error = adapter.write_setpoints(
+        {
+            "schema_version": 3,
+            "ts": "2026-07-28T12:00:00Z",
+            "adapter_id": "earnie-hems",
+            "set_grid_export_power_limit": 1_000_000.0,
+        }
+    )
+    assert error is None
+    body = post_mock.call_args.kwargs["json"]
+    assert body == {"entity_id": "number.export_limit", "value": 10.0}
+
+
+@patch("integrations.ha_adapter.requests.get")
+@patch("integrations.ha_adapter.requests.post")
 def test_write_setpoints_rejects_wrong_quantity(post_mock, get_mock):
     get_mock.side_effect = _setpoint_state_get(
         {**_SETPOINT_UNITS, "number.charge_limit": "%"}

@@ -313,6 +313,10 @@ class Config:
         return self.get('GLOBAL_TIMEOUT', default=default, cast=int)
 
     def is_silent_mode(self) -> bool:
+        from runtime_store.shadow.mode import is_shadow_mode
+
+        if is_shadow_mode():
+            return True
         return bool(self.get("SILENT_MODE", default=True))
 
     def is_loxone_silent_mode(self) -> bool:

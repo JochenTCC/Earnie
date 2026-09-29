@@ -47,9 +47,11 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 |--------|------|----------------|
 | Active power telemetry (`sens_grid_power_active`, `sens_pv_production_active`, `sens_evcs_active_power`, `sens_ess_power`, `sens_power_consumers`) | **W** | See below |
 | `sens_ess_soc` / EV SoC fields | **%** | `0`…`100` |
-| ESS charge/discharge **limits** | **W** | Non-negative **magnitudes** (true caps) |
+| ESS charge/discharge **limits**, `set_grid_export_power_limit` / `get_grid_export_power_limit` | **W** | Non-negative **magnitudes** (true caps); direction is in the field name, not the sign |
 | `set_ess_active_power` | **W** | Signed; `+` = discharge, `−` = charge (omit on Automatik) |
 | `set_evcs_max_current` / `get_evcs_nominal_current` | **A** | Non-negative |
+
+**Export limit "unconstrained" (2.7.a):** sticky backends always receive a number on `set_grid_export_power_limit`. When no cap applies, Earnie writes the plant's physical export maximum = **sum of PV nameplate (kWp)** + **max discharge power of every battery that supports forced discharge** (`battery_control = full`). Fallback when both are unknown: `1 000 000` W. Multi-ESS (**2.7.c**) must extend the battery sum.
 
 **Grid (`sens_grid_power_active`):** `+` = grid **import** (Bezug), `−` = **export** (Einspeisung). Adapters normalize hub-native signs before emit.
 
@@ -78,6 +80,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 | `get_evcs_ready_by_time` | no | string | Ready-by deadline (Loxone: AlarmClock SpecialState10 via `/all`, Tna text backup; binding = baustein name) |
 | `get_evcs_limit_soc` | no | % | Charge limit SoC |
 | `get_evcs_soc_min_immediate` | no | % | ASAP min SoC floor; ≤0 or absent = inactive; clamped to limit SoC |
+| `get_grid_export_power_limit` | no | W | Optional inbound max export from grid/HEMS (magnitude; negative or ≥ 1 000 000 = no cap) (2.7.a) |
 
 Machine schema: [`share/ehal/telemetry.schema.json`](../../share/ehal/telemetry.schema.json).
 
@@ -94,7 +97,8 @@ Setpoints are **math limits / forced power / modes**, not a full inner-loop cont
 | `set_ess_active_power` | no* | W | Forced ESS power (`+` discharge, `−` charge); **omit** on Automatik (OpenEMS: no Equals) |
 | `set_ess_charge_power_limit` | no* | W | Max charge power (magnitude ≥ 0) |
 | `set_ess_discharge_power_limit` | no* | W | Max discharge power (magnitude ≥ 0) |
-| `set_ess_mode` | no* | string/number | Sticky-backend control (Huawei Steuerbefehl); **0 = Automatik**; OpenEMS ignores |
+| `set_ess_mode` | no* | string/number | Sticky-backend control; **0 = Automatik**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores |
+| `set_grid_export_power_limit` | no* | W | Max grid export, non-negative magnitude (like ESS limits); `0` = no export; unconstrained = plant maximum (PV kWp sum + max discharge of force-dischargeable ESS; fallback 1 000 000 W) (2.7.a) |
 | `set_evcs_max_current` | no* | A | EV charge current setpoint / max current |
 | `set_evcs_mode` | no* | enum | `off` \| `pv` \| `now` |
 
