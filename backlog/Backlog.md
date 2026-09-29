@@ -58,6 +58,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Heat storage topology:** solar thermal collector and heat pump feed heat **only into the heat storage**; space heating and domestic hot water draw heat **only from the heat storage** (the storage also serves house heating, not just DHW)
   - **Heat storage temperature band:** storage temperature may float between `setpoint − tolerance` and **95 °C**; only above 95 °C is the solar collector heat input capped
   - **Heat pump in the band:** the heat pump may add heat only within the setpoint range (`setpoint − tolerance` … `setpoint`); above the setpoint it stays off (surplus above setpoint comes from solar only)
+  - **Below the band:** if the storage temperature drops below `setpoint − tolerance`, the heat pump **must** heat (hard lower bound, not a flexibility window)
   - House parameters from energy certificate (`EXAMPLE:/local/reference/energy-certificate.pdf` — not in repo)
   - Prepare air conditioning as thermal consumer
   - Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3)
