@@ -13,7 +13,7 @@ Nur `main.py` steuert die Anlage im Produktivbetrieb (Loxone-/EHAL-Schreibvorgä
 
 Beim Daemon-Start schreibt Earnie **einmal** sichere Sollwerte (ESS Automatik / Freigabe und EVCS aus), bevor der erste Optimierungslauf läuft — auf allen EHAL-Backends (Loxone, HA, OpenEMS). Im Silent-Modus entfällt dieser Schreibvorgang. Silent/Loud stellt ihr unter **Daemon Control → Optimierer-Dienst** um (gespeichert in `runtime/local_settings.json` → `silent_mode`); ein Neustart von `main.py` ist dafür nicht nötig. Zum Überspringen der Safe-Setpoints: `EARNIE_SKIP_SAFE_SETPOINTS_ON_START=1`.
 
-Unter **Optimierer-Dienst → Dienst-Log** zeigt die App den Schluss (Tail) von `runtime/earnie.log` in einem Expander (Aktualisieren lädt neu). Log-Level (`INFO` / `WARNING` / …) sind filterbar; Standard ist INFO und höher.
+Unter **Optimierer-Dienst → Dienst-Log** zeigt die App den Schluss (Tail) von `runtime/earnie.log` in einem Expander (Aktualisieren oben und unten am Log lädt neu). Log-Level (`INFO` / `WARNING` / …) sind filterbar; Standard ist INFO und höher. Bei jedem erfolgreichen Start von `main.py` schreibt Earnie einen klaren Trennstreifen (Separator) mit PID und Version in `earnie.log`, damit Läufe leichter unterscheidbar sind.
 
 **Docker (empfohlen):** Ein Container (`earnie`). Die UI startet `main.py` automatisch, wenn `EARNIE_AUTO_START_MAIN=1` gesetzt ist (Standard in den Compose-Dateien).
 

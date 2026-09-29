@@ -28,9 +28,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## New Bugs (Do not remove this chapter — even if empty)
 
 
-
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
-
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

@@ -104,7 +104,7 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Veröffentlichte Images** kommen über GitHub Actions: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml) und baut zuerst nur den **Release-Kandidaten** `ghcr.io/jochentcc/earnie-energy:X.Y.Z` (kein `:latest` / `:next` am Tag allein). Nach manueller Freigabe des Jobs `promote` (Environment `release-approval`) folgen `:latest` (nur offizielle Versionen) bzw. `:next` sowie die veröffentlichte GitHub Release. Details: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
-**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt denselben Ablauf: zuerst Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release** — **nicht** `:latest`. Zum Testen `:next` (nach Freigabe) oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.10`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
+**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt denselben Ablauf: zuerst Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release** — **nicht** `:latest`. Zum Testen `:next` (nach Freigabe) oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.12`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
@@ -112,7 +112,7 @@ Eigene Compose-Dateien (nicht in der Prod-YAML): `docker/compose/synology-alpha.
 
 - Container `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`
 - Compose-Projektname `earnie-alpha` (kollidiert nicht mit Prod `earnie-productive`)
-- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.0-alpha.10`)
+- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.0-alpha.12`)
 
 ```powershell
 mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime

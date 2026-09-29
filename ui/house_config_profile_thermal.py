@@ -443,6 +443,21 @@ def _render_thermal_solar_fields(
         ),
     }
 
+def _profile_geo_from_session(session_scope: str) -> tuple[float | None, float | None, str | None]:
+    """Live Standort widgets — form edit drops lat/lon from thermal_rc until save."""
+    lat_key = _scoped_key(session_scope, "house_profile_latitude")
+    lon_key = _scoped_key(session_scope, "house_profile_longitude")
+    land_key = _scoped_key(session_scope, "house_profile_land")
+    lat = float(st.session_state[lat_key]) if lat_key in st.session_state else None
+    lon = float(st.session_state[lon_key]) if lon_key in st.session_state else None
+    timezone_name = None
+    if land_key in st.session_state:
+        from house_config.geo_timezone import timezone_for_land
+
+        timezone_name = timezone_for_land(str(st.session_state[land_key]))
+    return lat, lon, timezone_name
+
+
 def _live_consumer_for_annual(
     consumer: dict,
     index: int,
@@ -478,6 +493,13 @@ def _live_consumer_for_annual(
             key = _scoped_key(session_scope, key_suffix)
             if key in st.session_state:
                 preview[field] = cast(st.session_state[key])
+        lat, lon, timezone_name = _profile_geo_from_session(session_scope)
+        if lat is not None:
+            preview["latitude"] = lat
+        if lon is not None:
+            preview["longitude"] = lon
+        if timezone_name:
+            preview["timezone_name"] = timezone_name
     elif c_type == "ev":
         for field, key_suffix, cast in (
             ("battery_capacity_kwh", f"hc_ev_cap_{index}", float),
@@ -507,6 +529,13 @@ def _live_consumer_for_annual(
             key = _scoped_key(session_scope, key_suffix)
             if key in st.session_state:
                 rc[field] = cast(st.session_state[key])
+        lat, lon, timezone_name = _profile_geo_from_session(session_scope)
+        if lat is not None:
+            rc["latitude"] = lat
+        if lon is not None:
+            rc["longitude"] = lon
+        if timezone_name:
+            rc["timezone_name"] = timezone_name
         preview["thermal_rc"] = rc
     return preview
 

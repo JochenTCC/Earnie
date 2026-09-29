@@ -173,7 +173,7 @@ def _render_log_section() -> None:
             key="daemon_log_levels",
             help="Zeilen ohne [LEVEL] bleiben immer sichtbar.",
         )
-        if st.button("Aktualisieren", key="daemon_log_refresh"):
+        if st.button("Aktualisieren", key="daemon_log_refresh_top"):
             st.rerun()
         text, err = read_earnie_log_tail(path)
         if err:
@@ -189,6 +189,8 @@ def _render_log_section() -> None:
         if shown < total:
             st.caption(f"Anzeige: {shown} von {total} Zeilen (Level-Filter).")
         st.code(filtered, language="log")
+        if st.button("Aktualisieren", key="daemon_log_refresh_bottom"):
+            st.rerun()
 
 
 def _warn_ehal_write_error() -> None:

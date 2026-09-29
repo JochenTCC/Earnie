@@ -16,7 +16,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.11`**.
+**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.12`**.
 
 **Next:** community/official **2.6** publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**). Shadow Prod recorder (**2.6.o**), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
 
@@ -52,6 +52,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Add VI to Loxone VI template; HA binding templates if appropriate; mapping in Loxone productive config (Jochen).
   - **Follow-up (not this letter):** SE / grid-situation export restriction sim → **2.+1** item (consumes **2.7.a** model).
 
+- [ ] In case of big diff between PV prognosis and actual PV energy Earnie should use a correction factor for optimization at least for the next QH in order to prevent unneeded forced charging or other actions (has to be specified more concrete how)
 - [ ] **2.7.b — Thermals P2** — Coupled single-node models
   - House ↔ heat storage ↔ solar system
   - House parameters from energy certificate (`EXAMPLE:/local/reference/energy-certificate.pdf` — not in repo)

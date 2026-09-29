@@ -1,4 +1,5 @@
 # main.py
+import os
 import sys
 import time
 from datetime import datetime, timedelta
@@ -557,6 +558,15 @@ if __name__ == "__main__":
         logger.error("%s", exc)
         print(f"Abbruch: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
+
+    _sep = "=" * 72
+    logger.info(_sep)
+    logger.info(
+        "main.py started — pid=%s — Earnie %s",
+        os.getpid(),
+        __version__,
+    )
+    logger.info(_sep)
 
     from scripts.startup_checks import (
         run_live_scenario_entity_check_on_startup,

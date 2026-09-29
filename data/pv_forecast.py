@@ -14,12 +14,19 @@ _LAST_FETCH_SOURCE: str = "api"
 _USING_SYNTHETIC_FALLBACK: bool = False
 
 
+def _as_naive_local(value: datetime) -> datetime:
+    """Normalize aware API timestamps for comparison with ``datetime.now()``."""
+    if value.tzinfo is None:
+        return value
+    return value.astimezone().replace(tzinfo=None)
+
+
 def _parse_retry_at(response: requests.Response) -> Optional[datetime]:
     """Liest Retry-At aus Header oder JSON-Body einer 429-Antwort."""
     header_value = response.headers.get("X-Ratelimit-Retry-At")
     if header_value:
         try:
-            return datetime.fromisoformat(header_value.strip())
+            return _as_naive_local(datetime.fromisoformat(header_value.strip()))
         except ValueError:
             pass
 
@@ -36,7 +43,7 @@ def _parse_retry_at(response: requests.Response) -> Optional[datetime]:
     if not retry_at:
         return None
     try:
-        return datetime.fromisoformat(str(retry_at).strip())
+        return _as_naive_local(datetime.fromisoformat(str(retry_at).strip()))
     except ValueError:
         return None
 
@@ -83,18 +90,26 @@ def _pre_fetch_cached_or_none(
     """Rate-limit / 15-min cooldown. Returns (should_return, value)."""
     global _RATE_LIMIT_RETRY_AT
 
-    if _RATE_LIMIT_RETRY_AT and now_time < _RATE_LIMIT_RETRY_AT:
+    now_cmp = _as_naive_local(now_time)
+    retry_at = _RATE_LIMIT_RETRY_AT
+    if retry_at is not None:
+        retry_at = _as_naive_local(retry_at)
+        _RATE_LIMIT_RETRY_AT = retry_at
+
+    if retry_at and now_cmp < retry_at:
         _set_fetch_source("rate_limited")
         print(
             f"[cache] forecast.solar Rate-Limit aktiv bis "
-            f"{_RATE_LIMIT_RETRY_AT.isoformat()}. Nutze lokalen Cache."
+            f"{retry_at.isoformat()}. Nutze lokalen Cache."
         )
         return True, cached
 
-    if _RATE_LIMIT_RETRY_AT and now_time >= _RATE_LIMIT_RETRY_AT:
+    if retry_at and now_cmp >= retry_at:
         _RATE_LIMIT_RETRY_AT = None
 
-    if _LAST_API_CALL and (now_time - _LAST_API_CALL) < timedelta(minutes=15):
+    if _LAST_API_CALL and (now_cmp - _as_naive_local(_LAST_API_CALL)) < timedelta(
+        minutes=15
+    ):
         if cached is not None:
             _set_fetch_source("cache")
             print(

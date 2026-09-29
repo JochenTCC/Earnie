@@ -2,6 +2,29 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.0-alpha.12 pre-release (2026-09-29)
+
+- [x] Bump `version.py` + alpha compose pins to **2.6.0-alpha.12**; release notes `.github/release-notes/v2.6.0-alpha.12.md`
+- [x] Candidate tag `v2.6.0-alpha.12` (promote after platform test)
+
+### Bugfix earnie.log run separator + second Aktualisieren (2026-09-29)
+
+- [x] **Add a separator in earnie.log when main.py was started** — After `ensure_single_instance`, `main.py` logs a `====` banner with pid + Earnie version. Docs: `betrieb.md`. Live verified.
+- [x] **Second "Aktualisieren" on Optimierer-Dienst Dienst-Log** — Top + bottom refresh (`daemon_log_refresh_top` / `_bottom`) in `ui/pages/page_daemon.py`. Live verified.
+
+### Bugfix Temperatur RC expander 0 kWh/a (2026-09-29)
+
+- [x] **Energy consumption pre-calculation in expander of Temperatur RC shows zero (on NAS env)** — Form sync rewrote `thermal_rc` without lat/lon → `consumer_annual_kwh` fell back to `annual_kwh=0`. Fix: re-inject Standort from profile widgets in `_live_consumer_for_annual`; keep geo on session consumers after sync (`_edit_and_sync_consumers`). Test: `test_live_consumer_for_annual_injects_thermal_rc_geo_from_profile`. Live verified on Shadow NAS (~4082 kWh/a after expand/edit).
+
+### Bugfix EV daytime plan while unplugged + PV Retry-At tz (2026-09-29)
+
+- [x] **EV planned charge while not connected (productive)** — `open_charging_deadlines` with next-morning FertigUm forced `available_from=now` → MILP planned ~3.5 kW midday while unplugged (writes already 0 A via `anticipated`). Fix: same-calendar-day only for open-cycle latch (`_open_cycle_keeps_available_now`). Tests: `TestAbsentAvailability`. Live verified on NAS productive (`14:23:49`: `available_from` 18:00, `e_auto_kw` 0 with latch still present).
+- [x] **forecast.solar 429 Retry-At naive/aware crash** — aware `X-Ratelimit-Retry-At` vs `datetime.now()` crashed the cycle. Fix: `_as_naive_local` on parse/compare. Tests: `test_pv_forecast`.
+
+### Bugfix Debug-Dump UTF-8 BOM (2026-09-29)
+
+- [x] **Debug-Dump save failed with UTF-8 BOM** — `Unexpected UTF-8 BOM (decode using utf-8-sig)` when `config.json` (or run_state) had a Windows BOM. Dump readers used plain `utf-8`; now use `settings.json_io.read_json_dict` (`utf-8-sig`). Test: `test_write_debug_dump_zip_accepts_utf8_bom_config`. Live UI acceptance verified.
+
 ### 2.6.r re-check — quality gate before alpha.11 (2026-09-29)
 
 - [x] **2.6.r re-check** on `main` (pre-candidate **2.6.0-alpha.11**; skill `quality-gate`; no `version.py` bump in chapter)
