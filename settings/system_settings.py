@@ -1,6 +1,7 @@
 """System- und UI-Einstellungen aus config.json / local_settings."""
 from __future__ import annotations
 
+import json
 import os
 
 from settings.json_io import read_json_dict
@@ -50,6 +51,22 @@ def load_local_settings_document(local_settings_path: str) -> dict:
     if not os.path.isfile(path):
         return {}
     return read_json_dict(path)
+
+
+def write_silent_mode_to_local_settings(local_settings_path: str, silent: bool) -> None:
+    """Merge ``silent_mode`` into local_settings.json; drop legacy key. Preserve other keys."""
+    if not isinstance(silent, bool):
+        raise ValueError("silent_mode muss true oder false sein.")
+    path = local_settings_path
+    document = load_local_settings_document(path)
+    document["silent_mode"] = silent
+    document.pop("loxone_silent_mode", None)
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(document, handle, indent=2, ensure_ascii=False)
+        handle.write("\n")
 
 
 def load_ehal_loxone_http_port(raw_config: dict) -> int:

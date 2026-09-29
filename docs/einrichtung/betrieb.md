@@ -11,7 +11,7 @@
 
 Nur `main.py` steuert die Anlage im Produktivbetrieb (Loxone-/EHAL-Schreibvorgänge). Die App **zeigt** den berechneten 24–48-Stunden-Horizont (`live_optimization_debug.json`) und kann den Daemon unter **Daemon Control → Optimierer-Dienst** starten, stoppen und neu starten. Vor dem Start prüft Earnie `runtime/main.lock` (bereits laufende Instanz).
 
-Beim Daemon-Start schreibt Earnie **einmal** sichere Sollwerte (ESS Automatik / Freigabe und EVCS aus), bevor der erste Optimierungslauf läuft — auf allen EHAL-Backends (Loxone, HA, OpenEMS). Im Silent-Modus entfällt dieser Schreibvorgang. Zum Überspringen: `EARNIE_SKIP_SAFE_SETPOINTS_ON_START=1`.
+Beim Daemon-Start schreibt Earnie **einmal** sichere Sollwerte (ESS Automatik / Freigabe und EVCS aus), bevor der erste Optimierungslauf läuft — auf allen EHAL-Backends (Loxone, HA, OpenEMS). Im Silent-Modus entfällt dieser Schreibvorgang. Silent/Loud stellt ihr unter **Daemon Control → Optimierer-Dienst** um (gespeichert in `runtime/local_settings.json` → `silent_mode`); ein Neustart von `main.py` ist dafür nicht nötig. Zum Überspringen der Safe-Setpoints: `EARNIE_SKIP_SAFE_SETPOINTS_ON_START=1`.
 
 Unter **Optimierer-Dienst → Dienst-Log** zeigt die App den Schluss (Tail) von `runtime/earnie.log` in einem Expander (Aktualisieren lädt neu). Log-Level (`INFO` / `WARNING` / …) sind filterbar; Standard ist INFO und höher.
 
@@ -51,7 +51,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; u. a. `consumption_snapshot`, optional `closed_interval`) |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
-| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode`, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`)     |
+| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode` — auch UI **Optimierer-Dienst**, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`)     |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
 

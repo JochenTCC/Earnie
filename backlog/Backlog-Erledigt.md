@@ -2,6 +2,19 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Silent toggle affects running daemon (verified) (2026-09-29)
+
+- [x] **Check whether Silent Modus Switch on Optimierer-Dienst impacts a running daemon** — Yes: same `local_settings.json` path (UI write + daemon reload); no process restart needed. Next `main()` cycle after toggle picks up `silent_mode` (`is_silent_mode` false→true across pid 44400 after UI wrote silent). Mid-cycle writes already decided for the current run stay unchanged until that next cycle.
+
+### Minor Monitor Sankey order + Silent/Loud UI toggle (2026-09-29)
+
+- [x] **Monitor: Sankey under Chart 1** — Order Chart 1 → S2 nav → Sankey → Chart 2 → Simulation Details → Energievergleich (`ui/live_mode.py`; Sankey removed from `page_cockpit.py`).
+- [x] **Optimierer-Dienst Silent/Loud toggle** — `st.toggle` persists `silent_mode` in `runtime/local_settings.json` (`write_silent_mode_to_local_settings`); disabled under `EARNIE_SHADOW=1`; docs `betrieb.md` / `ehal-com.md`; tests `test_local_settings.py`.
+
+### Minor SE Chart NNE on import price (2026-09-29)
+
+- [x] **SE analysis charts: show volumetric Netznutzung AP on import price** — Already correct: Chart 1 Preis is matrix `k_act` (NNE via `netzentgelt_override` before VAT). No UI change; regression `test_se_chart_strompreis_includes_netznutzung` locks chart field == `k_act` with NNE > without.
+
 ### Bugfix Dynamic tariff green-zone mirroring (2026-09-29)
 
 - [x] **Dynamic tariff green-zone prices used mirroring instead of OLS** — Prod lacked `price_model_coefficients.json` (gitignored `data/cache/`); live features archive-only so future slots always mirrored. Shipped model `share/data/price_model_coefficients.json`; live features via Open-Meteo forecast weather + hour-of-day EU power stand-in (cached). Shadow acceptance verified (`price_source=predicted`).

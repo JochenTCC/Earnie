@@ -6,6 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 
+import config
 from runtime_store import run_state
 from runtime_store.main_daemon import (
     DaemonError,
@@ -15,8 +16,11 @@ from runtime_store.main_daemon import (
     status,
     stop,
 )
-from runtime_store.persist_paths import log_file
+from runtime_store.persist_paths import log_file, resolve_local_settings_json_path
+from runtime_store.shadow.mode import is_shadow_mode
+from settings.system_settings import write_silent_mode_to_local_settings
 from ui.help_hint import render_page_title_with_help
+from ui.runtime_config import reload_runtime_config
 
 _HELP = (
     "Startet, stoppt oder startet den Hintergrunddienst `main.py` neu. "
@@ -120,6 +124,40 @@ def _render_status(daemon: DaemonStatus) -> None:
     )
 
 
+def _render_silent_mode_toggle() -> None:
+    shadow = is_shadow_mode()
+    current = bool(config.is_silent_mode())
+    st.subheader("Schreibzugriffe")
+    if shadow:
+        st.caption(
+            "Shadow-Modus (`EARNIE_SHADOW=1`): Silent-Umschalter deaktiviert — "
+            "keine Sollwert-Schreibzugriffe."
+        )
+    else:
+        st.caption(
+            "Silent-Modus: keine Sollwert-Schreibzugriffe. "
+            "Loud-Modus: Schreiben nur, solange der Optimierer-Dienst läuft."
+        )
+    silent = st.toggle(
+        "Silent-Modus",
+        value=current,
+        disabled=shadow,
+        key="daemon_silent_mode",
+        help="Persistiert in runtime/local_settings.json (silent_mode).",
+    )
+    if shadow or silent == current:
+        return
+    write_silent_mode_to_local_settings(resolve_local_settings_json_path(), silent)
+    reload_runtime_config()
+    if silent:
+        st.success("Silent-Modus aktiv — keine Schreibzugriffe.")
+    else:
+        st.warning(
+            "Loud-Modus: Die Anlage erhält Sollwerte, sobald der Optimierer-Dienst läuft."
+        )
+    st.rerun()
+
+
 def _render_log_section() -> None:
     st.subheader("Dienst-Log")
     path = log_file()
@@ -154,6 +192,7 @@ def _render_log_section() -> None:
 
 
 def render() -> None:
+    reload_runtime_config()
     render_page_title_with_help(
         "🛠️ Optimierer-Dienst",
         _HELP,
@@ -173,6 +212,7 @@ def render() -> None:
 
     daemon = status()
     _render_status(daemon)
+    _render_silent_mode_toggle()
 
     running = daemon.state == "running"
     col_start, col_stop, col_restart = st.columns(3)

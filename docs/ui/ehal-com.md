@@ -331,7 +331,7 @@ Bindings are **no longer** edited in the House Configurator under "Smarthome Mer
 | Typical use                 | testing, parallel legacy operation      | production after cutover         |
 
 
-Silent mode: `runtime/local_settings.json` → `"silent_mode"` (legacy: `"loxone_silent_mode"`; takes priority over `system.silent_mode`). Default without a file: **silent on**. The status bar shows the configured mode (Silent/Loud) separately from whether the optimizer service is running; Loud mode enables writes only when **main.py** is started (Daemon Control).
+Silent mode: set on **Daemon Control → Optimierer-Dienst** (toggle **Silent-Modus**); persisted in `runtime/local_settings.json` → `"silent_mode"` (legacy: `"loxone_silent_mode"`; takes priority over `system.silent_mode`). Default without a file: **silent on**. The status bar shows the configured mode (Silent/Loud) separately from whether the optimizer service is running; Loud mode enables writes only when **main.py** is started (Daemon Control). A change applies on the next optimizer cycle — no daemon restart required.
 
 ## Cutover Checklist
 
