@@ -147,3 +147,7 @@ Für **Backtesting** (Szenario-Explorer): `scenario_explorer_conf.price_source` 
 ### Monatliche Fixtarife (Backtesting)
 
 Export-Tarif-Typ `monthly_table` in `tariffs.json` liefert die Monatswerte (`monthly_rates`). **Sunset-2-Sunset** (Produktiv) nutzt die aufgelöste Export-Tarif-Referenz aus dem Live-Szenario.
+
+### Preisreihe exportieren (`export_price_series`)
+
+`scenario_explorer_conf.export_price_series` (Standard: `false`). Wenn `true`, schreibt `scripts/run_backtesting.py` die für den Simulationszeitraum geladene, **tarifunabhängige** EPEX-Preisreihe (netto Cent/kWh, QH-Auflösung, vor Markup/Netznutzung/USt) zusätzlich als eigenständige `backtesting_prices.csv` in den Log-Zielordner (`--output-dir`, Standard `.`) — referenziert in `backtesting_log.json` als `price_series_file`. Anders als `backtesting.csv` (pro Szenario, mit bereits verrechnetem `k_act`/`k_push_act`) ist das dieselbe rohe Marktpreisserie, die für **alle** Szenarien eines Laufs gemeinsam gilt, damit sie ohne erneuten Energy-Charts-/aWATTar-Abruf für andere Zwecke weiterverwendet werden kann (z. B. externe Einsparpotenzial-Rechnungen).

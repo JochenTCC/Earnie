@@ -223,6 +223,7 @@ def load_sim_path_params(raw_config: dict) -> dict[str, Any]:
             sim_paths.get("season_mirror_to_last_month", False)
         ),
         "ENERGY_CHARTS_BZN": sim_paths.get("energy_charts_bzn", "DE-LU"),
+        "EXPORT_PRICE_SERIES": bool(sim_paths.get("export_price_series", False)),
     }
 
 

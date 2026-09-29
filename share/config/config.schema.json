@@ -377,6 +377,10 @@
         "energy_charts_bzn": {
           "type": "string",
           "description": "Bidding Zone für Energy-Charts-CSV (z. B. DE-LU)."
+        },
+        "export_price_series": {
+          "type": "boolean",
+          "description": "Wenn true: die für den Simulationszeitraum geladene, tarifunabhängige EPEX-Preisreihe (netto Cent/kWh, QH) zusätzlich als backtesting_prices.csv im Log-Zielordner ablegen, damit sie ohne erneuten Energy-Charts-/aWATTar-Abruf weiterverwendet werden kann. Standard: false."
         }
       }
     },

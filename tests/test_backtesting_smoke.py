@@ -10,7 +10,11 @@ import pytest
 import config
 from data.data_loader import load_market_prices
 from optimizer.charging_context import resolve_charging_context
-from simulation.backtesting_log import load_backtesting_log, save_backtesting_log
+from simulation.backtesting_log import (
+    BACKTESTING_PRICE_SERIES_CSV,
+    load_backtesting_log,
+    save_backtesting_log,
+)
 from simulation.engine import (
     HISTORICAL_REFERENCE_ID,
     HistoricalDataCache,
@@ -220,3 +224,56 @@ def test_backtesting_log_roundtrip(tmp_path, smoke_anchor: pd.Timestamp):
     meta, hourly = load_backtesting_log(str(tmp_path))
     assert meta["period"]["windows"] == 1
     assert len(hourly) == 48
+    assert "price_series_file" not in meta
+    assert not os.path.isfile(os.path.join(str(tmp_path), BACKTESTING_PRICE_SERIES_CSV))
+
+
+@requires_historical_data
+def test_backtesting_log_price_series_export(tmp_path, smoke_anchor: pd.Timestamp):
+    """export_price_series-Pfad: prices-DataFrame wird als eigenständige CSV abgelegt."""
+    ts = pd.date_range(
+        smoke_anchor - pd.Timedelta(hours=23),
+        periods=24,
+        freq="h",
+    )
+    sample = pd.DataFrame(
+        {
+            "sim_cost": [0.01] * 24,
+            "sim_soc": [50.0] * 24,
+            "batt_action_kw": [0.0] * 24,
+            "steuerbefehl": ["Automatik"] * 24,
+        },
+        index=ts,
+    )
+    sample.index.name = "ts"
+    live_id = config.get_live_scenario_id()
+    results = {HISTORICAL_REFERENCE_ID: sample, live_id: sample}
+    labels = {
+        HISTORICAL_REFERENCE_ID: "Historisch (ohne Optimierung, ohne PV/Batterie)",
+        live_id: "Live",
+    }
+    plausibility = {live_id: PlausibilityReport()}
+    period_meta = {
+        "start": ts[0].date().isoformat(),
+        "end": ts[-1].date().isoformat(),
+        "windows": 1,
+    }
+    prices = pd.DataFrame({"price_cent_kwh": [8.5] * 24}, index=ts)
+    prices.index.name = "ts_price"
+
+    log_path = save_backtesting_log(
+        results,
+        labels,
+        plausibility,
+        period_meta,
+        log_dir=str(tmp_path),
+        prices=prices,
+    )
+    meta, _ = load_backtesting_log(str(tmp_path))
+    assert meta["price_series_file"] == BACKTESTING_PRICE_SERIES_CSV
+    price_series_path = os.path.join(str(tmp_path), BACKTESTING_PRICE_SERIES_CSV)
+    assert os.path.isfile(price_series_path)
+    written = pd.read_csv(price_series_path, sep=";", decimal=",")
+    assert list(written.columns) == ["ts_price", "price_cent_kwh"]
+    assert len(written) == 24
+    assert log_path.startswith(str(tmp_path))
