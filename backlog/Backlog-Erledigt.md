@@ -2,6 +2,22 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Monitor Chart 2 daily Kosten KPIs (2026-09-29)
+
+- [x] **Monitor Chart 2 daily Kosten KPIs** — SA-day annotation columns (full span = two cols; segment = visible day); plan-based **Ersparnis bisher** in gray zone. Live fix: gray slots overlay log `savings_snapshot` plan costs (`_overlay_history_plan_costs`) so BL−Opt cumulates SA₀→now instead of MILP fill zeros. Tests: `test_chart_day_costs` / `test_build_display_savings_series_overlays_history_plan_in_gray_zone`. Live Monitor acceptance verified.
+
+### Bugfix False “Zwangs-Entladen nicht ausgeführt” (2026-09-29)
+
+- [x] **False “Zwangs-Entladen nicht ausgeführt”** (`debug_dump_20260923_201155`) — Deviation uses full-entry `closed_by` (not `by_slot` winners); `battery_power_below_tolerance` = Ist ≤ tol only (S6 “nicht ausgeführt”). Tests: `test_deviation_timeline` / `test_deviation_eval`. Dump evening 19:15–19:45 cleared; live Monitor acceptance verified.
+
+### Bugfix monthly_table slot_datetime (2026-09-29)
+
+- [x] **`monthly_table` import: Monitor/`main.py` ValueError `slot_datetime`** — Fix: `epex_to_brutto_cent(..., slot_datetime=)` forwarded from `resolve_market_slots` (and mirrored/predicted paths). Test: `test_resolve_market_slots_monthly_table_passes_slot_datetime`. Live HA-Addon acceptance verified.
+
+### Bugfix HA EHAL scan 401 (2026-09-29)
+
+- [x] **HA dog fooding: Scan fehlgeschlagen HTTP 401** on EHAL page (HA-Addon Local Dev) — not a code defect; wrong / stale Long-Lived Access Token in the form. Correct token → Entities scannen OK. No code change; no PATCH.
+
 ### 2.6.p — Absent / holiday mode via EHAL on all backends (2026-09-29)
 
 - [x] **2.6.p — Absent / holiday mode via EHAL on all backends**

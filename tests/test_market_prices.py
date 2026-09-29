@@ -206,3 +206,27 @@ def test_hourly_settlement_epex_values_passes_through_none():
     averaged = hourly_settlement_epex_values([10.0, None], slots)
 
     assert averaged == [10.0, None]
+
+
+def test_resolve_market_slots_monthly_table_passes_slot_datetime():
+    from unittest.mock import patch
+
+    from data.tariff_pricing import import_cent_kwh
+
+    slot = normalize_price_slot(datetime(2026, 9, 29, 10, 0, tzinfo=VIENNA))
+    market = [{"timestamp": slot, "price_buy": 12.5}]
+    monthly_spec = {
+        "type": "monthly_table",
+        "id": "debug_monthly",
+        "prices_include_vat": True,
+        "vat_percent": 20.0,
+        "monthly_rates": [[2026, 9, 25.0]],
+    }
+    resolved_settings = {
+        "_import_tariff_spec": monthly_spec,
+        "import_tariff_id": "debug_monthly",
+    }
+    expected = import_cent_kwh(12.5, monthly_spec, slot_datetime=slot)
+    with patch("config.get_resolved_runtime_settings", return_value=resolved_settings):
+        out = resolve_market_slots(market, [slot])
+    assert out[0]["k_act"] == expected
