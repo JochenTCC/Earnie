@@ -64,7 +64,7 @@ def _render_controls() -> tuple[Path, float, Path | None]:
     )
     model_path = DEFAULT_MODEL_PATH if use_saved_model else None
     if use_saved_model and not DEFAULT_MODEL_PATH.exists():
-        st.info("Kein Modell unter data/cache/price_model_coefficients.json")
+        st.info(f"Kein Modell unter {DEFAULT_MODEL_PATH}")
     return dataset_path, train_ratio, model_path
 
 

@@ -86,3 +86,5 @@ poc_doc_assistant/run_periodic_sync.py
 testmodcom.py
 modbus-test.py
 modbus_scan.py
+# Local shadow runtime (full tree)
+earnie_shadow/

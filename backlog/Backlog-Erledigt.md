@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Dynamic tariff green-zone mirroring (2026-09-29)
+
+- [x] **Dynamic tariff green-zone prices used mirroring instead of OLS** — Prod lacked `price_model_coefficients.json` (gitignored `data/cache/`); live features archive-only so future slots always mirrored. Shipped model `share/data/price_model_coefficients.json`; live features via Open-Meteo forecast weather + hour-of-day EU power stand-in (cached). Shadow acceptance verified (`price_source=predicted`).
+
 ### Bugfix Monitor Chart 2 daily Kosten KPIs (2026-09-29)
 
 - [x] **Monitor Chart 2 daily Kosten KPIs** — SA-day annotation columns (full span = two cols; segment = visible day); plan-based **Ersparnis bisher** in gray zone. Live fix: gray slots overlay log `savings_snapshot` plan costs (`_overlay_history_plan_costs`) so BL−Opt cumulates SA₀→now instead of MILP fill zeros. Tests: `test_chart_day_costs` / `test_build_display_savings_series_overlays_history_plan_in_gray_zone`. Live Monitor acceptance verified.
