@@ -31,9 +31,11 @@ def modeled_monthly_kwh(profile: dict, *, hours: int = 8760) -> dict[str, float]
     """Monatssummen aus modelliertem Profil (ohne total_profile_csv)."""
     from datetime import timedelta
 
+    from data.consumption_profiles import MODELED_PROFILE_REF_START
+
     hourly = build_modeled_hourly_kw_profile(profile, hours=hours)
     monthly: dict[str, float] = defaultdict(float)
-    start = datetime(2023, 1, 1, 0, 0, 0)
+    start = MODELED_PROFILE_REF_START
     for index, power_kw in enumerate(hourly):
         ts = start + timedelta(hours=index)
         key = f"{ts.year}-{ts.month:02d}"

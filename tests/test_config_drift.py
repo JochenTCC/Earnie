@@ -108,8 +108,8 @@ def test_repo_example_matches_earnie_env_config_shape():
 
         pytest.skip("earnie_env/config/config.json nicht vorhanden")
 
-    import json
+    from settings.json_io import read_json_dict
 
-    example = json.loads(example_path.read_text(encoding="utf-8"))
-    actual = json.loads(live_path.read_text(encoding="utf-8"))
+    example = read_json_dict(str(example_path))
+    actual = read_json_dict(str(live_path))
     assert find_config_drift(example, actual) == []

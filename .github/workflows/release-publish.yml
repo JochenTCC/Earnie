@@ -85,6 +85,15 @@ jobs:
           echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
           echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE})"
 
+      - name: Shadow release guard (no EARNIE_SHADOW in packaging/docker)
+        run: |
+          set -euo pipefail
+          if grep -rnE 'EARNIE_SHADOW' packaging docker Dockerfile Dockerfile.* 2>/dev/null; then
+            echo "::error::EARNIE_SHADOW must not appear under packaging/, docker/, or Dockerfile*"
+            exit 1
+          fi
+          echo "Shadow release guard OK (no EARNIE_SHADOW in packaging trees)"
+
       # A missing environment is auto-created WITHOUT protection rules, so the
       # promote job would publish immediately — fail before building anything.
       - name: Approval gate configured (environment release-approval)

@@ -7,6 +7,7 @@ from optimizer.thermal_model import (
     ThermalBand,
     capacity_kwh_per_k_from_volume,
     compute_heat_loss_kw,
+    heat_content_kwh,
     plan_minimum_heating,
     simulate_next_temp_c,
 )
@@ -15,6 +16,17 @@ from optimizer.thermal_model import (
 def test_capacity_from_6000_liters():
     capacity = capacity_kwh_per_k_from_volume(6000)
     assert 6.9 < capacity < 7.1
+
+
+def test_heat_content_kwh_ref_zero():
+    capacity = capacity_kwh_per_k_from_volume(1000.0)
+    assert heat_content_kwh(50.0, capacity) == pytest.approx(capacity * 50.0)
+    assert heat_content_kwh(0.0, capacity) == pytest.approx(0.0)
+
+
+def test_heat_content_kwh_rejects_non_positive_capacity():
+    with pytest.raises(ValueError, match="capacity_kwh_per_k"):
+        heat_content_kwh(40.0, 0.0)
 
 
 def test_simulate_heating_raises_temp():

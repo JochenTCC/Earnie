@@ -17,7 +17,11 @@ from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, l
 from data.live_market_prices import fetch_live_day_ahead_prices
 from data.feed_in_prices import k_push_act_for_matrix_row
 from runtime_store import run_state, optimization_history
-from runtime_store.soc_plausibility import sanitize_soc_reading
+from runtime_store.soc_plausibility import (
+    closed_interval_confirms_reported,
+    count_consecutive_reported_soc,
+    sanitize_soc_reading,
+)
 from runtime_store import live_optimization_debug
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
@@ -26,6 +30,7 @@ from optimizer.thermal_targets import (
     collect_thermal_observability,
     thermal_horizon_hours_from_slots,
 )
+from optimizer.thermal_live_store import collect_heat_storage_observability
 from optimizer.run_trigger import (
     TRIGGER_QUARTER_HOUR,
     TRIGGER_REQUEST_OPTIMIZE,
@@ -59,7 +64,14 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         )
     else:
         logger.info("--- Earnie Live-Abfrage gestartet (v%s) ---", __version__)
-    if config.is_loxone_silent_mode():
+    from runtime_store.shadow.mode import is_shadow_mode as _shadow_startup
+
+    if _shadow_startup():
+        logger.warning(
+            "Shadow: cycle setpoints go through the write path for would-write "
+            "logging only (no backend send; see shadow_writes.jsonl)."
+        )
+    elif config.is_loxone_silent_mode():
         if ehal_live.is_ehal_network_backend():
             logger.warning(
                 "Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf EHAL-Southbound."
@@ -160,12 +172,29 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     prev_logged_soc = optimization_history.latest_logged_soc_percent()
     if prev_logged_soc is not None:
         battery_kw = float(live_power["battery"]) if live_power else 0.0
+        history_rows = optimization_history._sorted_history_rows(
+            optimization_history._load_jsonl_history()
+        )
+        history_raw = [
+            (row.get("_raw") or row)
+            for row in history_rows
+            if isinstance(row.get("_raw") or row, dict)
+        ]
+        consecutive_reported = count_consecutive_reported_soc(
+            history_raw, reported_soc
+        )
+        closed_confirms = closed_interval_confirms_reported(
+            closed_interval, reported_soc, prev_logged_soc
+        )
+        if closed_confirms:
+            consecutive_reported = max(consecutive_reported, 2)
         current_soc, soc_corrected = sanitize_soc_reading(
             prev_logged_soc,
             reported_soc,
             battery_kw,
+            consecutive_same_reported=consecutive_reported,
         )
-        if soc_corrected:
+        if soc_corrected and abs(float(current_soc) - reported_soc) > 0.05:
             logger.warning(
                 "SoC-Lesung korrigiert: Miniserver %.1f%% → %.1f%% "
                 "(Integration aus %.1f%%, Batterie %.2f kW).",
@@ -173,6 +202,15 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 current_soc,
                 prev_logged_soc,
                 battery_kw,
+            )
+        elif closed_confirms and abs(reported_soc - float(prev_logged_soc)) > 1.0:
+            logger.info(
+                "SoC-Kette verworfen: Miniserver %.1f%% bestätigt durch "
+                "Intervall-Sampler (Start %.1f%% → Ende %.1f%%), Historie war %.1f%%.",
+                reported_soc,
+                float((closed_interval or {}).get("soc_start_percent") or reported_soc),
+                float((closed_interval or {}).get("soc_end_percent") or reported_soc),
+                float(prev_logged_soc),
             )
 
     current_hour = datetime.now().hour
@@ -207,11 +245,19 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     baseline_targets = consumer_targets.resolve_historical_baseline_targets_kwh(
         matrix=optimization_matrix,
     )
+    thermal_horizon = thermal_horizon_hours_from_slots(len(optimization_matrix))
     thermal_observability = collect_thermal_observability(
         live_consumers,
         active_targets_kwh=targets,
         baseline_targets_kwh=baseline_targets,
-        horizon=thermal_horizon_hours_from_slots(len(optimization_matrix)),
+        horizon=thermal_horizon,
+    )
+    thermal_observability.extend(
+        collect_heat_storage_observability(
+            list(house_profile.get("consumers") or []),
+            house_profile=house_profile,
+            horizon=thermal_horizon,
+        )
     )
     for item in thermal_observability:
         if item.get("error"):
@@ -271,6 +317,17 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 consumer["nominal_power_kw"],
                 marker,
             )
+    from optimizer.live_export_limit import resolve_live_export_context
+
+    telemetry_for_export = None
+    try:
+        telemetry_for_export = ehal_live.get_adapter().read_telemetry()
+    except Exception as exc:  # noqa: BLE001 — Live continues without inbound cap
+        logger.warning("Export-Limit Telemetrie nicht lesbar: %s", exc)
+    export_ctx = resolve_live_export_context(
+        matrix_row=optimization_matrix[0] if optimization_matrix else None,
+        telemetry=telemetry_for_export,
+    )
     mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, urgent_obs = optimizer.milp_optimizer(
         optimization_matrix,
         current_hour,
@@ -283,7 +340,11 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         consumer_continue_on=optimizer.get_generic_flex_continue_on(
             charging_contexts, live_consumers
         ),
+        hk_max_export_kw=export_ctx["hk_max_export_kw"],
+        inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
     )
+    # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
+    export_cap = export_ctx["effective_export_cap_kw"]
     battery_params = config.get_battery_params()
     battery_plan_kw = optimizer.battery_plan_kw_from_control(
         mode,
@@ -303,7 +364,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     current_market_item = optimization_matrix[0]
 
     ehal_writes: list[dict] | None = None
-    if config.is_loxone_silent_mode():
+    from runtime_store.shadow.writes import should_invoke_setpoint_writes
+
+    if not should_invoke_setpoint_writes(silent=config.is_loxone_silent_mode()):
         if ehal_live.is_ehal_network_backend():
             logger.info(
                 "Silent-Modus: Steuerwerte (EHAL ESS+EVCS) werden nicht gesendet."
@@ -318,7 +381,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         backend = "HA" if ehal_live.is_ha_backend() else "OpenEMS"
         logger.info("Sende EHAL ESS-Limits an %s...", backend)
         err_ess, ess_records = ehal_live.write_ess_setpoints_from_control(
-            mode, target_power
+            mode, target_power, export_cap_kw=export_cap
         )
         logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
         err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(
@@ -330,7 +393,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         loxone_writes = None
     else:
         logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
-        huawei_writes = loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
+        huawei_writes = loxone_client.send_huawei_modbus_states(
+            mode, target_power, target_soc, export_cap_kw=export_cap
+        )
         logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
         flex_writes = loxone_client.send_flexible_consumer_states(
             consumer_powers, charging_contexts, consumer_pv_follow
@@ -370,6 +435,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         consumer_powers,
         charging_contexts,
         consumer_pv_follow,
+        export_cap_kw=export_cap,
     )
     sent_flex_kw: dict[str, float] = {}
     for consumer in live_consumers:
@@ -457,6 +523,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "loxone_writes": loxone_writes,
             "ehal_writes": ehal_writes,
             "soc_percent": round(float(current_soc), 2),
+            "reported_soc_percent": round(float(reported_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
             "market_price_cent": market_price_cent,
             "epex_price_cent": epex_price_cent,
@@ -552,6 +619,9 @@ if __name__ == "__main__":
     reinit_config_or_exit(config)
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
     log_config_drift(logging.getLogger("main"))
+    from runtime_store.shadow import refuse_shadow_startup_or_exit
+
+    refuse_shadow_startup_or_exit()
     try:
         ensure_single_instance("main")
     except SingleInstanceError as exc:
@@ -601,9 +671,10 @@ if __name__ == "__main__":
         touch_daemon_heartbeat()
         if power_interval_sampler.tick():
             try:
-                from runtime_store.shadow import flush_after_sampler
+                from runtime_store.shadow import flush_after_sampler, is_shadow_mode
 
-                flush_after_sampler()
+                if not is_shadow_mode():
+                    flush_after_sampler()
             except Exception:  # noqa: BLE001 — never break wait loop
                 logger.exception("shadow feed sampler flush failed")
 
@@ -679,45 +750,71 @@ if __name__ == "__main__":
         )
 
         if needs_loxone_auth_recovery():
-            ok, detail = probe_current_loxone_credentials()
-            if ok:
+            from runtime_store.shadow.mode import is_shadow_mode as _shadow_now
+
+            if _shadow_now():
                 clear_loxone_auth_error()
             else:
-                if detail.startswith("Loxone auth failed"):
-                    code = 401 if "HTTP 401" in detail else 403
-                    persist_loxone_auth_error(
-                        message=detail,
-                        http_status=code,
-                        source="main_gate",
+                ok, detail = probe_current_loxone_credentials()
+                if ok:
+                    clear_loxone_auth_error()
+                else:
+                    if detail.startswith("Loxone auth failed"):
+                        code = 401 if "HTTP 401" in detail else 403
+                        persist_loxone_auth_error(
+                            message=detail,
+                            http_status=code,
+                            source="main_gate",
+                        )
+                    log_setup_gate_wait(
+                        _setup_gate_state,
+                        "loxone_auth",
+                        "Loxone-Zugang verweigert (%s). "
+                        "Bitte Zugangsdaten in der Streamlit-UI (Port %s) unter "
+                        "Smarthome-Backend prüfen. Erneuter Versuch in %s Sekunden.",
+                        detail,
+                        config.get_ui_streamlit_port(),
+                        _SETUP_WAIT_SEC,
                     )
-                log_setup_gate_wait(
-                    _setup_gate_state,
-                    "loxone_auth",
-                    "Loxone-Zugang verweigert (%s). "
-                    "Bitte Zugangsdaten in der Streamlit-UI (Port %s) unter "
-                    "Smarthome-Backend prüfen. Erneuter Versuch in %s Sekunden.",
-                    detail,
-                    config.get_ui_streamlit_port(),
-                    _SETUP_WAIT_SEC,
-                )
-                time.sleep(_SETUP_WAIT_SEC)
-                load_app_dotenv(override=True)
-                config.reinit_config()
-                continue
+                    time.sleep(_SETUP_WAIT_SEC)
+                    load_app_dotenv(override=True)
+                    config.reinit_config()
+                    continue
 
         _setup_gate_state.clear()
         try:
+            from runtime_store.shadow.mode import is_shadow_mode
+            from runtime_store.shadow import (
+                consume_optimize_trigger,
+                wait_for_prod_cycle,
+            )
+
+            if is_shadow_mode():
+                if consume_optimize_trigger():
+                    next_trigger = TRIGGER_REQUEST_OPTIMIZE
+                cycle_info = wait_for_prod_cycle()
+                if cycle_info.get("skipped"):
+                    logger.warning(
+                        "shadow: cycle skipped (%s) — warte %ss",
+                        cycle_info.get("reason"),
+                        _SETUP_WAIT_SEC,
+                    )
+                    time.sleep(_SETUP_WAIT_SEC)
+                    continue
+
             main(run_trigger=next_trigger)
             clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
             try:
                 from runtime_store.shadow import (
                     flush_after_cycle,
+                    is_shadow_mode as _is_shadow,
                     run_superset_after_cycle,
                 )
 
-                run_superset_after_cycle()
-                flush_after_cycle()
+                if not _is_shadow():
+                    run_superset_after_cycle()
+                    flush_after_cycle()
             except Exception:  # noqa: BLE001 — recorder must never break Prod
                 logger.exception("shadow feed post-cycle failed")
 
@@ -733,6 +830,8 @@ if __name__ == "__main__":
                 on_poll=_wait_poll,
             )
             if early == TRIGGER_REQUEST_OPTIMIZE:
+                next_trigger = TRIGGER_REQUEST_OPTIMIZE
+            elif is_shadow_mode() and consume_optimize_trigger():
                 next_trigger = TRIGGER_REQUEST_OPTIMIZE
 
         except LoxoneAuthError as exc:

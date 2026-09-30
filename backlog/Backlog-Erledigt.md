@@ -2,6 +2,74 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.b — Thermals P2 (2026-09-30)
+
+- [x] **2.7.b — Thermals P2** — Coupled single-node models
+  - [x] **Slice 1 — House ↔ heat storage ↔ solar (linear)** — optional `thermal.heat_storage` on `thermal_annual`; coupled day targets via `optimizer/thermal_coupled.py`; HK fields; spec [`docs/spec/thermals-p2.md`](../docs/spec/thermals-p2.md); legacy open-loop when volume ≤ 0
+  - [x] **House indoor RC** — DIN V 18599 Bauweise `leicht`/`mittel`/`schwer` → C from Wohnfläche; H calibrated from HWB (override optional); band control; `T_house` state; HK fields; chart Haus-Ist; [`optimizer/thermal_house.py`](../optimizer/thermal_house.py)
+  - [x] House parameters from energy certificate — **research only** (manual mapping; no automatic PDF/import). Reference: local GEQ EAW EFH Dornbirn 2014 (not in repo). Usable seeds: HWB ≈ 40 kWh/m²a, BGF ≈ 157 m² (≠ Wohnfläche), θi = 20 °C, Sole/Wasser-WP, solar Neigung 18° + Verdrehung 26° (WW-only). **Superseded for the reference installation by the hydraulic plan (2015, local, not in repo) and the tank datasheet:** one combined buffer of **887 l** gross / 861 l net (INHAUS PR 1000; the "1000" is only the type name) → `heat_storage.volume_liters` = **887** (not ≈ 500 from the EAW tank split 100 l RH + 400 l WW); solar collector **10.6 m²** (not 6 m²) → `solar_thermal_area_m2`. Tank: H 2040 mm without insulation, Ø 790 mm, 100 mm PU foam, solar register 3.1 m² (310–1030 mm), four ½" sensor wells at 310 / 745 / 1250 / 1710 mm. Start value `heat_loss_kw_per_k` ≈ 0.006 (estimate, to be calibrated; code default 0.02 is ~3× too high for this tank). **Do not** map building LT+LV ≈ 0.125 kW/K onto `heat_storage.heat_loss_kw_per_k` (tank U only; EAW standby ≈ 4.7 kWh/d → U ≈ 0.006–0.01). BRI ≈ 489 m³ optional for volume heuristics; house C uses Wohnfläche × Bauweise. Monthly Hausprofil model uses Open-Meteo + collector irradiance (same as Live metric), not the offline climate fixture alone.
+  - [x] Add a new y-Axis to "Stündlicher Verlauf" Chart on HK page with temperatures (outside ambient, house temp, heat storage tank, pool temp) to give user a visualization of simulation
+  - [x] **Heat storage topology (year-sim):** solar thermal collector and heat pump feed heat **only into the heat storage**; space heating and domestic hot water draw heat **only from the heat storage** (the storage also serves house heating, not just DHW); legacy no-store path unchanged
+  - [x] **Heat storage temperature band (year-sim):** storage temperature may float between `setpoint − tolerance` and **95 °C**; only above 95 °C is the solar collector heat input capped (`HEAT_STORAGE_ABS_MAX_C` in `optimizer/thermal_coupled.py`)
+  - [x] **Heat pump in the band (year-sim):** WP bang-bang at the floor; WP heat capped at `setpoint` (not `setpoint + tolerance`); above the setpoint WP stays off (surplus above setpoint from solar only)
+  - [x] **Below the band (year-sim):** if projected storage temperature drops below `setpoint − tolerance`, the heat pump **must** heat (hard lower bound)
+  - [x] **Below the band (Live/MILP):** align Live/MILP with year-sim hard lower bound (and opportunistic WP in `[setpoint−tol, setpoint]`) — still daily electric kWh flex only; MILP store-T SoC remains out of scope for this slice; Live reads `T_eq` + `T_low`
+  - [x] Change default year of Yearly view on HK page (also on SE page) to the last / current year not 2023
+  - [x] **Virtual heat-content sensor (prep for Thermals P3)** — derive `Q = C(V) × T` (C from `capacity_kwh_per_k_from_volume`, T ref 0 °C) for heat storage and pool; same C for sim and measured. Stratified tanks: SM supplies energy-equivalent `T_eq` (not top sensor alone). Spec: Entwicklungsplan §3.5; operator guide [`docs/konfiguration/waermespeicher-schichtung-teq.md`](../docs/konfiguration/waermespeicher-schichtung-teq.md); physics [`docs/spec/thermals-p2.md`](../docs/spec/thermals-p2.md)
+    - [x] **EHAL binding** `sens_temperature_heat_storage` (`T_eq`) + `sens_temperature_heat_storage_low` (`T_low`) on `thermal_annual` — Live floor/`T_low` hint wired
+    - [x] **Reference installation `T_eq` weights:** only **three** sensors (S3 oben / S4 mitte / S5 unten) in a tank with four sensor wells (310 / 745 / 1250 / 1710 mm); occupied wells not confirmed. **Provisional mapping (best fit of one snapshot against four dial thermometers):** S3 → 1710, S4 → 1250, S5 → 745 mm → `0.27*T_oben + 0.24*T_mitte + 0.49*T_unten` (Schritt A in [`waermespeicher-schichtung-teq.md`](../docs/konfiguration/waermespeicher-schichtung-teq.md)). Risk: lowest ~530 mm (well 310 mm) unmeasured → `T_eq` too high when the tank bottom is cold; consider a fourth immersion sensor in the 310 mm well. Verify mapping with several dial-vs-Loxone snapshots under different stratification, then fix `w_i`
+    - [x] **Live:** read measured `T_eq` → `Q_meas`; compute `Q_sim` from RC state / short forecast; persist via `thermal_observability` on `optimization_history.jsonl`
+    - [x] **Year-sim / HK model path:** expose `Q_sim` hour series (`heat_content_series` on consumption display bundle)
+    - [x] **Weekly chart:** simulated vs measured heat content (kWh) for heat storage and pool — HK Gesamt-Lastverhalten / Stündlicher Verlauf (Ist from Live history when available)
+    - [x] **Move Wärmeinhalt chart** from HK Gesamt-Lastverhalten to page **Analyse Verbrauch & Kosten** — show **past** MILP-simulated vs measured heat content (`Q_sim` / `Q_meas` from Live `thermal_observability` / `optimization_history.jsonl`), not the year-sim HK model series; keep model-only °C axis on HK Stündlicher Verlauf
+    - [x] Remove Swimspa charts on page Analyse v&K including code for that
+
+### Minor: Remove EHAL flex.set_power_setpoint (2026-09-30)
+
+- [x] **Remove EHAL `flex.{slug}.set_power_setpoint` permanently** — unused for live control (non-EV flex writes only `set_enable`; variable kW/A is EV-only via `set_evcs_max_current`). Stripped Pattern B field + legacy stub `flex.power_setpoint_name` / non-EV migrate from `loxone_outputs.power_setpoint_name`; mapping UI / Live-Schreiben expected fields / `share/ehal/roles/consumer.json` / greenfield recipes / docs (`loxone-signals`, `ehal-com`). EV `set_evcs_max_current` kept. Heat-pump Prio3 temperature-setpoint path (2.+1) unrelated.
+
+### Bugfix Loxone Live-Lesen range checks removed (2026-09-30)
+
+- [x] **Loxone Live-Lesen range checks removed** — Dropped Earnie-side SoC/power/temp/binary/export min–max validators in `loxone_connectivity` (Loxone already enforces ranges). Live-Lesen still fails on read/parse only. Live acceptance verified (EHAL-Com Live-Lesen / `verify_loxone_setup`).
+
+### Bugfix EHAL-Com Mapping-Tabelle EHAL column (2026-09-30)
+
+- [x] **EHAL-Com Mapping-Tabelle EHAL column** — HTTP-Probe scan shows `ehal` (house binding reverse, else greenfield device map); columns ordered `name, ehal, type, source, room, category, uuid`. Live acceptance verified.
+
+### 2.7.a dogfood — Loxone productive + live test (2026-09-30)
+
+- [x] **2.7.a dogfood — Loxone productive + live test** (wiring archived 2026-09-29)
+  - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (unconstrained = PV kWp sum + battery max discharge kW)
+  - Prefer Shadow dogfood via **2.7.f**; completes the open live-test from wiring-only archive
+
+### Bugfix Stale SoC sanitize chain (2026-09-30)
+
+- [x] **Stale SoC sanitize chain** (`debug_dump_20260927_083552`) — Trust plant SoC when closed-interval sampler confirms against history (`closed_interval_confirms_reported` + `reported_soc_percent` consecutive count). Live acceptance verified.
+
+### 2.7.d — One-way storage type folded into 2.7.g / 2.7.h (2026-09-29)
+
+- [x] **2.7.d — One-way storage type** (planning fold; not implemented as a standalone letter)
+  - Superseded by the shared powerstation model: **2.7.g** (`role: single_use`, physical `backing` = former one-way / no forced discharge) and **2.7.h** (`role: standby_backup`, owns `set_ess_source_select` / EcoFlow mapping / Loxone Merker bridge)
+  - No separate `batteries[].direction: one_way` flag — use `type: powerstation` + `backing` + `role` instead
+  - Open work continues under [Backlog.md](Backlog.md) **2.7.g** / **2.7.h**
+
+### 2.7.a dogfood — Loxone wiring (partial) (2026-09-29)
+
+- [x] **2.7.a dogfood — Loxone productive wiring** (partial)
+  - Wire export-limit Merker / VI–VO in the productive Loxone config (`set_grid_export_power_limit`, optional inbound `get_grid_export_power_limit`; Einspeisesperre = limit `0`, `set_ess_mode` stays battery-only)
+  - Bind in EHAL-Com; set a HK `plant.max_export_power_kw` and verify Live writes + MILP respect the cap
+  - Live-test closed 2026-09-30 → `### 2.7.a dogfood — Loxone productive + live test (2026-09-30)`
+
+### 2.7.f — Shadow Mode S2+S3: Dev client (2026-09-29)
+
+- [x] **2.7.f — Shadow Mode S2+S3: Dev client** (depends on Prod running **2.6.o** recorder)
+  - Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) — `EARNIE_SHADOW=1` only (`runtime_store.shadow.is_shadow_mode()`); implies silent; never a config key
+  - **S2:** transport replay (§6.1–6.2), central write block + `shadow_writes.jsonl` (§6.3), config read-only / skip load-time migrations that write (§6.4), startup checks (§4.2), release guard (§4.4); own mandatory runtime dir + optional `scripts.shadow_seed_runtime`
+  - Accept Prod’s `earnie_data_model` if in `COMPATIBLE_DATA_MODELS`; never migrate/re-stamp shared config. No Shadow `config_overlay` in v1 (Prod-rejected keys not testable)
+  - **S3:** UI banner + feed health + would-write table; `EARNIE_UI_STREAMLIT_PORT`; German user docs (`docs/einrichtung/`) + `DEVELOPER.md`
+  - Tests per spec §10; E2E with HouseSim as Prod backend (`tests/test_shadow_*.py` — 36 passed)
+  - **Out of scope (unchanged):** S4 Soll/Soll diff + offline JSONL backtest → **2.+1**; Shadow as 2nd HA add-on (scenario C)
+
 ### Official 2.6.0 release (2026-09-30)
 
 - [x] Bump `version.py` **2.6.0-alpha.12** → **2.6.0**; release notes `.github/release-notes/v2.6.0.md`
@@ -141,6 +209,15 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - [x] Verified — `remote_backtesting_support` S2083: validate absolute share roots + relative `result_dir`
   - [x] Obsolete — Still failing / accept after scan: `release-publish.yml` `pip install -r requirements.txt` (S8541 / S8544 — `--only-binary=:all:` breaks local package `.`); `new_coverage` informational
   - [x] Obsolete — Optional follow-ups: raise new-code coverage; `ui/chart_trace_segments.py` S3923 if still open; confirm S8707/S8705 gone after next Sonar analysis
+
+### 2.7.a — Export power limitation (2026-09-26)
+
+- [x] **2.7.a — Export power limitation** (Live / MILP / EHAL; HK static cap) — code on `feature/2.7` (`46918e8`)
+  - Hard ceilings (kW): effective export cap = `min` of active sources (HK `plant.max_export_power_kw`, inbound EHAL `get_grid_export_power_limit`, pay-to-export → 0); MILP `p_grid_sell` constraint
+  - Soft / economic: positive export tariffs prefer avoiding export (objective), separate from hard ceiling
+  - Outbound `set_grid_export_power_limit` + ESS mode Einspeisesperre (**3**); Loxone VI/VO templates + greenfield/recipe maps; HA/OpenEMS adapters
+  - Helpers: `optimizer/export_power_limit.py`, `optimizer/live_export_limit.py`; HK UI `ui/house_config_plant.py`; tests `test_export_power_limit` / `test_live_export_limit` / `test_milp_export_cap`
+  - Live-test dogfood closed 2026-09-30 (Loxone wiring archived 2026-09-29)
 
 ### Release approval gate — candidate → approve → publish (2026-09-26)
 

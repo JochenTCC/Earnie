@@ -14,12 +14,6 @@
       "loxone_blocks_key": "ehal_bindings.flex.{id}.set_enable",
       "suggested_name": "Earnie_Verbraucher_Freigabe",
       "notes": "Enable / Freigabe write."
-    },
-    {
-      "ehal_field": "flex.set_power_setpoint",
-      "loxone_blocks_key": "ehal_bindings.flex.{id}.set_power_setpoint",
-      "suggested_name": "Earnie_Verbraucher_Ziel_kW",
-      "notes": "Optional kW setpoint on flex consumer."
     }
   ],
   "reference": "docs/referenz/loxone-signals.md"

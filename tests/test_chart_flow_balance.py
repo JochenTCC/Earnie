@@ -148,6 +148,26 @@ def test_full_battery_pv_surplus_skips_charge_segment() -> None:
     assert slot.is_visually_balanced
 
 
+def test_pay_to_export_shrinks_pv_bar_and_hides_export() -> None:
+    """Neg. Einspeisetarif + clipped Netzbezug: no Einspeisung bars; PV up-bar = used only."""
+    row = {
+        "PV-Prognose (kW)": 8.125,
+        "Verbrauch-Prognose (kW)": 0.526,
+        "SwimSpa (kW)": 0.0,
+        "Geplante Batterie-Aktion (kW)": 0.0,
+        "Netzbezug (kW)": 0.0,
+        "Einspeisevergütung (Cent/kWh)": -0.947,
+        "Simulierter SoC (%)": 100.0,
+    }
+    slot = build_flow_balance_segments(row, flex_consumers=_flex_pairs())
+    kinds_down = {segment.kind for segment in slot.down}
+    assert KIND_EXPORT_PV not in kinds_down
+    assert KIND_EXPORT_BATTERY not in kinds_down
+    pv = next(segment for segment in slot.up if segment.kind == KIND_PV)
+    assert pv.kw == pytest.approx(0.526)
+    assert slot.is_visually_balanced
+
+
 def test_rows_without_soc_keep_planned_charge() -> None:
     row = {
         "PV-Prognose (kW)": 10.0,

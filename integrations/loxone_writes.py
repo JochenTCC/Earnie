@@ -42,11 +42,22 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
 def _send_loxone_value_traced(input_name: str, value: float) -> LoxoneWriteRecord:
     """Sendet einen Steuerwert und liefert Erfolg plus Zeitstempel."""
     from integrations import loxone_client as lc
+    from runtime_store.shadow.writes import block_write_if_shadow
 
     io_name = str(input_name or "").strip()
     written_at = datetime.now().isoformat(timespec="seconds")
     if not io_name:
         return LoxoneWriteRecord(io_name="", value=float(value), success=False, written_at=written_at)
+
+    if block_write_if_shadow(
+        backend="loxone",
+        target=io_name,
+        value=float(value),
+        source="loxone_writes",
+    ):
+        return LoxoneWriteRecord(
+            io_name=io_name, value=float(value), success=False, written_at=written_at
+        )
 
     url = f"http://{config.get('LOXONE_IP')}/dev/sps/io/{io_name}/{value}"
     timeout_val = config.get_global_timeout(default=5)
@@ -92,6 +103,7 @@ def map_ess_setpoints(
     ``active_power_kw`` uses EHAL sign (+discharge, −charge). ``None`` means Automatik /
     Entladesperre without a forced Equals setpoint. Limits are true caps (kW magnitudes).
     ``mode_hint`` is for Loxone/HA (Huawei Steuerbefehl); OpenEMS ignores it.
+    Battery-only: export caps travel on ``set_grid_export_power_limit`` (2.7.a).
     """
     max_kw = max(0.0, abs(float(max_power_kw)))
     target = max(0.0, abs(float(target_power_kw)))
@@ -322,6 +334,9 @@ def _write_flexible_consumer_output(
     return records
 
 
+_OMIT_EXPORT_CAP = object()
+
+
 def build_sent_loxone_snapshot(
     mode: int,
     target_power_kw: float,
@@ -329,6 +344,8 @@ def build_sent_loxone_snapshot(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None,
     consumer_pv_follow: dict[str, int] | None = None,
+    *,
+    export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
 ) -> dict[str, float]:
     """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
     max_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
@@ -355,6 +372,25 @@ def build_sent_loxone_snapshot(
         else:
             snapshot[str(cfg_name)] = float(value)
 
+    if export_cap_kw is not _OMIT_EXPORT_CAP:
+        from house_config.ehal_bindings import resolve_plant_binding
+        from optimizer.export_power_limit import export_limit_setpoint_kw
+        from optimizer.live_export_limit import (
+            live_unconstrained_export_kw,
+            load_house_doc,
+        )
+
+        export_marker = resolve_plant_binding(
+            load_house_doc(), "set_grid_export_power_limit"
+        )
+        if export_marker:
+            cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
+            snapshot[str(export_marker)] = float(
+                export_limit_setpoint_kw(
+                    cap, unconstrained_kw=live_unconstrained_export_kw()
+                )
+            )
+
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         _write_flexible_consumer_output(
             consumer, consumer_powers, contexts, snapshot, consumer_pv_follow, send=False
@@ -364,7 +400,11 @@ def build_sent_loxone_snapshot(
 
 
 def send_huawei_modbus_states(
-    mode: int, target_power_kw: float, target_soc: float
+    mode: int,
+    target_power_kw: float,
+    target_soc: float,
+    *,
+    export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
 ) -> list[LoxoneWriteRecord]:
     """Übersetzt Optimierungsmodi und schreibt ESS-Steuerwerte (Design C1) an Loxone."""
     from house_config.battery_control import (
@@ -419,6 +459,30 @@ def send_huawei_modbus_states(
         else:
             send_value = float(value)
         records.append(lc._send_loxone_value_traced(str(cfg_name), send_value))
+
+    if export_cap_kw is not _OMIT_EXPORT_CAP:
+        from house_config.ehal_bindings import resolve_plant_binding
+        from optimizer.export_power_limit import export_limit_setpoint_kw
+        from optimizer.live_export_limit import (
+            live_unconstrained_export_kw,
+            load_house_doc,
+        )
+
+        export_marker = resolve_plant_binding(
+            load_house_doc(), "set_grid_export_power_limit"
+        )
+        if export_marker:
+            cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
+            records.append(
+                lc._send_loxone_value_traced(
+                    str(export_marker),
+                    float(
+                        export_limit_setpoint_kw(
+                            cap, unconstrained_kw=live_unconstrained_export_kw()
+                        )
+                    ),
+                )
+            )
     return records
 
 

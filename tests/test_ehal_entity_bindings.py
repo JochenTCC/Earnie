@@ -62,7 +62,7 @@ def test_migrate_consumer_legacy_to_ehal_bindings_ev():
     assert bindings["flex.ev1.set_enable"] == "EV_Enable"
 
 
-def test_migrate_consumer_flex_power_setpoint():
+def test_migrate_consumer_flex_power_setpoint_dropped():
     consumer = {
         "id": "pump",
         "type": "generic",
@@ -70,8 +70,28 @@ def test_migrate_consumer_flex_power_setpoint():
         "loxone_outputs": {"power_setpoint_name": "Pump_Set", "enable_name": "Pump_En"},
     }
     bindings = migrate_consumer_legacy_to_ehal_bindings(consumer)
-    assert bindings["flex.pump.set_power_setpoint"] == "Pump_Set"
+    assert bindings["flex.pump.sens_power_act"] == "Pump_P"
+    assert bindings["flex.pump.set_enable"] == "Pump_En"
+    assert "flex.pump.set_power_setpoint" not in bindings
     assert "set_evcs_max_current" not in bindings
+
+
+def test_migrate_strips_existing_flex_power_setpoint_binding():
+    consumer = {
+        "id": "pump",
+        "type": "generic",
+        "ehal_bindings": {
+            "flex.pump.sens_power_act": "Pump_P",
+            "flex.pump.set_enable": "Pump_En",
+            "flex.pump.set_power_setpoint": "Pump_Set",
+            "flex.power_setpoint_name": "Legacy_Stub",
+        },
+    }
+    bindings = migrate_consumer_legacy_to_ehal_bindings(consumer)
+    assert bindings["flex.pump.sens_power_act"] == "Pump_P"
+    assert bindings["flex.pump.set_enable"] == "Pump_En"
+    assert "flex.pump.set_power_setpoint" not in bindings
+    assert "flex.power_setpoint_name" not in bindings
 
 
 def test_resolve_plant_binding_has_no_loxone_blocks_fallback():

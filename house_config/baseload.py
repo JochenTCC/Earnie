@@ -100,7 +100,9 @@ def consumer_annual_kwh(consumer: dict) -> float:
 
         return estimate_ev_annual_kwh(consumer)
     if consumer.get("type") == "thermal_annual":
-        thermal = consumer.get("thermal") or consumer
+        thermal = dict(consumer.get("thermal") or consumer)
+        if "nominal_power_kw" not in thermal:
+            thermal["nominal_power_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
         lat = thermal.get("latitude")
         lon = thermal.get("longitude")
         # Open-Meteo only after Config() finished — during profile normalize inside

@@ -21,6 +21,7 @@ TELEMETRY_OPTIONAL = (
     "sens_power_consumers",
     "sens_temperature_outside",
     "sens_absent_mode",
+    "get_grid_export_power_limit",
 )
 SETPOINT_FIELDS = (
     "set_ess_active_power",
@@ -29,6 +30,7 @@ SETPOINT_FIELDS = (
     "set_ess_mode",
     "set_evcs_max_current",
     "set_evcs_mode",
+    "set_grid_export_power_limit",
 )
 EHAL_MAP_FIELDS = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + SETPOINT_FIELDS
 EXTRAS_FIELDS: tuple[str, ...] = ()
@@ -44,6 +46,8 @@ EHAL_TO_BLOCKS: dict[str, str] = {
     "set_ess_charge_power_limit": "target_charge_power_name",
     "set_ess_discharge_power_limit": "target_discharge_power_name",
     "set_ess_mode": "control_cmd_name",
+    "get_grid_export_power_limit": "grid_export_limit_in_name",
+    "set_grid_export_power_limit": "grid_export_limit_out_name",
 }
 
 # Prefer ehal.profiles (2.4.g); keep local fallback if import fails in odd envs.
@@ -83,6 +87,18 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "set_ess_charge_power_limit": ("ladegrenze", "charge limit", "max lade"),
     "set_ess_discharge_power_limit": ("entladegrenze", "discharge limit", "max entlade"),
     "set_ess_mode": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd", "ess mode"),
+    "get_grid_export_power_limit": (
+        "einspeisegrenze",
+        "export limit",
+        "feed-in limit",
+        "grid export limit",
+    ),
+    "set_grid_export_power_limit": (
+        "einspeisegrenze",
+        "export limit",
+        "feed-in curtail",
+        "einspeise leistungs",
+    ),
     "set_evcs_max_current": (
         "maxstrom",
         "max current",
@@ -123,10 +139,8 @@ _HINTS: dict[str, tuple[str, ...]] = {
     ),
     "flex.power_name": ("leistung", "power", "verbrauch"),
     "flex.enable_name": ("freigabe", "enable", "sg ready"),
-    "flex.power_setpoint_name": ("sollwert", "setpoint", "ziel leistung"),
     "flex.sens_power_act": ("leistung", "power", "verbrauch"),
     "flex.set_enable": ("freigabe", "enable", "sg ready"),
-    "flex.set_power_setpoint": ("sollwert", "setpoint", "ziel leistung"),
 }
 
 

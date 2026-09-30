@@ -275,6 +275,31 @@ def _render_thermal_annual_building_fields(
         format_func=building_class_option_label,
         key=_scoped_key(session_scope, f"hc_class_{index}"),
     )
+    from optimizer.thermal_house import (
+        BUILDING_MASS_C_WH_PER_M2K,
+        DEFAULT_BUILDING_MASS,
+        normalize_building_mass,
+    )
+
+    mass_options = list(BUILDING_MASS_C_WH_PER_M2K.keys())
+    mass_current = normalize_building_mass(thermal.get("building_mass"))
+    item["building_mass"] = labeled_selectbox(
+        "Bauweise (Wärmespeicher)",
+        options=mass_options,
+        index=mass_options.index(mass_current)
+        if mass_current in mass_options
+        else mass_options.index(DEFAULT_BUILDING_MASS),
+        format_func=lambda key: {
+            "leicht": "Leicht (50 Wh/m²K)",
+            "mittel": "Mittel (90 Wh/m²K)",
+            "schwer": "Schwer (130 Wh/m²K)",
+        }.get(key, key),
+        key=_scoped_key(session_scope, f"hc_building_mass_{index}"),
+    )
+    st.caption(
+        "DIN V 18599-2: wirksame Wärmekapazität C = Wert × Wohnfläche "
+        "(für Aufheizen/Auskühlen in Übergangszeiten)."
+    )
     use_exact_hwb = labeled_checkbox(
         "Genaue HWB-Angabe",
         value=bool(float(thermal.get("hwb_kwh_m2", 0.0) or 0.0) > 0),
@@ -321,6 +346,27 @@ def _render_thermal_comfort_fields(
         step=0.5,
         key=_scoped_key(session_scope, f"hc_target_temp_{index}"),
     )
+    from optimizer.thermal_house import DEFAULT_HOUSE_TOLERANCE_C
+
+    item["house_tolerance_c"] = labeled_number_input(
+        "Heizband Toleranz (K)",
+        min_value=0.05,
+        value=float(thermal.get("house_tolerance_c", DEFAULT_HOUSE_TOLERANCE_C)),
+        step=0.1,
+        key=_scoped_key(session_scope, f"hc_house_tol_{index}"),
+    )
+    h_existing = thermal.get("house_heat_loss_kw_per_k")
+    h_value = float(h_existing) if h_existing not in (None, "") else 0.0
+    item_h = labeled_number_input(
+        "Haus-Verlustkoeffizient H (kW/K, 0 = auto aus HWB)",
+        min_value=0.0,
+        value=h_value,
+        step=0.01,
+        format="%.3f",
+        key=_scoped_key(session_scope, f"hc_house_h_{index}"),
+    )
+    if float(item_h) > 0.0:
+        item["house_heat_loss_kw_per_k"] = float(item_h)
     item["absent_temp_reduction_c"] = labeled_number_input(
         "Temperaturabsenkung wenn abwesend",
         min_value=0.0,
@@ -356,6 +402,62 @@ def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
     )
 
 
+def _render_thermal_storage_fields(
+    thermal: dict,
+    index: int,
+    *,
+    session_scope: str,
+) -> dict | None:
+    """Optional heat storage; volume 0 disables coupled path (legacy open-loop)."""
+    existing = thermal.get("heat_storage") if isinstance(thermal.get("heat_storage"), dict) else {}
+    volume = labeled_number_input(
+        "Wärmespeicher Volumen (Liter)",
+        min_value=0.0,
+        value=float(existing.get("volume_liters", 0.0) or 0.0),
+        step=50.0,
+        help=(
+            "0 = bisheriges Modell (Solar als Tages-Gutschrift). "
+            ">0 = gekoppelt: Solar und WP speisen den Speicher, Hausbedarf entnimmt."
+        ),
+        ratios=WIDE_LABEL_RATIOS,
+        key=_scoped_key(session_scope, f"hc_storage_vol_{index}"),
+    )
+    if float(volume) <= 0.0:
+        return None
+    return {
+        "volume_liters": float(volume),
+        "heat_loss_kw_per_k": labeled_number_input(
+            "Wärmespeicher Verlust (kW/K)",
+            min_value=0.0,
+            value=float(existing.get("heat_loss_kw_per_k", 0.02) or 0.02),
+            step=0.005,
+            format="%.3f",
+            help=(
+                "U des Speichers gegen Umgebung (typ. ~0.005–0.02), "
+                "nicht Gebäude-LT+LV aus dem Energieausweis. "
+                "Zu groß → Sommer-WP-Bedarf trotz Solar zu hoch."
+            ),
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_storage_u_{index}"),
+        ),
+        "setpoint_c": labeled_number_input(
+            "Wärmespeicher Soll (°C)",
+            value=float(existing.get("setpoint_c", 45.0)),
+            step=1.0,
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_storage_set_{index}"),
+        ),
+        "tolerance_c": labeled_number_input(
+            "Wärmespeicher Toleranz (K)",
+            min_value=0.1,
+            value=float(existing.get("tolerance_c", 5.0) or 5.0),
+            step=0.5,
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_storage_tol_{index}"),
+        ),
+    }
+
+
 def _render_thermal_annual_wp_preview(
     item: dict,
     thermal: dict,
@@ -376,6 +478,11 @@ def _render_thermal_annual_wp_preview(
             default_azimuth=location["default_pv_azimuth"],
         )
     )
+    storage = _render_thermal_storage_fields(
+        thermal, index, session_scope=session_scope
+    )
+    if storage is not None:
+        item["heat_storage"] = storage
     if _live_markers_enabled():
         st.caption(
             "WP-Merker unter **Daemon Control → EHAL-Com** "
@@ -486,9 +593,12 @@ def _live_consumer_for_annual(
         for field, key_suffix, cast in (
             ("living_area_m2", f"hc_area_{index}", float),
             ("building_class", f"hc_class_{index}", int),
+            ("building_mass", f"hc_building_mass_{index}", str),
             ("persons", f"hc_persons_{index}", int),
             ("heat_pump_type", f"hc_wp_{index}", str),
             ("hwb_kwh_m2", f"hc_hwb_{index}", float),
+            ("house_tolerance_c", f"hc_house_tol_{index}", float),
+            ("house_heat_loss_kw_per_k", f"hc_house_h_{index}", float),
         ):
             key = _scoped_key(session_scope, key_suffix)
             if key in st.session_state:

@@ -45,6 +45,11 @@
       "type": "string",
       "enum": ["off", "pv", "now"],
       "description": "EV charge mode: off (idle/absent/complete), pv (PV-follow), or now (immediate)."
+    },
+    "set_grid_export_power_limit": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Max grid export power in W (non-negative magnitude). 0 = no export; unconstrained = plant maximum (PV kWp + force-discharge ESS kW), fallback 1000000."
     }
   },
   "anyOf": [
@@ -53,7 +58,8 @@
     {"required": ["set_ess_discharge_power_limit"]},
     {"required": ["set_ess_mode"]},
     {"required": ["set_evcs_max_current"]},
-    {"required": ["set_evcs_mode"]}
+    {"required": ["set_evcs_mode"]},
+    {"required": ["set_grid_export_power_limit"]}
   ],
   "additionalProperties": false
 }

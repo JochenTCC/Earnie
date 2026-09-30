@@ -22,6 +22,8 @@ def _help_text() -> str:
 
 
 def render() -> None:
+    from runtime_store.shadow.mode import is_shadow_mode
+
     render_page_title_with_help(
         "🏠 Hauskonfigurator",
         _help_text(),
@@ -29,6 +31,11 @@ def render() -> None:
         page_docs_key="house-config",
     )
     st.caption(f"Datei: `{resolve_house_profiles_json_path()}`")
+    if is_shadow_mode():
+        st.info(
+            "Shadow-Modus: Hauskonfigurator ist schreibgeschützt "
+            "(Prod-Config). EHAL-Mapping kann weiterhin ins Runtime-Overlay."
+        )
 
     # Reseed before widget when missing OR None/invalid (deselection leaves key present as None).
     if st.session_state.get(_HOUSE_CONFIG_TAB_KEY) not in _HOUSE_CONFIG_TABS:

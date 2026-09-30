@@ -319,10 +319,108 @@ def test_thermal_milp_chooses_cheaper_hours():
             pulse_lengths.append(index - start)
         else:
             index += 1
-    assert all(1 <= length <= 4 for length in pulse_lengths)
+    max_on = int(consumer.get("max_on_quarterhours", 16) or 16)
+    assert pulse_lengths
+    assert all(1 <= length <= max_on for length in pulse_lengths)
     nominal = consumer["nominal_power_kw"]
     for hour, var in enumerate(on):
         if var.varValue and var.varValue > 0.5:
             assert model.consumer_milp_charge_kw["wp_heating"] == pytest.approx(nominal)
         else:
             assert var.varValue is not None and var.varValue <= 0.5
+
+
+def test_thermal_milp_live_forced_indices_are_on():
+    """Live store floor forced_indices → ON in the MILP solution."""
+    from optimizer.cbc_solver import solve_with_strict_fallback
+    from optimizer.milp import _add_milp_objective
+    from optimizer.milp_consumers import filter_feasible_consumers
+    from optimizer.milp_horizon import _build_milp_model
+    from optimizer.thermal_flex_context import add_thermal_flex_constraints
+
+    consumer = planning_thermal_to_milp(_wp_consumer())
+    day = date(2024, 1, 15)
+    matrix = []
+    for hour in range(8):
+        matrix.append(
+            {
+                "hour": hour,
+                "date": day,
+                "slot_datetime": datetime.combine(day, time(hour, 0)),
+                "k_act": 50.0,
+                "price_buy": 0.50,
+                "expected_p_act": 0.5,
+                "expected_p_pv": 0.0,
+                "consumption_mode": "live_snapshot",
+            }
+        )
+    contexts = {
+        consumer["id"]: {
+            "daily_targets": {day: 2.0},
+            "forced_indices": [0, 1],
+            "live_day_min_kwh": {day: 2.0},
+            "floor_kwh": 2.0,
+            "opp_cap_kwh": 0.0,
+        }
+    }
+    remaining = {consumer["id"]: 2.0}
+    battery = {
+        "min_soc": 10.0,
+        "max_soc": 100.0,
+        "max_power_kw": 5.0,
+        "battery_capacity_kwh": 10.0,
+        "efficiency": 0.95,
+    }
+    planned = filter_feasible_consumers(
+        [consumer], remaining, matrix, list(range(8)), False, {}, {}
+    )
+    model = _build_milp_model(
+        matrix, 8, battery, 50.0, planned, 0.0, remaining, {}
+    )
+    _add_milp_objective(model, matrix, 3.5, {}, wear_cent_per_kwh=0.0)
+    add_thermal_flex_constraints(model, matrix, list(range(8)), contexts)
+    assert solve_with_strict_fallback(model.prob, msg=False) == "Optimal"
+    on = model.consumer_on[consumer["id"]]
+    assert on[0].varValue and on[0].varValue > 0.5
+    assert on[1].varValue and on[1].varValue > 0.5
+
+
+def test_resolve_thermal_flex_se_has_no_forced_indices(monkeypatch):
+    """SE / profile_spec matrices stay climate-only (no Live store overlay)."""
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
+    profile = _house_profile()
+    profile["consumers"][0]["thermal"] = {
+        "living_area_m2": 157.0,
+        "building_class": 2,
+        "heat_pump_type": "erde",
+        "persons": 2,
+        "target_temp_c": 21.5,
+        "heating_limit_c": 15.0,
+        "heat_storage": {
+            "volume_liters": 500.0,
+            "heat_loss_kw_per_k": 0.02,
+            "setpoint_c": 45.0,
+            "tolerance_c": 5.0,
+        },
+    }
+    consumer = planning_thermal_to_milp(profile["consumers"][0])
+    day = date(2024, 1, 15)
+    matrix = [
+        {
+            "hour": hour,
+            "date": day,
+            "slot_datetime": datetime.combine(day, time(hour, 0)),
+            "k_act": 10.0,
+            "price_buy": 0.10,
+            "expected_p_act": 0.5,
+            "expected_p_pv": 0.0,
+            "consumption_mode": "profile_spec",
+        }
+        for hour in range(24)
+    ]
+    contexts = resolve_thermal_flex_contexts(matrix, [consumer], profile)
+    ctx = contexts[consumer["id"]]
+    assert "forced_indices" not in ctx
+    assert "live_day_min_kwh" not in ctx

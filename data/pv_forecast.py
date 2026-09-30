@@ -199,6 +199,27 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
     """Prüft Cache-Gültigkeit und holt ggf. neue API-Daten (Cache pro URL)."""
     now_time = datetime.now()
     cached = _CACHED_HOURLY_WATTS_BY_URL.get(url)
+
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        # Never call forecast.solar from Shadow (shared IP rate limit with Prod).
+        feed_key = f"ext:pv_forecast:{_shadow_url_hash(url)}"
+        from runtime_store.shadow.replay import replay_ext_payload
+
+        data = replay_ext_payload(feed_key)
+        if isinstance(data, dict):
+            hourly_watts = data.get("result", {}).get("watts", {})
+            if hourly_watts:
+                _CACHED_HOURLY_WATTS_BY_URL[url] = hourly_watts
+                _set_fetch_source("shadow_feed")
+                return hourly_watts
+        if cached is not None:
+            _set_fetch_source("cache")
+            return cached
+        _set_fetch_source("shadow_missing")
+        return None
+
     should_return, early = _pre_fetch_cached_or_none(now_time, cached)
     if should_return:
         return early

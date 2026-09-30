@@ -147,8 +147,15 @@ def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
     if not io_name:
         return None
 
-    timeout_val = config.get_global_timeout(default=5)
     feed_key = f"loxone:io:{io_name}"
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        from runtime_store.shadow.replay import replay_loxone_io
+
+        return replay_loxone_io(feed_key)
+
+    timeout_val = config.get_global_timeout(default=5)
     try:
         response = requests.get(
             _loxone_jdev_url(io_name),
@@ -251,8 +258,15 @@ def _fetch_loxone_io_all(io_name: str) -> Optional[dict]:
     if not io_name:
         return None
 
-    timeout_val = config.get_global_timeout(default=5)
     feed_key = f"loxone:io_all:{io_name}"
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        from runtime_store.shadow.replay import replay_loxone_io_all
+
+        return replay_loxone_io_all(feed_key)
+
+    timeout_val = config.get_global_timeout(default=5)
     try:
         response = requests.get(
             _loxone_jdev_all_url(io_name),
@@ -439,6 +453,26 @@ def _default_house_profiles_doc() -> dict | None:
     except Exception as exc:
         logger.warning("house_profiles für Plant-Bindings nicht geladen: %s", exc)
         return None
+
+
+def fetch_heat_storage_temps(
+    consumer: dict,
+    *,
+    house_doc: dict | None = None,
+) -> dict:
+    """Read heat-storage T_eq / T_low for thermal_annual (missing → None)."""
+    from settings.ehal_marker_resolve import (
+        marker_sens_temperature_heat_storage,
+        marker_sens_temperature_heat_storage_low,
+    )
+
+    _ = house_doc  # reserved for plant-scoped fallbacks
+    eq_io = marker_sens_temperature_heat_storage(consumer)
+    low_io = marker_sens_temperature_heat_storage_low(consumer)
+    return {
+        "temp_eq_c": _read_optional_temp_c(eq_io),
+        "temp_low_c": _read_optional_temp_c(low_io),
+    }
 
 
 def fetch_thermal_readings(

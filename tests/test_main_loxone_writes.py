@@ -103,3 +103,30 @@ def test_main_run_state_omits_loxone_writes_when_silent(monkeypatch):
     send_flex.assert_not_called()
     assert saved
     assert saved[0]["loxone_writes"] is None
+
+
+def test_main_invokes_setpoint_writes_when_shadow_silent(monkeypatch, tmp_path):
+    """Shadow implies silent but still calls send_* so would-writes are logged."""
+    patch_main_run(monkeypatch, silent=True)
+    runtime = tmp_path / "rt"
+    runtime.mkdir()
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime))
+    monkeypatch.setattr(main_module.ehal_live, "is_ehal_network_backend", lambda: False)
+    saved: list[dict] = []
+    monkeypatch.setattr(
+        main_module.run_state,
+        "save_run_state",
+        lambda payload: saved.append(payload),
+    )
+    send_huawei = MagicMock(return_value=[])
+    send_flex = MagicMock(return_value=[])
+    monkeypatch.setattr(main_module.loxone_client, "send_huawei_modbus_states", send_huawei)
+    monkeypatch.setattr(main_module.loxone_client, "send_flexible_consumer_states", send_flex)
+
+    main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
+
+    send_huawei.assert_called_once()
+    send_flex.assert_called_once()
+    assert saved
+    assert saved[0]["loxone_writes"] == []

@@ -55,16 +55,6 @@ def marker_flex_enable(consumer: dict) -> str:
     return binding_address(ehal_bindings(consumer), cid, KIND_SET_ENABLE)
 
 
-def marker_flex_power_setpoint(consumer: dict) -> str:
-    """Consumer Sollwert from ``ehal_bindings`` (Pattern B)."""
-    from ehal.flex_fields import KIND_SET_POWER_SETPOINT, binding_address
-
-    cid = str(consumer.get("id") or "").strip()
-    if not cid:
-        return ""
-    return binding_address(ehal_bindings(consumer), cid, KIND_SET_POWER_SETPOINT)
-
-
 def marker_sens_evcs_connected(consumer: dict) -> str:
     return resolve_lox_marker(consumer, "sens_evcs_connected")
 
@@ -128,6 +118,18 @@ def marker_sens_temperature_water(consumer: dict) -> str:
     return _first_nonempty(ehal_bindings(consumer).get("sens_temperature_water"))
 
 
+def marker_sens_temperature_heat_storage(consumer: dict) -> str:
+    return _first_nonempty(
+        ehal_bindings(consumer).get("sens_temperature_heat_storage"),
+    )
+
+
+def marker_sens_temperature_heat_storage_low(consumer: dict) -> str:
+    return _first_nonempty(
+        ehal_bindings(consumer).get("sens_temperature_heat_storage_low"),
+    )
+
+
 def marker_get_temperature_water_setpoint(consumer: dict) -> str:
     return _first_nonempty(
         ehal_bindings(consumer).get("get_temperature_water_setpoint"),
@@ -164,6 +166,17 @@ def marker_sens_absent_mode(
     from house_config.ehal_bindings import resolve_plant_binding
 
     return resolve_plant_binding(house_doc, "sens_absent_mode", config_doc)
+
+
+def marker_get_grid_export_power_limit(
+    *,
+    house_doc: dict | None = None,
+    config_doc: dict | None = None,
+) -> str:
+    """Inbound export cap: plant ``get_grid_export_power_limit`` only (kW on Loxone)."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    return resolve_plant_binding(house_doc, "get_grid_export_power_limit", config_doc)
 
 
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:

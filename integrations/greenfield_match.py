@@ -17,6 +17,7 @@ _HK_TYPE_BY_KIND = {
 
 _GROUP_ALIASES = {
     "Earnie_WP_": "Earnie_Waermepumpe_",
+    "Earnie_Waermespeicher_": "Earnie_Waermepumpe_",
 }
 
 

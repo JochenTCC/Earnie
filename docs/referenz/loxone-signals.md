@@ -85,7 +85,7 @@ Source: `share/loxone/templates/VirtualOut/`
 | `VO_Earnie_Status.xml`    | optional alive / `Earnie_Request_Optimize` (port **8541**)  |
 | `VO_Earnie_Plant.xml`     | plant `sens_*`, outside temperature                         |
 | `VO_Earnie_EV.xml`        | EV telemetry                                                 |
-| `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`                                |
+| `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
 | `VO_Earnie_Consumer.xml`  | flex power                                                   |
 | `VO_Earnie_Pool.xml`      | pool telemetry                                                |
 
@@ -196,7 +196,6 @@ One template `VI_Earnie_Consumer` / `VO_Earnie_Consumer` covers **one** consumer
 | -------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
 | Power    | `Earnie_Verbraucher_Leistung` → `Earnie_Verbraucher_<Slug>_Leistung`   | VO: `flex.{hk_id}.sens_power_act`                  |
 | Enable   | `Earnie_Verbraucher_Freigabe` → `…_<Slug>_Freigabe`                    | Check: `flex.{hk_id}.Earnie_Verbraucher_Freigabe`  |
-| Target kW| `Earnie_Verbraucher_Ziel_kW` → `…_<Slug>_Ziel_kW`                      | Check: `flex.{hk_id}.Earnie_Verbraucher_Ziel_kW`   |
 
 
 **Example washing machine** (`id` = `waschmaschine`):
@@ -221,7 +220,7 @@ Analogous: prefix `Earnie_EAuto_`, entity `id` = `{ev_id}` (e.g. `eauto`, `garag
 | additional sens/get | `Earnie_EAuto_*` → `…_<Slug>_*`                         | VO: `ev.{ev_id}.<ehal_field>`             |
 
 
-Heat pump: titles `Earnie_Waermepumpe_Leistung` / `Earnie_Waermepumpe_Freigabe`; VO/check with `flex.{hk_id}` (default `id` `wp_heating`). Pool: `flex.pool.sens_power_act` resp. `{hk_id}`.
+Heat pump: titles `Earnie_Waermepumpe_Leistung` / `Earnie_Waermepumpe_Freigabe`; store temps `Earnie_Waermespeicher_Temp_eq` / `Earnie_Waermespeicher_Temp_low`; VO/check with `flex.{hk_id}` for power/enable (default `id` `wp_heating`). Pool: `flex.pool.sens_power_act` resp. `{hk_id}`.
 
 **Import:** the default matches **case-insensitive** exact template names and **prefix+slug** (e.g. `Earnie_Verbraucher_Waschmaschine_Leistung` → consumer `waschmaschine`; `Earnie_EAuto_Garage_Soll_A` → EV `garage`). Bindings keep the Miniserver spelling.
 
@@ -243,7 +242,7 @@ Checking all configured signals:
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Plant (battery, PV, grid, control command, house load, outside temp., absent)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers`, `set_ess_*` |
 | Request Optimize (ad hoc)                                               | Loxone VO → daemon HTTP                       | `Earnie_Request_Optimize` on port `system.ehal_loxone_http_port` (default **8541**)                                                                       |
-| Heat pump / Flex / Thermal                                              | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`, `flex.{slug}.set_power_setpoint`                                                                  |
+| Heat pump / Flex / Thermal                                              | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`                                                                                                  |
 | EV (`ev`)                                                                | `consumers[].ehal_bindings`                   | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*`                                                                                                                  |
 | Pool / SwimSpa                                                           | `consumers[].ehal_bindings` + filter entity   | see default `Earnie_Pool_*` / EHAL-Com §C.6                                                                                                                |
 
@@ -261,19 +260,21 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | `sens_pv_production_active`       | Read      | `Earnie_PV_Leistung` (or EFM production)         | PV power, kW                                                                                |
 | `sens_ess_power`                  | Read      | `Earnie_Batterie_Leistung` (or EFM storage)      | Battery; EHAL: + discharge                                                                  |
 | `sens_grid_power_active`          | Read      | `Earnie_Netzleistung` (or EFM grid)              | Grid: + import, kW                                                                          |
+| `get_grid_export_power_limit`     | Read      | `Earnie_Netz_Einspeisegrenze_In` (optional)      | Inbound max export kW (2.7.a); EHAL W                                                       |
 | `sens_power_consumers`            | Read      | (optional)                                        | House load; otherwise derived                                                               |
 | `sens_temperature_outside`        | Read      | `Earnie_Aussentemperatur`                        | Outside temperature °C (house-wide; heat pump/pool)                                        |
 | `sens_absent_mode`                | Read      | `Earnie_Abwesend`                                | House absent / holiday mode 0/1 (OR with HK `absent_mode`)                                 |
 | `set_ess_active_power`            | Write     | `Earnie_Batterie_Sollleistung`                   | Forced power, kW; `+` discharge, `−` charge                                                 |
 | `set_ess_charge_power_limit`      | Write     | `Earnie_LadeLeistungs-Limit`                     | Max. charge power (true limit)                                                              |
 | `set_ess_discharge_power_limit`   | Write     | `Earnie_EntladeLeistungs-Limit`                  | Max. discharge power (true limit)                                                           |
-| `set_ess_mode`                    | Write     | `Earnie_Steuerbefehl`                            | Sticky: always write; `0` = automatic (ignore setpoint power); OpenEMS ignores it           |
+| `set_ess_mode`                    | Write     | `Earnie_Steuerbefehl`                            | Sticky: always write; `0` = automatic; battery only; OpenEMS ignores                        |
+| `set_grid_export_power_limit`     | Write     | `Earnie_EinspeiseLeistungs-Limit`                | Max export kW (magnitude ≥ 0); `0` = no export; unconstrained = PV kWp + max battery discharge kW (2.7.a) |
 | *(watchdog)*                       | Read      | `Earnie_Heartbeat`                               | Pattern B; not an EHAL field                                                                |
 
 
 Legacy role names (`soc_name`, `pv_power_name`, …) in `loxone_blocks` have been removed — only `plant.ehal_bindings` with §C field names.
 
-**Sticky Merker:** Loxone keeps the last written value. Automatic is `set_ess_mode = 0` — Config must not apply the setpoint power in mode 0, even if `Earnie_Batterie_Sollleistung` still holds an old value.
+**Sticky Merker:** Loxone keeps the last written value. Automatic is `set_ess_mode = 0` — Config must not apply the setpoint power in mode 0, even if `Earnie_Batterie_Sollleistung` still holds an old value. For export curtailment: `set_grid_export_power_limit` is a non-negative magnitude (kW, like the charge/discharge limits). Config curtails grid feed-in to `min(limit, inverter rating)`; `0` = no export (Einspeisesperre), unconstrained is written as the plant maximum = PV kWp sum + max discharge kW of force-dischargeable batteries (fallback `1000` kW if unknown). `set_ess_mode` / `Earnie_Steuerbefehl` is battery-only and never signals export curtailment.
 
 ## Flexible Consumers — `ehal_bindings` on the Consumer
 
@@ -286,10 +287,18 @@ The control signal definitions live in the active house profile (`house_profiles
 | ------------------------------------ | --------- | ---------------------------------------------------------------------------------------------- | ------------ |
 | `flex.{slug}.sens_power_act`       | Read      | Heat pump: `Earnie_Waermepumpe_Leistung`; generic: `Earnie_Verbraucher_Leistung`; or EFM load  | kW or 0/1   |
 | `flex.{slug}.set_enable`           | Write     | Heat pump: `Earnie_Waermepumpe_Freigabe`; generic: `Earnie_Verbraucher_Freigabe`               | `0`/`1`     |
-| `flex.{slug}.set_power_setpoint`   | Write     | `Earnie_Verbraucher_Ziel_kW` (optional)                                                        | kW setpoint |
 
 
 Pool enables: default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` in `ehal_bindings`.
+
+**Heat storage Ist (Live, 2.7.b):** on the `thermal_annual` consumer:
+
+| EHAL field | Meaning | Default Merker |
+| --- | --- | --- |
+| `sens_temperature_heat_storage` | Energy-equivalent `T_eq` (°C) | `Earnie_Waermespeicher_Temp_eq` |
+| `sens_temperature_heat_storage_low` | Lowest immersion sensor `T_low` (°C) — WP-on hint when bottom is cold | `Earnie_Waermespeicher_Temp_low` |
+
+For stratified tanks `T_eq` must be the energy-equivalent mean (volume-weighted), not the top sensor alone. Guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md).
 
 ### EV (Prefix `Earnie_EAuto_`)
 
@@ -332,7 +341,7 @@ Compose production stacks publish container port **8541** (see [Streamlit Ports]
 | ------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `swimspa` / pool    | `flex.{slug}.set_enable` → `Earnie_Pool_Freigabe`              | `flex.{slug}.sens_power_act` → `Earnie_Pool_P_act`                  |
 | `ev`                | `set_evcs_max_current` / `set_evcs_mode`                       | `sens_evcs_*` / `flex.{slug}.sens_power_act`                        |
-| `wp_heating`        | `flex.{slug}.set_enable` → `Earnie_Waermepumpe_Freigabe`       | `flex.{slug}.sens_power_act` → `Earnie_Waermepumpe_Leistung`        |
+| `wp_heating`        | `flex.{slug}.set_enable` → `Earnie_Waermepumpe_Freigabe`       | `flex.{slug}.sens_power_act` → `Earnie_Waermepumpe_Leistung`; `sens_temperature_heat_storage` / `_low` → `Earnie_Waermespeicher_Temp_eq` / `_low` |
 
 
 ## Reading vs. Writing in `main.py`

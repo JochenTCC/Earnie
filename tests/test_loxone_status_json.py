@@ -41,6 +41,45 @@ def test_status_payload_maps_plant_merker_to_ehal_kw() -> None:
     assert payload["set_ess_mode"] == 1.0
 
 
+def test_status_payload_export_limit_defaults_to_unconstrained(monkeypatch) -> None:
+    """Nothing sent yet must not read as 0 kW (= Einspeisesperre) on the VI."""
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", lambda: 15.0
+    )
+    payload = build_loxone_status_payload(
+        loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
+    )
+    assert payload["set_grid_export_power_limit"] == 15.0
+
+
+def test_status_payload_export_limit_fallback_when_plant_unknown(monkeypatch) -> None:
+    def _boom() -> float:
+        raise RuntimeError("config unavailable")
+
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", _boom
+    )
+    payload = build_loxone_status_payload(
+        loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
+    )
+    assert payload["set_grid_export_power_limit"] == 1000.0
+
+
+def test_status_payload_export_limit_sent_value_wins(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", lambda: 15.0
+    )
+    payload = build_loxone_status_payload(
+        loxone_sent={"Earnie_EinspeiseLeistungs-Limit": 0.0},
+        consumers=[],
+        plant_io_index={
+            "Earnie_EinspeiseLeistungs-Limit": "set_grid_export_power_limit"
+        },
+        now_ts=100.0,
+    )
+    assert payload["set_grid_export_power_limit"] == 0.0
+
+
 def test_status_payload_ev_and_flex_namespaced_keys() -> None:
     consumers = [
         {
@@ -56,7 +95,6 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
             "type": "generic",
             "ehal_bindings": {
                 "flex.waschmaschine.set_enable": "Earnie_Verbraucher_Waschmaschine_Freigabe",
-                "flex.waschmaschine.set_power_setpoint": "Earnie_Verbraucher_Waschmaschine_Ziel_kW",
             },
         },
         {
@@ -72,7 +110,6 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
             "Earnie_EAuto_Soll_A": 16.0,
             "Earnie_EAuto_Modus": 2.0,
             "Earnie_Verbraucher_Waschmaschine_Freigabe": 1.0,
-            "Earnie_Verbraucher_Waschmaschine_Ziel_kW": 2.0,
             "Earnie_Waermepumpe_Freigabe": 1.0,
             "Earnie_Pool_Freigabe": 0.0,
             "Earnie_Pool_Filter_Freigabe": 1.0,
@@ -84,7 +121,7 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
     assert payload["ev.garage.Earnie_EAuto_Soll_A"] == 16.0
     assert payload["ev.garage.Earnie_EAuto_Modus"] == 2.0
     assert payload["flex.waschmaschine.Earnie_Verbraucher_Freigabe"] == 1.0
-    assert payload["flex.waschmaschine.Earnie_Verbraucher_Ziel_kW"] == 2.0
+    assert "flex.waschmaschine.Earnie_Verbraucher_Ziel_kW" not in payload
     assert payload["flex.waermepumpe.Earnie_Waermepumpe_Freigabe"] == 1.0
     assert payload["Earnie_Pool_Freigabe"] == 0.0
     assert payload["Earnie_Pool_Filter_Freigabe"] == 1.0

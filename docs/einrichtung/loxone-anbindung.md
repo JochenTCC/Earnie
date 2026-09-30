@@ -52,12 +52,15 @@ Merker-Namen liegen in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Haus
 | ESS-Sollleistung     | `plant.ehal_bindings.set_ess_active_power` | kW; `+` = Entladung, `−` = Ladung; bei Automatik weglassen / 0          |
 | Ladegrenze           | `plant.ehal_bindings.set_ess_charge_power_limit` | kW; echte Max. Ladeleistung                                             |
 | Entladegrenze        | `plant.ehal_bindings.set_ess_discharge_power_limit` | kW; echte Max. Entladeleistung                                          |
-| Steuerbefehl / ESS-Modus | `plant.ehal_bindings.set_ess_mode` | **Pflicht bei jedem Zyklus:** `0` = Automatik (Sollleistung ignorieren), `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen |
+| Steuerbefehl / ESS-Modus | `plant.ehal_bindings.set_ess_mode` | **Pflicht bei jedem Zyklus:** `0` = Automatik (Sollleistung ignorieren), `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen (nur Batterie) |
+| Einspeisegrenze (outbound) | `plant.ehal_bindings.set_grid_export_power_limit` | kW, Betrag ≥ 0; harte Decke für Netz-Einspeisung; `0` = keine Einspeisung; **unbegrenzt = PV-Nennleistung + max. Entladeleistung** |
+| Einspeisegrenze (inbound, optional) | `plant.ehal_bindings.get_grid_export_power_limit` | kW; variable Grenze vom Netz/HEMS → Earnie |
 | Verbraucher-Freigabe | `consumers[].ehal_bindings` (Flex enable) | `0` = gesperrt, `1` = Freigabe (SwimSpa, Wärmepumpe, Filter)            |
 | E-Auto Sollstrom     | `ehal_bindings.set_evcs_max_current` | Ziel-Ladestrom / -leistung                                              |
 | E-Auto PV-Follow     | `ehal_bindings` / `set_evcs_mode`          | `0`/`1` bzw. Modus                                                      |
 
 Frühere Rollen `target_soc_name` und `pv_counter_name` entfallen. Force über `set_ess_active_power`, Grenzen als echte Caps. Loxone-Merker sind **sticky** — Automatik ist `set_ess_mode = 0`, nicht „Sollleistung weggelassen“. PV-Intervallenergie aus ∫ `sens_pv_production_active`.
+Statische HK-Decke: optional `plant.max_export_power_kw` im Hauskonfigurator. Effektive Decke = `min` aus HK, inbound EHAL und **0** wenn der Einspeisetarif negativ ist (Nutzer zahlt für Einspeisung). Config setzt `set_grid_export_power_limit` als Wechselrichter-Curtailment um, am einfachsten als `MIN(Limit; WR-Nennleistung)`: `0` = Einspeisesperre; ohne Begrenzung schreibt Earnie die maximal mögliche Einspeisung der Anlage = Summe der PV-Nennleistungen (kWp) + maximale Entladeleistung der Batterie (nur wenn sie zwangsentladen werden kann, `Batteriesteuerung = voll`). Sind beide unbekannt, steht `1000` kW im Merker. Der Steuerbefehl (`set_ess_mode`) gilt nur für die Batterie und signalisiert keine Einspeisebegrenzung.
 Historische Verbrauchsdaten kommen über CSV-Upload / Energiemonitor bzw. `cons_data` (kein Miniserver-FTP-Log mehr).
 
 Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-Logik hinter diesen virtuellen Eingängen. Config muss `Steuerbefehl = 0` als Freigabe/Automatik behandeln, auch wenn `Earnie_Batterie_Sollleistung` noch einen alten Wert hält.
@@ -69,7 +72,7 @@ Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-
 python -m scripts.verify_loxone_setup
 ```
 
-Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit IO-Name und Detailtext. Typische Fehler: falscher Merkername, Benutzer ohne Rechte, Wert außerhalb des erwarteten Bereichs (z. B. Freigabe ≠ 0/1).
+Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit IO-Name und Detailtext. Typische Fehler: falscher Merkername, Benutzer ohne Rechte, Lesen oder Parsen fehlgeschlagen.
 
 Die Verbindung kann auch bequem über die Web-Oberfläche auf der Seite **Smarthome-Backend** (Anbindung) geprüft werden.
 

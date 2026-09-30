@@ -54,12 +54,12 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 | `VirtualIn/VI_Earnie_Plant.xml` | Heartbeat + ESS Design C1 setpoints |
 | `VirtualIn/VI_Earnie_Heatpump.xml` | `Earnie_Waermepumpe_Freigabe` |
 | `VirtualIn/VI_Earnie_EV.xml` | `Earnie_EAuto_Soll_A`, `Earnie_EAuto_Modus` |
-| `VirtualIn/VI_Earnie_Consumer.xml` | Generic Freigabe + Ziel_kW |
+| `VirtualIn/VI_Earnie_Consumer.xml` | Generic Freigabe |
 | `VirtualIn/VI_Earnie_Pool.xml` | `Earnie_Pool_Freigabe`, `Earnie_Pool_Filter_Freigabe` |
 | `VirtualOut/VO_Earnie_Status.xml` | Optional alive / `Earnie_Request_Optimize` (port **8541**) |
 | `VirtualOut/VO_Earnie_Plant.xml` | Plant `sens_*` + `Earnie_Aussentemperatur` |
 | `VirtualOut/VO_Earnie_EV.xml` | EV `sens_*` / `get_*` (`Earnie_EAuto_Leistung`, …) |
-| `VirtualOut/VO_Earnie_Heatpump.xml` | `Earnie_Waermepumpe_Leistung` |
+| `VirtualOut/VO_Earnie_Heatpump.xml` | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
 | `VirtualOut/VO_Earnie_Consumer.xml` | `Earnie_Verbraucher_Leistung` |
 | `VirtualOut/VO_Earnie_Pool.xml` | Pool temps / power / filter telemetry |
 

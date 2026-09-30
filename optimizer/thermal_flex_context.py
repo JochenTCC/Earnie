@@ -64,6 +64,8 @@ def thermal_daily_kwh_for_date(
     params = heating_params_from_thermal(thermal)
     params["latitude"] = float(profile["latitude"])
     params["longitude"] = float(profile["longitude"])
+    if "hp_electric_kw" not in params:
+        params["hp_electric_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
     day_index = day.timetuple().tm_yday - 1
     if climate is not None:
         bundle = climate._bundle_for_calendar_year(day.year)
@@ -110,7 +112,8 @@ def resolve_thermal_flex_contexts(
         for item in _house_thermal_consumers(house_profile)
     }
     live_absent = False
-    if matrix_is_live_snapshot(matrix):
+    is_live = matrix_is_live_snapshot(matrix)
+    if is_live:
         live_absent = bool(resolve_absent_status(house_profile)["effective"])
     dates = sorted(
         {
@@ -142,8 +145,74 @@ def resolve_thermal_flex_contexts(
             )
             if kwh > 0.0:
                 daily_targets[day] = round(kwh, 3)
-        contexts[cid] = {"daily_targets": daily_targets}
+        ctx: dict = {"daily_targets": daily_targets}
+        if is_live:
+            live_ctx = _live_store_flex_overlay(
+                matrix, source, house_profile, consumer
+            )
+            if live_ctx:
+                ctx.update(live_ctx)
+        contexts[cid] = ctx
     return contexts
+
+
+def _live_store_flex_overlay(
+    matrix: list,
+    source: dict,
+    house_profile: dict,
+    milp_consumer: dict,
+) -> dict | None:
+    """Open-loop store floor + opportunistic scalars for Live snapshots only."""
+    from data.outdoor_forecast import get_outdoor_forecast_with_fallback
+    from optimizer.thermal_coupled import heat_storage_enabled
+    from optimizer.thermal_live_store import (
+        live_min_kwh_by_day,
+        map_forced_hours_to_slot_indices,
+        plan_live_store_for_thermal_consumer,
+    )
+    from optimizer.thermal_targets import thermal_horizon_hours_from_slots
+
+    thermal = source.get("thermal") or source
+    if not heat_storage_enabled(thermal.get("heat_storage")):
+        return None
+    horizon_h = thermal_horizon_hours_from_slots(len(matrix))
+    fallback_ambient = 10.0
+    try:
+        from integrations.loxone_client import _read_optional_temp_c
+        from settings.ehal_marker_resolve import marker_sens_temperature_outside
+
+        ambient_io = marker_sens_temperature_outside(house_doc=None)
+        live_amb = _read_optional_temp_c(ambient_io)
+        if live_amb is not None:
+            fallback_ambient = float(live_amb)
+    except Exception:
+        pass
+    ambient_forecast, _src = get_outdoor_forecast_with_fallback(
+        horizon=horizon_h,
+        fallback_ambient_c=fallback_ambient,
+    )
+    plan = plan_live_store_for_thermal_consumer(
+        source,
+        house_profile=house_profile,
+        ambient_forecast_c=ambient_forecast,
+        house_doc=None,
+    )
+    if plan is None:
+        return None
+    eligible = consumer_thermal_eligible_indices(
+        matrix, milp_consumer, list(range(len(matrix)))
+    )
+    forced = map_forced_hours_to_slot_indices(
+        matrix, plan.forced_hour_flags, eligible_indices=eligible
+    )
+    return {
+        "forced_indices": forced,
+        "floor_kwh": plan.floor_electric_kwh,
+        "opp_cap_kwh": plan.opp_cap_electric_kwh,
+        "live_day_min_kwh": live_min_kwh_by_day(matrix, plan),
+        "live_store_start_c": plan.start_temp_c,
+        "live_store_temp_low_c": plan.temp_low_c,
+    }
 
 
 def _indices_for_date(matrix: list, day: date) -> list[int]:
@@ -260,63 +329,98 @@ def add_thermal_flex_constraints(
     consumer_continue_on: dict[str, bool] | None = None,
 ) -> None:
     """Tages-Lieferung, max. Pulsdauer und max. Pulse/Tag für thermal_annual."""
-    from optimizer.milp_consumers import _delivery_energy_expr, _max_deliverable_kwh
-    from optimizer.consumer_power import power_limits_kw
-
     continue_on = consumer_continue_on or {}
     for consumer in model.planned_consumers:
-        cid = consumer["id"]
         if not is_thermal_flex_consumer(consumer):
             continue
-        ctx = thermal_contexts.get(cid) or {}
-        daily_targets: dict[date, float] = ctx.get("daily_targets") or {}
-        if not daily_targets:
-            continue
-        on_vars = model.consumer_on[cid]
-        max_hours = _max_on_hours(consumer)
-        max_pulses = _max_pulses_per_day(consumer)
-        add_max_on_duration_constraints(
-            model.prob,
-            on_vars,
-            max_hours=max_hours,
-            prefix=cid,
-        )
-        eligible_all = consumer_thermal_eligible_indices(
+        _add_one_thermal_flex_consumer(
+            model,
             matrix,
-            consumer,
             schedule_indices,
+            consumer,
+            thermal_contexts.get(consumer["id"]) or {},
+            continuing=bool(continue_on.get(consumer["id"], False)),
         )
-        eligible_set = set(eligible_all)
-        for day, target_kwh in daily_targets.items():
-            day_indices = [
-                index
-                for index in _indices_for_date(matrix, day)
-                if index in eligible_set
-            ]
-            if not day_indices or target_kwh <= 0.0:
-                continue
-            _, max_kw = power_limits_kw(consumer)
-            max_deliverable = _max_deliverable_kwh(
-                consumer, day_indices, dt_h=model.dt_h
-            )
-            day_slots = len(day_indices)
-            prorated = _prorate_thermal_day_target_kwh(float(target_kwh), day_slots)
+
+
+def _force_thermal_on_slots(
+    model: MilpHorizonModel,
+    cid: str,
+    on_vars: list,
+    forced_indices: list[int],
+    eligible_set: set[int],
+) -> None:
+    for index in forced_indices:
+        if index not in eligible_set or index < 0 or index >= len(on_vars):
+            continue
+        model.prob += (on_vars[index] >= 1, f"{cid}_thermal_forced_{index}")
+
+
+def _add_one_thermal_flex_consumer(
+    model: MilpHorizonModel,
+    matrix: list,
+    schedule_indices: list[int],
+    consumer: dict,
+    ctx: dict,
+    *,
+    continuing: bool,
+) -> None:
+    from optimizer.consumer_power import power_limits_kw
+    from optimizer.milp_consumers import _delivery_energy_expr, _max_deliverable_kwh
+
+    cid = consumer["id"]
+    daily_targets: dict[date, float] = dict(ctx.get("daily_targets") or {})
+    live_day_min: dict[date, float] = dict(ctx.get("live_day_min_kwh") or {})
+    forced_indices = [int(i) for i in (ctx.get("forced_indices") or [])]
+    if not daily_targets and not live_day_min and not forced_indices:
+        return
+    on_vars = model.consumer_on[cid]
+    max_hours = _max_on_hours(consumer)
+    max_pulses = _max_pulses_per_day(consumer)
+    if not forced_indices:
+        add_max_on_duration_constraints(
+            model.prob, on_vars, max_hours=max_hours, prefix=cid
+        )
+    eligible_set = set(
+        consumer_thermal_eligible_indices(matrix, consumer, schedule_indices)
+    )
+    _force_thermal_on_slots(model, cid, on_vars, forced_indices, eligible_set)
+    for day in sorted(set(daily_targets) | set(live_day_min)):
+        day_indices = [
+            index
+            for index in _indices_for_date(matrix, day)
+            if index in eligible_set
+        ]
+        if not day_indices:
+            continue
+        _, max_kw = power_limits_kw(consumer)
+        max_deliverable = _max_deliverable_kwh(
+            consumer, day_indices, dt_h=model.dt_h
+        )
+        prorated = _prorate_thermal_day_target_kwh(
+            float(daily_targets.get(day, 0.0) or 0.0), len(day_indices)
+        )
+        want = max(prorated, float(live_day_min.get(day, 0.0) or 0.0))
+        if forced_indices:
+            op_max_kwh = max_deliverable
+        else:
             op_slots = _max_on_slots_with_limits(
-                day_slots, max_hours=max_hours, max_pulses=max_pulses
+                len(day_indices), max_hours=max_hours, max_pulses=max_pulses
             )
             op_max_kwh = op_slots * float(max_kw) * float(model.dt_h)
-            effective = min(prorated, max_deliverable, op_max_kwh)
-            if effective <= 1e-9:
-                continue
+        effective = min(want, max_deliverable, op_max_kwh)
+        if effective <= 1e-9:
+            continue
+        if not forced_indices:
             add_max_pulses_per_day_constraints(
                 model.prob,
                 on_vars,
                 day_indices,
                 max_pulses=max_pulses,
                 prefix=f"{cid}_{day.isoformat()}",
-                continuing=bool(continue_on.get(cid, False)),
+                continuing=continuing,
             )
-            model.prob += (
-                _delivery_energy_expr(model, consumer, day_indices) >= effective,
-                f"{cid}_thermal_day_{day.isoformat()}",
-            )
+        model.prob += (
+            _delivery_energy_expr(model, consumer, day_indices) >= effective,
+            f"{cid}_thermal_day_{day.isoformat()}",
+        )

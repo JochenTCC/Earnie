@@ -36,6 +36,7 @@ BACKTESTING_LOG_JSON = "backtesting_log.json"
 BACKTESTING_CSV = "backtesting.csv"
 BACKTESTING_CSV_LEGACY = "backtesting_hourly.csv"
 BACKTESTING_CBC_EVENTS_JSONL = "backtesting_cbc_events.jsonl"
+BACKTESTING_PRICE_SERIES_CSV = "backtesting_prices.csv"
 LOG_VERSION = BACKTESTING_LOG_SCHEMA
 _DEFAULT_LOG_DIR = resolve_backtesting_log_dir()
 
@@ -170,6 +171,24 @@ def _hourly_to_csv(results: dict[str, pd.DataFrame], labels: dict[str, str]) -> 
     ]
     col_order = base_order + flex_cols + tail_order
     return out[[c for c in col_order if c in out.columns]]
+
+
+def write_price_series_csv(prices: pd.DataFrame | None, target_dir: str) -> str | None:
+    """Schreibt die rohe EPEX-Preisreihe (netto Cent/kWh, QH, tarifunabhängig) als
+    eigenständige CSV, damit sie ohne erneuten Energy-Charts-/aWATTar-Abruf für
+    andere Zwecke (z. B. Einsparpotenzial-Rechnungen) weiterverwendet werden kann.
+
+    Gesteuert über ``scenario_explorer_conf.export_price_series`` (Standard: aus).
+    """
+    if prices is None or prices.empty:
+        return None
+    os.makedirs(target_dir, exist_ok=True)
+    csv_path = os.path.join(target_dir, BACKTESTING_PRICE_SERIES_CSV)
+    out = prices.copy()
+    out.index.name = out.index.name or "ts_price"
+    out.reset_index(inplace=True)
+    out.to_csv(csv_path, index=False, sep=";", decimal=",")
+    return csv_path
 
 
 def _summarize_cbc_events(events_by_scenario: dict[str, list[dict]]) -> dict:
@@ -503,6 +522,17 @@ def _attach_window_snapshots(
         payload["window_snapshots_horizon_mode"] = period.get("horizon_mode")
 
 
+def _attach_price_series(
+    payload: dict,
+    target_dir: str,
+    prices: pd.DataFrame | None,
+) -> None:
+    """Preisreihen-Sidecar schreiben, sofern eine Preisreihe übergeben wurde."""
+    price_series_path = write_price_series_csv(prices, target_dir)
+    if price_series_path:
+        payload["price_series_file"] = BACKTESTING_PRICE_SERIES_CSV
+
+
 def _attach_period_bounds(
     payload: dict,
     period: dict,
@@ -537,6 +567,7 @@ def save_backtesting_log(
     window_snapshots: list[dict] | None = None,
     monthly_fee_by_scenario: dict[str, float] | None = None,
     fee_breakdown_by_scenario: dict[str, dict[str, float]] | None = None,
+    prices: pd.DataFrame | None = None,
 ) -> str:
     """Schreibt Metadaten (JSON) und Stundenwerte (CSV). Gibt den JSON-Pfad zurück."""
     target_dir = _DEFAULT_LOG_DIR if log_dir is None else log_dir
@@ -566,6 +597,7 @@ def save_backtesting_log(
     _attach_cbc_events(payload, target_dir, period, cbc_events_by_scenario)
     _attach_critical_cases(payload, plausibility_by_scenario, cbc_events_by_scenario)
     _attach_window_snapshots(payload, target_dir, period, window_snapshots)
+    _attach_price_series(payload, target_dir, prices)
     _attach_period_bounds(payload, period, all_ts, len(results))
 
     with open(json_path, "w", encoding="utf-8") as f:

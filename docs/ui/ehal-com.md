@@ -37,12 +37,14 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Telemetry (optional)    | `sens_ess_power`                   | no       | **W**; ESS sign **OpenEMS-aligned**: `+` = **discharge**, `-` = **charge**                                     |
 | Telemetry (optional)    | `sens_evcs_active_power`           | no       | **W**; >= 0 (typically 0 when idle)                                                                            |
 | Telemetry (optional)    | `sens_power_consumers`             | no       | **W**; house load; from a Merker if mapped, otherwise derived from grid/PV/ESS                                |
+| Telemetry (optional)    | `get_grid_export_power_limit`      | no       | **W**; inbound max export from grid/HEMS (magnitude ≥ 0; negative/absent = no cap) (2.7.a)                  |
 | Setpoints (force)       | `set_ess_active_power`             | no*      | **W**; signed; OpenEMS-aligned: `+` = **discharge**, `−` = **charge**; omit for automatic mode (see [sign convention for `set_ess_active_power`](#sign-set_ess_active_power)) |
 | Setpoints (limits)      | `set_ess_charge_power_limit`       | no*      | **W**; non-negative amount (true max. charge power)                                                            |
 | Setpoints (limits)      | `set_ess_discharge_power_limit`    | no*      | **W**; non-negative amount (true max. discharge power)                                                         |
+| Setpoints (limits)      | `set_grid_export_power_limit`      | no*      | **W**; non-negative max grid export (magnitude, like ESS limits); `0` = no export; unconstrained = plant maximum (PV kWp sum + max discharge of force-dischargeable ESS; fallback 1 000 000 W) (2.7.a) |
 | Setpoints (limits)      | `set_evcs_max_current`             | no*      | **A**; non-negative amount (EV charging target/max current)                                                    |
-| Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic** (even with an old setpoint power); OpenEMS ignores it          |
-| Setpoints (extended)    | `set_evcs_mode`                    | no*      | Enum: `off` \| `pv` \| `now`                                                                                    |
+| Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores it |
+| Setpoints (extended)    | `set_evcs_mode`                    | no*      | Enum: `off`                                                                                                     |
 | Capability flags        | `supports_ess_write`               | yes      | boolean; ESS setpoints may be written                                                                          |
 | Capability flags        | `supports_evcs_current`            | yes      | boolean; `set_evcs_max_current` may be written                                                                  |
 
@@ -101,7 +103,7 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 | PV production            | Measurement   | `sens_pv_production_active`   | `_sum/ProductionActivePower`    | `meters.pv.power`       | Unit 100 reg. **850** (DC PV, W) resp. AC PV **808–813**; total is often the sum of DC+AC                          | `pv_power_name` / `plant.ehal_bindings`                     |
 | Power to consumers        | Measurement   | `sens_power_consumers`        |                                   |                          |                                                                                                                       | `ehal_bindings.sens_power_consumers` (otherwise derived)    |
 | Outside temperature       | Measurement   | `sens_temperature_outside`    |                                   |                          |                                                                                                                       | `Earnie_Aussentemperatur` / `plant.ehal_bindings`           |
-| Absent / holiday          | Measurement   | `sens_absent_mode`            | `plant.ehal_bindings` as `component/Channel` (e.g. holiday controller) |                          |                                                                                                                       | `Earnie_Abwesend` / `plant.ehal_bindings` (0/1; OR with HK) |
+| Absent / holiday          | Measurement   | `sens_absent_mode`            |                                   |                          |                                                                                                                       | `Earnie_Abwesend` / `plant.ehal_bindings` (0/1; OR with HK) |
 
 
 
@@ -149,16 +151,15 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 Live operation runs via house-profile flex Merker. Role template: `share/ehal/roles/consumer.json`. **Heat pump** → [C.5](#c5-heat-pump-stub); **Pool / SwimSpa** → [C.6](#c6-pool--swimspa-stub).
 
-`flex.` is a **role namespace**. Binding and live keys follow pattern B: `flex.{slug}.sens_power_act` / `set_enable` / `set_power_setpoint`. Live shows `{id}:flex.{slug}.…`. For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example: `zaehler_trockner:flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
+`flex.` is a **role namespace**. Binding and live keys follow pattern B: `flex.{slug}.sens_power_act` / `set_enable`. Live shows `{id}:flex.{slug}.…`. For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example: `zaehler_trockner:flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
 
-**Pattern B VO push path:** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/\v` (enable/setpoint `flex.{slug}.set_enable` / `flex.{slug}.set_power_setpoint`). Merker title stays `Earnie_Verbraucher_…`. See [Loxone Signals — Multiple Flex Consumers](../referenz/loxone-signals.md).
+**Pattern B VO push path:** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/\v` (enable `flex.{slug}.set_enable`). Merker title stays `Earnie_Verbraucher_…`. See [Loxone Signals — Multiple Flex Consumers](../referenz/loxone-signals.md).
 
 
 | Area / meaning        | Type          | EHAL value name (stub)             | OpenEMS | evcc (YAML attribute) | Victron GX / EVCS (Modbus) | Loxone / Loxone extra                        |
 | ------------------------ | --------------- | ------------------------------------- | ------- | ------------------------ | ----------------------------- | ------------------------------------------------ |
 | Flex power / state      | Measurement   | `flex.{slug}.sens_power_act`         |         |                           |                                | `Earnie_Verbraucher_Leistung` or EFM load        |
 | Flex enable             | Control value | `flex.{slug}.set_enable`             |         |                           |                                | `Earnie_Verbraucher_Freigabe`                     |
-| Flex power setpoint     | Control value | `flex.{slug}.set_power_setpoint`     |         |                           |                                | `Earnie_Verbraucher_Ziel_kW`                      |
 
 
 
@@ -168,13 +169,17 @@ Live operation runs via house-profile flex Merker. Role template: `share/ehal/ro
 Role template: `share/ehal/roles/heatpump.json`. Greenfield prefix `Earnie_Waermepumpe_*`. In live operation typically a `thermal_annual` consumer (e.g. `wp_heating`).
 
 
-| Area / meaning              | Type          | EHAL value name (stub / wire) | OpenEMS | evcc | Victron | Loxone / Loxone extra                       |
+| Area / meaning              | Type          | EHAL value name (stub / wire) | OpenEMS | evcc | Victron | HA / Loxone |
 | ------------------------------ | --------------- | -------------------------------- | ------- | ---- | ------- | ----------------------------------------------- |
-| Heat pump power               | Measurement   | `flex.{slug}.sens_power_act`    |         |      |         | `Earnie_Waermepumpe_Leistung` or EFM load       |
-| Heat pump enable / SG-Ready   | Control value | `flex.{slug}.set_enable`        |         |      |         | `Earnie_Waermepumpe_Freigabe`                    |
+| Heat pump power               | Measurement   | `flex.{slug}.sens_power_act`    |         |      |         | HA power entity / `Earnie_Waermepumpe_Leistung` or EFM |
+| Heat pump enable / SG-Ready   | Control value | `flex.{slug}.set_enable`        |         |      |         | HA switch/input_boolean / `Earnie_Waermepumpe_Freigabe` |
+| Heat storage `T_eq`           | Measurement   | `sens_temperature_heat_storage` |         |      |         | HA °C sensor / `Earnie_Waermespeicher_Temp_eq` |
+| Heat storage `T_low`          | Measurement   | `sens_temperature_heat_storage_low` |     |      |         | HA °C sensor (bottom) / `Earnie_Waermespeicher_Temp_low` |
 
 
-Notes: pattern B — VI = enable from Earnie (`flex.{hk_id}.…` in the check); VO = optional push `flex.{hk_id}.sens_power_act`. Outside temperature only on the plant (`sens_temperature_outside`, see C.1) — not on the heat-pump VO. No target-kW Merker in this Greenfield round.
+Notes: pattern B — VI = enable from Earnie (`flex.{hk_id}.…` in the check); VO = optional push `flex.{hk_id}.sens_power_act` plus store temps. Outside temperature only on the plant (`sens_temperature_outside`, see C.1) — not on the heat-pump VO. No target-kW Merker in this Greenfield round. Recipe: `share/loxone/recipes/heatpump.json`; VO: `VO_Earnie_Heatpump.xml`.
+
+**Heat storage:** stratified tanks must expose energy-equivalent `T_eq` (volume-weighted mean) as `sens_temperature_heat_storage`, plus raw bottom sensor `T_low` as `sens_temperature_heat_storage_low`. Do not bind a single top-layer sensor as the RC state. On HA, map two temperature entities onto those EHAL fields on the `thermal_annual` consumer (same Pattern B HITL as Loxone). Operator guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md); physics in [thermals-p2.md](../spec/thermals-p2.md).
 
 ### C.6 Pool / SwimSpa (Stub)
 
@@ -243,7 +248,7 @@ Units and signs: see §B. Full role matrix: §C.
 
 ### Live Write
 
-`**set_***` (plant / EV) as well as flex **enable** / setpoint (`{id}:flex.{slug}.set_enable`, optionally `set_power_setpoint`). The table lists **all** expected write fields; values/success come from the last `main.py` run (`runtime/optimizer_run_state.json`); unmapped rows have an empty mapping column. Same identity columns:
+`**set_***` (plant / EV) as well as flex **enable** (`{id}:flex.{slug}.set_enable`). The table lists **all** expected write fields; values/success come from the last `main.py` run (`runtime/optimizer_run_state.json`); unmapped rows have an empty mapping column. Same identity columns:
 
 
 | Column                                            | Meaning                                                                                       |
@@ -266,7 +271,7 @@ Unter **Live-Schreiben** liegt der Expander **Schreibtest**: gemappte Probe-Feld
 **Voraussetzungen**
 
 - Silent-Modus **aus** (gleiche Sperre wie der Daemon). Bei Silent sind die Buttons deaktiviert.
-- Nur **gemappte** Probe-Felder: `set_ess_mode`, `set_ess_charge_power_limit`, `set_ess_discharge_power_limit`, `set_evcs_max_current`.
+- Nur **gemappte** Probe-Felder: `set_ess_mode`, `set_ess_charge_power_limit`, `set_ess_discharge_power_limit`, `set_grid_export_power_limit`, `set_evcs_max_current`.
 - Bestätigungsdialog vor jedem Live-Schreiben.
 
 **Grenzen (nützliche / sichere Werte)**
@@ -274,6 +279,7 @@ Unter **Live-Schreiben** liegt der Expander **Schreibtest**: gemappte Probe-Feld
 | Feld | Bereich |
 |------|---------|
 | Limits (Laden/Entladen) | `0 … max_power_kw` (als W auf dem Wire) |
+| `set_grid_export_power_limit` | `0 … 1 000 000` W (Betrag; `0` = keine Einspeisung; Obergrenze = unconstrained-Fallback) |
 | `set_evcs_max_current` | `0 … min(Nennstrom, 6 A)` |
 | `set_ess_mode` | `0` Automatik / `1` Laden / `2` Entladen |
 
@@ -291,9 +297,7 @@ Nach Auto-Roundtrip werden immer sichere Sollwerte geschrieben (ESS Automatik, E
 
 ### HA Entity → EHAL Mapping
 
-Only with backend **Home Assistant**: entity-centric HITL (**Pattern B** storage like Loxone **2.4.k**: `plant` / `consumers[].ehal_bindings`). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials live in `config/.env` (`EHAL_HA_*`); optional **`sign`** (plant) stays in `config.json` → `ehal.ha`.
-
-**Runtime subset:** the live HA adapter aggregates `HA_ALL_FIELDS` (plant grid/PV/ESS powers + optional energy counters + ESS setpoints + optional plant `sens_absent_mode` side-channel; first EV: `sens_evcs_active_power`, `set_evcs_max_current`, `set_evcs_mode`). Extra fields offered in the mapping UI (outdoor temperature, full EV SoC/connected/`get_evcs_*`, flex/pool) may be saved but are **not** read or written on the HA path yet — Loxone remains the more complete Pattern B backend for those.
+Only with backend **Home Assistant**: entity-centric HITL (same Pattern B shape as Loxone **2.4.k**). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials live in `config/.env` (`EHAL_HA_*`); optional **`sign`** (plant) stays in `config.json` → `ehal.ha`.
 
 Workflow: scan `/api/states` once per Streamlit session (button refreshes) → heuristic proposes **empty** fields only → confirm → save. Saved bindings are never overwritten by propose; **no LLM**. After save, Live-Lesen / Live-Schreiben use the same entity-centric `EHAL-Feld` + Mapping column contract as Loxone (`{consumer_id}:field` for consumers).
 
@@ -331,7 +335,7 @@ Bindings are **no longer** edited in the House Configurator under "Smarthome Mer
 | Typical use                 | testing, parallel legacy operation      | production after cutover         |
 
 
-Silent mode: set on **Daemon Control → Optimierer-Dienst** (toggle **Silent-Modus**); persisted in `runtime/local_settings.json` → `"silent_mode"` (legacy: `"loxone_silent_mode"`; takes priority over `system.silent_mode`). Default without a file: **silent on**. The status bar shows the configured mode (Silent/Loud) separately from whether the optimizer service is running; Loud mode enables writes only when **main.py** is started (Daemon Control). A change applies on the next optimizer cycle — no daemon restart required.
+Silent mode: `runtime/local_settings.json` → `"silent_mode"` (legacy: `"loxone_silent_mode"`; takes priority over `system.silent_mode`). Default without a file: **silent on**. The status bar shows the configured mode (Silent/Loud) separately from whether the optimizer service is running; Loud mode enables writes only when **main.py** is started (Daemon Control).
 
 ## Cutover Checklist
 

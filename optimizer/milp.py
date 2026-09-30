@@ -61,8 +61,22 @@ def _build_milp_model_with_objective(
     k_push: float,
     inputs: _MilpInputs,
     consumer_continue_on: dict[str, bool] | None,
+    *,
+    hk_max_export_kw: float | None = None,
+    inbound_export_limit_kw: float | None = None,
+    export_caps_kw: list[float | None] | None = None,
 ) -> MilpHorizonModel:
     """Horizontmodell samt Zielfunktion (Energiekosten + Batterie-Verschleiß)."""
+    from .export_power_limit import export_caps_for_horizon
+
+    caps = export_caps_kw
+    if caps is None:
+        caps = export_caps_for_horizon(
+            matrix[: inputs.horizon],
+            hk_max_export_kw=hk_max_export_kw,
+            inbound_limit_kw=inbound_export_limit_kw,
+            fallback_k_push=k_push,
+        )
     model = _build_milp_model(
         matrix,
         inputs.horizon,
@@ -74,6 +88,7 @@ def _build_milp_model_with_objective(
         inputs.ev_milp_by_id,
         consumer_continue_on=consumer_continue_on,
         dt_h=inputs.dt_h,
+        export_caps_kw=caps,
     )
     wear_cent_per_kwh = 0.0
     if battery_params["battery_capacity_kwh"] > 0.0:
@@ -202,6 +217,9 @@ def _solve_milp_to_model(
     soc_hold_percent: float | None = None,
     *,
     dt_h: float = DEFAULT_DT_H,
+    hk_max_export_kw: float | None = None,
+    inbound_export_limit_kw: float | None = None,
+    export_caps_kw: list[float | None] | None = None,
 ) -> tuple[MilpHorizonModel, dict[str, float], dict[str, float], list[int], dict, dict] | None:
     """Baut und löst das MILP; None wenn nicht optimal / leere Matrix."""
     if not matrix:
@@ -226,6 +244,9 @@ def _solve_milp_to_model(
         k_push,
         inputs,
         consumer_continue_on,
+        hk_max_export_kw=hk_max_export_kw,
+        inbound_export_limit_kw=inbound_export_limit_kw,
+        export_caps_kw=export_caps_kw,
     )
     _add_flex_side_constraints(
         model, matrix, inputs, verbose, consumer_continue_on, thermal_flex_contexts
@@ -336,6 +357,9 @@ def milp_optimizer(
     thermal_flex_contexts: dict[str, dict] | None = None,
     soc_hold_index: int | None = None,
     soc_hold_percent: float | None = None,
+    hk_max_export_kw: float | None = None,
+    inbound_export_limit_kw: float | None = None,
+    export_caps_kw: list[float | None] | None = None,
 ) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
@@ -372,6 +396,9 @@ def milp_optimizer(
         thermal_flex_contexts,
         soc_hold_index=soc_hold_index,
         soc_hold_percent=soc_hold_percent,
+        hk_max_export_kw=hk_max_export_kw,
+        inbound_export_limit_kw=inbound_export_limit_kw,
+        export_caps_kw=export_caps_kw,
     )
     if solved is None:
         return _AUTOMATIK_FALLBACK
@@ -419,6 +446,9 @@ def milp_horizon_schedule(
     thermal_flex_contexts: dict[str, dict] | None = None,
     soc_hold_index: int | None = None,
     soc_hold_percent: float | None = None,
+    hk_max_export_kw: float | None = None,
+    inbound_export_limit_kw: float | None = None,
+    export_caps_kw: list[float | None] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Ein CBC-Solve über die Matrix; Rückgabe: Stundenplan-Slots für Open-Loop / commit-K.
@@ -456,6 +486,9 @@ def milp_horizon_schedule(
         thermal_flex_contexts,
         soc_hold_index=soc_hold_index,
         soc_hold_percent=soc_hold_percent,
+        hk_max_export_kw=hk_max_export_kw,
+        inbound_export_limit_kw=inbound_export_limit_kw,
+        export_caps_kw=export_caps_kw,
     )
     if solved is None:
         return [dict(_FALLBACK_SCHEDULE_SLOT)]

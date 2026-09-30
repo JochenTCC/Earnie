@@ -60,6 +60,31 @@ def test_match_wp_and_ev_groups():
     assert ev.bindings["set_evcs_max_current"] == "Earnie_EAuto_Soll_A"
 
 
+def test_match_heat_storage_temps_merge_onto_wp():
+    """Earnie_Waermespeicher_Temp_* bind onto the heatpump / thermal_annual group."""
+    empty_doc = {"controls": {}}
+    extra = {
+        "Earnie_Waermepumpe_Leistung",
+        "Earnie_Waermepumpe_Freigabe",
+        "Earnie_Waermespeicher_Temp_eq",
+        "Earnie_Waermespeicher_Temp_low",
+    }
+    matches, report = match_controls(empty_doc, load_device_map(), extra_names=extra)
+    assert "Earnie_Waermespeicher_Temp_eq" in report.matched_markers
+    assert "Earnie_Waermespeicher_Temp_low" in report.matched_markers
+    wp_matches = [m for m in matches if m.hk_type == "thermal_annual"]
+    assert len(wp_matches) == 1
+    assert wp_matches[0].group_key == "Earnie_Waermepumpe_"
+    assert (
+        wp_matches[0].bindings["sens_temperature_heat_storage"]
+        == "Earnie_Waermespeicher_Temp_eq"
+    )
+    assert (
+        wp_matches[0].bindings["sens_temperature_heat_storage_low"]
+        == "Earnie_Waermespeicher_Temp_low"
+    )
+
+
 def test_alarm_clock_tna_merges_onto_ev_with_power():
     """AlarmClock Bezeichnung → get_evcs_ready_by_time on EV that has Zähler/power."""
     from integrations.loxone_greenfield_import import (
@@ -146,7 +171,6 @@ def test_slug_match_waschmaschine_creates_generic_consumer():
     extra = {
         "Earnie_Verbraucher_Waschmaschine_Leistung",
         "Earnie_Verbraucher_Waschmaschine_Freigabe",
-        "Earnie_Verbraucher_Waschmaschine_Ziel_kW",
     }
     matches, report = match_controls(empty_doc, load_device_map(), extra_names=extra)
     assert any("Waschmaschine" in n for n in report.matched_markers)
@@ -157,7 +181,7 @@ def test_slug_match_waschmaschine_creates_generic_consumer():
     assert wm.hk_type == "generic"
     assert wm.bindings["flex.waschmaschine.sens_power_act"] == "Earnie_Verbraucher_Waschmaschine_Leistung"
     assert wm.bindings["flex.waschmaschine.set_enable"] == "Earnie_Verbraucher_Waschmaschine_Freigabe"
-    assert wm.bindings["flex.waschmaschine.set_power_setpoint"] == "Earnie_Verbraucher_Waschmaschine_Ziel_kW"
+    assert "flex.waschmaschine.set_power_setpoint" not in wm.bindings
     house, pid = ensure_live_profile(_empty_house())
     house = apply_typed_matches(house, matches, profile_id=pid)
     by_id = {c["id"]: c for c in house["profiles"][pid]["consumers"]}

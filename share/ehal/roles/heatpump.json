@@ -1,7 +1,7 @@
 {
   "role_id": "heatpump",
   "label": "Wärmepumpe (Stub)",
-  "description": "Forward-looking template. Not in M1 EHAL; later Thermals / flex-consumer. Today: thermal_annual consumer with enable freigabe.",
+  "description": "Forward-looking template. Not in M1 EHAL plant wire; live as thermal_annual flex + heat-storage temps. Today: enable freigabe, optional power, T_eq / T_low.",
   "status": "stub",
   "ehal_fields": [
     {
@@ -15,7 +15,19 @@
       "required": false,
       "kind": "stub",
       "notes": "Pattern B Freigabe / SG-Ready."
+    },
+    {
+      "field": "sens_temperature_heat_storage",
+      "required": false,
+      "kind": "stub",
+      "notes": "Heat storage T_eq (°C) on thermal_annual ehal_bindings. HA: map a °C sensor entity."
+    },
+    {
+      "field": "sens_temperature_heat_storage_low",
+      "required": false,
+      "kind": "stub",
+      "notes": "Heat storage bottom sensor T_low (°C). HA: map lowest immersion sensor entity."
     }
   ],
-  "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signals.md and Thermals backlog."
+  "unit_sign_notes": "Stub only — not part of M1 plant wire. See docs/referenz/loxone-signals.md and Thermals 2.7.b."
 }

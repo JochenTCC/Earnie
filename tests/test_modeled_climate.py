@@ -114,6 +114,12 @@ def test_thermal_annual_kwh_from_archive(monkeypatch):
         "building_class": 3,
         "heat_pump_type": "luft",
         "persons": 2,
+        "heat_storage": {
+            "volume_liters": 800.0,
+            "heat_loss_kw_per_k": 0.02,
+            "setpoint_c": 45.0,
+            "tolerance_c": 5.0,
+        },
     }
     without, year = thermal_annual_kwh_from_archive(thermal, reference_year=2024)
     with_solar, _ = thermal_annual_kwh_from_archive(

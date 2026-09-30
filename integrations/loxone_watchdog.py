@@ -10,7 +10,6 @@ from integrations import loxone_client
 from runtime_store import run_state
 from settings.ehal_marker_resolve import (
     marker_flex_enable,
-    marker_flex_power_setpoint,
     marker_set_evcs_max_current,
     marker_set_evcs_mode,
 )
@@ -85,7 +84,7 @@ def verify_and_restore_loxone_states(
     }
     flex_enable_names.discard("")
     flex_setpoint_names = {
-        str(marker_set_evcs_max_current(c) or marker_flex_power_setpoint(c) or "")
+        str(marker_set_evcs_max_current(c) or "")
         for c in config.get_flexible_consumers(optimizer_only=True)
     }
     flex_setpoint_names.discard("")
@@ -123,6 +122,9 @@ def verify_and_restore_loxone_states(
 
 def run_watchdog_cycle() -> list[LoxoneMismatch]:
     """Ein Prüfdurchlauf: run_state laden, vergleichen, ggf. korrigieren."""
+    from runtime_store.shadow.replay import assert_not_shadow_backend
+
+    assert_not_shadow_backend("loxone_watchdog")
     config.reload_config()
     state = run_state.load_run_state()
     expected = expected_loxone_snapshot_from_run_state(state or {})

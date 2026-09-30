@@ -76,7 +76,21 @@
       "match": "exact",
       "entity_kind": "plant",
       "ehal_field": "set_ess_mode",
-      "notes": "Sticky-backend control; 0 = Automatik. OpenEMS ignores."
+      "notes": "Sticky-backend control; 0 = Automatik; battery only. OpenEMS ignores."
+    },
+    {
+      "name": "Earnie_EinspeiseLeistungs-Limit",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "set_grid_export_power_limit",
+      "notes": "2.7.a outbound max export kW (magnitude ≥ 0); 0 = no export; unconstrained = PV kWp + max battery discharge kW."
+    },
+    {
+      "name": "Earnie_Netz_Einspeisegrenze_In",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "get_grid_export_power_limit",
+      "notes": "2.7.a optional inbound grid-side export limit (kW)."
     },
     {
       "name": "Earnie_Waermepumpe_Leistung",
@@ -95,6 +109,24 @@
       "ehal_field": "flex.set_enable",
       "group": "Earnie_Waermepumpe_",
       "notes": "VI Title; status JSON key flex.{hk_id}.Earnie_Waermepumpe_Freigabe."
+    },
+    {
+      "name": "Earnie_Waermespeicher_Temp_eq",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_temperature_heat_storage",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; energy-equivalent store T_eq (°C). Binding on thermal_annual ehal_bindings."
+    },
+    {
+      "name": "Earnie_Waermespeicher_Temp_low",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_temperature_heat_storage_low",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; lowest immersion sensor T_low (°C); Live WP-on hint."
     },
     {
       "name": "Earnie_WP_P_act",
@@ -216,14 +248,6 @@
       "group": "Earnie_Verbraucher_"
     },
     {
-      "name": "Earnie_Verbraucher_Ziel_kW",
-      "match": "exact",
-      "entity_kind": "generic",
-      "hk_type": "generic",
-      "ehal_field": "flex.set_power_setpoint",
-      "group": "Earnie_Verbraucher_"
-    },
-    {
       "name": "Earnie_Pool_P_act",
       "match": "exact",
       "entity_kind": "pool",
@@ -317,6 +341,12 @@
   "prefix_groups": [
     {
       "prefix": "Earnie_Waermepumpe_",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "default_label": "Wärmepumpe"
+    },
+    {
+      "prefix": "Earnie_Waermespeicher_",
       "entity_kind": "heatpump",
       "hk_type": "thermal_annual",
       "default_label": "Wärmepumpe"

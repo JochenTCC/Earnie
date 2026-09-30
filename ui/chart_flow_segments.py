@@ -32,6 +32,7 @@ from ui.chart_colors import (
     MUTED_BATTERY_CHARGE_PV,
     MUTED_BATTERY_EXPORT,
     MUTED_BATTERY_LOAD,
+    MUTED_CURTAIL_PV,
     MUTED_EXPORT_PV,
     blend_hsl,
     chart1_baseload_color_for_zone,
@@ -57,6 +58,8 @@ KIND_BATTERY_DISCHARGE_LOAD = "battery_discharge_load"
 KIND_EXPORT_BATTERY = "export_battery"
 
 KIND_EXPORT_PV = "export_pv"
+
+KIND_CURTAIL_PV = "curtail_pv"
 
 KIND_FLEX = "flex"
 
@@ -275,6 +278,7 @@ def _segments_from_allocation(
     flows: FlowAllocation,
     *,
     surplus_export_pv: float = 0.0,
+    surplus_curtail_pv: float = 0.0,
 ) -> tuple[list[FlowBalanceSegment], list[FlowBalanceSegment]]:
     up: list[FlowBalanceSegment] = []
     down: list[FlowBalanceSegment] = []
@@ -301,6 +305,13 @@ def _segments_from_allocation(
             kw=export_pv,
             direction="down",
             color=MUTED_EXPORT_PV,
+        ),
+        _muted_segment(
+            kind=KIND_CURTAIL_PV,
+            label="Abregelung (PV)",
+            kw=surplus_curtail_pv,
+            direction="down",
+            color=MUTED_CURTAIL_PV,
         ),
         _muted_segment(
             kind=KIND_EXPORT_BATTERY,
@@ -397,24 +408,61 @@ def _assemble_balanced_slot(
     powers: dict[str, float],
     up_segments: list[FlowBalanceSegment],
     down_segments: list[FlowBalanceSegment],
+    *,
+    forbid_export: bool = False,
 ) -> FlowBalanceSlot:
-    up_external = powers["pv"] + powers["grid_import"]
+    nameplate_pv = float(powers["pv"])
+    up_external = nameplate_pv + powers["grid_import"]
     down_primary = sum(segment.kw for segment in down_segments)
     offset_kw = up_external - down_primary - powers["battery_charge"]
+    surplus_export_pv = 0.0
+    surplus_curtail_pv = float(powers.get("curtail_pv") or 0.0)
+    if powers["grid_export"] < 1e-9 and offset_kw > 1e-9:
+        if forbid_export:
+            surplus_curtail_pv += offset_kw
+        else:
+            surplus_export_pv = offset_kw
+
+    # Pay-to-export: shrink the PV up-bar (curtailed kW never enters the house
+    # balance) instead of drawing Einspeisung / Abregelung down-bars.
+    effective_pv = nameplate_pv
+    display_curtail_pv = 0.0
+    if forbid_export and surplus_curtail_pv > 1e-9:
+        effective_pv = max(0.0, nameplate_pv - surplus_curtail_pv)
+        up_segments = [
+            (
+                FlowBalanceSegment(
+                    kind=seg.kind,
+                    label=seg.label,
+                    kw=effective_pv,
+                    direction=seg.direction,
+                    color=seg.color,
+                    consumer_id=seg.consumer_id,
+                    hover_lines=seg.hover_lines,
+                    muted=seg.muted,
+                )
+                if seg.kind == KIND_PV
+                else seg
+            )
+            for seg in up_segments
+        ]
+        if effective_pv <= 1e-9:
+            up_segments = [seg for seg in up_segments if seg.kind != KIND_PV]
+    elif surplus_curtail_pv > 1e-9:
+        display_curtail_pv = surplus_curtail_pv
+
     flows = allocate_slot_flows(
-        pv=powers["pv"],
+        pv=effective_pv,
         load_kw=powers["load_kw"],
         battery_charge=powers["battery_charge"],
         battery_discharge=powers["battery_discharge"],
         grid_import=powers["grid_import"],
         grid_export=powers["grid_export"],
     )
-    surplus_export_pv = 0.0
-    if powers["grid_export"] < 1e-9 and offset_kw > 1e-9:
-        surplus_export_pv = offset_kw
     balance_up, balance_down = _segments_from_allocation(
         flows,
         surplus_export_pv=surplus_export_pv,
+        surplus_curtail_pv=display_curtail_pv,
     )
     up_segments.extend(balance_up)
     down_segments.extend(balance_down)
@@ -427,6 +475,18 @@ def _assemble_balanced_slot(
         down_primary_kw=down_primary,
         battery_discharge_kw=powers["battery_discharge"],
     )
+
+
+def _row_pay_to_export(row: Mapping[str, Any]) -> bool:
+    """True when Einspeisevergütung is negative (hard export cap 0)."""
+    for key in ("k_push_act", "Einspeisevergütung (Cent/kWh)"):
+        if key not in row:
+            continue
+        try:
+            return float(row[key]) < 0.0
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 def build_flow_balance_segments(
@@ -465,8 +525,15 @@ def build_flow_balance_segments(
         row,
         battery_raw,
     )
+    forbid_export = _row_pay_to_export(row)
     grid_import = max(grid, 0.0) + discharge_skipped
-    grid_export = max(-grid, 0.0) + charge_skipped
+    # Pay-to-export: skipped charge / clipped netz must not become "Einspeisung".
+    if forbid_export:
+        grid_export = 0.0
+        curtail_pv = charge_skipped + max(-grid, 0.0)
+    else:
+        grid_export = max(-grid, 0.0) + charge_skipped
+        curtail_pv = 0.0
     battery_charge = max(battery, 0.0)
     battery_discharge = max(-battery, 0.0)
     flex_pairs = list(flex_consumers) if flex_consumers is not None else _default_flex_pairs(row)
@@ -478,9 +545,11 @@ def build_flow_balance_segments(
             "grid_export": grid_export,
             "battery_charge": battery_charge,
             "battery_discharge": battery_discharge,
+            "curtail_pv": curtail_pv,
         },
         _primary_up_segments(pv, grid_import),
         _primary_down_segments(row, baseload, flex_pairs),
+        forbid_export=forbid_export,
     )
 
 def build_flow_balance_slots_from_df(

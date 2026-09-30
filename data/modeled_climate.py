@@ -342,6 +342,8 @@ class ModeledClimateContext:
         bundle = self._bundle_for_calendar_year(year)
         thermal = consumer.get("thermal") or consumer
         params = heating_params_from_thermal(thermal)
+        if "hp_electric_kw" not in params:
+            params["hp_electric_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
         area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
         hourly_wm2 = None
         if area_m2 > 0.0:

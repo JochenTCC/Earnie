@@ -21,6 +21,7 @@ PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_power_consumers",
     "sens_temperature_outside",
     "sens_absent_mode",
+    "get_grid_export_power_limit",
 )
 
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
@@ -28,6 +29,7 @@ PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
+    "set_grid_export_power_limit",
 )
 
 EV_LIVE_READ_FIELDS: tuple[str, ...] = (
@@ -60,6 +62,11 @@ THERMAL_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_heating_active",
 )
 
+THERMAL_ANNUAL_LIVE_READ_FIELDS: tuple[str, ...] = (
+    "sens_temperature_heat_storage",
+    "sens_temperature_heat_storage_low",
+)
+
 NETWORK_LIVE_READ_FIELDS: tuple[str, ...] = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
 NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS
 
@@ -79,16 +86,15 @@ def is_live_read_field(field: str) -> bool:
 
 
 def is_live_write_field(field: str) -> bool:
-    """True for Live-Schreiben rows (``set_*`` / flex ``set_enable`` / setpoint)."""
-    from ehal.flex_fields import KIND_SET_ENABLE, KIND_SET_POWER_SETPOINT, flex_field_kind
+    """True for Live-Schreiben rows (``set_*`` / flex ``set_enable``)."""
+    from ehal.flex_fields import KIND_SET_ENABLE, flex_field_kind
 
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
     if name.startswith("set_"):
         return True
-    kind = flex_field_kind(name)
-    return kind in (KIND_SET_ENABLE, KIND_SET_POWER_SETPOINT)
+    return flex_field_kind(name) == KIND_SET_ENABLE
 
 
 def _consumer_is_ev(consumer: dict) -> bool:
@@ -119,6 +125,18 @@ def _consumer_is_thermal(consumer: dict) -> bool:
         return False
     return any(
         str(bindings.get(field) or "").strip() for field in THERMAL_LIVE_READ_FIELDS
+    )
+
+
+def _consumer_is_thermal_annual(consumer: dict) -> bool:
+    if str(consumer.get("type") or "") == "thermal_annual":
+        return True
+    bindings = consumer.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return False
+    return any(
+        str(bindings.get(field) or "").strip()
+        for field in THERMAL_ANNUAL_LIVE_READ_FIELDS
     )
 
 
@@ -167,18 +185,19 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
             fields.append(f"{cid}:{flex_sens_power_act(cid)}")
             if _consumer_is_thermal(consumer):
                 fields.extend(f"{cid}:{name}" for name in THERMAL_LIVE_READ_FIELDS)
+            if _consumer_is_thermal_annual(consumer):
+                fields.extend(
+                    f"{cid}:{name}" for name in THERMAL_ANNUAL_LIVE_READ_FIELDS
+                )
     return fields
 
 
 def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
-    """Canonical Live-Schreiben ids (plant + EV + flex Freigabe/Sollwert)."""
+    """Canonical Live-Schreiben ids (plant + EV + flex Freigabe)."""
     if network_backend:
         return list(NETWORK_LIVE_WRITE_FIELDS)
-    from ehal.flex_fields import flex_set_enable, flex_set_power_setpoint
-    from settings.ehal_marker_resolve import (
-        marker_flex_enable,
-        marker_flex_power_setpoint,
-    )
+    from ehal.flex_fields import flex_set_enable
+    from settings.ehal_marker_resolve import marker_flex_enable
 
     fields = list(PLANT_LIVE_WRITE_FIELDS)
     for consumer in _all_live_consumers():
@@ -190,8 +209,6 @@ def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
             continue
         if marker_flex_enable(consumer):
             fields.append(f"{cid}:{flex_set_enable(cid)}")
-        if marker_flex_power_setpoint(consumer):
-            fields.append(f"{cid}:{flex_set_power_setpoint(cid)}")
     return fields
 
 
@@ -245,12 +262,11 @@ def mapping_or_dash(mapping: dict[str, str], field: str) -> str:
 
 
 def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dict[str, str]:
-    """Merker IO-Name → EHAL write field (plant + EV + flex Freigabe/Sollwert)."""
+    """Merker IO-Name → EHAL write field (plant + EV + flex Freigabe)."""
     import config
-    from ehal.flex_fields import flex_set_enable, flex_set_power_setpoint
+    from ehal.flex_fields import flex_set_enable
     from settings.ehal_marker_resolve import (
         marker_flex_enable,
-        marker_flex_power_setpoint,
         marker_set_evcs_max_current,
         marker_set_evcs_mode,
     )
@@ -266,6 +282,18 @@ def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dic
         io_name = str(config.get(cfg_key) or "").strip()
         if io_name:
             index[io_name] = field
+
+    try:
+        from house_config.ehal_bindings import resolve_plant_binding
+        from optimizer.live_export_limit import load_house_doc
+
+        export_io = str(
+            resolve_plant_binding(load_house_doc(), "set_grid_export_power_limit") or ""
+        ).strip()
+        if export_io:
+            index[export_io] = "set_grid_export_power_limit"
+    except Exception:  # noqa: BLE001 — status JSON still works without plant doc
+        pass
 
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
@@ -283,9 +311,6 @@ def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dic
         enable = str(marker_flex_enable(consumer) or "").strip()
         if enable:
             index[enable] = f"{cid}:{flex_set_enable(cid)}"
-        setpoint = str(marker_flex_power_setpoint(consumer) or "").strip()
-        if setpoint:
-            index[setpoint] = f"{cid}:{flex_set_power_setpoint(cid)}"
 
     if not include_write_aliases:
         return index

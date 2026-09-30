@@ -19,13 +19,13 @@ def _needs_heat(next_temp_c: float, band: ThermalBand) -> bool:
     return next_temp_c < band.min_c - 1e-9
 
 
-def thermal_rc_hourly_kw_from_ambient(
+def thermal_rc_hourly_kw_and_temp_from_ambient(
     consumer: dict,
     ambient_c: list[float],
     *,
     start_temp_c: float | None = None,
-) -> list[float]:
-    """Stündliches Heizprofil (kW) aus RC-Modell und Außentemperatur-Reihe."""
+) -> tuple[list[float], list[float]]:
+    """Stündliches Heizprofil (kW) und Wassertemperatur (°C) aus RC + Außenluft."""
     rc = thermal_rc_params(consumer)
     band = ThermalBand(
         setpoint_c=float(rc["setpoint_c"]),
@@ -40,7 +40,8 @@ def thermal_rc_hourly_kw_from_ambient(
         raise ValueError("thermal_rc nominal_power_kw muss > 0 sein.")
 
     temp = float(start_temp_c if start_temp_c is not None else band.setpoint_c)
-    hourly: list[float] = []
+    hourly_kw: list[float] = []
+    hourly_temp: list[float] = []
     for ambient in ambient_c:
         next_no_heat = simulate_next_temp_c(
             temp,
@@ -52,7 +53,7 @@ def thermal_rc_hourly_kw_from_ambient(
             extra_heat_paths=heat_paths if isinstance(heat_paths, list) else None,
         )
         if _needs_heat(next_no_heat, band):
-            hourly.append(nominal)
+            hourly_kw.append(nominal)
             temp = simulate_next_temp_c(
                 temp,
                 float(ambient),
@@ -63,9 +64,25 @@ def thermal_rc_hourly_kw_from_ambient(
                 extra_heat_paths=heat_paths if isinstance(heat_paths, list) else None,
             )
         else:
-            hourly.append(0.0)
+            hourly_kw.append(0.0)
             temp = next_no_heat
-    return hourly
+        hourly_temp.append(temp)
+    return hourly_kw, hourly_temp
+
+
+def thermal_rc_hourly_kw_from_ambient(
+    consumer: dict,
+    ambient_c: list[float],
+    *,
+    start_temp_c: float | None = None,
+) -> list[float]:
+    """Stündliches Heizprofil (kW) aus RC-Modell und Außentemperatur-Reihe."""
+    hourly_kw, _temps = thermal_rc_hourly_kw_and_temp_from_ambient(
+        consumer,
+        ambient_c,
+        start_temp_c=start_temp_c,
+    )
+    return hourly_kw
 
 
 def _planning_timezone_for_rc(rc: dict) -> str:

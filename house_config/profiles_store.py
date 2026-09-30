@@ -467,6 +467,20 @@ def _normalize_plant(raw: dict | None) -> dict:
     if not isinstance(raw, dict):
         return {}
     out: dict = {}
+    max_export = raw.get("max_export_power_kw")
+    if max_export is not None and max_export != "":
+        try:
+            export_kw = float(max_export)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"plant.max_export_power_kw ungültig: {max_export!r}."
+            ) from exc
+        if export_kw <= 0.0:
+            raise ValueError(
+                "plant.max_export_power_kw muss > 0 sein "
+                "(Feld weglassen = keine HK-Einspeisegrenze)."
+            )
+        out["max_export_power_kw"] = export_kw
     bindings = raw.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
         cleaned = {
@@ -527,7 +541,14 @@ def normalize_house_profiles_document(doc: dict) -> dict:
 
 
 def load_house_profiles_document(path: str) -> dict:
-    return normalize_house_profiles_document(_read_json(path))
+    doc = normalize_house_profiles_document(_read_json(path))
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if not is_shadow_mode():
+        return doc
+    from runtime_store.shadow.ehal_overlay import apply_overlay_to_house
+
+    return apply_overlay_to_house(doc)
 
 
 def _serialize_profile(profile: dict) -> dict:
@@ -564,6 +585,10 @@ def _serialize_profile(profile: dict) -> dict:
 
 def save_house_profiles_document(path: str, doc: dict) -> None:
     from runtime_store.data_model import stamp_data_model
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        _refuse_shadow_config_write(path)
 
     normalized = normalize_house_profiles_document(doc)
     serializable = {
@@ -579,6 +604,31 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
         json.dump(serializable, handle, indent=4, ensure_ascii=False)
         handle.write("\n")
     os.replace(tmp, target)
+
+
+def _refuse_shadow_config_write(path: str) -> None:
+    """Raise when Shadow would mutate files under the shared config dir."""
+    from pathlib import Path
+
+    from runtime_store.persist_paths import config_dir
+    from runtime_store.shadow.errors import ConfigReadOnlyError
+
+    try:
+        target = Path(path).resolve()
+        cfg_root = Path(config_dir()).resolve()
+        if target == cfg_root or cfg_root in target.parents:
+            raise ConfigReadOnlyError(
+                f"Shadow Mode: Konfiguration schreibgeschützt ({path})"
+            )
+    except ConfigReadOnlyError:
+        raise
+    except Exception:
+        cfg = config_dir().replace("\\", "/").rstrip("/")
+        norm = str(path).replace("\\", "/")
+        if norm == cfg or norm.startswith(cfg + "/"):
+            raise ConfigReadOnlyError(
+                f"Shadow Mode: Konfiguration schreibgeschützt ({path})"
+            ) from None
 
 
 def _attach_ehal_entity_fields(out: dict, consumer: dict) -> None:

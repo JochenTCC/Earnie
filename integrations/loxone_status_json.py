@@ -10,7 +10,6 @@ from integrations.ehal_debug_mapping import (
 )
 from settings.ehal_marker_resolve import (
     marker_flex_enable,
-    marker_flex_power_setpoint,
     marker_set_evcs_max_current,
     marker_set_evcs_mode,
 )
@@ -86,11 +85,33 @@ def _live_consumers() -> list[dict]:
     return _all_live_consumers()
 
 
+def _unconstrained_export_limit_kw() -> float:
+    """Default for ``set_grid_export_power_limit`` when nothing was sent yet.
+
+    ``0`` would mean Einspeisesperre, so fall back to the same "unconstrained" value
+    the Live write path sends.
+    """
+    from optimizer.export_power_limit import (
+        EXPORT_LIMIT_UNCONSTRAINED_W,
+        export_limit_setpoint_kw,
+    )
+
+    try:
+        from optimizer.live_export_limit import live_unconstrained_export_kw
+
+        return float(
+            export_limit_setpoint_kw(None, unconstrained_kw=live_unconstrained_export_kw())
+        )
+    except Exception:  # noqa: BLE001 — status JSON must never fail on config
+        return EXPORT_LIMIT_UNCONSTRAINED_W / 1000.0
+
+
 def _plant_status_keys(
     loxone_sent: Mapping[str, float],
     io_to_field: Mapping[str, str],
 ) -> dict[str, float]:
     payload = {field: 0.0 for field in PLANT_LIVE_WRITE_FIELDS}
+    payload["set_grid_export_power_limit"] = _unconstrained_export_limit_kw()
     for io_name, value in loxone_sent.items():
         field = str(io_to_field.get(io_name) or "").strip()
         if field in payload:
@@ -186,14 +207,6 @@ def _consumer_status_keys(
             value = _sent_enable_value(loxone_sent, enable, enable_key)
             if value is not None:
                 payload[enable_key] = value
-
-        setpoint = marker_flex_power_setpoint(as_dict)
-        _emit_if_present(
-            payload,
-            loxone_sent,
-            setpoint,
-            f"flex.{cid}.Earnie_Verbraucher_Ziel_kW",
-        )
     return payload
 
 

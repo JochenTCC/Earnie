@@ -1,7 +1,7 @@
 {
   "role_id": "heatpump",
   "label": "Wärmepumpe",
-  "baustein_notes": "Greenfield prefix Earnie_Waermepumpe_*. HK type thermal_annual (id wp_heating). Prefer EFM Load Bezeichnung for flex.wp_heating.sens_power_act.",
+  "baustein_notes": "Greenfield prefix Earnie_Waermepumpe_* (+ Earnie_Waermespeicher_* temps). HK type thermal_annual (id wp_heating). Prefer EFM Load Bezeichnung for flex.wp_heating.sens_power_act. T_eq/T_low: SM supplies volume-weighted T_eq; T_low = raw bottom sensor.",
   "recommended_markers": [
     {
       "ehal_field": "flex.sens_power_act",
@@ -14,7 +14,19 @@
       "loxone_blocks_key": "ehal_bindings.flex.wp_heating.set_enable",
       "suggested_name": "Earnie_Waermepumpe_Freigabe",
       "notes": "SG-Ready / Freigabe 0/1. VI Check key flex.{hk_id}.Earnie_Waermepumpe_Freigabe."
+    },
+    {
+      "ehal_field": "sens_temperature_heat_storage",
+      "loxone_blocks_key": "ehal_bindings.sens_temperature_heat_storage",
+      "suggested_name": "Earnie_Waermespeicher_Temp_eq",
+      "notes": "Energy-equivalent store T_eq (°C). VO path sens_temperature_heat_storage."
+    },
+    {
+      "ehal_field": "sens_temperature_heat_storage_low",
+      "loxone_blocks_key": "ehal_bindings.sens_temperature_heat_storage_low",
+      "suggested_name": "Earnie_Waermespeicher_Temp_low",
+      "notes": "Lowest immersion sensor T_low (°C); Live WP-on hint when below band floor."
     }
   ],
-  "reference": "docs/referenz/loxone-signals.md"
+  "reference": "docs/referenz/loxone-signals.md; docs/konfiguration/waermespeicher-schichtung-teq.md"
 }

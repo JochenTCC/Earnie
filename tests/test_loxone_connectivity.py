@@ -61,16 +61,6 @@ class TestProbeLoxoneHttpAccess:
 
 
 class TestReadCheckValidation:
-    def test_soc_validation_rejects_out_of_range(self):
-        assert lc._soc_valid(105.0) is not None
-
-    def test_power_validation_accepts_typical_value(self):
-        assert lc._power_valid(2.5) is None
-
-    def test_binary_validation(self):
-        assert lc._binary_valid(1.0) is None
-        assert lc._binary_valid(0.5) is not None
-
     def test_read_check_missing_text_io_is_warning(self):
         with patch.object(lc.loxone_client, "fetch_loxone_ready_by_time", return_value=None):
             result = lc._read_check(
@@ -83,6 +73,14 @@ class TestReadCheckValidation:
         assert result.severity == "warning"
         assert lc._check_counts_as_ok(result) is True
         assert "AlarmClock" in result.detail
+
+    def test_read_check_accepts_any_numeric_value(self):
+        with patch.object(
+            lc.loxone_client, "fetch_loxone_generic_value", return_value=105.0
+        ):
+            result = lc._read_check("sens_ess_soc", "SOC")
+        assert result.passed is True
+        assert "105" in result.detail
 
 
 class TestCollectReadChecks:
@@ -152,6 +150,26 @@ class TestCollectReadChecks:
 
         by_label = {label: io for label, io, _ in checks}
         assert by_label["sens_absent_mode"] == "Earnie_Abwesend"
+
+    def test_collects_plant_export_limit_in_from_house_profiles(self):
+        house = {
+            "plant": {
+                "ehal_bindings": {
+                    "get_grid_export_power_limit": "Earnie_Netz_Einspeisegrenze_In",
+                },
+            }
+        }
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=[]
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ), patch.object(
+            lc.loxone_client, "_default_house_profiles_doc", return_value=house
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["get_grid_export_power_limit"] == "Earnie_Netz_Einspeisegrenze_In"
 
     def test_ignores_consumer_ambient_for_live_reads(self):
         house = {"plant": {"ehal_bindings": {}}}
@@ -340,6 +358,59 @@ class TestCollectReadChecks:
         assert by_label["pool:sens_temperature_water"] == "Pool_Ist"
         assert by_label["pool:get_temperature_water_setpoint"] == "Pool_Soll"
         assert "pool:flex.pool.sens_power_act" not in by_label
+
+    def test_collects_thermal_annual_heat_storage_temps(self):
+        consumers = [
+            {
+                "id": "waermepumpe",
+                "type": "thermal_annual",
+                "ehal_bindings": {
+                    "flex.waermepumpe.sens_power_act": "P_WP",
+                    "sens_temperature_heat_storage": "Earnie_Waermespeicher_Temp_eq",
+                    "sens_temperature_heat_storage_low": "Earnie_Waermespeicher_Temp_low",
+                },
+            }
+        ]
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["waermepumpe:flex.waermepumpe.sens_power_act"] == "P_WP"
+        assert (
+            by_label["waermepumpe:sens_temperature_heat_storage"]
+            == "Earnie_Waermespeicher_Temp_eq"
+        )
+        assert (
+            by_label["waermepumpe:sens_temperature_heat_storage_low"]
+            == "Earnie_Waermespeicher_Temp_low"
+        )
+
+    def test_heat_storage_temps_without_power_marker_still_collected(self):
+        consumers = [
+            {
+                "id": "wp_heating",
+                "type": "thermal_annual",
+                "ehal_bindings": {
+                    "sens_temperature_heat_storage": "TempEq",
+                    "sens_temperature_heat_storage_low": "TempLow",
+                },
+            }
+        ]
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["wp_heating:sens_temperature_heat_storage"] == "TempEq"
+        assert by_label["wp_heating:sens_temperature_heat_storage_low"] == "TempLow"
+        assert "wp_heating:flex.wp_heating.sens_power_act" not in by_label
 
 
 class TestLoxoneIntegrationGate:

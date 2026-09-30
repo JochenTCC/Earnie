@@ -77,6 +77,36 @@ def test_read_telemetry_normalizes(fetch_mock):
     assert telemetry["sens_power_consumers"] == pytest.approx(1500.0)
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected_w"),
+    [(3.5, 3500.0), (0.0, 0.0), (-1.0, None), (None, None)],
+)
+@patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
+def test_read_telemetry_inbound_export_limit(fetch_mock, raw, expected_w):
+    values = {"SoC": 55.0, "PV": 2.0, "Bat": 0.0, "Grid": 0.0, "ExpIn": raw}
+    fetch_mock.side_effect = values.get
+    telemetry = LoxoneAdapter(_cfg(grid_export_limit_in_name="ExpIn")).read_telemetry()
+    assert telemetry.get("get_grid_export_power_limit") == expected_w
+
+
+@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
+def test_write_setpoints_export_limit_magnitude_kw(send_mock):
+    send_mock.return_value = True
+    adapter = LoxoneAdapter(_cfg(grid_export_limit_out_name="ExpOut"))
+    for limit_w, expected_kw in ((0.0, 0.0), (4200.0, 4.2), (1_000_000.0, 1000.0)):
+        send_mock.reset_mock()
+        error = adapter.write_setpoints(
+            {
+                "schema_version": EHAL_SCHEMA_VERSION,
+                "ts": "2026-07-28T12:00:00Z",
+                "adapter_id": "loxone-home",
+                "set_grid_export_power_limit": limit_w,
+            }
+        )
+        assert error is None
+        send_mock.assert_called_once_with("ExpOut", expected_kw)
+
+
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
 def test_read_telemetry_missing_raises(fetch_mock):
     fetch_mock.return_value = None

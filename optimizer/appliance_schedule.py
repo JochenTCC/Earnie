@@ -163,18 +163,9 @@ def appliance_kw_for_slot(
 
 
 def _recalculate_chart_row_grid(chart_row: dict[str, Any]) -> None:
-    from optimizer.targets import consumer_column_name
+    from optimizer.sim_chart_rows import sync_chart_row_netzbezug
 
-    pv = float(chart_row.get("PV-Prognose (kW)", 0.0) or 0.0)
-    batt = float(chart_row.get("Geplante Batterie-Aktion (kW)", 0.0) or 0.0)
-    flex_sum = sum(
-        float(chart_row.get(consumer_column_name(consumer), 0.0) or 0.0)
-        for consumer in config.get_flexible_consumers(optimizer_only=True)
-    )
-    for appliance in config.get_appliances():
-        flex_sum += float(chart_row.get(appliance_column_name(appliance), 0.0) or 0.0)
-    con = float(chart_row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
-    chart_row["Netzbezug (kW)"] = round(con + flex_sum - pv + batt, 2)
+    sync_chart_row_netzbezug(chart_row)
 
 
 def apply_appliance_schedules_to_chart_rows(

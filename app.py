@@ -24,6 +24,10 @@ from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
 config = load_config_or_exit()
 reinit_config_or_exit(config)
 
+from runtime_store.shadow import refuse_shadow_startup_or_exit
+
+refuse_shadow_startup_or_exit()
+
 from runtime_store.config_drift import (
     format_drift_message,
     load_config_drift_items,
@@ -46,6 +50,7 @@ from ui.styles import (
     inject_single_file_uploader_css,
 )
 from ui.truth_banner import render_truth_banner
+from ui.shadow_banner import render_shadow_banner
 
 logger = logging.getLogger("app")
 
@@ -56,6 +61,7 @@ st.set_page_config(
     layout="wide",
 )
 render_app_logo()
+render_shadow_banner()
 
 
 def _render_downgrade_warning() -> None:

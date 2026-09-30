@@ -1249,17 +1249,6 @@
         "value": "st-gf-earn-022"
       }
     },
-    "gf-earn-023": {
-      "name": "Earnie_Verbraucher_Ziel_kW",
-      "type": "InfoOnlyAnalog",
-      "uuidAction": "gf-earn-023",
-      "room": "17b525a0-028d-b174-ffff912d5ec91829",
-      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
-      "details": {},
-      "states": {
-        "value": "st-gf-earn-023"
-      }
-    },
     "gf-earn-024": {
       "name": "Earnie_Pool_P_act",
       "type": "InfoOnlyAnalog",

@@ -15,12 +15,6 @@
       "required": false,
       "kind": "stub",
       "notes": "Pattern B Freigabe. Legacy flex.enable_name migrates on load."
-    },
-    {
-      "field": "flex.{hk_id}.set_power_setpoint",
-      "required": false,
-      "kind": "stub",
-      "notes": "Pattern B Sollwert. Legacy flex.power_setpoint_name migrates on load."
     }
   ],
   "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signals.md § Flexible Verbraucher."

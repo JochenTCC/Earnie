@@ -39,6 +39,7 @@ TELEMETRY_OPTIONAL = (
     "sens_ess_power",
     "sens_evcs_active_power",
     "sens_power_consumers",
+    "get_grid_export_power_limit",
 )
 # Side-channel binary plant sensors (not part of EHAL telemetry wire / numeric read).
 TELEMETRY_BINARY_OPTIONAL = (
@@ -57,6 +58,7 @@ SETPOINT_FIELDS = (
     "set_ess_mode",
     "set_evcs_max_current",
     "set_evcs_mode",
+    "set_grid_export_power_limit",
 )
 MAPPABLE_DOMAINS = frozenset(
     {"sensor", "number", "select", "input_number", "binary_sensor", "input_boolean"}
@@ -240,6 +242,16 @@ class HaAdapter:
         return self._get_json(f"/api/states/{entity_id}")
 
     def call_service(self, domain: str, service: str, data: dict[str, Any]) -> None:
+        from runtime_store.shadow.writes import block_write_if_shadow
+
+        entity = str((data or {}).get("entity_id") or f"{domain}.{service}")
+        if block_write_if_shadow(
+            backend="ha",
+            target=entity,
+            value={"domain": domain, "service": service, "data": data},
+            source="ha_adapter.call_service",
+        ):
+            return
         url = f"{self._base}/api/services/{domain}/{service}"
         try:
             response = requests.post(
@@ -367,6 +379,19 @@ class HaAdapter:
                 outcome.messages.append(msg)
                 outcome.hub_status = status or outcome.hub_status
 
+        if "set_grid_export_power_limit" in doc:
+            if not self.cfg.entities.get("set_grid_export_power_limit"):
+                self._skip("set_grid_export_power_limit", outcome)
+            else:
+                ok, status, msg = self._try_setpoint_write(
+                    "set_grid_export_power_limit",
+                    float(doc["set_grid_export_power_limit"]),
+                )
+                if not ok:
+                    outcome.failed.append("set_grid_export_power_limit")
+                    outcome.messages.append(msg)
+                    outcome.hub_status = status or outcome.hub_status
+
     def _huawei_force_payload(self, power_w: float) -> dict[str, Any]:
         force = self.cfg.ha_ess_force or {}
         duration = int(force.get("duration_min") or 20)
@@ -479,8 +504,15 @@ class HaAdapter:
         )
 
     def _get_json(self, path: str) -> Any:
-        url = f"{self._base}{path}"
         feed_key = f"ha:get:{path}"
+        from runtime_store.shadow.mode import is_shadow_mode
+
+        if is_shadow_mode():
+            from runtime_store.shadow.replay import replay_ha_get
+
+            return replay_ha_get(feed_key)
+
+        url = f"{self._base}{path}"
         try:
             response = requests.get(
                 url, headers=self._headers, timeout=self.cfg.timeout_sec
@@ -579,7 +611,13 @@ class HaAdapter:
         """EHAL base unit → target entity unit, read fresh from HA on every write."""
         payload = self.read_state(entity_id)
         attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
-        return round(from_ehal(field_name, value, attrs.get("unit_of_measurement")), 6)
+        converted = from_ehal(field_name, value, attrs.get("unit_of_measurement"))
+        if field_name == "set_grid_export_power_limit":
+            # Unconstrained export = high magnitude; clamp to the number entity's range.
+            entity_max = attrs.get("max")
+            if isinstance(entity_max, (int, float)):
+                converted = min(converted, float(entity_max))
+        return round(converted, 6)
 
     def _record_write_error(
         self,

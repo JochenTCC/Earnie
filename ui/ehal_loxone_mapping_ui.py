@@ -1,10 +1,8 @@
 """EHAL Loxone mapping Streamlit section UI."""
 from __future__ import annotations
 
-import config
 from ui.ehal_loxone_mapping import (
     _clear_pending_for_widget,
-    _ensure_ehal_loxone_meta,
     _field_select_caption,
     _migrate_on_open,
     _name_options,
@@ -12,10 +10,11 @@ from ui.ehal_loxone_mapping import (
     _render_field_selects,
     _save_entity_mapping,
     add_manual_marker_name,
-    apply_entity_bindings,
     build_entity_rows,
     configured_marker_names,
+    enrich_structure_scan_rows,
     is_known_marker_name,
+    persist_loxone_entity_mapping,
     resolve_live_profile_id,
     session_manual_marker_names,
 )
@@ -25,18 +24,9 @@ from typing import Any
 import streamlit as st
 
 import config
-from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
-from house_config.ehal_bindings import (
-    FILTER_EHAL_FIELDS,
-    THERMAL_RC_EHAL_FIELDS,
-    ensure_migrated,
-    filter_ehal_fields_for_consumer,
-    strip_migrated_config_keys,
-)
-from integrations.ehal_live import reset_adapter_cache
+from house_config.ehal_bindings import FILTER_EHAL_FIELDS
 from ui.ehal_function_status import render_function_status
 from integrations.loxone_ehal_mapping import (
-    FIELD_LABELS,
     SETPOINT_FIELDS,
     TELEMETRY_OPTIONAL,
     TELEMETRY_REQUIRED,
@@ -46,13 +36,6 @@ from integrations.loxone_greenfield_import import probe_marker_names
 from integrations.loxone_structure import (
     SOURCE_HTTP_PROBE,
     scan_structure,
-)
-from ui.house_config_io import (
-    get_live_scenario_refs,
-    load_house_profiles,
-    load_main_config,
-    save_house_profiles,
-    save_main_config,
 )
 
 _NONE = "— nicht gemappt —"
@@ -92,7 +75,6 @@ EV_FIELDS: tuple[str, ...] = (
 FLEX_FIELDS: tuple[str, ...] = (
     "flex.sens_power_act",
     "flex.set_enable",
-    "flex.set_power_setpoint",
 )
 
 FILTER_FIELDS: tuple[str, ...] = FILTER_EHAL_FIELDS
@@ -107,10 +89,8 @@ _EXTRA_LABELS: dict[str, str] = {
     "get_evcs_soc_min_immediate": "EV SOC-Min Sofort (%)",
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
-    "flex.power_setpoint_name": "Flex Leistungs-Sollwert",
     "flex.sens_power_act": "Flex Leistung / Zustand",
     "flex.set_enable": "Flex Freigabe",
-    "flex.set_power_setpoint": "Flex Leistungs-Sollwert",
     "get_filter_remaining_hours": "Filter Sollstunden (h)",
     "sens_filter_active": "Filter läuft (Binär)",
     "get_filter_native_start_hour": "Native Filter-Startstunde",
@@ -119,6 +99,8 @@ _EXTRA_LABELS: dict[str, str] = {
     "get_temperature_water_setpoint": "Pool Soll-Temperatur (°C)",
     "get_temperature_tolerance_c": "Temperatur-Toleranz (°C)",
     "sens_heating_active": "Heizung aktiv",
+    "sens_temperature_heat_storage": "Wärmespeicher T_eq (°C)",
+    "sens_temperature_heat_storage_low": "Wärmespeicher T_low (°C)",
     "sens_temperature_outside": "Außentemperatur (°C)",
     "sens_absent_mode": "Abwesend / Urlaub (0/1)",
 }
@@ -166,6 +148,8 @@ def _select_marker(
 
 def render_ehal_loxone_mapping_section() -> None:
     """HTTP-probe structure scan + entity HITL; persists plant/consumer ehal_bindings."""
+    from runtime_store.shadow.mode import is_shadow_mode
+
     st.caption(
         "Entity-zentriertes Mapping: Anlage + Verbraucher aus dem Live-Hausprofil. "
         "Pool/SwimSpa-Filter: Verbraucher `pool_filter` mit `ehal_bindings` "
@@ -177,6 +161,11 @@ def render_ehal_loxone_mapping_section() -> None:
         "Struktur-Scan: HTTP-Probe bekannter Earnie_*/gemappter Merker; "
         "in jedem Feld-Dropdown einen neuen Merker eintippen (mit Bestätigung)."
     )
+    if is_shadow_mode():
+        st.info(
+            "Shadow-Modus: Mapping-Speichern schreibt nur das Runtime-Overlay "
+            "`shadow_ehal_bindings.json` (Prod-Config bleibt schreibgeschützt)."
+        )
     house, config_doc = _migrate_on_open()
     profile_id = resolve_live_profile_id(house)
     entities = build_entity_rows(house, profile_id)
@@ -217,9 +206,12 @@ def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]
     """Scan via HTTP-Probe only (MCP / Ollama / Quellenvergleich UI removed; code kept in integrations)."""
     if st.button("HTTP-Probe", key="ehal_lox_scan_btn"):
         configured = configured_marker_names(house, profile_id) + session_manual_marker_names()
-        _run_structure_scan(configured)
+        _run_structure_scan(configured, house, profile_id)
     rows: list[dict[str, Any]] = list(st.session_state.get(_SESSION_SCAN) or [])
     if rows:
+        # Re-resolve ehal so Mapping-Tabelle tracks house bindings after save.
+        rows = enrich_structure_scan_rows(rows, house, profile_id)
+        st.session_state[_SESSION_SCAN] = rows
         st.caption(f"{len(rows)} Namen für Mapping (HTTP-Probe)")
         st.dataframe(rows[:40], width="stretch", hide_index=True)
         if len(rows) > 40:
@@ -299,16 +291,13 @@ def _accept_pending_new_marker(house: dict, config_doc: dict) -> None:
     entity = next((row for row in rows if row["id"] == entity_id), None)
     bindings = dict(entity["bindings"]) if entity else {}
     bindings[field] = name
-    migrated_house, migrated_config, _ = ensure_migrated(house, config_doc)
-    saved = apply_entity_bindings(
-        migrated_house,
+    persist_loxone_entity_mapping(
+        house,
+        config_doc,
         profile_id=profile_id,
         entity_id=entity_id,
-        bindings=bindings,
+        ehal_map=bindings,
     )
-    save_house_profiles(saved)
-    save_main_config(_ensure_ehal_loxone_meta(migrated_config))
-    reset_adapter_cache()
     if widget_key:
         st.session_state[widget_key] = name
     st.session_state.pop(_SESSION_PENDING_NEW, None)
@@ -333,7 +322,7 @@ def _render_entity_picker(entities: list[dict[str, Any]]) -> dict[str, Any]:
         st.session_state[_SESSION_ENTITY] = entity_id
     return next(row for row in entities if row["id"] == entity_id)
 
-def _run_structure_scan(configured: list[str]) -> None:
+def _run_structure_scan(configured: list[str], house: dict, profile_id: str) -> None:
     """HTTP-Probe only for mapping names. MCP/Ollama remain in integrations for later re-use."""
     st.session_state.pop(_SESSION_PROPOSALS, None)
     result = scan_structure(
@@ -347,17 +336,7 @@ def _run_structure_scan(configured: list[str]) -> None:
     )
     st.session_state["ehal_lox_scan_errors"] = result.all_errors()
     items = result.mapping_items(use_source=SOURCE_HTTP_PROBE)
-    st.session_state[_SESSION_SCAN] = [
-        {
-            "name": item.name,
-            "uuid": item.uuid,
-            "type": item.type,
-            "room": item.room,
-            "category": item.category,
-            "source": item.source,
-        }
-        for item in items
-    ]
+    st.session_state[_SESSION_SCAN] = enrich_structure_scan_rows(items, house, profile_id)
     if items:
         st.session_state[_SESSION_PROPOSALS] = heuristic_propose(
             [item.name for item in items],
