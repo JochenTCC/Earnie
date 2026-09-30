@@ -70,6 +70,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Tests per spec §10; E2E with HouseSim as Prod backend (`tests/test_shadow_*.py` — 36 passed)
   - **Out of scope (unchanged):** S4 Soll/Soll diff + offline JSONL backtest → **2.+1**; Shadow as 2nd HA add-on (scenario C)
 
+### Official 2.6.0 release (2026-09-30)
+
+- [x] Bump `version.py` **2.6.0-alpha.12** → **2.6.0**; release notes `.github/release-notes/v2.6.0.md`
+- [x] Candidate tag `v2.6.0` (promote after platform test → `:latest` + official HA add-on)
+
 ### 2.6.0-alpha.12 pre-release (2026-09-29)
 
 - [x] Bump `version.py` + alpha compose pins to **2.6.0-alpha.12**; release notes `.github/release-notes/v2.6.0-alpha.12.md`

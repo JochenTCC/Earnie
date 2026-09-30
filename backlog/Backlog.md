@@ -16,9 +16,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.12`**. This branch keeps `version.py` at **`2.7.0-dev`** until post-2.6 approval.
+**Versioning note:** Official **2.6.0** is the HA-coupling MINOR (supersedes **2.5.3** on `:latest`). Alpha compose still pins last community candidate **`2.6.0-alpha.12`** until the next pre-release bump. This branch keeps `version.py` at **`2.7.0-dev`** until an approved 2.7 bump.
 
-**Next:** community/official **2.6** publish as needed. On this branch: **2.7.c** … **2.7.e**. Shadow Prod recorder (**2.6.o**), Shadow client (**2.7.f**), **2.7.a** (export limit + dogfood), **2.7.b** (Thermals P2), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
+**Next:** On this branch: **2.7.c** … **2.7.e**. Shadow Prod recorder (**2.6.o**), Shadow client (**2.7.f**), **2.7.a** (export limit + dogfood), **2.7.b** (Thermals P2), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done. Official **2.6.0** is on `main`.
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -30,7 +30,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
+**Order:** **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
 
 - [ ] **2.7.c — Multiple isolated battery / battery+inverter entities** (bidirectional)
   - Isolated battery modes: charging / discharging / standby

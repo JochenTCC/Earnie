@@ -2,6 +2,11 @@
 
 Add-on `version:` mirrors the Earnie app release. Official tags bump `earnie` + `earnie_prerelease`; pre-releases bump only `earnie_prerelease`. Prebuilt: `ghcr.io/jochentcc/earnie-addon-{arch}`.
 
+## 2.6.0
+
+- Official **MINOR** after **2.5.3**. Focus: Home Assistant coupling (EHAL Pattern B), add-on channels, Shadow Mode S1 recorder, and quality hardening through the `2.6.0-alpha.*` community line.
+- Earnie release: [2.6.0](https://github.com/JochenTCC/Earnie/releases/tag/v2.6.0)
+
 ## 2.6.0-alpha.1
 
 - First community **pre-release** of the **2.6** HA-coupling line (follows official **2.5.3**). Do **not** continue `2.5.3-alpha.N` — pin this tag.
