@@ -196,7 +196,6 @@ One template `VI_Earnie_Consumer` / `VO_Earnie_Consumer` covers **one** consumer
 | -------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
 | Power    | `Earnie_Verbraucher_Leistung` → `Earnie_Verbraucher_<Slug>_Leistung`   | VO: `flex.{hk_id}.sens_power_act`                  |
 | Enable   | `Earnie_Verbraucher_Freigabe` → `…_<Slug>_Freigabe`                    | Check: `flex.{hk_id}.Earnie_Verbraucher_Freigabe`  |
-| Target kW| `Earnie_Verbraucher_Ziel_kW` → `…_<Slug>_Ziel_kW`                      | Check: `flex.{hk_id}.Earnie_Verbraucher_Ziel_kW`   |
 
 
 **Example washing machine** (`id` = `waschmaschine`):
@@ -243,7 +242,7 @@ Checking all configured signals:
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Plant (battery, PV, grid, control command, house load, outside temp., absent)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers`, `set_ess_*` |
 | Request Optimize (ad hoc)                                               | Loxone VO → daemon HTTP                       | `Earnie_Request_Optimize` on port `system.ehal_loxone_http_port` (default **8541**)                                                                       |
-| Heat pump / Flex / Thermal                                              | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`, `flex.{slug}.set_power_setpoint`                                                                  |
+| Heat pump / Flex / Thermal                                              | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`                                                                                                  |
 | EV (`ev`)                                                                | `consumers[].ehal_bindings`                   | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*`                                                                                                                  |
 | Pool / SwimSpa                                                           | `consumers[].ehal_bindings` + filter entity   | see default `Earnie_Pool_*` / EHAL-Com §C.6                                                                                                                |
 
@@ -288,7 +287,6 @@ The control signal definitions live in the active house profile (`house_profiles
 | ------------------------------------ | --------- | ---------------------------------------------------------------------------------------------- | ------------ |
 | `flex.{slug}.sens_power_act`       | Read      | Heat pump: `Earnie_Waermepumpe_Leistung`; generic: `Earnie_Verbraucher_Leistung`; or EFM load  | kW or 0/1   |
 | `flex.{slug}.set_enable`           | Write     | Heat pump: `Earnie_Waermepumpe_Freigabe`; generic: `Earnie_Verbraucher_Freigabe`               | `0`/`1`     |
-| `flex.{slug}.set_power_setpoint`   | Write     | `Earnie_Verbraucher_Ziel_kW` (optional)                                                        | kW setpoint |
 
 
 Pool enables: default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` in `ehal_bindings`.

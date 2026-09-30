@@ -66,7 +66,6 @@ _OUTPUT_MARKER_KEYS: frozenset[str] = frozenset(
         "set_evcs_current",
         "set_evcs_mode",
         "flex.enable_name",
-        "flex.power_setpoint_name",
     }
 )
 
@@ -111,7 +110,6 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
     from ehal.flex_fields import (
         KIND_SENS_POWER_ACT,
         KIND_SET_ENABLE,
-        KIND_SET_POWER_SETPOINT,
         flex_field,
     )
 
@@ -138,20 +136,26 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
         )
     else:
         _put_binding(bindings, "flex.enable_name", outputs.get("enable_name"))
-    setpoint = (
-        outputs.get("power_setpoint_name")
-        or outputs.get("set_evcs_max_current")
-        or outputs.get("set_evcs_current")
-    )
+    # Non-EV flex never writes a kW setpoint (enable-only). EV uses set_evcs_max_current.
     if consumer.get("type") == "ev":
-        _put_binding(bindings, "set_evcs_max_current", setpoint)
-    elif cid:
-        _put_binding(
-            bindings, flex_field(cid, KIND_SET_POWER_SETPOINT), setpoint
+        setpoint = (
+            outputs.get("power_setpoint_name")
+            or outputs.get("set_evcs_max_current")
+            or outputs.get("set_evcs_current")
         )
-    else:
-        _put_binding(bindings, "flex.power_setpoint_name", setpoint)
+        _put_binding(bindings, "set_evcs_max_current", setpoint)
     _put_binding(bindings, "set_evcs_mode", outputs.get("set_evcs_mode"))
+
+
+def _strip_obsolete_flex_power_setpoint(bindings: dict[str, str]) -> None:
+    """Drop removed Pattern B / stub flex kW setpoint keys (never written live)."""
+    for key in list(bindings):
+        name = str(key or "").strip()
+        if name in ("flex.power_setpoint_name", "flex.set_power_setpoint"):
+            bindings.pop(key, None)
+            continue
+        if name.startswith("flex.") and name.endswith(".set_power_setpoint"):
+            bindings.pop(key, None)
 
 
 def _migrate_thermal_loxone(consumer: dict, bindings: dict[str, str]) -> None:
@@ -187,9 +191,12 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
         _migrate_charging_loxone(sched["loxone"], bindings)
     _migrate_consumer_io(consumer, bindings)
     _migrate_thermal_loxone(consumer, bindings)
+    _strip_obsolete_flex_power_setpoint(bindings)
     cid = _nonempty(consumer.get("id"))
     if cid:
-        return expand_flex_bindings(bindings, cid)
+        expanded = expand_flex_bindings(bindings, cid)
+        _strip_obsolete_flex_power_setpoint(expanded)
+        return expanded
     return bindings
 
 

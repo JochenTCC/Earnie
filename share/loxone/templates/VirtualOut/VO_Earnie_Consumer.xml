@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   DRAFT (2.4.n Pattern B) — Loxone → Earnie generic flex consumer power push.
-  Freigabe/Ziel_kW are on VI_Earnie_Consumer. Multi-consumer: Prefix+Slug Titles (docs).
+  Freigabe is on VI_Earnie_Consumer. Multi-consumer: Prefix+Slug Titles (docs).
   VO path: /ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/\v — replace {hk_id}
   with the Hausprofil consumer id (e.g. waschmaschine). Binding key flex.{hk_id}.sens_power_act.
   Leistung may be EFM Load — keep VO cmd.

@@ -32,7 +32,7 @@ def power_limits_kw(consumer: dict) -> tuple[float, float]:
     if min_kw is None:
         raise ValueError(
             f"Verbraucher '{consumer.get('id', '?')}': min_power_kw fehlt "
-            "(Pflicht bei set_evcs_max_current / power_setpoint_name)."
+            "(Pflicht bei set_evcs_max_current)."
         )
     min_kw = float(min_kw)
     if min_kw < 0.0:

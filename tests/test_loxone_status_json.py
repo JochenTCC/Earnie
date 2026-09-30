@@ -95,7 +95,6 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
             "type": "generic",
             "ehal_bindings": {
                 "flex.waschmaschine.set_enable": "Earnie_Verbraucher_Waschmaschine_Freigabe",
-                "flex.waschmaschine.set_power_setpoint": "Earnie_Verbraucher_Waschmaschine_Ziel_kW",
             },
         },
         {
@@ -111,7 +110,6 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
             "Earnie_EAuto_Soll_A": 16.0,
             "Earnie_EAuto_Modus": 2.0,
             "Earnie_Verbraucher_Waschmaschine_Freigabe": 1.0,
-            "Earnie_Verbraucher_Waschmaschine_Ziel_kW": 2.0,
             "Earnie_Waermepumpe_Freigabe": 1.0,
             "Earnie_Pool_Freigabe": 0.0,
             "Earnie_Pool_Filter_Freigabe": 1.0,
@@ -123,7 +121,7 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
     assert payload["ev.garage.Earnie_EAuto_Soll_A"] == 16.0
     assert payload["ev.garage.Earnie_EAuto_Modus"] == 2.0
     assert payload["flex.waschmaschine.Earnie_Verbraucher_Freigabe"] == 1.0
-    assert payload["flex.waschmaschine.Earnie_Verbraucher_Ziel_kW"] == 2.0
+    assert "flex.waschmaschine.Earnie_Verbraucher_Ziel_kW" not in payload
     assert payload["flex.waermepumpe.Earnie_Waermepumpe_Freigabe"] == 1.0
     assert payload["Earnie_Pool_Freigabe"] == 0.0
     assert payload["Earnie_Pool_Filter_Freigabe"] == 1.0

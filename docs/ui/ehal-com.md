@@ -151,16 +151,15 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 Live operation runs via house-profile flex Merker. Role template: `share/ehal/roles/consumer.json`. **Heat pump** → [C.5](#c5-heat-pump-stub); **Pool / SwimSpa** → [C.6](#c6-pool--swimspa-stub).
 
-`flex.` is a **role namespace**. Binding and live keys follow pattern B: `flex.{slug}.sens_power_act` / `set_enable` / `set_power_setpoint`. Live shows `{id}:flex.{slug}.…`. For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example: `zaehler_trockner:flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
+`flex.` is a **role namespace**. Binding and live keys follow pattern B: `flex.{slug}.sens_power_act` / `set_enable`. Live shows `{id}:flex.{slug}.…`. For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example: `zaehler_trockner:flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
 
-**Pattern B VO push path:** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/\v` (enable/setpoint `flex.{slug}.set_enable` / `flex.{slug}.set_power_setpoint`). Merker title stays `Earnie_Verbraucher_…`. See [Loxone Signals — Multiple Flex Consumers](../referenz/loxone-signals.md).
+**Pattern B VO push path:** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/\v` (enable `flex.{slug}.set_enable`). Merker title stays `Earnie_Verbraucher_…`. See [Loxone Signals — Multiple Flex Consumers](../referenz/loxone-signals.md).
 
 
 | Area / meaning        | Type          | EHAL value name (stub)             | OpenEMS | evcc (YAML attribute) | Victron GX / EVCS (Modbus) | Loxone / Loxone extra                        |
 | ------------------------ | --------------- | ------------------------------------- | ------- | ------------------------ | ----------------------------- | ------------------------------------------------ |
 | Flex power / state      | Measurement   | `flex.{slug}.sens_power_act`         |         |                           |                                | `Earnie_Verbraucher_Leistung` or EFM load        |
 | Flex enable             | Control value | `flex.{slug}.set_enable`             |         |                           |                                | `Earnie_Verbraucher_Freigabe`                     |
-| Flex power setpoint     | Control value | `flex.{slug}.set_power_setpoint`     |         |                           |                                | `Earnie_Verbraucher_Ziel_kW`                      |
 
 
 
@@ -249,7 +248,7 @@ Units and signs: see §B. Full role matrix: §C.
 
 ### Live Write
 
-`**set_***` (plant / EV) as well as flex **enable** / setpoint (`{id}:flex.{slug}.set_enable`, optionally `set_power_setpoint`). The table lists **all** expected write fields; values/success come from the last `main.py` run (`runtime/optimizer_run_state.json`); unmapped rows have an empty mapping column. Same identity columns:
+`**set_***` (plant / EV) as well as flex **enable** (`{id}:flex.{slug}.set_enable`). The table lists **all** expected write fields; values/success come from the last `main.py` run (`runtime/optimizer_run_state.json`); unmapped rows have an empty mapping column. Same identity columns:
 
 
 | Column                                            | Meaning                                                                                       |

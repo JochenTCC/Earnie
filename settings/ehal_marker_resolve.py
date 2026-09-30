@@ -55,16 +55,6 @@ def marker_flex_enable(consumer: dict) -> str:
     return binding_address(ehal_bindings(consumer), cid, KIND_SET_ENABLE)
 
 
-def marker_flex_power_setpoint(consumer: dict) -> str:
-    """Consumer Sollwert from ``ehal_bindings`` (Pattern B)."""
-    from ehal.flex_fields import KIND_SET_POWER_SETPOINT, binding_address
-
-    cid = str(consumer.get("id") or "").strip()
-    if not cid:
-        return ""
-    return binding_address(ehal_bindings(consumer), cid, KIND_SET_POWER_SETPOINT)
-
-
 def marker_sens_evcs_connected(consumer: dict) -> str:
     return resolve_lox_marker(consumer, "sens_evcs_connected")
 

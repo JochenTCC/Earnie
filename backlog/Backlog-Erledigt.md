@@ -2,6 +2,28 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Minor: Remove EHAL flex.set_power_setpoint (2026-09-30)
+
+- [x] **Remove EHAL `flex.{slug}.set_power_setpoint` permanently** — unused for live control (non-EV flex writes only `set_enable`; variable kW/A is EV-only via `set_evcs_max_current`). Stripped Pattern B field + legacy stub `flex.power_setpoint_name` / non-EV migrate from `loxone_outputs.power_setpoint_name`; mapping UI / Live-Schreiben expected fields / `share/ehal/roles/consumer.json` / greenfield recipes / docs (`loxone-signals`, `ehal-com`). EV `set_evcs_max_current` kept. Heat-pump Prio3 temperature-setpoint path (2.+1) unrelated.
+
+### Bugfix Loxone Live-Lesen range checks removed (2026-09-30)
+
+- [x] **Loxone Live-Lesen range checks removed** — Dropped Earnie-side SoC/power/temp/binary/export min–max validators in `loxone_connectivity` (Loxone already enforces ranges). Live-Lesen still fails on read/parse only. Live acceptance verified (EHAL-Com Live-Lesen / `verify_loxone_setup`).
+
+### Bugfix EHAL-Com Mapping-Tabelle EHAL column (2026-09-30)
+
+- [x] **EHAL-Com Mapping-Tabelle EHAL column** — HTTP-Probe scan shows `ehal` (house binding reverse, else greenfield device map); columns ordered `name, ehal, type, source, room, category, uuid`. Live acceptance verified.
+
+### 2.7.a dogfood — Loxone productive + live test (2026-09-30)
+
+- [x] **2.7.a dogfood — Loxone productive + live test** (wiring archived 2026-09-29)
+  - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (unconstrained = PV kWp sum + battery max discharge kW)
+  - Prefer Shadow dogfood via **2.7.f**; completes the open live-test from wiring-only archive
+
+### Bugfix Stale SoC sanitize chain (2026-09-30)
+
+- [x] **Stale SoC sanitize chain** (`debug_dump_20260927_083552`) — Trust plant SoC when closed-interval sampler confirms against history (`closed_interval_confirms_reported` + `reported_soc_percent` consecutive count). Live acceptance verified.
+
 ### 2.7.d — One-way storage type folded into 2.7.g / 2.7.h (2026-09-29)
 
 - [x] **2.7.d — One-way storage type** (planning fold; not implemented as a standalone letter)
@@ -14,7 +36,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **2.7.a dogfood — Loxone productive wiring** (partial)
   - Wire export-limit Merker / VI–VO in the productive Loxone config (`set_grid_export_power_limit`, optional inbound `get_grid_export_power_limit`; Einspeisesperre = limit `0`, `set_ess_mode` stays battery-only)
   - Bind in EHAL-Com; set a HK `plant.max_export_power_kw` and verify Live writes + MILP respect the cap
-  - **Still open:** Live-test (static HK cap, inbound override, pay-to-export soft, release unconstrained) → [Backlog.md](Backlog.md) **2.7.a dogfood**
+  - Live-test closed 2026-09-30 → `### 2.7.a dogfood — Loxone productive + live test (2026-09-30)`
 
 ### 2.7.f — Shadow Mode S2+S3: Dev client (2026-09-29)
 
@@ -168,7 +190,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Soft / economic: positive export tariffs prefer avoiding export (objective), separate from hard ceiling
   - Outbound `set_grid_export_power_limit` + ESS mode Einspeisesperre (**3**); Loxone VI/VO templates + greenfield/recipe maps; HA/OpenEMS adapters
   - Helpers: `optimizer/export_power_limit.py`, `optimizer/live_export_limit.py`; HK UI `ui/house_config_plant.py`; tests `test_export_power_limit` / `test_live_export_limit` / `test_milp_export_cap`
-  - **Still open:** Live-test dogfood → [Backlog.md](Backlog.md) **2.7.a dogfood** (Loxone wiring archived 2026-09-29)
+  - Live-test dogfood closed 2026-09-30 (Loxone wiring archived 2026-09-29)
 
 ### Release approval gate — candidate → approve → publish (2026-09-26)
 

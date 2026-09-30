@@ -23,19 +23,15 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **Stale SoC sanitize chain** (`debug_dump_20260927_083552`) — Fix implemented: trust plant SoC when closed-interval sampler confirms against history (`closed_interval_confirms_reported` + `reported_soc_percent` consecutive count). Live acceptance pending.
-- [ ] **EHAL-Com Mapping-Tabelle EHAL column** — HTTP-Probe scan shows `ehal` (house binding reverse, else greenfield device map); columns ordered `name, ehal, type, source, room, category, uuid`. Live acceptance pending.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] **Negative export tariff + battery discharge** (`debug_dump_20260927_090524`) — Forced grid discharge while `k_push < 0` does **not** make sense. Dump: live 08:23–09:01 `Zwangsentladen` at **positive** `k_push` (~10–14 ct, room-making OK); plan ~13:45–14:15 `Zwangsentladen` + ~5 kW export at **≈ −0.8 ct** (bug). Replay: hard `export_cap=0` → MILP **Infeasible** (no PV curtailment); without caps Optimal still `dch`+`sell` on negative slots. **Partial fix (2026-09-27):** Monitor/plan chart no longer invents grid export when `k_push_act < 0` (`clip_grid_kw_to_export_cap` in `sim_chart_rows` / finalize) — post-fix `exporting_neg: 0`. **Still open:** PV curtailment var so hard cap stays feasible when SoC full; soft pay-to-export behaviour for live dogfood (2.7.a). Open question: Monitor plan vs live discharge after `k_push` already negative.
-- [ ] Tariff preview seems to not work with the model - just by mirroring existing tariff data. Check reasons
+- [ ] **Negative export tariff + battery discharge** (`debug_dump_20260927_090524`) — Forced grid discharge while `k_push < 0` does **not** make sense. Dump: live 08:23–09:01 `Zwangsentladen` at **positive** `k_push` (~10–14 ct, room-making OK); plan ~13:45–14:15 `Zwangsentladen` + ~5 kW export at **≈ −0.8 ct** (bug). Replay: hard `export_cap=0` → MILP **Infeasible** (no PV curtailment); without caps Optimal still `dch`+`sell` on negative slots. **Partial fix (2026-09-27):** Monitor/plan chart no longer invents grid export when `k_push_act < 0` (`clip_grid_kw_to_export_cap` in `sim_chart_rows` / finalize) — post-fix `exporting_neg: 0`. **Still open:** PV curtailment var so hard cap stays feasible when SoC full. Soft pay-to-export live dogfood closed with **2.7.a** (2026-09-30). Open question: Monitor plan vs live discharge after `k_push` already negative.
+- [ ] check if for tariff forecast the individual tariff extra cost + volumetric Netzentgelt are also added (like the known tariff) or if forecast has to be updated (because it seems to be quite lower as actual tariff all the time)
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
-- [ ] Make min max checking of EHAL value readings configurable via json-File (not in code)
 - [ ] Add an option on Hauskonfigurator Page to sort Verbraucher descending according to annual consumption
-- [ ] **Remove EHAL `flex.{slug}.set_power_setpoint` permanently** — unused for live control (non-EV flex writes only `set_enable`; variable kW/A is EV-only via `set_evcs_max_current`). Strip Pattern B field + legacy stub `flex.power_setpoint_name` / non-EV migrate from `loxone_outputs.power_setpoint_name`; mapping UI / Live-Schreiben expected fields / `share/ehal/roles/consumer.json` / greenfield recipes / docs (`loxone-signals`, `ehal-com`). Do **not** remove EV `set_evcs_max_current`. Heat-pump Prio3 temperature-setpoint path (2.+1) is unrelated.
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

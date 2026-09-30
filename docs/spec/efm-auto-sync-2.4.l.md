@@ -14,7 +14,7 @@
 | `flex.power_name` | **Go** | `/jdev/sps/io/{Meter.name}` returns actual power (kW). Prefer **control name**, not state UUID (state UUID → 404). |
 | CSV stem mapping | **Go** | Suggest stem from Bezeichnung; user still exports/uploads single-series CSVs. |
 | MCP `control_bind` | **N/A** | `control_describe` returns Meter metadata (`states`, `details`) but **no** `control_bind` field. EFM↔Zähler link is LoxAPP3 `nodes[].ctrlUuid`. |
-| `flex.enable_name` / `flex.power_setpoint_name` | **N/A** | Cannot be derived from Zähler (by design). |
+| `flex.enable_name` | **N/A** | Cannot be derived from Zähler (by design). |
 
 **Product path:** library `integrations/loxone_efm_meters.py` called from greenfield `merge_efm` (Smarthome-Backend Loxone-Import). No separate EHAL-Com EFM UI. No multi-column EFM Statistik import.
 

@@ -37,7 +37,6 @@ def test_fields_for_consumer_ev_vs_flex():
     assert fields_for_consumer({"id": "wp", "type": "thermal_annual"}) == (
         "flex.wp.sens_power_act",
         "flex.wp.set_enable",
-        "flex.wp.set_power_setpoint",
         "sens_temperature_heat_storage",
         "sens_temperature_heat_storage_low",
     )

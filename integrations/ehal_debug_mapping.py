@@ -86,16 +86,15 @@ def is_live_read_field(field: str) -> bool:
 
 
 def is_live_write_field(field: str) -> bool:
-    """True for Live-Schreiben rows (``set_*`` / flex ``set_enable`` / setpoint)."""
-    from ehal.flex_fields import KIND_SET_ENABLE, KIND_SET_POWER_SETPOINT, flex_field_kind
+    """True for Live-Schreiben rows (``set_*`` / flex ``set_enable``)."""
+    from ehal.flex_fields import KIND_SET_ENABLE, flex_field_kind
 
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
     if name.startswith("set_"):
         return True
-    kind = flex_field_kind(name)
-    return kind in (KIND_SET_ENABLE, KIND_SET_POWER_SETPOINT)
+    return flex_field_kind(name) == KIND_SET_ENABLE
 
 
 def _consumer_is_ev(consumer: dict) -> bool:
@@ -194,14 +193,11 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
 
 
 def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
-    """Canonical Live-Schreiben ids (plant + EV + flex Freigabe/Sollwert)."""
+    """Canonical Live-Schreiben ids (plant + EV + flex Freigabe)."""
     if network_backend:
         return list(NETWORK_LIVE_WRITE_FIELDS)
-    from ehal.flex_fields import flex_set_enable, flex_set_power_setpoint
-    from settings.ehal_marker_resolve import (
-        marker_flex_enable,
-        marker_flex_power_setpoint,
-    )
+    from ehal.flex_fields import flex_set_enable
+    from settings.ehal_marker_resolve import marker_flex_enable
 
     fields = list(PLANT_LIVE_WRITE_FIELDS)
     for consumer in _all_live_consumers():
@@ -213,8 +209,6 @@ def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
             continue
         if marker_flex_enable(consumer):
             fields.append(f"{cid}:{flex_set_enable(cid)}")
-        if marker_flex_power_setpoint(consumer):
-            fields.append(f"{cid}:{flex_set_power_setpoint(cid)}")
     return fields
 
 
@@ -268,12 +262,11 @@ def mapping_or_dash(mapping: dict[str, str], field: str) -> str:
 
 
 def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dict[str, str]:
-    """Merker IO-Name → EHAL write field (plant + EV + flex Freigabe/Sollwert)."""
+    """Merker IO-Name → EHAL write field (plant + EV + flex Freigabe)."""
     import config
-    from ehal.flex_fields import flex_set_enable, flex_set_power_setpoint
+    from ehal.flex_fields import flex_set_enable
     from settings.ehal_marker_resolve import (
         marker_flex_enable,
-        marker_flex_power_setpoint,
         marker_set_evcs_max_current,
         marker_set_evcs_mode,
     )
@@ -318,9 +311,6 @@ def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dic
         enable = str(marker_flex_enable(consumer) or "").strip()
         if enable:
             index[enable] = f"{cid}:{flex_set_enable(cid)}"
-        setpoint = str(marker_flex_power_setpoint(consumer) or "").strip()
-        if setpoint:
-            index[setpoint] = f"{cid}:{flex_set_power_setpoint(cid)}"
 
     if not include_write_aliases:
         return index

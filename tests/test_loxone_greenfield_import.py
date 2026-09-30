@@ -171,7 +171,6 @@ def test_slug_match_waschmaschine_creates_generic_consumer():
     extra = {
         "Earnie_Verbraucher_Waschmaschine_Leistung",
         "Earnie_Verbraucher_Waschmaschine_Freigabe",
-        "Earnie_Verbraucher_Waschmaschine_Ziel_kW",
     }
     matches, report = match_controls(empty_doc, load_device_map(), extra_names=extra)
     assert any("Waschmaschine" in n for n in report.matched_markers)
@@ -182,7 +181,7 @@ def test_slug_match_waschmaschine_creates_generic_consumer():
     assert wm.hk_type == "generic"
     assert wm.bindings["flex.waschmaschine.sens_power_act"] == "Earnie_Verbraucher_Waschmaschine_Leistung"
     assert wm.bindings["flex.waschmaschine.set_enable"] == "Earnie_Verbraucher_Waschmaschine_Freigabe"
-    assert wm.bindings["flex.waschmaschine.set_power_setpoint"] == "Earnie_Verbraucher_Waschmaschine_Ziel_kW"
+    assert "flex.waschmaschine.set_power_setpoint" not in wm.bindings
     house, pid = ensure_live_profile(_empty_house())
     house = apply_typed_matches(house, matches, profile_id=pid)
     by_id = {c["id"]: c for c in house["profiles"][pid]["consumers"]}

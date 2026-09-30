@@ -73,7 +73,6 @@ EV_FIELDS: tuple[str, ...] = (
 FLEX_FIELDS: tuple[str, ...] = (
     "flex.sens_power_act",
     "flex.set_enable",
-    "flex.set_power_setpoint",
 )
 
 FILTER_FIELDS: tuple[str, ...] = FILTER_EHAL_FIELDS
@@ -88,10 +87,8 @@ _EXTRA_LABELS: dict[str, str] = {
     "get_evcs_soc_min_immediate": "EV SOC-Min Sofort (%)",
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
-    "flex.power_setpoint_name": "Flex Leistungs-Sollwert",
     "flex.sens_power_act": "Flex Leistung / Zustand",
     "flex.set_enable": "Flex Freigabe",
-    "flex.set_power_setpoint": "Flex Leistungs-Sollwert",
     "get_filter_remaining_hours": "Filter Sollstunden (h)",
     "sens_filter_active": "Filter läuft (Binär)",
     "get_filter_native_start_hour": "Native Filter-Startstunde",

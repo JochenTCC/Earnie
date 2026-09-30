@@ -1,8 +1,7 @@
 """Pattern B flex EHAL field names: ``flex.{slug}.sens_power_act`` etc.
 
-Legacy stub keys (``flex.power_name`` / ``flex.enable_name`` /
-``flex.power_setpoint_name``) expand to the slug form. Zähler ids
-``zaehler_<slug>`` use ``<slug>`` in the wire path (e.g.
+Legacy stub keys (``flex.power_name`` / ``flex.enable_name``) expand to the
+slug form. Zähler ids ``zaehler_<slug>`` use ``<slug>`` in the wire path (e.g.
 ``zaehler_trockner`` → ``flex.trockner.sens_power_act``).
 """
 
@@ -12,29 +11,23 @@ import re
 
 KIND_SENS_POWER_ACT = "sens_power_act"
 KIND_SET_ENABLE = "set_enable"
-KIND_SET_POWER_SETPOINT = "set_power_setpoint"
 
-_FLEX_KINDS: frozenset[str] = frozenset(
-    {KIND_SENS_POWER_ACT, KIND_SET_ENABLE, KIND_SET_POWER_SETPOINT}
-)
+_FLEX_KINDS: frozenset[str] = frozenset({KIND_SENS_POWER_ACT, KIND_SET_ENABLE})
 
 _ROLE_TO_KIND: dict[str, str] = {
     "flex.power_name": KIND_SENS_POWER_ACT,
     "flex.sens_power_act": KIND_SENS_POWER_ACT,
     "flex.enable_name": KIND_SET_ENABLE,
     "flex.set_enable": KIND_SET_ENABLE,
-    "flex.power_setpoint_name": KIND_SET_POWER_SETPOINT,
-    "flex.set_power_setpoint": KIND_SET_POWER_SETPOINT,
 }
 
 _PATTERN_B = re.compile(
-    r"^flex\.(?P<slug>[^.]+)\.(?P<kind>sens_power_act|set_enable|set_power_setpoint)$"
+    r"^flex\.(?P<slug>[^.]+)\.(?P<kind>sens_power_act|set_enable)$"
 )
 
 _KIND_LABELS_DE: dict[str, str] = {
     KIND_SENS_POWER_ACT: "Flex Leistung / Zustand",
     KIND_SET_ENABLE: "Flex Freigabe",
-    KIND_SET_POWER_SETPOINT: "Flex Leistungs-Sollwert",
 }
 
 
@@ -66,16 +59,11 @@ def flex_set_enable(consumer_id: str) -> str:
     return flex_field(consumer_id, KIND_SET_ENABLE)
 
 
-def flex_set_power_setpoint(consumer_id: str) -> str:
-    return flex_field(consumer_id, KIND_SET_POWER_SETPOINT)
-
-
-def flex_fields_for_consumer(consumer_id: str) -> tuple[str, str, str]:
+def flex_fields_for_consumer(consumer_id: str) -> tuple[str, str]:
     """HITL / Live field list for a non-EV flex consumer."""
     return (
         flex_sens_power_act(consumer_id),
         flex_set_enable(consumer_id),
-        flex_set_power_setpoint(consumer_id),
     )
 
 

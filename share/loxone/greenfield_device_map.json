@@ -248,14 +248,6 @@
       "group": "Earnie_Verbraucher_"
     },
     {
-      "name": "Earnie_Verbraucher_Ziel_kW",
-      "match": "exact",
-      "entity_kind": "generic",
-      "hk_type": "generic",
-      "ehal_field": "flex.set_power_setpoint",
-      "group": "Earnie_Verbraucher_"
-    },
-    {
       "name": "Earnie_Pool_P_act",
       "match": "exact",
       "entity_kind": "pool",

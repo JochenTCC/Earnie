@@ -10,7 +10,6 @@ from integrations.ehal_debug_mapping import (
 )
 from settings.ehal_marker_resolve import (
     marker_flex_enable,
-    marker_flex_power_setpoint,
     marker_set_evcs_max_current,
     marker_set_evcs_mode,
 )
@@ -208,14 +207,6 @@ def _consumer_status_keys(
             value = _sent_enable_value(loxone_sent, enable, enable_key)
             if value is not None:
                 payload[enable_key] = value
-
-        setpoint = marker_flex_power_setpoint(as_dict)
-        _emit_if_present(
-            payload,
-            loxone_sent,
-            setpoint,
-            f"flex.{cid}.Earnie_Verbraucher_Ziel_kW",
-        )
     return payload
 
 

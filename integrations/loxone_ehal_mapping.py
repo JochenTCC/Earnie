@@ -139,10 +139,8 @@ _HINTS: dict[str, tuple[str, ...]] = {
     ),
     "flex.power_name": ("leistung", "power", "verbrauch"),
     "flex.enable_name": ("freigabe", "enable", "sg ready"),
-    "flex.power_setpoint_name": ("sollwert", "setpoint", "ziel leistung"),
     "flex.sens_power_act": ("leistung", "power", "verbrauch"),
     "flex.set_enable": ("freigabe", "enable", "sg ready"),
-    "flex.set_power_setpoint": ("sollwert", "setpoint", "ziel leistung"),
 }
 
 
