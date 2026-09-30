@@ -170,13 +170,17 @@ Live operation runs via house-profile flex Merker. Role template: `share/ehal/ro
 Role template: `share/ehal/roles/heatpump.json`. Greenfield prefix `Earnie_Waermepumpe_*`. In live operation typically a `thermal_annual` consumer (e.g. `wp_heating`).
 
 
-| Area / meaning              | Type          | EHAL value name (stub / wire) | OpenEMS | evcc | Victron | Loxone / Loxone extra                       |
+| Area / meaning              | Type          | EHAL value name (stub / wire) | OpenEMS | evcc | Victron | HA / Loxone |
 | ------------------------------ | --------------- | -------------------------------- | ------- | ---- | ------- | ----------------------------------------------- |
-| Heat pump power               | Measurement   | `flex.{slug}.sens_power_act`    |         |      |         | `Earnie_Waermepumpe_Leistung` or EFM load       |
-| Heat pump enable / SG-Ready   | Control value | `flex.{slug}.set_enable`        |         |      |         | `Earnie_Waermepumpe_Freigabe`                    |
+| Heat pump power               | Measurement   | `flex.{slug}.sens_power_act`    |         |      |         | HA power entity / `Earnie_Waermepumpe_Leistung` or EFM |
+| Heat pump enable / SG-Ready   | Control value | `flex.{slug}.set_enable`        |         |      |         | HA switch/input_boolean / `Earnie_Waermepumpe_Freigabe` |
+| Heat storage `T_eq`           | Measurement   | `sens_temperature_heat_storage` |         |      |         | HA °C sensor / `Earnie_Waermespeicher_Temp_eq` |
+| Heat storage `T_low`          | Measurement   | `sens_temperature_heat_storage_low` |     |      |         | HA °C sensor (bottom) / `Earnie_Waermespeicher_Temp_low` |
 
 
-Notes: pattern B — VI = enable from Earnie (`flex.{hk_id}.…` in the check); VO = optional push `flex.{hk_id}.sens_power_act`. Outside temperature only on the plant (`sens_temperature_outside`, see C.1) — not on the heat-pump VO. No target-kW Merker in this Greenfield round.
+Notes: pattern B — VI = enable from Earnie (`flex.{hk_id}.…` in the check); VO = optional push `flex.{hk_id}.sens_power_act` plus store temps. Outside temperature only on the plant (`sens_temperature_outside`, see C.1) — not on the heat-pump VO. No target-kW Merker in this Greenfield round. Recipe: `share/loxone/recipes/heatpump.json`; VO: `VO_Earnie_Heatpump.xml`.
+
+**Heat storage:** stratified tanks must expose energy-equivalent `T_eq` (volume-weighted mean) as `sens_temperature_heat_storage`, plus raw bottom sensor `T_low` as `sens_temperature_heat_storage_low`. Do not bind a single top-layer sensor as the RC state. On HA, map two temperature entities onto those EHAL fields on the `thermal_annual` consumer (same Pattern B HITL as Loxone). Operator guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md); physics in [thermals-p2.md](../spec/thermals-p2.md).
 
 ### C.6 Pool / SwimSpa (Stub)
 

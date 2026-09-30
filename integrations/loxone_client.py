@@ -455,6 +455,26 @@ def _default_house_profiles_doc() -> dict | None:
         return None
 
 
+def fetch_heat_storage_temps(
+    consumer: dict,
+    *,
+    house_doc: dict | None = None,
+) -> dict:
+    """Read heat-storage T_eq / T_low for thermal_annual (missing → None)."""
+    from settings.ehal_marker_resolve import (
+        marker_sens_temperature_heat_storage,
+        marker_sens_temperature_heat_storage_low,
+    )
+
+    _ = house_doc  # reserved for plant-scoped fallbacks
+    eq_io = marker_sens_temperature_heat_storage(consumer)
+    low_io = marker_sens_temperature_heat_storage_low(consumer)
+    return {
+        "temp_eq_c": _read_optional_temp_c(eq_io),
+        "temp_low_c": _read_optional_temp_c(low_io),
+    }
+
+
 def fetch_thermal_readings(
     consumer: dict,
     *,

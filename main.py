@@ -30,6 +30,7 @@ from optimizer.thermal_targets import (
     collect_thermal_observability,
     thermal_horizon_hours_from_slots,
 )
+from optimizer.thermal_live_store import collect_heat_storage_observability
 from optimizer.run_trigger import (
     TRIGGER_QUARTER_HOUR,
     TRIGGER_REQUEST_OPTIMIZE,
@@ -244,11 +245,19 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     baseline_targets = consumer_targets.resolve_historical_baseline_targets_kwh(
         matrix=optimization_matrix,
     )
+    thermal_horizon = thermal_horizon_hours_from_slots(len(optimization_matrix))
     thermal_observability = collect_thermal_observability(
         live_consumers,
         active_targets_kwh=targets,
         baseline_targets_kwh=baseline_targets,
-        horizon=thermal_horizon_hours_from_slots(len(optimization_matrix)),
+        horizon=thermal_horizon,
+    )
+    thermal_observability.extend(
+        collect_heat_storage_observability(
+            list(house_profile.get("consumers") or []),
+            house_profile=house_profile,
+            horizon=thermal_horizon,
+        )
     )
     for item in thermal_observability:
         if item.get("error"):

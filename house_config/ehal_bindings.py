@@ -44,6 +44,11 @@ THERMAL_RC_EHAL_FIELDS: tuple[str, ...] = (
     "sens_heating_active",
 )
 
+THERMAL_ANNUAL_EHAL_FIELDS: tuple[str, ...] = (
+    "sens_temperature_heat_storage",
+    "sens_temperature_heat_storage_low",
+)
+
 _INPUT_MARKER_KEYS: frozenset[str] = frozenset(
     {
         "power_name",

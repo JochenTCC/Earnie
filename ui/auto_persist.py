@@ -26,7 +26,8 @@ def auto_persist(
     Persist ``payload`` when it differs from the last saved fingerprint.
 
     Returns True when a write was performed. Skips when ``ready`` is False
-    (incomplete / invalid form).
+    (incomplete / invalid form). In Shadow Mode, skips config writes without
+    crashing (Prod config is read-only).
     """
     if not ready:
         return False
@@ -34,7 +35,23 @@ def auto_persist(
     last_key = f"_auto_persist_fp::{state_key}"
     if st.session_state.get(last_key) == fingerprint:
         return False
-    save()
+    from runtime_store.shadow.errors import ConfigReadOnlyError
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        st.session_state[last_key] = fingerprint
+        st.caption(
+            "Shadow-Modus: Konfiguration schreibgeschützt — nicht gespeichert."
+        )
+        return False
+    try:
+        save()
+    except ConfigReadOnlyError:
+        st.session_state[last_key] = fingerprint
+        st.caption(
+            "Shadow-Modus: Konfiguration schreibgeschützt — nicht gespeichert."
+        )
+        return False
     st.session_state[last_key] = fingerprint
     st.caption(success_caption)
     return True

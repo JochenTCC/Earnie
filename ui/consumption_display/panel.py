@@ -17,9 +17,13 @@ from ui.consumption_display.adapters import (
 from ui.consumption_display.aggregation import annual_kwh_actual, annual_kwh_from_bundle
 from ui.consumption_display.charts import (
     csv_validation_monthly_chart,
+    heat_content_week_chart,
     stacked_monthly_chart,
     week_scenario_consumer_timeseries_chart,
     week_timeseries_chart,
+)
+from ui.consumption_display.heat_content_history import (
+    measured_heat_content_for_timestamps,
 )
 from ui.consumption_display.navigation import render_iso_week_navigation
 from ui.consumption_display.types import (
@@ -91,6 +95,39 @@ def render_consumption_display(
                 week_timeseries_chart(bundle, iso_year=iso_year, iso_week=iso_week),
                 width="stretch",
             )
+        _render_heat_content_week_chart(bundle, iso_year=iso_year, iso_week=iso_week)
+
+
+def _render_heat_content_week_chart(
+    bundle: ConsumptionSeriesBundle,
+    *,
+    iso_year: int,
+    iso_week: int,
+) -> None:
+    if not bundle.heat_content_series:
+        return
+    from ui.consumption_display.aggregation import slice_bundle_for_iso_week
+
+    sliced = slice_bundle_for_iso_week(bundle, iso_year=iso_year, iso_week=iso_week)
+    measured = measured_heat_content_for_timestamps(
+        sliced.timestamps,
+        series_keys=list(sliced.heat_content_series.keys()),
+    )
+    fig = heat_content_week_chart(
+        bundle,
+        iso_year=iso_year,
+        iso_week=iso_week,
+        measured_by_key=measured,
+    )
+    if fig is None:
+        return
+    st.plotly_chart(fig, width="stretch")
+    has_meas = bool((fig.layout.meta or {}).get("has_measured"))
+    if not has_meas:
+        st.caption(
+            "Wärmeinhalt Ist erscheint, sobald der Live-Dienst `T_eq` / Pool-Temperatur "
+            "in `optimization_history.jsonl` aufzeichnet."
+        )
 
 
 def _build_bundle(

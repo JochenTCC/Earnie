@@ -2,6 +2,30 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.d — One-way storage type folded into 2.7.g / 2.7.h (2026-09-29)
+
+- [x] **2.7.d — One-way storage type** (planning fold; not implemented as a standalone letter)
+  - Superseded by the shared powerstation model: **2.7.g** (`role: single_use`, physical `backing` = former one-way / no forced discharge) and **2.7.h** (`role: standby_backup`, owns `set_ess_source_select` / EcoFlow mapping / Loxone Merker bridge)
+  - No separate `batteries[].direction: one_way` flag — use `type: powerstation` + `backing` + `role` instead
+  - Open work continues under [Backlog.md](Backlog.md) **2.7.g** / **2.7.h**
+
+### 2.7.a dogfood — Loxone wiring (partial) (2026-09-29)
+
+- [x] **2.7.a dogfood — Loxone productive wiring** (partial)
+  - Wire export-limit Merker / VI–VO in the productive Loxone config (`set_grid_export_power_limit`, optional inbound `get_grid_export_power_limit`; Einspeisesperre = limit `0`, `set_ess_mode` stays battery-only)
+  - Bind in EHAL-Com; set a HK `plant.max_export_power_kw` and verify Live writes + MILP respect the cap
+  - **Still open:** Live-test (static HK cap, inbound override, pay-to-export soft, release unconstrained) → [Backlog.md](Backlog.md) **2.7.a dogfood**
+
+### 2.7.f — Shadow Mode S2+S3: Dev client (2026-09-29)
+
+- [x] **2.7.f — Shadow Mode S2+S3: Dev client** (depends on Prod running **2.6.o** recorder)
+  - Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) — `EARNIE_SHADOW=1` only (`runtime_store.shadow.is_shadow_mode()`); implies silent; never a config key
+  - **S2:** transport replay (§6.1–6.2), central write block + `shadow_writes.jsonl` (§6.3), config read-only / skip load-time migrations that write (§6.4), startup checks (§4.2), release guard (§4.4); own mandatory runtime dir + optional `scripts.shadow_seed_runtime`
+  - Accept Prod’s `earnie_data_model` if in `COMPATIBLE_DATA_MODELS`; never migrate/re-stamp shared config. No Shadow `config_overlay` in v1 (Prod-rejected keys not testable)
+  - **S3:** UI banner + feed health + would-write table; `EARNIE_UI_STREAMLIT_PORT`; German user docs (`docs/einrichtung/`) + `DEVELOPER.md`
+  - Tests per spec §10; E2E with HouseSim as Prod backend (`tests/test_shadow_*.py` — 36 passed)
+  - **Out of scope (unchanged):** S4 Soll/Soll diff + offline JSONL backtest → **2.+1**; Shadow as 2nd HA add-on (scenario C)
+
 ### 2.6.0-alpha.12 pre-release (2026-09-29)
 
 - [x] Bump `version.py` + alpha compose pins to **2.6.0-alpha.12**; release notes `.github/release-notes/v2.6.0-alpha.12.md`
@@ -144,7 +168,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Soft / economic: positive export tariffs prefer avoiding export (objective), separate from hard ceiling
   - Outbound `set_grid_export_power_limit` + ESS mode Einspeisesperre (**3**); Loxone VI/VO templates + greenfield/recipe maps; HA/OpenEMS adapters
   - Helpers: `optimizer/export_power_limit.py`, `optimizer/live_export_limit.py`; HK UI `ui/house_config_plant.py`; tests `test_export_power_limit` / `test_live_export_limit` / `test_milp_export_cap`
-  - **Still open:** productive Loxone wiring + live dogfood → [Backlog.md](Backlog.md) **2.7.a dogfood**
+  - **Still open:** Live-test dogfood → [Backlog.md](Backlog.md) **2.7.a dogfood** (Loxone wiring archived 2026-09-29)
 
 ### Release approval gate — candidate → approve → publish (2026-09-26)
 

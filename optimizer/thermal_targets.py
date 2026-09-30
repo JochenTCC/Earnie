@@ -202,6 +202,20 @@ def build_thermal_observability(
                 "total": total_kw,
                 "heating": heating_kw,
             }
+    from optimizer.thermal_model import heat_content_kwh
+
+    actual_c = readings.get("actual_c")
+    q_meas = (
+        round(heat_content_kwh(float(actual_c), capacity), 3)
+        if actual_c is not None
+        else None
+    )
+    forecast = plan.forecast_temp_c or []
+    q_sim_temp = float(forecast[0]) if forecast else float(actual_c or band.setpoint_c)
+    snapshot["heat_content_kwh"] = {
+        "q_meas": q_meas,
+        "q_sim": round(heat_content_kwh(q_sim_temp, capacity), 3),
+    }
     return snapshot
 
 

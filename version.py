@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "2.7.0-dev.2"
+__version__ = "2.7.0-dev.5"
 
 # SemVer core + optional pre-release used for community candidates.
 _IMAGE_VERSION_RE = re.compile(

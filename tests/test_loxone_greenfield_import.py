@@ -60,6 +60,31 @@ def test_match_wp_and_ev_groups():
     assert ev.bindings["set_evcs_max_current"] == "Earnie_EAuto_Soll_A"
 
 
+def test_match_heat_storage_temps_merge_onto_wp():
+    """Earnie_Waermespeicher_Temp_* bind onto the heatpump / thermal_annual group."""
+    empty_doc = {"controls": {}}
+    extra = {
+        "Earnie_Waermepumpe_Leistung",
+        "Earnie_Waermepumpe_Freigabe",
+        "Earnie_Waermespeicher_Temp_eq",
+        "Earnie_Waermespeicher_Temp_low",
+    }
+    matches, report = match_controls(empty_doc, load_device_map(), extra_names=extra)
+    assert "Earnie_Waermespeicher_Temp_eq" in report.matched_markers
+    assert "Earnie_Waermespeicher_Temp_low" in report.matched_markers
+    wp_matches = [m for m in matches if m.hk_type == "thermal_annual"]
+    assert len(wp_matches) == 1
+    assert wp_matches[0].group_key == "Earnie_Waermepumpe_"
+    assert (
+        wp_matches[0].bindings["sens_temperature_heat_storage"]
+        == "Earnie_Waermespeicher_Temp_eq"
+    )
+    assert (
+        wp_matches[0].bindings["sens_temperature_heat_storage_low"]
+        == "Earnie_Waermespeicher_Temp_low"
+    )
+
+
 def test_alarm_clock_tna_merges_onto_ev_with_power():
     """AlarmClock Bezeichnung → get_evcs_ready_by_time on EV that has Zähler/power."""
     from integrations.loxone_greenfield_import import (

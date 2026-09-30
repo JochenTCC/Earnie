@@ -85,7 +85,7 @@ Source: `share/loxone/templates/VirtualOut/`
 | `VO_Earnie_Status.xml`    | optional alive / `Earnie_Request_Optimize` (port **8541**)  |
 | `VO_Earnie_Plant.xml`     | plant `sens_*`, outside temperature                         |
 | `VO_Earnie_EV.xml`        | EV telemetry                                                 |
-| `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`                                |
+| `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
 | `VO_Earnie_Consumer.xml`  | flex power                                                   |
 | `VO_Earnie_Pool.xml`      | pool telemetry                                                |
 
@@ -221,7 +221,7 @@ Analogous: prefix `Earnie_EAuto_`, entity `id` = `{ev_id}` (e.g. `eauto`, `garag
 | additional sens/get | `Earnie_EAuto_*` → `…_<Slug>_*`                         | VO: `ev.{ev_id}.<ehal_field>`             |
 
 
-Heat pump: titles `Earnie_Waermepumpe_Leistung` / `Earnie_Waermepumpe_Freigabe`; VO/check with `flex.{hk_id}` (default `id` `wp_heating`). Pool: `flex.pool.sens_power_act` resp. `{hk_id}`.
+Heat pump: titles `Earnie_Waermepumpe_Leistung` / `Earnie_Waermepumpe_Freigabe`; store temps `Earnie_Waermespeicher_Temp_eq` / `Earnie_Waermespeicher_Temp_low`; VO/check with `flex.{hk_id}` for power/enable (default `id` `wp_heating`). Pool: `flex.pool.sens_power_act` resp. `{hk_id}`.
 
 **Import:** the default matches **case-insensitive** exact template names and **prefix+slug** (e.g. `Earnie_Verbraucher_Waschmaschine_Leistung` → consumer `waschmaschine`; `Earnie_EAuto_Garage_Soll_A` → EV `garage`). Bindings keep the Miniserver spelling.
 
@@ -293,6 +293,15 @@ The control signal definitions live in the active house profile (`house_profiles
 
 Pool enables: default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` in `ehal_bindings`.
 
+**Heat storage Ist (Live, 2.7.b):** on the `thermal_annual` consumer:
+
+| EHAL field | Meaning | Default Merker |
+| --- | --- | --- |
+| `sens_temperature_heat_storage` | Energy-equivalent `T_eq` (°C) | `Earnie_Waermespeicher_Temp_eq` |
+| `sens_temperature_heat_storage_low` | Lowest immersion sensor `T_low` (°C) — WP-on hint when bottom is cold | `Earnie_Waermespeicher_Temp_low` |
+
+For stratified tanks `T_eq` must be the energy-equivalent mean (volume-weighted), not the top sensor alone. Guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md).
+
 ### EV (Prefix `Earnie_EAuto_`)
 
 
@@ -334,7 +343,7 @@ Compose production stacks publish container port **8541** (see [Streamlit Ports]
 | ------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `swimspa` / pool    | `flex.{slug}.set_enable` → `Earnie_Pool_Freigabe`              | `flex.{slug}.sens_power_act` → `Earnie_Pool_P_act`                  |
 | `ev`                | `set_evcs_max_current` / `set_evcs_mode`                       | `sens_evcs_*` / `flex.{slug}.sens_power_act`                        |
-| `wp_heating`        | `flex.{slug}.set_enable` → `Earnie_Waermepumpe_Freigabe`       | `flex.{slug}.sens_power_act` → `Earnie_Waermepumpe_Leistung`        |
+| `wp_heating`        | `flex.{slug}.set_enable` → `Earnie_Waermepumpe_Freigabe`       | `flex.{slug}.sens_power_act` → `Earnie_Waermepumpe_Leistung`; `sens_temperature_heat_storage` / `_low` → `Earnie_Waermespeicher_Temp_eq` / `_low` |
 
 
 ## Reading vs. Writing in `main.py`

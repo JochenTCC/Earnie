@@ -77,7 +77,7 @@ In `runtime/local_settings.json` (nicht in der gemeinsamen `config.json`):
 
 ### Shadow-Modus (Dev-Client)
 
-Eine Entwicklungsinstanz kann parallel zur Produktivinstanz laufen und Eingänge aus dem Shadow-Feed lesen — ohne Backend-Schreibzugriffe und ohne Änderungen an der gemeinsamen Konfiguration. Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md).
+Eine Entwicklungsinstanz kann parallel zur Produktivinstanz laufen und Eingänge aus dem Shadow-Feed lesen — ohne Backend-Schreibzugriffe und ohne Änderungen an der gemeinsamen Konfiguration (Ausnahme: EHAL-Mapping kann in `{Runtime}/shadow_ehal_bindings.json` landen und wird beim Laden der Hausprofile nur in Shadow gemerged). Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md).
 
 Voraussetzungen:
 
@@ -102,7 +102,7 @@ Optional: Runtime aus Prod vorbelegen (gelernten Zustand kopieren, ohne Logs/Loc
 .venv\Scripts\python.exe -m scripts.shadow_seed_runtime --from <prod-runtime> --to <shadow-runtime>
 ```
 
-Die Streamlit-UI zeigt ein dauerhaftes Shadow-Banner; unter EHAL-Com erscheint die Tabelle der blockierten Schreibvorgänge (`shadow_writes.jsonl`).
+Die Streamlit-UI zeigt ein dauerhaftes Shadow-Banner; unter EHAL-Com erscheint die Tabelle der blockierten Schreibvorgänge (`shadow_writes.jsonl`). EHAL-Mapping „Speichern“ schreibt im Shadow-Modus nur das Runtime-Overlay `shadow_ehal_bindings.json`.
 
 ### Log- und Historiendateien
 

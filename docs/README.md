@@ -54,6 +54,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [Speichern / Laden](konfiguration/speichern-laden.md) — `earnie_env`, Auto-Save, ZIP-Export/Import
 - [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
 - [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
+- [Wärmespeicher Schichtung / T_eq](konfiguration/waermespeicher-schichtung-teq.md) — Schichtfühler → äquivalente Temperatur für Earnie (Loxone-Formel, Gewichte)
 - [Historische Leistungsprofil-CSV](konfiguration/verbrauchs-csv.md) — Last-/PV-/Verbraucher-Profile, Normalisierung, Loxone-Import
 - [Preise & aWATTar](konfiguration/preise.md) — Bezugspreis, Einspeisevergütung, Preis-Prognose
 
@@ -82,5 +83,5 @@ Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) stehen nur hier �
 - [OpenEMS lab setup](spec/openems-lab-setup.md) — Compose + Earnie ↔ OpenEMS
 - [Branching & Hotfix Playbook](spec/branching-hotfix-playbook.md) — Tags, hotfixes, `main`
 - [Release Checklist](spec/release-checklist.md) — Kandidat → Test auf HA / LoxBerry → Freigabe
-- [Shadow Mode](spec/shadow-mode.md) — Prod-Feed-Recorder (S1) shipped; Shadow-Client (S2+S3) on `feature/2.7` (**2.7.f**)
+- [Shadow Mode](spec/shadow-mode.md) — Prod-Feed-Recorder (S1) + Shadow-Client (S2+S3, **2.7.f**) implemented; S4 → **2.+1**
 - Weitere Specs unter [`docs/spec/`](spec/)

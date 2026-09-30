@@ -289,6 +289,61 @@ def _add_pv_timeseries(
         )
 
 
+def _temp_trace_style(series_key: str) -> dict:
+    from data.modeled_temperatures import (
+        TEMP_AMBIENT,
+        TEMP_HEAT_STORAGE,
+        TEMP_HOUSE,
+        TEMP_HOUSE_SETPOINT,
+    )
+
+    if series_key == TEMP_AMBIENT:
+        return {"color": "#1f77b4", "width": 2, "dash": "solid"}
+    if series_key == TEMP_HOUSE_SETPOINT:
+        return {"color": "#2ca02c", "width": 2, "dash": "dash"}
+    if series_key == TEMP_HOUSE:
+        return {"color": "#17becf", "width": 2, "dash": "solid"}
+    if series_key == TEMP_HEAT_STORAGE:
+        return {"color": "#d62728", "width": 2, "dash": "solid"}
+    return {"color": "#ff7f0e", "width": 2, "dash": "dot"}
+
+
+def _temp_series_order(keys: list[str]) -> list[str]:
+    from data.modeled_temperatures import (
+        TEMP_AMBIENT,
+        TEMP_HEAT_STORAGE,
+        TEMP_HOUSE,
+        TEMP_HOUSE_SETPOINT,
+    )
+
+    preferred = [TEMP_AMBIENT, TEMP_HOUSE_SETPOINT, TEMP_HOUSE, TEMP_HEAT_STORAGE]
+    ordered = [key for key in preferred if key in keys]
+    ordered.extend(sorted(key for key in keys if key not in preferred))
+    return ordered
+
+
+def _add_temp_timeseries(
+    fig: go.Figure,
+    bundle: ConsumptionSeriesBundle,
+    x_values: list,
+) -> None:
+    if not bundle.temp_series:
+        return
+    for key in _temp_series_order(list(bundle.temp_series)):
+        values = bundle.temp_series.get(key) or []
+        if not values:
+            continue
+        label = bundle.temp_labels.get(key, key)
+        fig.add_scatter(
+            name=label,
+            x=x_values,
+            y=values,
+            mode="lines",
+            line=_temp_trace_style(key),
+            yaxis="y2",
+        )
+
+
 def timeseries_chart(
     bundle: ConsumptionSeriesBundle,
     *,
@@ -309,18 +364,29 @@ def timeseries_chart(
             mode="lines",
             line=dict(color="#6b8cae", width=2, dash="dash"),
         )
-    fig.update_layout(
-        title=title,
-        xaxis_title="Zeit",
-        yaxis_title="kW",
-        height=360,
-        margin=dict(l=40, r=20, t=50, b=40),
-        xaxis=dict(
+    _add_temp_timeseries(fig, bundle, x_values)
+    has_temps = bool(bundle.temp_series)
+    layout: dict = {
+        "title": title,
+        "xaxis_title": "Zeit",
+        "yaxis_title": "kW",
+        "height": 360,
+        "margin": dict(l=40, r=56 if has_temps else 20, t=50, b=40),
+        "xaxis": dict(
             type="date",
             tickformat="%a %d.%m.",
             dtick=86_400_000,
         ),
-    )
+    }
+    if has_temps:
+        layout["yaxis"] = dict(title="kW", side="left")
+        layout["yaxis2"] = dict(
+            title="°C",
+            overlaying="y",
+            side="right",
+            showgrid=False,
+        )
+    fig.update_layout(**layout)
     return fig
 
 
@@ -485,3 +551,61 @@ def stack_monthly_sum_matches_total(
         if abs(stack_sum - total) > tolerance:
             return False
     return True
+
+
+_HC_SIM_COLOR = "#2a6f97"
+_HC_MEAS_COLOR = "#bc4749"
+
+
+def heat_content_week_chart(
+    bundle: ConsumptionSeriesBundle,
+    *,
+    iso_year: int,
+    iso_week: int,
+    measured_by_key: dict[str, list[float | None]] | None = None,
+) -> go.Figure | None:
+    """Weekly Q_sim vs Q_meas (kWh). Returns None when no heat-content series."""
+    from ui.consumption_display.aggregation import slice_bundle_for_iso_week
+
+    if not bundle.heat_content_series:
+        return None
+    sliced = slice_bundle_for_iso_week(bundle, iso_year=iso_year, iso_week=iso_week)
+    if not sliced.timestamps or not sliced.heat_content_series:
+        return None
+    x_values = [parse_timestamp(ts) for ts in sliced.timestamps]
+    fig = go.Figure()
+    has_meas = False
+    for key, values in sliced.heat_content_series.items():
+        if len(values) != len(x_values):
+            continue
+        label = sliced.heat_content_labels.get(key, key)
+        fig.add_scatter(
+            name=label,
+            x=x_values,
+            y=values,
+            mode="lines",
+            line=dict(color=_HC_SIM_COLOR, width=2),
+        )
+        measured = (measured_by_key or {}).get(key) or []
+        if measured and any(v is not None for v in measured):
+            has_meas = True
+            fig.add_scatter(
+                name=f"{label.replace(' (Modell)', '')} (Ist)",
+                x=x_values,
+                y=measured,
+                mode="lines",
+                line=dict(color=_HC_MEAS_COLOR, width=2, dash="dash"),
+                connectgaps=False,
+            )
+    if not fig.data:
+        return None
+    fig.update_layout(
+        title=f"Wärmeinhalt — {format_iso_week_label(iso_year, iso_week)}",
+        xaxis_title="Zeit",
+        yaxis_title="kWh",
+        height=320,
+        margin=dict(l=40, r=20, t=50, b=40),
+        xaxis=dict(type="date", tickformat="%a %d.%m.", dtick=86_400_000),
+    )
+    fig.layout.meta = {"has_measured": has_meas}
+    return fig

@@ -111,6 +111,24 @@
       "notes": "VI Title; status JSON key flex.{hk_id}.Earnie_Waermepumpe_Freigabe."
     },
     {
+      "name": "Earnie_Waermespeicher_Temp_eq",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_temperature_heat_storage",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; energy-equivalent store T_eq (°C). Binding on thermal_annual ehal_bindings."
+    },
+    {
+      "name": "Earnie_Waermespeicher_Temp_low",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "sens_temperature_heat_storage_low",
+      "group": "Earnie_Waermepumpe_",
+      "notes": "VO Title; lowest immersion sensor T_low (°C); Live WP-on hint."
+    },
+    {
       "name": "Earnie_WP_P_act",
       "match": "exact",
       "entity_kind": "heatpump",
@@ -331,6 +349,12 @@
   "prefix_groups": [
     {
       "prefix": "Earnie_Waermepumpe_",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "default_label": "Wärmepumpe"
+    },
+    {
+      "prefix": "Earnie_Waermespeicher_",
       "entity_kind": "heatpump",
       "hk_type": "thermal_annual",
       "default_label": "Wärmepumpe"

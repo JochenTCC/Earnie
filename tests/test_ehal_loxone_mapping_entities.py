@@ -7,15 +7,21 @@ from ui.ehal_loxone_mapping import (
     FLEX_FIELDS,
     PLANT_ENTITY_ID,
     PLANT_FIELDS,
+    SCAN_ROW_KEYS,
     _NONE,
     _field_select_caption,
     _name_options,
     add_manual_marker_name,
     apply_entity_bindings,
     build_entity_rows,
+    device_map_ehal_by_name,
+    ehal_name_for_marker,
+    enrich_structure_scan_rows,
     fields_for_consumer,
     is_known_marker_name,
+    marker_to_ehal_lookup,
     resolve_field_select_default,
+    structure_scan_row,
 )
 
 
@@ -24,11 +30,16 @@ def test_fields_for_consumer_ev_vs_flex():
     assert "get_evcs_limit_soc" in EV_FIELDS
     assert "get_evcs_soc_min_immediate" in EV_FIELDS
     assert "sens_power_consumers" in PLANT_FIELDS
-    assert fields_for_consumer({"type": "thermal_annual"}) == FLEX_FIELDS
+    assert fields_for_consumer({"type": "thermal_annual"}) == FLEX_FIELDS + (
+        "sens_temperature_heat_storage",
+        "sens_temperature_heat_storage_low",
+    )
     assert fields_for_consumer({"id": "wp", "type": "thermal_annual"}) == (
         "flex.wp.sens_power_act",
         "flex.wp.set_enable",
         "flex.wp.set_power_setpoint",
+        "sens_temperature_heat_storage",
+        "sens_temperature_heat_storage_low",
     )
     assert "get_filter_remaining_hours" in FILTER_FIELDS
 
@@ -259,3 +270,108 @@ def test_is_known_marker_name_casefold():
     assert not is_known_marker_name("Brand_New", options)
     assert not is_known_marker_name(_NONE, options)
     assert not is_known_marker_name("", options)
+
+
+def test_marker_to_ehal_lookup_reverse_binding():
+    house = {
+        "plant": {"ehal_bindings": {"sens_ess_soc": "Earnie_Batterie_SoC"}},
+        "profiles": {
+            "live": {
+                "id": "live",
+                "consumers": [
+                    {
+                        "id": "waermepumpe",
+                        "type": "thermal_annual",
+                        "ehal_bindings": {
+                            "flex.waermepumpe.set_enable": "Earnie_Waermepumpe_Freigabe",
+                        },
+                    }
+                ],
+            }
+        },
+    }
+    lookup = marker_to_ehal_lookup(house, "live")
+    assert lookup["Earnie_Waermepumpe_Freigabe"] == "flex.waermepumpe.set_enable"
+    assert lookup["Earnie_Batterie_SoC"] == "sens_ess_soc"
+
+
+def test_ehal_name_for_marker_binding_then_device_map():
+    house = {
+        "plant": {
+            "ehal_bindings": {
+                "flex.waermepumpe.set_enable": "Earnie_Waermepumpe_Freigabe",
+            }
+        },
+        "profiles": {"live": {"id": "live", "consumers": []}},
+    }
+    assert (
+        ehal_name_for_marker("Earnie_Waermepumpe_Freigabe", house, "live")
+        == "flex.waermepumpe.set_enable"
+    )
+    # Unbound plant Merker → greenfield device map
+    assert ehal_name_for_marker("Earnie_Netzleistung", house, "live") == (
+        "sens_grid_power_active"
+    )
+    # Device map ehal_field null (watchdog only)
+    assert ehal_name_for_marker("Earnie_Heartbeat", house, "live") == ""
+    assert ehal_name_for_marker("Unknown_Custom", house, "live") == ""
+
+
+def test_structure_scan_row_column_order():
+    row = structure_scan_row(
+        name="Earnie_SOC",
+        ehal="sens_ess_soc",
+        type_="http_probe",
+        source="http_probe",
+        room="Keller",
+        category="Energie",
+        uuid="abc-123",
+    )
+    assert tuple(row.keys()) == SCAN_ROW_KEYS
+    assert list(row.keys())[-3:] == ["room", "category", "uuid"]
+
+
+def test_enrich_structure_scan_rows_orders_and_resolves():
+    house = {
+        "plant": {},
+        "profiles": {
+            "live": {
+                "id": "live",
+                "consumers": [
+                    {
+                        "id": "waermepumpe",
+                        "type": "thermal_annual",
+                        "ehal_bindings": {
+                            "flex.waermepumpe.set_enable": "Earnie_Waermepumpe_Freigabe",
+                        },
+                    }
+                ],
+            }
+        },
+    }
+    items = [
+        {
+            "name": "Earnie_Waermepumpe_Freigabe",
+            "uuid": "u1",
+            "type": "http_probe",
+            "room": "Technik",
+            "category": "HVAC",
+            "source": "http_probe",
+        },
+        {
+            "name": "Earnie_Heartbeat",
+            "uuid": "",
+            "type": "http_probe",
+            "room": "",
+            "category": "",
+            "source": "http_probe",
+        },
+    ]
+    rows = enrich_structure_scan_rows(items, house, "live")
+    assert tuple(rows[0].keys()) == SCAN_ROW_KEYS
+    assert rows[0]["ehal"] == "flex.waermepumpe.set_enable"
+    assert rows[0]["uuid"] == "u1"
+    assert rows[1]["ehal"] == ""
+    assert device_map_ehal_by_name().get("Earnie_Netzleistung") == (
+        "sens_grid_power_active"
+    )

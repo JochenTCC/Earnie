@@ -23,6 +23,16 @@ class TestLoxoneEnvHelpers:
         assert lc.loxone_env_configured() is True
 
 
+class TestTemperatureValidators:
+    def test_ambient_rejects_above_80(self):
+        assert lc._temperature_valid(80.3) is not None
+
+    def test_heat_storage_accepts_near_abs_max(self):
+        assert lc._heat_storage_temperature_valid(80.3) is None
+        assert lc._heat_storage_temperature_valid(95.0) is None
+        assert lc._heat_storage_temperature_valid(101.0) is not None
+
+
 class TestProbeLoxoneHttpAccess:
     def test_empty_host_fails(self):
         ok, detail = lc.probe_loxone_http_access(
@@ -365,6 +375,59 @@ class TestCollectReadChecks:
         assert by_label["pool:sens_temperature_water"] == "Pool_Ist"
         assert by_label["pool:get_temperature_water_setpoint"] == "Pool_Soll"
         assert "pool:flex.pool.sens_power_act" not in by_label
+
+    def test_collects_thermal_annual_heat_storage_temps(self):
+        consumers = [
+            {
+                "id": "waermepumpe",
+                "type": "thermal_annual",
+                "ehal_bindings": {
+                    "flex.waermepumpe.sens_power_act": "P_WP",
+                    "sens_temperature_heat_storage": "Earnie_Waermespeicher_Temp_eq",
+                    "sens_temperature_heat_storage_low": "Earnie_Waermespeicher_Temp_low",
+                },
+            }
+        ]
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["waermepumpe:flex.waermepumpe.sens_power_act"] == "P_WP"
+        assert (
+            by_label["waermepumpe:sens_temperature_heat_storage"]
+            == "Earnie_Waermespeicher_Temp_eq"
+        )
+        assert (
+            by_label["waermepumpe:sens_temperature_heat_storage_low"]
+            == "Earnie_Waermespeicher_Temp_low"
+        )
+
+    def test_heat_storage_temps_without_power_marker_still_collected(self):
+        consumers = [
+            {
+                "id": "wp_heating",
+                "type": "thermal_annual",
+                "ehal_bindings": {
+                    "sens_temperature_heat_storage": "TempEq",
+                    "sens_temperature_heat_storage_low": "TempLow",
+                },
+            }
+        ]
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["wp_heating:sens_temperature_heat_storage"] == "TempEq"
+        assert by_label["wp_heating:sens_temperature_heat_storage_low"] == "TempLow"
+        assert "wp_heating:flex.wp_heating.sens_power_act" not in by_label
 
 
 class TestLoxoneIntegrationGate:

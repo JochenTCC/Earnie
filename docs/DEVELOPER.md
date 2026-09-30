@@ -134,6 +134,7 @@ Run a development build in parallel to Prod on the same live inputs without touc
 
 - Activate **only** with `EARNIE_SHADOW=1` (never a config key). Implies silent mode.
 - Requires an explicit `EARNIE_RUNTIME_PATH` or `EARNIE_ENV_PATH`; shares Prod’s config (read-only) and feed under `{config}/shadow_feed/` (or `EARNIE_SHADOW_FEED_PATH`).
+- Exception: EHAL-Com mapping may write `{runtime}/shadow_ehal_bindings.json` (merged on house-profile load); Prod config files stay untouched.
 - Prod must run with `"shadow_feed_enabled": true` in its `local_settings.json`.
 - Optional seed: `python -m scripts.shadow_seed_runtime --from <prod-runtime> --to <shadow-runtime>`.
 - Same-host UI port: `EARNIE_UI_STREAMLIT_PORT` (existing override).

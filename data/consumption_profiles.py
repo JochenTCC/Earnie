@@ -1,12 +1,9 @@
 """Synthetische Verbrauchsprofile aus Hausprofilen für Backtesting."""
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING
-
-MODELED_PROFILE_REF_START = datetime(2023, 1, 1)
-MODELED_PROFILE_HOURS_PER_YEAR = 8760
 
 from data.heating_need import (
     daily_electric_kwh,
@@ -15,9 +12,13 @@ from data.heating_need import (
     thermal_daily_pwm_hourly_profile,
     weekly_electric_kwh,
 )
+from data.open_meteo_solar_archive import last_full_archive_year
 from house_config.baseload import consumer_annual_kwh
 from house_config.consumption_csv import consumer_uses_profile_csv, load_hourly_profile_csv
 from house_config.ev_profile import ev_hourly_kw_for_day
+
+MODELED_PROFILE_REF_START = datetime(last_full_archive_year(), 1, 1)
+MODELED_PROFILE_HOURS_PER_YEAR = 8760
 
 if TYPE_CHECKING:
     from data.modeled_climate import ModeledClimateContext
@@ -124,7 +125,7 @@ def _flat_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
 
 def _modeled_ev_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     hourly = [0.0] * hours
-    start_day = date(2023, 1, 1)
+    start_day = MODELED_PROFILE_REF_START.date()
     for hour_index in range(hours):
         day = start_day + timedelta(days=hour_index // 24)
         day_hourly = ev_hourly_kw_for_day(consumer, day)
@@ -132,9 +133,12 @@ def _modeled_ev_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     return hourly
 
 
-def _modeled_thermal_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
-    thermal = consumer.get("thermal") or consumer
-    daily = daily_electric_kwh(**heating_params_from_thermal(thermal))
+def _pwm_or_weekly_thermal_profile(
+    consumer: dict,
+    daily: list[float],
+    *,
+    hours: int,
+) -> list[float]:
     nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     if nominal > 0.0:
         return thermal_daily_pwm_hourly_profile(
@@ -142,8 +146,70 @@ def _modeled_thermal_annual_hourly_kw(consumer: dict, *, hours: int) -> list[flo
             nominal_power_kw=nominal,
             hours_per_year=hours,
         )
-    weekly = weekly_electric_kwh(**heating_params_from_thermal(thermal))
+    weekly: list[float] = []
+    for week_idx in range(52):
+        start = week_idx * 7
+        weekly.append(round(sum(daily[start : start + 7]), 3))
     return hourly_profile_for_year(weekly, hours_per_year=hours)
+
+
+def _thermal_annual_daily_from_archive(consumer: dict) -> list[float] | None:
+    """Open-Meteo daily WP kWh when lat/lon + Config available; else None."""
+    thermal = consumer.get("thermal") or consumer
+    lat = thermal.get("latitude")
+    lon = thermal.get("longitude")
+    if lat is None or lon is None:
+        return None
+    import config as _cfg
+
+    if getattr(_cfg, "CONFIG", None) is None:
+        return None
+
+    from data.modeled_climate import collector_surface_from_thermal
+    from data.open_meteo_solar_archive import (
+        build_open_meteo_climate_bundle_for_year,
+        last_full_archive_year,
+    )
+
+    params = heating_params_from_thermal(thermal)
+    if "hp_electric_kw" not in params:
+        params["hp_electric_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
+    area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
+    year = last_full_archive_year()
+    timezone = str(thermal.get("timezone_name") or _cfg.get_planning_timezone())
+    collector = collector_surface_from_thermal(thermal, {})
+    surfaces = [collector] if area_m2 > 0.0 else []
+    bundle = build_open_meteo_climate_bundle_for_year(
+        year,
+        lat=float(lat),
+        lon=float(lon),
+        timezone=timezone,
+        surfaces=surfaces,
+    )
+    hourly_wm2 = (
+        bundle.collector_surface_series(collector) if area_m2 > 0.0 else None
+    )
+    return daily_electric_kwh(
+        **params,
+        hourly_temperature_c=bundle.temperature_c,
+        hourly_collector_wm2=hourly_wm2,
+    )
+
+
+def _modeled_thermal_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
+    """Hourly WP profile; prefer Open-Meteo + collector irradiance over fixture."""
+    thermal = consumer.get("thermal") or consumer
+    params = heating_params_from_thermal(thermal)
+    if "hp_electric_kw" not in params:
+        params["hp_electric_kw"] = float(consumer.get("nominal_power_kw", 3.0) or 3.0)
+    daily = _thermal_annual_daily_from_archive(consumer)
+    if daily is None:
+        daily = daily_electric_kwh(**params)
+    profile = _pwm_or_weekly_thermal_profile(consumer, daily, hours=hours)
+    if len(profile) >= hours:
+        return profile[:hours]
+    pad = profile[-1] if profile else 0.0
+    return profile + [pad] * (hours - len(profile))
 
 
 def _modeled_thermal_rc_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
@@ -182,7 +248,7 @@ def _modeled_generic_schedule_hourly_kw(consumer: dict, *, hours: int) -> list[f
     from house_config.generic_schedule import generic_hourly_kw_for_day
 
     hourly = [0.0] * hours
-    start_day = date(2023, 1, 1)
+    start_day = MODELED_PROFILE_REF_START.date()
     for hour_index in range(hours):
         day = start_day + timedelta(days=hour_index // 24)
         day_hourly = generic_hourly_kw_for_day(consumer, day)

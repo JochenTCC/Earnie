@@ -86,10 +86,14 @@ def _ha_credentials(data: dict) -> dict[str, Any]:
 
 def _ensure_ha_migrated() -> tuple[dict, dict]:
     """One-shot migrate flat entities → Pattern B; return (config, house)."""
+    from runtime_store.shadow.mode import is_shadow_mode
+
     config_doc = load_main_config()
     house = load_house_profiles()
     new_house, new_config, changed = ensure_migrated(house, config_doc)
     if changed:
+        if is_shadow_mode():
+            return new_config, new_house
         save_house_profiles(new_house)
         save_main_config(new_config)
         return new_config, new_house
@@ -392,25 +396,29 @@ def _save_entity_mapping(
     from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
     from runtime_store.dotenv_io import write_ha_dotenv
     from runtime_store.dotenv_loader import load_app_dotenv
+    from runtime_store.shadow.ehal_overlay import upsert_entity_bindings
+    from runtime_store.shadow.mode import is_shadow_mode
 
     error = _validate_mapping_save(entity_id, ehal_map, scan_rows)
     if error:
         st.error(error)
         return
-    resolved_url = resolve_ha_base_url(base_url)
-    if not resolved_url or not resolve_ha_token(token):
-        st.error(
-            "URL und Token sind erforderlich "
-            "(oder SUPERVISOR_TOKEN beim Betrieb als Home-Assistant-Add-on)."
-        )
-        return
-    try:
-        # Never persist SUPERVISOR_TOKEN — empty token stays empty in .env.
-        write_ha_dotenv(resolved_url, token)
-    except (OSError, PermissionError) as exc:
-        st.error(f"Speichern der .env fehlgeschlagen: {exc}")
-        return
-    load_app_dotenv(override=True)
+    shadow = is_shadow_mode()
+    if not shadow:
+        resolved_url = resolve_ha_base_url(base_url)
+        if not resolved_url or not resolve_ha_token(token):
+            st.error(
+                "URL und Token sind erforderlich "
+                "(oder SUPERVISOR_TOKEN beim Betrieb als Home-Assistant-Add-on)."
+            )
+            return
+        try:
+            # Never persist SUPERVISOR_TOKEN — empty token stays empty in .env.
+            write_ha_dotenv(resolved_url, token)
+        except (OSError, PermissionError) as exc:
+            st.error(f"Speichern der .env fehlgeschlagen: {exc}")
+            return
+        load_app_dotenv(override=True)
     migrated_house, migrated_config, _ = ensure_migrated(house, config_doc)
     updated = apply_entity_bindings(
         migrated_house,
@@ -418,6 +426,19 @@ def _save_entity_mapping(
         entity_id=entity_id,
         bindings=ehal_map,
     )
+    if shadow:
+        path = upsert_entity_bindings(
+            profile_id=profile_id,
+            entity_id=entity_id,
+            bindings=ehal_map,
+        )
+        reset_adapter_cache()
+        st.success(
+            f"HA-EHAL-Mapping für `{entity_id}` im Shadow-Overlay gespeichert "
+            f"(`{path}`; Prod-Config unverändert)."
+        )
+        st.rerun()
+        return
     save_house_profiles(updated)
     payload = dict(migrated_config)
     ehal = dict(payload.get("ehal") or {}) if isinstance(payload.get("ehal"), dict) else {}
@@ -444,6 +465,8 @@ def _save_entity_mapping(
 
 
 def _render_ha_mapping_intro() -> None:
+    from runtime_store.shadow.mode import is_shadow_mode
+
     st.caption(
         "Entity-zentriertes Mapping (wie Loxone): zuerst Entity wählen "
         "(Anlage + Verbraucher aus dem Live-Hausprofil), dann nur deren EHAL-Felder. "
@@ -452,6 +475,11 @@ def _render_ha_mapping_intro() -> None:
         "Zugangsdaten in `config/.env` (`EHAL_HA_*`). "
         "Gespeicherte Bindings werden nicht überschrieben. Kein LLM."
     )
+    if is_shadow_mode():
+        st.info(
+            "Shadow-Modus: Mapping-Speichern schreibt nur das Runtime-Overlay "
+            "`shadow_ehal_bindings.json` (Prod-Config und `.env` bleiben schreibgeschützt)."
+        )
 
 
 def _render_mapping_action_buttons() -> tuple[bool, bool]:

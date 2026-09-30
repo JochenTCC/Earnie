@@ -60,7 +60,13 @@ Doc/review corrections only (user docs, renames, merges, TOC, abbreviations) —
 
 Before committing `backlog/Backlog-Bugfixes.md` or `backlog/Backlog-Erledigt.md`, scrub personal/customer names using stable aliases (`UserA`, …). See `.cursor/rules/backlog-anonymize-users.mdc` and local map `.cursor/user-aliases.local.md` (gitignored).
 
-## 5. Versioning & Release
+## 5. Hints / Remarks (not todos)
+
+* Orientation notes, scope reminders, and cross-epic pointers are **hints**, not work items.
+* Format: `- **Note:** …` (or `- **Hint:** …`) — **never** `- [ ]` / `- [x]`.
+* Checkboxes (`- [ ]` / `- [x]`) are only for actionable tasks that can be completed and archived.
+
+## 6. Versioning & Release
 
 * **Rule:** Changes to `version.py` must **never be made without explicit user approval**.
 

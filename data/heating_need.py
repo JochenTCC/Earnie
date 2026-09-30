@@ -287,8 +287,41 @@ def daily_electric_kwh(
     solar_thermal_area_m2: float = 0.0,
     solar_thermal_tilt_deg: float = 18.0,
     solar_thermal_azimuth_deg: float = 0.0,
+    heat_storage: dict | None = None,
+    hp_electric_kw: float = 3.0,
+    building_mass: str | None = None,
+    house_tolerance_c: float | None = None,
+    house_heat_loss_kw_per_k: float | None = None,
 ) -> list[float]:
     """Elektrischer WP-Bedarf pro Kalendertag (kWh)."""
+    if float(living_area_m2) > 0.0:
+        from optimizer.thermal_house import house_year_result
+
+        return house_year_result(
+            living_area_m2=living_area_m2,
+            building_class=building_class,
+            heat_pump_type=heat_pump_type,
+            persons=persons,
+            latitude=latitude,
+            longitude=longitude,
+            target_temp_c=target_temp_c,
+            heating_limit_c=heating_limit_c,
+            hp_electric_kw=float(hp_electric_kw),
+            heat_storage=heat_storage,
+            daily_temps=daily_temps,
+            daily_radiation_mj=daily_radiation_mj,
+            hourly_temperature_c=hourly_temperature_c,
+            hourly_collector_wm2=hourly_collector_wm2,
+            hwb_kwh_m2=hwb_kwh_m2,
+            solar_thermal_area_m2=solar_thermal_area_m2,
+            solar_thermal_tilt_deg=solar_thermal_tilt_deg,
+            solar_thermal_azimuth_deg=solar_thermal_azimuth_deg,
+            building_mass=building_mass,
+            house_tolerance_c=house_tolerance_c,
+            house_heat_loss_kw_per_k=house_heat_loss_kw_per_k,
+        ).daily_electric_kwh
+
+    # Fallback without Wohnfläche: legacy open-loop HDD path (no house RC).
     area_m2 = float(solar_thermal_area_m2)
     daily_temps, daily_radiation_mj, calendar_dates = _resolve_climate_series(
         latitude=latitude,
@@ -352,6 +385,11 @@ def weekly_electric_kwh(
     solar_thermal_area_m2: float = 0.0,
     solar_thermal_tilt_deg: float = 18.0,
     solar_thermal_azimuth_deg: float = 0.0,
+    heat_storage: dict | None = None,
+    hp_electric_kw: float = 3.0,
+    building_mass: str | None = None,
+    house_tolerance_c: float | None = None,
+    house_heat_loss_kw_per_k: float | None = None,
 ) -> list[float]:
     """Elektrischer WP-Bedarf pro Kalenderwoche (kWh)."""
     daily = daily_electric_kwh(
@@ -371,6 +409,11 @@ def weekly_electric_kwh(
         solar_thermal_area_m2=solar_thermal_area_m2,
         solar_thermal_tilt_deg=solar_thermal_tilt_deg,
         solar_thermal_azimuth_deg=solar_thermal_azimuth_deg,
+        heat_storage=heat_storage,
+        hp_electric_kw=hp_electric_kw,
+        building_mass=building_mass,
+        house_tolerance_c=house_tolerance_c,
+        house_heat_loss_kw_per_k=house_heat_loss_kw_per_k,
     )
     weekly: list[float] = []
     for week_idx in range(52):
@@ -387,7 +430,13 @@ def _thermal_hwb_value(thermal: dict) -> float | None:
 
 def heating_params_from_thermal(thermal: dict) -> dict:
     """Gemeinsame Parameter für estimate_annual_kwh / weekly_electric_kwh."""
-    return {
+    from optimizer.thermal_coupled import normalize_heat_storage
+    from optimizer.thermal_house import (
+        DEFAULT_HOUSE_TOLERANCE_C,
+        normalize_building_mass,
+    )
+
+    params = {
         "living_area_m2": float(thermal.get("living_area_m2", 0.0)),
         "building_class": int(thermal.get("building_class", 3)),
         "heat_pump_type": str(thermal.get("heat_pump_type", "luft")),
@@ -400,7 +449,22 @@ def heating_params_from_thermal(thermal: dict) -> dict:
         "solar_thermal_area_m2": float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0),
         "solar_thermal_tilt_deg": float(thermal.get("solar_thermal_tilt_deg", 18.0)),
         "solar_thermal_azimuth_deg": float(thermal.get("solar_thermal_azimuth_deg", 0.0)),
+        "building_mass": normalize_building_mass(thermal.get("building_mass")),
+        "house_tolerance_c": float(
+            thermal.get("house_tolerance_c", DEFAULT_HOUSE_TOLERANCE_C)
+            or DEFAULT_HOUSE_TOLERANCE_C
+        ),
     }
+    h_override = thermal.get("house_heat_loss_kw_per_k")
+    if h_override not in (None, "") and float(h_override) > 0.0:
+        params["house_heat_loss_kw_per_k"] = float(h_override)
+    storage = normalize_heat_storage(thermal.get("heat_storage"))
+    if storage is not None:
+        params["heat_storage"] = storage
+    hp_raw = thermal.get("nominal_power_kw")
+    if hp_raw not in (None, ""):
+        params["hp_electric_kw"] = float(hp_raw)
+    return params
 
 
 def estimate_annual_kwh(
@@ -417,6 +481,11 @@ def estimate_annual_kwh(
     solar_thermal_area_m2: float = 0.0,
     solar_thermal_tilt_deg: float = 18.0,
     solar_thermal_azimuth_deg: float = 0.0,
+    heat_storage: dict | None = None,
+    hp_electric_kw: float = 3.0,
+    building_mass: str | None = None,
+    house_tolerance_c: float | None = None,
+    house_heat_loss_kw_per_k: float | None = None,
 ) -> float:
     if living_area_m2 <= 0:
         return 0.0
@@ -433,6 +502,11 @@ def estimate_annual_kwh(
         solar_thermal_area_m2=solar_thermal_area_m2,
         solar_thermal_tilt_deg=solar_thermal_tilt_deg,
         solar_thermal_azimuth_deg=solar_thermal_azimuth_deg,
+        heat_storage=heat_storage,
+        hp_electric_kw=hp_electric_kw,
+        building_mass=building_mass,
+        house_tolerance_c=house_tolerance_c,
+        house_heat_loss_kw_per_k=house_heat_loss_kw_per_k,
     )
     return round(sum(weekly), 3)
 

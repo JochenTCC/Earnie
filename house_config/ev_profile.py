@@ -7,7 +7,8 @@ from settings.ev_power import merge_ev_power_conversion_fields
 from settings.flexible_consumers import normalize_day_schedule, target_kwh_from_rest_soc
 
 _REFERENCE_YEAR_DAYS = 365
-_REFERENCE_YEAR_START = date(2023, 1, 1)
+# Same rule as last_full_archive_year(); avoid importing open_meteo (config import cycle).
+_REFERENCE_YEAR_START = date(date.today().year - 1, 1, 1)
 
 
 def normalize_ev_milp_block(raw: dict | None) -> dict | None:

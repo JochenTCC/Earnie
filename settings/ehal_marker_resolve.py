@@ -128,6 +128,18 @@ def marker_sens_temperature_water(consumer: dict) -> str:
     return _first_nonempty(ehal_bindings(consumer).get("sens_temperature_water"))
 
 
+def marker_sens_temperature_heat_storage(consumer: dict) -> str:
+    return _first_nonempty(
+        ehal_bindings(consumer).get("sens_temperature_heat_storage"),
+    )
+
+
+def marker_sens_temperature_heat_storage_low(consumer: dict) -> str:
+    return _first_nonempty(
+        ehal_bindings(consumer).get("sens_temperature_heat_storage_low"),
+    )
+
+
 def marker_get_temperature_water_setpoint(consumer: dict) -> str:
     return _first_nonempty(
         ehal_bindings(consumer).get("get_temperature_water_setpoint"),

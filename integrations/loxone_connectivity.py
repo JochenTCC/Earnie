@@ -227,6 +227,18 @@ def _temperature_valid(value: float) -> str | None:
     return None
 
 
+def _heat_storage_temperature_valid(value: float) -> str | None:
+    """Buffer/DHW store may sit near HEAT_STORAGE_ABS_MAX_C (solar float)."""
+    from optimizer.thermal_coupled import HEAT_STORAGE_ABS_MAX_C
+
+    if not math.isfinite(value):
+        return f"Temperatur nicht numerisch: {value}"
+    # Small headroom for sensor noise above the model abs-max.
+    if value < 0.0 or value > HEAT_STORAGE_ABS_MAX_C + 5.0:
+        return f"Temperatur unrealistisch: {value} °C"
+    return None
+
+
 def _binary_valid(value: float) -> str | None:
     if value in (0.0, 1.0):
         return None
@@ -284,6 +296,8 @@ def _consumer_has_live_read_marker(consumer: dict) -> bool:
         marker_sens_evcs_active_power,
         marker_sens_evcs_connected,
         marker_sens_heating_active,
+        marker_sens_temperature_heat_storage,
+        marker_sens_temperature_heat_storage_low,
         marker_sens_temperature_water,
     )
 
@@ -299,6 +313,10 @@ def _consumer_has_live_read_marker(consumer: dict) -> bool:
         or marker_get_temperature_tolerance_c(consumer)
         or marker_sens_heating_active(consumer)
     ):
+        return True
+    if marker_sens_temperature_heat_storage(
+        consumer
+    ) or marker_sens_temperature_heat_storage_low(consumer):
         return True
     return False
 
@@ -528,6 +546,21 @@ def _is_thermal_consumer(consumer: dict) -> bool:
     )
 
 
+def _is_thermal_annual_consumer(consumer: dict) -> bool:
+    """True for heat-pump thermal_annual (or heat-storage EHAL bindings)."""
+    if str(consumer.get("type") or "") == "thermal_annual":
+        return True
+    from settings.ehal_marker_resolve import (
+        marker_sens_temperature_heat_storage,
+        marker_sens_temperature_heat_storage_low,
+    )
+
+    return bool(
+        marker_sens_temperature_heat_storage(consumer)
+        or marker_sens_temperature_heat_storage_low(consumer)
+    )
+
+
 def _append_thermal_read_checks(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
@@ -563,6 +596,30 @@ def _append_thermal_read_checks(
         f"{cid}:sens_heating_active",
         marker_sens_heating_active(consumer),
         {"validate": _binary_valid},
+    )
+
+
+def _append_thermal_annual_read_checks(
+    checks: list[tuple[str, str, dict]],
+    consumer: dict,
+) -> None:
+    from settings.ehal_marker_resolve import (
+        marker_sens_temperature_heat_storage,
+        marker_sens_temperature_heat_storage_low,
+    )
+
+    cid = consumer["id"]
+    _append_io_check(
+        checks,
+        f"{cid}:sens_temperature_heat_storage",
+        marker_sens_temperature_heat_storage(consumer),
+        {"validate": _heat_storage_temperature_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:sens_temperature_heat_storage_low",
+        marker_sens_temperature_heat_storage_low(consumer),
+        {"validate": _heat_storage_temperature_valid},
     )
 
 
@@ -630,6 +687,8 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
             _append_flex_power_check(checks, consumer)
             if _is_thermal_consumer(consumer):
                 _append_thermal_read_checks(checks, consumer)
+            if _is_thermal_annual_consumer(consumer):
+                _append_thermal_annual_read_checks(checks, consumer)
 
     return checks
 

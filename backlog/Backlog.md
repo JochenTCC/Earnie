@@ -18,7 +18,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.12`**. This branch keeps `version.py` at **`2.7.0-dev`** until post-2.6 approval.
 
-**Next:** community/official **2.6** publish as needed. On this branch: **2.7.f** Shadow client first, then **2.7.a** dogfood … **2.7.e**. Shadow Prod recorder (**2.6.o**), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
+**Next:** community/official **2.6** publish as needed. On this branch: **2.7.a** dogfood … **2.7.e**. Shadow Prod recorder (**2.6.o**), Shadow client (**2.7.f**), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -30,58 +30,49 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.f** → **2.7.a** dogfood → **2.7.b** → **2.7.c** → **2.7.d** → **2.7.g** → **2.7.h** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6. **2.7.f** first so Shadow can dogfood the rest of 2.7 against Prod with **2.6.o** feed.
+**Order:** **2.7.a** dogfood → **2.7.b** → **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. Former **2.7.d** (one-way storage type) folded into **2.7.g**/**2.7.h** → [Erledigt](Backlog-Erledigt.md).
 
-- [ ] **2.7.f — Shadow Mode S2+S3: Dev client** (depends on Prod running **2.6.o** recorder)
-  - Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) — `EARNIE_SHADOW=1` only (`runtime_store.shadow.is_shadow_mode()`); implies silent; never a config key
-  - **S2:** transport replay (§6.1–6.2), central write block + `shadow_writes.jsonl` (§6.3), config read-only / skip load-time migrations that write (§6.4), startup checks (§4.2), release guard (§4.4); own mandatory runtime dir + optional `scripts.shadow_seed_runtime`
-  - Accept Prod’s `earnie_data_model` if in `COMPATIBLE_DATA_MODELS`; never migrate/re-stamp shared config. No Shadow `config_overlay` in v1 (Prod-rejected keys not testable)
-  - **S3:** UI banner + feed health + would-write table; `EARNIE_UI_STREAMLIT_PORT`; German user docs (`docs/einrichtung/`) + `DEVELOPER.md`
-  - Tests per spec §10; E2E with HouseSim as Prod backend
-  - **Out of scope:** S4 Soll/Soll diff + offline JSONL backtest → **2.+1**; Shadow as 2nd HA add-on (scenario C)
-
-- [ ] **2.7.a dogfood — Loxone productive + live test** (code done → [Erledigt](Backlog-Erledigt.md); after **2.7.f** preferred for Shadow dogfood)
-  - Wire export-limit Merker / VI–VO in the productive Loxone config (`set_grid_export_power_limit`, optional inbound `get_grid_export_power_limit`; Einspeisesperre = limit `0`, `set_ess_mode` stays battery-only)
-  - Bind in EHAL-Com; set a HK `plant.max_export_power_kw` and verify Live writes + MILP respect the cap
+- [ ] **2.7.a dogfood — Loxone productive + live test** (wiring done → [Erledigt](Backlog-Erledigt.md); prefer Shadow dogfood via **2.7.f**)
   - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (unconstrained = PV kWp sum + battery max discharge kW)
 
-- [ ] In case of big diff between PV prognosis and actual PV energy Earnie should use a correction factor for optimization at least for the next QH in order to prevent unneeded forced charging or other actions (has to be specified more concrete how)
 - [ ] **2.7.b — Thermals P2** — Coupled single-node models
-  - House ↔ heat storage ↔ solar system
-  - **Heat storage topology:** solar thermal collector and heat pump feed heat **only into the heat storage**; space heating and domestic hot water draw heat **only from the heat storage** (the storage also serves house heating, not just DHW)
-  - **Heat storage temperature band:** storage temperature may float between `setpoint − tolerance` and **95 °C**; only above 95 °C is the solar collector heat input capped
-  - **Heat pump in the band:** the heat pump may add heat only within the setpoint range (`setpoint − tolerance` … `setpoint`); above the setpoint it stays off (surplus above setpoint comes from solar only)
-  - **Below the band:** if the storage temperature drops below `setpoint − tolerance`, the heat pump **must** heat (hard lower bound, not a flexibility window)
-  - House parameters from energy certificate (`EXAMPLE:/local/reference/energy-certificate.pdf` — not in repo)
-  - Prepare air conditioning as thermal consumer
-  - Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3)
-  - **Note:** Epic continues under **2.+1** (**Thermals P3**, heat pump Prio3 after **Thermals P2** / **2.7.b**). Heat storage here is thermal, not ESS multi-storage (**2.7.c**/**2.7.d**).
+  - [x] **Slice 1 — House ↔ heat storage ↔ solar (linear)** — optional `thermal.heat_storage` on `thermal_annual`; coupled day targets via `optimizer/thermal_coupled.py`; HK fields; spec [`docs/spec/thermals-p2.md`](../docs/spec/thermals-p2.md); legacy open-loop when volume ≤ 0
+  - [x] **House indoor RC** — DIN V 18599 Bauweise `leicht`/`mittel`/`schwer` → C from Wohnfläche; H calibrated from HWB (override optional); band control; `T_house` state; HK fields; chart Haus-Ist; [`optimizer/thermal_house.py`](../optimizer/thermal_house.py)
+  - [x] House parameters from energy certificate — **research only** (manual mapping; no automatic PDF/import). Reference: local GEQ EAW EFH Dornbirn 2014 (not in repo). Usable seeds: HWB ≈ 40 kWh/m²a, BGF ≈ 157 m² (≠ Wohnfläche), θi = 20 °C, Sole/Wasser-WP, solar Neigung 18° + Verdrehung 26° (WW-only). **Superseded for the reference installation by the hydraulic plan (2015, local, not in repo) and the tank datasheet:** one combined buffer of **887 l** gross / 861 l net (INHAUS PR 1000; the "1000" is only the type name) → `heat_storage.volume_liters` = **887** (not ≈ 500 from the EAW tank split 100 l RH + 400 l WW); solar collector **10.6 m²** (not 6 m²) → `solar_thermal_area_m2`. Tank: H 2040 mm without insulation, Ø 790 mm, 100 mm PU foam, solar register 3.1 m² (310–1030 mm), four ½" sensor wells at 310 / 745 / 1250 / 1710 mm. Start value `heat_loss_kw_per_k` ≈ 0.006 (estimate, to be calibrated; code default 0.02 is ~3× too high for this tank). **Do not** map building LT+LV ≈ 0.125 kW/K onto `heat_storage.heat_loss_kw_per_k` (tank U only; EAW standby ≈ 4.7 kWh/d → U ≈ 0.006–0.01). BRI ≈ 489 m³ optional for volume heuristics; house C uses Wohnfläche × Bauweise. Monthly Hausprofil model uses Open-Meteo + collector irradiance (same as Live metric), not the offline climate fixture alone.
+  - [x] Add a new y-Axis to "Stündlicher Verlauf" Chart on HK page with temperatures (outside ambient, house temp, heat storage tank, pool temp) to give user a visualization of simulation
+  - [x] **Heat storage topology (year-sim):** solar thermal collector and heat pump feed heat **only into the heat storage**; space heating and domestic hot water draw heat **only from the heat storage** (the storage also serves house heating, not just DHW); legacy no-store path unchanged
+  - [x] **Heat storage temperature band (year-sim):** storage temperature may float between `setpoint − tolerance` and **95 °C**; only above 95 °C is the solar collector heat input capped (`HEAT_STORAGE_ABS_MAX_C` in `optimizer/thermal_coupled.py`)
+  - [x] **Heat pump in the band (year-sim):** WP bang-bang at the floor; WP heat capped at `setpoint` (not `setpoint + tolerance`); above the setpoint WP stays off (surplus above setpoint from solar only)
+  - [x] **Below the band (year-sim):** if projected storage temperature drops below `setpoint − tolerance`, the heat pump **must** heat (hard lower bound)
+  - [x] **Below the band (Live/MILP):** align Live/MILP with year-sim hard lower bound (and opportunistic WP in `[setpoint−tol, setpoint]`) — still daily electric kWh flex only; MILP store-T SoC remains out of scope for this slice; Live reads `T_eq` + `T_low`
+  - [x] Change default year of Yearly view on HK page (also on SE page) to the last / current year not 2023
+  - [ ] **Virtual heat-content sensor (prep for Thermals P3)** — derive `Q = C(V) × T` (C from `capacity_kwh_per_k_from_volume`, T ref 0 °C) for heat storage and pool; same C for sim and measured. Stratified tanks: SM supplies energy-equivalent `T_eq` (not top sensor alone). Spec: Entwicklungsplan §3.5; operator guide [`docs/konfiguration/waermespeicher-schichtung-teq.md`](../docs/konfiguration/waermespeicher-schichtung-teq.md); physics [`docs/spec/thermals-p2.md`](../docs/spec/thermals-p2.md)
+    - [x] **EHAL binding** `sens_temperature_heat_storage` (`T_eq`) + `sens_temperature_heat_storage_low` (`T_low`) on `thermal_annual` — Live floor/`T_low` hint wired
+    - [x] **Reference installation `T_eq` weights:** only **three** sensors (S3 oben / S4 mitte / S5 unten) in a tank with four sensor wells (310 / 745 / 1250 / 1710 mm); occupied wells not confirmed. **Provisional mapping (best fit of one snapshot against four dial thermometers):** S3 → 1710, S4 → 1250, S5 → 745 mm → `0.27*T_oben + 0.24*T_mitte + 0.49*T_unten` (Schritt A in [`waermespeicher-schichtung-teq.md`](../docs/konfiguration/waermespeicher-schichtung-teq.md)). Risk: lowest ~530 mm (well 310 mm) unmeasured → `T_eq` too high when the tank bottom is cold; consider a fourth immersion sensor in the 310 mm well. Verify mapping with several dial-vs-Loxone snapshots under different stratification, then fix `w_i`
+    - [x] **Live:** read measured `T_eq` → `Q_meas`; compute `Q_sim` from RC state / short forecast; persist via `thermal_observability` on `optimization_history.jsonl`
+    - [x] **Year-sim / HK model path:** expose `Q_sim` hour series (`heat_content_series` on consumption display bundle)
+    - [x] **Weekly chart:** simulated vs measured heat content (kWh) for heat storage and pool — HK Gesamt-Lastverhalten / Stündlicher Verlauf (Ist from Live history when available)
+  - **Note:** Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3).
+  - **Note:** Epic continues under **2.+1** (**Thermals P3**, heat pump Prio3 after **Thermals P2** / **2.7.b**). Heat storage here is thermal, not ESS multi-storage (**2.7.c**) / powerstation (**2.7.g**/**2.7.h**).
 
 - [ ] **2.7.c — Multiple isolated battery / battery+inverter entities** (bidirectional)
   - Isolated battery modes: charging / discharging / standby
   - batt+inverter modes: optimizing / charging / discharging
   - All batteries participate in optimization
-  - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` writes PV kWp sum + max discharge of the single battery (only when `battery_control = full`). With multi-ESS, sum the max discharge power of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / one-way storages from **2.7.d**); update `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md` accordingly
+  - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` writes PV kWp sum + max discharge of the single battery (only when `battery_control = full`). With multi-ESS, sum the max discharge power of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / physical powerstations from **2.7.g**/**2.7.h** that cannot feed the house grid); update `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md` accordingly
   - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
   - Downstream: Loxone template XML gen and HouseSim scenario import should gain multi-battery support after this letter
 
-- [ ] **2.7.d — One-way storage type** (depends on **2.7.c**)
-  - E.g. EcoFlow Delta 3 bridged HA `hassio-ecoflow-cloud` → Loxone, see `docs/referenz/loxone-signals.md`: chargeable on command, **not** dischargeable on command, **cannot** feed the house grid
-  - New component classification `batteries[].direction: "bidirectional" | "one_way"` in `components.json` schema (default `bidirectional`, backward compatible); MILP must never plan a forced/automatic discharge for `one_way` batteries and must not count their SoC as grid-offset capacity
-  - New EHAL Setpoint field `set_ess_source_select` (Write, enum `0` = grid / `1` = battery): routes locally-attached consumers on a one-way storage between grid passthrough (storage may charge in parallel) and battery-only island supply (no grid draw, no charging); irrelevant/omit for bidirectional ESS — needs `ehal.md` §Setpoint-API + `share/ehal/setpoint.schema.json` update (schema_version bump)
-  - New Capability-Flag `supports_ess_source_select` in `share/ehal/capabilities.schema.json`
-  - Feasibility confirmed for EcoFlow Delta 3: HA switch `switch.<device>_grid_bypass` (internal key `ban_bypass_en`) maps 1:1 by boolean identity — switch ON = "grid bypass disabled" = battery-only = EHAL `1`; switch OFF = "grid bypass enabled" (charges from AC, loads pass through) = EHAL `0`. Verified against `hassio-ecoflow-cloud` source (`switch.py::BypassBanScalarSwitch`); note the field name itself is confusingly inverted
-  - Schema note: existing HA-adapter `sign: ehal|negate` convention (`share/config/ehal.ha.snippet.json`) only covers **signed power fields**; a boolean/enum field needs a separate invert convention for devices whose polarity doesn't happen to line up
-  - Bridging path when Earnie stays on `ehal.backend=loxone` (no native HA southbound): Merker `Earnie_Speicher_Quellenwahl`, written by Earnie via `VI_Earnie_Plant.xml`-style poll, mirrored to HA via a Virtual-Output webhook — same pattern as `set_ess_charge_power_limit` in `docs/referenz/loxone-signals.md`
+- [ ] Prepara and execute a small study about saving potentaials
 
-- [ ] **2.7.g — Powerstation reserve for single-use manual devices** (supersedes parts of **2.7.d**; depends on **2.7.c**; shares data model with **2.7.h**)
+- [ ] **2.7.g — Powerstation reserve for single-use manual devices** (`role: single_use`; depends on **2.7.c**; shares data model with **2.7.h**)
   - Idea: give each `earnie_role: manual` consumer (washing machine, dryer, …) a dedicated energy reserve inside the multi-ESS pool ("virtual powerstation"), pre-charged opportunistically in cheap slots and handed off whenever the device is actually switched on — instead of only showing a start-time recommendation (`optimizer/appliance_recommendation.py`, 1–5 star ranking) that the user must act on manually. Only feasible with at least one storage in the system. Worst case (reserve not sufficient) falls back to today's behaviour: grid draw, no regression.
   - Reuses the EV **SOC-Min-Sofort** pattern (`docs/konfiguration/flexible-verbraucher.md`, `optimizer/charging_urgent.py`) generalized from "reach X % SoC by `ready_by`" to "keep N kWh reserved, no deadline, ASAP-refill in cheap slots after each trigger" — new per-consumer reserve target (kWh) plus a state machine (empty → charging → standby/full → discharging on trigger → empty), not a single global `min_soc`.
   - Trigger detection: for consumers with `loxone_inputs.power_name` already configured, a threshold crossing on that existing power signal; for purely manual devices without a meter, the existing **Manuelle Geräte** app button stays the trigger.
   - Energy-per-run learning: use the `loxone_inputs.power_name` history (already read for `power_source: loxone`) to replace the fixed `default_power_kw` × `default_runtime_h` estimate over time; keep the manual value as fallback.
   - Multi-reserve prioritization (several manual devices charging reserves at once) deferred to **2.+1** — simple equal-share rule for v1 is enough, since the worst case stays grid draw either way; a later learned/heuristic priority is a pure refinement, not a blocker.
-  - **Converges with 2.7.d:** a real one-way storage (e.g. EcoFlow Delta 3) *is* a physical instance of this same reserve pattern — chargeable on command, handed off automatically to its one dedicated attached consumer without ever needing an explicit discharge command. That covers 2.7.d's core requirement ("MILP must never plan a forced/automatic discharge for `one_way` batteries") as the normal case of the reserve pattern rather than a separate exclusion rule, and makes `set_ess_source_select` / island-mode optional for **this role** (still a hard requirement for the standby-backup role, see **2.7.h**) instead of a blanket 2.7.d blocker. Bonus: the one-way storage's own power sensor (`sens_ess_power` / "Total Out Power", already bridged for the Delta 3) doubles as a free per-consumer meter, feeding the energy-per-run learning above without a separate Loxone power merker.
-  - **Recommendation:** fold `batteries[].direction: "bidirectional" | "one_way"` from **2.7.d** into a shared reserve/powerstation model with a `role` field (`type: powerstation`, `backing: "virtual" | "physical"`, `attached_consumer_id`, `role: "single_use" | "standby_backup"` — this item implements `role: single_use`, **2.7.h** implements `role: standby_backup`) instead of maintaining three separate concepts (SOC-Min-Sofort-style reserve for virtual/single-use, `direction: one_way` for physical, an as-yet-undefined price-switch constraint for standby-backup).
+  - **Shared data model** (with **2.7.h**): `type: powerstation`, `backing: "virtual" | "physical"`, `attached_consumer_id`, `role: "single_use" | "standby_backup"` — this item implements `role: single_use`. Do **not** introduce a separate `batteries[].direction: one_way` flag; physical one-way storages (e.g. EcoFlow Delta 3) are `backing: physical` instances of this pattern.
+  - **Physical (`backing: physical`) instance:** chargeable on command, handed off automatically to its one dedicated attached consumer without an explicit discharge command (hardware cannot feed the house grid). MILP must never plan a forced/automatic discharge and must not count their SoC as grid-offset capacity — normal case of the reserve pattern, not a separate exclusion rule. `set_ess_source_select` / island-mode is **optional** for this role (hard requirement only for **2.7.h**). Bonus: the storage's own power sensor (`sens_ess_power` / "Total Out Power", already bridged for the Delta 3) doubles as a free per-consumer meter for energy-per-run learning.
   - Spec write-up: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.1 in the `Earnie-Projekt` docs repo.
 
 - [ ] **2.7.h — Powerstation smart standby-backup for continuous loads** (`role: standby_backup`; shares data model with **2.7.g**; depends on **2.7.c**, benefits from **2.7.g** landing first)
@@ -89,10 +80,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Unlike **2.7.g** (a reserve *target* reached ASAP and drawn down on a trigger), this is a rolling MILP **constraint** per slot — closer to the existing whole-house battery price-arbitrage logic than to the SOC-Min-Sofort pattern, and it needs `set_ess_source_select` as a **hard requirement**, not an optional refinement: Earnie must actively flip the attached consumer(s) between grid pass-through and battery-only island every time the price crosses the threshold.
   - Reserve sizing is power × number of expensive hours to bridge in the horizon, not an energy-per-run estimate — no energy-per-run learning needed here (unlike **2.7.g**).
   - **Virtual (main-ESS-backed) instance:** largely redundant with the existing whole-house price optimization — the only real addition is a *protected* minimum reserve carved out for these consumers so general house/export decisions can't draw it down. Needs a go/no-go: for a virtual powerstation, is a per-consumer floor worth it over simply raising the house battery's global `min_soc`?
-  - **Physical (one-way storage) instance:** genuine new value as an independent, dedicated partial UPS — potentially outage resilience (grid/inverter failure) on top of price optimization, depending on hardware. Seamless (no-reboot) transfer switching is a per-device hardware capability to verify — not every powerstation switches sources without a brief interruption.
+  - **Physical (`backing: physical`) instance:** genuine new value as an independent, dedicated partial UPS — potentially outage resilience (grid/inverter failure) on top of price optimization, depending on hardware. Seamless (no-reboot) transfer switching is a per-device hardware capability to verify — not every powerstation switches sources without a brief interruption. Reference hardware: EcoFlow Delta 3 bridged HA `hassio-ecoflow-cloud` → Loxone (`docs/referenz/loxone-signals.md`).
+  - **EHAL `set_ess_source_select`** (Write, enum `0` = grid / `1` = battery): routes locally-attached consumers between grid passthrough (storage may charge in parallel) and battery-only island supply (no grid draw, no charging); irrelevant/omit for bidirectional house ESS — needs `ehal.md` §Setpoint-API + `share/ehal/setpoint.schema.json` update (schema_version bump). Capability-Flag `supports_ess_source_select` in `share/ehal/capabilities.schema.json`.
+  - **EcoFlow Delta 3 mapping:** HA switch `switch.<device>_grid_bypass` (internal key `ban_bypass_en`) maps 1:1 by boolean identity — switch ON = "grid bypass disabled" = battery-only = EHAL `1`; switch OFF = "grid bypass enabled" (charges from AC, loads pass through) = EHAL `0`. Verified against `hassio-ecoflow-cloud` source (`switch.py::BypassBanScalarSwitch`); note the field name itself is confusingly inverted. Existing HA-adapter `sign: ehal|negate` (`share/config/ehal.ha.snippet.json`) only covers **signed power fields** — boolean/enum fields need a separate invert convention when polarity does not line up.
+  - **Bridging path** when Earnie stays on `ehal.backend=loxone` (no native HA southbound): Merker `Earnie_Speicher_Quellenwahl`, written by Earnie via `VI_Earnie_Plant.xml`-style poll, mirrored to HA via a Virtual-Output webhook — same pattern as `set_ess_charge_power_limit` in `docs/referenz/loxone-signals.md`.
   - Spec write-up: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.2 in the `Earnie-Projekt` docs repo.
 
-- [ ] **2.7.e — Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–d**)
+- [ ] **2.7.e — Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–c** / **2.7.g–h**)
   - **Today:** display range depends on device (`ui/s2_viewport.py`: phone = 24 h segments, desktop/tablet = SA₀→SA₂). Charts get only the data of that default range. Panning with the Plotly drag/pan tool beyond it shows an empty chart. Navigation is via buttons / date picker (`ui/history_navigation.py`, `ui/s2_navigation.py`).
   - **Option A — pan-driven lazy loading:** panning replaces the nav buttons. Data for newly visible ranges is fetched step by step and appended to the charts.
   - **Option B — coupling:** keep the buttons, but sync them with the pan position (pan past the edge → switch segment/cycle; button → move the Plotly x-range). Optionally preload neighbouring segments (±1) so short pans never show empty areas.
@@ -100,11 +94,24 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Usability to check:** touch pan vs page scroll on phones, discoverability vs explicit buttons, behaviour at log start / live edge ("Heute"), loading indicator while data is fetched.
   - **Outcome:** short spike on a branch (prototype for one chart, then all), test on desktop + phone, then decide: A, B, preload-only, or keep status quo. Record decision here before any productive implementation.
 
+### Version 2.+1 (maybe also part of 2.7?)
+
+- [ ] Enable multiple EV / Wallboxes *(reuse Pattern B namespacing approach from **2.7.c** multi-ESS)*
+  - Parametrize EVs as now (+ sensors)
+  - Parametrize Wallboxes 
+    - Max power
+    - sensor / control commands
+  - Assignment is done when EV is connected to a wallbox:
+    - both devices report connection
+    - confirm assignment by test charging
+    - Assignment is removed when disconnecting
+    - Cancel assignments and re-bind in case of shutdown
+
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)
 
 - [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
-  - Add a chart that shows comparison between actual and modeled temperature (including ambient temperature and heating activity)
+  - Chart: comparison actual vs modeled — **reuse** the virtual heat-content / weekly Ist-vs-Modell chart from **2.7.b** (pool branch of §3.5); include ambient and heating activity
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
   - Move Loxone markers to data model - remove flat definition in config.json where possible
   - **Note:** Thin marker↔role prep and UI editability are in **2.3.f**; EHAL core / DACH adapters / Loxone-EHAL extraction in **2.4** (`2.4.e`). This chapter owns nesting / structure, not the EHAL interface rewrite.
@@ -121,7 +128,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - Start parameters from `config.json`; adaptation history **separate**; correct live parameters only when needed (rhythm oriented to horizon)
 
 - [ ] **Thermals P3** — Thermal parameter adaptation (on Adaptation P1; after **Thermals P2** / **2.7.b**)
-  - `heat_loss_kw_per_k` and further linear model parameters; horizon per consumer (24 h / 1 year)
+  - Prerequisite: virtual heat-content sensor + Ist/Modell chart (**2.7.b** / Entwicklungsplan §3.5)
+  - Reference: `Q_meas` (or `T_meas`); variables: `heat_loss_kw_per_k` and further linear model parameters (optional effective C); horizon per consumer (24 h / 1 year)
 - [ ] **Adaptation P4** — UI visualization adaptation algos (after Adaptation P3 and Thermals P3)
 - [ ] Better consumption optimization with temperature-control devices
   - [ ] Heat pump (Prio3) — only indirect control via setpoint adjustment via Loxone setpoint (after **Thermals P2** / **2.7.b**); distinct from **Thermals P1a** (direct enable/PWM flex from daily HDD budget)
@@ -136,7 +144,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Checked 2026-09-29: no other note of this idea in `backlog/Backlog-Bugfixes.md`, `backlog/Backlog-Erledigt.md`, `docs/spec/`, `.cursor/plans/`, or the external Entwicklungsdokumente (`Entwicklungs-Plan-Earnie-cons.md`, HA add-on/compat docs) — this stub is the only prior record.
 - [ ] **HouseSim S3** — CI harness: short simulated windows, not N live `main.py` days. Load each archetype → golden map → `HaAdapter` → check criteria of concept doc §3.5 (setpoint effect on next read, degrade on write errors, SoC/PV/temperature in a plausible band) for **all** archetypes; the static 2.6.a fixture stays the fast job. Diagnose-JSON → fixture converter only when support needs it.
 - [ ] **HouseSim wallbox write-back** — Wallbox setpoints act on the simulated physics instead of only the scenario override: `set_evcs_max_current` / mode writes (go-e / Wattpilot `amp` + `frc`, evcc `max_current` + enable) → charge power = current × voltage × phases while an EV is connected (`car_arrives` / `car_leaves`), capped by the EV's acceptance. Mock REST (S1–S3) and S4 integration; tests on `evcc_en`, `fronius_de`, `huawei_en` (`sma_keba` stays the read-only wallbox case). Prerequisite for **HouseSim scenario import**.
-- [ ] **HouseSim scenario import** (idea, after wallbox write-back; prefers **2.7.c**/**2.7.d** multi-/one-way ESS model) — S4 config flow reads a finished Earnie scenario (`house_config` with consumers, PV, batteries) and builds the simulated house from it: one device per configured component with a matching archetype, physics parameters from the scenario instead of manual `house_params`. Consumers beyond battery + PV need their physics in the core first (wallbox: item above; heat pump: open). Concept doc §5 S4 „optional später“.
+- [ ] **HouseSim scenario import** (idea, after wallbox write-back; prefers **2.7.c** multi-ESS + **2.7.g**/**2.7.h** powerstation model) — S4 config flow reads a finished Earnie scenario (`house_config` with consumers, PV, batteries) and builds the simulated house from it: one device per configured component with a matching archetype, physics parameters from the scenario instead of manual `house_params`. Consumers beyond battery + PV need their physics in the core first (wallbox: item above; heat pump: open). Concept doc §5 S4 „optional später“.
 
 
 ### Version 2.+1 - Enhance Loxone Auto Binding functionality
@@ -153,20 +161,6 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 - [ ] Implement a POC for EEG simulation *(benefits from **2.7.a** export-limit model and **2.7.c** multi-ESS)*
 
 
-### Version 2.+1
-
-- [ ] Enable multiple EV / Wallboxes *(reuse Pattern B namespacing approach from **2.7.c** multi-ESS)*
-  - Parametrize EVs as now (+ sensors)
-  - Parametrize Wallboxes 
-    - Max power
-    - sensor / control commands
-  - Assignment is done when EV is connected to a wallbox:
-    - both devices report connection
-    - confirm assignment by test charging
-    - Assignment is removed when disconnecting
-    - Cancel assignments and re-bind in case of shutdown
-
-
 ### Version 2.+1 — Add-on Version 1.0 (Earnie northbound state)
 
 Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX is usable (**2.6.h**). Not the separate item “EHAL adaptation for MQTT” below.
@@ -176,6 +170,7 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
 
 ### Version 2.+1
 
+- [ ] In case of big diff between PV prognosis and actual PV energy Earnie should use a correction factor for optimization at least for the next QH in order to prevent unneeded forced charging or other actions (has to be specified more concrete how)
 - [ ] Check possibility for automatically learn consumer schedules (for known consumers) and nominal power (for all consumers) from sens_power_act to substitute or improve manual settings
 - [ ] **Banner der Wahrheit — Layer C enforcement** *(after soft first approach `2.4.q`; follow-up from `2.4.i` spike)*
   - Cosign/Sigstore in release CI + startup verifier + production signing keys

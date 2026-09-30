@@ -127,3 +127,41 @@ def test_fetch_thermal_readings_loads_plant_ambient_when_house_doc_omitted():
 
     assert readings["ambient_c"] == 9.5
     assert readings["missing_signals"] == []
+
+
+def test_fetch_heat_storage_temps_both_sensors():
+    from integrations.loxone_client import fetch_heat_storage_temps
+
+    consumer = {
+        "id": "wp_heating",
+        "type": "thermal_annual",
+        "ehal_bindings": {
+            "sens_temperature_heat_storage": "TempEq",
+            "sens_temperature_heat_storage_low": "TempLow",
+        },
+    }
+
+    def _fake(io_name: str):
+        return {"TempEq": 43.5, "TempLow": 37.0}.get(str(io_name))
+
+    with patch(
+        "integrations.loxone_client.fetch_loxone_generic_value",
+        side_effect=_fake,
+    ):
+        readings = fetch_heat_storage_temps(consumer)
+
+    assert readings["temp_eq_c"] == 43.5
+    assert readings["temp_low_c"] == 37.0
+
+
+def test_fetch_heat_storage_temps_missing_ok():
+    from integrations.loxone_client import fetch_heat_storage_temps
+
+    consumer = {"id": "wp_heating", "type": "thermal_annual", "ehal_bindings": {}}
+    with patch(
+        "integrations.loxone_client.fetch_loxone_generic_value",
+        return_value=None,
+    ):
+        readings = fetch_heat_storage_temps(consumer)
+    assert readings["temp_eq_c"] is None
+    assert readings["temp_low_c"] is None

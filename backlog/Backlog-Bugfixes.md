@@ -24,6 +24,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
 - [ ] **Stale SoC sanitize chain** (`debug_dump_20260927_083552`) — Fix implemented: trust plant SoC when closed-interval sampler confirms against history (`closed_interval_confirms_reported` + `reported_soc_percent` consecutive count). Live acceptance pending.
+- [ ] **EHAL-Com Mapping-Tabelle EHAL column** — HTTP-Probe scan shows `ehal` (house binding reverse, else greenfield device map); columns ordered `name, ehal, type, source, room, category, uuid`. Live acceptance pending.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
@@ -33,5 +34,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
+- [ ] Add an option on Hauskonfigurator Page to sort Verbraucher descending according to annual consumption
+- [ ] **Remove EHAL `flex.{slug}.set_power_setpoint` permanently** — unused for live control (non-EV flex writes only `set_enable`; variable kW/A is EV-only via `set_evcs_max_current`). Strip Pattern B field + legacy stub `flex.power_setpoint_name` / non-EV migrate from `loxone_outputs.power_setpoint_name`; mapping UI / Live-Schreiben expected fields / `share/ehal/roles/consumer.json` / greenfield recipes / docs (`loxone-signals`, `ehal-com`). Do **not** remove EV `set_evcs_max_current`. Heat-pump Prio3 temperature-setpoint path (2.+1) is unrelated.
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

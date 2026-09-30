@@ -12,6 +12,14 @@ def capacity_kwh_per_k_from_volume(volume_liters: float) -> float:
     return (volume_liters / 1000.0) * 1.163
 
 
+def heat_content_kwh(temp_c: float, capacity_kwh_per_k: float) -> float:
+    """Wärmeinhalt Q in kWh bei Referenz 0 °C: Q = C × T."""
+    capacity = float(capacity_kwh_per_k)
+    if capacity <= 0:
+        raise ValueError("capacity_kwh_per_k muss > 0 sein")
+    return capacity * float(temp_c)
+
+
 def compute_heat_loss_kw(
     temp_c: float,
     ambient_c: float,

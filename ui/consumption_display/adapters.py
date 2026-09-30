@@ -1,12 +1,19 @@
 """Datenadapter für die drei Verbrauchs-UI-Modi."""
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pandas as pd
 
 from data.consumption_profiles import build_modeled_hourly_kw_by_consumer
 from data.cons_data_house_profile import (
     consumer_labels_for_ids,
     expected_cons_data_consumer_ids,
+)
+from data.modeled_temperatures import (
+    build_modeled_temperature_series,
+    heat_content_from_temperature_series,
+    temperature_series_for_timestamps,
 )
 from ui.consumption_display.types import ConsumptionSeriesBundle
 from ui.consumption_validation_charts import csv_series_to_monthly_kwh
@@ -24,11 +31,21 @@ def bundle_from_modeled_profile(
     baseload = by_consumer.pop("baseload")
     timestamps = _hourly_timestamps(resolved_hours)
     labels = _consumer_labels_from_profile(profile)
+    temp_series, temp_labels = build_modeled_temperature_series(
+        profile, hours=resolved_hours
+    )
+    heat_content_series, heat_content_labels = heat_content_from_temperature_series(
+        profile, temp_series
+    )
     return ConsumptionSeriesBundle(
         timestamps=timestamps,
         consumer_series=by_consumer,
         baseload=baseload,
         consumer_labels=labels,
+        temp_series=temp_series,
+        temp_labels=temp_labels,
+        heat_content_series=heat_content_series,
+        heat_content_labels=heat_content_labels,
     )
 
 
@@ -44,12 +61,20 @@ def bundle_from_csv_validation(
     by_consumer = build_modeled_kw_for_timestamps(profile, timestamps)
     baseload = by_consumer.pop("baseload")
     labels = _consumer_labels_from_profile(profile)
+    temp_series, temp_labels = temperature_series_for_timestamps(profile, timestamps)
+    heat_content_series, heat_content_labels = heat_content_from_temperature_series(
+        profile, temp_series
+    )
     return ConsumptionSeriesBundle(
         timestamps=timestamps,
         consumer_series=by_consumer,
         baseload=baseload,
         actual_total=actual_total,
         consumer_labels=labels,
+        temp_series=temp_series,
+        temp_labels=temp_labels,
+        heat_content_series=heat_content_series,
+        heat_content_labels=heat_content_labels,
     )
 
 
@@ -93,16 +118,10 @@ def with_modeled_pv_by_system(
     by_system = climate.pv_kw_by_system_for_slots(slots)
     if not by_system:
         return bundle
-    return ConsumptionSeriesBundle(
-        timestamps=bundle.timestamps,
-        consumer_series=bundle.consumer_series,
-        baseload=bundle.baseload,
-        pv=bundle.pv,
-        actual_total=bundle.actual_total,
-        consumer_labels=dict(bundle.consumer_labels),
+    return replace(
+        bundle,
         pv_by_system=by_system,
         pv_system_labels=climate.pv_system_labels(),
-        pv_imported=bundle.pv_imported,
     )
 
 
@@ -255,18 +274,12 @@ def with_modeled_pv_from_all_scenarios(
         by_config[key] = _sum_hourly_series([by_system[pv_id] for pv_id in sorted(available)])
         config_labels[key] = joined_pv_config_label(available, labels)
 
-    return ConsumptionSeriesBundle(
-        timestamps=bundle.timestamps,
-        consumer_series=bundle.consumer_series,
-        baseload=bundle.baseload,
-        pv=bundle.pv,
-        actual_total=bundle.actual_total,
-        consumer_labels=dict(bundle.consumer_labels),
+    return replace(
+        bundle,
         pv_by_system=by_system,
         pv_system_labels=labels,
         pv_by_config=by_config,
         pv_config_labels=config_labels,
-        pv_imported=bundle.pv_imported,
     )
 
 
@@ -313,19 +326,7 @@ def with_imported_pv_overlay(
         float(csv_kw_at_datetime(path, datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")))
         for ts in bundle.timestamps
     ]
-    return ConsumptionSeriesBundle(
-        timestamps=bundle.timestamps,
-        consumer_series=bundle.consumer_series,
-        baseload=bundle.baseload,
-        pv=bundle.pv,
-        actual_total=bundle.actual_total,
-        consumer_labels=dict(bundle.consumer_labels),
-        pv_by_system=dict(bundle.pv_by_system),
-        pv_system_labels=dict(bundle.pv_system_labels),
-        pv_by_config=dict(bundle.pv_by_config),
-        pv_config_labels=dict(bundle.pv_config_labels),
-        pv_imported=values,
-    )
+    return replace(bundle, pv_imported=values)
 
 
 def actual_monthly_from_csv(series: list[tuple[str, float]]) -> dict[str, float]:
@@ -357,9 +358,11 @@ def _consumer_labels_from_profile(profile: dict) -> dict[str, str]:
 
 
 def _hourly_timestamps(hours: int) -> list[str]:
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
-    start = datetime(2023, 1, 1, 0, 0, 0)
+    from data.consumption_profiles import MODELED_PROFILE_REF_START
+
+    start = MODELED_PROFILE_REF_START
     return [
         (start + timedelta(hours=index)).strftime("%Y-%m-%d %H:%M:%S")
         for index in range(hours)

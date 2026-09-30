@@ -45,17 +45,109 @@ def _sample_profile() -> dict:
     }
 
 
-def test_build_modeled_hourly_kw_by_consumer_sums_to_profile():
-    profile = _sample_profile()
-    hours = 48
-    by_consumer = build_modeled_hourly_kw_by_consumer(profile, hours=hours)
-    total = build_modeled_hourly_kw_profile(profile, hours=hours)
-    assert "baseload" in by_consumer
-    assert "pool" in by_consumer
-    summed = [0.0] * hours
-    for series in by_consumer.values():
-        summed = [a + b for a, b in zip(summed, series)]
-    assert summed == pytest.approx(total)
+def test_modeled_thermal_annual_prefers_open_meteo_collector(monkeypatch):
+    """Hausprofil monthly model must use archive + collector, not fixture-only."""
+    from data import consumption_profiles as cp
+
+    calls: dict[str, object] = {}
+
+    class _FakeBundle:
+        temperature_c = None
+        def collector_surface_series(self, _surface):
+            calls["collector"] = True
+            return "wm2"
+
+    def fake_daily(**kwargs):
+        calls["hourly_wm2"] = kwargs.get("hourly_collector_wm2")
+        calls["hourly_temp"] = kwargs.get("hourly_temperature_c")
+        return [1.0] * 365
+
+    monkeypatch.setattr(cp, "daily_electric_kwh", fake_daily)
+    monkeypatch.setattr(
+        cp,
+        "_thermal_annual_daily_from_archive",
+        lambda consumer: fake_daily(
+            hourly_temperature_c="temps",
+            hourly_collector_wm2="wm2",
+        ),
+    )
+    consumer = {
+        "id": "wp",
+        "type": "thermal_annual",
+        "nominal_power_kw": 2.0,
+        "thermal": {
+            "living_area_m2": 100.0,
+            "building_class": 3,
+            "heat_pump_type": "erde",
+            "persons": 2,
+            "latitude": 47.4,
+            "longitude": 9.7,
+            "solar_thermal_area_m2": 6.0,
+        },
+    }
+    profile = cp._modeled_thermal_annual_hourly_kw(consumer, hours=48)
+    assert len(profile) == 48
+    assert calls.get("hourly_wm2") == "wm2"
+    assert sum(profile) > 0
+
+
+def test_modeled_thermal_annual_archive_requests_collector(monkeypatch):
+    from data import consumption_profiles as cp
+    import config as cfg
+
+    monkeypatch.setattr(cfg, "CONFIG", object(), raising=False)
+    monkeypatch.setattr(cfg, "get_planning_timezone", lambda: "Europe/Vienna")
+
+    recorded: dict[str, object] = {}
+
+    class _FakeBundle:
+        temperature_c = "temps"
+
+        def collector_surface_series(self, surface):
+            recorded["surface"] = surface
+            return "wm2-series"
+
+    def fake_bundle(year, *, lat, lon, timezone, surfaces):
+        recorded["surfaces"] = surfaces
+        recorded["lat"] = lat
+        return _FakeBundle()
+
+    def fake_daily(**kwargs):
+        recorded["kwargs"] = kwargs
+        return [0.5] * 10
+
+    monkeypatch.setattr(
+        "data.open_meteo_solar_archive.build_open_meteo_climate_bundle_for_year",
+        fake_bundle,
+    )
+    monkeypatch.setattr(
+        "data.open_meteo_solar_archive.last_full_archive_year",
+        lambda: 2025,
+    )
+    monkeypatch.setattr(cp, "daily_electric_kwh", fake_daily)
+
+    consumer = {
+        "nominal_power_kw": 1.6,
+        "thermal": {
+            "living_area_m2": 157.0,
+            "building_class": 3,
+            "heat_pump_type": "erde",
+            "persons": 2,
+            "latitude": 47.4,
+            "longitude": 9.74,
+            "timezone_name": "Europe/Vienna",
+            "solar_thermal_area_m2": 6.0,
+            "solar_thermal_tilt_deg": 18.0,
+            "solar_thermal_azimuth_deg": 26.0,
+            "hwb_kwh_m2": 40.0,
+        },
+    }
+    daily = cp._thermal_annual_daily_from_archive(consumer)
+    assert daily == [0.5] * 10
+    assert recorded["surfaces"]
+    assert recorded["kwargs"]["hourly_collector_wm2"] == "wm2-series"
+    assert recorded["kwargs"]["hourly_temperature_c"] == "temps"
+
 
 
 def test_build_modeled_hourly_kw_by_consumer_baseload_constant():
@@ -96,10 +188,13 @@ def test_iso_weeks_in_timestamps_nav_bounds():
 
 
 def test_slice_bundle_for_month():
+    from data.consumption_profiles import MODELED_PROFILE_REF_START
+
+    month_key = f"{MODELED_PROFILE_REF_START.year}-01"
     bundle = bundle_from_modeled_profile(_sample_profile(), hours=72)
-    sliced = slice_bundle_for_month(bundle, "2023-01")
+    sliced = slice_bundle_for_month(bundle, month_key)
     assert sliced.hour_count() == 72
-    assert all(ts.startswith("2023-01") for ts in sliced.timestamps)
+    assert all(ts.startswith(month_key) for ts in sliced.timestamps)
 
 
 def test_slice_bundle_for_iso_week_full_week():
@@ -447,3 +542,352 @@ def test_annual_metrics_use_trailing_8760_hours_not_full_horizon():
     )
     assert annual_kwh_actual(bundle) == pytest.approx(8760.0)
     assert annual_kwh_from_bundle(bundle) == pytest.approx(8760.0)
+
+
+def test_timeseries_chart_adds_temp_yaxis2():
+    from data.modeled_temperatures import TEMP_AMBIENT, TEMP_HOUSE_SETPOINT
+    from ui.consumption_display.charts import timeseries_chart
+    from ui.consumption_display.types import ConsumptionSeriesBundle
+
+    start = datetime(2023, 1, 2)
+    timestamps = [
+        (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(24)
+    ]
+    bundle = ConsumptionSeriesBundle(
+        timestamps=timestamps,
+        consumer_series={"pool": [1.0] * 24},
+        baseload=[0.5] * 24,
+        consumer_labels={"pool": "Pool"},
+        temp_series={
+            TEMP_AMBIENT: [5.0] * 24,
+            TEMP_HOUSE_SETPOINT: [21.5] * 24,
+        },
+        temp_labels={
+            TEMP_AMBIENT: "Außentemperatur",
+            TEMP_HOUSE_SETPOINT: "Haus-Solltemperatur",
+        },
+    )
+    fig = timeseries_chart(bundle, title="Stündlicher Verlauf — test")
+    assert "yaxis2" in fig.layout
+    assert fig.layout.yaxis2.title.text == "°C"
+    names = {trace.name for trace in fig.data}
+    assert "Außentemperatur" in names
+    assert "Haus-Solltemperatur" in names
+    temp_traces = [t for t in fig.data if t.name in names and getattr(t, "yaxis", None) == "y2"]
+    assert len(temp_traces) == 2
+
+
+def test_timeseries_chart_without_temps_has_no_yaxis2():
+    from ui.consumption_display.charts import timeseries_chart
+    from ui.consumption_display.types import ConsumptionSeriesBundle
+
+    start = datetime(2023, 1, 2)
+    timestamps = [
+        (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(24)
+    ]
+    bundle = ConsumptionSeriesBundle(
+        timestamps=timestamps,
+        consumer_series={"pool": [1.0] * 24},
+        baseload=[0.5] * 24,
+    )
+    fig = timeseries_chart(bundle, title="kW only")
+    assert "yaxis2" not in fig.layout
+
+
+def test_modeled_temperature_series_house_setpoint_without_climate():
+    from data.modeled_temperatures import (
+        TEMP_HOUSE_SETPOINT,
+        build_modeled_temperature_series,
+    )
+
+    profile = {
+        "consumers": [
+            {
+                "id": "wp",
+                "type": "thermal_annual",
+                "thermal": {"target_temp_c": 20.0, "living_area_m2": 100.0},
+            }
+        ]
+    }
+    series, labels = build_modeled_temperature_series(profile, hours=48)
+    assert series[TEMP_HOUSE_SETPOINT] == [20.0] * 48
+    assert labels[TEMP_HOUSE_SETPOINT] == "Haus-Solltemperatur"
+
+
+def test_modeled_temperature_series_passes_collector_irradiance(monkeypatch):
+    """HK temp chart must feed collector wm2 into house_year_result (solar → store)."""
+    import pandas as pd
+
+    import config as cfg
+    from data.modeled_temperatures import build_modeled_temperature_series
+    from data.open_meteo_solar_archive import TiltedSurface
+
+    recorded: dict[str, object] = {}
+    ambient = pd.Series(
+        [10.0] * 24,
+        index=pd.date_range("2024-01-01", periods=24, freq="h"),
+    )
+    wm2 = pd.Series(
+        [0.0] * 24,
+        index=pd.date_range("2024-01-01", periods=24, freq="h"),
+    )
+
+    class _FakeBundle:
+        temperature_c = ambient
+
+        def collector_surface_series(self, surface):
+            recorded["collector_surface"] = surface
+            return wm2
+
+    def fake_bundle(year, *, lat, lon, timezone, surfaces):
+        recorded["surfaces"] = surfaces
+        return _FakeBundle()
+
+    def fake_house_year(**kwargs):
+        recorded["house_kwargs"] = kwargs
+        from optimizer.thermal_house import HouseYearResult
+
+        return HouseYearResult(
+            daily_electric_kwh=[1.0],
+            hourly_house_temp_c=[21.0] * 24,
+            hourly_store_temp_c=[50.0] * 24,
+        )
+
+    monkeypatch.setattr(cfg, "CONFIG", {"planning": {}})
+    monkeypatch.setattr(cfg, "get_planning_timezone", lambda: "Europe/Vienna")
+    monkeypatch.setattr(
+        "data.open_meteo_solar_archive.build_open_meteo_climate_bundle_for_year",
+        fake_bundle,
+    )
+    monkeypatch.setattr(
+        "data.open_meteo_solar_archive.last_full_archive_year",
+        lambda: 2024,
+    )
+    monkeypatch.setattr(
+        "optimizer.thermal_house.house_year_result",
+        fake_house_year,
+    )
+
+    profile = {
+        "consumers": [
+            {
+                "id": "wp",
+                "type": "thermal_annual",
+                "nominal_power_kw": 3.0,
+                "thermal": {
+                    "living_area_m2": 100.0,
+                    "building_class": 3,
+                    "heat_pump_type": "luft",
+                    "persons": 2,
+                    "latitude": 48.2,
+                    "longitude": 11.0,
+                    "target_temp_c": 21.5,
+                    "heating_limit_c": 15.0,
+                    "solar_thermal_area_m2": 6.0,
+                    "solar_thermal_tilt_deg": 18.0,
+                    "solar_thermal_azimuth_deg": 26.0,
+                    "heat_storage": {
+                        "volume_liters": 500.0,
+                        "heat_loss_kw_per_k": 0.02,
+                        "setpoint_c": 45.0,
+                        "tolerance_c": 5.0,
+                    },
+                },
+            }
+        ]
+    }
+    series, _labels = build_modeled_temperature_series(profile, hours=24)
+    assert recorded["surfaces"]
+    assert isinstance(recorded["surfaces"][0], TiltedSurface)
+    assert recorded["house_kwargs"]["hourly_collector_wm2"] is wm2
+    assert "heat_storage_c" in series
+    assert series["heat_storage_c"] == [50.0] * 24
+
+
+def test_slice_bundle_preserves_temp_series():
+    from data.modeled_temperatures import TEMP_AMBIENT
+    from ui.consumption_display.types import ConsumptionSeriesBundle
+
+    start = datetime(2023, 1, 2)
+    timestamps = [
+        (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(48)
+    ]
+    bundle = ConsumptionSeriesBundle(
+        timestamps=timestamps,
+        consumer_series={},
+        baseload=[0.0] * 48,
+        temp_series={TEMP_AMBIENT: list(range(48))},
+        temp_labels={TEMP_AMBIENT: "Außentemperatur"},
+    )
+    week = timestamps[0]
+    iso = datetime.strptime(week, "%Y-%m-%d %H:%M:%S").isocalendar()
+    sliced = slice_bundle_for_iso_week(
+        bundle, iso_year=iso.year, iso_week=iso.week
+    )
+    assert TEMP_AMBIENT in sliced.temp_series
+    assert len(sliced.temp_series[TEMP_AMBIENT]) == len(sliced.timestamps)
+    assert sliced.temp_labels[TEMP_AMBIENT] == "Außentemperatur"
+
+
+def test_heat_content_from_temperature_series_store_and_pool():
+    from data.modeled_temperatures import (
+        HC_HEAT_STORAGE,
+        TEMP_HEAT_STORAGE,
+        heat_content_from_temperature_series,
+    )
+    from optimizer.thermal_model import capacity_kwh_per_k_from_volume, heat_content_kwh
+
+    profile = {
+        "consumers": [
+            {
+                "id": "wp_heating",
+                "type": "thermal_annual",
+                "thermal": {
+                    "heat_storage": {
+                        "volume_liters": 887.0,
+                        "heat_loss_kw_per_k": 0.006,
+                        "setpoint_c": 45.0,
+                        "tolerance_c": 5.0,
+                    }
+                },
+            },
+            {
+                "id": "pool",
+                "type": "thermal_rc",
+                "label": "Pool",
+                "thermal_rc": {"water_volume_liters": 5000.0},
+            },
+        ]
+    }
+    temps = {
+        TEMP_HEAT_STORAGE: [50.0, 51.0],
+        "pool_pool": [28.0, 29.0],
+    }
+    series, labels = heat_content_from_temperature_series(profile, temps)
+    store_c = capacity_kwh_per_k_from_volume(887.0)
+    assert series[HC_HEAT_STORAGE][0] == pytest.approx(
+        heat_content_kwh(50.0, store_c)
+    )
+    assert "pool_q_pool" in series
+    assert "Wärmespeicher" in labels[HC_HEAT_STORAGE]
+
+
+def test_slice_bundle_preserves_heat_content_series():
+    from data.modeled_temperatures import HC_HEAT_STORAGE
+    from ui.consumption_display.types import ConsumptionSeriesBundle
+
+    start = datetime(2023, 1, 2)
+    timestamps = [
+        (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(48)
+    ]
+    bundle = ConsumptionSeriesBundle(
+        timestamps=timestamps,
+        consumer_series={},
+        baseload=[0.0] * 48,
+        heat_content_series={HC_HEAT_STORAGE: [float(i) for i in range(48)]},
+        heat_content_labels={HC_HEAT_STORAGE: "Wärmespeicher Wärmeinhalt (Modell)"},
+    )
+    week = timestamps[0]
+    iso = datetime.strptime(week, "%Y-%m-%d %H:%M:%S").isocalendar()
+    sliced = slice_bundle_for_iso_week(
+        bundle, iso_year=iso.year, iso_week=iso.week
+    )
+    assert HC_HEAT_STORAGE in sliced.heat_content_series
+    assert len(sliced.heat_content_series[HC_HEAT_STORAGE]) == len(sliced.timestamps)
+
+
+def test_heat_content_week_chart_sim_and_meas():
+    from data.modeled_temperatures import HC_HEAT_STORAGE
+    from ui.consumption_display.charts import heat_content_week_chart
+    from ui.consumption_display.types import ConsumptionSeriesBundle
+
+    start = datetime(2023, 1, 2)
+    timestamps = [
+        (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(48)
+    ]
+    bundle = ConsumptionSeriesBundle(
+        timestamps=timestamps,
+        consumer_series={},
+        baseload=[0.0] * 48,
+        heat_content_series={HC_HEAT_STORAGE: [40.0 + i * 0.1 for i in range(48)]},
+        heat_content_labels={HC_HEAT_STORAGE: "Wärmespeicher Wärmeinhalt (Modell)"},
+    )
+    iso = start.isocalendar()
+    measured = {
+        HC_HEAT_STORAGE: [41.0 if i % 3 == 0 else None for i in range(48)]
+    }
+    # Align measured to sliced week length inside chart via full bundle
+    from ui.consumption_display.aggregation import slice_bundle_for_iso_week
+
+    sliced = slice_bundle_for_iso_week(bundle, iso_year=iso.year, iso_week=iso.week)
+    measured_week = {
+        HC_HEAT_STORAGE: measured[HC_HEAT_STORAGE][: len(sliced.timestamps)]
+    }
+    fig = heat_content_week_chart(
+        bundle,
+        iso_year=iso.year,
+        iso_week=iso.week,
+        measured_by_key=measured_week,
+    )
+    assert fig is not None
+    assert len(fig.data) == 2
+    assert fig.layout.meta["has_measured"] is True
+
+
+def test_measured_heat_content_aligns_hours(tmp_path, monkeypatch):
+    import json
+
+    from data.modeled_temperatures import HC_HEAT_STORAGE
+    from runtime_store import optimization_history
+    from ui.consumption_display.heat_content_history import (
+        measured_heat_content_for_timestamps,
+    )
+
+    hist = tmp_path / "optimization_history.jsonl"
+    entry = {
+        "completed_at": "2023-01-02T03:15:00",
+        "thermal_observability": [
+            {
+                "consumer_id": "wp_heating",
+                "kind": "heat_storage",
+                "heat_content_kwh": {"q_meas": 55.5, "q_sim": 54.0},
+            }
+        ],
+    }
+    hist.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+    monkeypatch.setattr(optimization_history, "HISTORY_FILE", str(hist))
+    monkeypatch.setattr(optimization_history, "RUNTIME_DIR", str(tmp_path))
+    optimization_history._JSONL_HISTORY_CACHE = None
+    optimization_history._JSONL_HISTORY_CACHE_PATH = None
+
+    timestamps = [
+        "2023-01-02 02:00:00",
+        "2023-01-02 03:00:00",
+        "2023-01-02 04:00:00",
+    ]
+    series = measured_heat_content_for_timestamps(
+        timestamps, series_keys=[HC_HEAT_STORAGE]
+    )
+    assert series[HC_HEAT_STORAGE][0] is None
+    assert series[HC_HEAT_STORAGE][1] == pytest.approx(55.5)
+    assert series[HC_HEAT_STORAGE][2] is None
+
+
+def test_thermal_rc_returns_hourly_temps():
+    from house_config.thermal_rc_profile import thermal_rc_hourly_kw_and_temp_from_ambient
+
+    consumer = {
+        "nominal_power_kw": 2.0,
+        "thermal_rc": {
+            "setpoint_c": 30.0,
+            "tolerance_c": 1.0,
+            "water_volume_liters": 5000.0,
+            "heat_loss_kw_per_k": 0.05,
+            "heating_efficiency": 1.0,
+        },
+    }
+    ambient = [0.0] * 24
+    kw, temps = thermal_rc_hourly_kw_and_temp_from_ambient(consumer, ambient)
+    assert len(kw) == 24
+    assert len(temps) == 24
+    assert all(t >= 28.0 for t in temps)

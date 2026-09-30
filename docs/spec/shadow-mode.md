@@ -148,10 +148,11 @@ When `is_shadow_mode()`:
 
 ### 6.4 Config read-only
 
-- All config writers raise `ConfigReadOnlyError` when the target is under `config_dir()`: `settings.json_io.write_json_dict`, `.env` writes (`runtime_store.dotenv_io`), uploads, config pack import, bootstrap of config files.
+- All config writers raise `ConfigReadOnlyError` when the target is under `config_dir()`: `settings.json_io.write_json_dict`, `house_config.profiles_store.save_house_profiles_document`, `.env` writes (`runtime_store.dotenv_io`), uploads, config pack import, bootstrap of config files.
 - Load-time migrations that write back are **skipped** in Shadow (e.g. `apply_ha_secrets_migration_to_disk` in `runtime_store/config_load.py`); Shadow uses the migrated values in memory only.
-- UI: banner "Konfiguration schreibgeschützt (Shadow)"; save buttons disabled.
-- Consequence: config changes for a dev feature are made in Prod's UI / file. The Prod build **ignores** keys it does not know. Keys the Prod build would **reject** cannot be tested via Shadow in v1 (no Shadow-only overlay).
+- UI: banner "Konfiguration schreibgeschützt (Shadow)"; general save buttons disabled.
+- **Exception — EHAL bindings overlay:** EHAL-Com mapping save (Loxone / HA) may persist entity `ehal_bindings` to `{runtime}/shadow_ehal_bindings.json`. `load_house_profiles_document` merges that overlay onto the read-only Prod `house_profiles.json` while `EARNIE_SHADOW=1`. Prod files are never written. Delete the overlay file (or the Shadow runtime dir) to discard Shadow-only mappings.
+- Other config changes for a dev feature are still made in Prod's UI / file. The Prod build **ignores** keys it does not know. Keys the Prod build would **reject** still cannot be tested via a full Shadow-only config overlay (bindings-only exception above).
 
 ### 6.5 Own runtime dir
 
@@ -211,7 +212,7 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 - Recorder: records per primitive (ok + error), no secrets in records, atomic `latest.json`, JSONL rotation + retention, recorder exception does not break `main()`.
 - Replay: each primitive returns identical types / exceptions as live; missing / stale key → unreachable behaviour; `ShadowBackendAccessError` on any unreplayed backend call (monkeypatch `requests.get/post` to fail).
 - Write block: every write primitive blocked in Shadow, `shadow_writes.jsonl` written; startup safe setpoints, listener, watchdog not started.
-- Config read-only: every writer raises under `config_dir()`; `apply_ha_secrets_migration_to_disk` skipped.
+- Config read-only: every writer raises under `config_dir()` (including `save_house_profiles_document`); `apply_ha_secrets_migration_to_disk` skipped; EHAL bindings overlay under runtime merges on load.
 - Startup checks §4.2 (each refusal path).
 - Release guard §4.4.
 - End-to-end: HouseSim (`house_sim/`) as Prod backend with recorder → Shadow run on the feed → same optimizer inputs, zero backend requests from Shadow.
@@ -230,7 +231,7 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 **Decided (2026-09-27):**
 
 1. **HA superset (default):** only config-referenced entities (§5.3); no full `/api/states` dump by default.
-2. **Config keys unknown to Prod:** no Shadow overlay in v1. Prod ignores unknown keys; Prod-rejected keys cannot be tested via Shadow.
+2. **Config keys unknown to Prod:** no general Shadow config overlay. **Exception:** EHAL entity bindings may be saved to `{runtime}/shadow_ehal_bindings.json` and merged on house-profile load (§6.4). Prod ignores unknown keys; Prod-rejected keys still cannot be tested via a full Shadow-only config.
 3. **Backlog packaging:** S1 recorder = **2.6.o** (before finishing **2.6.r** Sonar); S2+S3 Shadow client = **2.7.f** (first on `feature/2.7`, before **2.7.a–e**). S4 → **2.+1**.
 
 **Still open:**

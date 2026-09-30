@@ -94,6 +94,8 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "get_temperature_water_setpoint": "Pool Soll-Temperatur (°C)",
     "get_temperature_tolerance_c": "Temperatur-Toleranz (°C)",
     "sens_heating_active": "Heizung aktiv",
+    "sens_temperature_heat_storage": "Wärmespeicher T_eq (°C)",
+    "sens_temperature_heat_storage_low": "Wärmespeicher T_low (°C)",
 }
 
 # Field → device role_id for HITL grouping (M1 plant roles only).

@@ -80,6 +80,26 @@ Bei `daily_target_source: thermal` steuert das RC-Modell das Tagesenergieziel au
 
 Details: [Loxone-Signale](../referenz/loxone-signals.md), [SwimSpa Filter](../spec/swimspa-filter.md).
 
+## Haus Wärme: optionaler Wärmespeicher (`heat_storage`)
+
+Bei `type: thermal_annual` kann unter `thermal.heat_storage` ein **Pufferspeicher** modelliert werden (Thermals P2). Solarthermie und Wärmepumpe speisen den Speicher; Raumheizung und Warmwasser entnehmen Wärme nur aus dem Speicher. Ohne Speicher bzw. bei `volume_liters = 0` bleibt das bisherige Modell (Solar als Tages-Gutschrift auf den WP-Bedarf).
+
+**Temperaturband (Jahressimulation):** Die Speichertemperatur darf zwischen `setpoint_c − tolerance_c` und **95 °C** liegen. Die Wärmepumpe heizt hart nach, wenn die Temperatur unter die Untergrenze fallen würde, und speist höchstens bis zum Sollwert (`setpoint_c`); darüber bleibt sie aus. Überschusswärme oberhalb des Sollwerts kommt nur von der Solarthermie (Eingang wird erst oberhalb von 95 °C begrenzt).
+
+
+| Feld | Bedeutung |
+| ---- | --------- |
+| `thermal.heat_storage.volume_liters` | Speichervolumen; `≤ 0` oder fehlend = Legacy-Pfad |
+| `thermal.heat_storage.heat_loss_kw_per_k` | Speicherverlust gegen Umgebung |
+| `thermal.heat_storage.setpoint_c` / `tolerance_c` | Sollwert und Untergrenze (`setpoint − tolerance`); Obergrenze WP = Sollwert, absolut/Solar = 95 °C |
+
+
+**Schichtspeicher → Temperaturen für Earnie:** Hat der Speicher mehrere Fühler, muss Loxone (oder HA) eine **äquivalente Temperatur** `T_eq` bilden (volumen-gewichtetes Mittel) und zusätzlich den **untersten Fühler** `T_low` liefern. Bindings auf dem `thermal_annual`-Consumer: `sens_temperature_heat_storage` (`T_eq`), `sens_temperature_heat_storage_low` (`T_low`). Anleitung: [Wärmespeicher Schichtung / T_eq](waermespeicher-schichtung-teq.md).
+
+**Live-Band:** Mit aktivem `heat_storage` erzwingt der Live-Optimierer WP-Freigabe, wenn die Open-Loop-Prognose von `T_eq` unter `setpoint − tolerance` fiele (wie in der Jahressimulation), und zusätzlich kurzfristig wenn `T_low` unter derselben Grenze liegt. Darüber hinaus kann Live opportunistisch Energie bis zum Sollwert einplanen; die Jahressimulation bleibt reines Bang-Bang am Boden.
+
+Entwickler-Spec: [thermals-p2.md](../spec/thermals-p2.md).
+
 ## E-Auto: `charging_schedule`
 
 Wenn gesetzt und `enabled: true`:

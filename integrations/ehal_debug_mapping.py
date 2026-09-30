@@ -62,6 +62,11 @@ THERMAL_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_heating_active",
 )
 
+THERMAL_ANNUAL_LIVE_READ_FIELDS: tuple[str, ...] = (
+    "sens_temperature_heat_storage",
+    "sens_temperature_heat_storage_low",
+)
+
 NETWORK_LIVE_READ_FIELDS: tuple[str, ...] = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
 NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS
 
@@ -124,6 +129,18 @@ def _consumer_is_thermal(consumer: dict) -> bool:
     )
 
 
+def _consumer_is_thermal_annual(consumer: dict) -> bool:
+    if str(consumer.get("type") or "") == "thermal_annual":
+        return True
+    bindings = consumer.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return False
+    return any(
+        str(bindings.get(field) or "").strip()
+        for field in THERMAL_ANNUAL_LIVE_READ_FIELDS
+    )
+
+
 def _all_live_consumers() -> list[dict]:
     """House-profile + flex consumers (including unmapped)."""
     import config
@@ -169,6 +186,10 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
             fields.append(f"{cid}:{flex_sens_power_act(cid)}")
             if _consumer_is_thermal(consumer):
                 fields.extend(f"{cid}:{name}" for name in THERMAL_LIVE_READ_FIELDS)
+            if _consumer_is_thermal_annual(consumer):
+                fields.extend(
+                    f"{cid}:{name}" for name in THERMAL_ANNUAL_LIVE_READ_FIELDS
+                )
     return fields
 
 

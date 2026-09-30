@@ -33,6 +33,16 @@ def _base_thermal() -> dict:
     }
 
 
+def _heat_storage() -> dict:
+    """Solar only offsets WP when heat_storage volume > 0 (Thermals P2 topology)."""
+    return {
+        "volume_liters": 800.0,
+        "heat_loss_kw_per_k": 0.02,
+        "setpoint_c": 45.0,
+        "tolerance_c": 5.0,
+    }
+
+
 def test_weekly_electric_kwh_without_solar_regression():
     params = heating_params_from_thermal(_base_thermal())
     weekly = weekly_electric_kwh(**params)
@@ -41,7 +51,7 @@ def test_weekly_electric_kwh_without_solar_regression():
 
 
 def test_solar_thermal_reduces_annual_wp_demand():
-    base = _base_thermal()
+    base = {**_base_thermal(), "heat_storage": _heat_storage()}
     without = estimate_annual_kwh(**heating_params_from_thermal(base))
     with_solar = estimate_annual_kwh(
         **heating_params_from_thermal(
@@ -63,6 +73,7 @@ def test_daily_electric_kwh_hourly_collector_reduces_summer_day():
     params = heating_params_from_thermal(
         {
             **_base_thermal(),
+            "heat_storage": _heat_storage(),
             "solar_thermal_area_m2": 8.0,
             "solar_thermal_tilt_deg": 18.0,
             "solar_thermal_azimuth_deg": 0.0,
@@ -86,29 +97,18 @@ def test_consumer_annual_kwh_reflects_solar_thermal(monkeypatch):
     from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
     install_open_meteo_climate_mock(monkeypatch)
-    without = consumer_annual_kwh(
-        {
-            "type": "thermal_annual",
-            "latitude": 48.2,
-            "longitude": 11.0,
-            "living_area_m2": 120.0,
-            "building_class": 3,
-            "heat_pump_type": "luft",
-            "persons": 2,
-        }
-    )
-    with_solar = consumer_annual_kwh(
-        {
-            "type": "thermal_annual",
-            "latitude": 48.2,
-            "longitude": 11.0,
-            "living_area_m2": 120.0,
-            "building_class": 3,
-            "heat_pump_type": "luft",
-            "persons": 2,
-            "solar_thermal_area_m2": 6.0,
-        }
-    )
+    base = {
+        "type": "thermal_annual",
+        "latitude": 48.2,
+        "longitude": 11.0,
+        "living_area_m2": 120.0,
+        "building_class": 3,
+        "heat_pump_type": "luft",
+        "persons": 2,
+        "heat_storage": _heat_storage(),
+    }
+    without = consumer_annual_kwh(base)
+    with_solar = consumer_annual_kwh({**base, "solar_thermal_area_m2": 6.0})
     assert with_solar < without
 
 
