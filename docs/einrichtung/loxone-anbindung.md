@@ -72,7 +72,7 @@ Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-
 python -m scripts.verify_loxone_setup
 ```
 
-Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit IO-Name und Detailtext. Typische Fehler: falscher Merkername, Benutzer ohne Rechte, Wert außerhalb des erwarteten Bereichs (z. B. Freigabe ≠ 0/1).
+Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit IO-Name und Detailtext. Typische Fehler: falscher Merkername, Benutzer ohne Rechte, Lesen oder Parsen fehlgeschlagen.
 
 Die Verbindung kann auch bequem über die Web-Oberfläche auf der Seite **Smarthome-Backend** (Anbindung) geprüft werden.
 

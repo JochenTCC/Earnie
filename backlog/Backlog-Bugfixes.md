@@ -23,15 +23,15 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **Negative export tariff + battery discharge -- Still open:** PV curtailment var so hard cap stays feasible when SoC full. Soft pay-to-export live dogfood closed with **2.7.a** (2026-09-30). Open question: Monitor plan vs live discharge after `k_push` already negative.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] **Negative export tariff + battery discharge** (`debug_dump_20260927_090524`) — Forced grid discharge while `k_push < 0` does **not** make sense. Dump: live 08:23–09:01 `Zwangsentladen` at **positive** `k_push` (~10–14 ct, room-making OK); plan ~13:45–14:15 `Zwangsentladen` + ~5 kW export at **≈ −0.8 ct** (bug). Replay: hard `export_cap=0` → MILP **Infeasible** (no PV curtailment); without caps Optimal still `dch`+`sell` on negative slots. **Partial fix (2026-09-27):** Monitor/plan chart no longer invents grid export when `k_push_act < 0` (`clip_grid_kw_to_export_cap` in `sim_chart_rows` / finalize) — post-fix `exporting_neg: 0`. **Still open:** PV curtailment var so hard cap stays feasible when SoC full. Soft pay-to-export live dogfood closed with **2.7.a** (2026-09-30). Open question: Monitor plan vs live discharge after `k_push` already negative.
+- [ ] "debug-dumps\debug_dump_20260930_182138"
 - [ ] check if for tariff forecast the individual tariff extra cost + volumetric Netzentgelt are also added (like the known tariff) or if forecast has to be updated (because it seems to be quite lower as actual tariff all the time)
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
-- [ ] Add an option on Hauskonfigurator Page to sort Verbraucher descending according to annual consumption
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

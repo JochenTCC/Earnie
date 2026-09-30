@@ -188,7 +188,8 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 - [ ] `version.py` on `origin/main` equals the intended tag without `v`
 - [ ] Channel correct: `-` in version → pre-release (**B**); clean `X.Y.Z` → official (**C**)
 - [ ] **If B:** all three `docker/compose/*-alpha.yml` have `image: ghcr.io/jochentcc/earnie-energy:<version.py>`
-- [ ] Optional notes file exists or default notes are OK: `.github/release-notes/v….md`
+- [ ] Release notes exist or default notes are OK: `.github/release-notes/v….md`
+- [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/spec/release-checklist.md` §1
 - [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)
 - [ ] GitHub environment `release-approval` exists with the user as *Required reviewer* (otherwise job `release` fails early by design)
 

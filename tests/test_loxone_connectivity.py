@@ -23,16 +23,6 @@ class TestLoxoneEnvHelpers:
         assert lc.loxone_env_configured() is True
 
 
-class TestTemperatureValidators:
-    def test_ambient_rejects_above_80(self):
-        assert lc._temperature_valid(80.3) is not None
-
-    def test_heat_storage_accepts_near_abs_max(self):
-        assert lc._heat_storage_temperature_valid(80.3) is None
-        assert lc._heat_storage_temperature_valid(95.0) is None
-        assert lc._heat_storage_temperature_valid(101.0) is not None
-
-
 class TestProbeLoxoneHttpAccess:
     def test_empty_host_fails(self):
         ok, detail = lc.probe_loxone_http_access(
@@ -71,16 +61,6 @@ class TestProbeLoxoneHttpAccess:
 
 
 class TestReadCheckValidation:
-    def test_soc_validation_rejects_out_of_range(self):
-        assert lc._soc_valid(105.0) is not None
-
-    def test_power_validation_accepts_typical_value(self):
-        assert lc._power_valid(2.5) is None
-
-    def test_binary_validation(self):
-        assert lc._binary_valid(1.0) is None
-        assert lc._binary_valid(0.5) is not None
-
     def test_read_check_missing_text_io_is_warning(self):
         with patch.object(lc.loxone_client, "fetch_loxone_ready_by_time", return_value=None):
             result = lc._read_check(
@@ -93,6 +73,14 @@ class TestReadCheckValidation:
         assert result.severity == "warning"
         assert lc._check_counts_as_ok(result) is True
         assert "AlarmClock" in result.detail
+
+    def test_read_check_accepts_any_numeric_value(self):
+        with patch.object(
+            lc.loxone_client, "fetch_loxone_generic_value", return_value=105.0
+        ):
+            result = lc._read_check("sens_ess_soc", "SOC")
+        assert result.passed is True
+        assert "105" in result.detail
 
 
 class TestCollectReadChecks:
@@ -182,11 +170,6 @@ class TestCollectReadChecks:
 
         by_label = {label: io for label, io, _ in checks}
         assert by_label["get_grid_export_power_limit"] == "Earnie_Netz_Einspeisegrenze_In"
-
-    def test_export_limit_valid_allows_unconstrained_kw(self):
-        assert lc._export_limit_valid(1000.0) is None
-        assert lc._export_limit_valid(-1.0) is None
-        assert lc._export_limit_valid(1_000_001.0) is not None
 
     def test_ignores_consumer_ambient_for_live_reads(self):
         house = {"plant": {"ehal_bindings": {}}}

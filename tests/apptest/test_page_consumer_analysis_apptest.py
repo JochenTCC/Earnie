@@ -1,7 +1,7 @@
 """AppTest-Smoketest für Analyse Verbrauch & Kosten (echtes Rendering, headless).
 
 Die Fixture-Config enthält kein Produktiv-Log, daher deckt dieser Test den
-Leerzustand ab (Titel + Hinweistexte für Kosten- und Swimspa-Abschnitt).
+Leerzustand ab (Titel + Hinweistext für fehlende Log-Daten).
 default_timeout=10 statt der AppTest-Vorgabe (3s): unter voller Test-Suite-
 Last kann das Rendering knapp über 3s liegen und sonst spuriös timeouten.
 """

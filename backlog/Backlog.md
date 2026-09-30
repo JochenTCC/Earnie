@@ -18,7 +18,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.12`**. This branch keeps `version.py` at **`2.7.0-dev`** until post-2.6 approval.
 
-**Next:** community/official **2.6** publish as needed. On this branch: **2.7.a** dogfood … **2.7.e**. Shadow Prod recorder (**2.6.o**), Shadow client (**2.7.f**), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
+**Next:** community/official **2.6** publish as needed. On this branch: **2.7.c** … **2.7.e**. Shadow Prod recorder (**2.6.o**), Shadow client (**2.7.f**), **2.7.a** (export limit + dogfood), **2.7.b** (Thermals P2), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -30,30 +30,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.a** dogfood → **2.7.b** → **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. Former **2.7.d** (one-way storage type) folded into **2.7.g**/**2.7.h** → [Erledigt](Backlog-Erledigt.md).
-
-- [ ] **2.7.a dogfood — Loxone productive + live test** (wiring done → [Erledigt](Backlog-Erledigt.md); prefer Shadow dogfood via **2.7.f**)
-  - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (unconstrained = PV kWp sum + battery max discharge kW)
-
-- [ ] **2.7.b — Thermals P2** — Coupled single-node models
-  - [x] **Slice 1 — House ↔ heat storage ↔ solar (linear)** — optional `thermal.heat_storage` on `thermal_annual`; coupled day targets via `optimizer/thermal_coupled.py`; HK fields; spec [`docs/spec/thermals-p2.md`](../docs/spec/thermals-p2.md); legacy open-loop when volume ≤ 0
-  - [x] **House indoor RC** — DIN V 18599 Bauweise `leicht`/`mittel`/`schwer` → C from Wohnfläche; H calibrated from HWB (override optional); band control; `T_house` state; HK fields; chart Haus-Ist; [`optimizer/thermal_house.py`](../optimizer/thermal_house.py)
-  - [x] House parameters from energy certificate — **research only** (manual mapping; no automatic PDF/import). Reference: local GEQ EAW EFH Dornbirn 2014 (not in repo). Usable seeds: HWB ≈ 40 kWh/m²a, BGF ≈ 157 m² (≠ Wohnfläche), θi = 20 °C, Sole/Wasser-WP, solar Neigung 18° + Verdrehung 26° (WW-only). **Superseded for the reference installation by the hydraulic plan (2015, local, not in repo) and the tank datasheet:** one combined buffer of **887 l** gross / 861 l net (INHAUS PR 1000; the "1000" is only the type name) → `heat_storage.volume_liters` = **887** (not ≈ 500 from the EAW tank split 100 l RH + 400 l WW); solar collector **10.6 m²** (not 6 m²) → `solar_thermal_area_m2`. Tank: H 2040 mm without insulation, Ø 790 mm, 100 mm PU foam, solar register 3.1 m² (310–1030 mm), four ½" sensor wells at 310 / 745 / 1250 / 1710 mm. Start value `heat_loss_kw_per_k` ≈ 0.006 (estimate, to be calibrated; code default 0.02 is ~3× too high for this tank). **Do not** map building LT+LV ≈ 0.125 kW/K onto `heat_storage.heat_loss_kw_per_k` (tank U only; EAW standby ≈ 4.7 kWh/d → U ≈ 0.006–0.01). BRI ≈ 489 m³ optional for volume heuristics; house C uses Wohnfläche × Bauweise. Monthly Hausprofil model uses Open-Meteo + collector irradiance (same as Live metric), not the offline climate fixture alone.
-  - [x] Add a new y-Axis to "Stündlicher Verlauf" Chart on HK page with temperatures (outside ambient, house temp, heat storage tank, pool temp) to give user a visualization of simulation
-  - [x] **Heat storage topology (year-sim):** solar thermal collector and heat pump feed heat **only into the heat storage**; space heating and domestic hot water draw heat **only from the heat storage** (the storage also serves house heating, not just DHW); legacy no-store path unchanged
-  - [x] **Heat storage temperature band (year-sim):** storage temperature may float between `setpoint − tolerance` and **95 °C**; only above 95 °C is the solar collector heat input capped (`HEAT_STORAGE_ABS_MAX_C` in `optimizer/thermal_coupled.py`)
-  - [x] **Heat pump in the band (year-sim):** WP bang-bang at the floor; WP heat capped at `setpoint` (not `setpoint + tolerance`); above the setpoint WP stays off (surplus above setpoint from solar only)
-  - [x] **Below the band (year-sim):** if projected storage temperature drops below `setpoint − tolerance`, the heat pump **must** heat (hard lower bound)
-  - [x] **Below the band (Live/MILP):** align Live/MILP with year-sim hard lower bound (and opportunistic WP in `[setpoint−tol, setpoint]`) — still daily electric kWh flex only; MILP store-T SoC remains out of scope for this slice; Live reads `T_eq` + `T_low`
-  - [x] Change default year of Yearly view on HK page (also on SE page) to the last / current year not 2023
-  - [ ] **Virtual heat-content sensor (prep for Thermals P3)** — derive `Q = C(V) × T` (C from `capacity_kwh_per_k_from_volume`, T ref 0 °C) for heat storage and pool; same C for sim and measured. Stratified tanks: SM supplies energy-equivalent `T_eq` (not top sensor alone). Spec: Entwicklungsplan §3.5; operator guide [`docs/konfiguration/waermespeicher-schichtung-teq.md`](../docs/konfiguration/waermespeicher-schichtung-teq.md); physics [`docs/spec/thermals-p2.md`](../docs/spec/thermals-p2.md)
-    - [x] **EHAL binding** `sens_temperature_heat_storage` (`T_eq`) + `sens_temperature_heat_storage_low` (`T_low`) on `thermal_annual` — Live floor/`T_low` hint wired
-    - [x] **Reference installation `T_eq` weights:** only **three** sensors (S3 oben / S4 mitte / S5 unten) in a tank with four sensor wells (310 / 745 / 1250 / 1710 mm); occupied wells not confirmed. **Provisional mapping (best fit of one snapshot against four dial thermometers):** S3 → 1710, S4 → 1250, S5 → 745 mm → `0.27*T_oben + 0.24*T_mitte + 0.49*T_unten` (Schritt A in [`waermespeicher-schichtung-teq.md`](../docs/konfiguration/waermespeicher-schichtung-teq.md)). Risk: lowest ~530 mm (well 310 mm) unmeasured → `T_eq` too high when the tank bottom is cold; consider a fourth immersion sensor in the 310 mm well. Verify mapping with several dial-vs-Loxone snapshots under different stratification, then fix `w_i`
-    - [x] **Live:** read measured `T_eq` → `Q_meas`; compute `Q_sim` from RC state / short forecast; persist via `thermal_observability` on `optimization_history.jsonl`
-    - [x] **Year-sim / HK model path:** expose `Q_sim` hour series (`heat_content_series` on consumption display bundle)
-    - [x] **Weekly chart:** simulated vs measured heat content (kWh) for heat storage and pool — HK Gesamt-Lastverhalten / Stündlicher Verlauf (Ist from Live history when available)
-  - **Note:** Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3).
-  - **Note:** Epic continues under **2.+1** (**Thermals P3**, heat pump Prio3 after **Thermals P2** / **2.7.b**). Heat storage here is thermal, not ESS multi-storage (**2.7.c**) / powerstation (**2.7.g**/**2.7.h**).
+**Order:** **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**. Work on branch `feature/2.7` until official **2.6** is cut; merge after. Do not bump `version.py` to 2.7 until approved post-2.6. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
 
 - [ ] **2.7.c — Multiple isolated battery / battery+inverter entities** (bidirectional)
   - Isolated battery modes: charging / discharging / standby
@@ -63,7 +40,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
   - Downstream: Loxone template XML gen and HouseSim scenario import should gain multi-battery support after this letter
 
-- [ ] Prepara and execute a small study about saving potentaials
+- [ ] Prepare and execute a small study about saving potentials for 2.7.g and 2.7.h
 
 - [ ] **2.7.g — Powerstation reserve for single-use manual devices** (`role: single_use`; depends on **2.7.c**; shares data model with **2.7.h**)
   - Idea: give each `earnie_role: manual` consumer (washing machine, dryer, …) a dedicated energy reserve inside the multi-ESS pool ("virtual powerstation"), pre-charged opportunistically in cheap slots and handed off whenever the device is actually switched on — instead of only showing a start-time recommendation (`optimizer/appliance_recommendation.py`, 1–5 star ranking) that the user must act on manually. Only feasible with at least one storage in the system. Worst case (reserve not sufficient) falls back to today's behaviour: grid draw, no regression.

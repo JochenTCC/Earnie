@@ -796,42 +796,26 @@ def test_slice_bundle_preserves_heat_content_series():
     assert len(sliced.heat_content_series[HC_HEAT_STORAGE]) == len(sliced.timestamps)
 
 
-def test_heat_content_week_chart_sim_and_meas():
+def test_live_heat_content_chart_sim_and_meas():
     from data.modeled_temperatures import HC_HEAT_STORAGE
-    from ui.consumption_display.charts import heat_content_week_chart
-    from ui.consumption_display.types import ConsumptionSeriesBundle
+    from ui.consumption_display.charts import live_heat_content_chart
 
     start = datetime(2023, 1, 2)
     timestamps = [
         (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(48)
     ]
-    bundle = ConsumptionSeriesBundle(
-        timestamps=timestamps,
-        consumer_series={},
-        baseload=[0.0] * 48,
-        heat_content_series={HC_HEAT_STORAGE: [40.0 + i * 0.1 for i in range(48)]},
-        heat_content_labels={HC_HEAT_STORAGE: "Wärmespeicher Wärmeinhalt (Modell)"},
-    )
-    iso = start.isocalendar()
-    measured = {
-        HC_HEAT_STORAGE: [41.0 if i % 3 == 0 else None for i in range(48)]
-    }
-    # Align measured to sliced week length inside chart via full bundle
-    from ui.consumption_display.aggregation import slice_bundle_for_iso_week
-
-    sliced = slice_bundle_for_iso_week(bundle, iso_year=iso.year, iso_week=iso.week)
-    measured_week = {
-        HC_HEAT_STORAGE: measured[HC_HEAT_STORAGE][: len(sliced.timestamps)]
-    }
-    fig = heat_content_week_chart(
-        bundle,
-        iso_year=iso.year,
-        iso_week=iso.week,
-        measured_by_key=measured_week,
+    fig = live_heat_content_chart(
+        timestamps,
+        q_sim_by_key={HC_HEAT_STORAGE: [40.0 + i * 0.1 for i in range(48)]},
+        q_meas_by_key={
+            HC_HEAT_STORAGE: [41.0 if i % 3 == 0 else None for i in range(48)]
+        },
+        labels={HC_HEAT_STORAGE: "Wärmespeicher"},
     )
     assert fig is not None
     assert len(fig.data) == 2
     assert fig.layout.meta["has_measured"] is True
+    assert fig.layout.meta["has_sim"] is True
 
 
 def test_measured_heat_content_aligns_hours(tmp_path, monkeypatch):
@@ -840,6 +824,7 @@ def test_measured_heat_content_aligns_hours(tmp_path, monkeypatch):
     from data.modeled_temperatures import HC_HEAT_STORAGE
     from runtime_store import optimization_history
     from ui.consumption_display.heat_content_history import (
+        live_heat_content_for_window,
         measured_heat_content_for_timestamps,
     )
 
@@ -871,6 +856,27 @@ def test_measured_heat_content_aligns_hours(tmp_path, monkeypatch):
     assert series[HC_HEAT_STORAGE][0] is None
     assert series[HC_HEAT_STORAGE][1] == pytest.approx(55.5)
     assert series[HC_HEAT_STORAGE][2] is None
+
+    live = live_heat_content_for_window(
+        datetime(2023, 1, 2, 0, 0, 0),
+        datetime(2023, 1, 2, 5, 0, 0),
+    )
+    assert live is not None
+    assert HC_HEAT_STORAGE in live.q_sim_by_key
+    hour_idx = live.timestamps.index("2023-01-02 03:00:00")
+    assert live.q_meas_by_key[HC_HEAT_STORAGE][hour_idx] == pytest.approx(55.5)
+    assert live.q_sim_by_key[HC_HEAT_STORAGE][hour_idx] == pytest.approx(54.0)
+
+    from datetime import timezone
+
+    live_aware = live_heat_content_for_window(
+        datetime(2023, 1, 2, 0, 0, 0, tzinfo=timezone.utc),
+        datetime(2023, 1, 2, 5, 0, 0, tzinfo=timezone.utc),
+    )
+    assert live_aware is not None
+    assert live_aware.q_meas_by_key[HC_HEAT_STORAGE][
+        live_aware.timestamps.index("2023-01-02 03:00:00")
+    ] == pytest.approx(55.5)
 
 
 def test_thermal_rc_returns_hourly_temps():

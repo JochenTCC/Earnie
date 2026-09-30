@@ -104,8 +104,8 @@ Same `C` for both until adaptation changes effective capacity.
 **Shipped:**
 
 - Helper: [`optimizer/thermal_model.py`](../../optimizer/thermal_model.py) `heat_content_kwh`
-- Year-sim / HK: `Q_sim` hour series on `ConsumptionSeriesBundle.heat_content_*` ([`data/modeled_temperatures.py`](../../data/modeled_temperatures.py)); weekly kWh chart under Gesamt-Lastverhalten
-- Live: each cycle appends heat-storage (+ pool) `heat_content_kwh` into `thermal_observability` on `runtime/optimization_history.jsonl` ([`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py) `collect_heat_storage_observability`); HK chart overlays `Q_meas` when history exists
+- Year-sim / HK: `Q_sim` hour series on `ConsumptionSeriesBundle.heat_content_*` ([`data/modeled_temperatures.py`](../../data/modeled_temperatures.py)); HK Stündlicher Verlauf keeps model °C only (no Wärmeinhalt chart)
+- Live: each cycle appends heat-storage (+ pool) `heat_content_kwh` into `thermal_observability` on `runtime/optimization_history.jsonl` ([`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py) `collect_heat_storage_observability`); Analyse Verbrauch & Kosten plots Live `Q_sim` vs `Q_meas` for the selected 7-/28-day window
 - Stratified-tank **weights `w_i`** remain operator/field work (not coded in Earnie)
 
 ### Loxone guideline (operator-facing)
@@ -144,6 +144,6 @@ When `heat_storage.volume_liters > 0` on a Live snapshot:
 - Store step + wrappers: [`optimizer/thermal_coupled.py`](../../optimizer/thermal_coupled.py)
 - Live store floor planner: [`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py)
 - Heat content helper: [`optimizer/thermal_model.py`](../../optimizer/thermal_model.py) `heat_content_kwh`
-- HK heat-content overlays: [`data/modeled_temperatures.py`](../../data/modeled_temperatures.py); chart [`ui/consumption_display/charts.py`](../../ui/consumption_display/charts.py) `heat_content_week_chart`
+- Year-sim series: [`data/modeled_temperatures.py`](../../data/modeled_temperatures.py); Live Analyse chart [`ui/consumption_display/charts.py`](../../ui/consumption_display/charts.py) `live_heat_content_chart`
 - Day targets: [`data/heating_need.py`](../../data/heating_need.py) `daily_electric_kwh` → `house_year_result` when Wohnfläche > 0
 - Live flex: [`optimizer/thermal_flex_context.py`](../../optimizer/thermal_flex_context.py)

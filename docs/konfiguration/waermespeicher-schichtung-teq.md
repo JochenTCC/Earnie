@@ -50,7 +50,7 @@ Die **Endschichten** reichen bis Boden bzw. Deckel: Der äußerste Fühler steht
 - **`T_eq`:** RC-Zustand / Open-Loop-Boden für Live (fehlend → Fallback `setpoint_c`). Earnie speichert daraus `Q_meas = C × T_eq` je Live-Zyklus in `optimization_history.jsonl`.
 - **`T_low`:** Rohwert des untersten Fühlers (nicht von Earnie in `T_eq` umgerechnet). Wenn `T_low < setpoint − tolerance`, erzwingt Live kurzfristig WP-AN, auch wenn `T_eq` noch über der Band-Untergrenze liegt (Schichtung). Fehlt das Binding, entfällt nur dieser Hinweis.
 
-**Chart:** Im Hauskonfigurator unter Gesamt-Lastverhalten / Stündlicher Verlauf erscheint ein Wochenchart **Wärmeinhalt** (kWh): Modell `Q_sim` durchgezogen, Ist `Q_meas` gestrichelt — sobald der Live-Dienst Werte aufgezeichnet hat. Ohne Historie nur Modell + Hinweis.
+**Chart:** Unter **Live-Cockpit → Analyse Verbrauch & Kosten** erscheint ein Chart **Wärmeinhalt** (kWh) für das gewählte 7-/28-Tage-Fenster: Live-Sim `Q_sim` durchgezogen, Ist `Q_meas` gestrichelt — aus `thermal_observability` in `optimization_history.jsonl`. Ohne Historie Hinweis statt Chart. Im Hauskonfigurator bleibt unter Stündlicher Verlauf nur die Modell-Temperatur (°C), kein Wärmeinhalt-Chart.
 
 Pool: weiterhin ein Sensor → `sens_temperature_water` (kein Schichtmittel nötig, solange nur ein Fühler). Gleiches `Q = C × T` und Chart-Muster.
 
@@ -134,7 +134,7 @@ Wenn die Geometrie unsicher ist oder der Querschnitt nicht konstant:
 1. **Ausgleichsphase:** Speicher weder stark beladen noch gezapft (keine WP-/Solar-Ladung, keine große WW-Entnahme), z. B. nachts mehrere Stunden.
 2. Schichtung baut sich ab; die Fühlertemperaturen nähern sich an. Dann gilt näherungsweise `T_eq ≈ T_oben ≈ … ≈ T_unten` — Gewichte sind unkritisch.
 3. **Kontrollfall mit klarer Schichtung:** nach Solar-/WP-Ladung oder nach WW-Zapfung alle Fühler-Istwerte und das volumengewichtete `T_eq` notieren.
-4. Mit dem in Earnie konfigurierten `volume_liters` ist `C` fest. Vergleich im Wochenchart **Wärmeinhalt** (`Q_sim` vs. `Q_meas`) im Hauskonfigurator.
+4. Mit dem in Earnie konfigurierten `volume_liters` ist `C` fest. Vergleich im Chart **Wärmeinhalt** (`Q_sim` vs. `Q_meas`) unter **Analyse Verbrauch & Kosten**.
 5. Wenn `Q_meas` systematisch **über** dem plausiblen Modell liegt bei gleicher Dynamik: effektives Volumen/C oder Gewichte prüfen (zu viel Gewicht auf heiße Oberschicht). Systematisch **unter**: zu viel Gewicht auf kalte Unterschicht oder Volumen zu klein.
 6. Gewichte nur in kleinen Schritten ändern (z. B. ±0,05) und Summe 1 halten; nicht gleichzeitig Volumen und alle `w_i` „frei“ drehen.
 

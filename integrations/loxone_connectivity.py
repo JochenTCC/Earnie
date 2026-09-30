@@ -1,10 +1,8 @@
 """Loxone-Verbindungsprüfung für Integrationstests und Installations-Checks."""
 from __future__ import annotations
 
-import math
 import os
 from dataclasses import dataclass
-from typing import Callable
 
 import config
 from integrations import loxone_client
@@ -140,7 +138,6 @@ def _read_check(
     label: str,
     io_name: str,
     *,
-    validate: Callable[[float], str | None] | None = None,
     read_raw: bool = False,
     warn_if_missing: bool = False,
     validate_filter_start_hour: bool = False,
@@ -189,68 +186,7 @@ def _read_check(
     value = loxone_client.fetch_loxone_generic_value(io_name)
     if value is None:
         return LoxoneCheck(label, io_name, False, "Lesen oder Parsen fehlgeschlagen")
-    if validate is not None:
-        error = validate(float(value))
-        if error:
-            return LoxoneCheck(label, io_name, False, error)
     return LoxoneCheck(label, io_name, True, f"Wert={value}")
-
-
-def _soc_valid(value: float) -> str | None:
-    if not math.isfinite(value) or value < 0.0 or value > 100.0:
-        return f"SoC außerhalb 0–100 %: {value}"
-    return None
-
-
-def _power_valid(value: float) -> str | None:
-    if not math.isfinite(value):
-        return f"Leistung nicht numerisch: {value}"
-    if abs(value) > 500.0:
-        return f"Leistung unrealistisch hoch: {value} kW"
-    return None
-
-
-def _export_limit_valid(value: float) -> str | None:
-    """Loxone Merker in kW; negative = no inbound cap; unconstrained often ~1000."""
-    if not math.isfinite(value):
-        return f"Einspeisegrenze nicht numerisch: {value}"
-    if value > 1_000_000.0:
-        return f"Einspeisegrenze unrealistisch hoch: {value} kW"
-    return None
-
-
-def _temperature_valid(value: float) -> str | None:
-    if not math.isfinite(value):
-        return f"Temperatur nicht numerisch: {value}"
-    if value < -60.0 or value > 80.0:
-        return f"Temperatur unrealistisch: {value} °C"
-    return None
-
-
-def _heat_storage_temperature_valid(value: float) -> str | None:
-    """Buffer/DHW store may sit near HEAT_STORAGE_ABS_MAX_C (solar float)."""
-    from optimizer.thermal_coupled import HEAT_STORAGE_ABS_MAX_C
-
-    if not math.isfinite(value):
-        return f"Temperatur nicht numerisch: {value}"
-    # Small headroom for sensor noise above the model abs-max.
-    if value < 0.0 or value > HEAT_STORAGE_ABS_MAX_C + 5.0:
-        return f"Temperatur unrealistisch: {value} °C"
-    return None
-
-
-def _binary_valid(value: float) -> str | None:
-    if value in (0.0, 1.0):
-        return None
-    return f"Erwartet 0 oder 1, erhalten: {value}"
-
-
-def _consumer_power_validate(consumer: dict) -> Callable[[float], str | None]:
-    inputs = consumer.get("loxone_inputs") or {}
-    signal = inputs.get("signal_type") or consumer.get("signal_type", "power")
-    if signal == "binary":
-        return _binary_valid
-    return _power_valid
 
 
 def _is_ev_consumer(consumer: dict) -> bool:
@@ -417,19 +353,16 @@ def _append_ev_read_checks(
         checks,
         f"{cid}:sens_evcs_active_power",
         marker_sens_evcs_active_power(consumer),
-        {"validate": _consumer_power_validate(consumer)},
     )
     _append_io_check(
         checks,
         f"{cid}:sens_evcs_connected",
         marker_sens_evcs_connected(consumer),
-        {"validate": _binary_valid},
     )
     _append_io_check(
         checks,
         f"{cid}:sens_evcs_soc_act",
         marker_sens_evcs_soc_act(consumer),
-        {"validate": _soc_valid},
     )
     _append_io_check(
         checks,
@@ -440,7 +373,6 @@ def _append_ev_read_checks(
         checks,
         f"{cid}:get_evcs_nominal_current",
         marker_get_evcs_nominal_current(consumer),
-        {"validate": _power_valid},
     )
     _append_io_check(
         checks,
@@ -452,13 +384,11 @@ def _append_ev_read_checks(
         checks,
         f"{cid}:get_evcs_limit_soc",
         marker_get_evcs_limit_soc(consumer),
-        {"validate": _soc_valid},
     )
     _append_io_check(
         checks,
         f"{cid}:get_evcs_soc_min_immediate",
         marker_get_evcs_soc_min_immediate(consumer),
-        {"validate": _soc_valid},
     )
 
 
@@ -475,7 +405,6 @@ def _append_flex_power_check(
         checks,
         f"{cid}:{flex_sens_power_act(cid)}",
         marker_flex_power(consumer),
-        {"validate": _consumer_power_validate(consumer)},
     )
 
 
@@ -496,13 +425,11 @@ def _append_filter_read_checks(
         checks,
         f"{cid}:get_filter_remaining_hours",
         marker_get_filter_remaining_hours(consumer),
-        {"validate": _power_valid},
     )
     _append_io_check(
         checks,
         f"{cid}:sens_filter_active",
         marker_sens_filter_active(consumer),
-        {"validate": _binary_valid},
     )
     _append_io_check(
         checks,
@@ -513,7 +440,6 @@ def _append_filter_read_checks(
         checks,
         f"{cid}:get_filter_native_duration_hours",
         marker_get_filter_native_duration_hours(consumer),
-        {"validate": _power_valid},
     )
 
 
@@ -577,25 +503,21 @@ def _append_thermal_read_checks(
         checks,
         f"{cid}:sens_temperature_water",
         marker_sens_temperature_water(consumer),
-        {"validate": _temperature_valid},
     )
     _append_io_check(
         checks,
         f"{cid}:get_temperature_water_setpoint",
         marker_get_temperature_water_setpoint(consumer),
-        {"validate": _temperature_valid},
     )
     _append_io_check(
         checks,
         f"{cid}:get_temperature_tolerance_c",
         marker_get_temperature_tolerance_c(consumer),
-        {"validate": _temperature_valid},
     )
     _append_io_check(
         checks,
         f"{cid}:sens_heating_active",
         marker_sens_heating_active(consumer),
-        {"validate": _binary_valid},
     )
 
 
@@ -613,13 +535,11 @@ def _append_thermal_annual_read_checks(
         checks,
         f"{cid}:sens_temperature_heat_storage",
         marker_sens_temperature_heat_storage(consumer),
-        {"validate": _heat_storage_temperature_valid},
     )
     _append_io_check(
         checks,
         f"{cid}:sens_temperature_heat_storage_low",
         marker_sens_temperature_heat_storage_low(consumer),
-        {"validate": _heat_storage_temperature_valid},
     )
 
 
@@ -632,51 +552,22 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
     )
 
     checks: list[tuple[str, str, dict]] = [
-        ("sens_ess_soc", config.get("LOXONE_SOC_NAME"), {"validate": _soc_valid}),
-        (
-            "sens_pv_production_active",
-            config.get("LOXONE_PV_POWER_NAME"),
-            {"validate": _power_valid},
-        ),
-        (
-            "sens_ess_power",
-            config.get("LOXONE_BATTERY_POWER_NAME"),
-            {"validate": _power_valid},
-        ),
-        (
-            "sens_grid_power_active",
-            config.get("LOXONE_GRID_POWER_NAME"),
-            {"validate": _power_valid},
-        ),
+        ("sens_ess_soc", config.get("LOXONE_SOC_NAME"), {}),
+        ("sens_pv_production_active", config.get("LOXONE_PV_POWER_NAME"), {}),
+        ("sens_ess_power", config.get("LOXONE_BATTERY_POWER_NAME"), {}),
+        ("sens_grid_power_active", config.get("LOXONE_GRID_POWER_NAME"), {}),
     ]
     consumers_power = config.get("LOXONE_CONSUMERS_POWER_NAME")
     if consumers_power:
-        checks.append(
-            ("sens_power_consumers", consumers_power, {"validate": _power_valid})
-        )
+        checks.append(("sens_power_consumers", consumers_power, {}))
 
     house_doc = loxone_client._default_house_profiles_doc()
     ambient_io = marker_sens_temperature_outside(house_doc=house_doc)
-    _append_io_check(
-        checks,
-        "sens_temperature_outside",
-        ambient_io,
-        {"validate": _temperature_valid},
-    )
+    _append_io_check(checks, "sens_temperature_outside", ambient_io)
     absent_io = marker_sens_absent_mode(house_doc=house_doc)
-    _append_io_check(
-        checks,
-        "sens_absent_mode",
-        absent_io,
-        {"validate": _binary_valid},
-    )
+    _append_io_check(checks, "sens_absent_mode", absent_io)
     export_in_io = marker_get_grid_export_power_limit(house_doc=house_doc)
-    _append_io_check(
-        checks,
-        "get_grid_export_power_limit",
-        export_in_io,
-        {"validate": _export_limit_valid},
-    )
+    _append_io_check(checks, "get_grid_export_power_limit", export_in_io)
 
     for consumer in _consumers_for_live_reads():
         if _is_ev_consumer(consumer):
