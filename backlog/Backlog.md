@@ -16,9 +16,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.12`**.
+**Versioning note:** Official **2.6.0** is the HA-coupling MINOR (supersedes **2.5.3** on `:latest`). Alpha compose still pins last community candidate **`2.6.0-alpha.12`** until the next pre-release bump.
 
-**Next:** community/official **2.6** publish as needed → **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**). Shadow Prod recorder (**2.6.o**), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
+**Next:** **2.7** on `feature/2.7` (**2.7.f** Shadow client first, then **2.7.a** … **2.7.e**). Shadow Prod recorder (**2.6.o**), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done.
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 

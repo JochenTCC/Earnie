@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Official 2.6.0 release (2026-09-30)
+
+- [x] Bump `version.py` **2.6.0-alpha.12** → **2.6.0**; release notes `.github/release-notes/v2.6.0.md`
+- [x] Candidate tag `v2.6.0` (promote after platform test → `:latest` + official HA add-on)
+
 ### 2.6.0-alpha.12 pre-release (2026-09-29)
 
 - [x] Bump `version.py` + alpha compose pins to **2.6.0-alpha.12**; release notes `.github/release-notes/v2.6.0-alpha.12.md`
