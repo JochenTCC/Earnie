@@ -163,7 +163,7 @@ Keep community Alpha stacks pointing at the current pre-release image.
 
 | Trigger | Action |
 |---------|--------|
-| **D** bump — new `version.py` contains `-` (alpha/rc) | Set each file’s `image:` to `ghcr.io/jochentcc/earnie-energy:<version.py>` |
+| **D** bump — new `version.py` contains `-` (alpha/beta/rc) | Set each file’s `image:` to `ghcr.io/jochentcc/earnie-energy:<version.py>` |
 | **D** bump — new `version.py` is clean `X.Y.Z` (official) | **Do not** change alpha compose (leave last pre-release pin); `*_productive.yml` stay on `:latest` |
 | Before **B** publish | Verify all three `image:` lines equal `ghcr.io/jochentcc/earnie-energy:<version.py>`; if not, sync, then commit + push before tagging |
 | **C** / **A** | No alpha compose edit required |
@@ -197,7 +197,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 
 Read `version.py`. **Never change without explicit user approval** (see `versioning.mdc`).
 
-Prefer publishing from `main`. After an alpha/rc tag, leave that pre-release string on `main` until the next approved bump — do **not** bump back to the previous official version.
+Prefer publishing from `main`. After an alpha/beta/rc tag, leave that pre-release string on `main` until the next approved bump — do **not** bump back to the previous official version.
 
 If publishing **B** and alpha compose is out of date: run **Alpha compose sync**, commit, push, then continue.
 

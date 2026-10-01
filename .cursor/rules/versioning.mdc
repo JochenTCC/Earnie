@@ -7,11 +7,11 @@ alwaysApply: true
 
 Format: **MAJOR.MINOR.PATCH** (Semantic Versioning in `version.py`).
 
-Optional **pre-release** suffix for community test builds only: `MAJOR.MINOR.PATCH-alpha.N` or `MAJOR.MINOR.PATCH-rc.N` (e.g. `2.2.0-alpha.1`). No backlog letter suffixes (`.a`, `.b`) in `version.py`.
+Optional **pre-release** suffix for community test builds only: `MAJOR.MINOR.PATCH-alpha.N`, `MAJOR.MINOR.PATCH-beta.N`, or `MAJOR.MINOR.PATCH-rc.N` (e.g. `2.2.0-alpha.1`, `2.6.1-beta.1`). No backlog letter suffixes (`.a`, `.b`) in `version.py`.
 
 ## Principle: user approval (required)
 
-- **Never change `version.py` without explicit user confirmation** — not at session end, not for bugfixes, not when a backlog chapter is completed, not for alpha/rc bumps.
+- **Never change `version.py` without explicit user confirmation** — not at session end, not for bugfixes, not when a backlog chapter is completed, not for alpha/beta/rc bumps.
 - Instead: **propose** (target version + brief rationale) and **ask**.
 - On rejection or no response: leave `version.py` **unchanged**.
 - Commit messages may reference backlog chapters (`hausconfig: 1.24.f …`) — that does **not** replace an automatic version bump.
@@ -21,18 +21,18 @@ Optional **pre-release** suffix for community test builds only: `MAJOR.MINOR.PAT
 | Level | File / location | Notation | Purpose |
 |-------|-----------------|----------|---------|
 | **Release state** | `version.py` | `1.24.0` | Published app/container version (only after user approval) |
-| **Pre-release** | `version.py` | `2.2.0-alpha.1` | Community test build on `main` (GitHub Pre-release; no `:latest`) |
+| **Pre-release** | `version.py` | `2.2.0-alpha.1` / `2.6.1-beta.1` | Community test build on `main` (GitHub Pre-release; no `:latest`) |
 | **Development step** | `backlog/Backlog.md` | `1.24.f` | Sub-step in the MINOR cycle (planning/progress) |
 
 - Letter chapters (`.a`, `.b`, … `.g`) and the release chapter (`.0`) exist **only in the backlog**, not in `version.py`.
 - Backlog progress (moving chapters to `backlog/Backlog-Erledigt.md`) is **independent** of `version.py`.
 
-## Pre-releases (alpha / rc)
+## Pre-releases (alpha / beta / rc)
 
-- Publish from **`main`**: approve bump → commit → push → annotated tag `vX.Y.Z-alpha.N` (must match `version.py`).
+- Publish from **`main`**: approve bump → commit → push → annotated tag `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N` (must match `version.py`).
 - CI (`.github/workflows/release-publish.yml`): the tag builds a **candidate** (GHCR `:<version>`, draft release). After the user tests it and approves job `promote` (environment `release-approval`): GitHub Release with `--prerelease` (not `--latest`), GHCR `:next` (no `:latest`), HA add-on `earnie_prerelease` pin. Details: skill `session-abschluss` Phase 2.
-- A rejected candidate is never re-tagged — fix, approved bump to the next pre-release (`alpha.N+1`), tag again.
-- Leave the pre-release string on `main` until the next approved bump (`alpha.N+1`, `rc.N`, or final `X.Y.Z`). Do **not** bump back to the previous official version after tagging.
+- A rejected candidate is never re-tagged — fix, approved bump to the next pre-release (`alpha.N+1` / `beta.N+1` / …), tag again.
+- Leave the pre-release string on `main` until the next approved bump (`alpha.N+1`, `beta.N`, `rc.N`, or final `X.Y.Z`). Do **not** bump back to the previous official version after tagging.
 - Backlog letters stay planning-only; do not invent backlog IDs like `2.2.0-alpha.1`.
 
 ## MINOR cycle: no automatic increment
@@ -52,7 +52,7 @@ While working on the **same MINOR cycle** — i.e. backlog chapters `MAJOR.MINOR
 |----------|-------------------|----------|
 | Entire MINOR cycle complete, release desired | `MAJOR.MINOR.0` or next MINOR | User |
 | Next MINOR chapter complete (e.g. `1.25.0`) | `1.25.0` | User |
-| Community test build desired | `X.Y.Z-alpha.N` or `X.Y.Z-rc.N` | User |
+| Community test build desired | `X.Y.Z-alpha.N`, `X.Y.Z-beta.N`, or `X.Y.Z-rc.N` | User |
 | Bugfix complete | PATCH +1 | User |
 | `### Version N.+1` complete | MINOR +1, PATCH = 0 | User |
 | Cycle start: set target MINOR once | e.g. `1.24.0` | User |
@@ -63,6 +63,6 @@ No fixed automation like "`.a` → MINOR", "`.b` → PATCH" — that mapping doe
 
 - Maintain backlog as usual (`backlog.mdc`).
 - **No** silent version bump at session end.
-- If a release or community pre-release seems appropriate: ask once (official vs alpha/rc); otherwise skip.
+- If a release or community pre-release seems appropriate: ask once (official vs alpha/beta/rc); otherwise skip.
 
-Commit message may include the version if the user set it: `… (v1.24.0)` or `… (v2.2.0-alpha.1)`.
+Commit message may include the version if the user set it: `… (v1.24.0)` or `… (v2.2.0-alpha.1)` / `… (v2.6.1-beta.1)`.

@@ -26,6 +26,7 @@ def test_default_tags_follow_version_py():
 
 def test_is_prerelease_version():
     assert bc.is_prerelease_version("2.2.0-alpha.1") is True
+    assert bc.is_prerelease_version("2.6.1-beta.1") is True
     assert bc.is_prerelease_version("2.2.0-rc.1") is True
     assert bc.is_prerelease_version("2.2.0") is False
 

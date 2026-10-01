@@ -55,7 +55,7 @@ def _run_deploy_tariff_gate() -> None:
 
 
 def is_prerelease_version(version: str) -> bool:
-    """True for SemVer pre-releases (e.g. 2.2.0-alpha.1, 2.2.0-rc.1)."""
+    """True for SemVer pre-releases (e.g. 2.2.0-alpha.1, 2.6.1-beta.1, 2.2.0-rc.1)."""
     return "-" in version
 
 

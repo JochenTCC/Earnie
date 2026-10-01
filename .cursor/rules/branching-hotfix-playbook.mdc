@@ -19,8 +19,8 @@ Before acting on (or recommending) any of: new long-lived branches, hotfixes for
 | Urgent patch for a **tagged** build by shipping dirty unfinished `main` | Short-lived `hotfix/…` from that **tag**, then port fix to `main` |
 | Hotfix only on the release tip **without** merging/cherry-picking to `main` | Always port the code fix to `main` |
 | Tag a commit where `version.py` ≠ tag (without `v`) | Bump/align `version.py` first (explicit approval) |
-| Mid-alpha cycle: PATCH the **last official** for a community tester fix | Next `X.Y.Z-alpha.N+1` (after approval), unless patching prod `:latest` |
-| Rewind `main`’s `version.py` to an official PATCH while alpha continues | Port **code** only; leave `main` on the ongoing alpha/rc |
+| Mid-alpha cycle: PATCH the **last official** for a community tester fix | Next `X.Y.Z-alpha.N+1` / `-beta.N+1` (after approval), unless patching prod `:latest` |
+| Rewind `main`’s `version.py` to an official PATCH while alpha continues | Port **code** only; leave `main` on the ongoing alpha/beta/rc |
 | Rewrite / force-push a published tag | New tag with a new approved version string |
 
 ## Default (no warning needed)
