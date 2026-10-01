@@ -295,7 +295,6 @@ def meter_residual_baseload_kw(
     Controllable CSVs are peeled (MILP re-adds). Known CSV peeled and re-added
     via fixed overlay. Returns (residual_kw, clipped_hours).
     """
-    from house_config.consumption_csv import load_hourly_profile_csv
     from house_config.profile_csv_policy import accounted_csv_consumers
     from data.consumption_profiles import (
         csv_kw_at_datetime,
@@ -305,14 +304,12 @@ def meter_residual_baseload_kw(
     csv_path = str(house_profile.get("total_profile_csv", "") or "").strip()
     if not csv_path:
         raise ValueError("meter residual requires total_profile_csv")
-    lookup = {ts: float(kw) for ts, kw in load_hourly_profile_csv(csv_path)}
+    # Hour-floor ZOH via csv_kw_at_datetime (QH slots hold parent clock-hour).
     accounted = accounted_csv_consumers(house_profile)
     residual: list[float] = []
     clipped = 0
     for slot_dt in slot_datetimes:
-        key = slot_dt.strftime("%Y-%m-%d %H:%M:%S")
-        naive = slot_dt.replace(tzinfo=None) if slot_dt.tzinfo else slot_dt
-        total = float(lookup.get(key, lookup.get(naive.strftime("%Y-%m-%d %H:%M:%S"), 0.0)))
+        total = float(csv_kw_at_datetime(csv_path, slot_dt) or 0.0)
         peel = 0.0
         for consumer in accounted:
             if consumer_uses_profile_csv(consumer):

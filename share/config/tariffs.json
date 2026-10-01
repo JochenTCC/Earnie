@@ -1267,20 +1267,6 @@
             "supplier_id": "tiwag"
         },
         {
-            "id": "de_eeg_staatliche_verguetung_eeg_einspeiseverguetung_10kwp",
-            "label": "EEG Staatliche Verguetung — EEG Einspeiseverguetung <10kWp",
-            "type": "fixed",
-            "land": "DE",
-            "currency": "EUR",
-            "settlement_fee_cent_kwh": 0.0,
-            "markup_percent": 0.0,
-            "prices_include_vat": true,
-            "vat_percent": 0.0,
-            "notes": "Gesetzlich garantierter Festpreis ueber 20 Jahre hinweg für kleine Dachanlagen.",
-            "k_push_cent": 8.04,
-            "supplier_id": "eeg_staatliche_verguetung"
-        },
-        {
             "id": "de_tibber_tibber_einspeisung_monats_marktwert",
             "label": "Tibber — Tibber Einspeisung (Monats-Marktwert)",
             "type": "monthly_table",

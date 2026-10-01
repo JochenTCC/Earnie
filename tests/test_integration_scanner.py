@@ -391,25 +391,26 @@ class TestDiscoverHomeAssistantPreferSupervisor:
             method="supervisor",
             extra={"base_url": "http://supervisor/core"},
         )
+        fake_zeroconf_module = MagicMock()
         with patch(
             "integrations.ha_supervisor.discover_home_assistant_via_supervisor",
             return_value=[hit],
-        ) as sup_mock, patch(
-            "zeroconf.Zeroconf"
-        ) as zc_mock:
+        ) as sup_mock, patch.dict("sys.modules", {"zeroconf": fake_zeroconf_module}):
             results = scanner.discover_home_assistant(timeout_sec=0.1)
         assert results == [hit]
         sup_mock.assert_called_once()
-        zc_mock.assert_not_called()
+        fake_zeroconf_module.Zeroconf.assert_not_called()
 
     def test_falls_through_to_mdns_when_supervisor_empty(self):
         fake_zc = MagicMock()
+        fake_zeroconf_module = MagicMock()
+        fake_zeroconf_module.Zeroconf.return_value = fake_zc
         with patch(
             "integrations.ha_supervisor.discover_home_assistant_via_supervisor",
             return_value=[],
-        ), patch("zeroconf.Zeroconf", return_value=fake_zc) as zc_cls, patch(
-            "zeroconf.ServiceBrowser"
-        ), patch("time.sleep"):
+        ), patch.dict("sys.modules", {"zeroconf": fake_zeroconf_module}), patch(
+            "time.sleep"
+        ):
             assert scanner.discover_home_assistant(timeout_sec=0.01) == []
-        zc_cls.assert_called_once()
+        fake_zeroconf_module.Zeroconf.assert_called_once()
         fake_zc.close.assert_called_once()

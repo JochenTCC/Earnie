@@ -59,6 +59,7 @@ Keep the schema from `backlog/Backlog.md` / `backlog/Backlog-Bugfixes.md` / `bac
 - **backlog/Backlog-Bugfixes.md:** open prod bugs/regressions; when done **suggest PATCH only** and ask the user — do not change silently
 - **`## Bugfix Verifications Pending`:** implemented fixes awaiting live verification — move here after commit, **not** to `backlog/Backlog-Erledigt.md`; archive only after successful verification (see `.cursor/rules/backlog.mdc`)
 - **`## Document Review Findings`:** docs corrections only — after fix, archive directly in `backlog/Backlog-Erledigt.md` (`### Document Review …`); **skip** Verifications Pending (skill `doc-review-findings`)
+- **Bugfix regression test (soft):** If this session included a **code** bugfix, apply skill `bugfix-regression-test` before finishing Phase 1 — remind and propose a dedicated regression test (cite GitHub `#N` when available). Do not block commit if the user declines or an exception applies (docs-only, config/env, hardware-only); note the skip reason briefly.
 - **backlog/Backlog.md:** feature backlog (version blocks), packaging, reference — only remaining open phases/sub-items
 - **backlog/Backlog-Erledigt.md:** New section `### <Topic> (YYYY-MM-DD)` with date **today** (local time Europe/Vienna)
 - Document only what was actually completed in the session/diff — do not invent items

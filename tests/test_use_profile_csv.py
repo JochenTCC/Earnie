@@ -19,6 +19,29 @@ def _hourly_csv(path: Path, hours: int, power: float) -> None:
     write_canonical_hourly_csv(str(path), rows)
 
 
+def test_meter_residual_holds_hourly_csv_on_qh_slots(tmp_path: Path) -> None:
+    """Issue #24: hourly Gesamt-CSV must ZOH onto 15-min slots (not exact-ts miss)."""
+    from house_config.planning_flex_overlays import meter_residual_baseload_kw
+
+    total = tmp_path / "total.csv"
+    day = datetime(2025, 3, 1)
+    write_canonical_hourly_csv(
+        str(total),
+        [
+            ((day + timedelta(hours=h)).strftime("%Y-%m-%d %H:%M:%S"), 1.0)
+            for h in range(24)
+        ],
+    )
+    slots = [day + timedelta(minutes=15 * i) for i in range(96)]
+    residual, clipped = meter_residual_baseload_kw(
+        {"total_profile_csv": str(total), "consumers": []},
+        slots,
+    )
+    assert clipped == 0
+    assert residual[:4] == [1.0, 1.0, 1.0, 1.0]
+    assert sum(residual) * 0.25 == pytest.approx(24.0)
+
+
 def test_residual_baseload_subtracts_instrumented_csv(tmp_path: Path) -> None:
     total = tmp_path / "total.csv"
     cons = tmp_path / "cons.csv"

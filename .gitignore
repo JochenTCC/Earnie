@@ -67,6 +67,7 @@ debug-*.log
 
 # Local Debug-Dumps (not versioned)
 debug-dumps/
+chart_debug_review/
 
 # Local VS Code / Cursor launch configs (machine-specific)
 .vscode/launch.json
