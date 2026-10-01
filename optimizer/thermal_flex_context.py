@@ -400,7 +400,10 @@ def _add_one_thermal_flex_consumer(
         prorated = _prorate_thermal_day_target_kwh(
             float(daily_targets.get(day, 0.0) or 0.0), len(day_indices)
         )
-        want = max(prorated, float(live_day_min.get(day, 0.0) or 0.0))
+        live_min = float(live_day_min.get(day, 0.0) or 0.0)
+        # Live store overlay: HDD ignored; floor via forced_indices; live_min = opp only.
+        live_overlay = ctx.get("live_store_start_c") is not None
+        want = live_min if live_overlay else max(prorated, live_min)
         if forced_indices:
             op_max_kwh = max_deliverable
         else:

@@ -175,19 +175,81 @@ def test_live_min_kwh_adds_opp_on_first_day():
     band = _band()
     capacity = capacity_kwh_per_k_from_volume(500.0)
     plan = plan_live_store_horizon(
-        start_temp_c=40.0,
-        ambient_forecast_c=[10.0] * 2,
+        start_temp_c=42.0,
+        ambient_forecast_c=[15.0] * 4,
         band=band,
         capacity_kwh_per_k=capacity,
-        heat_loss_kw_per_k=0.02,
+        heat_loss_kw_per_k=0.005,
         wp_electric_kw=2.0,
-        jaz=3.5,
+        jaz=4.0,
         living_area_m2=0.0,
         persons=0,
     )
     by_day = live_min_kwh_by_day(matrix, plan)
-    assert day in by_day
-    assert by_day[day] >= plan.opp_cap_electric_kwh - 1e-9
+    assert plan.opp_cap_electric_kwh > 0.0
+    assert by_day == {day: round(plan.opp_cap_electric_kwh, 3)}
+
+
+def test_live_min_kwh_excludes_floor_when_above_setpoint():
+    """Above setpoint: opp=0 and floor must not create a movable day budget."""
+    day = date(2026, 1, 15)
+    matrix = [
+        {
+            "date": day,
+            "hour": hour,
+            "slot_datetime": datetime(2026, 1, 15, hour, 0),
+            "consumption_mode": "live_snapshot",
+        }
+        for hour in range(24)
+    ]
+    band = _band()
+    capacity = capacity_kwh_per_k_from_volume(887.0)
+    plan = plan_live_store_horizon(
+        start_temp_c=60.0,
+        ambient_forecast_c=[10.0] * 48,
+        band=band,
+        capacity_kwh_per_k=capacity,
+        heat_loss_kw_per_k=0.01,
+        wp_electric_kw=1.9,
+        jaz=4.0,
+        living_area_m2=157.0,
+        building_mass="mittel",
+        annual_heat_kwh=6000.0,
+        persons=2,
+    )
+    assert plan.opp_cap_electric_kwh == 0.0
+    assert live_min_kwh_by_day(matrix, plan) == {}
+
+
+def test_hot_store_floor_does_not_force_within_few_hours():
+    """Regression Shadow 66 °C: short-forecast H must not empty the buffer by ~14:00."""
+    band = ThermalBand(setpoint_c=47.0, tolerance_c=5.0)
+    capacity = capacity_kwh_per_k_from_volume(887.0)
+    # Cold short forecast would previously inflate H by ~8760/n and force WP in ~3 h.
+    ambient = [8.0] * 8 + [14.0] * 16 + [8.0] * 24
+    plan = plan_live_store_horizon(
+        start_temp_c=66.6,
+        ambient_forecast_c=ambient,
+        band=band,
+        capacity_kwh_per_k=capacity,
+        heat_loss_kw_per_k=0.01,
+        wp_electric_kw=1.9,
+        jaz=4.3,
+        temp_low_c=56.1,
+        living_area_m2=157.0,
+        building_mass="mittel",
+        target_temp_c=21.5,
+        heating_limit_c=15.0,
+        annual_heat_kwh=6280.0,
+        persons=2,
+        used_measured_eq=True,
+        used_measured_low=True,
+        house_profile=None,  # force short-forecast scale fallback
+    )
+    first = next((i for i, f in enumerate(plan.forced_hour_flags) if f), None)
+    assert plan.opp_cap_electric_kwh == 0.0
+    assert first is None or first >= 12
+    assert plan.store_temp_c[3] > 52.0
 
 
 @patch("optimizer.thermal_live_store.resolve_heat_storage_readings")

@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Unneeded Hauswärme / hot heat storage (2026-10-01)
+
+- [x] **Unneeded Hauswärme with hot heat storage** (`debug_dump_20260930_182138`, NAS Shadow) — Live planned WP Freigabe while buffer was ~60–80 °C (setpoint 47 °C). Three stacked causes: (1) MILP day lower bound `max(HDD, live_min)` kept open-loop climate kWh even with measured store; (2) floor electric was a movable day budget → early ON; (3) Live envelope `H` calibrated from short outdoor forecast (HWB÷~48h HDD ≈ ×100 too large) plus space demand = full WP `max_heat` emptied the tank in ~3 h → forced Freigabe ~14:00. Shadow did receive `T_eq`/`T_low`. Fix: Live overlay ignores HDD; floor only via `forced_indices`; flexible want = `opp_cap` only; year-scale H + envelope-hold space draw. Spec `docs/spec/thermals-p2.md`. Tests: `test_thermal_milp_live_hot_store_ignores_hdd_day_target`, `test_thermal_milp_live_warm_store_no_early_floor_budget`, `test_live_min_kwh_excludes_floor_when_above_setpoint`, `test_hot_store_floor_does_not_force_within_few_hours`. Verified on NAS Shadow (no unneeded near-term Freigabe with hot store).
+
 ### Bugfix #24 Hourly Gesamt-CSV baseload quartered (2026-10-01)
 
 - [x] **[#24](https://github.com/JochenTCC/Earnie/issues/24) — Hourly Gesamt-CSV baseload quartered in 15‑min SE** — Path B `meter_residual_baseload_kw` used exact slot timestamps; hourly CSV only has `:00`, so `:15`/`:30`/`:45` became 0 → energy ≈ ÷4. Fix: hour-floor ZOH via `csv_kw_at_datetime`. Test: `test_meter_residual_holds_hourly_csv_on_qh_slots`. Verified on reporter pack March 2026 Gesamt ≈ 302.8 kWh (old exact-ts ≈ 75.7). Branch: `fix/issue24`.

@@ -39,6 +39,18 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` writes PV kWp sum + max discharge of the single battery (only when `battery_control = full`). With multi-ESS, sum the max discharge power of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / physical powerstations from **2.7.g**/**2.7.h** that cannot feed the house grid); update `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md` accordingly
   - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
   - Downstream: Loxone template XML gen and HouseSim scenario import should gain multi-battery support after this letter
+  - Add two new EHAL values:
+    - SOC-Min [%]
+    - SOC-Max [%]
+    - Add a check in HK whether these parameters shall be written by Earnie to configured value in house-config
+      - When checked, the values are set to smarthome-backend
+      - When not checked, values are taken into account for MILP
+
+
+- [ ] improve prognosis for EV coming back (connecting for charging)
+  - Take schedule from config as start
+  - If scheduled time passed without connected EV calculate last possible start time for charging to fullfill ReadyAt condition - 1h buffer and take this as new internal connecting schedule.
+  - Only skip charging completely when no new ReadyAt date was delivered bei smarthome-backend
 
 - [ ] Prepare and execute a small study about saving potentials for 2.7.g and 2.7.h
 

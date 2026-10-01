@@ -28,12 +28,10 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] "debug-dumps\debug_dump_20260930_182138"
 - [ ] check if for tariff forecast the individual tariff extra cost + volumetric Netzentgelt are also added (like the known tariff) or if forecast has to be updated (because it seems to be quite lower as actual tariff all the time)
-
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
-
+- [ ] Übernimm im HA-Addon die Positionsdaten aus HA, wenn möglich
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

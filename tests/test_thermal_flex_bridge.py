@@ -1,7 +1,7 @@
 """Tests für Thermals P1a — Haus-Wärme MILP flex bridge."""
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 import pytest
 
@@ -383,6 +383,125 @@ def test_thermal_milp_live_forced_indices_are_on():
     on = model.consumer_on[consumer["id"]]
     assert on[0].varValue and on[0].varValue > 0.5
     assert on[1].varValue and on[1].varValue > 0.5
+
+
+def test_thermal_milp_live_hot_store_ignores_hdd_day_target():
+    """Regression debug_dump_20260930_182138: T_eq ≫ setpoint → no HDD-forced WP."""
+    from optimizer.cbc_solver import solve_with_strict_fallback
+    from optimizer.milp import _add_milp_objective
+    from optimizer.milp_consumers import filter_feasible_consumers
+    from optimizer.milp_horizon import _build_milp_model
+    from optimizer.thermal_flex_context import add_thermal_flex_constraints
+
+    consumer = planning_thermal_to_milp(_wp_consumer())
+    day = date(2026, 9, 30)
+    matrix = []
+    for hour in range(8):
+        matrix.append(
+            {
+                "hour": hour + 18,
+                "date": day,
+                "slot_datetime": datetime.combine(day, time((hour + 18) % 24, 0)),
+                "k_act": 35.0,
+                "price_buy": 0.35,
+                "expected_p_act": 0.5,
+                "expected_p_pv": 0.0,
+                "consumption_mode": "live_snapshot",
+            }
+        )
+    contexts = {
+        consumer["id"]: {
+            "daily_targets": {day: 5.0},
+            "forced_indices": [],
+            "live_day_min_kwh": {},
+            "floor_kwh": 0.0,
+            "opp_cap_kwh": 0.0,
+            "live_store_start_c": 80.1,
+            "live_store_temp_low_c": 79.9,
+        }
+    }
+    remaining = {consumer["id"]: 5.0}
+    battery = {
+        "min_soc": 10.0,
+        "max_soc": 100.0,
+        "max_power_kw": 5.0,
+        "battery_capacity_kwh": 10.0,
+        "efficiency": 0.95,
+    }
+    planned = filter_feasible_consumers(
+        [consumer], remaining, matrix, list(range(8)), False, {}, {}
+    )
+    model = _build_milp_model(
+        matrix, 8, battery, 50.0, planned, 0.0, remaining, {}
+    )
+    _add_milp_objective(model, matrix, 3.5, {}, wear_cent_per_kwh=0.0)
+    add_thermal_flex_constraints(model, matrix, list(range(8)), contexts)
+    assert solve_with_strict_fallback(model.prob, msg=False) == "Optimal"
+    on = model.consumer_on[consumer["id"]]
+    assert all(not (var.varValue and var.varValue > 0.5) for var in on)
+
+
+def test_thermal_milp_live_warm_store_no_early_floor_budget():
+    """60 °C store: floor energy must not become a movable day budget (early ON)."""
+    from optimizer.cbc_solver import solve_with_strict_fallback
+    from optimizer.milp import _add_milp_objective
+    from optimizer.milp_consumers import filter_feasible_consumers
+    from optimizer.milp_horizon import _build_milp_model
+    from optimizer.thermal_flex_context import add_thermal_flex_constraints
+
+    consumer = planning_thermal_to_milp(_wp_consumer())
+    consumer["min_on_quarterhours"] = 1
+    day = date(2026, 10, 1)
+    next_day = date(2026, 10, 2)
+    matrix = []
+    for hour in range(24):
+        slot_day = day if hour < 18 else next_day
+        slot_hour = (9 + hour) % 24
+        matrix.append(
+            {
+                "hour": slot_hour,
+                "date": slot_day,
+                "slot_datetime": datetime.combine(day, time(9, 0))
+                + timedelta(hours=hour),
+                "k_act": 15.0 if 10 <= slot_hour <= 16 else 40.0,
+                "price_buy": 0.15 if 10 <= slot_hour <= 16 else 0.40,
+                "expected_p_act": 0.5,
+                "expected_p_pv": 0.0,
+                "consumption_mode": "live_snapshot",
+            }
+        )
+    # Future floor would previously set live_day_min on next_day and MILP heated early.
+    contexts = {
+        consumer["id"]: {
+            "daily_targets": {day: 6.0, next_day: 10.0},
+            "forced_indices": [20, 21],
+            "live_day_min_kwh": {},
+            "floor_kwh": 3.0,
+            "opp_cap_kwh": 0.0,
+            "live_store_start_c": 60.0,
+            "live_store_temp_low_c": 59.5,
+        }
+    }
+    remaining = {consumer["id"]: 10.0}
+    battery = {
+        "min_soc": 10.0,
+        "max_soc": 100.0,
+        "max_power_kw": 5.0,
+        "battery_capacity_kwh": 10.0,
+        "efficiency": 0.95,
+    }
+    planned = filter_feasible_consumers(
+        [consumer], remaining, matrix, list(range(24)), False, {}, {}
+    )
+    model = _build_milp_model(
+        matrix, 24, battery, 80.0, planned, 0.0, remaining, {}
+    )
+    _add_milp_objective(model, matrix, 3.5, {}, wear_cent_per_kwh=0.0)
+    add_thermal_flex_constraints(model, matrix, list(range(24)), contexts)
+    assert solve_with_strict_fallback(model.prob, msg=False) == "Optimal"
+    on = model.consumer_on[consumer["id"]]
+    on_slots = [i for i, var in enumerate(on) if var.varValue and var.varValue > 0.5]
+    assert on_slots == [20, 21]
 
 
 def test_resolve_thermal_flex_se_has_no_forced_indices(monkeypatch):

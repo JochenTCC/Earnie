@@ -97,6 +97,60 @@ class _HouseLiveParams:
     house_band_min: float
     house_temp: float
     max_heat: float
+    house_target_c: float
+    heating_limit_c: float
+
+
+def _year_ambient_for_house_h(house_profile: dict | None) -> list[float] | None:
+    """Full-year outdoor series for envelope H calibration (not the Live forecast)."""
+    if not isinstance(house_profile, dict):
+        return None
+    try:
+        from datetime import datetime
+
+        from data.modeled_climate import ModeledClimateContext
+
+        climate = ModeledClimateContext.for_house_profile(house_profile, kwp=0.0)
+        bundle = climate._bundle_for_calendar_year(datetime.now().year)
+        temps = bundle.temperature_c
+        if temps is None or len(temps) < 24 * 30:
+            return None
+        return [float(t) for t in temps.tolist()]
+    except Exception:
+        return None
+
+
+def _resolve_live_house_heat_loss_kw_per_k(
+    *,
+    override_kw_per_k: float | None,
+    annual_heat_kwh: float,
+    ambient_forecast_c: list[float],
+    target_temp_c: float,
+    heating_limit_c: float,
+    house_profile: dict | None = None,
+) -> float:
+    """Calibrate H from year climate when possible; never from a short Live forecast alone."""
+    if override_kw_per_k is not None and float(override_kw_per_k) > 0.0:
+        return float(override_kw_per_k)
+    year_ambient = _year_ambient_for_house_h(house_profile)
+    if year_ambient:
+        return resolve_house_heat_loss_kw_per_k(
+            override_kw_per_k=None,
+            annual_heat_kwh=float(annual_heat_kwh),
+            ambient_c=year_ambient,
+            target_temp_c=float(target_temp_c),
+            heating_limit_c=float(heating_limit_c),
+        )
+    # Fallback: scale short-forecast calibration up to year length (order-of-magnitude).
+    n = max(1, len(ambient_forecast_c))
+    raw = resolve_house_heat_loss_kw_per_k(
+        override_kw_per_k=None,
+        annual_heat_kwh=float(annual_heat_kwh),
+        ambient_c=[float(t) for t in ambient_forecast_c],
+        target_temp_c=float(target_temp_c),
+        heating_limit_c=float(heating_limit_c),
+    )
+    return float(raw) * (n / 8760.0)
 
 
 def _resolve_house_live_params(
@@ -111,14 +165,17 @@ def _resolve_house_live_params(
     ambient_forecast_c: list[float],
     start_house_temp_c: float | None,
     max_heat: float,
+    house_profile: dict | None = None,
 ) -> _HouseLiveParams:
     house_temp = float(
         start_house_temp_c if start_house_temp_c is not None else target_temp_c
     )
+    target = float(target_temp_c)
+    limit = float(heating_limit_c)
     use_house = float(living_area_m2) > 0.0
     if not use_house:
         return _HouseLiveParams(
-            False, 0.0, 0.0, float(target_temp_c), house_temp, max_heat
+            False, 0.0, 0.0, target, house_temp, max_heat, target, limit
         )
     tol = (
         DEFAULT_HOUSE_TOLERANCE_C
@@ -128,17 +185,47 @@ def _resolve_house_live_params(
     return _HouseLiveParams(
         True,
         house_capacity_kwh_per_k(living_area_m2, building_mass),
-        resolve_house_heat_loss_kw_per_k(
+        _resolve_live_house_heat_loss_kw_per_k(
             override_kw_per_k=house_heat_loss_kw_per_k,
             annual_heat_kwh=float(annual_heat_kwh),
-            ambient_c=[float(t) for t in ambient_forecast_c],
-            target_temp_c=float(target_temp_c),
-            heating_limit_c=float(heating_limit_c),
+            ambient_forecast_c=ambient_forecast_c,
+            target_temp_c=target,
+            heating_limit_c=limit,
+            house_profile=house_profile,
         ),
-        float(target_temp_c) - tol,
+        target - tol,
         house_temp,
         max_heat,
+        target,
+        limit,
     )
+
+
+def _space_heat_demand_kw(
+    house: _HouseLiveParams,
+    house_temp: float,
+    ambient: float,
+) -> float:
+    """Store draw for space heat: envelope hold / climb — not full WP dump.
+
+    Using ``max_heat`` as continuous demand emptied a hot buffer (e.g. 67 °C) in
+    ~3 h and forced Freigabe while T_eq was still far above setpoint.
+    """
+    if not house.use_house:
+        return 0.0
+    if float(ambient) >= house.heating_limit_c - 1e-9:
+        return 0.0
+    if not house_requests_heat(
+        house_temp,
+        ambient,
+        capacity_kwh_per_k=house.house_c,
+        heat_loss_kw_per_k=house.house_h,
+        band_min_c=house.house_band_min,
+    ):
+        return 0.0
+    loss = house.house_h * (float(house_temp) - float(ambient))
+    climb = (house.house_target_c - float(house_temp)) * house.house_c
+    return min(house.max_heat, max(0.0, loss + climb))
 
 
 def _simulate_store_floor_hours(
@@ -162,15 +249,7 @@ def _simulate_store_floor_hours(
     floor_electric = 0.0
     for hour, ambient_raw in enumerate(ambient_forecast_c):
         ambient = float(ambient_raw)
-        space_kw = 0.0
-        if house.use_house and house_requests_heat(
-            house_temp,
-            ambient,
-            capacity_kwh_per_k=house.house_c,
-            heat_loss_kw_per_k=house.house_h,
-            band_min_c=house.house_band_min,
-        ):
-            space_kw = house.max_heat
+        space_kw = _space_heat_demand_kw(house, house_temp, ambient)
         result = step_coupled_hour(
             store_temp,
             ambient,
@@ -241,6 +320,7 @@ def plan_live_store_horizon(
     start_house_temp_c: float | None = None,
     used_measured_eq: bool = False,
     used_measured_low: bool = False,
+    house_profile: dict | None = None,
 ) -> LiveStorePlan:
     """Bang-bang floor on T_eq plus optional T_low near-term force; opp headroom."""
     horizon = len(ambient_forecast_c)
@@ -262,6 +342,7 @@ def plan_live_store_horizon(
         ambient_forecast_c=ambient_forecast_c,
         start_house_temp_c=start_house_temp_c,
         max_heat=wp_kw * jaz_f,
+        house_profile=house_profile,
     )
     forced, electric_by_hour, floor_electric, store_temps = _simulate_store_floor_hours(
         start_temp_c=start_temp_c,
@@ -359,6 +440,7 @@ def plan_live_store_for_thermal_consumer(
         persons=int(thermal.get("persons", 2) or 2),
         used_measured_eq=readings.used_measured_eq,
         used_measured_low=readings.used_measured_low,
+        house_profile=house_profile,
     )
 
 
@@ -389,26 +471,21 @@ def map_forced_hours_to_slot_indices(
 
 
 def live_min_kwh_by_day(matrix: list, plan: LiveStorePlan) -> dict[Any, float]:
-    """Per-calendar-day lower bound: floor electric by hour + opp_cap on first day."""
-    from datetime import timedelta
+    """Flexible Live day lower bound: opportunistic headroom to setpoint on first day.
 
+    Bang-bang floor energy is enforced only via ``forced_indices`` (correct timing).
+    Putting floor kWh into a movable day budget made MILP heat while the store was
+    still hot (e.g. 60 °C) to satisfy later floor hours — including hours outside
+    the MILP window.
+    """
     from optimizer.charging_context import matrix_slot_datetime
 
     if not matrix:
         return {}
-    start = matrix_slot_datetime(matrix, 0)
-    by_day: dict[Any, float] = {}
-    for hour, elec in enumerate(plan.electric_by_hour):
-        if float(elec) <= 1e-12:
-            continue
-        day = (start + timedelta(hours=hour)).date()
-        by_day[day] = by_day.get(day, 0.0) + float(elec)
-    if plan.opp_cap_electric_kwh > 1e-9:
-        first_day = start.date()
-        by_day[first_day] = by_day.get(first_day, 0.0) + float(
-            plan.opp_cap_electric_kwh
-        )
-    return {day: round(kwh, 3) for day, kwh in by_day.items()}
+    if plan.opp_cap_electric_kwh <= 1e-9:
+        return {}
+    first_day = matrix_slot_datetime(matrix, 0).date()
+    return {first_day: round(float(plan.opp_cap_electric_kwh), 3)}
 
 
 def build_heat_storage_observability(

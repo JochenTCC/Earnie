@@ -133,9 +133,9 @@ When `heat_storage.volume_liters > 0` on a Live snapshot:
 
 1. Read `sens_temperature_heat_storage` (`T_eq`) and optional `sens_temperature_heat_storage_low` (`T_low`).
 2. Missing `T_eq` → start at `setpoint_c`. Missing `T_low` → skip bottom hint.
-3. Open-loop horizon plan ([`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py)) uses the same store step as year-sim (`step_coupled_hour`).
+3. Open-loop horizon plan ([`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py)) uses the same store step as year-sim (`step_coupled_hour`). Envelope `H` is calibrated from **year climate** (or scaled), never from the short Live outdoor forecast alone — otherwise HWB÷48h HDD inflates H by ~100× and Freigabe fires while the store is still hot. Space-heat store draw uses envelope hold/climb power, not full WP `max_heat`.
 4. Forced ON QH when the plan would turn WP on; additionally if `T_low < setpoint − tolerance`, force the near-term hour even when `T_eq` is still above the floor.
-5. Day energy ≥ `max(climate day, floor + opportunistic headroom to setpoint)`. Timing of non-forced energy stays MILP flex. Year-sim stays floor bang-bang only.
+5. Live: bang-bang floor → `forced_indices` only (correct timing). Flexible day lower bound = opportunistic headroom to setpoint (`opp_cap` / `live_day_min_kwh` on the first day). Climate/HDD day targets are **not** applied when the Live store overlay is active. Year-sim stays floor bang-bang only. SE / non-Live keep climate day targets only.
 6. SE / non-Live matrices keep climate day targets only (no forced ON overlay).
 
 ## Code
