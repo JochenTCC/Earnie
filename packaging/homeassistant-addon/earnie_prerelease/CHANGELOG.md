@@ -2,6 +2,11 @@
 
 Same image family as `earnie/`. Pre-releases and official releases both bump this tree (`version:` = newest including alpha/rc on pre-release tags; matches stable on official tags).
 
+## 2.6.1-beta.1
+
+- Pins Earnie `2.6.1-beta.1` (`ghcr.io/jochentcc/earnie-energy:2.6.1-beta.1`).
+- Earnie release: [2.6.1-beta.1](https://github.com/JochenTCC/Earnie/releases/tag/v2.6.1-beta.1)
+
 ## 2.6.0
 
 - Official **MINOR** after **2.5.3**. Focus: Home Assistant coupling (EHAL Pattern B), add-on channels, Shadow Mode S1 recorder, and quality hardening through the `2.6.0-alpha.*` community line.
