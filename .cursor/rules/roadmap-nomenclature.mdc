@@ -42,6 +42,7 @@ alwaysApply: true
 * **Parameter Adaptation (`Adaptation`):** P1 (Skeleton), P2 (PV New), P3 (PV Pilot), P4 (UI Viz)
 * **Generic Thermal Models (`Thermals`):** P1 (Single-Node), P2 (Coupled), P3 (Adaptation)
 * **MILP Sunset Horizon (`MILP Horizon`):** Phases P1-P5
+* **Release Regression Suite (`Regression`):** P1 (MVP: runner, cases, golden), P2 (customer data / private repo), P3 (CI gate + scrubber)
 * **Session Conclusion:** Phases P1-P2
 * **Migration (`MIGRATION.md`):** Phases P1-P7
 

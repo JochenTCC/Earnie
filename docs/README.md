@@ -84,4 +84,5 @@ Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) stehen nur hier �
 - [Branching & Hotfix Playbook](spec/branching-hotfix-playbook.md) — Tags, hotfixes, `main`
 - [Release Checklist](spec/release-checklist.md) — Kandidat → Test auf HA / LoxBerry → Freigabe
 - [Shadow Mode](spec/shadow-mode.md) — Prod-Feed-Recorder (S1) + Shadow-Client (S2+S3, **2.7.f**) implemented; S4 → **2.+1**
+- [Regression Suite](spec/regression-suite.md) — Golden-Master-Cases vor Release, öffentliche + private Daten (**2.7.i**, Entwurf)
 - Weitere Specs unter [`docs/spec/`](spec/)
