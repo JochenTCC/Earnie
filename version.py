@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 __version__ = "2.7.0-dev.6"
+
 # SemVer core + optional pre-release used for community candidates.
 _IMAGE_VERSION_RE = re.compile(
     r"^(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?)",
@@ -20,7 +21,7 @@ def display_version() -> str:
 
 
 def normalize_for_image_build(raw: str) -> str:
-    """Keep X.Y.Z or X.Y.Z-alpha.N; strip junk like `` (wip)`` for setuptools."""
+    """Keep X.Y.Z or X.Y.Z-(alpha|beta|rc).N; strip junk like `` (wip)`` for setuptools."""
     match = _IMAGE_VERSION_RE.match(str(raw or "").strip())
     return match.group(1) if match else "0.0.0"
 

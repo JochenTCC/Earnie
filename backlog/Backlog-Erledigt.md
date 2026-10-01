@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix #24 Hourly Gesamt-CSV baseload quartered (2026-10-01)
+
+- [x] **[#24](https://github.com/JochenTCC/Earnie/issues/24) — Hourly Gesamt-CSV baseload quartered in 15‑min SE** — Path B `meter_residual_baseload_kw` used exact slot timestamps; hourly CSV only has `:00`, so `:15`/`:30`/`:45` became 0 → energy ≈ ÷4. Fix: hour-floor ZOH via `csv_kw_at_datetime`. Test: `test_meter_residual_holds_hourly_csv_on_qh_slots`. Verified on reporter pack March 2026 Gesamt ≈ 302.8 kWh (old exact-ts ≈ 75.7). Branch: `fix/issue24`.
+- [x] **[#24](https://github.com/JochenTCC/Earnie/issues/24) — EEG `k_push_cent` edit (9.03) not shown (still 8.04)** — HA add-on: missing `/config/tariffs.json` fell back to stale `/data/earnie_env/config/tariffs.json` (catalog 8.04). Fix: with `EARNIE_INSTALL_CONTEXT=homeassistant_addon`, sidecars always resolve under `EARNIE_CONFIG_PATH`. Regression: `test_ha_addon_tariffs_ignore_stale_data_volume_copy`. Verified (path repro: edited add-on file → 9.03; missing add-on file no longer reads data-volume 8.04).
+
 ### 2.7.b — Thermals P2 (2026-09-30)
 
 - [x] **2.7.b — Thermals P2** — Coupled single-node models

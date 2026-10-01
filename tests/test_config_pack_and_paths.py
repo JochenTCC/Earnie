@@ -23,6 +23,7 @@ from runtime_store.persist_paths import (
     env_root,
     resolve_config_json_path,
     resolve_config_prefixed_path,
+    resolve_tariffs_json_path,
     resolve_uploads_dir,
     runtime_dir,
 )
@@ -136,6 +137,29 @@ def test_ha_addon_config_path_outside_env_root_honored(
         addon_cfg / "config.json"
     ).resolve()
     assert Path(runtime_dir()).resolve() == (stack / "runtime").resolve()
+
+
+def test_ha_addon_tariffs_ignore_stale_data_volume_copy(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Issue #24: missing addon tariffs.json must not read the old data-volume catalog."""
+    monkeypatch.chdir(tmp_path)
+    stack = tmp_path / "data" / "earnie_env"
+    data_cfg = stack / "config"
+    data_cfg.mkdir(parents=True)
+    (stack / "runtime").mkdir(parents=True)
+    (data_cfg / "tariffs.json").write_text('{"k_push_cent": 8.04}', encoding="utf-8")
+    addon_cfg = tmp_path / "config"
+    addon_cfg.mkdir()
+    (addon_cfg / "config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("EARNIE_ENV_PATH", str(stack))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(stack / "runtime"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(addon_cfg))
+    monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+    monkeypatch.delenv("EARNIE_TARIFFS_PATH", raising=False)
+    assert Path(resolve_tariffs_json_path()).resolve() == (
+        addon_cfg / "tariffs.json"
+    ).resolve()
 
 
 def test_config_prefixed_uploads_co_located(monkeypatch, tmp_path: Path) -> None:

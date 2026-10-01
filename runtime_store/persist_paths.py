@@ -379,6 +379,10 @@ def _resolve_sidecar_json_path(
     Reihenfolge: cloud session > explizite Sidecar-ENV > vorhandene Datei im Config-Dir >
     vorhandener Default/Legacy > (bei CONFIG_PATH) Zielpfad im Config-Dir >
     Default-Pfad.
+
+    Home Assistant add-on: always keep sidecars under ``EARNIE_CONFIG_PATH``
+    (``/config`` / addon_config). Never fall back to a leftover copy under
+    ``EARNIE_ENV_PATH/config`` (stale catalog after addon_config migration).
     """
     from runtime_store.cloud_demo import get_session_env_root
 
@@ -388,6 +392,10 @@ def _resolve_sidecar_json_path(
     if env:
         return env
     config_directory = _config_directory_from_env()
+    if config_directory and (
+        read_env("INSTALL_CONTEXT").strip().lower() == "homeassistant_addon"
+    ):
+        return os.path.join(config_directory, filename)
     if config_directory:
         co_located = os.path.join(config_directory, filename)
         if os.path.isfile(co_located):

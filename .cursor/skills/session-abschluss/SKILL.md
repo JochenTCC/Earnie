@@ -59,6 +59,7 @@ Keep the schema from `backlog/Backlog.md` / `backlog/Backlog-Bugfixes.md` / `bac
 - **backlog/Backlog-Bugfixes.md:** open prod bugs/regressions; when done **suggest PATCH only** and ask the user — do not change silently
 - **`## Bugfix Verifications Pending`:** implemented fixes awaiting live verification — move here after commit, **not** to `backlog/Backlog-Erledigt.md`; archive only after successful verification (see `.cursor/rules/backlog.mdc`)
 - **`## Document Review Findings`:** docs corrections only — after fix, archive directly in `backlog/Backlog-Erledigt.md` (`### Document Review …`); **skip** Verifications Pending (skill `doc-review-findings`)
+- **Bugfix regression test (soft):** If this session included a **code** bugfix, apply skill `bugfix-regression-test` before finishing Phase 1 — remind and propose a dedicated regression test (cite GitHub `#N` when available). Do not block commit if the user declines or an exception applies (docs-only, config/env, hardware-only); note the skip reason briefly.
 - **backlog/Backlog.md:** feature backlog (version blocks), packaging, reference — only remaining open phases/sub-items
 - **backlog/Backlog-Erledigt.md:** New section `### <Topic> (YYYY-MM-DD)` with date **today** (local time Europe/Vienna)
 - Document only what was actually completed in the session/diff — do not invent items
@@ -162,7 +163,7 @@ Keep community Alpha stacks pointing at the current pre-release image.
 
 | Trigger | Action |
 |---------|--------|
-| **D** bump — new `version.py` contains `-` (alpha/rc) | Set each file’s `image:` to `ghcr.io/jochentcc/earnie-energy:<version.py>` |
+| **D** bump — new `version.py` contains `-` (alpha/beta/rc) | Set each file’s `image:` to `ghcr.io/jochentcc/earnie-energy:<version.py>` |
 | **D** bump — new `version.py` is clean `X.Y.Z` (official) | **Do not** change alpha compose (leave last pre-release pin); `*_productive.yml` stay on `:latest` |
 | Before **B** publish | Verify all three `image:` lines equal `ghcr.io/jochentcc/earnie-energy:<version.py>`; if not, sync, then commit + push before tagging |
 | **C** / **A** | No alpha compose edit required |
@@ -197,7 +198,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 
 Read `version.py`. **Never change without explicit user approval** (see `versioning.mdc`).
 
-Prefer publishing from `main`. After an alpha/rc tag, leave that pre-release string on `main` until the next approved bump — do **not** bump back to the previous official version.
+Prefer publishing from `main`. After an alpha/beta/rc tag, leave that pre-release string on `main` until the next approved bump — do **not** bump back to the previous official version.
 
 If publishing **B** and alpha compose is out of date: run **Alpha compose sync**, commit, push, then continue.
 

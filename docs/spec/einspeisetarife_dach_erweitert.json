@@ -133,22 +133,6 @@
             "hinweis": "Landesversorger-Festpreis fuer Tiroler PV-Anlagen."
         },
         {
-            "stromlieferant": "EEG Staatliche Verguetung",
-            "tarifname": "EEG Einspeiseverguetung <10kWp",
-            "tarif_typ": "fix",
-            "land": "DE",
-            "einzugsbereich": "National",
-            "waehrung": "EUR",
-            "mwst_prozent": 0.0,
-            "preise_inkl_ust": true,
-            "grundpauschale_monat_euro": 0.0,
-            "abwicklungsgebuehr_kwh_cent": 0.0,
-            "aufschlag_prozent": 0.0,
-            "arbeitspreis_kwh_cent": 8.04,
-            "preisgarantie_monate": 240,
-            "hinweis": "Gesetzlich garantierter Festpreis ueber 20 Jahre hinweg für kleine Dachanlagen."
-        },
-        {
             "stromlieferant": "Tibber",
             "tarifname": "Tibber Einspeisung (Monats-Marktwert)",
             "tarif_typ": "monthly_float",

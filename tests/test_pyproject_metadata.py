@@ -28,6 +28,7 @@ def test_requirements_txt_installs_project():
 
 def test_normalize_for_image_build_keeps_prerelease():
     assert normalize_for_image_build("2.6.0-alpha.7") == "2.6.0-alpha.7"
+    assert normalize_for_image_build("2.6.1-beta.1") == "2.6.1-beta.1"
     assert normalize_for_image_build("2.6.0-rc.1") == "2.6.0-rc.1"
     assert normalize_for_image_build("2.5.3") == "2.5.3"
     assert normalize_for_image_build("2.0.0 (wip)") == "2.0.0"

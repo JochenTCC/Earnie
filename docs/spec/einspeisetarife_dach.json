@@ -95,22 +95,6 @@
             "preisgarantie_monate": 12
         },
         {
-            "stromlieferant": "EEG Staatliche Verguetung",
-            "tarifname": "EEG Einspeiseverguetung <10kWp",
-            "tarif_typ": "fix",
-            "land": "DE",
-            "einzugsbereich": "National",
-            "waehrung": "EUR",
-            "mwst_prozent": 0.0,
-            "preise_inkl_ust": true,
-            "grundpauschale_monat_euro": 0.0,
-            "abwicklungsgebuehr_kwh_cent": 0.0,
-            "aufschlag_prozent": 0.0,
-            "arbeitspreis_kwh_cent": 8.04,
-            "preisgarantie_monate": 240,
-            "hinweis": "Wird ueber den oertlichen Verteilnetzbetreiber (VNB) abgerechnet, nicht ueber den Stromlieferanten."
-        },
-        {
             "stromlieferant": "aWATTar DE",
             "tarifname": "HOURLY Einspeisung",
             "tarif_typ": "spot",
