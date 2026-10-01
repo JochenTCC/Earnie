@@ -1,7 +1,7 @@
 # Spezifikation: Preisprognose für extrapolierte Slots (EU-Wetter & Erzeugung)
 
-**Version:** 0.4  
-**Status:** Phase 0–3 live path done (2026-09-29); **2.5.e+:** Live Day-Ahead is QH; forecast **features stay hourly** and are **held onto parent-hour QH slots** (no QH retrain in Version 2.5)  
+**Version:** 0.5  
+**Status:** Phase 0–3 live path done (2026-09-29); **2.5.e+:** Live Day-Ahead is QH; forecast **features stay hourly** and are **held onto parent-hour QH slots** (no QH retrain in Version 2.5). **Research (§11):** EU `public_power_forecast` + rolling live bias — gated off, not for public release.  
 **Epic-Kurzname:** **Preis-Prognose**  
 **Ersetzt:** Backlog-Research „Preis-Spiegelung Mittelung“  
 **Bezug:** [UI Sunset-2-Sunset](ui-sunset2sunset.md) §5 (grüne Zone), `data/market_prices.py` (`resolve_market_slots`), [quarter-hour-slots.md](quarter-hour-slots.md)
@@ -15,7 +15,7 @@ Grundidee: AT-Spotpreise korrelieren mit der **europäischen** erneuerbaren Verf
 | Familie | Quelle (Training) | Quelle (Live) | Variablen |
 |---------|-------------------|---------------|-----------|
 | **Wetter** | Open-Meteo ERA5-Archiv | Open-Meteo Forecast | kapazitätsgewichteter EU-Mittelwert: `wind_speed_10m`, `shortwave_radiation` |
-| **Erzeugung** | Energy-Charts `public_power` | Stand-in: stündliches EU-Leistungsprofil aus dem letzten Archivtag (Full Energy-Charts Forecast optional später) | summierte EU-MW: `wind_mw`, `solar_mw` |
+| **Erzeugung** | Energy-Charts `public_power` | **Default:** hour-of-day stand-in from last archive day. **Research (off):** `public_power_forecast` via `eu_power_live_source=energy_charts_forecast` | summierte EU-MW: `wind_mw`, `solar_mw` |
 
 Zielzone Preise: **AT Day-Ahead** (`bzn=AT`, EPEX-kompatibel).
 
@@ -190,7 +190,7 @@ Modul: `ui/price_forecast.py`
 
 - ✅ `resolve_market_slots`: bei `forecast` fehlende Slots per OLS befüllen, Fallback Spiegelung
 - ✅ Live-Features: Open-Meteo Forecast-Wetter + stündliches EU-Leistungs-Stand-in aus dem letzten Archivtag
-- Offen optional: Energy-Charts `public_power_forecast` statt Archiv-Stand-in; monatliches Re-Training
+- **Research (not product default):** Energy-Charts `public_power_forecast` as live generation features; rolling live EPEX bias; tariff-extras parity checks — see §11
 
 ## 8. Architektur (Phase 3 Live)
 
@@ -222,7 +222,22 @@ EU power stand-in (archive) ──▶│     (share/data/price_model_coefficient
 - Prognosegüte der Wetter-API für D+2-Horizont
 - DST: Slots über `normalize_price_slot` / Europe/Vienna
 
-## 11. Bezug
+## 11. Research gates (internal only — not for public release)
+
+Ship defaults stay **archive hour-of-day power stand-in** and **no live bias**. Enable only in local `earnie_env` / `earnie_shadow` for value checks.
+
+| Config key (`market_prices`) | Default | Research value |
+|------------------------------|---------|----------------|
+| `eu_power_live_source` | `archive_hod` | `energy_charts_forecast` → Energy-Charts `public_power_forecast` (solar + wind on/offshore, day-ahead then current) |
+| `live_bias_enabled` | `false` | `true` → rolling mean residual (Day-Ahead − OLS) over lookback, capped, applied only to **predicted** EPEX |
+| `live_bias_lookback_hours` | `48` | lookback window when bias enabled |
+| `live_bias_cap_cent_kwh` | `5.0` | absolute cap on live bias |
+
+Tariff extras (settlement, markup, Netznutzung, VAT) apply via `epex_to_brutto_cent` / `import_cent_kwh` for **both** Day-Ahead and predicted slots; regression: `test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex`.
+
+Compare script: `python -m scripts.compare_live_price_prognosis_research` (optional `--with-live-bias`).
+
+## 12. Bezug
 
 - Preise Live: [preise.md](../konfiguration/preise.md)
 - UI grüne Zone: [ui-sunset2sunset.md](ui-sunset2sunset.md) §5
@@ -232,6 +247,7 @@ EU power stand-in (archive) ──▶│     (share/data/price_model_coefficient
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
+| 2026-10-01 | 0.5 | Research gates: EU power forecast + live bias + tariff parity (§11); not product default |
 | 2026-09-29 | 0.4 | Phase 3 live: Default `forecast`/OLS; Open-Meteo Features; ship-Modell `share/data/` |
 | 2026-07-06 | 0.2 | Phase 2: OLS-Modell, Evaluation vs. Spiegelung |
 | 2026-07-06 | 0.1 | Initiale Spec; Phase 0 Scope; Phase 1 Pipeline |

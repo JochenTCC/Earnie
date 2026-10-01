@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Invalid JSON config crash message (2026-10-01)
+
+- [x] **Invalid JSON in config.json crash** — `read_json_dict` raises clear `ValueError` (path + Zeile/Spalte, no chained `JSONDecodeError`); `bootstrap.run()` aborts via `_abort_config_error` (`Abbruch:…`, exit 1) like `load_config_or_exit`. Regression: `tests/test_json_io.py`. Verified.
+
+### Bugfix Tariff forecast surcharges already applied (2026-10-01)
+
+- [x] **Tariff forecast vs known tariff extras / volumetric Netzentgelt** — Checked: no fix. Predicted/mirrored slots use the same `epex_to_brutto_cent` → `import_cent_kwh` path as day-ahead (markup, `settlement_fee_cent_kwh`, `netzentgelt_override` before VAT). Forecast model outputs EPEX only; brutto add-ons are applied at price resolution (`docs/spec/price-forecast-renewables.md`). Persistent “forecast looks cheaper” is not missing surcharges on that path.
+
 ### Bugfix Unneeded Hauswärme / hot heat storage (2026-10-01)
 
 - [x] **Unneeded Hauswärme with hot heat storage** (`debug_dump_20260930_182138`, NAS Shadow) — Live planned WP Freigabe while buffer was ~60–80 °C (setpoint 47 °C). Three stacked causes: (1) MILP day lower bound `max(HDD, live_min)` kept open-loop climate kWh even with measured store; (2) floor electric was a movable day budget → early ON; (3) Live envelope `H` calibrated from short outdoor forecast (HWB÷~48h HDD ≈ ×100 too large) plus space demand = full WP `max_heat` emptied the tank in ~3 h → forced Freigabe ~14:00. Shadow did receive `T_eq`/`T_low`. Fix: Live overlay ignores HDD; floor only via `forced_indices`; flexible want = `opp_cap` only; year-scale H + envelope-hold space draw. Spec `docs/spec/thermals-p2.md`. Tests: `test_thermal_milp_live_hot_store_ignores_hdd_day_target`, `test_thermal_milp_live_warm_store_no_early_floor_budget`, `test_live_min_kwh_excludes_floor_when_above_setpoint`, `test_hot_store_floor_does_not_force_within_few_hours`. Verified on NAS Shadow (no unneeded near-term Freigabe with hot store).

@@ -13,8 +13,12 @@ def read_json_dict(path: str) -> dict:
                 return json.load(f)
         except UnicodeDecodeError as e:
             last_decode_error = e
-        except json.JSONDecodeError:
-            raise
+        except json.JSONDecodeError as e:
+            # from None: avoid debugger/cause-chain focus on stdlib JSONDecodeError
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: '{path}' enthält ungültiges JSON "
+                f"(Zeile {e.lineno}, Spalte {e.colno}): {e.msg}"
+            ) from None
     raise ValueError(
         f"Konfigurationsdatei '{path}' ist weder UTF-8 noch cp1252 "
         f"(z. B. Umlaute wie in 'Wärmepumpe'). Bitte als UTF-8 speichern."

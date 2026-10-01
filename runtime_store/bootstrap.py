@@ -611,25 +611,30 @@ def _bootstrap_all_artifacts() -> list[str]:
 
 def run() -> None:
     """Fehlende Laufzeitdateien anlegen; bestehende Dateien bleiben unverändert."""
-    _ensure_directory(runtime_dir())
-    _ensure_directory(config_dir())
+    try:
+        _ensure_directory(runtime_dir())
+        _ensure_directory(config_dir())
 
-    created = _bootstrap_all_artifacts()
+        created = _bootstrap_all_artifacts()
 
-    if created:
-        logger.info("bootstrap: %s neue Datei(en) angelegt.", len(created))
-    else:
-        logger.debug("bootstrap: alle persistenten Dateien vorhanden.")
+        if created:
+            logger.info("bootstrap: %s neue Datei(en) angelegt.", len(created))
+        else:
+            logger.debug("bootstrap: alle persistenten Dateien vorhanden.")
 
-    from runtime_store.version_track import check_and_record_version
+        from runtime_store.version_track import check_and_record_version
 
-    check_and_record_version()
+        check_and_record_version()
 
-    from runtime_store.cloud_demo import is_cloud_demo
-    from runtime_store.offline_demo_seed import seed_offline_live_scenario
+        from runtime_store.cloud_demo import is_cloud_demo
+        from runtime_store.offline_demo_seed import seed_offline_live_scenario
 
-    if is_cloud_demo():
-        logger.debug("bootstrap: cloud demo — skip offline live-scenario seed.")
-        return
-    if seed_offline_live_scenario():
-        logger.info("bootstrap: offline demo live-scenario refs seeded.")
+        if is_cloud_demo():
+            logger.debug("bootstrap: cloud demo — skip offline live-scenario seed.")
+            return
+        if seed_offline_live_scenario():
+            logger.info("bootstrap: offline demo live-scenario refs seeded.")
+    except ValueError as exc:
+        from runtime_store.config_load import _abort_config_error
+
+        _abort_config_error(exc)

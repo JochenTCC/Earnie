@@ -1,6 +1,7 @@
 """EU-Wetter- und Erzeugungsfeatures für Preisprognose-Training (Spec: price-forecast-renewables)."""
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -23,6 +24,16 @@ WIND_PRODUCTION_NAMES = frozenset({"Wind onshore", "Wind offshore"})
 SOLAR_PRODUCTION_NAME = "Solar"
 LOAD_PRODUCTION_NAME = "Load"
 RESIDUAL_LOAD_PRODUCTION_NAME = "Residual load"
+POWER_FORECAST_PRODUCTION_TYPES: tuple[str, ...] = (
+    "solar",
+    "wind_onshore",
+    "wind_offshore",
+)
+POWER_FORECAST_TYPES: tuple[str, ...] = ("day-ahead", "current")
+POWER_FORECAST_CACHE_TTL_SEC = 45 * 60
+
+logger = logging.getLogger(__name__)
+_power_forecast_cache: dict[tuple[str, str, str], tuple[float, pd.DataFrame]] = {}
 
 GENERATION_COUNTRIES: tuple[str, ...] = (
     "de",
@@ -241,6 +252,152 @@ def fetch_eu_renewables_hourly(start: date, end: date) -> pd.DataFrame:
     """Summierte EU-Wind- und Solar-Erzeugung (MW) je Stunde."""
     power = fetch_eu_power_hourly(start, end)
     return power[["eu_wind_mw", "eu_solar_mw"]]
+
+
+def _public_power_forecast_hourly(payload: dict[str, Any]) -> pd.Series:
+    """Parse one Energy-Charts public_power_forecast payload → hourly MW series."""
+    seconds = payload.get("unix_seconds") or []
+    values = payload.get("forecast_values") or []
+    if not seconds:
+        raise ValueError("Energy-Charts public_power_forecast: unix_seconds fehlt.")
+    if len(values) != len(seconds):
+        raise ValueError(
+            "Energy-Charts public_power_forecast: forecast_values Länge != unix_seconds."
+        )
+    tz = planning_timezone()
+    index = pd.DatetimeIndex(
+        [datetime.fromtimestamp(int(ts), tz=tz) for ts in seconds],
+        name="slot_datetime",
+    )
+    cleaned = [float(v) if v is not None else float("nan") for v in values]
+    series = pd.Series(cleaned, index=index, dtype=float)
+    return series.resample("h").mean()
+
+
+def _fetch_country_production_forecast(
+    country: str,
+    production_type: str,
+    start: date,
+    end: date,
+) -> pd.Series | None:
+    """One country/production_type; try day-ahead then current. None if empty."""
+    end_inclusive = (end - timedelta(days=1)).isoformat() if end > start else start.isoformat()
+    for forecast_type in POWER_FORECAST_TYPES:
+        try:
+            payload = _http_get_json(
+                f"{ENERGY_CHARTS_BASE}/public_power_forecast",
+                {
+                    "country": country,
+                    "production_type": production_type,
+                    "forecast_type": forecast_type,
+                    "start": start.isoformat(),
+                    "end": end_inclusive,
+                },
+            )
+            series = _public_power_forecast_hourly(payload)
+            if series.empty or series.isna().all():
+                continue
+            series = _dedupe_hourly_mean(series)
+            series.index = series.index.map(normalize_hour_slot)
+            return series.sort_index()
+        except (OSError, ValueError, requests.HTTPError, RuntimeError) as exc:
+            logger.debug(
+                "public_power_forecast %s/%s/%s: %s",
+                country,
+                production_type,
+                forecast_type,
+                exc,
+            )
+            continue
+    return None
+
+
+def fetch_country_power_forecast_hourly(
+    country: str,
+    start: date,
+    end: date,
+) -> pd.DataFrame | None:
+    """Stündliche Wind/Solar-Prognose je Land (Energy-Charts public_power_forecast)."""
+    wind = pd.Series(dtype=float)
+    solar = pd.Series(dtype=float)
+    got_any = False
+    for production_type in POWER_FORECAST_PRODUCTION_TYPES:
+        series = _fetch_country_production_forecast(
+            country, production_type, start, end
+        )
+        if series is None:
+            logger.warning(
+                "Preisprognose-Research: keine public_power_forecast für %s/%s.",
+                country,
+                production_type,
+            )
+            continue
+        got_any = True
+        if production_type == "solar":
+            solar = solar.add(series, fill_value=0.0) if not solar.empty else series
+        else:
+            wind = wind.add(series, fill_value=0.0) if not wind.empty else series
+    if not got_any:
+        return None
+    index = wind.index.union(solar.index)
+    frame = pd.DataFrame(index=index)
+    frame["wind_mw"] = wind.reindex(index)
+    frame["solar_mw"] = solar.reindex(index)
+    return frame.sort_index()
+
+
+def fetch_eu_power_forecast_hourly(start: date, end: date) -> pd.DataFrame:
+    """Summierte EU-Wind/Solar-Prognose (MW); partial country coverage allowed.
+
+    Research-only live path (``eu_power_live_source=energy_charts_forecast``).
+    Raises ValueError if no country contributes data.
+    """
+    cache_key = (start.isoformat(), end.isoformat(), "eu_power_forecast")
+    cached = _power_forecast_cache.get(cache_key)
+    if cached is not None:
+        stored_at, frame = cached
+        if time.time() - stored_at <= POWER_FORECAST_CACHE_TTL_SEC:
+            return frame.copy()
+        _power_forecast_cache.pop(cache_key, None)
+
+    total: pd.DataFrame | None = None
+    countries_used = 0
+    for country in GENERATION_COUNTRIES:
+        country_frame = fetch_country_power_forecast_hourly(country, start, end)
+        if country_frame is None or country_frame.empty:
+            continue
+        countries_used += 1
+        renamed = country_frame.rename(
+            columns={col: f"{col}_{country}" for col in country_frame.columns}
+        )
+        if total is None:
+            total = renamed
+        else:
+            total = total.join(renamed, how="outer")
+    if total is None or countries_used == 0:
+        raise ValueError(
+            "EU public_power_forecast: keine Länderdaten im Zeitraum "
+            f"{start}..{end}."
+        )
+    if countries_used < len(GENERATION_COUNTRIES):
+        logger.warning(
+            "Preisprognose-Research: EU-Leistungsprognose nur für %d/%d Länder.",
+            countries_used,
+            len(GENERATION_COUNTRIES),
+        )
+    result = pd.DataFrame(index=total.index)
+    for base, eu_name in (("wind_mw", "eu_wind_mw"), ("solar_mw", "eu_solar_mw")):
+        cols = [c for c in total.columns if c.startswith(f"{base}_")]
+        result[eu_name] = total[cols].sum(axis=1, min_count=1)
+    # Archive stand-in also exposes load columns; keep zeros so joins/enrich stay stable.
+    result["eu_load_mw"] = 0.0
+    result["eu_residual_load_mw"] = 0.0
+    mask = (result.index.date >= start) & (result.index.date < end)
+    result = result.loc[mask].sort_index()
+    if result.empty or result[["eu_wind_mw", "eu_solar_mw"]].isna().all().all():
+        raise ValueError("EU public_power_forecast: leerer Wind/Solar-Frame.")
+    _power_forecast_cache[cache_key] = (time.time(), result)
+    return result.copy()
 
 
 def fetch_at_day_ahead_hourly(start: date, end: date) -> pd.Series:

@@ -221,3 +221,29 @@ def render_price_forecast_block() -> None:
         ].copy()
         show.index = show.index.strftime("%Y-%m-%d %H:%M")
         st.dataframe(show.round(3), width="stretch")
+
+    with st.expander("Research (internal only — not for public release)"):
+        st.caption(
+            "Live green-zone research gates in `config.json` → `market_prices` "
+            "(defaults stay product-safe). Spec §11."
+        )
+        from data.price_forecast_live import (
+            get_eu_power_live_source,
+            get_live_bias_enabled,
+            get_live_bias_lookback_hours,
+        )
+
+        try:
+            st.write(
+                {
+                    "eu_power_live_source": get_eu_power_live_source(),
+                    "live_bias_enabled": get_live_bias_enabled(),
+                    "live_bias_lookback_hours": get_live_bias_lookback_hours(),
+                }
+            )
+        except ValueError as exc:
+            st.warning(str(exc))
+        st.code(
+            "python -m scripts.compare_live_price_prognosis_research --hours 12 --with-live-bias",
+            language="powershell",
+        )
