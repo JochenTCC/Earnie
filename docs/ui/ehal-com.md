@@ -72,7 +72,7 @@ Adapters must translate hub-specific conventions to EHAL **at the boundary**. Mo
 | Loxone | `Earnie_Batterie_Sollleistung` | Adapter writes **kW**, **same sign** as EHAL (`+` discharge). Config/inverter must use the same sign. |
 | Victron GX | device-dependent | Measurement channel reg. **842** is often `+` = charging — **invert** for EHAL. An ESS setpoint must be mapped per the respective ESS-mode-2/3 documentation. |
 
-**Loxone live vs. setpoint:** when **reading** `sens_ess_power`, the adapter inverts Loxone live (`+` = charging) to EHAL (`+` = discharge). When **writing** `set_ess_active_power`, only **W → kW** is converted; the sign stays EHAL (`+` = discharge). Config must therefore not invert the setpoint again.
+**Loxone live vs. setpoint:** when **reading** `sens_ess_power`, the adapter only converts kW → W; Loxone live already uses `+` = discharge like EHAL. When **writing** `set_ess_active_power`, only **W → kW** is converted; the sign stays EHAL (`+` = discharge). Config must therefore not invert the setpoint again.
 
 Sticky backends: an old setpoint stays in the Merker. Enable/automatic is `set_ess_mode = 0`, not "setpoint power = 0" or an omitted field alone.
 

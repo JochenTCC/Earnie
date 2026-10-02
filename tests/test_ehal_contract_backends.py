@@ -88,8 +88,8 @@ def test_live_power_identical_when_only_backend_switches():
     assert openems_power is not None
     assert openems_power["pv"] == 2.0
     assert openems_power["grid"] == 1.0
-    assert openems_power["battery"] == -0.5
-    assert openems_power["house"] == pytest.approx(2.5)
+    assert openems_power["battery"] == 0.5
+    assert openems_power["house"] == pytest.approx(3.5)
 
 
 def test_get_adapter_routes_by_ehal_backend_only():
@@ -231,7 +231,7 @@ def test_derive_sens_power_consumers_w():
             "sens_grid_power_active": 1000.0,
             "sens_ess_power": 500.0,
         }
-    ) == pytest.approx(500.0)
+    ) == pytest.approx(3500.0)  # PV + import + discharge
     assert ehal_live.derive_sens_power_consumers_w(
         {
             "sens_pv_production_active": 2000.0,

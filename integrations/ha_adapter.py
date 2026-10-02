@@ -290,8 +290,8 @@ class HaAdapter:
             doc["sens_power_consumers"] = max(
                 0.0,
                 float(doc["sens_pv_production_active"])
-                - float(doc["sens_grid_power_active"])
-                - ess,
+                + float(doc["sens_grid_power_active"])
+                + ess,
             )
         return validate_telemetry(doc)
 
