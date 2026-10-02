@@ -61,15 +61,19 @@ def load_components_document(path: str) -> dict:
 
 
 def _serialize_battery(spec: dict) -> dict:
+    """Persist split charge/discharge limits (2.7.j); drop legacy single max."""
     out: dict = {
         "id": spec["id"],
         "label": spec["label"],
         "battery_capacity_kwh": spec["battery_capacity_kwh"],
-        "battery_max_power_kw": spec["battery_max_power_kw"],
+        "battery_max_charge_power_kw": float(spec["battery_max_charge_power_kw"]),
+        "battery_max_discharge_power_kw": float(spec["battery_max_discharge_power_kw"]),
         "battery_efficiency": spec["battery_efficiency"],
         "battery_min_soc": spec["battery_min_soc"],
         "battery_max_soc": spec["battery_max_soc"],
         "threshold_power": spec["threshold_power"],
+        "limits_from_live": bool(spec.get("limits_from_live", False)),
+        "control": str(spec.get("control") or "full"),
     }
     standby = float(spec.get("standby_power_kw", 0.0) or 0.0)
     if standby > 0.0:
