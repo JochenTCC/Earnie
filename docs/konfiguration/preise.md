@@ -131,16 +131,15 @@ Block `market_prices` in `config.json`:
 | ------------------------ | ------------------------------------------------------------------ |
 | `missing_price_strategy` | `forecast` (Standard) oder `mirror`                                |
 | `forecast_model_path`    | Pfad zu `price_model_coefficients.json` (Default: `share/data/price_model_coefficients.json`; Fallback `data/cache/…`; für Strategie `forecast`) |
-| `eu_power_live_source`   | **Nur Research / intern:** `archive_hod` (Standard) oder `energy_charts_forecast` — nicht für öffentlichen Release |
-| `live_bias_enabled`      | **Nur Research / intern:** `false` (Standard); bei `true` rollierende EPEX-Bias-Korrektur auf prognostizierte Slots |
+| `live_bias_enabled`      | Rollierende EPEX-Bias-Korrektur auf prognostizierte Slots (Standard: `true`) |
+| `live_bias_lookback_hours` | Lookback-Fenster in Stunden (Standard: `48`) |
+| `live_bias_cap_cent_kwh` | Absolute Kappe ±Cent/kWh (Standard: `12.0`) |
 
 
 Wenn die aWATTar-API für späte Stunden des Horizonts noch keine Preise liefert:
 
-- `forecast` (Standard): OLS-Korrelationsmodell extrapoliert fehlende Stunden — Live-Features aus Open-Meteo-Wetterprognose plus stündlichem EU-Leistungs-Stand-in aus dem letzten Archivtag; in Charts als grüner Bereich (siehe [Charts](../ui/charts.md)).
+- `forecast` (Standard): OLS-Korrelationsmodell extrapoliert fehlende Stunden — Live-Features aus Open-Meteo-Wetterprognose plus stündlichem EU-Leistungs-Stand-in aus dem letzten Archivtag; in Charts als grüner Bereich (siehe [Charts](../ui/charts.md)). Mit Standard-`live_bias_enabled` wird auf prognostizierte EPEX-Werte eine rollierende Korrektur (Day-Ahead − OLS) angewendet, begrenzt durch `live_bias_cap_cent_kwh`.
 - `mirror`: gleiche Uhrzeit vom Vortag; Fallback auch automatisch, wenn Modell oder Features nicht geladen werden können.
-
-**Intern (Research):** `eu_power_live_source=energy_charts_forecast` und/oder `live_bias_enabled=true` nur lokal zum Wert-Check — siehe Spec [Preis-Prognose](../spec/price-forecast-renewables.md) §11. Produkt-Default bleibt `archive_hod` ohne Live-Bias.
 
 Spec: [Preis-Prognose (Dev)](../spec/price-forecast-renewables.md).
 

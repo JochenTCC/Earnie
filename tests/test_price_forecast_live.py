@@ -12,7 +12,6 @@ import pytest
 
 from data.price_forecast_live import (
     DEFAULT_MODEL_PATH,
-    EU_POWER_LIVE_SOURCE_ARCHIVE_HOD,
     MISSING_PRICE_STRATEGY_FORECAST,
     MISSING_PRICE_STRATEGY_MIRROR,
     _archive_covers_slot_range,
@@ -149,56 +148,14 @@ def test_resolve_market_slots_kwargs_forecast_without_features_uses_mirror():
         "data.price_forecast_live.get_missing_price_strategy",
         return_value=MISSING_PRICE_STRATEGY_FORECAST,
     ):
-        with patch(
-            "data.price_forecast_live.get_eu_power_live_source",
-            return_value=EU_POWER_LIVE_SOURCE_ARCHIVE_HOD,
-        ):
+        with patch("data.price_forecast_live.load_configured_model", return_value=model):
             with patch(
-                "data.price_forecast_live.load_configured_model", return_value=model
+                "data.price_forecast_live.build_live_feature_frame_for_slots",
+                return_value=None,
             ):
-                with patch(
-                    "data.price_forecast_live.build_live_feature_frame_for_slots",
-                    return_value=None,
-                ):
-                    kwargs = resolve_market_slots_kwargs([])
+                kwargs = resolve_market_slots_kwargs([])
     assert kwargs["missing_price_strategy"] == MISSING_PRICE_STRATEGY_MIRROR
     assert "forecast_model" not in kwargs
-
-
-def test_resolve_market_slots_kwargs_ec_source_warms_and_mirrors_on_miss():
-    from data.price_forecast_live import EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST
-
-    model = object()
-    warm = {"n": 0}
-
-    def _warm(_slots):
-        warm["n"] += 1
-
-    with patch(
-        "data.price_forecast_live.get_missing_price_strategy",
-        return_value=MISSING_PRICE_STRATEGY_FORECAST,
-    ):
-        with patch(
-            "data.price_forecast_live.get_eu_power_live_source",
-            return_value=EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST,
-        ):
-            with patch(
-                "data.price_forecast_live.ensure_eu_forecast_cache_warming",
-                side_effect=_warm,
-            ):
-                with patch(
-                    "data.price_forecast_live.load_configured_model",
-                    return_value=model,
-                ):
-                    with patch(
-                        "data.price_forecast_live.build_live_feature_frame_for_slots",
-                        return_value=None,
-                    ):
-                        kwargs = resolve_market_slots_kwargs(
-                            [datetime(2099, 1, 1, 12, tzinfo=ZoneInfo("Europe/Vienna"))]
-                        )
-    assert warm["n"] == 1
-    assert kwargs["missing_price_strategy"] == MISSING_PRICE_STRATEGY_MIRROR
 
 
 def test_build_live_feature_frame_logs_error_on_forecast_failure(caplog):
@@ -227,32 +184,28 @@ def test_feature_load_error_summary_omits_url():
     assert _feature_load_error_summary(exc) == "HTTP 400"
 
 
-def test_get_eu_power_live_source_defaults_archive_hod():
-    from data.price_forecast_live import (
-        EU_POWER_LIVE_SOURCE_ARCHIVE_HOD,
-        get_eu_power_live_source,
-    )
-
-    with patch("config.Config._read_json_dict", return_value={}):
-        assert get_eu_power_live_source() == EU_POWER_LIVE_SOURCE_ARCHIVE_HOD
-
-
-def test_get_eu_power_live_source_rejects_invalid():
-    from data.price_forecast_live import get_eu_power_live_source
-
-    with patch(
-        "config.Config._read_json_dict",
-        return_value={"market_prices": {"eu_power_live_source": "nope"}},
-    ):
-        with pytest.raises(ValueError, match="eu_power_live_source"):
-            get_eu_power_live_source()
-
-
-def test_get_live_bias_enabled_defaults_false():
+def test_get_live_bias_enabled_defaults_true():
     from data.price_forecast_live import get_live_bias_enabled
 
     with patch("config.Config._read_json_dict", return_value={}):
+        assert get_live_bias_enabled() is True
+
+
+def test_get_live_bias_enabled_can_disable():
+    from data.price_forecast_live import get_live_bias_enabled
+
+    with patch(
+        "config.Config._read_json_dict",
+        return_value={"market_prices": {"live_bias_enabled": False}},
+    ):
         assert get_live_bias_enabled() is False
+
+
+def test_get_live_bias_cap_defaults_to_12():
+    from data.price_forecast_live import get_live_bias_cap_cent_kwh
+
+    with patch("config.Config._read_json_dict", return_value={}):
+        assert get_live_bias_cap_cent_kwh() == pytest.approx(12.0)
 
 
 def _stub_price_model(*, intercept: float) -> object:
@@ -274,34 +227,24 @@ def test_compute_rolling_epex_bias_cent_mean_and_cap():
 
     tz = ZoneInfo("Europe/Vienna")
     ref = datetime(2025, 7, 2, 12, 0, tzinfo=tz)
-    day_ahead = {
-        ref - timedelta(hours=h): 10.0 for h in range(1, 10)
-    }
-    # Model always predicts 7 → residual +3
+    day_ahead = {ref - timedelta(hours=h): 10.0 for h in range(1, 10)}
     model = _stub_price_model(intercept=7.0)
-    idx = pd.DatetimeIndex(
-        [(ref - timedelta(hours=h)).replace(tzinfo=None) for h in range(1, 10)]
-    )
-    fake_features = pd.DataFrame({"intercept": [1.0] * len(idx)}, index=idx)
+    idx = [ref - timedelta(hours=h) for h in range(1, 10)]
+    frame = pd.DataFrame({"intercept": [1.0] * len(idx)}, index=idx)
     with patch(
         "data.price_forecast_live.build_live_feature_frame_for_slots",
-        return_value=fake_features,
+        return_value=frame,
     ):
-        with patch(
-            "data.price_forecast_live.predict_prices",
-            return_value=pd.Series([7.0]),
-        ):
-            bias, n = compute_rolling_epex_bias_cent(
-                day_ahead,
-                forecast_model=model,
-                reference_slot=ref,
-                lookback_hours=9,
-                cap_cent_kwh=5.0,
-                min_samples=6,
-            )
+        bias, n = compute_rolling_epex_bias_cent(
+            day_ahead,
+            forecast_model=model,
+            reference_slot=ref,
+            lookback_hours=8,
+            cap_cent_kwh=12.0,
+            min_samples=6,
+        )
     assert n >= 6
-    assert bias is not None
-    assert abs(bias - 3.0) < 1e-6
+    assert bias == pytest.approx(3.0)
 
 
 def test_compute_rolling_epex_bias_respects_cap():
@@ -311,61 +254,18 @@ def test_compute_rolling_epex_bias_respects_cap():
     ref = datetime(2025, 7, 2, 12, 0, tzinfo=tz)
     day_ahead = {ref - timedelta(hours=h): 20.0 for h in range(1, 10)}
     model = _stub_price_model(intercept=0.0)
-    idx = pd.DatetimeIndex(
-        [(ref - timedelta(hours=h)).replace(tzinfo=None) for h in range(1, 10)]
-    )
-    fake_features = pd.DataFrame({"intercept": [1.0] * len(idx)}, index=idx)
+    idx = [ref - timedelta(hours=h) for h in range(1, 10)]
+    frame = pd.DataFrame({"intercept": [1.0] * len(idx)}, index=idx)
     with patch(
         "data.price_forecast_live.build_live_feature_frame_for_slots",
-        return_value=fake_features,
+        return_value=frame,
     ):
-        with patch(
-            "data.price_forecast_live.predict_prices",
-            return_value=pd.Series([0.0]),
-        ):
-            bias, _n = compute_rolling_epex_bias_cent(
-                day_ahead,
-                forecast_model=model,
-                reference_slot=ref,
-                lookback_hours=9,
-                cap_cent_kwh=5.0,
-                min_samples=6,
-            )
-    assert bias == 5.0
-
-
-def test_power_frame_falls_back_to_archive_hod_on_forecast_error():
-    from data import price_forecast_live as pfl
-
-    pfl._power_day_cache.clear()
-    tz = ZoneInfo("Europe/Vienna")
-    slots = [datetime(2099, 1, 1, 12, tzinfo=tz)]
-    remapped = pd.DataFrame(
-        {
-            "eu_wind_mw": [1.0],
-            "eu_solar_mw": [2.0],
-            "eu_load_mw": [0.0],
-            "eu_residual_load_mw": [0.0],
-        },
-        index=pd.DatetimeIndex([slots[0]]),
-    )
-    with patch(
-        "data.price_forecast_live.get_eu_power_live_source",
-        return_value=pfl.EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST,
-    ):
-        with patch(
-            "data.eu_market_features.fetch_eu_power_forecast_hourly",
-            side_effect=ValueError("no data"),
-        ):
-            with patch(
-                "data.price_forecast_live._cached_eu_power_day",
-                return_value=remapped,
-            ):
-                with patch(
-                    "data.eu_market_features.remap_power_by_hour_of_day",
-                    return_value=remapped,
-                ) as remap_mock:
-                    power, src = pfl._power_frame_for_forecast_slots(slots)
-    assert src == pfl.EU_POWER_LIVE_SOURCE_ARCHIVE_HOD
-    assert power is remapped
-    remap_mock.assert_called_once()
+        bias, _n = compute_rolling_epex_bias_cent(
+            day_ahead,
+            forecast_model=model,
+            reference_slot=ref,
+            lookback_hours=8,
+            cap_cent_kwh=5.0,
+            min_samples=6,
+        )
+    assert bias == pytest.approx(5.0)

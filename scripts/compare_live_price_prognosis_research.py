@@ -1,9 +1,9 @@
-"""Internal research: compare live price-prognosis feature/bias variants.
+"""Compare live price-prognosis with/without live bias.
 
-Not for public release. Example:
+Example:
 
   .venv\\Scripts\\python.exe -m scripts.compare_live_price_prognosis_research \\
-      --hours 12
+      --hours 12 --with-live-bias
 
 Requires network (Open-Meteo / Energy-Charts) when not fully mocked.
 """
@@ -20,8 +20,6 @@ from data.market_prices import (
     resolve_market_slots,
 )
 from data.price_forecast_live import (
-    EU_POWER_LIVE_SOURCE_ARCHIVE_HOD,
-    EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST,
     build_live_feature_frame_for_slots,
     load_configured_model,
 )
@@ -31,8 +29,8 @@ from data.tariff_pricing import import_cent_kwh
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Research-only: OLS green-zone predictions with archive_hod vs "
-            "energy_charts_forecast and optional live bias."
+            "OLS green-zone predictions with optional live bias "
+            "(archive hour-of-day EU power stand-in)."
         )
     )
     parser.add_argument(
@@ -50,6 +48,12 @@ def _parse_args() -> argparse.Namespace:
         "--with-live-bias",
         action="store_true",
         help="Also print a column with live_bias_enabled=True (uses Day-Ahead lookback).",
+    )
+    parser.add_argument(
+        "--bias-cap",
+        type=float,
+        default=12.0,
+        help="live_bias_cap_cent_kwh when --with-live-bias (default 12).",
     )
     return parser.parse_args()
 
@@ -90,44 +94,35 @@ def main() -> int:
     targets = _future_hour_slots(args.hours, args.tz)
     print(json.dumps({"tariff_parity": _tariff_parity_check()}, indent=2))
 
-    variants = [
-        ("archive_hod", EU_POWER_LIVE_SOURCE_ARCHIVE_HOD, False),
-        ("energy_charts_forecast", EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST, False),
-    ]
+    variants = [("archive_hod", False)]
     if args.with_live_bias:
-        variants.append(
-            ("energy_charts_forecast+bias", EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST, True)
-        )
+        variants.append(("archive_hod+bias", True))
 
-    # Minimal Day-Ahead history so resolve does not fail when bias lookback is empty:
-    # mirror fallback still needs some past prices if forecast features miss a slot.
     market = []
     for hours_back in range(1, 72):
         slot = targets[0] - timedelta(hours=hours_back)
         market.append({"timestamp": slot, "price_buy": 8.0 + (hours_back % 5)})
 
+    frame = build_live_feature_frame_for_slots(targets)
     rows = []
-    for label, power_source, bias_on in variants:
-        # Force power source for this variant without mutating config.json.
-        import data.price_forecast_live as pfl
+    if frame is None or frame.empty:
+        print(json.dumps({"error": "no feature frame"}, indent=2))
+        return 1
 
-        frame = None
-        with _force_power_source(pfl, power_source):
-            frame = build_live_feature_frame_for_slots(targets)
-        if frame is None or frame.empty:
-            rows.append({"variant": label, "error": "no feature frame"})
-            continue
+    for label, bias_on in variants:
         resolved = resolve_market_slots(
             market,
             targets,
             missing_price_strategy="forecast",
             forecast_model=model,
             forecast_feature_frame=frame,
-            eu_power_live_source=power_source,
             live_bias_enabled=bias_on,
             live_bias_lookback_hours=48,
+            live_bias_cap_cent_kwh=float(args.bias_cap),
         )
-        predicted = [r for r in resolved if r.get("price_source") == PRICE_SOURCE_PREDICTED]
+        predicted = [
+            r for r in resolved if r.get("price_source") == PRICE_SOURCE_PREDICTED
+        ]
         if not predicted:
             rows.append({"variant": label, "error": "no predicted slots"})
             continue
@@ -140,28 +135,11 @@ def main() -> int:
                 "min_epex": round(min(prices), 3),
                 "max_epex": round(max(prices), 3),
                 "live_bias": predicted[0].get("live_bias_cent_kwh"),
-                "power_source": predicted[0].get("eu_power_live_source"),
             }
         )
 
     print(json.dumps({"variants": rows}, indent=2))
     return 0
-
-
-class _force_power_source:
-    def __init__(self, module, source: str) -> None:
-        self._module = module
-        self._source = source
-        self._orig = None
-
-    def __enter__(self):
-        self._orig = self._module.get_eu_power_live_source
-        self._module.get_eu_power_live_source = lambda: self._source
-        return self
-
-    def __exit__(self, *args):
-        self._module.get_eu_power_live_source = self._orig
-        return False
 
 
 if __name__ == "__main__":

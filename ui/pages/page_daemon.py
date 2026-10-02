@@ -124,94 +124,6 @@ def _render_status(daemon: DaemonStatus) -> None:
     )
 
 
-def _format_cache_age(age_sec: float | None) -> str:
-    if age_sec is None:
-        return "—"
-    if age_sec < 120:
-        return f"{age_sec:.0f} s"
-    if age_sec < 3600:
-        return f"{age_sec / 60:.0f} min"
-    return f"{age_sec / 3600:.1f} h"
-
-
-def _render_price_forecast_cache_status() -> None:
-    """Cross-process EU forecast disk-cache status (research path)."""
-    from data.eu_forecast_disk_cache import (
-        STATE_ERROR,
-        STATE_INACTIVE,
-        STATE_MISSING,
-        STATE_READY,
-        STATE_STALE,
-        STATE_WARMING,
-        get_eu_forecast_cache_status,
-    )
-    from data.price_forecast_live import (
-        get_eu_power_live_source,
-        get_live_bias_enabled,
-        get_missing_price_strategy,
-    )
-
-    st.subheader("Preisprognose-Cache")
-    try:
-        source = get_eu_power_live_source()
-        strategy = get_missing_price_strategy()
-        bias = get_live_bias_enabled()
-    except ValueError as exc:
-        st.warning(f"Preisprognose-Config ungültig: {exc}")
-        return
-
-    status = get_eu_forecast_cache_status(
-        eu_power_live_source=source,
-        missing_price_strategy=strategy,
-        live_bias_enabled=bias,
-    )
-    st.caption(
-        f"Strategie: `{strategy}` · EU-Leistung: `{source}` · "
-        f"Live-Bias: {'an' if bias else 'aus'}"
-    )
-    state = str(status.get("state") or STATE_MISSING)
-    age = _format_cache_age(
-        float(status["age_sec"]) if status.get("age_sec") is not None else None
-    )
-    ttl_min = float(status.get("ttl_sec") or 0) / 60.0
-    rng = ""
-    if status.get("range_start") and status.get("range_end"):
-        rng = f" · Zeitraum `{status['range_start']}` … `{status['range_end']}`"
-
-    if state == STATE_INACTIVE:
-        st.info(
-            "Research-Pfad `energy_charts_forecast` ist aus — "
-            "Produkt-Stand-in (Archiv-Stundenprofil) ohne Disk-Cache-Warmup."
-        )
-        return
-    if state == STATE_READY:
-        st.success(
-            f"Prognosedaten verfügbar (Alter {age}, TTL {ttl_min:.0f} min)"
-            f"{rng}."
-        )
-        return
-    if state == STATE_STALE:
-        st.warning(
-            f"Prognose-Cache veraltet (Alter {age}) — Hintergrund-Aktualisierung; "
-            f"aktuelle Planung nutzt noch den alten Stand{rng}."
-        )
-        return
-    if state == STATE_WARMING:
-        st.info(
-            "Prognosedaten werden geladen — Live nutzt vorübergehend Spiegelung "
-            f"für fehlende Day-Ahead-Slots{rng}."
-        )
-        return
-    if state == STATE_ERROR:
-        err = status.get("error") or "?"
-        st.warning(f"Prognose-Cache-Fehler: {err}. Fallback Spiegelung.")
-        return
-    st.info(
-        "Prognosedaten noch nicht verfügbar — Live nutzt vorübergehend Spiegelung "
-        "für fehlende Day-Ahead-Slots."
-    )
-
-
 def _render_silent_mode_toggle() -> None:
     shadow = is_shadow_mode()
     current = bool(config.is_silent_mode())
@@ -353,7 +265,6 @@ def render() -> None:
 
     daemon = status()
     _render_status(daemon)
-    _render_price_forecast_cache_status()
     _render_silent_mode_toggle()
     do_start, do_stop, do_restart = _render_lifecycle_buttons(
         running=daemon.state == "running",

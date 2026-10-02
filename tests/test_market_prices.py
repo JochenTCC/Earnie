@@ -324,12 +324,8 @@ def test_resolve_market_slots_applies_live_bias_to_predicted_only():
                     forecast_model=MagicMock(),
                     forecast_feature_frame=feature_frame,
                     live_bias_enabled=True,
-                    eu_power_live_source="energy_charts_forecast",
                 )
     by_src = {row["price_source"]: row for row in out}
     assert by_src[PRICE_SOURCE_DAY_AHEAD]["price_buy"] == pytest.approx(10.0)
     assert by_src[PRICE_SOURCE_PREDICTED]["price_buy"] == pytest.approx(6.25)
     assert by_src[PRICE_SOURCE_PREDICTED]["live_bias_cent_kwh"] == pytest.approx(1.25)
-    assert by_src[PRICE_SOURCE_PREDICTED]["eu_power_live_source"] == (
-        "energy_charts_forecast"
-    )

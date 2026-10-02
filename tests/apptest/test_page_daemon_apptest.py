@@ -23,7 +23,3 @@ def test_title_and_status_present():
     assert at.title[0].value == "🛠️ Optimierer-Dienst"
     labels = {b.label for b in at.button}
     assert {"Start", "Stop", "Neustart"} <= labels
-    markdown = "\n".join(m.value for m in at.markdown)
-    assert "Preisprognose-Cache" in markdown or any(
-        "Preisprognose-Cache" in (s.value or "") for s in at.subheader
-    )

@@ -29,7 +29,7 @@ In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version
 | **Konfiguration** | Hauskonfigurator, Szenarienkonfigurator, Szenario-Explorer (wenn freigeschaltet) |
 | **Daemon Control** | Smarthome-Backend, Optimierer-Dienst, EHAL-Com |
 
-**Optimierer-Dienst:** Start/Stop/Neustart, Dienst-Log, **Preisprognose-Cache**-Status (Research) und Umschalter **Silent / Loud** (`silent_mode` in `runtime/local_settings.json`; kein Neustart von `main.py` nötig). Details: [Betrieb](../einrichtung/betrieb.md) · Schreibverhalten: [EHAL-Com](ehal-com.md).
+**Optimierer-Dienst:** Start/Stop/Neustart, Dienst-Log und Umschalter **Silent / Loud** (`silent_mode` in `runtime/local_settings.json`; kein Neustart von `main.py` nötig). Details: [Betrieb](../einrichtung/betrieb.md) · Schreibverhalten: [EHAL-Com](ehal-com.md).
 
 Während der Greenfield-Ersteinrichtung sind zunächst nur **Konfiguration** und **Daemon Control** sichtbar (Daemon-Seiten werden für die Ersteinrichtung auch ohne `live_environment` in der Env erzwungen). Solange kein Smarthome-Backend gewählt ist, zeigt Daemon Control zunächst nur **Smarthome-Backend** — Optimierer-Dienst und EHAL-Com erscheinen erst danach.
 

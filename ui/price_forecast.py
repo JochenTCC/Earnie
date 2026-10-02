@@ -222,13 +222,13 @@ def render_price_forecast_block() -> None:
         show.index = show.index.strftime("%Y-%m-%d %H:%M")
         st.dataframe(show.round(3), width="stretch")
 
-    with st.expander("Research (internal only — not for public release)"):
+    with st.expander("Live bias (green-zone correction)"):
         st.caption(
-            "Live green-zone research gates in `config.json` → `market_prices` "
-            "(defaults stay product-safe). Spec §11."
+            "Rolling Day-Ahead − OLS residual on predicted slots "
+            "(`market_prices.live_bias_*`). Spec §11."
         )
         from data.price_forecast_live import (
-            get_eu_power_live_source,
+            get_live_bias_cap_cent_kwh,
             get_live_bias_enabled,
             get_live_bias_lookback_hours,
         )
@@ -236,9 +236,9 @@ def render_price_forecast_block() -> None:
         try:
             st.write(
                 {
-                    "eu_power_live_source": get_eu_power_live_source(),
                     "live_bias_enabled": get_live_bias_enabled(),
                     "live_bias_lookback_hours": get_live_bias_lookback_hours(),
+                    "live_bias_cap_cent_kwh": get_live_bias_cap_cent_kwh(),
                 }
             )
         except ValueError as exc:

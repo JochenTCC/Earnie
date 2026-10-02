@@ -1,7 +1,7 @@
 # Spezifikation: Preisprognose für extrapolierte Slots (EU-Wetter & Erzeugung)
 
-**Version:** 0.5  
-**Status:** Phase 0–3 live path done (2026-09-29); **2.5.e+:** Live Day-Ahead is QH; forecast **features stay hourly** and are **held onto parent-hour QH slots** (no QH retrain in Version 2.5). **Research (§11):** EU `public_power_forecast` + rolling live bias — gated off, not for public release.  
+**Version:** 0.6  
+**Status:** Phase 0–3 live path done (2026-09-29); **2.5.e+:** Live Day-Ahead is QH; forecast **features stay hourly** and are **held onto parent-hour QH slots** (no QH retrain in Version 2.5). **§11:** live bias on predicted slots (default on, cap ±12 Cent/kWh).  
 **Epic-Kurzname:** **Preis-Prognose**  
 **Ersetzt:** Backlog-Research „Preis-Spiegelung Mittelung“  
 **Bezug:** [UI Sunset-2-Sunset](ui-sunset2sunset.md) §5 (grüne Zone), `data/market_prices.py` (`resolve_market_slots`), [quarter-hour-slots.md](quarter-hour-slots.md)
@@ -222,29 +222,21 @@ EU power stand-in (archive) ──▶│     (share/data/price_model_coefficient
 - Prognosegüte der Wetter-API für D+2-Horizont
 - DST: Slots über `normalize_price_slot` / Europe/Vienna
 
-## 11. Research gates (internal only — not for public release)
+## 11. Live bias (product)
 
-Ship defaults stay **archive hour-of-day power stand-in** and **no live bias**. Enable only in local `earnie_env` / `earnie_shadow` for value checks.
+Rolling EPEX residual correction on **predicted** green-zone slots only (Day-Ahead − OLS over a lookback window), absolute cap.
 
-| Config key (`market_prices`) | Default | Research value |
-|------------------------------|---------|----------------|
-| `eu_power_live_source` | `archive_hod` | `energy_charts_forecast` → Energy-Charts `public_power_forecast` (solar + wind on/offshore, day-ahead then current) |
-| `live_bias_enabled` | `false` | `true` → rolling mean residual (Day-Ahead − OLS) over lookback, capped, applied only to **predicted** EPEX |
-| `live_bias_lookback_hours` | `48` | lookback window when bias enabled |
-| `live_bias_cap_cent_kwh` | `5.0` | absolute cap on live bias |
+| Config key (`market_prices`) | Default | Meaning |
+|------------------------------|---------|---------|
+| `live_bias_enabled` | `true` | Apply rolling bias to predicted EPEX |
+| `live_bias_lookback_hours` | `48` | Lookback window |
+| `live_bias_cap_cent_kwh` | `12.0` | Absolute cap (± Cent/kWh) |
+
+EU live power features stay the product **archive hour-of-day** stand-in. The unsuccessful `energy_charts_forecast` trial (async disk cache, Optimierer-Dienst panel) is archived on branch `archive/energy-charts-forecast-research` — not shipped.
 
 Tariff extras (settlement, markup, Netznutzung, VAT) apply via `epex_to_brutto_cent` / `import_cent_kwh` for **both** Day-Ahead and predicted slots; regression: `test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex`.
 
 Compare script: `python -m scripts.compare_live_price_prognosis_research` (optional `--with-live-bias`).
-
-### Disk cache + non-blocking live (research)
-
-When `eu_power_live_source=energy_charts_forecast`:
-
-- Frames persist under `runtime/cache/` (`eu_power_forecast_*.json`, `eu_weather_forecast_*.json`) with TTL **45 min** (same as in-memory).
-- Status sidecar: `runtime/cache/eu_forecast_cache_status.json` (states: `missing` / `warming` / `ready` / `stale` / `error`).
-- Cold miss does **not** block `main.py`: background refresh + temporary **`mirror`** for missing Day-Ahead slots until cache is ready; **stale-while-revalidate** keeps using expired disk frames while refresh runs.
-- Country HTTP fan-out uses a small thread pool; Optimierer-Dienst shows **Preisprognose-Cache** (reads disk/sidecar — Streamlit ≠ daemon process).
 
 ## 12. Bezug
 
@@ -256,7 +248,7 @@ When `eu_power_live_source=energy_charts_forecast`:
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
-| 2026-10-02 | 0.6 | Research: disk cache + non-blocking warmup/mirror; Optimierer-Dienst cache status |
+| 2026-10-02 | 0.6 | Live bias product default on (cap ±12); Energy-Charts forecast trial archived off branch |
 | 2026-10-01 | 0.5 | Research gates: EU power forecast + live bias + tariff parity (§11); not product default |
 | 2026-09-29 | 0.4 | Phase 3 live: Default `forecast`/OLS; Open-Meteo Features; ship-Modell `share/data/` |
 | 2026-07-06 | 0.2 | Phase 2: OLS-Modell, Evaluation vs. Spiegelung |

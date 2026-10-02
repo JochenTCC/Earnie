@@ -302,9 +302,9 @@ def resolve_market_slots(
     forecast_feature_frame: pd.DataFrame | None = None,
     forecast_model_path: Path | None = None,
     eu_power_live_source: str | None = None,
-    live_bias_enabled: bool = False,
+    live_bias_enabled: bool = True,
     live_bias_lookback_hours: int = 48,
-    live_bias_cap_cent_kwh: float = 5.0,
+    live_bias_cap_cent_kwh: float = 12.0,
 ) -> list[dict[str, Any]]:
     """
     Liefert Preis-Slots für target_hours (beliebige Länge >= 1).
@@ -312,8 +312,8 @@ def resolve_market_slots(
     Fehlende Day-Ahead-Stunden: Spiegelung (Standard) oder OLS-Prognose bei
     missing_price_strategy='forecast' (Fallback: Spiegelung).
 
-    Research kwargs (default off / unused): ``eu_power_live_source``,
-    ``live_bias_enabled`` (+ lookback/cap) — see price-forecast-renewables.md.
+    Live bias (default on): rolling Day-Ahead−OLS residual on predicted slots,
+    capped by ``live_bias_cap_cent_kwh`` (default ±12 Cent/kWh).
     """
     if not target_hours:
         raise ValueError("resolve_market_slots erfordert mindestens eine Zielstunde.")
