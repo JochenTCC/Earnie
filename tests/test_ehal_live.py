@@ -47,7 +47,7 @@ def test_read_live_power_kw_ha_backend(config_mock, adapter_factory):
     power = ehal_live.read_live_power_kw()
     assert power is not None
     assert power["pv"] == 2.0
-    assert power["battery"] == -0.5
+    assert power["battery"] == 0.5
 
 
 @patch("integrations.ehal_live.get_loxone_adapter")
@@ -71,7 +71,7 @@ def test_read_live_power_kw_loxone_backend(config_mock, adapter_factory):
     power = ehal_live.read_live_power_kw()
     assert power is not None
     assert power["pv"] == 2.0
-    assert power["battery"] == -0.5
+    assert power["battery"] == 0.5
     assert ehal_live.is_loxone_backend() is True
     assert ehal_live.is_ehal_network_backend() is False
 
@@ -98,8 +98,9 @@ def test_read_live_power_kw_sign(config_mock, adapter_factory):
     assert power is not None
     assert power["pv"] == 2.0
     assert power["grid"] == 1.0
-    assert power["battery"] == -0.5
-    assert power["house"] == pytest.approx(2.5)
+    assert power["battery"] == 0.5
+    # PV 2 + import 1 + discharge 0.5
+    assert power["house"] == pytest.approx(3.5)
 
 
 @patch("integrations.ehal_live.persist_write_error")

@@ -69,8 +69,8 @@ def _utc_ts() -> str:
 
 
 def loxone_battery_kw_to_ehal_w(battery_kw: float) -> float:
-    """Loxone Live: +charge → EHAL sens_ess_power: +discharge."""
-    return -float(battery_kw) * 1000.0
+    """Loxone battery Merker (kW, ``+`` = discharge) → EHAL sens_ess_power (W, same sign)."""
+    return float(battery_kw) * 1000.0
 
 
 def ehal_limit_w_to_loxone_kw(limit_w: float) -> float:
@@ -320,7 +320,7 @@ class LoxoneAdapter:
             value = loxone_client.fetch_loxone_generic_value(marker)
             if value is not None:
                 return max(0.0, float(value) * 1000.0)
-        return max(0.0, pv_w - grid_w - ess_w)
+        return max(0.0, pv_w + grid_w + ess_w)
 
     def _require_marker(self, name: str, field: str) -> float:
         marker = str(name or "").strip()

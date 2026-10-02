@@ -110,7 +110,8 @@ def test_read_telemetry_normalizes(get_mock):
     assert telemetry["sens_ess_soc"] == 55.0
     assert telemetry["sens_ess_power"] == -200.0
     assert telemetry["sens_evcs_active_power"] == 1200.0
-    assert telemetry["sens_power_consumers"] == pytest.approx(600.0)
+    # PV 500 + import 100 − charge 200
+    assert telemetry["sens_power_consumers"] == pytest.approx(400.0)
 
 
 @patch("integrations.ha_adapter.requests.get", side_effect=_setpoint_state_get())

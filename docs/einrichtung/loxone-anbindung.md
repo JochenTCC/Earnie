@@ -61,6 +61,20 @@ Merker-Namen liegen in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Haus
 
 Frühere Rollen `target_soc_name` und `pv_counter_name` entfallen. Force über `set_ess_active_power`, Grenzen als echte Caps. Loxone-Merker sind **sticky** — Automatik ist `set_ess_mode = 0`, nicht „Sollleistung weggelassen“. PV-Intervallenergie aus ∫ `sens_pv_production_active`.
 Statische HK-Decke: optional `plant.max_export_power_kw` im Hauskonfigurator. Effektive Decke = `min` aus HK, inbound EHAL und **0** wenn der Einspeisetarif negativ ist (Nutzer zahlt für Einspeisung). Config setzt `set_grid_export_power_limit` als Wechselrichter-Curtailment um, am einfachsten als `MIN(Limit; WR-Nennleistung)`: `0` = Einspeisesperre; ohne Begrenzung schreibt Earnie die maximal mögliche Einspeisung der Anlage = Summe der PV-Nennleistungen (kWp) + maximale Entladeleistung der Batterie (nur wenn sie zwangsentladen werden kann, `Batteriesteuerung = voll`). Sind beide unbekannt, steht `1000` kW im Merker. Der Steuerbefehl (`set_ess_mode`) gilt nur für die Batterie und signalisiert keine Einspeisebegrenzung.
+**Vorzeichenkonvention (verbindlich):** Alle Leistungen, die *ins Haus* fließen, sind positiv. Ohne Wechselrichterverluste gilt:
+
+```
+P_cons = P_PV + P_Grid + P_Bat
+```
+
+| Größe | Merker / EHAL-Feld | `+` | `−` |
+|---|---|---|---|
+| `P_PV` | PV-Leistung / `sens_pv_production_active` | Erzeugung | — (≥ 0) |
+| `P_Grid` | `Earnie_Netzleistung` / `sens_grid_power_active` | Bezug | Einspeisung |
+| `P_Bat` | `Earnie_Batterie_Leistung` bzw. EFM-Speicher / `sens_ess_power` | Entladen | Laden |
+| `P_cons` | Hausverbrauch / `sens_power_consumers` | Verbrauch | — (≥ 0) |
+
+Earnie dreht keine Vorzeichen — die Loxone-Merker müssen bereits so geliefert werden. Huawei-Register haben teils andere Vorzeichen und müssen in Loxone gedreht werden: 37113 (Netz, `+` = Einspeisung) und 37765 (Batterie, `+` = Laden).
 Historische Verbrauchsdaten kommen über CSV-Upload / Energiemonitor bzw. `cons_data` (kein Miniserver-FTP-Log mehr).
 
 Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-Logik hinter diesen virtuellen Eingängen. Config muss `Steuerbefehl = 0` als Freigabe/Automatik behandeln, auch wenn `Earnie_Batterie_Sollleistung` noch einen alten Wert hält.

@@ -67,7 +67,23 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 
 **EVCS (**`sens_evcs_active_power`**):** charge power ≥ `0` (W) when charging; `0` when idle.
 
-**ESS (**`sens_ess_power`**, optional):** OpenEMS-aligned — `+` = **discharge**, `−` = **charge**. Adapters that use the opposite convention (e.g. Loxone Live: + charge) must invert at the boundary.
+**ESS (**`sens_ess_power`**, optional):** OpenEMS-aligned — `+` = **discharge**, `−` = **charge**. Adapters whose source uses the opposite convention (e.g. Victron: + charge) must invert at the boundary. Loxone battery Merker already use `+` = discharge (no inversion).
+
+**Reference power balance (normative):** all power signs are chosen so that every flow *into the house* is positive. Ignoring inverter losses:
+
+```
+P_cons = P_PV + P_Grid + P_Bat
+         (sens_power_consumers = sens_pv_production_active + sens_grid_power_active + sens_ess_power)
+```
+
+| Term | Field | `+` | `−` |
+|------|-------|-----|-----|
+| `P_PV` | `sens_pv_production_active` | production | — (≥ 0) |
+| `P_Grid` | `sens_grid_power_active` | import (Bezug) | export (Einspeisung) |
+| `P_Bat` | `sens_ess_power` | discharge | charge |
+| `P_cons` | `sens_power_consumers` | house load | — (≥ 0) |
+
+Every adapter, derived value (`sens_power_consumers` when not mapped), Live dict and Loxone Merker follows this convention; hub-native signs are normalized at the adapter boundary. Example: Huawei registers 37113 (grid, `+` = export) and 37765 (battery, `+` = charge) must both be negated.
 
 **House load (**`sens_power_consumers`**, optional):** prefer mapped Merker; else derive from grid/PV/ESS balance.
 
@@ -305,7 +321,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 
 - Adapter: `integrations/loxone_adapter.py` (HTTP markers via `loxone_client`). Live façade: `integrations/ehal_live.py` (`get_adapter()` includes Loxone).
 - Default config: missing/`none`/`loxone` → `EHAL_BACKEND=loxone`, `adapter_id` default `loxone-home`. Marker names live in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Pattern B); empty legacy `loxone_blocks` may remain but is not the mapping source.
-- Telemetry: kW markers → W; Loxone battery **+charge** → EHAL `sens_ess_power` **+discharge** (`× −1000`); grid pass-through as EHAL `+` import; field names §C (`sens_`*).
+- Telemetry: kW markers → W; Loxone battery **+discharge** → EHAL `sens_ess_power` **+discharge** (`× 1000`, no inversion); grid pass-through as EHAL `+` import; field names §C (`sens_`*).
 - Capabilities: `supports_ess_write` when charge/discharge markers exist; `supports_evcs_current` when EV current write path works.
 - Live writes: ESS limits / `set_ess_mode` / EV current+mode / flex enable via adapter + `ehal_bindings`.
 - Removed from live semantics (wire rename): ESS `target_soc`, EV `soc_at_plug_in`, PV cumulative counter, Sofortladen countdown Merker.
