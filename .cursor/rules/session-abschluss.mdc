@@ -12,8 +12,9 @@ When the user wants to **end session**, **backlog sync**, **commit and push**, o
 3. **`version.py`:** change only after explicit user approval (see `versioning.mdc`) — no automatic bump at session end
 4. On approved **D** bump to a pre-release (or before **B**): sync `docker/compose/*-alpha.yml` `image:` tags to `version.py` (skill section **Alpha compose sync**)
 5. For local or possibly temporary files **ask first** (e.g. personal VS Code settings, local paths)
-6. After Phase 1: present the skill’s **Publish decision guide** (**A** skip / **B** pre-release / **C** official / **D** bump then publish) with live `version.py` and one recommended choice
-7. **Phase 2** (tag / Docker) **only** after the user picks B, C, or D→B/C — never automatically
-8. A tag builds a **candidate** only; the user tests it on the target platform and approves job `promote` (environment `release-approval`) themselves — never approve/reject on their behalf; `streamlitcloud` reset only after approval
+6. **Always ask** whether private earnie-env / `Earnie-env-home` changes should be committed, pushed, and tagged (skill §2a)
+7. After Phase 1: present the skill’s **Publish decision guide** (**A** skip / **B** pre-release / **C** official / **D** bump then publish) with live `version.py` and one recommended choice
+8. **Phase 2** (tag / Docker) **only** after the user picks B, C, or D→B/C — never automatically
+9. A tag builds a **candidate** only; the user tests it on the target platform and approves job `promote` (environment `release-approval`) themselves — never approve/reject on their behalf; `streamlitcloud` reset only after approval
 
 Commit and push approval is implied by the end-session request; still do not commit secrets or gitignored files.

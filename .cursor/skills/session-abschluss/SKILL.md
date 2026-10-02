@@ -3,7 +3,8 @@ name: session-abschluss
 description: >-
   Ends a development session: maintain backlog/Backlog.md, backlog/Backlog-Bugfixes.md, and
   backlog/Backlog-Erledigt.md,
-  commit and push all open changes, then guide the user through publish choices
+  commit and push all open changes, ask whether private earnie-env / Earnie-env-home
+  files should be committed, pushed, and tagged, then guide the user through publish choices
   (A skip / B community pre-release / C official / D bump version.py first)
   before any tag (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
   A tag only builds a release candidate; the user tests it on the target platform and
@@ -28,6 +29,7 @@ Run in parallel:
 - `git diff --cached`
 - `git log -5 --oneline` (commit style)
 - Chat history for this session: what was completed, what remains open?
+- **Private earnie-env (if present):** `git status` / `git diff` in the sibling private site-pack repo (default `..\Earnie-env-home`, see `docs/einrichtung/private-env.md` / `scripts/link_private_env.ps1`). Do not invent a second path; if the junction exists, follow its target.
 
 ### 2. Classify changes
 
@@ -46,6 +48,20 @@ Run in parallel:
 If multiple questionable files: **one compact list** with recommendation (commit / skip / later).
 
 Stage only after the user responds. Do not commit excluded files.
+
+### 2a. Private earnie-env — always ask
+
+**Always ask** (even if the private repo looks clean — the user may have other env packs or pending sync):
+
+> Should any **earnie-env** / `Earnie-env-home` changes be committed, pushed, and tagged?
+
+Rules:
+
+- House site files live in the **private** sibling repo (junctioned as `earnie_env/config/`), **not** in the public Earnie tree — never commit `.env`, `tariffs.json` from the junction into the private repo as the public catalog (public catalog = `share/config/tariffs.json` in Earnie).
+- If dirty: summarize changed paths, then wait for yes/no on **commit**, **push**, and (if publishing) **tag**.
+- If tagging Earnie (**B** / **C**): ask whether to create/push the **same annotated tag** on the private env repo (e.g. `vX.Y.Z-alpha.N`) so site packs stay aligned with the Earnie release.
+- Only commit/push/tag the private repo after explicit user OK — never silently.
+- If the private repo is missing or not a git checkout: say so once and skip (do not create it).
 
 ### 3. Update backlog
 
@@ -99,6 +115,7 @@ Briefly summarize:
 - Commit hash and message
 - Push status
 - Excluded files (if any)
+- Private earnie-env decision (skipped / committed+pushed / tagged or not)
 
 Then **always** present the publish decision guide below (read `version.py` first; fill in concrete values). Do **not** skip this block after Phase 1 — even if publish seems unlikely; the user may still choose **D**.
 
@@ -193,6 +210,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 - [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/spec/release-checklist.md` §1
 - [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)
 - [ ] GitHub environment `release-approval` exists with the user as *Required reviewer* (otherwise job `release` fails early by design)
+- [ ] **Private earnie-env:** user asked whether to commit/push/tag `Earnie-env-home` (or sibling env packs) with the same tag; done or explicitly skipped
 
 ### 1. Check version
 
