@@ -33,8 +33,9 @@ def _cfg(**kwargs) -> LoxoneConfig:
 
 
 def test_battery_sign_and_limit_units():
-    assert loxone_battery_kw_to_ehal_w(1.5) == pytest.approx(-1500.0)
-    assert loxone_battery_kw_to_ehal_w(-0.5) == pytest.approx(500.0)
+    # Loxone battery Merker: + = discharge, same sign as EHAL
+    assert loxone_battery_kw_to_ehal_w(1.5) == pytest.approx(1500.0)
+    assert loxone_battery_kw_to_ehal_w(-0.5) == pytest.approx(-500.0)
     assert ehal_limit_w_to_loxone_kw(2000) == pytest.approx(2.0)
     assert ehal_active_power_w_to_loxone_kw(-1500) == pytest.approx(-1.5)
 
@@ -72,9 +73,9 @@ def test_read_telemetry_normalizes(fetch_mock):
     assert telemetry["sens_ess_soc"] == 55.0
     assert telemetry["sens_pv_production_active"] == 2000.0
     assert telemetry["sens_grid_power_active"] == 1000.0
-    assert telemetry["sens_ess_power"] == pytest.approx(-500.0)
-    # max(0, 2000 - 1000 - (-500)) = 1500
-    assert telemetry["sens_power_consumers"] == pytest.approx(1500.0)
+    assert telemetry["sens_ess_power"] == pytest.approx(500.0)
+    # PV 2000 + import 1000 + discharge 500
+    assert telemetry["sens_power_consumers"] == pytest.approx(3500.0)
 
 
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")

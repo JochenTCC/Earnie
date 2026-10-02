@@ -21,7 +21,7 @@
       "scale": 0.001,
       "unit": "kW",
       "direction": "read",
-      "notes": "Placeholder — Loxone marker often in kW with +charge; EHAL needs W and +discharge."
+      "notes": "Placeholder — Loxone marker in kW with + = discharge; EHAL needs W, same sign."
     },
     {
       "address": 47101,
@@ -71,8 +71,8 @@
       "source": "Battery_Power",
       "ehal_field": "sens_ess_power",
       "scale": 1000,
-      "negate": true,
-      "transform_note": "kW→W and invert +charge → EHAL +discharge (matches loxone_adapter)."
+      "negate": false,
+      "transform_note": "kW→W; Loxone + = discharge already matches EHAL (matches loxone_adapter)."
     },
     {
       "source": "Active_Power_Setpoint",

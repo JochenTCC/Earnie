@@ -13,7 +13,7 @@
       "ehal_field": "sens_ess_power",
       "loxone_blocks_key": "plant.ehal_bindings.sens_ess_power",
       "suggested_name": "Earnie_Batterie_Leistung",
-      "notes": "Optional; kW, typically +charge in Loxone. Prefer EFM Storage meter name when present."
+      "notes": "Optional; kW, + = discharge (same sign as EHAL, no inversion). Prefer EFM Storage meter name when present."
     },
     {
       "ehal_field": "set_ess_active_power",

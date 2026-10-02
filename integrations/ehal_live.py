@@ -96,14 +96,17 @@ def load_write_error() -> EhalWriteError | None:
 
 
 def derive_sens_power_consumers_w(telemetry: dict[str, Any]) -> float:
-    """House load W: mapped value if present, else max(0, PV − grid − ESS)."""
+    """House load W: mapped value if present, else max(0, PV + grid + ESS).
+
+    EHAL signs: grid ``+`` = import, ESS ``+`` = discharge.
+    """
     mapped = telemetry.get("sens_power_consumers")
     if mapped is not None:
         return max(0.0, float(mapped))
     pv = float(telemetry["sens_pv_production_active"])
     grid = float(telemetry["sens_grid_power_active"])
     ess = float(telemetry.get("sens_ess_power") or 0.0)
-    return max(0.0, pv - grid - ess)
+    return max(0.0, pv + grid + ess)
 
 
 def with_derived_sens_power_consumers(telemetry: dict[str, Any]) -> dict[str, Any]:
@@ -260,7 +263,7 @@ def read_ess_soc() -> float | None:
 
 
 def read_live_power_kw() -> dict[str, float] | None:
-    """Return Live power dict (kW) in Loxone-compatible signs (+ battery = charge)."""
+    """Return Live power dict (kW): grid ``+`` = import, battery ``+`` = discharge."""
     try:
         telemetry = with_derived_sens_power_consumers(get_adapter().read_telemetry())
     except (
@@ -279,8 +282,8 @@ def read_live_power_kw() -> dict[str, float] | None:
     if ess_w is None:
         battery = 0.0
     else:
-        # EHAL sens_ess_power: +discharge; Live/Loxone convention: +charge
-        battery = -float(ess_w) / 1000.0
+        # EHAL sens_ess_power and Live dict share the sign: + = discharge
+        battery = float(ess_w) / 1000.0
     house = pv + battery + grid
     return {
         "pv": round(pv, 2),
