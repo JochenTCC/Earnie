@@ -15,6 +15,8 @@ Beim Daemon-Start schreibt Earnie **einmal** sichere Sollwerte (ESS Automatik / 
 
 Unter **Optimierer-Dienst → Dienst-Log** zeigt die App den Schluss (Tail) von `runtime/earnie.log` in einem Expander (Aktualisieren oben und unten am Log lädt neu). Log-Level (`INFO` / `WARNING` / …) sind filterbar; Standard ist INFO und höher. Bei jedem erfolgreichen Start von `main.py` schreibt Earnie einen klaren Trennstreifen (Separator) mit PID und Version in `earnie.log`, damit Läufe leichter unterscheidbar sind.
 
+Unter **Preisprognose-Cache** (derselbe Seite) erscheint der Status des Research-Disk-Caches für EU-Leistungs-/Wetterprognose (`runtime/cache/`), wenn `market_prices.eu_power_live_source=energy_charts_forecast` gesetzt ist: verfügbar, veraltet, wird geladen, oder vorübergehende Spiegelung.
+
 **Docker (empfohlen):** Ein Container (`earnie`). Die UI startet `main.py` automatisch, wenn `EARNIE_AUTO_START_MAIN=1` gesetzt ist (Standard in den Compose-Dateien).
 
 **Lokal (venv / VS Code):** `main.py` und Streamlit können getrennt laufen. Auto-Start ist aus, solange `EARNIE_AUTO_START_MAIN` nicht auf `1` steht — so bleibt Debugging von `main.py` exklusiv.

@@ -113,11 +113,78 @@ def test_fetch_eu_power_forecast_hourly_sums_countries(monkeypatch):
         )
 
     monkeypatch.setattr(emf, "fetch_country_power_forecast_hourly", fake_country)
+    monkeypatch.setattr(emf, "save_frame", lambda *a, **k: None)
+    monkeypatch.setattr(emf, "refresh_status_from_disk", lambda *a, **k: {})
     emf._power_forecast_cache.clear()
     frame = emf.fetch_eu_power_forecast_hourly(
         date(2025, 7, 1),
         date(2025, 7, 2),
     )
+    assert frame is not None
     assert abs(float(frame["eu_wind_mw"].iloc[0]) - 1100.0) < 1e-9
     assert abs(float(frame["eu_solar_mw"].iloc[0]) - 550.0) < 1e-9
     assert "eu_load_mw" in frame.columns
+
+
+def test_fetch_eu_power_forecast_nonblocking_miss_schedules_refresh(monkeypatch):
+    from datetime import date
+
+    import data.eu_market_features as emf
+
+    scheduled: list[tuple] = []
+
+    def fake_schedule(start, end):
+        scheduled.append((start, end))
+        return True
+
+    monkeypatch.setattr(emf, "load_frame", lambda *a, **k: (None, None, False))
+    monkeypatch.setattr(emf, "schedule_power_forecast_refresh", fake_schedule)
+    emf._power_forecast_cache.clear()
+    frame = emf.fetch_eu_power_forecast_hourly(
+        date(2025, 7, 1),
+        date(2025, 7, 2),
+        blocking=False,
+    )
+    assert frame is None
+    assert scheduled == [(date(2025, 7, 1), date(2025, 7, 2))]
+
+
+def test_fetch_eu_power_forecast_uses_disk_without_http(monkeypatch):
+    from datetime import date
+
+    import pandas as pd
+
+    import data.eu_market_features as emf
+
+    idx = pd.DatetimeIndex(
+        [datetime(2025, 7, 1, 12, 0, tzinfo=VIENNA)],
+        name="slot_datetime",
+    )
+    disk_frame = pd.DataFrame(
+        {
+            "eu_wind_mw": [42.0],
+            "eu_solar_mw": [7.0],
+            "eu_load_mw": [0.0],
+            "eu_residual_load_mw": [0.0],
+        },
+        index=idx,
+    )
+    called = {"net": 0}
+
+    def boom(*_a, **_k):
+        called["net"] += 1
+        raise AssertionError("network must not be called")
+
+    monkeypatch.setattr(
+        emf, "load_frame", lambda *a, **k: (disk_frame, 10.0, True)
+    )
+    monkeypatch.setattr(emf, "_fetch_eu_power_forecast_network", boom)
+    emf._power_forecast_cache.clear()
+    frame = emf.fetch_eu_power_forecast_hourly(
+        date(2025, 7, 1),
+        date(2025, 7, 2),
+        blocking=False,
+    )
+    assert frame is not None
+    assert float(frame["eu_wind_mw"].iloc[0]) == 42.0
+    assert called["net"] == 0

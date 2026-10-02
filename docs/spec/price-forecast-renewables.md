@@ -237,6 +237,15 @@ Tariff extras (settlement, markup, Netznutzung, VAT) apply via `epex_to_brutto_c
 
 Compare script: `python -m scripts.compare_live_price_prognosis_research` (optional `--with-live-bias`).
 
+### Disk cache + non-blocking live (research)
+
+When `eu_power_live_source=energy_charts_forecast`:
+
+- Frames persist under `runtime/cache/` (`eu_power_forecast_*.json`, `eu_weather_forecast_*.json`) with TTL **45 min** (same as in-memory).
+- Status sidecar: `runtime/cache/eu_forecast_cache_status.json` (states: `missing` / `warming` / `ready` / `stale` / `error`).
+- Cold miss does **not** block `main.py`: background refresh + temporary **`mirror`** for missing Day-Ahead slots until cache is ready; **stale-while-revalidate** keeps using expired disk frames while refresh runs.
+- Country HTTP fan-out uses a small thread pool; Optimierer-Dienst shows **Preisprognose-Cache** (reads disk/sidecar — Streamlit ≠ daemon process).
+
 ## 12. Bezug
 
 - Preise Live: [preise.md](../konfiguration/preise.md)
@@ -247,6 +256,7 @@ Compare script: `python -m scripts.compare_live_price_prognosis_research` (optio
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
+| 2026-10-02 | 0.6 | Research: disk cache + non-blocking warmup/mirror; Optimierer-Dienst cache status |
 | 2026-10-01 | 0.5 | Research gates: EU power forecast + live bias + tariff parity (§11); not product default |
 | 2026-09-29 | 0.4 | Phase 3 live: Default `forecast`/OLS; Open-Meteo Features; ship-Modell `share/data/` |
 | 2026-07-06 | 0.2 | Phase 2: OLS-Modell, Evaluation vs. Spiegelung |

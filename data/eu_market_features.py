@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -12,6 +14,17 @@ import pandas as pd
 import requests
 
 import config
+from data.eu_forecast_disk_cache import (
+    DEFAULT_TTL_SEC,
+    KIND_POWER,
+    KIND_WEATHER,
+    load_frame,
+    mark_warming,
+    refresh_status_from_disk,
+    save_frame,
+)
+
+POWER_FORECAST_FETCH_WORKERS = 4
 
 ENERGY_CHARTS_BASE = "https://api.energy-charts.info"
 OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
@@ -34,6 +47,11 @@ POWER_FORECAST_CACHE_TTL_SEC = 45 * 60
 
 logger = logging.getLogger(__name__)
 _power_forecast_cache: dict[tuple[str, str, str], tuple[float, pd.DataFrame]] = {}
+_weather_forecast_cache: dict[tuple[str, str], tuple[float, pd.DataFrame]] = {}
+_power_refresh_lock = threading.Lock()
+_power_refresh_inflight: set[tuple[str, str]] = set()
+_weather_refresh_lock = threading.Lock()
+_weather_refresh_inflight: set[tuple[str, str]] = set()
 
 GENERATION_COUNTRIES: tuple[str, ...] = (
     "de",
@@ -346,24 +364,14 @@ def fetch_country_power_forecast_hourly(
     return frame.sort_index()
 
 
-def fetch_eu_power_forecast_hourly(start: date, end: date) -> pd.DataFrame:
-    """Summierte EU-Wind/Solar-Prognose (MW); partial country coverage allowed.
-
-    Research-only live path (``eu_power_live_source=energy_charts_forecast``).
-    Raises ValueError if no country contributes data.
-    """
-    cache_key = (start.isoformat(), end.isoformat(), "eu_power_forecast")
-    cached = _power_forecast_cache.get(cache_key)
-    if cached is not None:
-        stored_at, frame = cached
-        if time.time() - stored_at <= POWER_FORECAST_CACHE_TTL_SEC:
-            return frame.copy()
-        _power_forecast_cache.pop(cache_key, None)
-
+def _aggregate_country_power_forecasts(
+    country_frames: list[tuple[str, pd.DataFrame]],
+    start: date,
+    end: date,
+) -> pd.DataFrame:
     total: pd.DataFrame | None = None
     countries_used = 0
-    for country in GENERATION_COUNTRIES:
-        country_frame = fetch_country_power_forecast_hourly(country, start, end)
+    for country, country_frame in country_frames:
         if country_frame is None or country_frame.empty:
             continue
         countries_used += 1
@@ -389,14 +397,139 @@ def fetch_eu_power_forecast_hourly(start: date, end: date) -> pd.DataFrame:
     for base, eu_name in (("wind_mw", "eu_wind_mw"), ("solar_mw", "eu_solar_mw")):
         cols = [c for c in total.columns if c.startswith(f"{base}_")]
         result[eu_name] = total[cols].sum(axis=1, min_count=1)
-    # Archive stand-in also exposes load columns; keep zeros so joins/enrich stay stable.
     result["eu_load_mw"] = 0.0
     result["eu_residual_load_mw"] = 0.0
     mask = (result.index.date >= start) & (result.index.date < end)
     result = result.loc[mask].sort_index()
     if result.empty or result[["eu_wind_mw", "eu_solar_mw"]].isna().all().all():
         raise ValueError("EU public_power_forecast: leerer Wind/Solar-Frame.")
-    _power_forecast_cache[cache_key] = (time.time(), result)
+    return result
+
+
+def _fetch_eu_power_forecast_network(start: date, end: date) -> pd.DataFrame:
+    """HTTP fan-out for all GENERATION_COUNTRIES (parallel)."""
+    country_frames: list[tuple[str, pd.DataFrame]] = []
+    with ThreadPoolExecutor(max_workers=POWER_FORECAST_FETCH_WORKERS) as pool:
+        futures = {
+            pool.submit(fetch_country_power_forecast_hourly, country, start, end): country
+            for country in GENERATION_COUNTRIES
+        }
+        for future in as_completed(futures):
+            country = futures[future]
+            try:
+                frame = future.result()
+            except Exception as exc:  # noqa: BLE001 — per-country isolation
+                logger.warning(
+                    "Preisprognose-Research: public_power_forecast %s fehlgeschlagen (%s).",
+                    country,
+                    type(exc).__name__,
+                )
+                frame = None
+            if frame is not None and not frame.empty:
+                country_frames.append((country, frame))
+    return _aggregate_country_power_forecasts(country_frames, start, end)
+
+
+def _store_power_forecast_caches(
+    start: date, end: date, result: pd.DataFrame
+) -> None:
+    cache_key = (start.isoformat(), end.isoformat(), "eu_power_forecast")
+    now = time.time()
+    _power_forecast_cache[cache_key] = (now, result)
+    try:
+        save_frame(KIND_POWER, start, end, result)
+    except (OSError, ValueError, TypeError) as exc:
+        logger.warning("EU-Leistungsprognose Disk-Cache Schreibfehler: %s", exc)
+
+
+def schedule_power_forecast_refresh(start: date, end: date) -> bool:
+    """Start background HTTP refresh once per range. Returns True if scheduled."""
+    key = (start.isoformat(), end.isoformat())
+    with _power_refresh_lock:
+        if key in _power_refresh_inflight:
+            return False
+        _power_refresh_inflight.add(key)
+
+    def _worker() -> None:
+        t0 = time.time()
+        try:
+            logger.info(
+                "Preisprognose-Research: Lade public_power_forecast %s..%s (Hintergrund)…",
+                start.isoformat(),
+                end.isoformat(),
+            )
+            mark_warming(start, end)
+            result = _fetch_eu_power_forecast_network(start, end)
+            _store_power_forecast_caches(start, end, result)
+            refresh_status_from_disk(start, end)
+            logger.info(
+                "Preisprognose-Research: public_power_forecast fertig in %.1fs.",
+                time.time() - t0,
+            )
+        except Exception as exc:  # noqa: BLE001 — background must not kill process
+            logger.warning(
+                "Preisprognose-Research: public_power_forecast Hintergrund fehlgeschlagen (%s).",
+                type(exc).__name__,
+            )
+            refresh_status_from_disk(start, end, error=str(exc))
+        finally:
+            with _power_refresh_lock:
+                _power_refresh_inflight.discard(key)
+
+    threading.Thread(
+        target=_worker, name="eu-power-forecast-cache", daemon=True
+    ).start()
+    return True
+
+
+def fetch_eu_power_forecast_hourly(
+    start: date,
+    end: date,
+    *,
+    blocking: bool = True,
+    allow_stale: bool = True,
+) -> pd.DataFrame | None:
+    """Summierte EU-Wind/Solar-Prognose (MW); partial country coverage allowed.
+
+    Research-only live path (``eu_power_live_source=energy_charts_forecast``).
+
+    ``blocking=True`` (scripts/tests): sync HTTP on miss.
+    ``blocking=False``: memory → disk (fresh or stale) → else schedule refresh and
+    return ``None`` (caller falls back to mirror).
+    """
+    cache_key = (start.isoformat(), end.isoformat(), "eu_power_forecast")
+    cached = _power_forecast_cache.get(cache_key)
+    if cached is not None:
+        stored_at, frame = cached
+        age = time.time() - stored_at
+        if age <= POWER_FORECAST_CACHE_TTL_SEC:
+            return frame.copy()
+        if allow_stale:
+            schedule_power_forecast_refresh(start, end)
+            return frame.copy()
+        _power_forecast_cache.pop(cache_key, None)
+
+    disk_frame, _age, is_fresh = load_frame(
+        KIND_POWER, start, end, ttl_sec=POWER_FORECAST_CACHE_TTL_SEC
+    )
+    if disk_frame is not None:
+        _power_forecast_cache[cache_key] = (
+            time.time() - (_age or 0.0),
+            disk_frame,
+        )
+        if is_fresh:
+            return disk_frame.copy()
+        if allow_stale:
+            schedule_power_forecast_refresh(start, end)
+            return disk_frame.copy()
+
+    if not blocking:
+        schedule_power_forecast_refresh(start, end)
+        return None
+
+    result = _fetch_eu_power_forecast_network(start, end)
+    _store_power_forecast_caches(start, end, result)
+    refresh_status_from_disk(start, end)
     return result.copy()
 
 
@@ -593,8 +726,7 @@ def _fetch_open_meteo_forecast_grid(*, forecast_days: int) -> dict[str, pd.DataF
     }
 
 
-def fetch_eu_weather_forecast_hourly(start: date, end: date) -> pd.DataFrame:
-    """Kapazitätsgewichteter EU-Wetterprognose-Mittelwert (Open-Meteo Forecast)."""
+def _fetch_eu_weather_forecast_network(start: date, end: date) -> pd.DataFrame:
     forecast_days = _forecast_days_for_range(start, end)
     try:
         point_frames = _fetch_open_meteo_forecast_grid(forecast_days=forecast_days)
@@ -608,6 +740,99 @@ def fetch_eu_weather_forecast_hourly(start: date, end: date) -> pd.DataFrame:
     result = _weighted_eu_weather_from_points(point_frames)
     mask = (result.index.date >= start) & (result.index.date < end)
     return result.loc[mask].sort_index()
+
+
+def _store_weather_forecast_caches(
+    start: date, end: date, result: pd.DataFrame
+) -> None:
+    cache_key = (start.isoformat(), end.isoformat())
+    _weather_forecast_cache[cache_key] = (time.time(), result)
+    try:
+        save_frame(KIND_WEATHER, start, end, result)
+    except (OSError, ValueError, TypeError) as exc:
+        logger.warning("EU-Wetterprognose Disk-Cache Schreibfehler: %s", exc)
+
+
+def schedule_weather_forecast_refresh(start: date, end: date) -> bool:
+    key = (start.isoformat(), end.isoformat())
+    with _weather_refresh_lock:
+        if key in _weather_refresh_inflight:
+            return False
+        _weather_refresh_inflight.add(key)
+
+    def _worker() -> None:
+        t0 = time.time()
+        try:
+            logger.info(
+                "Preisprognose: Lade EU-Wetterprognose %s..%s (Hintergrund)…",
+                start.isoformat(),
+                end.isoformat(),
+            )
+            result = _fetch_eu_weather_forecast_network(start, end)
+            _store_weather_forecast_caches(start, end, result)
+            refresh_status_from_disk(start, end)
+            logger.info(
+                "Preisprognose: EU-Wetterprognose fertig in %.1fs.",
+                time.time() - t0,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Preisprognose: EU-Wetterprognose Hintergrund fehlgeschlagen (%s).",
+                type(exc).__name__,
+            )
+            refresh_status_from_disk(start, end, error=str(exc))
+        finally:
+            with _weather_refresh_lock:
+                _weather_refresh_inflight.discard(key)
+
+    threading.Thread(
+        target=_worker, name="eu-weather-forecast-cache", daemon=True
+    ).start()
+    return True
+
+
+def fetch_eu_weather_forecast_hourly(
+    start: date,
+    end: date,
+    *,
+    blocking: bool = True,
+    allow_stale: bool = True,
+) -> pd.DataFrame | None:
+    """Kapazitätsgewichteter EU-Wetterprognose-Mittelwert (Open-Meteo Forecast)."""
+    cache_key = (start.isoformat(), end.isoformat())
+    cached = _weather_forecast_cache.get(cache_key)
+    if cached is not None:
+        stored_at, frame = cached
+        age = time.time() - stored_at
+        if age <= DEFAULT_TTL_SEC:
+            return frame.copy()
+        if allow_stale:
+            schedule_weather_forecast_refresh(start, end)
+            return frame.copy()
+        _weather_forecast_cache.pop(cache_key, None)
+
+    disk_frame, age, is_fresh = load_frame(
+        KIND_WEATHER, start, end, ttl_sec=DEFAULT_TTL_SEC
+    )
+    if disk_frame is not None:
+        _weather_forecast_cache[cache_key] = (
+            time.time() - (age or 0.0),
+            disk_frame,
+        )
+        if is_fresh:
+            return disk_frame.copy()
+        if allow_stale:
+            schedule_weather_forecast_refresh(start, end)
+            return disk_frame.copy()
+
+    if not blocking:
+        schedule_weather_forecast_refresh(start, end)
+        return None
+
+    result = _fetch_eu_weather_forecast_network(start, end)
+    _store_weather_forecast_caches(start, end, result)
+    refresh_status_from_disk(start, end)
+    return result.copy()
 
 
 def remap_power_by_hour_of_day(

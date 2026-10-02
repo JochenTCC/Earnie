@@ -12,6 +12,7 @@ import pytest
 
 from data.price_forecast_live import (
     DEFAULT_MODEL_PATH,
+    EU_POWER_LIVE_SOURCE_ARCHIVE_HOD,
     MISSING_PRICE_STRATEGY_FORECAST,
     MISSING_PRICE_STRATEGY_MIRROR,
     _archive_covers_slot_range,
@@ -148,14 +149,56 @@ def test_resolve_market_slots_kwargs_forecast_without_features_uses_mirror():
         "data.price_forecast_live.get_missing_price_strategy",
         return_value=MISSING_PRICE_STRATEGY_FORECAST,
     ):
-        with patch("data.price_forecast_live.load_configured_model", return_value=model):
+        with patch(
+            "data.price_forecast_live.get_eu_power_live_source",
+            return_value=EU_POWER_LIVE_SOURCE_ARCHIVE_HOD,
+        ):
             with patch(
-                "data.price_forecast_live.build_live_feature_frame_for_slots",
-                return_value=None,
+                "data.price_forecast_live.load_configured_model", return_value=model
             ):
-                kwargs = resolve_market_slots_kwargs([])
+                with patch(
+                    "data.price_forecast_live.build_live_feature_frame_for_slots",
+                    return_value=None,
+                ):
+                    kwargs = resolve_market_slots_kwargs([])
     assert kwargs["missing_price_strategy"] == MISSING_PRICE_STRATEGY_MIRROR
     assert "forecast_model" not in kwargs
+
+
+def test_resolve_market_slots_kwargs_ec_source_warms_and_mirrors_on_miss():
+    from data.price_forecast_live import EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST
+
+    model = object()
+    warm = {"n": 0}
+
+    def _warm(_slots):
+        warm["n"] += 1
+
+    with patch(
+        "data.price_forecast_live.get_missing_price_strategy",
+        return_value=MISSING_PRICE_STRATEGY_FORECAST,
+    ):
+        with patch(
+            "data.price_forecast_live.get_eu_power_live_source",
+            return_value=EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST,
+        ):
+            with patch(
+                "data.price_forecast_live.ensure_eu_forecast_cache_warming",
+                side_effect=_warm,
+            ):
+                with patch(
+                    "data.price_forecast_live.load_configured_model",
+                    return_value=model,
+                ):
+                    with patch(
+                        "data.price_forecast_live.build_live_feature_frame_for_slots",
+                        return_value=None,
+                    ):
+                        kwargs = resolve_market_slots_kwargs(
+                            [datetime(2099, 1, 1, 12, tzinfo=ZoneInfo("Europe/Vienna"))]
+                        )
+    assert warm["n"] == 1
+    assert kwargs["missing_price_strategy"] == MISSING_PRICE_STRATEGY_MIRROR
 
 
 def test_build_live_feature_frame_logs_error_on_forecast_failure(caplog):

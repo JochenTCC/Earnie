@@ -225,7 +225,11 @@ def _build_archive_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
     return _enrich_merged_features(power.join(weather, how="inner"))
 
 
-def _power_frame_for_forecast_slots(slots: list[datetime]) -> tuple[pd.DataFrame, str]:
+def _power_frame_for_forecast_slots(
+    slots: list[datetime],
+    *,
+    blocking: bool = True,
+) -> tuple[pd.DataFrame | None, str]:
     """Return (power_frame, provenance) for green-zone / live_forecast mode."""
     from data.eu_market_features import (
         fetch_eu_power_forecast_hourly,
@@ -237,8 +241,13 @@ def _power_frame_for_forecast_slots(slots: list[datetime]) -> tuple[pd.DataFrame
         start = min(slot.date() for slot in slots)
         end = max(slot.date() for slot in slots) + timedelta(days=1)
         try:
-            power = fetch_eu_power_forecast_hourly(start, end)
-            return power, EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST
+            power = fetch_eu_power_forecast_hourly(
+                start, end, blocking=blocking, allow_stale=True
+            )
+            if power is not None and not power.empty:
+                return power, EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST
+            if not blocking:
+                return None, EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST
         except (OSError, ValueError, requests.HTTPError, RuntimeError) as exc:
             logger.warning(
                 "Preisprognose-Research: public_power_forecast fehlgeschlagen (%s) — "
@@ -250,7 +259,11 @@ def _power_frame_for_forecast_slots(slots: list[datetime]) -> tuple[pd.DataFrame
     return remap_power_by_hour_of_day(power_ref, slots), EU_POWER_LIVE_SOURCE_ARCHIVE_HOD
 
 
-def _build_forecast_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
+def _build_forecast_feature_frame(
+    slots: list[datetime],
+    *,
+    blocking: bool = True,
+) -> pd.DataFrame | None:
     """Live green-zone features: Open-Meteo forecast weather + power (stand-in or EC)."""
     import time
 
@@ -258,16 +271,35 @@ def _build_forecast_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
 
     start = min(slot.date() for slot in slots)
     end = max(slot.date() for slot in slots) + timedelta(days=1)
+    use_research = get_eu_power_live_source() == EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST
+    live_blocking = blocking if use_research else True
     t0 = time.perf_counter()
     logger.info(
-        "Preisprognose: Live-Features %s..%s (%d Stunden-Slots)…",
+        "Preisprognose: Live-Features %s..%s (%d Stunden-Slots, blocking=%s)…",
         start.isoformat(),
         (end - timedelta(days=1)).isoformat(),
         len(slots),
+        live_blocking,
     )
-    weather = fetch_eu_weather_forecast_hourly(start, end)
+    weather = fetch_eu_weather_forecast_hourly(
+        start, end, blocking=live_blocking, allow_stale=True
+    )
     t_weather = time.perf_counter() - t0
-    power, power_source = _power_frame_for_forecast_slots(slots)
+    if weather is None or weather.empty:
+        if not live_blocking:
+            logger.info(
+                "Preisprognose: Wetter-Cache noch nicht bereit — Spiegelung bis Warmup."
+            )
+        return None
+    power, power_source = _power_frame_for_forecast_slots(
+        slots, blocking=live_blocking
+    )
+    if power is None or power.empty:
+        if not live_blocking:
+            logger.info(
+                "Preisprognose: Leistungs-Cache noch nicht bereit — Spiegelung bis Warmup."
+            )
+        return None
     merged = power.join(weather, how="inner")
     frame = _enrich_merged_features(merged)
     if frame is not None and not frame.empty:
@@ -282,6 +314,58 @@ def _build_forecast_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
         0 if frame is None else len(frame),
     )
     return frame
+
+
+def ensure_eu_forecast_cache_warming(slot_datetimes: list) -> None:
+    """Kick background refresh for research EC path without blocking."""
+    from data.market_prices import normalize_price_slot
+
+    if not slot_datetimes:
+        return
+    if get_eu_power_live_source() != EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST:
+        return
+    slots = [normalize_price_slot(dt) for dt in slot_datetimes]
+    hour_slots = sorted({s.replace(minute=0, second=0, microsecond=0) for s in slots})
+    start = min(slot.date() for slot in hour_slots)
+    end = max(slot.date() for slot in hour_slots) + timedelta(days=1)
+    from data.eu_forecast_disk_cache import (
+        KIND_POWER,
+        KIND_WEATHER,
+        load_frame,
+        mark_warming,
+        refresh_status_from_disk,
+    )
+    from data.eu_market_features import (
+        schedule_power_forecast_refresh,
+        schedule_weather_forecast_refresh,
+    )
+
+    _pw, _age_p, power_fresh = load_frame(
+        KIND_POWER, start, end, ttl_sec=LIVE_FEATURE_CACHE_TTL_SEC
+    )
+    _wx, _age_w, weather_fresh = load_frame(
+        KIND_WEATHER, start, end, ttl_sec=LIVE_FEATURE_CACHE_TTL_SEC
+    )
+    if power_fresh and weather_fresh:
+        refresh_status_from_disk(
+            start,
+            end,
+            eu_power_live_source=EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST,
+            missing_price_strategy=get_missing_price_strategy(),
+            live_bias_enabled=get_live_bias_enabled(),
+        )
+        return
+    mark_warming(
+        start,
+        end,
+        eu_power_live_source=EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST,
+        missing_price_strategy=get_missing_price_strategy(),
+        live_bias_enabled=get_live_bias_enabled(),
+    )
+    if not weather_fresh:
+        schedule_weather_forecast_refresh(start, end)
+    if not power_fresh:
+        schedule_power_forecast_refresh(start, end)
 
 
 def _feature_cache_key(slots: list[datetime], mode: str) -> tuple[str, str, str]:
@@ -326,12 +410,19 @@ def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | N
         return cached
 
     try:
-        frame = (
-            _build_archive_feature_frame(hour_slots)
-            if use_archive
-            else _build_forecast_feature_frame(hour_slots)
-        )
+        if use_archive:
+            frame = _build_archive_feature_frame(hour_slots)
+        else:
+            research = power_src == EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST
+            frame = _build_forecast_feature_frame(
+                hour_slots, blocking=not research
+            )
         if frame is None or frame.empty:
+            if (
+                not use_archive
+                and power_src == EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST
+            ):
+                ensure_eu_forecast_cache_warming(hour_slots)
             return None
         _live_feature_cache[cache_key] = (time.time(), frame)
         return frame
@@ -416,6 +507,9 @@ def resolve_market_slots_kwargs(target_hours: list) -> dict:
     kwargs: dict = {"missing_price_strategy": strategy}
     if strategy != MISSING_PRICE_STRATEGY_FORECAST:
         return kwargs
+
+    if get_eu_power_live_source() == EU_POWER_LIVE_SOURCE_ENERGY_CHARTS_FORECAST:
+        ensure_eu_forecast_cache_warming(target_hours)
 
     model_path = get_forecast_model_path()
     model = load_configured_model()
