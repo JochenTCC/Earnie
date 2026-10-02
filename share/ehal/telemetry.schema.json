@@ -94,6 +94,28 @@
       "type": ["number", "null"],
       "minimum": 0,
       "description": "Optional grid-side max export power in W (inbound ceiling)."
+    },
+    "get_ess_soc_min": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Optional ESS discharge cut-off SoC in % (device config)."
+    },
+    "get_ess_soc_max": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Optional ESS charge cut-off SoC in % (device config)."
+    },
+    "get_ess_max_charge_power": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Optional ESS device max charge power in W (magnitude ≥ 0)."
+    },
+    "get_ess_max_discharge_power": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Optional ESS device max discharge power in W (magnitude ≥ 0)."
     }
   },
   "additionalProperties": false

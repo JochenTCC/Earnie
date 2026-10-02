@@ -32,7 +32,20 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
+**Order:** **2.7.j** → **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
+
+- [ ] **2.7.j — Additional ESS parameters**
+  - Four plant EHAL **reads** (W / %), same HK switch `limits_from_live` on `batteries[]`; plant bindings until **2.7.c** namespaces multi-ESS:
+    - `get_ess_soc_min` [%] — Huawei LUNA: 47082, U16, gain 10 (discharge cut-off); **read/MILP only** (no `set_ess_soc_*`)
+    - `get_ess_soc_max` [%] — Huawei LUNA: 47081, U16, gain 10 (charge cut-off); **read/MILP only**
+    - `get_ess_max_charge_power` [W, magnitude ≥ 0] — Huawei LUNA: 47075, U32, gain 1
+    - `get_ess_max_discharge_power` [W, magnitude ≥ 0] — Huawei LUNA: 47077, U32, gain 1
+    - Cycle writes reuse existing `set_ess_*_power_limit` (W); registers read via `testmodcom.py` (not yet cross-checked against a Huawei PDF covering 47xxx)
+  - House configurator (HK): per ESS checkbox “take values from inverter / battery in live operation” (`limits_from_live`)
+    - When checked: live `get_*` → MILP limits, `set_ess_*_power_limit` caps, unconstrained export (discharge side); fallback HK if mapping absent
+    - When not checked: HK values → MILP; power caps written via `set_ess_*_power_limit`; SOC stays Earnie/MILP only
+    - Split `battery_max_power_kw` → `battery_max_charge_power_kw` / `battery_max_discharge_power_kw` (legacy migrate)
+  - Wire through Loxone / HA / OpenEMS adapters, `share/ehal/roles/ess.json`, `telemetry.schema.json`, EHAL-Com mapping and docs
 
 - [ ] **2.7.c — Multiple isolated battery / battery+inverter entities** (bidirectional)
   - Isolated battery modes: charging / discharging / standby
@@ -41,16 +54,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` writes PV kWp sum + max discharge of the single battery (only when `battery_control = full`). With multi-ESS, sum the max discharge power of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / physical powerstations from **2.7.g**/**2.7.h** that cannot feed the house grid); update `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md` accordingly
   - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
   - Downstream: Loxone template XML gen and HouseSim scenario import should gain multi-battery support after this letter
-  - Add two new EHAL values:
-    - SOC-Min [%]
-    - SOC-Max [%]
-    - Add a check in HK whether these parameters shall be written by Earnie to configured value in house-config
-      - When checked, the values are set to smarthome-backend
-      - When not checked, values are taken into account for MILP
-  - Read max charge / max discharge power as EHAL telemetry (per ESS):
-    - New optional fields, e.g. `get_ess_max_charge_power` / `get_ess_max_discharge_power` [W, magnitude ≥ 0] (Huawei LUNA: storage max charge/discharge power registers, e.g. 37046 / 37048 — verify against the Modbus map)
-    - When mapped, they override the static HK `battery_max_power_kw` (today one value for both directions) for MILP limits, `set_ess_*_power_limit` caps and the "unconstrained" export value; fall back to HK when absent
-    - Wire through Loxone / HA / OpenEMS adapters, `share/ehal/roles/ess.json`, `telemetry.schema.json`, EHAL-Com mapping and docs
 
 
 - [ ] improve prognosis for EV coming back (connecting for charging)

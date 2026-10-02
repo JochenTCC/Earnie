@@ -178,7 +178,7 @@ def test_loxone_ess_write_uses_non_network_path():
         assert ehal_live.is_ehal_network_backend() is False
         with pytest.raises(ValueError, match="openems or ha"):
             ehal_live.write_ess_setpoints_from_control(1, 1.5)
-        map_mock.assert_called_once_with(1, 1.5, 5.0)
+        map_mock.assert_called_once_with(1, 1.5, 5.0, 5.0)
         get_loxone.assert_not_called()
 
 

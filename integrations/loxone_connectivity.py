@@ -546,6 +546,10 @@ def _append_thermal_annual_read_checks(
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
     from settings.ehal_marker_resolve import (
+        marker_get_ess_max_charge_power,
+        marker_get_ess_max_discharge_power,
+        marker_get_ess_soc_max,
+        marker_get_ess_soc_min,
         marker_get_grid_export_power_limit,
         marker_sens_absent_mode,
         marker_sens_temperature_outside,
@@ -568,6 +572,22 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
     _append_io_check(checks, "sens_absent_mode", absent_io)
     export_in_io = marker_get_grid_export_power_limit(house_doc=house_doc)
     _append_io_check(checks, "get_grid_export_power_limit", export_in_io)
+    _append_io_check(
+        checks, "get_ess_soc_min", marker_get_ess_soc_min(house_doc=house_doc)
+    )
+    _append_io_check(
+        checks, "get_ess_soc_max", marker_get_ess_soc_max(house_doc=house_doc)
+    )
+    _append_io_check(
+        checks,
+        "get_ess_max_charge_power",
+        marker_get_ess_max_charge_power(house_doc=house_doc),
+    )
+    _append_io_check(
+        checks,
+        "get_ess_max_discharge_power",
+        marker_get_ess_max_discharge_power(house_doc=house_doc),
+    )
 
     for consumer in _consumers_for_live_reads():
         if _is_ev_consumer(consumer):

@@ -22,6 +22,10 @@ TELEMETRY_OPTIONAL = (
     "sens_temperature_outside",
     "sens_absent_mode",
     "get_grid_export_power_limit",
+    "get_ess_soc_min",
+    "get_ess_soc_max",
+    "get_ess_max_charge_power",
+    "get_ess_max_discharge_power",
 )
 SETPOINT_FIELDS = (
     "set_ess_active_power",
@@ -48,6 +52,10 @@ EHAL_TO_BLOCKS: dict[str, str] = {
     "set_ess_mode": "control_cmd_name",
     "get_grid_export_power_limit": "grid_export_limit_in_name",
     "set_grid_export_power_limit": "grid_export_limit_out_name",
+    "get_ess_soc_min": "ess_soc_min_name",
+    "get_ess_soc_max": "ess_soc_max_name",
+    "get_ess_max_charge_power": "ess_max_charge_power_name",
+    "get_ess_max_discharge_power": "ess_max_discharge_power_name",
 }
 
 # Prefer ehal.profiles (2.4.g); keep local fallback if import fails in odd envs.
@@ -92,6 +100,32 @@ _HINTS: dict[str, tuple[str, ...]] = {
         "export limit",
         "feed-in limit",
         "grid export limit",
+    ),
+    "get_ess_soc_min": (
+        "soc min",
+        "soc-min",
+        "entladeabschaltung",
+        "min soc batterie",
+        "discharge cutoff",
+    ),
+    "get_ess_soc_max": (
+        "soc max",
+        "soc-max",
+        "ladeabschaltung",
+        "max soc batterie",
+        "charge cutoff",
+    ),
+    "get_ess_max_charge_power": (
+        "max ladeleistung",
+        "max charge power",
+        "ladeleistung max",
+        "ess max charge",
+    ),
+    "get_ess_max_discharge_power": (
+        "max entladeleistung",
+        "max discharge power",
+        "entladeleistung max",
+        "ess max discharge",
     ),
     "set_grid_export_power_limit": (
         "einspeisegrenze",

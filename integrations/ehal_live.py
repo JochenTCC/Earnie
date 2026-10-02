@@ -203,6 +203,10 @@ def get_loxone_adapter() -> LoxoneAdapter:
     house = load_house_doc()
     export_in = resolve_plant_binding(house, "get_grid_export_power_limit")
     export_out = resolve_plant_binding(house, "set_grid_export_power_limit")
+    ess_soc_min = resolve_plant_binding(house, "get_ess_soc_min")
+    ess_soc_max = resolve_plant_binding(house, "get_ess_soc_max")
+    ess_max_charge = resolve_plant_binding(house, "get_ess_max_charge_power")
+    ess_max_discharge = resolve_plant_binding(house, "get_ess_max_discharge_power")
     cfg = LoxoneConfig(
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "loxone-home"),
         soc_name=str(config.get("LOXONE_SOC_NAME") or ""),
@@ -220,6 +224,10 @@ def get_loxone_adapter() -> LoxoneAdapter:
         evcs_mode_name=str(ev.get("evcs_mode_name") or ""),
         grid_export_limit_in_name=str(export_in or ""),
         grid_export_limit_out_name=str(export_out or ""),
+        ess_soc_min_name=str(ess_soc_min or ""),
+        ess_soc_max_name=str(ess_soc_max or ""),
+        ess_max_charge_power_name=str(ess_max_charge or ""),
+        ess_max_discharge_power_name=str(ess_max_discharge or ""),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
     )
     if _loxone_adapter is not None and _loxone_adapter.cfg != cfg:
@@ -309,7 +317,10 @@ def write_ess_setpoints_from_control(
     target_power_kw: float,
     max_power_kw: float | None = None,
     *,
+    max_charge_power_kw: float | None = None,
+    max_discharge_power_kw: float | None = None,
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
+    telemetry: dict[str, Any] | None = None,
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
     """Map optimizer mode/power to EHAL Design C1 ESS setpoints.
 
@@ -324,23 +335,41 @@ def write_ess_setpoints_from_control(
     )
     from optimizer.export_power_limit import export_limit_setpoint_w
     from optimizer.live_export_limit import live_unconstrained_export_kw
+    from settings.ess_limits_resolve import apply_effective_ess_limits
 
-    battery_params = config.get_battery_params()
+    battery_params = apply_effective_ess_limits(
+        config.get_battery_params(), telemetry=telemetry
+    )
     control = control_from_battery_params(battery_params)
     if control == BATTERY_CONTROL_READ_ONLY:
         return None, []
 
-    if max_power_kw is None:
-        max_power_kw = float(battery_params.get("max_power_kw") or 0.0)
+    if max_charge_power_kw is None and max_discharge_power_kw is None and max_power_kw is not None:
+        max_charge_power_kw = float(max_power_kw)
+        max_discharge_power_kw = float(max_power_kw)
+    if max_charge_power_kw is None:
+        max_charge_power_kw = float(battery_params.get("max_charge_power_kw") or 0.0)
+    if max_discharge_power_kw is None:
+        max_discharge_power_kw = float(
+            battery_params.get("max_discharge_power_kw") or 0.0
+        )
     active_kw, charge_kw, discharge_kw, control_cmd = loxone_client.map_ess_setpoints(
-        mode, target_power_kw, float(max_power_kw)
+        mode,
+        target_power_kw,
+        float(max_charge_power_kw),
+        float(max_discharge_power_kw),
     )
     if control == BATTERY_CONTROL_LIMITS_ONLY:
         active_kw = None
         if mode in (1, 3):
             mode = 0
             active_kw, charge_kw, discharge_kw, control_cmd = (
-                loxone_client.map_ess_setpoints(0, 0.0, float(max_power_kw))
+                loxone_client.map_ess_setpoints(
+                    0,
+                    0.0,
+                    float(max_charge_power_kw),
+                    float(max_discharge_power_kw),
+                )
             )
     adapter = get_network_adapter()
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")

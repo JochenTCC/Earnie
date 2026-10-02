@@ -293,15 +293,37 @@ def runtime_settings_snapshot(get_attr: Callable[..., Any]) -> dict:
 
 
 def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
+    max_charge = get_attr(
+        "BATTERY_MAX_CHARGE_POWER_KW",
+        default=None,
+        cast=float,
+    )
+    max_discharge = get_attr(
+        "BATTERY_MAX_DISCHARGE_POWER_KW",
+        default=None,
+        cast=float,
+    )
+    legacy_max = get_attr("BATTERY_MAX_POWER_KW", cast=float)
+    if max_charge is None:
+        max_charge = legacy_max
+    if max_discharge is None:
+        max_discharge = legacy_max
+    max_charge_f = float(max_charge if max_charge is not None else 0.0)
+    max_discharge_f = float(max_discharge if max_discharge is not None else 0.0)
     return {
         "battery_capacity_kwh": get_attr("BATTERY_CAPACITY_KWH", cast=float),
         "min_soc": get_attr("BATTERY_MIN_SOC", cast=float),
         "max_soc": get_attr("BATTERY_MAX_SOC", cast=float),
-        "max_power_kw": get_attr("BATTERY_MAX_POWER_KW", cast=float),
+        "max_charge_power_kw": max_charge_f,
+        "max_discharge_power_kw": max_discharge_f,
+        "max_power_kw": max(max_charge_f, max_discharge_f),
         "efficiency": get_attr("BATTERY_EFFICIENCY", cast=float),
         "standby_power_kw": get_attr("BATTERY_STANDBY_POWER_KW", default=0.0, cast=float),
         "control": str(get_attr("BATTERY_CONTROL", default="full") or "full").strip().lower()
         or "full",
+        "limits_from_live": bool(
+            get_attr("BATTERY_LIMITS_FROM_LIVE", default=False, cast=bool)
+        ),
     }
 
 

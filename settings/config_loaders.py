@@ -366,6 +366,18 @@ def load_full_runtime_params(
         "BATTERY_MAX_POWER_KW": float(
             lookup_runtime_value(resolved, "battery_max_power_kw", config_path)
         ),
+        "BATTERY_MAX_CHARGE_POWER_KW": float(
+            resolved.get(
+                "battery_max_charge_power_kw",
+                lookup_runtime_value(resolved, "battery_max_power_kw", config_path),
+            )
+        ),
+        "BATTERY_MAX_DISCHARGE_POWER_KW": float(
+            resolved.get(
+                "battery_max_discharge_power_kw",
+                lookup_runtime_value(resolved, "battery_max_power_kw", config_path),
+            )
+        ),
         "BATTERY_EFFICIENCY": float(
             lookup_runtime_value(resolved, "battery_efficiency", config_path)
         ),
@@ -383,6 +395,7 @@ def load_full_runtime_params(
             resolved.get("battery_control") or "full"
         ).strip().lower()
         or "full",
+        "BATTERY_LIMITS_FROM_LIVE": bool(resolved.get("limits_from_live", False)),
         "THRESHOLD_POWER": validate_threshold_power(
             lookup_runtime_value(resolved, "threshold_power", config_path)
         ),

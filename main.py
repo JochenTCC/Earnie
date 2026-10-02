@@ -324,6 +324,11 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         telemetry_for_export = ehal_live.get_adapter().read_telemetry()
     except Exception as exc:  # noqa: BLE001 — Live continues without inbound cap
         logger.warning("Export-Limit Telemetrie nicht lesbar: %s", exc)
+    from settings.ess_limits_resolve import apply_effective_ess_limits
+
+    battery_params = apply_effective_ess_limits(
+        config.get_battery_params(), telemetry=telemetry_for_export
+    )
     export_ctx = resolve_live_export_context(
         matrix_row=optimization_matrix[0] if optimization_matrix else None,
         telemetry=telemetry_for_export,
@@ -332,6 +337,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         optimization_matrix,
         current_hour,
         current_soc,
+        battery_params=battery_params,
         consumers=live_consumers,
         consumer_remaining_kwh=consumer_remaining,
         charging_contexts=charging_contexts,
@@ -345,7 +351,6 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
     # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
     export_cap = export_ctx["effective_export_cap_kw"]
-    battery_params = config.get_battery_params()
     battery_plan_kw = optimizer.battery_plan_kw_from_control(
         mode,
         target_power,
@@ -381,7 +386,10 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         backend = "HA" if ehal_live.is_ha_backend() else "OpenEMS"
         logger.info("Sende EHAL ESS-Limits an %s...", backend)
         err_ess, ess_records = ehal_live.write_ess_setpoints_from_control(
-            mode, target_power, export_cap_kw=export_cap
+            mode,
+            target_power,
+            export_cap_kw=export_cap,
+            telemetry=telemetry_for_export,
         )
         logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
         err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(

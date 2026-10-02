@@ -54,7 +54,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
 | Active power telemetry (`sens_grid_power_active`, `sens_pv_production_active`, `sens_evcs_active_power`, `sens_ess_power`, `sens_power_consumers`) | **W** | See below                                                                             |
 | `sens_ess_soc` / EV SoC fields                                                                                                                     | **%** | `0`…`100`                                                                             |
-| ESS charge/discharge **limits**, `set_grid_export_power_limit` / `get_grid_export_power_limit`                                                     | **W** | Non-negative **magnitudes** (true caps); direction is in the field name, not the sign |
+| ESS charge/discharge **limits**, `set_grid_export_power_limit` / `get_grid_export_power_limit`, `get_ess_max_charge_power` / `get_ess_max_discharge_power` | **W** | Non-negative **magnitudes** (true caps); direction is in the field name, not the sign |
 | `set_ess_active_power`                                                                                                                             | **W** | Signed; `+` = discharge, `−` = charge (omit on Automatik)                             |
 | `set_evcs_max_current` / `get_evcs_nominal_current`                                                                                                | **A** | Non-negative                                                                          |
 
@@ -106,6 +106,10 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), Live dict
 | `get_evcs_limit_soc`          | no       | %      | Charge limit SoC                                                                                           |
 | `get_evcs_soc_min_immediate`  | no       | %      | ASAP min SoC floor; ≤0 or absent = inactive; clamped to limit SoC                                          |
 | `get_grid_export_power_limit` | no       | W      | Optional inbound max export from grid/HEMS (magnitude; negative or ≥ 1 000 000 = no cap) (2.7.a)           |
+| `get_ess_soc_min`             | no       | %      | Optional discharge cut-off SoC (device config; MILP when `limits_from_live`) (2.7.j)                        |
+| `get_ess_soc_max`             | no       | %      | Optional charge cut-off SoC (device config; MILP when `limits_from_live`) (2.7.j)                           |
+| `get_ess_max_charge_power`    | no       | W      | Optional device max charge power magnitude (2.7.j)                                                         |
+| `get_ess_max_discharge_power` | no       | W      | Optional device max discharge power magnitude (2.7.j)                                                      |
 
 
 Machine schema: `[share/ehal/telemetry.schema.json](../../share/ehal/telemetry.schema.json)`.
@@ -249,6 +253,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 | `set_ess_charge_power_limit`    | e.g. `SetActivePowerGreaterOrEquals` (adapter maps magnitude)                                                                               |
 | `set_ess_discharge_power_limit` | e.g. `SetActivePowerLessOrEquals`                                                                                                           |
 | `set_ess_mode`                  | *(ignored by OpenEMS)*                                                                                                                      |
+| `get_ess_soc_min` / `get_ess_soc_max` / `get_ess_max_charge_power` / `get_ess_max_discharge_power` | *(optional 2.7.j; omit when no Edge channel — Core uses HK fallback)* |
 | `set_evcs_max_current`          | EVCS Max Current                                                                                                                            |
 | `sens_absent_mode`              | Optional side-channel: `plant.ehal_bindings.sens_absent_mode` = `componentId/ChannelId` (no fixed Edge default; not in core telemetry wire) |
 

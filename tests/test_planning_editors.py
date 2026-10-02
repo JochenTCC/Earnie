@@ -1020,7 +1020,9 @@ def test_sync_battery_session_reseeds_when_widget_keys_missing():
 
     assert session["5_0_kwh_speicher__planning_battery_label"] == "Hausbatterie 5 kWh"
     assert session["5_0_kwh_speicher__planning_battery_capacity"] == 5.0
-    assert session["5_0_kwh_speicher__planning_battery_power"] == 2.5
+    assert session["5_0_kwh_speicher__planning_battery_charge_power"] == 2.5
+    assert session["5_0_kwh_speicher__planning_battery_discharge_power"] == 2.5
+    assert session["5_0_kwh_speicher__planning_battery_limits_from_live"] is False
 
 
 def test_sync_scenario_session_reseeds_when_widget_keys_missing():
@@ -1236,7 +1238,8 @@ def test_seed_battery_widget_state_uses_existing_capacity():
 
     assert session["speicher_8kwh__planning_battery_capacity"] == 8.0
     assert session["speicher_8kwh__planning_battery_label"] == "Speicher 8kWh"
-    assert session["speicher_8kwh__planning_battery_power"] == 4.0
+    assert session["speicher_8kwh__planning_battery_charge_power"] == 4.0
+    assert session["speicher_8kwh__planning_battery_discharge_power"] == 4.0
     assert session["speicher_8kwh__planning_battery_threshold"] == 8.0
 
 
@@ -1353,7 +1356,8 @@ def test_new_battery_template_clones_last_selected():
     )
     assert template["label"] == "10 kWh Speicher copy"
     assert template["battery_capacity_kwh"] == 10.0
-    assert template["battery_max_power_kw"] == 5.0
+    assert template["battery_max_charge_power_kw"] == 5.0
+    assert template["battery_max_discharge_power_kw"] == 5.0
     assert template["battery_efficiency"] == 0.95
     assert template["threshold_power"] == 0.08
     assert template["standby_power_kw"] == 0.1

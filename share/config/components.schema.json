@@ -65,7 +65,6 @@
       "required": [
         "id",
         "battery_capacity_kwh",
-        "battery_max_power_kw",
         "battery_efficiency",
         "battery_min_soc",
         "battery_max_soc"
@@ -83,7 +82,23 @@
         },
         "battery_max_power_kw": {
           "type": "number",
-          "exclusiveMinimum": 0
+          "exclusiveMinimum": 0,
+          "description": "Deprecated (2.7.j): single max for both directions; migrate to charge/discharge fields."
+        },
+        "battery_max_charge_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Max charge power (kW). Prefer over battery_max_power_kw."
+        },
+        "battery_max_discharge_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Max discharge power (kW). Prefer over battery_max_power_kw."
+        },
+        "limits_from_live": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, live get_ess_* telemetry overrides HK SOC/power ceilings (fallback HK if unmapped)."
         },
         "battery_efficiency": {
           "type": "number",
@@ -104,7 +119,7 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1,
-          "description": "Relativer Anteil von battery_max_power_kw (Standard 0.02)."
+          "description": "Relativer Anteil von max(charge, discharge) kW (Standard 0.02)."
         },
         "standby_power_kw": {
           "type": "number",

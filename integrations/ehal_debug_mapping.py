@@ -22,6 +22,10 @@ PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_temperature_outside",
     "sens_absent_mode",
     "get_grid_export_power_limit",
+    "get_ess_soc_min",
+    "get_ess_soc_max",
+    "get_ess_max_charge_power",
+    "get_ess_max_discharge_power",
 )
 
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (

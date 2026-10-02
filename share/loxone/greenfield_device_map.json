@@ -93,6 +93,34 @@
       "notes": "2.7.a optional inbound grid-side export limit (kW)."
     },
     {
+      "name": "Earnie_Batterie_SOC_Min",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "get_ess_soc_min",
+      "notes": "2.7.j optional discharge cut-off SoC % (Huawei 47082)."
+    },
+    {
+      "name": "Earnie_Batterie_SOC_Max",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "get_ess_soc_max",
+      "notes": "2.7.j optional charge cut-off SoC % (Huawei 47081)."
+    },
+    {
+      "name": "Earnie_Batterie_Max_Ladeleistung",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "get_ess_max_charge_power",
+      "notes": "2.7.j optional device max charge power (Loxone kW → EHAL W; Huawei 47075)."
+    },
+    {
+      "name": "Earnie_Batterie_Max_Entladeleistung",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "get_ess_max_discharge_power",
+      "notes": "2.7.j optional device max discharge power (Loxone kW → EHAL W; Huawei 47077)."
+    },
+    {
       "name": "Earnie_Waermepumpe_Leistung",
       "match": "exact",
       "entity_kind": "heatpump",

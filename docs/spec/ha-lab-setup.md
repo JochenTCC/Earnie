@@ -372,6 +372,8 @@ Silent gate: `loxone_silent_mode` also blocks HA setpoint writes (same as OpenEM
 | `sens_ess_soc` | yes | `sensor` (%) |
 | `sens_ess_power` | no | `sensor` |
 | `sens_evcs_active_power` | no | `sensor` |
+| `get_ess_soc_min` / `get_ess_soc_max` | no | `sensor` / `number` (%) — device cut-offs when `limits_from_live` (2.7.j) |
+| `get_ess_max_charge_power` / `get_ess_max_discharge_power` | no | `sensor` / `number` (W or kW → adapter) — device ceilings (2.7.j); may reuse the same entities as the set limits when the integration exposes R/W numbers |
 | `set_ess_charge_power_limit` | no* | `number` / `input_number` |
 | `set_ess_discharge_power_limit` | no* | `number` / `input_number` |
 | `set_evcs_max_current` | no* | `number` (A) |

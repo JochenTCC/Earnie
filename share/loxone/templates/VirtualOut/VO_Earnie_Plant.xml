@@ -6,8 +6,9 @@
   Netz/PV/Batterie_Leistung may also come from EFM Zähler — keep VO cmds; prefer EFM Bezeichnung in Earnie bindings when present.
   Earnie_Aussentemperatur is house-wide (shared with WP/Pool thermal).
   Earnie_Abwesend is house-wide absent / holiday mode (0/1).
+  2.7.j optional ESS config ceilings: SOC-Min/Max + Max Lade-/Entladeleistung (get_ess_*).
 -->
-<VirtualOut Title="Earnie Plant Telemetry" Comment="Pattern B: push plant sens_* to Earnie (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
+<VirtualOut Title="Earnie Plant Telemetry" Comment="Pattern B: push plant sens_*/get_* to Earnie (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<VirtualOutCmd Title="Earnie_Netzleistung" Comment="sens_grid_power_active kW; or EFM Grid" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_grid_power_active/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
 	<VirtualOutCmd Title="Earnie_PV_Leistung" Comment="sens_pv_production_active kW; or EFM Production" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_pv_production_active/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
 	<VirtualOutCmd Title="Earnie_Batterie_SoC" Comment="sens_ess_soc %" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_ess_soc/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
@@ -15,4 +16,8 @@
 	<VirtualOutCmd Title="Earnie_Aussentemperatur" Comment="sens_temperature_outside C; house-wide" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_temperature_outside/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
 	<VirtualOutCmd Title="Earnie_Abwesend" Comment="sens_absent_mode 0/1" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_absent_mode/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="false" Repeat="0" RepeatRate="0"/>
 	<VirtualOutCmd Title="Earnie_Netz_Einspeisegrenze_In" Comment="get_grid_export_power_limit kW inbound (optional)" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_grid_export_power_limit/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Batterie_SOC_Min" Comment="get_ess_soc_min % discharge cut-off (optional 2.7.j)" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_ess_soc_min/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Batterie_SOC_Max" Comment="get_ess_soc_max % charge cut-off (optional 2.7.j)" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_ess_soc_max/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Batterie_Max_Ladeleistung" Comment="get_ess_max_charge_power kW device ceiling (optional 2.7.j)" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_ess_max_charge_power/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Batterie_Max_Entladeleistung" Comment="get_ess_max_discharge_power kW device ceiling (optional 2.7.j)" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_ess_max_discharge_power/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
 </VirtualOut>

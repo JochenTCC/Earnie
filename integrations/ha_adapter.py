@@ -40,6 +40,10 @@ TELEMETRY_OPTIONAL = (
     "sens_evcs_active_power",
     "sens_power_consumers",
     "get_grid_export_power_limit",
+    "get_ess_soc_min",
+    "get_ess_soc_max",
+    "get_ess_max_charge_power",
+    "get_ess_max_discharge_power",
 )
 # Side-channel binary plant sensors (not part of EHAL telemetry wire / numeric read).
 TELEMETRY_BINARY_OPTIONAL = (
@@ -65,7 +69,13 @@ MAPPABLE_DOMAINS = frozenset(
 )
 WRITE_DOMAINS = frozenset({"number", "select", "input_number"})
 _NONNEG_TELEMETRY = frozenset(
-    {"sens_pv_production_active", "sens_evcs_active_power", "sens_power_consumers"}
+    {
+        "sens_pv_production_active",
+        "sens_evcs_active_power",
+        "sens_power_consumers",
+        "get_ess_max_charge_power",
+        "get_ess_max_discharge_power",
+    }
 )
 
 

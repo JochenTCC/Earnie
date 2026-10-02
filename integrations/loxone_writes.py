@@ -96,7 +96,10 @@ def send_loxone_value(input_name: str, value: float) -> bool:
 
 
 def map_ess_setpoints(
-    mode: int, target_power_kw: float, max_power_kw: float
+    mode: int,
+    target_power_kw: float,
+    max_charge_power_kw: float,
+    max_discharge_power_kw: float | None = None,
 ) -> tuple[float | None, float, float, int]:
     """Design C1: (active_power_kw|None, charge_limit_kw, discharge_limit_kw, mode_hint).
 
@@ -104,16 +107,23 @@ def map_ess_setpoints(
     Entladesperre without a forced Equals setpoint. Limits are true caps (kW magnitudes).
     ``mode_hint`` is for Loxone/HA (Huawei Steuerbefehl); OpenEMS ignores it.
     Battery-only: export caps travel on ``set_grid_export_power_limit`` (2.7.a).
+
+    ``max_discharge_power_kw`` defaults to ``max_charge_power_kw`` for legacy single-max
+    callers (pre-2.7.j).
     """
-    max_kw = max(0.0, abs(float(max_power_kw)))
+    max_charge = max(0.0, abs(float(max_charge_power_kw)))
+    if max_discharge_power_kw is None:
+        max_discharge = max_charge
+    else:
+        max_discharge = max(0.0, abs(float(max_discharge_power_kw)))
     target = max(0.0, abs(float(target_power_kw)))
     if mode == 1:  # MODE_ZWANGS_LADEN
-        return -target, max_kw, 0.0, 1
+        return -target, max_charge, 0.0, 1
     if mode == 2:  # MODE_ENTLADESPERRE
-        return None, max_kw, 0.0, 1
+        return None, max_charge, 0.0, 1
     if mode == 3:  # MODE_ZWANGS_ENTLADEN
-        return target, 0.0, max_kw, 2
-    return None, max_kw, max_kw, 0
+        return target, 0.0, max_discharge, 2
+    return None, max_charge, max_discharge, 0
 
 
 def flex_consumer_enable_value(
@@ -348,9 +358,19 @@ def build_sent_loxone_snapshot(
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
 ) -> dict[str, float]:
     """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
-    max_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
+    battery_params = config.get_battery_params()
+    max_charge = float(
+        battery_params.get("max_charge_power_kw")
+        or battery_params.get("max_power_kw")
+        or 0.0
+    )
+    max_discharge = float(
+        battery_params.get("max_discharge_power_kw")
+        or battery_params.get("max_power_kw")
+        or 0.0
+    )
     active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-        mode, target_power_kw, max_kw
+        mode, target_power_kw, max_charge, max_discharge
     )
     contexts = charging_contexts or {}
     snapshot: dict[str, float] = {}
@@ -419,12 +439,21 @@ def send_huawei_modbus_states(
     if control == BATTERY_CONTROL_READ_ONLY:
         return []
 
-    max_kw = float(battery_params.get("max_power_kw") or 0.0)
+    max_charge = float(
+        battery_params.get("max_charge_power_kw")
+        or battery_params.get("max_power_kw")
+        or 0.0
+    )
+    max_discharge = float(
+        battery_params.get("max_discharge_power_kw")
+        or battery_params.get("max_power_kw")
+        or 0.0
+    )
     if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (1, 3):
         mode = 0
         target_power_kw = 0.0
     active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-        mode, target_power_kw, max_kw
+        mode, target_power_kw, max_charge, max_discharge
     )
     if control == BATTERY_CONTROL_LIMITS_ONLY:
         active_kw = None

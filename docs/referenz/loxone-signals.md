@@ -83,7 +83,7 @@ Source: `share/loxone/templates/VirtualOut/`
 | File                      | Content (short)                                             |
 | ------------------------- | ------------------------------------------------------------ |
 | `VO_Earnie_Status.xml`    | optional alive / `Earnie_Request_Optimize` (port **8541**)  |
-| `VO_Earnie_Plant.xml`     | plant `sens_*`, outside temperature                         |
+| `VO_Earnie_Plant.xml`     | plant `sens_*` / `get_*` (ESS SOC cut-offs + max power, 2.7.j), outside temperature |
 | `VO_Earnie_EV.xml`        | EV telemetry                                                 |
 | `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
 | `VO_Earnie_Consumer.xml`  | flex power                                                   |
@@ -261,6 +261,10 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | `sens_ess_power`                  | Read      | `Earnie_Batterie_Leistung` (or EFM storage)      | Battery kW; **+ discharge**, − charge (same as EHAL, no inversion)                          |
 | `sens_grid_power_active`          | Read      | `Earnie_Netzleistung` (or EFM grid)              | Grid: + import, kW                                                                          |
 | `get_grid_export_power_limit`     | Read      | `Earnie_Netz_Einspeisegrenze_In` (optional)      | Inbound max export kW (2.7.a); EHAL W                                                       |
+| `get_ess_soc_min`                 | Read      | `Earnie_Batterie_SOC_Min` (optional)             | Discharge cut-off SoC % (2.7.j); MILP when `limits_from_live`                               |
+| `get_ess_soc_max`                 | Read      | `Earnie_Batterie_SOC_Max` (optional)             | Charge cut-off SoC % (2.7.j)                                                                |
+| `get_ess_max_charge_power`        | Read      | `Earnie_Batterie_Max_Ladeleistung` (optional)    | Device max charge (Loxone kW → EHAL W) (2.7.j)                                              |
+| `get_ess_max_discharge_power`     | Read      | `Earnie_Batterie_Max_Entladeleistung` (optional) | Device max discharge (Loxone kW → EHAL W) (2.7.j)                                           |
 | `sens_power_consumers`            | Read      | (optional)                                        | House load; otherwise derived                                                               |
 | `sens_temperature_outside`        | Read      | `Earnie_Aussentemperatur`                        | Outside temperature °C (house-wide; heat pump/pool)                                        |
 | `sens_absent_mode`                | Read      | `Earnie_Abwesend`                                | House absent / holiday mode 0/1 (OR with HK `absent_mode`)                                 |

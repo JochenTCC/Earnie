@@ -57,6 +57,10 @@ class LoxoneConfig:
     evcs_mode_name: str = ""
     grid_export_limit_in_name: str = ""
     grid_export_limit_out_name: str = ""
+    ess_soc_min_name: str = ""
+    ess_soc_max_name: str = ""
+    ess_max_charge_power_name: str = ""
+    ess_max_discharge_power_name: str = ""
     timeout_sec: float = 10.0
 
 
@@ -172,7 +176,42 @@ class LoxoneAdapter:
             # Loxone Merker in kW → EHAL W; negative = no inbound cap (never a hard 0).
             if limit_kw is not None and limit_kw >= 0.0:
                 doc["get_grid_export_power_limit"] = limit_kw * 1000.0
+        self._read_optional_ess_limits(doc)
         return validate_telemetry(doc)
+
+    def _read_optional_ess_limits(self, doc: dict[str, Any]) -> None:
+        """Optional plant ESS config ceilings (Pattern B); Merker kW → EHAL W, SOC %."""
+        soc_pairs = (
+            ("ess_soc_min_name", "get_ess_soc_min"),
+            ("ess_soc_max_name", "get_ess_soc_max"),
+        )
+        for attr, field in soc_pairs:
+            io_name = str(getattr(self.cfg, attr, "") or "").strip()
+            if not io_name:
+                continue
+            raw = loxone_client.fetch_loxone_generic_value(io_name)
+            try:
+                value = None if raw is None else float(raw)
+            except (TypeError, ValueError):
+                continue
+            if value is not None:
+                doc[field] = max(0.0, min(100.0, value))
+
+        power_pairs = (
+            ("ess_max_charge_power_name", "get_ess_max_charge_power"),
+            ("ess_max_discharge_power_name", "get_ess_max_discharge_power"),
+        )
+        for attr, field in power_pairs:
+            io_name = str(getattr(self.cfg, attr, "") or "").strip()
+            if not io_name:
+                continue
+            raw = loxone_client.fetch_loxone_generic_value(io_name)
+            try:
+                limit_kw = None if raw is None else float(raw)
+            except (TypeError, ValueError):
+                continue
+            if limit_kw is not None and limit_kw >= 0.0:
+                doc[field] = limit_kw * 1000.0
 
     def write_setpoints(
         self,

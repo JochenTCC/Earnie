@@ -10,6 +10,8 @@
     "sens_grid_energy_export": "sensor.power_meter_exported",
     "set_ess_charge_power_limit": "number.batteries_maximum_charging_power",
     "set_ess_discharge_power_limit": "number.batteries_maximum_discharging_power",
+    "get_ess_max_charge_power": "number.batteries_maximum_charging_power",
+    "get_ess_max_discharge_power": "number.batteries_maximum_discharging_power",
     "set_evcs_max_current": "number.goe_204711_amp"
   },
   "sign": {

@@ -62,16 +62,21 @@ def new_battery_template(
         return {}
 
     source_label = str(source.get("label") or source.get("id") or "Batterie").strip()
+    from house_config.entity_resolution import split_battery_max_power_kw
+
+    charge_kw, discharge_kw = split_battery_max_power_kw(source, battery_id="template")
     return {
         "label": allocate_unique_label(f"{source_label} copy", batteries),
         "battery_capacity_kwh": float(source.get("battery_capacity_kwh", 5.0)),
-        "battery_max_power_kw": float(source.get("battery_max_power_kw", 2.5)),
+        "battery_max_charge_power_kw": charge_kw,
+        "battery_max_discharge_power_kw": discharge_kw,
         "battery_efficiency": float(source.get("battery_efficiency", 0.97)),
         "battery_min_soc": float(source.get("battery_min_soc", 10.0)),
         "battery_max_soc": float(source.get("battery_max_soc", 100.0)),
         "threshold_power": float(source.get("threshold_power", 0.05)),
         "standby_power_kw": float(source.get("standby_power_kw", 0.0) or 0.0),
         "control": str(source.get("control") or "full").strip().lower() or "full",
+        "limits_from_live": bool(source.get("limits_from_live", False)),
         "battery_wear": copy.deepcopy(dict(source.get("battery_wear") or {})),
     }
 
@@ -106,10 +111,12 @@ def _clear_scoped_widget_keys(session_scope: str) -> None:
 
 
 def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
+    from house_config.entity_resolution import split_battery_max_power_kw
+
     if existing:
         label = str(existing.get("label", "5 kWh Speicher"))
         capacity = float(existing.get("battery_capacity_kwh", 5.0))
-        max_power = float(existing.get("battery_max_power_kw", 2.5))
+        max_charge, max_discharge = split_battery_max_power_kw(existing)
         efficiency = float(existing.get("battery_efficiency", 0.97))
         min_soc = float(existing.get("battery_min_soc", 10.0))
         max_soc = float(existing.get("battery_max_soc", 100.0))
@@ -118,6 +125,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         control = str(existing.get("control") or DEFAULT_BATTERY_CONTROL).strip().lower()
         if control not in BATTERY_CONTROL_VALUES:
             control = DEFAULT_BATTERY_CONTROL
+        limits_from_live = bool(existing.get("limits_from_live", False))
         wear = existing.get("battery_wear") or {}
         wear_enabled = bool(wear.get("enabled", False))
         wear_replacement_cost = float(wear.get("replacement_cost_euro", 1500.0))
@@ -126,13 +134,15 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     else:
         label = allocate_unique_label("5 kWh Speicher", list_batteries())
         capacity = 5.0
-        max_power = 2.5
+        max_charge = 2.5
+        max_discharge = 2.5
         efficiency = 0.97
         min_soc = 10.0
         max_soc = 100.0
         threshold_percent = 5.0
         standby_power = 0.0
         control = DEFAULT_BATTERY_CONTROL
+        limits_from_live = False
         wear_enabled = False
         wear_replacement_cost = 1500.0
         wear_expected_cycles = 6000.0
@@ -140,7 +150,12 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
 
     st.session_state[_scoped_key(session_scope, "planning_battery_label")] = label
     st.session_state[_scoped_key(session_scope, "planning_battery_capacity")] = capacity
-    st.session_state[_scoped_key(session_scope, "planning_battery_power")] = max_power
+    st.session_state[_scoped_key(session_scope, "planning_battery_charge_power")] = (
+        max_charge
+    )
+    st.session_state[_scoped_key(session_scope, "planning_battery_discharge_power")] = (
+        max_discharge
+    )
     st.session_state[_scoped_key(session_scope, "planning_battery_efficiency")] = efficiency
     st.session_state[_scoped_key(session_scope, "planning_battery_min_soc")] = min_soc
     st.session_state[_scoped_key(session_scope, "planning_battery_max_soc")] = max_soc
@@ -148,6 +163,9 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_battery_standby")] = standby_power
     st.session_state[_scoped_key(session_scope, "planning_battery_control")] = (
         CONTROL_LABELS_DE[control]
+    )
+    st.session_state[_scoped_key(session_scope, "planning_battery_limits_from_live")] = (
+        limits_from_live
     )
     st.session_state[_scoped_key(session_scope, "planning_battery_wear_enabled")] = wear_enabled
     st.session_state[
@@ -271,12 +289,19 @@ def _render_battery_core_fields(session_scope: str) -> dict:
         step=0.5,
         key=_scoped_key(session_scope, "planning_battery_capacity"),
     )
-    max_power = labeled_number_input(
-        "Max. Lade-/Entladeleistung (kW)",
+    max_charge = labeled_number_input(
+        "Max. Ladeleistung (kW)",
         min_value=0.1,
         step=0.1,
         ratios=WIDE_LABEL_RATIOS,
-        key=_scoped_key(session_scope, "planning_battery_power"),
+        key=_scoped_key(session_scope, "planning_battery_charge_power"),
+    )
+    max_discharge = labeled_number_input(
+        "Max. Entladeleistung (kW)",
+        min_value=0.1,
+        step=0.1,
+        ratios=WIDE_LABEL_RATIOS,
+        key=_scoped_key(session_scope, "planning_battery_discharge_power"),
     )
     efficiency = labeled_number_input(
         "Wirkungsgrad",
@@ -288,12 +313,19 @@ def _render_battery_core_fields(session_scope: str) -> dict:
     return {
         "label": label,
         "capacity": capacity,
-        "max_power": max_power,
+        "max_charge": max_charge,
+        "max_discharge": max_discharge,
         "efficiency": efficiency,
     }
 
 
 def _render_battery_limit_fields(session_scope: str) -> dict:
+    limits_from_live = labeled_checkbox(
+        "Grenzwerte im Live-Betrieb vom Wechselrichter / Speicher übernehmen",
+        help="SOC-Min/Max und Max. Lade-/Entladeleistung aus EHAL-Telemetrie "
+        "(get_ess_*); sonst Hauskonfigurator. Fehlendes Mapping → HK-Fallback.",
+        key=_scoped_key(session_scope, "planning_battery_limits_from_live"),
+    )
     min_soc = labeled_number_input(
         "Minimaler SoC (%)",
         min_value=0.0,
@@ -310,7 +342,7 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
         "Leistungs-Schwelle (%)",
         min_value=1.0,
         max_value=100.0,
-        help="Anteil der max. Lade-/Entladeleistung.",
+        help="Anteil der größeren von Max. Lade-/Entladeleistung.",
         key=_scoped_key(session_scope, "planning_battery_threshold"),
     )
     standby_power = labeled_number_input(
@@ -331,6 +363,7 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
     label_to_control = {v: k for k, v in CONTROL_LABELS_DE.items()}
     control = label_to_control.get(str(control_label), DEFAULT_BATTERY_CONTROL)
     return {
+        "limits_from_live": limits_from_live,
         "min_soc": min_soc,
         "max_soc": max_soc,
         "threshold_percent": threshold_percent,
@@ -385,13 +418,15 @@ def _battery_save_payload(fields: dict) -> dict:
     return {
         "label": fields["label"],
         "battery_capacity_kwh": fields["capacity"],
-        "battery_max_power_kw": fields["max_power"],
+        "battery_max_charge_power_kw": fields["max_charge"],
+        "battery_max_discharge_power_kw": fields["max_discharge"],
         "battery_efficiency": fields["efficiency"],
         "battery_min_soc": fields["min_soc"],
         "battery_max_soc": fields["max_soc"],
         "threshold_power": fields["threshold_percent"] / 100.0,
         "standby_power_kw": float(fields["standby_power"] or 0.0),
         "control": fields.get("control") or DEFAULT_BATTERY_CONTROL,
+        "limits_from_live": bool(fields.get("limits_from_live", False)),
         "battery_wear": fields["battery_wear"],
     }
 

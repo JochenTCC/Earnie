@@ -9,12 +9,15 @@ from house_config.battery_control import (
 ZERO_BATTERY_FLAT = {
     "battery_capacity_kwh": 0.0,
     "battery_max_power_kw": 0.0,
+    "battery_max_charge_power_kw": 0.0,
+    "battery_max_discharge_power_kw": 0.0,
     "battery_efficiency": 1.0,
     "battery_min_soc": 0.0,
     "battery_max_soc": 100.0,
     "threshold_power": 0.02,
     "standby_power_kw": 0.0,
     "battery_control": DEFAULT_BATTERY_CONTROL,
+    "limits_from_live": False,
 }
 
 ZERO_PV_FLAT = {
@@ -68,6 +71,57 @@ def planning_pv_entry(pv: dict) -> dict:
     }
 
 
+def split_battery_max_power_kw(raw: dict, *, battery_id: str = "?", index: int = 0) -> tuple[float, float]:
+    """Resolve charge/discharge max kW; migrate legacy ``battery_max_power_kw``."""
+    charge_raw = raw.get("battery_max_charge_power_kw")
+    discharge_raw = raw.get("battery_max_discharge_power_kw")
+    legacy_raw = raw.get("battery_max_power_kw")
+    try:
+        legacy = float(legacy_raw) if legacy_raw is not None else None
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): battery_max_power_kw ungültig."
+        ) from exc
+    try:
+        charge = float(charge_raw) if charge_raw is not None else None
+        discharge = float(discharge_raw) if discharge_raw is not None else None
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): "
+            "battery_max_charge/discharge_power_kw ungültig."
+        ) from exc
+    if charge is None and discharge is None:
+        if legacy is None:
+            raise ValueError(
+                f"batteries[{index}] ('{battery_id}'): "
+                "battery_max_charge_power_kw / battery_max_discharge_power_kw "
+                "(oder legacy battery_max_power_kw) fehlt."
+            )
+        charge = legacy
+        discharge = legacy
+    elif charge is None:
+        charge = discharge if discharge is not None else legacy
+    elif discharge is None:
+        discharge = charge if charge is not None else legacy
+    if charge is None or discharge is None:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): Lade-/Entladeleistung unvollständig."
+        )
+    if charge < 0.0 or discharge < 0.0:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): "
+            "battery_max_charge/discharge_power_kw muss >= 0 sein."
+        )
+    # Zero battery / reference strip: both may be 0. Positive configs need > 0
+    # on at least one side when capacity is present (checked by callers if needed).
+    if (charge == 0.0) ^ (discharge == 0.0):
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): "
+            "battery_max_charge/discharge_power_kw müssen beide 0 oder beide > 0 sein."
+        )
+    return float(charge), float(discharge)
+
+
 def normalize_battery(raw: dict, index: int) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"batteries[{index}] muss ein Objekt sein.")
@@ -88,17 +142,30 @@ def normalize_battery(raw: dict, index: int) -> dict:
     control = normalize_battery_control(
         raw.get("control"), battery_id=battery_id, index=index
     )
+    charge_kw, discharge_kw = split_battery_max_power_kw(
+        raw, battery_id=battery_id, index=index
+    )
+    capacity = float(raw["battery_capacity_kwh"])
+    if capacity > 0.0 and (charge_kw <= 0.0 or discharge_kw <= 0.0):
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): "
+            "battery_max_charge/discharge_power_kw muss > 0 sein."
+        )
     return {
         "id": battery_id,
         "label": label,
-        "battery_capacity_kwh": float(raw["battery_capacity_kwh"]),
-        "battery_max_power_kw": float(raw["battery_max_power_kw"]),
+        "battery_capacity_kwh": capacity,
+        "battery_max_charge_power_kw": charge_kw,
+        "battery_max_discharge_power_kw": discharge_kw,
+        # Legacy alias = max(charge, discharge) for threshold / straggler callers.
+        "battery_max_power_kw": max(charge_kw, discharge_kw),
         "battery_efficiency": float(raw["battery_efficiency"]),
         "battery_min_soc": float(raw["battery_min_soc"]),
         "battery_max_soc": float(raw["battery_max_soc"]),
         "threshold_power": threshold,
         "standby_power_kw": standby,
         "control": control,
+        "limits_from_live": bool(raw.get("limits_from_live", False)),
         "battery_wear": _normalize_battery_wear(raw.get("battery_wear"), battery_id, index),
     }
 
@@ -195,6 +262,8 @@ def resolve_battery_into_settings(
     out.update(
         {
             "battery_capacity_kwh": bat["battery_capacity_kwh"],
+            "battery_max_charge_power_kw": bat["battery_max_charge_power_kw"],
+            "battery_max_discharge_power_kw": bat["battery_max_discharge_power_kw"],
             "battery_max_power_kw": bat["battery_max_power_kw"],
             "battery_efficiency": bat["battery_efficiency"],
             "battery_min_soc": bat["battery_min_soc"],
@@ -202,6 +271,7 @@ def resolve_battery_into_settings(
             "threshold_power": bat["threshold_power"],
             "standby_power_kw": bat.get("standby_power_kw", 0.0),
             "battery_control": bat.get("control", DEFAULT_BATTERY_CONTROL),
+            "limits_from_live": bool(bat.get("limits_from_live", False)),
         }
     )
     if bat.get("battery_wear") is not None:

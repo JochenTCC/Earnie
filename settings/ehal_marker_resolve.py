@@ -179,6 +179,50 @@ def marker_get_grid_export_power_limit(
     return resolve_plant_binding(house_doc, "get_grid_export_power_limit", config_doc)
 
 
+def marker_get_ess_soc_min(
+    *,
+    house_doc: dict | None = None,
+    config_doc: dict | None = None,
+) -> str:
+    """Plant ``get_ess_soc_min`` Merker (%)."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    return resolve_plant_binding(house_doc, "get_ess_soc_min", config_doc)
+
+
+def marker_get_ess_soc_max(
+    *,
+    house_doc: dict | None = None,
+    config_doc: dict | None = None,
+) -> str:
+    """Plant ``get_ess_soc_max`` Merker (%)."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    return resolve_plant_binding(house_doc, "get_ess_soc_max", config_doc)
+
+
+def marker_get_ess_max_charge_power(
+    *,
+    house_doc: dict | None = None,
+    config_doc: dict | None = None,
+) -> str:
+    """Plant ``get_ess_max_charge_power`` Merker (kW on Loxone → EHAL W)."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    return resolve_plant_binding(house_doc, "get_ess_max_charge_power", config_doc)
+
+
+def marker_get_ess_max_discharge_power(
+    *,
+    house_doc: dict | None = None,
+    config_doc: dict | None = None,
+) -> str:
+    """Plant ``get_ess_max_discharge_power`` Merker (kW on Loxone → EHAL W)."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    return resolve_plant_binding(house_doc, "get_ess_max_discharge_power", config_doc)
+
+
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:
     """Limit SoC %: optional ``get_evcs_limit_soc`` Merker, else profile percent."""
     from integrations import loxone_client

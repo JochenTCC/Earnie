@@ -1,7 +1,7 @@
 {
   "role_id": "ess",
   "label": "Batterie (ESS)",
-  "baustein_notes": "SoC as %. Battery power often kW with Loxone +charge (adapter inverts to EHAL +discharge). Prefer EFM Storage Zähler for power. Design C1: set_ess_active_power (force) + true charge/discharge limits + set_ess_mode hint. Pattern B VI mirrors setpoints from Earnie.",
+  "baustein_notes": "SoC as %. Battery power often kW with Loxone +charge (adapter inverts to EHAL +discharge). Prefer EFM Storage Zähler for power. Design C1: set_ess_active_power (force) + true charge/discharge limits + set_ess_mode hint. Pattern B VI mirrors setpoints from Earnie. 2.7.j: optional get_ess_* device ceilings for limits_from_live.",
   "recommended_markers": [
     {
       "ehal_field": "sens_ess_soc",
@@ -14,6 +14,30 @@
       "loxone_blocks_key": "plant.ehal_bindings.sens_ess_power",
       "suggested_name": "Earnie_Batterie_Leistung",
       "notes": "Optional; kW, + = discharge (same sign as EHAL, no inversion). Prefer EFM Storage meter name when present."
+    },
+    {
+      "ehal_field": "get_ess_soc_min",
+      "loxone_blocks_key": "plant.ehal_bindings.get_ess_soc_min",
+      "suggested_name": "Earnie_Batterie_SOC_Min",
+      "notes": "Optional discharge cut-off % (2.7.j); MILP when limits_from_live."
+    },
+    {
+      "ehal_field": "get_ess_soc_max",
+      "loxone_blocks_key": "plant.ehal_bindings.get_ess_soc_max",
+      "suggested_name": "Earnie_Batterie_SOC_Max",
+      "notes": "Optional charge cut-off % (2.7.j)."
+    },
+    {
+      "ehal_field": "get_ess_max_charge_power",
+      "loxone_blocks_key": "plant.ehal_bindings.get_ess_max_charge_power",
+      "suggested_name": "Earnie_Batterie_Max_Ladeleistung",
+      "notes": "Optional device max charge kW → EHAL W (2.7.j)."
+    },
+    {
+      "ehal_field": "get_ess_max_discharge_power",
+      "loxone_blocks_key": "plant.ehal_bindings.get_ess_max_discharge_power",
+      "suggested_name": "Earnie_Batterie_Max_Entladeleistung",
+      "notes": "Optional device max discharge kW → EHAL W (2.7.j)."
     },
     {
       "ehal_field": "set_ess_active_power",

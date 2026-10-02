@@ -202,13 +202,17 @@ def window_slot_datetimes(anchor: datetime) -> list[datetime]:
 def _scenario_to_battery_params(scenario_params: dict) -> dict:
     """Übersetzt JSON-Szenario-Parameter in das Format des Optimizers."""
     from house_config.battery_control import DEFAULT_BATTERY_CONTROL, control_from_battery_params
+    from house_config.entity_resolution import split_battery_max_power_kw
 
     control_raw = scenario_params.get("battery_control", scenario_params.get("control"))
+    charge_kw, discharge_kw = split_battery_max_power_kw(scenario_params)
     return {
         "battery_capacity_kwh": float(scenario_params["battery_capacity_kwh"]),
         "min_soc": float(scenario_params["battery_min_soc"]),
         "max_soc": float(scenario_params["battery_max_soc"]),
-        "max_power_kw": float(scenario_params["battery_max_power_kw"]),
+        "max_charge_power_kw": charge_kw,
+        "max_discharge_power_kw": discharge_kw,
+        "max_power_kw": max(charge_kw, discharge_kw),
         "efficiency": float(scenario_params["battery_efficiency"]),
         "standby_power_kw": max(
             0.0, float(scenario_params.get("standby_power_kw") or 0.0)
@@ -216,6 +220,7 @@ def _scenario_to_battery_params(scenario_params: dict) -> dict:
         "control": control_from_battery_params(
             {"control": control_raw or DEFAULT_BATTERY_CONTROL}
         ),
+        "limits_from_live": bool(scenario_params.get("limits_from_live", False)),
     }
 
 

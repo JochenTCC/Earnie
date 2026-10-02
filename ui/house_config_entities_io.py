@@ -121,28 +121,61 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         "id": entity_id,
         "label": label or entity_id,
         "battery_capacity_kwh": float(raw_spec["battery_capacity_kwh"]),
-        "battery_max_power_kw": float(raw_spec["battery_max_power_kw"]),
+        "battery_max_charge_power_kw": float(
+            raw_spec.get("battery_max_charge_power_kw", raw_spec.get("battery_max_power_kw"))
+        ),
+        "battery_max_discharge_power_kw": float(
+            raw_spec.get(
+                "battery_max_discharge_power_kw",
+                raw_spec.get("battery_max_power_kw"),
+            )
+        ),
         "battery_efficiency": float(raw_spec["battery_efficiency"]),
         "battery_min_soc": float(raw_spec["battery_min_soc"]),
         "battery_max_soc": float(raw_spec["battery_max_soc"]),
         "threshold_power": float(raw_spec.get("threshold_power", 0.05)),
         "standby_power_kw": float(raw_spec.get("standby_power_kw", 0.0) or 0.0),
+        "limits_from_live": bool(raw_spec.get("limits_from_live", False)),
     }
+    if raw_spec.get("control") is not None:
+        spec["control"] = raw_spec["control"]
     existing_wear = None
+    existing_control = None
     if stable_id:
         for item in batteries:
             if str(item.get("id", "")).strip() == entity_id:
                 existing_wear = item.get("battery_wear")
+                existing_control = item.get("control")
                 break
+    if "control" not in spec and existing_control is not None:
+        spec["control"] = existing_control
     if raw_spec.get("battery_wear") is not None:
         spec["battery_wear"] = raw_spec["battery_wear"]
     elif existing_wear is not None:
         spec["battery_wear"] = existing_wear
     else:
         spec["battery_wear"] = {"enabled": False}
-    normalize_battery(spec, 0)
+    normalized = normalize_battery(spec, 0)
+    # Persist split fields (drop legacy single max when both are present).
+    save_spec = {
+        "id": normalized["id"],
+        "label": normalized["label"],
+        "battery_capacity_kwh": normalized["battery_capacity_kwh"],
+        "battery_max_charge_power_kw": normalized["battery_max_charge_power_kw"],
+        "battery_max_discharge_power_kw": normalized["battery_max_discharge_power_kw"],
+        "battery_efficiency": normalized["battery_efficiency"],
+        "battery_min_soc": normalized["battery_min_soc"],
+        "battery_max_soc": normalized["battery_max_soc"],
+        "threshold_power": normalized["threshold_power"],
+        "standby_power_kw": normalized["standby_power_kw"],
+        "control": normalized["control"],
+        "limits_from_live": normalized["limits_from_live"],
+        "battery_wear": normalized["battery_wear"]
+        if normalized["battery_wear"] is not None
+        else {"enabled": False},
+    }
     batteries = [item for item in batteries if item.get("id") != entity_id]
-    batteries.append(spec)
+    batteries.append(save_spec)
     data["batteries"] = batteries
     _save_components_document(data)
 

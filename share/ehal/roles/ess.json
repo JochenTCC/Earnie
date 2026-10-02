@@ -17,6 +17,30 @@
       "notes": "Optional W; + = discharge, − = charge (OpenEMS-aligned)."
     },
     {
+      "field": "get_ess_soc_min",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Optional discharge cut-off SoC in % (device config; MILP when limits_from_live)."
+    },
+    {
+      "field": "get_ess_soc_max",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Optional charge cut-off SoC in % (device config; MILP when limits_from_live)."
+    },
+    {
+      "field": "get_ess_max_charge_power",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Optional device max charge power in W (magnitude ≥ 0; Huawei 47075)."
+    },
+    {
+      "field": "get_ess_max_discharge_power",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Optional device max discharge power in W (magnitude ≥ 0; Huawei 47077)."
+    },
+    {
       "field": "set_ess_active_power",
       "required": false,
       "kind": "setpoint",

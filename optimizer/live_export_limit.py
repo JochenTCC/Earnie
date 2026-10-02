@@ -35,7 +35,13 @@ def live_unconstrained_export_kw() -> float | None:
     battery_params = config.get_battery_params()
     discharge_kw = 0.0
     if control_from_battery_params(battery_params) == BATTERY_CONTROL_FULL:
-        discharge_kw = float(battery_params.get("max_power_kw") or 0.0)
+        discharge_kw = float(
+            battery_params.get(
+                "max_discharge_power_kw",
+                battery_params.get("max_power_kw") or 0.0,
+            )
+            or 0.0
+        )
     return physical_max_export_kw(config.get("PV_KWP", 0.0, float), discharge_kw)
 
 

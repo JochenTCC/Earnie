@@ -42,6 +42,10 @@ class EhalTelemetry(TypedDict):
     get_evcs_limit_soc: NotRequired[float | None]
     get_evcs_soc_min_immediate: NotRequired[float | None]
     get_grid_export_power_limit: NotRequired[float | None]
+    get_ess_soc_min: NotRequired[float | None]
+    get_ess_soc_max: NotRequired[float | None]
+    get_ess_max_charge_power: NotRequired[float | None]
+    get_ess_max_discharge_power: NotRequired[float | None]
 
 
 class EhalSetpoint(TypedDict):

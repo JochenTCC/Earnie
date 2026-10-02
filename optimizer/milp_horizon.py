@@ -92,7 +92,13 @@ def _create_grid_battery_vars(
     """LpVariables für Netzbezug/-einspeisung, Lade-/Entladeleistung und SOC-Energie."""
     min_soc = battery_params["min_soc"]
     max_soc = battery_params["max_soc"]
-    max_power = battery_params["max_power_kw"]
+    max_charge = float(
+        battery_params.get("max_charge_power_kw", battery_params["max_power_kw"])
+    )
+    max_discharge = float(
+        battery_params.get("max_discharge_power_kw", battery_params["max_power_kw"])
+    )
+    max_power = max(max_charge, max_discharge)
     battery_capacity = battery_params["battery_capacity_kwh"]
     e_min = (min_soc / 100.0) * battery_capacity
     e_max = (max_soc / 100.0) * battery_capacity
@@ -100,11 +106,11 @@ def _create_grid_battery_vars(
     p_grid_buy = [pulp.LpVariable(f"p_grid_buy_{t}", lowBound=0) for t in range(horizon)]
     p_grid_sell = [pulp.LpVariable(f"p_grid_sell_{t}", lowBound=0) for t in range(horizon)]
     p_charge = [
-        pulp.LpVariable(f"p_charge_{t}", lowBound=0, upBound=max_power)
+        pulp.LpVariable(f"p_charge_{t}", lowBound=0, upBound=max_charge)
         for t in range(horizon)
     ]
     p_discharge = [
-        pulp.LpVariable(f"p_discharge_{t}", lowBound=0, upBound=max_power)
+        pulp.LpVariable(f"p_discharge_{t}", lowBound=0, upBound=max_discharge)
         for t in range(horizon)
     ]
     e_batt = [
