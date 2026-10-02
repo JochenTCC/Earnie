@@ -46,6 +46,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - Add a check in HK whether these parameters shall be written by Earnie to configured value in house-config
       - When checked, the values are set to smarthome-backend
       - When not checked, values are taken into account for MILP
+  - Read max charge / max discharge power as EHAL telemetry (per ESS):
+    - New optional fields, e.g. `get_ess_max_charge_power` / `get_ess_max_discharge_power` [W, magnitude ≥ 0] (Huawei LUNA: storage max charge/discharge power registers, e.g. 37046 / 37048 — verify against the Modbus map)
+    - When mapped, they override the static HK `battery_max_power_kw` (today one value for both directions) for MILP limits, `set_ess_*_power_limit` caps and the "unconstrained" export value; fall back to HK when absent
+    - Wire through Loxone / HA / OpenEMS adapters, `share/ehal/roles/ess.json`, `telemetry.schema.json`, EHAL-Com mapping and docs
 
 
 - [ ] improve prognosis for EV coming back (connecting for charging)

@@ -258,7 +258,7 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | ---------------------------------- | --------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | `sens_ess_soc`                    | Read      | `Earnie_Batterie_SoC`                            | Battery SoC, %                                                                             |
 | `sens_pv_production_active`       | Read      | `Earnie_PV_Leistung` (or EFM production)         | PV power, kW                                                                                |
-| `sens_ess_power`                  | Read      | `Earnie_Batterie_Leistung` (or EFM storage)      | Battery; EHAL: + discharge                                                                  |
+| `sens_ess_power`                  | Read      | `Earnie_Batterie_Leistung` (or EFM storage)      | Battery kW; **+ discharge**, − charge (same as EHAL, no inversion)                          |
 | `sens_grid_power_active`          | Read      | `Earnie_Netzleistung` (or EFM grid)              | Grid: + import, kW                                                                          |
 | `get_grid_export_power_limit`     | Read      | `Earnie_Netz_Einspeisegrenze_In` (optional)      | Inbound max export kW (2.7.a); EHAL W                                                       |
 | `sens_power_consumers`            | Read      | (optional)                                        | House load; otherwise derived                                                               |

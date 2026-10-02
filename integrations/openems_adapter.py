@@ -209,7 +209,7 @@ class OpenemsAdapter:
                 doc["sens_evcs_active_power"] = max(0.0, float(evcs_power))
 
         ess_w = float(doc.get("sens_ess_power") or 0.0)
-        doc["sens_power_consumers"] = max(0.0, pv_w - grid_w - ess_w)
+        doc["sens_power_consumers"] = max(0.0, pv_w + grid_w + ess_w)
         return validate_telemetry(doc)
 
     def _invalid_setpoint_error(

@@ -75,7 +75,8 @@ def test_read_telemetry_normalizes(get_mock):
     assert telemetry["sens_ess_soc"] == 55.0
     assert telemetry["sens_ess_power"] == 200.0
     assert telemetry["sens_evcs_active_power"] == 1200.0
-    assert telemetry["sens_power_consumers"] == pytest.approx(200.0)
+    # EHAL: PV 500 + import 100 + discharge 200
+    assert telemetry["sens_power_consumers"] == pytest.approx(800.0)
 
 
 @patch("integrations.openems_adapter.requests.post")

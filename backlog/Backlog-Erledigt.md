@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Negative export tariff + battery discharge (2026-10-02)
+
+- [x] **Negative export tariff + battery discharge** — Soft pay-to-export live dogfood closed with **2.7.a** (2026-09-30). Live verification: plan vs live discharge when `k_push` is negative. PV curtailment var for hard cap when SoC full remains optional hardening if the cap becomes infeasible at full SoC.
+
 ### Bugfix Invalid JSON config crash message (2026-10-01)
 
 - [x] **Invalid JSON in config.json crash** — `read_json_dict` raises clear `ValueError` (path + Zeile/Spalte, no chained `JSONDecodeError`); `bootstrap.run()` aborts via `_abort_config_error` (`Abbruch:…`, exit 1) like `load_config_or_exit`. Regression: `tests/test_json_io.py`. Verified.

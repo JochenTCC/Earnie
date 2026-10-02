@@ -31,6 +31,7 @@ Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` o
 - [ ] `version.py` bump approved and on `origin/main` (tag = `version.py` without `v`)
 - [ ] Pre-release: `docker/compose/{synology,loxberry,proxmox}-alpha.yml` pin `ghcr.io/jochentcc/earnie-energy:<version>`
 - [ ] Release notes: `.github/release-notes/v<version>.md` — write (or rewrite) them **before** the tag
+- [ ] Merge pending items from `.github/release-notes/UNRELEASED.md` into `v<version>.md` (breaking / user-action items near the top), then reset `UNRELEASED.md` to its header
 - [ ] **HA add-on Änderungsprotokoll (user-facing):** after `promote`, `bump_ha_addon` copies the **first non-heading prose line** of those release notes into `packaging/homeassistant-addon/earnie[_prerelease]/CHANGELOG.md` (what HA shows as Änderungsprotokoll). Edit that first line for end users: short German, no pin/`latest`/channel jargon, no internal backlog IDs — use Highlights-style bullets users can understand. Optional: after a local `python -m scripts.bump_ha_addon --version <version> --dry-run`, sanity-check the planned CHANGELOG blurb; if the auto blurb is still too technical, expand the first line (or first paragraph as one line) before tagging.
 - [ ] `git status` clean, `main` == `origin/main`
 

@@ -23,12 +23,11 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **Negative export tariff + battery discharge -- Still open:** PV curtailment var so hard cap stays feasible when SoC full. Soft pay-to-export live dogfood closed with **2.7.a** (2026-09-30). Open question: Monitor plan vs live discharge after `k_push` already negative.
-
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-
+- [ ] "debug-dumps\debug_dump_20260930_182138"
+- [ ] plausibility of RC model simulation
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
