@@ -21,6 +21,9 @@ from runtime_store.persist_paths import resolve_runtime_prefixed_path
 
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
 MISSING_PRICE_STRATEGY_FORECAST = "forecast"
+DEFAULT_LIVE_BIAS_LOOKBACK_HOURS = 48
+DEFAULT_LIVE_BIAS_CAP_CENT = 12.0
+MIN_LIVE_BIAS_SAMPLES = 6
 DEFAULT_MODEL_PATH = Path("share/data/price_model_coefficients.json")
 LEGACY_MODEL_PATH = Path("data/cache/price_model_coefficients.json")
 LIVE_FEATURE_CACHE_TTL_SEC = 45 * 60
@@ -55,6 +58,56 @@ def get_missing_price_strategy() -> str:
             "market_prices.missing_price_strategy muss 'mirror' oder 'forecast' sein."
         )
     return strategy
+
+
+def get_live_bias_enabled() -> bool:
+    """Rolling EPEX residual on predicted slots (default on)."""
+    import config
+
+    block = config.Config._read_json_dict(str(config.CONFIG_JSON_PATH)).get(
+        "market_prices"
+    )
+    if not isinstance(block, dict):
+        return True
+    if "live_bias_enabled" not in block:
+        return True
+    return bool(block.get("live_bias_enabled"))
+
+
+def get_live_bias_lookback_hours() -> int:
+    import config
+
+    block = config.Config._read_json_dict(str(config.CONFIG_JSON_PATH)).get(
+        "market_prices"
+    )
+    raw = (
+        block.get("live_bias_lookback_hours", DEFAULT_LIVE_BIAS_LOOKBACK_HOURS)
+        if isinstance(block, dict)
+        else DEFAULT_LIVE_BIAS_LOOKBACK_HOURS
+    )
+    hours = int(raw)
+    if hours < 1:
+        raise ValueError(
+            "market_prices.live_bias_lookback_hours muss >= 1 sein."
+        )
+    return hours
+
+
+def get_live_bias_cap_cent_kwh() -> float:
+    import config
+
+    block = config.Config._read_json_dict(str(config.CONFIG_JSON_PATH)).get(
+        "market_prices"
+    )
+    raw = (
+        block.get("live_bias_cap_cent_kwh", DEFAULT_LIVE_BIAS_CAP_CENT)
+        if isinstance(block, dict)
+        else DEFAULT_LIVE_BIAS_CAP_CENT
+    )
+    cap = float(raw)
+    if cap <= 0:
+        raise ValueError("market_prices.live_bias_cap_cent_kwh muss > 0 sein.")
+    return cap
 
 
 def get_forecast_model_path() -> Path:
@@ -263,6 +316,71 @@ def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | N
         return None
 
 
+def compute_rolling_epex_bias_cent(
+    day_ahead_by_slot: dict[datetime, float],
+    *,
+    forecast_model: PriceForecastModel,
+    reference_slot: datetime,
+    lookback_hours: int,
+    cap_cent_kwh: float = DEFAULT_LIVE_BIAS_CAP_CENT,
+    min_samples: int = MIN_LIVE_BIAS_SAMPLES,
+) -> tuple[float | None, int]:
+    """Mean (actual − model) over recent Day-Ahead hours; capped.
+
+    Returns (bias_cent_or_None, sample_count).
+    """
+    from data.market_prices import normalize_price_slot
+    from optimizer.slot_duration import floor_to_hour_slot
+
+    ref = floor_to_hour_slot(normalize_price_slot(reference_slot))
+    lookback_slots: list[datetime] = []
+    for hours_back in range(1, lookback_hours + 1):
+        lookback_slots.append(ref - timedelta(hours=hours_back))
+
+    feature_frame = build_live_feature_frame_for_slots(lookback_slots)
+    if feature_frame is None or feature_frame.empty:
+        logger.warning(
+            "Preisprognose: live bias — keine Features für Lookback."
+        )
+        return None, 0
+
+    residuals: list[float] = []
+    for slot in lookback_slots:
+        actual = day_ahead_by_slot.get(slot)
+        if actual is None:
+            parent = floor_to_hour_slot(slot)
+            actual = day_ahead_by_slot.get(parent)
+        if actual is None:
+            continue
+        lookup = slot.replace(tzinfo=None) if feature_frame.index.tz is None else slot
+        if lookup not in feature_frame.index:
+            parent = floor_to_hour_slot(lookup)
+            if parent not in feature_frame.index:
+                continue
+            lookup = parent
+        predicted = float(predict_prices(forecast_model, feature_frame.loc[[lookup]])[0])
+        residuals.append(float(actual) - predicted)
+
+    if len(residuals) < min_samples:
+        logger.warning(
+            "Preisprognose: live bias — zu wenige Samples (%d < %d).",
+            len(residuals),
+            min_samples,
+        )
+        return None, len(residuals)
+
+    bias = sum(residuals) / len(residuals)
+    capped = max(-cap_cent_kwh, min(cap_cent_kwh, bias))
+    logger.info(
+        "Preisprognose: live bias %.3f Cent/kWh (raw %.3f, n=%d, cap=±%.1f).",
+        capped,
+        bias,
+        len(residuals),
+        cap_cent_kwh,
+    )
+    return capped, len(residuals)
+
+
 def resolve_market_slots_kwargs(target_hours: list) -> dict:
     """Kwargs für market_prices.resolve_market_slots aus config.json."""
     strategy = get_missing_price_strategy()
@@ -285,6 +403,10 @@ def resolve_market_slots_kwargs(target_hours: list) -> dict:
     feature_frame = build_live_feature_frame_for_slots(target_hours)
     if feature_frame is not None and not feature_frame.empty:
         kwargs["forecast_feature_frame"] = feature_frame
+        if get_live_bias_enabled():
+            kwargs["live_bias_enabled"] = True
+            kwargs["live_bias_lookback_hours"] = get_live_bias_lookback_hours()
+            kwargs["live_bias_cap_cent_kwh"] = get_live_bias_cap_cent_kwh()
         return kwargs
 
     kwargs["missing_price_strategy"] = MISSING_PRICE_STRATEGY_MIRROR

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+import pandas as pd
 import pytest
 
 from zoneinfo import ZoneInfo
@@ -10,6 +11,7 @@ from zoneinfo import ZoneInfo
 from data.market_prices import (
     PRICE_SOURCE_DAY_AHEAD,
     PRICE_SOURCE_MIRRORED,
+    PRICE_SOURCE_PREDICTED,
     hourly_settlement_epex_values,
     index_market_data_by_slot,
     normalize_price_slot,
@@ -230,3 +232,100 @@ def test_resolve_market_slots_monthly_table_passes_slot_datetime():
     with patch("config.get_resolved_runtime_settings", return_value=resolved_settings):
         out = resolve_market_slots(market, [slot])
     assert out[0]["k_act"] == expected
+
+
+def test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex():
+    """Regression: predicted k_act uses same import formula as day_ahead."""
+    from unittest.mock import MagicMock, patch
+
+    from data.tariff_pricing import import_cent_kwh
+
+    da_slot = normalize_price_slot(datetime(2025, 7, 1, 10, 0, tzinfo=VIENNA))
+    pred_slot = normalize_price_slot(datetime(2025, 7, 2, 18, 0, tzinfo=VIENNA))
+    epex = 8.0
+    market = [{"timestamp": da_slot, "price_buy": epex}]
+    spot_spec = {
+        "type": "spot_hourly",
+        "id": "debug_spot",
+        "settlement_fee_cent_kwh": 1.5,
+        "markup_percent": 3.0,
+        "prices_include_vat": False,
+        "vat_percent": 20.0,
+    }
+    resolved_settings = {
+        "_import_tariff_spec": spot_spec,
+        "import_tariff_id": "debug_spot",
+        "netzentgelt_cent_kwh": 2.0,
+    }
+    expected = import_cent_kwh(
+        epex,
+        spot_spec,
+        netzentgelt_override=2.0,
+        slot_datetime=pred_slot,
+    )
+    feature_frame = pd.DataFrame(
+        {"intercept": [1.0]},
+        index=pd.DatetimeIndex([pred_slot.replace(tzinfo=None)]),
+    )
+    model = MagicMock()
+    with patch("config.get_resolved_runtime_settings", return_value=resolved_settings):
+        with patch(
+            "data.market_prices._lookup_forecast_epex",
+            return_value=epex,
+        ):
+            out = resolve_market_slots(
+                market,
+                [da_slot, pred_slot],
+                missing_price_strategy="forecast",
+                forecast_model=model,
+                forecast_feature_frame=feature_frame,
+            )
+    by_src = {row["price_source"]: row for row in out}
+    assert by_src[PRICE_SOURCE_DAY_AHEAD]["k_act"] == pytest.approx(expected)
+    assert by_src[PRICE_SOURCE_PREDICTED]["k_act"] == pytest.approx(expected)
+    assert by_src[PRICE_SOURCE_PREDICTED]["price_buy"] == pytest.approx(epex)
+
+
+def test_resolve_market_slots_applies_live_bias_to_predicted_only():
+    from unittest.mock import MagicMock, patch
+
+    da_slot = normalize_price_slot(datetime(2025, 7, 1, 10, 0, tzinfo=VIENNA))
+    pred_slot = normalize_price_slot(datetime(2025, 7, 2, 18, 0, tzinfo=VIENNA))
+    market = [{"timestamp": da_slot, "price_buy": 10.0}]
+    feature_frame = pd.DataFrame(
+        {"intercept": [1.0]},
+        index=pd.DatetimeIndex([pred_slot.replace(tzinfo=None)]),
+    )
+    spot_spec = {
+        "type": "spot_hourly",
+        "id": "debug_spot",
+        "settlement_fee_cent_kwh": 0.0,
+        "markup_percent": 0.0,
+        "prices_include_vat": True,
+        "vat_percent": 20.0,
+    }
+    resolved_settings = {
+        "_import_tariff_spec": spot_spec,
+        "import_tariff_id": "debug_spot",
+    }
+    with patch("config.get_resolved_runtime_settings", return_value=resolved_settings):
+        with patch(
+            "data.market_prices._lookup_forecast_epex",
+            return_value=5.0,
+        ):
+            with patch(
+                "data.market_prices._resolve_live_bias_cent",
+                return_value=1.25,
+            ):
+                out = resolve_market_slots(
+                    market,
+                    [da_slot, pred_slot],
+                    missing_price_strategy="forecast",
+                    forecast_model=MagicMock(),
+                    forecast_feature_frame=feature_frame,
+                    live_bias_enabled=True,
+                )
+    by_src = {row["price_source"]: row for row in out}
+    assert by_src[PRICE_SOURCE_DAY_AHEAD]["price_buy"] == pytest.approx(10.0)
+    assert by_src[PRICE_SOURCE_PREDICTED]["price_buy"] == pytest.approx(6.25)
+    assert by_src[PRICE_SOURCE_PREDICTED]["live_bias_cent_kwh"] == pytest.approx(1.25)

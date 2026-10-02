@@ -170,6 +170,8 @@ def _append_predicted_slot(
     epex_cent: float,
     *,
     forecast_model_path: Path | None = None,
+    eu_power_live_source: str | None = None,
+    live_bias_cent_kwh: float | None = None,
 ) -> None:
     row: dict[str, Any] = {
         "slot_datetime": slot,
@@ -180,6 +182,10 @@ def _append_predicted_slot(
     }
     if forecast_model_path is not None:
         row["forecast_model_path"] = str(forecast_model_path)
+    if eu_power_live_source is not None:
+        row["eu_power_live_source"] = eu_power_live_source
+    if live_bias_cent_kwh is not None:
+        row["live_bias_cent_kwh"] = float(live_bias_cent_kwh)
     resolved.append(row)
 
 
@@ -207,6 +213,36 @@ def _lookup_forecast_epex(
     return float(predict_prices(forecast_model, frame)[0])
 
 
+def _day_ahead_epex_by_slot(
+    by_slot: dict[datetime, dict[str, Any]],
+) -> dict[datetime, float]:
+    return {slot: float(row["price_buy"]) for slot, row in by_slot.items()}
+
+
+def _resolve_live_bias_cent(
+    by_slot: dict[datetime, dict[str, Any]],
+    target_hours: list[datetime],
+    *,
+    forecast_model: Any,
+    live_bias_enabled: bool,
+    live_bias_lookback_hours: int,
+    live_bias_cap_cent_kwh: float,
+) -> float | None:
+    if not live_bias_enabled or forecast_model is None or not target_hours:
+        return None
+    from data.price_forecast_live import compute_rolling_epex_bias_cent
+
+    ref = min(normalize_price_slot(dt) for dt in target_hours)
+    bias, _n = compute_rolling_epex_bias_cent(
+        _day_ahead_epex_by_slot(by_slot),
+        forecast_model=forecast_model,
+        reference_slot=ref,
+        lookback_hours=live_bias_lookback_hours,
+        cap_cent_kwh=live_bias_cap_cent_kwh,
+    )
+    return bias
+
+
 def _resolve_missing_slot(
     resolved: list[dict[str, Any]],
     slot: datetime,
@@ -217,6 +253,8 @@ def _resolve_missing_slot(
     forecast_feature_frame: pd.DataFrame | None,
     forecast_model_path: Path | None,
     max_lookback_days: int,
+    eu_power_live_source: str | None = None,
+    live_bias_cent_kwh: float | None = None,
 ) -> None:
     if (
         missing_price_strategy == MISSING_PRICE_STRATEGY_FORECAST
@@ -229,11 +267,15 @@ def _resolve_missing_slot(
             forecast_feature_frame=forecast_feature_frame,
         )
         if epex is not None:
+            if live_bias_cent_kwh is not None:
+                epex = float(epex) + float(live_bias_cent_kwh)
             _append_predicted_slot(
                 resolved,
                 slot,
                 epex,
                 forecast_model_path=forecast_model_path,
+                eu_power_live_source=eu_power_live_source,
+                live_bias_cent_kwh=live_bias_cent_kwh,
             )
             return
 
@@ -259,12 +301,19 @@ def resolve_market_slots(
     forecast_model: Any | None = None,
     forecast_feature_frame: pd.DataFrame | None = None,
     forecast_model_path: Path | None = None,
+    eu_power_live_source: str | None = None,
+    live_bias_enabled: bool = True,
+    live_bias_lookback_hours: int = 48,
+    live_bias_cap_cent_kwh: float = 12.0,
 ) -> list[dict[str, Any]]:
     """
     Liefert Preis-Slots für target_hours (beliebige Länge >= 1).
 
     Fehlende Day-Ahead-Stunden: Spiegelung (Standard) oder OLS-Prognose bei
     missing_price_strategy='forecast' (Fallback: Spiegelung).
+
+    Live bias (default on): rolling Day-Ahead−OLS residual on predicted slots,
+    capped by ``live_bias_cap_cent_kwh`` (default ±12 Cent/kWh).
     """
     if not target_hours:
         raise ValueError("resolve_market_slots erfordert mindestens eine Zielstunde.")
@@ -277,6 +326,14 @@ def resolve_market_slots(
         )
 
     by_slot = index_market_data_by_slot(market_data)
+    live_bias = _resolve_live_bias_cent(
+        by_slot,
+        target_hours,
+        forecast_model=forecast_model,
+        live_bias_enabled=live_bias_enabled,
+        live_bias_lookback_hours=live_bias_lookback_hours,
+        live_bias_cap_cent_kwh=live_bias_cap_cent_kwh,
+    )
     resolved: list[dict[str, Any]] = []
 
     for target_dt in target_hours:
@@ -303,6 +360,8 @@ def resolve_market_slots(
             forecast_feature_frame=forecast_feature_frame,
             forecast_model_path=forecast_model_path,
             max_lookback_days=MAX_MIRROR_LOOKBACK_DAYS,
+            eu_power_live_source=eu_power_live_source,
+            live_bias_cent_kwh=live_bias,
         )
 
     return resolved

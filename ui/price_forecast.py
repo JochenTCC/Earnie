@@ -221,3 +221,29 @@ def render_price_forecast_block() -> None:
         ].copy()
         show.index = show.index.strftime("%Y-%m-%d %H:%M")
         st.dataframe(show.round(3), width="stretch")
+
+    with st.expander("Live bias (green-zone correction)"):
+        st.caption(
+            "Rolling Day-Ahead − OLS residual on predicted slots "
+            "(`market_prices.live_bias_*`). Spec §11."
+        )
+        from data.price_forecast_live import (
+            get_live_bias_cap_cent_kwh,
+            get_live_bias_enabled,
+            get_live_bias_lookback_hours,
+        )
+
+        try:
+            st.write(
+                {
+                    "live_bias_enabled": get_live_bias_enabled(),
+                    "live_bias_lookback_hours": get_live_bias_lookback_hours(),
+                    "live_bias_cap_cent_kwh": get_live_bias_cap_cent_kwh(),
+                }
+            )
+        except ValueError as exc:
+            st.warning(str(exc))
+        st.code(
+            "python -m scripts.compare_live_price_prognosis_research --hours 12 --with-live-bias",
+            language="powershell",
+        )

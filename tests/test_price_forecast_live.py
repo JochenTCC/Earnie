@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -182,3 +182,90 @@ def test_feature_load_error_summary_omits_url():
     response.status_code = 400
     exc = requests.HTTPError("https://example.com/long-url", response=response)
     assert _feature_load_error_summary(exc) == "HTTP 400"
+
+
+def test_get_live_bias_enabled_defaults_true():
+    from data.price_forecast_live import get_live_bias_enabled
+
+    with patch("config.Config._read_json_dict", return_value={}):
+        assert get_live_bias_enabled() is True
+
+
+def test_get_live_bias_enabled_can_disable():
+    from data.price_forecast_live import get_live_bias_enabled
+
+    with patch(
+        "config.Config._read_json_dict",
+        return_value={"market_prices": {"live_bias_enabled": False}},
+    ):
+        assert get_live_bias_enabled() is False
+
+
+def test_get_live_bias_cap_defaults_to_12():
+    from data.price_forecast_live import get_live_bias_cap_cent_kwh
+
+    with patch("config.Config._read_json_dict", return_value={}):
+        assert get_live_bias_cap_cent_kwh() == pytest.approx(12.0)
+
+
+def _stub_price_model(*, intercept: float) -> object:
+    from data.price_forecast_model import PriceForecastModel
+
+    return PriceForecastModel(
+        version=2,
+        feature_names=("intercept",),
+        coefficients=(float(intercept),),
+        trained_range_start="2025-01-01",
+        trained_range_end="2025-12-31",
+        training_rows=1,
+        bias_correction_cent_kwh=0.0,
+    )
+
+
+def test_compute_rolling_epex_bias_cent_mean_and_cap():
+    from data.price_forecast_live import compute_rolling_epex_bias_cent
+
+    tz = ZoneInfo("Europe/Vienna")
+    ref = datetime(2025, 7, 2, 12, 0, tzinfo=tz)
+    day_ahead = {ref - timedelta(hours=h): 10.0 for h in range(1, 10)}
+    model = _stub_price_model(intercept=7.0)
+    idx = [ref - timedelta(hours=h) for h in range(1, 10)]
+    frame = pd.DataFrame({"intercept": [1.0] * len(idx)}, index=idx)
+    with patch(
+        "data.price_forecast_live.build_live_feature_frame_for_slots",
+        return_value=frame,
+    ):
+        bias, n = compute_rolling_epex_bias_cent(
+            day_ahead,
+            forecast_model=model,
+            reference_slot=ref,
+            lookback_hours=8,
+            cap_cent_kwh=12.0,
+            min_samples=6,
+        )
+    assert n >= 6
+    assert bias == pytest.approx(3.0)
+
+
+def test_compute_rolling_epex_bias_respects_cap():
+    from data.price_forecast_live import compute_rolling_epex_bias_cent
+
+    tz = ZoneInfo("Europe/Vienna")
+    ref = datetime(2025, 7, 2, 12, 0, tzinfo=tz)
+    day_ahead = {ref - timedelta(hours=h): 20.0 for h in range(1, 10)}
+    model = _stub_price_model(intercept=0.0)
+    idx = [ref - timedelta(hours=h) for h in range(1, 10)]
+    frame = pd.DataFrame({"intercept": [1.0] * len(idx)}, index=idx)
+    with patch(
+        "data.price_forecast_live.build_live_feature_frame_for_slots",
+        return_value=frame,
+    ):
+        bias, _n = compute_rolling_epex_bias_cent(
+            day_ahead,
+            forecast_model=model,
+            reference_slot=ref,
+            lookback_hours=8,
+            cap_cent_kwh=5.0,
+            min_samples=6,
+        )
+    assert bias == pytest.approx(5.0)
