@@ -135,6 +135,7 @@
         }
     ],
     "plant": {
+        "max_export_power_kw": 11.0,
         "ehal_bindings": {
             "sens_ess_soc": "B004-Battery_SOC",
             "sens_pv_production_active": "Ernie-Merker-PV_Act",

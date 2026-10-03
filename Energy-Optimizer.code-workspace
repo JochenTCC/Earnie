@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../ha-addon-earnie"
+		},
+		{
+			"path": "../Earnie-env-home"
 		}
 	],
 	"settings": {

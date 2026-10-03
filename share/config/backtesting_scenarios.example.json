@@ -27,12 +27,15 @@
                 "pv_tilt": 25,
                 "pv_azimuth": 0,
                 "pv_kwp": 10,
-                "battery_max_power_kw": 2.5,
+                "battery_max_charge_power_kw": 2.5,
+                "battery_max_discharge_power_kw": 2.5,
                 "battery_efficiency": 0.97,
                 "battery_capacity_kwh": 5.0,
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
-                "threshold_power": 0.02
+                "threshold_power": 0.02,
+                "limits_from_live": false,
+                "control": "full"
             }
         },
         {
@@ -44,12 +47,15 @@
                 "pv_tilt": 25,
                 "pv_azimuth": 0,
                 "pv_kwp": 10,
-                "battery_max_power_kw": 5.0,
+                "battery_max_charge_power_kw": 5.0,
+                "battery_max_discharge_power_kw": 5.0,
                 "battery_efficiency": 0.97,
                 "battery_capacity_kwh": 10.0,
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
-                "threshold_power": 0.02
+                "threshold_power": 0.02,
+                "limits_from_live": false,
+                "control": "full"
             }
         },
         {
@@ -61,12 +67,15 @@
                 "pv_tilt": 25,
                 "pv_azimuth": 0,
                 "pv_kwp": 10,
-                "battery_max_power_kw": 5.0,
+                "battery_max_charge_power_kw": 5.0,
+                "battery_max_discharge_power_kw": 5.0,
                 "battery_efficiency": 0.97,
                 "battery_capacity_kwh": 10.0,
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
-                "threshold_power": 0.02
+                "threshold_power": 0.02,
+                "limits_from_live": false,
+                "control": "full"
             }
         },
         {

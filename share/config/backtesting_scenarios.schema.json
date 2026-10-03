@@ -137,7 +137,30 @@
               "type": "number"
             },
             "battery_max_power_kw": {
-              "type": "number"
+              "type": "number",
+              "description": "Deprecated (2.7.j): single max for both directions; prefer charge/discharge fields."
+            },
+            "battery_max_charge_power_kw": {
+              "type": "number",
+              "description": "Max charge power (kW). Prefer over battery_max_power_kw."
+            },
+            "battery_max_discharge_power_kw": {
+              "type": "number",
+              "description": "Max discharge power (kW). Prefer over battery_max_power_kw."
+            },
+            "limits_from_live": {
+              "type": "boolean",
+              "description": "When true, live get_ess_* telemetry overrides HK SOC/power ceilings."
+            },
+            "control": {
+              "type": "string",
+              "enum": ["full", "limits_only", "read_only"],
+              "description": "Battery controllability (same as components.json batteries[].control)."
+            },
+            "standby_power_kw": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Dauerhafte AC-Eigenleistung der Batterie (kW)."
             },
             "battery_efficiency": {
               "type": "number"
