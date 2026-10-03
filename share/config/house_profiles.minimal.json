@@ -1,5 +1,5 @@
 {
     "$schema": "./house_profiles.schema.json",
-    "earnie_data_model": 3,
+    "earnie_data_model": 4,
     "profiles": []
 }

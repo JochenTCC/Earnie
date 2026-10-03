@@ -28,7 +28,11 @@ def _reset(tmp_path, monkeypatch):
     shadow_feed.reset_for_tests()
 
 
-def _write_meta(feed: Path, *, prod_runtime: str, data_model: int = 3) -> None:
+def _write_meta(feed: Path, *, prod_runtime: str, data_model: int | None = None) -> None:
+    from runtime_store.data_model import CURRENT_DATA_MODEL
+
+    if data_model is None:
+        data_model = CURRENT_DATA_MODEL
     feed.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     (feed / "meta.json").write_text(

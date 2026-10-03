@@ -30,7 +30,7 @@ def test_ensure_compatible_rejects_missing_tag():
         ensure_compatible({"live_scenario_id": "live"}, label="config.json")
 
 
-def test_ensure_compatible_accepts_v3_clean_config():
+def test_ensure_compatible_accepts_v4_clean_config():
     doc = {
         "earnie_data_model": CURRENT_DATA_MODEL,
         "live_scenario_id": "live",
@@ -43,7 +43,7 @@ def test_reject_legacy_config_structure_legacy_block():
     with pytest.raises(DataModelError, match="scenario_explorer_conf"):
         reject_legacy_config_structure(
             {
-                "earnie_data_model": 3,
+                "earnie_data_model": CURRENT_DATA_MODEL,
                 "live_scenario_id": "live",
                 "file_paths_battery_simulation": {"path_cons_data": "x.csv"},
             },

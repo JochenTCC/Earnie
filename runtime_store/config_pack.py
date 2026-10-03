@@ -82,8 +82,23 @@ def build_config_pack_bytes() -> bytes:
     return buffer.getvalue()
 
 
-def _validate_pack_member(name: str, doc: dict[str, Any]) -> None:
-    ensure_compatible(doc, label=name)
+def _migrate_and_validate_pack_docs(
+    json_payloads: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Migrate v3→v4 when needed, then ensure every member is compatible."""
+    from runtime_store.data_model import MIGRATABLE_DATA_MODELS, read_data_model
+    from runtime_store.migrate_v4 import migrate_pack_docs
+
+    needs = any(
+        read_data_model(doc) in MIGRATABLE_DATA_MODELS
+        for doc in json_payloads.values()
+    )
+    if needs:
+        json_payloads = migrate_pack_docs(json_payloads)
+    for name, doc in json_payloads.items():
+        stamp_data_model(doc)
+        ensure_compatible(doc, label=name)
+    return json_payloads
 
 
 def import_config_pack_bytes(payload: bytes) -> list[str]:
@@ -92,6 +107,7 @@ def import_config_pack_bytes(payload: bytes) -> list[str]:
 
     Returns the list of written relative names. Raises DataModelError / ValueError
     on invalid packs (no partial write — uses a temp dir then replaces).
+    v3 packs are migrated to v4 before validation.
     """
     with zipfile.ZipFile(io.BytesIO(payload), "r") as archive:
         names = set(archive.namelist())
@@ -100,7 +116,6 @@ def import_config_pack_bytes(payload: bytes) -> list[str]:
         manifest = json.loads(archive.read(MANIFEST_NAME).decode("utf-8"))
         if not isinstance(manifest, dict):
             raise ValueError("Ungültiges Config-Paket: Manifest ist kein Objekt.")
-        ensure_compatible(manifest, label=MANIFEST_NAME)
 
         json_payloads: dict[str, dict[str, Any]] = {}
         for arcname, _resolver in PACK_JSON_FILES:
@@ -109,9 +124,19 @@ def import_config_pack_bytes(payload: bytes) -> list[str]:
             doc = json.loads(archive.read(arcname).decode("utf-8"))
             if not isinstance(doc, dict):
                 raise ValueError(f"Ungültiges Config-Paket: '{arcname}' ist kein Objekt.")
-            _validate_pack_member(arcname, doc)
-            stamp_data_model(doc)
             json_payloads[arcname] = doc
+
+        from runtime_store.data_model import MIGRATABLE_DATA_MODELS, read_data_model
+
+        manifest_ver = read_data_model(manifest)
+        if manifest_ver in MIGRATABLE_DATA_MODELS or any(
+            read_data_model(d) in MIGRATABLE_DATA_MODELS for d in json_payloads.values()
+        ):
+            json_payloads = _migrate_and_validate_pack_docs(json_payloads)
+            stamp_data_model(manifest)
+        else:
+            ensure_compatible(manifest, label=MANIFEST_NAME)
+            json_payloads = _migrate_and_validate_pack_docs(json_payloads)
 
         upload_members = [
             n for n in names if n.startswith("uploads/") and not n.endswith("/")

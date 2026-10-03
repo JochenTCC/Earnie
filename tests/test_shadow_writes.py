@@ -44,7 +44,7 @@ def test_config_write_raises_in_shadow(monkeypatch, tmp_path):
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg_dir))
     with pytest.raises(ConfigReadOnlyError):
-        write_json_dict(str(target), {"earnie_data_model": 3})
+        write_json_dict(str(target), {"earnie_data_model": 4})
 
 
 def test_silent_implied_by_shadow(monkeypatch, tmp_path):

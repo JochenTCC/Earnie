@@ -108,7 +108,7 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
                         "id": "live",
                         "label": "Live",
                         "settings": {
-                            "battery_id": "",
+                            "battery_ids": [],
                             "pv_system_ids": [],
                             "house_profile_id": "",
                             "import_tariff_id": "",
@@ -216,12 +216,12 @@ def test_delete_battery_removes_entity_and_scrubs_scenarios(tmp_path, monkeypatc
                     {
                         "id": "live",
                         "label": "Live",
-                        "settings": {"battery_id": "bat1", "house_profile_id": "home"},
+                        "settings": {"battery_ids": ["bat1"], "house_profile_id": "home"},
                     },
                     {
                         "id": "alt",
                         "label": "Alt",
-                        "settings": {"battery_id": "bat2", "house_profile_id": "home"},
+                        "settings": {"battery_ids": ["bat2"], "house_profile_id": "home"},
                     },
                 ]
             }
@@ -237,8 +237,8 @@ def test_delete_battery_removes_entity_and_scrubs_scenarios(tmp_path, monkeypatc
     assert [b["id"] for b in components_payload["batteries"]] == ["bat2"]
     scenarios = load_backtesting_scenarios_raw()["scenarios"]
     by_id = {s["id"]: s for s in scenarios}
-    assert by_id["live"]["settings"]["battery_id"] == ""
-    assert by_id["alt"]["settings"]["battery_id"] == "bat2"
+    assert by_id["live"]["settings"]["battery_ids"] == []
+    assert by_id["alt"]["settings"]["battery_ids"] == ["bat2"]
 
     with pytest.raises(ValueError, match="Unbekannte Batterie"):
         delete_battery("bat1")
@@ -282,7 +282,7 @@ def test_upsert_scenario_appends_new_entry(tmp_path, monkeypatch):
                         "id": "live",
                         "label": "Live",
                         "settings": {
-                            "battery_id": "bat1",
+                            "battery_ids": ["bat1"],
                             "house_profile_id": "home",
                             "import_tariff_id": "imp",
                             "export_tariff_id": "exp",
@@ -299,7 +299,7 @@ def test_upsert_scenario_appends_new_entry(tmp_path, monkeypatch):
             "id": "ohne_pv",
             "label": "Ohne PV",
             "settings": {
-                "battery_id": "bat1",
+                "battery_ids": ["bat1"],
                 "house_profile_id": "home",
                 "import_tariff_id": "imp",
                 "export_tariff_id": "exp",
@@ -312,7 +312,7 @@ def test_upsert_scenario_appends_new_entry(tmp_path, monkeypatch):
     assert scenario_ids == {"live", "ohne_pv"}
     ohne_pv = next(item for item in saved["scenarios"] if item["id"] == "ohne_pv")
     assert ohne_pv["label"] == "Ohne PV"
-    assert ohne_pv["settings"]["battery_id"] == "bat1"
+    assert ohne_pv["settings"]["battery_ids"] == ["bat1"]
 
 
 def test_delete_scenario_removes_non_live(tmp_path, monkeypatch):
@@ -579,7 +579,7 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
                         "id": "live",
                         "label": "Live",
                         "settings": {
-                            "battery_id": "bat",
+                            "battery_ids": ["bat"],
                             "pv_system_ids": ["pv"],
                             "house_profile_id": "efh",
                             "import_tariff_id": "imp",
@@ -1040,7 +1040,7 @@ def test_sync_scenario_session_reseeds_when_widget_keys_missing():
         "label": "Live",
         "settings": {
             "house_profile_id": "example_efh",
-            "battery_id": "5_0_kwh_speicher",
+            "battery_ids": ["5_0_kwh_speicher"],
             "pv_system_ids": ["dach_sued"],
             "import_tariff_id": "awattar_at",
             "export_tariff_id": "monthly_sunny",

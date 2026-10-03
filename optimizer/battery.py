@@ -253,6 +253,18 @@ def derive_control_from_milp_plan(
     if battery_capacity <= 0.0 or control == BATTERY_CONTROL_READ_ONLY:
         return MODE_AUTOMATIK, 0.0, round(float(current_soc), 1)
 
+    from house_config.battery_kind import allows_automatik
+
+    kind = str(battery_params.get("kind") or "battery_inverter").strip().lower()
+    ess_plan = milp_plan
+    if isinstance(milp_plan.get("ess"), dict):
+        ess_id = str(battery_params.get("id") or "").strip()
+        if ess_id and ess_id in milp_plan["ess"]:
+            ess_plan = {
+                **milp_plan,
+                **milp_plan["ess"][ess_id],
+            }
+
     net_pv_surplus = (
         matrix_row["expected_p_pv"]
         - effective_p_act(matrix_row, battery_params)
@@ -262,9 +274,9 @@ def derive_control_from_milp_plan(
     mode, target_power, target_soc = MODE_AUTOMATIK, 0.0, 99.0
     if control == BATTERY_CONTROL_FULL:
         mode, target_power, target_soc = _milp_full_control_setpoint(
-            opt_charge=milp_plan["p_charge"],
-            opt_discharge=milp_plan["p_discharge"],
-            opt_grid_buy=milp_plan["p_grid_buy"],
+            opt_charge=float(ess_plan.get("p_charge") or 0.0),
+            opt_discharge=float(ess_plan.get("p_discharge") or 0.0),
+            opt_grid_buy=float(milp_plan.get("p_grid_buy") or 0.0),
             net_pv_surplus=net_pv_surplus,
             current_soc=current_soc,
             planned_soc=planned_soc,
@@ -278,7 +290,7 @@ def derive_control_from_milp_plan(
         )
     elif (
         net_pv_surplus < -threshold
-        and milp_plan["p_discharge"] < threshold
+        and float(ess_plan.get("p_discharge") or 0.0) < threshold
         and current_soc > (min_soc + 2.0)
     ):
         # Same Entladesperre path as full-control fallthrough (limits_only etc.).
@@ -292,7 +304,19 @@ def derive_control_from_milp_plan(
         MODE_ZWANGS_LADEN,
         MODE_ZWANGS_ENTLADEN,
     ):
-        return MODE_AUTOMATIK, 0.0, round(float(current_soc), 1)
+        mode, target_power, target_soc = (
+            MODE_AUTOMATIK,
+            0.0,
+            round(float(current_soc), 1),
+        )
+
+    # Isolated ESS: never Automatik — map hold to standby (Entladesperre).
+    if not allows_automatik(kind) and mode == MODE_AUTOMATIK:
+        mode, target_power, target_soc = (
+            MODE_ENTLADESPERRE,
+            0.0,
+            round(float(current_soc), 1),
+        )
 
     return mode, target_power, target_soc
 

@@ -156,7 +156,7 @@ def test_reject_legacy_runtime_settings_block_unit():
     from settings.legacy_config_gates import reject_legacy_runtime_settings_block
 
     with pytest.raises(ValueError, match="runtime_settings"):
-        reject_legacy_runtime_settings_block({"runtime_settings": {"battery_id": "x"}})
+        reject_legacy_runtime_settings_block({"runtime_settings": {"battery_ids": ["x"]}})
 
 
 def test_reject_legacy_runtime_settings_block_allows_clean_config():
@@ -281,7 +281,7 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
                         "id": DEFAULT_LIVE_SCENARIO_ID,
                         "label": "Live",
                         "settings": {
-                            "battery_id": "home",
+                            "battery_ids": ["home"],
                             "pv_system_ids": ["roof"],
                             "import_tariff_id": "fixed_imp",
                             "export_tariff_id": "fixed_exp",
@@ -403,7 +403,7 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
                         "id": DEFAULT_LIVE_SCENARIO_ID,
                         "label": "Live",
                         "settings": {
-                            "battery_id": "home",
+                            "battery_ids": ["home"],
                             "pv_system_ids": ["roof"],
                             "import_tariff_id": "fixed_imp",
                             "export_tariff_id": "fixed_exp",

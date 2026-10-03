@@ -1,6 +1,6 @@
 {
     "$schema": "./backtesting_scenarios.schema.json",
-    "earnie_data_model": 3,
+    "earnie_data_model": 4,
     "cbc_gap_rel": 0.1,
     "commit_hours": 24,
     "cbc_strict_time_limit_sec": 3,
@@ -9,7 +9,9 @@
             "id": "live",
             "label": "Live",
             "settings": {
-                "battery_id": "default_5kwh",
+                "battery_ids": [
+                    "default_5kwh"
+                ],
                 "pv_system_ids": [
                     "roof_south"
                 ],
@@ -82,7 +84,9 @@
             "id": "entity_refs_planning",
             "label": "10 kWh + monatliche Einspeise (Entitäten-Referenzen)",
             "settings": {
-                "battery_id": "upgrade_10kwh",
+                "battery_ids": [
+                    "upgrade_10kwh"
+                ],
                 "pv_system_ids": [
                     "roof_south"
                 ],

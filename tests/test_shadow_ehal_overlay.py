@@ -129,7 +129,7 @@ def test_config_json_still_readonly(tmp_path):
     target = tmp_path / "config" / "config.json"
     target.write_text("{}", encoding="utf-8")
     with pytest.raises(ConfigReadOnlyError):
-        write_json_dict(str(target), {"earnie_data_model": 3})
+        write_json_dict(str(target), {"earnie_data_model": 4})
 
 
 def test_overlay_path_under_runtime(tmp_path):

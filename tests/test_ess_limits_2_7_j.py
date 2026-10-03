@@ -211,15 +211,13 @@ def test_live_unconstrained_uses_discharge_side(monkeypatch):
     import config
     from optimizer.live_export_limit import live_unconstrained_export_kw
 
-    monkeypatch.setattr(
-        config,
-        "get_battery_params",
-        lambda: {
-            "max_charge_power_kw": 3.0,
-            "max_discharge_power_kw": 9.0,
-            "max_power_kw": 9.0,
-            "control": "full",
-        },
-    )
+    params = {
+        "max_charge_power_kw": 3.0,
+        "max_discharge_power_kw": 9.0,
+        "max_power_kw": 9.0,
+        "control": "full",
+    }
+    monkeypatch.setattr(config, "get_battery_params", lambda: params)
+    monkeypatch.setattr(config, "get_battery_params_list", lambda: [params])
     monkeypatch.setattr(config, "get", lambda name, default=None, cast=None: 10.0)
     assert live_unconstrained_export_kw() == pytest.approx(19.0)

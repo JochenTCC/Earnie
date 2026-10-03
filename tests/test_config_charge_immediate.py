@@ -97,7 +97,7 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
     )
     payload = _minimal_charge_immediate_config()
     live_settings = {
-        "battery_id": "home",
+        "battery_ids": ["home"],
         "pv_system_ids": ["roof"],
         "import_tariff_id": "fixed_imp",
         "export_tariff_id": "fixed_exp",

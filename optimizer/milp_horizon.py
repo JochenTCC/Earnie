@@ -21,7 +21,51 @@ EMPTY_MILP_PLAN = {
     "p_grid_sell": 0.0,
     "p_charge": 0.0,
     "p_discharge": 0.0,
+    "ess": {},
 }
+
+
+def coerce_battery_params_list(
+    battery_params: dict | list[dict] | None,
+) -> list[dict]:
+    """Normalize singular or list battery params for multi-ESS MILP (2.7.c)."""
+    if battery_params is None:
+        return []
+    if isinstance(battery_params, list):
+        return [dict(item) for item in battery_params if isinstance(item, dict)]
+    if isinstance(battery_params, dict):
+        return [dict(battery_params)]
+    return []
+
+
+def aggregate_battery_params_for_load(batteries: list[dict]) -> dict:
+    """House-load view: first ESS fields + summed standby."""
+    if not batteries:
+        return {
+            "battery_capacity_kwh": 0.0,
+            "min_soc": 0.0,
+            "max_soc": 100.0,
+            "max_charge_power_kw": 0.0,
+            "max_discharge_power_kw": 0.0,
+            "max_power_kw": 0.0,
+            "efficiency": 1.0,
+            "standby_power_kw": 0.0,
+            "control": "full",
+        }
+    agg = dict(batteries[0])
+    agg["standby_power_kw"] = sum(
+        float(b.get("standby_power_kw") or 0.0) for b in batteries
+    )
+    agg["max_charge_power_kw"] = sum(
+        float(b.get("max_charge_power_kw", b.get("max_power_kw") or 0.0) or 0.0)
+        for b in batteries
+    )
+    agg["max_discharge_power_kw"] = sum(
+        float(b.get("max_discharge_power_kw", b.get("max_power_kw") or 0.0) or 0.0)
+        for b in batteries
+    )
+    agg["max_power_kw"] = max(agg["max_charge_power_kw"], agg["max_discharge_power_kw"])
+    return agg
 
 
 @dataclass
@@ -40,6 +84,11 @@ class MilpHorizonModel:
     planned_consumers: list
     consumer_milp_charge_kw: dict[str, float]
     dt_h: float
+    ess_ids: list[str] | None = None
+    p_charge_by_ess: dict[str, list] | None = None
+    p_discharge_by_ess: dict[str, list] | None = None
+    e_batt_by_ess: dict[str, list] | None = None
+    battery_params_by_id: dict[str, dict] | None = None
 
 
 def _normalize_fixed_flex_by_t(
@@ -70,6 +119,12 @@ class _GridBatteryVars:
     delta_charge: list
     delta_import: list
     big_m_grid: float
+    ess_ids: list[str]
+    p_charge_by_ess: dict[str, list]
+    p_discharge_by_ess: dict[str, list]
+    e_batt_by_ess: dict[str, list]
+    delta_charge_by_ess: dict[str, list]
+    battery_params_by_id: dict[str, dict]
 
 
 @dataclass
@@ -86,46 +141,92 @@ class _ConsumerVarBlock:
 def _create_grid_battery_vars(
     matrix: list[dict[str, Any]],
     horizon: int,
-    battery_params: dict,
+    battery_params: dict | list[dict],
     planned_consumers: list,
 ) -> _GridBatteryVars:
     """LpVariables für Netzbezug/-einspeisung, Lade-/Entladeleistung und SOC-Energie."""
-    min_soc = battery_params["min_soc"]
-    max_soc = battery_params["max_soc"]
-    max_charge = float(
-        battery_params.get("max_charge_power_kw", battery_params["max_power_kw"])
-    )
-    max_discharge = float(
-        battery_params.get("max_discharge_power_kw", battery_params["max_power_kw"])
-    )
-    max_power = max(max_charge, max_discharge)
-    battery_capacity = battery_params["battery_capacity_kwh"]
-    e_min = (min_soc / 100.0) * battery_capacity
-    e_max = (max_soc / 100.0) * battery_capacity
+    batteries = coerce_battery_params_list(battery_params)
+    if not batteries:
+        batteries = [
+            {
+                "id": "primary",
+                "battery_capacity_kwh": 0.0,
+                "min_soc": 0.0,
+                "max_soc": 100.0,
+                "max_charge_power_kw": 0.0,
+                "max_discharge_power_kw": 0.0,
+                "max_power_kw": 0.0,
+                "efficiency": 1.0,
+                "standby_power_kw": 0.0,
+                "control": "full",
+            }
+        ]
+    load_params = aggregate_battery_params_for_load(batteries)
+    ess_ids: list[str] = []
+    params_by_id: dict[str, dict] = {}
+    p_charge_by_ess: dict[str, list] = {}
+    p_discharge_by_ess: dict[str, list] = {}
+    e_batt_by_ess: dict[str, list] = {}
+    delta_charge_by_ess: dict[str, list] = {}
 
+    for index, bat in enumerate(batteries):
+        ess_id = str(bat.get("id") or f"ess_{index}").strip() or f"ess_{index}"
+        ess_ids.append(ess_id)
+        params_by_id[ess_id] = bat
+        max_charge = float(bat.get("max_charge_power_kw", bat.get("max_power_kw") or 0.0) or 0.0)
+        max_discharge = float(
+            bat.get("max_discharge_power_kw", bat.get("max_power_kw") or 0.0) or 0.0
+        )
+        capacity = float(bat.get("battery_capacity_kwh") or 0.0)
+        min_soc = float(bat.get("min_soc") or 0.0)
+        max_soc = float(bat.get("max_soc") or 100.0)
+        e_min = (min_soc / 100.0) * capacity
+        e_max = (max_soc / 100.0) * capacity
+        slug = ess_id.replace("-", "_")
+        p_charge_by_ess[ess_id] = [
+            pulp.LpVariable(f"p_charge_{slug}_{t}", lowBound=0, upBound=max_charge)
+            for t in range(horizon)
+        ]
+        p_discharge_by_ess[ess_id] = [
+            pulp.LpVariable(f"p_discharge_{slug}_{t}", lowBound=0, upBound=max_discharge)
+            for t in range(horizon)
+        ]
+        e_batt_by_ess[ess_id] = [
+            pulp.LpVariable(f"e_batt_{slug}_{t}", lowBound=e_min, upBound=e_max)
+            for t in range(horizon)
+        ]
+        delta_charge_by_ess[ess_id] = [
+            pulp.LpVariable(f"delta_charge_{slug}_{t}", cat=pulp.LpBinary)
+            for t in range(horizon)
+        ]
+
+    max_charge_sum = float(load_params["max_charge_power_kw"])
+    max_discharge_sum = float(load_params["max_discharge_power_kw"])
+    max_power = float(load_params["max_power_kw"])
+    # Aggregate vars = sum of ESS (compat for objective / terminal / extract)
     p_grid_buy = [pulp.LpVariable(f"p_grid_buy_{t}", lowBound=0) for t in range(horizon)]
     p_grid_sell = [pulp.LpVariable(f"p_grid_sell_{t}", lowBound=0) for t in range(horizon)]
     p_charge = [
-        pulp.LpVariable(f"p_charge_{t}", lowBound=0, upBound=max_charge)
+        pulp.LpVariable(f"p_charge_{t}", lowBound=0, upBound=max_charge_sum)
         for t in range(horizon)
     ]
     p_discharge = [
-        pulp.LpVariable(f"p_discharge_{t}", lowBound=0, upBound=max_discharge)
+        pulp.LpVariable(f"p_discharge_{t}", lowBound=0, upBound=max_discharge_sum)
         for t in range(horizon)
     ]
-    e_batt = [
-        pulp.LpVariable(f"e_batt_{t}", lowBound=e_min, upBound=e_max)
-        for t in range(horizon)
-    ]
-    delta_charge = [pulp.LpVariable(f"delta_charge_{t}", cat=pulp.LpBinary) for t in range(horizon)]
+    primary_id = ess_ids[0]
+    e_batt = e_batt_by_ess[primary_id]
+    delta_charge = delta_charge_by_ess[primary_id]
     max_flex_power = sum(power_limits_kw(c)[1] for c in planned_consumers)
     max_load = max(
-        (effective_p_act(row, battery_params) for row in matrix[:horizon]),
+        (effective_p_act(row, load_params) for row in matrix[:horizon]),
         default=0.0,
     )
     max_pv = max((row["expected_p_pv"] for row in matrix[:horizon]), default=0.0)
     big_m_grid = max(max_load + max_flex_power + max_power, max_pv + max_power, 50.0)
-    delta_import = [pulp.LpVariable(f"delta_import_{t}", cat=pulp.LpBinary) for t in range(horizon)]
+    delta_import = [
+        pulp.LpVariable(f"delta_import_{t}", cat=pulp.LpBinary) for t in range(horizon)
+    ]
     return _GridBatteryVars(
         p_grid_buy=p_grid_buy,
         p_grid_sell=p_grid_sell,
@@ -135,6 +236,12 @@ def _create_grid_battery_vars(
         delta_charge=delta_charge,
         delta_import=delta_import,
         big_m_grid=big_m_grid,
+        ess_ids=ess_ids,
+        p_charge_by_ess=p_charge_by_ess,
+        p_discharge_by_ess=p_discharge_by_ess,
+        e_batt_by_ess=e_batt_by_ess,
+        delta_charge_by_ess=delta_charge_by_ess,
+        battery_params_by_id=params_by_id,
     )
 
 
@@ -189,23 +296,21 @@ def _add_slot_power_balance_and_soc(
     fixed_flex: float,
     *,
     t: int,
-    e_init: float,
+    e_init_by_ess: dict[str, float],
     dt_h: float,
     export_cap_kw: float | None = None,
 ) -> None:
     """Energiebilanz, Exklusivität und SOC-Rekursion für einen Slot."""
-    max_power = battery_params["max_power_kw"]
-    efficiency = battery_params["efficiency"]
+    load_params = battery_params
+    max_power = float(load_params["max_power_kw"])
     p_grid_buy = grid_vars.p_grid_buy
     p_grid_sell = grid_vars.p_grid_sell
     p_charge = grid_vars.p_charge
     p_discharge = grid_vars.p_discharge
-    e_batt = grid_vars.e_batt
-    delta_charge = grid_vars.delta_charge
     delta_import = grid_vars.delta_import
     big_m_grid = grid_vars.big_m_grid
     p_pv = matrix_row["expected_p_pv"]
-    p_con = effective_p_act(matrix_row, battery_params)
+    p_con = effective_p_act(matrix_row, load_params)
     p_flex = fixed_flex + pulp.lpSum(
         _flex_power_at_t(
             consumer,
@@ -216,6 +321,53 @@ def _add_slot_power_balance_and_soc(
         )
         for consumer in planned_consumers
     )
+    # Tie aggregates to per-ESS vars
+    prob += p_charge[t] == pulp.lpSum(
+        grid_vars.p_charge_by_ess[eid][t] for eid in grid_vars.ess_ids
+    )
+    prob += p_discharge[t] == pulp.lpSum(
+        grid_vars.p_discharge_by_ess[eid][t] for eid in grid_vars.ess_ids
+    )
+    for eid in grid_vars.ess_ids:
+        bat = grid_vars.battery_params_by_id[eid]
+        max_c = float(bat.get("max_charge_power_kw", bat.get("max_power_kw") or 0.0) or 0.0)
+        max_d = float(
+            bat.get("max_discharge_power_kw", bat.get("max_power_kw") or 0.0) or 0.0
+        )
+        max_ess = max(max_c, max_d)
+        delta = grid_vars.delta_charge_by_ess[eid][t]
+        prob += grid_vars.p_charge_by_ess[eid][t] <= max_ess * delta
+        prob += grid_vars.p_discharge_by_ess[eid][t] <= max_ess * (1 - delta)
+        efficiency = float(bat.get("efficiency") or 1.0)
+        e_batt = grid_vars.e_batt_by_ess[eid]
+        prev_e = e_init_by_ess[eid] if t == 0 else e_batt[t - 1]
+        prob += (
+            e_batt[t]
+            == prev_e
+            + (
+                grid_vars.p_charge_by_ess[eid][t] * efficiency
+                - grid_vars.p_discharge_by_ess[eid][t] / efficiency
+            )
+            * dt_h
+        )
+        _add_control_slot_constraints(
+            prob,
+            bat,
+            t=t,
+            p_pv=p_pv,
+            p_con=p_con,
+            p_flex=p_flex,
+            p_grid_buy=p_grid_buy[t],
+            p_grid_sell=p_grid_sell[t],
+            p_charge=grid_vars.p_charge_by_ess[eid][t],
+            p_discharge=grid_vars.p_discharge_by_ess[eid][t],
+            delta_import=delta_import[t],
+            max_power=max_ess,
+            big_m_grid=big_m_grid,
+            suffix=str(eid).replace("-", "_"),
+            # Self-consumption pin is single-ESS only (multi would fight over grid).
+            apply_self_consumption=len(grid_vars.ess_ids) == 1,
+        )
     prob += (
         p_pv + p_grid_buy[t] + p_discharge[t]
         == p_con + p_flex + p_grid_sell[t] + p_charge[t]
@@ -227,34 +379,12 @@ def _add_slot_power_balance_and_soc(
     prob += p_grid_sell[t] <= sell_upper * (1 - delta_import[t])
     if export_cap_kw is not None:
         prob += p_grid_sell[t] <= max(0.0, float(export_cap_kw))
-    prob += p_charge[t] <= max_power * delta_charge[t]
-    prob += p_discharge[t] <= max_power * (1 - delta_charge[t])
-    _add_control_slot_constraints(
-        prob,
-        battery_params,
-        t=t,
-        p_pv=p_pv,
-        p_con=p_con,
-        p_flex=p_flex,
-        p_grid_buy=p_grid_buy[t],
-        p_grid_sell=p_grid_sell[t],
-        p_charge=p_charge[t],
-        p_discharge=p_discharge[t],
-        delta_import=delta_import[t],
-        max_power=max_power,
-        big_m_grid=big_m_grid,
-    )
-    prev_e = e_init if t == 0 else e_batt[t - 1]
-    prob += (
-        e_batt[t]
-        == prev_e + (p_charge[t] * efficiency - p_discharge[t] / efficiency) * dt_h
-    )
 
 
 def _add_power_balance_and_soc_dynamics(
     prob: pulp.LpProblem,
     matrix: list[dict[str, Any]],
-    battery_params: dict,
+    battery_params: dict | list[dict],
     current_soc: float,
     grid_vars: _GridBatteryVars,
     consumer_vars: _ConsumerVarBlock,
@@ -264,9 +394,18 @@ def _add_power_balance_and_soc_dynamics(
     horizon: int,
     dt_h: float,
     export_caps_kw: list[float | None] | None = None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> None:
     """Energiebilanz, Netz-/Batterie-Exklusivität und SOC-Rekursion je Slot."""
-    e_init = (current_soc / 100.0) * battery_params["battery_capacity_kwh"]
+    batteries = coerce_battery_params_list(battery_params)
+    load_params = aggregate_battery_params_for_load(batteries)
+    e_init_by_ess: dict[str, float] = {}
+    for eid in grid_vars.ess_ids:
+        bat = grid_vars.battery_params_by_id[eid]
+        soc = float(current_soc)
+        if current_soc_by_id and eid in current_soc_by_id:
+            soc = float(current_soc_by_id[eid])
+        e_init_by_ess[eid] = (soc / 100.0) * float(bat.get("battery_capacity_kwh") or 0.0)
     for t in range(horizon):
         cap = None
         if export_caps_kw is not None and t < len(export_caps_kw):
@@ -274,13 +413,13 @@ def _add_power_balance_and_soc_dynamics(
         _add_slot_power_balance_and_soc(
             prob,
             matrix[t],
-            battery_params,
+            load_params,
             grid_vars,
             consumer_vars,
             planned_consumers,
             float(fixed_flex_by_t.get(t, 0.0)),
             t=t,
-            e_init=e_init,
+            e_init_by_ess=e_init_by_ess,
             dt_h=dt_h,
             export_cap_kw=cap,
         )
@@ -301,6 +440,8 @@ def _add_control_slot_constraints(
     delta_import,
     max_power: float,
     big_m_grid: float,
+    suffix: str = "",
+    apply_self_consumption: bool = True,
 ) -> None:
     """Apply limits_only / read_only envelope (full = no extra constraints)."""
     from house_config.battery_control import (
@@ -318,7 +459,7 @@ def _add_control_slot_constraints(
     # Charge from PV only; discharge covers house load only
     prob += p_charge <= float(p_pv)
     prob += p_discharge <= p_con + p_flex
-    if control == BATTERY_CONTROL_READ_ONLY:
+    if control == BATTERY_CONTROL_READ_ONLY and apply_self_consumption:
         _add_self_consumption_coupling(
             prob,
             t=t,
@@ -330,6 +471,7 @@ def _add_control_slot_constraints(
             p_charge=p_charge,
             p_discharge=p_discharge,
             big_m=max(big_m_grid, max_power, 1.0),
+            suffix=suffix,
         )
 
 
@@ -345,11 +487,13 @@ def _add_self_consumption_coupling(
     p_charge,
     p_discharge,
     big_m: float,
+    suffix: str = "",
 ) -> None:
     """Pin battery+grid to residual split (greedy self-consumption accounting)."""
-    surplus = pulp.LpVariable(f"sc_surplus_{t}", lowBound=0)
-    deficit = pulp.LpVariable(f"sc_deficit_{t}", lowBound=0)
-    delta_surplus = pulp.LpVariable(f"sc_delta_surplus_{t}", cat="Binary")
+    tag = f"_{suffix}" if suffix else ""
+    surplus = pulp.LpVariable(f"sc_surplus{tag}_{t}", lowBound=0)
+    deficit = pulp.LpVariable(f"sc_deficit{tag}_{t}", lowBound=0)
+    delta_surplus = pulp.LpVariable(f"sc_delta_surplus{tag}_{t}", cat="Binary")
     residual = p_pv - p_con - p_flex
     prob += surplus - deficit == residual
     prob += surplus <= big_m * delta_surplus
@@ -361,7 +505,7 @@ def _add_self_consumption_coupling(
 def _build_milp_model(
     matrix: list[dict[str, Any]],
     horizon: int,
-    battery_params: dict,
+    battery_params: dict | list[dict],
     current_soc: float,
     planned_consumers: list,
     fixed_flex_kw_t0_or_by_t: float | dict[int, float],
@@ -371,6 +515,7 @@ def _build_milp_model(
     *,
     dt_h: float = DEFAULT_DT_H,
     export_caps_kw: list[float | None] | None = None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> MilpHorizonModel:
     dt_h = validate_dt_h(dt_h)
     prob = pulp.LpProblem("Energy_Cost_Minimization", pulp.LpMinimize)
@@ -398,6 +543,7 @@ def _build_milp_model(
         horizon=horizon,
         dt_h=dt_h,
         export_caps_kw=export_caps_kw,
+        current_soc_by_id=current_soc_by_id,
     )
     return MilpHorizonModel(
         prob=prob,
@@ -414,6 +560,11 @@ def _build_milp_model(
         planned_consumers=planned_consumers,
         consumer_milp_charge_kw=consumer_vars.consumer_milp_charge_kw,
         dt_h=dt_h,
+        ess_ids=list(grid_vars.ess_ids),
+        p_charge_by_ess=dict(grid_vars.p_charge_by_ess),
+        p_discharge_by_ess=dict(grid_vars.p_discharge_by_ess),
+        e_batt_by_ess=dict(grid_vars.e_batt_by_ess),
+        battery_params_by_id=dict(grid_vars.battery_params_by_id),
     )
 
 

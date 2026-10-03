@@ -119,7 +119,7 @@ def _write_live_pack(config_dir: Path, tariffs: dict) -> None:
                         "id": DEFAULT_LIVE_SCENARIO_ID,
                         "label": "Live",
                         "settings": {
-                            "battery_id": "home_5kwh",
+                            "battery_ids": ["home_5kwh"],
                             "pv_system_ids": ["roof"],
                             "import_tariff_id": "fixed_imp",
                             "export_tariff_id": "monthly_exp",

@@ -40,7 +40,7 @@ def minimal_config_payload(
 
 def default_live_settings() -> dict:
     return {
-        "battery_id": "",
+        "battery_ids": [],
         "pv_system_ids": [],
         "house_profile_id": "",
         "import_tariff_id": "",

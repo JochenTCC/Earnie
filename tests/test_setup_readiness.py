@@ -136,7 +136,7 @@ def test_missing_runtime_scenario_items_lists_gaps(tmp_path, monkeypatch):
                     "id": DEFAULT_LIVE_SCENARIO_ID,
                     "label": "Live",
                     "settings": {
-                        "battery_id": "",
+                        "battery_ids": [],
                         "import_tariff_id": "",
                         "export_tariff_id": "",
                         "house_profile_id": "",
@@ -197,7 +197,7 @@ def test_planning_ready_unlocks_scenario_explorer(tmp_path, monkeypatch):
                     "id": DEFAULT_LIVE_SCENARIO_ID,
                     "label": "Live",
                     "settings": {
-                        "battery_id": "bat",
+                        "battery_ids": ["bat"],
                         "pv_system_ids": [],
                         "house_profile_id": "efh",
                         "import_tariff_id": "imp",
@@ -265,7 +265,7 @@ def test_loxone_sidebar_deferred_after_planning_unlock(tmp_path, monkeypatch):
                     "id": DEFAULT_LIVE_SCENARIO_ID,
                     "label": "Live",
                     "settings": {
-                        "battery_id": "bat",
+                        "battery_ids": ["bat"],
                         "pv_system_ids": [],
                         "house_profile_id": "efh",
                         "import_tariff_id": "imp",

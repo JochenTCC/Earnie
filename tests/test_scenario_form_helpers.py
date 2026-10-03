@@ -147,12 +147,12 @@ def test_new_scenario_template_clones_live_settings():
         {
             "id": "live",
             "label": "Live",
-            "settings": {"battery_id": "bat1", "house_profile_id": "home"},
+            "settings": {"battery_ids": ["bat1"], "house_profile_id": "home"},
         }
     ]
     template = new_scenario_template(scenarios, source_id="live", live_id="live")
     assert template["label"] == "Live copy"
-    assert template["settings"]["battery_id"] == "bat1"
+    assert template["settings"]["battery_ids"] == ["bat1"]
     assert template["settings"]["house_profile_id"] == "home"
     assert template["enabled"] is True
 
@@ -163,7 +163,7 @@ def test_new_scenario_template_clones_last_selected_not_live():
             "id": "live",
             "label": "Live",
             "enabled": True,
-            "settings": {"battery_id": "bat_live"},
+            "settings": {"battery_ids": ["bat_live"]},
             "own_reference": False,
         },
         {
@@ -171,7 +171,7 @@ def test_new_scenario_template_clones_last_selected_not_live():
             "label": "Ohne PV",
             "enabled": False,
             "settings": {
-                "battery_id": "bat1",
+                "battery_ids": ["bat1"],
                 "pv_system_ids": ["pv1", "pv2"],
             },
             "own_reference": True,
@@ -183,7 +183,7 @@ def test_new_scenario_template_clones_last_selected_not_live():
     assert template["label"] == "Ohne PV copy"
     assert template["enabled"] is False
     assert template["own_reference"] is True
-    assert template["settings"]["battery_id"] == "bat1"
+    assert template["settings"]["battery_ids"] == ["bat1"]
     assert template["settings"]["pv_system_ids"] == ["pv1", "pv2"]
 
 
@@ -201,14 +201,14 @@ def test_new_scenario_template_unknown_source_falls_back_to_live():
         {
             "id": "live",
             "label": "Live",
-            "settings": {"battery_id": "bat_live"},
+            "settings": {"battery_ids": ["bat_live"]},
         }
     ]
     template = new_scenario_template(
         scenarios, source_id="missing", live_id="live"
     )
     assert template["label"] == "Live copy"
-    assert template["settings"]["battery_id"] == "bat_live"
+    assert template["settings"]["battery_ids"] == ["bat_live"]
 
 
 def test_new_scenario_template_without_source_uses_empty_settings():
@@ -335,7 +335,7 @@ def test_read_scenario_form_snapshot_resolves_entity_ids():
         import_tariffs=[],
         export_tariffs=[],
     )
-    assert snapshot["settings"]["battery_id"] == "bat1"
+    assert snapshot["settings"]["battery_ids"] == ["bat1"]
 
 
 def test_build_scenario_settings_basic_refs():
@@ -357,14 +357,16 @@ def test_build_scenario_settings_basic_refs():
 
 def test_build_scenario_settings_stores_pv_system_ids():
     settings = build_scenario_settings(
-        battery_id="bat",
+        battery_ids=["bat"],
         pv_system_ids=["a", "b"],
         import_tariff_id="imp",
         export_tariff_id="exp",
         house_profile_id="home",
     )
     assert settings["pv_system_ids"] == ["a", "b"]
+    assert settings["battery_ids"] == ["bat"]
     assert "pv_system_id" not in settings
+    assert "battery_id" not in settings
 
 
 def test_build_scenario_settings_use_imported_pv():
@@ -391,7 +393,7 @@ def test_normalize_scenario_form_snapshot_legacy_pv_system_id_rejected():
         normalize_scenario_form_snapshot(
             {
                 "label": "Live",
-                "settings": {"pv_system_id": "roof", "battery_id": "bat1"},
+                "settings": {"pv_system_id": "roof", "battery_ids": ["bat1"]},
             },
         )
 
@@ -401,7 +403,7 @@ def test_normalize_scenario_form_snapshot_strips_geo_override():
         {
             "label": "Live",
             "settings": {
-                "battery_id": "bat1",
+                "battery_ids": ["bat1"],
                 "house_profile_id": "home",
                 "latitude": 1.0,
                 "longitude": 2.0,
@@ -410,19 +412,19 @@ def test_normalize_scenario_form_snapshot_strips_geo_override():
         },
     )
     assert snapshot["settings"] == {
-        "battery_id": "bat1",
+        "battery_ids": ["bat1"],
         "house_profile_id": "home",
     }
 
 
 def test_normalize_scenario_form_snapshot_keeps_label_and_settings():
     snapshot = normalize_scenario_form_snapshot(
-        {"id": "variant_a", "label": "Variante A", "settings": {"battery_id": "bat1"}},
+        {"id": "variant_a", "label": "Variante A", "settings": {"battery_ids": ["bat1"]}},
     )
     assert snapshot == {
         "label": "Variante A",
         "enabled": True,
-        "settings": {"battery_id": "bat1"},
+        "settings": {"battery_ids": ["bat1"]},
     }
     assert "id" not in snapshot
 
@@ -432,7 +434,7 @@ def test_normalize_scenario_form_snapshot_keeps_enabled_false():
         {
             "label": "Off",
             "enabled": False,
-            "settings": {"battery_id": "bat1"},
+            "settings": {"battery_ids": ["bat1"]},
         },
     )
     assert snapshot["enabled"] is False
@@ -443,7 +445,7 @@ def test_normalize_scenario_form_snapshot_keeps_own_reference():
         {
             "label": "Ref",
             "own_reference": True,
-            "settings": {"battery_id": "bat1"},
+            "settings": {"battery_ids": ["bat1"]},
         },
     )
     assert snapshot["own_reference"] is True

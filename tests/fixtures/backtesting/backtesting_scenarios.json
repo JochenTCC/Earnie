@@ -7,7 +7,9 @@
             "id": "live",
             "label": "Live",
             "settings": {
-                "battery_id": "test_battery",
+                "battery_ids": [
+                    "test_battery"
+                ],
                 "pv_system_ids": [
                     "test_pv"
                 ],
@@ -40,7 +42,9 @@
             "id": "entity_test",
             "label": "Entitäten-Referenzen Test",
             "settings": {
-                "battery_id": "test_battery",
+                "battery_ids": [
+                    "test_battery"
+                ],
                 "pv_system_ids": [
                     "test_pv"
                 ],
@@ -49,5 +53,5 @@
             }
         }
     ],
-    "earnie_data_model": 3
+    "earnie_data_model": 4
 }

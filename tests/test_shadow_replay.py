@@ -50,7 +50,7 @@ def _write_feed(
             {
                 "feed_schema": 1,
                 "earnie_version": "2.6.0",
-                "earnie_data_model": 3,
+                "earnie_data_model": 4,
                 "ehal_backend": "ha",
                 "prod_runtime_dir": "/prod",
                 "heartbeat_ts": hb,

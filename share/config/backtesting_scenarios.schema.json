@@ -46,7 +46,7 @@
     },
     "earnie_data_model": {
       "type": "integer",
-      "const": 3,
+      "const": 4,
       "description": "Earnie data-model version for config pack import/export."
     }
   },
@@ -79,10 +79,19 @@
         "settings": {
           "type": "object",
           "description": "Parameter-Override (flache Felder oder Referenzen auf Entitäten). Standort/Zeitzone kommen aus dem Hausprofil (house_profile_id), nicht aus settings.",
+          "additionalProperties": true,
           "properties": {
+            "battery_ids": {
+              "type": "array",
+              "description": "Referenzen auf batteries[].id in components.json (Mehrfach-Auswahl, 2.7.c).",
+              "items": {
+                "type": "string"
+              }
+            },
             "battery_id": {
               "type": "string",
-              "description": "Referenz auf batteries[].id in config.json."
+              "description": "Removed in earnie_data_model 4 — use battery_ids[].",
+              "not": {}
             },
             "pv_system_ids": {
               "type": "array",

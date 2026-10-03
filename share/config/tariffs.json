@@ -1,6 +1,6 @@
 {
     "$schema": "./tariffs.schema.json",
-    "earnie_data_model": 3,
+    "earnie_data_model": 4,
     "catalog_as_of": "2026-09-28",
     "oemag_monthly_feed_in_rates": [
         {

@@ -23,13 +23,30 @@ def _var_value_at(variables: list, hour_index: int) -> float:
     return value if value is not None else 0.0
 
 
-def _extract_milp_plan_at(model: MilpHorizonModel, hour_index: int) -> dict[str, float]:
-    return {
+def _extract_milp_plan_at(model: MilpHorizonModel, hour_index: int) -> dict[str, Any]:
+    plan: dict[str, Any] = {
         "p_grid_buy": _var_value_at(model.p_grid_buy, hour_index),
         "p_grid_sell": _var_value_at(model.p_grid_sell, hour_index),
         "p_charge": _var_value_at(model.p_charge, hour_index),
         "p_discharge": _var_value_at(model.p_discharge, hour_index),
     }
+    ess_ids = getattr(model, "ess_ids", None) or []
+    charge_by = getattr(model, "p_charge_by_ess", None) or {}
+    discharge_by = getattr(model, "p_discharge_by_ess", None) or {}
+    if ess_ids and charge_by and discharge_by:
+        ess_map: dict[str, dict[str, float]] = {}
+        for ess_id in ess_ids:
+            c_vars = charge_by.get(ess_id)
+            d_vars = discharge_by.get(ess_id)
+            if not c_vars or not d_vars:
+                continue
+            ess_map[ess_id] = {
+                "p_charge": _var_value_at(c_vars, hour_index),
+                "p_discharge": _var_value_at(d_vars, hour_index),
+            }
+        if ess_map:
+            plan["ess"] = ess_map
+    return plan
 
 
 def _extract_milp_plan(model: MilpHorizonModel) -> dict[str, float]:

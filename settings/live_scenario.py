@@ -6,7 +6,7 @@ from typing import Any, Callable
 from settings.json_io import read_json_dict, write_json_dict
 
 RUNTIME_REF_KEYS = frozenset({
-    "battery_id",
+    "battery_ids",
     "pv_system_ids",
     "import_tariff_id",
     "export_tariff_id",
@@ -82,11 +82,17 @@ def get_battery_wear_cent_per_kwh(
         )
     except ValueError:
         return 0.0
-    battery_id = str(live_settings.get("battery_id", "") or "").strip()
-    if battery_id:
+    from house_config.entity_resolution import normalize_battery_ids
+
+    wear_settings = dict(live_settings)
+    if "battery_id" in wear_settings and "battery_ids" not in wear_settings:
+        bid = str(wear_settings.pop("battery_id") or "").strip()
+        wear_settings["battery_ids"] = [bid] if bid else []
+    battery_ids = normalize_battery_ids(wear_settings)
+    if battery_ids:
         raise ValueError(
             f"Live-Szenario '{live_scenario_id}': battery_wear fehlt in batteries[] "
-            "(Pflicht wenn battery_id gesetzt)."
+            "(Pflicht wenn battery_ids gesetzt)."
         )
     return 0.0
 
@@ -155,6 +161,8 @@ def _apply_live_ref_updates(
         settings[key] = value
     if "pv_system_ids" in new_settings:
         settings.pop("pv_system_id", None)
+    if "battery_ids" in new_settings:
+        settings.pop("battery_id", None)
 
 
 def update_live_scenario_settings(
@@ -293,6 +301,7 @@ def runtime_settings_snapshot(get_attr: Callable[..., Any]) -> dict:
 
 
 def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
+    """First / primary battery params (compat). Prefer ``battery_params_list_snapshot``."""
     max_charge = get_attr(
         "BATTERY_MAX_CHARGE_POWER_KW",
         default=None,
@@ -321,10 +330,28 @@ def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
         "standby_power_kw": get_attr("BATTERY_STANDBY_POWER_KW", default=0.0, cast=float),
         "control": str(get_attr("BATTERY_CONTROL", default="full") or "full").strip().lower()
         or "full",
+        "kind": str(
+            get_attr("BATTERY_KIND", default="battery_inverter") or "battery_inverter"
+        ).strip().lower()
+        or "battery_inverter",
         "limits_from_live": bool(
             get_attr("BATTERY_LIMITS_FROM_LIVE", default=False, cast=bool)
         ),
     }
+
+
+def battery_params_list_snapshot(get_attr: Callable[..., Any]) -> list[dict]:
+    """All selected ESS params for multi-ESS (2.7.c). Falls back to singular snapshot."""
+    from house_config.entity_resolution import battery_params_from_planning
+
+    planning = get_attr("_planning_batteries", default=None)
+    if isinstance(planning, list) and planning:
+        return [battery_params_from_planning(entry) for entry in planning]
+    single = battery_params_snapshot(get_attr)
+    if float(single.get("battery_capacity_kwh") or 0.0) <= 0.0:
+        return []
+    single.setdefault("id", "primary")
+    return [single]
 
 
 def scenario_explorer_conf_snapshot(obj: Any) -> dict:

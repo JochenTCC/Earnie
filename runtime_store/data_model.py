@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from typing import Any
 
-CURRENT_DATA_MODEL = 3
-COMPATIBLE_DATA_MODELS: frozenset[int] = frozenset({3})
+CURRENT_DATA_MODEL = 4
+COMPATIBLE_DATA_MODELS: frozenset[int] = frozenset({4})
+# v3 loads only via migrate_v4.migrate_* then stamp to 4
+MIGRATABLE_DATA_MODELS: frozenset[int] = frozenset({3})
 
 DATA_MODEL_KEY = "earnie_data_model"
 
@@ -64,7 +66,7 @@ def ensure_compatible(doc: dict[str, Any], *, label: str) -> int:
     """
     Validate a document against the current data-model version.
 
-    Missing tag or versions other than 3 raise ``DataModelError``.
+    Missing tag or versions other than the current raise ``DataModelError``.
     Config documents are also checked for removed structural keys.
     """
     version = read_data_model(doc)
@@ -72,6 +74,12 @@ def ensure_compatible(doc: dict[str, Any], *, label: str) -> int:
         raise DataModelError(
             f"{label}: earnie_data_model fehlt "
             f"(erforderlich: {CURRENT_DATA_MODEL})."
+        )
+    if version in MIGRATABLE_DATA_MODELS:
+        raise DataModelError(
+            f"{label}: earnie_data_model={version} muss zuerst nach "
+            f"{CURRENT_DATA_MODEL} migriert werden "
+            f"(python -m scripts.migrate_data_model_v4)."
         )
     if version not in COMPATIBLE_DATA_MODELS:
         raise DataModelError(

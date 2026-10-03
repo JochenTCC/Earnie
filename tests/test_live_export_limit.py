@@ -67,9 +67,9 @@ def test_live_unconstrained_counts_only_force_discharge_battery(
 ) -> None:
     import config
 
-    monkeypatch.setattr(
-        config, "get_battery_params", lambda: {"max_power_kw": 5.0, "control": control}
-    )
+    params = {"max_power_kw": 5.0, "max_discharge_power_kw": 5.0, "control": control}
+    monkeypatch.setattr(config, "get_battery_params", lambda: params)
+    monkeypatch.setattr(config, "get_battery_params_list", lambda: [params])
     monkeypatch.setattr(
         config, "get", lambda name, default=None, cast=None: 9.8 if name == "PV_KWP" else default
     )

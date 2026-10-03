@@ -57,10 +57,15 @@ def test_batteries_by_id_from_fixture():
 
 def test_resolve_battery_into_settings():
     batteries = batteries_by_id(config.CONFIG.get_components_catalog())
-    resolved = resolve_battery_into_settings({"battery_id": "test_battery"}, batteries)
+    resolved = resolve_battery_into_settings(
+        {"battery_ids": ["test_battery"]}, batteries
+    )
     assert resolved["battery_capacity_kwh"] == 8.0
     assert resolved["_battery_wear"]["enabled"] is True
     assert "battery_id" not in resolved
+    assert "battery_ids" not in resolved
+    assert len(resolved["_planning_batteries"]) == 1
+    assert resolved["_planning_batteries"][0]["id"] == "test_battery"
 
 
 def test_resolve_battery_into_settings_without_id():
@@ -70,6 +75,8 @@ def test_resolve_battery_into_settings_without_id():
     assert resolved["battery_capacity_kwh"] == ZERO_BATTERY_FLAT["battery_capacity_kwh"]
     assert resolved["battery_max_power_kw"] == 0.0
     assert "battery_id" not in resolved
+    assert "battery_ids" not in resolved
+    assert resolved["_planning_batteries"] == []
 
 
 def test_battery_wear_cent_per_kwh_from_entity():
@@ -122,7 +129,7 @@ def test_resolve_pv_into_settings_multi():
 def test_resolve_pv_into_settings_without_id():
     from house_config.entity_resolution import ZERO_PV_FLAT
 
-    resolved = resolve_pv_into_settings({"battery_id": "bat"}, {})
+    resolved = resolve_pv_into_settings({"battery_ids": ["bat"]}, {})
     assert resolved["pv_kwp"] == ZERO_PV_FLAT["pv_kwp"]
     assert resolved["_planning_pv_systems"] == []
     assert "pv_system_id" not in resolved
@@ -137,19 +144,25 @@ def test_strip_assets_for_reference():
     )
 
     live = {
-        "battery_id": "home",
-        "pv_system_id": "roof",
+        "battery_ids": ["home"],
+        "pv_system_ids": ["roof"],
         "battery_capacity_kwh": 10.0,
         "pv_kwp": 8.0,
         "import_tariff_id": "fixed_25ct",
         "_battery_wear": {"enabled": True},
+        "_planning_batteries": [{"id": "home"}],
+        "_planning_pv_systems": [{"id": "roof"}],
     }
     stripped = strip_assets_for_reference(live)
     assert stripped["battery_capacity_kwh"] == ZERO_BATTERY_FLAT["battery_capacity_kwh"]
     assert stripped["pv_kwp"] == ZERO_PV_FLAT["pv_kwp"]
     assert "battery_id" not in stripped
+    assert "battery_ids" not in stripped
     assert "pv_system_id" not in stripped
+    assert "pv_system_ids" not in stripped
     assert "_battery_wear" not in stripped
+    assert "_planning_batteries" not in stripped
+    assert "_planning_pv_systems" not in stripped
     assert stripped["import_tariff_id"] == "fixed_25ct"
 
 
@@ -1607,7 +1620,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "id": "live",
                 "label": "Live",
                 "settings": {
-                    "battery_id": "home_5kwh",
+                    "battery_ids": ["home_5kwh"],
                     "pv_system_ids": ["roof"],
                     "import_tariff_id": "fixed_imp",
                     "export_tariff_id": "fixed_exp",

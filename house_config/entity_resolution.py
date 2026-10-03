@@ -5,6 +5,10 @@ from house_config.battery_control import (
     DEFAULT_BATTERY_CONTROL,
     normalize_battery_control,
 )
+from house_config.battery_kind import (
+    DEFAULT_BATTERY_KIND,
+    normalize_battery_kind,
+)
 
 ZERO_BATTERY_FLAT = {
     "battery_capacity_kwh": 0.0,
@@ -17,6 +21,7 @@ ZERO_BATTERY_FLAT = {
     "threshold_power": 0.02,
     "standby_power_kw": 0.0,
     "battery_control": DEFAULT_BATTERY_CONTROL,
+    "battery_kind": DEFAULT_BATTERY_KIND,
     "limits_from_live": False,
 }
 
@@ -34,13 +39,32 @@ def strip_assets_for_reference(params: dict) -> dict:
     out.update(ZERO_PV_FLAT)
     for key in (
         "battery_id",
+        "battery_ids",
         "pv_system_id",
         "pv_system_ids",
         "_battery_wear",
+        "_planning_batteries",
         "_planning_pv_systems",
     ):
         out.pop(key, None)
     return out
+
+
+def normalize_battery_ids(settings: dict) -> list[str]:
+    """Return unique ``battery_ids``; reject singular legacy ``battery_id``."""
+    if "battery_id" in settings:
+        raise ValueError(
+            "settings.battery_id ist nicht mehr unterstützt — "
+            "bitte battery_ids[] verwenden."
+        )
+    ids: list[str] = []
+    raw_list = settings.get("battery_ids")
+    if isinstance(raw_list, list):
+        for item in raw_list:
+            bat_id = str(item or "").strip()
+            if bat_id and bat_id not in ids:
+                ids.append(bat_id)
+    return ids
 
 
 def normalize_pv_system_ids(settings: dict) -> list[str]:
@@ -142,6 +166,9 @@ def normalize_battery(raw: dict, index: int) -> dict:
     control = normalize_battery_control(
         raw.get("control"), battery_id=battery_id, index=index
     )
+    kind = normalize_battery_kind(
+        raw.get("kind"), battery_id=battery_id, index=index
+    )
     charge_kw, discharge_kw = split_battery_max_power_kw(
         raw, battery_id=battery_id, index=index
     )
@@ -151,9 +178,17 @@ def normalize_battery(raw: dict, index: int) -> dict:
             f"batteries[{index}] ('{battery_id}'): "
             "battery_max_charge/discharge_power_kw muss > 0 sein."
         )
+    ehal_bindings = raw.get("ehal_bindings")
+    if ehal_bindings is None:
+        ehal_bindings = {}
+    if not isinstance(ehal_bindings, dict):
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): ehal_bindings muss ein Objekt sein."
+        )
     return {
         "id": battery_id,
         "label": label,
+        "kind": kind,
         "battery_capacity_kwh": capacity,
         "battery_max_charge_power_kw": charge_kw,
         "battery_max_discharge_power_kw": discharge_kw,
@@ -166,6 +201,11 @@ def normalize_battery(raw: dict, index: int) -> dict:
         "standby_power_kw": standby,
         "control": control,
         "limits_from_live": bool(raw.get("limits_from_live", False)),
+        "ehal_bindings": {
+            str(k): str(v).strip()
+            for k, v in ehal_bindings.items()
+            if str(v or "").strip()
+        },
         "battery_wear": _normalize_battery_wear(raw.get("battery_wear"), battery_id, index),
     }
 
@@ -244,38 +284,108 @@ def pv_systems_by_id(raw_config: dict) -> dict[str, dict]:
     return result
 
 
+def planning_battery_entry(bat: dict) -> dict:
+    """Stable planning-shape entry for a resolved battery (runtime/MILP)."""
+    return {
+        "id": bat["id"],
+        "label": bat["label"],
+        "kind": bat.get("kind", DEFAULT_BATTERY_KIND),
+        "battery_capacity_kwh": float(bat["battery_capacity_kwh"]),
+        "battery_max_charge_power_kw": float(bat["battery_max_charge_power_kw"]),
+        "battery_max_discharge_power_kw": float(bat["battery_max_discharge_power_kw"]),
+        "battery_max_power_kw": float(bat["battery_max_power_kw"]),
+        "battery_efficiency": float(bat["battery_efficiency"]),
+        "battery_min_soc": float(bat["battery_min_soc"]),
+        "battery_max_soc": float(bat["battery_max_soc"]),
+        "threshold_power": float(bat["threshold_power"]),
+        "standby_power_kw": float(bat.get("standby_power_kw", 0.0) or 0.0),
+        "control": bat.get("control", DEFAULT_BATTERY_CONTROL),
+        "limits_from_live": bool(bat.get("limits_from_live", False)),
+        "ehal_bindings": dict(bat.get("ehal_bindings") or {}),
+        "battery_wear": (
+            dict(bat["battery_wear"]) if bat.get("battery_wear") is not None else None
+        ),
+    }
+
+
+def battery_params_from_planning(entry: dict) -> dict:
+    """Optimizer-shaped params dict from a planning battery entry."""
+    return {
+        "id": entry["id"],
+        "kind": entry.get("kind", DEFAULT_BATTERY_KIND),
+        "battery_capacity_kwh": float(entry["battery_capacity_kwh"]),
+        "min_soc": float(entry["battery_min_soc"]),
+        "max_soc": float(entry["battery_max_soc"]),
+        "max_charge_power_kw": float(entry["battery_max_charge_power_kw"]),
+        "max_discharge_power_kw": float(entry["battery_max_discharge_power_kw"]),
+        "max_power_kw": float(entry["battery_max_power_kw"]),
+        "efficiency": float(entry["battery_efficiency"]),
+        "standby_power_kw": float(entry.get("standby_power_kw", 0.0) or 0.0),
+        "threshold_power": float(entry.get("threshold_power", 0.02) or 0.02),
+        "control": str(entry.get("control", DEFAULT_BATTERY_CONTROL) or DEFAULT_BATTERY_CONTROL),
+        "limits_from_live": bool(entry.get("limits_from_live", False)),
+        "ehal_bindings": dict(entry.get("ehal_bindings") or {}),
+    }
+
+
 def resolve_battery_into_settings(
     settings: dict,
     batteries: dict[str, dict],
 ) -> dict:
-    """Ersetzt battery_id durch flache Batterie-Felder (falls gesetzt)."""
+    """Resolve ``battery_ids`` into ``_planning_batteries`` + flat fields.
+
+    Flat fields use the first selected battery for singular callers; standby and
+    max discharge powers are also summed for house-level aggregates.
+    Inline flat battery fields (no ``battery_ids``) remain supported for
+    scenarios that embed capacity/power directly.
+    """
     out = dict(settings)
-    battery_id = out.pop("battery_id", None)
-    if not battery_id:
+    if "battery_id" in out:
+        raise ValueError(
+            "settings.battery_id ist nicht mehr unterstützt — "
+            "bitte battery_ids[] verwenden."
+        )
+    bat_ids = normalize_battery_ids(out)
+    out.pop("battery_ids", None)
+
+    if not bat_ids:
+        out["_planning_batteries"] = []
         if "battery_capacity_kwh" not in out:
             out.update(ZERO_BATTERY_FLAT)
         return out
-    battery_id = str(battery_id).strip()
-    if battery_id not in batteries:
-        raise ValueError(f"Unbekannte battery_id '{battery_id}'.")
-    bat = batteries[battery_id]
+
+    planning: list[dict] = []
+    for bat_id in bat_ids:
+        if bat_id not in batteries:
+            raise ValueError(f"Unbekannte battery_id '{bat_id}'.")
+        planning.append(planning_battery_entry(batteries[bat_id]))
+
+    out["_planning_batteries"] = planning
+    first = planning[0]
     out.update(
         {
-            "battery_capacity_kwh": bat["battery_capacity_kwh"],
-            "battery_max_charge_power_kw": bat["battery_max_charge_power_kw"],
-            "battery_max_discharge_power_kw": bat["battery_max_discharge_power_kw"],
-            "battery_max_power_kw": bat["battery_max_power_kw"],
-            "battery_efficiency": bat["battery_efficiency"],
-            "battery_min_soc": bat["battery_min_soc"],
-            "battery_max_soc": bat["battery_max_soc"],
-            "threshold_power": bat["threshold_power"],
-            "standby_power_kw": bat.get("standby_power_kw", 0.0),
-            "battery_control": bat.get("control", DEFAULT_BATTERY_CONTROL),
-            "limits_from_live": bool(bat.get("limits_from_live", False)),
+            "battery_capacity_kwh": first["battery_capacity_kwh"],
+            "battery_max_charge_power_kw": first["battery_max_charge_power_kw"],
+            "battery_max_discharge_power_kw": first["battery_max_discharge_power_kw"],
+            "battery_max_power_kw": first["battery_max_power_kw"],
+            "battery_efficiency": first["battery_efficiency"],
+            "battery_min_soc": first["battery_min_soc"],
+            "battery_max_soc": first["battery_max_soc"],
+            "threshold_power": first["threshold_power"],
+            "standby_power_kw": sum(
+                float(b.get("standby_power_kw", 0.0) or 0.0) for b in planning
+            ),
+            "battery_control": first.get("control", DEFAULT_BATTERY_CONTROL),
+            "battery_kind": first.get("kind", DEFAULT_BATTERY_KIND),
+            "limits_from_live": bool(first.get("limits_from_live", False)),
         }
     )
-    if bat.get("battery_wear") is not None:
-        out["_battery_wear"] = dict(bat["battery_wear"])
+    # Aggregates used by export unconstrained / house load
+    out["_battery_max_discharge_power_kw_sum"] = sum(
+        float(b["battery_max_discharge_power_kw"]) for b in planning
+    )
+    if first.get("battery_wear") is not None:
+        out["_battery_wear"] = dict(first["battery_wear"])
     return out
 
 

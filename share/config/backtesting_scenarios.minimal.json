@@ -1,6 +1,6 @@
 {
     "$schema": "./backtesting_scenarios.schema.json",
-    "earnie_data_model": 3,
+    "earnie_data_model": 4,
     "cbc_gap_rel": 0.1,
     "commit_hours": 24,
     "cbc_strict_time_limit_sec": 3,
@@ -9,7 +9,7 @@
             "id": "live",
             "label": "Live",
             "settings": {
-                "battery_id": "",
+                "battery_ids": [],
                 "pv_system_ids": [],
                 "import_tariff_id": "",
                 "export_tariff_id": "",

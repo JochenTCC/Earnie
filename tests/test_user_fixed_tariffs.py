@@ -201,7 +201,7 @@ def test_setup_readiness_accepts_user_fixed(tmp_path: Path):
                     {
                         "id": "live",
                         "settings": {
-                            "battery_id": "bat1",
+                            "battery_ids": ["bat1"],
                             "house_profile_id": "home",
                             "import_tariff_id": USER_FIXED_TARIFF_ID,
                             USER_IMPORT_CENT_KEY: 19.0,
@@ -246,7 +246,7 @@ def test_setup_readiness_rejects_user_fixed_without_import_cent(tmp_path: Path):
                     {
                         "id": "live",
                         "settings": {
-                            "battery_id": "bat1",
+                            "battery_ids": ["bat1"],
                             "house_profile_id": "home",
                             "import_tariff_id": USER_FIXED_TARIFF_ID,
                             "export_tariff_id": "exp1",

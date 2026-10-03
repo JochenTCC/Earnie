@@ -18,7 +18,7 @@ from settings.json_io import read_json_dict, write_json_dict
 logger = logging.getLogger(__name__)
 
 _REF_KEYS = (
-    "battery_id",
+    "battery_ids",
     "import_tariff_id",
     "export_tariff_id",
     "house_profile_id",
@@ -85,8 +85,9 @@ def _catalog_defaults() -> dict[str, Any]:
         "example_efh" if "example_efh" in profile_ids else (profile_ids[0] if profile_ids else "")
     )
     pv_id = _first_id(components.get("pv_systems", []) or [])
+    bat_id = _first_id(components.get("batteries", []) or [])
     return {
-        "battery_id": _first_id(components.get("batteries", []) or []),
+        "battery_ids": [bat_id] if bat_id else [],
         "pv_system_ids": [pv_id] if pv_id else [],
         "import_tariff_id": _prefer_id(
             tariffs.get("import_tariffs", []) or [], "awattar_at"
@@ -98,9 +99,18 @@ def _catalog_defaults() -> dict[str, Any]:
     }
 
 
+def _ref_value_empty(settings: dict, key: str) -> bool:
+    value = settings.get(key)
+    if key in ("battery_ids", "pv_system_ids"):
+        return not (
+            isinstance(value, list) and any(str(item or "").strip() for item in value)
+        )
+    return not str(value or "").strip()
+
+
 def _settings_incomplete(settings: dict) -> bool:
     for key in _REF_KEYS:
-        if not str(settings.get(key, "") or "").strip():
+        if _ref_value_empty(settings, key):
             return True
     return False
 
@@ -133,20 +143,24 @@ def live_scenario_refs_incomplete(
 def _fill_empty_refs(settings: dict, defaults: dict[str, Any]) -> list[str]:
     filled: list[str] = []
     for key in _REF_KEYS:
-        if str(settings.get(key, "") or "").strip():
+        if not _ref_value_empty(settings, key):
             continue
-        value = defaults.get(key, "")
-        if not value:
-            continue
-        settings[key] = value
+        value = defaults.get(key)
+        if key == "battery_ids":
+            if not value:
+                continue
+            settings[key] = list(value)
+        else:
+            if not value:
+                continue
+            settings[key] = value
         filled.append(key)
-    pv_ids = settings.get("pv_system_ids")
-    has_pv = isinstance(pv_ids, list) and any(str(x).strip() for x in pv_ids)
-    if not has_pv:
+    if _ref_value_empty(settings, "pv_system_ids"):
         default_pv = defaults.get("pv_system_ids") or []
         if default_pv:
             settings["pv_system_ids"] = list(default_pv)
             filled.append("pv_system_ids")
+    settings.pop("battery_id", None)
     return filled
 
 

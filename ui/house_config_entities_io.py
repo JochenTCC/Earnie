@@ -201,9 +201,14 @@ def delete_battery(entity_id: str) -> None:
         settings = scenario.get("settings")
         if not isinstance(settings, dict):
             continue
-        if str(settings.get("battery_id", "") or "").strip() != target:
+        raw_ids = settings.get("battery_ids")
+        if not isinstance(raw_ids, list):
             continue
-        settings["battery_id"] = ""
+        before = [str(item or "").strip() for item in raw_ids if str(item or "").strip()]
+        cleaned = [bat_id for bat_id in before if bat_id != target]
+        if cleaned == before:
+            continue
+        settings["battery_ids"] = cleaned
         changed = True
     if changed:
         _io.save_backtesting_scenarios(doc)
@@ -240,11 +245,22 @@ def save_planning_tariff_selection(import_tariff_id: str, export_tariff_id: str)
 
 def get_live_scenario_refs() -> dict:
     """Entitäts-Referenzen des Live-Szenarios aus backtesting_scenarios.json."""
-    from house_config.entity_resolution import normalize_pv_system_ids
+    from house_config.entity_resolution import (
+        normalize_battery_ids,
+        normalize_pv_system_ids,
+    )
 
-    settings = _live_scenario_settings()
+    settings = dict(_live_scenario_settings())
+    if "battery_id" in settings and "battery_ids" not in settings:
+        bid = str(settings.pop("battery_id") or "").strip()
+        settings["battery_ids"] = [bid] if bid else []
+    else:
+        settings.pop("battery_id", None)
+    battery_ids = normalize_battery_ids(settings)
     return {
-        "battery_id": str(settings.get("battery_id", "") or "").strip(),
+        "battery_ids": battery_ids,
+        # Compatibility for call sites still reading the primary battery.
+        "battery_id": battery_ids[0] if battery_ids else "",
         "pv_system_ids": normalize_pv_system_ids(settings),
         "import_tariff_id": str(settings.get("import_tariff_id", "") or "").strip(),
         "export_tariff_id": str(settings.get("export_tariff_id", "") or "").strip(),
@@ -253,18 +269,30 @@ def get_live_scenario_refs() -> dict:
 
 def save_live_scenario_refs(
     *,
-    battery_id: str,
+    battery_ids: list[str] | None = None,
+    battery_id: str = "",
     pv_system_ids: list[str],
     import_tariff_id: str,
     export_tariff_id: str,
     house_profile_id: str,
 ) -> None:
     """Speichert Entitäts-Referenzen für das Live-Szenario."""
-    cleaned = [str(item or "").strip() for item in pv_system_ids if str(item or "").strip()]
+    cleaned_pv = [
+        str(item or "").strip() for item in pv_system_ids if str(item or "").strip()
+    ]
+    cleaned_bat = [
+        str(item or "").strip()
+        for item in (battery_ids or [])
+        if str(item or "").strip()
+    ]
+    if not cleaned_bat:
+        legacy = str(battery_id or "").strip()
+        if legacy:
+            cleaned_bat = [legacy]
     config.update_live_scenario_settings(
         {
-            "battery_id": battery_id.strip(),
-            "pv_system_ids": cleaned,
+            "battery_ids": cleaned_bat,
+            "pv_system_ids": cleaned_pv,
             "import_tariff_id": import_tariff_id.strip(),
             "export_tariff_id": export_tariff_id.strip(),
             "house_profile_id": house_profile_id.strip(),

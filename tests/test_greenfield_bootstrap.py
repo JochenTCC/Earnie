@@ -30,7 +30,7 @@ _RUNTIME_SETTINGS_FLAT_LEGACY_KEYS = frozenset({
 })
 
 _RUNTIME_SETTINGS_ID_ONLY_KEYS = frozenset({
-    "battery_id",
+    "battery_ids",
     "pv_system_ids",
     "house_profile_id",
     "import_tariff_id",
@@ -159,7 +159,7 @@ def test_config_minimal_live_scenario_id_only():
     scenarios = json.loads(scenarios_path.read_text(encoding="utf-8"))
     live = next(s for s in scenarios["scenarios"] if s["id"] == "live")
     assert set(live["settings"]) <= {
-        "battery_id",
+        "battery_ids",
         "pv_system_ids",
         "import_tariff_id",
         "export_tariff_id",

@@ -13,6 +13,17 @@ from house_config.battery_control import (
     CONTROL_LABELS_DE,
     DEFAULT_BATTERY_CONTROL,
 )
+from house_config.battery_kind import (
+    BATTERY_KIND_BATTERY_INVERTER,
+    BATTERY_KIND_ISOLATED,
+    DEFAULT_BATTERY_KIND,
+)
+
+KIND_LABELS_DE = {
+    BATTERY_KIND_BATTERY_INVERTER: "Batterie + Wechselrichter",
+    BATTERY_KIND_ISOLATED: "Isolierte Batterie",
+}
+_KIND_VALUES = (BATTERY_KIND_BATTERY_INVERTER, BATTERY_KIND_ISOLATED)
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import (
     delete_battery,
@@ -75,8 +86,11 @@ def new_battery_template(
         "battery_max_soc": float(source.get("battery_max_soc", 100.0)),
         "threshold_power": float(source.get("threshold_power", 0.05)),
         "standby_power_kw": float(source.get("standby_power_kw", 0.0) or 0.0),
+        "kind": str(source.get("kind") or DEFAULT_BATTERY_KIND).strip().lower()
+        or DEFAULT_BATTERY_KIND,
         "control": str(source.get("control") or "full").strip().lower() or "full",
         "limits_from_live": bool(source.get("limits_from_live", False)),
+        "ehal_bindings": dict(source.get("ehal_bindings") or {}),
         "battery_wear": copy.deepcopy(dict(source.get("battery_wear") or {})),
     }
 
@@ -125,6 +139,9 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         control = str(existing.get("control") or DEFAULT_BATTERY_CONTROL).strip().lower()
         if control not in BATTERY_CONTROL_VALUES:
             control = DEFAULT_BATTERY_CONTROL
+        kind = str(existing.get("kind") or DEFAULT_BATTERY_KIND).strip().lower()
+        if kind not in _KIND_VALUES:
+            kind = DEFAULT_BATTERY_KIND
         limits_from_live = bool(existing.get("limits_from_live", False))
         wear = existing.get("battery_wear") or {}
         wear_enabled = bool(wear.get("enabled", False))
@@ -142,6 +159,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         threshold_percent = 5.0
         standby_power = 0.0
         control = DEFAULT_BATTERY_CONTROL
+        kind = DEFAULT_BATTERY_KIND
         limits_from_live = False
         wear_enabled = False
         wear_replacement_cost = 1500.0
@@ -149,6 +167,9 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         wear_cycle_fraction = 0.5
 
     st.session_state[_scoped_key(session_scope, "planning_battery_label")] = label
+    st.session_state[_scoped_key(session_scope, "planning_battery_kind")] = KIND_LABELS_DE[
+        kind
+    ]
     st.session_state[_scoped_key(session_scope, "planning_battery_capacity")] = capacity
     st.session_state[_scoped_key(session_scope, "planning_battery_charge_power")] = (
         max_charge
@@ -352,6 +373,16 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
         help="Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch).",
         key=_scoped_key(session_scope, "planning_battery_standby"),
     )
+    kind_labels = [KIND_LABELS_DE[v] for v in _KIND_VALUES]
+    kind_label = labeled_selectbox(
+        "Topologie",
+        options=kind_labels,
+        help="Batterie+WR: Automatik/Optimieren erlaubt. "
+        "Isolierte Batterie: nur Laden / Entladen / Standby (nie Automatik).",
+        key=_scoped_key(session_scope, "planning_battery_kind"),
+    )
+    label_to_kind = {v: k for k, v in KIND_LABELS_DE.items()}
+    kind = label_to_kind.get(str(kind_label), DEFAULT_BATTERY_KIND)
     control_labels = [CONTROL_LABELS_DE[v] for v in sorted(BATTERY_CONTROL_VALUES)]
     control_label = labeled_selectbox(
         "Steuerbarkeit",
@@ -368,6 +399,7 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
         "max_soc": max_soc,
         "threshold_percent": threshold_percent,
         "standby_power": standby_power,
+        "kind": kind,
         "control": control,
     }
 
@@ -417,6 +449,7 @@ def _render_battery_fields(session_scope: str) -> dict:
 def _battery_save_payload(fields: dict) -> dict:
     return {
         "label": fields["label"],
+        "kind": fields.get("kind") or DEFAULT_BATTERY_KIND,
         "battery_capacity_kwh": fields["capacity"],
         "battery_max_charge_power_kw": fields["max_charge"],
         "battery_max_discharge_power_kw": fields["max_discharge"],
@@ -427,6 +460,7 @@ def _battery_save_payload(fields: dict) -> dict:
         "standby_power_kw": float(fields["standby_power"] or 0.0),
         "control": fields.get("control") or DEFAULT_BATTERY_CONTROL,
         "limits_from_live": bool(fields.get("limits_from_live", False)),
+        "ehal_bindings": dict(fields.get("ehal_bindings") or {}),
         "battery_wear": fields["battery_wear"],
     }
 

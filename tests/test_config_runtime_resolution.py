@@ -13,7 +13,7 @@ from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
 def _write_live_scenarios(config_dir, *, settings: dict | None = None) -> None:
     live_settings = settings or {
-        "battery_id": "home_5kwh",
+        "battery_ids": ["home_5kwh"],
         "pv_system_ids": ["roof"],
         "import_tariff_id": "fixed_imp",
         "export_tariff_id": "monthly_exp",
@@ -55,7 +55,7 @@ def _write_minimal_greenfield_config(config_dir) -> None:
         encoding="utf-8",
     )
     _write_live_scenarios(config_dir, settings={
-        "battery_id": "",
+        "battery_ids": [],
         "pv_system_ids": [],
         "import_tariff_id": "",
         "export_tariff_id": "",
@@ -278,7 +278,7 @@ def test_config_rejects_legacy_runtime_settings_block(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _write_id_only_config(config_dir)
     payload = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
-    payload["runtime_settings"] = {"battery_id": "home_5kwh"}
+    payload["runtime_settings"] = {"battery_ids": ["home_5kwh"]}
     (config_dir / "config.json").write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError, match="runtime_settings"):
@@ -383,7 +383,7 @@ def test_backtesting_scenario_without_battery_resolves_zero_flat(tmp_path, monke
                 "id": DEFAULT_LIVE_SCENARIO_ID,
                 "label": "Live",
                 "settings": {
-                    "battery_id": "home_5kwh",
+                    "battery_ids": ["home_5kwh"],
                     "pv_system_ids": ["roof"],
                     "import_tariff_id": "fixed_imp",
                     "export_tariff_id": "monthly_exp",
@@ -439,7 +439,7 @@ def test_update_live_scenario_settings_accepts_id_refs_only(tmp_path, monkeypatc
         require_loxone_credentials=False,
     )
 
-    cfg.update_live_scenario_settings({"battery_id": "home_5kwh"})
+    cfg.update_live_scenario_settings({"battery_ids": ["home_5kwh"]})
 
     reloaded = Config(
         config_path=str(config_dir / "config.json"),
@@ -453,7 +453,7 @@ def test_update_live_scenario_settings_accepts_id_refs_only(tmp_path, monkeypatc
         (config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8")
     )
     live = next(s for s in scenarios_doc["scenarios"] if s["id"] == DEFAULT_LIVE_SCENARIO_ID)
-    assert live["settings"]["battery_id"] == "home_5kwh"
+    assert live["settings"]["battery_ids"] == ["home_5kwh"]
     assert reloaded.BATTERY_CAPACITY_KWH == pytest.approx(5.0)
 
 
@@ -516,7 +516,7 @@ def test_set_live_scenario_id_persists_and_reloads(tmp_path, monkeypatch):
             "id": "alt",
             "label": "Alternative",
             "settings": {
-                "battery_id": "home_5kwh",
+                "battery_ids": ["home_5kwh"],
                 "pv_system_ids": ["roof"],
                 "import_tariff_id": "fixed_imp",
                 "export_tariff_id": "monthly_exp",

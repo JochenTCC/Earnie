@@ -75,7 +75,7 @@ def _minimal_share(tmp_path: Path) -> Path:
                     "id": "live",
                     "label": "Live",
                     "settings": {
-                        "battery_id": "",
+                        "battery_ids": [],
                         "pv_system_ids": [],
                         "import_tariff_id": "",
                         "export_tariff_id": "",
@@ -215,7 +215,7 @@ def test_bootstrap_under_cloud_session_skips_offline_seed(tmp_path, monkeypatch)
                     "id": "live",
                     "label": "Live",
                     "settings": {
-                        "battery_id": "",
+                        "battery_ids": [],
                         "pv_system_ids": [],
                         "import_tariff_id": "",
                         "export_tariff_id": "",
@@ -234,7 +234,7 @@ def test_bootstrap_under_cloud_session_skips_offline_seed(tmp_path, monkeypatch)
         (session / "config" / "backtesting_scenarios.json").read_text(encoding="utf-8")
     )
     settings = scenarios["scenarios"][0]["settings"]
-    assert settings["battery_id"] == ""
+    assert settings["battery_ids"] == []
     assert settings["house_profile_id"] == ""
     assert settings["import_tariff_id"] == ""
 
@@ -273,7 +273,7 @@ def test_cloud_restricted_nav_hauskonfigurator_only(tmp_path, monkeypatch):
                     "id": "live",
                     "label": "Live",
                     "settings": {
-                        "battery_id": "",
+                        "battery_ids": [],
                         "pv_system_ids": [],
                         "import_tariff_id": "",
                         "export_tariff_id": "",

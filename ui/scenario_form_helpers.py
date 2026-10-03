@@ -324,7 +324,8 @@ def scenario_baseline_key(session_scope: str) -> str:
 
 def build_scenario_settings(
     *,
-    battery_id: str,
+    battery_ids: list[str] | None = None,
+    battery_id: str | None = None,
     pv_system_ids: list[str] | None = None,
     import_tariff_id: str,
     export_tariff_id: str,
@@ -340,8 +341,18 @@ def build_scenario_settings(
     )
 
     settings: dict = {}
-    if battery_id:
-        settings["battery_id"] = battery_id
+    cleaned_bat = [
+        str(item or "").strip()
+        for item in (battery_ids or [])
+        if str(item or "").strip()
+    ]
+    if not cleaned_bat and battery_id:
+        # Legacy kwarg from older call sites during transition
+        legacy = str(battery_id or "").strip()
+        if legacy:
+            cleaned_bat = [legacy]
+    if cleaned_bat:
+        settings["battery_ids"] = cleaned_bat
     cleaned_pv = [
         str(item or "").strip()
         for item in (pv_system_ids or [])
@@ -371,13 +382,21 @@ def _optional_user_cent(raw_settings: dict, key: str) -> float | None:
 
 
 def normalize_scenario_form_snapshot(scenario: dict) -> dict:
-    from house_config.entity_resolution import normalize_pv_system_ids
+    from house_config.entity_resolution import (
+        normalize_battery_ids,
+        normalize_pv_system_ids,
+    )
     from house_config.tariffs_store import USER_EXPORT_CENT_KEY, USER_IMPORT_CENT_KEY
 
     raw_settings = scenario.get("settings", {}) or {}
+    # Tolerate legacy battery_id in on-disk snapshots until migrate runs
+    legacy_settings = dict(raw_settings)
+    if "battery_id" in legacy_settings and "battery_ids" not in legacy_settings:
+        bid = str(legacy_settings.pop("battery_id") or "").strip()
+        legacy_settings["battery_ids"] = [bid] if bid else []
     settings = build_scenario_settings(
-        battery_id=str(raw_settings.get("battery_id", "") or "").strip(),
-        pv_system_ids=normalize_pv_system_ids(raw_settings),
+        battery_ids=normalize_battery_ids(legacy_settings),
+        pv_system_ids=normalize_pv_system_ids(legacy_settings),
         import_tariff_id=str(raw_settings.get("import_tariff_id", "") or "").strip(),
         export_tariff_id=str(raw_settings.get("export_tariff_id", "") or "").strip(),
         house_profile_id=str(raw_settings.get("house_profile_id", "") or "").strip(),
@@ -442,20 +461,27 @@ def _scenario_settings_from_session(
     exp_map: dict,
 ) -> dict:
     profile_pick = session_state.get(scoped_widget_key(session_scope, "scenario_profile"))
-    battery_pick = session_state.get(scoped_widget_key(session_scope, "scenario_battery"))
+    battery_picks = session_state.get(scoped_widget_key(session_scope, "scenario_battery")) or []
     pv_picks = session_state.get(scoped_widget_key(session_scope, "scenario_pv")) or []
     import_pick = session_state.get(scoped_widget_key(session_scope, "scenario_import"))
     export_pick = session_state.get(scoped_widget_key(session_scope, "scenario_export"))
 
+    if isinstance(battery_picks, str):
+        battery_picks = [battery_picks]
     if isinstance(pv_picks, str):
         pv_picks = [pv_picks]
+    battery_ids = [
+        lookup_entity_id(bat_map, pick)
+        for pick in battery_picks
+        if lookup_entity_id(bat_map, pick)
+    ]
     pv_system_ids = [
         lookup_entity_id(pv_map, pick) for pick in pv_picks if lookup_entity_id(pv_map, pick)
     ]
     import_tariff_id = lookup_entity_id(imp_map, import_pick)
     export_tariff_id = lookup_entity_id(exp_map, export_pick)
     return build_scenario_settings(
-        battery_id=lookup_entity_id(bat_map, battery_pick),
+        battery_ids=battery_ids,
         pv_system_ids=pv_system_ids,
         import_tariff_id=import_tariff_id,
         export_tariff_id=export_tariff_id,

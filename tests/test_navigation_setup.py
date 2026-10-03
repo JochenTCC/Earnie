@@ -77,7 +77,7 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
     _write_live_scenario(
         config_dir,
         {
-            "battery_id": "",
+            "battery_ids": [],
             "pv_system_ids": [],
             "import_tariff_id": "",
             "export_tariff_id": "",
@@ -118,7 +118,7 @@ def test_restricted_navigation_defaults_to_smarthome_backend_when_live_environme
     _write_live_scenario(
         config_dir,
         {
-            "battery_id": "",
+            "battery_ids": [],
             "pv_system_ids": [],
             "import_tariff_id": "",
             "export_tariff_id": "",
@@ -148,7 +148,7 @@ def test_restricted_navigation_shows_daemon_pages_once_sb_configured(tmp_path, m
     _write_live_scenario(
         config_dir,
         {
-            "battery_id": "",
+            "battery_ids": [],
             "pv_system_ids": [],
             "import_tariff_id": "",
             "export_tariff_id": "",
@@ -273,7 +273,7 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     _write_live_scenario(
         config_dir,
         {
-            "battery_id": "",
+            "battery_ids": [],
             "pv_system_ids": [],
             "import_tariff_id": "",
             "export_tariff_id": "",
@@ -335,7 +335,7 @@ def test_scenario_explorer_visible_when_planning_ready(tmp_path, monkeypatch):
     _write_live_scenario(
         config_dir,
         {
-            "battery_id": "bat",
+            "battery_ids": ["bat"],
             "pv_system_ids": ["pv"],
             "house_profile_id": "efh",
             "import_tariff_id": "imp",

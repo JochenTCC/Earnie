@@ -6,7 +6,7 @@ from settings.scenarios import normalize_scenario
 
 def test_normalize_scenario_defaults_enabled_true():
     out = normalize_scenario(
-        {"id": "live", "label": "Live", "settings": {"battery_id": "b1"}},
+        {"id": "live", "label": "Live", "settings": {"battery_ids": ["b1"]}},
         0,
     )
     assert out["enabled"] is True
@@ -19,7 +19,7 @@ def test_normalize_scenario_keeps_enabled_false():
             "id": "off",
             "label": "Off",
             "enabled": False,
-            "settings": {"battery_id": "b1"},
+            "settings": {"battery_ids": ["b1"]},
         },
         0,
     )
@@ -32,7 +32,7 @@ def test_normalize_scenario_keeps_own_reference_bool():
             "id": "x",
             "label": "X",
             "own_reference": True,
-            "settings": {"battery_id": "b1"},
+            "settings": {"battery_ids": ["b1"]},
         },
         0,
     )
@@ -42,7 +42,7 @@ def test_normalize_scenario_keeps_own_reference_bool():
             "id": "y",
             "label": "Y",
             "own_reference": False,
-            "settings": {"battery_id": "b1"},
+            "settings": {"battery_ids": ["b1"]},
         },
         1,
     )

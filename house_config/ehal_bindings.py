@@ -421,12 +421,26 @@ def resolve_plant_binding(
     ehal_field: str,
     config_doc: dict | None = None,
 ) -> str:
-    """Plant Merker from ``plant.ehal_bindings`` only (no ``loxone_blocks`` fallback)."""
+    """Plant Merker from ``plant.ehal_bindings`` plus battery Pattern B ESS (2.7.c)."""
     field = _nonempty(ehal_field)
     house = house_doc if isinstance(house_doc, dict) else {}
     plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
     bindings = plant.get("ehal_bindings") if isinstance(plant.get("ehal_bindings"), dict) else {}
-    return _nonempty(bindings.get(field))
+    direct = _nonempty(bindings.get(field))
+    if direct:
+        return direct
+    # Merge batteries[].ehal_bindings (ess.{slug}.* → flat aliases for primary)
+    try:
+        from house_config.components_store import load_components_document
+        from house_config.ess_bindings import merge_ess_bindings_into_plant
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        components = load_components_document(resolve_components_json_path())
+        batteries = components.get("batteries") if isinstance(components, dict) else []
+        merged = merge_ess_bindings_into_plant(bindings, batteries if isinstance(batteries, list) else [])
+        return _nonempty(merged.get(field))
+    except Exception:
+        return ""
 
 
 def _plant_bindings_empty(plant: dict) -> bool:

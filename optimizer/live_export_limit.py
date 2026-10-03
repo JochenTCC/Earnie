@@ -18,30 +18,39 @@ def load_house_doc() -> dict:
     return load_house_profiles_document(resolve_house_profiles_json_path())
 
 
-def live_unconstrained_export_kw() -> float | None:
-    """Plant export maximum written as "unconstrained" on the export-limit setpoint.
-
-    PV nameplate (sum of all PV systems) + max discharge power of the battery, counted
-    only when it can be force-discharged (``battery_control = full``).
-    TODO(2.7.c): with multiple ESS, sum the discharge power of every battery that
-    supports forced discharge (skip limits_only / read_only / one-way storages).
-    """
-    import config
+def _force_dischargeable_discharge_kw(battery_params: dict) -> float:
     from house_config.battery_control import (
         BATTERY_CONTROL_FULL,
         control_from_battery_params,
     )
 
-    battery_params = config.get_battery_params()
-    discharge_kw = 0.0
-    if control_from_battery_params(battery_params) == BATTERY_CONTROL_FULL:
-        discharge_kw = float(
-            battery_params.get(
-                "max_discharge_power_kw",
-                battery_params.get("max_power_kw") or 0.0,
-            )
-            or 0.0
+    if control_from_battery_params(battery_params) != BATTERY_CONTROL_FULL:
+        return 0.0
+    return float(
+        battery_params.get(
+            "max_discharge_power_kw",
+            battery_params.get("max_power_kw") or 0.0,
         )
+        or 0.0
+    )
+
+
+def live_unconstrained_export_kw() -> float | None:
+    """Plant export maximum written as "unconstrained" on the export-limit setpoint.
+
+    PV nameplate (sum of all PV systems) + max discharge power of every battery that
+    can be force-discharged (``battery_control = full``). Skips ``limits_only`` /
+    ``read_only`` (2.7.c). Powerstations (2.7.g/h) are not in the list yet.
+    """
+    import config
+
+    discharge_kw = 0.0
+    get_list = getattr(config, "get_battery_params_list", None)
+    if callable(get_list):
+        for bat in get_list() or []:
+            discharge_kw += _force_dischargeable_discharge_kw(bat)
+    else:
+        discharge_kw = _force_dischargeable_discharge_kw(config.get_battery_params())
     return physical_max_export_kw(config.get("PV_KWP", 0.0, float), discharge_kw)
 
 

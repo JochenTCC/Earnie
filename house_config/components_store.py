@@ -73,11 +73,17 @@ def _serialize_battery(spec: dict) -> dict:
         "battery_max_soc": spec["battery_max_soc"],
         "threshold_power": spec["threshold_power"],
         "limits_from_live": bool(spec.get("limits_from_live", False)),
+        "kind": str(spec.get("kind") or "battery_inverter"),
         "control": str(spec.get("control") or "full"),
     }
     standby = float(spec.get("standby_power_kw", 0.0) or 0.0)
     if standby > 0.0:
         out["standby_power_kw"] = standby
+    bindings = spec.get("ehal_bindings")
+    if isinstance(bindings, dict) and bindings:
+        out["ehal_bindings"] = {
+            str(k): str(v).strip() for k, v in bindings.items() if str(v or "").strip()
+        }
     wear = spec.get("battery_wear")
     if wear is not None:
         out["battery_wear"] = wear

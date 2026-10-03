@@ -15,7 +15,7 @@
     },
     "earnie_data_model": {
       "type": "integer",
-      "const": 3,
+      "const": 4,
       "description": "Earnie data-model version for config pack import/export."
     }
   },

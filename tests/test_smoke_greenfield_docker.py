@@ -47,7 +47,7 @@ def test_validate_greenfield_config_rejects_runtime_settings_block(tmp_path: Pat
     config_dir.mkdir()
     path = config_dir / "config.json"
     path.write_text(
-        json.dumps({"runtime_settings": {"battery_id": "b1", "pv_kwp": 10}}),
+        json.dumps({"runtime_settings": {"battery_ids": ["b1"], "pv_kwp": 10}}),
         encoding="utf-8",
     )
     ok, detail = smoke.validate_greenfield_config(path)
@@ -68,7 +68,7 @@ def test_validate_greenfield_config_accepts_live_scenario(tmp_path: Path):
                         "id": "live",
                         "label": "Live",
                         "settings": {
-                            "battery_id": "b1",
+                            "battery_ids": ["b1"],
                             "import_tariff_id": "t1",
                         },
                     }

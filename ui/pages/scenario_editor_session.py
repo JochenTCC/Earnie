@@ -107,15 +107,21 @@ def _seed_scenario_widget_state(
         settings.get("house_profile_id"),
         allow_none=True,
     )
-    seed_entity_select_state(
+    from house_config.entity_resolution import (
+        normalize_battery_ids,
+        normalize_pv_system_ids,
+    )
+
+    bat_settings = dict(settings)
+    if "battery_id" in bat_settings and "battery_ids" not in bat_settings:
+        bid = str(bat_settings.pop("battery_id") or "").strip()
+        bat_settings["battery_ids"] = [bid] if bid else []
+    seed_entity_multiselect_state(
         session_scope,
         "scenario_battery",
         batteries,
-        settings.get("battery_id"),
-        allow_none=True,
+        normalize_battery_ids(bat_settings),
     )
-    from house_config.entity_resolution import normalize_pv_system_ids
-
     seed_entity_multiselect_state(
         session_scope,
         "scenario_pv",

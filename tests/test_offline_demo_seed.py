@@ -71,7 +71,7 @@ def _prepare_cloud_like(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
                     "id": "live",
                     "label": "Live",
                     "settings": {
-                        "battery_id": "",
+                        "battery_ids": [],
                         "pv_system_ids": [],
                         "import_tariff_id": "",
                         "export_tariff_id": "",
@@ -150,7 +150,7 @@ def test_seed_fills_empty_live_refs(tmp_path, monkeypatch):
         )
     )
     settings = doc["scenarios"][0]["settings"]
-    assert settings["battery_id"] == "10_kwh_speicher"
+    assert settings["battery_ids"] == ["10_kwh_speicher"]
     assert settings["pv_system_ids"] == ["dach_sued"]
     assert settings["import_tariff_id"] == "awattar_at"
     assert settings["export_tariff_id"] == "fixed_37ct"
@@ -163,13 +163,13 @@ def test_seed_does_not_overwrite_existing_refs(tmp_path, monkeypatch):
     path = root / "earnie_env" / "config" / "backtesting_scenarios.json"
     doc = json.loads(path.read_text(encoding="utf-8"))
     doc["scenarios"][0]["settings"]["export_tariff_id"] = "fixed_37ct"
-    doc["scenarios"][0]["settings"]["battery_id"] = "keep_me"
+    doc["scenarios"][0]["settings"]["battery_ids"] = ["keep_me"]
     path.write_text(json.dumps(doc), encoding="utf-8")
 
     offline_demo_seed.seed_offline_live_scenario()
 
     settings = json.loads(path.read_text(encoding="utf-8"))["scenarios"][0]["settings"]
-    assert settings["battery_id"] == "keep_me"
+    assert settings["battery_ids"] == ["keep_me"]
     assert settings["export_tariff_id"] == "fixed_37ct"
     assert settings["import_tariff_id"] == "awattar_at"
 

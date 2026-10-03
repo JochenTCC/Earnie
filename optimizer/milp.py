@@ -54,9 +54,28 @@ logger = logging.getLogger(__name__)
 _AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN, {})
 
 
+def _default_battery_params() -> dict | list[dict]:
+    """Prefer multi-ESS list (2.7.c); fall back to singular snapshot."""
+    get_list = getattr(config, "get_battery_params_list", None)
+    if callable(get_list):
+        batteries = get_list()
+        if batteries:
+            return batteries
+    return config.get_battery_params()
+
+
+def _primary_battery_params(battery_params: dict | list[dict]) -> dict:
+    from .milp_horizon import aggregate_battery_params_for_load, coerce_battery_params_list
+
+    batteries = coerce_battery_params_list(battery_params)
+    if not batteries:
+        return battery_params if isinstance(battery_params, dict) else {}
+    return aggregate_battery_params_for_load(batteries)
+
+
 def _build_milp_model_with_objective(
     matrix: list[dict[str, Any]],
-    battery_params: dict,
+    battery_params: dict | list[dict],
     current_soc: float,
     k_push: float,
     inputs: _MilpInputs,
@@ -91,9 +110,11 @@ def _build_milp_model_with_objective(
         export_caps_kw=caps,
     )
     wear_cent_per_kwh = 0.0
-    if battery_params["battery_capacity_kwh"] > 0.0:
+    primary = _primary_battery_params(battery_params)
+    if float(primary.get("battery_capacity_kwh") or 0.0) > 0.0:
+        # Wear from primary ESS capacity (multi-ESS wear refinement later).
         wear_cent_per_kwh = config.get_battery_wear_cent_per_kwh(
-            battery_params["battery_capacity_kwh"]
+            float(primary["battery_capacity_kwh"])
         )
     _add_milp_objective(
         model,
@@ -144,7 +165,7 @@ def _add_flex_side_constraints(
 def _add_soc_anchor_constraints(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
-    battery_params: dict,
+    battery_params: dict | list[dict],
     current_soc: float,
     verbose: bool,
     *,
@@ -154,6 +175,7 @@ def _add_soc_anchor_constraints(
     terminal_soc_percent: float | None,
 ) -> None:
     """SOC-Anker in Vorrangfolge: Hold-Slot, PV-only bis Sonnenaufgang, End-SoC."""
+    battery_params = _primary_battery_params(battery_params)
     if soc_hold_index is not None and soc_hold_percent is not None:
         e_hold = (float(soc_hold_percent) / 100.0) * battery_params[
             "battery_capacity_kwh"
@@ -200,7 +222,7 @@ def _add_soc_anchor_constraints(
 def _solve_milp_to_model(
     matrix: list[dict[str, Any]],
     current_soc: float,
-    battery_params: dict,
+    battery_params: dict | list[dict],
     k_push: float,
     verbose: bool,
     consumers: list | None,
@@ -342,7 +364,7 @@ def milp_optimizer(
     matrix: list[dict[str, Any]],
     current_hour: int,
     current_soc: float,
-    battery_params: dict | None = None,
+    battery_params: dict | list[dict] | None = None,
     k_push: float | None = None,
     verbose: bool = True,
     consumers: list | None = None,
@@ -367,10 +389,13 @@ def milp_optimizer(
     Rückgabe: (mode, target_power, target_soc, {consumer_id: leistung_kw},
                {consumer_id: pv_follow 0|1}, milp_plan, urgent_observability)
     """
-    battery_params = battery_params or config.get_battery_params()
+    battery_params = (
+        battery_params if battery_params is not None else _default_battery_params()
+    )
+    primary = _primary_battery_params(battery_params)
     trivial = _try_trivial_milp_skip(
         matrix,
-        battery_params,
+        primary,
         consumers,
         consumer_remaining_kwh,
         spa_remaining_kwh,
@@ -405,7 +430,7 @@ def milp_optimizer(
 
     model, preset_by_slot, remaining, schedule_indices, contexts, filters = solved
     controls = _extract_optimizer_controls_from_model(
-        model, matrix, preset_by_slot, current_soc, battery_params
+        model, matrix, preset_by_slot, current_soc, primary
     )
     urgent_observability = _collect_urgent_rule_observability(
         model, matrix, remaining, schedule_indices, contexts, filters
@@ -431,7 +456,7 @@ def milp_optimizer(
 def milp_horizon_schedule(
     matrix: list[dict[str, Any]],
     current_soc: float,
-    battery_params: dict | None = None,
+    battery_params: dict | list[dict] | None = None,
     k_push: float | None = None,
     verbose: bool = False,
     consumers: list | None = None,
@@ -455,11 +480,14 @@ def milp_horizon_schedule(
 
     Bei leerer Matrix oder nicht-optimalem Solve: ein Fallback-Slot (Automatik).
     """
-    battery_params = battery_params or config.get_battery_params()
+    battery_params = (
+        battery_params if battery_params is not None else _default_battery_params()
+    )
+    primary = _primary_battery_params(battery_params)
     if (
         _try_trivial_milp_skip(
             matrix,
-            battery_params,
+            primary,
             consumers,
             consumer_remaining_kwh,
             spa_remaining_kwh,
@@ -493,7 +521,7 @@ def milp_horizon_schedule(
     if solved is None:
         return [dict(_FALLBACK_SCHEDULE_SLOT)]
     model, preset_by_slot, _, _, _, _ = solved
-    return extract_horizon_schedule(model, battery_params, preset_by_slot)
+    return extract_horizon_schedule(model, primary, preset_by_slot)
 
 
 # Re-Exports für Tests und interne Aufrufer (API-Stabilität).

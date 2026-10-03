@@ -503,7 +503,12 @@ def test_bootstrap_no_longer_soft_fills_oemag_from_template(tmp_path, monkeypatc
     # Stamp may bump earnie_data_model; must not invent OeMAG keys.
     assert "oemag_monthly_feed_in_rates" not in doc
     assert "monthly_float_reference_cent_kwh" not in doc
-    assert tariffs.read_text(encoding="utf-8") != before or doc.get("earnie_data_model") == 3
+    from runtime_store.data_model import CURRENT_DATA_MODEL
+
+    assert (
+        tariffs.read_text(encoding="utf-8") != before
+        or doc.get("earnie_data_model") == CURRENT_DATA_MODEL
+    )
 
 
 def test_subprocess_env_passes_cloud_session_root(monkeypatch, tmp_path):

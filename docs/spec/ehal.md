@@ -59,7 +59,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 | `set_evcs_max_current` / `get_evcs_nominal_current`                                                                                                | **A** | Non-negative                                                                          |
 
 
-**Export limit "unconstrained" (2.7.a):** sticky backends always receive a number on `set_grid_export_power_limit`. When no cap applies, Earnie writes the plant's physical export maximum = **sum of PV nameplate (kWp)** + **max discharge power of every battery that supports forced discharge** (`battery_control = full`). Fallback when both are unknown: `1 000 000` W. Multi-ESS (**2.7.c**) must extend the battery sum.
+**Export limit "unconstrained" (2.7.a / 2.7.c):** sticky backends always receive a number on `set_grid_export_power_limit`. When no cap applies, Earnie writes the plant's physical export maximum = **sum of PV nameplate (kWp)** + **sum of max discharge power of every selected battery that supports forced discharge** (`battery_control = full`; skip `limits_only` / `read_only`). Fallback when both are unknown: `1 000 000` W. ESS bindings use Pattern B `ess.{slug}.*` on `batteries[].ehal_bindings`.
 
 **Grid (**`sens_grid_power_active`**):** `+` = grid **import** (Bezug), `−` = **export** (Einspeisung). Adapters normalize hub-native signs before emit.
 

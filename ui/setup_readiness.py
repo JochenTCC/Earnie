@@ -155,14 +155,22 @@ def _user_fixed_cent_ok(value, *, require_positive: bool) -> bool:
 
 
 def _missing_live_battery_items(live_settings: dict, components_path: str) -> list[str]:
-    battery_id = str(live_settings.get("battery_id", "") or "").strip()
+    from house_config.entity_resolution import normalize_battery_ids
+
+    settings = dict(live_settings)
+    if "battery_id" in settings and "battery_ids" not in settings:
+        bid = str(settings.pop("battery_id") or "").strip()
+        settings["battery_ids"] = [bid] if bid else []
+    else:
+        settings.pop("battery_id", None)
+    battery_ids = normalize_battery_ids(settings)
     components_doc = _read_json_document(components_path)
     batteries = {
         str(item.get("id", "")).strip()
         for item in components_doc.get("batteries", [])
         if isinstance(item, dict) and item.get("id")
     }
-    if not battery_id or battery_id not in batteries:
+    if not battery_ids or any(bat_id not in batteries for bat_id in battery_ids):
         return ["Batterie für Live-Szenario wählen (Echtzeit-Umgebung)"]
     return []
 

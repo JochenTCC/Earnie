@@ -175,7 +175,7 @@
             "supplier_id": "monatliche_testwerte"
         }
     ],
-    "earnie_data_model": 3,
+    "earnie_data_model": 4,
     "econtrol_referenzmarktwert_pv_monthly": [
         {
             "year": 2025,

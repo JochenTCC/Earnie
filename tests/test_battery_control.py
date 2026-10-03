@@ -59,7 +59,7 @@ def test_normalize_battery_control_rejects_unknown():
 def test_resolve_battery_carries_control():
     bat = normalize_battery(_battery_raw(control="read_only"), 0)
     resolved = resolve_battery_into_settings(
-        {"battery_id": "b1"}, {"b1": bat}
+        {"battery_ids": ["b1"]}, {"b1": bat}
     )
     assert resolved["battery_control"] == BATTERY_CONTROL_READ_ONLY
 

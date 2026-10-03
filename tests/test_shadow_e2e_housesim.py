@@ -81,7 +81,7 @@ def test_housesim_prod_records_and_shadow_replays(monkeypatch, tmp_path):
             {
                 "feed_schema": 1,
                 "earnie_version": "2.6.0",
-                "earnie_data_model": 3,
+                "earnie_data_model": 4,
                 "ehal_backend": "ha",
                 "prod_runtime_dir": str(tmp_path / "prod_rt"),
                 "heartbeat_ts": hb,

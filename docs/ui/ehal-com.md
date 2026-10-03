@@ -114,6 +114,8 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 ### C.2 ESS (Battery)
 
+**Multi-ESS (2.7.c):** bindings live on `batteries[].ehal_bindings` as Pattern B `ess.{slug}.sens_ess_soc` / `set_ess_*` / `get_ess_*` (slug = battery id). Plant flat `sens_ess_*` remains a primary-battery alias after migrate.
+
 
 | Area / meaning                  | Type          | EHAL value name                                              | OpenEMS                                       | evcc (YAML attribute)          | Victron GX / EVCS (Modbus)                                                                                              | Loxone / Loxone extra                                        |
 | ---------------------------------- | --------------- | ---------------------------------------------------------------- | --------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |

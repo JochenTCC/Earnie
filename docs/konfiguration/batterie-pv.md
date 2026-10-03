@@ -2,7 +2,7 @@
 
 Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in `earnie_env/config/components.json` (`batteries[]`, `pv_systems[]`).
 
-Ein Szenario kann **mehrere PV-Anlagen** referenzieren (`pv_system_ids`). Die Prognose und die Optimierung nutzen die **Summe** aller Anlagen.
+Ein Szenario kann **mehrere PV-Anlagen** referenzieren (`pv_system_ids`) und **mehrere Batterien** (`battery_ids`, 2.7.c). Die Prognose und die Optimierung nutzen die **Summe** aller Anlagen bzw. aller gewählten Speicher.
 
 Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 
@@ -14,6 +14,8 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | Parameter               | Einheit  | Quelle                               | Bedeutung                                                                                                                             |
 | ----------------------- | -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `pv_system_ids`         | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf `pv_systems[].id`                                                                                    |
+| `battery_ids`           | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf `batteries[].id` (2.7.c; ersetzt `battery_id`)                                                      |
+| `kind`                  | enum     | `components.json` → `batteries[]`    | Topologie: `battery_inverter` (Automatik/Optimieren) oder `isolated` (nur Laden/Entladen/Standby)                                    |
 | `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung je Anlage; aufgelöst als Summe `pv_kwp`                                                                      |
 | `pv_tilt`               | °        | `components.json` → `pv_systems[]`   | Dachneigung **je Anlage** (bei mehreren Anlagen keine einzelne Globalneigung)                                                         |
 | `pv_azimuth`            | °        | `components.json` → `pv_systems[]`   | Ausrichtung je Anlage: `0` = Süd, `-90` = Ost, `90` = West                                                                            |
@@ -36,6 +38,15 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 
 Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
 
+## Topologie (`kind`, 2.7.c)
+
+| Wert | Product modes | Wire |
+|------|---------------|------|
+| `battery_inverter` (Default) | optimizing / charging / discharging | Design C1 inkl. Automatik (`set_ess_mode = 0`) |
+| `isolated` | charging / discharging / standby | Nie Automatik; Hold als Standby/Entladesperre |
+
+EHAL-Bindings je Batterie: Pattern B `ess.{slug}.*` in `batteries[].ehal_bindings` (nicht mehr nur plant-flach).
+
 ## Steuerbarkeit (`control`)
 
 | Wert | MILP | Live-Setpoints |
@@ -45,6 +56,8 @@ Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active`. Di
 | `read_only` | Eigenverbrauch-Kopplung (kein freier Fahrplan) | Keine ESS-Setpoints |
 
 Wenn `control` mehr verlangt als das EHAL-Mapping hergibt (z. B. `full` ohne `set_ess_active_power` und ohne `plant.ha_ess_force`), warnt EHAL-Com. Huawei ohne Wirkleistungs-Entity: optional `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`) — siehe [EHAL-Spec](../spec/ehal.md) und [EHAL-Com](../ui/ehal-com.md).
+
+Einspeise-„unconstrained“-Wert = PV-kWp-Summe + Summe der Max-Entladeleistung aller gewählten Batterien mit `control = full`.
 
 
 ## SOC-Verhalten
@@ -84,7 +97,7 @@ Editierbar im Hauskonfigurator unter **Batterien** per Checkbox "Verschleiß ber
 
 ## Live-Szenario vs. `config.json`
 
-In der App (Seite **Szenarienkonfigurator**) werden Entitäts-Referenzen für das Live-Szenario gewählt (PV als Mehrfachauswahl). Gespeichert wird das Live-Szenario in `backtesting_scenarios.json` (`live_scenario_id` in `config.json`, Standard: `live`). PV- und Batterie-Entitäten selbst pflegt man im **Hauskonfigurator**. Die Bezeichnung des Live-Szenarios ist fest.
+In der App (Seite **Szenarienkonfigurator**) werden Entitäts-Referenzen für das Live-Szenario gewählt (PV und Batterien als Mehrfachauswahl). Gespeichert wird das Live-Szenario in `backtesting_scenarios.json` (`live_scenario_id` in `config.json`, Standard: `live`). PV- und Batterie-Entitäten selbst pflegt man im **Hauskonfigurator**. Die Bezeichnung des Live-Szenarios ist fest.
 
 ## Szenarien
 

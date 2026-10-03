@@ -363,6 +363,7 @@ def load_full_runtime_params(
         "PV_AZIMUTH": float(resolved.get("pv_azimuth", 0.0) or 0.0),
         "PV_KWP": float(resolved.get("pv_kwp", 0.0) or 0.0),
         "_planning_pv_systems": _planning_pv_systems_from_resolved(resolved),
+        "_planning_batteries": list(resolved.get("_planning_batteries") or []),
         "BATTERY_MAX_POWER_KW": float(
             lookup_runtime_value(resolved, "battery_max_power_kw", config_path)
         ),
@@ -395,6 +396,10 @@ def load_full_runtime_params(
             resolved.get("battery_control") or "full"
         ).strip().lower()
         or "full",
+        "BATTERY_KIND": str(
+            resolved.get("battery_kind") or "battery_inverter"
+        ).strip().lower()
+        or "battery_inverter",
         "BATTERY_LIMITS_FROM_LIVE": bool(resolved.get("limits_from_live", False)),
         "THRESHOLD_POWER": validate_threshold_power(
             lookup_runtime_value(resolved, "threshold_power", config_path)

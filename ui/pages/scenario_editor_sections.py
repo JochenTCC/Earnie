@@ -263,10 +263,9 @@ def _render_scenario_entity_picks(ctx: dict) -> dict:
                 "Bitte Land im Hauskonfigurator (Standort) setzen."
             )
 
-    battery_pick = render_entity_selectbox(
-        "Batterie",
+    battery_picks = render_entity_multiselect(
+        "Batterien",
         ctx["batteries"],
-        allow_none=True,
         key=scoped_widget_key(session_scope, "scenario_battery"),
         container=battery_col,
     )
@@ -279,7 +278,8 @@ def _render_scenario_entity_picks(ctx: dict) -> dict:
     _render_imported_pv_option(session_scope, selected_profile)
     return {
         "prof_pick": prof_pick,
-        "battery_pick": battery_pick,
+        "battery_pick": battery_picks,
+        "battery_picks": battery_picks,
         "pv_picks": pv_picks,
         "selected_profile_id": selected_profile_id,
         "selected_profile": selected_profile,
@@ -311,8 +311,15 @@ def _scenario_persist_payload(
     user_import_cent, user_export_cent = _user_fixed_cents_from_session(
         session_scope, import_tariff_id, export_tariff_id
     )
+    battery_picks = picks.get("battery_picks") or picks.get("battery_pick") or []
+    if isinstance(battery_picks, str):
+        battery_picks = [battery_picks]
     settings = build_scenario_settings(
-        battery_id=lookup_entity_id(ctx["bat_map"], picks["battery_pick"]),
+        battery_ids=[
+            lookup_entity_id(ctx["bat_map"], pick)
+            for pick in battery_picks
+            if lookup_entity_id(ctx["bat_map"], pick)
+        ],
         pv_system_ids=[
             lookup_entity_id(ctx["pv_map"], pick)
             for pick in picks["pv_picks"]
