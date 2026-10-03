@@ -2,6 +2,23 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.6 - Enhancements for HA coupling (2026-10-03)
+
+- [x] **Version 2.6 — Enhancements for HA coupling** (chapter closed; official **2.6.0** on `main`, supersedes **2.5.3** on `:latest`)
+  - Scope: easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items in [Backlog.md](Backlog.md). Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
+  - Documents: [House simulator spec](../docs/spec/house-sim.md) (HouseSim S1–S4); [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md); [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) (channel work **2.6.k**)
+  - Letter archive: **2.6.a**…**2.6.p**, **2.6.r**, alphas through **2.6.0-alpha.12**, and official **2.6.0** — see sections below in this file
+
+### 2.7.j — Additional ESS parameters (2026-10-03)
+
+- [x] **2.7.j — Additional ESS parameters**
+  - Four plant EHAL **reads** (W / %), HK switch `limits_from_live` on `batteries[]`; plant bindings until **2.7.c** namespaces multi-ESS:
+    - `get_ess_soc_min` / `get_ess_soc_max` [%] — read/MILP only (no `set_ess_soc_*`); Huawei LUNA 47082 / 47081
+    - `get_ess_max_charge_power` / `get_ess_max_discharge_power` [W ≥ 0]; Huawei LUNA 47075 / 47077
+    - Cycle writes reuse existing `set_ess_*_power_limit` (W)
+  - HK: per-ESS “Grenzwerte … übernehmen” (`limits_from_live`); split `battery_max_power_kw` → `battery_max_charge_power_kw` / `battery_max_discharge_power_kw` (legacy migrate on load; persist split fields in `components_store._serialize_battery`)
+  - Wired through Loxone / HA / OpenEMS adapters, `share/ehal/roles/ess.json`, telemetry schema, EHAL-Com mapping and docs
+
 ### Bugfix Negative export tariff + battery discharge (2026-10-02)
 
 - [x] **Negative export tariff + battery discharge** — Soft pay-to-export live dogfood closed with **2.7.a** (2026-09-30). Live verification: plan vs live discharge when `k_push` is negative. PV curtailment var for hard cap when SoC full remains optional hardening if the cap becomes infeasible at full SoC.

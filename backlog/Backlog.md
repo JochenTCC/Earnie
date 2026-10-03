@@ -16,36 +16,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
-### Version 2.6 - Enhancements for HA coupling
-
-**Versioning note:** Official **2.6.0** is the HA-coupling MINOR (supersedes **2.5.3** on `:latest`). Alpha compose still pins last community candidate **`2.6.0-alpha.12`** until the next pre-release bump. This branch keeps `version.py` at **`2.7.0-dev`** until an approved 2.7 bump.
-
-**Next:** On this branch: **2.7.c** … **2.7.e**. Shadow Prod recorder (**2.6.o**), Shadow client (**2.7.f**), **2.7.a** (export limit + dogfood), **2.7.b** (Thermals P2), user-fixed tariffs, and absent EHAL on all backends (**2.6.p**) are done. Official **2.6.0** is on `main`.
-
-**Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
-
-**Documents:**
-
-- [House simulator spec](../docs/spec/house-sim.md) — HouseSim S1–S4 (archetypes, core, S4 integration)
-- [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**
-- [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — add-on packaging items; channel work is now **2.6.k**
-
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.j** → **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
-
-- [ ] **2.7.j — Additional ESS parameters**
-  - Four plant EHAL **reads** (W / %), same HK switch `limits_from_live` on `batteries[]`; plant bindings until **2.7.c** namespaces multi-ESS:
-    - `get_ess_soc_min` [%] — Huawei LUNA: 47082, U16, gain 10 (discharge cut-off); **read/MILP only** (no `set_ess_soc_*`)
-    - `get_ess_soc_max` [%] — Huawei LUNA: 47081, U16, gain 10 (charge cut-off); **read/MILP only**
-    - `get_ess_max_charge_power` [W, magnitude ≥ 0] — Huawei LUNA: 47075, U32, gain 1
-    - `get_ess_max_discharge_power` [W, magnitude ≥ 0] — Huawei LUNA: 47077, U32, gain 1
-    - Cycle writes reuse existing `set_ess_*_power_limit` (W); registers read via `testmodcom.py` (not yet cross-checked against a Huawei PDF covering 47xxx)
-  - House configurator (HK): per ESS checkbox “take values from inverter / battery in live operation” (`limits_from_live`)
-    - When checked: live `get_*` → MILP limits, `set_ess_*_power_limit` caps, unconstrained export (discharge side); fallback HK if mapping absent
-    - When not checked: HK values → MILP; power caps written via `set_ess_*_power_limit`; SOC stays Earnie/MILP only
-    - Split `battery_max_power_kw` → `battery_max_charge_power_kw` / `battery_max_discharge_power_kw` (legacy migrate)
-  - Wire through Loxone / HA / OpenEMS adapters, `share/ehal/roles/ess.json`, `telemetry.schema.json`, EHAL-Com mapping and docs
+**Order:** **2.7.c** → **2.7.g** → **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.j** (additional ESS parameters), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
 
 - [ ] **2.7.c — Multiple isolated battery / battery+inverter entities** (bidirectional)
   - Isolated battery modes: charging / discharging / standby
@@ -54,7 +27,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` writes PV kWp sum + max discharge of the single battery (only when `battery_control = full`). With multi-ESS, sum the max discharge power of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / physical powerstations from **2.7.g**/**2.7.h** that cannot feed the house grid); update `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md` accordingly
   - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
   - Downstream: Loxone template XML gen and HouseSim scenario import should gain multi-battery support after this letter
-
 
 - [ ] improve prognosis for EV coming back (connecting for charging)
   - Take schedule from config as start
@@ -84,14 +56,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Bridging path** when Earnie stays on `ehal.backend=loxone` (no native HA southbound): Merker `Earnie_Speicher_Quellenwahl`, written by Earnie via `VI_Earnie_Plant.xml`-style poll, mirrored to HA via a Virtual-Output webhook — same pattern as `set_ess_charge_power_limit` in `docs/referenz/loxone-signals.md`.
   - Spec write-up: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.2 in the `Earnie-Projekt` docs repo.
 
-- [ ] **2.7.e — Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–c** / **2.7.g–h**)
-  - **Today:** display range depends on device (`ui/s2_viewport.py`: phone = 24 h segments, desktop/tablet = SA₀→SA₂). Charts get only the data of that default range. Panning with the Plotly drag/pan tool beyond it shows an empty chart. Navigation is via buttons / date picker (`ui/history_navigation.py`, `ui/s2_navigation.py`).
-  - **Option A — pan-driven lazy loading:** panning replaces the nav buttons. Data for newly visible ranges is fetched step by step and appended to the charts.
-  - **Option B — coupling:** keep the buttons, but sync them with the pan position (pan past the edge → switch segment/cycle; button → move the Plotly x-range). Optionally preload neighbouring segments (±1) so short pans never show empty areas.
-  - **Feasibility to check:** Streamlit `st.plotly_chart` does not return `relayout` (x-range) events — only selections. Needs a custom component, `streamlit-plotly-events`-style bridge or a debounced rerun trigger. Check rerun cost/latency per pan, keeping all S-2 charts (flow, SoC, cumulative, consumer stack) on the same x-axis, zone/SA marker decorations outside the default range, and memory/load time on the Pi/Synology.
-  - **Usability to check:** touch pan vs page scroll on phones, discoverability vs explicit buttons, behaviour at log start / live edge ("Heute"), loading indicator while data is fetched.
-  - **Outcome:** short spike on a branch (prototype for one chart, then all), test on desktop + phone, then decide: A, B, preload-only, or keep status quo. Record decision here before any productive implementation.
-
 - [ ] **2.7.i — Release regression suite (golden-master cases, public + private data)** (epic **Regression**; independent of **2.7.a–h**; spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md))
   - Goal: Earnie's behaviour must not change unnoticed between releases. Frozen inputs (config, consumption, prices, PV forecast, start state) → offline deterministic run → compact metrics → compare against committed golden. Runs **before a release / publish**, never per commit (pytest marker `regression`, deselected by default).
   - Data split: runner + synthetic/own cases in the public repo (`tests/regression/cases/`); customer cases in a **private repo** `Earnie-regression-private` (never in the public repo or its history). Public issues reference a case only by ID (`REG-<issue>-<slug>`); report records the SHA of the private repo.
@@ -103,7 +67,15 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.+1 (maybe also part of 2.7?)
 
-- [ ] Enable multiple EV / Wallboxes *(reuse Pattern B namespacing approach from **2.7.c** multi-ESS)*
+- [ ] **Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–c** / **2.7.g–h**)
+  - **Today:** display range depends on device (`ui/s2_viewport.py`: phone = 24 h segments, desktop/tablet = SA₀→SA₂). Charts get only the data of that default range. Panning with the Plotly drag/pan tool beyond it shows an empty chart. Navigation is via buttons / date picker (`ui/history_navigation.py`, `ui/s2_navigation.py`).
+  - **Option A — pan-driven lazy loading:** panning replaces the nav buttons. Data for newly visible ranges is fetched step by step and appended to the charts.
+  - **Option B — coupling:** keep the buttons, but sync them with the pan position (pan past the edge → switch segment/cycle; button → move the Plotly x-range). Optionally preload neighbouring segments (±1) so short pans never show empty areas.
+  - **Feasibility to check:** Streamlit `st.plotly_chart` does not return `relayout` (x-range) events — only selections. Needs a custom component, `streamlit-plotly-events`-style bridge or a debounced rerun trigger. Check rerun cost/latency per pan, keeping all S-2 charts (flow, SoC, cumulative, consumer stack) on the same x-axis, zone/SA marker decorations outside the default range, and memory/load time on the Pi/Synology.
+  - **Usability to check:** touch pan vs page scroll on phones, discoverability vs explicit buttons, behaviour at log start / live edge ("Heute"), loading indicator while data is fetched.
+  - **Outcome:** short spike on a branch (prototype for one chart, then all), test on desktop + phone, then decide: A, B, preload-only, or keep status quo. Record decision here before any productive implementation.
+  
+  - [ ] Enable multiple EV / Wallboxes *(reuse Pattern B namespacing approach from **2.7.c** multi-ESS)*
   - Parametrize EVs as now (+ sensors)
   - Parametrize Wallboxes 
     - Max power
