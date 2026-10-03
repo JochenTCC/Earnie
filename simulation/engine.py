@@ -199,10 +199,26 @@ def window_slot_datetimes(anchor: datetime) -> list[datetime]:
     return [start + step * i for i in range(n)]
 
 
-def _scenario_to_battery_params(scenario_params: dict) -> dict:
-    """Übersetzt JSON-Szenario-Parameter in das Format des Optimizers."""
+def _scenario_to_battery_params(scenario_params: dict) -> dict | list[dict]:
+    """Übersetzt JSON-Szenario-Parameter in das Format des Optimizers.
+
+    Multi-ESS (2.7.c): when ``_planning_batteries`` has 2+ entries, return a list
+    so SE/MILP/chart SoC keep per-battery identity. Singular scenarios stay a dict.
+    """
     from house_config.battery_control import DEFAULT_BATTERY_CONTROL, control_from_battery_params
-    from house_config.entity_resolution import split_battery_max_power_kw
+    from house_config.entity_resolution import (
+        battery_params_from_planning,
+        split_battery_max_power_kw,
+    )
+
+    planning = scenario_params.get("_planning_batteries")
+    planning_list = (
+        [entry for entry in planning if isinstance(entry, dict)]
+        if isinstance(planning, list)
+        else []
+    )
+    if len(planning_list) >= 2:
+        return [battery_params_from_planning(entry) for entry in planning_list]
 
     control_raw = scenario_params.get("battery_control", scenario_params.get("control"))
     charge_kw, discharge_kw = split_battery_max_power_kw(scenario_params)
@@ -300,7 +316,7 @@ def _critical_snapshot_kind(
 class _SimulationRunInit:
     """Szenario-abgeleitete Laufparameter und die aktiven Solver-Overrides."""
 
-    battery_params: dict
+    battery_params: dict | list[dict]
     flexible_consumers: list
     feed_in_settings: feed_in_prices.FeedInSettings
     total_hours: float
@@ -315,7 +331,7 @@ class _AnchorRunConfig:
     cache: HistoricalDataCache
     prices_df: pd.DataFrame
     scenario_params: dict
-    battery_params: dict
+    battery_params: dict | list[dict]
     feed_in_settings: feed_in_prices.FeedInSettings
     price_resources: BacktestingPriceResources | None
     scenario_id: str | None
@@ -456,9 +472,14 @@ def _process_anchor_window(
         set_cbc_milp_context(
             consumer_targets_kwh=dict(step.meta["consumer_daily_targets_kwh"]),
         )
-    step.meta["standby_power_kw"] = float(
-        cfg.battery_params.get("standby_power_kw") or 0.0
-    )
+    if isinstance(cfg.battery_params, list):
+        step.meta["standby_power_kw"] = float(
+            sum(float(b.get("standby_power_kw") or 0.0) for b in cfg.battery_params)
+        )
+    else:
+        step.meta["standby_power_kw"] = float(
+            cfg.battery_params.get("standby_power_kw") or 0.0
+        )
     plausibility_result = validate_window_consumption(step.chart_rows, step.meta)
     plausibility.add(plausibility_result)
     if collect_snapshots:

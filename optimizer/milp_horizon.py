@@ -89,6 +89,7 @@ class MilpHorizonModel:
     p_discharge_by_ess: dict[str, list] | None = None
     e_batt_by_ess: dict[str, list] | None = None
     battery_params_by_id: dict[str, dict] | None = None
+    p_pv_curtail: list | None = None
 
 
 def _normalize_fixed_flex_by_t(
@@ -115,6 +116,7 @@ class _GridBatteryVars:
     p_grid_sell: list
     p_charge: list
     p_discharge: list
+    p_pv_curtail: list
     e_batt: list
     delta_charge: list
     delta_import: list
@@ -214,6 +216,16 @@ def _create_grid_battery_vars(
         pulp.LpVariable(f"p_discharge_{t}", lowBound=0, upBound=max_discharge_sum)
         for t in range(horizon)
     ]
+    # Feasible sink when export is hard-capped (pay-to-export / plant limit) but PV
+    # exceeds load + charge — without this the power balance is Infeasible.
+    p_pv_curtail = [
+        pulp.LpVariable(
+            f"p_pv_curtail_{t}",
+            lowBound=0,
+            upBound=max(0.0, float(matrix[t].get("expected_p_pv") or 0.0)),
+        )
+        for t in range(horizon)
+    ]
     primary_id = ess_ids[0]
     e_batt = e_batt_by_ess[primary_id]
     delta_charge = delta_charge_by_ess[primary_id]
@@ -232,6 +244,7 @@ def _create_grid_battery_vars(
         p_grid_sell=p_grid_sell,
         p_charge=p_charge,
         p_discharge=p_discharge,
+        p_pv_curtail=p_pv_curtail,
         e_batt=e_batt,
         delta_charge=delta_charge,
         delta_import=delta_import,
@@ -370,7 +383,11 @@ def _add_slot_power_balance_and_soc(
         )
     prob += (
         p_pv + p_grid_buy[t] + p_discharge[t]
-        == p_con + p_flex + p_grid_sell[t] + p_charge[t]
+        == p_con
+        + p_flex
+        + p_grid_sell[t]
+        + p_charge[t]
+        + grid_vars.p_pv_curtail[t]
     )
     prob += p_grid_buy[t] <= big_m_grid * delta_import[t]
     sell_upper = big_m_grid
@@ -565,6 +582,7 @@ def _build_milp_model(
         p_discharge_by_ess=dict(grid_vars.p_discharge_by_ess),
         e_batt_by_ess=dict(grid_vars.e_batt_by_ess),
         battery_params_by_id=dict(grid_vars.battery_params_by_id),
+        p_pv_curtail=list(grid_vars.p_pv_curtail),
     )
 
 
@@ -661,6 +679,12 @@ def _add_milp_objective(
             model.p_charge[t] + model.p_discharge[t]
             for t in range(model.horizon)
         )
+    # Prefer export over free curtail when k_push ≈ 0; still << real tariffs.
+    curtail_cost = 0.0
+    if model.p_pv_curtail:
+        curtail_cost = 1e-4 * dt_h * pulp.lpSum(
+            model.p_pv_curtail[t] for t in range(model.horizon)
+        )
     tie_break = 0.0
     for cid, ev_params in (ev_milp_params_by_id or {}).items():
         if cid not in model.consumer_on:
@@ -671,4 +695,4 @@ def _add_milp_objective(
         tie_break += eps_on * pulp.lpSum(on_vars) + eps_time * pulp.lpSum(
             t * on_vars[t] for t in range(len(on_vars))
         )
-    model.prob += energy_cost + wear_cost + tie_break
+    model.prob += energy_cost + wear_cost + curtail_cost + tie_break

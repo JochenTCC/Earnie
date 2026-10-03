@@ -90,6 +90,52 @@ def thermal_daily_kwh_for_date(
     return 0.0
 
 
+def _slot_aligned_thermal_energy_kwh(
+    source: dict,
+    matrix: list,
+    *,
+    climate: ModeledClimateContext | None = None,
+) -> list[float]:
+    """Modeled thermal kWh per matrix slot (same basis as profile_spec)."""
+    from data.consumption_profiles import modeled_consumer_kw_at_datetime
+    from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw, validate_dt_h
+
+    validate_dt_h(DEFAULT_DT_H)
+    energies: list[float] = []
+    for row in matrix:
+        slot_dt = row.get("slot_datetime")
+        if slot_dt is None:
+            energies.append(0.0)
+            continue
+        energies.append(
+            float(
+                energy_kwh_from_kw(
+                    [
+                        modeled_consumer_kw_at_datetime(
+                            source, slot_dt, climate=climate
+                        )
+                        or 0.0
+                    ]
+                )
+            )
+        )
+    return energies
+
+
+def _daily_targets_from_slot_energy(
+    matrix: list, slot_energy_kwh: list[float]
+) -> dict[date, float]:
+    daily: dict[date, float] = {}
+    for index, row in enumerate(matrix):
+        if index >= len(slot_energy_kwh):
+            break
+        day = row.get("date")
+        if not isinstance(day, date):
+            continue
+        daily[day] = daily.get(day, 0.0) + float(slot_energy_kwh[index])
+    return {day: round(kwh, 3) for day, kwh in daily.items() if kwh > 0.0}
+
+
 def resolve_thermal_flex_contexts(
     matrix: list,
     consumers: list[dict],
@@ -97,7 +143,13 @@ def resolve_thermal_flex_contexts(
     *,
     climate: ModeledClimateContext | None = None,
 ) -> dict[str, dict]:
-    """Tagesziele je Kalendertag für thermal_annual-Flex-Verbraucher."""
+    """Tagesziele je Kalendertag für thermal_annual-Flex-Verbraucher.
+
+    Slot-aligned to the horizon matrix (same energy basis as
+    ``planning_thermal_daily_targets`` / profile_spec), not full-calendar HDD.
+    Constraint builder sums only schedule-eligible slots so sunrise book
+    windows match book ``spec_flex_targets_kwh``.
+    """
     if not house_profile or not matrix:
         return {}
     from house_config.planning_flex_bridge import _house_thermal_consumers
@@ -115,13 +167,6 @@ def resolve_thermal_flex_contexts(
     is_live = matrix_is_live_snapshot(matrix)
     if is_live:
         live_absent = bool(resolve_absent_status(house_profile)["effective"])
-    dates = sorted(
-        {
-            row.get("date")
-            for row in matrix
-            if row.get("date") is not None
-        }
-    )
     contexts: dict[str, dict] = {}
     for consumer in consumers:
         if not is_thermal_flex_consumer(consumer):
@@ -133,19 +178,14 @@ def resolve_thermal_flex_contexts(
         source = thermal_source_with_live_absent(
             source, live_absent_active=live_absent
         )
-        daily_targets: dict[date, float] = {}
-        for day in dates:
-            if not isinstance(day, date):
-                continue
-            kwh = thermal_daily_kwh_for_date(
-                source,
-                house_profile,
-                day,
-                climate=climate,
-            )
-            if kwh > 0.0:
-                daily_targets[day] = round(kwh, 3)
-        ctx: dict = {"daily_targets": daily_targets}
+        slot_energy = _slot_aligned_thermal_energy_kwh(
+            source, matrix, climate=climate
+        )
+        ctx: dict = {
+            "daily_targets": _daily_targets_from_slot_energy(matrix, slot_energy),
+            "slot_energy_kwh": slot_energy,
+            "targets_slot_aligned": True,
+        }
         if is_live:
             live_ctx = _live_store_flex_overlay(
                 matrix, source, house_profile, consumer
@@ -381,15 +421,19 @@ def _add_one_thermal_flex_consumer(
         add_max_on_duration_constraints(
             model.prob, on_vars, max_hours=max_hours, prefix=cid
         )
+    # Sunrise: schedule_indices are book (SA1→SA2). Spec/plausibility WP is
+    # book-window energy — require delivery only on those slots, using the
+    # exact slot-aligned kWh (not calendar HDD × day_slots/96).
     eligible_set = set(
         consumer_thermal_eligible_indices(matrix, consumer, schedule_indices)
     )
     _force_thermal_on_slots(model, cid, on_vars, forced_indices, eligible_set)
+    slot_energy = list(ctx.get("slot_energy_kwh") or [])
+    slot_aligned = bool(ctx.get("targets_slot_aligned")) and bool(slot_energy)
     for day in sorted(set(daily_targets) | set(live_day_min)):
+        matrix_day_indices = _indices_for_date(matrix, day)
         day_indices = [
-            index
-            for index in _indices_for_date(matrix, day)
-            if index in eligible_set
+            index for index in matrix_day_indices if index in eligible_set
         ]
         if not day_indices:
             continue
@@ -397,9 +441,19 @@ def _add_one_thermal_flex_consumer(
         max_deliverable = _max_deliverable_kwh(
             consumer, day_indices, dt_h=model.dt_h
         )
-        prorated = _prorate_thermal_day_target_kwh(
-            float(daily_targets.get(day, 0.0) or 0.0), len(day_indices)
-        )
+        if slot_aligned:
+            prorated = round(
+                sum(
+                    float(slot_energy[index])
+                    for index in day_indices
+                    if index < len(slot_energy)
+                ),
+                3,
+            )
+        else:
+            prorated = _prorate_thermal_day_target_kwh(
+                float(daily_targets.get(day, 0.0) or 0.0), len(day_indices)
+            )
         live_min = float(live_day_min.get(day, 0.0) or 0.0)
         # Live store overlay: HDD ignored; floor via forced_indices; live_min = opp only.
         live_overlay = ctx.get("live_store_start_c") is not None

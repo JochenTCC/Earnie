@@ -69,6 +69,38 @@ def test_milp_pay_to_export_hard_zero_via_optimizer() -> None:
     assert float(plan.get("p_grid_sell", 0.0)) <= 1e-6
 
 
+def test_milp_pay_to_export_feasible_when_pv_exceeds_charge() -> None:
+    """Export=0 must not make MILP Infeasible if PV > load + max_charge (curtail)."""
+    from optimizer.milp import _solve_milp_to_model
+
+    # PV 8 − load 0.5 − charge 2.5 = 5 kW must be curtailed under pay-to-export.
+    matrix = _surplus_matrix(k_push=-5.0, p_pv=8.0, hours=4)
+    solved = _solve_milp_to_model(
+        matrix,
+        50.0,
+        _battery_params(),
+        -5.0,
+        False,
+        [],
+        {},
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    assert solved is not None
+    model = solved[0]
+    assert model.p_pv_curtail is not None
+    for t in range(4):
+        assert float(model.p_grid_sell[t].varValue or 0.0) <= 1e-6
+        curtail = float(model.p_pv_curtail[t].varValue or 0.0)
+        assert curtail + 1e-6 >= 8.0 - 0.5 - 2.5
+
+
 def test_milp_unconstrained_still_solves() -> None:
     matrix = _surplus_matrix(k_push=15.0)
     _, _, _, _, _, plan, _ = milp_optimizer(

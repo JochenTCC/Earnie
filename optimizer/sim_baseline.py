@@ -4,6 +4,10 @@ from __future__ import annotations
 import config
 from settings.flexible_consumers import flex_kw_lookup
 from optimizer import battery as bat
+from optimizer.milp_horizon import (
+    aggregate_battery_params_for_load,
+    coerce_battery_params_list,
+)
 from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.sim_chart_rows import (
     _chart_price_fields,
@@ -12,6 +16,20 @@ from optimizer.sim_chart_rows import (
     _format_chart_uhrzeit,
 )
 from optimizer.targets import consumer_column_name
+
+
+def _baseline_battery_params(
+    battery_params: dict | list[dict] | None,
+) -> dict:
+    """House-load aggregate for baseline (multi-ESS list → singular dict)."""
+    if battery_params is None:
+        return config.get_battery_params()
+    batteries = coerce_battery_params_list(battery_params)
+    if not batteries:
+        return config.get_battery_params()
+    if len(batteries) == 1:
+        return batteries[0]
+    return aggregate_battery_params_for_load(batteries)
 
 
 def _matched_baseline_profile_kw(row: dict, consumer: dict) -> float:
@@ -153,12 +171,12 @@ def simulate_baseline_horizon(
     initial_soc: float,
     charging_contexts: dict[str, dict] | None = None,
     *,
-    battery_params: dict | None = None,
+    battery_params: dict | list[dict] | None = None,
 ) -> list:
     """Simuliert den 24h-Verlauf ohne Optimierung: Batterie folgt nur dem aktuellen PV-Überschuss."""
     chart_rows = []
     sim_soc = initial_soc
-    battery_params = battery_params or config.get_battery_params()
+    battery_params = _baseline_battery_params(battery_params)
     for row in optimization_matrix:
         sim_soc, chart_row = _simulate_single_hour_baseline(row, sim_soc, battery_params)
         chart_rows.append(chart_row)
@@ -179,13 +197,13 @@ def simulate_baseline_with_optimized_flex(
     optimized_rows: list,
     initial_soc: float,
     *,
-    battery_params: dict | None = None,
+    battery_params: dict | list[dict] | None = None,
 ) -> list:
     """
     Baseline-Batterie (nur PV-Überschuss), aber dieselbe stündliche Flex-Last wie optimiert.
     Für den stündlichen Kostenvergleich: gleiche Last, Unterschied nur Batterie/Netz.
     """
-    battery_params = battery_params or config.get_battery_params()
+    battery_params = _baseline_battery_params(battery_params)
     sim_soc = initial_soc
     chart_rows: list[dict] = []
     for row, optimized_row in zip(optimization_matrix, optimized_rows):
@@ -209,7 +227,7 @@ def simulate_matched_baseline_horizon(
     consumer_targets_kwh: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
     *,
-    battery_params: dict | None = None,
+    battery_params: dict | list[dict] | None = None,
 ) -> list:
     """
     Baseline mit gleicher Flex-Energie wie die Optimierung,
@@ -222,7 +240,7 @@ def simulate_matched_baseline_horizon(
     )
     chart_rows = []
     sim_soc = initial_soc
-    battery_params = battery_params or config.get_battery_params()
+    battery_params = _baseline_battery_params(battery_params)
     for row, flex_kw in zip(optimization_matrix, matched_flex):
         sim_soc, chart_row = _simulate_single_hour_baseline(
             row,

@@ -15,7 +15,10 @@ from simulation.engine import (
     CONSUMPTION_TOLERANCE_REL,
     window_anchor_for_date,
 )
-from ui.backtesting_results_helpers import nav_bounds_from_period
+from ui.backtesting_results_helpers import (
+    is_single_month_test_run,
+    nav_bounds_from_period,
+)
 
 SEVERITY_NONE = "none"
 SEVERITY_YELLOW = "yellow"
@@ -252,15 +255,42 @@ def month_with_most_deviation_days(
     return min(month for month, count in counts.items() if count == best)
 
 
+def _month_has_in_run_days(
+    index: dict[date, CalendarCellState],
+    *,
+    year: int,
+    month: int,
+) -> bool:
+    return any(
+        cell.in_run
+        for cell_date, cell in index.items()
+        if cell_date.year == year and cell_date.month == month
+    )
+
+
 def _default_visible_month(
     index: dict[date, CalendarCellState],
     year: int,
     selected_date: date | None,
+    period: dict | None = None,
 ) -> int:
+    period = period or {}
+    if is_single_month_test_run(period):
+        test_month = int(period["start_month"])
+        if 1 <= test_month <= 12:
+            return test_month
     stored = st.session_state.get(_SESSION_MONTH_KEY)
-    if isinstance(stored, int) and 1 <= stored <= 12:
+    if (
+        isinstance(stored, int)
+        and 1 <= stored <= 12
+        and _month_has_in_run_days(index, year=year, month=stored)
+    ):
         return stored
-    if selected_date is not None and selected_date.year == year:
+    if (
+        selected_date is not None
+        and selected_date.year == year
+        and _month_has_in_run_days(index, year=year, month=selected_date.month)
+    ):
         return selected_date.month
     deviation_month = month_with_most_deviation_days(index, year=year)
     if deviation_month is not None:
@@ -269,11 +299,7 @@ def _default_visible_month(
     if default is not None and default.year == year:
         return default.month
     for month in range(1, 13):
-        if any(
-            cell.in_run
-            for cell_date, cell in index.items()
-            if cell_date.year == year and cell_date.month == month
-        ):
+        if _month_has_in_run_days(index, year=year, month=month):
             return month
     return 1
 
@@ -321,7 +347,15 @@ def render_deviation_calendar(
     period = meta.get("period") or {}
     year = int(period.get("backtesting_year") or BACKTESTING_YEAR)
     selected_date = _stored_selected_date()
-    visible_month = _default_visible_month(index, year, selected_date)
+    if selected_date is not None and not (
+        selected_date.year == year
+        and _month_has_in_run_days(index, year=year, month=selected_date.month)
+        and index.get(selected_date) is not None
+        and index[selected_date].in_run
+    ):
+        selected_date = None
+        st.session_state.pop(_SESSION_DATE_KEY, None)
+    visible_month = _default_visible_month(index, year, selected_date, period)
     st.session_state[_SESSION_MONTH_KEY] = visible_month
 
     st.caption(

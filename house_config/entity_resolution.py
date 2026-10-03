@@ -310,8 +310,10 @@ def planning_battery_entry(bat: dict) -> dict:
 
 def battery_params_from_planning(entry: dict) -> dict:
     """Optimizer-shaped params dict from a planning battery entry."""
+    bat_id = entry["id"]
     return {
-        "id": entry["id"],
+        "id": bat_id,
+        "label": str(entry.get("label") or bat_id).strip() or bat_id,
         "kind": entry.get("kind", DEFAULT_BATTERY_KIND),
         "battery_capacity_kwh": float(entry["battery_capacity_kwh"]),
         "min_soc": float(entry["battery_min_soc"]),

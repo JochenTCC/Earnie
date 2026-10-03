@@ -84,6 +84,7 @@ def _build_milp_model_with_objective(
     hk_max_export_kw: float | None = None,
     inbound_export_limit_kw: float | None = None,
     export_caps_kw: list[float | None] | None = None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> MilpHorizonModel:
     """Horizontmodell samt Zielfunktion (Energiekosten + Batterie-Verschleiß)."""
     from .export_power_limit import export_caps_for_horizon
@@ -108,6 +109,7 @@ def _build_milp_model_with_objective(
         consumer_continue_on=consumer_continue_on,
         dt_h=inputs.dt_h,
         export_caps_kw=caps,
+        current_soc_by_id=current_soc_by_id,
     )
     wear_cent_per_kwh = 0.0
     primary = _primary_battery_params(battery_params)
@@ -242,6 +244,7 @@ def _solve_milp_to_model(
     hk_max_export_kw: float | None = None,
     inbound_export_limit_kw: float | None = None,
     export_caps_kw: list[float | None] | None = None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> tuple[MilpHorizonModel, dict[str, float], dict[str, float], list[int], dict, dict] | None:
     """Baut und löst das MILP; None wenn nicht optimal / leere Matrix."""
     if not matrix:
@@ -269,6 +272,7 @@ def _solve_milp_to_model(
         hk_max_export_kw=hk_max_export_kw,
         inbound_export_limit_kw=inbound_export_limit_kw,
         export_caps_kw=export_caps_kw,
+        current_soc_by_id=current_soc_by_id,
     )
     _add_flex_side_constraints(
         model, matrix, inputs, verbose, consumer_continue_on, thermal_flex_contexts
@@ -382,6 +386,7 @@ def milp_optimizer(
     hk_max_export_kw: float | None = None,
     inbound_export_limit_kw: float | None = None,
     export_caps_kw: list[float | None] | None = None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
@@ -424,6 +429,7 @@ def milp_optimizer(
         hk_max_export_kw=hk_max_export_kw,
         inbound_export_limit_kw=inbound_export_limit_kw,
         export_caps_kw=export_caps_kw,
+        current_soc_by_id=current_soc_by_id,
     )
     if solved is None:
         return _AUTOMATIK_FALLBACK
@@ -474,6 +480,7 @@ def milp_horizon_schedule(
     hk_max_export_kw: float | None = None,
     inbound_export_limit_kw: float | None = None,
     export_caps_kw: list[float | None] | None = None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Ein CBC-Solve über die Matrix; Rückgabe: Stundenplan-Slots für Open-Loop / commit-K.
@@ -517,6 +524,7 @@ def milp_horizon_schedule(
         hk_max_export_kw=hk_max_export_kw,
         inbound_export_limit_kw=inbound_export_limit_kw,
         export_caps_kw=export_caps_kw,
+        current_soc_by_id=current_soc_by_id,
     )
     if solved is None:
         return [dict(_FALLBACK_SCHEDULE_SLOT)]

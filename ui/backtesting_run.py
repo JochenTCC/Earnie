@@ -242,6 +242,13 @@ def _execute_backtesting_run(
         if exit_code == 0:
             status.update(label="Szenario-Explorer abgeschlossen", state="complete")
             load_backtesting_data.clear()
+            if (
+                start_month is not None
+                and end_month is not None
+                and int(start_month) == int(end_month)
+            ):
+                st.session_state["backtesting_calendar_month"] = int(start_month)
+                st.session_state.pop("backtesting_calendar_date", None)
             st.rerun()
             return
         status.update(label="Szenario-Explorer fehlgeschlagen", state="error")

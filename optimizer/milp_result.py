@@ -74,6 +74,32 @@ def _normalize_preset_by_slot(
     }
 
 
+def _planned_soc_by_ess_at(model: MilpHorizonModel, hour_index: int) -> dict[str, float]:
+    """End-of-slot SoC (%) per ESS from ``e_batt_by_ess`` (empty when single/legacy)."""
+    ess_ids = getattr(model, "ess_ids", None) or []
+    e_by = getattr(model, "e_batt_by_ess", None) or {}
+    params_by = getattr(model, "battery_params_by_id", None) or {}
+    if len(ess_ids) < 2 or not e_by:
+        return {}
+    out: dict[str, float] = {}
+    for ess_id in ess_ids:
+        e_vars = e_by.get(ess_id)
+        bat_params = params_by.get(ess_id) or {}
+        if not e_vars or hour_index >= len(e_vars):
+            continue
+        e_val = e_vars[hour_index].varValue
+        capacity = float(bat_params.get("battery_capacity_kwh") or 0.0)
+        min_soc = float(bat_params.get("min_soc") or 0.0)
+        max_soc = float(bat_params.get("max_soc") or 100.0)
+        out[str(ess_id)] = bat.planned_soc_percent_from_energy(
+            float(e_val) if e_val is not None else 0.0,
+            capacity,
+            min_soc,
+            max_soc,
+        )
+    return out
+
+
 def extract_horizon_schedule(
     model: MilpHorizonModel,
     battery_params: dict,
@@ -103,14 +129,16 @@ def extract_horizon_schedule(
             min_soc,
             max_soc,
         )
-        slots.append(
-            {
-                "milp_plan": milp_plan,
-                "consumer_powers": consumer_powers,
-                "consumer_pv_follow": _consumer_pv_follow_at_all(model, t),
-                "planned_soc_percent": planned_soc,
-            }
-        )
+        slot: dict[str, Any] = {
+            "milp_plan": milp_plan,
+            "consumer_powers": consumer_powers,
+            "consumer_pv_follow": _consumer_pv_follow_at_all(model, t),
+            "planned_soc_percent": planned_soc,
+        }
+        by_ess = _planned_soc_by_ess_at(model, t)
+        if by_ess:
+            slot["planned_soc_by_ess"] = by_ess
+        slots.append(slot)
     return slots
 
 

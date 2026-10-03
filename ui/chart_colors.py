@@ -154,6 +154,18 @@ MUTED_CURTAIL_PV = blend_hsl(_HSL_BASELOAD, _HSL_WHITE, 0.2, 45.0)
 _HSL_SOC = (120.0, 90.0, 40.0)
 _ALPHA_SOC = 1.0
 COLOR_SOC = color_from_hsl(*_HSL_SOC, _ALPHA_SOC)
+# Hue offsets for additional ESS SoC lines (primary stays COLOR_SOC / index 0).
+_SOC_HUE_OFFSETS = (0.0, 40.0, -50.0, 80.0, -90.0)
+
+
+def soc_color_for_index(index: int) -> str:
+    """SoC line color for battery index (0 = primary green)."""
+    idx = max(0, int(index))
+    offset = _SOC_HUE_OFFSETS[idx % len(_SOC_HUE_OFFSETS)]
+    if idx >= len(_SOC_HUE_OFFSETS):
+        offset += 15.0 * (idx // len(_SOC_HUE_OFFSETS))
+    h, s, l = _HSL_SOC
+    return color_from_hsl((h + offset) % 360.0, s, l, _ALPHA_SOC)
 
 _ALPHA_PV_LINE_FILL = 0.15
 CHART_PV_LINE_COLOR = color_from_hsl(_HSL_PV[0], _HSL_PV[1], 45.0)

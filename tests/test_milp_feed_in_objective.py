@@ -45,4 +45,7 @@ def test_milp_prefers_export_in_high_feed_in_hour():
         model, matrix, fallback_k_push=2.0, ev_milp_params_by_id={}, wear_cent_per_kwh=0.0
     )
     sells = _grid_sell_kwh(model, matrix)
-    assert sells[2] > sells[0] + 0.1
+    # High k_push slot must hit the sell ceiling. Residual battery dump among equal
+    # low-k_push slots is alternate-optima (same objective) — do not pin which one.
+    assert sells[2] == max(sells)
+    assert sells[2] > min(sells) + 0.1

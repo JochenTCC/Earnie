@@ -198,7 +198,7 @@ def _build_anchor_window_plan(
 def _anchor_step_end_soc(
     chart_rows: list[dict],
     step_start_soc: float,
-    battery_params: dict,
+    battery_params: dict | list[dict],
     *,
     horizon_mode: str,
 ) -> float:
@@ -221,7 +221,7 @@ def _simulate_plan_horizon(
     plan,
     sim_soc: float,
     *,
-    battery_params: dict,
+    battery_params: dict | list[dict],
     hours_done: int,
     collect_cbc: bool,
     scenario_params: dict,
@@ -263,7 +263,7 @@ def _simulate_anchor_step(
     cache: HistoricalDataCache,
     prices_df: pd.DataFrame,
     scenario_params: dict,
-    battery_params: dict,
+    battery_params: dict | list[dict],
     feed_in_settings: feed_in_prices.FeedInSettings,
     hours_done: int,
     collect_cbc: bool,

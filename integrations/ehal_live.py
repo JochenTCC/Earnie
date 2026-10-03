@@ -278,6 +278,72 @@ def read_ess_soc() -> float | None:
     return float(telemetry["sens_ess_soc"])
 
 
+def _soc_address_for_battery(bat: dict) -> str:
+    from ehal.ess_fields import binding_address, ess_field
+
+    bindings = bat.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return ""
+    ess_id = str(bat.get("id") or "").strip()
+    if not ess_id:
+        return ""
+    addr = binding_address(bindings, ess_id, "sens_ess_soc")
+    if addr:
+        return addr
+    # Flat key still stored on some batteries before Pattern B rewrite
+    return str(bindings.get("sens_ess_soc") or bindings.get(ess_field(ess_id, "sens_ess_soc")) or "").strip()
+
+
+def _read_soc_from_address(address: str) -> float | None:
+    addr = str(address or "").strip()
+    if not addr:
+        return None
+    try:
+        if is_ha_backend():
+            adapter = get_ha_adapter()
+            entities = getattr(adapter.cfg, "entities", {}) or {}
+            entity_id = str(entities.get(addr) or addr).strip()
+            if not entity_id:
+                return None
+            payload = adapter.read_state(entity_id)
+            raw = payload.get("state")
+            return None if raw is None else float(raw)
+        if is_loxone_backend() or not is_ehal_network_backend():
+            raw = loxone_client.fetch_loxone_generic_value(addr)
+            return None if raw is None else float(raw)
+    except (
+        OpenemsHttpError,
+        HaHttpError,
+        LoxoneAdapterError,
+        TypeError,
+        ValueError,
+        OSError,
+        KeyError,
+    ) as exc:
+        logger.debug("Per-ESS SoC read failed for %s: %s", addr, exc)
+        return None
+    return None
+
+
+def read_ess_soc_by_id() -> dict[str, float]:
+    """SoC (%) per battery id (Pattern B bindings); missing → primary SoC fallback."""
+    primary = read_ess_soc()
+    get_list = getattr(config, "get_battery_params_list", None)
+    batteries = get_list() if callable(get_list) else []
+    batteries = [b for b in (batteries or []) if isinstance(b, dict)]
+    out: dict[str, float] = {}
+    for bat in batteries:
+        ess_id = str(bat.get("id") or "").strip()
+        if not ess_id:
+            continue
+        soc = _read_soc_from_address(_soc_address_for_battery(bat))
+        if soc is None and primary is not None:
+            soc = float(primary)
+        if soc is not None:
+            out[ess_id] = float(soc)
+    return out
+
+
 def read_live_power_kw() -> dict[str, float] | None:
     """Return Live power dict (kW): grid ``+`` = import, battery ``+`` = discharge."""
     try:

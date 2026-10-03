@@ -213,6 +213,7 @@ def _run_savings_horizons(
     *,
     sunrise_soc_min_index: int | None,
     consumers: list | None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> _SavingsRows:
     """Optimierter Open-Loop-Lauf plus freie und ziel-gematchte Baseline."""
     from optimizer.charging_context import apply_horizon_charging_limits
@@ -238,6 +239,7 @@ def _run_savings_horizons(
         sunrise_soc_min_index=sunrise_soc_min_index,
         flexible_consumers=consumers,
         commit_hours=len(matrix),
+        current_soc_by_id=current_soc_by_id,
     )
     baseline_rows = simulate_baseline_horizon(
         matrix, initial_soc, charging_contexts=charging_contexts
@@ -393,6 +395,7 @@ def calculate_optimization_savings(
     sunrise_soc_min_index: int | None = None,
     filter_contexts: dict[str, dict] | None = None,
     consumers: list | None = None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> dict:
     """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation.
 
@@ -417,6 +420,7 @@ def calculate_optimization_savings(
         filters,
         sunrise_soc_min_index=sunrise_soc_min_index,
         consumers=consumers,
+        current_soc_by_id=current_soc_by_id,
     )
     return _assemble_savings_dict(
         matrix,

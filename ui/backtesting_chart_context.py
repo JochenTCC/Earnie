@@ -142,9 +142,11 @@ def _geo_from_snapshot(snapshot: dict) -> tuple[float, float, str]:
         lon = config.get("LONGITUDE", cast=float)
     return float(lat), float(lon), str(tz_name)
 
-def _battery_params_from_snapshot(snapshot: dict) -> dict:
+def _battery_params_from_snapshot(snapshot: dict) -> dict | list[dict]:
     """Szenario-Batterie aus Snapshot; Fallback für ältere Logs ohne battery_params."""
     stored = snapshot.get("battery_params")
+    if isinstance(stored, list) and stored:
+        return [dict(item) for item in stored if isinstance(item, dict)]
     if isinstance(stored, dict) and float(stored.get("battery_capacity_kwh", 0.0)) > 0:
         return {
             "battery_capacity_kwh": float(stored["battery_capacity_kwh"]),

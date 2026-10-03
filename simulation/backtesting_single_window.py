@@ -140,6 +140,15 @@ def simulate_window_snapshot(
         collect_cbc=False,
         collect_full_horizon=True,
     )
+    # Match year-run engine: standby is subtracted in plausibility baseload check.
+    if isinstance(battery_params, list):
+        step_meta["standby_power_kw"] = float(
+            sum(float(b.get("standby_power_kw") or 0.0) for b in battery_params)
+        )
+    else:
+        step_meta["standby_power_kw"] = float(
+            battery_params.get("standby_power_kw") or 0.0
+        )
 
     return build_window_snapshot(
         window_anchor=anchor,

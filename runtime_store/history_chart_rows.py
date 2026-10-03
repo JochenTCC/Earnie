@@ -273,6 +273,22 @@ def _append_milp_table_columns(row: dict[str, Any], entry: dict[str, Any] | None
     row.update(_immediate_charge_flags_from_entry(entry))
 
 
+def _attach_history_ess_soc_columns(row: dict[str, Any], entry: dict[str, Any]) -> None:
+    """Map logged ``soc_percent_by_ess`` onto per-label Chart1 SoC columns."""
+    by_ess = entry.get("soc_percent_by_ess")
+    if not isinstance(by_ess, dict) or not by_ess:
+        return
+    from optimizer.sim_chart_rows import attach_ess_soc_columns
+
+    get_list = getattr(config, "get_battery_params_list", None)
+    batteries = get_list() if callable(get_list) else []
+    attach_ess_soc_columns(
+        row,
+        {str(k): float(v) for k, v in by_ess.items()},
+        batteries if isinstance(batteries, list) else None,
+    )
+
+
 def entry_to_chart_row(
     entry: dict[str, Any],
     slot_start: datetime,
@@ -298,6 +314,7 @@ def entry_to_chart_row(
         "Simulierter SoC (%)": round(float(entry.get("soc_percent", 0.0) or 0.0), 1),
         "Steuerbefehl": bat.steuerbefehl_for_mode(mode, target_power),
     }
+    _attach_history_ess_soc_columns(row, entry)
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         cid = consumer["id"]
         flex_kw = _consumer_kw_from_entry(

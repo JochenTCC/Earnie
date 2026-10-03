@@ -22,6 +22,7 @@ from ui.chart_colors import (
     COLOR_ESS_UNDERLAY_DISCHARGE,
     COLOR_ESS_UNDERLAY_HOLD,
     COLOR_SOC,
+    soc_color_for_index,
 )
 from ui.chart_slot_axis import (
     ChartSlotAxis,
@@ -199,14 +200,48 @@ def _add_optimized_soc_segment(
         fig,
         soc_x,
         soc_y,
-        name="SoC",
+        name=ctx["name"],
         show_legend=part_start == 0 and index == 0,
         yaxis=ctx["yaxis"],
         hover_labels=_soc_hover_labels_for_times(
             soc_x, ctx["uhrzeit"], ctx["axis"].starts,
         ),
-        line=dict(color=COLOR_SOC, width=2.5),
+        line=dict(color=ctx["color"], width=2.5),
     )
+
+
+_ESS_SOC_COLUMN_RE = re.compile(r"^Simulierter SoC (.+) \(%\)$")
+
+
+def _optimized_soc_tail_y(
+    df: pd.DataFrame,
+    soc_column: str,
+    *,
+    battery_params: dict | None,
+) -> float | None:
+    if df.empty:
+        return None
+    if soc_column == "Simulierter SoC (%)":
+        return _soc_tail_y_from_row(df.iloc[-1], battery_params=battery_params)
+    raw = df.iloc[-1][soc_column]
+    if raw is None or (isinstance(raw, float) and math.isnan(raw)):
+        return None
+    return float(raw)
+
+
+def discover_ess_soc_series(df: pd.DataFrame) -> list[tuple[str, str]]:
+    """Return [(column, legend)] for per-battery SoC columns; empty if none."""
+    series: list[tuple[str, str]] = []
+    for column in df.columns:
+        name = str(column)
+        if name == "Simulierter SoC (%)":
+            continue
+        match = _ESS_SOC_COLUMN_RE.match(name)
+        if not match:
+            continue
+        label = match.group(1).strip()
+        series.append((name, f"SoC · {label}" if label else "SoC"))
+    return series
 
 
 def add_optimized_soc_trace(
@@ -219,22 +254,28 @@ def add_optimized_soc_trace(
     history_slot_count: int | None = None,
     chart_now: datetime | None = None,
     battery_params: dict | None = None,
+    *,
+    soc_column: str = "Simulierter SoC (%)",
+    name: str = "SoC",
+    color: str | None = None,
 ) -> None:
+    if soc_column not in df.columns:
+        return
     ctx = {
         "df": df,
         "axis": axis,
         "yaxis": yaxis,
         "uhrzeit": df["Uhrzeit"],
         "length": len(df),
-        "soc": df["Simulierter SoC (%)"],
-        "tail_y": (
-            _soc_tail_y_from_row(df.iloc[-1], battery_params=battery_params)
-            if not df.empty
-            else None
+        "soc": df[soc_column],
+        "tail_y": _optimized_soc_tail_y(
+            df, soc_column, battery_params=battery_params
         ),
         "history_slot_count": history_slot_count,
         "chart_now": chart_now,
         "battery_params": battery_params,
+        "name": name,
+        "color": color or COLOR_SOC,
     }
     for part_start, part_end in _soc_split_points(ctx["length"], history_slot_count):
         part_extrap_start, part_extrap_end = _part_extrap_offsets(
@@ -251,6 +292,49 @@ def add_optimized_soc_trace(
             _add_optimized_soc_segment(
                 fig, ctx, abs_start, abs_end, index, part_start
             )
+
+
+def add_optimized_soc_traces(
+    fig: go.Figure,
+    df: pd.DataFrame,
+    axis: ChartSlotAxis,
+    yaxis: str = "y2",
+    extrap_start: int | None = None,
+    extrap_end: int | None = None,
+    history_slot_count: int | None = None,
+    chart_now: datetime | None = None,
+    battery_params: dict | None = None,
+) -> None:
+    """One SoC line (legacy) or one line per ESS when multi-battery columns exist."""
+    series = discover_ess_soc_series(df)
+    if not series:
+        add_optimized_soc_trace(
+            fig,
+            df,
+            axis,
+            yaxis=yaxis,
+            extrap_start=extrap_start,
+            extrap_end=extrap_end,
+            history_slot_count=history_slot_count,
+            chart_now=chart_now,
+            battery_params=battery_params,
+        )
+        return
+    for index, (column, legend) in enumerate(series):
+        add_optimized_soc_trace(
+            fig,
+            df,
+            axis,
+            yaxis=yaxis,
+            extrap_start=extrap_start,
+            extrap_end=extrap_end,
+            history_slot_count=history_slot_count,
+            chart_now=chart_now,
+            battery_params=battery_params,
+            soc_column=column,
+            name=legend,
+            color=soc_color_for_index(index),
+        )
 
 
 def add_baseline_soc_traces(
@@ -518,7 +602,9 @@ __all__ = [
     "add_ess_mode_soc_underlay_traces",
     "add_export_price_on_soc_axis_trace",
     "add_optimized_soc_trace",
+    "add_optimized_soc_traces",
     "add_price_on_soc_axis_trace",
+    "discover_ess_soc_series",
     "classify_ess_soc_underlay",
     "_soc_tail_y_from_row",
 ]

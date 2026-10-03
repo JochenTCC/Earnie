@@ -2,6 +2,27 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.c — Multiple isolated battery / battery+inverter entities (2026-10-03)
+
+- [x] **2.7.c — Multiple isolated battery / battery+inverter entities** (bidirectional)
+  - Isolated battery modes: charging / discharging / standby
+  - batt+inverter modes: optimizing / charging / discharging
+  - All batteries participate in optimization
+  - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` sums PV kWp + max discharge of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / physical powerstations from **2.7.g**/**2.7.h** that cannot feed the house grid); docs `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md`
+  - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
+  - [x] In SE after calculation of Test Month the Detaillierte Simulationsansicht should automatically go to March (tested month)
+  - [x] Show SOC line for each battery in Monitor chart1
+  - **Note:** Downstream Loxone template XML gen and HouseSim scenario import multi-battery support remains open under Version 2.+1
+
+### Bugfix SE Plausibility Class A / Class B (2026-10-03)
+
+- [x] **SE Class A: MILP Infeasible / EV zero under pay-to-export** — Fix: `optimizer/milp_horizon.py` (`p_pv_curtail`). Regression: `tests/test_milp_export_cap.py::test_milp_pay_to_export_feasible_when_pv_exceeds_charge`. Snapshot re-solve `2026-04-23T07:00:00`/`live`: Optimal + EV ~10.5 kWh. **SE year verified** (`2025-10-01`–`2026-09-30`, `sunrise_window`, `live`/`live_copy`): Class A days gone.
+- [x] **SE Class B: WP under-delivery on Optimal sunrise windows** — Fix: `optimizer/thermal_flex_context.py` (slot-aligned book-slot climate kWh vs calendar HDD × `day_slots/96`). Regression: `tests/test_thermal_flex_bridge.py::test_thermal_book_slots_use_slot_aligned_energy_not_calendar_prorate`. Diag: `python -m scripts.diag_class_b_window`. **SE year verified** same run: **364/365** OK (was ~310/365); sole leftover `2026-09-21` flex Δ 0.72 = `pool_filter` native-credit residual (tracked as open follow-up).
+
+### Bugfix RC model simulation plausibility (2026-10-03)
+
+- [x] **Plausibility of RC model simulation on NAS productive** — Live acceptance verified on NAS productive; no code change.
+
 ### Version 2.6 - Enhancements for HA coupling (2026-10-03)
 
 - [x] **Version 2.6 — Enhancements for HA coupling** (chapter closed; official **2.6.0** on `main`, supersedes **2.5.3** on `:latest`)

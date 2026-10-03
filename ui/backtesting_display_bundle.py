@@ -129,7 +129,7 @@ def _backtesting_baseline_rows(
     optimized_rows: list[dict],
     *,
     initial_soc: float,
-    battery_params: dict,
+    battery_params: dict | list[dict],
 ) -> dict[str, list[dict]]:
     """Baseline-, Matched-Baseline- und Same-Flex-Zeilen; `prep` wie prepare_optimization_matrix."""
     matrix_prep, charging_contexts, targets = prep
@@ -218,7 +218,7 @@ def _build_backtesting_savings_info(
     initial_soc: float,
     consumer_daily_targets_kwh: dict[str, float] | None,
     sunrise_soc_min_index: int | None,
-    battery_params: dict,
+    battery_params: dict | list[dict],
 ) -> dict:
     """Savings-Dict für Charts aus persistierten Backtesting-Zeilen (ohne Legacy-Profile)."""
     matrix_prep, charging_contexts, targets = prepare_optimization_matrix(
@@ -388,6 +388,24 @@ def _display_bundle_cache() -> dict[tuple, OptimizationDisplayBundle]:
     return cache
 
 
+def _scenario_expects_multi_ess_soc(scenario_id: str) -> bool:
+    try:
+        scenarios = config.get_backtesting_scenarios()
+    except ValueError:
+        return False
+    planning = (scenarios.get(scenario_id) or {}).get("_planning_batteries")
+    return isinstance(planning, list) and len(planning) >= 2
+
+
+def _snapshot_missing_multi_ess_soc(snapshot: dict) -> bool:
+    from ui.chart_soc import discover_ess_soc_series
+
+    rows = snapshot.get("chart_rows_full") or snapshot.get("chart_rows_24h") or []
+    if not rows:
+        return True
+    return not bool(discover_ess_soc_series(pd.DataFrame(rows[:1])))
+
+
 def resolve_backtesting_display_bundle(
     log_dir: str,
     window_anchor: str,
@@ -409,21 +427,30 @@ def resolve_backtesting_display_bundle(
         str(view_mode),
         int(segment_index),
         str(log_horizon),
+        "multi_ess_soc_v1",
     )
     bundle_cache = _display_bundle_cache()
     cached = bundle_cache.get(bundle_key)
     if cached is not None:
         return cached
 
-    bundle = load_backtesting_display_bundle(
-        log_dir,
-        window_anchor,
-        scenario_id,
-        view_mode=view_mode,
-        segment_index=segment_index,
-        log_horizon_mode=log_horizon,
+    existing = load_window_snapshot(log_dir, window_anchor, scenario_id)
+    replace_stale = bool(
+        existing is not None
+        and _scenario_expects_multi_ess_soc(scenario_id)
+        and _snapshot_missing_multi_ess_soc(existing)
     )
-    if bundle is None:
+    bundle = None
+    if existing is not None and not replace_stale:
+        bundle = load_backtesting_display_bundle(
+            log_dir,
+            window_anchor,
+            scenario_id,
+            view_mode=view_mode,
+            segment_index=segment_index,
+            log_horizon_mode=log_horizon,
+        )
+    if bundle is None or replace_stale:
         from simulation.backtesting_single_window import (
             cache_key_for_window,
             initial_soc_for_anchor,
@@ -431,6 +458,8 @@ def resolve_backtesting_display_bundle(
         )
 
         cache_key = cache_key_for_window(window_anchor, scenario_id, log_horizon)
+        if replace_stale:
+            cache_key = (*cache_key, "multi_ess_soc_v1")
         snapshot_cache = _on_demand_snapshot_cache()
         snapshot = snapshot_cache.get(cache_key)
         if snapshot is None:
@@ -445,9 +474,14 @@ def resolve_backtesting_display_bundle(
                     horizon_mode=log_horizon,
                 )
             snapshot_cache[cache_key] = snapshot
-            from simulation.backtesting_snapshots import append_window_snapshot
+            if replace_stale:
+                from simulation.backtesting_snapshots import upsert_window_snapshot
 
-            append_window_snapshot(log_dir, snapshot)
+                upsert_window_snapshot(log_dir, snapshot)
+            else:
+                from simulation.backtesting_snapshots import append_window_snapshot
+
+                append_window_snapshot(log_dir, snapshot)
         bundle = build_backtesting_display_bundle(
             snapshot,
             view_mode=view_mode,

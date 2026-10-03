@@ -23,10 +23,23 @@ from ui.chart_slot_axis import (
 )
 
 
-def _resolve_battery_params(battery_params: dict | None) -> dict:
-    if battery_params is not None:
-        return battery_params
-    return config.get_battery_params()
+def _resolve_battery_params(battery_params: dict | list[dict] | None) -> dict:
+    """Singular or multi-ESS list → house-load aggregate dict for chart helpers."""
+    if battery_params is None:
+        return config.get_battery_params()
+    if isinstance(battery_params, list):
+        from optimizer.milp_horizon import (
+            aggregate_battery_params_for_load,
+            coerce_battery_params_list,
+        )
+
+        batteries = coerce_battery_params_list(battery_params)
+        if not batteries:
+            return config.get_battery_params()
+        if len(batteries) == 1:
+            return batteries[0]
+        return aggregate_battery_params_for_load(batteries)
+    return battery_params
 
 def _soc_tail_y_from_row(
     row: pd.Series,

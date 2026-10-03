@@ -26,10 +26,15 @@ from .targets import (
     consumer_column_name,
     resolve_horizon_consumer_targets_kwh,
 )
+from .milp_horizon import (
+    aggregate_battery_params_for_load,
+    coerce_battery_params_list,
+)
 from .sim_chart_rows import (
     _chart_row_from_controls,
     _chart_row_from_schedule_slot,
     _finalize_chart_rows_for_display,
+    attach_ess_soc_columns,
     finalize_chart_row_energy,
     flexible_consumer_power_kw,
     horizon_end_soc_from_chart_rows,
@@ -157,11 +162,13 @@ class _HorizonSetup:
     matrix: list
     consumers_cfg: list
     battery_params: dict
+    batteries: list[dict]
     charging_contexts: dict[str, dict] | None
     filters: dict[str, dict] | None
     horizon_limits: dict[str, float]
     horizon_terminal_soc: float | None
     options: _HorizonOptions
+    current_soc_by_id: dict[str, float] | None = None
 
 
 class _SlotInputs(NamedTuple):
@@ -173,18 +180,38 @@ class _SlotInputs(NamedTuple):
     flex_indices: list[int]
 
 
+def _resolve_horizon_batteries(
+    battery_params: dict | list[dict] | None,
+) -> tuple[list[dict], dict]:
+    """Return (batteries list, aggregate params) for MILP + chart SoC."""
+    if battery_params is None:
+        get_list = getattr(config, "get_battery_params_list", None)
+        if callable(get_list):
+            listed = get_list()
+            if listed:
+                batteries = coerce_battery_params_list(listed)
+                return batteries, aggregate_battery_params_for_load(batteries)
+        battery_params = config.get_battery_params()
+    batteries = coerce_battery_params_list(battery_params)
+    if not batteries:
+        agg = battery_params if isinstance(battery_params, dict) else {}
+        return [], agg
+    return batteries, aggregate_battery_params_for_load(batteries)
+
+
 def _prepare_horizon_state(
     optimization_matrix: list,
     initial_soc: float,
     options: _HorizonOptions,
     *,
-    battery_params: dict | None,
+    battery_params: dict | list[dict] | None,
     consumer_daily_targets_kwh: dict[str, float] | None,
     charging_contexts: dict[str, dict] | None,
     filter_contexts: dict[str, dict] | None,
     matrix_prepared: bool,
     disable_horizon_soc_anchor: bool,
     flexible_consumers: list | None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> _HorizonSetup:
     """Bereitet Matrix, Lade-/Filterkontexte, Flex-Horizontgrenzen und Terminal-SoC auf."""
     consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
@@ -204,7 +231,7 @@ def _prepare_horizon_state(
             consumer_daily_targets_kwh,
             consumers=consumers_cfg,
         )
-    battery_params = battery_params or config.get_battery_params()
+    batteries, agg_battery = _resolve_horizon_batteries(battery_params)
     horizon_limits = resolve_horizon_consumer_targets_kwh(
         optimization_matrix,
         consumer_daily_targets_kwh,
@@ -231,12 +258,14 @@ def _prepare_horizon_state(
     return _HorizonSetup(
         matrix=optimization_matrix,
         consumers_cfg=consumers_cfg,
-        battery_params=battery_params,
+        battery_params=agg_battery,
+        batteries=batteries,
         charging_contexts=charging_contexts,
         filters=filters,
         horizon_limits=horizon_limits,
         horizon_terminal_soc=horizon_terminal_soc,
         options=options,
+        current_soc_by_id=current_soc_by_id,
     )
 
 
@@ -327,10 +356,11 @@ def _refill_commit_buffer(
     terminal_soc_percent = _terminal_soc_for_commit(
         options.commit_hours, len(remaining_slice), setup.horizon_terminal_soc
     )
+    milp_batteries = setup.batteries or setup.battery_params
     schedule = milp_horizon_schedule(
         remaining_slice,
         sim_soc,
-        battery_params=setup.battery_params,
+        battery_params=milp_batteries,
         k_push=options.k_push,
         verbose=options.verbose,
         consumers=setup.consumers_cfg,
@@ -345,6 +375,7 @@ def _refill_commit_buffer(
         soc_hold_percent=(
             options.soc_hold_percent if rel_hold is not None else None
         ),
+        current_soc_by_id=setup.current_soc_by_id,
     )
     commit_slots = _commit_slots_for_buffer(
         options.commit_hours,
@@ -375,6 +406,21 @@ def _advance_delivered_and_flex_run(
     )
 
 
+def _initial_soc_by_ess(
+    setup: _HorizonSetup,
+    initial_soc: float,
+) -> dict[str, float]:
+    """Start SoC map for multi-ESS chart columns (fallback: primary SoC for all)."""
+    by_id = dict(setup.current_soc_by_id or {})
+    out: dict[str, float] = {}
+    for bat in setup.batteries:
+        ess_id = str(bat.get("id") or "").strip()
+        if not ess_id:
+            continue
+        out[ess_id] = float(by_id.get(ess_id, initial_soc))
+    return out
+
+
 def _run_horizon_slots(
     setup: _HorizonSetup,
     initial_soc: float,
@@ -384,6 +430,7 @@ def _run_horizon_slots(
     """Läuft die Matrix Slot für Slot ab (MPC bzw. Open-Loop-Commit-Puffer)."""
     chart_rows: list[dict] = []
     sim_soc = initial_soc
+    soc_by_ess = _initial_soc_by_ess(setup, initial_soc)
     total_steps = len(setup.matrix)
     delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in setup.consumers_cfg}
     generic_flex_run: dict[str, dict] = {}
@@ -397,6 +444,7 @@ def _run_horizon_slots(
         for i, row in enumerate(setup.matrix):
             set_cbc_milp_context(simulation_hour_index=hour_base + i)
             slot_in = _slot_solve_inputs(setup, i, delivered_horizon, generic_flex_run)
+            slot: dict | None = None
             if setup.options.commit_hours <= 1:
                 sim_soc, chart_row, mode, target_power = _solve_slot_mpc(
                     setup, row, sim_soc, i, slot_in
@@ -414,6 +462,11 @@ def _run_horizon_slots(
                     setup.consumers_cfg,
                     slot,
                 )
+            attach_ess_soc_columns(chart_row, soc_by_ess, setup.batteries)
+            if slot is not None:
+                planned_by = slot.get("planned_soc_by_ess") or {}
+                for ess_id, soc_val in planned_by.items():
+                    soc_by_ess[str(ess_id)] = float(soc_val)
             sim_soc = _advance_delivered_and_flex_run(
                 setup,
                 chart_row,
@@ -437,7 +490,7 @@ def _run_horizon_slots(
 def simulate_horizon(
     optimization_matrix: list,
     initial_soc: float,
-    battery_params: dict | None = None,
+    battery_params: dict | list[dict] | None = None,
     k_push: float | None = None,
     verbose: bool = True,
     on_progress=None,
@@ -454,6 +507,7 @@ def simulate_horizon(
     flex_book_start: int = 0,
     soc_hold_index: int | None = None,
     soc_hold_percent: float | None = None,
+    current_soc_by_id: dict[str, float] | None = None,
 ) -> list:
     """
     Simuliert einen Optimierungshorizont über die gesamte Matrix.
@@ -493,6 +547,7 @@ def simulate_horizon(
         matrix_prepared=matrix_prepared,
         disable_horizon_soc_anchor=disable_horizon_soc_anchor,
         flexible_consumers=flexible_consumers,
+        current_soc_by_id=current_soc_by_id,
     )
     chart_rows, sim_soc = _run_horizon_slots(
         setup, initial_soc, on_progress, simulation_hour_offset

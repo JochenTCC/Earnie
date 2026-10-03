@@ -27,7 +27,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] "debug-dumps\debug_dump_20260930_182138"
-- [ ] plausibility of RC model simulation on NAS productive
+
+## Bug SE Plausibility — Class A MILP Infeasible / EV zero
+
+
+## Bug SE Plausibility — Class B WP / pool_filter shortfall (Optimal)
+
+- [ ] **SE `pool_filter` native-credit residual vs `profile_spec`** — After Class A/B year verify (`2025-10-01`–`2026-09-30`, sunrise): sole remaining fail `2026-09-21` flex Δ **0.72** kWh. MILP zeros Earnie target via native window credit; chart/plausibility still expect full debt. Optional: credit native delivery in plausibility/spec.
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 

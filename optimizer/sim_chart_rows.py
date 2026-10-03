@@ -15,6 +15,30 @@ COL_PV_IST = "PV-Ist (kW)"
 COL_VERBRAUCH_PROGNOSE = "Verbrauch-Prognose (kW)"
 COL_BATTERIE_AKTION = "Geplante Batterie-Aktion (kW)"
 COL_NETZBEZUG = "Netzbezug (kW)"
+COL_SOC = "Simulierter SoC (%)"
+
+
+def ess_soc_column_name(label: str) -> str:
+    """Chart column for one ESS SoC series (multi-battery Chart1)."""
+    text = str(label or "").strip() or "ESS"
+    return f"Simulierter SoC {text} (%)"
+
+
+def attach_ess_soc_columns(
+    chart_row: dict,
+    soc_by_ess: dict[str, float] | None,
+    batteries: list[dict] | None,
+) -> None:
+    """Write per-ESS SoC columns when more than one battery is configured."""
+    bats = [b for b in (batteries or []) if isinstance(b, dict)]
+    if len(bats) < 2 or not soc_by_ess:
+        return
+    for bat in bats:
+        ess_id = str(bat.get("id") or "").strip()
+        if not ess_id or ess_id not in soc_by_ess:
+            continue
+        label = str(bat.get("label") or ess_id).strip() or ess_id
+        chart_row[ess_soc_column_name(label)] = round(float(soc_by_ess[ess_id]), 1)
 
 
 def _chart_price_fields(row: dict) -> dict:
@@ -138,7 +162,7 @@ def _chart_row_from_controls(
         COL_VERBRAUCH_PROGNOSE: con,
         COL_BATTERIE_AKTION: round(batt_action, 2),
         COL_NETZBEZUG: round(p_grid, 2),
-        "Simulierter SoC (%)": round(old_soc, 1),
+        COL_SOC: round(old_soc, 1),
         "Steuerbefehl": action_text,
     }
     for consumer in consumers_cfg:
@@ -205,7 +229,7 @@ def horizon_end_soc_percent(
     """SoC nach der letzten Horizontstunde (Kette über alle chart_rows)."""
     soc = float(initial_soc)
     for row in chart_rows:
-        displayed = float(row["Simulierter SoC (%)"])
+        displayed = float(row[COL_SOC])
         soc = displayed
         batt = float(row.get(COL_BATTERIE_AKTION, 0.0) or 0.0)
         soc, _ = bat.apply_soc_change(

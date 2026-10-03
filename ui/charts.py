@@ -33,6 +33,7 @@ from ui.chart_soc import (
     add_ess_mode_soc_underlay_traces,
     add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
+    add_optimized_soc_traces,
     add_price_on_soc_axis_trace,
     _soc_at_chart_now,
 )
@@ -151,7 +152,7 @@ def _add_soc_price_layer(
         chart_now=options.chart_now,
         battery_params=options.battery_params,
     )
-    add_optimized_soc_trace(
+    add_optimized_soc_traces(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
         history_slot_count=options.history_slot_count,
         chart_now=options.chart_now,

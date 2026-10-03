@@ -90,6 +90,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         else:
             logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
         return
+    current_soc_by_id = ehal_live.read_ess_soc_by_id()
 
     config.is_sunrise_planning_horizon()
     planning_window = profile_manager.compute_live_planning_window()
@@ -326,9 +327,18 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         logger.warning("Export-Limit Telemetrie nicht lesbar: %s", exc)
     from settings.ess_limits_resolve import apply_effective_ess_limits
 
-    battery_params = apply_effective_ess_limits(
-        config.get_battery_params(), telemetry=telemetry_for_export
-    )
+    get_battery_list = getattr(config, "get_battery_params_list", None)
+    listed_batteries = get_battery_list() if callable(get_battery_list) else None
+    if listed_batteries and len(listed_batteries) > 1:
+        battery_params = [
+            apply_effective_ess_limits(bat, telemetry=telemetry_for_export)
+            for bat in listed_batteries
+            if isinstance(bat, dict)
+        ]
+    else:
+        battery_params = apply_effective_ess_limits(
+            config.get_battery_params(), telemetry=telemetry_for_export
+        )
     export_ctx = resolve_live_export_context(
         matrix_row=optimization_matrix[0] if optimization_matrix else None,
         telemetry=telemetry_for_export,
@@ -348,16 +358,23 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         ),
         hk_max_export_kw=export_ctx["hk_max_export_kw"],
         inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
+        current_soc_by_id=current_soc_by_id or None,
     )
     # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
     export_cap = export_ctx["effective_export_cap_kw"]
+    if isinstance(battery_params, list):
+        from optimizer.milp_horizon import aggregate_battery_params_for_load
+
+        primary_battery = aggregate_battery_params_for_load(battery_params)
+    else:
+        primary_battery = battery_params
     battery_plan_kw = optimizer.battery_plan_kw_from_control(
         mode,
         target_power,
         optimization_matrix[0]["expected_p_pv"],
         optimization_matrix[0]["expected_p_act"],
         sum(consumer_powers.values()),
-        battery_params["max_power_kw"],
+        primary_battery["max_power_kw"],
     )
 
     logger.info(
@@ -475,6 +492,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             sunrise_soc_min_index=sunrise_soc_min_index,
             filter_contexts=filter_contexts,
             consumers=live_consumers,
+            current_soc_by_id=current_soc_by_id or None,
         )
         savings_snapshot = optimizer.build_savings_snapshot(savings_info)
         logger.info(
@@ -531,6 +549,10 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "loxone_writes": loxone_writes,
             "ehal_writes": ehal_writes,
             "soc_percent": round(float(current_soc), 2),
+            "soc_percent_by_ess": {
+                str(ess_id): round(float(soc), 2)
+                for ess_id, soc in (current_soc_by_id or {}).items()
+            },
             "reported_soc_percent": round(float(reported_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
             "market_price_cent": market_price_cent,

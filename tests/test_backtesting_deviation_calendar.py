@@ -222,3 +222,32 @@ def test_run_anchors_from_hourly_uses_last_slot_presence():
     anchors = _run_anchors_from_hourly(meta, hourly)
     assert anchors == [anchor]
     assert _run_anchors_from_hourly(meta, pd.DataFrame(columns=["ts", "scenario_id"])) is None
+
+
+def test_default_visible_month_ignores_stale_stored_month(monkeypatch):
+    from ui import backtesting_deviation_calendar as cal
+
+    meta = _sample_meta(start="2025-03-01", end="2025-03-31")
+    meta["period"]["start_month"] = 3
+    meta["period"]["end_month"] = 3
+    run_anchors = _run_anchors_for_dates([date(2025, 3, 15)])
+    index = build_deviation_calendar_index(meta, [], run_anchors=run_anchors)
+    monkeypatch.setattr(
+        cal.st,
+        "session_state",
+        {"backtesting_calendar_month": 1},
+        raising=False,
+    )
+    assert cal._default_visible_month(index, 2025, None, meta["period"]) == 3
+
+
+def test_default_visible_month_prefers_single_month_period(monkeypatch):
+    from ui import backtesting_deviation_calendar as cal
+
+    meta = _sample_meta(start="2025-03-01", end="2025-03-31")
+    meta["period"]["start_month"] = 3
+    meta["period"]["end_month"] = 3
+    run_anchors = _run_anchors_for_dates([date(2025, 3, 1), date(2025, 3, 31)])
+    index = build_deviation_calendar_index(meta, [], run_anchors=run_anchors)
+    monkeypatch.setattr(cal.st, "session_state", {}, raising=False)
+    assert cal._default_visible_month(index, 2025, date(2025, 1, 5), meta["period"]) == 3

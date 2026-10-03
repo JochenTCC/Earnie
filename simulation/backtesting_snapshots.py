@@ -82,7 +82,7 @@ def build_window_snapshot(
     matrix_full: list[dict] | None = None,
     sunrise_soc_min_index: int | None = None,
     scenario_params: dict | None = None,
-    battery_params: dict | None = None,
+    battery_params: dict | list[dict] | None = None,
 ) -> dict:
     """Baut ein serialisierbares Fenster-Snapshot-Dict."""
     geo: dict[str, Any] | None = None
@@ -176,6 +176,25 @@ def append_window_snapshot(log_dir: str, snapshot: dict) -> bool:
     with open(path, "a", encoding="utf-8") as handle:
         handle.write(json.dumps(snapshot, ensure_ascii=False) + "\n")
     _invalidate_snapshot_index(log_dir)
+    return True
+
+
+def upsert_window_snapshot(log_dir: str, snapshot: dict) -> bool:
+    """Replace existing (anchor, scenario) snapshot or append if missing."""
+    window_anchor = str(snapshot.get("window_anchor", ""))
+    scenario_id = str(snapshot.get("scenario_id", ""))
+    if not window_anchor or not scenario_id:
+        return False
+    key = _snapshot_lookup_key(window_anchor, scenario_id)
+    existing = load_all_window_snapshots(log_dir)
+    kept = [
+        item
+        for item in existing
+        if _snapshot_lookup_key(item.get("window_anchor"), item.get("scenario_id"))
+        != key
+    ]
+    kept.append(snapshot)
+    write_window_snapshots_jsonl(log_dir, kept)
     return True
 
 

@@ -227,3 +227,129 @@ def test_milp_two_battery_balance_builds():
     assert model.ess_ids == ["a", "b"]
     assert "a" in model.p_charge_by_ess
     assert "b" in model.e_batt_by_ess
+
+
+def test_extract_horizon_schedule_emits_planned_soc_by_ess():
+    from optimizer.milp import milp_horizon_schedule
+
+    batteries = [
+        {
+            "id": "a",
+            "label": "Haus",
+            "battery_capacity_kwh": 5.0,
+            "min_soc": 10.0,
+            "max_soc": 100.0,
+            "max_charge_power_kw": 2.5,
+            "max_discharge_power_kw": 2.5,
+            "max_power_kw": 2.5,
+            "efficiency": 0.97,
+            "standby_power_kw": 0.0,
+            "control": "full",
+        },
+        {
+            "id": "b",
+            "label": "Garage",
+            "battery_capacity_kwh": 10.0,
+            "min_soc": 10.0,
+            "max_soc": 100.0,
+            "max_charge_power_kw": 5.0,
+            "max_discharge_power_kw": 5.0,
+            "max_power_kw": 5.0,
+            "efficiency": 0.97,
+            "standby_power_kw": 0.0,
+            "control": "full",
+        },
+    ]
+    matrix = [
+        {
+            "expected_p_pv": 3.0,
+            "expected_p_act": 1.0,
+            "k_act": 20.0,
+            "k_push_act": 5.0,
+            "hour": 12,
+        },
+        {
+            "expected_p_pv": 2.0,
+            "expected_p_act": 1.5,
+            "k_act": 25.0,
+            "k_push_act": 5.0,
+            "hour": 13,
+        },
+    ]
+    schedule = milp_horizon_schedule(
+        matrix,
+        current_soc=50.0,
+        battery_params=batteries,
+        k_push=5.0,
+        verbose=False,
+        consumers=[],
+        current_soc_by_id={"a": 40.0, "b": 60.0},
+    )
+    assert len(schedule) == 2
+    by_ess = schedule[0].get("planned_soc_by_ess") or {}
+    assert set(by_ess) == {"a", "b"}
+    assert 10.0 <= float(by_ess["a"]) <= 100.0
+    assert 10.0 <= float(by_ess["b"]) <= 100.0
+
+
+def test_simulate_horizon_writes_per_ess_soc_columns():
+    from optimizer.simulation import simulate_horizon
+    from optimizer.sim_chart_rows import ess_soc_column_name
+
+    batteries = [
+        {
+            "id": "a",
+            "label": "Haus",
+            "battery_capacity_kwh": 5.0,
+            "min_soc": 10.0,
+            "max_soc": 100.0,
+            "max_charge_power_kw": 2.5,
+            "max_discharge_power_kw": 2.5,
+            "max_power_kw": 2.5,
+            "efficiency": 0.97,
+            "standby_power_kw": 0.0,
+            "control": "full",
+        },
+        {
+            "id": "b",
+            "label": "Garage",
+            "battery_capacity_kwh": 10.0,
+            "min_soc": 10.0,
+            "max_soc": 100.0,
+            "max_charge_power_kw": 5.0,
+            "max_discharge_power_kw": 5.0,
+            "max_power_kw": 5.0,
+            "efficiency": 0.97,
+            "standby_power_kw": 0.0,
+            "control": "full",
+        },
+    ]
+    matrix = [
+        {
+            "expected_p_pv": 3.0,
+            "expected_p_act": 1.0,
+            "k_act": 20.0,
+            "k_push_act": 5.0,
+            "hour": 12,
+        },
+        {
+            "expected_p_pv": 2.0,
+            "expected_p_act": 1.5,
+            "k_act": 25.0,
+            "k_push_act": 5.0,
+            "hour": 13,
+        },
+    ]
+    rows = simulate_horizon(
+        matrix,
+        50.0,
+        battery_params=batteries,
+        k_push=5.0,
+        verbose=False,
+        commit_hours=len(matrix),
+        current_soc_by_id={"a": 40.0, "b": 60.0},
+    )
+    assert len(rows) == 2
+    assert rows[0][ess_soc_column_name("Haus")] == pytest.approx(40.0)
+    assert rows[0][ess_soc_column_name("Garage")] == pytest.approx(60.0)
+    assert "Simulierter SoC (%)" in rows[0]
