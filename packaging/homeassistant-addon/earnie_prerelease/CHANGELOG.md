@@ -2,6 +2,11 @@
 
 Same image family as `earnie/`. Pre-releases and official releases both bump this tree (`version:` = newest including alpha/rc on pre-release tags; matches stable on official tags).
 
+## 2.6.1-beta.2
+
+- Pins Earnie `2.6.1-beta.2` (`ghcr.io/jochentcc/earnie-energy:2.6.1-beta.2`).
+- Earnie release: [2.6.1-beta.2](https://github.com/JochenTCC/Earnie/releases/tag/v2.6.1-beta.2)
+
 ## 2.6.1-beta.1
 
 - Pins Earnie `2.6.1-beta.1` (`ghcr.io/jochentcc/earnie-energy:2.6.1-beta.1`).
