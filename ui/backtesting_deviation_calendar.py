@@ -35,19 +35,19 @@ _SEVERITY_RANK: dict[str, int] = {
 }
 
 _RED_KINDS = frozenset({"milp_no_optimal", "strict_slow", "strict_fallback"})
-_GERMAN_MONTHS = (
-    "Januar",
-    "Februar",
-    "März",
-    "April",
+_GERMAN_MONTHS_SHORT = (
+    "Jan",
+    "Feb",
+    "Mär",
+    "Apr",
     "Mai",
-    "Juni",
-    "Juli",
-    "August",
-    "September",
-    "Oktober",
-    "November",
-    "Dezember",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Dez",
 )
 _WEEKDAY_HEADERS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 _SESSION_DATE_KEY = "backtesting_calendar_date"
@@ -343,7 +343,7 @@ def render_deviation_calendar(
     index: dict[date, CalendarCellState],
     meta: dict,
 ) -> date | None:
-    """Ein Monat mit Zurück/Vor-Navigation; gibt gewählten Kalendertag zurück."""
+    """Ein Monat mit 12 Monats-Buttons; gibt gewählten Kalendertag zurück."""
     period = meta.get("period") or {}
     year = int(period.get("backtesting_year") or BACKTESTING_YEAR)
     selected_date = _stored_selected_date()
@@ -365,25 +365,20 @@ def render_deviation_calendar(
         "ausgegraut = außerhalb Lauf"
     )
 
-    nav_prev, nav_title, nav_next = st.columns([1, 3, 1])
-    with nav_prev:
-        if st.button(
-            "Zurück",
-            disabled=visible_month <= 1,
-            key="backtesting_calendar_prev",
-        ):
-            st.session_state[_SESSION_MONTH_KEY] = visible_month - 1
-            st.rerun()
-    with nav_title:
-        st.markdown(f"**{_GERMAN_MONTHS[visible_month - 1]} {year}**")
-    with nav_next:
-        if st.button(
-            "Vor",
-            disabled=visible_month >= 12,
-            key="backtesting_calendar_next",
-        ):
-            st.session_state[_SESSION_MONTH_KEY] = visible_month + 1
-            st.rerun()
+    st.markdown(f"**{year}**")
+    month_cols = st.columns(12)
+    for month in range(1, 13):
+        has_days = _month_has_in_run_days(index, year=year, month=month)
+        is_selected = month == visible_month
+        with month_cols[month - 1]:
+            if st.button(
+                _GERMAN_MONTHS_SHORT[month - 1],
+                disabled=not has_days or is_selected,
+                type="primary" if is_selected else "secondary",
+                key=f"backtesting_calendar_month_{month}",
+            ):
+                st.session_state[_SESSION_MONTH_KEY] = month
+                st.rerun()
 
     clicked_date = _render_month(year, visible_month, index, selected_date)
     if clicked_date is not None:

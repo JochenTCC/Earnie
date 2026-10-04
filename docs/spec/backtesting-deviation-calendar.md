@@ -19,7 +19,7 @@ Replace the deviation table (`st.dataframe`) with a **12-month calendar navigato
 
 ## Acceptance criteria
 
-- Full-year log: single-month view with Zurück/Vor navigation; Jan deviation days colored; OK days clickable and load charts via on-demand sim when no snapshot exists.
+- Full-year log: single-month view with one button per month (Jan–Dez); months without in-run days disabled; Jan deviation days colored; OK days clickable and load charts via on-demand sim when no snapshot exists.
 - Test-month run: only one month has active (clickable) days.
 - `fixed_24h` log: Chart1/2 without SA toggle.
 - `sunset_window` log: SA segment toggle still works for detail charts.
