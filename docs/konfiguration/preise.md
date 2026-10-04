@@ -16,7 +16,7 @@ Quellen und rechtliche Anker: [Tarife und Preise nachrechnen](../referenz/tarife
 
 Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `earnie_env/config/tariffs.json` auf (Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json)). Aufschläge stehen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).
 
-Marktpreise (Live) kommen primär von **Energy-Charts** (Gebotszone aus Hausprofil-`land`: AT / DE-LU / CH); bei Ausfall Fallback **aWATTar** (stündlich, auf 15-Min-Slots expandiert). Die aWATTar-URL aus `land` (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
+Marktpreise (Live) kommen primär von **Energy-Charts** (Gebotszone aus Hausprofil-`land`: AT / DE-LU / CH). Erfolgreiche Abrufe werden unter `runtime/live_energy_charts_<zone>.json` gespeichert und wiederverwendet, solange die Serie das Planungsfenster abdeckt und seit dem letzten Day-Ahead-Publish (~12:00 Ortszeit) frisch ist — der Daemon ruft Energy-Charts daher nicht mehr jedes Viertelstunde neu ab. Ist ein Refresh nötig und der Spiegel-Lookback (7 Tage) schon im Cache, fragt Earnie Energy-Charts nur ab **heute 00:00** bis Planungsende und füllt die Historie aus dem Cache. Bei Ausfall (z. B. HTTP 503) nutzt Earnie zuerst diesen QH-Cache; erst wenn der Cache fehlt oder das Fenster nicht abdeckt, Fallback **aWATTar** (stündlich, auf 15-Min-Slots expandiert). Die aWATTar-URL aus `land` (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
 
 ```
 (Marktpreis × (1 + markup_percent/100) + settlement_fee_cent_kwh

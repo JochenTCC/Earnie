@@ -14,7 +14,9 @@
                 "replacement_cost_euro": 2400,
                 "expected_cycles": 6000,
                 "cycle_cost_fraction": 0.5
-            }
+            },
+            "kind": "battery_inverter",
+            "ehal_bindings": {}
         }
     ],
     "pv_systems": [

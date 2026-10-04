@@ -8,8 +8,9 @@ from zoneinfo import ZoneInfo
 from data.live_market_prices import fetch_live_day_ahead_prices
 
 
-def test_energy_charts_fallback_does_not_nameerror_market_zone_ch():
+def test_energy_charts_fallback_does_not_nameerror_market_zone_ch(tmp_path, monkeypatch):
     """Regression: Energy-Charts failure must reach aWATTar (import MARKET_ZONE_CH)."""
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     planning_end = datetime(2026, 10, 6, 7, 26, tzinfo=ZoneInfo("Europe/Vienna"))
     with patch(
         "data.live_market_prices.fetch_energy_charts_prices",

@@ -58,6 +58,17 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [ ] **Regression P3 — gate + scrub:** CI job `regression` before `promote` in `release-publish.yml` (deploy-key secret), whitelist-based scrubber for customer → public repro cases (names/IDs, location, GDPR consent note), optional metric trend across releases.
   - **Open decisions:** soft vs. hard gate (proposal: soft first); customer-facing data-handling wording beyond the private repo; CBC version identical on dev machine / Docker / CI.
 
+- [ ] **2.7.k — ENTSO-E Transparency as additional EPEX day-ahead source (user token)** (independent of **2.7.a–j**; token not yet available — user is applying for one)
+  - Goal: a quarter-hour live source between Energy-Charts and the hourly aWATTar fallback. Today `fetch_live_day_ahead_prices` (`data/live_market_prices.py`) runs Energy-Charts → disk cache → aWATTar (AT only, hourly expand). New chain: Energy-Charts → **ENTSO-E** → cache → aWATTar.
+  - Scope v1: each user enters their **own** ENTSO-E token; no Earnie-hosted token or relay. Without a token the stage is skipped silently (no regression, no warning spam).
+  - New client `integrations/entsoe_client.py`: `GET https://web-api.tp.entsoe.eu/api` with `documentType=A44`, `in_Domain`/`out_Domain` = zone EIC code, `periodStart`/`periodEnd`, `securityToken`. Parse the XML (PT15M and PT60M resolutions; expand hourly to QH where a zone still publishes hourly). Map `MARKET_ZONE_AT` / `_DE` / `_CH` (`data/data_loader.py`) to EIC codes.
+  - Reuse the existing live price cache (`data/live_price_cache.py`, same series format and merge). The file name `live_energy_charts_<zone>.json` is source-specific — rename or add a `source` field (bump `CACHE_VERSION`).
+  - Token storage: `config/.env` as `ENTSOE_API_TOKEN` (same pattern as `EHAL_HA_TOKEN`: `.env.example`, `runtime_store/dotenv_io.py` quoted keys), never in `config.json` / house profile. Optional UI field next to the other price-source settings.
+  - Tests against recorded XML responses (no network); never log the token (strip `securityToken` from logged URLs).
+  - Docs (German): update `docs/referenz/tarife-quellen.md` (ENTSO-E row: "Optional später" → implemented, token needed), `docs/konfiguration/preise.md`, `docs/einrichtung/betrieb.md`; spec in `docs/spec/quarter-hour-slots.md` if the source order is described there.
+  - **Verify first** with the real token: current API parameters, QH resolution per zone (esp. CH), rate limits, terms of use (personal token; attribution).
+  - **Out of scope / later (2.+1 or product decision):** Earnie-server relay that fetches once per zone with one token and serves all instances (token never leaves the server, central plausibility check); whether reliable price delivery becomes part of a subscription — judge after the relay exists, base prices should stay free.
+
 ### Version 2.+1 (maybe also part of 2.7?)
 
 - [ ] **Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–c** / **2.7.g–h**)
