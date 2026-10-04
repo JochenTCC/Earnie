@@ -81,6 +81,13 @@ def resolve_scenario_settings(
     und house_profile_id auf. Liefert flaches Dict kompatibel mit simulation/engine.py.
     """
     out = dict(settings)
+    # Tolerate on-disk legacy singular until bootstrap migrate persists battery_ids[].
+    if "battery_id" in out:
+        raw = out.pop("battery_id")
+        existing = out.get("battery_ids")
+        if not (isinstance(existing, list) and existing):
+            bat_id = str(raw or "").strip()
+            out["battery_ids"] = [bat_id] if bat_id else []
     if components is None:
         if not components_path:
             raise ValueError("components_path oder components erforderlich.")

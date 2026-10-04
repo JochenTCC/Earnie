@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix NAS live startup / price fallback (2026-10-04)
+
+- [x] **Live aWATTar fallback NameError `MARKET_ZONE_CH`** — Energy-Charts 503 hit `if zone == MARKET_ZONE_CH` without importing the constant. Fix: import `MARKET_ZONE_CH` in `data/live_market_prices.py`. Regression: `tests/test_live_market_prices_regression.py`. NAS productive verified.
+- [x] **Startup abort `settings.battery_id` on data-model 4** — Bootstrap stamped `earnie_data_model=4` without migrating singular `battery_id`. Fix: `_migrate_pack_legacy_keys` in `runtime_store/bootstrap.py`, soft-coerce in `house_config/scenario_resolution.py`, startup check uses `battery_ids`. Regression: `tests/test_bootstrap_battery_id_regression.py`. NAS productive verified.
+
 ### 2.7.c — Multiple isolated battery / battery+inverter entities (2026-10-03)
 
 - [x] **2.7.c — Multiple isolated battery / battery+inverter entities** (bidirectional)

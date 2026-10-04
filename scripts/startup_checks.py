@@ -150,8 +150,12 @@ def run_live_scenario_entity_check_on_startup() -> None:
         return
 
     missing = []
-    if not str(settings.get("battery_id", "") or "").strip():
-        missing.append("battery_id")
+    bat_ids = settings.get("battery_ids")
+    has_bat = isinstance(bat_ids, list) and any(str(x or "").strip() for x in bat_ids)
+    if not has_bat and str(settings.get("battery_id", "") or "").strip():
+        has_bat = True  # legacy singular; bootstrap migrates to battery_ids[]
+    if not has_bat:
+        missing.append("battery_ids")
     pv_ids = settings.get("pv_system_ids")
     has_pv = isinstance(pv_ids, list) and any(str(x or "").strip() for x in pv_ids)
     if not has_pv:

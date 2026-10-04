@@ -323,6 +323,65 @@ def _stamp_pack_jsons_to_current_data_model() -> list[str]:
     return modified
 
 
+def _scenarios_have_legacy_battery_id(doc: dict) -> bool:
+    scenarios = doc.get("scenarios")
+    if not isinstance(scenarios, list):
+        return False
+    for entry in scenarios:
+        if not isinstance(entry, dict):
+            continue
+        settings = entry.get("settings")
+        if isinstance(settings, dict) and "battery_id" in settings:
+            return True
+    return False
+
+
+def _migrate_pack_legacy_keys() -> list[str]:
+    """
+    Persist v4 key renames even when earnie_data_model is already current.
+
+    Stamp alone can leave settings.battery_id on disk; live resolve then aborts.
+    Skipped in Shadow Mode (shared config is read-only).
+    """
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    if is_shadow_mode():
+        return []
+
+    from runtime_store.migrate_v4 import migrate_document
+    from settings.json_io import read_json_dict, write_json_dict
+
+    modified: list[str] = []
+    scenarios_path = resolve_backtesting_scenarios_json_path()
+    if os.path.isfile(scenarios_path):
+        doc = read_json_dict(scenarios_path)
+        if isinstance(doc, dict) and _scenarios_have_legacy_battery_id(doc):
+            migrated = migrate_document(doc, kind="scenarios")
+            write_json_dict(scenarios_path, migrated)
+            modified.append(scenarios_path)
+            logger.info(
+                "bootstrap: migrated settings.battery_id → battery_ids[] in %s",
+                scenarios_path,
+            )
+
+    components_path = resolve_components_json_path()
+    if os.path.isfile(components_path):
+        doc = read_json_dict(components_path)
+        if isinstance(doc, dict):
+            before = json.dumps(doc, sort_keys=True, ensure_ascii=False)
+            migrated = migrate_document(doc, kind="components")
+            after = json.dumps(migrated, sort_keys=True, ensure_ascii=False)
+            if after != before:
+                write_json_dict(components_path, migrated)
+                if components_path not in modified:
+                    modified.append(components_path)
+                logger.info(
+                    "bootstrap: migrated components.json defaults/kind in %s",
+                    components_path,
+                )
+    return modified
+
+
 def _bootstrap_tariffs_example() -> bool:
     dest = config_path("tariffs.example.json")
     return _copy_template_if_missing(
@@ -568,6 +627,9 @@ def _bootstrap_runtime_data_artifacts(*, shadow: bool = False) -> list[str]:
     if not shadow:
         for path in _stamp_pack_jsons_to_current_data_model():
             created.append(path)
+        for path in _migrate_pack_legacy_keys():
+            if path not in created:
+                created.append(path)
     if _bootstrap_local_settings_json():
         created.append(resolve_local_settings_json_path())
     if not shadow and _bootstrap_dotenv():

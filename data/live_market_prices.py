@@ -11,6 +11,7 @@ import pandas as pd
 import config
 from data.data_loader import (
     MARKET_ZONE_AT,
+    MARKET_ZONE_CH,
     fetch_energy_charts_prices,
 )
 from data.market_prices import awattar_fetch_window, normalize_price_slot
