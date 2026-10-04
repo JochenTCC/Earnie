@@ -139,6 +139,85 @@ class TestAbsentAvailability:
       assert cc.charging_deadline_after(arrival, consumer) == datetime(2026, 6, 23, 7, 0)
 
 
+class TestLateReturnAvailableFrom:
+  def test_keeps_future_config_slot_when_not_missed(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 22, 17, 0)
+      scheduled = datetime(2026, 6, 22, 19, 0)
+      deadline = datetime(2026, 6, 23, 7, 0)
+      assert (
+          cc.late_return_available_from(
+              horizon,
+              consumer,
+              scheduled_from=scheduled,
+              deadline=deadline,
+              target_kwh=14.0,
+              max_kw=3.5,
+          )
+          == scheduled
+      )
+
+  def test_missed_slot_uses_ready_at_minus_charge_minus_buffer(self):
+      consumer = _eauto_consumer()
+      consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 11
+      horizon = datetime(2026, 7, 10, 11, 15)
+      scheduled = datetime(2026, 7, 11, 10, 0)
+      deadline = datetime(2026, 7, 11, 12, 0)
+      assert cc._today_connect_slot_missed(horizon, consumer) is True
+      expected = cc.latest_start_datetime(deadline, 14.0, 3.5) - timedelta(
+          hours=cc.LATE_RETURN_CONNECT_BUFFER_H
+      )
+      assert (
+          cc.late_return_available_from(
+              horizon,
+              consumer,
+              scheduled_from=scheduled,
+              deadline=deadline,
+              target_kwh=14.0,
+              max_kw=3.5,
+          )
+          == max(horizon, expected)
+      )
+
+  def test_schedule_after_deadline_uses_last_possible(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 23, 8, 0)
+      scheduled = datetime(2026, 6, 23, 19, 0)
+      deadline = datetime(2026, 6, 23, 16, 3)
+      expected = cc.latest_start_datetime(deadline, 14.0, 3.5) - timedelta(
+          hours=cc.LATE_RETURN_CONNECT_BUFFER_H
+      )
+      assert (
+          cc.late_return_available_from(
+              horizon,
+              consumer,
+              scheduled_from=scheduled,
+              deadline=deadline,
+              target_kwh=14.0,
+              max_kw=3.5,
+          )
+          == max(horizon, expected)
+      )
+
+  def test_clamps_last_possible_to_horizon_when_already_past(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 23, 14, 0)
+      scheduled = datetime(2026, 6, 23, 19, 0)
+      deadline = datetime(2026, 6, 23, 16, 0)
+      # Large energy need → last possible before horizon → clamp to now.
+      assert (
+          cc.late_return_available_from(
+              horizon,
+              consumer,
+              scheduled_from=scheduled,
+              deadline=deadline,
+              target_kwh=50.0,
+              max_kw=3.5,
+          )
+          == horizon
+      )
+
+
 class TestLoxoneAbsentForecast:
   def test_forecast_inactive_without_loxone_deadline(self):
       consumer = _eauto_consumer()
@@ -205,6 +284,7 @@ class TestLoxoneAbsentForecast:
   def test_late_return_with_loxone_fertig_um(self):
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 23, 8, 0)
+      deadline = datetime(2026, 6, 23, 16, 3)
       with patch.object(
           cc.loxone_client, "fetch_loxone_generic_value", return_value=0
       ), patch.object(
@@ -212,9 +292,16 @@ class TestLoxoneAbsentForecast:
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
-      # Overnight ready_by already passed; next arrival is after FertigUm → inactive.
-      assert ctx["active"] is False
-      assert ctx["target_kwh"] == 0.0
+      # Next config arrival is after FertigUm → last-possible connect, stay active.
+      assert ctx["active"] is True
+      assert ctx["anticipated"] is True
+      assert ctx["plugged_in"] is False
+      assert ctx["deadline"] == deadline
+      expected = cc.latest_start_datetime(
+          deadline, ctx["target_kwh"], consumer["nominal_power_kw"]
+      ) - timedelta(hours=cc.LATE_RETURN_CONNECT_BUFFER_H)
+      assert ctx["available_from"] == max(horizon, expected)
+      assert ctx["target_kwh"] > 0
 
   def test_absent_after_overnight_ready_by_waits_for_next_arrival(self):
       """Dump 091219: FertigUm 'Morgen' must not keep overnight open all morning."""
@@ -237,11 +324,12 @@ class TestLoxoneAbsentForecast:
       assert ctx["available_from"] == datetime(2026, 7, 31, 18, 0)
       assert ctx["deadline"] == datetime(2026, 8, 1, 11, 0)
 
-  def test_forecast_same_day_past_slot_waits_for_next_arrival(self):
+  def test_forecast_same_day_past_slot_uses_last_possible_connect(self):
       consumer = _eauto_consumer()
       consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 11
       consumer["charging_schedule"]["weekend"]["car_available_from_hour"] = 10
       horizon = datetime(2026, 7, 10, 11, 15)
+      deadline = datetime(2026, 7, 11, 12, 0)
       with patch.object(
           cc.loxone_client, "fetch_loxone_generic_value", return_value=0
       ), patch.object(
@@ -251,7 +339,13 @@ class TestLoxoneAbsentForecast:
 
       assert ctx["active"] is True
       assert ctx["anticipated"] is True
-      assert ctx["available_from"] == datetime(2026, 7, 11, 10, 0)
+      assert ctx["deadline"] == deadline
+      expected = cc.latest_start_datetime(
+          deadline, ctx["target_kwh"], consumer["nominal_power_kw"]
+      ) - timedelta(hours=cc.LATE_RETURN_CONNECT_BUFFER_H)
+      assert ctx["available_from"] == max(horizon, expected)
+      # Must not jump to the next calendar car_available_from.
+      assert ctx["available_from"] != datetime(2026, 7, 11, 10, 0)
 
   def test_forecast_disabled_when_unplugged(self):
       consumer = _eauto_consumer(forecast_when_absent=False)

@@ -113,6 +113,7 @@ Wenn gesetzt und `enabled: true`:
 | `weekday` / `weekend`  | `car_available_from_hour`, `ready_by_hour`, `daily_rest_soc`                                                                               |
 | `loxone`               | `plugged_in_name`, `ready_by_time_name`, `soc_at_plug_in_name`, `battery_capacity_kwh_name`, `nominal_power_kw_name`, `charge_immediate_*` |
 
+**Verspätete Rückkehr:** Startpunkt ist `car_available_from_hour`. Ist dieser Ankunfts-Slot vorbei und das Auto noch nicht angeschlossen, setzt Earnie den internen Connect-Zeitpunkt auf FertigUm − benötigte Ladezeit − 1 h (mindestens „jetzt“). Der Ladezyklus wird nur ganz übersprungen, wenn vom Smarthome-Backend keine FertigUm/`get_evcs_ready_by_time` geliefert wird (oder die Frist schon abgelaufen ist).
 
 Ladeziel in kWh (vereinfacht, Kapazität nur aus Loxone):
 

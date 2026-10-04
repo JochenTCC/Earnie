@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### EV late-return connect prognosis (2026-10-04)
+
+- [x] Improve prognosis for EV coming back (connecting for charging)
+  - Take schedule from config as start
+  - If scheduled time passed without connected EV: last possible start = ReadyAt − charge duration − 1h buffer as internal connecting schedule (`late_return_available_from` in `optimizer/charging_resolve.py`)
+  - Only skip future charging completely when no ReadyAt from smarthome-backend (or deadline already expired)
+  - Docs: `docs/konfiguration/flexible-verbraucher.md`; tests: `tests/test_charging_context.py`
+
+### SE calendar month buttons (2026-10-04)
+
+- [x] Instead of Previous/Next (Zurück/Vor) on Detaillierte Simulationsansicht on SE page: one button per month to change visible month (`ui/backtesting_deviation_calendar.py`; months without in-run days disabled)
+
 ### Bugfix NAS live startup / price fallback (2026-10-04)
 
 - [x] **Live aWATTar fallback NameError `MARKET_ZONE_CH`** — Energy-Charts 503 hit `if zone == MARKET_ZONE_CH` without importing the constant. Fix: import `MARKET_ZONE_CH` in `data/live_market_prices.py`. Regression: `tests/test_live_market_prices_regression.py`. NAS productive verified.

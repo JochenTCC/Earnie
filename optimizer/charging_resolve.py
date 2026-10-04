@@ -21,7 +21,11 @@ from optimizer.charging_schedule import (
 )
 from settings.ehal_marker_resolve import marker_sens_evcs_connected
 from settings.flexible_consumers import flex_kw_lookup
-from optimizer.charging_urgent import urgent_min_kwh_from_soc
+from optimizer.charging_urgent import latest_start_datetime, urgent_min_kwh_from_soc
+from optimizer.consumer_power import power_limits_kw
+
+# Extra connect buffer after last possible charge start (late return prognosis).
+LATE_RETURN_CONNECT_BUFFER_H = 1.0
 
 
 def _cc():
@@ -36,6 +40,40 @@ def suppresses_live_charging_output(ctx: dict | None) -> bool:
     if not ctx:
         return False
     return bool(ctx.get("anticipated") and not ctx.get("plugged_in"))
+
+
+def _today_connect_slot_missed(horizon_start: datetime, consumer: dict) -> bool:
+    """True when today's config car_available_from_hour is already before now."""
+    today_from = _window_start_for_day(
+        consumer, horizon_start.date(), reference=horizon_start
+    )
+    return today_from is not None and today_from < horizon_start
+
+
+def late_return_available_from(
+    horizon_start: datetime,
+    consumer: dict,
+    *,
+    scheduled_from: datetime | None,
+    deadline: datetime,
+    target_kwh: float,
+    max_kw: float,
+) -> datetime | None:
+    """
+    After a missed config connect slot (or next arrival after ReadyAt), use
+    ReadyAt − charge duration − 1h as internal available_from (clamped to now).
+    """
+    if scheduled_from is None:
+        return None
+    if scheduled_from <= horizon_start:
+        return scheduled_from
+    missed = _today_connect_slot_missed(horizon_start, consumer)
+    if not missed and scheduled_from < deadline:
+        return scheduled_from
+    last = latest_start_datetime(
+        deadline, float(target_kwh), float(max_kw)
+    ) - timedelta(hours=LATE_RETURN_CONNECT_BUFFER_H)
+    return max(horizon_start, last)
 
 
 def _absent_availability_for_day_offset(
@@ -105,8 +143,10 @@ def resolve_absent_availability(
     """
     Ladebeginn bei Abwesenheit: offenes Übernacht-Fenster oder nächster Termin.
 
-    Verspätete Rückkehr am selben Tag (Slot vorbei, Auto noch abgehängt) gilt nicht
-    als „jetzt verfügbar“ — es wird der nächste car_available_from_hour verwendet.
+    Config-only baseline: after today's connect slot passes, returns the next
+    ``car_available_from_hour``. Callers with a live ReadyAt should then apply
+    ``late_return_available_from`` so a missed slot becomes ReadyAt − charge − 1h
+    instead of skipping when the next evening is after FertigUm.
 
     open_cycle_deadline: Latch aus flexible_consumers_state — kurzes Unplug am
     *selben Kalendertag* vor FertigUm hält den laufenden Ladezyklus offen
@@ -172,21 +212,21 @@ def _loxone_absent_forecast_context(
         return _loxone_inactive_context(
             "loxone (abwesend, keine aktive Fertigstellungszeit in Loxone)"
         )
-    available_from = resolve_absent_availability(
+    if loxone_deadline <= horizon_start:
+        return _loxone_inactive_context(
+            "loxone (abwesend, keine gültige Fertigstellungszeit)"
+        )
+    scheduled_from = resolve_absent_availability(
         horizon_start,
         consumer,
         ready_raw=ready_raw,
         open_cycle_deadline=open_cycle_deadline,
     )
-    if available_from is None:
+    if scheduled_from is None:
         return _loxone_inactive_context(
             "loxone (abwesend, kein car_available_from_hour in Config)"
         )
-    if loxone_deadline <= available_from:
-        return _loxone_inactive_context(
-            "loxone (abwesend, keine gültige Fertigstellungszeit)"
-        )
-    day_sched = config_day_schedule(consumer, available_from)
+    day_sched = config_day_schedule(consumer, horizon_start)
     capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
     limit_soc = _cc().resolve_get_evcs_limit_soc(consumer)
     target_kwh = config.Config.target_kwh_from_rest_soc(
@@ -199,13 +239,27 @@ def _loxone_absent_forecast_context(
         return _loxone_inactive_context(
             "loxone (abwesend, kein Ladeziel aus daily_rest_soc)"
         )
+    target_rounded = round(float(target_kwh), 3)
+    _, max_kw = power_limits_kw(consumer)
+    available_from = late_return_available_from(
+        horizon_start,
+        consumer,
+        scheduled_from=scheduled_from,
+        deadline=loxone_deadline,
+        target_kwh=target_rounded,
+        max_kw=max_kw,
+    )
+    if available_from is None or loxone_deadline <= available_from:
+        return _loxone_inactive_context(
+            "loxone (abwesend, keine gültige Fertigstellungszeit)"
+        )
     return {
         "active": True,
         "plugged_in": False,
         "anticipated": True,
         "available_from": available_from,
         "deadline": loxone_deadline,
-        "target_kwh": round(target_kwh, 3),
+        "target_kwh": target_rounded,
         "use_time_window": False,
         "source_label": "loxone (abwesend, Prognose + FertigUm Loxone)",
     }
@@ -328,6 +382,24 @@ def _config_path_with_plugged_in(
         ready_raw=ready_raw,
         open_cycle_deadline=open_cycle_deadline,
     )
+    # Late-return only with live FertigUm from smarthome-backend — not config ready_by.
+    deadline = parse_loxone_ready_by_time(ready_raw, horizon_start)
+    target_kwh = float(out.get("target_kwh") or 0.0)
+    if (
+        available_from is not None
+        and deadline is not None
+        and deadline > horizon_start
+        and target_kwh > 0
+    ):
+        _, max_kw = power_limits_kw(consumer)
+        available_from = late_return_available_from(
+            horizon_start,
+            consumer,
+            scheduled_from=available_from,
+            deadline=deadline,
+            target_kwh=target_kwh,
+            max_kw=max_kw,
+        )
     if available_from is not None:
         out["available_from"] = available_from
     if "FertigUm" in str(out.get("source_label") or ""):

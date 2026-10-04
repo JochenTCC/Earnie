@@ -20,12 +20,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Order:** **2.7.g** → **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
 
-- [ ] Instead of a "Previus" and "Next" button on Detaillierte Simulationsansicht on SE page create one button per month to change visible month
-- [ ] improve prognosis for EV coming back (connecting for charging)
-  - Take schedule from config as start
-  - If scheduled time passed without connected EV calculate last possible start time for charging to fullfill ReadyAt condition - 1h buffer and take this as new internal connecting schedule.
-  - Only skip future charging completely when no new ReadyAt date was delivered by smarthome-backend
-
 - [ ] Prepare and execute a small study about saving potentials for 2.7.g and 2.7.h
 
 - [ ] **2.7.g — Powerstation reserve for single-use manual devices** (`role: single_use`; depends on **2.7.c**; shares data model with **2.7.h**)
