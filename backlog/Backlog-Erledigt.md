@@ -2,6 +2,12 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Official 2.6.1 release (2026-10-05)
+
+- [x] Bump `version.py` **2.6.1-beta.2** → **2.6.1**; release notes `.github/release-notes/v2.6.1.md`
+- [x] Candidate tag `v2.6.1` on hotfix line `fix/issue24` (promote after platform test → `:latest` + official HA add-on)
+- [x] Includes **2.6.1-beta.1** (#24 hourly CSV ZOH, HA tariffs path, EEG catalog) and **2.6.1-beta.2** (unified power sign convention)
+
 ### Bugfix #24 Hourly Gesamt-CSV baseload quartered (2026-10-01)
 
 - [x] **[#24](https://github.com/JochenTCC/Earnie/issues/24) — Hourly Gesamt-CSV baseload quartered in 15‑min SE** — Path B `meter_residual_baseload_kw` used exact slot timestamps; hourly CSV only has `:00`, so `:15`/`:30`/`:45` became 0 → energy ≈ ÷4. Fix: hour-floor ZOH via `csv_kw_at_datetime`. Test: `test_meter_residual_holds_hourly_csv_on_qh_slots`. Verified on reporter pack March 2026 Gesamt ≈ 302.8 kWh (old exact-ts ≈ 75.7). Branch: `fix/issue24`.
