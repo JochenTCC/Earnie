@@ -2,10 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-### Official 2.6.1 release (2026-10-05)
+### 2.6.2-beta.1 pre-release (2026-10-05)
+
+- [x] Port `MARKET_ZONE_CH` import so Energy-Charts 503 falls back to aWATTar (Monitor); regression `test_live_market_prices_regression.py`
+- [x] Bump `version.py` → **2.6.2-beta.1**; sync alpha compose pins; release notes `.github/release-notes/v2.6.2-beta.1.md`
+- [x] Candidate tag `v2.6.2-beta.1` (promote after platform test → `:next` only; no `:latest`)
+
+### Official 2.6.1 release (2026-10-05) — candidate declined
 
 - [x] Bump `version.py` **2.6.1-beta.2** → **2.6.1**; release notes `.github/release-notes/v2.6.1.md`
-- [x] Candidate tag `v2.6.1` on hotfix line `fix/issue24` (promote after platform test → `:latest` + official HA add-on)
+- [x] Candidate tag `v2.6.1` on hotfix line `fix/issue24` — **promote declined** (Monitor crash on Energy-Charts 503 / missing `MARKET_ZONE_CH`); superseded by **2.6.2-beta.1**
 - [x] Includes **2.6.1-beta.1** (#24 hourly CSV ZOH, HA tariffs path, EEG catalog) and **2.6.1-beta.2** (unified power sign convention)
 
 ### Bugfix #24 Hourly Gesamt-CSV baseload quartered (2026-10-01)
