@@ -2,11 +2,17 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Official 2.6.2 release (2026-10-05)
+
+- [x] Bump `version.py` **2.6.2-beta.1** → **2.6.2**; release notes `.github/release-notes/v2.6.2.md`
+- [x] Candidate tag `v2.6.2` on hotfix line `fix/issue24` (promote after platform test → `:latest` + official HA add-on)
+- [x] HA verified on **2.6.2-beta.1** (Energy-Charts fallback / Monitor)
+
 ### 2.6.2-beta.1 pre-release (2026-10-05)
 
 - [x] Port `MARKET_ZONE_CH` import so Energy-Charts 503 falls back to aWATTar (Monitor); regression `test_live_market_prices_regression.py`
 - [x] Bump `version.py` → **2.6.2-beta.1**; sync alpha compose pins; release notes `.github/release-notes/v2.6.2-beta.1.md`
-- [x] Candidate tag `v2.6.2-beta.1` (promote after platform test → `:next` only; no `:latest`)
+- [x] Candidate tag `v2.6.2-beta.1` — promoted / HA OK; superseded by official **2.6.2**
 
 ### Official 2.6.1 release (2026-10-05) — candidate declined
 
