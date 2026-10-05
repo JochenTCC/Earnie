@@ -118,6 +118,14 @@ Kurz erklärt, damit die folgenden Schritte nicht wie „Zauberei“ wirken:
      übernimmt das sofort.
   5. Für jede weitere Automation (Schritt 4 hat zwei, Schritt 5 und 6 je eine) denselben Ablauf
      wiederholen.
+- **Die Dateien `automations.yaml`, `scripts.yaml`, `scenes.yaml`:** Diese drei Dateien binden die
+  meisten HA-Installationen per `!include` in `configuration.yaml` ein (z. B.
+  `automation: !include automations.yaml`). Jede gehört fest zu genau einem Eintrag
+  (`automation:`, `script:`, `scene:`) und ist nur für dessen Inhalt gedacht. `rest_command:` und
+  `template:` sind eigene Einträge und gehören **nicht** in diese Dateien. Die UI schreibt
+  außerdem selbst in `automations.yaml` und kann fremde Einträge dort überschreiben oder die Datei
+  beschädigen (Fehler „response error: 500“ beim Speichern). Wer `rest_command` auslagern möchte,
+  nimmt dafür eine eigene Datei (siehe Schritt 4).
 - **Ändern übernehmen (für `configuration.yaml`-Änderungen: Template-Sensor, `rest_command`):**
   1. **Entwicklerwerkzeuge → YAML** (oder **Einstellungen → System → Wartung**) → Button
      **„Konfiguration prüfen“** — meldet Syntaxfehler, ohne etwas zu übernehmen.
@@ -274,22 +282,32 @@ passiert in zwei Teilen, die beide in dieselbe `configuration.yaml` kommen wie S
   Miniserver-Benutzerkennung für HA statt der `LOXONE_USER`/`LOXONE_PASS`-Zugangsdaten aus Earnies
   `.env`.
 
-**`rest_command` einfügen:** ans Ende eurer `configuration.yaml` (oder in einen bestehenden
-`rest_command:`-Block, siehe Grundlagen-Abschnitt oben zum Zusammenführen):
+**`rest_command` in eigene Datei auslagern:** Die Befehle gehören **nicht** in `automations.yaml`,
+`scripts.yaml` oder `scenes.yaml` (siehe Grundlagen-Abschnitt oben), sondern in eine eigene Datei,
+die ihr in `configuration.yaml` einbindet:
 
-```yaml
-rest_command:
-  loxone_push_ess_soc:
-    url: "http://192.168.178.10/jdev/sps/io/Earnie_Batterie_SoC/{{ value }}"
-    username: !secret loxone_user
-    password: !secret loxone_pass
-  loxone_push_ess_power:
-    url: "http://192.168.178.10/jdev/sps/io/Earnie_Batterie_Leistung/{{ value }}"
-    username: !secret loxone_user
-    password: !secret loxone_pass
-```
+1. In `configuration.yaml` eintragen (einen eventuell schon vorhandenen `rest_command:`-Eintrag
+   vorher entfernen, sonst gibt es einen doppelten Schlüssel):
 
-Konfiguration prüfen → **„REST-Befehle neu laden“** (oder HA neu starten).
+   ```yaml
+   rest_command: !include rest_command.yaml
+   ```
+
+2. Neue Datei `rest_command.yaml` im selben Ordner wie `configuration.yaml` anlegen, mit diesem
+   Inhalt — **ohne** die Zeile `rest_command:`, die steht ja schon in `configuration.yaml`:
+
+   ```yaml
+   loxone_push_ess_soc:
+     url: "http://192.168.178.10/jdev/sps/io/Earnie_Batterie_SoC/{{ value }}"
+     username: !secret loxone_user
+     password: !secret loxone_pass
+   loxone_push_ess_power:
+     url: "http://192.168.178.10/jdev/sps/io/Earnie_Batterie_Leistung/{{ value }}"
+     username: !secret loxone_user
+     password: !secret loxone_pass
+   ```
+
+3. Konfiguration prüfen → **„REST-Befehle neu laden“** (oder HA neu starten).
 
 **Automationen anlegen:** über die HA-Oberfläche, wie im Grundlagen-Abschnitt oben beschrieben
 (Automatisierung erstellen → „In YAML bearbeiten“) — **zweimal**, einmal je Block. `<device>`
@@ -403,10 +421,13 @@ Danach in Earnie unter **Daemon Control → EHAL-Com → Loxone Structure → EH
 
 ## Anhang: die komplette `configuration.yaml`-Ergänzung zum Kopieren
 
-Nur noch Template-Sensor (Schritt 2) und `rest_command` (Schritt 4) gehören in
-`configuration.yaml` — die vier Automationen legt ihr über die Oberfläche an (siehe
-Grundlagen-Abschnitt oben). **Vorher überall** `<device>` und `192.168.178.10` durch eure eigenen
-Werte aus Schritt 1 (Entity-IDs) bzw. eure Miniserver-Adresse ersetzen:
+Es sind drei Dateien betroffen: `configuration.yaml` (Template-Sensor und `rest_command`-Verweis),
+`rest_command.yaml` (die Befehle) und `secrets.yaml` (Zugangsdaten). Die vier Automationen legt ihr
+über die Oberfläche an (siehe Grundlagen-Abschnitt oben). **Vorher überall** `<device>` und
+`192.168.178.10` durch eure eigenen Werte aus Schritt 1 (Entity-IDs) bzw. eure Miniserver-Adresse
+ersetzen.
+
+In `configuration.yaml` (ans Ende):
 
 ```yaml
 template:
@@ -418,26 +439,32 @@ template:
           {{ (states('sensor.<device>_total_out_power') | float(0))
              - (states('sensor.<device>_total_in_power') | float(0)) }}
 
-rest_command:
-  loxone_push_ess_soc:
-    url: "http://192.168.178.10/jdev/sps/io/Earnie_Batterie_SoC/{{ value }}"
-    username: !secret loxone_user
-    password: !secret loxone_pass
-  loxone_push_ess_power:
-    url: "http://192.168.178.10/jdev/sps/io/Earnie_Batterie_Leistung/{{ value }}"
-    username: !secret loxone_user
-    password: !secret loxone_pass
+rest_command: !include rest_command.yaml
 ```
 
-Dazu in `secrets.yaml` (gleiches Verzeichnis, gleicher Editor):
+Neue Datei `rest_command.yaml` (im selben Ordner, ohne die Zeile `rest_command:`):
+
+```yaml
+loxone_push_ess_soc:
+  url: "http://192.168.178.10/jdev/sps/io/Earnie_Batterie_SoC/{{ value }}"
+  username: !secret loxone_user
+  password: !secret loxone_pass
+loxone_push_ess_power:
+  url: "http://192.168.178.10/jdev/sps/io/Earnie_Batterie_Leistung/{{ value }}"
+  username: !secret loxone_user
+  password: !secret loxone_pass
+```
+
+In `secrets.yaml` (gleiches Verzeichnis, gleicher Editor):
 
 ```yaml
 loxone_user: "ha-earnie"
 loxone_pass: "euer-passwort"
 ```
 
-**Falls in eurer `configuration.yaml` schon `template:` oder `rest_command:` vorkommt:** nicht den
-ganzen Block oben einfügen, sondern nur die neuen Einträge darunter in den bestehenden Abschnitt
+**Falls in eurer `configuration.yaml` schon `template:` oder `rest_command:` vorkommt:** den
+vorhandenen `rest_command:`-Eintrag durch die `!include`-Zeile ersetzen (sein Inhalt wandert in
+`rest_command.yaml`), beim `template:`-Block nur den neuen Sensor in den bestehenden Abschnitt
 übernehmen. Danach wie gewohnt: Konfiguration prüfen → neu laden / neu starten (siehe
 Grundlagen-Abschnitt oben). Die vier Automationen (zwei aus Schritt 4, je eine aus Schritt 5 und 6)
 legt ihr separat über **Einstellungen → Automatisierungen & Szenen** an, mit den jeweiligen
