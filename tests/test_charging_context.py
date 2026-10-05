@@ -219,7 +219,8 @@ class TestLateReturnAvailableFrom:
 
 
 class TestLoxoneAbsentForecast:
-  def test_forecast_inactive_without_loxone_deadline(self):
+  def test_forecast_falls_back_to_config_ready_at_without_live(self):
+      """No live FertigUm → config ready_by keeps the cycle active (no day skip)."""
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
@@ -229,11 +230,16 @@ class TestLoxoneAbsentForecast:
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
-      assert ctx["active"] is False
-      assert ctx["target_kwh"] == 0.0
-      assert "keine aktive Fertigstellungszeit" in ctx["source_label"]
+      assert ctx["active"] is True
+      assert ctx["anticipated"] is True
+      assert ctx["plugged_in"] is False
+      assert ctx["available_from"] == datetime(2026, 6, 22, 19, 0)
+      assert ctx["deadline"] == datetime(2026, 6, 23, 7, 0)
+      assert ctx["connect_phase"] == cc.PHASE_BEFORE_ARRIVAL
+      assert ctx["ready_at_source"] == cc.READY_AT_CONFIG
+      assert "ReadyAt Config" in ctx["source_label"]
 
-  def test_forecast_inactive_with_empty_loxone_deadline(self):
+  def test_forecast_falls_back_to_config_ready_at_with_empty_live(self):
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
@@ -243,7 +249,25 @@ class TestLoxoneAbsentForecast:
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
+      assert ctx["active"] is True
+      assert ctx["connect_phase"] == cc.PHASE_BEFORE_ARRIVAL
+      assert ctx["ready_at_source"] == cc.READY_AT_CONFIG
+      assert ctx["deadline"] == datetime(2026, 6, 23, 7, 0)
+
+  def test_forecast_inactive_without_any_ready_at(self):
+      consumer = _eauto_consumer()
+      consumer["charging_schedule"]["weekday"]["ready_by_hour"] = None
+      consumer["charging_schedule"]["weekend"]["ready_by_hour"] = None
+      horizon = datetime(2026, 6, 22, 17, 0)
+      with patch.object(
+          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+      ), patch.object(
+          cc.loxone_client, "fetch_loxone_ready_by_time", return_value=None
+      ), _patch_eauto_capacity():
+          ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
       assert ctx["active"] is False
+      assert ctx["connect_phase"] == cc.PHASE_INACTIVE
       assert ctx["target_kwh"] == 0.0
 
   def test_forecast_uses_loxone_fertig_um_when_absent(self):
@@ -262,6 +286,8 @@ class TestLoxoneAbsentForecast:
       assert ctx["available_from"] == datetime(2026, 6, 22, 19, 0)
       assert ctx["deadline"] == datetime(2026, 6, 23, 16, 3)
       assert ctx["use_time_window"] is False
+      assert ctx["connect_phase"] == cc.PHASE_BEFORE_ARRIVAL
+      assert ctx["ready_at_source"] == cc.READY_AT_LIVE
       assert "FertigUm Loxone" in ctx["source_label"]
 
   def test_forecast_timezone_aware_horizon(self):
@@ -297,11 +323,50 @@ class TestLoxoneAbsentForecast:
       assert ctx["anticipated"] is True
       assert ctx["plugged_in"] is False
       assert ctx["deadline"] == deadline
+      assert ctx["connect_phase"] == cc.PHASE_LATE_RETURN
       expected = cc.latest_start_datetime(
           deadline, ctx["target_kwh"], consumer["nominal_power_kw"]
       ) - timedelta(hours=cc.LATE_RETURN_CONNECT_BUFFER_H)
       assert ctx["available_from"] == max(horizon, expected)
       assert ctx["target_kwh"] > 0
+
+  def test_late_return_with_config_ready_at_only(self):
+      """Missed connect + no live FertigUm → late-return via config ready_by."""
+      consumer = _eauto_consumer()
+      consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 11
+      consumer["charging_schedule"]["weekend"]["car_available_from_hour"] = 10
+      horizon = datetime(2026, 7, 10, 11, 15)
+      with patch.object(
+          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+      ), patch.object(
+          cc.loxone_client, "fetch_loxone_ready_by_time", return_value=None
+      ), _patch_eauto_capacity():
+          ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
+      assert ctx["active"] is True
+      assert ctx["connect_phase"] == cc.PHASE_LATE_RETURN
+      assert ctx["ready_at_source"] == cc.READY_AT_CONFIG
+      deadline = ctx["deadline"]
+      assert deadline == datetime(2026, 7, 11, 7, 0)
+      expected = cc.latest_start_datetime(
+          deadline, ctx["target_kwh"], consumer["nominal_power_kw"]
+      ) - timedelta(hours=cc.LATE_RETURN_CONNECT_BUFFER_H)
+      assert ctx["available_from"] == max(horizon, expected)
+      assert ctx["available_from"] != datetime(2026, 7, 11, 10, 0)
+
+  def test_before_arrival_does_not_open_available_from_now(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 22, 17, 0)
+      with patch.object(
+          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+      ), patch.object(
+          cc.loxone_client, "fetch_loxone_ready_by_time", return_value="Morgen, 07:00"
+      ), _patch_eauto_capacity():
+          ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
+      assert ctx["connect_phase"] == cc.PHASE_BEFORE_ARRIVAL
+      assert ctx["available_from"] == datetime(2026, 6, 22, 19, 0)
+      assert ctx["available_from"] > horizon
 
   def test_absent_after_overnight_ready_by_waits_for_next_arrival(self):
       """Dump 091219: FertigUm 'Morgen' must not keep overnight open all morning."""
@@ -340,6 +405,7 @@ class TestLoxoneAbsentForecast:
       assert ctx["active"] is True
       assert ctx["anticipated"] is True
       assert ctx["deadline"] == deadline
+      assert ctx["connect_phase"] == cc.PHASE_LATE_RETURN
       expected = cc.latest_start_datetime(
           deadline, ctx["target_kwh"], consumer["nominal_power_kw"]
       ) - timedelta(hours=cc.LATE_RETURN_CONNECT_BUFFER_H)
@@ -653,6 +719,26 @@ class TestConfigPathFertigUm:
         assert ctx.get("anticipated") is True
         assert cc.suppresses_live_charging_output(ctx) is True
         assert ctx["target_kwh"] > 0
+        assert ctx["connect_phase"] == cc.PHASE_BEFORE_ARRIVAL
+        assert ctx["ready_at_source"] == cc.READY_AT_LIVE
+
+    def test_unplugged_config_ready_at_late_return_without_live(self):
+        consumer = self._config_consumer()
+        consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 8
+        consumer["charging_schedule"]["weekend"]["car_available_from_hour"] = 8
+        horizon = datetime(2026, 7, 20, 10, 0)
+        matrix = _hour_matrix(horizon, 24)
+        with patch.object(cc, "_loxone_ready_raw", return_value=None), patch.object(
+            cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+        ), _patch_eauto_capacity():
+            ctx = cc.resolve_charging_context(
+                consumer, matrix, None, logged_simulation=False
+            )
+        assert ctx["active"] is True
+        assert ctx["connect_phase"] == cc.PHASE_LATE_RETURN
+        assert ctx["ready_at_source"] == cc.READY_AT_CONFIG
+        assert ctx["use_time_window"] is False
+        assert ctx["available_from"] >= horizon
 
     def test_unplugged_without_forecast_inactive(self):
         consumer = self._config_consumer()
@@ -668,6 +754,40 @@ class TestConfigPathFertigUm:
         assert ctx["active"] is False
         assert ctx.get("plugged_in") is False
         assert ctx.get("target_kwh", 0) == 0
+
+
+class TestConnectPrognosisPhases:
+  def test_open_cycle_same_day_phase(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 8, 8, 10, 0)
+      open_deadline = datetime(2026, 8, 8, 13, 0)
+      prog = cc.resolve_connect_prognosis(
+          horizon,
+          consumer,
+          ready_raw=None,
+          open_cycle_deadline=open_deadline,
+          target_kwh=14.0,
+          max_kw=3.5,
+      )
+      assert prog.phase == cc.PHASE_OPEN_CYCLE
+      assert prog.available_from == horizon
+      assert prog.deadline == open_deadline
+
+  def test_open_cycle_next_day_not_forced(self):
+      consumer = _eauto_consumer()
+      consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 18
+      horizon = datetime(2026, 9, 29, 13, 0)
+      open_deadline = datetime(2026, 9, 30, 6, 15)
+      prog = cc.resolve_connect_prognosis(
+          horizon,
+          consumer,
+          ready_raw=open_deadline.timestamp(),
+          open_cycle_deadline=open_deadline,
+          target_kwh=14.0,
+          max_kw=3.5,
+      )
+      assert prog.phase != cc.PHASE_OPEN_CYCLE
+      assert prog.available_from == datetime(2026, 9, 29, 18, 0)
 
 
 class TestParseLoxoneReadyByTime:

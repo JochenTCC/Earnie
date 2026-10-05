@@ -331,7 +331,7 @@ Am bestehenden `Earnie_LadeLeistungs-Limit`-Merker (aus `VI_Earnie_Plant.xml`, s
 Wertänderung folgende URL aufruft:
 
 ```
-POST http://<HA-Host>:8123/api/webhook/earnie_charge_limit?v=\v
+GET http://<HA-Host>:8123/api/webhook/earnie_charge_limit?v=\v
 ```
 
 `<HA-Host>` ist die IP oder der Hostname eures Home-Assistant-Systems.
@@ -344,7 +344,7 @@ alias: "Earnie -> Ecoflow AC-Ladelimit"
 triggers:
   - trigger: webhook
     webhook_id: earnie_charge_limit
-    allowed_methods: [POST]
+    allowed_methods: [GET, POST]
     local_only: false
 actions:
   - action: number.set_value
@@ -366,7 +366,7 @@ Earnie fehlt.
 Virtueller Ausgang am neuen Merker `Earnie_Speicher_Quellenwahl`:
 
 ```
-POST http://<HA-Host>:8123/api/webhook/earnie_speicher_quelle?v=\v
+GET http://<HA-Host>:8123/api/webhook/earnie_speicher_quelle?v=\v
 ```
 
 In HA — Automation über die Oberfläche anlegen (wie in Schritt 4/5), direkte 1:1-Abbildung, kein
@@ -377,7 +377,7 @@ alias: "Speicher-Quellenwahl -> Ecoflow Grid Bypass"
 triggers:
   - trigger: webhook
     webhook_id: earnie_speicher_quelle
-    allowed_methods: [POST]
+    allowed_methods: [GET, POST]
     local_only: false
 actions:
   - action: >

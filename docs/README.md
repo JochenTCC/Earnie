@@ -85,4 +85,5 @@ Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) stehen nur hier �
 - [Release Checklist](spec/release-checklist.md) — Kandidat → Test auf HA / LoxBerry → Freigabe
 - [Shadow Mode](spec/shadow-mode.md) — Prod-Feed-Recorder (S1) + Shadow-Client (S2+S3, **2.7.f**) implemented; S4 → **2.+1**
 - [Regression Suite](spec/regression-suite.md) — Golden-Master-Cases vor Release, öffentliche + private Daten (**2.7.i**, Entwurf)
+- [EV return prognosis](spec/ev-return-prognosis.md) — Connect-Phasen bei abwesendem E-Auto (`forecast_when_absent`)
 - Weitere Specs unter [`docs/spec/`](spec/)

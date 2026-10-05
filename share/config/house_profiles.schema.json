@@ -298,7 +298,8 @@
           "maximum": 1
         },
         "forecast_when_absent": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "true = bei Abwesenheit Ladebedarf prognostizieren (Loxone- und Config-Pfad). ReadyAt: Live-FertigUm wenn parsebar, sonst Config ready_by_hour."
         },
         "nominal_power_voltage_v": {
           "type": "number",
