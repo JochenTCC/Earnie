@@ -18,7 +18,9 @@ _PLACEHOLDER_PASSES = frozenset({"passwort-des-benutzers-in-der-loxone"})
 
 _LOXONE_KEYS = ("LOXONE_IP", "LOXONE_USER", "LOXONE_PASS")
 _HA_KEYS = ("EHAL_HA_BASE_URL", "EHAL_HA_TOKEN")
-_QUOTED_KEYS = frozenset({"LOXONE_USER", "LOXONE_PASS", "EHAL_HA_TOKEN"})
+_QUOTED_KEYS = frozenset(
+    {"LOXONE_USER", "LOXONE_PASS", "EHAL_HA_TOKEN", "ENTSOE_API_TOKEN"}
+)
 
 
 def _normalized_env_value(key: str) -> str:

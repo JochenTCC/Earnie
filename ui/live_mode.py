@@ -193,7 +193,7 @@ def _opt_in_planning_inputs() -> tuple[object, list] | None:
     market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
     if not market_data:
         st.error(
-            "🚨 Fehler: Börsenstrompreise (Energy-Charts / aWATTar-Fallback) "
+            "🚨 Fehler: Börsenstrompreise (ENTSO-E / Energy-Charts / aWATTar) "
             "konnten nicht geladen werden. Abbruch der Simulation."
         )
         st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)

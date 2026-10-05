@@ -2,6 +2,26 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.k — ENTSO-E first in live day-ahead price chain (2026-10-05)
+
+- [x] **2.7.k — ENTSO-E Transparency as additional EPEX day-ahead source (user token)**
+  - Live chain: ENTSO-E (when `ENTSOE_API_TOKEN` in `config/.env`) → Energy-Charts (Fraunhofer) → QH disk cache → aWATTar; no token → INFO skip with checked `.env` path
+  - Client [`integrations/entsoe_client.py`](../integrations/entsoe_client.py): A44, EIC map AT/DE-LU/CH; PT15M native, PT60M (CH) → QH expand; token never logged; env + `.env` file fallback for token
+  - Cache rename `live_day_ahead_<zone>.json` (`CACHE_VERSION` 2, optional `source`); orchestrator [`data/live_market_prices.py`](../data/live_market_prices.py)
+  - Fixtures `tests/fixtures/entsoe/`; tests `test_entsoe_client.py` + live cache order/fallback
+  - Docs: `tarife-quellen.md`, `preise.md`, `betrieb.md`, `quarter-hour-slots.md`; `.env.example` + `dotenv_io` quoted key
+  - **Verified live** (2026-10-05): API probe AT/DE-LU PT15M, CH PT60M; main.py against NAS productive `.env` with token → ENTSO-E used
+  - Out of scope: Earnie-hosted relay / subscription SLA; SE price chain; Streamlit token UI
+
+### EV coming-back prognosis review and refactor (2026-10-05)
+
+- [x] Thorough review of EV coming-back / connect prognosis (too-early planning + day skip)
+  - Spec: [`docs/spec/ev-return-prognosis.md`](../docs/spec/ev-return-prognosis.md) (current algorithm, Jul–Oct 2026 history, phase model)
+  - Single resolver `resolve_connect_prognosis` in [`optimizer/ev_connect_prognosis.py`](../optimizer/ev_connect_prognosis.py); phases `before_arrival` / `late_return` / `open_cycle` / `overnight_open` / `inactive`
+  - ReadyAt: live FertigUm, else config `ready_by_hour` (both Loxone and config paths) — no day skip when only config ReadyAt exists
+  - Context fields `connect_phase` + `ready_at_source` for debug dumps; German user doc + schema for `forecast_when_absent`
+  - Tests: [`tests/test_charging_context.py`](../tests/test_charging_context.py)
+
 ### 2.7.g — Powerstation reserve for single-use manual devices (2026-10-05)
 
 - [x] **2.7.g — Powerstation reserve for single-use manual devices** (`role: single_use`; shared model with **2.7.h**)

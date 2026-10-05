@@ -141,9 +141,9 @@ Nachrechnen der Formeln: diese Seite. Technisches Mapping: [preise.md](../konfig
 | Quelle | Zugang | Rolle in Earnie |
 | ------ | ------ | --------------- |
 | **Offizielle EPEX** SFTP / MATS API | Kostenpflichtig ([Market Data Services](https://www.epexspot.com/en/marketdataservices), [EEX Webshop](https://webshop.eex-group.com/epex-spot-public-market-data)) | **Nicht** angebunden |
-| **Energy-Charts** `GET /price?bzn=…` | Kostenlos; Fraunhofer ISE, CC BY 4.0 ([api.energy-charts.info](https://api.energy-charts.info/)) | **Primäre** Day-Ahead-Quelle für AT, DE-LU, CH |
-| **aWATTar** `api.awattar.at` / `.de` | Kostenlos, Fair Use | Fallback (AT) bzw. optional (DE); Katalog-Tarife als `spot_hourly` (API-URL aus `land`) |
-| **ENTSO-E Transparency** | Token erforderlich | Optional später |
+| **ENTSO-E Transparency** `documentType=A44` | Persönlicher API-Token (`ENTSOE_API_TOKEN` in `config/.env`); [transparency.entsoe.eu](https://transparency.entsoe.eu/) | **Primäre** Live-Day-Ahead-Quelle, wenn Token gesetzt (AT / DE-LU / CH) |
+| **Energy-Charts** `GET /price?bzn=…` | Kostenlos; Fraunhofer ISE, CC BY 4.0 ([api.energy-charts.info](https://api.energy-charts.info/)) | Live-Fallback ohne/bei Ausfall ENTSO-E; **primäre** SE-/Backtesting-Quelle für AT, DE-LU, CH |
+| **aWATTar** `api.awattar.at` / `.de` | Kostenlos, Fair Use | Letzter Live-Fallback (AT) bzw. optional (DE); Katalog-Tarife als `spot_hourly` (API-URL aus `land`) |
 | **APG** markt.apg.at | Öffentliche Charts | Nur manuelle Referenz |
 
 ### OeMAG Marktpreis
@@ -167,7 +167,7 @@ Nachrechnen der Formeln: diese Seite. Technisches Mapping: [preise.md](../konfig
 
 ### Attribution
 
-Day-Ahead über Energy-Charts: [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Day-Ahead Live: optional [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) (persönlicher Token); sonst [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ## 7. Audit / Abweichungen (Stand 2.3.b, 2026-07-21)
 

@@ -1,4 +1,4 @@
-"""Durable Energy-Charts cache for Live day-ahead prices (QH)."""
+"""Durable day-ahead price cache for Live (QH; ENTSO-E / Energy-Charts)."""
 from __future__ import annotations
 
 import json
@@ -13,8 +13,8 @@ from runtime_store.persist_paths import runtime_path
 
 logger = logging.getLogger(__name__)
 
-CACHE_VERSION = 1
-_CACHE_PREFIX = "live_energy_charts_"
+CACHE_VERSION = 2
+_CACHE_PREFIX = "live_day_ahead_"
 
 
 def cache_path_for_zone(zone: str) -> Path:
@@ -87,7 +87,7 @@ def load_live_price_cache(
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        logger.warning("Ignoring unreadable Energy-Charts cache %s", path)
+        logger.warning("Ignoring unreadable day-ahead price cache %s", path)
         return None
     if not isinstance(raw, dict) or int(raw.get("version") or 0) != CACHE_VERSION:
         return None
@@ -100,7 +100,14 @@ def load_live_price_cache(
     fetched_at = _parse_ts(fetched_raw, fallback_tz=fallback_tz)
     if fetched_at is None:
         return None
-    return {"zone": zone, "fetched_at": fetched_at, "prices": prices, "path": path}
+    source = str(raw.get("source") or "").strip() or None
+    return {
+        "zone": zone,
+        "fetched_at": fetched_at,
+        "prices": prices,
+        "path": path,
+        "source": source,
+    }
 
 
 def save_live_price_cache(
@@ -110,12 +117,13 @@ def save_live_price_cache(
     fetched_at: datetime,
     window_start: datetime,
     window_end: datetime,
+    source: str | None = None,
 ) -> Path | None:
-    """Persist QH series after a successful Energy-Charts fetch."""
+    """Persist QH series after a successful day-ahead network fetch."""
     if not live_prices:
         return None
     path = cache_path_for_zone(zone)
-    payload = {
+    payload: dict[str, Any] = {
         "version": CACHE_VERSION,
         "zone": zone,
         "fetched_at": fetched_at.isoformat(),
@@ -130,13 +138,15 @@ def save_live_price_cache(
             if item.get("timestamp") is not None
         ],
     }
+    if source:
+        payload["source"] = str(source)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(payload) + "\n", encoding="utf-8")
         os.replace(tmp, path)
     except OSError as exc:
-        logger.warning("Could not write Energy-Charts cache %s: %s", path, exc)
+        logger.warning("Could not write day-ahead price cache %s: %s", path, exc)
         return None
     return path
 
@@ -219,7 +229,7 @@ def network_fetch_start(
     now: datetime,
 ) -> datetime:
     """
-    Earliest Energy-Charts request start.
+    Earliest network request start for day-ahead prices.
 
     When cache already holds the mirror lookback before today, request only
     from local midnight today through ``needed_end`` (history filled from cache).

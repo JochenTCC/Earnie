@@ -16,15 +16,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**), and **2.7.g** (single-use powerstation reserve) → [Erledigt](Backlog-Erledigt.md).
+**Order:** **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**), **2.7.g** (single-use powerstation reserve), and **2.7.k** (ENTSO-E live prices) → [Erledigt](Backlog-Erledigt.md).
 
 - **Note:** Savings study done (2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; keep **2.7.h** for private-use standby-backup.
-
-- [ ] Make a thorough review about EV coming back prognosis strategy.
-  - It still does not work very well
-  - Give a description of how it works right now
-  - Give a description about history of changes
-  - Let's design / refactor the current approach
 
 - [ ] **2.7.h — Powerstation smart standby-backup for continuous loads** (`role: standby_backup`; shares data model with **2.7.g**; depends on **2.7.c**, benefits from **2.7.g** landing first)
   - Idea: for consumers that run more or less continuously (PC, smart-home hub, router, NAS, …) — no single "run" event, no fixed energy-per-run — route their supply between grid and a pre-charged powerstation reserve on a rolling per-slot basis, driven by price: expensive slots draw from the reserve, cheap slots pass through from grid (optionally recharging the reserve in parallel). A price-aware mini-UPS, not just outage backup.
@@ -45,17 +39,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [ ] **Regression P2 — customer data:** private repo + private-root support (skip when missing), `--intake` (debug-dump ZIP → case folder + ID), case-ID / issue-reference convention, SHAs in the report.
   - [ ] **Regression P3 — gate + scrub:** CI job `regression` before `promote` in `release-publish.yml` (deploy-key secret), whitelist-based scrubber for customer → public repro cases (names/IDs, location, GDPR consent note), optional metric trend across releases.
   - **Open decisions:** soft vs. hard gate (proposal: soft first); customer-facing data-handling wording beyond the private repo; CBC version identical on dev machine / Docker / CI.
-
-- [ ] **2.7.k — ENTSO-E Transparency as additional EPEX day-ahead source (user token)** (independent of **2.7.a–j**; token not yet available — user is applying for one)
-  - Goal: a quarter-hour live source between Energy-Charts and the hourly aWATTar fallback. Today `fetch_live_day_ahead_prices` (`data/live_market_prices.py`) runs Energy-Charts → disk cache → aWATTar (AT only, hourly expand). New chain: Energy-Charts → **ENTSO-E** → cache → aWATTar.
-  - Scope v1: each user enters their **own** ENTSO-E token; no Earnie-hosted token or relay. Without a token the stage is skipped silently (no regression, no warning spam).
-  - New client `integrations/entsoe_client.py`: `GET https://web-api.tp.entsoe.eu/api` with `documentType=A44`, `in_Domain`/`out_Domain` = zone EIC code, `periodStart`/`periodEnd`, `securityToken`. Parse the XML (PT15M and PT60M resolutions; expand hourly to QH where a zone still publishes hourly). Map `MARKET_ZONE_AT` / `_DE` / `_CH` (`data/data_loader.py`) to EIC codes.
-  - Reuse the existing live price cache (`data/live_price_cache.py`, same series format and merge). The file name `live_energy_charts_<zone>.json` is source-specific — rename or add a `source` field (bump `CACHE_VERSION`).
-  - Token storage: `config/.env` as `ENTSOE_API_TOKEN` (same pattern as `EHAL_HA_TOKEN`: `.env.example`, `runtime_store/dotenv_io.py` quoted keys), never in `config.json` / house profile. Optional UI field next to the other price-source settings.
-  - Tests against recorded XML responses (no network); never log the token (strip `securityToken` from logged URLs).
-  - Docs (German): update `docs/referenz/tarife-quellen.md` (ENTSO-E row: "Optional später" → implemented, token needed), `docs/konfiguration/preise.md`, `docs/einrichtung/betrieb.md`; spec in `docs/spec/quarter-hour-slots.md` if the source order is described there.
-  - **Verify first** with the real token: current API parameters, QH resolution per zone (esp. CH), rate limits, terms of use (personal token; attribution).
-  - **Out of scope / later (2.+1 or product decision):** Earnie-server relay that fetches once per zone with one token and serves all instances (token never leaves the server, central plausibility check); subscription angle = **guaranteed availability** of day-ahead prices (multi-source redundancy behind the relay, so a tariff is always available), as opposed to the free tier's best-effort chain on Energy-Charts (Fraunhofer, no SLA) / own ENTSO-E token / aWATTar. Price functionality itself stays in the free feature set — the subscription only buys reliability. Needs the relay first; decide pricing/SLA wording at that point.
 
 ### Version 2.+1 (maybe also part of 2.7?)
 

@@ -1,0 +1,66 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Publication_MarketDocument xmlns:ns0="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
+    <ns0:mRID>4ce919f6db3b4ab78ca7a5ad65580b0d</ns0:mRID>
+    <ns0:revisionNumber>1</ns0:revisionNumber>
+    <ns0:type>A44</ns0:type>
+    <ns0:sender_MarketParticipant.mRID codingScheme="A01">10X1001A1001A450</ns0:sender_MarketParticipant.mRID>
+    <ns0:sender_MarketParticipant.marketRole.type>A32</ns0:sender_MarketParticipant.marketRole.type>
+    <ns0:receiver_MarketParticipant.mRID codingScheme="A01">10X1001A1001A450</ns0:receiver_MarketParticipant.mRID>
+    <ns0:receiver_MarketParticipant.marketRole.type>A33</ns0:receiver_MarketParticipant.marketRole.type>
+    <ns0:createdDateTime>2026-10-05T13:58:23Z</ns0:createdDateTime>
+    <ns0:period.timeInterval>
+      <ns0:start>2026-10-04T22:00Z</ns0:start>
+      <ns0:end>2026-10-06T22:00Z</ns0:end>
+    </ns0:period.timeInterval>
+      <ns0:TimeSeries>
+        <ns0:mRID>1</ns0:mRID>
+        <ns0:auction.type>A01</ns0:auction.type>
+        <ns0:businessType>A62</ns0:businessType>
+        <ns0:in_Domain.mRID codingScheme="A01">10YAT-APG------L</ns0:in_Domain.mRID>
+        <ns0:out_Domain.mRID codingScheme="A01">10YAT-APG------L</ns0:out_Domain.mRID>
+        <ns0:contract_MarketAgreement.type>A01</ns0:contract_MarketAgreement.type>
+        <ns0:currency_Unit.name>EUR</ns0:currency_Unit.name>
+        <ns0:price_Measure_Unit.name>MWH</ns0:price_Measure_Unit.name>
+          <ns0:classificationSequence_AttributeInstanceComponent.position>2</ns0:classificationSequence_AttributeInstanceComponent.position>
+        <ns0:curveType>A03</ns0:curveType>
+          <ns0:Period>
+            <ns0:timeInterval>
+              <ns0:start>2026-10-04T22:00Z</ns0:start>
+              <ns0:end>2026-10-05T22:00Z</ns0:end>
+            </ns0:timeInterval>
+            <ns0:resolution>PT15M</ns0:resolution>
+              <ns0:Point>
+                <ns0:position>1</ns0:position>
+                  <ns0:price.amount>192.46</ns0:price.amount>
+              </ns0:Point>
+              <ns0:Point>
+                <ns0:position>2</ns0:position>
+                  <ns0:price.amount>192.3</ns0:price.amount>
+              </ns0:Point>
+              <ns0:Point>
+                <ns0:position>3</ns0:position>
+                  <ns0:price.amount>185.91</ns0:price.amount>
+              </ns0:Point>
+              <ns0:Point>
+                <ns0:position>4</ns0:position>
+                  <ns0:price.amount>185.27</ns0:price.amount>
+              </ns0:Point>
+              <ns0:Point>
+                <ns0:position>5</ns0:position>
+                  <ns0:price.amount>183.14</ns0:price.amount>
+              </ns0:Point>
+              <ns0:Point>
+                <ns0:position>6</ns0:position>
+                  <ns0:price.amount>179.28</ns0:price.amount>
+              </ns0:Point>
+              <ns0:Point>
+                <ns0:position>7</ns0:position>
+                  <ns0:price.amount>176.2</ns0:price.amount>
+              </ns0:Point>
+              <ns0:Point>
+                <ns0:position>8</ns0:position>
+                  <ns0:price.amount>175</ns0:price.amount>
+              </ns0:Point>
+              </ns0:Period>
+      </ns0:TimeSeries>
+      </ns0:Publication_MarketDocument>

@@ -48,9 +48,9 @@ SDAC Day-Ahead switched to 15‑min MTU for delivery from **2025-10-01** (EPEX /
 | Path | Code | Notes |
 |------|------|-------|
 | SE / backtesting | `data/data_loader.py` `fetch_energy_charts_prices` | AT / DE-LU / CH; AT falls back to aWATTar on failure |
-| Live | `data/live_market_prices.py` `fetch_live_day_ahead_prices` via `main.py`, `ui/live_mode.py` | **Energy-Charts first**, disk cache `runtime/live_energy_charts_<zone>.json` while it covers the planning window and is fresh vs Day-Ahead publish (~12:00); refresh requests from **today 00:00** when mirror lookback is already cached; on failure prefer that QH cache, then **aWATTar** hourly fallback |
+| Live | `data/live_market_prices.py` `fetch_live_day_ahead_prices` via `main.py`, `ui/live_mode.py` | **ENTSO-E first** when `ENTSOE_API_TOKEN` is set (`integrations/entsoe_client.py`), then **Energy-Charts** (Fraunhofer); disk cache `runtime/live_day_ahead_<zone>.json` while it covers the planning window and is fresh vs Day-Ahead publish (~12:00); refresh requests from **today 00:00** when mirror lookback is already cached; on failure prefer that QH cache, then **aWATTar** hourly fallback |
 
-**Update (2026-08-14):** the line above previously read "Live: aWATTar only (hourly API)" — stale. `data/live_market_prices.py` prefers Energy-Charts (same QH source as SE) and only falls back to aWATTar's hourly API when the Energy-Charts request fails. Live and SE are therefore equally exposed to the settlement-mismatch risk in §3.3/§3.4, not just SE.
+**Update (2026-10-05):** Live network order is ENTSO-E → Energy-Charts → stale cache → aWATTar. Without a token, ENTSO-E is skipped silently. SE/backtesting remains Energy-Charts → aWATTar. Live and SE remain exposed to the settlement-mismatch risk in §3.3/§3.4.
 
 ### 3.3 Catalog tariff settlement map
 

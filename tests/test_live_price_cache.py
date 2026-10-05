@@ -1,4 +1,4 @@
-"""Live Energy-Charts disk cache: skip fetch when fresh; prefer cache over aWATTar."""
+"""Live day-ahead disk cache: skip fetch when fresh; prefer cache over aWATTar."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -10,6 +10,7 @@ import pytest
 
 from data import live_market_prices as lmp
 from data.live_price_cache import (
+    CACHE_VERSION,
     cache_covers_window,
     cache_is_fresh_for_day_ahead,
     cache_path_for_zone,
@@ -23,6 +24,11 @@ TZ = ZoneInfo("Europe/Vienna")
 
 def _slot(year, month, day, hour, minute=0) -> datetime:
     return datetime(year, month, day, hour, minute, tzinfo=TZ)
+
+
+@pytest.fixture(autouse=True)
+def _clear_entsoe_token(monkeypatch):
+    monkeypatch.delenv("ENTSOE_API_TOKEN", raising=False)
 
 
 def _qh_series(start: datetime, hours: int, base: float = 10.0) -> list[dict]:
@@ -74,10 +80,12 @@ def test_save_and_load_roundtrip(tmp_path, monkeypatch):
         window_end=_slot(2026, 10, 3, 1, 45),
     )
     assert path == cache_path_for_zone("AT")
+    assert path.name == "live_day_ahead_AT.json"
     loaded = load_live_price_cache("AT", fallback_tz=TZ)
     assert loaded is not None
     assert loaded["fetched_at"] == _slot(2026, 10, 3, 14)
     assert len(loaded["prices"]) == 8
+    assert CACHE_VERSION == 2
 
 
 def test_fetch_skips_network_when_cache_covers_and_fresh(tmp_path, monkeypatch):
@@ -196,6 +204,60 @@ def test_successful_fetch_writes_cache(tmp_path, monkeypatch):
     loaded = load_live_price_cache("AT", fallback_tz=TZ)
     assert loaded is not None
     assert len(loaded["prices"]) == 8
+    assert loaded.get("source") == "energy_charts"
+
+
+def test_entsoe_preferred_over_energy_charts_when_token_set(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    monkeypatch.setenv("ENTSOE_API_TOKEN", "test-token")
+    monkeypatch.setattr(lmp.config, "get_planning_timezone", lambda: "Europe/Vienna")
+    start = _slot(2026, 10, 4, 0)
+    end = _slot(2026, 10, 5, 0)
+    index = pd.date_range(start.replace(tzinfo=None), periods=4, freq="15min")
+    df = pd.DataFrame({"price_cent_kwh": [12.0, 12.1, 12.2, 12.3]}, index=index)
+    with patch.object(lmp, "_runtime_market_zone", return_value="AT"):
+        with patch.object(lmp, "_now_slot", return_value=_slot(2026, 10, 4, 13)):
+            with patch.object(lmp, "awattar_fetch_window", return_value=(start, end)):
+                with patch(
+                    "integrations.entsoe_client.fetch_entsoe_day_ahead_prices",
+                    return_value=df,
+                ) as fetch_entsoe:
+                    with patch.object(lmp, "fetch_energy_charts_prices") as fetch_ec:
+                        result = lmp.fetch_live_day_ahead_prices(planning_end=end)
+    assert result is not None
+    assert len(result) == 4
+    fetch_entsoe.assert_called_once()
+    fetch_ec.assert_not_called()
+    loaded = load_live_price_cache("AT", fallback_tz=TZ)
+    assert loaded is not None
+    assert loaded.get("source") == "entsoe"
+
+
+def test_entsoe_failure_falls_through_to_energy_charts(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    monkeypatch.setenv("ENTSOE_API_TOKEN", "test-token")
+    monkeypatch.setattr(lmp.config, "get_planning_timezone", lambda: "Europe/Vienna")
+    start = _slot(2026, 10, 4, 0)
+    end = _slot(2026, 10, 5, 0)
+    index = pd.date_range(start.replace(tzinfo=None), periods=4, freq="15min")
+    df = pd.DataFrame({"price_cent_kwh": [11.0, 11.1, 11.2, 11.3]}, index=index)
+    with patch.object(lmp, "_runtime_market_zone", return_value="AT"):
+        with patch.object(lmp, "_now_slot", return_value=_slot(2026, 10, 4, 13)):
+            with patch.object(lmp, "awattar_fetch_window", return_value=(start, end)):
+                with patch(
+                    "integrations.entsoe_client.fetch_entsoe_day_ahead_prices",
+                    side_effect=RuntimeError("ENTSO-E down"),
+                ):
+                    with patch.object(
+                        lmp, "fetch_energy_charts_prices", return_value=df
+                    ) as fetch_ec:
+                        result = lmp.fetch_live_day_ahead_prices(planning_end=end)
+    assert result is not None
+    assert len(result) == 4
+    fetch_ec.assert_called_once()
+    loaded = load_live_price_cache("AT", fallback_tz=TZ)
+    assert loaded is not None
+    assert loaded.get("source") == "energy_charts"
 
 
 def test_network_fetch_start_uses_today_when_history_cached():

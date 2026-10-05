@@ -1,4 +1,4 @@
-"""Live Day-Ahead prices: Energy-Charts first, disk cache, aWATTar hourly fallback."""
+"""Live Day-Ahead prices: ENTSO-E, Energy-Charts, disk cache, aWATTar fallback."""
 from __future__ import annotations
 
 import logging
@@ -86,10 +86,12 @@ def _live_from_cache(
     reason: str,
 ) -> list[dict[str, Any]]:
     live = cached_prices_to_live(cached["prices"], fallback_tz=_planning_tz())
+    source = cached.get("source") or "unknown"
     logger.info(
-        "Using cached Energy-Charts %s prices (%s, %s slots, fetched_at=%s)",
+        "Using cached day-ahead %s prices (%s, source=%s, %s slots, fetched_at=%s)",
         cached["zone"],
         reason,
+        source,
         len(live),
         cached["fetched_at"].isoformat(),
     )
@@ -117,7 +119,7 @@ def _try_cached_live(
         return None
     if require_fresh and not cache_is_fresh_for_day_ahead(cached["fetched_at"], now):
         return None
-    reason = "covers window, skip fetch" if require_fresh else "Energy-Charts unavailable"
+    reason = "covers window, skip fetch" if require_fresh else "network sources unavailable"
     return _live_from_cache(cached, reason=reason)
 
 
@@ -127,6 +129,60 @@ def _cached_live_for_zone(zone: str) -> list[dict[str, Any]] | None:
         return None
     live = cached_prices_to_live(cached["prices"], fallback_tz=_planning_tz())
     return live or None
+
+
+def _merge_trim_and_save(
+    zone: str,
+    fresh: list[dict[str, Any]],
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    fetched_at: datetime,
+    source: str,
+) -> list[dict[str, Any]]:
+    if not fresh:
+        raise ValueError(f"{source} returned no usable price rows.")
+    cached_live = _cached_live_for_zone(zone)
+    merged = merge_live_price_series(cached_live or [], fresh)
+    live = trim_live_price_series(merged, window_start, window_end)
+    if not live:
+        raise ValueError(f"{source} merge produced no usable price rows.")
+    save_live_price_cache(
+        zone,
+        live,
+        fetched_at=fetched_at,
+        window_start=window_start,
+        window_end=window_end,
+        source=source,
+    )
+    return live
+
+
+def _fetch_and_cache_entsoe(
+    zone: str,
+    window_start: datetime,
+    window_end: datetime,
+    *,
+    fetched_at: datetime,
+) -> list[dict[str, Any]] | None:
+    from integrations.entsoe_client import fetch_entsoe_day_ahead_prices
+
+    cached_live = _cached_live_for_zone(zone)
+    fetch_start = network_fetch_start(
+        window_start, window_end, cached_live, fetched_at
+    )
+    df = fetch_entsoe_day_ahead_prices(fetch_start, window_end, zone)
+    if df is None:
+        return None
+    fresh = _dataframe_to_live_market_data(df)
+    return _merge_trim_and_save(
+        zone,
+        fresh,
+        window_start=window_start,
+        window_end=window_end,
+        fetched_at=fetched_at,
+        source="entsoe",
+    )
 
 
 def _fetch_and_cache_energy_charts(
@@ -152,20 +208,14 @@ def _fetch_and_cache_energy_charts(
     )
     df = fetch_energy_charts_prices(start_ts, end_ts, bzn=zone)
     fresh = _dataframe_to_live_market_data(df)
-    if not fresh:
-        raise ValueError("Energy-Charts returned no usable price rows.")
-    merged = merge_live_price_series(cached_live or [], fresh)
-    live = trim_live_price_series(merged, window_start, window_end)
-    if not live:
-        raise ValueError("Energy-Charts merge produced no usable price rows.")
-    save_live_price_cache(
+    return _merge_trim_and_save(
         zone,
-        live,
-        fetched_at=fetched_at,
+        fresh,
         window_start=window_start,
         window_end=window_end,
+        fetched_at=fetched_at,
+        source="energy_charts",
     )
-    return live
 
 
 def _awattar_after_cache_miss(
@@ -173,7 +223,7 @@ def _awattar_after_cache_miss(
     planning_end: datetime | None,
 ) -> list[dict[str, Any]] | None:
     logger.warning(
-        "No usable Energy-Charts cache for %s; falling back to aWATTar",
+        "No usable day-ahead cache for %s; falling back to aWATTar",
         zone,
     )
     if zone == MARKET_ZONE_CH:
@@ -187,12 +237,11 @@ def fetch_live_day_ahead_prices(
     """
     Live market data for the planning window.
 
-    Prefer Energy-Charts for the house bidding zone. Reuse
-    ``runtime/live_energy_charts_<zone>.json`` while it still covers the
-    fetch window and is fresh vs. Day-Ahead publish (~12:00). When a refresh
-    is needed, request only from today onward if the mirror lookback is
-    already cached. On Energy-Charts failure, prefer that QH cache over
-    aWATTar (hourly expand) when coverage reaches the planning end.
+    Prefer ENTSO-E when ``ENTSOE_API_TOKEN`` is set, then Energy-Charts
+    (Fraunhofer). Reuse ``runtime/live_day_ahead_<zone>.json`` while it still
+    covers the fetch window and is fresh vs. Day-Ahead publish (~12:00). On
+    network failure, prefer that QH cache over aWATTar (hourly expand) when
+    coverage reaches the planning end.
     """
     zone = _runtime_market_zone()
     start, end = awattar_fetch_window(planning_end)
@@ -201,6 +250,15 @@ def fetch_live_day_ahead_prices(
     cached_hit = _try_cached_live(zone, start, end, now=now, require_fresh=True)
     if cached_hit is not None:
         return cached_hit
+
+    try:
+        entsoe_live = _fetch_and_cache_entsoe(
+            zone, start, end, fetched_at=now
+        )
+        if entsoe_live is not None:
+            return entsoe_live
+    except Exception as exc:
+        logger.warning("ENTSO-E %s failed for live prices (%s)", zone, exc)
 
     try:
         return _fetch_and_cache_energy_charts(

@@ -51,7 +51,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; u. a. `consumption_snapshot`, optional `closed_interval`) |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
-| `live_energy_charts_<zone>.json` | Cache der letzten erfolgreichen Energy-Charts-Day-Ahead-Serie (QH; Zone z. B. `AT`); Live nutzt ihn statt erneutem API-Abruf bzw. vor aWATTar-Fallback |
+| `live_day_ahead_<zone>.json` | Cache der letzten erfolgreichen Live-Day-Ahead-Serie (QH; Zone z. B. `AT`; `source` ENTSO-E oder Energy-Charts); Live nutzt ihn statt erneutem API-Abruf bzw. vor aWATTar-Fallback |
 | `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode` — auch UI **Optimierer-Dienst**, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`)     |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
