@@ -147,6 +147,9 @@ def upsert_house_profile(profile: dict) -> None:
     if "earnie_data_model" in raw:
         payload["earnie_data_model"] = raw["earnie_data_model"]
     save_house_profiles_document(path, payload)
+    from ui.house_config_entities_io import sync_powerstation_attached_from_consumers
+
+    sync_powerstation_attached_from_consumers(consumers)
 
 
 def _scenario_ids_using_house_profile(profile_id: str) -> tuple[list[str], bool]:

@@ -134,11 +134,27 @@ def normalize_appliance_recommendation_block(
             f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
             "appliance_recommendation erfordert default_power_kw > 0 bei power_source=loxone."
         )
-    return {
+    from house_config.powerstation import MODE_ADVICE, MODE_RESERVE, normalize_assist_mode
+
+    mode = normalize_assist_mode(raw.get("mode"))
+    powerstation_id = str(raw.get("powerstation_id") or "").strip()
+    if mode == MODE_RESERVE and not powerstation_id:
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
+            "appliance_recommendation.mode=reserve erfordert powerstation_id."
+        )
+    out = {
+        "mode": mode,
         "power_source": power_source,
         "default_power_kw": default_power_kw,
         "default_runtime_h": default_runtime_h or 2.0,
     }
+    if mode == MODE_RESERVE:
+        out["powerstation_id"] = powerstation_id
+    elif powerstation_id and mode == MODE_ADVICE:
+        # Drop stale link when switching back to advice.
+        pass
+    return out
 
 
 def _loxone_power_name_from_consumer(consumer: dict) -> str:
@@ -171,13 +187,18 @@ def appliance_from_profile_consumer(consumer: dict) -> dict:
         raise ValueError(
             f"Hausprofil-Verbraucher '{consumer_id}': appliance_recommendation fehlt."
         )
+    from house_config.powerstation import MODE_ADVICE
+
     spec = {
         "id": consumer_id,
         "name": str(consumer.get("label", consumer_id)),
+        "mode": normalized.get("mode", MODE_ADVICE),
         "power_source": normalized["power_source"],
         "default_power_kw": normalized["default_power_kw"],
         "default_runtime_h": normalized["default_runtime_h"],
     }
+    if normalized.get("powerstation_id"):
+        spec["powerstation_id"] = normalized["powerstation_id"]
     if loxone_power_name:
         spec["loxone_inputs"] = {"power_name": loxone_power_name}
     spec["recommendation_horizon_h"] = manual_recommendation_horizon_h(consumer)
@@ -185,6 +206,31 @@ def appliance_from_profile_consumer(consumer: dict) -> dict:
 
 
 def recommendation_appliances_from_profile(house_profile: dict) -> list[dict]:
+    """All manual appliances (advice + reserve)."""
+    return _manual_appliances_from_profile(house_profile, modes=None)
+
+
+def advice_appliances_from_profile(house_profile: dict) -> list[dict]:
+    """Manual appliances in advice mode (star ranking)."""
+    from house_config.powerstation import MODE_ADVICE
+
+    return _manual_appliances_from_profile(house_profile, modes={MODE_ADVICE})
+
+
+def reserve_appliances_from_profile(house_profile: dict) -> list[dict]:
+    """Manual appliances in reserve mode (powerstation)."""
+    from house_config.powerstation import MODE_RESERVE
+
+    return _manual_appliances_from_profile(house_profile, modes={MODE_RESERVE})
+
+
+def _manual_appliances_from_profile(
+    house_profile: dict,
+    *,
+    modes: set[str] | None,
+) -> list[dict]:
+    from house_config.powerstation import consumer_assist_mode
+
     consumers = house_profile.get("consumers") or []
     appliances: list[dict] = []
     for raw in consumers:
@@ -193,6 +239,8 @@ def recommendation_appliances_from_profile(house_profile: dict) -> list[dict]:
         if str(raw.get("type", "")).strip().lower() != "generic":
             continue
         if not is_earnie_manual(raw):
+            continue
+        if modes is not None and consumer_assist_mode(raw) not in modes:
             continue
         appliances.append(appliance_from_profile_consumer(raw))
     return appliances

@@ -105,6 +105,156 @@ def delete_pv_system(entity_id: str) -> None:
         _io.save_backtesting_scenarios(doc)
         config.reinit_config()
 
+def _attached_ids_from_battery(item: dict) -> list[str]:
+    ids = [
+        str(cid).strip()
+        for cid in (item.get("attached_consumer_ids") or [])
+        if str(cid or "").strip()
+    ]
+    if ids:
+        return ids
+    singular = str(item.get("attached_consumer_id") or "").strip()
+    return [singular] if singular else []
+
+
+def sync_powerstation_attached_from_consumers(consumers: list[dict]) -> None:
+    """Write attached_consumer_ids on powerstations linked via reserve mode."""
+    from house_config.powerstation import (
+        BACKING_PHYSICAL,
+        reserve_links_from_consumers,
+    )
+
+    links = reserve_links_from_consumers(consumers)
+    data = _load_components_document()
+    batteries = list(data.get("batteries") or [])
+    changed = False
+    for item in batteries:
+        if not isinstance(item, dict):
+            continue
+        bid = str(item.get("id") or "").strip()
+        if str(item.get("type") or "house").strip().lower() != "powerstation":
+            continue
+        # Authoritative from consumers: missing key → clear attached list.
+        new_ids = list(links.get(bid, []))
+        backing = str(item.get("backing") or "virtual").strip().lower()
+        if backing == BACKING_PHYSICAL and len(new_ids) > 1:
+            new_ids = new_ids[:1]
+        old_ids = _attached_ids_from_battery(item)
+        if old_ids != new_ids:
+            item["attached_consumer_ids"] = new_ids
+            item["attached_consumer_id"] = new_ids[0] if new_ids else ""
+            changed = True
+    if changed:
+        data["batteries"] = batteries
+        _save_components_document(data)
+
+
+def _strip_attached_from_other_powerstations(
+    powerstation_id: str, claimed: set[str]
+) -> None:
+    """Remove claimed consumer ids from sibling powerstation attached lists."""
+    if not claimed:
+        return
+    data = _load_components_document()
+    batteries = list(data.get("batteries") or [])
+    changed = False
+    for item in batteries:
+        if not isinstance(item, dict):
+            continue
+        bid = str(item.get("id") or "").strip()
+        if bid == powerstation_id:
+            continue
+        if str(item.get("type") or "house").strip().lower() != "powerstation":
+            continue
+        old_ids = _attached_ids_from_battery(item)
+        new_ids = [cid for cid in old_ids if cid not in claimed]
+        if new_ids != old_ids:
+            item["attached_consumer_ids"] = new_ids
+            item["attached_consumer_id"] = new_ids[0] if new_ids else ""
+            changed = True
+    if changed:
+        data["batteries"] = batteries
+        _save_components_document(data)
+
+
+def sync_consumers_from_powerstation_attached(
+    powerstation_id: str,
+    attached_ids: list[str],
+) -> None:
+    """Battery-form authoritative: push attached list → house-profile consumers."""
+    from house_config.powerstation import MODE_ADVICE, MODE_RESERVE
+    from ui import house_config_io as _io
+
+    ps_id = str(powerstation_id or "").strip()
+    if not ps_id:
+        return
+    wanted = {str(cid).strip() for cid in attached_ids if str(cid or "").strip()}
+    doc = _io.load_house_profiles()
+    raw_profiles = doc.get("profiles") or {}
+    if isinstance(raw_profiles, dict):
+        profiles = list(raw_profiles.values())
+    elif isinstance(raw_profiles, list):
+        profiles = list(raw_profiles)
+    else:
+        profiles = []
+    changed = False
+    for profile in profiles:
+        if not isinstance(profile, dict):
+            continue
+        for consumer in profile.get("consumers") or []:
+            if not isinstance(consumer, dict):
+                continue
+            cid = str(consumer.get("id") or "").strip()
+            if not cid:
+                continue
+            rec_raw = consumer.get("appliance_recommendation")
+            rec = dict(rec_raw) if isinstance(rec_raw, dict) else {}
+            current_ps = str(rec.get("powerstation_id") or "").strip()
+            if cid in wanted:
+                if (
+                    str(rec.get("mode") or "").strip().lower() != MODE_RESERVE
+                    or current_ps != ps_id
+                ):
+                    rec["mode"] = MODE_RESERVE
+                    rec["powerstation_id"] = ps_id
+                    consumer["appliance_recommendation"] = rec
+                    changed = True
+            elif current_ps == ps_id:
+                rec["mode"] = MODE_ADVICE
+                rec.pop("powerstation_id", None)
+                consumer["appliance_recommendation"] = rec
+                changed = True
+    if changed:
+        _io.save_house_profiles(doc)
+    _strip_attached_from_other_powerstations(ps_id, wanted)
+
+
+def _scrub_battery_ids_from_scenarios(target: str) -> bool:
+    """Remove ``target`` from all scenario ``battery_ids``; return True if changed."""
+    from ui import house_config_io as _io
+
+    doc = _io.load_backtesting_scenarios_raw()
+    changed = False
+    for scenario in doc.get("scenarios") or []:
+        if not isinstance(scenario, dict):
+            continue
+        settings = scenario.get("settings")
+        if not isinstance(settings, dict):
+            continue
+        raw_ids = settings.get("battery_ids")
+        if not isinstance(raw_ids, list):
+            continue
+        before = [str(item or "").strip() for item in raw_ids if str(item or "").strip()]
+        cleaned = [bat_id for bat_id in before if bat_id != target]
+        if cleaned == before:
+            continue
+        settings["battery_ids"] = cleaned
+        changed = True
+    if changed:
+        _io.save_backtesting_scenarios(doc)
+    return changed
+
+
 def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
     from house_config.entity_resolution import normalize_battery
     from house_config.label_uniqueness import assert_unique_label
@@ -139,27 +289,59 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
     }
     if raw_spec.get("control") is not None:
         spec["control"] = raw_spec["control"]
+    if raw_spec.get("type") is not None:
+        spec["type"] = raw_spec["type"]
+    if raw_spec.get("kind") is not None:
+        spec["kind"] = raw_spec["kind"]
+    for key in ("backing", "role", "attached_consumer_id", "attached_consumer_ids"):
+        if raw_spec.get(key) is not None:
+            spec[key] = raw_spec[key]
     existing_wear = None
     existing_control = None
+    existing_type_fields: dict = {}
     if stable_id:
         for item in batteries:
             if str(item.get("id", "")).strip() == entity_id:
                 existing_wear = item.get("battery_wear")
                 existing_control = item.get("control")
+                for key in (
+                    "type",
+                    "backing",
+                    "role",
+                    "attached_consumer_id",
+                    "attached_consumer_ids",
+                    "kind",
+                ):
+                    if key in item:
+                        existing_type_fields[key] = item[key]
                 break
     if "control" not in spec and existing_control is not None:
         spec["control"] = existing_control
+    for key, value in existing_type_fields.items():
+        spec.setdefault(key, value)
     if raw_spec.get("battery_wear") is not None:
         spec["battery_wear"] = raw_spec["battery_wear"]
     elif existing_wear is not None:
         spec["battery_wear"] = existing_wear
     else:
         spec["battery_wear"] = {"enabled": False}
+    if raw_spec.get("ehal_bindings") is not None:
+        spec["ehal_bindings"] = raw_spec["ehal_bindings"]
+    from house_config.powerstation import apply_virtual_powerstation_inheritance
+
+    siblings = [
+        item
+        for item in batteries
+        if str(item.get("id", "")).strip() != entity_id
+    ]
+    siblings.append(spec)
+    spec = apply_virtual_powerstation_inheritance(spec, siblings)
     normalized = normalize_battery(spec, 0)
     # Persist split fields (drop legacy single max when both are present).
     save_spec = {
         "id": normalized["id"],
         "label": normalized["label"],
+        "type": normalized.get("type", "house"),
         "battery_capacity_kwh": normalized["battery_capacity_kwh"],
         "battery_max_charge_power_kw": normalized["battery_max_charge_power_kw"],
         "battery_max_discharge_power_kw": normalized["battery_max_discharge_power_kw"],
@@ -169,22 +351,51 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         "threshold_power": normalized["threshold_power"],
         "standby_power_kw": normalized["standby_power_kw"],
         "control": normalized["control"],
+        "kind": normalized.get("kind"),
         "limits_from_live": normalized["limits_from_live"],
         "battery_wear": normalized["battery_wear"]
         if normalized["battery_wear"] is not None
         else {"enabled": False},
     }
+    if normalized.get("type") == "powerstation":
+        save_spec["backing"] = normalized["backing"]
+        save_spec["role"] = normalized["role"]
+        save_spec["attached_consumer_ids"] = list(
+            normalized.get("attached_consumer_ids") or []
+        )
+        save_spec["attached_consumer_id"] = normalized.get("attached_consumer_id") or (
+            save_spec["attached_consumer_ids"][0]
+            if save_spec["attached_consumer_ids"]
+            else ""
+        )
+    if normalized.get("ehal_bindings"):
+        save_spec["ehal_bindings"] = normalized["ehal_bindings"]
+    # Scrub before components save: reinit rejects Powerstations in battery_ids.
+    if str(save_spec.get("type") or "") == "powerstation":
+        _scrub_battery_ids_from_scenarios(entity_id)
+    prev_attached: list[str] = []
+    for item in batteries:
+        if str(item.get("id", "")).strip() == entity_id:
+            prev_attached = _attached_ids_from_battery(item)
+            break
     batteries = [item for item in batteries if item.get("id") != entity_id]
     batteries.append(save_spec)
     data["batteries"] = batteries
     _save_components_document(data)
+    if str(save_spec.get("type") or "") == "powerstation":
+        new_attached = list(save_spec.get("attached_consumer_ids") or [])
+        # Only push battery→consumer when the attached list itself changed;
+        # otherwise auto-persist of inherited fields would detach consumers.
+        if new_attached != prev_attached:
+            sync_consumers_from_powerstation_attached(entity_id, new_attached)
 
 def delete_battery(entity_id: str) -> None:
     """Remove a battery from components.json and scrub scenario references."""
-    from ui import house_config_io as _io
     target = str(entity_id or "").strip()
     if not target:
         raise ValueError("Batterie-ID fehlt.")
+    # Scrub first so components save → reinit does not see a dangling id.
+    _scrub_battery_ids_from_scenarios(target)
     data = _load_components_document()
     batteries = list(data.get("batteries") or [])
     remaining = [item for item in batteries if str(item.get("id", "")).strip() != target]
@@ -192,27 +403,6 @@ def delete_battery(entity_id: str) -> None:
         raise ValueError(f"Unbekannte Batterie '{target}'.")
     data["batteries"] = remaining
     _save_components_document(data)
-
-    doc = _io.load_backtesting_scenarios_raw()
-    changed = False
-    for scenario in doc.get("scenarios") or []:
-        if not isinstance(scenario, dict):
-            continue
-        settings = scenario.get("settings")
-        if not isinstance(settings, dict):
-            continue
-        raw_ids = settings.get("battery_ids")
-        if not isinstance(raw_ids, list):
-            continue
-        before = [str(item or "").strip() for item in raw_ids if str(item or "").strip()]
-        cleaned = [bat_id for bat_id in before if bat_id != target]
-        if cleaned == before:
-            continue
-        settings["battery_ids"] = cleaned
-        changed = True
-    if changed:
-        _io.save_backtesting_scenarios(doc)
-        config.reinit_config()
 
 def _live_scenario_settings() -> dict:
     from house_config.scenario_resolution import (

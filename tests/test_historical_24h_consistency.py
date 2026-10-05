@@ -27,8 +27,13 @@ from tests.historical_case_selection import (
 # Offline: keine Loxone-API beim Import von config
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
-# 25x reales MILP-Solving über historische Tage — dominiert die Suite-Laufzeit.
+# Real MILP over historical days — keep case count small for pre-commit.
 pytestmark = pytest.mark.slow
+
+# Parametrized solves: last 2 calendar months × high/low PV (≈4 CBC runs).
+_MILP_MONTHS_BACK = 2
+# Catalog coverage check still expects a full year in the fixture file.
+_CATALOG_MONTHS_BACK = 12
 
 
 def _load_cases() -> tuple[list[HistoricalConsistencyCase], list[str]]:
@@ -36,7 +41,9 @@ def _load_cases() -> tuple[list[HistoricalConsistencyCase], list[str]]:
         return [], []
     try:
         cache = HistoricalDataCache(cons_data_path=str(CONS_DATA_FILE))
-        cases = select_monthly_pv_extreme_cases(cache, months_back=12)
+        cases = select_monthly_pv_extreme_cases(
+            cache, months_back=_MILP_MONTHS_BACK
+        )
     except (ValueError, OSError, KeyError):
         return [], []
     return cases, [case.case_id for case in cases]
@@ -125,9 +132,11 @@ def test_historical_24h_optimization_is_internally_consistent(
 
 @requires_historical_data
 def test_historical_case_catalog_has_expected_size(historical_cons_data):
-    """Ca. 24 Läufe (2 PV-Extreme pro Monat über 12 Monate)."""
+    """Fixture still covers ~12 months (2 PV extremes/month); MILP uses a subset."""
     cache = HistoricalDataCache(cons_data_path=historical_cons_data)
-    cases = select_monthly_pv_extreme_cases(cache, months_back=12)
+    cases = select_monthly_pv_extreme_cases(
+        cache, months_back=_CATALOG_MONTHS_BACK
+    )
     assert len(cases) >= 20, (
         f"Zu wenige historische Testfälle ({len(cases)}); "
         f"{CONS_DATA_FILE} sollte mindestens 12 Monate abdecken."
@@ -135,3 +144,10 @@ def test_historical_case_catalog_has_expected_size(historical_cons_data):
     labels = {case.label for case in cases}
     assert "high_pv" in labels
     assert "low_pv" in labels or "single_day" in labels
+    milp_cases = select_monthly_pv_extreme_cases(
+        cache, months_back=_MILP_MONTHS_BACK
+    )
+    assert 2 <= len(milp_cases) <= 4, (
+        f"MILP-Subset erwartet 2–4 Fälle (months_back={_MILP_MONTHS_BACK}), "
+        f"erhalten: {len(milp_cases)}"
+    )

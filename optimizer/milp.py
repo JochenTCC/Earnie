@@ -113,6 +113,19 @@ def _build_milp_model_with_objective(
     )
     wear_cent_per_kwh = 0.0
     primary = _primary_battery_params(battery_params)
+    asap_kwh = float(primary.get("_virtual_reserve_asap_kwh") or 0.0)
+    if asap_kwh > 1e-9:
+        from .milp_horizon import _add_virtual_reserve_asap_charge
+
+        _add_virtual_reserve_asap_charge(
+            model,
+            asap_charge_kwh=asap_kwh,
+            max_charge_kw=float(
+                primary.get("max_charge_power_kw", primary.get("max_power_kw") or 0.0)
+                or 0.0
+            ),
+            efficiency=float(primary.get("efficiency") or 1.0),
+        )
     if float(primary.get("battery_capacity_kwh") or 0.0) > 0.0:
         # Wear from primary ESS capacity (multi-ESS wear refinement later).
         wear_cent_per_kwh = config.get_battery_wear_cent_per_kwh(

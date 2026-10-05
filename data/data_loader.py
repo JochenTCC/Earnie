@@ -1,9 +1,16 @@
 # data_loader.py
 import logging
+import os
+
 import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_csv_exists(price_csv_path: str) -> None:
+    if not os.path.isfile(price_csv_path):
+        raise FileNotFoundError(f"Preis-CSV fehlt: {price_csv_path}")
 
 ENERGY_CHARTS_PRICE_URL = "https://api.energy-charts.info/price"
 _ENERGY_CHARTS_HEADERS = {

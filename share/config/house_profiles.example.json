@@ -82,6 +82,7 @@
                         "start_shift_h": 4.0
                     },
                     "appliance_recommendation": {
+                        "mode": "advice",
                         "power_source": "loxone",
                         "default_power_kw": 2.0,
                         "default_runtime_h": 2.0
@@ -104,6 +105,7 @@
                         "start_shift_h": 4.0
                     },
                     "appliance_recommendation": {
+                        "mode": "advice",
                         "power_source": "loxone",
                         "default_power_kw": 2.5,
                         "default_runtime_h": 1.5
@@ -126,6 +128,7 @@
                         "start_shift_h": 8.0
                     },
                     "appliance_recommendation": {
+                        "mode": "advice",
                         "power_source": "manual",
                         "default_power_kw": 1.2,
                         "default_runtime_h": 2.5

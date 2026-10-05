@@ -234,8 +234,20 @@
     },
     "appliance_recommendation": {
       "type": "object",
-      "description": "Empfehlungsmodus (Waschmaschine/Trockner/GS) — 1.96d",
+      "description": "Manuelle Geräte: advice (Sterne) oder reserve (Powerstation) — 2.7.g",
       "properties": {
+        "mode": {
+          "enum": [
+            "advice",
+            "reserve"
+          ],
+          "default": "advice",
+          "description": "advice = Startzeit-Empfehlung; reserve = single_use Powerstation (XOR)."
+        },
+        "powerstation_id": {
+          "type": "string",
+          "description": "components.batteries[].id mit type=powerstation (erforderlich bei mode=reserve)."
+        },
         "power_source": {
           "enum": [
             "loxone",

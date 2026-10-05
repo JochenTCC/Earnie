@@ -2,6 +2,45 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.g — Powerstation reserve for single-use manual devices (2026-10-05)
+
+- [x] **2.7.g — Powerstation reserve for single-use manual devices** (`role: single_use`; shared model with **2.7.h**)
+  - Assist mode XOR: `appliance_recommendation.mode` `advice` | `reserve` + `powerstation_id` when reserve (Hausprofil + Manuelle Geräte UI)
+  - Shared data model: `type: powerstation`, `backing: virtual|physical`, `attached_consumer_ids[]` (legacy singular = first; virtual multi, physical max 1), `role: single_use`
+  - Virtual carve-out: UI hide/inherit electrical fields from primary Hausbatterie; capacity = reserve cap
+  - Bidirectional attach sync: battery form ↔ house-profile consumers; consumer→battery clears empty PS lists; battery multiselect reads `profiles` dict
+  - Runtime: reserve state machine + virtual floor (`optimizer/powerstation_reserve.py`, `powerstation_live.py`, `runtime_store/powerstation_reserves.py`); MILP / export-limit carve-out; physical packs excluded from house-grid discharge planning
+  - Trigger: Manuelle Geräte button; meter path when `loxone_inputs.power_name` present; energy-per-run learning helper
+  - Multi-reserve equal-share for v1; prioritization deferred to **2.+1**
+  - Schemas/examples, German docs (`batterie-pv.md`, `flexible-verbraucher.md`, handbook, EcoFlow note); tests `tests/test_powerstation_2_7_g.py`
+  - Spec: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.1 (`Earnie-Projekt`)
+
+### Virtual Powerstation multi-consumer attach (2.7.g partial) (2026-10-05)
+
+- [x] **Multiple consumers on one virtual Powerstation**
+  - Canonical field `attached_consumer_ids[]` (+ legacy `attached_consumer_id` = first); physical stays max 1
+  - Hauskonfigurator: multiselect for virtual; profile caption; sync from all reserve-mode manuals
+  - Runtime: one shared reserve pool per PS (summed target, cap by capacity); trigger from any attached appliance
+  - Docs: `docs/konfiguration/batterie-pv.md`, `flexible-verbraucher.md`; tests in `tests/test_powerstation_2_7_g.py`
+
+### Virtual Powerstation UI hide / inherit (2.7.g partial) (2026-10-05)
+
+- [x] **Virtual Powerstation (`backing: virtual`): hide nonsensical Hausbatterie parameters** and inherit from the primary `type: house` battery on save/normalize
+  - UI ([`ui/planning_battery_form.py`](../ui/planning_battery_form.py)): only Bezeichnung, Typ, Backing, Rolle, Verbraucher, Kapazität (carve-out cap); caption / warning when no Hausbatterie
+  - Inheritance helpers: [`house_config/powerstation.py`](../house_config/powerstation.py) (`apply_virtual_powerstation_inheritance`); applied in [`components_store.py`](../house_config/components_store.py) + [`upsert_battery`](../ui/house_config_entities_io.py)
+  - Hidden → inherit charge/efficiency/SoC/threshold from main ESS; discharge `0`, standby `0`, `limits_from_live` false, `control: limits_only`, wear off; fixed defaults if no Hausbatterie
+  - Physical Powerstations unchanged (full form)
+  - Docs: [`docs/konfiguration/batterie-pv.md`](../docs/konfiguration/batterie-pv.md) § Virtuelle Powerstation; tests in `tests/test_powerstation_2_7_g.py`
+  - Superseded by full **2.7.g** archive entry above; **2.7.h** remains open
+
+### Powerstation savings study 2.7.g / 2.7.h (2026-10-05)
+
+- [x] Prepare and execute a small study about saving potentials for 2.7.g and 2.7.h
+  - Private result: `Earnie-env-home/studies/powerstation-savings-2025.md` (home plant, 2025, aWATTar hourly day-ahead; Energy-Charts was down)
+  - Cash bill: virtual reserves/floors flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €)
+  - Bill savings alone do not carry **2.7.g** / **2.7.h**. A virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced
+  - Pointer left in [Backlog.md](Backlog.md) next to **2.7.h** (study informed keep-**2.7.g**-for-UX decision)
+
 ### EV late-return connect prognosis (2026-10-04)
 
 - [x] Improve prognosis for EV coming back (connecting for charging)

@@ -6,8 +6,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Research Items
 
-- [ ] **Live price prognosis — Energy-Charts `public_power_forecast` trial (archived):** full implementation including async `runtime/cache` warmup lives on branch `archive/energy-charts-forecast-research` only — not for merge to `main`. Product power features remain archive hour-of-day.
-- [x] **Live EPEX bias on predicted slots (product):** `live_bias_enabled` default **true**, cap default **±12** Cent/kWh (`live_bias_cap_cent_kwh`), lookback 48h. Spec: [price-forecast-renewables.md](../docs/spec/price-forecast-renewables.md) §11. Compare: `python -m scripts.compare_live_price_prognosis_research --with-live-bias`.
 - [ ] **HA-Loxone-Bridge-Builder:** standalone tool (no Earnie/EHAL runtime dependency) to auto-generate HA `rest_command:`/`automation:` YAML for numeric HA→Loxone writes. Design draft: [backlog/HA-Loxone-Bridge-Builder-Draft.md](HA-Loxone-Bridge-Builder-Draft.md). **Not part of Version 2.6.** A different audience (any HA+Loxone install). Do not share code with **2.6.b** / **2.6.e** (those map HA entities onto a fixed EHAL vocabulary inside Earnie). Deferred Loxone Virtual-In/Out XML in the draft is also not the Version 2.+1 “Earnie → Loxone template XML” item.
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
@@ -18,19 +16,15 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** **2.7.g** → **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), and former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**) → [Erledigt](Backlog-Erledigt.md).
+**Order:** **2.7.h** → **2.7.e**; **2.7.i** (release regression suite) is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish remaining letters here, then merge. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**), and **2.7.g** (single-use powerstation reserve) → [Erledigt](Backlog-Erledigt.md).
 
-- [ ] Prepare and execute a small study about saving potentials for 2.7.g and 2.7.h
+- **Note:** Savings study done (2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; keep **2.7.h** for private-use standby-backup.
 
-- [ ] **2.7.g — Powerstation reserve for single-use manual devices** (`role: single_use`; depends on **2.7.c**; shares data model with **2.7.h**)
-  - Idea: give each `earnie_role: manual` consumer (washing machine, dryer, …) a dedicated energy reserve inside the multi-ESS pool ("virtual powerstation"), pre-charged opportunistically in cheap slots and handed off whenever the device is actually switched on — instead of only showing a start-time recommendation (`optimizer/appliance_recommendation.py`, 1–5 star ranking) that the user must act on manually. Only feasible with at least one storage in the system. Worst case (reserve not sufficient) falls back to today's behaviour: grid draw, no regression.
-  - Reuses the EV **SOC-Min-Sofort** pattern (`docs/konfiguration/flexible-verbraucher.md`, `optimizer/charging_urgent.py`) generalized from "reach X % SoC by `ready_by`" to "keep N kWh reserved, no deadline, ASAP-refill in cheap slots after each trigger" — new per-consumer reserve target (kWh) plus a state machine (empty → charging → standby/full → discharging on trigger → empty), not a single global `min_soc`.
-  - Trigger detection: for consumers with `loxone_inputs.power_name` already configured, a threshold crossing on that existing power signal; for purely manual devices without a meter, the existing **Manuelle Geräte** app button stays the trigger.
-  - Energy-per-run learning: use the `loxone_inputs.power_name` history (already read for `power_source: loxone`) to replace the fixed `default_power_kw` × `default_runtime_h` estimate over time; keep the manual value as fallback.
-  - Multi-reserve prioritization (several manual devices charging reserves at once) deferred to **2.+1** — simple equal-share rule for v1 is enough, since the worst case stays grid draw either way; a later learned/heuristic priority is a pure refinement, not a blocker.
-  - **Shared data model** (with **2.7.h**): `type: powerstation`, `backing: "virtual" | "physical"`, `attached_consumer_id`, `role: "single_use" | "standby_backup"` — this item implements `role: single_use`. Do **not** introduce a separate `batteries[].direction: one_way` flag; physical one-way storages (e.g. EcoFlow Delta 3) are `backing: physical` instances of this pattern.
-  - **Physical (`backing: physical`) instance:** chargeable on command, handed off automatically to its one dedicated attached consumer without an explicit discharge command (hardware cannot feed the house grid). MILP must never plan a forced/automatic discharge and must not count their SoC as grid-offset capacity — normal case of the reserve pattern, not a separate exclusion rule. `set_ess_source_select` / island-mode is **optional** for this role (hard requirement only for **2.7.h**). Bonus: the storage's own power sensor (`sens_ess_power` / "Total Out Power", already bridged for the Delta 3) doubles as a free per-consumer meter for energy-per-run learning.
-  - Spec write-up: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.1 in the `Earnie-Projekt` docs repo.
+- [ ] Make a thorough review about EV coming back prognosis strategy.
+  - It still does not work very well
+  - Give a description of how it works right now
+  - Give a description about history of changes
+  - Let's design / refactor the current approach
 
 - [ ] **2.7.h — Powerstation smart standby-backup for continuous loads** (`role: standby_backup`; shares data model with **2.7.g**; depends on **2.7.c**, benefits from **2.7.g** landing first)
   - Idea: for consumers that run more or less continuously (PC, smart-home hub, router, NAS, …) — no single "run" event, no fixed energy-per-run — route their supply between grid and a pre-charged powerstation reserve on a rolling per-slot basis, driven by price: expensive slots draw from the reserve, cheap slots pass through from grid (optionally recharging the reserve in parallel). A price-aware mini-UPS, not just outage backup.
@@ -61,7 +55,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Tests against recorded XML responses (no network); never log the token (strip `securityToken` from logged URLs).
   - Docs (German): update `docs/referenz/tarife-quellen.md` (ENTSO-E row: "Optional später" → implemented, token needed), `docs/konfiguration/preise.md`, `docs/einrichtung/betrieb.md`; spec in `docs/spec/quarter-hour-slots.md` if the source order is described there.
   - **Verify first** with the real token: current API parameters, QH resolution per zone (esp. CH), rate limits, terms of use (personal token; attribution).
-  - **Out of scope / later (2.+1 or product decision):** Earnie-server relay that fetches once per zone with one token and serves all instances (token never leaves the server, central plausibility check); whether reliable price delivery becomes part of a subscription — judge after the relay exists, base prices should stay free.
+  - **Out of scope / later (2.+1 or product decision):** Earnie-server relay that fetches once per zone with one token and serves all instances (token never leaves the server, central plausibility check); subscription angle = **guaranteed availability** of day-ahead prices (multi-source redundancy behind the relay, so a tariff is always available), as opposed to the free tier's best-effort chain on Energy-Charts (Fraunhofer, no SLA) / own ENTSO-E token / aWATTar. Price functionality itself stays in the free feature set — the subscription only buys reliability. Needs the relay first; decide pricing/SLA wording at that point.
 
 ### Version 2.+1 (maybe also part of 2.7?)
 
@@ -162,7 +156,10 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
 - [ ] Simulate restrictions for energy export dependent on current grid situation in SE (and maybe Live) — **after 2.7.a** (consumes Live/MILP/EHAL export-cap model; do not redefine caps here)
 
 
-
 ### Version 3.0
 
 - [ ] Make complete Earnie available as cloud service (Online optimization and Internet communication with local smarthome / isolated devices) - similar to "Smart-Energy" (Steiermark)
+
+## Findings from former Research
+
+- [x] **Live price prognosis — Energy-Charts `public_power_forecast` trial (archived):** full implementation including async `runtime/cache` warmup lives on branch `archive/energy-charts-forecast-research` only — not for merge to `main`. Product power features remain archive hour-of-day.

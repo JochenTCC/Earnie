@@ -61,7 +61,7 @@
     },
     "battery_entity": {
       "type": "object",
-      "description": "Hausbatterie (nicht E-Auto — siehe flexible_consumers).",
+      "description": "Hausbatterie oder Powerstation (2.7.g/h); nicht E-Auto — siehe flexible_consumers.",
       "required": [
         "id",
         "battery_capacity_kwh",
@@ -75,6 +75,31 @@
         },
         "label": {
           "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["house", "powerstation"],
+          "default": "house",
+          "description": "house = Multi-ESS Hausspeicher; powerstation = single_use / standby_backup Reserve (2.7.g/h)."
+        },
+        "backing": {
+          "type": "string",
+          "enum": ["virtual", "physical"],
+          "description": "Nur type=powerstation: virtual = Carve-out im Multi-ESS; physical = One-Way-Pack."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["single_use", "standby_backup"],
+          "description": "Nur type=powerstation: single_use (2.7.g) oder standby_backup (2.7.h)."
+        },
+        "attached_consumer_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Nur type=powerstation: angeschlossene manuelle Verbraucher (virtual: mehrere; physical: höchstens einer)."
+        },
+        "attached_consumer_id": {
+          "type": "string",
+          "description": "Deprecated alias: erstes Element von attached_consumer_ids (Kompatibilität)."
         },
         "battery_capacity_kwh": {
           "type": "number",

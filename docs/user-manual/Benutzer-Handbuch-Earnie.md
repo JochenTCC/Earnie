@@ -227,7 +227,7 @@ Waschmaschine, Trockner, Geschirrspüler und ähnliche Geräte als **generische*
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Bekannt (known)**  | Feste / geplante Zeiten fließen als Grundlast ein — Earnie verschiebt sie nicht, berücksichtigt sie aber bei der Optimierung                                                                                                        |
 | **Flexibel (flex)**  | Earnie darf den Start im erlaubten Zeiffenster verschieben                                                                                                                                                                          |
-| **Manuell (manual)** | Sie planen auf der Seite *Manuelle Geräte*; Earnie gibt Start-Empfehlungen. In Live-Optimierung und Szenario-Explorer wird die typische Zeitplan-Last trotzdem wie bei *bekannt* mitgerechnet (Annahme: Sie starten wie empfohlen). |
+| **Manuell (manual)** | Auf *Manuelle Geräte*: entweder **Start-Empfehlung** (Sterne) oder **Energiereserve** (Powerstation) — Wahl im Hauskonfigurator, nicht beides. In Live-Optimierung und Szenario-Explorer wird die typische Zeitplan-Last bei Advice trotzdem wie bei *bekannt* mitgerechnet. |
 
 
 Leistung und typische Laufzeit angeben. Optional später ein Loxone-Leistungsmerker für Ist-Anzeige und zur Kontrolle.
@@ -415,7 +415,7 @@ Ab **Jetzt** können zwei SoC-Verläufe liegen — **SoC** (MILP-Plan) und **SoC
 
 ### Manuelle Geräte
 
-Unter **Live-Cockpit → Manuelle Geräte**: Laufzeiten und Startempfehlungen für Verbraucher mit Rolle **manuell**. Geplante Läufe erscheinen in Chart 1.
+Unter **Live-Cockpit → Manuelle Geräte**: Verbraucher mit Rolle **manuell**. Pro Gerät im Hauskonfigurator unter **Unterstützung** entweder Start-Empfehlung (Sterne + optionaler Tagesplan) oder Energiereserve (Powerstation-Status und Trigger). Geplante Läufe (Empfehlungsmodus) erscheinen in Chart 1.
 
 ### Analyse Verbrauch & Kosten
 

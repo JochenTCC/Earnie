@@ -18,6 +18,11 @@ from house_config.battery_kind import (
     BATTERY_KIND_ISOLATED,
     DEFAULT_BATTERY_KIND,
 )
+from house_config.powerstation import (
+    BACKING_VIRTUAL,
+    primary_house_battery,
+    virtual_powerstation_fill_fields,
+)
 
 KIND_LABELS_DE = {
     BATTERY_KIND_BATTERY_INVERTER: "Batterie + Wechselrichter",
@@ -35,6 +40,7 @@ from ui.auto_persist import auto_persist, payload_fingerprint
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_checkbox,
+    labeled_multiselect,
     labeled_number_input,
     labeled_selectbox,
     labeled_text_input,
@@ -142,6 +148,18 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         kind = str(existing.get("kind") or DEFAULT_BATTERY_KIND).strip().lower()
         if kind not in _KIND_VALUES:
             kind = DEFAULT_BATTERY_KIND
+        bat_type = str(existing.get("type") or "house").strip().lower() or "house"
+        backing = str(existing.get("backing") or "virtual").strip().lower() or "virtual"
+        role = str(existing.get("role") or "single_use").strip().lower() or "single_use"
+        attached_ids = [
+            str(cid).strip()
+            for cid in (existing.get("attached_consumer_ids") or [])
+            if str(cid or "").strip()
+        ]
+        if not attached_ids:
+            singular = str(existing.get("attached_consumer_id") or "").strip()
+            if singular:
+                attached_ids = [singular]
         limits_from_live = bool(existing.get("limits_from_live", False))
         wear = existing.get("battery_wear") or {}
         wear_enabled = bool(wear.get("enabled", False))
@@ -160,6 +178,10 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         standby_power = 0.0
         control = DEFAULT_BATTERY_CONTROL
         kind = DEFAULT_BATTERY_KIND
+        bat_type = "house"
+        backing = "virtual"
+        role = "single_use"
+        attached_ids = []
         limits_from_live = False
         wear_enabled = False
         wear_replacement_cost = 1500.0
@@ -167,6 +189,21 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         wear_cycle_fraction = 0.5
 
     st.session_state[_scoped_key(session_scope, "planning_battery_label")] = label
+    st.session_state[_scoped_key(session_scope, "planning_battery_type")] = (
+        "Powerstation" if bat_type == "powerstation" else "Hausbatterie"
+    )
+    st.session_state[_scoped_key(session_scope, "planning_battery_backing")] = (
+        "Virtuell (Carve-out)" if backing == "virtual" else "Physisch"
+    )
+    st.session_state[_scoped_key(session_scope, "planning_battery_role")] = (
+        "Single-use (manuell)" if role == "single_use" else "Standby-Backup"
+    )
+    st.session_state[_scoped_key(session_scope, "planning_battery_attached")] = (
+        attached_ids[0] if attached_ids else ""
+    )
+    st.session_state[_scoped_key(session_scope, "planning_battery_attached_ids")] = (
+        list(attached_ids)
+    )
     st.session_state[_scoped_key(session_scope, "planning_battery_kind")] = KIND_LABELS_DE[
         kind
     ]
@@ -299,17 +336,138 @@ def _render_battery_select() -> dict:
     }
 
 
-def _render_battery_core_fields(session_scope: str) -> dict:
-    label = labeled_text_input(
-        "Bezeichnung",
-        key=_scoped_key(session_scope, "planning_battery_label"),
+def _manual_consumer_options() -> tuple[list[str], dict[str, str]]:
+    """Manual consumer ids from house profiles for Powerstation attachment."""
+    from ui.house_config_io import load_house_profiles
+
+    options: list[str] = [""]
+    labels: dict[str, str] = {"": "— Verbraucher wählen —"}
+    try:
+        doc = load_house_profiles()
+    except Exception:
+        return options, labels
+    # load_house_profiles_document normalizes profiles to dict[id → profile].
+    raw_profiles = doc.get("profiles") or {}
+    if isinstance(raw_profiles, dict):
+        profile_iter = raw_profiles.values()
+    elif isinstance(raw_profiles, list):
+        profile_iter = raw_profiles
+    else:
+        profile_iter = []
+    for profile in profile_iter:
+        if not isinstance(profile, dict):
+            continue
+        for consumer in profile.get("consumers") or []:
+            if not isinstance(consumer, dict):
+                continue
+            if str(consumer.get("earnie_role") or "").strip().lower() != "manual":
+                continue
+            cid = str(consumer.get("id") or "").strip()
+            if not cid or cid in labels:
+                continue
+            options.append(cid)
+            clabel = str(consumer.get("label") or cid).strip() or cid
+            labels[cid] = f"{clabel} ({cid})"
+    return options, labels
+
+
+def _ensure_attached_options(
+    options: list[str],
+    labels: dict[str, str],
+    current_ids: list[str],
+) -> None:
+    for cid in current_ids:
+        if cid and cid not in options:
+            options.append(cid)
+            labels[cid] = f"{cid} (nicht in Hausprofil)"
+
+
+def _render_attached_consumers(
+    session_scope: str, *, backing: str
+) -> list[str]:
+    """Virtual: multi-select; physical: single consumer (one-way pack)."""
+    attached_options, attached_labels = _manual_consumer_options()
+    # Drop empty placeholder for multiselect; keep for single select.
+    multi_options = [cid for cid in attached_options if cid]
+    if backing == BACKING_VIRTUAL:
+        current_ids = [
+            str(cid).strip()
+            for cid in (
+                st.session_state.get(
+                    _scoped_key(session_scope, "planning_battery_attached_ids"),
+                    [],
+                )
+                or []
+            )
+            if str(cid or "").strip()
+        ]
+        _ensure_attached_options(multi_options, attached_labels, current_ids)
+        # Session key seeded in _seed_battery_widget_state (no default= with key).
+        selected = labeled_multiselect(
+            "Angeschlossene Verbraucher",
+            options=multi_options,
+            format_func=lambda value: attached_labels.get(value, value or "—"),
+            key=_scoped_key(session_scope, "planning_battery_attached_ids"),
+            help="Virtuell: gemeinsame Energiereserve für mehrere manuelle Geräte.",
+        )
+        st.caption(
+            "Powerstations nicht in Szenario-`battery_ids`. Mehrere Verbraucher "
+            "teilen sich den Carve-out — oder Zuordnung unter Hausprofil → "
+            "manuelles Gerät → Unterstützung „Energiereserve“."
+        )
+        return [str(cid).strip() for cid in (selected or []) if str(cid).strip()]
+
+    current_attached = str(
+        st.session_state.get(
+            _scoped_key(session_scope, "planning_battery_attached"), ""
+        )
+        or ""
+    ).strip()
+    _ensure_attached_options(attached_options, attached_labels, [current_attached])
+    index_default = (
+        attached_options.index(current_attached)
+        if current_attached in attached_options
+        else 0
     )
-    capacity = labeled_number_input(
-        "Kapazität (kWh)",
-        min_value=0.1,
-        step=0.5,
-        key=_scoped_key(session_scope, "planning_battery_capacity"),
+    attached = labeled_selectbox(
+        "Angeschlossener Verbraucher",
+        options=attached_options,
+        index=index_default,
+        format_func=lambda value: attached_labels.get(value, value or "—"),
+        key=_scoped_key(session_scope, "planning_battery_attached"),
+        help="Physisch: ein Gerät pro One-Way-Pack.",
     )
+    st.caption(
+        "Powerstations nicht in Szenario-`battery_ids`. Verbraucher optional "
+        "hier wählen — oder später unter Hausprofil → manuelles Gerät → "
+        "Unterstützung „Energiereserve“ die Powerstation zuordnen "
+        "(verknüpft automatisch)."
+    )
+    cid = str(attached or "").strip()
+    return [cid] if cid else []
+
+
+def _render_powerstation_meta(session_scope: str) -> tuple[str, str, list[str]]:
+    """Backing / role / attached consumers. Returns (backing, role, ids)."""
+    backing_label = labeled_selectbox(
+        "Backing",
+        options=["Virtuell (Carve-out)", "Physisch"],
+        key=_scoped_key(session_scope, "planning_battery_backing"),
+    )
+    backing = "physical" if backing_label == "Physisch" else BACKING_VIRTUAL
+    role_label = labeled_selectbox(
+        "Rolle",
+        options=["Single-use (manuell)", "Standby-Backup"],
+        key=_scoped_key(session_scope, "planning_battery_role"),
+    )
+    role = "standby_backup" if role_label == "Standby-Backup" else "single_use"
+    attached_ids = _render_attached_consumers(session_scope, backing=backing)
+    return backing, role, attached_ids
+
+
+def _render_battery_power_efficiency(
+    session_scope: str, *, bat_type: str
+) -> tuple[float, float, float]:
     max_charge = labeled_number_input(
         "Max. Ladeleistung (kW)",
         min_value=0.1,
@@ -317,12 +475,19 @@ def _render_battery_core_fields(session_scope: str) -> dict:
         ratios=WIDE_LABEL_RATIOS,
         key=_scoped_key(session_scope, "planning_battery_charge_power"),
     )
+    discharge_kwargs: dict = {
+        "min_value": 0.0 if bat_type == "powerstation" else 0.1,
+        "step": 0.1,
+        "ratios": WIDE_LABEL_RATIOS,
+        "key": _scoped_key(session_scope, "planning_battery_discharge_power"),
+    }
+    if bat_type == "powerstation":
+        discharge_kwargs["help"] = (
+            "Bei physischer Powerstation 0 = kein Hausnetz-Rückspeisen."
+        )
     max_discharge = labeled_number_input(
         "Max. Entladeleistung (kW)",
-        min_value=0.1,
-        step=0.1,
-        ratios=WIDE_LABEL_RATIOS,
-        key=_scoped_key(session_scope, "planning_battery_discharge_power"),
+        **discharge_kwargs,
     )
     efficiency = labeled_number_input(
         "Wirkungsgrad",
@@ -331,12 +496,89 @@ def _render_battery_core_fields(session_scope: str) -> dict:
         step=0.01,
         key=_scoped_key(session_scope, "planning_battery_efficiency"),
     )
+    return max_charge, max_discharge, efficiency
+
+
+def _virtual_ps_inherited_ui_fields(
+    *,
+    capacity: float,
+    exclude_id: str = "",
+) -> tuple[dict, dict | None]:
+    """Map inherited JSON fields onto form keys; return (fields, primary_house)."""
+    primary = primary_house_battery(list_batteries(), exclude_id=exclude_id)
+    fill = virtual_powerstation_fill_fields(
+        primary_house=primary,
+        capacity_kwh=float(capacity or 0.0),
+    )
+    fields = {
+        "max_charge": float(fill["battery_max_charge_power_kw"]),
+        "max_discharge": float(fill["battery_max_discharge_power_kw"]),
+        "efficiency": float(fill["battery_efficiency"]),
+        "limits_from_live": bool(fill["limits_from_live"]),
+        "min_soc": float(fill["battery_min_soc"]),
+        "max_soc": float(fill["battery_max_soc"]),
+        "threshold_percent": float(fill["threshold_power"]) * 100.0,
+        "standby_power": float(fill["standby_power_kw"]),
+        "kind": fill["kind"],
+        "control": fill["control"],
+        "battery_wear": dict(fill["battery_wear"]),
+    }
+    return fields, primary
+
+
+def _render_battery_core_fields(session_scope: str) -> dict:
+    label = labeled_text_input(
+        "Bezeichnung",
+        key=_scoped_key(session_scope, "planning_battery_label"),
+    )
+    type_label = labeled_selectbox(
+        "Typ",
+        options=["Hausbatterie", "Powerstation"],
+        key=_scoped_key(session_scope, "planning_battery_type"),
+    )
+    bat_type = "powerstation" if type_label == "Powerstation" else "house"
+    backing = BACKING_VIRTUAL
+    role = "single_use"
+    attached_ids: list[str] = []
+    if bat_type == "powerstation":
+        backing, role, attached_ids = _render_powerstation_meta(session_scope)
+    is_virtual_ps = bat_type == "powerstation" and backing == BACKING_VIRTUAL
+    capacity_kwargs: dict = {
+        "min_value": 0.1,
+        "step": 0.5,
+        "key": _scoped_key(session_scope, "planning_battery_capacity"),
+    }
+    if is_virtual_ps:
+        capacity_kwargs["help"] = "Max. Reserve / Carve-out auf der Hausbatterie."
+    capacity = labeled_number_input("Kapazität (kWh)", **capacity_kwargs)
+    attached_fields = {
+        "attached_consumer_ids": list(attached_ids),
+        "attached_consumer_id": attached_ids[0] if attached_ids else "",
+    }
+    if is_virtual_ps:
+        return {
+            "label": label,
+            "type": bat_type,
+            "backing": backing,
+            "role": role,
+            **attached_fields,
+            "capacity": capacity,
+            "is_virtual_ps": True,
+        }
+    max_charge, max_discharge, efficiency = _render_battery_power_efficiency(
+        session_scope, bat_type=bat_type
+    )
     return {
         "label": label,
+        "type": bat_type,
+        "backing": backing,
+        "role": role,
+        **attached_fields,
         "capacity": capacity,
         "max_charge": max_charge,
         "max_discharge": max_discharge,
         "efficiency": efficiency,
+        "is_virtual_ps": False,
     }
 
 
@@ -439,16 +681,39 @@ def _render_battery_wear_fields(session_scope: str) -> dict:
     }
 
 
-def _render_battery_fields(session_scope: str) -> dict:
+def _render_battery_fields(session_scope: str, *, exclude_id: str = "") -> dict:
     fields = _render_battery_core_fields(session_scope)
+    if fields.get("is_virtual_ps"):
+        inherited, primary = _virtual_ps_inherited_ui_fields(
+            capacity=float(fields.get("capacity") or 0.0),
+            exclude_id=exclude_id,
+        )
+        fields.update(inherited)
+        if primary is None:
+            st.warning(
+                "Virtuelle Powerstation braucht eine Hausbatterie als "
+                "Carve-out-Basis. Fehlende Werte werden mit Standardwerten "
+                "gefüllt."
+            )
+        else:
+            house_label = str(
+                primary.get("label") or primary.get("id") or "Hausbatterie"
+            ).strip()
+            st.caption(
+                f"Lade-/Entladeleistung, Wirkungsgrad, SoC und Grenzen werden "
+                f"von der Hausbatterie „{house_label}“ übernommen "
+                f"(Carve-out, keine eigene Hardware)."
+            )
+        return fields
     fields.update(_render_battery_limit_fields(session_scope))
     fields["battery_wear"] = _render_battery_wear_fields(session_scope)
     return fields
 
 
 def _battery_save_payload(fields: dict) -> dict:
-    return {
+    payload = {
         "label": fields["label"],
+        "type": fields.get("type") or "house",
         "kind": fields.get("kind") or DEFAULT_BATTERY_KIND,
         "battery_capacity_kwh": fields["capacity"],
         "battery_max_charge_power_kw": fields["max_charge"],
@@ -463,6 +728,21 @@ def _battery_save_payload(fields: dict) -> dict:
         "ehal_bindings": dict(fields.get("ehal_bindings") or {}),
         "battery_wear": fields["battery_wear"],
     }
+    if payload["type"] == "powerstation":
+        payload["backing"] = fields.get("backing") or "virtual"
+        payload["role"] = fields.get("role") or "single_use"
+        attached_ids = [
+            str(cid).strip()
+            for cid in (fields.get("attached_consumer_ids") or [])
+            if str(cid or "").strip()
+        ]
+        if not attached_ids:
+            singular = str(fields.get("attached_consumer_id") or "").strip()
+            if singular:
+                attached_ids = [singular]
+        payload["attached_consumer_ids"] = attached_ids
+        payload["attached_consumer_id"] = attached_ids[0] if attached_ids else ""
+    return payload
 
 
 def _save_battery(
@@ -546,8 +826,8 @@ def render_battery_planning_tab() -> None:
     )
     ctx = _render_battery_select()
     is_new = ctx["is_new"]
-    fields = _render_battery_fields(ctx["session_scope"])
     stable_id = "" if is_new else str(ctx["existing"].get("id", ""))
+    fields = _render_battery_fields(ctx["session_scope"], exclude_id=stable_id)
     label = fields["label"]
     ready = bool(str(label or "").strip()) and float(fields["capacity"] or 0) > 0
     taken = {bid for bid in ctx["battery_ids"] if bid != stable_id}

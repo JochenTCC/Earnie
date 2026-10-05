@@ -9,6 +9,13 @@ from house_config.battery_kind import (
     DEFAULT_BATTERY_KIND,
     normalize_battery_kind,
 )
+from house_config.powerstation import (
+    BATTERY_TYPE_HOUSE,
+    BATTERY_TYPE_POWERSTATION,
+    is_powerstation,
+    normalize_battery_type,
+    normalize_powerstation_fields,
+)
 
 ZERO_BATTERY_FLAT = {
     "battery_capacity_kwh": 0.0,
@@ -44,6 +51,7 @@ def strip_assets_for_reference(params: dict) -> dict:
         "pv_system_ids",
         "_battery_wear",
         "_planning_batteries",
+        "_planning_powerstations",
         "_planning_pv_systems",
     ):
         out.pop(key, None)
@@ -136,9 +144,10 @@ def split_battery_max_power_kw(raw: dict, *, battery_id: str = "?", index: int =
             f"batteries[{index}] ('{battery_id}'): "
             "battery_max_charge/discharge_power_kw muss >= 0 sein."
         )
-    # Zero battery / reference strip: both may be 0. Positive configs need > 0
-    # on at least one side when capacity is present (checked by callers if needed).
-    if (charge == 0.0) ^ (discharge == 0.0):
+    # Zero battery / reference strip: both may be 0. Positive house configs need
+    # both > 0. Powerstations (2.7.g) may charge-only (discharge 0 = no house feed).
+    bat_type = str(raw.get("type") or BATTERY_TYPE_HOUSE).strip().lower()
+    if bat_type != BATTERY_TYPE_POWERSTATION and (charge == 0.0) ^ (discharge == 0.0):
         raise ValueError(
             f"batteries[{index}] ('{battery_id}'): "
             "battery_max_charge/discharge_power_kw müssen beide 0 oder beide > 0 sein."
@@ -172,8 +181,19 @@ def normalize_battery(raw: dict, index: int) -> dict:
     charge_kw, discharge_kw = split_battery_max_power_kw(
         raw, battery_id=battery_id, index=index
     )
+    bat_type = normalize_battery_type(
+        raw.get("type"), battery_id=battery_id, index=index
+    )
     capacity = float(raw["battery_capacity_kwh"])
-    if capacity > 0.0 and (charge_kw <= 0.0 or discharge_kw <= 0.0):
+    if bat_type == BATTERY_TYPE_POWERSTATION:
+        if capacity > 0.0 and charge_kw <= 0.0:
+            raise ValueError(
+                f"batteries[{index}] ('{battery_id}'): "
+                "powerstation battery_max_charge_power_kw muss > 0 sein."
+            )
+        # Physical one-way packs cannot feed the house grid; discharge may be 0.
+        discharge_kw = max(0.0, discharge_kw)
+    elif capacity > 0.0 and (charge_kw <= 0.0 or discharge_kw <= 0.0):
         raise ValueError(
             f"batteries[{index}] ('{battery_id}'): "
             "battery_max_charge/discharge_power_kw muss > 0 sein."
@@ -185,9 +205,10 @@ def normalize_battery(raw: dict, index: int) -> dict:
         raise ValueError(
             f"batteries[{index}] ('{battery_id}'): ehal_bindings muss ein Objekt sein."
         )
-    return {
+    out = {
         "id": battery_id,
         "label": label,
+        "type": bat_type,
         "kind": kind,
         "battery_capacity_kwh": capacity,
         "battery_max_charge_power_kw": charge_kw,
@@ -208,6 +229,11 @@ def normalize_battery(raw: dict, index: int) -> dict:
         },
         "battery_wear": _normalize_battery_wear(raw.get("battery_wear"), battery_id, index),
     }
+    if bat_type == BATTERY_TYPE_POWERSTATION:
+        out.update(
+            normalize_powerstation_fields(raw, battery_id=battery_id, index=index)
+        )
+    return out
 
 
 def _normalize_battery_wear(raw: object, battery_id: str, index: int) -> dict | None:
@@ -286,9 +312,10 @@ def pv_systems_by_id(raw_config: dict) -> dict[str, dict]:
 
 def planning_battery_entry(bat: dict) -> dict:
     """Stable planning-shape entry for a resolved battery (runtime/MILP)."""
-    return {
+    entry = {
         "id": bat["id"],
         "label": bat["label"],
+        "type": bat.get("type", BATTERY_TYPE_HOUSE),
         "kind": bat.get("kind", DEFAULT_BATTERY_KIND),
         "battery_capacity_kwh": float(bat["battery_capacity_kwh"]),
         "battery_max_charge_power_kw": float(bat["battery_max_charge_power_kw"]),
@@ -306,14 +333,23 @@ def planning_battery_entry(bat: dict) -> dict:
             dict(bat["battery_wear"]) if bat.get("battery_wear") is not None else None
         ),
     }
+    if is_powerstation(bat):
+        entry["backing"] = bat["backing"]
+        entry["role"] = bat["role"]
+        entry["attached_consumer_ids"] = list(bat.get("attached_consumer_ids") or [])
+        entry["attached_consumer_id"] = bat.get("attached_consumer_id") or (
+            entry["attached_consumer_ids"][0] if entry["attached_consumer_ids"] else ""
+        )
+    return entry
 
 
 def battery_params_from_planning(entry: dict) -> dict:
     """Optimizer-shaped params dict from a planning battery entry."""
     bat_id = entry["id"]
-    return {
+    out = {
         "id": bat_id,
         "label": str(entry.get("label") or bat_id).strip() or bat_id,
+        "type": entry.get("type", BATTERY_TYPE_HOUSE),
         "kind": entry.get("kind", DEFAULT_BATTERY_KIND),
         "battery_capacity_kwh": float(entry["battery_capacity_kwh"]),
         "min_soc": float(entry["battery_min_soc"]),
@@ -328,6 +364,15 @@ def battery_params_from_planning(entry: dict) -> dict:
         "limits_from_live": bool(entry.get("limits_from_live", False)),
         "ehal_bindings": dict(entry.get("ehal_bindings") or {}),
     }
+    if is_powerstation(entry):
+        out["backing"] = entry.get("backing")
+        out["role"] = entry.get("role")
+        attached_ids = list(entry.get("attached_consumer_ids") or [])
+        out["attached_consumer_ids"] = attached_ids
+        out["attached_consumer_id"] = entry.get("attached_consumer_id") or (
+            attached_ids[0] if attached_ids else ""
+        )
+    return out
 
 
 def resolve_battery_into_settings(
@@ -350,6 +395,14 @@ def resolve_battery_into_settings(
     bat_ids = normalize_battery_ids(out)
     out.pop("battery_ids", None)
 
+    # Powerstations are never selected via scenario battery_ids — attach via consumers.
+    all_powerstations = [
+        planning_battery_entry(bat)
+        for bat in batteries.values()
+        if is_powerstation(bat)
+    ]
+    out["_planning_powerstations"] = all_powerstations
+
     if not bat_ids:
         out["_planning_batteries"] = []
         if "battery_capacity_kwh" not in out:
@@ -357,10 +410,30 @@ def resolve_battery_into_settings(
         return out
 
     planning: list[dict] = []
+    skipped_powerstations: list[str] = []
     for bat_id in bat_ids:
         if bat_id not in batteries:
             raise ValueError(f"Unbekannte battery_id '{bat_id}'.")
-        planning.append(planning_battery_entry(batteries[bat_id]))
+        bat = batteries[bat_id]
+        if is_powerstation(bat):
+            # Soft-skip: converting a house battery already listed in scenario
+            # battery_ids must not hard-fail config reload (HK auto-save).
+            skipped_powerstations.append(bat_id)
+            continue
+        planning.append(planning_battery_entry(bat))
+    if skipped_powerstations:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "battery_ids enthielt Powerstation(s) %s — ignoriert "
+            "(Anbindung über appliance_recommendation.powerstation_id).",
+            skipped_powerstations,
+        )
+    if not planning:
+        out["_planning_batteries"] = []
+        if "battery_capacity_kwh" not in out:
+            out.update(ZERO_BATTERY_FLAT)
+        return out
 
     out["_planning_batteries"] = planning
     first = planning[0]

@@ -23,7 +23,11 @@ def _force_dischargeable_discharge_kw(battery_params: dict) -> float:
         BATTERY_CONTROL_FULL,
         control_from_battery_params,
     )
+    from house_config.powerstation import is_powerstation
 
+    # Powerstations never feed the house grid / export unconstrained sum (2.7.g/h).
+    if is_powerstation(battery_params):
+        return 0.0
     if control_from_battery_params(battery_params) != BATTERY_CONTROL_FULL:
         return 0.0
     return float(
@@ -40,7 +44,7 @@ def live_unconstrained_export_kw() -> float | None:
 
     PV nameplate (sum of all PV systems) + max discharge power of every battery that
     can be force-discharged (``battery_control = full``). Skips ``limits_only`` /
-    ``read_only`` (2.7.c). Powerstations (2.7.g/h) are not in the list yet.
+    ``read_only`` (2.7.c) and ``type=powerstation`` (2.7.g/h).
     """
     import config
 

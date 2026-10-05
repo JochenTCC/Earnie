@@ -148,17 +148,27 @@ Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`flex.po
 
 ## Manuelle Geräte (Hausprofil, `type: generic`)
 
-Waschmaschine, Trockner usw. als `generic`**-Verbraucher** in `house_profiles.json` (optional `appliance_recommendation` für Loxone-Leistung und Empfehlungsmodus). Planung über die Seite **Manuelle Geräte**; Persistenz in `runtime/appliance_schedules.json`. Geplante Laufzeiten erscheinen in Chart 1 (Flow-Balance).
+Waschmaschine, Trockner usw. als `generic`**-Verbraucher** in `house_profiles.json` (optional `appliance_recommendation`). Auf **Manuelle Geräte** erscheint je nach Modus die Start-Empfehlung oder der Reserve-Status. Persistenz der Startpläne: `runtime/appliance_schedules.json`; Reserve-Zustand: `runtime/powerstation_reserves.json`. Geplante Laufzeiten (Advice) erscheinen in Chart 1 (Flow-Balance).
 
-**Startempfehlung (Opportunitätskosten):** Ranking und Sterne nutzen nicht den reinen Bezugspreis. Pro Planungsstunde gilt: PV-Überschuss (`expected_p_pv − expected_p_act`) wird mit dem Einspeisetarif (`k_push_act`) bewertet, der Rest mit dem Bezugspreis (`k_act`). Batteriepfade sind in dieser Näherung nicht enthalten.
+**Unterstützung (XOR, Default `advice`):** Im Hauskonfigurator wählt jedes manuelle Gerät genau einen Modus — nicht beides.
+
+
+| `appliance_recommendation.mode` | Verhalten |
+| --- | --- |
+| `advice` | 1–5-Sterne-Startempfehlung auf **Manuelle Geräte**; optional Tagesplan-Häkchen |
+| `reserve` | `role: single_use`-Powerstation (`powerstation_id` → `components.batteries[]` mit `type: powerstation`); kein Sterne-Ranking. Bei `backing: virtual` dürfen mehrere manuelle Geräte dieselbe Powerstation teilen (gemeinsamer Carve-out). |
+
+**Startempfehlung (Opportunitätskosten, nur `advice`):** Ranking und Sterne nutzen nicht den reinen Bezugspreis. Pro Planungsstunde gilt: PV-Überschuss (`expected_p_pv − expected_p_act`) wird mit dem Einspeisetarif (`k_push_act`) bewertet, der Rest mit dem Bezugspreis (`k_act`). Batteriepfade sind in dieser Näherung nicht enthalten.
 
 
 | Feld                                                             | Bedeutung                                                      |
 | ---------------------------------------------------------------- | -------------------------------------------------------------- |
 | `id`, `label`                                                    | Kennung und Anzeigename                                        |
+| `appliance_recommendation.mode`                                  | `advice` (Default) oder `reserve`                              |
+| `appliance_recommendation.powerstation_id`                       | Bei `reserve`: id der Powerstation in `components.json`        |
 | `appliance_recommendation.power_source`                          | `loxone` oder `manual`                                         |
 | `loxone_inputs.power_name`                                       | Bei `loxone`: Ist-Leistungsmerker (`known` und `manual`)       |
-| `appliance_recommendation.default_power_kw`, `default_runtime_h` | Standard für Empfehlungsmodus (Seite liest nur aus Hausprofil) |
+| `appliance_recommendation.default_power_kw`, `default_runtime_h` | Standard für Empfehlung bzw. Reserve-Ziel (kWh ≈ P×t)          |
 
 
 
@@ -181,7 +191,7 @@ Im Hausprofil (`house_profiles.json`, `type: generic`) steuert `earnie_role` (St
 | ------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `known`       | Geplante Laufzeiten werden zur **Grundlast** (`expected_p_act`) addiert — nicht als MILP-Flex                               | wird auf `0` gesetzt (fester Start)                   |
 | `flex`        | Optimierbare Flex-Last (MILP)                                                                                               | Verschiebungsfenster (± h)                            |
-| `manual`      | **Manuelles Gerät** — Planung auf **Live-Cockpit → Manuelle Geräte**; Start-Empfehlungen. Im **Szenario-Explorer** wie `flex` MILP-optimiert (CSV-Energie als Ziel wenn „Von Basis-Last abziehen“, sonst Schedule). **Live:** nur aktiver Nutzer-Tagesplan — kein Default-Wochen-Overlay. | **Empfehlungshorizont (h)** für die Startzeit-Tabelle |
+| `manual`      | **Manuelles Gerät** — **Live-Cockpit → Manuelle Geräte**; Modus `advice` (Start-Empfehlung) oder `reserve` (Powerstation). Im **Szenario-Explorer** wie `flex` MILP-optimiert (CSV-Energie als Ziel wenn „Von Basis-Last abziehen“, sonst Schedule). **Live advice:** nur aktiver Nutzer-Tagesplan — kein Default-Wochen-Overlay. | Bei `advice`: **Empfehlungshorizont (h)**; bei `reserve`: Powerstation-Anbindung |
 
 
 Einrichtung im **Hauskonfigurator** unter „Earnie-Berücksichtigung“. Thermische Verbraucher (SwimSpa, Wärmepumpe) und E-Auto sind hiervon unberührt.

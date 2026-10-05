@@ -609,6 +609,29 @@ def _add_soc_equality_constraint(
     model.prob += model.e_batt[slot_index] == e_kwh
 
 
+def _add_virtual_reserve_asap_charge(
+    model: MilpHorizonModel,
+    *,
+    asap_charge_kwh: float,
+    max_charge_kw: float,
+    efficiency: float,
+) -> None:
+    """Force primary ESS to absorb ASAP kWh for virtual single_use reserves (2.7.g)."""
+    if asap_charge_kwh <= 1e-9 or max_charge_kw <= 1e-9 or model.horizon < 1:
+        return
+    eta = float(efficiency) if efficiency > 1e-9 else 1.0
+    # Grid/AC kWh to store ``asap_charge_kwh`` in the battery.
+    ac_kwh_needed = asap_charge_kwh / eta
+    from optimizer.charging_urgent import hours_needed_to_deliver
+
+    hours = hours_needed_to_deliver(ac_kwh_needed, max_charge_kw)
+    slot_count = max(1, min(model.horizon, int(hours / model.dt_h) + 1))
+    model.prob += (
+        pulp.lpSum(model.p_charge[t] * model.dt_h for t in range(slot_count))
+        >= ac_kwh_needed
+    ), "virtual_reserve_asap_charge"
+
+
 def _add_sunrise_soc_min_constraint(
     model: MilpHorizonModel,
     sunrise_index: int,

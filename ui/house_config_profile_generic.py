@@ -192,6 +192,92 @@ def _render_generic_flex_shift(
     return float(start_shift_h)
 
 
+def _render_manual_assist_mode(
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+) -> str:
+    from house_config.powerstation import MODE_ADVICE, MODE_RESERVE, consumer_assist_mode
+
+    current = consumer_assist_mode(consumer)
+    mode = labeled_selectbox(
+        "Unterstützung",
+        options=[MODE_ADVICE, MODE_RESERVE],
+        index=0 if current != MODE_RESERVE else 1,
+        format_func=lambda value: (
+            "Start-Empfehlung"
+            if value == MODE_ADVICE
+            else "Energiereserve (Powerstation)"
+        ),
+        key=_scoped_key(session_scope, f"hc_assist_mode_{index}"),
+    )
+    st.caption(
+        "Entweder Startzeit-Empfehlung (Sterne) **oder** Energiereserve — "
+        "nicht beides für dasselbe Gerät."
+    )
+    return str(mode)
+
+
+def _render_manual_powerstation_id(
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+) -> str:
+    from ui.house_config_io import list_batteries
+
+    rec = consumer.get("appliance_recommendation") or {}
+    current = str(rec.get("powerstation_id") or "").strip()
+    powerstations = [
+        b
+        for b in list_batteries()
+        if str(b.get("type") or "house") == "powerstation"
+    ]
+    options = [""] + [str(b["id"]) for b in powerstations]
+    labels = {
+        "": "— Powerstation wählen —",
+        **{
+            str(b["id"]): f"{b.get('label') or b['id']} ({b['id']})"
+            for b in powerstations
+        },
+    }
+    if current and current not in options:
+        options.append(current)
+        labels[current] = f"{current} (fehlt in components.json)"
+    index_default = options.index(current) if current in options else 0
+    selected = labeled_selectbox(
+        "Powerstation",
+        options=options,
+        index=index_default,
+        format_func=lambda value: labels.get(value, value or "—"),
+        key=_scoped_key(session_scope, f"hc_powerstation_{index}"),
+    )
+    if not powerstations:
+        st.warning(
+            "Keine Powerstation in components.json — unter "
+            "**Hauskonfigurator → Batterien** Typ „Powerstation“ wählen und "
+            "speichern (Verbraucher-Zuordnung kann danach hier erfolgen)."
+        )
+    elif not selected:
+        st.error("Modus Energiereserve erfordert eine Powerstation.")
+    else:
+        chosen = next(
+            (b for b in powerstations if str(b.get("id")) == selected),
+            None,
+        )
+        if (
+            chosen is not None
+            and str(chosen.get("backing") or "virtual").strip().lower()
+            == "virtual"
+        ):
+            st.caption(
+                "Virtuelle Powerstation: mehrere manuelle Geräte können dieselbe "
+                "Energiereserve (Carve-out) nutzen."
+            )
+    return str(selected or "").strip()
+
+
 def _render_generic_manual_fields(
     consumer: dict,
     index: int,
@@ -201,23 +287,29 @@ def _render_generic_manual_fields(
     *,
     session_scope: str,
 ) -> tuple[float, dict]:
-    horizon_default = (
+    from house_config.powerstation import MODE_ADVICE, MODE_RESERVE
+
+    mode = _render_manual_assist_mode(
+        consumer, index, session_scope=session_scope
+    )
+    start_shift_h = float(
         defaults["start_shift_h"]
         if defaults["start_shift_h"] >= 1
         else DEFAULT_MANUAL_HORIZON_H
     )
-    start_shift_h = labeled_number_input(
-        "Empfehlungshorizont (h)",
-        min_value=1.0,
-        max_value=MAX_START_SHIFT_H,
-        value=min(MAX_START_SHIFT_H, float(horizon_default)),
-        step=0.5,
-        key=_scoped_key(session_scope, f"hc_horizon_{index}"),
-    )
-    st.caption(
-        "Maximaler Vorschau-Horizont auf der Seite „Manuelle Geräte“ "
-        "für die Startzeit-Empfehlung."
-    )
+    if mode == MODE_ADVICE:
+        start_shift_h = labeled_number_input(
+            "Empfehlungshorizont (h)",
+            min_value=1.0,
+            max_value=MAX_START_SHIFT_H,
+            value=min(MAX_START_SHIFT_H, float(start_shift_h)),
+            step=0.5,
+            key=_scoped_key(session_scope, f"hc_horizon_{index}"),
+        )
+        st.caption(
+            "Maximaler Vorschau-Horizont auf der Seite „Manuelle Geräte“ "
+            "für die Startzeit-Empfehlung."
+        )
     appliance_defaults = _render_manual_appliance_defaults(
         consumer,
         index,
@@ -225,12 +317,19 @@ def _render_generic_manual_fields(
         float(duration_h),
         session_scope=session_scope,
     )
-    recommendation = {
+    recommendation: dict = {
+        "mode": mode,
         "power_source": _render_manual_power_source(
             consumer, index, session_scope=session_scope
         ),
         **appliance_defaults,
     }
+    if mode == MODE_RESERVE:
+        ps_id = _render_manual_powerstation_id(
+            consumer, index, session_scope=session_scope
+        )
+        if ps_id:
+            recommendation["powerstation_id"] = ps_id
     return float(start_shift_h), recommendation
 
 

@@ -14,7 +14,22 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | Parameter               | Einheit  | Quelle                               | Bedeutung                                                                                                                             |
 | ----------------------- | -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `pv_system_ids`         | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf `pv_systems[].id`                                                                                    |
-| `battery_ids`           | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf `batteries[].id` (2.7.c; ersetzt `battery_id`)                                                      |
+| `battery_ids`           | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf **Hausbatterien** `batteries[].id` mit `type: house` (2.7.c; ersetzt `battery_id`). Keine Powerstations. |
+| `type`                  | enum     | `components.json` → `batteries[]`    | `house` (Default) oder `powerstation` (2.7.g/h Reserve; Anbindung über manuelles Gerät `mode: reserve`) |
+| `backing` / `role` / `attached_consumer_ids` | — | `components.json` → Powerstation | Nur bei `type: powerstation`: `virtual`\|`physical`, `single_use`\|`standby_backup`; `attached_consumer_ids` (Liste) optional — Zuordnung auch über manuelle Geräte `mode: reserve` + `powerstation_id`. Legacy: `attached_consumer_id` = erstes Listenelement. |
+
+### Virtuelle Powerstation (Carve-out)
+
+Bei `type: powerstation` und `backing: virtual` ist die Powerstation **kein eigener Speicher**, sondern ein kWh-Carve-out auf der ersten Hausbatterie (`type: house`). Im Hauskonfigurator → Batterien sind dann nur noch sichtbar:
+
+- Bezeichnung, Typ, Backing, Rolle, **Angeschlossene Verbraucher** (Mehrfachauswahl)
+- **Kapazität (kWh)** = max. Reserve / Carve-out-Größe (nicht Packgröße)
+
+Mehrere manuelle Geräte können dieselbe virtuelle Powerstation nutzen: gemeinsame Energiereserve (Ziel-kWh = Summe der Gerätebedarfe, begrenzt durch Kapazität); Trigger von jedem angeschlossenen Gerät.
+
+Ausgeblendet und beim Speichern/Normalisieren von der Hausbatterie übernommen (bzw. feste Defaults, falls keine Hausbatterie existiert): Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungs-Schwelle, Standby, Topologie, Steuerbarkeit, `limits_from_live`, Verschleiß. Entladeleistung der virtuellen Powerstation wird immer `0` gesetzt; Verschleiß bleibt aus (Zyklen zählen auf der Hausbatterie).
+
+Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular.
 | `kind`                  | enum     | `components.json` → `batteries[]`    | Topologie: `battery_inverter` (Automatik/Optimieren) oder `isolated` (nur Laden/Entladen/Standby)                                    |
 | `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung je Anlage; aufgelöst als Summe `pv_kwp`                                                                      |
 | `pv_tilt`               | °        | `components.json` → `pv_systems[]`   | Dachneigung **je Anlage** (bei mehreren Anlagen keine einzelne Globalneigung)                                                         |
@@ -57,7 +72,7 @@ EHAL-Bindings je Batterie: Pattern B `ess.{slug}.*` in `batteries[].ehal_binding
 
 Wenn `control` mehr verlangt als das EHAL-Mapping hergibt (z. B. `full` ohne `set_ess_active_power` und ohne `plant.ha_ess_force`), warnt EHAL-Com. Huawei ohne Wirkleistungs-Entity: optional `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`) — siehe [EHAL-Spec](../spec/ehal.md) und [EHAL-Com](../ui/ehal-com.md).
 
-Einspeise-„unconstrained“-Wert = PV-kWp-Summe + Summe der Max-Entladeleistung aller gewählten Batterien mit `control = full`.
+Einspeise-„unconstrained“-Wert = PV-kWp-Summe + Summe der Max-Entladeleistung aller gewählten Hausbatterien mit `control = full`. Powerstations (`type: powerstation`) zählen nicht mit — sie speisen nicht ins Hausnetz zurück.
 
 
 ## SOC-Verhalten

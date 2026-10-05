@@ -32,12 +32,11 @@ from ui.help_hint import render_page_title_with_help
 from ui.runtime_config import invalidate_live_optimization_cache
 
 _DEVICES_HELP = (
-    "Empfehlungsmodus für manuelle Geräte (Waschmaschine, Trockner, "
-    "Geschirrspüler): günstigste Startstunde im konfigurierten "
-    "Empfehlungshorizont (Hausprofil) nach Opportunitätskosten — "
-    "PV-Überschuss zum Einspeisetarif, Rest zum Bezugspreis. "
-    "Optional kann eine Startstunde in die nächste Optimierung einfließen "
-    "(Nennleistung × Laufzeit)."
+    "Manuelle Geräte: je Gerät entweder **Start-Empfehlung** (Sterne im "
+    "Empfehlungshorizont) oder **Energiereserve** (Powerstation, 2.7.g) — "
+    "Wahl im Hauskonfigurator. Empfehlung: günstigste Startstunde nach "
+    "Opportunitätskosten (PV-Überschuss / Bezugspreis). Reserve: Status und "
+    "manueller Trigger, wenn kein Leistungsmerker vorhanden."
 )
 _DEFAULT_RUNTIME_H = 2.0
 _DELTA_COLUMN = "Delta"
@@ -75,6 +74,8 @@ def _delta_cell_color(delta_eur: float) -> str:
 
 
 def render() -> None:
+    from house_config.powerstation import MODE_ADVICE, MODE_RESERVE
+
     render_page_title_with_help(
         "🔌 Manuelle Geräte",
         _DEVICES_HELP,
@@ -89,18 +90,32 @@ def render() -> None:
             "'appliances' in config.json (siehe config.example.json)."
         )
         return
+    advice = [
+        a for a in appliances if str(a.get("mode") or MODE_ADVICE) == MODE_ADVICE
+    ]
+    reserve = [
+        a for a in appliances if str(a.get("mode") or "") == MODE_RESERVE
+    ]
     st.caption(
-        "Empfehlungshorizont je Gerät aus dem Hausprofil · "
-        "Nennleistung/Laufzeit im Hauskonfigurator · "
-        "Häkchen in der Tabelle = Optimierungsplan."
+        "Unterstützung je Gerät im Hauskonfigurator · "
+        "Nennleistung/Laufzeit dort pflegen · "
+        "Häkchen bei Start-Empfehlung = Optimierungsplan."
     )
-    matrix = _load_planning_matrix()
-    if not matrix:
-        return
-    _render_star_threshold_settings()
-    for appliance in appliances:
-        _render_appliance(appliance, matrix)
-        st.divider()
+    if advice:
+        matrix = _load_planning_matrix()
+        if matrix:
+            _render_star_threshold_settings()
+            st.subheader("Start-Empfehlung")
+            for appliance in advice:
+                _render_appliance(appliance, matrix)
+                st.divider()
+        elif not reserve:
+            return
+    if reserve:
+        st.subheader("Energiereserve")
+        for appliance in reserve:
+            _render_reserve_appliance(appliance)
+            st.divider()
 
 
 def _load_planning_matrix() -> list | None:
@@ -210,6 +225,65 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
         st.warning("Keine gültige Leistung im Hausprofil — Empfehlung nicht möglich.")
         return
     _render_recommendation(appliance, matrix, power_kw, runtime_h)
+
+
+def _render_reserve_appliance(appliance: dict) -> None:
+    from optimizer.powerstation_reserve import reserve_target_kwh
+    from runtime_store.powerstation_reserves import (
+        get_or_init_state,
+        load_reserve_states,
+        set_trigger,
+    )
+
+    st.markdown(f"#### {appliance['name']}")
+    power_kw = _appliance_power_kw(appliance)
+    runtime_h = _appliance_runtime_h(appliance)
+    target = reserve_target_kwh(
+        default_power_kw=power_kw, default_runtime_h=runtime_h
+    )
+    ps_id = str(appliance.get("powerstation_id") or "").strip()
+    if not ps_id:
+        st.error(
+            "Keine Powerstation verknüpft — im Hauskonfigurator "
+            "`powerstation_id` setzen."
+        )
+        return
+    states = load_reserve_states()
+    entry = get_or_init_state(states, ps_id, target_kwh=target)
+    state = str(entry.get("state") or "empty")
+    stored = float(entry.get("stored_kwh") or 0.0)
+    st.caption(
+        f"Powerstation: `{ps_id}` · Ziel: **{target:.2f} kWh** · "
+        f"Vorrat: **{stored:.2f} kWh** · Status: **{state}**"
+    )
+    if appliance.get("power_source") == "loxone":
+        merker = _appliance_loxone_power_name(appliance)
+        if merker:
+            st.caption(
+                f"Trigger über Leistungsmerker `{merker}` (Schwelle) "
+                "oder manuell unten."
+            )
+        else:
+            st.caption("Kein Leistungsmerker — manueller Trigger nötig.")
+    else:
+        st.caption("Kein Leistungsmerker — manueller Trigger nötig.")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button(
+            "Gerät läuft jetzt (Trigger)",
+            key=f"reserve_trigger_on_{appliance['id']}",
+        ):
+            set_trigger(ps_id, active=True)
+            invalidate_live_optimization_cache()
+            st.rerun()
+    with col_b:
+        if st.button(
+            "Trigger zurücksetzen",
+            key=f"reserve_trigger_off_{appliance['id']}",
+        ):
+            set_trigger(ps_id, active=False)
+            invalidate_live_optimization_cache()
+            st.rerun()
 
 
 def _recommendation_horizon_h(appliance: dict) -> int:

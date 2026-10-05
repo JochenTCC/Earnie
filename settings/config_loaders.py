@@ -364,6 +364,7 @@ def load_full_runtime_params(
         "PV_KWP": float(resolved.get("pv_kwp", 0.0) or 0.0),
         "_planning_pv_systems": _planning_pv_systems_from_resolved(resolved),
         "_planning_batteries": list(resolved.get("_planning_batteries") or []),
+        "_planning_powerstations": list(resolved.get("_planning_powerstations") or []),
         "BATTERY_MAX_POWER_KW": float(
             lookup_runtime_value(resolved, "battery_max_power_kw", config_path)
         ),

@@ -339,6 +339,22 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         battery_params = apply_effective_ess_limits(
             config.get_battery_params(), telemetry=telemetry_for_export
         )
+    from optimizer.powerstation_live import (
+        advance_virtual_reserves_from_plan,
+        apply_reserves_to_battery_params,
+        load_active_reserves,
+        physical_charge_setpoints_kw,
+        sync_triggers_from_telemetry,
+        write_physical_powerstation_charges,
+    )
+
+    active_reserves = load_active_reserves()
+    sync_triggers_from_telemetry(telemetry_for_export, active_reserves)
+    # Re-load after trigger updates so MILP sees discharging state.
+    active_reserves = load_active_reserves()
+    battery_params = apply_reserves_to_battery_params(
+        battery_params, active_reserves
+    )
     export_ctx = resolve_live_export_context(
         matrix_row=optimization_matrix[0] if optimization_matrix else None,
         telemetry=telemetry_for_export,
@@ -376,6 +392,20 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         sum(consumer_powers.values()),
         primary_battery["max_power_kw"],
     )
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    advance_virtual_reserves_from_plan(
+        battery_plan_kw=float(battery_plan_kw),
+        dt_h=DEFAULT_DT_H,
+        reserves=active_reserves,
+    )
+    phys_charge = physical_charge_setpoints_kw(active_reserves)
+    if phys_charge:
+        logger.info(
+            "2.7.g physical powerstation charge setpoints (kW): %s",
+            phys_charge,
+        )
+        write_physical_powerstation_charges(phys_charge)
 
     logger.info(
         "Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW | "

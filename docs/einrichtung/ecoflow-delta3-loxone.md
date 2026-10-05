@@ -35,12 +35,13 @@ multiple isolated battery … One-Way storage type“):
 | `set_ess_source_select` *(neu, Backlog-Vorschlag)* | 🔜 Merker/Bridge lässt sich vorbereiten, Earnie schreibt/nutzt das Feld aber erst nach Umsetzung des Backlog-Punkts |
 | `set_ess_active_power`, `set_ess_discharge_power_limit`, `set_ess_mode` | ❌ nicht anlegen/mappen — für einen One-Way-Speicher grundsätzlich nicht zutreffend |
 
-**Konsequenz für `components.json`:** Solange `batteries[].direction: one_way` in der MILP noch
-nicht berücksichtigt wird, würde Earnie die Delta 3 sonst wie einen normalen bidirektionalen
-Speicher einplanen — inklusive Entlade-Fahrplan, der physisch nie ankommt, weil es keinen echten
-Entlade-Befehl gibt. Nehmt die Delta 3 deshalb **vorerst nicht** als optimierten Batterie-Eintrag
-in `components.json` → `batteries[]` auf. Bindet nur `sens_ess_soc` / `sens_ess_power` zur
-Anzeige, ohne sie der MILP als disponible Kapazität zu übergeben.
+**Konsequenz für `components.json` (2.7.g):** Die Delta 3 ist eine Powerstation
+(`type: powerstation`, `backing: physical`, `role: single_use` oder später `standby_backup`),
+**nicht** eine Hausbatterie in Szenario-`battery_ids[]`. Anbindung über ein manuelles Gerät mit
+`appliance_recommendation.mode: reserve` und `powerstation_id`. Die MILP plant kein
+Hausnetz-Entladen und keinen Entlade-Befehl; Laden läuft über
+`ess.{slug}.set_ess_charge_power_limit`. Telemetrie (`sens_ess_power`) kann als Zähler für
+Energie-pro-Lauf dienen.
 
 ## Architektur
 

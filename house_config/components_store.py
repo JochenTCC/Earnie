@@ -5,6 +5,7 @@ import json
 import os
 
 from house_config.entity_resolution import normalize_battery, normalize_pv_system
+from house_config.powerstation import apply_virtual_powerstation_inheritance
 
 
 def _read_json(path: str) -> dict:
@@ -31,7 +32,10 @@ def normalize_components_document(doc: dict) -> dict:
     batteries: list[dict] = []
     seen_battery_ids: set[str] = set()
     for index, item in enumerate(batteries_raw):
-        spec = normalize_battery(item, index)
+        if not isinstance(item, dict):
+            raise ValueError(f"batteries[{index}] muss ein Objekt sein.")
+        inherited = apply_virtual_powerstation_inheritance(item, batteries_raw)
+        spec = normalize_battery(inherited, index)
         if spec["id"] in seen_battery_ids:
             raise ValueError(f"batteries: doppelte id '{spec['id']}'.")
         seen_battery_ids.add(spec["id"])
@@ -62,9 +66,11 @@ def load_components_document(path: str) -> dict:
 
 def _serialize_battery(spec: dict) -> dict:
     """Persist split charge/discharge limits (2.7.j); drop legacy single max."""
+    bat_type = str(spec.get("type") or "house").strip().lower() or "house"
     out: dict = {
         "id": spec["id"],
         "label": spec["label"],
+        "type": bat_type,
         "battery_capacity_kwh": spec["battery_capacity_kwh"],
         "battery_max_charge_power_kw": float(spec["battery_max_charge_power_kw"]),
         "battery_max_discharge_power_kw": float(spec["battery_max_discharge_power_kw"]),
@@ -76,6 +82,20 @@ def _serialize_battery(spec: dict) -> dict:
         "kind": str(spec.get("kind") or "battery_inverter"),
         "control": str(spec.get("control") or "full"),
     }
+    if bat_type == "powerstation":
+        out["backing"] = str(spec.get("backing") or "virtual").strip().lower()
+        out["role"] = str(spec.get("role") or "single_use").strip().lower()
+        attached_ids = [
+            str(cid).strip()
+            for cid in (spec.get("attached_consumer_ids") or [])
+            if str(cid or "").strip()
+        ]
+        if not attached_ids:
+            singular = str(spec.get("attached_consumer_id") or "").strip()
+            if singular:
+                attached_ids = [singular]
+        out["attached_consumer_ids"] = attached_ids
+        out["attached_consumer_id"] = attached_ids[0] if attached_ids else ""
     standby = float(spec.get("standby_power_kw", 0.0) or 0.0)
     if standby > 0.0:
         out["standby_power_kw"] = standby

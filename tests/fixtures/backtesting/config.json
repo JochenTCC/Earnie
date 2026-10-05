@@ -12,7 +12,8 @@
         "path_cons_data": "tests/fixtures/backtesting/cons_data.csv",
         "cons_data_retention_months": 24,
         "cons_data_write_mode": "hourly",
-        "price_source": "api",
+        "price_source": "csv",
+        "path_price": "tests/fixtures/backtesting/prices.csv",
         "price_provider": "awattar",
         "price_range": "last_12_months"
     },
