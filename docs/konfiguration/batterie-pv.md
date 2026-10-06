@@ -37,6 +37,7 @@ Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earni
 
 - **Nur `backing: physical`:** Virtuelle Standby-Instanzen werden zur Laufzeit übersprungen (kein geschützter Floor auf der Hausbatterie — ggf. globales `battery_min_soc` erhöhen).
 - **Harte Voraussetzung:** Capability `supports_ess_source_select` und Mapping von `set_ess_source_select` (EcoFlow: HA-Switch `switch.<device>_grid_bypass`; bei `ehal.backend=loxone` Merker `Earnie_Speicher_Quellenwahl` → Bridge zu HA, siehe [EcoFlow Delta 3](../einrichtung/ecoflow-delta3-loxone.md)).
+- **Quellenwahl vs. Ladegrenzen:** `set_ess_source_select` darf das **Anlagen-**Binding nutzen (Plant-Merker / Plant-HA-Entity — EcoFlow-Bridge). `set_ess_charge_power_limit` / `set_ess_discharge_power_limit` der physischen Powerstation brauchen ein **eigenes** Binding an der Powerstation und greifen **nicht** auf die Hausbatterie-Mappings zurück (sonst würden Haus-Lade-/Entladegrenzen überschrieben).
 - Reserve-Größe: angeschlossene Last × teure Stunden im Horizont (kein Energie-pro-Lauf-Lernen wie bei `single_use`).
 | `kind`                  | enum     | `components.json` → `batteries[]`    | Topologie: `battery_inverter` (Automatik/Optimieren) oder `isolated` (nur Laden/Entladen/Standby)                                    |
 | `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung je Anlage; aufgelöst als Summe `pv_kwp`                                                                      |

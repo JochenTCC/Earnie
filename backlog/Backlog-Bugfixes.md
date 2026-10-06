@@ -32,8 +32,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 - [ ] Virtual and physical powerstations shall not be selectable in Scenario-Config (not only warning)
   - Scenario catalog filters via `scenario_selectable_batteries` (`house_config/powerstation.py` → `_load_scenario_catalogs`); regression `test_scenario_selectable_batteries_excludes_virtual_and_physical_ps`
 
+- [ ] **Physical powerstation ESS writes fall back to the house battery's plant-flat entity** — fix implemented (2026-10-06); live acceptance pending before **2.7.h** dogfood with limits
+  - `optimizer/powerstation_live.py`: no plant-flat remap for charge/discharge (HA + Loxone); explicit exception only for `set_ess_source_select` (EcoFlow bridge); missing binding → skip + `runtime/ehal_write_error.json`
+  - Docs: `docs/konfiguration/batterie-pv.md`; regression: `tests/test_powerstation_2_7_h.py` (`test_ha_charge_does_not_remap_to_house_battery`, Loxone charge isolation, HA source_select plant-flat)
+
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
 - [ ] "debug-dumps\debug_dump_20260930_182138"
 
 

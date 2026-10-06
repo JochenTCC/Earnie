@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 import config
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 # Last written powerstation Merker values for Loxone status.json (flat + Pattern-B).
 _last_powerstation_sent: dict[str, float] = {}
+
+# Plant-flat fallback allowed only for EcoFlow-bridge Quellenwahl (not charge/discharge).
+_PLANT_FLAT_ALLOWED_KINDS = frozenset({"set_ess_source_select"})
 
 
 def last_powerstation_sent() -> dict[str, float]:
@@ -178,7 +182,7 @@ def appliance_is_reserve_mode(appliance: dict) -> bool:
 
 def _binding_for_ps(ps_id: str, kind: str) -> str:
     """Resolve Merker/entity address from planning powerstation ehal_bindings."""
-    from ehal.ess_fields import binding_address, ess_field
+    from ehal.ess_fields import binding_address
 
     for ps in _planning_powerstations():
         if str(ps.get("id") or "").strip() != ps_id:
@@ -192,7 +196,9 @@ def _binding_for_ps(ps_id: str, kind: str) -> str:
             if flat:
                 return flat
         break
-    # Plant-flat fallback (EcoFlow bridge often shares plant Merker names).
+    # EcoFlow bridge: plant Merker for Quellenwahl only — never charge/discharge.
+    if kind not in _PLANT_FLAT_ALLOWED_KINDS:
+        return ""
     try:
         from house_config.ehal_bindings import resolve_plant_binding
         from optimizer.live_export_limit import load_house_doc
@@ -214,6 +220,142 @@ def _resolve_marker(field_key: str) -> tuple[str, str]:
     return kind, _binding_for_ps("", kind)
 
 
+def _utc_ts() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _write_error_kinds(field_keys: list[str]) -> list[str]:
+    """Map Pattern-B / flat keys to plant-flat kinds (write_error.schema enum)."""
+    from ehal.ess_fields import ess_field_kind, parse_ess_pattern_b
+
+    kinds: list[str] = []
+    seen: set[str] = set()
+    for key in field_keys:
+        parsed = parse_ess_pattern_b(key)
+        kind = parsed[1] if parsed else (ess_field_kind(key) or str(key).strip())
+        if kind and kind not in seen:
+            seen.add(kind)
+            kinds.append(kind)
+    return kinds
+
+
+def _persist_ps_write_error(
+    *,
+    adapter_id: str,
+    failed_fields: list[str],
+    message: str,
+) -> None:
+    """Persist missing-binding / write failures for powerstation setpoints."""
+    kinds = _write_error_kinds(failed_fields)
+    if not kinds:
+        return
+    from ehal import EHAL_SCHEMA_VERSION, validate_write_error
+    from integrations import ehal_live
+
+    detail = "; ".join(failed_fields)
+    full_message = f"{message}: {detail}" if detail else message
+    try:
+        error = validate_write_error(
+            {
+                "schema_version": EHAL_SCHEMA_VERSION,
+                "ts": _utc_ts(),
+                "adapter_id": adapter_id,
+                "failed_fields": kinds,
+                "message": full_message,
+                "retryable": True,
+            }
+        )
+        ehal_live.persist_write_error(error)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("powerstation write-error persist failed: %s", exc)
+
+
+def _ha_remap_powerstation_fields(
+    fields: dict[str, float],
+    entities: dict[str, str],
+) -> tuple[dict[str, float], list[str]]:
+    """Map Pattern-B keys to HA entities; plant-flat only for source_select."""
+    from ehal.ess_fields import ess_field_kind, parse_ess_pattern_b
+
+    remapped: dict[str, float] = {}
+    missing: list[str] = []
+    for key, value in fields.items():
+        if key in entities:
+            remapped[key] = value
+            continue
+        parsed = parse_ess_pattern_b(key)
+        kind = parsed[1] if parsed else (ess_field_kind(key) or key)
+        if kind in _PLANT_FLAT_ALLOWED_KINDS and kind in entities:
+            remapped[kind] = value
+            continue
+        missing.append(key)
+        logger.warning(
+            "2.7.h: no HA entity for powerstation field %s — skip (no plant-flat fallback)",
+            key,
+        )
+    return remapped, missing
+
+
+def _write_powerstation_ha(fields: dict[str, float], ehal_live: Any) -> None:
+    adapter = ehal_live.get_ha_adapter()
+    remapped, missing = _ha_remap_powerstation_fields(fields, adapter.cfg.entities)
+    error = None
+    if remapped:
+        writer = getattr(adapter, "write_mapped_fields", None)
+        error = writer(remapped) if callable(writer) else adapter.write_setpoints(remapped)
+    if missing:
+        _persist_ps_write_error(
+            adapter_id=str(getattr(adapter.cfg, "adapter_id", None) or "ha"),
+            failed_fields=missing,
+            message=(
+                "Powerstation ESS fields have no own HA binding; "
+                "refusing plant-flat house-battery fallback"
+            ),
+        )
+    elif error is not None:
+        logger.warning("physical powerstation HA setpoints failed: %s", error)
+        ehal_live.persist_write_error(error)
+
+
+def _write_powerstation_loxone(fields: dict[str, float]) -> None:
+    from integrations import loxone_client
+
+    power_kinds = frozenset(
+        {"set_ess_charge_power_limit", "set_ess_discharge_power_limit"}
+    )
+    missing: list[str] = []
+    for field_key, value_w in fields.items():
+        kind, marker = _resolve_marker(field_key)
+        if not marker:
+            logger.warning(
+                "2.7.h: no Merker/entity for powerstation field %s — skip",
+                field_key,
+            )
+            missing.append(field_key)
+            continue
+        # Loxone ESS markers are kW; EHAL wire values here are W for power fields.
+        if kind in power_kinds:
+            send_val = max(0.0, float(value_w)) / 1000.0
+        else:
+            send_val = float(value_w)
+        _last_powerstation_sent[kind] = send_val
+        loxone_client._send_loxone_value_traced(marker, send_val)
+    if missing:
+        _persist_ps_write_error(
+            adapter_id="loxone",
+            failed_fields=missing,
+            message=(
+                "Powerstation ESS fields have no own Merker; "
+                "refusing plant-flat house-battery fallback"
+            ),
+        )
+
+
 def _write_powerstation_fields(fields: dict[str, float]) -> None:
     """Write Pattern-B or flat ESS fields via HA mapped write or Loxone Merker."""
     if not fields:
@@ -228,51 +370,14 @@ def _write_powerstation_fields(fields: dict[str, float]) -> None:
         return
 
     if ehal_live.is_ha_backend():
-        from ehal.ess_fields import ess_field_kind, parse_ess_pattern_b
-
-        adapter = ehal_live.get_ha_adapter()
-        entities = adapter.cfg.entities
-        remapped: dict[str, float] = {}
-        for key, value in fields.items():
-            if key in entities:
-                remapped[key] = value
-                continue
-            parsed = parse_ess_pattern_b(key)
-            kind = parsed[1] if parsed else (ess_field_kind(key) or key)
-            if kind in entities:
-                remapped[kind] = value
-            else:
-                remapped[key] = value  # still attempt; writer reports missing
-        writer = getattr(adapter, "write_mapped_fields", None)
-        error = writer(remapped) if callable(writer) else adapter.write_setpoints(remapped)
-        if error is not None:
-            logger.warning("physical powerstation HA setpoints failed: %s", error)
+        _write_powerstation_ha(fields, ehal_live)
         return
 
     if ehal_live.is_ehal_network_backend():
         # OpenEMS: no source_select path for portable packs.
         return
 
-    from integrations import loxone_client
-
-    power_kinds = frozenset(
-        {"set_ess_charge_power_limit", "set_ess_discharge_power_limit"}
-    )
-    for field_key, value_w in fields.items():
-        kind, marker = _resolve_marker(field_key)
-        if not marker:
-            logger.warning(
-                "2.7.h: no Merker/entity for powerstation field %s — skip",
-                field_key,
-            )
-            continue
-        # Loxone ESS markers are kW; EHAL wire values here are W for power fields.
-        if kind in power_kinds:
-            send_val = max(0.0, float(value_w)) / 1000.0
-        else:
-            send_val = float(value_w)
-        _last_powerstation_sent[kind] = send_val
-        loxone_client._send_loxone_value_traced(marker, send_val)
+    _write_powerstation_loxone(fields)
 
 
 def write_physical_powerstation_charges(charge_kw_by_id: dict[str, float]) -> None:

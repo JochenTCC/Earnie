@@ -255,3 +255,110 @@ def test_write_standby_source_selects_loxone_marker():
         psl.write_standby_source_selects({"delta3": 1})
         send.assert_called()
         assert psl.last_powerstation_sent().get("set_ess_source_select") == 1.0
+
+
+def test_ha_charge_does_not_remap_to_house_battery():
+    """Unmapped PS charge/discharge must not write plant-flat house entities."""
+    from optimizer import powerstation_live as psl
+
+    adapter = MagicMock()
+    adapter.cfg.entities = {
+        "set_ess_charge_power_limit": "number.house_charge",
+        "set_ess_discharge_power_limit": "number.house_discharge",
+    }
+    adapter.cfg.adapter_id = "ha-test"
+    adapter.write_mapped_fields = MagicMock(return_value=None)
+    persisted: list = []
+
+    with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
+        "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
+    ), patch(
+        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+    ), patch(
+        "integrations.ehal_live.is_ha_backend", return_value=True
+    ), patch(
+        "integrations.ehal_live.get_ha_adapter", return_value=adapter
+    ), patch(
+        "integrations.ehal_live.persist_write_error", side_effect=persisted.append
+    ):
+        psl.write_physical_powerstation_charges({"delta3": 1.0})
+
+    adapter.write_mapped_fields.assert_not_called()
+    assert len(persisted) == 1
+    failed = set(persisted[0]["failed_fields"])
+    assert failed == {
+        "set_ess_charge_power_limit",
+        "set_ess_discharge_power_limit",
+    }
+    assert "ess.delta3.set_ess_charge_power_limit" in persisted[0]["message"]
+
+
+def test_loxone_charge_does_not_use_plant_merker():
+    """Unmapped PS charge must not send the house battery plant Merker."""
+    from optimizer import powerstation_live as psl
+
+    psl._last_powerstation_sent.clear()
+    persisted: list = []
+
+    def plant_binding(_house, kind, *_a, **_k):
+        if kind == "set_ess_charge_power_limit":
+            return "Earnie_LadeLeistungs-Limit"
+        if kind == "set_ess_discharge_power_limit":
+            return "Earnie_EntladeLeistungs-Limit"
+        return ""
+
+    with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
+        "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
+    ), patch(
+        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+    ), patch(
+        "integrations.ehal_live.is_ha_backend", return_value=False
+    ), patch(
+        "integrations.ehal_live.is_ehal_network_backend", return_value=False
+    ), patch(
+        "house_config.ehal_bindings.resolve_plant_binding", side_effect=plant_binding
+    ), patch(
+        "optimizer.live_export_limit.load_house_doc", return_value={}
+    ), patch(
+        "integrations.ehal_live.persist_write_error", side_effect=persisted.append
+    ), patch(
+        "integrations.loxone_client._send_loxone_value_traced"
+    ) as send:
+        send.return_value = MagicMock(success=True)
+        psl.write_physical_powerstation_charges({"delta3": 1.0})
+
+    send.assert_not_called()
+    assert len(persisted) == 1
+    failed = set(persisted[0]["failed_fields"])
+    assert failed == {
+        "set_ess_charge_power_limit",
+        "set_ess_discharge_power_limit",
+    }
+    assert "ess.delta3.set_ess_charge_power_limit" in persisted[0]["message"]
+
+
+def test_ha_source_select_still_uses_plant_flat():
+    """EcoFlow bridge: plant-flat set_ess_source_select remains allowed."""
+    from optimizer import powerstation_live as psl
+
+    adapter = MagicMock()
+    adapter.cfg.entities = {"set_ess_source_select": "switch.delta_3_grid_bypass"}
+    adapter.cfg.adapter_id = "ha-test"
+    adapter.write_mapped_fields = MagicMock(return_value=None)
+    persisted: list = []
+
+    with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
+        "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
+    ), patch(
+        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+    ), patch(
+        "integrations.ehal_live.is_ha_backend", return_value=True
+    ), patch(
+        "integrations.ehal_live.get_ha_adapter", return_value=adapter
+    ), patch(
+        "integrations.ehal_live.persist_write_error", side_effect=persisted.append
+    ):
+        psl.write_standby_source_selects({"delta3": 1})
+
+    adapter.write_mapped_fields.assert_called_once_with({"set_ess_source_select": 1.0})
+    assert persisted == []
