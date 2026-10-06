@@ -3,7 +3,7 @@
 **Status:** draft, nothing applied. Backlog: [Backlog.md](Backlog.md) → **2.7.l — Inverter entity**.
 **Target files:** [`docs/spec/ehal.md`](../docs/spec/ehal.md) and [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) (both English). Apply in **Inverter P4**; German user docs (`docs/konfiguration/batterie-pv.md`) follow in **Inverter P2**.
 
-Open: wire `schema_version` stays **4** (2.7 is unreleased, all new fields are optional) or bumps to **5**. This draft assumes 4; swap the number in the envelope row, both headings and the three "(schema_version 4)" section titles if it becomes 5.
+Decided: wire `schema_version` stays **4** (2.7 is unreleased, all new fields are optional). No version bump in the envelope row or section titles.
 
 ---
 

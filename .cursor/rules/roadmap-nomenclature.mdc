@@ -43,6 +43,7 @@ alwaysApply: true
 * **Generic Thermal Models (`Thermals`):** P1 (Single-Node), P2 (Coupled), P3 (Adaptation)
 * **MILP Sunset Horizon (`MILP Horizon`):** Phases P1-P5
 * **Release Regression Suite (`Regression`):** P1 (MVP: runner, cases, golden), P2 (customer data / private repo), P3 (CI gate + scrubber)
+* **Inverter entity (`Inverter`, 2.7.l):** P1 (schema + resolution + migration), P2 (UI + docs), P3 (MILP clipping), P4 (EHAL role), P5 (follow-ups)
 * **Session Conclusion:** Phases P1-P2
 * **Migration (`MIGRATION.md`):** Phases P1-P7
 
