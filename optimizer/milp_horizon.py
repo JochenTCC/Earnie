@@ -422,7 +422,8 @@ def _add_power_balance_and_soc_dynamics(
         soc = float(current_soc)
         if current_soc_by_id and eid in current_soc_by_id:
             soc = float(current_soc_by_id[eid])
-        e_init_by_ess[eid] = (soc / 100.0) * float(bat.get("battery_capacity_kwh") or 0.0)
+        capacity = float(bat.get("battery_capacity_kwh") or 0.0)
+        e_init_by_ess[eid] = (soc / 100.0) * capacity
     for t in range(horizon):
         cap = None
         if export_caps_kw is not None and t < len(export_caps_kw):

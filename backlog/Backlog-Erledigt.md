@@ -2,6 +2,24 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — EV setpoints empty / continuous postpone (2026-10-06)
+
+- [x] EV charging continuously postponed / empty live setpoints (dump `debug_dump_20261006_055651`)
+  - Cause: virtual-reserve ASAP (`_virtual_reserve_asap_kwh`) + sunrise PV-only → MILP Infeasible → Automatik fallback (`consumer_powers_kw={}`)
+  - Fix: skip PV-only when ASAP carve-out pending (`optimizer/milp.py`); regression `tests/test_milp_sunrise_soc.py::test_milp_feasible_with_virtual_asap_and_sunrise_pv_only`
+  - **Verified live** (2026-10-06): productive NAS — `earnie.log` ASAP skip @ 06:22; `e_auto` 3.52 kW (was empty); no further `milp_no_optimal`
+
+### Bugfix — Consumer editor Standard-Laufzeit removed (2026-10-06)
+
+- [x] Consumer editor: removed redundant "Standard-Laufzeit"; advice/reserve runtime = `schedule.duration_h` only (dropped persisted `appliance_recommendation.default_runtime_h`)
+  - **Verified live** (2026-10-06)
+
+### Bugfix — Powerstations not selectable in Scenario-Config (2026-10-06)
+
+- [x] Virtual and physical powerstations shall not be selectable in Scenario-Config (not only warning)
+  - Scenario catalog filters via `scenario_selectable_batteries` (`house_config/powerstation.py` → `_load_scenario_catalogs`); regression `test_scenario_selectable_batteries_excludes_virtual_and_physical_ps`
+  - **Verified live** (2026-10-06)
+
 ### 2.7.h — Powerstation smart standby-backup for continuous loads (2026-10-06)
 
 - [x] **2.7.h — Powerstation smart standby-backup for continuous loads** (`role: standby_backup`; shared model with **2.7.g**)

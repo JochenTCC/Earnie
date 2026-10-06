@@ -217,3 +217,107 @@ def test_milp_recovers_when_soc_below_min_before_sunrise():
     model = solved[0]
     # Grid charge allowed in night slots to climb back to SOC_min.
     assert float(model.p_charge[0].varValue or 0.0) > 1e-3
+
+
+def test_milp_feasible_with_virtual_asap_and_sunrise_pv_only():
+    """Prod 2026-10-06: ASAP carve-out + PV-only → Infeasible → empty EV setpoints.
+
+    Virtual reserve ASAP needs grid ``p_charge`` before sunrise; PV-only must yield.
+    """
+    from optimizer.milp import milp_optimizer
+    from optimizer.powerstation_reserve import prepare_battery_params_for_reserves
+
+    tz = ZoneInfo("Europe/Vienna")
+    start = datetime(2026, 10, 6, 6, 0, tzinfo=tz)
+    sunrise_idx = 5
+    matrix = []
+    for i in range(16):
+        dt = start + timedelta(minutes=15 * i)
+        matrix.append(
+            {
+                "hour": dt.hour,
+                "date": dt.date(),
+                "slot_datetime": dt,
+                "expected_p_pv": 0.0 if i < sunrise_idx else 1.5,
+                "expected_p_act": 0.5,
+                "k_act": 34.0,
+                "k_push_act": 20.0,
+                "expected_flex_kw": {},
+            }
+        )
+    battery = {
+        "id": "house",
+        "battery_capacity_kwh": 15.0,
+        "min_soc": 5.0,
+        "max_soc": 100.0,
+        "max_charge_power_kw": 5.0,
+        "max_discharge_power_kw": 5.0,
+        "max_power_kw": 5.0,
+        "efficiency": 0.94,
+        "control": "full",
+    }
+    reserves = [
+        {
+            "backing": "virtual",
+            "protected_kwh": 0.0,
+            "asap_charge_kwh": 1.0,
+            "state": "empty",
+            "stored_kwh": 0.0,
+            "target_kwh": 1.0,
+        },
+        {
+            "backing": "virtual",
+            "protected_kwh": 0.0,
+            "asap_charge_kwh": 0.1,
+            "state": "empty",
+            "stored_kwh": 0.0,
+            "target_kwh": 0.1,
+        },
+    ]
+    battery = prepare_battery_params_for_reserves(battery, reserves)
+    assert float(battery.get("_virtual_reserve_asap_kwh") or 0.0) > 1.0
+
+    consumer = {
+        "id": "e_auto",
+        "name": "smart",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 1,
+        "loxone_outputs": {"power_setpoint_name": "Earnie_EAuto_Soll_kW"},
+        "charging_schedule": {
+            "enabled": True,
+            "milp": {
+                "live_modus_a_min_remaining_kwh": 2.8,
+                "tie_break_on_epsilon": 0.001,
+                "tie_break_time_epsilon": 0.0001,
+            },
+        },
+    }
+    deadline = datetime(2026, 10, 6, 7, 0, tzinfo=tz)
+    mode, _tp, tsoc, powers, _pvf, _plan, obs = milp_optimizer(
+        matrix,
+        current_hour=6,
+        current_soc=5.0,
+        battery_params=battery,
+        k_push=20.0,
+        verbose=False,
+        consumers=[consumer],
+        consumer_remaining_kwh={"e_auto": 3.0},
+        charging_contexts={
+            "e_auto": {
+                "active": True,
+                "plugged_in": True,
+                "deadline": deadline,
+                "target_kwh": 3.0,
+                "use_time_window": False,
+            }
+        },
+        flex_indices=list(range(len(matrix))),
+        sunrise_soc_min_index=sunrise_idx,
+        current_soc_by_id={"house": 5.0},
+    )
+    # Not Automatik fallback (empty powers + tsoc 99 with no flex).
+    assert powers != {}
+    assert float(powers.get("e_auto") or 0.0) > 1.0
+    assert "e_auto" in obs
+    assert tsoc != 99.0 or mode != 0 or float(powers.get("e_auto") or 0.0) > 1e-3
