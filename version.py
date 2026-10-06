@@ -5,11 +5,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "2.7.0-dev.14"
+__version__ = "2.7.0-dev.15"
 
 # SemVer core + optional pre-release used for community candidates.
 _IMAGE_VERSION_RE = re.compile(
-    r"^(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?)",
+    r"^(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc|dev)\.\d+)?)",
 )
 
 
