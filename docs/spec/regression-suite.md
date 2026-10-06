@@ -1,9 +1,9 @@
 # Specification: Release Regression Suite (golden-master cases)
 
-**Version:** 0.1 (proposal)  
+**Version:** 0.2 (proposal; adds L3 live replay, cycle recorder, solver-determinism findings §14–§16)  
 **Status:** Not implemented — backlog **2.7.i**  
-**Epic short name:** **Regression** (phases **P1**–**P3**)  
-**Related:** [Release Checklist](release-checklist.md), [House simulator](house-sim.md), [Shadow Mode](shadow-mode.md), `tests/fixtures/prod_dumps/README.md`, `.cursor/rules/test-health.mdc`
+**Epic short name:** **Regression** (phases **R0**, **R-Rec**, **P1**–**P3**, **L3**)  
+**Related:** [Release Checklist](release-checklist.md), [House simulator](house-sim.md), [Shadow Mode](shadow-mode.md), `tests/fixtures/prod_dumps/README.md`, `.cursor/rules/test-health.mdc`, `optimizer/cbc_solver.py`
 
 ## 1. Goal
 
@@ -33,7 +33,9 @@ The suite is **not** part of the per-commit pytest run. It runs **before a relea
 | **Case** | Folder with frozen inputs + `expected.json` (§5). |
 | **Golden** | The committed `expected.json`. Changed only on purpose. |
 | **L1 — cycle replay** | One optimizer cycle with a given state (what the prod-dump replay does today). |
-| **L2 — backtest window** | Several days to weeks via the backtesting engine (behaviour over time). |
+| **L2 — backtest window** | Several days to weeks via the backtesting engine (behaviour over time, simulated state carried through the window). |
+| **L3 — live replay** | A sequence of *recorded* production cycles replayed one by one, each starting from the **measured** state of that cycle (§15). Not the same as L2: no simulated state, no accumulated drift. |
+| **Recorder** | Always-on production component that stores the inputs and outputs of every optimizer cycle in a ring buffer (§14). |
 | **Public case** | Synthetic or maintainer-owned data; lives in the main repo. |
 | **Private case** | Customer data; lives in the private repo `Earnie-regression-private`. |
 
@@ -95,7 +97,7 @@ Slot-exact equality would break on every solver or float-level change. Three tie
 2. **Metrics with tolerance** — fail when exceeded: total cost (€), grid import / export (kWh), self-sufficiency, battery cycles, per-consumer energy. Default tolerance ±0.5 %, overridable per metric in `expected.json`.
 3. **Plan diff** — informational only: number of slots whose setpoint differs and a plan hash. Shown in the report, never fails.
 
-The solver version (CBC) must be pinned identically for golden recording and verification; the engine fingerprint in `expected.json` makes a mismatch visible instead of producing phantom diffs.
+The solver and its settings must be identical for golden recording and verification; the engine fingerprint in `expected.json` makes a mismatch visible instead of producing phantom diffs. **Note:** the production default solver is **HiGHS** (`DEFAULT_MILP_SOLVER`), not CBC, and the production path is wall-clock dependent — see §16 before choosing tolerances or the regression solver mode.
 
 ## 8. Runner
 
@@ -148,12 +150,72 @@ Before P1 ships, check that `tests/fixtures/prod_dumps/` and `tests/fixtures/bac
 
 | Phase | Content |
 |---|---|
-| **Regression P1** (MVP) | Case format + schema, runner (L1 + L2), `--update-golden`, report; 4–6 public cases (winter, summer, negative prices, EV deadline, heat storage); migrate existing prod-dump cases; solver-determinism check (same case twice, two machines); checklist item |
+| **Regression R0** (spike, first) | Solver-determinism / tolerance study (§16). Needs input data, therefore runs **after R-Rec** has produced recordings. Outcome: regression solver mode + per-metric tolerances. |
+| **Regression R-Rec** (recorder) | Always-on cycle recorder with ring buffer (§14), capture-point test (record → replay == live). Prerequisite for R0 and L3; also feeds debug dumps. |
+| **Regression P1** (MVP) | Case format + schema, runner (L1 + L2), `--update-golden`, report; 4–6 public cases (winter, summer, negative prices, EV deadline, heat storage); migrate existing prod-dump cases; tolerances and solver mode from R0; checklist item |
 | **Regression P2** (customer data) | Private repo `Earnie-regression-private`, private-root support + skip logic, `--intake`, case-ID / issue-reference convention, SHA in report |
 | **Regression P3** (gate + scrub) | CI job before `promote`, scrubber script + tests, optional metric trend across releases |
+| **Regression L3** (live replay) | Replay runner for recorder windows, case creation from a time window (§15). After R-Rec and P1. |
+
+Order: **R-Rec → R0 → P1 → L3 → P2 → P3.**
 
 ## 13. Open decisions
 
 1. Soft vs. hard release gate (§11) — default proposal: soft first.
 2. Whether a customer-facing statement about data handling is needed beyond the private repo (consent / contract wording).
-3. Solver pinning: CBC version identical on dev machine, Docker image and CI — verified in P1 before any golden is trusted.
+3. Solver pinning: the solver actually used (HiGHS by default, `highspy` version) identical on dev machine, Docker image and CI — verified in R0 before any golden is trusted.
+4. Regression solver mode (§16): deterministic mode (no wall-clock limit, small gap) vs. production path; possibly both (deterministic for goldens, production path as sample).
+5. Recorder defaults (§14): retention days (default 7). **Decided:** debug dumps include the matching recorder window automatically. Still open: default window length (proposal: the whole ring buffer, optionally narrowed by the user) and the resulting ZIP size.
+
+## 14. Cycle recorder (R-Rec)
+
+**Purpose:** provide the *complete inputs* of real cycles. `optimization_history.jsonl` only holds results and display values (SoC, mode, target power, current price, forecast values, plan), not the price/PV vectors over the horizon, the configuration or the start state, so it cannot drive a replay on its own.
+
+**Capture point:** the central input is `optimization_matrix` in `main.py` (per slot: `k_act`, `expected_p_pv`, `expected_p_act`, …) plus `planning_window`. The matrix is modified afterwards (live snapshot, `prepare_optimization_matrix`, standby relief), so it is captured **directly before `prepare_optimization_matrix`** — a well-defined replay entry point. The debug snapshot already serializes `planning_matrix` / `planning_window`; the recorder does the same every cycle.
+
+**Entry per cycle:** timestamp, `app_version`, config hash; matrix + window (columnar arrays, not row dicts); start state (SoC, `flexible_consumers_state`, charging contexts, run state, PV counter state); **outputs:** setpoints actually written, plan hash, flags (override, immediate charging, outage, manual intervention).
+
+**Storage:** one gzip JSONL segment per day, `runtime/recorder/cycles_YYYY-MM-DD.jsonl.gz`; ring buffer = delete segments older than N days. Configuration snapshots are stored once per hash and referenced from cycles. Estimate (to be measured): ~10–20 KB per cycle compressed, ~1–2 MB/day, 7–14 MB for 7 days.
+
+**Configuration:** `recorder_retention_days` (default 7), on/off switch; **on by default in production**.
+
+**Robustness:** a recorder failure must never affect the production run (same try/except pattern as `append_production_run`), with a log entry and a counter of lost cycles.
+
+**Privacy:** entries contain load profiles → local only, never uploaded, documented as opt-out in `docs/einrichtung/betrieb.md`. Same line as §9.
+
+**Acceptance test:** record a cycle, replay it offline from the recording, and assert the replay produces the same plan as the live run (under the solver mode of §16). This doubles as the first determinism evidence.
+
+**Debug-dump integration (decided):** the unified debug-dump ZIP (schema v3) automatically contains the matching recorder window (`recorder/` segments plus the referenced config snapshots), so faults noticed days later still have their inputs. Consequence: **every user report becomes a potential golden case.** `--intake` (P2) turns such a ZIP into a case folder; L3 (§15) cuts the relevant time window from the recorded cycles. The dump manifest records the window (`recorder.from`, `recorder.to`, cycle count, config hashes). Dumps without recorder data (older versions, recorder off) stay valid; intake then falls back to L1 from the single-cycle inputs. The dump schema version needs a bump or an optional `recorder` block; decide when implementing. Privacy: a dump now carries up to N days of load profile, so the existing note in the dump dialog (what the file contains, only share with the maintainer) must say so.
+
+## 15. L3 live replay
+
+**Question answered:** would the new version have decided differently than the old one in *real* cycles?
+
+- Each cycle is replayed from its recorded inputs and **measured** start state, so every difference is attributable to one cycle (no drift as in L2).
+- **Case creation:** select a time window `[t0, t1]` from the recorder ring buffer → cut the cycles → store as a case folder (sequence of L1 cycles, each with inputs, state, recorded outputs).
+- **Two comparisons:** (a) replay vs. *recorded* (behaviour change vs. production), (b) replay vs. *golden replay* (behaviour change vs. the last release).
+- **Metrics:** share of cycles with a different setpoint, cost Δ over the window, number of mode changes (flapping); plan diff is the primary information here.
+- **Caveat:** production decisions are not always pure optimizer decisions (overrides, manual intervention, Loxone immediate charging as in `eauto_false_complete_2026-06-29`, outages). Such cycles are flagged by the recorder and excluded or reported separately.
+
+## 16. Solver determinism and tolerance (R0)
+
+Frozen inputs remove time and price as sources of deviation. What remains is the MILP solver. Findings from `optimizer/cbc_solver.py`:
+
+1. Default solver is **HiGHS** (`threads=1`); CBC is optional. Spec text and fingerprint must name the solver actually used.
+2. `solve_with_strict_fallback` is two-stage: a **strict** attempt with a **3 s wall-clock limit**; if not `Optimal`, a fallback with **`gapRel = 10 %`**. Consequences: which stage produces the plan depends on CPU speed and load (also on the same machine, e.g. parallel workers; dev machine vs. NAS), and stage 2 may return any feasible plan within 10 % of the optimum.
+3. `optimizer/cbc_events.py` already logs slow strict runs; production logs show how often the fallback occurs.
+4. The existing `tests/test_prod_dump_regression.py::_solve_urgent_dump_milp` calls `PULP_CBC_CMD(msg=False)` directly, not the production path.
+
+**Study design (once recordings exist):**
+
+| Factor | Levels |
+|---|---|
+| Solver | HiGHS (default), CBC for comparison |
+| Mode | production path (3 s → 10 %), strict without limit, `gapRel` 1 % |
+| Load | idle, N parallel workers |
+| Repetitions | 20 per case |
+| Input perturbation | none, prices ±0.1 ct |
+
+Per run: stage reached, runtime, objective value, cost (€), plan hash, number of slots differing from the reference (strict without limit). Cases: full 96-slot problems with several consumers and battery (recorder windows or backtesting engine with HouseSim fixtures; **not** the hourly prod-dump scenarios).
+
+**Expected decision:** if strict without limit finishes in acceptable time, goldens use that deterministic mode and tolerances can be tight; otherwise a small `gapRel` with no wall-clock limit as a dedicated regression solver mode, plus a production-path sample so the real path is still exercised. Per-metric tolerances in `expected.json` are derived from the measured spread, not guessed (the ±0.5 % default of §7 is a placeholder until then).

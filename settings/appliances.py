@@ -117,12 +117,6 @@ def normalize_appliance_recommendation_block(
             f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
             "power_source=loxone erfordert loxone_inputs.power_name."
         )
-    default_runtime_h = optional_positive(
-        raw.get("default_runtime_h"),
-        consumer_id,
-        "appliance_recommendation.default_runtime_h",
-        allow_zero=False,
-    )
     default_power_kw = optional_positive(
         raw.get("default_power_kw", nominal_power_kw),
         consumer_id,
@@ -147,7 +141,6 @@ def normalize_appliance_recommendation_block(
         "mode": mode,
         "power_source": power_source,
         "default_power_kw": default_power_kw,
-        "default_runtime_h": default_runtime_h or 2.0,
     }
     if mode == MODE_RESERVE:
         out["powerstation_id"] = powerstation_id
@@ -167,6 +160,25 @@ def _loxone_power_name_from_consumer(consumer: dict) -> str:
     if isinstance(rec, dict):
         return str(rec.get("loxone_power_name", "")).strip()
     return ""
+
+
+def _runtime_h_from_schedule(consumer: dict, *, consumer_id: str) -> float:
+    """Laufzeit für Advice/Reserve = schedule.duration_h (single source of truth)."""
+    schedule = consumer.get("schedule") or {}
+    if not isinstance(schedule, dict):
+        schedule = {}
+    runtime_h = optional_positive(
+        schedule.get("duration_h"),
+        consumer_id,
+        "schedule.duration_h",
+        allow_zero=False,
+    )
+    if runtime_h is None:
+        raise ValueError(
+            f"Hausprofil-Verbraucher '{consumer_id}': "
+            "schedule.duration_h fehlt (Laufzeit für manuelle Geräte)."
+        )
+    return float(runtime_h)
 
 
 def appliance_from_profile_consumer(consumer: dict) -> dict:
@@ -195,7 +207,10 @@ def appliance_from_profile_consumer(consumer: dict) -> dict:
         "mode": normalized.get("mode", MODE_ADVICE),
         "power_source": normalized["power_source"],
         "default_power_kw": normalized["default_power_kw"],
-        "default_runtime_h": normalized["default_runtime_h"],
+        # Derived for Manuelle Geräte / Reserve APIs; not persisted on recommendation.
+        "default_runtime_h": _runtime_h_from_schedule(
+            consumer, consumer_id=consumer_id
+        ),
     }
     if normalized.get("powerstation_id"):
         spec["powerstation_id"] = normalized["powerstation_id"]
@@ -286,9 +301,12 @@ def update_appliance_defaults_in_house_profile(
         )
     entry = dict(consumers[target_index])
     entry["nominal_power_kw"] = float(power_kw)
+    schedule = dict(entry.get("schedule") or {})
+    schedule["duration_h"] = float(runtime_h)
+    entry["schedule"] = schedule
     rec = dict(entry.get("appliance_recommendation") or {})
     rec["default_power_kw"] = float(power_kw)
-    rec["default_runtime_h"] = float(runtime_h)
+    rec.pop("default_runtime_h", None)
     loxone_power_name = _loxone_power_name_from_consumer(entry)
     normalize_appliance_recommendation_block(
         rec,

@@ -62,6 +62,12 @@
       "loxone_blocks_key": "plant.ehal_bindings.set_ess_mode",
       "suggested_name": "Earnie_Steuerbefehl",
       "notes": "Mode hint for Huawei/Loxone; OpenEMS ignores."
+    },
+    {
+      "ehal_field": "set_ess_source_select",
+      "loxone_blocks_key": "plant.ehal_bindings.set_ess_source_select",
+      "suggested_name": "Earnie_Speicher_Quellenwahl",
+      "notes": "2.7.h standby_backup: 0 = grid pass-through, 1 = battery-only island (EcoFlow grid_bypass)."
     }
   ],
   "reference": "docs/referenz/loxone-signals.md"

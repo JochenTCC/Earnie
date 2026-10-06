@@ -343,10 +343,18 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         advance_virtual_reserves_from_plan,
         apply_reserves_to_battery_params,
         load_active_reserves,
+        load_standby_packs,
         physical_charge_setpoints_kw,
         sync_triggers_from_telemetry,
         write_physical_powerstation_charges,
+        write_standby_source_selects,
     )
+    from optimizer.powerstation_standby import (
+        apply_standby_load_relief,
+        live_source_and_charge,
+        plan_standby_horizon,
+    )
+    from optimizer.slot_duration import DEFAULT_DT_H
 
     active_reserves = load_active_reserves()
     sync_triggers_from_telemetry(telemetry_for_export, active_reserves)
@@ -355,6 +363,27 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     battery_params = apply_reserves_to_battery_params(
         battery_params, active_reserves
     )
+    standby_packs = load_standby_packs()
+    standby_plans = plan_standby_horizon(
+        optimization_matrix,
+        standby_packs,
+        current_soc_by_id=current_soc_by_id or None,
+        dt_h=DEFAULT_DT_H,
+    )
+    if standby_plans:
+        optimization_matrix = apply_standby_load_relief(
+            optimization_matrix, standby_plans
+        )
+        logger.info(
+            "2.7.h standby_backup plans: %s",
+            {
+                ps: {
+                    "slot0_source": (plan.get("source_select") or [None])[0],
+                    "load_kw": plan.get("load_kw"),
+                }
+                for ps, plan in standby_plans.items()
+            },
+        )
     export_ctx = resolve_live_export_context(
         matrix_row=optimization_matrix[0] if optimization_matrix else None,
         telemetry=telemetry_for_export,
@@ -392,17 +421,21 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         sum(consumer_powers.values()),
         primary_battery["max_power_kw"],
     )
-    from optimizer.slot_duration import DEFAULT_DT_H
-
     advance_virtual_reserves_from_plan(
         battery_plan_kw=float(battery_plan_kw),
         dt_h=DEFAULT_DT_H,
         reserves=active_reserves,
     )
     phys_charge = physical_charge_setpoints_kw(active_reserves)
+    standby_sources, standby_charges = live_source_and_charge(standby_plans, slot=0)
+    for ps_id, chg in standby_charges.items():
+        phys_charge[ps_id] = float(chg)
+    if standby_sources:
+        logger.info("2.7.h source_select (0=grid/1=battery): %s", standby_sources)
+        write_standby_source_selects(standby_sources)
     if phys_charge:
         logger.info(
-            "2.7.g physical powerstation charge setpoints (kW): %s",
+            "2.7.g/h physical powerstation charge setpoints (kW): %s",
             phys_charge,
         )
         write_physical_powerstation_charges(phys_charge)

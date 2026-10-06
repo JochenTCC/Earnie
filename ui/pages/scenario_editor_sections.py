@@ -43,6 +43,7 @@ from ui.scenario_form_helpers import (
 
 
 def _load_scenario_catalogs() -> dict:
+    from house_config.powerstation import scenario_selectable_batteries
     from house_config.tariffs_store import ensure_user_fixed_option
 
     scenarios_doc = load_backtesting_scenarios_raw()
@@ -57,7 +58,8 @@ def _load_scenario_catalogs() -> dict:
         for s in scenarios
         if str(s.get("id", "")).strip()
     ]
-    batteries = list_batteries()
+    # Powerstations attach via consumers — never offer them as scenario battery picks.
+    batteries = scenario_selectable_batteries(list_batteries())
     pv_systems = list_pv_systems()
     import_tariffs = ensure_user_fixed_option(list_import_tariffs())
     export_tariffs = ensure_user_fixed_option(list_export_tariffs())

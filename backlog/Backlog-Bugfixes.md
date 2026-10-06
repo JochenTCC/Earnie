@@ -23,6 +23,14 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **2.7.h — productive Earnie dogfood** (code archived in Erledigt; not yet verified live)
+  - Physical `role: standby_backup` + `set_ess_source_select` (EcoFlow Delta 3 / Loxone Merker `Earnie_Speicher_Quellenwahl` → HA `switch.*_grid_bypass`): price-driven grid vs battery island flips, reserve sizing, charge in cheap slots
+  - After successful live check: remove this item; add **Verified live** note on the **2.7.h** Erledigt entry
+
+- [ ] Consumer editor: removed redundant "Standard-Laufzeit"; advice/reserve runtime = `schedule.duration_h` only (dropped persisted `appliance_recommendation.default_runtime_h`)
+
+- [ ] Virtual and physical powerstations shall not be selectable in Scenario-Config (not only warning)
+  - Scenario catalog filters via `scenario_selectable_batteries` (`house_config/powerstation.py` → `_load_scenario_catalogs`); regression `test_scenario_selectable_batteries_excludes_virtual_and_physical_ps`
 
 ## New Bugs (Do not remove this chapter — even if empty)
 

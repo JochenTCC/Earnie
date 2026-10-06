@@ -65,10 +65,22 @@
       "notes": "Sticky-backend control (Loxone/HA): always write; 0 = Automatik even if Sollleistung Merker is stale. OpenEMS ignores."
     },
     {
+      "field": "set_ess_source_select",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "0 = grid pass-through, 1 = battery-only island. Powerstation standby_backup (2.7.h); omit for bidirectional house ESS."
+    },
+    {
       "field": "supports_ess_write",
       "required": true,
       "kind": "capability",
       "notes": "True when ESS setpoint writes are available."
+    },
+    {
+      "field": "supports_ess_source_select",
+      "required": false,
+      "kind": "capability",
+      "notes": "True when set_ess_source_select can be written (standby_backup)."
     }
   ],
   "capability_expectations": {

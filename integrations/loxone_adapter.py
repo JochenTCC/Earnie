@@ -32,6 +32,7 @@ SETPOINT_FIELDS = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
+    "set_ess_source_select",
     "set_evcs_max_current",
     "set_evcs_mode",
     "set_grid_export_power_limit",
@@ -61,6 +62,7 @@ class LoxoneConfig:
     ess_soc_max_name: str = ""
     ess_max_charge_power_name: str = ""
     ess_max_discharge_power_name: str = ""
+    ess_source_select_name: str = ""
     timeout_sec: float = 10.0
 
 
@@ -98,6 +100,7 @@ class LoxoneAdapter:
             "set_ess_active_power": cfg.active_power_name,
             "set_ess_charge_power_limit": cfg.charge_power_name,
             "set_ess_discharge_power_limit": cfg.discharge_power_name,
+            "set_ess_source_select": cfg.ess_source_select_name,
             "set_evcs_max_current": cfg.evcs_max_current_name,
             "set_grid_export_power_limit": cfg.grid_export_limit_out_name,
         }
@@ -106,6 +109,7 @@ class LoxoneAdapter:
         self._supports_ess_active = "ess_active" in functions
         self._supports_evcs_current = "evcs_current" in functions
         self._supports_grid_export_limit = "grid_export_limit" in functions
+        self._supports_ess_source_select = "ess_source_select" in functions
         for message in incomplete_function_messages(write_map):
             logger.warning("Loxone mapping adapter_id=%s: %s", cfg.adapter_id, message)
         self._incomplete_fields = incomplete_function_fields(write_map)
@@ -141,6 +145,7 @@ class LoxoneAdapter:
             "adapter_id": self.cfg.adapter_id,
             "supports_ess_write": self._supports_ess_write,
             "supports_evcs_current": self._supports_evcs_current,
+            "supports_ess_source_select": self._supports_ess_source_select,
         }
         return validate_capabilities(doc)
 
@@ -249,6 +254,18 @@ class LoxoneAdapter:
             if not ok:
                 failed.append("set_ess_mode")
                 messages.append(msg)
+
+        if "set_ess_source_select" in doc:
+            if not self._supports_ess_source_select:
+                self._skip("set_ess_source_select")
+            else:
+                select_val = 1.0 if float(doc["set_ess_source_select"]) >= 0.5 else 0.0
+                ok, msg = self._try_marker_write(
+                    self.cfg.ess_source_select_name, select_val
+                )
+                if not ok:
+                    failed.append("set_ess_source_select")
+                    messages.append(msg)
 
         flip_evcs = self._write_evcs_setpoints(doc, failed, messages) or flip_evcs
 

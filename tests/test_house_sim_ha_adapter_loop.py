@@ -57,7 +57,7 @@ def test_write_setpoints_updates_mock(bench):
     _package, store, _physics, adapter, _base = bench
     err = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-01-01T00:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_active_power": -1500.0,
@@ -89,7 +89,7 @@ def test_switch_write_domain_rejected_by_adapter(bench):
     )
     err = bad.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-01-01T00:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_active_power": 1.0,
@@ -105,7 +105,7 @@ def test_write_error_degrades_ess_capability(bench):
     store.force_service_status(403)
     err = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-01-01T00:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_active_power": -1000.0,
@@ -121,7 +121,7 @@ def test_closed_loop_charge_moves_soc(bench):
     package, store, physics, adapter, _base = bench
     err = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-01-01T00:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_active_power": -2000.0,

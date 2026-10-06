@@ -60,14 +60,26 @@ SETPOINT_FIELDS = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
+    "set_ess_source_select",
     "set_evcs_max_current",
     "set_evcs_mode",
     "set_grid_export_power_limit",
 )
 MAPPABLE_DOMAINS = frozenset(
-    {"sensor", "number", "select", "input_number", "binary_sensor", "input_boolean"}
+    {
+        "sensor",
+        "number",
+        "select",
+        "input_number",
+        "binary_sensor",
+        "input_boolean",
+        "switch",
+    }
 )
-WRITE_DOMAINS = frozenset({"number", "select", "input_number"})
+WRITE_DOMAINS = frozenset({"number", "select", "input_number", "switch"})
+# Boolean/enum invert for fields where HA ON/high does not match EHAL polarity.
+# Modes: "ehal" (identity) or "invert" (flip 0↔1 / on↔off). Separate from numeric sign.
+BOOLEAN_INVERT_FIELDS = frozenset({"set_ess_source_select"})
 _NONNEG_TELEMETRY = frozenset(
     {
         "sens_pv_production_active",
@@ -98,8 +110,18 @@ class HaConfig:
     adapter_id: str
     entities: dict[str, str] = field(default_factory=dict)
     sign: dict[str, str] = field(default_factory=dict)
+    # Per-field boolean/enum polarity: "ehal" (default) or "invert" (0↔1).
+    boolean_invert: dict[str, str] = field(default_factory=dict)
     timeout_sec: float = 10.0
     ha_ess_force: dict[str, Any] | None = None
+
+
+def apply_boolean_invert(value: float | int | bool, mode: str | None) -> float:
+    """Map EHAL 0/1 through optional invert for HA switch/binary polarity."""
+    numeric = 1.0 if bool(float(value)) else 0.0
+    if str(mode or "ehal").strip().lower() == "invert":
+        return 0.0 if numeric >= 0.5 else 1.0
+    return numeric
 
 
 class HaHttpError(RuntimeError):
@@ -156,6 +178,7 @@ class HaAdapter:
 
         entities = canonicalize_ha_entity_keys(dict(cfg.entities))
         sign = canonicalize_ha_entity_keys(dict(cfg.sign))
+        boolean_invert = canonicalize_ha_entity_keys(dict(cfg.boolean_invert))
         force = normalize_ha_ess_force(cfg.ha_ess_force) if cfg.ha_ess_force else None
         vendor_ess_active = ha_ess_force_enables_ess_active(force)
         self.cfg = HaConfig(
@@ -164,6 +187,7 @@ class HaAdapter:
             adapter_id=cfg.adapter_id,
             entities=entities,
             sign=sign,
+            boolean_invert=boolean_invert,
             timeout_sec=cfg.timeout_sec,
             ha_ess_force=force,
         )
@@ -172,6 +196,7 @@ class HaAdapter:
         self._supports_ess_write = "ess_limits" in functions
         self._supports_ess_active = "ess_active" in functions
         self._supports_evcs_current = "evcs_current" in functions
+        self._supports_ess_source_select = "ess_source_select" in functions
         self._vendor_ess_active = vendor_ess_active
         for message in incomplete_function_messages(
             entities, vendor_ess_active=vendor_ess_active
@@ -217,11 +242,12 @@ class HaAdapter:
             "adapter_id": self.cfg.adapter_id,
             "supports_ess_write": self._supports_ess_write,
             "supports_evcs_current": self._supports_evcs_current,
+            "supports_ess_source_select": self._supports_ess_source_select,
         }
         return validate_capabilities(doc)
 
     def list_mappable_entities(self) -> list[dict[str, Any]]:
-        """Return sensor/number/select/input_number entities for mapping UI."""
+        """Return sensor/number/select/switch/… entities for mapping UI."""
         payload = self._get_json("/api/states")
         if not isinstance(payload, list):
             raise HaHttpError("HA /api/states did not return a list")
@@ -389,6 +415,18 @@ class HaAdapter:
                 outcome.messages.append(msg)
                 outcome.hub_status = status or outcome.hub_status
 
+        if "set_ess_source_select" in doc:
+            if not self._supports_ess_source_select:
+                self._skip("set_ess_source_select", outcome)
+            else:
+                ok, status, msg = self._try_setpoint_write(
+                    "set_ess_source_select", float(doc["set_ess_source_select"])
+                )
+                if not ok:
+                    outcome.failed.append("set_ess_source_select")
+                    outcome.messages.append(msg)
+                    outcome.hub_status = status or outcome.hub_status
+
         if "set_grid_export_power_limit" in doc:
             if not self.cfg.entities.get("set_grid_export_power_limit"):
                 self._skip("set_grid_export_power_limit", outcome)
@@ -513,6 +551,41 @@ class HaAdapter:
             flip_evcs=outcome.flip_evcs,
         )
 
+    def write_mapped_fields(
+        self, fields: dict[str, float | int | str]
+    ) -> EhalWriteError | None:
+        """Write mapped entities by key (flat or Pattern-B), no envelope validation.
+
+        Used for multi-ESS / powerstation Pattern-B setpoints that are not part of
+        the plant-flat setpoint schema document.
+        """
+        outcome = _HaWriteOutcome()
+        for field_name, value in fields.items():
+            key = str(field_name or "").strip()
+            if not key or key not in self.cfg.entities:
+                outcome.failed.append(key or "unknown")
+                outcome.messages.append(f"Missing HA write entity for {key}")
+                continue
+            ok, status, msg = self._try_setpoint_write(key, value)
+            if not ok:
+                outcome.failed.append(key)
+                outcome.messages.append(msg)
+                outcome.hub_status = status or outcome.hub_status
+                if "ess" in key or key.startswith("set_ess"):
+                    outcome.flip_ess = True
+        self._last_skipped = list(outcome.skipped)
+        if not outcome.failed:
+            self._last_write_error = None
+            return None
+        return self._record_write_error(
+            failed_fields=outcome.failed,
+            message="; ".join(outcome.messages),
+            hub_status=outcome.hub_status,
+            retryable=True,
+            flip_ess=outcome.flip_ess,
+            flip_evcs=outcome.flip_evcs,
+        )
+
     def _get_json(self, path: str) -> Any:
         feed_key = f"ha:get:{path}"
         from runtime_store.shadow.mode import is_shadow_mode
@@ -578,6 +651,13 @@ class HaAdapter:
         if domain not in WRITE_DOMAINS:
             return False, None, f"Unsupported write domain for {entity_id}"
         try:
+            if domain == "switch":
+                from ehal.ess_fields import ess_field_kind
+
+                kind = ess_field_kind(field_name) or field_name
+                if kind not in BOOLEAN_INVERT_FIELDS and field_name not in BOOLEAN_INVERT_FIELDS:
+                    return False, None, f"Unsupported write domain for {entity_id}"
+                return self._try_switch_write(field_name, entity_id, value)
             if domain != "select" and field_quantity(field_name) is not None:
                 value = self._to_entity_unit(field_name, entity_id, float(value))
             if domain == "select":
@@ -610,6 +690,41 @@ class HaAdapter:
         except HaHttpError as exc:
             logger.warning(
                 "HA setpoint write failed adapter_id=%s field=%s: %s",
+                self.cfg.adapter_id,
+                field_name,
+                exc,
+            )
+            status = str(exc.status_code) if exc.status_code is not None else None
+            return False, status, str(exc)
+
+    def _try_switch_write(
+        self,
+        field_name: str,
+        entity_id: str,
+        value: float | str,
+    ) -> tuple[bool, str | None, str]:
+        """Write boolean/enum EHAL fields onto a HA ``switch`` entity."""
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return False, None, f"Non-numeric switch value for {field_name}: {value!r}"
+        from ehal.ess_fields import ess_field_kind
+
+        kind = ess_field_kind(field_name) or field_name
+        mode = None
+        if kind in BOOLEAN_INVERT_FIELDS or field_name in BOOLEAN_INVERT_FIELDS:
+            mode = (
+                self.cfg.boolean_invert.get(field_name)
+                or self.cfg.boolean_invert.get(kind)
+            )
+        ha_on = apply_boolean_invert(numeric, mode) >= 0.5
+        service = "turn_on" if ha_on else "turn_off"
+        try:
+            self.call_service("switch", service, {"entity_id": entity_id})
+            return True, None, ""
+        except HaHttpError as exc:
+            logger.warning(
+                "HA switch write failed adapter_id=%s field=%s: %s",
                 self.cfg.adapter_id,
                 field_name,
                 exc,

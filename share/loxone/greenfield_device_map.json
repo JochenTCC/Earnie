@@ -79,6 +79,13 @@
       "notes": "Sticky-backend control; 0 = Automatik; battery only. OpenEMS ignores."
     },
     {
+      "name": "Earnie_Speicher_Quellenwahl",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "set_ess_source_select",
+      "notes": "2.7.h standby_backup: 0 = grid, 1 = battery island (EcoFlow grid_bypass)."
+    },
+    {
       "name": "Earnie_EinspeiseLeistungs-Limit",
       "match": "exact",
       "entity_kind": "plant",

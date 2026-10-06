@@ -28,7 +28,7 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 
 | Category               | Field                            | Required | Unit / sign convention                                                                                    |
 | ------------------------ | ---------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| Envelope                | `schema_version`                  | yes      | integer; wire version (**3** = design C1 `set_ess_active_power`)                                              |
+| Envelope                | `schema_version`                  | yes      | integer; wire version (**4** = `set_ess_source_select` / 2.7.h; **3** = design C1)                           |
 | Envelope                | `ts`                               | yes      | ISO-8601 timestamp **with timezone** (UTC preferred)                                                          |
 | Envelope                | `adapter_id`                       | yes      | stable adapter ID (e.g. `openems-lab`, `earnie-hems`)                                                             |
 | Telemetry               | `sens_grid_power_active`           | yes      | **W**; `+` = grid **import**, `-` = **export**                                                                 |
@@ -48,9 +48,11 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Setpoints (limits)      | `set_grid_export_power_limit`      | no*      | **W**; non-negative max grid export (magnitude, like ESS limits); `0` = no export; unconstrained = plant maximum (PV kWp sum + max discharge of force-dischargeable ESS; fallback 1 000 000 W) (2.7.a) |
 | Setpoints (limits)      | `set_evcs_max_current`             | no*      | **A**; non-negative amount (EV charging target/max current)                                                    |
 | Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores it |
+| Setpoints (source)      | `set_ess_source_select`            | no*      | **0** = grid pass-through, **1** = battery island; powerstation `standby_backup` (2.7.h); omit for house ESS |
 | Setpoints (extended)    | `set_evcs_mode`                    | no*      | Enum: `off`                                                                                                     |
 | Capability flags        | `supports_ess_write`               | yes      | boolean; ESS setpoints may be written                                                                          |
 | Capability flags        | `supports_evcs_current`            | yes      | boolean; `set_evcs_max_current` may be written                                                                  |
+| Capability flags        | `supports_ess_source_select`       | no       | boolean; `set_ess_source_select` may be written                                                                 |
 
 
 A setpoint document must contain **at least one** of the setpoint fields. Omitted fields generally mean **"leave unchanged"** (partial updates are allowed). **Exception for sticky backends (Loxone/HA):** the Merker keeps the last value — automatic is `set_ess_mode = 0`, not "setpoint power omitted". Full device roles including `get_`* / additional `sens_evcs_`*: see §C.

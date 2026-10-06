@@ -255,6 +255,15 @@ def build_loxone_status_payload(
         "heartbeat_ts": int(now_ts if now_ts is not None else time.time()),
     }
     payload.update(_plant_status_keys(sent, plant_only))
+    # 2.7.h / 2.7.g physical powerstation writes (Quellenwahl, Ladelimit) cached by live hooks.
+    try:
+        from optimizer.powerstation_live import last_powerstation_sent
+
+        for field, value in last_powerstation_sent().items():
+            if field in PLANT_LIVE_WRITE_FIELDS:
+                payload[field] = float(value)
+    except Exception:  # noqa: BLE001 — status JSON must never fail
+        pass
     payload.update(_consumer_status_keys(sent, live_consumers))
     for key, value in _pool_keys_from_snapshot(sent).items():
         payload.setdefault(key, value)

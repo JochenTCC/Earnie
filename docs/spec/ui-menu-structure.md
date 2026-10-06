@@ -69,7 +69,7 @@ Wrappt den bisherigen Sunset-2-Sunset-Block: `render_optimization_savings_and_ch
 
 Pro Gerät (Waschmaschine, Trockner, Geschirrspüler):
 
-1. **Leistung & Laufzeit:** aus Hausprofil (`appliance_recommendation`); optionaler Loxone-Merker in `loxone_inputs.power_name` (noch keine Live-Abfrage).
+1. **Leistung & Laufzeit:** Leistung aus `appliance_recommendation.default_power_kw`, Laufzeit aus `schedule.duration_h`; optionaler Loxone-Merker in `loxone_inputs.power_name` (noch keine Live-Abfrage).
 2. **Empfehlungshorizont:** je Gerät aus Hausprofil (`schedule.start_shift_h` bei `earnie_role: manual`).
 3. Über den **Empfehlungshorizont** wird für jeden möglichen Startslot die Opportunitätskosten des Laufs berechnet (PV-Überschuss × Einspeisetarif + Rest × Bezugspreis) → **günstigste Startzeit** + **Startgüte** (Kosten in €, plus Ersparnis vs. „sofort starten").
 4. Rein **beratend** — kein Loxone-Schaltsignal.

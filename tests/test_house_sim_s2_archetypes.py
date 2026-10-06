@@ -190,7 +190,7 @@ def test_huawei_limit_writes_succeed_without_active_setpoint():
     try:
         err = adapter.write_setpoints(
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "ts": "2026-01-01T00:00:00Z",
                 "adapter_id": "earnie-hems",
                 "set_ess_charge_power_limit": 3000.0,
@@ -227,7 +227,7 @@ def test_adapter_converts_setpoint_to_kw_entity():
     try:
         err = adapter.write_setpoints(
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "ts": "2026-01-01T00:00:00Z",
                 "adapter_id": "earnie-hems",
                 "set_ess_active_power": -1500.0,

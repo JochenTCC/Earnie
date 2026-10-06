@@ -144,14 +144,12 @@ def _render_manual_appliance_defaults(
     consumer: dict,
     index: int,
     nominal: float,
-    duration_h: float,
     *,
     session_scope: str,
 ) -> dict:
-    """Standard power/runtime for manual appliances (not Merker UI)."""
+    """Standard power for manual appliances (runtime = schedule.duration_h)."""
     rec = consumer.get("appliance_recommendation") or {}
     default_power = float(rec.get("default_power_kw", nominal) or nominal)
-    default_runtime = float(rec.get("default_runtime_h", duration_h) or duration_h)
     return {
         "default_power_kw": float(
             labeled_number_input(
@@ -159,15 +157,6 @@ def _render_manual_appliance_defaults(
                 min_value=0.0,
                 value=default_power,
                 key=_scoped_key(session_scope, f"hc_app_pwr_{index}"),
-            )
-        ),
-        "default_runtime_h": float(
-            labeled_number_input(
-                "Standard-Laufzeit (h)",
-                min_value=0.1,
-                value=default_runtime,
-                step=0.25,
-                key=_scoped_key(session_scope, f"hc_app_rt_{index}"),
             )
         ),
     }
@@ -314,7 +303,6 @@ def _render_generic_manual_fields(
         consumer,
         index,
         nominal,
-        float(duration_h),
         session_scope=session_scope,
     )
     recommendation: dict = {
@@ -344,13 +332,18 @@ def _render_generic_role_schedule(
     defaults: dict,
     session_scope: str,
 ) -> dict:
-    duration_h = labeled_number_input(
-        "Nenndauer pro Lauf (h)",
-        min_value=0.1,
-        value=defaults["duration_h"],
-        step=0.25,
-        key=_scoped_key(session_scope, f"hc_duration_{index}"),
-    )
+    duration_kwargs: dict = {
+        "min_value": 0.1,
+        "value": defaults["duration_h"],
+        "step": 0.25,
+        "key": _scoped_key(session_scope, f"hc_duration_{index}"),
+    }
+    if earnie_role == EARNIE_ROLE_MANUAL:
+        duration_kwargs["help"] = (
+            "Auch Laufzeit für Start-Empfehlung und Energiereserve "
+            "(Manuelle Geräte)."
+        )
+    duration_h = labeled_number_input("Nenndauer pro Lauf (h)", **duration_kwargs)
     start_hour = labeled_number_input(
         "Referenz-Startzeit (Stunde)",
         min_value=0,

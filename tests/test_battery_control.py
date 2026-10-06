@@ -211,7 +211,7 @@ def test_ha_adapter_calls_huawei_forcible_charge():
         with patch.object(adapter, "_try_setpoint_write", return_value=(True, None, "")):
             err = adapter.write_setpoints(
                 {
-                    "schema_version": 3,
+                    "schema_version": 4,
                     "ts": "2026-01-01T00:00:00Z",
                     "adapter_id": "test",
                     "set_ess_active_power": -1500,
@@ -256,7 +256,7 @@ def test_ha_adapter_stops_huawei_force_on_automatik():
         with patch.object(adapter, "_try_setpoint_write", return_value=(True, None, "")):
             adapter.write_setpoints(
                 {
-                    "schema_version": 3,
+                    "schema_version": 4,
                     "ts": "2026-01-01T00:00:00Z",
                     "adapter_id": "test",
                     "set_ess_charge_power_limit": 5000,

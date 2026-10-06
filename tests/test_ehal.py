@@ -1,4 +1,4 @@
-"""Unit tests for EHAL schema_version 3 schemas and validate helpers."""
+"""Unit tests for EHAL schema_version 4 schemas and validate helpers."""
 
 from __future__ import annotations
 
@@ -26,10 +26,10 @@ def _envelope(**extra):
     return base
 
 
-def test_schema_version_is_3():
-    assert EHAL_SCHEMA_VERSION == 3
+def test_schema_version_is_4():
+    assert EHAL_SCHEMA_VERSION == 4
     for kind in ("telemetry", "setpoint", "capabilities", "write_error"):
-        assert load_schema(kind)["properties"]["schema_version"]["const"] == 3
+        assert load_schema(kind)["properties"]["schema_version"]["const"] == 4
 
 
 def test_schema_files_exist():

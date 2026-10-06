@@ -30,6 +30,14 @@ Mehrere manuelle Geräte können dieselbe virtuelle Powerstation nutzen: gemeins
 Ausgeblendet und beim Speichern/Normalisieren von der Hausbatterie übernommen (bzw. feste Defaults, falls keine Hausbatterie existiert): Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungs-Schwelle, Standby, Topologie, Steuerbarkeit, `limits_from_live`, Verschleiß. Entladeleistung der virtuellen Powerstation wird immer `0` gesetzt; Verschleiß bleibt aus (Zyklen zählen auf der Hausbatterie).
 
 Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular.
+
+### Standby-Backup (`role: standby_backup`, 2.7.h)
+
+Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earnie schaltet die Versorgung der angeschlossenen Verbraucher **preisgetrieben** zwischen Netz-Pass-Through und Batterie-Insel um (`set_ess_source_select`: `0` = Netz, `1` = Batterie). In günstigen Slots darf die Powerstation parallel laden (`set_ess_charge_power_limit`).
+
+- **Nur `backing: physical`:** Virtuelle Standby-Instanzen werden zur Laufzeit übersprungen (kein geschützter Floor auf der Hausbatterie — ggf. globales `battery_min_soc` erhöhen).
+- **Harte Voraussetzung:** Capability `supports_ess_source_select` und Mapping von `set_ess_source_select` (EcoFlow: HA-Switch `switch.<device>_grid_bypass`; bei `ehal.backend=loxone` Merker `Earnie_Speicher_Quellenwahl` → Bridge zu HA, siehe [EcoFlow Delta 3](../einrichtung/ecoflow-delta3-loxone.md)).
+- Reserve-Größe: angeschlossene Last × teure Stunden im Horizont (kein Energie-pro-Lauf-Lernen wie bei `single_use`).
 | `kind`                  | enum     | `components.json` → `batteries[]`    | Topologie: `battery_inverter` (Automatik/Optimieren) oder `isolated` (nur Laden/Entladen/Standby)                                    |
 | `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung je Anlage; aufgelöst als Summe `pv_kwp`                                                                      |
 | `pv_tilt`               | °        | `components.json` → `pv_systems[]`   | Dachneigung **je Anlage** (bei mehreren Anlagen keine einzelne Globalneigung)                                                         |

@@ -98,6 +98,7 @@ class OpenemsAdapter:
             "adapter_id": self.cfg.adapter_id,
             "supports_ess_write": self._supports_ess_write,
             "supports_evcs_current": self._supports_evcs_current,
+            "supports_ess_source_select": False,
         }
         return validate_capabilities(doc)
 

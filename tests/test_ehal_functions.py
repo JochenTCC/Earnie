@@ -26,7 +26,7 @@ LIMITS = {
     "set_ess_charge_power_limit": "number.charge",
     "set_ess_discharge_power_limit": "number.discharge",
 }
-SETPOINT_TS = {"schema_version": 3, "ts": "2026-01-01T00:00:00Z", "adapter_id": "earnie-hems"}
+SETPOINT_TS = {"schema_version": 4, "ts": "2026-01-01T00:00:00Z", "adapter_id": "earnie-hems"}
 
 
 def _state(statuses, function_id):

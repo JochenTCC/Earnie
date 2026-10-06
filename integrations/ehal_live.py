@@ -170,6 +170,9 @@ def get_ha_adapter() -> HaAdapter:
     sign = config.get("EHAL_HA_SIGN") or {}
     if not isinstance(sign, dict):
         sign = {}
+    boolean_invert = config.get("EHAL_HA_BOOLEAN_INVERT") or {}
+    if not isinstance(boolean_invert, dict):
+        boolean_invert = {}
     ha_ess_force = None
     house = load_house_profiles_for_ha()
     if isinstance(house, dict):
@@ -184,6 +187,9 @@ def get_ha_adapter() -> HaAdapter:
             {str(k): str(v) for k, v in entities.items()}
         ),
         sign=canonicalize_ha_entity_keys({str(k): str(v) for k, v in sign.items()}),
+        boolean_invert=canonicalize_ha_entity_keys(
+            {str(k): str(v) for k, v in boolean_invert.items()}
+        ),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
         ha_ess_force=ha_ess_force if isinstance(ha_ess_force, dict) else None,
     )
@@ -207,6 +213,7 @@ def get_loxone_adapter() -> LoxoneAdapter:
     ess_soc_max = resolve_plant_binding(house, "get_ess_soc_max")
     ess_max_charge = resolve_plant_binding(house, "get_ess_max_charge_power")
     ess_max_discharge = resolve_plant_binding(house, "get_ess_max_discharge_power")
+    ess_source_select = resolve_plant_binding(house, "set_ess_source_select")
     cfg = LoxoneConfig(
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "loxone-home"),
         soc_name=str(config.get("LOXONE_SOC_NAME") or ""),
@@ -228,6 +235,7 @@ def get_loxone_adapter() -> LoxoneAdapter:
         ess_soc_max_name=str(ess_soc_max or ""),
         ess_max_charge_power_name=str(ess_max_charge or ""),
         ess_max_discharge_power_name=str(ess_max_discharge or ""),
+        ess_source_select_name=str(ess_source_select or ""),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
     )
     if _loxone_adapter is not None and _loxone_adapter.cfg != cfg:

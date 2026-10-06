@@ -234,7 +234,7 @@ def test_expand_ha_telemetry_aliases_ev_to_consumer():
         {
             "sens_ess_soc": 55.0,
             "sens_evcs_active_power": 3200.0,
-            "schema_version": 3,
+            "schema_version": 4,
         },
         house,
     )

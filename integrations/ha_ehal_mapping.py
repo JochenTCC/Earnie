@@ -256,6 +256,17 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
         "hints": ("ess_mode", "mode_hint", "steuerbefehl", "ess mode", "control_cmd"),
         "domains": _WRITE_DOMAINS,
     },
+    "set_ess_source_select": {
+        "hints": (
+            "grid_bypass",
+            "grid bypass",
+            "ban_bypass",
+            "quellenwahl",
+            "source_select",
+            "source select",
+        ),
+        "domains": frozenset({"switch", "input_boolean", "select", "number", "input_number"}),
+    },
     "set_evcs_max_current": {
         "hints": (
             "max_current",

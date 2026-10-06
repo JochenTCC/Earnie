@@ -32,6 +32,7 @@ SETPOINT_FIELDS = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
+    "set_ess_source_select",
     "set_evcs_max_current",
     "set_evcs_mode",
     "set_grid_export_power_limit",
@@ -50,6 +51,7 @@ EHAL_TO_BLOCKS: dict[str, str] = {
     "set_ess_charge_power_limit": "target_charge_power_name",
     "set_ess_discharge_power_limit": "target_discharge_power_name",
     "set_ess_mode": "control_cmd_name",
+    "set_ess_source_select": "ess_source_select_name",
     "get_grid_export_power_limit": "grid_export_limit_in_name",
     "set_grid_export_power_limit": "grid_export_limit_out_name",
     "get_ess_soc_min": "ess_soc_min_name",
@@ -75,6 +77,7 @@ except ImportError:  # pragma: no cover
         "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
         "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
         "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl (Hinweis)",
+        "set_ess_source_select": "Setpoint Quellenwahl (0=Netz / 1=Batterie-Insel)",
         "set_evcs_max_current": "Setpoint Wallbox-Sollstrom (A)",
         "set_evcs_mode": "Setpoint Wallbox-Modus (off|pv|now)",
     }
@@ -95,6 +98,13 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "set_ess_charge_power_limit": ("ladegrenze", "charge limit", "max lade"),
     "set_ess_discharge_power_limit": ("entladegrenze", "discharge limit", "max entlade"),
     "set_ess_mode": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd", "ess mode"),
+    "set_ess_source_select": (
+        "quellenwahl",
+        "source select",
+        "grid bypass",
+        "bypass",
+        "speicher quellen",
+    ),
     "get_grid_export_power_limit": (
         "einspeisegrenze",
         "export limit",

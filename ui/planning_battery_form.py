@@ -82,6 +82,12 @@ def new_battery_template(
     from house_config.entity_resolution import split_battery_max_power_kw
 
     charge_kw, discharge_kw = split_battery_max_power_kw(source, battery_id="template")
+    # New drafts are always Hausbatterie (no type). Powerstations may be
+    # charge-only (discharge 0); house rules require both 0 or both > 0.
+    if (charge_kw == 0.0) ^ (discharge_kw == 0.0):
+        both = charge_kw or discharge_kw
+        charge_kw = both
+        discharge_kw = both
     return {
         "label": allocate_unique_label(f"{source_label} copy", batteries),
         "battery_capacity_kwh": float(source.get("battery_capacity_kwh", 5.0)),
@@ -459,8 +465,25 @@ def _render_powerstation_meta(session_scope: str) -> tuple[str, str, list[str]]:
         "Rolle",
         options=["Single-use (manuell)", "Standby-Backup"],
         key=_scoped_key(session_scope, "planning_battery_role"),
+        help=(
+            "Standby-Backup (preisbewusste Mini-UPS für Dauerläufer) erfordert "
+            "Backing „Physisch“ und EHAL-Quellenwahl (`set_ess_source_select`). "
+            "Virtuell wird zur Laufzeit ignoriert — ggf. globales SOC-Min der Hausbatterie erhöhen."
+        ),
     )
     role = "standby_backup" if role_label == "Standby-Backup" else "single_use"
+    if role == "standby_backup" and backing != "physical":
+        st.warning(
+            "Standby-Backup ist nur mit physischer Powerstation aktiv. "
+            "Virtuelle Instanzen werden übersprungen (kein geschützter Floor)."
+        )
+    elif role == "standby_backup" and backing == "physical":
+        from ui.setup_readiness import standby_backup_readiness_messages
+
+        for msg in standby_backup_readiness_messages():
+            if "Quellenwahl" in msg or "set_ess_source_select" in msg:
+                st.info(msg)
+                break
     attached_ids = _render_attached_consumers(session_scope, backing=backing)
     return backing, role, attached_ids
 

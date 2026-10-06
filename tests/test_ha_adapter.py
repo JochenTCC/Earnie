@@ -123,7 +123,7 @@ def test_write_setpoints_number_service(post_mock, _get_mock):
     adapter = HaAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_charge_power_limit": 1000,
@@ -151,7 +151,7 @@ def test_write_setpoints_active_power(post_mock, _get_mock):
     adapter = HaAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_active_power": -1500,
@@ -176,7 +176,7 @@ def test_write_setpoints_degrades_on_403(post_mock, _get_mock):
     adapter = HaAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_charge_power_limit": 1000,
@@ -225,7 +225,7 @@ def test_write_setpoints_converts_to_entity_unit(post_mock, get_mock):
     adapter = HaAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_active_power": -1500,
@@ -254,7 +254,7 @@ def test_write_export_limit_unconstrained_clamps_to_entity_max(post_mock, get_mo
     )
     error = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "earnie-hems",
             "set_grid_export_power_limit": 1_000_000.0,
@@ -274,7 +274,7 @@ def test_write_setpoints_rejects_wrong_quantity(post_mock, get_mock):
     adapter = HaAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "earnie-hems",
             "set_ess_charge_power_limit": 3000,

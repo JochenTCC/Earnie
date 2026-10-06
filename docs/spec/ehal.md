@@ -1,7 +1,7 @@
-# EHAL — Earnie Hardware Access Layer (schema_version 3)
+# EHAL — Earnie Hardware Access Layer (schema_version 4)
 
-**Status:** current (schema_version 3; Pattern B bindings shipped)  
-**History (backlog):** `2.4.a` (M1) → `2.4.j` (wire rename) → `2.4.k` (entity mapping) → `2.4.o` (Design C1 `set_ess_active_power`)  
+**Status:** current (schema_version 4; Pattern B bindings shipped; `set_ess_source_select` for 2.7.h)  
+**History (backlog):** `2.4.a` (M1) → `2.4.j` (wire rename) → `2.4.k` (entity mapping) → `2.4.o` (Design C1 `set_ess_active_power`) → `2.7.h` (source select)  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 §2.2, §2.5 Phase 1, §2.6  
 **Canonical field names:** `[docs/ui/ehal-com.md](../ui/ehal-com.md)` §B / §C  
 **Schemas:** `[share/ehal/](../../share/ehal/)`  
@@ -40,7 +40,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 
 | Field            | Type              | Required | Meaning                                                                                                  |
 | ---------------- | ----------------- | -------- | -------------------------------------------------------------------------------------------------------- |
-| `schema_version` | integer           | yes      | Wire version; **current =** `3` (Design C1 in **2.4.o**; `sens_`* freeze was **2.4.j** / v2; M1 was `1`) |
+| `schema_version` | integer           | yes      | Wire version; **current =** `4` (`set_ess_source_select` / 2.7.h; Design C1 was **2.4.o** / v3; `sens_`* freeze **2.4.j** / v2; M1 was `1`) |
 | `ts`             | string (ISO-8601) | yes      | Sample / write time with timezone (`Z` or offset). Prefer UTC.                                           |
 | `adapter_id`     | string            | yes      | Stable adapter instance id (e.g. `openems-lab`, `earnie-hems`)                                           |
 
@@ -87,7 +87,7 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), Live dict
 
 **House load (**`sens_power_consumers`**, optional):** prefer mapped Merker; else derive from grid/PV/ESS balance.
 
-## Telemetry-API (schema_version 3)
+## Telemetry-API (schema_version 4)
 
 
 | Field                         | Required | Unit   | Notes                                                                                                      |
@@ -114,7 +114,7 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), Live dict
 
 Machine schema: `[share/ehal/telemetry.schema.json](../../share/ehal/telemetry.schema.json)`.
 
-## Setpoint-API (schema_version 3)
+## Setpoint-API (schema_version 4)
 
 Setpoints are **math limits / forced power / modes**, not a full inner-loop controller. Realtime enforcement stays in the subsystem (OpenEMS / HA / inverter).
 
@@ -129,6 +129,7 @@ Setpoints are **math limits / forced power / modes**, not a full inner-loop cont
 | `set_ess_charge_power_limit`    | no*             | W             | Max charge power (magnitude ≥ 0)                                                                                                                                                                |
 | `set_ess_discharge_power_limit` | no*             | W             | Max discharge power (magnitude ≥ 0)                                                                                                                                                             |
 | `set_ess_mode`                  | no*             | string/number | Sticky-backend control; **0 = Automatik**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores                                                                        |
+| `set_ess_source_select`         | no*             | enum 0\|1     | Route locally-attached loads: **0 = grid** pass-through (charge allowed), **1 = battery-only** island. Powerstation `standby_backup` (2.7.h); omit for bidirectional house ESS. OpenEMS unused. |
 | `set_grid_export_power_limit`   | no*             | W             | Max grid export, non-negative magnitude (like ESS limits); `0` = no export; unconstrained = plant maximum (PV kWp sum + max discharge of force-dischargeable ESS; fallback 1 000 000 W) (2.7.a) |
 | `set_evcs_max_current`          | no*             | A             | EV charge current setpoint / max current                                                                                                                                                        |
 | `set_evcs_mode`                 | no*             | enum          | `off`                                                                                                                                                                                           |
@@ -168,16 +169,17 @@ When there is no `set_ess_active_power` entity (typical `huawei_solar`), configu
 
 With Elevate permissions enabled in [wlcrs/huawei_solar](https://github.com/wlcrs/huawei_solar), the HA adapter calls `huawei_solar.forcible_charge` / `forcible_discharge` (power W, duration minutes, re-issued each control cycle) and `stop_forcible_charge` on Automatik / Entladesperre. Together with both limit entities this makes `ess_active` available so the plant can use `control: full`. HouseSim archetype `huawei_en` golden map stays limits-only; force is covered by adapter / mock-service tests.
 
-## Capability-Flags (schema_version 3)
+## Capability-Flags (schema_version 4)
 
 
-| Field                   | Required | Meaning                                                   |
-| ----------------------- | -------- | --------------------------------------------------------- |
-| `supports_ess_write`    | yes      | ESS setpoints (active power and/or limits) can be written |
-| `supports_evcs_current` | yes      | `set_evcs_max_current` can be written                     |
+| Field                          | Required | Meaning                                                                   |
+| ------------------------------ | -------- | ------------------------------------------------------------------------- |
+| `supports_ess_write`           | yes      | ESS setpoints (active power and/or limits) can be written                 |
+| `supports_evcs_current`        | yes      | `set_evcs_max_current` can be written                                     |
+| `supports_ess_source_select`   | no       | `set_ess_source_select` can be written (standby_backup powerstation)      |
 
 
-Additional boolean flags may be added in later `schema_version` values without removing these two.
+`supports_ess_write` and `supports_evcs_current` remain required; `supports_ess_source_select` may be omitted (treated as false).
 
 Machine schema: `[share/ehal/capabilities.schema.json](../../share/ehal/capabilities.schema.json)`.
 

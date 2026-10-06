@@ -218,7 +218,6 @@ def _normalize_earnie_role(
         rec_input = {
             "power_source": "manual",
             "default_power_kw": spec["nominal_power_kw"],
-            "default_runtime_h": float(schedule.get("duration_h", 2.0) or 2.0),
         }
     power_source = str(rec_input.get("power_source", "manual")).strip().lower()
     power_name = _loxone_power_name_from_raw(raw)
@@ -661,7 +660,9 @@ def _serialize_consumer(consumer: dict) -> dict:
             out["earnie_role"] = consumer["earnie_role"]
         rec = consumer.get("appliance_recommendation")
         if isinstance(rec, dict):
-            out["appliance_recommendation"] = dict(rec)
+            cleaned = dict(rec)
+            cleaned.pop("default_runtime_h", None)
+            out["appliance_recommendation"] = cleaned
         if consumer.get("loxone_inputs"):
             out["loxone_inputs"] = dict(consumer["loxone_inputs"])
     elif consumer["type"] == "ev":

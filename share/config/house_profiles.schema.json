@@ -257,10 +257,6 @@
         "default_power_kw": {
           "type": "number",
           "minimum": 0
-        },
-        "default_runtime_h": {
-          "type": "number",
-          "exclusiveMinimum": 0
         }
       }
     },

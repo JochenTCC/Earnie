@@ -216,7 +216,6 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
                         "appliance_recommendation": {
                             "power_source": "manual",
                             "default_power_kw": 2.0,
-                            "default_runtime_h": 2.0,
                         },
                     }
                 ],
@@ -319,7 +318,8 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
     )
     consumer = saved["profiles"][0]["consumers"][0]
     assert consumer["appliance_recommendation"]["default_power_kw"] == 2.5
-    assert consumer["appliance_recommendation"]["default_runtime_h"] == 1.75
+    assert "default_runtime_h" not in consumer["appliance_recommendation"]
+    assert consumer["schedule"]["duration_h"] == 1.75
     appliance = config.get_appliances()[0]
     assert appliance["default_power_kw"] == 2.5
     assert appliance["default_runtime_h"] == 1.75
@@ -457,7 +457,8 @@ def test_recommendation_appliances_from_house_profile():
                 "appliance_recommendation": {
                     "power_source": "loxone",
                     "default_power_kw": 2.0,
-                    "default_runtime_h": 2.0,
+                    # Stale key must be ignored — runtime comes from schedule.duration_h.
+                    "default_runtime_h": 9.0,
                 },
                 "loxone_inputs": {"power_name": "Leistung Waschmaschine"},
             }

@@ -85,7 +85,7 @@ def test_write_setpoints_ess_and_evcs(post_mock):
     adapter = OpenemsAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-07-27T12:00:00Z",
             "adapter_id": "openems-lab",
             "set_ess_active_power": -1500,
@@ -113,7 +113,7 @@ def test_write_lock_degrades_ess(post_mock):
     adapter = OpenemsAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "ts": "2026-07-27T12:00:00Z",
             "adapter_id": "openems-lab",
             "set_ess_charge_power_limit": 500,

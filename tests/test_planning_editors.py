@@ -1456,6 +1456,37 @@ def test_new_battery_template_deepcopies_wear():
     assert batteries[0]["battery_wear"]["expected_cycles"] == 6000.0
 
 
+def test_new_battery_template_from_powerstation_coerces_house_powers():
+    """Regression: PS charge-only must not crash Hausbatterie new-draft seed."""
+    from house_config.entity_resolution import split_battery_max_power_kw
+    from ui.planning_battery_form import new_battery_template
+
+    batteries = [
+        {
+            "id": "ps1",
+            "label": "Powerstation",
+            "type": "powerstation",
+            "backing": "virtual",
+            "battery_capacity_kwh": 2.0,
+            "battery_max_charge_power_kw": 5.0,
+            "battery_max_discharge_power_kw": 0.0,
+            "battery_efficiency": 0.95,
+            "battery_min_soc": 0.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+            "control": "limits_only",
+        }
+    ]
+    template = new_battery_template(batteries, source_id="ps1", live_battery_id="")
+    assert "type" not in template
+    assert template["battery_max_charge_power_kw"] == 5.0
+    assert template["battery_max_discharge_power_kw"] == 5.0
+    # Seed path calls split without type — must accept house draft.
+    charge, discharge = split_battery_max_power_kw(template, battery_id="template")
+    assert charge == 5.0
+    assert discharge == 5.0
+
+
 def test_upsert_thermal_profile_roundtrip(tmp_path, monkeypatch):
     from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 

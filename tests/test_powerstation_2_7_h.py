@@ -1,0 +1,257 @@
+"""2.7.h — physical standby_backup, source_select, rolling MILP."""
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from ehal import EHAL_SCHEMA_VERSION, validate_capabilities, validate_setpoint
+from ehal.ess_fields import ESS_FIELD_KINDS, ess_field
+from ehal.functions import available_functions
+from house_config.powerstation import ROLE_STANDBY_BACKUP
+from integrations.ha_adapter import (
+    BOOLEAN_INVERT_FIELDS,
+    HaAdapter,
+    HaConfig,
+    apply_boolean_invert,
+)
+from optimizer.powerstation_standby import (
+    SOURCE_BATTERY,
+    SOURCE_GRID,
+    apply_standby_load_relief,
+    attached_load_kw,
+    collect_standby_packs,
+    live_source_and_charge,
+    plan_standby_horizon,
+    reserve_target_kwh_for_standby,
+)
+
+
+def test_schema_version_is_4():
+    assert EHAL_SCHEMA_VERSION == 4
+
+
+def test_set_ess_source_select_in_ess_kinds():
+    assert "set_ess_source_select" in ESS_FIELD_KINDS
+    assert ess_field("delta3", "set_ess_source_select") == (
+        "ess.delta3.set_ess_source_select"
+    )
+
+
+def test_validate_setpoint_source_select():
+    doc = validate_setpoint(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-10-06T00:00:00Z",
+            "adapter_id": "test",
+            "set_ess_source_select": 1,
+        }
+    )
+    assert doc["set_ess_source_select"] == 1
+
+
+def test_validate_capabilities_source_select_optional():
+    doc = validate_capabilities(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-10-06T00:00:00Z",
+            "adapter_id": "test",
+            "supports_ess_write": True,
+            "supports_evcs_current": False,
+            "supports_ess_source_select": True,
+        }
+    )
+    assert doc["supports_ess_source_select"] is True
+
+
+def test_ess_source_select_function_from_pattern_b():
+    funcs = available_functions(
+        {"ess.delta3.set_ess_source_select": "switch.delta_3_grid_bypass"}
+    )
+    assert "ess_source_select" in funcs
+
+
+def test_boolean_invert_identity_and_flip():
+    assert apply_boolean_invert(1, "ehal") == 1.0
+    assert apply_boolean_invert(0, "ehal") == 0.0
+    assert apply_boolean_invert(1, "invert") == 0.0
+    assert apply_boolean_invert(0, "invert") == 1.0
+    assert "set_ess_source_select" in BOOLEAN_INVERT_FIELDS
+
+
+def test_collect_skips_virtual_standby():
+    packs = collect_standby_packs(
+        powerstations=[
+            {
+                "id": "virt",
+                "type": "powerstation",
+                "backing": "virtual",
+                "role": ROLE_STANDBY_BACKUP,
+                "attached_consumer_ids": ["nas"],
+                "battery_capacity_kwh": 2.0,
+            },
+            {
+                "id": "delta3",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": ROLE_STANDBY_BACKUP,
+                "attached_consumer_ids": ["nas"],
+                "battery_capacity_kwh": 1.0,
+                "battery_max_charge_power_kw": 1.0,
+            },
+        ],
+        appliances=[{"id": "nas", "default_power_kw": 0.15}],
+    )
+    assert len(packs) == 1
+    assert packs[0]["powerstation_id"] == "delta3"
+    assert packs[0]["load_kw"] == pytest.approx(0.15)
+
+
+def test_attached_load_and_reserve_sizing():
+    load = attached_load_kw(
+        {"attached_consumer_ids": ["a", "b"]},
+        {"a": {"default_power_kw": 0.1}, "b": {"default_power_kw": 0.05}},
+    )
+    assert load == pytest.approx(0.15)
+    assert reserve_target_kwh_for_standby(
+        load_kw=0.15, expensive_hours=4.0, capacity_kwh=1.0
+    ) == pytest.approx(0.6)
+
+
+def test_plan_standby_islands_expensive_slots():
+    # Cheap then expensive: expect charge in cheap, island in expensive when SoC allows.
+    matrix = [
+        {"k_act": 0.05, "expected_p_act": 1.0, "expected_p_pv": 0.0},
+        {"k_act": 0.40, "expected_p_act": 1.0, "expected_p_pv": 0.0},
+        {"k_act": 0.40, "expected_p_act": 1.0, "expected_p_pv": 0.0},
+        {"k_act": 0.05, "expected_p_act": 1.0, "expected_p_pv": 0.0},
+    ]
+    packs = [
+        {
+            "powerstation_id": "delta3",
+            "load_kw": 0.2,
+            "capacity_kwh": 1.0,
+            "max_charge_power_kw": 1.0,
+            "min_soc": 10.0,
+            "max_soc": 100.0,
+            "efficiency": 0.95,
+        }
+    ]
+    plans = plan_standby_horizon(
+        matrix, packs, current_soc_by_id={"delta3": 80.0}, dt_h=0.25
+    )
+    assert "delta3" in plans
+    selects = plans["delta3"]["source_select"]
+    assert len(selects) == 4
+    # At least one expensive slot should island when starting at 80% SoC.
+    assert SOURCE_BATTERY in selects
+    sources, charges = live_source_and_charge(plans, slot=0)
+    assert sources["delta3"] in (SOURCE_GRID, SOURCE_BATTERY)
+    if sources["delta3"] == SOURCE_BATTERY:
+        assert charges["delta3"] == 0.0
+
+
+def test_apply_standby_load_relief():
+    matrix = [
+        {"expected_p_act": 1.0, "k_act": 0.2},
+        {"expected_p_act": 1.0, "k_act": 0.2},
+    ]
+    plans = {
+        "delta3": {
+            "source_select": [SOURCE_BATTERY, SOURCE_GRID],
+            "load_kw": 0.2,
+        }
+    }
+    out = apply_standby_load_relief(matrix, plans)
+    assert out[0]["expected_p_act"] == pytest.approx(0.8)
+    assert out[1]["expected_p_act"] == pytest.approx(1.0)
+    assert matrix[0]["expected_p_act"] == pytest.approx(1.0)  # original untouched
+
+
+def test_ha_switch_write_source_select():
+    adapter = HaAdapter(
+        HaConfig(
+            base_url="http://ha.local",
+            token="t",
+            adapter_id="test",
+            entities={"set_ess_source_select": "switch.delta_3_grid_bypass"},
+        )
+    )
+    calls: list[tuple] = []
+
+    def fake_service(domain, service, data):
+        calls.append((domain, service, data))
+
+    adapter.call_service = fake_service  # type: ignore[method-assign]
+    error = adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-10-06T00:00:00Z",
+            "adapter_id": "test",
+            "set_ess_source_select": 1,
+        }
+    )
+    assert error is None
+    assert calls == [
+        ("switch", "turn_on", {"entity_id": "switch.delta_3_grid_bypass"})
+    ]
+
+    calls.clear()
+    adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-10-06T00:00:00Z",
+            "adapter_id": "test",
+            "set_ess_source_select": 0,
+        }
+    )
+    assert calls == [
+        ("switch", "turn_off", {"entity_id": "switch.delta_3_grid_bypass"})
+    ]
+
+
+def test_ha_switch_write_with_invert():
+    adapter = HaAdapter(
+        HaConfig(
+            base_url="http://ha.local",
+            token="t",
+            adapter_id="test",
+            entities={"set_ess_source_select": "switch.odd"},
+            boolean_invert={"set_ess_source_select": "invert"},
+        )
+    )
+    calls: list[tuple] = []
+    adapter.call_service = lambda d, s, data: calls.append((d, s, data))  # type: ignore
+    adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-10-06T00:00:00Z",
+            "adapter_id": "test",
+            "set_ess_source_select": 1,
+        }
+    )
+    assert calls[0][1] == "turn_off"
+
+
+def test_write_standby_source_selects_loxone_marker():
+    from optimizer import powerstation_live as psl
+
+    psl._last_powerstation_sent.clear()
+    with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
+        "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
+    ), patch(
+        "integrations.ehal_live.is_ha_backend", return_value=False
+    ), patch(
+        "integrations.ehal_live.is_ehal_network_backend", return_value=False
+    ), patch(
+        "house_config.ehal_bindings.resolve_plant_binding",
+        return_value="Earnie_Speicher_Quellenwahl",
+    ), patch(
+        "optimizer.live_export_limit.load_house_doc", return_value={}
+    ), patch(
+        "integrations.loxone_client._send_loxone_value_traced"
+    ) as send:
+        send.return_value = MagicMock(success=True)
+        psl.write_standby_source_selects({"delta3": 1})
+        send.assert_called()
+        assert psl.last_powerstation_sent().get("set_ess_source_select") == 1.0

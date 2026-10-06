@@ -6,6 +6,9 @@
       "sign": {
         "sens_grid_power_active": "ehal",
         "sens_ess_power": "ehal"
+      },
+      "boolean_invert": {
+        "set_ess_source_select": "ehal"
       }
     }
   }

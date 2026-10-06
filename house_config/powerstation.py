@@ -48,6 +48,18 @@ def is_house_battery(battery: dict) -> bool:
     return not is_powerstation(battery)
 
 
+def scenario_selectable_batteries(batteries: list[dict] | None) -> list[dict]:
+    """House batteries only — powerstations are not scenario ``battery_ids`` picks."""
+    out: list[dict] = []
+    for item in batteries or []:
+        if not isinstance(item, dict) or not is_house_battery(item):
+            continue
+        if not str(item.get("id") or "").strip():
+            continue
+        out.append(item)
+    return out
+
+
 def is_virtual_powerstation(battery: dict) -> bool:
     if not is_powerstation(battery):
         return False

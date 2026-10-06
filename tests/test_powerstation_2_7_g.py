@@ -12,6 +12,7 @@ from house_config.powerstation import (
     MODE_RESERVE,
     consumer_assist_mode,
     is_powerstation,
+    scenario_selectable_batteries,
 )
 from optimizer.powerstation_reserve import (
     apply_virtual_reserve_floor,
@@ -276,6 +277,18 @@ def test_collect_active_reserves_shares_virtual_pool(monkeypatch, tmp_path):
     assert len(active) == 1
     assert active[0]["appliance_ids"] == ["wm", "dryer"]
     assert active[0]["target_kwh"] == 3.5  # 2.0 + 1.5
+
+
+def test_scenario_selectable_batteries_excludes_virtual_and_physical_ps():
+    """Regression: Scenario-Config must not offer powerstations as battery picks."""
+    items = [
+        _house_battery(id="home", label="Home"),
+        _powerstation(id="ps_v", label="Virtual PS", backing="virtual"),
+        _powerstation(id="ps_p", label="Physical PS", backing="physical"),
+        {"label": "orphan without id"},
+    ]
+    selectable = scenario_selectable_batteries(items)
+    assert [b["id"] for b in selectable] == ["home"]
 
 
 def test_resolve_skips_powerstation_in_battery_ids():

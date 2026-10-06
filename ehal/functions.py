@@ -71,6 +71,12 @@ EHAL_FUNCTIONS: tuple[EhalFunction, ...] = (
         ("set_grid_export_power_limit",),
         "Ohne outbound Limit kann Earnie die Einspeisegrenze nicht an den Hub schreiben.",
     ),
+    EhalFunction(
+        "ess_source_select",
+        "Quellenwahl Netz/Batterie (Standby-Backup)",
+        ("set_ess_source_select",),
+        "Ohne Quellenwahl kann Earnie angeschlossene Dauerläufer nicht zwischen Netz und Powerstation umschalten.",
+    ),
 )
 
 FUNCTIONS_BY_ID = {f.id: f for f in EHAL_FUNCTIONS}
@@ -84,9 +90,19 @@ class FunctionStatus:
 
 
 def _mapped_fields(mapped: Mapping[str, object] | Iterable[str]) -> set[str]:
+    """Flat keys plus Pattern-B ESS kinds (``ess.{slug}.set_*`` → ``set_*``)."""
+    from ehal.ess_fields import ess_field_kind
+
     if isinstance(mapped, Mapping):
-        return {str(k) for k, v in mapped.items() if str(v or "").strip()}
-    return {str(k) for k in mapped}
+        keys = {str(k) for k, v in mapped.items() if str(v or "").strip()}
+    else:
+        keys = {str(k) for k in mapped}
+    out = set(keys)
+    for key in keys:
+        kind = ess_field_kind(key)
+        if kind:
+            out.add(kind)
+    return out
 
 
 def function_statuses(

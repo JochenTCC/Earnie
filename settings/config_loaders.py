@@ -187,6 +187,9 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
     entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
     sign = ha.get("sign") if isinstance(ha.get("sign"), dict) else {}
+    boolean_invert = (
+        ha.get("boolean_invert") if isinstance(ha.get("boolean_invert"), dict) else {}
+    )
     return {
         "EHAL_BACKEND": backend,
         "EHAL_ADAPTER_ID": resolve_adapter_id(ehal.get("adapter_id"), backend),
@@ -204,6 +207,11 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
         "EHAL_HA_SIGN": {
             str(key): str(value).strip().lower()
             for key, value in sign.items()
+            if str(value).strip()
+        },
+        "EHAL_HA_BOOLEAN_INVERT": {
+            str(key): str(value).strip().lower()
+            for key, value in boolean_invert.items()
             if str(value).strip()
         },
     }

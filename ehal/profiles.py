@@ -23,7 +23,7 @@ _HW_EXAMPLES = _HW_DIR / "examples"
 _RECIPES_DIR = _REPO_ROOT / "share" / "loxone" / "recipes"
 _RECIPE_SCHEMA = _RECIPES_DIR / "recipe.schema.json"
 
-# M1 EHAL field surface (telemetry + setpoint + capabilities; schema_version 3 / §C).
+# M1 EHAL field surface (telemetry + setpoint + capabilities; schema_version 4 / §C).
 M1_EHAL_FIELDS: frozenset[str] = frozenset(
     {
         "sens_grid_power_active",
@@ -48,11 +48,13 @@ M1_EHAL_FIELDS: frozenset[str] = frozenset(
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",
         "set_ess_mode",
+        "set_ess_source_select",
         "set_evcs_max_current",
         "set_evcs_mode",
         "set_grid_export_power_limit",
         "supports_ess_write",
         "supports_evcs_current",
+        "supports_ess_source_select",
     }
 )
 
@@ -83,6 +85,7 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
     "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
     "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl (Hinweis)",
+    "set_ess_source_select": "Setpoint Quellenwahl (0=Netz / 1=Batterie-Insel)",
     "set_evcs_max_current": "Setpoint Wallbox-Sollstrom (A)",
     "set_evcs_mode": "Setpoint Wallbox-Modus (off|pv|now)",
     "set_grid_export_power_limit": "Setpoint Einspeisegrenze (W; ≥ 0, frei = PV + Entladeleistung)",
@@ -124,6 +127,7 @@ _FIELD_ROLE: dict[str, str] = {
     "set_ess_charge_power_limit": "ess",
     "set_ess_discharge_power_limit": "ess",
     "set_ess_mode": "ess",
+    "set_ess_source_select": "ess",
     "sens_evcs_active_power": "evcs",
     "set_evcs_max_current": "evcs",
     "set_evcs_mode": "evcs",

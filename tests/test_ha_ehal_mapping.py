@@ -180,11 +180,16 @@ def test_buffer_temp_not_proposed():
         assert entry["entity_id"] != "sensor.house_sim_buffer_temp"
 
 
-def test_switch_not_in_mappable_scan_input():
+def test_switch_in_mappable_scan_but_not_auto_proposed():
+    """2.7.h: switches are mappable for set_ess_source_select; unrelated switches stay unproposed."""
     pkg = load_archetype("evcc_en")
     rows = _scan_rows_from_fixture(pkg.entities)
     ids = {row["entity_id"] for row in rows}
-    assert "switch.evcc_loadpoint_1_enable" not in ids
+    assert "switch.evcc_loadpoint_1_enable" in ids
+    proposals = heuristic_propose(rows)
+    assert all(not eid.startswith("switch.") for eid in (
+        entry["entity_id"] for entry in proposals.values()
+    ))
 
 
 def test_resolve_field_select_default_keeps_existing():

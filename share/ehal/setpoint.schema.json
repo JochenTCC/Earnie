@@ -1,14 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/setpoint.schema.json",
-  "title": "EHAL Setpoint-API (schema_version 3)",
-  "description": "Design C1: ESS active_power (signed W) + true charge/discharge limits + optional mode hint. EVCS currents in A. At least one setpoint field required. Field names: docs/ui/ehal-com.md §C.",
+  "title": "EHAL Setpoint-API (schema_version 4)",
+  "description": "Design C1: ESS active_power (signed W) + true charge/discharge limits + optional mode hint + source select (2.7.h). EVCS currents in A. At least one setpoint field required. Field names: docs/ui/ehal-com.md §C.",
   "type": "object",
   "required": ["schema_version", "ts", "adapter_id"],
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 3
+      "const": 4
     },
     "ts": {
       "type": "string",
@@ -36,6 +36,11 @@
       "type": ["string", "number"],
       "description": "Optional ESS mode hint for Loxone/HA (e.g. Huawei control_cmd). OpenEMS ignores."
     },
+    "set_ess_source_select": {
+      "type": "number",
+      "enum": [0, 1],
+      "description": "Route locally-attached consumers: 0 = grid pass-through (charge allowed), 1 = battery-only island (no AC charge). Powerstation standby_backup (2.7.h); omit for bidirectional house ESS."
+    },
     "set_evcs_max_current": {
       "type": "number",
       "minimum": 0,
@@ -57,6 +62,7 @@
     {"required": ["set_ess_charge_power_limit"]},
     {"required": ["set_ess_discharge_power_limit"]},
     {"required": ["set_ess_mode"]},
+    {"required": ["set_ess_source_select"]},
     {"required": ["set_evcs_max_current"]},
     {"required": ["set_evcs_mode"]},
     {"required": ["set_grid_export_power_limit"]}

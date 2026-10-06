@@ -1,10 +1,10 @@
-"""TypedDict models mirroring share/ehal/*.schema.json (schema_version 3)."""
+"""TypedDict models mirroring share/ehal/*.schema.json (schema_version 4)."""
 
 from __future__ import annotations
 
 from typing import NotRequired, TypedDict
 
-EHAL_SCHEMA_VERSION = 3
+EHAL_SCHEMA_VERSION = 4
 
 # Legacy M1 unprefixed telemetry names — rejected, no longer remapped to §C.
 REMOVED_TELEMETRY_FIELD_NAMES: frozenset[str] = frozenset(
@@ -56,6 +56,7 @@ class EhalSetpoint(TypedDict):
     set_ess_charge_power_limit: NotRequired[float]
     set_ess_discharge_power_limit: NotRequired[float]
     set_ess_mode: NotRequired[str | float]
+    set_ess_source_select: NotRequired[float]
     set_evcs_max_current: NotRequired[float]
     set_evcs_mode: NotRequired[str]
     set_grid_export_power_limit: NotRequired[float]
@@ -67,6 +68,7 @@ class EhalCapabilities(TypedDict):
     adapter_id: str
     supports_ess_write: bool
     supports_evcs_current: bool
+    supports_ess_source_select: NotRequired[bool]
 
 
 class EhalWriteError(TypedDict):

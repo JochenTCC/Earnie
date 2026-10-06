@@ -255,7 +255,7 @@ def _render_scan_section(base_url: str, token: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = list(st.session_state.get(_SESSION_SCAN) or [])
     if rows:
         st.caption(
-            f"{len(rows)} mappable Entities (sensor/number/select/input_number). "
+            f"{len(rows)} mappable Entities (sensor/number/select/switch/…). "
             "Scan einmal pro Session (Button = erneuter Scan)."
         )
         preview = [

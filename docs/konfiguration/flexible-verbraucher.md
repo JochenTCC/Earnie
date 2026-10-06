@@ -168,7 +168,8 @@ Waschmaschine, Trockner usw. als `generic`**-Verbraucher** in `house_profiles.js
 | `appliance_recommendation.powerstation_id`                       | Bei `reserve`: id der Powerstation in `components.json`        |
 | `appliance_recommendation.power_source`                          | `loxone` oder `manual`                                         |
 | `loxone_inputs.power_name`                                       | Bei `loxone`: Ist-Leistungsmerker (`known` und `manual`)       |
-| `appliance_recommendation.default_power_kw`, `default_runtime_h` | Standard für Empfehlung bzw. Reserve-Ziel (kWh ≈ P×t)          |
+| `appliance_recommendation.default_power_kw`                      | Standard-Leistung für Empfehlung bzw. Reserve                  |
+| `schedule.duration_h`                                            | Laufzeit pro Lauf (auch Advice/Reserve: Ziel kWh ≈ P×t)        |
 
 
 
@@ -206,7 +207,7 @@ Bei `earnie_role: known` oder `manual` kann optional eine **Loxone-Leistungsquel
 | `loxone_inputs.power_name`                   | Loxone-Merker für Ist-Leistung (einheitlich für `known` und `manual`) |
 | `appliance_recommendation.power_source`      | `manual` oder `loxone` (nur bei `manual`)                             |
 | `appliance_recommendation.default_power_kw`  | Nennleistung für Empfehlung/Grundlast                                 |
-| `appliance_recommendation.default_runtime_h` | Standard-Laufzeit (nur bei `manual`)                                  |
+| `schedule.duration_h`                        | Nenndauer pro Lauf — auch Laufzeit für Advice/Reserve                 |
 
 
 Der Merker wird gespeichert; Live-Abfrage und Adaption der Nennleistung folgen in **Version 2.+1**. Bis dahin nutzt die Grundlast-Overlay bzw. die Startzeit-Empfehlung die Werte aus dem Profil.

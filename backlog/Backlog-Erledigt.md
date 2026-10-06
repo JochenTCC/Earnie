@@ -2,6 +2,25 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.h — Powerstation smart standby-backup for continuous loads (2026-10-06)
+
+- [x] **2.7.h — Powerstation smart standby-backup for continuous loads** (`role: standby_backup`; shared model with **2.7.g**)
+  - Physical only: virtual floor declined (savings study / go/no-go — not worth more than raising house `min_soc`)
+  - Rolling per-slot MILP: expensive → battery island, cheap → grid pass-through (+ optional recharge); reserve = load kW × expensive hours, capped by pack capacity
+  - EHAL `set_ess_source_select` (0 = grid / 1 = battery) + capability `supports_ess_source_select`; setpoint schema_version **4**; HA boolean invert for EcoFlow `switch.*_grid_bypass` (`ban_bypass_en`)
+  - Runtime: [`optimizer/powerstation_standby.py`](../optimizer/powerstation_standby.py) + live write path; Loxone Merker `Earnie_Speicher_Quellenwahl` / `VI_Earnie_Plant.xml`; readiness warnings in setup UI
+  - Docs: `ehal.md`, `loxone-signals.md`, `batterie-pv.md`, EcoFlow bridge guide; tests `tests/test_powerstation_2_7_h.py`
+  - Spec: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.2 (`Earnie-Projekt`)
+  - **Not yet verified on productive Earnie** — live dogfood tracked under [Bugfixes](Backlog-Bugfixes.md) → Verifications Pending
+
+### Bugfix — New battery from Powerstation selection crash (2026-10-06)
+
+- [x] Creating a new battery, when a powerstation is selected — crashes
+  - Cause: `new_battery_template` cloned charge-only PS powers (`discharge=0`) into a typeless Hausbatterie draft; seed then failed house power rules in `split_battery_max_power_kw`
+  - Fix: coerce asymmetric charge/discharge to both non-zero (or both zero) in `ui/planning_battery_form.py` `new_battery_template`
+  - Regression: `tests/test_planning_editors.py::test_new_battery_template_from_powerstation_coerces_house_powers`
+  - **Verified live** (2026-10-06): Hauskonfigurator → Batterien → Powerstation selected → „— neu —“ opens without crash
+
 ### 2.7.k — ENTSO-E first in live day-ahead price chain (2026-10-05)
 
 - [x] **2.7.k — ENTSO-E Transparency as additional EPEX day-ahead source (user token)**
@@ -51,7 +70,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Hidden → inherit charge/efficiency/SoC/threshold from main ESS; discharge `0`, standby `0`, `limits_from_live` false, `control: limits_only`, wear off; fixed defaults if no Hausbatterie
   - Physical Powerstations unchanged (full form)
   - Docs: [`docs/konfiguration/batterie-pv.md`](../docs/konfiguration/batterie-pv.md) § Virtuelle Powerstation; tests in `tests/test_powerstation_2_7_g.py`
-  - Superseded by full **2.7.g** archive entry above; **2.7.h** remains open
+  - Superseded by full **2.7.g** archive entry above; **2.7.h** archived 2026-10-06 (productive verification still pending)
 
 ### Powerstation savings study 2.7.g / 2.7.h (2026-10-05)
 
@@ -59,7 +78,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Private result: `Earnie-env-home/studies/powerstation-savings-2025.md` (home plant, 2025, aWATTar hourly day-ahead; Energy-Charts was down)
   - Cash bill: virtual reserves/floors flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €)
   - Bill savings alone do not carry **2.7.g** / **2.7.h**. A virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced
-  - Pointer left in [Backlog.md](Backlog.md) next to **2.7.h** (study informed keep-**2.7.g**-for-UX decision)
+  - Study informed keep-**2.7.g**-for-UX and physical-only **2.7.h** (virtual floor declined)
 
 ### EV late-return connect prognosis (2026-10-04)
 
@@ -186,7 +205,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **2.7.d — One-way storage type** (planning fold; not implemented as a standalone letter)
   - Superseded by the shared powerstation model: **2.7.g** (`role: single_use`, physical `backing` = former one-way / no forced discharge) and **2.7.h** (`role: standby_backup`, owns `set_ess_source_select` / EcoFlow mapping / Loxone Merker bridge)
   - No separate `batteries[].direction: one_way` flag — use `type: powerstation` + `backing` + `role` instead
-  - Open work continues under [Backlog.md](Backlog.md) **2.7.g** / **2.7.h**
+  - Follow-on work shipped as **2.7.g** / **2.7.h** (see archive entries above)
 
 ### 2.7.a dogfood — Loxone wiring (partial) (2026-09-29)
 
