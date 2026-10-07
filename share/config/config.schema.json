@@ -486,6 +486,22 @@
               }
             }
           }
+        },
+        "loxone_push": {
+          "type": "object",
+          "description": "Entity-by-entity VO push source switch (poll default). Keys: plant, battery:<id>, consumer:<id>.",
+          "properties": {
+            "entities": {
+              "type": "array",
+              "description": "Entity keys that read sens_*/get_* from the push inbox instead of Merker poll.",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

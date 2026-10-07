@@ -381,7 +381,34 @@ def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
 
 
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
-    """Holt einen numerischen Wert live aus dem Loxone Miniserver (Einheiten werden abgeschnitten)."""
+    """Holt einen numerischen Wert: push inbox when the entity is on push, else Merker poll.
+
+    AlarmClock (``fetch_loxone_ready_by_time``) and meter ``/all`` energy stay on poll —
+    they never call this for push IDs. Units are stripped the same way for both sources.
+    """
+    name = str(io_name or "").strip()
+    if name:
+        try:
+            from ehal.loxone_push_source import source_for_merker
+            from runtime_store.loxone_push_inbox import read_push_value
+
+            if source_for_merker(name) == "push":
+                from ehal.loxone_push_source import get_merker_index
+
+                binding = get_merker_index().get(name)
+                if binding is not None:
+                    value, state = read_push_value(binding.ehal_id)
+                    if value is None:
+                        logger.warning(
+                            "Loxone push: no value for '%s' (%s, state=%s)",
+                            name,
+                            binding.ehal_id,
+                            state,
+                        )
+                    return value
+        except Exception:  # noqa: BLE001 — never break the poll path
+            logger.exception("Loxone push read failed for '%s'; falling back to poll", name)
+
     raw_value = fetch_loxone_raw_value(io_name)
     if raw_value is None:
         return None

@@ -106,7 +106,7 @@ Virtual Out address **status / request optimize**:
 
 `http://192.168.178.10:8541`
 
-Telemetry VOs (`VO_Earnie_*` except `Status`) target the daemon port **8541** as well. The receiver `/ehal/loxone/telemetry/…` exists only in the pilot on branch `spike/vo-push-pilot` (observation inbox in EHAL-Com, disabled unless `EARNIE_PILOT_PUSH_TOKEN` is set); on `main` these VO commands have no receiver. The value placeholder in a Virtual Output command is `<v>` (written `&lt;v&gt;` in the XML) — `\v` is the Virtual **Input** check placeholder and arrives as the control character 0x0B in an output.
+Telemetry VOs (`VO_Earnie_*` except `Status`) target the daemon port **8541** as well. The receiver `/ehal/loxone/telemetry/<EHAL-ID>/<value>` takes Virtual-Output pushes when `EARNIE_PILOT_PUSH_TOKEN` is set. Per entity, `config.json` → `ehal.loxone_push.entities` switches the read path from Merker-Poll to Push (`plant`, `battery:<id>`, `consumer:<id>`). Default is poll for all entities. Recommended VO repeat: **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, default 10). AlarmClock (`get_evcs_ready_by_time`) and Meter-Energy via `/all` stay on poll. The value placeholder in a Virtual Output command is `<v>` (written `&lt;v&gt;` in the XML) — `\v` is the Virtual **Input** check placeholder and arrives as the control character 0x0B in an output.
 
 Adjust the polling / Cmd check pattern to match the JSON keys (plant: `set_ess_*` / `heartbeat_ts`; flex/EV: `flex.{hk_id}.…` / `ev.{ev_id}.…`). Stable **titles** remain the contract for Core and the default import.
 

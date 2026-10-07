@@ -85,7 +85,7 @@ def _cmd_attrs(
 
 
 def render_template(group: str, signals: list[Signal], *, host: str, port: int, token: str,
-                    repeat: str = "30", repeat_rate: str = "30",
+                    repeat: str = "10", repeat_rate: str = "10",
                     token_in_address: bool = False) -> str:
     """Template text in the shape Loxone Config exports (without the BOM).
 
@@ -132,8 +132,8 @@ def main() -> int:
     parser.add_argument("--env-file", type=Path, default=None,
                         help=f"optional .env containing {TOKEN_ENV}; default: write a placeholder")
     parser.add_argument("--out-dir", required=True, type=Path)
-    parser.add_argument("--repeat", default="30", help="Repeat attribute (Config export: 30 for a 30 s repeat)")
-    parser.add_argument("--repeat-rate", default="30", help="RepeatRate attribute (Config export: 30)")
+    parser.add_argument("--repeat", default="10", help="Repeat attribute (Config export: 10 for a 10 s repeat)")
+    parser.add_argument("--repeat-rate", default="10", help="RepeatRate attribute (Config export: 10)")
     parser.add_argument("--token-in-address", action="store_true",
                         help="put the token into the device address (/t/<token>) instead of ?t= per command; "
                              "check with scripts.pilot_vo_capture that Loxone joins address and command that way")

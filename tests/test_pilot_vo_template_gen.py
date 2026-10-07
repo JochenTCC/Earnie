@@ -124,7 +124,7 @@ def test_template_values_placeholder_repeat_and_digital(tmp_path: Path) -> None:
     cmds = {c.get("Title"): c for c in root if c.tag == "VirtualOutCmd"}
     analog = cmds["Push_Earnie_Netzleistung"]
     assert analog.get("CmdOn") == "/ehal/loxone/telemetry/sens_grid_power_active/<v>?t=abcd1234efgh"
-    assert (analog.get("Analog"), analog.get("Repeat"), analog.get("RepeatRate")) == ("true", "30", "30")
+    assert (analog.get("Analog"), analog.get("Repeat"), analog.get("RepeatRate")) == ("true", "10", "10")
     digital = cmds["Push_Earnie_Abwesend"]
     assert digital.get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1?t=abcd1234efgh"
     assert digital.get("CmdOff") == "/ehal/loxone/telemetry/sens_absent_mode/0?t=abcd1234efgh"
@@ -163,7 +163,7 @@ def test_heartbeat_template_and_analog_has_no_off_command() -> None:
     assert cmd.get("CmdOn") == "/ehal/loxone/telemetry/heartbeat/<v>?t=abcd1234efgh"
     assert cmd.get("Analog") == "true"
     assert cmd.get("CmdOff") == ""  # analog outputs have no Off command
-    assert (cmd.get("Repeat"), cmd.get("RepeatRate")) == ("30", "30")
+    assert (cmd.get("Repeat"), cmd.get("RepeatRate")) == ("10", "10")
 
 
 def test_all_collected_analog_commands_have_empty_off(tmp_path: Path) -> None:

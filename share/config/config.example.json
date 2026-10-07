@@ -40,6 +40,9 @@
     },
     "ehal": {
         "backend": "loxone",
-        "adapter_id": "loxone-home"
+        "adapter_id": "loxone-home",
+        "loxone_push": {
+            "entities": []
+        }
     }
 }

@@ -746,6 +746,15 @@ if __name__ == "__main__":
 
     start_loxone_request_http(config.get_ehal_loxone_http_port())
 
+    from runtime_store.loxone_push_inbox import (
+        hydrate_memory_from_disk,
+        wait_for_push_link,
+    )
+
+    hydrate_memory_from_disk()
+    if os.getenv("EARNIE_PILOT_PUSH_TOKEN"):
+        wait_for_push_link()
+
     from runtime_store.dotenv_io import (
         deferred_loxone_blocks_live,
         needs_loxone_setup,
@@ -881,6 +890,9 @@ if __name__ == "__main__":
                 consume_optimize_trigger,
                 wait_for_prod_cycle,
             )
+            from runtime_store.loxone_push_inbox import log_link_transition
+
+            log_link_transition()
 
             if is_shadow_mode():
                 if consume_optimize_trigger():

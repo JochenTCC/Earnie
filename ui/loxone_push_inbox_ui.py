@@ -92,9 +92,16 @@ def build_inbox_rows(
         if poll is not None:
             poll_text, diff_text = _compare(derived, str(poll.get("Wert") or ""))
         interval = (row or {}).get("interval_ema_s")
+        try:
+            from ehal.loxone_push_source import source_for_ehal_id
+
+            quelle = source_for_ehal_id(ehal_id)
+        except Exception:  # noqa: BLE001
+            quelle = "poll"
         rows.append(
             {
                 "EHAL-ID": ehal_id,
+                "Quelle": quelle,
                 "Wert (abgeleitet)": "" if derived is None else f"{derived:g}",
                 "Status": state,
                 "Roh": str((row or {}).get("raw") or ""),
@@ -175,12 +182,24 @@ def _render_inbox_fragment() -> None:
 
 def render_push_inbox_section() -> None:
     token_set = bool(str(os.getenv("EARNIE_PILOT_PUSH_TOKEN") or "").strip())
+    try:
+        from ehal.loxone_push_source import get_push_entities
+
+        push_keys = sorted(get_push_entities())
+    except Exception:  # noqa: BLE001
+        push_keys = []
+    source_caption = (
+        f"Push-Entitäten (`ehal.loxone_push.entities`): **{', '.join(push_keys)}**."
+        if push_keys
+        else "Keine Push-Entitäten konfiguriert — alle Lesungen noch per Poll "
+        "(`ehal.loxone_push.entities` in `config.json`)."
+    )
     st.caption(
-        "Pilot: Loxone **Virtual Output** sendet den Wert mit Wiederholung an "
+        "Loxone **Virtual Output** sendet den Wert mit Wiederholung an "
         f"`http://<Earnie-Host>:{_DEFAULT_PORT}/ehal/loxone/telemetry/<EHAL-ID>/<v>?t=<Token>` "
         "(`<v>` ist der Wert-Platzhalter im VO-Befehl). Das Token kann auch als Adress-Präfix "
         f"`http://<Earnie-Host>:{_DEFAULT_PORT}/t/<Token>` im VO-Gerät stehen (dann ohne `?t=` im Befehl). "
-        "Nur Beobachtung — der Optimierer nutzt diese Werte nicht."
+        f"{source_caption}"
     )
     if not token_set:
         st.info(

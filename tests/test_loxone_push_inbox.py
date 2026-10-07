@@ -16,9 +16,12 @@ from runtime_store import loxone_push_inbox as inbox
 def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     monkeypatch.delenv(http_mod.PUSH_TOKEN_ENV, raising=False)
+    monkeypatch.delenv(inbox.REPEAT_ENV, raising=False)
+    inbox.reset_memory_for_tests()
     http_mod.stop_loxone_request_http()
     yield
     http_mod.stop_loxone_request_http()
+    inbox.reset_memory_for_tests()
 
 
 @pytest.mark.parametrize(
@@ -121,9 +124,9 @@ def test_staleness_uses_configured_repeat_not_smoothed_gap(monkeypatch: pytest.M
     row = inbox.load_inbox()["sens_ess_soc"]
     assert row["interval_ema_s"] < 20
     last = t0 + timedelta(seconds=37)
-    assert not inbox.is_stale(row, now=last + timedelta(seconds=30))  # next repeat is due
-    assert not inbox.is_stale(row, now=last + timedelta(seconds=85))
-    assert inbox.is_stale(row, now=last + timedelta(seconds=95))  # > 3 x 30 s
+    assert not inbox.is_stale(row, now=last + timedelta(seconds=10))  # next repeat is due
+    assert not inbox.is_stale(row, now=last + timedelta(seconds=25))
+    assert inbox.is_stale(row, now=last + timedelta(seconds=35))  # > 3 x 10 s
 
 
 def test_staleness_respects_repeat_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -191,9 +194,9 @@ def _row(value: float | None, age_s: float, *, parse_ok: bool = True) -> dict:
 
 
 def test_link_alive_from_fresh_nonzero_analog_or_heartbeat() -> None:
-    assert inbox.link_alive({"heartbeat": _row(1.0, 10)}, now=_now())
-    assert inbox.link_alive({"sens_ess_soc": _row(55.0, 80)}, now=_now())
-    assert not inbox.link_alive({"sens_ess_soc": _row(55.0, 95)}, now=_now())  # older than 3 x 30 s
+    assert inbox.link_alive({"heartbeat": _row(1.0, 5)}, now=_now())
+    assert inbox.link_alive({"sens_ess_soc": _row(55.0, 20)}, now=_now())
+    assert not inbox.link_alive({"sens_ess_soc": _row(55.0, 35)}, now=_now())  # older than 3 x 10 s
     assert not inbox.link_alive({"sens_grid_power_active": _row(0.0, 5)}, now=_now())  # zero is no proof
     assert not inbox.link_alive({"sens_absent_mode": _row(1.0, 5)}, now=_now())  # digital is edge-based
     assert not inbox.link_alive({}, now=_now())

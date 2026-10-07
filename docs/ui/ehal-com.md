@@ -165,7 +165,7 @@ Live operation runs via house-profile flex Merker. Role template: `share/ehal/ro
 
 `flex.` is a **role namespace**. Binding and live keys follow pattern B: `flex.{slug}.sens_power_act` / `set_enable`. Live shows `{id}:flex.{slug}.…`. For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example: `zaehler_trockner:flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
 
-**Pattern B VO push path (pilot, no receiver on `main`):** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/<v>` (enable `flex.{slug}.set_enable`). Merker title stays `Earnie_Verbraucher_…`. See [Loxone Signals — Multiple Flex Consumers](../referenz/loxone-signals.md).
+**VO push telemetry:** Loxone Virtual Outputs call `GET /ehal/loxone/telemetry/<qualified-EHAL-ID>/<v>` on the daemon port (default **8541**), with token via `?t=`, header, or address prefix `/t/<token>`. Enable with `EARNIE_PILOT_PUSH_TOKEN`. The **Push-Inbox** section shows derived state, link (heartbeat), and poll comparison. **Live-Lesen** has a **Quelle** column (`push` / `poll`). Entities listed in `config.json` → `ehal.loxone_push.entities` read from the inbox; others still poll Merkers. Procedure: [`backlog/Binding-Push-Only-Conversion.md`](../../backlog/Binding-Push-Only-Conversion.md). See also [Loxone Signals](../referenz/loxone-signals.md).
 
 
 | Area / meaning        | Type          | EHAL value name (stub)             | OpenEMS | evcc (YAML attribute) | Victron GX / EVCS (Modbus) | Loxone / Loxone extra                        |

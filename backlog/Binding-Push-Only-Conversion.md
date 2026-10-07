@@ -1,12 +1,12 @@
 # Push-only migration of the Loxone binding — handover and procedure
 
-**Purpose:** entry point for a new session (Cursor). Describes the starting point, the decisions, the pilot findings and the procedure for switching the binding **entity by entity** from "read Loxone Merker (poll)" to "Loxone sends via Virtual Output (push)". **State: 2026-10-07. Nothing of the push-only read path has been built yet** — the pilot is observation only.
+**Purpose:** entry point for a new session (Cursor). Describes the starting point, the decisions, the pilot findings and the procedure for switching the binding **entity by entity** from "read Loxone Merker (poll)" to "Loxone sends via Virtual Output (push)". **State: 2026-10-07 — WP1–WP8 coded on `spike/vo-push-pilot`** (inbox read API, `ehal.loxone_push.entities`, intercept, zero rule + 5 min last-known, start-up wait, EHAL-Com Quelle). **Phase C** (entity flips on alpha) is ops — see §9b.
 
 (The file name is German for historical reasons; the content is English because backlog files are English.)
 
 **Starter prompt (paste into the new chat):**
 
-> Read `backlog/Binding-Push-Only-Umstellung.md` (and the project rules in `.cursor/rules/*.mdc`; `CLAUDE.md` summarises the essentials). We migrate the Loxone binding to push-only entity by entity (pilot branch `spike/vo-push-pilot`). Start with section 8 (work packages) and ask me about the open decisions in section 9 before you change the read path.
+> Read `backlog/Binding-Push-Only-Conversion.md` (and the project rules in `.cursor/rules/*.mdc`; `CLAUDE.md` summarises the essentials). We migrate the Loxone binding to push-only entity by entity (pilot branch `spike/vo-push-pilot`). Section 9 decisions are locked (2026-10-07); implement WP1–WP8 then flip entities per section 7.
 
 ---
 
@@ -70,8 +70,8 @@ Today's read path (target of the migration): `integrations/loxone_client.py::fet
 
 1. Every bound `sens_*` / `get_*` quantity comes from the inbox, no longer from the poll. The Merker name ↔ qualified ID mapping comes from the binding list (`read_signals_from_docs`: `old_name` ↔ `ehal_id`).
 2. **Not pushable**, therefore still poll or unchanged: `get_evcs_ready_by_time` (AlarmClock, `SpecialState10`), meter energy via `/all` (`sens_*_energy`).
-3. **Freshness:** a value is valid if younger than 3 × repeat interval (90 s). After a start the inbox knows nothing for up to 30 s → **start-up window** (proposal: wait up to 40 s for the heartbeat before the first run reads).
-4. **Zero rule (proposal, to be confirmed)**, only for quantities where 0 is plausible:
+3. **Freshness:** a value is valid if younger than 3 × repeat interval (**30 s** at 10 s repeat). After a start the inbox knows nothing for up to one repeat → **start-up window** (wait up to 40 s for the heartbeat before the first run reads).
+4. **Zero rule** (locked), only for quantities where 0 is plausible:
 
    | Field kind | Silence while the link is alive | Silence while the link is dead |
    |---|---|---|
@@ -79,10 +79,10 @@ Today's read path (target of the migration): `integrations/loxone_client.py::fet
    | Activity / digital (`sens_heating_active`, `sens_filter_active`, `sens_absent_mode`, `sens_evcs_connected`) | last value holds until the edge; never sent = 0 | read error |
    | SoC, capacity, limits (`get_*`), temperatures | **do not** assume 0 → read error | read error |
 
-5. **Read errors** behave as today: required fields (`sens_ess_soc`, grid, PV, battery power) → abort the run and log (`LoxoneAdapterError`), optional fields are omitted. The dead-man fallback in the Loxone program stays unchanged.
+5. **Read errors:** after silence, keep **last known up to 5 minutes**, then required fields abort as today (`LoxoneAdapterError`); optional fields are omitted. The dead-man fallback in the Loxone program stays unchanged.
 6. **Link** = a fresh repeating non-zero signal (heartbeat or an analog measurement). Heartbeat VO: `Push_Earnie_Heartbeat`, a non-zero constant at the input.
-7. **Spot check** also in push-only operation (proposal): every 15 minutes one single poll, only for comparison (log on deviation), never for decisions. Otherwise there is no cross-check after switching.
-8. **Rollback at any time:** set the entity back to `poll`. The bindings (Merker names) stay.
+7. **Spot check:** none (operator uses Push-Inbox / Live-Lesen while still on poll during the 48 h precondition).
+8. **Rollback at any time:** remove the entity from `ehal.loxone_push.entities` (back to poll). The bindings (Merker names) stay.
 
 ## 7. Procedure entity by entity
 
@@ -124,21 +124,29 @@ Prerequisite before any change to the read path: **characterization tests** (bac
 | WP3 | **Interception in the read path**: for entities on `push` take the WP1 value instead of HTTP; **no** change to the adapters if the reverse list hooks into `fetch_loxone_generic_value` | `integrations/loxone_client.py`; exclude AlarmClock and `/all` reads |
 | WP4 | **Zero rule per field kind** (table in section 6) + a test per row; read-error semantics (required field → abort) | new pure function next to `derive_state`; tests like `test_loxone_push_inbox.py` |
 | WP5 | **Start-up window and link:** wait for the heartbeat before the first run (upper bound), log lines on link loss, status in EHAL-Com | `main.py` loop, `ui/loxone_push_inbox_ui.py` |
-| WP6 | **Spot-check comparison** (poll only for comparison, log) | read layer + log |
+| WP6 | ~~Spot-check~~ **skipped** (decision: no) | — |
 | WP7 | **EHAL-Com:** show the source per entity and (later) switch it; live read shows "source: push/poll" | `ui/loxone_debug*.py`, mapping pages |
 | WP8 | **Docs:** `docs/ui/ehal-com.md`, `docs/referenz/loxone-signals.md` (German, `german-user-docs.mdc`); backlog: a separate item for the push-only read path (follow-ups are separate items, not new epic phases); epic phases in `roadmap-nomenclature.mdc` if needed | see the rules in `.cursor/rules/` |
 | WP9 | **Delivery:** build the container from the branch, roll out on NAS alpha; merge the fix branch before or together with it (otherwise the `status.json` overwrite effect stays) | the pre-commit hook runs the full suite (7–8 min); change the version only after approval |
 
-## 9. Open decisions (clarify before building)
+## 9. Decisions (locked 2026-10-07)
 
-1. **Confirm the zero rule** (table in section 6; above all: may temperatures and limits count as read errors on silence?).
-2. **Where does the source switch live?** Proposal: `config.json` → `ehal.loxone_push.entities` (list of entity IDs, e.g. `plant`, `battery:ecoflow_delta_3`, `consumer:trockner`), later a switch in EHAL-Com. Alternative: `runtime/local_settings.json` (changeable without restart, but not versioned).
-3. **Push-only really without any fallback?** For required fields (SoC, grid, PV, battery power) the run aborts on silence. Alternative: last known value for up to N minutes. The request was push-only; the safety nets (dead man in Loxone, abort on read error) are the substitute.
-4. **Spot check** in push-only operation: yes / no, interval.
-5. **Start-up window:** upper bound (proposal 40 s) and behaviour afterwards.
-6. **Merge the fix branch first?** And how the two branches (`054ab475` and later, `b5a658d2`) are merged into `main`.
-7. **Digital commands:** check whether Config took over the Off command from the template (otherwise add it by hand).
-8. **Token in the address instead of in every command** (`--token-in-address`; the receiver supports it, see `integrations/loxone_request_http.py::split_token_prefix`): **first check whether Loxone joins address and command that way.** Test with the capture script: `python -m scripts.pilot_vo_capture --port 8599`, a VO with address `http://<PC-IP>:8599/t/abc` and command `/ehal/loxone/telemetry/sens_ess_soc/<v>`; the capture must show `/t/abc/ehal/loxone/telemetry/sens_ess_soc/<value>`. If the path part of the address does not come along, `?t=` stays in the command (still supported).
+1. **Zero rule:** confirmed (table in section 6).
+2. **Source switch:** `config.json` → `ehal.loxone_push.entities` (list of entity keys: `plant`, `battery:<id>`, `consumer:<id>`); restart per flip.
+3. **Required-field silence:** **last known value up to 5 minutes**, then read error / abort as today.
+4. **Spot check:** **no** (WP6 skipped).
+5. **Start-up window:** wait up to **40 s** for heartbeat/link; VO repeat **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, default 10 → freshness 30 s).
+6. **Merge fix branch first:** yes (`fix/status-json-powerstation-keys` into the pilot delivery line before first push-only alpha deploy).
+7. **Digital Off commands:** still verify in Config (ops).
+8. **Token / `/t/<token>` verify:** **deferred** — keep the current pilot token for now; rotate before trusting LAN-exposed push for production.
+
+## 9b. WP9 / Phase C ops checklist (alpha)
+
+1. Set VO Repeat/RepeatRate to **10** in Loxone (or regenerate with `pilot_vo_template_gen --repeat 10`).
+2. Set `EARNIE_PILOT_PUSH_REPEAT_S=10` on the alpha instance; leave `ehal.loxone_push.entities` empty (all poll).
+3. Build/deploy container from this branch; confirm Push-Inbox + Live-Lesen Quelle=poll; no behaviour change.
+4. Per stage (section 7): 48 h inbox green → add entity key to `entities` → restart daemon → watch 30–60 min → ≥24 h → next. Rollback = remove key + restart.
+5. Stages 7–9: also restart daemon (values ≤40 s) and brief link loss (last-known ≤5 min).
 
 ## 10. Risks
 

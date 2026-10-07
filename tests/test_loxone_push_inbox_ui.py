@@ -17,6 +17,9 @@ def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     monkeypatch.delenv(inbox.REPEAT_ENV, raising=False)
     monkeypatch.delenv("EARNIE_PILOT_PUSH_TOKEN", raising=False)
+    inbox.reset_memory_for_tests()
+    yield
+    inbox.reset_memory_for_tests()
 
 
 def _poll(field: str, value: str, mapping: str = "Merker_X") -> dict[str, str]:
