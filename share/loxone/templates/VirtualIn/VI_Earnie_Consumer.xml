@@ -1,11 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  DRAFT (2.4.n Pattern B) — validate in Loxone Config, then re-export.
+  Structure = Loxone Config export (checked 2026-10-07 against VI_Earnie_Plant_Real.xml); values are the repo defaults.
   VI Check keys / status JSON: flex.{hk_id}.Earnie_Verbraucher_* (replace {hk_id}).
   Miniserver Titles stay Earnie_Verbraucher_* (multi: Prefix+Slug, see docs).
   Leistung: VO_Earnie_Consumer or EFM Load (not this VI).
+  Analog=true: sticky 0/1 from JSON. Analog=false (digital) pulses true on every poll.
 -->
-<VirtualInHttp Title="Earnie Generic Consumer" Comment="Pattern B: flex Freigabe from Earnie (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
-	<!-- Analog=true: sticky 0/1 from JSON. Analog=false (digital) pulses true on every poll. -->
-	<VirtualInHttpCmd Title="Earnie_Verbraucher_Freigabe" Comment="flex.{hk_id}.enable / flex.set_enable 0/1 sticky" Check="&quot;flex.{hk_id}.Earnie_Verbraucher_Freigabe&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
+<VirtualInHttp HintText="" Title="Earnie Generic Consumer" Comment="Pattern B: flex Freigabe from Earnie (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
+	<Info templateType="2" minVersion="17010630"/>
+	<VirtualInHttpCmd Title="Earnie_Verbraucher_Freigabe" Comment="flex.{hk_id}.enable / flex.set_enable 0/1 sticky" Check="&quot;flex.{hk_id}.Earnie_Verbraucher_Freigabe&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1" Unit="&lt;v&gt;" HintText=""/>
 </VirtualInHttp>

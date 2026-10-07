@@ -39,7 +39,7 @@ Earnie Core writes and reads the same Merker names on the Miniserver. The librar
 | --------------------------------------- | -------------------------- | --------------------------------------------------------- | ------------------------------------------------------------ |
 | **Miniserver title**                   | Cmd title (jdev / import) | `Earnie_Verbraucher_Waschmaschine_Freigabe`               | `Earnie_EAuto_Garage_Soll_A`                                |
 | **Virtual-Input check / status JSON**  | Virtual In check pattern  | `flex.{hk_id}.Earnie_Verbraucher_Freigabe`                | `ev.{ev_id}.Earnie_EAuto_Soll_A`                            |
-| **Virtual-Output command when on**     | Virtual Out URL           | `/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/\v`   | `/ehal/loxone/telemetry/ev.{ev_id}.sens_evcs_soc_act/\v`    |
+| **Virtual-Output command when on**     | Virtual Out URL           | `/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/<v>`   | `/ehal/loxone/telemetry/ev.{ev_id}.sens_evcs_soc_act/<v>`    |
 
 
 `{hk_id}` / `{ev_id}` = house profile entity `id` (snake_case). Templates leave the placeholders in place — replace them in Config.
@@ -106,7 +106,7 @@ Virtual Out address **status / request optimize**:
 
 `http://192.168.178.10:8541`
 
-Other telemetry VO drafts may still carry `:8501` as a placeholder until those endpoints exist.
+Telemetry VOs (`VO_Earnie_*` except `Status`) target the daemon port **8541** as well. The receiver `/ehal/loxone/telemetry/…` exists only in the pilot on branch `spike/vo-push-pilot` (observation inbox in EHAL-Com, disabled unless `EARNIE_PILOT_PUSH_TOKEN` is set); on `main` these VO commands have no receiver. The value placeholder in a Virtual Output command is `<v>` (written `&lt;v&gt;` in the XML) — `\v` is the Virtual **Input** check placeholder and arrives as the control character 0x0B in an output.
 
 Adjust the polling / Cmd check pattern to match the JSON keys (plant: `set_ess_*` / `heartbeat_ts`; flex/EV: `flex.{hk_id}.…` / `ev.{ev_id}.…`). Stable **titles** remain the contract for Core and the default import.
 
@@ -201,7 +201,7 @@ One template `VI_Earnie_Consumer` / `VO_Earnie_Consumer` covers **one** consumer
 **Example washing machine** (`id` = `waschmaschine`):
 
 - Title: `Earnie_Verbraucher_Waschmaschine_Leistung`
-- VO command when on: `/ehal/loxone/telemetry/flex.waschmaschine.sens_power_act/\v`
+- VO command when on: `/ehal/loxone/telemetry/flex.waschmaschine.sens_power_act/<v>`
 - VI check (enable): `"flex.waschmaschine.Earnie_Verbraucher_Freigabe":\v` (title stays `Earnie_Verbraucher_Waschmaschine_Freigabe`)
 - EHAL-Com binding: `flex.{hk_id}.sens_power_act` → title (for `zaehler_<slug>`: wire slug without `zaehler_`)
 

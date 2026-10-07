@@ -165,7 +165,7 @@ Live operation runs via house-profile flex Merker. Role template: `share/ehal/ro
 
 `flex.` is a **role namespace**. Binding and live keys follow pattern B: `flex.{slug}.sens_power_act` / `set_enable`. Live shows `{id}:flex.{slug}.…`. For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example: `zaehler_trockner:flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
 
-**Pattern B VO push path:** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/\v` (enable `flex.{slug}.set_enable`). Merker title stays `Earnie_Verbraucher_…`. See [Loxone Signals — Multiple Flex Consumers](../referenz/loxone-signals.md).
+**Pattern B VO push path (pilot, no receiver on `main`):** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/<v>` (enable `flex.{slug}.set_enable`). Merker title stays `Earnie_Verbraucher_…`. See [Loxone Signals — Multiple Flex Consumers](../referenz/loxone-signals.md).
 
 
 | Area / meaning        | Type          | EHAL value name (stub)             | OpenEMS | evcc (YAML attribute) | Victron GX / EVCS (Modbus) | Loxone / Loxone extra                        |

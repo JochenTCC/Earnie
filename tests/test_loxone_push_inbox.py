@@ -1,0 +1,223 @@
+"""Pilot (spike/vo-push-pilot): Virtual Output push inbox + telemetry endpoint."""
+from __future__ import annotations
+
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+from integrations import loxone_request_http as http_mod
+from runtime_store import loxone_push_inbox as inbox
+
+
+@pytest.fixture(autouse=True)
+def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    monkeypatch.delenv(http_mod.PUSH_TOKEN_ENV, raising=False)
+    http_mod.stop_loxone_request_http()
+    yield
+    http_mod.stop_loxone_request_http()
+
+
+@pytest.mark.parametrize(
+    "ehal_id",
+    [
+        "sens_ess_soc",
+        "get_ess_max_charge_power",
+        "sens_absent_mode",
+        "ess.ecoflow_delta_3.sens_ess_soc",
+        "flex.waschmaschine.sens_power_act",  # legacy alias
+        "consumer.waschmaschine.sens_power_act",
+        "heatpump.waermepumpe.sens_temperature_heat_storage",
+        "pool.pool_swimspa.sens_temperature_water",
+        "evcs.garage.sens_evcs_connected",
+        "ev.garage.sens_evcs_soc_act",
+        "heartbeat",
+    ],
+)
+def test_valid_ids(ehal_id: str) -> None:
+    assert inbox.is_valid_ehal_id(ehal_id)
+
+
+@pytest.mark.parametrize(
+    "ehal_id",
+    [
+        "",
+        "set_ess_charge_power_limit",  # setpoints are never pushed from Loxone
+        "ess.x.set_ess_mode",
+        "../etc/passwd",
+        "ess.Bad Slug.sens_ess_soc",
+        "sens_ess_soc/extra",
+        "unknown.slug.sens_ess_soc",
+        "sens_" + "a" * 100,
+    ],
+)
+def test_invalid_ids(ehal_id: str) -> None:
+    assert not inbox.is_valid_ehal_id(ehal_id)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("12.5", 12.5),
+        ("12,5", 12.5),
+        ("-3.2", -3.2),
+        ("3.5 kW", 3.5),
+        ("55%", 55.0),
+        ("0", 0.0),
+        ("", None),
+        ("abc", None),
+        ("nan", None),
+        ("inf", None),
+        ("1" * 40, None),
+    ],
+)
+def test_parse_push_value(raw: str, expected: float | None) -> None:
+    assert inbox.parse_push_value(raw) == expected
+
+
+def test_record_push_tracks_count_interval_and_peer() -> None:
+    t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
+    assert inbox.record_push("sens_ess_soc", "55", "10.0.0.5", now=t0) == "new"
+    assert inbox.record_push("sens_ess_soc", "56", "10.0.0.5", now=t0 + timedelta(seconds=30)) == "ok"
+    assert inbox.record_push("sens_ess_soc", "56", "10.0.0.5", now=t0 + timedelta(seconds=60)) == "ok"
+    row = inbox.load_inbox()["sens_ess_soc"]
+    assert row["count"] == 3
+    assert row["value"] == 56.0
+    assert row["raw"] == "56"
+    assert row["peer"] == "10.0.0.5"
+    assert row["parse_ok"] is True
+    assert row["interval_ema_s"] == pytest.approx(30.0)
+
+
+def test_unparseable_value_is_kept_for_inspection() -> None:
+    assert inbox.record_push("sens_ess_soc", "n/a", "x") == "new"
+    row = inbox.load_inbox()["sens_ess_soc"]
+    assert row["parse_ok"] is False
+    assert row["value"] is None
+    assert row["raw"] == "n/a"
+
+
+def test_record_push_rejects_bad_input_and_caps_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert inbox.record_push("bad id", "1") == "bad_id"
+    assert inbox.record_push("sens_ess_soc", "") == "bad_raw"
+    assert inbox.record_push("sens_ess_soc", "1" * 40) == "bad_raw"
+    monkeypatch.setattr(inbox, "MAX_IDS", 2)
+    assert inbox.record_push("sens_a", "1") == "new"
+    assert inbox.record_push("sens_b", "1") == "new"
+    assert inbox.record_push("sens_c", "1") == "full"
+    assert inbox.record_push("sens_a", "2") == "ok"  # existing IDs keep updating
+    assert set(inbox.load_inbox()) == {"sens_a", "sens_b"}
+
+
+def test_staleness_uses_configured_repeat_not_smoothed_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(inbox.REPEAT_ENV, raising=False)
+    t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
+    # Bursts of changes (7 s, 15 s gaps) pull the smoothed interval far below the repeat.
+    for offset in (0, 7, 22, 37):
+        inbox.record_push("sens_ess_soc", "55", now=t0 + timedelta(seconds=offset))
+    row = inbox.load_inbox()["sens_ess_soc"]
+    assert row["interval_ema_s"] < 20
+    last = t0 + timedelta(seconds=37)
+    assert not inbox.is_stale(row, now=last + timedelta(seconds=30))  # next repeat is due
+    assert not inbox.is_stale(row, now=last + timedelta(seconds=85))
+    assert inbox.is_stale(row, now=last + timedelta(seconds=95))  # > 3 x 30 s
+
+
+def test_staleness_respects_repeat_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(inbox.REPEAT_ENV, "60")
+    t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
+    inbox.record_push("sens_ess_soc", "55", now=t0)
+    row = inbox.load_inbox()["sens_ess_soc"]
+    assert not inbox.is_stale(row, now=t0 + timedelta(seconds=170))
+    assert inbox.is_stale(row, now=t0 + timedelta(seconds=190))
+    monkeypatch.setenv(inbox.REPEAT_ENV, "garbage")
+    assert inbox.expected_repeat_s() == inbox.DEFAULT_REPEAT_S
+
+
+def _get(port: int, path: str, headers: dict[str, str] | None = None) -> int:
+    request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", headers=headers or {})
+    try:
+        with urllib.request.urlopen(request, timeout=2) as resp:
+            return resp.status
+    except urllib.error.HTTPError as exc:
+        return exc.code
+
+
+def test_endpoint_disabled_without_token() -> None:
+    port = http_mod.start_loxone_request_http(0).server_address[1]
+    assert _get(port, "/ehal/loxone/telemetry/sens_ess_soc/55") == 404
+    assert inbox.load_inbox() == {}
+
+
+def test_endpoint_token_validation_and_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret")
+    port = http_mod.start_loxone_request_http(0).server_address[1]
+    base = "/ehal/loxone/telemetry/"
+    assert _get(port, base + "sens_ess_soc/55") == 401
+    assert _get(port, base + "sens_ess_soc/55?t=wrong") == 401
+    assert _get(port, base + "sens_ess_soc/55?t=s3cret") == 204
+    assert _get(port, base + "ess.ecoflow_delta_3.sens_ess_soc/61,5", {http_mod.PUSH_TOKEN_HEADER: "s3cret"}) == 204
+    assert _get(port, base + "set_ess_mode/1?t=s3cret") == 400
+    assert _get(port, base + "sens_ess_soc?t=s3cret") == 400  # no value
+    rows = inbox.load_inbox()
+    assert rows["sens_ess_soc"]["value"] == 55.0
+    assert rows["ess.ecoflow_delta_3.sens_ess_soc"]["value"] == 61.5
+    assert "set_ess_mode" not in rows
+
+
+def test_existing_endpoints_unaffected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret")
+    port = http_mod.start_loxone_request_http(0).server_address[1]
+    assert _get(port, "/ehal/loxone/alive") == 204
+    assert _get(port, "/ehal/loxone/status.json") == 200
+    assert _get(port, "/nope") == 404
+
+
+# --- derived value state -------------------------------------------------------------------
+def _now():
+    from datetime import datetime, timezone
+
+    return datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def _row(value: float | None, age_s: float, *, parse_ok: bool = True) -> dict:
+    from datetime import timedelta
+
+    last = _now() - timedelta(seconds=age_s)
+    return {"value": value, "raw": str(value), "parse_ok": parse_ok, "last_ts": last.isoformat(), "count": 3}
+
+
+def test_link_alive_from_fresh_nonzero_analog_or_heartbeat() -> None:
+    assert inbox.link_alive({"heartbeat": _row(1.0, 10)}, now=_now())
+    assert inbox.link_alive({"sens_ess_soc": _row(55.0, 80)}, now=_now())
+    assert not inbox.link_alive({"sens_ess_soc": _row(55.0, 95)}, now=_now())  # older than 3 x 30 s
+    assert not inbox.link_alive({"sens_grid_power_active": _row(0.0, 5)}, now=_now())  # zero is no proof
+    assert not inbox.link_alive({"sens_absent_mode": _row(1.0, 5)}, now=_now())  # digital is edge-based
+    assert not inbox.link_alive({}, now=_now())
+
+
+def test_derive_state_analog() -> None:
+    def d(row, link):
+        return inbox.derive_state("sens_ess_soc", row, link=link, now=_now())
+
+    assert d(_row(55.0, 20), True) == (inbox.STATE_OK, 55.0)
+    assert d(_row(55.0, 200), True) == (inbox.STATE_ZERO_ASSUMED_SILENT, 0.0)
+    assert d(_row(55.0, 200), False) == (inbox.STATE_UNKNOWN, None)
+    assert d(None, True) == (inbox.STATE_ZERO_ASSUMED_NEVER, 0.0)
+    assert d(None, False) == (inbox.STATE_UNKNOWN, None)
+    assert d(_row(0.0, 500), True) == (inbox.STATE_ZERO_HELD, 0.0)
+    assert d(_row(0.0, 500), False) == (inbox.STATE_ZERO_HELD_NO_LINK, 0.0)
+    assert d(_row(None, 5, parse_ok=False), True) == (inbox.STATE_UNREADABLE, None)
+
+
+def test_derive_state_digital_is_held_until_next_edge() -> None:
+    def d(row, link):
+        return inbox.derive_state("sens_evcs_connected", row, link=link, now=_now())
+
+    assert d(_row(1.0, 20), True) == (inbox.STATE_OK, 1.0)
+    assert d(_row(1.0, 900), True) == (inbox.STATE_DIGITAL_HELD, 1.0)  # no repeat needed
+    assert d(_row(1.0, 900), False) == (inbox.STATE_DIGITAL_HELD, 1.0)
+    assert d(_row(0.0, 900), True) == (inbox.STATE_ZERO_HELD, 0.0)

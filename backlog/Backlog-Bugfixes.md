@@ -58,6 +58,12 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - `ehal_live.read_ess_soc_by_id` → `_read_soc_from_address` returns `None` on a missing binding or read error and the caller substitutes the primary SoC; the only trace is a debug log. A misnamed SoC Merker of a second battery therefore looks plausible in operation.
   - Fix sketch: log a warning once per battery and show the fallback in EHAL-Com (Live-Lesen row status); decide whether a physical powerstation without own SoC should be planned at all.
 
+- [ ] EcoFlow Delta 3 bridge: Miniserver self-write of a Virtual Input is overwritten by HA (2026-10-07, not analysed yet)
+  - Setup: the Miniserver writes its own Virtual Input via a Virtual Output command (`/dev/sps/io/<Input>/\v`, device = the Miniserver itself), e.g. bypass state (`Delta3_Grid_ByPass`) and charge limit (`Delta3_P_ChargeLimit`). HA mirrors these inputs through the Loxone integration (PyLoxone) and drives the EcoFlow entities from automations (`docs/einrichtung/ecoflow-delta3-loxone.md`, steps 5/6).
+  - Symptom: in between, the input value changes to a different value that the Miniserver logic did not write; HA seems to set it. Which writer and when is unknown.
+  - To check: (1) does an HA `rest_command` (SoC / power / SOC min/max pushes) target the same input name, or does a name collision exist between inputs; (2) does the HA start trigger or a state-trigger automation push a value back into an input; (3) does the Virtual Output command repeat or fire on every cycle (Repeat setting); (4) does the Loxone integration write entity states back to the Miniserver; (5) compare timestamps of the HA log (`rest_command`) with the Miniserver's online monitor.
+  - Fix idea if confirmed: let HA only read these inputs (no `rest_command` to them) or switch the bridge to the webhook variant (step 5/6, variant B). Update the guide's "Hinweis zum Eingang" once the cause is known.
+
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 

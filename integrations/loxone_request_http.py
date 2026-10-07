@@ -1,18 +1,24 @@
 """Minimal Loxone → Earnie HTTP (Request Optimize, alive, Pattern B status.json)."""
 from __future__ import annotations
 
+import hmac
 import json
 import logging
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 logger = logging.getLogger(__name__)
 
 REQUEST_OPTIMIZE_PATH = "/ehal/loxone/request_optimize"
 ALIVE_PATH = "/ehal/loxone/alive"
 STATUS_PATH = "/ehal/loxone/status.json"
+# Pilot (spike/vo-push-pilot): Virtual Output push, observation only.
+TELEMETRY_PREFIX = "/ehal/loxone/telemetry/"
+PUSH_TOKEN_ENV = "EARNIE_PILOT_PUSH_TOKEN"
+PUSH_TOKEN_HEADER = "X-Earnie-Token"
 
 
 def _normalize_path(raw_path: str) -> str:
@@ -76,7 +82,39 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if self.path.startswith(TELEMETRY_PREFIX):
+            self._handle_telemetry_push()
+            return
         self.send_error(404)
+
+    def _handle_telemetry_push(self) -> None:
+        """``GET /ehal/loxone/telemetry/<EHAL-ID>/<value>`` — pilot inbox (no control effect).
+
+        Disabled (404) unless ``EARNIE_PILOT_PUSH_TOKEN`` is set. The token comes in
+        the ``X-Earnie-Token`` header or as ``?t=`` query parameter.
+        """
+        expected = str(os.getenv(PUSH_TOKEN_ENV) or "").strip()
+        if not expected:
+            self.send_error(404)
+            return
+        parsed = urlparse(self.path)
+        supplied = self.headers.get(PUSH_TOKEN_HEADER) or (
+            parse_qs(parsed.query).get("t") or [""]
+        )[0]
+        if not hmac.compare_digest(str(supplied).encode(), expected.encode()):
+            self.send_error(401)
+            return
+        ehal_id, _, raw = unquote(parsed.path[len(TELEMETRY_PREFIX):]).partition("/")
+        from runtime_store.loxone_push_inbox import record_push
+
+        peer = self.client_address[0] if self.client_address else ""
+        result = record_push(ehal_id, raw, peer)
+        if result in ("ok", "new"):
+            self.send_response(204)
+            self.end_headers()
+            return
+        # bad_id / bad_raw → 400, full → 507; never echo the input back.
+        self.send_error(507 if result == "full" else 400)
 
     def do_POST(self) -> None:  # noqa: N802
         path = _normalize_path(self.path)

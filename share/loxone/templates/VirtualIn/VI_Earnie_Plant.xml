@@ -1,19 +1,22 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  DRAFT (2.4.n Pattern B + Design C1) — validate in Loxone Config, then "Als Vorlage speichern".
+  Structure = Loxone Config export (checked 2026-10-07 against VI_Earnie_Plant_Real.xml); values are the repo defaults.
   Replace EARNIE_HOST with Earnie LAN IP/hostname. Status JSON on daemon port 8541
   (system.ehal_loxone_http_port); Check patterns assume JSON like:
   {"heartbeat_ts":1710000000,"set_ess_active_power":0,"set_ess_charge_power_limit":0,"set_ess_discharge_power_limit":0,"set_ess_mode":0}
   Cmd Titles = frozen Merker names (share/loxone/greenfield_device_map.json).
   C1: Sollleistung = forced active power (kW, +discharge/−charge); Lade-/EntladeLeistungs-Limit = true caps;
   Steuerbefehl sticky: mode 0 = Automatik / free even if Sollleistung Merker is stale (OpenEMS ignores mode).
+  Per-powerstation keys ess.{slug}.set_* are emitted by status.json since fix/status-json-powerstation-keys;
+  add one Cmd per key you need (Check "ess.{slug}.set_ess_charge_power_limit":\v etc.).
 -->
-<VirtualInHttp Title="Earnie Plant Status" Comment="Pattern B: poll Earnie heartbeat + ESS C1 setpoints (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
-	<VirtualInHttpCmd Title="Earnie_Heartbeat" Comment="Unix timestamp; watchdog if stale" Check="&quot;heartbeat_ts&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
-	<VirtualInHttpCmd Title="Earnie_Batterie_Sollleistung" Comment="set_ess_active_power (kW; +discharge −charge; omit on Automatik)" Check="&quot;set_ess_active_power&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
-	<VirtualInHttpCmd Title="Earnie_LadeLeistungs-Limit" Comment="set_ess_charge_power_limit (kW true max charge cap)" Check="&quot;set_ess_charge_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
-	<VirtualInHttpCmd Title="Earnie_EntladeLeistungs-Limit" Comment="set_ess_discharge_power_limit (kW true max discharge cap)" Check="&quot;set_ess_discharge_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
-	<VirtualInHttpCmd Title="Earnie_Steuerbefehl" Comment="set_ess_mode sticky; 0=Automatik even if Sollleistung stale; battery only; OpenEMS ignores" Check="&quot;set_ess_mode&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
-	<VirtualInHttpCmd Title="Earnie_Speicher_Quellenwahl" Comment="set_ess_source_select (2.7.h); 0=grid pass-through 1=battery island; powerstation standby_backup" Check="&quot;set_ess_source_select&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
-	<VirtualInHttpCmd Title="Earnie_EinspeiseLeistungs-Limit" Comment="set_grid_export_power_limit (kW magnitude; 0=no export; unconstrained=PV kWp+max discharge kW; DefVal 1000 until first write)" Check="&quot;set_grid_export_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="1000" MinVal="-2147483647" MaxVal="2147483647"/>
+<VirtualInHttp HintText="" Title="Earnie Plant Status" Comment="Pattern B: poll Earnie heartbeat + ESS C1 setpoints (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
+	<Info templateType="2" minVersion="17010630"/>
+	<VirtualInHttpCmd Title="Earnie_Heartbeat" Comment="Unix timestamp; watchdog if stale" Check="&quot;heartbeat_ts&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v&gt;" HintText=""/>
+	<VirtualInHttpCmd Title="Earnie_Batterie_Sollleistung" Comment="set_ess_active_power (kW; +discharge −charge; omit on Automatik)" Check="&quot;set_ess_active_power&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v.3&gt; kW" HintText=""/>
+	<VirtualInHttpCmd Title="Earnie_LadeLeistungs-Limit" Comment="set_ess_charge_power_limit (kW true max charge cap)" Check="&quot;set_ess_charge_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v.3&gt; kW" HintText=""/>
+	<VirtualInHttpCmd Title="Earnie_EntladeLeistungs-Limit" Comment="set_ess_discharge_power_limit (kW true max discharge cap)" Check="&quot;set_ess_discharge_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v.3&gt; kW" HintText=""/>
+	<VirtualInHttpCmd Title="Earnie_Steuerbefehl" Comment="set_ess_mode sticky; 0=Automatik even if Sollleistung stale; battery only; OpenEMS ignores" Check="&quot;set_ess_mode&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v&gt;" HintText=""/>
+	<VirtualInHttpCmd Title="Earnie_Speicher_Quellenwahl" Comment="set_ess_source_select (2.7.h); 0=grid pass-through 1=battery island; powerstation standby_backup" Check="&quot;set_ess_source_select&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1" Unit="&lt;v&gt;" HintText=""/>
+	<VirtualInHttpCmd Title="Earnie_EinspeiseLeistungs-Limit" Comment="set_grid_export_power_limit (kW magnitude; 0=no export; unconstrained=PV kWp+max discharge kW; DefVal 1000 until first write)" Check="&quot;set_grid_export_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="1000" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v.3&gt; kW" HintText=""/>
 </VirtualInHttp>
