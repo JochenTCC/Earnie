@@ -150,8 +150,8 @@ def test_token_must_be_url_safe(tmp_path: Path, token: str) -> None:
 
 def test_token_ok(tmp_path: Path) -> None:
     env = tmp_path / ".env"
-    env.write_text("EARNIE_PILOT_PUSH_TOKEN=3f9a1c7e5b2d4a60\n", encoding="utf-8")
-    assert gen.read_token(env) == "3f9a1c7e5b2d4a60"
+    env.write_text("EARNIE_PILOT_PUSH_TOKEN=dummytoken0123456\n", encoding="utf-8")
+    assert gen.read_token(env) == "dummytoken0123456"
 
 
 def test_heartbeat_template_and_analog_has_no_off_command() -> None:
@@ -170,3 +170,29 @@ def test_all_collected_analog_commands_have_empty_off(tmp_path: Path) -> None:
     sigs = [s for s in gen.collect_read_signals(_config(tmp_path)) if not s.digital]
     root = ET.fromstring(gen.render_template("X", sigs, host="h", port=1, token="abcd1234").encode("utf-8"))
     assert all(c.get("CmdOff") == "" for c in root if c.tag == "VirtualOutCmd")
+
+
+def test_token_in_address_moves_the_token_out_of_the_commands(tmp_path: Path) -> None:
+    sigs = gen.collect_read_signals(_config(tmp_path)) + [gen.heartbeat_signal()]
+    text = gen.render_template(
+        "X", sigs, host="192.168.178.35", port=8541, token="abcd1234efgh", token_in_address=True
+    )
+    root = ET.fromstring(text.encode("utf-8"))
+    assert root.get("Address") == "http://192.168.178.35:8541/t/abcd1234efgh"
+    cmds = [c for c in root if c.tag == "VirtualOutCmd"]
+    assert cmds
+    for cmd in cmds:
+        assert "abcd1234efgh" not in (cmd.get("CmdOn") or "") + (cmd.get("CmdOff") or "")
+        assert "?t=" not in (cmd.get("CmdOn") or "")
+    by_title = {c.get("Title"): c for c in cmds}
+    assert by_title["Push_Earnie_Netzleistung"].get("CmdOn") == "/ehal/loxone/telemetry/sens_grid_power_active/<v>"
+    assert by_title["Push_Earnie_Abwesend"].get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1"
+    assert by_title["Push_Earnie_Abwesend"].get("CmdOff") == "/ehal/loxone/telemetry/sens_absent_mode/0"
+
+
+def test_default_keeps_the_token_in_every_command(tmp_path: Path) -> None:
+    sigs = gen.collect_read_signals(_config(tmp_path))
+    text = gen.render_template("X", sigs, host="h", port=1, token="abcd1234efgh")
+    root = ET.fromstring(text.encode("utf-8"))
+    assert root.get("Address") == "http://h:1"
+    assert all("t=abcd1234efgh" in (c.get("CmdOn") or "") for c in root if c.tag == "VirtualOutCmd")

@@ -178,3 +178,4 @@ Observed with the Miniserver and the NAS alpha instance:
 - Docker bridge: the receiver sees the Docker gateway as peer, not the Miniserver address.
 - Exported Config templates differ from the repo drafts (Info element, extra attributes, BOM); the repo templates now follow the export shape.
 - Not yet verified: load on the Miniserver with all 40 repeating commands; delivery rate over days; behaviour after an Earnie restart.
+- Token in the address: the receiver also accepts `http://host:8541/t/<token>` + command `/ehal/loxone/telemetry/...` (not verified yet whether Loxone joins an address path and a command that way; check with `scripts.pilot_vo_capture`).

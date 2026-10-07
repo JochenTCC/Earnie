@@ -221,3 +221,42 @@ def test_derive_state_digital_is_held_until_next_edge() -> None:
     assert d(_row(1.0, 900), True) == (inbox.STATE_DIGITAL_HELD, 1.0)  # no repeat needed
     assert d(_row(1.0, 900), False) == (inbox.STATE_DIGITAL_HELD, 1.0)
     assert d(_row(0.0, 900), True) == (inbox.STATE_ZERO_HELD, 0.0)
+
+
+# --- token as address prefix: http://host:8541/t/<token> + command /ehal/loxone/telemetry/... ----
+def test_split_token_prefix() -> None:
+    split = http_mod.split_token_prefix
+    assert split("/t/abc123/ehal/loxone/telemetry/sens_ess_soc/5") == ("abc123", "/ehal/loxone/telemetry/sens_ess_soc/5")
+    assert split("/t/abc%2D1/x?y=1") == ("abc-1", "/x?y=1")
+    assert split("/ehal/loxone/telemetry/sens_ess_soc/5") == (None, "/ehal/loxone/telemetry/sens_ess_soc/5")
+    assert split("/t/abc") == ("abc", "/")
+
+
+def test_endpoint_accepts_token_in_address_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret-token")
+    port = http_mod.start_loxone_request_http(0).server_address[1]
+    base = "/ehal/loxone/telemetry/"
+    assert _get(port, "/t/s3cret-token" + base + "sens_ess_soc/55.5") == 204
+    assert _get(port, "/t/wrong" + base + "sens_ess_soc/56") == 401
+    assert _get(port, "/t/s3cret-token" + base + "set_ess_mode/1") == 400  # setpoints never accepted
+    assert _get(port, "/t/s3cret-token/ehal/loxone/status.json") == 404  # other routes not via prefix
+    assert _get(port, "/t/s3cret-token/ehal/loxone/alive") == 404
+    # older variants still work
+    assert _get(port, base + "sens_pv_production_active/1?t=s3cret-token") == 204
+    assert _get(port, base + "heartbeat/1", {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"}) == 204
+    rows = inbox.load_inbox()
+    assert rows["sens_ess_soc"]["value"] == 55.5
+    assert set(rows) == {"sens_ess_soc", "sens_pv_production_active", "heartbeat"}
+
+
+def test_header_wins_over_prefix_and_must_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret-token")
+    port = http_mod.start_loxone_request_http(0).server_address[1]
+    path = "/t/s3cret-token/ehal/loxone/telemetry/sens_ess_soc/1"
+    assert _get(port, path, {http_mod.PUSH_TOKEN_HEADER: "wrong"}) == 401
+
+
+def test_prefix_endpoint_disabled_without_token() -> None:
+    port = http_mod.start_loxone_request_http(0).server_address[1]
+    assert _get(port, "/t/anything/ehal/loxone/telemetry/sens_ess_soc/1") == 404
+    assert inbox.load_inbox() == {}

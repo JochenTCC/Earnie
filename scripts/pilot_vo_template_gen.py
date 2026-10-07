@@ -50,14 +50,17 @@ def collect_read_signals(config_dir: Path) -> list[Signal]:
 INFO_ATTRS = {"templateType": "3", "minVersion": "17010630"}
 
 
-def _cmd_attrs(sig: Signal, token: str, repeat: str, repeat_rate: str) -> dict[str, str]:
+def _cmd_attrs(
+    sig: Signal, token: str, repeat: str, repeat_rate: str, token_in_address: bool = False
+) -> dict[str, str]:
     base = f"/ehal/loxone/telemetry/{sig.ehal_id}/"
+    query = "" if token_in_address else f"?t={token}"
     if sig.digital:
         # Digital output: fixed values for On / Off (the value placeholder is for analog outputs).
-        on_cmd, off_cmd = f"{base}1?t={token}", f"{base}0?t={token}"
+        on_cmd, off_cmd = f"{base}1{query}", f"{base}0{query}"
         comment = f"{sig.ehal_id} 0/1; parallel to {sig.old_name}"
     else:
-        on_cmd, off_cmd = f"{base}<v>?t={token}", ""
+        on_cmd, off_cmd = f"{base}<v>{query}", ""
         comment = f"{sig.ehal_id}; parallel to {sig.old_name}"
     attrs = {
         "Title": sig.title,
@@ -82,15 +85,21 @@ def _cmd_attrs(sig: Signal, token: str, repeat: str, repeat_rate: str) -> dict[s
 
 
 def render_template(group: str, signals: list[Signal], *, host: str, port: int, token: str,
-                    repeat: str = "30", repeat_rate: str = "30") -> str:
-    """Template text in the shape Loxone Config exports (without the BOM)."""
+                    repeat: str = "30", repeat_rate: str = "30",
+                    token_in_address: bool = False) -> str:
+    """Template text in the shape Loxone Config exports (without the BOM).
+
+    ``token_in_address``: put the token into the device address (``http://host:port/t/<token>``)
+    instead of ``?t=`` in every command, so rotating it touches one field per device.
+    """
+    address = f"http://{host}:{port}" + (f"/t/{token}" if token_in_address else "")
     root = ET.Element(
         "VirtualOut",
         {
             "HintText": "",
             "Title": f"Earnie Push Pilot - {group}",
             "Comment": "Pilot push to Earnie (spike/vo-push-pilot); parallel to the poll signals",
-            "Address": f"http://{host}:{port}",
+            "Address": address,
             "CmdInit": "",
             "CloseAfterSend": "true",
             "CmdSep": "",
@@ -98,7 +107,7 @@ def render_template(group: str, signals: list[Signal], *, host: str, port: int, 
     )
     ET.SubElement(root, "Info", INFO_ATTRS)
     for sig in signals:
-        ET.SubElement(root, "VirtualOutCmd", _cmd_attrs(sig, token, repeat, repeat_rate))
+        ET.SubElement(root, "VirtualOutCmd", _cmd_attrs(sig, token, repeat, repeat_rate, token_in_address))
     ET.indent(root, space="\t")
     body = ET.tostring(root, encoding="unicode").replace(" />", "/>")
     return '<?xml version="1.0" encoding="utf-8"?>\n' + body + "\n"
@@ -125,6 +134,9 @@ def main() -> int:
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--repeat", default="30", help="Repeat attribute (Config export: 30 for a 30 s repeat)")
     parser.add_argument("--repeat-rate", default="30", help="RepeatRate attribute (Config export: 30)")
+    parser.add_argument("--token-in-address", action="store_true",
+                        help="put the token into the device address (/t/<token>) instead of ?t= per command; "
+                             "check with scripts.pilot_vo_capture that Loxone joins address and command that way")
     args = parser.parse_args()
 
     token = read_token(args.env_file) if args.env_file else TOKEN_PLACEHOLDER
@@ -136,7 +148,8 @@ def main() -> int:
     for group, items in groups.items():
         path = args.out_dir / f"VO_Pilot_{group}.xml"
         write_template(path, render_template(group, items, host=args.host, port=args.port, token=token,
-                                             repeat=args.repeat, repeat_rate=args.repeat_rate))
+                                             repeat=args.repeat, repeat_rate=args.repeat_rate,
+                                             token_in_address=args.token_in_address))
         print(f"{path.name}: {len(items)} Cmds")
     with open(args.out_dir / "Pilot-VO-Signalliste.csv", "w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle, delimiter=";")

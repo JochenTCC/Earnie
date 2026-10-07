@@ -21,6 +21,17 @@ PUSH_TOKEN_ENV = "EARNIE_PILOT_PUSH_TOKEN"
 PUSH_TOKEN_HEADER = "X-Earnie-Token"
 
 
+TOKEN_PATH_PREFIX = "/t/"
+
+
+def split_token_prefix(raw_path: str) -> tuple[str | None, str]:
+    """``/t/<token>/rest`` → (``token``, ``/rest``); other paths → (``None``, path)."""
+    if not raw_path.startswith(TOKEN_PATH_PREFIX):
+        return None, raw_path
+    token, _, rest = raw_path[len(TOKEN_PATH_PREFIX):].partition("/")
+    return unquote(token), "/" + rest
+
+
 def _normalize_path(raw_path: str) -> str:
     path = urlparse(raw_path).path.rstrip("/") or "/"
     return path
@@ -65,6 +76,15 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
             logger.exception("loxone_request_http: failed to record last callback")
 
     def do_GET(self) -> None:  # noqa: N802
+        prefix_token, route = split_token_prefix(self.path)
+        if prefix_token is not None:
+            # Token in the address (``http://host:8541/t/<token>``): only the telemetry
+            # endpoint is reachable this way.
+            if route.startswith(TELEMETRY_PREFIX):
+                self._handle_telemetry_push(route, prefix_token)
+            else:
+                self.send_error(404)
+            return
         path = _normalize_path(self.path)
         if path == ALIVE_PATH.rstrip("/") or path == ALIVE_PATH:
             self._record_peer()
@@ -83,24 +103,27 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if self.path.startswith(TELEMETRY_PREFIX):
-            self._handle_telemetry_push()
+            self._handle_telemetry_push(self.path, None)
             return
         self.send_error(404)
 
-    def _handle_telemetry_push(self) -> None:
+    def _handle_telemetry_push(self, route: str, prefix_token: str | None) -> None:
         """``GET /ehal/loxone/telemetry/<EHAL-ID>/<value>`` — pilot inbox (no control effect).
 
-        Disabled (404) unless ``EARNIE_PILOT_PUSH_TOKEN`` is set. The token comes in
-        the ``X-Earnie-Token`` header or as ``?t=`` query parameter.
+        Disabled (404) unless ``EARNIE_PILOT_PUSH_TOKEN`` is set. The token comes in the
+        ``X-Earnie-Token`` header, as a ``/t/<token>`` address prefix, or as ``?t=`` query
+        parameter (checked in this order; the first one present must match).
         """
         expected = str(os.getenv(PUSH_TOKEN_ENV) or "").strip()
         if not expected:
             self.send_error(404)
             return
-        parsed = urlparse(self.path)
-        supplied = self.headers.get(PUSH_TOKEN_HEADER) or (
-            parse_qs(parsed.query).get("t") or [""]
-        )[0]
+        parsed = urlparse(route)
+        supplied = (
+            self.headers.get(PUSH_TOKEN_HEADER)
+            or prefix_token
+            or (parse_qs(parsed.query).get("t") or [""])[0]
+        )
         if not hmac.compare_digest(str(supplied).encode(), expected.encode()):
             self.send_error(401)
             return

@@ -178,8 +178,9 @@ def render_push_inbox_section() -> None:
     st.caption(
         "Pilot: Loxone **Virtual Output** sendet den Wert mit Wiederholung an "
         f"`http://<Earnie-Host>:{_DEFAULT_PORT}/ehal/loxone/telemetry/<EHAL-ID>/<v>?t=<Token>` "
-        "(`<v>` ist der Wert-Platzhalter im VO-Befehl). Nur Beobachtung — der Optimierer "
-        "nutzt diese Werte nicht."
+        "(`<v>` ist der Wert-Platzhalter im VO-Befehl). Das Token kann auch als Adress-Präfix "
+        f"`http://<Earnie-Host>:{_DEFAULT_PORT}/t/<Token>` im VO-Gerät stehen (dann ohne `?t=` im Befehl). "
+        "Nur Beobachtung — der Optimierer nutzt diese Werte nicht."
     )
     if not token_set:
         st.info(
