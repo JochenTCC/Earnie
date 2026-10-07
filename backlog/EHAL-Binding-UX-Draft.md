@@ -120,7 +120,7 @@ Order: **P0 → P1 → P2 → P3**; P4 after P1; P6 can start now (builds on the
 3. **Import of batteries / PV / inverters (F14):** incomplete stub vs. bind-only.
 4. **Always-slug names (F8):** confirm; legacy bare names stay readable.
 5. **`sens_*` export:** name checklist only, until a VO receiver exists — acceptable?
-6. **Epic name `Binding`** and phases to be added to `roadmap-nomenclature.mdc` on approval (as done for `Inverter`).
+**Decided:** epic `Binding` with phases P0–P6 is registered in `roadmap-nomenclature.mdc` (as done for `Inverter`).
 
 ## 8. Not checked
 

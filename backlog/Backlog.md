@@ -126,7 +126,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [ ] **Binding P5 — HA parity:** column 3 = `entity_id` (+ `friendly_name`), red state for vanished entities, helper proposals for `set_*` only; align the `unique_id` scheme with **Add-on Version 1.0**.
   - [ ] **Binding P6 — Kennung (entity id) as editable variable:** field next to Bezeichnung on every entity form, prefilled from the label, uniqueness guarded, lock as in `entity_id_lock`; explicit "Kennung ändern" with cascade dry-run and a report of SB names that now deviate; generalise `clean_entity_ids` to `rename_entity_id`; unify the four `slug_id` UI paths. Starts from the uncommitted id-lock work; before **Inverter P2** and Pool nesting.
   - **Note:** Order P0 → P1 → P2 → P3; P4 after P1; P6 may start now; P5 last. **Inverter P4**, Multi-EV / Wallboxes, Pool nesting, **Add-on Version 1.0** and the MQTT adapter touch the same grammar — see draft §6.
-  - **Open decisions:** Kennung editable with cascade vs. immutable; saved-but-missing names allowed or not; import of battery / PV / inverter as stub vs bind-only; always-slug suggestions; `sens_*` export as name list only; add epic `Binding` to `roadmap-nomenclature.mdc` on approval.
+  - **Open decisions:** Kennung editable with cascade vs. immutable; saved-but-missing names allowed or not; import of battery / PV / inverter as stub vs bind-only; always-slug suggestions; `sens_*` export as name list only. Epic `Binding` is registered in `roadmap-nomenclature.mdc`.
 
 
 ### Version 2.+1 - POC for EEG-ready Earnie
