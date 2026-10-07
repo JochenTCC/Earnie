@@ -167,7 +167,12 @@ def _loxone_mapped_targets() -> dict[str, str]:
 
 
 def allowed_probe_fields(*, force_ess_active: bool = False) -> list[str]:
-    """All mapped Live-Schreiben fields; active power only when force unlocked."""
+    """All mapped Live-Schreiben fields (incl. ``set_ess_active_power``).
+
+    ``force_ess_active`` is kept for callers; listing no longer hides active power —
+    Schreibtest still requires Force to *send* those rows (clamp + UI).
+    """
+    del force_ess_active  # listing is independent of Force unlock
     from integrations.ehal_debug_mapping import expected_live_write_fields
 
     mapped = mapped_write_targets()
@@ -178,18 +183,12 @@ def allowed_probe_fields(*, force_ess_active: bool = False) -> list[str]:
     for field in ordered:
         if field not in mapped or field in seen:
             continue
-        kind = probe_kind(field)
-        if kind == FORCE_ESS_ACTIVE_POWER and not force_ess_active:
-            continue
         seen.add(field)
         fields.append(field)
-    # Mapped writes not in expected list (legacy / extra) — append stably.
     for field in sorted(mapped):
         if field in seen:
             continue
         kind = probe_kind(field)
-        if kind == FORCE_ESS_ACTIVE_POWER and not force_ess_active:
-            continue
         if kind.startswith("set_") or kind in SAFE_PROBE_FIELDS or kind == "set_enable":
             seen.add(field)
             fields.append(field)

@@ -281,9 +281,11 @@ def test_restore_calls_network_push(ehal_live_mock, loud_mode):
 
 
 @patch("integrations.ehal_write_test.mapped_write_targets")
-def test_allowed_probe_fields_force_gate(mapped_mock):
+def test_allowed_probe_fields_lists_active_power_without_force(mapped_mock):
+    """Active power stays in the Schreibtest table; Force only unlocks sending."""
     mapped_mock.return_value = {
         "set_ess_active_power": "number.ess",
+        "ess.ecoflow_delta_3.set_ess_active_power": "Earnie_Delta3_Sollleistung",
         "set_ess_mode": "number.mode",
         "set_ess_charge_power_limit": "number.charge",
     }
@@ -294,16 +296,15 @@ def test_allowed_probe_fields_force_gate(mapped_mock):
         "integrations.ehal_debug_mapping.expected_live_write_fields",
         return_value=[
             "set_ess_active_power",
+            "ess.ecoflow_delta_3.set_ess_active_power",
             "set_ess_mode",
             "set_ess_charge_power_limit",
         ],
     ):
-        without = ewt.allowed_probe_fields(force_ess_active=False)
-        assert "set_ess_active_power" not in without
-        assert "set_ess_mode" in without
-        with_force = ewt.allowed_probe_fields(force_ess_active=True)
-    assert "set_ess_active_power" in with_force
-    assert with_force.index("set_ess_active_power") < with_force.index("set_ess_mode")
+        fields = ewt.allowed_probe_fields(force_ess_active=False)
+    assert "set_ess_active_power" in fields
+    assert "ess.ecoflow_delta_3.set_ess_active_power" in fields
+    assert "set_ess_mode" in fields
 
 
 @patch("integrations.ehal_write_test.ehal_live")

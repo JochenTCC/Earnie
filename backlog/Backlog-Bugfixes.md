@@ -38,6 +38,26 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 - [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
 
+- [ ] Loxone mapping: duplicate `PLANT_FIELDS` — heuristic proposals miss fields
+  - `ui/ehal_loxone_mapping_ui.py:52` holds an older copy of `PLANT_FIELDS`; the current one is in `ui/ehal_loxone_mapping.py:56` (cleaned up in 2.7.m: `_PLANT_ESS_MOVED` removed from the list, `set_ess_source_select` and `set_grid_export_power_limit` added).
+  - The copy still contains the ESS fields and filters setpoints with `startswith("set_ess_")`, so `set_grid_export_power_limit` is missing. It feeds only `_run_structure_scan` → `heuristic_propose` (name proposals after the HTTP probe).
+  - Effect 1: `set_grid_export_power_limit` never gets a proposal although `_HINTS` has entries for it (`integrations/loxone_ehal_mapping.py:134`).
+  - Effect 2 (found by reading; confirm with a test before the fix): proposals are keyed by flat field name (`sens_ess_soc`), battery rows look up `ess.<id>.<kind>` (`proposals.get(field)` in `_render_field_selects`, `ui/ehal_loxone_mapping.py:707`), so battery rows probably never get a proposal.
+  - Fix sketch: delete the copy and use the list from `ui/ehal_loxone_mapping.py`; test that every mapping field is also in the proposal field list; map `ess.<id>.<kind>` → `<kind>` for proposals. Check the HA side for the same error (`ui/ehal_ha_mapping.py`, `_proposed_entity_id`; `heuristic_propose(scanned)` returns flat keys while battery rows use Pattern B).
+
+- [ ] Loxone `status.json`: physical powerstation limits overwrite the house battery's flat keys
+  - `optimizer/powerstation_live.py::_write_powerstation_loxone` stores sent values under the flat field kind (`_last_powerstation_sent["set_ess_charge_power_limit"]`), not under the Pattern B key. `integrations/loxone_status_json.py::build_loxone_status_payload` writes them after the plant values into the same flat keys (`PLANT_LIVE_WRITE_FIELDS`).
+  - Found by reading, not run: a powerstation charge limit replaces the house battery's `set_ess_charge_power_limit` in `status.json`; with two powerstations the last write wins. Affects only a Virtual HTTP Input mirror, not direct `/dev/sps/io/` writes. The comment there says "flat + Pattern-B", but only the flat key is stored.
+  - Fix sketch: keep powerstation values under `ess.<id>.<kind>` and emit them as such (qualified keys, see epic **Binding P1**); test with house battery + two powerstations.
+
+- [ ] Loxone: physical powerstation writes are not part of the write trace
+  - `_write_powerstation_loxone` discards the result of `_send_loxone_value_traced`; `main.py` puts only `huawei_writes + flex_writes` into the write records, and `build_sent_loxone_snapshot` knows only plant and consumers. Found by reading, not run: EHAL-Com → Live-Schreiben shows no value/success for `ess.<id>.set_ess_charge_power_limit` of a powerstation; only the log line ("Loxone API: … erfolgreich auf …") shows it.
+  - Fix sketch: return the records from `write_physical_powerstation_charges` / `write_standby_source_selects` and append them to `loxone_writes` and the `loxone_sent` snapshot; test via a powerstation fixture.
+
+- [ ] Second battery: missing or wrong SoC binding silently falls back to the primary battery's SoC
+  - `ehal_live.read_ess_soc_by_id` → `_read_soc_from_address` returns `None` on a missing binding or read error and the caller substitutes the primary SoC; the only trace is a debug log. A misnamed SoC Merker of a second battery therefore looks plausible in operation.
+  - Fix sketch: log a warning once per battery and show the fallback in EHAL-Com (Live-Lesen row status); decide whether a physical powerstation without own SoC should be planned at all.
+
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 

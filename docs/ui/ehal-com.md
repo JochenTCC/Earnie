@@ -295,7 +295,7 @@ Unter **Live-Schreiben** liegt der Expander **Schreibtest**: alle **gemappten** 
 | `set_evcs_max_current` | `0 … min(Nennstrom, 6 A)` |
 | `set_ess_mode` | `0` Automatik / `1` Laden / `2` Entladen |
 
-**Force ESS-Leistung:** Checkbox blendet die Tabellenzeile ``set_ess_active_power`` ein (Default 100 W, hart ±200 W) mit **zweiter** Bestätigung beim Senden. Die Checkbox allein schreibt nichts — Wert setzen und **Alle schreiben** / **Auto-Roundtrip**. HouseSim nutzt für die Physik nur die Active-Power-Sollwert-Entity, nicht den Mode-Hint.
+**Force ESS-Leistung:** ``set_ess_active_power`` (inkl. Pattern B) ist in der Tabelle immer sichtbar; die Force-Checkbox **entsperrt Senden** (Default 100 W, hart ±200 W) mit **zweiter** Bestätigung. Ohne Force bleibt die Zeile gesperrt. HouseSim nutzt für die Physik nur die Active-Power-Sollwert-Entity, nicht den Mode-Hint.
 
 **Auto-Roundtrip**
 

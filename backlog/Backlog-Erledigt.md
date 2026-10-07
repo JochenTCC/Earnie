@@ -2,6 +2,20 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Powerstation every-cycle set_* writes + Schreibtest full field list (2026-10-07)
+
+- [x] **Physical powerstation Merkers refreshed every optimize cycle** (sticky Loxone state)
+  - `write_cycle_powerstation_setpoints` / `build_cycle_powerstation_fields` in [`optimizer/powerstation_live.py`](../optimizer/powerstation_live.py): all **mapped** `ess.{slug}.set_*` (charge from plan else 0; discharge/active → 0; mode → 0 Automatik; source_select → plan else grid)
+  - Wired in [`main.py`](../main.py); idle packs no longer skip writes when no reserve/standby charge
+  - Loxone wire units: charge/discharge/active W→kW; records returned for Live-Schreiben
+- [x] **Live-Schreiben includes powerstation Merker writes** in last-run table
+  - PS `LoxoneWriteRecord`s merged into `loxone_writes` with house ESS + flex (`serialize_write_records`)
+  - Pattern B write IO index: batteries + plant `set_ess_source_select` in [`integrations/ehal_debug_mapping.py`](../integrations/ehal_debug_mapping.py)
+- [x] **Schreibtest lists all mapped write fields** (plant, Pattern B, EV, Flex)
+  - [`integrations/ehal_write_test.py`](../integrations/ehal_write_test.py) / [`ui/ehal_write_test.py`](../ui/ehal_write_test.py): auto rows from `expected_live_write_fields` ∩ mapped; **Senden** default unchecked
+  - `set_ess_active_power` (incl. Pattern B) always visible; Force checkbox unlocks send only (±200 W + second confirm)
+  - Docs [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md); tests `tests/test_powerstation_2_7_h.py`, `tests/test_ehal_write_test.py`
+
 ### 2.7.m — Per-battery EHAL mapping (EHAL-Com) (2026-10-06)
 
 - [x] **2.7.m — Per-battery EHAL mapping (EHAL-Com)** (before **2.7.l**; unblocks **2.7.h** dogfood mapping)

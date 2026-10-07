@@ -378,7 +378,7 @@ def _ha_remap_powerstation_fields(
     return remapped, missing
 
 
-def _write_powerstation_ha(fields: dict[str, float], ehal_live: Any) -> None:
+def _write_powerstation_ha(fields: dict[str, float], ehal_live: Any) -> list:
     adapter = ehal_live.get_ha_adapter()
     remapped, missing = _ha_remap_powerstation_fields(fields, adapter.cfg.entities)
     error = None
@@ -397,14 +397,25 @@ def _write_powerstation_ha(fields: dict[str, float], ehal_live: Any) -> None:
     elif error is not None:
         logger.warning("physical powerstation HA setpoints failed: %s", error)
         ehal_live.persist_write_error(error)
+    return []
 
 
-def _write_powerstation_loxone(fields: dict[str, float]) -> None:
+def _loxone_ps_wire_value(kind: str, value_w: float) -> float:
+    """EHAL W / mode → Loxone Merker number (kW for power fields)."""
+    from integrations.loxone_adapter import ehal_active_power_w_to_loxone_kw
+
+    if kind == "set_ess_active_power":
+        return float(ehal_active_power_w_to_loxone_kw(float(value_w)))
+    if kind in ("set_ess_charge_power_limit", "set_ess_discharge_power_limit"):
+        return max(0.0, float(value_w)) / 1000.0
+    return float(value_w)
+
+
+def _write_powerstation_loxone(fields: dict[str, float]) -> list:
     from integrations import loxone_client
+    from integrations.loxone_comm_trace import LoxoneWriteRecord
 
-    power_kinds = frozenset(
-        {"set_ess_charge_power_limit", "set_ess_discharge_power_limit"}
-    )
+    records: list[LoxoneWriteRecord] = []
     missing: list[str] = []
     for field_key, value_w in fields.items():
         kind, marker = _resolve_marker(field_key)
@@ -415,13 +426,9 @@ def _write_powerstation_loxone(fields: dict[str, float]) -> None:
             )
             missing.append(field_key)
             continue
-        # Loxone ESS markers are kW; EHAL wire values here are W for power fields.
-        if kind in power_kinds:
-            send_val = max(0.0, float(value_w)) / 1000.0
-        else:
-            send_val = float(value_w)
+        send_val = _loxone_ps_wire_value(kind, float(value_w))
         _last_powerstation_sent[kind] = send_val
-        loxone_client._send_loxone_value_traced(marker, send_val)
+        records.append(loxone_client._send_loxone_value_traced(marker, send_val))
     if missing:
         _persist_ps_write_error(
             adapter_id="loxone",
@@ -431,69 +438,110 @@ def _write_powerstation_loxone(fields: dict[str, float]) -> None:
                 "refusing plant-flat house-battery fallback"
             ),
         )
+    return records
 
 
-def _write_powerstation_fields(fields: dict[str, float]) -> None:
-    """Write Pattern-B or flat ESS fields via HA mapped write or Loxone Merker."""
+def _write_powerstation_fields(fields: dict[str, float]) -> list:
+    """Write Pattern-B ESS fields; return Loxone write records (empty on HA/skip)."""
     if not fields:
-        return
+        return []
     try:
         from integrations import ehal_live
         from runtime_store.shadow.writes import should_invoke_setpoint_writes
     except Exception as exc:  # noqa: BLE001
         logger.warning("powerstation write skipped: %s", exc)
-        return
+        return []
     if not should_invoke_setpoint_writes(silent=config.is_loxone_silent_mode()):
-        return
+        return []
 
     if ehal_live.is_ha_backend():
-        _write_powerstation_ha(fields, ehal_live)
-        return
+        return _write_powerstation_ha(fields, ehal_live)
 
     if ehal_live.is_ehal_network_backend():
-        # OpenEMS: no source_select path for portable packs.
-        return
+        return []
 
-    _write_powerstation_loxone(fields)
+    return _write_powerstation_loxone(fields)
 
 
-def write_physical_powerstation_charges(charge_kw_by_id: dict[str, float]) -> None:
-    """Write Pattern-B charge limit; discharge=0 only when that field is mapped.
+def build_cycle_powerstation_fields(
+    charge_kw_by_id: dict[str, float],
+    source_by_id: dict[str, int] | None = None,
+) -> dict[str, float]:
+    """All mapped ``ess.{slug}.set_*`` for physical packs (idle defaults).
 
-    EcoFlow / one-way packs must not map ``set_ess_discharge_power_limit`` — do not
-    invent a write (or Schreibfehler) for an intentionally absent Merker.
+    Charge from ``charge_kw_by_id`` (kW); discharge/active → 0 W; mode → 0;
+    source_select from ``source_by_id`` (default grid). Unmapped kinds omitted.
     """
-    if not charge_kw_by_id:
-        return
+    from ehal.ess_fields import ess_field
+
+    sources = source_by_id or {}
+    ids: set[str] = set(_physical_powerstation_ids())
+    ids.update(str(k).strip() for k in (charge_kw_by_id or {}) if str(k).strip())
+    ids.update(str(k).strip() for k in sources if str(k).strip())
+
+    fields: dict[str, float] = {}
+    for ps_id in sorted(ids):
+        charge_w = max(0.0, float(charge_kw_by_id.get(ps_id, 0.0))) * 1000.0
+        if _binding_for_ps(ps_id, "set_ess_charge_power_limit"):
+            fields[ess_field(ps_id, "set_ess_charge_power_limit")] = charge_w
+        if _binding_for_ps(ps_id, "set_ess_discharge_power_limit"):
+            fields[ess_field(ps_id, "set_ess_discharge_power_limit")] = 0.0
+        if _binding_for_ps(ps_id, "set_ess_mode"):
+            fields[ess_field(ps_id, "set_ess_mode")] = 0.0
+        if _binding_for_ps(ps_id, "set_ess_active_power"):
+            fields[ess_field(ps_id, "set_ess_active_power")] = 0.0
+        if _binding_for_ps(ps_id, "set_ess_source_select"):
+            sel = int(sources.get(ps_id, 0))
+            fields[ess_field(ps_id, "set_ess_source_select")] = (
+                1.0 if sel >= 1 else 0.0
+            )
+    return fields
+
+
+def write_cycle_powerstation_setpoints(
+    charge_kw_by_id: dict[str, float],
+    source_by_id: dict[str, int] | None = None,
+) -> list:
+    """Refresh every mapped PS ``set_*`` Merker; return Loxone write records."""
+    fields = build_cycle_powerstation_fields(charge_kw_by_id, source_by_id)
+    if fields:
+        logger.info(
+            "2.7.g/h cycle powerstation setpoints: %s",
+            {k: fields[k] for k in sorted(fields)},
+        )
+    return _write_powerstation_fields(fields)
+
+
+def write_physical_powerstation_charges(charge_kw_by_id: dict[str, float]) -> list:
+    """Compat: charge (+ discharge=0 if mapped) only — prefer cycle writer."""
     from ehal.ess_fields import ess_field
 
     fields: dict[str, float] = {}
-    for ps_id, charge_kw in charge_kw_by_id.items():
+    for ps_id, charge_kw in (charge_kw_by_id or {}).items():
         slug = str(ps_id).strip()
         if not slug:
             continue
-        charge_w = max(0.0, float(charge_kw) * 1000.0)
-        fields[ess_field(slug, "set_ess_charge_power_limit")] = charge_w
+        fields[ess_field(slug, "set_ess_charge_power_limit")] = (
+            max(0.0, float(charge_kw)) * 1000.0
+        )
         if _binding_for_ps(slug, "set_ess_discharge_power_limit"):
             fields[ess_field(slug, "set_ess_discharge_power_limit")] = 0.0
-    _write_powerstation_fields(fields)
+    return _write_powerstation_fields(fields)
 
 
-def write_standby_source_selects(source_by_id: dict[str, int]) -> None:
-    """Write ``set_ess_source_select`` (0=grid / 1=battery) per standby pack."""
-    if not source_by_id:
-        return
+def write_standby_source_selects(source_by_id: dict[str, int]) -> list:
+    """Compat: source_select only — prefer cycle writer."""
     from ehal.ess_fields import ess_field
 
     fields: dict[str, float] = {}
-    for ps_id, select in source_by_id.items():
+    for ps_id, select in (source_by_id or {}).items():
         slug = str(ps_id).strip()
         if not slug:
             continue
         fields[ess_field(slug, "set_ess_source_select")] = (
             1.0 if int(select) >= 1 else 0.0
         )
-    _write_powerstation_fields(fields)
+    return _write_powerstation_fields(fields)
 
 
 def load_standby_packs() -> list[dict[str, Any]]:

@@ -348,8 +348,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         load_standby_packs,
         physical_charge_setpoints_kw,
         sync_triggers_from_telemetry,
-        write_physical_powerstation_charges,
-        write_standby_source_selects,
+        write_cycle_powerstation_setpoints,
     )
     from optimizer.powerstation_standby import (
         apply_standby_load_relief,
@@ -430,18 +429,14 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
     reserve_charges = physical_charge_setpoints_kw(active_reserves)
     standby_sources, standby_charges = live_source_and_charge(standby_plans, slot=0)
-    # Refresh sticky Merkers every cycle (idle packs → charge 0 / grid).
+    # Refresh all mapped PS set_* Merkers every cycle (idle → charge 0 / mode 0 / grid).
     phys_charge = cycle_powerstation_charge_kw(reserve_charges, standby_charges)
     standby_sources = cycle_standby_source_selects(standby_sources)
     if standby_sources:
         logger.info("2.7.h source_select (0=grid/1=battery): %s", standby_sources)
-        write_standby_source_selects(standby_sources)
-    if phys_charge:
-        logger.info(
-            "2.7.g/h physical powerstation charge setpoints (kW): %s",
-            phys_charge,
-        )
-        write_physical_powerstation_charges(phys_charge)
+    powerstation_writes = write_cycle_powerstation_setpoints(
+        phys_charge, standby_sources
+    )
 
     logger.info(
         "Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW | "
@@ -491,7 +486,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         flex_writes = loxone_client.send_flexible_consumer_states(
             consumer_powers, charging_contexts, consumer_pv_follow
         )
-        loxone_writes = serialize_write_records(huawei_writes + flex_writes)
+        loxone_writes = serialize_write_records(
+            list(huawei_writes) + list(flex_writes) + list(powerstation_writes)
+        )
 
     if live_power is None:
         live_power = ehal_live.read_live_power_kw()

@@ -50,14 +50,14 @@ def _render_write_test_intro() -> None:
 def _render_force_checkbox(*, disabled: bool) -> bool:
     return bool(
         st.checkbox(
-            f"``set_ess_active_power`` in Tabelle freigeben (±{ACTIVE_POWER_MAX_ABS_W:g} W)",
+            f"``set_ess_active_power`` schreiben freigeben (±{ACTIVE_POWER_MAX_ABS_W:g} W)",
             value=False,
             key="ehal_write_test_force",
             disabled=disabled,
             help=(
-                "Blendet die Zeile ``set_ess_active_power`` ein (Default "
-                f"{_DEFAULT_FORCE_W:g} W). Schreibt **nicht** automatisch — "
-                "Wert in der Tabelle setzen, dann „Alle schreiben“."
+                "Zeilen sind immer sichtbar. Ohne Haken ist Senden für "
+                "``set_ess_active_power`` (auch Pattern B) gesperrt. "
+                f"Default-Wert {_DEFAULT_FORCE_W:g} W, hart ±{ACTIVE_POWER_MAX_ABS_W:g} W."
             ),
         )
     )
@@ -182,25 +182,32 @@ def _render_probe_table(
 
     selected: dict[str, Any] = {}
     for field in fields:
+        kind = probe_kind(field)
+        force_locked = kind == FORCE_ESS_ACTIVE_POWER and not force_ess_active
+        row_disabled = disabled or force_locked
         cols = st.columns([0.8, 2.4, 2.8, 2.0])
         include = cols[0].checkbox(
             "Senden",
             value=False,
             key=f"ehal_write_test_incl_{field}",
-            disabled=disabled,
+            disabled=row_disabled,
             label_visibility="collapsed",
         )
         cols[1].markdown(f"`{field}`")
-        cols[2].caption(targets.get(field) or "—")
+        mapping = targets.get(field) or "—"
+        if force_locked:
+            cols[2].caption(f"{mapping} · Force nötig")
+        else:
+            cols[2].caption(mapping)
         value = _render_row_value(
             field,
             max_power_kw=max_power_kw,
             ev_nominal_a=ev_nominal_a,
             force_ess_active=force_ess_active,
-            disabled=disabled or not include,
+            disabled=row_disabled or not include,
             container=cols[3],
         )
-        if include and value is not None:
+        if include and not force_locked and value is not None:
             selected[field] = value
     return selected
 

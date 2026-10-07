@@ -476,3 +476,75 @@ def test_cycle_writes_idle_zero_charge_to_loxone():
     send.assert_called_once()
     assert send.call_args[0][0] == "PS_Charge"
     assert send.call_args[0][1] == pytest.approx(0.0)
+
+
+def test_build_cycle_powerstation_fields_all_mapped_setpoints():
+    """Idle cycle includes every mapped set_* with safe defaults."""
+    from optimizer import powerstation_live as psl
+
+    slug = "ecoflow_delta_3"
+    planning = [
+        {
+            "id": slug,
+            "type": "powerstation",
+            "backing": "physical",
+            "role": ROLE_STANDBY_BACKUP,
+            "ehal_bindings": {
+                ess_field(slug, "set_ess_charge_power_limit"): "PS_Charge",
+                ess_field(slug, "set_ess_discharge_power_limit"): "PS_Discharge",
+                ess_field(slug, "set_ess_mode"): "PS_Mode",
+                ess_field(slug, "set_ess_active_power"): "PS_Active",
+            },
+        }
+    ]
+    with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
+        "house_config.ehal_bindings.resolve_plant_binding", return_value=""
+    ), patch(
+        "optimizer.live_export_limit.load_house_doc", return_value={}
+    ):
+        fields = psl.build_cycle_powerstation_fields({slug: 0.5}, {})
+
+    assert fields[ess_field(slug, "set_ess_charge_power_limit")] == pytest.approx(500.0)
+    assert fields[ess_field(slug, "set_ess_discharge_power_limit")] == 0.0
+    assert fields[ess_field(slug, "set_ess_mode")] == 0.0
+    assert fields[ess_field(slug, "set_ess_active_power")] == 0.0
+
+
+def test_write_cycle_powerstation_setpoints_returns_records():
+    """Cycle writer sends all mapped Merkers and returns Live-Schreiben records."""
+    from integrations.loxone_comm_trace import LoxoneWriteRecord
+    from optimizer import powerstation_live as psl
+
+    slug = "ecoflow_delta_3"
+    planning = [
+        {
+            "id": slug,
+            "type": "powerstation",
+            "backing": "physical",
+            "role": ROLE_STANDBY_BACKUP,
+            "ehal_bindings": {
+                ess_field(slug, "set_ess_charge_power_limit"): "PS_Charge",
+                ess_field(slug, "set_ess_mode"): "PS_Mode",
+                ess_field(slug, "set_ess_active_power"): "PS_Active",
+            },
+        }
+    ]
+    with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
+        "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
+    ), patch(
+        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+    ), patch(
+        "integrations.ehal_live.is_ha_backend", return_value=False
+    ), patch(
+        "integrations.ehal_live.is_ehal_network_backend", return_value=False
+    ), patch(
+        "integrations.loxone_client._send_loxone_value_traced"
+    ) as send:
+        send.side_effect = lambda name, val: LoxoneWriteRecord(
+            name, float(val), True, "2026-10-07T10:00:00"
+        )
+        records = psl.write_cycle_powerstation_setpoints({slug: 0.0}, {})
+
+    names = {r.io_name for r in records}
+    assert names == {"PS_Charge", "PS_Mode", "PS_Active"}
+    assert len(records) == 3

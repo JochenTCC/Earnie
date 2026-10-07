@@ -111,19 +111,44 @@ Order: **P0 → P1 → P2 → P3**; P4 after P1; P6 can start now (builds on the
 | **2.7.m** (archived) | Defined `Earnie_Batterie_<Slug>_…` and per-battery bindings; no generator / parser followed → P1. |
 | **2.7.i** Regression, HouseSim | Fixtures pin ids: rename cascade must keep them valid or re-record; HA golden maps stay valid (propose unchanged). |
 | Bugfix "NAS alpha `ess.15_kwh_speicher_copy_3.*`" | Symptom of dirty ids (uncommitted id-lock work) plus a physical powerstation without own Merker; **P2** red / yellow states make this visible. |
+| **2.7.n** (Backlog.md, Version 2.7) | Slice of this epic for 2.7: stable identifiers (**P1** core, **P6** core, `ev.` / `evcs.` namespaces) plus the generic Loxone read / write path (n-5 / n-6, gated). See §9. |
 | **SB-Identification-Draft** | Only the term "SB"; discovery is independent. |
 
 ## 7. Open decisions
 
 1. **Saved-but-missing names (F11):** allowed with one warning (as today) vs. not saved until probe finds them. Decide after P0d.
 2. **Import of batteries / PV / inverters (F14):** incomplete stub vs. bind-only. Decide before P4.
-3. **Always-slug names (F8):** confirm; legacy bare names stay readable. Decide before P1 (proposed: yes).
-4. **`sens_*` export:** name checklist only, until a VO receiver exists — acceptable? Decide after P0a/b.
+3. **`sens_*` export:** name checklist only, until a VO receiver exists — acceptable? Decide after P0a/b.
 
 **Decided:**
 - Epic `Binding` with phases P0–P6 is registered in `roadmap-nomenclature.mdc` (as done for `Inverter`).
 - **Kennung is editable** (P6), defaulting from the Bezeichnung. Rename only as an explicit action with cascade dry-run and a report of SB names that now deviate. If **P0c** shows history / debug dumps / regression fixtures keyed by id, an alias table (`old → new`) is applied on read. No separate immutable `uid` unless P0c shows broad dependence.
+- **Always-slug names (F8):** new name suggestions always contain the Kennung; legacy bare names stay recognised.
+- **Two namespaces for wallbox and vehicle:** `evcs.<wallbox>.*` and `ev.<vehicle>.*` (§9).
+- **`sens_evcs_connected`** is valid in both namespaces and keeps its name in 2.7.n.
 
 ## 8. Not checked
 
 External development documents (`Entwicklungsplan`, HA add-on docs) are not in this checkout. Loxone Config behaviour (template install, project file format, LoxAPP3 content) is unverified until P0.
+
+## 9. Slice for 2.7: item 2.7.n
+
+Principle: **freeze the identifiers now, build the tools later.** An identifier that is baked into deployed Loxone configs, VI templates and bindings is hard to change; table, export and import can be added any time.
+
+**In 2.7.n:** four bugfixes (two fixed directly, two closed by the generic write path), P0c / P0d, qualified EHAL ID for all entity kinds, stable Kennung (batteries / PV, lock for consumers / EVs), characterization tests, field registry in the role JSON, generic Loxone read and write path. **Not in 2.7.n:** three-column table, colours, export, import hardening, signal catalog, HA parity, multi-EV runtime.
+
+**Several wallboxes and EVs (naming only).** Bindings are already stored per EV consumer and resolved per consumer; only the Pattern B spelling is missing (today a mix in `status.json` `ev.{id}.Earnie_EAuto_Soll_A` and the VO path `ev.{ev_id}.<field>`).
+
+| Namespace | Device | Field kinds (unchanged) |
+| --- | --- | --- |
+| `evcs.<wallbox>.<kind>` | wallbox (charger) | `sens_evcs_active_power`, `sens_evcs_connected`, `get_evcs_nominal_current`, `set_evcs_max_current`, `set_evcs_mode` |
+| `ev.<vehicle>.<kind>` | vehicle | `sens_evcs_soc_act`, `sens_evcs_bat_capacity`, `get_evcs_limit_soc`, `get_evcs_soc_min_immediate`, `get_evcs_ready_by_time` |
+
+- Today's single EV consumer `garage` yields both forms from one Kennung (`evcs.garage.set_evcs_max_current`, `ev.garage.sens_evcs_soc_act`); the namespace follows the field kind, storage stays flat.
+- Later separate entities carry their own Kennung; the car ↔ wallbox assignment is runtime logic, not part of the names.
+- `sens_evcs_connected` is allowed in both namespaces (both devices report "connected"). **Decided:** kept under this name in 2.7.n; a rename to `sens_connected` is possible later but needs an alias on load (about 25 code places plus schema, role JSON, recipes, fixtures and stored bindings).
+- Field kinds are not renamed (`sens_evcs_soc_act` says "evcs" but means the vehicle; a rename would break the wire, possible later with an alias).
+- Loxone names: `Earnie_Wallbox_<Kennung>_…` for charger kinds, `Earnie_EAuto_<Kennung>_…` for vehicle kinds; existing names (`Earnie_EAuto_Soll_A`) stay valid because bindings store the real name.
+- The adapter still uses only the first EV (`_first_ev_loxone_bindings`); multi-EV runtime stays in the backlog item "Enable multiple EV / Wallboxes".
+
+**Generic path, kept safe.** Only transport and conversion become data-driven (unit, factor, sign, clamp per field in the role JSON). The decision logic (which value is written when: `map_ess_setpoints`, sticky refresh, function gating) stays in code. A single writer returns records keyed by qualified ID; the write trace, the `loxone_sent` snapshot and `status.json` are built from them, which removes the two bugs structurally. Safety: characterization tests first (n-4), Shadow would-write comparison (`shadow_writes.jsonl`) old vs new, and a hard gate — if n-5 / n-6 are not ready, n-1 … n-4 ship alone.
