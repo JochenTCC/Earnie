@@ -376,7 +376,11 @@ _REQUIRED_PLANT_LIVE_FIELDS = (
 
 
 def _required_plant_live_bindings_present() -> bool:
-    """True when required plant telemetry + ESS setpoints resolve to Merker names."""
+    """True when required plant telemetry + primary ESS setpoints resolve.
+
+    ESS SoC/setpoints come from ``batteries[].ehal_bindings`` via
+    ``resolve_plant_binding`` primary aliases (2.7.m).
+    """
     from house_config.ehal_bindings import resolve_plant_binding
 
     raw = _read_json_document(resolve_config_json_path())

@@ -1,6 +1,7 @@
 """Tests for 2.6.g HA Pattern B migrate / aggregate."""
 from __future__ import annotations
 
+from ehal.ess_fields import ess_field
 from house_config.ehal_bindings import ensure_migrated, strip_migrated_config_keys
 from house_config.ha_ehal_bindings import (
     aggregate_ha_entities,
@@ -128,6 +129,46 @@ def test_apply_ha_entities_overwrites_and_clears():
 def test_aggregate_empty_house():
     assert aggregate_ha_entities(None) == {}
     assert aggregate_ha_entities({}) == {}
+
+
+def test_aggregate_two_batteries_pattern_b_and_primary_alias():
+    house = {
+        "plant": {
+            "ehal_bindings": {
+                "sens_grid_power_active": "sensor.grid",
+                "sens_pv_production_active": "sensor.pv",
+                "set_ess_source_select": "switch.source",
+            }
+        },
+        "profiles": {},
+    }
+    components = {
+        "batteries": [
+            {
+                "id": "house",
+                "ehal_bindings": {
+                    ess_field("house", "sens_ess_soc"): "sensor.house_soc",
+                    ess_field("house", "sens_ess_power"): "sensor.house_p",
+                },
+            },
+            {
+                "id": "ps1",
+                "ehal_bindings": {
+                    ess_field("ps1", "sens_ess_soc"): "sensor.ps_soc",
+                    ess_field("ps1", "set_ess_charge_power_limit"): "number.ps_charge",
+                },
+            },
+        ]
+    }
+    agg = aggregate_ha_entities(house, components_doc=components)
+    assert agg["sens_grid_power_active"] == "sensor.grid"
+    assert agg["set_ess_source_select"] == "switch.source"
+    assert agg[ess_field("house", "sens_ess_soc")] == "sensor.house_soc"
+    assert agg[ess_field("ps1", "sens_ess_soc")] == "sensor.ps_soc"
+    assert agg[ess_field("ps1", "set_ess_charge_power_limit")] == "number.ps_charge"
+    # Primary (first) battery flat aliases for legacy HaAdapter required fields.
+    assert agg["sens_ess_soc"] == "sensor.house_soc"
+    assert agg["sens_ess_power"] == "sensor.house_p"
 
 
 def test_get_ha_adapter_prefers_house_bindings(monkeypatch, tmp_path):

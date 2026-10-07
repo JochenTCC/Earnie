@@ -1,7 +1,9 @@
 """UI-adjacent tests for entity-centric EHAL Loxone mapping save (2.4.k)."""
 from __future__ import annotations
 
+from ehal.ess_fields import ess_field
 from ui.ehal_loxone_mapping import (
+    BATTERY_ENTITY_KIND,
     EV_FIELDS,
     FILTER_FIELDS,
     FLEX_FIELDS,
@@ -12,11 +14,13 @@ from ui.ehal_loxone_mapping import (
     _field_select_caption,
     _name_options,
     add_manual_marker_name,
+    apply_battery_bindings,
     apply_entity_bindings,
     build_entity_rows,
     device_map_ehal_by_name,
     ehal_name_for_marker,
     enrich_structure_scan_rows,
+    fields_for_battery,
     fields_for_consumer,
     is_known_marker_name,
     marker_to_ehal_lookup,
@@ -30,6 +34,9 @@ def test_fields_for_consumer_ev_vs_flex():
     assert "get_evcs_limit_soc" in EV_FIELDS
     assert "get_evcs_soc_min_immediate" in EV_FIELDS
     assert "sens_power_consumers" in PLANT_FIELDS
+    assert "sens_ess_soc" not in PLANT_FIELDS
+    assert "set_ess_active_power" not in PLANT_FIELDS
+    assert "set_ess_source_select" in PLANT_FIELDS
     assert fields_for_consumer({"type": "thermal_annual"}) == FLEX_FIELDS + (
         "sens_temperature_heat_storage",
         "sens_temperature_heat_storage_low",
@@ -79,7 +86,9 @@ def test_build_entity_rows_pool_filter_only():
             }
         },
     }
-    rows = build_entity_rows(house, "live")
+    rows = build_entity_rows(
+        house, "live", components_doc={"batteries": [], "pv_systems": []}
+    )
     ids = [r["id"] for r in rows]
     assert ids == [PLANT_ENTITY_ID, "pool", "pool_filter"]
     filt = next(r for r in rows if r["id"] == "pool_filter")
@@ -115,7 +124,7 @@ def test_resolve_field_select_default_keeps_existing_over_proposal():
 
 def test_build_entity_rows_includes_plant_and_consumers():
     house = {
-        "plant": {"ehal_bindings": {"sens_ess_soc": "SOC"}},
+        "plant": {"ehal_bindings": {"set_ess_source_select": "Quellenwahl"}},
         "profiles": {
             "live": {
                 "id": "live",
@@ -126,13 +135,98 @@ def test_build_entity_rows_includes_plant_and_consumers():
             }
         },
     }
-    rows = build_entity_rows(house, "live")
+    rows = build_entity_rows(house, "live", components_doc={"batteries": [], "pv_systems": []})
     ids = [r["id"] for r in rows]
     assert ids == [PLANT_ENTITY_ID, "ev1", "wp"]
-    assert rows[0]["bindings"]["sens_ess_soc"] == "SOC"
+    assert rows[0]["bindings"]["set_ess_source_select"] == "Quellenwahl"
+    assert "sens_ess_soc" not in rows[0]["fields"]
     assert "set_evcs_max_current" in rows[1]["fields"]
     assert "set_evcs_current" not in rows[1]["fields"]
     assert "flex.wp.sens_power_act" in rows[2]["fields"]
+
+
+def test_build_entity_rows_includes_batteries():
+    house = {
+        "plant": {},
+        "profiles": {"live": {"id": "live", "consumers": []}},
+    }
+    components = {
+        "batteries": [
+            {
+                "id": "house",
+                "label": "Haus",
+                "ehal_bindings": {
+                    ess_field("house", "sens_ess_soc"): "Earnie_Batterie_SoC",
+                },
+            },
+            {
+                "id": "ps1",
+                "label": "Delta",
+                "type": "powerstation",
+                "backing": "physical",
+                "ehal_bindings": {},
+            },
+            {
+                "id": "virt",
+                "label": "Virtuell",
+                "type": "powerstation",
+                "backing": "virtual",
+                "ehal_bindings": {},
+            },
+        ],
+        "pv_systems": [],
+    }
+    rows = build_entity_rows(house, "live", components_doc=components)
+    kinds = [(r["id"], r["kind"]) for r in rows]
+    assert kinds[0] == (PLANT_ENTITY_ID, "plant")
+    assert ("house", BATTERY_ENTITY_KIND) in kinds
+    assert ("ps1", BATTERY_ENTITY_KIND) in kinds
+    assert ("virt", BATTERY_ENTITY_KIND) not in kinds
+    house_row = next(r for r in rows if r["id"] == "house")
+    assert ess_field("house", "sens_ess_soc") in house_row["fields"]
+    assert ess_field("house", "set_ess_source_select") not in house_row["fields"]
+    assert house_row["bindings"][ess_field("house", "sens_ess_soc")] == (
+        "Earnie_Batterie_SoC"
+    )
+    assert fields_for_battery("house") == house_row["fields"]
+
+
+def test_apply_battery_bindings_rejects_virtual_powerstation():
+    import pytest
+
+    components = {
+        "batteries": [
+            {
+                "id": "virt",
+                "label": "V",
+                "type": "powerstation",
+                "backing": "virtual",
+                "ehal_bindings": {},
+            }
+        ],
+        "pv_systems": [],
+    }
+    with pytest.raises(ValueError, match="Virtual powerstation"):
+        apply_battery_bindings(
+            components,
+            battery_id="virt",
+            bindings={ess_field("virt", "sens_ess_soc"): "SoC"},
+        )
+
+
+def test_apply_battery_bindings_writes_components():
+    components = {
+        "batteries": [{"id": "house", "label": "Haus", "ehal_bindings": {}}],
+        "pv_systems": [],
+    }
+    updated = apply_battery_bindings(
+        components,
+        battery_id="house",
+        bindings={ess_field("house", "sens_ess_soc"): "SoC"},
+    )
+    assert updated["batteries"][0]["ehal_bindings"][
+        ess_field("house", "sens_ess_soc")
+    ] == "SoC"
 
 
 def test_build_entity_rows_thermal_rc_alone_has_no_synthetic_filter():
@@ -152,7 +246,9 @@ def test_build_entity_rows_thermal_rc_alone_has_no_synthetic_filter():
             }
         },
     }
-    rows = build_entity_rows(house, "live")
+    rows = build_entity_rows(
+        house, "live", components_doc={"batteries": [], "pv_systems": []}
+    )
     ids = [r["id"] for r in rows]
     assert ids == [PLANT_ENTITY_ID, "pool"]
     assert "pool_filter" not in ids

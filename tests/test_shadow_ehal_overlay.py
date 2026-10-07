@@ -10,6 +10,7 @@ from house_config.profiles_store import (
     save_house_profiles_document,
 )
 from runtime_store.shadow.ehal_overlay import (
+    apply_overlay_to_components,
     apply_overlay_to_house,
     clear_overlay,
     overlay_path,
@@ -142,3 +143,25 @@ def test_overlay_path_under_runtime(tmp_path):
     assert path.is_file()
     raw = json.loads(path.read_text(encoding="utf-8"))
     assert raw["plant_bindings"]["a"] == "b"
+
+
+def test_upsert_and_apply_battery_overlay():
+    from ehal.ess_fields import ess_field
+
+    soc = ess_field("house", "sens_ess_soc")
+    upsert_entity_bindings(
+        profile_id="live",
+        entity_id="house",
+        bindings={soc: "Shadow_SoC"},
+        entity_kind="battery",
+    )
+    components = {
+        "batteries": [
+            {"id": "house", "label": "Haus", "ehal_bindings": {soc: "Prod_SoC"}},
+            {"id": "other", "label": "X", "ehal_bindings": {}},
+        ],
+        "pv_systems": [],
+    }
+    merged = apply_overlay_to_components(components)
+    assert merged["batteries"][0]["ehal_bindings"][soc] == "Shadow_SoC"
+    assert merged["batteries"][1]["ehal_bindings"] == {}

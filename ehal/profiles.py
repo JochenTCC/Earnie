@@ -251,7 +251,14 @@ def role_field_labels() -> dict[str, str]:
 
 def field_role_id(field: str) -> str | None:
     """Return device role_id for an M1 mapping field, or None."""
-    return _FIELD_ROLE.get(field)
+    from ehal.ess_fields import ess_field_kind
+
+    name = str(field or "").strip()
+    role = _FIELD_ROLE.get(name)
+    if role:
+        return role
+    kind = ess_field_kind(name)
+    return _FIELD_ROLE.get(kind) if kind else None
 
 
 def role_group_label(role_id: str) -> str:
@@ -281,11 +288,12 @@ def group_fields_by_role(fields: tuple[str, ...] | list[str]) -> list[tuple[str,
     """Order fields into (role_id, fields) groups for HITL sections.
 
     Unknown fields are collected under role_id ``other``.
+    Pattern B ``ess.{slug}.*`` groups under ``ess`` (2.7.m).
     """
     buckets: dict[str, list[str]] = {rid: [] for rid in ("grid", "pv", "ess", "evcs")}
     other: list[str] = []
     for field in fields:
-        role = _FIELD_ROLE.get(field)
+        role = field_role_id(field)
         if role and role in buckets:
             buckets[role].append(field)
         else:

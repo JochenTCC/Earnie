@@ -97,35 +97,57 @@ def _target_battery_for_plant_ess(
     return str(batteries[0]["id"]).strip()
 
 
+# Shared EcoFlow bridge Merker stays on plant (2.7.m).
+_PLANT_ESS_KEEP = frozenset({"set_ess_source_select"})
+
+
+def _collect_plants_with_flat_ess(
+    house_doc: dict[str, Any],
+) -> list[tuple[dict, dict[str, str]]]:
+    """Find plant dicts that still hold movable flat ESS bindings.
+
+    Supports live top-level ``house["plant"]`` and legacy nested
+    ``profiles[].plant`` (list-shaped profiles).
+    """
+    found: list[tuple[dict, dict[str, str]]] = []
+    top = house_doc.get("plant")
+    if isinstance(top, dict):
+        bindings = top.get("ehal_bindings")
+        flat = plant_flat_ess_keys(bindings if isinstance(bindings, dict) else None)
+        movable = {k: v for k, v in flat.items() if k not in _PLANT_ESS_KEEP}
+        if movable:
+            found.append((top, movable))
+    profiles = house_doc.get("profiles")
+    if isinstance(profiles, list):
+        for profile in profiles:
+            if not isinstance(profile, dict):
+                continue
+            plant = profile.get("plant")
+            if not isinstance(plant, dict):
+                continue
+            bindings = plant.get("ehal_bindings")
+            flat = plant_flat_ess_keys(bindings if isinstance(bindings, dict) else None)
+            movable = {k: v for k, v in flat.items() if k not in _PLANT_ESS_KEEP}
+            if movable:
+                found.append((plant, movable))
+    return found
+
+
 def migrate_plant_ess_to_components(
     house_doc: dict[str, Any],
     components_doc: dict[str, Any],
     *,
     label: str = "house_profiles.json",
 ) -> tuple[dict[str, Any], dict[str, Any], bool]:
-    """Move plant flat ESS bindings onto the single battery's ehal_bindings."""
+    """Move plant flat ESS bindings onto the single battery's ehal_bindings.
+
+    Leaves ``set_ess_source_select`` on plant (shared EcoFlow bridge, 2.7.m).
+    """
     house_out = dict(house_doc)
     comp_out = dict(components_doc)
-    profiles = house_out.get("profiles")
-    if not isinstance(profiles, list):
-        stamp_data_model(house_out)
-        stamp_data_model(comp_out)
-        return house_out, comp_out, False
+    flat_plants = _collect_plants_with_flat_ess(house_out)
 
-    # Collect flat ESS from any profile plant (usually one live profile)
-    flat_by_profile: list[tuple[dict, dict[str, str]]] = []
-    for profile in profiles:
-        if not isinstance(profile, dict):
-            continue
-        plant = profile.get("plant")
-        if not isinstance(plant, dict):
-            continue
-        bindings = plant.get("ehal_bindings")
-        flat = plant_flat_ess_keys(bindings if isinstance(bindings, dict) else None)
-        if flat:
-            flat_by_profile.append((plant, flat))
-
-    if not flat_by_profile:
+    if not flat_plants:
         stamp_data_model(house_out)
         stamp_data_model(comp_out)
         return house_out, migrate_components_doc(comp_out), False
@@ -143,7 +165,7 @@ def migrate_plant_ess_to_components(
         raise MigrateV4Error(f"{label}: battery '{target_id}' not found in components.")
 
     merged: dict[str, str] = dict(target_bat.get("ehal_bindings") or {})
-    for plant, flat in flat_by_profile:
+    for plant, flat in flat_plants:
         for kind, address in flat.items():
             key = ess_field(target_id, kind)
             if key not in merged:
@@ -159,6 +181,17 @@ def migrate_plant_ess_to_components(
     stamp_data_model(house_out)
     stamp_data_model(comp_out)
     return house_out, migrate_components_doc(comp_out), True
+
+
+def residual_plant_flat_ess_keys(house_doc: dict[str, Any] | None) -> list[str]:
+    """Flat ESS keys still on plant after migrate (except shared source_select)."""
+    keys: list[str] = []
+    for plant, flat in _collect_plants_with_flat_ess(
+        house_doc if isinstance(house_doc, dict) else {}
+    ):
+        del plant  # only need keys
+        keys.extend(sorted(flat))
+    return sorted(set(keys))
 
 
 def migrate_document(doc: dict[str, Any], *, kind: str) -> dict[str, Any]:

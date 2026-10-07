@@ -174,6 +174,10 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
             '{"written_at":"2026-07-05T23:00:00"}\n',
             encoding="utf-8",
         )
+        (tmp_path / "runtime" / "optimization_history.jsonl.2026-06-01_00-00-00").write_text(
+            '{"written_at":"2026-06-15T12:00:00"}\n',
+            encoding="utf-8",
+        )
         config_path = Path(os.environ["EARNIE_CONFIG_PATH"])
         cfg = json.loads(config_path.read_text(encoding="utf-8"))
         cfg["market_prices"] = {"forecast_model_path": "runtime/price_model_coefficients.json"}
@@ -194,6 +198,7 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
         assert "manifest.json" in names
         assert "README.txt" in names
         assert "runtime/optimization_history.jsonl" in names
+        assert "runtime/optimization_history.jsonl.2026-06-01_00-00-00" in names
         assert "runtime/optimization_history_window.jsonl" not in names
         manifest = json.loads(archive.read("manifest.json"))
         assert manifest["schema_version"] == 3
@@ -207,6 +212,9 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
         assert "runtime/optimization_history.jsonl" in manifest["files"][
             "required_present"
         ]
+        assert "runtime/optimization_history.jsonl.2026-06-01_00-00-00" in manifest[
+            "files"
+        ]["optional_present"]
         assert "inputs/config.json" in names
         assert "inputs/deviation_rules.json" in names
         assert "inputs/price_model_coefficients.json" in names

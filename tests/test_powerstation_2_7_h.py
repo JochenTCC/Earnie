@@ -285,11 +285,7 @@ def test_ha_charge_does_not_remap_to_house_battery():
 
     adapter.write_mapped_fields.assert_not_called()
     assert len(persisted) == 1
-    failed = set(persisted[0]["failed_fields"])
-    assert failed == {
-        "set_ess_charge_power_limit",
-        "set_ess_discharge_power_limit",
-    }
+    assert persisted[0]["failed_fields"] == ["set_ess_charge_power_limit"]
     assert "ess.delta3.set_ess_charge_power_limit" in persisted[0]["message"]
 
 
@@ -329,12 +325,49 @@ def test_loxone_charge_does_not_use_plant_merker():
 
     send.assert_not_called()
     assert len(persisted) == 1
-    failed = set(persisted[0]["failed_fields"])
-    assert failed == {
-        "set_ess_charge_power_limit",
-        "set_ess_discharge_power_limit",
-    }
+    assert persisted[0]["failed_fields"] == ["set_ess_charge_power_limit"]
     assert "ess.delta3.set_ess_charge_power_limit" in persisted[0]["message"]
+
+
+def test_loxone_charge_only_when_discharge_unmapped():
+    """EcoFlow-style: charge Merker present, no discharge → write charge, no Schreibfehler."""
+    from ehal.ess_fields import ess_field
+    from optimizer import powerstation_live as psl
+
+    psl._last_powerstation_sent.clear()
+    persisted: list = []
+    slug = "ecoflow_delta_3"
+    planning = [
+        {
+            "id": slug,
+            "type": "powerstation",
+            "ehal_bindings": {
+                ess_field(slug, "set_ess_charge_power_limit"): "PS_Charge_Limit",
+            },
+        }
+    ]
+
+    with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
+        "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
+    ), patch(
+        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+    ), patch(
+        "integrations.ehal_live.is_ha_backend", return_value=False
+    ), patch(
+        "integrations.ehal_live.is_ehal_network_backend", return_value=False
+    ), patch(
+        "integrations.ehal_live.persist_write_error", side_effect=persisted.append
+    ), patch(
+        "integrations.loxone_client._send_loxone_value_traced"
+    ) as send:
+        send.return_value = MagicMock(success=True)
+        psl.write_physical_powerstation_charges({slug: 1.5})
+
+    send.assert_called_once()
+    assert send.call_args[0][0] == "PS_Charge_Limit"
+    assert send.call_args[0][1] == pytest.approx(1.5)
+    assert persisted == []
+    assert psl.last_powerstation_sent().get("set_ess_charge_power_limit") == 1.5
 
 
 def test_ha_source_select_still_uses_plant_flat():

@@ -200,6 +200,7 @@ def render_ehal_loxone_mapping_section() -> None:
             profile_id=profile_id,
             entity_id=str(entity["id"]),
             ehal_map=ehal_map,
+            entity_kind=str(entity.get("kind") or ""),
         )
 
 def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]]:
@@ -297,6 +298,7 @@ def _accept_pending_new_marker(house: dict, config_doc: dict) -> None:
         profile_id=profile_id,
         entity_id=entity_id,
         ehal_map=bindings,
+        entity_kind=str((entity or {}).get("kind") or ""),
     )
     if widget_key:
         st.session_state[widget_key] = name

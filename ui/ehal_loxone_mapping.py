@@ -6,6 +6,7 @@ from typing import Any
 import streamlit as st
 
 import config
+from ehal.ess_fields import ESS_BATTERY_MAPPING_KINDS, ess_field, ess_field_kind
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
 from house_config.ehal_bindings import (
     FILTER_EHAL_FIELDS,
@@ -18,7 +19,6 @@ from house_config.ehal_bindings import (
 from integrations.ehal_live import reset_adapter_cache
 from integrations.loxone_ehal_mapping import (
     FIELD_LABELS,
-    SETPOINT_FIELDS,
     TELEMETRY_OPTIONAL,
     TELEMETRY_REQUIRED,
     heuristic_propose,
@@ -46,15 +46,21 @@ _SESSION_MANUAL_FEEDBACK = "ehal_lox_manual_feedback"
 _SESSION_PENDING_NEW = "ehal_lox_pending_new_marker"
 
 PLANT_ENTITY_ID = "plant"
+BATTERY_ENTITY_KIND = "battery"
 
+# Plant mapping no longer owns ESS SoC/power/limits (2.7.m); shared EcoFlow bridge stays.
+_PLANT_ESS_MOVED = frozenset(ESS_BATTERY_MAPPING_KINDS)
+PLANT_TELEMETRY_REQUIRED: tuple[str, ...] = tuple(
+    f for f in TELEMETRY_REQUIRED if f not in _PLANT_ESS_MOVED
+)
 PLANT_FIELDS: tuple[str, ...] = (
-    TELEMETRY_REQUIRED
-    + tuple(f for f in TELEMETRY_OPTIONAL if f != "sens_evcs_active_power")
+    PLANT_TELEMETRY_REQUIRED
     + tuple(
         f
-        for f in SETPOINT_FIELDS
-        if f.startswith("set_ess_") or f == "set_grid_export_power_limit"
+        for f in TELEMETRY_OPTIONAL
+        if f != "sens_evcs_active_power" and f not in _PLANT_ESS_MOVED
     )
+    + ("set_ess_source_select", "set_grid_export_power_limit")
 )
 
 EV_FIELDS: tuple[str, ...] = (
@@ -111,7 +117,25 @@ def _field_label(field: str) -> str:
     pattern_label = flex_field_label(field)
     if pattern_label:
         return pattern_label
+    kind = ess_field_kind(field)
+    if kind and kind in labels:
+        return labels[kind]
     return labels.get(field, field)
+
+
+def fields_for_battery(battery_id: str) -> tuple[str, ...]:
+    """Pattern B ESS mapping fields for one battery (excludes shared source_select)."""
+    return tuple(ess_field(battery_id, kind) for kind in ESS_BATTERY_MAPPING_KINDS)
+
+
+def _load_components_for_mapping() -> dict:
+    try:
+        from ui.house_config_io import _load_components_document
+
+        doc = _load_components_document()
+        return doc if isinstance(doc, dict) else {"batteries": [], "pv_systems": []}
+    except Exception:
+        return {"batteries": [], "pv_systems": []}
 
 
 def _field_select_caption(
@@ -200,8 +224,13 @@ def consumers_for_profile(house_doc: dict, profile_id: str) -> list[dict]:
     return [c for c in raw if isinstance(c, dict)]
 
 
-def build_entity_rows(house_doc: dict, profile_id: str) -> list[dict[str, Any]]:
-    """Plant + live-profile consumers as mapping entity rows."""
+def build_entity_rows(
+    house_doc: dict,
+    profile_id: str,
+    *,
+    components_doc: dict | None = None,
+) -> list[dict[str, Any]]:
+    """Plant + batteries + live-profile consumers as mapping entity rows."""
     plant = house_doc.get("plant") if isinstance(house_doc.get("plant"), dict) else {}
     rows: list[dict[str, Any]] = [
         {
@@ -212,6 +241,29 @@ def build_entity_rows(house_doc: dict, profile_id: str) -> list[dict[str, Any]]:
             "bindings": binding_map(plant.get("ehal_bindings")),
         }
     ]
+    components = (
+        components_doc
+        if isinstance(components_doc, dict)
+        else _load_components_for_mapping()
+    )
+    from house_config.powerstation import ehal_mappable_batteries
+
+    for battery in ehal_mappable_batteries(
+        components.get("batteries") if isinstance(components, dict) else []
+    ):
+        bid = _nonempty(battery.get("id"))
+        if not bid:
+            continue
+        rows.append(
+            {
+                "id": bid,
+                "kind": BATTERY_ENTITY_KIND,
+                "label": _nonempty(battery.get("label")) or bid,
+                "fields": fields_for_battery(bid),
+                "bindings": binding_map(battery.get("ehal_bindings")),
+                "battery": battery,
+            }
+        )
     consumers = consumers_for_profile(house_doc, profile_id)
     for consumer in consumers:
         cid = _nonempty(consumer.get("id"))
@@ -237,7 +289,10 @@ def apply_entity_bindings(
     entity_id: str,
     bindings: dict[str, str],
 ) -> dict:
-    """Write bindings onto plant or consumer; return new doc."""
+    """Write bindings onto plant or consumer; return new doc.
+
+    Battery entities use :func:`apply_battery_bindings` (components.json).
+    """
     house = dict(house_doc)
     cleaned = {k: v for k, v in bindings.items() if _nonempty(v)}
     if entity_id == PLANT_ENTITY_ID:
@@ -259,6 +314,68 @@ def apply_entity_bindings(
     profile["consumers"] = consumers
     house["profiles"] = {**profiles, profile_id: profile}
     return house
+
+
+def apply_battery_bindings(
+    components_doc: dict,
+    *,
+    battery_id: str,
+    bindings: dict[str, str],
+) -> dict:
+    """Write Pattern B ESS bindings onto ``batteries[].ehal_bindings``.
+
+    Refuses virtual powerstations (no EHAL binding surface).
+    """
+    from copy import deepcopy
+
+    from house_config.powerstation import is_virtual_powerstation
+
+    out = deepcopy(components_doc) if isinstance(components_doc, dict) else {
+        "batteries": [],
+        "pv_systems": [],
+    }
+    batteries = out.get("batteries")
+    if not isinstance(batteries, list):
+        batteries = []
+        out["batteries"] = batteries
+    cleaned = {k: v for k, v in bindings.items() if _nonempty(v)}
+    bid = _nonempty(battery_id)
+    found = False
+    for index, battery in enumerate(batteries):
+        if not isinstance(battery, dict):
+            continue
+        if _nonempty(battery.get("id")) != bid:
+            continue
+        if is_virtual_powerstation(battery):
+            raise ValueError(
+                f"Virtual powerstation '{bid}' has no EHAL bindings "
+                "(inherits house ESS; map the house battery instead)."
+            )
+        updated = dict(battery)
+        updated["ehal_bindings"] = cleaned
+        batteries[index] = updated
+        found = True
+        break
+    if not found and bid:
+        batteries.append({"id": bid, "label": bid, "ehal_bindings": cleaned})
+    return out
+
+
+def entity_kind_for_id(
+    house_doc: dict,
+    profile_id: str,
+    entity_id: str,
+    *,
+    components_doc: dict | None = None,
+) -> str:
+    """Return ``plant`` / ``battery`` / ``consumer`` / ```` for an entity id."""
+    eid = _nonempty(entity_id)
+    if eid == PLANT_ENTITY_ID:
+        return "plant"
+    for row in build_entity_rows(house_doc, profile_id, components_doc=components_doc):
+        if _nonempty(row.get("id")) == eid:
+            return str(row.get("kind") or "")
+    return ""
 
 
 def configured_marker_names(house_doc: dict, profile_id: str) -> list[str]:
@@ -503,31 +620,45 @@ def persist_loxone_entity_mapping(
     profile_id: str,
     entity_id: str,
     ehal_map: dict[str, str],
+    entity_kind: str = "",
 ) -> str:
-    """Persist entity bindings; Shadow → runtime overlay, else house_profiles + config.
+    """Persist entity bindings; Shadow → runtime overlay, else house/components + config.
 
     Returns a short success detail (where data was written).
     """
     from runtime_store.shadow.ehal_overlay import upsert_entity_bindings
     from runtime_store.shadow.mode import is_shadow_mode
+    from ui.house_config_io import _load_components_document, _save_components_document
 
     migrated_house, migrated_config, _ = ensure_migrated(house, config_doc)
-    updated = apply_entity_bindings(
-        migrated_house,
-        profile_id=profile_id,
-        entity_id=entity_id,
-        bindings=ehal_map,
+    kind = str(entity_kind or "").strip() or entity_kind_for_id(
+        migrated_house, profile_id, entity_id
     )
     if is_shadow_mode():
         path = upsert_entity_bindings(
             profile_id=profile_id,
             entity_id=entity_id,
             bindings=ehal_map,
+            entity_kind=kind,
         )
         reset_adapter_cache()
-        return (
-            f"Shadow-Overlay `{path}` (Prod-`house_profiles.json` unverändert)"
+        return f"Shadow-Overlay `{path}` (Prod-Config unverändert)"
+    if kind == BATTERY_ENTITY_KIND:
+        components = apply_battery_bindings(
+            _load_components_document(),
+            battery_id=entity_id,
+            bindings=ehal_map,
         )
+        _save_components_document(components)
+        save_main_config(_ensure_ehal_loxone_meta(migrated_config))
+        reset_adapter_cache()
+        return "`components.json` (`batteries[].ehal_bindings`)"
+    updated = apply_entity_bindings(
+        migrated_house,
+        profile_id=profile_id,
+        entity_id=entity_id,
+        bindings=ehal_map,
+    )
     save_house_profiles(updated)
     save_main_config(_ensure_ehal_loxone_meta(migrated_config))
     reset_adapter_cache()
@@ -559,7 +690,11 @@ def _render_field_selects(
     ehal_map: dict[str, str] = {}
     bindings = entity["bindings"]
     fields: tuple[str, ...] = tuple(entity["fields"])
-    required = set(TELEMETRY_REQUIRED) if entity["id"] == PLANT_ENTITY_ID else set()
+    required: set[str] = set()
+    if entity["id"] == PLANT_ENTITY_ID:
+        required = set(PLANT_TELEMETRY_REQUIRED)
+    elif str(entity.get("kind") or "") == BATTERY_ENTITY_KIND:
+        required = {ess_field(str(entity["id"]), "sens_ess_soc")}
     grouped = group_fields_by_role(fields)
     if not grouped:
         grouped = [("other", list(fields))]
@@ -568,7 +703,8 @@ def _render_field_selects(
         caption = role_group_label(role_id) if role_id != "other" else "Felder"
         st.markdown(f"**{caption}** — `{entity_id}`")
         for field in role_fields:
-            prop = proposals.get(field) or {}
+            # Quellenwahl is opt-in (standby_backup); never pre-fill from heuristics.
+            prop = {} if field == "set_ess_source_select" else (proposals.get(field) or {})
             existing = str(bindings.get(field) or "")
             proposed = str(prop.get("marker_name") or "")
             default = resolve_field_select_default(existing, proposed)
@@ -588,11 +724,22 @@ def _render_field_selects(
 
 
 
-def _validate_mapping_save(entity_id: str, ehal_map: dict[str, str]) -> str | None:
-    if entity_id == PLANT_ENTITY_ID:
-        missing = [name for name in TELEMETRY_REQUIRED if name not in ehal_map]
+def _validate_mapping_save(
+    entity_id: str,
+    ehal_map: dict[str, str],
+    *,
+    entity_kind: str = "",
+) -> str | None:
+    kind = str(entity_kind or "").strip()
+    if entity_id == PLANT_ENTITY_ID or kind == "plant":
+        missing = [name for name in PLANT_TELEMETRY_REQUIRED if name not in ehal_map]
         if missing:
             return "Pflichtfelder fehlen: " + ", ".join(missing)
+        return None
+    if kind == BATTERY_ENTITY_KIND:
+        soc = ess_field(entity_id, "sens_ess_soc")
+        if soc not in ehal_map:
+            return f"Pflichtfelder fehlen: {soc}"
     return None
 
 
@@ -614,8 +761,12 @@ def _save_entity_mapping(
     profile_id: str,
     entity_id: str,
     ehal_map: dict[str, str],
+    entity_kind: str = "",
 ) -> None:
-    error = _validate_mapping_save(entity_id, ehal_map)
+    kind = str(entity_kind or "").strip() or entity_kind_for_id(
+        house, profile_id, entity_id
+    )
+    error = _validate_mapping_save(entity_id, ehal_map, entity_kind=kind)
     if error:
         st.error(error)
         return
@@ -625,6 +776,7 @@ def _save_entity_mapping(
         profile_id=profile_id,
         entity_id=entity_id,
         ehal_map=ehal_map,
+        entity_kind=kind,
     )
     st.session_state[_SESSION_MIGRATED] = True
     st.success(f"Mapping für `{entity_id}` gespeichert — {detail}.")

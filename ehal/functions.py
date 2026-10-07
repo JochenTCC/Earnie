@@ -120,7 +120,8 @@ def function_statuses(
     present = _mapped_fields(mapped)
     if vendor_ess_active:
         present.add("set_ess_active_power")
-    scope = set(fields) if fields is not None else None
+    # Pattern B ess.{slug}.* expands to flat kinds so battery entity scope matches.
+    scope = _mapped_fields(fields) if fields is not None else None
     out: list[FunctionStatus] = []
     for function in EHAL_FUNCTIONS:
         if scope is not None and not set(function.required) <= scope:

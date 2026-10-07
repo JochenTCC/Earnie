@@ -28,6 +28,23 @@ PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
     "get_ess_max_discharge_power",
 )
 
+# Per-battery Pattern B read kinds (2.7.m); plant flats stay as primary aliases.
+BATTERY_ESS_LIVE_READ_KINDS: tuple[str, ...] = (
+    "sens_ess_soc",
+    "sens_ess_power",
+    "get_ess_soc_min",
+    "get_ess_soc_max",
+    "get_ess_max_charge_power",
+    "get_ess_max_discharge_power",
+)
+
+BATTERY_ESS_LIVE_WRITE_KINDS: tuple[str, ...] = (
+    "set_ess_active_power",
+    "set_ess_charge_power_limit",
+    "set_ess_discharge_power_limit",
+    "set_ess_mode",
+)
+
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_ess_active_power",
     "set_ess_charge_power_limit",
@@ -78,25 +95,31 @@ NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS
 
 def is_live_read_field(field: str) -> bool:
     """True for Live-Lesen rows (``sens_*`` / ``get_*`` / flex ``*.sens_power_act``)."""
+    from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import is_flex_live_read_field
 
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
+    kind = ess_field_kind(name) or name
     return (
-        name.startswith("sens_")
-        or name.startswith("get_")
+        kind.startswith("sens_")
+        or kind.startswith("get_")
         or is_flex_live_read_field(name)
     )
 
 
 def is_live_write_field(field: str) -> bool:
     """True for Live-Schreiben rows (``set_*`` / flex ``set_enable``)."""
+    from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import KIND_SET_ENABLE, flex_field_kind
 
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
+    kind = ess_field_kind(name) or name
+    if kind.startswith("set_"):
+        return True
     if name.startswith("set_"):
         return True
     return flex_field_kind(name) == KIND_SET_ENABLE
@@ -168,11 +191,35 @@ def _all_live_consumers() -> list[dict]:
     return list(by_id.values())
 
 
+def _all_live_batteries() -> list[dict]:
+    """EHAL-mappable batteries only (excludes virtual powerstations)."""
+    try:
+        from house_config.components_store import load_components_document
+        from house_config.powerstation import ehal_mappable_batteries
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return []
+        doc = load_components_document(path)
+        raw = doc.get("batteries") if isinstance(doc, dict) else []
+        return ehal_mappable_batteries(raw if isinstance(raw, list) else [])
+    except Exception:
+        return []
+
+
 def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
-    """Canonical Live-Lesen field ids (plant + consumers), including unmapped."""
+    """Canonical Live-Lesen field ids (plant + batteries + consumers), including unmapped."""
+    from ehal.ess_fields import ess_field
+
     if network_backend:
         return list(NETWORK_LIVE_READ_FIELDS)
     fields = list(PLANT_LIVE_READ_FIELDS)
+    for battery in _all_live_batteries():
+        bid = str(battery.get("id") or "").strip()
+        if not bid:
+            continue
+        fields.extend(ess_field(bid, kind) for kind in BATTERY_ESS_LIVE_READ_KINDS)
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
         if not cid:
@@ -198,13 +245,19 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
 
 
 def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
-    """Canonical Live-Schreiben ids (plant + EV + flex Freigabe)."""
-    if network_backend:
-        return list(NETWORK_LIVE_WRITE_FIELDS)
+    """Canonical Live-Schreiben ids (plant + batteries + EV + flex Freigabe)."""
+    from ehal.ess_fields import ess_field
     from ehal.flex_fields import flex_set_enable
     from settings.ehal_marker_resolve import marker_flex_enable
 
+    if network_backend:
+        return list(NETWORK_LIVE_WRITE_FIELDS)
     fields = list(PLANT_LIVE_WRITE_FIELDS)
+    for battery in _all_live_batteries():
+        bid = str(battery.get("id") or "").strip()
+        if not bid:
+            continue
+        fields.extend(ess_field(bid, kind) for kind in BATTERY_ESS_LIVE_WRITE_KINDS)
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
         if not cid:

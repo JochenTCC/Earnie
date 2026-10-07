@@ -637,9 +637,14 @@ class HaAdapter:
                 exc,
             )
             raise
-        if field_name == "sens_ess_soc":
+        from ehal.ess_fields import ess_field_kind
+
+        kind = ess_field_kind(field_name) or field_name
+        if kind == "sens_ess_soc" or field_name == "sens_ess_soc":
             return float(raw)
-        return apply_sign(raw, self.cfg.sign.get(field_name))
+        # Per-battery Pattern B sign override, else flat kind / field inherit (2.7.m).
+        mode = self.cfg.sign.get(field_name) or self.cfg.sign.get(kind)
+        return apply_sign(raw, mode)
 
     def _try_setpoint_write(
         self, field_name: str, value: float | str

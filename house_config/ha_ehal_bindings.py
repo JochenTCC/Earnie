@@ -144,14 +144,29 @@ def migrate_ha_entities_to_house(
     return house, changed
 
 
-def aggregate_ha_entities(house_doc: dict | None) -> dict[str, str]:
-    """Flat field→entity_id map for ``HaAdapter`` from plant + first EV consumer."""
+def aggregate_ha_entities(
+    house_doc: dict | None,
+    *,
+    components_doc: dict | None = None,
+) -> dict[str, str]:
+    """Field→entity_id map for ``HaAdapter``: plant + first EV + battery Pattern B.
+
+    Primary battery ESS bindings are also aliased to flat ``sens_ess_*`` /
+    ``set_ess_*`` keys for legacy callers (2.7.m). ``set_ess_source_select``
+    stays plant-owned (shared EcoFlow bridge).
+    """
+    from ehal.ess_fields import is_plant_flat_ess_field
+    from house_config.ess_bindings import merge_ess_bindings_into_plant
+
     house = house_doc if isinstance(house_doc, dict) else {}
     out: dict[str, str] = {}
     plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
     plant_bindings = _binding_map(plant.get("ehal_bindings"))
     for field in HA_ALL_FIELDS:
         if field in HA_EV_FIELDS:
+            continue
+        # Battery-owned ESS flats come from components; keep plant source_select.
+        if is_plant_flat_ess_field(field) and field != "set_ess_source_select":
             continue
         value = plant_bindings.get(field)
         if value:
@@ -163,7 +178,44 @@ def aggregate_ha_entities(house_doc: dict | None) -> dict[str, str]:
         value = ev_bindings.get(field) or plant_bindings.get(field)
         if value:
             out[field] = value
+
+    batteries = _batteries_for_aggregate(components_doc)
+    if batteries:
+        merged = merge_ess_bindings_into_plant({}, batteries)
+        for key, value in merged.items():
+            addr = _nonempty(value)
+            if addr:
+                out[key] = addr
+    # Legacy plant-flat ESS until migrate_ess_bindings_once (battery Pattern B wins).
+    for field, value in plant_bindings.items():
+        if (
+            is_plant_flat_ess_field(field)
+            and field != "set_ess_source_select"
+            and field not in out
+            and value
+        ):
+            out[field] = value
     return canonicalize_ha_entity_keys(out)
+
+
+def _batteries_for_aggregate(components_doc: dict | None) -> list[dict]:
+    from house_config.powerstation import ehal_mappable_batteries
+
+    if isinstance(components_doc, dict):
+        raw = components_doc.get("batteries")
+        return ehal_mappable_batteries(raw if isinstance(raw, list) else [])
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return []
+        doc = load_components_document(path)
+        raw = doc.get("batteries") if isinstance(doc, dict) else []
+        return ehal_mappable_batteries(raw if isinstance(raw, list) else [])
+    except Exception:
+        return []
 
 
 def apply_ha_entities_to_house(

@@ -2,6 +2,24 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.m — Per-battery EHAL mapping (EHAL-Com) (2026-10-06)
+
+- [x] **2.7.m — Per-battery EHAL mapping (EHAL-Com)** (before **2.7.l**; unblocks **2.7.h** dogfood mapping)
+  - Decisions: ESS off plant row (runtime primary flat aliases only); per-battery Loxone Merker `Earnie_Batterie_<Slug>_…`; shared plant `set_ess_source_select` / `Earnie_Speicher_Quellenwahl`; virtual powerstations excluded from EHAL binding
+  - **2.7.m-1:** `kind: battery` rows in `build_entity_rows` (house + physical PS only); persist via `apply_battery_bindings` → `components.json`; Shadow `battery_bindings`
+  - **2.7.m-2:** `aggregate_ha_entities` merges Pattern B + primary aliases; Live-Lesen per-battery rows; plant-flat ESS fallback until migrate
+  - **2.7.m-3:** battery required SoC; function status Pattern B scope; per-battery HA sign inherit; setup_readiness via `resolve_plant_binding`
+  - **2.7.m-4:** `scripts/migrate_ess_bindings_once.py` (`--config-dir` / `--dry-run`); top-level plant migrate; keep `set_ess_source_select` on plant
+  - Docs: `ehal-com.md` §C.2, `batterie-pv.md`, `ehal.md`, `loxone-signals.md`; tests mapping / aggregate×2 / shadow / migrate
+
+### Monthly rotation — optimization_history.jsonl + earnie.log (2026-10-06)
+
+- [x] Monthly rotation for `optimization_history.jsonl` and `earnie.log` (no size trigger; `backupCount=12` ≈ one year)
+  - Shared helpers: `runtime_store/month_file_rotation.py` (`compute_next_month_rollover`, archive naming, rename→copy/truncate, prune)
+  - `logger_config.MonthRotatingFileHandler` (replaces size+weekly `W0`); history rotates on append; loaders merge active + archives
+  - Debug dump + shadow seed include history archive siblings; docs `docs/einrichtung/betrieb.md`
+  - Tests: `tests/test_logger_config_rotation.py`, `tests/test_optimization_history_rotation.py`
+
 ### Bugfix — EV setpoints empty / continuous postpone (2026-10-06)
 
 - [x] EV charging continuously postponed / empty live setpoints (dump `debug_dump_20261006_055651`)

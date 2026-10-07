@@ -172,6 +172,39 @@ def test_migrate_plant_ess_ambiguous_raises():
         migrate_plant_ess_to_components(house, components)
 
 
+def test_migrate_plant_ess_top_level_plant_keeps_source_select():
+    house = {
+        "earnie_data_model": 4,
+        "plant": {
+            "ehal_bindings": {
+                "sens_ess_soc": "Earnie_Batterie_SoC",
+                "set_ess_active_power": "Earnie_Batterie_Sollleistung",
+                "set_ess_source_select": "Earnie_Speicher_Quellenwahl",
+                "sens_grid_power_active": "Earnie_Netz",
+            }
+        },
+        "profiles": {"live": {"id": "live", "consumers": []}},
+    }
+    components = {
+        "earnie_data_model": 4,
+        "batteries": [{"id": "house", "label": "Haus", "battery_capacity_kwh": 10}],
+        "pv_systems": [],
+    }
+    house_out, comp_out, changed = migrate_plant_ess_to_components(house, components)
+    assert changed
+    plant_b = house_out["plant"]["ehal_bindings"]
+    assert "sens_ess_soc" not in plant_b
+    assert "set_ess_active_power" not in plant_b
+    assert plant_b["set_ess_source_select"] == "Earnie_Speicher_Quellenwahl"
+    assert plant_b["sens_grid_power_active"] == "Earnie_Netz"
+    bat_b = comp_out["batteries"][0]["ehal_bindings"]
+    assert bat_b[ess_field("house", "sens_ess_soc")] == "Earnie_Batterie_SoC"
+    assert (
+        bat_b[ess_field("house", "set_ess_active_power")]
+        == "Earnie_Batterie_Sollleistung"
+    )
+
+
 def test_physical_max_export_sums_discharge():
     assert physical_max_export_kw(10.0, 2.5 + 5.0) == pytest.approx(17.5)
 

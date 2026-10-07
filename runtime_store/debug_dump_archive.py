@@ -157,7 +157,8 @@ def write_debug_dump_zip(
     """
     Write a unified debug-dump ZIP (schema v3). Returns absolute path.
 
-    Always includes full ``runtime/optimization_history.jsonl``. Optional
+    Always includes full ``runtime/optimization_history.jsonl`` plus any
+    monthly archive siblings ``optimization_history.jsonl.*``. Optional
     ``chart_payload`` is stored under ``manifest.chart`` when provided.
     """
     moment = captured_at or datetime.now()
@@ -195,6 +196,10 @@ def write_debug_dump_zip(
 
         archive.write(history_src, arcname="runtime/optimization_history.jsonl")
         required_present.append("runtime/optimization_history.jsonl")
+        for archive_path in optimization_history.list_rotated_siblings(history_src):
+            arcname = f"runtime/{os.path.basename(archive_path)}"
+            archive.write(archive_path, arcname=arcname)
+            optional_present.append(arcname)
         for filename in _OPTIONAL_RUNTIME:
             written = _copy_runtime_file_if_present(
                 archive, filename, runtime_base=runtime_base

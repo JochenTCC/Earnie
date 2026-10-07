@@ -28,6 +28,9 @@ _WRITE_DOMAINS = WRITE_DOMAINS
 _ENERGY_EXCLUDE = ("energy", "ertrag", "kwh", "wh ")
 _HOUSE_LOAD_EXCLUDE = ("leistung_verbrauch", "verbrauch")
 
+# Opt-in plant fields: never auto-propose (standby_backup Quellenwahl).
+MANUAL_ONLY_FIELDS = frozenset({"set_ess_source_select"})
+
 # Per-field: name hints, allowed domains, optional device_class / unit boosts.
 _FIELD_RULES: dict[str, dict[str, Any]] = {
     "sens_grid_power_active": {
@@ -256,15 +259,9 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
         "hints": ("ess_mode", "mode_hint", "steuerbefehl", "ess mode", "control_cmd"),
         "domains": _WRITE_DOMAINS,
     },
+    # set_ess_source_select: manual only (standby_backup) — see MANUAL_ONLY_FIELDS
     "set_ess_source_select": {
-        "hints": (
-            "grid_bypass",
-            "grid bypass",
-            "ban_bypass",
-            "quellenwahl",
-            "source_select",
-            "source select",
-        ),
+        "hints": (),
         "domains": frozenset({"switch", "input_boolean", "select", "number", "input_number"}),
     },
     "set_evcs_max_current": {
@@ -357,6 +354,8 @@ def heuristic_propose(
     rows = [row for row in rows if row["entity_id"]]
     proposals: dict[str, dict[str, Any]] = {}
     for field in fields:
+        if field in MANUAL_ONLY_FIELDS:
+            continue
         rules = _FIELD_RULES.get(field)
         if not rules:
             continue

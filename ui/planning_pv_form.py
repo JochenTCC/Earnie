@@ -6,6 +6,10 @@ from collections.abc import Sequence
 
 import streamlit as st
 
+from house_config.entity_id_lock import (
+    ID_PROVISIONAL_LABEL_KEY,
+    is_id_locked,
+)
 from house_config.id_slug import slug_id
 from house_config.label_uniqueness import allocate_unique_label
 from runtime_store.persist_paths import resolve_config_json_path
@@ -31,6 +35,7 @@ _SESSION_SELECT_PENDING_KEY = "planning_pv_select_pending"
 _SESSION_SELECTED_ID_KEY = "planning_pv_selected_id"
 _SESSION_SUPPRESS_AUTOPERSIST_KEY = "planning_pv_suppress_autopersist"
 _SESSION_TEMPLATE_SOURCE_KEY = "planning_pv_template_source"
+_SESSION_PROVISIONAL_LABEL_KEY = "planning_pv_provisional_label"
 
 
 def new_pv_system_template(
@@ -151,6 +156,12 @@ def _seed_pv_widget_state(
             )
 
     st.session_state[_scoped_key(session_scope, "planning_pv_label")] = label
+    if session_scope == "__new__" or (existing and not is_id_locked(existing)):
+        if existing:
+            seed = str(existing.get(ID_PROVISIONAL_LABEL_KEY) or label).strip()
+        else:
+            seed = str(label).strip()
+        st.session_state[_SESSION_PROVISIONAL_LABEL_KEY] = seed
     st.session_state[_scoped_key(session_scope, "planning_pv_kwp")] = kwp
     st.session_state[_scoped_key(session_scope, "planning_pv_tilt")] = tilt
     st.session_state[_scoped_key(session_scope, "planning_pv_azimuth")] = azimuth
@@ -335,31 +346,44 @@ def _render_pv_fields(ctx: dict) -> dict:
 
 
 def _pv_save_payload(fields: dict) -> dict:
-    return {
+    payload = {
         "label": fields["label"],
         "kwp": fields["kwp"],
         "pv_tilt": float(fields["tilt"]),
         "pv_azimuth": float(fields["azimuth"]),
     }
+    provisional = str(
+        fields.get(ID_PROVISIONAL_LABEL_KEY)
+        or st.session_state.get(_SESSION_PROVISIONAL_LABEL_KEY)
+        or ""
+    ).strip()
+    if provisional:
+        payload[ID_PROVISIONAL_LABEL_KEY] = provisional
+    return payload
 
 
 def _save_pv(
     fields: dict,
     *,
     stable_id: str,
-    entity_id: str,
     is_new: bool,
-) -> None:
+    force_id_from_label: bool = False,
+) -> str | None:
     try:
-        upsert_pv_system(_pv_save_payload(fields), stable_id=stable_id)
+        persisted_id = upsert_pv_system(
+            _pv_save_payload(fields),
+            stable_id=stable_id,
+            force_id_from_label=force_id_from_label,
+        )
     except ValueError as exc:
         st.error(str(exc))
-        return
+        return None
     st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
-    if is_new:
-        st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
+    if is_new or (stable_id and persisted_id != stable_id):
+        st.session_state[_SESSION_SELECT_PENDING_KEY] = persisted_id
         st.session_state[_SESSION_SYNC_KEY] = None
-        st.rerun()
+        st.session_state.pop(_SESSION_PROVISIONAL_LABEL_KEY, None)
+    return persisted_id
 
 
 def _persist_pv_form(
@@ -371,7 +395,7 @@ def _persist_pv_form(
     ready: bool,
 ) -> None:
     payload = {"id": entity_id, **_pv_save_payload(fields)}
-    persist_key = f"planning_pv::{entity_id}"
+    persist_key = f"planning_pv::{stable_id or entity_id}"
     suppress = bool(st.session_state.pop(_SESSION_SUPPRESS_AUTOPERSIST_KEY, False))
     if suppress and ready:
         # Mark draft as clean without writing so delete-of-last is not undone.
@@ -386,13 +410,38 @@ def _persist_pv_form(
             save=lambda: _save_pv(
                 fields,
                 stable_id=stable_id,
-                entity_id=entity_id,
                 is_new=is_new,
             ),
             ready=ready,
         )
     if wrote:
         st.rerun()
+
+
+def _render_pv_id_from_label(stable_id: str, fields: dict) -> None:
+    label = str(fields.get("label") or "").strip()
+    if not label or not stable_id:
+        return
+    desired = slug_id(label)
+    if desired == stable_id:
+        return
+    help_txt = (
+        f"Aktuelle ID `{stable_id}` → aus Bezeichnung `{desired}` (danach fest)."
+    )
+    if st.button(
+        "ID aus Bezeichnung übernehmen",
+        key="planning_pv_id_from_label",
+        help=help_txt,
+    ):
+        persisted = _save_pv(
+            fields,
+            stable_id=stable_id,
+            is_new=False,
+            force_id_from_label=True,
+        )
+        if persisted:
+            st.success(f"ID gesetzt: `{persisted}`")
+            st.rerun()
 
 
 def _render_pv_delete(stable_id: str) -> None:
@@ -438,4 +487,5 @@ def render_pv_planning_tab() -> None:
         ready=ready,
     )
     if not is_new and stable_id:
+        _render_pv_id_from_label(stable_id, fields)
         _render_pv_delete(stable_id)

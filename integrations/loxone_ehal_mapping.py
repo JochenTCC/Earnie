@@ -98,13 +98,7 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "set_ess_charge_power_limit": ("ladegrenze", "charge limit", "max lade"),
     "set_ess_discharge_power_limit": ("entladegrenze", "discharge limit", "max entlade"),
     "set_ess_mode": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd", "ess mode"),
-    "set_ess_source_select": (
-        "quellenwahl",
-        "source select",
-        "grid bypass",
-        "bypass",
-        "speicher quellen",
-    ),
+    # set_ess_source_select: manual only (standby_backup) — see MANUAL_ONLY_FIELDS
     "get_grid_export_power_limit": (
         "einspeisegrenze",
         "export limit",
@@ -219,6 +213,10 @@ def merge_loxone_blocks(
     return out
 
 
+# Opt-in plant fields: never auto-propose / leave unbound until the operator maps them.
+MANUAL_ONLY_FIELDS = frozenset({"set_ess_source_select"})
+
+
 def heuristic_propose(
     names: list[str],
     *,
@@ -228,6 +226,8 @@ def heuristic_propose(
     proposals: dict[str, dict[str, Any]] = {}
     lowered = [(n, n.lower()) for n in names if str(n).strip()]
     for field in fields:
+        if field in MANUAL_ONLY_FIELDS:
+            continue
         hints = _HINTS.get(field, ())
         best_name = ""
         best_score = 0.0

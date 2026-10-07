@@ -192,6 +192,26 @@ def test_switch_in_mappable_scan_but_not_auto_proposed():
     ))
 
 
+def test_heuristic_propose_skips_source_select():
+    """Plant Quellenwahl stays unbound until the operator maps it (standby_backup)."""
+    rows = [
+        {
+            "entity_id": "switch.delta_3_grid_bypass",
+            "domain": "switch",
+            "name": "Delta 3 Grid Bypass",
+            "unit": "",
+        },
+        {
+            "entity_id": "sensor.grid_power",
+            "domain": "sensor",
+            "name": "Grid Power",
+            "unit": "W",
+        },
+    ]
+    proposals = heuristic_propose(rows)
+    assert "set_ess_source_select" not in proposals
+
+
 def test_resolve_field_select_default_keeps_existing():
     assert (
         resolve_field_select_default("sensor.saved_grid", "sensor.evcc_grid_power")

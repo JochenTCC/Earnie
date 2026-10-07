@@ -11,15 +11,17 @@ from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_page_house_config.py"
+# Battery/PV forms grew (entity-id lock, readiness); default 3s flakes under xdist.
+_TIMEOUT_S = 10.0
 
 
 def test_renders_without_exception():
-    at = AppTest.from_file(str(_SCRIPT)).run()
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     assert not at.exception
 
 
 def test_title_and_default_tab():
-    at = AppTest.from_file(str(_SCRIPT)).run()
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     assert at.title[0].value == "🏠 Hauskonfigurator"
     [tabs] = at.segmented_control
     assert tabs.options == ["Hausprofil", "PV-Anlagen", "Batterien"]
@@ -28,21 +30,21 @@ def test_title_and_default_tab():
 
 def test_loxone_import_moved_to_smarthome_backend_page():
     """Loxone-Import now lives on Smarthome-Backend, not Hausprofil (see M4)."""
-    at = AppTest.from_file(str(_SCRIPT)).run()
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     assert not any("Loxone-Import" in h.value for h in at.subheader)
 
 
 def test_switch_to_pv_tab_renders_without_exception():
-    at = AppTest.from_file(str(_SCRIPT)).run()
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     [tabs] = at.segmented_control
-    tabs.set_value("PV-Anlagen").run()
+    tabs.set_value("PV-Anlagen").run(timeout=_TIMEOUT_S)
     assert not at.exception
     [tabs_after] = at.segmented_control
     assert tabs_after.value == "PV-Anlagen"
 
 
 def test_switch_to_batterien_tab_renders_without_exception():
-    at = AppTest.from_file(str(_SCRIPT)).run()
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     [tabs] = at.segmented_control
-    tabs.set_value("Batterien").run()
+    tabs.set_value("Batterien").run(timeout=_TIMEOUT_S)
     assert not at.exception

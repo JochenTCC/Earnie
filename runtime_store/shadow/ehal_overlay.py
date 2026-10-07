@@ -1,7 +1,7 @@
 """Shadow-only EHAL bindings overlay under ``EARNIE_RUNTIME_PATH``.
 
-Prod ``house_profiles.json`` stays read-only. Mapping UI saves land here and
-``load_house_profiles_document`` merges them when ``EARNIE_SHADOW=1``.
+Prod ``house_profiles.json`` / ``components.json`` stay read-only. Mapping UI
+saves land here and loaders merge them when ``EARNIE_SHADOW=1``.
 """
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from typing import Any
 
 OVERLAY_FILENAME = "shadow_ehal_bindings.json"
 PLANT_ENTITY_ID = "plant"
+BATTERY_ENTITY_KIND = "battery"
 
 
 def overlay_path() -> str:
@@ -61,13 +62,20 @@ def upsert_entity_bindings(
     profile_id: str,
     entity_id: str,
     bindings: dict[str, str],
+    entity_kind: str = "",
 ) -> str:
     """Replace one entity's bindings in the overlay; return absolute path."""
     cleaned = _clean_bindings(bindings)
     doc = read_overlay()
     eid = str(entity_id or "").strip()
-    if eid == PLANT_ENTITY_ID:
+    kind = str(entity_kind or "").strip()
+    if eid == PLANT_ENTITY_ID or kind == "plant":
         doc["plant_bindings"] = cleaned
+        # Drop stale consumer/battery slot if id was reused (defensive).
+    elif kind == BATTERY_ENTITY_KIND:
+        by_bat = dict(doc.get("battery_bindings") or {})
+        by_bat[eid] = cleaned
+        doc["battery_bindings"] = by_bat
     else:
         by_profile = dict(doc.get("consumer_bindings") or {})
         profile_map = dict(by_profile.get(profile_id) or {})
@@ -95,6 +103,34 @@ def apply_overlay_to_house(house: dict) -> dict:
         out["plant"] = plant
     if isinstance(by_profile, dict):
         _apply_consumer_overlay(out, by_profile)
+    return out
+
+
+def apply_overlay_to_components(components: dict) -> dict:
+    """Merge ``battery_bindings`` overlay into ``batteries[].ehal_bindings``."""
+    overlay = read_overlay()
+    by_bat = overlay.get("battery_bindings") if isinstance(overlay, dict) else None
+    if not isinstance(by_bat, dict) or not by_bat:
+        return components
+    out = deepcopy(components) if isinstance(components, dict) else {
+        "batteries": [],
+        "pv_systems": [],
+    }
+    batteries = out.get("batteries")
+    if not isinstance(batteries, list):
+        return out
+    for index, battery in enumerate(batteries):
+        if not isinstance(battery, dict):
+            continue
+        bid = str(battery.get("id") or "").strip()
+        raw = by_bat.get(bid)
+        if not isinstance(raw, dict):
+            continue
+        updated = dict(battery)
+        updated["ehal_bindings"] = _clean_bindings(
+            {str(k): str(v) for k, v in raw.items()}
+        )
+        batteries[index] = updated
     return out
 
 

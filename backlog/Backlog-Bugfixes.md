@@ -33,6 +33,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] Error in NAS alpha ("P:\earnie-alpha") when starting main.py
+  EHAL Schreibfehler: Powerstation ESS fields have no own Merker; refusing plant-flat house-battery fallback: ess.15_kwh_speicher_copy_3.set_ess_charge_power_limit; ess.15_kwh_speicher_copy_3.set_ess_discharge_power_limit (set_ess_charge_power_limit, set_ess_discharge_power_limit)
+
 - [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
 
 

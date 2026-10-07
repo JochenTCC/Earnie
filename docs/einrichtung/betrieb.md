@@ -46,10 +46,10 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `power_interval_sampler_state.json` | Zwischenpuffer der Leistungsproben (≤ 60 s) für Viertelstunden-Mittel im Produktiv-Log; optional Energie-Anker (`energy_anchors`) für Loxone-Zähler ΔkWh → mittlere Slot-Leistung |
 | `cons_data_pending.json`        | Pending-Puffer für cons_data-Samples                                                         |
 | `consumption_profiles.csv`      | Berechnete Grundlast-Profile                                                                 |
-| `earnie.log`                    | Rotierendes Python-Log von main.py (5 MB oder wöchentlich; Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`) |
+| `earnie.log`                    | Rotierendes Python-Log von main.py (monatlich; max. 12 Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`) |
 | `main.lock` / `main.pid`        | Single-Instance-Sperre des Produktiv-Daemons (`main.lock` gehalten; PID zusätzlich in `main.pid` für Status/Stop unter Windows) |
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
-| `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; u. a. `consumption_snapshot`, optional `closed_interval`) |
+| `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; monatlich rotiert, max. 12 Archive; u. a. `consumption_snapshot`, optional `closed_interval`) |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
 | `live_day_ahead_<zone>.json` | Cache der letzten erfolgreichen Live-Day-Ahead-Serie (QH; Zone z. B. `AT`; `source` ENTSO-E oder Energy-Charts); Live nutzt ihn statt erneutem API-Abruf bzw. vor aWATTar-Fallback |
 | `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode` — auch UI **Optimierer-Dienst**, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`)     |
@@ -112,8 +112,8 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 
 | Datei                                | Status                         | Hinweis                                                       |
 | ------------------------------------ | ------------------------------ | ------------------------------------------------------------- |
-| `optimization_history.jsonl`         | **kanonisch**                  | Produktiv-Historie (eine JSON-Zeile pro Optimierungslauf)     |
-| `earnie.log`                         | **aktiv**                      | Rotierendes Python-Log von `main.py` (5 MB **oder** wöchentlich Mo 00:00/`W0`, max. 8 Archive) |
+| `optimization_history.jsonl`         | **kanonisch**                  | Produktiv-Historie (eine JSON-Zeile pro Optimierungslauf; monatlich, max. 12 Archive `optimization_history.jsonl.YYYY-MM-DD_HH-MM-SS`) |
+| `earnie.log`                         | **aktiv**                      | Rotierendes Python-Log von `main.py` (monatlich, max. 12 Archive) |
 | `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf                     |
 | `live_optimization_debug.json`       | **aktiv**                      | 24h-Anzeige-Snapshot für die Streamlit-App                    |
 | `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis von Szenario-Explorer — nicht für Produktiv-NAS   |

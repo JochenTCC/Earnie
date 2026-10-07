@@ -158,6 +158,17 @@ def test_match_controls_unions_http_probe_extra_names():
     assert wp.bindings["flex.waermepumpe.set_enable"] == "Earnie_Waermepumpe_Freigabe"
 
 
+def test_match_controls_skips_source_select_autobind():
+    """Quellenwahl Merker is recognized but not auto-bound on plant."""
+    empty_doc = {"controls": {}}
+    extra = {"Earnie_Speicher_Quellenwahl", "Earnie_Batterie_SoC"}
+    matches, report = match_controls(empty_doc, load_device_map(), extra_names=extra)
+    assert "Earnie_Speicher_Quellenwahl" in report.skipped_markers
+    plant = next(m for m in matches if m.entity_kind == "plant")
+    assert "set_ess_source_select" not in plant.bindings
+    assert plant.bindings["sens_ess_soc"] == "Earnie_Batterie_SoC"
+
+
 def test_match_pool_is_thermal_rc():
     matches, _report = match_controls(_doc(), load_device_map())
     pool = next(m for m in matches if m.entity_kind == "pool")

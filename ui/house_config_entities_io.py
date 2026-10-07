@@ -42,30 +42,66 @@ def _save_components_document(data: dict) -> None:
     save_components_document(resolve_components_json_path(), data)
     config.reinit_config()
 
-def upsert_pv_system(raw_spec: dict, *, stable_id: str = "") -> None:
+def upsert_pv_system(
+    raw_spec: dict,
+    *,
+    stable_id: str = "",
+    force_id_from_label: bool = False,
+) -> str:
+    """Upsert PV system; return the persisted id (may rename when unlocking)."""
+    from house_config.entity_id_lock import (
+        ID_LOCKED_KEY,
+        ID_PROVISIONAL_LABEL_KEY,
+        resolve_id_on_save,
+    )
     from house_config.entity_resolution import normalize_pv_system
     from house_config.label_uniqueness import assert_unique_label
 
     data = _load_components_document()
     systems = list(data.get("pv_systems") or [])
+    old_id = str(stable_id or "").strip()
+    existing = next(
+        (
+            item
+            for item in systems
+            if isinstance(item, dict) and str(item.get("id", "")).strip() == old_id
+        ),
+        None,
+    )
     taken = {str(item.get("id", "")) for item in systems if item.get("id")}
-    if stable_id:
-        taken.discard(stable_id)
     label = str(raw_spec.get("label", "")).strip()
-    entity_id = stable_id.strip() or slug_id(label or "pv_anlage", existing=taken)
+    entity_id, id_locked, provisional = resolve_id_on_save(
+        label=label,
+        stable_id=old_id,
+        existing=existing,
+        taken=taken,
+        provisional_from_ui=str(raw_spec.get(ID_PROVISIONAL_LABEL_KEY) or "").strip(),
+        force_from_label=force_id_from_label,
+    )
     assert_unique_label(label or entity_id, systems, exclude_id=entity_id)
-    spec = {
+    # Wire shape for components.json (kwp); normalize_pv_system uses pv_kwp at runtime.
+    save_spec = {
         "id": entity_id,
         "label": label or entity_id,
         "kwp": float(raw_spec["kwp"]),
         "pv_tilt": float(raw_spec.get("pv_tilt", 25.0)),
         "pv_azimuth": float(raw_spec.get("pv_azimuth", 0.0)),
+        ID_LOCKED_KEY: id_locked,
     }
-    normalize_pv_system(spec, 0)
-    systems = [item for item in systems if item.get("id") != entity_id]
-    systems.append(spec)
+    if not id_locked and provisional:
+        save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
+    normalize_pv_system(save_spec, 0)  # validate before persist
+    if old_id and old_id != entity_id:
+        _rewrite_id_list_in_scenarios("pv_system_ids", old_id, entity_id)
+    systems = [
+        item
+        for item in systems
+        if str(item.get("id", "")).strip() not in {entity_id, old_id}
+    ]
+    systems.append(save_spec)
     data["pv_systems"] = systems
     _save_components_document(data)
+    return entity_id
 
 def delete_pv_system(entity_id: str) -> None:
     """Remove a PV system from components.json and scrub scenario references."""
@@ -255,18 +291,119 @@ def _scrub_battery_ids_from_scenarios(target: str) -> bool:
     return changed
 
 
-def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
+def _rewrite_id_list_in_scenarios(key: str, old_id: str, new_id: str) -> bool:
+    """Replace ``old_id`` with ``new_id`` in scenario settings lists."""
+    from ui import house_config_io as _io
+
+    if not old_id or not new_id or old_id == new_id:
+        return False
+    doc = _io.load_backtesting_scenarios_raw()
+    changed = False
+    for scenario in doc.get("scenarios") or []:
+        if not isinstance(scenario, dict):
+            continue
+        settings = scenario.get("settings")
+        if not isinstance(settings, dict):
+            continue
+        raw_ids = settings.get(key)
+        if not isinstance(raw_ids, list):
+            continue
+        before = [str(item or "").strip() for item in raw_ids if str(item or "").strip()]
+        after = [new_id if item == old_id else item for item in before]
+        # Dedupe while preserving order.
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for item in after:
+            if item in seen:
+                continue
+            seen.add(item)
+            cleaned.append(item)
+        if cleaned == before:
+            continue
+        settings[key] = cleaned
+        changed = True
+    if changed:
+        _io.save_backtesting_scenarios(doc)
+    return changed
+
+
+def _rewrite_shadow_battery_overlay(old_id: str, new_id: str) -> None:
+    try:
+        from runtime_store.shadow.ehal_overlay import read_overlay, write_overlay
+        from runtime_store.shadow.mode import is_shadow_mode
+
+        if not is_shadow_mode():
+            return
+        overlay = read_overlay()
+        by_bat = overlay.get("battery_bindings")
+        if not isinstance(by_bat, dict) or old_id not in by_bat:
+            return
+        from house_config.entity_id_lock import rewrite_ess_bindings_slug
+
+        raw = by_bat.pop(old_id)
+        by_bat[new_id] = rewrite_ess_bindings_slug(
+            raw if isinstance(raw, dict) else {},
+            old_id=old_id,
+            new_id=new_id,
+        )
+        overlay["battery_bindings"] = by_bat
+        write_overlay(overlay)
+    except Exception:
+        return
+
+
+def upsert_battery(
+    raw_spec: dict,
+    *,
+    stable_id: str = "",
+    force_id_from_label: bool = False,
+) -> str:
+    """Upsert battery; return the persisted id (may rename when unlocking)."""
+    from house_config.entity_id_lock import (
+        ID_LOCKED_KEY,
+        ID_PROVISIONAL_LABEL_KEY,
+        resolve_id_on_save,
+        rewrite_ess_bindings_slug,
+    )
     from house_config.entity_resolution import normalize_battery
     from house_config.label_uniqueness import assert_unique_label
 
     data = _load_components_document()
     batteries = list(data.get("batteries") or [])
+    old_id = str(stable_id or "").strip()
+    existing = next(
+        (
+            item
+            for item in batteries
+            if isinstance(item, dict) and str(item.get("id", "")).strip() == old_id
+        ),
+        None,
+    )
     taken = {str(item.get("id", "")) for item in batteries if item.get("id")}
-    if stable_id:
-        taken.discard(stable_id)
     label = str(raw_spec.get("label", "")).strip()
-    entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
+    entity_id, id_locked, provisional = resolve_id_on_save(
+        label=label,
+        stable_id=old_id,
+        existing=existing,
+        taken=taken,
+        provisional_from_ui=str(raw_spec.get(ID_PROVISIONAL_LABEL_KEY) or "").strip(),
+        force_from_label=force_id_from_label,
+    )
     assert_unique_label(label or entity_id, batteries, exclude_id=entity_id)
+    # Planning form often sends empty ehal_bindings — keep disk bindings then.
+    bindings_src = raw_spec.get("ehal_bindings")
+    if (
+        not (isinstance(bindings_src, dict) and any(str(v or "").strip() for v in bindings_src.values()))
+        and isinstance(existing, dict)
+        and isinstance(existing.get("ehal_bindings"), dict)
+    ):
+        bindings_src = existing.get("ehal_bindings")
+    if old_id and old_id != entity_id:
+        bindings_src = rewrite_ess_bindings_slug(
+            bindings_src if isinstance(bindings_src, dict) else {},
+            old_id=old_id,
+            new_id=entity_id,
+        )
     spec = {
         "id": entity_id,
         "label": label or entity_id,
@@ -287,6 +424,9 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         "standby_power_kw": float(raw_spec.get("standby_power_kw", 0.0) or 0.0),
         "limits_from_live": bool(raw_spec.get("limits_from_live", False)),
     }
+    if bindings_src is not None:
+        raw_spec = dict(raw_spec)
+        raw_spec["ehal_bindings"] = bindings_src
     if raw_spec.get("control") is not None:
         spec["control"] = raw_spec["control"]
     if raw_spec.get("type") is not None:
@@ -299,9 +439,10 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
     existing_wear = None
     existing_control = None
     existing_type_fields: dict = {}
-    if stable_id:
+    lookup_id = old_id or entity_id
+    if lookup_id:
         for item in batteries:
-            if str(item.get("id", "")).strip() == entity_id:
+            if str(item.get("id", "")).strip() == lookup_id:
                 existing_wear = item.get("battery_wear")
                 existing_control = item.get("control")
                 for key in (
@@ -332,7 +473,7 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
     siblings = [
         item
         for item in batteries
-        if str(item.get("id", "")).strip() != entity_id
+        if str(item.get("id", "")).strip() not in {entity_id, old_id}
     ]
     siblings.append(spec)
     spec = apply_virtual_powerstation_inheritance(spec, siblings)
@@ -356,7 +497,10 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         "battery_wear": normalized["battery_wear"]
         if normalized["battery_wear"] is not None
         else {"enabled": False},
+        ID_LOCKED_KEY: id_locked,
     }
+    if not id_locked and provisional:
+        save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
     if normalized.get("type") == "powerstation":
         save_spec["backing"] = normalized["backing"]
         save_spec["role"] = normalized["role"]
@@ -370,15 +514,24 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         )
     if normalized.get("ehal_bindings"):
         save_spec["ehal_bindings"] = normalized["ehal_bindings"]
+    if old_id and old_id != entity_id:
+        _rewrite_id_list_in_scenarios("battery_ids", old_id, entity_id)
+        _rewrite_shadow_battery_overlay(old_id, entity_id)
     # Scrub before components save: reinit rejects Powerstations in battery_ids.
     if str(save_spec.get("type") or "") == "powerstation":
         _scrub_battery_ids_from_scenarios(entity_id)
+        if old_id and old_id != entity_id:
+            _scrub_battery_ids_from_scenarios(old_id)
     prev_attached: list[str] = []
     for item in batteries:
-        if str(item.get("id", "")).strip() == entity_id:
+        if str(item.get("id", "")).strip() in {entity_id, old_id}:
             prev_attached = _attached_ids_from_battery(item)
             break
-    batteries = [item for item in batteries if item.get("id") != entity_id]
+    batteries = [
+        item
+        for item in batteries
+        if str(item.get("id", "")).strip() not in {entity_id, old_id}
+    ]
     batteries.append(save_spec)
     data["batteries"] = batteries
     _save_components_document(data)
@@ -388,6 +541,7 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         # otherwise auto-persist of inherited fields would detach consumers.
         if new_attached != prev_attached:
             sync_consumers_from_powerstation_attached(entity_id, new_attached)
+    return entity_id
 
 def delete_battery(entity_id: str) -> None:
     """Remove a battery from components.json and scrub scenario references."""

@@ -15,6 +15,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | ----------------------- | -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `pv_system_ids`         | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf `pv_systems[].id`                                                                                    |
 | `battery_ids`           | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf **Hausbatterien** `batteries[].id` mit `type: house` (2.7.c; ersetzt `battery_id`). Keine Powerstations. |
+| `id` / `id_locked` / `id_provisional_label` | — | `components.json` → `batteries[]` / `pv_systems[]` | Interne ID (EHAL-Slug). Neu/Kopie: zuerst freigegeben (`id_locked: false`, Seed in `id_provisional_label`); erste geänderte **Bezeichnung** setzt `id` aus dem Label und sperrt. Bestehende Einträge ohne Flag gelten als gesperrt. Einmalig: UI-Button „ID aus Bezeichnung übernehmen“. Offline-Batch für schmutzige Envs: `python -m scripts.clean_entity_ids_once --config-dir <config>` (Dry-Run; `--apply` schreibt; optional `--only-copy`). |
 | `type`                  | enum     | `components.json` → `batteries[]`    | `house` (Default) oder `powerstation` (2.7.g/h Reserve; Anbindung über manuelles Gerät `mode: reserve`) |
 | `backing` / `role` / `attached_consumer_ids` | — | `components.json` → Powerstation | Nur bei `type: powerstation`: `virtual`\|`physical`, `single_use`\|`standby_backup`; `attached_consumer_ids` (Liste) optional — Zuordnung auch über manuelle Geräte `mode: reserve` + `powerstation_id`. Legacy: `attached_consumer_id` = erstes Listenelement. |
 
@@ -69,7 +70,7 @@ Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active`. Di
 | `battery_inverter` (Default) | optimizing / charging / discharging | Design C1 inkl. Automatik (`set_ess_mode = 0`) |
 | `isolated` | charging / discharging / standby | Nie Automatik; Hold als Standby/Entladesperre |
 
-EHAL-Bindings je Batterie: Pattern B `ess.{slug}.*` in `batteries[].ehal_bindings` (nicht mehr nur plant-flach).
+EHAL-Bindings je Batterie: Pattern B `ess.{slug}.*` in `batteries[].ehal_bindings`. In [EHAL-Com](../ui/ehal-com.md) erscheinen Hausspeicher und **physische** Powerstations als Mapping-Entities; **virtuelle** Powerstations haben kein eigenes Binding (nutzen die Hausbatterie). Speichern schreibt `components.json`, nicht `house_profiles.json`. Die Anlagen-Zeile behält nur die gemeinsame Quellenwahl `set_ess_source_select` (`Earnie_Speicher_Quellenwahl` für die EcoFlow-Bridge). Übrige ESS-Felder gehören zur Batterie-Zeile; Loxone-Mehrspeicher-Merker mit Slug-Infix `Earnie_Batterie_<Slug>_…`. Einmal-Migration plant-flach → Batterie: `python -m scripts.migrate_ess_bindings_once --config-dir <config>`.
 
 ## Steuerbarkeit (`control`)
 

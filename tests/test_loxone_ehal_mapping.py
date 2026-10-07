@@ -76,6 +76,14 @@ def test_heuristic_propose_soc_min_immediate_and_absent():
     )
 
 
+def test_heuristic_propose_skips_source_select():
+    """Plant Quellenwahl stays unbound until the operator maps it (standby_backup)."""
+    proposals = heuristic_propose(
+        ["Earnie_Speicher_Quellenwahl", "Delta3_Grid_ByPass", "Netz_Leistung"]
+    )
+    assert "set_ess_source_select" not in proposals
+
+
 def test_parse_ollama_proposals_filters_unknown():
     content = json_blob(
         {

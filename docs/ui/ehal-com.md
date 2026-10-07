@@ -116,7 +116,7 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 ### C.2 ESS (Battery)
 
-**Multi-ESS (2.7.c):** bindings live on `batteries[].ehal_bindings` as Pattern B `ess.{slug}.sens_ess_soc` / `set_ess_*` / `get_ess_*` (slug = battery id). Plant flat `sens_ess_*` remains a primary-battery alias after migrate.
+**Multi-ESS / per-battery mapping (2.7.c / 2.7.m):** In EHAL-Com each mappable battery is its own entity (house batteries and **physical** powerstations). **Virtual** powerstations are omitted — they inherit the house ESS and have no EHAL bindings. Bindings are stored on `components.json` → `batteries[].ehal_bindings` as Pattern B `ess.{slug}.sens_ess_soc` / `set_ess_*` / `get_ess_*` (slug = battery id). The plant row keeps grid/PV/load/export plus the shared EcoFlow bridge `set_ess_source_select` (`Earnie_Speicher_Quellenwahl`); other ESS fields are not editable on plant. Runtime still synthesizes flat primary-battery aliases (`sens_ess_soc`, …) for legacy adapters. Multi-ESS Loxone Merker titles use slug infix `Earnie_Batterie_<Slug>_…`.
 
 
 | Area / meaning                  | Type          | EHAL value name                                              | OpenEMS                                       | evcc (YAML attribute)          | Victron GX / EVCS (Modbus)                                                                                              | Loxone / Loxone extra                                        |

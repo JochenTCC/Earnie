@@ -56,6 +56,14 @@ def seed_runtime(*, src: Path, dst: Path) -> list[str]:
         shutil.copy2(source, target)
         copied.append(str(target))
 
+    # Monthly archives of the production history (same stem + stamped suffix).
+    for source in sorted(src.glob("optimization_history.jsonl.*")):
+        if not source.is_file() or source.name in _EXCLUDE_NAMES:
+            continue
+        target = dst / source.name
+        shutil.copy2(source, target)
+        copied.append(str(target))
+
     for pattern in _COPY_GLOBS:
         for source in src.glob(pattern):
             if source.name in _EXCLUDE_NAMES:

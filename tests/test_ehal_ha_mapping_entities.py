@@ -8,7 +8,8 @@ from integrations.ehal_debug_mapping import (
     expand_ha_writes_for_live,
     ha_pattern_b_live_mapping,
 )
-from integrations.ha_adapter import TELEMETRY_ENERGY_OPTIONAL, TELEMETRY_REQUIRED
+from ehal.ess_fields import ess_field
+from integrations.ha_adapter import TELEMETRY_ENERGY_OPTIONAL
 from ui import ehal_ha_mapping as ha_map
 from ui.ehal_ha_mapping import (
     _NONE,
@@ -21,7 +22,9 @@ from ui.ehal_ha_mapping import (
     _validate_mapping_save,
 )
 from ui.ehal_loxone_mapping import (
+    BATTERY_ENTITY_KIND,
     PLANT_ENTITY_ID,
+    PLANT_TELEMETRY_REQUIRED,
     apply_entity_bindings,
     build_entity_rows,
     resolve_field_select_default,
@@ -58,15 +61,20 @@ def _sample_house() -> dict:
 
 
 def test_ha_plant_fields_include_energy_optional():
-    rows = build_entity_rows(_sample_house(), "live")
+    rows = build_entity_rows(
+        _sample_house(), "live", components_doc={"batteries": [], "pv_systems": []}
+    )
     plant = next(r for r in rows if r["id"] == PLANT_ENTITY_ID)
     fields = _ha_entity_fields(plant)
     for name in TELEMETRY_ENERGY_OPTIONAL:
         assert name in fields
+    assert "sens_ess_soc" not in fields
 
 
 def test_ha_consumer_fields_unchanged():
-    rows = build_entity_rows(_sample_house(), "live")
+    rows = build_entity_rows(
+        _sample_house(), "live", components_doc={"batteries": [], "pv_systems": []}
+    )
     wallbox = next(r for r in rows if r["id"] == "wallbox")
     assert _ha_entity_fields(wallbox) == tuple(wallbox["fields"])
     for name in TELEMETRY_ENERGY_OPTIONAL:
@@ -102,18 +110,27 @@ def test_field_select_caption_marks_required():
 def test_validate_mapping_save_requires_plant_telemetry():
     err = _validate_mapping_save(PLANT_ENTITY_ID, {"sens_ess_soc": "sensor.soc"})
     assert err is not None and "Pflichtfelder fehlen" in err
-    for name in TELEMETRY_REQUIRED:
-        if name == "sens_ess_soc":
-            continue
+    for name in PLANT_TELEMETRY_REQUIRED:
         assert name in err
     assert (
         _validate_mapping_save(
             PLANT_ENTITY_ID,
-            {name: f"sensor.{name}" for name in TELEMETRY_REQUIRED},
+            {name: f"sensor.{name}" for name in PLANT_TELEMETRY_REQUIRED},
         )
         is None
     )
     assert _validate_mapping_save("wallbox", {}) is None
+    soc = ess_field("house", "sens_ess_soc")
+    assert (
+        _validate_mapping_save("house", {}, entity_kind=BATTERY_ENTITY_KIND)
+        is not None
+    )
+    assert (
+        _validate_mapping_save(
+            "house", {soc: "sensor.soc"}, entity_kind=BATTERY_ENTITY_KIND
+        )
+        is None
+    )
 
 
 def test_persist_ha_ess_force_write_and_clear():

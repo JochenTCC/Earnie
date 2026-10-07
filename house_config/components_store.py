@@ -61,7 +61,17 @@ def load_components_document(path: str) -> dict:
         raise ValueError("batteries muss ein Array sein.")
     if not isinstance(pv_systems, list):
         raise ValueError("pv_systems muss ein Array sein.")
-    return {"batteries": batteries, "pv_systems": pv_systems}
+    out = {"batteries": batteries, "pv_systems": pv_systems}
+    try:
+        from runtime_store.shadow.mode import is_shadow_mode
+
+        if is_shadow_mode():
+            from runtime_store.shadow.ehal_overlay import apply_overlay_to_components
+
+            return apply_overlay_to_components(out)
+    except Exception:
+        pass
+    return out
 
 
 def _serialize_battery(spec: dict) -> dict:
@@ -107,21 +117,44 @@ def _serialize_battery(spec: dict) -> dict:
     wear = spec.get("battery_wear")
     if wear is not None:
         out["battery_wear"] = wear
+    if "id_locked" in spec:
+        out["id_locked"] = bool(spec.get("id_locked"))
+    provisional = str(spec.get("id_provisional_label") or "").strip()
+    if provisional and not out.get("id_locked", True):
+        out["id_provisional_label"] = provisional
     return out
 
 
 def _serialize_pv_system(spec: dict) -> dict:
-    return {
+    out = {
         "id": spec["id"],
         "label": spec["label"],
         "kwp": spec["pv_kwp"],
         "pv_tilt": spec["pv_tilt"],
         "pv_azimuth": spec["pv_azimuth"],
     }
+    if "id_locked" in spec:
+        out["id_locked"] = bool(spec.get("id_locked"))
+    provisional = str(spec.get("id_provisional_label") or "").strip()
+    if provisional and not out.get("id_locked", True):
+        out["id_provisional_label"] = provisional
+    return out
 
 
 def save_components_document(path: str, doc: dict) -> None:
     from runtime_store.data_model import stamp_data_model
+
+    try:
+        from runtime_store.shadow.mode import is_shadow_mode
+
+        if is_shadow_mode():
+            from runtime_store.shadow.errors import ConfigReadOnlyError
+
+            raise ConfigReadOnlyError(
+                f"Shadow mode: refusing write to components.json ({path})"
+            )
+    except ImportError:
+        pass
 
     normalized = normalize_components_document(doc)
     serializable = {

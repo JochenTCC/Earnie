@@ -67,6 +67,24 @@ def is_virtual_powerstation(battery: dict) -> bool:
     return backing == BACKING_VIRTUAL
 
 
+def ehal_mappable_batteries(batteries: list[dict] | None) -> list[dict]:
+    """Batteries that participate in EHAL binding (2.7.m).
+
+    House batteries and physical powerstations only. Virtual powerstations
+    inherit from the house ESS and must not appear in EHAL-Com / Live-Lesen.
+    """
+    out: list[dict] = []
+    for item in batteries or []:
+        if not isinstance(item, dict):
+            continue
+        if is_virtual_powerstation(item):
+            continue
+        if not str(item.get("id") or "").strip():
+            continue
+        out.append(item)
+    return out
+
+
 def primary_house_battery(
     batteries: list[dict] | None,
     *,

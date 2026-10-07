@@ -107,7 +107,19 @@ def unit_quantity(unit: object) -> str | None:
 
 
 def field_quantity(field: str) -> str | None:
-    return FIELD_QUANTITY.get(str(field))
+    name = str(field or "").strip()
+    qty = FIELD_QUANTITY.get(name)
+    if qty is not None:
+        return qty
+    try:
+        from ehal.ess_fields import ess_field_kind
+
+        kind = ess_field_kind(name)
+        if kind:
+            return FIELD_QUANTITY.get(kind)
+    except ImportError:
+        pass
+    return None
 
 
 def unit_check(field: str, unit: object, *, device_class: object = None) -> UnitCheck:

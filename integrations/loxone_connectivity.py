@@ -601,7 +601,43 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
             if _is_thermal_annual_consumer(consumer):
                 _append_thermal_annual_read_checks(checks, consumer)
 
+    _append_battery_ess_read_checks(checks)
     return checks
+
+
+def _append_battery_ess_read_checks(checks: list[tuple[str, str, dict]]) -> None:
+    """Per-battery Pattern B ESS reads from ``components.json`` (2.7.m)."""
+    from ehal.ess_fields import binding_address
+    from integrations.ehal_debug_mapping import BATTERY_ESS_LIVE_READ_KINDS
+
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return
+        doc = load_components_document(path)
+    except Exception:
+        return
+    from house_config.powerstation import ehal_mappable_batteries
+
+    batteries = doc.get("batteries") if isinstance(doc, dict) else []
+    for battery in ehal_mappable_batteries(
+        batteries if isinstance(batteries, list) else []
+    ):
+        bid = str(battery.get("id") or "").strip()
+        if not bid:
+            continue
+        bindings = battery.get("ehal_bindings")
+        for kind in BATTERY_ESS_LIVE_READ_KINDS:
+            from ehal.ess_fields import ess_field
+
+            field = ess_field(bid, kind)
+            io_name = binding_address(
+                bindings if isinstance(bindings, dict) else None, bid, kind
+            )
+            _append_io_check(checks, field, io_name)
 
 
 def run_read_checks() -> list[LoxoneCheck]:

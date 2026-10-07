@@ -224,6 +224,11 @@ def _match_one_exact_marker(
         report.skipped_markers.append(io_name)
         claimed.add(io_name.casefold())
         return
+    # Standby-backup Quellenwahl is opt-in — never auto-bind on plant.
+    if field == "set_ess_source_select":
+        report.skipped_markers.append(io_name)
+        claimed.add(io_name.casefold())
+        return
     report.matched_markers.append(io_name)
     claimed.add(io_name.casefold())
     kind = str(marker.get("entity_kind") or "").strip()

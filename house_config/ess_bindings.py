@@ -2,6 +2,27 @@
 from __future__ import annotations
 
 from ehal.ess_fields import ess_ehal_slug, parse_ess_pattern_b, plant_flat_ess_keys
+from house_config.powerstation import is_house_battery
+
+
+def _battery_ids(batteries: list[dict]) -> list[str]:
+    return [
+        str(b.get("id") or "").strip()
+        for b in batteries
+        if str(b.get("id") or "").strip()
+    ]
+
+
+def _primary_for_flat_aliases(
+    selected: list[str],
+    by_id: dict[str, dict],
+) -> str:
+    """House battery first — powerstations must not own plant-flat ESS aliases."""
+    for bat_id in selected:
+        bat = by_id.get(bat_id)
+        if bat is not None and is_house_battery(bat):
+            return bat_id
+    return selected[0] if selected else ""
 
 
 def merge_ess_bindings_into_plant(
@@ -13,7 +34,8 @@ def merge_ess_bindings_into_plant(
     """Return plant-facing bindings with ESS Pattern B + flat aliases for primary.
 
     Adapters that still expect flat ``sens_ess_*`` / ``set_ess_*`` on plant keep
-    working when the primary selected battery has ``ess.{slug}.*`` bindings.
+    working when the primary **house** battery has ``ess.{slug}.*`` bindings.
+    Powerstations stay on Pattern-B keys only (no plant-flat takeover).
     """
     out: dict[str, str] = {}
     if isinstance(plant_bindings, dict):
@@ -26,12 +48,16 @@ def merge_ess_bindings_into_plant(
     if not bats:
         return out
 
-    selected = list(battery_ids or [])
+    by_id = {
+        str(b.get("id") or "").strip(): b
+        for b in bats
+        if str(b.get("id") or "").strip()
+    }
+    selected = [i for i in (battery_ids or []) if i in by_id]
     if not selected:
-        selected = [str(b.get("id") or "").strip() for b in bats if str(b.get("id") or "").strip()]
+        selected = _battery_ids(bats)
 
-    by_id = {str(b.get("id") or "").strip(): b for b in bats if str(b.get("id") or "").strip()}
-    primary = selected[0] if selected else ""
+    primary = _primary_for_flat_aliases(selected, by_id)
 
     for bat_id in selected:
         bat = by_id.get(bat_id)

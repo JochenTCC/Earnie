@@ -20,6 +20,11 @@ ESS_FIELD_KINDS: frozenset[str] = frozenset(
     }
 )
 
+# Mapping UI battery rows (2.7.m): shared EcoFlow bridge stays on plant.
+ESS_BATTERY_MAPPING_KINDS: tuple[str, ...] = tuple(
+    sorted(k for k in ESS_FIELD_KINDS if k != "set_ess_source_select")
+)
+
 _PLANT_FLAT_ESS_FIELDS: frozenset[str] = frozenset(ESS_FIELD_KINDS)
 
 _PATTERN_B = re.compile(

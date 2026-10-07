@@ -233,6 +233,11 @@ def normalize_battery(raw: dict, index: int) -> dict:
         out.update(
             normalize_powerstation_fields(raw, battery_id=battery_id, index=index)
         )
+    if "id_locked" in raw:
+        out["id_locked"] = bool(raw.get("id_locked"))
+    provisional = str(raw.get("id_provisional_label") or "").strip()
+    if provisional and not out.get("id_locked", True):
+        out["id_provisional_label"] = provisional
     return out
 
 
@@ -271,13 +276,19 @@ def normalize_pv_system(raw: dict, index: int) -> dict:
     kwp = float(raw["kwp"])
     if kwp <= 0.0:
         raise ValueError(f"pv_systems[{index}] ('{pv_id}'): kwp muss > 0 sein.")
-    return {
+    out = {
         "id": pv_id,
         "label": label,
         "pv_kwp": kwp,
         "pv_tilt": float(raw.get("pv_tilt", raw.get("tilt", 0.0))),
         "pv_azimuth": float(raw.get("pv_azimuth", raw.get("azimuth", 0.0))),
     }
+    if "id_locked" in raw:
+        out["id_locked"] = bool(raw.get("id_locked"))
+    provisional = str(raw.get("id_provisional_label") or "").strip()
+    if provisional and not out.get("id_locked", True):
+        out["id_provisional_label"] = provisional
+    return out
 
 
 def batteries_by_id(raw_config: dict) -> dict[str, dict]:

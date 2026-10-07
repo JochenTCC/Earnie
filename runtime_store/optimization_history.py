@@ -1,13 +1,14 @@
 """
 optimization_history.py – Persistierte Produktiv-Optimierungen (main.py) für die App.
 
-Läufe: runtime/optimization_history.jsonl (append-only, JSONL only).
+Läufe: runtime/optimization_history.jsonl (JSONL; monthly rotation, max 12 archives).
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -17,6 +18,12 @@ import pandas as pd
 import config
 from data.planning_window import align_to_planning_timezone
 from .file_metadata import OPTIMIZATION_HISTORY_SCHEMA, stamp_payload, strip_metadata
+from .month_file_rotation import (
+    DEFAULT_BACKUP_COUNT,
+    compute_next_month_rollover,
+    list_rotated_siblings,
+    maybe_rollover,
+)
 from .persist_paths import runtime_dir as persist_runtime_dir
 
 logger = logging.getLogger(__name__)
@@ -29,8 +36,9 @@ HISTORY_FILENAME = "optimization_history.jsonl"
 RUNTIME_DIR = persist_runtime_dir()
 HISTORY_FILE = os.path.join(RUNTIME_DIR, HISTORY_FILENAME)
 
-_JSONL_HISTORY_CACHE: tuple[tuple[int, int], list[dict[str, Any]]] | None = None
+_JSONL_HISTORY_CACHE: tuple[tuple[Any, ...], list[dict[str, Any]]] | None = None
 _JSONL_HISTORY_CACHE_PATH: str | None = None
+_ROLLOVER_AT: float | None = None
 
 MODE_LABELS = {
     0: "Automatik",
@@ -71,11 +79,38 @@ def history_file_path() -> str:
     return HISTORY_FILE
 
 
+def history_archive_paths() -> list[str]:
+    """Rotated history archives next to the active file (oldest first)."""
+    return list_rotated_siblings(history_file_path())
+
+
+def _clear_jsonl_history_cache() -> None:
+    global _JSONL_HISTORY_CACHE, _JSONL_HISTORY_CACHE_PATH
+    _JSONL_HISTORY_CACHE = None
+    _JSONL_HISTORY_CACHE_PATH = None
+
+
+def _ensure_rollover_at() -> float:
+    global _ROLLOVER_AT
+    if _ROLLOVER_AT is None:
+        _ROLLOVER_AT = compute_next_month_rollover(time.time())
+    return _ROLLOVER_AT
+
+
 def append_production_run(payload: dict[str, Any]) -> None:
-    """Hängt einen main.py-Durchlauf an die JSONL-Historie an."""
+    """Hängt einen main.py-Durchlauf an die JSONL-Historie an (monatliche Rotation)."""
+    global _ROLLOVER_AT
     path = history_file_path()
-    entry = stamp_payload(dict(payload), schema_version=OPTIMIZATION_HISTORY_SCHEMA)
     _ensure_parent_dir(path)
+    next_at, did_rotate = maybe_rollover(
+        path,
+        backup_count=DEFAULT_BACKUP_COUNT,
+        rollover_at=_ensure_rollover_at(),
+    )
+    _ROLLOVER_AT = next_at
+    if did_rotate:
+        _clear_jsonl_history_cache()
+    entry = stamp_payload(dict(payload), schema_version=OPTIMIZATION_HISTORY_SCHEMA)
     line = json.dumps(entry, ensure_ascii=False)
     with open(path, "a", encoding="utf-8") as f:
         f.write(line)
@@ -156,19 +191,27 @@ def _row_from_json_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _load_jsonl_history() -> list[dict[str, Any]]:
-    global _JSONL_HISTORY_CACHE, _JSONL_HISTORY_CACHE_PATH
+def _history_paths_to_load() -> list[str]:
+    """Active file (if present) plus archives, oldest archive first then active."""
     path = history_file_path()
-    if not os.path.isfile(path):
-        return []
-    stat = os.stat(path)
-    cache_key = (int(stat.st_mtime_ns), int(stat.st_size))
-    if (
-        _JSONL_HISTORY_CACHE is not None
-        and _JSONL_HISTORY_CACHE_PATH == path
-        and _JSONL_HISTORY_CACHE[0] == cache_key
-    ):
-        return list(_JSONL_HISTORY_CACHE[1])
+    paths = list(list_rotated_siblings(path))
+    if os.path.isfile(path):
+        paths.append(path)
+    return paths
+
+
+def _cache_fingerprint(paths: list[str]) -> tuple[Any, ...]:
+    parts: list[tuple[str, int, int]] = []
+    for file_path in paths:
+        try:
+            stat = os.stat(file_path)
+            parts.append((file_path, int(stat.st_mtime_ns), int(stat.st_size)))
+        except OSError:
+            parts.append((file_path, 0, 0))
+    return tuple(parts)
+
+
+def _rows_from_jsonl_file(path: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -193,6 +236,25 @@ def _load_jsonl_history() -> list[dict[str, Any]]:
                     rows.append(row)
     except OSError as exc:
         logger.warning("optimization_history: %s konnte nicht gelesen werden: %s", path, exc)
+    return rows
+
+
+def _load_jsonl_history() -> list[dict[str, Any]]:
+    global _JSONL_HISTORY_CACHE, _JSONL_HISTORY_CACHE_PATH
+    path = history_file_path()
+    paths = _history_paths_to_load()
+    if not paths:
+        return []
+    cache_key = _cache_fingerprint(paths)
+    if (
+        _JSONL_HISTORY_CACHE is not None
+        and _JSONL_HISTORY_CACHE_PATH == path
+        and _JSONL_HISTORY_CACHE[0] == cache_key
+    ):
+        return list(_JSONL_HISTORY_CACHE[1])
+    rows: list[dict[str, Any]] = []
+    for file_path in paths:
+        rows.extend(_rows_from_jsonl_file(file_path))
     _JSONL_HISTORY_CACHE = (cache_key, rows)
     _JSONL_HISTORY_CACHE_PATH = path
     return rows

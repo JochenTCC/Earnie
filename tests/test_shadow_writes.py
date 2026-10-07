@@ -101,12 +101,16 @@ def test_shadow_seed_runtime_copies_and_excludes(tmp_path):
     dst = tmp_path / "shadow"
     src.mkdir()
     (src / "optimization_history.jsonl").write_text("{}\n", encoding="utf-8")
+    (src / "optimization_history.jsonl.2026-01-01_00-00-00").write_text(
+        '{"old":1}\n', encoding="utf-8"
+    )
     (src / "cons_data.csv").write_text("a,b\n", encoding="utf-8")
     (src / "earnie.log").write_text("log\n", encoding="utf-8")
     (src / "local_settings.json").write_text("{}", encoding="utf-8")
     (src / "main.lock").write_text("1", encoding="utf-8")
     copied = seed_runtime(src=src, dst=dst)
     assert (dst / "optimization_history.jsonl").is_file()
+    assert (dst / "optimization_history.jsonl.2026-01-01_00-00-00").is_file()
     assert (dst / "cons_data.csv").is_file()
     assert (dst / ".shadow_runtime").is_file()
     assert not (dst / "earnie.log").exists()

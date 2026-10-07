@@ -381,7 +381,11 @@ def _write_powerstation_fields(fields: dict[str, float]) -> None:
 
 
 def write_physical_powerstation_charges(charge_kw_by_id: dict[str, float]) -> None:
-    """Write Pattern-B ``ess.{slug}.set_ess_charge_power_limit``; discharge always 0."""
+    """Write Pattern-B charge limit; discharge=0 only when that field is mapped.
+
+    EcoFlow / one-way packs must not map ``set_ess_discharge_power_limit`` — do not
+    invent a write (or Schreibfehler) for an intentionally absent Merker.
+    """
     if not charge_kw_by_id:
         return
     from ehal.ess_fields import ess_field
@@ -393,7 +397,8 @@ def write_physical_powerstation_charges(charge_kw_by_id: dict[str, float]) -> No
             continue
         charge_w = max(0.0, float(charge_kw) * 1000.0)
         fields[ess_field(slug, "set_ess_charge_power_limit")] = charge_w
-        fields[ess_field(slug, "set_ess_discharge_power_limit")] = 0.0
+        if _binding_for_ps(slug, "set_ess_discharge_power_limit"):
+            fields[ess_field(slug, "set_ess_discharge_power_limit")] = 0.0
     _write_powerstation_fields(fields)
 
 
