@@ -31,6 +31,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - `optimizer/powerstation_live.py`: no plant-flat remap for charge/discharge (HA + Loxone); explicit exception only for `set_ess_source_select` (EcoFlow bridge); missing binding → skip + `runtime/ehal_write_error.json`
   - Docs: `docs/konfiguration/batterie-pv.md`; regression: `tests/test_powerstation_2_7_h.py` (`test_ha_charge_does_not_remap_to_house_battery`, Loxone charge isolation, HA source_select plant-flat)
 
+- [ ] **Loxone `status.json`: physical powerstation limits overwrote the house battery's flat keys** — fix implemented on branch `fix/status-json-powerstation-keys`; live acceptance pending
+  - Cause: `_write_powerstation_loxone` cached sent values under the flat field kind (`set_ess_charge_power_limit`, `set_ess_mode`, …) and `build_loxone_status_payload` wrote them into the house battery's flat keys; with two powerstations the last write won. Only the Virtual HTTP Input mirror was affected, not direct `/dev/sps/io/` writes. The per-battery `ess.<id>.*` check keys of a VI never received data.
+  - Fix: `optimizer/powerstation_live.py` caches under the Pattern B key `ess.<id>.<kind>` (`_status_key`); only the shared EcoFlow-bridge `set_ess_source_select` stays flat. `integrations/loxone_status_json.py` emits Pattern B keys and no longer touches the flat limit / mode keys.
+  - Tests: `tests/test_loxone_status_json.py` (house keys untouched, two powerstations, shared Quellenwahl flat, write path end to end); `tests/test_powerstation_2_7_h.py` adjusted. Four of them fail without the fix.
+  - **Note:** after the fix the VI commands `Earnie_Delta3_*` receive mirror values for the first time. A VI scale with `DestValHigh="-100"` inverts the sign of such a mirrored value; check the scaling before rollout.
+  - After a successful live check: remove this item → `Backlog-Erledigt.md`.
+
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] Error in NAS alpha ("P:\earnie-alpha") when starting main.py
@@ -44,11 +51,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Effect 1: `set_grid_export_power_limit` never gets a proposal although `_HINTS` has entries for it (`integrations/loxone_ehal_mapping.py:134`).
   - Effect 2 (found by reading; confirm with a test before the fix): proposals are keyed by flat field name (`sens_ess_soc`), battery rows look up `ess.<id>.<kind>` (`proposals.get(field)` in `_render_field_selects`, `ui/ehal_loxone_mapping.py:707`), so battery rows probably never get a proposal.
   - Fix sketch: delete the copy and use the list from `ui/ehal_loxone_mapping.py`; test that every mapping field is also in the proposal field list; map `ess.<id>.<kind>` → `<kind>` for proposals. Check the HA side for the same error (`ui/ehal_ha_mapping.py`, `_proposed_entity_id`; `heuristic_propose(scanned)` returns flat keys while battery rows use Pattern B).
-
-- [ ] Loxone `status.json`: physical powerstation limits overwrite the house battery's flat keys
-  - `optimizer/powerstation_live.py::_write_powerstation_loxone` stores sent values under the flat field kind (`_last_powerstation_sent["set_ess_charge_power_limit"]`), not under the Pattern B key. `integrations/loxone_status_json.py::build_loxone_status_payload` writes them after the plant values into the same flat keys (`PLANT_LIVE_WRITE_FIELDS`).
-  - Found by reading, not run: a powerstation charge limit replaces the house battery's `set_ess_charge_power_limit` in `status.json`; with two powerstations the last write wins. Affects only a Virtual HTTP Input mirror, not direct `/dev/sps/io/` writes. The comment there says "flat + Pattern-B", but only the flat key is stored.
-  - Fix sketch: keep powerstation values under `ess.<id>.<kind>` and emit them as such (qualified keys, see epic **Binding P1**); test with house battery + two powerstations.
 
 - [ ] Loxone: physical powerstation writes are not part of the write trace
   - `_write_powerstation_loxone` discards the result of `_send_loxone_value_traced`; `main.py` puts only `huawei_writes + flex_writes` into the write records, and `build_sent_loxone_snapshot` knows only plant and consumers. Found by reading, not run: EHAL-Com → Live-Schreiben shows no value/success for `ess.<id>.set_ess_charge_power_limit` of a powerstation; only the log line ("Loxone API: … erfolgreich auf …") shows it.

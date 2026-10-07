@@ -367,7 +367,10 @@ def test_loxone_charge_only_when_discharge_unmapped():
     assert send.call_args[0][0] == "PS_Charge_Limit"
     assert send.call_args[0][1] == pytest.approx(1.5)
     assert persisted == []
-    assert psl.last_powerstation_sent().get("set_ess_charge_power_limit") == 1.5
+    sent = psl.last_powerstation_sent()
+    # Pattern-B key per powerstation; the flat key belongs to the house battery.
+    assert sent.get(ess_field(slug, "set_ess_charge_power_limit")) == 1.5
+    assert "set_ess_charge_power_limit" not in sent
 
 
 def test_ha_source_select_still_uses_plant_flat():
