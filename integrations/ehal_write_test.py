@@ -31,12 +31,12 @@ from integrations.ehal_write_test_bounds import (
     canonical_probe_field,
     clamp_probe_value,
     expected_loxone_wire_value,
+    probe_kind,
     probe_value_bounds,
     values_match,
 )
 from integrations.ha_adapter import parse_ha_field_value
 from integrations.loxone_adapter import EVCS_MODE_VALUES
-from integrations.loxone_ehal_mapping import SETPOINT_FIELDS
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ __all__ = [
     "expected_loxone_wire_value",
     "looks_like_housesim",
     "mapped_write_targets",
+    "probe_kind",
     "probe_value_bounds",
     "read_back",
     "restore_safe_setpoints",
@@ -120,10 +121,9 @@ def assert_writes_allowed() -> None:
 
 
 def mapped_write_targets() -> dict[str, str]:
-    """Canonical setpoint field → backend address (entity / Merker / channel label)."""
+    """Live-write field id → backend address (entity / Merker / channel label)."""
     if ehal_live.is_ha_backend():
-        adapter = ehal_live.get_ha_adapter()
-        return ha_setpoint_mapping(dict(adapter.cfg.entities))
+        return _ha_mapped_targets()
     if ehal_live.is_openems_backend():
         return _openems_mapped_targets()
     return _loxone_mapped_targets()
@@ -141,26 +141,57 @@ def _openems_mapped_targets() -> dict[str, str]:
     return out
 
 
+def _ha_mapped_targets() -> dict[str, str]:
+    from integrations.ehal_debug_mapping import expected_live_write_fields
+
+    adapter = ehal_live.get_ha_adapter()
+    entities = dict(adapter.cfg.entities)
+    flat = ha_setpoint_mapping(entities)
+    out: dict[str, str] = dict(flat)
+    for field in expected_live_write_fields(network_backend=False):
+        addr = str(entities.get(field) or "").strip()
+        if addr:
+            out[field] = addr
+    return out
+
+
 def _loxone_mapped_targets() -> dict[str, str]:
     raw = loxone_write_field_to_io()
     out: dict[str, str] = {}
     for field, io_name in raw.items():
-        canon = canonical_probe_field(field)
-        if canon not in SETPOINT_FIELDS:
-            continue
-        if canon not in out and str(io_name or "").strip():
-            out[canon] = str(io_name).strip()
+        name = str(field or "").strip()
+        marker = str(io_name or "").strip()
+        if name and marker and name not in out:
+            out[name] = marker
     return out
 
 
 def allowed_probe_fields(*, force_ess_active: bool = False) -> list[str]:
-    """Mapped safe-probe fields; include active power only when force unlocked."""
+    """All mapped Live-Schreiben fields; active power only when force unlocked."""
+    from integrations.ehal_debug_mapping import expected_live_write_fields
+
     mapped = mapped_write_targets()
+    network = bool(ehal_live.is_ehal_network_backend())
+    ordered = expected_live_write_fields(network_backend=network)
     fields: list[str] = []
-    if force_ess_active and FORCE_ESS_ACTIVE_POWER in mapped:
-        fields.append(FORCE_ESS_ACTIVE_POWER)
-    for field in SAFE_PROBE_FIELDS:
-        if field in mapped:
+    seen: set[str] = set()
+    for field in ordered:
+        if field not in mapped or field in seen:
+            continue
+        kind = probe_kind(field)
+        if kind == FORCE_ESS_ACTIVE_POWER and not force_ess_active:
+            continue
+        seen.add(field)
+        fields.append(field)
+    # Mapped writes not in expected list (legacy / extra) — append stably.
+    for field in sorted(mapped):
+        if field in seen:
+            continue
+        kind = probe_kind(field)
+        if kind == FORCE_ESS_ACTIVE_POWER and not force_ess_active:
+            continue
+        if kind.startswith("set_") or kind in SAFE_PROBE_FIELDS or kind == "set_enable":
+            seen.add(field)
             fields.append(field)
     return fields
 
@@ -191,6 +222,10 @@ def build_probe_setpoint(field: str, value: Any, *, adapter_id: str) -> dict[str
 def build_probes_setpoint(
     values: dict[str, Any], *, adapter_id: str
 ) -> dict[str, Any]:
+    """Plant-flat / EV setpoint document (no Pattern B / flex keys)."""
+    from ehal.ess_fields import is_ess_pattern_b_field
+    from ehal.flex_fields import flex_field_kind
+
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     doc: dict[str, Any] = {
         "schema_version": EHAL_SCHEMA_VERSION,
@@ -198,7 +233,10 @@ def build_probes_setpoint(
         "adapter_id": adapter_id,
     }
     for field, value in values.items():
-        doc[canonical_probe_field(field)] = value
+        name = canonical_probe_field(field)
+        if is_ess_pattern_b_field(name) or flex_field_kind(name):
+            continue
+        doc[probe_kind(field)] = value
     return doc
 
 
@@ -214,9 +252,9 @@ def clamp_probe_values(
         raise WriteTestClampError("Keine Sollwerte zum Schreiben ausgewählt.")
     out: dict[str, Any] = {}
     for field, value in values.items():
-        canon = canonical_probe_field(field)
-        out[canon] = clamp_probe_value(
-            canon,
+        key = str(field or "").strip()
+        out[key] = clamp_probe_value(
+            key,
             value,
             max_power_kw=max_power_kw,
             ev_nominal_a=ev_nominal_a,
@@ -232,7 +270,7 @@ def write_probes(
     max_power_kw: float | None = None,
     ev_nominal_a: float | None = None,
 ) -> tuple[EhalWriteError | None, dict[str, Any]]:
-    """Write multiple clamped probe fields in one setpoint document."""
+    """Write clamped probes (adapter + Pattern B / flex Merker paths)."""
     assert_writes_allowed()
     if max_power_kw is None:
         max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
@@ -244,16 +282,108 @@ def write_probes(
         ev_nominal_a=ev_nominal_a,
         force_ess_active=force_ess_active,
     )
-    adapter = ehal_live.get_adapter()
-    setpoint = build_probes_setpoint(
-        clamped, adapter_id=str(adapter.cfg.adapter_id)
-    )
-    error = adapter.write_setpoints(setpoint)
+    error = _dispatch_probe_writes(clamped)
     if error is not None:
         ehal_live.persist_write_error(error)
     else:
         ehal_live.clear_write_error()
     return error, clamped
+
+
+def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
+    from ehal.ess_fields import is_ess_pattern_b_field
+    from ehal.flex_fields import flex_field_kind
+
+    pattern_b: dict[str, float] = {}
+    flex_fields: dict[str, float] = {}
+    adapter_values: dict[str, Any] = {}
+    for field, value in clamped.items():
+        name = canonical_probe_field(field)
+        if is_ess_pattern_b_field(name):
+            pattern_b[name] = float(value)
+            continue
+        if flex_field_kind(name):
+            flex_fields[name] = float(value)
+            continue
+        adapter_values[field] = value
+
+    error: EhalWriteError | None = None
+    if adapter_values:
+        adapter = ehal_live.get_adapter()
+        setpoint = build_probes_setpoint(
+            adapter_values, adapter_id=str(adapter.cfg.adapter_id)
+        )
+        payload = {
+            k: v
+            for k, v in setpoint.items()
+            if k not in ("schema_version", "ts", "adapter_id")
+        }
+        if payload:
+            error = adapter.write_setpoints(setpoint)
+    if error is None and pattern_b:
+        error = _write_pattern_b_probes(pattern_b)
+    if error is None and flex_fields:
+        error = _write_flex_enable_probes(flex_fields)
+    return error
+
+
+def _write_pattern_b_probes(fields: dict[str, float]) -> EhalWriteError | None:
+    if ehal_live.is_ha_backend():
+        adapter = ehal_live.get_ha_adapter()
+        writer = getattr(adapter, "write_mapped_fields", None)
+        if callable(writer):
+            return writer(fields)
+        return adapter.write_setpoints(
+            build_probes_setpoint(fields, adapter_id=str(adapter.cfg.adapter_id))
+        )
+    if ehal_live.is_openems_backend():
+        return None
+    return _write_loxone_mapped_probes(fields)
+
+
+def _write_flex_enable_probes(fields: dict[str, float]) -> EhalWriteError | None:
+    if ehal_live.is_ehal_network_backend():
+        return None
+    return _write_loxone_mapped_probes(fields)
+
+
+def _marker_for_probe_field(field: str, targets: dict[str, str]) -> str:
+    direct = str(targets.get(field) or "").strip()
+    if direct:
+        return direct
+    canon = canonical_probe_field(field)
+    for key, marker in targets.items():
+        if canonical_probe_field(key) == canon and str(marker or "").strip():
+            return str(marker).strip()
+    return ""
+
+
+def _loxone_probe_wire_value(field: str, value: Any) -> float:
+    from integrations.loxone_adapter import (
+        ehal_active_power_w_to_loxone_kw,
+        ehal_limit_w_to_loxone_kw,
+    )
+
+    kind = probe_kind(field)
+    if kind == FORCE_ESS_ACTIVE_POWER:
+        return float(ehal_active_power_w_to_loxone_kw(float(value)))
+    if kind in LOXONE_KW_WRITE_FIELDS:
+        return float(ehal_limit_w_to_loxone_kw(float(value)))
+    return float(value)
+
+
+def _write_loxone_mapped_probes(fields: dict[str, Any]) -> EhalWriteError | None:
+    from integrations import loxone_client
+
+    targets = mapped_write_targets()
+    for field, value in fields.items():
+        marker = _marker_for_probe_field(field, targets)
+        if not marker:
+            continue
+        loxone_client._send_loxone_value_traced(
+            marker, _loxone_probe_wire_value(field, value)
+        )
+    return None
 
 
 def write_probe(
@@ -276,29 +406,32 @@ def write_probe(
 
 def read_back(field: str) -> Any | None:
     """Best-effort echo of the written setpoint; None when no readable echo."""
-    canon = canonical_probe_field(field)
     if ehal_live.is_ha_backend():
-        return _read_back_ha(canon)
+        return _read_back_ha(field)
     if ehal_live.is_openems_backend():
         return None
-    return _read_back_loxone(canon)
+    return _read_back_loxone(field)
 
 
 def _read_back_ha(field: str) -> Any | None:
     adapter = ehal_live.get_ha_adapter()
-    entity_id = str(adapter.cfg.entities.get(field) or "").strip()
+    targets = mapped_write_targets()
+    entity_id = _marker_for_probe_field(field, targets) or str(
+        adapter.cfg.entities.get(field) or ""
+    ).strip()
     if not entity_id:
         return None
     payload = adapter.read_state(entity_id)
     state = payload.get("state")
-    if field == "set_ess_mode":
+    kind = probe_kind(field)
+    if kind == "set_ess_mode":
         return _coerce_ess_mode_echo(state)
-    if field == "set_evcs_mode":
+    if kind == "set_evcs_mode":
         return str(state or "").strip().lower() or None
     attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
     unit = attrs.get("unit_of_measurement")
     try:
-        return parse_ha_field_value(field, str(state), unit=unit)
+        return parse_ha_field_value(kind, str(state), unit=unit)
     except (TypeError, ValueError):
         try:
             return float(state)
@@ -309,16 +442,16 @@ def _read_back_ha(field: str) -> Any | None:
 def _read_back_loxone(field: str) -> Any | None:
     from integrations import loxone_client
 
-    targets = mapped_write_targets()
-    marker = str(targets.get(field) or "").strip()
+    marker = _marker_for_probe_field(field, mapped_write_targets())
     if not marker:
         return None
     raw = loxone_client.fetch_loxone_generic_value(marker)
     if raw is None:
         return None
-    if field == "set_ess_mode":
+    kind = probe_kind(field)
+    if kind == "set_ess_mode":
         return _coerce_ess_mode_echo(raw)
-    if field == "set_evcs_mode":
+    if kind == "set_evcs_mode":
         try:
             code = int(float(raw))
         except (TypeError, ValueError):
@@ -328,7 +461,7 @@ def _read_back_loxone(field: str) -> Any | None:
                 return name
         return None
     numeric = float(raw)
-    if field in LOXONE_KW_WRITE_FIELDS:
+    if kind in LOXONE_KW_WRITE_FIELDS:
         return numeric * 1000.0
     return numeric
 

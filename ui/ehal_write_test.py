@@ -17,11 +17,16 @@ from integrations.ehal_write_test import (
     default_ev_nominal_a,
     looks_like_housesim,
     mapped_write_targets,
+    probe_kind,
     probe_value_bounds,
     restore_safe_setpoints,
     roundtrip_batch,
     write_probes,
     writes_allowed,
+)
+from integrations.ehal_write_test_bounds import (
+    FLEX_SET_ENABLE_KIND,
+    SOURCE_SELECT_FIELD,
 )
 
 _SESSION_PENDING = "ehal_write_test_pending"
@@ -31,9 +36,9 @@ _DEFAULT_FORCE_W = 100.0
 
 def _render_write_test_intro() -> None:
     st.caption(
-        "Mehrere gemappte Sollwerte in einer Tabelle setzen und mit **einem** "
-        "Klick schreiben (ein Setpoint-Dokument). Optional Auto-Roundtrip. "
-        "Gleicher Adapter-Pfad wie der Produktiv-Lauf."
+        "Alle gemappten Schreib-Felder (Plant, Batterien Pattern B, EV, Flex). "
+        "**Senden** je Zeile aktivieren, Werte setzen, dann schreiben. "
+        "Optional Auto-Roundtrip."
     )
     if looks_like_housesim():
         st.info(
@@ -131,7 +136,7 @@ def render_write_test_section() -> None:
 
         if not fields:
             st.caption(
-                "Keine gemappten Probe-Felder. ESS-/Export-/EVCS-Bindings auf EHAL-Com setzen."
+                "Keine gemappten Schreib-Felder. Bindings auf EHAL-Com setzen."
             )
             return
 
@@ -177,11 +182,10 @@ def _render_probe_table(
 
     selected: dict[str, Any] = {}
     for field in fields:
-        include_default = True
         cols = st.columns([0.8, 2.4, 2.8, 2.0])
         include = cols[0].checkbox(
             "Senden",
-            value=include_default,
+            value=False,
             key=f"ehal_write_test_incl_{field}",
             disabled=disabled,
             label_visibility="collapsed",
@@ -210,13 +214,14 @@ def _render_row_value(
     disabled: bool,
     container: Any,
 ) -> Any:
+    kind = probe_kind(field)
     lo, hi, unit = probe_value_bounds(
         field,
         max_power_kw=max_power_kw,
         ev_nominal_a=ev_nominal_a,
         force_ess_active=force_ess_active,
     )
-    if field == "set_ess_mode":
+    if kind == "set_ess_mode":
         labels = {0: "0 Automatik", 1: "1 Laden", 2: "2 Entladen"}
         return container.selectbox(
             "Wert",
@@ -226,13 +231,35 @@ def _render_row_value(
             disabled=disabled,
             label_visibility="collapsed",
         )
+    if kind in (SOURCE_SELECT_FIELD, FLEX_SET_ENABLE_KIND):
+        labels = (
+            {0: "0 Netz", 1: "1 Batterie"}
+            if kind == SOURCE_SELECT_FIELD
+            else {0: "0 Aus", 1: "1 Ein"}
+        )
+        return container.selectbox(
+            "Wert",
+            options=[0, 1],
+            format_func=lambda m: labels[int(m)],
+            key=f"ehal_write_test_val_{field}",
+            disabled=disabled,
+            label_visibility="collapsed",
+        )
+    if kind == "set_evcs_mode":
+        return container.selectbox(
+            "Wert",
+            options=["off", "pv", "now"],
+            key=f"ehal_write_test_val_{field}",
+            disabled=disabled,
+            label_visibility="collapsed",
+        )
 
     if lo is None or hi is None:
         container.caption(unit or "—")
         return None
 
-    default = _default_probe_value(field, hi=float(hi))
-    step = 100.0 if unit == "W" and field == FORCE_ESS_ACTIVE_POWER else (
+    default = _default_probe_value(kind, hi=float(hi))
+    step = 100.0 if unit == "W" and kind == FORCE_ESS_ACTIVE_POWER else (
         1.0 if unit == "W" else 0.5
     )
     return container.number_input(
@@ -247,10 +274,10 @@ def _render_row_value(
     )
 
 
-def _default_probe_value(field: str, *, hi: float) -> float:
-    if field == FORCE_ESS_ACTIVE_POWER:
+def _default_probe_value(kind: str, *, hi: float) -> float:
+    if kind == FORCE_ESS_ACTIVE_POWER:
         return min(_DEFAULT_FORCE_W, ACTIVE_POWER_MAX_ABS_W, hi if hi > 0 else _DEFAULT_FORCE_W)
-    if "limit" in field and hi > 0:
+    if "limit" in kind and hi > 0:
         return min(hi, 1000.0) if hi >= 1000 else hi
     return 0.0
 
@@ -288,10 +315,16 @@ def _render_restore_confirm() -> None:
             st.rerun()
 
 
+def _force_fields(values: dict[str, Any]) -> list[str]:
+    return [f for f in values if probe_kind(f) == FORCE_ESS_ACTIVE_POWER]
+
+
 def _render_force_confirm(pending: dict, values: dict[str, Any]) -> None:
+    force_lines = ", ".join(
+        f"`{f}={values[f]!r}`" for f in _force_fields(values)
+    ) or FORCE_ESS_ACTIVE_POWER
     st.error(
-        f"**Zweite Bestätigung:** ``{FORCE_ESS_ACTIVE_POWER} = "
-        f"{values.get(FORCE_ESS_ACTIVE_POWER)!r}`` "
+        f"**Zweite Bestätigung:** {force_lines} "
         f"(max ±{ACTIVE_POWER_MAX_ABS_W:g} W) erzwingt Batterieleistung."
     )
     st.caption("Nur wenn Sie bewusst testen — danach wiederherstellen.")
@@ -348,7 +381,7 @@ def _confirm_write_test_dialog() -> None:
         _render_restore_confirm()
         return
 
-    has_force = FORCE_ESS_ACTIVE_POWER in values
+    has_force = bool(_force_fields(values))
     if has_force and not pending.get("force_confirmed"):
         _render_force_confirm(pending, values)
         return

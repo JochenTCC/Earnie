@@ -115,12 +115,14 @@ Order: **P0 → P1 → P2 → P3**; P4 after P1; P6 can start now (builds on the
 
 ## 7. Open decisions
 
-1. **Kennung semantics (P6):** editable variable with cascade (proposed) vs. keeping `id` immutable and only displaying it. Interpretation of "Variable" here: editable, defaulting from the Bezeichnung.
-2. **Saved-but-missing names (F11):** allowed with one warning (as today) vs. not saved until probe finds them.
-3. **Import of batteries / PV / inverters (F14):** incomplete stub vs. bind-only.
-4. **Always-slug names (F8):** confirm; legacy bare names stay readable.
-5. **`sens_*` export:** name checklist only, until a VO receiver exists — acceptable?
-**Decided:** epic `Binding` with phases P0–P6 is registered in `roadmap-nomenclature.mdc` (as done for `Inverter`).
+1. **Saved-but-missing names (F11):** allowed with one warning (as today) vs. not saved until probe finds them. Decide after P0d.
+2. **Import of batteries / PV / inverters (F14):** incomplete stub vs. bind-only. Decide before P4.
+3. **Always-slug names (F8):** confirm; legacy bare names stay readable. Decide before P1 (proposed: yes).
+4. **`sens_*` export:** name checklist only, until a VO receiver exists — acceptable? Decide after P0a/b.
+
+**Decided:**
+- Epic `Binding` with phases P0–P6 is registered in `roadmap-nomenclature.mdc` (as done for `Inverter`).
+- **Kennung is editable** (P6), defaulting from the Bezeichnung. Rename only as an explicit action with cascade dry-run and a report of SB names that now deviate. If **P0c** shows history / debug dumps / regression fixtures keyed by id, an alias table (`old → new`) is applied on read. No separate immutable `uid` unless P0c shows broad dependence.
 
 ## 8. Not checked
 

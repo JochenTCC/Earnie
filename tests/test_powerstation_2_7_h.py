@@ -395,3 +395,84 @@ def test_ha_source_select_still_uses_plant_flat():
 
     adapter.write_mapped_fields.assert_called_once_with({"set_ess_source_select": 1.0})
     assert persisted == []
+
+
+def test_cycle_powerstation_charge_kw_defaults_idle_mapped_pack():
+    """Idle physical PS with charge binding gets 0 every cycle (sticky refresh)."""
+    from optimizer import powerstation_live as psl
+
+    slug = "ecoflow_delta_3"
+    planning = [
+        {
+            "id": slug,
+            "type": "powerstation",
+            "backing": "physical",
+            "role": ROLE_STANDBY_BACKUP,
+            "ehal_bindings": {
+                ess_field(slug, "set_ess_charge_power_limit"): "PS_Charge",
+            },
+        }
+    ]
+    with patch.object(psl, "_planning_powerstations", return_value=planning):
+        out = psl.cycle_powerstation_charge_kw({}, {})
+    assert out == {slug: 0.0}
+
+
+def test_cycle_standby_source_selects_defaults_grid_when_bound():
+    """Idle standby_backup with Quellenwahl binding refreshes to grid (0)."""
+    from optimizer import powerstation_live as psl
+
+    slug = "ecoflow_delta_3"
+    planning = [
+        {
+            "id": slug,
+            "type": "powerstation",
+            "backing": "physical",
+            "role": ROLE_STANDBY_BACKUP,
+            "ehal_bindings": {},
+        }
+    ]
+    with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
+        "house_config.ehal_bindings.resolve_plant_binding",
+        return_value="Earnie_Speicher_Quellenwahl",
+    ), patch(
+        "optimizer.live_export_limit.load_house_doc", return_value={}
+    ):
+        out = psl.cycle_standby_source_selects({})
+    assert out == {slug: SOURCE_GRID}
+
+
+def test_cycle_writes_idle_zero_charge_to_loxone():
+    """Every-cycle path sends charge 0 when no reserve/standby charge."""
+    from optimizer import powerstation_live as psl
+
+    slug = "ecoflow_delta_3"
+    planning = [
+        {
+            "id": slug,
+            "type": "powerstation",
+            "backing": "physical",
+            "role": ROLE_STANDBY_BACKUP,
+            "ehal_bindings": {
+                ess_field(slug, "set_ess_charge_power_limit"): "PS_Charge",
+            },
+        }
+    ]
+    with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
+        "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
+    ), patch(
+        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+    ), patch(
+        "integrations.ehal_live.is_ha_backend", return_value=False
+    ), patch(
+        "integrations.ehal_live.is_ehal_network_backend", return_value=False
+    ), patch(
+        "integrations.loxone_client._send_loxone_value_traced"
+    ) as send:
+        send.return_value = MagicMock(success=True)
+        charges = psl.cycle_powerstation_charge_kw({}, {})
+        psl.write_physical_powerstation_charges(charges)
+
+    send.assert_called_once()
+    assert send.call_args[0][0] == "PS_Charge"
+    assert send.call_args[0][1] == pytest.approx(0.0)

@@ -80,7 +80,17 @@ def test_clamp_accepts_export_limit():
 
 
 def test_allowed_probe_fields_includes_export_limit():
-    with patch("integrations.ehal_write_test.mapped_write_targets") as mapped:
+    with patch("integrations.ehal_write_test.mapped_write_targets") as mapped, patch(
+        "integrations.ehal_write_test.ehal_live.is_ehal_network_backend",
+        return_value=False,
+    ), patch(
+        "integrations.ehal_debug_mapping.expected_live_write_fields",
+        return_value=[
+            "set_ess_mode",
+            "set_ess_charge_power_limit",
+            "set_grid_export_power_limit",
+        ],
+    ):
         mapped.return_value = {
             "set_ess_mode": "number.mode",
             "set_grid_export_power_limit": "number.export_limit",
@@ -88,6 +98,24 @@ def test_allowed_probe_fields_includes_export_limit():
         fields = ewt.allowed_probe_fields(force_ess_active=False)
     assert "set_grid_export_power_limit" in fields
     assert fields.index("set_ess_mode") < fields.index("set_grid_export_power_limit")
+
+
+def test_allowed_probe_fields_includes_pattern_b():
+    slug_field = "ess.ecoflow_delta_3.set_ess_charge_power_limit"
+    with patch("integrations.ehal_write_test.mapped_write_targets") as mapped, patch(
+        "integrations.ehal_write_test.ehal_live.is_ehal_network_backend",
+        return_value=False,
+    ), patch(
+        "integrations.ehal_debug_mapping.expected_live_write_fields",
+        return_value=[slug_field, "set_ess_mode"],
+    ):
+        mapped.return_value = {
+            slug_field: "Earnie_Delta3_LadeLeistungs-Limit",
+            "set_ess_mode": "Earnie_Steuerbefehl",
+        }
+        fields = ewt.allowed_probe_fields(force_ess_active=False)
+    assert slug_field in fields
+    assert "set_ess_mode" in fields
 
 
 def test_clamp_rejects_oversized_ev_current():
@@ -259,11 +287,23 @@ def test_allowed_probe_fields_force_gate(mapped_mock):
         "set_ess_mode": "number.mode",
         "set_ess_charge_power_limit": "number.charge",
     }
-    without = ewt.allowed_probe_fields(force_ess_active=False)
-    assert "set_ess_active_power" not in without
-    assert "set_ess_mode" in without
-    with_force = ewt.allowed_probe_fields(force_ess_active=True)
-    assert with_force[0] == "set_ess_active_power"
+    with patch(
+        "integrations.ehal_write_test.ehal_live.is_ehal_network_backend",
+        return_value=False,
+    ), patch(
+        "integrations.ehal_debug_mapping.expected_live_write_fields",
+        return_value=[
+            "set_ess_active_power",
+            "set_ess_mode",
+            "set_ess_charge_power_limit",
+        ],
+    ):
+        without = ewt.allowed_probe_fields(force_ess_active=False)
+        assert "set_ess_active_power" not in without
+        assert "set_ess_mode" in without
+        with_force = ewt.allowed_probe_fields(force_ess_active=True)
+    assert "set_ess_active_power" in with_force
+    assert with_force.index("set_ess_active_power") < with_force.index("set_ess_mode")
 
 
 @patch("integrations.ehal_write_test.ehal_live")

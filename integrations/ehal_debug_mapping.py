@@ -319,8 +319,43 @@ def mapping_or_dash(mapping: dict[str, str], field: str) -> str:
     return value if value else _MAPPING_EMPTY
 
 
+def _append_plant_binding_io(
+    index: dict[str, str],
+    *,
+    field: str,
+    house: dict | None,
+) -> None:
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    if house is None:
+        return
+    io_name = str(resolve_plant_binding(house, field) or "").strip()
+    if io_name and io_name not in index:
+        index[io_name] = field
+
+
+def _append_battery_write_io(index: dict[str, str]) -> None:
+    """Pattern B ``ess.{slug}.set_*`` Merkers from components batteries."""
+    from ehal.ess_fields import binding_address, ess_field
+
+    for battery in _all_live_batteries():
+        bid = str(battery.get("id") or "").strip()
+        if not bid:
+            continue
+        bindings = battery.get("ehal_bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for kind in BATTERY_ESS_LIVE_WRITE_KINDS:
+            field = ess_field(bid, kind)
+            io_name = binding_address(bindings, bid, kind)
+            if not io_name:
+                io_name = str(bindings.get(kind) or "").strip()
+            if io_name and io_name not in index:
+                index[io_name] = field
+
+
 def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dict[str, str]:
-    """Merker IO-Name → EHAL write field (plant + EV + flex Freigabe)."""
+    """Merker IO-Name → EHAL write field (plant + batteries + EV + flex)."""
     import config
     from ehal.flex_fields import flex_set_enable
     from settings.ehal_marker_resolve import (
@@ -341,17 +376,19 @@ def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dic
         if io_name:
             index[io_name] = field
 
+    house: dict | None = None
     try:
-        from house_config.ehal_bindings import resolve_plant_binding
         from optimizer.live_export_limit import load_house_doc
 
-        export_io = str(
-            resolve_plant_binding(load_house_doc(), "set_grid_export_power_limit") or ""
-        ).strip()
-        if export_io:
-            index[export_io] = "set_grid_export_power_limit"
+        loaded = load_house_doc()
+        house = loaded if isinstance(loaded, dict) else None
     except Exception:  # noqa: BLE001 — status JSON still works without plant doc
-        pass
+        house = None
+    _append_plant_binding_io(
+        index, field="set_grid_export_power_limit", house=house
+    )
+    _append_plant_binding_io(index, field="set_ess_source_select", house=house)
+    _append_battery_write_io(index)
 
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()

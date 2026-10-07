@@ -278,12 +278,12 @@ Units and signs: see §B. Full role matrix: §C.
 
 ### Schreibtest
 
-Unter **Live-Schreiben** liegt der Expander **Schreibtest**: gemappte Probe-Felder in einer **Tabelle** (Senden-Haken + Wert), mit **einem** Klick als ein Setpoint-Dokument schreiben. Optional **Auto-Roundtrip** (Schreiben → kurze Wartezeit → Lesen je Feld → Vergleich → Wiederherstellen). Es wird derselbe Adapter-Pfad wie im Produktiv-Lauf genutzt (`adapter.write_setpoints`).
+Unter **Live-Schreiben** liegt der Expander **Schreibtest**: alle **gemappten** Schreib-Felder (Plant, Pattern B `ess.{slug}.set_*`, EV, Flex-Freigabe) in einer **Tabelle**. **Senden** ist je Zeile standardmäßig aus — Haken setzen, Wert wählen, dann schreiben. Optional **Auto-Roundtrip** (Schreiben → kurze Wartezeit → Lesen je Feld → Vergleich → Wiederherstellen). Plant-/EV-Felder nutzen `adapter.write_setpoints`; Pattern B / Flex gehen über die gemappten Merker/Entities.
 
 **Voraussetzungen**
 
 - Silent-Modus **aus** (gleiche Sperre wie der Daemon). Bei Silent sind die Buttons deaktiviert.
-- Nur **gemappte** Probe-Felder: `set_ess_mode`, `set_ess_charge_power_limit`, `set_ess_discharge_power_limit`, `set_grid_export_power_limit`, `set_evcs_max_current`.
+- Zeilen = alle gemappten Live-Schreiben-Felder (inkl. `set_ess_source_select`, `set_evcs_mode`, Flex `set_enable`).
 - Bestätigungsdialog vor jedem Live-Schreiben.
 
 **Grenzen (nützliche / sichere Werte)**

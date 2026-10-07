@@ -14,8 +14,10 @@ SAFE_PROBE_FIELDS: tuple[str, ...] = (
     "set_ess_mode",
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
+    "set_ess_source_select",
     "set_grid_export_power_limit",
     "set_evcs_max_current",
+    "set_evcs_mode",
 )
 
 FORCE_ESS_ACTIVE_POWER = "set_ess_active_power"
@@ -27,6 +29,8 @@ LIMIT_FIELDS = frozenset(
     {"set_ess_charge_power_limit", "set_ess_discharge_power_limit"}
 )
 EXPORT_LIMIT_FIELD = "set_grid_export_power_limit"
+SOURCE_SELECT_FIELD = "set_ess_source_select"
+FLEX_SET_ENABLE_KIND = "set_enable"
 LOXONE_KW_WRITE_FIELDS = frozenset(
     {
         "set_ess_active_power",
@@ -42,10 +46,25 @@ class WriteTestClampError(ValueError):
 
 
 def canonical_probe_field(field: str) -> str:
-    """Strip consumer prefix (``{id}:set_…`` → ``set_…``)."""
+    """Strip consumer prefix (``{id}:set_…`` → ``set_…``); keep Pattern B."""
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
+    return name
+
+
+def probe_kind(field: str) -> str:
+    """Wire kind for clamp/bounds (Pattern B / flex → kind; else canonical)."""
+    from ehal.ess_fields import ess_field_kind
+    from ehal.flex_fields import flex_field_kind
+
+    name = canonical_probe_field(field)
+    kind = ess_field_kind(name)
+    if kind:
+        return kind
+    flex_kind = flex_field_kind(name)
+    if flex_kind:
+        return flex_kind
     return name
 
 
@@ -58,8 +77,8 @@ def clamp_probe_value(
     force_ess_active: bool = False,
 ) -> float | int | str:
     """Clamp/validate a probe value; raise WriteTestClampError on illegal force use."""
-    canon = canonical_probe_field(field)
-    if canon == FORCE_ESS_ACTIVE_POWER:
+    kind = probe_kind(field)
+    if kind == FORCE_ESS_ACTIVE_POWER:
         if not force_ess_active:
             raise WriteTestClampError(
                 "set_ess_active_power erfordert die Force-Freigabe "
@@ -73,28 +92,28 @@ def clamp_probe_value(
             )
         return max(-ACTIVE_POWER_MAX_ABS_W, min(ACTIVE_POWER_MAX_ABS_W, raw))
 
-    if canon == "set_ess_mode":
+    if kind == "set_ess_mode":
         return _clamp_ess_mode(value)
 
-    if canon in LIMIT_FIELDS:
+    if kind in LIMIT_FIELDS:
         max_w = max(0.0, abs(float(max_power_kw)) * 1000.0)
         raw = float(value)
         if raw < 0 or raw > max_w + 1e-9:
             raise WriteTestClampError(
-                f"{canon} muss in 0…{max_w:g} W liegen (angegeben {raw:g})."
+                f"{kind} muss in 0…{max_w:g} W liegen (angegeben {raw:g})."
             )
         return max(0.0, min(max_w, raw))
 
-    if canon == EXPORT_LIMIT_FIELD:
+    if kind == EXPORT_LIMIT_FIELD:
         max_w = float(EXPORT_LIMIT_UNCONSTRAINED_W)
         raw = float(value)
         if raw < 0 or raw > max_w + 1e-9:
             raise WriteTestClampError(
-                f"{canon} muss in 0…{max_w:g} W liegen (angegeben {raw:g})."
+                f"{kind} muss in 0…{max_w:g} W liegen (angegeben {raw:g})."
             )
         return max(0.0, min(max_w, raw))
 
-    if canon == "set_evcs_max_current":
+    if kind == "set_evcs_max_current":
         cap = DEFAULT_EVCS_PROBE_CAP_A
         if ev_nominal_a is not None and float(ev_nominal_a) > 0:
             cap = min(float(ev_nominal_a), DEFAULT_EVCS_PROBE_CAP_A)
@@ -105,7 +124,7 @@ def clamp_probe_value(
             )
         return max(0.0, min(cap, raw))
 
-    if canon == "set_evcs_mode":
+    if kind == "set_evcs_mode":
         mode = str(value or "").strip().lower()
         if mode not in EVCS_MODE_VALUES:
             raise WriteTestClampError(
@@ -113,7 +132,20 @@ def clamp_probe_value(
             )
         return mode
 
-    raise WriteTestClampError(f"Feld nicht als Schreibtest-Probe erlaubt: {canon}")
+    if kind in (SOURCE_SELECT_FIELD, FLEX_SET_ENABLE_KIND):
+        return _clamp_binary_select(value, kind)
+
+    raise WriteTestClampError(f"Feld nicht als Schreibtest-Probe erlaubt: {kind}")
+
+
+def _clamp_binary_select(value: Any, kind: str) -> float:
+    try:
+        raw = float(value)
+    except (TypeError, ValueError) as exc:
+        raise WriteTestClampError(f"{kind} ungültig: {value!r}") from exc
+    if raw not in (0.0, 1.0):
+        raise WriteTestClampError(f"{kind} muss 0 oder 1 sein (angegeben {value!r}).")
+    return raw
 
 
 def _clamp_ess_mode(value: Any) -> int:
@@ -149,10 +181,10 @@ def values_match(written: Any, read_back: Any, *, abs_tol: float = 1.0) -> bool:
 
 def expected_loxone_wire_value(field: str, ehal_value: Any) -> Any:
     """Value as stored on Loxone Merker (for unit-aware compare helpers/tests)."""
-    canon = canonical_probe_field(field)
-    if canon == "set_ess_active_power":
+    kind = probe_kind(field)
+    if kind == "set_ess_active_power":
         return ehal_active_power_w_to_loxone_kw(float(ehal_value))
-    if canon in LIMIT_FIELDS or canon == EXPORT_LIMIT_FIELD:
+    if kind in LIMIT_FIELDS or kind == EXPORT_LIMIT_FIELD:
         return ehal_limit_w_to_loxone_kw(float(ehal_value))
     return ehal_value
 
@@ -165,19 +197,25 @@ def probe_value_bounds(
     force_ess_active: bool = False,
 ) -> tuple[float | None, float | None, str]:
     """Return (min, max, unit_hint) for UI number inputs; modes return (None, None, …)."""
-    canon = canonical_probe_field(field)
-    if canon == FORCE_ESS_ACTIVE_POWER and force_ess_active:
+    kind = probe_kind(field)
+    if kind == FORCE_ESS_ACTIVE_POWER and force_ess_active:
         return -ACTIVE_POWER_MAX_ABS_W, ACTIVE_POWER_MAX_ABS_W, "W"
-    if canon in LIMIT_FIELDS:
+    if kind in LIMIT_FIELDS:
         max_w = max(0.0, abs(float(max_power_kw)) * 1000.0)
         return 0.0, max_w, "W"
-    if canon == EXPORT_LIMIT_FIELD:
+    if kind == EXPORT_LIMIT_FIELD:
         return 0.0, float(EXPORT_LIMIT_UNCONSTRAINED_W), "W"
-    if canon == "set_evcs_max_current":
+    if kind == "set_evcs_max_current":
         cap = DEFAULT_EVCS_PROBE_CAP_A
         if ev_nominal_a is not None and float(ev_nominal_a) > 0:
             cap = min(float(ev_nominal_a), DEFAULT_EVCS_PROBE_CAP_A)
         return 0.0, cap, "A"
-    if canon == "set_ess_mode":
+    if kind == "set_ess_mode":
         return None, None, "0=Automatik / 1=Laden / 2=Entladen"
+    if kind == SOURCE_SELECT_FIELD:
+        return None, None, "0=Netz / 1=Batterie"
+    if kind == FLEX_SET_ENABLE_KIND:
+        return None, None, "0=Aus / 1=Ein"
+    if kind == "set_evcs_mode":
+        return None, None, "off|pv|now"
     return None, None, ""

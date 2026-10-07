@@ -342,6 +342,8 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     from optimizer.powerstation_live import (
         advance_virtual_reserves_from_plan,
         apply_reserves_to_battery_params,
+        cycle_powerstation_charge_kw,
+        cycle_standby_source_selects,
         load_active_reserves,
         load_standby_packs,
         physical_charge_setpoints_kw,
@@ -426,10 +428,11 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         dt_h=DEFAULT_DT_H,
         reserves=active_reserves,
     )
-    phys_charge = physical_charge_setpoints_kw(active_reserves)
+    reserve_charges = physical_charge_setpoints_kw(active_reserves)
     standby_sources, standby_charges = live_source_and_charge(standby_plans, slot=0)
-    for ps_id, chg in standby_charges.items():
-        phys_charge[ps_id] = float(chg)
+    # Refresh sticky Merkers every cycle (idle packs → charge 0 / grid).
+    phys_charge = cycle_powerstation_charge_kw(reserve_charges, standby_charges)
+    standby_sources = cycle_standby_source_selects(standby_sources)
     if standby_sources:
         logger.info("2.7.h source_select (0=grid/1=battery): %s", standby_sources)
         write_standby_source_selects(standby_sources)

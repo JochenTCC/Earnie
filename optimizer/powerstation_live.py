@@ -176,6 +176,83 @@ def physical_charge_setpoints_kw(
     return out
 
 
+def _physical_powerstation_ids() -> list[str]:
+    """Ids of non-virtual powerstations (charge refresh targets)."""
+    from house_config.powerstation import is_virtual_powerstation
+
+    ids: list[str] = []
+    for ps in _planning_powerstations():
+        if not isinstance(ps, dict) or is_virtual_powerstation(ps):
+            continue
+        ps_id = str(ps.get("id") or "").strip()
+        if ps_id:
+            ids.append(ps_id)
+    return ids
+
+
+def _standby_backup_physical_ids() -> list[str]:
+    """Ids of physical ``standby_backup`` packs (source_select refresh targets)."""
+    from house_config.powerstation import (
+        BACKING_PHYSICAL,
+        ROLE_STANDBY_BACKUP,
+        is_powerstation,
+    )
+
+    ids: list[str] = []
+    for ps in _planning_powerstations():
+        if not isinstance(ps, dict) or not is_powerstation(ps):
+            continue
+        if str(ps.get("role") or "").strip().lower() != ROLE_STANDBY_BACKUP:
+            continue
+        if str(ps.get("backing") or "").strip().lower() != BACKING_PHYSICAL:
+            continue
+        ps_id = str(ps.get("id") or "").strip()
+        if ps_id:
+            ids.append(ps_id)
+    return ids
+
+
+def cycle_powerstation_charge_kw(
+    reserve_charges: dict[str, float],
+    standby_charges: dict[str, float],
+) -> dict[str, float]:
+    """Charge kW for every physical PS with a charge binding (idle → 0).
+
+    Ensures sticky Loxone Merkers are refreshed every optimize cycle, not only
+    when a reserve/standby plan is active.
+    """
+    out: dict[str, float] = {}
+    for ps_id in _physical_powerstation_ids():
+        if _binding_for_ps(ps_id, "set_ess_charge_power_limit"):
+            out[ps_id] = 0.0
+    for ps_id, kw in (reserve_charges or {}).items():
+        key = str(ps_id).strip()
+        if key:
+            out[key] = max(0.0, float(kw))
+    for ps_id, kw in (standby_charges or {}).items():
+        key = str(ps_id).strip()
+        if key:
+            out[key] = max(0.0, float(kw))
+    return out
+
+
+def cycle_standby_source_selects(
+    standby_sources: dict[str, int],
+) -> dict[str, int]:
+    """``source_select`` for standby packs with a binding (idle → grid)."""
+    from optimizer.powerstation_standby import SOURCE_GRID
+
+    out: dict[str, int] = {}
+    for ps_id in _standby_backup_physical_ids():
+        if _binding_for_ps(ps_id, "set_ess_source_select"):
+            out[ps_id] = SOURCE_GRID
+    for ps_id, select in (standby_sources or {}).items():
+        key = str(ps_id).strip()
+        if key:
+            out[key] = 1 if int(select) >= 1 else 0
+    return out
+
+
 def appliance_is_reserve_mode(appliance: dict) -> bool:
     return str(appliance.get("mode") or "") == MODE_RESERVE
 
