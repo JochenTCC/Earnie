@@ -46,7 +46,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 - [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
 - [ ] 2026-10-08 07:07:14 [WARNING] (data.outdoor_forecast:209) - Außentemperatur-Prognose fehlgeschlagen (503 Server Error: Service Unavailable for url: https://api.open-meteo.com/v1/forecast?latitude=47.40409024399311&longitude=9.742743769241422&hourly=temperature_2m&forecast_days=3&timezone=auto) – konstante Fallback-Temperatur 14.10 °C  --> This warning is quite often - please check
 - [ ] 2026-10-08 11:59:39 [WARNING] (optimizer.milp_consumer_delivery:193) - Haus Wärme: Ziel (26.87 kWh) nicht vollständig erreichbar mit 49 h à 1.90 kW – lade mit Best-Effort.
-- [ ] 2026-10-08 12:11:48 [ERROR] (scripts.startup_checks:108) - [loxone-verify] FEHLER consumer.waschmaschine.sens_power_act (Zähler Waschmaschine): Lesen oder Parsen fehlgeschlagen - should not be an error - but a warning
 
 
 
