@@ -228,10 +228,14 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
 
 
 def _render_reserve_appliance(appliance: dict) -> None:
+    from datetime import datetime, timezone
+
     from optimizer.powerstation_reserve import reserve_target_kwh
     from runtime_store.powerstation_reserves import (
+        REFILL_DEADLINE_H,
         get_or_init_state,
         load_reserve_states,
+        refill_deadline_utc,
         set_trigger,
     )
 
@@ -256,17 +260,27 @@ def _render_reserve_appliance(appliance: dict) -> None:
         f"Powerstation: `{ps_id}` · Ziel: **{target:.2f} kWh** · "
         f"Vorrat: **{stored:.2f} kWh** · Status: **{state}**"
     )
-    if appliance.get("power_source") == "loxone":
-        merker = _appliance_loxone_power_name(appliance)
-        if merker:
-            st.caption(
-                f"Trigger über Leistungsmerker `{merker}` (Schwelle) "
-                "oder manuell unten."
+    deadline = refill_deadline_utc(entry)
+    if state in ("empty", "charging") and deadline is not None:
+        remaining_h = (deadline - datetime.now(timezone.utc)).total_seconds() / 3600.0
+        st.caption(
+            f"Nachladen bis **{deadline.astimezone().strftime('%d.%m. %H:%M')}** "
+            f"(max. {REFILL_DEADLINE_H:.0f} h, preisoptimal"
+            + (
+                f", noch ca. {max(0.0, remaining_h):.1f} h"
+                if remaining_h > 0
+                else ", Frist erreicht"
             )
-        else:
-            st.caption("Kein Leistungsmerker — manueller Trigger nötig.")
-    else:
-        st.caption("Kein Leistungsmerker — manueller Trigger nötig.")
+            + ")."
+        )
+    st.caption(
+        "Trigger (ODER): digitales `consumer.<id>.sens_consumer_active` "
+        "(Gerät läuft), Leistungs-Schwelle auf `sens_power_act`, "
+        "physische PS-Ausgangsleistung, oder manuell unten."
+    )
+    merker = _appliance_loxone_power_name(appliance)
+    if merker:
+        st.caption(f"Leistungsmerker: `{merker}`.")
     col_a, col_b = st.columns(2)
     with col_a:
         if st.button(
@@ -280,6 +294,7 @@ def _render_reserve_appliance(appliance: dict) -> None:
         if st.button(
             "Trigger zurücksetzen",
             key=f"reserve_trigger_off_{appliance['id']}",
+            help="Löscht den Vorrat und startet das Nachladen neu (manueller Reset).",
         ):
             set_trigger(ps_id, active=False)
             invalidate_live_optimization_cache()

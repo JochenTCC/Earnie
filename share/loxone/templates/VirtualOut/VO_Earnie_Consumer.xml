@@ -2,9 +2,10 @@
 <!--
   DRAFT (2.4.n Pattern B) — Loxone → Earnie generic flex consumer power push.
   Freigabe is on VI_Earnie_Consumer. Multi-consumer: Prefix+Slug Titles (docs).
-  VO path: /ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/<v> — replace {hk_id}
-  with the Hausprofil consumer id (e.g. waschmaschine). Binding key flex.{hk_id}.sens_power_act.
-  Leistung may be EFM Load — keep VO cmd.
+  VO paths: flex.{hk_id}.sens_power_act (analog, legacy flex wire) and
+  consumer.{hk_id}.sens_consumer_active (digital 0/1 Gerät läuft — 2.7.p / Binding
+  consumer. namespace). Replace {hk_id} with the Hausprofil Kennung (e.g. waschmaschine).
+  Multi: Title Earnie_Verbraucher_<Slug>_Aktiv. Leistung may be EFM Load — keep VO cmd.
   Value placeholder in a Virtual Output command is <v> (verified 2026-10-07 with a capture: the Virtual-Input style \v is sent as the
   control character 0x0B). <v> arrives with a point and 3 decimals (e.g. 6.333). In the XML attribute it is written &lt;v&gt;.
   Pilot (branch spike/vo-push-pilot): target is the daemon port 8541 (not the Streamlit port 8501); append ?t=TOKEN to the command
@@ -13,4 +14,5 @@
 <VirtualOut HintText="" Title="Earnie Generic Consumer Telemetry" Comment="Pattern B: push flex power to Earnie (draft)" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<Info templateType="3" minVersion="17010630"/>
 	<VirtualOutCmd Title="Earnie_Verbraucher_Leistung" Comment="flex.{hk_id}.sens_power_act; or EFM Load" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/&lt;v&gt;" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="true" Repeat="0" RepeatRate="0" SourceValLow="0" DestValLow="0" SourceValHigh="0" DestValHigh="0" HintText=""/>
+	<VirtualOutCmd Title="Earnie_Verbraucher_Aktiv" Comment="Rename to Earnie_Verbraucher_&lt;Slug&gt;_Aktiv; EHAL consumer.{hk_id}.sens_consumer_active 0/1 (2.7.p)" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/loxone/telemetry/consumer.{hk_id}.sens_consumer_active/&lt;v&gt;" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="false" Repeat="0" RepeatRate="0" HintText=""/>
 </VirtualOut>

@@ -92,6 +92,7 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
     "flex.sens_power_act": "Flex Leistung / Zustand",
+    "flex.sens_consumer_active": "Gerät läuft (Binär)",
     "flex.set_enable": "Flex Freigabe",
     "get_filter_remaining_hours": "Filter Sollstunden (h)",
     "sens_filter_active": "Filter läuft (Binär)",

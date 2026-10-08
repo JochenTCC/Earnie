@@ -1,19 +1,25 @@
 {
   "role_id": "consumer",
   "label": "Flex-Verbraucher (Stub)",
-  "baustein_notes": "Greenfield prefix Earnie_Verbraucher_*. Multi: Prefix+Slug Titles; VI Check / VO paths use flex.{hk_id}.…. Prefer EFM Load Bezeichnung for flex.{hk_id}.sens_power_act when the meter is that consumer.",
+  "baustein_notes": "Greenfield prefix Earnie_Verbraucher_*. Multi: Prefix+Slug Titles. Live/VO exchange IDs use consumer.{hk_id}.* (Binding 2.7.n); storage bindings may still be flex.{id}.*. Prefer EFM Load for power when the meter is that consumer.",
   "recommended_markers": [
     {
       "ehal_field": "flex.sens_power_act",
       "loxone_blocks_key": "ehal_bindings.flex.{id}.sens_power_act",
-      "suggested_name": "Earnie_Verbraucher_Leistung",
-      "notes": "Read power or binary on house-profile consumer."
+      "suggested_name": "Earnie_Verbraucher_{Slug}_Leistung",
+      "notes": "Read power. Exchange/Live: consumer.{id}.sens_power_act. Legacy bare Earnie_Verbraucher_Leistung still recognised."
+    },
+    {
+      "ehal_field": "flex.sens_consumer_active",
+      "loxone_blocks_key": "ehal_bindings.flex.{id}.sens_consumer_active",
+      "suggested_name": "Earnie_Verbraucher_{Slug}_Aktiv",
+      "notes": "Digital 0/1 Gerät läuft (2.7.p). Exchange/VO: consumer.{id}.sens_consumer_active. OR-trigger with Leistung for Powerstation reserve release."
     },
     {
       "ehal_field": "flex.set_enable",
       "loxone_blocks_key": "ehal_bindings.flex.{id}.set_enable",
-      "suggested_name": "Earnie_Verbraucher_Freigabe",
-      "notes": "Enable / Freigabe write."
+      "suggested_name": "Earnie_Verbraucher_{Slug}_Freigabe",
+      "notes": "Enable / Freigabe write. Legacy bare Earnie_Verbraucher_Freigabe still recognised."
     }
   ],
   "reference": "docs/referenz/loxone-signals.md"

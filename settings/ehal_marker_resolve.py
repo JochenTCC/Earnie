@@ -84,6 +84,35 @@ def marker_flex_enable(consumer: dict) -> str:
     return binding_address(ehal_bindings(consumer), cid, KIND_SET_ENABLE)
 
 
+def marker_sens_consumer_active(consumer: dict) -> str:
+    """Digital Gerät-läuft Merker (2.7.p) from Pattern B bindings."""
+    from ehal.flex_fields import (
+        KIND_SENS_CONSUMER_ACTIVE,
+        binding_address,
+        flex_field,
+    )
+    from ehal.push_signals import pilot_id
+
+    cid = str(consumer.get("id") or "").strip()
+    if not cid:
+        return ""
+    bindings = ehal_bindings(consumer)
+    merker = binding_address(bindings, cid, KIND_SENS_CONSUMER_ACTIVE)
+    if merker:
+        return merker
+    key = flex_field(cid, KIND_SENS_CONSUMER_ACTIVE)
+    if key not in bindings and KIND_SENS_CONSUMER_ACTIVE not in bindings:
+        # Legacy alternate binary used as run indicator for manuals.
+        alt = _first_nonempty(bindings.get("flex.alternate_binary_power_name"))
+        if alt:
+            return alt
+        return ""
+    ctype = str(consumer.get("type") or "")
+    return str(
+        pilot_id("consumer", cid, KIND_SENS_CONSUMER_ACTIVE, ctype) or ""
+    ).strip()
+
+
 def marker_sens_evcs_connected(consumer: dict) -> str:
     return resolve_lox_marker(consumer, "sens_evcs_connected")
 

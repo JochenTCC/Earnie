@@ -171,6 +171,7 @@ Live operation runs via house-profile flex Merker. Role template: `share/ehal/ro
 | Area / meaning        | Type          | EHAL value name (stub)             | OpenEMS | evcc (YAML attribute) | Victron GX / EVCS (Modbus) | Loxone / Loxone extra                        |
 | ------------------------ | --------------- | ------------------------------------- | ------- | ------------------------ | ----------------------------- | ------------------------------------------------ |
 | Flex power / state      | Measurement   | `flex.{slug}.sens_power_act`         |         |                           |                                | `Earnie_Verbraucher_Leistung` or EFM load        |
+| Flex consumer active    | Measurement   | `consumer.{slug}.sens_consumer_active` (Live/VO; storage may be `flex.{slug}.sens_consumer_active`) |         |                           |                                | `Earnie_Verbraucher_<Slug>_Aktiv` (digital 0/1; 2.7.p reserve release) |
 | Flex enable             | Control value | `flex.{slug}.set_enable`             |         |                           |                                | `Earnie_Verbraucher_Freigabe`                     |
 
 

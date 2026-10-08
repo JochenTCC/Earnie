@@ -617,20 +617,55 @@ def _add_virtual_reserve_asap_charge(
     max_charge_kw: float,
     efficiency: float,
 ) -> None:
-    """Force primary ESS to absorb ASAP kWh for virtual single_use reserves (2.7.g)."""
-    if asap_charge_kwh <= 1e-9 or max_charge_kw <= 1e-9 or model.horizon < 1:
+    """Deprecated alias — prefer ``_add_virtual_reserve_deadline_charge`` (2.7.p)."""
+    _add_virtual_reserve_deadline_charge(
+        model,
+        matrix=None,
+        refill_kwh=asap_charge_kwh,
+        max_charge_kw=max_charge_kw,
+        efficiency=efficiency,
+        deadline=None,
+    )
+
+
+def _add_virtual_reserve_deadline_charge(
+    model: MilpHorizonModel,
+    *,
+    matrix: list | None,
+    refill_kwh: float,
+    max_charge_kw: float,
+    efficiency: float,
+    deadline,
+) -> None:
+    """Require primary ESS charge of refill kWh by deadline (price-optimal within window).
+
+    Sum of ``p_charge`` over slots before the deadline (or full horizon when the
+    deadline is missing / beyond the horizon) must cover AC kWh needed. The MILP
+    cost objective picks cheap slots inside that window — not ASAP front-loading.
+    """
+    if refill_kwh <= 1e-9 or max_charge_kw <= 1e-9 or model.horizon < 1:
         return
     eta = float(efficiency) if efficiency > 1e-9 else 1.0
-    # Grid/AC kWh to store ``asap_charge_kwh`` in the battery.
-    ac_kwh_needed = asap_charge_kwh / eta
-    from optimizer.charging_urgent import hours_needed_to_deliver
+    ac_kwh_needed = refill_kwh / eta
+    from optimizer.charging_schedule import matrix_slot_datetime
 
-    hours = hours_needed_to_deliver(ac_kwh_needed, max_charge_kw)
-    slot_count = max(1, min(model.horizon, int(hours / model.dt_h) + 1))
+    eligible: list[int] = []
+    if matrix and deadline is not None:
+        for t in range(min(model.horizon, len(matrix))):
+            if matrix_slot_datetime(matrix, t) < deadline:
+                eligible.append(t)
+    if not eligible:
+        # No usable pre-deadline slots (missing deadline / past): full horizon so
+        # the cost objective can still pick cheap slots inside the plan.
+        eligible = list(range(model.horizon))
+
+    deliverable = max_charge_kw * model.dt_h * len(eligible)
+    required = min(ac_kwh_needed, deliverable)
+    if required <= 1e-9:
+        return
     model.prob += (
-        pulp.lpSum(model.p_charge[t] * model.dt_h for t in range(slot_count))
-        >= ac_kwh_needed
-    ), "virtual_reserve_asap_charge"
+        pulp.lpSum(model.p_charge[t] * model.dt_h for t in eligible) >= required
+    ), "virtual_reserve_deadline_charge"
 
 
 def _add_sunrise_soc_min_constraint(

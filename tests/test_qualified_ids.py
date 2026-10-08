@@ -66,5 +66,6 @@ def test_digital_ids() -> None:
     assert q.is_digital_id("sens_absent_mode")
     assert q.is_digital_id("evcs.e_auto.sens_evcs_connected")
     assert q.is_digital_id("pool.pool_filter.sens_filter_active")
+    assert q.is_digital_id("consumer.waschmaschine.sens_consumer_active")
     assert not q.is_digital_id("evcs.e_auto.sens_evcs_active_power")
     assert not q.is_digital_id("heartbeat")

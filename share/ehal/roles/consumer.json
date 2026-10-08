@@ -11,6 +11,12 @@
       "notes": "Pattern B power. Legacy binding key flex.power_name migrates on load. Zähler id zaehler_<slug> uses slug without prefix."
     },
     {
+      "field": "flex.{hk_id}.sens_consumer_active",
+      "required": false,
+      "kind": "stub",
+      "notes": "Storage Pattern B key. Exchange/Live/VO: consumer.{hk_id}.sens_consumer_active (2.7.n). Digital 0/1 Gerät läuft (2.7.p) OR-trigger with sens_power_act."
+    },
+    {
       "field": "flex.{hk_id}.set_enable",
       "required": false,
       "kind": "stub",

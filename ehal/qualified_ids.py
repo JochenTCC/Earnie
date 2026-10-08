@@ -84,7 +84,13 @@ def id_namespace_alternation(*, include_legacy: bool = True) -> str:
 # Field kinds that are 0/1 states. A Loxone output reports them only on edges
 # (On = 1, Off = 0), so the last explicit value stays valid until the next edge.
 DIGITAL_KINDS = frozenset(
-    {"sens_absent_mode", "sens_evcs_connected", "sens_heating_active", "sens_filter_active"}
+    {
+        "sens_absent_mode",
+        "sens_evcs_connected",
+        "sens_heating_active",
+        "sens_filter_active",
+        "sens_consumer_active",
+    }
 )
 
 

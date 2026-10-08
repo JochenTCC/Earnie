@@ -400,15 +400,23 @@ def _append_flex_power_check(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
 ) -> None:
-    from ehal.flex_fields import flex_sens_power_act
+    from ehal.flex_fields import flex_sens_consumer_active, flex_sens_power_act
     from integrations.ehal_debug_mapping import live_read_consumer_field
-    from settings.ehal_marker_resolve import marker_flex_power
+    from settings.ehal_marker_resolve import (
+        marker_flex_power,
+        marker_sens_consumer_active,
+    )
 
     cid = consumer["id"]
     _append_io_check(
         checks,
         live_read_consumer_field(consumer, flex_sens_power_act(cid)),
         marker_flex_power(consumer),
+    )
+    _append_io_check(
+        checks,
+        live_read_consumer_field(consumer, flex_sens_consumer_active(cid)),
+        marker_sens_consumer_active(consumer),
     )
 
 

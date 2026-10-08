@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.p — Virtual powerstation consumer-start release (2026-10-08)
+
+- [x] **2.7.p — Virtual powerstation consumer-start release**
+  - EHAL exchange/Live/VO: `consumer.{Kennung}.sens_consumer_active` (digital; storage may still be `flex.{slug}.*`); Merker `Earnie_Verbraucher_<Slug>_Aktiv`; Live-Lesen; recipe/role/HITL
+  - OR-trigger: digital active **or** `sens_power_act` threshold **or** physical `ess.*.sens_ess_power` **or** UI button (live reads, not plant telemetry alone; accepts `consumer.*` and `flex.*` telemetry keys)
+  - Release while active; after inactive drain leftover `stored_kwh`; refill price-optimal with hard **24 h** deadline (`refill_opened_at`, MILP deadline charge window replaces ASAP front-load)
+  - Docs: `batterie-pv.md`, `flexible-verbraucher.md`, `ehal-com.md`, `loxone-signals.md`, `docs/spec/ehal.md`; tests `tests/test_powerstation_2_7_p.py`
+
 ### 2.7.o — Push-only Loxone read path + cleanup (2026-10-08)
 
 - [x] **2.7.o — Binding push-only read path** (WP1–WP8 + post Phase C cleanup; procedure [`Binding-Push-Only-Conversion.md`](Binding-Push-Only-Conversion.md))

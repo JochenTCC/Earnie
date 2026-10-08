@@ -28,6 +28,8 @@ Bei `type: powerstation` und `backing: virtual` ist die Powerstation **kein eige
 
 Mehrere manuelle Geräte können dieselbe virtuelle Powerstation nutzen: gemeinsame Energiereserve (Ziel-kWh = Summe der Gerätebedarfe, begrenzt durch Kapazität); Trigger von jedem angeschlossenen Gerät.
 
+**Release-Trigger (2.7.p, ODER):** digitales `consumer.{slug}.sens_consumer_active` (0/1 „Gerät läuft“, VO/Merker `Earnie_Verbraucher_<Slug>_Aktiv`), **oder** Leistungs-Schwelle auf `consumer.{slug}.sens_power_act` (Binding ggf. noch `flex.{slug}.*`), **oder** bei physischer PS die Ausgangsleistung `ess.{id}.sens_ess_power`, **oder** Button auf **Manuelle Geräte**. Solange ein Gerät aktiv ist, wird die gehaltene Reserve freigegeben (SoC-Floor der Hausbatterie fällt). Nach dem Lauf wird Restvorrat weiter abgebucht; danach Nachladen **preisoptimal** mit harter Frist **24 h**.
+
 Ausgeblendet und beim Speichern/Normalisieren von der Hausbatterie übernommen (bzw. feste Defaults, falls keine Hausbatterie existiert): Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungs-Schwelle, Standby, Topologie, Steuerbarkeit, `limits_from_live`, Verschleiß. Entladeleistung der virtuellen Powerstation wird immer `0` gesetzt; Verschleiß bleibt aus (Zyklen zählen auf der Hausbatterie).
 
 Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular.

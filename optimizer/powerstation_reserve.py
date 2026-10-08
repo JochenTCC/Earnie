@@ -16,8 +16,11 @@ from runtime_store.powerstation_reserves import (
     STATE_DISCHARGING,
     STATE_EMPTY,
     STATE_STANDBY,
+    clear_refill_opened,
+    ensure_refill_opened,
     get_or_init_state,
     load_reserve_states,
+    refill_deadline_utc,
     save_reserve_states,
 )
 
@@ -140,6 +143,7 @@ def collect_active_reserves(
             for a in group
             if str(a.get("id") or "").strip()
         ]
+        deadline = refill_deadline_utc(entry)
         active.append(
             {
                 "powerstation_id": ps_id,
@@ -153,6 +157,9 @@ def collect_active_reserves(
                 "trigger_active": bool(entry.get("trigger_active")),
                 "protected_kwh": protected_kwh_from_state(entry),
                 "asap_charge_kwh": asap_charge_kwh_from_state(entry),
+                "refill_kwh": asap_charge_kwh_from_state(entry),
+                "refill_opened_at": entry.get("refill_opened_at"),
+                "refill_deadline_utc": deadline.isoformat() if deadline else None,
                 "max_charge_power_kw": float(
                     ps.get("battery_max_charge_power_kw")
                     or ps.get("max_charge_power_kw")
@@ -182,11 +189,28 @@ def virtual_asap_charge_kwh(reserves: list[dict[str, Any]]) -> float:
     )
 
 
+def virtual_refill_deadline_iso(reserves: list[dict[str, Any]]) -> str | None:
+    """Earliest refill deadline among virtual reserves that still need energy."""
+    earliest: str | None = None
+    for reserve in reserves:
+        if reserve.get("backing") != BACKING_VIRTUAL:
+            continue
+        if float(reserve.get("refill_kwh") or 0.0) <= 1e-9:
+            continue
+        stamp = str(reserve.get("refill_deadline_utc") or "").strip()
+        if not stamp:
+            continue
+        if earliest is None or stamp < earliest:
+            earliest = stamp
+    return earliest
+
+
 def apply_virtual_reserve_floor(
     battery_params: dict | list[dict],
     *,
     protected_kwh: float,
     asap_charge_kwh: float = 0.0,
+    refill_deadline_utc: str | None = None,
 ) -> dict | list[dict]:
     """Raise primary house ESS min_soc so protected kWh cannot serve other loads."""
     if isinstance(battery_params, list):
@@ -196,13 +220,20 @@ def apply_virtual_reserve_floor(
         if protected_kwh > 1e-9:
             _raise_min_soc(out[0], protected_kwh)
         if asap_charge_kwh > 1e-9:
+            # refill_kwh: cost-optimal fill with deadline (2.7.p); alias kept for tests.
+            out[0]["_virtual_reserve_refill_kwh"] = float(asap_charge_kwh)
             out[0]["_virtual_reserve_asap_kwh"] = float(asap_charge_kwh)
+            if refill_deadline_utc:
+                out[0]["_virtual_reserve_refill_deadline_utc"] = str(refill_deadline_utc)
         return out
     out = dict(battery_params)
     if protected_kwh > 1e-9:
         _raise_min_soc(out, protected_kwh)
     if asap_charge_kwh > 1e-9:
+        out["_virtual_reserve_refill_kwh"] = float(asap_charge_kwh)
         out["_virtual_reserve_asap_kwh"] = float(asap_charge_kwh)
+        if refill_deadline_utc:
+            out["_virtual_reserve_refill_deadline_utc"] = str(refill_deadline_utc)
     return out
 
 
@@ -210,11 +241,12 @@ def prepare_battery_params_for_reserves(
     battery_params: dict | list[dict],
     reserves: list[dict[str, Any]],
 ) -> dict | list[dict]:
-    """Apply virtual floor + ASAP metadata for the live/MILP call."""
+    """Apply virtual floor + refill-deadline metadata for the live/MILP call."""
     return apply_virtual_reserve_floor(
         battery_params,
         protected_kwh=virtual_protected_kwh(reserves),
         asap_charge_kwh=virtual_asap_charge_kwh(reserves),
+        refill_deadline_utc=virtual_refill_deadline_iso(reserves),
     )
 
 
@@ -256,6 +288,8 @@ def advance_reserve_after_slot(
             entry["state"] = STATE_EMPTY
             entry["stored_kwh"] = 0.0
             entry["trigger_active"] = False
+            entry["refill_opened_at"] = None
+            ensure_refill_opened(entry)
         else:
             entry["state"] = STATE_DISCHARGING
             entry["stored_kwh"] = stored
@@ -266,10 +300,13 @@ def advance_reserve_after_slot(
     entry["stored_kwh"] = stored
     if target <= 1e-9:
         entry["state"] = STATE_EMPTY
+        ensure_refill_opened(entry)
     elif stored + 1e-6 >= target:
         entry["state"] = STATE_STANDBY
+        clear_refill_opened(entry)
     else:
         entry["state"] = STATE_CHARGING
+        ensure_refill_opened(entry)
     save_reserve_states(states)
     return entry
 

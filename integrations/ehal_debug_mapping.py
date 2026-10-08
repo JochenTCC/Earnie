@@ -282,9 +282,15 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
                 for name in FILTER_LIVE_READ_FIELDS
             )
         else:
-            from ehal.flex_fields import flex_sens_power_act
+            from ehal.flex_fields import (
+                flex_sens_consumer_active,
+                flex_sens_power_act,
+            )
 
             fields.append(live_read_consumer_field(consumer, flex_sens_power_act(cid)))
+            fields.append(
+                live_read_consumer_field(consumer, flex_sens_consumer_active(cid))
+            )
             if _consumer_is_thermal(consumer):
                 fields.extend(
                     live_read_consumer_field(consumer, name)

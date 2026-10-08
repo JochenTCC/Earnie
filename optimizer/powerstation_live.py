@@ -81,13 +81,118 @@ def apply_reserves_to_battery_params(
     return prepare_battery_params_for_reserves(battery_params, active)
 
 
+def _consumers_by_id() -> dict[str, dict]:
+    try:
+        consumers = config.get_flexible_consumers()
+    except Exception:  # noqa: BLE001
+        return {}
+    out: dict[str, dict] = {}
+    for consumer in consumers or []:
+        if not isinstance(consumer, dict):
+            continue
+        cid = str(consumer.get("id") or "").strip()
+        if cid:
+            out[cid] = consumer
+    return out
+
+
+def _telemetry_number(telemetry: dict[str, Any] | None, key: str) -> float | None:
+    if not isinstance(telemetry, dict) or key not in telemetry:
+        return None
+    raw = telemetry.get(key)
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _digital_active_from_consumer(consumer: dict) -> bool | None:
+    """Read ``sens_consumer_active`` Merker when mapped; None if unavailable."""
+    from settings.ehal_marker_resolve import marker_sens_consumer_active
+
+    io_name = marker_sens_consumer_active(consumer)
+    if not io_name:
+        return None
+    try:
+        from integrations.loxone_client import fetch_loxone_generic_value
+
+        raw = fetch_loxone_generic_value(io_name)
+    except Exception:  # noqa: BLE001
+        return None
+    if raw is None:
+        return None
+    try:
+        return float(raw) >= 0.5
+    except (TypeError, ValueError):
+        return None
+
+
+def _live_power_kw(consumer: dict) -> float | None:
+    try:
+        from integrations.loxone_client import resolve_consumer_live_power_kw
+
+        return resolve_consumer_live_power_kw(consumer)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _first_telemetry_number(
+    telemetry: dict[str, Any] | None, *keys: str
+) -> float | None:
+    for key in keys:
+        value = _telemetry_number(telemetry, key)
+        if value is not None:
+            return value
+    return None
+
+
+def appliance_run_signal_active(
+    appliance_id: str,
+    *,
+    telemetry: dict[str, Any] | None,
+    consumers_by_id: dict[str, dict] | None = None,
+) -> bool:
+    """OR trigger: digital active, power threshold, or telemetry keys (2.7.p)."""
+    cid = str(appliance_id or "").strip()
+    if not cid:
+        return False
+    # Exchange form consumer.* (2.7.n); flex.* remains an accepted storage/legacy alias.
+    digital = _first_telemetry_number(
+        telemetry,
+        f"consumer.{cid}.sens_consumer_active",
+        f"flex.{cid}.sens_consumer_active",
+    )
+    if digital is not None and digital >= 0.5:
+        return True
+    power = _first_telemetry_number(
+        telemetry,
+        f"consumer.{cid}.sens_power_act",
+        f"flex.{cid}.sens_power_act",
+    )
+    if detect_trigger_from_power(power):
+        return True
+    consumer = (consumers_by_id or {}).get(cid)
+    if consumer is None:
+        return False
+    live_digital = _digital_active_from_consumer(consumer)
+    if live_digital is True:
+        return True
+    live_power = _live_power_kw(consumer)
+    return detect_trigger_from_power(live_power)
+
+
 def sync_triggers_from_telemetry(
     telemetry: dict[str, Any] | None,
     reserves: list[dict[str, Any]],
 ) -> None:
-    """Threshold crossing on flex sens_power_act or manual trigger flag."""
-    if not isinstance(telemetry, dict):
-        return
+    """Release when any attached consumer runs (digital OR power OR PS out).
+
+    Inactive while discharging does **not** clear the latch — leftover
+    ``stored_kwh`` keeps draining until empty, then refill opens (2.7.p).
+    """
+    consumers = _consumers_by_id()
     for reserve in reserves:
         ps_id = str(reserve.get("powerstation_id") or "")
         if not ps_id:
@@ -101,21 +206,16 @@ def sync_triggers_from_telemetry(
             singular = str(reserve.get("appliance_id") or "").strip()
             if singular:
                 appliance_ids = [singular]
-        triggered = False
-        for appliance_id in appliance_ids:
-            field = f"flex.{appliance_id}.sens_power_act"
-            power = telemetry.get(field)
-            if detect_trigger_from_power(
-                float(power) if power is not None else None
-            ):
-                triggered = True
-                break
+        triggered = any(
+            appliance_run_signal_active(
+                appliance_id, telemetry=telemetry, consumers_by_id=consumers
+            )
+            for appliance_id in appliance_ids
+        )
         if not triggered:
             # Physical pack out power as free meter (2.7.g bonus).
-            power = telemetry.get(f"ess.{ps_id}.sens_ess_power")
-            triggered = detect_trigger_from_power(
-                float(power) if power is not None else None
-            )
+            power = _telemetry_number(telemetry, f"ess.{ps_id}.sens_ess_power")
+            triggered = detect_trigger_from_power(power)
         if triggered:
             set_trigger(ps_id, active=True)
 

@@ -283,6 +283,15 @@
       "group": "Earnie_Verbraucher_"
     },
     {
+      "name": "Earnie_Verbraucher_Aktiv",
+      "match": "exact",
+      "entity_kind": "generic",
+      "hk_type": "generic",
+      "ehal_field": "flex.sens_consumer_active",
+      "group": "Earnie_Verbraucher_",
+      "notes": "2.7.p; Prefix+Slug Earnie_Verbraucher_<Slug>_Aktiv. Exchange ID consumer.{id}.sens_consumer_active."
+    },
+    {
       "name": "Earnie_Pool_P_act",
       "match": "exact",
       "entity_kind": "pool",

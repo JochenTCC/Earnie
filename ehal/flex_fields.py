@@ -10,23 +10,28 @@ from __future__ import annotations
 import re
 
 KIND_SENS_POWER_ACT = "sens_power_act"
+KIND_SENS_CONSUMER_ACTIVE = "sens_consumer_active"
 KIND_SET_ENABLE = "set_enable"
 
-_FLEX_KINDS: frozenset[str] = frozenset({KIND_SENS_POWER_ACT, KIND_SET_ENABLE})
+_FLEX_KINDS: frozenset[str] = frozenset(
+    {KIND_SENS_POWER_ACT, KIND_SENS_CONSUMER_ACTIVE, KIND_SET_ENABLE}
+)
 
 _ROLE_TO_KIND: dict[str, str] = {
     "flex.power_name": KIND_SENS_POWER_ACT,
     "flex.sens_power_act": KIND_SENS_POWER_ACT,
+    "flex.sens_consumer_active": KIND_SENS_CONSUMER_ACTIVE,
     "flex.enable_name": KIND_SET_ENABLE,
     "flex.set_enable": KIND_SET_ENABLE,
 }
 
 _PATTERN_B = re.compile(
-    r"^flex\.(?P<slug>[^.]+)\.(?P<kind>sens_power_act|set_enable)$"
+    r"^flex\.(?P<slug>[^.]+)\.(?P<kind>sens_power_act|sens_consumer_active|set_enable)$"
 )
 
 _KIND_LABELS_DE: dict[str, str] = {
     KIND_SENS_POWER_ACT: "Flex Leistung / Zustand",
+    KIND_SENS_CONSUMER_ACTIVE: "Gerät läuft (Binär)",
     KIND_SET_ENABLE: "Flex Freigabe",
 }
 
@@ -55,14 +60,19 @@ def flex_sens_power_act(consumer_id: str) -> str:
     return flex_field(consumer_id, KIND_SENS_POWER_ACT)
 
 
+def flex_sens_consumer_active(consumer_id: str) -> str:
+    return flex_field(consumer_id, KIND_SENS_CONSUMER_ACTIVE)
+
+
 def flex_set_enable(consumer_id: str) -> str:
     return flex_field(consumer_id, KIND_SET_ENABLE)
 
 
-def flex_fields_for_consumer(consumer_id: str) -> tuple[str, str]:
+def flex_fields_for_consumer(consumer_id: str) -> tuple[str, ...]:
     """HITL / Live field list for a non-EV flex consumer."""
     return (
         flex_sens_power_act(consumer_id),
+        flex_sens_consumer_active(consumer_id),
         flex_set_enable(consumer_id),
     )
 
@@ -82,9 +92,15 @@ def is_flex_sens_power_act_field(field: str) -> bool:
     return flex_field_kind(field) == KIND_SENS_POWER_ACT
 
 
+def is_flex_sens_consumer_active_field(field: str) -> bool:
+    return flex_field_kind(field) == KIND_SENS_CONSUMER_ACTIVE
+
+
 def is_flex_live_read_field(field: str) -> bool:
-    """True for Live-Lesen flex power rows (Pattern B or legacy stub)."""
-    return is_flex_sens_power_act_field(field)
+    """True for Live-Lesen flex power / active rows (Pattern B or legacy stub)."""
+    return is_flex_sens_power_act_field(field) or is_flex_sens_consumer_active_field(
+        field
+    )
 
 
 def flex_field_label(field: str) -> str | None:

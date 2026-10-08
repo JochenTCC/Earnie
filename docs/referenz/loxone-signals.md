@@ -195,6 +195,7 @@ One template `VI_Earnie_Consumer` / `VO_Earnie_Consumer` covers **one** consumer
 | Signal   | Merker title (1st / additional)                                       | VI check / VO path                                |
 | -------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
 | Power    | `Earnie_Verbraucher_Leistung` → `Earnie_Verbraucher_<Slug>_Leistung`   | VO: `flex.{hk_id}.sens_power_act`                  |
+| Active   | `Earnie_Verbraucher_<Slug>_Aktiv` (Kennung required)                   | VO: `consumer.{hk_id}.sens_consumer_active` (0/1; 2.7.p) |
 | Enable   | `Earnie_Verbraucher_Freigabe` → `…_<Slug>_Freigabe`                    | Check: `flex.{hk_id}.Earnie_Verbraucher_Freigabe`  |
 
 
@@ -291,6 +292,7 @@ The control signal definitions live in the active house profile (`house_profiles
 | EHAL field                        | Direction | Default / example                                                                          | Value       |
 | ------------------------------------ | --------- | ---------------------------------------------------------------------------------------------- | ------------ |
 | `flex.{slug}.sens_power_act`       | Read      | Heat pump: `Earnie_Waermepumpe_Leistung`; generic: `Earnie_Verbraucher_Leistung`; or EFM load  | kW or 0/1   |
+| `consumer.{slug}.sens_consumer_active` | Read  | Generic: `Earnie_Verbraucher_<Slug>_Aktiv` (digital; reserve release OR-trigger, 2.7.p). Storage binding may still use `flex.{slug}.sens_consumer_active`. | `0`/`1` |
 | `flex.{slug}.set_enable`           | Write     | Heat pump: `Earnie_Waermepumpe_Freigabe`; generic: `Earnie_Verbraucher_Freigabe`               | `0`/`1`     |
 
 

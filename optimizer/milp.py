@@ -113,18 +113,37 @@ def _build_milp_model_with_objective(
     )
     wear_cent_per_kwh = 0.0
     primary = _primary_battery_params(battery_params)
-    asap_kwh = float(primary.get("_virtual_reserve_asap_kwh") or 0.0)
-    if asap_kwh > 1e-9:
-        from .milp_horizon import _add_virtual_reserve_asap_charge
+    refill_kwh = float(
+        primary.get("_virtual_reserve_refill_kwh")
+        or primary.get("_virtual_reserve_asap_kwh")
+        or 0.0
+    )
+    if refill_kwh > 1e-9:
+        from datetime import datetime, timezone
 
-        _add_virtual_reserve_asap_charge(
+        from .milp_horizon import _add_virtual_reserve_deadline_charge
+
+        deadline_raw = primary.get("_virtual_reserve_refill_deadline_utc")
+        deadline = None
+        if deadline_raw:
+            try:
+                deadline = datetime.fromisoformat(
+                    str(deadline_raw).replace("Z", "+00:00")
+                )
+                if deadline.tzinfo is None:
+                    deadline = deadline.replace(tzinfo=timezone.utc)
+            except ValueError:
+                deadline = None
+        _add_virtual_reserve_deadline_charge(
             model,
-            asap_charge_kwh=asap_kwh,
+            matrix=matrix,
+            refill_kwh=refill_kwh,
             max_charge_kw=float(
                 primary.get("max_charge_power_kw", primary.get("max_power_kw") or 0.0)
                 or 0.0
             ),
             efficiency=float(primary.get("efficiency") or 1.0),
+            deadline=deadline,
         )
     if float(primary.get("battery_capacity_kwh") or 0.0) > 0.0:
         # Wear from primary ESS capacity (multi-ESS wear refinement later).
@@ -206,7 +225,11 @@ def _add_soc_anchor_constraints(
         # Floor already via e_batt lowBound; do not force == SOC_min (residual dump).
         min_soc = float(battery_params["min_soc"])
         below_min = float(current_soc) < min_soc - 1e-9
-        asap_kwh = float(battery_params.get("_virtual_reserve_asap_kwh") or 0.0)
+        refill_kwh = float(
+            battery_params.get("_virtual_reserve_refill_kwh")
+            or battery_params.get("_virtual_reserve_asap_kwh")
+            or 0.0
+        )
         if below_min:
             # Plant already below SOC_min: PV-only would block grid recovery before
             # sunrise and make the whole MILP Infeasible (empty EV/flex plan).
@@ -218,16 +241,15 @@ def _add_soc_anchor_constraints(
                     float(current_soc),
                     min_soc,
                 )
-        elif asap_kwh > 1e-9:
-            # Virtual single_use ASAP charge needs grid-side p_charge before sunrise;
-            # PV-only would make that hard constraint Infeasible → Automatik fallback
-            # (empty EV/flex setpoints). Prefer filling the carve-out.
+        elif refill_kwh > 1e-9:
+            # Virtual reserve refill may need grid-side p_charge before sunrise;
+            # PV-only would make that hard constraint Infeasible → Automatik fallback.
             if verbose:
                 logger.warning(
-                    "MILP SOC-Anker Sonnenaufgang: Slot %d — virtual reserve ASAP "
+                    "MILP SOC-Anker Sonnenaufgang: Slot %d — virtual reserve refill "
                     "%.3f kWh pending; skip PV-only so grid can fill carve-out",
                     sunrise_soc_min_index,
-                    asap_kwh,
+                    refill_kwh,
                 )
         else:
             _add_pv_only_charge_through_sunrise(model, matrix, sunrise_soc_min_index)

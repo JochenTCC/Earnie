@@ -60,7 +60,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 | `VirtualOut/VO_Earnie_Plant.xml` | Plant `sens_*` / `get_*` (incl. ESS SOC-Min/Max + max charge/discharge, 2.7.j) + `Earnie_Aussentemperatur` |
 | `VirtualOut/VO_Earnie_EV.xml` | EV `sens_*` / `get_*` (`Earnie_EAuto_Leistung`, …) |
 | `VirtualOut/VO_Earnie_Heatpump.xml` | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
-| `VirtualOut/VO_Earnie_Consumer.xml` | `Earnie_Verbraucher_Leistung` |
+| `VirtualOut/VO_Earnie_Consumer.xml` | `Earnie_Verbraucher_Leistung`; `Earnie_Verbraucher_<Slug>_Aktiv` → VO `consumer.{hk_id}.sens_consumer_active` (2.7.p) |
 | `VirtualOut/VO_Earnie_Pool.xml` | Pool temps / power / filter telemetry |
 
 Frozen Merker names: [`../greenfield_device_map.json`](../greenfield_device_map.json), recipes in [`../recipes/`](../recipes/).

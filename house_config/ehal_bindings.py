@@ -127,6 +127,14 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
         alt = _nonempty(inputs.get("alternate_binary_power_name"))
         if alt:
             _put_binding(bindings, "flex.alternate_binary_power_name", alt)
+            # Manuals: alternate binary is the Gerät-läuft indicator (2.7.p).
+            # Pool filter keeps sens_filter_active via _migrate_filter_bindings.
+            if cid and str(consumer.get("type") or "") != "pool_filter":
+                _put_binding(
+                    bindings,
+                    flex_field(cid, "sens_consumer_active"),
+                    alt,
+                )
     outputs = consumer.get("loxone_outputs")
     if not isinstance(outputs, dict):
         return
