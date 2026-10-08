@@ -69,7 +69,7 @@ def _primary_battery_params(battery_params: dict | list[dict]) -> dict:
 
     batteries = coerce_battery_params_list(battery_params)
     if not batteries:
-        return battery_params if isinstance(battery_params, dict) else {}
+        return {}
     return aggregate_battery_params_for_load(batteries)
 
 

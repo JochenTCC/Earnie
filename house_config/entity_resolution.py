@@ -147,7 +147,7 @@ def split_battery_max_power_kw(raw: dict, *, battery_id: str = "?", index: int =
     # Zero battery / reference strip: both may be 0. Positive house configs need
     # both > 0. Powerstations (2.7.g) may charge-only (discharge 0 = no house feed).
     bat_type = str(raw.get("type") or BATTERY_TYPE_HOUSE).strip().lower()
-    if bat_type != BATTERY_TYPE_POWERSTATION and (charge == 0.0) ^ (discharge == 0.0):
+    if bat_type != BATTERY_TYPE_POWERSTATION and bool(charge) != bool(discharge):
         raise ValueError(
             f"batteries[{index}] ('{battery_id}'): "
             "battery_max_charge/discharge_power_kw müssen beide 0 oder beide > 0 sein."
@@ -381,7 +381,7 @@ def battery_params_from_planning(entry: dict) -> dict:
         attached_ids = list(entry.get("attached_consumer_ids") or [])
         out["attached_consumer_ids"] = attached_ids
         out["attached_consumer_id"] = entry.get("attached_consumer_id") or (
-            attached_ids[0] if attached_ids else ""
+            next(iter(attached_ids), "")
         )
     return out
 

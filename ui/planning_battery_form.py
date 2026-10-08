@@ -89,7 +89,7 @@ def new_battery_template(
     charge_kw, discharge_kw = split_battery_max_power_kw(source, battery_id="template")
     # New drafts are always Hausbatterie (no type). Powerstations may be
     # charge-only (discharge 0); house rules require both 0 or both > 0.
-    if (charge_kw == 0.0) ^ (discharge_kw == 0.0):
+    if bool(charge_kw) != bool(discharge_kw):
         both = charge_kw or discharge_kw
         charge_kw = both
         discharge_kw = both
