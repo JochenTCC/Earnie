@@ -58,9 +58,10 @@ class _HaMockHandler(BaseHTTPRequestHandler):
         body = message.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(body)  # NOSONAR pythonsecurity:S5131 text/plain + nosniff, never rendered as HTML
 
     def do_GET(self) -> None:  # noqa: N802
         if not self._check_auth():
