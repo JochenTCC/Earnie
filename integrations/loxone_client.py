@@ -368,7 +368,32 @@ def _legacy_ready_by_value(raw: str | float | None) -> str | float | None:
 
 
 def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
-    """FertigUm: AlarmClock SpecialState10 (unix), else Tna text, else legacy Merker."""
+    """FertigUm: push inbox when the entity is on push, else AlarmClock poll.
+
+    Poll path: SpecialState10 (unix), else Tna text, else legacy Merker.
+    """
+    name = str(io_name or "").strip()
+    if name:
+        try:
+            from ehal.loxone_push_source import get_merker_index, source_for_merker
+            from runtime_store.loxone_push_inbox import read_push_ready_by_time
+
+            if source_for_merker(name) == "push":
+                binding = get_merker_index().get(name)
+                if binding is not None:
+                    value = read_push_ready_by_time(binding.ehal_id)
+                    if value is None:
+                        logger.warning(
+                            "Loxone push: no ready_by_time for '%s' (%s)",
+                            name,
+                            binding.ehal_id,
+                        )
+                    return value
+        except Exception:  # noqa: BLE001 — never break the poll path
+            logger.exception(
+                "Loxone push ready_by_time failed for '%s'; falling back to poll", name
+            )
+
     ll = _fetch_loxone_io_all(io_name)
     if ll:
         unix = _alarm_clock_next_entry_unix(ll)
@@ -383,8 +408,9 @@ def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
     """Holt einen numerischen Wert: push inbox when the entity is on push, else Merker poll.
 
-    AlarmClock (``fetch_loxone_ready_by_time``) and meter ``/all`` energy stay on poll —
-    they never call this for push IDs. Units are stripped the same way for both sources.
+    Meter ``/all`` energy stays on poll (never calls this for energy IDs). FertigUm uses
+    ``fetch_loxone_ready_by_time`` (push when the EV entity is flipped). Units are stripped
+    the same way for both sources.
     """
     name = str(io_name or "").strip()
     if name:

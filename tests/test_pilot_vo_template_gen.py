@@ -25,7 +25,9 @@ def test_pilot_id_namespaces() -> None:
     )
     assert gen.pilot_id("consumer", "e_auto", "sens_evcs_active_power", "ev") == "evcs.e_auto.sens_evcs_active_power"
     assert gen.pilot_id("consumer", "e_auto", "sens_evcs_soc_act", "ev") == "ev.e_auto.sens_evcs_soc_act"
-    assert gen.pilot_id("consumer", "e_auto", "get_evcs_ready_by_time", "ev") is None
+    assert gen.pilot_id("consumer", "e_auto", "get_evcs_ready_by_time", "ev") == (
+        "ev.e_auto.get_evcs_ready_by_time"
+    )
 
 
 def test_ascii_title() -> None:
@@ -75,6 +77,7 @@ def test_collect_only_reads_and_valid_ids(tmp_path: Path) -> None:
         "sens_absent_mode",
         "evcs.e_auto.sens_evcs_connected",
         "ev.e_auto.sens_evcs_soc_act",
+        "ev.e_auto.get_evcs_ready_by_time",
         "consumer.trockner.sens_power_act",
         "pool.pool_swimspa.sens_temperature_water",
         "ess.15_kwh_speicher.sens_ess_soc",

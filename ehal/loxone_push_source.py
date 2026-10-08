@@ -6,7 +6,9 @@ push inbox instead of Merker poll. Keys: ``plant``, ``battery:<id>``,
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 from dataclasses import dataclass
 
 from ehal.push_signals import pilot_id
@@ -14,8 +16,8 @@ from ehal.qualified_ids import field_kind
 
 logger = logging.getLogger(__name__)
 
-# AlarmClock / SpecialState10 and meter ``/all`` energy stay on poll forever.
-NEVER_PUSH_KINDS = frozenset({"get_evcs_ready_by_time"})
+# Meter ``/all`` energy stays on poll forever (not a VO push).
+NEVER_PUSH_KINDS: frozenset[str] = frozenset()
 _ENERGY_KIND_SUFFIX = "_energy"
 
 
@@ -57,8 +59,6 @@ def parse_push_entities(raw: object) -> frozenset[str]:
 def load_push_entities_from_config(raw_config: dict | None = None) -> frozenset[str]:
     """Read push entity keys from a config dict or the live ``config.json``."""
     if raw_config is None:
-        import json
-
         from runtime_store.persist_paths import resolve_config_json_path
 
         path = resolve_config_json_path()
@@ -131,13 +131,42 @@ def build_merker_index(
 
 _index_cache: dict[str, MerkerBinding] | None = None
 _push_entities_cache: frozenset[str] | None = None
+_index_mtime_key: tuple[float, float] | None = None
+_push_entities_mtime: float | None = None
 
 
 def clear_source_caches() -> None:
     """Reset lazy caches (tests / after config reload)."""
-    global _index_cache, _push_entities_cache
+    global _index_cache, _push_entities_cache, _index_mtime_key, _push_entities_mtime
     _index_cache = None
     _push_entities_cache = None
+    _index_mtime_key = None
+    _push_entities_mtime = None
+
+
+def _file_mtime(path: str) -> float:
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return -1.0
+
+
+def _config_mtime() -> float:
+    from runtime_store.persist_paths import resolve_config_json_path
+
+    return _file_mtime(resolve_config_json_path())
+
+
+def _house_components_mtime_key() -> tuple[float, float]:
+    from runtime_store.persist_paths import (
+        resolve_components_json_path,
+        resolve_house_profiles_json_path,
+    )
+
+    return (
+        _file_mtime(resolve_house_profiles_json_path()),
+        _file_mtime(resolve_components_json_path()),
+    )
 
 
 def _load_house_components() -> tuple[dict, dict]:
@@ -154,25 +183,35 @@ def _load_house_components() -> tuple[dict, dict]:
 
 
 def get_merker_index() -> dict[str, MerkerBinding]:
-    global _index_cache
+    global _index_cache, _index_mtime_key
+    mtime_key = _house_components_mtime_key()
+    if _index_cache is not None and _index_mtime_key != mtime_key:
+        _index_cache = None
     if _index_cache is None:
         try:
             house, components = _load_house_components()
             _index_cache = build_merker_index(house, components)
+            _index_mtime_key = mtime_key
         except Exception:  # noqa: BLE001 — poll path must keep working
             logger.exception("loxone push: failed to build Merker index")
             _index_cache = {}
+            _index_mtime_key = mtime_key
     return _index_cache
 
 
 def get_push_entities() -> frozenset[str]:
-    global _push_entities_cache
+    global _push_entities_cache, _push_entities_mtime
+    mtime = _config_mtime()
+    if _push_entities_cache is not None and _push_entities_mtime != mtime:
+        _push_entities_cache = None
     if _push_entities_cache is None:
         try:
             _push_entities_cache = load_push_entities_from_config()
+            _push_entities_mtime = mtime
         except Exception:  # noqa: BLE001
             logger.exception("loxone push: failed to load push entities")
             _push_entities_cache = frozenset()
+            _push_entities_mtime = mtime
     return _push_entities_cache
 
 
@@ -196,8 +235,11 @@ def source_for_entity_key(key: str) -> str:
 def source_for_ehal_id(ehal_id: str) -> str:
     """``push`` / ``poll`` for a qualified or bare EHAL ID (UI)."""
     eid = str(ehal_id or "").strip()
-    if not eid or eid == "heartbeat":
+    if not eid:
         return "poll"
+    # Heartbeat is a synthetic VO link probe — always push, never an entity switch.
+    if eid == "heartbeat":
+        return "push"
     for binding in get_merker_index().values():
         if binding.ehal_id == eid:
             return source_for_entity_key(binding.entity_key)

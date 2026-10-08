@@ -20,8 +20,8 @@ from ehal.qualified_ids import (
 HEARTBEAT_ID = "heartbeat"
 HEARTBEAT_TITLE = "Push_Earnie_Heartbeat"
 
-# Not a numeric value pushed by a VO (AlarmClock read via SpecialState10).
-SKIP_KINDS = frozenset({"get_evcs_ready_by_time"})
+# Kinds excluded from VO push generation (meter energy handled separately).
+SKIP_KINDS: frozenset[str] = frozenset()
 _UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue"})
 
 

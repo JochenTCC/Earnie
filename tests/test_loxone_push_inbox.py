@@ -226,6 +226,31 @@ def test_derive_state_digital_is_held_until_next_edge() -> None:
     assert d(_row(0.0, 900), True) == (inbox.STATE_ZERO_HELD, 0.0)
 
 
+def test_read_push_ready_by_time_numeric_and_text() -> None:
+    eid = "ev.e_auto.get_evcs_ready_by_time"
+    now = _now()
+    assert inbox.is_valid_ehal_id(eid)
+    inbox.record_push(eid, "1735689600", now=now)
+    assert inbox.read_push_ready_by_time(eid, now=now) == pytest.approx(1735689600.0)
+    inbox.reset_memory_for_tests()
+    inbox.record_push(eid, "Morgen, 16:03", now=now)
+    assert inbox.read_push_ready_by_time(eid, now=now) == "Morgen, 16:03"
+
+
+def test_read_push_ready_by_time_stale_holds_numeric_not_zero() -> None:
+    eid = "ev.e_auto.get_evcs_ready_by_time"
+    t0 = _now()
+    inbox.record_push(eid, "1735689600", now=t0)
+    stale = t0 + timedelta(seconds=120)
+    assert inbox.read_push_ready_by_time(eid, now=stale) == pytest.approx(1735689600.0)
+    too_old = t0 + timedelta(seconds=400)
+    assert inbox.read_push_ready_by_time(eid, now=too_old) is None
+    inbox.clear_inbox()
+    assert inbox.read_push_ready_by_time(eid, now=t0) is None
+    inbox.record_push(eid, "Morgen, 08:00", now=t0)
+    assert inbox.read_push_ready_by_time(eid, now=t0 + timedelta(seconds=120)) is None
+
+
 # --- token as address prefix: http://host:8541/t/<token> + command /ehal/loxone/telemetry/... ----
 def test_split_token_prefix() -> None:
     split = http_mod.split_token_prefix

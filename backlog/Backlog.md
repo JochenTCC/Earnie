@@ -20,6 +20,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - **Note:** Savings study done (2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive Earnie dogfood still open.
 
+- [ ] The virtual Powerstations need a trigger when the connected consumers are started to "release" the held-in-reserve energy.
+  - New EHAL Fields for actual "consumer active" or "consumer started"
+  - Provide held-in-reserve energy when a consumer is activated
+  - Plan making new reserve
+
+- **Note:** Loxone push exceptions implemented (heartbeat always-push Quelle; FertigUm VO `ev.<id>.get_evcs_ready_by_time` + inbox when `consumer:<ev>` on `loxone_push.entities`) — archive at session-abschluss.
+
 - [ ] **2.7.n — Binding 1.0: stable identifiers + generic EHAL read/write path** (slice of epic **Binding**; runs **before 2.7.l P1**; draft: [`backlog/EHAL-Binding-UX-Draft.md`](EHAL-Binding-UX-Draft.md) §9)
   - **Goal:** freeze the identifier contract (qualified EHAL IDs, Pattern B namespaces incl. several wallboxes / EVs, stable Kennung) and make the Loxone read/write conversion data-driven, so **2.7.l** (inverter) and later wallbox / EV work add rows instead of code. Tools (three-column table, export, import) stay in **2.+1** (epic **Binding** P2–P5). Storage stays unchanged; no data migration.
   - **Problem (generic path):** every EHAL field is wired by hand for Loxone. Read: own branch and fixed conversion in `integrations/loxone_adapter.py` plus a field in `LoxoneConfig`. Write: `integrations/loxone_writes.py` (`send_huawei_modbus_states`, `build_sent_loxone_snapshot`), `optimizer/powerstation_live.py` and `integrations/loxone_status_json.py`. Example: commit `32bb5b8f` (2.7.j, four new read fields) touched about 15 places; the duplicate `PLANT_FIELDS` list is a forgotten place. Risk: n-5 / n-6 touch the production path (setpoints), hence the gate below.

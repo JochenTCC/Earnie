@@ -157,8 +157,6 @@ def build_read_rows(
 
 def _live_read_source(field: str, mapping: str) -> str:
     """``push`` / ``poll`` for Live-Lesen (Loxone VO migration)."""
-    if str(field or "").endswith("get_evcs_ready_by_time"):
-        return "poll"
     try:
         from ehal.loxone_push_source import source_for_ehal_id, source_for_merker
 

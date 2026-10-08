@@ -435,6 +435,38 @@ def read_push_value(
     return value, state
 
 
+def read_push_ready_by_time(
+    ehal_id: str,
+    *,
+    now: datetime | None = None,
+    repeat_s: float | None = None,
+    last_known_max_s: float = LAST_KNOWN_MAX_S,
+) -> str | float | None:
+    """FertigUm from the inbox: numeric (Unix/Loxone epoch) or fresh raw text.
+
+    Never invents ``0`` as a deadline. Stale/missing → last-known numeric within the
+    hold window, else ``None``. Non-numeric ``raw`` is returned only while fresh.
+    """
+    eid = str(ehal_id or "").strip()
+    if not eid or not is_valid_ehal_id(eid):
+        return None
+    ref = now if now is not None else datetime.now(timezone.utc)
+    with _lock:
+        signals = dict(_memory) if _memory else load_inbox()
+        row = signals.get(eid)
+        held = _last_known.get(eid)
+        if row is not None and not is_stale(row, repeat_s=repeat_s, now=ref):
+            if row.get("parse_ok", True) and row.get("value") is not None:
+                return float(row["value"])
+            raw = str(row.get("raw") or "").strip()
+            if raw:
+                return raw
+        state, value = _hold_last_known(held, now=ref, max_age_s=last_known_max_s)
+        if state == STATE_LAST_KNOWN and value is not None:
+            return float(value)
+    return None
+
+
 def wait_for_push_link(
     *,
     timeout_s: float = STARTUP_WAIT_MAX_S,

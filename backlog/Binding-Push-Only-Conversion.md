@@ -69,7 +69,7 @@ Today's read path (target of the migration): `integrations/loxone_client.py::fet
 **Source per entity** (switch `poll | push`, default `poll`). For an entity set to `push`:
 
 1. Every bound `sens_*` / `get_*` quantity comes from the inbox, no longer from the poll. The Merker name ↔ qualified ID mapping comes from the binding list (`read_signals_from_docs`: `old_name` ↔ `ehal_id`).
-2. **Not pushable**, therefore still poll or unchanged: `get_evcs_ready_by_time` (AlarmClock, `SpecialState10`), meter energy via `/all` (`sens_*_energy`).
+2. **Not pushable**, therefore still poll or unchanged: meter energy via `/all` (`sens_*_energy`). `get_evcs_ready_by_time` is pushable via Analog VO (`ev.<id>.get_evcs_ready_by_time`); when the EV consumer is on the push list the optimizer reads the inbox, otherwise AlarmClock SpecialState10 poll. The **heartbeat** VO is always push (not an entity key on `loxone_push.entities`).
 3. **Freshness:** a value is valid if younger than 3 × repeat interval (**30 s** at 10 s repeat). After a start the inbox knows nothing for up to one repeat → **start-up window** (wait up to 40 s for the heartbeat before the first run reads).
 4. **Zero rule** (locked), only for quantities where 0 is plausible:
 
@@ -121,7 +121,7 @@ Prerequisite before any change to the read path: **characterization tests** (bac
 |---|---|---|
 | WP1 | **Read API of the inbox inside the daemon:** `read_push_value(ehal_id)` → (value, state) with an in-process cache (the listener and the read path run in the same process `main.py`; the JSON file is only for the UI) | `runtime_store/loxone_push_inbox.py` |
 | WP2 | **Source switch per entity** (`poll` / `push`), default `poll`; mapping entity → IDs; Merker name → ID reverse list | new small config layer; location see section 9 |
-| WP3 | **Interception in the read path**: for entities on `push` take the WP1 value instead of HTTP; **no** change to the adapters if the reverse list hooks into `fetch_loxone_generic_value` | `integrations/loxone_client.py`; exclude AlarmClock and `/all` reads |
+| WP3 | **Interception in the read path**: for entities on `push` take the WP1 value instead of HTTP; **no** change to the adapters if the reverse list hooks into `fetch_loxone_generic_value` / `fetch_loxone_ready_by_time` | `integrations/loxone_client.py`; exclude `/all` meter-energy reads |
 | WP4 | **Zero rule per field kind** (table in section 6) + a test per row; read-error semantics (required field → abort) | new pure function next to `derive_state`; tests like `test_loxone_push_inbox.py` |
 | WP5 | **Start-up window and link:** wait for the heartbeat before the first run (upper bound), log lines on link loss, status in EHAL-Com | `main.py` loop, `ui/loxone_push_inbox_ui.py` |
 | WP6 | ~~Spot-check~~ **skipped** (decision: no) | — |

@@ -49,6 +49,17 @@ def test_value_placeholder_is_not_the_input_style_escape(path: Path) -> None:
         assert _BACKSLASH_V not in (cmd.get("CmdOn") or ""), cmd.get("Title")
 
 
+def test_ev_template_includes_fertigum_ready_by_time() -> None:
+    path = _DIR / "VO_Earnie_EV.xml"
+    cmds = {c.get("Title"): c for c in _parse(path) if c.tag == "VirtualOutCmd"}
+    fertig = cmds["Earnie_EAuto_FertigUm"]
+    assert fertig.get("Analog") == "true"
+    # ElementTree unescapes &lt;v&gt; in the attribute value.
+    assert fertig.get("CmdOn") == (
+        "/ehal/loxone/telemetry/ev.{ev_id}.get_evcs_ready_by_time/<v>"
+    )
+
+
 # --- Virtual Input templates (structure of VI_Earnie_Plant_Real.xml, exported by Config 2026-10-07) ---
 _VI_DIR = _DIR.parent / "VirtualIn"
 _VI_FILES = sorted(_VI_DIR.glob("VI_Earnie_*.xml"))
