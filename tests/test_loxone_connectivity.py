@@ -64,7 +64,7 @@ class TestReadCheckValidation:
     def test_read_check_missing_text_io_is_warning(self):
         with patch.object(lc.loxone_client, "fetch_loxone_ready_by_time", return_value=None):
             result = lc._read_check(
-                "ev1:get_evcs_ready_by_time",
+                "ev.ev1.get_evcs_ready_by_time",
                 "Wecker_Smart",
                 read_raw=True,
                 warn_if_missing=True,
@@ -207,12 +207,12 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         labels = [label for label, _, _ in checks]
-        assert "ev1:sens_evcs_active_power" in labels
-        assert "ev1:sens_evcs_connected" in labels
-        assert "ev1:sens_evcs_soc_act" in labels
-        assert "ev1:get_evcs_ready_by_time" in labels
+        assert "evcs.ev1.sens_evcs_active_power" in labels
+        assert "evcs.ev1.sens_evcs_connected" in labels
+        assert "ev.ev1.sens_evcs_soc_act" in labels
+        assert "ev.ev1.get_evcs_ready_by_time" in labels
         assert "ev1:flex.power_name" not in labels
-        assert "ev1:flex.ev1.sens_power_act" not in labels
+        assert "consumer.ev1.sens_power_act" not in labels
 
     def test_collects_non_ev_flex_power(self):
         consumers = [
@@ -240,9 +240,9 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         by_label = {label: io for label, io, _ in checks}
-        assert by_label["swimspa:flex.swimspa.sens_power_act"] == "P_Spa"
-        assert by_label["wp_heating:flex.wp_heating.sens_power_act"] == "P_WP"
-        assert "swimspa:flex.swimspa.set_enable" not in by_label
+        assert by_label["consumer.swimspa.sens_power_act"] == "P_Spa"
+        assert by_label["heatpump.wp_heating.sens_power_act"] == "P_WP"
+        assert "consumer.swimspa.set_enable" not in by_label
         assert "swimspa:flex.enable_name" not in by_label
 
     def test_ev_detected_without_type_via_charging_loxone(self):
@@ -269,8 +269,8 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         labels = [label for label, _, _ in checks]
-        assert "ev:sens_evcs_active_power" in labels
-        assert "ev:sens_evcs_connected" in labels
+        assert "evcs.ev.sens_evcs_active_power" in labels
+        assert "evcs.ev.sens_evcs_connected" in labels
 
     def test_house_profile_ehal_bindings_preferred_over_stripped_flex(self):
         """Greenfield: EV bindings on profile; flex bridge often drops ehal_bindings."""
@@ -304,9 +304,9 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         by_label = {label: io for label, io, _ in checks}
-        assert by_label["ev:sens_evcs_active_power"] == "Ernie_EAuto_P_act"
-        assert by_label["ev:sens_evcs_connected"] == "Ernie_EAuto_Da"
-        assert by_label["ev:get_evcs_ready_by_time"] == "Ernie_EAuto_FertigUm"
+        assert by_label["evcs.ev.sens_evcs_active_power"] == "Ernie_EAuto_P_act"
+        assert by_label["evcs.ev.sens_evcs_connected"] == "Ernie_EAuto_Da"
+        assert by_label["ev.ev.get_evcs_ready_by_time"] == "Ernie_EAuto_FertigUm"
 
     def test_collects_thermal_rc_temperatures(self):
         consumers = [
@@ -330,11 +330,11 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         by_label = {label: io for label, io, _ in checks}
-        assert by_label["swimspa:flex.swimspa.sens_power_act"] == "P_Spa"
-        assert by_label["swimspa:sens_temperature_water"] == "Spa_Ist"
-        assert by_label["swimspa:get_temperature_water_setpoint"] == "Spa_Soll"
-        assert by_label["swimspa:get_temperature_tolerance_c"] == "Spa_Tol"
-        assert by_label["swimspa:sens_heating_active"] == "Spa_Heat"
+        assert by_label["pool.swimspa.sens_power_act"] == "P_Spa"
+        assert by_label["pool.swimspa.sens_temperature_water"] == "Spa_Ist"
+        assert by_label["pool.swimspa.get_temperature_water_setpoint"] == "Spa_Soll"
+        assert by_label["pool.swimspa.get_temperature_tolerance_c"] == "Spa_Tol"
+        assert by_label["pool.swimspa.sens_heating_active"] == "Spa_Heat"
 
     def test_thermal_temps_without_power_marker_still_collected(self):
         consumers = [
@@ -355,9 +355,9 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         by_label = {label: io for label, io, _ in checks}
-        assert by_label["pool:sens_temperature_water"] == "Pool_Ist"
-        assert by_label["pool:get_temperature_water_setpoint"] == "Pool_Soll"
-        assert "pool:flex.pool.sens_power_act" not in by_label
+        assert by_label["pool.pool.sens_temperature_water"] == "Pool_Ist"
+        assert by_label["pool.pool.get_temperature_water_setpoint"] == "Pool_Soll"
+        assert "pool.pool.sens_power_act" not in by_label
 
     def test_collects_thermal_annual_heat_storage_temps(self):
         consumers = [
@@ -379,13 +379,13 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         by_label = {label: io for label, io, _ in checks}
-        assert by_label["waermepumpe:flex.waermepumpe.sens_power_act"] == "P_WP"
+        assert by_label["heatpump.waermepumpe.sens_power_act"] == "P_WP"
         assert (
-            by_label["waermepumpe:sens_temperature_heat_storage"]
+            by_label["heatpump.waermepumpe.sens_temperature_heat_storage"]
             == "Earnie_Waermespeicher_Temp_eq"
         )
         assert (
-            by_label["waermepumpe:sens_temperature_heat_storage_low"]
+            by_label["heatpump.waermepumpe.sens_temperature_heat_storage_low"]
             == "Earnie_Waermespeicher_Temp_low"
         )
 
@@ -408,9 +408,12 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         by_label = {label: io for label, io, _ in checks}
-        assert by_label["wp_heating:sens_temperature_heat_storage"] == "TempEq"
-        assert by_label["wp_heating:sens_temperature_heat_storage_low"] == "TempLow"
-        assert "wp_heating:flex.wp_heating.sens_power_act" not in by_label
+        assert by_label["heatpump.wp_heating.sens_temperature_heat_storage"] == "TempEq"
+        assert (
+            by_label["heatpump.wp_heating.sens_temperature_heat_storage_low"]
+            == "TempLow"
+        )
+        assert "heatpump.wp_heating.sens_power_act" not in by_label
 
 
 class TestLoxoneIntegrationGate:

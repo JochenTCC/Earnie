@@ -103,6 +103,25 @@ def test_poll_row_matching_variants() -> None:
     assert match("sens_unknown", by_field) is None
 
 
+def test_poll_row_matching_qualified_live_lesen_ids() -> None:
+    """Live-Lesen now emits the same qualified IDs as Push-Inbox."""
+    by_field = {
+        "consumer.waschmaschine.sens_power_act": _poll(
+            "consumer.waschmaschine.sens_power_act", "0.4"
+        ),
+        "pool.pool_swimspa.sens_temperature_water": _poll(
+            "pool.pool_swimspa.sens_temperature_water", "36.0"
+        ),
+        "evcs.garage.sens_evcs_active_power": _poll(
+            "evcs.garage.sens_evcs_active_power", "7.2"
+        ),
+    }
+    match = ui._poll_row_for
+    assert match("consumer.waschmaschine.sens_power_act", by_field)["Wert"] == "0.4"
+    assert match("pool.pool_swimspa.sens_temperature_water", by_field)["Wert"] == "36.0"
+    assert match("evcs.garage.sens_evcs_active_power", by_field)["Wert"] == "7.2"
+
+
 def test_no_poll_rows_leaves_comparison_columns_empty() -> None:
     inbox.record_push("sens_ess_soc", "55", now=T0)
     row = ui.build_inbox_rows(inbox.load_inbox(), None, now=T0)[0]

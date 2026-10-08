@@ -94,14 +94,15 @@ NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS
 
 
 def is_live_read_field(field: str) -> bool:
-    """True for Live-Lesen rows (``sens_*`` / ``get_*`` / flex ``*.sens_power_act``)."""
+    """True for Live-Lesen rows (``sens_*`` / ``get_*`` / flex / qualified IDs)."""
     from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import is_flex_live_read_field
+    from ehal.qualified_ids import field_kind
 
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
-    kind = ess_field_kind(name) or name
+    kind = ess_field_kind(name) or field_kind(name)
     return (
         kind.startswith("sens_")
         or kind.startswith("get_")
@@ -129,9 +130,53 @@ def _consumer_is_ev(consumer: dict) -> bool:
     if str(consumer.get("type") or "") == "ev":
         return True
     sched = consumer.get("charging_schedule") or {}
-    if isinstance(sched, dict) and sched.get("enabled"):
-        return True
+    if isinstance(sched, dict):
+        if sched.get("enabled"):
+            return True
+        lox = sched.get("loxone") if isinstance(sched.get("loxone"), dict) else {}
+        for key in (
+            "plugged_in_name",
+            "actual_soc_name",
+            "ready_by_time_name",
+            "battery_capacity_kwh_name",
+            "nominal_power_kw_name",
+            "sens_evcs_connected",
+            "sens_evcs_soc_act",
+            "get_evcs_ready_by_time",
+        ):
+            if str(lox.get(key) or "").strip():
+                return True
+    bindings = consumer.get("ehal_bindings")
+    if isinstance(bindings, dict):
+        for key, value in bindings.items():
+            name = str(key or "")
+            if name.startswith(("sens_evcs_", "get_evcs_", "set_evcs_")) and str(
+                value or ""
+            ).strip():
+                return True
     return False
+
+
+def _consumer_type_for_qualified_id(consumer: dict) -> str:
+    """Consumer type for qualified Live-Lesen IDs (infer when bridge dropped type)."""
+    ctype = str(consumer.get("type") or "").strip()
+    if ctype:
+        return ctype
+    if _consumer_is_ev(consumer):
+        return "ev"
+    if _consumer_is_thermal_annual(consumer):
+        return "thermal_annual"
+    if _consumer_is_thermal(consumer):
+        return "thermal_rc"
+    return ""
+
+
+def live_read_consumer_field(consumer: dict, field_key: str) -> str:
+    """Qualified Live-Lesen EHAL ID (same form as Push-Inbox)."""
+    from ehal.qualified_ids import qualified_consumer_id
+
+    cid = str(consumer.get("id") or "").strip()
+    return qualified_consumer_id(cid, _consumer_type_for_qualified_id(consumer), field_key)
 
 
 def _consumer_is_filter(consumer: dict) -> bool:
@@ -225,21 +270,30 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
         if not cid:
             continue
         if _consumer_is_ev(consumer):
-            fields.extend(f"{cid}:{name}" for name in EV_LIVE_READ_FIELDS)
+            fields.extend(
+                live_read_consumer_field(consumer, name) for name in EV_LIVE_READ_FIELDS
+            )
         elif _consumer_is_filter(consumer):
             from ehal.flex_fields import flex_sens_power_act
 
-            fields.append(f"{cid}:{flex_sens_power_act(cid)}")
-            fields.extend(f"{cid}:{name}" for name in FILTER_LIVE_READ_FIELDS)
+            fields.append(live_read_consumer_field(consumer, flex_sens_power_act(cid)))
+            fields.extend(
+                live_read_consumer_field(consumer, name)
+                for name in FILTER_LIVE_READ_FIELDS
+            )
         else:
             from ehal.flex_fields import flex_sens_power_act
 
-            fields.append(f"{cid}:{flex_sens_power_act(cid)}")
+            fields.append(live_read_consumer_field(consumer, flex_sens_power_act(cid)))
             if _consumer_is_thermal(consumer):
-                fields.extend(f"{cid}:{name}" for name in THERMAL_LIVE_READ_FIELDS)
+                fields.extend(
+                    live_read_consumer_field(consumer, name)
+                    for name in THERMAL_LIVE_READ_FIELDS
+                )
             if _consumer_is_thermal_annual(consumer):
                 fields.extend(
-                    f"{cid}:{name}" for name in THERMAL_ANNUAL_LIVE_READ_FIELDS
+                    live_read_consumer_field(consumer, name)
+                    for name in THERMAL_ANNUAL_LIVE_READ_FIELDS
                 )
     return fields
 
@@ -500,7 +554,10 @@ def _ha_live_consumers(house_doc: dict | None) -> list[dict]:
 
 
 def ha_pattern_b_live_mapping(house_doc: dict | None = None) -> dict[str, str]:
-    """Entity-centric EHAL-Feld → HA entity_id from Pattern B (2.6.h Live contract)."""
+    """Entity-centric EHAL-Feld → HA entity_id from Pattern B (2.6.h Live contract).
+
+    Live-Lesen consumer reads use qualified IDs; Live-Schreiben keeps ``{cid}:field``.
+    """
     if house_doc is None:
         from ui.house_config_io import load_house_profiles
 
@@ -514,7 +571,10 @@ def ha_pattern_b_live_mapping(house_doc: dict | None = None) -> dict[str, str]:
         if not cid:
             continue
         for field, entity_id in _binding_map(consumer.get("ehal_bindings")).items():
-            out[f"{cid}:{field}"] = entity_id
+            if is_live_read_field(field):
+                out[live_read_consumer_field(consumer, field)] = entity_id
+            else:
+                out[f"{cid}:{field}"] = entity_id
     return out
 
 
@@ -522,7 +582,7 @@ def expand_ha_telemetry_for_live(
     telemetry: dict[str, Any],
     house_doc: dict | None = None,
 ) -> dict[str, Any]:
-    """Alias flat HA wire keys onto `{cid}:field` Live row ids; drop bare EV keys."""
+    """Alias flat HA wire keys onto qualified Live-Lesen IDs; drop bare EV keys."""
     flat = {str(k): v for k, v in telemetry.items()}
     out: dict[str, Any] = dict(flat)
     for consumer in _ha_live_consumers(house_doc):
@@ -531,7 +591,7 @@ def expand_ha_telemetry_for_live(
             continue
         for name in EV_LIVE_READ_FIELDS:
             if name in flat:
-                out[f"{cid}:{name}"] = flat[name]
+                out[live_read_consumer_field(consumer, name)] = flat[name]
     for name in EV_LIVE_READ_FIELDS:
         out.pop(name, None)
     return out

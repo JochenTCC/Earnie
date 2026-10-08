@@ -164,10 +164,9 @@ def _live_read_source(field: str, mapping: str) -> str:
 
         if mapping:
             return source_for_merker(mapping)
-        # Pattern B / consumer rows: ``bat:ess.x.sens`` or bare / qualified field
+        # Qualified / bare EHAL ID, or legacy ``{cid}:{stored_key}``
         if ":" in field:
-            tail = field.split(":", 1)[1]
-            return source_for_ehal_id(tail)
+            return source_for_ehal_id(field.split(":", 1)[1])
         return source_for_ehal_id(field)
     except Exception:  # noqa: BLE001
         return "poll"

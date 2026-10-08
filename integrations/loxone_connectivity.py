@@ -337,6 +337,7 @@ def _append_ev_read_checks(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
 ) -> None:
+    from integrations.ehal_debug_mapping import live_read_consumer_field
     from settings.ehal_marker_resolve import (
         marker_get_evcs_limit_soc,
         marker_get_evcs_ready_by_time,
@@ -348,46 +349,49 @@ def _append_ev_read_checks(
         marker_sens_evcs_soc_act,
     )
 
-    cid = consumer["id"]
+    # Force EV namespace when type was dropped by the planning bridge.
+    ev = dict(consumer)
+    if not str(ev.get("type") or "").strip():
+        ev["type"] = "ev"
     _append_io_check(
         checks,
-        f"{cid}:sens_evcs_active_power",
+        live_read_consumer_field(ev, "sens_evcs_active_power"),
         marker_sens_evcs_active_power(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:sens_evcs_connected",
+        live_read_consumer_field(ev, "sens_evcs_connected"),
         marker_sens_evcs_connected(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:sens_evcs_soc_act",
+        live_read_consumer_field(ev, "sens_evcs_soc_act"),
         marker_sens_evcs_soc_act(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:sens_evcs_bat_capacity",
+        live_read_consumer_field(ev, "sens_evcs_bat_capacity"),
         marker_sens_evcs_bat_capacity(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:get_evcs_nominal_current",
+        live_read_consumer_field(ev, "get_evcs_nominal_current"),
         marker_get_evcs_nominal_current(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:get_evcs_ready_by_time",
+        live_read_consumer_field(ev, "get_evcs_ready_by_time"),
         marker_get_evcs_ready_by_time(consumer),
         {"read_raw": True, "warn_if_missing": True},
     )
     _append_io_check(
         checks,
-        f"{cid}:get_evcs_limit_soc",
+        live_read_consumer_field(ev, "get_evcs_limit_soc"),
         marker_get_evcs_limit_soc(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:get_evcs_soc_min_immediate",
+        live_read_consumer_field(ev, "get_evcs_soc_min_immediate"),
         marker_get_evcs_soc_min_immediate(consumer),
     )
 
@@ -396,14 +400,14 @@ def _append_flex_power_check(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
 ) -> None:
-    from settings.ehal_marker_resolve import marker_flex_power
-
     from ehal.flex_fields import flex_sens_power_act
+    from integrations.ehal_debug_mapping import live_read_consumer_field
+    from settings.ehal_marker_resolve import marker_flex_power
 
     cid = consumer["id"]
     _append_io_check(
         checks,
-        f"{cid}:{flex_sens_power_act(cid)}",
+        live_read_consumer_field(consumer, flex_sens_power_act(cid)),
         marker_flex_power(consumer),
     )
 
@@ -412,6 +416,7 @@ def _append_filter_read_checks(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
 ) -> None:
+    from integrations.ehal_debug_mapping import live_read_consumer_field
     from settings.ehal_marker_resolve import (
         marker_get_filter_native_duration_hours,
         marker_get_filter_native_start_hour,
@@ -419,26 +424,25 @@ def _append_filter_read_checks(
         marker_sens_filter_active,
     )
 
-    cid = consumer["id"]
     _append_flex_power_check(checks, consumer)
     _append_io_check(
         checks,
-        f"{cid}:get_filter_remaining_hours",
+        live_read_consumer_field(consumer, "get_filter_remaining_hours"),
         marker_get_filter_remaining_hours(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:sens_filter_active",
+        live_read_consumer_field(consumer, "sens_filter_active"),
         marker_sens_filter_active(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:get_filter_native_start_hour",
+        live_read_consumer_field(consumer, "get_filter_native_start_hour"),
         marker_get_filter_native_start_hour(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:get_filter_native_duration_hours",
+        live_read_consumer_field(consumer, "get_filter_native_duration_hours"),
         marker_get_filter_native_duration_hours(consumer),
     )
 
@@ -491,6 +495,7 @@ def _append_thermal_read_checks(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
 ) -> None:
+    from integrations.ehal_debug_mapping import live_read_consumer_field
     from settings.ehal_marker_resolve import (
         marker_get_temperature_tolerance_c,
         marker_get_temperature_water_setpoint,
@@ -498,25 +503,24 @@ def _append_thermal_read_checks(
         marker_sens_temperature_water,
     )
 
-    cid = consumer["id"]
     _append_io_check(
         checks,
-        f"{cid}:sens_temperature_water",
+        live_read_consumer_field(consumer, "sens_temperature_water"),
         marker_sens_temperature_water(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:get_temperature_water_setpoint",
+        live_read_consumer_field(consumer, "get_temperature_water_setpoint"),
         marker_get_temperature_water_setpoint(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:get_temperature_tolerance_c",
+        live_read_consumer_field(consumer, "get_temperature_tolerance_c"),
         marker_get_temperature_tolerance_c(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:sens_heating_active",
+        live_read_consumer_field(consumer, "sens_heating_active"),
         marker_sens_heating_active(consumer),
     )
 
@@ -525,20 +529,20 @@ def _append_thermal_annual_read_checks(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
 ) -> None:
+    from integrations.ehal_debug_mapping import live_read_consumer_field
     from settings.ehal_marker_resolve import (
         marker_sens_temperature_heat_storage,
         marker_sens_temperature_heat_storage_low,
     )
 
-    cid = consumer["id"]
     _append_io_check(
         checks,
-        f"{cid}:sens_temperature_heat_storage",
+        live_read_consumer_field(consumer, "sens_temperature_heat_storage"),
         marker_sens_temperature_heat_storage(consumer),
     )
     _append_io_check(
         checks,
-        f"{cid}:sens_temperature_heat_storage_low",
+        live_read_consumer_field(consumer, "sens_temperature_heat_storage_low"),
         marker_sens_temperature_heat_storage_low(consumer),
     )
 
