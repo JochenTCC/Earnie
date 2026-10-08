@@ -240,7 +240,7 @@ def test_ha_pattern_b_live_mapping_entity_centric():
     house = _sample_house()
     mapping = ha_pattern_b_live_mapping(house)
     assert mapping["sens_ess_soc"] == "sensor.soc"
-    assert mapping["wallbox:sens_evcs_active_power"] == "sensor.ev_power"
+    assert mapping["evcs.wallbox.sens_evcs_active_power"] == "sensor.ev_power"
     assert mapping["wallbox:set_evcs_max_current"] == "number.ev_amps"
     assert "sens_evcs_active_power" not in mapping
 
@@ -256,7 +256,7 @@ def test_expand_ha_telemetry_aliases_ev_to_consumer():
         house,
     )
     assert expanded["sens_ess_soc"] == 55.0
-    assert expanded["wallbox:sens_evcs_active_power"] == 3200.0
+    assert expanded["evcs.wallbox.sens_evcs_active_power"] == 3200.0
     assert "sens_evcs_active_power" not in expanded
 
 
@@ -297,10 +297,10 @@ def test_ha_telemetry_rows_entity_centric_mapping_column():
         telemetry,
         "t1",
         mapping=mapping,
-        expected_fields=["sens_ess_soc", "wallbox:sens_evcs_active_power"],
+        expected_fields=["sens_ess_soc", "evcs.wallbox.sens_evcs_active_power"],
     )
     by_field = {r["EHAL-Feld"]: r for r in rows}
     assert by_field["sens_ess_soc"]["Mapping"] == "sensor.soc"
     assert by_field["sens_ess_soc"]["Wert"] == "40.0"
-    assert by_field["wallbox:sens_evcs_active_power"]["Mapping"] == "sensor.ev_power"
-    assert by_field["wallbox:sens_evcs_active_power"]["Wert"] == "100.0"
+    assert by_field["evcs.wallbox.sens_evcs_active_power"]["Mapping"] == "sensor.ev_power"
+    assert by_field["evcs.wallbox.sens_evcs_active_power"]["Wert"] == "100.0"

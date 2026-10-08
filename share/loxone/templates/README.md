@@ -4,7 +4,7 @@ Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTem
 
 **How-to (operators):** [`docs/referenz/loxone-signals.md`](../../../docs/referenz/loxone-signals.md) — Library setup, Default Merker names, EFM, Earnie-dead fallback, Loxone import.
 
-**Status:** hand-authored draft. Import → fix Address/`Check` → **Als Vorlage speichern** → replace these files with Config-exported XML (canonical packaging still open until that handoff).
+**Status:** `VirtualOut/VO_*.xml` follow the structure that Loxone Config exports (checked 2026-10-07 against a template saved with **Als Vorlage speichern**): `Info` element first, `HintText` / `CmdAnswer` / `SourceVal…` attributes, UTF-8 with BOM, tab indent. Titles, comments and commands are still hand-authored, and the placeholders (`EARNIE_HOST`, `{hk_id}` / `{ev_id}`) have to be replaced after inserting. `VirtualIn/VI_*.xml` follow the structure of a Virtual Input exported by Config the same way (`Info templateType="2"`, `Unit`, `HintText`); a Virtual Input extracts the value with the escape in `Check`, a Virtual Output command writes it with `<v>`.
 
 **Pattern B:** **VI** = Earnie → Loxone (`set_*` / Freigaben / Sollwerte + Heartbeat). **VO** = optional Loxone → Earnie telemetry push (`sens_*` / `get_*` / Flex-Leistung; placeholder URLs). Core still reads Miniserver `/jdev/sps/io/{name}`.
 
@@ -45,7 +45,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 
 1. Restart **Loxone Config**.
 2. Insert via periphery **Device Templates** / Virtual In / Virtual Out (Earnie entries should appear).
-3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize` / `/alive`) use port **8541** (`system.ehal_loxone_http_port`). VO telemetry drafts may still use **8501** placeholders for `/ehal/loxone/telemetry/…` until those endpoints ship.
+3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize` / `/alive`) use port **8541** (`system.ehal_loxone_http_port`). Telemetry VOs (`VO_Earnie_*` except `Status`) now also use port **8541**; their receiver `/ehal/loxone/telemetry/…` exists only in the pilot on branch `spike/vo-push-pilot` (no receiver on `main`). The value placeholder in a Virtual Output command is `<v>`, written `&lt;v&gt;` in the XML (`\v` would be sent as the control character 0x0B).
 
 ## Files (repo layout)
 
@@ -91,7 +91,7 @@ Three layers:
 | ----- | ---- | --------------------- |
 | HK `id` | snake_case entity | `waschmaschine` |
 | Merker Title | `Earnie_Verbraucher_<Slug>_…` | `Earnie_Verbraucher_Waschmaschine_Leistung` |
-| VO path | `flex.{hk_id}.sens_power_act` | `…/flex.waschmaschine.sens_power_act/\v` |
+| VO path | `flex.{hk_id}.sens_power_act` | `…/flex.waschmaschine.sens_power_act/<v>` |
 | EHAL binding key | `flex.{hk_id}.sens_power_act` on that consumer | → Merker Title |
 
 Template defaults leave `{hk_id}` / `{ev_id}` placeholders — replace in Config. WP: Titles `Earnie_Waermepumpe_*` (legacy `Earnie_WP_*`); Pool: `flex.pool.sens_power_act` or `{hk_id}`.

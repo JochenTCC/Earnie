@@ -31,12 +31,23 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - `optimizer/powerstation_live.py`: no plant-flat remap for charge/discharge (HA + Loxone); explicit exception only for `set_ess_source_select` (EcoFlow bridge); missing binding → skip + `runtime/ehal_write_error.json`
   - Docs: `docs/konfiguration/batterie-pv.md`; regression: `tests/test_powerstation_2_7_h.py` (`test_ha_charge_does_not_remap_to_house_battery`, Loxone charge isolation, HA source_select plant-flat)
 
+- [ ] **Loxone `status.json`: physical powerstation limits overwrote the house battery's flat keys** — fix implemented on branch `fix/status-json-powerstation-keys`; live acceptance pending
+  - Cause: `_write_powerstation_loxone` cached sent values under the flat field kind (`set_ess_charge_power_limit`, `set_ess_mode`, …) and `build_loxone_status_payload` wrote them into the house battery's flat keys; with two powerstations the last write won. Only the Virtual HTTP Input mirror was affected, not direct `/dev/sps/io/` writes. The per-battery `ess.<id>.*` check keys of a VI never received data.
+  - Fix: `optimizer/powerstation_live.py` caches under the Pattern B key `ess.<id>.<kind>` (`_status_key`); only the shared EcoFlow-bridge `set_ess_source_select` stays flat. `integrations/loxone_status_json.py` emits Pattern B keys and no longer touches the flat limit / mode keys.
+  - Tests: `tests/test_loxone_status_json.py` (house keys untouched, two powerstations, shared Quellenwahl flat, write path end to end); `tests/test_powerstation_2_7_h.py` adjusted. Four of them fail without the fix.
+  - **Note:** after the fix the VI commands `Earnie_Delta3_*` receive mirror values for the first time. A VI scale with `DestValHigh="-100"` inverts the sign of such a mirrored value; check the scaling before rollout.
+  - After a successful live check: remove this item → `Backlog-Erledigt.md`.
+
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] Error in NAS alpha ("P:\earnie-alpha") when starting main.py
   EHAL Schreibfehler: Powerstation ESS fields have no own Merker; refusing plant-flat house-battery fallback: ess.15_kwh_speicher_copy_3.set_ess_charge_power_limit; ess.15_kwh_speicher_copy_3.set_ess_discharge_power_limit (set_ess_charge_power_limit, set_ess_discharge_power_limit)
 
 - [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
+- [ ] 2026-10-08 07:07:14 [WARNING] (data.outdoor_forecast:209) - Außentemperatur-Prognose fehlgeschlagen (503 Server Error: Service Unavailable for url: https://api.open-meteo.com/v1/forecast?latitude=47.40409024399311&longitude=9.742743769241422&hourly=temperature_2m&forecast_days=3&timezone=auto) – konstante Fallback-Temperatur 14.10 °C  --> This warning is quite often - please check
+- [ ] 2026-10-08 11:59:39 [WARNING] (optimizer.milp_consumer_delivery:193) - Haus Wärme: Ziel (26.87 kWh) nicht vollständig erreichbar mit 49 h à 1.90 kW – lade mit Best-Effort.
+
+
 
 - [ ] Loxone mapping: duplicate `PLANT_FIELDS` — heuristic proposals miss fields
   - `ui/ehal_loxone_mapping_ui.py:52` holds an older copy of `PLANT_FIELDS`; the current one is in `ui/ehal_loxone_mapping.py:56` (cleaned up in 2.7.m: `_PLANT_ESS_MOVED` removed from the list, `set_ess_source_select` and `set_grid_export_power_limit` added).
@@ -45,11 +56,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Effect 2 (found by reading; confirm with a test before the fix): proposals are keyed by flat field name (`sens_ess_soc`), battery rows look up `ess.<id>.<kind>` (`proposals.get(field)` in `_render_field_selects`, `ui/ehal_loxone_mapping.py:707`), so battery rows probably never get a proposal.
   - Fix sketch: delete the copy and use the list from `ui/ehal_loxone_mapping.py`; test that every mapping field is also in the proposal field list; map `ess.<id>.<kind>` → `<kind>` for proposals. Check the HA side for the same error (`ui/ehal_ha_mapping.py`, `_proposed_entity_id`; `heuristic_propose(scanned)` returns flat keys while battery rows use Pattern B).
 
-- [ ] Loxone `status.json`: physical powerstation limits overwrite the house battery's flat keys
-  - `optimizer/powerstation_live.py::_write_powerstation_loxone` stores sent values under the flat field kind (`_last_powerstation_sent["set_ess_charge_power_limit"]`), not under the Pattern B key. `integrations/loxone_status_json.py::build_loxone_status_payload` writes them after the plant values into the same flat keys (`PLANT_LIVE_WRITE_FIELDS`).
-  - Found by reading, not run: a powerstation charge limit replaces the house battery's `set_ess_charge_power_limit` in `status.json`; with two powerstations the last write wins. Affects only a Virtual HTTP Input mirror, not direct `/dev/sps/io/` writes. The comment there says "flat + Pattern-B", but only the flat key is stored.
-  - Fix sketch: keep powerstation values under `ess.<id>.<kind>` and emit them as such (qualified keys, see epic **Binding P1**); test with house battery + two powerstations.
-
 - [ ] Loxone: physical powerstation writes are not part of the write trace
   - `_write_powerstation_loxone` discards the result of `_send_loxone_value_traced`; `main.py` puts only `huawei_writes + flex_writes` into the write records, and `build_sent_loxone_snapshot` knows only plant and consumers. Found by reading, not run: EHAL-Com → Live-Schreiben shows no value/success for `ess.<id>.set_ess_charge_power_limit` of a powerstation; only the log line ("Loxone API: … erfolgreich auf …") shows it.
   - Fix sketch: return the records from `write_physical_powerstation_charges` / `write_standby_source_selects` and append them to `loxone_writes` and the `loxone_sent` snapshot; test via a powerstation fixture.
@@ -57,6 +63,12 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 - [ ] Second battery: missing or wrong SoC binding silently falls back to the primary battery's SoC
   - `ehal_live.read_ess_soc_by_id` → `_read_soc_from_address` returns `None` on a missing binding or read error and the caller substitutes the primary SoC; the only trace is a debug log. A misnamed SoC Merker of a second battery therefore looks plausible in operation.
   - Fix sketch: log a warning once per battery and show the fallback in EHAL-Com (Live-Lesen row status); decide whether a physical powerstation without own SoC should be planned at all.
+
+- [ ] EcoFlow Delta 3 bridge: Miniserver self-write of a Virtual Input is overwritten by HA (2026-10-07, not analysed yet)
+  - Setup: the Miniserver writes its own Virtual Input via a Virtual Output command (`/dev/sps/io/<Input>/\v`, device = the Miniserver itself), e.g. bypass state (`Delta3_Grid_ByPass`) and charge limit (`Delta3_P_ChargeLimit`). HA mirrors these inputs through the Loxone integration (PyLoxone) and drives the EcoFlow entities from automations (`docs/einrichtung/ecoflow-delta3-loxone.md`, steps 5/6).
+  - Symptom: in between, the input value changes to a different value that the Miniserver logic did not write; HA seems to set it. Which writer and when is unknown.
+  - To check: (1) does an HA `rest_command` (SoC / power / SOC min/max pushes) target the same input name, or does a name collision exist between inputs; (2) does the HA start trigger or a state-trigger automation push a value back into an input; (3) does the Virtual Output command repeat or fire on every cycle (Repeat setting); (4) does the Loxone integration write entity states back to the Miniserver; (5) compare timestamps of the HA log (`rest_command`) with the Miniserver's online monitor.
+  - Fix idea if confirmed: let HA only read these inputs (no `rest_command` to them) or switch the bridge to the webhook variant (step 5/6, variant B). Update the guide's "Hinweis zum Eingang" once the cause is known.
 
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)

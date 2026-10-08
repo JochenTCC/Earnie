@@ -144,6 +144,19 @@ Principle: **freeze the identifiers now, build the tools later.** An identifier 
 | `evcs.<wallbox>.<kind>` | wallbox (charger) | `sens_evcs_active_power`, `sens_evcs_connected`, `get_evcs_nominal_current`, `set_evcs_max_current`, `set_evcs_mode` |
 | `ev.<vehicle>.<kind>` | vehicle | `sens_evcs_soc_act`, `sens_evcs_bat_capacity`, `get_evcs_limit_soc`, `get_evcs_soc_min_immediate`, `get_evcs_ready_by_time` |
 
+**Namespaces for the other consumers (decided).** Named by device type, not by the cryptic `flex.`:
+
+| Entity | Namespace | Example |
+| --- | --- | --- |
+| Plant (one per house) | none | `sens_grid_power_active`, `sens_temperature_outside` |
+| Battery | `ess.<Kennung>.` | `ess.15_kwh_speicher.sens_ess_soc` |
+| Heat pump (`thermal_annual`) | `heatpump.<Kennung>.` | `heatpump.waermepumpe.sens_temperature_heat_storage` |
+| Pool (`thermal_rc`, and the `pool_filter` entity) | `pool.<Kennung>.` | `pool.pool_swimspa.sens_temperature_water` |
+| Every other consumer | `consumer.<Kennung>.` | `consumer.waschmaschine.sens_power_act` |
+| Inverter (2.7.l P4) | `inv.<Kennung>.` | |
+
+Rule: a namespace equals the field-name stem where one exists (`ess` ↔ `sens_ess_*`, `evcs` ↔ `sens_evcs_*`, `inv` ↔ `sens_inv_*`); otherwise the device type. `flex.<slug>.*` stays an accepted alias on input (stored bindings, `status.json`, deployed VI check patterns) and is not emitted in new IDs. Renaming the stored keys needs an alias on load and is a separate step.
+
 - Today's single EV consumer `garage` yields both forms from one Kennung (`evcs.garage.set_evcs_max_current`, `ev.garage.sens_evcs_soc_act`); the namespace follows the field kind, storage stays flat.
 - Later separate entities carry their own Kennung; the car ↔ wallbox assignment is runtime logic, not part of the names.
 - `sens_evcs_connected` is allowed in both namespaces (both devices report "connected"). **Decided:** kept under this name in 2.7.n; a rename to `sens_connected` is possible later but needs an alias on load (about 25 code places plus schema, role JSON, recipes, fixtures and stored bindings).
@@ -152,3 +165,17 @@ Principle: **freeze the identifiers now, build the tools later.** An identifier 
 - The adapter still uses only the first EV (`_first_ev_loxone_bindings`); multi-EV runtime stays in the backlog item "Enable multiple EV / Wallboxes".
 
 **Generic path, kept safe.** Only transport and conversion become data-driven (unit, factor, sign, clamp per field in the role JSON). The decision logic (which value is written when: `map_ess_setpoints`, sticky refresh, function gating) stays in code. A single writer returns records keyed by qualified ID; the write trace, the `loxone_sent` snapshot and `status.json` are built from them, which removes the two bugs structurally. Safety: characterization tests first (n-4), Shadow would-write comparison (`shadow_writes.jsonl`) old vs new, and a hard gate — if n-5 / n-6 are not ready, n-1 … n-4 ship alone.
+
+## 10. Pilot findings (spike/vo-push-pilot, 2026-10-07)
+
+Observed with the Miniserver and the NAS alpha instance:
+
+- A Virtual Output command is a plain `GET` from the Miniserver without extra headers; the token can only travel as `?t=` in the command (it arrives unchanged).
+- The value placeholder in a VO command is `<v>` (`<v.1>` for one decimal); `<v>` arrives with a point and three decimals. The Virtual-Input escape in a VO command is sent as the control character 0x0B.
+- Repeat works with unchanged values: exactly every 30 s, the timer restarts after every send (change or repeat); a change is sent immediately.
+- **An output reports "On" (value not 0) and "Off" (value 0) separately.** An analog output has no Off command, so nothing is sent at 0 (a stopped wallbox never appears). A digital output sends its Off command once on the edge; the Off state is not repeated.
+- Consequence for the design: silence of an analog signal means 0 only while the link is alive. The link is judged from repeating non-zero signals (a constant `heartbeat` VO, or any fresh analog value). A drop to 0 is noticed after the stale limit (3 x repeat, 90 s). Digital signals keep their last explicit value until the next edge.
+- Docker bridge: the receiver sees the Docker gateway as peer, not the Miniserver address.
+- Exported Config templates differ from the repo drafts (Info element, extra attributes, BOM); the repo templates now follow the export shape.
+- Not yet verified: load on the Miniserver with all 40 repeating commands; delivery rate over days; behaviour after an Earnie restart.
+- Token in the address: the receiver also accepts `http://host:8541/t/<token>` + command `/ehal/loxone/telemetry/...` (not verified yet whether Loxone joins an address path and a command that way; check with `scripts.pilot_vo_capture`).

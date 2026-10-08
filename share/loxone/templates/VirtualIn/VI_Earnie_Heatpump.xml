@@ -1,11 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  DRAFT (2.4.n Pattern B) — validate in Loxone Config, then re-export.
+  Structure = Loxone Config export (checked 2026-10-07 against VI_Earnie_Plant_Real.xml); values are the repo defaults.
   Expected JSON fragment: {"flex.{hk_id}.Earnie_Waermepumpe_Freigabe":1}
   Power Earnie_Waermepumpe_Leistung: VO_Earnie_Heatpump or EFM Load (not this VI).
   Legacy Titles Earnie_WP_* remain valid on existing plants.
+  Analog=true: sticky 0/1 from JSON. Analog=false (digital) pulses true on every poll.
 -->
-<VirtualInHttp Title="Earnie Wärmepumpe" Comment="Pattern B: WP Freigabe from Earnie (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
-	<!-- Analog=true: sticky 0/1 from JSON. Analog=false (digital) pulses true on every poll. -->
-	<VirtualInHttpCmd Title="Earnie_Waermepumpe_Freigabe" Comment="flex.{hk_id}.enable / flex.{hk_id}.set_enable 0/1 sticky" Check="&quot;flex.{hk_id}.Earnie_Waermepumpe_Freigabe&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
+<VirtualInHttp HintText="" Title="Earnie Wärmepumpe" Comment="Pattern B: WP Freigabe from Earnie (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
+	<Info templateType="2" minVersion="17010630"/>
+	<VirtualInHttpCmd Title="Earnie_Waermepumpe_Freigabe" Comment="flex.{hk_id}.enable / flex.{hk_id}.set_enable 0/1 sticky" Check="&quot;flex.{hk_id}.Earnie_Waermepumpe_Freigabe&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1" Unit="&lt;v&gt;" HintText=""/>
 </VirtualInHttp>

@@ -184,3 +184,87 @@ def test_status_payload_greenfield_pool_uses_configured_enable_only() -> None:
     )
     assert payload["Earnie_Pool_Freigabe"] == 1.0
     assert "Earnie_Pool_Filter_Freigabe" not in payload
+
+
+def _clear_powerstation_cache():
+    from optimizer import powerstation_live as psl
+
+    psl._last_powerstation_sent.clear()
+    return psl
+
+
+def test_powerstation_values_use_pattern_b_keys_and_leave_house_keys_alone() -> None:
+    """A powerstation write must not overwrite the house battery's flat status keys."""
+    psl = _clear_powerstation_cache()
+    psl._last_powerstation_sent["ess.ecoflow_delta_3.set_ess_charge_power_limit"] = 0.0
+    psl._last_powerstation_sent["ess.ecoflow_delta_3.set_ess_mode"] = 1.0
+    try:
+        payload = build_loxone_status_payload(
+            loxone_sent={"Earnie_LadeLeistungs-Limit": 5.0, "Earnie_Steuerbefehl": 2.0},
+            consumers=[],
+            plant_io_index={
+                "Earnie_LadeLeistungs-Limit": "set_ess_charge_power_limit",
+                "Earnie_Steuerbefehl": "set_ess_mode",
+            },
+            now_ts=100.0,
+        )
+    finally:
+        psl._last_powerstation_sent.clear()
+    assert payload["set_ess_charge_power_limit"] == 5.0  # house battery, not the pack's 0.0
+    assert payload["set_ess_mode"] == 2.0
+    assert payload["ess.ecoflow_delta_3.set_ess_charge_power_limit"] == 0.0
+    assert payload["ess.ecoflow_delta_3.set_ess_mode"] == 1.0
+
+
+def test_shared_quellenwahl_stays_flat() -> None:
+    psl = _clear_powerstation_cache()
+    psl._last_powerstation_sent["set_ess_source_select"] = 1.0
+    try:
+        payload = build_loxone_status_payload(
+            loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
+        )
+    finally:
+        psl._last_powerstation_sent.clear()
+    assert payload["set_ess_source_select"] == 1.0
+
+
+def test_two_powerstations_do_not_collide() -> None:
+    psl = _clear_powerstation_cache()
+    psl._last_powerstation_sent["ess.pack_a.set_ess_charge_power_limit"] = 1.5
+    psl._last_powerstation_sent["ess.pack_b.set_ess_charge_power_limit"] = 0.0
+    try:
+        payload = build_loxone_status_payload(
+            loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
+        )
+    finally:
+        psl._last_powerstation_sent.clear()
+    assert payload["ess.pack_a.set_ess_charge_power_limit"] == 1.5
+    assert payload["ess.pack_b.set_ess_charge_power_limit"] == 0.0
+    assert payload["set_ess_charge_power_limit"] == 0.0  # untouched plant default
+
+
+def test_write_path_caches_pattern_b_key_not_flat_kind(monkeypatch) -> None:
+    """End to end: ``_write_powerstation_loxone`` → status payload."""
+    from unittest.mock import MagicMock
+
+    psl = _clear_powerstation_cache()
+    field = "ess.ecoflow_delta_3.set_ess_charge_power_limit"
+    monkeypatch.setattr(
+        psl, "_resolve_marker", lambda key: ("set_ess_charge_power_limit", "Earnie_Delta3_LadeLeistungs-Limit")
+    )
+    monkeypatch.setattr(
+        "integrations.loxone_client._send_loxone_value_traced",
+        lambda name, value: MagicMock(success=True),
+    )
+    try:
+        psl._write_powerstation_loxone({field: 2000.0})  # W → 2.0 kW
+        payload = build_loxone_status_payload(
+            loxone_sent={"Earnie_LadeLeistungs-Limit": 5.0},
+            consumers=[],
+            plant_io_index={"Earnie_LadeLeistungs-Limit": "set_ess_charge_power_limit"},
+            now_ts=100.0,
+        )
+    finally:
+        psl._last_powerstation_sent.clear()
+    assert payload[field] == 2.0
+    assert payload["set_ess_charge_power_limit"] == 5.0

@@ -125,6 +125,7 @@ def build_read_rows(
                 {
                     "EHAL-Feld": field,
                     "Mapping": "",
+                    "Quelle": _live_read_source(field, ""),
                     "Wert": "",
                     "Status": "Kein Mapping",
                     "Detail": "",
@@ -142,6 +143,7 @@ def build_read_rows(
             {
                 "EHAL-Feld": field,
                 "Mapping": mapping,
+                "Quelle": _live_read_source(field, mapping),
                 "Wert": wert,
                 "Status": (
                     "Kein Mapping" if not mapping else read_check_status_label(item)
@@ -151,6 +153,21 @@ def build_read_rows(
             }
         )
     return rows
+
+
+def _live_read_source(field: str, mapping: str) -> str:
+    """``push`` / ``poll`` for Live-Lesen (Loxone VO migration)."""
+    try:
+        from ehal.loxone_push_source import source_for_ehal_id, source_for_merker
+
+        if mapping:
+            return source_for_merker(mapping)
+        # Qualified / bare EHAL ID, or legacy ``{cid}:{stored_key}``
+        if ":" in field:
+            return source_for_ehal_id(field.split(":", 1)[1])
+        return source_for_ehal_id(field)
+    except Exception:  # noqa: BLE001
+        return "poll"
 
 def build_telemetry_rows(
     telemetry: dict[str, Any],

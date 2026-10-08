@@ -130,10 +130,38 @@ def parse_filter_native_start_hour(
 
 
 def fetch_filter_native_start_hour(io_name: str) -> tuple[float | None, str, str | None]:
-    """Liest und parst die native Filter-Start-Stunde live. Returns: (hour, format, raw)."""
+    """Liest und parst die native Filter-Start-Stunde live. Returns: (hour, format, raw).
+
+    Pushable bindings read the inbox only (no Merker poll fallback).
+    """
     io_name = str(io_name or "").strip()
     if not io_name:
         return None, "missing", None
+    try:
+        from ehal.loxone_push_source import resolve_push_binding
+        from runtime_store.loxone_push_inbox import read_push_value
+
+        binding = resolve_push_binding(io_name)
+        if binding is not None:
+            value, state = read_push_value(binding.ehal_id)
+            if value is None:
+                logger.warning(
+                    "Loxone push: no filter start for '%s' (%s, state=%s)",
+                    io_name,
+                    binding.ehal_id,
+                    state,
+                )
+                return None, "missing", None
+            raw = str(int(value)) if float(value).is_integer() else str(value)
+            hour, fmt = parse_filter_native_start_hour(raw)
+            return hour, fmt, raw
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Loxone push filter start failed for '%s'; not falling back to poll",
+            io_name,
+        )
+        return None, "missing", None
+
     raw = fetch_loxone_raw_value(io_name)
     if raw is None:
         return None, "missing", None
@@ -368,7 +396,35 @@ def _legacy_ready_by_value(raw: str | float | None) -> str | float | None:
 
 
 def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
-    """FertigUm: AlarmClock SpecialState10 (unix), else Tna text, else legacy Merker."""
+    """FertigUm: push inbox for bound pushable fields; else AlarmClock poll.
+
+    Push path returns numeric Unix or fresh Tna text (``Morgen, 07:00``) for
+    ``parse_loxone_ready_by_time``. No Merker poll fallback when bound to push.
+    Poll path (unbound / legacy): SpecialState10, else Tna, else legacy Merker.
+    """
+    name = str(io_name or "").strip()
+    if name:
+        try:
+            from ehal.loxone_push_source import resolve_push_binding
+            from runtime_store.loxone_push_inbox import read_push_ready_by_time
+
+            binding = resolve_push_binding(name)
+            if binding is not None:
+                value = read_push_ready_by_time(binding.ehal_id)
+                if value is None:
+                    logger.warning(
+                        "Loxone push: no ready_by_time for '%s' (%s)",
+                        name,
+                        binding.ehal_id,
+                    )
+                return value
+        except Exception:  # noqa: BLE001 — do not fall back to poll for push bindings
+            logger.exception(
+                "Loxone push ready_by_time failed for '%s'; not falling back to poll",
+                name,
+            )
+            return None
+
     ll = _fetch_loxone_io_all(io_name)
     if ll:
         unix = _alarm_clock_next_entry_unix(ll)
@@ -381,7 +437,35 @@ def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
 
 
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
-    """Holt einen numerischen Wert live aus dem Loxone Miniserver (Einheiten werden abgeschnitten)."""
+    """Holt einen numerischen Wert: push inbox for bound pushable fields, else Merker poll.
+
+    Meter ``/all`` energy stays on poll (never calls this for energy IDs). FertigUm uses
+    ``fetch_loxone_ready_by_time``. Bound pushable fields never fall back to Merker HTTP.
+    ``io_name`` may be a Merker name or a qualified/bare EHAL ID.
+    """
+    name = str(io_name or "").strip()
+    if name:
+        try:
+            from ehal.loxone_push_source import resolve_push_binding
+            from runtime_store.loxone_push_inbox import read_push_value
+
+            binding = resolve_push_binding(name)
+            if binding is not None:
+                value, state = read_push_value(binding.ehal_id)
+                if value is None:
+                    logger.warning(
+                        "Loxone push: no value for '%s' (%s, state=%s)",
+                        name,
+                        binding.ehal_id,
+                        state,
+                    )
+                return value
+        except Exception:  # noqa: BLE001 — do not fall back to poll for push bindings
+            logger.exception(
+                "Loxone push read failed for '%s'; not falling back to poll", name
+            )
+            return None
+
     raw_value = fetch_loxone_raw_value(io_name)
     if raw_value is None:
         return None

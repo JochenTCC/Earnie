@@ -19,7 +19,10 @@ from runtime_store.powerstation_reserves import set_trigger
 
 logger = logging.getLogger(__name__)
 
-# Last written powerstation Merker values for Loxone status.json (flat + Pattern-B).
+# Last written powerstation Merker values for Loxone status.json, keyed by the
+# status.json key: Pattern-B ``ess.{slug}.{kind}`` per powerstation, flat
+# ``set_ess_source_select`` for the shared EcoFlow-bridge Merker. Never a flat limit /
+# mode key — those belong to the house battery.
 _last_powerstation_sent: dict[str, float] = {}
 
 # Plant-flat fallback allowed only for EcoFlow-bridge Quellenwahl (not charge/discharge).
@@ -28,6 +31,15 @@ _PLANT_FLAT_ALLOWED_KINDS = frozenset({"set_ess_source_select"})
 
 def last_powerstation_sent() -> dict[str, float]:
     return dict(_last_powerstation_sent)
+
+
+def _status_key(field_key: str, kind: str) -> str:
+    """Key under which a written powerstation value appears in ``status.json``."""
+    from ehal.ess_fields import parse_ess_pattern_b
+
+    if kind in _PLANT_FLAT_ALLOWED_KINDS:
+        return kind  # shared plant Merker (EcoFlow bridge)
+    return field_key if parse_ess_pattern_b(field_key) else kind
 
 
 def _planning_powerstations() -> list[dict]:
@@ -427,7 +439,7 @@ def _write_powerstation_loxone(fields: dict[str, float]) -> list:
             missing.append(field_key)
             continue
         send_val = _loxone_ps_wire_value(kind, float(value_w))
-        _last_powerstation_sent[kind] = send_val
+        _last_powerstation_sent[_status_key(field_key, kind)] = send_val
         records.append(loxone_client._send_loxone_value_traced(marker, send_val))
     if missing:
         _persist_ps_write_error(

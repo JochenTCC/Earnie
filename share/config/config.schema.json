@@ -486,6 +486,22 @@
               }
             }
           }
+        },
+        "loxone_push": {
+          "type": "object",
+          "description": "Deprecated. Pushable sens_*/get_* always read from the VO inbox; leftover entities lists are ignored.",
+          "properties": {
+            "entities": {
+              "type": "array",
+              "description": "Ignored (legacy opt-in list). Kept so old config.json files still validate.",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

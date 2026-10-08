@@ -69,7 +69,7 @@ def test_build_read_rows_formats_ready_by_loxone_counter():
     lox_counter = 555135300.0
     checks = [
         LoxoneCheck(
-            "ev:get_evcs_ready_by_time",
+            "ev.ev.get_evcs_ready_by_time",
             "Ladewecker",
             True,
             f"raw={lox_counter!r}",
@@ -78,7 +78,7 @@ def test_build_read_rows_formats_ready_by_loxone_counter():
     rows = build_read_rows(
         checks,
         "t0",
-        expected_fields=["ev:get_evcs_ready_by_time"],
+        expected_fields=["ev.ev.get_evcs_ready_by_time"],
     )
     unix = int(lox_counter + LOXONE_EPOCH_TO_UNIX)
     assert rows[0]["Wert"] == format_ready_by_display(lox_counter)
@@ -89,7 +89,7 @@ def test_build_read_rows_formats_ready_by_loxone_counter():
 def test_build_read_rows_ready_by_keeps_tna_text():
     checks = [
         LoxoneCheck(
-            "ev:get_evcs_ready_by_time",
+            "ev.ev.get_evcs_ready_by_time",
             "Ladewecker",
             True,
             "Wert=Morgen, 11:00",
@@ -98,18 +98,20 @@ def test_build_read_rows_ready_by_keeps_tna_text():
     rows = build_read_rows(
         checks,
         "t0",
-        expected_fields=["ev:get_evcs_ready_by_time"],
+        expected_fields=["ev.ev.get_evcs_ready_by_time"],
     )
     assert rows[0]["Wert"] == "Morgen, 11:00"
 
 
 def test_build_read_rows_includes_flex_power():
     checks = [
-        LoxoneCheck("wp:flex.wp.sens_power_act", "Ernie_WP", True, "Wert=1.2"),
+        LoxoneCheck("consumer.wp.sens_power_act", "Ernie_WP", True, "Wert=1.2"),
     ]
-    rows = build_read_rows(checks, "t0", expected_fields=["wp:flex.wp.sens_power_act"])
+    rows = build_read_rows(
+        checks, "t0", expected_fields=["consumer.wp.sens_power_act"]
+    )
     assert len(rows) == 1
-    assert rows[0]["EHAL-Feld"] == "wp:flex.wp.sens_power_act"
+    assert rows[0]["EHAL-Feld"] == "consumer.wp.sens_power_act"
     assert rows[0]["Mapping"] == "Ernie_WP"
 
 
@@ -117,12 +119,12 @@ def test_build_read_rows_unmapped_expected_empty_mapping():
     rows = build_read_rows(
         [],
         "t0",
-        expected_fields=["sens_ess_soc", "car:sens_evcs_active_power"],
+        expected_fields=["sens_ess_soc", "evcs.car.sens_evcs_active_power"],
     )
     assert len(rows) == 2
     assert rows[0]["Mapping"] == ""
     assert rows[0]["Status"] == "Kein Mapping"
-    assert rows[1]["EHAL-Feld"] == "car:sens_evcs_active_power"
+    assert rows[1]["EHAL-Feld"] == "evcs.car.sens_evcs_active_power"
     assert rows[1]["Mapping"] == ""
 
 
@@ -367,11 +369,11 @@ def test_expected_live_read_fields_include_thermal_temps():
     ):
         fields = expected_live_read_fields(network_backend=False)
 
-    assert "swimspa:flex.swimspa.sens_power_act" in fields
-    assert "swimspa:sens_temperature_water" in fields
-    assert "swimspa:get_temperature_water_setpoint" in fields
-    assert "swimspa:get_temperature_tolerance_c" in fields
-    assert "swimspa:sens_heating_active" in fields
-    assert fields.index("swimspa:sens_temperature_water") > fields.index(
-        "swimspa:flex.swimspa.sens_power_act"
+    assert "pool.swimspa.sens_power_act" in fields
+    assert "pool.swimspa.sens_temperature_water" in fields
+    assert "pool.swimspa.get_temperature_water_setpoint" in fields
+    assert "pool.swimspa.get_temperature_tolerance_c" in fields
+    assert "pool.swimspa.sens_heating_active" in fields
+    assert fields.index("pool.swimspa.sens_temperature_water") > fields.index(
+        "pool.swimspa.sens_power_act"
     )
