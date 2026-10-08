@@ -1,7 +1,6 @@
-"""Entity source switch + Merker intercept for VO push."""
+"""Always-push source switch + Merker/EHAL intercept for VO push."""
 from __future__ import annotations
 
-import time
 from datetime import datetime, timezone
 from unittest.mock import patch
 
@@ -9,6 +8,7 @@ import pytest
 
 from ehal import loxone_push_source as src
 from integrations import loxone_client
+from optimizer import charging_schedule as cs
 from runtime_store import loxone_push_inbox as inbox
 
 
@@ -70,57 +70,51 @@ def test_entity_keys_and_merker_index() -> None:
     assert index["Earnie_Fertig"].ehal_id == "ev.e_auto.get_evcs_ready_by_time"
 
 
+def test_empty_merker_still_in_ehal_index() -> None:
+    house = {
+        "plant": {"ehal_bindings": {"sens_grid_power_active": ""}},
+        "profiles": {},
+    }
+    ehal = src.build_ehal_index(house, {})
+    assert "sens_grid_power_active" in ehal
+    assert ehal["sens_grid_power_active"].merker == ""
+    assert src.build_merker_index(house, {}) == {}
+
+
 def test_heartbeat_source_is_always_push() -> None:
     assert src.source_for_ehal_id("heartbeat") == "push"
     assert src.source_for_ehal_id("") == "poll"
+    assert src.source_for_ehal_id("sens_grid_power_active") == "push"
+    assert src.source_for_ehal_id("sens_pv_energy") == "poll"
 
 
-def test_parse_push_entities() -> None:
+def test_parse_push_entities_legacy() -> None:
     assert src.parse_push_entities(["plant", " consumer:trockner ", ""]) == frozenset(
         {"plant", "consumer:trockner"}
     )
     assert src.parse_push_entities(None) == frozenset()
+    assert src.load_push_entities_from_config({"ehal": {"loxone_push": {"entities": ["plant"]}}}) == frozenset()
 
 
-def test_source_for_merker_respects_config(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_source_for_merker_always_push_when_indexed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         src,
         "get_merker_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
-    monkeypatch.setattr(src, "get_push_entities", lambda: frozenset({"consumer:trockner"}))
-    assert src.source_for_merker("Earnie_Trockner") == "push"
-    assert src.source_for_merker("Earnie_Netz") == "poll"
-
-
-def test_push_entities_cache_reloads_when_config_mtime_changes(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Streamlit stays up across config edits — cache must follow config.json mtime."""
-    cfg = tmp_path / "config.json"
-    cfg.write_text(
-        '{"ehal":{"loxone_push":{"entities":["consumer:trockner"]}}}',
-        encoding="utf-8",
-    )
     monkeypatch.setattr(
-        "runtime_store.persist_paths.resolve_config_json_path",
-        lambda: str(cfg),
+        src,
+        "get_ehal_index",
+        lambda: src.build_ehal_index(HOUSE, COMPONENTS),
     )
-    src.clear_source_caches()
-    assert src.get_push_entities() == frozenset({"consumer:trockner"})
-    # Same mtime → cache hit
-    assert src.get_push_entities() == frozenset({"consumer:trockner"})
-    time.sleep(0.02)
-    cfg.write_text(
-        '{"ehal":{"loxone_push":{"entities":["consumer:trockner","consumer:waermepumpe"]}}}',
-        encoding="utf-8",
-    )
-    assert src.get_push_entities() == frozenset(
-        {"consumer:trockner", "consumer:waermepumpe"}
-    )
+    assert src.source_for_merker("Earnie_Trockner") == "push"
+    assert src.source_for_merker("Earnie_Netz") == "push"
+    assert src.source_for_merker("Unknown_Merker") == "poll"
 
 
-def test_fetch_uses_push_when_entity_switched(
+def test_fetch_uses_push_for_all_indexed(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
@@ -128,23 +122,46 @@ def test_fetch_uses_push_when_entity_switched(
     now = datetime.now(timezone.utc)
     inbox.record_push("heartbeat", "1", now=now)
     inbox.record_push("consumer.trockner.sens_power_act", "1.5", now=now)
+    inbox.record_push("sens_grid_power_active", "2.25", now=now)
     monkeypatch.setattr(
         src,
         "get_merker_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
-    monkeypatch.setattr(src, "get_push_entities", lambda: frozenset({"consumer:trockner"}))
+    monkeypatch.setattr(
+        src,
+        "get_ehal_index",
+        lambda: src.build_ehal_index(HOUSE, COMPONENTS),
+    )
     with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        value = loxone_client.fetch_loxone_generic_value("Earnie_Trockner")
-        assert value == pytest.approx(1.5)
+        assert loxone_client.fetch_loxone_generic_value("Earnie_Trockner") == pytest.approx(
+            1.5
+        )
+        assert loxone_client.fetch_loxone_generic_value("Earnie_Netz") == pytest.approx(
+            2.25
+        )
         raw.assert_not_called()
-        # plant still polls
-        raw.return_value = "2.0 kW"
-        assert loxone_client.fetch_loxone_generic_value("Earnie_Netz") == pytest.approx(2.0)
-        raw.assert_called_once()
 
 
-def test_ready_by_time_uses_push_when_ev_switched(
+def test_fetch_by_ehal_id_without_merker(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    inbox.reset_memory_for_tests()
+    now = datetime.now(timezone.utc)
+    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("sens_grid_power_active", "3.0", now=now)
+    house = {"plant": {"ehal_bindings": {"sens_grid_power_active": ""}}, "profiles": {}}
+    monkeypatch.setattr(src, "get_merker_index", lambda: src.build_merker_index(house, {}))
+    monkeypatch.setattr(src, "get_ehal_index", lambda: src.build_ehal_index(house, {}))
+    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
+        assert loxone_client.fetch_loxone_generic_value(
+            "sens_grid_power_active"
+        ) == pytest.approx(3.0)
+        raw.assert_not_called()
+
+
+def test_ready_by_time_uses_push_numeric(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
@@ -157,25 +174,62 @@ def test_ready_by_time_uses_push_when_ev_switched(
         "get_merker_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
-    monkeypatch.setattr(src, "get_push_entities", lambda: frozenset({"consumer:e_auto"}))
+    monkeypatch.setattr(
+        src,
+        "get_ehal_index",
+        lambda: src.build_ehal_index(HOUSE, COMPONENTS),
+    )
     with patch.object(loxone_client, "_fetch_loxone_io_all") as poll_all:
         got = loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig")
         assert got == pytest.approx(1735689600.0)
         poll_all.assert_not_called()
 
 
-def test_ready_by_time_polls_when_ev_not_switched(
+def test_ready_by_time_push_text_reaches_wecker_parser(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Regression: inbox Tna text → fetch → parse_loxone_ready_by_time."""
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    inbox.reset_memory_for_tests()
+    now = datetime.now(timezone.utc)
+    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("ev.e_auto.get_evcs_ready_by_time", "Morgen, 07:00", now=now)
     monkeypatch.setattr(
         src,
         "get_merker_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
-    monkeypatch.setattr(src, "get_push_entities", lambda: frozenset())
-    with patch.object(loxone_client, "_fetch_loxone_io_all", return_value=None), patch.object(
-        loxone_client, "fetch_loxone_raw_value", return_value="Morgen, 08:00"
+    monkeypatch.setattr(
+        src,
+        "get_ehal_index",
+        lambda: src.build_ehal_index(HOUSE, COMPONENTS),
+    )
+    with patch.object(loxone_client, "_fetch_loxone_io_all") as poll_all:
+        raw = loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig")
+        assert raw == "Morgen, 07:00"
+        poll_all.assert_not_called()
+    from_dt = datetime(2026, 10, 8, 12, 0, 0)
+    assert cs.parse_loxone_ready_by_time(raw, from_dt) == datetime(2026, 10, 9, 7, 0, 0)
+
+
+def test_ready_by_time_no_poll_fallback_when_bound(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    inbox.reset_memory_for_tests()
+    monkeypatch.setattr(
+        src,
+        "get_merker_index",
+        lambda: src.build_merker_index(HOUSE, COMPONENTS),
+    )
+    monkeypatch.setattr(
+        src,
+        "get_ehal_index",
+        lambda: src.build_ehal_index(HOUSE, COMPONENTS),
+    )
+    with patch.object(loxone_client, "_fetch_loxone_io_all") as poll_all, patch.object(
+        loxone_client, "fetch_loxone_raw_value"
     ) as raw:
-        assert loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig") == "Morgen, 08:00"
-        raw.assert_called_once()
+        assert loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig") is None
+        poll_all.assert_not_called()
+        raw.assert_not_called()

@@ -56,7 +56,7 @@
 | `ehal/push_signals.py` | `Signal`, `read_signals_from_docs(house, components)` (bound read fields → qualified ID, VO title `Push_…`), `heartbeat_signal()`. |
 | `runtime_store/loxone_push_inbox.py` | Inbox (`runtime/loxone_push_inbox.json`), `record_push`, `link_alive`, `derive_state` (OK / 0 held / 0 assumed / digital held / unknown …), `expected_repeat_s` (`EARNIE_PILOT_PUSH_REPEAT_S`, default 30). |
 | `integrations/loxone_request_http.py` | Daemon HTTP on 8541: endpoint `GET /ehal/loxone/telemetry/<ID>/<value>`; **off** while `EARNIE_PILOT_PUSH_TOKEN` is unset; the token comes as header `X-Earnie-Token`, as **address prefix** `/t/<token>` before the path (device address `http://host:8541/t/<token>`, command without `?t=`; added in the later commit) or as `?t=` (checked in this order, the first one present must match); accepts only `sens_` / `get_` IDs and `heartbeat`. |
-| `ui/loxone_push_inbox_ui.py` | EHAL-Com section "Push-Inbox": derived state, link, expected signals from the bindings, comparison with the poll value. |
+| ~~`ui/loxone_push_inbox_ui.py`~~ | Removed after push-only cleanup (2026-10-08); Live-Lesen Quelle remains. |
 | `scripts/pilot_vo_template_gen.py` | Generates `VO_Pilot_*.xml` from the bindings of a config (`--config-dir`, `--host`, `--port`, `--env-file` / placeholder token, `--out-dir`). Digital: On `…/1`, Off `…/0`; analog: no Off. Option `--token-in-address` puts the token into the VO device address instead of every command (later commit). |
 | `scripts/pilot_vo_capture.py` | Small listener that shows what a VO really sends. |
 | `share/loxone/templates/VirtualIn|VirtualOut/*.xml` | Repo templates in the Config export structure. |

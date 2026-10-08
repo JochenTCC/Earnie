@@ -70,12 +70,6 @@ def render() -> None:
 
     render_loxone_debug_block()
 
-    if backend == BACKEND_LOXONE:
-        from ui.loxone_push_inbox_ui import render_push_inbox_section
-
-        with st.expander("Push-Inbox (Pilot: Virtual-Output-Push)", expanded=True):
-            render_push_inbox_section()
-
     if backend == BACKEND_HA:
         from ui.ehal_ha_mapping import render_ehal_ha_mapping_section
 

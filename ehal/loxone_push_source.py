@@ -1,12 +1,11 @@
-"""Per-entity push vs poll source switch for the Loxone VO push migration.
+"""Push vs poll source for Loxone VO telemetry (push-only for pushable fields).
 
-Config: ``ehal.loxone_push.entities`` — list of entity keys that read from the
-push inbox instead of Merker poll. Keys: ``plant``, ``battery:<id>``,
-``consumer:<id>``. Default (missing/empty) = all poll.
+Pushable ``sens_*`` / ``get_*`` always read from the inbox. Meter ``*_energy``
+via ``/all`` stays on poll. Legacy ``ehal.loxone_push.entities`` is ignored
+(tolerated in config for one release).
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
@@ -23,7 +22,7 @@ _ENERGY_KIND_SUFFIX = "_energy"
 
 @dataclass(frozen=True)
 class MerkerBinding:
-    """One Merker name mapped to a pushable EHAL ID and its entity key."""
+    """One pushable EHAL ID, optionally still keyed by a legacy Merker name."""
 
     merker: str
     ehal_id: str
@@ -32,7 +31,7 @@ class MerkerBinding:
 
 
 def entity_key(entity_kind: str, entity_id: str) -> str:
-    """Stable config key for the source switch (``plant``, ``battery:…``, ``consumer:…``)."""
+    """Stable entity key (``plant``, ``battery:…``, ``consumer:…``)."""
     kind = str(entity_kind or "").strip()
     eid = str(entity_id or "").strip()
     if kind == "plant":
@@ -45,7 +44,7 @@ def entity_key(entity_kind: str, entity_id: str) -> str:
 
 
 def parse_push_entities(raw: object) -> frozenset[str]:
-    """Parse ``ehal.loxone_push.entities`` into a frozenset of entity keys."""
+    """Deprecated: parse legacy ``ehal.loxone_push.entities`` (ignored at runtime)."""
     if not isinstance(raw, list):
         return frozenset()
     keys: set[str] = set()
@@ -57,20 +56,9 @@ def parse_push_entities(raw: object) -> frozenset[str]:
 
 
 def load_push_entities_from_config(raw_config: dict | None = None) -> frozenset[str]:
-    """Read push entity keys from a config dict or the live ``config.json``."""
-    if raw_config is None:
-        from runtime_store.persist_paths import resolve_config_json_path
-
-        path = resolve_config_json_path()
-        try:
-            with open(path, encoding="utf-8") as handle:
-                raw_config = json.load(handle)
-        except (OSError, json.JSONDecodeError, TypeError):
-            raw_config = {}
-    ehal = raw_config.get("ehal") if isinstance(raw_config, dict) else None
-    push = ehal.get("loxone_push") if isinstance(ehal, dict) else None
-    entities = push.get("entities") if isinstance(push, dict) else None
-    return parse_push_entities(entities)
+    """Deprecated: always empty — push is the default for pushable fields."""
+    del raw_config
+    return frozenset()
 
 
 def is_pushable_kind(kind: str) -> bool:
@@ -84,7 +72,10 @@ def is_pushable_kind(kind: str) -> bool:
 
 
 def merker_bindings_from_docs(house: dict, components: dict) -> list[MerkerBinding]:
-    """All pushable Merker → EHAL ID bindings from saved house/components docs."""
+    """All pushable field bindings from saved house/components docs.
+
+    Merker name may be empty (push-only read via qualified EHAL ID).
+    """
     out: list[MerkerBinding] = []
     entries: list[tuple[str, str, str, str, str]] = []
     for field, name in ((house.get("plant") or {}).get("ehal_bindings") or {}).items():
@@ -102,15 +93,14 @@ def merker_bindings_from_docs(house: dict, components: dict) -> list[MerkerBindi
             entries.append(("battery", bid, "", str(field), str(name)))
 
     for kind, eid, ctype, field, name in entries:
-        merker = str(name or "").strip()
-        if not merker or not is_pushable_kind(field):
+        if not is_pushable_kind(field):
             continue
         ehal_id = pilot_id(kind, eid, field, ctype)
         if ehal_id is None:
             continue
         out.append(
             MerkerBinding(
-                merker=merker,
+                merker=str(name or "").strip(),
                 ehal_id=ehal_id,
                 entity_key=entity_key(kind, eid),
                 kind=field_kind(field),
@@ -122,26 +112,35 @@ def merker_bindings_from_docs(house: dict, components: dict) -> list[MerkerBindi
 def build_merker_index(
     house: dict, components: dict
 ) -> dict[str, MerkerBinding]:
-    """``{merker_name: MerkerBinding}`` (last wins on duplicate Merker names)."""
+    """``{merker_name: MerkerBinding}`` for non-empty Merker names (last wins)."""
     index: dict[str, MerkerBinding] = {}
     for binding in merker_bindings_from_docs(house, components):
-        index[binding.merker] = binding
+        if binding.merker:
+            index[binding.merker] = binding
+    return index
+
+
+def build_ehal_index(
+    house: dict, components: dict
+) -> dict[str, MerkerBinding]:
+    """``{ehal_id: MerkerBinding}`` for every pushable binding (last wins)."""
+    index: dict[str, MerkerBinding] = {}
+    for binding in merker_bindings_from_docs(house, components):
+        index[binding.ehal_id] = binding
     return index
 
 
 _index_cache: dict[str, MerkerBinding] | None = None
-_push_entities_cache: frozenset[str] | None = None
+_ehal_index_cache: dict[str, MerkerBinding] | None = None
 _index_mtime_key: tuple[float, float] | None = None
-_push_entities_mtime: float | None = None
 
 
 def clear_source_caches() -> None:
     """Reset lazy caches (tests / after config reload)."""
-    global _index_cache, _push_entities_cache, _index_mtime_key, _push_entities_mtime
+    global _index_cache, _ehal_index_cache, _index_mtime_key
     _index_cache = None
-    _push_entities_cache = None
+    _ehal_index_cache = None
     _index_mtime_key = None
-    _push_entities_mtime = None
 
 
 def _file_mtime(path: str) -> float:
@@ -149,12 +148,6 @@ def _file_mtime(path: str) -> float:
         return os.path.getmtime(path)
     except OSError:
         return -1.0
-
-
-def _config_mtime() -> float:
-    from runtime_store.persist_paths import resolve_config_json_path
-
-    return _file_mtime(resolve_config_json_path())
 
 
 def _house_components_mtime_key() -> tuple[float, float]:
@@ -182,78 +175,89 @@ def _load_house_components() -> tuple[dict, dict]:
     return house if isinstance(house, dict) else {}, components if isinstance(components, dict) else {}
 
 
-def get_merker_index() -> dict[str, MerkerBinding]:
-    global _index_cache, _index_mtime_key
+def _ensure_indexes() -> None:
+    global _index_cache, _ehal_index_cache, _index_mtime_key
     mtime_key = _house_components_mtime_key()
-    if _index_cache is not None and _index_mtime_key != mtime_key:
-        _index_cache = None
-    if _index_cache is None:
-        try:
-            house, components = _load_house_components()
-            _index_cache = build_merker_index(house, components)
-            _index_mtime_key = mtime_key
-        except Exception:  # noqa: BLE001 — poll path must keep working
-            logger.exception("loxone push: failed to build Merker index")
-            _index_cache = {}
-            _index_mtime_key = mtime_key
+    if (
+        _index_cache is not None
+        and _ehal_index_cache is not None
+        and _index_mtime_key == mtime_key
+    ):
+        return
+    try:
+        house, components = _load_house_components()
+        _index_cache = build_merker_index(house, components)
+        _ehal_index_cache = build_ehal_index(house, components)
+        _index_mtime_key = mtime_key
+    except Exception:  # noqa: BLE001 — read path must keep working
+        logger.exception("loxone push: failed to build binding indexes")
+        _index_cache = {}
+        _ehal_index_cache = {}
+        _index_mtime_key = mtime_key
+
+
+def get_merker_index() -> dict[str, MerkerBinding]:
+    _ensure_indexes()
+    assert _index_cache is not None
     return _index_cache
 
 
+def get_ehal_index() -> dict[str, MerkerBinding]:
+    _ensure_indexes()
+    assert _ehal_index_cache is not None
+    return _ehal_index_cache
+
+
+def resolve_push_binding(io_or_ehal: str) -> MerkerBinding | None:
+    """Look up a pushable binding by Merker name or qualified/bare EHAL ID."""
+    name = str(io_or_ehal or "").strip()
+    if not name:
+        return None
+    binding = get_merker_index().get(name)
+    if binding is not None:
+        return binding
+    return get_ehal_index().get(name)
+
+
 def get_push_entities() -> frozenset[str]:
-    global _push_entities_cache, _push_entities_mtime
-    mtime = _config_mtime()
-    if _push_entities_cache is not None and _push_entities_mtime != mtime:
-        _push_entities_cache = None
-    if _push_entities_cache is None:
-        try:
-            _push_entities_cache = load_push_entities_from_config()
-            _push_entities_mtime = mtime
-        except Exception:  # noqa: BLE001
-            logger.exception("loxone push: failed to load push entities")
-            _push_entities_cache = frozenset()
-            _push_entities_mtime = mtime
-    return _push_entities_cache
+    """Deprecated: always empty (push is unconditional for pushable fields)."""
+    return frozenset()
 
 
 def source_for_merker(merker: str) -> str:
-    """Return ``push`` or ``poll`` for a Merker name (AlarmClock/energy always poll)."""
-    name = str(merker or "").strip()
-    if not name:
-        return "poll"
-    binding = get_merker_index().get(name)
+    """Return ``push`` for indexed pushable Merkers, else ``poll``."""
+    binding = resolve_push_binding(merker)
     if binding is None:
         return "poll"
-    if binding.entity_key in get_push_entities():
+    return "push" if is_pushable_kind(binding.kind) else "poll"
+
+
+def source_for_entity_key(key: str) -> str:
+    """Entity keys are always push once the migration is complete."""
+    return "push" if str(key or "").strip() else "poll"
+
+
+def source_for_ehal_id(ehal_id: str) -> str:
+    """``push`` for heartbeat and pushable IDs; ``poll`` for energy / unknown empty."""
+    eid = str(ehal_id or "").strip()
+    if not eid:
+        return "poll"
+    if eid == "heartbeat":
+        return "push"
+    kind = field_kind(eid)
+    if kind.endswith(_ENERGY_KIND_SUFFIX):
+        return "poll"
+    if is_pushable_kind(kind):
+        return "push"
+    binding = get_ehal_index().get(eid)
+    if binding is not None and is_pushable_kind(binding.kind):
         return "push"
     return "poll"
 
 
-def source_for_entity_key(key: str) -> str:
-    return "push" if str(key or "").strip() in get_push_entities() else "poll"
-
-
-def source_for_ehal_id(ehal_id: str) -> str:
-    """``push`` / ``poll`` for a qualified or bare EHAL ID (UI)."""
-    eid = str(ehal_id or "").strip()
-    if not eid:
-        return "poll"
-    # Heartbeat is a synthetic VO link probe — always push, never an entity switch.
-    if eid == "heartbeat":
-        return "push"
-    for binding in get_merker_index().values():
-        if binding.ehal_id == eid:
-            return source_for_entity_key(binding.entity_key)
-    if "." not in eid:
-        return source_for_entity_key("plant")
-    namespace, _, rest = eid.partition(".")
-    slug, _, _ = rest.partition(".")
-    if namespace == "ess":
-        return source_for_entity_key(f"battery:{slug}")
-    return source_for_entity_key(f"consumer:{slug}")
-
-
 def any_push_entities() -> bool:
-    return bool(get_push_entities())
+    """True when any pushable binding exists (legacy name kept for callers)."""
+    return bool(get_ehal_index())
 
 
 # Re-export for callers that already import pilot_id from push_signals.
@@ -261,9 +265,11 @@ __all__ = [
     "MerkerBinding",
     "NEVER_PUSH_KINDS",
     "any_push_entities",
+    "build_ehal_index",
     "build_merker_index",
     "clear_source_caches",
     "entity_key",
+    "get_ehal_index",
     "get_merker_index",
     "get_push_entities",
     "is_pushable_kind",
@@ -271,6 +277,7 @@ __all__ = [
     "merker_bindings_from_docs",
     "parse_push_entities",
     "pilot_id",
+    "resolve_push_binding",
     "source_for_ehal_id",
     "source_for_entity_key",
     "source_for_merker",

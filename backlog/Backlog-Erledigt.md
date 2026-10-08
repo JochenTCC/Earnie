@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.o — Push-only Loxone read path + cleanup (2026-10-08)
+
+- [x] **2.7.o — Binding push-only read path** (WP1–WP8 + post Phase C cleanup; procedure [`Binding-Push-Only-Conversion.md`](Binding-Push-Only-Conversion.md))
+  - Inbox `read_push_value` / `read_push_ready_by_time`, zero rule + 5 min last-known, start-up wait, EHAL-Com Quelle
+  - Push is unconditional for pushable `sens_*` / `get_*` (`ehal.loxone_push.entities` deprecated/ignored)
+  - No Merker poll fallback for bound push fields; meter `*_energy` / writes / probe / watchdog stay on poll
+  - FertigUm: numeric or fresh Tna text (`Morgen, 07:00`) via inbox → existing `parse_loxone_ready_by_time`
+  - READ Merker optional (EHAL-ID fallback when binding key present); WRITE Merkers required
+  - Removed EHAL-Com **Push-Inbox** UI (`ui/loxone_push_inbox_ui.py`); daemon inbox kept
+  - Docs: `docs/ui/ehal-com.md`, `docs/referenz/loxone-signals.md`
+- [x] Former backlog “Push works for all EHAL values…” checklist (opt-in removal, Wecker path, Merker read strip) folded into this item
+
 ### Powerstation every-cycle set_* writes + Schreibtest full field list (2026-10-07)
 
 - [x] **Physical powerstation Merkers refreshed every optimize cycle** (sticky Loxone state)

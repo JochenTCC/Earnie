@@ -421,7 +421,11 @@ def resolve_plant_binding(
     ehal_field: str,
     config_doc: dict | None = None,
 ) -> str:
-    """Plant Merker from ``plant.ehal_bindings`` plus battery Pattern B ESS (2.7.c)."""
+    """Plant read/write address from ``plant.ehal_bindings`` (+ primary ESS aliases).
+
+    For pushable ``sens_*`` / ``get_*``: Merker if set, else bare EHAL field id when the
+    binding key is present with an empty Merker (push-only). ``set_*`` still need a Merker.
+    """
     field = _nonempty(ehal_field)
     house = house_doc if isinstance(house_doc, dict) else {}
     plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
@@ -429,6 +433,21 @@ def resolve_plant_binding(
     direct = _nonempty(bindings.get(field))
     if direct:
         return direct
+
+    def _push_fallback(source: dict) -> str:
+        if field not in source:
+            return ""
+        try:
+            from ehal.loxone_push_source import is_pushable_kind
+        except Exception:
+            return ""
+        if is_pushable_kind(field):
+            return field
+        return ""
+
+    plant_push = _push_fallback(bindings)
+    if plant_push:
+        return plant_push
     # Merge batteries[].ehal_bindings (ess.{slug}.* → flat aliases for primary)
     try:
         from house_config.components_store import load_components_document
@@ -438,7 +457,10 @@ def resolve_plant_binding(
         components = load_components_document(resolve_components_json_path())
         batteries = components.get("batteries") if isinstance(components, dict) else []
         merged = merge_ess_bindings_into_plant(bindings, batteries if isinstance(batteries, list) else [])
-        return _nonempty(merged.get(field))
+        merker = _nonempty(merged.get(field))
+        if merker:
+            return merker
+        return _push_fallback(merged if isinstance(merged, dict) else {})
     except Exception:
         return ""
 
