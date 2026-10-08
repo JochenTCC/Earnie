@@ -28,7 +28,9 @@ def normalize_for_image_build(raw: str) -> str:
 
 def rewrite_version_file_for_image(path: str | Path = "version.py") -> str:
     """Rewrite only the ``__version__`` assignment in place (keeps helpers)."""
-    file_path = Path(path)
+    file_path = Path(path).resolve()
+    if file_path.name != "version.py":
+        raise ValueError(f"Refusing to rewrite non-version file: {file_path.name}")
     text = file_path.read_text(encoding="utf-8")
     match = re.search(
         r"""(__version__\s*=\s*['"])([^'"]+)(['"])""",

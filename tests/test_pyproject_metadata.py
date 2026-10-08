@@ -4,6 +4,8 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+import pytest
+
 from version import (
     __version__,
     display_version,
@@ -55,3 +57,12 @@ def test_rewrite_version_file_for_image_preserves_helpers(tmp_path):
     text = target.read_text(encoding="utf-8")
     assert '__version__ = "2.6.0-alpha.7"' in text
     assert "def display_version()" in text
+
+
+def test_rewrite_version_file_for_image_rejects_other_filenames(tmp_path):
+    target = tmp_path / "other.py"
+    content = '__version__ = "1.0.0-dev.1"' + chr(10)
+    target.write_text(content, encoding="utf-8")
+    with pytest.raises(ValueError):
+        rewrite_version_file_for_image(target)
+    assert target.read_text(encoding="utf-8") == content
