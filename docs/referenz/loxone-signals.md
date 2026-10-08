@@ -26,9 +26,9 @@ In the docs, the canonical template/import path is called **Default** (formerly 
 
 Earnie Core writes and reads the same Merker names on the Miniserver. The library adds the **Loxone-side** HTTP mirroring and enables an **Earnie-dead** fallback in Config (see below).
 
-**Virtual Inputs** = Earnie→Loxone (`set_*` / enables / setpoints, heartbeat) via `GET http://<Earnie>:8541/ehal/loxone/status.json` (daemon HTTP; `heartbeat_ts` = Unix now, setpoints from the last `loxone_sent`).
+**Virtual Inputs** = Earnie→Loxone (`set_*` / enables / setpoints, heartbeat) via `GET http://<Earnie>:8541/ehal/loxone/status.json` (daemon HTTP; `heartbeat_ts` = Unix now; setpoints from the publish ledger / `loxone_sent`). After **2.7.q Q5**, Loud writes are **push-only** (no `/dev/sps/io/<Merker>/<value>` for cycle setpoints). Dual-emit of legacy Check keys remains until Q8.
 
-**Virtual Outputs** = optional Loxone→Earnie push of `sens_*` / `get_*` / flex power (placeholder URLs). Core still writes/reads `/jdev/sps/io/{name}`.
+**Virtual Outputs** = Loxone→Earnie push of `sens_*` / `get_*` / flex power (qualified path IDs). Core reads those fields from the push inbox.
 
 **Enable Cmds (0/1) must be analog:** the VI templates have `Analog="true"` set. In Config, do **not** select "as digital input" / digital mode — otherwise the input briefly pulses to `1` on **every** poll, even when `status.json` permanently returns `0`. Sticky 0/1 only comes from the `\v` value in analog mode.
 
@@ -43,6 +43,10 @@ Earnie Core writes and reads the same Merker names on the Miniserver. The librar
 
 
 `{hk_id}` / `{ev_id}` = house profile entity `id` (snake_case). Templates leave the placeholders in place — replace them in Config.
+
+**Dual-emit (2.7.q q.B → Q8):** `status.json` emits the legacy Check keys above **and** the qualified EHAL IDs next to them (`consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable`, `pool.{slug}.set_enable`, `evcs.{slug}.set_evcs_max_current` / `set_evcs_mode`; plant bare fields and powerstation `ess.{id}.set_*` stay as today). Prefer qualified Checks (Q5); legacy Checks remain valid until dual-emit is removed (Q8).
+
+**VI v2 + Pilot (2.7.q q.C):** Library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (Titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen: `python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …` → `VI_Pilot_*.xml`. VO Pilot titles come from the qualified ID (`Push_<id>` with dots → `_`): `python -m scripts.pilot_vo_template_gen …`. See [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Q5 write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Q5.
 
 ---
 
@@ -61,13 +65,15 @@ Copy only the `.xml` files (not `README.md`, and don't nest a whole folder tree 
 Source: `share/loxone/templates/VirtualIn/`
 
 
-| File                      | Content (short)                     |
-| ------------------------- | ------------------------------------ |
-| `VI_Earnie_Plant.xml`     | Heartbeat + ESS design-C1 setpoints |
-| `VI_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Freigabe`       |
-| `VI_Earnie_EV.xml`        | EV target current / mode            |
-| `VI_Earnie_Consumer.xml`  | generic enable + target_kW          |
-| `VI_Earnie_Pool.xml`      | pool / filter enable                |
+| File | Content (short) |
+| ---- | --------------- |
+| `VI_Earnie_Plant.xml` / `_v2.xml` | Heartbeat + ESS design-C1 (legacy Merker Titles / v2 field-name Titles) |
+| `VI_Earnie_Heatpump.xml` / `_v2.xml` | Legacy Freigabe / `heatpump.{hk_id}.set_enable` |
+| `VI_Earnie_EV.xml` / `_v2.xml` | Legacy `ev.*.Earnie_EAuto_*` / `evcs.*.set_evcs_*` |
+| `VI_Earnie_Consumer.xml` / `_v2.xml` | Legacy flex Freigabe / `consumer.{hk_id}.set_enable` |
+| `VI_Earnie_Pool.xml` / `_v2.xml` | Legacy bare Freigaben / `pool.*.set_enable` |
+
+Prefer **v2** for new wiring; keep legacy for Q5 rollback. Config-specific: generate `VI_Pilot_*.xml` (see above).
 
 
 Target folder (one of the existing Config paths; create the folder if needed):
@@ -142,7 +148,7 @@ Goal: if Earnie is unreachable or the Virtual In is no longer being updated, the
 Recommended approach (logic blocks in Config, no Earnie code):
 
 1. **Watchdog** on `Earnie_Heartbeat` (Unix timestamp from `VI_Earnie_Plant`): age = now − heartbeat (or "value unchanged for x seconds").
-2. Choose a threshold (e.g. 2–3× the Virtual In polling time, typically ≥ 90 s at a 30 s poll).
+2. Choose a threshold (e.g. 2–3× the Virtual In polling time, typically ≥ 30 s at a 10 s poll).
 3. When the **dead-man fallback is triggered**:
    - Set `Earnie_Steuerbefehl` / ESS mode locally to **automatic** (`0`) or the plant's safe ESS rules
    - Set flex **enables** (`Earnie_*_Freigabe`) to `0` (blocked) or known emergency logic

@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v2 (2.7.q Q4): Check = evcs.{ev_id}.set_evcs_*. Replace {ev_id}.
+  Legacy: VI_Earnie_EV.xml (ev.{ev_id}.Earnie_EAuto_*).
+-->
+<VirtualInHttp HintText="" Title="Earnie EV v2" Comment="Pattern B: EV setpoints from Earnie (qualified)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="10">
+	<Info templateType="2" minVersion="17010630"/>
+	<VirtualInHttpCmd Title="evcs.{ev_id}.set_evcs_max_current" Comment="evcs.{ev_id}.set_evcs_max_current A" Check="&quot;evcs.{ev_id}.set_evcs_max_current&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="32" DestValHigh="32" DefVal="0" MinVal="0" MaxVal="63" Unit="&lt;v&gt; A" HintText=""/>
+	<VirtualInHttpCmd Title="evcs.{ev_id}.set_evcs_mode" Comment="evcs.{ev_id}.set_evcs_mode off=0 pv=1 now=2" Check="&quot;evcs.{ev_id}.set_evcs_mode&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="10" DestValHigh="10" DefVal="0" MinVal="0" MaxVal="10" Unit="&lt;v&gt;" HintText=""/>
+</VirtualInHttp>

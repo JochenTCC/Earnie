@@ -62,6 +62,8 @@ def test_ev_template_includes_fertigum_ready_by_time() -> None:
 
 # --- Virtual Input templates (structure of VI_Earnie_Plant_Real.xml, exported by Config 2026-10-07) ---
 _VI_DIR = _DIR.parent / "VirtualIn"
+_VI_LEGACY = sorted(p for p in _VI_DIR.glob("VI_Earnie_*.xml") if "_v2" not in p.name)
+_VI_V2 = sorted(_VI_DIR.glob("VI_Earnie_*_v2.xml"))
 _VI_FILES = sorted(_VI_DIR.glob("VI_Earnie_*.xml"))
 _VI_ROOT_ATTRS = ["HintText", "Title", "Comment", "Address", "PollingTime"]
 _VI_CMD_ATTRS = [
@@ -71,7 +73,9 @@ _VI_CMD_ATTRS = [
 
 
 def test_vi_templates_found() -> None:
-    assert len(_VI_FILES) == 5
+    assert len(_VI_LEGACY) == 5
+    assert len(_VI_V2) == 5
+    assert len(_VI_FILES) == 10
 
 
 @pytest.mark.parametrize("path", _VI_FILES, ids=lambda p: p.name)
@@ -88,3 +92,34 @@ def test_vi_export_structure(path: Path) -> None:
         assert list(cmd.attrib) == _VI_CMD_ATTRS, cmd.get("Title")
         # A Virtual Input extracts the value with the escape (unlike a Virtual Output command).
         assert cmd.get("Check", "").endswith(chr(58) + _BACKSLASH_V), cmd.get("Title")
+
+
+def test_vi_v2_checks_use_qualified_keys() -> None:
+    """v2 library templates must not use legacy Merker Check keys."""
+    legacy_check_frags = (
+        "Earnie_Verbraucher_Freigabe",
+        "Earnie_Waermepumpe_Freigabe",
+        "Earnie_EAuto_Soll_A",
+        "Earnie_Pool_Freigabe",
+    )
+    for path in _VI_V2:
+        for cmd in _parse(path):
+            if cmd.tag != "VirtualInHttpCmd":
+                continue
+            check = cmd.get("Check") or ""
+            for frag in legacy_check_frags:
+                assert frag not in check, (path.name, check)
+    consumer = (_VI_DIR / "VI_Earnie_Consumer_v2.xml").read_bytes().decode("utf-8-sig")
+    assert "consumer.{hk_id}.set_enable" in consumer
+    ev = (_VI_DIR / "VI_Earnie_EV_v2.xml").read_bytes().decode("utf-8-sig")
+    assert "evcs.{ev_id}.set_evcs_max_current" in ev
+    assert "evcs.{ev_id}.set_evcs_mode" in ev
+    pool = (_VI_DIR / "VI_Earnie_Pool_v2.xml").read_bytes().decode("utf-8-sig")
+    assert "pool.pool_filter.set_enable" in pool
+
+
+def test_vi_legacy_checks_unchanged() -> None:
+    consumer = (_VI_DIR / "VI_Earnie_Consumer.xml").read_bytes().decode("utf-8-sig")
+    assert "flex.{hk_id}.Earnie_Verbraucher_Freigabe" in consumer
+    ev = (_VI_DIR / "VI_Earnie_EV.xml").read_bytes().decode("utf-8-sig")
+    assert "ev.{ev_id}.Earnie_EAuto_Soll_A" in ev

@@ -9,6 +9,7 @@ import pytest
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from integrations import loxone_watchdog as wd
+from integrations.loxone_comm_trace import LoxoneWriteRecord
 
 
 class TestExpectedSnapshotFromRunState:
@@ -49,11 +50,11 @@ class TestVerifyAndRestore:
             wd.loxone_client, "fetch_loxone_generic_value", return_value=2.02
         ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch.object(
             wd.config, "get", return_value=""
-        ), patch.object(wd.loxone_client, "send_loxone_value") as mock_send:
+        ), patch.object(wd, "_restore_via_publish") as mock_restore:
             mismatches = wd.verify_and_restore_loxone_states(expected)
 
         assert mismatches == []
-        mock_send.assert_not_called()
+        mock_restore.assert_not_called()
 
     def test_corrects_charge_power_outside_tolerance(self):
         expected = {"Earnie_Ziel_LadeLeistung": 2.0}
@@ -63,14 +64,14 @@ class TestVerifyAndRestore:
             wd.config, "get", side_effect=lambda name, **kw: {
                 "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
             }.get(name, "")
-        ), patch.object(wd.loxone_client, "send_loxone_value", return_value=True) as mock_send:
+        ), patch.object(wd, "_restore_via_publish", return_value=True) as mock_restore:
             mismatches = wd.verify_and_restore_loxone_states(expected)
 
         assert len(mismatches) == 1
         assert mismatches[0].expected == 2.0
         assert mismatches[0].actual == 1.8
         assert mismatches[0].corrected is True
-        mock_send.assert_called_once_with("Earnie_Ziel_LadeLeistung", 2.0)
+        mock_restore.assert_called_once_with("Earnie_Ziel_LadeLeistung", 2.0)
 
     def test_read_failure_is_reported_without_send(self):
         expected = {"Earnie_Steuerbefehl": 1.0}
@@ -80,10 +81,26 @@ class TestVerifyAndRestore:
             wd.config, "get", side_effect=lambda name, **kw: {
                 "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
             }.get(name, "")
-        ), patch.object(wd.loxone_client, "send_loxone_value") as mock_send:
+        ), patch.object(wd, "_restore_via_publish") as mock_restore:
             mismatches = wd.verify_and_restore_loxone_states(expected)
 
         assert len(mismatches) == 1
         assert mismatches[0].read_failed is True
         assert mismatches[0].corrected is False
-        mock_send.assert_not_called()
+        mock_restore.assert_not_called()
+
+    def test_restore_via_publish_uses_io_index(self):
+        fake = LoxoneWriteRecord(
+            "Earnie_Ziel_LadeLeistung", 2.0, True, "2026-10-08T12:00:00"
+        )
+        with patch(
+            "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
+            return_value={"Earnie_Ziel_LadeLeistung": "set_ess_charge_power_limit"},
+        ), patch(
+            "integrations.loxone_writes._publish_setpoint_traced", return_value=fake
+        ) as mock_pub:
+            ok = wd._restore_via_publish("Earnie_Ziel_LadeLeistung", 2.0)
+        assert ok is True
+        mock_pub.assert_called_once_with(
+            "set_ess_charge_power_limit", 2.0, io_name="Earnie_Ziel_LadeLeistung"
+        )

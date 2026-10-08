@@ -214,7 +214,7 @@ Covers heating + filter. Two live entities: heat (`daily_target_source: thermal`
 | Native filter duration          | Input value   | `get_filter_native_duration_hours`             |         |      |         | `Earnie_Pool_Filter_NativeDauer`                                    |
 
 
-Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.1). The chart may subtract filter power via `subtract_consumer_ids` (not an EHAL field). Pattern B: `VI_Earnie_Pool` (enables), `VO_Earnie_Pool` (telemetry). **VI check** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (same as title); `status.json` reads the same keys from the written enable title.
+Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.1). The chart may subtract filter power via `subtract_consumer_ids` (not an EHAL field). Pattern B: `VI_Earnie_Pool` (enables), `VO_Earnie_Pool` (telemetry). **VI check (legacy)** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (same as title). **VI v2 / Pilot (2.7.q q.C):** Check keys = qualified IDs (`pool.{slug}.set_enable`, `pool.pool_filter.set_enable`, …); library `VI_Earnie_*_v2.xml` or `python -m scripts.pilot_vi_template_gen`. **Dual-emit (2.7.q q.B):** `status.json` emits legacy keys and qualified peers side by side until cutover.
 
 **EHAL-Com mapping:** filter fields (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native start/duration, enable) are mapped on the house-profile consumer `pool_filter` under `ehal_bindings`. Without `pool_filter` there is no filter MILP and no synthetic filter entity. Without a mapping, the filter stays inactive.
 
@@ -356,6 +356,33 @@ Silent mode: `runtime/local_settings.json` → `"silent_mode"` (legacy: `"loxone
 2. **Live Read:** `sens_`* / `get_`* with status **OK**
 3. **Live Write:** all `set_`* entries **success = yes** (disable silent mode first)
 4. **Cockpit / Sankey:** setpoints match live values ([Charts & Panels](charts.md))
+
+### Q5 — Write push-only (2.7.q q.D)
+
+Loud writes publish only to `status.json` (qualified EHAL IDs). The Miniserver VI polls every **10 s**. Dual-emit of legacy Check keys stays until Q8 so you can roll Checks back without redeploying Earnie.
+
+**Preconditions**
+
+1. Loud dual-run build was green (publish + former Merker HTTP).
+2. Regenerate Pilot VIs: `python -m scripts.pilot_vi_template_gen --config-dir <config> --host <Earnie-LAN-IP> --port 8541 --out-dir <dir>`.
+3. In Config: each write actuator is driven by the **VirtualInHttpCmd** (same object as the old Merker title).
+
+**Stage VI Checks** (rising risk; keep dual-emit; observe ≥24 h per stage, day+night for EV/PS):
+
+| Stage | Group | Pilot / v2 file (home plant example) |
+| ----- | ----- | ------------------------------------ |
+| 1 | Consumers `consumer.*.set_enable` | `VI_Pilot_*` / `VI_Earnie_Consumer_v2` (if any) |
+| 2 | Heat pump `heatpump.*.set_enable` | `VI_Pilot_Waermepumpe.xml` |
+| 3 | Pool / filter `pool.*.set_enable` | `VI_Pilot_Pool.xml` — keep **Analog** |
+| 4 | Plant C1 + export + heartbeat | `VI_Pilot_Plant.xml`, `VI_Pilot_Heartbeat.xml`, house-battery Pilot |
+| 5 | EV `evcs.*.set_evcs_*` | `VI_Pilot_EV.xml` — accept ≤10 s latency |
+| 6 | Powerstations `ess.{id}.set_*` | `VI_Pilot_Batterie_*.xml` — accept ≤10 s latency |
+
+Per stage: switch Check to the qualified key → confirm `status.json` has the key → VI value updates within one poll → Live Write / callback `ts` advances. Rollback = restore legacy Check while dual-emit still emits it.
+
+**After all stages:** deploy the Q5 Earnie build (no Merker HTTP on Loud cycle). Confirm actuators follow VI within ≤10 s; no `/dev/sps/io/…` setpoint traffic for ESS/flex/PS. Observe ≥24 h.
+
+**Accepted (q.D open points):** VI poll latency up to ~10 s for EV current and per-cycle powerstation writes; Freigabe Cmds stay Analog (sticky `\v`, no digital pulse on every poll).
 
 
 

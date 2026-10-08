@@ -524,8 +524,8 @@ def _loxone_ps_wire_value(kind: str, value_w: float) -> float:
 
 
 def _write_powerstation_loxone(fields: dict[str, float]) -> list:
-    from integrations import loxone_client
     from integrations.loxone_comm_trace import LoxoneWriteRecord
+    from integrations.loxone_writes import _publish_setpoint_traced
 
     records: list[LoxoneWriteRecord] = []
     missing: list[str] = []
@@ -539,8 +539,11 @@ def _write_powerstation_loxone(fields: dict[str, float]) -> list:
             missing.append(field_key)
             continue
         send_val = _loxone_ps_wire_value(kind, float(value_w))
-        _last_powerstation_sent[_status_key(field_key, kind)] = send_val
-        records.append(loxone_client._send_loxone_value_traced(marker, send_val))
+        status_key = _status_key(field_key, kind)
+        _last_powerstation_sent[status_key] = send_val
+        records.append(
+            _publish_setpoint_traced(status_key, send_val, io_name=marker)
+        )
     if missing:
         _persist_ps_write_error(
             adapter_id="loxone",

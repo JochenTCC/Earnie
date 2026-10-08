@@ -36,6 +36,15 @@ def test_ascii_title() -> None:
     assert gen.ascii_title("   ") == "Push_unbenannt"
 
 
+def test_title_from_qualified_id() -> None:
+    from ehal.push_signals import title_from_qualified_id
+
+    assert title_from_qualified_id("consumer.trockner.sens_power_act") == (
+        "Push_consumer_trockner_sens_power_act"
+    )
+    assert title_from_qualified_id("sens_grid_power_active") == "Push_sens_grid_power_active"
+
+
 def _config(tmp_path: Path) -> Path:
     cfg = tmp_path / "config"
     cfg.mkdir(exist_ok=True)
@@ -85,10 +94,13 @@ def test_collect_only_reads_and_valid_ids(tmp_path: Path) -> None:
     assert signals["sens_absent_mode"].digital
     assert signals["evcs.e_auto.sens_evcs_connected"].digital
     assert not signals["sens_grid_power_active"].digital
-    assert signals["consumer.trockner.sens_power_act"].title == "Push_Zaehler_Trockner"
+    assert signals["consumer.trockner.sens_power_act"].title == "Push_consumer_trockner_sens_power_act"
+    assert signals["consumer.trockner.sens_power_act"].old_name == "Zähler Trockner"
     assert signals["consumer.trockner.sens_power_act"].group == "Verbraucher"
     assert signals["pool.pool_swimspa.sens_temperature_water"].group == "Pool"
     assert signals["ev.e_auto.sens_evcs_soc_act"].group == "EV"
+    assert signals["sens_grid_power_active"].title == "Push_sens_grid_power_active"
+    assert signals["sens_absent_mode"].title == "Push_sens_absent_mode"
 
 
 # Attribute order of a Cmd as exported by Loxone Config (2026-10-07, analog / digital).
@@ -115,8 +127,8 @@ def test_template_matches_the_loxone_config_export_shape(tmp_path: Path) -> None
     info, *cmds = list(root)
     assert info.tag == "Info" and info.attrib == {"templateType": "3", "minVersion": "17010630"}
     by_title = {c.get("Title"): c for c in cmds}
-    assert list(by_title["Push_Earnie_Netzleistung"].attrib) == ANALOG_ATTRS
-    assert list(by_title["Push_Earnie_Abwesend"].attrib) == DIGITAL_ATTRS
+    assert list(by_title["Push_sens_grid_power_active"].attrib) == ANALOG_ATTRS
+    assert list(by_title["Push_sens_absent_mode"].attrib) == DIGITAL_ATTRS
     assert "/>" in text and " />" not in text  # self-closing like the export
     assert chr(9) + "<VirtualOutCmd" in text  # tab indent
 
@@ -125,10 +137,10 @@ def test_template_values_placeholder_repeat_and_digital(tmp_path: Path) -> None:
     text, root = _render_plant(tmp_path)
     assert "&lt;v&gt;" in text and "<v>" not in text
     cmds = {c.get("Title"): c for c in root if c.tag == "VirtualOutCmd"}
-    analog = cmds["Push_Earnie_Netzleistung"]
+    analog = cmds["Push_sens_grid_power_active"]
     assert analog.get("CmdOn") == "/ehal/loxone/telemetry/sens_grid_power_active/<v>?t=abcd1234efgh"
     assert (analog.get("Analog"), analog.get("Repeat"), analog.get("RepeatRate")) == ("true", "10", "10")
-    digital = cmds["Push_Earnie_Abwesend"]
+    digital = cmds["Push_sens_absent_mode"]
     assert digital.get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1?t=abcd1234efgh"
     assert digital.get("CmdOff") == "/ehal/loxone/telemetry/sens_absent_mode/0?t=abcd1234efgh"
     assert digital.get("Analog") == "false"
@@ -188,9 +200,9 @@ def test_token_in_address_moves_the_token_out_of_the_commands(tmp_path: Path) ->
         assert "abcd1234efgh" not in (cmd.get("CmdOn") or "") + (cmd.get("CmdOff") or "")
         assert "?t=" not in (cmd.get("CmdOn") or "")
     by_title = {c.get("Title"): c for c in cmds}
-    assert by_title["Push_Earnie_Netzleistung"].get("CmdOn") == "/ehal/loxone/telemetry/sens_grid_power_active/<v>"
-    assert by_title["Push_Earnie_Abwesend"].get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1"
-    assert by_title["Push_Earnie_Abwesend"].get("CmdOff") == "/ehal/loxone/telemetry/sens_absent_mode/0"
+    assert by_title["Push_sens_grid_power_active"].get("CmdOn") == "/ehal/loxone/telemetry/sens_grid_power_active/<v>"
+    assert by_title["Push_sens_absent_mode"].get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1"
+    assert by_title["Push_sens_absent_mode"].get("CmdOff") == "/ehal/loxone/telemetry/sens_absent_mode/0"
 
 
 def test_default_keeps_the_token_in_every_command(tmp_path: Path) -> None:

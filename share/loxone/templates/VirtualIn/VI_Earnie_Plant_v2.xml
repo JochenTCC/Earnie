@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v2 (2.7.q Q4): Check keys unchanged (already bare / qualified-shaped). Titles = field names.
+  Replace EARNIE_HOST. For multi-storage add Cmds with Check "ess.{slug}.set_*":\v.
+  Legacy Merker Titles: VI_Earnie_Plant.xml.
+-->
+<VirtualInHttp HintText="" Title="Earnie Plant Status v2" Comment="Pattern B: heartbeat + ESS C1 setpoints (qualified titles)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="10">
+	<Info templateType="2" minVersion="17010630"/>
+	<VirtualInHttpCmd Title="heartbeat_ts" Comment="Unix timestamp; watchdog if stale" Check="&quot;heartbeat_ts&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v&gt;" HintText=""/>
+	<VirtualInHttpCmd Title="set_ess_active_power" Comment="set_ess_active_power (kW; +discharge -charge; omit on Automatik)" Check="&quot;set_ess_active_power&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v.3&gt; kW" HintText=""/>
+	<VirtualInHttpCmd Title="set_ess_charge_power_limit" Comment="set_ess_charge_power_limit (kW true max charge cap)" Check="&quot;set_ess_charge_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v.3&gt; kW" HintText=""/>
+	<VirtualInHttpCmd Title="set_ess_discharge_power_limit" Comment="set_ess_discharge_power_limit (kW true max discharge cap)" Check="&quot;set_ess_discharge_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v.3&gt; kW" HintText=""/>
+	<VirtualInHttpCmd Title="set_ess_mode" Comment="set_ess_mode sticky; 0=Automatik" Check="&quot;set_ess_mode&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v&gt;" HintText=""/>
+	<VirtualInHttpCmd Title="set_ess_source_select" Comment="set_ess_source_select (2.7.h); 0=grid 1=battery island" Check="&quot;set_ess_source_select&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1" Unit="&lt;v&gt;" HintText=""/>
+	<VirtualInHttpCmd Title="set_grid_export_power_limit" Comment="set_grid_export_power_limit (kW; DefVal 1000 until first write)" Check="&quot;set_grid_export_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="1000" MinVal="-2147483647" MaxVal="2147483647" Unit="&lt;v.3&gt; kW" HintText=""/>
+</VirtualInHttp>

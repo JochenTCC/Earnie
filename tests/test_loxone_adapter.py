@@ -14,6 +14,22 @@ from integrations.loxone_adapter import (
     ehal_limit_w_to_loxone_kw,
     loxone_battery_kw_to_ehal_w,
 )
+from integrations.loxone_comm_trace import LoxoneWriteRecord
+
+
+def _pub_ok(qid, value, *, io_name=""):
+    return LoxoneWriteRecord(io_name or qid, float(value), True, "t")
+
+
+def _pub_fail(qid, value, *, io_name=""):
+    return LoxoneWriteRecord(io_name or qid, float(value), False, "t")
+
+
+def _pub_io_value_calls(mock) -> set[tuple[str, float]]:
+    return {
+        (str(c.kwargs.get("io_name") or ""), float(c.args[1]))
+        for c in mock.call_args_list
+    }
 
 
 def _cfg(**kwargs) -> LoxoneConfig:
@@ -90,12 +106,11 @@ def test_read_telemetry_inbound_export_limit(fetch_mock, raw, expected_w):
     assert telemetry.get("get_grid_export_power_limit") == expected_w
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_export_limit_magnitude_kw(send_mock):
-    send_mock.return_value = True
+@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
+def test_write_setpoints_export_limit_magnitude_kw(pub_mock):
     adapter = LoxoneAdapter(_cfg(grid_export_limit_out_name="ExpOut"))
     for limit_w, expected_kw in ((0.0, 0.0), (4200.0, 4.2), (1_000_000.0, 1000.0)):
-        send_mock.reset_mock()
+        pub_mock.reset_mock()
         error = adapter.write_setpoints(
             {
                 "schema_version": EHAL_SCHEMA_VERSION,
@@ -105,7 +120,9 @@ def test_write_setpoints_export_limit_magnitude_kw(send_mock):
             }
         )
         assert error is None
-        send_mock.assert_called_once_with("ExpOut", expected_kw)
+        pub_mock.assert_called_once_with(
+            "set_grid_export_power_limit", expected_kw, io_name="ExpOut"
+        )
 
 
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
@@ -115,9 +132,8 @@ def test_read_telemetry_missing_raises(fetch_mock):
         LoxoneAdapter(_cfg()).read_telemetry()
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_ess_kw(send_mock):
-    send_mock.return_value = True
+@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
+def test_write_setpoints_ess_kw(pub_mock):
     adapter = LoxoneAdapter(_cfg())
     error = adapter.write_setpoints(
         {
@@ -130,16 +146,15 @@ def test_write_setpoints_ess_kw(send_mock):
         }
     )
     assert error is None
-    assert send_mock.call_count == 3
-    calls = {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
+    assert pub_mock.call_count == 3
+    calls = _pub_io_value_calls(pub_mock)
     assert ("Active", -1.5) in calls
     assert ("Charge", 1.5) in calls
     assert ("Discharge", 2.0) in calls
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_evcs_and_mode(send_mock):
-    send_mock.return_value = True
+@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
+def test_write_setpoints_evcs_and_mode(pub_mock):
     adapter = LoxoneAdapter(
         _cfg(
             control_cmd_name="Cmd",
@@ -158,16 +173,15 @@ def test_write_setpoints_evcs_and_mode(send_mock):
         }
     )
     assert error is None
-    calls = {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
+    calls = _pub_io_value_calls(pub_mock)
     assert ("Cmd", 2.0) in calls
     assert ("EV_A", 16.0) in calls
     assert ("EV_Modus", 1.0) in calls
     assert not [name for name, _ in calls if name in ("PVF", "NOW")]
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_evcs_mode_off(send_mock):
-    send_mock.return_value = True
+@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
+def test_write_setpoints_evcs_mode_off(pub_mock):
     adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A", evcs_mode_name="EV_Modus"))
     error = adapter.write_setpoints(
         {
@@ -178,13 +192,11 @@ def test_write_setpoints_evcs_mode_off(send_mock):
         }
     )
     assert error is None
-    calls = {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
-    assert ("EV_Modus", 0.0) in calls
+    assert ("EV_Modus", 0.0) in _pub_io_value_calls(pub_mock)
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_evcs_mode_now_encodes_two(send_mock):
-    send_mock.return_value = True
+@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
+def test_write_setpoints_evcs_mode_now_encodes_two(pub_mock):
     adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A", evcs_mode_name="EV_Modus"))
     error = adapter.write_setpoints(
         {
@@ -195,13 +207,12 @@ def test_write_setpoints_evcs_mode_now_encodes_two(send_mock):
         }
     )
     assert error is None
-    assert ("EV_Modus", 2.0) in {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
+    assert ("EV_Modus", 2.0) in _pub_io_value_calls(pub_mock)
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_evcs_mode_skipped_without_mode_marker(send_mock):
+@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
+def test_write_setpoints_evcs_mode_skipped_without_mode_marker(pub_mock):
     """Unmapped mode marker: not written and not a live-trace row; current stays usable."""
-    send_mock.return_value = True
     adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A"))
     error = adapter.write_setpoints(
         {
@@ -215,12 +226,11 @@ def test_write_setpoints_evcs_mode_skipped_without_mode_marker(send_mock):
     assert error is None
     assert adapter.last_skipped_fields() == []
     assert adapter.capabilities()["supports_evcs_current"] is True
-    assert ("EV_A", 10.0) in {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
+    assert ("EV_A", 10.0) in _pub_io_value_calls(pub_mock)
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_ess_mode_skipped_without_cmd_marker(send_mock):
-    send_mock.return_value = True
+@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)
+def test_write_setpoints_ess_mode_skipped_without_cmd_marker(pub_mock):
     adapter = LoxoneAdapter(_cfg(control_cmd_name=""))
     error = adapter.write_setpoints(
         {
@@ -232,12 +242,11 @@ def test_write_setpoints_ess_mode_skipped_without_cmd_marker(send_mock):
     )
     assert error is None
     assert adapter.last_skipped_fields() == []
-    send_mock.assert_not_called()
+    pub_mock.assert_not_called()
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_write_setpoints_degrades_on_failure(send_mock):
-    send_mock.return_value = False
+@patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_fail)
+def test_write_setpoints_degrades_on_failure(pub_mock):
     adapter = LoxoneAdapter(_cfg())
     error = adapter.write_setpoints(
         {

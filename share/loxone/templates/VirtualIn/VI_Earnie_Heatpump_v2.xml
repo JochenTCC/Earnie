@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v2 (2.7.q Q4): Check = heatpump.{hk_id}.set_enable. Replace {hk_id}.
+  Legacy: VI_Earnie_Heatpump.xml (flex.{hk_id}.Earnie_Waermepumpe_Freigabe).
+-->
+<VirtualInHttp HintText="" Title="Earnie Waermepumpe v2" Comment="Pattern B: heatpump Freigabe from Earnie" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="10">
+	<Info templateType="2" minVersion="17010630"/>
+	<VirtualInHttpCmd Title="heatpump.{hk_id}.set_enable" Comment="heatpump.{hk_id}.set_enable 0/1 sticky" Check="&quot;heatpump.{hk_id}.set_enable&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1" Unit="&lt;v&gt;" HintText=""/>
+</VirtualInHttp>

@@ -39,8 +39,47 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
     return _impl(consumer)
 
 
+def _publish_setpoint_traced(
+    qualified_id: str,
+    value: float,
+    *,
+    io_name: str = "",
+) -> LoxoneWriteRecord:
+    """Publish a setpoint into the status.json ledger (2.7.q Q5; no Merker HTTP)."""
+    from integrations.ehal_write import write_field
+    from runtime_store.shadow.writes import block_write_if_shadow
+
+    written_at = datetime.now().isoformat(timespec="seconds")
+    qid = str(qualified_id or "").strip()
+    display = str(io_name or qid or "").strip()
+    if not qid:
+        return LoxoneWriteRecord(
+            io_name=display, value=float(value), success=False, written_at=written_at
+        )
+
+    if block_write_if_shadow(
+        backend="loxone",
+        target=display or qid,
+        value=float(value),
+        source="loxone_writes",
+    ):
+        return LoxoneWriteRecord(
+            io_name=display, value=float(value), success=False, written_at=written_at
+        )
+
+    pub = write_field(qid, float(value))
+    if pub.published:
+        print(f"   ↳ EHAL publish: {qid} = {value}")
+    return LoxoneWriteRecord(
+        io_name=display,
+        value=float(value),
+        success=bool(pub.published),
+        written_at=written_at,
+    )
+
+
 def _send_loxone_value_traced(input_name: str, value: float) -> LoxoneWriteRecord:
-    """Sendet einen Steuerwert und liefert Erfolg plus Zeitstempel."""
+    """Legacy Merker HTTP write (watchdog / adapter only; not the Loud cycle path)."""
     from integrations import loxone_client as lc
     from runtime_store.shadow.writes import block_write_if_shadow
 
@@ -322,6 +361,40 @@ def _flexible_consumer_output_values(
     )
 
 
+def _publish_flexible_consumer_outputs(
+    consumer: dict, values: dict[str, float]
+) -> list[LoxoneWriteRecord]:
+    """Publish qualified IDs for flex/EV outputs (2.7.q Q5 push-only)."""
+    from ehal.qualified_ids import qualified_consumer_id
+    from integrations.ehal_debug_mapping import _consumer_type_for_qualified_id
+
+    records: list[LoxoneWriteRecord] = []
+    cid = str(consumer.get("id") or "").strip()
+    if not cid or not values:
+        return records
+    ctype = _consumer_type_for_qualified_id(consumer)
+    current = marker_set_evcs_max_current(consumer)
+    mode = marker_set_evcs_mode(consumer)
+    enable = marker_flex_enable(consumer)
+    for io_name, value in values.items():
+        name = str(io_name or "").strip()
+        if not name:
+            continue
+        if current and name == current:
+            kind = "set_evcs_max_current"
+        elif mode and name == mode:
+            kind = "set_evcs_mode"
+        elif enable and name == enable:
+            kind = "set_enable"
+        else:
+            continue
+        qid = qualified_consumer_id(cid, ctype, kind)
+        records.append(
+            _publish_setpoint_traced(qid, float(value), io_name=name)
+        )
+    return records
+
+
 def _write_flexible_consumer_output(
     consumer: dict,
     consumer_powers: dict[str, float],
@@ -331,14 +404,13 @@ def _write_flexible_consumer_output(
     *,
     send: bool,
 ) -> list[LoxoneWriteRecord]:
-    """Schreibt Freigabe/Strom-Sollwert/Modus an Loxone und/oder in den Snapshot."""
+    """Publishes Freigabe/Strom-Sollwert/Modus via status.json and/or snapshot."""
     values = _flexible_consumer_output_values(
         consumer, consumer_powers, charging_contexts, consumer_pv_follow
     )
     records: list[LoxoneWriteRecord] = []
     if send:
-        for io_name, value in values.items():
-            records.append(_send_loxone_value_traced(io_name, value))
+        records.extend(_publish_flexible_consumer_outputs(consumer, values))
     if snapshot is not None:
         snapshot.update(values)
     return records
@@ -471,6 +543,9 @@ def send_huawei_modbus_states(
 
     records: list[LoxoneWriteRecord] = []
     active_name = lc.config.get("LOXONE_TARGET_ACTIVE_POWER_NAME")
+    from integrations.ehal_debug_mapping import build_loxone_setpoint_io_index
+
+    io_to_field = build_loxone_setpoint_io_index()
 
     for cfg_name, value in (
         (active_name, active_kw),
@@ -481,13 +556,21 @@ def send_huawei_modbus_states(
         if not cfg_name:
             continue
         if value is None:
-            # Sticky Merker: still refresh Sollleistung with 0 under Automatik/Entladesperre.
+            # Sticky VI: still refresh Sollleistung with 0 under Automatik/Entladesperre.
             if cfg_name != active_name:
                 continue
             send_value = 0.0
         else:
             send_value = float(value)
-        records.append(lc._send_loxone_value_traced(str(cfg_name), send_value))
+        field = str(io_to_field.get(str(cfg_name)) or "").strip()
+        if not field:
+            logger.warning(
+                "ESS C1: no EHAL field for Merker %s — skip publish", cfg_name
+            )
+            continue
+        records.append(
+            _publish_setpoint_traced(field, send_value, io_name=str(cfg_name))
+        )
 
     if export_cap_kw is not _OMIT_EXPORT_CAP:
         from house_config.ehal_bindings import resolve_plant_binding
@@ -502,14 +585,16 @@ def send_huawei_modbus_states(
         )
         if export_marker:
             cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
+            export_val = float(
+                export_limit_setpoint_kw(
+                    cap, unconstrained_kw=live_unconstrained_export_kw()
+                )
+            )
             records.append(
-                lc._send_loxone_value_traced(
-                    str(export_marker),
-                    float(
-                        export_limit_setpoint_kw(
-                            cap, unconstrained_kw=live_unconstrained_export_kw()
-                        )
-                    ),
+                _publish_setpoint_traced(
+                    "set_grid_export_power_limit",
+                    export_val,
+                    io_name=str(export_marker),
                 )
             )
     return records

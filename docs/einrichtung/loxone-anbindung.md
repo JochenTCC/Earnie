@@ -1,6 +1,6 @@
 # Loxone-Anbindung
 
-Earnie kommuniziert mit dem Loxone Miniserver über **HTTP** (Lesen und Schreiben von Werten). Die konkrete Schaltlogik in Loxone (Wechselrichter (Batteriespeicher), Wallbox, Pool, ...) liegt außerhalb von Earnie — der Optimizer liefert Sollwerte und Freigaben.
+Earnie kommuniziert mit dem Loxone Miniserver über **HTTP**: Telemetrie kommt per VO-Push in die Inbox; Sollwerte und Freigaben liegen in `status.json` und werden vom Miniserver per Virtual Input (poll ~10 s) gelesen (2.7.q Q5). Die konkrete Schaltlogik in Loxone (Wechselrichter, Wallbox, Pool, …) liegt außerhalb von Earnie.
 
 Andere Hubs (HA+evcc, OpenEMS): [Smarthome-Backend wählen](smarthome-backend-wahl.md).
 
@@ -95,11 +95,11 @@ Die Verbindung kann auch bequem über die Web-Oberfläche auf der Seite **Smarth
 ```
 Loxone Miniserver                    Earnie
 ─────────────────                    ────────────────
-Merker (SOC, Leistung, PV)    ──►   main.py liest
+Telemetrie (VO push / Inbox)  ──►   main.py liest
 E-Auto-Status, Flex-Leistung  ──►   Optimierung (MILP)
                                      │
-Virtuelle Eingänge (Soll)     ◄──   main.py schreibt
-Freigaben (0/1)               ◄──   alle 15 Minuten
+Virtuelle Eingänge (VI)       ◄──   status.json (push-only, Q5)
+  poll ~10 s, qualified Checks ◄──   Freigaben / ESS / EV-Soll
 ```
 
-Die Streamlit-App liest Live-Werte für Anzeige (Sankey, SOC) und übernimmt die Optimierung aus dem letzten `main.py`-Durchlauf.
+Die Streamlit-App liest Live-Werte für Anzeige (Sankey, SOC) und übernimmt die Optimierung aus dem letzten `main.py`-Durchlauf. Schreibpfad: siehe [EHAL-Com § Q5](../ui/ehal-com.md#q5--write-push-only-27q-qd).

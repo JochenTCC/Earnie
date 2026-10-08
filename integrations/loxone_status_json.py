@@ -174,6 +174,34 @@ def _emit_if_present(
     payload[key] = float(loxone_sent[name])
 
 
+def _status_consumer_type(consumer: Mapping[str, Any]) -> str:
+    """Type for ``qualified_consumer_id`` (prefer stored type; infer EV/pool)."""
+    ctype = str(consumer.get("type") or "").strip()
+    if ctype:
+        return ctype
+    if _consumer_is_ev(consumer):
+        return "ev"
+    if _consumer_is_pool_filter(consumer) or _consumer_is_pool_heat(consumer):
+        return "thermal_rc"
+    return ""
+
+
+def _emit_qualified_peer(
+    payload: dict[str, float],
+    consumer: Mapping[str, Any],
+    kind: str,
+    value: float,
+) -> None:
+    """Emit qualified EHAL ID next to a legacy status key (2.7.q Q2)."""
+    from ehal.qualified_ids import qualified_consumer_id
+
+    cid = str(consumer.get("id") or "").strip()
+    if not cid:
+        return
+    qid = qualified_consumer_id(cid, _status_consumer_type(consumer), kind)
+    payload[qid] = float(value)
+
+
 def _consumer_status_keys(
     loxone_sent: Mapping[str, float],
     consumers: Sequence[Mapping[str, Any]],
@@ -187,18 +215,28 @@ def _consumer_status_keys(
             continue
         as_dict = dict(consumer)
         if _consumer_is_ev(as_dict):
+            legacy_a = f"ev.{cid}.Earnie_EAuto_Soll_A"
+            legacy_mode = f"ev.{cid}.Earnie_EAuto_Modus"
             _emit_if_present(
                 payload,
                 loxone_sent,
                 marker_set_evcs_max_current(as_dict),
-                f"ev.{cid}.Earnie_EAuto_Soll_A",
+                legacy_a,
             )
             _emit_if_present(
                 payload,
                 loxone_sent,
                 marker_set_evcs_mode(as_dict),
-                f"ev.{cid}.Earnie_EAuto_Modus",
+                legacy_mode,
             )
+            if legacy_a in payload:
+                _emit_qualified_peer(
+                    payload, as_dict, "set_evcs_max_current", payload[legacy_a]
+                )
+            if legacy_mode in payload:
+                _emit_qualified_peer(
+                    payload, as_dict, "set_evcs_mode", payload[legacy_mode]
+                )
             continue
 
         enable = marker_flex_enable(as_dict)
@@ -207,15 +245,78 @@ def _consumer_status_keys(
             value = _sent_enable_value(loxone_sent, enable, enable_key)
             if value is not None:
                 payload[enable_key] = value
+                _emit_qualified_peer(payload, as_dict, "set_enable", value)
     return payload
 
 
 def _pool_keys_from_snapshot(loxone_sent: Mapping[str, float]) -> dict[str, float]:
-    return {
-        key: float(loxone_sent[key])
-        for key in POOL_ENABLE_KEYS
-        if key in loxone_sent
-    }
+    """Legacy bare pool titles; filter also gets ``pool.pool_filter.set_enable``."""
+    from ehal.qualified_ids import POOL_FILTER_ID, qualified_consumer_id
+
+    out: dict[str, float] = {}
+    for key in POOL_ENABLE_KEYS:
+        if key not in loxone_sent:
+            continue
+        value = float(loxone_sent[key])
+        out[key] = value
+        if key == POOL_FILTER_ENABLE_KEY:
+            out[qualified_consumer_id(POOL_FILTER_ID, "thermal_rc", "set_enable")] = (
+                value
+            )
+    return out
+
+
+def _legacy_peer_for_qualified(
+    qid: str,
+    consumers: Sequence[Mapping[str, Any]],
+) -> str | None:
+    """Legacy status.json key for a published qualified ID (dual-run)."""
+    from ehal.flex_fields import flex_ehal_slug
+    from ehal.qualified_ids import field_kind
+
+    parts = str(qid or "").split(".")
+    if len(parts) < 3:
+        return None
+    ns, slug, kind = parts[0], parts[1], field_kind(qid)
+    for consumer in consumers:
+        if not isinstance(consumer, Mapping):
+            continue
+        cid = str(consumer.get("id") or "").strip()
+        if not cid or flex_ehal_slug(cid) != slug:
+            continue
+        as_dict = dict(consumer)
+        if kind in ("set_evcs_max_current", "set_evcs_mode") and _consumer_is_ev(
+            as_dict
+        ):
+            if kind == "set_evcs_max_current":
+                return f"ev.{cid}.Earnie_EAuto_Soll_A"
+            return f"ev.{cid}.Earnie_EAuto_Modus"
+        if kind == "set_enable":
+            enable = marker_flex_enable(as_dict)
+            return _flex_enable_status_key(cid, enable, as_dict)
+    if ns == "pool" and slug == "pool_filter" and kind == "set_enable":
+        return POOL_FILTER_ENABLE_KEY
+    return None
+
+
+def _merge_published_into_payload(
+    payload: dict[str, float | int],
+    consumers: Sequence[Mapping[str, Any]],
+) -> None:
+    """Overlay ``write_field`` ledger; dual-emit legacy peers when known."""
+    try:
+        from integrations.ehal_write import load_published
+    except Exception:  # noqa: BLE001
+        return
+    try:
+        published = load_published()
+    except Exception:  # noqa: BLE001
+        return
+    for qid, value in published.items():
+        payload[qid] = float(value)
+        legacy = _legacy_peer_for_qualified(qid, consumers)
+        if legacy:
+            payload[legacy] = float(value)
 
 
 def build_loxone_status_payload(
@@ -270,4 +371,5 @@ def build_loxone_status_payload(
     payload.update(_consumer_status_keys(sent, live_consumers))
     for key, value in _pool_keys_from_snapshot(sent).items():
         payload.setdefault(key, value)
+    _merge_published_into_payload(payload, live_consumers)
     return payload

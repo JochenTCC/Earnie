@@ -249,7 +249,7 @@ def test_write_standby_source_selects_loxone_marker():
     ), patch(
         "optimizer.live_export_limit.load_house_doc", return_value={}
     ), patch(
-        "integrations.loxone_client._send_loxone_value_traced"
+        "integrations.loxone_writes._publish_setpoint_traced"
     ) as send:
         send.return_value = MagicMock(success=True)
         psl.write_standby_source_selects({"delta3": 1})
@@ -318,7 +318,7 @@ def test_loxone_charge_does_not_use_plant_merker():
     ), patch(
         "integrations.ehal_live.persist_write_error", side_effect=persisted.append
     ), patch(
-        "integrations.loxone_client._send_loxone_value_traced"
+        "integrations.loxone_writes._publish_setpoint_traced"
     ) as send:
         send.return_value = MagicMock(success=True)
         psl.write_physical_powerstation_charges({"delta3": 1.0})
@@ -358,14 +358,15 @@ def test_loxone_charge_only_when_discharge_unmapped():
     ), patch(
         "integrations.ehal_live.persist_write_error", side_effect=persisted.append
     ), patch(
-        "integrations.loxone_client._send_loxone_value_traced"
+        "integrations.loxone_writes._publish_setpoint_traced"
     ) as send:
         send.return_value = MagicMock(success=True)
         psl.write_physical_powerstation_charges({slug: 1.5})
 
     send.assert_called_once()
-    assert send.call_args[0][0] == "PS_Charge_Limit"
+    assert send.call_args[0][0] == ess_field(slug, "set_ess_charge_power_limit")
     assert send.call_args[0][1] == pytest.approx(1.5)
+    assert send.call_args.kwargs.get("io_name") == "PS_Charge_Limit"
     assert persisted == []
     sent = psl.last_powerstation_sent()
     # Pattern-B key per powerstation; the flat key belongs to the house battery.
@@ -447,6 +448,7 @@ def test_cycle_standby_source_selects_defaults_grid_when_bound():
 
 def test_cycle_writes_idle_zero_charge_to_loxone():
     """Every-cycle path sends charge 0 when no reserve/standby charge."""
+    from ehal.ess_fields import ess_field
     from optimizer import powerstation_live as psl
 
     slug = "ecoflow_delta_3"
@@ -470,15 +472,16 @@ def test_cycle_writes_idle_zero_charge_to_loxone():
     ), patch(
         "integrations.ehal_live.is_ehal_network_backend", return_value=False
     ), patch(
-        "integrations.loxone_client._send_loxone_value_traced"
+        "integrations.loxone_writes._publish_setpoint_traced"
     ) as send:
         send.return_value = MagicMock(success=True)
         charges = psl.cycle_powerstation_charge_kw({}, {})
         psl.write_physical_powerstation_charges(charges)
 
     send.assert_called_once()
-    assert send.call_args[0][0] == "PS_Charge"
+    assert send.call_args[0][0] == ess_field(slug, "set_ess_charge_power_limit")
     assert send.call_args[0][1] == pytest.approx(0.0)
+    assert send.call_args.kwargs.get("io_name") == "PS_Charge"
 
 
 def test_build_cycle_powerstation_fields_all_mapped_setpoints():
@@ -541,10 +544,10 @@ def test_write_cycle_powerstation_setpoints_returns_records():
     ), patch(
         "integrations.ehal_live.is_ehal_network_backend", return_value=False
     ), patch(
-        "integrations.loxone_client._send_loxone_value_traced"
+        "integrations.loxone_writes._publish_setpoint_traced"
     ) as send:
-        send.side_effect = lambda name, val: LoxoneWriteRecord(
-            name, float(val), True, "2026-10-07T10:00:00"
+        send.side_effect = lambda qid, val, *, io_name="": LoxoneWriteRecord(
+            io_name or qid, float(val), True, "2026-10-07T10:00:00"
         )
         records = psl.write_cycle_powerstation_setpoints({slug: 0.0}, {})
 

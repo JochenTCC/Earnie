@@ -249,7 +249,9 @@ class LoxoneAdapter:
             self._skip("set_ess_mode")
         elif "set_ess_mode" in doc:
             ok, msg = self._try_marker_write(
-                self.cfg.control_cmd_name, float(doc["set_ess_mode"])
+                self.cfg.control_cmd_name,
+                float(doc["set_ess_mode"]),
+                field="set_ess_mode",
             )
             if not ok:
                 failed.append("set_ess_mode")
@@ -261,7 +263,9 @@ class LoxoneAdapter:
             else:
                 select_val = 1.0 if float(doc["set_ess_source_select"]) >= 0.5 else 0.0
                 ok, msg = self._try_marker_write(
-                    self.cfg.ess_source_select_name, select_val
+                    self.cfg.ess_source_select_name,
+                    select_val,
+                    field="set_ess_source_select",
                 )
                 if not ok:
                     failed.append("set_ess_source_select")
@@ -297,6 +301,7 @@ class LoxoneAdapter:
             ok, msg = self._try_marker_write(
                 self.cfg.active_power_name,
                 ehal_active_power_w_to_loxone_kw(doc["set_ess_active_power"]),
+                field="set_ess_active_power",
             )
             if not ok:
                 failed.append("set_ess_active_power")
@@ -306,6 +311,7 @@ class LoxoneAdapter:
             ok, msg = self._try_marker_write(
                 self.cfg.charge_power_name,
                 ehal_limit_w_to_loxone_kw(doc["set_ess_charge_power_limit"]),
+                field="set_ess_charge_power_limit",
             )
             if not ok:
                 failed.append("set_ess_charge_power_limit")
@@ -315,6 +321,7 @@ class LoxoneAdapter:
             ok, msg = self._try_marker_write(
                 self.cfg.discharge_power_name,
                 ehal_limit_w_to_loxone_kw(doc["set_ess_discharge_power_limit"]),
+                field="set_ess_discharge_power_limit",
             )
             if not ok:
                 failed.append("set_ess_discharge_power_limit")
@@ -327,6 +334,7 @@ class LoxoneAdapter:
                 ok, msg = self._try_marker_write(
                     self.cfg.grid_export_limit_out_name,
                     ehal_limit_w_to_loxone_kw(doc["set_grid_export_power_limit"]),
+                    field="set_grid_export_power_limit",
                 )
                 if not ok:
                     failed.append("set_grid_export_power_limit")
@@ -346,6 +354,7 @@ class LoxoneAdapter:
             ok, msg = self._try_marker_write(
                 self.cfg.evcs_max_current_name,
                 float(doc["set_evcs_max_current"]),
+                field="set_evcs_max_current",
             )
             if not ok:
                 failed.append("set_evcs_max_current")
@@ -362,13 +371,17 @@ class LoxoneAdapter:
         return flip
 
     def _try_evcs_mode_write(self, mode: str) -> tuple[bool, str]:
-        """Write the ``set_evcs_mode`` Modus Merker (off=0, pv=1, now=2)."""
+        """Publish ``set_evcs_mode`` (off=0, pv=1, now=2) via status.json."""
         mode_l = str(mode or "").strip().lower()
         if mode_l not in EVCS_MODE_VALUES:
             return False, f"Unsupported set_evcs_mode: {mode!r}"
         if not self.cfg.evcs_mode_name:
             return False, "No set_evcs_mode marker configured"
-        return self._try_marker_write(self.cfg.evcs_mode_name, EVCS_MODE_VALUES[mode_l])
+        return self._try_marker_write(
+            self.cfg.evcs_mode_name,
+            EVCS_MODE_VALUES[mode_l],
+            field="set_evcs_mode",
+        )
 
     def _read_or_derive_consumers(self, pv_w: float, grid_w: float, ess_w: float) -> float:
         marker = str(self.cfg.consumers_power_name or "").strip()
@@ -387,26 +400,34 @@ class LoxoneAdapter:
             raise LoxoneAdapterError(f"Loxone marker read failed for {field} ({marker})")
         return float(value)
 
-    def _try_marker_write(self, marker_name: str, value: float) -> tuple[bool, str]:
+    def _try_marker_write(
+        self, marker_name: str, value: float, *, field: str = ""
+    ) -> tuple[bool, str]:
+        """Publish setpoint via status.json (2.7.q Q5); Merker name is display/activation only."""
+        from integrations.loxone_writes import _publish_setpoint_traced
+
         marker = str(marker_name or "").strip()
+        qid = str(field or "").strip()
         if not marker:
             return False, "Loxone write marker name is empty"
+        if not qid:
+            return False, "EHAL field empty for Loxone publish"
         try:
-            ok = loxone_client.send_loxone_value(marker, float(value))
+            rec = _publish_setpoint_traced(qid, float(value), io_name=marker)
         except (OSError, ValueError, TypeError) as exc:
             logger.warning(
-                "Loxone write failed adapter_id=%s marker=%s: %s",
+                "Loxone publish failed adapter_id=%s field=%s: %s",
                 self.cfg.adapter_id,
-                marker,
+                qid,
                 exc,
             )
             return False, str(exc)
-        if not ok:
-            msg = f"Loxone POST failed for marker {marker}"
+        if not rec.success:
+            msg = f"Loxone publish failed for {qid}"
             logger.warning(
-                "Loxone write failed adapter_id=%s marker=%s",
+                "Loxone publish failed adapter_id=%s field=%s",
                 self.cfg.adapter_id,
-                marker,
+                qid,
             )
             return False, msg
         return True, ""

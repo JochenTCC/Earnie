@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v2 (2.7.q Q4): VI Check keys = qualified EHAL IDs (status.json dual-emit peers).
+  Replace {hk_id} with the consumer Kennung. Analog=true for sticky 0/1 Freigabe.
+  Legacy: VI_Earnie_Consumer.xml (flex.{hk_id}.Earnie_Verbraucher_Freigabe).
+-->
+<VirtualInHttp HintText="" Title="Earnie Generic Consumer v2" Comment="Pattern B: consumer.{hk_id}.set_enable from Earnie" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="10">
+	<Info templateType="2" minVersion="17010630"/>
+	<VirtualInHttpCmd Title="consumer.{hk_id}.set_enable" Comment="consumer.{hk_id}.set_enable 0/1 sticky" Check="&quot;consumer.{hk_id}.set_enable&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1" Unit="&lt;v&gt;" HintText=""/>
+</VirtualInHttp>

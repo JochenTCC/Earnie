@@ -1,8 +1,66 @@
 # EHAL-Com Binding UX — Draft (epic `Binding`)
 
-**Status:** proposal 2026-10-07, not approved. Backlog entry: [Backlog.md](Backlog.md) → *Version 2.+1 - Enhance Auto Binding functionality*. Language: English (backlog rule); UI strings German later.
+**Status:** proposal 2026-10-07; **revised 2026-10-08 (§0 is authoritative; where §1–§8 contradict it, §0 wins)**. Backlog entry: [Backlog.md](Backlog.md) → *Version 2.+1 - Enhance Auto Binding functionality*. Language: English (backlog rule); UI strings German later.
 
 **Terms:** **SB** = smarthome backend (Loxone / Home Assistant / OpenEMS / later MQTT). **EHAL ID** = identifier of a signal on the Earnie side (`ess.ecoflow_delta_3.sens_ess_power`). **SB name** = identifier of the same signal on the SB side (Loxone Merker / VI-VO title, HA `entity_id`). **Kennung** = the entity slug (`ecoflow_delta_3`) that both identifiers embed.
+
+## 0. Revision 2026-10-08 — consequences of push-only
+
+The Loxone read path went push-only (backlog 2.7.o, `backlog/Binding-Push-Only-Conversion.md`) and works. The maintainer then decided:
+
+1. **Writes go push-only too** (backlog **2.7.q**): Earnie publishes `set_*` / enables in `status.json` under their qualified EHAL IDs, the Miniserver VI picks them up. No direct `/dev/sps/io/<name>/<value>` call, no Merker name.
+2. **Meter-energy poll (`/all`) is retired.** Each meter gets a second VO that pushes the total energy next to its power VO (2.7.q Q6). The slot-Ist sampler reads the counter from the inbox; ΔkWh logic stays, no averaging or integration of power is added.
+3. **Principle:** Earnie defines the signals (qualified IDs); the smarthome backend maps them to its own objects (Loxone: the source in the VO command, the target at the VI output; HA: a generated YAML package). Earnie stores no SB names for Loxone.
+4. **Home Assistant: Weg B.** HA uses the same HTTP contract in both directions (HA pushes telemetry with `rest_command`, polls `status.json` for setpoints). Earnie generates the YAML and pre-fills `entity_id`s from today's bindings. The REST pull adapter and the HA mapping chapter stay until parity is proven.
+5. **Kennung rename risk accepted** as not worse than before (the Kennung is now part of the wire address, so a rename needs a matching Loxone change; the P6 report lists the affected addresses).
+
+### 0.1 What stays true
+
+- The EHAL-Com page becomes the **signal contract page**: it shows which EHAL fields Earnie needs (and which function needs them), whether the backend delivers / fetches them (match), and offers the export (Loxone VO / VI templates; HA YAML).
+- Row: qualified EHAL ID · meaning (with entity) · required by · match status · export. Match status is derived at render time, never persisted: Loxone read = last received (age) / never; Loxone write = last fetched by the Miniserver; HA Weg B likewise; legacy HA pull = mapped `entity_id`. Colour always with a symbol.
+- Direction 1 (SB first) and direction 2 (Earnie first) collapse: the contract is always Earnie's; the SB side either already delivers it (green) or gets the export (open). Hybrid installs need no special case.
+- What remains of the SB name: the **Loxone import** (typed entities from Merker / EFM names, `greenfield_device_map.json`, prefix + slug). It creates entities, it no longer writes names into bindings.
+
+### 0.2 Effect on the analysis below
+
+| Item | Status |
+| --- | --- |
+| §1 idea 3 (three-field row with SB name), idea 4 (colours from SB-name existence) | Replaced by the row in §0.1; the SB-name column disappears for Loxone. |
+| §1 idea 5 / §7.3 (how does import learn EHAL IDs) | Answered: the ID arrives in the push; unknown IDs go to a discovery list (P4). No signal-catalog file needed. |
+| §2 bullet "EHAL ID is already inside Loxone … has no receiver" | Outdated: the receiver exists (2.7.o). |
+| F2, F3, F5 (existence needs a scan, state matrix, verification loop) | Largely replaced by "received / fetched" status, which needs no scan. Still relevant for HA pull (legacy) and for the Loxone import. |
+| F6 (VO not functional, `sens_*` export = name checklist only) | Obsolete: VO is the read path, export = VO templates. |
+| F7 (qualified ID before anything else) | Still the foundation (2.7.n-2). |
+| F8, F9 (always-slug suggestions, one naming table both directions) | Obsolete for Loxone reads / writes (no names). The VO title is derived from the qualified ID. Naming grammar only remains for the import. |
+| F10 (HA third field not ours to name) | Replaced by Weg B: the HA side is generated from the contract. |
+| F11 (bound but missing Merker) | Obsolete after 2.7.q. |
+| F12 (export follows need) | Kept: "needed only" from `ehal/functions.py`. |
+| F13 (Kennung rename cascade) | Kept, and more concrete: the report lists Loxone VO / VI addresses and HA package entries that deviate after a rename. |
+| F14 (import of battery / PV / inverter) | Open, unchanged. |
+| F15 (namespace collisions) | Mostly gone (no free-text names). Kennung uniqueness stays. |
+| §4 state table | Replaced by §0.1 match status. |
+| §5 P0–P6 | Re-scoped in the backlog, see §0.3. |
+
+### 0.3 Phases after the revision
+
+| Phase | New scope |
+| --- | --- |
+| P0 | (a) done in the pilot; (b) obsolete; (c) open; (d) obsolete after 2.7.q. |
+| P1 | Qualified ID + parser = **2.7.n-2**. SB-name grammar dropped. |
+| P2 | Signal list + match status; first Loxone slice in **2.7.q Q7**; HA and polish later. |
+| P3 | Export of VO / VI templates ("needed only" / "all"); VI generator in 2.7.q Q4. |
+| P4 | Import preview, did-you-mean for near-miss names, discovery list of unknown incoming IDs. Signal catalog dropped. |
+| P5 | HA Weg B (HTTP contract, backend-neutral receiver `/ehal/telemetry/…`, YAML package pre-filled from bindings, units handled in HA or via a `unit` parameter, add-on can ship the package). Pull adapter and HA mapping chapter retire after parity. |
+| P6 | Kennung as editable variable; rename report lists wire addresses. |
+
+### 0.4 Write path (2.7.q) in one picture
+
+Today: direct `GET /dev/sps/io/<Merker>/<value>` **and** a `status.json` mirror, with mixed keys (plant bare fields, `ess.<id>.set_*`, `ev.<id>.Earnie_EAuto_*`, `flex.<id>.Earnie_*_Freigabe`, bare pool titles). After: only `status.json`, keys = qualified IDs (`evcs.<id>.set_evcs_max_current`, `consumer.<id>.set_enable`, …), legacy keys emitted for one version. A dual-run is idempotent because both paths set the same VI input. Open: VI poll latency (30 s) against the immediate direct write; Schreibtest round trip (read-back through a VO echo); silent / Shadow gating of the `status.json` endpoint.
+
+### 0.5 Not overlooked, but to verify
+
+- `ehal/functions.py::_mapped_fields` counts only non-empty binding values; empty-valued push-only Loxone keys would make functions look unavailable (2.7.q Q8).
+- Schreibtest, `scripts/verify_loxone_setup.py`, the watchdog and the AlarmClock `SpecialState10` poll still use names or polls (2.7.q Q7).
 
 ## 1. Ideas (restated)
 
@@ -36,17 +94,17 @@
 
 **F5 — Direction 2 is not automatically less error-prone.** The error moves into the manual step in Config (renaming, wiring a Merker). Templates make `set_*` exact, but `sens_*` names need a Merker that the user wires to a real source. Needed: verification loop "export → create in Config → probe → yellow turns green" and a drift check.
 
-**F6 — "Input/output of the SB" is ambiguous for Loxone.** A name is (a) a VI cmd title (Earnie → Loxone, `set_*`), (b) a VO cmd title (push, `sens_*` — not functional, see §2), or (c) any existing control / EFM designation / Merker. For `sens_*` the green name is usually (c), not an Earnie-pattern name. Export value is therefore highest for `set_*`; for `sens_*` Earnie can only export a name checklist.
+**[Obsolete, see §0.2]** **F6 — "Input/output of the SB" is ambiguous for Loxone.** A name is (a) a VI cmd title (Earnie → Loxone, `set_*`), (b) a VO cmd title (push, `sens_*` — not functional, see §2), or (c) any existing control / EFM designation / Merker. For `sens_*` the green name is usually (c), not an Earnie-pattern name. Export value is therefore highest for `set_*`; for `sens_*` Earnie can only export a name checklist.
 
 **F7 — The EHAL ID is not uniform (see §2).** It cannot become a first-class column, a template parameter or an import key before one qualified form exists. Fix without migrating storage: a function `qualified_ehal_id(entity, field)` + parser as display / exchange form (plant stays bare; `ess.` / `flex.` unchanged; EV / wallbox / inverter get `evcs.{slug}.` / `inv.{slug}.`), storage keys untouched. `status.json` keeps its old keys as aliases for one release (deployed Loxone VI `Check` patterns reference them).
 
 **F8 — "First instance gets the bare name" contradicts stable suggestions.** `Earnie_Verbraucher_Freigabe` for the first, `…_<Slug>_Freigabe` for the second: adding a second entity changes what the first would be called. New suggestions should always contain the slug; bare names stay recognised on import (legacy).
 
-**F9 — One naming table must serve both directions.** Extend the device map to explicit `{field → name_prefix, tail}` per entity role (including battery, irregular names). Export: `suggest(entity, field)`. Import: `parse(name)`. Property test: `parse(suggest(x)) == x` for every role field. Today these are two code paths with prose in between.
+**[Obsolete for Loxone, see §0.2]** **F9 — One naming table must serve both directions.** Extend the device map to explicit `{field → name_prefix, tail}` per entity role (including battery, irregular names). Export: `suggest(entity, field)`. Import: `parse(name)`. Property test: `parse(suggest(x)) == x` for every role field. Today these are two code paths with prose in between.
 
-**F10 — HA: the third field exists, but is not ours to name.** `entity_id` (plus `friendly_name`, registry `unique_id`) is chosen by the integration → almost always green; yellow only for helper entities (`input_number` / `input_boolean`) for write signals. Direction 1 has no meaning for HA (no EHAL ID lives in HA); the existing propose is the import. Earnie-first for HA overlaps with Add-on 1.0 (MQTT discovery, Earnie-chosen entity ids).
+**[Replaced by Weg B, see §0.2]** **F10 — HA: the third field exists, but is not ours to name.** `entity_id` (plus `friendly_name`, registry `unique_id`) is chosen by the integration → almost always green; yellow only for helper entities (`input_number` / `input_boolean`) for write signals. Direction 1 has no meaning for HA (no EHAL ID lives in HA); the existing propose is the import. Earnie-first for HA overlaps with Add-on 1.0 (MQTT discovery, Earnie-chosen entity ids).
 
-**F11 — Saving a yellow (missing) name.** The "New Merker?" flow already stores names that return 404 ("mapping active anyway"). Runtime behaviour on write/read of a missing Merker is not specified here — check, and make it one clear log line instead of an error each cycle.
+**[Obsolete after 2.7.q, see §0.2]** **F11 — Saving a yellow (missing) name.** The "New Merker?" flow already stores names that return 404 ("mapping active anyway"). Runtime behaviour on write/read of a missing Merker is not specified here — check, and make it one clear log line instead of an error each cycle.
 
 **F12 — Export should follow need, not completeness.** `ehal/functions.py` knows which fields a function needs (unavailable until all are mapped). Offer **minimal** (fields required by enabled functions / `control` level) vs **all**.
 
@@ -56,7 +114,7 @@
 
 **F15 — Namespace collisions.** SB names must be checked against all scanned names (case-insensitive, Loxone matching is case-insensitive in the import) and Kennung uniqueness across entities that share a prefix. `slug_id(existing=…)` guards one list at a time.
 
-## 4. Signal row and sync states
+## 4. Signal row and sync states *(superseded by §0.1)*
 
 One row = qualified EHAL ID · meaning · SB name · state (derived at render time from a scan; never persisted).
 
@@ -71,7 +129,7 @@ One row = qualified EHAL ID · meaning · SB name · state (derived at render ti
 
 User-typed unknown names are yellow too (same state: not in the SB yet, exportable); origin only as tooltip.
 
-## 5. Proposal (epic `Binding`)
+## 5. Proposal (epic `Binding`) *(original; re-scoped in §0.3)*
 
 Order: **P0 → P1 → P2 → P3**; P4 after P1; P6 can start now (builds on the uncommitted `entity_id_lock` work) and should land before **Inverter P2** and the Pool nesting; P5 last. Sizes are rough, not measured.
 
@@ -111,10 +169,12 @@ Order: **P0 → P1 → P2 → P3**; P4 after P1; P6 can start now (builds on the
 | **2.7.m** (archived) | Defined `Earnie_Batterie_<Slug>_…` and per-battery bindings; no generator / parser followed → P1. |
 | **2.7.i** Regression, HouseSim | Fixtures pin ids: rename cascade must keep them valid or re-record; HA golden maps stay valid (propose unchanged). |
 | Bugfix "NAS alpha `ess.15_kwh_speicher_copy_3.*`" | Symptom of dirty ids (uncommitted id-lock work) plus a physical powerstation without own Merker; **P2** red / yellow states make this visible. |
-| **2.7.n** (Backlog.md, Version 2.7) | Slice of this epic for 2.7: stable identifiers (**P1** core, **P6** core, `ev.` / `evcs.` namespaces) plus the generic Loxone read / write path (n-5 / n-6, gated). See §9. |
+| **2.7.n** (Backlog.md, Version 2.7) | Slice of this epic for 2.7: stable identifiers (**P1** core, **P6** core, `ev.` / `evcs.` namespaces) plus the generic Loxone read path (n-5, gated). The write path is **2.7.q**, which runs first. See §0 and §9. |
 | **SB-Identification-Draft** | Only the term "SB"; discovery is independent. |
 
 ## 7. Open decisions
+
+*Revised 2026-10-08: decisions 1 and 3 are obsolete (no saved names, no name checklist). Open now: battery / PV / inverter import (stub vs bind-only), HA unit handling on the wire, activation-flag storage for Loxone fields (see backlog Binding and 2.7.q).*
 
 1. **Saved-but-missing names (F11):** allowed with one warning (as today) vs. not saved until probe finds them. Decide after P0d.
 2. **Import of batteries / PV / inverters (F14):** incomplete stub vs. bind-only. Decide before P4.
@@ -132,6 +192,8 @@ Order: **P0 → P1 → P2 → P3**; P4 after P1; P6 can start now (builds on the
 External development documents (`Entwicklungsplan`, HA add-on docs) are not in this checkout. Loxone Config behaviour (template install, project file format, LoxAPP3 content) is unverified until P0.
 
 ## 9. Slice for 2.7: item 2.7.n
+
+*Revised 2026-10-08: the write half of the generic path (former n-6) moved into **2.7.q** (push-only via `status.json`); n-5 is conversion only. See §0.*
 
 Principle: **freeze the identifiers now, build the tools later.** An identifier that is baked into deployed Loxone configs, VI templates and bindings is hard to change; table, export and import can be added any time.
 

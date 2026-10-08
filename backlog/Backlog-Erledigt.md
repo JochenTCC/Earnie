@@ -2,6 +2,36 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.q q.D / Q5 — Write push-only version cut (2026-10-08)
+
+- [x] **Q5 code — version cut:** Loud cycle, Schreibtest, Loxone adapter, and watchdog restore publish only via `status.json` (`integrations/loxone_writes.py::_publish_setpoint_traced`); no Merker HTTP for setpoints. Dual-emit of legacy Check keys kept until Q8.
+  - Call sites: `send_huawei_modbus_states`, flex/EV outputs, `optimizer/powerstation_live.py`, `integrations/ehal_write_test.py`, `integrations/loxone_adapter.py`, `integrations/loxone_watchdog.py`
+  - Tests: `tests/test_ehal_write.py`, `test_loxone_client.py` (Huawei/flex), `test_powerstation_2_7_h.py`, `test_loxone_watchdog.py`, `test_loxone_adapter.py`, `test_loxone_status_json.py`
+  - Docs: `docs/ui/ehal-com.md` § Q5 staged VI checklist; `docs/referenz/loxone-signals.md`; `docs/einrichtung/loxone-anbindung.md`; `share/loxone/templates/README.md`
+  - Pilot VIs regenerated: `tmp/vi_pilot_out/` from Earnie-env-home config
+  - **Decided:** accept ≤10 s VI poll for EV / powerstation writes; Freigabe stays Analog
+  - **Live dogfood still open:** stage VI Checks + deploy + ≥24 h → [Bugfixes](Backlog-Bugfixes.md) Verifications Pending; remaining ops checkbox in [Backlog.md](Backlog.md) q.D
+
+### 2.7.q q.C — Templates + VI generator Q4 (2026-10-08)
+
+- [x] **q.C / Q4 — Templates + generator:** VI library v2 (`VI_Earnie_*_v2.xml`) with qualified Check keys; keep legacy `VI_Earnie_*.xml` for Q5 rollback; `scripts/pilot_vi_template_gen.py` fills real Kennungen from config (`VI_Pilot_*.xml` + CSV); VO titles from qualified ID (`title_from_qualified_id` / `Push_<id>`); `write_signals_from_docs` + `heartbeat_write_signal` in `ehal/push_signals.py`
+  - Tests: `tests/test_pilot_vi_template_gen.py`, updated `test_pilot_vo_template_gen.py` / `test_loxone_vo_template_shape.py`
+  - Docs: `share/loxone/templates/README.md`, `docs/referenz/loxone-signals.md`, `docs/ui/ehal-com.md`
+
+### 2.7.q q.B — Dual-run write Q2+Q3 (2026-10-08)
+
+- [x] **q.B / Q2 — Key scheme:** `status.json` dual-emits qualified IDs next to legacy keys for one version (`evcs.<slug>.set_evcs_*`, `consumer.` / `heatpump.` / `pool.<slug>.set_enable`; plant bare + powerstation `ess.<id>.set_*` unchanged). Built from `ehal/qualified_ids.py`; title sniffing only for legacy keys
+- [x] **q.B / Q3 — Writer** (former 2.7.n-6): `integrations/ehal_write.py::write_field` publishes ledger (`ehal_published.json` + run_state); wired in `send_huawei_modbus_states`, flex/EV outputs, powerstation Loxone writes, Schreibtest; success = published + Miniserver callback `ts`; direct `/dev/sps/io/…` stays (dual-run)
+  - Tests: `tests/test_ehal_write.py`, dual-emit asserts in `test_loxone_write_characterization.py` / `test_loxone_status_json.py`
+  - Docs: `docs/referenz/loxone-signals.md`, `docs/ui/ehal-com.md`
+
+### 2.7.q q.A — Write-path characterization gate Q1 (2026-10-08)
+
+- [x] **q.A / Q1 — Write characterization** (former write half of 2.7.n-4; gate for 2.7.q dual-run)
+  - Thin pins in `tests/test_loxone_write_characterization.py`: ESS modes (incl. sticky active `0`, asymmetric limits), flex enable + status key shapes, EV current/mode/Sofort, powerstation W→kW + Pattern-B status keys (house flat untouched), frozen legacy `status.json` payload snapshot
+  - Minimal silent/Shadow: Shadow does not start status.json listener; silent still serves planned `loxone_sent` (characterized as known risk)
+  - **Deferred** (Shadow future undecided): Shadow would-write old-vs-new; silent publish gate so planned status.json values never actuate
+
 ### 2.7.p — Virtual powerstation consumer-start release (2026-10-08)
 
 - [x] **2.7.p — Virtual powerstation consumer-start release**

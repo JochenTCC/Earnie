@@ -73,10 +73,26 @@ def _values_match(expected: float, actual: float, tolerance: float) -> bool:
     return abs(expected - actual) <= tolerance
 
 
+def _restore_via_publish(io_name: str, expected_value: float) -> bool:
+    """Re-publish setpoint (2.7.q Q5); no Merker HTTP restore."""
+    from integrations.ehal_debug_mapping import build_loxone_setpoint_io_index
+    from integrations.loxone_writes import _publish_setpoint_traced
+
+    field = str(build_loxone_setpoint_io_index().get(io_name) or "").strip()
+    if not field:
+        logger.warning(
+            "Watchdog: no EHAL field for %s — cannot publish restore", io_name
+        )
+        return False
+    return bool(
+        _publish_setpoint_traced(field, float(expected_value), io_name=io_name).success
+    )
+
+
 def verify_and_restore_loxone_states(
     expected: dict[str, float],
 ) -> list[LoxoneMismatch]:
-    """Liest Steuer-Merker, vergleicht mit Soll und setzt bei Abweichung zurück."""
+    """Reads control inputs, compares to Soll, re-publishes on mismatch (Q5)."""
     mismatches: list[LoxoneMismatch] = []
     flex_enable_names = {
         str(marker_flex_enable(c) or "")
@@ -112,7 +128,7 @@ def verify_and_restore_loxone_states(
         if _values_match(expected_value, actual_value, tolerance):
             continue
 
-        corrected = loxone_client.send_loxone_value(io_name, expected_value)
+        corrected = _restore_via_publish(io_name, expected_value)
         mismatches.append(
             LoxoneMismatch(io_name, expected_value, actual_value, corrected, False)
         )

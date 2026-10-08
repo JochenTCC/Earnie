@@ -601,6 +601,8 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             )
         market_price_cent = round(float(current_market_item["k_act"]), 4)
         epex_price_cent = round(float(current_market_item["price_buy"]), 4)
+        from integrations.ehal_write import load_published_records
+
         run_payload = {
             "source": "main.py",
             "success": True,
@@ -611,6 +613,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "loxone_sent": loxone_sent,
             "loxone_writes": loxone_writes,
             "ehal_writes": ehal_writes,
+            "ehal_published": load_published_records(),
             "soc_percent": round(float(current_soc), 2),
             "soc_percent_by_ess": {
                 str(ess_id): round(float(soc), 2)

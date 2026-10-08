@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v2 (2.7.q Q4): pool.{hk_id}.set_enable + pool.pool_filter.set_enable.
+  Replace {hk_id} for heat; filter Kennung is fixed (pool_filter).
+  Legacy: VI_Earnie_Pool.xml (bare Earnie_Pool_*_Freigabe).
+-->
+<VirtualInHttp HintText="" Title="Earnie Pool v2" Comment="Pattern B: pool heat + filter Freigabe (qualified)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="10">
+	<Info templateType="2" minVersion="17010630"/>
+	<VirtualInHttpCmd Title="pool.{hk_id}.set_enable" Comment="pool.{hk_id}.set_enable 0/1 sticky" Check="&quot;pool.{hk_id}.set_enable&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1" Unit="&lt;v&gt;" HintText=""/>
+	<VirtualInHttpCmd Title="pool.pool_filter.set_enable" Comment="pool.pool_filter.set_enable 0/1 sticky" Check="&quot;pool.pool_filter.set_enable&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1" Unit="&lt;v&gt;" HintText=""/>
+</VirtualInHttp>

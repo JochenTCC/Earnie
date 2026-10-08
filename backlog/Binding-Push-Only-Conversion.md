@@ -4,6 +4,8 @@
 
 (The file name is German for historical reasons; the content is English because backlog files are English.)
 
+**Next step (2026-10-08):** the write side follows the same principle — backlog **2.7.q** (`status.json` with qualified IDs, no Merker names, meter-energy poll retired, mapping chapter replaced by the Signal list); see `backlog/EHAL-Binding-UX-Draft.md` §0.
+
 **Starter prompt (paste into the new chat):**
 
 > Read `backlog/Binding-Push-Only-Conversion.md` (and the project rules in `.cursor/rules/*.mdc`; `CLAUDE.md` summarises the essentials). We migrate the Loxone binding to push-only entity by entity (pilot branch `spike/vo-push-pilot`). Section 9 decisions are locked (2026-10-07); implement WP1–WP8 then flip entities per section 7.

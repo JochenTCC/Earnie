@@ -3,7 +3,7 @@
 Reads the *read* bindings (``sens_*`` / ``get_*``) of an Earnie config dir and writes
 one ``VO_Pilot_*.xml`` per entity group plus ``Pilot-VO-Signalliste.csv``. Every new VO
 Cmd pushes its value to ``/ehal/loxone/telemetry/<EHAL-ID>/<v>?t=<token>`` (digital signals: fixed 1 for On, 0 for Off; analog outputs have no Off command) and is
-titled ``Push_<old name>`` so it can run in parallel to the existing signal.
+titled ``Push_<qualified-id>`` (dots → ``_``) so it can run in parallel to Merker Cmds.
 
 Without ``--env-file`` the XML carries the placeholder ``PILOT_TOKEN_HIER_ERSETZEN`` — replace it
 with a text editor before copying the files to Loxone. With ``--env-file`` the token

@@ -23,6 +23,10 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **2.7.q q.D / Q5 — write push-only dogfood** (code cut in repo; Loxone Config VI Checks done 2026-10-08; Loud ≥24 h pending)
+  - Deploy cut build (`2.7.0-dev.28`); confirm no Merker HTTP for cycle setpoints; actuators follow VI within ≤10 s
+  - After live OK: clear this item; archive remaining q.D ops checkbox → [Erledigt](Backlog-Erledigt.md)
+
 - [ ] **2.7.h — productive Earnie dogfood** (code archived in Erledigt; not yet verified live)
   - Physical `role: standby_backup` + `set_ess_source_select` (EcoFlow Delta 3 / Loxone Merker `Earnie_Speicher_Quellenwahl` → HA `switch.*_grid_bypass`): price-driven grid vs battery island flips, reserve sizing, charge in cheap slots
   - After successful live check: remove this item; add **Verified live** note on the **2.7.h** Erledigt entry
@@ -39,9 +43,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - After a successful live check: remove this item → `Backlog-Erledigt.md`.
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
-- [ ] Error in NAS alpha ("P:\earnie-alpha") when starting main.py
-  EHAL Schreibfehler: Powerstation ESS fields have no own Merker; refusing plant-flat house-battery fallback: ess.15_kwh_speicher_copy_3.set_ess_charge_power_limit; ess.15_kwh_speicher_copy_3.set_ess_discharge_power_limit (set_ess_charge_power_limit, set_ess_discharge_power_limit)
 
 - [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
 - [ ] 2026-10-08 07:07:14 [WARNING] (data.outdoor_forecast:209) - Außentemperatur-Prognose fehlgeschlagen (503 Server Error: Service Unavailable for url: https://api.open-meteo.com/v1/forecast?latitude=47.40409024399311&longitude=9.742743769241422&hourly=temperature_2m&forecast_days=3&timezone=auto) – konstante Fallback-Temperatur 14.10 °C  --> This warning is quite often - please check

@@ -44,7 +44,7 @@ alwaysApply: true
 * **MILP Sunset Horizon (`MILP Horizon`):** Phases P1-P5
 * **Release Regression Suite (`Regression`):** P1 (MVP: runner, cases, golden), P2 (customer data / private repo), P3 (CI gate + scrubber)
 * **Inverter entity (`Inverter`, 2.7.l):** P1 (schema + resolution + migration), P2 (UI + docs), P3 (MILP clipping), P4 (EHAL role), P5 (follow-ups)
-* **EHAL-Com binding UX (`Binding`):** P0 (spikes), P1 (naming grammar + qualified EHAL ID), P2 (three-column table + sync states), P3 (Loxone export of yellow signals), P4 (import hardening + signal catalog), P5 (HA parity), P6 (Kennung as editable variable)
+* **EHAL-Com signal contract (`Binding`):** P0 (spikes), P1 (qualified EHAL ID + parser), P2 (Signal list + match status), P3 (Loxone VO / VI export), P4 (import hardening + discovery), P5 (HA Weg B: HTTP contract + YAML package), P6 (Kennung as editable variable)
 * **Session Conclusion:** Phases P1-P2
 * **Migration (`MIGRATION.md`):** Phases P1-P7
 

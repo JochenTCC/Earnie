@@ -371,17 +371,57 @@ def _loxone_probe_wire_value(field: str, value: Any) -> float:
     return float(value)
 
 
+def _publish_id_for_probe(field: str) -> str:
+    """Qualified EHAL ID for a Schreibtest probe field (plant / Pattern B / consumer)."""
+    from ehal.ess_fields import parse_ess_pattern_b
+    from ehal.qualified_ids import NAMESPACES, field_kind, qualified_consumer_id
+    from integrations.ehal_debug_mapping import (
+        PLANT_LIVE_WRITE_FIELDS,
+        _consumer_type_for_qualified_id,
+        _all_live_consumers,
+        _consumer_is_ev,
+    )
+
+    raw = str(field or "").strip()
+    if not raw:
+        return ""
+    if parse_ess_pattern_b(raw) or raw in PLANT_LIVE_WRITE_FIELDS:
+        return raw
+    ns = raw.split(".", 1)[0]
+    if ns in NAMESPACES and raw.count(".") >= 2:
+        return raw
+    if ":" not in raw:
+        return canonical_probe_field(raw)
+    cid, rest = raw.split(":", 1)
+    cid = cid.strip()
+    kind = field_kind(rest)
+    consumer: dict | None = None
+    for item in _all_live_consumers():
+        if str(item.get("id") or "").strip() == cid:
+            consumer = item
+            break
+    if consumer is None:
+        ctype = "ev" if kind.startswith("set_evcs_") else ""
+        return qualified_consumer_id(cid, ctype, kind) if cid and kind else raw
+    ctype = _consumer_type_for_qualified_id(consumer)
+    if _consumer_is_ev(consumer) or kind.startswith("set_evcs_"):
+        ctype = "ev"
+    return qualified_consumer_id(cid, ctype, kind)
+
+
 def _write_loxone_mapped_probes(fields: dict[str, Any]) -> EhalWriteError | None:
-    from integrations import loxone_client
+    from integrations.loxone_writes import _publish_setpoint_traced
 
     targets = mapped_write_targets()
     for field, value in fields.items():
         marker = _marker_for_probe_field(field, targets)
         if not marker:
             continue
-        loxone_client._send_loxone_value_traced(
-            marker, _loxone_probe_wire_value(field, value)
-        )
+        wire = _loxone_probe_wire_value(field, value)
+        qid = _publish_id_for_probe(str(field))
+        if not qid:
+            continue
+        _publish_setpoint_traced(qid, wire, io_name=marker)
     return None
 
 

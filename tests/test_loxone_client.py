@@ -1120,24 +1120,34 @@ class TestSendHuaweiAndConsumers:
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
             "LOXONE_CONTROL_CMD_NAME": "Cmd",
         }
+        io_index = {
+            "Active": "set_ess_active_power",
+            "Charge": "set_ess_charge_power_limit",
+            "Discharge": "set_ess_discharge_power_limit",
+            "Cmd": "set_ess_mode",
+        }
         fake_record = lc.LoxoneWriteRecord(
             io_name="x", value=1.0, success=True, written_at="2026-07-14T10:00:00"
         )
         with patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)), patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
-        ), patch.object(
-            lc, "_send_loxone_value_traced", return_value=fake_record
-        ) as mock_send:
+        ), patch(
+            "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
+            return_value=io_index,
+        ), patch(
+            "integrations.loxone_writes._publish_setpoint_traced",
+            return_value=fake_record,
+        ) as mock_pub:
             records = lc.send_huawei_modbus_states(mode=3, target_power_kw=1.5, target_soc=55.0)
 
         assert len(records) == 4
-        assert mock_send.call_count == 4
-        mock_send.assert_any_call("Active", 1.5)
-        mock_send.assert_any_call("Charge", 0.0)
-        mock_send.assert_any_call("Discharge", 5.0)
-        mock_send.assert_any_call("Cmd", 2.0)
-        called_names = [c.args[0] for c in mock_send.call_args_list]
-        assert "SoC" not in called_names
+        assert mock_pub.call_count == 4
+        qids = [c.args[0] for c in mock_pub.call_args_list]
+        assert "set_ess_active_power" in qids
+        assert "set_ess_charge_power_limit" in qids
+        assert "set_ess_discharge_power_limit" in qids
+        assert "set_ess_mode" in qids
+        assert "SoC" not in qids
 
     def test_send_huawei_modbus_states_calls_ess_outputs_only(self):
         names = {
@@ -1145,19 +1155,29 @@ class TestSendHuaweiAndConsumers:
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
             "LOXONE_CONTROL_CMD_NAME": "Cmd",
         }
+        io_index = {
+            "Charge": "set_ess_charge_power_limit",
+            "Discharge": "set_ess_discharge_power_limit",
+            "Cmd": "set_ess_mode",
+        }
         with patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)), patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
-        ), patch.object(
-            lc, "_send_loxone_value_traced", return_value=lc.LoxoneWriteRecord("x", 0.0, True, "t")
-        ) as mock_send:
+        ), patch(
+            "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
+            return_value=io_index,
+        ), patch(
+            "integrations.loxone_writes._publish_setpoint_traced",
+            return_value=lc.LoxoneWriteRecord("x", 0.0, True, "t"),
+        ) as mock_pub:
             lc.send_huawei_modbus_states(mode=3, target_power_kw=1.5, target_soc=55.0)
 
-        assert mock_send.call_count == 3
-        mock_send.assert_any_call("Charge", 0.0)
-        mock_send.assert_any_call("Discharge", 5.0)
-        mock_send.assert_any_call("Cmd", 2.0)
-        called_names = [c.args[0] for c in mock_send.call_args_list]
-        assert "SoC" not in called_names
+        assert mock_pub.call_count == 3
+        qids = [c.args[0] for c in mock_pub.call_args_list]
+        assert set(qids) == {
+            "set_ess_charge_power_limit",
+            "set_ess_discharge_power_limit",
+            "set_ess_mode",
+        }
 
     def test_send_flexible_consumer_states_skips_without_output(self):
         consumers = [
@@ -1171,9 +1191,10 @@ class TestSendHuaweiAndConsumers:
                 "loxone_outputs": {},
             }
         ]
-        with patch.object(lc.config, "get_flexible_consumers", return_value=consumers), patch.object(
-            lc, "_send_loxone_value_traced", return_value=lc.LoxoneWriteRecord("x", 0.0, True, "t")
-        ) as mock_send:
+        with patch.object(lc.config, "get_flexible_consumers", return_value=consumers), patch(
+            "integrations.loxone_writes._publish_setpoint_traced",
+            return_value=lc.LoxoneWriteRecord("x", 0.0, True, "t"),
+        ) as mock_pub:
             lc.send_flexible_consumer_states({"hidden": 1.0})
 
-        mock_send.assert_not_called()
+        mock_pub.assert_not_called()

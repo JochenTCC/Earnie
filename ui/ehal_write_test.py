@@ -414,12 +414,19 @@ def _execute_pending() -> None:
                 ev_nominal_a=ev_a,
             )
             if error is None:
+                from integrations.ehal_write import published_fetched_at
+
+                fetched = published_fetched_at()
+                suffix = (
+                    f"; Miniserver fetched at {fetched}" if fetched else ""
+                )
                 st.session_state[_SESSION_RESULT] = {
                     "kind": "manual_ok",
                     "values": clamped,
                     "message": (
-                        "Schreiben OK: "
+                        "Schreiben OK (published): "
                         + ", ".join(f"{k}={v!r}" for k, v in clamped.items())
+                        + suffix
                     ),
                 }
             else:

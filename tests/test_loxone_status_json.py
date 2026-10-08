@@ -1,7 +1,19 @@
 """Tests for Pattern B status.json payload builder."""
 from __future__ import annotations
 
+import pytest
+
 from integrations.loxone_status_json import build_loxone_status_payload
+
+
+@pytest.fixture(autouse=True)
+def _clear_ehal_published_ledger() -> None:
+    """Isolate from ``ehal_published.json`` written by parallel xdist workers."""
+    from integrations.ehal_write import clear_published_for_tests
+
+    clear_published_for_tests()
+    yield
+    clear_published_for_tests()
 
 
 def test_status_payload_defaults_plant_keys() -> None:
@@ -81,6 +93,9 @@ def test_status_payload_export_limit_sent_value_wins(monkeypatch) -> None:
 
 
 def test_status_payload_ev_and_flex_namespaced_keys() -> None:
+    from integrations.ehal_write import clear_published_for_tests
+
+    clear_published_for_tests()
     consumers = [
         {
             "id": "garage",
@@ -104,6 +119,13 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
                 "flex.waermepumpe.set_enable": "Earnie_Waermepumpe_Freigabe",
             },
         },
+        {
+            "id": "pool_swimspa",
+            "type": "thermal_rc",
+            "ehal_bindings": {
+                "flex.pool_swimspa.set_enable": "Earnie_Pool_Freigabe",
+            },
+        },
     ]
     payload = build_loxone_status_payload(
         loxone_sent={
@@ -125,9 +147,18 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
     assert payload["flex.waermepumpe.Earnie_Waermepumpe_Freigabe"] == 1.0
     assert payload["Earnie_Pool_Freigabe"] == 0.0
     assert payload["Earnie_Pool_Filter_Freigabe"] == 1.0
+    assert payload["evcs.garage.set_evcs_max_current"] == 16.0
+    assert payload["evcs.garage.set_evcs_mode"] == 2.0
+    assert payload["consumer.waschmaschine.set_enable"] == 1.0
+    assert payload["heatpump.waermepumpe.set_enable"] == 1.0
+    assert payload["pool.pool_swimspa.set_enable"] == 0.0
+    assert payload["pool.pool_filter.set_enable"] == 1.0
 
 
 def test_status_payload_maps_legacy_swimspa_enable_to_pool_keys() -> None:
+    from integrations.ehal_write import clear_published_for_tests
+
+    clear_published_for_tests()
     consumers = [
         {
             "id": "swimspa",
@@ -157,6 +188,8 @@ def test_status_payload_maps_legacy_swimspa_enable_to_pool_keys() -> None:
     assert payload["Earnie_Pool_Filter_Freigabe"] == 0.0
     assert "flex.pool_filter.Earnie_Verbraucher_Freigabe" not in payload
     assert "flex.swimspa.Earnie_Verbraucher_Freigabe" not in payload
+    assert payload["pool.swimspa.set_enable"] == 1.0
+    assert payload["pool.pool_filter.set_enable"] == 0.0
 
 
 def test_status_payload_greenfield_pool_uses_configured_enable_only() -> None:
@@ -253,8 +286,8 @@ def test_write_path_caches_pattern_b_key_not_flat_kind(monkeypatch) -> None:
         psl, "_resolve_marker", lambda key: ("set_ess_charge_power_limit", "Earnie_Delta3_LadeLeistungs-Limit")
     )
     monkeypatch.setattr(
-        "integrations.loxone_client._send_loxone_value_traced",
-        lambda name, value: MagicMock(success=True),
+        "integrations.loxone_writes._publish_setpoint_traced",
+        lambda qid, value, *, io_name="": MagicMock(success=True),
     )
     try:
         psl._write_powerstation_loxone({field: 2000.0})  # W → 2.0 kW
