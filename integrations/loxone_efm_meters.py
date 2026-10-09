@@ -443,7 +443,7 @@ def _bind_meter_power(
     """Attach Zähler power; prefer EFM address for sens_* power fields."""
     from ehal.flex_fields import expand_flex_bindings, flex_sens_power_act
     from integrations.loxone_meter_energy import (
-        bind_consumer_meter_energy,
+        activate_consumer_energy_bindings,
         meter_has_energy_states,
         meter_is_bidirectional,
     )
@@ -458,14 +458,13 @@ def _bind_meter_power(
         bindings["sens_evcs_active_power"] = power
     consumer["ehal_bindings"] = expand_flex_bindings(bindings, consumer_id)
     if meter_has_energy_states(meter_meta):
-        bind_consumer_meter_energy(
+        activate_consumer_energy_bindings(
             consumer,
-            meter_name=power,
             bidirectional=meter_is_bidirectional(meter_meta),
         )
     elif power:
         # EFM Zähler name: assume Meter energy states exist (LoxAPP3 optional).
-        bind_consumer_meter_energy(consumer, meter_name=power, bidirectional=False)
+        activate_consumer_energy_bindings(consumer, bidirectional=False)
 
 
 def apply_consumer_imports(
@@ -538,7 +537,7 @@ def apply_plant_power_suggestions(
 ) -> dict:
     """Optionally set plant sens_* from grid/pv/battery Zähler names."""
     from integrations.loxone_meter_energy import (
-        bind_plant_meter_energy,
+        activate_plant_energy_bindings,
         controls_by_name,
         meter_has_energy_states,
         meter_is_bidirectional,
@@ -564,24 +563,23 @@ def apply_plant_power_suggestions(
             bindings[field] = power
             changed = True
             meta = by_name.get(power.casefold())
-            if meter_has_energy_states(meta):
-                bind_plant_meter_energy(
-                    plant,
-                    ehal_field=field,
-                    meter_name=power,
-                    bidirectional=meter_is_bidirectional(meta),
-                )
-            elif field in (
+            has_energy = meter_has_energy_states(meta) or field in (
                 "sens_pv_production_active",
                 "sens_grid_power_active",
-            ):
-                # EFM Zähler name: assume Meter energy states exist (LoxAPP3 optional).
-                bind_plant_meter_energy(
+            )
+            if has_energy:
+                plant["ehal_bindings"] = bindings
+                activate_plant_energy_bindings(
                     plant,
-                    ehal_field=field,
-                    meter_name=power,
-                    bidirectional=field == "sens_grid_power_active",
+                    pv=field == "sens_pv_production_active",
+                    grid=field == "sens_grid_power_active",
+                    bidirectional=(
+                        meter_is_bidirectional(meta)
+                        if meter_has_energy_states(meta)
+                        else field == "sens_grid_power_active"
+                    ),
                 )
+                bindings = dict(plant.get("ehal_bindings") or {})
     if changed:
         plant["ehal_bindings"] = bindings
         house["plant"] = plant

@@ -1,7 +1,7 @@
 """UI-adjacent tests for entity-centric EHAL Loxone mapping save (2.4.k)."""
 from __future__ import annotations
 
-from ehal.ess_fields import ess_field
+from ehal.ess_fields import ESS_BATTERY_MAPPING_KINDS, ess_field
 from ui.ehal_loxone_mapping import (
     BATTERY_ENTITY_KIND,
     EV_FIELDS,
@@ -9,6 +9,7 @@ from ui.ehal_loxone_mapping import (
     FLEX_FIELDS,
     PLANT_ENTITY_ID,
     PLANT_FIELDS,
+    PROPOSAL_FIELDS,
     SCAN_ROW_KEYS,
     _NONE,
     _field_select_caption,
@@ -24,6 +25,7 @@ from ui.ehal_loxone_mapping import (
     fields_for_consumer,
     is_known_marker_name,
     marker_to_ehal_lookup,
+    proposal_for_mapping_field,
     resolve_field_select_default,
     structure_scan_row,
 )
@@ -34,9 +36,15 @@ def test_fields_for_consumer_ev_vs_flex():
     assert "get_evcs_limit_soc" in EV_FIELDS
     assert "get_evcs_soc_min_immediate" in EV_FIELDS
     assert "sens_power_consumers" in PLANT_FIELDS
+    assert "sens_pv_energy" in PLANT_FIELDS
+    assert "sens_grid_energy_import" in PLANT_FIELDS
+    assert "sens_grid_energy_export" in PLANT_FIELDS
     assert "sens_ess_soc" not in PLANT_FIELDS
     assert "set_ess_active_power" not in PLANT_FIELDS
     assert "set_ess_source_select" in PLANT_FIELDS
+    assert "set_grid_export_power_limit" in PLANT_FIELDS
+    assert "sens_energy_total" in FLEX_FIELDS
+    assert "sens_energy_export" in FLEX_FIELDS
     assert fields_for_consumer({"type": "thermal_annual"}) == FLEX_FIELDS + (
         "sens_temperature_heat_storage",
         "sens_temperature_heat_storage_low",
@@ -49,6 +57,34 @@ def test_fields_for_consumer_ev_vs_flex():
         "sens_temperature_heat_storage_low",
     )
     assert "get_filter_remaining_hours" in FILTER_FIELDS
+
+
+def test_proposal_fields_cover_plant_and_battery_kinds():
+    assert "set_grid_export_power_limit" in PROPOSAL_FIELDS
+    for kind in ESS_BATTERY_MAPPING_KINDS:
+        assert kind in PROPOSAL_FIELDS
+    plant_fields = set(PLANT_FIELDS)
+    battery_fields = set(fields_for_battery("bat1"))
+    proposals = {f: {"marker_name": f"M_{f}", "confidence": 0.5} for f in PROPOSAL_FIELDS}
+    for field in plant_fields | battery_fields:
+        if field == "set_ess_source_select":
+            continue
+        assert proposal_for_mapping_field(proposals, field), field
+
+
+def test_proposal_for_mapping_field_pattern_b_and_miss():
+    proposals = {
+        "sens_ess_soc": {
+            "marker_name": "Batterie_SoC",
+            "confidence": 0.6,
+            "source": "heuristic",
+        }
+    }
+    hit = proposal_for_mapping_field(proposals, "ess.bat1.sens_ess_soc")
+    assert hit["marker_name"] == "Batterie_SoC"
+    assert proposal_for_mapping_field(proposals, "ess.bat1.sens_ess_power") == {}
+    assert proposal_for_mapping_field({}, "sens_ess_soc") == {}
+    assert proposal_for_mapping_field({"sens_ess_soc": "junk"}, "sens_ess_soc") == {}
 
 
 def test_fields_for_consumer_pool_filter_includes_filter_roles():

@@ -24,6 +24,7 @@ WRITE_ERROR_FILENAME = "ehal_write_error.json"
 _openems_adapter: OpenemsAdapter | None = None
 _ha_adapter: HaAdapter | None = None
 _loxone_adapter: LoxoneAdapter | None = None
+_soc_missing_warned: set[str] = set()
 
 
 class _EhalNetworkAdapter(Protocol):
@@ -333,22 +334,84 @@ def _read_soc_from_address(address: str) -> float | None:
     return None
 
 
-def read_ess_soc_by_id() -> dict[str, float]:
-    """SoC (%) per battery id (Pattern B bindings); missing → primary SoC fallback."""
-    primary = read_ess_soc()
+def _mappable_batteries_for_soc() -> list[dict]:
+    """House + physical PS from components; fallback to planning battery list."""
+    try:
+        from house_config.components_store import load_components_document
+        from house_config.powerstation import ehal_mappable_batteries
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if path:
+            doc = load_components_document(path)
+            raw = doc.get("batteries") if isinstance(doc, dict) else []
+            mapped = ehal_mappable_batteries(raw if isinstance(raw, list) else [])
+            if mapped:
+                return mapped
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("SoC battery list from components failed: %s", exc)
     get_list = getattr(config, "get_battery_params_list", None)
     batteries = get_list() if callable(get_list) else []
-    batteries = [b for b in (batteries or []) if isinstance(b, dict)]
+    return [b for b in (batteries or []) if isinstance(b, dict)]
+
+
+def _warn_soc_missing_once(ess_id: str) -> None:
+    if ess_id in _soc_missing_warned:
+        return
+    _soc_missing_warned.add(ess_id)
+    logger.warning(
+        "ESS SoC missing for %s — refuse planning (no primary SoC fallback)",
+        ess_id,
+    )
+
+
+def filter_planning_batteries_with_soc(
+    battery_params: list | dict,
+    current_soc_by_id: dict[str, float] | None,
+) -> list | dict:
+    """Drop multi-ESS house batteries without an own SoC from this cycle's plan."""
+    if not isinstance(battery_params, list):
+        return battery_params
+    soc_map = current_soc_by_id or {}
+    kept: list[dict] = []
+    for bat in battery_params:
+        if not isinstance(bat, dict):
+            continue
+        ess_id = str(bat.get("id") or "").strip()
+        if ess_id and ess_id not in soc_map:
+            logger.warning(
+                "Dropping ESS %s from this cycle — no own SoC",
+                ess_id,
+            )
+            continue
+        kept.append(bat)
+    return kept if kept else battery_params
+
+
+def read_ess_soc_by_id() -> dict[str, float]:
+    """SoC (%) per mappable battery id; omit when own SoC missing.
+
+    Primary house battery may use plant ``sens_ess_soc`` as its own alias.
+    Secondary house ESS and physical powerstations are never filled from primary.
+    """
+    from house_config.powerstation import primary_house_battery
+
+    plant_soc = read_ess_soc()
+    batteries = _mappable_batteries_for_soc()
+    primary = primary_house_battery(batteries)
+    primary_id = str((primary or {}).get("id") or "").strip()
     out: dict[str, float] = {}
     for bat in batteries:
         ess_id = str(bat.get("id") or "").strip()
         if not ess_id:
             continue
         soc = _read_soc_from_address(_soc_address_for_battery(bat))
-        if soc is None and primary is not None:
-            soc = float(primary)
-        if soc is not None:
-            out[ess_id] = float(soc)
+        if soc is None and ess_id == primary_id and plant_soc is not None:
+            soc = float(plant_soc)
+        if soc is None:
+            _warn_soc_missing_once(ess_id)
+            continue
+        out[ess_id] = float(soc)
     return out
 
 

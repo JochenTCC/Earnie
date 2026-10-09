@@ -76,6 +76,16 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
         lambda: 50.0,
     )
     monkeypatch.setattr(
+        main_module.ehal_live,
+        "read_ess_soc_by_id",
+        lambda: {},
+    )
+    monkeypatch.setattr(
+        main_module.ehal_live,
+        "filter_planning_batteries_with_soc",
+        lambda params, _soc: params,
+    )
+    monkeypatch.setattr(
         "data.live_market_prices.fetch_live_day_ahead_prices",
         lambda planning_end=None: [
             {"timestamp": datetime(2026, 6, 15, 10, 0), "price_buy": 10.0}

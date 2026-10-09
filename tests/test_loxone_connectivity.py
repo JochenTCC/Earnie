@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
+import pytest
+
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from integrations import loxone_connectivity as lc
@@ -84,6 +86,15 @@ class TestReadCheckValidation:
 
 
 class TestCollectReadChecks:
+    @pytest.fixture(autouse=True)
+    def _empty_components(self):
+        """No ambient batteries — plant flat ESS rows stay for legacy-only plants."""
+        with patch(
+            "runtime_store.persist_paths.resolve_components_json_path",
+            return_value=None,
+        ):
+            yield
+
     def _plant_get(self, name, **kw):
         return {
             "LOXONE_SOC_NAME": "SOC",
@@ -110,10 +121,32 @@ class TestCollectReadChecks:
             "sens_ess_soc",
             "sens_pv_production_active",
             "sens_ess_power",
-            "sens_grid_power_active",
+            "grid.meter.sens_grid_power_active",
         ]
         assert "PV-Zähler" not in labels
         assert all(not lbl.startswith("set_") for lbl in labels)
+
+    def test_omits_bare_plant_ess_when_batteries_exist(self):
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=[]
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ), patch.object(
+            lc.loxone_client, "_default_house_profiles_doc", return_value=None
+        ), patch(
+            "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+            return_value=True,
+        ), patch(
+            "integrations.loxone_connectivity._append_battery_ess_read_checks",
+        ):
+            checks = lc.collect_read_checks()
+
+        labels = [label for label, _, _ in checks]
+        assert "sens_ess_soc" not in labels
+        assert "sens_ess_power" not in labels
+        assert "get_ess_soc_min" not in labels
+        assert "sens_pv_production_active" in labels
+        assert "grid.meter.sens_grid_power_active" in labels
 
     def test_collects_plant_ambient_from_house_profiles(self):
         house = {
@@ -169,7 +202,9 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         by_label = {label: io for label, io, _ in checks}
-        assert by_label["get_grid_export_power_limit"] == "Earnie_Netz_Einspeisegrenze_In"
+        assert by_label["grid.meter.get_grid_export_power_limit"] == (
+            "Earnie_Netz_Einspeisegrenze_In"
+        )
 
     def test_ignores_consumer_ambient_for_live_reads(self):
         house = {"plant": {"ehal_bindings": {}}}
@@ -415,6 +450,35 @@ class TestCollectReadChecks:
         )
         assert "heatpump.wp_heating.sens_power_act" not in by_label
 
+    def test_activated_grid_energy_uses_qualified_id(self):
+        house = {
+            "plant": {
+                "ehal_bindings": {
+                    "sens_grid_energy_import": "",
+                    "sens_grid_energy_export": "",
+                    "sens_pv_energy": "",
+                }
+            }
+        }
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=[]
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ), patch.object(
+            lc.loxone_client, "_default_house_profiles_doc", return_value=house
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["grid.meter.sens_grid_energy_import"] == (
+            "grid.meter.sens_grid_energy_import"
+        )
+        assert by_label["grid.meter.sens_grid_energy_export"] == (
+            "grid.meter.sens_grid_energy_export"
+        )
+        assert by_label["sens_pv_energy"] == "sens_pv_energy"
+        assert "sens_grid_energy_import" not in by_label
+
 
 class TestLoxoneIntegrationGate:
     def test_integration_skips_without_credentials(self, monkeypatch):
@@ -435,6 +499,83 @@ class TestLoxoneIntegrationGate:
         monkeypatch.setenv("LOXONE_USER", "u")
         monkeypatch.setenv("LOXONE_PASS", "p")
         assert ct._loxone_integration_enabled() is False
+
+
+class TestReadCheckPushState:
+    def test_read_check_retains_push_state(self):
+        from runtime_store.loxone_push_inbox import STATE_ZERO_HELD
+
+        class _Binding:
+            ehal_id = "sens_grid_power_active"
+            kind = "sens_grid_power_active"
+
+        with patch(
+            "ehal.loxone_push_source.resolve_push_binding",
+            return_value=_Binding(),
+        ), patch(
+            "ehal.loxone_push_source.is_pushable_kind",
+            return_value=True,
+        ), patch(
+            "runtime_store.loxone_push_inbox.read_push_value",
+            return_value=(0.0, STATE_ZERO_HELD),
+        ):
+            result = lc._read_check("sens_grid_power_active", "Ernie_Grid")
+        assert result.passed is True
+        assert result.state == STATE_ZERO_HELD
+        assert "0.0" in result.detail
+
+
+class TestBatteryEssEmptyMerker:
+    def test_empty_merker_uses_pattern_b_ehal_id(self):
+        doc = {
+            "batteries": [
+                {
+                    "id": "delta3",
+                    "type": "powerstation",
+                    "backing": "physical",
+                    "ehal_bindings": {
+                        "ess.delta3.sens_ess_soc": "",
+                        "ess.delta3.sens_ess_power": "",
+                    },
+                }
+            ]
+        }
+        checks: list = []
+        with patch(
+            "runtime_store.persist_paths.resolve_components_json_path",
+            return_value="/tmp/components.json",
+        ), patch(
+            "house_config.components_store.load_components_document",
+            return_value=doc,
+        ):
+            lc._append_battery_ess_read_checks(checks)
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["ess.delta3.sens_ess_soc"] == "ess.delta3.sens_ess_soc"
+        assert by_label["ess.delta3.sens_ess_power"] == "ess.delta3.sens_ess_power"
+
+    def test_missing_binding_key_skips_check(self):
+        doc = {
+            "batteries": [
+                {
+                    "id": "delta3",
+                    "type": "powerstation",
+                    "backing": "physical",
+                    "ehal_bindings": {},
+                }
+            ]
+        }
+        checks: list = []
+        with patch(
+            "runtime_store.persist_paths.resolve_components_json_path",
+            return_value="/tmp/components.json",
+        ), patch(
+            "house_config.components_store.load_components_document",
+            return_value=doc,
+        ):
+            lc._append_battery_ess_read_checks(checks)
+
+        assert not any(label.startswith("ess.delta3.") for label, _, _ in checks)
 
 
 class TestVerifySetupAggregation:

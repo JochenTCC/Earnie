@@ -17,6 +17,18 @@
       "notes": "Optional W; + = discharge, − = charge (OpenEMS-aligned)."
     },
     {
+      "field": "sens_ess_energy_charge",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Cumulative charge kWh (Q6 VO push; Loxone Meter total). Exchange: ess.{id}.sens_ess_energy_charge."
+    },
+    {
+      "field": "sens_ess_energy_discharge",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Cumulative discharge kWh (Q6 bipolar; Loxone Meter totalNeg). Exchange: ess.{id}.sens_ess_energy_discharge."
+    },
+    {
       "field": "get_ess_soc_min",
       "required": false,
       "kind": "telemetry",

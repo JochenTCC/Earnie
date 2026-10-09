@@ -1,4 +1,4 @@
-"""Loxone Meter cumulative energy (total / totalNeg) for slot-Ist ΔkWh overlay."""
+"""Loxone meter cumulative energy for slot-Ist ΔkWh overlay (VO push / inbox)."""
 from __future__ import annotations
 
 import logging
@@ -6,20 +6,27 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
-# Plant EHAL power fields that may share a Meter control with energy states.
-_PV_FIELD = "sens_pv_production_active"
-_GRID_FIELD = "sens_grid_power_active"
 CHANNEL_PV = "pv"
 CHANNEL_GRID = "grid"
 
-# Structure-file / WS use total|totalNeg; HTTP /all uses Meter block abbreviations.
-_ENERGY_NAME_ALIASES = {
-    "total": "total",
-    "totalneg": "total_neg",
-    "mr": "total",  # unidirectional Meter reading
-    "mrc": "total",  # bidirectional consumption reading
-    "mrd": "total_neg",  # bidirectional delivery reading
-}
+FIELD_PV_ENERGY = "sens_pv_energy"
+FIELD_GRID_IMPORT = "sens_grid_energy_import"
+FIELD_GRID_EXPORT = "sens_grid_energy_export"
+FIELD_CONSUMER_TOTAL = "sens_energy_total"
+FIELD_CONSUMER_EXPORT = "sens_energy_export"
+FIELD_ESS_CHARGE = "sens_ess_energy_charge"
+FIELD_ESS_DISCHARGE = "sens_ess_energy_discharge"
+
+PLANT_ENERGY_FIELDS = (
+    FIELD_PV_ENERGY,
+    FIELD_GRID_IMPORT,
+    FIELD_GRID_EXPORT,
+)
+CONSUMER_ENERGY_FIELDS = (FIELD_CONSUMER_TOTAL, FIELD_CONSUMER_EXPORT)
+BATTERY_ENERGY_FIELDS = (FIELD_ESS_CHARGE, FIELD_ESS_DISCHARGE)
+ENERGY_ACTIVATION_KINDS = frozenset(
+    PLANT_ENERGY_FIELDS + CONSUMER_ENERGY_FIELDS + BATTERY_ENERGY_FIELDS
+)
 
 
 def meter_has_energy_states(meta: dict[str, Any] | None) -> bool:
@@ -45,107 +52,128 @@ def meter_is_bidirectional(meta: dict[str, Any] | None) -> bool:
     return bool(str(states.get("totalNeg") or "").strip())
 
 
-def energy_from_io_all(ll: dict[str, Any] | None) -> dict[str, float] | None:
-    """Parse Meter ``total`` / ``totalNeg`` kWh from ``/jdev/sps/io/{name}/all`` LL."""
-    if not isinstance(ll, dict):
-        return None
-    found: dict[str, float] = {}
-    for item in ll.values():
-        if not isinstance(item, dict):
-            continue
-        raw_name = str(item.get("name") or item.get("Name") or "").strip()
-        key = _ENERGY_NAME_ALIASES.get(raw_name.casefold())
-        if not key:
-            continue
-        parsed = _parse_energy_value(item.get("value"))
-        if parsed is None:
-            continue
-        found[key] = parsed
-    return found or None
+def energy_binding_activated(bindings: dict[str, Any] | None, field: str) -> bool:
+    """True when the energy field key is present (Merker name may be empty)."""
+    if not isinstance(bindings, dict):
+        return False
+    return field in bindings
 
 
-def _parse_energy_value(raw: Any) -> float | None:
-    if raw is None:
-        return None
-    text = str(raw).strip()
-    if not text:
-        return None
-    try:
-        from integrations.loxone_client import _parse_loxone_numeric
-
-        return float(_parse_loxone_numeric(text))
-    except (ValueError, TypeError, ImportError):
-        try:
-            return float(text.replace(",", ".").split()[0])
-        except (ValueError, TypeError, IndexError):
-            return None
-
-
-def fetch_meter_energy_kwh(
-    meter_name: str,
+def activate_plant_energy_bindings(
+    plant: dict[str, Any],
     *,
-    fetch_all: Callable[[str], dict[str, Any] | None] | None = None,
-) -> dict[str, float] | None:
-    """Live cumulative kWh for one Meter control name."""
-    name = str(meter_name or "").strip()
-    if not name:
-        return None
-    if fetch_all is None:
-        from integrations.loxone_client import _fetch_loxone_io_all
+    pv: bool = False,
+    grid: bool = False,
+    bidirectional: bool = False,
+) -> None:
+    """Activate plant energy push fields on ``ehal_bindings`` (in-place)."""
+    bindings = (
+        dict(plant["ehal_bindings"])
+        if isinstance(plant.get("ehal_bindings"), dict)
+        else {}
+    )
+    if pv:
+        bindings.setdefault(FIELD_PV_ENERGY, "")
+    if grid:
+        bindings.setdefault(FIELD_GRID_IMPORT, "")
+        if bidirectional:
+            bindings.setdefault(FIELD_GRID_EXPORT, "")
+    plant["ehal_bindings"] = bindings
 
-        fetch_all = _fetch_loxone_io_all
-    try:
-        ll = fetch_all(name)
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("meter energy /all failed for %r: %s", name, exc)
-        return None
-    return energy_from_io_all(ll)
 
-
-def plant_energy_meter_names(
+def activate_consumer_energy_bindings(
+    consumer: dict[str, Any],
     *,
-    plant: dict[str, Any] | None = None,
-    config_get: Callable[[str], Any] | None = None,
-) -> dict[str, str]:
-    """Map channel → Meter name from ``loxone_meter_energy`` or power bindings."""
-    plant = plant if isinstance(plant, dict) else {}
-    energy_map = plant.get("loxone_meter_energy")
-    bindings = plant.get("ehal_bindings") if isinstance(plant.get("ehal_bindings"), dict) else {}
-    out: dict[str, str] = {}
-    for channel, field in ((CHANNEL_PV, _PV_FIELD), (CHANNEL_GRID, _GRID_FIELD)):
-        name = ""
-        if isinstance(energy_map, dict):
-            raw = energy_map.get(field)
-            if isinstance(raw, dict):
-                name = str(raw.get("name") or "").strip()
-            else:
-                name = str(raw or "").strip()
-        if not name:
-            name = str(bindings.get(field) or "").strip()
-        if not name and config_get is not None:
-            cfg_key = (
-                "LOXONE_PV_POWER_NAME"
-                if channel == CHANNEL_PV
-                else "LOXONE_GRID_POWER_NAME"
-            )
-            name = str(config_get(cfg_key) or "").strip()
-        if name:
-            out[channel] = name
-    return out
+    bidirectional: bool = False,
+) -> None:
+    """Activate consumer energy push fields on ``ehal_bindings`` (in-place)."""
+    bindings = (
+        dict(consumer["ehal_bindings"])
+        if isinstance(consumer.get("ehal_bindings"), dict)
+        else {}
+    )
+    bindings.setdefault(FIELD_CONSUMER_TOTAL, "")
+    if bidirectional:
+        bindings.setdefault(FIELD_CONSUMER_EXPORT, "")
+    consumer["ehal_bindings"] = bindings
+
+
+def activate_battery_energy_bindings(
+    battery: dict[str, Any],
+    *,
+    bidirectional: bool = True,
+) -> None:
+    """Activate ESS energy push fields on ``batteries[].ehal_bindings`` (in-place).
+
+    Storage meters are bipolar by default (charge + discharge). Keys are Pattern B
+    ``ess.{id}.sens_ess_energy_*`` when the battery has an id, else flat kinds.
+    """
+    from ehal.ess_fields import ess_field
+
+    bindings = (
+        dict(battery["ehal_bindings"])
+        if isinstance(battery.get("ehal_bindings"), dict)
+        else {}
+    )
+    bid = str(battery.get("id") or "").strip()
+    charge_key = ess_field(bid, FIELD_ESS_CHARGE) if bid else FIELD_ESS_CHARGE
+    discharge_key = ess_field(bid, FIELD_ESS_DISCHARGE) if bid else FIELD_ESS_DISCHARGE
+    bindings.setdefault(charge_key, "")
+    if bidirectional:
+        bindings.setdefault(discharge_key, "")
+    battery["ehal_bindings"] = bindings
+
+
+def _read_counter(
+    ehal_id: str,
+    *,
+    read_counter: Callable[..., float | None] | None,
+    now: Any = None,
+) -> float | None:
+    if read_counter is not None:
+        return read_counter(ehal_id, now=now) if now is not None else read_counter(ehal_id)
+    from runtime_store.loxone_push_inbox import read_push_counter
+
+    return (
+        read_push_counter(ehal_id, now=now)
+        if now is not None
+        else read_push_counter(ehal_id)
+    )
 
 
 def read_plant_energy_readings(
-    meter_names: dict[str, str],
+    plant: dict[str, Any] | None = None,
     *,
-    fetch_meter: Callable[[str], dict[str, float] | None] | None = None,
+    read_counter: Callable[..., float | None] | None = None,
+    now: Any = None,
 ) -> dict[str, dict[str, float]]:
-    """``{pv|grid: {total[, total_neg]}}`` for configured Meter names."""
-    fetch = fetch_meter or fetch_meter_energy_kwh
+    """``{pv|grid: {total[, total_neg]}}`` from fresh inbox counters."""
+    from ehal.qualified_ids import qualified_plant_id
+
+    bindings = (
+        (plant or {}).get("ehal_bindings")
+        if isinstance((plant or {}).get("ehal_bindings"), dict)
+        else {}
+    )
     readings: dict[str, dict[str, float]] = {}
-    for channel, name in meter_names.items():
-        energy = fetch(name)
-        if energy:
-            readings[channel] = energy
+    if energy_binding_activated(bindings, FIELD_PV_ENERGY):
+        # PV still bare plant (grid.meter-style pv.* deferred — see backlog 2.7.n).
+        total = _read_counter(FIELD_PV_ENERGY, read_counter=read_counter, now=now)
+        if total is not None:
+            readings[CHANNEL_PV] = {"total": float(total)}
+    if energy_binding_activated(bindings, FIELD_GRID_IMPORT):
+        grid: dict[str, float] = {}
+        import_id = qualified_plant_id(FIELD_GRID_IMPORT)
+        total = _read_counter(import_id, read_counter=read_counter, now=now)
+        if total is not None:
+            grid["total"] = float(total)
+        if energy_binding_activated(bindings, FIELD_GRID_EXPORT):
+            export_id = qualified_plant_id(FIELD_GRID_EXPORT)
+            total_neg = _read_counter(export_id, read_counter=read_counter, now=now)
+            if total_neg is not None:
+                grid["total_neg"] = float(total_neg)
+        if "total" in grid:
+            readings[CHANNEL_GRID] = grid
     return readings
 
 
@@ -154,25 +182,10 @@ def _consumer_has_shared_meter(consumer: dict[str, Any]) -> bool:
     return bool(subtract_ids)
 
 
-def _consumer_power_meter_name(consumer: dict[str, Any]) -> str:
-    from settings.ehal_marker_resolve import (
-        marker_flex_power,
-        marker_sens_evcs_active_power,
-    )
-
-    name = marker_flex_power(consumer) or marker_sens_evcs_active_power(consumer)
-    if name:
-        return name
-    inputs = consumer.get("loxone_inputs")
-    if isinstance(inputs, dict):
-        return str(inputs.get("power_name") or "").strip()
-    return ""
-
-
 def flex_energy_meter_config(
     consumers: list[dict[str, Any]] | None,
 ) -> dict[str, dict[str, Any]]:
-    """``{consumer_id: {name, bidirectional}}`` for slot-Ist ΔE candidates."""
+    """``{consumer_id: {bidirectional}}`` for slot-Ist ΔE candidates (push fields)."""
     out: dict[str, dict[str, Any]] = {}
     for consumer in consumers or []:
         if not isinstance(consumer, dict):
@@ -180,41 +193,46 @@ def flex_energy_meter_config(
         cid = str(consumer.get("id") or "").strip()
         if not cid or _consumer_has_shared_meter(consumer):
             continue
-        energy_map = consumer.get("loxone_meter_energy")
-        if isinstance(energy_map, dict):
-            name = str(energy_map.get("name") or "").strip()
-            if name:
-                out[cid] = {
-                    "name": name,
-                    "bidirectional": bool(energy_map.get("bidirectional")),
-                }
-                continue
-        name = _consumer_power_meter_name(consumer)
-        if name:
-            out[cid] = {"name": name, "bidirectional": False}
+        bindings = consumer.get("ehal_bindings")
+        if not energy_binding_activated(bindings, FIELD_CONSUMER_TOTAL):
+            continue
+        out[cid] = {
+            "bidirectional": energy_binding_activated(bindings, FIELD_CONSUMER_EXPORT),
+        }
     return out
 
 
-def flex_energy_meter_names(
-    consumers: list[dict[str, Any]] | None,
-) -> dict[str, str]:
-    """Map flex consumer id → Meter name (skips shared-meter primaries)."""
-    cfg = flex_energy_meter_config(consumers)
-    return {cid: meta["name"] for cid, meta in cfg.items()}
-
-
 def read_flex_energy_readings(
-    meter_names: dict[str, str],
+    consumers: list[dict[str, Any]] | None,
     *,
-    fetch_meter: Callable[[str], dict[str, float] | None] | None = None,
+    read_counter: Callable[..., float | None] | None = None,
+    now: Any = None,
 ) -> dict[str, dict[str, float]]:
-    """``{consumer_id: {total[, total_neg]}}`` for configured flex Meter names."""
-    fetch = fetch_meter or fetch_meter_energy_kwh
+    """``{consumer_id: {total[, total_neg]}}`` from fresh inbox counters."""
+    from ehal.qualified_ids import qualified_consumer_id
+
     readings: dict[str, dict[str, float]] = {}
-    for consumer_id, name in meter_names.items():
-        energy = fetch(name)
-        if energy:
-            readings[str(consumer_id)] = energy
+    for consumer in consumers or []:
+        if not isinstance(consumer, dict):
+            continue
+        cid = str(consumer.get("id") or "").strip()
+        if not cid or _consumer_has_shared_meter(consumer):
+            continue
+        bindings = consumer.get("ehal_bindings")
+        if not energy_binding_activated(bindings, FIELD_CONSUMER_TOTAL):
+            continue
+        ctype = str(consumer.get("type") or "")
+        total_id = qualified_consumer_id(cid, ctype, FIELD_CONSUMER_TOTAL)
+        total = _read_counter(total_id, read_counter=read_counter, now=now)
+        if total is None:
+            continue
+        channel: dict[str, float] = {"total": float(total)}
+        if energy_binding_activated(bindings, FIELD_CONSUMER_EXPORT):
+            export_id = qualified_consumer_id(cid, ctype, FIELD_CONSUMER_EXPORT)
+            total_neg = _read_counter(export_id, read_counter=read_counter, now=now)
+            if total_neg is not None:
+                channel["total_neg"] = float(total_neg)
+        readings[cid] = channel
     return readings
 
 
@@ -247,6 +265,28 @@ def load_live_profile_consumers() -> list[dict[str, Any]]:
     return [
         c for c in (profile.get("consumers") or []) if isinstance(c, dict)
     ]
+
+
+def load_live_plant() -> dict[str, Any]:
+    """Plant block from ``house_profiles.json``."""
+    try:
+        import os
+
+        from house_config.profiles_store import load_house_profiles_document
+        from runtime_store.persist_paths import resolve_house_profiles_json_path
+    except ImportError:
+        return {}
+    path = resolve_house_profiles_json_path()
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        doc = load_house_profiles_document(path)
+    except (OSError, ValueError, TypeError):
+        return {}
+    if not isinstance(doc, dict):
+        return {}
+    plant = doc.get("plant")
+    return plant if isinstance(plant, dict) else {}
 
 
 def _flex_power_sources(flex_kw: dict[str, Any] | None) -> dict[str, str]:
@@ -366,39 +406,6 @@ def overlay_counter_on_closed(
         flex_meter_config=flex_meter_config,
     )
     return out
-
-
-def bind_consumer_meter_energy(
-    consumer: dict[str, Any],
-    *,
-    meter_name: str,
-    bidirectional: bool = False,
-) -> None:
-    """Record Loxone-local energy binding on a flex consumer (in-place)."""
-    name = str(meter_name or "").strip()
-    if not name:
-        return
-    consumer["loxone_meter_energy"] = {
-        "name": name,
-        "bidirectional": bool(bidirectional),
-    }
-
-
-def bind_plant_meter_energy(
-    plant: dict[str, Any],
-    *,
-    ehal_field: str,
-    meter_name: str,
-    bidirectional: bool = False,
-) -> None:
-    """Record Loxone-local energy binding next to plant power (in-place)."""
-    name = str(meter_name or "").strip()
-    field = str(ehal_field or "").strip()
-    if not name or field not in {_PV_FIELD, _GRID_FIELD}:
-        return
-    energy = dict(plant.get("loxone_meter_energy") or {})
-    energy[field] = {"name": name, "bidirectional": bool(bidirectional)}
-    plant["loxone_meter_energy"] = energy
 
 
 def controls_by_name(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:

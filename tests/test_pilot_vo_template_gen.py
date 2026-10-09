@@ -11,9 +11,14 @@ from scripts import pilot_vo_template_gen as gen
 
 
 def test_pilot_id_namespaces() -> None:
-    assert gen.pilot_id("plant", "plant", "sens_grid_power_active") == "sens_grid_power_active"
+    assert gen.pilot_id("plant", "plant", "sens_grid_power_active") == (
+        "grid.meter.sens_grid_power_active"
+    )
     assert gen.pilot_id("battery", "x", "ess.x.sens_ess_soc") == "ess.x.sens_ess_soc"
     assert gen.pilot_id("battery", "x", "sens_ess_soc") == "ess.x.sens_ess_soc"
+    assert gen.pilot_id("battery", "x", "sens_ess_energy_charge") == (
+        "ess.x.sens_ess_energy_charge"
+    )
     assert gen.pilot_id("consumer", "waschmaschine", "flex.waschmaschine.sens_power_act", "generic") == (
         "consumer.waschmaschine.sens_power_act"
     )
@@ -42,7 +47,9 @@ def test_title_from_qualified_id() -> None:
     assert title_from_qualified_id("consumer.trockner.sens_power_act") == (
         "Push_consumer_trockner_sens_power_act"
     )
-    assert title_from_qualified_id("sens_grid_power_active") == "Push_sens_grid_power_active"
+    assert title_from_qualified_id("grid.meter.sens_grid_power_active") == (
+        "Push_grid_meter_sens_grid_power_active"
+    )
 
 
 def _config(tmp_path: Path) -> Path:
@@ -73,6 +80,10 @@ def _config(tmp_path: Path) -> Path:
     (cfg / "components.json").write_text(
         json.dumps({"batteries": [{"id": "15_kwh_speicher", "ehal_bindings": {
             "ess.15_kwh_speicher.sens_ess_soc": "Earnie_Batterie_SoC",
+            "ess.15_kwh_speicher.sens_ess_power": "Earnie_Batterie_Leistung",
+            "ess.15_kwh_speicher.sens_ess_energy_charge": "",
+            "ess.15_kwh_speicher.sens_ess_energy_discharge": "",
+            "ess.15_kwh_speicher.get_ess_soc_min": "Earnie_Batterie_SOC_Min",
             "ess.15_kwh_speicher.set_ess_mode": "Earnie_Steuerbefehl"}}]}),
         encoding="utf-8",
     )
@@ -82,7 +93,7 @@ def _config(tmp_path: Path) -> Path:
 def test_collect_only_reads_and_valid_ids(tmp_path: Path) -> None:
     signals = {s.ehal_id: s for s in gen.collect_read_signals(_config(tmp_path))}
     assert set(signals) == {
-        "sens_grid_power_active",
+        "grid.meter.sens_grid_power_active",
         "sens_absent_mode",
         "evcs.e_auto.sens_evcs_connected",
         "ev.e_auto.sens_evcs_soc_act",
@@ -90,16 +101,26 @@ def test_collect_only_reads_and_valid_ids(tmp_path: Path) -> None:
         "consumer.trockner.sens_power_act",
         "pool.pool_swimspa.sens_temperature_water",
         "ess.15_kwh_speicher.sens_ess_soc",
+        "ess.15_kwh_speicher.sens_ess_power",
+        "ess.15_kwh_speicher.sens_ess_energy_charge",
+        "ess.15_kwh_speicher.sens_ess_energy_discharge",
+        "ess.15_kwh_speicher.get_ess_soc_min",
     }
+    assert signals["ess.15_kwh_speicher.sens_ess_energy_charge"].title == (
+        "Push_ess_15_kwh_speicher_sens_ess_energy_charge"
+    )
+    assert signals["ess.15_kwh_speicher.sens_ess_energy_charge"].group == "Batterie_15_kwh_speicher"
     assert signals["sens_absent_mode"].digital
     assert signals["evcs.e_auto.sens_evcs_connected"].digital
-    assert not signals["sens_grid_power_active"].digital
+    assert not signals["grid.meter.sens_grid_power_active"].digital
     assert signals["consumer.trockner.sens_power_act"].title == "Push_consumer_trockner_sens_power_act"
     assert signals["consumer.trockner.sens_power_act"].old_name == "Zähler Trockner"
     assert signals["consumer.trockner.sens_power_act"].group == "Verbraucher"
     assert signals["pool.pool_swimspa.sens_temperature_water"].group == "Pool"
     assert signals["ev.e_auto.sens_evcs_soc_act"].group == "EV"
-    assert signals["sens_grid_power_active"].title == "Push_sens_grid_power_active"
+    assert signals["grid.meter.sens_grid_power_active"].title == (
+        "Push_grid_meter_sens_grid_power_active"
+    )
     assert signals["sens_absent_mode"].title == "Push_sens_absent_mode"
 
 
@@ -127,7 +148,7 @@ def test_template_matches_the_loxone_config_export_shape(tmp_path: Path) -> None
     info, *cmds = list(root)
     assert info.tag == "Info" and info.attrib == {"templateType": "3", "minVersion": "17010630"}
     by_title = {c.get("Title"): c for c in cmds}
-    assert list(by_title["Push_sens_grid_power_active"].attrib) == ANALOG_ATTRS
+    assert list(by_title["Push_grid_meter_sens_grid_power_active"].attrib) == ANALOG_ATTRS
     assert list(by_title["Push_sens_absent_mode"].attrib) == DIGITAL_ATTRS
     assert "/>" in text and " />" not in text  # self-closing like the export
     assert chr(9) + "<VirtualOutCmd" in text  # tab indent
@@ -137,8 +158,10 @@ def test_template_values_placeholder_repeat_and_digital(tmp_path: Path) -> None:
     text, root = _render_plant(tmp_path)
     assert "&lt;v&gt;" in text and "<v>" not in text
     cmds = {c.get("Title"): c for c in root if c.tag == "VirtualOutCmd"}
-    analog = cmds["Push_sens_grid_power_active"]
-    assert analog.get("CmdOn") == "/ehal/loxone/telemetry/sens_grid_power_active/<v>?t=abcd1234efgh"
+    analog = cmds["Push_grid_meter_sens_grid_power_active"]
+    assert analog.get("CmdOn") == (
+        "/ehal/loxone/telemetry/grid.meter.sens_grid_power_active/<v>?t=abcd1234efgh"
+    )
     assert (analog.get("Analog"), analog.get("Repeat"), analog.get("RepeatRate")) == ("true", "10", "10")
     digital = cmds["Push_sens_absent_mode"]
     assert digital.get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1?t=abcd1234efgh"
@@ -200,7 +223,9 @@ def test_token_in_address_moves_the_token_out_of_the_commands(tmp_path: Path) ->
         assert "abcd1234efgh" not in (cmd.get("CmdOn") or "") + (cmd.get("CmdOff") or "")
         assert "?t=" not in (cmd.get("CmdOn") or "")
     by_title = {c.get("Title"): c for c in cmds}
-    assert by_title["Push_sens_grid_power_active"].get("CmdOn") == "/ehal/loxone/telemetry/sens_grid_power_active/<v>"
+    assert by_title["Push_grid_meter_sens_grid_power_active"].get("CmdOn") == (
+        "/ehal/loxone/telemetry/grid.meter.sens_grid_power_active/<v>"
+    )
     assert by_title["Push_sens_absent_mode"].get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1"
     assert by_title["Push_sens_absent_mode"].get("CmdOff") == "/ehal/loxone/telemetry/sens_absent_mode/0"
 

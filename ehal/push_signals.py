@@ -14,13 +14,14 @@ from ehal.qualified_ids import (
     is_digital_id,
     qualified_battery_id,
     qualified_consumer_id,
+    qualified_plant_id,
 )
 
 HEARTBEAT_ID = "heartbeat"
 HEARTBEAT_TITLE = "Push_Earnie_Heartbeat"
 HEARTBEAT_WRITE_ID = "heartbeat_ts"
 
-# Kinds excluded from VO push generation (meter energy handled separately).
+# Kinds excluded from VO / VI generation (empty = none).
 SKIP_KINDS: frozenset[str] = frozenset()
 _UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue"})
 _WRITE_ID_RE = re.compile(
@@ -103,7 +104,9 @@ def pilot_id(entity_kind: str, entity_id: str, field: str, consumer_type: str = 
         return qualified_battery_id(entity_id, field)
     if entity_kind == "consumer":
         return qualified_consumer_id(entity_id, consumer_type, field)
-    return field  # plant: house-wide bare field names
+    if entity_kind == "plant":
+        return qualified_plant_id(field)
+    return field
 
 
 def _group_for(entity_kind: str, entity_id: str) -> str:
@@ -150,8 +153,9 @@ def _signals_from_entries(
     used_titles: set[str] = set()
     for kind, entity_id, ctype, field, name in entries:
         name = str(name or "").strip()
-        if not name or not accept_field(field):
+        if not accept_field(field):
             continue
+        # Empty Merker = push-only activation (qualified ID is the wire path).
         ehal_id = pilot_id(kind, entity_id, field, ctype)
         if ehal_id is None:
             continue
@@ -166,7 +170,7 @@ def _signals_from_entries(
             Signal(
                 group=_group_for(kind, entity_id),
                 ehal_id=ehal_id,
-                old_name=name,
+                old_name=name or ehal_id,
                 title=title,
                 digital=is_digital_id(ehal_id),
             )

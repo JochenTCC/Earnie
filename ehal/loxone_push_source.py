@@ -1,8 +1,8 @@
 """Push vs poll source for Loxone VO telemetry (push-only for pushable fields).
 
-Pushable ``sens_*`` / ``get_*`` always read from the inbox. Meter ``*_energy``
-via ``/all`` stays on poll. Legacy ``ehal.loxone_push.entities`` is ignored
-(tolerated in config for one release).
+Pushable ``sens_*`` / ``get_*`` (including meter energy counters) always read
+from the inbox. Legacy ``ehal.loxone_push.entities`` is ignored (tolerated in
+config for one release).
 """
 from __future__ import annotations
 
@@ -15,9 +15,8 @@ from ehal.qualified_ids import field_kind
 
 logger = logging.getLogger(__name__)
 
-# Meter ``/all`` energy stays on poll forever (not a VO push).
+# Reserved for fields that must never go through the VO push path.
 NEVER_PUSH_KINDS: frozenset[str] = frozenset()
-_ENERGY_KIND_SUFFIX = "_energy"
 
 
 @dataclass(frozen=True)
@@ -65,8 +64,6 @@ def is_pushable_kind(kind: str) -> bool:
     """False for fields that never go through the VO push path."""
     k = field_kind(kind)
     if k in NEVER_PUSH_KINDS:
-        return False
-    if k.endswith(_ENERGY_KIND_SUFFIX):
         return False
     return k.startswith(("sens_", "get_"))
 
@@ -238,15 +235,13 @@ def source_for_entity_key(key: str) -> str:
 
 
 def source_for_ehal_id(ehal_id: str) -> str:
-    """``push`` for heartbeat and pushable IDs; ``poll`` for energy / unknown empty."""
+    """``push`` for heartbeat and pushable IDs; ``poll`` for unknown empty."""
     eid = str(ehal_id or "").strip()
     if not eid:
         return "poll"
     if eid == "heartbeat":
         return "push"
     kind = field_kind(eid)
-    if kind.endswith(_ENERGY_KIND_SUFFIX):
-        return "poll"
     if is_pushable_kind(kind):
         return "push"
     binding = get_ehal_index().get(eid)

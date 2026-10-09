@@ -347,6 +347,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         load_active_reserves,
         load_standby_packs,
         physical_charge_setpoints_kw,
+        planned_powerstation_loxone_sent,
         sync_triggers_from_telemetry,
         write_cycle_powerstation_setpoints,
     )
@@ -363,6 +364,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     active_reserves = load_active_reserves()
     battery_params = apply_reserves_to_battery_params(
         battery_params, active_reserves
+    )
+    battery_params = ehal_live.filter_planning_batteries_with_soc(
+        battery_params, current_soc_by_id
     )
     standby_packs = load_standby_packs()
     standby_plans = plan_standby_horizon(
@@ -524,6 +528,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         charging_contexts,
         consumer_pv_follow,
         export_cap_kw=export_cap,
+    )
+    loxone_sent.update(
+        planned_powerstation_loxone_sent(phys_charge, standby_sources)
     )
     sent_flex_kw: dict[str, float] = {}
     for consumer in live_consumers:

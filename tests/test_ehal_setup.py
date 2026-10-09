@@ -225,4 +225,5 @@ def test_build_telemetry_rows():
     )
     assert len(rows) == 2
     assert rows[0]["EHAL-Feld"] == "sens_ess_soc"
-    assert rows[0]["Mapping"] == "sensor.soc"
+    assert "Mapping" not in rows[0]
+    assert rows[0]["Wert"] == "55.0"

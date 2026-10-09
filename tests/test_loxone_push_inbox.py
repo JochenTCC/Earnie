@@ -226,6 +226,31 @@ def test_derive_state_digital_is_held_until_next_edge() -> None:
     assert d(_row(0.0, 900), True) == (inbox.STATE_ZERO_HELD, 0.0)
 
 
+def test_derive_state_energy_never_zero_assumes() -> None:
+    def d(row, link):
+        return inbox.derive_state("sens_pv_energy", row, link=link, now=_now())
+
+    assert d(_row(123.4, 20), True) == (inbox.STATE_OK, 123.4)
+    assert d(_row(123.4, 200), True) == (inbox.STATE_READ_ERROR, None)
+    assert d(None, True) == (inbox.STATE_UNKNOWN, None)
+    assert d(None, False) == (inbox.STATE_UNKNOWN, None)
+
+
+def test_read_push_counter_fresh_and_stale() -> None:
+    eid = "sens_pv_energy"
+    now = _now()
+    inbox.record_push(eid, "24120.12", now=now)
+    assert inbox.read_push_counter(eid, now=now) == pytest.approx(24120.12)
+    assert inbox.read_push_counter(eid, now=now + timedelta(seconds=5)) == pytest.approx(
+        24120.12
+    )
+    assert inbox.read_push_counter(eid, now=now + timedelta(seconds=200)) is None
+    inbox.clear_inbox()
+    assert inbox.read_push_counter(eid, now=now) is None
+    inbox.record_push(eid, "0", now=now)
+    assert inbox.read_push_counter(eid, now=now) == pytest.approx(0.0)
+
+
 def test_read_push_ready_by_time_numeric_and_text() -> None:
     eid = "ev.e_auto.get_evcs_ready_by_time"
     now = _now()

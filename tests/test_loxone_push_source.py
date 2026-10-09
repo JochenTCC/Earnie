@@ -62,7 +62,7 @@ def _clear():
 def test_entity_keys_and_merker_index() -> None:
     index = src.build_merker_index(HOUSE, COMPONENTS)
     assert index["Earnie_Netz"].entity_key == "plant"
-    assert index["Earnie_Netz"].ehal_id == "sens_grid_power_active"
+    assert index["Earnie_Netz"].ehal_id == "grid.meter.sens_grid_power_active"
     assert index["Earnie_Trockner"].entity_key == "consumer:trockner"
     assert index["Earnie_Trockner"].ehal_id == "consumer.trockner.sens_power_act"
     assert index["Earnie_SoC"].entity_key == "battery:15_kwh_speicher"
@@ -76,8 +76,8 @@ def test_empty_merker_still_in_ehal_index() -> None:
         "profiles": {},
     }
     ehal = src.build_ehal_index(house, {})
-    assert "sens_grid_power_active" in ehal
-    assert ehal["sens_grid_power_active"].merker == ""
+    assert "grid.meter.sens_grid_power_active" in ehal
+    assert ehal["grid.meter.sens_grid_power_active"].merker == ""
     assert src.build_merker_index(house, {}) == {}
 
 
@@ -85,7 +85,11 @@ def test_heartbeat_source_is_always_push() -> None:
     assert src.source_for_ehal_id("heartbeat") == "push"
     assert src.source_for_ehal_id("") == "poll"
     assert src.source_for_ehal_id("sens_grid_power_active") == "push"
-    assert src.source_for_ehal_id("sens_pv_energy") == "poll"
+    assert src.source_for_ehal_id("sens_pv_energy") == "push"
+    assert src.source_for_ehal_id("sens_grid_energy_import") == "push"
+    assert src.source_for_ehal_id("sens_grid_energy_export") == "push"
+    assert src.is_pushable_kind("sens_energy_total")
+    assert src.is_pushable_kind("sens_energy_export")
 
 
 def test_parse_push_entities_legacy() -> None:
@@ -122,7 +126,7 @@ def test_fetch_uses_push_for_all_indexed(
     now = datetime.now(timezone.utc)
     inbox.record_push("heartbeat", "1", now=now)
     inbox.record_push("consumer.trockner.sens_power_act", "1.5", now=now)
-    inbox.record_push("sens_grid_power_active", "2.25", now=now)
+    inbox.record_push("grid.meter.sens_grid_power_active", "2.25", now=now)
     monkeypatch.setattr(
         src,
         "get_merker_index",
@@ -150,13 +154,13 @@ def test_fetch_by_ehal_id_without_merker(
     inbox.reset_memory_for_tests()
     now = datetime.now(timezone.utc)
     inbox.record_push("heartbeat", "1", now=now)
-    inbox.record_push("sens_grid_power_active", "3.0", now=now)
+    inbox.record_push("grid.meter.sens_grid_power_active", "3.0", now=now)
     house = {"plant": {"ehal_bindings": {"sens_grid_power_active": ""}}, "profiles": {}}
     monkeypatch.setattr(src, "get_merker_index", lambda: src.build_merker_index(house, {}))
     monkeypatch.setattr(src, "get_ehal_index", lambda: src.build_ehal_index(house, {}))
     with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
         assert loxone_client.fetch_loxone_generic_value(
-            "sens_grid_power_active"
+            "grid.meter.sens_grid_power_active"
         ) == pytest.approx(3.0)
         raw.assert_not_called()
 

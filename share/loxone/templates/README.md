@@ -85,7 +85,8 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 | `VirtualIn/VI_Earnie_Pool.xml` | Legacy bare pool Freigaben |
 | `VirtualIn/VI_Earnie_Pool_v2.xml` | `pool.{hk_id}.set_enable` + `pool.pool_filter.set_enable` |
 | `VirtualOut/VO_Earnie_Status.xml` | Optional alive / `Earnie_Request_Optimize` (port **8541**) |
-| `VirtualOut/VO_Earnie_Plant.xml` | Plant `sens_*` / `get_*` (incl. ESS SOC-Min/Max + max charge/discharge, 2.7.j) + `Earnie_Aussentemperatur` |
+| `VirtualOut/VO_Earnie_Plant.xml` | Plant grid/PV/outside/absent + energy Q6; Titles = `Push_<EHAL-ID>`; no ESS (per-battery) |
+| `VirtualOut/VO_Earnie_Battery.xml` | Per-battery `ess.{bat_id}.*`: SoC, power, bipolar energy charge/discharge, optional `get_ess_*` |
 | `VirtualOut/VO_Earnie_EV.xml` | EV `sens_*` / `get_*` (`Earnie_EAuto_Leistung`, …) |
 | `VirtualOut/VO_Earnie_Heatpump.xml` | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
 | `VirtualOut/VO_Earnie_Consumer.xml` | `Earnie_Verbraucher_Leistung`; `Earnie_Verbraucher_<Slug>_Aktiv` → VO `consumer.{hk_id}.sens_consumer_active` (2.7.p) |
@@ -99,9 +100,9 @@ Frozen Merker names (import / legacy): [`../greenfield_device_map.json`](../gree
 - `Earnie_LadeLeistungs-Limit` / `Earnie_EntladeLeistungs-Limit` → true caps (VI)
 - `Earnie_Steuerbefehl` → `set_ess_mode` (sticky: **0 = Automatik**; VI)
 - `Earnie_Speicher_Quellenwahl` → `set_ess_source_select` (2.7.h: **0 = Netz** / **1 = Batterie-Insel**; VI)
-- VO: `Earnie_Netzleistung`, `Earnie_PV_Leistung`, `Earnie_Batterie_SoC`, `Earnie_Batterie_Leistung`, `Earnie_Aussentemperatur` (`sens_temperature_outside`), `Earnie_Abwesend` (`sens_absent_mode`)
+- VO Plant Titles: `Push_grid_meter_*` / bare PV/house + energy Q6. No bare `sens_ess_*` / `get_ess_*` — use `VO_Earnie_Battery.xml` / Pilot `VO_Pilot_Batterie_*.xml` (`ess.{bat_id}.*`, incl. bipolar `sens_ess_energy_charge` / `sens_ess_energy_discharge`).
 
-**Zähler-Bausteine:** `Earnie_Netzleistung`, `Earnie_PV_Leistung`, `Earnie_Batterie_Leistung` (sowie WP/EV/Verbraucher/Pool-Leistung) **können auch vom jeweiligen EFM-Zähler kommen**. VO-Cmds bleiben im XML als Namenskatalog / optionaler Push — Earnie-Binding bevorzugt die EFM-Bezeichnung, wenn vorhanden.
+**Zähler-Bausteine:** Plant/consumer power VOs **können auch vom jeweiligen EFM-Zähler kommen**. VO-Cmds bleiben im XML als Namenskatalog / optionaler Push — Earnie-Binding bevorzugt die EFM-Bezeichnung, wenn vorhanden.
 
 ## Multiple consumers / EVs (`VI_`/`VO_` Consumer + EV)
 

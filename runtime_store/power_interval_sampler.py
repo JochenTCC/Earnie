@@ -57,14 +57,13 @@ def _empty_state() -> dict[str, Any]:
 
 
 def _default_read_energy() -> dict[str, dict[str, float]] | None:
-    """Plant/flex energy totals: Loxone Meters or HA energy entities (2.6.c)."""
+    """Plant/flex energy totals: Loxone VO inbox or HA energy entities (2.6.c / Q6)."""
     try:
         import config
         from integrations import ehal_live
         from integrations.loxone_meter_energy import (
-            flex_energy_meter_names,
+            load_live_plant,
             load_live_profile_consumers,
-            plant_energy_meter_names,
             read_flex_energy_readings,
             read_plant_energy_readings,
         )
@@ -88,27 +87,17 @@ def _default_read_energy() -> dict[str, dict[str, float]] | None:
         "none",
     ):
         return None
-    plant: dict[str, Any] = {}
-    try:
-        from house_config.profiles_store import load_house_profiles_document
-        from runtime_store.persist_paths import resolve_house_profiles_json_path
-
-        path = resolve_house_profiles_json_path()
-        if path and os.path.isfile(path):
-            doc = load_house_profiles_document(path)
-            raw_plant = doc.get("plant") if isinstance(doc, dict) else None
-            if isinstance(raw_plant, dict):
-                plant = raw_plant
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("power_interval_sampler: plant load failed: %s", exc)
     readings: dict[str, Any] = {}
-    plant_names = plant_energy_meter_names(plant=plant, config_get=config.get)
-    if plant_names:
-        readings.update(read_plant_energy_readings(plant_names))
+    try:
+        plant = load_live_plant()
+        plant_readings = read_plant_energy_readings(plant)
+        if plant_readings:
+            readings.update(plant_readings)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("power_interval_sampler: plant energy load failed: %s", exc)
     try:
         consumers = load_live_profile_consumers()
-        flex_names = flex_energy_meter_names(consumers)
-        flex_readings = read_flex_energy_readings(flex_names)
+        flex_readings = read_flex_energy_readings(consumers)
         if flex_readings:
             readings["flex"] = flex_readings
     except Exception as exc:  # noqa: BLE001

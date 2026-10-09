@@ -165,7 +165,7 @@ Live operation runs via house-profile flex Merker. Role template: `share/ehal/ro
 
 `flex.` is a **role namespace** for stored bindings (pattern B: `flex.{slug}.sens_power_act` / `set_enable`). **Live-Lesen** shows qualified EHAL IDs (`consumer.{slug}.sens_power_act`, `heatpump.*`, `pool.*`, …). For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example Live-Lesen: `consumer.trockner.sens_power_act`; binding key may still be `flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
 
-**VO push telemetry:** Loxone Virtual Outputs call `GET /ehal/loxone/telemetry/<qualified-EHAL-ID>/<v>` on the daemon port (default **8541**), with token via `?t=`, header, or address prefix `/t/<token>`. Enable with `EARNIE_PILOT_PUSH_TOKEN`. All pushable `sens_*` / `get_*` fields read from the push inbox (no Merker poll). Meter energy via `/all` stays on poll. **Live-Lesen** has a **Quelle** column (`push` / `poll`). Write setpoints still use Merker / Virtual Input names. See [Loxone Signals](../referenz/loxone-signals.md).
+**VO push telemetry:** Loxone Virtual Outputs call `GET /ehal/loxone/telemetry/<qualified-EHAL-ID>/<v>` on the daemon port (default **8541**), with token via `?t=`, header, or address prefix `/t/<token>`. Enable with `EARNIE_PILOT_PUSH_TOKEN`. All pushable `sens_*` / `get_*` fields — including meter energy counters (`sens_pv_energy`, `grid.meter.sens_grid_energy_*`, `consumer.*.sens_energy_*`, `ess.*.sens_ess_energy_charge` / `_discharge`) — read from the push inbox (no Merker poll, no Meter `/all`). Battery library template: `VO_Earnie_Battery.xml` (or Pilot `VO_Pilot_Batterie_*.xml`). Write setpoints still use Merker / Virtual Input names until Binding Q7/Q8. See [Loxone Signals](../referenz/loxone-signals.md).
 
 
 | Area / meaning        | Type          | EHAL value name (stub)             | OpenEMS | evcc (YAML attribute) | Victron GX / EVCS (Modbus) | Loxone / Loxone extra                        |
@@ -240,28 +240,27 @@ The status bar combines **silent/loud mode** with the state of the **optimizer s
 
 ### Live Read
 
-Only `**sens_***` and `**get_***` (measurements / inputs). The table lists **all** expected EHAL fields (plant + consumers); without a binding, the mapping column stays empty and the status is **No mapping**. Columns everywhere:
+Only `**sens_***` and `**get_***` (measurements / inputs). The table lists **all** expected EHAL fields (plant + consumers); without a binding **and** without a usable push resolve, Status is **No mapping**. Columns:
 
 
 | Column                                            | Meaning                                                                                                                                    |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| EHAL field                                          | canonical EHAL name (for consumers `{id}:{field}`)                                                                                          |
-| Mapping to Loxone / Home Assistant / OpenEMS       | address in the selected backend (Loxone Merker, HA `entity_id`, OpenEMS channel); column title depends on the backend; empty if not yet mapped |
-| Value                                                | live value                                                                                                                                    |
-| Status                                               | OK / warning / error / no mapping                                                                                                            |
+| EHAL field                                          | exchange EHAL ID (qualified where that is the wire form)                                                                                    |
+| Value                                                | live value (including assumed / last-known `0` from the push zero rule)                                                                       |
+| Status                                               | OK / warning / error / no mapping; for Loxone push also push-state strings (`0 angenommen …`, `0 (gehalten)`, `Zuletzt bekannt (gehalten)`, …) |
 | Detail                                               | error text (empty when OK)                                                                                                                    |
-| Last read                                            | timestamp of the query                                                                                                                        |
+| Last read                                            | timestamp of the query; for push rows prefer the inbox `last_ts` (local clock) when available                                                   |
 
 
-**Loxone:** pushable `sens_*` / `get_*` from the VO inbox (Quelle column). Plant fields: `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, optional `sens_power_consumers`, `sens_temperature_outside`, `sens_absent_mode`, `get_grid_export_power_limit`, `get_ess_soc_min` / `get_ess_soc_max` / `get_ess_max_charge_power` / `get_ess_max_discharge_power` (`plant.ehal_bindings`). **Consumers** use qualified EHAL IDs: EV → `evcs.{id}.*` / `ev.{id}.*`; flex power → `consumer.{slug}.sens_power_act` (or `heatpump.*` / `pool.*` by type); domain temps under the same namespace. No PV meter, no `set_` / enables in Live-Lesen. `get_evcs_ready_by_time`: Analog VO numeric next-entry or fresh Tna text (`Morgen, 07:00`). Numeric counters (Loxone epoch since 2009-01-01) are converted to Unix and shown locally readable in the **Value** column (`YYYY-MM-DD HH:MM:SS (unix …)`).
+**Loxone:** pushable `sens_*` / `get_*` from the VO inbox. Empty Merker with a present binding key still reads via the qualified EHAL ID (push-only). **No mapping** means unbound only — not “value is 0”. **Grid meter** rows are always `grid.meter.*` (never bare `sens_grid_*` / `get_grid_*`; storage keys on `plant.ehal_bindings` may stay bare). When ehal-mappable batteries exist, ESS Live rows are only `ess.<id>.*` — bare plant `sens_ess_*` / `get_ess_*` are omitted (legacy single-ESS plants without Pattern B batteries still show bare plant ESS). Other plant house-wide fields stay bare: `sens_pv_production_active`, optional `sens_power_consumers`, `sens_temperature_outside`, `sens_absent_mode`, `sens_pv_energy` (until deferred `pv.*`). **Consumers** use qualified EHAL IDs: EV → `evcs.{id}.*` / `ev.{id}.*`; flex power → `consumer.{slug}.sens_power_act` (or `heatpump.*` / `pool.*` by type); domain temps under the same namespace. No `set_` / enables in Live-Lesen. `get_evcs_ready_by_time`: Analog VO numeric next-entry or fresh Tna text (`Morgen, 07:00`). Numeric counters (Loxone epoch since 2009-01-01) are converted to Unix and shown locally readable in the **Value** column (`YYYY-MM-DD HH:MM:SS (unix …)`).
 
-**HA / OpenEMS:** EHAL telemetry via REST (only `sens_`* / `get_`* in the table; the connection test may show the full JSON including the envelope). Mapping = entity or channel; derived house load: `—(derived)`. Optional caption for live power in kW.
+**HA / OpenEMS:** EHAL telemetry via REST (only `sens_`* / `get_`* in the table; the connection test may show the full JSON including the envelope). Derived house load: `—(derived)`. Optional caption for live power in kW.
 
 Units and signs: see §B. Full role matrix: §C.
 
 ### Live Write
 
-`**set_***` (plant / EV) as well as flex **enable** (`{id}:flex.{slug}.set_enable`). The table lists **all** expected write fields; values/success come from the last `main.py` run (`runtime/optimizer_run_state.json`); unmapped rows have an empty mapping column. Same identity columns:
+`**set_***` (plant / EV) as well as flex **enable** (`consumer|heatpump|pool.<slug>.set_enable`, `evcs.<id>.set_evcs_*`). Grid export write is `grid.meter.set_grid_export_power_limit`. With Pattern B batteries, plant bare `set_ess_*` (except shared `set_ess_source_select`) are omitted in favour of `ess.<id>.*`. The table lists **all** expected write fields; values/success come from the last `main.py` run (`runtime/optimizer_run_state.json`); unmapped rows have an empty mapping column. Same identity columns:
 
 
 | Column                                            | Meaning                                                                                       |
@@ -312,7 +311,7 @@ Nach Auto-Roundtrip werden immer sichere Sollwerte geschrieben (ESS Automatik, E
 
 Only with backend **Home Assistant**: entity-centric HITL (same Pattern B shape as Loxone **2.4.k**). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials live in `config/.env` (`EHAL_HA_*`); optional **`sign`** (plant) stays in `config.json` → `ehal.ha`.
 
-Workflow: scan `/api/states` once per Streamlit session (button refreshes) → heuristic proposes **empty** fields only → confirm → save. Saved bindings are never overwritten by propose; **no LLM**. After save, Live-Lesen uses qualified consumer EHAL IDs (same as Loxone Live-Lesen); Live-Schreiben still uses `{consumer_id}:field` for consumer setpoints.
+Workflow: scan `/api/states` once per Streamlit session (button refreshes) → heuristic proposes **empty** fields only → confirm → save. Saved bindings are never overwritten by propose; **no LLM**. After save, Live-Lesen and Live-Schreiben both use exchange EHAL IDs (qualified `consumer.*` / `evcs.*` / `ev.*` / `grid.meter.*` / `ess.<id>.*`; bare plant flats only where that is still the wire form).
 
 Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on plant bindings (`device_class=energy`, preferably `state_class=total_increasing`). Heuristic proposes them empty-only like other fields. Spec: [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md) (HA section).
 
@@ -333,7 +332,7 @@ Library templates and the Earnie-dead fallback: [Loxone Signals and the Earnie L
 4. **Human-in-the-loop** — choose an entity, assign EHAL fields (select label: **meaning** plus the EHAL value name, e.g. `Netzleistung (sens_grid_power_active)`). The Merker address comes from the binding of the chosen field.
 5. **Save** — **Save mapping** writes all visible field assignments of the selected entity to `plant.ehal_bindings` / `consumers[].ehal_bindings` in `house_profiles.json`. Individual new Merker are already persisted for that field on confirmation (step 3). On the first migrate/save, legacy Merker trigger keys and plant roles are removed from `loxone_blocks` (an empty `loxone_blocks` is dropped).
 
-**EFM meters:** applied by **Smarthome-Backend → Loxone-Import** (`merge_efm`), not by a separate expander on this page. That path binds power and can set `plant.loxone_meter_energy` / `consumer.loxone_meter_energy` so the daemon can derive slot Ist from Meter `total`/`totalNeg` (see [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md)). Mapping a power field to a Meter name here also works for the same overlay. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md); SB page: [Smarthome-Backend](smarthome-backend.md).
+**EFM meters:** applied by **Smarthome-Backend → Loxone-Import** (`merge_efm`), not by a separate expander on this page. That path binds power and **activates** energy push fields on `ehal_bindings` (`sens_pv_energy` / `sens_grid_energy_*` / `sens_energy_total` [+ export when bipolar]) so the daemon can derive slot Ist from VO-pushed counters (see [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md)). Wire the matching energy VOs next to power. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md); SB page: [Smarthome-Backend](smarthome-backend.md).
 
 Bindings are **no longer** edited in the House Configurator under "Smarthome Merker" — only here on EHAL-Com. See [Loxone Signals](../referenz/loxone-signals.md).
 

@@ -94,7 +94,7 @@ def _config(tmp_path: Path) -> Path:
 def test_collect_only_writes_with_qualified_ids(tmp_path: Path) -> None:
     signals = {s.ehal_id: s for s in gen.collect_write_signals(_config(tmp_path))}
     assert set(signals) == {
-        "set_grid_export_power_limit",
+        "grid.meter.set_grid_export_power_limit",
         "set_ess_active_power",
         "evcs.e_auto.set_evcs_max_current",
         "evcs.e_auto.set_evcs_mode",

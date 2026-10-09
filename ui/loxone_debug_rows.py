@@ -15,6 +15,7 @@ from ui.loxone_debug import (
 )
 from integrations.ehal_debug_mapping import (
     build_loxone_setpoint_io_index,
+    canonicalize_live_display_field,
     expected_live_read_fields,
     expected_live_write_fields,
     ha_setpoint_mapping,
@@ -70,11 +71,80 @@ def status_strip_banner(silent: bool, daemon_running: bool) -> tuple[str, str]:
     )
 
 def read_check_status_label(item: LoxoneCheck) -> str:
+    if item.state:
+        return item.state
     if item.passed:
         return "OK"
     if item.severity == "warning":
         return "Warnung"
     return "Fehler"
+
+
+def _live_field_to_push_ehal_id(field: str) -> str:
+    """Map a Live-Lesen row label to a push inbox EHAL ID (bare / Pattern B / qualified)."""
+    from ehal.qualified_ids import GRID_KINDS, field_kind, qualified_plant_id
+
+    name = str(field or "").strip()
+    if not name:
+        return ""
+    if ":" in name:
+        # Legacy ``{consumer}:{stored_key}`` — prefer the stored key when already qualified.
+        tail = name.split(":", 1)[1].strip()
+        return tail
+    kind = field_kind(name)
+    if kind in GRID_KINDS:
+        return qualified_plant_id(kind)
+    return name
+
+
+def _inbox_last_read_local(ehal_id: str) -> str:
+    """Local ``HH:MM:SS`` from the push inbox ``last_ts``, or empty."""
+    eid = str(ehal_id or "").strip()
+    if not eid:
+        return ""
+    try:
+        from datetime import datetime, timezone
+
+        from runtime_store.loxone_push_inbox import memory_snapshot
+
+        row = memory_snapshot().get(eid)
+        if not row:
+            return ""
+        parsed = datetime.fromisoformat(str(row.get("last_ts") or ""))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone().strftime("%H:%M:%S")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _try_push_live_row(
+    field: str,
+    *,
+    read_at: str,
+) -> dict[str, str] | None:
+    """Build a Live-Lesen row from the push inbox when a numeric value resolves."""
+    from ehal.loxone_push_source import is_pushable_kind
+    from ehal.qualified_ids import field_kind
+    from runtime_store.loxone_push_inbox import read_push_value
+
+    ehal_id = _live_field_to_push_ehal_id(field)
+    if not ehal_id or not is_pushable_kind(field_kind(ehal_id)):
+        return None
+    try:
+        value, state = read_push_value(ehal_id)
+    except Exception:  # noqa: BLE001
+        return None
+    if value is None:
+        return None
+    last = _inbox_last_read_local(ehal_id) or read_at
+    return {
+        "EHAL-Feld": field,
+        "Wert": str(value),
+        "Status": state,
+        "Detail": "",
+        "Zuletzt gelesen": last,
+    }
 
 def rows_with_mapping_column_label(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     """Rename internal ``Mapping`` key to the backend-specific display title.
@@ -104,11 +174,13 @@ def build_read_rows(
     *,
     expected_fields: list[str] | None = None,
 ) -> list[dict[str, str]]:
-    by_label = {
-        item.label: item
-        for item in checks
-        if is_live_read_field(item.label)
-    }
+    by_label: dict[str, LoxoneCheck] = {}
+    for item in checks:
+        if not is_live_read_field(item.label):
+            continue
+        key = canonicalize_live_display_field(item.label, has_batteries=False)
+        if key:
+            by_label[key] = item
     ordered = ordered_union(
         expected_fields
         if expected_fields is not None
@@ -120,54 +192,47 @@ def build_read_rows(
         if not is_live_read_field(field):
             continue
         item = by_label.get(field)
-        if item is None:
-            rows.append(
-                {
-                    "EHAL-Feld": field,
-                    "Mapping": "",
-                    "Quelle": _live_read_source(field, ""),
-                    "Wert": "",
-                    "Status": "Kein Mapping",
-                    "Detail": "",
-                    "Zuletzt gelesen": read_at,
-                }
-            )
-            continue
-        mapping = str(item.io_name or "").strip()
+        mapping = str(item.io_name or "").strip() if item is not None else ""
+        if item is None or not mapping:
+            push_row = _try_push_live_row(field, read_at=read_at)
+            if push_row is not None:
+                rows.append(push_row)
+                continue
+            if item is None:
+                rows.append(
+                    {
+                        "EHAL-Feld": field,
+                        "Wert": "",
+                        "Status": "Kein Mapping",
+                        "Detail": "",
+                        "Zuletzt gelesen": read_at,
+                    }
+                )
+                continue
         wert = parse_check_wert(item.detail, passed=item.passed)
         if wert and field.endswith("get_evcs_ready_by_time"):
             from integrations.loxone_client import format_ready_by_display
 
             wert = format_ready_by_display(wert)
+        ehal_id = _live_field_to_push_ehal_id(field)
+        last = read_at
+        if item.state:
+            last = _inbox_last_read_local(ehal_id) or read_at
+        if not mapping:
+            status = "Kein Mapping"
+        else:
+            status = read_check_status_label(item)
         rows.append(
             {
                 "EHAL-Feld": field,
-                "Mapping": mapping,
-                "Quelle": _live_read_source(field, mapping),
                 "Wert": wert,
-                "Status": (
-                    "Kein Mapping" if not mapping else read_check_status_label(item)
-                ),
+                "Status": status,
                 "Detail": "" if item.passed else item.detail,
-                "Zuletzt gelesen": read_at,
+                "Zuletzt gelesen": last,
             }
         )
     return rows
 
-
-def _live_read_source(field: str, mapping: str) -> str:
-    """``push`` / ``poll`` for Live-Lesen (Loxone VO migration)."""
-    try:
-        from ehal.loxone_push_source import source_for_ehal_id, source_for_merker
-
-        if mapping:
-            return source_for_merker(mapping)
-        # Qualified / bare EHAL ID, or legacy ``{cid}:{stored_key}``
-        if ":" in field:
-            return source_for_ehal_id(field.split(":", 1)[1])
-        return source_for_ehal_id(field)
-    except Exception:  # noqa: BLE001
-        return "poll"
 
 def build_telemetry_rows(
     telemetry: dict[str, Any],
@@ -176,12 +241,19 @@ def build_telemetry_rows(
     mapping: dict[str, str] | None = None,
     expected_fields: list[str] | None = None,
 ) -> list[dict[str, str]]:
-    source = mapping or {}
-    present = {
-        str(field): value
-        for field, value in telemetry.items()
-        if is_live_read_field(str(field))
-    }
+    source: dict[str, str] = {}
+    for k, v in (mapping or {}).items():
+        key = canonicalize_live_display_field(str(k), has_batteries=False)
+        val = str(v or "").strip()
+        if key and val:
+            source[key] = val
+    present: dict[str, Any] = {}
+    for field, value in telemetry.items():
+        if not is_live_read_field(str(field)):
+            continue
+        key = canonicalize_live_display_field(str(field), has_batteries=False)
+        if key:
+            present[key] = value
     ordered = ordered_union(
         expected_fields
         if expected_fields is not None
@@ -197,7 +269,6 @@ def build_telemetry_rows(
             rows.append(
                 {
                     "EHAL-Feld": field,
-                    "Mapping": mapped,
                     "Wert": str(present[field]),
                     "Status": "OK" if mapped else "Kein Mapping",
                     "Detail": "",
@@ -208,7 +279,6 @@ def build_telemetry_rows(
             rows.append(
                 {
                     "EHAL-Feld": field,
-                    "Mapping": mapped,
                     "Wert": "",
                     "Status": "Kein Mapping" if not mapped else "Fehlt",
                     "Detail": "",

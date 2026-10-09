@@ -516,6 +516,37 @@ def test_build_cycle_powerstation_fields_all_mapped_setpoints():
     assert fields[ess_field(slug, "set_ess_active_power")] == 0.0
 
 
+def test_planned_powerstation_loxone_sent_merker_wire_no_publish():
+    """Silent snapshot helper: Merker keys + kW wire; never publishes."""
+    from optimizer import powerstation_live as psl
+
+    slug = "ecoflow_delta_3"
+    planning = [
+        {
+            "id": slug,
+            "type": "powerstation",
+            "backing": "physical",
+            "role": ROLE_STANDBY_BACKUP,
+            "ehal_bindings": {
+                ess_field(slug, "set_ess_charge_power_limit"): "PS_Charge",
+                ess_field(slug, "set_ess_mode"): "PS_Mode",
+            },
+        }
+    ]
+    with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
+        "house_config.ehal_bindings.resolve_plant_binding", return_value=""
+    ), patch(
+        "optimizer.live_export_limit.load_house_doc", return_value={}
+    ), patch(
+        "integrations.loxone_writes._publish_setpoint_traced"
+    ) as send:
+        sent = psl.planned_powerstation_loxone_sent({slug: 0.5}, {})
+
+    send.assert_not_called()
+    assert sent["PS_Charge"] == pytest.approx(0.5)
+    assert sent["PS_Mode"] == pytest.approx(0.0)
+
+
 def test_write_cycle_powerstation_setpoints_returns_records():
     """Cycle writer sends all mapped Merkers and returns Live-Schreiben records."""
     from integrations.loxone_comm_trace import LoxoneWriteRecord

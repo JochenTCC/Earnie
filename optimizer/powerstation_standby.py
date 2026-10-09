@@ -144,10 +144,16 @@ def plan_standby_horizon(
     plans: dict[str, dict[str, Any]] = {}
     for pack in packs:
         ps_id = str(pack["powerstation_id"])
+        if ps_id not in soc_map:
+            logger.warning(
+                "2.7.h: skip standby plan for %s — no own SoC (refuse fallback)",
+                ps_id,
+            )
+            continue
         plan = _solve_one_pack(
             matrix,
             pack,
-            current_soc=float(soc_map.get(ps_id, pack.get("min_soc") or 50.0)),
+            current_soc=float(soc_map[ps_id]),
             dt_h=dt_h,
         )
         if plan is not None:

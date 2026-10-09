@@ -8,6 +8,8 @@ ESS_FIELD_KINDS: frozenset[str] = frozenset(
     {
         "sens_ess_soc",
         "sens_ess_power",
+        "sens_ess_energy_charge",
+        "sens_ess_energy_discharge",
         "set_ess_active_power",
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",

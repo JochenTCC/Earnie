@@ -1,44 +1,51 @@
 # Loxone Meter energy for slot Ist (ΔkWh)
 
-**Status:** investigation complete — **Go** for Loxone Meter side channel; **Go** for HA plant energy entities (**2.6.c**)  
-**Date:** 2026-09-15 (HA section 2026-09-23)  
-**Related:** [`efm-auto-sync-2.4.l.md`](efm-auto-sync-2.4.l.md), backlog **2.6.c** (HA plant), **2.+1** flex counters (Loxone done)
+**Status:** **Go** — live path is VO push into the inbox (**2.7.q Q6**, 2026-10-09). HA plant energy entities remain (**2.6.c**).  
+**Related:** [`efm-auto-sync-2.4.l.md`](efm-auto-sync-2.4.l.md), backlog **2.7.q** Q6, **2.6.c** (HA plant)
 
 ## Verdict
 
 | Capability | Result | Notes |
 | --- | --- | --- |
 | Meter energy states in LoxAPP3 | **Go** | Real dump (`tests/fixtures/loxapp3_greenfield.json`): uni Meter has `states.total`; bidirectional Grid has `total` + `totalNeg`. Formats `%.1fkWh`. |
-| Same control as power binding | **Go** | EFM already binds plant power to Meter **name** (`/jdev/sps/io/{name}` → `actual` kW). Energy is another state of that control — no second HITL field. |
-| Live read path | **Go (HTTP `/all`)** | Same pattern as AlarmClock `SpecialState10`: `GET /jdev/sps/io/{Meter.name}/all`, parse LL entries with `name` `total` / `totalNeg`. Official Structure File lists these as Meter states; WebSocket is the App path, Earnie stays on HTTP like existing power/AlarmClock reads. |
-| EHAL wire change | **No** | Keep telemetry power-only (2.4.j). Interval energy for Ist is a Loxone-adapter + sampler overlay. |
-| Grid sign | **Go** | `total` = consumption (Bezug); `totalNeg` = delivery (Einspeisung). Net slot energy = Δtotal − ΔtotalNeg → avg `grid_kw` with EHAL sign (+ import). |
+| Same control as power binding | **Go (config)** | EFM still binds plant/consumer **power** to the Meter name. Energy is activated as separate EHAL push fields (no Merker `/all`). |
+| Live read path | **Go (VO push)** | Loxone pushes cumulative kWh via Virtual Outputs to `/ehal/loxone/telemetry/<EHAL-ID>/<v>`. The QH sampler reads fresh inbox counters. HTTP `/jdev/sps/io/{Meter}/all` and profile key `loxone_meter_energy` are **retired**. |
+| EHAL wire | **Push fields** | Plant reuses HA kinds; consumers add `sens_energy_total` (+ `sens_energy_export` when bipolar); batteries add `sens_ess_energy_charge` / `sens_ess_energy_discharge` (bipolar; Pilot / `VO_Earnie_Battery`). |
+| Grid sign | **Go** | Import = consumption; export = delivery. Net slot energy = Δimport − Δexport → avg `grid_kw` with EHAL sign (+ import). |
 | Reset / wrap | **Fallback** | Negative channel Δ → reject counter for that channel, keep sample mean. |
+| Stale / never received | **Fallback** | Counter older than 3 × VO repeat (or never pushed) → no overlay for that channel; sample-mean stays. **Never zero-assumed.** |
 
-## IO recipe
+## Push IO recipe (Q6)
 
-1. Resolve Meter name from plant power binding (`sens_pv_production_active` / `sens_grid_power_active`) or `plant.loxone_meter_energy`.
-2. `GET /jdev/sps/io/{name}/all` → LL object.
-3. Walk LL values; for dict items with `name` ∈ {`total`, `totalNeg`} **or HTTP Meter abbreviations** `Mr` (uni total), `Mrc`/`Mrd` (bipolar consumption/delivery) parse `value` (strip kWh via existing Loxone numeric parser). Power-only Merker (e.g. `Earnie_*`) are not enough — set `plant.loxone_meter_energy` to the real Meter control names when EHAL power bindings point at Merker.
-4. At QH open + close: store readings; on `finalize_closed_interval` set `*_energy_kwh` from ΔE and `*_kw = ΔE / 0.25` when usable.
-5. Plant channels without usable ΔE, battery, house, baseload, Merker-only flex, and shared-meter primaries (`subtract_consumer_ids`) stay on sample means. Tag `ist_power_source` (`flex` is a per-consumer-id map: `counter` | `mean`).
+1. Activate energy fields on `plant.ehal_bindings` / `consumer.ehal_bindings` / `batteries[].ehal_bindings` (Merker name may be empty — push-only). Plant: `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export`. Consumer: `sens_energy_total`, and `sens_energy_export` when bipolar. Battery: `ess.{id}.sens_ess_energy_charge` + `sens_ess_energy_discharge` (bipolar Storage).
+2. Configure VO Cmds (library `VO_Earnie_Plant.xml` / `VO_Earnie_Consumer.xml` / `VO_Earnie_Battery.xml`, or generated pilots) that push Meter `total` / `totalNeg` (or EFM equivalents) to those qualified IDs with a Repeat (default 10 s).
+3. At QH open + close: `read_push_counter` → store readings; on `finalize_closed_interval` set `*_energy_kwh` from ΔE and `*_kw = ΔE / 0.25` when usable.
+4. Plant channels without usable ΔE, battery (slot overlay not yet wired), house, baseload, Merker-only flex, and shared-meter primaries (`subtract_consumer_ids`) stay on sample means. Tag `ist_power_source` (`flex` is a per-consumer-id map: `counter` | `mean`).
 
-## Flex consumers (2.+1)
+## Field map
 
-1. Resolve Meter name from `consumer.loxone_meter_energy` or power binding (`flex.{slug}.sens_power_act` / EVCS / `loxone_inputs.power_name`).
-2. Skip counter overlay when `loxone_inputs.subtract_consumer_ids` is set (composite meter; live power already peels subtracted loads).
-3. At QH open + close: anchor flex readings under `energy_anchors.open.flex`; on `finalize_closed_interval` set `flex_kw[id] = ΔE / 0.25` when usable.
-4. Greenfield / Loxone-Import (`merge_efm`) writes `loxone_meter_energy` when binding `flex.*.sens_power_act` to a Meter.
+| Channel | EHAL ID(s) | Reading shape |
+| --- | --- | --- |
+| PV | `sens_pv_energy` | `{total}` |
+| Grid bipolar | `sens_grid_energy_import`, `sens_grid_energy_export` | `{total, total_neg}` |
+| Consumer mono | `consumer.<id>.sens_energy_total` | `{total}` |
+| Consumer bipolar | `…sens_energy_total` + `…sens_energy_export` | `{total, total_neg}` |
+| Battery bipolar | `ess.<id>.sens_ess_energy_charge` + `…_discharge` | push IO ready; slot-Ist overlay deferred |
+
+## Flex consumers
+
+1. Skip counter overlay when `loxone_inputs.subtract_consumer_ids` is set (composite meter; live power already peels subtracted loads).
+2. Greenfield / Loxone-Import (`merge_efm`) **activates** energy `ehal_bindings` keys when binding power to a Meter (no `loxone_meter_energy` side channel).
 
 ## Out of scope
 
 - OpenEMS energy entities (no side channel yet).
-- Extending EHAL telemetry schema with cumulative kWh.
-- Battery on counters; HA flex energy entities; shared-meter ΔE peel beyond sample mean.
+- Averaging or integrating pushed **power** to invent energy.
+- Battery slot-Ist ΔE overlay (VO push fields exist; sampler still uses power mean for ESS). HA flex energy entities; shared-meter ΔE peel beyond sample mean.
 
 ## HA plant energy entities (2.6.c / 2.6.g)
 
-Separate optional maps on **`plant.ehal_bindings`** (not on the power entity; same §C keys as the former flat `ehal.ha.entities`):
+Unchanged separate optional maps on **`plant.ehal_bindings`**:
 
 | Field | Role |
 | --- | --- |
@@ -46,4 +53,9 @@ Separate optional maps on **`plant.ehal_bindings`** (not on the power entity; sa
 | `sens_grid_energy_import` | Grid import kWh → `grid.total` |
 | `sens_grid_energy_export` | Grid export kWh → `grid.total_neg` |
 
-Reader: `integrations/ha_meter_energy.py` (via aggregated adapter entities). Same sampler anchors / `overlay_counter_on_closed` / `*_kw = ΔE / 0.25` as Loxone. Mock bench: `house_sim` advances these counters via ∫P·Δt.
+Reader: `integrations/ha_meter_energy.py`. Same sampler anchors / `overlay_counter_on_closed` / `*_kw = ΔE / 0.25` as Loxone push. Mock bench: `house_sim` advances these counters via ∫P·Δt.
+
+## Retired (pre-Q6)
+
+- `GET /jdev/sps/io/{Meter.name}/all` parse of `total` / `totalNeg` / `Mr` / `Mrc` / `Mrd`
+- Profile side channel `plant.loxone_meter_energy` / `consumer.loxone_meter_energy`

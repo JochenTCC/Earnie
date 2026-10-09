@@ -154,7 +154,7 @@ def _render_live_reads_fragment() -> None:
     rows = build_read_rows(checks, read_at)
     if rows:
         st.dataframe(
-            rows_with_mapping_column_label(rows),
+            rows,
             width="stretch",
             hide_index=True,
         )
@@ -190,13 +190,11 @@ def _render_ehal_telemetry_fragment() -> None:
         telemetry_payload = expand_ha_telemetry_for_live(telemetry_payload, house)
         expected = expected_live_read_fields(network_backend=False)
     st.dataframe(
-        rows_with_mapping_column_label(
-            build_telemetry_rows(
-                telemetry_payload,
-                read_at,
-                mapping=mapping,
-                expected_fields=expected,
-            )
+        build_telemetry_rows(
+            telemetry_payload,
+            read_at,
+            mapping=mapping,
+            expected_fields=expected,
         ),
         width="stretch",
         hide_index=True,

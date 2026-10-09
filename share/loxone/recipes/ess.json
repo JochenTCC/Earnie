@@ -16,6 +16,18 @@
       "notes": "Optional; kW, + = discharge (same sign as EHAL, no inversion). Prefer EFM Storage meter name when present."
     },
     {
+      "ehal_field": "sens_ess_energy_charge",
+      "loxone_blocks_key": "batteries[].ehal_bindings.ess.{id}.sens_ess_energy_charge",
+      "suggested_name": "Push_ess_<Slug>_sens_ess_energy_charge",
+      "notes": "Q6 VO push; cumulative charge kWh (Loxone Meter total). Pattern B on batteries[]."
+    },
+    {
+      "ehal_field": "sens_ess_energy_discharge",
+      "loxone_blocks_key": "batteries[].ehal_bindings.ess.{id}.sens_ess_energy_discharge",
+      "suggested_name": "Push_ess_<Slug>_sens_ess_energy_discharge",
+      "notes": "Q6 bipolar; cumulative discharge kWh (Loxone Meter totalNeg)."
+    },
+    {
       "ehal_field": "get_ess_soc_min",
       "loxone_blocks_key": "plant.ehal_bindings.get_ess_soc_min",
       "suggested_name": "Earnie_Batterie_SOC_Min",

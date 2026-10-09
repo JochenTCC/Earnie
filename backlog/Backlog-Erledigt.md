@@ -2,7 +2,23 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-### 2.7.q q.D / Q5 — Write push-only version cut (2026-10-08)
+### 2.7.q q.E / Q6 — Meter energy as VO push (2026-10-09)
+
+- [x] **q.E / Q6 — Meter energy as VO push** (decided 2026-10-08): each meter gets a second VO for cumulative kWh (bipolar: consumption + delivery). No averaging / integration of pushed power. QH-open/close anchors read last pushed counter from the inbox; `*_kw = ΔE / 0.25` unchanged (negative Δ rejects that channel).
+  - Fields: plant `sens_pv_energy`, `sens_grid_energy_import` / `_export`; consumers `sens_energy_total` (+ `sens_energy_export` when bipolar); batteries `sens_ess_energy_charge` / `_discharge` (push IO ready; slot overlay deferred)
+  - Code: energy kinds pushable in `ehal/loxone_push_source.py`; inbox / `read_signals_from_docs`; `integrations/loxone_meter_energy.py` inbox-only (no `/all`, no `loxone_meter_energy` profile names); EFM import activates energy bindings; stale (> 3 × repeat) / never received → no overlay, sample-mean fallback; never zero-assumed
+  - Templates: `VO_Earnie_Plant` / `Consumer` / `Battery` + generator; spec `docs/spec/loxone-meter-energy-slot-ist.md` push section; docs `ehal-com.md`, `loxone-signals.md`
+  - Tests: `tests/test_loxone_meter_energy.py`, `test_loxone_push_source.py`, VO template / EFM / mapping coverage
+  - **Not yet verified on productive Earnie** — live dogfood tracked under [Bugfixes](Backlog-Bugfixes.md) → Verifications Pending
+
+### Minor — Live-Lesen push zero / last-known Status (2026-10-09)
+
+- [x] **Finding from 2.7.q q.D / Q5 dogfood:** Live-Lesen showed **Kein Mapping** (or bare OK) for push signals at / assumed `0` instead of Push-Inbox style Status
+  - `LoxoneCheck.state` from `read_push_value`; `build_read_rows` uses push-state labels (`0 angenommen …`, `Zuletzt bekannt …`) and inbox `last_ts`
+  - Empty Merker Pattern B ESS → EHAL-ID in `collect_read_checks`; Kein Mapping only when unbound / push resolve fails
+  - Tests: `tests/test_loxone_debug.py`, `tests/test_loxone_connectivity.py`; docs: `docs/ui/ehal-com.md` Live Read
+
+### 2.7.q q.D / Q5 — Write push-only cutover + live dogfood (2026-10-09)
 
 - [x] **Q5 code — version cut:** Loud cycle, Schreibtest, Loxone adapter, and watchdog restore publish only via `status.json` (`integrations/loxone_writes.py::_publish_setpoint_traced`); no Merker HTTP for setpoints. Dual-emit of legacy Check keys kept until Q8.
   - Call sites: `send_huawei_modbus_states`, flex/EV outputs, `optimizer/powerstation_live.py`, `integrations/ehal_write_test.py`, `integrations/loxone_adapter.py`, `integrations/loxone_watchdog.py`
@@ -10,7 +26,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Docs: `docs/ui/ehal-com.md` § Q5 staged VI checklist; `docs/referenz/loxone-signals.md`; `docs/einrichtung/loxone-anbindung.md`; `share/loxone/templates/README.md`
   - Pilot VIs regenerated: `tmp/vi_pilot_out/` from Earnie-env-home config
   - **Decided:** accept ≤10 s VI poll for EV / powerstation writes; Freigabe stays Analog
-  - **Live dogfood still open:** stage VI Checks + deploy + ≥24 h → [Bugfixes](Backlog-Bugfixes.md) Verifications Pending; remaining ops checkbox in [Backlog.md](Backlog.md) q.D
+- [x] **Q5 ops — plant dogfood verified live** (2026-10-09): Loxone Config VI Checks (2026-10-08); cut build `2.7.0-dev.28`; no Merker HTTP for cycle setpoints; actuators follow VI within ≤10 s; Loud ≥24 h OK
 
 ### 2.7.q q.C — Templates + VI generator Q4 (2026-10-08)
 

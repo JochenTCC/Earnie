@@ -53,6 +53,12 @@ _PLANT_ESS_MOVED = frozenset(ESS_BATTERY_MAPPING_KINDS)
 PLANT_TELEMETRY_REQUIRED: tuple[str, ...] = tuple(
     f for f in TELEMETRY_REQUIRED if f not in _PLANT_ESS_MOVED
 )
+_PLANT_ENERGY_OPTIONAL: tuple[str, ...] = (
+    "sens_pv_energy",
+    "sens_grid_energy_import",
+    "sens_grid_energy_export",
+)
+
 PLANT_FIELDS: tuple[str, ...] = (
     PLANT_TELEMETRY_REQUIRED
     + tuple(
@@ -60,6 +66,7 @@ PLANT_FIELDS: tuple[str, ...] = (
         for f in TELEMETRY_OPTIONAL
         if f != "sens_evcs_active_power" and f not in _PLANT_ESS_MOVED
     )
+    + _PLANT_ENERGY_OPTIONAL
     + ("set_ess_source_select", "set_grid_export_power_limit")
 )
 
@@ -80,9 +87,32 @@ FLEX_FIELDS: tuple[str, ...] = (
     "flex.sens_power_act",
     "flex.sens_consumer_active",
     "flex.set_enable",
+    "sens_energy_total",
+    "sens_energy_export",
 )
 
 FILTER_FIELDS: tuple[str, ...] = FILTER_EHAL_FIELDS
+
+# Flat kinds for heuristic_propose (battery rows use Pattern B at lookup time).
+PROPOSAL_FIELDS: tuple[str, ...] = (
+    PLANT_FIELDS + ESS_BATTERY_MAPPING_KINDS + EV_FIELDS + FLEX_FIELDS + FILTER_FIELDS
+)
+
+
+def proposal_for_mapping_field(
+    proposals: dict[str, dict[str, Any]], field: str
+) -> dict[str, Any]:
+    """Resolve a proposal for a mapping field (flat or Pattern B ``ess.<id>.<kind>``)."""
+    entry = proposals.get(field) if isinstance(proposals, dict) else None
+    if isinstance(entry, dict):
+        return entry
+    kind = ess_field_kind(field)
+    if kind:
+        entry = proposals.get(kind)
+        if isinstance(entry, dict):
+            return entry
+    return {}
+
 
 _EXTRA_LABELS: dict[str, str] = {
     "sens_evcs_connected": "EV angeschlossen",
@@ -706,7 +736,11 @@ def _render_field_selects(
         st.markdown(f"**{caption}** — `{entity_id}`")
         for field in role_fields:
             # Quellenwahl is opt-in (standby_backup); never pre-fill from heuristics.
-            prop = {} if field == "set_ess_source_select" else (proposals.get(field) or {})
+            prop = (
+                {}
+                if field == "set_ess_source_select"
+                else proposal_for_mapping_field(proposals, field)
+            )
             existing = str(bindings.get(field) or "")
             proposed = str(prop.get("marker_name") or "")
             default = resolve_field_select_default(existing, proposed)

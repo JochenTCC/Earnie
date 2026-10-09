@@ -84,6 +84,17 @@ def test_heuristic_propose_skips_source_select():
     assert "set_ess_source_select" not in proposals
 
 
+def test_heuristic_propose_grid_export_power_limit():
+    proposals = heuristic_propose(
+        ["Earnie_Einspeisegrenze", "Netz_Leistung"],
+        fields=("set_grid_export_power_limit", "sens_grid_power_active"),
+    )
+    assert (
+        proposals["set_grid_export_power_limit"]["marker_name"]
+        == "Earnie_Einspeisegrenze"
+    )
+
+
 def test_parse_ollama_proposals_filters_unknown():
     content = json_blob(
         {

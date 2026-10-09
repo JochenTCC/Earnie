@@ -1,10 +1,13 @@
 """MILP-Horizontmodell: Variablen, Energiebilanz, SOC-Randbedingungen, Zielfunktion."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 import pulp
+
+logger = logging.getLogger(__name__)
 
 from data.feed_in_prices import k_push_act_for_matrix_row
 from .battery import effective_p_act
@@ -417,11 +420,19 @@ def _add_power_balance_and_soc_dynamics(
     batteries = coerce_battery_params_list(battery_params)
     load_params = aggregate_battery_params_for_load(batteries)
     e_init_by_ess: dict[str, float] = {}
+    multi_ess = len(grid_vars.ess_ids) > 1
     for eid in grid_vars.ess_ids:
         bat = grid_vars.battery_params_by_id[eid]
-        soc = float(current_soc)
         if current_soc_by_id and eid in current_soc_by_id:
             soc = float(current_soc_by_id[eid])
+        elif not multi_ess:
+            soc = float(current_soc)
+        else:
+            logger.error(
+                "MILP multi-ESS: SoC missing for %s — refusing primary substitute; SoC=0",
+                eid,
+            )
+            soc = 0.0
         capacity = float(bat.get("battery_capacity_kwh") or 0.0)
         e_init_by_ess[eid] = (soc / 100.0) * capacity
     for t in range(horizon):

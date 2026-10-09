@@ -613,6 +613,22 @@ def build_cycle_powerstation_fields(
     return fields
 
 
+def planned_powerstation_loxone_sent(
+    charge_kw_by_id: dict[str, float],
+    source_by_id: dict[str, int] | None = None,
+) -> dict[str, float]:
+    """Merker → wire value for Silent Live-Schreiben / ``loxone_sent`` (no publish)."""
+    out: dict[str, float] = {}
+    for field_key, value_w in build_cycle_powerstation_fields(
+        charge_kw_by_id, source_by_id
+    ).items():
+        kind, marker = _resolve_marker(field_key)
+        if not marker:
+            continue
+        out[marker] = _loxone_ps_wire_value(kind, float(value_w))
+    return out
+
+
 def write_cycle_powerstation_setpoints(
     charge_kw_by_id: dict[str, float],
     source_by_id: dict[str, int] | None = None,

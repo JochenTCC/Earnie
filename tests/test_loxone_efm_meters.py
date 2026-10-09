@@ -183,7 +183,8 @@ def test_apply_consumer_imports_sets_flex_power_only():
     assert cons[0]["label"] == "Kochen"
     assert cons[0]["earnie_role"] == "known"
     assert cons[0]["ehal_bindings"]["flex.kochen.sens_power_act"] == "Zähler Kochen"
-    assert cons[0]["loxone_meter_energy"]["name"] == "Zähler Kochen"
+    assert "sens_energy_total" in cons[0]["ehal_bindings"]
+    assert "loxone_meter_energy" not in cons[0]
     assert "flex.enable_name" not in cons[0]["ehal_bindings"]
     assert "flex.power_setpoint_name" not in cons[0]["ehal_bindings"]
     assert "flex.kochen.set_enable" not in cons[0]["ehal_bindings"]
@@ -204,6 +205,6 @@ def test_apply_plant_power_suggestions():
     bindings = out["plant"]["ehal_bindings"]
     assert bindings["sens_grid_power_active"] == "Zähler Netz"
     assert bindings["sens_ess_soc"] == "SoC"
-    energy = out["plant"]["loxone_meter_energy"]
-    assert energy["sens_grid_power_active"]["name"] == "Zähler Netz"
-    assert energy["sens_grid_power_active"]["bidirectional"] is True
+    assert "sens_grid_energy_import" in bindings
+    assert "sens_grid_energy_export" in bindings
+    assert "loxone_meter_energy" not in out["plant"]

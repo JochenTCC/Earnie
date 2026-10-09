@@ -36,34 +36,40 @@ def _copy_loxone_binding(raw: dict, spec: dict) -> None:
         spec["loxone_outputs"] = dict(loxone_outputs)
 
 
+def _keep_energy_activation_key(key: str) -> bool:
+    from ehal.qualified_ids import field_kind
+    from integrations.loxone_meter_energy import ENERGY_ACTIVATION_KINDS
+
+    return field_kind(key) in ENERGY_ACTIVATION_KINDS
+
+
+def _clean_ehal_bindings(bindings: dict) -> dict[str, str]:
+    """Keep non-empty Merker values; retain empty energy activation keys (Q6)."""
+    cleaned: dict[str, str] = {}
+    for key, value in bindings.items():
+        field = str(key).strip()
+        if not field:
+            continue
+        address = str(value).strip()
+        if address or _keep_energy_activation_key(field):
+            cleaned[field] = address
+    return cleaned
+
+
 def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
     from ehal.flex_fields import expand_flex_bindings
 
     bindings = raw.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
-        cleaned = {
-            str(key): str(value).strip()
-            for key, value in bindings.items()
-            if str(value).strip()
-        }
+        cleaned = _clean_ehal_bindings(bindings)
         if cleaned:
             cid = str(spec.get("id") or raw.get("id") or "").strip()
-            spec["ehal_bindings"] = (
-                expand_flex_bindings(cleaned, cid) if cid else cleaned
-            )
-
-
-def _normalize_loxone_meter_energy(raw: dict, spec: dict) -> None:
-    energy = raw.get("loxone_meter_energy")
-    if not isinstance(energy, dict):
-        return
-    name = str(energy.get("name") or "").strip()
-    if not name:
-        return
-    spec["loxone_meter_energy"] = {
-        "name": name,
-        "bidirectional": bool(energy.get("bidirectional")),
-    }
+            # expand_flex_bindings drops empty addresses — re-attach energy keys.
+            expanded = expand_flex_bindings(cleaned, cid) if cid else dict(cleaned)
+            for field, address in cleaned.items():
+                if not address and _keep_energy_activation_key(field):
+                    expanded.setdefault(field, "")
+            spec["ehal_bindings"] = expanded
 
 
 def _legacy_loxone_power_name(raw: dict) -> str:
@@ -326,7 +332,6 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     elif consumer_type == "thermal_rc":
         _normalize_thermal_rc_consumer(raw, spec, profile_id=profile_id, index=index)
     _copy_ehal_entity_fields(raw, spec)
-    _normalize_loxone_meter_energy(raw, spec)
     return spec
 
 
@@ -482,34 +487,9 @@ def _normalize_plant(raw: dict | None) -> dict:
         out["max_export_power_kw"] = export_kw
     bindings = raw.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
-        cleaned = {
-            str(key): str(value).strip()
-            for key, value in bindings.items()
-            if str(value).strip()
-        }
+        cleaned = _clean_ehal_bindings(bindings)
         if cleaned:
             out["ehal_bindings"] = cleaned
-    energy = raw.get("loxone_meter_energy")
-    if isinstance(energy, dict) and energy:
-        cleaned_energy: dict = {}
-        for key, value in energy.items():
-            field = str(key).strip()
-            if not field:
-                continue
-            if isinstance(value, dict):
-                name = str(value.get("name") or "").strip()
-                if not name:
-                    continue
-                cleaned_energy[field] = {
-                    "name": name,
-                    "bidirectional": bool(value.get("bidirectional")),
-                }
-            else:
-                name = str(value or "").strip()
-                if name:
-                    cleaned_energy[field] = name
-        if cleaned_energy:
-            out["loxone_meter_energy"] = cleaned_energy
     from house_config.ha_ess_force import normalize_ha_ess_force
 
     force = normalize_ha_ess_force(raw.get("ha_ess_force"))
@@ -633,12 +613,6 @@ def _refuse_shadow_config_write(path: str) -> None:
 def _attach_ehal_entity_fields(out: dict, consumer: dict) -> None:
     if consumer.get("ehal_bindings"):
         out["ehal_bindings"] = dict(consumer["ehal_bindings"])
-    energy = consumer.get("loxone_meter_energy")
-    if isinstance(energy, dict) and str(energy.get("name") or "").strip():
-        out["loxone_meter_energy"] = {
-            "name": str(energy.get("name") or "").strip(),
-            "bidirectional": bool(energy.get("bidirectional")),
-        }
 
 
 def _serialize_consumer(consumer: dict) -> dict:

@@ -28,7 +28,7 @@ from ui.ehal_function_status import (
     render_control_capability_warnings,
     render_function_status,
 )
-from ehal.ess_fields import ess_field
+from ehal.ess_fields import ess_field, ess_field_kind
 from ui.ehal_loxone_mapping import (
     BATTERY_ENTITY_KIND,
     PLANT_ENTITY_ID,
@@ -64,10 +64,19 @@ def _clear_map_widget_keys(entity_id: str, fields: tuple[str, ...] | list[str]) 
 
 
 def _proposed_entity_id(proposals: dict[str, dict[str, Any]], field: str) -> str:
-    entry = proposals.get(field) if isinstance(proposals, dict) else None
-    if not isinstance(entry, dict):
+    if not isinstance(proposals, dict):
         return ""
-    return str(entry.get("entity_id") or "").strip()
+    keys = [field]
+    kind = ess_field_kind(field)
+    if kind and kind not in keys:
+        keys.append(kind)
+    for key in keys:
+        entry = proposals.get(key)
+        if isinstance(entry, dict):
+            eid = str(entry.get("entity_id") or "").strip()
+            if eid:
+                return eid
+    return ""
 
 
 def _ha_credentials(data: dict) -> dict[str, Any]:

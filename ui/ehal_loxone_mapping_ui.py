@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ui.ehal_loxone_mapping import (
+    PROPOSAL_FIELDS,
     _clear_pending_for_widget,
     _field_select_caption,
     _migrate_on_open,
@@ -24,14 +25,8 @@ from typing import Any
 import streamlit as st
 
 import config
-from house_config.ehal_bindings import FILTER_EHAL_FIELDS
 from ui.ehal_function_status import render_function_status
-from integrations.loxone_ehal_mapping import (
-    SETPOINT_FIELDS,
-    TELEMETRY_OPTIONAL,
-    TELEMETRY_REQUIRED,
-    heuristic_propose,
-)
+from integrations.loxone_ehal_mapping import heuristic_propose
 from integrations.loxone_greenfield_import import probe_marker_names
 from integrations.loxone_structure import (
     SOURCE_HTTP_PROBE,
@@ -48,64 +43,6 @@ _SESSION_MANUAL_FEEDBACK = "ehal_lox_manual_feedback"
 _SESSION_PENDING_NEW = "ehal_lox_pending_new_marker"
 
 PLANT_ENTITY_ID = "plant"
-
-PLANT_FIELDS: tuple[str, ...] = (
-    TELEMETRY_REQUIRED
-    + tuple(f for f in TELEMETRY_OPTIONAL if f != "sens_evcs_active_power")
-    + tuple(
-        f
-        for f in SETPOINT_FIELDS
-        if f.startswith("set_ess_")
-    )
-)
-
-EV_FIELDS: tuple[str, ...] = (
-    "sens_evcs_active_power",
-    "sens_evcs_connected",
-    "sens_evcs_soc_act",
-    "get_evcs_nominal_current",
-    "sens_evcs_bat_capacity",
-    "get_evcs_ready_by_time",
-    "get_evcs_limit_soc",
-    "get_evcs_soc_min_immediate",
-    "set_evcs_max_current",
-    "set_evcs_mode",
-)
-
-FLEX_FIELDS: tuple[str, ...] = (
-    "flex.sens_power_act",
-    "flex.sens_consumer_active",
-    "flex.set_enable",
-)
-
-FILTER_FIELDS: tuple[str, ...] = FILTER_EHAL_FIELDS
-
-_EXTRA_LABELS: dict[str, str] = {
-    "sens_evcs_connected": "EV angeschlossen",
-    "sens_evcs_soc_act": "EV Ist-SOC (%)",
-    "get_evcs_nominal_current": "EV Nennstrom (A)",
-    "sens_evcs_bat_capacity": "EV Batteriekapazität (kWh)",
-    "get_evcs_ready_by_time": "EV FertigUm",
-    "get_evcs_limit_soc": "EV Ladeziel-SOC (%)",
-    "get_evcs_soc_min_immediate": "EV SOC-Min Sofort (%)",
-    "flex.power_name": "Flex Leistung / Zustand",
-    "flex.enable_name": "Flex Freigabe",
-    "flex.sens_power_act": "Flex Leistung / Zustand",
-    "flex.sens_consumer_active": "Gerät läuft (Binär)",
-    "flex.set_enable": "Flex Freigabe",
-    "get_filter_remaining_hours": "Filter Sollstunden (h)",
-    "sens_filter_active": "Filter läuft (Binär)",
-    "get_filter_native_start_hour": "Native Filter-Startstunde",
-    "get_filter_native_duration_hours": "Native Filter-Dauer (h)",
-    "sens_temperature_water": "Pool Ist-Temperatur (°C)",
-    "get_temperature_water_setpoint": "Pool Soll-Temperatur (°C)",
-    "get_temperature_tolerance_c": "Temperatur-Toleranz (°C)",
-    "sens_heating_active": "Heizung aktiv",
-    "sens_temperature_heat_storage": "Wärmespeicher T_eq (°C)",
-    "sens_temperature_heat_storage_low": "Wärmespeicher T_low (°C)",
-    "sens_temperature_outside": "Außentemperatur (°C)",
-    "sens_absent_mode": "Abwesend / Urlaub (0/1)",
-}
 
 
 
@@ -344,5 +281,5 @@ def _run_structure_scan(configured: list[str], house: dict, profile_id: str) -> 
     if items:
         st.session_state[_SESSION_PROPOSALS] = heuristic_propose(
             [item.name for item in items],
-            fields=PLANT_FIELDS + EV_FIELDS + FLEX_FIELDS + FILTER_FIELDS,
+            fields=PROPOSAL_FIELDS,
         )

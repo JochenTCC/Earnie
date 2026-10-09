@@ -17,6 +17,7 @@ class LoxoneCheck:
     passed: bool
     detail: str
     severity: str = "error"
+    state: str | None = None
 
 
 def _check_counts_as_ok(item: LoxoneCheck) -> bool:
@@ -182,6 +183,33 @@ def _read_check(
             True,
             f"Start={hour:.0f} h, Format={fmt}, raw={raw!r}",
         )
+
+    try:
+        from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
+        from runtime_store.loxone_push_inbox import read_push_value
+
+        binding = resolve_push_binding(io_name)
+    except Exception:  # noqa: BLE001
+        binding = None
+    else:
+        if binding is not None and is_pushable_kind(binding.kind):
+            try:
+                value, state = read_push_value(binding.ehal_id)
+            except Exception:  # noqa: BLE001 — no Merker poll fallback for push
+                return LoxoneCheck(
+                    label, io_name, False, "Lesen oder Parsen fehlgeschlagen"
+                )
+            if value is None:
+                return LoxoneCheck(
+                    label,
+                    io_name,
+                    False,
+                    "Lesen oder Parsen fehlgeschlagen",
+                    state=state,
+                )
+            return LoxoneCheck(
+                label, io_name, True, f"Wert={value}", state=state
+            )
 
     value = loxone_client.fetch_loxone_generic_value(io_name)
     if value is None:
@@ -555,8 +583,36 @@ def _append_thermal_annual_read_checks(
     )
 
 
+def _append_plant_energy_read_checks(
+    checks: list[tuple[str, str, dict]],
+    house_doc: dict | None,
+) -> None:
+    """Activated plant energy counters (push-only; Merker may be empty)."""
+    from ehal.loxone_push_source import is_pushable_kind
+    from ehal.qualified_ids import qualified_plant_id
+    from integrations.loxone_meter_energy import (
+        PLANT_ENERGY_FIELDS,
+        energy_binding_activated,
+    )
+
+    if not isinstance(house_doc, dict):
+        return
+    plant = house_doc.get("plant") if isinstance(house_doc.get("plant"), dict) else {}
+    bindings = plant.get("ehal_bindings") if isinstance(plant.get("ehal_bindings"), dict) else {}
+    for field in PLANT_ENERGY_FIELDS:
+        if not energy_binding_activated(bindings, field):
+            continue
+        label = qualified_plant_id(field)
+        io_name = str(bindings.get(field) or "").strip()
+        if not io_name and is_pushable_kind(field):
+            io_name = label
+        _append_io_check(checks, label, io_name)
+
+
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
+    from ehal.qualified_ids import qualified_plant_id
+    from integrations.ehal_debug_mapping import has_mappable_live_batteries
     from settings.ehal_marker_resolve import (
         marker_get_ess_max_charge_power,
         marker_get_ess_max_discharge_power,
@@ -567,12 +623,22 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
         marker_sens_temperature_outside,
     )
 
-    checks: list[tuple[str, str, dict]] = [
-        ("sens_ess_soc", config.get("LOXONE_SOC_NAME"), {}),
-        ("sens_pv_production_active", config.get("LOXONE_PV_POWER_NAME"), {}),
-        ("sens_ess_power", config.get("LOXONE_BATTERY_POWER_NAME"), {}),
-        ("sens_grid_power_active", config.get("LOXONE_GRID_POWER_NAME"), {}),
-    ]
+    has_batteries = has_mappable_live_batteries()
+    checks: list[tuple[str, str, dict]] = []
+    if not has_batteries:
+        checks.append(("sens_ess_soc", config.get("LOXONE_SOC_NAME"), {}))
+    checks.append(
+        ("sens_pv_production_active", config.get("LOXONE_PV_POWER_NAME"), {})
+    )
+    if not has_batteries:
+        checks.append(("sens_ess_power", config.get("LOXONE_BATTERY_POWER_NAME"), {}))
+    checks.append(
+        (
+            qualified_plant_id("sens_grid_power_active"),
+            config.get("LOXONE_GRID_POWER_NAME"),
+            {},
+        )
+    )
     consumers_power = config.get("LOXONE_CONSUMERS_POWER_NAME")
     if consumers_power:
         checks.append(("sens_power_consumers", consumers_power, {}))
@@ -583,23 +649,27 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
     absent_io = marker_sens_absent_mode(house_doc=house_doc)
     _append_io_check(checks, "sens_absent_mode", absent_io)
     export_in_io = marker_get_grid_export_power_limit(house_doc=house_doc)
-    _append_io_check(checks, "get_grid_export_power_limit", export_in_io)
     _append_io_check(
-        checks, "get_ess_soc_min", marker_get_ess_soc_min(house_doc=house_doc)
+        checks, qualified_plant_id("get_grid_export_power_limit"), export_in_io
     )
-    _append_io_check(
-        checks, "get_ess_soc_max", marker_get_ess_soc_max(house_doc=house_doc)
-    )
-    _append_io_check(
-        checks,
-        "get_ess_max_charge_power",
-        marker_get_ess_max_charge_power(house_doc=house_doc),
-    )
-    _append_io_check(
-        checks,
-        "get_ess_max_discharge_power",
-        marker_get_ess_max_discharge_power(house_doc=house_doc),
-    )
+    if not has_batteries:
+        _append_io_check(
+            checks, "get_ess_soc_min", marker_get_ess_soc_min(house_doc=house_doc)
+        )
+        _append_io_check(
+            checks, "get_ess_soc_max", marker_get_ess_soc_max(house_doc=house_doc)
+        )
+        _append_io_check(
+            checks,
+            "get_ess_max_charge_power",
+            marker_get_ess_max_charge_power(house_doc=house_doc),
+        )
+        _append_io_check(
+            checks,
+            "get_ess_max_discharge_power",
+            marker_get_ess_max_discharge_power(house_doc=house_doc),
+        )
+    _append_plant_energy_read_checks(checks, house_doc)
 
     for consumer in _consumers_for_live_reads():
         if _is_ev_consumer(consumer):
@@ -619,7 +689,8 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
 
 def _append_battery_ess_read_checks(checks: list[tuple[str, str, dict]]) -> None:
     """Per-battery Pattern B ESS reads from ``components.json`` (2.7.m)."""
-    from ehal.ess_fields import binding_address
+    from ehal.ess_fields import binding_address, ess_field
+    from ehal.loxone_push_source import is_pushable_kind
     from integrations.ehal_debug_mapping import BATTERY_ESS_LIVE_READ_KINDS
 
     try:
@@ -642,13 +713,13 @@ def _append_battery_ess_read_checks(checks: list[tuple[str, str, dict]]) -> None
         if not bid:
             continue
         bindings = battery.get("ehal_bindings")
+        bind_map = bindings if isinstance(bindings, dict) else None
         for kind in BATTERY_ESS_LIVE_READ_KINDS:
-            from ehal.ess_fields import ess_field
-
             field = ess_field(bid, kind)
-            io_name = binding_address(
-                bindings if isinstance(bindings, dict) else None, bid, kind
-            )
+            io_name = binding_address(bind_map, bid, kind)
+            if not io_name and bind_map is not None and field in bind_map:
+                if is_pushable_kind(kind):
+                    io_name = field
             _append_io_check(checks, field, io_name)
 
 

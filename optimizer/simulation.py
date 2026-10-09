@@ -410,14 +410,19 @@ def _initial_soc_by_ess(
     setup: _HorizonSetup,
     initial_soc: float,
 ) -> dict[str, float]:
-    """Start SoC map for multi-ESS chart columns (fallback: primary SoC for all)."""
+    """Start SoC map for multi-ESS chart columns (no primary substitute for missing)."""
     by_id = dict(setup.current_soc_by_id or {})
+    multi = len([b for b in setup.batteries if str(b.get("id") or "").strip()]) > 1
     out: dict[str, float] = {}
     for bat in setup.batteries:
         ess_id = str(bat.get("id") or "").strip()
         if not ess_id:
             continue
-        out[ess_id] = float(by_id.get(ess_id, initial_soc))
+        if ess_id in by_id:
+            out[ess_id] = float(by_id[ess_id])
+        elif not multi:
+            out[ess_id] = float(initial_soc)
+        # else: omit — refuse silent primary SoC for a second ESS
     return out
 
 

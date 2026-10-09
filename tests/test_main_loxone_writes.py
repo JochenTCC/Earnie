@@ -96,6 +96,10 @@ def test_main_run_state_omits_loxone_writes_when_silent(monkeypatch):
     send_flex = MagicMock()
     monkeypatch.setattr(main_module.loxone_client, "send_huawei_modbus_states", send_huawei)
     monkeypatch.setattr(main_module.loxone_client, "send_flexible_consumer_states", send_flex)
+    monkeypatch.setattr(
+        "optimizer.powerstation_live.planned_powerstation_loxone_sent",
+        lambda *_a, **_k: {"PS_Charge": 0.5},
+    )
 
     main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
 
@@ -103,6 +107,8 @@ def test_main_run_state_omits_loxone_writes_when_silent(monkeypatch):
     send_flex.assert_not_called()
     assert saved
     assert saved[0]["loxone_writes"] is None
+    assert saved[0]["loxone_sent"]["Ernie_Mode"] == 1.0
+    assert saved[0]["loxone_sent"]["PS_Charge"] == 0.5
 
 
 def test_main_invokes_setpoint_writes_when_shadow_silent(monkeypatch, tmp_path):

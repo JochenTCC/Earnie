@@ -23,9 +23,10 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **2.7.q q.D / Q5 — write push-only dogfood** (code cut in repo; Loxone Config VI Checks done 2026-10-08; Loud ≥24 h pending)
-  - Deploy cut build (`2.7.0-dev.28`); confirm no Merker HTTP for cycle setpoints; actuators follow VI within ≤10 s
-  - After live OK: clear this item; archive remaining q.D ops checkbox → [Erledigt](Backlog-Erledigt.md)
+- [ ] **2.7.q q.E / Q6 — Meter energy VO push** (code archived in Erledigt; live acceptance pending)
+  - Wire energy VOs next to power (plant `sens_pv_energy` / `sens_grid_energy_*`, consumers `sens_energy_total` [+ export], batteries `sens_ess_energy_charge` / `_discharge`); confirm inbox values and QH slot-Ist ΔE overlay (`*_kw = ΔE / 0.25`) with sample-mean fallback on stale / wrap
+  - Confirm no Meter `/all` poll and no zero-assumption for silent counters
+  - After successful live check: remove this item; add **Verified live** note on the **2.7.q q.E** Erledigt entry
 
 - [ ] **2.7.h — productive Earnie dogfood** (code archived in Erledigt; not yet verified live)
   - Physical `role: standby_backup` + `set_ess_source_select` (EcoFlow Delta 3 / Loxone Merker `Earnie_Speicher_Quellenwahl` → HA `switch.*_grid_bypass`): price-driven grid vs battery island flips, reserve sizing, charge in cheap slots
@@ -42,25 +43,29 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - **Note:** after the fix the VI commands `Earnie_Delta3_*` receive mirror values for the first time. A VI scale with `DestValHigh="-100"` inverts the sign of such a mirrored value; check the scaling before rollout.
   - After a successful live check: remove this item → `Backlog-Erledigt.md`.
 
+- [ ] **Loxone / HA mapping: duplicate `PLANT_FIELDS` — heuristic proposals miss fields** — fix implemented (2026-10-09); UI acceptance pending (**2.7.n-1** half)
+  - Removed stale field-list copy in `ui/ehal_loxone_mapping_ui.py`; `heuristic_propose` uses canonical `PROPOSAL_FIELDS` (`PLANT_FIELDS` + `ESS_BATTERY_MAPPING_KINDS` + EV/FLEX/FILTER).
+  - Pattern B lookup: `proposal_for_mapping_field` (Loxone) and `_proposed_entity_id` (HA) resolve `ess.<id>.<kind>` → flat kind.
+  - Tests: `tests/test_ehal_loxone_mapping_entities.py`, `tests/test_ehal_ha_mapping_entities.py`, `tests/test_loxone_ehal_mapping.py`.
+  - Verify in EHAL-Com: HTTP probe proposes `set_grid_export_power_limit` and battery SoC on a multi-ESS plant; then → `Backlog-Erledigt.md`.
+
+- [ ] **Loxone: silent `loxone_sent` omitted physical powerstation setpoints** — fix implemented (2026-10-09); live acceptance pending
+  - Loud `loxone_writes` merge was already done (Erledigt 2026-10-07). Remaining gap: Silent Live-Schreiben / watchdog Soll from `loxone_sent`.
+  - Fix: `planned_powerstation_loxone_sent` in `optimizer/powerstation_live.py` (Merker → wire, no publish); `main.py` merges into `loxone_sent` after `build_sent_loxone_snapshot`. Does not update `_last_powerstation_sent` in silent.
+  - Tests: `tests/test_powerstation_2_7_h.py`, `tests/test_main_loxone_writes.py`, `tests/test_loxone_debug.py`.
+
+- [ ] **Second battery / physical PS: missing SoC no longer falls back to primary** — fix implemented (2026-10-09); live acceptance pending (**2.7.n-1**)
+  - `read_ess_soc_by_id` iterates `ehal_mappable_batteries`; primary may use plant `sens_ess_soc`; others omitted + warn once. Standby pack without SoC skipped; house ESS without SoC dropped from this cycle’s MILP list; milp/sim no longer reinject primary SoC for missing multi-ESS ids.
+  - Tests: `tests/test_ess_soc_by_id.py`.
+
+- [ ] **Live-Lesen / Live-Schreiben show obsolete bare / colon EHAL IDs** — fix implemented (2026-10-09); live acceptance pending
+  - Live tables use exchange IDs only: `grid.meter.*`, `ess.<id>.*` when mappable batteries exist (no bare `get_ess_soc_min` / `sens_grid_energy_import` / plant ESS flats), qualified consumer writes (`evcs.*` / `consumer|heatpump|pool.*.set_enable`) instead of `{cid}:field`.
+  - Code: `integrations/ehal_debug_mapping.py`, `integrations/loxone_connectivity.py`; docs `docs/ui/ehal-com.md`; tests `test_loxone_debug.py`, `test_loxone_connectivity.py`, `test_ehal_ha_mapping_entities.py`.
+
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
 - [ ] 2026-10-08 07:07:14 [WARNING] (data.outdoor_forecast:209) - Außentemperatur-Prognose fehlgeschlagen (503 Server Error: Service Unavailable for url: https://api.open-meteo.com/v1/forecast?latitude=47.40409024399311&longitude=9.742743769241422&hourly=temperature_2m&forecast_days=3&timezone=auto) – konstante Fallback-Temperatur 14.10 °C  --> This warning is quite often - please check
-
-- [ ] Loxone mapping: duplicate `PLANT_FIELDS` — heuristic proposals miss fields
-  - `ui/ehal_loxone_mapping_ui.py:52` holds an older copy of `PLANT_FIELDS`; the current one is in `ui/ehal_loxone_mapping.py:56` (cleaned up in 2.7.m: `_PLANT_ESS_MOVED` removed from the list, `set_ess_source_select` and `set_grid_export_power_limit` added).
-  - The copy still contains the ESS fields and filters setpoints with `startswith("set_ess_")`, so `set_grid_export_power_limit` is missing. It feeds only `_run_structure_scan` → `heuristic_propose` (name proposals after the HTTP probe).
-  - Effect 1: `set_grid_export_power_limit` never gets a proposal although `_HINTS` has entries for it (`integrations/loxone_ehal_mapping.py:134`).
-  - Effect 2 (found by reading; confirm with a test before the fix): proposals are keyed by flat field name (`sens_ess_soc`), battery rows look up `ess.<id>.<kind>` (`proposals.get(field)` in `_render_field_selects`, `ui/ehal_loxone_mapping.py:707`), so battery rows probably never get a proposal.
-  - Fix sketch: delete the copy and use the list from `ui/ehal_loxone_mapping.py`; test that every mapping field is also in the proposal field list; map `ess.<id>.<kind>` → `<kind>` for proposals. Check the HA side for the same error (`ui/ehal_ha_mapping.py`, `_proposed_entity_id`; `heuristic_propose(scanned)` returns flat keys while battery rows use Pattern B).
-
-- [ ] Loxone: physical powerstation writes are not part of the write trace
-  - `_write_powerstation_loxone` discards the result of `_send_loxone_value_traced`; `main.py` puts only `huawei_writes + flex_writes` into the write records, and `build_sent_loxone_snapshot` knows only plant and consumers. Found by reading, not run: EHAL-Com → Live-Schreiben shows no value/success for `ess.<id>.set_ess_charge_power_limit` of a powerstation; only the log line ("Loxone API: … erfolgreich auf …") shows it.
-  - Fix sketch: return the records from `write_physical_powerstation_charges` / `write_standby_source_selects` and append them to `loxone_writes` and the `loxone_sent` snapshot; test via a powerstation fixture.
-
-- [ ] Second battery: missing or wrong SoC binding silently falls back to the primary battery's SoC
-  - `ehal_live.read_ess_soc_by_id` → `_read_soc_from_address` returns `None` on a missing binding or read error and the caller substitutes the primary SoC; the only trace is a debug log. A misnamed SoC Merker of a second battery therefore looks plausible in operation.
-  - Fix sketch: log a warning once per battery and show the fallback in EHAL-Com (Live-Lesen row status); decide whether a physical powerstation without own SoC should be planned at all.
 
 - [ ] EcoFlow Delta 3 bridge: Miniserver self-write of a Virtual Input is overwritten by HA (2026-10-07, not analysed yet)
   - Setup: the Miniserver writes its own Virtual Input via a Virtual Output command (`/dev/sps/io/<Input>/\v`, device = the Miniserver itself), e.g. bypass state (`Delta3_Grid_ByPass`) and charge limit (`Delta3_P_ChargeLimit`). HA mirrors these inputs through the Loxone integration (PyLoxone) and drives the EcoFlow entities from automations (`docs/einrichtung/ecoflow-delta3-loxone.md`, steps 5/6).

@@ -310,6 +310,11 @@ def link_alive(
     return False
 
 
+def _is_energy_kind(kind: str) -> bool:
+    """Cumulative kWh counters — never invent 0 when silent (Q6)."""
+    return "energy" in str(kind or "")
+
+
 def derive_state(
     ehal_id: str,
     row: dict[str, Any] | None,
@@ -319,7 +324,10 @@ def derive_state(
     now: datetime | None = None,
 ) -> tuple[str, float | None]:
     """(state label, derived value) for one expected signal; ``row`` is ``None`` if never received."""
+    energy = _is_energy_kind(field_kind(ehal_id))
     if row is None:
+        if energy:
+            return (STATE_UNKNOWN, None)
         return (STATE_ZERO_ASSUMED_NEVER, 0.0) if link else (STATE_UNKNOWN, None)
     if not row.get("parse_ok", True) or row.get("value") is None:
         return (STATE_UNREADABLE, None)
@@ -331,6 +339,8 @@ def derive_state(
         return (STATE_OK, value)
     if is_digital_id(ehal_id):
         return (STATE_DIGITAL_HELD, value)  # edge-complete (On and Off commands)
+    if energy:
+        return (STATE_READ_ERROR, None)
     return (STATE_ZERO_ASSUMED_SILENT, 0.0) if link else (STATE_UNKNOWN, None)
 
 
@@ -371,6 +381,7 @@ def resolve_push_read(
     kind = field_kind(ehal_id)
     digital = kind in DIGITAL_KINDS
     power = _is_power_kind(kind)
+    energy = _is_energy_kind(kind)
     held = last_known
 
     def hold() -> tuple[str, float | None]:
@@ -384,13 +395,19 @@ def resolve_push_read(
             return (STATE_OK, value)
         if digital:
             return (STATE_DIGITAL_HELD, value)
+        if energy:
+            return (STATE_READ_ERROR, None)
         if power and link:
             return (STATE_ZERO_ASSUMED_SILENT, 0.0)
         return hold()
 
     if row is not None and (not row.get("parse_ok", True) or row.get("value") is None):
+        if energy:
+            return (STATE_READ_ERROR, None)
         return hold()
 
+    if energy:
+        return (STATE_READ_ERROR, None)
     if digital and link:
         return (STATE_ZERO_ASSUMED_NEVER, 0.0)
     if power and link:
@@ -433,6 +450,33 @@ def read_push_value(
         ):
             _last_known[eid] = (float(value), ref)
     return value, state
+
+
+def read_push_counter(
+    ehal_id: str,
+    *,
+    now: datetime | None = None,
+    repeat_s: float | None = None,
+) -> float | None:
+    """Fresh cumulative counter from the inbox, or ``None`` when missing/stale.
+
+    Never invents ``0`` for silence (Q6 meter energy). A fresh explicit ``0.0``
+    push is returned as ``0.0``.
+    """
+    eid = str(ehal_id or "").strip()
+    if not eid or not is_valid_ehal_id(eid):
+        return None
+    ref = now if now is not None else datetime.now(timezone.utc)
+    with _lock:
+        signals = dict(_memory) if _memory else load_inbox()
+        row = signals.get(eid)
+        if row is None:
+            return None
+        if not row.get("parse_ok", True) or row.get("value") is None:
+            return None
+        if is_stale(row, repeat_s=repeat_s, now=ref):
+            return None
+        return float(row["value"])
 
 
 def read_push_ready_by_time(

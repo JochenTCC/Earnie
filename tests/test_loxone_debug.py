@@ -54,7 +54,8 @@ def test_load_loxone_auth_error_none_when_missing():
     )
     assert len(rows) == 2
     assert rows[0]["EHAL-Feld"] == "sens_ess_soc"
-    assert rows[0]["Mapping"] == "Ernie_SOC"
+    assert "Mapping" not in rows[0]
+    assert "Quelle" not in rows[0]
     assert rows[0]["Wert"] == "65.0"
     assert rows[0]["Status"] == "OK"
     assert rows[0]["Zuletzt gelesen"] == "2026-07-14T12:00:00"
@@ -112,7 +113,7 @@ def test_build_read_rows_includes_flex_power():
     )
     assert len(rows) == 1
     assert rows[0]["EHAL-Feld"] == "consumer.wp.sens_power_act"
-    assert rows[0]["Mapping"] == "Ernie_WP"
+    assert "Mapping" not in rows[0]
 
 
 def test_build_read_rows_unmapped_expected_empty_mapping():
@@ -122,16 +123,104 @@ def test_build_read_rows_unmapped_expected_empty_mapping():
         expected_fields=["sens_ess_soc", "evcs.car.sens_evcs_active_power"],
     )
     assert len(rows) == 2
-    assert rows[0]["Mapping"] == ""
+    assert "Mapping" not in rows[0]
     assert rows[0]["Status"] == "Kein Mapping"
     assert rows[1]["EHAL-Feld"] == "evcs.car.sens_evcs_active_power"
-    assert rows[1]["Mapping"] == ""
+    assert "Mapping" not in rows[1]
 
 
 def test_read_check_status_label():
     assert read_check_status_label(LoxoneCheck("x", "io", True, "ok")) == "OK"
     assert read_check_status_label(LoxoneCheck("x", "io", False, "bad", severity="warning")) == "Warnung"
     assert read_check_status_label(LoxoneCheck("x", "io", False, "bad")) == "Fehler"
+
+
+def test_read_check_status_label_prefers_push_state():
+    from runtime_store.loxone_push_inbox import STATE_ZERO_ASSUMED_SILENT
+
+    assert (
+        read_check_status_label(
+            LoxoneCheck("sens_grid_power_active", "io", True, "Wert=0.0", state=STATE_ZERO_ASSUMED_SILENT)
+        )
+        == STATE_ZERO_ASSUMED_SILENT
+    )
+
+
+def test_build_read_rows_push_zero_held_status():
+    from runtime_store.loxone_push_inbox import STATE_ZERO_HELD
+
+    rows = build_read_rows(
+        [
+            LoxoneCheck(
+                "sens_grid_power_active",
+                "Ernie_Grid",
+                True,
+                "Wert=0.0",
+                state=STATE_ZERO_HELD,
+            )
+        ],
+        "t0",
+        expected_fields=["sens_grid_power_active"],
+    )
+    assert rows[0]["EHAL-Feld"] == "grid.meter.sens_grid_power_active"
+    assert rows[0]["Status"] == STATE_ZERO_HELD
+    assert rows[0]["Wert"] == "0.0"
+    assert "Mapping" not in rows[0]
+
+
+def test_build_read_rows_push_assumed_never_without_check():
+    from runtime_store.loxone_push_inbox import STATE_ZERO_ASSUMED_NEVER
+
+    with patch(
+        "runtime_store.loxone_push_inbox.read_push_value",
+        return_value=(0.0, STATE_ZERO_ASSUMED_NEVER),
+    ), patch(
+        "ui.loxone_debug_rows._inbox_last_read_local",
+        return_value="12:00:00",
+    ):
+        rows = build_read_rows(
+            [],
+            "t0",
+            expected_fields=["sens_grid_power_active"],
+        )
+    assert rows[0]["Status"] == STATE_ZERO_ASSUMED_NEVER
+    assert rows[0]["Wert"] in ("0", "0.0")
+    assert rows[0]["Status"] != "Kein Mapping"
+    assert rows[0]["Zuletzt gelesen"] == "12:00:00"
+
+
+def test_build_read_rows_push_last_known_soc():
+    from runtime_store.loxone_push_inbox import STATE_LAST_KNOWN
+
+    with patch(
+        "runtime_store.loxone_push_inbox.read_push_value",
+        return_value=(55.0, STATE_LAST_KNOWN),
+    ), patch(
+        "ui.loxone_debug_rows._inbox_last_read_local",
+        return_value="11:59:00",
+    ):
+        rows = build_read_rows(
+            [LoxoneCheck("sens_ess_soc", "", False, "IO-Name fehlt in config.json")],
+            "t0",
+            expected_fields=["sens_ess_soc"],
+        )
+    assert rows[0]["Status"] == STATE_LAST_KNOWN
+    assert rows[0]["Wert"] == "55.0"
+    assert "Mapping" not in rows[0]
+
+
+def test_build_read_rows_unmapped_still_kein_mapping_when_push_fails():
+    with patch(
+        "runtime_store.loxone_push_inbox.read_push_value",
+        return_value=(None, "Lesefehler"),
+    ):
+        rows = build_read_rows(
+            [],
+            "t0",
+            expected_fields=["sens_ess_soc"],
+        )
+    assert rows[0]["Status"] == "Kein Mapping"
+    assert rows[0]["Wert"] == ""
 
 
 def test_build_write_rows_from_trace_maps_set_fields():
@@ -217,6 +306,29 @@ def test_build_intended_write_rows_for_silent_mode():
     assert rows[0]["Wert"] == "2.0"
 
 
+def test_build_intended_write_rows_powerstation_merker_silent():
+    with patch(
+        "ui.loxone_debug_rows.build_loxone_setpoint_io_index",
+        return_value={
+            "PS_Charge": "ess.ecoflow_delta_3.set_ess_charge_power_limit",
+        },
+    ), patch(
+        "ui.loxone_debug_rows.loxone_write_field_to_io",
+        return_value={
+            "ess.ecoflow_delta_3.set_ess_charge_power_limit": "PS_Charge",
+        },
+    ):
+        rows = build_intended_write_rows(
+            {"PS_Charge": 0.5},
+            "2026-10-09T09:00:00",
+            expected_fields=["ess.ecoflow_delta_3.set_ess_charge_power_limit"],
+        )
+    assert rows[0]["EHAL-Feld"] == "ess.ecoflow_delta_3.set_ess_charge_power_limit"
+    assert rows[0]["Mapping"] == "PS_Charge"
+    assert rows[0]["Meldung"] == "Nicht gesendet (Silent-Modus)"
+    assert rows[0]["Wert"] == "0.5"
+
+
 def test_write_summary_from_rows_matches_table_not_raw_trace():
     rows = [
         {"Erfolg": "Ja"},
@@ -255,7 +367,8 @@ def test_build_telemetry_rows_filters_and_maps():
     )
     assert len(rows) == 2
     assert rows[0]["EHAL-Feld"] == "sens_ess_soc"
-    assert rows[0]["Mapping"] == "sensor.soc"
+    assert "Mapping" not in rows[0]
+    assert rows[0]["Wert"] == "55.0"
     assert "schema_version" not in {r["EHAL-Feld"] for r in rows}
 
 
@@ -268,8 +381,8 @@ def test_build_telemetry_rows_pads_unmapped_expected():
     )
     assert len(rows) == 2
     by_field = {r["EHAL-Feld"]: r for r in rows}
-    assert by_field["sens_grid_power_active"]["Mapping"] == ""
-    assert by_field["sens_grid_power_active"]["Status"] == "Kein Mapping"
+    assert "Mapping" not in by_field["grid.meter.sens_grid_power_active"]
+    assert by_field["grid.meter.sens_grid_power_active"]["Status"] == "Kein Mapping"
 
 
 def test_mapping_column_label_by_backend():
@@ -344,11 +457,100 @@ def test_expected_live_read_fields_include_plant_ambient():
     with patch(
         "integrations.ehal_debug_mapping._all_live_consumers",
         return_value=[],
+    ), patch(
+        "integrations.ehal_debug_mapping._all_live_batteries",
+        return_value=[],
     ):
         fields = expected_live_read_fields(network_backend=False)
     assert "sens_temperature_outside" in fields
     assert "sens_absent_mode" in fields
-    assert fields.index("sens_temperature_outside") > fields.index("sens_ess_soc")
+    assert "sens_ess_soc" in fields
+    assert "grid.meter.sens_grid_power_active" in fields
+    assert "grid.meter.sens_grid_energy_import" in fields
+    assert "grid.meter.sens_grid_energy_export" in fields
+    assert "grid.meter.get_grid_export_power_limit" in fields
+    assert "sens_grid_energy_import" not in fields
+    assert "sens_grid_power_active" not in fields
+
+
+def test_expected_live_read_fields_omit_bare_ess_when_batteries():
+    from integrations.ehal_debug_mapping import expected_live_read_fields
+
+    batteries = [{"id": "15_kwh_speicher", "type": "house"}]
+    with patch(
+        "integrations.ehal_debug_mapping._all_live_consumers",
+        return_value=[],
+    ), patch(
+        "integrations.ehal_debug_mapping._all_live_batteries",
+        return_value=batteries,
+    ):
+        fields = expected_live_read_fields(network_backend=False)
+    assert "get_ess_soc_min" not in fields
+    assert "sens_ess_soc" not in fields
+    assert "ess.15_kwh_speicher.get_ess_soc_min" in fields
+    assert "ess.15_kwh_speicher.sens_ess_soc" in fields
+    assert "grid.meter.sens_grid_energy_import" in fields
+    assert "sens_grid_energy_import" not in fields
+
+
+def test_expected_live_write_fields_use_qualified_consumer_ids():
+    from integrations.ehal_debug_mapping import expected_live_write_fields
+
+    consumers = [
+        {
+            "id": "wallbox",
+            "type": "ev",
+            "ehal_bindings": {"set_evcs_max_current": "Ernie_A"},
+        },
+        {
+            "id": "wp",
+            "type": "thermal_annual",
+            "ehal_bindings": {"flex.wp.set_enable": "Ernie_WP"},
+        },
+    ]
+    with patch(
+        "integrations.ehal_debug_mapping._all_live_consumers",
+        return_value=consumers,
+    ), patch(
+        "integrations.ehal_debug_mapping._all_live_batteries",
+        return_value=[],
+    ), patch(
+        "settings.ehal_marker_resolve.marker_flex_enable",
+        side_effect=lambda c: (
+            "Ernie_WP" if str(c.get("id")) == "wp" else ""
+        ),
+    ):
+        fields = expected_live_write_fields(network_backend=False)
+    assert "evcs.wallbox.set_evcs_max_current" in fields
+    assert "heatpump.wp.set_enable" in fields
+    assert "wallbox:set_evcs_max_current" not in fields
+    assert "wp:flex.wp.set_enable" not in fields
+    assert "grid.meter.set_grid_export_power_limit" in fields
+
+
+def test_build_read_rows_grid_meter_push_lookup():
+    """Live-Lesen looks up inbox under grid.meter.* (not bare sens_grid_*)."""
+    from runtime_store.loxone_push_inbox import STATE_OK
+
+    with patch(
+        "runtime_store.loxone_push_inbox.read_push_value",
+        side_effect=lambda ehal_id, **_kw: (
+            (12.5, STATE_OK)
+            if ehal_id == "grid.meter.sens_grid_energy_import"
+            else (None, "Lesefehler")
+        ),
+    ), patch(
+        "ui.loxone_debug_rows._inbox_last_read_local",
+        return_value="12:00:00",
+    ):
+        rows = build_read_rows(
+            [],
+            "t0",
+            expected_fields=["grid.meter.sens_grid_energy_import"],
+        )
+    assert rows[0]["EHAL-Feld"] == "grid.meter.sens_grid_energy_import"
+    assert rows[0]["Wert"] == "12.5"
+    assert rows[0]["Status"] == STATE_OK
 
 
 def test_expected_live_read_fields_include_thermal_temps():
@@ -366,6 +568,9 @@ def test_expected_live_read_fields_include_thermal_temps():
     with patch(
         "integrations.ehal_debug_mapping._all_live_consumers",
         return_value=consumers,
+    ), patch(
+        "integrations.ehal_debug_mapping._all_live_batteries",
+        return_value=[],
     ):
         fields = expected_live_read_fields(network_backend=False)
 

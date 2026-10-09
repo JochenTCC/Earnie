@@ -1,8 +1,8 @@
 """HA cumulative energy entities for slot-Ist ΔkWh overlay (2.6.c).
 
 Side channel only — does not extend EHAL telemetry. Readings use the same
-shape as ``loxone_meter_energy`` so ``overlay_counter_on_closed`` can reuse
-``total`` / ``total_neg`` (import / export).
+``{total[, total_neg]}`` shape as the Loxone VO-push reader so
+``overlay_counter_on_closed`` can reuse import / export.
 """
 from __future__ import annotations
 

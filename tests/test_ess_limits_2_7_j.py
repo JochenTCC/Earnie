@@ -195,6 +195,9 @@ def test_collect_read_checks_includes_ess_limit_gets():
         lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
     ), patch.object(
         lc.loxone_client, "_default_house_profiles_doc", return_value=house
+    ), patch(
+        "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+        return_value=False,
     ):
         checks = lc.collect_read_checks()
 

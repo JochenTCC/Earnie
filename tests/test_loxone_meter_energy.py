@@ -1,4 +1,4 @@
-"""Tests for Loxone Meter energy (ΔkWh) helpers."""
+"""Tests for Loxone Meter energy (ΔkWh) helpers — VO push / inbox (Q6)."""
 from __future__ import annotations
 
 import json
@@ -7,53 +7,26 @@ from pathlib import Path
 import pytest
 
 from integrations.loxone_meter_energy import (
-    bind_consumer_meter_energy,
-    bind_plant_meter_energy,
+    FIELD_CONSUMER_EXPORT,
+    FIELD_CONSUMER_TOTAL,
+    FIELD_GRID_EXPORT,
+    FIELD_GRID_IMPORT,
+    FIELD_PV_ENERGY,
+    activate_consumer_energy_bindings,
+    activate_plant_energy_bindings,
     channel_delta_kwh,
     controls_by_name,
-    energy_from_io_all,
     flex_energy_meter_config,
-    flex_energy_meter_names,
     meter_has_energy_states,
     meter_is_bidirectional,
     mono_delta_kwh,
     overlay_counter_on_closed,
-    plant_energy_meter_names,
+    read_flex_energy_readings,
+    read_plant_energy_readings,
 )
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "loxapp3_greenfield.json"
-
-
-def test_energy_from_io_all_parses_total_and_total_neg():
-    ll = {
-        "Code": "200",
-        "0": {"name": "actual", "value": "1.2"},
-        "1": {"name": "total", "value": "123.4 kWh"},
-        "2": {"name": "totalNeg", "value": "45,6"},
-    }
-    energy = energy_from_io_all(ll)
-    assert energy == {"total": 123.4, "total_neg": 45.6}
-
-
-def test_energy_from_io_all_parses_http_meter_abbreviations():
-    """Live /jdev/sps/io/{Meter}/all uses Pf/Mr/Mrc/Mrd, not total/totalNeg."""
-    uni = {
-        "Code": "200",
-        "output0": {"name": "Pf", "value": 1.2},
-        "output1": {"name": "Mr", "value": 24120.12},
-    }
-    assert energy_from_io_all(uni) == {"total": 24120.12}
-    bipolar = {
-        "Code": "200",
-        "output0": {"name": "Pf", "value": -0.02},
-        "output1": {"name": "Mrc", "value": 541.422},
-        "output8": {"name": "Mrd", "value": 481.076},
-    }
-    assert energy_from_io_all(bipolar) == {
-        "total": 541.422,
-        "total_neg": 481.076,
-    }
 
 
 def test_greenfield_meters_expose_energy_states():
@@ -107,33 +80,6 @@ def test_overlay_counter_on_closed_prefers_delta():
     assert out["ist_power_source"]["flex"] == {}
 
 
-def test_plant_energy_meter_names_prefer_loxone_meter_energy():
-    plant = {
-        "ehal_bindings": {"sens_pv_production_active": "Merker PV"},
-        "loxone_meter_energy": {
-            "sens_pv_production_active": {
-                "name": "Zähler PV-Anlage",
-                "bidirectional": False,
-            },
-            "sens_grid_power_active": "Zähler Netz",
-        },
-    }
-    names = plant_energy_meter_names(plant=plant)
-    assert names["pv"] == "Zähler PV-Anlage"
-    assert names["grid"] == "Zähler Netz"
-
-
-def test_bind_plant_meter_energy():
-    plant: dict = {}
-    bind_plant_meter_energy(
-        plant,
-        ehal_field="sens_grid_power_active",
-        meter_name="Zähler Netz",
-        bidirectional=True,
-    )
-    assert plant["loxone_meter_energy"]["sens_grid_power_active"]["name"] == "Zähler Netz"
-
-
 def test_overlay_counter_on_closed_flex_meter():
     closed = {
         "flex_kw": {"ev": 3.0, "wp": 1.0},
@@ -161,28 +107,109 @@ def test_overlay_counter_on_closed_flex_meter():
     assert out["ist_power_source"]["flex"]["wp"] == "mean"
 
 
-def test_flex_energy_meter_names_skip_shared_meter():
+def test_activate_plant_energy_bindings():
+    plant: dict = {"ehal_bindings": {"sens_grid_power_active": "Zähler Netz"}}
+    activate_plant_energy_bindings(plant, grid=True, bidirectional=True)
+    bindings = plant["ehal_bindings"]
+    assert FIELD_GRID_IMPORT in bindings
+    assert FIELD_GRID_EXPORT in bindings
+    assert bindings["sens_grid_power_active"] == "Zähler Netz"
+
+
+def test_activate_consumer_energy_bindings_bipolar():
+    consumer: dict = {"id": "ev"}
+    activate_consumer_energy_bindings(consumer, bidirectional=True)
+    assert FIELD_CONSUMER_TOTAL in consumer["ehal_bindings"]
+    assert FIELD_CONSUMER_EXPORT in consumer["ehal_bindings"]
+
+
+def test_activate_battery_energy_bindings_bipolar():
+    from ehal.ess_fields import ess_field
+    from integrations.loxone_meter_energy import (
+        FIELD_ESS_CHARGE,
+        FIELD_ESS_DISCHARGE,
+        activate_battery_energy_bindings,
+    )
+
+    battery: dict = {"id": "15_kwh_speicher"}
+    activate_battery_energy_bindings(battery, bidirectional=True)
+    assert ess_field("15_kwh_speicher", FIELD_ESS_CHARGE) in battery["ehal_bindings"]
+    assert ess_field("15_kwh_speicher", FIELD_ESS_DISCHARGE) in battery["ehal_bindings"]
+
+
+def test_read_plant_energy_from_inbox_counters():
+    from ehal.qualified_ids import qualified_plant_id
+
+    plant = {
+        "ehal_bindings": {
+            FIELD_PV_ENERGY: "",
+            FIELD_GRID_IMPORT: "",
+            FIELD_GRID_EXPORT: "",
+        }
+    }
+    inbox = {
+        FIELD_PV_ENERGY: 10.5,
+        qualified_plant_id(FIELD_GRID_IMPORT): 100.0,
+        qualified_plant_id(FIELD_GRID_EXPORT): 20.0,
+    }
+
+    def read_counter(ehal_id: str, **_kwargs):
+        return inbox.get(ehal_id)
+
+    readings = read_plant_energy_readings(plant, read_counter=read_counter)
+    assert readings["pv"] == {"total": 10.5}
+    assert readings["grid"] == {"total": 100.0, "total_neg": 20.0}
+
+
+def test_read_plant_energy_omits_stale_or_missing():
+    plant = {"ehal_bindings": {FIELD_PV_ENERGY: ""}}
+
+    def read_counter(_ehal_id: str, **_kwargs):
+        return None
+
+    assert read_plant_energy_readings(plant, read_counter=read_counter) == {}
+
+
+def test_flex_energy_skips_shared_meter_and_reads_inbox():
     consumers = [
         {
             "id": "swimspa",
-            "loxone_meter_energy": {"name": "Zähler SwimSpa"},
+            "type": "thermal_rc",
+            "ehal_bindings": {FIELD_CONSUMER_TOTAL: ""},
             "loxone_inputs": {"subtract_consumer_ids": ["pool_filter"]},
         },
         {
             "id": "kochen",
-            "ehal_bindings": {"flex.kochen.sens_power_act": "Zähler Kochen"},
+            "type": "generic",
+            "ehal_bindings": {
+                "flex.kochen.sens_power_act": "Zähler Kochen",
+                FIELD_CONSUMER_TOTAL: "",
+            },
+        },
+        {
+            "id": "wallbox",
+            "type": "ev",
+            "ehal_bindings": {
+                FIELD_CONSUMER_TOTAL: "",
+                FIELD_CONSUMER_EXPORT: "",
+            },
         },
     ]
-    names = flex_energy_meter_names(consumers)
-    assert "swimspa" not in names
-    assert names["kochen"] == "Zähler Kochen"
     cfg = flex_energy_meter_config(consumers)
+    assert "swimspa" not in cfg
     assert cfg["kochen"]["bidirectional"] is False
+    assert cfg["wallbox"]["bidirectional"] is True
 
+    inbox = {
+        "consumer.kochen.sens_energy_total": 5.0,
+        "ev.wallbox.sens_energy_total": 12.0,
+        "ev.wallbox.sens_energy_export": 1.5,
+    }
 
-def test_bind_consumer_meter_energy():
-    consumer: dict = {"id": "ev"}
-    bind_consumer_meter_energy(
-        consumer, meter_name="Zähler Wallbox", bidirectional=False
-    )
-    assert consumer["loxone_meter_energy"]["name"] == "Zähler Wallbox"
+    def read_counter(ehal_id: str, **_kwargs):
+        return inbox.get(ehal_id)
+
+    readings = read_flex_energy_readings(consumers, read_counter=read_counter)
+    assert "swimspa" not in readings
+    assert readings["kochen"] == {"total": 5.0}
+    assert readings["wallbox"] == {"total": 12.0, "total_neg": 1.5}
