@@ -148,28 +148,19 @@ def _read_check(
         return LoxoneCheck(label, io_name, False, "IO-Name fehlt in config.json")
 
     if read_raw:
-        # FertigUm: push inbox only (Q7 — SpecialState10 poll retired).
-        raw = (
-            loxone_client.fetch_loxone_ready_by_time(io_name)
-            if warn_if_missing
-            else loxone_client.fetch_loxone_raw_value(io_name)
-        )
+        # FertigUm / ready-by: push inbox only (Q7 — Merker / SpecialState10 poll retired).
+        raw = loxone_client.fetch_loxone_ready_by_time(io_name)
         if raw is None:
-            detail = (
-                "Wert leer (Push-Inbox — noch kein Termin gepusht)"
-                if warn_if_missing
-                else "Lesen fehlgeschlagen (kein Wert)"
+            detail = "Wert leer (Push-Inbox — noch kein Termin gepusht)"
+            return LoxoneCheck(
+                label,
+                io_name,
+                False,
+                detail,
+                severity="warning" if warn_if_missing else "error",
             )
-            if warn_if_missing:
-                return LoxoneCheck(label, io_name, False, detail, severity="warning")
-            return LoxoneCheck(label, io_name, False, detail)
-        display = (
-            loxone_client.format_ready_by_display(raw)
-            if warn_if_missing
-            else repr(raw)
-        )
-        prefix = "Wert=" if warn_if_missing else "raw="
-        return LoxoneCheck(label, io_name, True, f"{prefix}{display}")
+        display = loxone_client.format_ready_by_display(raw)
+        return LoxoneCheck(label, io_name, True, f"Wert={display}")
 
     if validate_filter_start_hour:
         hour, fmt, raw = loxone_client.fetch_filter_native_start_hour(io_name)

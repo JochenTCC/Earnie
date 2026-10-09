@@ -19,7 +19,6 @@ from settings.ehal_marker_resolve import (
 from settings.ev_power import (
     ampere_to_kw,
     ev_nominal_power_conversion,
-    kw_from_nominal_reading,
 )
 from settings.flexible_consumers import runtime_consumer_id
 
@@ -51,20 +50,19 @@ def fetch_loxone_raw_value(io_name: str):
 
 
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
-    """Nennleistung (kW) aus live ``get_evcs_nominal_current`` (A)."""
+    """Nennleistung (kW) aus live ``get_evcs_nominal_current`` (A) via push inbox."""
     fallback = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     bindings = ehal_bindings(consumer)
-    ehal_name = str(
-        bindings.get("get_evcs_nominal_current")
-        or bindings.get("sens_evcs_nominal_current")
-        or ""
-    ).strip()
+    amp_binding = (
+        "get_evcs_nominal_current" in bindings
+        or "sens_evcs_nominal_current" in bindings
+    )
     io_name = marker_get_evcs_nominal_current(consumer)
     if not io_name:
         return fallback
 
-    raw = fetch_loxone_raw_value(io_name)
-    if raw is None:
+    value = fetch_loxone_generic_value(io_name)
+    if value is None:
         logger.warning(
             "Loxone: Keine gültige Nennleistung für '%s' (%s), Fallback %.2f kW",
             consumer.get("id"),
@@ -73,29 +71,18 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
         )
         return fallback
 
-    try:
-        value, unit = _parse_loxone_value(raw)
-    except ValueError as e:
-        logger.error(
-            "Loxone: Parsing-Fehler bei Nennleistung '%s' (raw=%r): %s",
-            io_name,
-            raw,
-            e,
-        )
-        return fallback
-
-    if ehal_name or unit == "a":
+    if amp_binding:
         voltage_v, phases = ev_nominal_power_conversion(consumer)
-        live = ampere_to_kw(value, voltage_v=voltage_v, phases=phases)
+        live = ampere_to_kw(float(value), voltage_v=voltage_v, phases=phases)
     else:
-        live = kw_from_nominal_reading(value, unit, consumer)
+        live = float(value)
 
     if live <= 0:
         logger.warning(
-            "Loxone: Keine gültige Nennleistung für '%s' (%s, raw=%r), Fallback %.2f kW",
+            "Loxone: Keine gültige Nennleistung für '%s' (%s, value=%r), Fallback %.2f kW",
             consumer.get("id"),
             io_name,
-            raw,
+            value,
             fallback,
         )
         return fallback
@@ -122,41 +109,12 @@ def resolve_consumer_battery_capacity_kwh(consumer: dict) -> float | None:
         )
         return None
 
-    raw = fetch_loxone_raw_value(io_name)
-    if raw is None:
+    value = fetch_loxone_generic_value(io_name)
+    if value is None or float(value) <= 0:
         logger.error(
             "Loxone: Akkukapazität für '%s' (%s) nicht lesbar.",
             cid,
             io_name,
-        )
-        return None
-
-    try:
-        value, unit = _parse_loxone_value(raw)
-    except ValueError as e:
-        logger.error(
-            "Loxone: Parsing-Fehler bei Akkukapazität '%s' (raw=%r): %s",
-            io_name,
-            raw,
-            e,
-        )
-        return None
-
-    if unit is not None and unit not in ("kwh", "kw", ""):
-        logger.error(
-            "Loxone: Unbekannte Einheit '%s' bei Akkukapazität '%s' (%s).",
-            unit,
-            cid,
-            io_name,
-        )
-        return None
-
-    if value <= 0:
-        logger.error(
-            "Loxone: Ungültige Akkukapazität für '%s' (%s, raw=%r).",
-            cid,
-            io_name,
-            raw,
         )
         return None
     return float(value)

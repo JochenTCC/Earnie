@@ -170,7 +170,15 @@ def fetch_filter_native_start_hour(io_name: str) -> tuple[float | None, str, str
 
 
 def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
-    """Holt den rohen LL.value-String live aus dem Loxone Miniserver."""
+    """GET ``/jdev/sps/io/<name>`` — Merker poll only.
+
+    Pushable ``sens_*`` / ``get_*`` telemetry must use ``fetch_loxone_generic_value``
+    (VO push inbox). Intentional remaining Merker polls: unbound / unindexed names
+    via that helper's fallback; greenfield / structure presence probes; shadow or
+    auth connectivity probes that are not optimizer telemetry. Writes use
+    ``_loxone_jdev_url`` (not this read). Meter energy ``/all`` and FertigUm
+    SpecialState10 are retired (Q6 / Q7).
+    """
     io_name = str(io_name or "").strip()
     if not io_name:
         return None

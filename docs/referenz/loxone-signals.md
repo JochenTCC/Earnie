@@ -20,7 +20,7 @@ In the docs, the canonical template/import path is called **Default** (formerly 
 | Direction        | Building block                          | Role                                                                        |
 | ----------------- | --------------------------------------- | --------------------------------------------------------------------------- |
 | Earnie → Loxone | **Virtual HTTP In** (`VI_Earnie_*.xml`) | Earnie polls status/setpoints/enables into **named Merker** (`Earnie_`*)   |
-| Loxone → Earnie | **Virtual Out** (`VO_Earnie_*.xml`)     | optional push (telemetry); Core still reads `/jdev/sps/io/{Name}`          |
+| Loxone → Earnie | **Virtual Out** (`VO_Earnie_*.xml`)     | push telemetry into Earnie inbox (qualified EHAL ID); no Merker poll for bound `sens_*` / `get_*` |
 | Meter          | EFM / Meter                             | grid/PV/battery/flex **power** preferably via the EFM designation          |
 
 
@@ -137,7 +137,7 @@ Manual follow-up: after **Smarthome-Backend → Loxone-Import**, check signal ma
 
 **EV ready-by time:** the Loxone import binds **AlarmClock** blocks to `get_evcs_ready_by_time` on the EV entity that already has meter/power bindings — same convention as the meter designation. Optional Analog VO: `/ehal/loxone/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numeric next-entry; inbox also accepts short Tna-style text).
 
-Bound FertigUm fields always use the push inbox. Unbound legacy AlarmClock names may still be polled via **SpecialState10** (`nextEntryTime`) on `/jdev/sps/io/{name}/all` (Unix = value + 1230768000) with **Tna** text as backup.
+Bound FertigUm fields always use the push inbox (SpecialState10 / `/all` Merker poll retired).
 
 ### 5. Earnie Dead-Man Fallback (in Loxone Config)
 

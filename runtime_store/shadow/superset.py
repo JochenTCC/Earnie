@@ -102,6 +102,7 @@ def _collect_loxone_io_names(doc: dict[str, Any]) -> set[str]:
 
 
 def _superset_loxone(seen: frozenset[str], deadline: float) -> None:
+    from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
     from integrations.loxone_client import fetch_loxone_raw_value
 
     for io_name in sorted(_collect_loxone_io_names(_house_profiles_doc())):
@@ -111,6 +112,9 @@ def _superset_loxone(seen: frozenset[str], deadline: float) -> None:
         if key in seen:
             continue
         try:
+            binding = resolve_push_binding(io_name)
+            if binding is not None and is_pushable_kind(binding.kind):
+                continue
             fetch_loxone_raw_value(io_name)
         except Exception:  # noqa: BLE001
             continue

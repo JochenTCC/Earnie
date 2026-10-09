@@ -5,7 +5,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import config
 import pytest
@@ -198,6 +198,67 @@ def test_superset_ha_fetches_missing(tmp_path, monkeypatch):
     called_ids = [c.args[0] for c in adapter.read_state.call_args_list]
     assert "sensor.grid" in called_ids
     assert "sensor.soc" not in called_ids
+
+
+def test_superset_loxone_skips_pushable_bindings(tmp_path, monkeypatch):
+    """Pushable VO titles must not be Merker-polled during shadow feed fill."""
+    _enable_feed(tmp_path, monkeypatch)
+    import runtime_store.shadow.superset as superset_mod
+    from ehal.loxone_push_source import MerkerBinding
+
+    monkeypatch.setattr(config.CONFIG, "EHAL_BACKEND", "loxone", raising=False)
+    monkeypatch.setattr(config.CONFIG, "SHADOW_FEED_ENABLED", True, raising=False)
+    for key in (
+        "LOXONE_SOC_NAME",
+        "LOXONE_PV_POWER_NAME",
+        "LOXONE_BATTERY_POWER_NAME",
+        "LOXONE_GRID_POWER_NAME",
+        "LOXONE_CONSUMERS_POWER_NAME",
+        "LOXONE_TARGET_ACTIVE_POWER_NAME",
+        "LOXONE_TARGET_CHARGE_POWER_NAME",
+        "LOXONE_TARGET_DISCHARGE_POWER_NAME",
+        "LOXONE_CONTROL_CMD_NAME",
+    ):
+        monkeypatch.setattr(config.CONFIG, key, "", raising=False)
+    monkeypatch.setattr(
+        superset_mod,
+        "_house_profiles_doc",
+        lambda: {
+            "plant": {"ehal_bindings": {}},
+            "profiles": {
+                "live": {
+                    "consumers": [
+                        {
+                            "id": "e_auto",
+                            "type": "ev",
+                            "ehal_bindings": {
+                                "get_evcs_nominal_current": "Earnie_EAuto_MaxStrom",
+                                "set_evcs_max_current": "Earnie_EAuto_Soll_A",
+                            },
+                        }
+                    ]
+                }
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "ehal.loxone_push_source.resolve_push_binding",
+        lambda name: MerkerBinding(
+            merker="Earnie_EAuto_MaxStrom",
+            ehal_id="evcs.e_auto.get_evcs_nominal_current",
+            entity_key="consumer:e_auto",
+            kind="get_evcs_nominal_current",
+        )
+        if name == "Earnie_EAuto_MaxStrom"
+        else None,
+    )
+    with patch(
+        "integrations.loxone_client.fetch_loxone_raw_value"
+    ) as raw:
+        run_after_cycle(budget_sec=5)
+    called = [c.args[0] for c in raw.call_args_list]
+    assert "Earnie_EAuto_MaxStrom" not in called
+    assert "Earnie_EAuto_Soll_A" in called
 
 
 def test_superset_budget_stops_early(tmp_path, monkeypatch):

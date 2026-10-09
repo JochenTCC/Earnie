@@ -675,23 +675,30 @@ class TestSharedMeterSubtraction:
                 "nominal_power_phases": 3,
             },
         }
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="16"):
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=16.0) as gen, patch.object(
+            lc, "fetch_loxone_raw_value"
+        ) as raw:
             live = lc.resolve_consumer_nominal_power_kw(consumer)
         assert live == pytest.approx(11.04)
+        gen.assert_called_once_with("Ladestrom Max")
+        raw.assert_not_called()
 
-    def test_resolve_nominal_current_binding_with_unit_suffix(self):
+    def test_resolve_nominal_current_inbox_float(self):
         consumer = {
             "id": "eauto",
             "nominal_power_kw": 3.5,
-            "ehal_bindings": {"get_evcs_nominal_current": "Ladestrom Max"},
+            "ehal_bindings": {"get_evcs_nominal_current": "Earnie_EAuto_MaxStrom"},
             "charging_schedule": {
                 "nominal_power_voltage_v": 230.0,
                 "nominal_power_phases": 3,
             },
         }
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="16 A"):
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=16.0), patch.object(
+            lc, "fetch_loxone_raw_value"
+        ) as raw:
             live = lc.resolve_consumer_nominal_power_kw(consumer)
         assert live == pytest.approx(11.04)
+        raw.assert_not_called()
 
     def test_resolve_nominal_power_ignores_legacy_charging_nest(self):
         """Nest-only ``nominal_power_kw_name`` is no longer resolved (Pattern B only)."""
@@ -702,7 +709,7 @@ class TestSharedMeterSubtraction:
                 "loxone": {"nominal_power_kw_name": "Ladestrom Max"},
             },
         }
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="16 A"):
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=16.0):
             assert lc.resolve_consumer_nominal_power_kw(consumer) == 3.5
 
     def test_resolve_nominal_power_fallback_on_missing_io(self):
@@ -714,8 +721,12 @@ class TestSharedMeterSubtraction:
             "id": "eauto",
             "ehal_bindings": {"sens_evcs_bat_capacity": "Batteriekapazität_E-Auto"},
         }
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=77.0) as gen, patch.object(
+            lc, "fetch_loxone_raw_value"
+        ) as raw:
             assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
+        gen.assert_called_once_with("Batteriekapazität_E-Auto")
+        raw.assert_not_called()
 
     def test_resolve_battery_capacity_ignores_legacy_charging_nest(self):
         consumer = {
@@ -724,7 +735,7 @@ class TestSharedMeterSubtraction:
                 "loxone": {"battery_capacity_kwh_name": "Batteriekapazität_E-Auto"},
             },
         }
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=77.0):
             assert lc.resolve_consumer_battery_capacity_kwh(consumer) is None
 
     def test_resolve_battery_capacity_fails_without_loxone_value(self):
@@ -732,7 +743,7 @@ class TestSharedMeterSubtraction:
             "id": "eauto",
             "ehal_bindings": {"sens_evcs_bat_capacity": "Batteriekapazität_E-Auto"},
         }
-        with patch.object(lc, "fetch_loxone_raw_value", return_value=None):
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=None):
             assert lc.resolve_consumer_battery_capacity_kwh(consumer) is None
 
     def test_resolve_battery_capacity_fails_without_io_name(self):

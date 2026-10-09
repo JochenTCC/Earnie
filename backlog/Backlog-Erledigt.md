@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Powerstation savings study 2025 (2026-10-09)
+
+- [x] **Savings study** (done 2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive Earnie dogfood still open (see [Bugfixes](Backlog-Bugfixes.md) Verifications Pending).
+
 ### Loxone-verify hydrate/wait + warn on missing VO (2026-10-09)
 
 - [x] **Loxone-verify: hydrate / wait before verify + warn on missing VO**

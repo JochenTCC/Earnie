@@ -31,9 +31,16 @@ HOUSE = {
                 {
                     "id": "e_auto",
                     "type": "ev",
+                    "nominal_power_kw": 3.5,
+                    "charging_schedule": {
+                        "nominal_power_voltage_v": 230.0,
+                        "nominal_power_phases": 3,
+                    },
                     "ehal_bindings": {
                         "sens_evcs_active_power": "Earnie_WB",
                         "get_evcs_ready_by_time": "Earnie_Fertig",
+                        "get_evcs_nominal_current": "Earnie_EAuto_MaxStrom",
+                        "sens_evcs_bat_capacity": "Earnie_EAuto_Kapazitaet",
                     },
                 },
             ]
@@ -214,6 +221,36 @@ def test_ready_by_time_push_text_reaches_wecker_parser(
         poll_all.assert_not_called()
     from_dt = datetime(2026, 10, 8, 12, 0, 0)
     assert cs.parse_loxone_ready_by_time(raw, from_dt) == datetime(2026, 10, 9, 7, 0, 0)
+
+
+def test_ev_nominal_and_capacity_use_inbox_not_merker(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    inbox.reset_memory_for_tests()
+    now = datetime.now(timezone.utc)
+    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("evcs.e_auto.get_evcs_nominal_current", "16", now=now)
+    inbox.record_push("ev.e_auto.sens_evcs_bat_capacity", "77", now=now)
+    monkeypatch.setattr(
+        src,
+        "get_merker_index",
+        lambda: src.build_merker_index(HOUSE, COMPONENTS),
+    )
+    monkeypatch.setattr(
+        src,
+        "get_ehal_index",
+        lambda: src.build_ehal_index(HOUSE, COMPONENTS),
+    )
+    consumer = HOUSE["profiles"]["live"]["consumers"][1]
+    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
+        assert loxone_client.resolve_consumer_nominal_power_kw(consumer) == pytest.approx(
+            11.04
+        )
+        assert loxone_client.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(
+            77.0
+        )
+        raw.assert_not_called()
 
 
 def test_ready_by_time_no_poll_fallback_when_bound(
