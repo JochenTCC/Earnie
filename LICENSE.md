@@ -1,6 +1,6 @@
 # Lizenz- und Nutzungsbedingungen: HEMS-Optimierer (Awattar & Loxone Integration)
 **Status:** Entwurf v1.0 (Rechtliche & Strategische Vorlage)
-**Lizenztyp:** Source-Available & Non-Commercial License (mit Datenbeitrags-Verpflichtung)
+**Lizenztyp:** Source-Available & Non-Commercial License (mit freiwilligem Datenbeitrag)
 
 ---
 
@@ -23,11 +23,10 @@ Diese Software wird als "Source-Available" (Quelloffen, aber mit Nutzungsbeschr�
 
 ---
 
-### § 3 Datenbeitrags-Verpflichtung für unbekannte Systeme
-1. Da die Weiterentwicklung der Software auf der Erkennung und Integration einer Vielzahl von Hardware-Komponenten (Wechselrichter, Speicher, Ladestationen) basiert, verpflichtet sich der Nutzer zur Kooperation bei der Systemerweiterung.
-2. Schließt der Nutzer Hardware-Komponenten an das System an, die im offiziellen Core-Repository noch nicht vollständig unterstützt werden oder für die keine Standard-Konfigurationsprofile vorliegen ("unbekannte Systeme"), erklärt er sich bereit, die für die Integration notwendigen technischen Parameter, Kommunikationsprotokolle (z. B. Modbus-Registerbelegungen) und anonymisierte Konfigurationsdaten dem Projekt zur Verfügung zu stellen.
-3. Die Bereitstellung erfolgt in anonymisierter Form (ohne personenbezogene Daten wie Namen, IP-Adressen oder genaue Standorte).
-4. **Kompensationsregelung (Entschädigung):** Als Gegenleistung für die erfolgreiche Bereitstellung funktionsfähiger Konfigurationsdaten für ein neues System erhält der Nutzer eine Entschädigung. Die Höhe, Art und Form dieser Entschädigung (z. B. in Form von Gutschriften auf Premium-Cloud-Dienste, Erlass von Abo-Gebühren oder eine direkte Aufwandsentschädigung) wird durch den Rechteinhaber separat definiert (siehe Konfigurationsparameter `[PARAM_DATA_COMPENSATION]`).
+### § 3 Freiwilliger Datenbeitrag für unbekannte Systeme
+1. Da die Weiterentwicklung der Software auf der Erkennung und Integration einer Vielzahl von Hardware-Komponenten (Wechselrichter, Speicher, Ladestationen) basiert, wird der Nutzer um freiwillige Kooperation bei der Systemerweiterung gebeten.
+2. Schließt der Nutzer Hardware-Komponenten an das System an, die im offiziellen Core-Repository noch nicht vollständig unterstützt werden oder für die keine Standard-Konfigurationsprofile vorliegen ("unbekannte Systeme"), kann er die für die Integration notwendigen technischen Parameter, Kommunikationsprotokolle (z. B. Modbus-Registerbelegungen) und anonymisierte Konfigurationsdaten dem Projekt freiwillig zur Verfügung stellen. Eine Verpflichtung hierzu besteht nicht; die Nutzung der Software ist nicht von einem Datenbeitrag abhängig.
+3. Die freiwillige Bereitstellung erfolgt in anonymisierter Form (ohne personenbezogene Daten wie Namen, IP-Adressen oder genaue Standorte).
 
 ---
 
@@ -41,11 +40,3 @@ Diese Software wird als "Source-Available" (Quelloffen, aber mit Nutzungsbeschr�
 ### § 5 Gewährleistungsausschluss und Haftungsbeschränkung
 1. Die Software wird "wie besehen" (AS IS) und ohne jegliche ausdrückliche oder implizite Gewährleistung zur Verfügung gestellt.
 2. Da die Software direkt in die Steuerung von elektrischen Großverbrauchern und Speichersystemen eingreift, liegt das Risiko der Nutzung vollständig beim Anwender. Der Urheber haftet nicht für Schäden an der Hardware (z. B. Batterieverschleiß, Fehlsteuerungen von Wärmepumpen), entgangene Einsparungen oder Strafen durch Netzbetreiber/Energieversorger.
-
----
-
-## 8. Konfigurations-Notiz für das Business-Modell
-Um diese Lizenzbedingungen rechtssicher mit unserem Abrechnungsmodell zu verknüpfen, müssen wir im Backend die Kompensations-Logik festlegen.
-
-Bitte teile mir mit, ob wir hierfür einen Standard-Default-Wert hinterlegen sollen:
-* **[PARAM_DATA_COMPENSATION]** (Gutschrift/Entschädigung für verifizierte Hardware-Profile): **[Noch offen, z. B. 3 Monate Gratis-Premium-Abo oder Einmalzahlung]**

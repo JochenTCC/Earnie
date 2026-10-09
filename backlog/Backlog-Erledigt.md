@@ -1432,7 +1432,7 @@ EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`,
 
 ### 2.4.g Device / hardware profile schemas (2026-07-28)
 
-- [x] **2.4.g — Device / hardware profile schemas (M2 slice; bounty later)** *(was 2.5.c)* — EHAL device-role templates (`share/ehal/device_roles.schema.json`, `share/ehal/roles/`); Modbus/SunSpec outline (`share/hardware_profiles/`); Loxone JSON Merker recipes (`share/loxone/recipes/`); loader `ehal/profiles.py` + `tests/test_ehal_profiles.py`; HITL role grouping on EHAL-Com; docs [`docs/spec/ehal.md`](../docs/spec/ehal.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md) §4, [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md). Full Community Bounty engine deferred to Entwicklungsplan **M4**.
+- [x] **2.4.g — Device / hardware profile schemas (M2 slice)** *(was 2.5.c)* — EHAL device-role templates (`share/ehal/device_roles.schema.json`, `share/ehal/roles/`); Modbus/SunSpec outline (`share/hardware_profiles/`); Loxone JSON Merker recipes (`share/loxone/recipes/`); loader `ehal/profiles.py` + `tests/test_ehal_profiles.py`; HITL role grouping on EHAL-Com; docs [`docs/spec/ehal.md`](../docs/spec/ehal.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md) §4, [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md).
 
 
 ### 2.4.f Loxone one-click mapping + structure research (2026-07-28)

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/hardware_profiles/hardware_profile.schema.json",
   "title": "Hardware Profile Outline (2.4.g / Path D seed)",
-  "description": "JSON outline for SunSpec or proprietary Modbus profiles mapping toward EHAL fields. Outline/example only — no Modbus client, ARP scan, or bounty upload in this chapter (M4).",
+  "description": "JSON outline for SunSpec or proprietary Modbus profiles mapping toward EHAL fields. Outline/example only — no Modbus client or ARP scan in this chapter (M4).",
   "type": "object",
   "required": ["vendor", "model", "protocol", "status", "ehal_bindings"],
   "properties": {
