@@ -1,6 +1,6 @@
 # Earnie — Developer Documentation
 
-Technical reference for developers and contributors. Product overview and user onboarding: **[README.md](README.md)** · **[docs/README.md](docs/README.md)** · Contributing: **[CONTRIBUTING.md](CONTRIBUTING.md)**
+Technical reference for developers and contributors. Product overview and user onboarding: **[README.md](README.md)** · **[docs/README.md](docs/README.md)** · Contributing: **[CONTRIBUTING.md](../CONTRIBUTING.md)**
 
 ## Project Structure
 
