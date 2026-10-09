@@ -535,6 +535,63 @@ class TestReadCheckPushState:
         assert result.state == STATE_ZERO_HELD
         assert "0.0" in result.detail
 
+    def test_read_check_push_miss_is_warning(self):
+        from runtime_store.loxone_push_inbox import STATE_READ_ERROR
+
+        class _Binding:
+            ehal_id = "sens_ess_soc"
+            kind = "sens_ess_soc"
+
+        with patch(
+            "ehal.loxone_push_source.resolve_push_binding",
+            return_value=_Binding(),
+        ), patch(
+            "ehal.loxone_push_source.is_pushable_kind",
+            return_value=True,
+        ), patch(
+            "runtime_store.loxone_push_inbox.read_push_value",
+            return_value=(None, STATE_READ_ERROR),
+        ):
+            result = lc._read_check("sens_ess_soc", "Earnie_Batterie_SoC")
+        assert result.passed is False
+        assert result.severity == "warning"
+        assert lc._check_counts_as_ok(result) is True
+        assert "Push-Inbox" in result.detail
+        assert result.state == STATE_READ_ERROR
+
+    def test_read_check_last_known_passes(self):
+        from runtime_store.loxone_push_inbox import STATE_LAST_KNOWN
+
+        class _Binding:
+            ehal_id = "sens_ess_soc"
+            kind = "sens_ess_soc"
+
+        with patch(
+            "ehal.loxone_push_source.resolve_push_binding",
+            return_value=_Binding(),
+        ), patch(
+            "ehal.loxone_push_source.is_pushable_kind",
+            return_value=True,
+        ), patch(
+            "runtime_store.loxone_push_inbox.read_push_value",
+            return_value=(55.0, STATE_LAST_KNOWN),
+        ):
+            result = lc._read_check("sens_ess_soc", "Earnie_Batterie_SoC")
+        assert result.passed is True
+        assert result.severity == "error"
+        assert result.state == STATE_LAST_KNOWN
+        assert "55" in result.detail
+
+    def test_read_check_unbound_push_stays_error(self):
+        with patch(
+            "ehal.loxone_push_source.resolve_push_binding",
+            return_value=None,
+        ):
+            result = lc._read_check("sens_ess_soc", "Missing_Merker")
+        assert result.passed is False
+        assert result.severity == "error"
+        assert "Merker-Poll entfernt" in result.detail
+
 
 class TestBatteryEssEmptyMerker:
     def test_empty_merker_uses_pattern_b_ehal_id(self):

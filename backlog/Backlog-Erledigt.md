@@ -2,6 +2,56 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Loxone-verify hydrate/wait + warn on missing VO (2026-10-09)
+
+- [x] **Loxone-verify: hydrate / wait before verify + warn on missing VO**
+  - `prepare_loxone_push_inbox_for_startup`: hydrate inbox → start VO HTTP → `wait_for_push_link` (token), then startup verify
+  - Push miss / outdated last-known → Live Read + startup **Warnung**; last-known ≤5 min still OK; unbound stays error
+  - Tests: `tests/test_loxone_connectivity.py`, `tests/test_startup_checks.py`; docs: `docs/ui/ehal-com.md`
+
+### Bugfix — Duplicate `PLANT_FIELDS` heuristic proposals (2026-10-09)
+
+- [x] **Loxone / HA mapping: duplicate `PLANT_FIELDS` — heuristic proposals miss fields** (**2.7.n-1** half) — fix implemented (2026-10-09); **Verified** UI (2026-10-09)
+  - Removed stale field-list copy in `ui/ehal_loxone_mapping_ui.py`; `heuristic_propose` uses canonical `PROPOSAL_FIELDS` (`PLANT_FIELDS` + `ESS_BATTERY_MAPPING_KINDS` + EV/FLEX/FILTER).
+  - Pattern B lookup: `proposal_for_mapping_field` (Loxone) and `_proposed_entity_id` (HA) resolve `ess.<id>.<kind>` → flat kind.
+  - Tests: `tests/test_ehal_loxone_mapping_entities.py`, `tests/test_ehal_ha_mapping_entities.py`, `tests/test_loxone_ehal_mapping.py`.
+  - UI: EHAL-Com HTTP probe proposes `set_grid_export_power_limit` and battery SoC on a multi-ESS plant.
+
+### Bugfix — Second battery SoC no longer falls back to primary (2026-10-09)
+
+- [x] **Second battery / physical PS: missing SoC no longer falls back to primary** (**2.7.n-1**) — fix implemented (2026-10-09); **Verified live** (2026-10-09)
+  - `read_ess_soc_by_id` iterates `ehal_mappable_batteries`; primary may use plant `sens_ess_soc`; others omitted + warn once. Standby pack without SoC skipped; house ESS without SoC dropped from this cycle’s MILP list; milp/sim no longer reinject primary SoC for missing multi-ESS ids.
+  - Tests: `tests/test_ess_soc_by_id.py`.
+
+### Bugfix — Live-Lesen / Live-Schreiben obsolete bare / colon EHAL IDs (2026-10-09)
+
+- [x] **Live-Lesen / Live-Schreiben show obsolete bare / colon EHAL IDs** — fix implemented (2026-10-09); **Verified live** (2026-10-09)
+  - Live tables use exchange IDs only: `grid.meter.*`, `ess.<id>.*` when mappable batteries exist (no bare `get_ess_soc_min` / `sens_grid_energy_import` / plant ESS flats), qualified consumer writes (`evcs.*` / `consumer|heatpump|pool.*.set_enable`) instead of `{cid}:field`.
+  - Code: `integrations/ehal_debug_mapping.py`, `integrations/loxone_connectivity.py`; docs `docs/ui/ehal-com.md`; tests `test_loxone_debug.py`, `test_loxone_connectivity.py`, `test_ehal_ha_mapping_entities.py`.
+
+### Bugfix — Remove consumer `*.sens_energy_export` (2026-10-09)
+
+- [x] **Remove consumer `*.sens_energy_export`** — fix implemented (2026-10-09); **Verified live** (2026-10-09)
+  - Consumers are mono only (`sens_energy_total`); bipolar export field dropped from role/FLEX_FIELDS/Live-Lesen/`VO_Earnie_Consumer.xml`, meter energy activate/read, and EFM.
+  - Migrate strips leftover `sens_energy_export` from `consumers[].ehal_bindings`. Plant `sens_grid_energy_export` and battery charge/discharge unchanged.
+  - Docs: `charts.md`, `ehal-com.md`, `loxone-signals.md`, `loxone-meter-energy-slot-ist.md`. Tests: `test_loxone_meter_energy.py`, `test_ehal_entity_bindings.py`, VO/mapping entity tests.
+  - Live: Miniserver VO cmds no longer push `consumer.*.sens_energy_export`; Live-Lesen / slot Ist use `sens_energy_total` only.
+
+### 2.7.q — Binding push-only write path + retire the Loxone mapping (2026-10-09)
+
+- [x] **2.7.q — Binding push-only write path + retire the Loxone mapping** (epic **Binding**; follows archived **2.7.o**)
+  - **Packages (all code done):** q.A/Q1 · q.B/Q2+Q3 · q.C/Q4 · q.D/Q5 (live dogfood verified) · q.E/Q6 (meter energy VO push; **Verified live** 2026-10-09) · q.F/Q7+Q8 — detail sections below
+  - **Outcome:** Loud writes publish only via qualified IDs in `status.json` (VI poll ≤10 s); no Merker HTTP for setpoints; meter-energy `/all` poll removed in code; EHAL-Com mapping chapter → Signal list; empty-string activation flags; dual-emit legacy peers removed
+  - **Deferred (Shadow future undecided):** Shadow would-write old-vs-new comparison; silent publish gate so planned `status.json` setpoints never actuate
+  - **Follow-up (open in Backlog):** Retire remaining Loxone Merker poll reads (gap after push-only read/write)
+
+### 2.7.q q.F — Contract UI + storage Q7+Q8 (2026-10-09)
+
+- [x] **q.F — Contract UI + storage** (Q7+Q8; done 2026-10-09)
+  - **Note (adapted after Q5/Q6):** Loud Live-Schreiben was already push-only; VO/VI CLI gens (q.C) reused for UI ZIP export.
+  - [x] **Q7 — EHAL-Com Signalliste:** mapping chapter replaced; Schreibtest = publish + callback; SpecialState10 poll removed; verify/watchdog on inbox/callback; docs updated.
+  - [x] **Q8 — Storage cleanup:** empty-string activation flags; `_mapped_fields(require_nonempty_value=…)`; import writes empty values; `scripts/clear_loxone_binding_names_once`; dual-emit legacy peers removed from `status.json`.
+
 ### 2.7.q q.E / Q6 — Meter energy as VO push (2026-10-09)
 
 - [x] **q.E / Q6 — Meter energy as VO push** (decided 2026-10-08): each meter gets a second VO for cumulative kWh (bipolar: consumption + delivery). No averaging / integration of pushed power. QH-open/close anchors read last pushed counter from the inbox; `*_kw = ΔE / 0.25` unchanged (negative Δ rejects that channel).
@@ -9,7 +59,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Code: energy kinds pushable in `ehal/loxone_push_source.py`; inbox / `read_signals_from_docs`; `integrations/loxone_meter_energy.py` inbox-only (no `/all`, no `loxone_meter_energy` profile names); EFM import activates energy bindings; stale (> 3 × repeat) / never received → no overlay, sample-mean fallback; never zero-assumed
   - Templates: `VO_Earnie_Plant` / `Consumer` / `Battery` + generator; spec `docs/spec/loxone-meter-energy-slot-ist.md` push section; docs `ehal-com.md`, `loxone-signals.md`
   - Tests: `tests/test_loxone_meter_energy.py`, `test_loxone_push_source.py`, VO template / EFM / mapping coverage
-  - **Not yet verified on productive Earnie** — live dogfood tracked under [Bugfixes](Backlog-Bugfixes.md) → Verifications Pending
+  - **Verified live** (2026-10-09): energy VOs next to power; inbox values and QH slot-Ist ΔE overlay OK; no Meter `/all` poll; no zero-assumption for silent counters
 
 ### Minor — Live-Lesen push zero / last-known Status (2026-10-09)
 

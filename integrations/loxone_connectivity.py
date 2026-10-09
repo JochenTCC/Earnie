@@ -196,14 +196,22 @@ def _read_check(
                 value, state = read_push_value(binding.ehal_id)
             except Exception:  # noqa: BLE001 — no Merker poll fallback for push
                 return LoxoneCheck(
-                    label, io_name, False, "Lesen oder Parsen fehlgeschlagen"
+                    label,
+                    io_name,
+                    False,
+                    "Kein frischer Push-Inbox-Wert",
+                    severity="warning",
                 )
             if value is None:
+                detail = "Kein frischer Push-Inbox-Wert"
+                if state:
+                    detail = f"{detail} ({state})"
                 return LoxoneCheck(
                     label,
                     io_name,
                     False,
-                    "Lesen oder Parsen fehlgeschlagen",
+                    detail,
+                    severity="warning",
                     state=state,
                 )
             return LoxoneCheck(

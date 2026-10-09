@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
+from collections.abc import Callable
 
 from house_config.tariff_plausibility import (
     collect_tariff_plausibility_errors,
@@ -28,12 +30,38 @@ def _env_flag(suffix: str, *, default: bool = False) -> bool:
     return raw.lower() in _TRUTHY
 
 
+def prepare_loxone_push_inbox_for_startup(
+    *,
+    start_http_fn: Callable[[], None] | None = None,
+    wait_for_link: bool | None = None,
+) -> None:
+    """Hydrate push inbox, optionally start VO HTTP, then wait for link.
+
+    Call before ``run_loxone_verify_on_startup`` so last-known (≤5 min) and a
+    fresh VO cycle can populate the inbox. ``wait_for_link`` defaults to True
+    when ``EARNIE_PILOT_PUSH_TOKEN`` is set.
+    """
+    from runtime_store.loxone_push_inbox import (
+        hydrate_memory_from_disk,
+        wait_for_push_link,
+    )
+
+    hydrate_memory_from_disk()
+    if start_http_fn is not None:
+        start_http_fn()
+    if wait_for_link is None:
+        wait_for_link = bool(os.getenv("EARNIE_PILOT_PUSH_TOKEN"))
+    if wait_for_link:
+        wait_for_push_link()
+
+
 def run_loxone_verify_on_startup() -> None:
     """
-    Liest alle konfigurierten Loxone-IOs (ohne Roundtrip).
+    Liest alle konfigurierten Loxone push/Live-IOs (ohne Merker-Roundtrip).
 
-    Standard: einmal pro Worker-Start nach Deploy/Neustart.
-    Fehler werden geloggt; der Betrieb läuft weiter.
+    Call after ``prepare_loxone_push_inbox_for_startup`` so the inbox is hydrated
+    and (when tokenized) the push link has been waited for. Missing VO values are
+    warnings; strict mode still aborts only on non-warning failures.
 
     EARNIE_SKIP_LOXONE_VERIFY=1 → überspringen
     EARNIE_VERIFY_LOXONE_ON_START=0 → überspringen

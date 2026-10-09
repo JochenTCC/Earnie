@@ -111,3 +111,50 @@ class TestRunLoxoneVerifyOnStartup:
             ),
         ):
             sc.run_loxone_verify_on_startup()
+
+
+class TestPrepareLoxonePushInboxForStartup:
+    def test_order_hydrate_http_wait(self, monkeypatch):
+        monkeypatch.setenv("EARNIE_PILOT_PUSH_TOKEN", "tok")
+        order: list[str] = []
+
+        def _hydrate():
+            order.append("hydrate")
+
+        def _wait():
+            order.append("wait")
+
+        def _http():
+            order.append("http")
+
+        with (
+            patch(
+                "runtime_store.loxone_push_inbox.hydrate_memory_from_disk",
+                side_effect=_hydrate,
+            ),
+            patch(
+                "runtime_store.loxone_push_inbox.wait_for_push_link",
+                side_effect=_wait,
+            ),
+        ):
+            sc.prepare_loxone_push_inbox_for_startup(start_http_fn=_http)
+        assert order == ["hydrate", "http", "wait"]
+
+    def test_skips_wait_without_token(self, monkeypatch):
+        monkeypatch.delenv("EARNIE_PILOT_PUSH_TOKEN", raising=False)
+        order: list[str] = []
+
+        with (
+            patch(
+                "runtime_store.loxone_push_inbox.hydrate_memory_from_disk",
+                side_effect=lambda: order.append("hydrate"),
+            ),
+            patch(
+                "runtime_store.loxone_push_inbox.wait_for_push_link",
+                side_effect=lambda: order.append("wait"),
+            ),
+        ):
+            sc.prepare_loxone_push_inbox_for_startup(
+                start_http_fn=lambda: order.append("http"),
+            )
+        assert order == ["hydrate", "http"]

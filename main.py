@@ -742,28 +742,22 @@ if __name__ == "__main__":
     logger.info(_sep)
 
     from scripts.startup_checks import (
+        prepare_loxone_push_inbox_for_startup,
         run_live_scenario_entity_check_on_startup,
         run_loxone_verify_on_startup,
         run_tariff_plausibility_on_startup,
     )
+    from integrations.loxone_request_http import start_loxone_request_http
 
     run_tariff_plausibility_on_startup()
     run_live_scenario_entity_check_on_startup()
+    prepare_loxone_push_inbox_for_startup(
+        start_http_fn=lambda: start_loxone_request_http(
+            config.get_ehal_loxone_http_port()
+        ),
+    )
     run_loxone_verify_on_startup()
     ehal_live.push_safe_setpoints_on_startup()
-
-    from integrations.loxone_request_http import start_loxone_request_http
-
-    start_loxone_request_http(config.get_ehal_loxone_http_port())
-
-    from runtime_store.loxone_push_inbox import (
-        hydrate_memory_from_disk,
-        wait_for_push_link,
-    )
-
-    hydrate_memory_from_disk()
-    if os.getenv("EARNIE_PILOT_PUSH_TOKEN"):
-        wait_for_push_link()
 
     from runtime_store.dotenv_io import (
         deferred_loxone_blocks_live,

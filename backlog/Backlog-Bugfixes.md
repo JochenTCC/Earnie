@@ -23,11 +23,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **2.7.q q.E / Q6 — Meter energy VO push** (code archived in Erledigt; live acceptance pending)
-  - Wire energy VOs next to power (plant `sens_pv_energy` / `sens_grid_energy_*`, consumers `sens_energy_total` mono only, batteries `sens_ess_energy_charge` / `_discharge`); confirm inbox values and QH slot-Ist ΔE overlay (`*_kw = ΔE / 0.25`) with sample-mean fallback on stale / wrap
-  - Confirm no Meter `/all` poll and no zero-assumption for silent counters
-  - After successful live check: remove this item; add **Verified live** note on the **2.7.q q.E** Erledigt entry
-
 - [ ] **2.7.h — productive Earnie dogfood** (code archived in Erledigt; not yet verified live)
   - Physical `role: standby_backup` + `set_ess_source_select` (EcoFlow Delta 3 / Loxone Merker `Earnie_Speicher_Quellenwahl` → HA `switch.*_grid_bypass`): price-driven grid vs battery island flips, reserve sizing, charge in cheap slots
   - After successful live check: remove this item; add **Verified live** note on the **2.7.h** Erledigt entry
@@ -43,30 +38,10 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - **Note:** after the fix the VI commands `Earnie_Delta3_*` receive mirror values for the first time. A VI scale with `DestValHigh="-100"` inverts the sign of such a mirrored value; check the scaling before rollout.
   - After a successful live check: remove this item → `Backlog-Erledigt.md`.
 
-- [ ] **Loxone / HA mapping: duplicate `PLANT_FIELDS` — heuristic proposals miss fields** — fix implemented (2026-10-09); UI acceptance pending (**2.7.n-1** half)
-  - Removed stale field-list copy in `ui/ehal_loxone_mapping_ui.py`; `heuristic_propose` uses canonical `PROPOSAL_FIELDS` (`PLANT_FIELDS` + `ESS_BATTERY_MAPPING_KINDS` + EV/FLEX/FILTER).
-  - Pattern B lookup: `proposal_for_mapping_field` (Loxone) and `_proposed_entity_id` (HA) resolve `ess.<id>.<kind>` → flat kind.
-  - Tests: `tests/test_ehal_loxone_mapping_entities.py`, `tests/test_ehal_ha_mapping_entities.py`, `tests/test_loxone_ehal_mapping.py`.
-  - Verify in EHAL-Com: HTTP probe proposes `set_grid_export_power_limit` and battery SoC on a multi-ESS plant; then → `Backlog-Erledigt.md`.
-
 - [ ] **Loxone: silent `loxone_sent` omitted physical powerstation setpoints** — fix implemented (2026-10-09); live acceptance pending
   - Loud `loxone_writes` merge was already done (Erledigt 2026-10-07). Remaining gap: Silent Live-Schreiben / watchdog Soll from `loxone_sent`.
   - Fix: `planned_powerstation_loxone_sent` in `optimizer/powerstation_live.py` (Merker → wire, no publish); `main.py` merges into `loxone_sent` after `build_sent_loxone_snapshot`. Does not update `_last_powerstation_sent` in silent.
   - Tests: `tests/test_powerstation_2_7_h.py`, `tests/test_main_loxone_writes.py`, `tests/test_loxone_debug.py`.
-
-- [ ] **Second battery / physical PS: missing SoC no longer falls back to primary** — fix implemented (2026-10-09); live acceptance pending (**2.7.n-1**)
-  - `read_ess_soc_by_id` iterates `ehal_mappable_batteries`; primary may use plant `sens_ess_soc`; others omitted + warn once. Standby pack without SoC skipped; house ESS without SoC dropped from this cycle’s MILP list; milp/sim no longer reinject primary SoC for missing multi-ESS ids.
-  - Tests: `tests/test_ess_soc_by_id.py`.
-
-- [ ] **Live-Lesen / Live-Schreiben show obsolete bare / colon EHAL IDs** — fix implemented (2026-10-09); live acceptance pending
-  - Live tables use exchange IDs only: `grid.meter.*`, `ess.<id>.*` when mappable batteries exist (no bare `get_ess_soc_min` / `sens_grid_energy_import` / plant ESS flats), qualified consumer writes (`evcs.*` / `consumer|heatpump|pool.*.set_enable`) instead of `{cid}:field`.
-  - Code: `integrations/ehal_debug_mapping.py`, `integrations/loxone_connectivity.py`; docs `docs/ui/ehal-com.md`; tests `test_loxone_debug.py`, `test_loxone_connectivity.py`, `test_ehal_ha_mapping_entities.py`.
-
-- [ ] **Remove consumer `*.sens_energy_export`** — fix implemented (2026-10-09); live acceptance pending
-  - Consumers are mono only (`sens_energy_total`); bipolar export field dropped from role/FLEX_FIELDS/Live-Lesen/`VO_Earnie_Consumer.xml`, meter energy activate/read, and EFM.
-  - Migrate strips leftover `sens_energy_export` from `consumers[].ehal_bindings`. Plant `sens_grid_energy_export` and battery charge/discharge unchanged.
-  - Docs: `charts.md`, `ehal-com.md`, `loxone-signals.md`, `loxone-meter-energy-slot-ist.md`. Tests: `test_loxone_meter_energy.py`, `test_ehal_entity_bindings.py`, VO/mapping entity tests.
-  - Verify: re-export or disable Miniserver VO cmds that still push `consumer.*.sens_energy_export`; confirm Live-Lesen / slot Ist for consumers use `sens_energy_total` only.
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
