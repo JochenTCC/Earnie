@@ -275,7 +275,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 
 ## Device roles and hardware profiles
 
-**Mapping aids / contribution seeds**, not a new Live I/O path. Full Community Bounty engine remains Entwicklungsplan **M4**.
+**Mapping aids / contribution seeds**, not a new Live I/O path.
 
 
 | Artifact                | Path                                                                                                                 | Purpose                                                                              |
@@ -294,7 +294,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 
 - MQTT / Matter as first-class hubs
 - HA WebSocket state subscription / direct evcc REST adapter (deferred; REST HA path shipped)
-- Community Bounty engine / ARP scan / profile upload (Entwicklungsplan **M4**). Modbus/SunSpec **outline** schemas under `share/hardware_profiles/` — not a runtime Modbus client.
+- ARP scan / profile upload. Modbus/SunSpec **outline** schemas under `share/hardware_profiles/` — not a runtime Modbus client (direct Modbus profiles: Entwicklungsplan **M4**).
 
 
 
@@ -352,4 +352,3 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 - Schemas + examples only for Live; adapters keep hardcoded maps.
 - HITL labels/grouping via `ehal.profiles.role_field_labels` / `group_fields_by_role` (Loxone + HA mapping UIs).
 - Contribution entry: [CONTRIBUTING.md](../../CONTRIBUTING.md) §4.
-
