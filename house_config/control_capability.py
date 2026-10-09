@@ -26,7 +26,15 @@ def control_capability_warnings(
         return []
 
     vendor = ha_ess_force_enables_ess_active(ha_ess_force)
-    available = available_functions(ehal_map or {}, vendor_ess_active=vendor)
+    # Q8: Loxone activation-flag maps (all empty values) still count as mapped.
+    empty_only = bool(ehal_map) and not any(
+        str(v or "").strip() for v in (ehal_map or {}).values()
+    )
+    available = available_functions(
+        ehal_map or {},
+        vendor_ess_active=vendor,
+        require_nonempty_value=not empty_only,
+    )
     warnings: list[str] = []
 
     if level == BATTERY_CONTROL_FULL and "ess_active" not in available:

@@ -1,6 +1,6 @@
 """2.7.q Q1 gate: pin today's Loxone write decisions and status.json keys.
 
-Thin characterization so Q2 dual-emit (qualified next to legacy) cannot silently
+Thin characterization so Q8 qualified-only status.json keys cannot silently
 change ESS modes, flex enable, EV current/mode, powerstation wire/status keys,
 or the mixed legacy status.json payload shape.
 
@@ -142,11 +142,9 @@ def test_char_flex_enable_status_key_shape() -> None:
         plant_io_index={},
         now_ts=50.0,
     )
-    assert payload["flex.waschmaschine.Earnie_Verbraucher_Freigabe"] == 1.0
-    assert payload["flex.waermepumpe.Earnie_Waermepumpe_Freigabe"] == 0.0
-    assert payload["Earnie_Pool_Freigabe"] == 1.0
-    assert payload["Earnie_Pool_Filter_Freigabe"] == 0.0
-    # Q2 dual-emit (qualified next to legacy)
+    # Q8: qualified Check keys only (legacy peers removed)
+    assert "flex.waschmaschine.Earnie_Verbraucher_Freigabe" not in payload
+    assert "Earnie_Pool_Freigabe" not in payload
     assert payload["consumer.waschmaschine.set_enable"] == 1.0
     assert payload["heatpump.waermepumpe.set_enable"] == 0.0
     assert payload["pool.pool_filter.set_enable"] == 0.0
@@ -220,8 +218,7 @@ def test_char_ev_status_keys() -> None:
         plant_io_index={},
         now_ts=50.0,
     )
-    assert payload["ev.garage.Earnie_EAuto_Soll_A"] == 16.0
-    assert payload["ev.garage.Earnie_EAuto_Modus"] == 1.0
+    assert "ev.garage.Earnie_EAuto_Soll_A" not in payload
     assert payload["evcs.garage.set_evcs_max_current"] == 16.0
     assert payload["evcs.garage.set_evcs_mode"] == 1.0
 
@@ -341,10 +338,9 @@ def test_char_status_json_legacy_payload_snapshot(monkeypatch) -> None:
     assert payload["set_ess_discharge_power_limit"] == 4.0
     assert payload["set_ess_mode"] == 1.0
     assert payload["set_grid_export_power_limit"] == 15.0  # unconstrained ≠ 0
-    assert payload["ev.garage.Earnie_EAuto_Soll_A"] == 16.0
-    assert payload["ev.garage.Earnie_EAuto_Modus"] == 2.0
-    assert payload["flex.waschmaschine.Earnie_Verbraucher_Freigabe"] == 1.0
-    assert payload["Earnie_Pool_Freigabe"] == 0.0
+    assert "ev.garage.Earnie_EAuto_Soll_A" not in payload
+    assert "flex.waschmaschine.Earnie_Verbraucher_Freigabe" not in payload
+    assert "Earnie_Pool_Freigabe" not in payload
     assert payload["ess.ecoflow_delta_3.set_ess_charge_power_limit"] == 1.5
     assert payload["evcs.garage.set_evcs_max_current"] == 16.0
     assert payload["evcs.garage.set_evcs_mode"] == 2.0

@@ -24,7 +24,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
 - [ ] **2.7.q q.E / Q6 — Meter energy VO push** (code archived in Erledigt; live acceptance pending)
-  - Wire energy VOs next to power (plant `sens_pv_energy` / `sens_grid_energy_*`, consumers `sens_energy_total` [+ export], batteries `sens_ess_energy_charge` / `_discharge`); confirm inbox values and QH slot-Ist ΔE overlay (`*_kw = ΔE / 0.25`) with sample-mean fallback on stale / wrap
+  - Wire energy VOs next to power (plant `sens_pv_energy` / `sens_grid_energy_*`, consumers `sens_energy_total` mono only, batteries `sens_ess_energy_charge` / `_discharge`); confirm inbox values and QH slot-Ist ΔE overlay (`*_kw = ΔE / 0.25`) with sample-mean fallback on stale / wrap
   - Confirm no Meter `/all` poll and no zero-assumption for silent counters
   - After successful live check: remove this item; add **Verified live** note on the **2.7.q q.E** Erledigt entry
 
@@ -62,7 +62,15 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Live tables use exchange IDs only: `grid.meter.*`, `ess.<id>.*` when mappable batteries exist (no bare `get_ess_soc_min` / `sens_grid_energy_import` / plant ESS flats), qualified consumer writes (`evcs.*` / `consumer|heatpump|pool.*.set_enable`) instead of `{cid}:field`.
   - Code: `integrations/ehal_debug_mapping.py`, `integrations/loxone_connectivity.py`; docs `docs/ui/ehal-com.md`; tests `test_loxone_debug.py`, `test_loxone_connectivity.py`, `test_ehal_ha_mapping_entities.py`.
 
+- [ ] **Remove consumer `*.sens_energy_export`** — fix implemented (2026-10-09); live acceptance pending
+  - Consumers are mono only (`sens_energy_total`); bipolar export field dropped from role/FLEX_FIELDS/Live-Lesen/`VO_Earnie_Consumer.xml`, meter energy activate/read, and EFM.
+  - Migrate strips leftover `sens_energy_export` from `consumers[].ehal_bindings`. Plant `sens_grid_energy_export` and battery charge/discharge unchanged.
+  - Docs: `charts.md`, `ehal-com.md`, `loxone-signals.md`, `loxone-meter-energy-slot-ist.md`. Tests: `test_loxone_meter_energy.py`, `test_ehal_entity_bindings.py`, VO/mapping entity tests.
+  - Verify: re-export or disable Miniserver VO cmds that still push `consumer.*.sens_energy_export`; confirm Live-Lesen / slot Ist for consumers use `sens_energy_total` only.
+
 ## New Bugs (Do not remove this chapter — even if empty)
+
+- [ ] Don't show "main.py nicht aktiv" on Monitor page while main.py is running and currently optimizing
 
 - [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
 - [ ] 2026-10-08 07:07:14 [WARNING] (data.outdoor_forecast:209) - Außentemperatur-Prognose fehlgeschlagen (503 Server Error: Service Unavailable for url: https://api.open-meteo.com/v1/forecast?latitude=47.40409024399311&longitude=9.742743769241422&hourly=temperature_2m&forecast_days=3&timezone=auto) – konstante Fallback-Temperatur 14.10 °C  --> This warning is quite often - please check

@@ -1,7 +1,6 @@
 """Deprecated: plant ``loxone_blocks`` / Merker event-trigger editors.
 
-Bindings are edited entity-centrically on EHAL-Com
-(``ui/ehal_loxone_mapping.py``) and stored in ``house_profiles.json``.
+Loxone contract UI is the EHAL-Com **Signalliste** (``ui/ehal_signal_list.py``).
 Merker event-triggers were removed; use Loxone VO ``Earnie_Request_Optimize``
 (Daemon-HTTP, ``system.ehal_loxone_http_port``, default 8541).
 """
@@ -12,8 +11,9 @@ import streamlit as st
 
 def render_loxone_blocks_form() -> None:
     st.info(
-        "Anlagen-Merker werden unter **Loxone Struktur → EHAL Mapping** "
-        "(Entity „Anlage“) gepflegt und in `house_profiles.json` → `plant.ehal_bindings` gespeichert."
+        "Loxone-Signale stehen unter **EHAL-Com → Signalliste**. "
+        "Aktivierte Bindings liegen in `house_profiles.json` → `plant.ehal_bindings` "
+        "(und Pattern B auf Verbrauchern / Batterien)."
     )
 
 

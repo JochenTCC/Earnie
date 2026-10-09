@@ -13,7 +13,6 @@ FIELD_PV_ENERGY = "sens_pv_energy"
 FIELD_GRID_IMPORT = "sens_grid_energy_import"
 FIELD_GRID_EXPORT = "sens_grid_energy_export"
 FIELD_CONSUMER_TOTAL = "sens_energy_total"
-FIELD_CONSUMER_EXPORT = "sens_energy_export"
 FIELD_ESS_CHARGE = "sens_ess_energy_charge"
 FIELD_ESS_DISCHARGE = "sens_ess_energy_discharge"
 
@@ -22,7 +21,7 @@ PLANT_ENERGY_FIELDS = (
     FIELD_GRID_IMPORT,
     FIELD_GRID_EXPORT,
 )
-CONSUMER_ENERGY_FIELDS = (FIELD_CONSUMER_TOTAL, FIELD_CONSUMER_EXPORT)
+CONSUMER_ENERGY_FIELDS = (FIELD_CONSUMER_TOTAL,)
 BATTERY_ENERGY_FIELDS = (FIELD_ESS_CHARGE, FIELD_ESS_DISCHARGE)
 ENERGY_ACTIVATION_KINDS = frozenset(
     PLANT_ENERGY_FIELDS + CONSUMER_ENERGY_FIELDS + BATTERY_ENERGY_FIELDS
@@ -81,20 +80,17 @@ def activate_plant_energy_bindings(
     plant["ehal_bindings"] = bindings
 
 
-def activate_consumer_energy_bindings(
-    consumer: dict[str, Any],
-    *,
-    bidirectional: bool = False,
-) -> None:
-    """Activate consumer energy push fields on ``ehal_bindings`` (in-place)."""
+def activate_consumer_energy_bindings(consumer: dict[str, Any]) -> None:
+    """Activate consumer energy push field on ``ehal_bindings`` (in-place).
+
+    Consumers are mono only (``sens_energy_total``); they cannot export energy.
+    """
     bindings = (
         dict(consumer["ehal_bindings"])
         if isinstance(consumer.get("ehal_bindings"), dict)
         else {}
     )
     bindings.setdefault(FIELD_CONSUMER_TOTAL, "")
-    if bidirectional:
-        bindings.setdefault(FIELD_CONSUMER_EXPORT, "")
     consumer["ehal_bindings"] = bindings
 
 
@@ -185,7 +181,7 @@ def _consumer_has_shared_meter(consumer: dict[str, Any]) -> bool:
 def flex_energy_meter_config(
     consumers: list[dict[str, Any]] | None,
 ) -> dict[str, dict[str, Any]]:
-    """``{consumer_id: {bidirectional}}`` for slot-Ist ΔE candidates (push fields)."""
+    """``{consumer_id: {}}`` for slot-Ist ΔE candidates (push fields; mono only)."""
     out: dict[str, dict[str, Any]] = {}
     for consumer in consumers or []:
         if not isinstance(consumer, dict):
@@ -196,9 +192,7 @@ def flex_energy_meter_config(
         bindings = consumer.get("ehal_bindings")
         if not energy_binding_activated(bindings, FIELD_CONSUMER_TOTAL):
             continue
-        out[cid] = {
-            "bidirectional": energy_binding_activated(bindings, FIELD_CONSUMER_EXPORT),
-        }
+        out[cid] = {}
     return out
 
 
@@ -208,7 +202,7 @@ def read_flex_energy_readings(
     read_counter: Callable[..., float | None] | None = None,
     now: Any = None,
 ) -> dict[str, dict[str, float]]:
-    """``{consumer_id: {total[, total_neg]}}`` from fresh inbox counters."""
+    """``{consumer_id: {total}}`` from fresh inbox counters (mono only)."""
     from ehal.qualified_ids import qualified_consumer_id
 
     readings: dict[str, dict[str, float]] = {}
@@ -226,13 +220,7 @@ def read_flex_energy_readings(
         total = _read_counter(total_id, read_counter=read_counter, now=now)
         if total is None:
             continue
-        channel: dict[str, float] = {"total": float(total)}
-        if energy_binding_activated(bindings, FIELD_CONSUMER_EXPORT):
-            export_id = qualified_consumer_id(cid, ctype, FIELD_CONSUMER_EXPORT)
-            total_neg = _read_counter(export_id, read_counter=read_counter, now=now)
-            if total_neg is not None:
-                channel["total_neg"] = float(total_neg)
-        readings[cid] = channel
+        readings[cid] = {"total": float(total)}
     return readings
 
 

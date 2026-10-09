@@ -44,3 +44,10 @@ def test_backend_selector_moved_to_smarthome_backend_page():
         "Smarthome-Backend" in caption.value for caption in at.caption
     )
     assert not any(sh.value == "Anbindung" for sh in at.subheader)
+
+
+def test_signal_list_replaces_mapping_chapter():
+    """Q7: Loxone mapping chapter retired; Signalliste is the contract UI."""
+    at = AppTest.from_file(str(_SCRIPT)).run()
+    assert not any(sh.value == "Loxone Struktur → EHAL Mapping" for sh in at.subheader)
+    assert any(sh.value == "Signalliste" for sh in at.subheader)

@@ -414,13 +414,12 @@ def _write_loxone_mapped_probes(fields: dict[str, Any]) -> EhalWriteError | None
 
     targets = mapped_write_targets()
     for field, value in fields.items():
-        marker = _marker_for_probe_field(field, targets)
-        if not marker:
-            continue
-        wire = _loxone_probe_wire_value(field, value)
         qid = _publish_id_for_probe(str(field))
         if not qid:
             continue
+        # Activation key may have an empty Merker (Q8); publish still goes out.
+        marker = _marker_for_probe_field(field, targets) or qid
+        wire = _loxone_probe_wire_value(field, value)
         _publish_setpoint_traced(qid, wire, io_name=marker)
     return None
 
@@ -479,14 +478,21 @@ def _read_back_ha(field: str) -> Any | None:
 
 
 def _read_back_loxone(field: str) -> Any | None:
-    from integrations import loxone_client
+    """Q7 callback-only: published ledger value once the Miniserver has fetched.
 
-    marker = _marker_for_probe_field(field, mapped_write_targets())
-    if not marker:
+    No Merker HTTP echo. True VO value-echo is deferred to 2.+1.
+    """
+    from integrations.ehal_write import load_published_records, published_fetched_at
+
+    if not published_fetched_at():
         return None
-    raw = loxone_client.fetch_loxone_generic_value(marker)
-    if raw is None:
+    qid = _publish_id_for_probe(str(field))
+    if not qid:
         return None
+    rec = load_published_records().get(qid)
+    if not rec:
+        return None
+    raw = rec.get("value")
     kind = probe_kind(field)
     if kind == "set_ess_mode":
         return _coerce_ess_mode_echo(raw)
@@ -499,8 +505,12 @@ def _read_back_loxone(field: str) -> Any | None:
             if int(val) == code:
                 return name
         return None
-    numeric = float(raw)
+    try:
+        numeric = float(raw)
+    except (TypeError, ValueError):
+        return None
     if kind in LOXONE_KW_WRITE_FIELDS:
+        # Ledger stores the wire (kW) value from publish; probe compares in W.
         return numeric * 1000.0
     return numeric
 
@@ -610,14 +620,17 @@ def _roundtrip_read_back(field: str, written: Any) -> tuple[Any | None, Roundtri
         logger.warning("Write-test read-back failed for %s: %s", field, exc)
         echo = None
     if echo is None:
+        backend_hint = (
+            "Miniserver-Callback fehlt oder Wert nicht im Publish-Ledger."
+            if not ehal_live.is_ha_backend() and not ehal_live.is_openems_backend()
+            else "kein lesbares Echo."
+        )
         return echo, RoundtripResult(
             status=RoundtripStatus.PARTIAL,
             field=field,
             written=written,
             read_back=None,
-            message=(
-                f"{field}: Schreiben OK, aber kein lesbares Echo."
-            ),
+            message=f"{field}: Schreiben OK, aber {backend_hint}",
         )
     if values_match(written, echo):
         return echo, RoundtripResult(

@@ -26,13 +26,7 @@
       "field": "sens_energy_total",
       "required": false,
       "kind": "stub",
-      "notes": "Cumulative kWh (Q6 VO push). Exchange: consumer.{hk_id}.sens_energy_total."
-    },
-    {
-      "field": "sens_energy_export",
-      "required": false,
-      "kind": "stub",
-      "notes": "Delivery counter for bipolar meters (Q6). Exchange: consumer.{hk_id}.sens_energy_export."
+      "notes": "Cumulative kWh (Q6 VO push; mono only). Exchange: consumer.{hk_id}.sens_energy_total."
     }
   ],
   "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signals.md § Flexible Verbraucher."

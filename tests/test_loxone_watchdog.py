@@ -46,8 +46,15 @@ class TestExpectedSnapshotFromRunState:
 class TestVerifyAndRestore:
     def test_no_mismatch_when_within_tolerance(self):
         expected = {"Earnie_Ziel_LadeLeistung": 2.0}
-        with patch.object(
-            wd.loxone_client, "fetch_loxone_generic_value", return_value=2.02
+        published = {
+            "Earnie_Ziel_LadeLeistung": {"value": 2.02, "published_at": "t0"},
+        }
+        with patch(
+            "integrations.ehal_write.load_published_records", return_value=published
+        ), patch(
+            "integrations.ehal_write.published_fetched_at", return_value="t1"
+        ), patch.object(
+            wd, "_qualified_id_for_watchdog_key", return_value="Earnie_Ziel_LadeLeistung"
         ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch.object(
             wd.config, "get", return_value=""
         ), patch.object(wd, "_restore_via_publish") as mock_restore:
@@ -58,8 +65,15 @@ class TestVerifyAndRestore:
 
     def test_corrects_charge_power_outside_tolerance(self):
         expected = {"Earnie_Ziel_LadeLeistung": 2.0}
-        with patch.object(
-            wd.loxone_client, "fetch_loxone_generic_value", return_value=1.8
+        published = {
+            "Earnie_Ziel_LadeLeistung": {"value": 1.8, "published_at": "t0"},
+        }
+        with patch(
+            "integrations.ehal_write.load_published_records", return_value=published
+        ), patch(
+            "integrations.ehal_write.published_fetched_at", return_value="t1"
+        ), patch.object(
+            wd, "_qualified_id_for_watchdog_key", return_value="Earnie_Ziel_LadeLeistung"
         ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch.object(
             wd.config, "get", side_effect=lambda name, **kw: {
                 "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
@@ -73,21 +87,25 @@ class TestVerifyAndRestore:
         assert mismatches[0].corrected is True
         mock_restore.assert_called_once_with("Earnie_Ziel_LadeLeistung", 2.0)
 
-    def test_read_failure_is_reported_without_send(self):
+    def test_missing_ledger_triggers_republish(self):
         expected = {"Earnie_Steuerbefehl": 1.0}
-        with patch.object(
-            wd.loxone_client, "fetch_loxone_generic_value", return_value=None
+        with patch(
+            "integrations.ehal_write.load_published_records", return_value={}
+        ), patch(
+            "integrations.ehal_write.published_fetched_at", return_value=None
+        ), patch.object(
+            wd, "_qualified_id_for_watchdog_key", return_value="Earnie_Steuerbefehl"
         ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch.object(
             wd.config, "get", side_effect=lambda name, **kw: {
                 "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
             }.get(name, "")
-        ), patch.object(wd, "_restore_via_publish") as mock_restore:
+        ), patch.object(wd, "_restore_via_publish", return_value=True) as mock_restore:
             mismatches = wd.verify_and_restore_loxone_states(expected)
 
         assert len(mismatches) == 1
         assert mismatches[0].read_failed is True
-        assert mismatches[0].corrected is False
-        mock_restore.assert_not_called()
+        assert mismatches[0].corrected is True
+        mock_restore.assert_called_once_with("Earnie_Steuerbefehl", 1.0)
 
     def test_restore_via_publish_uses_io_index(self):
         fake = LoxoneWriteRecord(

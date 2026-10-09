@@ -148,16 +148,15 @@ def _read_check(
         return LoxoneCheck(label, io_name, False, "IO-Name fehlt in config.json")
 
     if read_raw:
-        # FertigUm: AlarmClock SpecialState10 (unix) via /all; Tna text as backup.
+        # FertigUm: push inbox only (Q7 — SpecialState10 poll retired).
         raw = (
             loxone_client.fetch_loxone_ready_by_time(io_name)
             if warn_if_missing
             else loxone_client.fetch_loxone_raw_value(io_name)
         )
         if raw is None:
-            # Empty SpecialState10 / Tna is common when no next alarm is set.
             detail = (
-                "Wert leer (AlarmClock nextEntryTime / Tna — in Loxone noch kein Termin)"
+                "Wert leer (Push-Inbox — noch kein Termin gepusht)"
                 if warn_if_missing
                 else "Lesen fehlgeschlagen (kein Wert)"
             )
@@ -211,10 +210,13 @@ def _read_check(
                 label, io_name, True, f"Wert={value}", state=state
             )
 
-    value = loxone_client.fetch_loxone_generic_value(io_name)
-    if value is None:
-        return LoxoneCheck(label, io_name, False, "Lesen oder Parsen fehlgeschlagen")
-    return LoxoneCheck(label, io_name, True, f"Wert={value}")
+    # Q7: no Merker HTTP fallback — only push inbox (handled above) counts.
+    return LoxoneCheck(
+        label,
+        io_name,
+        False,
+        "Kein Push-Inbox-Wert (Merker-Poll entfernt)",
+    )
 
 
 def _is_ev_consumer(consumer: dict) -> bool:

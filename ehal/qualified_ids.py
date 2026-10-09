@@ -11,6 +11,9 @@ that is still accepted on input; it is not emitted in new exchange IDs.
 """
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
+
 from ehal.flex_fields import flex_ehal_slug
 
 NS_ESS = "ess"
@@ -134,3 +137,75 @@ DIGITAL_KINDS = frozenset(
 
 def is_digital_id(ehal_id: str) -> bool:
     return field_kind(ehal_id) in DIGITAL_KINDS
+
+
+_KNOWN_NS = frozenset(NAMESPACES + LEGACY_NAMESPACES)
+_KIND_RE_PART = r"(?:sens|get|set|supports)_[a-z0-9_]+"
+_SLUG_RE_PART = r"[a-z0-9_]{1,64}"
+
+
+@dataclass(frozen=True)
+class ParsedQualifiedId:
+    """Decomposed exchange / display ID.
+
+    Plant bare fields and ``heartbeat`` have ``namespace`` / ``kennung`` = ``None``.
+    Legacy ``flex.*`` is accepted (``namespace == "flex"``); builders never emit it.
+    """
+
+    namespace: str | None
+    kennung: str | None
+    kind: str
+    raw: str
+
+    @property
+    def is_legacy_flex(self) -> bool:
+        return self.namespace == "flex"
+
+    @property
+    def is_plant_bare(self) -> bool:
+        return self.namespace is None
+
+
+def parse_qualified_id(ehal_id: object) -> ParsedQualifiedId | None:
+    """Parse a qualified or plant-bare EHAL ID; ``None`` when the shape is invalid.
+
+    Accepted forms:
+    - plant bare: ``sens_*`` / ``get_*`` / ``set_*`` / ``supports_*`` (no dots)
+    - ``heartbeat`` (link proof; not a field kind)
+    - ``<ns>.<Kennung>.<kind>`` for namespaces in ``NAMESPACES`` plus legacy ``flex``
+    """
+    raw = str(ehal_id or "").strip()
+    if not raw:
+        return None
+    if raw == "heartbeat":
+        return ParsedQualifiedId(None, None, "heartbeat", raw)
+    if "." not in raw:
+        if not _looks_like_kind(raw):
+            return None
+        return ParsedQualifiedId(None, None, raw, raw)
+    parts = raw.split(".")
+    if len(parts) != 3:
+        return None
+    ns, kennung, kind = parts
+    if ns not in _KNOWN_NS:
+        return None
+    if not kennung or not _looks_like_slug(kennung):
+        return None
+    if not _looks_like_kind(kind):
+        return None
+    return ParsedQualifiedId(ns, kennung, kind, raw)
+
+
+def _looks_like_kind(kind: str) -> bool:
+    return bool(re.fullmatch(_KIND_RE_PART, kind))
+
+
+def _looks_like_slug(slug: str) -> bool:
+    return bool(re.fullmatch(_SLUG_RE_PART, slug))
+
+
+def format_qualified_id(parsed: ParsedQualifiedId) -> str:
+    """Rebuild the exchange string (legacy ``flex`` kept as-is when present)."""
+    if parsed.namespace is None:
+        return parsed.kind
+    return f"{parsed.namespace}.{parsed.kennung}.{parsed.kind}"

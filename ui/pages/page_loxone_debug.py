@@ -19,13 +19,13 @@ from ui.setup_readiness import (
 _EHAL_COM_HELP = (
     "Live-Übersicht für Loxone, Home Assistant (EHAL) oder OpenEMS. "
     "Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend**. "
-    "Live-Lesen zeigt `sens_*`/`get_*` mit EHAL-Feld und Backend-Mapping; "
+    "Live-Lesen zeigt `sens_*`/`get_*` mit EHAL-Feld und Push-Status; "
     "Live-Schreiben die Schreibvorgänge (`set_*`, Flex-Freigabe/`set_enable`) "
     "aus dem Produktiv-Lauf von main.py. "
-    "**Schreibtest** erlaubt begrenzte manuelle Sollwerte und Auto-Roundtrip "
+    "**Schreibtest** prüft Publish + Miniserver-Callback "
     "(nur bei ausgeschaltetem Silent-Modus). "
-    "Loxone-Bindings werden entity-zentriert unter "
-    "Loxone Struktur → EHAL Mapping gepflegt. "
+    "Unter Loxone zeigt die **Signalliste** den Vertrag (qualifizierte IDs, "
+    "Match-Status, VO/VI-Export). "
     "Außerplanmäßige Optimierung: Earnie_Request_Optimize (Port 8541)."
 )
 
@@ -61,7 +61,7 @@ def render() -> None:
     backend = active_ehal_backend()
     st.caption(
         "Zugangsdaten und Backend-Wechsel auf **Smarthome-Backend**. "
-        "Diese Seite zeigt Live-Lesen/Schreiben und das Signal-Mapping."
+        "Diese Seite zeigt Live-Lesen/Schreiben und die Signalliste."
     )
     if backend == BACKEND_LOXONE:
         from runtime_store.loxone_callback_status import format_loxone_callback_caption
@@ -77,13 +77,13 @@ def render() -> None:
             render_ehal_ha_mapping_section()
 
     if backend == BACKEND_LOXONE:
-        from ui.ehal_loxone_mapping import render_ehal_loxone_mapping_section
+        from ui.ehal_signal_list import render_ehal_signal_list_section
 
         st.caption(
             "Loxone → Hausprofil (**Loxone-Import**) liegt auf "
             "**Smarthome-Backend** (nach erfolgreicher Verbindung)."
         )
 
-        st.subheader("Loxone Struktur → EHAL Mapping")
-        with st.expander("Mapping-Tabelle", expanded=True):
-            render_ehal_loxone_mapping_section()
+        st.subheader("Signalliste")
+        with st.expander("Vertrag (EHAL-IDs · Match · Export)", expanded=True):
+            render_ehal_signal_list_section()

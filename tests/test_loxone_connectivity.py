@@ -74,11 +74,22 @@ class TestReadCheckValidation:
         assert result.passed is False
         assert result.severity == "warning"
         assert lc._check_counts_as_ok(result) is True
-        assert "AlarmClock" in result.detail
+        assert "Push-Inbox" in result.detail
 
     def test_read_check_accepts_any_numeric_value(self):
-        with patch.object(
-            lc.loxone_client, "fetch_loxone_generic_value", return_value=105.0
+        class _Binding:
+            ehal_id = "sens_ess_soc"
+            kind = "sens_ess_soc"
+
+        with patch(
+            "ehal.loxone_push_source.resolve_push_binding",
+            return_value=_Binding(),
+        ), patch(
+            "ehal.loxone_push_source.is_pushable_kind",
+            return_value=True,
+        ), patch(
+            "runtime_store.loxone_push_inbox.read_push_value",
+            return_value=(105.0, None),
         ):
             result = lc._read_check("sens_ess_soc", "SOC")
         assert result.passed is True

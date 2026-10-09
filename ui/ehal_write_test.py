@@ -38,7 +38,8 @@ def _render_write_test_intro() -> None:
     st.caption(
         "Alle gemappten Schreib-Felder (Plant, Batterien Pattern B, EV, Flex). "
         "**Senden** je Zeile aktivieren, Werte setzen, dann schreiben. "
-        "Optional Auto-Roundtrip."
+        "Optional Auto-Roundtrip: Loxone = Publish + Miniserver-Callback "
+        "(kein Merker-HTTP-Echo)."
     )
     if looks_like_housesim():
         st.info(

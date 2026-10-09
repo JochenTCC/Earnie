@@ -36,23 +36,14 @@ def _copy_loxone_binding(raw: dict, spec: dict) -> None:
         spec["loxone_outputs"] = dict(loxone_outputs)
 
 
-def _keep_energy_activation_key(key: str) -> bool:
-    from ehal.qualified_ids import field_kind
-    from integrations.loxone_meter_energy import ENERGY_ACTIVATION_KINDS
-
-    return field_kind(key) in ENERGY_ACTIVATION_KINDS
-
-
 def _clean_ehal_bindings(bindings: dict) -> dict[str, str]:
-    """Keep non-empty Merker values; retain empty energy activation keys (Q6)."""
+    """Keep activated binding keys; empty values are Loxone activation flags (Q8)."""
     cleaned: dict[str, str] = {}
     for key, value in bindings.items():
         field = str(key).strip()
         if not field:
             continue
-        address = str(value).strip()
-        if address or _keep_energy_activation_key(field):
-            cleaned[field] = address
+        cleaned[field] = str(value).strip()
     return cleaned
 
 
@@ -64,10 +55,10 @@ def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
         cleaned = _clean_ehal_bindings(bindings)
         if cleaned:
             cid = str(spec.get("id") or raw.get("id") or "").strip()
-            # expand_flex_bindings drops empty addresses — re-attach energy keys.
+            # expand_flex_bindings drops empty addresses — re-attach activation flags.
             expanded = expand_flex_bindings(cleaned, cid) if cid else dict(cleaned)
             for field, address in cleaned.items():
-                if not address and _keep_energy_activation_key(field):
+                if not address:
                     expanded.setdefault(field, "")
             spec["ehal_bindings"] = expanded
 

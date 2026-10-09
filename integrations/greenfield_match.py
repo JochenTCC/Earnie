@@ -173,11 +173,13 @@ def _ensure_group_bucket(
 
 
 def _bind_field(bucket: dict[str, Any], field: str, io_name: str) -> None:
+    """Activate a binding key; Q8 stores empty value (no Merker name in bindings)."""
     bindings = bucket["bindings"]
     if field not in bindings:
-        bindings[field] = io_name
+        bindings[field] = ""
     if field == "sens_evcs_active_power":
-        bindings.setdefault("flex.sens_power_act", io_name)
+        bindings.setdefault("flex.sens_power_act", "")
+    _ = io_name  # still used by callers for entity creation / matching
 
 
 def _collapse_alias_groups(groups: dict[str, dict[str, Any]]) -> None:
@@ -189,8 +191,8 @@ def _collapse_alias_groups(groups: dict[str, dict[str, Any]]) -> None:
         alias_bindings = dict(alias_bucket.get("bindings") or {})
         if canonical_key in groups:
             target = groups[canonical_key]
-            for field, io_name in alias_bindings.items():
-                target["bindings"].setdefault(field, io_name)
+            for field, _io_name in alias_bindings.items():
+                target["bindings"].setdefault(field, "")
             continue
         groups[canonical_key] = {
             "entity_kind": alias_bucket.get("entity_kind") or "heatpump",
@@ -233,7 +235,7 @@ def _match_one_exact_marker(
     claimed.add(io_name.casefold())
     kind = str(marker.get("entity_kind") or "").strip()
     if kind == "plant":
-        plant_bindings.setdefault(field, io_name)
+        plant_bindings.setdefault(field, "")
         return
     group_key = str(marker.get("group") or "").strip() or kind
     meta = prefixes.get(group_key) or {}

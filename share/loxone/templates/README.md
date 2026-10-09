@@ -14,12 +14,12 @@ Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTem
 
 | Kind | Files | When to use |
 | ---- | ----- | ----------- |
-| **Legacy VI** | `VI_Earnie_*.xml` (no `_v2`) | Rollback of Check keys only (while dual-emit still serves legacy JSON keys) |
+| **Legacy VI** | `VI_Earnie_*.xml` (no `_v2`) | Obsolete after Q8 (legacy Check keys no longer published) |
 | **VI v2** | `VI_Earnie_*_v2.xml` | Preferred — Check keys = qualified EHAL IDs; Titles from the ID (placeholders `{hk_id}` / `{ev_id}`) |
-| **VI Pilot** | generated `VI_Pilot_*.xml` | Live config — real Kennungen filled by `python -m scripts.pilot_vi_template_gen` |
-| **VO Pilot** | generated `VO_Pilot_*.xml` | Live config — paths + titles from qualified IDs via `python -m scripts.pilot_vo_template_gen` |
+| **VI Pilot** | generated `VI_Pilot_*.xml` | Live config — real Kennungen filled by `python -m scripts.pilot_vi_template_gen` (or EHAL-Com Signal-list ZIP) |
+| **VO Pilot** | generated `VO_Pilot_*.xml` | Live config — paths + titles from qualified IDs via `python -m scripts.pilot_vo_template_gen` (or Signal-list ZIP) |
 
-**Dual-emit:** `status.json` emits legacy Check keys **and** qualified peers until Q8. After **2.7.q Q5**, Earnie no longer writes Merkers via `/dev/sps/io`; actuation is VI poll of `status.json` only (see `docs/ui/ehal-com.md` § Q5).
+**Q8:** `status.json` publishes **qualified Check keys only** (no legacy Merker peers). After **2.7.q Q5**, Earnie no longer writes Merkers via `/dev/sps/io`; actuation is VI poll of `status.json` only (see `docs/ui/ehal-com.md`).
 
 ### Generators
 

@@ -396,44 +396,34 @@ def _legacy_ready_by_value(raw: str | float | None) -> str | float | None:
 
 
 def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
-    """FertigUm: push inbox for bound pushable fields; else AlarmClock poll.
+    """FertigUm: push inbox only (Q7 — SpecialState10 / Tna / Merker poll retired).
 
-    Push path returns numeric Unix or fresh Tna text (``Morgen, 07:00``) for
-    ``parse_loxone_ready_by_time``. No Merker poll fallback when bound to push.
-    Poll path (unbound / legacy): SpecialState10, else Tna, else legacy Merker.
+    Returns numeric Unix or fresh Tna text for ``parse_loxone_ready_by_time``.
+    ``io_name`` may be a Merker name (resolved to a push binding) or a qualified ID.
     """
     name = str(io_name or "").strip()
-    if name:
-        try:
-            from ehal.loxone_push_source import resolve_push_binding
-            from runtime_store.loxone_push_inbox import read_push_ready_by_time
+    if not name:
+        return None
+    try:
+        from ehal.loxone_push_source import resolve_push_binding
+        from runtime_store.loxone_push_inbox import read_push_ready_by_time
 
-            binding = resolve_push_binding(name)
-            if binding is not None:
-                value = read_push_ready_by_time(binding.ehal_id)
-                if value is None:
-                    logger.warning(
-                        "Loxone push: no ready_by_time for '%s' (%s)",
-                        name,
-                        binding.ehal_id,
-                    )
-                return value
-        except Exception:  # noqa: BLE001 — do not fall back to poll for push bindings
-            logger.exception(
-                "Loxone push ready_by_time failed for '%s'; not falling back to poll",
+        binding = resolve_push_binding(name)
+        ehal_id = binding.ehal_id if binding is not None else name
+        value = read_push_ready_by_time(ehal_id)
+        if value is None:
+            logger.warning(
+                "Loxone push: no ready_by_time for '%s' (%s)",
                 name,
+                ehal_id,
             )
-            return None
-
-    ll = _fetch_loxone_io_all(io_name)
-    if ll:
-        unix = _alarm_clock_next_entry_unix(ll)
-        if unix is not None:
-            return unix
-        tna = _alarm_clock_tna_from_ll(ll)
-        if tna is not None:
-            return tna
-    return _legacy_ready_by_value(fetch_loxone_raw_value(io_name))
+        return value
+    except Exception:  # noqa: BLE001 — no SpecialState10 / Merker poll fallback
+        logger.exception(
+            "Loxone push ready_by_time failed for '%s'; poll path removed (Q7)",
+            name,
+        )
+        return None
 
 
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:

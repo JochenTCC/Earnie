@@ -92,7 +92,12 @@ def _restore_via_publish(io_name: str, expected_value: float) -> bool:
 def verify_and_restore_loxone_states(
     expected: dict[str, float],
 ) -> list[LoxoneMismatch]:
-    """Reads control inputs, compares to Soll, re-publishes on mismatch (Q5)."""
+    """Compare Soll to the publish ledger + Miniserver callback (Q7).
+
+    No Merker HTTP reads. Missing callback or ledger drift → re-publish.
+    """
+    from integrations.ehal_write import load_published_records, published_fetched_at
+
     mismatches: list[LoxoneMismatch] = []
     flex_enable_names = {
         str(marker_flex_enable(c) or "")
@@ -110,22 +115,29 @@ def verify_and_restore_loxone_states(
     }
     flex_mode_names.discard("")
 
+    published = load_published_records()
+    fetched = published_fetched_at()
+    if not fetched:
+        logger.warning("Watchdog: no Miniserver status.json callback yet")
+
     for io_name, expected_value in expected.items():
         if not io_name:
             continue
 
-        actual_raw = loxone_client.fetch_loxone_generic_value(io_name)
-        if actual_raw is None:
+        qid = _qualified_id_for_watchdog_key(io_name)
+        rec = published.get(qid) or published.get(io_name)
+        if rec is None:
+            corrected = _restore_via_publish(io_name, expected_value)
             mismatches.append(
-                LoxoneMismatch(io_name, expected_value, None, False, True)
+                LoxoneMismatch(io_name, expected_value, None, corrected, True)
             )
             continue
 
-        actual_value = float(actual_raw)
+        actual_value = float(rec["value"])
         tolerance = _tolerance_for_io(
             io_name, flex_enable_names, flex_setpoint_names, flex_mode_names
         )
-        if _values_match(expected_value, actual_value, tolerance):
+        if fetched and _values_match(expected_value, actual_value, tolerance):
             continue
 
         corrected = _restore_via_publish(io_name, expected_value)
@@ -134,6 +146,14 @@ def verify_and_restore_loxone_states(
         )
 
     return mismatches
+
+
+def _qualified_id_for_watchdog_key(io_name: str) -> str:
+    """Map a loxone_sent key (Merker or qualified) to the publish ledger ID."""
+    from integrations.ehal_debug_mapping import build_loxone_setpoint_io_index
+
+    field = str(build_loxone_setpoint_io_index().get(io_name) or "").strip()
+    return field or str(io_name).strip()
 
 
 def run_watchdog_cycle() -> list[LoxoneMismatch]:

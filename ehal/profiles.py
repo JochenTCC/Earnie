@@ -74,7 +74,6 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "sens_grid_energy_import": "Netz-Bezug Energie (kWh)",
     "sens_grid_energy_export": "Netz-Einspeisung Energie (kWh)",
     "sens_energy_total": "Verbraucher-Energiezähler (kWh)",
-    "sens_energy_export": "Verbraucher-Einspeisung Energie (kWh)",
     "sens_evcs_connected": "EV angeschlossen",
     "sens_evcs_soc_act": "EV Ist-SOC (%)",
     "sens_evcs_bat_capacity": "EV Batteriekapazität (kWh)",

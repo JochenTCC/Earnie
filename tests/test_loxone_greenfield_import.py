@@ -40,10 +40,10 @@ def test_match_skips_heartbeat_and_binds_plant():
     assert "Earnie_Heartbeat" in report.skipped_markers
     assert "Earnie_Heartbeat" not in report.matched_markers
     plant = next(m for m in matches if m.entity_kind == "plant")
-    assert plant.bindings["sens_ess_soc"] == "Earnie_Batterie_SoC"
-    assert plant.bindings["set_ess_mode"] == "Earnie_Steuerbefehl"
-    assert plant.bindings["set_ess_charge_power_limit"] == "Earnie_LadeLeistungs-Limit"
-    assert plant.bindings["sens_absent_mode"] == "Earnie_Abwesend"
+    assert plant.bindings["sens_ess_soc"] == ''
+    assert plant.bindings["set_ess_mode"] == ''
+    assert plant.bindings["set_ess_charge_power_limit"] == ''
+    assert plant.bindings["sens_absent_mode"] == ''
 
 
 def test_match_wp_and_ev_groups():
@@ -51,13 +51,13 @@ def test_match_wp_and_ev_groups():
     by_group = {m.group_key: m for m in matches}
     wp = by_group["Earnie_Waermepumpe_"]
     assert wp.hk_type == "thermal_annual"
-    assert wp.bindings["flex.waermepumpe.sens_power_act"] == "Earnie_Waermepumpe_Leistung"
-    assert wp.bindings["flex.waermepumpe.set_enable"] == "Earnie_Waermepumpe_Freigabe"
+    assert wp.bindings["flex.waermepumpe.sens_power_act"] == ''
+    assert wp.bindings["flex.waermepumpe.set_enable"] == ''
     ev = by_group["Earnie_EAuto_"]
     assert ev.hk_type == "ev"
-    assert ev.bindings["sens_evcs_active_power"] == "Earnie_EAuto_Leistung"
-    assert ev.bindings["flex.e_auto.sens_power_act"] == "Earnie_EAuto_Leistung"
-    assert ev.bindings["set_evcs_max_current"] == "Earnie_EAuto_Soll_A"
+    assert ev.bindings["sens_evcs_active_power"] == ''
+    assert ev.bindings["flex.e_auto.sens_power_act"] == ''
+    assert ev.bindings["set_evcs_max_current"] == ''
 
 
 def test_match_heat_storage_temps_merge_onto_wp():
@@ -77,11 +77,11 @@ def test_match_heat_storage_temps_merge_onto_wp():
     assert wp_matches[0].group_key == "Earnie_Waermepumpe_"
     assert (
         wp_matches[0].bindings["sens_temperature_heat_storage"]
-        == "Earnie_Waermespeicher_Temp_eq"
+        == ''
     )
     assert (
         wp_matches[0].bindings["sens_temperature_heat_storage_low"]
-        == "Earnie_Waermespeicher_Temp_low"
+        == ''
     )
 
 
@@ -99,12 +99,12 @@ def test_alarm_clock_tna_merges_onto_ev_with_power():
     consumers = house["profiles"][pid]["consumers"]
     evs = [c for c in consumers if c.get("type") == "ev"]
     assert len(evs) >= 1
-    assert evs[0]["ehal_bindings"]["get_evcs_ready_by_time"] == "Ladewecker"
+    assert evs[0]["ehal_bindings"]["get_evcs_ready_by_time"] == ""
     assert f"{evs[0]['id']}:Ladewecker" in result["report"]["alarm_clock_bound"]
-    # Idempotent: existing binding kept
+    # Idempotent: existing activation key kept
     house2 = merge_alarm_clock_ready_by(house, _doc(), profile_id=pid)
     ev2 = next(c for c in house2["profiles"][pid]["consumers"] if c.get("type") == "ev")
-    assert ev2["ehal_bindings"]["get_evcs_ready_by_time"] == "Ladewecker"
+    assert ev2["ehal_bindings"]["get_evcs_ready_by_time"] == ""
 
 
 def test_match_merges_legacy_wp_alias_into_waermepumpe(monkeypatch):
@@ -121,15 +121,15 @@ def test_match_merges_legacy_wp_alias_into_waermepumpe(monkeypatch):
     wp_matches = [m for m in matches if m.hk_type == "thermal_annual"]
     assert len(wp_matches) == 1
     assert wp_matches[0].group_key == "Earnie_Waermepumpe_"
-    assert wp_matches[0].bindings["flex.waermepumpe.sens_power_act"] == "Earnie_Waermepumpe_Leistung"
-    assert wp_matches[0].bindings["flex.waermepumpe.set_enable"] == "Earnie_WP_Freigabe"
+    assert wp_matches[0].bindings["flex.waermepumpe.sens_power_act"] == ''
+    assert wp_matches[0].bindings["flex.waermepumpe.set_enable"] == ''
     house, pid = ensure_live_profile(_empty_house())
     house = apply_typed_matches(house, matches, profile_id=pid)
     consumers = house["profiles"][pid]["consumers"]
     thermals = [c for c in consumers if c["type"] == "thermal_annual"]
     assert len(thermals) == 1
-    assert thermals[0]["ehal_bindings"]["flex.waermepumpe.sens_power_act"] == "Earnie_Waermepumpe_Leistung"
-    assert thermals[0]["ehal_bindings"]["flex.waermepumpe.set_enable"] == "Earnie_WP_Freigabe"
+    assert thermals[0]["ehal_bindings"]["flex.waermepumpe.sens_power_act"] == ""
+    assert thermals[0]["ehal_bindings"]["flex.waermepumpe.set_enable"] == ""
     normalize_house_profiles_document(
         {"profiles": [dict(house["profiles"][pid], id=pid)]}
     )
@@ -153,9 +153,9 @@ def test_match_controls_unions_http_probe_extra_names():
     matches, report = match_controls(empty_doc, load_device_map(), extra_names=extra)
     assert "Earnie_Waermepumpe_Leistung" in report.matched_markers
     plant = next(m for m in matches if m.entity_kind == "plant")
-    assert plant.bindings["sens_ess_soc"] == "Earnie_Batterie_SoC"
+    assert plant.bindings["sens_ess_soc"] == ''
     wp = next(m for m in matches if m.group_key == "Earnie_Waermepumpe_")
-    assert wp.bindings["flex.waermepumpe.set_enable"] == "Earnie_Waermepumpe_Freigabe"
+    assert wp.bindings["flex.waermepumpe.set_enable"] == ''
 
 
 def test_match_controls_skips_source_select_autobind():
@@ -166,7 +166,7 @@ def test_match_controls_skips_source_select_autobind():
     assert "Earnie_Speicher_Quellenwahl" in report.skipped_markers
     plant = next(m for m in matches if m.entity_kind == "plant")
     assert "set_ess_source_select" not in plant.bindings
-    assert plant.bindings["sens_ess_soc"] == "Earnie_Batterie_SoC"
+    assert plant.bindings["sens_ess_soc"] == ''
 
 
 def test_match_pool_is_thermal_rc():
@@ -190,16 +190,15 @@ def test_slug_match_waschmaschine_creates_generic_consumer():
     wm = cons[0]
     assert wm.label == "Waschmaschine"
     assert wm.hk_type == "generic"
-    assert wm.bindings["flex.waschmaschine.sens_power_act"] == "Earnie_Verbraucher_Waschmaschine_Leistung"
-    assert wm.bindings["flex.waschmaschine.set_enable"] == "Earnie_Verbraucher_Waschmaschine_Freigabe"
+    assert wm.bindings["flex.waschmaschine.sens_power_act"] == ''
+    assert wm.bindings["flex.waschmaschine.set_enable"] == ''
     assert "flex.waschmaschine.set_power_setpoint" not in wm.bindings
     house, pid = ensure_live_profile(_empty_house())
     house = apply_typed_matches(house, matches, profile_id=pid)
     by_id = {c["id"]: c for c in house["profiles"][pid]["consumers"]}
     assert "waschmaschine" in by_id
-    assert by_id["waschmaschine"]["ehal_bindings"]["flex.waschmaschine.sens_power_act"].endswith(
-        "Waschmaschine_Leistung"
-    )
+    assert "flex.waschmaschine.sens_power_act" in by_id["waschmaschine"]["ehal_bindings"]
+    assert by_id["waschmaschine"]["ehal_bindings"]["flex.waschmaschine.sens_power_act"] == ""
 
 
 def test_slug_match_ev_creates_ev_consumer():
@@ -213,8 +212,8 @@ def test_slug_match_ev_creates_ev_consumer():
     evs = [m for m in matches if m.entity_kind == "ev"]
     assert len(evs) == 1
     assert evs[0].label == "Garage"
-    assert evs[0].bindings["set_evcs_max_current"] == "Earnie_EAuto_Garage_Soll_A"
-    assert evs[0].bindings["sens_evcs_active_power"] == "Earnie_EAuto_Garage_Leistung"
+    assert evs[0].bindings["set_evcs_max_current"] == ''
+    assert evs[0].bindings["sens_evcs_active_power"] == ''
     house, pid = ensure_live_profile(_empty_house())
     house = apply_typed_matches(house, matches, profile_id=pid)
     by_id = {c["id"]: c for c in house["profiles"][pid]["consumers"]}
@@ -249,9 +248,7 @@ def test_slug_match_pool_filter_longest_prefix():
         by_kind.setdefault(m.entity_kind, []).append(m)
     assert len(by_kind.get("pool_filter", [])) == 1
     assert len(by_kind.get("pool", [])) == 1
-    assert by_kind["pool_filter"][0].bindings["flex.pool_filter.set_enable"] == (
-        "Earnie_Pool_Filter_Freigabe"
-    )
+    assert by_kind["pool_filter"][0].bindings["flex.pool_filter.set_enable"] == ""
 
 
 def test_exact_plant_case_insensitive():
@@ -259,8 +256,8 @@ def test_exact_plant_case_insensitive():
     extra = {"earnie_batterie_soc", "EARNIE_STEUERBEFEHL"}
     matches, _report = match_controls(empty_doc, load_device_map(), extra_names=extra)
     plant = next(m for m in matches if m.entity_kind == "plant")
-    assert plant.bindings["sens_ess_soc"] == "earnie_batterie_soc"
-    assert plant.bindings["set_ess_mode"] == "EARNIE_STEUERBEFEHL"
+    assert plant.bindings["sens_ess_soc"] == ''
+    assert plant.bindings["set_ess_mode"] == ''
 
 
 def test_probe_marker_names_treats_403_as_present(monkeypatch):
@@ -304,16 +301,13 @@ def test_run_import_creates_typed_and_efm_consumers():
     report = result["report"]
     assert report["profile_id"] == "live"
     plant = house["plant"]["ehal_bindings"]
-    assert plant["sens_ess_soc"] == "Earnie_Batterie_SoC"
-    assert plant["set_ess_active_power"] == "Earnie_Batterie_Sollleistung"
+    assert plant["sens_ess_soc"] == ""
+    assert plant["set_ess_active_power"] == ""
     consumers = house["profiles"]["live"]["consumers"]
     by_id = {c["id"]: c for c in consumers}
     assert "waermepumpe" in by_id
     assert by_id["waermepumpe"]["type"] == "thermal_annual"
-    assert (
-        by_id["waermepumpe"]["ehal_bindings"]["flex.waermepumpe.set_enable"]
-        == "Earnie_Waermepumpe_Freigabe"
-    )
+    assert by_id["waermepumpe"]["ehal_bindings"]["flex.waermepumpe.set_enable"] == ""
     assert "e_auto" in by_id
     assert by_id["e_auto"]["type"] == "ev"
     assert by_id["e_auto"]["battery_capacity_kwh"] == 50.0
@@ -327,7 +321,7 @@ def test_run_import_creates_typed_and_efm_consumers():
     from ehal.flex_fields import is_flex_sens_power_act_field
 
     assert any(
-        is_flex_sens_power_act_field(k) and v == "Zähler Kochen"
+        is_flex_sens_power_act_field(k) and v == ""
         for c in consumers
         for k, v in (c.get("ehal_bindings") or {}).items()
     )
@@ -345,12 +339,10 @@ def test_efm_merges_swimspa_and_wallbox_onto_typed():
     consumers = result["house_doc"]["profiles"]["live"]["consumers"]
     by_id = {c["id"]: c for c in consumers}
     pool = next(c for c in consumers if c["type"] == "thermal_rc")
-    assert pool["ehal_bindings"][flex_sens_power_act(pool["id"])] == "Zähler Swimspa"
-    assert by_id["e_auto"]["ehal_bindings"]["sens_evcs_active_power"] == "Zähler Wallbox"
-    assert (
-        by_id["waermepumpe"]["ehal_bindings"][flex_sens_power_act("waermepumpe")]
-        == "Zähler Wärmepumpe"
-    )
+    assert flex_sens_power_act(pool["id"]) in pool["ehal_bindings"]
+    assert pool["ehal_bindings"][flex_sens_power_act(pool["id"])] == ""
+    assert by_id["e_auto"]["ehal_bindings"]["sens_evcs_active_power"] == ""
+    assert by_id["waermepumpe"]["ehal_bindings"][flex_sens_power_act("waermepumpe")] == ""
     generic_ids = {c["id"] for c in consumers if c["type"] == "generic"}
     assert not {"zaehler_swimspa", "swimspa", "zaehler_wallbox", "wallbox", "zaehler_waermepumpe"} & generic_ids
 
@@ -431,8 +423,8 @@ def test_efm_fills_plant_when_earnie_grid_absent():
     }
     result = run_greenfield_import(mini, _empty_house())
     plant = result["house_doc"]["plant"]["ehal_bindings"]
-    assert plant["sens_ess_soc"] == "Earnie_Batterie_SoC"
-    assert plant["sens_grid_power_active"] == "Zähler Netz"
+    assert plant["sens_ess_soc"] == ""
+    assert plant["sens_grid_power_active"] == ""
     assert "sens_grid_power_active" in result["report"]["efm_plant_filled"]
 
 

@@ -33,6 +33,22 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 
 
 
+## Qualified EHAL IDs (2.7.n-2)
+
+Exchange / display form of every signal on the Loxone push wire and in `status.json` Check keys. Implemented in `ehal/qualified_ids.py` (builders + `parse_qualified_id`).
+
+| Form | Example | Notes |
+| ---- | ------- | ----- |
+| Plant bare | `sens_temperature_outside`, `sens_pv_production_active` | House-wide fields without a device Kennung; PV stays bare until a deferred `pv.*` namespace |
+| Grid meter | `grid.meter.sens_grid_power_active` | First Kennung `meter`; more `grid.<Kennung>.*` meters may follow. Plant **storage** keeps bare kind keys |
+| Battery | `ess.<Kennung>.sens_ess_soc` | Pattern B |
+| Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Emitted namespaces; legacy `flex.<slug>.*` accepted on parse only |
+| EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Same Kennung; namespace chosen by field kind |
+| Inverter (reserved) | `inv.<slug>.*` | **2.7.l P4** |
+| Heartbeat | `heartbeat` | Link proof; not a field kind |
+
+`parse_qualified_id(id)` → `ParsedQualifiedId(namespace, kennung, kind, raw)` or `None`. Plant bare and `heartbeat` have `namespace` / `kennung` = `None`. Round-trip: builders → parse → `format_qualified_id` restores the exchange string. Field kinds are not renamed in 2.7.n.
+
 ## Schema version and envelope
 
 Every Telemetry, Setpoint, and Capabilities document uses the same envelope fields:

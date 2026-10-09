@@ -44,7 +44,7 @@ def test_fields_for_consumer_ev_vs_flex():
     assert "set_ess_source_select" in PLANT_FIELDS
     assert "set_grid_export_power_limit" in PLANT_FIELDS
     assert "sens_energy_total" in FLEX_FIELDS
-    assert "sens_energy_export" in FLEX_FIELDS
+    assert "sens_energy_export" not in FLEX_FIELDS
     assert fields_for_consumer({"type": "thermal_annual"}) == FLEX_FIELDS + (
         "sens_temperature_heat_storage",
         "sens_temperature_heat_storage_low",

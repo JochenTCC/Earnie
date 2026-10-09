@@ -104,6 +104,8 @@ class LoxoneAdapter:
             "set_evcs_max_current": cfg.evcs_max_current_name,
             "set_grid_export_power_limit": cfg.grid_export_limit_out_name,
         }
+        # LoxoneConfig still carries Merker names (non-empty = wired). Activation-flag
+        # maps (empty values) use require_nonempty_value=False at the house-binding sites.
         functions = available_functions(write_map)
         self._supports_ess_write = "ess_limits" in functions
         self._supports_ess_active = "ess_active" in functions

@@ -57,7 +57,6 @@ PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
 
 CONSUMER_ENERGY_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_energy_total",
-    "sens_energy_export",
 )
 
 # Per-battery Pattern B read kinds (2.7.m).

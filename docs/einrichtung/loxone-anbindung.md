@@ -29,7 +29,7 @@ Bei abgelehnten Zugangsdaten (HTTP **401** oder **403**) pausiert der Optimierer
 
 Antworten liefern den Wert unter `LL.value`. Loxone gibt Zahlen oft **mit Einheit** zurück (z. B. `3.5 kW`, `72 %`, `16 A`). Der Optimizer parst diese Strings und ignoriert die Einheit für die Berechnung.
 
-Merker-Namen liegen in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Hausprofil) — siehe [Loxone-Signale](../referenz/loxone-signals.md). Zuordnung in der UI: **EHAL-Com**.
+Aktivierte Signale liegen als Schlüssel in `plant.ehal_bindings` / `consumers[].ehal_bindings` / `batteries[].ehal_bindings` (Werte nach 2.7.q Q8 leer — nur Aktivierungsflag). Vertrag und Match-Status: **EHAL-Com → Signalliste**. Details: [Loxone-Signale](../referenz/loxone-signals.md).
 
 ## Was der Optimizer liest
 
@@ -86,7 +86,7 @@ Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-
 python -m scripts.verify_loxone_setup
 ```
 
-Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit IO-Name und Detailtext. Typische Fehler: falscher Merkername, Benutzer ohne Rechte, Lesen oder Parsen fehlgeschlagen.
+Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit EHAL-ID und Detailtext. Typische Fehler: Signal nicht in der Push-Inbox, fehlender Miniserver-Callback auf `status.json`, Benutzer ohne Rechte.
 
 Die Verbindung kann auch bequem über die Web-Oberfläche auf der Seite **Smarthome-Backend** (Anbindung) geprüft werden.
 

@@ -69,3 +69,64 @@ def test_digital_ids() -> None:
     assert q.is_digital_id("consumer.waschmaschine.sens_consumer_active")
     assert not q.is_digital_id("evcs.e_auto.sens_evcs_active_power")
     assert not q.is_digital_id("heartbeat")
+
+
+@pytest.mark.parametrize(
+    ("raw", "ns", "kennung", "kind"),
+    [
+        ("sens_temperature_outside", None, None, "sens_temperature_outside"),
+        ("set_grid_export_power_limit", None, None, "set_grid_export_power_limit"),
+        ("heartbeat", None, None, "heartbeat"),
+        ("grid.meter.sens_grid_power_active", "grid", "meter", "sens_grid_power_active"),
+        ("ess.ecoflow_delta_3.sens_ess_soc", "ess", "ecoflow_delta_3", "sens_ess_soc"),
+        ("consumer.waschmaschine.set_enable", "consumer", "waschmaschine", "set_enable"),
+        ("heatpump.waermepumpe.sens_power_act", "heatpump", "waermepumpe", "sens_power_act"),
+        ("pool.pool_filter.set_enable", "pool", "pool_filter", "set_enable"),
+        ("evcs.e_auto.set_evcs_max_current", "evcs", "e_auto", "set_evcs_max_current"),
+        ("ev.e_auto.get_evcs_ready_by_time", "ev", "e_auto", "get_evcs_ready_by_time"),
+        ("inv.wr_main.sens_inv_power_ac", "inv", "wr_main", "sens_inv_power_ac"),
+        ("flex.waschmaschine.sens_power_act", "flex", "waschmaschine", "sens_power_act"),
+    ],
+)
+def test_parse_qualified_id(raw: str, ns: str | None, kennung: str | None, kind: str) -> None:
+    parsed = q.parse_qualified_id(raw)
+    assert parsed is not None
+    assert parsed.namespace == ns
+    assert parsed.kennung == kennung
+    assert parsed.kind == kind
+    assert parsed.raw == raw
+    assert q.format_qualified_id(parsed) == raw
+
+
+def test_parse_qualified_id_rejects_junk() -> None:
+    assert q.parse_qualified_id("") is None
+    assert q.parse_qualified_id("not_a_field") is None
+    assert q.parse_qualified_id("foo.bar") is None
+    assert q.parse_qualified_id("unknown.slug.sens_x") is None
+    assert q.parse_qualified_id("ess..sens_ess_soc") is None
+    assert q.parse_qualified_id("ess.BadSlug.sens_ess_soc") is None
+
+
+@pytest.mark.parametrize(
+    ("builder", "args"),
+    [
+        (q.qualified_plant_id, ("sens_pv_production_active",)),
+        (q.qualified_plant_id, ("sens_grid_power_active",)),
+        (q.qualified_grid_id, ("sens_grid_energy_import",)),
+        (q.qualified_battery_id, ("15_kwh_speicher", "sens_ess_soc")),
+        (q.qualified_consumer_id, ("waschmaschine", "generic", "set_enable")),
+        (q.qualified_consumer_id, ("e_auto", "ev", "set_evcs_max_current")),
+        (q.qualified_consumer_id, ("e_auto", "ev", "sens_evcs_soc_act")),
+        (q.qualified_consumer_id, ("waermepumpe", "thermal_annual", "sens_power_act")),
+        (q.qualified_consumer_id, ("pool_swimspa", "thermal_rc", "set_enable")),
+    ],
+)
+def test_builder_parse_round_trip(builder, args) -> None:
+    built = builder(*args)
+    parsed = q.parse_qualified_id(built)
+    assert parsed is not None
+    assert q.format_qualified_id(parsed) == built
+    if parsed.namespace is None:
+        assert built == parsed.kind
+    else:
+        assert built == f"{parsed.namespace}.{parsed.kennung}.{parsed.kind}"

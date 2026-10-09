@@ -159,7 +159,7 @@ def test_apply_match_prefers_smart_label_over_e_auto():
     cons = out["profiles"]["live"]["consumers"][0]
     assert cons["id"] == "e_auto"
     assert cons["label"] == "smart"
-    assert cons["ehal_bindings"]["sens_evcs_active_power"] == "Zähler smart"
+    assert cons["ehal_bindings"]["sens_evcs_active_power"] == ""
 
 
 def test_apply_consumer_imports_sets_flex_power_only():
@@ -182,7 +182,7 @@ def test_apply_consumer_imports_sets_flex_power_only():
     assert cons[0]["id"] == "kochen"
     assert cons[0]["label"] == "Kochen"
     assert cons[0]["earnie_role"] == "known"
-    assert cons[0]["ehal_bindings"]["flex.kochen.sens_power_act"] == "Zähler Kochen"
+    assert cons[0]["ehal_bindings"]["flex.kochen.sens_power_act"] == ""
     assert "sens_energy_total" in cons[0]["ehal_bindings"]
     assert "loxone_meter_energy" not in cons[0]
     assert "flex.enable_name" not in cons[0]["ehal_bindings"]
@@ -203,7 +203,7 @@ def test_apply_plant_power_suggestions():
     ]
     out = apply_plant_power_suggestions(house, selected=selected)
     bindings = out["plant"]["ehal_bindings"]
-    assert bindings["sens_grid_power_active"] == "Zähler Netz"
+    assert bindings["sens_grid_power_active"] == ""
     assert bindings["sens_ess_soc"] == "SoC"
     assert "sens_grid_energy_import" in bindings
     assert "sens_grid_energy_export" in bindings

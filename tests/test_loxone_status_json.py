@@ -140,13 +140,11 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
         plant_io_index={},
         now_ts=50.0,
     )
-    assert payload["ev.garage.Earnie_EAuto_Soll_A"] == 16.0
-    assert payload["ev.garage.Earnie_EAuto_Modus"] == 2.0
-    assert payload["flex.waschmaschine.Earnie_Verbraucher_Freigabe"] == 1.0
-    assert "flex.waschmaschine.Earnie_Verbraucher_Ziel_kW" not in payload
-    assert payload["flex.waermepumpe.Earnie_Waermepumpe_Freigabe"] == 1.0
-    assert payload["Earnie_Pool_Freigabe"] == 0.0
-    assert payload["Earnie_Pool_Filter_Freigabe"] == 1.0
+    # Q8: qualified Check keys only — no legacy Merker / flex.* peers.
+    assert "ev.garage.Earnie_EAuto_Soll_A" not in payload
+    assert "flex.waschmaschine.Earnie_Verbraucher_Freigabe" not in payload
+    assert "Earnie_Pool_Freigabe" not in payload
+    assert "Earnie_Pool_Filter_Freigabe" not in payload
     assert payload["evcs.garage.set_evcs_max_current"] == 16.0
     assert payload["evcs.garage.set_evcs_mode"] == 2.0
     assert payload["consumer.waschmaschine.set_enable"] == 1.0
@@ -184,10 +182,8 @@ def test_status_payload_maps_legacy_swimspa_enable_to_pool_keys() -> None:
         plant_io_index={},
         now_ts=50.0,
     )
-    assert payload["Earnie_Pool_Freigabe"] == 1.0
-    assert payload["Earnie_Pool_Filter_Freigabe"] == 0.0
-    assert "flex.pool_filter.Earnie_Verbraucher_Freigabe" not in payload
-    assert "flex.swimspa.Earnie_Verbraucher_Freigabe" not in payload
+    assert "Earnie_Pool_Freigabe" not in payload
+    assert "Earnie_Pool_Filter_Freigabe" not in payload
     assert payload["pool.swimspa.set_enable"] == 1.0
     assert payload["pool.pool_filter.set_enable"] == 0.0
 
@@ -215,7 +211,8 @@ def test_status_payload_greenfield_pool_uses_configured_enable_only() -> None:
         plant_io_index={},
         now_ts=50.0,
     )
-    assert payload["Earnie_Pool_Freigabe"] == 1.0
+    assert payload["pool.pool_swimspa.set_enable"] == 1.0
+    assert "Earnie_Pool_Freigabe" not in payload
     assert "Earnie_Pool_Filter_Freigabe" not in payload
 
 

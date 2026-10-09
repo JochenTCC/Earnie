@@ -120,17 +120,18 @@ def expand_flex_bindings(
     bindings: dict | None,
     consumer_id: str,
 ) -> dict[str, str]:
-    """Rewrite flex role stubs to Pattern B; leave other keys unchanged."""
+    """Rewrite flex role stubs to Pattern B; leave other keys unchanged.
+
+    Empty string values are kept as Loxone activation flags (2.7.q Q8).
+    """
     if not isinstance(bindings, dict):
         return {}
     out: dict[str, str] = {}
     for key, value in bindings.items():
-        address = str(value or "").strip()
-        if not address:
-            continue
         field = expand_flex_field(str(key), consumer_id)
-        if field and field not in out:
-            out[field] = address
+        if not field or field in out:
+            continue
+        out[field] = str(value or "").strip()
     return out
 
 

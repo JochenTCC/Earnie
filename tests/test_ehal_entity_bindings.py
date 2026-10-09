@@ -343,6 +343,32 @@ def test_ensure_migrated_strips_consumer_ambient_when_plant_already_set():
     assert out["plant"]["ehal_bindings"]["sens_temperature_outside"] == "PlantOutside"
 
 
+def test_ensure_migrated_strips_consumer_energy_export():
+    house = {
+        "profiles": [
+            {
+                "id": "p1",
+                "consumers": [
+                    {
+                        "id": "kochen",
+                        "type": "generic",
+                        "ehal_bindings": {
+                            "sens_energy_total": "",
+                            "sens_energy_export": "",
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+    out, _cfg, changed = ensure_migrated(house, {})
+    assert changed
+    cons = out["profiles"][0]["consumers"][0]
+    bindings = cons.get("ehal_bindings") or {}
+    assert "sens_energy_total" in bindings
+    assert "sens_energy_export" not in bindings
+
+
 def test_marker_get_filter_remaining_hours_prefers_ehal():
     from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
 

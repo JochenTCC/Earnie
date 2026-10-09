@@ -304,8 +304,8 @@ def _merge_typed_bindings(
 
     bindings = dict(existing.get("ehal_bindings") or {})
     expanded = expand_flex_bindings(incoming, consumer_id)
-    for field, io_name in expanded.items():
-        bindings.setdefault(field, io_name)
+    for field, _io_name in expanded.items():
+        bindings.setdefault(field, "")
     existing["ehal_bindings"] = expand_flex_bindings(bindings, consumer_id)
 
 
@@ -471,7 +471,7 @@ def merge_efm(
             field = str(prop.plant_field or "").strip()
             if not field:
                 continue
-            if str(plant_bindings.get(field) or "").strip():
+            if field in plant_bindings:
                 continue
             row["bind_plant"] = True
             selected_plant.append(row)
@@ -509,17 +509,15 @@ def extract_alarm_clocks(doc: dict[str, Any]) -> list[str]:
 
 
 def _ev_has_power_binding(consumer: dict) -> bool:
+    """True when EV power field is activated (Q8: key presence, value may be empty)."""
     from ehal.flex_fields import is_flex_sens_power_act_field
 
     bindings = consumer.get("ehal_bindings")
     if not isinstance(bindings, dict):
         return False
-    if str(bindings.get("sens_evcs_active_power") or "").strip():
+    if "sens_evcs_active_power" in bindings:
         return True
-    return any(
-        is_flex_sens_power_act_field(str(key)) and str(val or "").strip()
-        for key, val in bindings.items()
-    )
+    return any(is_flex_sens_power_act_field(str(key)) for key in bindings)
 
 
 def _pick_alarm_clock_for_ev(clocks: list[str], consumer: dict) -> str | None:
@@ -552,12 +550,13 @@ def _bind_alarm_clocks(
             if isinstance(consumer.get("ehal_bindings"), dict)
             else {}
         )
-        if str(bindings.get("get_evcs_ready_by_time") or "").strip():
+        if "get_evcs_ready_by_time" in bindings:
             continue
         clock = _pick_alarm_clock_for_ev(clocks, consumer)
         if not clock:
             continue
-        bindings["get_evcs_ready_by_time"] = clock
+        # Q8: activate the field; Merker name is not stored (VO push carries the ID).
+        bindings["get_evcs_ready_by_time"] = ""
         consumer["ehal_bindings"] = bindings
         cid = str(consumer.get("id") or "").strip() or "?"
         report.alarm_clock_bound.append(f"{cid}:{clock}")

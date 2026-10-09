@@ -89,12 +89,23 @@ class FunctionStatus:
     missing: tuple[str, ...]
 
 
-def _mapped_fields(mapped: Mapping[str, object] | Iterable[str]) -> set[str]:
-    """Flat keys plus Pattern-B ESS kinds (``ess.{slug}.set_*`` → ``set_*``)."""
+def _mapped_fields(
+    mapped: Mapping[str, object] | Iterable[str],
+    *,
+    require_nonempty_value: bool = True,
+) -> set[str]:
+    """Flat keys plus Pattern-B ESS kinds (``ess.{slug}.set_*`` → ``set_*``).
+
+    ``require_nonempty_value``: HA needs a real ``entity_id``. Loxone Q8 uses empty
+    strings as activation flags — pass ``False`` so key presence counts.
+    """
     from ehal.ess_fields import ess_field_kind
 
     if isinstance(mapped, Mapping):
-        keys = {str(k) for k, v in mapped.items() if str(v or "").strip()}
+        if require_nonempty_value:
+            keys = {str(k) for k, v in mapped.items() if str(v or "").strip()}
+        else:
+            keys = {str(k) for k, v in mapped.items() if str(k or "").strip()}
     else:
         keys = {str(k) for k in mapped}
     out = set(keys)
@@ -110,6 +121,7 @@ def function_statuses(
     *,
     fields: Iterable[str] | None = None,
     vendor_ess_active: bool = False,
+    require_nonempty_value: bool = True,
 ) -> list[FunctionStatus]:
     """Status of every function; ``fields`` restricts to functions whose required
     fields all belong to one mapping entity (e.g. plant vs. EV consumer).
@@ -117,11 +129,15 @@ def function_statuses(
     ``vendor_ess_active``: treat ``set_ess_active_power`` as mapped when a HA
     vendor force driver (e.g. huawei_solar) is configured.
     """
-    present = _mapped_fields(mapped)
+    present = _mapped_fields(mapped, require_nonempty_value=require_nonempty_value)
     if vendor_ess_active:
         present.add("set_ess_active_power")
     # Pattern B ess.{slug}.* expands to flat kinds so battery entity scope matches.
-    scope = _mapped_fields(fields) if fields is not None else None
+    scope = (
+        _mapped_fields(fields, require_nonempty_value=require_nonempty_value)
+        if fields is not None
+        else None
+    )
     out: list[FunctionStatus] = []
     for function in EHAL_FUNCTIONS:
         if scope is not None and not set(function.required) <= scope:
@@ -148,6 +164,7 @@ def incomplete_function_fields(
     mapped: Mapping[str, object] | Iterable[str],
     *,
     vendor_ess_active: bool = False,
+    require_nonempty_value: bool = True,
 ) -> set[str]:
     """Required fields of functions that are only partly mapped.
 
@@ -156,7 +173,11 @@ def incomplete_function_fields(
     half-finished function.
     """
     fields: set[str] = set()
-    for status in function_statuses(mapped, vendor_ess_active=vendor_ess_active):
+    for status in function_statuses(
+        mapped,
+        vendor_ess_active=vendor_ess_active,
+        require_nonempty_value=require_nonempty_value,
+    ):
         if status.state == "incomplete":
             fields.update(status.function.required)
     return fields
@@ -166,10 +187,15 @@ def available_functions(
     mapped: Mapping[str, object] | Iterable[str],
     *,
     vendor_ess_active: bool = False,
+    require_nonempty_value: bool = True,
 ) -> set[str]:
     return {
         s.function.id
-        for s in function_statuses(mapped, vendor_ess_active=vendor_ess_active)
+        for s in function_statuses(
+            mapped,
+            vendor_ess_active=vendor_ess_active,
+            require_nonempty_value=require_nonempty_value,
+        )
         if s.state == "available"
     }
 
@@ -180,12 +206,16 @@ def incomplete_function_messages(
     fields: Iterable[str] | None = None,
     labels: Mapping[str, str] | None = None,
     vendor_ess_active: bool = False,
+    require_nonempty_value: bool = True,
 ) -> list[str]:
     """German warnings for partly mapped functions (UI / log)."""
     names = labels or {}
     messages: list[str] = []
     for status in function_statuses(
-        mapped, fields=fields, vendor_ess_active=vendor_ess_active
+        mapped,
+        fields=fields,
+        vendor_ess_active=vendor_ess_active,
+        require_nonempty_value=require_nonempty_value,
     ):
         if status.state != "incomplete":
             continue

@@ -1,0 +1,46 @@
+---
+description: Machine IDs shown in UI must match the exact exchange/binding string — no aliases
+globs: ui/**/*.py,ehal/qualified_ids.py,integrations/**ehal*.py,integrations/loxone_connectivity.py,integrations/loxone_debug*.py,tests/test_loxone_debug.py,tests/test_loxone_connectivity.py,tests/test_ehal_*mapping*.py
+alwaysApply: false
+---
+
+# UI machine IDs — exact string match
+
+When the UI shows a **machine ID** (not a human Bezeichnung), the string must be identical to the ID used for bindings, Push-Inbox, `status.json`, Live checks, and other exchange paths. No pretty, truncated, remapped, or legacy alias in the ID column.
+
+## In scope (examples, not exhaustive)
+
+- EHAL field / qualified IDs (`sens_*`, `grid.meter.*`, `ess.<id>.*`, `evcs.<slug>.*`, …)
+- House-config entity / profile IDs
+- Backend addresses (Loxone Merker/UUID, HA `entity_id`)
+- Any other machine key shown or used as a row/lookup key in UI
+
+## Do
+
+- Emit the **canonical exchange form** from one helper (e.g. `ehal/qualified_ids.py`, `canonicalize_live_display_field`) and use that same string in the UI column and in lookup keys.
+- Prefer qualified / Pattern B IDs where that is the exchange form; drop obsolete bare or colon aliases from display when they are no longer the exchange ID.
+- Keep human labels (DE captions, Bezeichnung) separate — labels may differ; **IDs must not**.
+
+## Do not
+
+```text
+❌ Live-Lesen ID column: sens_grid_energy_import     (bare) while exchange is grid.meter.sens_grid_energy_import
+❌ Live-Schreiben ID column: wallbox:set_enable        while exchange is evcs.wallbox.set_enable
+❌ Mapping/debug shows get_ess_soc_min               while checks/bindings use ess.<id>.get_ess_soc_min
+✅ Same exact string in UI ID column, collect_read_checks, bindings resolve, Push-Inbox EHAL-ID
+```
+
+- Do not invent a display-only ID variant (`format_func` that changes the ID text, substring, synonym table for the ID column).
+- Do not keep a second hardcoded ID list for UI that can drift from the exchange builders.
+
+## Checklist (when adding/renaming IDs or Live/mapping rows)
+
+1. What string is the exchange / binding key?
+2. Does every UI ID column / debug row use that same string?
+3. Are obsolete aliases removed from display (or accepted only as input aliases, never re-emitted)?
+4. Test asserts the displayed/collected ID equals the exchange form (see Live-Lesen / Live-Schreiben regressions).
+
+## Related
+
+- Human entity selects / Bezeichnung: `streamlit-ui-state.mdc` + `ui/label_select.py`
+- New EHAL read fields → Live-Lesen path: skill `ehal-live-lesen`

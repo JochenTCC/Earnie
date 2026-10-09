@@ -54,7 +54,7 @@ def test_status_payload_sees_published_value(publish_dir: Path) -> None:
         now_ts=10.0,
     )
     assert payload["evcs.garage.set_evcs_max_current"] == 12.0
-    assert payload["ev.garage.Earnie_EAuto_Soll_A"] == 12.0
+    assert "ev.garage.Earnie_EAuto_Soll_A" not in payload
 
 
 def test_published_fetched_at_from_callback(publish_dir: Path) -> None:

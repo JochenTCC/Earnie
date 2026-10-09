@@ -415,6 +415,31 @@ def _strip_consumer_ambient_bindings(house: dict) -> bool:
     return changed
 
 
+def _strip_consumer_energy_export_bindings(house: dict) -> bool:
+    """Remove obsolete ``sens_energy_export`` from consumer ehal_bindings.
+
+    Consumers cannot export energy; only ``sens_energy_total`` remains.
+    """
+    changed = False
+    for profile in _profiles_iterable(house):
+        consumers = profile.get("consumers")
+        if not isinstance(consumers, list):
+            continue
+        for consumer in consumers:
+            if not isinstance(consumer, dict):
+                continue
+            bindings = consumer.get("ehal_bindings")
+            if not isinstance(bindings, dict):
+                continue
+            if "sens_energy_export" not in bindings:
+                continue
+            cleaned = dict(bindings)
+            cleaned.pop("sens_energy_export", None)
+            consumer["ehal_bindings"] = cleaned
+            changed = True
+    return changed
+
+
 def _profiles_iterable(house_doc: dict) -> list[dict]:
     profiles = house_doc.get("profiles")
     if isinstance(profiles, dict):
@@ -543,6 +568,8 @@ def ensure_migrated(
     if plant:
         house["plant"] = plant
     if _strip_consumer_ambient_bindings(house):
+        changed = True
+    if _strip_consumer_energy_export_bindings(house):
         changed = True
     if _strip_entity_event_triggers(house):
         changed = True

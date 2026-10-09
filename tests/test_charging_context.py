@@ -379,7 +379,7 @@ class TestLoxoneAbsentForecast:
       with patch.object(
           cc.loxone_client, "fetch_loxone_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_raw_value", return_value="Morgen, 11:00"
+          cc.loxone_client, "fetch_loxone_ready_by_time", return_value="Morgen, 11:00"
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 

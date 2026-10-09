@@ -111,8 +111,11 @@ def _serialize_battery(spec: dict) -> dict:
         out["standby_power_kw"] = standby
     bindings = spec.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
+        # Q8: empty string values are Loxone activation flags — keep the keys.
         out["ehal_bindings"] = {
-            str(k): str(v).strip() for k, v in bindings.items() if str(v or "").strip()
+            str(k): str(v).strip()
+            for k, v in bindings.items()
+            if str(k or "").strip()
         }
     wear = spec.get("battery_wear")
     if wear is not None:

@@ -445,7 +445,6 @@ def _bind_meter_power(
     from integrations.loxone_meter_energy import (
         activate_consumer_energy_bindings,
         meter_has_energy_states,
-        meter_is_bidirectional,
     )
 
     bindings = (
@@ -453,18 +452,16 @@ def _bind_meter_power(
         if isinstance(consumer.get("ehal_bindings"), dict)
         else {}
     )
-    bindings[flex_sens_power_act(consumer_id)] = power
+    # Q8: activate fields; do not store Zähler Merker names in bindings.
+    bindings[flex_sens_power_act(consumer_id)] = ""
     if str(consumer.get("type") or "") == "ev":
-        bindings["sens_evcs_active_power"] = power
+        bindings["sens_evcs_active_power"] = ""
     consumer["ehal_bindings"] = expand_flex_bindings(bindings, consumer_id)
-    if meter_has_energy_states(meter_meta):
-        activate_consumer_energy_bindings(
-            consumer,
-            bidirectional=meter_is_bidirectional(meter_meta),
-        )
-    elif power:
+    _ = power
+    if meter_has_energy_states(meter_meta) or power:
         # EFM Zähler name: assume Meter energy states exist (LoxAPP3 optional).
-        activate_consumer_energy_bindings(consumer, bidirectional=False)
+        # Consumers are mono only (sens_energy_total).
+        activate_consumer_energy_bindings(consumer)
 
 
 def apply_consumer_imports(
@@ -560,7 +557,7 @@ def apply_plant_power_suggestions(
         field = str(row.get("plant_field") or "").strip()
         power = str(row.get("power_address") or "").strip()
         if field and power:
-            bindings[field] = power
+            bindings[field] = ""
             changed = True
             meta = by_name.get(power.casefold())
             has_energy = meter_has_energy_states(meta) or field in (

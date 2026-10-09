@@ -222,7 +222,11 @@ def heuristic_propose(
     *,
     fields: tuple[str, ...] = EHAL_MAP_FIELDS + EXTRAS_FIELDS,
 ) -> dict[str, dict[str, Any]]:
-    """Name-hint matching without LLM; confidence 0.35–0.75."""
+    """Name-hint matching without LLM; confidence 0.35–0.75.
+
+    Retired from EHAL-Com UI in 2.7.q Q7 (Signal list). Kept for unit tests /
+    optional scripts; do not wire into Streamlit again.
+    """
     proposals: dict[str, dict[str, Any]] = {}
     lowered = [(n, n.lower()) for n in names if str(n).strip()]
     for field in fields:

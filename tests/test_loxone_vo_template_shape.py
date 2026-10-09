@@ -107,15 +107,13 @@ def test_plant_template_has_no_ess_fields() -> None:
     assert not any("ess" in t for t in titles)
 
 
-def test_consumer_template_includes_energy_counters() -> None:
+def test_consumer_template_includes_energy_counter_mono_only() -> None:
     path = _DIR / "VO_Earnie_Consumer.xml"
     cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
     assert cmds["Push_consumer_{hk_id}_sens_energy_total"] == (
         "/ehal/loxone/telemetry/consumer.{hk_id}.sens_energy_total/<v>"
     )
-    assert cmds["Push_consumer_{hk_id}_sens_energy_export"] == (
-        "/ehal/loxone/telemetry/consumer.{hk_id}.sens_energy_export/<v>"
-    )
+    assert "Push_consumer_{hk_id}_sens_energy_export" not in cmds
 
 
 def test_battery_template_full_push_and_bipolar_energy() -> None:

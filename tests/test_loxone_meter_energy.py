@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from integrations.loxone_meter_energy import (
-    FIELD_CONSUMER_EXPORT,
     FIELD_CONSUMER_TOTAL,
     FIELD_GRID_EXPORT,
     FIELD_GRID_IMPORT,
@@ -116,11 +115,11 @@ def test_activate_plant_energy_bindings():
     assert bindings["sens_grid_power_active"] == "Zähler Netz"
 
 
-def test_activate_consumer_energy_bindings_bipolar():
+def test_activate_consumer_energy_bindings_mono_only():
     consumer: dict = {"id": "ev"}
-    activate_consumer_energy_bindings(consumer, bidirectional=True)
+    activate_consumer_energy_bindings(consumer)
     assert FIELD_CONSUMER_TOTAL in consumer["ehal_bindings"]
-    assert FIELD_CONSUMER_EXPORT in consumer["ehal_bindings"]
+    assert "sens_energy_export" not in consumer["ehal_bindings"]
 
 
 def test_activate_battery_energy_bindings_bipolar():
@@ -191,14 +190,13 @@ def test_flex_energy_skips_shared_meter_and_reads_inbox():
             "type": "ev",
             "ehal_bindings": {
                 FIELD_CONSUMER_TOTAL: "",
-                FIELD_CONSUMER_EXPORT: "",
             },
         },
     ]
     cfg = flex_energy_meter_config(consumers)
     assert "swimspa" not in cfg
-    assert cfg["kochen"]["bidirectional"] is False
-    assert cfg["wallbox"]["bidirectional"] is True
+    assert cfg["kochen"] == {}
+    assert cfg["wallbox"] == {}
 
     inbox = {
         "consumer.kochen.sens_energy_total": 5.0,
@@ -212,4 +210,4 @@ def test_flex_energy_skips_shared_meter_and_reads_inbox():
     readings = read_flex_energy_readings(consumers, read_counter=read_counter)
     assert "swimspa" not in readings
     assert readings["kochen"] == {"total": 5.0}
-    assert readings["wallbox"] == {"total": 12.0, "total_neg": 1.5}
+    assert readings["wallbox"] == {"total": 12.0}

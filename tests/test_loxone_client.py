@@ -197,50 +197,18 @@ class TestFetchLoxoneAlarmClockTna:
 
 
 class TestFetchLoxoneReadyByTime:
-    def test_prefers_special_state10_unix(self):
-        response = _mock_http_response(json_data=_alarm_clock_all_payload())
-        with patch.object(lc.requests, "get", return_value=response), patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_IP": "192.168.1.1",
-                "LOXONE_USER": "user",
-                "LOXONE_PASS": "pass",
-            }.get(name, kw.get("default", 5)),
-        ), patch.object(lc, "fetch_loxone_raw_value") as raw:
-            got = lc.fetch_loxone_ready_by_time("Ladewecker")
-        assert got == pytest.approx(555135300.0 + lc.LOXONE_EPOCH_TO_UNIX)
+    """Q7: push inbox only — SpecialState10 / Tna / Merker poll removed."""
+
+    def test_no_alarmclock_poll_without_push(self):
+        with patch.object(lc, "_fetch_loxone_io_all") as poll_all, patch.object(
+            lc, "fetch_loxone_raw_value"
+        ) as raw:
+            assert lc.fetch_loxone_ready_by_time("Ladewecker") is None
+        poll_all.assert_not_called()
         raw.assert_not_called()
 
-    def test_falls_back_to_tna_when_special10_missing(self):
-        response = _mock_http_response(
-            json_data=_alarm_clock_all_payload(special10=None)
-        )
-        with patch.object(lc.requests, "get", return_value=response), patch.object(
-            lc.config, "get", return_value="x"
-        ), patch.object(lc, "fetch_loxone_raw_value") as raw:
-            assert lc.fetch_loxone_ready_by_time("Ladewecker") == "Morgen, 11:00"
-        raw.assert_not_called()
-
-    def test_falls_back_to_tna_when_special10_zero(self):
-        response = _mock_http_response(
-            json_data=_alarm_clock_all_payload(special10=0.0)
-        )
-        with patch.object(lc.requests, "get", return_value=response), patch.object(
-            lc.config, "get", return_value="x"
-        ):
-            assert lc.fetch_loxone_ready_by_time("Ladewecker") == "Morgen, 11:00"
-
-    def test_falls_back_to_raw_merker(self):
-        with patch.object(lc, "_fetch_loxone_io_all", return_value=None), patch.object(
-            lc, "fetch_loxone_raw_value", return_value="Heute, 08:00"
-        ):
-            assert lc.fetch_loxone_ready_by_time("Legacy_FertigUm") == "Heute, 08:00"
-
-    def test_falls_back_to_raw_converts_loxone_counter(self):
-        with patch.object(lc, "_fetch_loxone_io_all", return_value=None), patch.object(
-            lc, "fetch_loxone_raw_value", return_value="555135300"
-        ):
-            got = lc.fetch_loxone_ready_by_time("Legacy_Counter")
-        assert got == pytest.approx(555135300.0 + lc.LOXONE_EPOCH_TO_UNIX)
+    def test_empty_name_returns_none(self):
+        assert lc.fetch_loxone_ready_by_time("") is None
 
 
 class TestFormatReadyByDisplay:

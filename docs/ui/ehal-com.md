@@ -1,6 +1,6 @@
 # EHAL-Com (Connection & Debug)
 
-The **EHAL-Com** page under **Daemon Control** is the central place for smarthome connectivity and live debugging: **Loxone**, **Home Assistant (EHAL)**, or **OpenEMS**. It shows live read/write from the last production run of `main.py`. Loxone bindings are maintained **entity-centric** under **Loxone Structure → EHAL Mapping**. Ad hoc optimization runs via the output to Earnie `Earnie_Request_Optimize` (daemon HTTP, port `system.ehal_loxone_http_port`, default **8541**).
+The **EHAL-Com** page under **Daemon Control** is the central place for smarthome connectivity and live debugging: **Loxone**, **Home Assistant (EHAL)**, or **OpenEMS**. It shows live read/write from the last production run of `main.py`. For Loxone, the **Signal list** shows the contract (qualified EHAL IDs, match status, VO/VI export). Binding keys on `plant` / consumers / batteries are activation flags (empty Merker values after 2.7.q Q8). Ad hoc optimization runs via the output to Earnie `Earnie_Request_Optimize` (daemon HTTP, port `system.ehal_loxone_http_port`, default **8541**).
 
 ## Access
 
@@ -9,12 +9,12 @@ The **EHAL-Com** page under **Daemon Control** is the central place for smarthom
 
 ## Connection
 
-The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-backend.md) (discovery + selection + **Anbindung** credentials). This page no longer re-checks credentials; use Smarthome-Backend for that. EHAL-Com shows live read/write and mapping for whichever backend is already active:
+The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-backend.md) (discovery + selection + **Anbindung** credentials). This page no longer re-checks credentials; use Smarthome-Backend for that. EHAL-Com shows live read/write and the contract UI for whichever backend is already active:
 
 
-| Backend        | Storage                                       | Mapping on this page                                 |
+| Backend        | Storage                                       | Contract UI on this page                                 |
 | -------------- | --------------------------------------------- | ------------------------------------------------------ |
-| Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | Loxone Structure → EHAL Mapping                        |
+| Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | **Signalliste** (qualified IDs · match · VO/VI export) |
 | Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); `sign` in `config.json` → `ehal.ha` | HA Entity → EHAL Mapping → `plant` / `consumers[].ehal_bindings` |
 | OpenEMS        | `config.json` → `ehal.openems`                | (credentials on Smarthome-Backend)                     |
 
@@ -165,7 +165,7 @@ Live operation runs via house-profile flex Merker. Role template: `share/ehal/ro
 
 `flex.` is a **role namespace** for stored bindings (pattern B: `flex.{slug}.sens_power_act` / `set_enable`). **Live-Lesen** shows qualified EHAL IDs (`consumer.{slug}.sens_power_act`, `heatpump.*`, `pool.*`, …). For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example Live-Lesen: `consumer.trockner.sens_power_act`; binding key may still be `flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
 
-**VO push telemetry:** Loxone Virtual Outputs call `GET /ehal/loxone/telemetry/<qualified-EHAL-ID>/<v>` on the daemon port (default **8541**), with token via `?t=`, header, or address prefix `/t/<token>`. Enable with `EARNIE_PILOT_PUSH_TOKEN`. All pushable `sens_*` / `get_*` fields — including meter energy counters (`sens_pv_energy`, `grid.meter.sens_grid_energy_*`, `consumer.*.sens_energy_*`, `ess.*.sens_ess_energy_charge` / `_discharge`) — read from the push inbox (no Merker poll, no Meter `/all`). Battery library template: `VO_Earnie_Battery.xml` (or Pilot `VO_Pilot_Batterie_*.xml`). Write setpoints still use Merker / Virtual Input names until Binding Q7/Q8. See [Loxone Signals](../referenz/loxone-signals.md).
+**VO push telemetry:** Loxone Virtual Outputs call `GET /ehal/loxone/telemetry/<qualified-EHAL-ID>/<v>` on the daemon port (default **8541**), with token via `?t=`, header, or address prefix `/t/<token>`. Enable with `EARNIE_PILOT_PUSH_TOKEN`. All pushable `sens_*` / `get_*` fields — including meter energy counters (`sens_pv_energy`, `grid.meter.sens_grid_energy_*`, `consumer.*.sens_energy_*`, `ess.*.sens_ess_energy_charge` / `_discharge`) — read from the push inbox (no Merker poll, no Meter `/all`). Battery library template: `VO_Earnie_Battery.xml` (or Pilot `VO_Pilot_Batterie_*.xml`). **Writes** are push-only via `status.json` under qualified Check keys (Q5); Q8 dropped dual-emit of legacy Merker Check keys. See [Loxone Signals](../referenz/loxone-signals.md).
 
 
 | Area / meaning        | Type          | EHAL value name (stub)             | OpenEMS | evcc (YAML attribute) | Victron GX / EVCS (Modbus) | Loxone / Loxone extra                        |
@@ -278,7 +278,7 @@ Units and signs: see §B. Full role matrix: §C.
 
 ### Schreibtest
 
-Unter **Live-Schreiben** liegt der Expander **Schreibtest**: alle **gemappten** Schreib-Felder (Plant, Pattern B `ess.{slug}.set_*`, EV, Flex-Freigabe) in einer **Tabelle**. **Senden** ist je Zeile standardmäßig aus — Haken setzen, Wert wählen, dann schreiben. Optional **Auto-Roundtrip** (Schreiben → kurze Wartezeit → Lesen je Feld → Vergleich → Wiederherstellen). Plant-/EV-Felder nutzen `adapter.write_setpoints`; Pattern B / Flex gehen über die gemappten Merker/Entities.
+Under **Live-Schreiben**, the **Schreibtest** expander lists all activated write fields (plant, Pattern B `ess.{slug}.set_*`, EV, flex enable). Enable **Senden** per row, set values, then write. Optional **Auto-Roundtrip**: for Loxone, success = published into the ledger + Miniserver `status.json` callback `fetched_at` (no Merker HTTP echo; true VO value-echo deferred). HA still uses entity read-back.
 
 **Voraussetzungen**
 
@@ -320,21 +320,22 @@ Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, 
 
 
 
-### Loxone Structure → EHAL Mapping
+### Signalliste (Loxone contract)
 
-Only with backend **Loxone**: entity-centric wizard (backlog **2.4.k**, structure scan from **2.4.f**). Entities = **plant** + consumers from the **live house profile** (same shape as Earnie entities). Mapping rows: `{entity}.{ehal_field}` → Merker name; fields grouped by device role / §C (incl. EV `set_evcs_max_current` / `get_evcs_limit_soc`, optional `sens_power_consumers`, C.4 `flex.`*).
+Only with backend **Loxone** (2.7.q Q7). Replaces the former *Loxone Structure → EHAL Mapping* chapter.
 
-Library templates and the Earnie-dead fallback: [Loxone Signals and the Earnie Library](../referenz/loxone-signals.md#library-setup).
+| Column | Meaning |
+| ------ | ------- |
+| Qualified EHAL ID | Exchange form (`grid.meter.*`, `ess.{id}.*`, `consumer.` / `heatpump.` / `pool.` / `evcs.` / `ev.`) |
+| Meaning | Entity Bezeichnung + field label |
+| Required by | EHAL functions from `ehal/functions.py` that need the field |
+| Match (read) | Last received in the push inbox (age) / never |
+| Match (write) | Last Miniserver fetch of `status.json` (callback) / never published |
+| Export | ZIP of VO + VI pilot templates + README; **needed** = activated bindings |
 
-1. **HTTP probe** — checks known Greenfield/template names and already mapped Merker (`greenfield_device_map.json` + prefix+slug) via `/jdev/sps/io/{Name}` (`LL.Code` 200 or 403 = present, 404 = missing). Found names fill the mapping dropdowns. Manually added Merker are checked on the next probe as well. (Loxone MCP and the Ollama AI remain in the code for later re-integration; they are currently not offered in the UI.)
-2. **Loxone import** (on **Smarthome-Backend**, once connected) — creates typed plant/consumer entities and `ehal_bindings` from Merker+EFM (prefix+slug, case-insensitive). Meter designation without a leading "Zähler"/"Zaehler" and without EFM's "Verbraucher N:" as label/id; the same physical devices (e.g. pool↔swimspa, EV↔wallbox/smart) are merged, with EFM power preferred on the typed consumer. Afterward, check the signal mapping here. Beforehand, set up the library/Merker on the Miniserver: [Loxone Signals and the Earnie Library](../referenz/loxone-signals.md#library-setup).
-3. **New Merker in the field dropdown** — in every EHAL field select, a still-unknown Merker name can be typed in (`accept_new_options`). A confirmation appears (**New Merker?**): choosing **yes** adds the name to the Merker list, assigns it to the field in `house_profiles.json`, and optionally checks it via HTTP probe (present / 404); choosing **no** leaves the field unmapped. Empty input doesn't count.
-4. **Human-in-the-loop** — choose an entity, assign EHAL fields (select label: **meaning** plus the EHAL value name, e.g. `Netzleistung (sens_grid_power_active)`). The Merker address comes from the binding of the chosen field.
-5. **Save** — **Save mapping** writes all visible field assignments of the selected entity to `plant.ehal_bindings` / `consumers[].ehal_bindings` in `house_profiles.json`. Individual new Merker are already persisted for that field on confirmation (step 3). On the first migrate/save, legacy Merker trigger keys and plant roles are removed from `loxone_blocks` (an empty `loxone_blocks` is dropped).
+**Loxone import** (on **Smarthome-Backend**) still creates typed entities from Merker/EFM names but writes **empty** binding values (activation flags only). Clear existing Merker strings once with `python -m scripts.clear_loxone_binding_names_once --config-dir <config>`.
 
-**EFM meters:** applied by **Smarthome-Backend → Loxone-Import** (`merge_efm`), not by a separate expander on this page. That path binds power and **activates** energy push fields on `ehal_bindings` (`sens_pv_energy` / `sens_grid_energy_*` / `sens_energy_total` [+ export when bipolar]) so the daemon can derive slot Ist from VO-pushed counters (see [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md)). Wire the matching energy VOs next to power. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md); SB page: [Smarthome-Backend](smarthome-backend.md).
-
-Bindings are **no longer** edited in the House Configurator under "Smarthome Merker" — only here on EHAL-Com. See [Loxone Signals](../referenz/loxone-signals.md).
+**EFM meters:** applied by **Smarthome-Backend → Loxone-Import** (`merge_efm`). That path activates energy push fields on `ehal_bindings` (`sens_pv_energy` / `sens_grid_energy_*` / consumer `sens_energy_total` mono only) so the daemon can derive slot Ist from VO-pushed counters (see [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md)). Wire the matching energy VOs next to power. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md); SB page: [Smarthome-Backend](smarthome-backend.md). Library templates: [Loxone Signals](../referenz/loxone-signals.md#library-setup).
 
 ## Silent Mode vs. Loud Mode
 
@@ -366,7 +367,7 @@ Loud writes publish only to `status.json` (qualified EHAL IDs). The Miniserver V
 2. Regenerate Pilot VIs: `python -m scripts.pilot_vi_template_gen --config-dir <config> --host <Earnie-LAN-IP> --port 8541 --out-dir <dir>`.
 3. In Config: each write actuator is driven by the **VirtualInHttpCmd** (same object as the old Merker title).
 
-**Stage VI Checks** (rising risk; keep dual-emit; observe ≥24 h per stage, day+night for EV/PS):
+**Stage VI Checks** (rising risk; Q8 emits qualified Check keys only; observe ≥24 h per stage, day+night for EV/PS):
 
 | Stage | Group | Pilot / v2 file (home plant example) |
 | ----- | ----- | ------------------------------------ |
@@ -377,7 +378,7 @@ Loud writes publish only to `status.json` (qualified EHAL IDs). The Miniserver V
 | 5 | EV `evcs.*.set_evcs_*` | `VI_Pilot_EV.xml` — accept ≤10 s latency |
 | 6 | Powerstations `ess.{id}.set_*` | `VI_Pilot_Batterie_*.xml` — accept ≤10 s latency |
 
-Per stage: switch Check to the qualified key → confirm `status.json` has the key → VI value updates within one poll → Live Write / callback `ts` advances. Rollback = restore legacy Check while dual-emit still emits it.
+Per stage: switch Check to the qualified key → confirm `status.json` has the key → VI value updates within one poll → Live Write / callback `ts` advances. After Q8, legacy Check keys are no longer published — keep VI on qualified IDs.
 
 **After all stages:** deploy the Q5 Earnie build (no Merker HTTP on Loud cycle). Confirm actuators follow VI within ≤10 s; no `/dev/sps/io/…` setpoint traffic for ESS/flex/PS. Observe ≥24 h.
 

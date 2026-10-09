@@ -88,7 +88,6 @@ FLEX_FIELDS: tuple[str, ...] = (
     "flex.sens_consumer_active",
     "flex.set_enable",
     "sens_energy_total",
-    "sens_energy_export",
 )
 
 FILTER_FIELDS: tuple[str, ...] = FILTER_EHAL_FIELDS
@@ -206,9 +205,15 @@ def fields_for_consumer(consumer: dict) -> tuple[str, ...]:
 
 
 def binding_map(raw: object) -> dict[str, str]:
+    """Activated Loxone bindings; empty string values are activation flags (Q8)."""
     if not isinstance(raw, dict):
         return {}
-    return {str(k): _nonempty(v) for k, v in raw.items() if _nonempty(v)}
+    out: dict[str, str] = {}
+    for key, value in raw.items():
+        field = str(key or "").strip()
+        if field:
+            out[field] = _nonempty(value)
+    return out
 
 
 def resolve_field_select_default(existing: str, proposed: str) -> str:
@@ -326,7 +331,10 @@ def apply_entity_bindings(
     Battery entities use :func:`apply_battery_bindings` (components.json).
     """
     house = dict(house_doc)
-    cleaned = {k: v for k, v in bindings.items() if _nonempty(v)}
+    # Q8: keep keys with empty Merker as activation flags.
+    cleaned = {
+        str(k): _nonempty(v) for k, v in bindings.items() if str(k or "").strip()
+    }
     if entity_id == PLANT_ENTITY_ID:
         plant = dict(house.get("plant") or {}) if isinstance(house.get("plant"), dict) else {}
         plant["ehal_bindings"] = cleaned
@@ -370,7 +378,9 @@ def apply_battery_bindings(
     if not isinstance(batteries, list):
         batteries = []
         out["batteries"] = batteries
-    cleaned = {k: v for k, v in bindings.items() if _nonempty(v)}
+    cleaned = {
+        str(k): _nonempty(v) for k, v in bindings.items() if str(k or "").strip()
+    }
     bid = _nonempty(battery_id)
     found = False
     for index, battery in enumerate(batteries):
