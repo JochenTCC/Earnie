@@ -89,7 +89,7 @@ Laut `LICENSE.md` § 3: Bei Hardware ohne offizielles Profil bist du zur Koopera
 
 Neue Profile bitte als JSON gegen die jeweiligen Schemas validieren (siehe Tests `tests/test_ehal_profiles.py`). Spec: [docs/spec/ehal.md](docs/spec/ehal.md) Abschnitt *Device roles and hardware profiles*.
 
-**Geplant (noch nicht produktiv):** ein Community-**Hardware-Bounty**-Verfahren (Entwicklungsplan **M4**) — Einreichung neuer, verifizierter Geräteprofile gegen eine Entschädigung (Höhe/Form noch offen bzw. projektspezifisch definiert; siehe `LICENSE.md` § 3 / `[PARAM_DATA_COMPENSATION]`). Bis die Bounty-Engine steht: Profile und Hinweise gern über Info / About (GitHub-Issue) oder direkt als Issue.
+Profile und Hinweise zu neuen Geräten gern über Info / About (GitHub-Issue) oder direkt als Issue einreichen.
 
 ---
 
