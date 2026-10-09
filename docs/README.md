@@ -5,7 +5,7 @@ Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfigura
 **Einstieg aus Anwendersicht (Handbuch):** [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md)
 
 Produktüberblick und Landing: [README.md](../README.md) (Repo-Root).  
-Für Entwickler (Projektstruktur, Tests, Container): [DEVELOPER.md](DEVELOPER.md).
+Für Entwickler (Projektstruktur, Tests, Container): [DEVELOPER.md](../DEVELOPER.md).
 
 Zum Ausprobieren des Szenario-Explorers ohne Installation:
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://earnie.streamlit.app)
