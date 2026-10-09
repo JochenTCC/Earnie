@@ -23,12 +23,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **Retire remaining Loxone Merker poll reads** — fix implemented (2026-10-09); NAS/alpha acceptance pending
-  - Gap after archived **2.7.o** / **2.7.q**: optimize still Merker-polled VO-only titles (e.g. `Earnie_EAuto_MaxStrom` → 404 every cycle).
-  - Fix: `resolve_consumer_nominal_power_kw` / `resolve_consumer_battery_capacity_kwh` → `fetch_loxone_generic_value` (push inbox); shadow `_superset_loxone` skips pushable bindings; Live-check `read_raw` no longer Merker-polls; docstring + `docs/referenz/loxone-signals.md` note intentional poll exceptions.
-  - Tests: `tests/test_loxone_client.py`, `tests/test_loxone_push_source.py` (`test_ev_nominal_and_capacity_use_inbox_not_merker`), `tests/test_shadow_feed.py` (`test_superset_loxone_skips_pushable_bindings`).
-  - Accept when alpha logs are free of MaxStrom-style 404s for VO-only titles; then → Erledigt.
-
 - [ ] **2.7.h — productive Earnie dogfood** (code archived in Erledigt; not yet verified live)
   - Physical `role: standby_backup` + `set_ess_source_select` (EcoFlow Delta 3 / Loxone Merker `Earnie_Speicher_Quellenwahl` → HA `switch.*_grid_bypass`): price-driven grid vs battery island flips, reserve sizing, charge in cheap slots
   - After successful live check: remove this item; add **Verified live** note on the **2.7.h** Erledigt entry

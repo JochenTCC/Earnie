@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Retire remaining Loxone Merker poll reads (2026-10-09)
+
+- [x] **Retire remaining Loxone Merker poll reads** (**2.7.n Session A**) — fix implemented (2026-10-09); **Verified live** (2026-10-09)
+  - Gap after archived **2.7.o** / **2.7.q**: optimize Merker-polled VO-only titles (e.g. `Earnie_EAuto_MaxStrom` → 404 every cycle).
+  - Fix: `resolve_consumer_nominal_power_kw` / `resolve_consumer_battery_capacity_kwh` → `fetch_loxone_generic_value` (push inbox); shadow `_superset_loxone` skips pushable bindings; Live-check `read_raw` no longer Merker-polls; docstring + `docs/referenz/loxone-signals.md` note intentional poll exceptions.
+  - Tests: `tests/test_loxone_client.py`, `tests/test_loxone_push_source.py` (`test_ev_nominal_and_capacity_use_inbox_not_merker`), `tests/test_shadow_feed.py` (`test_superset_loxone_skips_pushable_bindings`).
+  - Commit `3ad9ede4` (`v2.7.0-dev.33`); alpha logs free of MaxStrom-style 404s.
+
 ### Powerstation savings study 2025 (2026-10-09)
 
 - [x] **Savings study** (done 2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive Earnie dogfood still open (see [Bugfixes](Backlog-Bugfixes.md) Verifications Pending).
