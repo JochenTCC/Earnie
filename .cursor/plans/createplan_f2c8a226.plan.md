@@ -1,6 +1,6 @@
 ---
 name: CreatePlan
-overview: Ship 2.4.g as schema-first device-role templates, a Modbus/SunSpec profile outline with two stubs, Loxone JSON Merker recipes (no .loxone binary), thin validation loaders, and cheap HITL role labels — no Live I/O or bounty engine.
+overview: Ship 2.4.g as schema-first device-role templates, a Modbus/SunSpec profile outline with two stubs, Loxone JSON Merker recipes (no .loxone binary), thin validation loaders, and cheap HITL role labels — no Live I/O.
 todos:
   - id: device-roles
     content: Add device_roles.schema.json + share/ehal/roles/*.json (grid/pv/ess/evcs + consumer/HP stubs)
@@ -25,7 +25,7 @@ isProject: false
 
 # 2.4.g — Device / hardware profile schemas (M2 slice)
 
-**Decisions locked:** Loxone = JSON Merker/Baustein recipes only (1A). Depth = schemas + Modbus outline + validate/load + light HITL labels (2C). Full Community Bounty = **M4** (out of scope).
+**Decisions locked:** Loxone = JSON Merker/Baustein recipes only (1A). Depth = schemas + Modbus outline + validate/load + light HITL labels (2C).
 
 **Prerequisite:** `2.4.a`–`2.4.f` done (EHAL M1 + adapters + HITL mapping).
 
@@ -103,13 +103,12 @@ Extend the `ehal` package (keep core wire validate untouched):
 
 ## 6. Spec / CONTRIBUTING
 
-- [`docs/spec/ehal.md`](docs/spec/ehal.md): new section **Device roles and hardware profiles (2.4.g)**; move Modbus library from “out of scope (M1 freeze)” to “first outline shipped; bounty = M4”; note consumer/HP templates are stubs
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) §4: point contributors at `share/ehal/roles/`, `share/hardware_profiles/`, `share/loxone/recipes/` as the contribution format; bounty upload still “not productive”
+- [`docs/spec/ehal.md`](docs/spec/ehal.md): new section **Device roles and hardware profiles (2.4.g)**; move Modbus library from “out of scope (M1 freeze)” to “first outline shipped”; note consumer/HP templates are stubs
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) §4: point contributors at `share/ehal/roles/`, `share/hardware_profiles/`, `share/loxone/recipes/` as the contribution format
 - Short German pointer in [`docs/ui/ehal-com.md`](docs/ui/ehal-com.md) only if HITL grouping is user-visible (one sentence)
 
 ## Explicit non-goals
 
-- Community Bounty engine / ARP / upload / ledger (M4)
 - Earnie-direct Modbus writer (Path D runtime)
 - `.loxone` Config library binary
 - Changing Live MILP, `loxone_adapter` I/O, or nesting Hausprofil (`2.+1`)
