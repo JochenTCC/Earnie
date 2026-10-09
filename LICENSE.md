@@ -1,6 +1,6 @@
 # Lizenz- und Nutzungsbedingungen: HEMS-Optimierer (Awattar & Loxone Integration)
 **Status:** Entwurf v1.0 (Rechtliche & Strategische Vorlage)
-**Lizenztyp:** Source-Available & Non-Commercial License (mit Datenbeitrags-Verpflichtung)
+**Lizenztyp:** Source-Available & Non-Commercial License (mit freiwilligem Datenbeitrag)
 
 ---
 
@@ -23,10 +23,10 @@ Diese Software wird als "Source-Available" (Quelloffen, aber mit Nutzungsbeschr�
 
 ---
 
-### § 3 Datenbeitrags-Verpflichtung für unbekannte Systeme
-1. Da die Weiterentwicklung der Software auf der Erkennung und Integration einer Vielzahl von Hardware-Komponenten (Wechselrichter, Speicher, Ladestationen) basiert, verpflichtet sich der Nutzer zur Kooperation bei der Systemerweiterung.
-2. Schließt der Nutzer Hardware-Komponenten an das System an, die im offiziellen Core-Repository noch nicht vollständig unterstützt werden oder für die keine Standard-Konfigurationsprofile vorliegen ("unbekannte Systeme"), erklärt er sich bereit, die für die Integration notwendigen technischen Parameter, Kommunikationsprotokolle (z. B. Modbus-Registerbelegungen) und anonymisierte Konfigurationsdaten dem Projekt zur Verfügung zu stellen.
-3. Die Bereitstellung erfolgt in anonymisierter Form (ohne personenbezogene Daten wie Namen, IP-Adressen oder genaue Standorte).
+### § 3 Freiwilliger Datenbeitrag für unbekannte Systeme
+1. Da die Weiterentwicklung der Software auf der Erkennung und Integration einer Vielzahl von Hardware-Komponenten (Wechselrichter, Speicher, Ladestationen) basiert, wird der Nutzer um freiwillige Kooperation bei der Systemerweiterung gebeten.
+2. Schließt der Nutzer Hardware-Komponenten an das System an, die im offiziellen Core-Repository noch nicht vollständig unterstützt werden oder für die keine Standard-Konfigurationsprofile vorliegen ("unbekannte Systeme"), kann er die für die Integration notwendigen technischen Parameter, Kommunikationsprotokolle (z. B. Modbus-Registerbelegungen) und anonymisierte Konfigurationsdaten dem Projekt freiwillig zur Verfügung stellen. Eine Verpflichtung hierzu besteht nicht; die Nutzung der Software ist nicht von einem Datenbeitrag abhängig.
+3. Die freiwillige Bereitstellung erfolgt in anonymisierter Form (ohne personenbezogene Daten wie Namen, IP-Adressen oder genaue Standorte).
 
 ---
 

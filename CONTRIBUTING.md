@@ -76,7 +76,7 @@ Nicht alles ist Teil des Basis-Setups (z. B. individuelle Pool-, Klima- oder Son
 
 Die Weiterentwicklung hängt stark davon ab, dass unbekannte Geräte (Wechselrichter, Speicher, Wallboxen, …) beschrieben und geteilt werden.
 
-Laut `LICENSE.md` § 3: Bei Hardware ohne offizielles Profil bist du zur Kooperation eingeladen — **anonymisierte** technische Parameter und Konfigurationsdaten (ohne personenbezogene Daten).
+Laut `LICENSE.md` § 3: Bei Hardware ohne offizielles Profil bist du freiwillig zur Kooperation eingeladen — **anonymisierte** technische Parameter und Konfigurationsdaten (ohne personenbezogene Daten).
 
 **Beitragsformat (2.4.g, Schema-Slice):**
 
