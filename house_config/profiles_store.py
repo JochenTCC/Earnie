@@ -306,6 +306,11 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
         "use_profile_csv": bool(raw.get("use_profile_csv", False)),
         "absent_mode_enabled": bool(raw.get("absent_mode_enabled", False)),
     }
+    if "id_locked" in raw:
+        spec["id_locked"] = bool(raw.get("id_locked"))
+    provisional = str(raw.get("id_provisional_label") or "").strip()
+    if provisional and not spec.get("id_locked", True):
+        spec["id_provisional_label"] = provisional
     if consumer_type == "generic":
         spec["schedule"] = _normalize_schedule(raw.get("schedule"), consumer=raw)
         spec["annual_kwh"] = generic_annual_kwh(spec)
@@ -613,6 +618,11 @@ def _serialize_consumer(consumer: dict) -> dict:
         "type": consumer["type"],
         "nominal_power_kw": consumer["nominal_power_kw"],
     }
+    if "id_locked" in consumer:
+        out["id_locked"] = bool(consumer.get("id_locked"))
+    provisional = str(consumer.get("id_provisional_label") or "").strip()
+    if provisional and not out.get("id_locked", True):
+        out["id_provisional_label"] = provisional
     if consumer.get("profile_csv"):
         out["profile_csv"] = consumer["profile_csv"]
     out["use_profile_csv"] = bool(consumer.get("use_profile_csv", False))

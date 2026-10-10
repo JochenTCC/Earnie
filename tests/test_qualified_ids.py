@@ -112,6 +112,7 @@ def test_parse_qualified_id_rejects_junk() -> None:
     [
         (q.qualified_plant_id, ("sens_pv_production_active",)),
         (q.qualified_plant_id, ("sens_grid_power_active",)),
+        (q.qualified_plant_id, ("set_grid_export_power_limit",)),
         (q.qualified_grid_id, ("sens_grid_energy_import",)),
         (q.qualified_battery_id, ("15_kwh_speicher", "sens_ess_soc")),
         (q.qualified_consumer_id, ("waschmaschine", "generic", "set_enable")),

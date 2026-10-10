@@ -17,11 +17,19 @@ from ehal import (
     validate_telemetry,
     validate_write_error,
 )
+from ehal.field_registry import (
+    PLANT_OPTIONAL_READ_FIELDS,
+    PLANT_REQUIRED_READ_FIELDS,
+    apply_loxone_read,
+    loxone_spec,
+    require_loxone_write,
+)
 from ehal.functions import (
     available_functions,
     incomplete_function_fields,
     incomplete_function_messages,
 )
+from ehal.qualified_ids import qualified_plant_id
 from ehal.validate import EhalValidationError
 from integrations import loxone_client
 
@@ -44,24 +52,16 @@ EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
 
 @dataclass(frozen=True)
 class LoxoneConfig:
+    """Write-activation flags (non-empty = wired). Reads use qualified IDs + registry."""
+
     adapter_id: str
-    soc_name: str
-    pv_power_name: str
-    battery_power_name: str
-    grid_power_name: str
     charge_power_name: str = ""
     discharge_power_name: str = ""
     active_power_name: str = ""
     control_cmd_name: str = ""
-    consumers_power_name: str = ""
     evcs_max_current_name: str = ""
     evcs_mode_name: str = ""
-    grid_export_limit_in_name: str = ""
     grid_export_limit_out_name: str = ""
-    ess_soc_min_name: str = ""
-    ess_soc_max_name: str = ""
-    ess_max_charge_power_name: str = ""
-    ess_max_discharge_power_name: str = ""
     ess_source_select_name: str = ""
     timeout_sec: float = 10.0
 
@@ -76,22 +76,17 @@ def _utc_ts() -> str:
 
 def loxone_battery_kw_to_ehal_w(battery_kw: float) -> float:
     """Loxone battery Merker (kW, ``+`` = discharge) → EHAL sens_ess_power (W, same sign)."""
-    return float(battery_kw) * 1000.0
-
-
-def ehal_limit_w_to_loxone_kw(limit_w: float) -> float:
-    """EHAL ESS limit magnitude (W) → Loxone charge/discharge marker (kW)."""
-    return max(0.0, float(limit_w)) / 1000.0
-
-
-
-def ehal_active_power_w_to_loxone_kw(active_w: float) -> float:
-    """EHAL signed active power (W, +discharge) → Loxone Merker (kW, same sign)."""
-    return float(active_w) / 1000.0
+    spec = loxone_spec("sens_ess_power")
+    if spec is None:
+        raise KeyError("no loxone conversion for sens_ess_power")
+    converted = apply_loxone_read(battery_kw, spec)
+    if converted is None:
+        raise ValueError(f"loxone sens_ess_power omitted for raw={battery_kw!r}")
+    return converted
 
 
 class LoxoneAdapter:
-    """Marker HTTP via loxone_client ↔ EHAL (§C wire names)."""
+    """Push inbox / markers ↔ EHAL (§C wire names); reads are registry-driven."""
 
     def __init__(self, cfg: LoxoneConfig) -> None:
         self.cfg = cfg
@@ -104,8 +99,7 @@ class LoxoneAdapter:
             "set_evcs_max_current": cfg.evcs_max_current_name,
             "set_grid_export_power_limit": cfg.grid_export_limit_out_name,
         }
-        # LoxoneConfig still carries Merker names (non-empty = wired). Activation-flag
-        # maps (empty values) use require_nonempty_value=False at the house-binding sites.
+        # Write-side still uses non-empty names as wired flags.
         functions = available_functions(write_map)
         self._supports_ess_write = "ess_limits" in functions
         self._supports_ess_active = "ess_active" in functions
@@ -152,73 +146,30 @@ class LoxoneAdapter:
         return validate_capabilities(doc)
 
     def read_telemetry(self) -> EhalTelemetry:
-        soc = self._require_marker(self.cfg.soc_name, "sens_ess_soc")
-        pv_kw = self._require_marker(self.cfg.pv_power_name, "sens_pv_production_active")
-        grid_kw = self._require_marker(self.cfg.grid_power_name, "sens_grid_power_active")
-        battery_kw = self._require_marker(
-            self.cfg.battery_power_name, "sens_ess_power"
-        )
-
-        grid_w = float(grid_kw) * 1000.0
-        pv_w = max(0.0, float(pv_kw)) * 1000.0
-        ess_w = loxone_battery_kw_to_ehal_w(battery_kw)
         doc: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),
             "adapter_id": self.cfg.adapter_id,
-            "sens_grid_power_active": grid_w,
-            "sens_pv_production_active": pv_w,
-            "sens_ess_soc": float(soc),
-            "sens_ess_power": ess_w,
-            "sens_power_consumers": self._read_or_derive_consumers(pv_w, grid_w, ess_w),
         }
-        if self.cfg.grid_export_limit_in_name:
-            raw = loxone_client.fetch_loxone_generic_value(
-                self.cfg.grid_export_limit_in_name
-            )
-            try:
-                limit_kw = None if raw is None else float(raw)
-            except (TypeError, ValueError):
-                limit_kw = None
-            # Loxone Merker in kW → EHAL W; negative = no inbound cap (never a hard 0).
-            if limit_kw is not None and limit_kw >= 0.0:
-                doc["get_grid_export_power_limit"] = limit_kw * 1000.0
-        self._read_optional_ess_limits(doc)
+        for field in PLANT_REQUIRED_READ_FIELDS:
+            doc[field] = self._require_field(field)
+        pv_w = float(doc["sens_pv_production_active"])
+        grid_w = float(doc["sens_grid_power_active"])
+        ess_w = float(doc["sens_ess_power"])
+        doc["sens_power_consumers"] = self._read_or_derive_consumers(pv_w, grid_w, ess_w)
+        for field in PLANT_OPTIONAL_READ_FIELDS:
+            value = self._read_optional_field(field)
+            if value is not None:
+                doc[field] = value
         return validate_telemetry(doc)
 
-    def _read_optional_ess_limits(self, doc: dict[str, Any]) -> None:
-        """Optional plant ESS config ceilings (Pattern B); Merker kW → EHAL W, SOC %."""
-        soc_pairs = (
-            ("ess_soc_min_name", "get_ess_soc_min"),
-            ("ess_soc_max_name", "get_ess_soc_max"),
-        )
-        for attr, field in soc_pairs:
-            io_name = str(getattr(self.cfg, attr, "") or "").strip()
-            if not io_name:
-                continue
-            raw = loxone_client.fetch_loxone_generic_value(io_name)
-            try:
-                value = None if raw is None else float(raw)
-            except (TypeError, ValueError):
-                continue
-            if value is not None:
-                doc[field] = max(0.0, min(100.0, value))
-
-        power_pairs = (
-            ("ess_max_charge_power_name", "get_ess_max_charge_power"),
-            ("ess_max_discharge_power_name", "get_ess_max_discharge_power"),
-        )
-        for attr, field in power_pairs:
-            io_name = str(getattr(self.cfg, attr, "") or "").strip()
-            if not io_name:
-                continue
-            raw = loxone_client.fetch_loxone_generic_value(io_name)
-            try:
-                limit_kw = None if raw is None else float(raw)
-            except (TypeError, ValueError):
-                continue
-            if limit_kw is not None and limit_kw >= 0.0:
-                doc[field] = limit_kw * 1000.0
+    def _read_optional_field(self, field: str) -> float | None:
+        spec = loxone_spec(field)
+        if spec is None:
+            return None
+        qid = qualified_plant_id(field)
+        raw = loxone_client.fetch_loxone_generic_value(qid)
+        return apply_loxone_read(raw, spec)
 
     def write_setpoints(
         self,
@@ -302,7 +253,9 @@ class LoxoneAdapter:
         if "set_ess_active_power" in doc and self._supports_ess_active:
             ok, msg = self._try_marker_write(
                 self.cfg.active_power_name,
-                ehal_active_power_w_to_loxone_kw(doc["set_ess_active_power"]),
+                require_loxone_write(
+                    "set_ess_active_power", doc["set_ess_active_power"]
+                ),
                 field="set_ess_active_power",
             )
             if not ok:
@@ -312,7 +265,9 @@ class LoxoneAdapter:
         if "set_ess_charge_power_limit" in doc and self._supports_ess_write:
             ok, msg = self._try_marker_write(
                 self.cfg.charge_power_name,
-                ehal_limit_w_to_loxone_kw(doc["set_ess_charge_power_limit"]),
+                require_loxone_write(
+                    "set_ess_charge_power_limit", doc["set_ess_charge_power_limit"]
+                ),
                 field="set_ess_charge_power_limit",
             )
             if not ok:
@@ -322,7 +277,10 @@ class LoxoneAdapter:
         if "set_ess_discharge_power_limit" in doc and self._supports_ess_write:
             ok, msg = self._try_marker_write(
                 self.cfg.discharge_power_name,
-                ehal_limit_w_to_loxone_kw(doc["set_ess_discharge_power_limit"]),
+                require_loxone_write(
+                    "set_ess_discharge_power_limit",
+                    doc["set_ess_discharge_power_limit"],
+                ),
                 field="set_ess_discharge_power_limit",
             )
             if not ok:
@@ -333,10 +291,15 @@ class LoxoneAdapter:
             if not self.cfg.grid_export_limit_out_name:
                 self._skip("set_grid_export_power_limit")
             else:
+                from ehal.qualified_ids import qualified_plant_id
+
                 ok, msg = self._try_marker_write(
                     self.cfg.grid_export_limit_out_name,
-                    ehal_limit_w_to_loxone_kw(doc["set_grid_export_power_limit"]),
-                    field="set_grid_export_power_limit",
+                    require_loxone_write(
+                        "set_grid_export_power_limit",
+                        doc["set_grid_export_power_limit"],
+                    ),
+                    field=qualified_plant_id("set_grid_export_power_limit"),
                 )
                 if not ok:
                     failed.append("set_grid_export_power_limit")
@@ -386,21 +349,21 @@ class LoxoneAdapter:
         )
 
     def _read_or_derive_consumers(self, pv_w: float, grid_w: float, ess_w: float) -> float:
-        marker = str(self.cfg.consumers_power_name or "").strip()
-        if marker:
-            value = loxone_client.fetch_loxone_generic_value(marker)
-            if value is not None:
-                return max(0.0, float(value) * 1000.0)
+        measured = self._read_optional_field("sens_power_consumers")
+        if measured is not None:
+            return measured
         return max(0.0, pv_w + grid_w + ess_w)
 
-    def _require_marker(self, name: str, field: str) -> float:
-        marker = str(name or "").strip()
-        if not marker:
-            raise LoxoneAdapterError(f"Loxone marker for {field} is not configured")
-        value = loxone_client.fetch_loxone_generic_value(marker)
+    def _require_field(self, field: str) -> float:
+        spec = loxone_spec(field)
+        if spec is None:
+            raise LoxoneAdapterError(f"Loxone conversion missing for {field}")
+        qid = qualified_plant_id(field)
+        raw = loxone_client.fetch_loxone_generic_value(qid)
+        value = apply_loxone_read(raw, spec)
         if value is None:
-            raise LoxoneAdapterError(f"Loxone marker read failed for {field} ({marker})")
-        return float(value)
+            raise LoxoneAdapterError(f"Loxone marker read failed for {field} ({qid})")
+        return value
 
     def _try_marker_write(
         self, marker_name: str, value: float, *, field: str = ""

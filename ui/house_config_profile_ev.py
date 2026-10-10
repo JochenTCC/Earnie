@@ -104,12 +104,19 @@ def _seed_ev_defaults_on_type_switch(
     if str(selected) != "ev" or str(consumer.get("type", "generic")) == "ev":
         return consumer
 
+    from house_config.entity_id_lock import ID_LOCKED_KEY, ID_PROVISIONAL_LABEL_KEY
+
     defaults = _default_ev_consumer()
     seeded = dict(defaults)
     if consumer.get("label"):
         seeded["label"] = consumer["label"]
     if consumer.get("id"):
         seeded["id"] = consumer["id"]
+    if ID_LOCKED_KEY in consumer:
+        seeded[ID_LOCKED_KEY] = consumer[ID_LOCKED_KEY]
+    provisional = str(consumer.get(ID_PROVISIONAL_LABEL_KEY) or "").strip()
+    if provisional:
+        seeded[ID_PROVISIONAL_LABEL_KEY] = provisional
     _apply_ev_default_widget_keys(seeded, index, session_scope=session_scope)
     return seeded
 

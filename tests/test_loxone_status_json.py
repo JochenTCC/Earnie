@@ -61,7 +61,8 @@ def test_status_payload_export_limit_defaults_to_unconstrained(monkeypatch) -> N
     payload = build_loxone_status_payload(
         loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
     )
-    assert payload["set_grid_export_power_limit"] == 15.0
+    assert payload["grid.meter.set_grid_export_power_limit"] == 15.0
+    assert "set_grid_export_power_limit" not in payload
 
 
 def test_status_payload_export_limit_fallback_when_plant_unknown(monkeypatch) -> None:
@@ -74,7 +75,7 @@ def test_status_payload_export_limit_fallback_when_plant_unknown(monkeypatch) ->
     payload = build_loxone_status_payload(
         loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
     )
-    assert payload["set_grid_export_power_limit"] == 1000.0
+    assert payload["grid.meter.set_grid_export_power_limit"] == 1000.0
 
 
 def test_status_payload_export_limit_sent_value_wins(monkeypatch) -> None:
@@ -85,11 +86,47 @@ def test_status_payload_export_limit_sent_value_wins(monkeypatch) -> None:
         loxone_sent={"Earnie_EinspeiseLeistungs-Limit": 0.0},
         consumers=[],
         plant_io_index={
+            "Earnie_EinspeiseLeistungs-Limit": "grid.meter.set_grid_export_power_limit"
+        },
+        now_ts=100.0,
+    )
+    assert payload["grid.meter.set_grid_export_power_limit"] == 0.0
+
+
+def test_status_payload_export_limit_accepts_bare_io_index(monkeypatch) -> None:
+    """plant_io_index may still carry the bare kind; wire key is always qualified."""
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", lambda: 15.0
+    )
+    payload = build_loxone_status_payload(
+        loxone_sent={"Earnie_EinspeiseLeistungs-Limit": 3.5},
+        consumers=[],
+        plant_io_index={
             "Earnie_EinspeiseLeistungs-Limit": "set_grid_export_power_limit"
         },
         now_ts=100.0,
     )
-    assert payload["set_grid_export_power_limit"] == 0.0
+    assert payload["grid.meter.set_grid_export_power_limit"] == 3.5
+    assert "set_grid_export_power_limit" not in payload
+
+
+def test_status_payload_export_limit_merges_bare_published_ledger(monkeypatch) -> None:
+    """Stale bare ledger entries still fill the qualified VI Check key."""
+    from integrations.ehal_write import clear_published_for_tests, write_field
+
+    clear_published_for_tests()
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", lambda: 15.0
+    )
+    write_field("set_grid_export_power_limit", 7.0)
+    try:
+        payload = build_loxone_status_payload(
+            loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
+        )
+    finally:
+        clear_published_for_tests()
+    assert payload["grid.meter.set_grid_export_power_limit"] == 7.0
+    assert "set_grid_export_power_limit" not in payload
 
 
 def test_status_payload_ev_and_flex_namespaced_keys() -> None:

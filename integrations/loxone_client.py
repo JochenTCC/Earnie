@@ -434,11 +434,25 @@ def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
         return None
 
 
+def _looks_like_ehal_id(name: str) -> bool:
+    """True for qualified/bare EHAL IDs (never Merker-poll; push-only since 2.7.o / F)."""
+    from ehal.qualified_ids import field_kind, parse_qualified_id
+
+    text = str(name or "").strip()
+    if not text:
+        return False
+    if parse_qualified_id(text) is not None:
+        return True
+    kind = field_kind(text)
+    return kind.startswith(("sens_", "get_", "set_"))
+
+
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
     """Holt einen numerischen Wert: push inbox for bound pushable fields, else Merker poll.
 
     Meter ``/all`` energy stays on poll (never calls this for energy IDs). FertigUm uses
     ``fetch_loxone_ready_by_time``. Bound pushable fields never fall back to Merker HTTP.
+    Qualified/bare EHAL IDs are push-only: unbound → ``None`` (no Merker poll).
     ``io_name`` may be a Merker name or a qualified/bare EHAL ID.
     """
     name = str(io_name or "").strip()
@@ -458,6 +472,8 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
                         state,
                     )
                 return value
+            if _looks_like_ehal_id(name):
+                return None
         except Exception:  # noqa: BLE001 — do not fall back to poll for push bindings
             logger.exception(
                 "Loxone push read failed for '%s'; not falling back to poll", name

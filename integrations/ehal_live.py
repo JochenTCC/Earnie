@@ -208,34 +208,19 @@ def get_loxone_adapter() -> LoxoneAdapter:
 
     ev = _first_ev_loxone_bindings()
     house = load_house_doc()
-    export_in = resolve_plant_binding(house, "get_grid_export_power_limit")
     export_out = resolve_plant_binding(house, "set_grid_export_power_limit")
-    ess_soc_min = resolve_plant_binding(house, "get_ess_soc_min")
-    ess_soc_max = resolve_plant_binding(house, "get_ess_soc_max")
-    ess_max_charge = resolve_plant_binding(house, "get_ess_max_charge_power")
-    ess_max_discharge = resolve_plant_binding(house, "get_ess_max_discharge_power")
     ess_source_select = resolve_plant_binding(house, "set_ess_source_select")
     cfg = LoxoneConfig(
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "loxone-home"),
-        soc_name=str(config.get("LOXONE_SOC_NAME") or ""),
-        pv_power_name=str(config.get("LOXONE_PV_POWER_NAME") or ""),
-        battery_power_name=str(config.get("LOXONE_BATTERY_POWER_NAME") or ""),
-        grid_power_name=str(config.get("LOXONE_GRID_POWER_NAME") or ""),
         charge_power_name=str(config.get("LOXONE_TARGET_CHARGE_POWER_NAME") or ""),
         discharge_power_name=str(
             config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME") or ""
         ),
         active_power_name=str(config.get("LOXONE_TARGET_ACTIVE_POWER_NAME") or ""),
         control_cmd_name=str(config.get("LOXONE_CONTROL_CMD_NAME") or ""),
-        consumers_power_name=str(config.get("LOXONE_CONSUMERS_POWER_NAME") or ""),
         evcs_max_current_name=str(ev.get("evcs_max_current_name") or ""),
         evcs_mode_name=str(ev.get("evcs_mode_name") or ""),
-        grid_export_limit_in_name=str(export_in or ""),
         grid_export_limit_out_name=str(export_out or ""),
-        ess_soc_min_name=str(ess_soc_min or ""),
-        ess_soc_max_name=str(ess_soc_max or ""),
-        ess_max_charge_power_name=str(ess_max_charge or ""),
-        ess_max_discharge_power_name=str(ess_max_discharge or ""),
         ess_source_select_name=str(ess_source_select or ""),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
     )
@@ -288,19 +273,27 @@ def read_ess_soc() -> float | None:
 
 
 def _soc_address_for_battery(bat: dict) -> str:
+    """Resolve SoC read key: Loxone uses qualified ID; HA uses binding address."""
     from ehal.ess_fields import binding_address, ess_field
+    from ehal.qualified_ids import qualified_battery_id
 
-    bindings = bat.get("ehal_bindings")
-    if not isinstance(bindings, dict):
-        return ""
     ess_id = str(bat.get("id") or "").strip()
     if not ess_id:
+        return ""
+    if is_loxone_backend() or not is_ehal_network_backend():
+        return qualified_battery_id(ess_id, "sens_ess_soc")
+    bindings = bat.get("ehal_bindings")
+    if not isinstance(bindings, dict):
         return ""
     addr = binding_address(bindings, ess_id, "sens_ess_soc")
     if addr:
         return addr
     # Flat key still stored on some batteries before Pattern B rewrite
-    return str(bindings.get("sens_ess_soc") or bindings.get(ess_field(ess_id, "sens_ess_soc")) or "").strip()
+    return str(
+        bindings.get("sens_ess_soc")
+        or bindings.get(ess_field(ess_id, "sens_ess_soc"))
+        or ""
+    ).strip()
 
 
 def _read_soc_from_address(address: str) -> float | None:
@@ -318,7 +311,12 @@ def _read_soc_from_address(address: str) -> float | None:
             raw = payload.get("state")
             return None if raw is None else float(raw)
         if is_loxone_backend() or not is_ehal_network_backend():
+            from ehal.field_registry import apply_loxone_read, loxone_spec
+
             raw = loxone_client.fetch_loxone_generic_value(addr)
+            spec = loxone_spec("sens_ess_soc")
+            if spec is not None:
+                return apply_loxone_read(raw, spec)
             return None if raw is None else float(raw)
     except (
         OpenemsHttpError,

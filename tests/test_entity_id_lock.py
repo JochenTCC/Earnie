@@ -1,4 +1,4 @@
-"""Deferred id lock from Bezeichnung (batteries + PV)."""
+"""Deferred id lock from Bezeichnung (batteries + PV + consumers)."""
 from __future__ import annotations
 
 import json
@@ -6,11 +6,16 @@ import json
 import pytest
 
 from ehal.ess_fields import ess_field
+from ehal.flex_fields import flex_field
 from house_config.entity_id_lock import (
+    FORCE_ID_FROM_LABEL_KEY,
+    is_id_locked,
     resolve_id_on_save,
+    rewrite_consumer_bindings_slug,
     rewrite_ess_bindings_slug,
 )
 from ui.house_config_entities_io import upsert_battery, upsert_pv_system
+from ui.house_config_profile_save import _resolve_consumer_ids
 
 
 def test_resolve_new_unlocked_then_locks_on_label_change():
@@ -77,6 +82,23 @@ def test_rewrite_ess_bindings_slug():
     assert out[ess_field(new, "set_ess_mode")] == "number.mode"
     assert out["unrelated"] == "x"
     assert ess_field(old, "sens_ess_soc") not in out
+
+
+def test_rewrite_consumer_bindings_slug():
+    old = "waschmaschine_copy"
+    new = "waschmaschine"
+    bindings = {
+        flex_field(old, "sens_power_act"): "Merker1",
+        f"consumer.{old}.set_enable": "",
+        f"ev.{old}.sens_evcs_soc_act": "SoC",
+        "unrelated": "x",
+    }
+    out = rewrite_consumer_bindings_slug(bindings, old_id=old, new_id=new)
+    assert out[flex_field(new, "sens_power_act")] == "Merker1"
+    assert out[f"consumer.{new}.set_enable"] == ""
+    assert out[f"ev.{new}.sens_evcs_soc_act"] == "SoC"
+    assert out["unrelated"] == "x"
+    assert flex_field(old, "sens_power_act") not in out
 
 
 @pytest.fixture
@@ -224,3 +246,130 @@ def test_upsert_pv_locks_after_bezeichnung_change(components_env):
     assert "id_provisional_label" not in pv
     scen = io.load_backtesting_scenarios_raw()
     assert scen["scenarios"][0]["settings"]["pv_system_ids"] == ["carport_ost"]
+
+
+@pytest.fixture
+def profiles_env(tmp_path, monkeypatch):
+    """Minimal config tree for house-profile consumer lock via upsert."""
+    from house_config.components_store import save_components_document
+    from house_config.profiles_store import save_house_profiles_document
+
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    profiles = cfg / "house_profiles.json"
+    components = cfg / "components.json"
+    save_house_profiles_document(str(profiles), {"profiles": []})
+    save_components_document(str(components), {"batteries": [], "pv_systems": []})
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg))
+    monkeypatch.setenv("EARNIE_HOUSE_PROFILES_PATH", str(profiles))
+    monkeypatch.setenv("EARNIE_COMPONENTS_PATH", str(components))
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    monkeypatch.delenv("EARNIE_ENV_PATH", raising=False)
+    return {"profiles": profiles}
+
+
+def _generic_consumer_edit(
+    label: str,
+    *,
+    provisional: str = "",
+    bindings: dict | None = None,
+    force: bool = False,
+) -> dict:
+    item: dict = {
+        "label": label,
+        "type": "generic",
+        "nominal_power_kw": 2.0,
+        "schedule": {"runs_per_week": 0},
+    }
+    if provisional:
+        item["id_provisional_label"] = provisional
+    if bindings is not None:
+        item["ehal_bindings"] = dict(bindings)
+    if force:
+        item[FORCE_ID_FROM_LABEL_KEY] = True
+    return item
+
+
+def test_resolve_consumer_locks_after_bezeichnung_change(profiles_env):
+    from house_config.profiles_store import load_house_profiles_document
+    from ui.house_config_io import upsert_house_profile
+
+    seed = "Waschmaschine copy"
+    first_edit = _generic_consumer_edit(
+        seed,
+        provisional=seed,
+        bindings={flex_field("waschmaschine_copy", "sens_power_act"): "P"},
+    )
+    first = _resolve_consumer_ids([{}], [first_edit])
+    assert first[0]["id"] == "waschmaschine_copy"
+    assert first[0]["id_locked"] is False
+    assert first[0]["id_provisional_label"] == seed
+
+    upsert_house_profile(
+        {
+            "id": "home",
+            "label": "Home",
+            "annual_kwh": 5000.0,
+            "latitude": 47.4,
+            "longitude": 9.7,
+            "consumers": first,
+        }
+    )
+    doc = load_house_profiles_document(str(profiles_env["profiles"]))
+    cons = doc["profiles"]["home"]["consumers"][0]
+    assert cons["id_locked"] is False
+    assert cons["id_provisional_label"] == seed
+
+    second_edit = _generic_consumer_edit("Waschküche")
+    second = _resolve_consumer_ids(first, [second_edit])
+    assert second[0]["id"] == "waschkueche"
+    assert second[0]["id_locked"] is True
+    assert "id_provisional_label" not in second[0]
+    assert second[0]["ehal_bindings"][flex_field("waschkueche", "sens_power_act")] == "P"
+
+    upsert_house_profile(
+        {
+            "id": "home",
+            "label": "Home",
+            "annual_kwh": 5000.0,
+            "latitude": 47.4,
+            "longitude": 9.7,
+            "consumers": second,
+        }
+    )
+    doc = load_house_profiles_document(str(profiles_env["profiles"]))
+    cons = doc["profiles"]["home"]["consumers"][0]
+    assert cons["id"] == "waschkueche"
+    assert cons["id_locked"] is True
+    assert "id_provisional_label" not in cons
+
+
+def test_resolve_consumer_legacy_missing_flag_stays_locked():
+    existing = [{"id": "ugly_copy_3", "label": "Nice Name", "type": "generic"}]
+    edited = [_generic_consumer_edit("Waschküche")]
+    resolved = _resolve_consumer_ids(existing, edited)
+    assert resolved[0]["id"] == "ugly_copy_3"
+    assert is_id_locked(resolved[0])
+    assert "id_locked" not in resolved[0]
+
+
+def test_resolve_consumer_force_from_label_renames_locked():
+    existing = [
+        {
+            "id": "ugly_copy_3",
+            "label": "Nice Name",
+            "type": "generic",
+            "id_locked": True,
+            "ehal_bindings": {
+                flex_field("ugly_copy_3", "sens_power_act"): "P",
+            },
+        }
+    ]
+    edited = [_generic_consumer_edit("Waschküche", force=True)]
+    resolved = _resolve_consumer_ids(existing, edited)
+    assert resolved[0]["id"] == "waschkueche"
+    assert resolved[0]["id_locked"] is True
+    assert (
+        resolved[0]["ehal_bindings"][flex_field("waschkueche", "sens_power_act")] == "P"
+    )

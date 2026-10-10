@@ -29,7 +29,13 @@ from house_config.generic_schedule import (
     generic_annual_kwh,
     reject_legacy_start_flexibility,
 )
-from house_config.id_slug import slug_id
+from house_config.entity_id_lock import (
+    FORCE_ID_FROM_LABEL_KEY,
+    ID_LOCKED_KEY,
+    ID_PROVISIONAL_LABEL_KEY,
+    resolve_id_on_save,
+    rewrite_consumer_bindings_slug,
+)
 from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
     building_class_option_label,
@@ -76,6 +82,8 @@ _PASSTHROUGH_CONSUMER_KEYS = (
     "profile_csv",
     "use_profile_csv",
     "ehal_bindings",
+    ID_LOCKED_KEY,
+    ID_PROVISIONAL_LABEL_KEY,
 )
 
 def _merge_passthrough_consumer_fields(original: dict, edited: dict) -> dict:
@@ -104,17 +112,53 @@ def _merge_passthrough_consumer_fields(original: dict, edited: dict) -> dict:
 def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dict]:
     taken: set[str] = set()
     resolved: list[dict] = []
-    for index, item in enumerate(edited):
+    for index, raw_item in enumerate(edited):
+        item = dict(raw_item)
+        force = bool(item.pop(FORCE_ID_FROM_LABEL_KEY, False))
         label = str(item.get("label", "")).strip()
         original = consumers[index] if index < len(consumers) else {}
         stable_id = str(original.get("id", "")).strip()
-        if stable_id:
-            consumer_id = stable_id
-        else:
-            consumer_id = slug_id(label or "verbraucher", existing=taken)
-        item = _merge_passthrough_consumer_fields(original, dict(item))
+        provisional_ui = str(
+            item.get(ID_PROVISIONAL_LABEL_KEY)
+            or original.get(ID_PROVISIONAL_LABEL_KEY)
+            or ""
+        ).strip()
+        consumer_id, id_locked, provisional = resolve_id_on_save(
+            label=label or "verbraucher",
+            stable_id=stable_id,
+            existing=original if isinstance(original, dict) else None,
+            taken=taken,
+            provisional_from_ui=provisional_ui,
+            force_from_label=force,
+        )
+        item = _merge_passthrough_consumer_fields(original, item)
+        if stable_id and stable_id != consumer_id:
+            bindings = item.get("ehal_bindings")
+            item["ehal_bindings"] = rewrite_consumer_bindings_slug(
+                bindings if isinstance(bindings, dict) else {},
+                old_id=stable_id,
+                new_id=consumer_id,
+            )
         item["id"] = consumer_id
         item["label"] = label or consumer_id
+        # Avoid dirty-writing id_locked onto legacy rows (missing flag ⇒ locked)
+        # so Hausprofil auto_persist does not rewrite every open.
+        if not id_locked:
+            item[ID_LOCKED_KEY] = False
+            if provisional:
+                item[ID_PROVISIONAL_LABEL_KEY] = provisional
+            else:
+                item.pop(ID_PROVISIONAL_LABEL_KEY, None)
+        elif (
+            ID_LOCKED_KEY in original
+            or force
+            or (stable_id and stable_id != consumer_id)
+        ):
+            item[ID_LOCKED_KEY] = True
+            item.pop(ID_PROVISIONAL_LABEL_KEY, None)
+        else:
+            item.pop(ID_LOCKED_KEY, None)
+            item.pop(ID_PROVISIONAL_LABEL_KEY, None)
         taken.add(consumer_id)
         resolved.append(item)
     return resolved

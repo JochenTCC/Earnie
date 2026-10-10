@@ -6,12 +6,11 @@ from unittest.mock import patch
 import pytest
 
 from ehal import EHAL_SCHEMA_VERSION
+from ehal.field_registry import require_loxone_write
 from integrations.loxone_adapter import (
     LoxoneAdapter,
     LoxoneAdapterError,
     LoxoneConfig,
-    ehal_active_power_w_to_loxone_kw,
-    ehal_limit_w_to_loxone_kw,
     loxone_battery_kw_to_ehal_w,
 )
 from integrations.loxone_comm_trace import LoxoneWriteRecord
@@ -35,10 +34,6 @@ def _pub_io_value_calls(mock) -> set[tuple[str, float]]:
 def _cfg(**kwargs) -> LoxoneConfig:
     base = dict(
         adapter_id="loxone-home",
-        soc_name="SoC",
-        pv_power_name="PV",
-        battery_power_name="Bat",
-        grid_power_name="Grid",
         charge_power_name="Charge",
         discharge_power_name="Discharge",
         active_power_name="Active",
@@ -48,12 +43,27 @@ def _cfg(**kwargs) -> LoxoneConfig:
     return LoxoneConfig(**base)
 
 
+def _plant_qid_values(**extra) -> dict:
+    from ehal.qualified_ids import qualified_plant_id
+
+    values = {
+        qualified_plant_id("sens_ess_soc"): 55.0,
+        qualified_plant_id("sens_pv_production_active"): 2.0,
+        qualified_plant_id("sens_ess_power"): 0.5,
+        qualified_plant_id("sens_grid_power_active"): 1.0,
+    }
+    values.update(extra)
+    return values
+
+
 def test_battery_sign_and_limit_units():
     # Loxone battery Merker: + = discharge, same sign as EHAL
     assert loxone_battery_kw_to_ehal_w(1.5) == pytest.approx(1500.0)
     assert loxone_battery_kw_to_ehal_w(-0.5) == pytest.approx(-500.0)
-    assert ehal_limit_w_to_loxone_kw(2000) == pytest.approx(2.0)
-    assert ehal_active_power_w_to_loxone_kw(-1500) == pytest.approx(-1.5)
+    assert require_loxone_write("set_ess_charge_power_limit", 2000) == pytest.approx(
+        2.0
+    )
+    assert require_loxone_write("set_ess_active_power", -1500) == pytest.approx(-1.5)
 
 
 def test_capabilities_ess_true_evcs_false():
@@ -76,15 +86,7 @@ def test_capabilities_ess_false_without_markers():
 
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
 def test_read_telemetry_normalizes(fetch_mock):
-    def _fetch(name: str):
-        return {
-            "SoC": 55.0,
-            "PV": 2.0,
-            "Bat": 0.5,
-            "Grid": 1.0,
-        }.get(name)
-
-    fetch_mock.side_effect = _fetch
+    fetch_mock.side_effect = _plant_qid_values().get
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert telemetry["sens_ess_soc"] == 55.0
     assert telemetry["sens_pv_production_active"] == 2000.0
@@ -100,9 +102,17 @@ def test_read_telemetry_normalizes(fetch_mock):
 )
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
 def test_read_telemetry_inbound_export_limit(fetch_mock, raw, expected_w):
-    values = {"SoC": 55.0, "PV": 2.0, "Bat": 0.0, "Grid": 0.0, "ExpIn": raw}
+    from ehal.qualified_ids import qualified_plant_id
+
+    values = _plant_qid_values(
+        **{
+            qualified_plant_id("sens_ess_power"): 0.0,
+            qualified_plant_id("sens_grid_power_active"): 0.0,
+            qualified_plant_id("get_grid_export_power_limit"): raw,
+        }
+    )
     fetch_mock.side_effect = values.get
-    telemetry = LoxoneAdapter(_cfg(grid_export_limit_in_name="ExpIn")).read_telemetry()
+    telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert telemetry.get("get_grid_export_power_limit") == expected_w
 
 
@@ -121,7 +131,9 @@ def test_write_setpoints_export_limit_magnitude_kw(pub_mock):
         )
         assert error is None
         pub_mock.assert_called_once_with(
-            "set_grid_export_power_limit", expected_kw, io_name="ExpOut"
+            "grid.meter.set_grid_export_power_limit",
+            expected_kw,
+            io_name="ExpOut",
         )
 
 

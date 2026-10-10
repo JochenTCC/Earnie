@@ -100,3 +100,52 @@ def test_send_huawei_publishes_only(publish_dir: Path) -> None:
     published = ew.load_published()
     assert published["set_ess_active_power"] == pytest.approx(1.5)
     assert published["set_ess_mode"] == pytest.approx(2.0)
+
+
+def test_send_huawei_publishes_export_limit_qualified(publish_dir: Path, monkeypatch) -> None:
+    from integrations import loxone_client as lc
+    from integrations.loxone_comm_trace import LoxoneWriteRecord
+
+    names = {
+        "LOXONE_TARGET_ACTIVE_POWER_NAME": "Active",
+        "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
+        "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
+        "LOXONE_CONTROL_CMD_NAME": "Cmd",
+    }
+    io_index = {
+        "Active": "set_ess_active_power",
+        "Charge": "set_ess_charge_power_limit",
+        "Discharge": "set_ess_discharge_power_limit",
+        "Cmd": "set_ess_mode",
+    }
+    monkeypatch.setattr(
+        "optimizer.live_export_limit.live_unconstrained_export_kw", lambda: 15.0
+    )
+    monkeypatch.setattr(
+        "house_config.ehal_bindings.resolve_plant_binding",
+        lambda *_a, **_k: "Earnie_EinspeiseLeistungs-Limit",
+    )
+    with (
+        patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)),
+        patch.object(
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+        ),
+        patch.object(lc, "_send_loxone_value_traced") as mock_http,
+        patch(
+            "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
+            return_value=io_index,
+        ),
+    ):
+        records = lc.send_huawei_modbus_states(
+            mode=3,
+            target_power_kw=1.5,
+            target_soc=55.0,
+            export_cap_kw=2.0,
+        )
+
+    assert len(records) == 5
+    assert all(isinstance(r, LoxoneWriteRecord) and r.success for r in records)
+    mock_http.assert_not_called()
+    published = ew.load_published()
+    assert published["grid.meter.set_grid_export_power_limit"] == pytest.approx(2.0)
+    assert "set_grid_export_power_limit" not in published

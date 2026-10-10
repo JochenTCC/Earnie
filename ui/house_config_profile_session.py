@@ -102,11 +102,14 @@ def _default_consumer() -> dict:
     }
 
 def _default_additional_consumer() -> dict:
+    from house_config.entity_id_lock import ID_PROVISIONAL_LABEL_KEY
     from house_config.label_uniqueness import allocate_unique_label
 
     existing = list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
+    label = allocate_unique_label("Verbraucher", existing)
     return {
-        "label": allocate_unique_label("Verbraucher", existing),
+        "label": label,
+        ID_PROVISIONAL_LABEL_KEY: label,
         "type": "generic",
         "nominal_power_kw": 1.0,
         "schedule": {

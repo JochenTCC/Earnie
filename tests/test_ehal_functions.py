@@ -166,10 +166,6 @@ def test_loxone_active_without_limits_is_skipped(send_mock):
     adapter = LoxoneAdapter(
         LoxoneConfig(
             adapter_id="loxone-home",
-            soc_name="SoC",
-            pv_power_name="PV",
-            battery_power_name="Bat",
-            grid_power_name="Grid",
             active_power_name="Active",
             control_cmd_name="Cmd",
         )

@@ -1,0 +1,45 @@
+---
+description: Forbid hardcoded EHAL↔hub unit/sign conversions — use registry or runtime hub units
+globs: ehal/**/*.py,integrations/**/*.py,share/ehal/**/*.json,optimizer/**/*ehal*.py,tests/test_*loxone*.py,tests/test_*ha_unit*.py,tests/test_field_registry.py
+alwaysApply: true
+---
+
+# EHAL unit conversion — no hardcoding
+
+Adapters **must not** invent per-field unit or sign math in Python. EHAL wire units stay frozen in [`docs/spec/ehal.md`](../../docs/spec/ehal.md) (§ Units and sign convention). Hub ↔ EHAL conversion is **data-driven**.
+
+## Allowed sources of conversion
+
+| Backend | Source of truth |
+|---|---|
+| **Loxone** (static hub units) | Optional `loxone` blocks on fields in `share/ehal/roles/*.json` → `ehal/field_registry.py` (`apply_loxone_read` / `apply_loxone_write`). `unit` = hub, `ehal_unit` = wire, `factor` / `sign` = hub→EHAL; write inverts after EHAL clamps. |
+| **Home Assistant** | Runtime `unit_of_measurement` via `integrations/ha_units.py` (`to_ehal` / `from_ehal`). Never store a factor on the binding. |
+| **OpenEMS / future hubs** | Optional `openems` (or hub) blocks in role JSON via the same registry — not a new `* 1000` / ad-hoc sign flip in the adapter. |
+
+## Do
+
+- Add or extend a role `loxone` (or shared registry) entry when a new Loxone field needs scale/sign/clamp.
+- For HA, map only compatible quantities; let `ha_units` derive the factor at read/write time.
+- Keep **decision** logic in code (which field to write, Automatik omit, derive `sens_power_consumers`) — not the unit math.
+- Point new fields at the frozen EHAL unit table in `docs/spec/ehal.md`.
+
+## Do not
+
+```text
+❌ float(raw) * 1000.0                    # ad-hoc kW→W in adapter
+❌ value_w / 1000.0                       # ad-hoc W→kW outside registry helper fed by role JSON
+❌ if field == "sens_ess_power": invert   # per-field sign branch instead of registry/HA sign
+❌ New LoxoneConfig Merker + conversion branch for one more power field
+✅ apply_loxone_read(raw, loxone_spec(field))
+✅ require_loxone_write(field, value_ehal)  # or apply_loxone_write(...)
+✅ ha_units.to_ehal(field, value, entity_unit)
+```
+
+- Do **not** add write-side helpers that hardcode scale — use `apply_loxone_write` / `require_loxone_write` (or OpenEMS equivalents) fed by role JSON.
+
+## Checklist (new or changed EHAL field / adapter path)
+
+1. What is the EHAL unit in `docs/spec/ehal.md`?
+2. What is the hub unit (Loxone kW / HA entity unit / …)?
+3. Is conversion in role JSON / `ha_units` — not a new literal factor in the adapter?
+4. Characterization or unit test covers the conversion without re-embedding the factor in production branches?

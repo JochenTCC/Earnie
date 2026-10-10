@@ -335,3 +335,11 @@ def test_read_back_ha_numeric(ehal_live_mock):
     }
     ehal_live_mock.get_ha_adapter.return_value = adapter
     assert ewt.read_back("set_ess_charge_power_limit") == pytest.approx(1500.0)
+
+
+def test_publish_id_for_probe_qualifies_export_limit() -> None:
+    assert (
+        ewt._publish_id_for_probe("set_grid_export_power_limit")
+        == "grid.meter.set_grid_export_power_limit"
+    )
+    assert ewt._publish_id_for_probe("set_ess_mode") == "set_ess_mode"

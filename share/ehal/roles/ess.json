@@ -8,13 +8,27 @@
       "field": "sens_ess_soc",
       "required": true,
       "kind": "telemetry",
-      "notes": "SoC in % (0…100)."
+      "notes": "SoC in % (0…100).",
+      "loxone": {
+        "unit": "%",
+        "ehal_unit": "%",
+        "factor": 1,
+        "sign": 1,
+        "read_required": true
+      }
     },
     {
       "field": "sens_ess_power",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional W; + = discharge, − = charge (OpenEMS-aligned)."
+      "notes": "Optional W; + = discharge, − = charge (OpenEMS-aligned).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "read_required": true
+      }
     },
     {
       "field": "sens_ess_energy_charge",
@@ -32,43 +46,111 @@
       "field": "get_ess_soc_min",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional discharge cut-off SoC in % (device config; MILP when limits_from_live)."
+      "notes": "Optional discharge cut-off SoC in % (device config; MILP when limits_from_live).",
+      "loxone": {
+        "unit": "%",
+        "ehal_unit": "%",
+        "factor": 1,
+        "sign": 1,
+        "clamp_min": 0,
+        "clamp_max": 100,
+        "read_required": false
+      }
     },
     {
       "field": "get_ess_soc_max",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional charge cut-off SoC in % (device config; MILP when limits_from_live)."
+      "notes": "Optional charge cut-off SoC in % (device config; MILP when limits_from_live).",
+      "loxone": {
+        "unit": "%",
+        "ehal_unit": "%",
+        "factor": 1,
+        "sign": 1,
+        "clamp_min": 0,
+        "clamp_max": 100,
+        "read_required": false
+      }
     },
     {
       "field": "get_ess_max_charge_power",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional device max charge power in W (magnitude ≥ 0; Huawei 47075)."
+      "notes": "Optional device max charge power in W (magnitude ≥ 0; Huawei 47075).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "omit_if": "negative",
+        "read_required": false
+      }
     },
     {
       "field": "get_ess_max_discharge_power",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional device max discharge power in W (magnitude ≥ 0; Huawei 47077)."
+      "notes": "Optional device max discharge power in W (magnitude ≥ 0; Huawei 47077).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "omit_if": "negative",
+        "read_required": false
+      }
     },
     {
       "field": "set_ess_active_power",
       "required": false,
       "kind": "setpoint",
-      "notes": "Forced active power in W (+discharge, −charge). Omit on Automatik. Design C1."
+      "notes": "Forced active power in W (+discharge, −charge). Omit on Automatik. Design C1.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1
+      }
     },
     {
       "field": "set_ess_charge_power_limit",
       "required": false,
       "kind": "setpoint",
-      "notes": "Max charge power magnitude in W (true cap)."
+      "notes": "Max charge power magnitude in W (true cap).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "clamp_min": 0
+      },
+      "openems": {
+        "unit": "W",
+        "ehal_unit": "W",
+        "factor": 1,
+        "sign": -1,
+        "clamp_min": 0
+      }
     },
     {
       "field": "set_ess_discharge_power_limit",
       "required": false,
       "kind": "setpoint",
-      "notes": "Max discharge power magnitude in W (true cap)."
+      "notes": "Max discharge power magnitude in W (true cap).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "clamp_min": 0
+      },
+      "openems": {
+        "unit": "W",
+        "ehal_unit": "W",
+        "factor": 1,
+        "sign": 1,
+        "clamp_min": 0
+      }
     },
     {
       "field": "set_ess_mode",

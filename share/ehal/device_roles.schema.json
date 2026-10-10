@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/device_roles.schema.json",
-  "title": "EHAL Device Role Template (2.4.g)",
-  "description": "Groups M1 EHAL fields by device role for adapter mapping aids. Does not extend the Live wire contract. Units/signs follow docs/spec/ehal.md. Stub roles (consumer, heatpump) may list future/flex fields with kind=stub.",
+  "title": "EHAL Device Role Template (2.4.g / 2.7.n-5)",
+  "description": "Groups M1 EHAL fields by device role for adapter mapping aids. Does not extend the Live wire contract. Units/signs follow docs/spec/ehal.md. Optional loxone / openems blocks hold hub ↔ EHAL conversion (factor/sign = hub → EHAL; write applies inverse). Stub roles (consumer, heatpump) may list future/flex fields with kind=stub.",
   "type": "object",
   "required": ["role_id", "label", "description", "ehal_fields"],
   "properties": {
@@ -37,7 +37,8 @@
             "description": "M1 EHAL field name, or stub identifier (e.g. flex.enable_name) when kind=stub."
           },
           "required": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Mapping completeness (M1 HITL); independent of loxone.read_required."
           },
           "kind": {
             "type": "string",
@@ -45,6 +46,87 @@
           },
           "notes": {
             "type": "string"
+          },
+          "loxone": {
+            "type": "object",
+            "description": "Loxone hub ↔ EHAL conversion. factor/sign always mean hub → EHAL; write applies inverse after EHAL clamps. omit_if / read_required apply on read only.",
+            "required": ["unit", "ehal_unit", "factor", "sign"],
+            "properties": {
+              "unit": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unit on the Loxone wire (e.g. kW, %)."
+              },
+              "ehal_unit": {
+                "type": "string",
+                "minLength": 1,
+                "description": "EHAL Live unit (e.g. W, %)."
+              },
+              "factor": {
+                "type": "number",
+                "description": "Hub → EHAL: multiply hub value by this after sign. Write divides by (sign * factor)."
+              },
+              "sign": {
+                "type": "number",
+                "enum": [-1, 1],
+                "description": "Multiplicative sign (±1) applied before factor (hub → EHAL)."
+              },
+              "clamp_min": {
+                "type": ["number", "null"],
+                "description": "Inclusive lower clamp in EHAL space; null = none."
+              },
+              "clamp_max": {
+                "type": ["number", "null"],
+                "description": "Inclusive upper clamp in EHAL space; null = none."
+              },
+              "omit_if": {
+                "type": ["string", "null"],
+                "enum": ["negative", null],
+                "description": "Read only: if 'negative', omit when raw (pre-factor) hub value is < 0. Ignored on write."
+              },
+              "read_required": {
+                "type": "boolean",
+                "default": false,
+                "description": "Read only: if true, missing/bad Loxone read aborts plant telemetry. Ignored on write."
+              }
+            },
+            "additionalProperties": false
+          },
+          "openems": {
+            "type": "object",
+            "description": "OpenEMS ↔ EHAL polarity/clamp (typically W↔W). factor/sign = hub → EHAL; write applies inverse after EHAL clamps.",
+            "required": ["sign"],
+            "properties": {
+              "unit": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unit on the OpenEMS channel (default W)."
+              },
+              "ehal_unit": {
+                "type": "string",
+                "minLength": 1,
+                "description": "EHAL Live unit (default W)."
+              },
+              "factor": {
+                "type": "number",
+                "default": 1,
+                "description": "Hub → EHAL scale (usually 1 for OpenEMS watts)."
+              },
+              "sign": {
+                "type": "number",
+                "enum": [-1, 1],
+                "description": "Multiplicative sign (±1) hub → EHAL."
+              },
+              "clamp_min": {
+                "type": ["number", "null"],
+                "description": "Inclusive lower clamp in EHAL space; null = none."
+              },
+              "clamp_max": {
+                "type": ["number", "null"],
+                "description": "Inclusive upper clamp in EHAL space; null = none."
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false

@@ -41,4 +41,5 @@ Reply in **German** in Claude Code chat (the user switches language spontaneousl
 - **Streamlit UI state:** `.cursor/rules/streamlit-ui-state.mdc`, skills `streamlit-ui-state`, `streamlit-apptest`.
 - **HouseSim** (`house_sim/`, spec `docs/spec/house-sim.md`): after changing `house_sim/core/` or `house_sim/fixtures/`, run `python -m scripts.sync_house_sim_integration` (UTF-8 env) — the S4 integration copy is generated and checked by `tests/test_house_sim_s4_packaging.py`.
 - **HA mapping:** units via `integrations/ha_units.py` (only physically compatible bindings, factor from `unit_of_measurement` at runtime); function completeness via `ehal/functions.py` (a function is unavailable until all its fields are mapped).
+- **EHAL unit conversion:** no hardcoded `*1000` / sign flips in adapters — Loxone via role `loxone` blocks + `ehal/field_registry.py`; HA via `ha_units` only (`.cursor/rules/ehal-unit-conversion.mdc`).
 - `.cursorignore`: if something is blocked, ask the user instead of guessing (`cursorignore-access.mdc`).

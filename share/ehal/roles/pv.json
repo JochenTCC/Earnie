@@ -8,7 +8,15 @@
       "field": "sens_pv_production_active",
       "required": true,
       "kind": "telemetry",
-      "notes": "W; production ≥ 0. Cumulative kWh counter is removed (2.4.j)."
+      "notes": "W; production ≥ 0. Cumulative kWh counter is removed (2.4.j).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "clamp_min": 0,
+        "read_required": true
+      }
     }
   ],
   "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."

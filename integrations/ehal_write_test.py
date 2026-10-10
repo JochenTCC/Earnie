@@ -358,23 +358,25 @@ def _marker_for_probe_field(field: str, targets: dict[str, str]) -> str:
 
 
 def _loxone_probe_wire_value(field: str, value: Any) -> float:
-    from integrations.loxone_adapter import (
-        ehal_active_power_w_to_loxone_kw,
-        ehal_limit_w_to_loxone_kw,
-    )
+    from ehal.field_registry import require_loxone_write
 
     kind = probe_kind(field)
     if kind == FORCE_ESS_ACTIVE_POWER:
-        return float(ehal_active_power_w_to_loxone_kw(float(value)))
+        return float(require_loxone_write("set_ess_active_power", float(value)))
     if kind in LOXONE_KW_WRITE_FIELDS:
-        return float(ehal_limit_w_to_loxone_kw(float(value)))
+        return float(require_loxone_write(kind, float(value)))
     return float(value)
 
 
 def _publish_id_for_probe(field: str) -> str:
     """Qualified EHAL ID for a Schreibtest probe field (plant / Pattern B / consumer)."""
     from ehal.ess_fields import parse_ess_pattern_b
-    from ehal.qualified_ids import NAMESPACES, field_kind, qualified_consumer_id
+    from ehal.qualified_ids import (
+        NAMESPACES,
+        field_kind,
+        qualified_consumer_id,
+        qualified_plant_id,
+    )
     from integrations.ehal_debug_mapping import (
         PLANT_LIVE_WRITE_FIELDS,
         _consumer_type_for_qualified_id,
@@ -385,8 +387,10 @@ def _publish_id_for_probe(field: str) -> str:
     raw = str(field or "").strip()
     if not raw:
         return ""
-    if parse_ess_pattern_b(raw) or raw in PLANT_LIVE_WRITE_FIELDS:
+    if parse_ess_pattern_b(raw):
         return raw
+    if raw in PLANT_LIVE_WRITE_FIELDS or field_kind(raw) in PLANT_LIVE_WRITE_FIELDS:
+        return qualified_plant_id(raw)
     ns = raw.split(".", 1)[0]
     if ns in NAMESPACES and raw.count(".") >= 2:
         return raw
@@ -511,7 +515,15 @@ def _read_back_loxone(field: str) -> Any | None:
         return None
     if kind in LOXONE_KW_WRITE_FIELDS:
         # Ledger stores the wire (kW) value from publish; probe compares in W.
-        return numeric * 1000.0
+        from ehal.field_registry import apply_loxone_read, loxone_spec
+
+        spec = loxone_spec(kind)
+        if spec is None:
+            raise KeyError(f"no loxone conversion for echo field {kind!r}")
+        converted = apply_loxone_read(numeric, spec)
+        if converted is None:
+            raise ValueError(f"loxone echo omitted for {kind} raw={numeric!r}")
+        return converted
     return numeric
 
 

@@ -65,14 +65,20 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 
 ## Units and sign convention (frozen)
 
+EHAL base units (adapters normalize hub-native units into these):
 
-| Domain                                                                                                                                             | Unit  | Sign / range                                                                          |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
-| Active power telemetry (`sens_grid_power_active`, `sens_pv_production_active`, `sens_evcs_active_power`, `sens_ess_power`, `sens_power_consumers`) | **W** | See below                                                                             |
-| `sens_ess_soc` / EV SoC fields                                                                                                                     | **%** | `0`…`100`                                                                             |
-| ESS charge/discharge **limits**, `set_grid_export_power_limit` / `get_grid_export_power_limit`, `get_ess_max_charge_power` / `get_ess_max_discharge_power` | **W** | Non-negative **magnitudes** (true caps); direction is in the field name, not the sign |
-| `set_ess_active_power`                                                                                                                             | **W** | Signed; `+` = discharge, `−` = charge (omit on Automatik)                             |
-| `set_evcs_max_current` / `get_evcs_nominal_current`                                                                                                | **A** | Non-negative                                                                          |
+
+| Quantity / domain                                                                                                                                  | Unit   | Sign / range                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
+| Active power telemetry (`sens_grid_power_active`, `sens_pv_production_active`, `sens_evcs_active_power`, `sens_ess_power`, `sens_power_consumers`) | **W**  | See below                                                                             |
+| ESS charge/discharge **limits**, `set_grid_export_power_limit` / `get_grid_export_power_limit`, `get_ess_max_charge_power` / `get_ess_max_discharge_power` | **W**  | Non-negative **magnitudes** (true caps); direction is in the field name, not the sign |
+| `set_ess_active_power`                                                                                                                             | **W**  | Signed; `+` = discharge, `−` = charge (omit on Automatik)                             |
+| Energy counters / capacity (`sens_pv_energy`, `sens_grid_energy_import` / `_export`, `sens_ess_energy_charge` / `_discharge`, `sens_energy_total`, `sens_evcs_bat_capacity`) | **kWh** | Cumulative or capacity ≥ `0`; HA may convert Wh → kWh at the boundary                 |
+| `sens_ess_soc` / EV SoC fields                                                                                                                     | **%**  | `0`…`100`                                                                             |
+| `set_evcs_max_current` / `get_evcs_nominal_current`                                                                                                | **A**  | Non-negative                                                                          |
+| Temperature (`sens_temperature_outside`, pool water/setpoint/tolerance, heat-storage `sens_temperature_heat_storage` / `_low`)                     | **°C** | Celsius only (no °F on the wire); adapters must convert hub °F if ever present        |
+| Duration (`get_filter_remaining_hours`, `get_filter_native_duration_hours`, …)                                                                     | **h**  | Hours; non-negative                                                                   |
+| Modes / flags (`set_ess_mode`, `set_evcs_mode`, `sens_absent_mode`, `sens_evcs_connected`, …)                                                       | —      | Dimensionless (enums or `0`/`1`); no physical unit                                    |
 
 
 **Export limit "unconstrained" (2.7.a / 2.7.c):** sticky backends always receive a number on `set_grid_export_power_limit`. When no cap applies, Earnie writes the plant's physical export maximum = **sum of PV nameplate (kWp)** + **sum of max discharge power of every selected battery that supports forced discharge** (`battery_control = full`; skip `limits_only` / `read_only`). Fallback when both are unknown: `1 000 000` W. ESS bindings use Pattern B `ess.{slug}.*` on `batteries[].ehal_bindings`.
@@ -100,6 +106,8 @@ P_cons = P_PV + P_Grid + P_Bat
 | `P_cons` | `sens_power_consumers` | house load | — (≥ 0) |
 
 Every adapter, derived value (`sens_power_consumers` when not mapped), Live dict and Loxone Merker follows this convention; hub-native signs are normalized at the adapter boundary. Example: Huawei registers 37113 (grid, `+` = export) and 37765 (battery, `+` = charge) must both be negated.
+
+**Hub unit conversion (registry):** static hub ↔ EHAL conversion lives in optional `loxone` / `openems` blocks on fields in `share/ehal/roles/*.json` (schema `device_roles.schema.json`). `factor` / `sign` always mean hub → EHAL; `ehal/field_registry.py` exposes `apply_loxone_read` / `apply_loxone_write` (and OpenEMS equivalents). Writes clamp in EHAL space then invert; `omit_if` / `read_required` are read-only. Top-level role `required` remains mapping completeness. HA keeps runtime unit factors in `integrations/ha_units.py` (entity `unit_of_measurement`; Binding P5 parity later).
 
 **House load (**`sens_power_consumers`**, optional):** prefer mapped Merker; else derive from grid/PV/ESS balance.
 
@@ -296,7 +304,8 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 
 | Artifact                | Path                                                                                                                 | Purpose                                                                              |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Device-role schema      | `[share/ehal/device_roles.schema.json](../../share/ehal/device_roles.schema.json)`                                   | Groups M1 fields by role (`grid`, `pv`, `ess`, `evcs`; stubs `consumer`, `heatpump`) |
+| Device-role schema      | `[share/ehal/device_roles.schema.json](../../share/ehal/device_roles.schema.json)`                                   | Groups M1 fields by role; optional per-field `loxone` / `openems` conversion blocks |
+| Field registry          | `[ehal/field_registry.py](../../ehal/field_registry.py)`                                                             | Loads hub blocks; `apply_loxone_read` / `apply_loxone_write` (+ OpenEMS apply)       |
 | Role instances          | `[share/ehal/roles/](../../share/ehal/roles/)`                                                                       | One JSON per `role_id`                                                               |
 | Hardware-profile schema | `[share/hardware_profiles/hardware_profile.schema.json](../../share/hardware_profiles/hardware_profile.schema.json)` | SunSpec / proprietary Modbus outline → EHAL bindings                                 |
 | Outline examples        | `[share/hardware_profiles/examples/](../../share/hardware_profiles/examples/)`                                       | `sunspec_inverter_ess.outline.json`, `huawei_via_loxone.outline.json`                |

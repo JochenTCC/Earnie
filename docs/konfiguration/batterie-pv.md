@@ -18,6 +18,26 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `id` / `id_locked` / `id_provisional_label` | — | `components.json` → `batteries[]` / `pv_systems[]` | Interne ID (EHAL-Slug). Neu/Kopie: zuerst freigegeben (`id_locked: false`, Seed in `id_provisional_label`); erste geänderte **Bezeichnung** setzt `id` aus dem Label und sperrt. Bestehende Einträge ohne Flag gelten als gesperrt. Einmalig: UI-Button „ID aus Bezeichnung übernehmen“. Offline-Batch für schmutzige Envs: `python -m scripts.clean_entity_ids_once --config-dir <config>` (Dry-Run; `--apply` schreibt; optional `--only-copy`). |
 | `type`                  | enum     | `components.json` → `batteries[]`    | `house` (Default) oder `powerstation` (2.7.g/h Reserve; Anbindung über manuelles Gerät `mode: reserve`) |
 | `backing` / `role` / `attached_consumer_ids` | — | `components.json` → Powerstation | Nur bei `type: powerstation`: `virtual`\|`physical`, `single_use`\|`standby_backup`; `attached_consumer_ids` (Liste) optional — Zuordnung auch über manuelle Geräte `mode: reserve` + `powerstation_id`. Legacy: `attached_consumer_id` = erstes Listenelement. |
+| `kind`                  | enum     | `components.json` → `batteries[]`    | Topologie: `battery_inverter` (Automatik/Optimieren) oder `isolated` (nur Laden/Entladen/Standby)                                    |
+| `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung je Anlage; aufgelöst als Summe `pv_kwp`                                                                      |
+| `pv_tilt`               | °        | `components.json` → `pv_systems[]`   | Dachneigung **je Anlage** (bei mehreren Anlagen keine einzelne Globalneigung)                                                         |
+| `pv_azimuth`            | °        | `components.json` → `pv_systems[]`   | Ausrichtung je Anlage: `0` = Süd, `-90` = Ost, `90` = West                                                                            |
+| `latitude`, `longitude` | °        | `house_profiles.json` (via Szenario) | Standort für PV-Prognose (Forecast.Solar / Open-Meteo)                                                                                |
+| `k_push_cent`           | Cent/kWh | `tariffs.json` (Export-Tarif)        | **Einspeisevergütung**                                                                                                                |
+| `battery_capacity_kwh`  | kWh      | `components.json` → `batteries[]`    | Nutzbare Speicherkapazität                                                                                                            |
+| `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung (2.7.j; ersetzt gemeinsames `battery_max_power_kw`) |
+| `battery_max_discharge_power_kw` | kW | `components.json` → `batteries[]` | Max. Entladeleistung (2.7.j) |
+| `battery_max_power_kw`  | kW       | `components.json` → `batteries[]`    | **Deprecated:** früher eine Grenze für beide Richtungen; beim Laden in charge/discharge migriert |
+| `limits_from_live` | bool | `components.json` → `batteries[]` | Wenn true: Live `get_ess_*` für SOC-Min/Max und Max. Lade-/Entladeleistung (Fallback HK) |
+| `battery_efficiency`    | 0–1      | `components.json` → `batteries[]`    | Roundtrip-Wirkungsgrad (Laden/Entladen)                                                                                               |
+| `battery_min_soc`       | %        | `components.json` → `batteries[]`    | Untere SOC-Grenze (Schutz)                                                                                                            |
+| `battery_max_soc`       | %        | `components.json` → `batteries[]`    | Obere SOC-Grenze                                                                                                                      |
+| `threshold_power`       | Anteil   | `components.json` → `batteries[]`    | Relativ zu `max(charge, discharge)` kW (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
+| `standby_power_kw`      | kW       | `components.json` → `batteries[]`    | Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch in der Optimierung)                                                          |
+| `control`               | enum     | `components.json` → `batteries[]`    | Steuerbarkeit der Anlage: `full` (Default) = Zwangsladen/-entladen; `limits_only` = nur Lade-/Entladegrenzen (Automatik/Entladesperre); `read_only` = Eigenverbrauch ohne Setpoints. Eigenschaft der Installation — gilt auch für Simulation / Backtesting / Business Case. |
+| `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten; wird aus `land` abgeleitet (`AT`→`Europe/Vienna`, `DE`→`Europe/Berlin`, `CH`→`Europe/Zurich`); siehe `planning_horizon` |
+| `netznutzung_arbeitspreis_cent_kwh` | Cent/kWh | `house_profiles.json` | Netznutzung Arbeitspreis netto (ohne USt); unabhängig vom Lieferantentarif                                                     |
+
 
 ### Virtuelle Powerstation (Carve-out)
 
@@ -42,26 +62,6 @@ Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earni
 - **Harte Voraussetzung:** Capability `supports_ess_source_select` und Mapping von `set_ess_source_select` (EcoFlow: HA-Switch `switch.<device>_grid_bypass`; bei `ehal.backend=loxone` Merker `Earnie_Speicher_Quellenwahl` → Bridge zu HA, siehe [EcoFlow Delta 3](../einrichtung/ecoflow-delta3-loxone.md)).
 - **Quellenwahl vs. Ladegrenzen:** `set_ess_source_select` darf das **Anlagen-**Binding nutzen (Plant-Merker / Plant-HA-Entity — EcoFlow-Bridge). `set_ess_charge_power_limit` / `set_ess_discharge_power_limit` der physischen Powerstation brauchen ein **eigenes** Binding an der Powerstation und greifen **nicht** auf die Hausbatterie-Mappings zurück (sonst würden Haus-Lade-/Entladegrenzen überschrieben).
 - Reserve-Größe: angeschlossene Last × teure Stunden im Horizont (kein Energie-pro-Lauf-Lernen wie bei `single_use`).
-| `kind`                  | enum     | `components.json` → `batteries[]`    | Topologie: `battery_inverter` (Automatik/Optimieren) oder `isolated` (nur Laden/Entladen/Standby)                                    |
-| `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung je Anlage; aufgelöst als Summe `pv_kwp`                                                                      |
-| `pv_tilt`               | °        | `components.json` → `pv_systems[]`   | Dachneigung **je Anlage** (bei mehreren Anlagen keine einzelne Globalneigung)                                                         |
-| `pv_azimuth`            | °        | `components.json` → `pv_systems[]`   | Ausrichtung je Anlage: `0` = Süd, `-90` = Ost, `90` = West                                                                            |
-| `latitude`, `longitude` | °        | `house_profiles.json` (via Szenario) | Standort für PV-Prognose (Forecast.Solar / Open-Meteo)                                                                                |
-| `k_push_cent`           | Cent/kWh | `tariffs.json` (Export-Tarif)        | **Einspeisevergütung**                                                                                                                |
-| `battery_capacity_kwh`  | kWh      | `components.json` → `batteries[]`    | Nutzbare Speicherkapazität                                                                                                            |
-| `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung (2.7.j; ersetzt gemeinsames `battery_max_power_kw`) |
-| `battery_max_discharge_power_kw` | kW | `components.json` → `batteries[]` | Max. Entladeleistung (2.7.j) |
-| `battery_max_power_kw`  | kW       | `components.json` → `batteries[]`    | **Deprecated:** früher eine Grenze für beide Richtungen; beim Laden in charge/discharge migriert |
-| `limits_from_live` | bool | `components.json` → `batteries[]` | Wenn true: Live `get_ess_*` für SOC-Min/Max und Max. Lade-/Entladeleistung (Fallback HK) |
-| `battery_efficiency`    | 0–1      | `components.json` → `batteries[]`    | Roundtrip-Wirkungsgrad (Laden/Entladen)                                                                                               |
-| `battery_min_soc`       | %        | `components.json` → `batteries[]`    | Untere SOC-Grenze (Schutz)                                                                                                            |
-| `battery_max_soc`       | %        | `components.json` → `batteries[]`    | Obere SOC-Grenze                                                                                                                      |
-| `threshold_power`       | Anteil   | `components.json` → `batteries[]`    | Relativ zu `max(charge, discharge)` kW (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
-| `standby_power_kw`      | kW       | `components.json` → `batteries[]`    | Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch in der Optimierung)                                                          |
-| `control`               | enum     | `components.json` → `batteries[]`    | Steuerbarkeit der Anlage: `full` (Default) = Zwangsladen/-entladen; `limits_only` = nur Lade-/Entladegrenzen (Automatik/Entladesperre); `read_only` = Eigenverbrauch ohne Setpoints. Eigenschaft der Installation — gilt auch für Simulation / Backtesting / Business Case. |
-| `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten; wird aus `land` abgeleitet (`AT`→`Europe/Vienna`, `DE`→`Europe/Berlin`, `CH`→`Europe/Zurich`); siehe `planning_horizon` |
-| `netznutzung_arbeitspreis_cent_kwh` | Cent/kWh | `house_profiles.json` | Netznutzung Arbeitspreis netto (ohne USt); unabhängig vom Lieferantentarif                                                     |
-
 
 Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
 
@@ -89,7 +89,7 @@ Einspeise-„unconstrained“-Wert = PV-kWp-Summe + Summe der Max-Entladeleistun
 
 ## SOC-Verhalten
 
-Der Parameter `battery_wear` kann niedrigere End-SOCs wirtschaftlich bestrafen (weicher Anreiz, unabhängig vom Modus). Der Block liegt am `components.json` **→** `batteries[]`**-Eintrag**, nicht mehr global in `config.json`.
+Der Parameter `battery_wear` kann niedrigere End-SOCs wirtschaftlich bestrafen (weicher Anreiz, unabhängig vom Modus). Der Block liegt am `components.json` → `batteries[]`-Eintrag, nicht mehr global in `config.json`.
 
 Block `planning_horizon` in `config.json`:
 

@@ -148,15 +148,6 @@ def _parse_ha_number(state: str) -> float:
     return float(text)
 
 
-def parse_ha_numeric_state(state: str, *, unit: str | None) -> float:
-    """Parse HA state string; convert kW→W when unit indicates kilowatts."""
-    value = _parse_ha_number(state)
-    unit_l = str(unit or "").strip().lower()
-    if unit_l in ("kw", "kilowatt", "kilowatts"):
-        return value * 1000.0
-    return value
-
-
 def parse_ha_field_value(field_name: str, state: str, *, unit: str | None) -> float:
     """Parse HA state for an EHAL field; convert entity unit → EHAL base unit.
 

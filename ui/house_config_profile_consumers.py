@@ -19,6 +19,12 @@ from ui.house_config_profile_csv import _render_consumer_profile_csv_fields
 
 import streamlit as st
 
+from house_config.entity_id_lock import (
+    FORCE_ID_FROM_LABEL_KEY,
+    ID_PROVISIONAL_LABEL_KEY,
+    is_id_locked,
+)
+from house_config.id_slug import slug_id
 from house_config.thermal_labels import CONSUMER_TYPE_LABELS
 from ui.form_layout import (
     labeled_checkbox,
@@ -163,12 +169,40 @@ def _render_consumer_form(
     # Unreachable when expander runs; keep type-checkers happy if body returns.
     return dict(consumer)
 
+def _render_consumer_id_from_label(
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+    label: str,
+) -> bool:
+    """One-shot: set frozen id from current Bezeichnung (existing ugly ids)."""
+    stable_id = str(consumer.get("id") or "").strip()
+    label_s = str(label or "").strip()
+    if not label_s or not stable_id:
+        return False
+    desired = slug_id(label_s)
+    if desired == stable_id:
+        return False
+    help_txt = (
+        f"Aktuelle ID `{stable_id}` → aus Bezeichnung `{desired}` "
+        "(EHAL-Slug; danach fest)."
+    )
+    return bool(
+        st.button(
+            "ID aus Bezeichnung übernehmen",
+            key=_scoped_key(session_scope, f"hc_id_from_label_{index}"),
+            help=help_txt,
+        )
+    )
+
+
 def _render_consumer_identity_fields(
     consumer: dict,
     index: int,
     *,
     session_scope: str,
-) -> tuple[str, str, float]:
+) -> tuple[str, str, float, bool]:
     type_options = _consumer_type_options(index)
     current_type = str(consumer.get("type", "generic"))
     if index > 0 and current_type == "thermal_annual":
@@ -188,13 +222,16 @@ def _render_consumer_identity_fields(
         value=consumer.get("label", ""),
         key=_scoped_key(session_scope, f"hc_label_{index}"),
     )
+    force_id = _render_consumer_id_from_label(
+        consumer, index, session_scope=session_scope, label=c_label
+    )
     nominal = labeled_number_input(
         "Nennleistung (kW)",
         min_value=0.0,
         value=float(consumer.get("nominal_power_kw", 0.0)),
         key=_scoped_key(session_scope, f"hc_nom_{index}"),
     )
-    return c_type, c_label, float(nominal)
+    return c_type, c_label, float(nominal), force_id
 
 
 def _dispatch_consumer_type_fields(
@@ -235,7 +272,14 @@ def _render_consumer_form_body(
     consumer = _seed_ev_defaults_on_type_switch(
         consumer, index, session_scope=session_scope
     )
-    c_type, c_label, nominal = _render_consumer_identity_fields(
+    # Seed Bezeichnung for deferred id lock (new / unlocked entities).
+    if not str(consumer.get("id") or "").strip() or not is_id_locked(consumer):
+        seed = str(
+            consumer.get(ID_PROVISIONAL_LABEL_KEY) or consumer.get("label") or ""
+        ).strip()
+        if seed and not str(consumer.get(ID_PROVISIONAL_LABEL_KEY) or "").strip():
+            consumer[ID_PROVISIONAL_LABEL_KEY] = seed
+    c_type, c_label, nominal, force_id = _render_consumer_identity_fields(
         consumer, index, session_scope=session_scope
     )
     item: dict = {
@@ -254,6 +298,12 @@ def _render_consumer_form_body(
             ),
         ),
     }
+    provisional = str(consumer.get(ID_PROVISIONAL_LABEL_KEY) or "").strip()
+    has_id = bool(str(consumer.get("id") or "").strip())
+    if provisional and (not has_id or not is_id_locked(consumer)):
+        item[ID_PROVISIONAL_LABEL_KEY] = provisional
+    if force_id:
+        item[FORCE_ID_FROM_LABEL_KEY] = True
     item.update(
         _dispatch_consumer_type_fields(
             consumer,

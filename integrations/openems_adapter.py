@@ -59,18 +59,29 @@ def _utc_ts() -> str:
 
 
 def openems_grid_to_ehal_w(openems_grid_w: float) -> float:
-    """OpenEMS: − = sell-to-grid; EHAL: + = import."""
-    return -float(openems_grid_w)
+    """OpenEMS: − = sell-to-grid; EHAL: + = import (role ``openems`` block)."""
+    from ehal.field_registry import apply_openems_read, openems_spec
+
+    spec = openems_spec("sens_grid_power_active")
+    if spec is None:
+        raise KeyError("no openems conversion for sens_grid_power_active")
+    return apply_openems_read(openems_grid_w, spec)
 
 
 def ehal_charge_limit_to_openems(charge_limit_w: float) -> float:
     """EHAL charge magnitude (W) → SetActivePowerGreaterOrEquals value."""
-    return -abs(float(charge_limit_w))
+    from ehal.field_registry import require_openems_write
+
+    return require_openems_write("set_ess_charge_power_limit", float(charge_limit_w))
 
 
 def ehal_discharge_limit_to_openems(discharge_limit_w: float) -> float:
     """EHAL discharge magnitude (W) → SetActivePowerLessOrEquals value."""
-    return abs(float(discharge_limit_w))
+    from ehal.field_registry import require_openems_write
+
+    return require_openems_write(
+        "set_ess_discharge_power_limit", float(discharge_limit_w)
+    )
 
 
 def evcs_amps_to_watts(amps: float, *, voltage_v: float, phases: int) -> float:

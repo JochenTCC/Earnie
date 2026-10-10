@@ -3,11 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from integrations.loxone_adapter import (
-    EVCS_MODE_VALUES,
-    ehal_active_power_w_to_loxone_kw,
-    ehal_limit_w_to_loxone_kw,
-)
+from ehal.field_registry import require_loxone_write
+from integrations.loxone_adapter import EVCS_MODE_VALUES
 from optimizer.export_power_limit import EXPORT_LIMIT_UNCONSTRAINED_W
 
 SAFE_PROBE_FIELDS: tuple[str, ...] = (
@@ -183,9 +180,9 @@ def expected_loxone_wire_value(field: str, ehal_value: Any) -> Any:
     """Value as stored on Loxone Merker (for unit-aware compare helpers/tests)."""
     kind = probe_kind(field)
     if kind == "set_ess_active_power":
-        return ehal_active_power_w_to_loxone_kw(float(ehal_value))
+        return require_loxone_write("set_ess_active_power", float(ehal_value))
     if kind in LIMIT_FIELDS or kind == EXPORT_LIMIT_FIELD:
-        return ehal_limit_w_to_loxone_kw(float(ehal_value))
+        return require_loxone_write(kind, float(ehal_value))
     return ehal_value
 
 

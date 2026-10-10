@@ -1,16 +1,39 @@
-"""Freeze component entity ids after the first intentional Bezeichnung change.
+"""Freeze entity ids after the first intentional Bezeichnung change.
 
-New batteries / PV systems start unlocked with ``id_provisional_label`` = seed
-label. When the saved label first differs, the id becomes ``slug_id(label)``
-and ``id_locked`` turns true. Legacy entities without the flag are locked.
+New batteries / PV systems / house-profile consumers start unlocked with
+``id_provisional_label`` = seed label. When the saved label first differs, the
+id becomes ``slug_id(label)`` and ``id_locked`` turns true. Legacy entities
+without the flag are locked.
 """
 from __future__ import annotations
 
 from ehal.ess_fields import ess_ehal_slug, parse_ess_pattern_b
+from ehal.flex_fields import flex_ehal_slug
+from ehal.qualified_ids import (
+    LEGACY_NAMESPACES,
+    NS_CONSUMER,
+    NS_EV,
+    NS_EVCS,
+    NS_HEATPUMP,
+    NS_POOL,
+    parse_qualified_id,
+)
 from house_config.id_slug import slug_id
 
 ID_LOCKED_KEY = "id_locked"
 ID_PROVISIONAL_LABEL_KEY = "id_provisional_label"
+FORCE_ID_FROM_LABEL_KEY = "_force_id_from_label"
+
+_CONSUMER_BINDING_NAMESPACES = frozenset(
+    {
+        NS_CONSUMER,
+        NS_HEATPUMP,
+        NS_POOL,
+        NS_EV,
+        NS_EVCS,
+        *LEGACY_NAMESPACES,
+    }
+)
 
 
 def is_id_locked(entity: dict | None) -> bool:
@@ -50,6 +73,36 @@ def rewrite_ess_bindings_slug(
             field = f"ess.{new_slug}.{parsed[1]}"
         if field not in out:
             out[field] = addr
+    return out
+
+
+def rewrite_consumer_bindings_slug(
+    bindings: dict | None,
+    *,
+    old_id: str,
+    new_id: str,
+) -> dict[str, str]:
+    """Rewrite Pattern B keys whose Kennung matches the old consumer slug.
+
+    Namespaces: ``consumer`` / ``heatpump`` / ``pool`` / ``ev`` / ``evcs`` /
+    legacy ``flex``. Empty addresses (Loxone activation flags) are kept.
+    """
+    if not isinstance(bindings, dict):
+        return {}
+    old_slug = flex_ehal_slug(old_id)
+    new_slug = flex_ehal_slug(new_id)
+    out: dict[str, str] = {}
+    for key, value in bindings.items():
+        field = str(key)
+        parsed = parse_qualified_id(field)
+        if (
+            parsed
+            and parsed.namespace in _CONSUMER_BINDING_NAMESPACES
+            and parsed.kennung == old_slug
+        ):
+            field = f"{parsed.namespace}.{new_slug}.{parsed.kind}"
+        if field not in out:
+            out[field] = str(value or "").strip()
     return out
 
 

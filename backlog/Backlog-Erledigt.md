@@ -2,6 +2,40 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### EHAL unit conversion — no hardcoding (write registry + hub audit) (2026-10-10)
+
+- [x] **EHAL unit conversion — no hardcoding (all backends, read + write):** After **2.7.n Session F** (Loxone **read** registry), finish writes + remaining hubs so adapters never embed `* 1000` / `/ 1000` / ad-hoc sign flips per field.
+  - **Loxone write:** setpoint `loxone` blocks on `set_ess_active_power` / charge+discharge limits / `set_grid_export_power_limit` in `share/ehal/roles/{ess,grid}.json`; `apply_loxone_write` / `require_loxone_write` in `ehal/field_registry.py`; adapter + powerstation + Schreibtest driven from registry; retired `ehal_*_w_to_loxone_kw` and battery-read `*1000` fallbacks.
+  - **HA:** runtime conversion only via `integrations/ha_units.py`; removed dead `parse_ha_numeric_state` hardcode.
+  - **OpenEMS:** optional `openems` polarity blocks + `apply_openems_read` / `apply_openems_write`; adapter helpers delegate to registry.
+  - Schema/docs/rule: `device_roles.schema.json`, `docs/spec/ehal.md`, `.cursor/rules/ehal-unit-conversion.mdc`. Tests: `test_field_registry`, Loxone/HA/OpenEMS adapter + write suites green.
+
+### 2.7.n Session F — Field registry + generic Loxone read (2026-10-10)
+
+- [x] **2.7.n — Binding 1.0: stable identifiers + generic EHAL read path** (slice of epic **Binding**; write side + Signal list = archived **2.7.q**): Sessions A–F complete. Identifier contract frozen (`ehal/qualified_ids.py`); Loxone **read** conversion data-driven. Full Binding tools (HA, import hardening, Kennung cascade) stay in **2.+1** (P4–P6).
+- [x] **Session F — 2.7.n-5 field registry + generic Loxone read:** nested `loxone` blocks on read fields in `share/ehal/roles/{grid,pv,ess}.json` + `device_roles.schema.json` (unit / ehal_unit / factor / sign / clamp / `omit_if` / `read_required`); `ehal/field_registry.py`; `LoxoneAdapter.read_telemetry` inbox by qualified ID → registry convert → required/optional; `LoxoneConfig` read Merker fields removed; per-battery SoC via `qualified_battery_id`; unbound EHAL IDs push-only (no Merker poll). Scope: Loxone only. Characterization (`tests/test_loxone_read_characterization.py`) + `tests/test_field_registry.py` green. Spec: `docs/spec/ehal.md` units table + Loxone registry note.
+  - **Decided (namespaces):** `ess`, `evcs`, `ev`, `inv`, `grid` (`grid.meter.*`), `heatpump`, `pool`, `consumer`; plant house-wide / PV bare until deferred `pv.*`; storage may still hold `flex.{slug}.*` / bare grid keys.
+  - **Decided:** `ev.` + `evcs.`; `sens_evcs_connected` not renamed in 2.7.n. Write conversion registry → archived **EHAL unit conversion — no hardcoding** (2026-10-10).
+
+### 2.7.n Session E — Read characterization extend (2026-10-10)
+
+- [x] **Session E — 2.7.n-4 characterization extend** (gate for F): extended `tests/test_loxone_read_characterization.py` with optional ESS `get_*` (clamp / kW→W / omit), per-battery SoC via `read_ess_soc_by_id` (Pattern B address, secondary refuse, primary plant alias), and push-inbox composition (missing/stale required → `LoxoneAdapterError`; optional omit). Baseline kW→W / clamps / required missing / export-limit omit kept. Write half = **2.7.q Q1** (already done). Must stay green through Session F.
+
+### 2.7.n Session D — Wire cleanup export limit (2026-10-10)
+
+- [x] **Session D — 2.7.n-2a wire cleanup**: loud write / `status.json` / stock VI emit `grid.meter.set_grid_export_power_limit` (align Live-Schreiben / Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`). Schreibtest probe ID + merge of stale bare ledger → qualified wire key. Deferred: PV namespace; kind rename to `set_export_power_limit`.
+
+### 2.7.n Session C — Kennung lock for consumers / EVs (2026-10-10)
+
+- [x] **Session C — 2.7.n-3 Kennung lock for consumers / EVs** (Binding P6 core): lock-on-first-change via `house_config/entity_id_lock.py` on consumer/EV upsert paths (same pattern as battery/PV). Full “Kennung ändern” cascade + alias/rewrite stays in 2.+1 / Binding P6. **Decided (P0c):** alias table **yes** — see [`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md).
+
+### Binding P0c — Entity-id persistence inventory (2026-10-10)
+
+- [x] **Session B — Binding P0c spike** (**2.7.n**): inventory which persisted files key by house-config entity id (history, run_state, shadow, dumps, fixtures).
+  - Deliverable: [`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md).
+  - **Alias table: yes** — alias-on-read for `optimization_history.jsonl` (+ archives); rewrite-on-rename for small live runtime files (flex state, reserves, schedules, sampler, run_state, shadow overlay, `ehal_published`, push inbox, cons_data/profile CSVs); dumps/fixtures out of runtime alias scope (re-record).
+  - No separate immutable `uid`. Unblocks Session C (alias required when Kennung cascade lands) and Inverter P1 (no history alias for inverter migration; battery renames still need the path above).
+
 ### Bugfix — Retire remaining Loxone Merker poll reads (2026-10-09)
 
 - [x] **Retire remaining Loxone Merker poll reads** (**2.7.n Session A**) — fix implemented (2026-10-09); **Verified live** (2026-10-09)

@@ -337,7 +337,8 @@ def test_char_status_json_legacy_payload_snapshot(monkeypatch) -> None:
     assert payload["set_ess_charge_power_limit"] == 5.0
     assert payload["set_ess_discharge_power_limit"] == 4.0
     assert payload["set_ess_mode"] == 1.0
-    assert payload["set_grid_export_power_limit"] == 15.0  # unconstrained ≠ 0
+    assert payload["grid.meter.set_grid_export_power_limit"] == 15.0  # unconstrained ≠ 0
+    assert "set_grid_export_power_limit" not in payload
     assert "ev.garage.Earnie_EAuto_Soll_A" not in payload
     assert "flex.waschmaschine.Earnie_Verbraucher_Freigabe" not in payload
     assert "Earnie_Pool_Freigabe" not in payload

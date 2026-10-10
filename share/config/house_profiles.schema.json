@@ -401,6 +401,14 @@
         "label": {
           "type": "string"
         },
+        "id_locked": {
+          "type": "boolean",
+          "description": "When true, id is frozen (EHAL slug). Missing ⇒ locked (legacy). New entities start false until Bezeichnung leaves id_provisional_label."
+        },
+        "id_provisional_label": {
+          "type": "string",
+          "description": "Seed Bezeichnung while id_locked is false; first differing save sets id from label and locks."
+        },
         "type": {
           "enum": [
             "generic",

@@ -136,7 +136,7 @@ Order: **P0 → P1 → P2 → P3**; P4 after P1; P6 can start now (builds on the
 **P0 — Spikes (S).** No product code.
 - (a) Loxone Config round trip: import our VI/VO XML, "Als Vorlage speichern", diff; fix the canonical template shape; check what Config accepts for installing generated templates.
 - (b) What does `LoxAPP3.json` expose beyond name / uuid / type / room / category (VI Check, VO CmdOn, description)? Decides whether import can read EHAL IDs from Loxone, and whether a Loxone project file / exported template XML is parseable.
-- (c) Which persisted files key by entity id (optimization history, run state, Shadow overlay, debug dumps, regression fixtures)? Decides the rename cascade scope.
+- (c) Which persisted files key by entity id (optimization history, run state, Shadow overlay, debug dumps, regression fixtures)? **Done 2026-10-10** — [`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md); **Alias table: yes**.
 - (d) Runtime behaviour for a bound but missing Merker (F11).
 
 **P1 — Naming grammar + qualified EHAL ID (M).** `qualified_ehal_id` + parser for all entity kinds (storage unchanged). Device map → bidirectional `{field → prefix, tail}` incl. battery group and irregular names. `suggest_sb_name` (Loxone, slug always included) / `parse_sb_name`. Optional `suggest_ha_helper_id` for `set_*`. `status.json` dual-emits qualified + legacy keys. Tests: round trip, uniqueness against scanned names, every role field covered.
@@ -182,7 +182,7 @@ Order: **P0 → P1 → P2 → P3**; P4 after P1; P6 can start now (builds on the
 
 **Decided:**
 - Epic `Binding` with phases P0–P6 is registered in `roadmap-nomenclature.mdc` (as done for `Inverter`).
-- **Kennung is editable** (P6), defaulting from the Bezeichnung. Rename only as an explicit action with cascade dry-run and a report of SB names that now deviate. If **P0c** shows history / debug dumps / regression fixtures keyed by id, an alias table (`old → new`) is applied on read. No separate immutable `uid` unless P0c shows broad dependence.
+- **Kennung is editable** (P6), defaulting from the Bezeichnung. Rename only as an explicit action with cascade dry-run and a report of SB names that now deviate. **P0c done (2026-10-10):** history / runtime state / shadow / ledgers / cons_data keyed by id → **alias table yes** (alias-on-read for history; rewrite-on-rename for small live files; dumps/fixtures re-record) — [`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md). No separate immutable `uid`.
 - **Always-slug names (F8):** new name suggestions always contain the Kennung; legacy bare names stay recognised.
 - **Two namespaces for wallbox and vehicle:** `evcs.<wallbox>.*` and `ev.<vehicle>.*` (§9).
 - **`sens_evcs_connected`** is valid in both namespaces and keeps its name in 2.7.n.
@@ -197,7 +197,7 @@ External development documents (`Entwicklungsplan`, HA add-on docs) are not in t
 
 Principle: **freeze the identifiers now, build the tools later.** An identifier that is baked into deployed Loxone configs, VI templates and bindings is hard to change; table, export and import can be added any time.
 
-**In 2.7.n:** four bugfixes (two fixed directly, two closed by the generic write path), P0c / P0d, qualified EHAL ID for all entity kinds, stable Kennung (batteries / PV, lock for consumers / EVs), characterization tests, field registry in the role JSON, generic Loxone read and write path. **Not in 2.7.n:** three-column table, colours, export, import hardening, signal catalog, HA parity, multi-EV runtime.
+**In 2.7.n:** four bugfixes (two fixed directly, two closed by the generic write path), P0c (**done** — alias yes; see [`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md)) / P0d (dropped after push-only), qualified EHAL ID for all entity kinds, stable Kennung (batteries / PV, lock for consumers / EVs), characterization tests, field registry in the role JSON, generic Loxone read and write path. **Not in 2.7.n:** three-column table, colours, export, import hardening, signal catalog, HA parity, multi-EV runtime.
 
 **Several wallboxes and EVs (naming only).** Bindings are already stored per EV consumer and resolved per consumer; only the Pattern B spelling is missing (today a mix in `status.json` `ev.{id}.Earnie_EAuto_Soll_A` and the VO path `ev.{ev_id}.<field>`).
 

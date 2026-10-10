@@ -8,25 +8,61 @@
       "field": "sens_grid_power_active",
       "required": true,
       "kind": "telemetry",
-      "notes": "W; + = import (Bezug), − = export (Einspeisung)."
+      "notes": "W; + = import (Bezug), − = export (Einspeisung).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "read_required": true
+      },
+      "openems": {
+        "unit": "W",
+        "ehal_unit": "W",
+        "factor": 1,
+        "sign": -1
+      }
     },
     {
       "field": "sens_power_consumers",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional house load W; Merker when mapped, else derive from grid/PV/ESS."
+      "notes": "Optional house load W; Merker when mapped, else derive from grid/PV/ESS.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "clamp_min": 0,
+        "read_required": false
+      }
     },
     {
       "field": "get_grid_export_power_limit",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional inbound max export W from grid/HEMS (2.7.a)."
+      "notes": "Optional inbound max export W from grid/HEMS (2.7.a).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "omit_if": "negative",
+        "read_required": false
+      }
     },
     {
       "field": "set_grid_export_power_limit",
       "required": false,
       "kind": "setpoint",
-      "notes": "Outbound feed-in curtailment W (magnitude ≥ 0); unconstrained = PV kWp + force-discharge ESS max (fallback 1000000) (2.7.a)."
+      "notes": "Outbound feed-in curtailment W (magnitude ≥ 0); unconstrained = PV kWp + force-discharge ESS max (fallback 1000000) (2.7.a).",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "clamp_min": 0
+      }
     }
   ],
   "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."

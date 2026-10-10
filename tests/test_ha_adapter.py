@@ -9,8 +9,9 @@ from integrations.ha_adapter import (
     HaAdapter,
     HaConfig,
     apply_sign,
-    parse_ha_numeric_state,
+    parse_ha_field_value,
 )
+from integrations.ha_units import to_ehal
 
 
 def _cfg(**kwargs) -> HaConfig:
@@ -77,9 +78,14 @@ def test_apply_sign():
     assert apply_sign(10, "negate") == -10.0
 
 
-def test_parse_ha_numeric_kw():
-    assert parse_ha_numeric_state("1.5", unit="kW") == pytest.approx(1500.0)
-    assert parse_ha_numeric_state("500", unit="W") == pytest.approx(500.0)
+def test_parse_ha_field_value_power_units():
+    assert parse_ha_field_value(
+        "sens_grid_power_active", "1.5", unit="kW"
+    ) == pytest.approx(1500.0)
+    assert parse_ha_field_value(
+        "sens_grid_power_active", "500", unit="W"
+    ) == pytest.approx(500.0)
+    assert to_ehal("sens_grid_power_active", 1.5, "kW") == pytest.approx(1500.0)
 
 
 @patch("integrations.ha_adapter.requests.get")

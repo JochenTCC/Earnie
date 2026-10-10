@@ -44,7 +44,7 @@ Earnie Core writes and reads the same Merker names on the Miniserver. The librar
 
 `{hk_id}` / `{ev_id}` = house profile entity `id` (snake_case). Templates leave the placeholders in place — replace them in Config.
 
-**Qualified Checks only (2.7.q Q8):** `status.json` publishes qualified EHAL IDs (`consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable`, `pool.{slug}.set_enable`, `evcs.{slug}.set_evcs_max_current` / `set_evcs_mode`; plant bare / `grid.meter.*` and powerstation `ess.{id}.set_*`). Legacy Merker Check peers are no longer dual-emitted — VI templates must use the qualified keys (`VI_Earnie_*_v2.xml` / Pilot VI).
+**Qualified Checks only (2.7.q Q8):** `status.json` publishes qualified EHAL IDs (`consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable`, `pool.{slug}.set_enable`, `evcs.{slug}.set_evcs_max_current` / `set_evcs_mode`; plant ESS bare / `grid.meter.*` — including write `grid.meter.set_grid_export_power_limit` — and powerstation `ess.{id}.set_*`). Legacy Merker Check peers are no longer dual-emitted — VI templates must use the qualified keys (`VI_Earnie_*_v2.xml` / Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`).
 
 **VI v2 + Pilot (2.7.q q.C):** Library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (Titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen: `python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …` → `VI_Pilot_*.xml`. VO Pilot titles come from the qualified ID (`Push_<id>` with dots → `_`): `python -m scripts.pilot_vo_template_gen …`. See [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Q5 write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Q5.
 

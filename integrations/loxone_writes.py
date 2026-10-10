@@ -580,6 +580,8 @@ def send_huawei_modbus_states(
             load_house_doc,
         )
 
+        from ehal.qualified_ids import qualified_plant_id
+
         export_marker = resolve_plant_binding(
             load_house_doc(), "set_grid_export_power_limit"
         )
@@ -592,7 +594,7 @@ def send_huawei_modbus_states(
             )
             records.append(
                 _publish_setpoint_traced(
-                    "set_grid_export_power_limit",
+                    qualified_plant_id("set_grid_export_power_limit"),
                     export_val,
                     io_name=str(export_marker),
                 )

@@ -110,12 +110,18 @@ def _plant_status_keys(
     loxone_sent: Mapping[str, float],
     io_to_field: Mapping[str, str],
 ) -> dict[str, float]:
-    payload = {field: 0.0 for field in PLANT_LIVE_WRITE_FIELDS}
-    payload["set_grid_export_power_limit"] = _unconstrained_export_limit_kw()
+    from ehal.qualified_ids import qualified_plant_id
+
+    payload = {qualified_plant_id(field): 0.0 for field in PLANT_LIVE_WRITE_FIELDS}
+    export_qid = qualified_plant_id("set_grid_export_power_limit")
+    payload[export_qid] = _unconstrained_export_limit_kw()
     for io_name, value in loxone_sent.items():
         field = str(io_to_field.get(io_name) or "").strip()
-        if field in payload:
-            payload[field] = float(value)
+        if not field:
+            continue
+        wire = qualified_plant_id(field)
+        if wire in payload:
+            payload[wire] = float(value)
     return payload
 
 
@@ -251,6 +257,7 @@ def _merge_published_into_payload(
     """Overlay ``write_field`` ledger (qualified IDs only — Q8, no legacy peers)."""
     _ = consumers
     try:
+        from ehal.qualified_ids import GRID_KINDS, field_kind, qualified_plant_id
         from integrations.ehal_write import load_published
     except Exception:  # noqa: BLE001
         return
@@ -259,7 +266,13 @@ def _merge_published_into_payload(
     except Exception:  # noqa: BLE001
         return
     for qid, value in published.items():
-        payload[qid] = float(value)
+        wire = str(qid or "").strip()
+        if not wire:
+            continue
+        kind = field_kind(wire)
+        if kind in GRID_KINDS:
+            wire = qualified_plant_id(kind)
+        payload[wire] = float(value)
 
 
 def build_loxone_status_payload(
@@ -283,10 +296,12 @@ def build_loxone_status_payload(
         if plant_io_index is not None
         else build_loxone_setpoint_io_index()
     )
+    from ehal.qualified_ids import field_kind
+
     plant_only = {
         io: field
         for io, field in io_index.items()
-        if field in PLANT_LIVE_WRITE_FIELDS
+        if field_kind(str(field or "")) in PLANT_LIVE_WRITE_FIELDS
     }
 
     live_consumers: Sequence[Mapping[str, Any]]

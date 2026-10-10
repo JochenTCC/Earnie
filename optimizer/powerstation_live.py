@@ -514,12 +514,14 @@ def _write_powerstation_ha(fields: dict[str, float], ehal_live: Any) -> list:
 
 def _loxone_ps_wire_value(kind: str, value_w: float) -> float:
     """EHAL W / mode → Loxone Merker number (kW for power fields)."""
-    from integrations.loxone_adapter import ehal_active_power_w_to_loxone_kw
+    from ehal.field_registry import require_loxone_write
 
-    if kind == "set_ess_active_power":
-        return float(ehal_active_power_w_to_loxone_kw(float(value_w)))
-    if kind in ("set_ess_charge_power_limit", "set_ess_discharge_power_limit"):
-        return max(0.0, float(value_w)) / 1000.0
+    if kind in (
+        "set_ess_active_power",
+        "set_ess_charge_power_limit",
+        "set_ess_discharge_power_limit",
+    ):
+        return float(require_loxone_write(kind, float(value_w)))
     return float(value_w)
 
 
