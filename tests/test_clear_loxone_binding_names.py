@@ -189,6 +189,28 @@ def test_empty_activation_resolves_write_qids() -> None:
     )
 
 
+def test_empty_grid_read_activation_resolves_qualified_exchange_id() -> None:
+    """Empty plant Merker must resolve to grid.meter.* (push inbox / Live-Lesen)."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    house = {
+        "plant": {
+            "ehal_bindings": {
+                "sens_grid_power_active": "",
+                "get_grid_export_power_limit": "",
+            }
+        }
+    }
+    assert (
+        resolve_plant_binding(house, "sens_grid_power_active")
+        == "grid.meter.sens_grid_power_active"
+    )
+    assert (
+        resolve_plant_binding(house, "get_grid_export_power_limit")
+        == "grid.meter.get_grid_export_power_limit"
+    )
+
+
 def test_empty_activation_flex_publish_uses_qid() -> None:
     from integrations.loxone_comm_trace import LoxoneWriteRecord
     from integrations.loxone_writes import _publish_flexible_consumer_outputs

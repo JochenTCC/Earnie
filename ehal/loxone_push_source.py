@@ -213,7 +213,18 @@ def resolve_push_binding(io_or_ehal: str) -> MerkerBinding | None:
     binding = get_merker_index().get(name)
     if binding is not None:
         return binding
-    return get_ehal_index().get(name)
+    binding = get_ehal_index().get(name)
+    if binding is not None:
+        return binding
+    # Bare GRID_KINDS (legacy empty-activation) → exchange id grid.meter.*
+    from ehal.qualified_ids import GRID_KINDS, qualified_plant_id
+
+    kind = field_kind(name)
+    if kind in GRID_KINDS:
+        qid = qualified_plant_id(kind)
+        if qid != name:
+            return get_ehal_index().get(qid)
+    return None
 
 
 def get_push_entities() -> frozenset[str]:

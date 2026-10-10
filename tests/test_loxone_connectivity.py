@@ -217,6 +217,41 @@ class TestCollectReadChecks:
             "Earnie_Netz_Einspeisegrenze_In"
         )
 
+    def test_empty_grid_activation_collects_qualified_io(self):
+        """Q8 empty Merker → Live-Lesen io_name is grid.meter.* (not bare)."""
+        house = {
+            "plant": {
+                "ehal_bindings": {
+                    "sens_grid_power_active": "",
+                    "get_grid_export_power_limit": "",
+                },
+            }
+        }
+
+        def _get(name, **kw):
+            from house_config.ehal_bindings import resolve_plant_binding
+
+            if name == "LOXONE_GRID_POWER_NAME":
+                return resolve_plant_binding(house, "sens_grid_power_active")
+            return self._plant_get(name, **kw)
+
+        with patch.object(lc.config, "get", side_effect=_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=[]
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ), patch.object(
+            lc.loxone_client, "_default_house_profiles_doc", return_value=house
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["grid.meter.sens_grid_power_active"] == (
+            "grid.meter.sens_grid_power_active"
+        )
+        assert by_label["grid.meter.get_grid_export_power_limit"] == (
+            "grid.meter.get_grid_export_power_limit"
+        )
+
     def test_ignores_consumer_ambient_for_live_reads(self):
         house = {"plant": {"ehal_bindings": {}}}
         with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(

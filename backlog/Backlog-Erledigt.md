@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Q8 empty grid bindings → Live-Lesen Merker-Poll (2026-10-10)
+
+- [x] **EHAL binding mismatch** — `grid.meter.sens_grid_power_active` / `get_grid_export_power_limit` showed `Kein Push-Inbox-Wert (Merker-Poll entfernt)` while empty plant activation and energy counters worked
+  - Cause: Q8 empty Merker fallback returned bare field IDs; push inbox / ehal index use `grid.meter.*`
+  - Fix: `resolve_plant_binding` empty activation → `qualified_plant_id`; `resolve_push_binding` maps bare `GRID_KINDS` → exchange ID
+  - Tests: `test_empty_grid_read_activation_resolves_qualified_exchange_id`, `test_empty_grid_activation_collects_qualified_io`
+  - Verified on NAS productive Live-Lesen (operator)
+
 ### Shadow recorder + client regression check (2026-10-10)
 
 - [x] Review code for shadow functionality on host and client side

@@ -474,11 +474,9 @@ def resolve_plant_binding(
         from ehal.qualified_ids import field_kind, qualified_plant_id
 
         kind = field_kind(field)
-        if kind.startswith("set_"):
+        # Q8: empty Merker → exchange ID (grid.meter.* for GRID_KINDS; bare otherwise).
+        if kind.startswith("set_") or is_pushable_kind(field):
             return qualified_plant_id(field)
-        # Reads: keep bare binding key (push inbox resolves via qualified index).
-        if is_pushable_kind(field):
-            return field
         return ""
 
     plant_fallback = _empty_key_fallback(bindings)
