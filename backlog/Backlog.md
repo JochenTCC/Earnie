@@ -26,7 +26,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Drop the plant-flat remap exception in `optimizer/powerstation_live.py`; update adapters, readiness, VI templates, `docs/spec/ehal.md`, `docs/ui/ehal-com.md`, `docs/konfiguration/batterie-pv.md`, EcoFlow guide.
   - One-off migrate when plant still has `set_ess_source_select`: copy onto the (single) physical standby_backup battery binding, then clear plant.
   - **Out of scope here:** repairing the Loxone ↔ HA EcoFlow bypass bridge after the ID move (operator rewires separately). Productive **2.7.h** dogfood waits until this lands.
-  
+
+- [ ] Make an automatic update every 10 sec (or alternatively when log changes) on page Optimierer-Dienst for the display on earnie.log
+  - [ ] Add a "Gehe nach Oben" button near the "Aktualisieren" button at the lower end
 - [ ] Remove any rollback legacy code from former chapters 
 - [ ] Make EHAL naming and documents as loxone agnostic as possible
 - [ ] Make a code review comparing EHAL field mapping / binding for Loxone and HA - search for similarities in different codes and search for duplications and potentials for reuse / unification
@@ -35,12 +37,14 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - Display in gray
     - Show the fallback default value if available (with hint)
   - propose colors for other states of Live Lesn values
+
 - [ ] **EHAL-Com — show expected units + raw vs converted values** (follow-up to EHAL unit conversion registry; triggered by live check 2026-10-10 when Loxone max charge/discharge were still in W)
   - **Signalliste:** per signal, show the expected hub unit (what the backend should send / receive — e.g. Loxone **kW** for ESS power limits) and the EHAL unit (e.g. **W**), sourced from role `loxone` / hub blocks in `share/ehal/roles/*.json` (not hard-coded in the UI).
   - **Live-Lesen:** keep existing **Wert** = raw value from the backend; add a column for the value **after** registry conversion (EHAL unit).
   - **Live-Schreiben:** opposite — keep **Wert** (or equivalent) as the EHAL/internal value Earnie plans; add a column for the value **after** conversion to hub units (what is written / mirrored to the backend).
   - Update `docs/ui/ehal-com.md` accordingly.
-- [ ] Check caching of Loxone push readings also for non-numeric values (e.g. ev.e_auto.get_evcs_ready_by_time) in order to make these values survive a restart of main.py
+  - Also display the defined unit into all columns with values defined in roles.json files
+
 
 - [ ] **2.7.l — Inverter entity (PV × battery topology)** (epic **Inverter**; EHAL/EHAL-Com doc draft: [`backlog/EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md))
   - **Problem:** `pv_systems[]` and `batteries[]` are unrelated lists; the scenario picks both by id. Nothing says which PV strings and batteries share an inverter. The MILP has one summed PV node, so inverter AC/DC limits (clipping), hybrid vs. AC-coupled batteries and several inverters with their own battery cannot be modelled. Balkonkraftwerk storage (EcoFlow etc.) has the inverter built into the battery and takes PV directly.
