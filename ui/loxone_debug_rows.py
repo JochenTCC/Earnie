@@ -32,10 +32,88 @@ from integrations.ehal_debug_mapping import (
 from integrations.loxone_connectivity import LoxoneCheck, loxone_env_configured, run_read_checks
 from runtime_store import run_state
 from runtime_store.main_daemon import status as daemon_status
+from ui.ehal_unit_display import live_read_pair, live_write_pair
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY
 from ui.runtime_config import reload_runtime_config
 from ui.sankey_produktiv import has_produktiv_run
 
+_DASH = "—"
+
+
+def _live_backend() -> str:
+    if config.is_ehal_ha_backend():
+        return "ha"
+    if config.is_ehal_network_backend():
+        return "openems"
+    return "loxone"
+
+
+def _network_display_backend(backend: str | None = None) -> str:
+    """HA/OpenEMS conversion rules for telemetry / ehal_writes tables."""
+    hub = backend or _live_backend()
+    return "ha" if hub == "loxone" else hub
+
+
+def _enrich_read_row(
+    row: dict[str, str],
+    *,
+    backend: str,
+    value_space: str,
+    hub_unit_hint: str | None = None,
+) -> dict[str, str]:
+    """Add Wert (EHAL); keep Wert as hub/raw side (or — when only EHAL known)."""
+    hub, ehal = live_read_pair(
+        row.get("EHAL-Feld", ""),
+        backend,  # type: ignore[arg-type]
+        row.get("Wert", ""),
+        value_space=value_space,  # type: ignore[arg-type]
+        hub_unit_hint=hub_unit_hint,
+    )
+    return {
+        "EHAL-Feld": row.get("EHAL-Feld", ""),
+        "Wert": hub if str(row.get("Wert", "")).strip() else row.get("Wert", ""),
+        "Wert (EHAL)": ehal if str(row.get("Wert", "")).strip() else "",
+        "Status": row.get("Status", ""),
+        "Detail": row.get("Detail", ""),
+        "Zuletzt gelesen": row.get("Zuletzt gelesen", ""),
+    }
+
+
+def _enrich_write_row(
+    row: dict[str, str],
+    *,
+    backend: str,
+    value_space: str,
+    hub_unit_hint: str | None = None,
+) -> dict[str, str]:
+    """Normalize Wert to EHAL; add Wert (Hub)."""
+    raw = row.get("Wert", "")
+    if not str(raw).strip():
+        return {
+            "EHAL-Feld": row.get("EHAL-Feld", ""),
+            "Mapping": row.get("Mapping", ""),
+            "Wert": "",
+            "Wert (Hub)": "",
+            "Erfolg": row.get("Erfolg", ""),
+            "Gesendet um": row.get("Gesendet um", ""),
+            "Meldung": row.get("Meldung", ""),
+        }
+    ehal, hub = live_write_pair(
+        row.get("EHAL-Feld", ""),
+        backend,  # type: ignore[arg-type]
+        raw,
+        value_space=value_space,  # type: ignore[arg-type]
+        hub_unit_hint=hub_unit_hint,
+    )
+    return {
+        "EHAL-Feld": row.get("EHAL-Feld", ""),
+        "Mapping": row.get("Mapping", ""),
+        "Wert": ehal,
+        "Wert (Hub)": hub,
+        "Erfolg": row.get("Erfolg", ""),
+        "Gesendet um": row.get("Gesendet um", ""),
+        "Meldung": row.get("Meldung", ""),
+    }
 
 
 def status_strip_banner(silent: bool, daemon_running: bool) -> tuple[str, str]:
@@ -138,13 +216,17 @@ def _try_push_live_row(
     if value is None:
         return None
     last = _inbox_last_read_local(ehal_id) or read_at
-    return {
-        "EHAL-Feld": field,
-        "Wert": str(value),
-        "Status": state,
-        "Detail": "",
-        "Zuletzt gelesen": last,
-    }
+    return _enrich_read_row(
+        {
+            "EHAL-Feld": field,
+            "Wert": str(value),
+            "Status": state,
+            "Detail": "",
+            "Zuletzt gelesen": last,
+        },
+        backend="loxone",
+        value_space="hub",
+    )
 
 def rows_with_mapping_column_label(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     """Rename internal ``Mapping`` key to the backend-specific display title.
@@ -167,6 +249,46 @@ def rows_with_mapping_column_label(rows: list[dict[str, str]]) -> list[dict[str,
             out[key] = value
         renamed.append(out)
     return renamed
+
+def _empty_mapped_read_row(field: str, read_at: str) -> dict[str, str]:
+    return _enrich_read_row(
+        {
+            "EHAL-Feld": field,
+            "Wert": "",
+            "Status": "Kein Mapping",
+            "Detail": "",
+            "Zuletzt gelesen": read_at,
+        },
+        backend="loxone",
+        value_space="hub",
+    )
+
+
+def _read_row_from_check(
+    field: str, item: LoxoneCheck, *, mapping: str, read_at: str
+) -> dict[str, str]:
+    wert = parse_check_wert(item.detail, passed=item.passed)
+    if wert and field.endswith("get_evcs_ready_by_time"):
+        from integrations.loxone_client import format_ready_by_display
+
+        wert = format_ready_by_display(wert)
+    ehal_id = _live_field_to_push_ehal_id(field)
+    last = read_at
+    if item.state:
+        last = _inbox_last_read_local(ehal_id) or read_at
+    status = "Kein Mapping" if not mapping else read_check_status_label(item)
+    return _enrich_read_row(
+        {
+            "EHAL-Feld": field,
+            "Wert": wert,
+            "Status": status,
+            "Detail": "" if item.passed else item.detail,
+            "Zuletzt gelesen": last,
+        },
+        backend="loxone",
+        value_space="hub",
+    )
+
 
 def build_read_rows(
     checks: list[LoxoneCheck],
@@ -199,37 +321,10 @@ def build_read_rows(
                 rows.append(push_row)
                 continue
             if item is None:
-                rows.append(
-                    {
-                        "EHAL-Feld": field,
-                        "Wert": "",
-                        "Status": "Kein Mapping",
-                        "Detail": "",
-                        "Zuletzt gelesen": read_at,
-                    }
-                )
+                rows.append(_empty_mapped_read_row(field, read_at))
                 continue
-        wert = parse_check_wert(item.detail, passed=item.passed)
-        if wert and field.endswith("get_evcs_ready_by_time"):
-            from integrations.loxone_client import format_ready_by_display
-
-            wert = format_ready_by_display(wert)
-        ehal_id = _live_field_to_push_ehal_id(field)
-        last = read_at
-        if item.state:
-            last = _inbox_last_read_local(ehal_id) or read_at
-        if not mapping:
-            status = "Kein Mapping"
-        else:
-            status = read_check_status_label(item)
         rows.append(
-            {
-                "EHAL-Feld": field,
-                "Wert": wert,
-                "Status": status,
-                "Detail": "" if item.passed else item.detail,
-                "Zuletzt gelesen": last,
-            }
+            _read_row_from_check(field, item, mapping=mapping, read_at=read_at)
         )
     return rows
 
@@ -240,6 +335,7 @@ def build_telemetry_rows(
     *,
     mapping: dict[str, str] | None = None,
     expected_fields: list[str] | None = None,
+    backend: str | None = None,
 ) -> list[dict[str, str]]:
     source: dict[str, str] = {}
     for k, v in (mapping or {}).items():
@@ -260,32 +356,33 @@ def build_telemetry_rows(
         else expected_live_read_fields(network_backend=True),
         sorted(present),
     )
+    hub = _network_display_backend(backend)
     rows: list[dict[str, str]] = []
     for field in ordered:
         if not is_live_read_field(field):
             continue
         mapped = mapping_or_dash(source, field)
         if field in present:
-            rows.append(
-                {
-                    "EHAL-Feld": field,
-                    "Wert": str(present[field]),
-                    "Status": "OK" if mapped else "Kein Mapping",
-                    "Detail": "",
-                    "Zuletzt gelesen": read_at,
-                }
-            )
+            wert = str(present[field])
+            status = "OK" if mapped else "Kein Mapping"
         else:
-            rows.append(
+            wert = ""
+            status = "Kein Mapping" if not mapped else "Fehlt"
+        rows.append(
+            _enrich_read_row(
                 {
                     "EHAL-Feld": field,
-                    "Wert": "",
-                    "Status": "Kein Mapping" if not mapped else "Fehlt",
+                    "Wert": wert,
+                    "Status": status,
                     "Detail": "",
                     "Zuletzt gelesen": read_at,
-                }
+                },
+                backend=hub,
+                value_space="ehal",
             )
+        )
     return rows
+
 
 def _write_row(
     *,
@@ -295,15 +392,23 @@ def _write_row(
     success: str,
     written_at: str,
     message: str,
+    backend: str = "loxone",
+    value_space: str = "hub",
+    hub_unit_hint: str | None = None,
 ) -> dict[str, str]:
-    return {
-        "EHAL-Feld": field,
-        "Mapping": mapping,
-        "Wert": value,
-        "Erfolg": success,
-        "Gesendet um": written_at,
-        "Meldung": message,
-    }
+    return _enrich_write_row(
+        {
+            "EHAL-Feld": field,
+            "Mapping": mapping,
+            "Wert": value,
+            "Erfolg": success,
+            "Gesendet um": written_at,
+            "Meldung": message,
+        },
+        backend=backend,
+        value_space=value_space,
+        hub_unit_hint=hub_unit_hint,
+    )
 
 def build_write_rows_from_trace(
     writes: list[dict[str, Any]],
@@ -340,6 +445,8 @@ def build_write_rows_from_trace(
                     success="",
                     written_at="",
                     message="" if not configured else "Nicht im letzten Lauf",
+                    backend="loxone",
+                    value_space="hub",
                 )
             )
             continue
@@ -352,6 +459,8 @@ def build_write_rows_from_trace(
                 success=_success_label(entry),
                 written_at=str(entry.get("written_at") or ""),
                 message="",
+                backend="loxone",
+                value_space="hub",
             )
         )
     return rows
@@ -392,6 +501,7 @@ def build_ehal_write_rows(
         else expected_live_write_fields(network_backend=True),
         list(by_field),
     )
+    hub = _network_display_backend()
     rows: list[dict[str, str]] = []
     for field in ordered:
         if not is_live_write_field(field):
@@ -407,6 +517,8 @@ def build_ehal_write_rows(
                     success="",
                     written_at="",
                     message="" if not mapped else "Nicht im letzten Lauf",
+                    backend=hub,
+                    value_space="ehal",
                 )
             )
             continue
@@ -418,6 +530,8 @@ def build_ehal_write_rows(
                 success=_success_label(entry),
                 written_at=str(entry.get("written_at") or ""),
                 message=str(entry.get("message") or ""),
+                backend=hub,
+                value_space="ehal",
             )
         )
     return rows
@@ -457,6 +571,8 @@ def build_intended_write_rows(
                     success="",
                     written_at="",
                     message="" if not configured else "Nicht im letzten Lauf",
+                    backend="loxone",
+                    value_space="hub",
                 )
             )
             continue
@@ -469,6 +585,8 @@ def build_intended_write_rows(
                 success="Nein",
                 written_at=completed_at,
                 message="Nicht gesendet (Silent-Modus)",
+                backend="loxone",
+                value_space="hub",
             )
         )
     return rows

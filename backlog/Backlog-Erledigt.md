@@ -2,6 +2,21 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Shadow recorder + client regression check (2026-10-10)
+
+- [x] Review code for shadow functionality on host and client side
+  - Suite green: 84 passed (`tests/test_shadow_*.py`, `test_auto_persist_shadow`, `test_local_settings`, `test_loxone_write_characterization`)
+  - Wiring still intact after **2.7.n** / **2.7.q** (record/replay, push-only write block, listener off, config RO, release guard)
+  - Dogfood gaps noted (not fixed): ENTSO-E not in feed; push-only sensors skipped by design; a few structure probes without `assert_not_shadow_backend`
+  - Deferred unchanged: S4 Soll/Soll + offline JSONL (**2.+1**); would-write old-vs-new; silent `status.json` publish gate
+
+### EHAL-Com — units, raw↔converted, Live-Lesen readability (2026-10-10)
+
+- [x] **EHAL-Com — units, raw↔converted, Live-Lesen readability** (follow-up to EHAL unit conversion registry)
+  - **Phase A:** shared `ui/ehal_unit_display.py` (registry / `ha_units` only); Signalliste **Hub-Einheit** / **EHAL-Einheit**; Live-Lesen **Wert (EHAL)** + unit suffixes; Live-Schreiben **Wert (Hub)** with Loxone hub-trace normalized to EHAL; same headers on all backends (`—` when no path); `docs/ui/ehal-com.md`
+  - **Phase B:** Pandas Styler row colours (optional gray / cached blue / stale yellow / error red) + optional empty-row fallback hint; Status text remains authoritative
+  - Tests: `tests/test_ehal_unit_display.py`, Signalliste + Live row assertions
+
 ### Q8 — Clear Loxone Merker names + write activation by key presence (2026-10-10)
 
 - [x] Remove remaining Merker name values from `ehal_bindings` (keep keys as activation flags) or mark code still needing Merker poll / non-empty HA entity_ids

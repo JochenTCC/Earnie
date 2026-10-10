@@ -56,11 +56,13 @@ def test_load_loxone_auth_error_none_when_missing():
     assert rows[0]["EHAL-Feld"] == "sens_ess_soc"
     assert "Mapping" not in rows[0]
     assert "Quelle" not in rows[0]
-    assert rows[0]["Wert"] == "65.0"
+    assert rows[0]["Wert"] == "65 %"
+    assert rows[0]["Wert (EHAL)"] == "65 %"
     assert rows[0]["Status"] == "OK"
     assert rows[0]["Zuletzt gelesen"] == "2026-07-14T12:00:00"
     assert rows[1]["Status"] == "Warnung"
     assert rows[1]["Wert"] == ""
+    assert rows[1]["Wert (EHAL)"] == ""
     assert rows[1]["Detail"] == "Timeout"
 
 
@@ -164,7 +166,8 @@ def test_build_read_rows_push_zero_held_status():
     )
     assert rows[0]["EHAL-Feld"] == "grid.meter.sens_grid_power_active"
     assert rows[0]["Status"] == STATE_ZERO_HELD
-    assert rows[0]["Wert"] == "0.0"
+    assert rows[0]["Wert"] == "0 kW"
+    assert rows[0]["Wert (EHAL)"] == "0 W"
     assert "Mapping" not in rows[0]
 
 
@@ -184,7 +187,8 @@ def test_build_read_rows_push_assumed_never_without_check():
             expected_fields=["sens_grid_power_active"],
         )
     assert rows[0]["Status"] == STATE_ZERO_ASSUMED_NEVER
-    assert rows[0]["Wert"] in ("0", "0.0")
+    assert rows[0]["Wert"] == "0 kW"
+    assert rows[0]["Wert (EHAL)"] == "0 W"
     assert rows[0]["Status"] != "Kein Mapping"
     assert rows[0]["Zuletzt gelesen"] == "12:00:00"
 
@@ -205,7 +209,8 @@ def test_build_read_rows_push_last_known_soc():
             expected_fields=["sens_ess_soc"],
         )
     assert rows[0]["Status"] == STATE_LAST_KNOWN
-    assert rows[0]["Wert"] == "55.0"
+    assert rows[0]["Wert"] == "55 %"
+    assert rows[0]["Wert (EHAL)"] == "55 %"
     assert "Mapping" not in rows[0]
 
 
@@ -255,7 +260,8 @@ def test_build_write_rows_from_trace_maps_set_fields():
     assert rows[0]["EHAL-Feld"] == "set_ess_charge_power_limit"
     assert rows[0]["Mapping"] == "Ernie_Charge"
     assert rows[0]["Erfolg"] == "Ja"
-    assert rows[0]["Wert"] == "1.5"
+    assert rows[0]["Wert"] == "1500 W"
+    assert rows[0]["Wert (Hub)"] == "1.5 kW"
 
 
 def test_build_write_rows_includes_unmapped_expected():
@@ -309,7 +315,9 @@ def test_build_intended_write_rows_for_silent_mode():
     assert rows[0]["EHAL-Feld"] == "set_ess_mode"
     assert rows[0]["Mapping"] == "Ernie_Mode"
     assert rows[0]["Meldung"] == "Nicht gesendet (Silent-Modus)"
-    assert rows[0]["Wert"] == "2.0"
+    # Mode has no Loxone unit block — value stays bare on hub side of the pair.
+    assert rows[0]["Wert"] in ("—", "2", "2.0")
+    assert "Wert (Hub)" in rows[0]
 
 
 def test_build_intended_write_rows_powerstation_merker_silent():
@@ -332,7 +340,8 @@ def test_build_intended_write_rows_powerstation_merker_silent():
     assert rows[0]["EHAL-Feld"] == "ess.ecoflow_delta_3.set_ess_charge_power_limit"
     assert rows[0]["Mapping"] == "PS_Charge"
     assert rows[0]["Meldung"] == "Nicht gesendet (Silent-Modus)"
-    assert rows[0]["Wert"] == "0.5"
+    assert rows[0]["Wert"] == "500 W"
+    assert rows[0]["Wert (Hub)"] == "0.5 kW"
 
 
 def test_write_summary_from_rows_matches_table_not_raw_trace():
@@ -374,7 +383,9 @@ def test_build_telemetry_rows_filters_and_maps():
     assert len(rows) == 2
     assert rows[0]["EHAL-Feld"] == "sens_ess_soc"
     assert "Mapping" not in rows[0]
-    assert rows[0]["Wert"] == "55.0"
+    # HA telemetry is already EHAL → Wert (hub) is — without entity unit hint.
+    assert rows[0]["Wert"] == "—"
+    assert rows[0]["Wert (EHAL)"] == "55 %"
     assert "schema_version" not in {r["EHAL-Feld"] for r in rows}
 
 

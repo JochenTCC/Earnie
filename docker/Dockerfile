@@ -1,4 +1,12 @@
+# syntax=docker/dockerfile:1
 # Zielplattform beim Build setzen: --platform linux/amd64 (Synology) oder linux/arm64 (LoxBerry)
+
+# Stage 1: Dependency-Liste aus pyproject.toml ziehen. Der Layer-Cache der Folgestufe hängt
+# nur am Inhalt von deps.txt — Versions-/Code-/Entry-Point-Änderungen invalidieren ihn nicht.
+FROM python:3.14-slim AS deps-list
+COPY pyproject.toml /tmp/pyproject.toml
+RUN python -c "import tomllib; d = tomllib.load(open('/tmp/pyproject.toml','rb'))['project']['dependencies']; open('/tmp/deps.txt','w').write('\n'.join(d)+'\n')"
+
 FROM python:3.14-slim
 
 RUN apt-get update && apt-get install -y \
@@ -6,6 +14,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Third-party deps first: only re-run when the dependency list changes. The pip cache mount
+# keeps downloaded wheels across builds, so even a changed list re-downloads only the delta.
+COPY --from=deps-list /tmp/deps.txt /tmp/deps.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r /tmp/deps.txt
 
 COPY pyproject.toml version.py README.md requirements.txt ./
 COPY optimizer/ optimizer/
@@ -18,7 +32,8 @@ COPY scripts/ scripts/
 # Dev-only junk in version.py (e.g. "2.0.0 (wip)") breaks setuptools in the image;
 # keep SemVer pre-releases (-alpha.N / -rc.N). Host file stays unchanged.
 RUN python -c "from version import rewrite_version_file_for_image; rewrite_version_file_for_image()"
-RUN pip install --no-cache-dir -r requirements.txt
+# requirements.txt is "." — deps are already installed above, only the project itself is built.
+RUN pip install --no-cache-dir --no-deps -r requirements.txt
 
 # Explicit copies only (S6470) — avoid recursive COPY . . pulling secrets/junk.
 COPY docker/ docker/

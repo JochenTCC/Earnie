@@ -246,10 +246,15 @@ Only `**sens_***` and `**get_***` (measurements / inputs). The table lists **all
 | Column                                            | Meaning                                                                                                                                    |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | EHAL field                                          | exchange EHAL ID (qualified where that is the wire form)                                                                                    |
-| Value                                                | live value (including assumed / last-known `0` from the push zero rule)                                                                       |
+| Value                                                | hub/raw side (Loxone push/check value with hub unit when known). Same header on HA/OpenEMS: filled only when reverse conversion is possible, else `—` |
+| Value (EHAL)                                         | value after registry / `ha_units` conversion to EHAL (with EHAL unit). `—` when no conversion path exists                                     |
 | Status                                               | OK / warning / error / no mapping; for Loxone push also push-state strings (`0 angenommen …`, `0 (gehalten)`, `Zuletzt bekannt (gehalten)`, …) |
-| Detail                                               | error text (empty when OK)                                                                                                                    |
+| Detail                                               | error text (empty when OK); optional empty rows may show a fallback hint                                                                     |
 | Last read                                            | timestamp of the query; for push rows prefer the inbox `last_ts` (local clock) when available                                                   |
+
+**Units:** from role `loxone` / `openems` blocks in `share/ehal/roles/*.json` (and HA quantity base units via `ha_units`) — not hard-coded in the UI. Every value cell shows its unit as a suffix when known.
+
+**Row colours (additive; Status stays authoritative):** black/default = mandatory fresh OK; gray = optional; blue = cached held; yellow = outdated/assumed/warning; red = no mapping or read error.
 
 
 **Loxone:** pushable `sens_*` / `get_*` from the VO inbox. Empty Merker with a present binding key still reads via the qualified EHAL ID (push-only). **No mapping** means unbound only — not “value is 0”. Missing or outdated VO inbox values (no fresh push, last-known older than 5 minutes) show as **Warnung** in Live Read / startup verify — not as a hard error; a last-known value within 5 minutes counts as **OK** (`Zuletzt bekannt …`). On `main.py` start, Earnie hydrates `runtime/loxone_push_inbox.json`, starts the VO HTTP listener, waits for the push link (up to ~40 s when `EARNIE_PILOT_PUSH_TOKEN` is set), then runs loxone-verify. **Grid meter** rows are always `grid.meter.*` (never bare `sens_grid_*` / `get_grid_*`; storage keys on `plant.ehal_bindings` may stay bare). When ehal-mappable batteries exist, ESS Live rows are only `ess.<id>.*` — bare plant `sens_ess_*` / `get_ess_*` are omitted (legacy single-ESS plants without Pattern B batteries still show bare plant ESS). Other plant house-wide fields stay bare: `sens_pv_production_active`, optional `sens_power_consumers`, `sens_temperature_outside`, `sens_absent_mode`, `sens_pv_energy` (until deferred `pv.*`). **Consumers** use qualified EHAL IDs: EV → `evcs.{id}.*` / `ev.{id}.*`; flex power → `consumer.{slug}.sens_power_act` (or `heatpump.*` / `pool.*` by type); domain temps under the same namespace. No `set_` / enables in Live-Lesen. `get_evcs_ready_by_time`: Analog VO numeric next-entry or fresh Tna text (`Morgen, 07:00`). Numeric counters (Loxone epoch since 2009-01-01) are converted to Unix and shown locally readable in the **Value** column (`YYYY-MM-DD HH:MM:SS (unix …)`).
@@ -267,7 +272,8 @@ Units and signs: see §B. Full role matrix: §C.
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | EHAL field                                          | `set_*` resp. `{id}:flex.{slug}.set_enable` (enable)                                            |
 | Mapping to Loxone / Home Assistant / OpenEMS       | Merker / HA entity / OpenEMS write channel; column title depends on the backend; empty if not yet mapped |
-| Value                                                | written setpoint                                                                                  |
+| Value                                                | EHAL / internal setpoint (with EHAL unit). Loxone loud traces that store hub units are normalized here |
+| Value (Hub)                                          | value after conversion to hub units (what is published / mirrored). `—` when no conversion path |
 | Success                                              | yes / no                                                                                          |
 | Sent at                                              | timestamp                                                                                          |
 | Message                                              | error text or silent-mode note                                                                    |
@@ -328,6 +334,8 @@ Only with backend **Loxone** (2.7.q Q7). Replaces the former *Loxone Structure �
 | ------ | ------- |
 | Qualified EHAL ID | Exchange form (`grid.meter.*`, `ess.{id}.*`, `consumer.` / `heatpump.` / `pool.` / `evcs.` / `ev.`) |
 | Meaning | Entity Bezeichnung + field label |
+| Hub unit | Expected hub unit from role `loxone` / hub block (e.g. Loxone **kW** for ESS power); `—` if none |
+| EHAL unit | EHAL wire unit from the same registry block (e.g. **W**); `—` if none |
 | Required by | EHAL functions from `ehal/functions.py` that need the field |
 | Match (read) | Last received in the push inbox (age) / never |
 | Match (write) | Last Miniserver fetch of `status.json` (callback) / never published |

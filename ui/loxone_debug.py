@@ -153,8 +153,10 @@ def _render_live_reads_fragment() -> None:
     st.caption(f"{ok}/{len(checks)} Merker erfolgreich gelesen · Stand **{read_at}**")
     rows = build_read_rows(checks, read_at)
     if rows:
+        from ui.ehal_live_read_style import style_live_read_rows
+
         st.dataframe(
-            rows,
+            style_live_read_rows(rows),
             width="stretch",
             hide_index=True,
         )
@@ -189,12 +191,16 @@ def _render_ehal_telemetry_fragment() -> None:
         house = load_house_profiles()
         telemetry_payload = expand_ha_telemetry_for_live(telemetry_payload, house)
         expected = expected_live_read_fields(network_backend=False)
+    from ui.ehal_live_read_style import style_live_read_rows
+
     st.dataframe(
-        build_telemetry_rows(
-            telemetry_payload,
-            read_at,
-            mapping=mapping,
-            expected_fields=expected,
+        style_live_read_rows(
+            build_telemetry_rows(
+                telemetry_payload,
+                read_at,
+                mapping=mapping,
+                expected_fields=expected,
+            )
         ),
         width="stretch",
         hide_index=True,

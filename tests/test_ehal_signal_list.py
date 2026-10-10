@@ -6,6 +6,8 @@ from io import BytesIO
 
 from ehal.signal_export import build_export_zip
 from ehal.signal_list import build_signal_rows
+from ui.ehal_signal_list import _table_records
+from ui.ehal_unit_display import units_for_field
 
 
 def _minimal_docs() -> tuple[dict, dict]:
@@ -74,6 +76,31 @@ def test_build_signal_rows_has_read_and_write() -> None:
     assert write.direction == "write"
     assert write.match_kind == "published"
     assert any("Einspeiseleistung" in label for label in write.required_by)
+
+
+def test_signal_list_table_has_hub_and_ehal_units() -> None:
+    house, components = _minimal_docs()
+    rows = build_signal_rows(house, components, inbox={}, published={}, fetched_at=None)
+    table = _table_records(rows)
+    ess_power = next(
+        (r for r in table if r["EHAL-ID"].endswith("sens_ess_soc")),
+        None,
+    )
+    assert ess_power is not None
+    assert ess_power["Hub-Einheit"] == "%"
+    assert ess_power["EHAL-Einheit"] == "%"
+    charge = next(
+        (
+            r
+            for r in table
+            if r["EHAL-ID"].endswith("set_ess_charge_power_limit")
+        ),
+        None,
+    )
+    assert charge is not None
+    units = units_for_field(charge["EHAL-ID"], "loxone")
+    assert charge["Hub-Einheit"] == units.hub_unit == "kW"
+    assert charge["EHAL-Einheit"] == units.ehal_unit == "W"
 
 
 def test_export_zip_contains_vo_and_vi() -> None:

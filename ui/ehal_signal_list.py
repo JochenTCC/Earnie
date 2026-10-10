@@ -7,6 +7,7 @@ import streamlit as st
 
 from ehal.signal_export import build_export_zip
 from ehal.signal_list import SignalRow, build_signal_rows
+from ui.ehal_unit_display import units_for_field
 
 _MATCH_SYMBOL = {
     "ok": "✅",
@@ -15,6 +16,7 @@ _MATCH_SYMBOL = {
     "published": "✅",
     "awaiting_fetch": "⏳",
 }
+_DASH = "—"
 
 
 def render_ehal_signal_list_section() -> None:
@@ -45,12 +47,15 @@ def _table_records(rows: list[SignalRow]) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for row in rows:
         symbol = _MATCH_SYMBOL.get(row.match_kind, "·")
-        req = ", ".join(row.required_by) if row.required_by else "—"
+        req = ", ".join(row.required_by) if row.required_by else _DASH
+        units = units_for_field(row.ehal_id, "loxone")
         out.append(
             {
                 "Richtung": "Lesen" if row.direction == "read" else "Schreiben",
                 "EHAL-ID": row.ehal_id,
                 "Bedeutung": f"{row.entity_label} — {row.meaning}",
+                "Hub-Einheit": units.hub_unit or _DASH,
+                "EHAL-Einheit": units.ehal_unit or _DASH,
                 "Benötigt von": req,
                 "Match": f"{symbol} {row.match_text}",
                 "Gruppe": row.group,

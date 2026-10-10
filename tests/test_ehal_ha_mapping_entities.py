@@ -310,7 +310,10 @@ def test_ha_telemetry_rows_entity_centric_values():
     )
     by_field = {r["EHAL-Feld"]: r for r in rows}
     assert "Mapping" not in by_field["sens_ess_soc"]
-    assert by_field["sens_ess_soc"]["Wert"] == "40.0"
+    # HA telemetry is already EHAL → Wert (hub) is — without entity unit hint.
+    assert by_field["sens_ess_soc"]["Wert"] == "—"
+    assert by_field["sens_ess_soc"]["Wert (EHAL)"] == "40 %"
     assert by_field["sens_ess_soc"]["Status"] == "OK"
     assert "Mapping" not in by_field["evcs.wallbox.sens_evcs_active_power"]
-    assert by_field["evcs.wallbox.sens_evcs_active_power"]["Wert"] == "100.0"
+    assert by_field["evcs.wallbox.sens_evcs_active_power"]["Wert"] == "—"
+    assert by_field["evcs.wallbox.sens_evcs_active_power"]["Wert (EHAL)"] == "100 W"
