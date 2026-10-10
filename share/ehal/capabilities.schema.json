@@ -35,7 +35,7 @@
     },
     "supports_ess_source_select": {
       "type": "boolean",
-      "description": "set_ess_source_select (grid/battery island) can be written (powerstation standby_backup, 2.7.h)."
+      "description": "ess.{id}.set_ess_source_select (grid/battery island) can be written (physical standby_backup, 2.7.h)."
     }
   },
   "additionalProperties": false

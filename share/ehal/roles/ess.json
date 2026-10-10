@@ -162,7 +162,7 @@
       "field": "set_ess_source_select",
       "required": false,
       "kind": "setpoint",
-      "notes": "0 = grid pass-through, 1 = battery-only island. Powerstation standby_backup (2.7.h); omit for bidirectional house ESS."
+      "notes": "0 = grid pass-through, 1 = battery-only island. Pattern B ess.{id}.set_ess_source_select on physical standby_backup only (2.7.h); omit for house ESS / plant."
     },
     {
       "field": "supports_ess_write",

@@ -1,7 +1,7 @@
 """UI-adjacent tests for entity-centric EHAL Loxone mapping save (2.4.k)."""
 from __future__ import annotations
 
-from ehal.ess_fields import ESS_BATTERY_MAPPING_KINDS, ess_field
+from ehal.ess_fields import ESS_BATTERY_MAPPING_KINDS, ess_field, ess_field_kind
 from ui.ehal_loxone_mapping import (
     BATTERY_ENTITY_KIND,
     EV_FIELDS,
@@ -41,7 +41,7 @@ def test_fields_for_consumer_ev_vs_flex():
     assert "sens_grid_energy_export" in PLANT_FIELDS
     assert "sens_ess_soc" not in PLANT_FIELDS
     assert "set_ess_active_power" not in PLANT_FIELDS
-    assert "set_ess_source_select" in PLANT_FIELDS
+    assert "set_ess_source_select" not in PLANT_FIELDS
     assert "set_grid_export_power_limit" in PLANT_FIELDS
     assert "sens_energy_total" in FLEX_FIELDS
     assert "sens_energy_export" not in FLEX_FIELDS
@@ -67,7 +67,8 @@ def test_proposal_fields_cover_plant_and_battery_kinds():
     battery_fields = set(fields_for_battery("bat1"))
     proposals = {f: {"marker_name": f"M_{f}", "confidence": 0.5} for f in PROPOSAL_FIELDS}
     for field in plant_fields | battery_fields:
-        if field == "set_ess_source_select":
+        kind = ess_field_kind(field)
+        if kind == "set_ess_source_select" or field == "set_ess_source_select":
             continue
         assert proposal_for_mapping_field(proposals, field), field
 
@@ -161,7 +162,7 @@ def test_resolve_field_select_default_keeps_existing_over_proposal():
 
 def test_build_entity_rows_includes_plant_and_consumers():
     house = {
-        "plant": {"ehal_bindings": {"set_ess_source_select": "Quellenwahl"}},
+        "plant": {"ehal_bindings": {"set_grid_export_power_limit": "ExportLimit"}},
         "profiles": {
             "live": {
                 "id": "live",
@@ -175,7 +176,8 @@ def test_build_entity_rows_includes_plant_and_consumers():
     rows = build_entity_rows(house, "live", components_doc={"batteries": [], "pv_systems": []})
     ids = [r["id"] for r in rows]
     assert ids == [PLANT_ENTITY_ID, "ev1", "wp"]
-    assert rows[0]["bindings"]["set_ess_source_select"] == "Quellenwahl"
+    assert "set_ess_source_select" not in rows[0]["fields"]
+    assert rows[0]["bindings"]["set_grid_export_power_limit"] == "ExportLimit"
     assert "sens_ess_soc" not in rows[0]["fields"]
     assert "set_evcs_max_current" in rows[1]["fields"]
     assert "set_evcs_current" not in rows[1]["fields"]
@@ -201,6 +203,7 @@ def test_build_entity_rows_includes_batteries():
                 "label": "Delta",
                 "type": "powerstation",
                 "backing": "physical",
+                "role": "standby_backup",
                 "ehal_bindings": {},
             },
             {
@@ -225,7 +228,9 @@ def test_build_entity_rows_includes_batteries():
     assert house_row["bindings"][ess_field("house", "sens_ess_soc")] == (
         "Earnie_Batterie_SoC"
     )
-    assert fields_for_battery("house") == house_row["fields"]
+    assert fields_for_battery("house", battery=house_row["battery"]) == house_row["fields"]
+    ps_row = next(r for r in rows if r["id"] == "ps1")
+    assert ess_field("ps1", "set_ess_source_select") in ps_row["fields"]
 
 
 def test_apply_battery_bindings_rejects_virtual_powerstation():

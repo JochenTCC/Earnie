@@ -97,40 +97,148 @@ def _target_battery_for_plant_ess(
     return str(batteries[0]["id"]).strip()
 
 
-# Shared EcoFlow bridge Merker stays on plant (2.7.m).
-_PLANT_ESS_KEEP = frozenset({"set_ess_source_select"})
+_SOURCE_SELECT_KIND = "set_ess_source_select"
+# Phase-1 (single-battery ESS move) skips Quellenwahl; phase-2 targets standby_backup.
+_PLANT_ESS_PHASE2_ONLY = frozenset({_SOURCE_SELECT_KIND})
 
 
-def _collect_plants_with_flat_ess(
-    house_doc: dict[str, Any],
-) -> list[tuple[dict, dict[str, str]]]:
-    """Find plant dicts that still hold movable flat ESS bindings.
-
-    Supports live top-level ``house["plant"]`` and legacy nested
-    ``profiles[].plant`` (list-shaped profiles).
-    """
-    found: list[tuple[dict, dict[str, str]]] = []
+def _iter_plants(house_doc: dict[str, Any]) -> list[dict]:
+    """Top-level plant plus legacy nested ``profiles[].plant``."""
+    plants: list[dict] = []
     top = house_doc.get("plant")
     if isinstance(top, dict):
-        bindings = top.get("ehal_bindings")
-        flat = plant_flat_ess_keys(bindings if isinstance(bindings, dict) else None)
-        movable = {k: v for k, v in flat.items() if k not in _PLANT_ESS_KEEP}
-        if movable:
-            found.append((top, movable))
+        plants.append(top)
     profiles = house_doc.get("profiles")
     if isinstance(profiles, list):
         for profile in profiles:
             if not isinstance(profile, dict):
                 continue
             plant = profile.get("plant")
-            if not isinstance(plant, dict):
-                continue
-            bindings = plant.get("ehal_bindings")
-            flat = plant_flat_ess_keys(bindings if isinstance(bindings, dict) else None)
-            movable = {k: v for k, v in flat.items() if k not in _PLANT_ESS_KEEP}
-            if movable:
-                found.append((plant, movable))
+            if isinstance(plant, dict):
+                plants.append(plant)
+    return plants
+
+
+def _collect_plants_with_flat_ess(
+    house_doc: dict[str, Any],
+) -> list[tuple[dict, dict[str, str]]]:
+    """Find plant dicts that still hold phase-1 movable flat ESS bindings.
+
+    Supports live top-level ``house["plant"]`` and legacy nested
+    ``profiles[].plant`` (list-shaped profiles). Quellenwahl is phase-2 only.
+    """
+    found: list[tuple[dict, dict[str, str]]] = []
+    for plant in _iter_plants(house_doc):
+        bindings = plant.get("ehal_bindings")
+        flat = plant_flat_ess_keys(bindings if isinstance(bindings, dict) else None)
+        movable = {k: v for k, v in flat.items() if k not in _PLANT_ESS_PHASE2_ONLY}
+        if movable:
+            found.append((plant, movable))
     return found
+
+
+def _collect_plants_with_any_flat_ess(
+    house_doc: dict[str, Any],
+) -> list[tuple[dict, dict[str, str]]]:
+    """All plant-flat ESS keys including Quellenwahl (residual checks)."""
+    found: list[tuple[dict, dict[str, str]]] = []
+    for plant in _iter_plants(house_doc):
+        bindings = plant.get("ehal_bindings")
+        flat = plant_flat_ess_keys(bindings if isinstance(bindings, dict) else None)
+        if flat:
+            found.append((plant, flat))
+    return found
+
+def _physical_standby_backup_batteries(
+    components_doc: dict[str, Any],
+) -> list[dict]:
+    from house_config.powerstation import (
+        BACKING_PHYSICAL,
+        ROLE_STANDBY_BACKUP,
+        is_powerstation,
+    )
+
+    raw = components_doc.get("batteries")
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for bat in raw:
+        if not isinstance(bat, dict) or not is_powerstation(bat):
+            continue
+        if str(bat.get("role") or "") != ROLE_STANDBY_BACKUP:
+            continue
+        if str(bat.get("backing") or "") != BACKING_PHYSICAL:
+            continue
+        if not str(bat.get("id") or "").strip():
+            continue
+        out.append(bat)
+    return out
+
+
+def _plant_source_select_address(plant: dict) -> str:
+    bindings = plant.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return ""
+    return str(bindings.get(_SOURCE_SELECT_KIND) or "").strip()
+
+
+def migrate_plant_source_select_to_standby(
+    house_doc: dict[str, Any],
+    components_doc: dict[str, Any],
+    *,
+    label: str = "house_profiles.json",
+) -> tuple[dict[str, Any], dict[str, Any], bool]:
+    """Move plant ``set_ess_source_select`` onto the physical standby_backup battery.
+
+    Requires exactly one physical ``role: standby_backup`` when plant still owns
+    the binding. Idempotent when plant has no Quellenwahl.
+    """
+    house_out = dict(house_doc)
+    comp_out = dict(components_doc)
+    plants_with = [
+        p for p in _iter_plants(house_out) if _plant_source_select_address(p)
+    ]
+    if not plants_with:
+        stamp_data_model(house_out)
+        stamp_data_model(comp_out)
+        return house_out, migrate_components_doc(comp_out), False
+
+    standbys = _physical_standby_backup_batteries(comp_out)
+    if len(standbys) == 0:
+        raise MigrateV4Error(
+            f"{label}: plant has set_ess_source_select but no physical "
+            "standby_backup battery to attach it to."
+        )
+    if len(standbys) > 1:
+        ids = ", ".join(str(b.get("id") or "").strip() for b in standbys)
+        raise MigrateV4Error(
+            f"{label}: plant has set_ess_source_select and "
+            f"{len(standbys)} physical standby_backup batteries ({ids}) — "
+            "move ess.{{slug}}.set_ess_source_select manually."
+        )
+    target_bat = standbys[0]
+    target_id = str(target_bat.get("id") or "").strip()
+    pattern_key = ess_field(target_id, _SOURCE_SELECT_KIND)
+    merged: dict[str, str] = dict(target_bat.get("ehal_bindings") or {})
+    changed = False
+    for plant in plants_with:
+        address = _plant_source_select_address(plant)
+        if not address:
+            continue
+        if pattern_key not in merged:
+            merged[pattern_key] = address
+            changed = True
+        bindings = plant.get("ehal_bindings")
+        if isinstance(bindings, dict) and _SOURCE_SELECT_KIND in bindings:
+            bindings.pop(_SOURCE_SELECT_KIND, None)
+            changed = True
+    if changed:
+        target_bat["ehal_bindings"] = merged
+        if not str(target_bat.get("kind") or "").strip():
+            target_bat["kind"] = DEFAULT_BATTERY_KIND
+    stamp_data_model(house_out)
+    stamp_data_model(comp_out)
+    return house_out, migrate_components_doc(comp_out), changed
 
 
 def migrate_plant_ess_to_components(
@@ -139,10 +247,7 @@ def migrate_plant_ess_to_components(
     *,
     label: str = "house_profiles.json",
 ) -> tuple[dict[str, Any], dict[str, Any], bool]:
-    """Move plant flat ESS bindings onto the single battery's ehal_bindings.
-
-    Leaves ``set_ess_source_select`` on plant (shared EcoFlow bridge, 2.7.m).
-    """
+    """Move plant flat ESS bindings onto the single battery's ehal_bindings."""
     house_out = dict(house_doc)
     comp_out = dict(components_doc)
     flat_plants = _collect_plants_with_flat_ess(house_out)
@@ -184,16 +289,14 @@ def migrate_plant_ess_to_components(
 
 
 def residual_plant_flat_ess_keys(house_doc: dict[str, Any] | None) -> list[str]:
-    """Flat ESS keys still on plant after migrate (except shared source_select)."""
+    """Flat ESS keys still on plant after migrate (incl. Quellenwahl)."""
     keys: list[str] = []
-    for plant, flat in _collect_plants_with_flat_ess(
+    for plant, flat in _collect_plants_with_any_flat_ess(
         house_doc if isinstance(house_doc, dict) else {}
     ):
         del plant  # only need keys
         keys.extend(sorted(flat))
     return sorted(set(keys))
-
-
 def migrate_document(doc: dict[str, Any], *, kind: str) -> dict[str, Any]:
     """Migrate a single document by kind: scenarios|components|generic."""
     version = read_data_model(doc)
@@ -241,6 +344,7 @@ def migrate_pack_docs(
         house_m = out.get("house_profiles.json", house)
         comp_m = out.get("components.json", components)
         house_m, comp_m, _ = migrate_plant_ess_to_components(house_m, comp_m)
+        house_m, comp_m, _ = migrate_plant_source_select_to_standby(house_m, comp_m)
         out["house_profiles.json"] = house_m
         out["components.json"] = comp_m
     return out

@@ -2,6 +2,37 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### `set_ess_source_select` → Pattern B `ess.<id>.*` (2026-10-10)
+
+- [x] **`set_ess_source_select` → Pattern B `ess.<id>.set_ess_source_select`** (follow-up to **2.7.h** / **2.7.m**)
+  - Quellenwahl is a physical `standby_backup` capability only — not plant / house ESS.
+  - Removed plant `ehal_bindings` / plant-flat remap (`_PLANT_FLAT_ALLOWED_KINDS`); `status.json` / Live-Schreiben / Signalliste use `ess.<id>.set_ess_source_select`.
+  - One-off migrate: `migrate_plant_source_select_to_standby` + phase 2 in `scripts/migrate_ess_bindings_once.py`.
+  - Docs: `docs/spec/ehal.md`, `docs/ui/ehal-com.md`, `docs/konfiguration/batterie-pv.md`, EcoFlow guide, `docs/referenz/loxone-signals.md`; plant VI templates drop flat Quellenwahl.
+  - **Out of scope:** Loxone ↔ HA EcoFlow bypass bridge rewire (operator). Productive **2.7.h** dogfood remains under [Bugfixes](Backlog-Bugfixes.md) until that rewire + live acceptance.
+
+### Optimierer-Dienst — earnie.log auto-refresh + Gehe nach Oben (2026-10-10)
+
+- [x] Make an automatic update every 10 sec on page Optimierer-Dienst for the display on earnie.log
+  - [x] Add a "Gehe nach Oben" button near the "Aktualisieren" button at the lower end
+  - `@st.fragment(run_every=10s)` for log body; expander keyed `daemon_log_expander`; scroll via `st.html` to `#daemon-log-top`
+  - Docs: `docs/einrichtung/betrieb.md`, handbook; AppTest: `tests/apptest/test_page_daemon_apptest.py`
+
+### Monitor Chart1 — multi-battery + virtual PS SoC lines (2026-10-10)
+
+- [x] Add additional SOC lines in chart1 of Monitor page for all batteries and also virtual powerstations
+  - Different greens via `soc_color_for_index`; very slim lines for virtual powerstation SoCs (`VIRTUAL_SOC_LINE_WIDTH`)
+  - Entities: house ESS + physical PS + virtual PS; virtual `% = stored_kwh / capacity`; forecast from house battery-plan attribution (mirror of reserve advance)
+  - `optimizer/powerstation_soc_chart.py`; history `soc_percent_by_ess` includes virtual; docs `docs/ui/charts.md`; tests `test_powerstation_soc_chart.py`, `test_chart1_multi_ess_soc.py`
+
+### Bugfix — Silent `loxone_sent` omitted physical powerstation setpoints (2026-10-10)
+
+- [x] **Loxone: silent `loxone_sent` omitted physical powerstation setpoints** — fix implemented (2026-10-09); **Verified live** (2026-10-10, NAS productive Silent cycle `request_optimize` @ `13:11:25`)
+  - Loud `loxone_writes` merge was already done (Erledigt 2026-10-07). Remaining gap: Silent Live-Schreiben / watchdog Soll from `loxone_sent`.
+  - Fix: `planned_powerstation_loxone_sent` in `optimizer/powerstation_live.py` (Merker → wire, no publish); `main.py` merges into `loxone_sent` after `build_sent_loxone_snapshot`. Does not update `_last_powerstation_sent` in silent.
+  - Tests: `tests/test_powerstation_2_7_h.py`, `tests/test_main_loxone_writes.py`, `tests/test_loxone_debug.py`.
+  - Live: `silent_mode=true`, `loxone_writes` empty, all four `Earnie_Delta3_*` setpoints present in `loxone_sent` (`0.0`). Loud restored after acceptance.
+
 ### Bugfix — Loxone `status.json` powerstation keys vs house battery flats (2026-10-10)
 
 - [x] **Loxone `status.json`: physical powerstation limits overwrote the house battery's flat keys** — fix on `main` (commit `b5a658d2` via `fix/status-json-powerstation-keys`); **Verified live** (2026-10-10, NAS productive `192.168.178.35:8541`)

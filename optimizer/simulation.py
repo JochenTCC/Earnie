@@ -31,6 +31,8 @@ from .milp_horizon import (
     coerce_battery_params_list,
 )
 from .sim_chart_rows import (
+    COL_BATTERIE_AKTION,
+    COL_SOC,
     _chart_row_from_controls,
     _chart_row_from_schedule_slot,
     _finalize_chart_rows_for_display,
@@ -42,6 +44,7 @@ from .sim_chart_rows import (
     resolve_sell_price_cent,
     sync_chart_row_netzbezug,
 )
+from .slot_duration import DEFAULT_DT_H
 from .sim_baseline import (
     _flex_kw_from_chart_row,
     _matched_baseline_profile_kw,
@@ -169,6 +172,7 @@ class _HorizonSetup:
     horizon_terminal_soc: float | None
     options: _HorizonOptions
     current_soc_by_id: dict[str, float] | None = None
+    chart_soc_entities: tuple[dict, ...] = ()
 
 
 class _SlotInputs(NamedTuple):
@@ -197,6 +201,26 @@ def _resolve_horizon_batteries(
         agg = battery_params if isinstance(battery_params, dict) else {}
         return [], agg
     return batteries, aggregate_battery_params_for_load(batteries)
+
+
+def _resolve_chart_soc_entities(batteries: list[dict]) -> tuple[dict, ...]:
+    """House MILP batteries plus planning powerstations for Chart1 SoC columns."""
+    from house_config.entity_resolution import battery_params_from_planning
+    from optimizer.powerstation_soc_chart import chart_soc_entities
+
+    powerstations: list[dict] = []
+    try:
+        resolved = config.get_resolved_runtime_settings() or {}
+    except Exception:  # noqa: BLE001
+        resolved = {}
+    for entry in resolved.get("_planning_powerstations") or []:
+        if not isinstance(entry, dict) or not str(entry.get("id") or "").strip():
+            continue
+        try:
+            powerstations.append(battery_params_from_planning(entry))
+        except (KeyError, TypeError, ValueError):
+            powerstations.append(entry)
+    return tuple(chart_soc_entities(batteries, powerstations))
 
 
 def _prepare_horizon_state(
@@ -232,6 +256,7 @@ def _prepare_horizon_state(
             consumers=consumers_cfg,
         )
     batteries, agg_battery = _resolve_horizon_batteries(battery_params)
+    chart_entities = _resolve_chart_soc_entities(batteries)
     horizon_limits = resolve_horizon_consumer_targets_kwh(
         optimization_matrix,
         consumer_daily_targets_kwh,
@@ -266,6 +291,7 @@ def _prepare_horizon_state(
         horizon_terminal_soc=horizon_terminal_soc,
         options=options,
         current_soc_by_id=current_soc_by_id,
+        chart_soc_entities=chart_entities,
     )
 
 
@@ -410,20 +436,104 @@ def _initial_soc_by_ess(
     setup: _HorizonSetup,
     initial_soc: float,
 ) -> dict[str, float]:
-    """Start SoC map for multi-ESS chart columns (no primary substitute for missing)."""
+    """Start SoC map for Chart1 columns (no primary substitute for missing house ESS)."""
     by_id = dict(setup.current_soc_by_id or {})
-    multi = len([b for b in setup.batteries if str(b.get("id") or "").strip()]) > 1
+    entities = list(setup.chart_soc_entities) or [
+        {
+            "id": str(b.get("id") or "").strip(),
+            "label": str(b.get("label") or b.get("id") or "").strip(),
+            "virtual": False,
+        }
+        for b in setup.batteries
+        if str(b.get("id") or "").strip()
+    ]
+    house_ids = {
+        str(b.get("id") or "").strip()
+        for b in setup.batteries
+        if str(b.get("id") or "").strip()
+    }
+    multi_house = len(house_ids) > 1
     out: dict[str, float] = {}
-    for bat in setup.batteries:
-        ess_id = str(bat.get("id") or "").strip()
+    for entity in entities:
+        ess_id = str(entity.get("id") or "").strip()
         if not ess_id:
             continue
         if ess_id in by_id:
             out[ess_id] = float(by_id[ess_id])
-        elif not multi:
+        elif ess_id in house_ids and not multi_house:
             out[ess_id] = float(initial_soc)
-        # else: omit — refuse silent primary SoC for a second ESS
+        # physical PS / second house: omit when missing — no silent primary fill
     return out
+
+
+def _seed_virtual_soc_for_chart(
+    setup: _HorizonSetup,
+    soc_by_ess: dict[str, float],
+) -> list[dict]:
+    """Seed virtual PS SoC into ``soc_by_ess``; return mutable sim entries."""
+    from optimizer.powerstation_soc_chart import (
+        initial_virtual_sim_entries,
+        soc_percent_map_for_entities,
+    )
+    from runtime_store.powerstation_reserves import load_reserve_states
+
+    virtual_ps = [
+        {
+            "id": e["id"],
+            "battery_capacity_kwh": e.get("battery_capacity_kwh", 0.0),
+            "type": "powerstation",
+            "backing": "virtual",
+        }
+        for e in setup.chart_soc_entities
+        if e.get("virtual")
+    ]
+    if not virtual_ps:
+        return []
+    try:
+        states = load_reserve_states()
+    except Exception:  # noqa: BLE001
+        states = {}
+    entries = initial_virtual_sim_entries(
+        powerstations=virtual_ps, reserve_states=states
+    )
+    soc_by_ess.update(
+        soc_percent_map_for_entities(list(setup.chart_soc_entities), entries)
+    )
+    return entries
+
+
+def _advance_chart_soc_after_slot(
+    setup: _HorizonSetup,
+    chart_row: dict,
+    soc_by_ess: dict[str, float],
+    *,
+    slot: dict | None,
+    virtual_entries: list[dict],
+) -> None:
+    """Update house/virtual SoC maps for the next Chart1 attach (physical held)."""
+    from optimizer.powerstation_soc_chart import simulate_virtual_reserve_soc_after_slot
+
+    planned_by = (slot or {}).get("planned_soc_by_ess") or {}
+    if planned_by:
+        for ess_id, soc_val in planned_by.items():
+            soc_by_ess[str(ess_id)] = float(soc_val)
+    else:
+        house_ids = [
+            str(b.get("id") or "").strip()
+            for b in setup.batteries
+            if str(b.get("id") or "").strip()
+        ]
+        if len(house_ids) == 1 and COL_SOC in chart_row:
+            soc_by_ess[house_ids[0]] = float(chart_row[COL_SOC])
+    if virtual_entries:
+        plan_kw = float(chart_row.get(COL_BATTERIE_AKTION, 0.0) or 0.0)
+        soc_by_ess.update(
+            simulate_virtual_reserve_soc_after_slot(
+                battery_plan_kw=plan_kw,
+                dt_h=DEFAULT_DT_H,
+                virtual_entries=virtual_entries,
+            )
+        )
 
 
 def _run_horizon_slots(
@@ -436,6 +546,8 @@ def _run_horizon_slots(
     chart_rows: list[dict] = []
     sim_soc = initial_soc
     soc_by_ess = _initial_soc_by_ess(setup, initial_soc)
+    virtual_entries = _seed_virtual_soc_for_chart(setup, soc_by_ess)
+    chart_entities = list(setup.chart_soc_entities) or list(setup.batteries)
     total_steps = len(setup.matrix)
     delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in setup.consumers_cfg}
     generic_flex_run: dict[str, dict] = {}
@@ -467,11 +579,14 @@ def _run_horizon_slots(
                     setup.consumers_cfg,
                     slot,
                 )
-            attach_ess_soc_columns(chart_row, soc_by_ess, setup.batteries)
-            if slot is not None:
-                planned_by = slot.get("planned_soc_by_ess") or {}
-                for ess_id, soc_val in planned_by.items():
-                    soc_by_ess[str(ess_id)] = float(soc_val)
+            attach_ess_soc_columns(chart_row, soc_by_ess, chart_entities)
+            _advance_chart_soc_after_slot(
+                setup,
+                chart_row,
+                soc_by_ess,
+                slot=slot,
+                virtual_entries=virtual_entries,
+            )
             sim_soc = _advance_delivered_and_flex_run(
                 setup,
                 chart_row,

@@ -32,7 +32,7 @@ multiple isolated battery … One-Way storage type“):
 |---|---|
 | `sens_ess_soc`, `sens_ess_power` | ✅ heute nutzbar (reine Telemetrie/Anzeige) |
 | `set_ess_charge_power_limit` | ✅ heute nutzbar (bestehendes EHAL-Feld) |
-| `set_ess_source_select` *(2.7.h)* | ✅ Earnie schreibt Quellenwahl für `role: standby_backup`; Merker `Earnie_Speicher_Quellenwahl` + Bridge zu `switch.<device>_grid_bypass` |
+| `ess.<id>.set_ess_source_select` *(2.7.h)* | ✅ Earnie schreibt Quellenwahl für physisches `role: standby_backup` (Pattern B); Merker + Bridge zu `switch.<device>_grid_bypass` (Operator verdrahtet nach ID-Umzug) |
 | `set_ess_active_power`, `set_ess_discharge_power_limit`, `set_ess_mode` | ❌ nicht anlegen/mappen — für einen One-Way-Speicher grundsätzlich nicht zutreffend |
 
 **Konsequenz für `components.json` (2.7.g):** Die Delta 3 ist eine Powerstation
@@ -71,10 +71,10 @@ Earnies eigene Anbindung bleibt unverändert auf `ehal.backend=loxone`.
 | `set_ess_charge_power_limit` | `number.<device>_ac_charging_power` (`plug_in_info_ac_in_chg_pow_max`, 100–1500 W) | `Earnie_LadeLeistungs-Limit` | Loxone → HA | ✅ |
 | `get_ess_soc_max` (optional) | `number.<device>_max_charge_level` (50–100 %) | `Earnie_Batterie_SOC_Max` | HA → Loxone | optional |
 | `get_ess_soc_min` (optional) | `number.<device>_min_discharge_level` (0–30 %) | `Earnie_Batterie_SOC_Min` | HA → Loxone | optional |
-| `set_ess_source_select` *(2.7.h)* | `switch.<device>_grid_bypass` (`ban_bypass_en`) | `Earnie_Speicher_Quellenwahl` | Loxone → HA | ✅ bei `role: standby_backup` |
+| `ess.<id>.set_ess_source_select` *(2.7.h)* | `switch.<device>_grid_bypass` (`ban_bypass_en`) | Pattern-B Merker (legacy oft `Earnie_Speicher_Quellenwahl`) | Loxone → HA | ✅ bei physischem `standby_backup` |
 | `set_ess_discharge_power_limit`, `set_ess_active_power`, `set_ess_mode` | – | – | – | ❌ nicht anlegen |
 
-**Polarität `set_ess_source_select` ↔ `switch.<device>_grid_bypass`:** 1:1-Abbildung, kein
+**Polarität `ess.<id>.set_ess_source_select` ↔ `switch.<device>_grid_bypass`:** 1:1-Abbildung, kein
 Invertieren nötig — EHAL `1` (battery) = Switch **ON** = „grid bypass disabled“ = Speicher läuft
 standalone (kein AC-Laden, Verbraucher exklusiv aus Batterie); EHAL `0` (grid) = Switch **OFF** =
 „grid bypass enabled“ = Speicher lädt aus AC-Eingang, Verbraucher im Pass-Through vom Netz. Der
@@ -474,12 +474,13 @@ actions:
 Die Webhook-ID wirkt selbst als Geheimnis — kein zusätzlicher Bearer-Token nötig, passt zum
 `\v`-Platzhalter-Muster der bestehenden Earnie-VO-Templates.
 
-### 6. Quellenwahl-Merker (`set_ess_source_select`, 2.7.h)
+### 6. Quellenwahl-Merker (`ess.<id>.set_ess_source_select`, 2.7.h)
 
-Earnie schreibt `set_ess_source_select` für physische Powerstations mit `role: standby_backup`
-(status.json-Feld / Merker `Earnie_Speicher_Quellenwahl`). Die Bridge Loxone → HA bleibt nötig,
-wenn Earnie auf `ehal.backend=loxone` läuft. Es gibt zwei Wege, den Schaltzustand zu Home Assistant
-zu bringen.
+Earnie schreibt Pattern B `ess.<id>.set_ess_source_select` für physische Powerstations mit
+`role: standby_backup` (status.json-Key gleich dem Pattern-B-Feld). Der Loxone-Merker-Name ist frei
+(historisch oft `Earnie_Speicher_Quellenwahl`); nach dem Umzug von Plant-flach auf Pattern B muss die
+Loxone↔HA-Bridge ggf. neu verdrahtet werden. Die Bridge Loxone → HA bleibt nötig, wenn Earnie auf
+`ehal.backend=loxone` läuft. Es gibt zwei Wege, den Schaltzustand zu Home Assistant zu bringen.
 
 **Zuordnung (gilt für beide Varianten, kein Invertieren nötig):**
 - Wert **1 / an** → Schalter `switch.<device>_grid_bypass` **AN** = Bypass aus, die Batterie läuft

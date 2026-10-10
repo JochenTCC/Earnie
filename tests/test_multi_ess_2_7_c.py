@@ -17,6 +17,7 @@ from runtime_store.migrate_v4 import (
     migrate_components_doc,
     migrate_scenarios_doc,
     migrate_plant_ess_to_components,
+    migrate_plant_source_select_to_standby,
 )
 
 
@@ -172,7 +173,7 @@ def test_migrate_plant_ess_ambiguous_raises():
         migrate_plant_ess_to_components(house, components)
 
 
-def test_migrate_plant_ess_top_level_plant_keeps_source_select():
+def test_migrate_plant_ess_top_level_leaves_source_select_for_phase2():
     house = {
         "earnie_data_model": 4,
         "plant": {
@@ -195,6 +196,7 @@ def test_migrate_plant_ess_top_level_plant_keeps_source_select():
     plant_b = house_out["plant"]["ehal_bindings"]
     assert "sens_ess_soc" not in plant_b
     assert "set_ess_active_power" not in plant_b
+    # Phase 1 skips Quellenwahl; phase 2 moves it onto standby_backup.
     assert plant_b["set_ess_source_select"] == "Earnie_Speicher_Quellenwahl"
     assert plant_b["sens_grid_power_active"] == "Earnie_Netz"
     bat_b = comp_out["batteries"][0]["ehal_bindings"]
@@ -203,6 +205,78 @@ def test_migrate_plant_ess_top_level_plant_keeps_source_select():
         bat_b[ess_field("house", "set_ess_active_power")]
         == "Earnie_Batterie_Sollleistung"
     )
+
+
+def test_migrate_plant_source_select_to_standby():
+    house = {
+        "earnie_data_model": 4,
+        "plant": {
+            "ehal_bindings": {
+                "set_ess_source_select": "Earnie_Speicher_Quellenwahl",
+                "sens_grid_power_active": "Earnie_Netz",
+            }
+        },
+    }
+    components = {
+        "earnie_data_model": 4,
+        "batteries": [
+            {"id": "house", "label": "Haus", "battery_capacity_kwh": 10},
+            {
+                "id": "delta3",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": "standby_backup",
+                "battery_capacity_kwh": 1,
+                "ehal_bindings": {},
+            },
+        ],
+        "pv_systems": [],
+    }
+    house_out, comp_out, changed = migrate_plant_source_select_to_standby(
+        house, components
+    )
+    assert changed
+    assert "set_ess_source_select" not in house_out["plant"]["ehal_bindings"]
+    assert house_out["plant"]["ehal_bindings"]["sens_grid_power_active"] == "Earnie_Netz"
+    standby = next(b for b in comp_out["batteries"] if b["id"] == "delta3")
+    assert standby["ehal_bindings"][
+        ess_field("delta3", "set_ess_source_select")
+    ] == "Earnie_Speicher_Quellenwahl"
+
+
+def test_migrate_plant_source_select_no_standby_raises():
+    house = {
+        "plant": {"ehal_bindings": {"set_ess_source_select": "Q"}},
+    }
+    components = {
+        "batteries": [{"id": "house", "battery_capacity_kwh": 10}],
+    }
+    with pytest.raises(MigrateV4Error, match="no physical"):
+        migrate_plant_source_select_to_standby(house, components)
+
+
+def test_migrate_plant_source_select_ambiguous_standby_raises():
+    house = {
+        "plant": {"ehal_bindings": {"set_ess_source_select": "Q"}},
+    }
+    components = {
+        "batteries": [
+            {
+                "id": "a",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": "standby_backup",
+            },
+            {
+                "id": "b",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": "standby_backup",
+            },
+        ],
+    }
+    with pytest.raises(MigrateV4Error, match="2 physical"):
+        migrate_plant_source_select_to_standby(house, components)
 
 
 def test_physical_max_export_sums_discharge():

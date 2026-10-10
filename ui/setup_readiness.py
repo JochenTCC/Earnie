@@ -432,22 +432,18 @@ def standby_backup_readiness_messages(
     house_doc: dict | None = None,
 ) -> list[str]:
     """German operator warnings for physical standby_backup without Quellenwahl."""
-    from house_config.ehal_bindings import resolve_plant_binding
     from house_config.powerstation import (
         BACKING_PHYSICAL,
         ROLE_STANDBY_BACKUP,
         is_powerstation,
     )
-    from ehal.ess_fields import binding_address
+    from ehal.ess_fields import binding_address, ess_field
 
     components = components_doc or _read_json_document(resolve_components_json_path())
-    house = house_doc or _read_json_document(resolve_house_profiles_json_path())
+    _ = house_doc  # API compat; plant-flat Quellenwahl no longer consulted
     batteries = components.get("batteries")
     if not isinstance(batteries, list):
         return []
-    plant_source = str(
-        resolve_plant_binding(house, "set_ess_source_select") or ""
-    ).strip()
     messages: list[str] = []
     for bat in batteries:
         if not isinstance(bat, dict) or not is_powerstation(bat):
@@ -466,10 +462,9 @@ def standby_backup_readiness_messages(
         if isinstance(bindings, dict):
             addr = binding_address(bindings, bid, "set_ess_source_select")
         if not addr:
-            addr = plant_source
-        if not addr:
             messages.append(
                 f"Powerstation „{bid}“ (Standby-Backup): Mapping für "
-                "`set_ess_source_select` / Quellenwahl fehlt — Funktion nicht verfügbar."
+                f"`{ess_field(bid, 'set_ess_source_select')}` / Quellenwahl fehlt — "
+                "Funktion nicht verfügbar."
             )
     return messages

@@ -79,3 +79,44 @@ def test_build_power_soc_chart_figure_multi_ess_soc_lines():
     fig = build_power_soc_chart_figure(df, show_baseline_soc=False)
     names = {t.name for t in fig.data if str(t.name).startswith("SoC")}
     assert names == {"SoC · Haus", "SoC · Garage"}
+
+
+def test_add_optimized_soc_traces_virtual_ps_uses_slim_line():
+    from optimizer.powerstation_soc_chart import (
+        HOUSE_SOC_LINE_WIDTH,
+        VIRTUAL_SOC_LINE_WIDTH,
+    )
+
+    start = datetime(2025, 3, 15, 12, 0, tzinfo=_TZ)
+    rows = []
+    for index in range(3):
+        slot = start + timedelta(minutes=15 * index)
+        rows.append(
+            {
+                "slot_datetime": slot,
+                "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
+                "Strompreis (Cent/kWh)": 20.0,
+                "Preis extrapoliert": False,
+                "PV-Prognose (kW)": 2.0,
+                "Verbrauch-Prognose (kW)": 1.0,
+                "Geplante Batterie-Aktion (kW)": 0.0,
+                "Netzbezug (kW)": -1.0,
+                "Simulierter SoC (%)": 50.0,
+                "Simulierter SoC Haus (%)": 50.0 + index,
+                "Simulierter SoC VirtPS (%)": 10.0 + index,
+                "Steuerbefehl": "Automatik",
+            }
+        )
+    df = pd.DataFrame(rows)
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    entities = [
+        {"id": "house", "label": "Haus", "virtual": False},
+        {"id": "virt", "label": "VirtPS", "virtual": True},
+    ]
+    add_optimized_soc_traces(fig, df, axis, chart_soc_entities=entities)
+    by_name = {t.name: t for t in fig.data if str(t.name).startswith("SoC")}
+    assert by_name["SoC · Haus"].line.width == HOUSE_SOC_LINE_WIDTH
+    assert by_name["SoC · VirtPS"].line.width == VIRTUAL_SOC_LINE_WIDTH
+    assert by_name["SoC · Haus"].line.color == soc_color_for_index(0)
+    assert by_name["SoC · VirtPS"].line.color == soc_color_for_index(1)

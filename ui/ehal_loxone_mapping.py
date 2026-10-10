@@ -6,7 +6,12 @@ from typing import Any
 import streamlit as st
 
 import config
-from ehal.ess_fields import ESS_BATTERY_MAPPING_KINDS, ess_field, ess_field_kind
+from ehal.ess_fields import (
+    ESS_BATTERY_MAPPING_KINDS,
+    ESS_BATTERY_MAPPING_KINDS_BASE,
+    ess_field,
+    ess_field_kind,
+)
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
 from house_config.ehal_bindings import (
     FILTER_EHAL_FIELDS,
@@ -48,7 +53,7 @@ _SESSION_PENDING_NEW = "ehal_lox_pending_new_marker"
 PLANT_ENTITY_ID = "plant"
 BATTERY_ENTITY_KIND = "battery"
 
-# Plant mapping no longer owns ESS SoC/power/limits (2.7.m); shared EcoFlow bridge stays.
+# Plant mapping no longer owns ESS SoC/power/limits/Quellenwahl (2.7.m / Pattern B).
 _PLANT_ESS_MOVED = frozenset(ESS_BATTERY_MAPPING_KINDS)
 PLANT_TELEMETRY_REQUIRED: tuple[str, ...] = tuple(
     f for f in TELEMETRY_REQUIRED if f not in _PLANT_ESS_MOVED
@@ -67,9 +72,8 @@ PLANT_FIELDS: tuple[str, ...] = (
         if f != "sens_evcs_active_power" and f not in _PLANT_ESS_MOVED
     )
     + _PLANT_ENERGY_OPTIONAL
-    + ("set_ess_source_select", "set_grid_export_power_limit")
+    + ("set_grid_export_power_limit",)
 )
-
 EV_FIELDS: tuple[str, ...] = (
     "sens_evcs_active_power",
     "sens_evcs_connected",
@@ -154,10 +158,33 @@ def _field_label(field: str) -> str:
     return labels.get(field, field)
 
 
-def fields_for_battery(battery_id: str) -> tuple[str, ...]:
-    """Pattern B ESS mapping fields for one battery (excludes shared source_select)."""
-    return tuple(ess_field(battery_id, kind) for kind in ESS_BATTERY_MAPPING_KINDS)
+def _battery_shows_source_select(battery: dict | None) -> bool:
+    """Quellenwahl only on physical standby_backup powerstations."""
+    from house_config.powerstation import (
+        BACKING_PHYSICAL,
+        ROLE_STANDBY_BACKUP,
+        is_powerstation,
+    )
 
+    if not isinstance(battery, dict) or not is_powerstation(battery):
+        return False
+    if str(battery.get("role") or "") != ROLE_STANDBY_BACKUP:
+        return False
+    return str(battery.get("backing") or "") == BACKING_PHYSICAL
+
+
+def fields_for_battery(
+    battery_id: str,
+    *,
+    battery: dict | None = None,
+) -> tuple[str, ...]:
+    """Pattern B ESS mapping fields; Quellenwahl only for physical standby_backup."""
+    kinds = (
+        ESS_BATTERY_MAPPING_KINDS
+        if _battery_shows_source_select(battery)
+        else ESS_BATTERY_MAPPING_KINDS_BASE
+    )
+    return tuple(ess_field(battery_id, kind) for kind in kinds)
 
 def _load_components_for_mapping() -> dict:
     try:
@@ -296,7 +323,7 @@ def build_entity_rows(
                 "id": bid,
                 "kind": BATTERY_ENTITY_KIND,
                 "label": _nonempty(battery.get("label")) or bid,
-                "fields": fields_for_battery(bid),
+                "fields": fields_for_battery(bid, battery=battery),
                 "bindings": binding_map(battery.get("ehal_bindings")),
                 "battery": battery,
             }
@@ -746,9 +773,10 @@ def _render_field_selects(
         st.markdown(f"**{caption}** — `{entity_id}`")
         for field in role_fields:
             # Quellenwahl is opt-in (standby_backup); never pre-fill from heuristics.
+            kind = ess_field_kind(field)
             prop = (
                 {}
-                if field == "set_ess_source_select"
+                if kind == "set_ess_source_select" or field == "set_ess_source_select"
                 else proposal_for_mapping_field(proposals, field)
             )
             existing = str(bindings.get(field) or "")

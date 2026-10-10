@@ -22,4 +22,4 @@ def test_title_and_status_present():
     at = AppTest.from_file(str(_SCRIPT)).run()
     assert at.title[0].value == "🛠️ Optimierer-Dienst"
     labels = {b.label for b in at.button}
-    assert {"Start", "Stop", "Neustart"} <= labels
+    assert {"Start", "Stop", "Neustart", "Gehe nach Oben"} <= labels

@@ -137,7 +137,7 @@ def test_aggregate_two_batteries_pattern_b_and_primary_alias():
             "ehal_bindings": {
                 "sens_grid_power_active": "sensor.grid",
                 "sens_pv_production_active": "sensor.pv",
-                "set_ess_source_select": "switch.source",
+                "set_ess_source_select": "switch.plant_legacy",
             }
         },
         "profiles": {},
@@ -153,16 +153,21 @@ def test_aggregate_two_batteries_pattern_b_and_primary_alias():
             },
             {
                 "id": "ps1",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": "standby_backup",
                 "ehal_bindings": {
                     ess_field("ps1", "sens_ess_soc"): "sensor.ps_soc",
                     ess_field("ps1", "set_ess_charge_power_limit"): "number.ps_charge",
+                    ess_field("ps1", "set_ess_source_select"): "switch.source",
                 },
             },
         ]
     }
     agg = aggregate_ha_entities(house, components_doc=components)
     assert agg["sens_grid_power_active"] == "sensor.grid"
-    assert agg["set_ess_source_select"] == "switch.source"
+    assert "set_ess_source_select" not in agg  # never plant-flat / primary alias
+    assert agg[ess_field("ps1", "set_ess_source_select")] == "switch.source"
     assert agg[ess_field("house", "sens_ess_soc")] == "sensor.house_soc"
     assert agg[ess_field("ps1", "sens_ess_soc")] == "sensor.ps_soc"
     assert agg[ess_field("ps1", "set_ess_charge_power_limit")] == "number.ps_charge"

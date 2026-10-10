@@ -16,27 +16,23 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.7 — Multiple storages and export power limitation
 
-**Order:** next **2.7.l**. **2.7.i** is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish the remaining 2.7 letters on `main`. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**), **2.7.g** (single-use powerstation reserve), **2.7.h** (standby-backup code done; productive dogfood **deferred** until Quellenwahl moves to Pattern B — item below), **2.7.k** (ENTSO-E live prices), **2.7.p** (virtual PS consumer-start release), **2.7.q** (push-only write + Signal list), **2.7.n** (Sessions A–F; field registry + generic Loxone read), and **EHAL unit conversion — no hardcoding** (read + write registry) → [Erledigt](Backlog-Erledigt.md).
+**Order:** next **2.7.l**. **2.7.i** is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish the remaining 2.7 letters on `main`. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**), **2.7.g** (single-use powerstation reserve), **2.7.h** (standby-backup code + Pattern B Quellenwahl done; productive dogfood after operator EcoFlow bridge rewire — see Bugfixes), **2.7.k** (ENTSO-E live prices), **2.7.p** (virtual PS consumer-start release), **2.7.q** (push-only write + Signal list), **2.7.n** (Sessions A–F; field registry + generic Loxone read), and **EHAL unit conversion — no hardcoding** (read + write registry) → [Erledigt](Backlog-Erledigt.md).
 - **Note (deferred from 2.7.n):** `pv.{Kennung}.*` later — keep PV bare on the plant wire. Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Stale Binding walkthrough / draft §9 scrub later.
 
-- [ ] **`set_ess_source_select` → Pattern B `ess.<id>.set_ess_source_select`** (follow-up to **2.7.h** / **2.7.m**; decided 2026-10-10)
-  - **Why:** Quellenwahl is a standby_backup powerstation capability (grid bypass / island), not a house-plant ESS control. Plant-flat ownership + shared EcoFlow-bridge Merker made the contract look like “plant storage” and hid the field after Signalliste replaced entity mapping.
-  - Remove plant `ehal_bindings` / plant-flat wire ownership of `set_ess_source_select`; house ESS never gets the field.
-  - Bind only on physical `role: standby_backup` batteries as `ess.<id>.set_ess_source_select` (activation / Signalliste / Live-Schreiben / `status.json` / capabilities).
-  - Drop the plant-flat remap exception in `optimizer/powerstation_live.py`; update adapters, readiness, VI templates, `docs/spec/ehal.md`, `docs/ui/ehal-com.md`, `docs/konfiguration/batterie-pv.md`, EcoFlow guide.
-  - One-off migrate when plant still has `set_ess_source_select`: copy onto the (single) physical standby_backup battery binding, then clear plant.
-  - **Out of scope here:** repairing the Loxone ↔ HA EcoFlow bypass bridge after the ID move (operator rewires separately). Productive **2.7.h** dogfood waits until this lands.
-
-- [ ] Make an automatic update every 10 sec (or alternatively when log changes) on page Optimierer-Dienst for the display on earnie.log
-  - [ ] Add a "Gehe nach Oben" button near the "Aktualisieren" button at the lower end
-- [ ] Remove any rollback legacy code from former chapters 
-- [ ] Make EHAL naming and documents as loxone agnostic as possible
-- [ ] Make a code review comparing EHAL field mapping / binding for Loxone and HA - search for similarities in different codes and search for duplications and potentials for reuse / unification
 - [ ] Improve readability of Live-Lesen by different colors (search if this topic is mentioned already elsewhere)
   - for optional readings
     - Display in gray
     - Show the fallback default value if available (with hint)
-  - propose colors for other states of Live Lesn values
+  - propose colors for other states of Live Lesen values - here are some ideas from my side:
+    - black for mandatory and uptodate values
+    - blue for cached values that were sent earlier
+    - yellow for outdated cached values
+    - red for not mapped values or with reading error
+
+- [ ] Remove any rollback legacy code from former chapters 
+- [ ] Make EHAL naming and documents as loxone agnostic as possible
+- [ ] Make a code review comparing EHAL field mapping / binding for Loxone and HA - search for similarities in different codes and search for duplications and potentials for reuse / unification
+
 
 - [ ] **EHAL-Com — show expected units + raw vs converted values** (follow-up to EHAL unit conversion registry; triggered by live check 2026-10-10 when Loxone max charge/discharge were still in W)
   - **Signalliste:** per signal, show the expected hub unit (what the backend should send / receive — e.g. Loxone **kW** for ESS power limits) and the EHAL unit (e.g. **W**), sourced from role `loxone` / hub blocks in `share/ehal/roles/*.json` (not hard-coded in the UI).

@@ -283,16 +283,18 @@ def test_powerstation_values_use_pattern_b_keys_and_leave_house_keys_alone() -> 
     assert payload["ess.ecoflow_delta_3.set_ess_mode"] == 1.0
 
 
-def test_shared_quellenwahl_stays_flat() -> None:
+def test_quellenwahl_uses_pattern_b() -> None:
     psl = _clear_powerstation_cache()
-    psl._last_powerstation_sent["set_ess_source_select"] = 1.0
+    key = "ess.ecoflow_delta_3.set_ess_source_select"
+    psl._last_powerstation_sent[key] = 1.0
     try:
         payload = build_loxone_status_payload(
             loxone_sent={}, consumers=[], plant_io_index={}, now_ts=100.0
         )
     finally:
         psl._last_powerstation_sent.clear()
-    assert payload["set_ess_source_select"] == 1.0
+    assert payload[key] == 1.0
+    assert "set_ess_source_select" not in payload
 
 
 def test_two_powerstations_do_not_collide() -> None:

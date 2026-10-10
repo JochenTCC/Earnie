@@ -201,6 +201,48 @@ def get_ha_adapter() -> HaAdapter:
     return _ha_adapter
 
 
+def _standby_source_select_merker() -> str:
+    """Pattern B Quellenwahl Merker from the physical standby_backup battery."""
+    from ehal.ess_fields import binding_address
+    from house_config.powerstation import (
+        BACKING_PHYSICAL,
+        ROLE_STANDBY_BACKUP,
+        ehal_mappable_batteries,
+        is_powerstation,
+    )
+
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return ""
+        doc = load_components_document(path)
+        raw = doc.get("batteries") if isinstance(doc, dict) else []
+    except Exception:  # noqa: BLE001
+        return ""
+    for bat in ehal_mappable_batteries(raw if isinstance(raw, list) else []):
+        if not is_powerstation(bat):
+            continue
+        if str(bat.get("role") or "") != ROLE_STANDBY_BACKUP:
+            continue
+        if str(bat.get("backing") or "") != BACKING_PHYSICAL:
+            continue
+        bid = str(bat.get("id") or "").strip()
+        if not bid:
+            continue
+        bindings = bat.get("ehal_bindings")
+        addr = binding_address(
+            bindings if isinstance(bindings, dict) else {},
+            bid,
+            "set_ess_source_select",
+        )
+        if addr:
+            return addr
+    return ""
+
+
 def get_loxone_adapter() -> LoxoneAdapter:
     global _loxone_adapter
     from house_config.ehal_bindings import resolve_plant_binding
@@ -209,7 +251,8 @@ def get_loxone_adapter() -> LoxoneAdapter:
     ev = _first_ev_loxone_bindings()
     house = load_house_doc()
     export_out = resolve_plant_binding(house, "set_grid_export_power_limit")
-    ess_source_select = resolve_plant_binding(house, "set_ess_source_select")
+    # Capability / residual flat write_setpoints: Pattern B standby Merker only.
+    ess_source_select = _standby_source_select_merker()
     cfg = LoxoneConfig(
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "loxone-home"),
         charge_power_name=str(config.get("LOXONE_TARGET_CHARGE_POWER_NAME") or ""),

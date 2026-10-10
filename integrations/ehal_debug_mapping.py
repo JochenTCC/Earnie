@@ -78,15 +78,15 @@ BATTERY_ESS_LIVE_WRITE_KINDS: tuple[str, ...] = (
     "set_ess_mode",
 )
 
+BATTERY_SOURCE_SELECT_KIND = "set_ess_source_select"
+
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_ess_active_power",
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
-    "set_ess_source_select",
     "set_grid_export_power_limit",
 )
-
 EV_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_evcs_active_power",
     "sens_evcs_connected",
@@ -250,11 +250,7 @@ def canonicalize_live_display_field(
     batteries = (
         has_mappable_live_batteries() if has_batteries is None else has_batteries
     )
-    if (
-        batteries
-        and is_plant_flat_ess_field(name)
-        and name != "set_ess_source_select"
-    ):
+    if batteries and is_plant_flat_ess_field(name):
         return None
     return name
 
@@ -403,6 +399,29 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
     return fields
 
 
+def _append_standby_source_select_fields(
+    fields: list[str], batteries: list[dict]
+) -> None:
+    from ehal.ess_fields import ess_field
+    from house_config.powerstation import (
+        BACKING_PHYSICAL,
+        ROLE_STANDBY_BACKUP,
+        is_powerstation,
+    )
+
+    for battery in batteries:
+        bid = str(battery.get("id") or "").strip()
+        if not bid:
+            continue
+        if not is_powerstation(battery):
+            continue
+        if str(battery.get("role") or "") != ROLE_STANDBY_BACKUP:
+            continue
+        if str(battery.get("backing") or "") != BACKING_PHYSICAL:
+            continue
+        fields.append(ess_field(bid, BATTERY_SOURCE_SELECT_KIND))
+
+
 def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
     """Canonical Live-Schreiben ids (plant + batteries + EV + flex Freigabe)."""
     from ehal.ess_fields import ess_field
@@ -410,20 +429,24 @@ def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
     from ehal.qualified_ids import qualified_plant_id
     from settings.ehal_marker_resolve import marker_flex_enable
 
-    if network_backend:
-        return list(NETWORK_LIVE_WRITE_FIELDS)
     batteries = _all_live_batteries()
+    if network_backend:
+        fields = [
+            f for f in NETWORK_LIVE_WRITE_FIELDS if f != BATTERY_SOURCE_SELECT_KIND
+        ]
+        _append_standby_source_select_fields(fields, batteries)
+        return fields
     has_batteries = bool(batteries)
     fields: list[str] = []
     if not has_batteries:
         fields.extend(BATTERY_ESS_LIVE_WRITE_KINDS)
-    fields.append("set_ess_source_select")
     fields.append(qualified_plant_id("set_grid_export_power_limit"))
     for battery in batteries:
         bid = str(battery.get("id") or "").strip()
         if not bid:
             continue
         fields.extend(ess_field(bid, kind) for kind in BATTERY_ESS_LIVE_WRITE_KINDS)
+    _append_standby_source_select_fields(fields, batteries)
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
         if not cid:
@@ -506,6 +529,11 @@ def _append_plant_binding_io(
 def _append_battery_write_io(index: dict[str, str]) -> None:
     """Pattern B ``ess.{slug}.set_*`` Merkers from components batteries."""
     from ehal.ess_fields import binding_address, ess_field
+    from house_config.powerstation import (
+        BACKING_PHYSICAL,
+        ROLE_STANDBY_BACKUP,
+        is_powerstation,
+    )
 
     for battery in _all_live_batteries():
         bid = str(battery.get("id") or "").strip()
@@ -514,7 +542,14 @@ def _append_battery_write_io(index: dict[str, str]) -> None:
         bindings = battery.get("ehal_bindings")
         if not isinstance(bindings, dict):
             continue
-        for kind in BATTERY_ESS_LIVE_WRITE_KINDS:
+        kinds = list(BATTERY_ESS_LIVE_WRITE_KINDS)
+        if (
+            is_powerstation(battery)
+            and str(battery.get("role") or "") == ROLE_STANDBY_BACKUP
+            and str(battery.get("backing") or "") == BACKING_PHYSICAL
+        ):
+            kinds.append(BATTERY_SOURCE_SELECT_KIND)
+        for kind in kinds:
             field = ess_field(bid, kind)
             io_name = binding_address(bindings, bid, kind)
             if not io_name:
@@ -558,9 +593,7 @@ def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dic
     _append_plant_binding_io(
         index, field="set_grid_export_power_limit", house=house
     )
-    _append_plant_binding_io(index, field="set_ess_source_select", house=house)
     _append_battery_write_io(index)
-
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
         if not cid:

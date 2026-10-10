@@ -609,6 +609,13 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         market_price_cent = round(float(current_market_item["k_act"]), 4)
         epex_price_cent = round(float(current_market_item["price_buy"]), 4)
         from integrations.ehal_write import load_published_records
+        from optimizer.powerstation_soc_chart import load_virtual_soc_by_id
+
+        soc_percent_by_ess = {
+            str(ess_id): round(float(soc), 2)
+            for ess_id, soc in (current_soc_by_id or {}).items()
+        }
+        soc_percent_by_ess.update(load_virtual_soc_by_id())
 
         run_payload = {
             "source": "main.py",
@@ -622,10 +629,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "ehal_writes": ehal_writes,
             "ehal_published": load_published_records(),
             "soc_percent": round(float(current_soc), 2),
-            "soc_percent_by_ess": {
-                str(ess_id): round(float(soc), 2)
-                for ess_id, soc in (current_soc_by_id or {}).items()
-            },
+            "soc_percent_by_ess": soc_percent_by_ess,
             "reported_soc_percent": round(float(reported_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
             "market_price_cent": market_price_cent,

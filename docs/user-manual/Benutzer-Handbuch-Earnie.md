@@ -396,7 +396,7 @@ Bei Loxone optional: `python -m scripts.verify_loxone_setup`.
 
 Im Produktivbetrieb läuft der Optimierer dauerhaft (Docker: mit der UI; lokal: `python main.py`) im **15-Minuten-Takt** (oder auf Anforderung durch das Smarthome-Backend). Daemon und Optimierungsalgo nutzen **Viertelstunden-Slots**.
 
-Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart, Umschalter **Silent / Loud** und Dienst-Log (`earnie.log`, Level-Filter, Standard INFO+). Details: [Betrieb](../einrichtung/betrieb.md).
+Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart, Umschalter **Silent / Loud** und Dienst-Log (`earnie.log`, Level-Filter, Standard INFO+, Auto-Aktualisierung alle 10 s, **Gehe nach Oben**). Details: [Betrieb](../einrichtung/betrieb.md).
 
 ### Monitor
 

@@ -76,6 +76,9 @@ def merge_ess_bindings_into_plant(
             parsed = parse_ess_pattern_b(field)
             if parsed and parsed[0] == slug and bat_id == primary:
                 kind = parsed[1]
+                # Quellenwahl stays Pattern B only (standby_backup; never plant flat).
+                if kind == "set_ess_source_select":
+                    continue
                 if kind not in out:
                     out[kind] = addr
     return out

@@ -83,7 +83,7 @@
       "match": "exact",
       "entity_kind": "plant",
       "ehal_field": "set_ess_source_select",
-      "notes": "2.7.h standby_backup: 0 = grid, 1 = battery island (EcoFlow grid_bypass)."
+      "notes": "Legacy Merker name; bind as ess.{standby_id}.set_ess_source_select on physical standby_backup (manual; 0=grid, 1=battery island)."
     },
     {
       "name": "Earnie_EinspeiseLeistungs-Limit",

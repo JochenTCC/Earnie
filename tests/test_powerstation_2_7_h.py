@@ -237,24 +237,32 @@ def test_write_standby_source_selects_loxone_marker():
     from optimizer import powerstation_live as psl
 
     psl._last_powerstation_sent.clear()
-    with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
+    planning = [
+        {
+            "id": "delta3",
+            "type": "powerstation",
+            "backing": "physical",
+            "role": ROLE_STANDBY_BACKUP,
+            "ehal_bindings": {
+                ess_field("delta3", "set_ess_source_select"): "Earnie_Speicher_Quellenwahl",
+            },
+        }
+    ]
+    with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
         "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
     ), patch(
         "integrations.ehal_live.is_ha_backend", return_value=False
     ), patch(
         "integrations.ehal_live.is_ehal_network_backend", return_value=False
     ), patch(
-        "house_config.ehal_bindings.resolve_plant_binding",
-        return_value="Earnie_Speicher_Quellenwahl",
-    ), patch(
-        "optimizer.live_export_limit.load_house_doc", return_value={}
-    ), patch(
         "integrations.loxone_writes._publish_setpoint_traced"
     ) as send:
         send.return_value = MagicMock(success=True)
         psl.write_standby_source_selects({"delta3": 1})
         send.assert_called()
-        assert psl.last_powerstation_sent().get("set_ess_source_select") == 1.0
+        assert psl.last_powerstation_sent().get(
+            ess_field("delta3", "set_ess_source_select")
+        ) == 1.0
 
 
 def test_ha_charge_does_not_remap_to_house_battery():
@@ -374,8 +382,35 @@ def test_loxone_charge_only_when_discharge_unmapped():
     assert "set_ess_charge_power_limit" not in sent
 
 
-def test_ha_source_select_still_uses_plant_flat():
-    """EcoFlow bridge: plant-flat set_ess_source_select remains allowed."""
+def test_ha_source_select_uses_pattern_b_only():
+    """Quellenwahl writes Pattern B entity key; plant-flat is not a fallback."""
+    from optimizer import powerstation_live as psl
+
+    pattern = ess_field("delta3", "set_ess_source_select")
+    adapter = MagicMock()
+    adapter.cfg.entities = {pattern: "switch.delta_3_grid_bypass"}
+    adapter.cfg.adapter_id = "ha-test"
+    adapter.write_mapped_fields = MagicMock(return_value=None)
+    persisted: list = []
+
+    with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
+        "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
+    ), patch(
+        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+    ), patch(
+        "integrations.ehal_live.is_ha_backend", return_value=True
+    ), patch(
+        "integrations.ehal_live.get_ha_adapter", return_value=adapter
+    ), patch(
+        "integrations.ehal_live.persist_write_error", side_effect=persisted.append
+    ):
+        psl.write_standby_source_selects({"delta3": 1})
+
+    adapter.write_mapped_fields.assert_called_once_with({pattern: 1.0})
+    assert persisted == []
+
+
+def test_ha_source_select_no_plant_flat_fallback():
     from optimizer import powerstation_live as psl
 
     adapter = MagicMock()
@@ -397,8 +432,9 @@ def test_ha_source_select_still_uses_plant_flat():
     ):
         psl.write_standby_source_selects({"delta3": 1})
 
-    adapter.write_mapped_fields.assert_called_once_with({"set_ess_source_select": 1.0})
-    assert persisted == []
+    adapter.write_mapped_fields.assert_not_called()
+    assert len(persisted) == 1
+    assert "set_ess_source_select" in persisted[0]["failed_fields"]
 
 
 def test_cycle_powerstation_charge_kw_defaults_idle_mapped_pack():
@@ -433,15 +469,12 @@ def test_cycle_standby_source_selects_defaults_grid_when_bound():
             "type": "powerstation",
             "backing": "physical",
             "role": ROLE_STANDBY_BACKUP,
-            "ehal_bindings": {},
+            "ehal_bindings": {
+                ess_field(slug, "set_ess_source_select"): "Earnie_Speicher_Quellenwahl",
+            },
         }
     ]
-    with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
-        "house_config.ehal_bindings.resolve_plant_binding",
-        return_value="Earnie_Speicher_Quellenwahl",
-    ), patch(
-        "optimizer.live_export_limit.load_house_doc", return_value={}
-    ):
+    with patch.object(psl, "_planning_powerstations", return_value=planning):
         out = psl.cycle_standby_source_selects({})
     assert out == {slug: SOURCE_GRID}
 

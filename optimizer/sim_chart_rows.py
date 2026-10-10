@@ -29,7 +29,11 @@ def attach_ess_soc_columns(
     soc_by_ess: dict[str, float] | None,
     batteries: list[dict] | None,
 ) -> None:
-    """Write per-ESS SoC columns when more than one battery is configured."""
+    """Write per-entity SoC columns when ≥2 Chart1 SoC entities are present.
+
+    ``batteries`` may be house ESS only or the expanded chart entity list
+    (house + physical/virtual powerstations).
+    """
     bats = [b for b in (batteries or []) if isinstance(b, dict)]
     if len(bats) < 2 or not soc_by_ess:
         return

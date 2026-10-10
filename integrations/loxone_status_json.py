@@ -315,14 +315,14 @@ def build_loxone_status_payload(
     }
     payload.update(_plant_status_keys(sent, plant_only))
     # 2.7.h / 2.7.g physical powerstation writes cached by live hooks: Pattern-B
-    # ``ess.{slug}.{kind}`` keys, plus the shared flat Quellenwahl. Flat limit / mode keys
-    # stay the house battery's and are never overwritten by a powerstation.
+    # ``ess.{slug}.{kind}`` only (incl. Quellenwahl). Flat limit / mode keys stay
+    # the house battery's and are never overwritten by a powerstation.
     try:
         from ehal.ess_fields import parse_ess_pattern_b
         from optimizer.powerstation_live import last_powerstation_sent
 
         for key, value in last_powerstation_sent().items():
-            if parse_ess_pattern_b(key) or key == "set_ess_source_select":
+            if parse_ess_pattern_b(key):
                 payload[key] = float(value)
     except Exception:  # noqa: BLE001 — status JSON must never fail
         pass

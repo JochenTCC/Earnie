@@ -19,14 +19,10 @@ from runtime_store.powerstation_reserves import set_trigger
 
 logger = logging.getLogger(__name__)
 
-# Last written powerstation Merker values for Loxone status.json, keyed by the
-# status.json key: Pattern-B ``ess.{slug}.{kind}`` per powerstation, flat
-# ``set_ess_source_select`` for the shared EcoFlow-bridge Merker. Never a flat limit /
+# Last written powerstation Merker values for Loxone status.json, keyed by
+# Pattern-B ``ess.{slug}.{kind}`` (incl. Quellenwahl). Never a flat house limit /
 # mode key — those belong to the house battery.
 _last_powerstation_sent: dict[str, float] = {}
-
-# Plant-flat fallback allowed only for EcoFlow-bridge Quellenwahl (not charge/discharge).
-_PLANT_FLAT_ALLOWED_KINDS = frozenset({"set_ess_source_select"})
 
 
 def last_powerstation_sent() -> dict[str, float]:
@@ -37,10 +33,9 @@ def _status_key(field_key: str, kind: str) -> str:
     """Key under which a written powerstation value appears in ``status.json``."""
     from ehal.ess_fields import parse_ess_pattern_b
 
-    if kind in _PLANT_FLAT_ALLOWED_KINDS:
-        return kind  # shared plant Merker (EcoFlow bridge)
-    return field_key if parse_ess_pattern_b(field_key) else kind
-
+    if parse_ess_pattern_b(field_key):
+        return field_key
+    return kind or field_key
 
 def _planning_powerstations() -> list[dict]:
     try:
@@ -385,16 +380,7 @@ def _binding_for_ps(ps_id: str, kind: str) -> str:
             if flat:
                 return flat
         break
-    # EcoFlow bridge: plant Merker for Quellenwahl only — never charge/discharge.
-    if kind not in _PLANT_FLAT_ALLOWED_KINDS:
-        return ""
-    try:
-        from house_config.ehal_bindings import resolve_plant_binding
-        from optimizer.live_export_limit import load_house_doc
-
-        return str(resolve_plant_binding(load_house_doc(), kind) or "").strip()
-    except Exception:  # noqa: BLE001
-        return ""
+    return ""
 
 
 def _resolve_marker(field_key: str) -> tuple[str, str]:
@@ -468,19 +454,12 @@ def _ha_remap_powerstation_fields(
     fields: dict[str, float],
     entities: dict[str, str],
 ) -> tuple[dict[str, float], list[str]]:
-    """Map Pattern-B keys to HA entities; plant-flat only for source_select."""
-    from ehal.ess_fields import ess_field_kind, parse_ess_pattern_b
-
+    """Map Pattern-B keys to HA entities; no plant-flat fallback."""
     remapped: dict[str, float] = {}
     missing: list[str] = []
     for key, value in fields.items():
         if key in entities:
             remapped[key] = value
-            continue
-        parsed = parse_ess_pattern_b(key)
-        kind = parsed[1] if parsed else (ess_field_kind(key) or key)
-        if kind in _PLANT_FLAT_ALLOWED_KINDS and kind in entities:
-            remapped[kind] = value
             continue
         missing.append(key)
         logger.warning(
@@ -488,7 +467,6 @@ def _ha_remap_powerstation_fields(
             key,
         )
     return remapped, missing
-
 
 def _write_powerstation_ha(fields: dict[str, float], ehal_live: Any) -> list:
     adapter = ehal_live.get_ha_adapter()

@@ -1,11 +1,13 @@
-"""One-off: move plant-flat ESS bindings onto the single house battery (2.7.m).
+"""One-off: move plant-flat ESS bindings onto batteries (2.7.m / Quellenwahl).
 
 Usage:
   python -m scripts.migrate_ess_bindings_once --config-dir earnie_env/config
   python -m scripts.migrate_ess_bindings_once --config-dir PATH --dry-run
 
-Keeps ``set_ess_source_select`` on plant (shared EcoFlow bridge). Stays on
-``earnie_data_model`` 4. Delete this script after successful env migration.
+Phase 1: movable plant-flat ESS → single battery Pattern B ``ess.{slug}.*``.
+Phase 2: plant ``set_ess_source_select`` → physical ``standby_backup``
+``ess.{id}.set_ess_source_select``. Stays on ``earnie_data_model`` 4.
+Delete this script after successful env migration.
 """
 from __future__ import annotations
 
@@ -40,8 +42,9 @@ def main(argv: list[str] | None = None) -> None:
     _configure_console_utf8()
     parser = argparse.ArgumentParser(
         description=(
-            "Move plant-flat ESS ehal_bindings onto the single battery "
-            "(Pattern B ess.{slug}.*); leave set_ess_source_select on plant."
+            "Move plant-flat ESS ehal_bindings onto batteries "
+            "(Pattern B ess.{slug}.*); move set_ess_source_select onto "
+            "the physical standby_backup battery."
         )
     )
     parser.add_argument(
@@ -59,6 +62,7 @@ def main(argv: list[str] | None = None) -> None:
     from runtime_store.migrate_v4 import (
         MigrateV4Error,
         migrate_plant_ess_to_components,
+        migrate_plant_source_select_to_standby,
         residual_plant_flat_ess_keys,
     )
 
@@ -73,8 +77,11 @@ def main(argv: list[str] | None = None) -> None:
     house = _load_json(house_path)
     components = _load_json(components_path)
     try:
-        house_out, comp_out, changed = migrate_plant_ess_to_components(
+        house_out, comp_out, changed_ess = migrate_plant_ess_to_components(
             house, components, label=str(house_path)
+        )
+        house_out, comp_out, changed_src = migrate_plant_source_select_to_standby(
+            house_out, comp_out, label=str(house_path)
         )
     except MigrateV4Error as exc:
         raise SystemExit(str(exc)) from exc
@@ -82,14 +89,15 @@ def main(argv: list[str] | None = None) -> None:
     residual = residual_plant_flat_ess_keys(house_out)
     if residual:
         raise SystemExit(
-            "Plant still has flat ESS bindings after migrate "
-            f"(except set_ess_source_select): {', '.join(residual)}. "
+            "Plant still has flat ESS bindings after migrate: "
+            f"{', '.join(residual)}. "
             "Move them to batteries[].ehal_bindings (ess.{{slug}}.*) manually "
-            "or reduce to a single battery."
+            "or reduce to a single battery / one physical standby_backup."
         )
 
+    changed = changed_ess or changed_src
     if not changed:
-        print("No plant-flat ESS bindings to move; nothing to do.")
+        print("No plant-flat ESS / Quellenwahl bindings to move; nothing to do.")
         return
 
     if args.dry_run:

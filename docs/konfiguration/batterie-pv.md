@@ -56,11 +56,11 @@ Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formul
 
 ### Standby-Backup (`role: standby_backup`, 2.7.h)
 
-Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earnie schaltet die Versorgung der angeschlossenen Verbraucher **preisgetrieben** zwischen Netz-Pass-Through und Batterie-Insel um (`set_ess_source_select`: `0` = Netz, `1` = Batterie). In günstigen Slots darf die Powerstation parallel laden (`set_ess_charge_power_limit`).
+Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earnie schaltet die Versorgung der angeschlossenen Verbraucher **preisgetrieben** zwischen Netz-Pass-Through und Batterie-Insel um (`ess.<id>.set_ess_source_select`: `0` = Netz, `1` = Batterie). In günstigen Slots darf die Powerstation parallel laden (`set_ess_charge_power_limit`).
 
 - **Nur `backing: physical`:** Virtuelle Standby-Instanzen werden zur Laufzeit übersprungen (kein geschützter Floor auf der Hausbatterie — ggf. globales `battery_min_soc` erhöhen).
-- **Harte Voraussetzung:** Capability `supports_ess_source_select` und Mapping von `set_ess_source_select` (EcoFlow: HA-Switch `switch.<device>_grid_bypass`; bei `ehal.backend=loxone` Merker `Earnie_Speicher_Quellenwahl` → Bridge zu HA, siehe [EcoFlow Delta 3](../einrichtung/ecoflow-delta3-loxone.md)).
-- **Quellenwahl vs. Ladegrenzen:** `set_ess_source_select` darf das **Anlagen-**Binding nutzen (Plant-Merker / Plant-HA-Entity — EcoFlow-Bridge). `set_ess_charge_power_limit` / `set_ess_discharge_power_limit` der physischen Powerstation brauchen ein **eigenes** Binding an der Powerstation und greifen **nicht** auf die Hausbatterie-Mappings zurück (sonst würden Haus-Lade-/Entladegrenzen überschrieben).
+- **Harte Voraussetzung:** Capability `supports_ess_source_select` und Mapping von `ess.<id>.set_ess_source_select` an der physischen Standby-Backup-Batterie (EcoFlow: HA-Switch `switch.<device>_grid_bypass`; bei `ehal.backend=loxone` Pattern-B-Merker → Bridge zu HA, siehe [EcoFlow Delta 3](../einrichtung/ecoflow-delta3-loxone.md)). Plant und Hausspeicher haben kein Quellenwahl-Feld.
+- **Quellenwahl vs. Ladegrenzen:** Quellenwahl und Lade-/Entladegrenzen der physischen Powerstation brauchen jeweils ein **eigenes** Pattern-B-Binding an der Powerstation und greifen **nicht** auf die Hausbatterie-Mappings zurück (sonst würden Haus-Lade-/Entladegrenzen überschrieben).
 - Reserve-Größe: angeschlossene Last × teure Stunden im Horizont (kein Energie-pro-Lauf-Lernen wie bei `single_use`).
 
 Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
@@ -72,7 +72,7 @@ Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active`. Di
 | `battery_inverter` (Default) | optimizing / charging / discharging | Design C1 inkl. Automatik (`set_ess_mode = 0`) |
 | `isolated` | charging / discharging / standby | Nie Automatik; Hold als Standby/Entladesperre |
 
-EHAL-Bindings je Batterie: Pattern B `ess.{slug}.*` in `batteries[].ehal_bindings`. In [EHAL-Com](../ui/ehal-com.md) erscheinen Hausspeicher und **physische** Powerstations als Mapping-Entities; **virtuelle** Powerstations haben kein eigenes Binding (nutzen die Hausbatterie). Speichern schreibt `components.json`, nicht `house_profiles.json`. Die Anlagen-Zeile behält nur die gemeinsame Quellenwahl `set_ess_source_select` (`Earnie_Speicher_Quellenwahl` für die EcoFlow-Bridge). Übrige ESS-Felder gehören zur Batterie-Zeile; Loxone-Mehrspeicher-Merker mit Slug-Infix `Earnie_Batterie_<Slug>_…`. Einmal-Migration plant-flach → Batterie: `python -m scripts.migrate_ess_bindings_once --config-dir <config>`.
+EHAL-Bindings je Batterie: Pattern B `ess.{slug}.*` in `batteries[].ehal_bindings`. In [EHAL-Com](../ui/ehal-com.md) erscheinen Hausspeicher und **physische** Powerstations als Mapping-Entities; **virtuelle** Powerstations haben kein eigenes Binding (nutzen die Hausbatterie). Speichern schreibt `components.json`, nicht `house_profiles.json`. Quellenwahl ist `ess.{slug}.set_ess_source_select` nur an physischen `standby_backup`-Batterien (nicht auf der Anlagen-Zeile). Übrige ESS-Felder gehören zur Batterie-Zeile; Loxone-Mehrspeicher-Merker mit Slug-Infix `Earnie_Batterie_<Slug>_…`. Einmal-Migration plant-flach → Batterie (inkl. Quellenwahl → Standby-Backup): `python -m scripts.migrate_ess_bindings_once --config-dir <config>`.
 
 ## Steuerbarkeit (`control`)
 

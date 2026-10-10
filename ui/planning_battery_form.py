@@ -480,7 +480,7 @@ def _render_powerstation_meta(session_scope: str) -> tuple[str, str, list[str]]:
         key=_scoped_key(session_scope, "planning_battery_role"),
         help=(
             "Standby-Backup (preisbewusste Mini-UPS für Dauerläufer) erfordert "
-            "Backing „Physisch“ und EHAL-Quellenwahl (`set_ess_source_select`). "
+            "Backing „Physisch“ und EHAL-Quellenwahl (`ess.<id>.set_ess_source_select`). "
             "Virtuell wird zur Laufzeit ignoriert — ggf. globales SOC-Min der Hausbatterie erhöhen."
         ),
     )

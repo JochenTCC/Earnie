@@ -206,7 +206,7 @@ def _add_optimized_soc_segment(
         hover_labels=_soc_hover_labels_for_times(
             soc_x, ctx["uhrzeit"], ctx["axis"].starts,
         ),
-        line=dict(color=ctx["color"], width=2.5),
+        line=dict(color=ctx["color"], width=float(ctx.get("line_width") or 2.5)),
     )
 
 
@@ -258,6 +258,7 @@ def add_optimized_soc_trace(
     soc_column: str = "Simulierter SoC (%)",
     name: str = "SoC",
     color: str | None = None,
+    line_width: float = 2.5,
 ) -> None:
     if soc_column not in df.columns:
         return
@@ -276,6 +277,7 @@ def add_optimized_soc_trace(
         "battery_params": battery_params,
         "name": name,
         "color": color or COLOR_SOC,
+        "line_width": float(line_width),
     }
     for part_start, part_end in _soc_split_points(ctx["length"], history_slot_count):
         part_extrap_start, part_extrap_end = _part_extrap_offsets(
@@ -294,6 +296,22 @@ def add_optimized_soc_trace(
             )
 
 
+def _resolve_virtual_soc_labels(
+    chart_soc_entities: list[dict] | None,
+) -> set[str]:
+    from optimizer.powerstation_soc_chart import (
+        load_chart_soc_entities,
+        virtual_soc_labels,
+    )
+
+    if chart_soc_entities is not None:
+        return virtual_soc_labels(chart_soc_entities)
+    try:
+        return virtual_soc_labels(load_chart_soc_entities())
+    except Exception:  # noqa: BLE001
+        return set()
+
+
 def add_optimized_soc_traces(
     fig: go.Figure,
     df: pd.DataFrame,
@@ -304,8 +322,14 @@ def add_optimized_soc_traces(
     history_slot_count: int | None = None,
     chart_now: datetime | None = None,
     battery_params: dict | None = None,
+    chart_soc_entities: list[dict] | None = None,
 ) -> None:
-    """One SoC line (legacy) or one line per ESS when multi-battery columns exist."""
+    """One SoC line (legacy) or one line per ESS/PS when multi columns exist."""
+    from optimizer.powerstation_soc_chart import (
+        HOUSE_SOC_LINE_WIDTH,
+        VIRTUAL_SOC_LINE_WIDTH,
+    )
+
     series = discover_ess_soc_series(df)
     if not series:
         add_optimized_soc_trace(
@@ -320,7 +344,14 @@ def add_optimized_soc_traces(
             battery_params=battery_params,
         )
         return
+    virtual_labels = _resolve_virtual_soc_labels(chart_soc_entities)
     for index, (column, legend) in enumerate(series):
+        label = legend.removeprefix("SoC · ").strip()
+        width = (
+            VIRTUAL_SOC_LINE_WIDTH
+            if label in virtual_labels
+            else HOUSE_SOC_LINE_WIDTH
+        )
         add_optimized_soc_trace(
             fig,
             df,
@@ -334,6 +365,7 @@ def add_optimized_soc_traces(
             soc_column=column,
             name=legend,
             color=soc_color_for_index(index),
+            line_width=width,
         )
 
 

@@ -244,9 +244,8 @@ def test_char_ps_wire_w_to_kw(kind: str, value_w: float, wire: float) -> None:
 def test_char_ps_status_key_pattern_b_not_flat() -> None:
     field = "ess.ecoflow_delta_3.set_ess_charge_power_limit"
     assert _status_key(field, "set_ess_charge_power_limit") == field
-    assert _status_key("set_ess_source_select", "set_ess_source_select") == (
-        "set_ess_source_select"
-    )
+    src = "ess.ecoflow_delta_3.set_ess_source_select"
+    assert _status_key(src, "set_ess_source_select") == src
 
 
 def test_char_ps_status_does_not_overwrite_house_flat() -> None:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 from pathlib import Path
 
 import streamlit as st
@@ -27,7 +28,8 @@ _HELP = (
     "Produktions-Steuerwerte schreibt nur der laufende Dienst. "
     "Vor dem Start wird geprüft, ob bereits eine Instanz läuft (`runtime/main.lock`). "
     "Das Dienst-Log (`earnie.log`) zeigt die letzten Zeilen zum Diagnose-Blick; "
-    "Log-Level sind filterbar (Standard: INFO und höher)."
+    "Log-Level sind filterbar (Standard: INFO und höher); die Anzeige aktualisiert "
+    "sich alle 10 Sekunden."
 )
 
 _STATE_LABELS = {
@@ -41,6 +43,9 @@ _LOG_TAIL_READ_BYTES = 256 * 1024
 _LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 _LOG_LEVELS_DEFAULT = ["INFO", "WARNING", "ERROR", "CRITICAL"]
 _LOG_LEVEL_RE = re.compile(r"\[(DEBUG|INFO|WARNING|ERROR|CRITICAL)\]")
+_LOG_FRAGMENT_RUN_EVERY = timedelta(seconds=10)
+_LOG_ANCHOR_ID = "daemon-log-top"
+_LOG_SCROLL_PENDING_KEY = "daemon_log_scroll_top"
 
 
 def parse_log_level(line: str) -> str | None:
@@ -158,39 +163,81 @@ def _render_silent_mode_toggle() -> None:
     st.rerun()
 
 
+def _scroll_to_log_top() -> None:
+    """Scroll main pane to the log anchor (st.html is not iframed)."""
+    st.html(
+        f"""
+        <script>
+        (function() {{
+          const el = document.getElementById('{_LOG_ANCHOR_ID}');
+          if (el) {{
+            el.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+            return;
+          }}
+          const main = window.parent.document.querySelector('section.main');
+          if (main) {{
+            main.scrollTo({{ top: 0, behavior: 'smooth' }});
+          }}
+        }})();
+        </script>
+        """,
+        unsafe_allow_javascript=True,
+    )
+
+
+def _render_filtered_log(text: str, levels: set[str]) -> None:
+    filtered = filter_log_lines(text, levels)
+    total = len(text.splitlines())
+    shown = len(filtered.splitlines()) if filtered else 0
+    if shown < total:
+        st.caption(f"Anzeige: {shown} von {total} Zeilen (Level-Filter).")
+    st.code(filtered, language="log")
+
+
+@st.fragment(run_every=_LOG_FRAGMENT_RUN_EVERY)
+def _render_log_tail_fragment() -> None:
+    st.markdown(
+        f'<div id="{_LOG_ANCHOR_ID}"></div>',
+        unsafe_allow_html=True,
+    )
+    if st.session_state.pop(_LOG_SCROLL_PENDING_KEY, False):
+        _scroll_to_log_top()
+    selected = st.multiselect(
+        "Log-Level",
+        options=list(_LOG_LEVELS),
+        default=_LOG_LEVELS_DEFAULT,
+        key="daemon_log_levels",
+        help="Zeilen ohne [LEVEL] bleiben immer sichtbar.",
+    )
+    if st.button("Aktualisieren", key="daemon_log_refresh_top"):
+        st.rerun()
+    text, err = read_earnie_log_tail(log_file())
+    if err:
+        st.info(err)
+    elif not text:
+        st.caption("Logdatei ist leer.")
+    else:
+        _render_filtered_log(text, set(selected))
+    col_refresh, col_top = st.columns(2)
+    with col_refresh:
+        if st.button("Aktualisieren", key="daemon_log_refresh_bottom", width="stretch"):
+            st.rerun()
+    with col_top:
+        if st.button("Gehe nach Oben", key="daemon_log_go_top", width="stretch"):
+            st.session_state[_LOG_SCROLL_PENDING_KEY] = True
+            st.rerun()
+
+
 def _render_log_section() -> None:
     st.subheader("Dienst-Log")
     path = log_file()
     with st.expander(
         f"earnie.log — letzte {_LOG_TAIL_LINES} Zeilen",
         expanded=False,
+        key="daemon_log_expander",
     ):
-        st.caption(f"Pfad: `{path}`")
-        selected = st.multiselect(
-            "Log-Level",
-            options=list(_LOG_LEVELS),
-            default=_LOG_LEVELS_DEFAULT,
-            key="daemon_log_levels",
-            help="Zeilen ohne [LEVEL] bleiben immer sichtbar.",
-        )
-        if st.button("Aktualisieren", key="daemon_log_refresh_top"):
-            st.rerun()
-        text, err = read_earnie_log_tail(path)
-        if err:
-            st.info(err)
-            return
-        if not text:
-            st.caption("Logdatei ist leer.")
-            return
-        levels = set(selected)
-        filtered = filter_log_lines(text, levels)
-        total = len(text.splitlines())
-        shown = len(filtered.splitlines()) if filtered else 0
-        if shown < total:
-            st.caption(f"Anzeige: {shown} von {total} Zeilen (Level-Filter).")
-        st.code(filtered, language="log")
-        if st.button("Aktualisieren", key="daemon_log_refresh_bottom"):
-            st.rerun()
+        st.caption(f"Pfad: `{path}` · Auto-Aktualisierung alle 10 s")
+        _render_log_tail_fragment()
 
 
 def _warn_ehal_write_error() -> None:

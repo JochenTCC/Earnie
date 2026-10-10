@@ -48,11 +48,11 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Setpoints (limits)      | `set_grid_export_power_limit`      | no*      | **W**; non-negative max grid export (magnitude, like ESS limits); `0` = no export; unconstrained = plant maximum (PV kWp sum + max discharge of force-dischargeable ESS; fallback 1 000 000 W) (2.7.a) |
 | Setpoints (limits)      | `set_evcs_max_current`             | no*      | **A**; non-negative amount (EV charging target/max current)                                                    |
 | Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores it |
-| Setpoints (source)      | `set_ess_source_select`            | no*      | **0** = grid pass-through, **1** = battery island; powerstation `standby_backup` (2.7.h); omit for house ESS |
+| Setpoints (source)      | `ess.<id>.set_ess_source_select`   | no*      | **0** = grid pass-through, **1** = battery island; Pattern B on physical `standby_backup` only (2.7.h); omit for house ESS / plant |
 | Setpoints (extended)    | `set_evcs_mode`                    | no*      | Enum: `off`                                                                                                     |
 | Capability flags        | `supports_ess_write`               | yes      | boolean; ESS setpoints may be written                                                                          |
 | Capability flags        | `supports_evcs_current`            | yes      | boolean; `set_evcs_max_current` may be written                                                                  |
-| Capability flags        | `supports_ess_source_select`       | no       | boolean; `set_ess_source_select` may be written                                                                 |
+| Capability flags        | `supports_ess_source_select`       | no       | boolean; Pattern B Quellenwahl (`ess.<id>.set_ess_source_select`) may be written                                 |
 
 
 A setpoint document must contain **at least one** of the setpoint fields. Omitted fields generally mean **"leave unchanged"** (partial updates are allowed). **Exception for sticky backends (Loxone/HA):** the Merker keeps the last value — automatic is `set_ess_mode = 0`, not "setpoint power omitted". Full device roles including `get_`* / additional `sens_evcs_`*: see §C.
@@ -116,7 +116,7 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 ### C.2 ESS (Battery)
 
-**Multi-ESS / per-battery mapping (2.7.c / 2.7.m):** In EHAL-Com each mappable battery is its own entity (house batteries and **physical** powerstations). **Virtual** powerstations are omitted — they inherit the house ESS and have no EHAL bindings. Bindings are stored on `components.json` → `batteries[].ehal_bindings` as Pattern B `ess.{slug}.sens_ess_soc` / `set_ess_*` / `get_ess_*` (slug = battery id). The plant row keeps grid/PV/load/export plus the shared EcoFlow bridge `set_ess_source_select` (`Earnie_Speicher_Quellenwahl`); other ESS fields are not editable on plant. Runtime still synthesizes flat primary-battery aliases (`sens_ess_soc`, …) for legacy adapters. Multi-ESS Loxone Merker titles use slug infix `Earnie_Batterie_<Slug>_…`.
+**Multi-ESS / per-battery mapping (2.7.c / 2.7.m):** In EHAL-Com each mappable battery is its own entity (house batteries and **physical** powerstations). **Virtual** powerstations are omitted — they inherit the house ESS and have no EHAL bindings. Bindings are stored on `components.json` → `batteries[].ehal_bindings` as Pattern B `ess.{slug}.sens_ess_soc` / `set_ess_*` / `get_ess_*` (slug = battery id). Quellenwahl is `ess.{slug}.set_ess_source_select` on physical `role: standby_backup` only (not on plant or house ESS). The plant row keeps grid/PV/load/export. Runtime still synthesizes flat primary-battery aliases (`sens_ess_soc`, …) for legacy adapters (not Quellenwahl). Multi-ESS Loxone Merker titles use slug infix `Earnie_Batterie_<Slug>_…`.
 
 
 | Area / meaning                  | Type          | EHAL value name                                              | OpenEMS                                       | evcc (YAML attribute)          | Victron GX / EVCS (Modbus)                                                                                              | Loxone / Loxone extra                                        |
@@ -260,7 +260,7 @@ Units and signs: see §B. Full role matrix: §C.
 
 ### Live Write
 
-`**set_***` (plant / EV) as well as flex **enable** (`consumer|heatpump|pool.<slug>.set_enable`, `evcs.<id>.set_evcs_*`). Grid export write is `grid.meter.set_grid_export_power_limit`. With Pattern B batteries, plant bare `set_ess_*` (except shared `set_ess_source_select`) are omitted in favour of `ess.<id>.*`. The table lists **all** expected write fields; values/success come from the last `main.py` run (`runtime/optimizer_run_state.json`); unmapped rows have an empty mapping column. Same identity columns:
+`**set_***` (plant / EV) as well as flex **enable** (`consumer|heatpump|pool.<slug>.set_enable`, `evcs.<id>.set_evcs_*`). Grid export write is `grid.meter.set_grid_export_power_limit`. With Pattern B batteries, plant bare `set_ess_*` are omitted in favour of `ess.<id>.*` (Quellenwahl = `ess.<id>.set_ess_source_select` on physical standby_backup). The table lists **all** expected write fields; values/success come from the last `main.py` run (`runtime/optimizer_run_state.json`); unmapped rows have an empty mapping column. Same identity columns:
 
 
 | Column                                            | Meaning                                                                                       |
@@ -283,7 +283,7 @@ Under **Live-Schreiben**, the **Schreibtest** expander lists all activated write
 **Voraussetzungen**
 
 - Silent-Modus **aus** (gleiche Sperre wie der Daemon). Bei Silent sind die Buttons deaktiviert.
-- Zeilen = alle gemappten Live-Schreiben-Felder (inkl. `set_ess_source_select`, `set_evcs_mode`, Flex `set_enable`).
+- Zeilen = alle gemappten Live-Schreiben-Felder (inkl. `ess.<id>.set_ess_source_select`, `set_evcs_mode`, Flex `set_enable`).
 - Bestätigungsdialog vor jedem Live-Schreiben.
 
 **Grenzen (nützliche / sichere Werte)**

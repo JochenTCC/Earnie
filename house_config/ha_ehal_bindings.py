@@ -152,8 +152,8 @@ def aggregate_ha_entities(
     """Field→entity_id map for ``HaAdapter``: plant + first EV + battery Pattern B.
 
     Primary battery ESS bindings are also aliased to flat ``sens_ess_*`` /
-    ``set_ess_*`` keys for legacy callers (2.7.m). ``set_ess_source_select``
-    stays plant-owned (shared EcoFlow bridge).
+    ``set_ess_*`` keys for legacy callers (2.7.m). Quellenwahl is Pattern B
+    on physical standby_backup only (never plant-owned).
     """
     from ehal.ess_fields import is_plant_flat_ess_field
     from house_config.ess_bindings import merge_ess_bindings_into_plant
@@ -165,8 +165,8 @@ def aggregate_ha_entities(
     for field in HA_ALL_FIELDS:
         if field in HA_EV_FIELDS:
             continue
-        # Battery-owned ESS flats come from components; keep plant source_select.
-        if is_plant_flat_ess_field(field) and field != "set_ess_source_select":
+        # Battery-owned ESS (incl. Quellenwahl) come from components Pattern B.
+        if is_plant_flat_ess_field(field):
             continue
         value = plant_bindings.get(field)
         if value:
@@ -187,6 +187,7 @@ def aggregate_ha_entities(
             if addr:
                 out[key] = addr
     # Legacy plant-flat ESS until migrate_ess_bindings_once (battery Pattern B wins).
+    # Never resurrect plant Quellenwahl — that moves to standby_backup Pattern B.
     for field, value in plant_bindings.items():
         if (
             is_plant_flat_ess_field(field)
@@ -196,7 +197,6 @@ def aggregate_ha_entities(
         ):
             out[field] = value
     return canonicalize_ha_entity_keys(out)
-
 
 def _batteries_for_aggregate(components_doc: dict | None) -> list[dict]:
     from house_config.powerstation import ehal_mappable_batteries

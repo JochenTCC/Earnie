@@ -278,14 +278,14 @@ def _attach_history_ess_soc_columns(row: dict[str, Any], entry: dict[str, Any]) 
     by_ess = entry.get("soc_percent_by_ess")
     if not isinstance(by_ess, dict) or not by_ess:
         return
+    from optimizer.powerstation_soc_chart import load_chart_soc_entities
     from optimizer.sim_chart_rows import attach_ess_soc_columns
 
-    get_list = getattr(config, "get_battery_params_list", None)
-    batteries = get_list() if callable(get_list) else []
+    entities = load_chart_soc_entities()
     attach_ess_soc_columns(
         row,
         {str(k): float(v) for k, v in by_ess.items()},
-        batteries if isinstance(batteries, list) else None,
+        entities,
     )
 
 

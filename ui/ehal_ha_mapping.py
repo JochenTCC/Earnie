@@ -344,9 +344,12 @@ def _render_field_selects(
         caption = role_group_label(role_id) if role_id != "other" else "Felder"
         st.markdown(f"**{caption}** — `{entity_id}`")
         for field in role_fields:
+            from ehal.ess_fields import ess_field_kind
+
+            kind = ess_field_kind(field)
             proposed = (
                 ""
-                if field == "set_ess_source_select"
+                if kind == "set_ess_source_select" or field == "set_ess_source_select"
                 else _proposed_entity_id(proposals, field)
             )
             default = resolve_field_select_default(

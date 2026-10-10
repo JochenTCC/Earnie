@@ -279,7 +279,7 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | `set_ess_charge_power_limit`      | Write     | `Earnie_LadeLeistungs-Limit`                     | Max. charge power (true limit)                                                              |
 | `set_ess_discharge_power_limit`   | Write     | `Earnie_EntladeLeistungs-Limit`                  | Max. discharge power (true limit)                                                           |
 | `set_ess_mode`                    | Write     | `Earnie_Steuerbefehl`                            | Sticky: always write; `0` = automatic; battery only; OpenEMS ignores                        |
-| `set_ess_source_select`           | Write     | `Earnie_Speicher_Quellenwahl`                    | 2.7.h / 2.7.m shared plant Merker (EcoFlow bridge); `0` = grid pass-through, `1` = battery-only island (capability `supports_ess_source_select`) |
+| `ess.<id>.set_ess_source_select`  | Write     | Pattern-B Merker (z. B. legacy `Earnie_Speicher_Quellenwahl`) | 2.7.h physical `standby_backup` only; `0` = grid pass-through, `1` = battery-only island (capability `supports_ess_source_select`); not on plant |
 | `set_grid_export_power_limit`     | Write     | `Earnie_EinspeiseLeistungs-Limit`                | Max export kW (magnitude ≥ 0); `0` = no export; unconstrained = PV kWp + max battery discharge kW (2.7.a) |
 | *(watchdog)*                       | Read      | `Earnie_Heartbeat`                               | Pattern B; not an EHAL field                                                                |
 

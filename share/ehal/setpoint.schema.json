@@ -39,7 +39,7 @@
     "set_ess_source_select": {
       "type": "number",
       "enum": [0, 1],
-      "description": "Route locally-attached consumers: 0 = grid pass-through (charge allowed), 1 = battery-only island (no AC charge). Powerstation standby_backup (2.7.h); omit for bidirectional house ESS."
+      "description": "Route locally-attached consumers: 0 = grid pass-through (charge allowed), 1 = battery-only island (no AC charge). Live wire is Pattern B ess.{id}.set_ess_source_select on physical standby_backup (2.7.h); omit for house ESS / plant."
     },
     "set_evcs_max_current": {
       "type": "number",
