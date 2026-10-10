@@ -44,6 +44,8 @@ def test_display_version_marks_candidate(monkeypatch):
     assert display_version() == "2.6.0-alpha.7 (candidate)"
     monkeypatch.setattr(version_mod, "__version__", "2.5.3")
     assert display_version() == "2.5.3"
+    monkeypatch.setattr(version_mod, "__version__", "2.7.0-dev.34")
+    assert display_version() == "2.7.0-dev.34"
 
 
 def test_rewrite_version_file_for_image_preserves_helpers(tmp_path):

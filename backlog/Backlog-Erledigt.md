@@ -2,6 +2,20 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Loxone `status.json` powerstation keys vs house battery flats (2026-10-10)
+
+- [x] **Loxone `status.json`: physical powerstation limits overwrote the house battery's flat keys** — fix on `main` (commit `b5a658d2` via `fix/status-json-powerstation-keys`); **Verified live** (2026-10-10, NAS productive `192.168.178.35:8541`)
+  - Cause: `_write_powerstation_loxone` cached under flat field kinds; `build_loxone_status_payload` wrote into house flat keys (last write won). VI Pattern-B Checks never got data.
+  - Fix: cache/emit Pattern B `ess.<id>.<kind>`; only shared `set_ess_source_select` stays plant-flat. Tests in `tests/test_loxone_status_json.py` / `tests/test_powerstation_2_7_h.py`.
+  - Live: `status.json` keeps house flats (`set_ess_charge_power_limit=5.0`, …) beside `ess.15_kwh_speicher.*` and `ess.ecoflow_delta_3.*`; flat `set_ess_source_select` present. Miniserver VIs are Pattern-B titled (`ess.ecoflow_delta_3.set_ess_charge_power_limit`, …); legacy `Earnie_Delta3_*` / bare flat Merker names 404. House VI `5.000 kW` matches status (no DestValHigh sign invert). EHAL-Com Schreibtest published `ess.ecoflow_delta_3.set_ess_charge_power_limit=1000.0` with Miniserver fetch ack; house flats stayed at 5.0 (no overwrite).
+
+### Bugfix — Physical powerstation ESS writes plant-flat fallback (2026-10-10)
+
+- [x] **Physical powerstation ESS writes fall back to the house battery's plant-flat entity** — fix implemented (2026-10-06); **Verified live** (2026-10-10, NAS productive; Loxone hub units for max charge/discharge corrected to kW)
+  - `optimizer/powerstation_live.py`: no plant-flat remap for charge/discharge (HA + Loxone); explicit exception only for `set_ess_source_select` (EcoFlow bridge — to be removed when Quellenwahl is Pattern B); missing binding → skip + `runtime/ehal_write_error.json`
+  - Docs: `docs/konfiguration/batterie-pv.md`; regression: `tests/test_powerstation_2_7_h.py` (`test_ha_charge_does_not_remap_to_house_battery`, Loxone charge isolation, HA source_select plant-flat)
+  - Follow-up (feature): EHAL-Com Signalliste expected units + Live-Lesen/Schreiben raw vs converted columns → [Backlog.md](Backlog.md) Version 2.7
+
 ### EHAL unit conversion — no hardcoding (write registry + hub audit) (2026-10-10)
 
 - [x] **EHAL unit conversion — no hardcoding (all backends, read + write):** After **2.7.n Session F** (Loxone **read** registry), finish writes + remaining hubs so adapters never embed `* 1000` / `/ 1000` / ad-hoc sign flips per field.
@@ -46,7 +60,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Powerstation savings study 2025 (2026-10-09)
 
-- [x] **Savings study** (done 2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive Earnie dogfood still open (see [Bugfixes](Backlog-Bugfixes.md) Verifications Pending).
+- [x] **Savings study** (done 2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive dogfood deferred until Quellenwahl is Pattern B (see [Backlog.md](Backlog.md) Version 2.7).
 
 ### Loxone-verify hydrate/wait + warn on missing VO (2026-10-09)
 
@@ -223,7 +237,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Runtime: [`optimizer/powerstation_standby.py`](../optimizer/powerstation_standby.py) + live write path; Loxone Merker `Earnie_Speicher_Quellenwahl` / `VI_Earnie_Plant.xml`; readiness warnings in setup UI
   - Docs: `ehal.md`, `loxone-signals.md`, `batterie-pv.md`, EcoFlow bridge guide; tests `tests/test_powerstation_2_7_h.py`
   - Spec: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.2 (`Earnie-Projekt`)
-  - **Not yet verified on productive Earnie** — live dogfood tracked under [Bugfixes](Backlog-Bugfixes.md) → Verifications Pending
+  - **Productive dogfood deferred (2026-10-10):** wait for `set_ess_source_select` → Pattern B `ess.<id>.*` in [Backlog.md](Backlog.md) Version 2.7; EcoFlow Loxone↔HA bridge rewire is separate. Then re-open live acceptance under [Bugfixes](Backlog-Bugfixes.md).
 
 ### Bugfix — New battery from Powerstation selection crash (2026-10-06)
 
@@ -282,7 +296,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Hidden → inherit charge/efficiency/SoC/threshold from main ESS; discharge `0`, standby `0`, `limits_from_live` false, `control: limits_only`, wear off; fixed defaults if no Hausbatterie
   - Physical Powerstations unchanged (full form)
   - Docs: [`docs/konfiguration/batterie-pv.md`](../docs/konfiguration/batterie-pv.md) § Virtuelle Powerstation; tests in `tests/test_powerstation_2_7_g.py`
-  - Superseded by full **2.7.g** archive entry above; **2.7.h** archived 2026-10-06 (productive verification still pending)
+  - Superseded by full **2.7.g** archive entry above; **2.7.h** archived 2026-10-06 (productive dogfood deferred — Pattern B Quellenwahl move)
 
 ### Powerstation savings study 2.7.g / 2.7.h (2026-10-05)
 

@@ -277,7 +277,10 @@ def advance_reserve_after_slot(
 ) -> dict[str, Any]:
     """Update stored energy / state after a planning slot (or trigger handoff)."""
     states = load_reserve_states()
-    entry = get_or_init_state(states, powerstation_id, target_kwh=0.0)
+    # Preserve configured/learned target — never overwrite with placeholder 0.
+    entry = get_or_init_state(
+        states, powerstation_id, target_kwh=0.0, update_target=False
+    )
     target = max(0.0, float(entry.get("target_kwh") or 0.0))
     stored = max(0.0, float(entry.get("stored_kwh") or 0.0))
     state = str(entry.get("state") or STATE_EMPTY)

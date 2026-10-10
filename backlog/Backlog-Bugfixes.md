@@ -23,20 +23,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **2.7.h — productive Earnie dogfood** (code archived in Erledigt; not yet verified live)
-  - Physical `role: standby_backup` + `set_ess_source_select` (EcoFlow Delta 3 / Loxone Merker `Earnie_Speicher_Quellenwahl` → HA `switch.*_grid_bypass`): price-driven grid vs battery island flips, reserve sizing, charge in cheap slots
-  - After successful live check: remove this item; add **Verified live** note on the **2.7.h** Erledigt entry
+- **Note:** **2.7.h** productive dogfood skipped (2026-10-10) until `set_ess_source_select` moves to Pattern B `ess.<id>.*` — see [Backlog.md](Backlog.md) Version 2.7. Re-open dogfood after that change (and after the EcoFlow bridge is rewired).
 
-- [ ] **Physical powerstation ESS writes fall back to the house battery's plant-flat entity** — fix implemented (2026-10-06); live acceptance pending before **2.7.h** dogfood with limits
-  - `optimizer/powerstation_live.py`: no plant-flat remap for charge/discharge (HA + Loxone); explicit exception only for `set_ess_source_select` (EcoFlow bridge); missing binding → skip + `runtime/ehal_write_error.json`
-  - Docs: `docs/konfiguration/batterie-pv.md`; regression: `tests/test_powerstation_2_7_h.py` (`test_ha_charge_does_not_remap_to_house_battery`, Loxone charge isolation, HA source_select plant-flat)
-
-- [ ] **Loxone `status.json`: physical powerstation limits overwrote the house battery's flat keys** — fix implemented on branch `fix/status-json-powerstation-keys`; live acceptance pending
-  - Cause: `_write_powerstation_loxone` cached sent values under the flat field kind (`set_ess_charge_power_limit`, `set_ess_mode`, …) and `build_loxone_status_payload` wrote them into the house battery's flat keys; with two powerstations the last write won. Only the Virtual HTTP Input mirror was affected, not direct `/dev/sps/io/` writes. The per-battery `ess.<id>.*` check keys of a VI never received data.
-  - Fix: `optimizer/powerstation_live.py` caches under the Pattern B key `ess.<id>.<kind>` (`_status_key`); only the shared EcoFlow-bridge `set_ess_source_select` stays flat. `integrations/loxone_status_json.py` emits Pattern B keys and no longer touches the flat limit / mode keys.
-  - Tests: `tests/test_loxone_status_json.py` (house keys untouched, two powerstations, shared Quellenwahl flat, write path end to end); `tests/test_powerstation_2_7_h.py` adjusted. Four of them fail without the fix.
-  - **Note:** after the fix the VI commands `Earnie_Delta3_*` receive mirror values for the first time. A VI scale with `DestValHigh="-100"` inverts the sign of such a mirrored value; check the scaling before rollout.
-  - After a successful live check: remove this item → `Backlog-Erledigt.md`.
+- [ ] **Virtual reserve: `advance_reserve_after_slot` / `set_trigger` wiped `target_kwh` to 0** — fix implemented (2026-10-10); live acceptance pending
+  - Symptom (Nas productive, Geschirrspüler / `virtual_gs`): dishwasher running, MILP ZWANGSLADEN toward ~11.8% (≈1 kWh refill), but `powerstation_reserves.json` stayed `empty` / `stored_kwh=0` / `target_kwh=0`.
+  - Cause: `get_or_init_state(..., target_kwh=0.0)` always overwrote the configured target on every slot advance / trigger latch, so charge credit was capped at `min(0, …)`.
+  - Fix: `update_target=False` for advance + trigger; collect/learn still refresh the target.
+  - Tests: `tests/test_powerstation_2_7_p.py` (`test_advance_and_trigger_preserve_target_kwh`).
 
 - [ ] **Loxone: silent `loxone_sent` omitted physical powerstation setpoints** — fix implemented (2026-10-09); live acceptance pending
   - Loud `loxone_writes` merge was already done (Erledigt 2026-10-07). Remaining gap: Silent Live-Schreiben / watchdog Soll from `loxone_sent`.
@@ -46,9 +39,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] Don't show "main.py nicht aktiv" on Monitor page while main.py is running and currently optimizing
-
-- [ ] 2026-10-06 05:37:40 [WARNING] (main:199) - SoC-Lesung korrigiert: Miniserver 11.0% → 100.0% (Integration aus 100.0%, Batterie 0.52 kW).  --> Why this?
-- [ ] 2026-10-08 07:07:14 [WARNING] (data.outdoor_forecast:209) - Außentemperatur-Prognose fehlgeschlagen (503 Server Error: Service Unavailable for url: https://api.open-meteo.com/v1/forecast?latitude=47.40409024399311&longitude=9.742743769241422&hourly=temperature_2m&forecast_days=3&timezone=auto) – konstante Fallback-Temperatur 14.10 °C  --> This warning is quite often - please check
 
 - [ ] EcoFlow Delta 3 bridge: Miniserver self-write of a Virtual Input is overwritten by HA (2026-10-07, not analysed yet)
   - Setup: the Miniserver writes its own Virtual Input via a Virtual Output command (`/dev/sps/io/<Input>/\v`, device = the Miniserver itself), e.g. bypass state (`Delta3_Grid_ByPass`) and charge limit (`Delta3_P_ChargeLimit`). HA mirrors these inputs through the Loxone integration (PyLoxone) and drives the EcoFlow entities from automations (`docs/einrichtung/ecoflow-delta3-loxone.md`, steps 5/6).

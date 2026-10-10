@@ -17,6 +17,7 @@ from ehal import (
     validate_telemetry,
     validate_write_error,
 )
+from ehal.ess_fields import is_plant_flat_ess_field
 from ehal.field_registry import (
     PLANT_OPTIONAL_READ_FIELDS,
     PLANT_REQUIRED_READ_FIELDS,
@@ -29,11 +30,62 @@ from ehal.functions import (
     incomplete_function_fields,
     incomplete_function_messages,
 )
-from ehal.qualified_ids import qualified_plant_id
+from ehal.qualified_ids import qualified_battery_id, qualified_plant_id
 from ehal.validate import EhalValidationError
 from integrations import loxone_client
 
 logger = logging.getLogger(__name__)
+
+
+def primary_ess_id_for_plant_read() -> str:
+    """Primary house battery id for plant-flat ESS kinds → Pattern B exchange IDs."""
+    try:
+        from house_config.components_store import load_components_document
+        from house_config.powerstation import ehal_mappable_batteries, primary_house_battery
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if path:
+            doc = load_components_document(path)
+            raw = doc.get("batteries") if isinstance(doc, dict) else []
+            mapped = ehal_mappable_batteries(raw if isinstance(raw, list) else [])
+            primary = primary_house_battery(mapped)
+            bid = str((primary or {}).get("id") or "").strip()
+            if bid:
+                return bid
+    except Exception:  # noqa: BLE001 — read path must stay usable
+        logger.debug("primary ESS id from components failed", exc_info=True)
+    try:
+        import settings.config as config
+        from house_config.powerstation import primary_house_battery
+
+        get_list = getattr(config, "get_battery_params_list", None)
+        batteries = get_list() if callable(get_list) else []
+        primary = primary_house_battery(
+            [b for b in (batteries or []) if isinstance(b, dict)]
+        )
+        return str((primary or {}).get("id") or "").strip()
+    except Exception:  # noqa: BLE001
+        logger.debug("primary ESS id from battery params failed", exc_info=True)
+        return ""
+
+
+def exchange_id_for_plant_read(field: str) -> str | None:
+    """Exchange QID for a plant telemetry kind; ESS → ``ess.<primary>.<kind>``.
+
+    Returns ``None`` when an ESS kind has no primary house battery (optional
+    fields omit; required fields raise in ``_require_field``).
+    """
+    kind = str(field or "").strip()
+    if not kind:
+        return None
+    if is_plant_flat_ess_field(kind):
+        primary = primary_ess_id_for_plant_read()
+        if not primary:
+            return None
+        return qualified_battery_id(primary, kind)
+    return qualified_plant_id(kind)
+
 
 SETPOINT_FIELDS = (
     "set_ess_active_power",
@@ -167,7 +219,9 @@ class LoxoneAdapter:
         spec = loxone_spec(field)
         if spec is None:
             return None
-        qid = qualified_plant_id(field)
+        qid = exchange_id_for_plant_read(field)
+        if qid is None:
+            return None
         raw = loxone_client.fetch_loxone_generic_value(qid)
         return apply_loxone_read(raw, spec)
 
@@ -358,7 +412,12 @@ class LoxoneAdapter:
         spec = loxone_spec(field)
         if spec is None:
             raise LoxoneAdapterError(f"Loxone conversion missing for {field}")
-        qid = qualified_plant_id(field)
+        qid = exchange_id_for_plant_read(field)
+        if qid is None:
+            raise LoxoneAdapterError(
+                f"Loxone ESS read {field} needs primary house battery "
+                f"(ess.<id>.{field})"
+            )
         raw = loxone_client.fetch_loxone_generic_value(qid)
         value = apply_loxone_read(raw, spec)
         if value is None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "2.7.0-dev.34"
+__version__ = "2.7.0-dev.36"
 
 # SemVer core + optional pre-release used for community candidates.
 _IMAGE_VERSION_RE = re.compile(
@@ -14,8 +14,9 @@ _IMAGE_VERSION_RE = re.compile(
 
 
 def display_version() -> str:
-    """UI label; pre-releases are marked as release candidates."""
-    if "-" in __version__:
+    """UI label; community pre-releases are marked as release candidates."""
+    # Local/dev builds keep the raw string; alpha/beta/rc get "(candidate)".
+    if "-" in __version__ and not ("-dev." in __version__):
         return f"{__version__} (candidate)"
     return __version__
 

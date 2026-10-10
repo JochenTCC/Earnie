@@ -7,6 +7,7 @@ import pytest
 
 from ehal import EHAL_SCHEMA_VERSION
 from ehal.field_registry import require_loxone_write
+from ehal.qualified_ids import qualified_battery_id, qualified_plant_id
 from integrations.loxone_adapter import (
     LoxoneAdapter,
     LoxoneAdapterError,
@@ -14,6 +15,16 @@ from integrations.loxone_adapter import (
     loxone_battery_kw_to_ehal_w,
 )
 from integrations.loxone_comm_trace import LoxoneWriteRecord
+
+_PRIMARY_ESS = "15_kwh_speicher"
+
+
+@pytest.fixture(autouse=True)
+def _primary_ess_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "integrations.loxone_adapter.primary_ess_id_for_plant_read",
+        lambda: _PRIMARY_ESS,
+    )
 
 
 def _pub_ok(qid, value, *, io_name=""):
@@ -44,12 +55,10 @@ def _cfg(**kwargs) -> LoxoneConfig:
 
 
 def _plant_qid_values(**extra) -> dict:
-    from ehal.qualified_ids import qualified_plant_id
-
     values = {
-        qualified_plant_id("sens_ess_soc"): 55.0,
+        qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"): 55.0,
         qualified_plant_id("sens_pv_production_active"): 2.0,
-        qualified_plant_id("sens_ess_power"): 0.5,
+        qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"): 0.5,
         qualified_plant_id("sens_grid_power_active"): 1.0,
     }
     values.update(extra)
@@ -94,6 +103,11 @@ def test_read_telemetry_normalizes(fetch_mock):
     assert telemetry["sens_ess_power"] == pytest.approx(500.0)
     # PV 2000 + import 1000 + discharge 500
     assert telemetry["sens_power_consumers"] == pytest.approx(3500.0)
+    fetch_mock.assert_any_call(qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"))
+    fetch_mock.assert_any_call(qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"))
+    fetched = {c.args[0] for c in fetch_mock.call_args_list}
+    assert "sens_ess_soc" not in fetched
+    assert "sens_ess_power" not in fetched
 
 
 @pytest.mark.parametrize(
@@ -102,11 +116,9 @@ def test_read_telemetry_normalizes(fetch_mock):
 )
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
 def test_read_telemetry_inbound_export_limit(fetch_mock, raw, expected_w):
-    from ehal.qualified_ids import qualified_plant_id
-
     values = _plant_qid_values(
         **{
-            qualified_plant_id("sens_ess_power"): 0.0,
+            qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"): 0.0,
             qualified_plant_id("sens_grid_power_active"): 0.0,
             qualified_plant_id("get_grid_export_power_limit"): raw,
         }
@@ -114,6 +126,16 @@ def test_read_telemetry_inbound_export_limit(fetch_mock, raw, expected_w):
     fetch_mock.side_effect = values.get
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert telemetry.get("get_grid_export_power_limit") == expected_w
+
+
+@patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
+def test_read_telemetry_ess_uses_pattern_b_not_plant_flat(fetch_mock):
+    """Regression: plant telemetry must not fetch bare sens_ess_* (push is Pattern B)."""
+    fetch_mock.side_effect = _plant_qid_values().get
+    LoxoneAdapter(_cfg()).read_telemetry()
+    fetched = [c.args[0] for c in fetch_mock.call_args_list]
+    assert qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc") in fetched
+    assert "sens_ess_soc" not in fetched
 
 
 @patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)

@@ -178,6 +178,7 @@ def test_inactive_keeps_draining_then_opens_refill(tmp_path, monkeypatch):
     entry = store.load_reserve_states()["vps"]
     assert entry["state"] == store.STATE_EMPTY
     assert entry["stored_kwh"] == pytest.approx(0.0)
+    assert entry["target_kwh"] == pytest.approx(2.0)
     assert entry.get("refill_opened_at")
     deadline = store.refill_deadline_utc(entry)
     assert deadline is not None
@@ -200,7 +201,41 @@ def test_ui_reset_wipes_and_reopens_refill(tmp_path, monkeypatch):
     entry = store.load_reserve_states()["vps"]
     assert entry["state"] == store.STATE_EMPTY
     assert entry["stored_kwh"] == pytest.approx(0.0)
+    assert entry["target_kwh"] == pytest.approx(2.0)
     assert entry.get("refill_opened_at")
+
+
+def test_advance_and_trigger_preserve_target_kwh(tmp_path, monkeypatch):
+    """Regression: advance/set_trigger must not wipe target with placeholder 0.
+
+    Prod (Nas, 2026-10-10): virtual_gs stayed empty after MILP charge because
+    advance_reserve_after_slot called get_or_init_state(..., target_kwh=0.0).
+    """
+    from optimizer.powerstation_reserve import advance_reserve_after_slot
+    from runtime_store import powerstation_reserves as store
+
+    monkeypatch.setattr(store, "_path", lambda: str(tmp_path / "reserves.json"))
+    states = store.load_reserve_states()
+    entry = store.get_or_init_state(states, "virtual_gs", target_kwh=1.0)
+    entry["state"] = store.STATE_EMPTY
+    entry["stored_kwh"] = 0.0
+    store.save_reserve_states(states)
+
+    advance_reserve_after_slot(powerstation_id="virtual_gs", charged_kwh=0.5)
+    entry = store.load_reserve_states()["virtual_gs"]
+    assert entry["target_kwh"] == pytest.approx(1.0)
+    assert entry["stored_kwh"] == pytest.approx(0.5)
+    assert entry["state"] == store.STATE_CHARGING
+
+    store.set_trigger("virtual_gs", active=True)
+    entry = store.load_reserve_states()["virtual_gs"]
+    assert entry["target_kwh"] == pytest.approx(1.0)
+    assert entry["state"] == store.STATE_DISCHARGING
+
+    advance_reserve_after_slot(powerstation_id="virtual_gs", discharged_kwh=0.2)
+    entry = store.load_reserve_states()["virtual_gs"]
+    assert entry["target_kwh"] == pytest.approx(1.0)
+    assert entry["stored_kwh"] == pytest.approx(0.3)
 
 
 def test_milp_deadline_prefers_cheap_slot_within_24h():

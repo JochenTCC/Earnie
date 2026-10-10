@@ -114,14 +114,23 @@ def get_or_init_state(
     powerstation_id: str,
     *,
     target_kwh: float,
+    update_target: bool = True,
 ) -> dict[str, Any]:
+    """Return reserve entry, creating it when missing.
+
+    ``update_target=True`` (default) refreshes ``target_kwh`` from the caller —
+    used by ``collect_active_reserves`` / learning. Slot advance and trigger
+    latch must pass ``update_target=False`` so a placeholder ``0.0`` cannot wipe
+    a filled carve-out target (prod: virtual_gs stayed empty after MILP charge).
+    """
     entry = states.get(powerstation_id)
     if entry is None:
         entry = default_state(target_kwh)
         states[powerstation_id] = entry
         ensure_refill_opened(entry)
         return entry
-    entry["target_kwh"] = float(target_kwh)
+    if update_target:
+        entry["target_kwh"] = float(target_kwh)
     state = str(entry.get("state") or STATE_EMPTY)
     if state not in _VALID_STATES:
         entry["state"] = STATE_EMPTY
@@ -141,7 +150,9 @@ def set_trigger(powerstation_id: str, *, active: bool) -> dict[str, Any]:
     (auto inactive must **not** call this — leftover drain stays in discharging).
     """
     states = load_reserve_states()
-    entry = get_or_init_state(states, powerstation_id, target_kwh=0.0)
+    entry = get_or_init_state(
+        states, powerstation_id, target_kwh=0.0, update_target=False
+    )
     entry["trigger_active"] = bool(active)
     if active and entry["state"] in (STATE_STANDBY, STATE_CHARGING, STATE_EMPTY):
         entry["state"] = STATE_DISCHARGING

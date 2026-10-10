@@ -24,6 +24,16 @@ from integrations.loxone_adapter import (
 )
 from runtime_store import loxone_push_inbox as inbox
 
+_PRIMARY_ESS = "15_kwh_speicher"
+
+
+@pytest.fixture(autouse=True)
+def _primary_ess_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "integrations.loxone_adapter.primary_ess_id_for_plant_read",
+        lambda: _PRIMARY_ESS,
+    )
+
 
 def _cfg(**kwargs) -> LoxoneConfig:
     base = dict(
@@ -39,9 +49,9 @@ def _cfg(**kwargs) -> LoxoneConfig:
 
 def _plant_fetch(**extra) -> dict:
     values = {
-        qualified_plant_id("sens_ess_soc"): 55.0,
+        qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"): 55.0,
         qualified_plant_id("sens_pv_production_active"): 0.0,
-        qualified_plant_id("sens_ess_power"): 0.0,
+        qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"): 0.0,
         qualified_plant_id("sens_grid_power_active"): 0.0,
     }
     values.update(extra)
@@ -76,9 +86,9 @@ def test_char_active_power_sign_preserved() -> None:
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
 def test_char_read_telemetry_kw_to_w_and_pv_clamp(fetch_mock) -> None:
     fetch_mock.side_effect = {
-        qualified_plant_id("sens_ess_soc"): 55.0,
+        qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"): 55.0,
         qualified_plant_id("sens_pv_production_active"): -0.1,  # clamped to 0 before ×1000
-        qualified_plant_id("sens_ess_power"): 0.5,
+        qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"): 0.5,
         qualified_plant_id("sens_grid_power_active"): -1.2,
     }.get
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
@@ -121,8 +131,8 @@ def test_char_export_limit_inbound(fetch_mock, raw, expected_w) -> None:
 def test_char_optional_ess_soc_limits_clamp(fetch_mock, raw, expected) -> None:
     values = _plant_fetch(
         **{
-            qualified_plant_id("get_ess_soc_min"): raw,
-            qualified_plant_id("get_ess_soc_max"): raw,
+            qualified_battery_id(_PRIMARY_ESS, "get_ess_soc_min"): raw,
+            qualified_battery_id(_PRIMARY_ESS, "get_ess_soc_max"): raw,
         }
     )
     fetch_mock.side_effect = values.get
@@ -139,8 +149,8 @@ def test_char_optional_ess_soc_limits_clamp(fetch_mock, raw, expected) -> None:
 def test_char_optional_ess_power_limits(fetch_mock, raw, expected_w) -> None:
     values = _plant_fetch(
         **{
-            qualified_plant_id("get_ess_max_charge_power"): raw,
-            qualified_plant_id("get_ess_max_discharge_power"): raw,
+            qualified_battery_id(_PRIMARY_ESS, "get_ess_max_charge_power"): raw,
+            qualified_battery_id(_PRIMARY_ESS, "get_ess_max_discharge_power"): raw,
         }
     )
     fetch_mock.side_effect = values.get
@@ -245,14 +255,25 @@ def test_char_read_ess_soc_by_id_primary_plant_alias() -> None:
 _PUSH_HOUSE = {
     "plant": {
         "ehal_bindings": {
-            "sens_ess_soc": "SoC",
             "sens_pv_production_active": "PV",
-            "sens_ess_power": "Bat",
             "sens_grid_power_active": "Grid",
-            "get_ess_soc_min": "SocMin",
         }
     },
     "profiles": {},
+}
+
+_PUSH_COMPONENTS = {
+    "batteries": [
+        {
+            "id": _PRIMARY_ESS,
+            "type": "house",
+            "ehal_bindings": {
+                ess_field(_PRIMARY_ESS, "sens_ess_soc"): "SoC",
+                ess_field(_PRIMARY_ESS, "sens_ess_power"): "Bat",
+                ess_field(_PRIMARY_ESS, "get_ess_soc_min"): "SocMin",
+            },
+        }
+    ]
 }
 
 
@@ -263,10 +284,14 @@ def _now() -> datetime:
 def _install_push_indexes(monkeypatch: pytest.MonkeyPatch) -> None:
     src.clear_source_caches()
     monkeypatch.setattr(
-        src, "get_merker_index", lambda: src.build_merker_index(_PUSH_HOUSE, {})
+        src,
+        "get_merker_index",
+        lambda: src.build_merker_index(_PUSH_HOUSE, _PUSH_COMPONENTS),
     )
     monkeypatch.setattr(
-        src, "get_ehal_index", lambda: src.build_ehal_index(_PUSH_HOUSE, {})
+        src,
+        "get_ehal_index",
+        lambda: src.build_ehal_index(_PUSH_HOUSE, _PUSH_COMPONENTS),
     )
 
 
@@ -274,9 +299,9 @@ def _seed_required_push(*, soc: str | None = "55", now: datetime | None = None) 
     ref = now if now is not None else _now()
     inbox.record_push("heartbeat", "1", now=ref)
     if soc is not None:
-        inbox.record_push(qualified_plant_id("sens_ess_soc"), soc, now=ref)
+        inbox.record_push(qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"), soc, now=ref)
     inbox.record_push(qualified_plant_id("sens_pv_production_active"), "0", now=ref)
-    inbox.record_push(qualified_plant_id("sens_ess_power"), "0", now=ref)
+    inbox.record_push(qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"), "0", now=ref)
     inbox.record_push(qualified_plant_id("sens_grid_power_active"), "0", now=ref)
 
 
