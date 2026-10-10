@@ -43,6 +43,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Decided:** wire `schema_version` stays **4** (2.7 unreleased, new fields optional); AC/DC clipping is part of **Inverter P3** (not deferred); epic `Inverter` added to `roadmap-nomenclature.mdc`.
   - **Note (epic Binding, see [draft](EHAL-Binding-UX-Draft.md)):** **P1** — **Binding P0c** done ([`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md)): history has no inverter keys yet → inverter one-off migration needs no history alias; battery Kennung renames still need alias-on-read / rewrite-on-rename before broad Kennung edit. **P2** — inverter forms get the Kennung logic of `entity_id_lock` from the start (**Binding P6**); do not add a fifth `slug_id` variant in the UI. **P4** — Loxone Merker names, `status.json` keys and VO paths for inverters wait for **Binding P1** (naming grammar); if P4 lands first, only bindings + Live rows, no name suggestions or templates.
 
+- [ ] Implement time-dependent Netzentgelt-Tarif SNAP / WiNAP - see Entwicklungsplan\Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md
 
 ### Version 2.8
   
