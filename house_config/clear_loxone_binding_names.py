@@ -6,7 +6,6 @@ HA entity_id maps are unchanged (caller must only run this for Loxone backends).
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
 
 
 def clear_binding_values(bindings: dict | None) -> dict[str, str]:
@@ -14,6 +13,23 @@ def clear_binding_values(bindings: dict | None) -> dict[str, str]:
     if not isinstance(bindings, dict):
         return {}
     return {str(k): "" for k in bindings if str(k or "").strip()}
+
+
+def _clear_consumers_in_profile(profile: dict) -> dict:
+    profile = dict(profile)
+    consumers = []
+    for consumer in profile.get("consumers") or []:
+        if not isinstance(consumer, dict):
+            consumers.append(consumer)
+            continue
+        consumer = dict(consumer)
+        if isinstance(consumer.get("ehal_bindings"), dict):
+            consumer["ehal_bindings"] = clear_binding_values(
+                consumer.get("ehal_bindings")
+            )
+        consumers.append(consumer)
+    profile["consumers"] = consumers
+    return profile
 
 
 def clear_loxone_binding_names_in_house(house_doc: dict) -> dict:
@@ -26,26 +42,19 @@ def clear_loxone_binding_names_in_house(house_doc: dict) -> dict:
         house["plant"] = plant
     profiles = house.get("profiles")
     if isinstance(profiles, dict):
-        new_profiles: dict[str, Any] = {}
-        for pid, profile in profiles.items():
-            if not isinstance(profile, dict):
-                new_profiles[pid] = profile
-                continue
-            profile = dict(profile)
-            consumers = []
-            for consumer in profile.get("consumers") or []:
-                if not isinstance(consumer, dict):
-                    consumers.append(consumer)
-                    continue
-                consumer = dict(consumer)
-                if isinstance(consumer.get("ehal_bindings"), dict):
-                    consumer["ehal_bindings"] = clear_binding_values(
-                        consumer.get("ehal_bindings")
-                    )
-                consumers.append(consumer)
-            profile["consumers"] = consumers
-            new_profiles[pid] = profile
-        house["profiles"] = new_profiles
+        house["profiles"] = {
+            pid: (
+                _clear_consumers_in_profile(profile)
+                if isinstance(profile, dict)
+                else profile
+            )
+            for pid, profile in profiles.items()
+        }
+    elif isinstance(profiles, list):
+        house["profiles"] = [
+            _clear_consumers_in_profile(profile) if isinstance(profile, dict) else profile
+            for profile in profiles
+        ]
     return house
 
 

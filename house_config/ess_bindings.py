@@ -68,10 +68,12 @@ def merge_ess_bindings_into_plant(
             continue
         slug = ess_ehal_slug(bat_id)
         for key, value in bindings.items():
-            addr = str(value or "").strip()
-            if not addr:
+            field = str(key or "").strip()
+            if not field:
                 continue
-            field = str(key)
+            # Keep empty Merker values (Q8 activation flags) so plant-flat aliases
+            # and resolve_plant_binding empty-key fallback still see the key.
+            addr = str(value or "").strip()
             out[field] = addr
             parsed = parse_ess_pattern_b(field)
             if parsed and parsed[0] == slug and bat_id == primary:

@@ -169,7 +169,10 @@ def probe_marker_names(
     password: str,
     timeout_sec: float = 5.0,
 ) -> MarkerProbeResult:
-    """Probe /jdev/sps/io/{name}; treat LL.Code 200 or 403 as present, 404 as missing."""
+    """Probe /jdev/sps/io/{name}; treat LL.Code 200 or 403 as present, 404 as missing.
+
+    Intentional Merker poll for greenfield presence — not optimizer telemetry (Q8).
+    """
     ip = str(host or "").strip().removeprefix("http://").removeprefix("https://")
     ip = ip.split("/")[0]
     if not ip:

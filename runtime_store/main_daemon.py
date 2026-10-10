@@ -69,6 +69,39 @@ def _subprocess_env() -> dict[str, str]:
     return env
 
 
+def _stdio_log_path() -> Path:
+    from runtime_store.persist_paths import daemon_stdio_log_file
+
+    return Path(daemon_stdio_log_file())
+
+
+def _open_daemon_stdio():
+    """Append handle for child stdout+stderr; caller closes after Popen."""
+    path = _stdio_log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(path, "a", encoding="utf-8", newline="\n")
+    handle.write(
+        f"\n---- main.py spawn {time.strftime('%Y-%m-%d %H:%M:%S')} ----\n"
+    )
+    handle.flush()
+    return handle
+
+
+def _stdio_tail(*, max_bytes: int = 4000) -> str:
+    path = _stdio_log_path()
+    if not path.is_file():
+        return ""
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as handle:
+            if size > max_bytes:
+                handle.seek(size - max_bytes)
+            chunk = handle.read(max_bytes)
+        return chunk.decode("utf-8", errors="replace").strip()
+    except OSError:
+        return ""
+
+
 def _status_from_probe(probe: InstanceProbe) -> DaemonStatus:
     if probe.busy:
         if probe.pid is not None and not is_pid_alive(probe.pid):
@@ -98,12 +131,20 @@ def start(*, wait_sec: float = _START_WAIT_SEC) -> DaemonStatus:
     # Detach from the parent console/stdin. Under VS Code debugpy
     # (integratedTerminal), a console-sharing child can deliver
     # KeyboardInterrupt to the Streamlit parent right after spawn.
+    # Capture child stdio under runtime/ (never DEVNULL) so logging /
+    # startup failures remain diagnosable when FileHandler misbehaves.
+    try:
+        stdio = _open_daemon_stdio()
+    except OSError as exc:
+        raise DaemonError(
+            f"stdio-Log konnte nicht geöffnet werden ({_stdio_log_path()}): {exc}"
+        ) from exc
     popen_kwargs: dict = {
         "cwd": str(project_root()),
         "env": _subprocess_env(),
         "stdin": subprocess.DEVNULL,
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
+        "stdout": stdio,
+        "stderr": subprocess.STDOUT,
     }
     if sys.platform == "win32":
         # CREATE_NO_WINDOW: no console inheritance (debugpy-safe).
@@ -114,18 +155,19 @@ def start(*, wait_sec: float = _START_WAIT_SEC) -> DaemonStatus:
     else:
         popen_kwargs["start_new_session"] = True
 
-    logger.info("Starte main.py …")
-    proc = subprocess.Popen(
-        [python_executable(), str(main_py)],
-        **popen_kwargs,
-    )
+    logger.info("Starte main.py … (stdio → %s)", _stdio_log_path())
+    try:
+        proc = subprocess.Popen(
+            [python_executable(), str(main_py)],
+            **popen_kwargs,
+        )
+    finally:
+        stdio.close()
 
     deadline = time.monotonic() + max(0.5, wait_sec)
     while time.monotonic() < deadline:
         if proc.poll() is not None:
-            raise DaemonError(
-                f"main.py beendete sich sofort (exit {proc.returncode})"
-            )
+            raise DaemonError(_early_exit_message(proc.returncode))
         current = status()
         if current.state == "running":
             logger.info("main.py läuft (PID %s)", current.pid)
@@ -136,11 +178,19 @@ def start(*, wait_sec: float = _START_WAIT_SEC) -> DaemonStatus:
     if current.state == "running":
         return current
     if proc.poll() is not None:
-        raise DaemonError(f"main.py beendete sich (exit {proc.returncode})")
+        raise DaemonError(_early_exit_message(proc.returncode))
     raise DaemonError(
         "main.py startete, aber die Single-Instance-Sperre wurde nicht "
         f"innerhalb von {wait_sec:.0f}s gesetzt"
     )
+
+
+def _early_exit_message(returncode: int | None) -> str:
+    msg = f"main.py beendete sich sofort (exit {returncode})"
+    tail = _stdio_tail()
+    if not tail:
+        return f"{msg}; siehe {_stdio_log_path()}"
+    return f"{msg}; letzte Ausgabe:\n{tail}"
 
 
 def _force_kill(pid: int) -> None:

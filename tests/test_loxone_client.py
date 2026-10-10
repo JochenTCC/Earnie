@@ -777,6 +777,9 @@ class TestBuildSentSnapshot:
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
         ), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch(
+            "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+            return_value=False,
         ):
             snapshot = lc.build_sent_loxone_snapshot(
                 mode=1,
@@ -1114,6 +1117,9 @@ class TestSendHuaweiAndConsumers:
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
             return_value=io_index,
         ), patch(
+            "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+            return_value=False,
+        ), patch(
             "integrations.loxone_writes._publish_setpoint_traced",
             return_value=fake_record,
         ) as mock_pub:
@@ -1144,6 +1150,9 @@ class TestSendHuaweiAndConsumers:
         ), patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
             return_value=io_index,
+        ), patch(
+            "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+            return_value=False,
         ), patch(
             "integrations.loxone_writes._publish_setpoint_traced",
             return_value=lc.LoxoneWriteRecord("x", 0.0, True, "t"),

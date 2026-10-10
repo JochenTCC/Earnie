@@ -70,6 +70,10 @@ def test_char_ess_active_sticky_zero_when_none() -> None:
             return_value={"max_charge_power_kw": 5.0, "max_discharge_power_kw": 4.0},
         ),
         patch.object(lw.config, "get_flexible_consumers", return_value=[]),
+        patch(
+            "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+            return_value=False,
+        ),
     ):
         snap = build_sent_loxone_snapshot(
             mode=0,

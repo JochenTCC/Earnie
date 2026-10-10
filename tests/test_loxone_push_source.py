@@ -172,6 +172,40 @@ def test_fetch_by_ehal_id_without_merker(
         raw.assert_not_called()
 
 
+def test_fetch_pushable_qid_reads_inbox_when_binding_index_empty(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Wiped ``ehal_bindings: {}`` must not black out VO pushes already in the inbox."""
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    inbox.reset_memory_for_tests()
+    now = datetime.now(timezone.utc)
+    qid = "ess.15_kwh_speicher.sens_ess_soc"
+    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push(qid, "36.0", now=now)
+    monkeypatch.setattr(src, "get_merker_index", lambda: {})
+    monkeypatch.setattr(src, "get_ehal_index", lambda: {})
+    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
+        assert loxone_client.fetch_loxone_generic_value(qid) == pytest.approx(36.0)
+        raw.assert_not_called()
+
+
+def test_fetch_setpoint_qid_without_binding_stays_none(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    inbox.reset_memory_for_tests()
+    monkeypatch.setattr(src, "get_merker_index", lambda: {})
+    monkeypatch.setattr(src, "get_ehal_index", lambda: {})
+    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
+        assert (
+            loxone_client.fetch_loxone_generic_value(
+                "ess.15_kwh_speicher.set_ess_mode"
+            )
+            is None
+        )
+        raw.assert_not_called()
+
+
 def test_ready_by_time_uses_push_numeric(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

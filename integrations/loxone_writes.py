@@ -79,7 +79,7 @@ def _publish_setpoint_traced(
 
 
 def _send_loxone_value_traced(input_name: str, value: float) -> LoxoneWriteRecord:
-    """Legacy Merker HTTP write (watchdog / adapter only; not the Loud cycle path)."""
+    """Legacy Merker HTTP write — needs a real Merker name (watchdog / non-loud only)."""
     from integrations import loxone_client as lc
     from runtime_store.shadow.writes import block_write_if_shadow
 
@@ -449,20 +449,35 @@ def build_sent_loxone_snapshot(
     # target_soc_name removed (2.4.j): ESS via active_power + limits + set_ess_mode.
     _ = target_soc
 
-    for cfg_name, value in (
-        (config.get("LOXONE_TARGET_ACTIVE_POWER_NAME"), active_kw),
-        (config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
-        (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
-        (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
+    from integrations.ehal_debug_mapping import has_mappable_live_batteries
+
+    has_batteries = bool(has_mappable_live_batteries())
+    for kind, cfg_name, value in (
+        ("set_ess_active_power", config.get("LOXONE_TARGET_ACTIVE_POWER_NAME"), active_kw),
+        (
+            "set_ess_charge_power_limit",
+            config.get("LOXONE_TARGET_CHARGE_POWER_NAME"),
+            charge_kw,
+        ),
+        (
+            "set_ess_discharge_power_limit",
+            config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"),
+            discharge_kw,
+        ),
+        ("set_ess_mode", config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
     ):
         if not cfg_name:
             continue
         if value is None:
-            if cfg_name != config.get("LOXONE_TARGET_ACTIVE_POWER_NAME"):
+            if kind != "set_ess_active_power":
                 continue
-            snapshot[str(cfg_name)] = 0.0
+            send_value = 0.0
         else:
-            snapshot[str(cfg_name)] = float(value)
+            send_value = float(value)
+        key = _ess_c1_exchange_field(
+            kind, str(cfg_name), {}, has_batteries=has_batteries
+        ) or str(cfg_name)
+        snapshot[key] = send_value
 
     if export_cap_kw is not _OMIT_EXPORT_CAP:
         from house_config.ehal_bindings import resolve_plant_binding
@@ -489,6 +504,30 @@ def build_sent_loxone_snapshot(
         )
 
     return snapshot
+
+
+def _ess_c1_exchange_field(
+    kind: str,
+    cfg_name: str,
+    io_to_field: dict[str, str],
+    *,
+    has_batteries: bool,
+) -> str:
+    """Resolve plant ESS Merker / activation name → publish EHAL id (Q8)."""
+    from ehal.ess_fields import ess_field
+    from integrations.ehal_debug_mapping import resolve_loxone_write_field
+    from integrations.loxone_adapter import primary_ess_id_for_plant_read
+
+    name = str(cfg_name or "").strip()
+    if not name:
+        return ""
+    if has_batteries:
+        bid = primary_ess_id_for_plant_read()
+        return ess_field(bid, kind) if bid else ""
+    field = str(io_to_field.get(name) or "").strip()
+    if field:
+        return field
+    return str(resolve_loxone_write_field(name, io_to_field) or "").strip()
 
 
 def send_huawei_modbus_states(
@@ -543,15 +582,27 @@ def send_huawei_modbus_states(
 
     records: list[LoxoneWriteRecord] = []
     active_name = lc.config.get("LOXONE_TARGET_ACTIVE_POWER_NAME")
-    from integrations.ehal_debug_mapping import build_loxone_setpoint_io_index
+    from integrations.ehal_debug_mapping import (
+        build_loxone_setpoint_io_index,
+        has_mappable_live_batteries,
+    )
 
     io_to_field = build_loxone_setpoint_io_index()
+    has_batteries = bool(has_mappable_live_batteries())
 
-    for cfg_name, value in (
-        (active_name, active_kw),
-        (lc.config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
-        (lc.config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
-        (lc.config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
+    for kind, cfg_name, value in (
+        ("set_ess_active_power", active_name, active_kw),
+        (
+            "set_ess_charge_power_limit",
+            lc.config.get("LOXONE_TARGET_CHARGE_POWER_NAME"),
+            charge_kw,
+        ),
+        (
+            "set_ess_discharge_power_limit",
+            lc.config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"),
+            discharge_kw,
+        ),
+        ("set_ess_mode", lc.config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
     ):
         if not cfg_name:
             continue
@@ -562,15 +613,16 @@ def send_huawei_modbus_states(
             send_value = 0.0
         else:
             send_value = float(value)
-        field = str(io_to_field.get(str(cfg_name)) or "").strip()
+        field = _ess_c1_exchange_field(
+            kind, str(cfg_name), io_to_field, has_batteries=has_batteries
+        )
         if not field:
             logger.warning(
                 "ESS C1: no EHAL field for Merker %s — skip publish", cfg_name
             )
             continue
-        records.append(
-            _publish_setpoint_traced(field, send_value, io_name=str(cfg_name))
-        )
+        # Trace/Live-Schreiben key = exchange id (Pattern B when batteries exist).
+        records.append(_publish_setpoint_traced(field, send_value, io_name=field))
 
     if export_cap_kw is not _OMIT_EXPORT_CAP:
         from house_config.ehal_bindings import resolve_plant_binding

@@ -217,7 +217,13 @@ def cons_data_pending_file() -> str:
 
 
 def log_file() -> str:
-    return runtime_path("earnie.log")
+    """Absolute path so FileHandler does not depend on process cwd."""
+    return os.path.abspath(runtime_path("earnie.log"))
+
+
+def daemon_stdio_log_file() -> str:
+    """Stdout/stderr capture for UI-/auto-started ``main.py`` (not earnie.log)."""
+    return os.path.abspath(runtime_path("main_stdio.log"))
 
 
 def consumption_profiles_file() -> str:

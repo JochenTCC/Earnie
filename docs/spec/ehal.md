@@ -27,8 +27,8 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Hub isolation | No OpenEMS, Home Assistant, evcc, or Loxone types in the math core                                                                                                                                                                                                                                                                   |
 | Adapter duty  | Map hub channels/entities → EHAL; normalize signs and units inside the adapter                                                                                                                                                                                                                                                       |
 | Transport     | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS)                                                                                                                                                                                                |
-| Loxone today  | Default `ehal.backend=loxone` uses `[integrations/loxone_adapter.py](../../integrations/loxone_adapter.py)` for plant telemetry/setpoints; marker names live in `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` (Pattern B; ESS per battery, **2.7.m**). Legacy `loxone_blocks` / unprefixed `*_name` dual-read is removed (fail-fast). Mapping UI: EHAL-Com |
-| HA today      | `ehal.backend=ha` uses `[integrations/ha_adapter.py](../../integrations/ha_adapter.py)`; entity IDs in the same Pattern B maps (aggregated live, incl. `ess.{slug}.*`). URL/token in `config/.env` (`EHAL_HA_*`); optional `sign` in `ehal.ha` (**2.6.i**). Flat `ehal.ha.entities` is one-shot migrated and cleared (**2.6.g**).                          |
+| Loxone today  | Default `ehal.backend=loxone` uses `[integrations/loxone_adapter.py](../../integrations/loxone_adapter.py)` for plant telemetry/setpoints. Pattern B keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` are **activation flags** (empty Merker values after **2.7.q Q8**); wire I/O is VO push + `status.json` under qualified IDs. Plant-flat ESS loud writes may still use `LOXONE_TARGET_*` env names until a later cleanup. Intentional Merker HTTP polls remain only for greenfield/structure probes, unbound fallback, and non-loud helpers — not optimizer telemetry. Mapping UI: EHAL-Com |
+| HA today      | `ehal.backend=ha` uses `[integrations/ha_adapter.py](../../integrations/ha_adapter.py)`; **non-empty** entity IDs in the same Pattern B maps (aggregated live, incl. `ess.{slug}.*`) until Binding P5 (Weg B). URL/token in `config/.env` (`EHAL_HA_*`); optional `sign` in `ehal.ha` (**2.6.i**). Flat `ehal.ha.entities` is one-shot migrated and cleared (**2.6.g**).                          |
 
 
 
@@ -352,10 +352,10 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 ## Implementation notes — Loxone
 
 - Adapter: `integrations/loxone_adapter.py` (HTTP markers via `loxone_client`). Live façade: `integrations/ehal_live.py` (`get_adapter()` includes Loxone).
-- Default config: missing/`none`/`loxone` → `EHAL_BACKEND=loxone`, `adapter_id` default `loxone-home`. Marker names live in `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` (Pattern B); empty legacy `loxone_blocks` may remain but is not the mapping source.
+- Default config: missing/`none`/`loxone` → `EHAL_BACKEND=loxone`, `adapter_id` default `loxone-home`. Pattern B keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` are activation flags (empty Merker values after Q8); empty legacy `loxone_blocks` may remain but is not the mapping source.
 - Telemetry: kW markers → W; Loxone battery **+discharge** → EHAL `sens_ess_power` **+discharge** (`× 1000`, no inversion); grid pass-through as EHAL `+` import; field names §C (`sens_`*).
 - Capabilities: `supports_ess_write` when charge/discharge markers exist; `supports_evcs_current` when EV current write path works.
-- Live writes: ESS limits / `set_ess_mode` / EV current+mode / flex enable via adapter + `ehal_bindings`.
+- Live writes: ESS limits / `set_ess_mode` / EV current+mode / flex enable via `status.json` qualified IDs; binding keys activate (Merker value optional). Plant-flat ESS may still use `LOXONE_TARGET_*` env names.
 - Removed from live semantics (wire rename): ESS `target_soc`, EV `soc_at_plug_in`, PV cumulative counter, Sofortladen countdown Merker.
 
 

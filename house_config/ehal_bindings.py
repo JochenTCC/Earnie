@@ -456,8 +456,8 @@ def resolve_plant_binding(
 ) -> str:
     """Plant read/write address from ``plant.ehal_bindings`` (+ primary ESS aliases).
 
-    For pushable ``sens_*`` / ``get_*``: Merker if set, else bare EHAL field id when the
-    binding key is present with an empty Merker (push-only). ``set_*`` still need a Merker.
+    Merker if set; else qualified / bare EHAL id when the binding key is present with
+    an empty Merker (Q8 activation — reads and ``set_*`` writes).
     """
     field = _nonempty(ehal_field)
     house = house_doc if isinstance(house_doc, dict) else {}
@@ -467,20 +467,23 @@ def resolve_plant_binding(
     if direct:
         return direct
 
-    def _push_fallback(source: dict) -> str:
+    def _empty_key_fallback(source: dict) -> str:
         if field not in source:
             return ""
-        try:
-            from ehal.loxone_push_source import is_pushable_kind
-        except Exception:
-            return ""
+        from ehal.loxone_push_source import is_pushable_kind
+        from ehal.qualified_ids import field_kind, qualified_plant_id
+
+        kind = field_kind(field)
+        if kind.startswith("set_"):
+            return qualified_plant_id(field)
+        # Reads: keep bare binding key (push inbox resolves via qualified index).
         if is_pushable_kind(field):
             return field
         return ""
 
-    plant_push = _push_fallback(bindings)
-    if plant_push:
-        return plant_push
+    plant_fallback = _empty_key_fallback(bindings)
+    if plant_fallback:
+        return plant_fallback
     # Merge batteries[].ehal_bindings (ess.{slug}.* → flat aliases for primary)
     try:
         from house_config.components_store import load_components_document
@@ -493,7 +496,7 @@ def resolve_plant_binding(
         merker = _nonempty(merged.get(field))
         if merker:
             return merker
-        return _push_fallback(merged if isinstance(merged, dict) else {})
+        return _empty_key_fallback(merged if isinstance(merged, dict) else {})
     except Exception:
         return ""
 

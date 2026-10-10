@@ -118,6 +118,7 @@ def planning_consumer_to_milp(consumer: dict) -> dict:
     result = {
         "id": str(consumer["id"]),
         "name": str(consumer.get("label", consumer["id"])),
+        "type": "generic",
         "nominal_power_kw": nominal,
         "min_power_kw": nominal,
         "min_on_quarterhours": min_on_quarterhours,
@@ -180,6 +181,7 @@ def planning_ev_to_milp(consumer: dict) -> dict:
     result = {
         "id": str(consumer["id"]),
         "name": str(consumer.get("label", consumer["id"])),
+        "type": "ev",
         "nominal_power_kw": float(consumer["nominal_power_kw"]),
         "min_power_kw": min_power if min_power > 0 else None,
         "min_on_quarterhours": min_on,
@@ -242,6 +244,7 @@ def planning_thermal_rc_to_milp(consumer: dict) -> dict:
     entry = {
         "id": str(consumer["id"]),
         "name": str(consumer.get("label", consumer["id"])),
+        "type": "thermal_rc",
         "nominal_power_kw": float(consumer.get("nominal_power_kw", 2.8) or 2.8),
         "min_on_quarterhours": min_on,
         "daily_target_kwh": 0.0,
@@ -342,6 +345,7 @@ def planning_pool_filter_to_milp(consumer: dict) -> dict:
     entry = {
         "id": POOL_FILTER_ID,
         "name": str(consumer.get("label") or consumer.get("name") or "Pool Filter"),
+        "type": str(consumer.get("type") or "generic"),
         "nominal_power_kw": nominal,
         "daily_target_kwh": _pool_filter_daily_target_kwh(consumer, nominal),
         "daily_target_source": "loxone_remaining_hours",
@@ -418,6 +422,7 @@ def planning_thermal_to_milp(consumer: dict) -> dict:
     entry: dict = {
         "id": str(consumer["id"]),
         "name": CONSUMER_TYPE_LABELS["thermal_annual"],
+        "type": "thermal_annual",
         "nominal_power_kw": nominal,
         "min_power_kw": nominal,
         "min_on_quarterhours": min_on,

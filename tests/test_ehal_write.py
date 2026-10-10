@@ -89,6 +89,10 @@ def test_send_huawei_publishes_only(publish_dir: Path) -> None:
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
             return_value=io_index,
         ),
+        patch(
+            "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+            return_value=False,
+        ),
     ):
         records = lc.send_huawei_modbus_states(
             mode=3, target_power_kw=1.5, target_soc=55.0
@@ -134,6 +138,10 @@ def test_send_huawei_publishes_export_limit_qualified(publish_dir: Path, monkeyp
         patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
             return_value=io_index,
+        ),
+        patch(
+            "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+            return_value=False,
         ),
     ):
         records = lc.send_huawei_modbus_states(

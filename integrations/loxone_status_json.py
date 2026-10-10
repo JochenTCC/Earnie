@@ -158,12 +158,13 @@ def _sent_enable_value(
     primary_marker: str,
     status_key: str,
 ) -> float | None:
-    """Value for status Freigabe — only the configured Freigabe marker or the Pool title."""
+    """Value for status Freigabe — Merker, qid key, or Pool title in the snapshot."""
     name = str(primary_marker or "").strip()
     if name and name in loxone_sent:
         return float(loxone_sent[name])
-    if status_key in POOL_ENABLE_KEYS and status_key in loxone_sent:
-        return float(loxone_sent[status_key])
+    key = str(status_key or "").strip()
+    if key and key in loxone_sent:
+        return float(loxone_sent[key])
     return None
 
 

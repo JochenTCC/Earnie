@@ -554,6 +554,9 @@ def _append_battery_write_io(index: dict[str, str]) -> None:
             io_name = binding_address(bindings, bid, kind)
             if not io_name:
                 io_name = str(bindings.get(kind) or "").strip()
+            # Q8: empty Merker is an activation flag — index the qualified id.
+            if not io_name and (field in bindings or kind in bindings):
+                io_name = field
             if io_name and io_name not in index:
                 index[io_name] = field
 
@@ -625,6 +628,23 @@ def loxone_write_field_to_io() -> dict[str, str]:
     }
 
 
+def _plant_flat_ess_to_primary_exchange(name: str) -> str:
+    """Bare plant ESS ``set_*`` → ``ess.<primary>.set_*`` when batteries exist."""
+    from ehal.ess_fields import ess_field, is_plant_flat_ess_field
+
+    kind = str(name or "").strip()
+    if not kind or not is_plant_flat_ess_field(kind):
+        return ""
+    if not has_mappable_live_batteries():
+        return kind
+    try:
+        from integrations.loxone_adapter import primary_ess_id_for_plant_read
+    except Exception:  # noqa: BLE001
+        return ""
+    bid = primary_ess_id_for_plant_read()
+    return ess_field(bid, kind) if bid else ""
+
+
 def resolve_loxone_write_field(io_name: str, index: dict[str, str] | None = None) -> str:
     """Reverse-map Merker → EHAL write field (or empty if unknown / not a write)."""
     name = str(io_name or "").strip()
@@ -633,10 +653,22 @@ def resolve_loxone_write_field(io_name: str, index: dict[str, str] | None = None
     lookup = index if index is not None else build_loxone_setpoint_io_index()
     field = lookup.get(name, "")
     if field and is_live_write_field(field):
-        return canonicalize_live_display_field(field) or field
-    # Direct EHAL key stored as io (rare)
+        canon = canonicalize_live_display_field(field)
+        if canon:
+            return canon
+        upgraded = _plant_flat_ess_to_primary_exchange(field)
+        if upgraded:
+            return upgraded
+        return field
+    # Direct EHAL key / Q8 activation id stored as io
     if is_live_write_field(name):
-        return canonicalize_live_display_field(name) or name
+        canon = canonicalize_live_display_field(name)
+        if canon:
+            return canon
+        upgraded = _plant_flat_ess_to_primary_exchange(name)
+        if upgraded:
+            return upgraded
+        return name
     return _MAPPING_EMPTY
 
 

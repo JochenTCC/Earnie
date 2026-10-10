@@ -222,10 +222,13 @@ def normalize_battery(raw: dict, index: int) -> dict:
         "standby_power_kw": standby,
         "control": control,
         "limits_from_live": bool(raw.get("limits_from_live", False)),
+        # Q8: empty string values are Loxone activation flags — keep the keys
+        # (same as components_store). Stripping empties breaks PS writes via
+        # _planning_powerstations → _binding_for_ps.
         "ehal_bindings": {
             str(k): str(v).strip()
             for k, v in ehal_bindings.items()
-            if str(v or "").strip()
+            if str(k or "").strip()
         },
         "battery_wear": _normalize_battery_wear(raw.get("battery_wear"), battery_id, index),
     }

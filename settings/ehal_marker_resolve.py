@@ -1,8 +1,7 @@
 """Resolve Merker addresses from ``ehal_bindings`` (§C / Pattern B keys only).
 
-Read fields (``sens_*`` / ``get_*``): Merker name if set, else qualified EHAL ID when
-the binding key is present (push-only; empty Merker is allowed). Write fields still
-require a Merker / VI name.
+Read and write fields: Merker name if set, else qualified EHAL ID when the binding
+key is present (Q8 activation flag; empty Merker is allowed for Loxone push-only).
 """
 from __future__ import annotations
 
@@ -20,33 +19,68 @@ def ehal_bindings(consumer: dict) -> dict:
     return bindings if isinstance(bindings, dict) else {}
 
 
-def resolve_lox_marker(consumer: dict, ehal_field: str) -> str:
-    """Read address: Merker or, if key present and empty, qualified EHAL ID."""
-    bindings = ehal_bindings(consumer)
-    merker = _first_nonempty(bindings.get(ehal_field))
-    if merker:
-        return merker
-    if ehal_field not in bindings:
-        return ""
-    from ehal.loxone_push_source import is_pushable_kind
+def _consumer_pilot_id(consumer: dict, ehal_field: str) -> str:
     from ehal.push_signals import pilot_id
 
-    if not is_pushable_kind(ehal_field):
-        return ""
     cid = str(consumer.get("id") or "").strip()
     ctype = str(consumer.get("type") or "")
     return str(pilot_id("consumer", cid, ehal_field, ctype) or "").strip()
 
 
+def _resolve_binding_key(consumer: dict, ehal_field: str) -> str:
+    """Merker if set; else qualified ID when ``ehal_field`` key is present."""
+    from ehal.qualified_ids import field_kind, parse_qualified_id
+
+    bindings = ehal_bindings(consumer)
+    merker = _first_nonempty(bindings.get(ehal_field))
+    if merker:
+        return merker
+    for key, value in bindings.items():
+        if field_kind(str(key)) != ehal_field:
+            continue
+        parsed = parse_qualified_id(str(key))
+        if parsed is None or parsed.is_plant_bare:
+            continue
+        text = str(value or "").strip()
+        return text or str(key)
+    if ehal_field not in bindings:
+        return ""
+    return _consumer_pilot_id(consumer, ehal_field)
+
+
+def resolve_lox_marker(consumer: dict, ehal_field: str) -> str:
+    """Read address: Merker or, if key present and empty, qualified EHAL ID."""
+    from ehal.loxone_push_source import is_pushable_kind
+    from ehal.qualified_ids import field_kind, parse_qualified_id
+
+    bindings = ehal_bindings(consumer)
+    merker = _first_nonempty(bindings.get(ehal_field))
+    if merker:
+        return merker
+    # Prefer a stored qualified key (correct namespace even if MILP shape lost ``type``).
+    for key, value in bindings.items():
+        if field_kind(str(key)) != ehal_field:
+            continue
+        parsed = parse_qualified_id(str(key))
+        if parsed is None or parsed.is_plant_bare:
+            continue
+        text = str(value or "").strip()
+        return text or str(key)
+    if ehal_field not in bindings:
+        return ""
+    if not is_pushable_kind(ehal_field):
+        return ""
+    return _consumer_pilot_id(consumer, ehal_field)
+
+
 def resolve_output_marker(consumer: dict, ehal_field: str) -> str:
-    """Write address: Merker / VI name required (no EHAL-ID fallback)."""
-    return _first_nonempty(ehal_bindings(consumer).get(ehal_field))
+    """Write address: Merker or qualified EHAL ID when the binding key is present."""
+    return _resolve_binding_key(consumer, ehal_field)
 
 
 def marker_flex_power(consumer: dict) -> str:
     """Consumer Messwert power from ``ehal_bindings`` (Pattern B)."""
     from ehal.flex_fields import KIND_SENS_POWER_ACT, binding_address, flex_field
-    from ehal.push_signals import pilot_id
 
     cid = str(consumer.get("id") or "").strip()
     if not cid:
@@ -58,8 +92,7 @@ def marker_flex_power(consumer: dict) -> str:
     key = flex_field(cid, KIND_SENS_POWER_ACT)
     if key not in bindings and KIND_SENS_POWER_ACT not in bindings:
         return ""
-    ctype = str(consumer.get("type") or "")
-    return str(pilot_id("consumer", cid, KIND_SENS_POWER_ACT, ctype) or "").strip()
+    return _consumer_pilot_id(consumer, KIND_SENS_POWER_ACT)
 
 
 def marker_sens_evcs_active_power(consumer: dict) -> str:
@@ -75,13 +108,26 @@ def marker_sens_filter_active(consumer: dict) -> str:
 
 
 def marker_flex_enable(consumer: dict) -> str:
-    """Consumer Freigabe from ``ehal_bindings`` (Pattern B)."""
-    from ehal.flex_fields import KIND_SET_ENABLE, binding_address
+    """Consumer Freigabe: Merker or qid when any ``*.set_enable`` key is present."""
+    from ehal.flex_fields import KIND_SET_ENABLE, binding_address, flex_field
+    from ehal.qualified_ids import field_kind
 
     cid = str(consumer.get("id") or "").strip()
     if not cid:
         return ""
-    return binding_address(ehal_bindings(consumer), cid, KIND_SET_ENABLE)
+    bindings = ehal_bindings(consumer)
+    merker = binding_address(bindings, cid, KIND_SET_ENABLE)
+    if merker:
+        return merker
+    qid = _consumer_pilot_id(consumer, KIND_SET_ENABLE)
+    for key, value in bindings.items():
+        if field_kind(str(key)) != KIND_SET_ENABLE:
+            continue
+        text = str(value or "").strip()
+        return text or qid
+    if flex_field(cid, KIND_SET_ENABLE) in bindings or KIND_SET_ENABLE in bindings:
+        return qid
+    return ""
 
 
 def marker_sens_consumer_active(consumer: dict) -> str:
@@ -91,7 +137,6 @@ def marker_sens_consumer_active(consumer: dict) -> str:
         binding_address,
         flex_field,
     )
-    from ehal.push_signals import pilot_id
 
     cid = str(consumer.get("id") or "").strip()
     if not cid:
@@ -103,14 +148,8 @@ def marker_sens_consumer_active(consumer: dict) -> str:
     key = flex_field(cid, KIND_SENS_CONSUMER_ACTIVE)
     if key not in bindings and KIND_SENS_CONSUMER_ACTIVE not in bindings:
         # Legacy alternate binary used as run indicator for manuals.
-        alt = _first_nonempty(bindings.get("flex.alternate_binary_power_name"))
-        if alt:
-            return alt
-        return ""
-    ctype = str(consumer.get("type") or "")
-    return str(
-        pilot_id("consumer", cid, KIND_SENS_CONSUMER_ACTIVE, ctype) or ""
-    ).strip()
+        return _first_nonempty(bindings.get("flex.alternate_binary_power_name"))
+    return _consumer_pilot_id(consumer, KIND_SENS_CONSUMER_ACTIVE)
 
 
 def marker_sens_evcs_connected(consumer: dict) -> str:
@@ -137,10 +176,12 @@ def marker_get_evcs_ready_by_time(consumer: dict) -> str:
 
 
 def marker_set_evcs_max_current(consumer: dict) -> str:
-    return _first_nonempty(
-        ehal_bindings(consumer).get("set_evcs_max_current"),
-        ehal_bindings(consumer).get("set_evcs_current"),
-    )
+    """EV current setpoint: Merker or qid when binding key is present (Q8)."""
+    for field in ("set_evcs_max_current", "set_evcs_current"):
+        resolved = resolve_output_marker(consumer, field)
+        if resolved:
+            return resolved
+    return ""
 
 
 def marker_charge_immediate(consumer: dict) -> str:

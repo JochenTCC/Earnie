@@ -166,3 +166,14 @@ def test_setup_logging_wires_month_handler(tmp_path: Path) -> None:
     assert handler.backupCount == logger_config._DEFAULT_BACKUP_COUNT
     assert logger_config._DEFAULT_BACKUP_COUNT == 12
     assert handler.rolloverAt == int(compute_next_month_rollover(time.time()))
+    assert os.path.isabs(handler.baseFilename)
+
+
+def test_setup_logging_resolves_relative_path(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    logger_config.setup_logging(log_file="earnie.log", level=logging.INFO)
+    root = logging.getLogger()
+    handler = next(
+        h for h in root.handlers if isinstance(h, logger_config.MonthRotatingFileHandler)
+    )
+    assert handler.baseFilename == str((tmp_path / "earnie.log").resolve())

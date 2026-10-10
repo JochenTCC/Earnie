@@ -1260,6 +1260,7 @@ def test_planning_thermal_rc_to_milp_bridge():
     }
     milp = planning_thermal_rc_to_milp(consumer)
     assert milp["daily_target_source"] == "thermal"
+    assert milp["type"] == "thermal_rc"
     assert milp["thermal_control"]["enabled"] is True
     assert "legacy_id" not in milp
     profile = {"consumers": [consumer]}

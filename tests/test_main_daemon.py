@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from runtime_store import main_daemon
+from runtime_store.persist_paths import daemon_stdio_log_file, log_file
 from runtime_store.single_instance import (
     SingleInstanceLock,
     is_pid_alive,
@@ -23,6 +24,16 @@ def test_probe_free_when_no_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert probe.busy is False
     assert probe.pid is None
     assert probe.lock_path == str(tmp_path / "main.lock")
+
+
+def test_log_paths_are_absolute(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    assert os.path.isabs(log_file())
+    assert log_file() == str((tmp_path / "earnie.log").resolve())
+    assert os.path.isabs(daemon_stdio_log_file())
+    assert daemon_stdio_log_file() == str((tmp_path / "main_stdio.log").resolve())
 
 
 def test_probe_busy_while_lock_held(
@@ -67,6 +78,42 @@ def test_start_raises_when_already_running(
             main_daemon.start(wait_sec=1.0)
     finally:
         lock.release()
+
+
+def test_start_captures_stdio_not_devnull(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UI/auto-start must not discard child stderr (earnie.log diagnose path)."""
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    root = Path(__file__).resolve().parents[1]
+    stub = tmp_path / "main.py"
+    stub.write_text(
+        "\n".join(
+            [
+                "import sys, time",
+                "sys.path.insert(0, r'%s')" % str(root).replace("\\", "\\\\"),
+                "from runtime_store.single_instance import ensure_single_instance",
+                "print('stub-stdio-ok', flush=True)",
+                "ensure_single_instance('main')",
+                "time.sleep(60)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(main_daemon, "project_root", lambda: tmp_path)
+    monkeypatch.setattr(main_daemon, "python_executable", lambda: sys.executable)
+
+    try:
+        st = main_daemon.start(wait_sec=5.0)
+        assert st.state == "running"
+        stdio = tmp_path / "main_stdio.log"
+        assert stdio.is_file()
+        text = stdio.read_text(encoding="utf-8")
+        assert "main.py spawn" in text
+        assert "stub-stdio-ok" in text
+    finally:
+        if main_daemon.status().state == "running":
+            main_daemon.stop(timeout_sec=5.0)
 
 
 def test_start_stop_with_stub_script(

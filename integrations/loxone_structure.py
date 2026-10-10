@@ -302,7 +302,10 @@ def probe_http_markers(
     extra_names: list[str] | None = None,
     timeout_sec: float = 5.0,
 ) -> StructureScanResult:
-    """Probe known Merker names via /jdev/sps/io (200/403 = present, 404 = missing)."""
+    """Probe known Merker names via /jdev/sps/io (200/403 = present, 404 = missing).
+
+    Intentional Merker poll — import/structure only; not the Loud optimizer path (Q8).
+    """
     from integrations.loxone_greenfield_import import probe_marker_names
 
     names = _http_probe_candidate_names(configured_names, extra_names=extra_names)

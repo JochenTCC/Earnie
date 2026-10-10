@@ -28,8 +28,8 @@
                     "absent_temp_reduction_c": 6.5,
                     "heating_limit_c": 15.0,
                     "ehal_bindings": {
-                        "flex.wp_heating.sens_power_act": "Earnie_Waermepumpe_Leistung",
-                        "flex.wp_heating.set_enable": "Earnie_Waermepumpe_Freigabe"
+                        "flex.wp_heating.sens_power_act": "",
+                        "flex.wp_heating.set_enable": ""
                     }
                 },
                 {
@@ -62,10 +62,10 @@
                         }
                     },
                     "ehal_bindings": {
-                        "sens_evcs_active_power": "Earnie_EAuto_Leistung",
-                        "flex.ev.sens_power_act": "Earnie_EAuto_Leistung",
-                        "set_evcs_max_current": "Earnie_EAuto_Ziel_kW",
-                        "set_evcs_mode": "Earnie_EAuto_Modus"
+                        "sens_evcs_active_power": "",
+                        "flex.ev.sens_power_act": "",
+                        "set_evcs_max_current": "",
+                        "set_evcs_mode": ""
                     }
                 },
                 {
@@ -87,7 +87,7 @@
                         "default_power_kw": 2.0
                     },
                     "ehal_bindings": {
-                        "flex.waschmaschine.sens_power_act": "Leistung Waschmaschine"
+                        "flex.waschmaschine.sens_power_act": ""
                     }
                 },
                 {
@@ -109,7 +109,7 @@
                         "default_power_kw": 2.5
                     },
                     "ehal_bindings": {
-                        "flex.trockner.sens_power_act": "Leistung Trockner"
+                        "flex.trockner.sens_power_act": ""
                     }
                 },
                 {
@@ -137,16 +137,16 @@
     "plant": {
         "max_export_power_kw": 11.0,
         "ehal_bindings": {
-            "sens_ess_soc": "B004-Battery_SOC",
-            "sens_pv_production_active": "Ernie-Merker-PV_Act",
-            "sens_ess_power": "Ernie-Merker-LeistungBat_Act",
-            "sens_grid_power_active": "Ernie-Merker-LeistungNetz_Act",
-            "sens_temperature_outside": "Earnie_Aussentemperatur",
-            "sens_absent_mode": "Earnie_Abwesend",
-            "set_ess_active_power": "Earnie_Batterie_Sollleistung",
-            "set_ess_charge_power_limit": "Earnie_LadeLeistungs-Limit",
-            "set_ess_discharge_power_limit": "Earnie_EntladeLeistungs-Limit",
-            "set_ess_mode": "Earnie_Steuerbefehl"
+            "sens_ess_soc": "",
+            "sens_pv_production_active": "",
+            "sens_ess_power": "",
+            "sens_grid_power_active": "",
+            "sens_temperature_outside": "",
+            "sens_absent_mode": "",
+            "set_ess_active_power": "",
+            "set_ess_charge_power_limit": "",
+            "set_ess_discharge_power_limit": "",
+            "set_ess_mode": ""
         }
     }
 }

@@ -365,20 +365,25 @@ def appliance_is_reserve_mode(appliance: dict) -> bool:
 
 
 def _binding_for_ps(ps_id: str, kind: str) -> str:
-    """Resolve Merker/entity address from planning powerstation ehal_bindings."""
-    from ehal.ess_fields import binding_address
+    """Resolve Merker/entity or qid from planning powerstation ehal_bindings (Q8)."""
+    from ehal.ess_fields import binding_address, ess_field
+    from ehal.qualified_ids import qualified_battery_id
 
     for ps in _planning_powerstations():
         if str(ps.get("id") or "").strip() != ps_id:
             continue
         bindings = ps.get("ehal_bindings")
-        addr = binding_address(bindings if isinstance(bindings, dict) else {}, ps_id, kind)
+        if not isinstance(bindings, dict):
+            return ""
+        addr = binding_address(bindings, ps_id, kind)
         if addr:
             return addr
-        if isinstance(bindings, dict):
-            flat = str(bindings.get(kind) or "").strip()
-            if flat:
-                return flat
+        flat = str(bindings.get(kind) or "").strip()
+        if flat:
+            return flat
+        key = ess_field(ps_id, kind)
+        if key in bindings or kind in bindings:
+            return qualified_battery_id(ps_id, kind)
         break
     return ""
 

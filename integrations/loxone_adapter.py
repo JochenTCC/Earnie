@@ -104,7 +104,12 @@ EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
 
 @dataclass(frozen=True)
 class LoxoneConfig:
-    """Write-activation flags (non-empty = wired). Reads use qualified IDs + registry."""
+    """Write-activation flags (non-empty = wired).
+
+    Plant ESS names still come from ``LOXONE_TARGET_*`` env. EV/export may be
+    Merker titles or qualified EHAL IDs (Q8 empty binding → qid). Reads use
+    qualified IDs + the field registry.
+    """
 
     adapter_id: str
     charge_power_name: str = ""
@@ -427,13 +432,15 @@ class LoxoneAdapter:
     def _try_marker_write(
         self, marker_name: str, value: float, *, field: str = ""
     ) -> tuple[bool, str]:
-        """Publish setpoint via status.json (2.7.q Q5); Merker name is display/activation only."""
+        """Publish setpoint via status.json (2.7.q Q5).
+
+        ``field`` is the qualified EHAL id. ``marker_name`` is display-only and may
+        be empty after Q8 (falls back to ``field``).
+        """
         from integrations.loxone_writes import _publish_setpoint_traced
 
-        marker = str(marker_name or "").strip()
         qid = str(field or "").strip()
-        if not marker:
-            return False, "Loxone write marker name is empty"
+        marker = str(marker_name or "").strip() or qid
         if not qid:
             return False, "EHAL field empty for Loxone publish"
         try:

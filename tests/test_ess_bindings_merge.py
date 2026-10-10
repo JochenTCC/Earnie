@@ -5,6 +5,27 @@ from ehal.ess_fields import ess_field
 from house_config.ess_bindings import merge_ess_bindings_into_plant
 
 
+def test_empty_activation_keeps_primary_flat_aliases():
+    """Q8: empty Merker on Pattern B must still create plant-flat keys."""
+    house_id = "15_kwh_speicher"
+    batteries = [
+        {
+            "id": house_id,
+            "type": "house",
+            "ehal_bindings": {
+                ess_field(house_id, "sens_ess_soc"): "",
+                ess_field(house_id, "set_ess_mode"): "",
+                ess_field(house_id, "sens_ess_power"): "",
+            },
+        },
+    ]
+    merged = merge_ess_bindings_into_plant({}, batteries)
+    assert ess_field(house_id, "sens_ess_soc") in merged
+    assert merged["sens_ess_soc"] == ""
+    assert merged["set_ess_mode"] == ""
+    assert merged["sens_ess_power"] == ""
+
+
 def test_flat_aliases_prefer_house_when_powerstations_listed_first():
     """NAS-style: virtual/physical PS before house must not blank plant SoC."""
     house_id = "15_kwh_speicher"

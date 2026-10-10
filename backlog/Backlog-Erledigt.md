@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Q8 — Clear Loxone Merker names + write activation by key presence (2026-10-10)
+
+- [x] Remove remaining Merker name values from `ehal_bindings` (keep keys as activation flags) or mark code still needing Merker poll / non-empty HA entity_ids
+  - Write resolvers: key presence → qualified EHAL ID (`settings/ehal_marker_resolve.py`, `resolve_plant_binding` for `set_*`, `_binding_for_ps`); adapter publish allows empty display Merker
+  - `clear_loxone_binding_names_in_house` also clears list-shaped `profiles` (was dict-only)
+  - Cleared Earnie-env-home `house_profiles.json` / `components.json` + `share/config/house_profiles.example.json`
+  - Marked intentional Merker polls (structure/greenfield); `docs/spec/ehal.md` Q8 note; HA entity_ids remain until Binding P5
+  - Tests: `tests/test_clear_loxone_binding_names.py`
+
 ### `set_ess_source_select` → Pattern B `ess.<id>.*` (2026-10-10)
 
 - [x] **`set_ess_source_select` → Pattern B `ess.<id>.set_ess_source_select`** (follow-up to **2.7.h** / **2.7.m**)

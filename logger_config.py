@@ -140,6 +140,9 @@ def setup_logging(log_file="earnie.log", level=logging.INFO):
     """
     configure_utf8_stdio()
 
+    # Absolute path: relative names would follow cwd (wrong under daemon spawn).
+    log_file = os.path.abspath(os.fspath(log_file))
+
     # Verzeichnis für Logfile erstellen, falls Pfade genutzt werden
     log_dir = os.path.dirname(log_file)
     if log_dir and not os.path.exists(log_dir):

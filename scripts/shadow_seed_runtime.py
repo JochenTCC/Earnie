@@ -23,6 +23,7 @@ _COPY_GLOBS = (
 _EXCLUDE_NAMES = frozenset(
     {
         "earnie.log",
+        "main_stdio.log",
         "local_settings.json",
         "ehal_write_error.json",
         "main.lock",

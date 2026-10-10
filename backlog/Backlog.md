@@ -170,6 +170,11 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
 
 ### Version 2.+1
 
+- [ ] **Time-variable grid fee (Netznutzung Arbeitspreis) in Earnie** *(Austria, from 2027; SNAP/WiNAP)*
+  - **Today:** one flat value per house profile (`netznutzung_arbeitspreis_cent_kwh`), added to the import price. No time dependence.
+  - **Goal:** time windows per house profile that override the flat value: SNAP (1 Apr–30 Sep, 10:00–16:00) and WiNAP (1 Oct–31 Mar, 22:00–04:00), values per grid area. Used in the MILP price (`k_act`), Scenario Explorer and the virtual invoice, so cheap windows interact correctly with spot tariffs.
+  - **Later (not this item):** capacity charge (Leistungspreis) for SE and virtual invoice, and an import cap in the MILP. Draft and open points: [Entwicklungsplan/Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md) (steps L1 → L5).
+  - **Dependency:** final SNE-G-V and the tariff regulation (SNE-T-V, expected end of 2026) for the actual values; until then window values stay configurable and marked illustrative.
 - [ ] In case of big diff between PV prognosis and actual PV energy Earnie should use a correction factor for optimization at least for the next QH in order to prevent unneeded forced charging or other actions (has to be specified more concrete how)
 - [ ] Check possibility for automatically learn consumer schedules (for known consumers) and nominal power (for all consumers) from sens_power_act to substitute or improve manual settings
 - [ ] **Banner der Wahrheit — Layer C enforcement** *(after soft first approach `2.4.q`; follow-up from `2.4.i` spike)*

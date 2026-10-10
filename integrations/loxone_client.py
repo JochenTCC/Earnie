@@ -452,13 +452,16 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
 
     Meter ``/all`` energy stays on poll (never calls this for energy IDs). FertigUm uses
     ``fetch_loxone_ready_by_time``. Bound pushable fields never fall back to Merker HTTP.
-    Qualified/bare EHAL IDs are push-only: unbound → ``None`` (no Merker poll).
+    Qualified/bare pushable EHAL IDs always use the inbox (even when the binding index
+    has no activation key — e.g. wiped ``ehal_bindings: {}`` after a bad sync).
+    Non-pushable EHAL IDs (``set_*``) stay unbound → ``None`` (no Merker poll).
     ``io_name`` may be a Merker name or a qualified/bare EHAL ID.
     """
     name = str(io_name or "").strip()
     if name:
         try:
-            from ehal.loxone_push_source import resolve_push_binding
+            from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
+            from ehal.qualified_ids import field_kind
             from runtime_store.loxone_push_inbox import read_push_value
 
             binding = resolve_push_binding(name)
@@ -473,6 +476,15 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
                     )
                 return value
             if _looks_like_ehal_id(name):
+                if is_pushable_kind(field_kind(name)):
+                    value, state = read_push_value(name)
+                    if value is None:
+                        logger.warning(
+                            "Loxone push: no value for unbound '%s' (state=%s)",
+                            name,
+                            state,
+                        )
+                    return value
                 return None
         except Exception:  # noqa: BLE001 — do not fall back to poll for push bindings
             logger.exception(

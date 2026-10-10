@@ -230,6 +230,9 @@ def test_build_write_rows_from_trace_maps_set_fields():
     ), patch(
         "ui.loxone_debug_rows.loxone_write_field_to_io",
         return_value={"set_ess_charge_power_limit": "Ernie_Charge"},
+    ), patch(
+        "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+        return_value=False,
     ):
         rows = build_write_rows_from_trace(
             [
@@ -294,6 +297,9 @@ def test_build_intended_write_rows_for_silent_mode():
     ), patch(
         "ui.loxone_debug_rows.loxone_write_field_to_io",
         return_value={"set_ess_mode": "Ernie_Mode"},
+    ), patch(
+        "integrations.ehal_debug_mapping.has_mappable_live_batteries",
+        return_value=False,
     ):
         rows = build_intended_write_rows(
             {"Ernie_Mode": 2.0},
