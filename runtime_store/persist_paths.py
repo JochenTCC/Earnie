@@ -270,6 +270,11 @@ def bundled_config_dir() -> str:
     return os.path.join("share", "config")
 
 
+def bundled_grid_fees_file() -> str:
+    """Netzentgelt-Katalog (Netzbereiche + Zeitregeln), read-only im Image."""
+    return os.path.join(bundled_config_dir(), "grid_fees.json")
+
+
 def bundled_config_example_file() -> str:
     return os.path.join(bundled_config_dir(), "config.example.json")
 

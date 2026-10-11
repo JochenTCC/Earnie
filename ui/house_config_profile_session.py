@@ -5,6 +5,7 @@ import os
 
 import streamlit as st
 
+from data.grid_fees import normalize_netznutzung_config
 from house_config.earnie_role import (
     DEFAULT_MANUAL_HORIZON_H,
     EARNIE_ROLE_FLEX,
@@ -179,7 +180,7 @@ def _seed_profile_widget_state(
         longitude = float(existing.get("longitude", 11.0))
         default_pv_tilt = int(existing.get("default_pv_tilt", 25))
         default_pv_azimuth = int(existing.get("default_pv_azimuth", 0))
-        nne_ap = float(existing.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0)
+        netznutzung = normalize_netznutzung_config(existing.get("netznutzung"))
         absent_mode = bool(existing.get("absent_mode", False))
     else:
         label = allocate_unique_label("Mein Haushalt", siblings or [])
@@ -189,7 +190,7 @@ def _seed_profile_widget_state(
         longitude = 11.0
         default_pv_tilt = 25
         default_pv_azimuth = 0
-        nne_ap = 0.0
+        netznutzung = normalize_netznutzung_config(None)
         absent_mode = False
     st.session_state[_scoped_key(session_scope, "house_profile_label")] = label
     st.session_state[_scoped_key(session_scope, "house_annual_kwh")] = annual_kwh
@@ -198,7 +199,21 @@ def _seed_profile_widget_state(
     st.session_state[_scoped_key(session_scope, "house_profile_longitude")] = longitude
     st.session_state[_scoped_key(session_scope, "house_profile_default_pv_tilt")] = default_pv_tilt
     st.session_state[_scoped_key(session_scope, "house_profile_default_pv_azimuth")] = default_pv_azimuth
-    st.session_state[_scoped_key(session_scope, "house_profile_nne_ap")] = nne_ap
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_area")] = (
+        netznutzung["area_id"] or "__manual__"
+    )
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_metering")] = netznutzung[
+        "power_metering"
+    ]
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_ap")] = netznutzung[
+        "base_cent_kwh"
+    ]
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_qh_meter")] = netznutzung[
+        "quarter_hour_meter"
+    ]
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_include_draft")] = (
+        "entwurf" in netznutzung["include_status"]
+    )
     st.session_state[_scoped_key(session_scope, "house_absent_mode")] = absent_mode
 
 def _profile_widget_state_missing(session_scope: str) -> bool:

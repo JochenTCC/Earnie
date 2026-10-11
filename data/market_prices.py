@@ -55,7 +55,7 @@ def epex_to_brutto_cent(
     return import_cent_kwh(
         float(epex_price_cent),
         spec,
-        netzentgelt_override=kwargs.get("netzentgelt_override"),
+        grid_fee=kwargs.get("grid_fee"),
         slot_datetime=slot_datetime,
     )
 

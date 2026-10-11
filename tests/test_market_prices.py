@@ -238,6 +238,7 @@ def test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex():
     """Regression: predicted k_act uses same import formula as day_ahead."""
     from unittest.mock import MagicMock, patch
 
+    from data.grid_fees import flat_grid_fee_spec
     from data.tariff_pricing import import_cent_kwh
 
     da_slot = normalize_price_slot(datetime(2025, 7, 1, 10, 0, tzinfo=VIENNA))
@@ -255,12 +256,12 @@ def test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex():
     resolved_settings = {
         "_import_tariff_spec": spot_spec,
         "import_tariff_id": "debug_spot",
-        "netzentgelt_cent_kwh": 2.0,
+        "_grid_fee_spec": flat_grid_fee_spec(2.0),
     }
     expected = import_cent_kwh(
         epex,
         spot_spec,
-        netzentgelt_override=2.0,
+        grid_fee=flat_grid_fee_spec(2.0),
         slot_datetime=pred_slot,
     )
     feature_frame = pd.DataFrame(

@@ -144,20 +144,100 @@ def _render_pv_default_row(*, session_scope: str) -> tuple[float, float]:
         )
     return float(default_pv_tilt), float(default_pv_azimuth)
 
-def _render_nne_arbeitspreis(*, session_scope: str) -> float:
-    nne_ap = labeled_number_input(
-        "Netznutzung Arbeitspreis (Cent/kWh)",
-        min_value=0.0,
-        step=0.001,
+NNE_AREA_MANUAL = "__manual__"
+_NNE_METERING_LABELS = {
+    "unmetered_power": "Nicht gemessene Leistung (Standard Haushalt)",
+    "metered_power": "Gemessene Leistung",
+}
+
+
+def _load_grid_fee_catalog_for_ui() -> dict:
+    from data.grid_fees import load_grid_fee_catalog
+    from runtime_store.persist_paths import bundled_grid_fees_file
+
+    return load_grid_fee_catalog(bundled_grid_fees_file())
+
+
+def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
+    """Netznutzung: Netzbereich aus Katalog oder eigener Wert; Messart; Zeitregeln."""
+    from data.grid_fees import resolve_grid_fee_spec
+
+    catalog = _load_grid_fee_catalog_for_ui()
+    areas = catalog["areas"]
+    area_key = _scoped_key(session_scope, "house_profile_nne_area")
+    options = [NNE_AREA_MANUAL, *areas.keys()]
+    area_choice = labeled_selectbox(
+        "Netzbereich (Netznutzung)",
+        options=options,
+        format_func=lambda key: (
+            "Eigener Wert (manuell)" if key == NNE_AREA_MANUAL else areas[key]["label"]
+        ),
         help=(
-            "Volumetrischer Netznutzungs-Arbeitspreis netto (ohne USt), unabhängig vom "
-            "Lieferantentarif. Wird zum Bezugspreis addiert (Live und SE). "
-            "AT-Orientierung: docs/referenz/Netznutzungsentgelte-Austria-2026.csv"
+            "Katalog Netznutzungs-Arbeitspreis (Netzebene 7) inkl. Zeitregeln wie "
+            "SNAP/WiNAP. Netto (ohne USt), unabhängig vom Lieferantentarif."
         ),
         ratios=WIDE_LABEL_RATIOS,
-        key=_scoped_key(session_scope, "house_profile_nne_ap"),
+        key=area_key,
     )
-    return float(nne_ap or 0.0)
+    metering = st.session_state.get(
+        _scoped_key(session_scope, "house_profile_nne_metering"), "unmetered_power"
+    )
+    base_manual = 0.0
+    if area_choice == NNE_AREA_MANUAL:
+        base_manual = float(
+            labeled_number_input(
+                "Netznutzung Arbeitspreis (Cent/kWh)",
+                min_value=0.0,
+                step=0.001,
+                help="Konstanter Netznutzungs-Arbeitspreis netto (ohne USt), ohne Zeitregeln.",
+                ratios=WIDE_LABEL_RATIOS,
+                key=_scoped_key(session_scope, "house_profile_nne_ap"),
+            )
+            or 0.0
+        )
+    else:
+        metering = labeled_selectbox(
+            "Leistungsmessung",
+            options=list(_NNE_METERING_LABELS),
+            format_func=lambda key: _NNE_METERING_LABELS[key],
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, "house_profile_nne_metering"),
+        )
+    qh_meter = bool(
+        labeled_checkbox(
+            "Viertelstunden-Smart-Meter (Voraussetzung für SNAP/WiNAP)",
+            key=_scoped_key(session_scope, "house_profile_nne_qh_meter"),
+        )
+    )
+    include_draft = bool(
+        labeled_checkbox(
+            "Entwurfs-Regeln einbeziehen (noch nicht verordnet, z. B. WiNAP)",
+            key=_scoped_key(session_scope, "house_profile_nne_include_draft"),
+        )
+    )
+    config = {
+        "area_id": None if area_choice == NNE_AREA_MANUAL else area_choice,
+        "power_metering": metering,
+        "quarter_hour_meter": qh_meter,
+        "base_cent_kwh": base_manual,
+        "include_status": ["verordnet", "entwurf"] if include_draft else ["verordnet"],
+    }
+    if config["area_id"] is not None:
+        try:
+            spec = resolve_grid_fee_spec(config, catalog, timezone_name="Europe/Vienna")
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            active = ", ".join(rule["id"] for rule in spec["rules"]) or "keine"
+            skipped = ", ".join(
+                f"{item['id']} ({item['reason']})" for item in spec["skipped"]
+            )
+            st.caption(
+                f"Basis-Arbeitspreis: **{spec['base_cent_kwh']:.2f} Cent/kWh** netto · "
+                f"aktive Zeitregeln: **{active}**"
+                + (f" · übersprungen: {skipped}" if skipped else "")
+            )
+    return config
 
 def _render_location_fields(*, session_scope: str) -> dict:
     st.subheader("Standort")
@@ -172,7 +252,7 @@ def _render_location_fields(*, session_scope: str) -> dict:
     default_pv_tilt, default_pv_azimuth = _render_pv_default_row(
         session_scope=session_scope
     )
-    nne_ap = _render_nne_arbeitspreis(session_scope=session_scope)
+    netznutzung = _render_nne_arbeitspreis(session_scope=session_scope)
     return {
         "land": land,
         "latitude": latitude,
@@ -180,7 +260,7 @@ def _render_location_fields(*, session_scope: str) -> dict:
         "timezone_name": timezone_name,
         "default_pv_tilt": default_pv_tilt,
         "default_pv_azimuth": default_pv_azimuth,
-        "netznutzung_arbeitspreis_cent_kwh": nne_ap,
+        "netznutzung": netznutzung,
     }
 
 def _render_thermal_rc_fields(

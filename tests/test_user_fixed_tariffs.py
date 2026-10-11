@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from data.grid_fees import flat_grid_fee_spec
 from data.tariff_pricing import export_cent_kwh, import_cent_kwh
 from house_config.tariff_plausibility import collect_scenario_tariff_ref_errors
 from house_config.tariffs_store import (
@@ -56,7 +57,7 @@ def test_resolve_user_fixed_import_adds_netznutzung_no_extra_vat():
     tariff = resolved["_import_tariff_spec"]
     assert tariff["prices_include_vat"] is True
     # Gross supplier price + Netznutzung; no second VAT.
-    assert import_cent_kwh(0.0, tariff, netzentgelt_override=5.0) == pytest.approx(16.4)
+    assert import_cent_kwh(0.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(16.4)
 
 
 def test_resolve_user_fixed_export_sets_k_push():

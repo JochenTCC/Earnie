@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from data.grid_fees import flat_grid_fee_spec
 from data.tariff_pricing import (
     SETTLEMENT_MTU_HOURLY,
     SETTLEMENT_MTU_QUARTER_HOUR,
@@ -54,7 +55,7 @@ def test_spot_import_netznutzung_arbeitspreis():
         "prices_include_vat": True,
         "vat_percent": 19.0,
     }
-    assert import_cent_kwh(10.0, tariff, netzentgelt_override=5.0) == pytest.approx(16.0)
+    assert import_cent_kwh(10.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(16.0)
 
 
 def test_fixed_import_adds_netznutzung_before_vat():
@@ -65,7 +66,7 @@ def test_fixed_import_adds_netznutzung_before_vat():
         "vat_percent": 20.0,
     }
     # (10 + 5) * 1.2
-    assert import_cent_kwh(99.0, tariff, netzentgelt_override=5.0) == pytest.approx(18.0)
+    assert import_cent_kwh(99.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(18.0)
 
 
 def test_monthly_import_adds_netznutzung():
@@ -79,7 +80,7 @@ def test_monthly_import_adds_netznutzung():
     }
     slot = datetime(2026, 8, 10, 12, 0)
     assert import_cent_kwh(
-        0.0, tariff, netzentgelt_override=3.0, slot_datetime=slot
+        0.0, tariff, grid_fee=flat_grid_fee_spec(3.0), slot_datetime=slot
     ) == pytest.approx(15.0)
 
 
