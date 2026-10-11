@@ -386,45 +386,18 @@
     },
     "loxone_blocks": {
       "type": "object",
-      "description": "Optional legacy plant marker roles. Prefer house_profiles plant.ehal_bindings (2.4.k). FTP log / PV-tuning keys removed in 2.4.m.",
+      "description": "Rejected at runtime when non-empty. Migrate with python -m scripts.migrate_ehal_bindings --path house_profiles.json --config config.json, then remove this object. Prefer plant.ehal_bindings / batteries[].ehal_bindings entity-scoped.",
       "additionalProperties": false,
       "properties": {
-        "soc_name": {
-          "type": "string",
-          "description": "Legacy Lesen Batterie-SOC % — bevorzugt plant.ehal_bindings.sens_ess_soc."
-        },
-        "pv_power_name": {
-          "type": "string",
-          "description": "Legacy Lesen PV-Leistung — bevorzugt plant.ehal_bindings.sens_pv_production_active."
-        },
-        "battery_power_name": {
-          "type": "string",
-          "description": "Legacy Lesen Batterieleistung — bevorzugt plant.ehal_bindings.sens_ess_power."
-        },
-        "grid_power_name": {
-          "type": "string",
-          "description": "Legacy Lesen Netzleistung — bevorzugt plant.ehal_bindings.sens_grid_power_active."
-        },
-        "target_active_power_name": {
-          "type": "string",
-          "description": "Legacy Schreiben ESS-Sollleistung — bevorzugt plant.ehal_bindings.set_ess_active_power."
-        },
-        "target_charge_power_name": {
-          "type": "string",
-          "description": "Legacy Schreiben Ladegrenze — bevorzugt plant.ehal_bindings.set_ess_charge_power_limit."
-        },
-        "target_discharge_power_name": {
-          "type": "string",
-          "description": "Legacy Schreiben Entladegrenze — bevorzugt plant.ehal_bindings.set_ess_discharge_power_limit."
-        },
-        "control_cmd_name": {
-          "type": "string",
-          "description": "Legacy Schreiben ESS-Modus-Hinweis — bevorzugt plant.ehal_bindings.set_ess_mode."
-        },
-        "consumers_power_name": {
-          "type": "string",
-          "description": "Legacy Lesen Hauslast — bevorzugt plant.ehal_bindings.sens_power_consumers."
-        }
+        "soc_name": {"type": "string"},
+        "pv_power_name": {"type": "string"},
+        "battery_power_name": {"type": "string"},
+        "grid_power_name": {"type": "string"},
+        "target_active_power_name": {"type": "string"},
+        "target_charge_power_name": {"type": "string"},
+        "target_discharge_power_name": {"type": "string"},
+        "control_cmd_name": {"type": "string"},
+        "consumers_power_name": {"type": "string"}
       }
     },
     "ehal": {
@@ -470,9 +443,14 @@
           "type": "object",
           "description": "Home Assistant non-secret settings (2.6.i). URL/token live in config/.env as EHAL_HA_BASE_URL / EHAL_HA_TOKEN.",
           "properties": {
+            "transport": {
+              "type": "string",
+              "enum": ["pull", "weg_b"],
+              "description": "Live I/O transport (2.7.r-T1): pull = HaAdapter REST states/services (default); weg_b = push telemetry to Earnie + poll GET /ehal/status.json (carrier converts to canonical EHAL units on the wire)."
+            },
             "entities": {
               "type": "object",
-              "description": "Deprecated flat map EHAL field → entity_id (cleared after Pattern B migrate).",
+              "description": "Deprecated flat map EHAL field → entity_id (cleared after entity-scoped migrate).",
               "additionalProperties": {
                 "type": "string"
               }

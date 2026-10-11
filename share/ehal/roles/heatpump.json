@@ -8,13 +8,13 @@
       "field": "flex.{hk_id}.sens_power_act",
       "required": false,
       "kind": "stub",
-      "notes": "Pattern B power on thermal_annual (e.g. wp_heating)."
+      "notes": "entity-scoped power on thermal_annual (e.g. wp_heating)."
     },
     {
       "field": "flex.{hk_id}.set_enable",
       "required": false,
       "kind": "stub",
-      "notes": "Pattern B Freigabe / SG-Ready."
+      "notes": "entity-scoped Freigabe / SG-Ready."
     },
     {
       "field": "sens_temperature_heat_storage",

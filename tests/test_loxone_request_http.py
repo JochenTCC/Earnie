@@ -102,6 +102,37 @@ def test_http_alive_records_callback(tmp_path, monkeypatch) -> None:
     assert status["client_ip"] in ("127.0.0.1", "::1", "localhost")
 
 
+def test_http_get_status_json_canonical_matches_loxone_path(monkeypatch) -> None:
+    import json
+
+    from integrations import loxone_status_json as status_mod
+
+    payload = {
+        "heartbeat_ts": 42,
+        "set_ess_active_power": -1.5,
+        "set_ess_charge_power_limit": 0.0,
+        "set_ess_discharge_power_limit": 0.0,
+        "set_ess_mode": 0.0,
+    }
+    monkeypatch.setattr(
+        status_mod,
+        "build_loxone_status_payload",
+        lambda: dict(payload),
+    )
+    server = http_mod.start_loxone_request_http(0)
+    port = server.server_address[1]
+    loxone_url = f"http://127.0.0.1:{port}/ehal/loxone/status.json"
+    canonical_url = f"http://127.0.0.1:{port}/ehal/status.json"
+    with urllib.request.urlopen(loxone_url, timeout=2) as resp:
+        assert resp.status == 200
+        loxone_data = json.loads(resp.read().decode("utf-8"))
+    with urllib.request.urlopen(canonical_url, timeout=2) as resp:
+        assert resp.status == 200
+        assert "application/json" in resp.headers.get("Content-Type", "")
+        canonical_data = json.loads(resp.read().decode("utf-8"))
+    assert canonical_data == loxone_data == payload
+
+
 def test_http_get_status_json(monkeypatch) -> None:
     import json
 

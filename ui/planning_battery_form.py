@@ -107,7 +107,7 @@ def new_battery_template(
         or DEFAULT_BATTERY_KIND,
         "control": str(source.get("control") or "full").strip().lower() or "full",
         "limits_from_live": bool(source.get("limits_from_live", False)),
-        # New id/slug — never copy Pattern B bindings from the source battery.
+        # New id/slug — never copy entity-scoped bindings from the source battery.
         "ehal_bindings": {},
         "battery_wear": copy.deepcopy(dict(source.get("battery_wear") or {})),
     }

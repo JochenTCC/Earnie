@@ -74,10 +74,11 @@ class TestVerifyAndRestore:
             "integrations.ehal_write.published_fetched_at", return_value="t1"
         ), patch.object(
             wd, "_qualified_id_for_watchdog_key", return_value="Earnie_Ziel_LadeLeistung"
-        ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch.object(
-            wd.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
-            }.get(name, "")
+        ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: (
+                "Earnie_Steuerbefehl" if kind == "set_ess_mode" else ""
+            ),
         ), patch.object(wd, "_restore_via_publish", return_value=True) as mock_restore:
             mismatches = wd.verify_and_restore_loxone_states(expected)
 
@@ -95,10 +96,11 @@ class TestVerifyAndRestore:
             "integrations.ehal_write.published_fetched_at", return_value=None
         ), patch.object(
             wd, "_qualified_id_for_watchdog_key", return_value="Earnie_Steuerbefehl"
-        ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch.object(
-            wd.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
-            }.get(name, "")
+        ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: (
+                "Earnie_Steuerbefehl" if kind == "set_ess_mode" else ""
+            ),
         ), patch.object(wd, "_restore_via_publish", return_value=True) as mock_restore:
             mismatches = wd.verify_and_restore_loxone_states(expected)
 

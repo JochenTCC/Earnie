@@ -3,7 +3,7 @@
 **Status:** current  
 **Purpose:** Bring up and configure the **combined** Compose stack (`earnie` + `homeassistant` + `evcc`) so you can prove Earnie talks to Home Assistant over **REST only** (EHAL / DACH path A2; backlog history **2.4.c**).
 
-**Audience:** Operator of the lab on a Dev-PC or Pi. Containers may already be running; this guide finishes **HA onboarding**, **token**, **evcc**, **Earnie HA Anbindung** (`.env` + Pattern B bindings), and a **communication check**.
+**Audience:** Operator of the lab on a Dev-PC or Pi. Containers may already be running; this guide finishes **HA onboarding**, **token**, **evcc**, **Earnie HA Anbindung** (`.env` + entity-scoped bindings), and a **communication check**.
 
 **German user overview (A2 vs B):** [`docs/einrichtung/ha-evcc.md`](../einrichtung/ha-evcc.md)
 
@@ -152,7 +152,7 @@ Connection refused → HA not ready or wrong port.
 ### 2.3 Where Earnie stores the token
 
 - Prefer Streamlit **Daemon Control → Smarthome-Backend** for `ehal.backend=ha` + URL/token (writes `EHAL_HA_*` into `config/.env`; optional `sign` stays in `config.json` → `ehal.ha`).
-- Entity mapping: **EHAL-Com → HA Entity → EHAL Mapping** (writes Pattern B `plant` / `consumers[].ehal_bindings` into `house_profiles.json`).
+- Entity mapping: **EHAL-Com → HA Entity → EHAL Mapping** (writes entity-scoped `plant` / `consumers[].ehal_bindings` into `house_profiles.json`).
 - Or merge [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) for `backend` / `adapter_id` / `sign` only — the snippet has **no** `token` / `base_url` keys after **2.6.i**.
 
 Treat `config/.env` as secret-bearing. Do not commit lab tokens.
@@ -341,8 +341,8 @@ Expect on the host:
 
 Either:
 
-1. **UI (preferred):** **Smarthome-Backend** for `ehal.backend=ha` + URL/token → `config/.env`; §5 mapping expander for Pattern B entity IDs (`plant` / `consumers[].ehal_bindings`) and optional `ehal.ha.sign`.
-2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json` (backend + `sign` only). Put URL/token into `ha_lab/config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`). Put entity IDs into `house_profiles.json` Pattern B maps — do **not** refill flat `ehal.ha.entities` for new labs (legacy map is one-shot migrated). Fixture golden maps under `house_sim/fixtures/*/ehal.ha.entities.json` are still the field→entity source for the mock bench; merge those keys into plant/consumer bindings when wiring Earnie.
+1. **UI (preferred):** **Smarthome-Backend** for `ehal.backend=ha` + URL/token → `config/.env`; §5 mapping expander for entity-scoped entity IDs (`plant` / `consumers[].ehal_bindings`) and optional `ehal.ha.sign`.
+2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json` (backend + `sign` only). Put URL/token into `ha_lab/config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`). Put entity IDs into `house_profiles.json` entity-scoped maps — do **not** refill flat `ehal.ha.entities` for new labs (legacy map is one-shot migrated). Fixture golden maps under `house_sim/fixtures/*/ehal.ha.entities.json` are still the field→entity source for the mock bench; merge those keys into plant/consumer bindings when wiring Earnie.
 
 Inside Compose, `EHAL_HA_BASE_URL` **must** be:
 
@@ -382,7 +382,7 @@ Silent gate: `loxone_silent_mode` also blocks HA setpoint writes (same as OpenEM
 
 7. Set **sign** `ehal` vs `negate` for grid / ESS power if needed (`ehal.ha.sign` in `config.json`).  
 8. **Telemetrie testen** → expect validated JSON (SoC, powers).  
-9. **Mapping speichern** → writes that entity’s bindings into `plant` / `consumers[].ehal_bindings` in `house_profiles.json` (Pattern B; legacy flat `ehal.ha.entities` is migrated once and cleared) and reloads runtime config.
+9. **Mapping speichern** → writes that entity’s bindings into `plant` / `consumers[].ehal_bindings` in `house_profiles.json` (entity-scoped; legacy flat `ehal.ha.entities` is migrated once and cleared) and reloads runtime config.
 
 LLM-assisted proposals are **not** in the shipping UI (optional Ollama code may exist in `integrations/` for later re-integration).
 
@@ -437,7 +437,7 @@ IDs only (`sensor.evcc_grid_power`, …).
 | --- | --- |
 | HA States shows mapped `entity_id`s | yes |
 | HITL **Telemetrie testen** returns SoC (+ powers) | yes |
-| `ha_lab/config/config.json` has `ehal.backend=ha`; entity IDs in `house_profiles.json` Pattern B bindings | yes |
+| `ha_lab/config/config.json` has `ehal.backend=ha`; entity IDs in `house_profiles.json` entity-scoped bindings | yes |
 | Live / logs: no “Kein Zugriff auf EHAL SoC” (§6.3) | yes |
 | Optimizer exclusivity still true (§3.6) | yes |
 
@@ -498,6 +498,23 @@ docker compose --project-directory . -f docker/compose/ha-lab.yml down
 ```
 
 Bind mounts (`ha_lab/…`) are kept. To factory-reset HA only, remove files under `ha_lab/homeassistant/` and start again.
+
+---
+
+## 9. Weg B (push + status.json) — optional after 2.7.r
+
+Default lab path remains **`ehal.ha.transport=pull`** (§5–§6). For the Loxone-like HTTP contract:
+
+1. Set `"transport": "weg_b"` under `ehal.ha` in `ha_lab/config/config.json` (see [`ehal.md`](ehal.md) § Home Assistant).
+2. Ensure Earnie listens on **`system.ehal_loxone_http_port`** (default **8541**) and `EARNIE_PILOT_PUSH_TOKEN` is set in `ha_lab/config/.env` (same rules as Loxone pilot push).
+3. Generate a carrier fragment from current bindings:
+   ```powershell
+   .venv\Scripts\python.exe -m scripts.ha_carrier_yaml_gen --config-dir ha_lab\config --host earnie-ha-lab --port 8541 --out ha_lab\homeassistant\earnie_weg_b.yaml
+   ```
+   Merge `rest_command` + `sensor` blocks into HA `configuration.yaml` (or packages). **Convert entity units to canonical EHAL units in Jinja before calling** `/ehal/telemetry/<qualified-id>/<value>`.
+4. Map bindings in EHAL-Com (entity IDs still document the HA side; push-only activation may leave entity_id empty).
+5. **Read check:** push values appear in EHAL-Com Live-Lesen (inbox age / push state, not `/api/states` for activated fields).
+6. **Write check:** with silent mode off, setpoints land in `GET /ehal/status.json`; Schreibtest success = published ledger + HA (or test client) fetched status.json (`published_fetched_at`). Huawei `ha_ess_force` stays on REST services when configured.
 
 ---
 

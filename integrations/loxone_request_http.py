@@ -1,4 +1,4 @@
-"""Minimal Loxone → Earnie HTTP (Request Optimize, alive, Pattern B status.json)."""
+"""Minimal hub → Earnie HTTP (Request Optimize, alive, status.json, telemetry push)."""
 from __future__ import annotations
 
 import hmac
@@ -15,8 +15,18 @@ logger = logging.getLogger(__name__)
 REQUEST_OPTIMIZE_PATH = "/ehal/loxone/request_optimize"
 ALIVE_PATH = "/ehal/loxone/alive"
 STATUS_PATH = "/ehal/loxone/status.json"
-# Pilot (spike/vo-push-pilot): Virtual Output push, observation only.
-TELEMETRY_PREFIX = "/ehal/loxone/telemetry/"
+STATUS_PATH_CANONICAL = "/ehal/status.json"
+_STATUS_PATHS = frozenset(
+    {
+        STATUS_PATH.rstrip("/"),
+        STATUS_PATH,
+        STATUS_PATH_CANONICAL.rstrip("/"),
+        STATUS_PATH_CANONICAL,
+    }
+)
+# Backend-neutral telemetry push; Loxone-prefixed path kept as alias for deployed VOs.
+TELEMETRY_PREFIX = "/ehal/telemetry/"
+TELEMETRY_PREFIX_ALIAS = "/ehal/loxone/telemetry/"
 PUSH_TOKEN_ENV = "EARNIE_PILOT_PUSH_TOKEN"
 PUSH_TOKEN_HEADER = "X-Earnie-Token"
 
@@ -30,6 +40,19 @@ def split_token_prefix(raw_path: str) -> tuple[str | None, str]:
         return None, raw_path
     token, _, rest = raw_path[len(TOKEN_PATH_PREFIX):].partition("/")
     return unquote(token), "/" + rest
+
+
+def match_telemetry_prefix(path: str) -> str | None:
+    """Return the matched telemetry prefix, or None.
+
+    Checks the longer Loxone alias first so strip length is always correct.
+    """
+    path_only = urlparse(path).path
+    if path_only.startswith(TELEMETRY_PREFIX_ALIAS):
+        return TELEMETRY_PREFIX_ALIAS
+    if path_only.startswith(TELEMETRY_PREFIX):
+        return TELEMETRY_PREFIX
+    return None
 
 
 def _normalize_path(raw_path: str) -> str:
@@ -80,7 +103,7 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
         if prefix_token is not None:
             # Token in the address (``http://host:8541/t/<token>``): only the telemetry
             # endpoint is reachable this way.
-            if route.startswith(TELEMETRY_PREFIX):
+            if match_telemetry_prefix(route) is not None:
                 self._handle_telemetry_push(route, prefix_token)
             else:
                 self.send_error(404)
@@ -91,25 +114,29 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             return
-        if path == STATUS_PATH.rstrip("/") or path == STATUS_PATH:
-            self._record_peer()
-            from integrations.loxone_status_json import build_loxone_status_payload
-
-            body = json.dumps(build_loxone_status_payload()).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+        if path in _STATUS_PATHS:
+            self._send_status_json()
             return
-        if self.path.startswith(TELEMETRY_PREFIX):
+        if match_telemetry_prefix(self.path) is not None:
             self._handle_telemetry_push(self.path, None)
             return
         self.send_error(404)
 
-    def _handle_telemetry_push(self, route: str, prefix_token: str | None) -> None:
-        """``GET /ehal/loxone/telemetry/<EHAL-ID>/<value>`` — pilot inbox (no control effect).
+    def _send_status_json(self) -> None:
+        self._record_peer()
+        from integrations.loxone_status_json import build_loxone_status_payload
 
+        body = json.dumps(build_loxone_status_payload()).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _handle_telemetry_push(self, route: str, prefix_token: str | None) -> None:
+        """``GET /ehal/telemetry/<EHAL-ID>/<value>`` — pilot inbox (no control effect).
+
+        Alias ``/ehal/loxone/telemetry/…`` is accepted for existing Virtual Outputs.
         Disabled (404) unless ``EARNIE_PILOT_PUSH_TOKEN`` is set. The token comes in the
         ``X-Earnie-Token`` header, as a ``/t/<token>`` address prefix, or as ``?t=`` query
         parameter (checked in this order; the first one present must match).
@@ -119,6 +146,10 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         parsed = urlparse(route)
+        matched = match_telemetry_prefix(parsed.path)
+        if matched is None:
+            self.send_error(404)
+            return
         supplied = (
             self.headers.get(PUSH_TOKEN_HEADER)
             or prefix_token
@@ -127,7 +158,7 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
         if not hmac.compare_digest(str(supplied).encode(), expected.encode()):
             self.send_error(401)
             return
-        ehal_id, _, raw = unquote(parsed.path[len(TELEMETRY_PREFIX):]).partition("/")
+        ehal_id, _, raw = unquote(parsed.path[len(matched):]).partition("/")
         from runtime_store.loxone_push_inbox import record_push
 
         peer = self.client_address[0] if self.client_address else ""
@@ -194,6 +225,7 @@ def start_loxone_request_http(
             REQUEST_OPTIMIZE_PATH,
             ALIVE_PATH,
             STATUS_PATH,
+            STATUS_PATH_CANONICAL,
         )
         return server
 

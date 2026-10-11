@@ -613,38 +613,28 @@ def _append_plant_energy_read_checks(
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
     from ehal.qualified_ids import qualified_plant_id
-    from integrations.ehal_debug_mapping import has_mappable_live_batteries
+    from house_config.ehal_bindings import resolve_plant_binding
     from settings.ehal_marker_resolve import (
-        marker_get_ess_max_charge_power,
-        marker_get_ess_max_discharge_power,
-        marker_get_ess_soc_max,
-        marker_get_ess_soc_min,
         marker_get_grid_export_power_limit,
         marker_sens_absent_mode,
         marker_sens_temperature_outside,
     )
 
-    has_batteries = has_mappable_live_batteries()
     checks: list[tuple[str, str, dict]] = []
-    if not has_batteries:
-        checks.append(("sens_ess_soc", config.get("LOXONE_SOC_NAME"), {}))
-    checks.append(
-        ("sens_pv_production_active", config.get("LOXONE_PV_POWER_NAME"), {})
-    )
-    if not has_batteries:
-        checks.append(("sens_ess_power", config.get("LOXONE_BATTERY_POWER_NAME"), {}))
-    checks.append(
-        (
-            qualified_plant_id("sens_grid_power_active"),
-            config.get("LOXONE_GRID_POWER_NAME"),
-            {},
-        )
-    )
-    consumers_power = config.get("LOXONE_CONSUMERS_POWER_NAME")
-    if consumers_power:
-        checks.append(("sens_power_consumers", consumers_power, {}))
-
     house_doc = loxone_client._default_house_profiles_doc()
+    # ESS reads come from _append_battery_ess_read_checks (entity-scoped only).
+    pv_io = resolve_plant_binding(house_doc, "sens_pv_production_active")
+    if pv_io:
+        checks.append(("sens_pv_production_active", pv_io, {}))
+    grid_io = resolve_plant_binding(house_doc, "sens_grid_power_active")
+    if grid_io:
+        checks.append(
+            (qualified_plant_id("sens_grid_power_active"), grid_io, {})
+        )
+    consumers_io = resolve_plant_binding(house_doc, "sens_power_consumers")
+    if consumers_io:
+        checks.append(("sens_power_consumers", consumers_io, {}))
+
     ambient_io = marker_sens_temperature_outside(house_doc=house_doc)
     _append_io_check(checks, "sens_temperature_outside", ambient_io)
     absent_io = marker_sens_absent_mode(house_doc=house_doc)
@@ -653,23 +643,6 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
     _append_io_check(
         checks, qualified_plant_id("get_grid_export_power_limit"), export_in_io
     )
-    if not has_batteries:
-        _append_io_check(
-            checks, "get_ess_soc_min", marker_get_ess_soc_min(house_doc=house_doc)
-        )
-        _append_io_check(
-            checks, "get_ess_soc_max", marker_get_ess_soc_max(house_doc=house_doc)
-        )
-        _append_io_check(
-            checks,
-            "get_ess_max_charge_power",
-            marker_get_ess_max_charge_power(house_doc=house_doc),
-        )
-        _append_io_check(
-            checks,
-            "get_ess_max_discharge_power",
-            marker_get_ess_max_discharge_power(house_doc=house_doc),
-        )
     _append_plant_energy_read_checks(checks, house_doc)
 
     for consumer in _consumers_for_live_reads():
@@ -689,7 +662,7 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
 
 
 def _append_battery_ess_read_checks(checks: list[tuple[str, str, dict]]) -> None:
-    """Per-battery Pattern B ESS reads from ``components.json`` (2.7.m)."""
+    """Per-battery entity-scoped ESS reads from ``components.json`` (2.7.m)."""
     from ehal.ess_fields import binding_address, ess_field
     from ehal.loxone_push_source import is_pushable_kind
     from integrations.ehal_debug_mapping import BATTERY_ESS_LIVE_READ_KINDS

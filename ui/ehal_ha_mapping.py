@@ -98,7 +98,7 @@ def _ha_credentials(data: dict) -> dict[str, Any]:
 
 
 def _ensure_ha_migrated() -> tuple[dict, dict]:
-    """One-shot migrate flat entities → Pattern B; return (config, house)."""
+    """One-shot migrate flat entities → entity-scoped; return (config, house)."""
     from runtime_store.shadow.mode import is_shadow_mode
 
     config_doc = load_main_config()
@@ -534,7 +534,7 @@ def _render_ha_mapping_intro() -> None:
     from runtime_store.shadow.mode import is_shadow_mode
 
     st.caption(
-        "Entity-zentriertes Mapping (Pattern B): zuerst Entity wählen "
+        "Entity-zentriertes Mapping (entity-scoped): zuerst Entity wählen "
         "(Anlage, Batterien aus `components.json`, Verbraucher aus dem Live-Hausprofil), "
         "dann nur deren EHAL-Felder. "
         "Scan einmal pro Session → Heuristik schlägt leere Felder vor → prüfen → "
@@ -744,7 +744,7 @@ def _render_entity_mapping_body(
 
 
 def render_ehal_ha_mapping_section() -> None:
-    """Entity-picker HITL; persists Pattern B bindings; HA secrets in .env."""
+    """Entity-picker HITL; persists entity-scoped bindings; HA secrets in .env."""
     _render_ha_mapping_intro()
 
     config_doc, house = _ensure_ha_migrated()

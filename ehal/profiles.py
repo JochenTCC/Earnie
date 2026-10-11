@@ -296,7 +296,7 @@ def group_fields_by_role(fields: tuple[str, ...] | list[str]) -> list[tuple[str,
     """Order fields into (role_id, fields) groups for HITL sections.
 
     Unknown fields are collected under role_id ``other``.
-    Pattern B ``ess.{slug}.*`` groups under ``ess`` (2.7.m).
+    entity-scoped ``ess.{slug}.*`` groups under ``ess`` (2.7.m).
     """
     buckets: dict[str, list[str]] = {rid: [] for rid in ("grid", "pv", "ess", "evcs")}
     other: list[str] = []

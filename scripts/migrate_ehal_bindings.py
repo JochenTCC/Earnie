@@ -63,7 +63,11 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    from house_config.ehal_bindings import ensure_migrated, strip_migrated_config_keys
+    from house_config.ehal_bindings import (
+        ensure_migrated,
+        migrate_loxone_blocks_to_plant,
+        strip_migrated_config_keys,
+    )
 
     house_path = Path(args.path)
     house_doc = _load_json(house_path)
@@ -72,6 +76,25 @@ def main(argv: list[str] | None = None) -> None:
     if args.config:
         config_path = Path(args.config)
         config_doc = _load_json(config_path)
+
+    # Explicit CLI migrate: blocks → plant before ensure_migrated (which refuses blocks).
+    if isinstance(config_doc, dict):
+        blocks = config_doc.get("loxone_blocks")
+        if isinstance(blocks, dict) and blocks:
+            house_doc = dict(house_doc)
+            plant = dict(house_doc.get("plant") or {}) if isinstance(
+                house_doc.get("plant"), dict
+            ) else {}
+            bindings = dict(plant.get("ehal_bindings") or {}) if isinstance(
+                plant.get("ehal_bindings"), dict
+            ) else {}
+            for field, addr in migrate_loxone_blocks_to_plant(blocks).items():
+                if field not in bindings or not str(bindings.get(field) or "").strip():
+                    bindings[field] = addr
+            plant["ehal_bindings"] = bindings
+            house_doc["plant"] = plant
+            config_doc = dict(config_doc)
+            config_doc.pop("loxone_blocks", None)
 
     house_out, config_out, changed = ensure_migrated(
         house_doc,

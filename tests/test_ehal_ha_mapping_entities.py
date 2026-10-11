@@ -6,7 +6,7 @@ import pytest
 from integrations.ehal_debug_mapping import (
     expand_ha_telemetry_for_live,
     expand_ha_writes_for_live,
-    ha_pattern_b_live_mapping,
+    ha_entity_scoped_live_mapping,
 )
 from ehal.ess_fields import ess_field
 from integrations.ha_adapter import TELEMETRY_ENERGY_OPTIONAL
@@ -243,9 +243,9 @@ def test_ha_empty_only_select_default():
     assert resolve_field_select_default("", "sensor.propose") == "sensor.propose"
 
 
-def test_ha_pattern_b_live_mapping_entity_centric():
+def test_ha_entity_scoped_live_mapping_entity_centric():
     house = _sample_house()
-    mapping = ha_pattern_b_live_mapping(house)
+    mapping = ha_entity_scoped_live_mapping(house)
     assert mapping["sens_ess_soc"] == "sensor.soc"
     assert mapping["grid.meter.sens_grid_power_active"] == "sensor.grid"
     assert mapping["evcs.wallbox.sens_evcs_active_power"] == "sensor.ev_power"
@@ -284,7 +284,7 @@ def test_expand_ha_writes_and_live_rows():
         house,
     )
     assert writes[0]["field"] == "evcs.wallbox.set_evcs_max_current"
-    mapping = ha_pattern_b_live_mapping(house)
+    mapping = ha_entity_scoped_live_mapping(house)
     rows = build_ehal_write_rows(
         writes,
         mapping=mapping,
@@ -297,7 +297,7 @@ def test_expand_ha_writes_and_live_rows():
 
 def test_ha_telemetry_rows_entity_centric_values():
     house = _sample_house()
-    mapping = ha_pattern_b_live_mapping(house)
+    mapping = ha_entity_scoped_live_mapping(house)
     telemetry = expand_ha_telemetry_for_live(
         {"sens_ess_soc": 40.0, "sens_evcs_active_power": 100.0},
         house,

@@ -9,7 +9,7 @@ Decided: wire `schema_version` stays **4** (2.7 is unreleased, all new fields ar
 
 ## Design in one paragraph
 
-An inverter is a first-class device (`components.json` → `inverters[]`). PV systems and batteries point to it via `inverter_id`. Built-in inverters (EcoFlow, Balkonkraftwerk storage) are normal inverters with `owned_by: <battery_id>` — no special case on the wire. EHAL gets a new optional role `inverter` in Pattern B (`inverter.{slug}.*`), bindings stored on `inverters[].ehal_bindings`, like `ess.{slug}.*` on `batteries[].ehal_bindings`. The global `sens_pv_production_active` stays the required plant sum; per-inverter values are additive and optional. `batteries[].kind` disappears; `ac_connection` on the inverter replaces it.
+An inverter is a first-class device (`components.json` → `inverters[]`). PV systems and batteries point to it via `inverter_id`. Built-in inverters (EcoFlow, Balkonkraftwerk storage) are normal inverters with `owned_by: <battery_id>` — no special case on the wire. EHAL gets a new optional role `inverter` in entity-scoped (`inverter.{slug}.*`), bindings stored on `inverters[].ehal_bindings`, like `ess.{slug}.*` on `batteries[].ehal_bindings`. The global `sens_pv_production_active` stays the required plant sum; per-inverter values are additive and optional. `batteries[].kind` disappears; `ac_connection` on the inverter replaces it.
 
 ### New wire fields
 
@@ -31,7 +31,7 @@ An inverter is a first-class device (`components.json` → `inverters[]`). PV sy
 ### 1. Header / history
 
 - `**History (backlog):**` append `→ 2.7.l (inverter entity)`.
-- `**Status:**` line: add "role `inverter` (Pattern B, optional)".
+- `**Status:**` line: add "role `inverter` (entity-scoped, optional)".
 
 ### 2. Core contract table
 
@@ -39,7 +39,7 @@ Add a row after "HA today":
 
 | Rule | Detail |
 |---|---|
-| Inverter today | Optional role `inverter`: bindings `inverter.{slug}.*` on `inverters[].ehal_bindings` (Pattern B, same storage idea as `ess.{slug}.*`). Without mapped inverter fields the plant behaves as before; `sens_pv_production_active` stays the plant PV sum. |
+| Inverter today | Optional role `inverter`: bindings `inverter.{slug}.*` on `inverters[].ehal_bindings` (entity-scoped, same storage idea as `ess.{slug}.*`). Without mapped inverter fields the plant behaves as before; `sens_pv_production_active` stays the plant PV sum. |
 
 ### 3. Units and sign convention
 
@@ -107,7 +107,7 @@ Add row: `supports_inv_power_limit` | no | `set_inv_ac_power_limit` can be writt
 ### 9. Deferred device classes / Device roles
 
 - "Device roles" table, `Device-role schema` row: roles list becomes `grid`, `pv`, `ess`, `inverter`, `evcs`; stubs unchanged. Add `share/ehal/roles/inverter.json` (all fields optional).
-- Rules paragraph: add "`inverter.{slug}.*` is a Pattern B namespace like `ess.{slug}.*` and `flex.{slug}.*`."
+- Rules paragraph: add "`inverter.{slug}.*` is a entity-scoped namespace like `ess.{slug}.*` and `flex.{slug}.*`."
 
 ### 10. Implementation notes
 
@@ -142,7 +142,7 @@ Add: "Efficiency modelling DC↔AC (follow-up of 2.7.l), multi-inverter attribut
 
 ### 4. New §C.7 "Inverter (per device)" (append after C.6 to avoid renumbering)
 
-Intro (short): "Bindings live on `inverters[].ehal_bindings` as Pattern B `inverter.{slug}.*` (slug = inverter id). Optional; role template `share/ehal/roles/inverter.json`. Built-in inverters (`owned_by`) share a physical device with an ESS: map both slugs to that device's entities."
+Intro (short): "Bindings live on `inverters[].ehal_bindings` as entity-scoped `inverter.{slug}.*` (slug = inverter id). Optional; role template `share/ehal/roles/inverter.json`. Built-in inverters (`owned_by`) share a physical device with an ESS: map both slugs to that device's entities."
 
 | Area / meaning | Type | EHAL value name | OpenEMS | evcc | Victron GX | Loxone / Loxone extra |
 |---|---|---|---|---|---|---|

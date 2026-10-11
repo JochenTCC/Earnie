@@ -36,7 +36,7 @@ _DEFAULT_FORCE_W = 100.0
 
 def _render_write_test_intro() -> None:
     st.caption(
-        "Alle gemappten Schreib-Felder (Plant, Batterien Pattern B, EV, Flex). "
+        "Alle gemappten Schreib-Felder (Plant, Batterien entity-scoped, EV, Flex). "
         "**Senden** je Zeile aktivieren, Werte setzen, dann schreiben. "
         "Optional Auto-Roundtrip: Loxone = Publish + Miniserver-Callback "
         "(kein Merker-HTTP-Echo)."
@@ -57,7 +57,7 @@ def _render_force_checkbox(*, disabled: bool) -> bool:
             disabled=disabled,
             help=(
                 "Zeilen sind immer sichtbar. Ohne Haken ist Senden für "
-                "``set_ess_active_power`` (auch Pattern B) gesperrt. "
+                "``set_ess_active_power`` (auch entity-scoped) gesperrt. "
                 f"Default-Wert {_DEFAULT_FORCE_W:g} W, hart ±{ACTIVE_POWER_MAX_ABS_W:g} W."
             ),
         )

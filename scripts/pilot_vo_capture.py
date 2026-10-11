@@ -11,7 +11,7 @@ Usage (PC in the LAN, port free):
     python -m scripts.pilot_vo_capture --port 8599 [--out capture.jsonl]
 
 VO address in Loxone Config: ``http://<this-PC-IP>:8599``; command e.g.
-``/ehal/loxone/telemetry/sens_ess_soc/\\v`` (repeat 30 s).
+``/ehal/telemetry/sens_ess_soc/\\v`` (repeat 30 s).
 """
 from __future__ import annotations
 

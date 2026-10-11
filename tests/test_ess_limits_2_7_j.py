@@ -166,47 +166,56 @@ def test_plant_live_read_fields_include_ess_gets():
         assert field in PLANT_LIVE_READ_FIELDS
 
 
-def test_collect_read_checks_includes_ess_limit_gets():
+def test_collect_read_checks_includes_ess_limit_gets(tmp_path, monkeypatch):
+    from ehal.ess_fields import ess_field
     from integrations import loxone_connectivity as lc
 
-    house = {
-        "plant": {
-            "ehal_bindings": {
-                "get_ess_soc_min": "Earnie_Batterie_SOC_Min",
-                "get_ess_soc_max": "Earnie_Batterie_SOC_Max",
-                "get_ess_max_charge_power": "Earnie_Batterie_Max_Ladeleistung",
-                "get_ess_max_discharge_power": "Earnie_Batterie_Max_Entladeleistung",
-            },
-        }
+    house_id = "15_kwh_speicher"
+    components = {
+        "batteries": [
+            {
+                "id": house_id,
+                "type": "house",
+                "ehal_bindings": {
+                    ess_field(house_id, "get_ess_soc_min"): "Earnie_Batterie_SOC_Min",
+                    ess_field(house_id, "get_ess_soc_max"): "Earnie_Batterie_SOC_Max",
+                    ess_field(
+                        house_id, "get_ess_max_charge_power"
+                    ): "Earnie_Batterie_Max_Ladeleistung",
+                    ess_field(
+                        house_id, "get_ess_max_discharge_power"
+                    ): "Earnie_Batterie_Max_Entladeleistung",
+                },
+            }
+        ]
     }
+    path = tmp_path / "components.json"
+    path.write_text(__import__("json").dumps(components), encoding="utf-8")
+    monkeypatch.setattr(
+        "runtime_store.persist_paths.resolve_components_json_path",
+        lambda: str(path),
+    )
+    house = {"plant": {"ehal_bindings": {}}}
 
-    def _plant_get(key, default=None):
-        return {
-            "LOXONE_SOC_NAME": "SoC",
-            "LOXONE_PV_POWER_NAME": "PV",
-            "LOXONE_BATTERY_POWER_NAME": "Bat",
-            "LOXONE_GRID_POWER_NAME": "Grid",
-            "LOXONE_CONSUMERS_POWER_NAME": None,
-        }.get(key, default)
-
-    with patch.object(lc.config, "get", side_effect=_plant_get), patch.object(
+    with patch.object(
         lc.config, "get_flexible_consumers", return_value=[]
     ), patch.object(
         lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
     ), patch.object(
         lc.loxone_client, "_default_house_profiles_doc", return_value=house
-    ), patch(
-        "integrations.ehal_debug_mapping.has_mappable_live_batteries",
-        return_value=False,
     ):
         checks = lc.collect_read_checks()
 
     by_label = {label: io for label, io, _ in checks}
-    assert by_label["get_ess_soc_min"] == "Earnie_Batterie_SOC_Min"
-    assert by_label["get_ess_soc_max"] == "Earnie_Batterie_SOC_Max"
-    assert by_label["get_ess_max_charge_power"] == "Earnie_Batterie_Max_Ladeleistung"
+    assert by_label[ess_field(house_id, "get_ess_soc_min")] == "Earnie_Batterie_SOC_Min"
+    assert by_label[ess_field(house_id, "get_ess_soc_max")] == "Earnie_Batterie_SOC_Max"
     assert (
-        by_label["get_ess_max_discharge_power"] == "Earnie_Batterie_Max_Entladeleistung"
+        by_label[ess_field(house_id, "get_ess_max_charge_power")]
+        == "Earnie_Batterie_Max_Ladeleistung"
+    )
+    assert (
+        by_label[ess_field(house_id, "get_ess_max_discharge_power")]
+        == "Earnie_Batterie_Max_Entladeleistung"
     )
 
 

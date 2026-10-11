@@ -58,7 +58,9 @@ def _tolerance_for_io(
     flex_setpoint_names: set[str],
     flex_mode_names: set[str],
 ) -> float:
-    if io_name == config.get("LOXONE_CONTROL_CMD_NAME"):
+    from house_config.ess_bindings import resolve_primary_ess_binding
+
+    if io_name and io_name == resolve_primary_ess_binding("set_ess_mode"):
         return 0.0
     if io_name in flex_enable_names:
         return 0.0

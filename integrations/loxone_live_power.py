@@ -504,9 +504,17 @@ def fetch_loxone_live_power() -> Optional[dict]:
     """
     Holt Echtzeit-Leistungswerte aus Loxone, normiert sie und prüft Vorzeichen.
     """
-    pv = fetch_loxone_generic_value(config.get("LOXONE_PV_POWER_NAME"))
-    battery_raw = fetch_loxone_generic_value(config.get("LOXONE_BATTERY_POWER_NAME"))
-    grid_raw = fetch_loxone_generic_value(config.get("LOXONE_GRID_POWER_NAME"))
+    from house_config.ehal_bindings import resolve_plant_binding
+    from house_config.ess_bindings import resolve_primary_ess_binding
+    from optimizer.live_export_limit import load_house_doc
+
+    house = load_house_doc()
+    pv_io = resolve_plant_binding(house, "sens_pv_production_active")
+    grid_io = resolve_plant_binding(house, "sens_grid_power_active")
+    battery_io = resolve_primary_ess_binding("sens_ess_power")
+    pv = fetch_loxone_generic_value(pv_io)
+    battery_raw = fetch_loxone_generic_value(battery_io)
+    grid_raw = fetch_loxone_generic_value(grid_io)
 
     if pv is None or grid_raw is None or battery_raw is None:
         return None

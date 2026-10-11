@@ -9,7 +9,7 @@
 | --- | --- | --- |
 | Meter energy states in LoxAPP3 | **Go** | Real dump (`tests/fixtures/loxapp3_greenfield.json`): uni Meter has `states.total`; bidirectional Grid has `total` + `totalNeg`. Formats `%.1fkWh`. |
 | Same control as power binding | **Go (config)** | EFM still binds plant/consumer **power** to the Meter name. Energy is activated as separate EHAL push fields (no Merker `/all`). |
-| Live read path | **Go (VO push)** | Loxone pushes cumulative kWh via Virtual Outputs to `/ehal/loxone/telemetry/<EHAL-ID>/<v>`. The QH sampler reads fresh inbox counters. HTTP `/jdev/sps/io/{Meter}/all` and profile key `loxone_meter_energy` are **retired**. |
+| Live read path | **Go (VO push)** | Loxone pushes cumulative kWh via Virtual Outputs to `/ehal/telemetry/<EHAL-ID>/<v>` (alias `/ehal/loxone/telemetry/…`). The QH sampler reads fresh inbox counters. HTTP `/jdev/sps/io/{Meter}/all` and profile key `loxone_meter_energy` are **retired**. |
 | EHAL wire | **Push fields** | Plant reuses HA kinds; consumers add `sens_energy_total` only (mono — consumers cannot export); batteries add `sens_ess_energy_charge` / `sens_ess_energy_discharge` (bipolar; Pilot / `VO_Earnie_Battery`). |
 | Grid sign | **Go** | Import = consumption; export = delivery. Net slot energy = Δimport − Δexport → avg `grid_kw` with EHAL sign (+ import). |
 | Reset / wrap | **Fallback** | Negative channel Δ → reject counter for that channel, keep sample mean. |

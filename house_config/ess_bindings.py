@@ -1,96 +1,88 @@
-"""Merge Pattern B ESS bindings from batteries[] for Live adapters (2.7.c)."""
+"""Primary house-battery entity-scoped ESS binding lookup (no plant-flat aliases)."""
 from __future__ import annotations
 
-from ehal.ess_fields import ess_ehal_slug, parse_ess_pattern_b, plant_flat_ess_keys
-from house_config.powerstation import is_house_battery
+from ehal.ess_fields import ESS_FIELD_KINDS, binding_address, ess_field
+from house_config.powerstation import ehal_mappable_batteries, primary_house_battery
 
 
-def _battery_ids(batteries: list[dict]) -> list[str]:
-    return [
-        str(b.get("id") or "").strip()
-        for b in batteries
-        if str(b.get("id") or "").strip()
-    ]
+def mappable_batteries(
+    batteries: list[dict] | None = None,
+) -> list[dict]:
+    """EHAL-mappable batteries from arg or components.json."""
+    if batteries is not None:
+        return ehal_mappable_batteries(
+            [b for b in batteries if isinstance(b, dict)]
+        )
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return []
+        doc = load_components_document(path)
+        raw = doc.get("batteries") if isinstance(doc, dict) else []
+        return ehal_mappable_batteries(raw if isinstance(raw, list) else [])
+    except Exception:  # noqa: BLE001 — resolve path must stay usable
+        return []
 
 
-def _primary_for_flat_aliases(
-    selected: list[str],
-    by_id: dict[str, dict],
-) -> str:
-    """House battery first — powerstations must not own plant-flat ESS aliases."""
-    for bat_id in selected:
-        bat = by_id.get(bat_id)
-        if bat is not None and is_house_battery(bat):
-            return bat_id
-    return selected[0] if selected else ""
+def primary_battery(
+    batteries: list[dict] | None = None,
+) -> dict | None:
+    """Primary house battery dict, or None."""
+    return primary_house_battery(mappable_batteries(batteries))
 
 
-def merge_ess_bindings_into_plant(
-    plant_bindings: dict | None,
-    batteries: list[dict] | None,
+def resolve_primary_ess_binding(
+    kind: str,
     *,
-    battery_ids: list[str] | None = None,
-) -> dict[str, str]:
-    """Return plant-facing bindings with ESS Pattern B + flat aliases for primary.
+    batteries: list[dict] | None = None,
+) -> str:
+    """Merker or Q8 entity-scoped exchange id for the primary house battery.
 
-    Adapters that still expect flat ``sens_ess_*`` / ``set_ess_*`` on plant keep
-    working when the primary **house** battery has ``ess.{slug}.*`` bindings.
-    Powerstations stay on Pattern-B keys only (no plant-flat takeover).
+    Empty Merker with key present → ``ess.{id}.{kind}`` for ``set_*`` / pushable
+    reads. Never invents plant-flat ``sens_ess_*`` / ``set_ess_*`` aliases.
     """
+    kind_s = str(kind or "").strip()
+    if kind_s not in ESS_FIELD_KINDS:
+        raise ValueError(f"Unknown ESS EHAL kind '{kind_s}'.")
+    bat = primary_battery(batteries)
+    if not bat:
+        return ""
+    bid = str(bat.get("id") or "").strip()
+    if not bid:
+        return ""
+    bindings = bat.get("ehal_bindings")
+    bind_map = bindings if isinstance(bindings, dict) else {}
+    merker = binding_address(bind_map, bid, kind_s)
+    if merker:
+        return merker
+    field = ess_field(bid, kind_s)
+    if field not in bind_map:
+        return ""
+    from ehal.loxone_push_source import is_pushable_kind
+
+    if kind_s.startswith("set_") or is_pushable_kind(kind_s):
+        return field
+    return ""
+
+
+def entity_scoped_battery_bindings(
+    batteries: list[dict] | None = None,
+) -> dict[str, str]:
+    """All non-empty entity-scoped ``ess.{id}.*`` addresses from mappable batteries."""
     out: dict[str, str] = {}
-    if isinstance(plant_bindings, dict):
-        for key, value in plant_bindings.items():
-            addr = str(value or "").strip()
-            if addr:
-                out[str(key)] = addr
-
-    bats = [b for b in (batteries or []) if isinstance(b, dict)]
-    if not bats:
-        return out
-
-    by_id = {
-        str(b.get("id") or "").strip(): b
-        for b in bats
-        if str(b.get("id") or "").strip()
-    }
-    selected = [i for i in (battery_ids or []) if i in by_id]
-    if not selected:
-        selected = _battery_ids(bats)
-
-    primary = _primary_for_flat_aliases(selected, by_id)
-
-    for bat_id in selected:
-        bat = by_id.get(bat_id)
-        if not bat:
+    for bat in mappable_batteries(batteries):
+        bid = str(bat.get("id") or "").strip()
+        if not bid:
             continue
         bindings = bat.get("ehal_bindings")
         if not isinstance(bindings, dict):
             continue
-        slug = ess_ehal_slug(bat_id)
         for key, value in bindings.items():
             field = str(key or "").strip()
-            if not field:
-                continue
-            # Keep empty Merker values (Q8 activation flags) so plant-flat aliases
-            # and resolve_plant_binding empty-key fallback still see the key.
             addr = str(value or "").strip()
-            out[field] = addr
-            parsed = parse_ess_pattern_b(field)
-            if parsed and parsed[0] == slug and bat_id == primary:
-                kind = parsed[1]
-                # Quellenwahl stays Pattern B only (standby_backup; never plant flat).
-                if kind == "set_ess_source_select":
-                    continue
-                if kind not in out:
-                    out[kind] = addr
+            if field and addr and field not in out:
+                out[field] = addr
     return out
-
-
-def primary_flat_ess_from_batteries(
-    batteries: list[dict] | None,
-    *,
-    battery_ids: list[str] | None = None,
-) -> dict[str, str]:
-    """Flat ESS keys for the primary battery only (for migrate diagnostics)."""
-    merged = merge_ess_bindings_into_plant({}, batteries, battery_ids=battery_ids)
-    return plant_flat_ess_keys(merged)

@@ -1,4 +1,4 @@
-# Earnie Loxone Templates (Pattern B + 2.7.q Q4)
+# Earnie Loxone Templates (entity-scoped + 2.7.q Q4)
 
 Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTemplateBuilder](https://wiki.loxberry.de/entwickler/perl_develop_plugins_with_perl/perl_loxberry_sdk_dokumentation/perl_modul_loxberryloxonetemplatebuilder) (`VI_*.xml` / `VO_*.xml`).
 
@@ -6,7 +6,7 @@ Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTem
 
 **Status:** `VirtualOut/VO_*.xml` follow the structure that Loxone Config exports (checked 2026-10-07 against a template saved with **Als Vorlage speichern**): `Info` element first, `HintText` / `CmdAnswer` / `SourceVal…` attributes, UTF-8 with BOM, tab indent. Titles, comments and commands are still hand-authored, and the placeholders (`EARNIE_HOST`, `{hk_id}` / `{ev_id}`) have to be replaced after inserting. `VirtualIn/VI_*.xml` follow the structure of a Virtual Input exported by Config the same way (`Info templateType="2"`, `Unit`, `HintText`); a Virtual Input extracts the value with the escape in `Check`, a Virtual Output command writes it with `<v>`.
 
-**Pattern B:** **VI** = Earnie → Loxone (`set_*` / Freigaben / Sollwerte + Heartbeat). **VO** = Loxone → Earnie telemetry push (`sens_*` / `get_*`; qualified path IDs). Core reads from the push inbox for those fields.
+**entity-scoped:** **VI** = Earnie → Loxone (`set_*` / Freigaben / Sollwerte + Heartbeat). **VO** = Loxone → Earnie telemetry push (`sens_*` / `get_*`; qualified path IDs). Core reads from the push inbox for those fields.
 
 **Freigabe 0/1:** VI cmds use `Analog="true"` (sticky value from `\v`). `Analog="false"` (digital) pulses true on every successful poll — do not use for Freigabe.
 
@@ -67,7 +67,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 
 1. Restart **Loxone Config**.
 2. Insert via periphery **Device Templates** / Virtual In / Virtual Out (Earnie entries should appear).
-3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize` / `/alive`) use port **8541** (`system.ehal_loxone_http_port`). Telemetry VOs also use port **8541** (`/ehal/loxone/telemetry/…`). The value placeholder in a Virtual Output command is `<v>`, written `&lt;v&gt;` in the XML (`\v` would be sent as the control character 0x0B).
+3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize` / `/alive`) use port **8541** (`system.ehal_loxone_http_port`). Telemetry VOs also use port **8541** (canonical `/ehal/telemetry/…`; alias `/ehal/loxone/telemetry/…` for existing VOs). The value placeholder in a Virtual Output command is `<v>`, written `&lt;v&gt;` in the XML (`\v` would be sent as the control character 0x0B).
 
 ## Files (repo layout)
 

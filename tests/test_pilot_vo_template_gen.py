@@ -153,12 +153,12 @@ def test_template_values_placeholder_repeat_and_digital(tmp_path: Path) -> None:
     cmds = {c.get("Title"): c for c in root if c.tag == "VirtualOutCmd"}
     analog = cmds["Push_grid_meter_sens_grid_power_active"]
     assert analog.get("CmdOn") == (
-        "/ehal/loxone/telemetry/grid.meter.sens_grid_power_active/<v>?t=abcd1234efgh"
+        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v>?t=abcd1234efgh"
     )
     assert (analog.get("Analog"), analog.get("Repeat"), analog.get("RepeatRate")) == ("true", "10", "10")
     digital = cmds["Push_sens_absent_mode"]
-    assert digital.get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1?t=abcd1234efgh"
-    assert digital.get("CmdOff") == "/ehal/loxone/telemetry/sens_absent_mode/0?t=abcd1234efgh"
+    assert digital.get("CmdOn") == "/ehal/telemetry/sens_absent_mode/1?t=abcd1234efgh"
+    assert digital.get("CmdOff") == "/ehal/telemetry/sens_absent_mode/0?t=abcd1234efgh"
     assert digital.get("Analog") == "false"
     _text, root0 = _render_plant(tmp_path, repeat="0", repeat_rate="0")
     assert {c.get("Repeat") for c in root0 if c.tag == "VirtualOutCmd"} == {"0"}
@@ -191,7 +191,7 @@ def test_heartbeat_template_and_analog_has_no_off_command() -> None:
     )
     cmd = next(c for c in ET.fromstring(text.encode("utf-8")) if c.tag == "VirtualOutCmd")
     assert cmd.get("Title") == "Push_Earnie_Heartbeat"
-    assert cmd.get("CmdOn") == "/ehal/loxone/telemetry/heartbeat/<v>?t=abcd1234efgh"
+    assert cmd.get("CmdOn") == "/ehal/telemetry/heartbeat/<v>?t=abcd1234efgh"
     assert cmd.get("Analog") == "true"
     assert cmd.get("CmdOff") == ""  # analog outputs have no Off command
     assert (cmd.get("Repeat"), cmd.get("RepeatRate")) == ("10", "10")
@@ -217,10 +217,10 @@ def test_token_in_address_moves_the_token_out_of_the_commands(tmp_path: Path) ->
         assert "?t=" not in (cmd.get("CmdOn") or "")
     by_title = {c.get("Title"): c for c in cmds}
     assert by_title["Push_grid_meter_sens_grid_power_active"].get("CmdOn") == (
-        "/ehal/loxone/telemetry/grid.meter.sens_grid_power_active/<v>"
+        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v>"
     )
-    assert by_title["Push_sens_absent_mode"].get("CmdOn") == "/ehal/loxone/telemetry/sens_absent_mode/1"
-    assert by_title["Push_sens_absent_mode"].get("CmdOff") == "/ehal/loxone/telemetry/sens_absent_mode/0"
+    assert by_title["Push_sens_absent_mode"].get("CmdOn") == "/ehal/telemetry/sens_absent_mode/1"
+    assert by_title["Push_sens_absent_mode"].get("CmdOff") == "/ehal/telemetry/sens_absent_mode/0"
 
 
 def test_default_keeps_the_token_in_every_command(tmp_path: Path) -> None:

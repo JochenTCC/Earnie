@@ -7,7 +7,7 @@ without the flag are locked.
 """
 from __future__ import annotations
 
-from ehal.ess_fields import ess_ehal_slug, parse_ess_pattern_b
+from ehal.ess_fields import ess_ehal_slug, parse_ess_entity_scoped
 from ehal.flex_fields import flex_ehal_slug
 from ehal.qualified_ids import (
     LEGACY_NAMESPACES,
@@ -57,7 +57,7 @@ def rewrite_ess_bindings_slug(
     old_id: str,
     new_id: str,
 ) -> dict[str, str]:
-    """Rewrite Pattern B keys ``ess.{old}.*`` → ``ess.{new}.*``."""
+    """Rewrite entity-scoped keys ``ess.{old}.*`` → ``ess.{new}.*``."""
     if not isinstance(bindings, dict):
         return {}
     old_slug = ess_ehal_slug(old_id)
@@ -68,7 +68,7 @@ def rewrite_ess_bindings_slug(
         if not addr:
             continue
         field = str(key)
-        parsed = parse_ess_pattern_b(field)
+        parsed = parse_ess_entity_scoped(field)
         if parsed and parsed[0] == old_slug:
             field = f"ess.{new_slug}.{parsed[1]}"
         if field not in out:
@@ -82,7 +82,7 @@ def rewrite_consumer_bindings_slug(
     old_id: str,
     new_id: str,
 ) -> dict[str, str]:
-    """Rewrite Pattern B keys whose Kennung matches the old consumer slug.
+    """Rewrite entity-scoped keys whose Kennung matches the old consumer slug.
 
     Namespaces: ``consumer`` / ``heatpump`` / ``pool`` / ``ev`` / ``evcs`` /
     legacy ``flex``. Empty addresses (Loxone activation flags) are kept.

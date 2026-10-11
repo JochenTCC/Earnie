@@ -4,7 +4,7 @@ Usage:
   python -m scripts.migrate_ess_bindings_once --config-dir earnie_env/config
   python -m scripts.migrate_ess_bindings_once --config-dir PATH --dry-run
 
-Phase 1: movable plant-flat ESS → single battery Pattern B ``ess.{slug}.*``.
+Phase 1: movable plant-flat ESS → single battery entity-scoped ``ess.{slug}.*``.
 Phase 2: plant ``set_ess_source_select`` → physical ``standby_backup``
 ``ess.{id}.set_ess_source_select``. Stays on ``earnie_data_model`` 4.
 Delete this script after successful env migration.
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Move plant-flat ESS ehal_bindings onto batteries "
-            "(Pattern B ess.{slug}.*); move set_ess_source_select onto "
+            "(entity-scoped ess.{slug}.*); move set_ess_source_select onto "
             "the physical standby_backup battery."
         )
     )

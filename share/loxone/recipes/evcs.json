@@ -1,7 +1,7 @@
 {
   "role_id": "evcs",
   "label": "Wallbox / E-Auto (EVCS)",
-  "baustein_notes": "Greenfield prefix Earnie_EAuto_*. Multi-EV: Prefix+Slug Titles; VI Check / VO paths use ev.{ev_id}.…. Live EV on house-profile ev consumer ehal_bindings. Pattern B VI mirrors Soll_A / Modus; VO pushes sens_*/get_*.",
+  "baustein_notes": "Greenfield prefix Earnie_EAuto_*. Multi-EV: Prefix+Slug Titles; VI Check / VO paths use ev.{ev_id}.…. Live EV on house-profile ev consumer ehal_bindings. entity-scoped VI mirrors Soll_A / Modus; VO pushes sens_*/get_*.",
   "recommended_markers": [
     {
       "ehal_field": "sens_evcs_active_power",

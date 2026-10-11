@@ -67,11 +67,11 @@ def test_send_huawei_publishes_only(publish_dir: Path) -> None:
     from integrations import loxone_client as lc
     from integrations.loxone_comm_trace import LoxoneWriteRecord
 
-    names = {
-        "LOXONE_TARGET_ACTIVE_POWER_NAME": "Active",
-        "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
-        "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
-        "LOXONE_CONTROL_CMD_NAME": "Cmd",
+    ess_names = {
+        "set_ess_active_power": "Active",
+        "set_ess_charge_power_limit": "Charge",
+        "set_ess_discharge_power_limit": "Discharge",
+        "set_ess_mode": "Cmd",
     }
     io_index = {
         "Active": "set_ess_active_power",
@@ -80,9 +80,12 @@ def test_send_huawei_publishes_only(publish_dir: Path) -> None:
         "Cmd": "set_ess_mode",
     }
     with (
-        patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)),
         patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+        ),
+        patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
         ),
         patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
@@ -108,11 +111,11 @@ def test_send_huawei_publishes_export_limit_qualified(publish_dir: Path, monkeyp
     from integrations import loxone_client as lc
     from integrations.loxone_comm_trace import LoxoneWriteRecord
 
-    names = {
-        "LOXONE_TARGET_ACTIVE_POWER_NAME": "Active",
-        "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
-        "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
-        "LOXONE_CONTROL_CMD_NAME": "Cmd",
+    ess_names = {
+        "set_ess_active_power": "Active",
+        "set_ess_charge_power_limit": "Charge",
+        "set_ess_discharge_power_limit": "Discharge",
+        "set_ess_mode": "Cmd",
     }
     io_index = {
         "Active": "set_ess_active_power",
@@ -128,9 +131,12 @@ def test_send_huawei_publishes_export_limit_qualified(publish_dir: Path, monkeyp
         lambda *_a, **_k: "Earnie_EinspeiseLeistungs-Limit",
     )
     with (
-        patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)),
         patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+        ),
+        patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
         ),
         patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",

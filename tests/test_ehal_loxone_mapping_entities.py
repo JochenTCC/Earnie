@@ -73,7 +73,7 @@ def test_proposal_fields_cover_plant_and_battery_kinds():
         assert proposal_for_mapping_field(proposals, field), field
 
 
-def test_proposal_for_mapping_field_pattern_b_and_miss():
+def test_proposal_for_mapping_field_entity_scoped_and_miss():
     proposals = {
         "sens_ess_soc": {
             "marker_name": "Batterie_SoC",

@@ -1,6 +1,8 @@
 """Tests for 2.4.k plant/consumer ehal_bindings migration."""
 from __future__ import annotations
 
+import pytest
+
 from house_config.ehal_bindings import (
     ensure_migrated,
     migrate_consumer_legacy_to_ehal_bindings,
@@ -8,7 +10,6 @@ from house_config.ehal_bindings import (
     resolve_plant_binding,
     strip_migrated_config_keys,
 )
-from settings.config_loaders import load_loxone_block_params
 from settings.ehal_marker_resolve import marker_sens_evcs_connected, marker_set_evcs_max_current
 
 
@@ -94,18 +95,54 @@ def test_migrate_strips_existing_flex_power_setpoint_binding():
     assert "flex.power_setpoint_name" not in bindings
 
 
-def test_resolve_plant_binding_has_no_loxone_blocks_fallback():
+def test_resolve_plant_binding_ignores_ess_and_loxone_blocks():
     house = {"plant": {"ehal_bindings": {}}}
     config = {"loxone_blocks": {"soc_name": "Battery_SOC"}}
     assert resolve_plant_binding(house, "sens_ess_soc", config) == ""
     house2 = {"plant": {"ehal_bindings": {"sens_ess_soc": "Plant_SOC"}}}
-    assert resolve_plant_binding(house2, "sens_ess_soc", config) == "Plant_SOC"
+    assert resolve_plant_binding(house2, "sens_ess_soc", config) == ""
+    house3 = {"plant": {"ehal_bindings": {"sens_pv_production_active": "Plant_PV"}}}
+    assert resolve_plant_binding(house3, "sens_pv_production_active", config) == "Plant_PV"
+
+
+def test_ensure_migrated_refuses_loxone_blocks():
+    house = {"plant": {"ehal_bindings": {"sens_pv_production_active": "PV"}}}
+    config = {"loxone_blocks": {"soc_name": "Battery_SOC"}}
+    with pytest.raises(ValueError, match="loxone_blocks"):
+        ensure_migrated(house, config)
+
+
+def test_ensure_migrated_refuses_plant_flat_ess_when_batteries_exist(
+    tmp_path, monkeypatch
+):
+    import json
+
+    from ehal.ess_fields import ess_field
+
+    components = {
+        "batteries": [
+            {
+                "id": "house",
+                "type": "house",
+                "ehal_bindings": {ess_field("house", "sens_ess_soc"): ""},
+            }
+        ]
+    }
+    path = tmp_path / "components.json"
+    path.write_text(json.dumps(components), encoding="utf-8")
+    monkeypatch.setattr(
+        "runtime_store.persist_paths.resolve_components_json_path",
+        lambda: str(path),
+    )
+    house = {"plant": {"ehal_bindings": {"sens_ess_soc": "Battery_SOC"}}}
+    with pytest.raises(ValueError, match="plant-flat ESS"):
+        ensure_migrated(house, {})
 
 
 def test_ensure_migrated_strips_triggers_keeps_bindings():
     house = {
         "plant": {
-            "ehal_bindings": {},
+            "ehal_bindings": {"sens_pv_production_active": "PV"},
             "event_triggers": [
                 {
                     "id": "plug",
@@ -137,11 +174,6 @@ def test_ensure_migrated_strips_triggers_keeps_bindings():
         ],
     }
     config = {
-        "loxone_blocks": {
-            "soc_name": "Battery_SOC",
-            "grid_power_name": "Grid_P",
-            "log_filename": "Verbrauch.csv",
-        },
         "system": {
             "event_triggers": [
                 {
@@ -158,87 +190,12 @@ def test_ensure_migrated_strips_triggers_keeps_bindings():
     }
     new_house, new_config, changed = ensure_migrated(house, config)
     assert changed is True
-    assert new_house["plant"]["ehal_bindings"]["sens_ess_soc"] == "Battery_SOC"
+    assert new_house["plant"]["ehal_bindings"]["sens_pv_production_active"] == "PV"
     assert "event_triggers" not in new_house["plant"]
     assert "event_triggers" not in new_house["profiles"][0]["consumers"][0]
     stripped = strip_migrated_config_keys(new_config)
     assert "event_triggers" not in stripped.get("system", {})
     assert "event_trigger_enabled" not in stripped.get("system", {})
-    assert "loxone_blocks" not in stripped
-
-
-def test_load_loxone_block_params_prefers_plant_bindings(tmp_path):
-    config = {
-        "loxone_blocks": {
-            "soc_name": "Old_SOC",
-            "pv_power_name": "pv_act",
-            "battery_power_name": "bat",
-            "grid_power_name": "grid",
-            "target_charge_power_name": "t_charge",
-            "target_discharge_power_name": "t_discharge",
-            "control_cmd_name": "cmd",
-        }
-    }
-    house = {
-        "plant": {
-            "ehal_bindings": {
-                "sens_ess_soc": "New_SOC",
-                "sens_grid_power_active": "Plant_Grid",
-                "sens_pv_production_active": "Plant_PV",
-                "sens_ess_power": "Plant_Bat",
-                "set_ess_charge_power_limit": "Plant_Ch",
-                "set_ess_discharge_power_limit": "Plant_Dis",
-                "set_ess_mode": "Plant_Cmd",
-            }
-        }
-    }
-    params = load_loxone_block_params(config, str(tmp_path / "config.json"), house_doc=house)
-    assert params["LOXONE_SOC_NAME"] == "New_SOC"
-    assert params["LOXONE_GRID_POWER_NAME"] == "Plant_Grid"
-    assert "LOXONE_LOG_FILENAME" not in params
-    assert "PV_TUNING_LOG_FILE" not in params
-
-
-def test_load_loxone_block_params_without_removed_extras(tmp_path):
-    """pv_counter_name / target_soc_name / FTP / PV-tuning are removed from the loader surface."""
-    config = {"loxone_blocks": {}}
-    house = {
-        "plant": {
-            "ehal_bindings": {
-                "sens_ess_soc": "SOC",
-                "sens_grid_power_active": "Grid",
-                "sens_pv_production_active": "PV",
-                "sens_ess_power": "Bat",
-                "set_ess_charge_power_limit": "Ch",
-                "set_ess_discharge_power_limit": "Dis",
-                "set_ess_mode": "Cmd",
-            }
-        }
-    }
-    params = load_loxone_block_params(config, str(tmp_path / "config.json"), house_doc=house)
-    assert "LOXONE_PV_COUNTER_NAME" not in params
-    assert "LOXONE_TARGET_SOC_NAME" not in params
-    assert "LOXONE_LOG_FILENAME" not in params
-    assert "PV_TUNING_LOG_FILE" not in params
-    assert params["LOXONE_SOC_NAME"] == "SOC"
-
-
-def test_load_loxone_block_params_no_dual_read_when_plant_set(tmp_path):
-    config = {
-        "loxone_blocks": {
-            "soc_name": "Old_SOC",
-            "pv_power_name": "pv_act",
-            "battery_power_name": "bat",
-            "grid_power_name": "grid",
-            "target_charge_power_name": "t_charge",
-            "target_discharge_power_name": "t_discharge",
-            "control_cmd_name": "cmd",
-        }
-    }
-    house = {"plant": {"ehal_bindings": {"sens_ess_soc": "New_SOC"}}}
-    params = load_loxone_block_params(config, str(tmp_path / "config.json"), house_doc=house)
-    assert params["LOXONE_SOC_NAME"] == "New_SOC"
-    assert params["LOXONE_GRID_POWER_NAME"] == ""
 
 
 def test_ehal_marker_resolve_prefers_bindings():

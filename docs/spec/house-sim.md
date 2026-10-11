@@ -1,6 +1,6 @@
 # House simulator (`house_sim/`) — HouseSim S1–S4
 
-**Status:** current (Energy-Optimizer **2.6.a** / HouseSim S1; bindings **2.6.g** Pattern B; **HouseSim S4** custom integration)  
+**Status:** current (Energy-Optimizer **2.6.a** / HouseSim S1; bindings **2.6.g** entity-scoped; **HouseSim S4** custom integration)  
 **Purpose:** Fixture-based house physics for HA binding tests — as a **mock REST** bench (S1) and optionally as a real HA custom integration (S4).
 
 ## What this is (and is not)
@@ -61,7 +61,7 @@ Out of scope for S1: `simulation/engine.py::run_simulation()`, `data/pv_forecast
 | --- | --- |
 | Base URL (`EHAL_HA_BASE_URL`) | `http://127.0.0.1:8124` |
 | Token (`EHAL_HA_TOKEN`) | `house-sim-bench-token` |
-| Golden map | `house_sim/fixtures/evcc_en/ehal.ha.entities.json` (fixture format; merge keys into Pattern B bindings) |
+| Golden map | `house_sim/fixtures/evcc_en/ehal.ha.entities.json` (fixture format; merge keys into entity-scoped bindings) |
 
 Token constant: `house_sim.mock_rest.DEFAULT_BENCH_TOKEN`.
 

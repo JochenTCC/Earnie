@@ -1,4 +1,4 @@
-"""Tests for Pattern B status.json payload builder."""
+"""Tests for entity-scoped status.json payload builder."""
 from __future__ import annotations
 
 import pytest
@@ -260,7 +260,7 @@ def _clear_powerstation_cache():
     return psl
 
 
-def test_powerstation_values_use_pattern_b_keys_and_leave_house_keys_alone() -> None:
+def test_powerstation_values_use_entity_scoped_keys_and_leave_house_keys_alone() -> None:
     """A powerstation write must not overwrite the house battery's flat status keys."""
     psl = _clear_powerstation_cache()
     psl._last_powerstation_sent["ess.ecoflow_delta_3.set_ess_charge_power_limit"] = 0.0
@@ -283,7 +283,7 @@ def test_powerstation_values_use_pattern_b_keys_and_leave_house_keys_alone() -> 
     assert payload["ess.ecoflow_delta_3.set_ess_mode"] == 1.0
 
 
-def test_quellenwahl_uses_pattern_b() -> None:
+def test_quellenwahl_uses_entity_scoped() -> None:
     psl = _clear_powerstation_cache()
     key = "ess.ecoflow_delta_3.set_ess_source_select"
     psl._last_powerstation_sent[key] = 1.0
@@ -312,7 +312,7 @@ def test_two_powerstations_do_not_collide() -> None:
     assert payload["set_ess_charge_power_limit"] == 0.0  # untouched plant default
 
 
-def test_write_path_caches_pattern_b_key_not_flat_kind(monkeypatch) -> None:
+def test_write_path_caches_entity_scoped_key_not_flat_kind(monkeypatch) -> None:
     """End to end: ``_write_powerstation_loxone`` → status payload."""
     from unittest.mock import MagicMock
 

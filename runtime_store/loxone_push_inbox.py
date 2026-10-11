@@ -5,8 +5,9 @@ The :8541 listener and the optimizer read path share one process (``main.py``).
 file under ``runtime/`` is for the Streamlit UI (separate process).
 
 A Virtual Output command (repeated, default 10 s) calls
-``GET /ehal/loxone/telemetry/<EHAL-ID>/<value>``; the EHAL ID travels in the
-path, so no Merker name is needed to learn which signal this is.
+``GET /ehal/telemetry/<EHAL-ID>/<value>`` (alias ``/ehal/loxone/telemetry/…``);
+the EHAL ID travels in the path, so no Merker name is needed to learn which
+signal this is.
 """
 from __future__ import annotations
 

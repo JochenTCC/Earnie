@@ -59,7 +59,7 @@ CONSUMER_ENERGY_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_energy_total",
 )
 
-# Per-battery Pattern B read kinds (2.7.m).
+# Per-battery entity-scoped read kinds (2.7.m).
 BATTERY_ESS_LIVE_READ_KINDS: tuple[str, ...] = (
     "sens_ess_soc",
     "sens_ess_power",
@@ -527,7 +527,7 @@ def _append_plant_binding_io(
 
 
 def _append_battery_write_io(index: dict[str, str]) -> None:
-    """Pattern B ``ess.{slug}.set_*`` Merkers from components batteries."""
+    """Entity-scoped ``ess.{slug}.set_*`` Merkers from components batteries."""
     from ehal.ess_fields import binding_address, ess_field
     from house_config.powerstation import (
         BACKING_PHYSICAL,
@@ -563,7 +563,6 @@ def _append_battery_write_io(index: dict[str, str]) -> None:
 
 def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dict[str, str]:
     """Merker IO-Name → EHAL write field (plant + batteries + EV + flex)."""
-    import config
     from ehal.flex_fields import flex_set_enable
     from settings.ehal_marker_resolve import (
         marker_flex_enable,
@@ -572,19 +571,6 @@ def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dic
     )
 
     index: dict[str, str] = {}
-    has_batteries = has_mappable_live_batteries()
-    if not has_batteries:
-        plant_map = (
-            ("set_ess_active_power", "LOXONE_TARGET_ACTIVE_POWER_NAME"),
-            ("set_ess_charge_power_limit", "LOXONE_TARGET_CHARGE_POWER_NAME"),
-            ("set_ess_discharge_power_limit", "LOXONE_TARGET_DISCHARGE_POWER_NAME"),
-            ("set_ess_mode", "LOXONE_CONTROL_CMD_NAME"),
-        )
-        for field, cfg_key in plant_map:
-            io_name = str(config.get(cfg_key) or "").strip()
-            if io_name:
-                index[io_name] = field
-
     house: dict | None = None
     try:
         from optimizer.live_export_limit import load_house_doc
@@ -628,23 +614,6 @@ def loxone_write_field_to_io() -> dict[str, str]:
     }
 
 
-def _plant_flat_ess_to_primary_exchange(name: str) -> str:
-    """Bare plant ESS ``set_*`` → ``ess.<primary>.set_*`` when batteries exist."""
-    from ehal.ess_fields import ess_field, is_plant_flat_ess_field
-
-    kind = str(name or "").strip()
-    if not kind or not is_plant_flat_ess_field(kind):
-        return ""
-    if not has_mappable_live_batteries():
-        return kind
-    try:
-        from integrations.loxone_adapter import primary_ess_id_for_plant_read
-    except Exception:  # noqa: BLE001
-        return ""
-    bid = primary_ess_id_for_plant_read()
-    return ess_field(bid, kind) if bid else ""
-
-
 def resolve_loxone_write_field(io_name: str, index: dict[str, str] | None = None) -> str:
     """Reverse-map Merker → EHAL write field (or empty if unknown / not a write)."""
     name = str(io_name or "").strip()
@@ -656,18 +625,12 @@ def resolve_loxone_write_field(io_name: str, index: dict[str, str] | None = None
         canon = canonicalize_live_display_field(field)
         if canon:
             return canon
-        upgraded = _plant_flat_ess_to_primary_exchange(field)
-        if upgraded:
-            return upgraded
         return field
     # Direct EHAL key / Q8 activation id stored as io
     if is_live_write_field(name):
         canon = canonicalize_live_display_field(name)
         if canon:
             return canon
-        upgraded = _plant_flat_ess_to_primary_exchange(name)
-        if upgraded:
-            return upgraded
         return name
     return _MAPPING_EMPTY
 
@@ -735,7 +698,7 @@ def _ha_live_consumers(house_doc: dict | None) -> list[dict]:
     return [by_id.get(str(c.get("id") or "").strip()) or c for c in live]
 
 
-def ha_pattern_b_live_mapping(house_doc: dict | None = None) -> dict[str, str]:
+def ha_entity_scoped_live_mapping(house_doc: dict | None = None) -> dict[str, str]:
     """Entity-centric EHAL-Feld → HA entity_id (exchange IDs for Live tables)."""
     if house_doc is None:
         from ui.house_config_io import load_house_profiles

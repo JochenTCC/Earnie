@@ -1,26 +1,26 @@
 {
   "role_id": "consumer",
   "label": "Flex-Verbraucher (Stub)",
-  "description": "Forward-looking template. M1 EHAL has no first-class consumer fields; Live still uses house-profile flex / Pattern B bindings.",
+  "description": "Forward-looking template. M1 EHAL has no first-class consumer fields; Live still uses house-profile flex / entity-scoped bindings.",
   "status": "stub",
   "ehal_fields": [
     {
       "field": "flex.{hk_id}.sens_power_act",
       "required": false,
       "kind": "stub",
-      "notes": "Pattern B power. Legacy binding key flex.power_name migrates on load. Zähler id zaehler_<slug> uses slug without prefix."
+      "notes": "entity-scoped power. Legacy binding key flex.power_name migrates on load. Zähler id zaehler_<slug> uses slug without prefix."
     },
     {
       "field": "flex.{hk_id}.sens_consumer_active",
       "required": false,
       "kind": "stub",
-      "notes": "Storage Pattern B key. Exchange/Live/VO: consumer.{hk_id}.sens_consumer_active (2.7.n). Digital 0/1 Gerät läuft (2.7.p) OR-trigger with sens_power_act."
+      "notes": "Storage entity-scoped key. Exchange/Live/VO: consumer.{hk_id}.sens_consumer_active (2.7.n). Digital 0/1 Gerät läuft (2.7.p) OR-trigger with sens_power_act."
     },
     {
       "field": "flex.{hk_id}.set_enable",
       "required": false,
       "kind": "stub",
-      "notes": "Pattern B Freigabe. Legacy flex.enable_name migrates on load."
+      "notes": "entity-scoped Freigabe. Legacy flex.enable_name migrates on load."
     },
     {
       "field": "sens_energy_total",

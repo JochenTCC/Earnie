@@ -99,7 +99,7 @@ def qualified_consumer_id(consumer_id: str, consumer_type: str, key: str) -> str
 
 
 def qualified_battery_id(battery_id: str, key: str) -> str:
-    """``ess.<Kennung>.<kind>`` for a battery binding key (Pattern B or flat)."""
+    """``ess.<Kennung>.<kind>`` for a battery binding key (entity-scoped or flat)."""
     return f"{NS_ESS}.{str(battery_id).strip()}.{field_kind(key)}"
 
 

@@ -115,9 +115,16 @@ def test_empty_ess_activation_resolves_plant_flat_aliases(
         lambda: str(path),
     )
 
+    from house_config.ess_bindings import resolve_primary_ess_binding
+
     house = {"plant": {"ehal_bindings": {}}}
-    assert resolve_plant_binding(house, "sens_ess_soc") == "sens_ess_soc"
-    assert resolve_plant_binding(house, "set_ess_mode") == "set_ess_mode"
+    assert resolve_plant_binding(house, "sens_ess_soc") == ""
+    assert resolve_primary_ess_binding("sens_ess_soc") == ess_field(
+        house_id, "sens_ess_soc"
+    )
+    assert resolve_primary_ess_binding("set_ess_mode") == ess_field(
+        house_id, "set_ess_mode"
+    )
 
 
 def test_empty_thermal_rc_activation_uses_pool_namespace() -> None:
@@ -243,7 +250,7 @@ def test_empty_activation_flex_publish_uses_qid() -> None:
 
 
 def test_q8_empty_battery_write_io_indexes_qid(tmp_path, monkeypatch) -> None:
-    """Q8 empty Merker must still appear in setpoint IO index (Pattern B)."""
+    """Q8 empty Merker must still appear in setpoint IO index (entity-scoped)."""
     from ehal.ess_fields import ess_field
     from integrations.ehal_debug_mapping import build_loxone_setpoint_io_index
 
@@ -274,23 +281,16 @@ def test_q8_empty_battery_write_io_indexes_qid(tmp_path, monkeypatch) -> None:
     assert index.get(qid) == qid
 
 
-def test_ess_c1_publishes_pattern_b_when_batteries_present() -> None:
+def test_ess_c1_publishes_entity_scoped_when_batteries_present() -> None:
     """House ESS C1 must publish ess.<id>.set_* after Q8 (not plant-flat Merker)."""
     from integrations import loxone_client as lc
     from integrations.loxone_comm_trace import LoxoneWriteRecord
     from integrations import loxone_writes as lw
 
-    names = {
-        "LOXONE_TARGET_ACTIVE_POWER_NAME": "set_ess_active_power",
-        "LOXONE_TARGET_CHARGE_POWER_NAME": "set_ess_charge_power_limit",
-        "LOXONE_TARGET_DISCHARGE_POWER_NAME": "set_ess_discharge_power_limit",
-        "LOXONE_CONTROL_CMD_NAME": "set_ess_mode",
-    }
     fake = LoxoneWriteRecord(
         io_name="x", value=0.0, success=True, written_at="t"
     )
     with (
-        patch.object(lc.config, "get", side_effect=lambda n, **k: names.get(n)),
         patch.object(
             lc.config,
             "get_battery_params",
@@ -299,6 +299,10 @@ def test_ess_c1_publishes_pattern_b_when_batteries_present() -> None:
                 "max_charge_power_kw": 5.0,
                 "max_discharge_power_kw": 5.0,
             },
+        ),
+        patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: kind,
         ),
         patch(
             "integrations.ehal_debug_mapping.has_mappable_live_batteries",
@@ -327,8 +331,8 @@ def test_ess_c1_publishes_pattern_b_when_batteries_present() -> None:
     assert [c.kwargs.get("io_name") for c in pub.call_args_list] == qids
 
 
-def test_live_schreiben_maps_bare_ess_trace_to_pattern_b() -> None:
-    """Write-trace bare set_ess_* must match Live Pattern B rows after Q8."""
+def test_live_schreiben_maps_entity_scoped_ess_trace() -> None:
+    """Write-trace entity-scoped ess.*set_* matches Live entity-scoped rows."""
     import ui.loxone_debug  # noqa: F401 — load before rows (avoids circular import)
     from ui.loxone_debug_rows import build_write_rows_from_trace
 
@@ -354,7 +358,7 @@ def test_live_schreiben_maps_bare_ess_trace_to_pattern_b() -> None:
         rows = build_write_rows_from_trace(
             [
                 {
-                    "io_name": "set_ess_mode",
+                    "io_name": qid,
                     "value": 0.0,
                     "success": True,
                     "written_at": "t",

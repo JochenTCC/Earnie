@@ -1,4 +1,4 @@
-"""Tests for 2.6.g HA Pattern B migrate / aggregate."""
+"""Tests for 2.6.g HA entity-scoped migrate / aggregate."""
 from __future__ import annotations
 
 from ehal.ess_fields import ess_field
@@ -131,7 +131,7 @@ def test_aggregate_empty_house():
     assert aggregate_ha_entities({}) == {}
 
 
-def test_aggregate_two_batteries_pattern_b_and_primary_alias():
+def test_aggregate_two_batteries_entity_scoped_and_primary_alias():
     house = {
         "plant": {
             "ehal_bindings": {
@@ -171,9 +171,9 @@ def test_aggregate_two_batteries_pattern_b_and_primary_alias():
     assert agg[ess_field("house", "sens_ess_soc")] == "sensor.house_soc"
     assert agg[ess_field("ps1", "sens_ess_soc")] == "sensor.ps_soc"
     assert agg[ess_field("ps1", "set_ess_charge_power_limit")] == "number.ps_charge"
-    # Primary (first) battery flat aliases for legacy HaAdapter required fields.
-    assert agg["sens_ess_soc"] == "sensor.house_soc"
-    assert agg["sens_ess_power"] == "sensor.house_p"
+    # No invented plant-flat aliases from battery entity-scoped.
+    assert "sens_ess_soc" not in agg
+    assert "sens_ess_power" not in agg
 
 
 def test_get_ha_adapter_prefers_house_bindings(monkeypatch, tmp_path):

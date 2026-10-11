@@ -32,7 +32,7 @@ multiple isolated battery … One-Way storage type“):
 |---|---|
 | `sens_ess_soc`, `sens_ess_power` | ✅ heute nutzbar (reine Telemetrie/Anzeige) |
 | `set_ess_charge_power_limit` | ✅ heute nutzbar (bestehendes EHAL-Feld) |
-| `ess.<id>.set_ess_source_select` *(2.7.h)* | ✅ Earnie schreibt Quellenwahl für physisches `role: standby_backup` (Pattern B); Merker + Bridge zu `switch.<device>_grid_bypass` (Operator verdrahtet nach ID-Umzug) |
+| `ess.<id>.set_ess_source_select` *(2.7.h)* | ✅ Earnie schreibt Quellenwahl für physisches `role: standby_backup` (entity-scoped); Merker + Bridge zu `switch.<device>_grid_bypass` (Operator verdrahtet nach ID-Umzug) |
 | `set_ess_active_power`, `set_ess_discharge_power_limit`, `set_ess_mode` | ❌ nicht anlegen/mappen — für einen One-Way-Speicher grundsätzlich nicht zutreffend |
 
 **Konsequenz für `components.json` (2.7.g):** Die Delta 3 ist eine Powerstation
@@ -476,9 +476,9 @@ Die Webhook-ID wirkt selbst als Geheimnis — kein zusätzlicher Bearer-Token n�
 
 ### 6. Quellenwahl-Merker (`ess.<id>.set_ess_source_select`, 2.7.h)
 
-Earnie schreibt Pattern B `ess.<id>.set_ess_source_select` für physische Powerstations mit
+Earnie schreibt entity-scoped `ess.<id>.set_ess_source_select` für physische Powerstations mit
 `role: standby_backup` (status.json-Key gleich dem Pattern-B-Feld). Der Loxone-Merker-Name ist frei
-(historisch oft `Earnie_Speicher_Quellenwahl`); nach dem Umzug von Plant-flach auf Pattern B muss die
+(historisch oft `Earnie_Speicher_Quellenwahl`); nach dem Umzug von Plant-flach auf entity-scoped muss die
 Loxone↔HA-Bridge ggf. neu verdrahtet werden. Die Bridge Loxone → HA bleibt nötig, wenn Earnie auf
 `ehal.backend=loxone` läuft. Es gibt zwei Wege, den Schaltzustand zu Home Assistant zu bringen.
 

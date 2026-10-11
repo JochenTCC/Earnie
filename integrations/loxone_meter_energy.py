@@ -101,7 +101,7 @@ def activate_battery_energy_bindings(
 ) -> None:
     """Activate ESS energy push fields on ``batteries[].ehal_bindings`` (in-place).
 
-    Storage meters are bipolar by default (charge + discharge). Keys are Pattern B
+    Storage meters are bipolar by default (charge + discharge). Keys are entity-scoped
     ``ess.{id}.sens_ess_energy_*`` when the battery has an id, else flat kinds.
     """
     from ehal.ess_fields import ess_field

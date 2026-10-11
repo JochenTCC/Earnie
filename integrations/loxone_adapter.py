@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 def primary_ess_id_for_plant_read() -> str:
-    """Primary house battery id for plant-flat ESS kinds → Pattern B exchange IDs."""
+    """Primary house battery id for ESS kinds → entity-scoped exchange IDs."""
     try:
         from house_config.components_store import load_components_document
         from house_config.powerstation import ehal_mappable_batteries, primary_house_battery
@@ -88,7 +88,7 @@ def exchange_id_for_plant_read(field: str) -> str | None:
     return qualified_plant_id(kind)
 
 
-# Numeric encoding of the Loxone Modus Merker (Pattern B).
+# Numeric encoding of the Loxone Modus Merker (entity-scoped).
 EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
 
 
@@ -96,9 +96,9 @@ EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
 class LoxoneConfig:
     """Write-activation flags (non-empty = wired).
 
-    Plant ESS names still come from ``LOXONE_TARGET_*`` env. EV/export may be
-    Merker titles or qualified EHAL IDs (Q8 empty binding → qid). Reads use
-    qualified IDs + the field registry.
+    Plant ESS write flags come from primary-battery entity-scoped
+    (``ess.{id}.set_*`` / Q8). EV/export may be Merker titles or qualified
+    EHAL IDs. Reads use qualified IDs + the field registry.
     """
 
     adapter_id: str

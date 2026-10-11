@@ -55,7 +55,7 @@ _SESSION_PENDING_NEW = "ehal_lox_pending_new_marker"
 PLANT_ENTITY_ID = "plant"
 BATTERY_ENTITY_KIND = "battery"
 
-# Plant mapping no longer owns ESS SoC/power/limits/Quellenwahl (2.7.m / Pattern B).
+# Plant mapping no longer owns ESS SoC/power/limits/Quellenwahl (2.7.m / entity-scoped).
 _PLANT_ESS_MOVED = frozenset(ESS_BATTERY_MAPPING_KINDS)
 PLANT_TELEMETRY_REQUIRED: tuple[str, ...] = tuple(
     f for f in TELEMETRY_REQUIRED if f not in _PLANT_ESS_MOVED
@@ -93,7 +93,7 @@ FLEX_FIELDS: tuple[str, ...] = (
 
 FILTER_FIELDS: tuple[str, ...] = FILTER_EHAL_FIELDS
 
-# Flat kinds for heuristic_propose (battery rows use Pattern B at lookup time).
+# Flat kinds for heuristic_propose (battery rows use entity-scoped at lookup time).
 PROPOSAL_FIELDS: tuple[str, ...] = (
     PLANT_FIELDS + ESS_BATTERY_MAPPING_KINDS + EV_FIELDS + FLEX_FIELDS + FILTER_FIELDS
 )
@@ -102,7 +102,7 @@ PROPOSAL_FIELDS: tuple[str, ...] = (
 def proposal_for_mapping_field(
     proposals: dict[str, dict[str, Any]], field: str
 ) -> dict[str, Any]:
-    """Resolve a proposal for a mapping field (flat or Pattern B ``ess.<id>.<kind>``)."""
+    """Resolve a proposal for a mapping field (flat or entity-scoped ``ess.<id>.<kind>``)."""
     entry = proposals.get(field) if isinstance(proposals, dict) else None
     if isinstance(entry, dict):
         return entry
@@ -175,7 +175,7 @@ def fields_for_battery(
     *,
     battery: dict | None = None,
 ) -> tuple[str, ...]:
-    """Pattern B ESS mapping fields; Quellenwahl only for physical standby_backup."""
+    """Entity-scoped ESS mapping fields; Quellenwahl only for physical standby_backup."""
     kinds = (
         ESS_BATTERY_MAPPING_KINDS
         if _battery_shows_source_select(battery)
@@ -386,7 +386,7 @@ def apply_battery_bindings(
     battery_id: str,
     bindings: dict[str, str],
 ) -> dict:
-    """Write Pattern B ESS bindings onto ``batteries[].ehal_bindings``.
+    """Write entity-scoped ESS bindings onto ``batteries[].ehal_bindings``.
 
     Refuses virtual powerstations (no EHAL binding surface).
     """

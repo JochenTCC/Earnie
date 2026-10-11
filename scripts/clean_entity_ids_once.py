@@ -5,7 +5,7 @@ Usage (dry-run by default — no writes):
   python -m scripts.clean_entity_ids_once --config-dir PATH --apply
   python -m scripts.clean_entity_ids_once --config-dir PATH --only-copy --apply
 
-Rewrites ``components.json`` ids, Pattern B ``ehal_bindings``, scenario
+Rewrites ``components.json`` ids, entity-scoped ``ehal_bindings``, scenario
 ``battery_ids`` / ``pv_system_ids``, and ``powerstation_id`` on reserve
 consumers in ``house_profiles.json``. Sets ``id_locked: true`` on renamed
 entities.

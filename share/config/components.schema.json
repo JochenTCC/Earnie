@@ -165,7 +165,7 @@
         },
         "ehal_bindings": {
           "type": "object",
-          "description": "Pattern B ESS bindings (2.7.c): keys ess.{slug}.sens_ess_soc / set_ess_* / get_ess_*; values are Merker titles or HA entity ids.",
+          "description": "entity-scoped ESS bindings (2.7.c): keys ess.{slug}.sens_ess_soc / set_ess_* / get_ess_*; values are Merker titles or HA entity ids.",
           "additionalProperties": {
             "type": "string"
           }

@@ -205,7 +205,6 @@ def test_superset_loxone_is_noop(tmp_path, monkeypatch):
     _enable_feed(tmp_path, monkeypatch)
     monkeypatch.setattr(config.CONFIG, "EHAL_BACKEND", "loxone", raising=False)
     monkeypatch.setattr(config.CONFIG, "SHADOW_FEED_ENABLED", True, raising=False)
-    monkeypatch.setattr(config.CONFIG, "LOXONE_SOC_NAME", "Earnie_SOC", raising=False)
     run_after_cycle(budget_sec=5)
 
 

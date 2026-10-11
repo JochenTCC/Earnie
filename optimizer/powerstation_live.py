@@ -31,9 +31,9 @@ def last_powerstation_sent() -> dict[str, float]:
 
 def _status_key(field_key: str, kind: str) -> str:
     """Key under which a written powerstation value appears in ``status.json``."""
-    from ehal.ess_fields import parse_ess_pattern_b
+    from ehal.ess_fields import parse_ess_entity_scoped
 
-    if parse_ess_pattern_b(field_key):
+    if parse_ess_entity_scoped(field_key):
         return field_key
     return kind or field_key
 
@@ -390,9 +390,9 @@ def _binding_for_ps(ps_id: str, kind: str) -> str:
 
 def _resolve_marker(field_key: str) -> tuple[str, str]:
     """Return (ehal_kind, merker_name) for a flat or Pattern-B field key."""
-    from ehal.ess_fields import ess_field_kind, parse_ess_pattern_b
+    from ehal.ess_fields import ess_field_kind, parse_ess_entity_scoped
 
-    parsed = parse_ess_pattern_b(field_key)
+    parsed = parse_ess_entity_scoped(field_key)
     if parsed:
         slug, kind = parsed
         return kind, _binding_for_ps(slug, kind)
@@ -411,12 +411,12 @@ def _utc_ts() -> str:
 
 def _write_error_kinds(field_keys: list[str]) -> list[str]:
     """Map Pattern-B / flat keys to plant-flat kinds (write_error.schema enum)."""
-    from ehal.ess_fields import ess_field_kind, parse_ess_pattern_b
+    from ehal.ess_fields import ess_field_kind, parse_ess_entity_scoped
 
     kinds: list[str] = []
     seen: set[str] = set()
     for key in field_keys:
-        parsed = parse_ess_pattern_b(key)
+        parsed = parse_ess_entity_scoped(key)
         kind = parsed[1] if parsed else (ess_field_kind(key) or str(key).strip())
         if kind and kind not in seen:
             seen.add(kind)

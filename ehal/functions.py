@@ -132,7 +132,7 @@ def function_statuses(
     present = _mapped_fields(mapped, require_nonempty_value=require_nonempty_value)
     if vendor_ess_active:
         present.add("set_ess_active_power")
-    # Pattern B ess.{slug}.* expands to flat kinds so battery entity scope matches.
+    # entity-scoped ess.{slug}.* expands to flat kinds so battery entity scope matches.
     scope = (
         _mapped_fields(fields, require_nonempty_value=require_nonempty_value)
         if fields is not None

@@ -24,7 +24,7 @@ Bei abgelehnten Zugangsdaten (HTTP **401** oder **403**) pausiert der Optimierer
 
 ## HTTP-Schnittstelle
 
-- **Lesen (Live):** Loxone schickt Messwerte per Virtual Output an Earnie (`GET /ehal/loxone/telemetry/<EHAL-ID>/<v>` auf dem Daemon-Port, typisch **8541**). Earnie pollt den Miniserver **nicht** mehr per Merker-HTTP.
+- **Lesen (Live):** Loxone schickt Messwerte per Virtual Output an Earnie (`GET /ehal/telemetry/<EHAL-ID>/<v>` auf dem Daemon-Port, typisch **8541**; Alias `/ehal/loxone/telemetry/…` für bestehende VOs). Earnie pollt den Miniserver **nicht** mehr per Merker-HTTP.
 - **Schreiben (Loud):** Sollwerte erscheinen in `status.json` unter qualifizierten EHAL-IDs; der Miniserver liest sie per Virtual Input.
 - **Struktur/Import:** `GET http://{LOXONE_IP}/data/LoxAPP3.json` (Control-Namen für Mapping/Import).
 
@@ -59,7 +59,7 @@ Aktivierte Signale liegen als Schlüssel in `plant.ehal_bindings` / `consumers[]
 | E-Auto PV-Follow     | `ehal_bindings` / `set_evcs_mode`          | `0`/`1` bzw. Modus                                                      |
 
 Frühere Rollen `target_soc_name` und `pv_counter_name` entfallen. Force über `set_ess_active_power`, Grenzen als echte Caps. Loxone-Merker sind **sticky** — Automatik ist `set_ess_mode = 0`, nicht „Sollleistung weggelassen“. PV-Intervallenergie aus ∫ `sens_pv_production_active`.
-Statische HK-Decke: optional `plant.max_export_power_kw` im Hauskonfigurator. Effektive Decke = `min` aus HK, inbound EHAL und **0** wenn der Einspeisetarif negativ ist (Nutzer zahlt für Einspeisung). Config setzt `set_grid_export_power_limit` als Wechselrichter-Curtailment um, am einfachsten als `MIN(Limit; WR-Nennleistung)`: `0` = Einspeisesperre; ohne Begrenzung schreibt Earnie die maximal mögliche Einspeisung der Anlage = Summe der PV-Nennleistungen (kWp) + Summe der maximalen Entladeleistungen aller gewählten Batterien, die zwangsentladen werden können (`Batteriesteuerung = voll`; `limits_only` / `read_only` zählen nicht, 2.7.c). Sind beide unbekannt, steht `1000` kW im Merker. ESS-Bindings liegen je Speicher unter Pattern B `ess.{slug}.*` in `batteries[].ehal_bindings` (plant-flach nur noch als Alias der Primärbatterie). Der Steuerbefehl (`set_ess_mode`) gilt pro Batterie und signalisiert keine Einspeisebegrenzung.
+Statische HK-Decke: optional `plant.max_export_power_kw` im Hauskonfigurator. Effektive Decke = `min` aus HK, inbound EHAL und **0** wenn der Einspeisetarif negativ ist (Nutzer zahlt für Einspeisung). Config setzt `set_grid_export_power_limit` als Wechselrichter-Curtailment um, am einfachsten als `MIN(Limit; WR-Nennleistung)`: `0` = Einspeisesperre; ohne Begrenzung schreibt Earnie die maximal mögliche Einspeisung der Anlage = Summe der PV-Nennleistungen (kWp) + Summe der maximalen Entladeleistungen aller gewählten Batterien, die zwangsentladen werden können (`Batteriesteuerung = voll`; `limits_only` / `read_only` zählen nicht, 2.7.c). Sind beide unbekannt, steht `1000` kW im Merker. ESS-Bindings liegen je Speicher unter entity-scoped `ess.{slug}.*` in `batteries[].ehal_bindings` (plant-flach nur noch als Alias der Primärbatterie). Der Steuerbefehl (`set_ess_mode`) gilt pro Batterie und signalisiert keine Einspeisebegrenzung.
 **Vorzeichenkonvention (verbindlich):** Alle Leistungen, die *ins Haus* fließen, sind positiv. Ohne Wechselrichterverluste gilt:
 
 ```

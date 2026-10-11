@@ -1,6 +1,6 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+﻿﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  DRAFT (2.4.n Pattern B) — Loxone → Earnie heatpump telemetry push.
+  DRAFT (2.4.n entity-scoped) — Loxone → Earnie heatpump telemetry push.
   Freigabe is on VI_Earnie_Heatpump. Power may be EFM Load — keep VO cmd.
   VO path: flex.{hk_id}.sens_power_act — default hk_id waermepumpe (rename if HK id differs).
   Binding key flex.{hk_id}.sens_power_act. Legacy Title Earnie_WP_P_act still valid.
@@ -10,9 +10,9 @@
   Pilot (branch spike/vo-push-pilot): target is the daemon port 8541 (not the Streamlit port 8501); append ?t=TOKEN to the command
   (EARNIE_PILOT_PUSH_TOKEN). Repeat (e.g. 30 s) is set per command in Config.
 -->
-<VirtualOut HintText="" Title="Earnie Wärmepumpe Telemetry" Comment="Pattern B: push WP power + heat-storage temps to Earnie (draft)" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
+<VirtualOut HintText="" Title="Earnie Wärmepumpe Telemetry" Comment="entity-scoped: push WP power + heat-storage temps to Earnie (draft)" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<Info templateType="3" minVersion="17010630"/>
-	<VirtualOutCmd Title="Earnie_Waermepumpe_Leistung" Comment="flex.{hk_id}.sens_power_act; or EFM Load" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/&lt;v&gt;" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="true" Repeat="0" RepeatRate="0" SourceValLow="0" DestValLow="0" SourceValHigh="0" DestValHigh="0" HintText=""/>
-	<VirtualOutCmd Title="Earnie_Waermespeicher_Temp_eq" Comment="sens_temperature_heat_storage T_eq C (volume-weighted)" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_temperature_heat_storage/&lt;v&gt;" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="true" Repeat="0" RepeatRate="0" SourceValLow="0" DestValLow="0" SourceValHigh="0" DestValHigh="0" HintText=""/>
-	<VirtualOutCmd Title="Earnie_Waermespeicher_Temp_low" Comment="sens_temperature_heat_storage_low T_low C (bottom sensor)" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_temperature_heat_storage_low/&lt;v&gt;" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="true" Repeat="0" RepeatRate="0" SourceValLow="0" DestValLow="0" SourceValHigh="0" DestValHigh="0" HintText=""/>
+	<VirtualOutCmd Title="Earnie_Waermepumpe_Leistung" Comment="flex.{hk_id}.sens_power_act; or EFM Load" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/telemetry/flex.{hk_id}.sens_power_act/&lt;v&gt;" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="true" Repeat="0" RepeatRate="0" SourceValLow="0" DestValLow="0" SourceValHigh="0" DestValHigh="0" HintText=""/>
+	<VirtualOutCmd Title="Earnie_Waermespeicher_Temp_eq" Comment="sens_temperature_heat_storage T_eq C (volume-weighted)" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/telemetry/sens_temperature_heat_storage/&lt;v&gt;" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="true" Repeat="0" RepeatRate="0" SourceValLow="0" DestValLow="0" SourceValHigh="0" DestValHigh="0" HintText=""/>
+	<VirtualOutCmd Title="Earnie_Waermespeicher_Temp_low" Comment="sens_temperature_heat_storage_low T_low C (bottom sensor)" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/telemetry/sens_temperature_heat_storage_low/&lt;v&gt;" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="true" Repeat="0" RepeatRate="0" SourceValLow="0" DestValLow="0" SourceValHigh="0" DestValHigh="0" HintText=""/>
 </VirtualOut>

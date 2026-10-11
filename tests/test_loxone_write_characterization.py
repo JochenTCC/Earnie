@@ -56,14 +56,17 @@ def test_char_ess_active_sticky_zero_when_none() -> None:
     """Automatik (mode 0): active_kw is None → snapshot writes sticky 0.0."""
     import integrations.loxone_writes as lw
 
-    config_map = {
-        "LOXONE_TARGET_ACTIVE_POWER_NAME": "Earnie_Batterie_Sollleistung",
-        "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_LadeLeistungs-Limit",
-        "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_EntladeLeistungs-Limit",
-        "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+    ess_names = {
+        "set_ess_active_power": "Earnie_Batterie_Sollleistung",
+        "set_ess_charge_power_limit": "Earnie_LadeLeistungs-Limit",
+        "set_ess_discharge_power_limit": "Earnie_EntladeLeistungs-Limit",
+        "set_ess_mode": "Earnie_Steuerbefehl",
     }
     with (
-        patch.object(lw.config, "get", side_effect=lambda name, **kw: config_map.get(name)),
+        patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
+        ),
         patch.object(
             lw.config,
             "get_battery_params",
@@ -245,7 +248,7 @@ def test_char_ps_wire_w_to_kw(kind: str, value_w: float, wire: float) -> None:
     assert _loxone_ps_wire_value(kind, value_w) == pytest.approx(wire)
 
 
-def test_char_ps_status_key_pattern_b_not_flat() -> None:
+def test_char_ps_status_key_entity_scoped_not_flat() -> None:
     field = "ess.ecoflow_delta_3.set_ess_charge_power_limit"
     assert _status_key(field, "set_ess_charge_power_limit") == field
     src = "ess.ecoflow_delta_3.set_ess_source_select"

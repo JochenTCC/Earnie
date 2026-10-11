@@ -2,7 +2,7 @@
 
 Reads the *read* bindings (``sens_*`` / ``get_*``) of an Earnie config dir and writes
 one ``VO_Pilot_*.xml`` per entity group plus ``Pilot-VO-Signalliste.csv``. Every new VO
-Cmd pushes its value to ``/ehal/loxone/telemetry/<EHAL-ID>/<v>?t=<token>`` (digital signals: fixed 1 for On, 0 for Off; analog outputs have no Off command) and is
+Cmd pushes its value to ``/ehal/telemetry/<EHAL-ID>/<v>?t=<token>`` (digital signals: fixed 1 for On, 0 for Off; analog outputs have no Off command) and is
 titled ``Push_<qualified-id>`` (dots → ``_``) so it can run in parallel to Merker Cmds.
 
 Without ``--env-file`` the XML carries the placeholder ``PILOT_TOKEN_HIER_ERSETZEN`` — replace it
@@ -53,7 +53,7 @@ INFO_ATTRS = {"templateType": "3", "minVersion": "17010630"}
 def _cmd_attrs(
     sig: Signal, token: str, repeat: str, repeat_rate: str, token_in_address: bool = False
 ) -> dict[str, str]:
-    base = f"/ehal/loxone/telemetry/{sig.ehal_id}/"
+    base = f"/ehal/telemetry/{sig.ehal_id}/"
     query = "" if token_in_address else f"?t={token}"
     if sig.digital:
         # Digital output: fixed values for On / Off (the value placeholder is for analog outputs).

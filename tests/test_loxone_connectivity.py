@@ -99,51 +99,49 @@ class TestReadCheckValidation:
 class TestCollectReadChecks:
     @pytest.fixture(autouse=True)
     def _empty_components(self):
-        """No ambient batteries — plant flat ESS rows stay for legacy-only plants."""
+        """No batteries — ESS rows come only from entity-scoped battery checks."""
         with patch(
             "runtime_store.persist_paths.resolve_components_json_path",
             return_value=None,
         ):
             yield
 
-    def _plant_get(self, name, **kw):
-        return {
-            "LOXONE_SOC_NAME": "SOC",
-            "LOXONE_PV_POWER_NAME": "PV",
-            "LOXONE_BATTERY_POWER_NAME": "BAT",
-            "LOXONE_GRID_POWER_NAME": "GRID",
-            "LOXONE_CONSUMERS_POWER_NAME": "",
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "CHG",
-            "LOXONE_CONTROL_CMD_NAME": "CMD",
-        }.get(name)
+    def _plant_house(self, extra: dict | None = None) -> dict:
+        bindings = {
+            "sens_pv_production_active": "PV",
+            "sens_grid_power_active": "GRID",
+        }
+        if extra:
+            bindings.update(extra)
+        return {"plant": {"ehal_bindings": bindings}}
 
     def test_plant_labels_are_ehal_sens_fields(self):
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        house = self._plant_house()
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
         ), patch.object(
-            lc.loxone_client, "_default_house_profiles_doc", return_value=None
+            lc.loxone_client, "_default_house_profiles_doc", return_value=house
         ):
             checks = lc.collect_read_checks()
 
         labels = [label for label, _, _ in checks]
         assert labels == [
-            "sens_ess_soc",
             "sens_pv_production_active",
-            "sens_ess_power",
             "grid.meter.sens_grid_power_active",
         ]
         assert "PV-Zähler" not in labels
         assert all(not lbl.startswith("set_") for lbl in labels)
 
     def test_omits_bare_plant_ess_when_batteries_exist(self):
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        house = self._plant_house()
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
         ), patch.object(
-            lc.loxone_client, "_default_house_profiles_doc", return_value=None
+            lc.loxone_client, "_default_house_profiles_doc", return_value=house
         ), patch(
             "integrations.ehal_debug_mapping.has_mappable_live_batteries",
             return_value=True,
@@ -160,12 +158,10 @@ class TestCollectReadChecks:
         assert "grid.meter.sens_grid_power_active" in labels
 
     def test_collects_plant_ambient_from_house_profiles(self):
-        house = {
-            "plant": {
-                "ehal_bindings": {"sens_temperature_outside": "Earnie_Aussentemperatur"},
-            }
-        }
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        house = self._plant_house(
+            {"sens_temperature_outside": "Earnie_Aussentemperatur"}
+        )
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -178,12 +174,8 @@ class TestCollectReadChecks:
         assert by_label["sens_temperature_outside"] == "Earnie_Aussentemperatur"
 
     def test_collects_plant_absent_mode_from_house_profiles(self):
-        house = {
-            "plant": {
-                "ehal_bindings": {"sens_absent_mode": "Earnie_Abwesend"},
-            }
-        }
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        house = self._plant_house({"sens_absent_mode": "Earnie_Abwesend"})
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -203,7 +195,7 @@ class TestCollectReadChecks:
                 },
             }
         }
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -228,14 +220,7 @@ class TestCollectReadChecks:
             }
         }
 
-        def _get(name, **kw):
-            from house_config.ehal_bindings import resolve_plant_binding
-
-            if name == "LOXONE_GRID_POWER_NAME":
-                return resolve_plant_binding(house, "sens_grid_power_active")
-            return self._plant_get(name, **kw)
-
-        with patch.object(lc.config, "get", side_effect=_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -254,7 +239,7 @@ class TestCollectReadChecks:
 
     def test_ignores_consumer_ambient_for_live_reads(self):
         house = {"plant": {"ehal_bindings": {}}}
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -280,7 +265,7 @@ class TestCollectReadChecks:
                 },
             }
         ]
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -313,7 +298,7 @@ class TestCollectReadChecks:
                 },
             },
         ]
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -340,7 +325,7 @@ class TestCollectReadChecks:
                 },
             }
         ]
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ), patch.object(
             lc.config.CONFIG,
@@ -375,7 +360,7 @@ class TestCollectReadChecks:
                 }
             ]
         }
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=flex
         ), patch.object(
             lc.config.CONFIG,
@@ -403,7 +388,7 @@ class TestCollectReadChecks:
                 },
             }
         ]
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -428,7 +413,7 @@ class TestCollectReadChecks:
                 },
             }
         ]
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -452,7 +437,7 @@ class TestCollectReadChecks:
                 },
             }
         ]
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -481,7 +466,7 @@ class TestCollectReadChecks:
                 },
             }
         ]
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -506,7 +491,7 @@ class TestCollectReadChecks:
                 }
             }
         }
-        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+        with patch.object(
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
@@ -629,7 +614,7 @@ class TestReadCheckPushState:
 
 
 class TestBatteryEssEmptyMerker:
-    def test_empty_merker_uses_pattern_b_ehal_id(self):
+    def test_empty_merker_uses_entity_scoped_ehal_id(self):
         doc = {
             "batteries": [
                 {

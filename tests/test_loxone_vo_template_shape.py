@@ -56,19 +56,19 @@ def test_ev_template_includes_fertigum_ready_by_time() -> None:
     assert fertig.get("Analog") == "true"
     # ElementTree unescapes &lt;v&gt; in the attribute value.
     assert fertig.get("CmdOn") == (
-        "/ehal/loxone/telemetry/ev.{ev_id}.get_evcs_ready_by_time/<v>"
+        "/ehal/telemetry/ev.{ev_id}.get_evcs_ready_by_time/<v>"
     )
 
 
 def test_plant_template_includes_energy_counters() -> None:
     path = _DIR / "VO_Earnie_Plant.xml"
     cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
-    assert cmds["Push_sens_pv_energy"] == "/ehal/loxone/telemetry/sens_pv_energy/<v>"
+    assert cmds["Push_sens_pv_energy"] == "/ehal/telemetry/sens_pv_energy/<v>"
     assert cmds["Push_grid_meter_sens_grid_energy_import"] == (
-        "/ehal/loxone/telemetry/grid.meter.sens_grid_energy_import/<v>"
+        "/ehal/telemetry/grid.meter.sens_grid_energy_import/<v>"
     )
     assert cmds["Push_grid_meter_sens_grid_energy_export"] == (
-        "/ehal/loxone/telemetry/grid.meter.sens_grid_energy_export/<v>"
+        "/ehal/telemetry/grid.meter.sens_grid_energy_export/<v>"
     )
 
 
@@ -76,10 +76,10 @@ def test_plant_template_grid_uses_grid_meter_namespace() -> None:
     path = _DIR / "VO_Earnie_Plant.xml"
     cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
     assert cmds["Push_grid_meter_sens_grid_power_active"] == (
-        "/ehal/loxone/telemetry/grid.meter.sens_grid_power_active/<v>"
+        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v>"
     )
     assert cmds["Push_grid_meter_get_grid_export_power_limit"] == (
-        "/ehal/loxone/telemetry/grid.meter.get_grid_export_power_limit/<v>"
+        "/ehal/telemetry/grid.meter.get_grid_export_power_limit/<v>"
     )
 
 
@@ -92,10 +92,10 @@ def test_plant_template_titles_match_push_ehal_ids() -> None:
         if cmd.tag != "VirtualOutCmd":
             continue
         cmd_on = cmd.get("CmdOn") or ""
-        # /ehal/loxone/telemetry/<ehal_id>/<v|0|1>
+        # /ehal/telemetry/<ehal_id>/<v|0|1>
         parts = cmd_on.strip("/").split("/")
-        assert len(parts) >= 4 and parts[0] == "ehal" and parts[2] == "telemetry"
-        ehal_id = parts[3]
+        assert len(parts) >= 3 and parts[0] == "ehal" and parts[1] == "telemetry"
+        ehal_id = parts[2]
         assert cmd.get("Title") == title_from_qualified_id(ehal_id), cmd.get("Title")
         assert "ess" not in ehal_id, ehal_id
 
@@ -111,7 +111,7 @@ def test_consumer_template_includes_energy_counter_mono_only() -> None:
     path = _DIR / "VO_Earnie_Consumer.xml"
     cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
     assert cmds["Push_consumer_{hk_id}_sens_energy_total"] == (
-        "/ehal/loxone/telemetry/consumer.{hk_id}.sens_energy_total/<v>"
+        "/ehal/telemetry/consumer.{hk_id}.sens_energy_total/<v>"
     )
     assert "Push_consumer_{hk_id}_sens_energy_export" not in cmds
 
@@ -120,19 +120,19 @@ def test_battery_template_full_push_and_bipolar_energy() -> None:
     path = _DIR / "VO_Earnie_Battery.xml"
     cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
     assert cmds["Push_ess_{bat_id}_sens_ess_soc"] == (
-        "/ehal/loxone/telemetry/ess.{bat_id}.sens_ess_soc/<v>"
+        "/ehal/telemetry/ess.{bat_id}.sens_ess_soc/<v>"
     )
     assert cmds["Push_ess_{bat_id}_sens_ess_power"] == (
-        "/ehal/loxone/telemetry/ess.{bat_id}.sens_ess_power/<v>"
+        "/ehal/telemetry/ess.{bat_id}.sens_ess_power/<v>"
     )
     assert cmds["Push_ess_{bat_id}_sens_ess_energy_charge"] == (
-        "/ehal/loxone/telemetry/ess.{bat_id}.sens_ess_energy_charge/<v>"
+        "/ehal/telemetry/ess.{bat_id}.sens_ess_energy_charge/<v>"
     )
     assert cmds["Push_ess_{bat_id}_sens_ess_energy_discharge"] == (
-        "/ehal/loxone/telemetry/ess.{bat_id}.sens_ess_energy_discharge/<v>"
+        "/ehal/telemetry/ess.{bat_id}.sens_ess_energy_discharge/<v>"
     )
     assert cmds["Push_ess_{bat_id}_get_ess_soc_min"] == (
-        "/ehal/loxone/telemetry/ess.{bat_id}.get_ess_soc_min/<v>"
+        "/ehal/telemetry/ess.{bat_id}.get_ess_soc_min/<v>"
     )
 
 

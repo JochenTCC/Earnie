@@ -221,8 +221,8 @@ def build_probe_setpoint(field: str, value: Any, *, adapter_id: str) -> dict[str
 def build_probes_setpoint(
     values: dict[str, Any], *, adapter_id: str
 ) -> dict[str, Any]:
-    """Plant-flat / EV setpoint document (no Pattern B / flex keys)."""
-    from ehal.ess_fields import is_ess_pattern_b_field
+    """Plant-flat / EV setpoint document (no entity-scoped / flex keys)."""
+    from ehal.ess_fields import is_ess_entity_scoped_field
     from ehal.flex_fields import flex_field_kind
 
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -233,7 +233,7 @@ def build_probes_setpoint(
     }
     for field, value in values.items():
         name = canonical_probe_field(field)
-        if is_ess_pattern_b_field(name) or flex_field_kind(name):
+        if is_ess_entity_scoped_field(name) or flex_field_kind(name):
             continue
         doc[probe_kind(field)] = value
     return doc
@@ -269,7 +269,7 @@ def write_probes(
     max_power_kw: float | None = None,
     ev_nominal_a: float | None = None,
 ) -> tuple[EhalWriteError | None, dict[str, Any]]:
-    """Write clamped probes (adapter + Pattern B / flex Merker paths)."""
+    """Write clamped probes (adapter + entity-scoped / flex Merker paths)."""
     assert_writes_allowed()
     if max_power_kw is None:
         max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
@@ -290,16 +290,16 @@ def write_probes(
 
 
 def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
-    from ehal.ess_fields import is_ess_pattern_b_field
+    from ehal.ess_fields import is_ess_entity_scoped_field
     from ehal.flex_fields import flex_field_kind
 
-    pattern_b: dict[str, float] = {}
+    entity_scoped: dict[str, float] = {}
     flex_fields: dict[str, float] = {}
     adapter_values: dict[str, Any] = {}
     for field, value in clamped.items():
         name = canonical_probe_field(field)
-        if is_ess_pattern_b_field(name):
-            pattern_b[name] = float(value)
+        if is_ess_entity_scoped_field(name):
+            entity_scoped[name] = float(value)
             continue
         if flex_field_kind(name):
             flex_fields[name] = float(value)
@@ -319,14 +319,14 @@ def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
         }
         if payload:
             error = adapter.write_setpoints(setpoint)
-    if error is None and pattern_b:
-        error = _write_pattern_b_probes(pattern_b)
+    if error is None and entity_scoped:
+        error = _write_entity_scoped_probes(entity_scoped)
     if error is None and flex_fields:
         error = _write_flex_enable_probes(flex_fields)
     return error
 
 
-def _write_pattern_b_probes(fields: dict[str, float]) -> EhalWriteError | None:
+def _write_entity_scoped_probes(fields: dict[str, float]) -> EhalWriteError | None:
     if ehal_live.is_ha_backend():
         adapter = ehal_live.get_ha_adapter()
         writer = getattr(adapter, "write_mapped_fields", None)
@@ -369,8 +369,8 @@ def _loxone_probe_wire_value(field: str, value: Any) -> float:
 
 
 def _publish_id_for_probe(field: str) -> str:
-    """Qualified EHAL ID for a Schreibtest probe field (plant / Pattern B / consumer)."""
-    from ehal.ess_fields import parse_ess_pattern_b
+    """Qualified EHAL ID for a Schreibtest probe field (plant / entity-scoped / consumer)."""
+    from ehal.ess_fields import parse_ess_entity_scoped
     from ehal.qualified_ids import (
         NAMESPACES,
         field_kind,
@@ -387,7 +387,7 @@ def _publish_id_for_probe(field: str) -> str:
     raw = str(field or "").strip()
     if not raw:
         return ""
-    if parse_ess_pattern_b(raw):
+    if parse_ess_entity_scoped(raw):
         return raw
     if raw in PLANT_LIVE_WRITE_FIELDS or field_kind(raw) in PLANT_LIVE_WRITE_FIELDS:
         return qualified_plant_id(raw)
@@ -456,6 +456,8 @@ def read_back(field: str) -> Any | None:
 
 
 def _read_back_ha(field: str) -> Any | None:
+    if ehal_live.is_ha_weg_b_transport():
+        return _read_back_ha_weg_b(field)
     adapter = ehal_live.get_ha_adapter()
     targets = mapped_write_targets()
     entity_id = _marker_for_probe_field(field, targets) or str(
@@ -479,6 +481,36 @@ def _read_back_ha(field: str) -> Any | None:
             return float(state)
         except (TypeError, ValueError):
             return state
+
+
+def _read_back_ha_weg_b(field: str) -> Any | None:
+    from integrations.ehal_write import load_published_records, published_fetched_at
+
+    if not published_fetched_at():
+        return None
+    qid = _publish_id_for_probe(str(field))
+    if not qid:
+        return None
+    rec = load_published_records().get(qid)
+    if not rec:
+        return None
+    raw = rec.get("value")
+    kind = probe_kind(field)
+    if kind == "set_ess_mode":
+        return _coerce_ess_mode_echo(raw)
+    if kind == "set_evcs_mode":
+        try:
+            code = int(float(raw))
+        except (TypeError, ValueError):
+            return None
+        for name, val in EVCS_MODE_VALUES.items():
+            if int(val) == code:
+                return name
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 def _read_back_loxone(field: str) -> Any | None:

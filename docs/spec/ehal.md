@@ -1,6 +1,6 @@
 # EHAL — Earnie Hardware Access Layer (schema_version 4)
 
-**Status:** current (schema_version 4; Pattern B bindings shipped; `set_ess_source_select` for 2.7.h)  
+**Status:** current (schema_version 4; entity-scoped bindings shipped *(formerly Pattern B)*; `set_ess_source_select` for 2.7.h)  
 **History (backlog):** `2.4.a` (M1) → `2.4.j` (wire rename) → `2.4.k` (entity mapping) → `2.4.o` (Design C1 `set_ess_active_power`) → `2.7.h` (source select)  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 §2.2, §2.5 Phase 1, §2.6  
 **Canonical field names:** `[docs/ui/ehal-com.md](../ui/ehal-com.md)` §B / §C  
@@ -27,21 +27,21 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Hub isolation | No OpenEMS, Home Assistant, evcc, or Loxone types in the math core                                                                                                                                                                                                                                                                   |
 | Adapter duty  | Map hub channels/entities → EHAL; normalize signs and units inside the adapter                                                                                                                                                                                                                                                       |
 | Transport     | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS)                                                                                                                                                                                                |
-| Loxone today  | Default `ehal.backend=loxone` uses `[integrations/loxone_adapter.py](../../integrations/loxone_adapter.py)` for plant telemetry/setpoints. Pattern B keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` are **activation flags** (empty Merker values after **2.7.q Q8**); wire I/O is VO push + `status.json` under qualified IDs. Plant-flat ESS loud writes may still use `LOXONE_TARGET_*` env names until a later cleanup. Structure/greenfield presence uses LoxAPP3 (no Merker HTTP in production Python). Mapping UI: EHAL-Com |
-| HA today      | `ehal.backend=ha` uses `[integrations/ha_adapter.py](../../integrations/ha_adapter.py)`; **non-empty** entity IDs in the same Pattern B maps (aggregated live, incl. `ess.{slug}.*`) until Binding P5 (Weg B). URL/token in `config/.env` (`EHAL_HA_*`); optional `sign` in `ehal.ha` (**2.6.i**). Flat `ehal.ha.entities` is one-shot migrated and cleared (**2.6.g**).                          |
+| Loxone today  | Default `ehal.backend=loxone` uses `[integrations/loxone_adapter.py](../../integrations/loxone_adapter.py)` for plant telemetry/setpoints. Entity-scoped keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` are **activation flags** (empty Merker values after **2.7.q Q8**); wire I/O is VO push + `status.json` under qualified IDs. ESS reads/writes use `ess.{id}.*` on batteries (no `LOXONE_*` loud-name config slots, no plant-flat ESS alias merge). Structure/greenfield presence uses LoxAPP3 (no Merker HTTP in production Python). Mapping UI: EHAL-Com |
+| HA today      | `ehal.backend=ha`; **`ehal.ha.transport`** `pull` (default) or `weg_b` (**2.7.r-T1**). **pull:** `[integrations/ha_adapter.py](../../integrations/ha_adapter.py)` REST (`/api/states`, services). **weg_b (contract, T2–T4):** same HTTP story as Loxone — HA pushes activated reads to `GET /ehal/telemetry/<qualified-id>/<value>` (token); setpoints on `GET /ehal/status.json` (alias `/ehal/loxone/status.json`). Entity IDs in entity-scoped maps for pull + HITL; URL/token in `config/.env` (`EHAL_HA_*`); optional `sign` in `ehal.ha` (**2.6.i**). Flat `ehal.ha.entities` migrated once (**2.6.g**).                          |
 
 
 
 
 ## Qualified EHAL IDs (2.7.n-2)
 
-Exchange / display form of every signal on the push/exchange wire and in `status.json` Check keys (Loxone VO today; HA Weg B planned). Implemented in `ehal/qualified_ids.py` (builders + `parse_qualified_id`).
+Exchange / display form of every signal on the push/exchange wire and in `status.json` keys (Loxone VO; HA **weg_b** uses the same qualified IDs). Implemented in `ehal/qualified_ids.py` (builders + `parse_qualified_id`).
 
 | Form | Example | Notes |
 | ---- | ------- | ----- |
 | Plant bare | `sens_temperature_outside`, `sens_pv_production_active` | House-wide fields without a device Kennung; PV stays bare until a deferred `pv.*` namespace |
 | Grid meter | `grid.meter.sens_grid_power_active` | First Kennung `meter`; more `grid.<Kennung>.*` meters may follow. Plant **storage** keeps bare kind keys |
-| Battery | `ess.<Kennung>.sens_ess_soc` | Pattern B |
+| Battery | `ess.<Kennung>.sens_ess_soc` | Entity-scoped binding key |
 | Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Emitted namespaces; legacy `flex.<slug>.*` accepted on parse only |
 | EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Same Kennung; namespace chosen by field kind |
 | Inverter (reserved) | `inv.<slug>.*` | **2.7.l P4** |
@@ -81,7 +81,7 @@ EHAL base units (adapters normalize hub-native units into these):
 | Modes / flags (`set_ess_mode`, `set_evcs_mode`, `sens_absent_mode`, `sens_evcs_connected`, …)                                                       | —      | Dimensionless (enums or `0`/`1`); no physical unit                                    |
 
 
-**Export limit "unconstrained" (2.7.a / 2.7.c):** sticky backends always receive a number on `set_grid_export_power_limit`. When no cap applies, Earnie writes the plant's physical export maximum = **sum of PV nameplate (kWp)** + **sum of max discharge power of every selected battery that supports forced discharge** (`battery_control = full`; skip `limits_only` / `read_only`). Fallback when both are unknown: `1 000 000` W. ESS bindings use Pattern B `ess.{slug}.*` on `batteries[].ehal_bindings`.
+**Export limit "unconstrained" (2.7.a / 2.7.c):** sticky backends always receive a number on `set_grid_export_power_limit`. When no cap applies, Earnie writes the plant's physical export maximum = **sum of PV nameplate (kWp)** + **sum of max discharge power of every selected battery that supports forced discharge** (`battery_control = full`; skip `limits_only` / `read_only`). Fallback when both are unknown: `1 000 000` W. ESS bindings use entity-scoped `ess.{slug}.*` on `batteries[].ehal_bindings`.
 
 **Grid (**`sens_grid_power_active`**):** `+` = grid **import** (Bezug), `−` = **export** (Einspeisung). Adapters normalize hub-native signs before emit.
 
@@ -153,7 +153,7 @@ Setpoints are **math limits / forced power / modes**, not a full inner-loop cont
 | `set_ess_charge_power_limit`    | no*             | W             | Max charge power (magnitude ≥ 0)                                                                                                                                                                |
 | `set_ess_discharge_power_limit` | no*             | W             | Max discharge power (magnitude ≥ 0)                                                                                                                                                             |
 | `set_ess_mode`                  | no*             | string/number | Sticky-backend control; **0 = Automatik**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores                                                                        |
-| `set_ess_source_select`         | no*             | enum 0\|1     | Route locally-attached loads: **0 = grid** pass-through (charge allowed), **1 = battery-only** island. Wire as Pattern B `ess.{id}.set_ess_source_select` on physical powerstation `standby_backup` only (2.7.h); omit for house ESS / plant. OpenEMS unused. |
+| `set_ess_source_select`         | no*             | enum 0\|1     | Route locally-attached loads: **0 = grid** pass-through (charge allowed), **1 = battery-only** island. Wire as entity-scoped `ess.{id}.set_ess_source_select` on physical powerstation `standby_backup` only (2.7.h); omit for house ESS / plant. OpenEMS unused. |
 | `set_grid_export_power_limit`   | no*             | W             | Max grid export, non-negative magnitude (like ESS limits); `0` = no export; unconstrained = plant maximum (PV kWp sum + max discharge of force-dischargeable ESS; fallback 1 000 000 W) (2.7.a) |
 | `set_evcs_max_current`          | no*             | A             | EV charge current setpoint / max current                                                                                                                                                        |
 | `set_evcs_mode`                 | no*             | enum          | `off`                                                                                                                                                                                           |
@@ -291,7 +291,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 
 | Class            | When                                                                                                                                                                                                                                                                                                                                                           |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Heatpump         | Not on the core EHAL plant wire; stub role (`share/ehal/roles/heatpump.json`) + Loxone recipe/VO (`share/loxone/recipes/heatpump.json`, `VO_Earnie_Heatpump.xml`). Live: `thermal_annual` consumer `ehal_bindings` for `flex.*` plus `sens_temperature_heat_storage` / `sens_temperature_heat_storage_low` (HA entity IDs or Loxone Merker via Pattern B HITL) |
+| Heatpump         | Not on the core EHAL plant wire; stub role (`share/ehal/roles/heatpump.json`) + Loxone recipe/VO (`share/loxone/recipes/heatpump.json`, `VO_Earnie_Heatpump.xml`). Live: `thermal_annual` consumer `ehal_bindings` for `flex.*` plus `sens_temperature_heat_storage` / `sens_temperature_heat_storage_low` (HA entity IDs or Loxone Merker via entity-scoped HITL) |
 | Generic consumer | Flex fields mapped via `consumers[].ehal_bindings` (storage often still `flex.{slug}.*`); Live/VO exchange uses **`consumer.{Kennung}.*`** (2.7.n), incl. **`sens_consumer_active`** (2.7.p). Stub role + recipe; VO Merker `Earnie_Verbraucher_<Slug>_Aktiv`                                                                                                                                                                                    |
 
 
@@ -337,25 +337,38 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 
 ## Implementation notes — Home Assistant + evcc
 
-- Adapter: `integrations/ha_adapter.py` (REST only: `/api/states`, `/api/services/...`). Prefer HA entities from evcc.
-- Config: `ehal.backend=ha`; URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` under `ehal.ha` in `config.json`. Entity IDs live in `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` (Pattern B; ESS per battery). Live aggregation (`aggregate_ha_entities`): plant grid/PV/export + optional energy counters + `sens_absent_mode`; battery Pattern B `ess.{slug}.*` (incl. `ess.{id}.set_ess_source_select` on physical standby_backup) with primary flat ESS aliases for non-Quellenwahl kinds; first EV only `sens_evcs_active_power` / `set_evcs_max_current` / `set_evcs_mode`. Extra Pattern B keys (outdoor temp, full EV SoC/connected, flex/pool) may be saved in HITL but are ignored by `HaAdapter` until wired. Legacy flat `ehal.ha.entities` is migrated once and cleared. Snippet: `share/config/ehal.ha.snippet.json` (backend / `adapter_id` / `sign` only — no secrets).
-- Compose lab: `docker/compose/ha-lab.yml` (Earnie :8506 + HA :8123 + evcc :7070). Setup: `[ha-lab-setup.md](ha-lab-setup.md)`. German A2/B: `[../einrichtung/ha-evcc.md](../einrichtung/ha-evcc.md)`.
-- HITL mapping UI: Streamlit EHAL-Com expander → `ui/ehal_ha_mapping.py` (entity picker plant / battery / consumer → scan `/api/states` once per session → **heuristic propose** for empty fields only → user confirms → house or `components.json` per entity; **no LLM**). Heuristic: `integrations/ha_ehal_mapping.py` (domain / `device_class` / unit / token-boundary name hints with vendor synonyms; unique best score or leave empty; physical-quantity filter via `ha_units`). Live path: Pattern B / `aggregate_ha_entities` → `HaAdapter`; Live tables use entity-centric Mapping columns like Loxone.
-- Optional slot-Ist energy maps (not on the EHAL power wire): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on `plant.ehal_bindings` → `integrations/ha_meter_energy.py` + sampler ΔkWh overlay (same contract as Loxone; see `[loxone-meter-energy-slot-ist.md](loxone-meter-energy-slot-ist.md)`).
-- Sign mode per field: `ehal` (already aligned) or `negate` — still in `ehal.ha.sign` (config). Units: kW states converted to W; energy Wh→kWh on the side channel.
-- Setpoints: typically `number.set_value` on mapped entities (Amps for EVCS; W for ESS limits).
-- Optimizer exclusivity + single Modbus writer: see German checklist in `ha-evcc.md`.
-- Same Live façade / write-error path as OpenEMS (`is_ehal_network_backend()`).
+### Transport (`ehal.ha.transport`)
+
+| Value | Live I/O (today / planned) |
+| ----- | --------------------------- |
+| **`pull`** (default when omitted) | **Shipped:** `integrations/ha_adapter.py` REST only (`/api/states`, `/api/services/...`). Prefer HA entities from evcc. Units: Earnie converts at the adapter boundary via `integrations/ha_units.py` from each entity's `unit_of_measurement`. |
+| **`weg_b`** | **Contract (2.7.r-T1); runtime T2–T4:** Same Earnie↔SB HTTP contract as Loxone. **Read:** HA automations / `rest_command` push activated telemetry to Earnie `GET /ehal/telemetry/<qualified-EHAL-id>/<value>` (see Loxone push rules: token, inbox freshness, zero rule, last-known). **Write:** HA polls Earnie `GET /ehal/status.json` (canonical; `/ehal/loxone/status.json` kept as alias) for setpoints under qualified keys; payload includes `heartbeat_ts` like Loxone VI fetch. Listener: `integrations/loxone_request_http.py` on `system.ehal_loxone_http_port` (default **8541**). **Token:** `EARNIE_PILOT_PUSH_TOKEN` env (header `X-Earnie-Token`, or `/t/<token>/…`, or `?t=` — same as Loxone pilot push). Setting `weg_b` alone does not switch live read/write until **2.7.r-T2/T3** land. |
+
+### Units on the HA telemetry wire (weg_b)
+
+Values in the telemetry URL path must already be in **canonical EHAL units** (§ Units table): active power **W**, energy **kWh**, SoC/ratios **%**, EVCS current **A**, etc. Earnie does not receive HA `unit_of_measurement` on push — the **HA carrier** (YAML template / automation) must convert native entity units before calling `/ehal/telemetry/…`. Setpoints in `status.json` use the same EHAL numeric units as Loxone (e.g. ESS limits in **W**).
+
+### Config and mapping
+
+- Config: `ehal.backend=ha`; `ehal.ha.transport` as above; URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` under `ehal.ha` in `config.json`. Loader: `settings/config_loaders.load_ehal_params` → `EHAL_HA_TRANSPORT` (invalid values raise). Snippet: `share/config/ehal.ha.snippet.json`.
+- Entity IDs in `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` (entity-scoped; ESS per battery). **pull:** required for live I/O. **weg_b:** HITL mapping remains the contract UI; live reads/writes move to push + `status.json` (T2/T3). Legacy flat `ehal.ha.entities` migrated once and cleared.
+- Live aggregation (`aggregate_ha_entities`) for **pull**: plant grid/PV/export + optional energy counters + `sens_absent_mode`; battery `ess.{slug}.*`; first EV EVCS fields; extras saved in HITL may be ignored until wired.
+- Compose lab: `docker/compose/ha-lab.yml`. Setup: `[ha-lab-setup.md](ha-lab-setup.md)`. German A2/B: `[../einrichtung/ha-evcc.md](../einrichtung/ha-evcc.md)`.
+- HITL: `ui/ehal_ha_mapping.py` on EHAL-Com; heuristic `integrations/ha_ehal_mapping.py` + `ha_units` on **pull**.
+- Optional slot-Ist energy (pull path): `integrations/ha_meter_energy.py` — see `[loxone-meter-energy-slot-ist.md](loxone-meter-energy-slot-ist.md)`.
+- Sign mode: `ehal.ha.sign` (`ehal` | `negate`) applies to **pull** adapter reads/writes.
+- **pull** setpoints: `number.set_value` on mapped entities. **weg_b** setpoints: poll `status.json` (T3); `plant.ha_ess_force` / Huawei forcible charge stays REST exception when configured.
+- Optimizer exclusivity + Modbus: `ha-evcc.md`. Same Live façade / write-error path as OpenEMS (`is_ehal_network_backend()`).
 
 
 
 ## Implementation notes — Loxone
 
 - Adapter: `integrations/loxone_adapter.py` (HTTP markers via `loxone_client`). Live façade: `integrations/ehal_live.py` (`get_adapter()` includes Loxone).
-- Default config: missing/`none`/`loxone` → `EHAL_BACKEND=loxone`, `adapter_id` default `loxone-home`. Pattern B keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` are activation flags (empty Merker values after Q8); empty legacy `loxone_blocks` may remain but is not the mapping source.
+- Default config: missing/`none`/`loxone` → `EHAL_BACKEND=loxone`, `adapter_id` default `loxone-home`. entity-scoped keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` are activation flags (empty Merker values after Q8). Non-empty `config.loxone_blocks` is rejected (run `python -m scripts.migrate_ehal_bindings`).
 - Telemetry: kW markers → W; Loxone battery **+discharge** → EHAL `sens_ess_power` **+discharge** (`× 1000`, no inversion); grid pass-through as EHAL `+` import; field names §C (`sens_`*).
 - Capabilities: `supports_ess_write` when charge/discharge markers exist; `supports_evcs_current` when EV current write path works.
-- Live writes: ESS limits / `set_ess_mode` / EV current+mode / flex enable via `status.json` qualified IDs; binding keys activate (Merker value optional). Plant-flat ESS may still use `LOXONE_TARGET_*` env names.
+- Live writes: ESS limits / `set_ess_mode` via primary-battery entity-scoped `ess.{id}.*`; EV current+mode / flex enable via `status.json` qualified IDs; binding keys activate (Merker value optional).
 - Removed from live semantics (wire rename): ESS `target_soc`, EV `soc_at_plug_in`, PV cumulative counter, Sofortladen countdown Merker.
 
 

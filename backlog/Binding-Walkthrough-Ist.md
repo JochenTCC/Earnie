@@ -8,7 +8,7 @@
 
 **Durchgehendes Beispiel:** Batterie „EcoFlow Delta 3“, Kennung `ecoflow_delta_3`.
 
-| Richtung | EHAL-Feld (Pattern B) | Bedeutung | Einheit auf dem Miniserver | Beispielname (frei wählbar) |
+| Richtung | EHAL-Feld (entity-scoped) | Bedeutung | Einheit auf dem Miniserver | Beispielname (frei wählbar) |
 |---|---|---|---|---|
 | Lesen | `ess.ecoflow_delta_3.sens_ess_soc` | Ladezustand dieser Batterie | **%** (0–100) | `Earnie_Batterie_ecoflow_delta_3_SoC` |
 | Schreiben | `ess.ecoflow_delta_3.set_ess_charge_power_limit` | Obergrenze Ladeleistung, die Earnie vorgibt | **kW**, Betrag ≥ 0 (`0` = nicht laden) | `Earnie_Batterie_ecoflow_delta_3_LadeLeistungs-Limit` |

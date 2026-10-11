@@ -59,9 +59,9 @@ def mapping_column_label() -> str:
 
 def _network_write_mapping() -> dict[str, str]:
     if ehal_live.is_ha_backend():
-        from integrations.ehal_debug_mapping import ha_pattern_b_live_mapping
+        from integrations.ehal_debug_mapping import ha_entity_scoped_live_mapping
 
-        return ha_pattern_b_live_mapping()
+        return ha_entity_scoped_live_mapping()
     if ehal_live.is_openems_backend():
         return openems_setpoint_mapping(
             ess_component=str(config.get("EHAL_OPENEMS_ESS_COMPONENT") or "ess0"),
@@ -94,9 +94,9 @@ def _omitted_write_caption(raw_count: int, rows: list[dict[str, str]]) -> str | 
 
 def _telemetry_mapping_for_adapter(adapter: Any) -> dict[str, str]:
     if ehal_live.is_ha_backend():
-        from integrations.ehal_debug_mapping import ha_pattern_b_live_mapping
+        from integrations.ehal_debug_mapping import ha_entity_scoped_live_mapping
 
-        mapping = ha_pattern_b_live_mapping()
+        mapping = ha_entity_scoped_live_mapping()
         if "sens_power_consumers" not in mapping:
             mapping = dict(mapping)
             mapping["sens_power_consumers"] = "—(abgeleitet)"

@@ -156,7 +156,7 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
 
 
 def _strip_obsolete_flex_power_setpoint(bindings: dict[str, str]) -> None:
-    """Drop removed Pattern B / stub flex kW setpoint keys (never written live)."""
+    """Drop removed entity-scoped / stub flex kW setpoint keys (never written live)."""
     for key in list(bindings):
         name = str(key or "").strip()
         if name in ("flex.power_setpoint_name", "flex.set_power_setpoint"):
@@ -478,54 +478,38 @@ def resolve_plant_binding(
     ehal_field: str,
     config_doc: dict | None = None,
 ) -> str:
-    """Plant read/write address from ``plant.ehal_bindings`` (+ primary ESS aliases).
+    """Plant read/write address from ``plant.ehal_bindings`` only.
 
     Merker if set; else qualified / bare EHAL id when the binding key is present with
     an empty Merker (Q8 activation — reads and ``set_*`` writes).
+
+    ESS kinds (``sens_ess_*`` / ``set_ess_*`` / …) are not resolved here — use
+    ``house_config.ess_bindings.resolve_primary_ess_binding``.
     """
+    _ = config_doc  # kept for call-site compat; plant bindings are house-only
     field = _nonempty(ehal_field)
+    if not field:
+        return ""
+    from ehal.ess_fields import is_plant_flat_ess_field
+
+    if is_plant_flat_ess_field(field):
+        return ""
     house = house_doc if isinstance(house_doc, dict) else {}
     plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
     bindings = plant.get("ehal_bindings") if isinstance(plant.get("ehal_bindings"), dict) else {}
     direct = _nonempty(bindings.get(field))
     if direct:
         return direct
-
-    def _empty_key_fallback(source: dict) -> str:
-        if field not in source:
-            return ""
-        from ehal.loxone_push_source import is_pushable_kind
-        from ehal.qualified_ids import field_kind, qualified_plant_id
-
-        kind = field_kind(field)
-        # Q8: empty Merker → exchange ID (grid.meter.* for GRID_KINDS; bare otherwise).
-        if kind.startswith("set_") or is_pushable_kind(field):
-            return qualified_plant_id(field)
+    if field not in bindings:
         return ""
+    from ehal.loxone_push_source import is_pushable_kind
+    from ehal.qualified_ids import field_kind, qualified_plant_id
 
-    plant_fallback = _empty_key_fallback(bindings)
-    if plant_fallback:
-        return plant_fallback
-    # Merge batteries[].ehal_bindings (ess.{slug}.* → flat aliases for primary)
-    try:
-        from house_config.components_store import load_components_document
-        from house_config.ess_bindings import merge_ess_bindings_into_plant
-        from runtime_store.persist_paths import resolve_components_json_path
-
-        components = load_components_document(resolve_components_json_path())
-        batteries = components.get("batteries") if isinstance(components, dict) else []
-        merged = merge_ess_bindings_into_plant(bindings, batteries if isinstance(batteries, list) else [])
-        merker = _nonempty(merged.get(field))
-        if merker:
-            return merker
-        return _empty_key_fallback(merged if isinstance(merged, dict) else {})
-    except Exception:
-        return ""
-
-
-def _plant_bindings_empty(plant: dict) -> bool:
-    bindings = plant.get("ehal_bindings")
-    return not (isinstance(bindings, dict) and any(_nonempty(v) for v in bindings.values()))
+    kind = field_kind(field)
+    # Q8: empty Merker → exchange ID (grid.meter.* for GRID_KINDS; bare otherwise).
+    if kind.startswith("set_") or is_pushable_kind(field):
+        return qualified_plant_id(field)
+    return ""
 
 
 def _strip_entity_event_triggers(house: dict) -> bool:
@@ -559,7 +543,7 @@ def ensure_migrated(
 ) -> tuple[dict, dict, bool]:
     """One-shot in-memory migration of blocks/consumer nests → entity bindings.
 
-    Also migrates flat ``ehal.ha.entities`` → Pattern B (2.6.g) and strips the
+    Also migrates flat ``ehal.ha.entities`` → entity-scoped (2.6.g) and strips the
     flat map when ``strip_legacy`` is true. With ``strip_legacy``, also moves
     ``ehal.ha`` URL/token into ``.env`` and strips those JSON keys (2.6.i).
     """
@@ -570,6 +554,26 @@ def ensure_migrated(
 
     house = copy.deepcopy(house_doc) if isinstance(house_doc, dict) else {}
     config = copy.deepcopy(config_doc) if isinstance(config_doc, dict) else {}
+    blocks = config.get("loxone_blocks") if isinstance(config.get("loxone_blocks"), dict) else {}
+    if blocks:
+        raise ValueError(
+            "config.loxone_blocks is no longer migrated automatically. "
+            "Run: python -m scripts.migrate_ehal_bindings "
+            "--path <house_profiles.json> --config <config.json>"
+        )
+    from house_config.ess_bindings import mappable_batteries
+    from runtime_store.migrate_v4 import residual_plant_flat_ess_keys
+
+    residual_flat = residual_plant_flat_ess_keys(house)
+    # Fail only when batteries exist to hold entity-scoped — HA-only installs may
+    # still store flat ESS on plant until migrate_ess_bindings_once runs.
+    if residual_flat and mappable_batteries():
+        raise ValueError(
+            "plant.ehal_bindings still has plant-flat ESS keys "
+            f"({', '.join(residual_flat)}). "
+            "Run: python -m scripts.migrate_ess_bindings_once "
+            "--config-dir <config dir>"
+        )
     changed = False
     plant = dict(house.get("plant") or {}) if isinstance(house.get("plant"), dict) else {}
     bindings = {
@@ -577,12 +581,6 @@ def ensure_migrated(
         for k, v in (plant.get("ehal_bindings") or {}).items()
         if _nonempty(v)
     }
-    blocks = config.get("loxone_blocks") if isinstance(config.get("loxone_blocks"), dict) else {}
-    if blocks and _plant_bindings_empty(plant):
-        migrated = migrate_loxone_blocks_to_plant(blocks)
-        if migrated:
-            bindings.update(migrated)
-            changed = True
     if _migrate_all_consumers(house):
         changed = True
     if _promote_ambient_to_plant(house, bindings):
@@ -679,7 +677,7 @@ _OBSOLETE_BLOCK_KEYS: frozenset[str] = frozenset(
 def strip_migrated_config_keys(config_doc: dict | None) -> dict:
     """Drop legacy Merker event-trigger keys; drop migrated/obsolete ``loxone_blocks`` keys.
 
-    Also clears flat ``ehal.ha.entities`` after Pattern B migrate (2.6.g) and
+    Also clears flat ``ehal.ha.entities`` after entity-scoped migrate (2.6.g) and
     strips ``ehal.ha`` URL/token keys (2.6.i; dotenv write is separate).
     """
     from house_config.ha_ehal_bindings import strip_ha_entities_from_config

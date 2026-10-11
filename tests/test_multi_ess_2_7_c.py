@@ -1,4 +1,4 @@
-"""2.7.c multi-ESS: battery_ids, kind, Pattern B, export unconstrained, migrate v4."""
+"""2.7.c multi-ESS: battery_ids, kind, entity-scoped, export unconstrained, migrate v4."""
 from __future__ import annotations
 
 import pytest
@@ -75,7 +75,7 @@ def test_resolve_battery_ids_planning_list():
     assert resolved["_battery_max_discharge_power_kw_sum"] == pytest.approx(7.5)
 
 
-def test_ess_field_pattern_b():
+def test_ess_field_entity_scoped():
     assert ess_field("default_5kwh", "sens_ess_soc") == "ess.default_5kwh.sens_ess_soc"
     expanded = expand_ess_bindings({"sens_ess_soc": "Earnie_Batterie_SoC"}, "default_5kwh")
     assert expanded["ess.default_5kwh.sens_ess_soc"] == "Earnie_Batterie_SoC"

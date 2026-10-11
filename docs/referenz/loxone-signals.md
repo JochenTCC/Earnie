@@ -15,7 +15,7 @@ In the docs, the canonical template/import path is called **Default** (formerly 
 
 ---
 
-## Pattern B Overview
+## entity-scoped Overview
 
 | Direction        | Building block                          | Role                                                                        |
 | ----------------- | --------------------------------------- | --------------------------------------------------------------------------- |
@@ -39,7 +39,7 @@ Earnie Core writes and reads the same Merker names on the Miniserver. The librar
 | --------------------------------------- | -------------------------- | --------------------------------------------------------- | ------------------------------------------------------------ |
 | **Miniserver title**                   | Cmd title (jdev / import) | `Earnie_Verbraucher_Waschmaschine_Freigabe`               | `Earnie_EAuto_Garage_Soll_A`                                |
 | **Virtual-Input check / status JSON**  | Virtual In check pattern  | `flex.{hk_id}.Earnie_Verbraucher_Freigabe`                | `ev.{ev_id}.Earnie_EAuto_Soll_A`                            |
-| **Virtual-Output command when on**     | Virtual Out URL           | `/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/<v>`   | `/ehal/loxone/telemetry/ev.{ev_id}.sens_evcs_soc_act/<v>`    |
+| **Virtual-Output command when on**     | Virtual Out URL           | `/ehal/telemetry/flex.{hk_id}.sens_power_act/<v>`   | `/ehal/telemetry/ev.{ev_id}.sens_evcs_soc_act/<v>`    |
 
 
 `{hk_id}` / `{ev_id}` = house profile entity `id` (snake_case). Templates leave the placeholders in place — replace them in Config.
@@ -104,7 +104,7 @@ Then **restart Loxone Config**. The templates appear under Peripherals / Device 
 
 In every inserted Virtual In/Out, replace the `EARNIE_HOST` placeholder with Earnie's LAN IP or hostname. UI/Streamlit typically uses port **8501**; the **daemon HTTP** (Virtual In status, `Earnie_Request_Optimize` / alive) uses port **8541** (`system.ehal_loxone_http_port`). See [Streamlit Ports](streamlit-ports.md).
 
-Example Virtual In address (Pattern B status JSON):
+Example Virtual In address (entity-scoped status JSON):
 
 `http://192.168.178.10:8541/ehal/loxone/status.json`
 
@@ -112,7 +112,7 @@ Virtual Out address **status / request optimize**:
 
 `http://192.168.178.10:8541`
 
-Telemetry VOs (`VO_Earnie_*` except `Status`) target the daemon port **8541** as well. The receiver `/ehal/loxone/telemetry/<EHAL-ID>/<value>` takes Virtual-Output pushes when `EARNIE_PILOT_PUSH_TOKEN` is set. All pushable `sens_*` / `get_*` fields read from the inbox (no Merker poll), including **meter energy** counters (`sens_pv_energy`, `sens_grid_energy_import` / `_export`, `consumer.<id>.sens_energy_total`). Recommended VO repeat: **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, default 10). Stale energy (> 3 × repeat) is not zero-assumed — slot Ist keeps the sample mean for that channel. The synthetic **heartbeat** VO is always push. FertigUm (`ev.<id>.get_evcs_ready_by_time`) is pushed as an Analog VO (numeric next-entry preferred; Tna-style text such as `Morgen, 07:00` is accepted while fresh and parsed by the optimizer). The value placeholder in a Virtual Output command is `<v>` (written `&lt;v&gt;` in the XML) — `\v` is the Virtual **Input** check placeholder and arrives as the control character 0x0B in an output.
+Telemetry VOs (`VO_Earnie_*` except `Status`) target the daemon port **8541** as well. The receiver `/ehal/telemetry/<EHAL-ID>/<value>` (alias `/ehal/loxone/telemetry/…` for existing VOs) takes Virtual-Output pushes when `EARNIE_PILOT_PUSH_TOKEN` is set. All pushable `sens_*` / `get_*` fields read from the inbox (no Merker poll), including **meter energy** counters (`sens_pv_energy`, `sens_grid_energy_import` / `_export`, `consumer.<id>.sens_energy_total`). Recommended VO repeat: **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, default 10). Stale energy (> 3 × repeat) is not zero-assumed — slot Ist keeps the sample mean for that channel. The synthetic **heartbeat** VO is always push. FertigUm (`ev.<id>.get_evcs_ready_by_time`) is pushed as an Analog VO (numeric next-entry preferred; Tna-style text such as `Morgen, 07:00` is accepted while fresh and parsed by the optimizer). The value placeholder in a Virtual Output command is `<v>` (written `&lt;v&gt;` in the XML) — `\v` is the Virtual **Input** check placeholder and arrives as the control character 0x0B in an output.
 
 Adjust the polling / Cmd check pattern to match the JSON keys (plant: `set_ess_*` / `heartbeat_ts`; flex/EV: `flex.{hk_id}.…` / `ev.{ev_id}.…`). Stable **titles** remain the contract for Core and the default import.
 
@@ -135,7 +135,7 @@ Power Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **may** come fro
 
 Manual follow-up: after **Smarthome-Backend → Loxone-Import**, check signal mapping on EHAL-Com (**Loxone Structure → EHAL Mapping**).
 
-**EV ready-by time:** the Loxone import binds **AlarmClock** blocks to `get_evcs_ready_by_time` on the EV entity that already has meter/power bindings — same convention as the meter designation. Optional Analog VO: `/ehal/loxone/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numeric next-entry; inbox also accepts short Tna-style text).
+**EV ready-by time:** the Loxone import binds **AlarmClock** blocks to `get_evcs_ready_by_time` on the EV entity that already has meter/power bindings — same convention as the meter designation. Optional Analog VO: `/ehal/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numeric next-entry; inbox also accepts short Tna-style text).
 
 Bound FertigUm fields always use the push inbox (SpecialState10 / `/all` Merker poll retired).
 
@@ -200,7 +200,7 @@ One template `VI_Earnie_Consumer` / `VO_Earnie_Consumer` covers **one** consumer
 **Example washing machine** (`id` = `waschmaschine`):
 
 - Title: `Earnie_Verbraucher_Waschmaschine_Leistung`
-- VO command when on: `/ehal/loxone/telemetry/flex.waschmaschine.sens_power_act/<v>`
+- VO command when on: `/ehal/telemetry/flex.waschmaschine.sens_power_act/<v>`
 - VI check (enable): `"flex.waschmaschine.Earnie_Verbraucher_Freigabe":\v` (title stays `Earnie_Verbraucher_Waschmaschine_Freigabe`)
 - EHAL-Com binding: `flex.{hk_id}.sens_power_act` → title (for `zaehler_<slug>`: wire slug without `zaehler_`)
 
@@ -273,12 +273,12 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | `set_ess_mode`                    | Write     | `Earnie_Steuerbefehl`                            | Sticky: always write; `0` = automatic; battery only; OpenEMS ignores                        |
 | `ess.<id>.set_ess_source_select`  | Write     | Pattern-B Merker (z. B. legacy `Earnie_Speicher_Quellenwahl`) | 2.7.h physical `standby_backup` only; `0` = grid pass-through, `1` = battery-only island (capability `supports_ess_source_select`); not on plant |
 | `set_grid_export_power_limit`     | Write     | `Earnie_EinspeiseLeistungs-Limit`                | Max export kW (magnitude ≥ 0); `0` = no export; unconstrained = PV kWp + max battery discharge kW (2.7.a) |
-| *(watchdog)*                       | Read      | `Earnie_Heartbeat`                               | Pattern B; not an EHAL field                                                                |
+| *(watchdog)*                       | Read      | `Earnie_Heartbeat`                               | entity-scoped; not an EHAL field                                                                |
 
 
 Legacy role names (`soc_name`, `pv_power_name`, …) in `loxone_blocks` have been removed — only `plant.ehal_bindings` with §C field names.
 
-**Sticky Merker:** Loxone keeps the last written value. Automatic is `set_ess_mode = 0` — Config must not apply the setpoint power in mode 0, even if `Earnie_Batterie_Sollleistung` still holds an old value. For export curtailment: `set_grid_export_power_limit` is a non-negative magnitude (kW, like the charge/discharge limits). Config curtails grid feed-in to `min(limit, inverter rating)`; `0` = no export (Einspeisesperre), unconstrained is written as the plant maximum = PV kWp sum + **sum** of max discharge kW of every selected force-dischargeable battery (`control = full`; 2.7.c; fallback `1000` kW if unknown). Multi-ESS Merker titles use slug infix `Earnie_Batterie_<Slug>_…`; Pattern B binding keys are `ess.{slug}.sens_ess_soc` / `set_ess_*` on `batteries[].ehal_bindings`. `set_ess_mode` / `Earnie_Steuerbefehl` is battery-only and never signals export curtailment.
+**Sticky Merker:** Loxone keeps the last written value. Automatic is `set_ess_mode = 0` — Config must not apply the setpoint power in mode 0, even if `Earnie_Batterie_Sollleistung` still holds an old value. For export curtailment: `set_grid_export_power_limit` is a non-negative magnitude (kW, like the charge/discharge limits). Config curtails grid feed-in to `min(limit, inverter rating)`; `0` = no export (Einspeisesperre), unconstrained is written as the plant maximum = PV kWp sum + **sum** of max discharge kW of every selected force-dischargeable battery (`control = full`; 2.7.c; fallback `1000` kW if unknown). Multi-ESS Merker titles use slug infix `Earnie_Batterie_<Slug>_…`; entity-scoped binding keys are `ess.{slug}.sens_ess_soc` / `set_ess_*` on `batteries[].ehal_bindings`. `set_ess_mode` / `Earnie_Steuerbefehl` is battery-only and never signals export curtailment.
 
 ## Flexible Consumers — `ehal_bindings` on the Consumer
 

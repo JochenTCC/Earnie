@@ -86,6 +86,9 @@ class HaConfig:
     boolean_invert: dict[str, str] = field(default_factory=dict)
     timeout_sec: float = 10.0
     ha_ess_force: dict[str, Any] | None = None
+    transport: str = "pull"
+    push_read_qids: dict[str, str] = field(default_factory=dict)
+    setpoint_qids: dict[str, str] = field(default_factory=dict)
 
 
 def apply_boolean_invert(value: float | int | bool, mode: str | None) -> float:
@@ -138,12 +141,18 @@ class HaAdapter:
 
     def __init__(self, cfg: HaConfig) -> None:
         from house_config.ha_ess_force import ha_ess_force_enables_ess_active, normalize_ha_ess_force
+        from runtime_store.ehal_setup import HA_TRANSPORT_WEG_B, normalize_ha_transport
 
-        entities = canonicalize_ha_entity_keys(dict(cfg.entities))
+        transport_raw = str(cfg.transport or "pull").strip().lower()
+        keep_empty = transport_raw == HA_TRANSPORT_WEG_B
+        entities = canonicalize_ha_entity_keys(dict(cfg.entities), keep_empty=keep_empty)
         sign = canonicalize_ha_entity_keys(dict(cfg.sign))
         boolean_invert = canonicalize_ha_entity_keys(dict(cfg.boolean_invert))
         force = normalize_ha_ess_force(cfg.ha_ess_force) if cfg.ha_ess_force else None
         vendor_ess_active = ha_ess_force_enables_ess_active(force)
+        transport = normalize_ha_transport(cfg.transport)
+        push_read_qids = dict(cfg.push_read_qids)
+        setpoint_qids = dict(cfg.setpoint_qids)
         self.cfg = HaConfig(
             base_url=cfg.base_url,
             token=cfg.token,
@@ -153,9 +162,18 @@ class HaAdapter:
             boolean_invert=boolean_invert,
             timeout_sec=cfg.timeout_sec,
             ha_ess_force=force,
+            transport=transport,
+            push_read_qids=push_read_qids,
+            setpoint_qids=setpoint_qids,
         )
+        self._weg_b = transport == HA_TRANSPORT_WEG_B
+        map_nonempty = not self._weg_b
         # A function is only usable when all its fields are mapped (ehal.functions).
-        functions = available_functions(entities, vendor_ess_active=vendor_ess_active)
+        functions = available_functions(
+            entities,
+            vendor_ess_active=vendor_ess_active,
+            require_nonempty_value=map_nonempty,
+        )
         self._supports_ess_write = "ess_limits" in functions
         self._supports_ess_active = "ess_active" in functions
         self._supports_evcs_current = "evcs_current" in functions
@@ -166,7 +184,9 @@ class HaAdapter:
         ):
             logger.warning("HA mapping adapter_id=%s: %s", cfg.adapter_id, message)
         self._incomplete_fields = incomplete_function_fields(
-            entities, vendor_ess_active=vendor_ess_active
+            entities,
+            vendor_ess_active=vendor_ess_active,
+            require_nonempty_value=map_nonempty,
         )
         self._last_write_error: EhalWriteError | None = None
         self._last_skipped: list[str] = []
@@ -238,6 +258,7 @@ class HaAdapter:
         return rows
 
     def read_state(self, entity_id: str) -> dict[str, Any]:
+        self._fence_rest_entity(entity_id)
         return self._get_json(f"/api/states/{entity_id}")
 
     def call_service(self, domain: str, service: str, data: dict[str, Any]) -> None:
@@ -268,7 +289,13 @@ class HaAdapter:
             )
 
     def read_telemetry(self) -> EhalTelemetry:
-        missing = [name for name in TELEMETRY_REQUIRED if not self.cfg.entities.get(name)]
+        if self._weg_b:
+            return self._read_telemetry_weg_b()
+        missing = [
+            name
+            for name in TELEMETRY_REQUIRED
+            if not self._entity_key_for_kind(name)
+        ]
         if missing:
             raise HaHttpError(
                 "HA telemetry mapping incomplete: " + ", ".join(missing)
@@ -282,7 +309,7 @@ class HaAdapter:
         for field_name in TELEMETRY_REQUIRED:
             doc[field_name] = self._read_mapped_numeric(field_name)
         for field_name in TELEMETRY_OPTIONAL:
-            if not self.cfg.entities.get(field_name):
+            if not self._entity_key_for_kind(field_name):
                 continue
             try:
                 value = self._read_mapped_numeric(field_name)
@@ -305,6 +332,101 @@ class HaAdapter:
                 + ess,
             )
         return validate_telemetry(doc)
+
+    def _entity_key_for_kind(self, kind: str) -> str | None:
+        from integrations.ha_push_read import adapter_key_for_kind
+
+        return adapter_key_for_kind(self.cfg.entities, kind)
+
+    def _push_qid_for_kind(self, kind: str) -> tuple[str, str] | None:
+        """Return ``(adapter_field_key, qualified_id)`` when push-read is activated."""
+        key = self._entity_key_for_kind(kind)
+        if not key:
+            return None
+        qid = self.cfg.push_read_qids.get(key)
+        if not qid:
+            return None
+        return key, qid
+
+    def _read_telemetry_weg_b(self) -> EhalTelemetry:
+        from integrations.ha_push_read import PushReadError, read_push_ehal_value
+
+        missing = [
+            name for name in TELEMETRY_REQUIRED if self._push_qid_for_kind(name) is None
+        ]
+        if missing:
+            raise HaHttpError(
+                "HA Weg B push read not activated for: " + ", ".join(missing)
+            )
+
+        doc: dict[str, Any] = {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": _utc_ts(),
+            "adapter_id": self.cfg.adapter_id,
+        }
+        for field_name in TELEMETRY_REQUIRED:
+            adapter_key, qid = self._push_qid_for_kind(field_name)  # type: ignore[misc]
+            try:
+                doc[field_name] = read_push_ehal_value(
+                    qid,
+                    sign=self.cfg.sign,
+                    adapter_field=adapter_key,
+                )
+            except PushReadError as exc:
+                raise HaHttpError(str(exc)) from exc
+        for field_name in TELEMETRY_OPTIONAL:
+            resolved = self._push_qid_for_kind(field_name)
+            if resolved is None:
+                continue
+            adapter_key, qid = resolved
+            try:
+                value = read_push_ehal_value(
+                    qid,
+                    sign=self.cfg.sign,
+                    adapter_field=adapter_key,
+                )
+            except PushReadError:
+                continue
+            if field_name in _NONNEG_TELEMETRY:
+                value = max(0.0, value)
+            doc[field_name] = value
+
+        if "sens_pv_production_active" in doc:
+            doc["sens_pv_production_active"] = max(
+                0.0, float(doc["sens_pv_production_active"])
+            )
+        if doc.get("sens_power_consumers") is None:
+            ess = float(doc.get("sens_ess_power") or 0.0)
+            doc["sens_power_consumers"] = max(
+                0.0,
+                float(doc["sens_pv_production_active"])
+                + float(doc["sens_grid_power_active"])
+                + ess,
+            )
+        return validate_telemetry(doc)
+
+    def _fence_rest_field(self, field_name: str) -> None:
+        if not self._weg_b:
+            return
+        key = self._entity_key_for_kind(field_name) or field_name
+        if key in self.cfg.push_read_qids:
+            raise HaHttpError(
+                f"HA Weg B: REST read blocked for push-activated field {field_name!r} "
+                f"(use push inbox, qualified id {self.cfg.push_read_qids[key]!r})"
+            )
+
+    def _fence_rest_entity(self, entity_id: str) -> None:
+        if not self._weg_b:
+            return
+        eid = str(entity_id or "").strip()
+        if not eid:
+            return
+        for field, mapped in self.cfg.entities.items():
+            if mapped == eid and field in self.cfg.push_read_qids:
+                raise HaHttpError(
+                    f"HA Weg B: REST read blocked for push-activated entity {eid!r} "
+                    f"(field {field!r})"
+                )
 
     def _invalid_setpoint_error(
         self,
@@ -585,7 +707,31 @@ class HaAdapter:
         return payload
 
     def _read_mapped_numeric(self, field_name: str) -> float:
-        entity_id = self.cfg.entities[field_name]
+        if self._weg_b:
+            from integrations.ha_push_read import PushReadError, read_push_ehal_value
+
+            resolved = self._push_qid_for_kind(field_name)
+            if resolved is None:
+                key = self._entity_key_for_kind(field_name)
+                if key and key in self.cfg.entities:
+                    raise HaHttpError(
+                        f"HA Weg B: field {field_name!r} is not push-activated"
+                    )
+                raise HaHttpError(f"HA telemetry mapping incomplete: {field_name}")
+            adapter_key, qid = resolved
+            try:
+                return read_push_ehal_value(
+                    qid,
+                    sign=self.cfg.sign,
+                    adapter_field=adapter_key,
+                )
+            except PushReadError as exc:
+                raise HaHttpError(str(exc)) from exc
+        key = self._entity_key_for_kind(field_name) or field_name
+        entity_id = self.cfg.entities.get(key)
+        if not entity_id:
+            raise HaHttpError(f"HA telemetry mapping incomplete: {field_name}")
+        self._fence_rest_field(field_name)
         payload = self.read_state(entity_id)
         attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
         unit = attrs.get("unit_of_measurement")
@@ -605,13 +751,42 @@ class HaAdapter:
         kind = ess_field_kind(field_name) or field_name
         if kind == "sens_ess_soc" or field_name == "sens_ess_soc":
             return float(raw)
-        # Per-battery Pattern B sign override, else flat kind / field inherit (2.7.m).
+        # Per-battery entity-scoped sign override, else flat kind / field inherit (2.7.m).
         mode = self.cfg.sign.get(field_name) or self.cfg.sign.get(kind)
         return apply_sign(raw, mode)
+
+    def _publish_setpoint_weg_b(
+        self, field_name: str, value: float | str
+    ) -> tuple[bool, str | None, str]:
+        from integrations.ehal_write import write_field
+        from integrations.ha_push_read import resolve_setpoint_qid
+
+        qid = resolve_setpoint_qid(field_name, self.cfg.setpoint_qids)
+        if not qid:
+            return False, None, f"Missing HA Weg B setpoint binding for {field_name}"
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return False, None, f"Non-numeric setpoint for {field_name}: {value!r}"
+        from ehal.ess_fields import ess_field_kind
+
+        kind = ess_field_kind(field_name) or field_name
+        if kind in BOOLEAN_INVERT_FIELDS or field_name in BOOLEAN_INVERT_FIELDS:
+            mode = (
+                self.cfg.boolean_invert.get(field_name)
+                or self.cfg.boolean_invert.get(kind)
+            )
+            numeric = apply_boolean_invert(numeric, mode)
+        pub = write_field(qid, numeric)
+        if not pub.published:
+            return False, None, f"EHAL publish rejected for {qid}"
+        return True, None, ""
 
     def _try_setpoint_write(
         self, field_name: str, value: float | str
     ) -> tuple[bool, str | None, str]:
+        if self._weg_b:
+            return self._publish_setpoint_weg_b(field_name, value)
         entity_id = str(self.cfg.entities.get(field_name) or "").strip()
         if not entity_id:
             return False, None, f"Missing HA write entity for {field_name}"

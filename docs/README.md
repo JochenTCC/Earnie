@@ -14,7 +14,7 @@ Zum Ausprobieren des Szenario-Explorers ohne Installation:
 
 1. **Konfiguration:** `share/config/config.example.json` → Bootstrap legt `earnie_env/config/config.json` an (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime`. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
 2. **Smarthome-Backend wählen:** [Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md) (Default Loxone; alternativ HA+evcc oder OpenEMS-Lab). Auswahl und Zugangsdaten in der UI: [Smarthome-Backend](ui/smarthome-backend.md). Bei Loxone: `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an). Bei HA: URL/Token in `config/.env` (`EHAL_HA_*`).
-3. **Feld-Mapping:** Bei Loxone Merker in `plant.ehal_bindings` / Hausprofil über **EHAL-Com** ([Loxone-Signale und Earnie-Library](referenz/loxone-signals.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md) (Pattern B: `plant` / `consumers[].ehal_bindings`).
+3. **Feld-Mapping:** Bei Loxone Merker in `plant.ehal_bindings` / Hausprofil über **EHAL-Com** ([Loxone-Signale und Earnie-Library](referenz/loxone-signals.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md) (entity-scoped: `plant` / `consumers[].ehal_bindings`).
 4. **Verbindung prüfen:** EHAL-Com (Live-Lesen) bzw. bei Loxone:
   ```powershell
    python -m scripts.verify_loxone_setup
@@ -69,7 +69,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 - [Abkürzungen](referenz/abbreviations.md) — EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
 - [Streamlit-Ports](referenz/streamlit-ports.md) — Port pro Stack/Plattform
-- [Loxone-Signale und Earnie-Library](referenz/loxone-signals.md) — VI/VO-Vorlagen (Pattern B), Default-Merker, EFM, Signal-Tabellen
+- [Loxone-Signale und Earnie-Library](referenz/loxone-signals.md) — VI/VO-Vorlagen (entity-scoped), Default-Merker, EFM, Signal-Tabellen
 - [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) — OeMAG-Marktpreis vs. E-Control RefMarkt PV
 - [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) — Bezugs-/Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung
 

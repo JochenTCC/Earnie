@@ -15,6 +15,13 @@ from integrations.loxone_meter_energy import CHANNEL_GRID, CHANNEL_PV
 
 logger = logging.getLogger(__name__)
 
+
+def _adapter_weg_b(adapter: Any) -> bool:
+    from runtime_store.ehal_setup import HA_TRANSPORT_WEG_B
+
+    transport = str(getattr(getattr(adapter, "cfg", None), "transport", "") or "")
+    return transport == HA_TRANSPORT_WEG_B
+
 FIELD_PV_ENERGY = "sens_pv_energy"
 FIELD_GRID_IMPORT = "sens_grid_energy_import"
 FIELD_GRID_EXPORT = "sens_grid_energy_export"
@@ -79,6 +86,45 @@ def _read_entity_kwh(
         return None
 
 
+def _weg_b_energy_readings(
+    adapter: Any,
+    mapped: dict[str, str],
+) -> dict[str, dict[str, float]]:
+    from integrations.ha_push_read import read_push_energy_kwh
+
+    qids = getattr(adapter.cfg, "push_read_qids", {}) or {}
+    readings: dict[str, dict[str, float]] = {}
+    pv_field = FIELD_PV_ENERGY
+    pv_id = mapped.get(pv_field)
+    if pv_field in qids:
+        total = read_push_energy_kwh(qids[pv_field])
+        if total is not None:
+            readings[CHANNEL_PV] = {"total": float(total)}
+    elif pv_id:
+        total = _read_entity_kwh(adapter, pv_id, FIELD_PV_ENERGY)
+        if total is not None:
+            readings[CHANNEL_PV] = {"total": float(total)}
+
+    grid: dict[str, float] = {}
+    for field, attr in (
+        (FIELD_GRID_IMPORT, "total"),
+        (FIELD_GRID_EXPORT, "total_neg"),
+    ):
+        if field in qids:
+            val = read_push_energy_kwh(qids[field])
+            if val is not None:
+                grid[attr] = float(val)
+        else:
+            eid = mapped.get(field)
+            if eid:
+                val = _read_entity_kwh(adapter, eid, field)
+                if val is not None:
+                    grid[attr] = float(val)
+    if "total" in grid:
+        readings[CHANNEL_GRID] = grid
+    return readings
+
+
 def read_plant_energy_readings(
     adapter: Any,
     *,
@@ -90,10 +136,15 @@ def read_plant_energy_readings(
     partial map would mix counter-based and sampled values in one slot.
     """
     mapped = plant_energy_entity_ids(entities if entities is not None else adapter.cfg.entities)
-    if "slot_energy" not in available_functions(mapped):
+    if "slot_energy" not in available_functions(
+        mapped,
+        require_nonempty_value=not _adapter_weg_b(adapter),
+    ):
         if mapped:
             logger.debug("ha_meter_energy: counters incomplete %s — slot Ist stays on mean", sorted(mapped))
         return {}
+    if _adapter_weg_b(adapter):
+        return _weg_b_energy_readings(adapter, mapped)
     readings: dict[str, dict[str, float]] = {}
     pv_id = mapped.get(FIELD_PV_ENERGY)
     if pv_id:

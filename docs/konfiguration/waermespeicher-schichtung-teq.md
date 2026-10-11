@@ -82,7 +82,7 @@ Bei vier Fühlern:
 (T_oben + T_oben_mitte + T_unten_mitte + T_unten) / 4
 ```
 
-Diesen Ausgang auf einen **Virtuellen Ausgang** / Merker legen, den Earnie unter Pattern B als `sens_temperature_heat_storage` mappt (EHAL-Com). Greenfield-Titel: `Earnie_Waermespeicher_Temp_eq` (VO `VO_Earnie_Heatpump.xml`). Zusätzlich den untersten Fühler als `Earnie_Waermespeicher_Temp_low` → `sens_temperature_heat_storage_low`.
+Diesen Ausgang auf einen **Virtuellen Ausgang** / Merker legen, den Earnie unter entity-scoped als `sens_temperature_heat_storage` mappt (EHAL-Com). Greenfield-Titel: `Earnie_Waermespeicher_Temp_eq` (VO `VO_Earnie_Heatpump.xml`). Zusätzlich den untersten Fühler als `Earnie_Waermespeicher_Temp_low` → `sens_temperature_heat_storage_low`.
 
 Das einfache Mittel gilt nur, wenn die Fühler in den Mitten gleich hoher Schichten sitzen (siehe oben). Sonst `w_i` proportional zur Schichtmächtigkeit setzen (siehe Schritt A):
 

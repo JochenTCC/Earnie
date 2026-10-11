@@ -224,7 +224,7 @@ class TestFlexibleConsumerHelpers:
         with patch.object(lc, "fetch_loxone_generic_value", return_value=0.0):
             assert lc.resolve_consumer_live_power_kw(consumer) == 0.0
 
-    def test_resolve_live_power_reads_pattern_b_binding(self):
+    def test_resolve_live_power_reads_entity_scoped_binding(self):
         """EHAL-only consumers resolve the power Merker from ``flex.{id}.sens_power_act``."""
         consumer = {
             "id": "waschmaschine",
@@ -524,7 +524,7 @@ class TestSharedMeterSubtraction:
         assert live == pytest.approx(11.04)
 
     def test_resolve_nominal_power_ignores_legacy_charging_nest(self):
-        """Nest-only ``nominal_power_kw_name`` is no longer resolved (Pattern B only)."""
+        """Nest-only ``nominal_power_kw_name`` is no longer resolved (entity-scoped only)."""
         consumer = {
             "id": "eauto",
             "nominal_power_kw": 3.5,
@@ -586,14 +586,17 @@ class TestBuildSentSnapshot:
                 },
             }
         ]
-        config_map = {
-            "LOXONE_TARGET_ACTIVE_POWER_NAME": "Earnie_Batterie_Sollleistung",
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        ess_names = {
+            "set_ess_active_power": "Earnie_Batterie_Sollleistung",
+            "set_ess_charge_power_limit": "Earnie_Ziel_LadeLeistung",
+            "set_ess_discharge_power_limit": "Earnie_Ziel_Entladeleistung",
+            "set_ess_mode": "Earnie_Steuerbefehl",
         }
 
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
+        with patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
+        ), patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
         ), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
@@ -632,13 +635,16 @@ class TestBuildSentSnapshot:
                 },
             }
         ]
-        config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        ess_names = {
+            "set_ess_charge_power_limit": "Earnie_Ziel_LadeLeistung",
+            "set_ess_discharge_power_limit": "Earnie_Ziel_Entladeleistung",
+            "set_ess_mode": "Earnie_Steuerbefehl",
         }
 
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
+        with patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
+        ), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ):
             snapshot = lc.build_sent_loxone_snapshot(
@@ -670,13 +676,16 @@ class TestBuildSentSnapshot:
                 },
             }
         ]
-        config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        ess_names = {
+            "set_ess_charge_power_limit": "Earnie_Ziel_LadeLeistung",
+            "set_ess_discharge_power_limit": "Earnie_Ziel_Entladeleistung",
+            "set_ess_mode": "Earnie_Steuerbefehl",
         }
 
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
+        with patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
+        ), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ):
             snapshot = lc.build_sent_loxone_snapshot(
@@ -707,10 +716,10 @@ class TestBuildSentSnapshot:
                 },
             }
         ]
-        config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        ess_names = {
+            "set_ess_charge_power_limit": "Earnie_Ziel_LadeLeistung",
+            "set_ess_discharge_power_limit": "Earnie_Ziel_Entladeleistung",
+            "set_ess_mode": "Earnie_Steuerbefehl",
         }
         absent_ctx = {
             "eauto": {
@@ -721,7 +730,10 @@ class TestBuildSentSnapshot:
             }
         }
 
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
+        with patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
+        ), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ):
             snapshot = lc.build_sent_loxone_snapshot(
@@ -752,10 +764,10 @@ class TestBuildSentSnapshot:
                 },
             }
         ]
-        config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        ess_names = {
+            "set_ess_charge_power_limit": "Earnie_Ziel_LadeLeistung",
+            "set_ess_discharge_power_limit": "Earnie_Ziel_Entladeleistung",
+            "set_ess_mode": "Earnie_Steuerbefehl",
         }
         cases = (
             {
@@ -794,9 +806,7 @@ class TestBuildSentSnapshot:
             },
         )
         for case in cases:
-            with patch.object(
-                lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
-            ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+            with patch("house_config.ess_bindings.resolve_primary_ess_binding", side_effect=lambda kind, **kw: ess_names.get(kind, "")), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
                 snapshot = lc.build_sent_loxone_snapshot(
                     mode=0,
                     target_power_kw=0.0,
@@ -825,15 +835,13 @@ class TestBuildSentSnapshot:
                 },
             }
         ]
-        config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        ess_names = {
+            "set_ess_charge_power_limit": "Earnie_Ziel_LadeLeistung",
+            "set_ess_discharge_power_limit": "Earnie_Ziel_Entladeleistung",
+            "set_ess_mode": "Earnie_Steuerbefehl",
         }
         # PV surplus → mode=1
-        with patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
-        ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+        with patch("house_config.ess_bindings.resolve_primary_ess_binding", side_effect=lambda kind, **kw: ess_names.get(kind, "")), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
             snapshot = lc.build_sent_loxone_snapshot(
                 mode=0,
                 target_power_kw=0.0,
@@ -846,9 +854,7 @@ class TestBuildSentSnapshot:
         assert "Earnie_EAuto_pv_follow" not in snapshot
 
         # Fixed set_evcs_max_current (not PV) → mode=2
-        with patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
-        ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+        with patch("house_config.ess_bindings.resolve_primary_ess_binding", side_effect=lambda kind, **kw: ess_names.get(kind, "")), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
             snapshot = lc.build_sent_loxone_snapshot(
                 mode=0,
                 target_power_kw=0.0,
@@ -862,9 +868,7 @@ class TestBuildSentSnapshot:
         assert "Earnie_EAuto_pv_follow" not in snapshot
 
         # Sofort laden skip → mode=2 (no amp setpoint from Earnie)
-        with patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
-        ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+        with patch("house_config.ess_bindings.resolve_primary_ess_binding", side_effect=lambda kind, **kw: ess_names.get(kind, "")), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
             values = lc._flexible_consumer_output_values(
                 consumers[0],
                 {"eauto": 3.5},
@@ -890,13 +894,16 @@ class TestBuildSentSnapshot:
                 },
             }
         ]
-        config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        ess_names = {
+            "set_ess_charge_power_limit": "Earnie_Ziel_LadeLeistung",
+            "set_ess_discharge_power_limit": "Earnie_Ziel_Entladeleistung",
+            "set_ess_mode": "Earnie_Steuerbefehl",
         }
 
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
+        with patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
+        ), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ):
             snapshot = lc.build_sent_loxone_snapshot(
@@ -915,11 +922,11 @@ class TestBuildSentSnapshot:
 
 class TestSendHuaweiAndConsumers:
     def test_send_huawei_modbus_states_returns_c1_records(self):
-        names = {
-            "LOXONE_TARGET_ACTIVE_POWER_NAME": "Active",
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
-            "LOXONE_CONTROL_CMD_NAME": "Cmd",
+        ess_names = {
+            "set_ess_active_power": "Active",
+            "set_ess_charge_power_limit": "Charge",
+            "set_ess_discharge_power_limit": "Discharge",
+            "set_ess_mode": "Cmd",
         }
         io_index = {
             "Active": "set_ess_active_power",
@@ -930,7 +937,10 @@ class TestSendHuaweiAndConsumers:
         fake_record = lc.LoxoneWriteRecord(
             io_name="x", value=1.0, success=True, written_at="2026-07-14T10:00:00"
         )
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)), patch.object(
+        with patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
+        ), patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
         ), patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
@@ -954,17 +964,20 @@ class TestSendHuaweiAndConsumers:
         assert "SoC" not in qids
 
     def test_send_huawei_modbus_states_calls_ess_outputs_only(self):
-        names = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
-            "LOXONE_CONTROL_CMD_NAME": "Cmd",
+        ess_names = {
+            "set_ess_charge_power_limit": "Charge",
+            "set_ess_discharge_power_limit": "Discharge",
+            "set_ess_mode": "Cmd",
         }
         io_index = {
             "Charge": "set_ess_charge_power_limit",
             "Discharge": "set_ess_discharge_power_limit",
             "Cmd": "set_ess_mode",
         }
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)), patch.object(
+        with patch(
+            "house_config.ess_bindings.resolve_primary_ess_binding",
+            side_effect=lambda kind, **kw: ess_names.get(kind, ""),
+        ), patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
         ), patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",

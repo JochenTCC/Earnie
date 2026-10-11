@@ -64,7 +64,7 @@ def test_validate_capabilities_source_select_optional():
     assert doc["supports_ess_source_select"] is True
 
 
-def test_ess_source_select_function_from_pattern_b():
+def test_ess_source_select_function_from_entity_scoped():
     funcs = available_functions(
         {"ess.delta3.set_ess_source_select": "switch.delta_3_grid_bypass"}
     )
@@ -382,8 +382,8 @@ def test_loxone_charge_only_when_discharge_unmapped():
     assert "set_ess_charge_power_limit" not in sent
 
 
-def test_ha_source_select_uses_pattern_b_only():
-    """Quellenwahl writes Pattern B entity key; plant-flat is not a fallback."""
+def test_ha_source_select_uses_entity_scoped_only():
+    """Quellenwahl writes entity-scoped entity key; plant-flat is not a fallback."""
     from optimizer import powerstation_live as psl
 
     pattern = ess_field("delta3", "set_ess_source_select")

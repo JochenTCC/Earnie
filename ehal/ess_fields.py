@@ -1,4 +1,4 @@
-"""Pattern B ESS EHAL field names: ``ess.{slug}.sens_ess_soc`` etc. (2.7.c)."""
+"""Entity-scoped ESS EHAL field names: ``ess.{slug}.sens_ess_soc`` etc. (2.7.c)."""
 from __future__ import annotations
 
 import re
@@ -32,7 +32,7 @@ ESS_BATTERY_MAPPING_KINDS_BASE: tuple[str, ...] = tuple(
 )
 _PLANT_FLAT_ESS_FIELDS: frozenset[str] = frozenset(ESS_FIELD_KINDS)
 
-_PATTERN_B = re.compile(
+_ENTITY_SCOPED = re.compile(
     r"^ess\.(?P<slug>[^.]+)\.(?P<kind>"
     + "|".join(sorted(ESS_FIELD_KINDS))
     + r")$"
@@ -40,7 +40,7 @@ _PATTERN_B = re.compile(
 
 
 def ess_ehal_slug(battery_id: str) -> str:
-    """Wire slug for Pattern B ESS bindings."""
+    """Wire slug for entity-scoped ESS bindings."""
     return str(battery_id or "").strip()
 
 
@@ -56,39 +56,39 @@ def ess_field(battery_id: str, kind: str) -> str:
 
 
 def ess_field_kind(field: str) -> str | None:
-    """Return kind for Pattern B or flat plant ESS key, else None."""
+    """Return kind for entity-scoped or flat plant ESS key, else None."""
     name = str(field or "").strip()
     if name in _PLANT_FLAT_ESS_FIELDS:
         return name
-    match = _PATTERN_B.match(name)
+    match = _ENTITY_SCOPED.match(name)
     if match:
         return match.group("kind")
     return None
 
 
-def is_ess_pattern_b_field(field: str) -> bool:
-    return _PATTERN_B.match(str(field or "").strip()) is not None
+def is_ess_entity_scoped_field(field: str) -> bool:
+    return _ENTITY_SCOPED.match(str(field or "").strip()) is not None
 
 
 def is_plant_flat_ess_field(field: str) -> bool:
     return str(field or "").strip() in _PLANT_FLAT_ESS_FIELDS
 
 
-def parse_ess_pattern_b(field: str) -> tuple[str, str] | None:
+def parse_ess_entity_scoped(field: str) -> tuple[str, str] | None:
     """Return (slug, kind) for ``ess.{slug}.{kind}``, else None."""
-    match = _PATTERN_B.match(str(field or "").strip())
+    match = _ENTITY_SCOPED.match(str(field or "").strip())
     if not match:
         return None
     return match.group("slug"), match.group("kind")
 
 
 def expand_ess_field(field: str, battery_id: str) -> str:
-    """Map flat plant ESS key → Pattern B for this battery; leave others."""
+    """Map flat plant ESS key → entity-scoped for this battery; leave others."""
     kind = ess_field_kind(field)
     name = str(field or "").strip()
     if kind is None:
         return name
-    if is_ess_pattern_b_field(name):
+    if is_ess_entity_scoped_field(name):
         return ess_field(battery_id, kind)
     if is_plant_flat_ess_field(name):
         return ess_field(battery_id, kind)
@@ -99,7 +99,7 @@ def expand_ess_bindings(
     bindings: dict | None,
     battery_id: str,
 ) -> dict[str, str]:
-    """Rewrite flat ESS keys to Pattern B; leave non-ESS keys unchanged."""
+    """Rewrite flat ESS keys to entity-scoped; leave non-ESS keys unchanged."""
     if not isinstance(bindings, dict):
         return {}
     out: dict[str, str] = {}

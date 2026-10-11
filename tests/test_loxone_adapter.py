@@ -129,8 +129,8 @@ def test_read_telemetry_inbound_export_limit(fetch_mock, raw, expected_w):
 
 
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
-def test_read_telemetry_ess_uses_pattern_b_not_plant_flat(fetch_mock):
-    """Regression: plant telemetry must not fetch bare sens_ess_* (push is Pattern B)."""
+def test_read_telemetry_ess_uses_entity_scoped_not_plant_flat(fetch_mock):
+    """Regression: plant telemetry must not fetch bare sens_ess_* (push is entity-scoped)."""
     fetch_mock.side_effect = _plant_qid_values().get
     LoxoneAdapter(_cfg()).read_telemetry()
     fetched = [c.args[0] for c in fetch_mock.call_args_list]

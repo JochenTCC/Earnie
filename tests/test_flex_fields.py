@@ -1,4 +1,4 @@
-"""Pattern B flex EHAL field helpers."""
+"""Entity-scoped flex EHAL field helpers."""
 from __future__ import annotations
 
 from ehal.flex_fields import (

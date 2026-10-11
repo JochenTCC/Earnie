@@ -81,7 +81,11 @@ class EhalWriteError(TypedDict):
     hub_status: NotRequired[str | None]
 
 
-def canonicalize_ha_entity_keys(entities: dict[str, str]) -> dict[str, str]:
+def canonicalize_ha_entity_keys(
+    entities: dict[str, str],
+    *,
+    keep_empty: bool = False,
+) -> dict[str, str]:
     """Validate HA entity keys: §C names only; legacy unprefixed names raise."""
     removed = sorted(
         str(key) for key in entities if str(key) in REMOVED_TELEMETRY_FIELD_NAMES
@@ -94,6 +98,6 @@ def canonicalize_ha_entity_keys(entities: dict[str, str]) -> dict[str, str]:
     out: dict[str, str] = {}
     for key, value in entities.items():
         name = str(value or "").strip()
-        if name:
+        if name or keep_empty:
             out[str(key)] = name
     return out

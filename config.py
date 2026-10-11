@@ -140,19 +140,12 @@ class Config:
         )
 
     def _load_static_params(self) -> None:
-        house_doc = self._load_house_profiles_raw()
         config_loaders.apply_attrs(
             self,
             config_loaders.load_system_and_ui_params(
                 self._raw_config,
                 local_settings_path=self.local_settings_path,
                 config_path=self.config_path,
-            ),
-        )
-        config_loaders.apply_attrs(
-            self,
-            config_loaders.load_loxone_block_params(
-                self._raw_config, self.config_path, house_doc=house_doc
             ),
         )
         config_loaders.apply_attrs(

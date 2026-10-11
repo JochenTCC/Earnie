@@ -11,6 +11,10 @@ BACKEND_LOXONE = "loxone"
 BACKEND_HA = "ha"
 BACKEND_OPENEMS = "openems"
 
+HA_TRANSPORT_PULL = "pull"
+HA_TRANSPORT_WEG_B = "weg_b"
+_HA_TRANSPORTS = frozenset({HA_TRANSPORT_PULL, HA_TRANSPORT_WEG_B})
+
 _BACKEND_LABELS = {
     BACKEND_LOXONE: "Loxone",
     BACKEND_HA: "Home Assistant",
@@ -27,6 +31,18 @@ _KNOWN_DEFAULT_ADAPTER_IDS = frozenset(_DEFAULT_ADAPTER_ID.values())
 
 def backend_label(backend: str) -> str:
     return _BACKEND_LABELS.get(backend, backend)
+
+
+def normalize_ha_transport(raw: object) -> str:
+    """``ehal.ha.transport``: ``pull`` (default when missing/empty) or ``weg_b``."""
+    value = str(raw or "").strip().lower()
+    if value in ("", HA_TRANSPORT_PULL):
+        return HA_TRANSPORT_PULL
+    if value == HA_TRANSPORT_WEG_B:
+        return HA_TRANSPORT_WEG_B
+    raise ValueError(
+        f"ehal.ha.transport must be {HA_TRANSPORT_PULL!r} or {HA_TRANSPORT_WEG_B!r}, got {raw!r}"
+    )
 
 
 def normalize_backend(raw: object) -> str:

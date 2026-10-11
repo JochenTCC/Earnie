@@ -1,4 +1,4 @@
-﻿# Open Bugs
+﻿﻿# Open Bugs
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md) (sections `### Bugfix …` / `### Document Review …` / regressions)
 
@@ -23,7 +23,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- **Note:** **2.7.h** productive dogfood still pending (2026-10-10): Pattern B Quellenwahl landed — re-open after operator rewires the Loxone ↔ HA EcoFlow bypass bridge to `ess.<id>.set_ess_source_select`.
+- **Note:** **2.7.h** productive dogfood still pending (2026-10-10): entity-scoped Quellenwahl landed — re-open after operator rewires the Loxone ↔ HA EcoFlow bypass bridge to `ess.<id>.set_ess_source_select`.
 
 - [ ] **Virtual reserve: `advance_reserve_after_slot` / `set_trigger` wiped `target_kwh` to 0** — fix implemented (2026-10-10); live acceptance pending
   - Symptom (Nas productive, Geschirrspüler / `virtual_gs`): dishwasher running, MILP ZWANGSLADEN toward ~11.8% (≈1 kWh refill), but `powerstation_reserves.json` stayed `empty` / `stored_kwh=0` / `target_kwh=0`.
@@ -40,6 +40,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] There is always a drop in the SOC lines on Chart1 (Monitor) for the powerstation (both physical and virtual) at "Jetzt".
+  - The line for virtual Geschirrspüler is invisible - probably hided by virtual Waschen - check if it's plotted and give them different line styles (but no solid line)
+  - A possible x-Axis drift was introduced with the added SOC-lines. One symptom is that the forced charging / discharging markers are not aligned with SOC line anymore (main 15 kWH battery)
 - [ ] EcoFlow Delta 3 bridge: Miniserver self-write of a Virtual Input is overwritten by HA (2026-10-07, not analysed yet)
   - Setup: the Miniserver writes its own Virtual Input via a Virtual Output command (`/dev/sps/io/<Input>/\v`, device = the Miniserver itself), e.g. bypass state (`Delta3_Grid_ByPass`) and charge limit (`Delta3_P_ChargeLimit`). HA mirrors these inputs through the Loxone integration (PyLoxone) and drives the EcoFlow entities from automations (`docs/einrichtung/ecoflow-delta3-loxone.md`, steps 5/6).
   - Symptom: in between, the input value changes to a different value that the Miniserver logic did not write; HA seems to set it. Which writer and when is unknown.

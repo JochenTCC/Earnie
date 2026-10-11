@@ -160,7 +160,7 @@ def read_check_status_label(item: LoxoneCheck) -> str:
 
 
 def _live_field_to_push_ehal_id(field: str) -> str:
-    """Map a Live-Lesen row label to a push inbox EHAL ID (bare / Pattern B / qualified)."""
+    """Map a Live-Lesen row label to a push inbox EHAL ID (bare / entity-scoped / qualified)."""
     from ehal.qualified_ids import GRID_KINDS, field_kind, qualified_plant_id
 
     name = str(field or "").strip()
@@ -201,6 +201,7 @@ def _try_push_live_row(
     field: str,
     *,
     read_at: str,
+    backend: str = "loxone",
 ) -> dict[str, str] | None:
     """Build a Live-Lesen row from the push inbox when a numeric value resolves."""
     from ehal.loxone_push_source import is_pushable_kind
@@ -217,6 +218,7 @@ def _try_push_live_row(
     if value is None:
         return None
     last = _inbox_last_read_local(ehal_id) or read_at
+    value_space = "ehal" if backend == "ha" else "hub"
     return _enrich_read_row(
         {
             "EHAL-Feld": field,
@@ -225,8 +227,8 @@ def _try_push_live_row(
             "Detail": "",
             "Zuletzt gelesen": last,
         },
-        backend="loxone",
-        value_space="hub",
+        backend=backend,
+        value_space=value_space,
     )
 
 def rows_with_mapping_column_label(rows: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -316,6 +318,13 @@ def build_read_rows(
             continue
         item = by_label.get(field)
         mapping = str(item.io_name or "").strip() if item is not None else ""
+        if ehal_live.is_ha_weg_b_transport():
+            push_row = _try_push_live_row(field, read_at=read_at, backend="ha")
+            if push_row is not None:
+                rows.append(push_row)
+            else:
+                rows.append(_empty_mapped_read_row(field, read_at))
+            continue
         if item is None or not mapping:
             push_row = _try_push_live_row(field, read_at=read_at)
             if push_row is not None:

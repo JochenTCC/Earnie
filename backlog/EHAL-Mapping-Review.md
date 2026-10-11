@@ -7,7 +7,7 @@ Comparison of EHAL field mapping / binding for Loxone and HA: shared surface, sa
 | Concern | Location |
 |---------|----------|
 | Binding store | `plant` / `batteries[]` / `consumers[].ehal_bindings` (Loxone: Merker or empty Q8 id; HA: `entity_id`) |
-| Qualified IDs / Pattern B | `ehal/qualified_ids.py`, `ehal/ess_fields.py`, `ehal/flex_fields.py` |
+| Qualified IDs / entity-scoped | `ehal/qualified_ids.py`, `ehal/ess_fields.py`, `ehal/flex_fields.py` |
 | Function completeness | `ehal/functions.py` |
 | ESS Automatik omit | `integrations/loxone_writes.map_ess_setpoints` via `integrations/ehal_live.write_ess_setpoints_from_control` (HA adds Huawei force-stop when `set_ess_active_power` is absent) |
 | HITL plant helpers | `ui/ehal_ha_mapping.py` imports `PLANT_TELEMETRY_REQUIRED` / entity helpers from `ui/ehal_loxone_mapping.py` |

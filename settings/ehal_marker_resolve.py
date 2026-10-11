@@ -1,4 +1,4 @@
-"""Resolve Merker addresses from ``ehal_bindings`` (§C / Pattern B keys only).
+"""Resolve Merker addresses from ``ehal_bindings`` (§C / entity-scoped keys only).
 
 Read and write fields: Merker name if set, else qualified EHAL ID when the binding
 key is present (Q8 activation flag; empty Merker is allowed for Loxone push-only).
@@ -79,7 +79,7 @@ def resolve_output_marker(consumer: dict, ehal_field: str) -> str:
 
 
 def marker_flex_power(consumer: dict) -> str:
-    """Consumer Messwert power from ``ehal_bindings`` (Pattern B)."""
+    """Consumer Messwert power from ``ehal_bindings`` (entity-scoped)."""
     from ehal.flex_fields import KIND_SENS_POWER_ACT, binding_address, flex_field
 
     cid = str(consumer.get("id") or "").strip()
@@ -131,7 +131,7 @@ def marker_flex_enable(consumer: dict) -> str:
 
 
 def marker_sens_consumer_active(consumer: dict) -> str:
-    """Digital Gerät-läuft Merker (2.7.p) from Pattern B bindings."""
+    """Digital Gerät-läuft Merker (2.7.p) from entity-scoped bindings."""
     from ehal.flex_fields import (
         KIND_SENS_CONSUMER_ACTIVE,
         binding_address,
@@ -271,10 +271,11 @@ def marker_get_ess_soc_min(
     house_doc: dict | None = None,
     config_doc: dict | None = None,
 ) -> str:
-    """Plant ``get_ess_soc_min`` Merker (%)."""
-    from house_config.ehal_bindings import resolve_plant_binding
+    """Primary-battery ``get_ess_soc_min`` Merker / Q8 id (%)."""
+    _ = house_doc, config_doc
+    from house_config.ess_bindings import resolve_primary_ess_binding
 
-    return resolve_plant_binding(house_doc, "get_ess_soc_min", config_doc)
+    return resolve_primary_ess_binding("get_ess_soc_min")
 
 
 def marker_get_ess_soc_max(
@@ -282,10 +283,11 @@ def marker_get_ess_soc_max(
     house_doc: dict | None = None,
     config_doc: dict | None = None,
 ) -> str:
-    """Plant ``get_ess_soc_max`` Merker (%)."""
-    from house_config.ehal_bindings import resolve_plant_binding
+    """Primary-battery ``get_ess_soc_max`` Merker / Q8 id (%)."""
+    _ = house_doc, config_doc
+    from house_config.ess_bindings import resolve_primary_ess_binding
 
-    return resolve_plant_binding(house_doc, "get_ess_soc_max", config_doc)
+    return resolve_primary_ess_binding("get_ess_soc_max")
 
 
 def marker_get_ess_max_charge_power(
@@ -293,10 +295,11 @@ def marker_get_ess_max_charge_power(
     house_doc: dict | None = None,
     config_doc: dict | None = None,
 ) -> str:
-    """Plant ``get_ess_max_charge_power`` Merker (kW on Loxone → EHAL W)."""
-    from house_config.ehal_bindings import resolve_plant_binding
+    """Primary-battery ``get_ess_max_charge_power`` Merker / Q8 id (kW→W)."""
+    _ = house_doc, config_doc
+    from house_config.ess_bindings import resolve_primary_ess_binding
 
-    return resolve_plant_binding(house_doc, "get_ess_max_charge_power", config_doc)
+    return resolve_primary_ess_binding("get_ess_max_charge_power")
 
 
 def marker_get_ess_max_discharge_power(
@@ -304,10 +307,11 @@ def marker_get_ess_max_discharge_power(
     house_doc: dict | None = None,
     config_doc: dict | None = None,
 ) -> str:
-    """Plant ``get_ess_max_discharge_power`` Merker (kW on Loxone → EHAL W)."""
-    from house_config.ehal_bindings import resolve_plant_binding
+    """Primary-battery ``get_ess_max_discharge_power`` Merker / Q8 id (kW→W)."""
+    _ = house_doc, config_doc
+    from house_config.ess_bindings import resolve_primary_ess_binding
 
-    return resolve_plant_binding(house_doc, "get_ess_max_discharge_power", config_doc)
+    return resolve_primary_ess_binding("get_ess_max_discharge_power")
 
 
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:

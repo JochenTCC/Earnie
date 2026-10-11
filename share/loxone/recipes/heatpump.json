@@ -7,7 +7,7 @@
       "ehal_field": "flex.sens_power_act",
       "loxone_blocks_key": "ehal_bindings.flex.wp_heating.sens_power_act",
       "suggested_name": "Earnie_Waermepumpe_Leistung",
-      "notes": "Heatpump active power kW. Pattern B VO path flex.{hk_id}.sens_power_act."
+      "notes": "Heatpump active power kW. entity-scoped VO path flex.{hk_id}.sens_power_act."
     },
     {
       "ehal_field": "flex.set_enable",

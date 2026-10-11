@@ -3,7 +3,7 @@ name: ehal-live-lesen
 description: >-
   When a new EHAL value (sens_*/get_*/flex.*.sens_* read field) is born, add it
   immediately to the Live-Lesen check path so EHAL-Com does not show Kein Mapping
-  for a mapped field. Use when adding or renaming EHAL fields, Pattern B
+  for a mapped field. Use when adding or renaming EHAL fields, entity-scoped
   bindings, role templates, Loxone VO telemetry, HA entity maps, house_config
   ehal_bindings constants, marker_resolve helpers, THERMAL_*_LIVE_READ_FIELDS,
   PLANT_LIVE_READ_FIELDS, EV/FILTER live-read tuples, or collect_read_checks /
@@ -23,13 +23,13 @@ Copy and tick:
 ```
 New EHAL read field:
 - [ ] marker_resolve helper (settings/ehal_marker_resolve.py) if Loxone Merker pull
-- [ ] Pattern B key on plant or consumer (house_config/ehal_bindings.py constants / fields_for_*)
+- [ ] entity-scoped key on plant or consumer (house_config/ehal_bindings.py constants / fields_for_*)
 - [ ] expected row list (integrations/ehal_debug_mapping.py):
       PLANT_LIVE_READ_FIELDS | EV_* | FILTER_* | THERMAL_* | THERMAL_ANNUAL_* |
       or expected_live_read_fields() branch for the entity kind
 - [ ] Loxone collect_read_checks (integrations/loxone_connectivity.py):
       _append_*_read_checks + _consumer_has_live_read_marker (+ detector if new kind)
-- [ ] HA Live path if backend reads it (aggregate / adapter / ha_pattern_b_live_mapping)
+- [ ] HA Live path if backend reads it (aggregate / adapter / ha_entity_scoped_live_mapping)
 - [ ] Test: collect_read_checks (or HA telemetry rows) includes qualified ID → Merker/entity
 - [ ] Docs: docs/ui/ehal-com.md §C + docs/referenz/loxone-signals.md if operator-visible
 ```

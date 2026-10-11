@@ -378,24 +378,18 @@ def build_sent_loxone_snapshot(
     # target_soc_name removed (2.4.j): ESS via active_power + limits + set_ess_mode.
     _ = target_soc
 
+    from house_config.ess_bindings import resolve_primary_ess_binding
     from integrations.ehal_debug_mapping import has_mappable_live_batteries
 
     has_batteries = bool(has_mappable_live_batteries())
-    for kind, cfg_name, value in (
-        ("set_ess_active_power", config.get("LOXONE_TARGET_ACTIVE_POWER_NAME"), active_kw),
-        (
-            "set_ess_charge_power_limit",
-            config.get("LOXONE_TARGET_CHARGE_POWER_NAME"),
-            charge_kw,
-        ),
-        (
-            "set_ess_discharge_power_limit",
-            config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"),
-            discharge_kw,
-        ),
-        ("set_ess_mode", config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
+    for kind, value in (
+        ("set_ess_active_power", active_kw),
+        ("set_ess_charge_power_limit", charge_kw),
+        ("set_ess_discharge_power_limit", discharge_kw),
+        ("set_ess_mode", float(control_cmd)),
     ):
-        if not cfg_name:
+        wired = resolve_primary_ess_binding(kind)
+        if not wired:
             continue
         if value is None:
             if kind != "set_ess_active_power":
@@ -404,8 +398,8 @@ def build_sent_loxone_snapshot(
         else:
             send_value = float(value)
         key = _ess_c1_exchange_field(
-            kind, str(cfg_name), {}, has_batteries=has_batteries
-        ) or str(cfg_name)
+            kind, wired, {}, has_batteries=has_batteries
+        ) or wired
         snapshot[key] = send_value
 
     if export_cap_kw is not _OMIT_EXPORT_CAP:
@@ -510,7 +504,7 @@ def send_huawei_modbus_states(
     )
 
     records: list[LoxoneWriteRecord] = []
-    active_name = lc.config.get("LOXONE_TARGET_ACTIVE_POWER_NAME")
+    from house_config.ess_bindings import resolve_primary_ess_binding
     from integrations.ehal_debug_mapping import (
         build_loxone_setpoint_io_index,
         has_mappable_live_batteries,
@@ -518,39 +512,33 @@ def send_huawei_modbus_states(
 
     io_to_field = build_loxone_setpoint_io_index()
     has_batteries = bool(has_mappable_live_batteries())
+    active_wired = resolve_primary_ess_binding("set_ess_active_power")
 
-    for kind, cfg_name, value in (
-        ("set_ess_active_power", active_name, active_kw),
-        (
-            "set_ess_charge_power_limit",
-            lc.config.get("LOXONE_TARGET_CHARGE_POWER_NAME"),
-            charge_kw,
-        ),
-        (
-            "set_ess_discharge_power_limit",
-            lc.config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"),
-            discharge_kw,
-        ),
-        ("set_ess_mode", lc.config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
+    for kind, value in (
+        ("set_ess_active_power", active_kw),
+        ("set_ess_charge_power_limit", charge_kw),
+        ("set_ess_discharge_power_limit", discharge_kw),
+        ("set_ess_mode", float(control_cmd)),
     ):
-        if not cfg_name:
+        wired = resolve_primary_ess_binding(kind)
+        if not wired:
             continue
         if value is None:
             # Sticky VI: still refresh Sollleistung with 0 under Automatik/Entladesperre.
-            if cfg_name != active_name:
+            if kind != "set_ess_active_power" or not active_wired:
                 continue
             send_value = 0.0
         else:
             send_value = float(value)
         field = _ess_c1_exchange_field(
-            kind, str(cfg_name), io_to_field, has_batteries=has_batteries
+            kind, wired, io_to_field, has_batteries=has_batteries
         )
         if not field:
             logger.warning(
-                "ESS C1: no EHAL field for Merker %s — skip publish", cfg_name
+                "ESS C1: no EHAL field for binding %s — skip publish", wired
             )
             continue
-        # Trace/Live-Schreiben key = exchange id (Pattern B when batteries exist).
+        # Trace/Live-Schreiben key = exchange id (entity-scoped when batteries exist).
         records.append(_publish_setpoint_traced(field, send_value, io_name=field))
 
     if export_cap_kw is not _OMIT_EXPORT_CAP:

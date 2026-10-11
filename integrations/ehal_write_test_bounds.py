@@ -43,7 +43,7 @@ class WriteTestClampError(ValueError):
 
 
 def canonical_probe_field(field: str) -> str:
-    """Strip consumer prefix (``{id}:set_…`` → ``set_…``); keep Pattern B."""
+    """Strip consumer prefix (``{id}:set_…`` → ``set_…``); keep entity-scoped."""
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
@@ -51,7 +51,7 @@ def canonical_probe_field(field: str) -> str:
 
 
 def probe_kind(field: str) -> str:
-    """Wire kind for clamp/bounds (Pattern B / flex → kind; else canonical)."""
+    """Wire kind for clamp/bounds (entity-scoped / flex → kind; else canonical)."""
     from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import flex_field_kind
 

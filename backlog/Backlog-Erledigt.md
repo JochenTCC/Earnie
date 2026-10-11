@@ -2,19 +2,53 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Push before 2.7.l inverter (2026-10-11)
+
+- [x] Push `main` (and site pack tag) before starting **2.7.l** inverter — tag `2.7.0-dev.49` (no GHCR publish)
+
+### 2.7.r — HA live I/O contract / Binding P5 transport (2026-10-11)
+
+- [x] **T1 — Contract & transport switch:** Single Earnie↔HA I/O story in `docs/spec/ehal.md` and user docs; config `ehal.ha.transport` (`pull`|`weg_b`, default `pull`) via `runtime_store/ehal_setup.py` / `settings/config_loaders.py`; canonical `GET /ehal/status.json` with `/ehal/loxone/status.json` alias (`integrations/loxone_status_json.py`); HA push telemetry on the wire in canonical EHAL units (W/kWh/%/A; carrier converts in HA).
+- [x] **T2 — HA → Earnie push read:** With `transport=weg_b`, `integrations/ha_adapter.py` reads activated fields from the push inbox (`integrations/ha_push_read.py`, `runtime_store/loxone_push_inbox.py`); REST is fenced for push-covered fields; missing/stale push fails loud (no pull fallback).
+- [x] **T3 — Earnie → HA via status.json:** Setpoints published to the status ledger for weg_b; service-call writes skipped for covered fields (`integrations/ehal_live.py`); `ha_ess_force`/Huawei paths remain REST exceptions.
+- [x] **T4 — Minimal carrier YAML + lab:** `scripts/ha_carrier_yaml_gen.py` + `integrations/ha_carrier_yaml.py`, example `share/config/ehal.ha.snippet.json`, lab checklist in `docs/spec/ha-lab-setup.md` §9 (not Add-on / full Binding P5 comfort).
+
+### Rename Pattern B → entity-scoped bindings (2026-10-11)
+
+- [x] Chosen term **entity-scoped bindings** (replacing internal name Pattern B); wire shapes unchanged (`ess.{slug}.*`, `flex.{slug}.*`, qualified exchange IDs)
+- [x] Python API renames (`parse_ess_entity_scoped`, `is_ess_entity_scoped_field`, `entity_scoped_battery_bindings`, `ha_entity_scoped_live_mapping`, `_ENTITY_SCOPED`, `_write_entity_scoped_probes`, …)
+- [x] Docs, spec, user docs, share templates, backlog notes, and `.cursor` rules/skills updated to entity-scoped prose
+- [x] Historical release notes, packaging changelogs, and `.cursor/plans` left unchanged
+
+### Binding P5 — Telemetry path rename (2026-10-11)
+
+- [x] **Binding P5 path rename:** canonical `/ehal/telemetry/…`; keep `/ehal/loxone/telemetry/…` as alias for deployed VOs
+  - Receiver: `integrations/loxone_request_http.py` (`match_telemetry_prefix`, dual strip)
+  - Emitters: `scripts/pilot_vo_template_gen.py` + `share/loxone/templates/VirtualOut/VO_Earnie_*.xml`
+  - Docs: `docs/einrichtung/loxone-anbindung.md`, `docs/referenz/loxone-signals.md`, `docs/ui/ehal-com.md`, templates README
+  - Tests: `tests/test_loxone_push_inbox.py`, `test_pilot_vo_template_gen.py`, `test_loxone_vo_template_shape.py`
+
+### Retire LOXONE_* plant loud names, loxone_blocks migrate, plant-flat ESS merge (2026-10-11)
+
+- [x] Removed all `LOXONE_*` plant loud-name config slots (`load_loxone_block_params` / `_LOXONE_BLOCK_ATTRS`) — reads and writes
+- [x] ESS writes/reads resolve primary-battery entity-scoped via `house_config.ess_bindings.resolve_primary_ess_binding`; plant non-ESS via `resolve_plant_binding`
+- [x] Retired `merge_ess_bindings_into_plant` plant-flat ESS alias merge; HA aggregate keeps plant-stored flat ESS until `migrate_ess_bindings_once` when batteries exist
+- [x] `ensure_migrated` refuses non-empty `loxone_blocks` (CLI `scripts/migrate_ehal_bindings.py` migrates explicitly); refuses residual plant-flat ESS when mappable batteries exist
+- [x] Docs/schema/tests updated (`docs/spec/ehal.md`, `share/config/config.schema.json`)
+
 ### SH concentration Phases A–D (2026-10-11)
 
 - [x] **Phase A** — Named ops in `integrations/ehal_live_ops.py`, re-exported from `ehal_live` (`read_generic_value`, flex live/write, `read_absent_mode`, `publish_setpoint_traced`, …); `load_default_house_profiles_doc` in `house_config/profiles_store.py`.
 - [x] **Phase B** — `main.py`, `optimizer/*`, `data/*`, `runtime_store/power_interval_sampler.py` use `ehal_live` (no `loxone_client` / `loxone_writes` imports).
 - [x] **Phase C** — Production import ban outside `integrations/` (`tests/test_no_loxone_client_outside_integrations.py`); UI/settings/scripts migrated; CONTRIBUTING updated.
 - [x] **Phase D** — Canonical backend flags on `ehal_live`; UI debug uses them; `config.is_ehal_*` wrappers removed.
-- Review: [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md). Remaining open: `LOXONE_TARGET_*` / `loxone_blocks` retire; Binding P5 path rename.
+- Review: [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md). Binding P5 path rename → done (see section above).
 
 ### EHAL / SH-backend cleanup — concentration review, binding rollback, Loxone-agnostic naming (2026-10-11)
 
 - [x] **SH-Backend communication concentration — review** — Findings: [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md). Façade `ehal_live.get_adapter()` already exists; scatter documented; Phases A–D implemented (see section above).
-- [x] **Remove Binding rollback legacy** — Dead Merker HTTP write (`_send_loxone_value_traced` / `send_loxone_value`); deprecated push-entity stubs; unused `ui/loxone_marker_forms.py` + `ui/smarthome_marker_fields.py` (moved `assemble_filter_bindings` to `house_config/ehal_bindings.py`); reverse `loxone_blocks` helpers; legacy `ascii_title`; non-`_v2` `VI_Earnie_*.xml`; doc scrub (dual-emit / Q5 rollback / Merker-HTTP drift); Binding walkthroughs marked STALE. Kept: `LOXONE_TARGET_*`, `loxone_blocks` migrate, plant-flat ESS aliases (separate backlog bullet).
-- [x] **EHAL naming Loxone-agnostic (hub-agnostic layer)** — `TELEMETRY_OPTIONAL_STATIC_HUB` / `STATIC_HUB_MAP_FIELDS` (+ temporary aliases); docs/schema/UI reword (Merker → binding/hub channel; sticky hubs; Smarthome-Binding); role JSON `"loxone"` + `apply_loxone_*` unchanged. Follow-ups: Binding P5 path rename (SH concentration A–D done).
+- [x] **Remove Binding rollback legacy** — Dead Merker HTTP write (`_send_loxone_value_traced` / `send_loxone_value`); deprecated push-entity stubs; unused `ui/loxone_marker_forms.py` + `ui/smarthome_marker_fields.py` (moved `assemble_filter_bindings` to `house_config/ehal_bindings.py`); reverse `loxone_blocks` helpers; legacy `ascii_title`; non-`_v2` `VI_Earnie_*.xml`; doc scrub (dual-emit / Q5 rollback / Merker-HTTP drift); Binding walkthroughs marked STALE. Follow-up done: `LOXONE_*` loud names / `loxone_blocks` migrate / plant-flat ESS merge retired (see section above).
+- [x] **EHAL naming Loxone-agnostic (hub-agnostic layer)** — `TELEMETRY_OPTIONAL_STATIC_HUB` / `STATIC_HUB_MAP_FIELDS` (+ temporary aliases); docs/schema/UI reword (Merker → binding/hub channel; sticky hubs; Smarthome-Binding); role JSON `"loxone"` + `apply_loxone_*` unchanged. Follow-up Binding P5 path rename → done (see section above); SH concentration A–D done.
 
 ### EHAL Loxone vs HA mapping review (2026-10-11)
 
@@ -81,9 +115,9 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Marked intentional Merker polls (structure/greenfield); `docs/spec/ehal.md` Q8 note; HA entity_ids remain until Binding P5
   - Tests: `tests/test_clear_loxone_binding_names.py`
 
-### `set_ess_source_select` → Pattern B `ess.<id>.*` (2026-10-10)
+### `set_ess_source_select` → entity-scoped `ess.<id>.*` (2026-10-10)
 
-- [x] **`set_ess_source_select` → Pattern B `ess.<id>.set_ess_source_select`** (follow-up to **2.7.h** / **2.7.m**)
+- [x] **`set_ess_source_select` → entity-scoped `ess.<id>.set_ess_source_select`** (follow-up to **2.7.h** / **2.7.m**)
   - Quellenwahl is a physical `standby_backup` capability only — not plant / house ESS.
   - Removed plant `ehal_bindings` / plant-flat remap (`_PLANT_FLAT_ALLOWED_KINDS`); `status.json` / Live-Schreiben / Signalliste use `ess.<id>.set_ess_source_select`.
   - One-off migrate: `migrate_plant_source_select_to_standby` + phase 2 in `scripts/migrate_ess_bindings_once.py`.
@@ -116,13 +150,13 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Loxone `status.json`: physical powerstation limits overwrote the house battery's flat keys** — fix on `main` (commit `b5a658d2` via `fix/status-json-powerstation-keys`); **Verified live** (2026-10-10, NAS productive `192.168.178.35:8541`)
   - Cause: `_write_powerstation_loxone` cached under flat field kinds; `build_loxone_status_payload` wrote into house flat keys (last write won). VI Pattern-B Checks never got data.
-  - Fix: cache/emit Pattern B `ess.<id>.<kind>`; only shared `set_ess_source_select` stays plant-flat. Tests in `tests/test_loxone_status_json.py` / `tests/test_powerstation_2_7_h.py`.
+  - Fix: cache/emit entity-scoped `ess.<id>.<kind>`; only shared `set_ess_source_select` stays plant-flat. Tests in `tests/test_loxone_status_json.py` / `tests/test_powerstation_2_7_h.py`.
   - Live: `status.json` keeps house flats (`set_ess_charge_power_limit=5.0`, …) beside `ess.15_kwh_speicher.*` and `ess.ecoflow_delta_3.*`; flat `set_ess_source_select` present. Miniserver VIs are Pattern-B titled (`ess.ecoflow_delta_3.set_ess_charge_power_limit`, …); legacy `Earnie_Delta3_*` / bare flat Merker names 404. House VI `5.000 kW` matches status (no DestValHigh sign invert). EHAL-Com Schreibtest published `ess.ecoflow_delta_3.set_ess_charge_power_limit=1000.0` with Miniserver fetch ack; house flats stayed at 5.0 (no overwrite).
 
 ### Bugfix — Physical powerstation ESS writes plant-flat fallback (2026-10-10)
 
 - [x] **Physical powerstation ESS writes fall back to the house battery's plant-flat entity** — fix implemented (2026-10-06); **Verified live** (2026-10-10, NAS productive; Loxone hub units for max charge/discharge corrected to kW)
-  - `optimizer/powerstation_live.py`: no plant-flat remap for charge/discharge (HA + Loxone); explicit exception only for `set_ess_source_select` (EcoFlow bridge — to be removed when Quellenwahl is Pattern B); missing binding → skip + `runtime/ehal_write_error.json`
+  - `optimizer/powerstation_live.py`: no plant-flat remap for charge/discharge (HA + Loxone); explicit exception only for `set_ess_source_select` (EcoFlow bridge — to be removed when Quellenwahl is entity-scoped); missing binding → skip + `runtime/ehal_write_error.json`
   - Docs: `docs/konfiguration/batterie-pv.md`; regression: `tests/test_powerstation_2_7_h.py` (`test_ha_charge_does_not_remap_to_house_battery`, Loxone charge isolation, HA source_select plant-flat)
   - Follow-up (feature): EHAL-Com Signalliste expected units + Live-Lesen/Schreiben raw vs converted columns → [Backlog.md](Backlog.md) Version 2.7
 
@@ -143,7 +177,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.n Session E — Read characterization extend (2026-10-10)
 
-- [x] **Session E — 2.7.n-4 characterization extend** (gate for F): extended `tests/test_loxone_read_characterization.py` with optional ESS `get_*` (clamp / kW→W / omit), per-battery SoC via `read_ess_soc_by_id` (Pattern B address, secondary refuse, primary plant alias), and push-inbox composition (missing/stale required → `LoxoneAdapterError`; optional omit). Baseline kW→W / clamps / required missing / export-limit omit kept. Write half = **2.7.q Q1** (already done). Must stay green through Session F.
+- [x] **Session E — 2.7.n-4 characterization extend** (gate for F): extended `tests/test_loxone_read_characterization.py` with optional ESS `get_*` (clamp / kW→W / omit), per-battery SoC via `read_ess_soc_by_id` (entity-scoped address, secondary refuse, primary plant alias), and push-inbox composition (missing/stale required → `LoxoneAdapterError`; optional omit). Baseline kW→W / clamps / required missing / export-limit omit kept. Write half = **2.7.q Q1** (already done). Must stay green through Session F.
 
 ### 2.7.n Session D — Wire cleanup export limit (2026-10-10)
 
@@ -170,7 +204,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Powerstation savings study 2025 (2026-10-09)
 
-- [x] **Savings study** (done 2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive dogfood deferred until Quellenwahl is Pattern B (see [Backlog.md](Backlog.md) Version 2.7).
+- [x] **Savings study** (done 2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive dogfood deferred until Quellenwahl is entity-scoped (see [Backlog.md](Backlog.md) Version 2.7).
 
 ### Loxone-verify hydrate/wait + warn on missing VO (2026-10-09)
 
@@ -183,7 +217,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Loxone / HA mapping: duplicate `PLANT_FIELDS` — heuristic proposals miss fields** (**2.7.n-1** half) — fix implemented (2026-10-09); **Verified** UI (2026-10-09)
   - Removed stale field-list copy in `ui/ehal_loxone_mapping_ui.py`; `heuristic_propose` uses canonical `PROPOSAL_FIELDS` (`PLANT_FIELDS` + `ESS_BATTERY_MAPPING_KINDS` + EV/FLEX/FILTER).
-  - Pattern B lookup: `proposal_for_mapping_field` (Loxone) and `_proposed_entity_id` (HA) resolve `ess.<id>.<kind>` → flat kind.
+  - entity-scoped lookup: `proposal_for_mapping_field` (Loxone) and `_proposed_entity_id` (HA) resolve `ess.<id>.<kind>` → flat kind.
   - Tests: `tests/test_ehal_loxone_mapping_entities.py`, `tests/test_ehal_ha_mapping_entities.py`, `tests/test_loxone_ehal_mapping.py`.
   - UI: EHAL-Com HTTP probe proposes `set_grid_export_power_limit` and battery SoC on a multi-ESS plant.
 
@@ -235,7 +269,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Finding from 2.7.q q.D / Q5 dogfood:** Live-Lesen showed **Kein Mapping** (or bare OK) for push signals at / assumed `0` instead of Push-Inbox style Status
   - `LoxoneCheck.state` from `read_push_value`; `build_read_rows` uses push-state labels (`0 angenommen …`, `Zuletzt bekannt …`) and inbox `last_ts`
-  - Empty Merker Pattern B ESS → EHAL-ID in `collect_read_checks`; Kein Mapping only when unbound / push resolve fails
+  - Empty Merker entity-scoped ESS → EHAL-ID in `collect_read_checks`; Kein Mapping only when unbound / push resolve fails
   - Tests: `tests/test_loxone_debug.py`, `tests/test_loxone_connectivity.py`; docs: `docs/ui/ehal-com.md` Live Read
 
 ### 2.7.q q.D / Q5 — Write push-only cutover + live dogfood (2026-10-09)
@@ -296,10 +330,10 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Loxone wire units: charge/discharge/active W→kW; records returned for Live-Schreiben
 - [x] **Live-Schreiben includes powerstation Merker writes** in last-run table
   - PS `LoxoneWriteRecord`s merged into `loxone_writes` with house ESS + flex (`serialize_write_records`)
-  - Pattern B write IO index: batteries + plant `set_ess_source_select` in [`integrations/ehal_debug_mapping.py`](../integrations/ehal_debug_mapping.py)
-- [x] **Schreibtest lists all mapped write fields** (plant, Pattern B, EV, Flex)
+  - entity-scoped write IO index: batteries + plant `set_ess_source_select` in [`integrations/ehal_debug_mapping.py`](../integrations/ehal_debug_mapping.py)
+- [x] **Schreibtest lists all mapped write fields** (plant, entity-scoped, EV, Flex)
   - [`integrations/ehal_write_test.py`](../integrations/ehal_write_test.py) / [`ui/ehal_write_test.py`](../ui/ehal_write_test.py): auto rows from `expected_live_write_fields` ∩ mapped; **Senden** default unchecked
-  - `set_ess_active_power` (incl. Pattern B) always visible; Force checkbox unlocks send only (±200 W + second confirm)
+  - `set_ess_active_power` (incl. entity-scoped) always visible; Force checkbox unlocks send only (±200 W + second confirm)
   - Docs [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md); tests `tests/test_powerstation_2_7_h.py`, `tests/test_ehal_write_test.py`
 
 ### 2.7.m — Per-battery EHAL mapping (EHAL-Com) (2026-10-06)
@@ -307,8 +341,8 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **2.7.m — Per-battery EHAL mapping (EHAL-Com)** (before **2.7.l**; unblocks **2.7.h** dogfood mapping)
   - Decisions: ESS off plant row (runtime primary flat aliases only); per-battery Loxone Merker `Earnie_Batterie_<Slug>_…`; shared plant `set_ess_source_select` / `Earnie_Speicher_Quellenwahl`; virtual powerstations excluded from EHAL binding
   - **2.7.m-1:** `kind: battery` rows in `build_entity_rows` (house + physical PS only); persist via `apply_battery_bindings` → `components.json`; Shadow `battery_bindings`
-  - **2.7.m-2:** `aggregate_ha_entities` merges Pattern B + primary aliases; Live-Lesen per-battery rows; plant-flat ESS fallback until migrate
-  - **2.7.m-3:** battery required SoC; function status Pattern B scope; per-battery HA sign inherit; setup_readiness via `resolve_plant_binding`
+  - **2.7.m-2:** `aggregate_ha_entities` merges entity-scoped + primary aliases; Live-Lesen per-battery rows; plant-flat ESS fallback until migrate
+  - **2.7.m-3:** battery required SoC; function status entity-scoped scope; per-battery HA sign inherit; setup_readiness via `resolve_plant_binding`
   - **2.7.m-4:** `scripts/migrate_ess_bindings_once.py` (`--config-dir` / `--dry-run`); top-level plant migrate; keep `set_ess_source_select` on plant
   - Docs: `ehal-com.md` §C.2, `batterie-pv.md`, `ehal.md`, `loxone-signals.md`; tests mapping / aggregate×2 / shadow / migrate
 
@@ -347,7 +381,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Runtime: [`optimizer/powerstation_standby.py`](../optimizer/powerstation_standby.py) + live write path; Loxone Merker `Earnie_Speicher_Quellenwahl` / `VI_Earnie_Plant.xml`; readiness warnings in setup UI
   - Docs: `ehal.md`, `loxone-signals.md`, `batterie-pv.md`, EcoFlow bridge guide; tests `tests/test_powerstation_2_7_h.py`
   - Spec: `Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.4.2 (`Earnie-Projekt`)
-  - **Productive dogfood deferred (2026-10-10):** wait for `set_ess_source_select` → Pattern B `ess.<id>.*` in [Backlog.md](Backlog.md) Version 2.7; EcoFlow Loxone↔HA bridge rewire is separate. Then re-open live acceptance under [Bugfixes](Backlog-Bugfixes.md).
+  - **Productive dogfood deferred (2026-10-10):** wait for `set_ess_source_select` → entity-scoped `ess.<id>.*` in [Backlog.md](Backlog.md) Version 2.7; EcoFlow Loxone↔HA bridge rewire is separate. Then re-open live acceptance under [Bugfixes](Backlog-Bugfixes.md).
 
 ### Bugfix — New battery from Powerstation selection crash (2026-10-06)
 
@@ -406,7 +440,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Hidden → inherit charge/efficiency/SoC/threshold from main ESS; discharge `0`, standby `0`, `limits_from_live` false, `control: limits_only`, wear off; fixed defaults if no Hausbatterie
   - Physical Powerstations unchanged (full form)
   - Docs: [`docs/konfiguration/batterie-pv.md`](../docs/konfiguration/batterie-pv.md) § Virtuelle Powerstation; tests in `tests/test_powerstation_2_7_g.py`
-  - Superseded by full **2.7.g** archive entry above; **2.7.h** archived 2026-10-06 (productive dogfood deferred — Pattern B Quellenwahl move)
+  - Superseded by full **2.7.g** archive entry above; **2.7.h** archived 2026-10-06 (productive dogfood deferred — entity-scoped Quellenwahl move)
 
 ### Powerstation savings study 2.7.g / 2.7.h (2026-10-05)
 
@@ -440,7 +474,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - batt+inverter modes: optimizing / charging / discharging
   - All batteries participate in optimization
   - **Export limit "unconstrained" value (from 2.7.a):** `live_unconstrained_export_kw()` in `optimizer/live_export_limit.py` sums PV kWp + max discharge of **every** battery that supports forced discharge (skip `limits_only` / `read_only` / physical powerstations from **2.7.g**/**2.7.h** that cannot feed the house grid); docs `docs/spec/ehal.md` + `docs/einrichtung/loxone-anbindung.md`
-  - EHAL / Pattern B namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
+  - EHAL / entity-scoped namespacing for multi-ESS (design reusable by **2.+1** multiple EV / Wallboxes)
   - [x] In SE after calculation of Test Month the Detaillierte Simulationsansicht should automatically go to March (tested month)
   - [x] Show SOC line for each battery in Monitor chart1
   - **Note:** Downstream Loxone template XML gen and HouseSim scenario import multi-battery support remains open under Version 2.+1
@@ -457,8 +491,8 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 ### Version 2.6 - Enhancements for HA coupling (2026-10-03)
 
 - [x] **Version 2.6 — Enhancements for HA coupling** (chapter closed; official **2.6.0** on `main`, supersedes **2.5.3** on `:latest`)
-  - Scope: easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items in [Backlog.md](Backlog.md). Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
-  - Documents: [House simulator spec](../docs/spec/house-sim.md) (HouseSim S1–S4); [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md); [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) (channel work **2.6.k**)
+  - Scope: easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (entity-scoped, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items in [Backlog.md](Backlog.md). Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
+  - Documents: [House simulator spec](../docs/spec/house-sim.md) (HouseSim S1–S4); [EHAL spec — entity-scoped / Loxone HITL](../docs/spec/ehal.md); [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) (channel work **2.6.k**)
   - Letter archive: **2.6.a**…**2.6.p**, **2.6.r**, alphas through **2.6.0-alpha.12**, and official **2.6.0** — see sections below in this file
 
 ### 2.7.j — Additional ESS parameters (2026-10-03)
@@ -516,7 +550,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Minor: Remove EHAL flex.set_power_setpoint (2026-09-30)
 
-- [x] **Remove EHAL `flex.{slug}.set_power_setpoint` permanently** — unused for live control (non-EV flex writes only `set_enable`; variable kW/A is EV-only via `set_evcs_max_current`). Stripped Pattern B field + legacy stub `flex.power_setpoint_name` / non-EV migrate from `loxone_outputs.power_setpoint_name`; mapping UI / Live-Schreiben expected fields / `share/ehal/roles/consumer.json` / greenfield recipes / docs (`loxone-signals`, `ehal-com`). EV `set_evcs_max_current` kept. Heat-pump Prio3 temperature-setpoint path (2.+1) unrelated.
+- [x] **Remove EHAL `flex.{slug}.set_power_setpoint` permanently** — unused for live control (non-EV flex writes only `set_enable`; variable kW/A is EV-only via `set_evcs_max_current`). Stripped entity-scoped field + legacy stub `flex.power_setpoint_name` / non-EV migrate from `loxone_outputs.power_setpoint_name`; mapping UI / Live-Schreiben expected fields / `share/ehal/roles/consumer.json` / greenfield recipes / docs (`loxone-signals`, `ehal-com`). EV `set_evcs_max_current` kept. Heat-pump Prio3 temperature-setpoint path (2.+1) unrelated.
 
 ### Bugfix Loxone Live-Lesen range checks removed (2026-09-30)
 
@@ -763,7 +797,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.6.e — Stronger HA propose / vendor name recognition (2026-09-26)
 
-- [x] **2.6.e — Stronger propose, still confirm-before-save.** Empty Pattern B map + HouseSim S2 archetypes: token-boundary name hints, longer-hint ranking (uncapped for ties), unique best score or leave empty; vendor vocab (Huawei / Fronius DE / SMA / go-e / KEBA). No LLM; empty-only UI unchanged. Module: `integrations/ha_ehal_mapping.py`.
+- [x] **2.6.e — Stronger propose, still confirm-before-save.** Empty entity-scoped map + HouseSim S2 archetypes: token-boundary name hints, longer-hint ranking (uncapped for ties), unique best score or leave empty; vendor vocab (Huawei / Fronius DE / SMA / go-e / KEBA). No LLM; empty-only UI unchanged. Module: `integrations/ha_ehal_mapping.py`.
   - [x] Hit rates (correct / golden, 0 wrong): `evcc_en` 13/13, `fronius_de` 9/9, `huawei_en` 11/11, `sma_keba` 11/11. Distractors never proposed (`inverter_active_power`, SMA `…_grid_power`, Fronius `leistung_verbrauch`).
   - [x] Tests: `tests/test_ha_ehal_mapping.py` (all archetypes ⊆ golden; vocab examples; token-boundary unit cases). Spec note: `docs/spec/ehal.md`.
 
@@ -867,7 +901,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - [x] Simplification triage — mechanical unused-import removals (`simulation/engine`, `backtesting_single_window`, `ui/backtesting_display_bundle`, `chart_trace_segments`, `loxone_debug_rows`, `optimizer/consistency`, `simulation`, `milp_consumer_*`, `__init__` battery aliases); deferred needs-accept: identical helpers / charts barrel trim / `_anchor_fraction_from_legacy_shift`
   - [x] KPI mega-files — **0** core/UI files &gt; 600 LOC: `ui/charts.py` → facade + `chart_cumulative_render.py` (+ flow ghosts); `data/planning_window.py` → `planning_window_zones.py`; `optimizer/milp.py` via `milp_inputs.py`
   - [x] KPI functions — **0** bodies &gt; 60 LOC in quality-gate packages (Wave 1 + full follow-on; full hard-limit bar)
-  - [x] Official docs — `Doc-Review-Checklist.md` §2.6.0 HA/HouseSim/Pattern B; Pattern B drift fixed in HA/user docs; issue-template placeholder `2.6.0`; 3 deferred findings → [Backlog-Bugfixes.md](Backlog-Bugfixes.md) Document Review Findings
+  - [x] Official docs — `Doc-Review-Checklist.md` §2.6.0 HA/HouseSim/entity-scoped; entity-scoped drift fixed in HA/user docs; issue-template placeholder `2.6.0`; 3 deferred findings → [Backlog-Bugfixes.md](Backlog-Bugfixes.md) Document Review Findings
   - [x] SonarCloud snapshot — last successful analysis [36110376214](https://github.com/JochenTCC/Earnie/actions/runs/36110376214) @ `d4ec89d`: QG **ERROR** (informational); `new_bugs` **0**; `new_vulnerabilities` **13** deferred under Bugfixes Verifications Pending / accepted triage. Post-`ddf5938` CI pulp-4 fail unblocked by pin below (refresh leak-period after push)
   - [x] **Pin `pulp` to `&lt;4`** in `pyproject.toml` (`pulp>=2.8.0,&lt;4`); local MILP smoke green on 3.3.2
   - [x] Optional near-hard pre-split (`scenario_editor_sections` ~598, `profiles_store` ~595) — **skipped** (explicit; not required for gate)
@@ -898,11 +932,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.6.h — HA EHAL-Com UX parity with Loxone (2026-09-23)
 
-- [x] **2.6.h — HA EHAL-Com UX parity with Loxone.** Entity picker first (plant + live-profile consumers), then only that entity’s EHAL fields; save via `apply_entity_bindings` (not giant form). Reuse Loxone HITL (`build_entity_rows` / role grouping / empty-only propose). Scan HA `/api/states` once per session; suggest-and-confirm never overwrites saved bindings; no LLM. Live-Lesen/Schreiben: entity-centric Mapping column from Pattern B. UI: `ui/ehal_ha_mapping.py`; Live helpers in `integrations/ehal_debug_mapping.py`. Tests: `tests/test_ehal_ha_mapping_entities.py` (+ HA / Live suite). Docs: `ehal-com.md`, `ehal.md`, `ha-evcc.md`.
+- [x] **2.6.h — HA EHAL-Com UX parity with Loxone.** Entity picker first (plant + live-profile consumers), then only that entity’s EHAL fields; save via `apply_entity_bindings` (not giant form). Reuse Loxone HITL (`build_entity_rows` / role grouping / empty-only propose). Scan HA `/api/states` once per session; suggest-and-confirm never overwrites saved bindings; no LLM. Live-Lesen/Schreiben: entity-centric Mapping column from entity-scoped. UI: `ui/ehal_ha_mapping.py`; Live helpers in `integrations/ehal_debug_mapping.py`. Tests: `tests/test_ehal_ha_mapping_entities.py` (+ HA / Live suite). Docs: `ehal-com.md`, `ehal.md`, `ha-evcc.md`.
 
-### 2.6.g — HA bindings on Pattern B (2026-09-23)
+### 2.6.g — HA bindings on entity-scoped (2026-09-23)
 
-- [x] **2.6.g — HA bindings on Pattern B (`house_profiles`).** Flat `ehal.ha.entities` → `plant.ehal_bindings` / EV consumer `ehal_bindings` (same §C keys as Loxone). One-shot migrator in `house_config/ha_ehal_bindings.py` via `ensure_migrated` / CLI; strip flat entities; `sign` stays in `ehal.ha`. Live: `aggregate_ha_entities` → `get_ha_adapter` (legacy fallback if empty). HITL save writes Pattern B (`ui/ehal_ha_mapping.py`). Golden `evcc_en` map kept for heuristics; house_sim print/docs updated. Tests: `tests/test_ha_ehal_bindings.py` (+ HA suite). Docs: `ehal.md`, `ehal-com.md`, `house-sim.md`, `smarthome-backend-wahl.md`, `loxone-meter-energy-slot-ist.md`, snippet.
+- [x] **2.6.g — HA bindings on entity-scoped (`house_profiles`).** Flat `ehal.ha.entities` → `plant.ehal_bindings` / EV consumer `ehal_bindings` (same §C keys as Loxone). One-shot migrator in `house_config/ha_ehal_bindings.py` via `ensure_migrated` / CLI; strip flat entities; `sign` stays in `ehal.ha`. Live: `aggregate_ha_entities` → `get_ha_adapter` (legacy fallback if empty). HITL save writes entity-scoped (`ui/ehal_ha_mapping.py`). Golden `evcc_en` map kept for heuristics; house_sim print/docs updated. Tests: `tests/test_ha_ehal_bindings.py` (+ HA suite). Docs: `ehal.md`, `ehal-com.md`, `house-sim.md`, `smarthome-backend-wahl.md`, `loxone-meter-energy-slot-ist.md`, snippet.
 
 ### 2.6.c — HA energy counters for slot Ist (2026-09-23)
 
@@ -1434,7 +1468,7 @@ EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`,
 - [x] **2.4 polishing — manual Merker in EHAL mapping** — Per-field creatable selectboxes on EHAL-Com (`accept_new_options`); confirm dialog saves new Merker into options and maps the EHAL field to `house_profiles.json`; optional HTTP probe; Live table column titles `Mapping auf Loxone` / Home Assistant / OpenEMS. Docs `ehal-com.md`; tests `test_ehal_loxone_mapping_entities.py`, `test_loxone_debug.py`.
 
 
-### Pattern B pool Freigabe + Live-Schreiben flex (2026-08-01)
+### entity-scoped pool Freigabe + Live-Schreiben flex (2026-08-01)
 
 - [x] **status.json pool VI Check keys** — bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe`; legacy SwimSpa enable Merkers dual-read onto those keys; VI templates `Analog=true` (sticky).
 - [x] **Greenfield `pool_filter` Freigabe → MILP bridge** — overlay enable onto filter bridge; auto `subtract_consumer_ids` for shared SwimSpa meter; native filter inference uses shared-meter heating ids.
@@ -1446,9 +1480,9 @@ EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`,
 - [x] **Pool / SwimSpa Filter mapping in EHAL-Com** — synthetic entity `swimspa_filter` for `get_filter_remaining_hours` (plus filter power/Freigabe/aktiv/native window); persist under `swimspa_filter_bindings`; dual-read via `marker_get_filter_remaining_hours`; remove hard-coded `Ernie_Swimspa_Filter_Sollstunden` bridge default. Live-Lesen + docs (§C.6 / flexible-verbraucher / loxone-signale). Tests: mapping, resolve, consumer targets, planning bridge.
 
 
-### Pattern B Virtual In status.json (2026-08-01)
+### entity-scoped Virtual In status.json (2026-08-01)
 
-- [x] **Daemon `GET /ehal/loxone/status.json` (port 8541)** — Pattern B VI payload from last-run `loxone_sent` (plant `set_ess_*` in kW, EV/flex namespaced Check keys, pool Freigaben) plus live `heartbeat_ts`; VI templates/docs retargeted from Streamlit `:8501` to daemon `:8541`. Tests: `tests/test_loxone_status_json.py`, `tests/test_loxone_request_http.py`.
+- [x] **Daemon `GET /ehal/loxone/status.json` (port 8541)** — entity-scoped VI payload from last-run `loxone_sent` (plant `set_ess_*` in kW, EV/flex namespaced Check keys, pool Freigaben) plus live `heartbeat_ts`; VI templates/docs retargeted from Streamlit `:8501` to daemon `:8541`. Tests: `tests/test_loxone_status_json.py`, `tests/test_loxone_request_http.py`.
 
 
 ### Bugfix Chart 2 flat Verbrauch optimiert (2026-08-01)
@@ -1539,7 +1573,7 @@ EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`,
 
 ### 2.4.n Greenfield Loxone Import - Workflow (2026-07-31)
 
-- [x] **2.4.n — Greenfield Loxone Import - Workflow** — P1 naming freeze + Pattern B full draft set under `share/loxone/templates/` (`VI_`/`VO_` Plant, EV, Heatpump, Consumer, Pool, Status); P2 `integrations/loxone_greenfield_import.py` (exact + Prefix+Slug casefold, EFM merge, HTTP probe); P3 HK onboarding → EHAL-Com **Greenfield importieren**; P4 German how-to [`docs/einrichtung/loxone-earnie-library.md`](../docs/einrichtung/loxone-earnie-library.md) + TOC/EHAL-Com/HK links; ehal-com **C.5** Wärmepumpe / **C.6** Pool + Aussentemp; Plant VI ESS Design C1 (`Earnie_Batterie_Sollleistung` + sticky `set_ess_mode`). Plans: `.cursor/plans/greenfield_loxone_import_303f8861.plan.md`, `.cursor/plans/vo_sens_get_templates_9cbef698.plan.md`, `.cursor/plans/ehal_ess_design_c1_9ae0ebdd.plan.md`. Config **Als Vorlage speichern** canonical re-export closed with chapter (drafts ship as library).
+- [x] **2.4.n — Greenfield Loxone Import - Workflow** — P1 naming freeze + entity-scoped full draft set under `share/loxone/templates/` (`VI_`/`VO_` Plant, EV, Heatpump, Consumer, Pool, Status); P2 `integrations/loxone_greenfield_import.py` (exact + Prefix+Slug casefold, EFM merge, HTTP probe); P3 HK onboarding → EHAL-Com **Greenfield importieren**; P4 German how-to [`docs/einrichtung/loxone-earnie-library.md`](../docs/einrichtung/loxone-earnie-library.md) + TOC/EHAL-Com/HK links; ehal-com **C.5** Wärmepumpe / **C.6** Pool + Aussentemp; Plant VI ESS Design C1 (`Earnie_Batterie_Sollleistung` + sticky `set_ess_mode`). Plans: `.cursor/plans/greenfield_loxone_import_303f8861.plan.md`, `.cursor/plans/vo_sens_get_templates_9cbef698.plan.md`, `.cursor/plans/ehal_ess_design_c1_9ae0ebdd.plan.md`. Config **Als Vorlage speichern** canonical re-export closed with chapter (drafts ship as library).
 
 
 ### 2.4.o EHAL ESS active power Design C1 (2026-07-31)

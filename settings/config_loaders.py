@@ -112,72 +112,15 @@ def load_system_and_ui_params(
     }
 
 
-_LOXONE_BLOCK_ATTRS: tuple[tuple[str, str, str | None], ...] = (
-    ("LOXONE_SOC_NAME", "soc_name", "sens_ess_soc"),
-    ("LOXONE_PV_POWER_NAME", "pv_power_name", "sens_pv_production_active"),
-    ("LOXONE_BATTERY_POWER_NAME", "battery_power_name", "sens_ess_power"),
-    ("LOXONE_GRID_POWER_NAME", "grid_power_name", "sens_grid_power_active"),
-    ("LOXONE_CONSUMERS_POWER_NAME", "consumers_power_name", "sens_power_consumers"),
-    ("LOXONE_TARGET_ACTIVE_POWER_NAME", "target_active_power_name", "set_ess_active_power"),
-    ("LOXONE_TARGET_CHARGE_POWER_NAME", "target_charge_power_name", "set_ess_charge_power_limit"),
-    ("LOXONE_TARGET_DISCHARGE_POWER_NAME", "target_discharge_power_name", "set_ess_discharge_power_limit"),
-    ("LOXONE_CONTROL_CMD_NAME", "control_cmd_name", "set_ess_mode"),
-)
-
-
-def _plant_bindings_present(house_doc: dict | None) -> bool:
-    house = house_doc if isinstance(house_doc, dict) else {}
-    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
-    bindings = plant.get("ehal_bindings") if isinstance(plant.get("ehal_bindings"), dict) else {}
-    return any(str(v or "").strip() for v in bindings.values())
-
-
-def _resolve_loxone_block_value(
-    raw_config: dict,
-    block_key: str,
-    ehal_field: str | None,
-    house_doc: dict | None,
-    config_path: str,
-) -> Any:
-    from house_config.ehal_bindings import resolve_plant_binding
-
-    if ehal_field:
-        bound = resolve_plant_binding(house_doc, ehal_field, raw_config)
-        if bound:
-            return bound
-        if _plant_bindings_present(house_doc):
-            return ""
-        if ehal_field == "sens_power_consumers":
-            blocks = raw_config.get("loxone_blocks")
-            if isinstance(blocks, dict):
-                return str(blocks.get(block_key) or "")
-            return ""
-    blocks = raw_config.get("loxone_blocks")
-    if isinstance(blocks, dict) and block_key in blocks:
-        return blocks[block_key]
-    return ""
-
-
-def load_loxone_block_params(
-    raw_config: dict,
-    config_path: str,
-    house_doc: dict | None = None,
-) -> dict[str, Any]:
-    """Prefer ``plant.ehal_bindings`` (§C); skip ``loxone_blocks`` when plant is set."""
-    return {
-        attr: _resolve_loxone_block_value(
-            raw_config, block_key, ehal_field, house_doc, config_path
-        )
-        for attr, block_key, ehal_field in _LOXONE_BLOCK_ATTRS
-    }
-
-
 def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     """Optional ehal block; missing/empty/none backend defaults to Loxone-EHAL.
 
     HA URL/token live in ``.env`` (``EHAL_HA_*`` via ``load_env_vars``, 2.6.i).
-    ``EHAL_HA_ENTITIES`` remains for legacy fallback only — Pattern B bindings
+    ``EHAL_HA_ENTITIES`` remains for legacy fallback only — entity-scoped bindings
     live in ``plant`` / ``consumers[].ehal_bindings`` (2.6.g).
+
+    ``EHAL_HA_TRANSPORT``: ``pull`` (default when ``ehal.ha.transport`` is missing)
+    or ``weg_b`` (2.7.r-T1; live inbox/status parity lands in T2–T4).
     """
     ehal = raw_config.get("ehal")
     if not isinstance(ehal, dict):
@@ -190,6 +133,9 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     boolean_invert = (
         ha.get("boolean_invert") if isinstance(ha.get("boolean_invert"), dict) else {}
     )
+    from runtime_store.ehal_setup import normalize_ha_transport
+
+    ha_transport = normalize_ha_transport(ha.get("transport"))
     return {
         "EHAL_BACKEND": backend,
         "EHAL_ADAPTER_ID": resolve_adapter_id(ehal.get("adapter_id"), backend),
@@ -214,6 +160,7 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
             for key, value in boolean_invert.items()
             if str(value).strip()
         },
+        "EHAL_HA_TRANSPORT": ha_transport,
     }
 
 

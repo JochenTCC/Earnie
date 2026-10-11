@@ -1,4 +1,4 @@
-"""Pattern B Virtual In status payload (``GET /ehal/loxone/status.json``)."""
+"""Entity-scoped setpoint payload (``GET /ehal/status.json``, alias ``/ehal/loxone/status.json``)."""
 from __future__ import annotations
 
 import time
@@ -319,11 +319,11 @@ def build_loxone_status_payload(
     # ``ess.{slug}.{kind}`` only (incl. Quellenwahl). Flat limit / mode keys stay
     # the house battery's and are never overwritten by a powerstation.
     try:
-        from ehal.ess_fields import parse_ess_pattern_b
+        from ehal.ess_fields import parse_ess_entity_scoped
         from optimizer.powerstation_live import last_powerstation_sent
 
         for key, value in last_powerstation_sent().items():
-            if parse_ess_pattern_b(key):
+            if parse_ess_entity_scoped(key):
                 payload[key] = float(value)
     except Exception:  # noqa: BLE001 — status JSON must never fail
         pass

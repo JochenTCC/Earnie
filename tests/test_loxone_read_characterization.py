@@ -177,7 +177,7 @@ def test_char_optional_ess_limits_absent_when_unconfigured(fetch_mock) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_char_read_ess_soc_by_id_pattern_b_address() -> None:
+def test_char_read_ess_soc_by_id_entity_scoped_address() -> None:
     ehal_live._soc_missing_warned.clear()
     batteries = [
         {

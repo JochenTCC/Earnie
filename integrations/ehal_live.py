@@ -74,6 +74,16 @@ def is_ha_backend() -> bool:
     return str(config.get("EHAL_BACKEND") or "").strip().lower() == "ha"
 
 
+def is_ha_weg_b_transport() -> bool:
+    from runtime_store.ehal_setup import HA_TRANSPORT_WEG_B
+
+    return (
+        is_ha_backend()
+        and str(config.get("EHAL_HA_TRANSPORT") or "").strip().lower()
+        == HA_TRANSPORT_WEG_B
+    )
+
+
 def is_loxone_backend() -> bool:
     backend = str(config.get("EHAL_BACKEND") or "").strip().lower()
     return backend in ("", "loxone")
@@ -190,12 +200,25 @@ def get_ha_adapter() -> HaAdapter:
             "ehal.backend=ha requires EHAL_HA_TOKEN in config/.env, "
             "or SUPERVISOR_TOKEN when running as the Home Assistant add-on."
         )
-    aggregated = aggregate_ha_entities(load_house_profiles_for_ha())
+    house = load_house_profiles_for_ha()
+    transport = str(config.get("EHAL_HA_TRANSPORT") or "pull").strip().lower()
+    aggregated = aggregate_ha_entities(house, transport=transport)
     if aggregated:
         entities = aggregated
     else:
         legacy = config.get("EHAL_HA_ENTITIES") or {}
         entities = legacy if isinstance(legacy, dict) else {}
+    from integrations.ha_push_read import (
+        load_house_components_for_ha,
+        push_read_qualified_ids,
+        setpoint_qualified_ids,
+    )
+
+    house_doc, components_doc = load_house_components_for_ha()
+    if house is not None and isinstance(house, dict):
+        house_doc = house
+    push_qids = push_read_qualified_ids(house_doc, components_doc)
+    setpoint_qids = setpoint_qualified_ids(house_doc, components_doc)
     sign = config.get("EHAL_HA_SIGN") or {}
     if not isinstance(sign, dict):
         sign = {}
@@ -203,7 +226,6 @@ def get_ha_adapter() -> HaAdapter:
     if not isinstance(boolean_invert, dict):
         boolean_invert = {}
     ha_ess_force = None
-    house = load_house_profiles_for_ha()
     if isinstance(house, dict):
         plant = house.get("plant")
         if isinstance(plant, dict) and plant.get("ha_ess_force"):
@@ -213,7 +235,8 @@ def get_ha_adapter() -> HaAdapter:
         token=token,
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "earnie-hems"),
         entities=canonicalize_ha_entity_keys(
-            {str(k): str(v) for k, v in entities.items()}
+            {str(k): str(v) for k, v in entities.items()},
+            keep_empty=str(transport).strip().lower() == "weg_b",
         ),
         sign=canonicalize_ha_entity_keys({str(k): str(v) for k, v in sign.items()}),
         boolean_invert=canonicalize_ha_entity_keys(
@@ -221,6 +244,9 @@ def get_ha_adapter() -> HaAdapter:
         ),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
         ha_ess_force=ha_ess_force if isinstance(ha_ess_force, dict) else None,
+        transport=transport,
+        push_read_qids=push_qids,
+        setpoint_qids=setpoint_qids,
     )
     if _ha_adapter is not None and _ha_adapter.cfg != cfg:
         _ha_adapter = None
@@ -230,7 +256,7 @@ def get_ha_adapter() -> HaAdapter:
 
 
 def _standby_source_select_merker() -> str:
-    """Pattern B Quellenwahl Merker from the physical standby_backup battery."""
+    """Entity-scoped Quellenwahl Merker from the physical standby_backup battery."""
     from ehal.ess_fields import binding_address
     from house_config.powerstation import (
         BACKING_PHYSICAL,
@@ -274,21 +300,26 @@ def _standby_source_select_merker() -> str:
 def get_loxone_adapter() -> LoxoneAdapter:
     global _loxone_adapter
     from house_config.ehal_bindings import resolve_plant_binding
+    from house_config.ess_bindings import resolve_primary_ess_binding
     from optimizer.live_export_limit import load_house_doc
 
     ev = _first_ev_loxone_bindings()
     house = load_house_doc()
     export_out = resolve_plant_binding(house, "set_grid_export_power_limit")
-    # Capability / residual flat write_setpoints: Pattern B standby Merker only.
+    # Capability / residual flat write_setpoints: entity-scoped standby Merker only.
     ess_source_select = _standby_source_select_merker()
     cfg = LoxoneConfig(
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "loxone-home"),
-        charge_power_name=str(config.get("LOXONE_TARGET_CHARGE_POWER_NAME") or ""),
-        discharge_power_name=str(
-            config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME") or ""
+        charge_power_name=str(
+            resolve_primary_ess_binding("set_ess_charge_power_limit") or ""
         ),
-        active_power_name=str(config.get("LOXONE_TARGET_ACTIVE_POWER_NAME") or ""),
-        control_cmd_name=str(config.get("LOXONE_CONTROL_CMD_NAME") or ""),
+        discharge_power_name=str(
+            resolve_primary_ess_binding("set_ess_discharge_power_limit") or ""
+        ),
+        active_power_name=str(
+            resolve_primary_ess_binding("set_ess_active_power") or ""
+        ),
+        control_cmd_name=str(resolve_primary_ess_binding("set_ess_mode") or ""),
         evcs_max_current_name=str(ev.get("evcs_max_current_name") or ""),
         evcs_mode_name=str(ev.get("evcs_mode_name") or ""),
         grid_export_limit_out_name=str(export_out or ""),
@@ -359,7 +390,7 @@ def _soc_address_for_battery(bat: dict) -> str:
     addr = binding_address(bindings, ess_id, "sens_ess_soc")
     if addr:
         return addr
-    # Flat key still stored on some batteries before Pattern B rewrite
+    # Flat key still stored on some batteries before entity-scoped rewrite
     return str(
         bindings.get("sens_ess_soc")
         or bindings.get(ess_field(ess_id, "sens_ess_soc"))
@@ -791,7 +822,7 @@ def _first_ev_consumer() -> dict | None:
 
 
 def _first_ev_loxone_bindings() -> dict[str, str]:
-    """EV write markers from first EV consumer ``ehal_bindings`` (Pattern B only)."""
+    """EV write markers from first EV consumer ``ehal_bindings`` (entity-scoped only)."""
     from settings.ehal_marker_resolve import (
         marker_set_evcs_max_current,
         marker_set_evcs_mode,
