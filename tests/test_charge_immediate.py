@@ -295,7 +295,7 @@ class TestEnrichContext:
         consumer = _eauto_consumer()
         with (
             patch.object(
-                ci.loxone_client,
+                ci.ehal_live,
                 "resolve_consumer_battery_capacity_kwh",
                 return_value=77.0,
             ),

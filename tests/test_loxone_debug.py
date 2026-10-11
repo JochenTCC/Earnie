@@ -403,23 +403,23 @@ def test_build_telemetry_rows_pads_unmapped_expected():
 
 
 def test_mapping_column_label_by_backend():
-    with patch("ui.loxone_debug.config.is_ehal_ha_backend", return_value=True), patch(
-        "ui.loxone_debug.config.is_ehal_openems_backend", return_value=False
+    with patch("ui.loxone_debug.ehal_live.is_ha_backend", return_value=True), patch(
+        "ui.loxone_debug.ehal_live.is_openems_backend", return_value=False
     ):
         assert mapping_column_label() == "Mapping auf Home Assistant"
-    with patch("ui.loxone_debug.config.is_ehal_ha_backend", return_value=False), patch(
-        "ui.loxone_debug.config.is_ehal_openems_backend", return_value=True
+    with patch("ui.loxone_debug.ehal_live.is_ha_backend", return_value=False), patch(
+        "ui.loxone_debug.ehal_live.is_openems_backend", return_value=True
     ):
         assert mapping_column_label() == "Mapping auf OpenEMS"
-    with patch("ui.loxone_debug.config.is_ehal_ha_backend", return_value=False), patch(
-        "ui.loxone_debug.config.is_ehal_openems_backend", return_value=False
+    with patch("ui.loxone_debug.ehal_live.is_ha_backend", return_value=False), patch(
+        "ui.loxone_debug.ehal_live.is_openems_backend", return_value=False
     ):
         assert mapping_column_label() == "Mapping auf Loxone"
 
 
 def test_rows_with_mapping_column_label_renames_key():
-    with patch("ui.loxone_debug.config.is_ehal_ha_backend", return_value=False), patch(
-        "ui.loxone_debug.config.is_ehal_openems_backend", return_value=False
+    with patch("ui.loxone_debug.ehal_live.is_ha_backend", return_value=False), patch(
+        "ui.loxone_debug.ehal_live.is_openems_backend", return_value=False
     ):
         out = rows_with_mapping_column_label(
             [

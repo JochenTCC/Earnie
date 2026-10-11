@@ -1,0 +1,36 @@
+---
+description: No silent fallbacks/workarounds on changed code — fail loud or ask first
+alwaysApply: true
+---
+
+# No implicit fallbacks on changed code
+
+When implementing or editing behavior, **do not** paper over gaps with silent fallbacks, compatibility shims, or “best effort” defaults that hide the real failure — unless the user explicitly approved that path.
+
+## Prefer
+
+- Fail loud: raise / return a clear error naming what is missing or inconsistent
+- Ask once: if a fallback, legacy alias, soft default, or dual-path seems needed → propose it and wait
+- Keep the new path strict; migrate callers instead of dual-reading old + new shapes
+
+## Do not (without prior approval)
+
+```text
+❌ except Exception: return 0 / None / {}     # swallow and invent a value
+❌ value = raw.get("new_key") or raw.get("old_key") or DEFAULT
+❌ if mapping_missing: use_plant_flat_or_sibling_entity()
+❌ try_new_path(); if fail: try_old_path()     # undocumented dual path
+❌ default=… that changes calc results when callers omit the arg
+✅ raise ValueError("… missing; configure X or map Y")
+✅ ask: "Strict fail vs fallback F — which?"
+```
+
+## Relation to other rules
+
+- Default parameters that obscure calculation results: same bar — explicit values or informative errors (`python-agent-structure` / user rule).
+- Existing, documented product fallbacks (e.g. price provider cascade, config `config_fallback` fields) stay as designed; this rule targets **new** soft paths introduced while changing code.
+- Quality gate: do not “simplify” by changing defaults/fallbacks that alter numbers.
+
+## When unsure
+
+Stop and ask. Do not ship a workaround “just so tests/UI keep working” without confirmation.

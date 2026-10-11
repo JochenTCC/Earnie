@@ -84,7 +84,6 @@ def test_send_huawei_publishes_only(publish_dir: Path) -> None:
         patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
         ),
-        patch.object(lc, "_send_loxone_value_traced") as mock_http,
         patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
             return_value=io_index,
@@ -100,7 +99,6 @@ def test_send_huawei_publishes_only(publish_dir: Path) -> None:
 
     assert len(records) == 4
     assert all(isinstance(r, LoxoneWriteRecord) and r.success for r in records)
-    mock_http.assert_not_called()
     published = ew.load_published()
     assert published["set_ess_active_power"] == pytest.approx(1.5)
     assert published["set_ess_mode"] == pytest.approx(2.0)
@@ -134,7 +132,6 @@ def test_send_huawei_publishes_export_limit_qualified(publish_dir: Path, monkeyp
         patch.object(
             lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
         ),
-        patch.object(lc, "_send_loxone_value_traced") as mock_http,
         patch(
             "integrations.ehal_debug_mapping.build_loxone_setpoint_io_index",
             return_value=io_index,
@@ -153,7 +150,6 @@ def test_send_huawei_publishes_export_limit_qualified(publish_dir: Path, monkeyp
 
     assert len(records) == 5
     assert all(isinstance(r, LoxoneWriteRecord) and r.success for r in records)
-    mock_http.assert_not_called()
     published = ew.load_published()
     assert published["grid.meter.set_grid_export_power_limit"] == pytest.approx(2.0)
     assert "set_grid_export_power_limit" not in published

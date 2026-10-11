@@ -70,8 +70,8 @@ def test_main_run_state_includes_loxone_writes_when_not_silent(monkeypatch):
     )
     huawei = [LoxoneWriteRecord("SoC", 80.0, True, "2026-07-14T10:00:00")]
     flex = [LoxoneWriteRecord("Ernie_WP", 1.0, True, "2026-07-14T10:00:01")]
-    monkeypatch.setattr(main_module.loxone_client, "send_huawei_modbus_states", lambda *a, **k: huawei)
-    monkeypatch.setattr(main_module.loxone_client, "send_flexible_consumer_states", lambda *a, **k: flex)
+    monkeypatch.setattr(main_module.ehal_live, "write_huawei_modbus_states", lambda *a, **k: huawei)
+    monkeypatch.setattr(main_module.ehal_live, "write_flexible_consumer_states", lambda *a, **k: flex)
 
     main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
 
@@ -94,8 +94,8 @@ def test_main_run_state_omits_loxone_writes_when_silent(monkeypatch):
     )
     send_huawei = MagicMock()
     send_flex = MagicMock()
-    monkeypatch.setattr(main_module.loxone_client, "send_huawei_modbus_states", send_huawei)
-    monkeypatch.setattr(main_module.loxone_client, "send_flexible_consumer_states", send_flex)
+    monkeypatch.setattr(main_module.ehal_live, "write_huawei_modbus_states", send_huawei)
+    monkeypatch.setattr(main_module.ehal_live, "write_flexible_consumer_states", send_flex)
     monkeypatch.setattr(
         "optimizer.powerstation_live.planned_powerstation_loxone_sent",
         lambda *_a, **_k: {"PS_Charge": 0.5},
@@ -127,8 +127,8 @@ def test_main_invokes_setpoint_writes_when_shadow_silent(monkeypatch, tmp_path):
     )
     send_huawei = MagicMock(return_value=[])
     send_flex = MagicMock(return_value=[])
-    monkeypatch.setattr(main_module.loxone_client, "send_huawei_modbus_states", send_huawei)
-    monkeypatch.setattr(main_module.loxone_client, "send_flexible_consumer_states", send_flex)
+    monkeypatch.setattr(main_module.ehal_live, "write_huawei_modbus_states", send_huawei)
+    monkeypatch.setattr(main_module.ehal_live, "write_flexible_consumer_states", send_flex)
 
     main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
 

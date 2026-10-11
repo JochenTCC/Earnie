@@ -72,8 +72,8 @@ from optimizer.ev_connect_prognosis import (  # noqa: F401
     resolve_ready_at,
 )
 
-# Re-exports for tests that patch cc.<name> / cc.loxone_client
-from integrations import loxone_client  # noqa: F401
+# Re-exports for tests that patch cc.<name> / cc.ehal_live
+from integrations import ehal_live  # noqa: F401
 from optimizer.ev_soc_tracking import (  # noqa: F401
     fetch_loxone_actual_soc_percent,
     loxone_reports_charge_complete,
@@ -127,7 +127,7 @@ __all__ = [
     "hours_needed_to_deliver",
     "late_return_available_from",
     "latest_start_datetime",
-    "loxone_client",
+    "ehal_live",
     "loxone_reports_charge_complete",
     "matrix_charging_anchor",
     "matrix_slot_datetime",

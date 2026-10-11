@@ -8,36 +8,16 @@ from typing import Any
 
 import requests
 
+from ehal.field_catalog import (
+    SETPOINT_FIELDS,
+    STATIC_HUB_MAP_FIELDS,
+    TELEMETRY_OPTIONAL_STATIC_HUB as TELEMETRY_OPTIONAL,
+    TELEMETRY_REQUIRED,
+)
+
 logger = logging.getLogger(__name__)
 
-TELEMETRY_REQUIRED = (
-    "sens_grid_power_active",
-    "sens_pv_production_active",
-    "sens_ess_soc",
-)
-TELEMETRY_OPTIONAL = (
-    "sens_ess_power",
-    "sens_evcs_active_power",
-    "sens_power_consumers",
-    "sens_temperature_outside",
-    "sens_absent_mode",
-    "get_grid_export_power_limit",
-    "get_ess_soc_min",
-    "get_ess_soc_max",
-    "get_ess_max_charge_power",
-    "get_ess_max_discharge_power",
-)
-SETPOINT_FIELDS = (
-    "set_ess_active_power",
-    "set_ess_charge_power_limit",
-    "set_ess_discharge_power_limit",
-    "set_ess_mode",
-    "set_ess_source_select",
-    "set_evcs_max_current",
-    "set_evcs_mode",
-    "set_grid_export_power_limit",
-)
-EHAL_MAP_FIELDS = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + SETPOINT_FIELDS
+EHAL_MAP_FIELDS = STATIC_HUB_MAP_FIELDS
 EXTRAS_FIELDS: tuple[str, ...] = ()
 
 # Canonical §C → loxone_blocks role keys.
@@ -180,37 +160,6 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "flex.sens_power_act": ("leistung", "power", "verbrauch"),
     "flex.set_enable": ("freigabe", "enable", "sg ready"),
 }
-
-
-def ehal_mapping_to_loxone_blocks(
-    ehal_map: dict[str, str],
-    *,
-    extras: dict[str, str] | None = None,
-) -> dict[str, str]:
-    """Translate EHAL field → marker map into loxone_blocks role keys."""
-    blocks: dict[str, str] = {}
-    for field, marker in ehal_map.items():
-        role = EHAL_TO_BLOCKS.get(field)
-        name = str(marker or "").strip()
-        if role and name:
-            blocks[role] = name
-    for role, marker in (extras or {}).items():
-        name = str(marker or "").strip()
-        if role == "control_cmd_name" and name:
-            blocks["control_cmd_name"] = name
-    return blocks
-
-
-def merge_loxone_blocks(
-    existing: dict[str, Any] | None,
-    updates: dict[str, str],
-) -> dict[str, Any]:
-    """Merge mapping updates into existing loxone_blocks (preserve unrelated keys)."""
-    out = dict(existing or {}) if isinstance(existing, dict) else {}
-    for key, value in updates.items():
-        if str(value).strip():
-            out[key] = str(value).strip()
-    return out
 
 
 # Opt-in plant fields: never auto-propose / leave unbound until the operator maps them.

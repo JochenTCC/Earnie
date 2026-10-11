@@ -52,7 +52,7 @@
     },
     "sens_power_consumers": {
       "type": ["number", "null"],
-      "description": "Optional house load in W. Prefer mapped Merker; else derive from grid/PV/ESS."
+      "description": "Optional house load in W. Prefer mapped hub channel / binding; else derive from grid/PV/ESS."
     },
     "sens_evcs_connected": {
       "type": ["boolean", "null"],

@@ -237,10 +237,8 @@ def _read_live_sample(
     if read_flex_chart is not None:
         flex_kw = dict(read_flex_chart())
     elif not ehal_live.is_ehal_network_backend():
-        from integrations import loxone_client
-
         flex_kw = dict(
-            loxone_client.resolve_flexible_consumers_live_power(fallbacks={}).chart_kw
+            ehal_live.resolve_flexible_consumers_live_power(fallbacks={}).chart_kw
         )
     snapshot = build_consumption_snapshot(live_power, flex_kw)
     soc = None

@@ -73,13 +73,6 @@ def _sanitize_id_text(ehal_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
 
 
-def ascii_title(name: str) -> str:
-    """Legacy Merker-based VO title (kept for tests / callers). Prefer ``title_from_qualified_id``."""
-    text = str(name).strip().translate(_UMLAUTS)
-    text = re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
-    return f"Push_{text}" if text else "Push_unbenannt"
-
-
 def title_from_qualified_id(ehal_id: str) -> str:
     """VO Cmd Title from the qualified EHAL ID (``Push_`` prefix for parallel push)."""
     text = _sanitize_id_text(ehal_id)

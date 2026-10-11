@@ -7,7 +7,7 @@ from typing import Any
 import config
 from data.outdoor_forecast import get_outdoor_forecast_with_fallback
 from data.thermal_power import resolve_live_heating_power_kw
-from integrations import loxone_client
+from integrations import ehal_live
 from optimizer.slot_duration import wall_hours_from_slots
 from optimizer.thermal_model import (
     ThermalBand,
@@ -71,7 +71,7 @@ def _resolve_subtracted_filter_kw(consumer: dict) -> float:
         )
         if sub is None:
             continue
-        measured = loxone_client._read_consumer_meter_kw(sub)
+        measured = ehal_live.read_consumer_meter_kw(sub)
         if measured is not None:
             total += float(measured)
     return total
@@ -83,7 +83,7 @@ def _build_thermal_plan(consumer: dict, *, horizon: int = 24):
     if not thermal or not thermal.get("enabled"):
         raise ValueError(f"Verbraucher '{consumer.get('id')}' hat kein aktives thermal_control.")
 
-    readings = loxone_client.fetch_thermal_readings(consumer)
+    readings = ehal_live.fetch_thermal_readings(consumer)
     if readings.get("actual_c") is None:
         raise ValueError("Ist-Temperatur konnte nicht gelesen werden.")
 
@@ -191,7 +191,7 @@ def build_thermal_observability(
         snapshot["missing_signals"] = readings["missing_signals"]
     if readings.get("heating_active") is not None:
         snapshot["readings_c"]["heating_active"] = readings["heating_active"]
-        total_kw = loxone_client._read_consumer_meter_kw(consumer)
+        total_kw = ehal_live.read_consumer_meter_kw(consumer)
         heating_kw = resolve_live_heating_power_kw(
             total_kw=total_kw,
             filter_kw=_resolve_subtracted_filter_kw(consumer),

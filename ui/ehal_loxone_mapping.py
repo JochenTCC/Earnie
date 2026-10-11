@@ -22,10 +22,13 @@ from house_config.ehal_bindings import (
     strip_migrated_config_keys,
 )
 from integrations.ehal_live import reset_adapter_cache
+from ehal.field_catalog import (
+    TELEMETRY_ENERGY_OPTIONAL,
+    TELEMETRY_OPTIONAL_STATIC_HUB as TELEMETRY_OPTIONAL,
+    TELEMETRY_REQUIRED,
+)
 from integrations.loxone_ehal_mapping import (
     FIELD_LABELS,
-    TELEMETRY_OPTIONAL,
-    TELEMETRY_REQUIRED,
     heuristic_propose,
 )
 from integrations.loxone_structure import (
@@ -57,11 +60,6 @@ _PLANT_ESS_MOVED = frozenset(ESS_BATTERY_MAPPING_KINDS)
 PLANT_TELEMETRY_REQUIRED: tuple[str, ...] = tuple(
     f for f in TELEMETRY_REQUIRED if f not in _PLANT_ESS_MOVED
 )
-_PLANT_ENERGY_OPTIONAL: tuple[str, ...] = (
-    "sens_pv_energy",
-    "sens_grid_energy_import",
-    "sens_grid_energy_export",
-)
 
 PLANT_FIELDS: tuple[str, ...] = (
     PLANT_TELEMETRY_REQUIRED
@@ -70,7 +68,7 @@ PLANT_FIELDS: tuple[str, ...] = (
         for f in TELEMETRY_OPTIONAL
         if f != "sens_evcs_active_power" and f not in _PLANT_ESS_MOVED
     )
-    + _PLANT_ENERGY_OPTIONAL
+    + TELEMETRY_ENERGY_OPTIONAL
     + ("set_grid_export_power_limit",)
 )
 EV_FIELDS: tuple[str, ...] = (

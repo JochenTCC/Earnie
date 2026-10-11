@@ -6,7 +6,7 @@ import pandas as pd
 
 from data import consumer_targets, live_consumption, profile_manager
 from data.live_market_prices import fetch_live_day_ahead_prices
-from runtime_store import run_state
+from runtime_store import main_daemon, run_state
 from runtime_store.live_display_loader import (
     load_live_display_snapshot,
     snapshot_completed_at,
@@ -113,7 +113,7 @@ def _render_main_down_notice(snapshot: dict | None, *, persisted_fresh: bool) ->
 def _render_opt_in_simulation_prompt() -> None:
     st.caption(
         "Ohne aktuellen main.py-Lauf kann eine **einmalige** UI-Simulation "
-        "gestartet werden (forecast.solar, kein Loxone-Schreiben)."
+        "gestartet werden (forecast.solar, keine EHAL-Setpoints)."
     )
     if st.button("Einmalige Simulation starten", key="live_opt_in_simulation_btn"):
         st.session_state[SESSION_OPT_IN_SIMULATION] = True
@@ -249,7 +249,7 @@ def _run_opt_in_live_simulation(
     sunrise_soc_min_index = sunrise_anchor_slot_index(planning_window)
 
     snapshot = _opt_in_consumption_snapshot(main_state)
-    if snapshot:
+    if snapshot and live_consumption.reject_live_matrix_snapshot_reason(snapshot) is None:
         matrix = live_consumption.apply_live_snapshot_to_matrix(matrix, snapshot, hour_index=0)
 
     sim_soc = float(main_state.get("soc_percent", current_soc)) if main_state else current_soc
@@ -314,6 +314,7 @@ def _live_optimization_prepare_fragment(current_soc: float) -> None:
             (main_state or {}).get("completed_at"),
             poll_sec=poll_sec,
             persisted_completed_at=persisted_at,
+            daemon_alive=main_daemon.status().state == "running",
         )
     )
     cache_key = _snapshot_cache_key(

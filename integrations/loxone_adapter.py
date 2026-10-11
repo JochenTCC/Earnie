@@ -18,6 +18,7 @@ from ehal import (
     validate_write_error,
 )
 from ehal.ess_fields import is_plant_flat_ess_field
+from ehal.field_catalog import SETPOINT_FIELDS
 from ehal.field_registry import (
     PLANT_OPTIONAL_READ_FIELDS,
     PLANT_REQUIRED_READ_FIELDS,
@@ -86,17 +87,6 @@ def exchange_id_for_plant_read(field: str) -> str | None:
         return qualified_battery_id(primary, kind)
     return qualified_plant_id(kind)
 
-
-SETPOINT_FIELDS = (
-    "set_ess_active_power",
-    "set_ess_charge_power_limit",
-    "set_ess_discharge_power_limit",
-    "set_ess_mode",
-    "set_ess_source_select",
-    "set_evcs_max_current",
-    "set_evcs_mode",
-    "set_grid_export_power_limit",
-)
 
 # Numeric encoding of the Loxone Modus Merker (Pattern B).
 EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}

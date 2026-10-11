@@ -50,7 +50,8 @@ class OpenemsConversionSpec:
     clamp_max: float | None
 
 
-# Plant telemetry fields read by LoxoneAdapter.read_telemetry (order fixed).
+# LoxoneAdapter.read_telemetry membership (order fixed). Not ehal.field_catalog —
+# sens_ess_power is required here and membership differs from mapping catalogs.
 PLANT_REQUIRED_READ_FIELDS: tuple[str, ...] = (
     "sens_ess_soc",
     "sens_pv_production_active",

@@ -113,9 +113,9 @@ def resolve_daily_target_kwh(
         consumer.get("daily_target_source", "config") == "config"
         and consumer.get("charging_schedule", {}).get("enabled")
     ):
-        from integrations import loxone_client
+        from integrations import ehal_live
 
-        capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+        capacity_kwh = ehal_live.resolve_consumer_battery_capacity_kwh(consumer)
         computed = config.Config.target_kwh_from_day_schedule(
             consumer, when, capacity_kwh=capacity_kwh
         )

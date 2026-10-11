@@ -129,13 +129,13 @@ def _render_manual_power_source(
         options=["manual", "loxone"],
         index=0 if default_source != "loxone" else 1,
         format_func=lambda value: (
-            "Aus Profil (Nennleistung)" if value == "manual" else "Smarthome-Merker (EHAL-Com)"
+            "Aus Profil (Nennleistung)" if value == "manual" else "Smarthome-Binding (EHAL-Com)"
         ),
         key=_scoped_key(session_scope, f"hc_app_src_{index}"),
     )
     if power_source == "loxone":
         st.caption(
-            "Merker-Adresse unter **Daemon Control → EHAL-Com** "
+            "Binding unter **Daemon Control → EHAL-Com** "
             "(Entity-Mapping, Feld `flex.{id}.sens_power_act`) pflegen."
         )
     return power_source

@@ -135,12 +135,16 @@ def live_simulation_readiness(
     *,
     poll_sec: int = 15,
     persisted_completed_at: str | None = None,
+    daemon_alive: bool | None = None,
 ) -> tuple[bool, str, int, int, bool]:
     """
     Steuert, wann app.py den Cockpit-Snapshot anzeigen darf.
 
     Rückgabe: (bereit, grund, ui_retry_sekunden, sync_warte_sekunden, persisted_fresh)
     grund: main_synced | wait_main | main_down — kein automatischer UI-MILP-Fallback mehr.
+
+    When the sync window has expired but ``daemon_alive`` is True (main.lock / PID),
+    stay in ``wait_main`` so the UI does not claim main.py is inactive mid-cycle.
     """
     display_ts = persisted_completed_at or main_completed_at
     persisted_fresh = is_persisted_display_fresh(display_ts, now)
@@ -152,6 +156,10 @@ def live_simulation_readiness(
     if sync_wait_sec > 0:
         ui_retry = sync_ui_countdown_seconds(main_completed_at, poll_sec, now)
         return False, "wait_main", ui_retry, sync_wait_sec, persisted_fresh
+
+    if daemon_alive is True:
+        ui_retry = max(1, int(poll_sec))
+        return False, "wait_main", ui_retry, 0, persisted_fresh
 
     return True, "main_down", 0, 0, persisted_fresh
 

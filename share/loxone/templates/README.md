@@ -10,16 +10,15 @@ Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTem
 
 **Freigabe 0/1:** VI cmds use `Analog="true"` (sticky value from `\v`). `Analog="false"` (digital) pulses true on every successful poll — do not use for Freigabe.
 
-## Legacy vs v2 vs Pilot
+## v2 vs Pilot
 
 | Kind | Files | When to use |
 | ---- | ----- | ----------- |
-| **Legacy VI** | `VI_Earnie_*.xml` (no `_v2`) | Obsolete after Q8 (legacy Check keys no longer published) |
-| **VI v2** | `VI_Earnie_*_v2.xml` | Preferred — Check keys = qualified EHAL IDs; Titles from the ID (placeholders `{hk_id}` / `{ev_id}`) |
+| **VI v2** | `VI_Earnie_*_v2.xml` | Library — Check keys = qualified EHAL IDs; Titles from the ID (placeholders `{hk_id}` / `{ev_id}`) |
 | **VI Pilot** | generated `VI_Pilot_*.xml` | Live config — real Kennungen filled by `python -m scripts.pilot_vi_template_gen` (or EHAL-Com Signal-list ZIP) |
 | **VO Pilot** | generated `VO_Pilot_*.xml` | Live config — paths + titles from qualified IDs via `python -m scripts.pilot_vo_template_gen` (or Signal-list ZIP) |
 
-**Q8:** `status.json` publishes **qualified Check keys only** (no legacy Merker peers). After **2.7.q Q5**, Earnie no longer writes Merkers via `/dev/sps/io`; actuation is VI poll of `status.json` only (see `docs/ui/ehal-com.md`).
+**Q8:** `status.json` publishes **qualified Check keys only** (no legacy Merker peers). After **2.7.q Q5**, Earnie no longer writes Merkers via `/dev/sps/io`; actuation is VI poll of `status.json` only (see `docs/ui/ehal-com.md`). Non-`_v2` library VI XMLs were removed after cutover.
 
 ### Generators
 
@@ -43,13 +42,13 @@ Copy these files from repo `share/loxone/templates/VirtualIn/` into Config’s *
 
 | Copy this file | Into (examples) |
 | -------------- | --------------- |
-| `VI_Earnie_Plant.xml` / `VI_Earnie_Plant_v2.xml` | `%ProgramData%\Loxone\Loxone Config\<version>\Template\VirtualIn\` |
-| `VI_Earnie_Heatpump.xml` / `_v2` | or `Documents\Loxone\Loxone Config\Templates\VirtualIn\` |
-| `VI_Earnie_EV.xml` / `_v2` | |
-| `VI_Earnie_Consumer.xml` / `_v2` | |
-| `VI_Earnie_Pool.xml` / `_v2` | |
+| `VI_Earnie_Plant_v2.xml` | `%ProgramData%\Loxone\Loxone Config\<version>\Template\VirtualIn\` |
+| `VI_Earnie_Heatpump_v2.xml` | or `Documents\Loxone\Loxone Config\Templates\VirtualIn\` |
+| `VI_Earnie_EV_v2.xml` | |
+| `VI_Earnie_Consumer_v2.xml` | |
+| `VI_Earnie_Pool_v2.xml` | |
 
-Keep the filenames exactly (`VI_…xml`). Do **not** nest an extra `VirtualIn\` subfolder inside `VirtualIn`. Prefer **v2** for new wiring; keep legacy only for rollback.
+Keep the filenames exactly (`VI_…xml`). Do **not** nest an extra `VirtualIn\` subfolder inside `VirtualIn`.
 
 ### 2. Virtual Out → `VirtualOut` folder
 
@@ -74,15 +73,10 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 
 | Repo path | Role |
 | --------- | ---- |
-| `VirtualIn/VI_Earnie_Plant.xml` | Legacy: Heartbeat + ESS Design C1 (Merker Titles) |
-| `VirtualIn/VI_Earnie_Plant_v2.xml` | v2: same Checks; Titles = field names (`heartbeat_ts`, `set_ess_*`, …) |
-| `VirtualIn/VI_Earnie_Heatpump.xml` | Legacy Freigabe Check |
+| `VirtualIn/VI_Earnie_Plant_v2.xml` | Heartbeat + ESS Design C1; Titles = field names (`heartbeat_ts`, `set_ess_*`, …) |
 | `VirtualIn/VI_Earnie_Heatpump_v2.xml` | `heatpump.{hk_id}.set_enable` |
-| `VirtualIn/VI_Earnie_EV.xml` | Legacy `ev.{ev_id}.Earnie_EAuto_*` |
 | `VirtualIn/VI_Earnie_EV_v2.xml` | `evcs.{ev_id}.set_evcs_max_current` / `set_evcs_mode` |
-| `VirtualIn/VI_Earnie_Consumer.xml` | Legacy `flex.{hk_id}.Earnie_Verbraucher_Freigabe` |
 | `VirtualIn/VI_Earnie_Consumer_v2.xml` | `consumer.{hk_id}.set_enable` |
-| `VirtualIn/VI_Earnie_Pool.xml` | Legacy bare pool Freigaben |
 | `VirtualIn/VI_Earnie_Pool_v2.xml` | `pool.{hk_id}.set_enable` + `pool.pool_filter.set_enable` |
 | `VirtualOut/VO_Earnie_Status.xml` | Optional alive / `Earnie_Request_Optimize` (port **8541**) |
 | `VirtualOut/VO_Earnie_Plant.xml` | Plant grid/PV/outside/absent + energy Q6; Titles = `Push_<EHAL-ID>`; no ESS (per-battery) |
@@ -108,20 +102,18 @@ Frozen Merker names (import / legacy): [`../greenfield_device_map.json`](../gree
 
 **Canonical naming** (user reference): [`docs/referenz/loxone-signals.md`](../../../docs/referenz/loxone-signals.md) — *Multiple Flex Consumers* / *Multiple EVs*.
 
-Three layers (legacy vs v2 Check):
-
-| Layer | Flex legacy | Flex v2 | EV legacy | EV v2 |
-| ----- | ----------- | ------- | --------- | ----- |
-| Miniserver **Title** (import) | `Earnie_Verbraucher_<Slug>_…` | same until Q8 | `Earnie_EAuto_<Slug>_…` | same until Q8 |
-| VI **Check** / status JSON | `flex.{hk_id}.Earnie_Verbraucher_Freigabe` | `consumer.{hk_id}.set_enable` | `ev.{ev_id}.Earnie_EAuto_Soll_A` | `evcs.{ev_id}.set_evcs_max_current` |
-| VO **Befehl bei Ein** | qualified path (Pilot) | same | qualified path (Pilot) | same |
+| Layer | Flex | EV |
+| ----- | ---- | -- |
+| Miniserver **Title** (import) | `Earnie_Verbraucher_<Slug>_…` | `Earnie_EAuto_<Slug>_…` |
+| VI **Check** / status JSON | `consumer.{hk_id}.set_enable` | `evcs.{ev_id}.set_evcs_max_current` / `set_evcs_mode` |
+| VO **Befehl bei Ein** | qualified path (Pilot) | qualified path (Pilot) |
 
 Template defaults leave `{hk_id}` / `{ev_id}` placeholders — replace in Config, or generate Pilot XML from your config dir.
 
-1. Insert **Device Template** once per flex/EV device (prefer **v2**).
+1. Insert **Device Template** once per flex/EV device (`*_v2.xml`).
 2. Rename Cmd **Titles** if needed and set Check/VO `{hk_id}` / `{ev_id}` as above — or use Pilot generator for real Kennungen.
-3. Align VI **Check** patterns with JSON keys Earnie publishes (dual-emit during cutover).
-4. In Earnie EHAL-Com, bind fields (Merker names remain as activation / import hints until Q8; Loud writes use qualified `status.json` keys after Q5).
+3. Align VI **Check** patterns with qualified keys Earnie publishes in `status.json`.
+4. In Earnie EHAL-Com, bind fields (empty Merker = activation flag after Q8; Loud writes use qualified `status.json` keys).
 
 ## Not in these XMLs
 

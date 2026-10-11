@@ -325,14 +325,6 @@ class Config:
     def is_loxone_silent_mode(self) -> bool:
         return self.is_silent_mode()
 
-    def is_ehal_openems_backend(self) -> bool:
-        return str(self.get("EHAL_BACKEND") or "").strip().lower() == "openems"
-
-    def is_ehal_ha_backend(self) -> bool:
-        return str(self.get("EHAL_BACKEND") or "").strip().lower() == "ha"
-
-    def is_ehal_network_backend(self) -> bool:
-        return self.is_ehal_openems_backend() or self.is_ehal_ha_backend()
 
     def get_ehal_loxone_http_port(self) -> int:
         from runtime_store.env_vars import read_env
@@ -627,17 +619,6 @@ def is_silent_mode() -> bool:
 def is_loxone_silent_mode() -> bool:
     return CONFIG.is_loxone_silent_mode()
 
-
-def is_ehal_openems_backend() -> bool:
-    return CONFIG.is_ehal_openems_backend()
-
-
-def is_ehal_ha_backend() -> bool:
-    return CONFIG.is_ehal_ha_backend()
-
-
-def is_ehal_network_backend() -> bool:
-    return CONFIG.is_ehal_network_backend()
 
 
 def get_ehal_loxone_http_port() -> int:

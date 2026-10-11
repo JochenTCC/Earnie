@@ -7,6 +7,7 @@ from typing import Any
 import streamlit as st
 
 import config
+from integrations import ehal_live
 from ui.loxone_debug import (
     _format_age_text,
     _network_write_mapping,
@@ -41,9 +42,9 @@ _DASH = "—"
 
 
 def _live_backend() -> str:
-    if config.is_ehal_ha_backend():
+    if ehal_live.is_ha_backend():
         return "ha"
-    if config.is_ehal_network_backend():
+    if ehal_live.is_ehal_network_backend():
         return "openems"
     return "loxone"
 
@@ -269,7 +270,7 @@ def _read_row_from_check(
 ) -> dict[str, str]:
     wert = parse_check_wert(item.detail, passed=item.passed)
     if wert and field.endswith("get_evcs_ready_by_time"):
-        from integrations.loxone_client import format_ready_by_display
+        from integrations.ehal_live import format_ready_by_display
 
         wert = format_ready_by_display(wert)
     ehal_id = _live_field_to_push_ehal_id(field)
@@ -479,7 +480,7 @@ def build_ehal_write_rows(
 ) -> list[dict[str, str]]:
     source = mapping if mapping is not None else _network_write_mapping()
     write_entries = list(writes)
-    if expected_fields is None and config.is_ehal_ha_backend():
+    if expected_fields is None and ehal_live.is_ha_backend():
         from integrations.ehal_debug_mapping import (
             expand_ha_writes_for_live,
             expected_live_write_fields,
@@ -612,7 +613,7 @@ def render_status_strip(main_state: dict | None) -> None:
 
     render_ehal_write_error_banner()
 
-    ehal_net = config.is_ehal_network_backend()
+    ehal_net = ehal_live.is_ehal_network_backend()
 
     if ehal_net:
         if not has_produktiv_run(main_state):

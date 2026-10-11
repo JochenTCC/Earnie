@@ -1,7 +1,7 @@
 {
   "role_id": "consumer",
   "label": "Flex-Verbraucher (Stub)",
-  "description": "Forward-looking template. M1 EHAL has no first-class consumer fields; Live still uses house-profile loxone_inputs/outputs and flex markers.",
+  "description": "Forward-looking template. M1 EHAL has no first-class consumer fields; Live still uses house-profile flex / Pattern B bindings.",
   "status": "stub",
   "ehal_fields": [
     {

@@ -3,14 +3,8 @@ from __future__ import annotations
 
 import copy
 
+from ehal.field_catalog import HA_MAP_FIELDS
 from ehal.models import canonicalize_ha_entity_keys
-from integrations.ha_adapter import (
-    SETPOINT_FIELDS,
-    TELEMETRY_BINARY_OPTIONAL,
-    TELEMETRY_ENERGY_OPTIONAL,
-    TELEMETRY_OPTIONAL,
-    TELEMETRY_REQUIRED,
-)
 
 # EV-scoped §C keys (same consumer placement as Loxone Pattern B).
 HA_EV_FIELDS: frozenset[str] = frozenset(
@@ -21,13 +15,7 @@ HA_EV_FIELDS: frozenset[str] = frozenset(
     }
 )
 
-HA_ALL_FIELDS: tuple[str, ...] = (
-    TELEMETRY_REQUIRED
-    + TELEMETRY_OPTIONAL
-    + TELEMETRY_BINARY_OPTIONAL
-    + TELEMETRY_ENERGY_OPTIONAL
-    + SETPOINT_FIELDS
-)
+HA_ALL_FIELDS: tuple[str, ...] = HA_MAP_FIELDS
 
 HA_PLANT_FIELDS: frozenset[str] = frozenset(
     field for field in HA_ALL_FIELDS if field not in HA_EV_FIELDS

@@ -1,7 +1,7 @@
 """
 live_consumption.py – Read-only Live-Snapshot aus Loxone für app.py (Sankey, What-if).
 
-Schreibt keine cons_data; nur Lesen über loxone_client.
+Schreibt keine cons_data; nur Lesen über ehal_live.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import config
-from integrations import loxone_client
+from integrations import ehal_live
 from optimizer.filter_context import filter_schedule_enabled
 from settings.flexible_consumers import flex_kw_to_canonical
 
@@ -34,6 +34,21 @@ def is_dead_telemetry_snapshot(snapshot: dict[str, Any] | None) -> bool:
         if abs(float(snapshot.get(key, 0.0) or 0.0)) > _DEAD_TELEMETRY_EPS:
             return False
     return True
+
+
+def reject_live_matrix_snapshot_reason(snapshot: dict[str, Any] | None) -> str | None:
+    """Why a live snapshot must not overwrite the forecast matrix (or None if OK).
+
+    Negative ``house_kw`` collapses ``baseload_kw`` to 0 via ``max(0, house-flex)``
+    and can flip full-control from Entladesperre to Automatik (dump 20261011_082448).
+    """
+    if not snapshot:
+        return None
+    if is_dead_telemetry_snapshot(snapshot):
+        return "all_zero"
+    if float(snapshot.get("house_kw") or 0.0) < 0.0:
+        return "negative_house"
+    return None
 
 
 def build_consumption_snapshot(
@@ -95,7 +110,7 @@ def fetch_live_flex_kw_for_ui(main_state: dict[str, Any] | None = None) -> dict[
 
     Nutzt filter_contexts aus dem letzten Produktiv-Lauf oder config_fallback.
     """
-    return loxone_client.resolve_flexible_consumers_live_power(
+    return ehal_live.resolve_flexible_consumers_live_power(
         filter_contexts=filter_contexts_for_ui(main_state),
         slot_datetime=_ui_slot_datetime(),
     ).kw
@@ -107,7 +122,7 @@ def fetch_live_consumption_snapshot(
     """
     Aktueller Verbrauchs-Snapshot: Haus gesamt, Grundlast, Flex je id, PV/Netz/Batterie.
     """
-    live_power = loxone_client.fetch_loxone_live_power()
+    live_power = ehal_live.fetch_live_power()
     if live_power is None:
         return None
     flex_kw = fetch_live_flex_kw_for_ui(main_state)

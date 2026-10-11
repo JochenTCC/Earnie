@@ -4,23 +4,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from integrations.ha_adapter import (
-    SETPOINT_FIELDS,
-    TELEMETRY_BINARY_OPTIONAL,
-    TELEMETRY_ENERGY_OPTIONAL,
-    TELEMETRY_OPTIONAL,
-    TELEMETRY_REQUIRED,
-    WRITE_DOMAINS,
-)
+from ehal.field_catalog import HA_MAP_FIELDS
+from integrations.ha_adapter import WRITE_DOMAINS
 from integrations.ha_units import describe_conversion, field_quantity, unit_check
 
-EHAL_HA_FIELDS = (
-    TELEMETRY_REQUIRED
-    + TELEMETRY_OPTIONAL
-    + TELEMETRY_BINARY_OPTIONAL
-    + TELEMETRY_ENERGY_OPTIONAL
-    + SETPOINT_FIELDS
-)
+EHAL_HA_FIELDS = HA_MAP_FIELDS
 
 _SENSOR_DOMAINS = frozenset({"sensor"})
 _BINARY_DOMAINS = frozenset({"binary_sensor", "input_boolean", "sensor", "input_number"})

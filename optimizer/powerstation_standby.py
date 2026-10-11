@@ -83,7 +83,7 @@ def collect_standby_packs(
             continue
         if backing != BACKING_PHYSICAL:
             logger.info(
-                "2.7.h: skip virtual standby_backup powerstation '%s' "
+                "skip virtual standby_backup powerstation '%s' "
                 "(physical only; raise house min_soc instead).",
                 ps_id,
             )
@@ -146,7 +146,7 @@ def plan_standby_horizon(
         ps_id = str(pack["powerstation_id"])
         if ps_id not in soc_map:
             logger.warning(
-                "2.7.h: skip standby plan for %s — no own SoC (refuse fallback)",
+                "skip standby plan for %s — no own SoC (refuse fallback)",
                 ps_id,
             )
             continue
@@ -216,7 +216,7 @@ def _solve_one_pack(
     status = prob.solve(pulp.PULP_CBC_CMD(msg=False))
     if pulp.LpStatus[status] not in ("Optimal", "Not Solved"):
         logger.warning(
-            "2.7.h standby MILP failed for %s: %s",
+            "standby MILP failed for %s: %s",
             pack["powerstation_id"],
             pulp.LpStatus[status],
         )

@@ -1,6 +1,8 @@
-# Loxone-Binding im Sollzustand (Epic `Binding` umgesetzt) — Walkthrough
+# EHAL-Binding Soll (Loxone example) — Walkthrough
 
-**Zielbild, nicht implementiert.** Beschreibt denselben Anwendungsfall wie [Binding-Walkthrough-Ist.md](Binding-Walkthrough-Ist.md) — eine **zweite Batterie** (physische Powerstation) mit Pattern-B-Feldern `ess.<kennung>.*` — so, wie er nach **Binding P0–P6** ablaufen soll. Grundlage: [EHAL-Binding-UX-Draft.md](EHAL-Binding-UX-Draft.md). Alle UI-Texte und Namensendungen sind Entwurf.
+> **STALE (partial):** Draft Zielbild from before 2.7.q Q5/Q8. Section claiming HTTP Merker read/write is outdated — loud I/O is VO push + `status.json` qualified IDs. Remaining Binding P4–P6 UX still useful; prefer [EHAL-Binding-UX-Draft.md](EHAL-Binding-UX-Draft.md) for current epic scope.
+
+**Zielbild, nicht vollständig implementiert.** Beschreibt denselben Anwendungsfall wie [Binding-Walkthrough-Ist.md](Binding-Walkthrough-Ist.md) — eine **zweite Batterie** (physische Powerstation) mit Pattern-B-Feldern `ess.<kennung>.*` — so, wie er nach **Binding P0–P6** ablaufen soll. Grundlage: [EHAL-Binding-UX-Draft.md](EHAL-Binding-UX-Draft.md). Alle UI-Texte und Namensendungen sind Entwurf.
 
 **Annahmen (noch offene Entscheidungen, siehe Draft §7):**
 

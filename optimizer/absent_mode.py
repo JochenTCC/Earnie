@@ -24,79 +24,15 @@ def ehal_read_state(ehal_live: bool | None, *, bound: bool) -> EhalReadState:
     return "on" if ehal_live else "off"
 
 
-def _split_openems_channel(binding: str) -> tuple[str, str] | None:
-    """Parse ``component/ChannelId``; None if the format is invalid."""
-    text = str(binding or "").strip()
-    if "/" not in text:
-        return None
-    component, channel = text.split("/", 1)
-    component = component.strip()
-    channel = channel.strip()
-    if not component or not channel:
-        return None
-    return component, channel
-
-
-def _read_absent_loxone(binding: str) -> bool | None:
-    from integrations import loxone_client
-    from integrations.loxone_value_parse import parse_binary_value
-
-    raw = loxone_client.fetch_loxone_generic_value(binding)
-    return parse_binary_value(raw)
-
-
-def _read_absent_ha(binding: str) -> bool | None:
-    from integrations.ehal_live import get_ha_adapter
-    from integrations.loxone_value_parse import parse_binary_value
-
-    entity_id = str(binding or "").strip()
-    try:
-        adapter = get_ha_adapter()
-    except Exception:
-        return None
-    mapped = str((adapter.cfg.entities or {}).get(ABSENT_EHAL_FIELD) or "").strip()
-    if mapped:
-        entity_id = mapped
-    if not entity_id:
-        return None
-    state_doc = adapter.read_state(entity_id)
-    raw = state_doc.get("state") if isinstance(state_doc, dict) else state_doc
-    return parse_binary_value(raw)
-
-
-def _read_absent_openems(binding: str) -> bool | None:
-    from integrations.ehal_live import get_openems_adapter
-    from integrations.loxone_value_parse import parse_binary_value
-
-    parts = _split_openems_channel(binding)
-    if parts is None:
-        return None
-    component, channel = parts
-    raw = get_openems_adapter().read_channel(component, channel)
-    return parse_binary_value(raw)
-
-
 def read_ehal_absent_mode(house_doc: dict | None = None) -> tuple[bool | None, bool]:
     """Read plant ``sens_absent_mode`` via the active EHAL backend.
 
     Returns ``(value, bound)`` where ``value`` is True/False/None (read failure)
     and ``bound`` is whether a plant binding is configured.
     """
-    from house_config.ehal_bindings import resolve_plant_binding
     from integrations import ehal_live
 
-    if house_doc is None:
-        from integrations.loxone_client import _default_house_profiles_doc
-
-        house_doc = _default_house_profiles_doc()
-    binding = resolve_plant_binding(house_doc, ABSENT_EHAL_FIELD)
-    if not binding:
-        return None, False
-    if ehal_live.is_ha_backend():
-        return _read_absent_ha(binding), True
-    if ehal_live.is_openems_backend():
-        return _read_absent_openems(binding), True
-    return _read_absent_loxone(binding), True
+    return ehal_live.read_absent_mode(house_doc)
 
 
 def resolve_absent_status(
@@ -133,11 +69,10 @@ def resolve_absent_status(
 
 def resolve_plant_binding_safe(house_doc: dict | None) -> bool:
     from house_config.ehal_bindings import resolve_plant_binding
+    from house_config.profiles_store import load_default_house_profiles_doc
 
     if house_doc is None:
-        from integrations.loxone_client import _default_house_profiles_doc
-
-        house_doc = _default_house_profiles_doc()
+        house_doc = load_default_house_profiles_doc()
     return bool(resolve_plant_binding(house_doc, ABSENT_EHAL_FIELD))
 
 

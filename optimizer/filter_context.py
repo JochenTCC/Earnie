@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 
 import config
-from integrations import loxone_client
+from integrations import ehal_live
 from .charging_context import consumer_charging_eligible_indices, matrix_slot_datetime
 
 logger = logging.getLogger(__name__)
@@ -98,13 +98,13 @@ def resolve_native_window(
     start_format = "missing"
     log_extra = None
     if start_name:
-        start, start_format, raw_start = loxone_client.fetch_filter_native_start_hour(
+        start, start_format, raw_start = ehal_live.fetch_filter_native_start_hour(
             start_name
         )
         if start is not None:
             log_extra = {"format": start_format, "raw": raw_start}
     if duration_name:
-        duration = loxone_client.fetch_loxone_generic_value(duration_name)
+        duration = ehal_live.read_generic_value(duration_name)
     if start is not None and duration is not None and float(duration) > 0:
         return float(start), float(duration), "loxone", log_extra
 

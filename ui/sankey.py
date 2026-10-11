@@ -179,7 +179,7 @@ def _real_sink_sum_kw(
 def _sankey_breakdown_consumers() -> list[dict]:
     """Flex MILP consumers plus known/manual house loads with live power Merker."""
     from house_config.known_chart_display import chart_known_generics
-    from integrations.loxone_client import _house_profile_power_consumers
+    from integrations.ehal_live import house_profile_power_consumers as _house_profile_power_consumers
     from simulation.engine import resolved_flexible_consumers
 
     consumers = list(

@@ -7,6 +7,7 @@ from typing import Any
 import streamlit as st
 
 import config
+from integrations import ehal_live
 from integrations.ehal_debug_mapping import (
     build_loxone_setpoint_io_index,
     expected_live_read_fields,
@@ -43,9 +44,9 @@ def _format_age_text(age_sec: float | None) -> str:
 
 def mapping_column_label() -> str:
     """Live-table column title for the backend address (Merker / entity / channel)."""
-    if config.is_ehal_ha_backend():
+    if ehal_live.is_ha_backend():
         return "Mapping auf Home Assistant"
-    if config.is_ehal_openems_backend():
+    if ehal_live.is_openems_backend():
         return "Mapping auf OpenEMS"
     return "Mapping auf Loxone"
 
@@ -57,11 +58,11 @@ def mapping_column_label() -> str:
 
 
 def _network_write_mapping() -> dict[str, str]:
-    if config.is_ehal_ha_backend():
+    if ehal_live.is_ha_backend():
         from integrations.ehal_debug_mapping import ha_pattern_b_live_mapping
 
         return ha_pattern_b_live_mapping()
-    if config.is_ehal_openems_backend():
+    if ehal_live.is_openems_backend():
         return openems_setpoint_mapping(
             ess_component=str(config.get("EHAL_OPENEMS_ESS_COMPONENT") or "ess0"),
             evcs_component=str(config.get("EHAL_OPENEMS_EVCS_COMPONENT") or "evcs0"),
@@ -92,7 +93,7 @@ def _omitted_write_caption(raw_count: int, rows: list[dict[str, str]]) -> str | 
 
 
 def _telemetry_mapping_for_adapter(adapter: Any) -> dict[str, str]:
-    if config.is_ehal_ha_backend():
+    if ehal_live.is_ha_backend():
         from integrations.ehal_debug_mapping import ha_pattern_b_live_mapping
 
         mapping = ha_pattern_b_live_mapping()
@@ -181,7 +182,7 @@ def _render_ehal_telemetry_fragment() -> None:
     mapping = _telemetry_mapping_for_adapter(adapter)
     telemetry_payload = dict(telemetry)
     expected = None
-    if config.is_ehal_ha_backend():
+    if ehal_live.is_ha_backend():
         from integrations.ehal_debug_mapping import (
             expand_ha_telemetry_for_live,
             expected_live_read_fields,
@@ -215,8 +216,8 @@ def _render_ehal_telemetry_fragment() -> None:
 
 def render_live_reads_section() -> None:
     st.subheader("Live-Lesen")
-    if config.is_ehal_network_backend():
-        hub = "HA" if config.is_ehal_ha_backend() else "OpenEMS"
+    if ehal_live.is_ehal_network_backend():
+        hub = "HA" if ehal_live.is_ha_backend() else "OpenEMS"
         st.caption(
             f"Backend **{hub}/EHAL** — nur `sens_*` / `get_*` Telemetrie über REST."
         )
@@ -345,7 +346,7 @@ def render_last_writes_section(main_state: dict | None) -> None:
     completed_at = str((main_state or {}).get("completed_at") or "")
     loxone_sent = (main_state or {}).get("loxone_sent") or {}
 
-    if config.is_ehal_network_backend():
+    if ehal_live.is_ehal_network_backend():
         _render_ehal_writes(
             main_state,
             silent_run=silent_run,

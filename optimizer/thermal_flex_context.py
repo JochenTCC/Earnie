@@ -218,7 +218,7 @@ def _live_store_flex_overlay(
     horizon_h = thermal_horizon_hours_from_slots(len(matrix))
     fallback_ambient = 10.0
     try:
-        from integrations.loxone_client import _read_optional_temp_c
+        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
         from settings.ehal_marker_resolve import marker_sens_temperature_outside
 
         ambient_io = marker_sens_temperature_outside(house_doc=None)

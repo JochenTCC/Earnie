@@ -35,21 +35,14 @@ def test_pilot_id_namespaces() -> None:
     )
 
 
-def test_ascii_title() -> None:
-    assert gen.ascii_title("Zähler Wärmepumpe") == "Push_Zaehler_Waermepumpe"
-    assert gen.ascii_title("Earnie_LadeLeistungs-Limit") == "Push_Earnie_LadeLeistungs-Limit"
-    assert gen.ascii_title("   ") == "Push_unbenannt"
-
-
 def test_title_from_qualified_id() -> None:
-    from ehal.push_signals import title_from_qualified_id
-
-    assert title_from_qualified_id("consumer.trockner.sens_power_act") == (
+    assert gen.title_from_qualified_id("consumer.trockner.sens_power_act") == (
         "Push_consumer_trockner_sens_power_act"
     )
-    assert title_from_qualified_id("grid.meter.sens_grid_power_active") == (
+    assert gen.title_from_qualified_id("grid.meter.sens_grid_power_active") == (
         "Push_grid_meter_sens_grid_power_active"
     )
+    assert gen.title_from_qualified_id("   ") == "Push_unbenannt"
 
 
 def _config(tmp_path: Path) -> Path:

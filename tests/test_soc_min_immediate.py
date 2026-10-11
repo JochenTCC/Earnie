@@ -66,12 +66,12 @@ class TestResolveSocMinImmediate:
     def test_zero_or_negative_inactive(self):
         consumer = _ev_consumer()
         with patch(
-            "integrations.loxone_client.fetch_loxone_generic_value",
+            "integrations.ehal_live.read_generic_value",
             return_value=0.0,
         ):
             assert resolve.resolve_get_evcs_soc_min_immediate(consumer) is None
         with patch(
-            "integrations.loxone_client.fetch_loxone_generic_value",
+            "integrations.ehal_live.read_generic_value",
             return_value=-5.0,
         ):
             assert resolve.resolve_get_evcs_soc_min_immediate(consumer) is None
@@ -79,7 +79,7 @@ class TestResolveSocMinImmediate:
     def test_clamps_to_limit_soc(self):
         consumer = _ev_consumer()
         with patch(
-            "integrations.loxone_client.fetch_loxone_generic_value",
+            "integrations.ehal_live.read_generic_value",
             return_value=90.0,
         ), patch.object(resolve, "resolve_get_evcs_limit_soc", return_value=80.0):
             assert resolve.resolve_get_evcs_soc_min_immediate(consumer) == 80.0
@@ -87,7 +87,7 @@ class TestResolveSocMinImmediate:
     def test_below_limit_passthrough(self):
         consumer = _ev_consumer()
         with patch(
-            "integrations.loxone_client.fetch_loxone_generic_value",
+            "integrations.ehal_live.read_generic_value",
             return_value=50.0,
         ), patch.object(resolve, "resolve_get_evcs_limit_soc", return_value=80.0):
             assert resolve.resolve_get_evcs_soc_min_immediate(consumer) == 50.0
@@ -221,11 +221,11 @@ class TestChargingContextEnrichment:
         ), patch.object(
             cc, "resolve_get_evcs_limit_soc", return_value=80.0
         ), patch.object(
-            cc.loxone_client, "fetch_loxone_generic_value", return_value=1.0
+            cc.ehal_live, "read_generic_value", return_value=1.0
         ), patch.object(
             cc, "fetch_loxone_actual_soc_percent", return_value=20.0
         ), patch.object(
-            cc.loxone_client,
+            cc.ehal_live,
             "resolve_consumer_battery_capacity_kwh",
             return_value=50.0,
         ), patch.object(

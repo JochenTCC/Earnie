@@ -11,7 +11,7 @@ from datetime import date, datetime, time
 import pandas as pd
 
 import config
-from integrations import loxone_client
+from integrations import ehal_live
 from settings.flexible_consumers import flex_kw_lookup
 from . import profile_manager
 
@@ -89,7 +89,7 @@ def _target_from_thermal(
 
 def _target_from_config(consumer: dict, target_date: date, fallback: float) -> float:
     if consumer.get("charging_schedule", {}).get("enabled"):
-        capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+        capacity_kwh = ehal_live.resolve_consumer_battery_capacity_kwh(consumer)
         computed = config.Config.target_kwh_from_day_schedule(
             consumer,
             datetime.combine(target_date, time(12, 0)),
@@ -131,7 +131,7 @@ def _target_from_loxone(
     loxone_name = consumer.get("loxone_target_kwh_name", "")
     today = datetime.now().date()
     if loxone_name and target_date == today:
-        value = loxone_client.fetch_loxone_generic_value(loxone_name)
+        value = ehal_live.read_generic_value(loxone_name)
         if value is not None and value >= 0:
             return float(value)
     totals = _historical_totals_for_date(target_date, cache)
@@ -152,7 +152,7 @@ def _target_from_loxone_remaining_hours(
     loxone_name = marker_get_filter_remaining_hours(consumer)
     today = datetime.now().date()
     if loxone_name and target_date == today:
-        hours = loxone_client.fetch_loxone_generic_value(loxone_name)
+        hours = ehal_live.read_generic_value(loxone_name)
         return _loxone_remaining_hours_target_kwh(consumer, hours)
     if not loxone_name and target_date == today:
         return _loxone_remaining_hours_target_kwh(consumer, None)

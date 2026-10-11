@@ -27,7 +27,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Hub isolation | No OpenEMS, Home Assistant, evcc, or Loxone types in the math core                                                                                                                                                                                                                                                                   |
 | Adapter duty  | Map hub channels/entities → EHAL; normalize signs and units inside the adapter                                                                                                                                                                                                                                                       |
 | Transport     | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS)                                                                                                                                                                                                |
-| Loxone today  | Default `ehal.backend=loxone` uses `[integrations/loxone_adapter.py](../../integrations/loxone_adapter.py)` for plant telemetry/setpoints. Pattern B keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` are **activation flags** (empty Merker values after **2.7.q Q8**); wire I/O is VO push + `status.json` under qualified IDs. Plant-flat ESS loud writes may still use `LOXONE_TARGET_*` env names until a later cleanup. Intentional Merker HTTP polls remain only for greenfield/structure probes, unbound fallback, and non-loud helpers — not optimizer telemetry. Mapping UI: EHAL-Com |
+| Loxone today  | Default `ehal.backend=loxone` uses `[integrations/loxone_adapter.py](../../integrations/loxone_adapter.py)` for plant telemetry/setpoints. Pattern B keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` are **activation flags** (empty Merker values after **2.7.q Q8**); wire I/O is VO push + `status.json` under qualified IDs. Plant-flat ESS loud writes may still use `LOXONE_TARGET_*` env names until a later cleanup. Structure/greenfield presence uses LoxAPP3 (no Merker HTTP in production Python). Mapping UI: EHAL-Com |
 | HA today      | `ehal.backend=ha` uses `[integrations/ha_adapter.py](../../integrations/ha_adapter.py)`; **non-empty** entity IDs in the same Pattern B maps (aggregated live, incl. `ess.{slug}.*`) until Binding P5 (Weg B). URL/token in `config/.env` (`EHAL_HA_*`); optional `sign` in `ehal.ha` (**2.6.i**). Flat `ehal.ha.entities` is one-shot migrated and cleared (**2.6.g**).                          |
 
 
@@ -35,7 +35,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 
 ## Qualified EHAL IDs (2.7.n-2)
 
-Exchange / display form of every signal on the Loxone push wire and in `status.json` Check keys. Implemented in `ehal/qualified_ids.py` (builders + `parse_qualified_id`).
+Exchange / display form of every signal on the push/exchange wire and in `status.json` Check keys (Loxone VO today; HA Weg B planned). Implemented in `ehal/qualified_ids.py` (builders + `parse_qualified_id`).
 
 | Form | Example | Notes |
 | ---- | ------- | ----- |
@@ -105,11 +105,11 @@ P_cons = P_PV + P_Grid + P_Bat
 | `P_Bat` | `sens_ess_power` | discharge | charge |
 | `P_cons` | `sens_power_consumers` | house load | — (≥ 0) |
 
-Every adapter, derived value (`sens_power_consumers` when not mapped), Live dict and Loxone Merker follows this convention; hub-native signs are normalized at the adapter boundary. Example: Huawei registers 37113 (grid, `+` = export) and 37765 (battery, `+` = charge) must both be negated.
+Every adapter, derived value (`sens_power_consumers` when not mapped), and Live dict follows this convention; hub-native signs are normalized at the adapter boundary. Example: Huawei registers 37113 (grid, `+` = export) and 37765 (battery, `+` = charge) must both be negated.
 
 **Hub unit conversion (registry):** static hub ↔ EHAL conversion lives in optional `loxone` / `openems` blocks on fields in `share/ehal/roles/*.json` (schema `device_roles.schema.json`). `factor` / `sign` always mean hub → EHAL; `ehal/field_registry.py` exposes `apply_loxone_read` / `apply_loxone_write` (and OpenEMS equivalents). Writes clamp in EHAL space then invert; `omit_if` / `read_required` are read-only. Top-level role `required` remains mapping completeness. HA keeps runtime unit factors in `integrations/ha_units.py` (entity `unit_of_measurement`; Binding P5 parity later).
 
-**House load (**`sens_power_consumers`**, optional):** prefer mapped Merker; else derive from grid/PV/ESS balance.
+**House load (**`sens_power_consumers`**, optional):** prefer mapped hub channel / binding; else derive from grid/PV/ESS balance.
 
 ## Telemetry-API (schema_version 4)
 
@@ -121,7 +121,7 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), Live dict
 | `sens_ess_soc`                | yes      | %      | Home battery SoC                                                                                           |
 | `sens_ess_power`              | no       | W      | Optional; sign as above                                                                                    |
 | `sens_evcs_active_power`      | no       | W      | ≥ 0 when present                                                                                           |
-| `sens_power_consumers`        | no       | W      | House load; Merker or derive                                                                               |
+| `sens_power_consumers`        | no       | W      | House load; mapped binding or derive                                                                       |
 | `sens_evcs_connected`         | no       | bool   | EV plugged in                                                                                              |
 | `sens_evcs_soc_act`           | no       | %      | Vehicle SoC                                                                                                |
 | `get_evcs_nominal_current`    | no       | A      | Nominal / max current                                                                                      |
@@ -144,7 +144,7 @@ Setpoints are **math limits / forced power / modes**, not a full inner-loop cont
 
 **Design C1:** force lives in `set_ess_active_power`; charge/discharge fields are **true caps**. OpenEMS uses active power + limits and **ignores** `set_ess_mode`.
 
-**Sticky backends (Loxone / HA entity holds):** Merker/entities keep the **last written value**. Omitting `set_ess_active_power` on the wire does **not** clear a stale Sollleistung. Earnie therefore **always writes** `set_ess_mode` **on every ESS cycle**. **Automatik / inverter free =** `set_ess_mode = 0` — Config must treat mode 0 as “ignore Sollleistung / release force,” even if `Earnie_Batterie_Sollleistung` still holds an old number. Do **not** infer Automatik from absent/`null` active power alone on sticky paths.
+**Sticky backends (hub/entity holds):** sticky hubs keep the **last written value**. Omitting `set_ess_active_power` on the wire does **not** clear a stale setpoint. Earnie therefore **always writes** `set_ess_mode` **on every ESS cycle**. **Automatik / inverter free =** `set_ess_mode = 0` — Config must treat mode 0 as “ignore Sollleistung / release force,” even if a sticky channel (Loxone example: `Earnie_Batterie_Sollleistung`) still holds an old number. Do **not** infer Automatik from absent/`null` active power alone on sticky paths.
 
 
 | Field                           | Required in doc | Unit          | Notes                                                                                                                                                                                           |

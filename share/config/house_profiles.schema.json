@@ -98,7 +98,7 @@
     },
     "loxone_inputs": {
       "type": "object",
-      "description": "Smarthome-Merker-Rollen zum Lesen (Adresse = String-Wert; Backend derzeit Loxone). Rollen: power_name, alternate_binary_power_name, signal_type, subtract_consumer_ids.",
+      "description": "Smarthome-Binding-Rollen zum Lesen (Adresse = String-Wert; Hub-Backend). Rollen: power_name, alternate_binary_power_name, signal_type, subtract_consumer_ids.",
       "properties": {
         "power_name": {
           "type": "string",
@@ -127,7 +127,7 @@
     },
     "loxone_outputs": {
       "type": "object",
-      "description": "Smarthome-Merker-Rollen zum Schreiben (Freigabe und/oder kW-Sollwert). Rollen: enable_name, power_setpoint_name. E-Auto-Modus: set_evcs_mode in ehal_bindings.",
+      "description": "Smarthome-Binding-Rollen zum Schreiben (Freigabe und/oder kW-Sollwert). Rollen: enable_name, power_setpoint_name. E-Auto-Modus: set_evcs_mode in ehal_bindings.",
       "properties": {
         "enable_name": {
           "type": "string",

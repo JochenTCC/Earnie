@@ -34,7 +34,7 @@
     },
     "set_ess_mode": {
       "type": ["string", "number"],
-      "description": "Optional ESS mode hint for Loxone/HA (e.g. Huawei control_cmd). OpenEMS ignores."
+      "description": "Optional ESS mode hint for sticky hubs (HA/Loxone; e.g. Huawei control_cmd). OpenEMS ignores."
     },
     "set_ess_source_select": {
       "type": "number",

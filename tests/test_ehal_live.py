@@ -159,8 +159,8 @@ def test_push_safe_setpoints_on_startup_network(config_mock, ess_mock, evcs_mock
     evcs_mock.assert_called_once_with({})
 
 
-@patch("integrations.ehal_live.loxone_client.send_flexible_consumer_states")
-@patch("integrations.ehal_live.loxone_client.send_huawei_modbus_states")
+@patch("integrations.ehal_live.write_flexible_consumer_states")
+@patch("integrations.ehal_live.write_huawei_modbus_states")
 @patch("integrations.ehal_live.config")
 def test_push_safe_setpoints_on_startup_loxone(config_mock, huawei_mock, flex_mock):
     ehal_live.reset_adapter_cache()
@@ -192,3 +192,97 @@ def test_push_safe_setpoints_on_startup_skip_env(config_mock, ess_mock):
     with patch.dict("os.environ", {"EARNIE_SKIP_SAFE_SETPOINTS_ON_START": "1"}):
         ehal_live.push_safe_setpoints_on_startup()
     ess_mock.assert_not_called()
+
+
+@patch("integrations.loxone_client.fetch_loxone_generic_value")
+def test_read_generic_value_delegates(fetch_mock):
+    fetch_mock.return_value = 1.5
+    assert ehal_live.read_generic_value("Earnie_X") == 1.5
+    fetch_mock.assert_called_once_with("Earnie_X")
+
+
+@patch("integrations.loxone_writes.send_flexible_consumer_states")
+def test_write_flexible_consumer_states_delegates(send_mock):
+    send_mock.return_value = []
+    assert ehal_live.write_flexible_consumer_states({"a": 1.0}, None, None) == []
+    send_mock.assert_called_once_with({"a": 1.0}, None, None)
+
+
+@patch("integrations.loxone_writes._publish_setpoint_traced")
+def test_publish_setpoint_traced_delegates(pub_mock):
+    pub_mock.return_value = MagicMock(success=True)
+    row = ehal_live.publish_setpoint_traced("ess.x.set_ess_active_power", 0.0, io_name="m")
+    assert row.success is True
+    pub_mock.assert_called_once_with(
+        "ess.x.set_ess_active_power", 0.0, io_name="m"
+    )
+
+
+@patch("integrations.ehal_live.is_openems_backend", return_value=False)
+@patch("integrations.ehal_live.is_ha_backend", return_value=False)
+@patch("integrations.ehal_live_ops.read_generic_value", return_value=1.0)
+def test_read_absent_mode_loxone(read_mock, _ha, _oe):
+    with patch(
+        "house_config.ehal_bindings.resolve_plant_binding",
+        return_value="Earnie_Absent",
+    ), patch(
+        "house_config.profiles_store.load_default_house_profiles_doc",
+        return_value={"plant": {}},
+    ):
+        value, bound = ehal_live.read_absent_mode()
+    assert bound is True
+    assert value is True
+    read_mock.assert_called_once_with("Earnie_Absent")
+
+
+@patch("integrations.ehal_live.is_openems_backend", return_value=False)
+@patch("integrations.ehal_live.is_ha_backend", return_value=True)
+@patch("integrations.ehal_live.get_ha_adapter")
+def test_read_absent_mode_ha(adapter_factory, _ha, _oe):
+    adapter = MagicMock()
+    adapter.cfg.entities = {"sens_absent_mode": "binary_sensor.absent"}
+    adapter.read_state.return_value = {"state": "on"}
+    adapter_factory.return_value = adapter
+    with patch(
+        "house_config.ehal_bindings.resolve_plant_binding",
+        return_value="binary_sensor.absent",
+    ), patch(
+        "house_config.profiles_store.load_default_house_profiles_doc",
+        return_value={"plant": {}},
+    ):
+        value, bound = ehal_live.read_absent_mode()
+    assert bound is True
+    assert value is True
+
+
+@patch("integrations.ehal_live.is_openems_backend", return_value=True)
+@patch("integrations.ehal_live.is_ha_backend", return_value=False)
+@patch("integrations.ehal_live.get_openems_adapter")
+def test_read_absent_mode_openems(adapter_factory, _ha, _oe):
+    adapter = MagicMock()
+    adapter.read_channel.return_value = 1
+    adapter_factory.return_value = adapter
+    with patch(
+        "house_config.ehal_bindings.resolve_plant_binding",
+        return_value="ctrl/Absent",
+    ), patch(
+        "house_config.profiles_store.load_default_house_profiles_doc",
+        return_value={"plant": {}},
+    ):
+        value, bound = ehal_live.read_absent_mode()
+    assert bound is True
+    assert value is True
+    adapter.read_channel.assert_called_once_with("ctrl", "Absent")
+
+
+def test_read_absent_mode_unbound():
+    with patch(
+        "house_config.ehal_bindings.resolve_plant_binding",
+        return_value="",
+    ), patch(
+        "house_config.profiles_store.load_default_house_profiles_doc",
+        return_value={"plant": {}},
+    ):
+        value, bound = ehal_live.read_absent_mode()
+    assert value is None
+    assert bound is False

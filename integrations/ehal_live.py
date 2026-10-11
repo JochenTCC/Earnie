@@ -11,8 +11,36 @@ import config
 from ehal import EHAL_SCHEMA_VERSION, EhalWriteError, validate_write_error
 from ehal.models import canonicalize_ha_entity_keys
 from integrations import loxone_client
+from integrations.ehal_live_ops import (  # noqa: F401 — façade re-exports
+    OMIT_EXPORT_CAP,
+    build_sent_loxone_snapshot,
+    consumers_with_live_nominal_power,
+    fetch_filter_native_start_hour,
+    fetch_flexible_consumers_live_kw,
+    fetch_heat_storage_temps,
+    fetch_live_power,
+    fetch_ready_by_time,
+    fetch_thermal_readings,
+    format_ready_by_display,
+    house_profile_power_consumers,
+    load_default_house_doc,
+    map_ess_setpoints,
+    publish_setpoint_traced,
+    read_absent_mode,
+    read_consumer_meter_kw,
+    read_generic_value,
+    read_optional_temp_c,
+    resolve_consumer_battery_capacity_kwh,
+    resolve_consumer_live_power_kw,
+    resolve_consumer_nominal_power_kw,
+    resolve_flexible_consumers_live_power,
+    write_flexible_consumer_states,
+    write_huawei_modbus_states,
+)
 from integrations.ha_adapter import HaAdapter, HaConfig, HaHttpError
 from integrations.loxone_adapter import LoxoneAdapter, LoxoneAdapterError, LoxoneConfig
+from integrations.loxone_client import LOXONE_EPOCH_TO_UNIX  # noqa: F401
+from integrations.loxone_live_power import LiveFlexPowerResult  # noqa: F401
 from integrations.openems_adapter import OpenemsAdapter, OpenemsConfig, OpenemsHttpError
 from runtime_store.persist_paths import runtime_path
 from settings.ev_power import ev_nominal_power_conversion, kw_to_ampere
@@ -531,7 +559,7 @@ def write_ess_setpoints_from_control(
         max_discharge_power_kw = float(
             battery_params.get("max_discharge_power_kw") or 0.0
         )
-    active_kw, charge_kw, discharge_kw, control_cmd = loxone_client.map_ess_setpoints(
+    active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
         mode,
         target_power_kw,
         float(max_charge_power_kw),
@@ -541,13 +569,11 @@ def write_ess_setpoints_from_control(
         active_kw = None
         if mode in (1, 3):
             mode = 0
-            active_kw, charge_kw, discharge_kw, control_cmd = (
-                loxone_client.map_ess_setpoints(
-                    0,
-                    0.0,
-                    float(max_charge_power_kw),
-                    float(max_discharge_power_kw),
-                )
+            active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
+                0,
+                0.0,
+                float(max_charge_power_kw),
+                float(max_discharge_power_kw),
             )
     adapter = get_network_adapter()
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -640,8 +666,8 @@ def _push_safe_setpoints_loxone() -> None:
         "Startup: sende sichere Loxone-Sollwerte "
         "(ESS Automatik, Freigabe/Sollwerte aus)..."
     )
-    huawei = loxone_client.send_huawei_modbus_states(0, 0.0, 0.0)
-    flex = loxone_client.send_flexible_consumer_states({}, None, None)
+    huawei = write_huawei_modbus_states(0, 0.0, 0.0)
+    flex = write_flexible_consumer_states({}, None, None)
     failed = [
         row
         for row in (huawei + flex)

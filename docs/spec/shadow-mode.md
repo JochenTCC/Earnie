@@ -140,7 +140,7 @@ When `is_shadow_mode()`:
 
 ### 6.3 Outputs: write block
 
-- **Central block at the write primitives**, not only at the scattered silent checks: `loxone_writes._send_loxone_value_traced` (Loxone writes are HTTP **GET** `/dev/sps/io/<name>/<value>` — blocking by HTTP method is not enough), `HaAdapter` POST, `OpenemsAdapter` POST.
+- **Central block at the write primitives**, not only at the scattered silent checks: `loxone_writes._publish_setpoint_traced` (Loxone loud path publishes to `status.json`; Miniserver polls — blocking by HTTP method on Merker URLs is not enough), `HaAdapter` POST, `OpenemsAdapter` POST.
 - Structure / setup probes (`loxone_structure`, `loxone_mcp_transport`, `loxone_greenfield_import`, `loxone_ehal_mapping`, `integration_scanner`) are backend access, not replayable: in Shadow they raise `ShadowBackendAccessError` and the UI actions that start them are disabled.
 - A blocked write returns the same "not sent" result as silent mode today, and appends a structured record to `{runtime}/shadow_writes.jsonl`: `{ts, cycle_seq, backend, target, value, source}` plus a normal INFO log line `shadow: would write …`.
 - Suppressed entirely in Shadow: `push_safe_setpoints_on_startup`, the Loxone request HTTP listener (`start_loxone_request_http`, port 8541), `loxone_watchdog`, the EHAL write test page (disabled like in silent mode).

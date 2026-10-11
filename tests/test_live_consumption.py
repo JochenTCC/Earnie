@@ -6,7 +6,7 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from data import live_consumption as lc
-from integrations.loxone_client import LiveFlexPowerResult
+from integrations.ehal_live import LiveFlexPowerResult
 
 _FILTER_CONTEXTS = {
     "pool_filter": {
@@ -38,6 +38,21 @@ def test_is_dead_telemetry_snapshot_allows_normal_reading():
     assert lc.is_dead_telemetry_snapshot(snapshot) is False
 
 
+def test_reject_live_matrix_snapshot_negative_house():
+    """Dump 20261011_082448: house_kw=-0.04 must not zero matrix baseload."""
+    snapshot = {
+        "house_kw": -0.04,
+        "baseload_kw": 0.0,
+        "pv_kw": 0.03,
+        "grid_kw": 0.15,
+        "battery_kw": -0.21,
+    }
+    assert lc.reject_live_matrix_snapshot_reason(snapshot) == "negative_house"
+    assert lc.reject_live_matrix_snapshot_reason(
+        {"house_kw": 0.55, "pv_kw": 0.03, "grid_kw": 0.5, "battery_kw": -0.2}
+    ) is None
+
+
 def test_fetch_live_flex_kw_for_ui_passes_filter_contexts_from_main_state():
     main_state = {"filter_contexts": _FILTER_CONTEXTS}
     flex_result = LiveFlexPowerResult(
@@ -46,7 +61,7 @@ def test_fetch_live_flex_kw_for_ui_passes_filter_contexts_from_main_state():
         measured_ids=frozenset({"swimspa", "pool_filter"}),
     )
     with patch.object(
-        lc.loxone_client,
+        lc.ehal_live,
         "resolve_flexible_consumers_live_power",
         return_value=flex_result,
     ) as resolve:
@@ -69,7 +84,7 @@ def test_fetch_live_consumption_snapshot_uses_ui_flex_resolution():
         "grid": -3.1,
         "battery": -0.03,
     }
-    with patch.object(lc.loxone_client, "fetch_loxone_live_power", return_value=live_power):
+    with patch.object(lc.ehal_live, "fetch_live_power", return_value=live_power):
         with patch.object(
             lc,
             "fetch_live_flex_kw_for_ui",

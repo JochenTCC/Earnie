@@ -10,7 +10,6 @@ from runtime_store import power_interval_sampler
 
 config = load_config_or_exit()
 import logger_config
-from integrations import loxone_client
 from integrations import ehal_live
 from integrations.loxone_comm_trace import serialize_write_records
 from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption, pv_forecast
@@ -150,16 +149,25 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         if ehal_live.is_ehal_network_backend():
             flex_kw_for_matrix = {}
         else:
-            flex_kw_for_matrix = loxone_client.fetch_flexible_consumers_live_kw()
+            flex_kw_for_matrix = ehal_live.fetch_flexible_consumers_live_kw()
         matrix_snapshot = live_consumption.build_consumption_snapshot(
             live_power, flex_kw_for_matrix
         )
-        if live_consumption.is_dead_telemetry_snapshot(matrix_snapshot):
+        reject_reason = live_consumption.reject_live_matrix_snapshot_reason(
+            matrix_snapshot
+        )
+        if reject_reason == "all_zero":
             logger.warning(
                 "Live-Telemetrie liefert Nullwerte (PV/Haus/Netz/Batterie) — "
                 "Optimierungsmatrix behält Prognose-Werte."
             )
-        else:
+        elif reject_reason == "negative_house":
+            logger.warning(
+                "Live-Telemetrie: house_kw=%.3f ungültig (negativ) — "
+                "Optimierungsmatrix behält Prognose-Werte.",
+                float(matrix_snapshot.get("house_kw") or 0.0),
+            )
+        elif reject_reason is None:
             optimization_matrix = live_consumption.apply_live_snapshot_to_matrix(
                 optimization_matrix, matrix_snapshot, hour_index=0
             )
@@ -167,6 +175,11 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 "Live-Snapshot in Optimierungsmatrix: PV=%.2f kW, Grundlast=%.2f kW",
                 matrix_snapshot["pv_kw"],
                 matrix_snapshot["baseload_kw"],
+            )
+        else:
+            logger.warning(
+                "Live-Telemetrie abgelehnt (%s) — Optimierungsmatrix behält Prognose-Werte.",
+                reject_reason,
             )
 
     reported_soc = float(current_soc)
@@ -219,7 +232,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     if ehal_live.is_ehal_network_backend():
         live_consumers = config.get_flexible_consumers()
     else:
-        live_consumers = loxone_client.consumers_with_live_nominal_power()
+        live_consumers = ehal_live.consumers_with_live_nominal_power()
     from optimizer.absent_mode import (
         apply_absent_mode_to_live_flex,
         resolve_absent_status,
@@ -380,7 +393,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             optimization_matrix, standby_plans
         )
         logger.info(
-            "2.7.h standby_backup plans: %s",
+            "standby_backup plans: %s",
             {
                 ps: {
                     "slot0_source": (plan.get("source_select") or [None])[0],
@@ -437,7 +450,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     phys_charge = cycle_powerstation_charge_kw(reserve_charges, standby_charges)
     standby_sources = cycle_standby_source_selects(standby_sources)
     if standby_sources:
-        logger.info("2.7.h source_select (0=grid/1=battery): %s", standby_sources)
+        logger.info(
+            "standby_backup source_select (0=grid/1=battery): %s", standby_sources
+        )
     powerstation_writes = write_cycle_powerstation_setpoints(
         phys_charge, standby_sources
     )
@@ -483,11 +498,11 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         loxone_writes = None
     else:
         logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
-        huawei_writes = loxone_client.send_huawei_modbus_states(
+        huawei_writes = ehal_live.write_huawei_modbus_states(
             mode, target_power, target_soc, export_cap_kw=export_cap
         )
         logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
-        flex_writes = loxone_client.send_flexible_consumer_states(
+        flex_writes = ehal_live.write_flexible_consumer_states(
             consumer_powers, charging_contexts, consumer_pv_follow
         )
         loxone_writes = serialize_write_records(
@@ -504,7 +519,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         flex_chart_kw = dict(flex_kw)
         live_flex_measured: set[str] = set()
     else:
-        live_flex = loxone_client.resolve_flexible_consumers_live_power(
+        live_flex = ehal_live.resolve_flexible_consumers_live_power(
             fallbacks=consumer_powers,
             consumers=live_consumers,
             filter_contexts=filter_contexts,
@@ -520,7 +535,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         sorted(live_flex_measured),
     )
 
-    loxone_sent = loxone_client.build_sent_loxone_snapshot(
+    loxone_sent = ehal_live.build_sent_loxone_snapshot(
         mode,
         target_power,
         target_soc,

@@ -138,9 +138,8 @@ def test_battery_template_full_push_and_bipolar_energy() -> None:
 
 # --- Virtual Input templates (structure of VI_Earnie_Plant_Real.xml, exported by Config 2026-10-07) ---
 _VI_DIR = _DIR.parent / "VirtualIn"
-_VI_LEGACY = sorted(p for p in _VI_DIR.glob("VI_Earnie_*.xml") if "_v2" not in p.name)
 _VI_V2 = sorted(_VI_DIR.glob("VI_Earnie_*_v2.xml"))
-_VI_FILES = sorted(_VI_DIR.glob("VI_Earnie_*.xml"))
+_VI_FILES = _VI_V2
 _VI_ROOT_ATTRS = ["HintText", "Title", "Comment", "Address", "PollingTime"]
 _VI_CMD_ATTRS = [
     "Title", "Comment", "Check", "Signed", "Analog", "SourceValLow", "DestValLow", "SourceValHigh",
@@ -149,9 +148,9 @@ _VI_CMD_ATTRS = [
 
 
 def test_vi_templates_found() -> None:
-    assert len(_VI_LEGACY) == 5
     assert len(_VI_V2) == 5
-    assert len(_VI_FILES) == 10
+    legacy = [p for p in _VI_DIR.glob("VI_Earnie_*.xml") if "_v2" not in p.name]
+    assert legacy == []
 
 
 @pytest.mark.parametrize("path", _VI_FILES, ids=lambda p: p.name)
@@ -193,9 +192,3 @@ def test_vi_v2_checks_use_qualified_keys() -> None:
     pool = (_VI_DIR / "VI_Earnie_Pool_v2.xml").read_bytes().decode("utf-8-sig")
     assert "pool.pool_filter.set_enable" in pool
 
-
-def test_vi_legacy_checks_unchanged() -> None:
-    consumer = (_VI_DIR / "VI_Earnie_Consumer.xml").read_bytes().decode("utf-8-sig")
-    assert "flex.{hk_id}.Earnie_Verbraucher_Freigabe" in consumer
-    ev = (_VI_DIR / "VI_Earnie_EV.xml").read_bytes().decode("utf-8-sig")
-    assert "ev.{ev_id}.Earnie_EAuto_Soll_A" in ev

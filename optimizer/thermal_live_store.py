@@ -60,7 +60,7 @@ def resolve_heat_storage_readings(
     heat_storage: dict | None = None,
 ) -> HeatStorageReadings:
     """Read T_eq / T_low; missing T_eq falls back to store setpoint."""
-    from integrations.loxone_client import fetch_heat_storage_temps
+    from integrations.ehal_live import fetch_heat_storage_temps
 
     storage = normalize_heat_storage(
         heat_storage
@@ -556,7 +556,7 @@ def collect_heat_storage_observability(
     results: list[dict[str, Any]] = []
     fallback_ambient = 10.0
     try:
-        from integrations.loxone_client import _read_optional_temp_c
+        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
         from settings.ehal_marker_resolve import marker_sens_temperature_outside
 
         live_amb = _read_optional_temp_c(marker_sens_temperature_outside(house_doc=house_doc))

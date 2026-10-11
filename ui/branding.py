@@ -5,8 +5,7 @@ from pathlib import Path
 
 import streamlit as st
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_ASSETS = _REPO_ROOT / "docs" / "assets"
+_ASSETS = Path(__file__).resolve().parent / "assets"
 _LOGO_LIGHT = _ASSETS / "Earnie-Logo-Simple-Light.png"
 _LOGO_DARK = _ASSETS / "Earnie-Logo-Simple_Dark.png"
 

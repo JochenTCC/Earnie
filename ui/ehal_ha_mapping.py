@@ -10,8 +10,8 @@ from ehal.profiles import group_fields_by_role, role_field_labels, role_group_la
 from house_config.ehal_bindings import ensure_migrated
 from house_config.ha_ehal_bindings import aggregate_ha_entities
 from integrations.ehal_live import reset_adapter_cache
+from ehal.field_catalog import TELEMETRY_ENERGY_OPTIONAL
 from integrations.ha_adapter import (
-    TELEMETRY_ENERGY_OPTIONAL,
     HaAdapter,
     HaConfig,
     HaHttpError,
@@ -534,7 +534,7 @@ def _render_ha_mapping_intro() -> None:
     from runtime_store.shadow.mode import is_shadow_mode
 
     st.caption(
-        "Entity-zentriertes Mapping (wie Loxone): zuerst Entity wählen "
+        "Entity-zentriertes Mapping (Pattern B): zuerst Entity wählen "
         "(Anlage, Batterien aus `components.json`, Verbraucher aus dem Live-Hausprofil), "
         "dann nur deren EHAL-Felder. "
         "Scan einmal pro Session → Heuristik schlägt leere Felder vor → prüfen → "

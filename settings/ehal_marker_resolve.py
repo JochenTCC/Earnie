@@ -312,11 +312,11 @@ def marker_get_ess_max_discharge_power(
 
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:
     """Limit SoC %: optional ``get_evcs_limit_soc`` Merker, else profile percent."""
-    from integrations import loxone_client
+    from integrations import ehal_live
 
     io_name = marker_get_evcs_limit_soc(consumer)
     if io_name:
-        raw = loxone_client.fetch_loxone_generic_value(io_name)
+        raw = ehal_live.read_generic_value(io_name)
         if raw is None:
             raise ValueError(
                 f"Verbraucher '{consumer.get('id', '?')}': "
@@ -329,12 +329,12 @@ def resolve_get_evcs_limit_soc(consumer: dict) -> float:
 
 def resolve_get_evcs_soc_min_immediate(consumer: dict) -> float | None:
     """ASAP min SoC %; None = inactive. Clamped to Limit-SOC when active."""
-    from integrations import loxone_client
+    from integrations import ehal_live
 
     io_name = marker_get_evcs_soc_min_immediate(consumer)
     if not io_name:
         return None
-    raw = loxone_client.fetch_loxone_generic_value(io_name)
+    raw = ehal_live.read_generic_value(io_name)
     if raw is None:
         return None
     try:

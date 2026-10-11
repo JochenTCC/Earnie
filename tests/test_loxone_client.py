@@ -115,55 +115,6 @@ class TestFetchLoxoneGenericValue:
         assert lc.fetch_loxone_generic_value("") is None
 
 
-class TestSendLoxoneValueTraced:
-    def test_success_record(self):
-        response = _mock_http_response()
-        with patch.object(lc.requests, "get", return_value=response), patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_IP": "10.0.0.5",
-                "LOXONE_USER": "admin",
-                "LOXONE_PASS": "secret",
-            }.get(name, kw.get("default", 5))
-        ):
-            record = lc._send_loxone_value_traced("Earnie_Mode", 2.0)
-
-        assert record.io_name == "Earnie_Mode"
-        assert record.value == pytest.approx(2.0)
-        assert record.success is True
-        assert record.written_at
-
-    def test_failure_record_on_timeout(self):
-        with patch.object(
-            lc.requests, "get", side_effect=requests.exceptions.Timeout()
-        ), patch.object(lc.config, "get", return_value=5):
-            record = lc._send_loxone_value_traced("Earnie_Mode", 1.0)
-
-        assert record.success is False
-        assert record.io_name == "Earnie_Mode"
-
-
-class TestSendLoxoneValue:
-    def test_success_returns_true(self):
-        response = _mock_http_response()
-        with patch.object(lc.requests, "get", return_value=response) as mock_get, patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_IP": "10.0.0.5",
-                "LOXONE_USER": "admin",
-                "LOXONE_PASS": "secret",
-            }.get(name, kw.get("default", 5))
-        ):
-            assert lc.send_loxone_value("Earnie_Mode", 2) is True
-
-        url = mock_get.call_args.args[0]
-        assert url == "http://10.0.0.5/dev/sps/io/Earnie_Mode/2"
-
-    def test_timeout_returns_false(self):
-        with patch.object(
-            lc.requests, "get", side_effect=requests.exceptions.Timeout()
-        ), patch.object(lc.config, "get", return_value=5):
-            assert lc.send_loxone_value("Earnie_Mode", 1) is False
-
-
 class TestFetchLoxoneLivePower:
     def test_computes_house_from_components(self):
         with patch.object(
@@ -947,7 +898,7 @@ class TestBuildSentSnapshot:
 
         with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
-        ), patch.object(lc, "send_loxone_value") as mock_send:
+        ):
             snapshot = lc.build_sent_loxone_snapshot(
                 mode=0,
                 target_power_kw=0.0,
@@ -957,7 +908,6 @@ class TestBuildSentSnapshot:
                 consumer_pv_follow={"eauto": 0},
             )
 
-        mock_send.assert_not_called()
         assert snapshot["Earnie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
         # Earnie charges via set_evcs_max_current without PV-follow → Modus "now"
         assert snapshot["Earnie_EAuto_Modus"] == 2.0

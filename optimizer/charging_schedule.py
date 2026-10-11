@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, time
 
-from integrations import loxone_client
+from integrations import ehal_live
 from settings.ehal_marker_resolve import marker_get_evcs_ready_by_time
 
 _LOXONE_WEEKDAY_NAMES = {
@@ -224,7 +224,7 @@ def _loxone_ready_raw(consumer: dict) -> str | float | None:
     io_name = marker_get_evcs_ready_by_time(consumer)
     if not io_name:
         return None
-    return loxone_client.fetch_loxone_ready_by_time(io_name)
+    return ehal_live.fetch_ready_by_time(io_name)
 
 
 

@@ -7,7 +7,7 @@ import math
 from typing import Any
 
 import config
-from integrations import loxone_client
+from integrations import ehal_live
 from optimizer.consumer_power import power_limits_kw
 from integrations.loxone_value_parse import parse_binary_value
 from optimizer.ev_soc_tracking import fetch_loxone_actual_soc_percent
@@ -31,7 +31,7 @@ def fetch_charge_immediate_switch(consumer: dict) -> bool | None:
     io_name = marker_charge_immediate(consumer)
     if not io_name:
         return None
-    return parse_binary_value(loxone_client.fetch_loxone_generic_value(io_name))
+    return parse_binary_value(ehal_live.read_generic_value(io_name))
 
 
 def charging_power_threshold_kw() -> float:
@@ -98,7 +98,7 @@ def compute_immediate_remaining_seconds(
 ) -> float | None:
     """Restzeit Sofortladen: Energie-bis-Limit / Ladeleistung (kein Countdown-Merker)."""
     label = consumer.get("name") or consumer.get("id")
-    capacity = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    capacity = ehal_live.resolve_consumer_battery_capacity_kwh(consumer)
     if capacity is None:
         logger.warning(
             "%s: Sofort-Laden — Akkukapazität fehlt, Restzeit nicht berechenbar.",
@@ -214,7 +214,7 @@ def enrich_context_with_immediate_charge(
 
     switch_on = fetch_charge_immediate_switch(consumer)
     if live_kw is None:
-        live_kw = loxone_client.resolve_consumer_live_power_kw(consumer)
+        live_kw = ehal_live.resolve_consumer_live_power_kw(consumer)
 
     if not is_immediate_charging_active(
         consumer, context, switch_on=switch_on, live_kw=live_kw
@@ -331,7 +331,7 @@ def prepare_optimization_matrix(
     live_flex_kw = live_flex_kw_from_matrix(matrix)
     live_consumers = consumers
     if live_consumers is None and live_flex_kw is not None:
-        live_consumers = loxone_client.consumers_with_live_nominal_power()
+        live_consumers = ehal_live.consumers_with_live_nominal_power()
 
     contexts = resolve_charging_contexts(
         matrix,

@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from optimizer import schedule as optimization_schedule
-from runtime_store import run_state
+from runtime_store import main_daemon, run_state
 from ui.fragment_refresh import MAIN_SYNC_POLL_RUN_EVERY, main_sync_poll_interval_sec
 
 _MAX_SEC = optimization_schedule.APP_MAIN_SYNC_MAX_WAIT_SECONDS
@@ -57,6 +57,7 @@ def poll_main_py_sync_if_pending() -> None:
     ready, _, _, _, _ = optimization_schedule.live_simulation_readiness(
         completed,
         poll_sec=poll,
+        daemon_alive=main_daemon.status().state == "running",
     )
     was_ready = st.session_state.get("main_sync_poll_ready")
     st.session_state.main_sync_poll_ready = ready

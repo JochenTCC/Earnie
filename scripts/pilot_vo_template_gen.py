@@ -28,10 +28,10 @@ from dotenv import dotenv_values
 
 from ehal.push_signals import (  # noqa: F401 — re-exported for callers and tests
     Signal,
-    ascii_title,
     heartbeat_signal,
     pilot_id,
     read_signals_from_docs,
+    title_from_qualified_id,
 )
 
 TOKEN_ENV = "EARNIE_PILOT_PUSH_TOKEN"

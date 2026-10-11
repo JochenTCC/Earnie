@@ -27,7 +27,7 @@
       "field": "sens_power_consumers",
       "required": false,
       "kind": "telemetry",
-      "notes": "Optional house load W; Merker when mapped, else derive from grid/PV/ESS.",
+      "notes": "Optional house load W; when mapped on the hub, else derive from grid/PV/ESS.",
       "loxone": {
         "unit": "kW",
         "ehal_unit": "W",

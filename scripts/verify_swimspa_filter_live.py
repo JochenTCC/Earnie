@@ -18,7 +18,7 @@ from datetime import datetime
 from runtime_store.config_load import load_config_or_exit
 
 config = load_config_or_exit()
-from integrations import loxone_client
+from integrations import ehal_live
 from integrations.loxone_connectivity import loxone_env_configured, ensure_live_config
 from optimizer.filter_context import slot_in_native_window
 
@@ -40,7 +40,7 @@ def _check_sollstunden(consumer: dict) -> tuple[bool, str]:
     name = marker_get_filter_remaining_hours(consumer)
     if not name:
         return False, "get_filter_remaining_hours fehlt"
-    value = loxone_client.fetch_loxone_generic_value(name)
+    value = ehal_live.read_generic_value(name)
     if value is None:
         return False, "nicht lesbar (push inbox)"
     if value < 0:
@@ -54,7 +54,7 @@ def _check_start_hour(consumer: dict) -> tuple[bool, str]:
     name = marker_get_filter_native_start_hour(consumer)
     if not name:
         return False, "get_filter_native_start_hour fehlt"
-    hour, fmt, raw = loxone_client.fetch_filter_native_start_hour(name)
+    hour, fmt, raw = ehal_live.fetch_filter_native_start_hour(name)
     if hour is None:
         return False, f"nicht parsebar (raw={raw!r}, format={fmt})"
     return True, f"Start={hour:.0f} h, Format={fmt}, raw={raw!r}"
@@ -66,7 +66,7 @@ def _check_duration(consumer: dict) -> tuple[bool, str]:
     name = marker_get_filter_native_duration_hours(consumer)
     if not name:
         return False, "get_filter_native_duration_hours fehlt"
-    value = loxone_client.fetch_loxone_generic_value(name)
+    value = ehal_live.read_generic_value(name)
     if value is None:
         return False, "nicht lesbar (push inbox)"
     if value <= 0:
@@ -77,7 +77,7 @@ def _check_duration(consumer: dict) -> tuple[bool, str]:
 def _check_binary(label: str, io_name: str) -> tuple[bool, str]:
     if not io_name:
         return False, "Merkername fehlt"
-    value = loxone_client.fetch_loxone_generic_value(io_name)
+    value = ehal_live.read_generic_value(io_name)
     if value is None:
         return False, "nicht lesbar (push inbox)"
     if value not in (0.0, 1.0):
@@ -138,7 +138,7 @@ def main() -> int:
     checks.append(("Natives Fenster Start", ok, detail))
     start_hour = None
     if ok:
-        start_hour, _, _ = loxone_client.fetch_filter_native_start_hour(
+        start_hour, _, _ = ehal_live.fetch_filter_native_start_hour(
             marker_get_filter_native_start_hour(consumer)
         )
 
@@ -146,7 +146,7 @@ def main() -> int:
     checks.append(("Natives Fenster Dauer", ok, detail))
     duration = None
     if ok:
-        duration = loxone_client.fetch_loxone_generic_value(
+        duration = ehal_live.read_generic_value(
             marker_get_filter_native_duration_hours(consumer)
         )
 

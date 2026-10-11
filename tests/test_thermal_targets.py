@@ -31,7 +31,7 @@ def _swimspa_consumer() -> dict:
 
 
 @patch("optimizer.thermal_targets.get_outdoor_forecast_with_fallback")
-@patch("integrations.loxone_client.fetch_thermal_readings")
+@patch("integrations.ehal_live.fetch_thermal_readings")
 def test_build_thermal_observability_compare(mock_readings, mock_forecast):
     mock_readings.return_value = {
         "actual_c": 36.0,

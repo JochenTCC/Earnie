@@ -282,7 +282,7 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
     )
     if _live_markers_enabled():
         st.caption(
-            "E-Auto-Merker unter **Daemon Control → EHAL-Com** "
+            "E-Auto-Bindings unter **Daemon Control → EHAL-Com** "
             "(Entity-Mapping) pflegen."
         )
     return item

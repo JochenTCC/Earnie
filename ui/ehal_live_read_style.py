@@ -9,7 +9,10 @@ from typing import Any
 import pandas as pd
 
 from ehal.qualified_ids import field_kind
-from integrations.loxone_ehal_mapping import TELEMETRY_OPTIONAL, TELEMETRY_REQUIRED
+from ehal.field_catalog import (
+    TELEMETRY_OPTIONAL_STATIC_HUB as TELEMETRY_OPTIONAL,
+    TELEMETRY_REQUIRED,
+)
 
 # CSS colours (light theme; Styler text color).
 _COLOR_DEFAULT = ""

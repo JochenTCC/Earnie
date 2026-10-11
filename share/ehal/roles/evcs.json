@@ -44,7 +44,7 @@
       "field": "get_evcs_limit_soc",
       "required": false,
       "kind": "input",
-      "notes": "Charge limit SoC % (Merker mapping in 2.4.k)."
+      "notes": "Charge limit SoC % (HITL mapping)."
     },
     {
       "field": "get_evcs_soc_min_immediate",
@@ -62,7 +62,7 @@
       "field": "set_evcs_mode",
       "required": false,
       "kind": "setpoint",
-      "notes": "Enum off | pv | now (replaces pv_follow + charge_immediate markers; Loxone numeric 0/1/2)."
+      "notes": "Enum off | pv | now (replaces pv_follow + charge_immediate markers; hub enum encoding 0/1/2, Loxone example)."
     },
     {
       "field": "supports_evcs_current",

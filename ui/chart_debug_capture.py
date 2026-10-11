@@ -8,7 +8,7 @@ from typing import Any
 import streamlit as st
 
 import config
-from integrations import loxone_client
+from integrations import ehal_live
 from runtime_store.chart_debug_capture import (
     build_chart_section,
     read_zip_bytes,
@@ -75,7 +75,7 @@ def _save_debug_dump(
     if bundle is not None:
         capture_live_power = live_power
         if capture_live_power is None:
-            capture_live_power = loxone_client.fetch_loxone_live_power()
+            capture_live_power = ehal_live.fetch_live_power()
         chart_payload = build_chart_section(
             bundle,
             current_soc=current_soc,

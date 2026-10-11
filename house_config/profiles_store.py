@@ -526,6 +526,24 @@ def load_house_profiles_document(path: str) -> dict:
     return apply_overlay_to_house(doc)
 
 
+def load_default_house_profiles_doc() -> dict | None:
+    """Load configured house_profiles.json (plant ehal_bindings, absent, temps)."""
+    import logging
+
+    try:
+        from runtime_store.persist_paths import resolve_house_profiles_json_path
+
+        path = resolve_house_profiles_json_path()
+        if not path or not os.path.isfile(path):
+            return None
+        return load_house_profiles_document(path)
+    except Exception as exc:  # noqa: BLE001 — optional live binding context
+        logging.getLogger(__name__).warning(
+            "house_profiles für Plant-Bindings nicht geladen: %s", exc
+        )
+        return None
+
+
 def _serialize_profile(profile: dict) -> dict:
     out: dict = {
         "id": profile["id"],

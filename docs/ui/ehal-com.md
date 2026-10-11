@@ -36,7 +36,7 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Telemetry               | `sens_ess_soc`                     | yes      | **%**; 0…100                                                                                                   |
 | Telemetry (optional)    | `sens_ess_power`                   | no       | **W**; ESS sign **OpenEMS-aligned**: `+` = **discharge**, `-` = **charge**                                     |
 | Telemetry (optional)    | `sens_evcs_active_power`           | no       | **W**; >= 0 (typically 0 when idle)                                                                            |
-| Telemetry (optional)    | `sens_power_consumers`             | no       | **W**; house load; from a Merker if mapped, otherwise derived from grid/PV/ESS                                |
+| Telemetry (optional)    | `sens_power_consumers`             | no       | **W**; house load; from a mapped hub channel if present, otherwise derived from grid/PV/ESS                  |
 | Telemetry (optional)    | `get_grid_export_power_limit`      | no       | **W**; inbound max export from grid/HEMS (magnitude ≥ 0; negative/absent = no cap) (2.7.a)                  |
 | Telemetry (optional)    | `get_ess_soc_min`                  | no       | **%**; discharge cut-off SoC (device config; MILP when `limits_from_live`) (2.7.j)                          |
 | Telemetry (optional)    | `get_ess_soc_max`                  | no       | **%**; charge cut-off SoC (device config; MILP when `limits_from_live`) (2.7.j)                             |
@@ -55,7 +55,7 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Capability flags        | `supports_ess_source_select`       | no       | boolean; Pattern B Quellenwahl (`ess.<id>.set_ess_source_select`) may be written                                 |
 
 
-A setpoint document must contain **at least one** of the setpoint fields. Omitted fields generally mean **"leave unchanged"** (partial updates are allowed). **Exception for sticky backends (Loxone/HA):** the Merker keeps the last value — automatic is `set_ess_mode = 0`, not "setpoint power omitted". Full device roles including `get_`* / additional `sens_evcs_`*: see §C.
+A setpoint document must contain **at least one** of the setpoint fields. Omitted fields generally mean **"leave unchanged"** (partial updates are allowed). **Exception for sticky hubs (HA/Loxone):** sticky channels keep the last value — automatic is `set_ess_mode = 0`, not "setpoint power omitted". Full device roles including `get_`* / additional `sens_evcs_`*: see §C.
 
 <a id="sign-set_ess_active_power"></a>
 
@@ -214,7 +214,7 @@ Covers heating + filter. Two live entities: heat (`daily_target_source: thermal`
 | Native filter duration          | Input value   | `get_filter_native_duration_hours`             |         |      |         | `Earnie_Pool_Filter_NativeDauer`                                    |
 
 
-Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.1). The chart may subtract filter power via `subtract_consumer_ids` (not an EHAL field). Pattern B: `VI_Earnie_Pool` (enables), `VO_Earnie_Pool` (telemetry). **VI check (legacy)** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (same as title). **VI v2 / Pilot (2.7.q q.C):** Check keys = qualified IDs (`pool.{slug}.set_enable`, `pool.pool_filter.set_enable`, …); library `VI_Earnie_*_v2.xml` or `python -m scripts.pilot_vi_template_gen`. **Dual-emit (2.7.q q.B):** `status.json` emits legacy keys and qualified peers side by side until cutover.
+Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.1). The chart may subtract filter power via `subtract_consumer_ids` (not an EHAL field). Pattern B: `VI_Earnie_Pool_v2` (enables), `VO_Earnie_Pool` (telemetry). **VI Check / Pilot (2.7.q):** qualified IDs (`pool.{slug}.set_enable`, `pool.pool_filter.set_enable`, …); library `VI_Earnie_*_v2.xml` or `python -m scripts.pilot_vi_template_gen`. After Q8, `status.json` publishes qualified Check keys only.
 
 **EHAL-Com mapping:** filter fields (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native start/duration, enable) are mapped on the house-profile consumer `pool_filter` under `ehal_bindings`. Without `pool_filter` there is no filter MILP and no synthetic filter entity. Without a mapping, the filter stays inactive.
 
@@ -367,7 +367,7 @@ Silent mode: `runtime/local_settings.json` → `"silent_mode"` (legacy: `"loxone
 
 ### Q5 — Write push-only (2.7.q q.D)
 
-Loud writes publish only to `status.json` (qualified EHAL IDs). The Miniserver VI polls every **10 s**. Dual-emit of legacy Check keys stays until Q8 so you can roll Checks back without redeploying Earnie.
+Loud writes publish only to `status.json` (qualified EHAL IDs). The Miniserver VI polls every **10 s**. After Q8, only qualified Check keys are published — VI templates must use `VI_Earnie_*_v2.xml` / Pilot VI.
 
 **Preconditions**
 

@@ -124,7 +124,7 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
         _passthrough_prepare_matrix,
     )
     monkeypatch.setattr(main_module.optimizer, "get_consumer_remaining_kwh", lambda **_: {})
-    monkeypatch.setattr(main_module.loxone_client, "consumers_with_live_nominal_power", lambda: [])
+    monkeypatch.setattr(main_module.ehal_live, "consumers_with_live_nominal_power", lambda: [])
     monkeypatch.setattr(
         main_module.optimizer,
         "milp_optimizer",
@@ -133,17 +133,17 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
     monkeypatch.setattr(main_module.config, "get_battery_params", lambda: {"max_power_kw": 2.5})
     monkeypatch.setattr(main_module.optimizer, "battery_plan_kw_from_control", lambda *a, **k: 0.0)
     monkeypatch.setattr(
-        main_module.loxone_client,
+        main_module.ehal_live,
         "fetch_flexible_consumers_live_kw",
         lambda **_: {},
     )
     monkeypatch.setattr(
-        main_module.loxone_client,
+        main_module.ehal_live,
         "resolve_flexible_consumers_live_power",
         lambda **_: MagicMock(kw={}, chart_kw={}, measured_ids=frozenset()),
     )
     monkeypatch.setattr(
-        main_module.loxone_client,
+        main_module.ehal_live,
         "build_sent_loxone_snapshot",
         lambda *a, **k: {"Ernie_Mode": 1.0},
     )

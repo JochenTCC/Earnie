@@ -213,10 +213,10 @@ def test_loxone_ready_raw_without_configured_marker(monkeypatch):
     assert cs._loxone_ready_raw({"id": "eauto"}) is None
 
 
-def test_loxone_ready_raw_fetches_via_loxone_client(monkeypatch):
+def test_loxone_ready_raw_fetches_via_ehal_live(monkeypatch):
     monkeypatch.setattr(cs, "marker_get_evcs_ready_by_time", lambda consumer: "Ernie_FertigUm")
     monkeypatch.setattr(
-        cs.loxone_client, "fetch_loxone_ready_by_time", lambda io_name: "Morgen, 06:00"
+        cs.ehal_live, "fetch_ready_by_time", lambda io_name: "Morgen, 06:00"
     )
     assert cs._loxone_ready_raw({"id": "eauto"}) == "Morgen, 06:00"
 

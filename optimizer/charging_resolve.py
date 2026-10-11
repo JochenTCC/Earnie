@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 
 import config
-from integrations import loxone_client
+from integrations import ehal_live
 from optimizer.charging_schedule import (
     _facade_loxone_ready_raw,
     charging_schedule_enabled,
@@ -127,7 +127,7 @@ def _loxone_absent_forecast_context(
 ) -> dict:
     ready_raw = _facade_loxone_ready_raw(consumer)
     day_sched = config_day_schedule(consumer, horizon_start)
-    capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    capacity_kwh = ehal_live.resolve_consumer_battery_capacity_kwh(consumer)
     limit_soc = _cc().resolve_get_evcs_limit_soc(consumer)
     target_kwh = config.Config.target_kwh_from_rest_soc(
         consumer,
@@ -163,7 +163,7 @@ def fetch_loxone_charging_context(
     sched = consumer.get("charging_schedule") or {}
     plug_name = marker_sens_evcs_connected(consumer)
     plugged_val = (
-        loxone_client.fetch_loxone_generic_value(plug_name) if plug_name else None
+        ehal_live.read_generic_value(plug_name) if plug_name else None
     )
     plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
     if not plugged_in:
@@ -179,7 +179,7 @@ def fetch_loxone_charging_context(
     ready_raw = _facade_loxone_ready_raw(consumer)
     deadline = parse_loxone_ready_by_time(ready_raw, horizon_start)
     soc_val = _cc().fetch_loxone_actual_soc_percent(consumer)
-    capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    capacity_kwh = ehal_live.resolve_consumer_battery_capacity_kwh(consumer)
     limit_soc = _cc().resolve_get_evcs_limit_soc(consumer)
     target_kwh = config.Config.target_kwh_from_rest_soc(
         consumer,
@@ -254,7 +254,7 @@ def _config_path_with_plugged_in(
     plug_name = marker_sens_evcs_connected(consumer)
     if not plug_name:
         return result
-    plugged_val = loxone_client.fetch_loxone_generic_value(plug_name)
+    plugged_val = ehal_live.read_generic_value(plug_name)
     plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
     if plugged_in:
         out = dict(result)
@@ -326,7 +326,7 @@ def _resolve_config_path_charging_context(
     """Config daily_target_source: rest-SoC + FertigUm/Ist-SOC overlays."""
     day_sched = config_day_schedule(consumer, horizon_start)
     rest_soc = day_sched.get("daily_rest_soc")
-    capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    capacity_kwh = ehal_live.resolve_consumer_battery_capacity_kwh(consumer)
     limit_soc = _cc().resolve_get_evcs_limit_soc(consumer)
     target_kwh = config.Config.target_kwh_from_rest_soc(
         consumer,

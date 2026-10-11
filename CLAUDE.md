@@ -36,6 +36,10 @@ Reply in **German** in Claude Code chat (the user switches language spontaneousl
 - User docs (`docs/README.md`, `docs/user-manual/`, `docs/einrichtung/`, `docs/konfiguration/`, `docs/ui/`, `docs/referenz/`) are **German**; update them in the same change when behaviour changes (`german-user-docs.mdc`).
 - `docs/spec/` and backlog: English.
 
+## Code changes
+
+- **No silent fallbacks/workarounds** on changed paths without asking — fail loud or propose and wait (`no-implicit-fallbacks.mdc`). Same bar for defaults that obscure calculation results.
+
 ## Area notes
 
 - **Streamlit UI state:** `.cursor/rules/streamlit-ui-state.mdc`, skills `streamlit-ui-state`, `streamlit-apptest`.

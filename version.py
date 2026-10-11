@@ -5,9 +5,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "2.7.0-dev.47"
+# Local/UI may append a temporary debug id after -dev.N (e.g. 2.7.0-dev.48D1).
+# Image/packaging always normalize that away via normalize_for_image_build().
+__version__ = "2.7.0-dev.48"
 
 # SemVer core + optional pre-release used for community candidates.
+# Trailing debug letters on -dev.N (e.g. D1) are intentionally not captured.
 _IMAGE_VERSION_RE = re.compile(
     r"^(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc|dev)\.\d+)?)",
 )
@@ -15,16 +18,20 @@ _IMAGE_VERSION_RE = re.compile(
 
 def display_version() -> str:
     """UI label; community pre-releases are marked as release candidates."""
-    # Local/dev builds keep the raw string; alpha/beta/rc get "(candidate)".
+    # Local/dev builds (incl. debug suffix) keep the raw string; alpha/beta/rc get "(candidate)".
     if "-" in __version__ and not ("-dev." in __version__):
         return f"{__version__} (candidate)"
     return __version__
 
 
 def normalize_for_image_build(raw: str) -> str:
-    """Keep X.Y.Z or X.Y.Z-(alpha|beta|rc).N; strip junk like `` (wip)`` for setuptools."""
+    """Keep X.Y.Z or X.Y.Z-(alpha|beta|rc|dev).N; strip debug ids and junk like `` (wip)``."""
     match = _IMAGE_VERSION_RE.match(str(raw or "").strip())
     return match.group(1) if match else "0.0.0"
+
+
+# setuptools / PEP 440 cannot use letter suffixes on -dev.N; Docker rewrite uses the same core.
+__version_pkg__ = normalize_for_image_build(__version__)
 
 
 def rewrite_version_file_for_image(path: str | Path = "version.py") -> str:

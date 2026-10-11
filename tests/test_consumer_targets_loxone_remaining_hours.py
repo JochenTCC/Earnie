@@ -23,7 +23,7 @@ def _swimspa_filter() -> dict:
     }
 
 
-@patch("integrations.loxone_client.fetch_loxone_generic_value")
+@patch("integrations.ehal_live.read_generic_value")
 def test_resolve_loxone_remaining_hours_from_sollstunden(mock_fetch):
     mock_fetch.return_value = 5.0
     today = date.today()
@@ -37,7 +37,7 @@ def test_resolve_loxone_remaining_hours_from_sollstunden(mock_fetch):
     mock_fetch.assert_called_once_with("Ernie_Swimspa_Filter_Sollstunden")
 
 
-@patch("integrations.loxone_client.fetch_loxone_generic_value")
+@patch("integrations.ehal_live.read_generic_value")
 def test_resolve_loxone_remaining_hours_from_ehal_binding(mock_fetch):
     mock_fetch.return_value = 2.0
     today = date.today()
@@ -58,7 +58,7 @@ def test_resolve_loxone_remaining_hours_from_ehal_binding(mock_fetch):
     mock_fetch.assert_called_once_with("Earnie_Pool_Filter_Sollstunden")
 
 
-@patch("integrations.loxone_client.fetch_loxone_generic_value")
+@patch("integrations.ehal_live.read_generic_value")
 def test_resolve_loxone_remaining_hours_zero_is_inactive(mock_fetch):
     mock_fetch.return_value = 0.0
     today = date.today()
@@ -71,7 +71,7 @@ def test_resolve_loxone_remaining_hours_zero_is_inactive(mock_fetch):
     assert result == 0.0
 
 
-@patch("integrations.loxone_client.fetch_loxone_generic_value")
+@patch("integrations.ehal_live.read_generic_value")
 def test_resolve_loxone_remaining_hours_missing_marker_is_inactive(mock_fetch):
     mock_fetch.return_value = None
     today = date.today()

@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from integrations.loxone_ehal_mapping import (
+from ehal.field_catalog import (
     SETPOINT_FIELDS,
-    TELEMETRY_OPTIONAL,
+    TELEMETRY_OPTIONAL_STATIC_HUB as TELEMETRY_OPTIONAL,
     TELEMETRY_REQUIRED,
 )
 

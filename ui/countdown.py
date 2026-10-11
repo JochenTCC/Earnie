@@ -6,7 +6,7 @@ import time
 import streamlit as st
 
 from optimizer import schedule as optimization_schedule
-from runtime_store import run_state
+from runtime_store import main_daemon, run_state
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY, main_sync_poll_interval_sec
 from ui.help_hint import render_status_with_help
 from ui.main_py_sync import MAIN_PY_SYNC_HELP, sync_footer_caption
@@ -37,6 +37,7 @@ def _render_countdown_captions() -> None:
     _, _, retry_sec, sync_wait_sec, _ = optimization_schedule.live_simulation_readiness(
         completed,
         poll_sec=poll_sec,
+        daemon_alive=main_daemon.status().state == "running",
     )
     next_run = optimization_schedule.next_quarter_hour_datetime()
     last_time = time.strftime("%H:%M:%S", time.localtime(last_optimization))

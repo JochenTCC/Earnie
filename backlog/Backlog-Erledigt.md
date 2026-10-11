@@ -2,6 +2,34 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SH concentration Phases A–D (2026-10-11)
+
+- [x] **Phase A** — Named ops in `integrations/ehal_live_ops.py`, re-exported from `ehal_live` (`read_generic_value`, flex live/write, `read_absent_mode`, `publish_setpoint_traced`, …); `load_default_house_profiles_doc` in `house_config/profiles_store.py`.
+- [x] **Phase B** — `main.py`, `optimizer/*`, `data/*`, `runtime_store/power_interval_sampler.py` use `ehal_live` (no `loxone_client` / `loxone_writes` imports).
+- [x] **Phase C** — Production import ban outside `integrations/` (`tests/test_no_loxone_client_outside_integrations.py`); UI/settings/scripts migrated; CONTRIBUTING updated.
+- [x] **Phase D** — Canonical backend flags on `ehal_live`; UI debug uses them; `config.is_ehal_*` wrappers removed.
+- Review: [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md). Remaining open: `LOXONE_TARGET_*` / `loxone_blocks` retire; Binding P5 path rename.
+
+### EHAL / SH-backend cleanup — concentration review, binding rollback, Loxone-agnostic naming (2026-10-11)
+
+- [x] **SH-Backend communication concentration — review** — Findings: [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md). Façade `ehal_live.get_adapter()` already exists; scatter documented; Phases A–D implemented (see section above).
+- [x] **Remove Binding rollback legacy** — Dead Merker HTTP write (`_send_loxone_value_traced` / `send_loxone_value`); deprecated push-entity stubs; unused `ui/loxone_marker_forms.py` + `ui/smarthome_marker_fields.py` (moved `assemble_filter_bindings` to `house_config/ehal_bindings.py`); reverse `loxone_blocks` helpers; legacy `ascii_title`; non-`_v2` `VI_Earnie_*.xml`; doc scrub (dual-emit / Q5 rollback / Merker-HTTP drift); Binding walkthroughs marked STALE. Kept: `LOXONE_TARGET_*`, `loxone_blocks` migrate, plant-flat ESS aliases (separate backlog bullet).
+- [x] **EHAL naming Loxone-agnostic (hub-agnostic layer)** — `TELEMETRY_OPTIONAL_STATIC_HUB` / `STATIC_HUB_MAP_FIELDS` (+ temporary aliases); docs/schema/UI reword (Merker → binding/hub channel; sticky hubs; Smarthome-Binding); role JSON `"loxone"` + `apply_loxone_*` unchanged. Follow-ups: Binding P5 path rename (SH concentration A–D done).
+
+### EHAL Loxone vs HA mapping review (2026-10-11)
+
+- [x] Code review comparing EHAL field mapping / binding for Loxone and HA (similarities, duplications, reuse)
+  - Findings: [EHAL-Mapping-Review.md](EHAL-Mapping-Review.md)
+  - Safe unification: hub-agnostic membership catalogs in `ehal/field_catalog.py`; adapters/UI import shared tuples
+  - Transport, unit conversion, Live-Lesen catalogs, HITL UIs, and Loxone read-loop membership stay separate
+  - Tests: `tests/test_ehal_field_catalog.py`
+
+### Bugfix — Sidebar logo, Monitor main.py status, log backlog IDs (2026-10-11)
+
+- [x] **Earnie logo disappeared in Sidebar** — logos lived under `docs/assets/` (excluded by `.dockerignore`); silent skip when missing. Ship under `ui/assets/` + `ui/branding.py` path. Tests: `tests/test_branding.py`.
+- [x] **Don't show "main.py nicht aktiv" while main.py is optimizing** — `main_down` after 30 s without slot `completed_at` ignored process liveness. `live_simulation_readiness(..., daemon_alive=)` stays `wait_main` when `main_daemon.status()` is running. Tests: `test_wait_main_when_daemon_alive_after_max_wait`.
+- [x] **Remove backlog chapter IDs from Earnie logs** — stripped `2.7.h` / `2.7.g/h` prefixes from 8 logger strings in `main.py`, `optimizer/powerstation_live.py`, `optimizer/powerstation_standby.py`.
+
 ### Remove remaining `/jdev/sps/io` Merker HTTP (2026-10-11)
 
 - [x] **No `/jdev/sps/io` in production Python** — inventory + removal after 2.7.o/q push-only

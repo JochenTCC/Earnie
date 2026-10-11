@@ -1,8 +1,8 @@
-"""Push vs poll source for Loxone VO telemetry (push-only for pushable fields).
+"""Loxone VO push binding index (push-only for pushable fields).
 
 Pushable ``sens_*`` / ``get_*`` (including meter energy counters) always read
-from the inbox. Legacy ``ehal.loxone_push.entities`` is ignored (tolerated in
-config for one release).
+from the inbox. Legacy ``ehal.loxone_push.entities`` is tolerated in config but
+unused.
 """
 from __future__ import annotations
 
@@ -40,24 +40,6 @@ def entity_key(entity_kind: str, entity_id: str) -> str:
     if kind == "consumer":
         return f"consumer:{eid}"
     raise ValueError(f"unknown entity kind: {entity_kind!r}")
-
-
-def parse_push_entities(raw: object) -> frozenset[str]:
-    """Deprecated: parse legacy ``ehal.loxone_push.entities`` (ignored at runtime)."""
-    if not isinstance(raw, list):
-        return frozenset()
-    keys: set[str] = set()
-    for item in raw:
-        text = str(item or "").strip()
-        if text:
-            keys.add(text)
-    return frozenset(keys)
-
-
-def load_push_entities_from_config(raw_config: dict | None = None) -> frozenset[str]:
-    """Deprecated: always empty — push is the default for pushable fields."""
-    del raw_config
-    return frozenset()
 
 
 def is_pushable_kind(kind: str) -> bool:
@@ -227,64 +209,18 @@ def resolve_push_binding(io_or_ehal: str) -> MerkerBinding | None:
     return None
 
 
-def get_push_entities() -> frozenset[str]:
-    """Deprecated: always empty (push is unconditional for pushable fields)."""
-    return frozenset()
-
-
-def source_for_merker(merker: str) -> str:
-    """Return ``push`` for indexed pushable Merkers, else ``poll``."""
-    binding = resolve_push_binding(merker)
-    if binding is None:
-        return "poll"
-    return "push" if is_pushable_kind(binding.kind) else "poll"
-
-
-def source_for_entity_key(key: str) -> str:
-    """Entity keys are always push once the migration is complete."""
-    return "push" if str(key or "").strip() else "poll"
-
-
-def source_for_ehal_id(ehal_id: str) -> str:
-    """``push`` for heartbeat and pushable IDs; ``poll`` for unknown empty."""
-    eid = str(ehal_id or "").strip()
-    if not eid:
-        return "poll"
-    if eid == "heartbeat":
-        return "push"
-    kind = field_kind(eid)
-    if is_pushable_kind(kind):
-        return "push"
-    binding = get_ehal_index().get(eid)
-    if binding is not None and is_pushable_kind(binding.kind):
-        return "push"
-    return "poll"
-
-
-def any_push_entities() -> bool:
-    """True when any pushable binding exists (legacy name kept for callers)."""
-    return bool(get_ehal_index())
-
-
 # Re-export for callers that already import pilot_id from push_signals.
 __all__ = [
     "MerkerBinding",
     "NEVER_PUSH_KINDS",
-    "any_push_entities",
     "build_ehal_index",
     "build_merker_index",
     "clear_source_caches",
     "entity_key",
     "get_ehal_index",
     "get_merker_index",
-    "get_push_entities",
     "is_pushable_kind",
-    "load_push_entities_from_config",
     "merker_bindings_from_docs",
-    "parse_push_entities",
     "pilot_id",
     "resolve_push_binding",
-    "source_for_ehal_id",
-    "source_for_entity_key",
-    "source_for_merker",
 ]

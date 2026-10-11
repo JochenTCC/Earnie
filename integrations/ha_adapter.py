@@ -26,45 +26,17 @@ from ehal.functions import (
     incomplete_function_messages,
 )
 from ehal.validate import EhalValidationError
+from ehal.field_catalog import (
+    SETPOINT_FIELDS,
+    TELEMETRY_BINARY_OPTIONAL,
+    TELEMETRY_ENERGY_OPTIONAL,
+    TELEMETRY_OPTIONAL_HA as TELEMETRY_OPTIONAL,
+    TELEMETRY_REQUIRED,
+)
 from integrations.ha_units import UnitMismatchError, field_quantity, from_ehal, to_ehal
 
 logger = logging.getLogger(__name__)
 
-TELEMETRY_REQUIRED = (
-    "sens_grid_power_active",
-    "sens_pv_production_active",
-    "sens_ess_soc",
-)
-TELEMETRY_OPTIONAL = (
-    "sens_ess_power",
-    "sens_evcs_active_power",
-    "sens_power_consumers",
-    "get_grid_export_power_limit",
-    "get_ess_soc_min",
-    "get_ess_soc_max",
-    "get_ess_max_charge_power",
-    "get_ess_max_discharge_power",
-)
-# Side-channel binary plant sensors (not part of EHAL telemetry wire / numeric read).
-TELEMETRY_BINARY_OPTIONAL = (
-    "sens_absent_mode",
-)
-# Slot-Ist ΔkWh side channel (2.6.c) — not part of EHAL telemetry wire.
-TELEMETRY_ENERGY_OPTIONAL = (
-    "sens_pv_energy",
-    "sens_grid_energy_import",
-    "sens_grid_energy_export",
-)
-SETPOINT_FIELDS = (
-    "set_ess_active_power",
-    "set_ess_charge_power_limit",
-    "set_ess_discharge_power_limit",
-    "set_ess_mode",
-    "set_ess_source_select",
-    "set_evcs_max_current",
-    "set_evcs_mode",
-    "set_grid_export_power_limit",
-)
 MAPPABLE_DOMAINS = frozenset(
     {
         "sensor",

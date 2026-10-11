@@ -111,7 +111,7 @@ def _digital_active_from_consumer(consumer: dict) -> bool | None:
     if not io_name:
         return None
     try:
-        from integrations.loxone_client import fetch_loxone_generic_value
+        from integrations.ehal_live import read_generic_value as fetch_loxone_generic_value
 
         raw = fetch_loxone_generic_value(io_name)
     except Exception:  # noqa: BLE001
@@ -126,7 +126,7 @@ def _digital_active_from_consumer(consumer: dict) -> bool | None:
 
 def _live_power_kw(consumer: dict) -> float | None:
     try:
-        from integrations.loxone_client import resolve_consumer_live_power_kw
+        from integrations.ehal_live import resolve_consumer_live_power_kw
 
         return resolve_consumer_live_power_kw(consumer)
     except Exception:  # noqa: BLE001
@@ -468,7 +468,7 @@ def _ha_remap_powerstation_fields(
             continue
         missing.append(key)
         logger.warning(
-            "2.7.h: no HA entity for powerstation field %s — skip (no plant-flat fallback)",
+            "no HA entity for powerstation field %s — skip (no plant-flat fallback)",
             key,
         )
     return remapped, missing
@@ -510,7 +510,7 @@ def _loxone_ps_wire_value(kind: str, value_w: float) -> float:
 
 def _write_powerstation_loxone(fields: dict[str, float]) -> list:
     from integrations.loxone_comm_trace import LoxoneWriteRecord
-    from integrations.loxone_writes import _publish_setpoint_traced
+    from integrations.ehal_live import publish_setpoint_traced
 
     records: list[LoxoneWriteRecord] = []
     missing: list[str] = []
@@ -518,7 +518,7 @@ def _write_powerstation_loxone(fields: dict[str, float]) -> list:
         kind, marker = _resolve_marker(field_key)
         if not marker:
             logger.warning(
-                "2.7.h: no Merker/entity for powerstation field %s — skip",
+                "no Merker/entity for powerstation field %s — skip",
                 field_key,
             )
             missing.append(field_key)
@@ -527,7 +527,7 @@ def _write_powerstation_loxone(fields: dict[str, float]) -> list:
         status_key = _status_key(field_key, kind)
         _last_powerstation_sent[status_key] = send_val
         records.append(
-            _publish_setpoint_traced(status_key, send_val, io_name=marker)
+            publish_setpoint_traced(status_key, send_val, io_name=marker)
         )
     if missing:
         _persist_ps_write_error(
@@ -622,7 +622,7 @@ def write_cycle_powerstation_setpoints(
     fields = build_cycle_powerstation_fields(charge_kw_by_id, source_by_id)
     if fields:
         logger.info(
-            "2.7.g/h cycle powerstation setpoints: %s",
+            "cycle powerstation setpoints: %s",
             {k: fields[k] for k in sorted(fields)},
         )
     return _write_powerstation_fields(fields)

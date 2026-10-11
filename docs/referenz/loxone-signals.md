@@ -26,7 +26,7 @@ In the docs, the canonical template/import path is called **Default** (formerly 
 
 Earnie Core writes and reads the same Merker names on the Miniserver. The library adds the **Loxone-side** HTTP mirroring and enables an **Earnie-dead** fallback in Config (see below).
 
-**Virtual Inputs** = Earnie→Loxone (`set_*` / enables / setpoints, heartbeat) via `GET http://<Earnie>:8541/ehal/loxone/status.json` (daemon HTTP; `heartbeat_ts` = Unix now; setpoints from the publish ledger / `loxone_sent`). After **2.7.q Q5**, Loud writes are **push-only** (no `/dev/sps/io/<Merker>/<value>` for cycle setpoints). Dual-emit of legacy Check keys remains until Q8.
+**Virtual Inputs** = Earnie→Loxone (`set_*` / enables / setpoints, heartbeat) via `GET http://<Earnie>:8541/ehal/loxone/status.json` (daemon HTTP; `heartbeat_ts` = Unix now; setpoints from the publish ledger / `loxone_sent`). After **2.7.q Q5**, Loud writes are **push-only** (no `/dev/sps/io/<Merker>/<value>` for cycle setpoints). After **Q8**, `status.json` publishes qualified Check keys only.
 
 **Virtual Outputs** = Loxone→Earnie push of `sens_*` / `get_*` / flex power (qualified path IDs). Core reads those fields from the push inbox.
 
@@ -67,13 +67,13 @@ Source: `share/loxone/templates/VirtualIn/`
 
 | File | Content (short) |
 | ---- | --------------- |
-| `VI_Earnie_Plant.xml` / `_v2.xml` | Heartbeat + ESS design-C1 (legacy Merker Titles / v2 field-name Titles) |
-| `VI_Earnie_Heatpump.xml` / `_v2.xml` | Legacy Freigabe / `heatpump.{hk_id}.set_enable` |
-| `VI_Earnie_EV.xml` / `_v2.xml` | Legacy `ev.*.Earnie_EAuto_*` / `evcs.*.set_evcs_*` |
-| `VI_Earnie_Consumer.xml` / `_v2.xml` | Legacy flex Freigabe / `consumer.{hk_id}.set_enable` |
-| `VI_Earnie_Pool.xml` / `_v2.xml` | Legacy bare Freigaben / `pool.*.set_enable` |
+| `VI_Earnie_Plant_v2.xml` | Heartbeat + ESS design-C1 (field-name Titles) |
+| `VI_Earnie_Heatpump_v2.xml` | `heatpump.{hk_id}.set_enable` |
+| `VI_Earnie_EV_v2.xml` | `evcs.*.set_evcs_*` |
+| `VI_Earnie_Consumer_v2.xml` | `consumer.{hk_id}.set_enable` |
+| `VI_Earnie_Pool_v2.xml` | `pool.*.set_enable` |
 
-Prefer **v2** for new wiring; keep legacy for Q5 rollback. Config-specific: generate `VI_Pilot_*.xml` (see above).
+Config-specific: generate `VI_Pilot_*.xml` (see above).
 
 
 Target folder (one of the existing Config paths; create the folder if needed):

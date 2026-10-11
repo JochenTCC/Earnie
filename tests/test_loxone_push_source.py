@@ -86,41 +86,14 @@ def test_empty_merker_still_in_ehal_index() -> None:
     assert src.build_merker_index(house, {}) == {}
 
 
-def test_heartbeat_source_is_always_push() -> None:
-    assert src.source_for_ehal_id("heartbeat") == "push"
-    assert src.source_for_ehal_id("") == "poll"
-    assert src.source_for_ehal_id("sens_grid_power_active") == "push"
-    assert src.source_for_ehal_id("sens_pv_energy") == "push"
-    assert src.source_for_ehal_id("sens_grid_energy_import") == "push"
-    assert src.source_for_ehal_id("sens_grid_energy_export") == "push"
+def test_pushable_kinds_include_energy_counters() -> None:
+    assert src.is_pushable_kind("sens_grid_power_active")
+    assert src.is_pushable_kind("sens_pv_energy")
+    assert src.is_pushable_kind("sens_grid_energy_import")
+    assert src.is_pushable_kind("sens_grid_energy_export")
     assert src.is_pushable_kind("sens_energy_total")
     assert src.is_pushable_kind("sens_energy_export")
-
-
-def test_parse_push_entities_legacy() -> None:
-    assert src.parse_push_entities(["plant", " consumer:trockner ", ""]) == frozenset(
-        {"plant", "consumer:trockner"}
-    )
-    assert src.parse_push_entities(None) == frozenset()
-    assert src.load_push_entities_from_config({"ehal": {"loxone_push": {"entities": ["plant"]}}}) == frozenset()
-
-
-def test_source_for_merker_always_push_when_indexed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        src,
-        "get_merker_index",
-        lambda: src.build_merker_index(HOUSE, COMPONENTS),
-    )
-    monkeypatch.setattr(
-        src,
-        "get_ehal_index",
-        lambda: src.build_ehal_index(HOUSE, COMPONENTS),
-    )
-    assert src.source_for_merker("Earnie_Trockner") == "push"
-    assert src.source_for_merker("Earnie_Netz") == "push"
-    assert src.source_for_merker("Unknown_Merker") == "poll"
+    assert not src.is_pushable_kind("set_ess_mode")
 
 
 def test_fetch_uses_push_for_all_indexed(

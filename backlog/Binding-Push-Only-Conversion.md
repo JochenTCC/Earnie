@@ -1,5 +1,7 @@
 # Push-only migration of the Loxone binding — handover and procedure
 
+> **STALE (historical):** Pre-cutover handover (2026-10-07). Push-only read + 2.7.q write path are **done** on `main`. Do not follow Phase C / dual-path steps as current procedure.
+
 **Purpose:** entry point for a new session (Cursor). Describes the starting point, the decisions, the pilot findings and the procedure for switching the binding **entity by entity** from "read Loxone Merker (poll)" to "Loxone sends via Virtual Output (push)". **State: 2026-10-07 — WP1–WP8 coded on `spike/vo-push-pilot`** (inbox read API, `ehal.loxone_push.entities`, intercept, zero rule + 5 min last-known, start-up wait, EHAL-Com Quelle). **Phase C** (entity flips on alpha) is ops — see §9b.
 
 (The file name is German for historical reasons; the content is English because backlog files are English.)

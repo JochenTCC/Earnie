@@ -160,9 +160,7 @@ def test_partial_limits_are_reported_as_skipped(post_mock):
     post_mock.assert_not_called()
 
 
-@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
-def test_loxone_active_without_limits_is_skipped(send_mock):
-    send_mock.return_value = True
+def test_loxone_active_without_limits_is_skipped():
     adapter = LoxoneAdapter(
         LoxoneConfig(
             adapter_id="loxone-home",
@@ -176,7 +174,6 @@ def test_loxone_active_without_limits_is_skipped(send_mock):
     )
     assert err is None
     assert adapter.last_skipped_fields() == ["set_ess_active_power"]
-    send_mock.assert_not_called()
 
 
 def test_partial_energy_counters_are_ignored():

@@ -34,7 +34,7 @@ def test_computed_session_soc_percent_from_plug_in_and_delivery():
     consumer = _eauto_consumer()
     session = {"plug_in_rest_soc_percent": 40.0}
     with patch.object(
-        est.loxone_client,
+        est.ehal_live,
         "resolve_consumer_battery_capacity_kwh",
         return_value=16.0,
     ):
@@ -47,7 +47,7 @@ def test_compare_ev_soc_sources_warns_on_large_delta():
     session = {"plug_in_rest_soc_percent": 40.0}
     with patch.object(est, "fetch_loxone_actual_soc_percent", return_value=90.0):
         with patch.object(
-            est.loxone_client,
+            est.ehal_live,
             "resolve_consumer_battery_capacity_kwh",
             return_value=16.0,
         ):

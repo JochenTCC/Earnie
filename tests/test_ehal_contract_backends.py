@@ -131,7 +131,7 @@ def test_ess_setpoint_payload_identical_when_only_backend_switches():
     ) as config_mock, patch(
         "integrations.ehal_live.get_openems_adapter", return_value=adapter
     ), patch(
-        "integrations.ehal_live.loxone_client.map_ess_setpoints",
+        "integrations.ehal_live.map_ess_setpoints",
         return_value=(-1.5, 5.0, 0.0, 1),
     ):
         config_mock.get.side_effect = _config_side_effect("openems")
@@ -144,7 +144,7 @@ def test_ess_setpoint_payload_identical_when_only_backend_switches():
     ) as config_mock, patch(
         "integrations.ehal_live.get_ha_adapter", return_value=adapter
     ), patch(
-        "integrations.ehal_live.loxone_client.map_ess_setpoints",
+        "integrations.ehal_live.map_ess_setpoints",
         return_value=(-1.5, 5.0, 0.0, 1),
     ):
         config_mock.get.side_effect = _config_side_effect("ha")
@@ -168,7 +168,7 @@ def test_loxone_ess_write_uses_non_network_path():
     """Loxone Live writes stay on loxone_client; façade ESS helper requires network backend."""
     ehal_live.reset_adapter_cache()
     with patch("integrations.ehal_live.config") as config_mock, patch(
-        "integrations.ehal_live.loxone_client.map_ess_setpoints",
+        "integrations.ehal_live.map_ess_setpoints",
         return_value=(-1.5, 5.0, 0.0, 1),
     ) as map_mock, patch(
         "integrations.ehal_live.get_loxone_adapter"

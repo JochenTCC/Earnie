@@ -260,7 +260,7 @@ def test_read_ehal_absent_loxone(monkeypatch):
         "integrations.ehal_live.is_openems_backend", lambda: False
     )
     monkeypatch.setattr(
-        "integrations.loxone_client.fetch_loxone_generic_value",
+        "integrations.ehal_live_ops.read_generic_value",
         lambda _name: 1.0,
     )
     value, bound = absent_mode.read_ehal_absent_mode(_plant_doc("Earnie_Abwesend"))

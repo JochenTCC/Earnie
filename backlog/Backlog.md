@@ -17,14 +17,17 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ### Version 2.7 — Multiple storages and export power limitation
 
 **Order:** next **2.7.l**. **2.7.i** is independent and can start any time — ideally **P1** lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish the remaining 2.7 letters on `main`. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**), **2.7.g** (single-use powerstation reserve), **2.7.h** (standby-backup code + Pattern B Quellenwahl done; productive dogfood after operator EcoFlow bridge rewire — see Bugfixes), **2.7.k** (ENTSO-E live prices), **2.7.p** (virtual PS consumer-start release), **2.7.q** (push-only write + Signal list), **2.7.n** (Sessions A–F; field registry + generic Loxone read), and **EHAL unit conversion — no hardcoding** (read + write registry) → [Erledigt](Backlog-Erledigt.md).
-- **Note (deferred from 2.7.n):** `pv.{Kennung}.*` later — keep PV bare on the plant wire. Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Stale Binding walkthrough / draft §9 scrub later.
-
-- [ ] Make a code review comparing EHAL field mapping / binding for Loxone and HA - search for similarities in different codes and search for duplications and potentials for reuse / unification
-- [ ] Remove any rollback legacy code from former chapters 
-- [ ] Make EHAL naming and documents as loxone agnostic as possible
+- **Note (deferred from 2.7.n):** `pv.{Kennung}.*` later — keep PV bare on the plant wire. Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
 - **Note:** `/jdev/sps/io` Merker HTTP removed from production Python (VO push + LoxAPP3 presence) → [Erledigt](Backlog-Erledigt.md).
+- **Note:** Loxone vs HA EHAL mapping review + shared `ehal/field_catalog.py` → [EHAL-Mapping-Review.md](EHAL-Mapping-Review.md) / [Erledigt](Backlog-Erledigt.md).
 
+- **Note:** SH-backend concentration review + Binding rollback cleanup + EHAL Loxone-agnostic naming → [Erledigt](Backlog-Erledigt.md) / [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md).
+- **Note:** SH concentration Phase A–D → [Erledigt](Backlog-Erledigt.md).
+- [ ] Retire `LOXONE_TARGET_*` plant ESS loud names and `loxone_blocks` load migrate after all deploy configs use Pattern B only (env audit).
+- [ ] **Binding P5** path rename: canonical `/ehal/telemetry/…` (keep `/ehal/loxone/telemetry/…` alias).
+- [ ] Rename "Pattern B" by a more self-explaining name in all docs / docs
 
+- [ ] Push before implementing inverter
 - [ ] **2.7.l — Inverter entity (PV × battery topology)** (epic **Inverter**; EHAL/EHAL-Com doc draft: [`backlog/EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md))
   - **Problem:** `pv_systems[]` and `batteries[]` are unrelated lists; the scenario picks both by id. Nothing says which PV strings and batteries share an inverter. The MILP has one summed PV node, so inverter AC/DC limits (clipping), hybrid vs. AC-coupled batteries and several inverters with their own battery cannot be modelled. Balkonkraftwerk storage (EcoFlow etc.) has the inverter built into the battery and takes PV directly.
   - **Model:** new `inverters[]` in `components.json`. PV systems and batteries reference it via `inverter_id` (n:1, reference on the child). The scenario keeps `pv_system_ids[]` / `battery_ids[]`; the inverters in play follow from them (no `inverter_ids[]`).
@@ -45,6 +48,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Note (epic Binding, see [draft](EHAL-Binding-UX-Draft.md)):** **P1** — **Binding P0c** done ([`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md)): history has no inverter keys yet → inverter one-off migration needs no history alias; battery Kennung renames still need alias-on-read / rewrite-on-rename before broad Kennung edit. **P2** — inverter forms get the Kennung logic of `entity_id_lock` from the start (**Binding P6**); do not add a fifth `slug_id` variant in the UI. **P4** — Loxone Merker names, `status.json` keys and VO paths for inverters wait for **Binding P1** (naming grammar); if P4 lands first, only bindings + Live rows, no name suggestions or templates.
 
 - [ ] Implement time-dependent Netzentgelt-Tarif SNAP / WiNAP - see Entwicklungsplan\Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md
+- [ ] Anonymous install counter (daily ping, no ID)
 
 ### Version 2.8
   

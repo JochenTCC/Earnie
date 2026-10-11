@@ -1789,7 +1789,7 @@ def test_pool_filter_milp_preserves_all_ehal_bindings():
 
 
 def test_assemble_filter_bindings_shape():
-    from ui.smarthome_marker_fields import assemble_filter_bindings
+    from house_config.ehal_bindings import assemble_filter_bindings
 
     bindings = assemble_filter_bindings(
         {

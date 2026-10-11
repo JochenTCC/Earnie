@@ -51,7 +51,7 @@ ernie-build-image = "scripts.build_container:main"
 ernie-generate-cons-data = "scripts.generate_cons_data:main"
 
 [tool.setuptools.dynamic]
-version = { attr = "version.__version__" }
+version = { attr = "version.__version_pkg__" }
 
 [tool.setuptools.packages.find]
 where = ["."]

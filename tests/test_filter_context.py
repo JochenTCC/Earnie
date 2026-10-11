@@ -239,7 +239,7 @@ def _matrix_forecast_6h() -> list[dict]:
 
 class TestFilterContextCaching:
     def test_simulate_horizon_resolves_native_window_once(self, monkeypatch):
-        from integrations import loxone_client
+        from integrations import ehal_live
         from optimizer.simulation import simulate_horizon
 
         fetch_calls: list[str] = []
@@ -249,10 +249,10 @@ class TestFilterContextCaching:
             return 10.0, "integer", "10 h"
 
         monkeypatch.setattr(
-            loxone_client, "fetch_filter_native_start_hour", _mock_start
+            ehal_live, "fetch_filter_native_start_hour", _mock_start
         )
         monkeypatch.setattr(
-            loxone_client, "fetch_loxone_generic_value", lambda _name: 4.0
+            ehal_live, "read_generic_value", lambda _name: 4.0
         )
 
         matrix = _matrix_forecast_6h()
@@ -269,7 +269,7 @@ class TestFilterContextCaching:
         assert fetch_calls == ["FilterStart"]
 
     def test_simulate_horizon_reuses_passed_filter_contexts(self, monkeypatch):
-        from integrations import loxone_client
+        from integrations import ehal_live
         from optimizer.simulation import simulate_horizon
 
         fetch_calls: list[str] = []
@@ -279,10 +279,10 @@ class TestFilterContextCaching:
             return 10.0, "integer", "10 h"
 
         monkeypatch.setattr(
-            loxone_client, "fetch_filter_native_start_hour", _mock_start
+            ehal_live, "fetch_filter_native_start_hour", _mock_start
         )
         monkeypatch.setattr(
-            loxone_client, "fetch_loxone_generic_value", lambda _name: 4.0
+            ehal_live, "read_generic_value", lambda _name: 4.0
         )
 
         matrix = _matrix_forecast_6h()

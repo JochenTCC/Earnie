@@ -31,11 +31,14 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Fix: `update_target=False` for advance + trigger; collect/learn still refresh the target.
   - Tests: `tests/test_powerstation_2_7_p.py` (`test_advance_and_trigger_preserve_target_kwh`).
 
-## New Bugs (Do not remove this chapter — even if empty)
+- [ ] **Negative `house_kw` live snapshot → Automatik instead of Entladesperre / missed Zwangsladen (08:00)** — fix implemented (2026-10-11); live acceptance pending
+  - Dump: `debug-dumps/debug_dump_20261011_082448` (meta: „Zwangsladen nicht ausgeführt um 8:00“); chart slot 08:00 `battery_forced_charge_missing`.
+  - Symptom: at 07:52 optimizer wrote Automatik (`mode=0`, discharge limits open); 07:45–08:00 battery discharged; 08:00 mean charge only ~0.06 kW vs planned Zwangsladen 0.213 kW.
+  - Cause: glitchy `house_kw=-0.04` → `baseload_kw=0` → live matrix overwrite zeroed `expected_p_act` → Entladesperre skipped → Automatik.
+  - Fix: `reject_live_matrix_snapshot_reason` (`negative_house` / `all_zero`) keeps forecast in `main.py` + UI opt-in.
+  - Tests: `tests/test_live_consumption.py` (`test_reject_live_matrix_snapshot_negative_house`).
 
-- [ ] Earnie logo disappeared in Sidebar - check why and repair that  
-- [ ] Don't show "main.py nicht aktiv" on Monitor page while main.py is running and currently optimizing
-- [ ] Remove any backlog chapter related references in earnie logs (e.g. "(main:382) - 2.7.h standby_backup plans: ")
+## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] EcoFlow Delta 3 bridge: Miniserver self-write of a Virtual Input is overwritten by HA (2026-10-07, not analysed yet)
   - Setup: the Miniserver writes its own Virtual Input via a Virtual Output command (`/dev/sps/io/<Input>/\v`, device = the Miniserver itself), e.g. bypass state (`Delta3_Grid_ByPass`) and charge limit (`Delta3_P_ChargeLimit`). HA mirrors these inputs through the Loxone integration (PyLoxone) and drives the EcoFlow entities from automations (`docs/einrichtung/ecoflow-delta3-loxone.md`, steps 5/6).

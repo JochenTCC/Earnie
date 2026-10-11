@@ -240,7 +240,7 @@ def _render_thermal_rc_fields(
     }
     if _live_markers_enabled():
         st.caption(
-            "Thermal-/Filter-Merker unter **Daemon Control → EHAL-Com** "
+            "Thermal-/Filter-Bindings unter **Daemon Control → EHAL-Com** "
             "(Entity-Mapping) pflegen."
         )
     return item
@@ -485,7 +485,7 @@ def _render_thermal_annual_wp_preview(
         item["heat_storage"] = storage
     if _live_markers_enabled():
         st.caption(
-            "WP-Merker unter **Daemon Control → EHAL-Com** "
+            "WP-Bindings unter **Daemon Control → EHAL-Com** "
             "(Entity-Mapping, `flex.*`) pflegen."
         )
     _render_wp_annual_metric(item, location=location)

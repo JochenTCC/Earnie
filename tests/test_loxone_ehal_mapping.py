@@ -4,49 +4,10 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from integrations.loxone_ehal_mapping import (
-    ehal_mapping_to_loxone_blocks,
     heuristic_propose,
-    merge_loxone_blocks,
     parse_ollama_proposals,
     propose_with_ollama,
 )
-
-
-def test_ehal_mapping_to_loxone_blocks():
-    blocks = ehal_mapping_to_loxone_blocks(
-        {
-            "sens_ess_soc": "Batterie_SoC",
-            "sens_pv_production_active": "PV_Leistung_kW",
-            "sens_evcs_active_power": "ignored-no-block-key",
-            "set_ess_mode": "Steuerbefehl",
-        },
-        extras={"control_cmd_name": ""},
-    )
-    assert blocks == {
-        "soc_name": "Batterie_SoC",
-        "pv_power_name": "PV_Leistung_kW",
-        "control_cmd_name": "Steuerbefehl",
-    }
-
-
-def test_ehal_mapping_ignores_removed_unprefixed_keys():
-    blocks = ehal_mapping_to_loxone_blocks(
-        {
-            "ess_soc": "Batterie_SoC",
-            "grid_power_active": "Netz",
-        }
-    )
-    assert blocks == {}
-
-
-def test_merge_preserves_unrelated_keys():
-    merged = merge_loxone_blocks(
-        {"soc_name": "old", "grid_power_name": "live_grid"},
-        {"soc_name": "new", "pv_power_name": "PV"},
-    )
-    assert merged["soc_name"] == "new"
-    assert merged["pv_power_name"] == "PV"
-    assert merged["grid_power_name"] == "live_grid"
 
 
 def test_heuristic_propose_energy_names():

@@ -327,14 +327,12 @@ from integrations.loxone_writes import (  # noqa: E402
     map_ess_setpoints,
     send_flexible_consumer_states,
     send_huawei_modbus_states,
-    send_loxone_value,
     _append_evcs_mode_writes,
     _effective_consumer_power_kw,
     _enable_output_values,
     _evcs_current_output_values,
     _flexible_consumer_output_values,
     _immediate_skip_output_values,
-    _send_loxone_value_traced,
     _skip_flexible_consumer_output,
     _write_flexible_consumer_output,
 )
@@ -348,17 +346,9 @@ def _read_optional_temp_c(io_name: str) -> float | None:
 
 def _default_house_profiles_doc() -> dict | None:
     """Load house_profiles.json for plant ehal_bindings (e.g. sens_temperature_outside)."""
-    try:
-        from house_config.profiles_store import load_house_profiles_document
-        from runtime_store.persist_paths import resolve_house_profiles_json_path
+    from house_config.profiles_store import load_default_house_profiles_doc
 
-        path = resolve_house_profiles_json_path()
-        if not path or not os.path.isfile(path):
-            return None
-        return load_house_profiles_document(path)
-    except Exception as exc:
-        logger.warning("house_profiles für Plant-Bindings nicht geladen: %s", exc)
-        return None
+    return load_default_house_profiles_doc()
 
 
 def fetch_heat_storage_temps(

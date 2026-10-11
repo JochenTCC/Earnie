@@ -5,9 +5,6 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-import requests
-from requests.auth import HTTPBasicAuth
-
 import config
 from integrations.loxone_comm_trace import LoxoneWriteRecord
 from settings.ehal_marker_resolve import (
@@ -19,12 +16,6 @@ from settings.ev_power import ev_nominal_power_conversion, kw_to_ampere
 from settings.flexible_consumers import runtime_consumer_id
 
 logger = logging.getLogger(__name__)
-
-
-def _loxone_auth():
-    from integrations import loxone_client as lc
-
-    return lc._loxone_auth()
 
 
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
@@ -70,62 +61,6 @@ def _publish_setpoint_traced(
         success=bool(pub.published),
         written_at=written_at,
     )
-
-
-def _send_loxone_value_traced(input_name: str, value: float) -> LoxoneWriteRecord:
-    """Legacy Merker HTTP write — needs a real Merker name (watchdog / non-loud only)."""
-    from integrations import loxone_client as lc
-    from runtime_store.shadow.writes import block_write_if_shadow
-
-    io_name = str(input_name or "").strip()
-    written_at = datetime.now().isoformat(timespec="seconds")
-    if not io_name:
-        return LoxoneWriteRecord(io_name="", value=float(value), success=False, written_at=written_at)
-
-    if block_write_if_shadow(
-        backend="loxone",
-        target=io_name,
-        value=float(value),
-        source="loxone_writes",
-    ):
-        return LoxoneWriteRecord(
-            io_name=io_name, value=float(value), success=False, written_at=written_at
-        )
-
-    url = f"http://{config.get('LOXONE_IP')}/dev/sps/io/{io_name}/{value}"
-    timeout_val = config.get_global_timeout(default=5)
-
-    try:
-        response = lc.requests.get(
-            url,
-            auth=_loxone_auth(),
-            timeout=timeout_val,
-        )
-        response.raise_for_status()
-        print(f"   ↳ Loxone API: {io_name} erfolgreich auf {value} gesetzt.")
-        return LoxoneWriteRecord(io_name=io_name, value=float(value), success=True, written_at=written_at)
-    except lc.requests.exceptions.Timeout:
-        print(f"🚨 Loxone-Fehler: Timeout ({timeout_val}s) beim Senden an {io_name}.")
-    except lc.requests.exceptions.RequestException as e:
-        from integrations.loxone_connectivity import raise_if_loxone_auth_http_error
-
-        raise_if_loxone_auth_http_error(e, source="loxone_writes")
-        print(f"🚨 Loxone-Fehler: Fehler beim Senden an {io_name}: {e}")
-    return LoxoneWriteRecord(io_name=io_name, value=float(value), success=False, written_at=written_at)
-
-
-def send_loxone_value(input_name: str, value: float) -> bool:
-    """
-    Sendet einen berechneten Steuerwert an einen Virtuellen Eingang des Loxone Miniservers.
-
-    Args:
-        input_name (str): Name des virtuellen Eingangs in Loxone (z.B. 'Ernie_Mode')
-        value (float): Der zu setzende Wert (z.B. 1, 0, 2.5)
-
-    Returns:
-        bool: True bei Erfolg, False bei Fehlern.
-    """
-    return _send_loxone_value_traced(input_name, value).success
 
 
 def map_ess_setpoints(

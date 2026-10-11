@@ -46,6 +46,35 @@ def test_main_down_after_max_wait_without_main_completion():
     assert fresh is True
 
 
+def test_wait_main_when_daemon_alive_after_max_wait():
+    now = _slot_start(10, 0, 30)
+    ready, reason, retry, sync_wait, fresh = s.live_simulation_readiness(
+        "2026-07-05T09:45:01",
+        now,
+        poll_sec=15,
+        daemon_alive=True,
+    )
+    assert not ready
+    assert reason == "wait_main"
+    assert retry == 15
+    assert sync_wait == 0
+    assert fresh is True
+
+
+def test_main_down_when_daemon_explicitly_dead_after_max_wait():
+    now = _slot_start(10, 0, 30)
+    ready, reason, retry, sync_wait, fresh = s.live_simulation_readiness(
+        "2026-07-05T09:45:01",
+        now,
+        daemon_alive=False,
+    )
+    assert ready
+    assert reason == "main_down"
+    assert retry == 0
+    assert sync_wait == 0
+    assert fresh is True
+
+
 def test_main_down_with_persisted_fresh_snapshot():
     now = _slot_start(10, 0, 30)
     persisted = (now - timedelta(minutes=30)).isoformat(timespec="seconds")

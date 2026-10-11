@@ -34,13 +34,13 @@
       "field": "sens_ess_energy_charge",
       "required": false,
       "kind": "telemetry",
-      "notes": "Cumulative charge kWh (Q6 VO push; Loxone Meter total). Exchange: ess.{id}.sens_ess_energy_charge."
+      "notes": "Cumulative charge kWh (Q6 push inbox; hub meter charge total). Exchange: ess.{id}.sens_ess_energy_charge."
     },
     {
       "field": "sens_ess_energy_discharge",
       "required": false,
       "kind": "telemetry",
-      "notes": "Cumulative discharge kWh (Q6 bipolar; Loxone Meter totalNeg). Exchange: ess.{id}.sens_ess_energy_discharge."
+      "notes": "Cumulative discharge kWh (Q6 bipolar; hub meter discharge total). Exchange: ess.{id}.sens_ess_energy_discharge."
     },
     {
       "field": "get_ess_soc_min",
@@ -156,7 +156,7 @@
       "field": "set_ess_mode",
       "required": false,
       "kind": "setpoint",
-      "notes": "Sticky-backend control (Loxone/HA): always write; 0 = Automatik even if Sollleistung Merker is stale. OpenEMS ignores."
+      "notes": "Sticky-backend control (HA/Loxone): always write; 0 = Automatik even if sticky setpoint is stale. OpenEMS ignores."
     },
     {
       "field": "set_ess_source_select",

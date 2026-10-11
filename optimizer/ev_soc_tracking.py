@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from integrations import loxone_client
+from integrations import ehal_live
 from settings.ehal_marker_resolve import (
     marker_sens_evcs_soc_act,
     resolve_get_evcs_limit_soc,
@@ -22,7 +22,7 @@ def fetch_loxone_actual_soc_percent(consumer: dict) -> float | None:
     io_name = marker_sens_evcs_soc_act(consumer)
     if not io_name:
         return None
-    raw = loxone_client.fetch_loxone_generic_value(io_name)
+    raw = ehal_live.read_generic_value(io_name)
     if raw is None:
         return None
     return float(raw)
@@ -53,7 +53,7 @@ def computed_session_soc_percent(
     plug_in = session.get("plug_in_rest_soc_percent")
     if plug_in is None:
         return None
-    capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    capacity_kwh = ehal_live.resolve_consumer_battery_capacity_kwh(consumer)
     if capacity_kwh is None or float(capacity_kwh) <= 0:
         return None
     sched = consumer.get("charging_schedule") or {}

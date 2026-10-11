@@ -45,7 +45,7 @@ def _eauto_consumer(*, forecast_when_absent: bool = True) -> dict:
 
 def _patch_eauto_capacity():
     return patch.object(
-        cc.loxone_client, "resolve_consumer_battery_capacity_kwh", return_value=16.0
+        cc.ehal_live, "resolve_consumer_battery_capacity_kwh", return_value=16.0
     )
 
 
@@ -224,9 +224,9 @@ class TestLoxoneAbsentForecast:
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value=None
+          cc.ehal_live, "fetch_ready_by_time", return_value=None
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -243,9 +243,9 @@ class TestLoxoneAbsentForecast:
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value=""
+          cc.ehal_live, "fetch_ready_by_time", return_value=""
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -260,9 +260,9 @@ class TestLoxoneAbsentForecast:
       consumer["charging_schedule"]["weekend"]["ready_by_hour"] = None
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value=None
+          cc.ehal_live, "fetch_ready_by_time", return_value=None
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -274,9 +274,9 @@ class TestLoxoneAbsentForecast:
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value="Morgen, 16:03"
+          cc.ehal_live, "fetch_ready_by_time", return_value="Morgen, 16:03"
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -297,9 +297,9 @@ class TestLoxoneAbsentForecast:
       tz = ZoneInfo("Europe/Vienna")
       horizon = datetime(2026, 6, 22, 17, 0, tzinfo=tz)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value="Morgen, 16:03"
+          cc.ehal_live, "fetch_ready_by_time", return_value="Morgen, 16:03"
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -312,9 +312,9 @@ class TestLoxoneAbsentForecast:
       horizon = datetime(2026, 6, 23, 8, 0)
       deadline = datetime(2026, 6, 23, 16, 3)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value="Heute, 16:03"
+          cc.ehal_live, "fetch_ready_by_time", return_value="Heute, 16:03"
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -337,9 +337,9 @@ class TestLoxoneAbsentForecast:
       consumer["charging_schedule"]["weekend"]["car_available_from_hour"] = 10
       horizon = datetime(2026, 7, 10, 11, 15)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value=None
+          cc.ehal_live, "fetch_ready_by_time", return_value=None
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -358,9 +358,9 @@ class TestLoxoneAbsentForecast:
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value="Morgen, 07:00"
+          cc.ehal_live, "fetch_ready_by_time", return_value="Morgen, 07:00"
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -377,9 +377,9 @@ class TestLoxoneAbsentForecast:
       consumer["charging_schedule"]["weekend"]["ready_by_hour"] = 7
       horizon = datetime(2026, 7, 31, 9, 0)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value="Morgen, 11:00"
+          cc.ehal_live, "fetch_ready_by_time", return_value="Morgen, 11:00"
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -396,9 +396,9 @@ class TestLoxoneAbsentForecast:
       horizon = datetime(2026, 7, 10, 11, 15)
       deadline = datetime(2026, 7, 11, 12, 0)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), patch.object(
-          cc.loxone_client, "fetch_loxone_ready_by_time", return_value="Morgen, 12:00"
+          cc.ehal_live, "fetch_ready_by_time", return_value="Morgen, 12:00"
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -417,7 +417,7 @@ class TestLoxoneAbsentForecast:
       consumer = _eauto_consumer(forecast_when_absent=False)
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+          cc.ehal_live, "read_generic_value", return_value=0
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
@@ -429,12 +429,12 @@ class TestLoxoneAbsentForecast:
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
-          cc.loxone_client,
-          "fetch_loxone_generic_value",
+          cc.ehal_live,
+          "read_generic_value",
           side_effect=[1, 50.0, 50.0],
       ), patch.object(
-          cc.loxone_client,
-          "fetch_loxone_ready_by_time",
+          cc.ehal_live,
+          "fetch_ready_by_time",
           return_value="Morgen, 07:00",
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
@@ -454,8 +454,8 @@ class TestPluggedInChargeComplete:
       with patch.object(
           cc, "loxone_reports_charge_complete", return_value=True
       ), patch.object(
-          cc.loxone_client,
-          "fetch_loxone_generic_value",
+          cc.ehal_live,
+          "read_generic_value",
           return_value=1,
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
@@ -480,8 +480,8 @@ class TestPluggedInChargeComplete:
       with patch.object(
           cc, "loxone_reports_charge_complete", return_value=True
       ), patch.object(
-          cc.loxone_client,
-          "fetch_loxone_generic_value",
+          cc.ehal_live,
+          "read_generic_value",
           return_value=1,
       ), patch.object(
           cc, "_loxone_ready_raw", return_value="Morgen, 07:00"
@@ -510,7 +510,7 @@ class TestPluggedInChargeComplete:
           return None
 
       with patch.object(
-          cc.loxone_client, "fetch_loxone_generic_value", side_effect=_io
+          cc.ehal_live, "read_generic_value", side_effect=_io
       ), patch.object(
           cc, "_loxone_ready_raw", return_value="Morgen, 07:00"
       ), _patch_eauto_capacity():
@@ -545,12 +545,12 @@ class TestPluggedInChargeComplete:
       with patch.object(
           cc, "loxone_reports_charge_complete", return_value=False
       ), patch.object(
-          cc.loxone_client,
-          "fetch_loxone_generic_value",
+          cc.ehal_live,
+          "read_generic_value",
           side_effect=[1, 80.0, 50.0],
       ), patch.object(
-          cc.loxone_client,
-          "fetch_loxone_ready_by_time",
+          cc.ehal_live,
+          "fetch_ready_by_time",
           return_value="Morgen, 07:00",
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
@@ -567,8 +567,8 @@ class TestPluggedInChargeComplete:
       with patch.object(
           cc, "loxone_reports_charge_complete", return_value=True
       ), patch.object(
-          cc.loxone_client,
-          "fetch_loxone_generic_value",
+          cc.ehal_live,
+          "read_generic_value",
           return_value=1,
       ), _patch_eauto_capacity():
           plugged_ctx = cc.fetch_loxone_charging_context(consumer, horizon)
@@ -577,12 +577,12 @@ class TestPluggedInChargeComplete:
       assert plugged_ctx["deadline"] is None
 
       with patch.object(
-          cc.loxone_client,
-          "fetch_loxone_generic_value",
+          cc.ehal_live,
+          "read_generic_value",
           return_value=0,
       ), patch.object(
-          cc.loxone_client,
-          "fetch_loxone_ready_by_time",
+          cc.ehal_live,
+          "fetch_ready_by_time",
           return_value="Morgen, 16:03",
       ), _patch_eauto_capacity():
           absent_ctx = cc.fetch_loxone_charging_context(consumer, horizon)
@@ -671,7 +671,7 @@ class TestConfigPathFertigUm:
         with patch.object(
             cc, "_loxone_ready_raw", return_value="Heute, 14:00"
         ), patch.object(
-            cc.loxone_client, "fetch_loxone_generic_value", return_value=1
+            cc.ehal_live, "read_generic_value", return_value=1
         ), _patch_eauto_capacity():
             ctx = cc.resolve_charging_context(
                 consumer, matrix, None, logged_simulation=False
@@ -693,7 +693,7 @@ class TestConfigPathFertigUm:
         horizon = datetime(2026, 7, 16, 2, 0)
         matrix = _hour_matrix(horizon, 24)
         with patch.object(cc, "_loxone_ready_raw", return_value=None), patch.object(
-            cc.loxone_client, "fetch_loxone_generic_value", return_value=1
+            cc.ehal_live, "read_generic_value", return_value=1
         ), _patch_eauto_capacity():
             ctx = cc.resolve_charging_context(
                 consumer, matrix, None, logged_simulation=False
@@ -709,7 +709,7 @@ class TestConfigPathFertigUm:
         with patch.object(
             cc, "_loxone_ready_raw", return_value="Morgen, 08:45"
         ), patch.object(
-            cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+            cc.ehal_live, "read_generic_value", return_value=0
         ), _patch_eauto_capacity():
             ctx = cc.resolve_charging_context(
                 consumer, matrix, None, logged_simulation=False
@@ -729,7 +729,7 @@ class TestConfigPathFertigUm:
         horizon = datetime(2026, 7, 20, 10, 0)
         matrix = _hour_matrix(horizon, 24)
         with patch.object(cc, "_loxone_ready_raw", return_value=None), patch.object(
-            cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+            cc.ehal_live, "read_generic_value", return_value=0
         ), _patch_eauto_capacity():
             ctx = cc.resolve_charging_context(
                 consumer, matrix, None, logged_simulation=False
@@ -746,7 +746,7 @@ class TestConfigPathFertigUm:
         horizon = datetime(2026, 7, 20, 9, 30)
         matrix = _hour_matrix(horizon, 24)
         with patch.object(
-            cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+            cc.ehal_live, "read_generic_value", return_value=0
         ), _patch_eauto_capacity():
             ctx = cc.resolve_charging_context(
                 consumer, matrix, None, logged_simulation=False

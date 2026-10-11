@@ -68,7 +68,7 @@ Southbound-Anbindungen laufen über den **Earnie Hardware Access Layer (EHAL)** 
 3. Unit-Tests für den Adapter; Config-Switch-Parität in `tests/test_ehal_contract_backends.py` erweitern.
 4. Mapping-Hilfen (Rollen/Rezepte) gehören in §4 — sie sind **keine** Live-I/O-Engine.
 
-Referenz-Backends: OpenEMS (`2.4.b`), HA+evcc (`2.4.c`), Loxone-EHAL M1 (`2.4.e`); automatisierter Multi-Backend-Nachweis (`2.4.h`). Flex/`target_soc`/`control_cmd` bleiben vorerst auf `loxone_client` (kein Schema-Erweiterung in `2.4.e`).
+Referenz-Backends: OpenEMS (`2.4.b`), HA+evcc (`2.4.c`), Loxone-EHAL M1 (`2.4.e`); automatisierter Multi-Backend-Nachweis (`2.4.h`). Live-I/O außerhalb von `integrations/` nur über [`integrations/ehal_live.py`](integrations/ehal_live.py) (named ops); `loxone_client` / `loxone_writes` / `loxone_live_power` sind integrations-intern.
 
 Nicht alles ist Teil des Basis-Setups (z. B. individuelle Pool-, Klima- oder Sonderanlagen). Technisch versierte Nutzer dürfen den Local Core und vorhandene Schnittstellen nutzen, um **eigene Logiken** anzubinden — unter derselben Lizenz; neue Hubs idealerweise als EHAL-Adapter.
 

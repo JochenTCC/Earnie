@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
-from integrations.loxone_writes import _send_loxone_value_traced
+from integrations.loxone_writes import _publish_setpoint_traced
 from runtime_store.shadow import feed as shadow_feed
 from runtime_store.shadow.errors import ConfigReadOnlyError
 from runtime_store.shadow.writes import read_shadow_writes
@@ -27,7 +27,7 @@ def test_loxone_write_blocked_and_logged(monkeypatch, tmp_path):
     runtime.mkdir()
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime))
-    record = _send_loxone_value_traced("Earnie_Mode", 1.0)
+    record = _publish_setpoint_traced("set_ess_mode", 1.0, io_name="Earnie_Mode")
     assert record.success is False
     rows = read_shadow_writes()
     assert len(rows) == 1
