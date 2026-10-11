@@ -64,6 +64,20 @@ def _default_battery_params() -> dict | list[dict]:
     return config.get_battery_params()
 
 
+def _default_inverter_params() -> list[dict]:
+    get_list = getattr(config, "get_planning_inverters", None)
+    if callable(get_list):
+        return list(get_list() or [])
+    return list(getattr(config, "_planning_inverters", None) or [])
+
+
+def _default_pv_systems() -> list[dict]:
+    get_list = getattr(config, "get_planning_pv_systems", None)
+    if callable(get_list):
+        return list(get_list() or [])
+    return list(getattr(config, "_planning_pv_systems", None) or [])
+
+
 def _primary_battery_params(battery_params: dict | list[dict]) -> dict:
     from .milp_horizon import aggregate_battery_params_for_load, coerce_battery_params_list
 
@@ -85,6 +99,8 @@ def _build_milp_model_with_objective(
     inbound_export_limit_kw: float | None = None,
     export_caps_kw: list[float | None] | None = None,
     current_soc_by_id: dict[str, float] | None = None,
+    inverter_params: dict | list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
 ) -> MilpHorizonModel:
     """Horizontmodell samt Zielfunktion (Energiekosten + Batterie-Verschleiß)."""
     from .export_power_limit import export_caps_for_horizon
@@ -97,6 +113,12 @@ def _build_milp_model_with_objective(
             inbound_limit_kw=inbound_export_limit_kw,
             fallback_k_push=k_push,
         )
+    inv = (
+        inverter_params
+        if inverter_params is not None
+        else _default_inverter_params()
+    )
+    pvs = pv_systems if pv_systems is not None else _default_pv_systems()
     model = _build_milp_model(
         matrix,
         inputs.horizon,
@@ -110,6 +132,8 @@ def _build_milp_model_with_objective(
         dt_h=inputs.dt_h,
         export_caps_kw=caps,
         current_soc_by_id=current_soc_by_id,
+        inverter_params=inv,
+        pv_systems=pvs,
     )
     wear_cent_per_kwh = 0.0
     primary = _primary_battery_params(battery_params)
@@ -292,6 +316,8 @@ def _solve_milp_to_model(
     inbound_export_limit_kw: float | None = None,
     export_caps_kw: list[float | None] | None = None,
     current_soc_by_id: dict[str, float] | None = None,
+    inverter_params: dict | list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
 ) -> tuple[MilpHorizonModel, dict[str, float], dict[str, float], list[int], dict, dict] | None:
     """Baut und löst das MILP; None wenn nicht optimal / leere Matrix."""
     if not matrix:
@@ -320,6 +346,8 @@ def _solve_milp_to_model(
         inbound_export_limit_kw=inbound_export_limit_kw,
         export_caps_kw=export_caps_kw,
         current_soc_by_id=current_soc_by_id,
+        inverter_params=inverter_params,
+        pv_systems=pv_systems,
     )
     _add_flex_side_constraints(
         model, matrix, inputs, verbose, consumer_continue_on, thermal_flex_contexts
@@ -434,6 +462,8 @@ def milp_optimizer(
     inbound_export_limit_kw: float | None = None,
     export_caps_kw: list[float | None] | None = None,
     current_soc_by_id: dict[str, float] | None = None,
+    inverter_params: dict | list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
 ) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
@@ -477,6 +507,8 @@ def milp_optimizer(
         inbound_export_limit_kw=inbound_export_limit_kw,
         export_caps_kw=export_caps_kw,
         current_soc_by_id=current_soc_by_id,
+        inverter_params=inverter_params,
+        pv_systems=pv_systems,
     )
     if solved is None:
         return _AUTOMATIK_FALLBACK
@@ -528,6 +560,8 @@ def milp_horizon_schedule(
     inbound_export_limit_kw: float | None = None,
     export_caps_kw: list[float | None] | None = None,
     current_soc_by_id: dict[str, float] | None = None,
+    inverter_params: dict | list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Ein CBC-Solve über die Matrix; Rückgabe: Stundenplan-Slots für Open-Loop / commit-K.
@@ -572,6 +606,8 @@ def milp_horizon_schedule(
         inbound_export_limit_kw=inbound_export_limit_kw,
         export_caps_kw=export_caps_kw,
         current_soc_by_id=current_soc_by_id,
+        inverter_params=inverter_params,
+        pv_systems=pv_systems,
     )
     if solved is None:
         return [dict(_FALLBACK_SCHEDULE_SLOT)]

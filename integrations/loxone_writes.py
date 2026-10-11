@@ -571,6 +571,21 @@ def send_huawei_modbus_states(
     return records
 
 
+def write_inv_ac_power_limits(fields_w: dict[str, float]) -> list[LoxoneWriteRecord]:
+    """Publish ``inv.{id}.set_inv_ac_power_limit`` (EHAL W → Loxone kW) to status.json."""
+    from ehal.field_registry import require_loxone_write
+    from ehal.inverter_fields import inv_field_kind
+
+    records: list[LoxoneWriteRecord] = []
+    for qualified_id, value_w in (fields_w or {}).items():
+        qid = str(qualified_id or "").strip()
+        if not qid or inv_field_kind(qid) != "set_inv_ac_power_limit":
+            continue
+        hub_kw = float(require_loxone_write("set_inv_ac_power_limit", float(value_w)))
+        records.append(_publish_setpoint_traced(qid, hub_kw, io_name=qid))
+    return records
+
+
 def send_flexible_consumer_states(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,

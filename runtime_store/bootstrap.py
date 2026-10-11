@@ -38,6 +38,8 @@ from runtime_store.persist_paths import (
     resolve_house_profiles_json_path,
     resolve_house_profiles_minimal_template_path,
     resolve_house_profiles_template_path,
+    resolve_grid_fees_catalog_template_path,
+    resolve_grid_fees_json_path,
     resolve_tariffs_catalog_template_path,
     resolve_tariffs_json_path,
     resolve_tariffs_minimal_template_path,
@@ -416,6 +418,15 @@ def _bootstrap_tariffs_json() -> bool:
     )
 
 
+def _bootstrap_grid_fees_json() -> bool:
+    """Seed site grid_fees.json from public catalog (share/config)."""
+    dest = resolve_grid_fees_json_path()
+    catalog = resolve_grid_fees_catalog_template_path()
+    if os.path.normpath(catalog) == os.path.normpath(dest):
+        return False
+    return _copy_template_if_missing(dest, catalog, "share/config/grid_fees.json")
+
+
 def _bootstrap_house_profiles_example() -> bool:
     dest = config_path("house_profiles.example.json")
     return _copy_template_if_missing(
@@ -576,7 +587,7 @@ def _bootstrap_dotenv() -> bool:
 
 
 def _bootstrap_config_pack_artifacts() -> tuple[list[str], bool]:
-    """Config/scenarios/tariffs/house/components/deviation artifacts.
+    """Config/scenarios/tariffs/grid_fees/house/components/deviation artifacts.
 
     Returns ``(created_paths, config_just_created)``.
     """
@@ -600,6 +611,8 @@ def _bootstrap_config_pack_artifacts() -> tuple[list[str], bool]:
         created.append(config_path("tariffs.schema.json"))
     if _bootstrap_tariffs_json():
         created.append(resolve_tariffs_json_path())
+    if _bootstrap_grid_fees_json():
+        created.append(resolve_grid_fees_json_path())
     if _bootstrap_house_profiles_example():
         created.append(config_path("house_profiles.example.json"))
     if _bootstrap_house_profiles_schema():

@@ -27,6 +27,7 @@ from runtime_store.ehal_setup import BACKEND_HA, default_adapter_id, resolve_ada
 from ui.ehal_function_status import (
     render_control_capability_warnings,
     render_function_status,
+    render_inverter_control_capability_warnings,
 )
 from ehal.ess_fields import ess_field, ess_field_kind
 from ui.ehal_loxone_mapping import (
@@ -35,8 +36,10 @@ from ui.ehal_loxone_mapping import (
     PLANT_TELEMETRY_REQUIRED,
     apply_battery_bindings,
     apply_entity_bindings,
+    apply_inverter_bindings,
     build_entity_rows,
     entity_kind_for_id,
+    INVERTER_ENTITY_KIND,
     resolve_live_profile_id,
 )
 from ui.house_config_io import (
@@ -495,6 +498,14 @@ def _save_entity_mapping(
         )
         _save_components_document(components)
         detail = "`components.json` (`batteries[].ehal_bindings`)"
+    elif kind == INVERTER_ENTITY_KIND:
+        components = apply_inverter_bindings(
+            _load_components_document(),
+            inverter_id=entity_id,
+            bindings=ehal_map,
+        )
+        _save_components_document(components)
+        detail = "`components.json` (`inverters[].ehal_bindings`)"
     else:
         updated = apply_entity_bindings(
             migrated_house,
@@ -581,6 +592,15 @@ def _run_telemetry_smoke_test(
             trial_components = apply_battery_bindings(
                 _load_components_document(),
                 battery_id=entity_id,
+                bindings=ehal_map,
+            )
+            entities_map = aggregate_ha_entities(
+                house, components_doc=trial_components
+            )
+        elif kind == INVERTER_ENTITY_KIND:
+            trial_components = apply_inverter_bindings(
+                _load_components_document(),
+                inverter_id=entity_id,
                 bindings=ehal_map,
             )
             entities_map = aggregate_ha_entities(
@@ -699,6 +719,12 @@ def _render_entity_mapping_body(
             control=bat_control,
             ehal_map=ehal_map,
             ha_ess_force=ha_ess_force if kind != BATTERY_ENTITY_KIND else None,
+        )
+    elif kind == INVERTER_ENTITY_KIND:
+        inv = entity.get("inverter") if isinstance(entity.get("inverter"), dict) else {}
+        inv_control = str(inv.get("control") or "full")
+        render_inverter_control_capability_warnings(
+            control=inv_control, ehal_map=ehal_map
         )
 
     sign = dict(current["sign"])

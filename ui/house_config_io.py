@@ -109,6 +109,9 @@ def list_batteries() -> list[dict]:
 def list_pv_systems() -> list[dict]:
     return config.get_pv_systems()
 
+def list_inverters() -> list[dict]:
+    return config.get_inverters()
+
 def list_import_tariffs() -> list[dict]:
     doc = load_tariffs()
     return list(doc.get("import_tariffs", {}).values())
@@ -219,6 +222,7 @@ from ui.house_config_entities_io import (  # noqa: E402
     _save_config_document,
     compute_baseload_kwh,
     delete_battery,
+    delete_inverter,
     delete_pv_system,
     delete_scenario,
     get_live_scenario_refs,
@@ -231,6 +235,7 @@ from ui.house_config_entities_io import (  # noqa: E402
     save_main_config,
     save_planning_tariff_selection,
     upsert_battery,
+    upsert_inverter,
     upsert_pv_system,
     upsert_scenario,
 )
@@ -249,6 +254,7 @@ __all__ = [
     "csv_upload_widget_key",
     "delete_battery",
     "delete_house_profile",
+    "delete_inverter",
     "delete_pv_system",
     "delete_scenario",
     "get_live_scenario_refs",
@@ -257,6 +263,7 @@ __all__ = [
     "list_batteries",
     "list_export_tariffs",
     "list_import_tariffs",
+    "list_inverters",
     "list_pv_systems",
     "load_backtesting_scenarios_raw",
     "load_house_profiles",
@@ -281,6 +288,7 @@ __all__ = [
     "tariffs_json_path",
     "upsert_battery",
     "upsert_house_profile",
+    "upsert_inverter",
     "upsert_pv_system",
     "upsert_scenario",
     "write_json_document",

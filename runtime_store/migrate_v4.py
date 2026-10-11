@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any
 
 from ehal.ess_fields import ess_field, plant_flat_ess_keys
-from house_config.battery_kind import DEFAULT_BATTERY_KIND
 from runtime_store.data_model import (
     CURRENT_DATA_MODEL,
     DATA_MODEL_KEY,
@@ -57,17 +56,18 @@ def migrate_scenarios_doc(doc: dict[str, Any]) -> dict[str, Any]:
 
 
 def migrate_components_doc(doc: dict[str, Any]) -> dict[str, Any]:
-    """Default missing batteries[].kind; stamp data model."""
+    """Ensure ehal_bindings; run inverter migrate (2.7.l) when still on kind."""
+    from house_config.migrate_inverters import migrate_components_inverters
+
     out = dict(doc)
     batteries = out.get("batteries")
     if isinstance(batteries, list):
         for bat in batteries:
             if not isinstance(bat, dict):
                 continue
-            if not str(bat.get("kind") or "").strip():
-                bat["kind"] = DEFAULT_BATTERY_KIND
             if "ehal_bindings" not in bat or bat.get("ehal_bindings") is None:
                 bat["ehal_bindings"] = {}
+    out, _changed = migrate_components_inverters(out)
     stamp_data_model(out)
     return out
 
@@ -234,8 +234,6 @@ def migrate_plant_source_select_to_standby(
             changed = True
     if changed:
         target_bat["ehal_bindings"] = merged
-        if not str(target_bat.get("kind") or "").strip():
-            target_bat["kind"] = DEFAULT_BATTERY_KIND
     stamp_data_model(house_out)
     stamp_data_model(comp_out)
     return house_out, migrate_components_doc(comp_out), changed
@@ -281,8 +279,6 @@ def migrate_plant_ess_to_components(
                 bindings.pop(kind, None)
 
     target_bat["ehal_bindings"] = merged
-    if not str(target_bat.get("kind") or "").strip():
-        target_bat["kind"] = DEFAULT_BATTERY_KIND
     stamp_data_model(house_out)
     stamp_data_model(comp_out)
     return house_out, migrate_components_doc(comp_out), True

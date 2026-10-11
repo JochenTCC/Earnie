@@ -21,6 +21,7 @@ def test_normalize_battery_migrates_legacy_and_limits_from_live():
     spec = normalize_battery(
         {
             "id": "b1",
+            "inverter_id": "wr_main",
             "battery_capacity_kwh": 10.0,
             "battery_max_power_kw": 5.0,
             "battery_efficiency": 0.95,
@@ -41,6 +42,7 @@ def test_normalize_battery_asymmetric_charge_discharge():
     spec = normalize_battery(
         {
             "id": "b1",
+            "inverter_id": "wr_main",
             "battery_capacity_kwh": 10.0,
             "battery_max_charge_power_kw": 3.0,
             "battery_max_discharge_power_kw": 7.0,
@@ -170,12 +172,16 @@ def test_collect_read_checks_includes_ess_limit_gets(tmp_path, monkeypatch):
     from ehal.ess_fields import ess_field
     from integrations import loxone_connectivity as lc
 
+    from tests.config_fixtures import main_hybrid_inverter
+
     house_id = "15_kwh_speicher"
     components = {
+        "inverters": [main_hybrid_inverter()],
         "batteries": [
             {
                 "id": house_id,
                 "type": "house",
+                "inverter_id": "wr_main",
                 "ehal_bindings": {
                     ess_field(house_id, "get_ess_soc_min"): "Earnie_Batterie_SOC_Min",
                     ess_field(house_id, "get_ess_soc_max"): "Earnie_Batterie_SOC_Max",
@@ -187,7 +193,8 @@ def test_collect_read_checks_includes_ess_limit_gets(tmp_path, monkeypatch):
                     ): "Earnie_Batterie_Max_Entladeleistung",
                 },
             }
-        ]
+        ],
+        "pv_systems": [],
     }
     path = tmp_path / "components.json"
     path.write_text(__import__("json").dumps(components), encoding="utf-8")

@@ -44,6 +44,7 @@ Nach `up` (vor manueller Ersteinrichtung) sollten u. a. vorhanden sein:
 | `greenfield/runtime/cons_data.csv` | Nur CSV-Header, keine Messzeilen |
 | `greenfield/config/house_profiles.json` | `profiles: []` |
 | `greenfield/config/tariffs.json` | Katalog aus `tariffs.example.json` (mehrere Import-/Export-Tarife zur Auswahl) |
+| `greenfield/config/grid_fees.json` | Netzentgelt-Katalog aus `share/config/grid_fees.json` |
 | `greenfield/config/backtesting_scenarios.json` | Mindestens Live-Szenario `live` (aus `backtesting_scenarios.minimal.json`) |
 
 Weitere Bootstrap-Dateien (Tarife, `deviation_rules.json`, leere Profil-CSVs, Log) siehe `runtime_store/bootstrap.py`.

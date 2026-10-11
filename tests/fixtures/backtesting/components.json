@@ -1,8 +1,19 @@
 {
+    "inverters": [
+        {
+            "id": "wr_main",
+            "label": "Haupt-Wechselrichter",
+            "type": "hybrid",
+            "ac_connection": "grid_tied",
+            "control": "full",
+            "ehal_bindings": {}
+        }
+    ],
     "batteries": [
         {
             "id": "test_battery",
             "label": "Test 8 kWh",
+            "inverter_id": "wr_main",
             "battery_capacity_kwh": 8.0,
             "battery_max_power_kw": 4.0,
             "battery_efficiency": 0.95,
@@ -15,7 +26,6 @@
                 "expected_cycles": 6000,
                 "cycle_cost_fraction": 0.5
             },
-            "kind": "battery_inverter",
             "ehal_bindings": {}
         }
     ],
@@ -25,7 +35,8 @@
             "label": "Test PV 6 kWp",
             "kwp": 6.0,
             "pv_tilt": 18,
-            "pv_azimuth": 28
+            "pv_azimuth": 28,
+            "inverter_id": "wr_main"
         }
     ],
     "earnie_data_model": 4

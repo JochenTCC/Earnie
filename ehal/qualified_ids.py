@@ -103,6 +103,11 @@ def qualified_battery_id(battery_id: str, key: str) -> str:
     return f"{NS_ESS}.{str(battery_id).strip()}.{field_kind(key)}"
 
 
+def qualified_inverter_id(inverter_id: str, key: str) -> str:
+    """``inv.<Kennung>.<kind>`` for an inverter binding key (entity-scoped or flat)."""
+    return f"{NS_INV}.{str(inverter_id).strip()}.{field_kind(key)}"
+
+
 def qualified_grid_id(key: str, *, meter_id: str = GRID_METER_ID) -> str:
     """``grid.<meter>.<kind>`` for a plant grid field (binding key or kind)."""
     mid = str(meter_id or GRID_METER_ID).strip() or GRID_METER_ID

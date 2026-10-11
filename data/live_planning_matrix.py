@@ -29,7 +29,12 @@ def assemble_live_planning_rows(
     logger.info("Matrix-Aufbau: Flexible Verbraucher-Profile laden …")
     flex_profiles = _load_flexible_consumer_hourly_profiles(target_hours)
     logger.info("Matrix-Aufbau: PV-Prognose laden …")
-    forecast_pv = pv_forecast.get_hourly_pv_forecast_for_hours(target_hours)
+    forecast_pv_by_system = pv_forecast.get_hourly_pv_forecast_by_system_for_hours(
+        target_hours
+    )
+    forecast_pv = pv_forecast.sum_pv_forecast_by_system(
+        forecast_pv_by_system, len(target_hours)
+    )
     logger.info("Matrix-Aufbau: Optimierungsmatrix zusammenstellen …")
     optimization_matrix = _build_optimization_matrix(
         market_data,
@@ -43,6 +48,11 @@ def assemble_live_planning_rows(
             cid: flex_profiles[cid][i]
             for cid in flex_profiles
         }
+        if forecast_pv_by_system:
+            row["expected_p_pv_by_system"] = {
+                sid: float(series[i])
+                for sid, series in forecast_pv_by_system.items()
+            }
     return optimization_matrix, flex_profiles
 
 

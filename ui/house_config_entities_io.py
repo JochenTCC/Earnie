@@ -79,6 +79,11 @@ def upsert_pv_system(
         force_from_label=force_id_from_label,
     )
     assert_unique_label(label or entity_id, systems, exclude_id=entity_id)
+    inverter_id = str(raw_spec.get("inverter_id") or "").strip()
+    if not inverter_id and isinstance(existing, dict):
+        inverter_id = str(existing.get("inverter_id") or "").strip()
+    if not inverter_id:
+        raise ValueError("PV-Anlage: inverter_id fehlt.")
     # Wire shape for components.json (kwp); normalize_pv_system uses pv_kwp at runtime.
     save_spec = {
         "id": entity_id,
@@ -86,6 +91,7 @@ def upsert_pv_system(
         "kwp": float(raw_spec["kwp"]),
         "pv_tilt": float(raw_spec.get("pv_tilt", 25.0)),
         "pv_azimuth": float(raw_spec.get("pv_azimuth", 0.0)),
+        "inverter_id": inverter_id,
         ID_LOCKED_KEY: id_locked,
     }
     if not id_locked and provisional:
@@ -102,6 +108,140 @@ def upsert_pv_system(
     data["pv_systems"] = systems
     _save_components_document(data)
     return entity_id
+
+
+def upsert_inverter(
+    raw_spec: dict,
+    *,
+    stable_id: str = "",
+    force_id_from_label: bool = False,
+) -> str:
+    """Upsert inverter; return the persisted id (may rename when unlocking)."""
+    from house_config.entity_id_lock import (
+        ID_LOCKED_KEY,
+        ID_PROVISIONAL_LABEL_KEY,
+        resolve_id_on_save,
+        rewrite_inv_bindings_slug,
+    )
+    from house_config.inverter import normalize_inverter
+    from house_config.label_uniqueness import assert_unique_label
+
+    data = _load_components_document()
+    inverters = list(data.get("inverters") or [])
+    old_id = str(stable_id or "").strip()
+    existing = next(
+        (
+            item
+            for item in inverters
+            if isinstance(item, dict) and str(item.get("id", "")).strip() == old_id
+        ),
+        None,
+    )
+    taken = {str(item.get("id", "")) for item in inverters if item.get("id")}
+    label = str(raw_spec.get("label", "")).strip()
+    entity_id, id_locked, provisional = resolve_id_on_save(
+        label=label,
+        stable_id=old_id,
+        existing=existing,
+        taken=taken,
+        provisional_from_ui=str(raw_spec.get(ID_PROVISIONAL_LABEL_KEY) or "").strip(),
+        force_from_label=force_id_from_label,
+    )
+    assert_unique_label(label or entity_id, inverters, exclude_id=entity_id)
+    bindings_src = raw_spec.get("ehal_bindings")
+    if (
+        not (
+            isinstance(bindings_src, dict)
+            and any(str(v or "").strip() for v in bindings_src.values())
+        )
+        and isinstance(existing, dict)
+        and isinstance(existing.get("ehal_bindings"), dict)
+    ):
+        bindings_src = existing.get("ehal_bindings")
+    if old_id and old_id != entity_id:
+        bindings_src = rewrite_inv_bindings_slug(
+            bindings_src if isinstance(bindings_src, dict) else {},
+            old_id=old_id,
+            new_id=entity_id,
+        )
+    save_spec: dict = {
+        "id": entity_id,
+        "label": label or entity_id,
+        "type": str(raw_spec.get("type") or "hybrid").strip().lower(),
+        "ac_connection": str(
+            raw_spec.get("ac_connection") or "grid_tied"
+        ).strip().lower(),
+        "control": str(raw_spec.get("control") or "full").strip().lower(),
+        ID_LOCKED_KEY: id_locked,
+    }
+    for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw"):
+        if field in raw_spec and raw_spec[field] not in (None, ""):
+            save_spec[field] = float(raw_spec[field])
+    owned_by = str(raw_spec.get("owned_by") or "").strip()
+    if not owned_by and isinstance(existing, dict):
+        owned_by = str(existing.get("owned_by") or "").strip()
+    if owned_by:
+        save_spec["owned_by"] = owned_by
+    if isinstance(bindings_src, dict):
+        save_spec["ehal_bindings"] = bindings_src
+    if not id_locked and provisional:
+        save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
+    normalize_inverter(save_spec, 0)
+    if old_id and old_id != entity_id:
+        _rewrite_inverter_refs_in_doc(data, old_id, entity_id)
+    inverters = [
+        item
+        for item in inverters
+        if str(item.get("id", "")).strip() not in {entity_id, old_id}
+    ]
+    inverters.append(save_spec)
+    data["inverters"] = inverters
+    _save_components_document(data)
+    return entity_id
+
+
+def _rewrite_inverter_refs_in_doc(data: dict, old_id: str, new_id: str) -> None:
+    """Point batteries/PV inverter_id from old_id to new_id in-place."""
+    for key in ("batteries", "pv_systems"):
+        rows = list(data.get(key) or [])
+        new_rows: list[dict] = []
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            row = dict(item)
+            if str(row.get("inverter_id") or "").strip() == old_id:
+                row["inverter_id"] = new_id
+            new_rows.append(row)
+        data[key] = new_rows
+
+
+def delete_inverter(entity_id: str) -> None:
+    """Remove an inverter; fail if batteries/PV still reference it."""
+    from house_config.inverter_lifecycle import inverter_refs_blocking_delete
+
+    target = str(entity_id or "").strip()
+    if not target:
+        raise ValueError("Wechselrichter-ID fehlt.")
+    data = _load_components_document()
+    inverters = list(data.get("inverters") or [])
+    remaining = [
+        item for item in inverters if str(item.get("id", "")).strip() != target
+    ]
+    if len(remaining) == len(inverters):
+        raise ValueError(f"Unbekannter Wechselrichter '{target}'.")
+    refs = inverter_refs_blocking_delete(
+        inverter_id=target,
+        batteries=list(data.get("batteries") or []),
+        pv_systems=list(data.get("pv_systems") or []),
+    )
+    if refs:
+        raise ValueError(
+            f"Wechselrichter '{target}' wird noch referenziert: "
+            + ", ".join(refs)
+            + "."
+        )
+    data["inverters"] = remaining
+    _save_components_document(data)
 
 def delete_pv_system(entity_id: str) -> None:
     """Remove a PV system from components.json and scrub scenario references."""
@@ -408,22 +548,31 @@ def upsert_battery(
         "id": entity_id,
         "label": label or entity_id,
         "battery_capacity_kwh": float(raw_spec["battery_capacity_kwh"]),
-        "battery_max_charge_power_kw": float(
-            raw_spec.get("battery_max_charge_power_kw", raw_spec.get("battery_max_power_kw"))
-        ),
-        "battery_max_discharge_power_kw": float(
-            raw_spec.get(
-                "battery_max_discharge_power_kw",
-                raw_spec.get("battery_max_power_kw"),
-            )
-        ),
-        "battery_efficiency": float(raw_spec["battery_efficiency"]),
-        "battery_min_soc": float(raw_spec["battery_min_soc"]),
-        "battery_max_soc": float(raw_spec["battery_max_soc"]),
         "threshold_power": float(raw_spec.get("threshold_power", 0.05)),
         "standby_power_kw": float(raw_spec.get("standby_power_kw", 0.0) or 0.0),
         "limits_from_live": bool(raw_spec.get("limits_from_live", False)),
     }
+    # Virtual PS may omit electrical fields; inheritance fills them before normalize.
+    for key, sources in (
+        (
+            "battery_max_charge_power_kw",
+            ("battery_max_charge_power_kw", "battery_max_power_kw"),
+        ),
+        (
+            "battery_max_discharge_power_kw",
+            ("battery_max_discharge_power_kw", "battery_max_power_kw"),
+        ),
+        ("battery_efficiency", ("battery_efficiency",)),
+        ("battery_min_soc", ("battery_min_soc",)),
+        ("battery_max_soc", ("battery_max_soc",)),
+    ):
+        raw_val = None
+        for src in sources:
+            if raw_spec.get(src) is not None:
+                raw_val = raw_spec.get(src)
+                break
+        if raw_val is not None:
+            spec[key] = float(raw_val)
     if bindings_src is not None:
         raw_spec = dict(raw_spec)
         raw_spec["ehal_bindings"] = bindings_src
@@ -431,8 +580,10 @@ def upsert_battery(
         spec["control"] = raw_spec["control"]
     if raw_spec.get("type") is not None:
         spec["type"] = raw_spec["type"]
-    if raw_spec.get("kind") is not None:
-        spec["kind"] = raw_spec["kind"]
+    if raw_spec.get("inverter_id") is not None:
+        inv_raw = str(raw_spec.get("inverter_id") or "").strip()
+        if inv_raw:
+            spec["inverter_id"] = inv_raw
     for key in ("backing", "role", "attached_consumer_id", "attached_consumer_ids"):
         if raw_spec.get(key) is not None:
             spec[key] = raw_spec[key]
@@ -451,7 +602,7 @@ def upsert_battery(
                     "role",
                     "attached_consumer_id",
                     "attached_consumer_ids",
-                    "kind",
+                    "inverter_id",
                 ):
                     if key in item:
                         existing_type_fields[key] = item[key]
@@ -468,7 +619,16 @@ def upsert_battery(
         spec["battery_wear"] = {"enabled": False}
     if raw_spec.get("ehal_bindings") is not None:
         spec["ehal_bindings"] = raw_spec["ehal_bindings"]
-    from house_config.powerstation import apply_virtual_powerstation_inheritance
+    from house_config.inverter_lifecycle import (
+        drop_owned_inverters,
+        ensure_owned_island_inverter,
+        is_physical_powerstation,
+        rebind_owned_by,
+    )
+    from house_config.powerstation import (
+        apply_virtual_powerstation_inheritance,
+        is_virtual_powerstation,
+    )
 
     siblings = [
         item
@@ -477,6 +637,38 @@ def upsert_battery(
     ]
     siblings.append(spec)
     spec = apply_virtual_powerstation_inheritance(spec, siblings)
+    inverters = list(data.get("inverters") or [])
+    if old_id and old_id != entity_id:
+        inverters = rebind_owned_by(
+            inverters, old_battery_id=old_id, new_battery_id=entity_id
+        )
+    if is_virtual_powerstation(spec):
+        spec.pop("inverter_id", None)
+        inverters = drop_owned_inverters(inverters, battery_id=entity_id)
+        if old_id and old_id != entity_id:
+            inverters = drop_owned_inverters(inverters, battery_id=old_id)
+    elif is_physical_powerstation(spec):
+        inverters, inv_id = ensure_owned_island_inverter(
+            inverters,
+            battery_id=entity_id,
+            battery_label=str(spec.get("label") or entity_id),
+        )
+        spec["inverter_id"] = inv_id
+    else:
+        inv_id = str(spec.get("inverter_id") or "").strip()
+        if not inv_id:
+            raise ValueError(
+                f"Batterie '{entity_id}': inverter_id fehlt "
+                "(virtuelle Powerstations ausgenommen)."
+            )
+        inverters = drop_owned_inverters(
+            inverters, battery_id=entity_id, keep_id=inv_id
+        )
+        if old_id and old_id != entity_id:
+            inverters = drop_owned_inverters(
+                inverters, battery_id=old_id, keep_id=inv_id
+            )
+    data["inverters"] = inverters
     normalized = normalize_battery(spec, 0)
     # Persist split fields (drop legacy single max when both are present).
     save_spec = {
@@ -492,7 +684,6 @@ def upsert_battery(
         "threshold_power": normalized["threshold_power"],
         "standby_power_kw": normalized["standby_power_kw"],
         "control": normalized["control"],
-        "kind": normalized.get("kind"),
         "limits_from_live": normalized["limits_from_live"],
         "battery_wear": normalized["battery_wear"]
         if normalized["battery_wear"] is not None
@@ -501,6 +692,9 @@ def upsert_battery(
     }
     if not id_locked and provisional:
         save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
+    inv_persist = str(normalized.get("inverter_id") or "").strip()
+    if inv_persist:
+        save_spec["inverter_id"] = inv_persist
     if normalized.get("type") == "powerstation":
         save_spec["backing"] = normalized["backing"]
         save_spec["role"] = normalized["role"]
@@ -545,6 +739,11 @@ def upsert_battery(
 
 def delete_battery(entity_id: str) -> None:
     """Remove a battery from components.json and scrub scenario references."""
+    from house_config.inverter_lifecycle import (
+        drop_owned_inverters,
+        inverter_refs_blocking_delete,
+    )
+
     target = str(entity_id or "").strip()
     if not target:
         raise ValueError("Batterie-ID fehlt.")
@@ -555,7 +754,29 @@ def delete_battery(entity_id: str) -> None:
     remaining = [item for item in batteries if str(item.get("id", "")).strip() != target]
     if len(remaining) == len(batteries):
         raise ValueError(f"Unbekannte Batterie '{target}'.")
+    inverters = list(data.get("inverters") or [])
+    owned_ids = [
+        str(item.get("id") or "").strip()
+        for item in inverters
+        if isinstance(item, dict)
+        and str(item.get("owned_by") or "").strip() == target
+        and str(item.get("id") or "").strip()
+    ]
+    pv_systems = list(data.get("pv_systems") or [])
+    for inv_id in owned_ids:
+        refs = inverter_refs_blocking_delete(
+            inverter_id=inv_id,
+            batteries=remaining,
+            pv_systems=pv_systems,
+            exclude_battery_id=target,
+        )
+        if refs:
+            raise ValueError(
+                f"Batterie '{target}' hat integrierten Wechselrichter '{inv_id}', "
+                "der noch referenziert wird: " + ", ".join(refs) + "."
+            )
     data["batteries"] = remaining
+    data["inverters"] = drop_owned_inverters(inverters, battery_id=target)
     _save_components_document(data)
 
 def _live_scenario_settings() -> dict:

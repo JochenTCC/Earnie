@@ -237,7 +237,8 @@ Leistung und typische Laufzeit angeben. Optional später ein Loxone-Leistungsmer
 Unter PV-Anlagen (Komponenten-Katalog):
 
 - installierte Leistung (**kWp**)  
-- Dachneigung und Ausrichtung (Azimut: Süd ≈ 0°, Ost negativ, West positiv)
+- Dachneigung und Ausrichtung (Azimut: Süd ≈ 0°, Ost negativ, West positiv)  
+- zugeordneter **Wechselrichter** (`inverter_id`)
 
 Es können mehrere PV-Anlagen konfiguriert werden. Die konfigurierten PV-Anlagen können in den Szenarios selektiert und kombiniert werden. So kann in einer Was-Wäre-Wenn Analyse auch eine mögliche Erweiterung vorab analysiert werden.
 
@@ -250,7 +251,10 @@ Folgende Parameter sind relevant:
 - nutzbare Kapazität (kWh)  
 - max. Lade-/Entladeleistung (kW)  
 - Wirkungsgrad, min./max. SOC  
+- zugeordneter **Wechselrichter** (Hausbatterie) bzw. integrierter Insel-WR bei physischer Powerstation  
 - optional **Verschleißkosten** (damit Earnie bei vielen Zyklen dies wirtschaftlich berücksichtigt)
+
+Wechselrichter pflegen Sie im Tab **Wechselrichter** (Typ, AC-Anschluss netzgekoppelt/Insel, optionale Leistungs-Caps). Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
 
 Im Live-Betrieb steuert Earnie Ziel-SOC und Lade-/Entlade-Sollwerte über das Smarthome-System; die konkrete Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter selbst.
 

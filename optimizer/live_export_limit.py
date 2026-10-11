@@ -1,4 +1,4 @@
-"""Resolve Live export-power ceilings (2.7.a) from HK + inbound EHAL."""
+"""Resolve Live export-power ceilings (2.7.a / 2.7.l) from HK + inbound EHAL."""
 from __future__ import annotations
 
 from typing import Any
@@ -7,6 +7,7 @@ from optimizer.export_power_limit import (
     effective_export_cap_kw,
     inbound_limit_w_to_kw,
     physical_max_export_kw,
+    physical_max_export_kw_from_inverters,
     plant_max_export_power_kw,
 )
 
@@ -39,22 +40,64 @@ def _force_dischargeable_discharge_kw(battery_params: dict) -> float:
     )
 
 
+def _planning_list(config: Any, attr: str) -> list[dict]:
+    raw = getattr(config, attr, None)
+    if raw is None and hasattr(config, "get"):
+        try:
+            raw = config.get(attr, None)
+        except TypeError:
+            raw = None
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def _battery_params_list(config: Any) -> list[dict]:
+    get_list = getattr(config, "get_battery_params_list", None)
+    if callable(get_list):
+        return [b for b in (get_list() or []) if isinstance(b, dict)]
+    return [config.get_battery_params()]
+
+
 def live_unconstrained_export_kw() -> float | None:
     """Plant export maximum written as "unconstrained" on the export-limit setpoint.
 
-    PV nameplate (sum of all PV systems) + max discharge power of every battery that
-    can be force-discharged (``battery_control = full``). Skips ``limits_only`` /
-    ``read_only`` (2.7.c) and ``type=powerstation`` (2.7.g/h).
+    With ``_planning_inverters`` (2.7.l): Σ over grid-tied inverters of
+    ``min(max_ac_power_kw, PV kWp capped by max_pv_input_kw + force-discharge)``.
+    Island inverters contribute nothing.
+
+    Legacy fallback (no planning inverters): PV nameplate sum + max discharge of
+    every force-dischargeable battery (``control = full``; skip powerstations).
     """
     import config
 
+    inverters = _planning_list(config, "_planning_inverters")
+    if inverters:
+        pv_by_inv: dict[str, float] = {}
+        for pv in _planning_list(config, "_planning_pv_systems"):
+            inv_id = str(pv.get("inverter_id") or "").strip()
+            if not inv_id:
+                continue
+            pv_by_inv[inv_id] = pv_by_inv.get(inv_id, 0.0) + float(
+                pv.get("pv_kwp") or 0.0
+            )
+        discharge_by_inv: dict[str, float] = {}
+        for bat in _battery_params_list(config):
+            inv_id = str(bat.get("inverter_id") or "").strip()
+            if not inv_id:
+                continue
+            discharge_by_inv[inv_id] = discharge_by_inv.get(inv_id, 0.0) + (
+                _force_dischargeable_discharge_kw(bat)
+            )
+        return physical_max_export_kw_from_inverters(
+            inverters=inverters,
+            pv_kwp_by_inverter=pv_by_inv,
+            force_discharge_kw_by_inverter=discharge_by_inv,
+        )
+
     discharge_kw = 0.0
-    get_list = getattr(config, "get_battery_params_list", None)
-    if callable(get_list):
-        for bat in get_list() or []:
-            discharge_kw += _force_dischargeable_discharge_kw(bat)
-    else:
-        discharge_kw = _force_dischargeable_discharge_kw(config.get_battery_params())
+    for bat in _battery_params_list(config):
+        discharge_kw += _force_dischargeable_discharge_kw(bat)
     return physical_max_export_kw(config.get("PV_KWP", 0.0, float), discharge_kw)
 
 

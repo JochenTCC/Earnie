@@ -243,13 +243,17 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
         ),
         encoding="utf-8",
     )
+    from tests.config_fixtures import main_hybrid_inverter
+
     (config_dir / "components.json").write_text(
         json.dumps(
             {
+                "inverters": [main_hybrid_inverter()],
                 "batteries": [
                     {
                         "id": "home",
                         "label": "Home",
+                        "inverter_id": "wr_main",
                         "battery_capacity_kwh": 5.0,
                         "battery_max_power_kw": 2.5,
                         "battery_efficiency": 0.97,
@@ -266,6 +270,7 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
                         "kwp": 10.0,
                         "pv_tilt": 25,
                         "pv_azimuth": 0,
+                        "inverter_id": "wr_main",
                     }
                 ],
             }
@@ -366,13 +371,17 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
         ),
         encoding="utf-8",
     )
+    from tests.config_fixtures import main_hybrid_inverter
+
     (config_dir / "components.json").write_text(
         json.dumps(
             {
+                "inverters": [main_hybrid_inverter()],
                 "batteries": [
                     {
                         "id": "home",
                         "label": "Home",
+                        "inverter_id": "wr_main",
                         "battery_capacity_kwh": 5.0,
                         "battery_max_power_kw": 2.5,
                         "battery_efficiency": 0.97,
@@ -389,6 +398,7 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
                         "kwp": 10.0,
                         "pv_tilt": 25,
                         "pv_azimuth": 0,
+                        "inverter_id": "wr_main",
                     }
                 ],
             }

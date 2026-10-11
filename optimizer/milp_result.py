@@ -30,6 +30,9 @@ def _extract_milp_plan_at(model: MilpHorizonModel, hour_index: int) -> dict[str,
         "p_charge": _var_value_at(model.p_charge, hour_index),
         "p_discharge": _var_value_at(model.p_discharge, hour_index),
     }
+    curtail_vars = getattr(model, "p_pv_curtail", None)
+    if curtail_vars:
+        plan["p_pv_curtail"] = _var_value_at(curtail_vars, hour_index)
     ess_ids = getattr(model, "ess_ids", None) or []
     charge_by = getattr(model, "p_charge_by_ess", None) or {}
     discharge_by = getattr(model, "p_discharge_by_ess", None) or {}

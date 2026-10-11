@@ -60,6 +60,7 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
     schema_payload = {"title": "schema"}
     deviation_example_payload = {"version": 1, "rules": []}
     deviation_schema_payload = {"title": "deviation-schema"}
+    grid_fees_payload = {"rule_sets": {}, "areas": [{"id": "AT-VBG"}]}
     (share_dir / "config.example.json").write_text(
         json.dumps(example_payload),
         encoding="utf-8",
@@ -76,6 +77,10 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
         json.dumps(deviation_schema_payload),
         encoding="utf-8",
     )
+    (share_dir / "grid_fees.json").write_text(
+        json.dumps(grid_fees_payload),
+        encoding="utf-8",
+    )
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -88,15 +93,18 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
     deviation_example_path = config_dir / "deviation_rules.example.json"
     deviation_schema_path = config_dir / "deviation_rules.schema.json"
     deviation_rules_path = config_dir / "deviation_rules.json"
+    grid_fees_path = config_dir / "grid_fees.json"
     assert example_path.is_file()
     assert schema_path.is_file()
     assert deviation_example_path.is_file()
     assert deviation_schema_path.is_file()
     assert deviation_rules_path.is_file()
+    assert grid_fees_path.is_file()
     assert json.loads(example_path.read_text(encoding="utf-8"))["system"]["loop_timeout"] == 900
     assert json.loads(schema_path.read_text(encoding="utf-8"))["title"] == "schema"
     assert json.loads(deviation_example_path.read_text(encoding="utf-8"))["version"] == 1
     assert json.loads(deviation_rules_path.read_text(encoding="utf-8"))["version"] == 1
+    assert json.loads(grid_fees_path.read_text(encoding="utf-8"))["areas"][0]["id"] == "AT-VBG"
 
 
 def test_bootstrap_rejects_directory_instead_of_file(tmp_path, monkeypatch):

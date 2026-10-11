@@ -66,6 +66,7 @@ def _minimal_share(tmp_path: Path) -> Path:
             {"id": "fixed_37ct", "label": "Fix Export", "type": "fixed", "k_push_cent": 3.7}
         ],
     })
+    _write_json(share_dir / "grid_fees.json", {"rule_sets": {}, "areas": []})
     _write_json(
         share_dir / "backtesting_scenarios.minimal.json",
         {

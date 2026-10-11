@@ -1,18 +1,22 @@
-"""Auflösung von batteries[] und pv_systems[] in flache runtime_settings-Felder."""
+"""Auflösung von batteries[], pv_systems[] und inverters[] in runtime_settings."""
 from __future__ import annotations
 
 from house_config.battery_control import (
     DEFAULT_BATTERY_CONTROL,
     normalize_battery_control,
 )
-from house_config.battery_kind import (
-    DEFAULT_BATTERY_KIND,
-    normalize_battery_kind,
+from house_config.inverter import (
+    AC_GRID_TIED,
+    DEFAULT_AC_CONNECTION,
+    inverters_by_id,
+    planning_inverter_entry,
+    validate_inverter_topology,
 )
 from house_config.powerstation import (
     BATTERY_TYPE_HOUSE,
     BATTERY_TYPE_POWERSTATION,
     is_powerstation,
+    is_virtual_powerstation,
     normalize_battery_type,
     normalize_powerstation_fields,
 )
@@ -28,7 +32,7 @@ ZERO_BATTERY_FLAT = {
     "threshold_power": 0.02,
     "standby_power_kw": 0.0,
     "battery_control": DEFAULT_BATTERY_CONTROL,
-    "battery_kind": DEFAULT_BATTERY_KIND,
+    "battery_ac_connection": DEFAULT_AC_CONNECTION,
     "limits_from_live": False,
 }
 
@@ -53,6 +57,7 @@ def strip_assets_for_reference(params: dict) -> dict:
         "_planning_batteries",
         "_planning_powerstations",
         "_planning_pv_systems",
+        "_planning_inverters",
     ):
         out.pop(key, None)
     return out
@@ -94,13 +99,17 @@ def normalize_pv_system_ids(settings: dict) -> list[str]:
 
 def planning_pv_entry(pv: dict) -> dict:
     """Stable planning-shape entry for a resolved PV system."""
-    return {
+    entry = {
         "id": pv["id"],
         "label": pv["label"],
         "pv_kwp": float(pv["pv_kwp"]),
         "pv_tilt": float(pv["pv_tilt"]),
         "pv_azimuth": float(pv["pv_azimuth"]),
     }
+    inv_id = str(pv.get("inverter_id") or "").strip()
+    if inv_id:
+        entry["inverter_id"] = inv_id
+    return entry
 
 
 def split_battery_max_power_kw(raw: dict, *, battery_id: str = "?", index: int = 0) -> tuple[float, float]:
@@ -172,11 +181,14 @@ def normalize_battery(raw: dict, index: int) -> dict:
         raise ValueError(
             f"batteries[{index}] ('{battery_id}'): standby_power_kw muss >= 0 sein."
         )
+    if "kind" in raw:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): field 'kind' is removed (2.7.l). "
+            "Use inverters[].ac_connection; run "
+            "python -m scripts.migrate_inverters_once --config-dir <config-dir>"
+        )
     control = normalize_battery_control(
         raw.get("control"), battery_id=battery_id, index=index
-    )
-    kind = normalize_battery_kind(
-        raw.get("kind"), battery_id=battery_id, index=index
     )
     charge_kw, discharge_kw = split_battery_max_power_kw(
         raw, battery_id=battery_id, index=index
@@ -205,11 +217,11 @@ def normalize_battery(raw: dict, index: int) -> dict:
         raise ValueError(
             f"batteries[{index}] ('{battery_id}'): ehal_bindings muss ein Objekt sein."
         )
+    inverter_id = str(raw.get("inverter_id") or "").strip()
     out = {
         "id": battery_id,
         "label": label,
         "type": bat_type,
-        "kind": kind,
         "battery_capacity_kwh": capacity,
         "battery_max_charge_power_kw": charge_kw,
         "battery_max_discharge_power_kw": discharge_kw,
@@ -235,6 +247,18 @@ def normalize_battery(raw: dict, index: int) -> dict:
     if bat_type == BATTERY_TYPE_POWERSTATION:
         out.update(
             normalize_powerstation_fields(raw, battery_id=battery_id, index=index)
+        )
+    if is_virtual_powerstation(out):
+        if inverter_id:
+            raise ValueError(
+                f"batteries[{index}] ('{battery_id}'): virtuelle Powerstation "
+                "darf keinen inverter_id haben."
+            )
+    elif inverter_id:
+        out["inverter_id"] = inverter_id
+    else:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): inverter_id fehlt."
         )
     if "id_locked" in raw:
         out["id_locked"] = bool(raw.get("id_locked"))
@@ -279,12 +303,16 @@ def normalize_pv_system(raw: dict, index: int) -> dict:
     kwp = float(raw["kwp"])
     if kwp <= 0.0:
         raise ValueError(f"pv_systems[{index}] ('{pv_id}'): kwp muss > 0 sein.")
+    inverter_id = str(raw.get("inverter_id") or "").strip()
+    if not inverter_id:
+        raise ValueError(f"pv_systems[{index}] ('{pv_id}'): inverter_id fehlt.")
     out = {
         "id": pv_id,
         "label": label,
         "pv_kwp": kwp,
         "pv_tilt": float(raw.get("pv_tilt", raw.get("tilt", 0.0))),
         "pv_azimuth": float(raw.get("pv_azimuth", raw.get("azimuth", 0.0))),
+        "inverter_id": inverter_id,
     }
     if "id_locked" in raw:
         out["id_locked"] = bool(raw.get("id_locked"))
@@ -330,7 +358,6 @@ def planning_battery_entry(bat: dict) -> dict:
         "id": bat["id"],
         "label": bat["label"],
         "type": bat.get("type", BATTERY_TYPE_HOUSE),
-        "kind": bat.get("kind", DEFAULT_BATTERY_KIND),
         "battery_capacity_kwh": float(bat["battery_capacity_kwh"]),
         "battery_max_charge_power_kw": float(bat["battery_max_charge_power_kw"]),
         "battery_max_discharge_power_kw": float(bat["battery_max_discharge_power_kw"]),
@@ -342,11 +369,18 @@ def planning_battery_entry(bat: dict) -> dict:
         "standby_power_kw": float(bat.get("standby_power_kw", 0.0) or 0.0),
         "control": bat.get("control", DEFAULT_BATTERY_CONTROL),
         "limits_from_live": bool(bat.get("limits_from_live", False)),
+        "ac_connection": str(
+            bat.get("ac_connection") or DEFAULT_AC_CONNECTION
+        ).strip().lower()
+        or DEFAULT_AC_CONNECTION,
         "ehal_bindings": dict(bat.get("ehal_bindings") or {}),
         "battery_wear": (
             dict(bat["battery_wear"]) if bat.get("battery_wear") is not None else None
         ),
     }
+    inv_id = str(bat.get("inverter_id") or "").strip()
+    if inv_id:
+        entry["inverter_id"] = inv_id
     if is_powerstation(bat):
         entry["backing"] = bat["backing"]
         entry["role"] = bat["role"]
@@ -364,7 +398,10 @@ def battery_params_from_planning(entry: dict) -> dict:
         "id": bat_id,
         "label": str(entry.get("label") or bat_id).strip() or bat_id,
         "type": entry.get("type", BATTERY_TYPE_HOUSE),
-        "kind": entry.get("kind", DEFAULT_BATTERY_KIND),
+        "ac_connection": str(
+            entry.get("ac_connection") or DEFAULT_AC_CONNECTION
+        ).strip().lower()
+        or DEFAULT_AC_CONNECTION,
         "battery_capacity_kwh": float(entry["battery_capacity_kwh"]),
         "min_soc": float(entry["battery_min_soc"]),
         "max_soc": float(entry["battery_max_soc"]),
@@ -378,6 +415,9 @@ def battery_params_from_planning(entry: dict) -> dict:
         "limits_from_live": bool(entry.get("limits_from_live", False)),
         "ehal_bindings": dict(entry.get("ehal_bindings") or {}),
     }
+    inv_id = str(entry.get("inverter_id") or "").strip()
+    if inv_id:
+        out["inverter_id"] = inv_id
     if is_powerstation(entry):
         out["backing"] = entry.get("backing")
         out["role"] = entry.get("role")
@@ -465,7 +505,9 @@ def resolve_battery_into_settings(
                 float(b.get("standby_power_kw", 0.0) or 0.0) for b in planning
             ),
             "battery_control": first.get("control", DEFAULT_BATTERY_CONTROL),
-            "battery_kind": first.get("kind", DEFAULT_BATTERY_KIND),
+            "battery_ac_connection": first.get(
+                "ac_connection", DEFAULT_AC_CONNECTION
+            ),
             "limits_from_live": bool(first.get("limits_from_live", False)),
         }
     )
@@ -510,3 +552,75 @@ def resolve_pv_into_settings(settings: dict, pv_systems: dict[str, dict]) -> dic
         out.pop("pv_tilt", None)
         out.pop("pv_azimuth", None)
     return out
+
+
+def attach_ac_connection_from_inverters(
+    batteries: dict[str, dict],
+    inverters: dict[str, dict],
+) -> None:
+    """Mutate batteries in place: copy inverter ac_connection onto each battery."""
+    for bat in batteries.values():
+        if is_virtual_powerstation(bat):
+            bat["ac_connection"] = AC_GRID_TIED
+            continue
+        inv_id = str(bat.get("inverter_id") or "").strip()
+        inv = inverters.get(inv_id) if inv_id else None
+        if inv is None:
+            bat["ac_connection"] = DEFAULT_AC_CONNECTION
+        else:
+            bat["ac_connection"] = inv["ac_connection"]
+
+
+def resolve_inverters_into_settings(
+    settings: dict,
+    *,
+    inverters: dict[str, dict],
+    batteries: dict[str, dict],
+    pv_systems: dict[str, dict],
+) -> dict:
+    """Inject ``_planning_inverters`` for inverters referenced by selected assets."""
+    out = dict(settings)
+    inv_ids: list[str] = []
+    for bat in out.get("_planning_batteries") or []:
+        inv_id = str(bat.get("inverter_id") or "").strip()
+        if inv_id and inv_id not in inv_ids:
+            inv_ids.append(inv_id)
+    for bat in out.get("_planning_powerstations") or []:
+        inv_id = str(bat.get("inverter_id") or "").strip()
+        if inv_id and inv_id not in inv_ids:
+            inv_ids.append(inv_id)
+    for pv in out.get("_planning_pv_systems") or []:
+        inv_id = str(pv.get("inverter_id") or "").strip()
+        if inv_id and inv_id not in inv_ids:
+            inv_ids.append(inv_id)
+    planning: list[dict] = []
+    for inv_id in inv_ids:
+        if inv_id not in inverters:
+            raise ValueError(f"Unbekannte inverter_id '{inv_id}'.")
+        planning.append(planning_inverter_entry(inverters[inv_id]))
+    out["_planning_inverters"] = planning
+    # Keep full catalogs available for topology validation callers.
+    _ = batteries, pv_systems
+    return out
+
+
+def resolve_components_into_settings(
+    settings: dict,
+    components: dict,
+) -> dict:
+    """Normalize components, validate topology, resolve batteries/PV/inverters."""
+    from house_config.inverter import reject_if_needs_inverter_migration
+
+    reject_if_needs_inverter_migration(components)
+    inverters = inverters_by_id(components)
+    batteries = batteries_by_id(components)
+    pv_systems = pv_systems_by_id(components)
+    validate_inverter_topology(
+        inverters=inverters, batteries=batteries, pv_systems=pv_systems
+    )
+    attach_ac_connection_from_inverters(batteries, inverters)
+    out = resolve_battery_into_settings(settings, batteries)
+    out = resolve_pv_into_settings(out, pv_systems)
+    return resolve_inverters_into_settings(
+        out, inverters=inverters, batteries=batteries, pv_systems=pv_systems
+    )

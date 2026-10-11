@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from house_config.battery_kind import DEFAULT_BATTERY_KIND
-
 BATTERY_TYPE_HOUSE = "house"
 BATTERY_TYPE_POWERSTATION = "powerstation"
 
@@ -134,7 +132,6 @@ def virtual_powerstation_fill_fields(
         "battery_max_discharge_power_kw": 0.0,
         "standby_power_kw": 0.0,
         "limits_from_live": False,
-        "kind": DEFAULT_BATTERY_KIND,
         "control": VIRTUAL_PS_CONTROL,
         "battery_wear": {"enabled": False},
     }

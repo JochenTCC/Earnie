@@ -6,6 +6,7 @@
 # Persistente Daten (überleben Image-Updates):
 #   ./earnie_env/config/config.json   – Haus-Konfiguration (wird nie überschrieben)
 #   ./earnie_env/config/tariffs.json  – Tarif-Katalog (Sidecar; wird nie überschrieben)
+#   ./earnie_env/config/grid_fees.json – Netzentgelt-Katalog (Sidecar; wird nie überschrieben)
 #   ./earnie_env/config/backtesting_scenarios.json, house_profiles.json – weitere Sidecars
 #   ./earnie_env/config/.env          – Loxone-Zugangsdaten
 #   ./earnie_env/runtime/  – cons_data, Zustands-JSONs, Profile, Logs

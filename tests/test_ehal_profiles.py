@@ -21,14 +21,22 @@ from ehal.validate import EhalValidationError
 
 def test_all_device_roles_validate() -> None:
     roles = list_device_roles()
-    assert set(roles) >= {"grid", "pv", "ess", "evcs", "consumer", "heatpump"}
+    assert set(roles) >= {
+        "grid",
+        "pv",
+        "ess",
+        "inverter",
+        "evcs",
+        "consumer",
+        "heatpump",
+    }
     for role_id in roles:
         doc = load_device_role(role_id)
         assert doc["role_id"] == role_id
 
 
 def test_m1_roles_only_reference_m1_fields() -> None:
-    for role_id in ("grid", "pv", "ess", "evcs"):
+    for role_id in ("grid", "pv", "ess", "inverter", "evcs"):
         doc = load_device_role(role_id)
         assert doc.get("status", "m1") == "m1"
         for item in doc["ehal_fields"]:

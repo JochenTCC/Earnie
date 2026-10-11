@@ -23,6 +23,14 @@ from ui.house_config_io import (
     upsert_pv_system,
     upsert_scenario,
 )
+
+_WR_MAIN = {
+    "id": "wr_main",
+    "label": "Haupt-Wechselrichter",
+    "type": "hybrid",
+    "ac_connection": "grid_tied",
+    "control": "full",
+}
 from tests.config_fixtures import default_live_settings, minimal_config_payload
 from ui.house_config_profile_form import (
     _NEW_PROFILE_OPTION,
@@ -97,7 +105,7 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     config_dir.joinpath("components.json").write_text(
-        json.dumps({"batteries": [], "pv_systems": []}),
+        json.dumps({"inverters": [_WR_MAIN], "batteries": [], "pv_systems": []}),
         encoding="utf-8",
     )
     config_dir.joinpath("backtesting_scenarios.json").write_text(
@@ -121,7 +129,15 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    upsert_pv_system({"label": "Dach Süd", "kwp": 9.5, "pv_tilt": 30, "pv_azimuth": 0})
+    upsert_pv_system(
+        {
+            "label": "Dach Süd",
+            "kwp": 9.5,
+            "pv_tilt": 30,
+            "pv_azimuth": 0,
+            "inverter_id": "wr_main",
+        }
+    )
     upsert_battery(
         {
             "label": "Speicher 5kWh",
@@ -131,6 +147,7 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "threshold_power": 0.05,
+            "inverter_id": "wr_main",
             "battery_wear": {
                 "enabled": True,
                 "replacement_cost_euro": 1500.0,
@@ -155,7 +172,7 @@ def test_upsert_battery_rejects_enabled_wear_missing_fields(tmp_path, monkeypatc
     config_dir = _bind_paths(tmp_path, monkeypatch)
     monkeypatch.setattr("ui.house_config_io.config.reinit_config", lambda **kwargs: None)
     config_dir.joinpath("components.json").write_text(
-        json.dumps({"batteries": [], "pv_systems": []}),
+        json.dumps({"inverters": [_WR_MAIN], "batteries": [], "pv_systems": []}),
         encoding="utf-8",
     )
 
@@ -169,6 +186,7 @@ def test_upsert_battery_rejects_enabled_wear_missing_fields(tmp_path, monkeypatc
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
                 "threshold_power": 0.05,
+                "inverter_id": "wr_main",
                 "battery_wear": {"enabled": True},
             }
         )
@@ -180,6 +198,7 @@ def test_delete_battery_removes_entity_and_scrubs_scenarios(tmp_path, monkeypatc
     config_dir.joinpath("components.json").write_text(
         json.dumps(
             {
+                "inverters": [_WR_MAIN],
                 "batteries": [
                     {
                         "id": "bat1",
@@ -190,6 +209,7 @@ def test_delete_battery_removes_entity_and_scrubs_scenarios(tmp_path, monkeypatc
                         "battery_min_soc": 10.0,
                         "battery_max_soc": 100.0,
                         "threshold_power": 0.05,
+                        "inverter_id": "wr_main",
                         "battery_wear": {"enabled": False},
                     },
                     {
@@ -201,6 +221,7 @@ def test_delete_battery_removes_entity_and_scrubs_scenarios(tmp_path, monkeypatc
                         "battery_min_soc": 10.0,
                         "battery_max_soc": 100.0,
                         "threshold_power": 0.05,
+                        "inverter_id": "wr_main",
                         "battery_wear": {"enabled": False},
                     },
                 ],
@@ -250,6 +271,7 @@ def test_upsert_pv_rejects_duplicate_label(tmp_path, monkeypatch):
     config_dir.joinpath("components.json").write_text(
         json.dumps(
             {
+                "inverters": [_WR_MAIN],
                 "batteries": [],
                 "pv_systems": [
                     {
@@ -258,6 +280,7 @@ def test_upsert_pv_rejects_duplicate_label(tmp_path, monkeypatch):
                         "kwp": 10.0,
                         "pv_tilt": 18.0,
                         "pv_azimuth": 0.0,
+                        "inverter_id": "wr_main",
                     }
                 ],
             }
@@ -266,7 +289,13 @@ def test_upsert_pv_rejects_duplicate_label(tmp_path, monkeypatch):
     )
     with pytest.raises(ValueError, match="bereits vergeben"):
         upsert_pv_system(
-            {"label": "dach süd", "kwp": 5.0, "pv_tilt": 20, "pv_azimuth": 0},
+            {
+                "label": "dach süd",
+                "kwp": 5.0,
+                "pv_tilt": 20,
+                "pv_azimuth": 0,
+                "inverter_id": "wr_main",
+            },
             stable_id="",
         )
 

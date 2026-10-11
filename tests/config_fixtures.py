@@ -48,8 +48,22 @@ def default_live_settings() -> dict:
     }
 
 
+def main_hybrid_inverter(**overrides) -> dict:
+    """Default hybrid inverter stub for test components.json payloads."""
+    base = {
+        "id": "wr_main",
+        "label": "Haupt-WR",
+        "type": "hybrid",
+        "ac_connection": "grid_tied",
+        "control": "full",
+        "ehal_bindings": {},
+    }
+    base.update(overrides)
+    return base
+
+
 def minimal_components_payload(*, extra: dict | None = None) -> dict:
-    payload = {"batteries": [], "pv_systems": []}
+    payload = {"inverters": [], "batteries": [], "pv_systems": []}
     if extra:
         payload.update(extra)
     return payload

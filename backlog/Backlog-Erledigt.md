@@ -2,6 +2,20 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Thermal Wärmeinhalt — latest-12 forecast fan (2026-10-11)
+
+- [x] **Improve chart for thermal simulation** — Analyse Verbrauch & Kosten Wärmeinhalt: keep Sim/Ist; overlay latest 12 hourly Q-forecast lines (`horizon_q_sim_kwh`) for heat storage + pools; common horizon ≤ 24 h
+  - Persist pool/thermal_control `horizon_q_sim_kwh` in `optimizer/thermal_targets.py`; heat storage already had it via `thermal_live_store`
+  - Loader + Plotly fan: `ui/consumption_display/heat_content_history.py`, `charts.py`, `page_consumer_analysis.py`
+  - Docs: `docs/konfiguration/waermespeicher-schichtung-teq.md`, `docs/ui/charts.md`, `docs/spec/thermals-p2.md`
+
+### Time-dependent Netznutzung Arbeitspreis SNAP / WiNAP (2026-10-11)
+
+- [x] **Time-variable grid fee (Netznutzung Arbeitspreis)** — Austria SNAP/WiNAP catalog + profile `netznutzung` object (PR [#32](https://github.com/JochenTCC/Earnie/pull/32))
+  - `data/grid_fees.py` + `share/config/grid_fees.json` (areas / rule sets); migrate `scripts/migrate_grid_fee_profile.py`
+  - Pricing / SE / invoice use resolved per-slot fees; house-profile UI + `house_profiles.schema.json`
+  - Later (still open elsewhere): Leistungspreis / import cap — see Leistungstarif Entwicklungsdokument L1→L5
+
 ### Push before 2.7.l inverter (2026-10-11)
 
 - [x] Push `main` (and site pack tag) before starting **2.7.l** inverter — tag `2.7.0-dev.49` (no GHCR publish)

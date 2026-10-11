@@ -8,7 +8,10 @@ import streamlit as st
 
 from ehal.functions import function_statuses, incomplete_function_messages
 from ehal.profiles import role_field_labels
-from house_config.control_capability import control_capability_warnings
+from house_config.control_capability import (
+    control_capability_warnings,
+    inverter_control_capability_warnings,
+)
 
 
 def render_function_status(
@@ -44,5 +47,16 @@ def render_control_capability_warnings(
 ) -> None:
     for message in control_capability_warnings(
         control=control, ehal_map=ehal_map, ha_ess_force=ha_ess_force
+    ):
+        st.warning(message)
+
+
+def render_inverter_control_capability_warnings(
+    *,
+    control: str | None,
+    ehal_map: Mapping[str, object],
+) -> None:
+    for message in inverter_control_capability_warnings(
+        control=control, ehal_map=ehal_map
     ):
         st.warning(message)

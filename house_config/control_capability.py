@@ -1,4 +1,4 @@
-"""Cross-check batteries[].control against bound EHAL functions."""
+"""Cross-check batteries[].control / inverters[].control against bound EHAL functions."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -12,6 +12,7 @@ from house_config.battery_control import (
     control_from_battery_params,
 )
 from house_config.ha_ess_force import ha_ess_force_enables_ess_active
+from house_config.inverter import DEFAULT_INVERTER_CONTROL
 
 
 def control_capability_warnings(
@@ -52,3 +53,28 @@ def control_capability_warnings(
             "aber die Funktion „Speicher begrenzen“ ist nicht verfügbar."
         )
     return warnings
+
+
+def inverter_control_capability_warnings(
+    *,
+    control: str | None,
+    ehal_map: Mapping[str, object] | None,
+) -> list[str]:
+    """German warnings when inverter ``control=full`` lacks ``inverter_limit``."""
+    level = str(control or DEFAULT_INVERTER_CONTROL).strip().lower()
+    if level != "full":
+        return []
+    empty_only = bool(ehal_map) and not any(
+        str(v or "").strip() for v in (ehal_map or {}).values()
+    )
+    available = available_functions(
+        ehal_map or {},
+        require_nonempty_value=not empty_only,
+    )
+    if "inverter_limit" in available:
+        return []
+    return [
+        "Steuerbarkeit „full“ erfordert Wechselrichter-AC-Limit "
+        "(set_inv_ac_power_limit), aber die Funktion „Wechselrichter "
+        "AC-Leistung begrenzen“ ist nicht verfügbar."
+    ]

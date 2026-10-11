@@ -8,7 +8,7 @@
   "properties": {
     "role_id": {
       "type": "string",
-      "enum": ["grid", "pv", "ess", "evcs", "consumer", "heatpump", "pool"]
+      "enum": ["grid", "pv", "ess", "inverter", "evcs", "consumer", "heatpump", "pool"]
     },
     "label": {
       "type": "string",

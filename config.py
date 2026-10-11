@@ -215,6 +215,13 @@ class Config:
             pv_azimuth=float(getattr(self, "PV_AZIMUTH", 0.0) or 0.0),
         )
 
+    def get_planning_inverters(self) -> list[dict]:
+        """Resolved inverters referenced by selected PV/batteries (Inverter P3)."""
+        planning = getattr(self, "_planning_inverters", None)
+        if isinstance(planning, list):
+            return [dict(item) for item in planning if isinstance(item, dict)]
+        return []
+
     def get_runtime_settings(self) -> dict:
         return live_scenario.runtime_settings_snapshot(self.get)
 
@@ -447,8 +454,13 @@ class Config:
 
         return list(pv_systems_by_id(self._components_doc).values())
 
+    def get_inverters(self) -> list[dict]:
+        from house_config.inverter import inverters_by_id
+
+        return list(inverters_by_id(self._components_doc).values())
+
     def get_components_catalog(self) -> dict:
-        """Normalisiertes components.json (batteries[], pv_systems[])."""
+        """Normalisiertes components.json (inverters[], batteries[], pv_systems[])."""
         return dict(self._components_doc)
 
     def resolve_scenario_settings_dict(self, settings: dict) -> dict:
@@ -690,8 +702,16 @@ def get_pv_systems() -> list[dict]:
     return CONFIG.get_pv_systems()
 
 
+def get_inverters() -> list[dict]:
+    return CONFIG.get_inverters()
+
+
 def get_planning_pv_systems() -> list[dict]:
     return CONFIG.get_planning_pv_systems()
+
+
+def get_planning_inverters() -> list[dict]:
+    return CONFIG.get_planning_inverters()
 
 
 def get_backtesting_cbc_gap_rel() -> float:

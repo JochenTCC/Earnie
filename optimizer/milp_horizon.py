@@ -17,6 +17,13 @@ from .milp_consumers import (
     _add_consumer_power_variables,
     _flex_power_at_t,
 )
+from .milp_inverter import (
+    coerce_inverter_params_list,
+    coerce_pv_systems_list,
+    filter_house_balance_batteries,
+    house_balance_pv_kw,
+    add_inverter_slot_constraints,
+)
 from .slot_duration import DEFAULT_DT_H, validate_dt_h
 
 EMPTY_MILP_PLAN = {
@@ -24,6 +31,7 @@ EMPTY_MILP_PLAN = {
     "p_grid_sell": 0.0,
     "p_charge": 0.0,
     "p_discharge": 0.0,
+    "p_pv_curtail": 0.0,
     "ess": {},
 }
 
@@ -148,9 +156,16 @@ def _create_grid_battery_vars(
     horizon: int,
     battery_params: dict | list[dict],
     planned_consumers: list,
+    *,
+    inverter_params: dict | list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
 ) -> _GridBatteryVars:
     """LpVariables für Netzbezug/-einspeisung, Lade-/Entladeleistung und SOC-Energie."""
-    batteries = coerce_battery_params_list(battery_params)
+    inverters = coerce_inverter_params_list(inverter_params)
+    pv_list = coerce_pv_systems_list(pv_systems)
+    batteries = filter_house_balance_batteries(
+        coerce_battery_params_list(battery_params), inverters
+    )
     if not batteries:
         batteries = [
             {
@@ -221,11 +236,16 @@ def _create_grid_battery_vars(
     ]
     # Feasible sink when export is hard-capped (pay-to-export / plant limit) but PV
     # exceeds load + charge — without this the power balance is Infeasible.
+    def _slot_house_pv(row: dict[str, Any]) -> float:
+        return house_balance_pv_kw(
+            row, inverters=inverters, pv_systems=pv_list
+        )
+
     p_pv_curtail = [
         pulp.LpVariable(
             f"p_pv_curtail_{t}",
             lowBound=0,
-            upBound=max(0.0, float(matrix[t].get("expected_p_pv") or 0.0)),
+            upBound=_slot_house_pv(matrix[t]),
         )
         for t in range(horizon)
     ]
@@ -237,7 +257,7 @@ def _create_grid_battery_vars(
         (effective_p_act(row, load_params) for row in matrix[:horizon]),
         default=0.0,
     )
-    max_pv = max((row["expected_p_pv"] for row in matrix[:horizon]), default=0.0)
+    max_pv = max((_slot_house_pv(row) for row in matrix[:horizon]), default=0.0)
     big_m_grid = max(max_load + max_flex_power + max_power, max_pv + max_power, 50.0)
     delta_import = [
         pulp.LpVariable(f"delta_import_{t}", cat=pulp.LpBinary) for t in range(horizon)
@@ -315,6 +335,8 @@ def _add_slot_power_balance_and_soc(
     e_init_by_ess: dict[str, float],
     dt_h: float,
     export_cap_kw: float | None = None,
+    inverter_params: dict | list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
 ) -> None:
     """Energiebilanz, Exklusivität und SOC-Rekursion für einen Slot."""
     load_params = battery_params
@@ -325,7 +347,11 @@ def _add_slot_power_balance_and_soc(
     p_discharge = grid_vars.p_discharge
     delta_import = grid_vars.delta_import
     big_m_grid = grid_vars.big_m_grid
-    p_pv = matrix_row["expected_p_pv"]
+    inverters = coerce_inverter_params_list(inverter_params)
+    pv_list = coerce_pv_systems_list(pv_systems)
+    p_pv = house_balance_pv_kw(
+        matrix_row, inverters=inverters, pv_systems=pv_list
+    )
     p_con = effective_p_act(matrix_row, load_params)
     p_flex = fixed_flex + pulp.lpSum(
         _flex_power_at_t(
@@ -384,6 +410,14 @@ def _add_slot_power_balance_and_soc(
             # Self-consumption pin is single-ESS only (multi would fight over grid).
             apply_self_consumption=len(grid_vars.ess_ids) == 1,
         )
+    add_inverter_slot_constraints(
+        prob,
+        t=t,
+        grid_vars=grid_vars,
+        inverters=inverters,
+        pv_systems=pv_list,
+        matrix_row=matrix_row,
+    )
     prob += (
         p_pv + p_grid_buy[t] + p_discharge[t]
         == p_con
@@ -415,9 +449,14 @@ def _add_power_balance_and_soc_dynamics(
     dt_h: float,
     export_caps_kw: list[float | None] | None = None,
     current_soc_by_id: dict[str, float] | None = None,
+    inverter_params: dict | list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
 ) -> None:
     """Energiebilanz, Netz-/Batterie-Exklusivität und SOC-Rekursion je Slot."""
-    batteries = coerce_battery_params_list(battery_params)
+    inverters = coerce_inverter_params_list(inverter_params)
+    batteries = filter_house_balance_batteries(
+        coerce_battery_params_list(battery_params), inverters
+    )
     load_params = aggregate_battery_params_for_load(batteries)
     e_init_by_ess: dict[str, float] = {}
     multi_ess = len(grid_vars.ess_ids) > 1
@@ -451,6 +490,8 @@ def _add_power_balance_and_soc_dynamics(
             e_init_by_ess=e_init_by_ess,
             dt_h=dt_h,
             export_cap_kw=cap,
+            inverter_params=inverter_params,
+            pv_systems=pv_systems,
         )
 
 
@@ -545,11 +586,18 @@ def _build_milp_model(
     dt_h: float = DEFAULT_DT_H,
     export_caps_kw: list[float | None] | None = None,
     current_soc_by_id: dict[str, float] | None = None,
+    inverter_params: dict | list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
 ) -> MilpHorizonModel:
     dt_h = validate_dt_h(dt_h)
     prob = pulp.LpProblem("Energy_Cost_Minimization", pulp.LpMinimize)
     grid_vars = _create_grid_battery_vars(
-        matrix, horizon, battery_params, planned_consumers
+        matrix,
+        horizon,
+        battery_params,
+        planned_consumers,
+        inverter_params=inverter_params,
+        pv_systems=pv_systems,
     )
     consumer_vars = _add_consumer_var_block(
         prob,
@@ -573,6 +621,8 @@ def _build_milp_model(
         dt_h=dt_h,
         export_caps_kw=export_caps_kw,
         current_soc_by_id=current_soc_by_id,
+        inverter_params=inverter_params,
+        pv_systems=pv_systems,
     )
     return MilpHorizonModel(
         prob=prob,

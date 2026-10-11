@@ -71,6 +71,10 @@ def _isolated_backtesting_config(tmp_path, monkeypatch):
         str(config_dir / "backtesting_scenarios.json"),
     )
     monkeypatch.setenv("EARNIE_COMPONENTS_PATH", str(config_dir / "components.json"))
+    monkeypatch.setenv(
+        "EARNIE_GRID_FEES_PATH",
+        str(Path(__file__).resolve().parents[2] / "share" / "config" / "grid_fees.json"),
+    )
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime_dir))
 
     monkeypatch.setattr(backtesting_log, "_DEFAULT_LOG_DIR", str(runtime_dir))

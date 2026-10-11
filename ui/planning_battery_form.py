@@ -17,28 +17,26 @@ from house_config.battery_control import (
     CONTROL_LABELS_DE,
     DEFAULT_BATTERY_CONTROL,
 )
-from house_config.battery_kind import (
-    BATTERY_KIND_BATTERY_INVERTER,
-    BATTERY_KIND_ISOLATED,
-    DEFAULT_BATTERY_KIND,
-)
 from house_config.powerstation import (
     BACKING_VIRTUAL,
     primary_house_battery,
     virtual_powerstation_fill_fields,
 )
-
-KIND_LABELS_DE = {
-    BATTERY_KIND_BATTERY_INVERTER: "Batterie + Wechselrichter",
-    BATTERY_KIND_ISOLATED: "Isolierte Batterie",
-}
-_KIND_VALUES = (BATTERY_KIND_BATTERY_INVERTER, BATTERY_KIND_ISOLATED)
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import (
     delete_battery,
     get_live_scenario_refs,
     list_batteries,
     upsert_battery,
+)
+from ui.planning_battery_inverter import (
+    default_inverter_id_for_new_house,
+    owned_inverter_for_battery,
+    persist_builtin_inverter,
+    render_builtin_inverter_section,
+    render_ecoflow_preset_button,
+    render_inverter_select,
+    seed_builtin_inverter_widgets,
 )
 from ui.auto_persist import auto_persist, payload_fingerprint
 from ui.form_layout import (
@@ -103,10 +101,10 @@ def new_battery_template(
         "battery_max_soc": float(source.get("battery_max_soc", 100.0)),
         "threshold_power": float(source.get("threshold_power", 0.05)),
         "standby_power_kw": float(source.get("standby_power_kw", 0.0) or 0.0),
-        "kind": str(source.get("kind") or DEFAULT_BATTERY_KIND).strip().lower()
-        or DEFAULT_BATTERY_KIND,
         "control": str(source.get("control") or "full").strip().lower() or "full",
         "limits_from_live": bool(source.get("limits_from_live", False)),
+        "inverter_id": str(source.get("inverter_id") or "").strip()
+        or default_inverter_id_for_new_house(),
         # New id/slug — never copy entity-scoped bindings from the source battery.
         "ehal_bindings": {},
         "battery_wear": copy.deepcopy(dict(source.get("battery_wear") or {})),
@@ -157,9 +155,6 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         control = str(existing.get("control") or DEFAULT_BATTERY_CONTROL).strip().lower()
         if control not in BATTERY_CONTROL_VALUES:
             control = DEFAULT_BATTERY_CONTROL
-        kind = str(existing.get("kind") or DEFAULT_BATTERY_KIND).strip().lower()
-        if kind not in _KIND_VALUES:
-            kind = DEFAULT_BATTERY_KIND
         bat_type = str(existing.get("type") or "house").strip().lower() or "house"
         backing = str(existing.get("backing") or "virtual").strip().lower() or "virtual"
         role = str(existing.get("role") or "single_use").strip().lower() or "single_use"
@@ -173,6 +168,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
             if singular:
                 attached_ids = [singular]
         limits_from_live = bool(existing.get("limits_from_live", False))
+        inverter_id = str(existing.get("inverter_id") or "").strip()
         wear = existing.get("battery_wear") or {}
         wear_enabled = bool(wear.get("enabled", False))
         wear_replacement_cost = float(wear.get("replacement_cost_euro", 1500.0))
@@ -189,12 +185,12 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         threshold_percent = 5.0
         standby_power = 0.0
         control = DEFAULT_BATTERY_CONTROL
-        kind = DEFAULT_BATTERY_KIND
         bat_type = "house"
         backing = "virtual"
         role = "single_use"
         attached_ids = []
         limits_from_live = False
+        inverter_id = default_inverter_id_for_new_house()
         wear_enabled = False
         wear_replacement_cost = 1500.0
         wear_expected_cycles = 6000.0
@@ -223,9 +219,11 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_battery_attached_ids")] = (
         list(attached_ids)
     )
-    st.session_state[_scoped_key(session_scope, "planning_battery_kind")] = KIND_LABELS_DE[
-        kind
-    ]
+    st.session_state[_scoped_key(session_scope, "planning_battery_inverter_id")] = (
+        inverter_id
+    )
+    bat_id = str(existing.get("id") or "").strip()
+    seed_builtin_inverter_widgets(session_scope, owned_inverter_for_battery(bat_id))
     st.session_state[_scoped_key(session_scope, "planning_battery_capacity")] = capacity
     st.session_state[_scoped_key(session_scope, "planning_battery_charge_power")] = (
         max_charge
@@ -555,9 +553,9 @@ def _virtual_ps_inherited_ui_fields(
         "max_soc": float(fill["battery_max_soc"]),
         "threshold_percent": float(fill["threshold_power"]) * 100.0,
         "standby_power": float(fill["standby_power_kw"]),
-        "kind": fill["kind"],
         "control": fill["control"],
         "battery_wear": dict(fill["battery_wear"]),
+        "inverter_id": "",
     }
     return fields, primary
 
@@ -651,16 +649,6 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
         help="Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch).",
         key=_scoped_key(session_scope, "planning_battery_standby"),
     )
-    kind_labels = [KIND_LABELS_DE[v] for v in _KIND_VALUES]
-    kind_label = labeled_selectbox(
-        "Topologie",
-        options=kind_labels,
-        help="Batterie+WR: Automatik/Optimieren erlaubt. "
-        "Isolierte Batterie: nur Laden / Entladen / Standby (nie Automatik).",
-        key=_scoped_key(session_scope, "planning_battery_kind"),
-    )
-    label_to_kind = {v: k for k, v in KIND_LABELS_DE.items()}
-    kind = label_to_kind.get(str(kind_label), DEFAULT_BATTERY_KIND)
     control_labels = [CONTROL_LABELS_DE[v] for v in sorted(BATTERY_CONTROL_VALUES)]
     control_label = labeled_selectbox(
         "Steuerbarkeit",
@@ -677,7 +665,6 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
         "max_soc": max_soc,
         "threshold_percent": threshold_percent,
         "standby_power": standby_power,
-        "kind": kind,
         "control": control,
     }
 
@@ -717,7 +704,46 @@ def _render_battery_wear_fields(session_scope: str) -> dict:
     }
 
 
-def _render_battery_fields(session_scope: str, *, exclude_id: str = "") -> dict:
+def _render_battery_inverter_ui(
+    session_scope: str,
+    fields: dict,
+    *,
+    battery_id: str,
+) -> tuple[str, dict | None]:
+    """Return (inverter_id, optional builtin inverter payload)."""
+    bat_type = str(fields.get("type") or "house").strip().lower()
+    backing = str(fields.get("backing") or BACKING_VIRTUAL).strip().lower()
+    if bat_type == "powerstation" and backing == BACKING_VIRTUAL:
+        st.caption("Virtuelle Powerstation: kein eigener Wechselrichter.")
+        return "", None
+    if bat_type == "powerstation" and backing != BACKING_VIRTUAL:
+        owned = owned_inverter_for_battery(battery_id)
+        builtin = render_builtin_inverter_section(
+            session_scope, battery_id=battery_id, inverter=owned
+        )
+        inv_id = str((owned or {}).get("id") or "").strip()
+        return inv_id, builtin
+    current = str(
+        fields.get("inverter_id")
+        or st.session_state.get(
+            _scoped_key(session_scope, "planning_battery_inverter_id"), ""
+        )
+        or default_inverter_id_for_new_house()
+    ).strip()
+    inv_id = render_inverter_select(
+        session_scope,
+        battery_id=battery_id,
+        current_id=current,
+    )
+    return inv_id, None
+
+
+def _render_battery_fields(
+    session_scope: str,
+    *,
+    exclude_id: str = "",
+    battery_id: str = "",
+) -> dict:
     fields = _render_battery_core_fields(session_scope)
     if fields.get("is_virtual_ps"):
         inherited, primary = _virtual_ps_inherited_ui_fields(
@@ -740,9 +766,16 @@ def _render_battery_fields(session_scope: str, *, exclude_id: str = "") -> dict:
                 f"von der Hausbatterie „{house_label}“ übernommen "
                 f"(Carve-out, keine eigene Hardware)."
             )
+        fields["inverter_id"] = ""
+        fields["builtin_inverter"] = None
         return fields
     fields.update(_render_battery_limit_fields(session_scope))
     fields["battery_wear"] = _render_battery_wear_fields(session_scope)
+    inv_id, builtin = _render_battery_inverter_ui(
+        session_scope, fields, battery_id=battery_id
+    )
+    fields["inverter_id"] = inv_id
+    fields["builtin_inverter"] = builtin
     return fields
 
 
@@ -750,7 +783,6 @@ def _battery_save_payload(fields: dict) -> dict:
     payload = {
         "label": fields["label"],
         "type": fields.get("type") or "house",
-        "kind": fields.get("kind") or DEFAULT_BATTERY_KIND,
         "battery_capacity_kwh": fields["capacity"],
         "battery_max_charge_power_kw": fields["max_charge"],
         "battery_max_discharge_power_kw": fields["max_discharge"],
@@ -764,6 +796,9 @@ def _battery_save_payload(fields: dict) -> dict:
         "ehal_bindings": dict(fields.get("ehal_bindings") or {}),
         "battery_wear": fields["battery_wear"],
     }
+    inv_id = str(fields.get("inverter_id") or "").strip()
+    if inv_id:
+        payload["inverter_id"] = inv_id
     provisional = str(
         fields.get(ID_PROVISIONAL_LABEL_KEY)
         or st.session_state.get(_SESSION_PROVISIONAL_LABEL_KEY)
@@ -785,6 +820,8 @@ def _battery_save_payload(fields: dict) -> dict:
                 attached_ids = [singular]
         payload["attached_consumer_ids"] = attached_ids
         payload["attached_consumer_id"] = attached_ids[0] if attached_ids else ""
+        if str(payload.get("backing") or "") == BACKING_VIRTUAL:
+            payload.pop("inverter_id", None)
     return payload
 
 
@@ -801,6 +838,11 @@ def _save_battery(
             stable_id=stable_id,
             force_id_from_label=force_id_from_label,
         )
+        builtin = fields.get("builtin_inverter")
+        if builtin and persisted_id:
+            payload = dict(builtin)
+            payload["owned_by"] = persisted_id
+            persist_builtin_inverter(payload, battery_id=persisted_id)
     except ValueError as exc:
         st.error(str(exc))
         return None
@@ -821,6 +863,8 @@ def _persist_battery_form(
     ready: bool,
 ) -> None:
     payload = {"id": entity_id, **_battery_save_payload(fields)}
+    if fields.get("builtin_inverter"):
+        payload["builtin_inverter"] = dict(fields["builtin_inverter"])
     persist_key = f"planning_battery::{stable_id or entity_id}"
     suppress = bool(st.session_state.pop(_SESSION_SUPPRESS_AUTOPERSIST_KEY, False))
     if suppress and ready:
@@ -901,10 +945,26 @@ def render_battery_planning_tab() -> None:
     )
     ctx = _render_battery_select()
     is_new = ctx["is_new"]
+    if render_ecoflow_preset_button(is_new=is_new):
+        return
     stable_id = "" if is_new else str(ctx["existing"].get("id", ""))
-    fields = _render_battery_fields(ctx["session_scope"], exclude_id=stable_id)
+    fields = _render_battery_fields(
+        ctx["session_scope"],
+        exclude_id=stable_id,
+        battery_id=stable_id,
+    )
     label = fields["label"]
-    ready = bool(str(label or "").strip()) and float(fields["capacity"] or 0) > 0
+    bat_type = str(fields.get("type") or "house").strip().lower()
+    backing = str(fields.get("backing") or BACKING_VIRTUAL).strip().lower()
+    needs_inv = not (bat_type == "powerstation" and backing == BACKING_VIRTUAL)
+    inv_ok = (not needs_inv) or bool(str(fields.get("inverter_id") or "").strip()) or (
+        bat_type == "powerstation" and backing != BACKING_VIRTUAL
+    )
+    ready = (
+        bool(str(label or "").strip())
+        and float(fields["capacity"] or 0) > 0
+        and inv_ok
+    )
     taken = {bid for bid in ctx["battery_ids"] if bid != stable_id}
     entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
     _persist_battery_form(

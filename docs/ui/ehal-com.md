@@ -42,10 +42,15 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Telemetry (optional)    | `get_ess_soc_max`                  | no       | **%**; charge cut-off SoC (device config; MILP when `limits_from_live`) (2.7.j)                             |
 | Telemetry (optional)    | `get_ess_max_charge_power`         | no       | **W**; device max charge power magnitude (2.7.j)                                                           |
 | Telemetry (optional)    | `get_ess_max_discharge_power`      | no       | **W**; device max discharge power magnitude (2.7.j)                                                        |
+| Telemetry (optional)    | `inv.{id}.sens_inv_power_ac`       | no       | **W**; per inverter; `+` = feeds the AC bus (2.7.l)                                                        |
+| Telemetry (optional)    | `inv.{id}.sens_inv_power_pv`       | no       | **W**; ≥ 0 (2.7.l)                                                                                         |
+| Telemetry (optional)    | `inv.{id}.get_inv_max_ac_power`    | no       | **W**; device AC rating magnitude (2.7.l)                                                                  |
+| Telemetry (optional)    | `inv.{id}.get_inv_max_pv_power`    | no       | **W**; DC/MPPT limit magnitude (2.7.l)                                                                     |
 | Setpoints (force)       | `set_ess_active_power`             | no*      | **W**; signed; OpenEMS-aligned: `+` = **discharge**, `−` = **charge**; omit for automatic mode (see [sign convention for `set_ess_active_power`](#sign-set_ess_active_power)) |
 | Setpoints (limits)      | `set_ess_charge_power_limit`       | no*      | **W**; non-negative amount (true max. charge power)                                                            |
 | Setpoints (limits)      | `set_ess_discharge_power_limit`    | no*      | **W**; non-negative amount (true max. discharge power)                                                         |
-| Setpoints (limits)      | `set_grid_export_power_limit`      | no*      | **W**; non-negative max grid export (magnitude, like ESS limits); `0` = no export; unconstrained = plant maximum (PV kWp sum + max discharge of force-dischargeable ESS; fallback 1 000 000 W) (2.7.a) |
+| Setpoints (limits)      | `set_grid_export_power_limit`      | no*      | **W**; non-negative max grid export (magnitude, like ESS limits); `0` = no export; unconstrained = plant maximum (per grid-tied inverter; fallback 1 000 000 W) (2.7.a / 2.7.l) |
+| Setpoints (limits)      | `inv.{id}.set_inv_ac_power_limit`  | no*      | **W**; max AC output of this inverter (magnitude ≥ 0); Live curtailment when plant `p_pv_curtail` > 0, else sticky rating (2.7.l) |
 | Setpoints (limits)      | `set_evcs_max_current`             | no*      | **A**; non-negative amount (EV charging target/max current)                                                    |
 | Setpoints (mode)        | `set_ess_mode`                     | no*      | Sticky backend: always write; **0 = automatic**; battery only (export caps via `set_grid_export_power_limit`); OpenEMS ignores it |
 | Setpoints (source)      | `ess.<id>.set_ess_source_select`   | no*      | **0** = grid pass-through, **1** = battery island; entity-scoped on physical `standby_backup` only (2.7.h); omit for house ESS / plant |
@@ -53,9 +58,10 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Capability flags        | `supports_ess_write`               | yes      | boolean; ESS setpoints may be written                                                                          |
 | Capability flags        | `supports_evcs_current`            | yes      | boolean; `set_evcs_max_current` may be written                                                                  |
 | Capability flags        | `supports_ess_source_select`       | no       | boolean; entity-scoped Quellenwahl (`ess.<id>.set_ess_source_select`) may be written                                 |
+| Capability flags        | `supports_inv_power_limit`         | no       | boolean; `inv.{id}.set_inv_ac_power_limit` may be written (2.7.l)                                                     |
 
 
-A setpoint document must contain **at least one** of the setpoint fields. Omitted fields generally mean **"leave unchanged"** (partial updates are allowed). **Exception for sticky hubs (HA/Loxone):** sticky channels keep the last value — automatic is `set_ess_mode = 0`, not "setpoint power omitted". Full device roles including `get_`* / additional `sens_evcs_`*: see §C.
+A setpoint document must contain **at least one** of the setpoint fields. Omitted fields generally mean **"leave unchanged"** (partial updates are allowed). **Exception for sticky hubs (HA/Loxone):** sticky channels keep the last value — automatic is `set_ess_mode = 0`, not "setpoint power omitted". Full device roles including `get_`* / additional `sens_evcs_`* / `ess.{id}.*` / `inv.{id}.*`: see §C.
 
 <a id="sign-set_ess_active_power"></a>
 
@@ -100,13 +106,15 @@ Column **type:** **measurement** = read (telemetry), **control value** = written
 
 Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:modbustcp_faq), [ESS Mode 2/3](https://www.victronenergy.com/live/ess:ess_mode_2_and_3), [EVCS Modbus register list v3.8](https://www.victronenergy.com/upload/documents/EVCS-Modbus-TCP-register-list-v3.8.xlsx), HA mapping example [ha-modbus-manager Victron EVCS](https://github.com/TCzerny/ha-modbus-manager/blob/main/docs/README_victron_ev_charging_station.md).
 
-### C.1 Inverter (Grid / PV)
+### C.1 Plant (Grid / PV sum)
+
+<a id="c1-inverter-grid-pv"></a>
 
 
 | Area / meaning          | Type          | EHAL value name              | OpenEMS                       | evcc (YAML attribute) | Victron GX / EVCS (Modbus)                                                                                          | Loxone / Loxone extra                                   |
 | -------------------------- | --------------- | ------------------------------ | -------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | Grid power               | Measurement   | `sens_grid_power_active`      | `_sum/GridActivePower`          | `meters.grid.power`     | Unit 100 reg. **820–822** (`grid_power_l`*, W; `+` = import, `−` = export); alternatively grid meter **2600–2602**  | `grid_power_name`                                           |
-| PV production            | Measurement   | `sens_pv_production_active`   | `_sum/ProductionActivePower`    | `meters.pv.power`       | Unit 100 reg. **850** (DC PV, W) resp. AC PV **808–813**; total is often the sum of DC+AC                          | `pv_power_name` / `plant.ehal_bindings`                     |
+| PV production            | Measurement   | `sens_pv_production_active`   | `_sum/ProductionActivePower`    | `meters.pv.power`       | Unit 100 reg. **850** (DC PV, W) resp. AC PV **808–813**; total is often the sum of DC+AC                          | `pv_power_name` / `plant.ehal_bindings` (plant sum; per-inverter values in [C.7](#c7-inverter-per-device)) |
 | Power to consumers        | Measurement   | `sens_power_consumers`        |                                   |                          |                                                                                                                       | `ehal_bindings.sens_power_consumers` (otherwise derived)    |
 | Outside temperature       | Measurement   | `sens_temperature_outside`    |                                   |                          |                                                                                                                       | `Earnie_Aussentemperatur` / `plant.ehal_bindings`           |
 | Absent / holiday          | Measurement   | `sens_absent_mode`            |                                   |                          |                                                                                                                       | `Earnie_Abwesend` / `plant.ehal_bindings` (0/1; OR with HK) |
@@ -117,6 +125,8 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 ### C.2 ESS (Battery)
 
 **Multi-ESS / per-battery mapping (2.7.c / 2.7.m):** In EHAL-Com each mappable battery is its own entity (house batteries and **physical** powerstations). **Virtual** powerstations are omitted — they inherit the house ESS and have no EHAL bindings. Bindings are stored on `components.json` → `batteries[].ehal_bindings` as entity-scoped `ess.{slug}.sens_ess_soc` / `set_ess_*` / `get_ess_*` (slug = battery id). Quellenwahl is `ess.{slug}.set_ess_source_select` on physical `role: standby_backup` only (not on plant or house ESS). The plant row keeps grid/PV/load/export. Runtime still synthesizes flat primary-battery aliases (`sens_ess_soc`, …) for legacy adapters (not Quellenwahl). Multi-ESS Loxone Merker titles use slug infix `Earnie_Batterie_<Slug>_…`.
+
+A battery belongs to an inverter via `batteries[].inverter_id`. `batteries[].kind` (topology) no longer exists; `inverters[].ac_connection` (`grid_tied` | `island`) replaces it.
 
 
 | Area / meaning                  | Type          | EHAL value name                                              | OpenEMS                                       | evcc (YAML attribute)          | Victron GX / EVCS (Modbus)                                                                                              | Loxone / Loxone extra                                        |
@@ -218,6 +228,24 @@ Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.
 
 **EHAL-Com mapping:** filter fields (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native start/duration, enable) are mapped on the house-profile consumer `pool_filter` under `ehal_bindings`. Without `pool_filter` there is no filter MILP and no synthetic filter entity. Without a mapping, the filter stays inactive.
 
+### C.7 Inverter (per device)
+
+<a id="c7-inverter-per-device"></a>
+
+Bindings live on `inverters[].ehal_bindings` as entity-scoped `inv.{id}.*` (id = inverter Kennung). Optional; role template `share/ehal/roles/inverter.json`. Built-in inverters (`owned_by`) share a physical device with an ESS: map both Kennungen to that device's entities. See also [Inverter topology](../spec/ehal.md#inverter-topology-inverters-27l) in `ehal.md`.
+
+
+| Area / meaning | Type | EHAL value name | OpenEMS | evcc | Victron GX | Loxone / Loxone extra |
+| --- | --- | --- | --- | --- | --- | --- |
+| Inverter AC power | Measurement | `inv.{id}.sens_inv_power_ac` | `ess0/ActivePower` / PV-inverter `…/ActivePower` | | TBD | `Earnie_WR_Leistung_AC` *(name TBD)* |
+| Inverter PV input power | Measurement | `inv.{id}.sens_inv_power_pv` | `charger0/ActualPower` | | TBD | `Earnie_WR_Leistung_PV` *(TBD)* |
+| Inverter max AC power (device) | Input value | `inv.{id}.get_inv_max_ac_power` | `ess0/MaxApparentPower` | | | `Earnie_WR_Max_AC` *(TBD)* |
+| Inverter max PV input (device) | Input value | `inv.{id}.get_inv_max_pv_power` | *(optional / absent)* | | | `Earnie_WR_Max_PV` *(TBD)* |
+| Write inverter AC limit | Control value | `inv.{id}.set_inv_ac_power_limit` | PV-inverter `…/ActivePowerLimit` | | | `Earnie_WR_Limit_AC` *(TBD)* |
+| Inverter limit write capability | Capability | `supports_inv_power_limit` | derived adapter capability | derived | | derivable from mapped limit Merker |
+
+Inverter `control` vs mapping: `full` needs `set_inv_ac_power_limit`; `limits_only` / `read_only` need no inverter write. EHAL-Com warns like for ESS. Curtailment write: lower limit only when plant `p_pv_curtail[t0] > 0` (allocated by PV forecast); otherwise write rating to release sticky backends.
+
 ## EHAL-Com
 
 Once the planning configuration is complete, **Scenario Explorer** appears, but **EHAL-Com** stays hidden until the connection for live operation is fully set up. Use **Connection**, **Live Read**, and the connection tests on this page.
@@ -240,7 +268,7 @@ The status bar combines **silent/loud mode** with the state of the **optimizer s
 
 ### Live Read
 
-Only `**sens_***` and `**get_***` (measurements / inputs). The table lists **all** expected EHAL fields (plant + consumers); without a binding **and** without a usable push resolve, Status is **No mapping**. Columns:
+Only `**sens_***` and `**get_***` (measurements / inputs). The table lists **all** expected EHAL fields (plant + batteries + inverters + consumers); without a binding **and** without a usable push resolve, Status is **No mapping**. Live tables group by role label (including **Wechselrichter** for `inv.{id}.*`). Columns:
 
 
 | Column                                            | Meaning                                                                                                                                    |

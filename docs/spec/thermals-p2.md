@@ -105,7 +105,7 @@ Same `C` for both until adaptation changes effective capacity.
 
 - Helper: [`optimizer/thermal_model.py`](../../optimizer/thermal_model.py) `heat_content_kwh`
 - Year-sim / HK: `Q_sim` hour series on `ConsumptionSeriesBundle.heat_content_*` ([`data/modeled_temperatures.py`](../../data/modeled_temperatures.py)); HK Stündlicher Verlauf keeps model °C only (no Wärmeinhalt chart)
-- Live: each cycle appends heat-storage (+ pool) `heat_content_kwh` into `thermal_observability` on `runtime/optimization_history.jsonl` ([`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py) `collect_heat_storage_observability`); Analyse Verbrauch & Kosten plots Live `Q_sim` vs `Q_meas` for the selected 7-/28-day window
+- Live: each cycle appends heat-storage (+ pool) `heat_content_kwh` and `horizon_q_sim_kwh` into `thermal_observability` on `runtime/optimization_history.jsonl` ([`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py) `collect_heat_storage_observability`, [`optimizer/thermal_targets.py`](../../optimizer/thermal_targets.py) `build_thermal_observability`); Analyse Verbrauch & Kosten plots Live `Q_sim` vs `Q_meas` for the selected 7-/28-day window and overlays the latest 12 hourly Q-forecast lines (common horizon ≤ 24 h)
 - Stratified-tank **weights `w_i`** remain operator/field work (not coded in Earnie)
 
 ### Loxone guideline (operator-facing)

@@ -103,11 +103,15 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
         "export_tariff_id": "fixed_exp",
         "house_profile_id": "",
     }
+    from tests.config_fixtures import main_hybrid_inverter
+
     components_doc = {
+        "inverters": [main_hybrid_inverter()],
         "batteries": [
             {
                 "id": "home",
                 "label": "Home",
+                "inverter_id": "wr_main",
                 "battery_capacity_kwh": 5.0,
                 "battery_max_power_kw": 2.5,
                 "battery_efficiency": 0.97,
@@ -118,7 +122,14 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
             }
         ],
         "pv_systems": [
-            {"id": "roof", "label": "Roof", "kwp": 10.0, "pv_tilt": 25, "pv_azimuth": 0}
+            {
+                "id": "roof",
+                "label": "Roof",
+                "kwp": 10.0,
+                "pv_tilt": 25,
+                "pv_azimuth": 0,
+                "inverter_id": "wr_main",
+            }
         ],
     }
     path = config_dir / "config.json"

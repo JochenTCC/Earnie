@@ -253,9 +253,11 @@ def derive_control_from_milp_plan(
     if battery_capacity <= 0.0 or control == BATTERY_CONTROL_READ_ONLY:
         return MODE_AUTOMATIK, 0.0, round(float(current_soc), 1)
 
-    from house_config.battery_kind import allows_automatik
+    from house_config.inverter import AC_GRID_TIED, allows_automatik
 
-    kind = str(battery_params.get("kind") or "battery_inverter").strip().lower()
+    ac_connection = str(
+        battery_params.get("ac_connection") or AC_GRID_TIED
+    ).strip().lower()
     ess_plan = milp_plan
     if isinstance(milp_plan.get("ess"), dict):
         ess_id = str(battery_params.get("id") or "").strip()
@@ -310,8 +312,8 @@ def derive_control_from_milp_plan(
             round(float(current_soc), 1),
         )
 
-    # Isolated ESS: never Automatik — map hold to standby (Entladesperre).
-    if not allows_automatik(kind) and mode == MODE_AUTOMATIK:
+    # Island inverter: never Automatik — map hold to standby (Entladesperre).
+    if not allows_automatik(ac_connection) and mode == MODE_AUTOMATIK:
         mode, target_power, target_soc = (
             MODE_ENTLADESPERRE,
             0.0,

@@ -658,7 +658,44 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
                 _append_thermal_annual_read_checks(checks, consumer)
 
     _append_battery_ess_read_checks(checks)
+    _append_inverter_read_checks(checks)
     return checks
+
+
+def _append_inverter_read_checks(checks: list[tuple[str, str, dict]]) -> None:
+    """Per-inverter entity-scoped reads from ``components.json`` (2.7.l P4)."""
+    from ehal.inverter_fields import binding_address, inv_field
+    from ehal.loxone_push_source import is_pushable_kind
+    from integrations.ehal_debug_mapping import INVERTER_LIVE_READ_KINDS
+
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return
+        doc = load_components_document(path)
+    except Exception:
+        return
+    raw = doc.get("inverters") if isinstance(doc, dict) else []
+    if not isinstance(raw, list):
+        return
+    for inverter in raw:
+        if not isinstance(inverter, dict):
+            continue
+        iid = str(inverter.get("id") or "").strip()
+        if not iid:
+            continue
+        bindings = inverter.get("ehal_bindings")
+        bind_map = bindings if isinstance(bindings, dict) else None
+        for kind in INVERTER_LIVE_READ_KINDS:
+            field = inv_field(iid, kind)
+            io_name = binding_address(bind_map, iid, kind)
+            if not io_name and bind_map is not None and field in bind_map:
+                if is_pushable_kind(kind):
+                    io_name = field
+            _append_io_check(checks, field, io_name)
 
 
 def _append_battery_ess_read_checks(checks: list[tuple[str, str, dict]]) -> None:

@@ -17,6 +17,14 @@ from house_config.entity_id_lock import (
 from ui.house_config_entities_io import upsert_battery, upsert_pv_system
 from ui.house_config_profile_save import _resolve_consumer_ids
 
+_WR_MAIN = {
+    "id": "wr_main",
+    "label": "Haupt-Wechselrichter",
+    "type": "hybrid",
+    "ac_connection": "grid_tied",
+    "control": "full",
+}
+
 
 def test_resolve_new_unlocked_then_locks_on_label_change():
     taken: set[str] = set()
@@ -113,7 +121,7 @@ def components_env(tmp_path, monkeypatch):
     config_json = cfg / "config.json"
     save_components_document(
         str(components),
-        {"batteries": [], "pv_systems": []},
+        {"inverters": [_WR_MAIN], "batteries": [], "pv_systems": []},
     )
     scenarios.write_text(
         json.dumps(
@@ -169,6 +177,8 @@ def test_upsert_battery_locks_after_bezeichnung_change(components_env):
             "battery_efficiency": 0.97,
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
+            "inverter_id": "wr_main",
+            "battery_wear": {"enabled": False},
             "ehal_bindings": {
                 ess_field("15_kwh_speicher_copy", "sens_ess_soc"): "SoC",
             },
@@ -194,6 +204,8 @@ def test_upsert_battery_locks_after_bezeichnung_change(components_env):
             "battery_efficiency": 0.97,
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
+            "inverter_id": "wr_main",
+            "battery_wear": {"enabled": False},
         },
         stable_id=first,
     )
@@ -220,6 +232,7 @@ def test_upsert_pv_locks_after_bezeichnung_change(components_env):
             "kwp": 10.0,
             "pv_tilt": 18.0,
             "pv_azimuth": 0.0,
+            "inverter_id": "wr_main",
         },
         stable_id="",
     )
@@ -235,6 +248,7 @@ def test_upsert_pv_locks_after_bezeichnung_change(components_env):
             "kwp": 10.0,
             "pv_tilt": 18.0,
             "pv_azimuth": -90.0,
+            "inverter_id": "wr_main",
         },
         stable_id=first,
     )
@@ -259,7 +273,9 @@ def profiles_env(tmp_path, monkeypatch):
     profiles = cfg / "house_profiles.json"
     components = cfg / "components.json"
     save_house_profiles_document(str(profiles), {"profiles": []})
-    save_components_document(str(components), {"batteries": [], "pv_systems": []})
+    save_components_document(
+        str(components), {"inverters": [], "batteries": [], "pv_systems": []}
+    )
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg))
     monkeypatch.setenv("EARNIE_HOUSE_PROFILES_PATH", str(profiles))
     monkeypatch.setenv("EARNIE_COMPONENTS_PATH", str(components))

@@ -799,11 +799,31 @@ def test_slice_bundle_preserves_heat_content_series():
 def test_live_heat_content_chart_sim_and_meas():
     from data.modeled_temperatures import HC_HEAT_STORAGE
     from ui.consumption_display.charts import live_heat_content_chart
+    from ui.consumption_display.heat_content_history import (
+        HeatContentForecastLine,
+        LiveHeatContentForecastFan,
+    )
 
     start = datetime(2023, 1, 2)
     timestamps = [
         (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(48)
     ]
+    fan = LiveHeatContentForecastFan(
+        lines_by_key={
+            HC_HEAT_STORAGE: [
+                HeatContentForecastLine(
+                    hour_start=start + timedelta(hours=h),
+                    x_timestamps=[
+                        start + timedelta(hours=h + i) for i in range(4)
+                    ],
+                    q_sim_kwh=[50.0 - i * 0.2 for i in range(4)],
+                )
+                for h in range(3)
+            ]
+        },
+        labels={HC_HEAT_STORAGE: "Wärmespeicher"},
+        common_horizon_h=4,
+    )
     fig = live_heat_content_chart(
         timestamps,
         q_sim_by_key={HC_HEAT_STORAGE: [40.0 + i * 0.1 for i in range(48)]},
@@ -811,11 +831,14 @@ def test_live_heat_content_chart_sim_and_meas():
             HC_HEAT_STORAGE: [41.0 if i % 3 == 0 else None for i in range(48)]
         },
         labels={HC_HEAT_STORAGE: "Wärmespeicher"},
+        forecast_fan=fan,
     )
     assert fig is not None
-    assert len(fig.data) == 2
+    assert len(fig.data) == 5  # Sim + Ist + 3 forecast lines
     assert fig.layout.meta["has_measured"] is True
     assert fig.layout.meta["has_sim"] is True
+    assert fig.layout.meta["forecast_fan_traces"] == 3
+    assert fig.layout.meta["forecast_fan_horizon_h"] == 4
 
 
 def test_measured_heat_content_aligns_hours(tmp_path, monkeypatch):
@@ -877,6 +900,64 @@ def test_measured_heat_content_aligns_hours(tmp_path, monkeypatch):
     assert live_aware.q_meas_by_key[HC_HEAT_STORAGE][
         live_aware.timestamps.index("2023-01-02 03:00:00")
     ] == pytest.approx(55.5)
+
+
+def test_live_heat_content_forecast_fan_latest_12_common_horizon(
+    tmp_path, monkeypatch
+):
+    import json
+
+    from data.modeled_temperatures import HC_HEAT_STORAGE
+    from runtime_store import optimization_history
+    from ui.consumption_display.heat_content_history import (
+        live_heat_content_forecast_fan,
+    )
+
+    hist = tmp_path / "optimization_history.jsonl"
+    lines: list[str] = []
+    # 14 hourly samples; horizons of length 30 and 20 → common ≤ 24 → 20
+    for hour in range(14):
+        completed = datetime(2023, 1, 2, hour, 15, 0)
+        horizon_len = 30 if hour < 10 else 20
+        entry = {
+            "completed_at": completed.isoformat(),
+            "thermal_observability": [
+                {
+                    "consumer_id": "wp_heating",
+                    "kind": "heat_storage",
+                    "heat_content_kwh": {"q_meas": 50.0, "q_sim": 49.0},
+                    "horizon_q_sim_kwh": [
+                        float(40 + hour) - 0.1 * i for i in range(horizon_len)
+                    ],
+                },
+                {
+                    "consumer_id": "swimspa",
+                    "heat_content_kwh": {"q_meas": 80.0, "q_sim": 79.0},
+                    "horizon_q_sim_kwh": [
+                        float(70 + hour) - 0.05 * i for i in range(horizon_len)
+                    ],
+                },
+            ],
+        }
+        lines.append(json.dumps(entry))
+    hist.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    monkeypatch.setattr(optimization_history, "HISTORY_FILE", str(hist))
+    monkeypatch.setattr(optimization_history, "RUNTIME_DIR", str(tmp_path))
+    optimization_history._JSONL_HISTORY_CACHE = None
+    optimization_history._JSONL_HISTORY_CACHE_PATH = None
+
+    fan = live_heat_content_forecast_fan(datetime(2023, 1, 2, 13, 30, 0))
+    assert fan is not None
+    assert fan.has_lines()
+    assert HC_HEAT_STORAGE in fan.lines_by_key
+    assert "pool_q_swimspa" in fan.lines_by_key
+    hs_lines = fan.lines_by_key[HC_HEAT_STORAGE]
+    assert len(hs_lines) == 12
+    assert hs_lines[0].hour_start == datetime(2023, 1, 2, 2, 0, 0)
+    assert hs_lines[-1].hour_start == datetime(2023, 1, 2, 13, 0, 0)
+    assert fan.common_horizon_h == 20
+    assert all(len(line.q_sim_kwh) == 20 for line in hs_lines)
+    assert all(len(line.x_timestamps) == 20 for line in hs_lines)
 
 
 def test_thermal_rc_returns_hourly_temps():

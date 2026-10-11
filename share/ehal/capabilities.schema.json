@@ -36,6 +36,10 @@
     "supports_ess_source_select": {
       "type": "boolean",
       "description": "ess.{id}.set_ess_source_select (grid/battery island) can be written (physical standby_backup, 2.7.h)."
+    },
+    "supports_inv_power_limit": {
+      "type": "boolean",
+      "description": "inv.{id}.set_inv_ac_power_limit can be written (2.7.l P4; curtailment control loop is P5)."
     }
   },
   "additionalProperties": false

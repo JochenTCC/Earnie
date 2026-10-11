@@ -219,7 +219,7 @@ def start_loxone_request_http(
         _server = server
         _thread = thread
         logger.info(
-            "Loxone request HTTP listening on %s:%s (%s, %s, %s)",
+            "Loxone request HTTP listening on %s:%s (%s, %s, %s, %s)",
             host,
             port,
             REQUEST_OPTIMIZE_PATH,

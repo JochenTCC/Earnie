@@ -51,7 +51,7 @@ def _write_minimal_greenfield_config(config_dir) -> None:
         encoding="utf-8",
     )
     (config_dir / "components.json").write_text(
-        json.dumps({"batteries": [], "pv_systems": []}),
+        json.dumps({"inverters": [], "batteries": [], "pv_systems": []}),
         encoding="utf-8",
     )
     _write_live_scenarios(config_dir, settings={
@@ -67,6 +67,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
     battery = {
         "id": "home_5kwh",
         "label": "5 kWh",
+        "inverter_id": "wr_main",
         "battery_capacity_kwh": 5.0,
         "battery_max_power_kw": 2.5,
         "battery_efficiency": 0.97,
@@ -107,6 +108,15 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
     (config_dir / "components.json").write_text(
         json.dumps(
             {
+                "inverters": [
+                    {
+                        "id": "wr_main",
+                        "label": "Haupt-WR",
+                        "type": "hybrid",
+                        "ac_connection": "grid_tied",
+                        "control": "full",
+                    }
+                ],
                 "batteries": [battery],
                 "pv_systems": [
                     {
@@ -115,6 +125,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "kwp": 10.0,
                         "pv_tilt": 30,
                         "pv_azimuth": 180,
+                        "inverter_id": "wr_main",
                     }
                 ],
             }

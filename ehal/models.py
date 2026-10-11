@@ -46,6 +46,10 @@ class EhalTelemetry(TypedDict):
     get_ess_soc_max: NotRequired[float | None]
     get_ess_max_charge_power: NotRequired[float | None]
     get_ess_max_discharge_power: NotRequired[float | None]
+    sens_inv_power_ac: NotRequired[float | None]
+    sens_inv_power_pv: NotRequired[float | None]
+    get_inv_max_ac_power: NotRequired[float | None]
+    get_inv_max_pv_power: NotRequired[float | None]
 
 
 class EhalSetpoint(TypedDict):
@@ -60,6 +64,7 @@ class EhalSetpoint(TypedDict):
     set_evcs_max_current: NotRequired[float]
     set_evcs_mode: NotRequired[str]
     set_grid_export_power_limit: NotRequired[float]
+    set_inv_ac_power_limit: NotRequired[float]
 
 
 class EhalCapabilities(TypedDict):
@@ -69,6 +74,7 @@ class EhalCapabilities(TypedDict):
     supports_ess_write: bool
     supports_evcs_current: bool
     supports_ess_source_select: NotRequired[bool]
+    supports_inv_power_limit: NotRequired[bool]
 
 
 class EhalWriteError(TypedDict):

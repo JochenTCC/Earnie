@@ -54,7 +54,12 @@
     "set_grid_export_power_limit": {
       "type": "number",
       "minimum": 0,
-      "description": "Max grid export power in W (non-negative magnitude). 0 = no export; unconstrained = plant maximum (PV kWp + force-discharge ESS kW), fallback 1000000."
+      "description": "Max grid export power in W (non-negative magnitude). 0 = no export; unconstrained = plant maximum (per grid-tied inverter; fallback 1000000)."
+    },
+    "set_inv_ac_power_limit": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Max AC output of one inverter in W (magnitude ≥ 0). Live wire is entity-scoped inv.{id}.set_inv_ac_power_limit (2.7.l). Curtailment control loop is P5."
     }
   },
   "anyOf": [
@@ -65,7 +70,8 @@
     {"required": ["set_ess_source_select"]},
     {"required": ["set_evcs_max_current"]},
     {"required": ["set_evcs_mode"]},
-    {"required": ["set_grid_export_power_limit"]}
+    {"required": ["set_grid_export_power_limit"]},
+    {"required": ["set_inv_ac_power_limit"]}
   ],
   "additionalProperties": false
 }

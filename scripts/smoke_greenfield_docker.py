@@ -36,6 +36,7 @@ REQUIRED_CONFIG_FILES = (
     ".env",
     "house_profiles.json",
     "tariffs.json",
+    "grid_fees.json",
     "backtesting_scenarios.json",
 )
 REQUIRED_RUNTIME_FILES = (

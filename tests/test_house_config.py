@@ -595,7 +595,7 @@ def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
     )
     components_path = tmp_path / "components.json"
     components_path.write_text(
-        json.dumps({"batteries": [], "pv_systems": []}), encoding="utf-8"
+        json.dumps({"inverters": [], "batteries": [], "pv_systems": []}), encoding="utf-8"
     )
     tariffs_path = tmp_path / "tariffs.json"
     tariffs_path.write_text(
@@ -1566,9 +1566,17 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
     (config_dir / "components.json").write_text(
         """
         {
+            "inverters": [{
+                "id": "wr_main",
+                "label": "Haupt-WR",
+                "type": "hybrid",
+                "ac_connection": "grid_tied",
+                "control": "full"
+            }],
             "batteries": [{
                 "id": "home_5kwh",
                 "label": "5 kWh",
+                "inverter_id": "wr_main",
                 "battery_capacity_kwh": 5.0,
                 "battery_max_power_kw": 2.5,
                 "battery_efficiency": 0.97,
@@ -1582,7 +1590,8 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "label": "Dach",
                 "kwp": 10.0,
                 "pv_tilt": 30,
-                "pv_azimuth": 180
+                "pv_azimuth": 180,
+                "inverter_id": "wr_main"
             }]
         }
         """.strip(),

@@ -1,13 +1,20 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/components.schema.json",
-  "title": "Earnie Komponenten (Batterie & PV)",
-  "description": "JSON-Schema für components.json — batteries[] und pv_systems[] (referenziert über battery_ids[] / pv_system_ids[] in Szenarien).",
+  "title": "Earnie Komponenten (Batterie, PV & Wechselrichter)",
+  "description": "JSON-Schema für components.json — inverters[], batteries[], pv_systems[] (Szenario wählt battery_ids[] / pv_system_ids[]; Inverter folgen aus inverter_id).",
   "type": "object",
   "properties": {
     "$schema": {
       "type": "string",
       "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
+    },
+    "inverters": {
+      "type": "array",
+      "description": "Wechselrichter (2.7.l); PV und Batterien referenzieren via inverter_id.",
+      "items": {
+        "$ref": "#/definitions/inverter_entity"
+      }
     },
     "batteries": {
       "type": "array",
@@ -151,11 +158,9 @@
           "minimum": 0,
           "description": "Dauerhafte AC-Eigenleistung der Batterie (kW), 24/7 als Verbrauch."
         },
-        "kind": {
+        "inverter_id": {
           "type": "string",
-          "enum": ["isolated", "battery_inverter"],
-          "default": "battery_inverter",
-          "description": "Topology (2.7.c): battery_inverter = optimizing/charging/discharging (Design C1 Automatik allowed); isolated = charging/discharging/standby (never Automatik)."
+          "description": "Reference to inverters[].id (required for house batteries and physical powerstations; omit for virtual powerstations)."
         },
         "control": {
           "type": "string",
@@ -217,7 +222,61 @@
         "id_provisional_label": {
           "type": "string",
           "description": "Seed Bezeichnung while id_locked is false; first differing save sets id from label and locks."
+        },
+        "inverter_id": {
+          "type": "string",
+          "description": "Reference to inverters[].id (required)."
         }
+      }
+    },
+    "inverter_entity": {
+      "type": "object",
+      "description": "Wechselrichter (2.7.l): PV×Batterie-Topologie, Clipping, island vs grid-tied.",
+      "required": ["id", "type", "ac_connection"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["hybrid", "pv_string", "battery"],
+          "description": "hybrid = PV+battery DC; pv_string = PV only; battery = AC-coupled battery inverter."
+        },
+        "ac_connection": {
+          "type": "string",
+          "enum": ["grid_tied", "island"],
+          "description": "grid_tied = house AC bus; island = attached loads only (replaces batteries[].kind=isolated)."
+        },
+        "max_ac_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "AC clipping + discharge cap; absent = no cap."
+        },
+        "max_pv_input_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional DC/MPPT input cap."
+        },
+        "max_ac_charge_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional grid-charge through inverter cap."
+        },
+        "control": {
+          "type": "string",
+          "enum": ["full", "limits_only", "read_only"],
+          "default": "full"
+        },
+        "owned_by": {
+          "type": "string",
+          "description": "Battery id that owns this built-in inverter (UI/lifecycle only)."
+        },
+        "ehal_bindings": {
+          "type": "object",
+          "description": "entity-scoped inv.{id}.* bindings.",
+          "additionalProperties": { "type": "string" }
+        },
+        "id_locked": { "type": "boolean" },
+        "id_provisional_label": { "type": "string" }
       }
     }
   }

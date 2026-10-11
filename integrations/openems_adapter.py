@@ -88,6 +88,46 @@ def evcs_amps_to_watts(amps: float, *, voltage_v: float, phases: int) -> float:
     return float(amps) * float(voltage_v) * max(1, int(phases))
 
 
+def _openems_inv_limit_channels() -> dict[str, tuple[str, str]]:
+    """``inv.{id}.set_inv_ac_power_limit`` → (component, channel) from components."""
+    from ehal.inverter_fields import binding_address, inv_field
+
+    out: dict[str, tuple[str, str]] = {}
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return out
+        doc = load_components_document(path)
+    except Exception:  # noqa: BLE001 — capability probe must stay usable
+        return out
+    raw = doc.get("inverters") if isinstance(doc, dict) else []
+    if not isinstance(raw, list):
+        return out
+    for inv in raw:
+        if not isinstance(inv, dict):
+            continue
+        inv_id = str(inv.get("id") or "").strip()
+        if not inv_id:
+            continue
+        bindings = inv.get("ehal_bindings")
+        bind_map = bindings if isinstance(bindings, dict) else {}
+        field = inv_field(inv_id, "set_inv_ac_power_limit")
+        addr = binding_address(bind_map, inv_id, "set_inv_ac_power_limit")
+        if not addr:
+            continue
+        if "/" not in addr:
+            continue
+        component, channel = addr.split("/", 1)
+        component = component.strip()
+        channel = channel.strip()
+        if component and channel:
+            out[field] = (component, channel)
+    return out
+
+
 class OpenemsAdapter:
     """REST-only OpenEMS ↔ EHAL adapter (no OpenEMS libraries)."""
 
@@ -95,12 +135,18 @@ class OpenemsAdapter:
         self.cfg = cfg
         self._supports_ess_write = True
         self._supports_evcs_current = bool(cfg.evcs_component)
+        self._inv_limit_channels = _openems_inv_limit_channels()
+        self._supports_inv_power_limit = bool(self._inv_limit_channels)
         self._last_write_error: EhalWriteError | None = None
+        self._last_skipped: list[str] = []
         self._auth = HTTPBasicAuth(cfg.username, cfg.password)
         self._base = cfg.base_url.rstrip("/")
 
     def last_write_error(self) -> EhalWriteError | None:
         return self._last_write_error
+
+    def last_skipped_fields(self) -> list[str]:
+        return list(self._last_skipped)
 
     def capabilities(self) -> EhalCapabilities:
         doc: dict[str, Any] = {
@@ -110,6 +156,7 @@ class OpenemsAdapter:
             "supports_ess_write": self._supports_ess_write,
             "supports_evcs_current": self._supports_evcs_current,
             "supports_ess_source_select": False,
+            "supports_inv_power_limit": self._supports_inv_power_limit,
         }
         return validate_capabilities(doc)
 
@@ -351,6 +398,55 @@ class OpenemsAdapter:
             retryable=True,
             flip_ess=outcome.flip_ess,
             flip_evcs=outcome.flip_evcs,
+        )
+
+    def write_mapped_fields(
+        self, fields: dict[str, float | int | str]
+    ) -> EhalWriteError | None:
+        """Write entity-scoped inverter limits (``inv.{id}.set_inv_ac_power_limit``)."""
+        from ehal.field_registry import require_openems_write
+        from ehal.inverter_fields import inv_field_kind
+
+        outcome = _OpenemsWriteOutcome()
+        self._last_skipped = []
+        # Refresh channel map each write (bindings may change without adapter rebuild).
+        self._inv_limit_channels = _openems_inv_limit_channels()
+        self._supports_inv_power_limit = bool(self._inv_limit_channels)
+
+        for field_name, value in fields.items():
+            key = str(field_name or "").strip()
+            if inv_field_kind(key) != "set_inv_ac_power_limit":
+                outcome.failed.append(key or "unknown")
+                outcome.messages.append(f"Unsupported OpenEMS mapped field {key}")
+                continue
+            channel_pair = self._inv_limit_channels.get(key)
+            if channel_pair is None:
+                self._last_skipped.append(key)
+                continue
+            component, channel = channel_pair
+            try:
+                hub_w = float(
+                    require_openems_write("set_inv_ac_power_limit", float(value))
+                )
+                self.write_channel(component, channel, hub_w)
+            except (OpenemsHttpError, KeyError, TypeError, ValueError) as exc:
+                outcome.failed.append(key)
+                outcome.messages.append(str(exc))
+                status = getattr(exc, "status_code", None)
+                if status is not None:
+                    outcome.hub_status = str(status)
+                self._supports_inv_power_limit = False
+
+        if not outcome.failed:
+            self._last_write_error = None
+            return None
+        return self._record_write_error(
+            failed_fields=outcome.failed,
+            message="; ".join(outcome.messages),
+            hub_status=outcome.hub_status,
+            retryable=True,
+            flip_ess=False,
+            flip_evcs=False,
         )
 
     def _channel_url(self, component: str, channel: str) -> str:

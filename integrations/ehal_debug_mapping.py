@@ -80,6 +80,16 @@ BATTERY_ESS_LIVE_WRITE_KINDS: tuple[str, ...] = (
 
 BATTERY_SOURCE_SELECT_KIND = "set_ess_source_select"
 
+# Per-inverter entity-scoped read/write kinds (2.7.l P4).
+INVERTER_LIVE_READ_KINDS: tuple[str, ...] = (
+    "sens_inv_power_ac",
+    "sens_inv_power_pv",
+    "get_inv_max_ac_power",
+    "get_inv_max_pv_power",
+)
+
+INVERTER_LIVE_WRITE_KINDS: tuple[str, ...] = ("set_inv_ac_power_limit",)
+
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_ess_active_power",
     "set_ess_charge_power_limit",
@@ -130,12 +140,13 @@ def is_live_read_field(field: str) -> bool:
     """True for Live-Lesen rows (``sens_*`` / ``get_*`` / flex / qualified IDs)."""
     from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import is_flex_live_read_field
+    from ehal.inverter_fields import inv_field_kind
     from ehal.qualified_ids import field_kind
 
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
-    kind = ess_field_kind(name) or field_kind(name)
+    kind = ess_field_kind(name) or inv_field_kind(name) or field_kind(name)
     return (
         kind.startswith("sens_")
         or kind.startswith("get_")
@@ -147,12 +158,13 @@ def is_live_write_field(field: str) -> bool:
     """True for Live-Schreiben rows (``set_*`` / flex ``set_enable``)."""
     from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import KIND_SET_ENABLE, flex_field_kind
+    from ehal.inverter_fields import inv_field_kind
     from ehal.qualified_ids import field_kind
 
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
-    kind = ess_field_kind(name) or field_kind(name)
+    kind = ess_field_kind(name) or inv_field_kind(name) or field_kind(name)
     if kind.startswith("set_"):
         return True
     if kind == KIND_SET_ENABLE:
@@ -329,9 +341,32 @@ def _all_live_batteries() -> list[dict]:
         return []
 
 
+def _all_live_inverters() -> list[dict]:
+    """Inverters from ``components.json`` (optional EHAL role)."""
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return []
+        doc = load_components_document(path)
+        raw = doc.get("inverters") if isinstance(doc, dict) else []
+        if not isinstance(raw, list):
+            return []
+        return [
+            inv
+            for inv in raw
+            if isinstance(inv, dict) and str(inv.get("id") or "").strip()
+        ]
+    except Exception:
+        return []
+
+
 def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
-    """Canonical Live-Lesen field ids (plant + batteries + consumers), including unmapped."""
+    """Canonical Live-Lesen field ids (plant + batteries + inverters + consumers)."""
     from ehal.ess_fields import ess_field
+    from ehal.inverter_fields import inv_field
     from ehal.qualified_ids import qualified_plant_id
 
     if network_backend:
@@ -348,6 +383,11 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
         if not bid:
             continue
         fields.extend(ess_field(bid, kind) for kind in BATTERY_ESS_LIVE_READ_KINDS)
+    for inverter in _all_live_inverters():
+        iid = str(inverter.get("id") or "").strip()
+        if not iid:
+            continue
+        fields.extend(inv_field(iid, kind) for kind in INVERTER_LIVE_READ_KINDS)
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
         if not cid:
@@ -423,9 +463,10 @@ def _append_standby_source_select_fields(
 
 
 def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
-    """Canonical Live-Schreiben ids (plant + batteries + EV + flex Freigabe)."""
+    """Canonical Live-Schreiben ids (plant + batteries + inverters + EV + flex)."""
     from ehal.ess_fields import ess_field
     from ehal.flex_fields import flex_set_enable
+    from ehal.inverter_fields import inv_field
     from ehal.qualified_ids import qualified_plant_id
     from settings.ehal_marker_resolve import marker_flex_enable
 
@@ -435,6 +476,12 @@ def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
             f for f in NETWORK_LIVE_WRITE_FIELDS if f != BATTERY_SOURCE_SELECT_KIND
         ]
         _append_standby_source_select_fields(fields, batteries)
+        for inverter in _all_live_inverters():
+            iid = str(inverter.get("id") or "").strip()
+            if iid:
+                fields.extend(
+                    inv_field(iid, kind) for kind in INVERTER_LIVE_WRITE_KINDS
+                )
         return fields
     has_batteries = bool(batteries)
     fields: list[str] = []
@@ -447,6 +494,11 @@ def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
             continue
         fields.extend(ess_field(bid, kind) for kind in BATTERY_ESS_LIVE_WRITE_KINDS)
     _append_standby_source_select_fields(fields, batteries)
+    for inverter in _all_live_inverters():
+        iid = str(inverter.get("id") or "").strip()
+        if not iid:
+            continue
+        fields.extend(inv_field(iid, kind) for kind in INVERTER_LIVE_WRITE_KINDS)
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
         if not cid:
@@ -721,6 +773,12 @@ def ha_entity_scoped_live_mapping(house_doc: dict | None = None) -> dict[str, st
                 out[live_read_consumer_field(consumer, field)] = entity_id
             else:
                 out[live_write_consumer_field(consumer, field)] = entity_id
+    for inverter in _all_live_inverters():
+        bindings = inverter.get("ehal_bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for field, entity_id in _binding_map(bindings).items():
+            out[str(field)] = entity_id
     return out
 
 

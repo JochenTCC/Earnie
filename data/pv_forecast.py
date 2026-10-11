@@ -368,37 +368,47 @@ def _sum_vectors(vectors: list[list[float]], length: int) -> list[float]:
     return total
 
 
-def get_hourly_pv_forecast_for_hours(target_hours: list) -> List[float]:
-    """
-    PV-Prognose (kW) für die übergebenen Stunden-Slots.
-    Summiert forecast.solar-Abrufe über alle Live-Szenario-PV-Anlagen.
-    """
+def _planning_pv_systems_for_forecast() -> list[dict]:
+    systems = config.get_planning_pv_systems()
+    if systems:
+        return systems
+    kwp = float(config.get("PV_KWP", cast=float) or 0.0)
+    if kwp <= 0.0:
+        return []
+    return [
+        {
+            "id": "pv",
+            "label": "PV",
+            "pv_kwp": kwp,
+            "pv_tilt": float(config.get("PV_TILT", cast=float) or 0.0),
+            "pv_azimuth": float(config.get("PV_AZIMUTH", cast=float) or 0.0),
+        }
+    ]
+
+
+def get_hourly_pv_forecast_by_system_for_hours(
+    target_hours: list,
+) -> dict[str, List[float]]:
+    """Per-PV-system forecast (kW) keyed by system id (Inverter P3 pass-through)."""
     global _USING_SYNTHETIC_FALLBACK
 
     if not target_hours:
-        raise ValueError("get_hourly_pv_forecast_for_hours erfordert mindestens eine Zielstunde.")
+        raise ValueError(
+            "get_hourly_pv_forecast_by_system_for_hours erfordert "
+            "mindestens eine Zielstunde."
+        )
+
+    systems = _planning_pv_systems_for_forecast()
+    if not systems:
+        _USING_SYNTHETIC_FALLBACK = False
+        return {}
 
     lat = float(config.get("LATITUDE", cast=float))
     lon = float(config.get("LONGITUDE", cast=float))
-    systems = config.get_planning_pv_systems()
-    if not systems:
-        kwp = float(config.get("PV_KWP", cast=float) or 0.0)
-        if kwp <= 0.0:
-            _USING_SYNTHETIC_FALLBACK = False
-            return [0.0] * len(target_hours)
-        systems = [
-            {
-                "id": "pv",
-                "label": "PV",
-                "pv_kwp": kwp,
-                "pv_tilt": float(config.get("PV_TILT", cast=float) or 0.0),
-                "pv_azimuth": float(config.get("PV_AZIMUTH", cast=float) or 0.0),
-            }
-        ]
-
-    vectors: list[list[float]] = []
+    by_system: dict[str, List[float]] = {}
     any_fallback = False
     for system in systems:
+        sid = str(system.get("id") or "").strip() or "pv"
         vector, used_api = _forecast_one_system(
             lat=lat,
             lon=lon,
@@ -407,18 +417,42 @@ def get_hourly_pv_forecast_for_hours(target_hours: list) -> List[float]:
             kwp=float(system.get("pv_kwp", 0.0) or 0.0),
             target_hours=target_hours,
         )
-        vectors.append(vector)
+        by_system[sid] = vector
         if not used_api:
             any_fallback = True
 
     _USING_SYNTHETIC_FALLBACK = any_fallback
-    pv_vector = _sum_vectors(vectors, len(target_hours))
     if any_fallback:
+        totals = _sum_vectors(list(by_system.values()), len(target_hours))
         print(
             f"[info] Synthetischer PV-Fallback (teilweise/gesamt) — "
-            f"Summen-Max: {max(pv_vector):.2f} kW über {len(systems)} Anlage(n)."
+            f"Summen-Max: {max(totals):.2f} kW über {len(systems)} Anlage(n)."
         )
-    return pv_vector
+    return by_system
+
+
+def sum_pv_forecast_by_system(
+    by_system: dict[str, List[float]],
+    length: int,
+) -> List[float]:
+    """Sum per-system PV series into one plant vector (kW)."""
+    if length < 0:
+        raise ValueError("sum_pv_forecast_by_system: length muss ≥ 0 sein.")
+    if not by_system:
+        return [0.0] * length
+    return _sum_vectors(list(by_system.values()), length)
+
+
+def get_hourly_pv_forecast_for_hours(target_hours: list) -> List[float]:
+    """
+    PV-Prognose (kW) für die übergebenen Stunden-Slots.
+    Summiert forecast.solar-Abrufe über alle Live-Szenario-PV-Anlagen.
+    """
+    if not target_hours:
+        raise ValueError("get_hourly_pv_forecast_for_hours erfordert mindestens eine Zielstunde.")
+
+    by_system = get_hourly_pv_forecast_by_system_for_hours(target_hours)
+    return sum_pv_forecast_by_system(by_system, len(target_hours))
 
 
 def get_hourly_pv_forecast() -> List[float]:

@@ -14,7 +14,7 @@ Quellen und rechtliche Anker: [Tarife und Preise nachrechnen](../referenz/tarife
 
 | Feld | Bedeutung |
 | --- | --- |
-| `area_id` | Netzbereich aus dem Katalog [`share/config/grid_fees.json`](../../share/config/grid_fees.json) (z. B. `AT-VBG`). `null` = eigener Wert ohne Zeitregeln. |
+| `area_id` | Netzbereich aus dem Katalog `earnie_env/config/grid_fees.json` (Seed aus öffentlichem [`share/config/grid_fees.json`](../../share/config/grid_fees.json); z. B. `AT-VBG`). `null` = eigener Wert ohne Zeitregeln. |
 | `power_metering` | `unmetered_power` (Standard Haushalt, nicht gemessene Leistung) oder `metered_power`; wählt den Basis-Arbeitspreis im Katalog. |
 | `quarter_hour_meter` | Viertelstunden-Smart-Meter vorhanden. Voraussetzung für SNAP/WiNAP; ohne Zähler werden die Regeln übersprungen (in UI und Jahresrechnung ausgewiesen). |
 | `base_cent_kwh` | Eigener Basis-Arbeitspreis (Cent/kWh netto); nur ohne `area_id` wirksam. |

@@ -13,6 +13,7 @@ from typing import Any
 OVERLAY_FILENAME = "shadow_ehal_bindings.json"
 PLANT_ENTITY_ID = "plant"
 BATTERY_ENTITY_KIND = "battery"
+INVERTER_ENTITY_KIND = "inverter"
 
 
 def overlay_path() -> str:
@@ -76,6 +77,10 @@ def upsert_entity_bindings(
         by_bat = dict(doc.get("battery_bindings") or {})
         by_bat[eid] = cleaned
         doc["battery_bindings"] = by_bat
+    elif kind == INVERTER_ENTITY_KIND:
+        by_inv = dict(doc.get("inverter_bindings") or {})
+        by_inv[eid] = cleaned
+        doc["inverter_bindings"] = by_inv
     else:
         by_profile = dict(doc.get("consumer_bindings") or {})
         profile_map = dict(by_profile.get(profile_id) or {})
@@ -107,30 +112,49 @@ def apply_overlay_to_house(house: dict) -> dict:
 
 
 def apply_overlay_to_components(components: dict) -> dict:
-    """Merge ``battery_bindings`` overlay into ``batteries[].ehal_bindings``."""
+    """Merge battery/inverter binding overlays into ``components.json`` entities."""
     overlay = read_overlay()
     by_bat = overlay.get("battery_bindings") if isinstance(overlay, dict) else None
-    if not isinstance(by_bat, dict) or not by_bat:
+    by_inv = overlay.get("inverter_bindings") if isinstance(overlay, dict) else None
+    if (not isinstance(by_bat, dict) or not by_bat) and (
+        not isinstance(by_inv, dict) or not by_inv
+    ):
         return components
     out = deepcopy(components) if isinstance(components, dict) else {
         "batteries": [],
         "pv_systems": [],
+        "inverters": [],
     }
-    batteries = out.get("batteries")
-    if not isinstance(batteries, list):
-        return out
-    for index, battery in enumerate(batteries):
-        if not isinstance(battery, dict):
-            continue
-        bid = str(battery.get("id") or "").strip()
-        raw = by_bat.get(bid)
-        if not isinstance(raw, dict):
-            continue
-        updated = dict(battery)
-        updated["ehal_bindings"] = _clean_bindings(
-            {str(k): str(v) for k, v in raw.items()}
-        )
-        batteries[index] = updated
+    if isinstance(by_bat, dict) and by_bat:
+        batteries = out.get("batteries")
+        if isinstance(batteries, list):
+            for index, battery in enumerate(batteries):
+                if not isinstance(battery, dict):
+                    continue
+                bid = str(battery.get("id") or "").strip()
+                raw = by_bat.get(bid)
+                if not isinstance(raw, dict):
+                    continue
+                updated = dict(battery)
+                updated["ehal_bindings"] = _clean_bindings(
+                    {str(k): str(v) for k, v in raw.items()}
+                )
+                batteries[index] = updated
+    if isinstance(by_inv, dict) and by_inv:
+        inverters = out.get("inverters")
+        if isinstance(inverters, list):
+            for index, inverter in enumerate(inverters):
+                if not isinstance(inverter, dict):
+                    continue
+                iid = str(inverter.get("id") or "").strip()
+                raw = by_inv.get(iid)
+                if not isinstance(raw, dict):
+                    continue
+                updated = dict(inverter)
+                updated["ehal_bindings"] = _clean_bindings(
+                    {str(k): str(v) for k, v in raw.items()}
+                )
+                inverters[index] = updated
     return out
 
 

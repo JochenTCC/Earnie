@@ -13,6 +13,7 @@ SAFE_PROBE_FIELDS: tuple[str, ...] = (
     "set_ess_discharge_power_limit",
     "set_ess_source_select",
     "set_grid_export_power_limit",
+    "set_inv_ac_power_limit",
     "set_evcs_max_current",
     "set_evcs_mode",
 )
@@ -23,7 +24,11 @@ DEFAULT_EVCS_PROBE_CAP_A = 6.0
 DEFAULT_ROUNDTRIP_WAIT_S = 1.5
 
 LIMIT_FIELDS = frozenset(
-    {"set_ess_charge_power_limit", "set_ess_discharge_power_limit"}
+    {
+        "set_ess_charge_power_limit",
+        "set_ess_discharge_power_limit",
+        "set_inv_ac_power_limit",
+    }
 )
 EXPORT_LIMIT_FIELD = "set_grid_export_power_limit"
 SOURCE_SELECT_FIELD = "set_ess_source_select"
@@ -34,6 +39,7 @@ LOXONE_KW_WRITE_FIELDS = frozenset(
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",
         EXPORT_LIMIT_FIELD,
+        "set_inv_ac_power_limit",
     }
 )
 
@@ -54,9 +60,10 @@ def probe_kind(field: str) -> str:
     """Wire kind for clamp/bounds (entity-scoped / flex → kind; else canonical)."""
     from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import flex_field_kind
+    from ehal.inverter_fields import inv_field_kind
 
     name = canonical_probe_field(field)
-    kind = ess_field_kind(name)
+    kind = ess_field_kind(name) or inv_field_kind(name)
     if kind:
         return kind
     flex_kind = flex_field_kind(name)

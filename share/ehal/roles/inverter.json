@@ -1,0 +1,90 @@
+{
+  "role_id": "inverter",
+  "label": "Wechselrichter",
+  "description": "Optional per-device inverter telemetry and AC output limit (2.7.l P4). Entity-scoped inv.{id}.* on inverters[].ehal_bindings. Plant sens_pv_production_active stays the required PV sum.",
+  "status": "m1",
+  "ehal_fields": [
+    {
+      "field": "sens_inv_power_ac",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "AC power of this inverter in W; + = feeds the AC bus, − = draws from it. Exchange: inv.{id}.sens_inv_power_ac.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "read_required": false
+      }
+    },
+    {
+      "field": "sens_inv_power_pv",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "PV input power ≥ 0 (W). Exchange: inv.{id}.sens_inv_power_pv.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "omit_if": "negative",
+        "read_required": false
+      }
+    },
+    {
+      "field": "get_inv_max_ac_power",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Device AC rating magnitude ≥ 0 (W). Exchange: inv.{id}.get_inv_max_ac_power.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "omit_if": "negative",
+        "read_required": false
+      }
+    },
+    {
+      "field": "get_inv_max_pv_power",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Device DC/MPPT input limit magnitude ≥ 0 (W). Exchange: inv.{id}.get_inv_max_pv_power.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "omit_if": "negative",
+        "read_required": false
+      }
+    },
+    {
+      "field": "set_inv_ac_power_limit",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "Cap on AC output (curtailment), magnitude ≥ 0 (W). Live write loop (P5). Exchange: inv.{id}.set_inv_ac_power_limit.",
+      "loxone": {
+        "unit": "kW",
+        "ehal_unit": "W",
+        "factor": 1000,
+        "sign": 1,
+        "clamp_min": 0
+      },
+      "openems": {
+        "unit": "W",
+        "ehal_unit": "W",
+        "factor": 1,
+        "sign": 1,
+        "clamp_min": 0
+      }
+    },
+    {
+      "field": "supports_inv_power_limit",
+      "required": false,
+      "kind": "capability",
+      "notes": "True when set_inv_ac_power_limit can be written (omitted = false)."
+    }
+  ],
+  "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention / Inverter topology."
+}

@@ -1,0 +1,38 @@
+{
+  "role_id": "inverter",
+  "label": "Wechselrichter",
+  "baustein_notes": "Optional inverter Merkers (2.7.l P4). Suggested names TBD — finalize with VO/VI templates. Bindings live on inverters[].ehal_bindings as inv.{id}.*.",
+  "recommended_markers": [
+    {
+      "ehal_field": "sens_inv_power_ac",
+      "loxone_blocks_key": "inverters[].ehal_bindings.inv.{id}.sens_inv_power_ac",
+      "suggested_name": "Earnie_WR_Leistung_AC",
+      "notes": "TBD (P4 stub): AC power kW, + = feeds house bus."
+    },
+    {
+      "ehal_field": "sens_inv_power_pv",
+      "loxone_blocks_key": "inverters[].ehal_bindings.inv.{id}.sens_inv_power_pv",
+      "suggested_name": "Earnie_WR_Leistung_PV",
+      "notes": "TBD (P4 stub): PV input power kW ≥ 0."
+    },
+    {
+      "ehal_field": "get_inv_max_ac_power",
+      "loxone_blocks_key": "inverters[].ehal_bindings.inv.{id}.get_inv_max_ac_power",
+      "suggested_name": "Earnie_WR_Max_AC",
+      "notes": "TBD (P4 stub): device AC rating kW."
+    },
+    {
+      "ehal_field": "get_inv_max_pv_power",
+      "loxone_blocks_key": "inverters[].ehal_bindings.inv.{id}.get_inv_max_pv_power",
+      "suggested_name": "Earnie_WR_Max_PV",
+      "notes": "TBD (P4 stub): DC/MPPT input limit kW."
+    },
+    {
+      "ehal_field": "set_inv_ac_power_limit",
+      "loxone_blocks_key": "inverters[].ehal_bindings.inv.{id}.set_inv_ac_power_limit",
+      "suggested_name": "Earnie_WR_Limit_AC",
+      "notes": "AC output cap kW; Live curtailment write when plant p_pv_curtail > 0, else sticky rating release."
+    }
+  ],
+  "reference": "docs/ui/ehal-com.md#c7-inverter-per-device"
+}

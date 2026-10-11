@@ -56,6 +56,8 @@ def test_build_thermal_observability_compare(mock_readings, mock_forecast):
     assert "heat_content_kwh" in snapshot
     assert snapshot["heat_content_kwh"]["q_meas"] is not None
     assert snapshot["heat_content_kwh"]["q_sim"] is not None
+    assert len(snapshot["horizon_q_sim_kwh"]) == 24
+    assert snapshot["horizon_q_sim_kwh"][0] == snapshot["heat_content_kwh"]["q_sim"]
 
 
 def test_thermal_horizon_hours_from_qh_slots():

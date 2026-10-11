@@ -24,7 +24,12 @@ def test_title_and_default_tab():
     at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     assert at.title[0].value == "🏠 Hauskonfigurator"
     [tabs] = at.segmented_control
-    assert tabs.options == ["Hausprofil", "PV-Anlagen", "Batterien"]
+    assert tabs.options == [
+        "Hausprofil",
+        "PV-Anlagen",
+        "Batterien",
+        "Wechselrichter",
+    ]
     assert tabs.value == "Hausprofil"
 
 
@@ -48,3 +53,12 @@ def test_switch_to_batterien_tab_renders_without_exception():
     [tabs] = at.segmented_control
     tabs.set_value("Batterien").run(timeout=_TIMEOUT_S)
     assert not at.exception
+
+
+def test_switch_to_wechselrichter_tab_renders_without_exception():
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
+    [tabs] = at.segmented_control
+    tabs.set_value("Wechselrichter").run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    [tabs_after] = at.segmented_control
+    assert tabs_after.value == "Wechselrichter"

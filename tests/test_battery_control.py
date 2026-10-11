@@ -31,6 +31,7 @@ import pulp
 def _battery_raw(**overrides):
     base = {
         "id": "b1",
+        "inverter_id": "wr_main",
         "battery_capacity_kwh": 10.0,
         "battery_max_power_kw": 5.0,
         "battery_efficiency": 0.95,

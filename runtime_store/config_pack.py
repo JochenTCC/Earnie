@@ -23,6 +23,7 @@ from runtime_store.persist_paths import (
     resolve_components_json_path,
     resolve_config_json_path,
     resolve_deviation_rules_json_path,
+    resolve_grid_fees_json_path,
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
     resolve_uploads_dir,
@@ -34,6 +35,7 @@ PACK_JSON_FILES: tuple[tuple[str, Any], ...] = (
     ("backtesting_scenarios.json", resolve_backtesting_scenarios_json_path),
     ("components.json", resolve_components_json_path),
     ("deviation_rules.json", resolve_deviation_rules_json_path),
+    ("grid_fees.json", resolve_grid_fees_json_path),
     ("house_profiles.json", resolve_house_profiles_json_path),
     ("tariffs.json", resolve_tariffs_json_path),
 )
@@ -46,7 +48,7 @@ def _utc_now_iso() -> str:
 
 
 def build_config_pack_bytes() -> bytes:
-    """Build a zip archive of the six config JSONs plus uploads/."""
+    """Build a zip archive of the config JSON sidecars plus uploads/."""
     buffer = io.BytesIO()
     file_list: list[str] = []
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:

@@ -14,6 +14,7 @@ from ehal.qualified_ids import (
     is_digital_id,
     qualified_battery_id,
     qualified_consumer_id,
+    qualified_inverter_id,
     qualified_plant_id,
 )
 
@@ -95,6 +96,8 @@ def pilot_id(entity_kind: str, entity_id: str, field: str, consumer_type: str = 
         return None
     if entity_kind == "battery":
         return qualified_battery_id(entity_id, field)
+    if entity_kind == "inverter":
+        return qualified_inverter_id(entity_id, field)
     if entity_kind == "consumer":
         return qualified_consumer_id(entity_id, consumer_type, field)
     if entity_kind == "plant":
@@ -107,6 +110,8 @@ def _group_for(entity_kind: str, entity_id: str) -> str:
         return "Plant"
     if entity_kind == "battery":
         return f"Batterie_{entity_id}"
+    if entity_kind == "inverter":
+        return f"Wechselrichter_{entity_id}"
     if entity_id in ("pool_swimspa", "pool_filter"):
         return "Pool"
     if entity_id == "waermepumpe":
@@ -117,7 +122,7 @@ def _group_for(entity_kind: str, entity_id: str) -> str:
 
 
 def _binding_entries(house: dict, components: dict) -> list[tuple[str, str, str, str, str]]:
-    """kind, id, type, field, name for plant, consumers, batteries."""
+    """kind, id, type, field, name for plant, consumers, batteries, inverters."""
     entries: list[tuple[str, str, str, str, str]] = []
     for field, name in ((house.get("plant") or {}).get("ehal_bindings") or {}).items():
         entries.append(("plant", "plant", "", field, name))
@@ -131,6 +136,9 @@ def _binding_entries(house: dict, components: dict) -> list[tuple[str, str, str,
     for battery in components.get("batteries", []):
         for field, name in (battery.get("ehal_bindings") or {}).items():
             entries.append(("battery", str(battery.get("id")), "", field, name))
+    for inverter in components.get("inverters", []):
+        for field, name in (inverter.get("ehal_bindings") or {}).items():
+            entries.append(("inverter", str(inverter.get("id")), "", field, name))
     return entries
 
 

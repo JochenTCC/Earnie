@@ -30,13 +30,15 @@ class MerkerBinding:
 
 
 def entity_key(entity_kind: str, entity_id: str) -> str:
-    """Stable entity key (``plant``, ``battery:…``, ``consumer:…``)."""
+    """Stable entity key (``plant``, ``battery:…``, ``inverter:…``, ``consumer:…``)."""
     kind = str(entity_kind or "").strip()
     eid = str(entity_id or "").strip()
     if kind == "plant":
         return "plant"
     if kind == "battery":
         return f"battery:{eid}"
+    if kind == "inverter":
+        return f"inverter:{eid}"
     if kind == "consumer":
         return f"consumer:{eid}"
     raise ValueError(f"unknown entity kind: {entity_kind!r}")
@@ -70,6 +72,10 @@ def merker_bindings_from_docs(house: dict, components: dict) -> list[MerkerBindi
         bid = str(battery.get("id") or "")
         for field, name in (battery.get("ehal_bindings") or {}).items():
             entries.append(("battery", bid, "", str(field), str(name)))
+    for inverter in components.get("inverters", []):
+        iid = str(inverter.get("id") or "")
+        for field, name in (inverter.get("ehal_bindings") or {}).items():
+            entries.append(("inverter", iid, "", str(field), str(name)))
 
     for kind, eid, ctype, field, name in entries:
         if not is_pushable_kind(field):

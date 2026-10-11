@@ -1,10 +1,10 @@
-"""2.7.c multi-ESS: battery_ids, kind, entity-scoped, export unconstrained, migrate v4."""
+"""2.7.c multi-ESS + 2.7.l inverter: battery_ids, ac_connection, migrate v4."""
 from __future__ import annotations
 
 import pytest
 
 from ehal.ess_fields import ess_field, expand_ess_bindings
-from house_config.battery_kind import BATTERY_KIND_ISOLATED, allows_automatik
+from house_config.inverter import AC_ISLAND, allows_automatik
 from house_config.entity_resolution import (
     normalize_battery_ids,
     resolve_battery_into_settings,
@@ -35,7 +35,8 @@ def test_resolve_battery_ids_planning_list():
         "a": {
             "id": "a",
             "label": "A",
-            "kind": "battery_inverter",
+            "inverter_id": "wr_main",
+            "ac_connection": "grid_tied",
             "battery_capacity_kwh": 5.0,
             "battery_max_charge_power_kw": 2.5,
             "battery_max_discharge_power_kw": 2.5,
@@ -53,7 +54,8 @@ def test_resolve_battery_ids_planning_list():
         "b": {
             "id": "b",
             "label": "B",
-            "kind": "isolated",
+            "inverter_id": "wr_b",
+            "ac_connection": "island",
             "battery_capacity_kwh": 10.0,
             "battery_max_charge_power_kw": 5.0,
             "battery_max_discharge_power_kw": 5.0,
@@ -82,7 +84,7 @@ def test_ess_field_entity_scoped():
 
 
 def test_isolated_never_automatik():
-    assert not allows_automatik(BATTERY_KIND_ISOLATED)
+    assert not allows_automatik(AC_ISLAND)
     milp_plan = {
         "p_grid_buy": 0.0,
         "p_grid_sell": 0.0,
@@ -91,7 +93,7 @@ def test_isolated_never_automatik():
     }
     params = {
         "id": "iso",
-        "kind": "isolated",
+        "ac_connection": "island",
         "battery_capacity_kwh": 5.0,
         "min_soc": 10.0,
         "max_soc": 100.0,
@@ -129,7 +131,7 @@ def test_migrate_scenarios_battery_id_to_ids():
     assert "battery_id" not in out["scenarios"][0]["settings"]
 
 
-def test_migrate_components_kind_default():
+def test_migrate_components_adds_inverters():
     doc = {
         "earnie_data_model": 3,
         "batteries": [
@@ -141,13 +143,16 @@ def test_migrate_components_kind_default():
                 "battery_efficiency": 0.97,
                 "battery_min_soc": 10,
                 "battery_max_soc": 100,
+                "kind": "battery_inverter",
             }
         ],
         "pv_systems": [],
     }
     out = migrate_components_doc(doc)
     assert out["earnie_data_model"] == 4
-    assert out["batteries"][0]["kind"] == "battery_inverter"
+    assert "kind" not in out["batteries"][0]
+    assert out["batteries"][0]["inverter_id"] == "wr_main"
+    assert any(i["id"] == "wr_main" for i in out["inverters"])
 
 
 def test_migrate_plant_ess_ambiguous_raises():

@@ -330,10 +330,10 @@ def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
         "standby_power_kw": get_attr("BATTERY_STANDBY_POWER_KW", default=0.0, cast=float),
         "control": str(get_attr("BATTERY_CONTROL", default="full") or "full").strip().lower()
         or "full",
-        "kind": str(
-            get_attr("BATTERY_KIND", default="battery_inverter") or "battery_inverter"
+        "ac_connection": str(
+            get_attr("BATTERY_AC_CONNECTION", default="grid_tied") or "grid_tied"
         ).strip().lower()
-        or "battery_inverter",
+        or "grid_tied",
         "limits_from_live": bool(
             get_attr("BATTERY_LIMITS_FROM_LIVE", default=False, cast=bool)
         ),

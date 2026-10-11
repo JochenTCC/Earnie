@@ -216,3 +216,158 @@ def measured_heat_content_for_timestamps(
                 values = bucket.get(key) or {}
                 result[key].append(values.get("q_meas"))
     return result
+
+
+def _horizon_q_from_item(item: dict[str, Any]) -> list[float] | None:
+    raw = item.get("horizon_q_sim_kwh")
+    if not isinstance(raw, list) or not raw:
+        return None
+    out: list[float] = []
+    for value in raw:
+        try:
+            out.append(float(value))
+        except (TypeError, ValueError):
+            return None
+    return out
+
+
+def _extract_horizons_by_series_key(entry: dict[str, Any]) -> dict[str, list[float]]:
+    out: dict[str, list[float]] = {}
+    for item in entry.get("thermal_observability") or []:
+        if not isinstance(item, dict) or item.get("error"):
+            continue
+        horizon = _horizon_q_from_item(item)
+        if horizon is None:
+            continue
+        key = _series_key_for_item(item)
+        if key is None:
+            continue
+        out[key] = horizon
+    return out
+
+
+def _load_horizons_by_hour(
+    window_start: datetime, window_end_inclusive: datetime
+) -> dict[datetime, dict[str, list[float]]]:
+    """Hour → series_key → horizon_q_sim_kwh (last entry in hour wins)."""
+    from runtime_store import optimization_history
+
+    start = _as_naive(window_start)
+    end = _as_naive(window_end_inclusive)
+    try:
+        entries = optimization_history.load_replay_entries_between(
+            start, end + timedelta(microseconds=1)
+        )
+    except Exception:
+        return {}
+
+    by_hour: dict[datetime, dict[str, list[float]]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        completed = _parse_ts(str(entry.get("completed_at") or ""))
+        if completed is None:
+            continue
+        completed = _as_naive(completed)
+        if completed < start or completed > end:
+            continue
+        hour = _hour_key(completed)
+        bucket = by_hour.setdefault(hour, {})
+        for key, horizon in _extract_horizons_by_series_key(entry).items():
+            bucket[key] = horizon
+    return by_hour
+
+
+@dataclass(frozen=True)
+class HeatContentForecastLine:
+    """One hourly Q-forecast trajectory with absolute timestamps."""
+
+    hour_start: datetime
+    x_timestamps: list[datetime]
+    q_sim_kwh: list[float]
+
+
+@dataclass(frozen=True)
+class LiveHeatContentForecastFan:
+    """Latest N hourly forecast lines per series key (oldest first)."""
+
+    lines_by_key: dict[str, list[HeatContentForecastLine]]
+    labels: dict[str, str]
+    common_horizon_h: int
+
+    def has_lines(self) -> bool:
+        return any(bool(lines) for lines in self.lines_by_key.values())
+
+
+def _lines_for_key(
+    by_hour: dict[datetime, dict[str, list[float]]],
+    key: str,
+    *,
+    max_lines: int,
+    max_horizon_h: int,
+) -> tuple[list[HeatContentForecastLine], int]:
+    hours = sorted(
+        hour for hour, bucket in by_hour.items() if bucket.get(key)
+    )
+    if not hours:
+        return [], 0
+    pairs = [(hour, by_hour[hour][key]) for hour in hours[-max_lines:]]
+    common_n = min(max_horizon_h, min(len(values) for _, values in pairs))
+    if common_n < 1:
+        return [], 0
+    lines = [
+        HeatContentForecastLine(
+            hour_start=hour_start,
+            x_timestamps=[
+                hour_start + timedelta(hours=i) for i in range(common_n)
+            ],
+            q_sim_kwh=list(values[:common_n]),
+        )
+        for hour_start, values in pairs
+    ]
+    return lines, common_n
+
+
+def live_heat_content_forecast_fan(
+    window_end: datetime,
+    *,
+    max_lines: int = 12,
+    max_horizon_h: int = 24,
+) -> LiveHeatContentForecastFan | None:
+    """Latest ``max_lines`` full-hour Q horizons ending at ``window_end``."""
+    end = _as_naive(window_end)
+    start = end - timedelta(hours=max(max_lines + 2, 14))
+    by_hour = _load_horizons_by_hour(start, end)
+    if not by_hour:
+        return None
+
+    keys: list[str] = []
+    seen: set[str] = set()
+    for bucket in by_hour.values():
+        for key in bucket:
+            if key not in seen:
+                seen.add(key)
+                keys.append(key)
+    if not keys:
+        return None
+
+    lines_by_key: dict[str, list[HeatContentForecastLine]] = {}
+    horizon_ns: list[int] = []
+    for key in keys:
+        lines, common_n = _lines_for_key(
+            by_hour,
+            key,
+            max_lines=max_lines,
+            max_horizon_h=max_horizon_h,
+        )
+        if not lines:
+            continue
+        lines_by_key[key] = lines
+        horizon_ns.append(common_n)
+    if not lines_by_key:
+        return None
+    return LiveHeatContentForecastFan(
+        lines_by_key=lines_by_key,
+        labels={key: _label_for_key(key) for key in lines_by_key},
+        common_horizon_h=min(horizon_ns),
+    )

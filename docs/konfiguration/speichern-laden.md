@@ -24,6 +24,7 @@ Enthaltene Dateien:
 | `components.json` | PV / Batterie |
 | `house_profiles.json` | Hausprofile |
 | `tariffs.json` | Tarifkatalog |
+| `grid_fees.json` | Netzentgeltkatalog |
 | `deviation_rules.json` | Soll/Ist-Regeln |
 | `uploads/*` | Profil-CSVs |
 

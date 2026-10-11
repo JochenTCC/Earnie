@@ -128,13 +128,75 @@ def export_caps_for_horizon(
 def physical_max_export_kw(
     pv_kwp: float | None, force_discharge_kw: float | None
 ) -> float | None:
-    """Plant export maximum: PV nameplate sum + max discharge of force-discharge ESS.
+    """Legacy plant export maximum: PV nameplate sum + force-discharge ESS sum.
 
-    ``force_discharge_kw`` must only include batteries that can be force-discharged
-    into the grid. Multi-ESS (2.7.c): pass the sum over all such batteries.
-    None when both parts are unknown/zero.
+    Prefer :func:`physical_max_export_kw_from_inverters` when ``inverters[]``
+    topology is available (2.7.l). ``force_discharge_kw`` must only include
+    batteries that can be force-discharged into the grid. None when both parts
+    are unknown/zero.
     """
     total = max(0.0, float(pv_kwp or 0.0)) + max(0.0, float(force_discharge_kw or 0.0))
+    return total if total > 0.0 else None
+
+
+def _contrib_for_grid_tied_inverter(
+    *,
+    max_ac_power_kw: float | None,
+    max_pv_input_kw: float | None,
+    pv_kwp: float,
+    force_discharge_kw: float,
+) -> float:
+    """One grid-tied inverter's export contribution (kW)."""
+    pv = max(0.0, float(pv_kwp))
+    if max_pv_input_kw is not None and float(max_pv_input_kw) > 0.0:
+        pv = min(pv, float(max_pv_input_kw))
+    uncapped = pv + max(0.0, float(force_discharge_kw))
+    if max_ac_power_kw is not None and float(max_ac_power_kw) > 0.0:
+        return min(float(max_ac_power_kw), uncapped)
+    return uncapped
+
+
+def physical_max_export_kw_from_inverters(
+    *,
+    inverters: Sequence[dict],
+    pv_kwp_by_inverter: dict[str, float],
+    force_discharge_kw_by_inverter: dict[str, float],
+) -> float | None:
+    """Plant export maximum from grid-tied inverters (2.7.l).
+
+    Per grid-tied inverter: ``min(max_ac_power_kw, PV kWp capped by
+    max_pv_input_kw + force-discharge kW)``; without ``max_ac_power_kw`` the
+    uncapped sum is used. Island inverters contribute nothing. None when the
+    total is zero/unknown.
+    """
+    total = 0.0
+    for inv in inverters:
+        if not isinstance(inv, dict):
+            continue
+        inv_id = str(inv.get("id") or "").strip()
+        if not inv_id:
+            continue
+        ac = str(inv.get("ac_connection") or "grid_tied").strip().lower()
+        if ac == "island":
+            continue
+        max_ac = inv.get("max_ac_power_kw")
+        max_pv = inv.get("max_pv_input_kw")
+        try:
+            max_ac_f = float(max_ac) if max_ac is not None else None
+        except (TypeError, ValueError):
+            max_ac_f = None
+        try:
+            max_pv_f = float(max_pv) if max_pv is not None else None
+        except (TypeError, ValueError):
+            max_pv_f = None
+        total += _contrib_for_grid_tied_inverter(
+            max_ac_power_kw=max_ac_f,
+            max_pv_input_kw=max_pv_f,
+            pv_kwp=float(pv_kwp_by_inverter.get(inv_id) or 0.0),
+            force_discharge_kw=float(
+                force_discharge_kw_by_inverter.get(inv_id) or 0.0
+            ),
+        )
     return total if total > 0.0 else None
 
 

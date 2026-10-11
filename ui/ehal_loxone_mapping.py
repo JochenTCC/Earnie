@@ -12,6 +12,7 @@ from ehal.ess_fields import (
     ess_field,
     ess_field_kind,
 )
+from ehal.inverter_fields import INVERTER_MAPPING_KINDS, inv_field, inv_field_kind
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
 from house_config.ehal_bindings import (
     FILTER_EHAL_FIELDS,
@@ -54,6 +55,7 @@ _SESSION_PENDING_NEW = "ehal_lox_pending_new_marker"
 
 PLANT_ENTITY_ID = "plant"
 BATTERY_ENTITY_KIND = "battery"
+INVERTER_ENTITY_KIND = "inverter"
 
 # Plant mapping no longer owns ESS SoC/power/limits/Quellenwahl (2.7.m / entity-scoped).
 _PLANT_ESS_MOVED = frozenset(ESS_BATTERY_MAPPING_KINDS)
@@ -95,18 +97,23 @@ FILTER_FIELDS: tuple[str, ...] = FILTER_EHAL_FIELDS
 
 # Flat kinds for heuristic_propose (battery rows use entity-scoped at lookup time).
 PROPOSAL_FIELDS: tuple[str, ...] = (
-    PLANT_FIELDS + ESS_BATTERY_MAPPING_KINDS + EV_FIELDS + FLEX_FIELDS + FILTER_FIELDS
+    PLANT_FIELDS
+    + ESS_BATTERY_MAPPING_KINDS
+    + INVERTER_MAPPING_KINDS
+    + EV_FIELDS
+    + FLEX_FIELDS
+    + FILTER_FIELDS
 )
 
 
 def proposal_for_mapping_field(
     proposals: dict[str, dict[str, Any]], field: str
 ) -> dict[str, Any]:
-    """Resolve a proposal for a mapping field (flat or entity-scoped ``ess.<id>.<kind>``)."""
+    """Resolve a proposal for a mapping field (flat or entity-scoped)."""
     entry = proposals.get(field) if isinstance(proposals, dict) else None
     if isinstance(entry, dict):
         return entry
-    kind = ess_field_kind(field)
+    kind = ess_field_kind(field) or inv_field_kind(field)
     if kind:
         entry = proposals.get(kind)
         if isinstance(entry, dict):
@@ -149,7 +156,7 @@ def _field_label(field: str) -> str:
     pattern_label = flex_field_label(field)
     if pattern_label:
         return pattern_label
-    kind = ess_field_kind(field)
+    kind = ess_field_kind(field) or inv_field_kind(field)
     if kind and kind in labels:
         return labels[kind]
     return labels.get(field, field)
@@ -182,6 +189,12 @@ def fields_for_battery(
         else ESS_BATTERY_MAPPING_KINDS_BASE
     )
     return tuple(ess_field(battery_id, kind) for kind in kinds)
+
+
+def fields_for_inverter(inverter_id: str) -> tuple[str, ...]:
+    """Entity-scoped inverter mapping fields (``inv.{id}.*``)."""
+    return tuple(inv_field(inverter_id, kind) for kind in INVERTER_MAPPING_KINDS)
+
 
 def _load_components_for_mapping() -> dict:
     try:
@@ -325,6 +338,25 @@ def build_entity_rows(
                 "battery": battery,
             }
         )
+    raw_inverters = (
+        components.get("inverters") if isinstance(components, dict) else None
+    )
+    for inverter in raw_inverters if isinstance(raw_inverters, list) else []:
+        if not isinstance(inverter, dict):
+            continue
+        iid = _nonempty(inverter.get("id"))
+        if not iid:
+            continue
+        rows.append(
+            {
+                "id": iid,
+                "kind": INVERTER_ENTITY_KIND,
+                "label": _nonempty(inverter.get("label")) or iid,
+                "fields": fields_for_inverter(iid),
+                "bindings": binding_map(inverter.get("ehal_bindings")),
+                "inverter": inverter,
+            }
+        )
     consumers = consumers_for_profile(house_doc, profile_id)
     for consumer in consumers:
         cid = _nonempty(consumer.get("id"))
@@ -427,6 +459,44 @@ def apply_battery_bindings(
     return out
 
 
+def apply_inverter_bindings(
+    components_doc: dict,
+    *,
+    inverter_id: str,
+    bindings: dict[str, str],
+) -> dict:
+    """Write entity-scoped inverter bindings onto ``inverters[].ehal_bindings``."""
+    from copy import deepcopy
+
+    out = deepcopy(components_doc) if isinstance(components_doc, dict) else {
+        "batteries": [],
+        "pv_systems": [],
+        "inverters": [],
+    }
+    inverters = out.get("inverters")
+    if not isinstance(inverters, list):
+        inverters = []
+        out["inverters"] = inverters
+    cleaned = {
+        str(k): _nonempty(v) for k, v in bindings.items() if str(k or "").strip()
+    }
+    iid = _nonempty(inverter_id)
+    found = False
+    for index, inverter in enumerate(inverters):
+        if not isinstance(inverter, dict):
+            continue
+        if _nonempty(inverter.get("id")) != iid:
+            continue
+        updated = dict(inverter)
+        updated["ehal_bindings"] = cleaned
+        inverters[index] = updated
+        found = True
+        break
+    if not found and iid:
+        inverters.append({"id": iid, "label": iid, "ehal_bindings": cleaned})
+    return out
+
+
 def entity_kind_for_id(
     house_doc: dict,
     profile_id: str,
@@ -434,7 +504,7 @@ def entity_kind_for_id(
     *,
     components_doc: dict | None = None,
 ) -> str:
-    """Return ``plant`` / ``battery`` / ``consumer`` / ```` for an entity id."""
+    """Return ``plant`` / ``battery`` / ``inverter`` / ``consumer`` / ```` for an entity id."""
     eid = _nonempty(entity_id)
     if eid == PLANT_ENTITY_ID:
         return "plant"
@@ -719,6 +789,16 @@ def persist_loxone_entity_mapping(
         save_main_config(_ensure_ehal_loxone_meta(migrated_config))
         reset_adapter_cache()
         return "`components.json` (`batteries[].ehal_bindings`)"
+    if kind == INVERTER_ENTITY_KIND:
+        components = apply_inverter_bindings(
+            _load_components_document(),
+            inverter_id=entity_id,
+            bindings=ehal_map,
+        )
+        _save_components_document(components)
+        save_main_config(_ensure_ehal_loxone_meta(migrated_config))
+        reset_adapter_cache()
+        return "`components.json` (`inverters[].ehal_bindings`)"
     updated = apply_entity_bindings(
         migrated_house,
         profile_id=profile_id,

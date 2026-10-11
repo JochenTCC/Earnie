@@ -37,6 +37,7 @@ _RUNTIME_ENV_KEYS = (
 # export/import never read/write the shared fixture tree (xdist races on Windows).
 _SIDECAR_ENV_KEYS = (
     "EARNIE_TARIFFS_PATH",
+    "EARNIE_GRID_FEES_PATH",
     "EARNIE_HOUSE_PROFILES_PATH",
     "EARNIE_BACKTESTING_SCENARIOS_PATH",
     "EARNIE_COMPONENTS_PATH",
@@ -216,6 +217,11 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
             "version": 1,
             "rules": [],
         },
+        "grid_fees.json": {
+            DATA_MODEL_KEY: CURRENT_DATA_MODEL,
+            "rule_sets": {},
+            "areas": [],
+        },
         "house_profiles.json": {DATA_MODEL_KEY: CURRENT_DATA_MODEL, "profiles": []},
         "tariffs.json": {
             DATA_MODEL_KEY: CURRENT_DATA_MODEL,
@@ -239,6 +245,8 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
         assert manifest[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
         exported = json.loads(zf.read("tariffs.json").decode("utf-8"))
         assert exported[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
+        grid_fees = json.loads(zf.read("grid_fees.json").decode("utf-8"))
+        assert grid_fees[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
 
     # Import into a second stack via ENV (directory semantics)
     other = tmp_path / "other" / "config"
@@ -249,12 +257,15 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
         (other / name).write_text("{}", encoding="utf-8")
     written = import_config_pack_bytes(payload)
     assert "config.json" in written
+    assert "grid_fees.json" in written
     assert any(w.startswith("uploads/") for w in written)
     loaded = json.loads((other / "config.json").read_text(encoding="utf-8"))
     assert loaded["live_scenario_id"] == "live"
     assert loaded[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
     assert CURRENT_DATA_MODEL == 4
     assert (other / "uploads" / "sample.csv").is_file()
+    imported_fees = json.loads((other / "grid_fees.json").read_text(encoding="utf-8"))
+    assert imported_fees["areas"] == []
 
 
 def test_config_pack_rejects_v1_manifest(monkeypatch, tmp_path: Path) -> None:

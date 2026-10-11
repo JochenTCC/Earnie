@@ -65,13 +65,17 @@ def _write_live_pack(config_dir: Path, tariffs: dict) -> None:
         ),
         encoding="utf-8",
     )
+    from tests.config_fixtures import main_hybrid_inverter
+
     (config_dir / "components.json").write_text(
         json.dumps(
             {
+                "inverters": [main_hybrid_inverter()],
                 "batteries": [
                     {
                         "id": "home_5kwh",
                         "label": "5 kWh",
+                        "inverter_id": "wr_main",
                         "battery_capacity_kwh": 5.0,
                         "battery_max_power_kw": 2.5,
                         "battery_efficiency": 0.97,
@@ -87,6 +91,7 @@ def _write_live_pack(config_dir: Path, tariffs: dict) -> None:
                         "kwp": 10.0,
                         "pv_tilt": 30.0,
                         "pv_azimuth": 180.0,
+                        "inverter_id": "wr_main",
                     }
                 ],
             }

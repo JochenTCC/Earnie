@@ -43,6 +43,8 @@ def _apply_default_test_config_env() -> None:
     )
     os.environ["EARNIE_COMPONENTS_PATH"] = str(bt_dir / "components.json")
     os.environ.pop("EARNIE_DEVIATION_RULES_PATH", None)
+    # Do not force EARNIE_GRID_FEES_PATH here — bootstrap tests must seed
+    # config/grid_fees.json from share/. AppTest sets the public catalog path.
 
 
 _apply_default_test_config_env()

@@ -216,6 +216,9 @@ def build_thermal_observability(
         "q_meas": q_meas,
         "q_sim": round(heat_content_kwh(q_sim_temp, capacity), 3),
     }
+    snapshot["horizon_q_sim_kwh"] = [
+        round(heat_content_kwh(float(temp_c), capacity), 3) for temp_c in forecast
+    ]
     return snapshot
 
 

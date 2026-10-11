@@ -1,16 +1,21 @@
-"""Laden und Validieren von config/components.json (Batterien & PV-Anlagen)."""
+"""Laden und Validieren von config/components.json (Batterien, PV, Wechselrichter)."""
 from __future__ import annotations
 
 import json
 import os
 
 from house_config.entity_resolution import normalize_battery, normalize_pv_system
+from house_config.inverter import (
+    normalize_inverter,
+    reject_if_needs_inverter_migration,
+    validate_inverter_topology,
+)
 from house_config.powerstation import apply_virtual_powerstation_inheritance
 
 
 def _read_json(path: str) -> dict:
     if not os.path.isfile(path):
-        return {"batteries": [], "pv_systems": []}
+        return {"inverters": [], "batteries": [], "pv_systems": []}
     for encoding in ("utf-8-sig", "utf-8", "cp1252"):
         try:
             with open(path, "r", encoding=encoding) as handle:
@@ -23,12 +28,24 @@ def _read_json(path: str) -> dict:
 def normalize_components_document(doc: dict) -> dict:
     if not isinstance(doc, dict):
         raise ValueError("components.json muss ein Objekt sein.")
+    reject_if_needs_inverter_migration(doc)
+    inverters_raw = doc.get("inverters", [])
     batteries_raw = doc.get("batteries", [])
     pv_raw = doc.get("pv_systems", [])
+    if not isinstance(inverters_raw, list):
+        raise ValueError("inverters muss ein Array sein.")
     if not isinstance(batteries_raw, list):
         raise ValueError("batteries muss ein Array sein.")
     if not isinstance(pv_raw, list):
         raise ValueError("pv_systems muss ein Array sein.")
+    inverters: list[dict] = []
+    seen_inv: set[str] = set()
+    for index, item in enumerate(inverters_raw):
+        spec = normalize_inverter(item, index)
+        if spec["id"] in seen_inv:
+            raise ValueError(f"inverters: doppelte id '{spec['id']}'.")
+        seen_inv.add(spec["id"])
+        inverters.append(spec)
     batteries: list[dict] = []
     seen_battery_ids: set[str] = set()
     for index, item in enumerate(batteries_raw):
@@ -48,20 +65,37 @@ def normalize_components_document(doc: dict) -> dict:
             raise ValueError(f"pv_systems: doppelte id '{spec['id']}'.")
         seen_pv_ids.add(spec["id"])
         pv_systems.append(spec)
-    return {"batteries": batteries, "pv_systems": pv_systems}
+    validate_inverter_topology(
+        inverters={i["id"]: i for i in inverters},
+        batteries={b["id"]: b for b in batteries},
+        pv_systems={p["id"]: p for p in pv_systems},
+    )
+    return {
+        "inverters": inverters,
+        "batteries": batteries,
+        "pv_systems": pv_systems,
+    }
 
 
 def load_components_document(path: str) -> dict:
     doc = _read_json(path)
     if not isinstance(doc, dict):
         raise ValueError("components.json muss ein Objekt sein.")
+    reject_if_needs_inverter_migration(doc, path=path)
+    inverters = doc.get("inverters", [])
     batteries = doc.get("batteries", [])
     pv_systems = doc.get("pv_systems", [])
+    if not isinstance(inverters, list):
+        raise ValueError("inverters muss ein Array sein.")
     if not isinstance(batteries, list):
         raise ValueError("batteries muss ein Array sein.")
     if not isinstance(pv_systems, list):
         raise ValueError("pv_systems muss ein Array sein.")
-    out = {"batteries": batteries, "pv_systems": pv_systems}
+    out = {
+        "inverters": inverters,
+        "batteries": batteries,
+        "pv_systems": pv_systems,
+    }
     try:
         from runtime_store.shadow.mode import is_shadow_mode
 
@@ -89,9 +123,11 @@ def _serialize_battery(spec: dict) -> dict:
         "battery_max_soc": spec["battery_max_soc"],
         "threshold_power": spec["threshold_power"],
         "limits_from_live": bool(spec.get("limits_from_live", False)),
-        "kind": str(spec.get("kind") or "battery_inverter"),
         "control": str(spec.get("control") or "full"),
     }
+    inv_id = str(spec.get("inverter_id") or "").strip()
+    if inv_id:
+        out["inverter_id"] = inv_id
     if bat_type == "powerstation":
         out["backing"] = str(spec.get("backing") or "virtual").strip().lower()
         out["role"] = str(spec.get("role") or "single_use").strip().lower()
@@ -111,7 +147,6 @@ def _serialize_battery(spec: dict) -> dict:
         out["standby_power_kw"] = standby
     bindings = spec.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
-        # Q8: empty string values are Loxone activation flags — keep the keys.
         out["ehal_bindings"] = {
             str(k): str(v).strip()
             for k, v in bindings.items()
@@ -135,7 +170,34 @@ def _serialize_pv_system(spec: dict) -> dict:
         "kwp": spec["pv_kwp"],
         "pv_tilt": spec["pv_tilt"],
         "pv_azimuth": spec["pv_azimuth"],
+        "inverter_id": str(spec.get("inverter_id") or "").strip(),
     }
+    if "id_locked" in spec:
+        out["id_locked"] = bool(spec.get("id_locked"))
+    provisional = str(spec.get("id_provisional_label") or "").strip()
+    if provisional and not out.get("id_locked", True):
+        out["id_provisional_label"] = provisional
+    return out
+
+
+def _serialize_inverter(spec: dict) -> dict:
+    out: dict = {
+        "id": spec["id"],
+        "label": spec["label"],
+        "type": spec["type"],
+        "ac_connection": spec["ac_connection"],
+        "control": str(spec.get("control") or "full"),
+    }
+    for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw", "owned_by"):
+        if field in spec and spec[field] is not None and spec[field] != "":
+            out[field] = spec[field]
+    bindings = spec.get("ehal_bindings")
+    if isinstance(bindings, dict) and bindings:
+        out["ehal_bindings"] = {
+            str(k): str(v).strip()
+            for k, v in bindings.items()
+            if str(k or "").strip()
+        }
     if "id_locked" in spec:
         out["id_locked"] = bool(spec.get("id_locked"))
     provisional = str(spec.get("id_provisional_label") or "").strip()
@@ -161,6 +223,7 @@ def save_components_document(path: str, doc: dict) -> None:
 
     normalized = normalize_components_document(doc)
     serializable = {
+        "inverters": [_serialize_inverter(item) for item in normalized["inverters"]],
         "batteries": [_serialize_battery(item) for item in normalized["batteries"]],
         "pv_systems": [_serialize_pv_system(item) for item in normalized["pv_systems"]],
     }

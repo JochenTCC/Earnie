@@ -36,6 +36,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `./earnie_env/config/config.json`                | Haus-Konfiguration (wird nie überschrieben)                                                                             |
 | `./earnie_env/config/tariffs.json`               | Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json`                                                            |
+| `./earnie_env/config/grid_fees.json`             | Netzentgelt-Katalog (Netzbereiche / Zeitregeln); Sidecar; Bootstrap aus `share/config/`                                 |
 | `./earnie_env/config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline                                                                                           |
 | `./earnie_env/config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
 | `./earnie_env/config/deviation_rules.json`       | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an)                                                                    |

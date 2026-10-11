@@ -88,6 +88,41 @@ def exchange_id_for_plant_read(field: str) -> str | None:
     return qualified_plant_id(kind)
 
 
+def _inverter_limit_write_map() -> dict[str, str]:
+    """Entity-scoped ``inv.{id}.set_inv_ac_power_limit`` → Merker (capability + P5 writes)."""
+    from ehal.inverter_fields import binding_address, inv_field
+
+    out: dict[str, str] = {}
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return out
+        doc = load_components_document(path)
+    except Exception:  # noqa: BLE001 — capability probe must stay usable
+        return out
+    raw = doc.get("inverters") if isinstance(doc, dict) else []
+    if not isinstance(raw, list):
+        return out
+    for inv in raw:
+        if not isinstance(inv, dict):
+            continue
+        inv_id = str(inv.get("id") or "").strip()
+        if not inv_id:
+            continue
+        bindings = inv.get("ehal_bindings")
+        bind_map = bindings if isinstance(bindings, dict) else {}
+        field = inv_field(inv_id, "set_inv_ac_power_limit")
+        addr = binding_address(bind_map, inv_id, "set_inv_ac_power_limit")
+        if not addr and field in bind_map:
+            addr = field
+        if addr:
+            out[field] = addr
+    return out
+
+
 # Numeric encoding of the Loxone Modus Merker (entity-scoped).
 EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
 
@@ -146,6 +181,7 @@ class LoxoneAdapter:
             "set_evcs_max_current": cfg.evcs_max_current_name,
             "set_grid_export_power_limit": cfg.grid_export_limit_out_name,
         }
+        write_map.update(_inverter_limit_write_map())
         # Write-side still uses non-empty names as wired flags.
         functions = available_functions(write_map)
         self._supports_ess_write = "ess_limits" in functions
@@ -153,6 +189,7 @@ class LoxoneAdapter:
         self._supports_evcs_current = "evcs_current" in functions
         self._supports_grid_export_limit = "grid_export_limit" in functions
         self._supports_ess_source_select = "ess_source_select" in functions
+        self._supports_inv_power_limit = "inverter_limit" in functions
         for message in incomplete_function_messages(write_map):
             logger.warning("Loxone mapping adapter_id=%s: %s", cfg.adapter_id, message)
         self._incomplete_fields = incomplete_function_fields(write_map)
@@ -189,6 +226,7 @@ class LoxoneAdapter:
             "supports_ess_write": self._supports_ess_write,
             "supports_evcs_current": self._supports_evcs_current,
             "supports_ess_source_select": self._supports_ess_source_select,
+            "supports_inv_power_limit": self._supports_inv_power_limit,
         }
         return validate_capabilities(doc)
 

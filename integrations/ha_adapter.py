@@ -178,6 +178,7 @@ class HaAdapter:
         self._supports_ess_active = "ess_active" in functions
         self._supports_evcs_current = "evcs_current" in functions
         self._supports_ess_source_select = "ess_source_select" in functions
+        self._supports_inv_power_limit = "inverter_limit" in functions
         self._vendor_ess_active = vendor_ess_active
         for message in incomplete_function_messages(
             entities, vendor_ess_active=vendor_ess_active
@@ -226,6 +227,7 @@ class HaAdapter:
             "supports_ess_write": self._supports_ess_write,
             "supports_evcs_current": self._supports_evcs_current,
             "supports_ess_source_select": self._supports_ess_source_select,
+            "supports_inv_power_limit": self._supports_inv_power_limit,
         }
         return validate_capabilities(doc)
 
@@ -747,8 +749,9 @@ class HaAdapter:
             )
             raise
         from ehal.ess_fields import ess_field_kind
+        from ehal.inverter_fields import inv_field_kind
 
-        kind = ess_field_kind(field_name) or field_name
+        kind = ess_field_kind(field_name) or inv_field_kind(field_name) or field_name
         if kind == "sens_ess_soc" or field_name == "sens_ess_soc":
             return float(raw)
         # Per-battery entity-scoped sign override, else flat kind / field inherit (2.7.m).
@@ -769,8 +772,9 @@ class HaAdapter:
         except (TypeError, ValueError):
             return False, None, f"Non-numeric setpoint for {field_name}: {value!r}"
         from ehal.ess_fields import ess_field_kind
+        from ehal.inverter_fields import inv_field_kind
 
-        kind = ess_field_kind(field_name) or field_name
+        kind = ess_field_kind(field_name) or inv_field_kind(field_name) or field_name
         if kind in BOOLEAN_INVERT_FIELDS or field_name in BOOLEAN_INVERT_FIELDS:
             mode = (
                 self.cfg.boolean_invert.get(field_name)
@@ -852,8 +856,9 @@ class HaAdapter:
         except (TypeError, ValueError):
             return False, None, f"Non-numeric switch value for {field_name}: {value!r}"
         from ehal.ess_fields import ess_field_kind
+        from ehal.inverter_fields import inv_field_kind
 
-        kind = ess_field_kind(field_name) or field_name
+        kind = ess_field_kind(field_name) or inv_field_kind(field_name) or field_name
         mode = None
         if kind in BOOLEAN_INVERT_FIELDS or field_name in BOOLEAN_INVERT_FIELDS:
             mode = (

@@ -646,6 +646,166 @@ def write_ess_setpoints_from_control(
     return error, records
 
 
+def _planning_inverters() -> list[dict]:
+    raw = getattr(config, "_planning_inverters", None)
+    if raw is None and hasattr(config, "get"):
+        try:
+            raw = config.get("_planning_inverters", None)
+        except TypeError:
+            raw = None
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def _planning_pv_systems() -> list[dict]:
+    raw = getattr(config, "_planning_pv_systems", None)
+    if raw is None and hasattr(config, "get"):
+        try:
+            raw = config.get("_planning_pv_systems", None)
+        except TypeError:
+            raw = None
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def _openems_channel_parts(binding: str) -> tuple[str, str] | None:
+    text = str(binding or "").strip()
+    if "/" not in text:
+        return None
+    component, channel = text.split("/", 1)
+    component = component.strip()
+    channel = channel.strip()
+    if not component or not channel:
+        return None
+    return component, channel
+
+
+def _mapped_inv_limit_ids() -> set[str]:
+    """Inverter ids with a non-empty ``set_inv_ac_power_limit`` binding."""
+    from ehal.inverter_fields import binding_address, inv_field
+
+    mapped: set[str] = set()
+    for inv in _planning_inverters():
+        inv_id = str(inv.get("id") or "").strip()
+        if not inv_id:
+            continue
+        bindings = inv.get("ehal_bindings")
+        bind_map = bindings if isinstance(bindings, dict) else {}
+        addr = binding_address(bind_map, inv_id, "set_inv_ac_power_limit")
+        field = inv_field(inv_id, "set_inv_ac_power_limit")
+        if not addr and field in bind_map:
+            addr = str(bind_map.get(field) or "").strip()
+        if not addr:
+            continue
+        if is_openems_backend() and _openems_channel_parts(addr) is None:
+            continue
+        mapped.add(inv_id)
+    return mapped
+
+
+def _battery_params_for_inv_limits() -> list[dict]:
+    get_list = getattr(config, "get_battery_params_list", None)
+    if callable(get_list):
+        return [b for b in (get_list() or []) if isinstance(b, dict)]
+    bat = config.get_battery_params()
+    return [bat] if isinstance(bat, dict) else []
+
+
+def _inv_limit_fields_w(
+    *,
+    plant_curtail_kw: float,
+    matrix_row: dict[str, Any] | None,
+    milp_plan: dict[str, Any] | None,
+) -> dict[str, float]:
+    """Qualified ``inv.{id}.set_inv_ac_power_limit`` → EHAL W for writable inverters."""
+    from ehal.inverter_fields import inv_field
+    from optimizer.inv_ac_power_limit import (
+        allocate_inv_ac_limits_kw,
+        eligible_inv_limit_ids,
+        force_discharge_kw_by_inverter,
+        inv_ac_limit_setpoint_w,
+        planned_discharge_kw_by_inverter,
+        pv_kwp_by_inverter,
+    )
+
+    inverters = _planning_inverters()
+    if not inverters:
+        return {}
+    writable = eligible_inv_limit_ids(inverters, mapped_ids=_mapped_inv_limit_ids())
+    if not writable:
+        return {}
+    pv_systems = _planning_pv_systems()
+    batteries = _battery_params_for_inv_limits()
+    limits_kw = allocate_inv_ac_limits_kw(
+        inverters=inverters,
+        writable_ids=writable,
+        plant_curtail_kw=float(plant_curtail_kw or 0.0),
+        matrix_row=matrix_row if isinstance(matrix_row, dict) else {},
+        pv_systems=pv_systems,
+        pv_kwp_by_inverter=pv_kwp_by_inverter(pv_systems),
+        force_discharge_kw_by_inverter=force_discharge_kw_by_inverter(batteries),
+        planned_discharge_by_inverter=planned_discharge_kw_by_inverter(
+            milp_plan, battery_params=batteries
+        ),
+    )
+    return {
+        inv_field(inv_id, "set_inv_ac_power_limit"): inv_ac_limit_setpoint_w(limit_kw)
+        for inv_id, limit_kw in limits_kw.items()
+    }
+
+
+def write_inv_ac_limits_from_plan(
+    *,
+    plant_curtail_kw: float = 0.0,
+    matrix_row: dict[str, Any] | None = None,
+    milp_plan: dict[str, Any] | None = None,
+) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
+    """Write per-inverter AC limits (P5 curtail-only sticky loop)."""
+    fields_w = _inv_limit_fields_w(
+        plant_curtail_kw=plant_curtail_kw,
+        matrix_row=matrix_row,
+        milp_plan=milp_plan,
+    )
+    if not fields_w:
+        return None, []
+
+    ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    if is_ehal_network_backend():
+        adapter = get_network_adapter()
+        writer = getattr(adapter, "write_mapped_fields", None)
+        if not callable(writer):
+            logger.warning(
+                "EHAL: adapter has no write_mapped_fields — skip inverter AC limits"
+            )
+            return None, []
+        error = writer(fields_w)
+        if error is not None:
+            persist_write_error(error)
+        return error, build_ehal_write_records(
+            fields_w,
+            written_at=ts,
+            error=error,
+            skipped=_last_skipped(adapter),
+        )
+
+    from integrations.loxone_writes import write_inv_ac_power_limits
+
+    records = write_inv_ac_power_limits(fields_w)
+    rows = [
+        {
+            "field": getattr(row, "io_name", ""),
+            "value": float(getattr(row, "value", 0.0) or 0.0),
+            "success": bool(getattr(row, "success", False)),
+            "written_at": str(getattr(row, "written_at", ts) or ts),
+            "message": "",
+        }
+        for row in records
+    ]
+    return None, rows
+
+
 def push_safe_setpoints_on_startup() -> None:
     """Force-write safe ESS/flex setpoints once at daemon start (before first optimize).
 
@@ -676,7 +836,8 @@ def _push_safe_setpoints_network() -> None:
     )
     err_ess, _ess_records = write_ess_setpoints_from_control(0, 0.0)
     err_evcs, _evcs_records = write_evcs_max_current_from_consumers({})
-    if err_ess is None and err_evcs is None:
+    err_inv, _inv_records = write_inv_ac_limits_from_plan(plant_curtail_kw=0.0)
+    if err_ess is None and err_evcs is None and err_inv is None:
         clear_write_error()
         logger.info("Startup: sichere EHAL-Sollwerte an %s gesendet.", backend)
         return
@@ -685,6 +846,8 @@ def _push_safe_setpoints_network() -> None:
         parts.append(str(err_ess.get("message") or "ESS"))
     if err_evcs is not None:
         parts.append(str(err_evcs.get("message") or "EVCS"))
+    if err_inv is not None:
+        parts.append(str(err_inv.get("message") or "INV"))
     logger.error(
         "Startup: sichere EHAL-Sollwerte an %s teilweise fehlgeschlagen: %s",
         backend,
@@ -699,17 +862,19 @@ def _push_safe_setpoints_loxone() -> None:
     )
     huawei = write_huawei_modbus_states(0, 0.0, 0.0)
     flex = write_flexible_consumer_states({}, None, None)
+    _inv_err, inv_rows = write_inv_ac_limits_from_plan(plant_curtail_kw=0.0)
     failed = [
         row
         for row in (huawei + flex)
         if not getattr(row, "success", True)
     ]
-    if not failed:
+    failed_inv = [row for row in inv_rows if not row.get("success")]
+    if not failed and not failed_inv:
         logger.info("Startup: sichere Loxone-Sollwerte gesendet.")
         return
     logger.error(
         "Startup: sichere Loxone-Sollwerte teilweise fehlgeschlagen (%s Feld(er)).",
-        len(failed),
+        len(failed) + len(failed_inv),
     )
 
 

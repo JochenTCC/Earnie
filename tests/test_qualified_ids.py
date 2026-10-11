@@ -43,6 +43,13 @@ def test_qualified_battery_id() -> None:
     assert q.qualified_battery_id("15_kwh_speicher", "sens_ess_soc") == "ess.15_kwh_speicher.sens_ess_soc"
 
 
+def test_qualified_inverter_id() -> None:
+    assert q.qualified_inverter_id("wr_main", "sens_inv_power_ac") == "inv.wr_main.sens_inv_power_ac"
+    assert q.qualified_inverter_id("wr_main", "inv.wr_main.set_inv_ac_power_limit") == (
+        "inv.wr_main.set_inv_ac_power_limit"
+    )
+
+
 def test_every_read_result_is_accepted_by_the_inbox() -> None:
     for consumer_id, ctype, key in [
         ("waschmaschine", "generic", "flex.waschmaschine.sens_power_act"),

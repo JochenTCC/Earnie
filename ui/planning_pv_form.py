@@ -13,9 +13,11 @@ from house_config.entity_id_lock import (
 from house_config.id_slug import slug_id
 from house_config.label_uniqueness import allocate_unique_label
 from runtime_store.persist_paths import resolve_config_json_path
+from house_config.inverter import INVERTER_TYPE_BATTERY
 from ui.house_config_io import (
     delete_pv_system,
     get_live_scenario_refs,
+    list_inverters,
     list_pv_systems,
     load_house_profiles,
     upsert_pv_system,
@@ -65,7 +67,28 @@ def new_pv_system_template(
         "pv_kwp": float(source.get("pv_kwp", source.get("kwp", 10.0))),
         "pv_tilt": float(source.get("pv_tilt", source.get("tilt", 18.0))),
         "pv_azimuth": float(source.get("pv_azimuth", source.get("azimuth", 0.0))),
+        "inverter_id": str(source.get("inverter_id") or "").strip()
+        or _default_pv_inverter_id(),
     }
+
+
+def _pv_capable_inverters() -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for item in list_inverters():
+        if not isinstance(item, dict):
+            continue
+        inv_id = str(item.get("id") or "").strip()
+        if not inv_id:
+            continue
+        if str(item.get("type") or "").strip().lower() == INVERTER_TYPE_BATTERY:
+            continue
+        out[inv_id] = item
+    return out
+
+
+def _default_pv_inverter_id() -> str:
+    inv_map = _pv_capable_inverters()
+    return next(iter(sorted(inv_map.keys())), "")
 
 
 def _remember_pv_template_source(entity_id: str) -> None:
@@ -143,11 +166,13 @@ def _seed_pv_widget_state(
         kwp = float(existing.get("pv_kwp", existing.get("kwp", 10.0)))
         tilt = int(existing.get("pv_tilt", existing.get("tilt", default_tilt)))
         azimuth = int(existing.get("pv_azimuth", existing.get("azimuth", default_azimuth)))
+        inverter_id = str(existing.get("inverter_id") or "").strip() or _default_pv_inverter_id()
     else:
         label = allocate_unique_label("Dach Süd", list_pv_systems())
         kwp = 10.0
         tilt = int(default_tilt)
         azimuth = int(default_azimuth)
+        inverter_id = _default_pv_inverter_id()
         if profiles:
             profile_ids = sorted(profiles.keys())
             default_profile_id = str(default_profile.get("id", profile_ids[0]))
@@ -165,6 +190,7 @@ def _seed_pv_widget_state(
     st.session_state[_scoped_key(session_scope, "planning_pv_kwp")] = kwp
     st.session_state[_scoped_key(session_scope, "planning_pv_tilt")] = tilt
     st.session_state[_scoped_key(session_scope, "planning_pv_azimuth")] = azimuth
+    st.session_state[_scoped_key(session_scope, "planning_pv_inverter_id")] = inverter_id
 
 
 def _pv_widget_state_missing(session_scope: str) -> bool:
@@ -314,6 +340,33 @@ def _render_pv_profile_defaults(session_scope: str, profiles: dict[str, dict]) -
     )
 
 
+def _render_pv_inverter_select(session_scope: str, *, current_id: str) -> str:
+    inv_map = _pv_capable_inverters()
+    inv_ids = sorted(inv_map.keys())
+    if not inv_ids:
+        st.warning(
+            "Kein PV-fähiger Wechselrichter vorhanden. Bitte zuerst unter "
+            "Hauskonfigurator → Wechselrichter einen Hybrid- oder PV-String-WR anlegen."
+        )
+        return ""
+    options, id_by_display = label_select_choices(
+        inv_map, inv_ids, new_option=None
+    )
+    key = _scoped_key(session_scope, "planning_pv_inverter_select")
+    current = str(current_id or "").strip()
+    if current and current in inv_map and key not in st.session_state:
+        st.session_state[key] = str(inv_map[current].get("label") or current)
+    elif key not in st.session_state and options:
+        st.session_state[key] = options[0]
+    picked = labeled_selectbox(
+        "Wechselrichter",
+        options=options,
+        key=key,
+        help="PV-String hängt am Wechselrichter (`inverter_id`).",
+    )
+    return resolve_label_select(picked, id_by_display)
+
+
 def _render_pv_fields(ctx: dict) -> dict:
     session_scope = ctx["session_scope"]
     label = labeled_text_input(
@@ -342,7 +395,19 @@ def _render_pv_fields(ctx: dict) -> dict:
         help="0 = Süd, -90 = Ost, 90 = West",
         key=_scoped_key(session_scope, "planning_pv_azimuth"),
     )
-    return {"label": label, "kwp": kwp, "tilt": tilt, "azimuth": azimuth}
+    current_inv = str(
+        ctx["existing"].get("inverter_id")
+        or st.session_state.get(_scoped_key(session_scope, "planning_pv_inverter_id"))
+        or _default_pv_inverter_id()
+    ).strip()
+    inverter_id = _render_pv_inverter_select(session_scope, current_id=current_inv)
+    return {
+        "label": label,
+        "kwp": kwp,
+        "tilt": tilt,
+        "azimuth": azimuth,
+        "inverter_id": inverter_id,
+    }
 
 
 def _pv_save_payload(fields: dict) -> dict:
@@ -351,6 +416,7 @@ def _pv_save_payload(fields: dict) -> dict:
         "kwp": fields["kwp"],
         "pv_tilt": float(fields["tilt"]),
         "pv_azimuth": float(fields["azimuth"]),
+        "inverter_id": str(fields.get("inverter_id") or "").strip(),
     }
     provisional = str(
         fields.get(ID_PROVISIONAL_LABEL_KEY)
@@ -476,7 +542,11 @@ def render_pv_planning_tab() -> None:
     fields = _render_pv_fields(ctx)
     stable_id = "" if is_new else str(ctx["existing"].get("id", ""))
     label = fields["label"]
-    ready = bool(str(label or "").strip()) and float(fields["kwp"] or 0) > 0
+    ready = (
+        bool(str(label or "").strip())
+        and float(fields["kwp"] or 0) > 0
+        and bool(str(fields.get("inverter_id") or "").strip())
+    )
     taken = {sid for sid in ctx["system_ids"] if sid != stable_id}
     entity_id = stable_id.strip() or slug_id(label or "pv_anlage", existing=taken)
     _persist_pv_form(

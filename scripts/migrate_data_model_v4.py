@@ -38,6 +38,7 @@ _FILES = (
     "backtesting_scenarios.json",
     "components.json",
     "deviation_rules.json",
+    "grid_fees.json",
     "house_profiles.json",
     "tariffs.json",
 )

@@ -91,12 +91,16 @@ def test_empty_ess_activation_resolves_plant_flat_aliases(
     from ehal.ess_fields import ess_field
     from house_config.ehal_bindings import resolve_plant_binding
 
+    from tests.config_fixtures import main_hybrid_inverter
+
     house_id = "15_kwh_speicher"
     components = {
+        "inverters": [main_hybrid_inverter()],
         "batteries": [
             {
                 "id": house_id,
                 "type": "house",
+                "inverter_id": "wr_main",
                 "ehal_bindings": {
                     ess_field(house_id, "sens_ess_soc"): "",
                     ess_field(house_id, "set_ess_active_power"): "",
@@ -105,7 +109,8 @@ def test_empty_ess_activation_resolves_plant_flat_aliases(
                     ess_field(house_id, "set_ess_mode"): "",
                 },
             }
-        ]
+        ],
+        "pv_systems": [],
     }
     path = tmp_path / "components.json"
     path.write_text(json.dumps(components), encoding="utf-8")
@@ -254,12 +259,16 @@ def test_q8_empty_battery_write_io_indexes_qid(tmp_path, monkeypatch) -> None:
     from ehal.ess_fields import ess_field
     from integrations.ehal_debug_mapping import build_loxone_setpoint_io_index
 
+    from tests.config_fixtures import main_hybrid_inverter
+
     house_id = "15_kwh_speicher"
     components = {
+        "inverters": [main_hybrid_inverter()],
         "batteries": [
             {
                 "id": house_id,
                 "type": "house",
+                "inverter_id": "wr_main",
                 "ehal_bindings": {
                     ess_field(house_id, "set_ess_active_power"): "",
                     ess_field(house_id, "set_ess_charge_power_limit"): "",
@@ -267,7 +276,8 @@ def test_q8_empty_battery_write_io_indexes_qid(tmp_path, monkeypatch) -> None:
                     ess_field(house_id, "set_ess_mode"): "",
                 },
             }
-        ]
+        ],
+        "pv_systems": [],
     }
     path = tmp_path / "components.json"
     path.write_text(json.dumps(components), encoding="utf-8")
@@ -379,6 +389,7 @@ def test_normalize_battery_keeps_q8_empty_activation_keys() -> None:
     raw = {
         "id": "ecoflow_delta_3",
         "type": "powerstation",
+        "inverter_id": "wr_ecoflow_delta_3",
         "battery_capacity_kwh": 1.0,
         "battery_max_charge_power_kw": 1.0,
         "battery_max_discharge_power_kw": 0.0,

@@ -19,7 +19,7 @@ Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration/Typen) �
 | **Netznutzung Leistungspreis** / netzgebietsspezifische Tabellen | **nein** | **nein** |
 | PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
 
-**Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Der Arbeitspreis kann zeitabhängig sein (SNAP, vorbereitet WiNAP; Katalog `share/config/grid_fees.json`). Der Leistungspreis fehlt weiterhin. Optionaler Katalog-Stub `grid_monthly_fee_eur` bleibt nur SE-Monatsfixgebühr.
+**Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Der Arbeitspreis kann zeitabhängig sein (SNAP, vorbereitet WiNAP; Laufzeitkatalog `earnie_env/config/grid_fees.json`, Seed aus `share/config/grid_fees.json`). Der Leistungspreis fehlt weiterhin. Optionaler Katalog-Stub `grid_monthly_fee_eur` bleibt nur SE-Monatsfixgebühr.
 
 Earnie liefert **gute-genug-€** für Vergleiche und Demos — **keine** Abrechnung gegen echte Stromrechnungen. Katalogwerte können unvollständig oder veraltet sein; bitte die Parameter im Szenarienkonfigurator prüfen.
 

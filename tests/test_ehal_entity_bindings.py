@@ -119,14 +119,19 @@ def test_ensure_migrated_refuses_plant_flat_ess_when_batteries_exist(
 
     from ehal.ess_fields import ess_field
 
+    from tests.config_fixtures import main_hybrid_inverter
+
     components = {
+        "inverters": [main_hybrid_inverter()],
         "batteries": [
             {
                 "id": "house",
                 "type": "house",
+                "inverter_id": "wr_main",
                 "ehal_bindings": {ess_field("house", "sens_ess_soc"): ""},
             }
-        ]
+        ],
+        "pv_systems": [],
     }
     path = tmp_path / "components.json"
     path.write_text(json.dumps(components), encoding="utf-8")

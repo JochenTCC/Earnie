@@ -271,8 +271,28 @@ def bundled_config_dir() -> str:
 
 
 def bundled_grid_fees_file() -> str:
-    """Netzentgelt-Katalog (Netzbereiche + Zeitregeln), read-only im Image."""
+    """Published Netzentgelt catalog under share/config/grid_fees.json (seed template)."""
     return os.path.join(bundled_config_dir(), "grid_fees.json")
+
+
+def resolve_grid_fees_catalog_template_path() -> str:
+    """Full public catalog for seeding site grid_fees.json (prefer share/config)."""
+    preferred = _preferred_or_legacy_file("grid_fees.json")
+    bundled = bundled_grid_fees_file()
+    if os.path.isfile(bundled):
+        return bundled
+    if os.path.isfile(preferred):
+        return preferred
+    return bundled
+
+
+def resolve_grid_fees_json_path() -> str:
+    """Pfad zu grid_fees.json: ENV > neben config.json > earnie_env/config."""
+    return _resolve_sidecar_json_path(
+        env_suffix="GRID_FEES_PATH",
+        filename="grid_fees.json",
+        default_path=os.path.join(_preferred_config_dir(), "grid_fees.json"),
+    )
 
 
 def bundled_config_example_file() -> str:

@@ -1,7 +1,12 @@
-"""Battery topology kinds (2.7.c): isolated vs battery+inverter."""
+"""Deprecated topology kinds (2.7.c) — replaced by inverters[].ac_connection (2.7.l).
+
+Kept as a thin shim for any remaining imports during Inverter P2 UI cleanup.
+"""
 from __future__ import annotations
 
 from typing import Literal
+
+from house_config.inverter import AC_ISLAND, allows_automatik as _allows_automatik_ac
 
 BatteryKind = Literal["isolated", "battery_inverter"]
 
@@ -17,17 +22,16 @@ _ALLOWED: frozenset[str] = frozenset(
 def normalize_battery_kind(
     raw: object, *, battery_id: str, index: int
 ) -> BatteryKind:
-    if raw is None or raw == "":
-        return DEFAULT_BATTERY_KIND
-    kind = str(raw).strip().lower()
-    if kind not in _ALLOWED:
-        raise ValueError(
-            f"batteries[{index}] ('{battery_id}'): kind muss "
-            f"'isolated' oder 'battery_inverter' sein (got {raw!r})."
-        )
-    return kind  # type: ignore[return-value]
+    raise ValueError(
+        f"batteries[{index}] ('{battery_id}'): field 'kind' is removed (2.7.l). "
+        "Use inverters[].ac_connection; run "
+        "python -m scripts.migrate_inverters_once --config-dir <config-dir>"
+    )
 
 
-def allows_automatik(kind: str) -> bool:
-    """True when Design C1 Automatik / optimizing mode is allowed."""
-    return str(kind or "").strip().lower() != BATTERY_KIND_ISOLATED
+def allows_automatik(kind_or_ac: str) -> bool:
+    """Compat: ``isolated`` / ``island`` → False; else True."""
+    value = str(kind_or_ac or "").strip().lower()
+    if value == BATTERY_KIND_ISOLATED or value == AC_ISLAND:
+        return False
+    return _allows_automatik_ac(value if value in ("grid_tied", "island") else "grid_tied")

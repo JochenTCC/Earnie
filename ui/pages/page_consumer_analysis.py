@@ -9,7 +9,10 @@ from ui.chart_context import live_now
 from ui.consumer_cost_analysis_charts import render_window_analysis
 from ui.consumer_cost_analysis_data import CostAnalysisSeries, build_cost_analysis_series
 from ui.consumption_display.charts import live_heat_content_chart
-from ui.consumption_display.heat_content_history import live_heat_content_for_window
+from ui.consumption_display.heat_content_history import (
+    live_heat_content_forecast_fan,
+    live_heat_content_for_window,
+)
 from ui.consumption_display.navigation import render_period_navigation
 from ui.consumption_display.period import PeriodKind, TimeWindow, format_window_label
 from ui.help_hint import render_page_title_with_help
@@ -19,7 +22,8 @@ _HELP = (
     "Herkunft (PV / Batterie / Netz) und grobe Kosten nur für den Netzanteil. "
     "Charts für die letzten 7 oder 28 Tage (verschiebbar); Kennzahl zusätzlich "
     "für die letzten 365 Tage der vorhandenen Log-Daten — keine Rechnungskorrektur. "
-    "Darunter Wärmeinhalt (Sim vs. Ist) aus Live `thermal_observability`."
+    "Darunter Wärmeinhalt (Sim vs. Ist) aus Live `thermal_observability`, "
+    "plus die letzten 12 stündlichen Q-Prognosen (gemeinsamer Horizont ≤ 24 h)."
 )
 
 _PERIOD_OPTIONS = {
@@ -60,12 +64,14 @@ def _render_heat_content_section(window: TimeWindow) -> None:
             f"für {format_window_label(window)}."
         )
         return
+    forecast_fan = live_heat_content_forecast_fan(window.end)
     fig = live_heat_content_chart(
         data.timestamps,
         q_sim_by_key=data.q_sim_by_key,
         q_meas_by_key=data.q_meas_by_key,
         labels=data.labels,
         title=f"Wärmeinhalt — {format_window_label(window)}",
+        forecast_fan=forecast_fan,
     )
     if fig is None:
         st.info(
@@ -83,6 +89,13 @@ def _render_heat_content_section(window: TimeWindow) -> None:
     elif not meta.get("has_sim"):
         st.caption(
             "Sim-Wärmeinhalt (`Q_sim`) fehlt in diesem Fenster — nur Ist vorhanden."
+        )
+    fan_traces = int(meta.get("forecast_fan_traces") or 0)
+    if fan_traces:
+        horizon_h = int(meta.get("forecast_fan_horizon_h") or 0)
+        st.caption(
+            f"Prognose-Fächer: bis zu 12 stündliche Q-Verläufe "
+            f"(gemeinsamer Horizont {horizon_h} h, max. 24 h)."
         )
 
 

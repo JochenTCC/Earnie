@@ -15,6 +15,7 @@ from ehal.qualified_ids import (
     NS_EV,
     NS_EVCS,
     NS_HEATPUMP,
+    NS_INV,
     NS_POOL,
     parse_qualified_id,
 )
@@ -103,6 +104,33 @@ def rewrite_consumer_bindings_slug(
             field = f"{parsed.namespace}.{new_slug}.{parsed.kind}"
         if field not in out:
             out[field] = str(value or "").strip()
+    return out
+
+
+def rewrite_inv_bindings_slug(
+    bindings: dict | None,
+    *,
+    old_id: str,
+    new_id: str,
+) -> dict[str, str]:
+    """Rewrite entity-scoped keys ``inv.{old}.*`` → ``inv.{new}.*``."""
+    if not isinstance(bindings, dict):
+        return {}
+    old_slug = flex_ehal_slug(old_id)
+    new_slug = flex_ehal_slug(new_id)
+    out: dict[str, str] = {}
+    for key, value in bindings.items():
+        addr = str(value or "").strip()
+        field = str(key)
+        parsed = parse_qualified_id(field)
+        if (
+            parsed
+            and parsed.namespace == NS_INV
+            and parsed.kennung == old_slug
+        ):
+            field = f"{NS_INV}.{new_slug}.{parsed.kind}"
+        if field not in out:
+            out[field] = addr
     return out
 
 

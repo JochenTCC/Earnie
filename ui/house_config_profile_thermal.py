@@ -153,9 +153,9 @@ _NNE_METERING_LABELS = {
 
 def _load_grid_fee_catalog_for_ui() -> dict:
     from data.grid_fees import load_grid_fee_catalog
-    from runtime_store.persist_paths import bundled_grid_fees_file
+    from runtime_store.persist_paths import resolve_grid_fees_json_path
 
-    return load_grid_fee_catalog(bundled_grid_fees_file())
+    return load_grid_fee_catalog(resolve_grid_fees_json_path())
 
 
 def _render_nne_arbeitspreis(*, session_scope: str) -> dict:

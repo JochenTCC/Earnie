@@ -2,12 +2,7 @@
 from __future__ import annotations
 
 from house_config.components_store import load_components_document
-from house_config.entity_resolution import (
-    batteries_by_id,
-    pv_systems_by_id,
-    resolve_battery_into_settings,
-    resolve_pv_into_settings,
-)
+from house_config.entity_resolution import resolve_components_into_settings
 from house_config.geo_timezone import timezone_for_land
 from house_config.planning_flex_bridge import collect_planning_flex_consumers
 from house_config.profiles_store import load_house_profiles_document
@@ -93,10 +88,7 @@ def resolve_scenario_settings(
         if not components_path:
             raise ValueError("components_path oder components erforderlich.")
         components = load_components_document(components_path)
-    batteries = batteries_by_id(components)
-    pv_systems = pv_systems_by_id(components)
-    out = resolve_battery_into_settings(out, batteries)
-    out = resolve_pv_into_settings(out, pv_systems)
+    out = resolve_components_into_settings(out, components)
 
     tariffs_doc = load_tariffs_document(tariffs_path)
     holder = monthly_rates_holder if monthly_rates_holder is not None else {}
@@ -149,12 +141,12 @@ def _resolve_profile_grid_fee(
 ) -> dict:
     """Netzentgelt-Spec (Basis + Zeitregeln) aus Hausprofil und Katalog."""
     from data.grid_fees import load_grid_fee_catalog, resolve_grid_fee_spec
-    from runtime_store.persist_paths import bundled_grid_fees_file
+    from runtime_store.persist_paths import resolve_grid_fees_json_path
 
     netznutzung = profile.get("netznutzung")
     catalog = None
     if isinstance(netznutzung, dict) and netznutzung.get("area_id"):
-        catalog = load_grid_fee_catalog(grid_fees_path or bundled_grid_fees_file())
+        catalog = load_grid_fee_catalog(grid_fees_path or resolve_grid_fees_json_path())
     return resolve_grid_fee_spec(netznutzung, catalog, timezone_name=timezone_name)
 
 

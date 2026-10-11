@@ -197,6 +197,13 @@ def aggregate_ha_entities(
             if value or weg_b:
                 if field not in out:
                     out[field] = value
+    for inv in _inverters_for_aggregate(components_doc):
+        raw_bind = inv.get("ehal_bindings")
+        inv_map = bind(raw_bind if isinstance(raw_bind, dict) else None)
+        for field, value in inv_map.items():
+            if value or weg_b:
+                if field not in out:
+                    out[field] = value
     if not weg_b:
         for key, value in entity_scoped_battery_bindings(batteries).items():
             if value and key not in out:
@@ -229,6 +236,28 @@ def _batteries_for_aggregate(components_doc: dict | None) -> list[dict]:
         doc = load_components_document(path)
         raw = doc.get("batteries") if isinstance(doc, dict) else []
         return ehal_mappable_batteries(raw if isinstance(raw, list) else [])
+    except Exception:
+        return []
+
+
+def _inverters_for_aggregate(components_doc: dict | None) -> list[dict]:
+    if isinstance(components_doc, dict):
+        raw = components_doc.get("inverters")
+        if not isinstance(raw, list):
+            return []
+        return [i for i in raw if isinstance(i, dict) and str(i.get("id") or "").strip()]
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return []
+        doc = load_components_document(path)
+        raw = doc.get("inverters") if isinstance(doc, dict) else []
+        if not isinstance(raw, list):
+            return []
+        return [i for i in raw if isinstance(i, dict) and str(i.get("id") or "").strip()]
     except Exception:
         return []
 

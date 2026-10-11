@@ -73,7 +73,7 @@ def test_resolve_scenario_settings_coerces_legacy_battery_id(monkeypatch):
     bat = {
         "id": "10_kwh_speicher",
         "label": "10 kWh",
-        "kind": "battery_inverter",
+        "inverter_id": "wr_main",
         "battery_capacity_kwh": 10.0,
         "battery_max_charge_power_kw": 5.0,
         "battery_max_discharge_power_kw": 5.0,
@@ -87,6 +87,14 @@ def test_resolve_scenario_settings_coerces_legacy_battery_id(monkeypatch):
         "limits_from_live": False,
         "ehal_bindings": {},
         "battery_wear": None,
+    }
+    wr = {
+        "id": "wr_main",
+        "label": "Haupt-WR",
+        "type": "hybrid",
+        "ac_connection": "grid_tied",
+        "control": "full",
+        "ehal_bindings": {},
     }
     monkeypatch.setattr(
         "house_config.scenario_resolution.load_tariffs_document",
@@ -103,7 +111,7 @@ def test_resolve_scenario_settings_coerces_legacy_battery_id(monkeypatch):
     resolved = resolve_scenario_settings(
         {"battery_id": "10_kwh_speicher"},
         raw_config={"live_scenario_id": "live"},
-        components={"batteries": [bat], "pv_systems": []},
+        components={"inverters": [wr], "batteries": [bat], "pv_systems": []},
         tariffs_path="unused",
         house_profiles_path="unused",
     )

@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from ehal.ess_fields import ess_field_kind
+from ehal.inverter_fields import inv_field_kind
 from ehal.loxone_push_source import is_pushable_kind
 from ehal.push_signals import pilot_id
 from runtime_store.loxone_push_inbox import (
@@ -29,6 +30,10 @@ def binding_entries(house: dict, components: dict) -> list[tuple[str, str, str, 
         bid = str(battery.get("id") or "")
         for field, name in (battery.get("ehal_bindings") or {}).items():
             entries.append(("battery", bid, "", str(field), str(name)))
+    for inverter in components.get("inverters", []):
+        iid = str(inverter.get("id") or "")
+        for field, name in (inverter.get("ehal_bindings") or {}).items():
+            entries.append(("inverter", iid, "", str(field), str(name)))
     return entries
 
 
@@ -67,7 +72,7 @@ def adapter_key_for_kind(
     if target in entities:
         return target
     for key in entities:
-        if ess_field_kind(key) == target:
+        if ess_field_kind(key) == target or inv_field_kind(key) == target:
             return key
     return None
 
@@ -84,7 +89,7 @@ def read_push_ehal_value(
         raise PushReadError(
             f"HA push read failed for {qualified_id!r} (field={adapter_field!r}, state={state})"
         )
-    kind = ess_field_kind(adapter_field) or adapter_field
+    kind = ess_field_kind(adapter_field) or inv_field_kind(adapter_field) or adapter_field
     if kind == "sens_ess_soc" or adapter_field == "sens_ess_soc":
         return float(value)
     mode = sign.get(adapter_field) or sign.get(kind)
@@ -146,9 +151,9 @@ def resolve_setpoint_qid(field: str, index: dict[str, str]) -> str:
         return ""
     if key in index:
         return index[key]
-    kind = ess_field_kind(key)
+    kind = ess_field_kind(key) or inv_field_kind(key)
     if kind:
         for bind_key, qid in index.items():
-            if ess_field_kind(bind_key) == kind:
+            if ess_field_kind(bind_key) == kind or inv_field_kind(bind_key) == kind:
                 return qid
     return key if key.count(".") >= 2 else ""

@@ -77,6 +77,7 @@ def _house_battery(**overrides):
     base = {
         "id": "home",
         "label": "Home",
+        "inverter_id": "wr_main",
         "battery_capacity_kwh": 10.0,
         "battery_max_charge_power_kw": 5.0,
         "battery_max_discharge_power_kw": 5.0,
@@ -169,9 +170,11 @@ def test_physical_ps_not_inherited():
 
 def test_normalize_components_inherits_virtual_ps():
     from house_config.components_store import normalize_components_document
+    from tests.config_fixtures import main_hybrid_inverter
 
     doc = normalize_components_document(
         {
+            "inverters": [main_hybrid_inverter()],
             "batteries": [
                 _house_battery(battery_efficiency=0.93, battery_max_charge_power_kw=3.5),
                 _powerstation(battery_efficiency=0.5, battery_max_charge_power_kw=9.0),
@@ -212,6 +215,7 @@ def test_normalize_physical_powerstation_keeps_one_attached():
     bat = normalize_battery(
         _powerstation(
             backing="physical",
+            inverter_id="wr_ps_wm",
             attached_consumer_ids=["wm", "dryer"],
         ),
         0,
@@ -489,7 +493,11 @@ def test_sync_consumers_from_powerstation_attached_detach(monkeypatch, tmp_path)
     profiles = tmp_path / "house_profiles.json"
     save_components_document(
         str(components),
-        {"batteries": [_minimal_powerstation(attached=["wm"])], "pv_systems": []},
+        {
+            "inverters": [],
+            "batteries": [_minimal_powerstation(attached=["wm"])],
+            "pv_systems": [],
+        },
     )
     save_house_profiles_document(
         str(profiles),
@@ -549,7 +557,11 @@ def test_sync_from_consumers_clears_powerstation_without_links(
     components = tmp_path / "components.json"
     save_components_document(
         str(components),
-        {"batteries": [_minimal_powerstation(attached=["wm"])], "pv_systems": []},
+        {
+            "inverters": [],
+            "batteries": [_minimal_powerstation(attached=["wm"])],
+            "pv_systems": [],
+        },
     )
     monkeypatch.setattr(
         entities_io, "resolve_components_json_path", lambda: str(components)

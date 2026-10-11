@@ -100,6 +100,10 @@ PAGE_DOCS: dict[str, PageDocs] = {
                 "docs/konfiguration/flexible-verbraucher.md",
             ),
             DocLink(
+                "PV, Batterie & Wechselrichter",
+                "docs/konfiguration/batterie-pv.md",
+            ),
+            DocLink(
                 "Historische Leistungsprofil-CSV",
                 "docs/konfiguration/verbrauchs-csv.md",
             ),

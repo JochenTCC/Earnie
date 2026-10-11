@@ -44,6 +44,7 @@ def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv("EARNIE_HOUSE_PROFILES_PATH", str(config_dir / "house_profiles.json"))
     monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv("EARNIE_GRID_FEES_PATH", str(config_dir / "grid_fees.json"))
     monkeypatch.setenv(
         "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
@@ -93,6 +94,10 @@ def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         ),
         encoding="utf-8",
     )
+    (share_dir / "grid_fees.json").write_text(
+        json.dumps({"rule_sets": {}, "areas": []}),
+        encoding="utf-8",
+    )
     (share_dir / "backtesting_scenarios.minimal.json").write_text(
         json.dumps({"cbc_gap_rel": 0.1, "scenarios": []}),
         encoding="utf-8",
@@ -123,6 +128,9 @@ def test_greenfield_bootstrap_creates_expected_files(tmp_path, monkeypatch):
     tariffs_payload = json.loads((root / "config" / "tariffs.json").read_text(encoding="utf-8"))
     assert len(tariffs_payload["import_tariffs"]) >= 1
     assert len(tariffs_payload["export_tariffs"]) >= 1
+    grid_fees_payload = json.loads((root / "config" / "grid_fees.json").read_text(encoding="utf-8"))
+    assert "rule_sets" in grid_fees_payload
+    assert "areas" in grid_fees_payload
 
     cons_lines = cons_data.read_text(encoding="utf-8").strip().splitlines()
     assert len(cons_lines) == 1

@@ -50,7 +50,7 @@ Die **Endschichten** reichen bis Boden bzw. Deckel: Der äußerste Fühler steht
 - **`T_eq`:** RC-Zustand / Open-Loop-Boden für Live (fehlend → Fallback `setpoint_c`). Earnie speichert daraus `Q_meas = C × T_eq` je Live-Zyklus in `optimization_history.jsonl`.
 - **`T_low`:** Rohwert des untersten Fühlers (nicht von Earnie in `T_eq` umgerechnet). Wenn `T_low < setpoint − tolerance`, erzwingt Live kurzfristig WP-AN, auch wenn `T_eq` noch über der Band-Untergrenze liegt (Schichtung). Fehlt das Binding, entfällt nur dieser Hinweis.
 
-**Chart:** Unter **Live-Cockpit → Analyse Verbrauch & Kosten** erscheint ein Chart **Wärmeinhalt** (kWh) für das gewählte 7-/28-Tage-Fenster: Live-Sim `Q_sim` durchgezogen, Ist `Q_meas` gestrichelt — aus `thermal_observability` in `optimization_history.jsonl`. Ohne Historie Hinweis statt Chart. Im Hauskonfigurator bleibt unter Stündlicher Verlauf nur die Modell-Temperatur (°C), kein Wärmeinhalt-Chart.
+**Chart:** Unter **Live-Cockpit → Analyse Verbrauch & Kosten** erscheint ein Chart **Wärmeinhalt** (kWh) für das gewählte 7-/28-Tage-Fenster: Live-Sim `Q_sim` durchgezogen, Ist `Q_meas` gestrichelt — aus `thermal_observability` in `optimization_history.jsonl`. Zusätzlich werden die **letzten 12 stündlichen Q-Prognosen** (`horizon_q_sim_kwh`, Wärmespeicher und Pools) als Fächer eingezeichnet; alle Linien teilen den größten gemeinsamen Horizont, maximal 24 h. Ohne Historie Hinweis statt Chart. Im Hauskonfigurator bleibt unter Stündlicher Verlauf nur die Modell-Temperatur (°C), kein Wärmeinhalt-Chart.
 
 Pool: weiterhin ein Sensor → `sens_temperature_water` (kein Schichtmittel nötig, solange nur ein Fühler). Gleiches `Q = C × T` und Chart-Muster.
 

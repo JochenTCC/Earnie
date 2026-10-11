@@ -54,9 +54,15 @@ M1_EHAL_FIELDS: frozenset[str] = frozenset(
         "set_evcs_max_current",
         "set_evcs_mode",
         "set_grid_export_power_limit",
+        "sens_inv_power_ac",
+        "sens_inv_power_pv",
+        "get_inv_max_ac_power",
+        "get_inv_max_pv_power",
+        "set_inv_ac_power_limit",
         "supports_ess_write",
         "supports_evcs_current",
         "supports_ess_source_select",
+        "supports_inv_power_limit",
     }
 )
 
@@ -94,6 +100,12 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "set_evcs_max_current": "Setpoint Wallbox-Sollstrom (A)",
     "set_evcs_mode": "Setpoint Wallbox-Modus (off|pv|now)",
     "set_grid_export_power_limit": "Setpoint Einspeisegrenze (W; ≥ 0, frei = PV + Entladeleistung)",
+    "sens_inv_power_ac": "Wechselrichter AC-Leistung (W, +Einspeisung ins Haus)",
+    "sens_inv_power_pv": "Wechselrichter PV-Eingangsleistung (W)",
+    "get_inv_max_ac_power": "Wechselrichter Max. AC-Leistung inbound (W)",
+    "get_inv_max_pv_power": "Wechselrichter Max. PV-Eingang inbound (W)",
+    "set_inv_ac_power_limit": "Setpoint WR AC-Limit (W; ≥ 0)",
+    "supports_inv_power_limit": "WR-Limit schreiben möglich",
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
     "flex.sens_power_act": "Flex Leistung / Zustand",
@@ -136,12 +148,18 @@ _FIELD_ROLE: dict[str, str] = {
     "set_ess_discharge_power_limit": "ess",
     "set_ess_mode": "ess",
     "set_ess_source_select": "ess",
+    "sens_inv_power_ac": "inverter",
+    "sens_inv_power_pv": "inverter",
+    "get_inv_max_ac_power": "inverter",
+    "get_inv_max_pv_power": "inverter",
+    "set_inv_ac_power_limit": "inverter",
+    "supports_inv_power_limit": "inverter",
     "sens_evcs_active_power": "evcs",
     "set_evcs_max_current": "evcs",
     "set_evcs_mode": "evcs",
 }
 
-_ROLE_ORDER = ("grid", "pv", "ess", "evcs", "consumer", "heatpump")
+_ROLE_ORDER = ("grid", "pv", "ess", "inverter", "evcs", "consumer", "heatpump")
 
 
 def roles_dir() -> Path:
@@ -260,12 +278,13 @@ def role_field_labels() -> dict[str, str]:
 def field_role_id(field: str) -> str | None:
     """Return device role_id for an M1 mapping field, or None."""
     from ehal.ess_fields import ess_field_kind
+    from ehal.inverter_fields import inv_field_kind
 
     name = str(field or "").strip()
     role = _FIELD_ROLE.get(name)
     if role:
         return role
-    kind = ess_field_kind(name)
+    kind = ess_field_kind(name) or inv_field_kind(name)
     return _FIELD_ROLE.get(kind) if kind else None
 
 
@@ -296,9 +315,10 @@ def group_fields_by_role(fields: tuple[str, ...] | list[str]) -> list[tuple[str,
     """Order fields into (role_id, fields) groups for HITL sections.
 
     Unknown fields are collected under role_id ``other``.
-    entity-scoped ``ess.{slug}.*`` groups under ``ess`` (2.7.m).
+    entity-scoped ``ess.{slug}.*`` / ``inv.{slug}.*`` group under ``ess`` / ``inverter``.
     """
-    buckets: dict[str, list[str]] = {rid: [] for rid in ("grid", "pv", "ess", "evcs")}
+    role_ids = ("grid", "pv", "ess", "inverter", "evcs")
+    buckets: dict[str, list[str]] = {rid: [] for rid in role_ids}
     other: list[str] = []
     for field in fields:
         role = field_role_id(field)
@@ -307,7 +327,7 @@ def group_fields_by_role(fields: tuple[str, ...] | list[str]) -> list[tuple[str,
         else:
             other.append(field)
     groups: list[tuple[str, list[str]]] = []
-    for role_id in ("grid", "pv", "ess", "evcs"):
+    for role_id in role_ids:
         if buckets[role_id]:
             groups.append((role_id, buckets[role_id]))
     if other:

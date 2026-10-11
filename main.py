@@ -406,7 +406,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         matrix_row=optimization_matrix[0] if optimization_matrix else None,
         telemetry=telemetry_for_export,
     )
-    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, urgent_obs = optimizer.milp_optimizer(
+    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan, urgent_obs = optimizer.milp_optimizer(
         optimization_matrix,
         current_hour,
         current_soc,
@@ -423,6 +423,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
         current_soc_by_id=current_soc_by_id or None,
     )
+    plant_curtail_kw = float((milp_plan or {}).get("p_pv_curtail") or 0.0)
     # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
     export_cap = export_ctx["effective_export_cap_kw"]
     if isinstance(battery_params, list):
@@ -492,9 +493,15 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(
             consumer_powers, charging_contexts
         )
-        if err_ess is None and err_evcs is None:
+        logger.info("Sende EHAL WR-AC-Limits an %s...", backend)
+        err_inv, inv_records = ehal_live.write_inv_ac_limits_from_plan(
+            plant_curtail_kw=plant_curtail_kw,
+            matrix_row=optimization_matrix[0] if optimization_matrix else None,
+            milp_plan=milp_plan if isinstance(milp_plan, dict) else None,
+        )
+        if err_ess is None and err_evcs is None and err_inv is None:
             ehal_live.clear_write_error()
-        ehal_writes = list(ess_records) + list(evcs_records)
+        ehal_writes = list(ess_records) + list(evcs_records) + list(inv_records)
         loxone_writes = None
     else:
         logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
@@ -505,9 +512,15 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         flex_writes = ehal_live.write_flexible_consumer_states(
             consumer_powers, charging_contexts, consumer_pv_follow
         )
+        logger.info("📤 Sende WR-AC-Limits an Loxone...")
+        _err_inv, inv_rows = ehal_live.write_inv_ac_limits_from_plan(
+            plant_curtail_kw=plant_curtail_kw,
+            matrix_row=optimization_matrix[0] if optimization_matrix else None,
+            milp_plan=milp_plan if isinstance(milp_plan, dict) else None,
+        )
         loxone_writes = serialize_write_records(
             list(huawei_writes) + list(flex_writes) + list(powerstation_writes)
-        )
+        ) + list(inv_rows)
 
     if live_power is None:
         live_power = ehal_live.read_live_power_kw()
