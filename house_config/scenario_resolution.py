@@ -75,6 +75,7 @@ def resolve_scenario_settings(
     tariffs_path: str,
     house_profiles_path: str,
     monthly_rates_holder: dict | None = None,
+    grid_fees_path: str | None = None,
 ) -> dict:
     """
     Löst battery_id, pv_system_ids, import/export_tariff_id
@@ -114,6 +115,9 @@ def resolve_scenario_settings(
         profile = profiles[profile_id]
         out["_house_profile"] = profile
         _apply_profile_geo(out, profile)
+        out["_grid_fee_spec"] = _resolve_profile_grid_fee(
+            profile, out["timezone_name"], grid_fees_path
+        )
         flex_consumers = collect_planning_flex_consumers(profile)
         if flex_consumers:
             out["_planning_flex_consumers"] = flex_consumers
@@ -138,11 +142,20 @@ def _apply_profile_geo(out: dict, profile: dict) -> None:
     out["timezone_name"] = str(profile.get("timezone_name", "") or "").strip()
     if not out["timezone_name"]:
         out["timezone_name"] = timezone_for_land(profile.get("land", "AT"))
-    nne = float(profile.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0)
-    if nne > 0.0:
-        out["netzentgelt_cent_kwh"] = nne
-    else:
-        out.pop("netzentgelt_cent_kwh", None)
+
+
+def _resolve_profile_grid_fee(
+    profile: dict, timezone_name: str, grid_fees_path: str | None
+) -> dict:
+    """Netzentgelt-Spec (Basis + Zeitregeln) aus Hausprofil und Katalog."""
+    from data.grid_fees import load_grid_fee_catalog, resolve_grid_fee_spec
+    from runtime_store.persist_paths import bundled_grid_fees_file
+
+    netznutzung = profile.get("netznutzung")
+    catalog = None
+    if isinstance(netznutzung, dict) and netznutzung.get("area_id"):
+        catalog = load_grid_fee_catalog(grid_fees_path or bundled_grid_fees_file())
+    return resolve_grid_fee_spec(netznutzung, catalog, timezone_name=timezone_name)
 
 
 def _prepare_live_scenario_settings(

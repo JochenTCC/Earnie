@@ -4,6 +4,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from data.grid_fees import flat_grid_fee_spec
 from house_config.tariffs_store import _normalize_dach_fields, resolve_supplier_id
 from optimizer.simulation import calculate_step_cost_parts_from_row
 from simulation.backtesting_log import _build_summary
@@ -428,7 +429,7 @@ def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
             "vat_percent": 20.0,
         },
         export_spec=None,
-        netznutzung_arbeitspreis_cent_kwh=5.0,
+        grid_fee=flat_grid_fee_spec(5.0),
     )
     assert "## Netznutzung" in body
     assert "| Energiebezug (Lieferant) | 7.00 € (100.0 kWh) |" in body
@@ -451,7 +452,7 @@ def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
             "vat_percent": 20.0,
         },
         export_spec=None,
-        netznutzung_arbeitspreis_cent_kwh=5.0,
+        grid_fee=flat_grid_fee_spec(5.0),
     )
     assert "| Netznutzung Arbeitspreis | 6.00 € |" in body_vat
     assert "| Energiebezug (Lieferant) | 6.00 € (100.0 kWh) |" in body_vat

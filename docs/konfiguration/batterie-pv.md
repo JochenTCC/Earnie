@@ -36,7 +36,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `standby_power_kw`      | kW       | `components.json` → `batteries[]`    | Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch in der Optimierung)                                                          |
 | `control`               | enum     | `components.json` → `batteries[]`    | Steuerbarkeit der Anlage: `full` (Default) = Zwangsladen/-entladen; `limits_only` = nur Lade-/Entladegrenzen (Automatik/Entladesperre); `read_only` = Eigenverbrauch ohne Setpoints. Eigenschaft der Installation — gilt auch für Simulation / Backtesting / Business Case. |
 | `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten; wird aus `land` abgeleitet (`AT`→`Europe/Vienna`, `DE`→`Europe/Berlin`, `CH`→`Europe/Zurich`); siehe `planning_horizon` |
-| `netznutzung_arbeitspreis_cent_kwh` | Cent/kWh | `house_profiles.json` | Netznutzung Arbeitspreis netto (ohne USt); unabhängig vom Lieferantentarif                                                     |
+| `netznutzung` | Objekt | `house_profiles.json` | Netznutzung Arbeitspreis netto (ohne USt): Netzbereich aus Katalog (inkl. Zeitregeln SNAP/WiNAP) oder eigener Wert; unabhängig vom Lieferantentarif, siehe [Preise](preise.md) |
 
 
 ### Virtuelle Powerstation (Carve-out)

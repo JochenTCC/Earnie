@@ -198,9 +198,7 @@ def _perform_house_profile_save(
                 "longitude": location["longitude"],
                 "default_pv_tilt": location["default_pv_tilt"],
                 "default_pv_azimuth": location["default_pv_azimuth"],
-                "netznutzung_arbeitspreis_cent_kwh": float(
-                    location.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0
-                ),
+                "netznutzung": location["netznutzung"],
                 "consumers": resolved,
                 "total_profile_csv": hist["total_profile_csv"],
                 "pv_profile_csv": hist["pv_profile_csv"],
@@ -268,9 +266,7 @@ def _render_house_profile_save(
         "longitude": location["longitude"],
         "default_pv_tilt": location["default_pv_tilt"],
         "default_pv_azimuth": location["default_pv_azimuth"],
-        "netznutzung_arbeitspreis_cent_kwh": float(
-            location.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0
-        ),
+        "netznutzung": location["netznutzung"],
         "consumers": resolved,
         "total_profile_csv": hist["total_profile_csv"],
         "pv_profile_csv": hist["pv_profile_csv"],

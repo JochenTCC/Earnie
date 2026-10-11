@@ -75,8 +75,8 @@ def _tariff_parity_check(epex: float = 10.0) -> dict:
         "prices_include_vat": False,
         "vat_percent": 20.0,
     }
-    nne = 2.0
-    k = import_cent_kwh(epex, spec, netzentgelt_override=nne)
+    nne = flat_grid_fee_spec(2.0)
+    k = import_cent_kwh(epex, spec, grid_fee=nne)
     return {
         "epex": epex,
         "k_act": round(k, 4),

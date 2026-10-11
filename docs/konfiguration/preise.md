@@ -8,7 +8,28 @@ Quellen und rechtliche Anker: [Tarife und Preise nachrechnen](../referenz/tarife
 
 **Fixkosten (SE only):** `monthly_fee_eur` (Lieferant-Grundpreis; Deduplizierung über `supplier_id`), optional `grid_monthly_fee_eur` / `metering_monthly_fee_eur` / `other_monthly_fee_eur` (einmal je Hausanschluss aus Bezug, sonst Einspeise). Bei **EPEX-/Spot-Tarifen** immer **netto** speichern und `prices_include_vat` = false (gleiche Basis wie Settlement/Markup); Festpreise: Netto/brutto wie `prices_include_vat`. Nur in **Szenario-Explorer**-Gesamt-/Monatskosten und in Fake-Jahresrechnungen unter `{Log}/invoices/`, nicht in Live-MILP und nicht in stündlichen `sim_cost`. Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4.
 
-**Netznutzungsentgelte (Arbeitspreis):** Am Hausprofil unter Standort als `netznutzung_arbeitspreis_cent_kwh` (Cent/kWh **netto**, ohne USt). Unabhängig vom Lieferantentarif; wird **vor** der USt zum Bezugspreis addiert und gilt für Live-MILP und SE (alle Import-Typen). In Fake-Jahresrechnungen erscheint er als eigene Position (aus dem Energiebezug herausgerechnet). Leistungspreis und netzgebietsspezifische Tabellen sind nicht modelliert; Orientierung AT: [Netznutzungsentgelte-Austria-2026.csv](../referenz/Netznutzungsentgelte-Austria-2026.csv). Monatlicher Netz-Grundpreis `grid_monthly_fee_eur` bleibt nur SE-Fixkosten-Stub.
+**Netznutzungsentgelte (Arbeitspreis):** Am Hausprofil unter Standort als Objekt `netznutzung` (Cent/kWh **netto**, ohne USt). Unabhängig vom Lieferantentarif; wird **vor** der USt zum Bezugspreis addiert und gilt für Live-MILP und SE (alle Import-Typen). In Fake-Jahresrechnungen erscheint er als eigene Position (aus dem Energiebezug herausgerechnet, bei Zeitfenstern je Fenster aufgeschlüsselt). Der Arbeitspreis kann **zeitabhängig** sein (SNAP/WiNAP, siehe unten). Leistungspreis ist nicht modelliert. Monatlicher Netz-Grundpreis `grid_monthly_fee_eur` bleibt nur SE-Fixkosten-Stub.
+
+### Netznutzung am Hausprofil (`netznutzung`)
+
+| Feld | Bedeutung |
+| --- | --- |
+| `area_id` | Netzbereich aus dem Katalog [`share/config/grid_fees.json`](../../share/config/grid_fees.json) (z. B. `AT-VBG`). `null` = eigener Wert ohne Zeitregeln. |
+| `power_metering` | `unmetered_power` (Standard Haushalt, nicht gemessene Leistung) oder `metered_power`; wählt den Basis-Arbeitspreis im Katalog. |
+| `quarter_hour_meter` | Viertelstunden-Smart-Meter vorhanden. Voraussetzung für SNAP/WiNAP; ohne Zähler werden die Regeln übersprungen (in UI und Jahresrechnung ausgewiesen). |
+| `base_cent_kwh` | Eigener Basis-Arbeitspreis (Cent/kWh netto); nur ohne `area_id` wirksam. |
+| `include_status` | Welche Regel-Stati gelten: Standard nur `verordnet`. `entwurf`/`illustrativ` müssen bewusst aktiviert werden. |
+
+**Zeitregeln** liegen im Katalog je Regelsatz (`rule_sets`). Eine Regel hat Gültigkeit (`valid_from`/`valid_to`), Monate, Wochentage, Uhrzeitfenster (darf über Mitternacht gehen, Ortszeit des Hausprofils; Monat und Wochentag zählen nach dem Datum des Slots), Wirkung (`percent_off`, `absolute_cent`, `add_cent`), Voraussetzungen (`requires`) und `status`. Passt mehr als eine Regel, gewinnt die erste. Eine einbezogene Regel ohne Wert ist ein Fehler (kein stiller Fallback).
+
+| Regel | Fenster | Wirkung | Status |
+| --- | --- | --- | --- |
+| **SNAP** (Sommer-Nieder-Arbeitspreis) | 1.4.–30.9., 10–16 Uhr, NE 7 | −20 % auf den Arbeitspreis | verordnet (seit 1.4.2026) |
+| **WiNAP** (Winter-Nieder-Arbeitspreis) | 1.10.–31.3., 22–4 Uhr, NE 7 | Höhe offen | Entwurf, im Katalog vorbereitet, standardmäßig aus |
+
+Die Katalogwerte stammen aus einer Recherche (SNE-V 2018, Fassung 01.04.2026; SNAP-Abschlag laut Netzbetreibern) und sind nicht gegen die jeweiligen Preisblätter geprüft; Netzbetreiber können Voraussetzungen (z. B. Opt-in) unterschiedlich handhaben. Der Netzverlust-Anteil ist nicht enthalten.
+
+**Migration:** Das frühere Feld `netznutzung_arbeitspreis_cent_kwh` wird nicht mehr gelesen (Fehlermeldung beim Laden). Einmalig umstellen: `python -m scripts.migrate_grid_fee_profile --path earnie_env/config/house_profiles.json` (Preis bleibt gleich; danach Netzbereich im Hausprofil wählen oder `--area-id AT-VBG --quarter-hour-meter` übergeben).
 
 **Land am Hausprofil:** Im Hauskonfigurator (Standort) wird `land` (`AT`/`DE`/`CH`) gespeichert. Der Szenarienkonfigurator-Filter **Land** ist Pflicht (kein „Alle“) und wird aus dem gewählten Hausprofil vorbelegt.
 
@@ -20,7 +41,7 @@ Marktpreise (Live) kommen aus der Gebotszone des Hausprofil-`land` (AT / DE-LU /
 
 ```
 (Marktpreis × (1 + markup_percent/100) + settlement_fee_cent_kwh
-  + netznutzung_arbeitspreis_cent_kwh aus Hausprofil)
+  + Netznutzung Arbeitspreis aus Hausprofil, je Slot inkl. Zeitregeln)
   × (1 + vat_percent/100)   falls prices_include_vat = false
 ```
 
@@ -32,7 +53,7 @@ Marktpreise (Live) kommen aus der Gebotszone des Hausprofil-`land` (AT / DE-LU /
 | `vat_percent` / `prices_include_vat` | USt (z. B. 20 % bei `prices_include_vat=false`) |
 
 
-Hausprofil-Feld `netznutzung_arbeitspreis_cent_kwh` (siehe oben) gilt zusätzlich für **alle** Import-Typen.
+Das Hausprofil-Objekt `netznutzung` (siehe oben) gilt zusätzlich für **alle** Import-Typen.
 
 
 

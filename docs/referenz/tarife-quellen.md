@@ -15,11 +15,11 @@ Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration/Typen) �
 | **Netzentgelt-Grundpreis** (`grid_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Messstellengebühr** (`metering_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Sonstige Fixkosten** (`other_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
-| **Netznutzung Arbeitspreis** (`netznutzung_arbeitspreis_cent_kwh` am Hausprofil) | **ja** (vor USt zum Bezugspreis) | **ja** |
+| **Netznutzung Arbeitspreis** (`netznutzung` am Hausprofil, inkl. Zeitfenster SNAP) | **ja** (vor USt zum Bezugspreis) | **ja** |
 | **Netznutzung Leistungspreis** / netzgebietsspezifische Tabellen | **nein** | **nein** |
 | PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
 
-**Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Leistungspreis und echte Netzgebiet-Lookup fehlen weiterhin. Optionaler Katalog-Stub `grid_monthly_fee_eur` bleibt nur SE-Monatsfixgebühr.
+**Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Der Arbeitspreis kann zeitabhängig sein (SNAP, vorbereitet WiNAP; Katalog `share/config/grid_fees.json`). Der Leistungspreis fehlt weiterhin. Optionaler Katalog-Stub `grid_monthly_fee_eur` bleibt nur SE-Monatsfixgebühr.
 
 Earnie liefert **gute-genug-€** für Vergleiche und Demos — **keine** Abrechnung gegen echte Stromrechnungen. Katalogwerte können unvollständig oder veraltet sein; bitte die Parameter im Szenarienkonfigurator prüfen.
 
@@ -35,7 +35,7 @@ Für Spot-/aWATTar-Tarife gilt (Cent/kWh), wie im Katalog und in der Vorschau:
 1. **Börsenpreis** der Stunde (Day-Ahead / EPEX-Zone zum Land des Tarifs).
 2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
 3. **Fixer Aufschlag** (`settlement_fee_cent_kwh`) in Cent/kWh.
-4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung_arbeitspreis_cent_kwh`, netto).
+4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto; je Slot, mit Zeitregeln wie SNAP).
 5. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100).
 
 Formel:
@@ -115,8 +115,8 @@ Regel: Wert aus dem **Bezugstarif**; fehlt er dort, aus dem Einspeisetarif — *
 - Pro **Kalendermonat** im SE-Zeitraum: **eine volle** Gebühr — keine anteilige Kürzung.
 - Jahres-/Gesamtwert: Summe aller Fixkosten über alle Monate + volumetrische Energiekosten (Bezug minus Einspeiseerlös).
 - **Nicht** in Live-MILP, **nicht** in den stündlichen `sim_cost`-Kurven.
-- Volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil (`netznutzung_arbeitspreis_cent_kwh`), nicht aus dem Tarifkatalog.
-- **Leistungspreis** und netzgebietsspezifische Lookup-Tabellen werden derzeit **nicht** modelliert.
+- Volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil (`netznutzung`) und dem Netzentgelt-Katalog, nicht aus dem Tarifkatalog.
+- **Leistungspreis** wird derzeit **nicht** modelliert.
 
 In der UI: Szenario-Explorer → Gesamtkosten und Monatliche Stromkosten (Hinweis „Näherung Monatsgebühren“, wenn Gebühren vorhanden; Hinweis zu Netznutzungsentgelten). Fake-Jahresrechnung: siehe §1.
 

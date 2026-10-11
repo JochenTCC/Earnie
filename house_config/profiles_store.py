@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 
+from data.grid_fees import normalize_netznutzung_config
 from house_config.baseload import compute_baseload_kwh, normalize_baseload_distribution
 from house_config.earnie_role import (
     DEFAULT_MANUAL_HORIZON_H,
@@ -386,10 +387,13 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
     land = land_raw if land_raw in {"AT", "DE", "CH"} else "AT"
     latitude = float(raw.get("latitude", 48.0) or 48.0)
     longitude = float(raw.get("longitude", 10.0) or 10.0)
-    nne_raw = raw.get("netznutzung_arbeitspreis_cent_kwh")
-    nne = float(nne_raw or 0.0) if nne_raw is not None else 0.0
-    if nne < 0.0:
-        raise ValueError("netznutzung_arbeitspreis_cent_kwh muss >= 0 sein.")
+    if "netznutzung_arbeitspreis_cent_kwh" in raw:
+        raise ValueError(
+            "netznutzung_arbeitspreis_cent_kwh wird nicht mehr unterstützt "
+            "(ersetzt durch das Objekt 'netznutzung'). Einmalig migrieren: "
+            "python -m scripts.migrate_grid_fee_profile --path <house_profiles.json>"
+        )
+    netznutzung = normalize_netznutzung_config(raw.get("netznutzung"))
     return {
         "annual_kwh": annual_kwh,
         "total_profile_csv": total_profile_csv,
@@ -403,7 +407,7 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
         "timezone_name": timezone_for_land(land),
         "default_pv_tilt": float(raw.get("default_pv_tilt", 25.0) or 25.0),
         "default_pv_azimuth": float(raw.get("default_pv_azimuth", 0.0) or 0.0),
-        "netznutzung_arbeitspreis_cent_kwh": nne,
+        "netznutzung": netznutzung,
     }
 
 
@@ -447,7 +451,7 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         "timezone_name": fields["timezone_name"],
         "default_pv_tilt": fields["default_pv_tilt"],
         "default_pv_azimuth": fields["default_pv_azimuth"],
-        "netznutzung_arbeitspreis_cent_kwh": fields["netznutzung_arbeitspreis_cent_kwh"],
+        "netznutzung": fields["netznutzung"],
         "total_profile_csv": fields["total_profile_csv"],
         "pv_profile_csv": fields["pv_profile_csv"],
         "battery_profile_csv": fields["battery_profile_csv"],
@@ -570,9 +574,7 @@ def _serialize_profile(profile: dict) -> dict:
         out["default_pv_tilt"] = profile["default_pv_tilt"]
     if profile.get("default_pv_azimuth") is not None:
         out["default_pv_azimuth"] = profile["default_pv_azimuth"]
-    nne = float(profile.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0)
-    if nne > 0.0:
-        out["netznutzung_arbeitspreis_cent_kwh"] = nne
+    out["netznutzung"] = normalize_netznutzung_config(profile.get("netznutzung"))
     return out
 
 

@@ -585,7 +585,7 @@ def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
                         "annual_kwh": 4000,
                         "latitude": 48.2,
                         "longitude": 16.3,
-                        "netznutzung_arbeitspreis_cent_kwh": 5.353,
+                        "netznutzung": {"base_cent_kwh": 5.353},
                         "consumers": [],
                     }
                 ]
@@ -624,11 +624,11 @@ def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
         tariffs_path=str(tariffs_path),
         house_profiles_path=str(profiles_path),
     )
-    assert resolved["netzentgelt_cent_kwh"] == pytest.approx(5.353)
+    assert resolved["_grid_fee_spec"]["base_cent_kwh"] == pytest.approx(5.353)
     from data.backtesting_prices import pricing_kwargs_from_resolved
 
     kwargs = pricing_kwargs_from_resolved(resolved)
-    assert kwargs["netzentgelt_override"] == pytest.approx(5.353)
+    assert kwargs["grid_fee"]["base_cent_kwh"] == pytest.approx(5.353)
 
 
 def test_monthly_table_export_tariff_resolution():

@@ -32,16 +32,12 @@ def _fmt_cent(value: float | None) -> str:
     return f"{float(value):.2f}"
 
 
-def _netznutzung_ap_net_cent(params: dict | None) -> float:
-    """Hausprofil-Arbeitspreis (Cent/kWh netto) aus aufgelösten SE-Params."""
+def _grid_fee_from_params(params: dict | None) -> dict | None:
+    """Aufgelöste Netzentgelt-Spec (``_grid_fee_spec``) aus SE-Params."""
     if not isinstance(params, dict):
-        return 0.0
-    raw = params.get("netzentgelt_cent_kwh")
-    if raw is None:
-        profile = params.get("_house_profile")
-        if isinstance(profile, dict):
-            raw = profile.get("netznutzung_arbeitspreis_cent_kwh")
-    return max(0.0, float(raw or 0.0))
+        return None
+    spec = params.get("_grid_fee_spec")
+    return spec if isinstance(spec, dict) else None
 
 
 def _netznutzung_ap_gross_cent(
@@ -58,17 +54,52 @@ def _netznutzung_ap_gross_cent(
     return float(ap_net_cent) * (1.0 + vat / 100.0)
 
 
-def _netznutzung_ap_eur(
+@dataclass(frozen=True)
+class _NetznutzungComponent:
+    """Ein Preisbestandteil (Basis oder Zeitregel) des Netz-Arbeitspreises."""
+
+    label: str
+    ap_net_cent: float
+    import_kwh: float
+    eur: float
+
+
+def _netznutzung_components(
+    df: pd.DataFrame,
     *,
-    import_kwh: float,
-    ap_net_cent: float,
+    grid_fee: dict | None,
     import_spec: dict | None,
-) -> float:
-    """Volumetrische Netznutzung € aus Netzbezug × brutto-AP."""
-    if import_kwh <= 0.0 or ap_net_cent <= 0.0:
-        return 0.0
-    gross_cent = _netznutzung_ap_gross_cent(ap_net_cent, import_spec)
-    return float(import_kwh) * gross_cent / 100.0
+) -> list[_NetznutzungComponent]:
+    """Netzbezug je Slot × (zeitabhängiger) brutto-Arbeitspreis, gruppiert je Regel."""
+    if grid_fee is None or df.empty or "import_kwh" not in df.columns:
+        return []
+    from data.grid_fees import grid_fee_work_cent, matching_rule
+
+    kwh_by_key: dict[str, float] = {}
+    eur_by_key: dict[str, float] = {}
+    net_by_key: dict[str, float] = {}
+    labels: dict[str, str] = {"": "Basis"}
+    order: list[str] = [""]
+    for rule in grid_fee["rules"]:
+        labels[rule["id"]] = f"{rule['id']} ({rule['label']})"
+        order.append(rule["id"])
+    for ts, kwh in df["import_kwh"].fillna(0.0).items():
+        kwh = float(kwh)
+        if kwh <= 0.0:
+            continue
+        slot = pd.Timestamp(ts).to_pydatetime()
+        rule = matching_rule(grid_fee, slot)
+        key = rule["id"] if rule else ""
+        net = grid_fee_work_cent(grid_fee, slot)
+        gross = _netznutzung_ap_gross_cent(net, import_spec)
+        kwh_by_key[key] = kwh_by_key.get(key, 0.0) + kwh
+        eur_by_key[key] = eur_by_key.get(key, 0.0) + kwh * gross / 100.0
+        net_by_key[key] = net
+    return [
+        _NetznutzungComponent(labels[key], net_by_key[key], kwh_by_key[key], eur_by_key[key])
+        for key in order
+        if key in kwh_by_key
+    ]
 
 
 def _tariff_line(spec: dict | None, *, kind: str) -> str:
@@ -269,6 +300,8 @@ def _netznutzung_section_lines(
     ap_gross_cent: float,
     import_kwh_year: float,
     netznutzung_ap_eur: float,
+    components: list[_NetznutzungComponent],
+    skipped: list[dict],
     fees: ScenarioFeeBreakdown,
     month_count: int,
 ) -> list[str]:
@@ -278,18 +311,38 @@ def _netznutzung_section_lines(
         "",
         "| Position | Wert |",
         "| --- | ---: |",
-        f"| Arbeitspreis netto | {_fmt_cent(ap_net_cent)} Cent/kWh |",
-        f"| Arbeitspreis in k_act | {_fmt_cent(ap_gross_cent)} Cent/kWh |",
+        f"| Arbeitspreis netto (Basis) | {_fmt_cent(ap_net_cent)} Cent/kWh |",
+        f"| Arbeitspreis in k_act (Basis) | {_fmt_cent(ap_gross_cent)} Cent/kWh |",
         f"| Netzbezug | {_fmt_kwh(import_kwh_year)} |",
         f"| Arbeitspreis (Jahr) | {_fmt_eur(netznutzung_ap_eur)} |",
         f"| Grundpreis (Katalog-Stub) | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
         "",
-        "Arbeitspreis kommt aus dem Hausprofil (`netznutzung_arbeitspreis_cent_kwh`), "
-        "unabhängig vom Lieferantentarif. In der Jahressumme ist er aus dem "
-        "Energiebezug herausgerechnet (kein Doppelzählen). Leistungspreis und "
-        "netzgebietsspezifische Tabellen fehlen.",
-        "",
     ]
+    if len(components) > 1 or any(c.label != "Basis" for c in components):
+        lines.extend(
+            [
+                "| Arbeitspreis nach Zeitfenster | Netzbezug | Cent/kWh netto | Betrag |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        for comp in components:
+            lines.append(
+                f"| {comp.label} | {_fmt_kwh(comp.import_kwh)} | "
+                f"{_fmt_cent(comp.ap_net_cent)} | {_fmt_eur(comp.eur)} |"
+            )
+        lines.append("")
+    if skipped:
+        skipped_text = ", ".join(f"{item['id']} ({item['reason']})" for item in skipped)
+        lines.extend([f"Nicht berücksichtigte Regeln: {skipped_text}.", ""])
+    lines.extend(
+        [
+            "Der Arbeitspreis kommt aus dem Hausprofil (`netznutzung`) und dem "
+            "Netzentgelt-Katalog, unabhängig vom Lieferantentarif. In der "
+            "Jahressumme ist er aus dem Energiebezug herausgerechnet (kein "
+            "Doppelzählen). Leistungspreis fehlt.",
+            "",
+        ]
+    )
     return lines
 
 
@@ -300,7 +353,7 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
         "(aus Energiebezug herausgerechnet)."
         if has_netznutzung_ap
         else "- Volumetrische **Netznutzung Arbeitspreis**: am Hausprofil setzen "
-        "(`netznutzung_arbeitspreis_cent_kwh`); sonst 0."
+        "(`netznutzung`); sonst 0."
     )
     return [
         "## Hinweise",
@@ -346,6 +399,8 @@ class _InvoiceYearContext:
     ap_net_cent: float
     ap_gross_cent: float
     netznutzung_ap_eur: float
+    netznutzung_components: list[_NetznutzungComponent]
+    netznutzung_skipped: list[dict]
 
     @property
     def month_count(self) -> int:
@@ -358,7 +413,7 @@ def _build_invoice_year_context(
     fees: ScenarioFeeBreakdown,
     import_spec: dict | None,
     verbrauch_info_kwh: float | None,
-    netznutzung_arbeitspreis_cent_kwh: float,
+    grid_fee: dict | None,
 ) -> _InvoiceYearContext:
     """Monatsreihen plus Jahressummen, Netznutzungs-AP und Gesamtbetrag."""
     (
@@ -382,13 +437,12 @@ def _build_invoice_year_context(
     else:
         consumption_kwh_year = hourly_consumption_year
     total_year = import_year - export_year + fees.total_monthly_eur * month_count
-    ap_net = max(0.0, float(netznutzung_arbeitspreis_cent_kwh or 0.0))
-    ap_gross = _netznutzung_ap_gross_cent(ap_net, import_spec)
-    nne_eur = _netznutzung_ap_eur(
-        import_kwh=import_kwh_year,
-        ap_net_cent=ap_net,
-        import_spec=import_spec,
+    components = _netznutzung_components(
+        df, grid_fee=grid_fee, import_spec=import_spec
     )
+    ap_net = float(grid_fee["base_cent_kwh"]) if grid_fee else 0.0
+    ap_gross = _netznutzung_ap_gross_cent(ap_net, import_spec)
+    nne_eur = sum(comp.eur for comp in components)
     if nne_eur > import_year:
         nne_eur = import_year
     return _InvoiceYearContext(
@@ -408,6 +462,8 @@ def _build_invoice_year_context(
         ap_net_cent=ap_net,
         ap_gross_cent=ap_gross,
         netznutzung_ap_eur=nne_eur,
+        netznutzung_components=components,
+        netznutzung_skipped=list(grid_fee["skipped"]) if grid_fee else [],
     )
 
 
@@ -437,6 +493,8 @@ def _invoice_summary_lines(
                 ap_gross_cent=ctx.ap_gross_cent,
                 import_kwh_year=ctx.import_kwh_year,
                 netznutzung_ap_eur=ctx.netznutzung_ap_eur,
+                components=ctx.netznutzung_components,
+                skipped=ctx.netznutzung_skipped,
                 fees=fees,
                 month_count=ctx.month_count,
             )
@@ -504,22 +562,22 @@ def render_scenario_invoice_markdown(
     import_spec: dict | None,
     export_spec: dict | None,
     verbrauch_info_kwh: float | None = None,
-    netznutzung_arbeitspreis_cent_kwh: float = 0.0,
+    grid_fee: dict | None = None,
 ) -> str:
     """Build one German fake-Jahresrechnung markdown body.
 
     ``verbrauch_info_kwh`` should match SE Gesamtkosten Jahres Verbrauch when set;
     otherwise falls back to summing hourly ``consumption_kw`` (legacy).
 
-    ``netznutzung_arbeitspreis_cent_kwh`` is the house-profile net AP (Cent/kWh).
-    When > 0, Jahr splits Lieferant vs Netznutzung (same Gesamt; AP already in k_act).
+    ``grid_fee`` is the resolved house-profile grid-fee spec (``data.grid_fees``).
+    When set, Jahr splits Lieferant vs Netznutzung (same Gesamt; AP already in k_act).
     """
     ctx = _build_invoice_year_context(
         df,
         fees=fees,
         import_spec=import_spec,
         verbrauch_info_kwh=verbrauch_info_kwh,
-        netznutzung_arbeitspreis_cent_kwh=netznutzung_arbeitspreis_cent_kwh,
+        grid_fee=grid_fee,
     )
     lines = [
         f"# Fake-Jahresrechnung — {label}",
@@ -606,7 +664,7 @@ def write_se_invoices(
             import_spec=import_spec if isinstance(import_spec, dict) else None,
             export_spec=export_spec if isinstance(export_spec, dict) else None,
             verbrauch_info_kwh=verbrauch_info,
-            netznutzung_arbeitspreis_cent_kwh=_netznutzung_ap_net_cent(params),
+            grid_fee=_grid_fee_from_params(params),
         )
         path = os.path.join(
             invoice_dir, f"{_safe_filename(label)}_jahresrechnung.md"

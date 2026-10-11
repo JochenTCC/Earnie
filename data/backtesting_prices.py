@@ -232,9 +232,9 @@ def pricing_kwargs_from_resolved(resolved: dict | None) -> dict:
     if spec is None:
         return {}
     kwargs: dict = {"import_tariff_spec": spec}
-    override = resolved.get("netzentgelt_cent_kwh")
-    if override is not None:
-        kwargs["netzentgelt_override"] = float(override)
+    grid_fee = resolved.get("_grid_fee_spec")
+    if grid_fee is not None:
+        kwargs["grid_fee"] = grid_fee
     return kwargs
 
 
@@ -243,7 +243,7 @@ def import_brutto_cent_for_slots(
     slot_datetimes: list[datetime],
     *,
     import_tariff_spec: dict | None = None,
-    netzentgelt_override: float | None = None,
+    grid_fee: dict | None = None,
 ) -> list[float]:
     """EPEX Cent/kWh → Bezugspreis je Slot (Tarif-Spec oder Legacy-Brutto)."""
     from data.market_prices import hourly_settlement_epex_values
@@ -257,24 +257,14 @@ def import_brutto_cent_for_slots(
     _mtu = tariff_settlement_mtu(import_tariff_spec)
     if _mtu == SETTLEMENT_MTU_HOURLY:
         epex_values = hourly_settlement_epex_values(epex_values, slot_datetimes)
-    tariff_type = str(import_tariff_spec.get("type", "")).strip().lower()
-    if tariff_type == "monthly_table":
-        return [
-            import_cent_kwh(
-                float(p),
-                import_tariff_spec,
-                netzentgelt_override=netzentgelt_override,
-                slot_datetime=slot,
-            )
-            for p, slot in zip(epex_values, slot_datetimes)
-        ]
     return [
         import_cent_kwh(
             float(p),
             import_tariff_spec,
-            netzentgelt_override=netzentgelt_override,
+            grid_fee=grid_fee,
+            slot_datetime=slot,
         )
-        for p in epex_values
+        for p, slot in zip(epex_values, slot_datetimes)
     ]
 
 
@@ -283,7 +273,7 @@ def enrich_slots_import_prices(
     slot_datetimes: list[datetime],
     *,
     import_tariff_spec: dict | None = None,
-    netzentgelt_override: float | None = None,
+    grid_fee: dict | None = None,
 ) -> None:
     """Setzt k_act in resolve_market_slots-Ergebnissen aus Tarif-Spec."""
     epex_values = [float(slot["price_buy"]) for slot in slots]
@@ -291,7 +281,7 @@ def enrich_slots_import_prices(
         epex_values,
         slot_datetimes,
         import_tariff_spec=import_tariff_spec,
-        netzentgelt_override=netzentgelt_override,
+        grid_fee=grid_fee,
     )
     for slot, price in zip(slots, brutto):
         slot["k_act"] = price
@@ -304,7 +294,7 @@ def matrix_prices_from_context(
     *,
     planning_moment: datetime | None = None,
     import_tariff_spec: dict | None = None,
-    netzentgelt_override: float | None = None,
+    grid_fee: dict | None = None,
 ) -> tuple[list[float], list[float], list[str]]:
     """EPEX- und Brutto-Preise je Slot; bei ctx=None Perfect-Foresight aus CSV."""
 
@@ -313,7 +303,7 @@ def matrix_prices_from_context(
             epex_values,
             slot_datetimes,
             import_tariff_spec=import_tariff_spec,
-            netzentgelt_override=netzentgelt_override,
+            grid_fee=grid_fee,
         )
 
     if ctx is None:

@@ -240,24 +240,33 @@ def missing_next_month_tariff_hints(
 def _add_netzentgelt(
     work_price: float,
     *,
-    netzentgelt_override: float | None,
+    grid_fee: dict[str, Any] | None,
+    slot_datetime: datetime | None,
 ) -> float:
-    """Add volumetric Netznutzung Arbeitspreis (Cent/kWh) from house-profile settings."""
-    if netzentgelt_override is None:
+    """Add volumetric Netznutzung Arbeitspreis (Cent/kWh, netto) for the slot.
+
+    ``grid_fee`` is the resolved spec from ``data.grid_fees`` (base plus time rules).
+    """
+    if grid_fee is None:
         return float(work_price)
-    return float(work_price) + float(netzentgelt_override)
+    from data.grid_fees import grid_fee_work_cent
+
+    return float(work_price) + grid_fee_work_cent(grid_fee, slot_datetime)
 
 
 def _spot_import_cent(
     epex_cent: float,
     tariff: dict[str, Any],
     *,
-    netzentgelt_override: float | None,
+    grid_fee: dict[str, Any] | None,
+    slot_datetime: datetime | None,
 ) -> float:
     settlement = float(tariff.get("settlement_fee_cent_kwh", 0.0) or 0.0)
     markup = float(tariff.get("markup_percent", 0.0) or 0.0)
     work_price = (float(epex_cent) * (1.0 + markup / 100.0)) + settlement
-    work_price = _add_netzentgelt(work_price, netzentgelt_override=netzentgelt_override)
+    work_price = _add_netzentgelt(
+        work_price, grid_fee=grid_fee, slot_datetime=slot_datetime
+    )
     return _apply_vat(
         work_price,
         prices_include_vat=bool(tariff.get("prices_include_vat", True)),
@@ -269,10 +278,13 @@ def import_cent_kwh(
     epex_cent: float,
     tariff: dict[str, Any],
     *,
-    netzentgelt_override: float | None = None,
+    grid_fee: dict[str, Any] | None = None,
     slot_datetime: datetime | None = None,
 ) -> float:
-    """EPEX Cent/kWh → Bezugspreis Cent/kWh laut Tarif-Spec."""
+    """EPEX Cent/kWh → Bezugspreis Cent/kWh laut Tarif-Spec.
+
+    ``grid_fee`` (aufgelöste Netzentgelt-Spec) mit Zeitregeln erfordert ``slot_datetime``.
+    """
     tariff_type = str(tariff.get("type", "")).strip().lower()
     if tariff_type == IMPORT_MONTHLY:
         if slot_datetime is None:
@@ -286,7 +298,7 @@ def import_cent_kwh(
             slot_datetime.month,
             label="Import-Tarif",
         )
-        work = _add_netzentgelt(price, netzentgelt_override=netzentgelt_override)
+        work = _add_netzentgelt(price, grid_fee=grid_fee, slot_datetime=slot_datetime)
         return round(
             _apply_vat(
                 work,
@@ -300,7 +312,8 @@ def import_cent_kwh(
             _spot_import_cent(
                 epex_cent,
                 tariff,
-                netzentgelt_override=netzentgelt_override,
+                grid_fee=grid_fee,
+                slot_datetime=slot_datetime,
             ),
             4,
         )
@@ -308,7 +321,7 @@ def import_cent_kwh(
         if "fix_cent_kwh" not in tariff:
             raise ValueError("Import-Tarif type 'fixed_cent' erfordert fix_cent_kwh.")
         fixed = float(tariff["fix_cent_kwh"])
-        work = _add_netzentgelt(fixed, netzentgelt_override=netzentgelt_override)
+        work = _add_netzentgelt(fixed, grid_fee=grid_fee, slot_datetime=slot_datetime)
         return round(
             _apply_vat(
                 work,

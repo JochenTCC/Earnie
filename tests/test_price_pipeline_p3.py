@@ -103,11 +103,12 @@ def test_enrich_slots_import_prices_matches_matrix():
 
 def test_se_chart_strompreis_includes_netznutzung():
     """SE Chart 1 Preis is k_act; k_act already includes house-profile NNE AP."""
+    from data.grid_fees import flat_grid_fee_spec
     from optimizer.sim_chart_rows import _chart_price_fields
 
     resolved = {
         **_resolved_awattar(),
-        "netzentgelt_cent_kwh": 5.0,
+        "_grid_fee_spec": flat_grid_fee_spec(5.0),
     }
     slots = [datetime(2025, 6, 10, 12, 0)]
     epex = [10.0]
