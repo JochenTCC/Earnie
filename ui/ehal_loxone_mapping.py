@@ -28,7 +28,6 @@ from integrations.loxone_ehal_mapping import (
     TELEMETRY_REQUIRED,
     heuristic_propose,
 )
-from integrations.loxone_greenfield_import import probe_marker_names
 from integrations.loxone_structure import (
     SOURCE_HTTP_PROBE,
     scan_structure,
@@ -454,7 +453,7 @@ def configured_marker_names(house_doc: dict, profile_id: str) -> list[str]:
     return names
 
 
-# HTTP-Probe Mapping-Tabelle column order (uuid/room/category far right).
+# LoxAPP3-Probe Mapping-Tabelle column order (uuid/room/category far right).
 SCAN_ROW_KEYS: tuple[str, ...] = (
     "name",
     "ehal",

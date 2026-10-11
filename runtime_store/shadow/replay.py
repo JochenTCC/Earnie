@@ -123,15 +123,6 @@ def replay_loxone_io(key: str) -> str | None:
     return None
 
 
-def replay_loxone_io_all(key: str) -> dict | None:
-    """Replay ``loxone:io_all:*`` → LL dict or None."""
-    record = lookup_record(key)
-    if record is None or not record.get("ok"):
-        return None
-    payload = record.get("payload")
-    return payload if isinstance(payload, dict) else None
-
-
 def replay_ha_get(key: str) -> Any:
     """
     Replay ``ha:get:*``.

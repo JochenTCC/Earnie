@@ -133,7 +133,7 @@ def render_greenfield_import_section() -> None:
 
     st.subheader("Loxone-Import")
     st.caption(
-        "Liest `LoxAPP3.json`, prüft `Earnie_*` per HTTP-Probe "
+        "Liest `LoxAPP3.json`, prüft `Earnie_*` gegen LoxAPP3-Control-Namen "
         "(inkl. Prefix+Slug, z. B. `Earnie_Verbraucher_Waschmaschine_Leistung`), "
         "legt typisierte Verbraucher an und merged EFM-Zähler. "
         f"[Namenskonvention]({_SIGNALE_URL})."

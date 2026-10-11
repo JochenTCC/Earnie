@@ -38,7 +38,7 @@
       "field": "get_evcs_ready_by_time",
       "required": false,
       "kind": "input",
-      "notes": "Ready-by deadline: bind AlarmClock Bezeichnung (e.g. Ladewecker); prefer SpecialState10 (nextEntryTime) via /all; Tna text is backup."
+      "notes": "Ready-by deadline: VO push of qualified get_evcs_ready_by_time (Unix or Tna text). LoxAPP3 AlarmClock Bezeichnung is import-only."
     },
     {
       "field": "get_evcs_limit_soc",

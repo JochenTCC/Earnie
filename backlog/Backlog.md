@@ -22,6 +22,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Make a code review comparing EHAL field mapping / binding for Loxone and HA - search for similarities in different codes and search for duplications and potentials for reuse / unification
 - [ ] Remove any rollback legacy code from former chapters 
 - [ ] Make EHAL naming and documents as loxone agnostic as possible
+- **Note:** `/jdev/sps/io` Merker HTTP removed from production Python (VO push + LoxAPP3 presence) → [Erledigt](Backlog-Erledigt.md).
 
 
 - [ ] **2.7.l — Inverter entity (PV × battery topology)** (epic **Inverter**; EHAL/EHAL-Com doc draft: [`backlog/EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md))

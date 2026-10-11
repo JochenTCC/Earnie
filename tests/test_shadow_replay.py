@@ -8,12 +8,11 @@ from unittest.mock import MagicMock
 
 import pytest
 from integrations.ha_adapter import HaAdapter, HaConfig, HaHttpError
-from integrations.loxone_client import _fetch_loxone_io_all, fetch_loxone_raw_value
 from runtime_store.shadow import feed as shadow_feed
 from runtime_store.shadow import reader as shadow_reader
 from runtime_store.shadow import replay as shadow_replay
 from runtime_store.shadow.errors import ShadowBackendAccessError
-from runtime_store.shadow.replay import assert_not_shadow_backend
+from runtime_store.shadow.replay import assert_not_shadow_backend, replay_loxone_io
 
 
 @pytest.fixture(autouse=True)
@@ -82,28 +81,7 @@ def test_replay_loxone_io(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
-    assert fetch_loxone_raw_value("Soc") == "55.5"
-
-
-def test_replay_loxone_io_all(monkeypatch, tmp_path):
-    feed = tmp_path / "feed"
-    ll = {"SpecialState10": {"value": "1"}, "Code": "200"}
-    _write_feed(
-        feed,
-        {
-            "loxone:io_all:Clock": {
-                "key": "loxone:io_all:Clock",
-                "ts": _utc(),
-                "ok": True,
-                "status": 200,
-                "payload": ll,
-                "error": None,
-            }
-        },
-    )
-    monkeypatch.setenv("EARNIE_SHADOW", "1")
-    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
-    assert _fetch_loxone_io_all("Clock") == ll
+    assert replay_loxone_io("loxone:io:Soc") == "55.5"
 
 
 def test_replay_missing_loxone_returns_none(monkeypatch, tmp_path):
@@ -111,7 +89,7 @@ def test_replay_missing_loxone_returns_none(monkeypatch, tmp_path):
     _write_feed(feed, {})
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
-    assert fetch_loxone_raw_value("Missing") is None
+    assert replay_loxone_io("loxone:io:Missing") is None
 
 
 def test_replay_stale_treated_as_missing(monkeypatch, tmp_path):
@@ -134,7 +112,7 @@ def test_replay_stale_treated_as_missing(monkeypatch, tmp_path):
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
     monkeypatch.setenv("EARNIE_SHADOW_MAX_AGE_SEC", "60")
-    assert fetch_loxone_raw_value("Soc") is None
+    assert replay_loxone_io("loxone:io:Soc") is None
 
 
 def test_replay_keeps_cycle_fresh_when_heartbeat_advances(monkeypatch, tmp_path):
@@ -159,7 +137,7 @@ def test_replay_keeps_cycle_fresh_when_heartbeat_advances(monkeypatch, tmp_path)
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
     monkeypatch.setenv("EARNIE_SHADOW_MAX_AGE_SEC", "120")
-    assert fetch_loxone_raw_value("Earnie_Pool_Temp_Ist") == "37.5"
+    assert replay_loxone_io("loxone:io:Earnie_Pool_Temp_Ist") == "37.5"
 
 
 def test_replay_sampler_newer_than_cycle_stays_fresh(monkeypatch, tmp_path):
@@ -182,7 +160,7 @@ def test_replay_sampler_newer_than_cycle_stays_fresh(monkeypatch, tmp_path):
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
     monkeypatch.setenv("EARNIE_SHADOW_MAX_AGE_SEC", "120")
-    assert fetch_loxone_raw_value("Soc") == "55"
+    assert replay_loxone_io("loxone:io:Soc") == "55"
 
 
 def test_replay_ha_get(monkeypatch, tmp_path):
@@ -228,7 +206,7 @@ def test_assert_backend_blocked_in_shadow(monkeypatch):
         assert_not_shadow_backend("probe")
 
 
-def test_requests_not_called_for_loxone_replay(monkeypatch, tmp_path):
+def test_replay_loxone_io_reads_feed_without_network(monkeypatch, tmp_path):
     feed = tmp_path / "feed"
     _write_feed(
         feed,
@@ -245,7 +223,4 @@ def test_requests_not_called_for_loxone_replay(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
-    get = MagicMock(side_effect=AssertionError("network"))
-    monkeypatch.setattr("integrations.loxone_client.requests.get", get)
-    assert fetch_loxone_raw_value("X") == "1"
-    get.assert_not_called()
+    assert replay_loxone_io("loxone:io:X") == "1"

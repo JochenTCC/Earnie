@@ -40,13 +40,12 @@ def _check_sollstunden(consumer: dict) -> tuple[bool, str]:
     name = marker_get_filter_remaining_hours(consumer)
     if not name:
         return False, "get_filter_remaining_hours fehlt"
-    raw = loxone_client.fetch_loxone_raw_value(name)
     value = loxone_client.fetch_loxone_generic_value(name)
     if value is None:
-        return False, f"nicht lesbar (raw={raw!r})"
+        return False, "nicht lesbar (push inbox)"
     if value < 0:
-        return False, f"negativ: {value} (raw={raw!r})"
-    return True, f"{value:.4f} h (raw={raw!r})"
+        return False, f"negativ: {value}"
+    return True, f"{value:.4f} h"
 
 
 def _check_start_hour(consumer: dict) -> tuple[bool, str]:
@@ -67,25 +66,23 @@ def _check_duration(consumer: dict) -> tuple[bool, str]:
     name = marker_get_filter_native_duration_hours(consumer)
     if not name:
         return False, "get_filter_native_duration_hours fehlt"
-    raw = loxone_client.fetch_loxone_raw_value(name)
     value = loxone_client.fetch_loxone_generic_value(name)
     if value is None:
-        return False, f"nicht lesbar (raw={raw!r})"
+        return False, "nicht lesbar (push inbox)"
     if value <= 0:
-        return False, f"Dauer <= 0: {value} (raw={raw!r})"
-    return True, f"{value:.4f} h (raw={raw!r})"
+        return False, f"Dauer <= 0: {value}"
+    return True, f"{value:.4f} h"
 
 
 def _check_binary(label: str, io_name: str) -> tuple[bool, str]:
     if not io_name:
         return False, "Merkername fehlt"
-    raw = loxone_client.fetch_loxone_raw_value(io_name)
     value = loxone_client.fetch_loxone_generic_value(io_name)
     if value is None:
-        return False, f"nicht lesbar (raw={raw!r})"
+        return False, "nicht lesbar (push inbox)"
     if value not in (0.0, 1.0):
-        return False, f"erwartet 0/1, erhalten {value} (raw={raw!r})"
-    return True, f"{int(value)} (raw={raw!r})"
+        return False, f"erwartet 0/1, erhalten {value}"
+    return True, f"{int(value)}"
 
 
 def _native_window_summary(

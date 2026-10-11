@@ -45,14 +45,6 @@ def _loxone_auth() -> HTTPBasicAuth:
     return HTTPBasicAuth(config.get("LOXONE_USER"), config.get("LOXONE_PASS"))
 
 
-def _loxone_jdev_url(io_name: str) -> str:
-    return f"http://{config.get('LOXONE_IP')}/jdev/sps/io/{io_name}"
-
-
-def _loxone_jdev_all_url(io_name: str) -> str:
-    return f"http://{config.get('LOXONE_IP')}/jdev/sps/io/{io_name}/all"
-
-
 def _parse_loxone_value(raw_value: str) -> tuple[float, str | None]:
     """Parst Loxone-Werte wie '3.5 kW', '16 A' oder '16A' → (Zahl, Einheit|None)."""
     text = str(raw_value).strip().replace(",", ".")
@@ -132,122 +124,46 @@ def parse_filter_native_start_hour(
 def fetch_filter_native_start_hour(io_name: str) -> tuple[float | None, str, str | None]:
     """Liest und parst die native Filter-Start-Stunde live. Returns: (hour, format, raw).
 
-    Pushable bindings read the inbox only (no Merker poll fallback).
+    Push inbox only (no Merker poll). Unbound names → missing.
     """
     io_name = str(io_name or "").strip()
     if not io_name:
         return None, "missing", None
     try:
-        from ehal.loxone_push_source import resolve_push_binding
+        from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
+        from ehal.qualified_ids import field_kind
         from runtime_store.loxone_push_inbox import read_push_value
 
         binding = resolve_push_binding(io_name)
+        ehal_id = None
         if binding is not None:
-            value, state = read_push_value(binding.ehal_id)
-            if value is None:
-                logger.warning(
-                    "Loxone push: no filter start for '%s' (%s, state=%s)",
-                    io_name,
-                    binding.ehal_id,
-                    state,
-                )
-                return None, "missing", None
-            raw = str(int(value)) if float(value).is_integer() else str(value)
-            hour, fmt = parse_filter_native_start_hour(raw)
-            return hour, fmt, raw
+            ehal_id = binding.ehal_id
+        elif _looks_like_ehal_id(io_name) and is_pushable_kind(field_kind(io_name)):
+            ehal_id = io_name
+        if ehal_id is None:
+            logger.warning(
+                "Loxone push: filter start unbound '%s' (Merker poll removed)",
+                io_name,
+            )
+            return None, "missing", None
+        value, state = read_push_value(ehal_id)
+        if value is None:
+            logger.warning(
+                "Loxone push: no filter start for '%s' (%s, state=%s)",
+                io_name,
+                ehal_id,
+                state,
+            )
+            return None, "missing", None
+        raw = str(int(value)) if float(value).is_integer() else str(value)
+        hour, fmt = parse_filter_native_start_hour(raw)
+        return hour, fmt, raw
     except Exception:  # noqa: BLE001
         logger.exception(
-            "Loxone push filter start failed for '%s'; not falling back to poll",
+            "Loxone push filter start failed for '%s'; Merker poll removed",
             io_name,
         )
         return None, "missing", None
-
-    raw = fetch_loxone_raw_value(io_name)
-    if raw is None:
-        return None, "missing", None
-    hour, fmt = parse_filter_native_start_hour(raw)
-    return hour, fmt, raw
-
-
-def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
-    """GET ``/jdev/sps/io/<name>`` — Merker poll only.
-
-    Pushable ``sens_*`` / ``get_*`` telemetry must use ``fetch_loxone_generic_value``
-    (VO push inbox). Intentional remaining Merker polls: unbound / unindexed names
-    via that helper's fallback; greenfield / structure presence probes; shadow or
-    auth connectivity probes that are not optimizer telemetry. Writes use
-    ``_loxone_jdev_url`` (not this read). Meter energy ``/all`` and FertigUm
-    SpecialState10 are retired (Q6 / Q7).
-    """
-    io_name = str(io_name or "").strip()
-    if not io_name:
-        return None
-
-    feed_key = f"loxone:io:{io_name}"
-    from runtime_store.shadow.mode import is_shadow_mode
-
-    if is_shadow_mode():
-        from runtime_store.shadow.replay import replay_loxone_io
-
-        return replay_loxone_io(feed_key)
-
-    timeout_val = config.get_global_timeout(default=5)
-    try:
-        response = requests.get(
-            _loxone_jdev_url(io_name),
-            auth=_loxone_auth(),
-            timeout=timeout_val,
-        )
-        status = int(response.status_code)
-        raw_text = response.text
-        try:
-            payload = response.json()
-        except ValueError:
-            payload = raw_text
-        response.raise_for_status()
-        raw_value = (
-            payload.get("LL", {}).get("value", "")
-            if isinstance(payload, dict)
-            else ""
-        )
-        if raw_value is None or str(raw_value).strip() == "":
-            logger.warning("Loxone: Kein value für '%s'", io_name)
-            _shadow_record(feed_key, ok=False, payload=payload, status=status, error="empty value")
-            return None
-        _shadow_record(feed_key, ok=True, payload=payload, status=status)
-        return str(raw_value).strip()
-    except requests.exceptions.Timeout:
-        logger.error(
-            "Loxone: Timeout (%ss) beim Abrufen von '%s'", timeout_val, io_name
-        )
-        _shadow_record(feed_key, ok=False, error=f"timeout {timeout_val}s")
-    except requests.exceptions.RequestException as e:
-        from integrations.loxone_connectivity import record_loxone_auth_http_error
-
-        record_loxone_auth_http_error(e, source="loxone_client.read")
-        logger.error("Loxone: Netzwerkfehler bei '%s': %s", io_name, e)
-        status = getattr(getattr(e, "response", None), "status_code", None)
-        _shadow_record(feed_key, ok=False, status=status, error=str(e))
-    except (KeyError, TypeError) as e:
-        logger.error("Loxone: Antwort-Fehler bei '%s': %s", io_name, e)
-        _shadow_record(feed_key, ok=False, error=str(e))
-    return None
-
-
-def _shadow_record(
-    key: str,
-    *,
-    ok: bool,
-    payload: object = None,
-    status: int | None = None,
-    error: str | None = None,
-) -> None:
-    try:
-        from runtime_store.shadow.hooks import record_transport
-
-        record_transport(key, ok=ok, payload=payload, status=status, error=error)
-    except Exception:  # noqa: BLE001 — never break Loxone reads
-        pass
 
 
 # AlarmClock nextEntryTime (SpecialState10): seconds since 2009-01-01.
@@ -286,121 +202,6 @@ def format_ready_by_display(value: str | float) -> str:
         return text
     stamp = datetime.fromtimestamp(unix).strftime("%Y-%m-%d %H:%M:%S")
     return f"{stamp} (unix {int(unix)})"
-
-
-def _fetch_loxone_io_all(io_name: str) -> Optional[dict]:
-    """GET ``/jdev/sps/io/{name}/all`` → LL dict, or None on error / non-200."""
-    io_name = str(io_name or "").strip()
-    if not io_name:
-        return None
-
-    feed_key = f"loxone:io_all:{io_name}"
-    from runtime_store.shadow.mode import is_shadow_mode
-
-    if is_shadow_mode():
-        from runtime_store.shadow.replay import replay_loxone_io_all
-
-        return replay_loxone_io_all(feed_key)
-
-    timeout_val = config.get_global_timeout(default=5)
-    try:
-        response = requests.get(
-            _loxone_jdev_all_url(io_name),
-            auth=_loxone_auth(),
-            timeout=timeout_val,
-        )
-        status = int(response.status_code)
-        try:
-            body = response.json()
-        except ValueError:
-            body = response.text
-        response.raise_for_status()
-        ll = (body.get("LL") if isinstance(body, dict) else None) or {}
-        if not isinstance(ll, dict):
-            _shadow_record(feed_key, ok=False, payload=body, status=status, error="no LL")
-            return None
-        if str(ll.get("Code") or "") not in ("", "200"):
-            _shadow_record(
-                feed_key, ok=False, payload=ll, status=status, error=f"code {ll.get('Code')}"
-            )
-            return None
-        _shadow_record(feed_key, ok=True, payload=ll, status=status)
-        return ll
-    except requests.exceptions.Timeout:
-        logger.error(
-            "Loxone: Timeout (%ss) bei AlarmClock/all '%s'", timeout_val, io_name
-        )
-        _shadow_record(feed_key, ok=False, error=f"timeout {timeout_val}s")
-    except requests.exceptions.RequestException as e:
-        from integrations.loxone_connectivity import record_loxone_auth_http_error
-
-        record_loxone_auth_http_error(e, source="loxone_client.read_all")
-        logger.error("Loxone: Netzwerkfehler bei AlarmClock/all '%s': %s", io_name, e)
-        status = getattr(getattr(e, "response", None), "status_code", None)
-        _shadow_record(feed_key, ok=False, status=status, error=str(e))
-    except (KeyError, TypeError, ValueError) as e:
-        logger.error("Loxone: Antwort-Fehler bei AlarmClock/all '%s': %s", io_name, e)
-        _shadow_record(feed_key, ok=False, error=str(e))
-    return None
-
-
-def _alarm_clock_next_entry_unix(ll: dict) -> Optional[float]:
-    """SpecialState10 / nextEntryTime → Unix seconds, or None if unset."""
-    item = ll.get("SpecialState10")
-    if not isinstance(item, dict):
-        return None
-    raw = item.get("value")
-    if raw is None or str(raw).strip() == "":
-        return None
-    try:
-        lox_seconds = float(str(raw).strip().replace(",", "."))
-    except (TypeError, ValueError):
-        return None
-    return normalize_loxone_time_to_unix(lox_seconds)
-
-
-def _alarm_clock_tna_from_ll(ll: dict) -> Optional[str]:
-    """Backup: AlarmClock output Tna text (e.g. ``Morgen, 06:15``)."""
-    for item in ll.values():
-        if not isinstance(item, dict):
-            continue
-        if str(item.get("name") or "") != "Tna":
-            continue
-        raw = item.get("value")
-        if raw is None or str(raw).strip() == "":
-            return None
-        return str(raw).strip()
-    return None
-
-
-def fetch_loxone_alarm_clock_tna(io_name: str) -> Optional[str]:
-    """Backup path: AlarmClock Tna text via ``/all``.
-
-    Prefer ``fetch_loxone_ready_by_time`` (SpecialState10). Kept if Loxone
-    renames SpecialState indices; Tna remains the human-readable output.
-    """
-    ll = _fetch_loxone_io_all(io_name)
-    if not ll:
-        return None
-    return _alarm_clock_tna_from_ll(ll)
-
-
-def _legacy_ready_by_value(raw: str | float | None) -> str | float | None:
-    """Convert legacy Merker numeric Counter → Unix; leave text unchanged."""
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        text = raw.strip()
-        if not text:
-            return None
-        try:
-            as_num = float(text.replace(",", "."))
-        except ValueError:
-            return text
-        unix = normalize_loxone_time_to_unix(as_num)
-        return unix if unix is not None else text
-    unix = normalize_loxone_time_to_unix(float(raw))
-    return unix if unix is not None else raw
 
 
 def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
@@ -448,57 +249,52 @@ def _looks_like_ehal_id(name: str) -> bool:
 
 
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
-    """Holt einen numerischen Wert: push inbox for bound pushable fields, else Merker poll.
+    """Numeric live read from the VO push inbox only (no Merker poll).
 
-    Meter ``/all`` energy stays on poll (never calls this for energy IDs). FertigUm uses
-    ``fetch_loxone_ready_by_time``. Bound pushable fields never fall back to Merker HTTP.
-    Qualified/bare pushable EHAL IDs always use the inbox (even when the binding index
-    has no activation key — e.g. wiped ``ehal_bindings: {}`` after a bad sync).
-    Non-pushable EHAL IDs (``set_*``) stay unbound → ``None`` (no Merker poll).
-    ``io_name`` may be a Merker name or a qualified/bare EHAL ID.
+    FertigUm uses ``fetch_loxone_ready_by_time``. Qualified/bare pushable EHAL IDs
+    always use the inbox (even when the binding index has no activation key).
+    Non-pushable EHAL IDs (``set_*``) and unbound Merker names → ``None``.
+    ``io_name`` may be a Merker name (resolved via binding index) or a qualified/bare ID.
     """
     name = str(io_name or "").strip()
-    if name:
-        try:
-            from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
-            from ehal.qualified_ids import field_kind
-            from runtime_store.loxone_push_inbox import read_push_value
+    if not name:
+        return None
+    try:
+        from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
+        from ehal.qualified_ids import field_kind
+        from runtime_store.loxone_push_inbox import read_push_value
 
-            binding = resolve_push_binding(name)
-            if binding is not None:
-                value, state = read_push_value(binding.ehal_id)
+        binding = resolve_push_binding(name)
+        if binding is not None:
+            value, state = read_push_value(binding.ehal_id)
+            if value is None:
+                logger.warning(
+                    "Loxone push: no value for '%s' (%s, state=%s)",
+                    name,
+                    binding.ehal_id,
+                    state,
+                )
+            return value
+        if _looks_like_ehal_id(name):
+            if is_pushable_kind(field_kind(name)):
+                value, state = read_push_value(name)
                 if value is None:
                     logger.warning(
-                        "Loxone push: no value for '%s' (%s, state=%s)",
+                        "Loxone push: no value for unbound '%s' (state=%s)",
                         name,
-                        binding.ehal_id,
                         state,
                     )
                 return value
-            if _looks_like_ehal_id(name):
-                if is_pushable_kind(field_kind(name)):
-                    value, state = read_push_value(name)
-                    if value is None:
-                        logger.warning(
-                            "Loxone push: no value for unbound '%s' (state=%s)",
-                            name,
-                            state,
-                        )
-                    return value
-                return None
-        except Exception:  # noqa: BLE001 — do not fall back to poll for push bindings
-            logger.exception(
-                "Loxone push read failed for '%s'; not falling back to poll", name
-            )
             return None
-
-    raw_value = fetch_loxone_raw_value(io_name)
-    if raw_value is None:
+        logger.warning(
+            "Loxone push: unbound Merker '%s' (Merker poll removed)",
+            name,
+        )
         return None
-    try:
-        return _parse_loxone_numeric(raw_value)
-    except ValueError as e:
-        logger.error("Loxone: Parsing-Fehler bei '%s' (raw=%r): %s", io_name, raw_value, e)
+    except Exception:  # noqa: BLE001 — never fall back to Merker HTTP
+        logger.exception(
+            "Loxone push read failed for '%s'; Merker poll removed", name
+        )
         return None
 
 

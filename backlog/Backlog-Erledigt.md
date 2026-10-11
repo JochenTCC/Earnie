@@ -2,6 +2,25 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Remove remaining `/jdev/sps/io` Merker HTTP (2026-10-11)
+
+- [x] **No `/jdev/sps/io` in production Python** — inventory + removal after 2.7.o/q push-only
+  - Dead `/all` AlarmClock path removed (`_fetch_loxone_io_all`, Tna helpers)
+  - Live reads fail-closed on VO push inbox; shadow Loxone superset is a no-op
+  - Greenfield/structure/UI presence = LoxAPP3 control-name membership (no Merker ping)
+  - Deleted `fetch_loxone_raw_value` / `_loxone_jdev_url`; docs scrubbed (`loxone-anbindung`, `loxone-signals`, `ehal.md`)
+  - External HA→Loxone YAML examples in EcoFlow guide may still show Miniserver write URLs (not Earnie Core)
+
+### Bugfix — Q8 bare EHAL IDs Merker-polled (shadow feed 404) (2026-10-11)
+
+- [x] **debug_dump_20261011_064913 — charge limits + Loxone 404 on bare EHAL IDs**
+  - Symptom: “Falsche Interpretation der Lade-Limits”; earnie.log 404 on `/jdev/sps/io/sens_ess_power` (and other bare `sens_ess_*` / `set_ess_*`).
+  - Units: Loxone hub must send **kW** (5, not 5000 W). Live-Lesen/Schreiben 5 kW ↔ 5000 W OK after operator Merker fix (not a leftover Earnie `*1000`).
+  - 404 cause: Q8 empty-Merker → `LOXONE_*` = bare EHAL IDs; with **`shadow_feed_enabled: true`** (not Shadow Mode) after-cycle `superset` Merker-polled them. Earlier VO-title poll fix did not cover EHAL activation IDs.
+  - Fix: skip EHAL exchange IDs in `_superset_loxone`; refuse them in `fetch_loxone_raw_value`.
+  - Tests: `test_superset_loxone_skips_q8_ehal_activation_ids`, `test_fetch_loxone_raw_value_refuses_ehal_exchange_ids`
+  - Verified on NAS productive (operator, 2026-10-11)
+
 ### Bugfix — Q8 empty grid bindings → Live-Lesen Merker-Poll (2026-10-10)
 
 - [x] **EHAL binding mismatch** — `grid.meter.sens_grid_power_active` / `get_grid_export_power_limit` showed `Kein Push-Inbox-Wert (Merker-Poll entfernt)` while empty plant activation and energy counters worked

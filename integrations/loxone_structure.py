@@ -1,7 +1,7 @@
 """Miniserver structure scan for Loxone → EHAL mapping (2.4.f / 2.4.n).
 
-Research mode (default): LoxAPP3 + HTTP marker probe (known Earnie_* / configured
-names via ``/jdev/sps/io``) + optional MCP 17.1, then compare results.
+Research mode (default): LoxAPP3 + candidate-name presence against LoxAPP3
+(source id ``http_probe``) + optional MCP 17.1, then compare results.
 A single preferred source may be selected later once lab data decides the winner.
 """
 from __future__ import annotations
@@ -285,7 +285,7 @@ def _http_probe_candidate_names(
         for name in device_map_marker_names(load_device_map()):
             _add(name)
     except (OSError, ValueError, FileNotFoundError) as exc:
-        logger.info("HTTP probe: device map unavailable: %s", exc)
+        logger.info("LoxAPP3 probe: device map unavailable: %s", exc)
     for raw in configured_names or []:
         _add(str(raw))
     for raw in extra_names or []:
@@ -300,11 +300,12 @@ def probe_http_markers(
     password: str,
     configured_names: list[str] | None = None,
     extra_names: list[str] | None = None,
-    timeout_sec: float = 5.0,
+    timeout_sec: float = 15.0,
+    loxapp3_doc: dict[str, Any] | None = None,
 ) -> StructureScanResult:
-    """Probe known Merker names via /jdev/sps/io (200/403 = present, 404 = missing).
+    """Classify known Merker names against LoxAPP3 control names (no Merker HTTP).
 
-    Intentional Merker poll — import/structure only; not the Loud optimizer path (Q8).
+    Source id stays ``http_probe`` for UI compare; presence is LoxAPP3 membership.
     """
     from integrations.loxone_greenfield_import import probe_marker_names
 
@@ -314,17 +315,18 @@ def probe_http_markers(
             source=SOURCE_HTTP_PROBE,
             structure_complete=False,
             skipped=True,
-            errors=["HTTP probe: no device-map or configured names to probe"],
+            errors=["LoxAPP3 probe: no device-map or configured names to probe"],
         )
     try:
         result = probe_marker_names(
             names,
+            loxapp3_doc=loxapp3_doc,
             host=host,
             username=username,
             password=password,
             timeout_sec=timeout_sec,
         )
-    except ValueError as exc:
+    except (ValueError, LoxoneStructureError) as exc:
         return StructureScanResult(
             source=SOURCE_HTTP_PROBE,
             structure_complete=False,
@@ -339,10 +341,10 @@ def probe_http_markers(
         sample = ", ".join(sorted(result.missing)[:8])
         more = len(result.missing) - min(8, len(result.missing))
         suffix = f" (+{more})" if more else ""
-        errors.append(f"HTTP probe missing (404): {sample}{suffix}")
+        errors.append(f"LoxAPP3 missing: {sample}{suffix}")
     if result.errors:
         errors.append(
-            "HTTP probe errors: " + ", ".join(sorted(result.errors)[:6])
+            "LoxAPP3 probe errors: " + ", ".join(sorted(result.errors)[:6])
         )
     return StructureScanResult(
         source=SOURCE_HTTP_PROBE,
@@ -365,22 +367,38 @@ def scan_structure(
 ) -> StructureCompareResult:
     """Probe structure sources and return a comparison (default: all variants).
 
-    Default variants: LoxAPP3.json, HTTP probe of known greenfield / configured
-    Merker names, and optional MCP 17.1. ``selected_source`` only affects which
-    item set feeds mapping dropdowns (``union`` = merge all names).
+    Default variants: LoxAPP3.json, candidate presence against that file
+    (source id ``http_probe``), and optional MCP 17.1. ``selected_source`` only
+    affects which item set feeds mapping dropdowns (``union`` = merge all names).
     """
     wanted = tuple(sources) if sources is not None else ALL_SOURCES
     variants: list[StructureScanResult] = []
+    loxapp3_doc: dict[str, Any] | None = None
 
     if SOURCE_LOXAPP3 in wanted:
-        variants.append(
-            _safe_loxapp3(
+        try:
+            loxapp3_doc = fetch_loxapp3_json(
                 host=host,
                 username=username,
                 password=password,
                 timeout_sec=timeout_sec,
             )
-        )
+            variants.append(
+                StructureScanResult(
+                    source=SOURCE_LOXAPP3,
+                    structure_complete=True,
+                    items=normalize_loxapp3(loxapp3_doc),
+                )
+            )
+        except LoxoneStructureError as exc:
+            logger.info("LoxAPP3 scan failed: %s", exc)
+            variants.append(
+                StructureScanResult(
+                    source=SOURCE_LOXAPP3,
+                    structure_complete=False,
+                    errors=[str(exc)],
+                )
+            )
 
     if SOURCE_HTTP_PROBE in wanted:
         loxapp3_for_probe = next(
@@ -399,7 +417,8 @@ def scan_structure(
                 password=password,
                 configured_names=configured_names or [],
                 extra_names=earnie_from_loxapp3,
-                timeout_sec=min(timeout_sec, 5.0),
+                timeout_sec=timeout_sec,
+                loxapp3_doc=loxapp3_doc,
             )
         )
 

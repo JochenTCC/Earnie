@@ -363,9 +363,9 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 ## Implementation notes — Loxone one-click mapping
 
 - Onboarding helper **inside** the Loxone-EHAL path — not a live I/O replacement.
-- Structure scan (`integrations/loxone_structure.py`): supports **compare-all** (LoxAPP3 + HTTP-Probe + optional **MCP 17.1**) for lab/compare; MCP helpers remain in `integrations/` for later re-integration.
-- **EHAL-Com UI:** mapping names come from **HTTP-Probe only** (`sources=(http_probe,)`). MCP URL input, Ollama button, Quellenvergleich, and source picker are not in the shipping UI.
-- **Greenfield HTTP marker probe:** `integrations/loxone_greenfield_import.probe_marker_names` hits known `greenfield_device_map.json` names via `/jdev/sps/io/{name}`. `LL.Code` `200` or `403` = present; `404` = missing. Union with LoxAPP3 names for typed Merker match. EFM meters still need LoxAPP3.
+- Structure scan (`integrations/loxone_structure.py`): supports **compare-all** (LoxAPP3 + candidate presence against LoxAPP3, source id `http_probe`, + optional **MCP 17.1**) for lab/compare; MCP helpers remain in `integrations/` for later re-integration.
+- **EHAL-Com UI:** mapping names come from the LoxAPP3-presence variant (`sources=(http_probe,)`). MCP URL input, Ollama button, Quellenvergleich, and source picker are not in the shipping UI.
+- **Greenfield presence probe:** `integrations/loxone_greenfield_import.probe_marker_names` classifies known `greenfield_device_map.json` names against LoxAPP3 control names (no Merker HTTP). EFM meters still need LoxAPP3.
 - HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Heuristic proposals + manual selects; confirm writes `plant` / `consumers[].ehal_bindings` via house profiles and ESS via `batteries[].ehal_bindings` on `components.json`. Field rows grouped by device role.
 - Optional LLM (code retained, **not** exposed in UI): local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP.
 - EFM interpretation C (meter tree → Hausprofil consumers + optional flex power): research note `[efm-auto-sync-2.4.l.md](efm-auto-sync-2.4.l.md)`; library `integrations/loxone_efm_meters.py` via greenfield `merge_efm` (Smarthome-Backend Loxone-Import).

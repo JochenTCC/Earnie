@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import patch
-
 import pytest
 
 from ehal import loxone_push_source as src
@@ -144,14 +142,12 @@ def test_fetch_uses_push_for_all_indexed(
         "get_ehal_index",
         lambda: src.build_ehal_index(HOUSE, COMPONENTS),
     )
-    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        assert loxone_client.fetch_loxone_generic_value("Earnie_Trockner") == pytest.approx(
-            1.5
-        )
-        assert loxone_client.fetch_loxone_generic_value("Earnie_Netz") == pytest.approx(
-            2.25
-        )
-        raw.assert_not_called()
+    assert loxone_client.fetch_loxone_generic_value("Earnie_Trockner") == pytest.approx(
+        1.5
+    )
+    assert loxone_client.fetch_loxone_generic_value("Earnie_Netz") == pytest.approx(
+        2.25
+    )
 
 
 def test_fetch_by_ehal_id_without_merker(
@@ -165,11 +161,9 @@ def test_fetch_by_ehal_id_without_merker(
     house = {"plant": {"ehal_bindings": {"sens_grid_power_active": ""}}, "profiles": {}}
     monkeypatch.setattr(src, "get_merker_index", lambda: src.build_merker_index(house, {}))
     monkeypatch.setattr(src, "get_ehal_index", lambda: src.build_ehal_index(house, {}))
-    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        assert loxone_client.fetch_loxone_generic_value(
-            "grid.meter.sens_grid_power_active"
-        ) == pytest.approx(3.0)
-        raw.assert_not_called()
+    assert loxone_client.fetch_loxone_generic_value(
+        "grid.meter.sens_grid_power_active"
+    ) == pytest.approx(3.0)
 
 
 def test_fetch_pushable_qid_reads_inbox_when_binding_index_empty(
@@ -184,9 +178,7 @@ def test_fetch_pushable_qid_reads_inbox_when_binding_index_empty(
     inbox.record_push(qid, "36.0", now=now)
     monkeypatch.setattr(src, "get_merker_index", lambda: {})
     monkeypatch.setattr(src, "get_ehal_index", lambda: {})
-    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        assert loxone_client.fetch_loxone_generic_value(qid) == pytest.approx(36.0)
-        raw.assert_not_called()
+    assert loxone_client.fetch_loxone_generic_value(qid) == pytest.approx(36.0)
 
 
 def test_fetch_setpoint_qid_without_binding_stays_none(
@@ -196,14 +188,12 @@ def test_fetch_setpoint_qid_without_binding_stays_none(
     inbox.reset_memory_for_tests()
     monkeypatch.setattr(src, "get_merker_index", lambda: {})
     monkeypatch.setattr(src, "get_ehal_index", lambda: {})
-    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        assert (
-            loxone_client.fetch_loxone_generic_value(
-                "ess.15_kwh_speicher.set_ess_mode"
-            )
-            is None
+    assert (
+        loxone_client.fetch_loxone_generic_value(
+            "ess.15_kwh_speicher.set_ess_mode"
         )
-        raw.assert_not_called()
+        is None
+    )
 
 
 def test_ready_by_time_uses_push_numeric(
@@ -224,10 +214,8 @@ def test_ready_by_time_uses_push_numeric(
         "get_ehal_index",
         lambda: src.build_ehal_index(HOUSE, COMPONENTS),
     )
-    with patch.object(loxone_client, "_fetch_loxone_io_all") as poll_all:
-        got = loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig")
-        assert got == pytest.approx(1735689600.0)
-        poll_all.assert_not_called()
+    got = loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig")
+    assert got == pytest.approx(1735689600.0)
 
 
 def test_ready_by_time_push_text_reaches_wecker_parser(
@@ -249,10 +237,8 @@ def test_ready_by_time_push_text_reaches_wecker_parser(
         "get_ehal_index",
         lambda: src.build_ehal_index(HOUSE, COMPONENTS),
     )
-    with patch.object(loxone_client, "_fetch_loxone_io_all") as poll_all:
-        raw = loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig")
-        assert raw == "Morgen, 07:00"
-        poll_all.assert_not_called()
+    raw = loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig")
+    assert raw == "Morgen, 07:00"
     from_dt = datetime(2026, 10, 8, 12, 0, 0)
     assert cs.parse_loxone_ready_by_time(raw, from_dt) == datetime(2026, 10, 9, 7, 0, 0)
 
@@ -277,14 +263,12 @@ def test_ev_nominal_and_capacity_use_inbox_not_merker(
         lambda: src.build_ehal_index(HOUSE, COMPONENTS),
     )
     consumer = HOUSE["profiles"]["live"]["consumers"][1]
-    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        assert loxone_client.resolve_consumer_nominal_power_kw(consumer) == pytest.approx(
-            11.04
-        )
-        assert loxone_client.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(
-            77.0
-        )
-        raw.assert_not_called()
+    assert loxone_client.resolve_consumer_nominal_power_kw(consumer) == pytest.approx(
+        11.04
+    )
+    assert loxone_client.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(
+        77.0
+    )
 
 
 def test_ready_by_time_no_poll_fallback_when_bound(
@@ -302,9 +286,4 @@ def test_ready_by_time_no_poll_fallback_when_bound(
         "get_ehal_index",
         lambda: src.build_ehal_index(HOUSE, COMPONENTS),
     )
-    with patch.object(loxone_client, "_fetch_loxone_io_all") as poll_all, patch.object(
-        loxone_client, "fetch_loxone_raw_value"
-    ) as raw:
-        assert loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig") is None
-        poll_all.assert_not_called()
-        raw.assert_not_called()
+    assert loxone_client.fetch_loxone_ready_by_time("Earnie_Fertig") is None

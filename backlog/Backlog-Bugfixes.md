@@ -33,7 +33,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] Earnie logo disappeared in Sidebar - check why and repair that  
 - [ ] Don't show "main.py nicht aktiv" on Monitor page while main.py is running and currently optimizing
+- [ ] Remove any backlog chapter related references in earnie logs (e.g. "(main:382) - 2.7.h standby_backup plans: ")
 
 - [ ] EcoFlow Delta 3 bridge: Miniserver self-write of a Virtual Input is overwritten by HA (2026-10-07, not analysed yet)
   - Setup: the Miniserver writes its own Virtual Input via a Virtual Output command (`/dev/sps/io/<Input>/\v`, device = the Miniserver itself), e.g. bypass state (`Delta3_Grid_ByPass`) and charge limit (`Delta3_P_ChargeLimit`). HA mirrors these inputs through the Loxone integration (PyLoxone) and drives the EcoFlow entities from automations (`docs/einrichtung/ecoflow-delta3-loxone.md`, steps 5/6).

@@ -260,39 +260,22 @@ def test_exact_plant_case_insensitive():
     assert plant.bindings["set_ess_mode"] == ''
 
 
-def test_probe_marker_names_treats_403_as_present(monkeypatch):
-    calls: list[str] = []
-
-    class _Resp:
-        def __init__(self, code: str, http: int = 200):
-            self.status_code = http
-            self.content = b"{}"
-            self._code = code
-
-        def json(self):
-            return {"LL": {"Code": self._code, "value": ""}}
-
-    def fake_get(url, auth=None, timeout=5.0):
-        calls.append(url)
-        if "DOES_NOT" in url:
-            return _Resp("404", 404)
-        if "Earnie_Heartbeat" in url:
-            return _Resp("403")
-        return _Resp("200")
-
-    monkeypatch.setattr(
-        "integrations.loxone_greenfield_import.requests.get", fake_get
-    )
+def test_probe_marker_names_uses_loxapp3_control_names():
+    doc = {
+        "controls": {
+            "1": {"name": "Earnie_Heartbeat"},
+            "2": {"name": "Earnie_Waermepumpe_Freigabe"},
+        }
+    }
     result = probe_marker_names(
         ["Earnie_Heartbeat", "Earnie_Waermepumpe_Freigabe", "DOES_NOT"],
-        host="192.0.2.1",
-        username="u",
-        password="p",
+        loxapp3_doc=doc,
     )
     assert "Earnie_Heartbeat" in result.present
     assert "Earnie_Waermepumpe_Freigabe" in result.present
     assert "DOES_NOT" in result.missing
-    assert len(calls) == 3
+    assert result.codes["Earnie_Heartbeat"] == "loxapp3"
+    assert result.codes["DOES_NOT"] == "missing"
 
 
 def test_run_import_creates_typed_and_efm_consumers():

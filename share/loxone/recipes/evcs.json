@@ -43,7 +43,7 @@
       "ehal_field": "get_evcs_ready_by_time",
       "loxone_blocks_key": "ehal_bindings.get_evcs_ready_by_time",
       "suggested_name": "Ladewecker",
-      "notes": "LoxAPP3 AlarmClock Bezeichnung; import merges onto EV with Zähler/power. Earnie reads SpecialState10 via /jdev/sps/io/{name}/all (Tna backup)."
+      "notes": "LoxAPP3 AlarmClock Bezeichnung; import merges onto EV with Zähler/power. Earnie reads ready-by via VO push (qualified get_evcs_ready_by_time)."
     },
     {
       "ehal_field": "set_evcs_max_current",

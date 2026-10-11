@@ -43,12 +43,6 @@ def fetch_filter_native_start_hour(io_name: str):
     return lc.fetch_filter_native_start_hour(io_name)
 
 
-def fetch_loxone_raw_value(io_name: str):
-    from integrations import loxone_client as lc
-
-    return lc.fetch_loxone_raw_value(io_name)
-
-
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
     """Nennleistung (kW) aus live ``get_evcs_nominal_current`` (A) via push inbox."""
     fallback = float(consumer.get("nominal_power_kw", 0.0) or 0.0)

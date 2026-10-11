@@ -162,7 +162,7 @@ Earnie Core stays unchanged on the Miniserver IOs; the fallback is **only** Conf
 Prerequisite: Earnie templates are installed in Loxone Config and each consumer has a meter block (EFM); credentials are entered on **Smarthome-Backend → Anbindung**. The import button only becomes active once the Miniserver is reachable.
 
 1. **Daemon Control → Smarthome-Backend**: once Loxone is connected, the **Loxone Import** section appears below the connection summary — on first setup, **No — continue manually** is shown on the same row as the import button.
-2. Earnie loads `LoxAPP3.json`, probes `Earnie_*` via HTTP (also prefix+slug, case-insensitive), creates typed entities, and binds in EFM meters.
+2. Earnie loads `LoxAPP3.json`, classifies `Earnie_*` against LoxAPP3 control names (also prefix+slug, case-insensitive), creates typed entities, and binds in EFM meters.
 3. Check the signal mapping on **EHAL-Com** ([Loxone Structure → EHAL Mapping](../ui/ehal-com.md#loxone-structure--ehal-mapping)); follow up on parameters (kWh, schedules, living area, …) in the **House Configurator**.
 
 ### Library Checklist
@@ -177,19 +177,11 @@ Prerequisite: Earnie templates are installed in Loxone Config and each consumer 
 
 ---
 
-## HTTP Marker Probe (for Binding and Import)
+## Presence check (for Binding and Import)
 
-The template Cmd titles are **known** (`greenfield_device_map.json`). Earnie can check them via `GET /jdev/sps/io/{Name}` **without** the blocks needing to be present in the Loxone app visualization:
+The template Cmd titles are **known** (`greenfield_device_map.json`). Earnie classifies them against **LoxAPP3 control names** (`GET /data/LoxAPP3.json`): present if the Bezeichnung appears in `controls`, otherwise missing. Titles that are not visible in the Loxone app (and thus absent from LoxAPP3) are not detected here — Binding **P4** discovery inbox covers unknown push IDs later.
 
-
-| `LL.Code` | Meaning for the import                                                                                    |
-| --------- | ----------------------------------------------------------------------------------------------------------- |
-| `200`     | name present and readable                                                                                    |
-| `403`     | name known on the Miniserver, not readable for the user (common with Virtual HTTP In) — counts as **present** |
-| `404`     | name unknown / not uploaded                                                                                   |
-
-
-Default import: LoxAPP3 names **union** probe hits. EFM meters still come from `LoxAPP3.json`.
+Default import uses LoxAPP3 names. EFM meters still come from `LoxAPP3.json`.
 
 ## Multiple Flex Consumers (Naming Convention)
 

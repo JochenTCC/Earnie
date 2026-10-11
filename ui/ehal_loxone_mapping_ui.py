@@ -97,7 +97,7 @@ def render_ehal_loxone_mapping_section() -> None:
         "(`plant` / `consumers[].ehal_bindings`). "
         "Außerplanmäßige Optimierung: Loxone VO `Earnie_Request_Optimize` "
         "(Daemon-HTTP, Port `system.ehal_loxone_http_port`, Standard 8541). "
-        "Struktur-Scan: HTTP-Probe bekannter Earnie_*/gemappter Merker; "
+        "Struktur-Scan: LoxAPP3-Probe bekannter Earnie_*/gemappter Merker; "
         "in jedem Feld-Dropdown einen neuen Merker eintippen (mit Bestätigung)."
     )
     if is_shadow_mode():
@@ -143,8 +143,8 @@ def render_ehal_loxone_mapping_section() -> None:
         )
 
 def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]]:
-    """Scan via HTTP-Probe only (MCP / Ollama / Quellenvergleich UI removed; code kept in integrations)."""
-    if st.button("HTTP-Probe", key="ehal_lox_scan_btn"):
+    """Scan via LoxAPP3 name presence (MCP / Ollama / Quellenvergleich UI removed; code kept)."""
+    if st.button("LoxAPP3-Probe", key="ehal_lox_scan_btn"):
         configured = configured_marker_names(house, profile_id) + session_manual_marker_names()
         _run_structure_scan(configured, house, profile_id)
     rows: list[dict[str, Any]] = list(st.session_state.get(_SESSION_SCAN) or [])
@@ -152,7 +152,7 @@ def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]
         # Re-resolve ehal so Mapping-Tabelle tracks house bindings after save.
         rows = enrich_structure_scan_rows(rows, house, profile_id)
         st.session_state[_SESSION_SCAN] = rows
-        st.caption(f"{len(rows)} Namen für Mapping (HTTP-Probe)")
+        st.caption(f"{len(rows)} Namen für Mapping (LoxAPP3-Probe)")
         st.dataframe(rows[:40], width="stretch", hide_index=True)
         if len(rows) > 40:
             st.caption(f"... und {len(rows) - 40} weitere.")
@@ -162,14 +162,14 @@ def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]
     return rows
 
 def _manual_add_probe_caption(name: str) -> str:
-    """Non-blocking HTTP presence check after manual add; always keeps the name in the list."""
+    """Non-blocking LoxAPP3 presence check after manual add; always keeps the name in the list."""
     host = str(config.get("LOXONE_IP") or "")
     username = str(config.get("LOXONE_USER") or "")
     password = str(config.get("LOXONE_PASS") or "")
     if not host.strip() or not username.strip():
         return (
             f"`{name}` gespeichert und zugeordnet "
-            "(keine Loxone-Zugangsdaten — HTTP-Probe übersprungen)."
+            "(keine Loxone-Zugangsdaten — LoxAPP3-Probe übersprungen)."
         )
     try:
         result = probe_marker_names(
@@ -177,16 +177,19 @@ def _manual_add_probe_caption(name: str) -> str:
             host=host,
             username=username,
             password=password,
-            timeout_sec=5.0,
+            timeout_sec=15.0,
         )
-    except ValueError as exc:
-        return f"`{name}` gespeichert und zugeordnet (Probe fehlgeschlagen: {exc})."
+    except Exception as exc:  # noqa: BLE001 — caption only
+        return f"`{name}` gespeichert und zugeordnet (LoxAPP3-Probe fehlgeschlagen: {exc})."
     if name in result.present:
-        return f"`{name}` gespeichert und zugeordnet — HTTP-Probe: auf dem Miniserver vorhanden."
+        return (
+            f"`{name}` gespeichert und zugeordnet — "
+            "in LoxAPP3 als Control-Name gefunden."
+        )
     if name in result.missing:
         return (
-            f"`{name}` gespeichert und zugeordnet — HTTP-Probe: 404 (fehlt noch); "
-            "Mapping trotzdem aktiv."
+            f"`{name}` gespeichert und zugeordnet — "
+            "nicht in LoxAPP3 sichtbar; Mapping trotzdem aktiv."
         )
     return f"`{name}` gespeichert und zugeordnet (Probe ohne eindeutigen Status)."
 
@@ -264,7 +267,7 @@ def _render_entity_picker(entities: list[dict[str, Any]]) -> dict[str, Any]:
     return next(row for row in entities if row["id"] == entity_id)
 
 def _run_structure_scan(configured: list[str], house: dict, profile_id: str) -> None:
-    """HTTP-Probe only for mapping names. MCP/Ollama remain in integrations for later re-use."""
+    """LoxAPP3 presence scan for mapping names. MCP/Ollama remain in integrations for later re-use."""
     st.session_state.pop(_SESSION_PROPOSALS, None)
     result = scan_structure(
         host=str(config.get("LOXONE_IP") or ""),

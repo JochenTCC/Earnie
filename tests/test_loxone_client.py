@@ -81,131 +81,11 @@ def _mock_http_response(*, json_data: dict | None = None, status_ok: bool = True
     return response
 
 
-class TestFetchLoxoneRawValue:
-    def test_success_returns_trimmed_string(self):
-        response = _mock_http_response(json_data={"LL": {"value": "  3.5 kW  "}})
-        with patch.object(lc.requests, "get", return_value=response) as mock_get, patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_IP": "192.168.1.1",
-                "LOXONE_USER": "user",
-                "LOXONE_PASS": "pass",
-            }.get(name, kw.get("default", 5))
-        ):
-            result = lc.fetch_loxone_raw_value("Earnie_SOC")
-
-        assert result == "3.5 kW"
-        mock_get.assert_called_once()
-        assert mock_get.call_args.kwargs["auth"].username == "user"
-        assert "jdev/sps/io/Earnie_SOC" in mock_get.call_args.args[0]
-
-    def test_jdev_url_includes_optional_port(self):
-        with patch.object(
-            lc.config,
-            "get",
-            side_effect=lambda name, **kw: {
-                "LOXONE_IP": "192.168.1.1:85",
-            }.get(name, kw.get("default")),
-        ):
-            assert lc._loxone_jdev_url("Earnie_SOC") == (
-                "http://192.168.1.1:85/jdev/sps/io/Earnie_SOC"
-            )
-
-    def test_empty_io_name_returns_none(self):
-        assert lc.fetch_loxone_raw_value("") is None
-        assert lc.fetch_loxone_raw_value(None) is None
-
-    def test_missing_value_in_response_returns_none(self):
-        response = _mock_http_response(json_data={"LL": {"value": ""}})
-        with patch.object(lc.requests, "get", return_value=response), patch.object(
-            lc.config, "get", return_value="x"
-        ):
-            assert lc.fetch_loxone_raw_value("Missing") is None
-
-    def test_timeout_returns_none(self):
-        with patch.object(
-            lc.requests, "get", side_effect=requests.exceptions.Timeout()
-        ), patch.object(lc.config, "get", return_value=5):
-            assert lc.fetch_loxone_raw_value("Timeout_IO") is None
-
-    def test_network_error_returns_none(self):
-        with patch.object(
-            lc.requests, "get", side_effect=requests.exceptions.ConnectionError("offline")
-        ), patch.object(lc.config, "get", return_value=5):
-            assert lc.fetch_loxone_raw_value("Net_IO") is None
-
-    def test_http_403_records_auth_error_and_returns_none(self, tmp_path, monkeypatch):
-        from runtime_store.loxone_auth_error import load_loxone_auth_error
-
-        monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
-        response = MagicMock()
-        response.status_code = 403
-        http_error = requests.HTTPError("403 Client Error")
-        http_error.response = response
-        response.raise_for_status.side_effect = http_error
-
-        with patch.object(lc.requests, "get", return_value=response), patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_IP": "192.168.1.1",
-                "LOXONE_USER": "user",
-                "LOXONE_PASS": "pass",
-            }.get(name, kw.get("default", 5))
-        ):
-            assert lc.fetch_loxone_raw_value("Earnie_SOC") is None
-
-        loaded = load_loxone_auth_error()
-        assert loaded is not None
-        assert loaded["http_status"] == 403
-
-
-def _alarm_clock_all_payload(*, tna="Morgen, 11:00", special10=555135300.0):
-    ll = {
-        "Code": "200",
-        "control": "dev/sps/io/Ladewecker/all",
-        "value": "0",
-        "output7": {"name": "Tna", "nr": 8, "value": tna},
-    }
-    if special10 is not None:
-        ll["SpecialState10"] = {
-            "uuid": "20e3f09d-02a2-e285-ffff912d5ec91829",
-            "nr": 11,
-            "value": special10,
-        }
-    return {"LL": ll}
-
-
-class TestFetchLoxoneAlarmClockTna:
-    def test_extracts_tna_from_all(self):
-        response = _mock_http_response(json_data=_alarm_clock_all_payload())
-        with patch.object(lc.requests, "get", return_value=response) as mock_get, patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_IP": "192.168.1.1",
-                "LOXONE_USER": "user",
-                "LOXONE_PASS": "pass",
-            }.get(name, kw.get("default", 5)),
-        ):
-            assert lc.fetch_loxone_alarm_clock_tna("Ladewecker") == "Morgen, 11:00"
-        assert "/jdev/sps/io/Ladewecker/all" in mock_get.call_args.args[0]
-
-    def test_missing_tna_returns_none(self):
-        response = _mock_http_response(
-            json_data={"LL": {"Code": "200", "value": "0", "output0": {"name": "A", "value": 0}}}
-        )
-        with patch.object(lc.requests, "get", return_value=response), patch.object(
-            lc.config, "get", return_value="x"
-        ):
-            assert lc.fetch_loxone_alarm_clock_tna("Ladewecker") is None
-
-
 class TestFetchLoxoneReadyByTime:
     """Q7: push inbox only — SpecialState10 / Tna / Merker poll removed."""
 
-    def test_no_alarmclock_poll_without_push(self):
-        with patch.object(lc, "_fetch_loxone_io_all") as poll_all, patch.object(
-            lc, "fetch_loxone_raw_value"
-        ) as raw:
-            assert lc.fetch_loxone_ready_by_time("Ladewecker") is None
-        poll_all.assert_not_called()
-        raw.assert_not_called()
+    def test_no_value_without_push(self):
+        assert lc.fetch_loxone_ready_by_time("Ladewecker") is None
 
     def test_empty_name_returns_none(self):
         assert lc.fetch_loxone_ready_by_time("") is None
@@ -228,13 +108,11 @@ class TestFormatReadyByDisplay:
 
 
 class TestFetchLoxoneGenericValue:
-    def test_parses_numeric_with_unit(self):
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="65.5 %"):
-            assert lc.fetch_loxone_generic_value("SOC") == pytest.approx(65.5)
+    def test_unbound_merker_returns_none(self):
+        assert lc.fetch_loxone_generic_value("SOC") is None
 
-    def test_invalid_numeric_returns_none(self):
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="nicht-numerisch"):
-            assert lc.fetch_loxone_generic_value("Bad") is None
+    def test_empty_name_returns_none(self):
+        assert lc.fetch_loxone_generic_value("") is None
 
 
 class TestSendLoxoneValueTraced:
@@ -675,13 +553,10 @@ class TestSharedMeterSubtraction:
                 "nominal_power_phases": 3,
             },
         }
-        with patch.object(lc, "fetch_loxone_generic_value", return_value=16.0) as gen, patch.object(
-            lc, "fetch_loxone_raw_value"
-        ) as raw:
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=16.0) as gen:
             live = lc.resolve_consumer_nominal_power_kw(consumer)
         assert live == pytest.approx(11.04)
         gen.assert_called_once_with("Ladestrom Max")
-        raw.assert_not_called()
 
     def test_resolve_nominal_current_inbox_float(self):
         consumer = {
@@ -693,12 +568,9 @@ class TestSharedMeterSubtraction:
                 "nominal_power_phases": 3,
             },
         }
-        with patch.object(lc, "fetch_loxone_generic_value", return_value=16.0), patch.object(
-            lc, "fetch_loxone_raw_value"
-        ) as raw:
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=16.0):
             live = lc.resolve_consumer_nominal_power_kw(consumer)
         assert live == pytest.approx(11.04)
-        raw.assert_not_called()
 
     def test_resolve_nominal_power_ignores_legacy_charging_nest(self):
         """Nest-only ``nominal_power_kw_name`` is no longer resolved (Pattern B only)."""
@@ -721,12 +593,9 @@ class TestSharedMeterSubtraction:
             "id": "eauto",
             "ehal_bindings": {"sens_evcs_bat_capacity": "Batteriekapazität_E-Auto"},
         }
-        with patch.object(lc, "fetch_loxone_generic_value", return_value=77.0) as gen, patch.object(
-            lc, "fetch_loxone_raw_value"
-        ) as raw:
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=77.0) as gen:
             assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
         gen.assert_called_once_with("Batteriekapazität_E-Auto")
-        raw.assert_not_called()
 
     def test_resolve_battery_capacity_ignores_legacy_charging_nest(self):
         consumer = {

@@ -24,10 +24,9 @@ Bei abgelehnten Zugangsdaten (HTTP **401** oder **403**) pausiert der Optimierer
 
 ## HTTP-Schnittstelle
 
-- **Lesen:** `GET http://{LOXONE_IP}/jdev/sps/io/{Name}`
-- **Schreiben:** `POST` auf dieselbe URL mit dem Zielwert
-
-Antworten liefern den Wert unter `LL.value`. Loxone gibt Zahlen oft **mit Einheit** zurück (z. B. `3.5 kW`, `72 %`, `16 A`). Der Optimizer parst diese Strings und ignoriert die Einheit für die Berechnung.
+- **Lesen (Live):** Loxone schickt Messwerte per Virtual Output an Earnie (`GET /ehal/loxone/telemetry/<EHAL-ID>/<v>` auf dem Daemon-Port, typisch **8541**). Earnie pollt den Miniserver **nicht** mehr per Merker-HTTP.
+- **Schreiben (Loud):** Sollwerte erscheinen in `status.json` unter qualifizierten EHAL-IDs; der Miniserver liest sie per Virtual Input.
+- **Struktur/Import:** `GET http://{LOXONE_IP}/data/LoxAPP3.json` (Control-Namen für Mapping/Import).
 
 Aktivierte Signale liegen als Schlüssel in `plant.ehal_bindings` / `consumers[].ehal_bindings` / `batteries[].ehal_bindings` (Werte nach 2.7.q Q8 leer — nur Aktivierungsflag). Vertrag und Match-Status: **EHAL-Com → Signalliste**. Details: [Loxone-Signale](../referenz/loxone-signals.md).
 

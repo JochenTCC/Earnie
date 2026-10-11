@@ -27,12 +27,6 @@ def _loxone_auth():
     return lc._loxone_auth()
 
 
-def _loxone_jdev_url(io_name: str) -> str:
-    from integrations import loxone_client as lc
-
-    return lc._loxone_jdev_url(io_name)
-
-
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
     from integrations.loxone_live_power import resolve_consumer_nominal_power_kw as _impl
 

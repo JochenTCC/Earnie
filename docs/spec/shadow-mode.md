@@ -79,8 +79,7 @@ Record **raw backend responses** at the transport primitives, not parsed values.
 
 | Backend | Primitive | Feed key |
 |---|---|---|
-| Loxone | `loxone_client.fetch_loxone_raw_value(io)` | `loxone:io:<io_name>` |
-| Loxone | `loxone_client._fetch_loxone_io_all(io)` | `loxone:io_all:<io_name>` |
+| Loxone | VO push inbox / cycle path (Merker HTTP retired) | `loxone:io:<io_name>` (legacy feed keys may remain) |
 | HA | `HaAdapter._get_json(path)` | `ha:get:<path>` (e.g. `ha:get:/api/states/sensor.x`) |
 | OpenEMS | `OpenemsAdapter` GET | `openems:get:<path>` |
 | forecast.solar | `data.pv_forecast` fetch | `ext:pv_forecast:<url-hash>` |

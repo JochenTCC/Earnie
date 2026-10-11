@@ -46,9 +46,9 @@ Energie-pro-Lauf dienen.
 ## Architektur
 
 ```
-Earnie ──HTTP jdev/sps/io (bestehend)──► Loxone Miniserver ◄──HTTP push (neu)── Home Assistant ◄──EcoFlow Cloud MQTT── Delta 3
+Earnie ◄──VO telemetry / status.json VI──► Loxone Miniserver ◄──HTTP push── Home Assistant ◄──EcoFlow Cloud MQTT── Delta 3
    ▲                                            │                                      │
-   └────────── main.py liest/schreibt ──────────┘                                      └── hassio-ecoflow-cloud Integration
+   └────────── push inbox + status.json ────────┘                                      └── hassio-ecoflow-cloud Integration
 ```
 
 Zwei neue, rein HTTP-basierte Bridge-Strecken (kein zusätzlicher MQTT-Broker nötig):

@@ -6,10 +6,6 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
-
-import requests
-from requests.auth import HTTPBasicAuth
 
 from house_config.id_slug import slug_id
 from integrations.loxone_efm_meters import (
@@ -20,10 +16,6 @@ from integrations.loxone_efm_meters import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Loxone jdev: 200 = readable, 403 = name known but not readable for this user,
-# 404 = unknown. Virtual HTTP In Cmd titles often return 403 without App visualization.
-_PRESENT_CODES = frozenset({"200", "403"})
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_MAP = _REPO_ROOT / "share" / "loxone" / "greenfield_device_map.json"
@@ -89,7 +81,7 @@ from integrations.greenfield_match import (  # noqa: E402
 
 @dataclass(frozen=True)
 class MarkerProbeResult:
-    """Outcome of probing known Merker names via /jdev/sps/io/{name}."""
+    """Outcome of classifying known Merker names against LoxAPP3 control names."""
 
     present: frozenset[str]
     missing: frozenset[str]
@@ -161,53 +153,58 @@ def _control_names(doc: dict[str, Any]) -> set[str]:
     return names
 
 
+def _loxapp3_name_index(doc: dict[str, Any]) -> dict[str, str]:
+    """casefold → first-seen control name spelling from LoxAPP3."""
+    index: dict[str, str] = {}
+    for name in _control_names(doc):
+        key = name.casefold()
+        if key not in index:
+            index[key] = name
+    return index
+
+
 def probe_marker_names(
     names: list[str] | tuple[str, ...] | set[str],
     *,
-    host: str,
-    username: str,
-    password: str,
-    timeout_sec: float = 5.0,
+    loxapp3_doc: dict[str, Any] | None = None,
+    host: str = "",
+    username: str = "",
+    password: str = "",
+    timeout_sec: float = 15.0,
 ) -> MarkerProbeResult:
-    """Probe /jdev/sps/io/{name}; treat LL.Code 200 or 403 as present, 404 as missing.
+    """Classify names against LoxAPP3 control names (no Merker HTTP).
 
-    Intentional Merker poll for greenfield presence — not optimizer telemetry (Q8).
+    Pass ``loxapp3_doc`` when already loaded; otherwise fetch ``/data/LoxAPP3.json``.
+    Invisible VO/VI titles not listed in LoxAPP3 are reported as missing.
     """
-    ip = str(host or "").strip().removeprefix("http://").removeprefix("https://")
-    ip = ip.split("/")[0]
-    if not ip:
-        raise ValueError("LOXONE_IP is empty")
-    auth = HTTPBasicAuth(username, password)
+    doc = loxapp3_doc
+    if doc is None:
+        from integrations.loxone_structure import fetch_loxapp3_json
+
+        doc = fetch_loxapp3_json(
+            host=host,
+            username=username,
+            password=password,
+            timeout_sec=timeout_sec,
+        )
+    index = _loxapp3_name_index(doc)
     present: set[str] = set()
     missing: set[str] = set()
-    errors: set[str] = set()
     codes: dict[str, str] = {}
     for raw in names:
         name = str(raw or "").strip()
         if not name:
             continue
-        url = f"http://{ip}/jdev/sps/io/{quote(name, safe='')}"
-        try:
-            response = requests.get(url, auth=auth, timeout=timeout_sec)
-            payload = response.json() if response.content else {}
-            ll = payload.get("LL") if isinstance(payload, dict) else {}
-            code = str((ll or {}).get("Code") or response.status_code)
-        except (requests.RequestException, OSError, ValueError, TypeError) as exc:
-            logger.warning("marker probe failed for %s: %s", name, exc)
-            errors.add(name)
-            codes[name] = "error"
-            continue
-        codes[name] = code
-        if code in _PRESENT_CODES:
+        if name.casefold() in index:
             present.add(name)
-        elif code == "404":
-            missing.add(name)
+            codes[name] = "loxapp3"
         else:
-            errors.add(name)
+            missing.add(name)
+            codes[name] = "missing"
     return MarkerProbeResult(
         present=frozenset(present),
         missing=frozenset(missing),
-        errors=frozenset(errors),
+        errors=frozenset(),
         codes=codes,
     )
 
@@ -215,15 +212,17 @@ def probe_marker_names(
 def probe_device_map_markers(
     device_map: dict[str, Any] | None = None,
     *,
-    host: str,
-    username: str,
-    password: str,
-    timeout_sec: float = 5.0,
+    host: str = "",
+    username: str = "",
+    password: str = "",
+    timeout_sec: float = 15.0,
+    loxapp3_doc: dict[str, Any] | None = None,
 ) -> MarkerProbeResult:
-    """Probe every exact name in greenfield_device_map.json."""
+    """Classify every exact name in greenfield_device_map.json against LoxAPP3."""
     dmap = device_map if device_map is not None else load_device_map()
     return probe_marker_names(
         device_map_marker_names(dmap),
+        loxapp3_doc=loxapp3_doc,
         host=host,
         username=username,
         password=password,
@@ -495,7 +494,7 @@ def merge_efm(
 
 
 def extract_alarm_clocks(doc: dict[str, Any]) -> list[str]:
-    """LoxAPP3 AlarmClock Bezeichnungen (SpecialState10 via /all — Zähler-style binding)."""
+    """LoxAPP3 AlarmClock Bezeichnungen (import bind → VO push get_evcs_ready_by_time)."""
     names: list[str] = []
     controls = doc.get("controls")
     if not isinstance(controls, dict):
@@ -600,9 +599,11 @@ def run_greenfield_import(
 ) -> dict[str, Any]:
     """Orchestrate Merker match + EFM merge; return house_doc + report.
 
-    When ``probe_host`` / credentials are set, device-map markers and LoxAPP3
-    Earnie_* names are probed via ``/jdev/sps/io/{name}`` and unioned.
+    Device-map / Earnie_* candidates are classified against the given LoxAPP3
+    ``doc`` (control-name presence). ``probe_host`` / credentials are unused
+    when ``doc`` is already loaded (kept for call-site compatibility).
     """
+    del probe_host, probe_username, probe_password, probe_timeout_sec
     dmap = device_map if device_map is not None else load_device_map()
     house, resolved_id = ensure_live_profile(house_doc or {"profiles": []})
     if profile_id:
@@ -610,18 +611,9 @@ def run_greenfield_import(
         if profile_id not in profiles:
             raise ValueError(f"profile_id '{profile_id}' missing from house profiles")
         resolved_id = profile_id
-    extra: set[str] | None = None
-    probe_result: MarkerProbeResult | None = None
-    if probe_host and probe_username is not None and probe_password is not None:
-        candidates = probe_candidate_names(doc, dmap)
-        probe_result = probe_marker_names(
-            candidates,
-            host=probe_host,
-            username=probe_username,
-            password=probe_password,
-            timeout_sec=probe_timeout_sec,
-        )
-        extra = set(probe_result.present)
+    candidates = probe_candidate_names(doc, dmap)
+    probe_result = probe_marker_names(candidates, loxapp3_doc=doc)
+    extra = set(probe_result.present)
     matches, report = match_controls(doc, dmap, extra_names=extra)
     report.profile_id = resolved_id
     if probe_result is not None:

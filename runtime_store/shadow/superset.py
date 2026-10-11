@@ -46,78 +46,10 @@ def _house_profiles_doc() -> dict[str, Any]:
     return doc if isinstance(doc, dict) else {}
 
 
-def _iter_profile_dicts(doc: dict[str, Any]) -> list[dict[str, Any]]:
-    profiles = doc.get("profiles")
-    out: list[dict[str, Any]] = []
-    if isinstance(profiles, dict):
-        out.extend(p for p in profiles.values() if isinstance(p, dict))
-    elif isinstance(profiles, list):
-        out.extend(p for p in profiles if isinstance(p, dict))
-    if isinstance(doc.get("consumers"), list) or isinstance(doc.get("plant"), dict):
-        out.append(doc)
-    return out
-
-
-def _collect_loxone_io_names(doc: dict[str, Any]) -> set[str]:
-    names: set[str] = set()
-
-    def _add_bindings(bindings: object) -> None:
-        if not isinstance(bindings, dict):
-            return
-        for value in bindings.values():
-            text = str(value or "").strip()
-            if text:
-                names.add(text)
-
-    plant = doc.get("plant") if isinstance(doc.get("plant"), dict) else {}
-    _add_bindings(plant.get("ehal_bindings"))
-    for profile in _iter_profile_dicts(doc):
-        plant_p = profile.get("plant") if isinstance(profile.get("plant"), dict) else {}
-        _add_bindings(plant_p.get("ehal_bindings"))
-        consumers = profile.get("consumers")
-        if isinstance(consumers, list):
-            for consumer in consumers:
-                if isinstance(consumer, dict):
-                    _add_bindings(consumer.get("ehal_bindings"))
-    try:
-        import config
-
-        for key in (
-            "LOXONE_SOC_NAME",
-            "LOXONE_PV_POWER_NAME",
-            "LOXONE_BATTERY_POWER_NAME",
-            "LOXONE_GRID_POWER_NAME",
-            "LOXONE_CONSUMERS_POWER_NAME",
-            "LOXONE_TARGET_ACTIVE_POWER_NAME",
-            "LOXONE_TARGET_CHARGE_POWER_NAME",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME",
-            "LOXONE_CONTROL_CMD_NAME",
-        ):
-            text = str(config.get(key) or "").strip()
-            if text:
-                names.add(text)
-    except Exception:  # noqa: BLE001
-        pass
-    return names
-
-
 def _superset_loxone(seen: frozenset[str], deadline: float) -> None:
-    from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
-    from integrations.loxone_client import fetch_loxone_raw_value
-
-    for io_name in sorted(_collect_loxone_io_names(_house_profiles_doc())):
-        if not _budget_ok(deadline):
-            return
-        key = f"loxone:io:{io_name}"
-        if key in seen:
-            continue
-        try:
-            binding = resolve_push_binding(io_name)
-            if binding is not None and is_pushable_kind(binding.kind):
-                continue
-            fetch_loxone_raw_value(io_name)
-        except Exception:  # noqa: BLE001
-            continue
+    """No Merker HTTP: Loxone live reads are VO push only (recorded on the cycle path)."""
+    del seen, deadline
+    return
 
 
 def _superset_ha(seen: frozenset[str], deadline: float) -> None:

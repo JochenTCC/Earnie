@@ -312,10 +312,8 @@ def test_char_push_missing_required_soc_raises(
     inbox.reset_memory_for_tests()
     _install_push_indexes(monkeypatch)
     _seed_required_push(soc=None)
-    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        with pytest.raises(LoxoneAdapterError, match="sens_ess_soc"):
-            LoxoneAdapter(_cfg()).read_telemetry()
-        raw.assert_not_called()
+    with pytest.raises(LoxoneAdapterError, match="sens_ess_soc"):
+        LoxoneAdapter(_cfg()).read_telemetry()
 
 
 def test_char_push_stale_required_soc_past_last_known_raises(
@@ -328,10 +326,8 @@ def test_char_push_stale_required_soc_past_last_known_raises(
     _seed_required_push(soc="55", now=old)
     # Fresh heartbeat so link is alive; SoC row stays stale past last-known window.
     inbox.record_push("heartbeat", "1", now=_now())
-    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        with pytest.raises(LoxoneAdapterError, match="sens_ess_soc"):
-            LoxoneAdapter(_cfg()).read_telemetry()
-        raw.assert_not_called()
+    with pytest.raises(LoxoneAdapterError, match="sens_ess_soc"):
+        LoxoneAdapter(_cfg()).read_telemetry()
 
 
 def test_char_push_missing_optional_ess_soc_min_omitted(
@@ -341,8 +337,6 @@ def test_char_push_missing_optional_ess_soc_min_omitted(
     inbox.reset_memory_for_tests()
     _install_push_indexes(monkeypatch)
     _seed_required_push()
-    with patch.object(loxone_client, "fetch_loxone_raw_value") as raw:
-        telemetry = LoxoneAdapter(_cfg()).read_telemetry()
-        raw.assert_not_called()
+    telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert telemetry["sens_ess_soc"] == pytest.approx(55.0)
     assert "get_ess_soc_min" not in telemetry
