@@ -47,6 +47,35 @@ def test_config_write_raises_in_shadow(monkeypatch, tmp_path):
         write_json_dict(str(target), {"earnie_data_model": 4})
 
 
+def test_config_write_allowed_with_external_feed(monkeypatch, tmp_path):
+    from runtime_store.shadow.mode import is_shadow_config_readonly
+
+    cfg_dir = tmp_path / "local_config"
+    cfg_dir.mkdir()
+    feed = tmp_path / "prod_feed"
+    feed.mkdir()
+    target = cfg_dir / "config.json"
+    target.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg_dir))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "rt"))
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    assert is_shadow_config_readonly() is False
+    write_json_dict(str(target), {"earnie_data_model": 4, "ok": True})
+    assert json.loads(target.read_text(encoding="utf-8"))["ok"] is True
+
+
+def test_is_shadow_config_readonly_when_feed_under_config(monkeypatch, tmp_path):
+    from runtime_store.shadow.mode import is_shadow_config_readonly
+
+    cfg_dir = tmp_path / "config"
+    cfg_dir.mkdir()
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg_dir))
+    monkeypatch.delenv("EARNIE_SHADOW_FEED_PATH", raising=False)
+    assert is_shadow_config_readonly() is True
+
+
 def test_silent_implied_by_shadow(monkeypatch, tmp_path):
     import config
     from tests.config_fixtures import minimal_config_payload, write_minimal_config_tree

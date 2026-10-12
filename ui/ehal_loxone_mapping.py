@@ -730,15 +730,15 @@ def _queue_pending_new_marker(
 
 def _migrate_on_open() -> tuple[dict, dict]:
     """Ensure entity bindings exist; persist house + stripped config once when changed."""
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
     house = load_house_profiles()
     config_doc = load_main_config()
     new_house, new_config, changed = ensure_migrated(house, config_doc)
     if changed and not st.session_state.get(_SESSION_MIGRATED):
         stripped = strip_migrated_config_keys(new_config)
-        if is_shadow_mode():
-            # Prod config is read-only; keep migrated values in this session only.
+        if is_shadow_config_readonly():
+            # Shared Prod config is read-only; keep migrated values in this session only.
             st.session_state[_SESSION_MIGRATED] = True
             return new_house, stripped
         save_house_profiles(new_house)
@@ -763,14 +763,14 @@ def persist_loxone_entity_mapping(
     Returns a short success detail (where data was written).
     """
     from runtime_store.shadow.ehal_overlay import upsert_entity_bindings
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
     from ui.house_config_io import _load_components_document, _save_components_document
 
     migrated_house, migrated_config, _ = ensure_migrated(house, config_doc)
     kind = str(entity_kind or "").strip() or entity_kind_for_id(
         migrated_house, profile_id, entity_id
     )
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         path = upsert_entity_bindings(
             profile_id=profile_id,
             entity_id=entity_id,

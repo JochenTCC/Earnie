@@ -470,9 +470,9 @@ def _rewrite_id_list_in_scenarios(key: str, old_id: str, new_id: str) -> bool:
 def _rewrite_shadow_battery_overlay(old_id: str, new_id: str) -> None:
     try:
         from runtime_store.shadow.ehal_overlay import read_overlay, write_overlay
-        from runtime_store.shadow.mode import is_shadow_mode
+        from runtime_store.shadow.mode import is_shadow_config_readonly
 
-        if not is_shadow_mode():
+        if not is_shadow_config_readonly():
             return
         overlay = read_overlay()
         by_bat = overlay.get("battery_bindings")

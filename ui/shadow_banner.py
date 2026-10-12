@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from runtime_store.shadow.cycle import feed_health
-from runtime_store.shadow.mode import is_shadow_mode
+from runtime_store.shadow.mode import is_shadow_config_readonly, is_shadow_mode
 from runtime_store.shadow.writes import read_shadow_writes
 from version import __version__
 
@@ -26,10 +26,14 @@ def render_shadow_banner() -> None:
             stand = dt.astimezone().strftime("%H:%M:%S")
         except ValueError:
             stand = hb
+    if is_shadow_config_readonly():
+        cfg_note = "Konfiguration schreibgeschützt (Prod-Config)"
+    else:
+        cfg_note = "lokale Config schreibbar"
     msg = (
         f"**Shadow-Modus** — Eingänge aus Prod-Feed "
-        f"(Stand {stand}, Alter {age_txt}), keine Schreibzugriffe, "
-        f"Konfiguration schreibgeschützt"
+        f"(Stand {stand}, Alter {age_txt}), keine Backend-Schreibzugriffe, "
+        f"{cfg_note}"
     )
     if health.get("stale"):
         st.warning(msg + " — **Prod-Feed veraltet**")

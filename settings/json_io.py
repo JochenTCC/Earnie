@@ -27,9 +27,9 @@ def read_json_dict(path: str) -> dict:
 
 def write_json_dict(path: str, data: dict) -> None:
     from runtime_store.data_model import stamp_data_model
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         from runtime_store.persist_paths import config_dir
         from runtime_store.shadow.errors import ConfigReadOnlyError
 

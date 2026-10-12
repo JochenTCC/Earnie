@@ -104,7 +104,10 @@ Optional: Runtime aus Prod vorbelegen (gelernten Zustand kopieren, ohne Logs/Loc
 .venv\Scripts\python.exe -m scripts.shadow_seed_runtime --from <prod-runtime> --to <shadow-runtime>
 ```
 
-Die Streamlit-UI zeigt ein dauerhaftes Shadow-Banner; unter EHAL-Com erscheint die Tabelle der blockierten Schreibvorgänge (`shadow_writes.jsonl`). EHAL-Mapping „Speichern“ schreibt im Shadow-Modus nur das Runtime-Overlay `shadow_ehal_bindings.json`.
+Die Streamlit-UI zeigt ein dauerhaftes Shadow-Banner; unter EHAL-Com erscheint die Tabelle der blockierten Schreibvorgänge (`shadow_writes.jsonl`).
+
+- **Geteilte Prod-Config** (Feed liegt unter dem Config-Verzeichnis): Config schreibgeschützt; EHAL-Mapping „Speichern“ schreibt nur das Runtime-Overlay `shadow_ehal_bindings.json`.
+- **Private lokale Config** (`EARNIE_SHADOW_FEED_PATH` zeigt auf den Prod-Feed außerhalb der lokalen Config): Hauskonfigurator, `.env` und EHAL-Mapping schreiben in die lokale `earnie_env` — Backend-Schreibzugriffe bleiben blockiert.
 
 ### Log- und Historiendateien
 
@@ -130,7 +133,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; ältere Ordner: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
 | `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; ältere Ordner: `runtime`). |
 | `EARNIE_SHADOW_FEED_PATH`               | Optional: Verzeichnis für den Prod-Shadow-Feed (sonst `{Config}/shadow_feed/`). Siehe [Shadow-Feed](#shadow-feed-prod-recorder-optional). |
-| `EARNIE_SHADOW`                         | `1` = Shadow-Modus (Dev-Client): Eingänge aus Feed, keine Backend-/Config-Schreibzugriffe. Siehe [Shadow-Modus](#shadow-modus-dev-client). |
+| `EARNIE_SHADOW`                         | `1` = Shadow-Modus (Dev-Client): Eingänge aus Feed, keine Backend-Schreibzugriffe. Config schreibgeschützt nur bei geteilter Prod-Config; private lokale Config (externer Feed) ist schreibbar. Siehe [Shadow-Modus](#shadow-modus-dev-client). |
 | `EARNIE_SHADOW_MAX_AGE_SEC`             | Max. Alter eines Feed-Eintrags relativ zur Prod-`cycle_ts` (Fallback: Heartbeat; Standard 120). |
 | `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable: `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Prod-Compose setzt oft `sunset2sunset,live_environment`; Cloud: `scenario_explorer` — siehe [Betriebsmodi](../ui/betriebsmodi.md). |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |

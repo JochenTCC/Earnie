@@ -93,11 +93,11 @@ def apply_ha_secrets_migration_to_disk() -> bool:
     Load config.json, migrate secrets to .env, persist stripped config if needed.
 
     Safe to call at startup; no-op when keys already absent.
-    Skipped entirely in Shadow Mode (config read-only; in-memory only).
+    Skipped when Shadow shares Prod config (read-only); private Shadow config writes.
     """
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         return False
 
     from settings.json_io import read_json_dict, write_json_dict

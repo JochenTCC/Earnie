@@ -97,9 +97,9 @@ def load_components_document(path: str) -> dict:
         "pv_systems": pv_systems,
     }
     try:
-        from runtime_store.shadow.mode import is_shadow_mode
+        from runtime_store.shadow.mode import is_shadow_config_readonly
 
-        if is_shadow_mode():
+        if is_shadow_config_readonly():
             from runtime_store.shadow.ehal_overlay import apply_overlay_to_components
 
             return apply_overlay_to_components(out)
@@ -210,9 +210,9 @@ def save_components_document(path: str, doc: dict) -> None:
     from runtime_store.data_model import stamp_data_model
 
     try:
-        from runtime_store.shadow.mode import is_shadow_mode
+        from runtime_store.shadow.mode import is_shadow_config_readonly
 
-        if is_shadow_mode():
+        if is_shadow_config_readonly():
             from runtime_store.shadow.errors import ConfigReadOnlyError
 
             raise ConfigReadOnlyError(

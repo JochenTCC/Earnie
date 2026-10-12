@@ -17,7 +17,7 @@ from runtime_store.shadow.feed import (
     flush_after_sampler,
     is_feed_recording_enabled,
 )
-from runtime_store.shadow.mode import is_shadow_mode
+from runtime_store.shadow.mode import is_shadow_config_readonly, is_shadow_mode
 from runtime_store.shadow.startup import (
     ensure_shadow_startup,
     refuse_shadow_startup_or_exit,
@@ -41,6 +41,7 @@ __all__ = [
     "flush_after_cycle",
     "flush_after_sampler",
     "is_feed_recording_enabled",
+    "is_shadow_config_readonly",
     "is_shadow_mode",
     "log_would_write",
     "read_shadow_writes",

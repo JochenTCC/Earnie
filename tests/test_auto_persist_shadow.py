@@ -4,12 +4,16 @@ from __future__ import annotations
 import ui.auto_persist as ap
 
 
-def test_auto_persist_skips_in_shadow(monkeypatch):
+def test_auto_persist_skips_in_shadow(monkeypatch, tmp_path):
     calls: list[int] = []
     session: dict = {}
     captions: list[str] = []
 
+    cfg = tmp_path / "config"
+    cfg.mkdir()
     monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg))
+    monkeypatch.delenv("EARNIE_SHADOW_FEED_PATH", raising=False)
     monkeypatch.setattr(ap.st, "session_state", session)
     monkeypatch.setattr(ap.st, "caption", lambda msg: captions.append(msg))
 
@@ -29,6 +33,32 @@ def test_auto_persist_skips_in_shadow(monkeypatch):
     )
     assert wrote2 is False
     assert calls == []
+
+
+def test_auto_persist_writes_with_private_shadow_config(monkeypatch, tmp_path):
+    calls: list[int] = []
+    session: dict = {}
+    captions: list[str] = []
+
+    cfg = tmp_path / "local_config"
+    cfg.mkdir()
+    feed = tmp_path / "prod_feed"
+    feed.mkdir()
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "rt"))
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setattr(ap.st, "session_state", session)
+    monkeypatch.setattr(ap.st, "caption", lambda msg: captions.append(msg))
+
+    wrote = ap.auto_persist(
+        state_key="plant_export",
+        payload={"enabled": True, "max_kw": 5.0},
+        save=lambda: calls.append(1),
+    )
+    assert wrote is True
+    assert calls == [1]
+    assert captions == ["Gespeichert"]
 
 
 def test_auto_persist_writes_when_not_shadow(monkeypatch):

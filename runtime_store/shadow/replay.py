@@ -88,8 +88,12 @@ def _staleness_ref_ts(latest: dict[str, Any] | None, meta: dict[str, Any] | None
     return None
 
 
-def lookup_record(key: str) -> dict[str, Any] | None:
-    """Return fresh ok/error record for *key*, or None if missing/stale."""
+def lookup_record(key: str, *, log_missing: bool = True) -> dict[str, Any] | None:
+    """Return fresh ok/error record for *key*, or None if missing/stale.
+
+    Set ``log_missing=False`` when a caller will try another source (e.g. Prod
+    inbox fallback) and only wants a warning if that also fails.
+    """
     if not is_shadow_mode():
         return None
     latest = read_latest()
@@ -97,16 +101,23 @@ def lookup_record(key: str) -> dict[str, Any] | None:
     records = records_map(latest)
     record = records.get(key)
     if not isinstance(record, dict):
-        _log_missing(key, "missing")
+        if log_missing:
+            _log_missing(key, "missing")
         return None
     ref_ts = _staleness_ref_ts(
         latest if isinstance(latest, dict) else None,
         meta if isinstance(meta, dict) else None,
     )
     if is_record_stale(record, ref_ts=ref_ts):
-        _log_missing(key, "stale")
+        if log_missing:
+            _log_missing(key, "stale")
         return None
     return record
+
+
+def warn_missing_feed_key(key: str, reason: str = "missing") -> None:
+    """Rate-limited warning when a feed key is unavailable after all fallbacks."""
+    _log_missing(key, reason)
 
 
 def replay_loxone_io(key: str) -> str | None:

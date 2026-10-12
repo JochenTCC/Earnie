@@ -79,12 +79,12 @@ Deferred product items (not part of R1–R3 cleanup): Shadow would-write old-vs-
 
 ## 3. Target architecture — phases R1–R4
 
-### R1 — Policy façade (behavior-preserving)
+### R1 — Policy façade (behavior-preserving) — **done (2026-10-12)**
 
 **Goal:** One small, documented API for “what Shadow may do” so new call sites do not invent gates.
 
 - `is_shadow_mode()` / `is_shadow_config_readonly()` remain the **only** gates.
-- Document a gate checklist (also in this § and later in DEVELOPER / spec):
+- Gate checklist in [`DEVELOPER.md`](../DEVELOPER.md) (Shadow gates subsection); mirrors:
 
 | Concern | Gate |
 |---------|------|
@@ -92,9 +92,20 @@ Deferred product items (not part of R1–R3 cleanup): Shadow would-write old-vs-
 | Config writers, load-time migration skip, EHAL overlay use | `is_shadow_config_readonly()` |
 | Setpoint helper invocation (would-write log) | `should_invoke_setpoint_writes()` |
 
-- Thin helpers optional (e.g. `require_shadow_writable_config()`) only if they reduce copy-paste without changing semantics.
+- No new Python helpers in R1 (repeated `ConfigReadOnlyError` raise stays as-is).
 
-**Acceptance:** No behavior change; review doc + call-site audit list; existing shadow tests green.
+**Acceptance:** No behavior change beyond landing shared/private dual-path; call-site audit below; shadow tests green.
+
+#### R1 call-site audit (2026-10-12)
+
+| Gate | Production call sites | Verdict |
+|------|------------------------|---------|
+| `is_shadow_mode()` | `feed`, `replay`, `writes`, `startup`, `cycle`, adapters (`ha`, `openems`, `awattar`), `data/*` forecast/loader, `loxone_push_inbox`, `loxone_request_http`, `config` silent imply, `main` cycle/trigger, UI banner/daemon/debug, `startup_checks` | Correct — runtime/backend/UI shadow detection |
+| `is_shadow_config_readonly()` | `settings/json_io`, `profiles_store`, `components_store`, `dotenv_io`, `bootstrap` (config pack skip), `ha_secrets_migrate`, `ui/auto_persist`, EHAL mapping UIs, `page_house_config`, `house_config_entities_io`, banner RO caption | Correct — config/overlay only |
+| Both | `bootstrap._bootstrap_all_artifacts`: `is_shadow_mode() and is_shadow_config_readonly()` before skipping config pack | Correct — private Shadow still bootstraps local config |
+| `should_invoke_setpoint_writes()` | `main.py`, `optimizer/powerstation_live.py` | Correct |
+
+**Wrong-gate fixes in R1:** none required after dual-path land.
 
 ### R2 — Single Loxone input contract
 

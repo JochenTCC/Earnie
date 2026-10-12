@@ -328,9 +328,9 @@ def _cleanup_tmp_file(tmp_path: str) -> None:
 
 def _atomic_write_dotenv(content: str) -> str:
     """Atomically write full .env content; returns path."""
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         from runtime_store.shadow.errors import ConfigReadOnlyError
 
         raise ConfigReadOnlyError(
@@ -383,9 +383,9 @@ def upsert_dotenv_keys(updates: dict[str, str]) -> str:
     """Merge KEY=value updates into the active .env; preserve other keys/lines."""
     if not updates:
         return resolve_dotenv_path()
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         from runtime_store.shadow.errors import ConfigReadOnlyError
 
         raise ConfigReadOnlyError(

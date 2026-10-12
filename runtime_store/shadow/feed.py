@@ -242,8 +242,34 @@ def _prune_retention_unlocked(directory: Path) -> None:
                 _rate_limited_warn("prune", "shadow feed prune failed: %s", exc)
 
 
+def _export_loxone_inbox_to_feed() -> None:
+    """Mirror Prod VO inbox into ``loxone:io:*`` once per cycle (soft-fail)."""
+    if not is_feed_recording_enabled():
+        return
+    try:
+        from runtime_store.loxone_push_inbox import memory_snapshot
+        from runtime_store.shadow.hooks import record_transport
+
+        for ehal_id, row in memory_snapshot().items():
+            if not isinstance(row, dict):
+                continue
+            raw = str(row.get("raw") or "").strip()
+            if not raw:
+                continue
+            parse_ok = bool(row.get("parse_ok", True)) and row.get("value") is not None
+            record_transport(
+                f"loxone:io:{ehal_id}",
+                ok=parse_ok,
+                payload={"LL": {"value": raw}},
+                error=None if parse_ok else "parse_failed",
+            )
+    except Exception as exc:  # noqa: BLE001
+        _rate_limited_warn("inbox_export", "shadow feed inbox export failed: %s", exc)
+
+
 def flush_after_cycle() -> None:
     """Bump cycle_seq and flush after a completed ``main()`` call."""
+    _export_loxone_inbox_to_feed()
     flush_latest(bump_cycle=True)
 
 

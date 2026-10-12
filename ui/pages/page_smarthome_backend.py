@@ -140,13 +140,19 @@ def _render_backend_import_section(backend: str) -> None:
         )
 
 
-def _render_configured_summary() -> None:
+def _render_configured_summary(*, allow_change: bool = True) -> None:
+    """Show connected backend. When ``allow_change`` is False (Shadow), skip
+    discovery / greenfield — those probe the live hub and raise
+    ``ShadowBackendAccessError`` (spec shadow-mode §6.3).
+    """
     backend = active_ehal_backend()
     st.success(f"Smarthome-Backend verbunden: **{backend_label(backend)}**")
     st.caption("EHAL-Com und Optimierer-Dienst sind freigeschaltet.")
     if backend == BACKEND_LOXONE:
         _render_miniserver_callback_caption()
     render_anbindung_section(backend, form_key_prefix="sb_anbindung")
+    if not allow_change:
+        return
     with st.expander("Backend ändern", expanded=False):
         _render_discovery_flow()
     _render_backend_import_section(backend)
@@ -277,19 +283,26 @@ def render() -> None:
         key="smarthome_backend_help",
         page_docs_key="smarthome-backend",
     )
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly, is_shadow_mode
     from ui.shadow_banner import render_shadow_feed_connection_note
 
     if is_shadow_mode():
         render_shadow_feed_connection_note()
-        st.caption(
-            "Struktur-Scan, Greenfield-Import und Backend-Wechsel sind im "
-            "Shadow-Modus deaktiviert (Konfiguration schreibgeschützt)."
-        )
+        if is_shadow_config_readonly():
+            st.caption(
+                "Struktur-Scan, Greenfield-Import und Backend-Wechsel sind im "
+                "Shadow-Modus deaktiviert (Konfiguration schreibgeschützt)."
+            )
+        else:
+            st.caption(
+                "Struktur-Scan, Greenfield-Import und Backend-Wechsel sind im "
+                "Shadow-Modus deaktiviert (Feed-Replay, kein Backend-Zugriff); "
+                "die lokale Config ist schreibbar."
+            )
         if is_sb_configured():
-            _render_configured_summary()
+            _render_configured_summary(allow_change=False)
         return
     if is_sb_configured():
-        _render_configured_summary()
+        _render_configured_summary(allow_change=True)
         return
     _render_discovery_flow()

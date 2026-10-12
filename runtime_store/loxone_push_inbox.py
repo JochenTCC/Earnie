@@ -143,6 +143,146 @@ def _write_inbox(rows: dict[str, dict[str, Any]]) -> None:
                 pass
 
 
+def _shadow_feed_key(ehal_id: str) -> str:
+    return f"loxone:io:{ehal_id}"
+
+
+def _record_push_to_shadow_feed(ehal_id: str, text: str, *, parse_ok: bool) -> None:
+    """Prod: mirror VO push into the shadow feed (never raises)."""
+    try:
+        from runtime_store.shadow.hooks import record_transport
+
+        record_transport(
+            _shadow_feed_key(ehal_id),
+            ok=parse_ok,
+            payload={"LL": {"value": text}},
+            error=None if parse_ok else "parse_failed",
+        )
+    except Exception:  # noqa: BLE001 — recorder must never break Prod
+        pass
+
+
+def _inbox_row_from_shadow_feed(ehal_id: str) -> dict[str, Any] | None:
+    """Shadow: inbox-shaped row from ``loxone:io:<id>``, or None if missing/stale.
+
+    Does not warn on miss — callers try Prod inbox next, then warn if still empty.
+    """
+    try:
+        from runtime_store.shadow.mode import is_shadow_mode
+        from runtime_store.shadow.replay import lookup_record
+
+        if not is_shadow_mode():
+            return None
+        record = lookup_record(_shadow_feed_key(ehal_id), log_missing=False)
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(record, dict):
+        return None
+    payload = record.get("payload")
+    raw = ""
+    if isinstance(payload, dict):
+        raw = str((payload.get("LL") or {}).get("value") or "").strip()
+    elif payload is not None:
+        raw = str(payload).strip()
+    if not raw:
+        if record.get("ok"):
+            return None
+        return {
+            "value": None,
+            "raw": "",
+            "parse_ok": False,
+            "last_ts": record.get("ts"),
+            "count": 1,
+        }
+    value = parse_push_value(raw)
+    return {
+        "value": value,
+        "raw": raw,
+        "parse_ok": value is not None,
+        "last_ts": record.get("ts")
+        or datetime.now(timezone.utc).isoformat(),
+        "count": 1,
+    }
+
+
+def _prod_inbox_path_candidates() -> list:
+    """Paths to Prod ``loxone_push_inbox.json`` visible from Shadow (NAS layout).
+
+    ``meta.prod_runtime_dir`` is often a container path (``/app/runtime``) and is
+    not used. Prefer ``EARNIE_SHADOW_PROD_RUNTIME_PATH``, else
+    ``{feed}/../../runtime`` when feed is ``…/config/shadow_feed``.
+    """
+    from pathlib import Path
+
+    out: list = []
+    env = str(os.getenv("EARNIE_SHADOW_PROD_RUNTIME_PATH") or "").strip()
+    if env:
+        out.append(Path(env) / INBOX_FILENAME)
+    try:
+        from runtime_store.shadow.feed import feed_dir
+
+        feed = feed_dir()
+        if feed.name == "shadow_feed":
+            out.append(feed.parent.parent / "runtime" / INBOX_FILENAME)
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _load_prod_inbox_signals() -> dict[str, dict[str, Any]]:
+    """Read Prod inbox file; empty if missing/unreadable."""
+    for path in _prod_inbox_path_candidates():
+        try:
+            if not path.is_file():
+                continue
+            with path.open(encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError, TypeError):
+            continue
+        rows = data.get("signals") if isinstance(data, dict) else None
+        if not isinstance(rows, dict):
+            continue
+        return {
+            str(k): v for k, v in rows.items() if isinstance(v, dict)
+        }
+    return {}
+
+
+def _shadow_feed_signals_for_read(ehal_id: str) -> dict[str, dict[str, Any]]:
+    """Feed rows for *ehal_id* (+ heartbeat); Prod inbox file if feed misses."""
+    out: dict[str, dict[str, Any]] = {}
+    prod_signals: dict[str, dict[str, Any]] | None = None
+    for key_id in (ehal_id, HEARTBEAT_ID):
+        row = _inbox_row_from_shadow_feed(key_id)
+        if row is None:
+            if prod_signals is None:
+                prod_signals = _load_prod_inbox_signals()
+            raw_row = prod_signals.get(key_id)
+            row = dict(raw_row) if isinstance(raw_row, dict) else None
+        if row is not None:
+            out[key_id] = row
+    if ehal_id not in out:
+        try:
+            from runtime_store.shadow.replay import warn_missing_feed_key
+
+            warn_missing_feed_key(_shadow_feed_key(ehal_id), "missing")
+        except Exception:  # noqa: BLE001
+            pass
+    return out
+
+
+def _shadow_feed_overlay_if_active(ehal_id: str) -> dict[str, dict[str, Any]]:
+    """Shadow-only: feed (+ Prod inbox fallback) rows for *ehal_id*; else ``{}``."""
+    try:
+        from runtime_store.shadow.mode import is_shadow_mode
+
+        if is_shadow_mode():
+            return _shadow_feed_signals_for_read(ehal_id)
+    except Exception:  # noqa: BLE001
+        return {}
+    return {}
+
+
 def record_push(
     ehal_id: str,
     raw: str,
@@ -193,6 +333,7 @@ def record_push(
         if value is not None:
             _last_known[ehal_id] = (float(value), stamp)
         _write_inbox(rows)
+    _record_push_to_shadow_feed(ehal_id, text, parse_ok=value is not None)
     if is_new:
         logger.info("loxone push inbox: new signal %s (peer %s)", ehal_id, row["peer"])
     return "new" if is_new else "ok"
@@ -430,8 +571,12 @@ def read_push_value(
     if not eid or not is_valid_ehal_id(eid):
         return None, STATE_READ_ERROR
     ref = now if now is not None else datetime.now(timezone.utc)
+    feed_overlay = _shadow_feed_overlay_if_active(eid)
     with _lock:
         signals = dict(_memory) if _memory else load_inbox()
+        if feed_overlay:
+            # Shadow has no VO listener; prefer Prod feed rows over empty local inbox.
+            signals = {**signals, **feed_overlay}
         row = signals.get(eid)
         link = link_alive(signals, repeat_s=repeat_s, now=ref)
         state, value = resolve_push_read(
@@ -468,8 +613,11 @@ def read_push_counter(
     if not eid or not is_valid_ehal_id(eid):
         return None
     ref = now if now is not None else datetime.now(timezone.utc)
+    feed_overlay = _shadow_feed_overlay_if_active(eid)
     with _lock:
         signals = dict(_memory) if _memory else load_inbox()
+        if feed_overlay:
+            signals = {**signals, **feed_overlay}
         row = signals.get(eid)
         if row is None:
             return None
@@ -496,8 +644,11 @@ def read_push_ready_by_time(
     if not eid or not is_valid_ehal_id(eid):
         return None
     ref = now if now is not None else datetime.now(timezone.utc)
+    feed_overlay = _shadow_feed_overlay_if_active(eid)
     with _lock:
         signals = dict(_memory) if _memory else load_inbox()
+        if feed_overlay:
+            signals = {**signals, **feed_overlay}
         row = signals.get(eid)
         held = _last_known.get(eid)
         if row is not None and not is_stale(row, repeat_s=repeat_s, now=ref):

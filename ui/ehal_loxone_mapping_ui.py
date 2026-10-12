@@ -87,7 +87,7 @@ def _select_marker(
 
 def render_ehal_loxone_mapping_section() -> None:
     """HTTP-probe structure scan + entity HITL; persists plant/consumer ehal_bindings."""
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
     st.caption(
         "Entity-zentriertes Mapping: Anlage + Verbraucher aus dem Live-Hausprofil. "
@@ -100,7 +100,7 @@ def render_ehal_loxone_mapping_section() -> None:
         "Struktur-Scan: LoxAPP3-Probe bekannter Earnie_*/gemappter Merker; "
         "in jedem Feld-Dropdown einen neuen Merker eintippen (mit Bestätigung)."
     )
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         st.info(
             "Shadow-Modus: Mapping-Speichern schreibt nur das Runtime-Overlay "
             "`shadow_ehal_bindings.json` (Prod-Config bleibt schreibgeschützt)."

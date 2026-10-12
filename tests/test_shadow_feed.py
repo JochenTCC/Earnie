@@ -208,6 +208,36 @@ def test_superset_loxone_is_noop(tmp_path, monkeypatch):
     run_after_cycle(budget_sec=5)
 
 
+def test_record_push_mirrors_to_shadow_feed(tmp_path, monkeypatch):
+    from runtime_store import loxone_push_inbox as inbox
+
+    feed_path = _enable_feed(tmp_path, monkeypatch)
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    inbox.reset_memory_for_tests()
+    eid = "ess.15_kwh_speicher.sens_ess_soc"
+    assert inbox.record_push(eid, "55.0", "10.0.0.1") == "new"
+    shadow_feed.flush_after_sampler()
+    latest = json.loads((feed_path / "latest.json").read_text(encoding="utf-8"))
+    key = f"loxone:io:{eid}"
+    assert key in latest["records"]
+    assert latest["records"][key]["payload"]["LL"]["value"] == "55.0"
+
+
+def test_flush_after_cycle_exports_inbox(tmp_path, monkeypatch):
+    from runtime_store import loxone_push_inbox as inbox
+
+    feed_path = _enable_feed(tmp_path, monkeypatch)
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    inbox.reset_memory_for_tests()
+    inbox.record_push("heartbeat", "1", "10.0.0.1")
+    # Drop in-memory feed map; cycle flush must re-export from the VO inbox.
+    shadow_feed.reset_for_tests()
+    assert shadow_feed.is_feed_recording_enabled()
+    shadow_feed.flush_after_cycle()
+    latest = json.loads((feed_path / "latest.json").read_text(encoding="utf-8"))
+    assert "loxone:io:heartbeat" in latest["records"]
+
+
 def test_superset_budget_stops_early(tmp_path, monkeypatch):
     _enable_feed(tmp_path, monkeypatch)
     house_bindings = {f"sensor.e{i}": f"sensor.e{i}" for i in range(20)}

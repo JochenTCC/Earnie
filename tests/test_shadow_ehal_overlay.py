@@ -133,6 +133,27 @@ def test_config_json_still_readonly(tmp_path):
         write_json_dict(str(target), {"earnie_data_model": 4})
 
 
+def test_save_house_profiles_allowed_with_external_feed(tmp_path, monkeypatch):
+    feed = tmp_path / "prod_feed"
+    feed.mkdir()
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    target = tmp_path / "config" / "house_profiles.json"
+    doc = {
+        "profiles": [
+            {
+                "id": "live",
+                "label": "Live",
+                "annual_kwh": 1000.0,
+                "consumers": [],
+            }
+        ],
+        "plant": {"ehal_bindings": {"sens_grid_power_active": "Local_Grid"}},
+    }
+    save_house_profiles_document(str(target), doc)
+    loaded = json.loads(target.read_text(encoding="utf-8"))
+    assert loaded["profiles"][0]["id"] == "live"
+
+
 def test_overlay_path_under_runtime(tmp_path):
     path = Path(overlay_path())
     assert path.name == "shadow_ehal_bindings.json"

@@ -521,9 +521,9 @@ def normalize_house_profiles_document(doc: dict) -> dict:
 
 def load_house_profiles_document(path: str) -> dict:
     doc = normalize_house_profiles_document(_read_json(path))
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if not is_shadow_mode():
+    if not is_shadow_config_readonly():
         return doc
     from runtime_store.shadow.ehal_overlay import apply_overlay_to_house
 
@@ -580,9 +580,9 @@ def _serialize_profile(profile: dict) -> dict:
 
 def save_house_profiles_document(path: str, doc: dict) -> None:
     from runtime_store.data_model import stamp_data_model
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         _refuse_shadow_config_write(path)
 
     normalized = normalize_house_profiles_document(doc)

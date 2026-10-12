@@ -294,11 +294,11 @@ def _stamp_pack_jsons_to_current_data_model() -> list[str]:
     Persist CURRENT_DATA_MODEL on pack/sidecar JSONs still tagged older (or missing).
 
     Ensures schemas with const=CURRENT stay valid for local/example files.
-    Skipped in Shadow Mode (shared config is read-only).
+    Skipped when Shadow shares Prod config (read-only).
     """
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         return []
 
     from runtime_store.data_model import CURRENT_DATA_MODEL
@@ -343,11 +343,11 @@ def _migrate_pack_legacy_keys() -> list[str]:
     Persist v4 key renames even when earnie_data_model is already current.
 
     Stamp alone can leave settings.battery_id on disk; live resolve then aborts.
-    Skipped in Shadow Mode (shared config is read-only).
+    Skipped when Shadow shares Prod config (read-only).
     """
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         return []
 
     from runtime_store.migrate_v4 import migrate_document
@@ -667,9 +667,9 @@ def _bootstrap_runtime_data_artifacts(*, shadow: bool = False) -> list[str]:
 
 def _bootstrap_all_artifacts() -> list[str]:
     """Create missing runtime artifacts; return paths of newly created files."""
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly, is_shadow_mode
 
-    if is_shadow_mode():
+    if is_shadow_mode() and is_shadow_config_readonly():
         logger.info(
             "bootstrap: Shadow Mode — skip config pack / .env writes "
             "(shared config read-only)"

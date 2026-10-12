@@ -134,15 +134,27 @@ Proxmox: LXC with `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh`
 
 ## Shadow Mode (Dev client)
 
-Run a development build in parallel to Prod on the same live inputs without touching the smarthome backend. Spec: [`docs/spec/shadow-mode.md`](docs/spec/shadow-mode.md). User-facing German notes: [`docs/einrichtung/betrieb.md`](docs/einrichtung/betrieb.md) (Shadow-Feed + Shadow-Modus).
+Run a development build in parallel to Prod on the same live inputs without touching the smarthome backend. Spec: [`docs/spec/shadow-mode.md`](docs/spec/shadow-mode.md) (§6.4 shared vs private config, §6.6 silent relation). User-facing German notes: [`docs/einrichtung/betrieb.md`](docs/einrichtung/betrieb.md) (Shadow-Feed + Shadow-Modus). Architecture / refactor phases: [`backlog/Shadow-Architecture-Review.md`](backlog/Shadow-Architecture-Review.md).
 
 - Activate **only** with `EARNIE_SHADOW=1` (never a config key). Implies silent mode.
-- Requires an explicit `EARNIE_RUNTIME_PATH` or `EARNIE_ENV_PATH`; shares Prod’s config (read-only) and feed under `{config}/shadow_feed/` (or `EARNIE_SHADOW_FEED_PATH`).
-- Exception: EHAL-Com mapping may write `{runtime}/shadow_ehal_bindings.json` (merged on house-profile load); Prod config files stay untouched.
+- Requires an explicit `EARNIE_RUNTIME_PATH` or `EARNIE_ENV_PATH`. Classic: shares Prod’s config (read-only) and feed under `{config}/shadow_feed/`. Private Dev: local `EARNIE_ENV_PATH` + `EARNIE_SHADOW_FEED_PATH` → Prod feed; local config is writable (`is_shadow_config_readonly()`).
+- Shared-config exception: EHAL-Com mapping may write `{runtime}/shadow_ehal_bindings.json` (merged on house-profile load); Prod config files stay untouched.
 - Prod must run with `"shadow_feed_enabled": true` in its `local_settings.json`.
 - Optional seed: `python -m scripts.shadow_seed_runtime --from <prod-runtime> --to <shadow-runtime>`.
 - Same-host UI port: `EARNIE_UI_STREAMLIT_PORT` (existing override).
 - Package trees must never set `EARNIE_SHADOW` (release gate in `release-publish.yml`).
+
+### Shadow gates (which helper to call)
+
+Use exactly one of these — do not invent a fourth gate or mix them up:
+
+| Concern | Gate |
+|---------|------|
+| Backend replay / write block / banner / cycle wait / startup refuse / feed recorder off in Shadow | `runtime_store.shadow.is_shadow_mode()` |
+| Config writers, load-time migration skip, EHAL overlay use (shared feed under `config_dir()` only) | `runtime_store.shadow.is_shadow_config_readonly()` |
+| Setpoint helper invocation so `shadow_writes.jsonl` fills (Shadow ≠ plain silent) | `runtime_store.shadow.writes.should_invoke_setpoint_writes()` |
+
+Wrong gate examples: using `is_shadow_mode()` for config saves breaks private-env dogfood; collapsing Shadow into plain silent empties would-write logs.
 
 ## Roadmap
 

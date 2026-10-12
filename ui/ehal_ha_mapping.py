@@ -102,13 +102,13 @@ def _ha_credentials(data: dict) -> dict[str, Any]:
 
 def _ensure_ha_migrated() -> tuple[dict, dict]:
     """One-shot migrate flat entities → entity-scoped; return (config, house)."""
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
     config_doc = load_main_config()
     house = load_house_profiles()
     new_house, new_config, changed = ensure_migrated(house, config_doc)
     if changed:
-        if is_shadow_mode():
+        if is_shadow_config_readonly():
             return new_config, new_house
         save_house_profiles(new_house)
         save_main_config(new_config)
@@ -447,7 +447,7 @@ def _save_entity_mapping(
     from runtime_store.dotenv_io import write_ha_dotenv
     from runtime_store.dotenv_loader import load_app_dotenv
     from runtime_store.shadow.ehal_overlay import upsert_entity_bindings
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
     from ui.house_config_io import _load_components_document, _save_components_document
 
     kind = str(entity_kind or "").strip() or entity_kind_for_id(
@@ -459,8 +459,8 @@ def _save_entity_mapping(
     if error:
         st.error(error)
         return
-    shadow = is_shadow_mode()
-    if not shadow:
+    shadow_readonly = is_shadow_config_readonly()
+    if not shadow_readonly:
         resolved_url = resolve_ha_base_url(base_url)
         if not resolved_url or not resolve_ha_token(token):
             st.error(
@@ -476,7 +476,7 @@ def _save_entity_mapping(
             return
         load_app_dotenv(override=True)
     migrated_house, migrated_config, _ = ensure_migrated(house, config_doc)
-    if shadow:
+    if shadow_readonly:
         path = upsert_entity_bindings(
             profile_id=profile_id,
             entity_id=entity_id,
@@ -542,7 +542,7 @@ def _save_entity_mapping(
 
 
 def _render_ha_mapping_intro() -> None:
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
     st.caption(
         "Entity-zentriertes Mapping (entity-scoped): zuerst Entity wählen "
@@ -554,7 +554,7 @@ def _render_ha_mapping_intro() -> None:
         "Zugangsdaten in `config/.env` (`EHAL_HA_*`). "
         "Gespeicherte Bindings werden nicht überschrieben. Kein LLM."
     )
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         st.info(
             "Shadow-Modus: Mapping-Speichern schreibt nur das Runtime-Overlay "
             "`shadow_ehal_bindings.json` (Prod-Config und `.env` bleiben schreibgeschützt)."

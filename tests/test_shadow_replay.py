@@ -224,3 +224,111 @@ def test_replay_loxone_io_reads_feed_without_network(monkeypatch, tmp_path):
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
     assert replay_loxone_io("loxone:io:X") == "1"
+
+
+def test_shadow_read_push_value_uses_feed_soc(monkeypatch, tmp_path) -> None:
+    """Shadow has no VO listener; SoC must come from ``loxone:io:<ehal_id>``."""
+    from runtime_store import loxone_push_inbox as inbox
+
+    eid = "ess.15_kwh_speicher.sens_ess_soc"
+    feed = tmp_path / "feed"
+    _write_feed(
+        feed,
+        {
+            f"loxone:io:{eid}": {
+                "key": f"loxone:io:{eid}",
+                "ts": _utc(),
+                "ok": True,
+                "status": None,
+                "payload": {"LL": {"value": "61.5"}},
+                "error": None,
+            }
+        },
+    )
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    inbox.reset_memory_for_tests()
+    value, state = inbox.read_push_value(eid)
+    assert (value, state) == (61.5, inbox.STATE_OK)
+
+
+def test_shadow_read_push_value_falls_back_to_prod_inbox(monkeypatch, tmp_path) -> None:
+    """When Prod feed has no loxone:* keys, use shared NAS Prod inbox file."""
+    from runtime_store import loxone_push_inbox as inbox
+
+    eid = "ess.15_kwh_speicher.sens_ess_soc"
+    earnie_env = tmp_path / "earnie_env"
+    feed = earnie_env / "config" / "shadow_feed"
+    prod_rt = earnie_env / "runtime"
+    prod_rt.mkdir(parents=True)
+    _write_feed(feed, {})  # no loxone keys (current Prod gap)
+    (prod_rt / "loxone_push_inbox.json").write_text(
+        json.dumps(
+            {
+                "signals": {
+                    eid: {
+                        "value": 17.0,
+                        "raw": "17",
+                        "parse_ok": True,
+                        "last_ts": _utc(),
+                        "count": 3,
+                    },
+                    "heartbeat": {
+                        "value": 1.0,
+                        "raw": "1",
+                        "parse_ok": True,
+                        "last_ts": _utc(),
+                        "count": 10,
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "shadow_runtime"))
+    inbox.reset_memory_for_tests()
+    value, state = inbox.read_push_value(eid)
+    assert (value, state) == (17.0, inbox.STATE_OK)
+
+
+def test_shadow_ready_by_time_falls_back_to_prod_inbox(monkeypatch, tmp_path) -> None:
+    """FertigUm must use Prod inbox overlay when feed has no loxone:* keys."""
+    from runtime_store import loxone_push_inbox as inbox
+
+    eid = "ev.e_auto.get_evcs_ready_by_time"
+    earnie_env = tmp_path / "earnie_env"
+    feed = earnie_env / "config" / "shadow_feed"
+    prod_rt = earnie_env / "runtime"
+    prod_rt.mkdir(parents=True)
+    _write_feed(feed, {})
+    (prod_rt / "loxone_push_inbox.json").write_text(
+        json.dumps(
+            {
+                "signals": {
+                    eid: {
+                        "value": None,
+                        "raw": "Morgen, 07:00",
+                        "parse_ok": False,
+                        "last_ts": _utc(),
+                        "count": 3,
+                    },
+                    "heartbeat": {
+                        "value": 1.0,
+                        "raw": "1",
+                        "parse_ok": True,
+                        "last_ts": _utc(),
+                        "count": 10,
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "shadow_runtime"))
+    inbox.reset_memory_for_tests()
+    assert inbox.read_push_ready_by_time(eid) == "Morgen, 07:00"

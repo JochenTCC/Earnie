@@ -23,7 +23,7 @@ def _help_text() -> str:
 
 
 def render() -> None:
-    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
     render_page_title_with_help(
         "🏠 Hauskonfigurator",
@@ -32,7 +32,7 @@ def render() -> None:
         page_docs_key="house-config",
     )
     st.caption(f"Datei: `{resolve_house_profiles_json_path()}`")
-    if is_shadow_mode():
+    if is_shadow_config_readonly():
         st.info(
             "Shadow-Modus: Hauskonfigurator ist schreibgeschützt "
             "(Prod-Config). EHAL-Mapping kann weiterhin ins Runtime-Overlay."

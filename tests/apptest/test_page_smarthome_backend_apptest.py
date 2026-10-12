@@ -84,3 +84,20 @@ def test_shows_configured_summary_when_hub_credentials_present(monkeypatch):
     assert not at.exception
     assert any("Smarthome-Backend verbunden" in s.value for s in at.success)
     assert any(sh.value == "Anbindung" for sh in at.subheader)
+
+
+def test_shadow_configured_skips_discovery_scan(monkeypatch, _mock_scan_no_network):
+    """Shadow §6.3: no integration_scanner from collapsed Backend ändern expander."""
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
+    monkeypatch.setenv("LOXONE_USER", "earnie")
+    monkeypatch.setenv("LOXONE_PASS", "secret")
+    monkeypatch.setattr(
+        "ui.pages.page_smarthome_backend._render_backend_import_section",
+        lambda backend: None,
+    )
+    at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT).run()
+    assert not at.exception
+    assert any("Smarthome-Backend verbunden" in s.value for s in at.success)
+    assert any("Shadow-Modus deaktiviert" in c.value for c in at.caption)
+    _mock_scan_no_network.assert_not_called()

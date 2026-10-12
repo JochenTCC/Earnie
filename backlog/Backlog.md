@@ -29,8 +29,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Inverter follow-ups** (postponed from **2.7.l**; epic **Inverter**): DC/AC efficiency paths; multi-inverter live attribution of `sens_pv_production_active`.
 - **Note:** Deferred (not part of 2.7.l): device catalog for inverters and batteries (commercially available models with rated powers, capacity, efficiency, limits) so parameters need not be typed by hand. The P2 presets (e.g. "EcoFlow Delta 3") are only hand-written seeds; the catalog would replace them later. Own backlog item when it is picked up.
 
-- **Note:** Shadow architecture review (proposal) → [Erledigt](Backlog-Erledigt.md) / [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); spec §11.1 / §12. Implementation = **R1–R4** below.
-- [ ] **Shadow R1 — Policy façade** (behavior-preserving): gate checklist for `is_shadow_mode` / `is_shadow_config_readonly` / `should_invoke_setpoint_writes`; call-site audit. Details: [review](Shadow-Architecture-Review.md) §3 R1.
+- **Note:** Shadow architecture review (proposal) + **R1** policy façade → [Erledigt](Backlog-Erledigt.md) / [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); spec §11.1 / §12. Open implementation = **R2–R4** below.
 - [ ] **Shadow R2 — Single Loxone input contract:** feed-only VO telemetry; `meta.json` capability; retire Prod-inbox file fallback after gate; never reintroduce Merker-superset. Details: [review](Shadow-Architecture-Review.md) §3 R2.
 - [ ] **Shadow R3 — Transport intercept:** shared record/replay helpers; complete `assert_not_shadow_backend` on probes; extract daemon orchestration from `main.py`. Details: [review](Shadow-Architecture-Review.md) §3 R3.
 - [ ] **Shadow R4 — Feed gaps:** ENTSO-E (and other missing `ext:*`) record/replay; S4 Soll/Soll stays **2.+1**. Details: [review](Shadow-Architecture-Review.md) §3 R4.

@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Shadow R1 — Policy façade (2026-10-12)
+
+- [x] **Shadow R1 — Policy façade** (behavior-preserving)
+  - Landed `is_shadow_config_readonly()` (shared feed → RO; external feed → private writable) + VO push → `loxone:io:*` feed with Prod-inbox fallback (compat until R2)
+  - Gate checklist in `DEVELOPER.md`; call-site audit in [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md) §3 R1 (no wrong-gate fixes needed)
+  - No new helpers; R2–R4 remain open in [`Backlog.md`](Backlog.md)
+
 ### 2.7.l — Inverter entity P1–P5 (2026-10-12)
 
 - [x] **2.7.l — Inverter entity (PV × battery topology)** (epic **Inverter**; draft [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md))
