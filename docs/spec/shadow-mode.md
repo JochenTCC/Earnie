@@ -1,7 +1,7 @@
 # Specification: Shadow Mode (Dev instance fed by Prod)
 
 **Version:** 0.3  
-**Status:** S1 (Prod recorder) implemented; S2+S3 (Shadow client) implemented on `feature/2.7` — backlog **2.6.o** → **2.7.f** → **2.+1** (S4)  
+**Status:** S1 (Prod recorder) implemented; S2+S3 (Shadow client) implemented — backlog **2.6.o** → **2.7.f** → **2.+1** (S4). Post-2.7 architecture review done: [`backlog/Shadow-Architecture-Review.md`](../../backlog/Shadow-Architecture-Review.md) (follow-up refactor **R1–R4**, not yet implemented).  
 **Epic short name:** **Shadow**  
 **Related:** Silent mode (`config.is_silent_mode()`), [EHAL](ehal.md), [Release Checklist](release-checklist.md)
 
@@ -79,7 +79,7 @@ Record **raw backend responses** at the transport primitives, not parsed values.
 
 | Backend | Primitive | Feed key |
 |---|---|---|
-| Loxone | VO push inbox / cycle path (Merker HTTP retired) | `loxone:io:<io_name>` (legacy feed keys may remain) |
+| Loxone | VO push inbox (`record_push` → feed; Merker HTTP retired) | `loxone:io:<ehal_id>` (legacy Merker-name keys may remain) |
 | HA | `HaAdapter._get_json(path)` | `ha:get:<path>` (e.g. `ha:get:/api/states/sensor.x`) |
 | OpenEMS | `OpenemsAdapter` GET | `openems:get:<path>` |
 | forecast.solar | `data.pv_forecast` fetch | `ext:pv_forecast:<url-hash>` |
@@ -96,7 +96,7 @@ Each record: `{"key", "ts" (UTC ISO), "ok": bool, "status" (HTTP code or null), 
 Shadow can only see what Prod reads. To cover bindings present in the shared config but not touched in this Prod cycle, Prod additionally reads, **once per quarter-hour cycle**:
 
 - **HA (default):** only entities referenced in the shared config bindings (plant / consumers / EHAL map) that were not read in this cycle — one `GET /api/states/<entity>` each → key `ha:get:/api/states/<entity>`. Full `GET /api/states` dump is **not** the default (payload size on SMB); optional later via a local_settings flag if needed.
-- **Loxone:** every IO name referenced in the config bindings (house profiles, consumers, EHAL mapping) that was not read in this cycle. The config is shared, so bindings added for the dev build are included.
+- **Loxone:** no Merker HTTP superset (push-only). Prod records each VO push into `loxone:io:<ehal_id>` as it arrives; Shadow `read_push_value` overlays those feed rows onto the (empty) local inbox. If the feed has no Loxone keys yet (older Prod), Shadow falls back to the shared Prod file `{earnie_env}/runtime/loxone_push_inbox.json` next to `config/shadow_feed` (or `EARNIE_SHADOW_PROD_RUNTIME_PATH`).
 - **OpenEMS:** the configured ESS / EVCS component channels.
 
 Superset reads run **after** the optimizer cycle's writes, are soft-fail, and have a per-cycle time budget (default 10 s). They must never delay setpoint writes.
@@ -145,13 +145,22 @@ When `is_shadow_mode()`:
 - A blocked write returns the same "not sent" result as silent mode today, and appends a structured record to `{runtime}/shadow_writes.jsonl`: `{ts, cycle_seq, backend, target, value, source}` plus a normal INFO log line `shadow: would write …`.
 - Suppressed entirely in Shadow: `push_safe_setpoints_on_startup`, the Loxone request HTTP listener (`start_loxone_request_http`, port 8541), `loxone_watchdog`, the EHAL write test page (disabled like in silent mode).
 
-### 6.4 Config read-only
+### 6.4 Config read-only (shared Prod config) vs private Shadow config
+
+Helper: `runtime_store.shadow.is_shadow_config_readonly()` — true only when Shadow is active **and** the feed directory resolves **under** this process's `config_dir()` (classic shared Prod config). When `EARNIE_SHADOW_FEED_PATH` points the feed **outside** the local config tree, the local env is a **private Shadow config** and may be written.
+
+**Shared config (read-only):**
 
 - All config writers raise `ConfigReadOnlyError` when the target is under `config_dir()`: `settings.json_io.write_json_dict`, `house_config.profiles_store.save_house_profiles_document`, `.env` writes (`runtime_store.dotenv_io`), uploads, config pack import, bootstrap of config files.
-- Load-time migrations that write back are **skipped** in Shadow (e.g. `apply_ha_secrets_migration_to_disk` in `runtime_store/config_load.py`); Shadow uses the migrated values in memory only.
-- UI: banner "Konfiguration schreibgeschützt (Shadow)"; general save buttons disabled.
-- **Exception — EHAL bindings overlay:** EHAL-Com mapping save (Loxone / HA) may persist entity `ehal_bindings` to `{runtime}/shadow_ehal_bindings.json`. `load_house_profiles_document` merges that overlay onto the read-only Prod `house_profiles.json` while `EARNIE_SHADOW=1`. Prod files are never written. Delete the overlay file (or the Shadow runtime dir) to discard Shadow-only mappings.
-- Other config changes for a dev feature are still made in Prod's UI / file. The Prod build **ignores** keys it does not know. Keys the Prod build would **reject** still cannot be tested via a full Shadow-only config overlay (bindings-only exception above).
+- Load-time migrations that write back are **skipped**; Shadow uses the migrated values in memory only.
+- UI: banner notes "Konfiguration schreibgeschützt (Prod-Config)".
+- **Exception — EHAL bindings overlay:** EHAL-Com mapping save (Loxone / HA) may persist entity `ehal_bindings` to `{runtime}/shadow_ehal_bindings.json`. `load_house_profiles_document` merges that overlay onto the read-only Prod `house_profiles.json`. Prod files are never written. Delete the overlay file (or the Shadow runtime dir) to discard Shadow-only mappings.
+
+**Private config (writable):**
+
+- Local `EARNIE_ENV_PATH` / `EARNIE_CONFIG_PATH` may be edited like a normal Dev client (Hauskonfigurator, `.env`, EHAL mapping to real files). Backend writes remain blocked (§6.3).
+- EHAL overlay is **not** used; mapping saves go to the local config files.
+- Typical launch: local `earnie_env` + `EARNIE_SHADOW_FEED_PATH` → Prod NAS `…/config/shadow_feed`.
 
 ### 6.5 Own runtime dir
 
@@ -165,7 +174,7 @@ When `is_shadow_mode()`:
 |---|---|---|
 | Reads backend | yes | **no** (feed) |
 | Writes backend | no | no (hard block + `shadow_writes.jsonl`) |
-| Writes config | yes | **no** |
+| Writes config | yes | **no** if feed under `config_dir()`; **yes** if private config (external feed) |
 | Switch | UI / `local_settings.json` | `EARNIE_SHADOW=1` only |
 | Runtime dir | shared default | own, mandatory |
 
@@ -181,7 +190,7 @@ Shadow implies silent, but the live cycle still **invokes** the setpoint write h
 
 ## 8. UI
 
-- Persistent banner on every page: **"Shadow-Modus — Eingänge aus Prod-Feed (Stand HH:MM:SS, Alter N s), keine Schreibzugriffe, Konfiguration schreibgeschützt"**; colour changes to warning when the feed is stale.
+- Persistent banner on every page: **"Shadow-Modus — Eingänge aus Prod-Feed (Stand HH:MM:SS, Alter N s), keine Backend-Schreibzugriffe, …"** plus either **Konfiguration schreibgeschützt (Prod-Config)** or **lokale Config schreibbar**; colour changes to warning when the feed is stale.
 - Smarthome backend page: connection tests show "Shadow — Feed" instead of probing the backend; missing feed keys are listed per mapped field.
 - Loxone/EHAL debug page: "would write" table from `shadow_writes.jsonl` for the last run (reuses the existing `loxone_writes` / `ehal_writes` rendering).
 - Status bar: Prod version from `meta.json` next to the Shadow version.
@@ -225,6 +234,17 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 | **S3** | UI (§8), `EARNIE_UI_STREAMLIT_PORT`, seed script (§6.5), user docs (German: `docs/einrichtung/`, DEVELOPER.md) | **2.7.f** | with S2 |
 | S4 (later) | Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input | **2.+1** | — |
 
+### 11.1 Post-2.7 follow-up (refactor R1–R4)
+
+Review: [`backlog/Shadow-Architecture-Review.md`](../../backlog/Shadow-Architecture-Review.md). Implementation is separate backlog work under Version 2.7; no behavior change until a phase is picked up.
+
+| Step | Content | Ships to Prod? |
+|---|---|---|
+| **R1** | Policy façade / gate checklist (`is_shadow_mode` vs `is_shadow_config_readonly` vs `should_invoke_setpoint_writes`); behavior-preserving | no functional change |
+| **R2** | Single Loxone input = feed (`loxone:io:*`); `meta.json` capability (e.g. `loxone_feed: "push"`); retire Prod-inbox file fallback after gate; never reintroduce Merker-superset | yes (recorder capability) when implemented |
+| **R3** | Transport intercept helpers; complete `assert_not_shadow_backend` on probes; extract daemon orchestration from `main.py` | inactive without env; safer for all builds |
+| **R4** | ENTSO-E (and other missing `ext:*`) into feed/replay; S4 stays **2.+1** | recorder keys when implemented |
+
 ## 12. Decisions / remaining open
 
 **Decided (2026-09-27):**
@@ -233,7 +253,14 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 2. **Config keys unknown to Prod:** no general Shadow config overlay. **Exception:** EHAL entity bindings may be saved to `{runtime}/shadow_ehal_bindings.json` and merged on house-profile load (§6.4). Prod ignores unknown keys; Prod-rejected keys still cannot be tested via a full Shadow-only config.
 3. **Backlog packaging:** S1 recorder = **2.6.o** (before finishing **2.6.r** Sonar); S2+S3 Shadow client = **2.7.f** (first on `feature/2.7`, before **2.7.a–e**). S4 → **2.+1**.
 
+**Decided (2026-10-12, post-2.7 architecture review):**
+
+4. **Shared vs private Shadow config (§6.4):** first-class. `is_shadow_config_readonly()` is true only when the feed resolves under this process’s `config_dir()`; an external `EARNIE_SHADOW_FEED_PATH` means a private writable local config. Not a temporary workaround.
+5. **Loxone feed contract:** push-only (`record_push` + cycle export → `loxone:io:*`); Loxone after-cycle Merker-superset stays a **no-op**. Prod-inbox file fallback (§5.3) is **compat until R2** capability gate retires it.
+6. **Silent vs Shadow writes:** Shadow implies silent but still invokes setpoint write helpers so `shadow_writes.jsonl` is filled (`should_invoke_setpoint_writes`); do not collapse Shadow into plain silent.
+
 **Still open:**
 
 - **Feed retention default:** 14 days of JSONL — size estimate needed after S1 on the real house.
 - **Clock skew / sampler heartbeat:** staleness uses age vs `latest.json.cycle_ts` (fallback: `meta.json.heartbeat_ts`, then Shadow wall clock), gated by `EARNIE_SHADOW_MAX_AGE_SEC` (default 120). Directed age: records newer than the ref (mid-wait sampler updates) stay fresh.
+- **R2 capability string / retire timing:** exact `meta.json` field name and how long dual-path warning runs before inbox fallback removal (see review).

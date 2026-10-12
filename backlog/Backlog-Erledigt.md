@@ -2,6 +2,28 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.l — Inverter entity P1–P5 (2026-10-12)
+
+- [x] **2.7.l — Inverter entity (PV × battery topology)** (epic **Inverter**; draft [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md))
+  - Model: `inverters[]` in `components.json`; PV/batteries reference via `inverter_id` (n:1); scenario keeps `pv_system_ids[]` / `battery_ids[]` (no `inverter_ids[]`)
+  - `type` `hybrid` | `pv_string` | `battery`; caps `max_ac_power_kw` / `max_pv_input_kw` / `max_ac_charge_kw`; `control`; `ac_connection` `grid_tied` | `island` (replaces `batteries[].kind` / Topologie)
+  - Built-in inverter: `owned_by` battery (UI/lifecycle); virtual PS none; physical PS owned `island`; EHAL role optional `inv.{id}.*`
+  - Data model stays `earnie_data_model` **4**; structural fail-fast + one-off `scripts/migrate_inverters_once.py` (no permanent loader shim)
+- [x] **Inverter P1 — schema + resolution:** `components.schema.json`, `inverter_id`, `entity_resolution` (`_planning_inverters`, validation), migrate + fail-fast, tests (`tests/test_inverter_p1.py`)
+- [x] **Inverter P2 — UI + docs:** house-configurator inverter editor, PV/battery selects, built-in section + presets, remove Topologie; German `docs/konfiguration/batterie-pv.md`; `entity_id_lock` from day one
+- [x] **Inverter P3 — MILP:** per-inverter PV node, AC/DC clipping, grid-charge rules, island outside house balance (`optimizer/milp_inverter.py`); efficiency deferred to follow-ups
+- [x] **Inverter P4 — EHAL:** role `share/ehal/roles/inverter.json`, Live/mapping, HA/Loxone/OpenEMS, export-limit unconstrained per inverter, `qualified_inverter_id()`, docs `ehal.md` / `ehal-com.md`
+- [x] **Inverter P5 — curtailment write:** `inv.{id}.set_inv_ac_power_limit` from plant `p_pv_curtail[t0]` (`optimizer/inv_ac_power_limit.py`, `write_inv_ac_limits_from_plan`); sticky rating release when no curtail
+- Open remain in [`Backlog.md`](Backlog.md): Inverter follow-ups (efficiency; multi-inverter live PV attribution); device catalog deferred
+
+### Shadow architecture review — proposal (2026-10-12)
+
+- [x] Review entire Shadow architecture after 2.7 changes and propose refactoring (attention: post-commit bugfixes)
+  - Verdict: S1–S3 match the spec; debt is call-site scatter + Prod-inbox fallback compat — not a broken core
+  - Classification: keep push-only Loxone feed, `is_shadow_config_readonly` (shared vs private), `should_invoke_setpoint_writes`; retire inbox-file fallback only after R2 capability gate; do not revive Merker-superset
+  - Proposal: **R1–R4** in [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); locked in [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) §11.1 / §12
+  - Implementation of R1–R4 remains open in [`Backlog.md`](Backlog.md) (proposal-only session; no code refactor)
+
 ### Thermal Wärmeinhalt — latest-12 forecast fan (2026-10-11)
 
 - [x] **Improve chart for thermal simulation** — Analyse Verbrauch & Kosten Wärmeinhalt: keep Sim/Ist; overlay latest 12 hourly Q-forecast lines (`horizon_q_sim_kwh`) for heat storage + pools; common horizon ≤ 24 h
