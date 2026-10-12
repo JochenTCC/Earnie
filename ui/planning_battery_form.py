@@ -524,11 +524,13 @@ def _render_battery_power_efficiency(
         **discharge_kwargs,
     )
     efficiency = labeled_number_input(
-        "Wirkungsgrad",
+        "Wirkungsgrad Chemie (η_batt)",
         min_value=0.5,
         max_value=1.0,
         step=0.01,
         key=_scoped_key(session_scope, "planning_battery_efficiency"),
+        help="Einweg-Faktor Zellchemie. Pfad η_path = η_inv · η_batt "
+        "(η_inv am Wechselrichter).",
     )
     return max_charge, max_discharge, efficiency
 

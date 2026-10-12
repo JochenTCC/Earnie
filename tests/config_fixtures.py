@@ -50,12 +50,15 @@ def default_live_settings() -> dict:
 
 def main_hybrid_inverter(**overrides) -> dict:
     """Default hybrid inverter stub for test components.json payloads."""
+    from house_config.inverter import DEFAULT_INVERTER_EFFICIENCY
+
     base = {
         "id": "wr_main",
         "label": "Haupt-WR",
         "type": "hybrid",
         "ac_connection": "grid_tied",
         "control": "full",
+        "efficiency": DEFAULT_INVERTER_EFFICIENCY,
         "ehal_bindings": {},
     }
     base.update(overrides)

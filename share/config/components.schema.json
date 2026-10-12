@@ -135,7 +135,8 @@
         "battery_efficiency": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "maximum": 1
+          "maximum": 1,
+          "description": "One-way chemistry factor η_batt (0–1]. Path η_path = η_inv · η_batt; round-trip ≈ η_path²."
         },
         "battery_min_soc": {
           "type": "number",
@@ -226,13 +227,18 @@
         "inverter_id": {
           "type": "string",
           "description": "Reference to inverters[].id (required)."
+        },
+        "ehal_bindings": {
+          "type": "object",
+          "description": "entity-scoped pv.{id}.* bindings (optional live PV power).",
+          "additionalProperties": { "type": "string" }
         }
       }
     },
     "inverter_entity": {
       "type": "object",
       "description": "Wechselrichter (2.7.l): PV×Batterie-Topologie, Clipping, island vs grid-tied.",
-      "required": ["id", "type", "ac_connection"],
+      "required": ["id", "type", "ac_connection", "efficiency"],
       "properties": {
         "id": { "type": "string" },
         "label": { "type": "string" },
@@ -245,6 +251,12 @@
           "type": "string",
           "enum": ["grid_tied", "island"],
           "description": "grid_tied = house AC bus; island = attached loads only (replaces batteries[].kind=isolated)."
+        },
+        "efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "One-way DC↔AC factor η_inv (0–1]. Applied to PV DC→AC and as part of ESS path η_inv·η_batt."
         },
         "max_ac_power_kw": {
           "type": "number",

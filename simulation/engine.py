@@ -219,9 +219,13 @@ def _scenario_to_battery_params(scenario_params: dict) -> dict | list[dict]:
     )
     if len(planning_list) >= 2:
         return [battery_params_from_planning(entry) for entry in planning_list]
+    if len(planning_list) == 1:
+        return battery_params_from_planning(planning_list[0])
 
     control_raw = scenario_params.get("battery_control", scenario_params.get("control"))
     charge_kw, discharge_kw = split_battery_max_power_kw(scenario_params)
+    # Inline flat scenarios without planning entries: treat battery_efficiency
+    # as full path η (no separate η_inv available).
     return {
         "battery_capacity_kwh": float(scenario_params["battery_capacity_kwh"]),
         "min_soc": float(scenario_params["battery_min_soc"]),

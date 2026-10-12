@@ -296,10 +296,24 @@ class HaAdapter:
     def read_telemetry(self) -> EhalTelemetry:
         if self._weg_b:
             return self._read_telemetry_weg_b()
-        missing = [
+        from integrations.pv_attribution import (
+            collect_scoped_pv_live_from_bindings,
+            load_components_for_attribution,
+            load_house_for_attribution,
+            plant_pv_may_be_derived,
+            with_attributed_plant_pv,
+        )
+
+        house = load_house_for_attribution()
+        components = load_components_for_attribution()
+        derive_pv = plant_pv_may_be_derived(house, components)
+        required = tuple(
             name
             for name in TELEMETRY_REQUIRED
-            if not self._entity_key_for_kind(name)
+            if not (derive_pv and name == "sens_pv_production_active")
+        )
+        missing = [
+            name for name in required if not self._entity_key_for_kind(name)
         ]
         if missing:
             raise HaHttpError(
@@ -311,7 +325,7 @@ class HaAdapter:
             "ts": _utc_ts(),
             "adapter_id": self.cfg.adapter_id,
         }
-        for field_name in TELEMETRY_REQUIRED:
+        for field_name in required:
             doc[field_name] = self._read_mapped_numeric(field_name)
         for field_name in TELEMETRY_OPTIONAL:
             if not self._entity_key_for_kind(field_name):
@@ -323,6 +337,22 @@ class HaAdapter:
             if field_name in _NONNEG_TELEMETRY:
                 value = max(0.0, value)
             doc[field_name] = value
+
+        if derive_pv and "sens_pv_production_active" not in doc:
+            from integrations.pv_attribution import read_scoped_pv_ha
+
+            def _read_field(field: str) -> float | None:
+                return read_scoped_pv_ha(field, adapter=self)
+
+            scoped = collect_scoped_pv_live_from_bindings(
+                components, read_value=_read_field
+            )
+            doc = with_attributed_plant_pv(
+                doc,
+                scoped_live=scoped,
+                inverters=list(components.get("inverters") or []),
+                pv_systems=list(components.get("pv_systems") or []),
+            )
 
         if "sens_pv_production_active" in doc:
             doc["sens_pv_production_active"] = max(
@@ -336,7 +366,12 @@ class HaAdapter:
                 + float(doc["sens_grid_power_active"])
                 + ess,
             )
-        return validate_telemetry(doc)
+        plant_doc = {
+            k: v
+            for k, v in doc.items()
+            if not (str(k).startswith("inv.") or str(k).startswith("pv."))
+        }
+        return validate_telemetry(plant_doc)
 
     def _entity_key_for_kind(self, kind: str) -> str | None:
         from integrations.ha_push_read import adapter_key_for_kind
@@ -355,9 +390,24 @@ class HaAdapter:
 
     def _read_telemetry_weg_b(self) -> EhalTelemetry:
         from integrations.ha_push_read import PushReadError, read_push_ehal_value
+        from integrations.pv_attribution import (
+            collect_scoped_pv_live_from_bindings,
+            load_components_for_attribution,
+            load_house_for_attribution,
+            plant_pv_may_be_derived,
+            with_attributed_plant_pv,
+        )
 
+        house = load_house_for_attribution()
+        components = load_components_for_attribution()
+        derive_pv = plant_pv_may_be_derived(house, components)
+        required = tuple(
+            name
+            for name in TELEMETRY_REQUIRED
+            if not (derive_pv and name == "sens_pv_production_active")
+        )
         missing = [
-            name for name in TELEMETRY_REQUIRED if self._push_qid_for_kind(name) is None
+            name for name in required if self._push_qid_for_kind(name) is None
         ]
         if missing:
             raise HaHttpError(
@@ -369,7 +419,7 @@ class HaAdapter:
             "ts": _utc_ts(),
             "adapter_id": self.cfg.adapter_id,
         }
-        for field_name in TELEMETRY_REQUIRED:
+        for field_name in required:
             adapter_key, qid = self._push_qid_for_kind(field_name)  # type: ignore[misc]
             try:
                 doc[field_name] = read_push_ehal_value(
@@ -396,6 +446,35 @@ class HaAdapter:
                 value = max(0.0, value)
             doc[field_name] = value
 
+        if derive_pv and "sens_pv_production_active" not in doc:
+            def _read_push_scoped(field: str) -> float | None:
+                qid = self.cfg.push_read_qids.get(field)
+                if not qid:
+                    return None
+                try:
+                    return max(
+                        0.0,
+                        float(
+                            read_push_ehal_value(
+                                qid,
+                                sign=self.cfg.sign,
+                                adapter_field=field,
+                            )
+                        ),
+                    )
+                except PushReadError:
+                    return None
+
+            scoped = collect_scoped_pv_live_from_bindings(
+                components, read_value=_read_push_scoped
+            )
+            doc = with_attributed_plant_pv(
+                doc,
+                scoped_live=scoped,
+                inverters=list(components.get("inverters") or []),
+                pv_systems=list(components.get("pv_systems") or []),
+            )
+
         if "sens_pv_production_active" in doc:
             doc["sens_pv_production_active"] = max(
                 0.0, float(doc["sens_pv_production_active"])
@@ -408,7 +487,12 @@ class HaAdapter:
                 + float(doc["sens_grid_power_active"])
                 + ess,
             )
-        return validate_telemetry(doc)
+        plant_doc = {
+            k: v
+            for k, v in doc.items()
+            if not (str(k).startswith("inv.") or str(k).startswith("pv."))
+        }
+        return validate_telemetry(plant_doc)
 
     def _fence_rest_field(self, field_name: str) -> None:
         if not self._weg_b:

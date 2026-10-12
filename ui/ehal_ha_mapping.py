@@ -34,9 +34,11 @@ from ui.ehal_loxone_mapping import (
     BATTERY_ENTITY_KIND,
     PLANT_ENTITY_ID,
     PLANT_TELEMETRY_REQUIRED,
+    PV_ENTITY_KIND,
     apply_battery_bindings,
     apply_entity_bindings,
     apply_inverter_bindings,
+    apply_pv_system_bindings,
     build_entity_rows,
     entity_kind_for_id,
     INVERTER_ENTITY_KIND,
@@ -506,6 +508,14 @@ def _save_entity_mapping(
         )
         _save_components_document(components)
         detail = "`components.json` (`inverters[].ehal_bindings`)"
+    elif kind == PV_ENTITY_KIND:
+        components = apply_pv_system_bindings(
+            _load_components_document(),
+            pv_system_id=entity_id,
+            bindings=ehal_map,
+        )
+        _save_components_document(components)
+        detail = "`components.json` (`pv_systems[].ehal_bindings`)"
     else:
         updated = apply_entity_bindings(
             migrated_house,
@@ -601,6 +611,15 @@ def _run_telemetry_smoke_test(
             trial_components = apply_inverter_bindings(
                 _load_components_document(),
                 inverter_id=entity_id,
+                bindings=ehal_map,
+            )
+            entities_map = aggregate_ha_entities(
+                house, components_doc=trial_components
+            )
+        elif kind == PV_ENTITY_KIND:
+            trial_components = apply_pv_system_bindings(
+                _load_components_document(),
+                pv_system_id=entity_id,
                 bindings=ehal_map,
             )
             entities_map = aggregate_ha_entities(

@@ -119,8 +119,9 @@ def field_quantity(field: str) -> str | None:
     try:
         from ehal.ess_fields import ess_field_kind
         from ehal.inverter_fields import inv_field_kind
+        from ehal.pv_fields import pv_field_kind
 
-        kind = ess_field_kind(name) or inv_field_kind(name)
+        kind = ess_field_kind(name) or inv_field_kind(name) or pv_field_kind(name)
         if kind:
             return FIELD_QUANTITY.get(kind)
     except ImportError:

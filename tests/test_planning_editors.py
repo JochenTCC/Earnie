@@ -30,6 +30,7 @@ _WR_MAIN = {
     "type": "hybrid",
     "ac_connection": "grid_tied",
     "control": "full",
+    "efficiency": 0.97,
 }
 from tests.config_fixtures import default_live_settings, minimal_config_payload
 from ui.house_config_profile_form import (

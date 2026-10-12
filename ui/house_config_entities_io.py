@@ -53,6 +53,7 @@ def upsert_pv_system(
         ID_LOCKED_KEY,
         ID_PROVISIONAL_LABEL_KEY,
         resolve_id_on_save,
+        rewrite_pv_bindings_slug,
     )
     from house_config.entity_resolution import normalize_pv_system
     from house_config.label_uniqueness import assert_unique_label
@@ -84,6 +85,21 @@ def upsert_pv_system(
         inverter_id = str(existing.get("inverter_id") or "").strip()
     if not inverter_id:
         raise ValueError("PV-Anlage: inverter_id fehlt.")
+    bindings_src = raw_spec.get("ehal_bindings")
+    if (
+        not (
+            isinstance(bindings_src, dict)
+            and bindings_src
+        )
+        and isinstance(existing, dict)
+    ):
+        bindings_src = existing.get("ehal_bindings")
+    if old_id and old_id != entity_id:
+        bindings_src = rewrite_pv_bindings_slug(
+            bindings_src if isinstance(bindings_src, dict) else {},
+            old_id=old_id,
+            new_id=entity_id,
+        )
     # Wire shape for components.json (kwp); normalize_pv_system uses pv_kwp at runtime.
     save_spec = {
         "id": entity_id,
@@ -94,6 +110,8 @@ def upsert_pv_system(
         "inverter_id": inverter_id,
         ID_LOCKED_KEY: id_locked,
     }
+    if isinstance(bindings_src, dict):
+        save_spec["ehal_bindings"] = bindings_src
     if not id_locked and provisional:
         save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
     normalize_pv_system(save_spec, 0)  # validate before persist
@@ -164,6 +182,13 @@ def upsert_inverter(
             old_id=old_id,
             new_id=entity_id,
         )
+    from house_config.inverter import DEFAULT_INVERTER_EFFICIENCY
+
+    efficiency_raw = raw_spec.get("efficiency")
+    if efficiency_raw in (None, "") and isinstance(existing, dict):
+        efficiency_raw = existing.get("efficiency")
+    if efficiency_raw in (None, ""):
+        efficiency_raw = DEFAULT_INVERTER_EFFICIENCY
     save_spec: dict = {
         "id": entity_id,
         "label": label or entity_id,
@@ -172,6 +197,7 @@ def upsert_inverter(
             raw_spec.get("ac_connection") or "grid_tied"
         ).strip().lower(),
         "control": str(raw_spec.get("control") or "full").strip().lower(),
+        "efficiency": float(efficiency_raw),
         ID_LOCKED_KEY: id_locked,
     }
     for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw"):

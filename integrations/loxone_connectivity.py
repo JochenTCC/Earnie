@@ -662,7 +662,44 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
 
     _append_battery_ess_read_checks(checks)
     _append_inverter_read_checks(checks)
+    _append_pv_system_read_checks(checks)
     return checks
+
+
+def _append_pv_system_read_checks(checks: list[tuple[str, str, dict]]) -> None:
+    """Per-PV-system entity-scoped reads from ``components.json``."""
+    from ehal.loxone_push_source import is_pushable_kind
+    from ehal.pv_fields import binding_address, pv_field
+    from integrations.ehal_debug_mapping import PV_LIVE_READ_KINDS
+
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return
+        doc = load_components_document(path)
+    except Exception:
+        return
+    raw = doc.get("pv_systems") if isinstance(doc, dict) else []
+    if not isinstance(raw, list):
+        return
+    for pv in raw:
+        if not isinstance(pv, dict):
+            continue
+        pid = str(pv.get("id") or "").strip()
+        if not pid:
+            continue
+        bindings = pv.get("ehal_bindings")
+        bind_map = bindings if isinstance(bindings, dict) else None
+        for kind in PV_LIVE_READ_KINDS:
+            field = pv_field(pid, kind)
+            io_name = binding_address(bind_map, pid, kind)
+            if not io_name and bind_map is not None and field in bind_map:
+                if is_pushable_kind(kind):
+                    io_name = field
+            _append_io_check(checks, field, io_name)
 
 
 def _append_inverter_read_checks(checks: list[tuple[str, str, dict]]) -> None:

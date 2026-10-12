@@ -3,11 +3,12 @@
 Pilot start of backlog 2.7.n-2 (spike/vo-push-pilot). The namespace names the *device
 type*; where a field family has a stem the namespace equals it (``ess`` ↔ ``sens_ess_*``,
 ``evcs`` ↔ ``sens_evcs_*``, ``inv`` ↔ ``sens_inv_*``, ``grid`` ↔ ``sens_grid_*`` /
-``*_grid_*``). Other plant house-wide fields stay bare for now (PV deferred).
+``*_grid_*``, ``pv`` ↔ plant / ``pv.{id}.sens_pv_*``). Plant house-wide PV sum stays
+bare ``sens_pv_production_active``; per-PV-system power uses ``pv.{id}.*``.
 
 Storage is unchanged: bindings stay under the keys they were saved with (``ess.{id}.*``,
-legacy ``flex.{slug}.*``, bare plant/consumer fields). ``flex`` is only a legacy alias
-that is still accepted on input; it is not emitted in new exchange IDs.
+``pv.{id}.*``, legacy ``flex.{slug}.*``, bare plant/consumer fields). ``flex`` is only a
+legacy alias that is still accepted on input; it is not emitted in new exchange IDs.
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ NS_ESS = "ess"
 NS_EVCS = "evcs"  # wallbox (charger)
 NS_EV = "ev"  # vehicle
 NS_INV = "inv"  # inverter (2.7.l P4)
+NS_PV = "pv"  # PV system (entity-scoped power)
 NS_GRID = "grid"
 NS_HEATPUMP = "heatpump"
 NS_POOL = "pool"
@@ -33,6 +35,7 @@ NAMESPACES: tuple[str, ...] = (
     NS_EVCS,
     NS_EV,
     NS_INV,
+    NS_PV,
     NS_GRID,
     NS_HEATPUMP,
     NS_POOL,
@@ -106,6 +109,11 @@ def qualified_battery_id(battery_id: str, key: str) -> str:
 def qualified_inverter_id(inverter_id: str, key: str) -> str:
     """``inv.<Kennung>.<kind>`` for an inverter binding key (entity-scoped or flat)."""
     return f"{NS_INV}.{str(inverter_id).strip()}.{field_kind(key)}"
+
+
+def qualified_pv_id(pv_system_id: str, key: str) -> str:
+    """``pv.<Kennung>.<kind>`` for a PV-system binding key (entity-scoped or flat)."""
+    return f"{NS_PV}.{str(pv_system_id).strip()}.{field_kind(key)}"
 
 
 def qualified_grid_id(key: str, *, meter_id: str = GRID_METER_ID) -> str:

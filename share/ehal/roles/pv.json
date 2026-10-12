@@ -1,23 +1,23 @@
 {
   "role_id": "pv",
   "label": "PV",
-  "description": "Photovoltaic production active power (interval energy from ∫ power × Δt).",
+  "description": "Photovoltaic production. Plant bare sens_pv_production_active is the AC sum; optional entity-scoped pv.{pv_system_id}.sens_pv_production_active on pv_systems[].ehal_bindings (DC string). Plant may be derived from Σ grid-tied inv.*.sens_inv_power_pv · η_inv when unmapped.",
   "status": "m1",
   "ehal_fields": [
     {
       "field": "sens_pv_production_active",
-      "required": true,
+      "required": false,
       "kind": "telemetry",
-      "notes": "W; production ≥ 0. Cumulative kWh counter is removed (2.4.j).",
+      "notes": "Plant AC PV sum in W (≥ 0), or per-PV-system DC power as pv.{id}.sens_pv_production_active. Required on the live wire unless plant is derived from a complete grid-tied inverter/PV map. Cumulative kWh counter is removed (2.4.j).",
       "loxone": {
         "unit": "kW",
         "ehal_unit": "W",
         "factor": 1000,
         "sign": 1,
         "clamp_min": 0,
-        "read_required": true
+        "read_required": false
       }
     }
   ],
-  "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."
+  "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention / Multi-inverter live PV attribution."
 }

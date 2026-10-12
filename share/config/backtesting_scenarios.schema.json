@@ -172,7 +172,10 @@
               "description": "Dauerhafte AC-Eigenleistung der Batterie (kW)."
             },
             "battery_efficiency": {
-              "type": "number"
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "description": "One-way chemistry η_batt when overriding components; path = η_inv · η_batt."
             },
             "battery_capacity_kwh": {
               "type": "number"

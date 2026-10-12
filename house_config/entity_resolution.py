@@ -10,6 +10,7 @@ from house_config.inverter import (
     DEFAULT_AC_CONNECTION,
     inverters_by_id,
     planning_inverter_entry,
+    reject_if_needs_conversion_efficiency_migration,
     validate_inverter_topology,
 )
 from house_config.powerstation import (
@@ -19,6 +20,7 @@ from house_config.powerstation import (
     is_virtual_powerstation,
     normalize_battery_type,
     normalize_powerstation_fields,
+    primary_house_battery,
 )
 
 ZERO_BATTERY_FLAT = {
@@ -306,6 +308,13 @@ def normalize_pv_system(raw: dict, index: int) -> dict:
     inverter_id = str(raw.get("inverter_id") or "").strip()
     if not inverter_id:
         raise ValueError(f"pv_systems[{index}] ('{pv_id}'): inverter_id fehlt.")
+    ehal_bindings = raw.get("ehal_bindings")
+    if ehal_bindings is None:
+        ehal_bindings = {}
+    if not isinstance(ehal_bindings, dict):
+        raise ValueError(
+            f"pv_systems[{index}] ('{pv_id}'): ehal_bindings muss ein Objekt sein."
+        )
     out = {
         "id": pv_id,
         "label": label,
@@ -313,6 +322,11 @@ def normalize_pv_system(raw: dict, index: int) -> dict:
         "pv_tilt": float(raw.get("pv_tilt", raw.get("tilt", 0.0))),
         "pv_azimuth": float(raw.get("pv_azimuth", raw.get("azimuth", 0.0))),
         "inverter_id": inverter_id,
+        "ehal_bindings": {
+            str(k): str(v).strip()
+            for k, v in ehal_bindings.items()
+            if str(k or "").strip()
+        },
     }
     if "id_locked" in raw:
         out["id_locked"] = bool(raw.get("id_locked"))
@@ -391,6 +405,29 @@ def planning_battery_entry(bat: dict) -> dict:
     return entry
 
 
+def _path_efficiency_from_planning(entry: dict) -> float:
+    """η_path = η_inv · η_batt for MILP/sim SoC (fail loud if η_inv missing)."""
+    bat_id = entry.get("id", "?")
+    eta_batt = float(entry["battery_efficiency"])
+    if "inverter_efficiency" not in entry:
+        raise ValueError(
+            f"Batterie '{bat_id}': inverter_efficiency (η_inv) fehlt auf "
+            "Planning-Eintrag — components.json migrieren?"
+        )
+    eta_inv = float(entry["inverter_efficiency"])
+    if not (0.0 < eta_inv <= 1.0):
+        raise ValueError(
+            f"Batterie '{bat_id}': inverter_efficiency muss in (0, 1] liegen "
+            f"(got {eta_inv!r})."
+        )
+    if not (0.0 < eta_batt <= 1.0):
+        raise ValueError(
+            f"Batterie '{bat_id}': battery_efficiency muss in (0, 1] liegen "
+            f"(got {eta_batt!r})."
+        )
+    return eta_inv * eta_batt
+
+
 def battery_params_from_planning(entry: dict) -> dict:
     """Optimizer-shaped params dict from a planning battery entry."""
     bat_id = entry["id"]
@@ -408,7 +445,7 @@ def battery_params_from_planning(entry: dict) -> dict:
         "max_charge_power_kw": float(entry["battery_max_charge_power_kw"]),
         "max_discharge_power_kw": float(entry["battery_max_discharge_power_kw"]),
         "max_power_kw": float(entry["battery_max_power_kw"]),
-        "efficiency": float(entry["battery_efficiency"]),
+        "efficiency": _path_efficiency_from_planning(entry),
         "standby_power_kw": float(entry.get("standby_power_kw", 0.0) or 0.0),
         "threshold_power": float(entry.get("threshold_power", 0.02) or 0.02),
         "control": str(entry.get("control", DEFAULT_BATTERY_CONTROL) or DEFAULT_BATTERY_CONTROL),
@@ -571,6 +608,56 @@ def attach_ac_connection_from_inverters(
             bat["ac_connection"] = inv["ac_connection"]
 
 
+def _eta_inv_for_planning_entry(
+    entry: dict,
+    *,
+    inverters: dict[str, dict],
+    batteries: dict[str, dict],
+) -> float:
+    """Resolve η_inv for a planning battery / powerstation entry."""
+    bat_id = entry.get("id", "?")
+    if is_virtual_powerstation(entry):
+        primary = primary_house_battery(list(batteries.values()))
+        if primary is None:
+            raise ValueError(
+                f"Batterie '{bat_id}': virtuelle Powerstation ohne Hausbatterie "
+                "— η_inv nicht ableitbar."
+            )
+        inv_id = str(primary.get("inverter_id") or "").strip()
+    else:
+        inv_id = str(entry.get("inverter_id") or "").strip()
+    if not inv_id:
+        raise ValueError(
+            f"Batterie '{bat_id}': inverter_id fehlt für η_inv."
+        )
+    inv = inverters.get(inv_id)
+    if inv is None:
+        raise ValueError(
+            f"Batterie '{bat_id}': unbekannte inverter_id '{inv_id}'."
+        )
+    if "efficiency" not in inv:
+        raise ValueError(
+            f"Inverter '{inv_id}': efficiency (η_inv) fehlt."
+        )
+    return float(inv["efficiency"])
+
+
+def attach_inverter_efficiency_to_planning(
+    settings: dict,
+    *,
+    inverters: dict[str, dict],
+    batteries: dict[str, dict],
+) -> None:
+    """Mutate planning entries: set inverter_efficiency (η_inv) for η_path."""
+    for key in ("_planning_batteries", "_planning_powerstations"):
+        for entry in settings.get(key) or []:
+            if not isinstance(entry, dict):
+                continue
+            entry["inverter_efficiency"] = _eta_inv_for_planning_entry(
+                entry, inverters=inverters, batteries=batteries
+            )
+
+
 def resolve_inverters_into_settings(
     settings: dict,
     *,
@@ -612,6 +699,7 @@ def resolve_components_into_settings(
     from house_config.inverter import reject_if_needs_inverter_migration
 
     reject_if_needs_inverter_migration(components)
+    reject_if_needs_conversion_efficiency_migration(components)
     inverters = inverters_by_id(components)
     batteries = batteries_by_id(components)
     pv_systems = pv_systems_by_id(components)
@@ -621,6 +709,9 @@ def resolve_components_into_settings(
     attach_ac_connection_from_inverters(batteries, inverters)
     out = resolve_battery_into_settings(settings, batteries)
     out = resolve_pv_into_settings(out, pv_systems)
+    attach_inverter_efficiency_to_planning(
+        out, inverters=inverters, batteries=batteries
+    )
     return resolve_inverters_into_settings(
         out, inverters=inverters, batteries=batteries, pv_systems=pv_systems
     )

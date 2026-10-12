@@ -16,6 +16,7 @@ from ehal.qualified_ids import (
     qualified_consumer_id,
     qualified_inverter_id,
     qualified_plant_id,
+    qualified_pv_id,
 )
 
 HEARTBEAT_ID = "heartbeat"
@@ -98,6 +99,8 @@ def pilot_id(entity_kind: str, entity_id: str, field: str, consumer_type: str = 
         return qualified_battery_id(entity_id, field)
     if entity_kind == "inverter":
         return qualified_inverter_id(entity_id, field)
+    if entity_kind == "pv_system":
+        return qualified_pv_id(entity_id, field)
     if entity_kind == "consumer":
         return qualified_consumer_id(entity_id, consumer_type, field)
     if entity_kind == "plant":
@@ -112,6 +115,8 @@ def _group_for(entity_kind: str, entity_id: str) -> str:
         return f"Batterie_{entity_id}"
     if entity_kind == "inverter":
         return f"Wechselrichter_{entity_id}"
+    if entity_kind == "pv_system":
+        return f"PV_{entity_id}"
     if entity_id in ("pool_swimspa", "pool_filter"):
         return "Pool"
     if entity_id == "waermepumpe":
@@ -139,6 +144,9 @@ def _binding_entries(house: dict, components: dict) -> list[tuple[str, str, str,
     for inverter in components.get("inverters", []):
         for field, name in (inverter.get("ehal_bindings") or {}).items():
             entries.append(("inverter", str(inverter.get("id")), "", field, name))
+    for pv in components.get("pv_systems", []):
+        for field, name in (pv.get("ehal_bindings") or {}).items():
+            entries.append(("pv_system", str(pv.get("id")), "", field, name))
     return entries
 
 

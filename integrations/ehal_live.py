@@ -156,6 +156,72 @@ def with_derived_sens_power_consumers(telemetry: dict[str, Any]) -> dict[str, An
     return out
 
 
+def collect_scoped_pv_live_w() -> dict[str, float]:
+    """Mapped ``inv.*.sens_inv_power_pv`` / ``pv.*.sens_pv_production_active`` live W."""
+    from integrations.pv_attribution import (
+        collect_scoped_pv_live_from_bindings,
+        load_components_for_attribution,
+        read_scoped_pv_ha,
+        read_scoped_pv_loxone,
+    )
+
+    components = load_components_for_attribution()
+    backend = str(config.get("EHAL_BACKEND") or "loxone").strip().lower()
+    if backend == "ha":
+        return collect_scoped_pv_live_from_bindings(
+            components, read_value=read_scoped_pv_ha
+        )
+    if backend == "loxone":
+        return collect_scoped_pv_live_from_bindings(
+            components, read_value=read_scoped_pv_loxone
+        )
+    return {}
+
+
+def with_live_pv_attribution(telemetry: dict[str, Any]) -> dict[str, Any]:
+    """Fill plant PV from Σ grid-tied inv PV · η_inv when plant is missing.
+
+    Also derives missing ``inv.*.sens_inv_power_pv`` from complete per-PV maps.
+    Fail loud on partial coverage when plant must be derived.
+    """
+    from integrations.pv_attribution import (
+        load_components_for_attribution,
+        with_attributed_plant_pv,
+    )
+
+    components = load_components_for_attribution()
+    inverters = list(components.get("inverters") or [])
+    pv_systems = list(components.get("pv_systems") or [])
+    scoped = collect_scoped_pv_live_w()
+    # Prefer values already on telemetry (tests / adapters) over fresh reads.
+    for key, value in telemetry.items():
+        key_s = str(key)
+        if (
+            key_s.startswith("inv.") and key_s.endswith(".sens_inv_power_pv")
+        ) or (
+            key_s.startswith("pv.") and key_s.endswith(".sens_pv_production_active")
+        ):
+            if value is not None:
+                scoped[key_s] = max(0.0, float(value))
+    out = with_attributed_plant_pv(
+        telemetry,
+        scoped_live=scoped,
+        inverters=inverters,
+        pv_systems=pv_systems,
+    )
+    if out.get("sens_pv_production_active") is None:
+        raise ValueError(
+            "sens_pv_production_active missing after live PV attribution "
+            "(map plant PV or complete grid-tied inv/pv coverage)."
+        )
+    return out
+
+
+def prepare_live_telemetry(telemetry: dict[str, Any]) -> dict[str, Any]:
+    """Post-read: PV attribution then house-load derive."""
+    return with_derived_sens_power_consumers(with_live_pv_attribution(telemetry))
+
+
 def get_openems_adapter() -> OpenemsAdapter:
     global _openems_adapter
     base_url = str(config.get("EHAL_OPENEMS_BASE_URL") or "").strip()
@@ -361,7 +427,7 @@ def reset_adapter_cache() -> None:
 
 def read_ess_soc() -> float | None:
     try:
-        telemetry = with_derived_sens_power_consumers(get_adapter().read_telemetry())
+        telemetry = prepare_live_telemetry(get_adapter().read_telemetry())
     except (
         OpenemsHttpError,
         HaHttpError,
@@ -518,7 +584,7 @@ def read_ess_soc_by_id() -> dict[str, float]:
 def read_live_power_kw() -> dict[str, float] | None:
     """Return Live power dict (kW): grid ``+`` = import, battery ``+`` = discharge."""
     try:
-        telemetry = with_derived_sens_power_consumers(get_adapter().read_telemetry())
+        telemetry = prepare_live_telemetry(get_adapter().read_telemetry())
     except (
         OpenemsHttpError,
         HaHttpError,

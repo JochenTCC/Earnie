@@ -68,10 +68,16 @@ def test_export_unconstrained_per_grid_tied_inverter() -> None:
         {
             "id": "wr_main",
             "ac_connection": "grid_tied",
+            "efficiency": 0.97,
             "max_ac_power_kw": 10.0,
             "max_pv_input_kw": 12.0,
         },
-        {"id": "wr_island", "ac_connection": "island", "max_ac_power_kw": 3.0},
+        {
+            "id": "wr_island",
+            "ac_connection": "island",
+            "efficiency": 0.97,
+            "max_ac_power_kw": 3.0,
+        },
     ]
     # PV 15 capped by max_pv 12 + discharge 5 = 17 → min(10, 17) = 10; island ignored.
     total = physical_max_export_kw_from_inverters(
@@ -83,7 +89,7 @@ def test_export_unconstrained_per_grid_tied_inverter() -> None:
 
 
 def test_export_unconstrained_without_max_ac_uses_uncapped_sum() -> None:
-    inverters = [{"id": "wr_main", "ac_connection": "grid_tied"}]
+    inverters = [{"id": "wr_main", "ac_connection": "grid_tied", "efficiency": 0.97}]
     total = physical_max_export_kw_from_inverters(
         inverters=inverters,
         pv_kwp_by_inverter={"wr_main": 9.8},
@@ -100,6 +106,7 @@ def test_live_unconstrained_uses_planning_inverters(monkeypatch) -> None:
     inv = {
         "id": "wr_main",
         "ac_connection": "grid_tied",
+        "efficiency": 0.97,
         "max_ac_power_kw": 8.0,
         "max_pv_input_kw": 20.0,
     }

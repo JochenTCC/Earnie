@@ -17,6 +17,7 @@ from ehal.qualified_ids import (
     NS_HEATPUMP,
     NS_INV,
     NS_POOL,
+    NS_PV,
     parse_qualified_id,
 )
 from house_config.id_slug import slug_id
@@ -129,6 +130,33 @@ def rewrite_inv_bindings_slug(
             and parsed.kennung == old_slug
         ):
             field = f"{NS_INV}.{new_slug}.{parsed.kind}"
+        if field not in out:
+            out[field] = addr
+    return out
+
+
+def rewrite_pv_bindings_slug(
+    bindings: dict | None,
+    *,
+    old_id: str,
+    new_id: str,
+) -> dict[str, str]:
+    """Rewrite entity-scoped keys ``pv.{old}.*`` → ``pv.{new}.*``."""
+    if not isinstance(bindings, dict):
+        return {}
+    old_slug = flex_ehal_slug(old_id)
+    new_slug = flex_ehal_slug(new_id)
+    out: dict[str, str] = {}
+    for key, value in bindings.items():
+        addr = str(value or "").strip()
+        field = str(key)
+        parsed = parse_qualified_id(field)
+        if (
+            parsed
+            and parsed.namespace == NS_PV
+            and parsed.kennung == old_slug
+        ):
+            field = f"{NS_PV}.{new_slug}.{parsed.kind}"
         if field not in out:
             out[field] = addr
     return out

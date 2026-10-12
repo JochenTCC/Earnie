@@ -4,6 +4,7 @@ from __future__ import annotations
 from house_config.inverter import (
     AC_ISLAND,
     DEFAULT_INVERTER_CONTROL,
+    DEFAULT_INVERTER_EFFICIENCY,
     INVERTER_TYPE_HYBRID,
 )
 from house_config.powerstation import BACKING_VIRTUAL, BATTERY_TYPE_POWERSTATION
@@ -72,6 +73,7 @@ def ensure_owned_island_inverter(
                 "type": INVERTER_TYPE_HYBRID,
                 "ac_connection": AC_ISLAND,
                 "control": DEFAULT_INVERTER_CONTROL,
+                "efficiency": DEFAULT_INVERTER_EFFICIENCY,
                 "owned_by": bat_id,
                 "ehal_bindings": {},
             }

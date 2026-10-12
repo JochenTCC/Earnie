@@ -231,13 +231,41 @@ class LoxoneAdapter:
         return validate_capabilities(doc)
 
     def read_telemetry(self) -> EhalTelemetry:
+        from integrations.pv_attribution import (
+            collect_scoped_pv_live_from_bindings,
+            load_components_for_attribution,
+            load_house_for_attribution,
+            plant_pv_may_be_derived,
+            with_attributed_plant_pv,
+        )
+
+        house = load_house_for_attribution()
+        components = load_components_for_attribution()
+        derive_pv = plant_pv_may_be_derived(house, components)
+        required = tuple(
+            f
+            for f in PLANT_REQUIRED_READ_FIELDS
+            if not (derive_pv and f == "sens_pv_production_active")
+        )
         doc: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),
             "adapter_id": self.cfg.adapter_id,
         }
-        for field in PLANT_REQUIRED_READ_FIELDS:
+        for field in required:
             doc[field] = self._require_field(field)
+        if derive_pv and "sens_pv_production_active" not in doc:
+            from integrations.pv_attribution import read_scoped_pv_loxone
+
+            scoped = collect_scoped_pv_live_from_bindings(
+                components, read_value=read_scoped_pv_loxone
+            )
+            doc = with_attributed_plant_pv(
+                doc,
+                scoped_live=scoped,
+                inverters=list(components.get("inverters") or []),
+                pv_systems=list(components.get("pv_systems") or []),
+            )
         pv_w = float(doc["sens_pv_production_active"])
         grid_w = float(doc["sens_grid_power_active"])
         ess_w = float(doc["sens_ess_power"])
@@ -246,7 +274,15 @@ class LoxoneAdapter:
             value = self._read_optional_field(field)
             if value is not None:
                 doc[field] = value
-        return validate_telemetry(doc)
+        # Drop entity-scoped keys before schema validate (additionalProperties false).
+        plant_doc = {
+            k: v
+            for k, v in doc.items()
+            if not (
+                str(k).startswith("inv.") or str(k).startswith("pv.")
+            )
+        }
+        return validate_telemetry(plant_doc)
 
     def _read_optional_field(self, field: str) -> float | None:
         spec = loxone_spec(field)

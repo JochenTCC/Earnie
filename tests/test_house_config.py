@@ -1571,6 +1571,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "label": "Haupt-WR",
                 "type": "hybrid",
                 "ac_connection": "grid_tied",
+                "efficiency": 0.97,
                 "control": "full"
             }],
             "batteries": [{

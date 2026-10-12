@@ -94,6 +94,7 @@ def test_resolve_scenario_settings_coerces_legacy_battery_id(monkeypatch):
         "type": "hybrid",
         "ac_connection": "grid_tied",
         "control": "full",
+        "efficiency": 0.97,
         "ehal_bindings": {},
     }
     monkeypatch.setattr(

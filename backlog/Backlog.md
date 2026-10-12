@@ -17,7 +17,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ### Version 2.7 — Multiple storages and export power limitation
 
 **Order:** Epic **Regression** (R-Rec / P1; formerly letter **2.7.i**) is independent and can start any time — ideally its MVP lands before the 2.7 release so it guards the multi-storage changes. Official **2.6.0** is on `main`; finish the remaining 2.7 letters on `main`. Do not bump `version.py` to a publishable 2.7 without approval. Shadow client (**2.7.f**) is done — dogfood the rest of 2.7 against Prod with **2.6.o** feed. **2.7.a** (code + Loxone wiring + live dogfood), **2.7.b** (Thermals P2), **2.7.c** (multi-ESS), **2.7.j** (additional ESS parameters), former **2.7.d** (one-way storage type, folded into **2.7.g**/**2.7.h**), **2.7.g** (single-use powerstation reserve), **2.7.h** (standby-backup code + entity-scoped Quellenwahl done; productive dogfood after operator EcoFlow bridge rewire — see Bugfixes), **2.7.k** (ENTSO-E live prices), **2.7.p** (virtual PS consumer-start release), **2.7.q** (push-only write + Signal list), **2.7.r** (HA live I/O contract), **2.7.n** (Sessions A–F; field registry + generic Loxone read), **EHAL unit conversion — no hardcoding** (read + write registry), and **2.7.l** (Inverter P1–P5) → [Erledigt](Backlog-Erledigt.md).
-- **Note (deferred from 2.7.n):** `pv.{Kennung}.*` later — keep PV bare on the plant wire. Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
+- **Note (deferred from 2.7.n):** Plant PV sum stays bare `sens_pv_production_active`; first entity-scoped `pv.{pv_system_id}.sens_pv_production_active` shipped with live attribution (Inverter follow-ups). Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
 - **Note:** `/jdev/sps/io` Merker HTTP removed from production Python (VO push + LoxAPP3 presence) → [Erledigt](Backlog-Erledigt.md).
 - **Note:** Loxone vs HA EHAL mapping review + shared `ehal/field_catalog.py` → [EHAL-Mapping-Review.md](EHAL-Mapping-Review.md) / [Erledigt](Backlog-Erledigt.md).
 - **Note:** SH-backend concentration review + Binding rollback cleanup + EHAL Loxone-agnostic naming → [Erledigt](Backlog-Erledigt.md) / [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md).
@@ -27,7 +27,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - **Note:** **2.7.l** Inverter P1–P5 → [Erledigt](Backlog-Erledigt.md); draft [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md). Open: follow-ups below. Device catalog deferred (own item when picked up).
 - **Note:** Shadow architecture review + **R1**–**R4** → [Erledigt](Backlog-Erledigt.md) / [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); spec §11.1 / §12. S4 Soll/Soll stays **2.+1**.
 
-- [ ] **Inverter follow-ups** (postponed from **2.7.l**; epic **Inverter**): DC/AC efficiency paths; multi-inverter live attribution of `sens_pv_production_active`.
+- [ ] **Inverter follow-ups** (postponed from **2.7.l**; epic **Inverter**). Design: [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md).
+  - [x] Design note [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md)
+  - [x] Schema + MILP/sim `η_inv` / `η_batt` + migration of lumped `battery_efficiency` (AC-path only in v1; `scripts.migrate_conversion_efficiency_once`)
+  - [x] Multi-inverter live attribution of `sens_pv_production_active` + first `pv.{pv_system_id}.*` (derive plant from Σ grid-tied inv · η_inv; fail-loud partial maps; curtailment stays forecast)
+  - [ ] Later: curtailment live weights (`attribute_plant_pv_to_inverters_w` → `allocate_inv_ac_limits_kw`)
 - **Note:** Deferred (not part of 2.7.l): device catalog for inverters and batteries (commercially available models with rated powers, capacity, efficiency, limits) so parameters need not be typed by hand. The P2 presets (e.g. "EcoFlow Delta 3") are only hand-written seeds; the catalog would replace them later. Own backlog item when it is picked up.
 
 - [ ] Anonymous install counter (daily ping, no ID)

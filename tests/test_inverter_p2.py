@@ -25,6 +25,7 @@ _WR_MAIN = {
     "type": "hybrid",
     "ac_connection": "grid_tied",
     "control": "full",
+    "efficiency": 0.97,
 }
 
 
@@ -242,6 +243,7 @@ def test_upsert_inverter_entity_id_lock(components_env):
             "type": "hybrid",
             "ac_connection": "grid_tied",
             "control": "full",
+            "efficiency": 0.97,
         },
         stable_id="",
     )
@@ -255,6 +257,7 @@ def test_upsert_inverter_entity_id_lock(components_env):
             "type": "hybrid",
             "ac_connection": "grid_tied",
             "control": "full",
+            "efficiency": 0.97,
         },
         stable_id=first,
     )

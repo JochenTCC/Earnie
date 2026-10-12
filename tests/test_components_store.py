@@ -16,6 +16,7 @@ _WR_MAIN = {
     "type": "hybrid",
     "ac_connection": "grid_tied",
     "control": "full",
+    "efficiency": 0.97,
 }
 
 

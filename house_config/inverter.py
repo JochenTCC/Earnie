@@ -17,6 +17,7 @@ AC_ISLAND: AcConnection = "island"
 DEFAULT_AC_CONNECTION: AcConnection = AC_GRID_TIED
 
 DEFAULT_INVERTER_CONTROL: InverterControl = "full"
+DEFAULT_INVERTER_EFFICIENCY = 0.97
 
 _TYPES = frozenset(
     {INVERTER_TYPE_HYBRID, INVERTER_TYPE_PV_STRING, INVERTER_TYPE_BATTERY}
@@ -27,6 +28,10 @@ _CONTROL = frozenset({"full", "limits_only", "read_only"})
 MIGRATE_HINT = (
     "components.json needs inverters[] (2.7.l). Run: "
     "python -m scripts.migrate_inverters_once --config-dir <config-dir>"
+)
+CONVERSION_EFFICIENCY_MIGRATE_HINT = (
+    "components.json needs inverters[].efficiency (η_inv). Run: "
+    "python -m scripts.migrate_conversion_efficiency_once --config-dir <config-dir>"
 )
 
 
@@ -72,6 +77,34 @@ def reject_if_needs_inverter_migration(doc: dict, *, path: str = "") -> None:
     raise ValueError(
         f"components.json{where}: pre-inverter topology detected "
         f"(missing inverters[] or residual batteries[].kind). {MIGRATE_HINT}"
+    )
+
+
+def needs_conversion_efficiency_migration(doc: dict) -> bool:
+    """True when any inverter lacks required one-way efficiency (η_inv)."""
+    if not isinstance(doc, dict):
+        return False
+    inverters = doc.get("inverters")
+    if not isinstance(inverters, list) or not inverters:
+        return False
+    for inv in inverters:
+        if not isinstance(inv, dict):
+            return True
+        if "efficiency" not in inv:
+            return True
+    return False
+
+
+def reject_if_needs_conversion_efficiency_migration(
+    doc: dict, *, path: str = ""
+) -> None:
+    """Fail fast when inverters[] exist but η_inv is missing."""
+    if not needs_conversion_efficiency_migration(doc):
+        return
+    where = f" ({path})" if path else ""
+    raise ValueError(
+        f"components.json{where}: inverters[].efficiency (η_inv) fehlt. "
+        f"{CONVERSION_EFFICIENCY_MIGRATE_HINT}"
     )
 
 
@@ -127,12 +160,29 @@ def normalize_inverter(raw: dict, index: int) -> dict:
         raise ValueError(
             f"inverters[{index}] ('{inv_id}'): ehal_bindings muss ein Objekt sein."
         )
+    if "efficiency" not in raw:
+        raise ValueError(
+            f"inverters[{index}] ('{inv_id}'): efficiency (η_inv) fehlt. "
+            f"{CONVERSION_EFFICIENCY_MIGRATE_HINT}"
+        )
+    try:
+        efficiency = float(raw["efficiency"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"inverters[{index}] ('{inv_id}'): efficiency ungültig."
+        ) from exc
+    if not (0.0 < efficiency <= 1.0):
+        raise ValueError(
+            f"inverters[{index}] ('{inv_id}'): efficiency muss in (0, 1] liegen "
+            f"(got {efficiency!r})."
+        )
     out: dict = {
         "id": inv_id,
         "label": label,
         "type": inv_type,
         "ac_connection": ac,
         "control": control,
+        "efficiency": efficiency,
         "ehal_bindings": {
             str(k): str(v).strip()
             for k, v in ehal_bindings.items()
@@ -178,6 +228,7 @@ def planning_inverter_entry(inv: dict) -> dict:
         "type": inv["type"],
         "ac_connection": inv["ac_connection"],
         "control": inv.get("control", DEFAULT_INVERTER_CONTROL),
+        "efficiency": float(inv["efficiency"]),
         "ehal_bindings": dict(inv.get("ehal_bindings") or {}),
     }
     for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw", "owned_by"):

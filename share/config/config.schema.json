@@ -261,7 +261,8 @@
         "battery_efficiency": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "maximum": 1
+          "maximum": 1,
+          "description": "One-way chemistry factor η_batt (0–1]. Path η_path = η_inv · η_batt."
         },
         "battery_min_soc": {
           "type": "number",

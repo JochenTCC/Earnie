@@ -90,6 +90,9 @@ INVERTER_LIVE_READ_KINDS: tuple[str, ...] = (
 
 INVERTER_LIVE_WRITE_KINDS: tuple[str, ...] = ("set_inv_ac_power_limit",)
 
+# Per-PV-system entity-scoped read kinds.
+PV_LIVE_READ_KINDS: tuple[str, ...] = ("sens_pv_production_active",)
+
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_ess_active_power",
     "set_ess_charge_power_limit",
@@ -363,10 +366,33 @@ def _all_live_inverters() -> list[dict]:
         return []
 
 
+def _all_live_pv_systems() -> list[dict]:
+    """PV systems from ``components.json`` (optional entity-scoped pv.*)."""
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        if not path:
+            return []
+        doc = load_components_document(path)
+        raw = doc.get("pv_systems") if isinstance(doc, dict) else []
+        if not isinstance(raw, list):
+            return []
+        return [
+            pv
+            for pv in raw
+            if isinstance(pv, dict) and str(pv.get("id") or "").strip()
+        ]
+    except Exception:
+        return []
+
+
 def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
-    """Canonical Live-Lesen field ids (plant + batteries + inverters + consumers)."""
+    """Canonical Live-Lesen field ids (plant + batteries + inverters + PV + consumers)."""
     from ehal.ess_fields import ess_field
     from ehal.inverter_fields import inv_field
+    from ehal.pv_fields import pv_field
     from ehal.qualified_ids import qualified_plant_id
 
     if network_backend:
@@ -388,6 +414,11 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
         if not iid:
             continue
         fields.extend(inv_field(iid, kind) for kind in INVERTER_LIVE_READ_KINDS)
+    for pv in _all_live_pv_systems():
+        pid = str(pv.get("id") or "").strip()
+        if not pid:
+            continue
+        fields.extend(pv_field(pid, kind) for kind in PV_LIVE_READ_KINDS)
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
         if not cid:
@@ -775,6 +806,12 @@ def ha_entity_scoped_live_mapping(house_doc: dict | None = None) -> dict[str, st
                 out[live_write_consumer_field(consumer, field)] = entity_id
     for inverter in _all_live_inverters():
         bindings = inverter.get("ehal_bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for field, entity_id in _binding_map(bindings).items():
+            out[str(field)] = entity_id
+    for pv in _all_live_pv_systems():
+        bindings = pv.get("ehal_bindings")
         if not isinstance(bindings, dict):
             continue
         for field, entity_id in _binding_map(bindings).items():

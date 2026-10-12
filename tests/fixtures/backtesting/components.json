@@ -6,7 +6,8 @@
             "type": "hybrid",
             "ac_connection": "grid_tied",
             "control": "full",
-            "ehal_bindings": {}
+            "ehal_bindings": {},
+            "efficiency": 0.97
         }
     ],
     "batteries": [
@@ -16,7 +17,7 @@
             "inverter_id": "wr_main",
             "battery_capacity_kwh": 8.0,
             "battery_max_power_kw": 4.0,
-            "battery_efficiency": 0.95,
+            "battery_efficiency": 0.979381443298969,
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "threshold_power": 0.02,

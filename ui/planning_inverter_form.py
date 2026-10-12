@@ -19,6 +19,7 @@ from house_config.inverter import (
     AC_GRID_TIED,
     AC_ISLAND,
     DEFAULT_AC_CONNECTION,
+    DEFAULT_INVERTER_EFFICIENCY,
     DEFAULT_INVERTER_TYPE,
     INVERTER_TYPE_BATTERY,
     INVERTER_TYPE_HYBRID,
@@ -88,6 +89,11 @@ def new_inverter_template(
             source.get("ac_connection") or DEFAULT_AC_CONNECTION
         ).strip().lower(),
         "control": str(source.get("control") or DEFAULT_BATTERY_CONTROL).strip().lower(),
+        "efficiency": float(
+            source.get("efficiency")
+            if source.get("efficiency") not in (None, "")
+            else DEFAULT_INVERTER_EFFICIENCY
+        ),
         "ehal_bindings": {},
     }
     for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw"):
@@ -134,6 +140,11 @@ def _seed_inv_widget_state(session_scope: str, existing: dict) -> None:
         max_ac = _optional_kw(existing, "max_ac_power_kw")
         max_pv = _optional_kw(existing, "max_pv_input_kw")
         max_charge = _optional_kw(existing, "max_ac_charge_kw")
+        efficiency = float(
+            existing["efficiency"]
+            if existing.get("efficiency") not in (None, "")
+            else DEFAULT_INVERTER_EFFICIENCY
+        )
     else:
         label = allocate_unique_label("Haupt-Wechselrichter", list_inverters())
         inv_type = DEFAULT_INVERTER_TYPE
@@ -142,6 +153,7 @@ def _seed_inv_widget_state(session_scope: str, existing: dict) -> None:
         max_ac = None
         max_pv = None
         max_charge = None
+        efficiency = DEFAULT_INVERTER_EFFICIENCY
     if inv_type not in _TYPE_VALUES:
         inv_type = DEFAULT_INVERTER_TYPE
     if ac not in _AC_VALUES:
@@ -162,6 +174,7 @@ def _seed_inv_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_inv_control")] = (
         CONTROL_LABELS_DE[control]
     )
+    st.session_state[_scoped_key(session_scope, "planning_inv_efficiency")] = efficiency
     st.session_state[_scoped_key(session_scope, "planning_inv_max_ac")] = (
         float(max_ac) if max_ac is not None else 0.0
     )
@@ -271,6 +284,15 @@ def _render_inv_fields(session_scope: str, *, existing: dict) -> dict:
     )
     label_to_control = {v: k for k, v in CONTROL_LABELS_DE.items()}
     control = label_to_control.get(str(control_label), DEFAULT_BATTERY_CONTROL)
+    efficiency = labeled_number_input(
+        "Wirkungsgrad DC↔AC (η_inv)",
+        min_value=0.5,
+        max_value=1.0,
+        step=0.01,
+        key=_scoped_key(session_scope, "planning_inv_efficiency"),
+        help="Einweg-Faktor Wechselrichter. PV DC→AC und Teil des Speicher-Pfads "
+        "η_path = η_inv · η_batt.",
+    )
     max_ac = labeled_number_input(
         "Max. AC-Leistung (kW, 0 = kein Cap)",
         min_value=0.0,
@@ -300,6 +322,7 @@ def _render_inv_fields(session_scope: str, *, existing: dict) -> dict:
         "type": inv_type,
         "ac_connection": ac,
         "control": control,
+        "efficiency": float(efficiency),
         "max_ac_power_kw": _optional_positive_from_widget(max_ac),
         "max_pv_input_kw": _optional_positive_from_widget(max_pv),
         "max_ac_charge_kw": _optional_positive_from_widget(max_charge),
@@ -314,6 +337,7 @@ def _inv_save_payload(fields: dict) -> dict:
         "type": fields["type"],
         "ac_connection": fields["ac_connection"],
         "control": fields["control"],
+        "efficiency": float(fields["efficiency"]),
         "ehal_bindings": dict(fields.get("ehal_bindings") or {}),
     }
     for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw"):

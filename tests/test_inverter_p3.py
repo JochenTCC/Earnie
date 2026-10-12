@@ -30,12 +30,14 @@ def _battery(*, bat_id: str = "bat", inv_id: str = "wr_main", max_kw: float = 5.
 
 
 def _hybrid_inv(*, inv_id: str = "wr_main", max_ac: float | None = None, **extra) -> dict:
+    # efficiency=1.0 so clip/topology tests isolate AC caps from η_inv.
     inv = {
         "id": inv_id,
         "label": inv_id,
         "type": "hybrid",
         "ac_connection": "grid_tied",
         "control": "full",
+        "efficiency": 1.0,
     }
     if max_ac is not None:
         inv["max_ac_power_kw"] = max_ac
@@ -133,6 +135,7 @@ def test_island_pv_excluded_from_house_balance():
             "type": "hybrid",
             "ac_connection": "island",
             "control": "full",
+            "efficiency": 1.0,
         },
     ]
     pvs = [
@@ -166,6 +169,7 @@ def test_island_battery_excluded_from_milp_ess():
             "type": "hybrid",
             "ac_connection": "island",
             "control": "full",
+            "efficiency": 1.0,
         },
     ]
     model = _build_milp_model(

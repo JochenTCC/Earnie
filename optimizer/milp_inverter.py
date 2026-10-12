@@ -1,7 +1,7 @@
 """Inverter topology for MILP house balance (Inverter P3 / 2.7.l).
 
-Efficiency DC↔AC paths are out of scope (P5). Absent optional kW caps keep
-prior behaviour for that inverter.
+AC-path conversion: P_pv_ac = P_pv_dc · η_inv then existing AC clip.
+Absent optional kW caps keep prior behaviour for that inverter.
 """
 from __future__ import annotations
 
@@ -96,12 +96,33 @@ def apply_dc_pv_cap(pv_kw: float, inv: dict) -> float:
     return min(raw, cap)
 
 
+def inverter_efficiency(inv: dict) -> float:
+    """One-way DC↔AC factor η_inv; required on normalized inverters."""
+    if "efficiency" not in inv or inv["efficiency"] is None or inv["efficiency"] == "":
+        raise ValueError(
+            f"Inverter '{inv.get('id')}': efficiency (η_inv) fehlt."
+        )
+    eta = float(inv["efficiency"])
+    if not (0.0 < eta <= 1.0):
+        raise ValueError(
+            f"Inverter '{inv.get('id')}': efficiency muss in (0, 1] liegen "
+            f"(got {eta!r})."
+        )
+    return eta
+
+
+def apply_dc_to_ac_efficiency(pv_dc_kw: float, inv: dict) -> float:
+    """P_pv_ac = P_pv_dc · η_inv (before AC clip)."""
+    return max(0.0, float(pv_dc_kw)) * inverter_efficiency(inv)
+
+
 def ac_clip_pv_and_max_discharge(
     pv_dc_kw: float,
     inv: dict,
 ) -> tuple[float, float | None]:
-    """House PV after AC clip + optional discharge headroom (hybrid / pv_string).
+    """House PV after η_inv + AC clip + optional discharge headroom.
 
+    ``pv_dc_kw`` is DC after ``apply_dc_pv_cap``. Applies η_inv then AC clip.
     Returns ``(pv_for_house_kw, max_discharge_kw_or_None)``.
     ``None`` discharge cap means no inverter AC limit on discharge.
     """
@@ -109,9 +130,10 @@ def ac_clip_pv_and_max_discharge(
     max_ac = optional_positive_kw(inv, "max_ac_power_kw")
     if inv_type == INVERTER_TYPE_BATTERY:
         return 0.0, max_ac
+    pv_after_eta = apply_dc_to_ac_efficiency(pv_dc_kw, inv)
     if max_ac is None:
-        return pv_dc_kw, None
-    pv_ac = min(pv_dc_kw, max_ac)
+        return pv_after_eta, None
+    pv_ac = min(pv_after_eta, max_ac)
     return pv_ac, max(0.0, max_ac - pv_ac)
 
 

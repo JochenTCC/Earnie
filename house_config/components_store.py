@@ -7,6 +7,7 @@ import os
 from house_config.entity_resolution import normalize_battery, normalize_pv_system
 from house_config.inverter import (
     normalize_inverter,
+    reject_if_needs_conversion_efficiency_migration,
     reject_if_needs_inverter_migration,
     validate_inverter_topology,
 )
@@ -29,6 +30,7 @@ def normalize_components_document(doc: dict) -> dict:
     if not isinstance(doc, dict):
         raise ValueError("components.json muss ein Objekt sein.")
     reject_if_needs_inverter_migration(doc)
+    reject_if_needs_conversion_efficiency_migration(doc)
     inverters_raw = doc.get("inverters", [])
     batteries_raw = doc.get("batteries", [])
     pv_raw = doc.get("pv_systems", [])
@@ -82,6 +84,7 @@ def load_components_document(path: str) -> dict:
     if not isinstance(doc, dict):
         raise ValueError("components.json muss ein Objekt sein.")
     reject_if_needs_inverter_migration(doc, path=path)
+    reject_if_needs_conversion_efficiency_migration(doc, path=path)
     inverters = doc.get("inverters", [])
     batteries = doc.get("batteries", [])
     pv_systems = doc.get("pv_systems", [])
@@ -172,6 +175,13 @@ def _serialize_pv_system(spec: dict) -> dict:
         "pv_azimuth": spec["pv_azimuth"],
         "inverter_id": str(spec.get("inverter_id") or "").strip(),
     }
+    bindings = spec.get("ehal_bindings")
+    if isinstance(bindings, dict) and bindings:
+        out["ehal_bindings"] = {
+            str(k): str(v).strip()
+            for k, v in bindings.items()
+            if str(k or "").strip()
+        }
     if "id_locked" in spec:
         out["id_locked"] = bool(spec.get("id_locked"))
     provisional = str(spec.get("id_provisional_label") or "").strip()
@@ -187,6 +197,7 @@ def _serialize_inverter(spec: dict) -> dict:
         "type": spec["type"],
         "ac_connection": spec["ac_connection"],
         "control": str(spec.get("control") or "full"),
+        "efficiency": float(spec["efficiency"]),
     }
     for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw", "owned_by"):
         if field in spec and spec[field] is not None and spec[field] != "":

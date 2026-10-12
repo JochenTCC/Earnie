@@ -302,6 +302,11 @@ def runtime_settings_snapshot(get_attr: Callable[..., Any]) -> dict:
 
 def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
     """First / primary battery params (compat). Prefer ``battery_params_list_snapshot``."""
+    from house_config.entity_resolution import battery_params_from_planning
+
+    planning = get_attr("_planning_batteries", default=None)
+    if isinstance(planning, list) and planning and isinstance(planning[0], dict):
+        return battery_params_from_planning(planning[0])
     max_charge = get_attr(
         "BATTERY_MAX_CHARGE_POWER_KW",
         default=None,
@@ -326,6 +331,7 @@ def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
         "max_charge_power_kw": max_charge_f,
         "max_discharge_power_kw": max_discharge_f,
         "max_power_kw": max(max_charge_f, max_discharge_f),
+        # Flat runtime without planning: battery_efficiency is full path η.
         "efficiency": get_attr("BATTERY_EFFICIENCY", cast=float),
         "standby_power_kw": get_attr("BATTERY_STANDBY_POWER_KW", default=0.0, cast=float),
         "control": str(get_attr("BATTERY_CONTROL", default="full") or "full").strip().lower()

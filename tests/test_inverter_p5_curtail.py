@@ -39,6 +39,8 @@ def _inv(
         "type": inv_type,
         "control": control,
         "ac_connection": ac,
+        # 1.0 so curtail allocation tests isolate weights/caps from η_inv.
+        "efficiency": 1.0,
     }
     if max_ac is not None:
         doc["max_ac_power_kw"] = max_ac

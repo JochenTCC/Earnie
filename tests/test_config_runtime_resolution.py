@@ -115,6 +115,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "type": "hybrid",
                         "ac_connection": "grid_tied",
                         "control": "full",
+                        "efficiency": 0.97,
                     }
                 ],
                 "batteries": [battery],

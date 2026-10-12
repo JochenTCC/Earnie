@@ -4,6 +4,7 @@ from __future__ import annotations
 from house_config.inverter import (
     AC_ISLAND,
     DEFAULT_INVERTER_CONTROL,
+    DEFAULT_INVERTER_EFFICIENCY,
     INVERTER_TYPE_HYBRID,
 )
 
@@ -42,6 +43,7 @@ def ecoflow_delta_3_seeds(*, battery_id: str = "ecoflow_delta_3") -> tuple[dict,
         "type": INVERTER_TYPE_HYBRID,
         "ac_connection": AC_ISLAND,
         "control": DEFAULT_INVERTER_CONTROL,
+        "efficiency": DEFAULT_INVERTER_EFFICIENCY,
         "owned_by": bat_id,
         "max_ac_power_kw": 1.8,
         "max_pv_input_kw": 0.5,

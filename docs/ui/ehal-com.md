@@ -44,6 +44,7 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | Telemetry (optional)    | `get_ess_max_discharge_power`      | no       | **W**; device max discharge power magnitude (2.7.j)                                                        |
 | Telemetry (optional)    | `inv.{id}.sens_inv_power_ac`       | no       | **W**; per inverter; `+` = feeds the AC bus (2.7.l)                                                        |
 | Telemetry (optional)    | `inv.{id}.sens_inv_power_pv`       | no       | **W**; ≥ 0 (2.7.l)                                                                                         |
+| Telemetry (optional)    | `pv.{id}.sens_pv_production_active` | no      | **W**; ≥ 0; per-PV-system DC power on `pv_systems[].ehal_bindings`                                         |
 | Telemetry (optional)    | `inv.{id}.get_inv_max_ac_power`    | no       | **W**; device AC rating magnitude (2.7.l)                                                                  |
 | Telemetry (optional)    | `inv.{id}.get_inv_max_pv_power`    | no       | **W**; DC/MPPT limit magnitude (2.7.l)                                                                     |
 | Setpoints (force)       | `set_ess_active_power`             | no*      | **W**; signed; OpenEMS-aligned: `+` = **discharge**, `−` = **charge**; omit for automatic mode (see [sign convention for `set_ess_active_power`](#sign-set_ess_active_power)) |
@@ -232,7 +233,7 @@ Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.
 
 <a id="c7-inverter-per-device"></a>
 
-Bindings live on `inverters[].ehal_bindings` as entity-scoped `inv.{id}.*` (id = inverter Kennung). Optional; role template `share/ehal/roles/inverter.json`. Built-in inverters (`owned_by`) share a physical device with an ESS: map both Kennungen to that device's entities. See also [Inverter topology](../spec/ehal.md#inverter-topology-inverters-27l) in `ehal.md`.
+Bindings live on `inverters[].ehal_bindings` as entity-scoped `inv.{id}.*` (id = inverter Kennung). Optional; role template `share/ehal/roles/inverter.json`. Built-in inverters (`owned_by`) share a physical device with an ESS: map both Kennungen to that device's entities. Optional per-PV-system power: `pv.{id}.sens_pv_production_active` on `pv_systems[].ehal_bindings`. See also [Inverter topology](../spec/ehal.md#inverter-topology-inverters-27l) in `ehal.md`.
 
 
 | Area / meaning | Type | EHAL value name | OpenEMS | evcc | Victron GX | Loxone / Loxone extra |

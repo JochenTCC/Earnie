@@ -14,6 +14,7 @@ OVERLAY_FILENAME = "shadow_ehal_bindings.json"
 PLANT_ENTITY_ID = "plant"
 BATTERY_ENTITY_KIND = "battery"
 INVERTER_ENTITY_KIND = "inverter"
+PV_ENTITY_KIND = "pv_system"
 
 
 def overlay_path() -> str:
@@ -81,6 +82,10 @@ def upsert_entity_bindings(
         by_inv = dict(doc.get("inverter_bindings") or {})
         by_inv[eid] = cleaned
         doc["inverter_bindings"] = by_inv
+    elif kind == PV_ENTITY_KIND:
+        by_pv = dict(doc.get("pv_system_bindings") or {})
+        by_pv[eid] = cleaned
+        doc["pv_system_bindings"] = by_pv
     else:
         by_profile = dict(doc.get("consumer_bindings") or {})
         profile_map = dict(by_profile.get(profile_id) or {})
@@ -112,12 +117,15 @@ def apply_overlay_to_house(house: dict) -> dict:
 
 
 def apply_overlay_to_components(components: dict) -> dict:
-    """Merge battery/inverter binding overlays into ``components.json`` entities."""
+    """Merge battery/inverter/PV binding overlays into ``components.json`` entities."""
     overlay = read_overlay()
     by_bat = overlay.get("battery_bindings") if isinstance(overlay, dict) else None
     by_inv = overlay.get("inverter_bindings") if isinstance(overlay, dict) else None
-    if (not isinstance(by_bat, dict) or not by_bat) and (
-        not isinstance(by_inv, dict) or not by_inv
+    by_pv = overlay.get("pv_system_bindings") if isinstance(overlay, dict) else None
+    if (
+        (not isinstance(by_bat, dict) or not by_bat)
+        and (not isinstance(by_inv, dict) or not by_inv)
+        and (not isinstance(by_pv, dict) or not by_pv)
     ):
         return components
     out = deepcopy(components) if isinstance(components, dict) else {
@@ -155,6 +163,21 @@ def apply_overlay_to_components(components: dict) -> dict:
                     {str(k): str(v) for k, v in raw.items()}
                 )
                 inverters[index] = updated
+    if isinstance(by_pv, dict) and by_pv:
+        systems = out.get("pv_systems")
+        if isinstance(systems, list):
+            for index, pv in enumerate(systems):
+                if not isinstance(pv, dict):
+                    continue
+                pid = str(pv.get("id") or "").strip()
+                raw = by_pv.get(pid)
+                if not isinstance(raw, dict):
+                    continue
+                updated = dict(pv)
+                updated["ehal_bindings"] = _clean_bindings(
+                    {str(k): str(v) for k, v in raw.items()}
+                )
+                systems[index] = updated
     return out
 
 

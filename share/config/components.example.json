@@ -8,7 +8,8 @@
             "type": "hybrid",
             "ac_connection": "grid_tied",
             "control": "full",
-            "ehal_bindings": {}
+            "ehal_bindings": {},
+            "efficiency": 0.97
         }
     ],
     "batteries": [
@@ -19,7 +20,7 @@
             "battery_capacity_kwh": 5.0,
             "battery_max_charge_power_kw": 2.5,
             "battery_max_discharge_power_kw": 2.5,
-            "battery_efficiency": 0.97,
+            "battery_efficiency": 1.0,
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "threshold_power": 0.05,
@@ -40,7 +41,7 @@
             "battery_capacity_kwh": 10.0,
             "battery_max_charge_power_kw": 5.0,
             "battery_max_discharge_power_kw": 5.0,
-            "battery_efficiency": 0.97,
+            "battery_efficiency": 1.0,
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "threshold_power": 0.02,
@@ -62,7 +63,8 @@
             "kwp": 10,
             "pv_tilt": 25,
             "pv_azimuth": 0,
-            "inverter_id": "wr_main"
+            "inverter_id": "wr_main",
+            "ehal_bindings": {}
         }
     ]
 }

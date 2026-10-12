@@ -107,6 +107,7 @@ def _mapped_fields(
     """
     from ehal.ess_fields import ess_field_kind
     from ehal.inverter_fields import inv_field_kind
+    from ehal.pv_fields import pv_field_kind
 
     if isinstance(mapped, Mapping):
         if require_nonempty_value:
@@ -117,7 +118,7 @@ def _mapped_fields(
         keys = {str(k) for k in mapped}
     out = set(keys)
     for key in keys:
-        kind = ess_field_kind(key) or inv_field_kind(key)
+        kind = ess_field_kind(key) or inv_field_kind(key) or pv_field_kind(key)
         if kind:
             out.add(kind)
     return out

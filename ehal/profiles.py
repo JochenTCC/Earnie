@@ -279,12 +279,13 @@ def field_role_id(field: str) -> str | None:
     """Return device role_id for an M1 mapping field, or None."""
     from ehal.ess_fields import ess_field_kind
     from ehal.inverter_fields import inv_field_kind
+    from ehal.pv_fields import pv_field_kind
 
     name = str(field or "").strip()
     role = _FIELD_ROLE.get(name)
     if role:
         return role
-    kind = ess_field_kind(name) or inv_field_kind(name)
+    kind = ess_field_kind(name) or inv_field_kind(name) or pv_field_kind(name)
     return _FIELD_ROLE.get(kind) if kind else None
 
 
@@ -315,7 +316,8 @@ def group_fields_by_role(fields: tuple[str, ...] | list[str]) -> list[tuple[str,
     """Order fields into (role_id, fields) groups for HITL sections.
 
     Unknown fields are collected under role_id ``other``.
-    entity-scoped ``ess.{slug}.*`` / ``inv.{slug}.*`` group under ``ess`` / ``inverter``.
+    entity-scoped ``ess.{slug}.*`` / ``inv.{slug}.*`` / ``pv.{slug}.*`` group under
+    ``ess`` / ``inverter`` / ``pv``.
     """
     role_ids = ("grid", "pv", "ess", "inverter", "evcs")
     buckets: dict[str, list[str]] = {rid: [] for rid in role_ids}

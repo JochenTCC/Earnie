@@ -40,7 +40,7 @@ Exchange / display form of every signal on the push/exchange wire and in `status
 
 | Form | Example | Notes |
 | ---- | ------- | ----- |
-| Plant bare | `sens_temperature_outside`, `sens_pv_production_active` | House-wide fields without a device Kennung; PV stays bare until a deferred `pv.*` namespace |
+| Plant bare | `sens_temperature_outside`, `sens_pv_production_active` | House-wide fields without a device Kennung; plant PV sum stays bare; per-PV-system power uses `pv.{id}.*` |
 | Grid meter | `grid.meter.sens_grid_power_active` | First Kennung `meter`; more `grid.<Kennung>.*` meters may follow. Plant **storage** keeps bare kind keys |
 | Battery | `ess.<Kennung>.sens_ess_soc` | Entity-scoped binding key |
 | Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Emitted namespaces; legacy `flex.<slug>.*` accepted on parse only |
@@ -86,7 +86,7 @@ EHAL base units (adapters normalize hub-native units into these):
 
 **Grid (**`sens_grid_power_active`**):** `+` = grid **import** (Bezug), `−` = **export** (Einspeisung). Adapters normalize hub-native signs before emit.
 
-**PV (**`sens_pv_production_active`**):** production ≥ `0` (W). Interval energy = ∫ power × Δt (no cumulative counter on the wire). `sens_pv_production_active` is the plant sum. When every inverter maps `sens_inv_power_pv`, adapters may derive it as Σ `sens_inv_power_pv` of grid-tied inverters (derived value only when the global field is unmapped; island inverters excluded).
+**PV (**`sens_pv_production_active`**):** production ≥ `0` (W). Interval energy = ∫ power × Δt (no cumulative counter on the wire). Bare `sens_pv_production_active` is the plant **AC** sum. Optional entity-scoped `pv.{pv_system_id}.sens_pv_production_active` on `pv_systems[].ehal_bindings` and `inv.{id}.sens_inv_power_pv` on inverters. When the plant field is unmapped and every **grid-tied** inverter that owns ≥1 PV system has inv PV (mapped or fully derived from its PV systems), post-read attribution sets plant = Σ (inv PV · η_inv); island inverters excluded. Incomplete maps fail loud. Curtailment still uses forecast shares (live-weight switch deferred).
 
 **EVCS (**`sens_evcs_active_power`**):** charge power ≥ `0` (W) when charging; `0` when idle.
 
@@ -120,7 +120,8 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), and Live 
 | Field                         | Required | Unit   | Notes                                                                                                      |
 | ----------------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------- |
 | `sens_grid_power_active`      | yes      | W      | PCC active power; sign as above                                                                            |
-| `sens_pv_production_active`   | yes      | W      | ≥ 0                                                                                                        |
+| `sens_pv_production_active`   | yes*     | W      | ≥ 0; *optional when derived from complete grid-tied inv/pv maps                                            |
+| `pv.{id}.sens_pv_production_active` | no | W | ≥ 0; optional per-PV-system DC power (entity-scoped) |
 | `sens_ess_soc`                | yes      | %      | Home battery SoC                                                                                           |
 | `sens_ess_power`              | no       | W      | Optional; sign as above                                                                                    |
 | `sens_evcs_active_power`      | no       | W      | ≥ 0 when present                                                                                           |
@@ -356,7 +357,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 - MQTT / Matter as first-class hubs
 - HA WebSocket state subscription / direct evcc REST adapter (deferred; REST HA path shipped)
 - ARP scan / profile upload. Modbus/SunSpec **outline** schemas under `share/hardware_profiles/` — not a runtime Modbus client (direct Modbus profiles: Entwicklungsplan **M4**).
-- Efficiency modelling DC↔AC (follow-up of 2.7.l), multi-inverter attribution of the plant-level `sens_pv_production_active` on the wire.
+- Live curtailment weights from measured inv PV (forecast shares remain; helper `attribute_plant_pv_to_inverters_w` ready).
 
 
 

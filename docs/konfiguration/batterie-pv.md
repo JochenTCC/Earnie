@@ -29,7 +29,8 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `battery_max_discharge_power_kw` | kW | `components.json` → `batteries[]` | Max. Entladeleistung (2.7.j) |
 | `battery_max_power_kw`  | kW       | `components.json` → `batteries[]`    | **Deprecated:** früher eine Grenze für beide Richtungen; beim Laden in charge/discharge migriert |
 | `limits_from_live` | bool | `components.json` → `batteries[]` | Wenn true: Live `get_ess_*` für SOC-Min/Max und Max. Lade-/Entladeleistung (Fallback HK) |
-| `battery_efficiency`    | 0–1      | `components.json` → `batteries[]`    | Roundtrip-Wirkungsgrad (Laden/Entladen)                                                                                               |
+| `efficiency`            | 0–1      | `components.json` → `inverters[]`    | Einweg-Wirkungsgrad DC↔AC (**η_inv**). Pflicht. Wirkt auf PV DC→AC und als Teil des Speicher-Pfads. Migration bestehender Envs: `python -m scripts.migrate_conversion_efficiency_once --config-dir <config>` |
+| `battery_efficiency`    | 0–1      | `components.json` → `batteries[]`    | Einweg-Wirkungsgrad Chemie (**η_batt**). MILP/Sim nutzen **η_path = η_inv · η_batt** (Roundtrip ≈ η_path²). Früher lumped Path-Faktor — nach Migration um η_inv bereinigt. |
 | `battery_min_soc`       | %        | `components.json` → `batteries[]`    | Untere SOC-Grenze (Schutz)                                                                                                            |
 | `battery_max_soc`       | %        | `components.json` → `batteries[]`    | Obere SOC-Grenze                                                                                                                      |
 | `threshold_power`       | Anteil   | `components.json` → `batteries[]`    | Relativ zu `max(charge, discharge)` kW (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
@@ -63,7 +64,7 @@ Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earni
 - **Quellenwahl vs. Ladegrenzen:** Quellenwahl und Lade-/Entladegrenzen der physischen Powerstation brauchen jeweils ein **eigenes** Pattern-B-Binding an der Powerstation und greifen **nicht** auf die Hausbatterie-Mappings zurück (sonst würden Haus-Lade-/Entladegrenzen überschrieben).
 - Reserve-Größe: angeschlossene Last × teure Stunden im Horizont (kein Energie-pro-Lauf-Lernen wie bei `single_use`).
 
-Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
+Live-PV-Leistung (AC-Summe der Anlage) kommt über `plant.ehal_bindings.sens_pv_production_active`. Fehlt dieses Mapping und sind alle netzgekoppelten Wechselrichter mit PV vollständig über `inv.{id}.sens_inv_power_pv` (oder alle zugehörigen `pv.{id}.sens_pv_production_active`) gemappt, leitet Earnie die Anlagen-PV aus Σ(WR-PV · η_inv) ab — Insel-WR zählen nicht mit; unvollständige Maps schlagen fehl. Optional je PV-Anlage: `pv_systems[].ehal_bindings` mit `pv.{id}.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Anlagen-Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
 
 ## Wechselrichter (`inverters[]`, 2.7.l)
 
@@ -81,7 +82,7 @@ PV-Anlagen und Batterien referenzieren denselben Wechselrichter über `inverter_
 
 **Einmal-Migration** alter Configs (`batteries[].kind` / fehlendes `inverters[]`): `python -m scripts.migrate_inverters_once --config-dir <config>` (Dry-Run ohne Schreiben; ohne `--dry-run` schreibt). Danach `kind` entfernen — der Loader lehnt Restbestände fail-fast ab.
 
-EHAL-Bindings je Batterie: entity-scoped `ess.{slug}.*` in `batteries[].ehal_bindings`. Wechselrichter-Bindings (später, Inverter P4): `inv.{slug}.*` in `inverters[].ehal_bindings`. In [EHAL-Com](../ui/ehal-com.md) erscheinen Hausspeicher und **physische** Powerstations als Mapping-Entities; **virtuelle** Powerstations haben kein eigenes Binding (nutzen die Hausbatterie). Speichern schreibt `components.json`, nicht `house_profiles.json`. Quellenwahl ist `ess.{slug}.set_ess_source_select` nur an physischen `standby_backup`-Batterien (nicht auf der Anlagen-Zeile). Übrige ESS-Felder gehören zur Batterie-Zeile; Loxone-Mehrspeicher-Merker mit Slug-Infix `Earnie_Batterie_<Slug>_…`. Einmal-Migration plant-flach → Batterie (inkl. Quellenwahl → Standby-Backup): `python -m scripts.migrate_ess_bindings_once --config-dir <config>`.
+EHAL-Bindings je Batterie: entity-scoped `ess.{slug}.*` in `batteries[].ehal_bindings`. Wechselrichter: `inv.{slug}.*` in `inverters[].ehal_bindings`. PV-Anlagen: optional `pv.{slug}.*` in `pv_systems[].ehal_bindings`. In [EHAL-Com](../ui/ehal-com.md) erscheinen Hausspeicher, **physische** Powerstations, Wechselrichter und PV-Anlagen als Mapping-Entities; **virtuelle** Powerstations haben kein eigenes Binding (nutzen die Hausbatterie). Speichern schreibt `components.json`, nicht `house_profiles.json`. Quellenwahl ist `ess.{slug}.set_ess_source_select` nur an physischen `standby_backup`-Batterien (nicht auf der Anlagen-Zeile). Übrige ESS-Felder gehören zur Batterie-Zeile; Loxone-Mehrspeicher-Merker mit Slug-Infix `Earnie_Batterie_<Slug>_…`. Einmal-Migration plant-flach → Batterie (inkl. Quellenwahl → Standby-Backup): `python -m scripts.migrate_ess_bindings_once --config-dir <config>`.
 
 ## Steuerbarkeit (`control`)
 

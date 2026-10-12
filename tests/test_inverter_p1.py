@@ -60,6 +60,7 @@ def test_resolve_planning_inverters():
                 "type": "hybrid",
                 "ac_connection": "grid_tied",
                 "control": "full",
+                "efficiency": 0.97,
             }
         ],
         "batteries": [

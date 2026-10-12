@@ -8,7 +8,11 @@ from house_config.battery_control import (
     CONTROL_LABELS_DE,
     DEFAULT_BATTERY_CONTROL,
 )
-from house_config.inverter import AC_ISLAND, INVERTER_TYPE_HYBRID
+from house_config.inverter import (
+    AC_ISLAND,
+    DEFAULT_INVERTER_EFFICIENCY,
+    INVERTER_TYPE_HYBRID,
+)
 from house_config.inverter_presets import ecoflow_delta_3_seeds
 from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
 from ui.house_config_io import list_inverters, upsert_battery, upsert_inverter
@@ -120,6 +124,14 @@ def render_builtin_inverter_section(
     )
     label_to_control = {v: k for k, v in CONTROL_LABELS_DE.items()}
     control = label_to_control.get(str(control_label), DEFAULT_BATTERY_CONTROL)
+    efficiency = labeled_number_input(
+        "Wirkungsgrad DC↔AC (η_inv)",
+        min_value=0.5,
+        max_value=1.0,
+        step=0.01,
+        key=f"{session_scope}__planning_bat_inv_efficiency",
+        help="Einweg-Faktor Wechselrichter (Teil des Speicher-Pfads η_inv · η_batt).",
+    )
     max_ac = labeled_number_input(
         "Max. AC-Leistung (kW, 0 = kein Cap)",
         min_value=0.0,
@@ -138,6 +150,7 @@ def render_builtin_inverter_section(
         "type": INVERTER_TYPE_HYBRID,
         "ac_connection": AC_ISLAND,
         "control": control,
+        "efficiency": float(efficiency),
         "owned_by": battery_id,
         "ehal_bindings": dict(inverter.get("ehal_bindings") or {}),
     }
@@ -160,6 +173,12 @@ def seed_builtin_inverter_widgets(session_scope: str, inverter: dict | None) -> 
     st.session_state[f"{session_scope}__planning_bat_inv_control"] = CONTROL_LABELS_DE[
         control
     ]
+    efficiency = inverter.get("efficiency")
+    st.session_state[f"{session_scope}__planning_bat_inv_efficiency"] = (
+        float(efficiency)
+        if efficiency not in (None, "")
+        else DEFAULT_INVERTER_EFFICIENCY
+    )
     max_ac = inverter.get("max_ac_power_kw")
     max_pv = inverter.get("max_pv_input_kw")
     st.session_state[f"{session_scope}__planning_bat_inv_max_ac"] = (
