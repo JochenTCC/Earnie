@@ -11,6 +11,7 @@ from house_config.inverter import (
     reject_if_needs_inverter_migration,
     validate_inverter_topology,
 )
+from house_config.migrate_topology import reject_if_needs_topology_migration
 from house_config.powerstation import apply_virtual_powerstation_inheritance
 
 
@@ -31,6 +32,7 @@ def normalize_components_document(doc: dict) -> dict:
         raise ValueError("components.json muss ein Objekt sein.")
     reject_if_needs_inverter_migration(doc)
     reject_if_needs_conversion_efficiency_migration(doc)
+    reject_if_needs_topology_migration(doc)
     inverters_raw = doc.get("inverters", [])
     batteries_raw = doc.get("batteries", [])
     pv_raw = doc.get("pv_systems", [])
@@ -85,6 +87,7 @@ def load_components_document(path: str) -> dict:
         raise ValueError("components.json muss ein Objekt sein.")
     reject_if_needs_inverter_migration(doc, path=path)
     reject_if_needs_conversion_efficiency_migration(doc, path=path)
+    reject_if_needs_topology_migration(doc, path=path)
     inverters = doc.get("inverters", [])
     batteries = doc.get("batteries", [])
     pv_systems = doc.get("pv_systems", [])
@@ -128,6 +131,8 @@ def _serialize_battery(spec: dict) -> dict:
         "limits_from_live": bool(spec.get("limits_from_live", False)),
         "control": str(spec.get("control") or "full"),
     }
+    if bat_type == "house" and spec.get("regulates_on") is not None:
+        out["regulates_on"] = str(spec["regulates_on"]).strip().lower()
     inv_id = str(spec.get("inverter_id") or "").strip()
     if inv_id:
         out["inverter_id"] = inv_id
@@ -199,7 +204,13 @@ def _serialize_inverter(spec: dict) -> dict:
         "control": str(spec.get("control") or "full"),
         "efficiency": float(spec["efficiency"]),
     }
-    for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw", "owned_by"):
+    for field in (
+        "max_ac_power_kw",
+        "max_pv_input_kw",
+        "max_ac_charge_kw",
+        "owned_by",
+        "regulates_on",
+    ):
         if field in spec and spec[field] is not None and spec[field] != "":
             out[field] = spec[field]
     bindings = spec.get("ehal_bindings")

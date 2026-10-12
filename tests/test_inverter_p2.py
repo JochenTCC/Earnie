@@ -91,6 +91,7 @@ def test_upsert_inverter_and_pv_battery_link(components_env):
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "inverter_id": "wr_main",
+            "regulates_on": "grid",
             "battery_wear": {"enabled": False},
         }
     )
@@ -149,6 +150,7 @@ def test_virtual_powerstation_has_no_inverter(components_env):
             "battery_min_soc": 5.0,
             "battery_max_soc": 100.0,
             "inverter_id": "wr_main",
+            "regulates_on": "grid",
             "battery_wear": {"enabled": False},
         }
     )
@@ -203,6 +205,7 @@ def test_delete_inverter_blocked_when_referenced(components_env):
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "inverter_id": "wr_main",
+            "regulates_on": "grid",
             "battery_wear": {"enabled": False},
         }
     )

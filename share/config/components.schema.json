@@ -169,6 +169,11 @@
           "default": "full",
           "description": "Steuerbarkeit: full = Zwangsladen/-entladen; limits_only = nur Lade-/Entladegrenzen; read_only = Eigenverbrauch ohne Setpoints."
         },
+        "regulates_on": {
+          "type": "string",
+          "enum": ["grid", "none"],
+          "description": "Required for type=house: which measurement the device's own controller uses when Earnie does not force it (grid = root meter / self-consumption; none = pure setpoint follower). Forbidden on powerstations."
+        },
         "ehal_bindings": {
           "type": "object",
           "description": "entity-scoped ESS bindings (2.7.c): keys ess.{slug}.sens_ess_soc / set_ess_* / get_ess_*; values are Merker titles or HA entity ids.",
@@ -277,6 +282,11 @@
           "type": "string",
           "enum": ["full", "limits_only", "read_only"],
           "default": "full"
+        },
+        "regulates_on": {
+          "type": "string",
+          "enum": ["grid", "none"],
+          "description": "Optional: which measurement the inverter's own controller uses (e.g. dynamic feed-in limiter on grid). Absent ≡ none for live loop count."
         },
         "owned_by": {
           "type": "string",

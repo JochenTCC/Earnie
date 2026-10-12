@@ -36,6 +36,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `threshold_power`       | Anteil   | `components.json` → `batteries[]`    | Relativ zu `max(charge, discharge)` kW (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
 | `standby_power_kw`      | kW       | `components.json` → `batteries[]`    | Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch in der Optimierung)                                                          |
 | `control`               | enum     | `components.json` → `batteries[]`    | Steuerbarkeit der Anlage: `full` (Default) = Zwangsladen/-entladen; `limits_only` = nur Lade-/Entladegrenzen (Automatik/Entladesperre); `read_only` = Eigenverbrauch ohne Setpoints. Eigenschaft der Installation — gilt auch für Simulation / Backtesting / Business Case. |
+| `regulates_on`          | enum     | `components.json` → `batteries[]` (nur `type: house`) | Eigener Geräteregler: `grid` = regelt auf den Netz-Zähler (Eigenverbrauch / Zero-Export, Normalfall); `none` = reiner Setpoint-Folger. **Pflicht** für Hausbatterien — unabhängig von `control`. Powerstations ohne dieses Feld. Optional auch an `inverters[]` (Dyn. Einspeiselimit). |
 | `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten; wird aus `land` abgeleitet (`AT`→`Europe/Vienna`, `DE`→`Europe/Berlin`, `CH`→`Europe/Zurich`); siehe `planning_horizon` |
 | `netznutzung` | Objekt | `house_profiles.json` | Netznutzung Arbeitspreis netto (ohne USt): Netzbereich aus Katalog (inkl. Zeitregeln SNAP/WiNAP) oder eigener Wert; unabhängig vom Lieferantentarif, siehe [Preise](preise.md) |
 
@@ -83,6 +84,22 @@ PV-Anlagen und Batterien referenzieren denselben Wechselrichter über `inverter_
 **Einmal-Migration** alter Configs (`batteries[].kind` / fehlendes `inverters[]`): `python -m scripts.migrate_inverters_once --config-dir <config>` (Dry-Run ohne Schreiben; ohne `--dry-run` schreibt). Danach `kind` entfernen — der Loader lehnt Restbestände fail-fast ab.
 
 EHAL-Bindings je Batterie: entity-scoped `ess.{slug}.*` in `batteries[].ehal_bindings`. Wechselrichter: `inv.{slug}.*` in `inverters[].ehal_bindings`. PV-Anlagen: optional `pv.{slug}.*` in `pv_systems[].ehal_bindings`. In [EHAL-Com](../ui/ehal-com.md) erscheinen Hausspeicher, **physische** Powerstations, Wechselrichter und PV-Anlagen als Mapping-Entities; **virtuelle** Powerstations haben kein eigenes Binding (nutzen die Hausbatterie). Speichern schreibt `components.json`, nicht `house_profiles.json`. Quellenwahl ist `ess.{slug}.set_ess_source_select` nur an physischen `standby_backup`-Batterien (nicht auf der Anlagen-Zeile). Übrige ESS-Felder gehören zur Batterie-Zeile; Loxone-Mehrspeicher-Merker mit Slug-Infix `Earnie_Batterie_<Slug>_…`. Einmal-Migration plant-flach → Batterie (inkl. Quellenwahl → Standby-Backup): `python -m scripts.migrate_ess_bindings_once --config-dir <config>`.
+
+## Anlagen-Topologie (Live): drei Fragen
+
+Vor dem Live-Betrieb muss die Wurzel der Bilanz klar sein (ein Zähler, ein Tarif, höchstens ein Regler auf diesen Zähler):
+
+1. **Sitzt der Zähler direkt am Hausanschluss?** → `plant.grid_meter.at_house_connection` in `house_profiles.json` (Hauskonfigurator → Profil / Anlage).
+2. **Gibt es nur einen Tarif?** → `plant.grid_meter.single_tariff` (kein zweiter Abrechnungszähler hinter demselben Mapping).
+3. **Regelt ein anderes Gerät selbst auf diesen Zähler?** → Hausbatterie `regulates_on: grid` (Eigenverbrauch / Zero-Export) oder `none` (reiner Setpoint-Folger). Fremdregler zählen — `control: read_only` heißt nur, dass Earnie nicht schreibt.
+
+Beide `plant.grid_meter`-Flags müssen im Live-Pfad `true` sein. Migration bestehender Anlagen:
+
+```text
+python -m scripts.migrate_topology_once --config-dir <config-dir>
+```
+
+setzt `regulates_on: grid` für jede Hausbatterie und legt `plant.grid_meter` mit `true`/`true` an — die drei Fragen danach bestätigen. Szenarien-Explorer und Backtesting sind von den Live-Ablehnungen ausgenommen (Schema-Regeln wie Batterie an `pv_string`-WR gelten überall). Details: [EHAL-Spec § Plant topology](../spec/ehal.md).
 
 ## Steuerbarkeit (`control`)
 

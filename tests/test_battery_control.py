@@ -37,6 +37,7 @@ def _battery_raw(**overrides):
         "battery_efficiency": 0.95,
         "battery_min_soc": 10.0,
         "battery_max_soc": 100.0,
+        "regulates_on": "grid",
     }
     base.update(overrides)
     return base

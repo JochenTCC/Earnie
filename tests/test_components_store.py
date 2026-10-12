@@ -40,6 +40,7 @@ def test_save_and_load_roundtrip(tmp_path):
                     "threshold_power": 0.05,
                     "limits_from_live": True,
                     "control": "limits_only",
+                    "regulates_on": "grid",
                     "battery_wear": {"enabled": False},
                 }
             ],
@@ -85,6 +86,7 @@ def test_save_migrates_legacy_max_power_to_split_fields(tmp_path):
                     "battery_min_soc": 10.0,
                     "battery_max_soc": 100.0,
                     "threshold_power": 0.05,
+                    "regulates_on": "grid",
                     "battery_wear": {"enabled": False},
                 }
             ],
@@ -112,6 +114,7 @@ def test_normalize_rejects_duplicate_battery_ids():
                         "battery_efficiency": 0.97,
                         "battery_min_soc": 10.0,
                         "battery_max_soc": 100.0,
+                        "regulates_on": "grid",
                     },
                     {
                         "id": "bat",
@@ -121,6 +124,7 @@ def test_normalize_rejects_duplicate_battery_ids():
                         "battery_efficiency": 0.95,
                         "battery_min_soc": 10.0,
                         "battery_max_soc": 100.0,
+                        "regulates_on": "grid",
                     },
                 ],
                 "pv_systems": [],

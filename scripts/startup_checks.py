@@ -196,6 +196,7 @@ def run_live_scenario_entity_check_on_startup() -> None:
             "Live-Szenario-Startup-Prüfung: '%s' mit Entitäts-IDs vorhanden.",
             scenario_id,
         )
+        run_live_topology_check_on_startup()
         return
 
     message = (
@@ -207,6 +208,18 @@ def run_live_scenario_entity_check_on_startup() -> None:
         logger.error("%s Abbruch (EARNIE_STRICT_TARIFF_VALIDATE).", message)
         raise SystemExit(1)
     logger.error("%s Optimierung startet trotzdem.", message)
+
+
+def run_live_topology_check_on_startup() -> None:
+    """Refuse daemon start when Topology P1 live rules fail (always strict)."""
+    from house_config.topology_live import validate_live_topology_from_config_dir
+
+    try:
+        validate_live_topology_from_config_dir()
+    except ValueError as exc:
+        logger.error("Live-Topology-Startup-Prüfung: %s Abbruch.", exc)
+        raise SystemExit(1) from exc
+    logger.info("Live-Topology-Startup-Prüfung: OK.")
 
 
 def run_tariff_plausibility_on_startup() -> None:

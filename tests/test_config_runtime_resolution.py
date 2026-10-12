@@ -74,6 +74,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
         "battery_min_soc": 10.0,
         "battery_max_soc": 100.0,
         "threshold_power": 0.05,
+        "regulates_on": "grid",
     }
     if battery_wear_enabled:
         battery["battery_wear"] = {

@@ -82,6 +82,7 @@ def test_resolve_scenario_settings_coerces_legacy_battery_id(monkeypatch):
         "battery_min_soc": 10.0,
         "battery_max_soc": 100.0,
         "threshold_power": 0.02,
+        "regulates_on": "grid",
         "standby_power_kw": 0.05,
         "control": "full",
         "limits_from_live": False,

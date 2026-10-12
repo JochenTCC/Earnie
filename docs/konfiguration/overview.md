@@ -67,7 +67,7 @@ Im Abschnitt **Konfiguration** pflegt der **Szenarienkonfigurator** das Live-Sze
 ## Weiterlesen
 
 - [Speichern / Laden](speichern-laden.md)
-- [PV & Batterie](batterie-pv.md)
+- [PV & Batterie](batterie-pv.md) (inkl. Anlagen-Topologie / drei Fragen für den Live-Pfad)
 - [Flexible Verbraucher](flexible-verbraucher.md)
 - [Verbrauchs-CSV](verbrauchs-csv.md)
 - [Preise & aWATTar](preise.md)

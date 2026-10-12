@@ -101,6 +101,7 @@ def test_empty_ess_activation_resolves_plant_flat_aliases(
                 "id": house_id,
                 "type": "house",
                 "inverter_id": "wr_main",
+                "regulates_on": "grid",
                 "ehal_bindings": {
                     ess_field(house_id, "sens_ess_soc"): "",
                     ess_field(house_id, "set_ess_active_power"): "",
@@ -269,6 +270,7 @@ def test_q8_empty_battery_write_io_indexes_qid(tmp_path, monkeypatch) -> None:
                 "id": house_id,
                 "type": "house",
                 "inverter_id": "wr_main",
+                "regulates_on": "grid",
                 "ehal_bindings": {
                     ess_field(house_id, "set_ess_active_power"): "",
                     ess_field(house_id, "set_ess_charge_power_limit"): "",

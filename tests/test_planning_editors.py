@@ -149,6 +149,7 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
             "battery_max_soc": 100.0,
             "threshold_power": 0.05,
             "inverter_id": "wr_main",
+            "regulates_on": "grid",
             "battery_wear": {
                 "enabled": True,
                 "replacement_cost_euro": 1500.0,
@@ -188,6 +189,7 @@ def test_upsert_battery_rejects_enabled_wear_missing_fields(tmp_path, monkeypatc
                 "battery_max_soc": 100.0,
                 "threshold_power": 0.05,
                 "inverter_id": "wr_main",
+                "regulates_on": "grid",
                 "battery_wear": {"enabled": True},
             }
         )
@@ -211,6 +213,7 @@ def test_delete_battery_removes_entity_and_scrubs_scenarios(tmp_path, monkeypatc
                         "battery_max_soc": 100.0,
                         "threshold_power": 0.05,
                         "inverter_id": "wr_main",
+                        "regulates_on": "grid",
                         "battery_wear": {"enabled": False},
                     },
                     {
@@ -223,6 +226,7 @@ def test_delete_battery_removes_entity_and_scrubs_scenarios(tmp_path, monkeypatc
                         "battery_max_soc": 100.0,
                         "threshold_power": 0.05,
                         "inverter_id": "wr_main",
+                        "regulates_on": "grid",
                         "battery_wear": {"enabled": False},
                     },
                 ],

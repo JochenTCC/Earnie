@@ -17,6 +17,10 @@ from house_config.battery_control import (
     CONTROL_LABELS_DE,
     DEFAULT_BATTERY_CONTROL,
 )
+from house_config.topology_regulates import (
+    REGULATES_ON_GRID,
+    REGULATES_ON_NONE,
+)
 from house_config.powerstation import (
     BACKING_VIRTUAL,
     primary_house_battery,
@@ -102,6 +106,10 @@ def new_battery_template(
         "threshold_power": float(source.get("threshold_power", 0.05)),
         "standby_power_kw": float(source.get("standby_power_kw", 0.0) or 0.0),
         "control": str(source.get("control") or "full").strip().lower() or "full",
+        "regulates_on": str(source.get("regulates_on") or REGULATES_ON_GRID)
+        .strip()
+        .lower()
+        or REGULATES_ON_GRID,
         "limits_from_live": bool(source.get("limits_from_live", False)),
         "inverter_id": str(source.get("inverter_id") or "").strip()
         or default_inverter_id_for_new_house(),
@@ -155,6 +163,11 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         control = str(existing.get("control") or DEFAULT_BATTERY_CONTROL).strip().lower()
         if control not in BATTERY_CONTROL_VALUES:
             control = DEFAULT_BATTERY_CONTROL
+        regulates_on = str(
+            existing.get("regulates_on") or REGULATES_ON_GRID
+        ).strip().lower()
+        if regulates_on not in (REGULATES_ON_GRID, REGULATES_ON_NONE):
+            regulates_on = REGULATES_ON_GRID
         bat_type = str(existing.get("type") or "house").strip().lower() or "house"
         backing = str(existing.get("backing") or "virtual").strip().lower() or "virtual"
         role = str(existing.get("role") or "single_use").strip().lower() or "single_use"
@@ -185,6 +198,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         threshold_percent = 5.0
         standby_power = 0.0
         control = DEFAULT_BATTERY_CONTROL
+        regulates_on = REGULATES_ON_GRID
         bat_type = "house"
         backing = "virtual"
         role = "single_use"
@@ -238,6 +252,13 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_battery_standby")] = standby_power
     st.session_state[_scoped_key(session_scope, "planning_battery_control")] = (
         CONTROL_LABELS_DE[control]
+    )
+    _regulates_labels = {
+        REGULATES_ON_GRID: "Netz-Zähler (Eigenverbrauch / Zero-Export)",
+        REGULATES_ON_NONE: "Keiner (nur Setpoints)",
+    }
+    st.session_state[_scoped_key(session_scope, "planning_battery_regulates_on")] = (
+        _regulates_labels.get(regulates_on, _regulates_labels[REGULATES_ON_GRID])
     )
     st.session_state[_scoped_key(session_scope, "planning_battery_limits_from_live")] = (
         limits_from_live
@@ -618,7 +639,9 @@ def _render_battery_core_fields(session_scope: str) -> dict:
     }
 
 
-def _render_battery_limit_fields(session_scope: str) -> dict:
+def _render_battery_limit_fields(
+    session_scope: str, *, bat_type: str = "house"
+) -> dict:
     limits_from_live = labeled_checkbox(
         "Grenzwerte im Live-Betrieb vom Wechselrichter / Speicher übernehmen",
         help="SOC-Min/Max und Max. Lade-/Entladeleistung aus EHAL-Telemetrie "
@@ -661,7 +684,7 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
     )
     label_to_control = {v: k for k, v in CONTROL_LABELS_DE.items()}
     control = label_to_control.get(str(control_label), DEFAULT_BATTERY_CONTROL)
-    return {
+    out = {
         "limits_from_live": limits_from_live,
         "min_soc": min_soc,
         "max_soc": max_soc,
@@ -669,6 +692,23 @@ def _render_battery_limit_fields(session_scope: str) -> dict:
         "standby_power": standby_power,
         "control": control,
     }
+    if str(bat_type or "house").strip().lower() == "house":
+        regulates_labels = {
+            REGULATES_ON_GRID: "Netz-Zähler (Eigenverbrauch / Zero-Export)",
+            REGULATES_ON_NONE: "Keiner (nur Setpoints)",
+        }
+        regulates_label = labeled_selectbox(
+            "Eigener Regler auf",
+            options=list(regulates_labels.values()),
+            help="Welche Messung der Geräteeigene Regler nutzt, wenn Earnie "
+            "nicht zwingt (regulates_on). Unabhängig von Steuerbarkeit.",
+            key=_scoped_key(session_scope, "planning_battery_regulates_on"),
+        )
+        label_to_regulates = {v: k for k, v in regulates_labels.items()}
+        out["regulates_on"] = label_to_regulates.get(
+            str(regulates_label), REGULATES_ON_GRID
+        )
+    return out
 
 
 def _render_battery_wear_fields(session_scope: str) -> dict:
@@ -771,7 +811,11 @@ def _render_battery_fields(
         fields["inverter_id"] = ""
         fields["builtin_inverter"] = None
         return fields
-    fields.update(_render_battery_limit_fields(session_scope))
+    fields.update(
+        _render_battery_limit_fields(
+            session_scope, bat_type=str(fields.get("type") or "house")
+        )
+    )
     fields["battery_wear"] = _render_battery_wear_fields(session_scope)
     inv_id, builtin = _render_battery_inverter_ui(
         session_scope, fields, battery_id=battery_id
@@ -798,6 +842,11 @@ def _battery_save_payload(fields: dict) -> dict:
         "ehal_bindings": dict(fields.get("ehal_bindings") or {}),
         "battery_wear": fields["battery_wear"],
     }
+    if str(payload.get("type") or "house") == "house":
+        payload["regulates_on"] = (
+            str(fields.get("regulates_on") or REGULATES_ON_GRID).strip().lower()
+            or REGULATES_ON_GRID
+        )
     inv_id = str(fields.get("inverter_id") or "").strip()
     if inv_id:
         payload["inverter_id"] = inv_id

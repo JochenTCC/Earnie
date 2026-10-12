@@ -198,6 +198,17 @@ def normalize_inverter(raw: dict, index: int) -> dict:
     owned_by = str(raw.get("owned_by") or "").strip()
     if owned_by:
         out["owned_by"] = owned_by
+    from house_config.topology_regulates import normalize_regulates_on
+
+    regulates_on = normalize_regulates_on(
+        raw.get("regulates_on") if "regulates_on" in raw else None,
+        entity_kind="inverters",
+        entity_id=inv_id,
+        index=index,
+        required=False,
+    )
+    if regulates_on is not None:
+        out["regulates_on"] = regulates_on
     if "id_locked" in raw:
         out["id_locked"] = bool(raw.get("id_locked"))
     provisional = str(raw.get("id_provisional_label") or "").strip()
@@ -231,7 +242,13 @@ def planning_inverter_entry(inv: dict) -> dict:
         "efficiency": float(inv["efficiency"]),
         "ehal_bindings": dict(inv.get("ehal_bindings") or {}),
     }
-    for field in ("max_ac_power_kw", "max_pv_input_kw", "max_ac_charge_kw", "owned_by"):
+    for field in (
+        "max_ac_power_kw",
+        "max_pv_input_kw",
+        "max_ac_charge_kw",
+        "owned_by",
+        "regulates_on",
+    ):
         if field in inv and inv[field] is not None:
             entry[field] = inv[field]
     return entry
@@ -267,6 +284,12 @@ def validate_inverter_topology(
         if inv_id not in inverters:
             raise ValueError(
                 f"Batterie '{bat_id}': unbekannte inverter_id '{inv_id}'."
+            )
+        inv = inverters[inv_id]
+        if inv["type"] == INVERTER_TYPE_PV_STRING:
+            raise ValueError(
+                f"Batterie '{bat_id}': inverter '{inv_id}' ist type=pv_string "
+                "(nur PV, keine Batterie)."
             )
 
     for pv_id, pv in pv_systems.items():

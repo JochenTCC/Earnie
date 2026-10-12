@@ -41,6 +41,7 @@ def _components(*, eta_inv: float | None = 0.97, eta_batt: float = 0.97) -> dict
                 "battery_max_soc": 100.0,
                 "threshold_power": 0.02,
                 "control": "full",
+                "regulates_on": "grid",
                 "ehal_bindings": {},
             }
         ],

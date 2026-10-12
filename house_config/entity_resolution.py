@@ -198,6 +198,22 @@ def normalize_battery(raw: dict, index: int) -> dict:
     bat_type = normalize_battery_type(
         raw.get("type"), battery_id=battery_id, index=index
     )
+    from house_config.topology_regulates import normalize_regulates_on
+
+    if bat_type == BATTERY_TYPE_POWERSTATION and "regulates_on" in raw:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): regulates_on ist nur für "
+            "type=house erlaubt (Powerstations weglassen)."
+        )
+    regulates_on = None
+    if bat_type == BATTERY_TYPE_HOUSE:
+        regulates_on = normalize_regulates_on(
+            raw.get("regulates_on"),
+            entity_kind="batteries",
+            entity_id=battery_id,
+            index=index,
+            required=True,
+        )
     capacity = float(raw["battery_capacity_kwh"])
     if bat_type == BATTERY_TYPE_POWERSTATION:
         if capacity > 0.0 and charge_kw <= 0.0:
@@ -246,6 +262,8 @@ def normalize_battery(raw: dict, index: int) -> dict:
         },
         "battery_wear": _normalize_battery_wear(raw.get("battery_wear"), battery_id, index),
     }
+    if regulates_on is not None:
+        out["regulates_on"] = regulates_on
     if bat_type == BATTERY_TYPE_POWERSTATION:
         out.update(
             normalize_powerstation_fields(raw, battery_id=battery_id, index=index)
@@ -392,6 +410,8 @@ def planning_battery_entry(bat: dict) -> dict:
             dict(bat["battery_wear"]) if bat.get("battery_wear") is not None else None
         ),
     }
+    if bat.get("regulates_on") is not None:
+        entry["regulates_on"] = bat["regulates_on"]
     inv_id = str(bat.get("inverter_id") or "").strip()
     if inv_id:
         entry["inverter_id"] = inv_id
@@ -697,9 +717,11 @@ def resolve_components_into_settings(
 ) -> dict:
     """Normalize components, validate topology, resolve batteries/PV/inverters."""
     from house_config.inverter import reject_if_needs_inverter_migration
+    from house_config.migrate_topology import reject_if_needs_topology_migration
 
     reject_if_needs_inverter_migration(components)
     reject_if_needs_conversion_efficiency_migration(components)
+    reject_if_needs_topology_migration(components)
     inverters = inverters_by_id(components)
     batteries = batteries_by_id(components)
     pv_systems = pv_systems_by_id(components)

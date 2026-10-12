@@ -45,6 +45,7 @@ alwaysApply: true
 * **Release Regression Suite (`Regression`):** P1 (MVP: runner, cases, golden), P2 (customer data / private repo), P3 (CI gate + scrubber)
 * **Inverter entity (`Inverter`, 2.7.l):** P1 (schema + resolution + migration), P2 (UI + docs), P3 (MILP clipping), P4 (EHAL role), P5 (follow-ups)
 * **EHAL-Com signal contract (`Binding`):** P0 (spikes), P1 (qualified EHAL ID + parser), P2 (Signal list + match status), P3 (Loxone VO / VI export), P4 (import hardening + discovery), P5 (HA Weg B: HTTP contract + YAML package), P6 (Kennung as editable variable)
+* **Plant topology (`Topology`, 2.7):** P1 (explicit root + regulator declaration + validation), P2 (live-balance coverage), P3 (per-ESS setpoint writes), P4 (reactive regulator in the MILP), P5 (balance nodes + attribution)
 * **Session Conclusion:** Phases P1-P2
 * **Migration (`MIGRATION.md`):** Phases P1-P7
 

@@ -26,6 +26,7 @@
             "threshold_power": 0.05,
             "limits_from_live": false,
             "control": "full",
+            "regulates_on": "grid",
             "ehal_bindings": {},
             "battery_wear": {
                 "enabled": true,
@@ -47,6 +48,7 @@
             "threshold_power": 0.02,
             "limits_from_live": false,
             "control": "full",
+            "regulates_on": "grid",
             "ehal_bindings": {},
             "battery_wear": {
                 "enabled": true,

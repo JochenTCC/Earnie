@@ -495,7 +495,34 @@ def _normalize_plant(raw: dict | None) -> dict:
     force = normalize_ha_ess_force(raw.get("ha_ess_force"))
     if force:
         out["ha_ess_force"] = force
+    grid_meter = _normalize_grid_meter(raw.get("grid_meter"))
+    if grid_meter is not None:
+        out["grid_meter"] = grid_meter
     return out
+
+
+def _normalize_grid_meter(raw: object) -> dict | None:
+    """Optional plant.grid_meter assertion (Topology P1). Absent stays absent."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("plant.grid_meter muss ein Objekt sein.")
+    if "at_house_connection" not in raw or "single_tariff" not in raw:
+        raise ValueError(
+            "plant.grid_meter benötigt at_house_connection und single_tariff "
+            "(beide boolean)."
+        )
+    at_house = raw["at_house_connection"]
+    single = raw["single_tariff"]
+    if not isinstance(at_house, bool) or not isinstance(single, bool):
+        raise ValueError(
+            "plant.grid_meter.at_house_connection und single_tariff müssen "
+            "boolean sein."
+        )
+    return {
+        "at_house_connection": at_house,
+        "single_tariff": single,
+    }
 
 
 def normalize_house_profiles_document(doc: dict) -> dict:

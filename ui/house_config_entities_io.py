@@ -604,6 +604,8 @@ def upsert_battery(
         raw_spec["ehal_bindings"] = bindings_src
     if raw_spec.get("control") is not None:
         spec["control"] = raw_spec["control"]
+    if raw_spec.get("regulates_on") is not None:
+        spec["regulates_on"] = raw_spec["regulates_on"]
     if raw_spec.get("type") is not None:
         spec["type"] = raw_spec["type"]
     if raw_spec.get("inverter_id") is not None:
@@ -615,6 +617,7 @@ def upsert_battery(
             spec[key] = raw_spec[key]
     existing_wear = None
     existing_control = None
+    existing_regulates_on = None
     existing_type_fields: dict = {}
     lookup_id = old_id or entity_id
     if lookup_id:
@@ -622,6 +625,7 @@ def upsert_battery(
             if str(item.get("id", "")).strip() == lookup_id:
                 existing_wear = item.get("battery_wear")
                 existing_control = item.get("control")
+                existing_regulates_on = item.get("regulates_on")
                 for key in (
                     "type",
                     "backing",
@@ -635,6 +639,8 @@ def upsert_battery(
                 break
     if "control" not in spec and existing_control is not None:
         spec["control"] = existing_control
+    if "regulates_on" not in spec and existing_regulates_on is not None:
+        spec["regulates_on"] = existing_regulates_on
     for key, value in existing_type_fields.items():
         spec.setdefault(key, value)
     if raw_spec.get("battery_wear") is not None:
@@ -716,6 +722,8 @@ def upsert_battery(
         else {"enabled": False},
         ID_LOCKED_KEY: id_locked,
     }
+    if normalized.get("regulates_on") is not None:
+        save_spec["regulates_on"] = normalized["regulates_on"]
     if not id_locked and provisional:
         save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
     inv_persist = str(normalized.get("inverter_id") or "").strip()

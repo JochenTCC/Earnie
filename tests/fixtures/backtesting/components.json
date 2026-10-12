@@ -27,7 +27,8 @@
                 "expected_cycles": 6000,
                 "cycle_cost_fraction": 0.5
             },
-            "ehal_bindings": {}
+            "ehal_bindings": {},
+            "regulates_on": "grid"
         }
     ],
     "pv_systems": [

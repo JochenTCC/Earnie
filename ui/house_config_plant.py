@@ -4,11 +4,13 @@ from __future__ import annotations
 import streamlit as st
 
 from ui.auto_persist import auto_persist
-from ui.form_layout import labeled_number_input
+from ui.form_layout import labeled_checkbox, labeled_number_input
 from ui.house_config_io import load_house_profiles, save_house_profiles
 
 _PLANT_EXPORT_KEY = "house_config_plant_max_export_kw"
 _PLANT_EXPORT_ENABLED_KEY = "house_config_plant_max_export_enabled"
+_PLANT_GM_AT_HOUSE_KEY = "house_config_plant_grid_meter_at_house"
+_PLANT_GM_SINGLE_TARIFF_KEY = "house_config_plant_grid_meter_single_tariff"
 
 
 def _seed_plant_export_widgets(plant: dict) -> None:
@@ -71,5 +73,63 @@ def render_plant_export_limit() -> None:
     auto_persist(
         state_key="house_config_plant_export",
         payload={"enabled": enabled, "max_kw": max_kw},
+        save=_persist,
+    )
+
+
+def _seed_plant_grid_meter_widgets(plant: dict) -> None:
+    raw = plant.get("grid_meter") if isinstance(plant.get("grid_meter"), dict) else {}
+    if _PLANT_GM_AT_HOUSE_KEY not in st.session_state:
+        st.session_state[_PLANT_GM_AT_HOUSE_KEY] = bool(
+            raw.get("at_house_connection", False)
+        )
+    if _PLANT_GM_SINGLE_TARIFF_KEY not in st.session_state:
+        st.session_state[_PLANT_GM_SINGLE_TARIFF_KEY] = bool(
+            raw.get("single_tariff", False)
+        )
+
+
+def render_plant_grid_meter_assertions() -> None:
+    """Topology P1: user assertions for the root meter / tariff boundary."""
+    house = load_house_profiles()
+    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
+    _seed_plant_grid_meter_widgets(plant if isinstance(plant, dict) else {})
+
+    st.markdown("##### Netz-Zähler (Anlage / Live)")
+    st.caption(
+        "Live-Pfad: beide Aussagen müssen zutreffen. "
+        "Sitzt der Zähler direkt am Hausanschluss? "
+        "Gibt es nur einen Tarif? "
+        "Regelt ein anderes Gerät selbst auf diesen Zähler? "
+        "(Fremdregler → Hausbatterie `regulates_on`.)"
+    )
+    at_house = labeled_checkbox(
+        "Zähler sitzt direkt am Hausanschluss",
+        key=_PLANT_GM_AT_HOUSE_KEY,
+        help="plant.grid_meter.at_house_connection",
+    )
+    single = labeled_checkbox(
+        "Nur ein Import- und ein Exporttarif hinter diesem Zähler",
+        key=_PLANT_GM_SINGLE_TARIFF_KEY,
+        help="plant.grid_meter.single_tariff",
+    )
+
+    def _persist() -> None:
+        doc = load_house_profiles()
+        plant_out = (
+            dict(doc.get("plant") or {})
+            if isinstance(doc.get("plant"), dict)
+            else {}
+        )
+        plant_out["grid_meter"] = {
+            "at_house_connection": bool(at_house),
+            "single_tariff": bool(single),
+        }
+        doc["plant"] = plant_out
+        save_house_profiles(doc)
+
+    auto_persist(
+        state_key="house_config_plant_grid_meter",
+        payload={"at_house": bool(at_house), "single": bool(single)},
         save=_persist,
     )

@@ -65,6 +65,28 @@ def main_hybrid_inverter(**overrides) -> dict:
     return base
 
 
+def house_battery_stub(**overrides) -> dict:
+    """Minimal house battery for components.json (Topology P1: regulates_on)."""
+    base = {
+        "id": "home",
+        "label": "Haus",
+        "inverter_id": "wr_main",
+        "battery_capacity_kwh": 5.0,
+        "battery_max_charge_power_kw": 2.5,
+        "battery_max_discharge_power_kw": 2.5,
+        "battery_efficiency": 0.97,
+        "battery_min_soc": 10.0,
+        "battery_max_soc": 100.0,
+        "threshold_power": 0.05,
+        "control": "full",
+        "regulates_on": "grid",
+        "ehal_bindings": {},
+        "battery_wear": {"enabled": False},
+    }
+    base.update(overrides)
+    return base
+
+
 def minimal_components_payload(*, extra: dict | None = None) -> dict:
     payload = {"inverters": [], "batteries": [], "pv_systems": []}
     if extra:

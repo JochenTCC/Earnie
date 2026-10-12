@@ -1584,6 +1584,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
                 "threshold_power": 0.05,
+                "regulates_on": "grid",
                 "battery_wear": {"enabled": false}
             }],
             "pv_systems": [{

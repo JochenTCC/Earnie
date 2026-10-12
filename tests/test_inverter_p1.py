@@ -76,6 +76,7 @@ def test_resolve_planning_inverters():
                 "battery_max_soc": 100.0,
                 "threshold_power": 0.02,
                 "control": "full",
+                "regulates_on": "grid",
                 "ehal_bindings": {},
                 "battery_wear": None,
             }

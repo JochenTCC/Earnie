@@ -128,6 +128,7 @@ def test_ensure_migrated_refuses_plant_flat_ess_when_batteries_exist(
                 "id": "house",
                 "type": "house",
                 "inverter_id": "wr_main",
+                "regulates_on": "grid",
                 "ehal_bindings": {ess_field("house", "sens_ess_soc"): ""},
             }
         ],

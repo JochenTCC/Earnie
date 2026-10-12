@@ -46,6 +46,18 @@ def _render_cockpit_locked_notice() -> None:
     st.info(_COCKPIT_LOCKED_NOTICE)
 
 
+def _render_live_topology_status() -> None:
+    """Refuse-style error when Topology P1 live rules fail (not warn-only)."""
+    from house_config.topology_live import validate_live_topology_from_config_dir
+
+    try:
+        validate_live_topology_from_config_dir()
+    except ValueError as exc:
+        st.error(f"Live-Topologie abgelehnt: {exc}")
+    except Exception as exc:  # noqa: BLE001 — sidecars may be absent in setup
+        st.warning(f"Live-Topologie nicht prüfbar: {exc}")
+
+
 def render() -> None:
     import config
 
@@ -57,6 +69,7 @@ def render() -> None:
     )
     st.caption(f"Konfiguration: `{config.CONFIG.config_path}`")
     _render_cockpit_locked_notice()
+    _render_live_topology_status()
 
     backend = active_ehal_backend()
     st.caption(

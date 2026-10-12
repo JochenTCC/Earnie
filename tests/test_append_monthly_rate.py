@@ -82,6 +82,7 @@ def _write_live_pack(config_dir: Path, tariffs: dict) -> None:
                         "battery_min_soc": 10.0,
                         "battery_max_soc": 100.0,
                         "threshold_power": 0.05,
+                        "regulates_on": "grid",
                     }
                 ],
                 "pv_systems": [

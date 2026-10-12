@@ -179,6 +179,7 @@ def test_upsert_battery_locks_after_bezeichnung_change(components_env):
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "inverter_id": "wr_main",
+            "regulates_on": "grid",
             "battery_wear": {"enabled": False},
             "ehal_bindings": {
                 ess_field("15_kwh_speicher_copy", "sens_ess_soc"): "SoC",
@@ -206,6 +207,7 @@ def test_upsert_battery_locks_after_bezeichnung_change(components_env):
             "battery_min_soc": 10.0,
             "battery_max_soc": 100.0,
             "inverter_id": "wr_main",
+            "regulates_on": "grid",
             "battery_wear": {"enabled": False},
         },
         stable_id=first,

@@ -260,6 +260,7 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
                         "battery_min_soc": 10.0,
                         "battery_max_soc": 100.0,
                         "threshold_power": 0.02,
+                        "regulates_on": "grid",
                         "battery_wear": {"enabled": False},
                     }
                 ],
@@ -388,6 +389,7 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
                         "battery_min_soc": 10.0,
                         "battery_max_soc": 100.0,
                         "threshold_power": 0.02,
+                        "regulates_on": "grid",
                         "battery_wear": {"enabled": False},
                     }
                 ],

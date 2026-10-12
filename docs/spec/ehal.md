@@ -208,6 +208,44 @@ Built-in inverters (`owned_by`): lifecycle/UI flag only; created and deleted wit
 
 `control` per inverter gates `set_inv_ac_power_limit` the same way `batteries[].control` gates ESS writes; EHAL-Com warns when `control` asks for more than bound functions allow.
 
+A battery attached to an inverter with `type: pv_string` is **rejected** (schema / topology validation).
+
+## Plant topology (Topology P1)
+
+Decision record: [`backlog/Plant-Topology-Conclusion.md`](../../backlog/Plant-Topology-Conclusion.md). Earnie balances at exactly one **root balance node** = one tariff boundary. Sub-nodes (`balance_nodes[]`, wire `node.*`) arrive in Topology P5; until then the root meter stays `grid.meter.*` on `plant.ehal_bindings`.
+
+**Model (condensed M1–M9):**
+
+| Id | Rule |
+| --- | --- |
+| M1 | One root = one tariff boundary; user asserts it (`plant.grid_meter`) |
+| M2 | A balance node = one upstream connection + n branches; a meter is a measurement on a connection |
+| M3 | Scope and control are modelled, copper is not (documented v1 limits for series/pass-through) |
+| M4 | Sub-nodes are attribution only; devices behind them stay in the root MILP (P5) |
+| M5 | Read per device, control per actuator; generator side of the root must be covered (P2) |
+| M6 | At most one active closed-loop **grid** regulator per node (`regulates_on`, not `control`) |
+| M7 | A second billing meter is a second economic node — non-goal in v1 (`single_tariff`) |
+| M8 | Island / standby stay as today (`ac_connection: island`) |
+| M9 | No readable root → refuse (assertion in v1; opt-in approximation later) |
+
+**Config (P1):**
+
+- `plant.grid_meter`: `{ "at_house_connection": true, "single_tariff": true }` — both must be `true` on the **live path** (daemon + EHAL-Com). Absent or `false` → refuse. SE / backtesting may omit.
+- `batteries[].regulates_on`: `"grid"` \| `"none"`, **required** on `type: house` (no silent default). Powerstations must not carry the field. Meaning: which measurement the device’s **own** controller uses when Earnie does not force it. `control: read_only` does **not** mean “does not regulate.”
+- Optional `inverters[].regulates_on` (absent ≡ `none`) for a dynamic feed-in limiter on the root meter.
+
+Migration (data model stays **4**): `python -m scripts.migrate_topology_once --config-dir <config-dir>` sets `regulates_on: grid` on every house battery, seeds `plant.grid_meter` true/true, and prints the operator confirm wording. Loader rejects the old shape (fail-fast, no dual-read).
+
+**Live-path validation only** (not SE / backtesting):
+
+| Rule | Behaviour |
+| --- | --- |
+| (i) Root loops | Count of **grid-tied** house batteries with `regulates_on: grid` plus inverters with `regulates_on: grid` ≤ 1; else refuse (names P3/P4). Island packs are excluded from the count. |
+| (ii) Multi house-ESS | At most one grid-tied house battery in the live plan until P3 + P4; second → refuse (no warn-and-exclude). |
+| (iii) Single foreign loop | One `read_only` / `limits_only` house battery with `regulates_on: grid` stays accepted (today’s self-consumption pin). |
+
+**Accepted topologies (v1 after P1):** (a)/(a′) one hybrid (+ read-only PV strings); (d)/(g)/(h) with documented limits; island / standby. **Rejected on live:** (b′) foreign self-consumption beside another loop, (c)/(c′) multi house-ESS / dual vendor loops, (e) no root assertion, (f) second tariff (`single_tariff: false`). Full table: Conclusion §2. P2–P5 widen acceptance (coverage, per-ESS writes, reactive MILP, balance nodes).
+
 ### HA vendor force: `plant.ha_ess_force`
 
 When there is no `set_ess_active_power` entity (typical `huawei_solar`), configure:

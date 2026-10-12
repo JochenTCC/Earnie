@@ -2,6 +2,22 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Topology P1 — root assertion + regulates_on (2026-10-12)
+
+- [x] **Topology P1 — explicit root, regulator declaration, validation** (epic **Topology**; decision [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md))
+  - Design pack: theses / Claude+Grok reviews / conclusion; epic phases P1–P5 in [`Backlog.md`](Backlog.md); nomenclature in `roadmap-nomenclature.mdc`
+  - `plant.grid_meter` (`at_house_connection`, `single_tariff`) required `true` on live path; `batteries[].regulates_on` (`grid` | `none`); optional `inverters[].regulates_on`
+  - One-shot `scripts.migrate_topology_once` + fail-fast loader; live validation (≤1 loop at root; ≤1 grid-tied house battery until P3+P4); reject battery on `pv_string` inverter
+  - UI (profile / battery / plant), German `docs/konfiguration/batterie-pv.md` (three questions), spec § Plant topology in `docs/spec/ehal.md`
+  - Tests: `tests/test_topology_p1.py`
+
+### Inverter follow-ups — η split + live PV attribution (2026-10-12)
+
+- [x] Design note [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md)
+- [x] Schema + MILP/sim `η_inv` / `η_batt` + migration of lumped `battery_efficiency` (AC-path only in v1; `scripts.migrate_conversion_efficiency_once`)
+- [x] Multi-inverter live attribution of `sens_pv_production_active` + first `pv.{pv_system_id}.*` (derive plant from Σ grid-tied inv · η_inv; fail-loud partial maps; curtailment stays forecast)
+- Open remain in [`Backlog.md`](Backlog.md): curtailment live weights; device catalog deferred
+
 ### Shadow R4 — Feed gaps / ENTSO-E (2026-10-12)
 
 - [x] **Shadow R4 — Feed gaps:** ENTSO-E record/replay (`ext:prices:entsoe`); S4 Soll/Soll stays **2.+1**
@@ -50,7 +66,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **Inverter P3 — MILP:** per-inverter PV node, AC/DC clipping, grid-charge rules, island outside house balance (`optimizer/milp_inverter.py`); efficiency deferred to follow-ups
 - [x] **Inverter P4 — EHAL:** role `share/ehal/roles/inverter.json`, Live/mapping, HA/Loxone/OpenEMS, export-limit unconstrained per inverter, `qualified_inverter_id()`, docs `ehal.md` / `ehal-com.md`
 - [x] **Inverter P5 — curtailment write:** `inv.{id}.set_inv_ac_power_limit` from plant `p_pv_curtail[t0]` (`optimizer/inv_ac_power_limit.py`, `write_inv_ac_limits_from_plan`); sticky rating release when no curtail
-- Open remain in [`Backlog.md`](Backlog.md): Inverter follow-ups (efficiency; multi-inverter live PV attribution); device catalog deferred
+- Open remain were Inverter follow-ups (η + live PV attribution → archive above; curtailment weights still open); device catalog deferred
 
 ### Shadow architecture review — proposal (2026-10-12)
 

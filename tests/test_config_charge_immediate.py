@@ -118,6 +118,7 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
                 "threshold_power": 0.02,
+                "regulates_on": "grid",
                 "battery_wear": {"enabled": False},
             }
         ],

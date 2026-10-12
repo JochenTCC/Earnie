@@ -60,6 +60,21 @@
               "description": "Force duration re-issued each control cycle (minutes)."
             }
           }
+        },
+        "grid_meter": {
+          "type": "object",
+          "description": "User assertion for the root balance node (Topology P1): meter at house connection and single tariff boundary. Both must be true on the live path.",
+          "required": ["at_house_connection", "single_tariff"],
+          "properties": {
+            "at_house_connection": {
+              "type": "boolean",
+              "description": "True when the mapped root meter measures directly downstream of the utility meter."
+            },
+            "single_tariff": {
+              "type": "boolean",
+              "description": "True when there is exactly one import and one export price behind that meter."
+            }
+          }
         }
       }
     },

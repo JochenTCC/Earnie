@@ -84,6 +84,7 @@ def _house_battery(**overrides):
         "battery_efficiency": 0.95,
         "battery_min_soc": 10.0,
         "battery_max_soc": 100.0,
+        "regulates_on": "grid",
         "battery_wear": {"enabled": False},
     }
     base.update(overrides)
