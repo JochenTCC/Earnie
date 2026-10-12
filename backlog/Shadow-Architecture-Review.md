@@ -182,10 +182,10 @@ Also: `tests/test_auto_persist_shadow.py` for UI persist under Shadow RO.
 
 ## 6. Suggested implementation order
 
-1. Land / commit current uncommitted Shadow fixes as-is (VO feed + readonly helper + inbox fallback) if not yet on `main`.
-2. **R1** docs + gate audit (cheap, no behavior change).
+1. ~~Land / commit Shadow dual-path (VO feed + readonly helper + inbox fallback).~~ **Done** with R1 (`37b71423`).
+2. ~~**R1** docs + gate audit.~~ **Done** (2026-10-12).
 3. **R2** capability flag + deprecate fallback (needs Prod build that always exports `loxone:io:*`).
 4. **R3** transport helpers + assert coverage + `main` extract.
 5. **R4** ENTSO-E; leave S4 on **2.+1**.
 
-Effort note: R1 is documentation/audit; R2–R3 are the real structural payoffs; R4 is gap-fill.
+Effort note: R2–R3 are the real structural payoffs; R4 is gap-fill.
