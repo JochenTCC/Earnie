@@ -25,14 +25,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - **Note:** Binding P5 path rename (`/ehal/telemetry/…` + `/ehal/loxone/telemetry/…` alias) → [Erledigt](Backlog-Erledigt.md).
 - **Note:** Rename Pattern B → entity-scoped bindings → [Erledigt](Backlog-Erledigt.md).
 - **Note:** **2.7.l** Inverter P1–P5 → [Erledigt](Backlog-Erledigt.md); draft [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md). Open: follow-ups below. Device catalog deferred (own item when picked up).
+- **Note:** Shadow architecture review + **R1**–**R4** → [Erledigt](Backlog-Erledigt.md) / [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); spec §11.1 / §12. S4 Soll/Soll stays **2.+1**.
 
 - [ ] **Inverter follow-ups** (postponed from **2.7.l**; epic **Inverter**): DC/AC efficiency paths; multi-inverter live attribution of `sens_pv_production_active`.
 - **Note:** Deferred (not part of 2.7.l): device catalog for inverters and batteries (commercially available models with rated powers, capacity, efficiency, limits) so parameters need not be typed by hand. The P2 presets (e.g. "EcoFlow Delta 3") are only hand-written seeds; the catalog would replace them later. Own backlog item when it is picked up.
 
-- **Note:** Shadow architecture review (proposal) + **R1** policy façade → [Erledigt](Backlog-Erledigt.md) / [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); spec §11.1 / §12. Open implementation = **R2–R4** below.
-- [ ] **Shadow R2 — Single Loxone input contract:** feed-only VO telemetry; `meta.json` capability; retire Prod-inbox file fallback after gate; never reintroduce Merker-superset. Details: [review](Shadow-Architecture-Review.md) §3 R2.
-- [ ] **Shadow R3 — Transport intercept:** shared record/replay helpers; complete `assert_not_shadow_backend` on probes; extract daemon orchestration from `main.py`. Details: [review](Shadow-Architecture-Review.md) §3 R3.
-- [ ] **Shadow R4 — Feed gaps:** ENTSO-E (and other missing `ext:*`) record/replay; S4 Soll/Soll stays **2.+1**. Details: [review](Shadow-Architecture-Review.md) §3 R4.
 - [ ] Anonymous install counter (daily ping, no ID)
 
 ### Version 2.8
@@ -154,22 +151,14 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
 - [ ] **Data & tariff fidelity - Part 2**
   - Keep official EPEX unconnected unless a paid/internal use case appears
   - Check possibilities to automatic tariffs.json update to existing installations
-  - Own / time-variable tariffs: see the four **User-defined tariffs** items below (spec: `Earnie-Projekt\Entwicklungsplan\Offen\Earnie-Benutzertarife-Entwicklungsdokument.md`)
-- [ ] **User-defined tariffs — T1: rules engine + `user_tariffs.json`** *(spec: see Part 2 above, §4 and §9)*
-  - Extract the rule engine from `data/grid_fees.py` into a shared module; add `rules[]`, `price_floor_cent_kwh`, `price_cap_cent_kwh`, `requires[]`, `source`, `last_verified` to import/export tariffs (additive, existing entries stay valid)
-  - Rules act on 15-min slots, first matching rule wins; `holidays` option (`treat_as`: sunday | weekday | own) via the `holidays` package (new dependency, MIT, offline); optional `region` in the house profile (required only with holiday logic)
-  - Loader for `user_tariffs.json` (merge with `tariffs.json`, ID collision = error, `user_` prefix); config pack, path resolution and add-on persistence must include the file
-  - Reserve `applies_to` (only `"main"` allowed); reject `tiers` and other unsupported features loudly (no silent fallback)
-  - Tests/fixtures: VKW Strom Duo summer window (regression: monthly average still 9.15 ct), Octopus Go, Westnetz §14a Modul 3
-- [ ] **User-defined tariffs — T2: house-profile `netznutzung` rules + `tariff_price_series`** *(after T1)*
-  - Allow `rules[]` in `netznutzung` when `area_id` is null (§14a Modul 3 HT/ST/NT)
-  - Single `tariff_price_series(tariff, slots, epex, house)` interface for MILP, SE and editor preview
-- [ ] **User-defined tariffs — T3: tariff editor + import I1/I2** *(after T2)*
-  - Form model, validation and preview data in the tariff package without UI; Streamlit is the first front end; stepwise disclosure, price preview, shadow-rule warning, invoice check
-  - Import: copy catalog tariff as template, JSON file/paste
-- [ ] **User-defined tariffs — T4/T4b: contribution path + signed catalog access** *(after T3; legal review first)*
-  - Opt-in upload with payload preview, `individual` flag, no free text and no personal data; extend `LICENSE.md` § 3 for tariff contributions
-  - Signed catalog package with validity date, manual import; credit for accepted contributions or small one-time fee; automatic updates / yearly subscription later
+  - Own / time-variable tariffs: see the **Edbert integration** item below
+- [ ] **Edbert integration — use Edbert for tariffs** *(engine, editor, catalog and publishers are developed in the separate public repo [`JochenTCC/edbert`](https://github.com/JochenTCC/edbert); its backlog `0.1.a`–`0.1.d` owns the work, spec `docs/spec/tariff-format.md` there)*
+  - **Engine (after Edbert `0.1.a`/`0.1.b`):** replace the tariff resolution in `data/tariff_pricing.py` / `house_config/tariffs_store.py` and the rule logic in `data/grid_fees.py` by Edbert's rule engine and `tariff_price_series`; the MILP keeps receiving `k_act` / `k_push_act` per 15-min slot (no model change). Regression: SNAP results unchanged, VKW Strom Duo summer window as a real window with the monthly mean still 9.15 ct
+  - **Data (with `0.1.a`):** `user_tariffs.json` next to `tariffs.json` (config pack, path resolution, add-on persistence); optional `region` in the house profile for holiday logic
+  - **Editor (after `0.1.c`):** embed Edbert's editor in the Szenarienkonfigurator; UI language follows Earnie (German), Edbert supports `de`/`en`
+  - **Catalog (after `0.1.d`, legal review first):** decide the fate of the public `share/config/tariffs.json` (stays as frozen seed vs. new entries only via Edbert's catalog channel); extend `LICENSE.md` § 3 for tariff contributions
+  - **Packaging (open decision):** how Earnie consumes Edbert (PyPI release, pinned git tag, or vendored copy) incl. Docker image and Home Assistant add-on; license compatibility (Edbert: PolyForm Noncommercial; Earnie: own source-available license, same owner)
+  - **Note:** The former Earnie items *User-defined tariffs — T1…T4/T4b* are superseded by Edbert `0.1.a`–`0.1.d` and by this item.
 - [ ] Check possibilities to show decimal numbers according to regional settings (e.g. use "," as decimal sign for Germany)
 - [ ] Simulate restrictions for energy export dependent on current grid situation in SE (and maybe Live) — **after 2.7.a** (consumes Live/MILP/EHAL export-cap model; do not redefine caps here)
 

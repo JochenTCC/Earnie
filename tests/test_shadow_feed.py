@@ -238,6 +238,25 @@ def test_flush_after_cycle_exports_inbox(tmp_path, monkeypatch):
     assert "loxone:io:heartbeat" in latest["records"]
 
 
+def test_meta_loxone_feed_capability_when_backend_loxone(tmp_path, monkeypatch):
+    feed_path = _enable_feed(tmp_path, monkeypatch)
+    monkeypatch.setattr(config.CONFIG, "EHAL_BACKEND", "loxone", raising=False)
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    shadow_feed.flush_after_cycle()
+    meta = json.loads((feed_path / "meta.json").read_text(encoding="utf-8"))
+    assert meta["ehal_backend"] == "loxone"
+    assert meta["loxone_feed"] == "push"
+
+
+def test_meta_omits_loxone_feed_when_backend_ha(tmp_path, monkeypatch):
+    feed_path = _enable_feed(tmp_path, monkeypatch)
+    monkeypatch.setattr(config.CONFIG, "EHAL_BACKEND", "ha", raising=False)
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    shadow_feed.flush_after_cycle()
+    meta = json.loads((feed_path / "meta.json").read_text(encoding="utf-8"))
+    assert "loxone_feed" not in meta
+
+
 def test_superset_budget_stops_early(tmp_path, monkeypatch):
     _enable_feed(tmp_path, monkeypatch)
     house_bindings = {f"sensor.e{i}": f"sensor.e{i}" for i in range(20)}

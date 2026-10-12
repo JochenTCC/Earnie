@@ -4,7 +4,7 @@ Review for Backlog 2.7: *Review entire Shadow architecture after all changes for
 
 **Verdict:** S1–S3 match the spec. The package under [`runtime_store/shadow/`](../runtime_store/shadow/) is layered correctly. Debt is **scatter** (transport/config hooks at many call sites) plus two **post-commit dual-paths**, not a broken core design. Refactor is phased follow-up (**R1–R4**); no greenfield rewrite.
 
-**Scope of this document:** proposal only. Behavior stays unchanged until an implementation session picks up R1+.
+**Scope of this document:** architecture review + phased follow-up. **R1–R4** implemented (2026-10-12); S4 stays **2.+1**.
 
 ---
 
@@ -68,10 +68,10 @@ Shadow replay / push overlay
 |--------|----------------|---------|
 | Loxone Merker-superset → **no-op**; VO push → `loxone:io:*` feed (`record_push` + cycle export) | Oct 2026 Erledigt + uncommitted feed path | **Keep** — correct push-only architecture |
 | `is_shadow_config_readonly()` (feed under `config_dir()` → RO; external `EARNIE_SHADOW_FEED_PATH` → private writable) | Uncommitted + already in spec §6.4 | **Keep as first-class** — two deployment modes, not a workaround |
-| Prod `loxone_push_inbox.json` file fallback + path sniff (`{feed}/../../runtime` or `EARNIE_SHADOW_PROD_RUNTIME_PATH`) | Uncommitted; tests freeze it | **Compat debt** — keep until **R2** capability gate retires it |
+| Prod `loxone_push_inbox.json` file fallback + path sniff (`{feed}/../../runtime` or `EARNIE_SHADOW_PROD_RUNTIME_PATH`) | Pre-R2 | **Retired (R2 hard cut)** — feed-only + `loxone_feed: "push"`; no dual-path release |
 | Tactical Merker skip-lists (pushable bindings / Q8 bare EHAL IDs in superset) | Oct 2026, before Merker removal | **Superseded** — do not revive |
 | `should_invoke_setpoint_writes` (Shadow ≠ plain silent) | Characterization / silent PS setpoints | **Keep** — fills `shadow_writes.jsonl` |
-| Incomplete `assert_not_shadow_backend` / ENTSO-E not in feed | Dogfood gaps (regression check 2026-10-10) | Address in **R3** / **R4** |
+| Incomplete `assert_not_shadow_backend` / ENTSO-E not in feed | Dogfood gaps (regression check 2026-10-10) | **Done** in **R3** / **R4** |
 
 Deferred product items (not part of R1–R3 cleanup): Shadow would-write old-vs-new comparison; silent `status.json` publish gate; **S4** Soll/Soll + offline JSONL → **2.+1**.
 
@@ -112,31 +112,31 @@ Deferred product items (not part of R1–R3 cleanup): Shadow would-write old-vs-
 **Goal:** Feed is the only Shadow source for VO telemetry.
 
 - Prod must record `loxone:io:*` via `record_push` and cycle export (already tested).
-- Add `meta.json` capability (e.g. `loxone_feed: "push"`) when Prod writes a complete Loxone map for the cycle.
-- After one release with dual-path + warning: **retire** Prod-inbox file fallback when capability is present; refuse or fail-closed when capability missing on modern Shadow.
+- Add `meta.json` capability `loxone_feed: "push"` when Prod `ehal_backend` is Loxone.
+- **Hard cut (decided 2026-10-12):** delete Prod-inbox file fallback immediately; Shadow startup refuses Loxone feeds missing the capability (no dual-path warning release).
 - **Never** reintroduce HTTP Merker-superset.
 
-**Acceptance:** Capability in meta; fallback path warned then removed behind gate; `test_superset_loxone_is_noop` and push→feed tests stay; inbox-fallback tests retired or rewritten to capability-missing behavior.
+**Acceptance:** Capability in meta; fallback removed; startup refuse without capability; `test_superset_loxone_is_noop` and push→feed tests stay; inbox-fallback tests rewritten to feed-only / capability-missing behavior.
 
-### R3 — Transport intercept layer
+### R3 — Transport intercept layer — **done (2026-10-12)**
 
 **Goal:** Collapse duplicated adapter branches; harden backend access; thin `main.py`.
 
-- Shared record/replay helpers (or a small `TransportSession` wrapper) for HA / OpenEMS / `ext:*` so new clients cannot forget the hook.
-- Complete `assert_not_shadow_backend` on remaining probes (MCP, greenfield, ehal mapping) — UI disable alone is not enough.
-- Move wait/skip/flush/superset/trigger orchestration out of `main.py` into named helpers under `runtime_store/shadow/` (e.g. `daemon.py`).
+- Shared helpers in `runtime_store/shadow/transport.py`: `safe_record`, `hub_get`, `ext_get` (HA / OpenEMS / `ext:*`; Loxone push left asymmetric).
+- `assert_not_shadow_backend` on MCP, greenfield, connectivity probe, HA `list_mappable_entities`, `scan_structure`.
+- Daemon orchestration in `runtime_store/shadow/daemon.py`; `main.py` calls named helpers.
 
-**Acceptance:** New external HTTP client for live data must go through the helper (test or import convention); probes raise in Shadow; daemon orchestration callable from tests without full `main`.
+**Acceptance:** New external HTTP client for live data must go through the helper (DEVELOPER.md + `tests/test_shadow_transport.py`); probes raise in Shadow (`test_probe_entries_raise_in_shadow`); daemon orchestration callable from tests without full `main` (`tests/test_shadow_daemon.py`).
 
-### R4 — Gaps + S4 prep
+### R4 — Gaps + S4 prep — **done (2026-10-12)**
 
 **Goal:** Close dogfood holes; leave Soll/Soll for later.
 
-- Record/replay **ENTSO-E** (and any other live price path still missing from §5.2).
+- Record/replay **ENTSO-E** via Family-B `ext_get`/`safe_record` in `integrations/entsoe_client.py` → feed key `ext:prices:entsoe` (raw A44 XML). Energy-Charts / aWATTar / outdoor / PV were already covered under R3.
 - Product deferred (separate backlog): would-write old-vs-new; silent `status.json` publish gate.
-- **S4** (Prod↔Shadow decision diff; offline JSONL backtest) stays **2.+1** — out of R1–R3.
+- **S4** (Prod↔Shadow decision diff; offline JSONL backtest) stays **2.+1** — not started.
 
-**Acceptance:** ENTSO-E keys in feed + Shadow replay tests; S4 not started under this review.
+**Acceptance:** ENTSO-E keys in feed + Shadow replay tests (`tests/test_entsoe_client.py`); S4 not started under this review.
 
 ### Out of scope
 
@@ -153,7 +153,7 @@ When implementing R1–R4 (or any Shadow bugfix):
 1. **Do not** reintroduce Loxone HTTP Merker-superset or poll VO titles / bare EHAL activation IDs.
 2. **Do not** collapse Shadow into plain silent (would empty `shadow_writes.jsonl` and break S3 would-write UI).
 3. **Do not** treat all Shadow as config-RO — private env with external feed must stay writable.
-4. **Do not** drop Prod-inbox fallback before the R2 capability gate (older Prod feeds go blind).
+4. **Do not** reintroduce Prod-inbox file fallback (R2 hard cut — feed-only + `loxone_feed: "push"`).
 5. **Do not** mix up `is_shadow_mode` vs `is_shadow_config_readonly` (wrong gate → write Prod config or skip overlay).
 6. **Do not** use only UI disable for structure/MCP/greenfield probes — raise `ShadowBackendAccessError`.
 7. **Do not** invent a second Shadow activation path (config key / `local_settings`) — env only.
@@ -170,7 +170,7 @@ Behaviors encoded today that any refactor must preserve or consciously replace:
 | Feed integrity | `test_record_ok_and_error_jsonl_no_secrets`, `test_atomic_latest_and_retention`, `test_recorder_exception_swallowed` |
 | Loxone push → feed | `test_record_push_mirrors_to_shadow_feed`, `test_flush_after_cycle_exports_inbox`, `test_superset_loxone_is_noop` |
 | Replay / staleness | `test_replay_*`, `test_shadow_read_push_value_uses_feed_soc` |
-| Inbox fallback (until R2) | `test_shadow_*_falls_back_to_prod_inbox` |
+| Feed-only Loxone (R2) | `test_shadow_read_push_value_ignores_prod_inbox_file`, `test_shadow_ready_by_time_from_feed`, `test_startup_*_loxone_*` |
 | Write block / silent | `test_loxone_write_blocked_and_logged`, `test_should_invoke_setpoint_writes_*`, `test_silent_implied_by_shadow` |
 | Config RO vs private | `test_config_write_*`, `test_is_shadow_config_readonly_*`, `test_save_house_profiles_*`, overlay tests in `test_shadow_ehal_overlay.py` |
 | Startup | `test_startup_refuses_*`, `test_startup_ok_writes_marker` |
@@ -184,8 +184,8 @@ Also: `tests/test_auto_persist_shadow.py` for UI persist under Shadow RO.
 
 1. ~~Land / commit Shadow dual-path (VO feed + readonly helper + inbox fallback).~~ **Done** with R1 (`37b71423`).
 2. ~~**R1** docs + gate audit.~~ **Done** (2026-10-12).
-3. **R2** capability flag + deprecate fallback (needs Prod build that always exports `loxone:io:*`).
-4. **R3** transport helpers + assert coverage + `main` extract.
-5. **R4** ENTSO-E; leave S4 on **2.+1**.
+3. ~~**R2** capability + hard-cut remove inbox fallback.~~ Implemented (hard cut; no dual-path release).
+4. ~~**R3** transport helpers + assert coverage + `main` extract.~~ **Done** (2026-10-12).
+5. ~~**R4** ENTSO-E; leave S4 on **2.+1**.~~ **Done** (2026-10-12).
 
 Effort note: R2–R3 are the real structural payoffs; R4 is gap-fill.

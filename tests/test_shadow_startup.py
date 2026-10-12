@@ -28,27 +28,32 @@ def _reset(tmp_path, monkeypatch):
     shadow_feed.reset_for_tests()
 
 
-def _write_meta(feed: Path, *, prod_runtime: str, data_model: int | None = None) -> None:
+def _write_meta(
+    feed: Path,
+    *,
+    prod_runtime: str,
+    data_model: int | None = None,
+    ehal_backend: str = "ha",
+    loxone_feed: str | None = None,
+) -> None:
     from runtime_store.data_model import CURRENT_DATA_MODEL
 
     if data_model is None:
         data_model = CURRENT_DATA_MODEL
     feed.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    (feed / "meta.json").write_text(
-        json.dumps(
-            {
-                "feed_schema": FEED_SCHEMA,
-                "earnie_version": "2.6.0-test",
-                "earnie_data_model": data_model,
-                "ehal_backend": "ha",
-                "prod_runtime_dir": prod_runtime,
-                "heartbeat_ts": ts,
-                "cycle_seq": 1,
-            }
-        ),
-        encoding="utf-8",
-    )
+    meta: dict = {
+        "feed_schema": FEED_SCHEMA,
+        "earnie_version": "2.6.0-test",
+        "earnie_data_model": data_model,
+        "ehal_backend": ehal_backend,
+        "prod_runtime_dir": prod_runtime,
+        "heartbeat_ts": ts,
+        "cycle_seq": 1,
+    }
+    if loxone_feed is not None:
+        meta["loxone_feed"] = loxone_feed
+    (feed / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
     (feed / "latest.json").write_text(
         json.dumps({"cycle_seq": 1, "cycle_ts": ts, "records": {}}),
         encoding="utf-8",
@@ -112,6 +117,37 @@ def test_startup_ok_writes_marker(monkeypatch, tmp_path):
     assert meta["feed_schema"] == FEED_SCHEMA
     assert (shadow_rt / ".shadow_runtime").is_file()
     ensure_shadow_runtime_marker()  # idempotent
+
+
+def test_startup_refuses_loxone_without_feed_capability(monkeypatch, tmp_path):
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    shadow_rt = tmp_path / "shadow_rt"
+    feed = tmp_path / "feed"
+    _write_meta(
+        feed,
+        prod_runtime=str(tmp_path / "prod_rt"),
+        ehal_backend="loxone",
+    )
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(shadow_rt))
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    with pytest.raises(ShadowStartupError, match="loxone_feed"):
+        ensure_shadow_startup()
+
+
+def test_startup_ok_loxone_with_feed_capability(monkeypatch, tmp_path):
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    shadow_rt = tmp_path / "shadow_rt"
+    feed = tmp_path / "feed"
+    _write_meta(
+        feed,
+        prod_runtime=str(tmp_path / "prod_rt"),
+        ehal_backend="loxone",
+        loxone_feed="push",
+    )
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(shadow_rt))
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    meta = ensure_shadow_startup()
+    assert meta["loxone_feed"] == "push"
 
 
 def test_startup_noop_without_shadow(monkeypatch):

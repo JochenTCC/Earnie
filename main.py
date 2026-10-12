@@ -281,18 +281,25 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 item["error"],
             )
             continue
+        _rc = item.get("readings_c") or {}
+        # Optional °C may be None (missing live Ist / heat_storage uses temp_eq).
+        _ist_c = _rc.get("actual")
+        if _ist_c is None:
+            _ist_c = _rc.get("temp_eq")
+        _band_min = _rc.get("band_min")
+        _band_max = _rc.get("band_max")
         logger.info(
             "Thermisch %s (mode=%s): aktiv %.2f kWh, thermisch %.2f kWh, Delta %+.2f kWh, "
-            "Heizstunden %s, Ist %.1f °C, Band %.1f–%.1f °C%s",
+            "Heizstunden %s, Ist %s °C, Band %s–%s °C%s",
             item["consumer_id"],
             item.get("mode"),
             item.get("active_target_kwh", 0.0),
             item.get("thermal_target_kwh", 0.0),
             item.get("delta_kwh", 0.0),
             item.get("heating_hours", 0),
-            (item.get("readings_c") or {}).get("actual"),
-            (item.get("readings_c") or {}).get("band_min"),
-            (item.get("readings_c") or {}).get("band_max"),
+            "n/a" if _ist_c is None else f"{float(_ist_c):.1f}",
+            "n/a" if _band_min is None else f"{float(_band_min):.1f}",
+            "n/a" if _band_max is None else f"{float(_band_max):.1f}",
             (
                 f", historical {item['baseline_target_kwh']:.2f} kWh"
                 if item.get("baseline_target_kwh") is not None
@@ -808,13 +815,9 @@ if __name__ == "__main__":
     def _wait_poll() -> None:
         touch_daemon_heartbeat()
         if power_interval_sampler.tick():
-            try:
-                from runtime_store.shadow import flush_after_sampler, is_shadow_mode
+            from runtime_store.shadow import maybe_flush_after_sampler
 
-                if not is_shadow_mode():
-                    flush_after_sampler()
-            except Exception:  # noqa: BLE001 — never break wait loop
-                logger.exception("shadow feed sampler flush failed")
+            maybe_flush_after_sampler()
 
     while True:
         touch_daemon_heartbeat()
@@ -888,11 +891,9 @@ if __name__ == "__main__":
         )
 
         if needs_loxone_auth_recovery():
-            from runtime_store.shadow.mode import is_shadow_mode as _shadow_now
+            from runtime_store.shadow import maybe_clear_auth_gate
 
-            if _shadow_now():
-                clear_loxone_auth_error()
-            else:
+            if not maybe_clear_auth_gate():
                 ok, detail = probe_current_loxone_credentials()
                 if ok:
                     clear_loxone_auth_error()
@@ -921,43 +922,32 @@ if __name__ == "__main__":
 
         _setup_gate_state.clear()
         try:
-            from runtime_store.shadow.mode import is_shadow_mode
             from runtime_store.shadow import (
-                consume_optimize_trigger,
-                wait_for_prod_cycle,
+                after_prod_cycle,
+                prepare_shadow_cycle,
+                resolve_next_trigger,
             )
             from runtime_store.loxone_push_inbox import log_link_transition
 
             log_link_transition()
 
-            if is_shadow_mode():
-                if consume_optimize_trigger():
-                    next_trigger = TRIGGER_REQUEST_OPTIMIZE
-                cycle_info = wait_for_prod_cycle()
-                if cycle_info.get("skipped"):
-                    logger.warning(
-                        "shadow: cycle skipped (%s) — warte %ss",
-                        cycle_info.get("reason"),
-                        _SETUP_WAIT_SEC,
-                    )
-                    time.sleep(_SETUP_WAIT_SEC)
-                    continue
+            prep = prepare_shadow_cycle(
+                next_trigger, optimize_trigger=TRIGGER_REQUEST_OPTIMIZE
+            )
+            next_trigger = prep.trigger
+            if prep.skipped:
+                logger.warning(
+                    "shadow: cycle skipped (%s) — warte %ss",
+                    prep.reason,
+                    _SETUP_WAIT_SEC,
+                )
+                time.sleep(_SETUP_WAIT_SEC)
+                continue
 
             main(run_trigger=next_trigger)
             clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
-            try:
-                from runtime_store.shadow import (
-                    flush_after_cycle,
-                    is_shadow_mode as _is_shadow,
-                    run_superset_after_cycle,
-                )
-
-                if not _is_shadow():
-                    run_superset_after_cycle()
-                    flush_after_cycle()
-            except Exception:  # noqa: BLE001 — recorder must never break Prod
-                logger.exception("shadow feed post-cycle failed")
+            after_prod_cycle()
 
             wait_sec = optimization_schedule.seconds_until_next_quarter_hour()
             next_run = optimization_schedule.next_quarter_hour_datetime()
@@ -970,10 +960,11 @@ if __name__ == "__main__":
                 total_wait_sec=wait_sec,
                 on_poll=_wait_poll,
             )
-            if early == TRIGGER_REQUEST_OPTIMIZE:
-                next_trigger = TRIGGER_REQUEST_OPTIMIZE
-            elif is_shadow_mode() and consume_optimize_trigger():
-                next_trigger = TRIGGER_REQUEST_OPTIMIZE
+            next_trigger = resolve_next_trigger(
+                early,
+                next_trigger,
+                optimize_trigger=TRIGGER_REQUEST_OPTIMIZE,
+            )
 
         except LoxoneAuthError as exc:
             logger.error(

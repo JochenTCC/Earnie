@@ -233,6 +233,9 @@ class HaAdapter:
 
     def list_mappable_entities(self) -> list[dict[str, Any]]:
         """Return sensor/number/select/switch/… entities for mapping UI."""
+        from runtime_store.shadow.replay import assert_not_shadow_backend
+
+        assert_not_shadow_backend("ha_adapter.list_mappable_entities")
         payload = self._get_json("/api/states")
         if not isinstance(payload, list):
             raise HaHttpError("HA /api/states did not return a list")
@@ -675,38 +678,37 @@ class HaAdapter:
 
     def _get_json(self, path: str) -> Any:
         feed_key = f"ha:get:{path}"
-        from runtime_store.shadow.mode import is_shadow_mode
+        from runtime_store.shadow.replay import replay_ha_get
+        from runtime_store.shadow.transport import hub_get, safe_record
 
-        if is_shadow_mode():
-            from runtime_store.shadow.replay import replay_ha_get
+        def _live() -> Any:
+            url = f"{self._base}{path}"
+            try:
+                response = requests.get(
+                    url, headers=self._headers, timeout=self.cfg.timeout_sec
+                )
+            except requests.RequestException as exc:
+                safe_record(feed_key, ok=False, error=str(exc))
+                raise HaHttpError(f"HA GET failed: {exc}") from exc
+            if response.status_code != 200:
+                safe_record(
+                    feed_key,
+                    ok=False,
+                    status=int(response.status_code),
+                    payload=_safe_json_or_text(response),
+                    error=f"HTTP {response.status_code}",
+                )
+                raise HaHttpError(
+                    f"HA GET {path} → HTTP {response.status_code}",
+                    status_code=response.status_code,
+                )
+            payload = response.json()
+            safe_record(
+                feed_key, ok=True, payload=payload, status=int(response.status_code)
+            )
+            return payload
 
-            return replay_ha_get(feed_key)
-
-        url = f"{self._base}{path}"
-        try:
-            response = requests.get(
-                url, headers=self._headers, timeout=self.cfg.timeout_sec
-            )
-        except requests.RequestException as exc:
-            _ha_shadow_record(feed_key, ok=False, error=str(exc))
-            raise HaHttpError(f"HA GET failed: {exc}") from exc
-        if response.status_code != 200:
-            _ha_shadow_record(
-                feed_key,
-                ok=False,
-                status=int(response.status_code),
-                payload=_safe_json_or_text(response),
-                error=f"HTTP {response.status_code}",
-            )
-            raise HaHttpError(
-                f"HA GET {path} → HTTP {response.status_code}",
-                status_code=response.status_code,
-            )
-        payload = response.json()
-        _ha_shadow_record(
-            feed_key, ok=True, payload=payload, status=int(response.status_code)
-        )
-        return payload
+        return hub_get(replay=lambda: replay_ha_get(feed_key), live=_live)
 
     def _read_mapped_numeric(self, field_name: str) -> float:
         if self._weg_b:
@@ -928,18 +930,3 @@ def _safe_json_or_text(response: Any) -> Any:
     except ValueError:
         return getattr(response, "text", None)
 
-
-def _ha_shadow_record(
-    key: str,
-    *,
-    ok: bool,
-    payload: Any = None,
-    status: int | None = None,
-    error: str | None = None,
-) -> None:
-    try:
-        from runtime_store.shadow.hooks import record_transport
-
-        record_transport(key, ok=ok, payload=payload, status=status, error=error)
-    except Exception:  # noqa: BLE001
-        pass

@@ -86,6 +86,7 @@ Voraussetzungen:
 1. Prod mit `shadow_feed_enabled: true` (siehe oben).
 2. Eigenes Runtime-Verzeichnis (`EARNIE_RUNTIME_PATH` oder `EARNIE_ENV_PATH` — Pflicht).
 3. Gemeinsames Config-Verzeichnis (z. B. SMB-Share der HA-Add-on-Config) bzw. `EARNIE_SHADOW_FEED_PATH`.
+4. Bei **Loxone**-Backend: Prod muss `loxone_feed: "push"` in `shadow_feed/meta.json` schreiben (VO-Push in den Feed). Ältere Prod-Builds ohne diese Capability lehnt Shadow beim Start ab — es gibt keinen Fallback auf die Prod-Datei `loxone_push_inbox.json`.
 
 Beispiel (PowerShell):
 

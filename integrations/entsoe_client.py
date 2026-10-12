@@ -20,6 +20,7 @@ from data.data_loader import (
 logger = logging.getLogger(__name__)
 
 ENTSOE_API_URL = "https://web-api.tp.entsoe.eu/api"
+FEED_KEY = "ext:prices:entsoe"
 _NS_URI = "urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3"
 _NS = {"p": _NS_URI}
 
@@ -197,13 +198,55 @@ def fetch_entsoe_day_ahead_prices(
         eic,
     )
 
-    response = requests.get(ENTSOE_API_URL, params=params, timeout=timeout)
-    if response.status_code >= 400:
-        logger.warning(
-            "ENTSO-E %s HTTP %s (%s)",
-            zone,
-            response.status_code,
-            redact_entsoe_url(response.url),
-        )
-        response.raise_for_status()
-    return parse_entsoe_a44_xml(response.text)
+    from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.replay import replay_ext_payload
+    from runtime_store.shadow.transport import ext_get, safe_record
+
+    def _replay() -> str | None:
+        payload = replay_ext_payload(FEED_KEY)
+        return payload if isinstance(payload, str) else None
+
+    def _live() -> str:
+        # Family B: Shadow fallback must not record; Prod records.
+        if is_shadow_mode():
+            response = requests.get(ENTSOE_API_URL, params=params, timeout=timeout)
+            if response.status_code >= 400:
+                logger.warning(
+                    "ENTSO-E %s HTTP %s (%s)",
+                    zone,
+                    response.status_code,
+                    redact_entsoe_url(response.url),
+                )
+            response.raise_for_status()
+            return response.text
+        try:
+            response = requests.get(ENTSOE_API_URL, params=params, timeout=timeout)
+            payload = response.text
+            if response.status_code >= 400:
+                logger.warning(
+                    "ENTSO-E %s HTTP %s (%s)",
+                    zone,
+                    response.status_code,
+                    redact_entsoe_url(response.url),
+                )
+                safe_record(
+                    FEED_KEY,
+                    ok=False,
+                    status=int(response.status_code),
+                    payload=payload,
+                    error=f"HTTP {response.status_code}",
+                )
+                response.raise_for_status()
+            safe_record(
+                FEED_KEY, ok=True, payload=payload, status=int(response.status_code)
+            )
+            return payload
+        except Exception as exc:
+            if not isinstance(exc, requests.HTTPError):
+                safe_record(FEED_KEY, ok=False, error=str(exc))
+            raise
+
+    xml_text = ext_get(replay=_replay, live=_live, allow_live_fallback=True)
+    if not isinstance(xml_text, str) or not xml_text.strip():
+        raise ValueError("ENTSO-E returned no XML payload")
+    return parse_entsoe_a44_xml(xml_text)

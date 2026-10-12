@@ -156,6 +156,18 @@ Use exactly one of these — do not invent a fourth gate or mix them up:
 
 Wrong gate examples: using `is_shadow_mode()` for config saves breaks private-env dogfood; collapsing Shadow into plain silent empties would-write logs.
 
+### Shadow transport intercept (R3)
+
+New live HTTP clients that feed the optimizer cycle (hub GET or `ext:*`) must go through [`runtime_store/shadow/transport.py`](runtime_store/shadow/transport.py):
+
+| Helper | Use |
+|--------|-----|
+| `hub_get(replay=…, live=…)` | HA / OpenEMS (and similar) — Shadow replays only; Prod `live` records via `safe_record` |
+| `ext_get(replay=…, live=…, allow_live_fallback=…)` | External APIs — Soft fallback (prices/outdoor) may live-fetch in Shadow **without** recording; PV uses `allow_live_fallback=False` |
+| `safe_record(...)` | Replace ad-hoc try/except wrappers around `record_transport` |
+
+Structure / setup probes (MCP, greenfield, EHAL mapping scan, credential probe) must call `assert_not_shadow_backend` — UI disable alone is not enough. Daemon loop glue lives in `runtime_store.shadow.daemon` (not `main_daemon.py`).
+
 ## Roadmap
 
 Open features and epics → **[backlog/Backlog.md](backlog/Backlog.md)**

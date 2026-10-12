@@ -165,7 +165,7 @@ def _meta_payload(*, cycle_seq: int, heartbeat_ts: str) -> dict[str, Any]:
         ehal_backend = str(config.get("EHAL_BACKEND") or "")
     except Exception:  # noqa: BLE001
         pass
-    return {
+    payload: dict[str, Any] = {
         "feed_schema": FEED_SCHEMA,
         "earnie_version": __version__,
         "earnie_data_model": CURRENT_DATA_MODEL,
@@ -174,6 +174,10 @@ def _meta_payload(*, cycle_seq: int, heartbeat_ts: str) -> dict[str, Any]:
         "heartbeat_ts": heartbeat_ts,
         "cycle_seq": cycle_seq,
     }
+    # R2: advertise push-only Loxone VO contract (Shadow refuses older feeds).
+    if ehal_backend.strip().lower() == "loxone":
+        payload["loxone_feed"] = "push"
+    return payload
 
 
 def flush_latest(*, bump_cycle: bool = False) -> None:

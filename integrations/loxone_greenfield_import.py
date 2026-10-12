@@ -603,6 +603,9 @@ def run_greenfield_import(
     ``doc`` (control-name presence). ``probe_host`` / credentials are unused
     when ``doc`` is already loaded (kept for call-site compatibility).
     """
+    from runtime_store.shadow.replay import assert_not_shadow_backend
+
+    assert_not_shadow_backend("loxone_greenfield_import.run_greenfield_import")
     del probe_host, probe_username, probe_password, probe_timeout_sec
     dmap = device_map if device_map is not None else load_device_map()
     house, resolved_id = ensure_live_profile(house_doc or {"profiles": []})

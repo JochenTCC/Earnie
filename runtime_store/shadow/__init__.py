@@ -7,6 +7,14 @@ from runtime_store.shadow.cycle import (
     feed_lag,
     wait_for_prod_cycle,
 )
+from runtime_store.shadow.daemon import (
+    ShadowCyclePrep,
+    after_prod_cycle,
+    maybe_clear_auth_gate,
+    maybe_flush_after_sampler,
+    prepare_shadow_cycle,
+    resolve_next_trigger,
+)
 from runtime_store.shadow.errors import (
     ConfigReadOnlyError,
     ShadowBackendAccessError,
@@ -32,7 +40,9 @@ from runtime_store.shadow.writes import (
 __all__ = [
     "ConfigReadOnlyError",
     "ShadowBackendAccessError",
+    "ShadowCyclePrep",
     "ShadowStartupError",
+    "after_prod_cycle",
     "block_write_if_shadow",
     "consume_optimize_trigger",
     "ensure_shadow_startup",
@@ -44,8 +54,12 @@ __all__ = [
     "is_shadow_config_readonly",
     "is_shadow_mode",
     "log_would_write",
+    "maybe_clear_auth_gate",
+    "maybe_flush_after_sampler",
+    "prepare_shadow_cycle",
     "read_shadow_writes",
     "refuse_shadow_startup_or_exit",
+    "resolve_next_trigger",
     "run_superset_after_cycle",
     "wait_for_prod_cycle",
 ]

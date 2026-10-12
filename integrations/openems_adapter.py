@@ -163,12 +163,10 @@ class OpenemsAdapter:
     def read_channel(self, component: str, channel: str) -> float | None:
         path = f"/rest/channel/{component}/{channel}"
         feed_key = f"openems:get:{path}"
-        from runtime_store.shadow.mode import is_shadow_mode
+        from runtime_store.shadow.replay import replay_openems_get
+        from runtime_store.shadow.transport import hub_get, safe_record
 
-        if is_shadow_mode():
-            from runtime_store.shadow.replay import replay_openems_get
-
-            payload = replay_openems_get(feed_key)
+        def _value_from_payload(payload: dict | None) -> float | None:
             if payload is None:
                 return None
             value = payload.get("value")
@@ -176,36 +174,41 @@ class OpenemsAdapter:
                 return None
             return float(value)
 
-        url = self._channel_url(component, channel)
-        try:
-            response = requests.get(url, auth=self._auth, timeout=self.cfg.timeout_sec)
-        except requests.RequestException as exc:
-            _openems_shadow_record(feed_key, ok=False, error=str(exc))
-            raise OpenemsHttpError(f"OpenEMS GET failed: {exc}") from exc
-        if response.status_code != 200:
+        def _live() -> float | None:
+            url = self._channel_url(component, channel)
             try:
-                body = response.json()
-            except ValueError:
-                body = response.text
-            _openems_shadow_record(
-                feed_key,
-                ok=False,
-                status=int(response.status_code),
-                payload=body,
-                error=f"HTTP {response.status_code}",
+                response = requests.get(
+                    url, auth=self._auth, timeout=self.cfg.timeout_sec
+                )
+            except requests.RequestException as exc:
+                safe_record(feed_key, ok=False, error=str(exc))
+                raise OpenemsHttpError(f"OpenEMS GET failed: {exc}") from exc
+            if response.status_code != 200:
+                try:
+                    body = response.json()
+                except ValueError:
+                    body = response.text
+                safe_record(
+                    feed_key,
+                    ok=False,
+                    status=int(response.status_code),
+                    payload=body,
+                    error=f"HTTP {response.status_code}",
+                )
+                raise OpenemsHttpError(
+                    f"OpenEMS GET {component}/{channel} → HTTP {response.status_code}",
+                    status_code=response.status_code,
+                )
+            payload = response.json()
+            safe_record(
+                feed_key, ok=True, payload=payload, status=int(response.status_code)
             )
-            raise OpenemsHttpError(
-                f"OpenEMS GET {component}/{channel} → HTTP {response.status_code}",
-                status_code=response.status_code,
-            )
-        payload = response.json()
-        _openems_shadow_record(
-            feed_key, ok=True, payload=payload, status=int(response.status_code)
+            return _value_from_payload(payload if isinstance(payload, dict) else None)
+
+        return hub_get(
+            replay=lambda: _value_from_payload(replay_openems_get(feed_key)),
+            live=_live,
         )
-        value = payload.get("value")
-        if value is None:
-            return None
-        return float(value)
 
     def write_channel(self, component: str, channel: str, value: float) -> None:
         from runtime_store.shadow.writes import block_write_if_shadow
@@ -517,18 +520,3 @@ class OpenemsAdapter:
         self._last_write_error = error
         return error
 
-
-def _openems_shadow_record(
-    key: str,
-    *,
-    ok: bool,
-    payload: Any = None,
-    status: int | None = None,
-    error: str | None = None,
-) -> None:
-    try:
-        from runtime_store.shadow.hooks import record_transport
-
-        record_transport(key, ok=ok, payload=payload, status=status, error=error)
-    except Exception:  # noqa: BLE001
-        pass

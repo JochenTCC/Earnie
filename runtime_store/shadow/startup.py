@@ -123,6 +123,21 @@ def _check_runtime_vs_prod(meta: dict) -> None:
         )
 
 
+def _check_loxone_feed_capability(meta: dict) -> None:
+    """Refuse Loxone feeds from Prod builds that do not export VO push keys."""
+    backend = str(meta.get("ehal_backend") or "").strip().lower()
+    loxone_feed_raw = meta.get("loxone_feed")
+    loxone_feed = str(loxone_feed_raw or "").strip().lower()
+    if backend != "loxone":
+        return
+    if loxone_feed == "push":
+        return
+    raise ShadowStartupError(
+        "Shadow-Feed: Loxone erfordert loxone_feed=push in meta.json "
+        "(Prod zu alt — kein VO-Push-Feed). Bitte Prod aktualisieren."
+    )
+
+
 def ensure_shadow_startup() -> dict:
     """
     Run §4.2 checks when Shadow is active.
@@ -140,6 +155,7 @@ def ensure_shadow_startup() -> dict:
     meta = _load_meta()
     _check_feed_schema(meta)
     _check_data_model(meta)
+    _check_loxone_feed_capability(meta)
     _check_runtime_vs_prod(meta)
     ensure_shadow_runtime_marker()
     logger.info(

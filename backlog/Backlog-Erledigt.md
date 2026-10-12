@@ -2,12 +2,41 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Shadow R4 — Feed gaps / ENTSO-E (2026-10-12)
+
+- [x] **Shadow R4 — Feed gaps:** ENTSO-E record/replay (`ext:prices:entsoe`); S4 Soll/Soll stays **2.+1**
+  - Family-B `ext_get`/`safe_record` in `integrations/entsoe_client.py`; raw A44 XML payload; no token in feed
+  - Inventory: Energy-Charts / aWATTar / outdoor / PV already covered (R3); no other live `ext:*` gaps
+  - Tests: Prod record, Shadow replay hit, Shadow miss live-fallback unrecorded (`tests/test_entsoe_client.py`)
+  - Docs: spec §5.2 / §11.1; review §3 R4 / §6
+  - Deferred (not R4): S4; would-write old-vs-new; silent `status.json` publish gate
+
+### Shadow R3 — Transport intercept (2026-10-12)
+
+- [x] **Shadow R3 — Transport intercept**
+  - Shared helpers: `runtime_store/shadow/transport.py` (`safe_record`, `hub_get`, `ext_get`); rewrote HA / OpenEMS / aWATTar / outdoor / energy_charts / PV call sites (Loxone push left asymmetric)
+  - `assert_not_shadow_backend` on MCP, greenfield import, Loxone HTTP probe, HA `list_mappable_entities`, `scan_structure`
+  - Daemon orchestration: `runtime_store/shadow/daemon.py`; thin wiring in `main.py`
+  - Docs: `DEVELOPER.md` transport convention; spec §11.1 R3 done; review §3 R3
+  - Tests: `tests/test_shadow_transport.py`, `tests/test_shadow_daemon.py`, probe asserts in `test_shadow_replay.py`
+  - Open remain were **R4** (→ archive above); S4 stays **2.+1**
+
+### Shadow R2 — Single Loxone input contract (2026-10-12)
+
+- [x] **Shadow R2 — Single Loxone input contract** (hard cut)
+  - Prod `meta.json` advertises `loxone_feed: "push"` when `ehal_backend` is Loxone (`runtime_store/shadow/feed.py`)
+  - Shadow startup refuses Loxone feeds without that capability (`runtime_store/shadow/startup.py`)
+  - Deleted Prod-inbox file fallback / path sniff; Shadow VO reads are feed-only (`runtime_store/loxone_push_inbox.py`); Merker-superset stays no-op
+  - Spec / docs: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) §5.3 / §5.4 / §11.1 / §12; [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md); review §3 R2
+  - Tests: capability + startup refuse; feed-miss ignores Prod inbox; keep push→feed / `test_superset_loxone_is_noop`
+  - Open remain were **R3–R4** (R3 → archive above)
+
 ### Shadow R1 — Policy façade (2026-10-12)
 
 - [x] **Shadow R1 — Policy façade** (behavior-preserving)
   - Landed `is_shadow_config_readonly()` (shared feed → RO; external feed → private writable) + VO push → `loxone:io:*` feed with Prod-inbox fallback (compat until R2)
   - Gate checklist in `DEVELOPER.md`; call-site audit in [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md) §3 R1 (no wrong-gate fixes needed)
-  - No new helpers; R2–R4 remain open in [`Backlog.md`](Backlog.md)
+  - No new helpers; R2–R4 archived above (same day)
 
 ### 2.7.l — Inverter entity P1–P5 (2026-10-12)
 
@@ -29,7 +58,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Verdict: S1–S3 match the spec; debt is call-site scatter + Prod-inbox fallback compat — not a broken core
   - Classification: keep push-only Loxone feed, `is_shadow_config_readonly` (shared vs private), `should_invoke_setpoint_writes`; retire inbox-file fallback only after R2 capability gate; do not revive Merker-superset
   - Proposal: **R1–R4** in [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); locked in [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) §11.1 / §12
-  - Implementation of R1–R4 remains open in [`Backlog.md`](Backlog.md) (proposal-only session; no code refactor)
+  - Proposal-only at the time; R1–R4 implemented and archived above (2026-10-12)
 
 ### Thermal Wärmeinhalt — latest-12 forecast fan (2026-10-11)
 

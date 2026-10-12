@@ -371,6 +371,9 @@ def scan_structure(
     (source id ``http_probe``), and optional MCP 17.1. ``selected_source`` only
     affects which item set feeds mapping dropdowns (``union`` = merge all names).
     """
+    from runtime_store.shadow.replay import assert_not_shadow_backend
+
+    assert_not_shadow_backend("loxone_structure.scan_structure")
     wanted = tuple(sources) if sources is not None else ALL_SOURCES
     variants: list[StructureScanResult] = []
     loxapp3_doc: dict[str, Any] | None = None

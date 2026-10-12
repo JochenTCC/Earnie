@@ -206,6 +206,30 @@ def test_assert_backend_blocked_in_shadow(monkeypatch):
         assert_not_shadow_backend("probe")
 
 
+def test_probe_entries_raise_in_shadow(monkeypatch):
+    """R3: MCP / greenfield / EHAL mapping probes must hard-forbid, not UI-only."""
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    from integrations.ha_adapter import HaAdapter, HaConfig
+    from integrations.loxone_connectivity import probe_loxone_http_access
+    from integrations.loxone_greenfield_import import run_greenfield_import
+    # Import structure before mcp_probe to avoid circular import init order.
+    from integrations.loxone_structure import scan_structure
+    from integrations.loxone_mcp_probe import probe_mcp17
+
+    with pytest.raises(ShadowBackendAccessError):
+        probe_mcp17("https://example.invalid/mcp")
+    with pytest.raises(ShadowBackendAccessError):
+        probe_loxone_http_access(host="10.0.0.1", username="u", password="p")
+    with pytest.raises(ShadowBackendAccessError):
+        run_greenfield_import({"controls": {}})
+    with pytest.raises(ShadowBackendAccessError):
+        HaAdapter(
+            HaConfig(base_url="http://unused", token="x", adapter_id="t", entities={})
+        ).list_mappable_entities()
+    with pytest.raises(ShadowBackendAccessError):
+        scan_structure(host="10.0.0.1", username="u", password="p")
+
+
 def test_replay_loxone_io_reads_feed_without_network(monkeypatch, tmp_path):
     feed = tmp_path / "feed"
     _write_feed(
@@ -253,8 +277,8 @@ def test_shadow_read_push_value_uses_feed_soc(monkeypatch, tmp_path) -> None:
     assert (value, state) == (61.5, inbox.STATE_OK)
 
 
-def test_shadow_read_push_value_falls_back_to_prod_inbox(monkeypatch, tmp_path) -> None:
-    """When Prod feed has no loxone:* keys, use shared NAS Prod inbox file."""
+def test_shadow_read_push_value_ignores_prod_inbox_file(monkeypatch, tmp_path) -> None:
+    """R2 hard cut: feed miss must not rescue from shared Prod inbox file."""
     from runtime_store import loxone_push_inbox as inbox
 
     eid = "ess.15_kwh_speicher.sens_ess_soc"
@@ -262,7 +286,7 @@ def test_shadow_read_push_value_falls_back_to_prod_inbox(monkeypatch, tmp_path) 
     feed = earnie_env / "config" / "shadow_feed"
     prod_rt = earnie_env / "runtime"
     prod_rt.mkdir(parents=True)
-    _write_feed(feed, {})  # no loxone keys (current Prod gap)
+    _write_feed(feed, {})  # no loxone keys
     (prod_rt / "loxone_push_inbox.json").write_text(
         json.dumps(
             {
@@ -291,11 +315,38 @@ def test_shadow_read_push_value_falls_back_to_prod_inbox(monkeypatch, tmp_path) 
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "shadow_runtime"))
     inbox.reset_memory_for_tests()
     value, state = inbox.read_push_value(eid)
-    assert (value, state) == (17.0, inbox.STATE_OK)
+    assert value != 17.0
+    assert value is None or state != inbox.STATE_OK
 
 
-def test_shadow_ready_by_time_falls_back_to_prod_inbox(monkeypatch, tmp_path) -> None:
-    """FertigUm must use Prod inbox overlay when feed has no loxone:* keys."""
+def test_shadow_ready_by_time_from_feed(monkeypatch, tmp_path) -> None:
+    """FertigUm comes from ``loxone:io:*`` feed only (no Prod inbox file)."""
+    from runtime_store import loxone_push_inbox as inbox
+
+    eid = "ev.e_auto.get_evcs_ready_by_time"
+    feed = tmp_path / "feed"
+    _write_feed(
+        feed,
+        {
+            f"loxone:io:{eid}": {
+                "key": f"loxone:io:{eid}",
+                "ts": _utc(),
+                "ok": True,
+                "status": None,
+                "payload": {"LL": {"value": "Morgen, 07:00"}},
+                "error": None,
+            }
+        },
+    )
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "shadow_runtime"))
+    inbox.reset_memory_for_tests()
+    assert inbox.read_push_ready_by_time(eid) == "Morgen, 07:00"
+
+
+def test_shadow_ready_by_time_ignores_prod_inbox_file(monkeypatch, tmp_path) -> None:
+    """Feed miss must not read FertigUm from Prod ``loxone_push_inbox.json``."""
     from runtime_store import loxone_push_inbox as inbox
 
     eid = "ev.e_auto.get_evcs_ready_by_time"
@@ -315,13 +366,6 @@ def test_shadow_ready_by_time_falls_back_to_prod_inbox(monkeypatch, tmp_path) ->
                         "last_ts": _utc(),
                         "count": 3,
                     },
-                    "heartbeat": {
-                        "value": 1.0,
-                        "raw": "1",
-                        "parse_ok": True,
-                        "last_ts": _utc(),
-                        "count": 10,
-                    },
                 }
             }
         ),
@@ -331,4 +375,4 @@ def test_shadow_ready_by_time_falls_back_to_prod_inbox(monkeypatch, tmp_path) ->
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "shadow_runtime"))
     inbox.reset_memory_for_tests()
-    assert inbox.read_push_ready_by_time(eid) == "Morgen, 07:00"
+    assert inbox.read_push_ready_by_time(eid) is None

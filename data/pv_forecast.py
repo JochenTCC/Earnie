@@ -201,59 +201,67 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
     cached = _CACHED_HOURLY_WATTS_BY_URL.get(url)
 
     from runtime_store.shadow.mode import is_shadow_mode
+    from runtime_store.shadow.replay import replay_ext_payload
+    from runtime_store.shadow.transport import ext_get
 
-    if is_shadow_mode():
+    feed_key = f"ext:pv_forecast:{_shadow_url_hash(url)}"
+
+    def _replay() -> dict | None:
         # Never call forecast.solar from Shadow (shared IP rate limit with Prod).
-        feed_key = f"ext:pv_forecast:{_shadow_url_hash(url)}"
-        from runtime_store.shadow.replay import replay_ext_payload
-
         data = replay_ext_payload(feed_key)
         if isinstance(data, dict):
             hourly_watts = data.get("result", {}).get("watts", {})
             if hourly_watts:
-                _CACHED_HOURLY_WATTS_BY_URL[url] = hourly_watts
-                _set_fetch_source("shadow_feed")
                 return hourly_watts
+        return None
+
+    def _live() -> Optional[dict]:
+        should_return, early = _pre_fetch_cached_or_none(now_time, cached)
+        if should_return:
+            return early
+        try:
+            response = requests.get(url, timeout=config.get_global_timeout())
+            return _store_hourly_watts_from_response(url, response, cached, now_time)
+        except requests.exceptions.Timeout:
+            return _record_fetch_failure_and_cache(
+                url,
+                cached,
+                error="timeout",
+                reason="Timeout",
+                log_message=(
+                    f"[FEHLER] Timeout beim PV-Forecast "
+                    f"({config.get_global_timeout()}s überschritten)."
+                ),
+            )
+        except requests.exceptions.HTTPError as http_err:
+            return _record_fetch_failure_and_cache(
+                url,
+                cached,
+                error=str(http_err),
+                reason=f"HTTPError:{http_err}",
+                log_message=f"[FEHLER] HTTP-Fehler beim PV-Forecast-Abruf: {http_err}.",
+            )
+        except Exception as e:
+            return _record_fetch_failure_and_cache(
+                url,
+                cached,
+                error=str(e),
+                reason=f"Exception:{e}",
+                log_message=f"[FEHLER] Unerwarteter Fehler beim PV-Forecast: {e}.",
+            )
+
+    hit = ext_get(replay=_replay, live=_live, allow_live_fallback=False)
+    if is_shadow_mode():
+        if hit is not None:
+            _CACHED_HOURLY_WATTS_BY_URL[url] = hit
+            _set_fetch_source("shadow_feed")
+            return hit
         if cached is not None:
             _set_fetch_source("cache")
             return cached
         _set_fetch_source("shadow_missing")
         return None
-
-    should_return, early = _pre_fetch_cached_or_none(now_time, cached)
-    if should_return:
-        return early
-
-    try:
-        response = requests.get(url, timeout=config.get_global_timeout())
-        return _store_hourly_watts_from_response(url, response, cached, now_time)
-    except requests.exceptions.Timeout:
-        return _record_fetch_failure_and_cache(
-            url,
-            cached,
-            error="timeout",
-            reason="Timeout",
-            log_message=(
-                f"[FEHLER] Timeout beim PV-Forecast "
-                f"({config.get_global_timeout()}s überschritten)."
-            ),
-        )
-    except requests.exceptions.HTTPError as http_err:
-        return _record_fetch_failure_and_cache(
-            url,
-            cached,
-            error=str(http_err),
-            reason=f"HTTPError:{http_err}",
-            log_message=f"[FEHLER] HTTP-Fehler beim PV-Forecast-Abruf: {http_err}.",
-        )
-    except Exception as e:
-        return _record_fetch_failure_and_cache(
-            url,
-            cached,
-            error=str(e),
-            reason=f"Exception:{e}",
-            log_message=f"[FEHLER] Unerwarteter Fehler beim PV-Forecast: {e}.",
-        )
+    return hit
 
 
 def _shadow_url_hash(url: str) -> str:
@@ -277,12 +285,9 @@ def _shadow_ext_record(
     status: int | None = None,
     error: str | None = None,
 ) -> None:
-    try:
-        from runtime_store.shadow.hooks import record_transport
+    from runtime_store.shadow.transport import safe_record
 
-        record_transport(key, ok=ok, payload=payload, status=status, error=error)
-    except Exception:  # noqa: BLE001
-        pass
+    safe_record(key, ok=ok, payload=payload, status=status, error=error)
 
 
 def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[list, bool]:

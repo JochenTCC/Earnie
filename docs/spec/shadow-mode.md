@@ -1,7 +1,7 @@
 # Specification: Shadow Mode (Dev instance fed by Prod)
 
 **Version:** 0.3  
-**Status:** S1 (Prod recorder) implemented; S2+S3 (Shadow client) implemented — backlog **2.6.o** → **2.7.f** → **2.+1** (S4). Post-2.7 architecture review done: [`backlog/Shadow-Architecture-Review.md`](../../backlog/Shadow-Architecture-Review.md) (follow-up refactor **R1–R4**, not yet implemented).  
+**Status:** S1 (Prod recorder) implemented; S2+S3 (Shadow client) implemented — backlog **2.6.o** → **2.7.f** → **2.+1** (S4). Post-2.7 architecture review + follow-up **R1–R4** done: [`backlog/Shadow-Architecture-Review.md`](../../backlog/Shadow-Architecture-Review.md).  
 **Epic short name:** **Shadow**  
 **Related:** Silent mode (`config.is_silent_mode()`), [EHAL](ehal.md), [Release Checklist](release-checklist.md)
 
@@ -83,7 +83,7 @@ Record **raw backend responses** at the transport primitives, not parsed values.
 | HA | `HaAdapter._get_json(path)` | `ha:get:<path>` (e.g. `ha:get:/api/states/sensor.x`) |
 | OpenEMS | `OpenemsAdapter` GET | `openems:get:<path>` |
 | forecast.solar | `data.pv_forecast` fetch | `ext:pv_forecast:<url-hash>` |
-| Day-ahead prices | `data.live_market_prices` fetch | `ext:prices:<source>` |
+| Day-ahead prices | `data.live_market_prices` fetch (ENTSO-E / Energy-Charts / aWATTar) | `ext:prices:<source>` (`entsoe`, `energy_charts`, `awattar`) |
 | Outdoor forecast | `data.outdoor_forecast` fetch | `ext:outdoor:<url-hash>` |
 | Inbound trigger | `loxone_request_http` optimize request | event `trigger:request_optimize` |
 
@@ -96,7 +96,7 @@ Each record: `{"key", "ts" (UTC ISO), "ok": bool, "status" (HTTP code or null), 
 Shadow can only see what Prod reads. To cover bindings present in the shared config but not touched in this Prod cycle, Prod additionally reads, **once per quarter-hour cycle**:
 
 - **HA (default):** only entities referenced in the shared config bindings (plant / consumers / EHAL map) that were not read in this cycle — one `GET /api/states/<entity>` each → key `ha:get:/api/states/<entity>`. Full `GET /api/states` dump is **not** the default (payload size on SMB); optional later via a local_settings flag if needed.
-- **Loxone:** no Merker HTTP superset (push-only). Prod records each VO push into `loxone:io:<ehal_id>` as it arrives; Shadow `read_push_value` overlays those feed rows onto the (empty) local inbox. If the feed has no Loxone keys yet (older Prod), Shadow falls back to the shared Prod file `{earnie_env}/runtime/loxone_push_inbox.json` next to `config/shadow_feed` (or `EARNIE_SHADOW_PROD_RUNTIME_PATH`).
+- **Loxone:** no Merker HTTP superset (push-only). Prod records each VO push into `loxone:io:<ehal_id>` as it arrives and sets `meta.json` capability `loxone_feed: "push"`. Shadow `read_push_value` overlays those feed rows onto the (empty) local inbox — **feed-only** (no Prod `loxone_push_inbox.json` file fallback). Shadow startup refuses Loxone feeds that lack `loxone_feed: "push"` (older Prod).
 - **OpenEMS:** the configured ESS / EVCS component channels.
 
 Superset reads run **after** the optimizer cycle's writes, are soft-fail, and have a per-cycle time budget (default 10 s). They must never delay setpoint writes.
@@ -107,7 +107,7 @@ Location: `{config_dir}/shadow_feed/` (the config dir is already shared between 
 
 | File | Content | Write mode |
 |---|---|---|
-| `meta.json` | `feed_schema`, Prod `earnie_version`, `earnie_data_model`, `ehal_backend`, `prod_runtime_dir`, `heartbeat_ts`, `cycle_seq` | atomic (tmp + `os.replace`) |
+| `meta.json` | `feed_schema`, Prod `earnie_version`, `earnie_data_model`, `ehal_backend`, `prod_runtime_dir`, `heartbeat_ts`, `cycle_seq`; when `ehal_backend` is Loxone also `loxone_feed: "push"` | atomic (tmp + `os.replace`) |
 | `latest.json` | map key → newest record; plus `cycle_seq`, `cycle_ts` of the last completed Prod cycle | atomic, after each cycle **and** each sampler tick (30 s) |
 | `feed-YYYY-MM-DD.jsonl` | append-only archive of all records + events | append; rotated daily; deleted after retention |
 
@@ -236,14 +236,14 @@ Shadow also reads Prod's `.env` in the config dir (backend secrets). It never us
 
 ### 11.1 Post-2.7 follow-up (refactor R1–R4)
 
-Review: [`backlog/Shadow-Architecture-Review.md`](../../backlog/Shadow-Architecture-Review.md). Implementation is separate backlog work under Version 2.7; no behavior change until a phase is picked up.
+Review: [`backlog/Shadow-Architecture-Review.md`](../../backlog/Shadow-Architecture-Review.md). **R1–R4** implemented (2026-10-12). S4 stays **2.+1**.
 
 | Step | Content | Ships to Prod? |
 |---|---|---|
-| **R1** | Policy façade / gate checklist (`is_shadow_mode` vs `is_shadow_config_readonly` vs `should_invoke_setpoint_writes`); behavior-preserving | no functional change |
-| **R2** | Single Loxone input = feed (`loxone:io:*`); `meta.json` capability (e.g. `loxone_feed: "push"`); retire Prod-inbox file fallback after gate; never reintroduce Merker-superset | yes (recorder capability) when implemented |
-| **R3** | Transport intercept helpers; complete `assert_not_shadow_backend` on probes; extract daemon orchestration from `main.py` | inactive without env; safer for all builds |
-| **R4** | ENTSO-E (and other missing `ext:*`) into feed/replay; S4 stays **2.+1** | recorder keys when implemented |
+| **R1** | Policy façade / gate checklist (`is_shadow_mode` vs `is_shadow_config_readonly` vs `should_invoke_setpoint_writes`); behavior-preserving | **done (2026-10-12)** — no functional change |
+| **R2** | Single Loxone input = feed (`loxone:io:*`); `meta.json` `loxone_feed: "push"`; hard-cut remove Prod-inbox file fallback; startup refuses Loxone feeds without capability; never reintroduce Merker-superset | **done (2026-10-12)** — yes (recorder capability) |
+| **R3** | Transport intercept helpers (`runtime_store/shadow/transport.py`); complete `assert_not_shadow_backend` on probes; extract daemon orchestration to `runtime_store/shadow/daemon.py` | **done (2026-10-12)** — inactive without env; safer for all builds |
+| **R4** | ENTSO-E (and other missing live `ext:*`) into feed/replay; S4 stays **2.+1** | **done (2026-10-12)** — `ext:prices:entsoe` |
 
 ## 12. Decisions / remaining open
 
@@ -256,11 +256,14 @@ Review: [`backlog/Shadow-Architecture-Review.md`](../../backlog/Shadow-Architect
 **Decided (2026-10-12, post-2.7 architecture review):**
 
 4. **Shared vs private Shadow config (§6.4):** first-class. `is_shadow_config_readonly()` is true only when the feed resolves under this process’s `config_dir()`; an external `EARNIE_SHADOW_FEED_PATH` means a private writable local config. Not a temporary workaround.
-5. **Loxone feed contract:** push-only (`record_push` + cycle export → `loxone:io:*`); Loxone after-cycle Merker-superset stays a **no-op**. Prod-inbox file fallback (§5.3) is **compat until R2** capability gate retires it.
+5. **Loxone feed contract:** push-only (`record_push` + cycle export → `loxone:io:*`); Loxone after-cycle Merker-superset stays a **no-op**. Prod-inbox file fallback removed (**R2** hard cut).
 6. **Silent vs Shadow writes:** Shadow implies silent but still invokes setpoint write helpers so `shadow_writes.jsonl` is filled (`should_invoke_setpoint_writes`); do not collapse Shadow into plain silent.
+
+**Decided (2026-10-12, Shadow R2 hard cut):**
+
+7. **`loxone_feed: "push"`** in feed `meta.json` when Prod `ehal_backend` is Loxone. Shadow refuses Loxone feeds missing that capability; no dual-path warning release — inbox file fallback deleted immediately.
 
 **Still open:**
 
 - **Feed retention default:** 14 days of JSONL — size estimate needed after S1 on the real house.
 - **Clock skew / sampler heartbeat:** staleness uses age vs `latest.json.cycle_ts` (fallback: `meta.json.heartbeat_ts`, then Shadow wall clock), gated by `EARNIE_SHADOW_MAX_AGE_SEC` (default 120). Directed age: records newer than the ref (mid-wait sampler updates) stay fresh.
-- **R2 capability string / retire timing:** exact `meta.json` field name and how long dual-path warning runs before inbox fallback removal (see review).

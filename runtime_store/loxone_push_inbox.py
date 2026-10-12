@@ -165,7 +165,7 @@ def _record_push_to_shadow_feed(ehal_id: str, text: str, *, parse_ok: bool) -> N
 def _inbox_row_from_shadow_feed(ehal_id: str) -> dict[str, Any] | None:
     """Shadow: inbox-shaped row from ``loxone:io:<id>``, or None if missing/stale.
 
-    Does not warn on miss — callers try Prod inbox next, then warn if still empty.
+    Does not warn on miss — callers warn if the feed has no row for *ehal_id*.
     """
     try:
         from runtime_store.shadow.mode import is_shadow_mode
@@ -205,60 +205,11 @@ def _inbox_row_from_shadow_feed(ehal_id: str) -> dict[str, Any] | None:
     }
 
 
-def _prod_inbox_path_candidates() -> list:
-    """Paths to Prod ``loxone_push_inbox.json`` visible from Shadow (NAS layout).
-
-    ``meta.prod_runtime_dir`` is often a container path (``/app/runtime``) and is
-    not used. Prefer ``EARNIE_SHADOW_PROD_RUNTIME_PATH``, else
-    ``{feed}/../../runtime`` when feed is ``…/config/shadow_feed``.
-    """
-    from pathlib import Path
-
-    out: list = []
-    env = str(os.getenv("EARNIE_SHADOW_PROD_RUNTIME_PATH") or "").strip()
-    if env:
-        out.append(Path(env) / INBOX_FILENAME)
-    try:
-        from runtime_store.shadow.feed import feed_dir
-
-        feed = feed_dir()
-        if feed.name == "shadow_feed":
-            out.append(feed.parent.parent / "runtime" / INBOX_FILENAME)
-    except Exception:  # noqa: BLE001
-        pass
-    return out
-
-
-def _load_prod_inbox_signals() -> dict[str, dict[str, Any]]:
-    """Read Prod inbox file; empty if missing/unreadable."""
-    for path in _prod_inbox_path_candidates():
-        try:
-            if not path.is_file():
-                continue
-            with path.open(encoding="utf-8") as handle:
-                data = json.load(handle)
-        except (OSError, json.JSONDecodeError, TypeError):
-            continue
-        rows = data.get("signals") if isinstance(data, dict) else None
-        if not isinstance(rows, dict):
-            continue
-        return {
-            str(k): v for k, v in rows.items() if isinstance(v, dict)
-        }
-    return {}
-
-
 def _shadow_feed_signals_for_read(ehal_id: str) -> dict[str, dict[str, Any]]:
-    """Feed rows for *ehal_id* (+ heartbeat); Prod inbox file if feed misses."""
+    """Feed rows for *ehal_id* (+ heartbeat). Feed-only — no Prod-inbox file."""
     out: dict[str, dict[str, Any]] = {}
-    prod_signals: dict[str, dict[str, Any]] | None = None
     for key_id in (ehal_id, HEARTBEAT_ID):
         row = _inbox_row_from_shadow_feed(key_id)
-        if row is None:
-            if prod_signals is None:
-                prod_signals = _load_prod_inbox_signals()
-            raw_row = prod_signals.get(key_id)
-            row = dict(raw_row) if isinstance(raw_row, dict) else None
         if row is not None:
             out[key_id] = row
     if ehal_id not in out:
@@ -272,7 +223,7 @@ def _shadow_feed_signals_for_read(ehal_id: str) -> dict[str, dict[str, Any]]:
 
 
 def _shadow_feed_overlay_if_active(ehal_id: str) -> dict[str, dict[str, Any]]:
-    """Shadow-only: feed (+ Prod inbox fallback) rows for *ehal_id*; else ``{}``."""
+    """Shadow-only: feed rows for *ehal_id*; else ``{}``."""
     try:
         from runtime_store.shadow.mode import is_shadow_mode
 
