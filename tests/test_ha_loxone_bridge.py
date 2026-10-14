@@ -55,6 +55,7 @@ def _jinja_env(states: dict[str, str] | None = None):
     env = jinja2.Environment()
     env.filters["is_number"] = _is_number
     env.globals["states"] = lambda entity: (states or {}).get(entity, "unknown")
+    env.globals["is_state"] = lambda entity, state: (states or {}).get(entity, "unknown") == state
     return env
 
 
@@ -95,6 +96,10 @@ def test_example_mapping_needs_real_webhook_ids() -> None:
         (lambda r: r["loxone"].update(host="http://192.168.178.10"), "bare IP/hostname"),
         (lambda r: r["derived_sensors"][0].update(name="Other Name"), "derives the entity id from the name"),
         (lambda r: r["derived_sensors"][0].update(plus=[]), "at least one entity"),
+        (lambda r: r["points"][5].update(repeat_seconds=0), "needs repeat_seconds > 0"),
+        (lambda r: r["points"][5].update(off_after_seconds=10), "must be greater than repeat_seconds"),
+        (lambda r: r["points"][4].update(off_after_seconds=30), "only applies to a switch"),
+        (lambda r: r["points"][0].update(off_after_seconds=30), "only applies to loxone_to_ha"),
     ],
 )
 def test_invalid_mapping_fails_loud(mutate, message: str) -> None:
@@ -170,6 +175,7 @@ def test_webhook_automation_for_number_clamps_and_rounds() -> None:
     trigger = auto["triggers"][0]
     assert trigger == {
         "trigger": "webhook",
+        "id": "webhook",
         "webhook_id": "test_ac_charge_limit_Zq81xKp",
         "allowed_methods": ["GET"],
         "local_only": True,
@@ -201,15 +207,50 @@ def test_webhook_automation_skips_unchanged_number() -> None:
     assert _render(differs, {entity: "500.0"}, target=800.0) == "True"
 
 
-def test_webhook_automation_for_switch_maps_1_to_on() -> None:
+def test_switch_off_after_defaults_to_three_repeats() -> None:
+    raw = _raw()
+    del raw["points"][5]["off_after_seconds"]
+    raw["points"][5]["repeat_seconds"] = 10
+    point = _mapping(raw).points[5]
+    assert point.off_after_seconds == 30  # like Earnie's push freshness: 3 x repeat
+    assert _mapping().points[4].off_after_seconds is None  # numbers have no off timer
+
+
+def test_switch_automation_restarts_on_every_on_and_times_out() -> None:
     auto = _automation(_load_package(render_package(_mapping())), "grid_bypass")
+    # Every On (repeated by Loxone) restarts the run and with it the off timer.
+    assert auto["mode"] == "restart"
+    assert "max" not in auto
+    assert [t.get("id") for t in auto["triggers"]] == ["webhook", "start"]
+    assert auto["triggers"][1] == {"trigger": "homeassistant", "id": "start", "event": "start"}
+
+    guard = auto["conditions"][0]["value_template"]
+    assert _render(guard, trigger={"id": "webhook", "query": {"v": "1.000"}}) == "True"
+    assert _render(guard, trigger={"id": "webhook", "query": {"v": "x"}}) == "False"
+    assert _render(guard, trigger={"id": "start"}) == "True"
+
     want_on = auto["actions"][0]["variables"]["want_on"]
-    assert _render(want_on, trigger={"query": {"v": "1"}}) == "True"
-    assert _render(want_on, trigger={"query": {"v": "0"}}) == "False"
-    choose = auto["actions"][2]["choose"][0]
-    assert choose["sequence"][0]["action"] == "switch.turn_on"
-    assert auto["actions"][2]["default"][0]["action"] == "switch.turn_off"
-    assert auto["actions"][2]["default"][0]["target"] == {"entity_id": "switch.delta_3_grid_bypass"}
+    assert _render(want_on, trigger={"id": "webhook", "query": {"v": "1"}}) == "True"
+    assert _render(want_on, trigger={"id": "webhook", "query": {"v": "0"}}) == "False"
+    assert _render(want_on, trigger={"id": "start"}) == "False"
+
+    entity = "switch.delta_3_grid_bypass"
+    turn_on = auto["actions"][1]
+    assert _render(turn_on["if"][0]["value_template"], {}, want_on=True) == "True"
+    assert turn_on["then"][0] == {"action": "switch.turn_on", "target": {"entity_id": entity}}
+
+    timer = auto["actions"][2]
+    start_timer = timer["if"][0]["value_template"]
+    assert _render(start_timer, want_on=True, trigger={"id": "webhook"}) == "True"
+    assert _render(start_timer, want_on=False, trigger={"id": "start"}) == "True"
+    # Off from Loxone (v=0): no timer, straight to the final turn_off step.
+    assert _render(start_timer, want_on=False, trigger={"id": "webhook"}) == "False"
+    assert timer["then"][0] == {"delay": {"seconds": 30}}
+    assert timer["then"][1]["then"][0]["action"] == "system_log.write"
+    assert "no On from Loxone for 30 s" in timer["then"][1]["then"][0]["data"]["message"]
+
+    turn_off = auto["actions"][3]
+    assert turn_off["then"][0] == {"action": "switch.turn_off", "target": {"entity_id": entity}}
 
 
 def test_webhook_local_only_can_be_disabled() -> None:
@@ -231,14 +272,17 @@ _DIGITAL_ATTRS = [a for a in _ANALOG_ATTRS if not a.startswith(("SourceVal", "De
 
 
 def test_virtual_out_has_loxone_export_shape_and_webhook_commands() -> None:
-    root = ET.fromstring(render_virtual_out(_mapping()))
+    text = render_virtual_out(_mapping())
+    assert "\r\n" in text and "\n" not in text.replace("\r\n", "")  # CRLF like the Config export
+    root = ET.fromstring(text)
     assert root.tag == "VirtualOut"
     assert list(root.attrib) == _ROOT_ATTRS
     assert root.get("Address") == "http://192.168.178.20:8123"
+    assert root.get("CmdSep") == ";"
     info, *cmds = list(root)
     assert info.tag == "Info" and info.attrib == {"templateType": "3", "minVersion": "17010630"}
     by_title = {c.get("Title"): c for c in cmds}
-    assert set(by_title) == {"HA_Delta3_AcChargeLimit", "HA_Delta3_GridBypass"}
+    assert list(by_title) == ["HA_Delta3_AcChargeLimit", "HA_Delta3_GridBypass"]
 
     analog = by_title["HA_Delta3_AcChargeLimit"]
     assert list(analog.attrib) == _ANALOG_ATTRS
@@ -252,10 +296,17 @@ def test_virtual_out_has_loxone_export_shape_and_webhook_commands() -> None:
     assert digital.get("Analog") == "false"
     assert digital.get("CmdOn") == "/api/webhook/test_grid_bypass_Zq81xKp?v=1"
     assert digital.get("CmdOff") == "/api/webhook/test_grid_bypass_Zq81xKp?v=0"
+    assert (digital.get("Repeat"), digital.get("RepeatRate")) == ("10", "10")
 
     for cmd in cmds:
         # In a Virtual Output command the VI-style escape arrives as the control character 0x0B.
         assert _BACKSLASH_V not in (cmd.get("CmdOn") or "")
+
+
+def test_virtual_out_address_omits_port_80() -> None:
+    raw = _raw()
+    raw["ha"]["port"] = 80
+    assert ET.fromstring(render_virtual_out(_mapping(raw))).get("Address") == "http://192.168.178.20"
 
 
 # --- checklist and CLI ----------------------------------------------------------------
@@ -265,6 +316,7 @@ def test_checklist_lists_inputs_and_commands_without_webhook_ids() -> None:
     text = render_checklist(_mapping(), package_file=PACKAGE_FILE, xml_file=XML_FILE)
     assert "`Earnie_Batterie_SoC`" in text
     assert "`HA_Delta3_AcChargeLimit`" in text
+    assert "ohne Ein für 30 s schaltet HA aus" in text
     assert "begrenzt auf 100.0…1500.0, Raster 50" in text
     assert "Zq81xKp" not in text
 

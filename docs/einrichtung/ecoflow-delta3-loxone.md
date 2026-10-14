@@ -65,7 +65,7 @@ Earnies eigene Anbindung bleibt unverändert auf `ehal.backend=loxone`.
 > **Neu (POC):** Der [Bridge-Generator](ha-loxone-bridge.md) erzeugt Schritt 2 bis 6 aus einer
 > Mapping-Datei – Loxone → HA dabei per Webhook statt über PyLoxone und selbst beschriebene Virtuelle
 > Eingänge (dort wurden Werte zwischendurch überschrieben). Schritt 8 (Logik im Miniserver) bleibt gültig.
-> Bis zum Live-Test bleibt diese Anleitung unverändert.
+> Die Webhook-Variante B in Schritt 5 und 6 entspricht dem, was der Generator erzeugt.
 
 ## Mapping-Tabelle
 
@@ -447,40 +447,103 @@ Variante B über einen Webhook. Beide setzen `number.<device>_ac_charging_power`
 
 #### Variante B: über einen Webhook
 
-Am bestehenden `Earnie_LadeLeistungs-Limit`-Merker (aus `VI_Earnie_Plant.xml`, siehe
-[Loxone-Signale](../referenz/loxone-signals.md)) einen **Virtual Output** ergänzen, der bei
-Wertänderung folgende URL aufruft:
+Der Miniserver ruft per **Virtuellem Ausgang** direkt einen Webhook in HA auf. Es gibt keinen
+Virtuellen Eingang, den der Miniserver selbst beschreibt, und keine PyLoxone-Verbindung dazwischen –
+der Wert hat also genau einen Schreiber.
 
-```
-GET http://<HA-Host>:8123/api/webhook/earnie_charge_limit?v=<v>
-```
+**HA-Adresse und Port ermitteln:** Maßgeblich ist die Adresse, unter der ihr die HA-Oberfläche im
+Browser öffnet.
 
-`<HA-Host>` ist die IP-Adresse eures Home-Assistant-Systems (der Miniserver löst Hostnamen
-womöglich nicht auf). **Port:** Standardmäßig läuft HA auf Port `8123`. Habt ihr in der
-`configuration.yaml` unter `http:` einen anderen `server_port` eingestellt (z. B. `8124`), muss genau
-dieser Port in der URL stehen. Dasselbe gilt für Schritt 6.
+- Standard ist Port `8123`: `http://<HA-IP>:8123`.
+- Habt ihr in der `configuration.yaml` unter `http:` einen anderen `server_port` eingestellt (z.B.
+  `8124`), muss genau dieser Port in der Adresse stehen.
+- Manche Installationen laufen direkt auf Port `80`. Dann entfällt der Port: `http://<HA-IP>`.
+- **Gegenprobe im Browser:** `http://<HA-IP>:<Port>/api/` muss „401: Unauthorized“ melden – dann
+  antwortet die HA-API (ohne Token, das ist hier richtig). `ERR_CONNECTION_REFUSED` heißt: Unter
+  diesem Port läuft nichts, also falscher Port oder falsche IP.
+- Immer die **IP-Adresse** nehmen, keinen Hostnamen (der Miniserver löst Hostnamen womöglich nicht auf).
 
-In HA — Automation über die Oberfläche anlegen (siehe Grundlagen-Abschnitt oben: Automatisierung
-erstellen → „In YAML bearbeiten“), Inhalt einfügen:
+Dasselbe gilt für Schritt 6.
+
+**Webhook-ID wählen:** Die ID ist der einzige Zugriffsschutz des Webhooks. Nehmt deshalb eine
+zufällige ID statt eines sprechenden Namens, z.B. erzeugt mit
+`python -c "import secrets; print(secrets.token_urlsafe(18))"`. In den Beispielen unten steht dafür
+`<webhook-id>`.
+
+**In Loxone Config:** Der Aufruf verteilt sich auf **zwei Stellen**. Loxone setzt ihn beim Senden
+zusammen:
+
+| Stelle | Inhalt (Beispiel) |
+|---|---|
+| **Virtueller Ausgang** (das Gerät), Feld „Adresse“ | `http://192.168.178.63` |
+| **Virtueller Ausgangsbefehl** darunter, Feld „Befehl bei Ein“ | `/api/webhook/<webhook-id>?v=<v>` |
+| ergibt den Aufruf | `http://192.168.178.63/api/webhook/<webhook-id>?v=800.000` |
+
+Ein Virtueller Ausgang kann mehrere Ausgangsbefehle enthalten. Für Home Assistant reicht deshalb
+**ein** Ausgang, unter dem alle Befehle hängen (Ladelimit hier, Grid-Bypass aus Schritt 6).
+
+1. Unter **Virtuelle Ausgänge** einen neuen **Virtuellen Ausgang** für Home Assistant anlegen (z.B.
+   „Home Assistant“). Adresse: `http://<HA-IP>:<Port>` wie oben ermittelt (bei Port 80 ohne `:<Port>`),
+   ohne Pfad und ohne `/` am Ende. Zugangsdaten bleiben leer.
+2. Diesem Ausgang einen **analogen** Virtuellen Ausgangsbefehl hinzufügen:
+   - Befehl bei Ein: `/api/webhook/<webhook-id>?v=<v>`
+   - Befehl bei Aus: leer lassen
+   - Wiederholung z.B. 30 s, damit HA nach einem Neustart wieder den aktuellen Wert bekommt.
+
+   Der Platzhalter ist `<v>`, nicht `\v` (siehe Schritt 5, Variante A). Loxone sendet den Wert mit
+   Dezimalpunkt und drei Nachkommastellen (z.B. `800.000`), die Automation rechnet das um.
+3. Den Ausgangsbefehl an den Ausgang von **F2** aus Schritt 8 hängen (Ladeleistung in **Watt**).
+   **Nicht** direkt an den Merker `Earnie_LadeLeistungs-Limit`: Der liefert **kW**, aus 1,5 kW würden
+   in HA sonst 100 W (die Untergrenze). Wer ohne die Logik aus Schritt 8 arbeitet, setzt eine Formel
+   `I1*1000` dazwischen.
+4. Speichern und übertragen.
+
+**In HA:** Automation über die Oberfläche anlegen (siehe Grundlagen-Abschnitt oben: Automatisierung
+erstellen → „In YAML bearbeiten“). `<device>` an beiden Stellen durch euren Gerätenamen aus Schritt 1
+ersetzen, `<webhook-id>` durch eure ID:
 
 ```yaml
-alias: "Earnie -> Ecoflow AC-Ladelimit"
+alias: "Loxone -> Ecoflow AC-Ladelimit"
+mode: queued
+max: 5
 triggers:
   - trigger: webhook
-    webhook_id: earnie_charge_limit
-    allowed_methods: [GET, POST]
-    local_only: false
+    webhook_id: <webhook-id>
+    allowed_methods: [GET]
+    local_only: true
+conditions:
+  - condition: template
+    value_template: "{{ trigger.query.v is defined and (trigger.query.v | is_number) }}"
 actions:
+  - variables:
+      target: "{{ [ [ ((trigger.query.v | float) / 50) | round(0) * 50, 100 ] | max, 1500 ] | min }}"
+  - condition: template
+    value_template: "{{ states('number.<device>_ac_charging_power') | float(none) != target }}"
   - action: number.set_value
     target:
       entity_id: number.<device>_ac_charging_power
     data:
-      value: "{{ (trigger.query.v | int(1500)) | max(100) | min(1500) }}"
+      value: "{{ target }}"
 ```
 
-Die Webhook-ID wirkt selbst als Geheimnis – kein zusätzlicher Bearer-Token nötig. Der Platzhalter
-`<v>` ist derselbe wie in den Earnie-VO-Vorlagen (`share/loxone/templates/VirtualOut/`) und liefert den
-Wert mit Dezimalpunkt und drei Nachkommastellen (z.B. `800.000`); die Automation rechnet das um.
+Was die Automation macht:
+
+- **Nur gültige Werte:** Fehlt `v` oder ist es keine Zahl, passiert nichts (kein Rückfall auf einen
+  festen Wert).
+- **Begrenzung und Raster:** 100 bis 1500 W (Bereich der Delta 3), gerundet auf 50 W (Schrittweite der
+  Integration): `812.000` → 800, `20` → 100.
+- **Schreibt nur bei Änderung:** Die Wiederholung aus Loxone erzeugt keine Dauer-Schreibzugriffe auf
+  die EcoFlow-Cloud.
+- **`local_only: true`:** Der Webhook nimmt nur Aufrufe aus dem lokalen Netz an. Der Miniserver steht im
+  selben Netz, von außen ist der Webhook damit nicht erreichbar.
+
+Die Fehlermeldung „Message malformed: expected 'all' or 'none' at 'actions[0].target.entity_id'“ beim
+Speichern heißt: `<device>` wurde nicht ersetzt.
+
+**Test:** Im Browser `http://<HA-IP>:<Port>/api/webhook/<webhook-id>?v=800` aufrufen.
+`number.<device>_ac_charging_power` muss danach auf 800 W stehen. Die Delta 3 übernimmt den Wert nur,
+wenn `select.<device>_ac_charging_mode` auf **Custom** steht (siehe Schritt 8). Ändert sich nichts, zeigt
+die Ablaufverfolgung (Trace) der Automation, an welcher Stelle sie stehen geblieben ist.
 
 ### 6. Quellenwahl-Merker (`ess.<id>.set_ess_source_select`, 2.7.h)
 
@@ -550,33 +613,100 @@ wieder steht und der Eingang einen neuen Zustand meldet.
 
 #### Variante B: über einen Webhook
 
-Robuster gegenüber Verbindungsabbrüchen der Loxone-Integration, dafür aufwendiger. **Digitaler**
-Virtueller Ausgangsbefehl am Merker `Earnie_Speicher_Quellenwahl`, mit festen Werten statt
+Robuster gegenüber Verbindungsabbrüchen der Loxone-Integration und ohne selbst beschriebenen
+Virtuellen Eingang. Adresse, Port und Webhook-ID wie in Schritt 5, Variante B (eigene, zweite
+Webhook-ID).
+
+**In Loxone Config:** Dem Virtuellen Ausgang „Home Assistant“ aus Schritt 5 einen **digitalen**
+Virtuellen Ausgangsbefehl hinzufügen („Als Digitalausgang verwenden“ aktiv), mit festen Werten statt
 Platzhalter:
 
-```
-Befehl bei Ein:  GET http://<HA-Host>:8123/api/webhook/earnie_speicher_quelle?v=1
-Befehl bei Aus:  GET http://<HA-Host>:8123/api/webhook/earnie_speicher_quelle?v=0
-```
+- Befehl bei Ein: `/api/webhook/<webhook-id>?v=1`
+- Befehl bei Aus: `/api/webhook/<webhook-id>?v=0`
+- Wiederholung: z.B. 10 s – **muss eingeschaltet sein**, siehe unten.
 
-Ein analoger Ausgang mit `?v=<v>` taugt hier nicht: Bei Wert 0 sendet er nichts (es gibt keinen
-Aus-Befehl), der Wechsel auf Netz käme in HA also nie an.
+Den Befehl an den Ausgang von **F3** aus Schritt 8 hängen (ohne die Logik direkt an den Merker
+`Earnie_Speicher_Quellenwahl`). Ein analoger Ausgang mit `?v=<v>` taugt hier nicht: Bei Wert 0 sendet
+er gar nichts.
 
-In HA — Automation über die Oberfläche anlegen (wie in Schritt 4/5):
+**Ein fehlendes „Ein“ gilt als „Aus“:** Ein digitaler Ausgang wiederholt „Ein“ im eingestellten
+Intervall, sendet „Aus“ aber nur **einmal** bei der Flanke (am Miniserver getestet). Geht genau dieser
+eine Aufruf verloren, z.B. weil HA gerade neu startet, bliebe die Delta 3 im Batteriebetrieb, lädt nicht
+nach und läuft leer. Die Automation wertet deshalb wie Earnie bei den Push-Signalen ein ausbleibendes
+„Ein“ als „Aus“: Kommt **30 s** lang (3 × Wiederholung) kein „Ein“, schaltet sie auf Netz und schreibt
+eine Warnung ins Protokoll. Genau 10 s wären zu knapp – ein leicht verspäteter Aufruf würde den Bypass
+kurz aus- und wieder einschalten.
+
+**In HA:** Automation über die Oberfläche anlegen (wie in Schritt 5), `<device>` an allen Stellen und
+`<webhook-id>` ersetzen. Bei anderer Wiederholung `seconds: 30` auf das Dreifache anpassen:
 
 ```yaml
-alias: "Speicher-Quellenwahl -> Ecoflow Grid Bypass"
+alias: "Loxone -> Ecoflow Grid Bypass"
+mode: restart
 triggers:
   - trigger: webhook
-    webhook_id: earnie_speicher_quelle
-    allowed_methods: [GET, POST]
-    local_only: false
+    id: webhook
+    webhook_id: <webhook-id>
+    allowed_methods: [GET]
+    local_only: true
+  - trigger: homeassistant
+    id: start
+    event: start
+conditions:
+  - condition: template
+    value_template: "{{ trigger.id == 'start' or (trigger.query.v is defined and (trigger.query.v | is_number)) }}"
 actions:
-  - action: >
-      {{ 'switch.turn_on' if (trigger.query.v | int(0)) == 1 else 'switch.turn_off' }}
-    target:
-      entity_id: switch.<device>_grid_bypass
+  - variables:
+      want_on: "{{ trigger.id == 'webhook' and (trigger.query.v | float) >= 0.5 }}"
+  - if:
+      - condition: template
+        value_template: "{{ want_on and not is_state('switch.<device>_grid_bypass', 'on') }}"
+    then:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.<device>_grid_bypass
+  - if:
+      - condition: template
+        value_template: "{{ want_on or trigger.id == 'start' }}"
+    then:
+      - delay:
+          seconds: 30
+      - if:
+          - condition: template
+            value_template: "{{ is_state('switch.<device>_grid_bypass', 'on') }}"
+        then:
+          - action: system_log.write
+            data:
+              level: warning
+              logger: ha_loxone_bridge
+              message: "Grid Bypass: kein Ein von Loxone seit 30 s, schalte auf Netz"
+  - if:
+      - condition: template
+        value_template: "{{ is_state('switch.<device>_grid_bypass', 'on') }}"
+    then:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.<device>_grid_bypass
 ```
+
+So arbeitet die Automation:
+
+- **`mode: restart`:** Jedes „Ein“ startet die Automation neu und damit auch die 30-s-Wartezeit. Solange
+  Loxone „Ein“ wiederholt, läuft die Wartezeit nie ab.
+- **„Aus“ von Loxone** (`v=0`): schaltet sofort auf Netz, ohne Wartezeit.
+- **Kein „Ein“ mehr** (Aufruf verloren, Verbindung weg): Nach 30 s schaltet die Automation auf Netz und
+  schreibt die Warnung (Einstellungen → System → Protokolle, Filter `ha_loxone_bridge`).
+- **HA-Neustart:** Der Start-Trigger lässt die Wartezeit sofort laufen. Steht Loxone auf „Ein“, kommt
+  innerhalb von 10 s die nächste Wiederholung und der Bypass bleibt an. Steht Loxone auf „Aus“, kommt
+  nichts mehr und die Automation schaltet nach 30 s auf Netz.
+- Geschaltet wird nur, wenn sich der Zustand wirklich ändert.
+
+`v=1` schaltet den Schalter **an** (Batteriebetrieb), `v=0` **aus** (Netz), siehe Zuordnung oben.
+
+**Test:** `http://<HA-IP>:<Port>/api/webhook/<webhook-id>?v=1` im Browser aufrufen: Der Schalter geht an
+und nach 30 s ohne weiteren Aufruf wieder aus. Läuft Loxone mit, bleibt er an. In den
+Ablaufverfolgungen der Automation (⋮ → Ablaufverfolgungen) seht ihr alle 10 s einen neuen Lauf; HA
+speichert standardmäßig nur die letzten 5, mehr mit `trace: stored_traces: 20` im YAML der Automation.
 
 Nach dem Mapping in EHAL-Com schreibt Earnie den Merker im Live-Zyklus; manuelles Beschalten
 (Taster/Zeitprogramm) bleibt für Tests möglich.

@@ -16,6 +16,8 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - `\v` is the Virtual **Input** placeholder; in a Virtual Output it is sent as the control character 0x0B. Replaced with `<v>` in step 5 variant A (Miniserver self-write) and variant B (charge-limit webhook); removed the claim that `\v` matches the Earnie VO templates (they use `<v>`).
   - Step 6 variant B (bypass webhook): switched to a **digital** VO with fixed `?v=1` / `?v=0`, since an analog VO sends nothing at value 0 and the switch to grid would never reach HA.
   - Possible root cause of the open bug "Miniserver self-write of a Virtual Input is overwritten" — noted there for verification.
+  - Variant B of steps 5 and 6 rewritten to match the bridge generator: random webhook id, `GET` + `local_only: true`, `is_number` guard (no silent 1500 W default), 50 W rounding, write only on change; VO hangs on F2 (W) instead of the `Earnie_LadeLeistungs-Limit` Merker (kW — old automation turned 1.5 kW into 100 W).
+  - HA port: added how to find it (browser address; `/api/` → 401 = reachable, `ERR_CONNECTION_REFUSED` = wrong port), incl. installs on port 80 without `:8123`; same note in `ha-loxone-bridge.md`.
 
 ### Bugfix — Physical standby PS Chart1 SoC held flat (2026-10-14)
 

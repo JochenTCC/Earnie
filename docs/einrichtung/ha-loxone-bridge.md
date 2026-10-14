@@ -43,7 +43,9 @@ Jeder Wert hat damit genau **einen** Schreiber.
 
 2. Anpassen:
    - `loxone.host` / `ha.host`: **IP-Adressen** (keine Hostnamen, siehe EcoFlow-Anleitung Schritt 4).
-     Läuft HA nicht auf Port 8123, `ha.port` ändern.
+   - `ha.port`: der Port, unter dem ihr die HA-Oberfläche im Browser öffnet – Standard `8123`, bei
+     manchen Installationen `80`. Gegenprobe: `http://<HA-IP>:<Port>/api/` meldet „401: Unauthorized“;
+     `ERR_CONNECTION_REFUSED` heißt falscher Port (Details: EcoFlow-Anleitung, Schritt 5, Variante B).
    - `ha_entity`: die echten Entity-IDs eurer Delta 3 (Entwicklerwerkzeuge → Zustände, Gerätename statt
      `delta_3`).
    - `loxone_input`: Namen der Virtuellen Eingänge im Miniserver (exakte Groß-/Kleinschreibung).
@@ -96,14 +98,17 @@ immer über die Mapping-Datei und neu generieren.
 2. `VO_HA_Bridge.xml` als Vorlage für einen Virtuellen Ausgang importieren. Die Adresse zeigt auf HA.
 3. Die beiden Befehle an die Logik aus der EcoFlow-Anleitung (Schritt 8) hängen:
    - `HA_Delta3_AcChargeLimit` (analog) an den Ausgang von **F2** (Ladeleistung in W),
-   - `HA_Delta3_GridBypass` (digital) an den Ausgang von **F3** (Bypass 0/1).
+   - `HA_Delta3_GridBypass` (digital, Ein `?v=1`, Aus `?v=0`) an den Ausgang von **F3**.
+
+   Die Wiederholung am Bypass-Befehl muss eingeschaltet sein (Beispiel: 10 s). HA wertet ein
+   ausbleibendes „Ein“ als „Aus“, siehe „Verhalten im Detail“.
 4. Die alte Strecke abbauen: die Virtuellen Ausgangsbefehle, mit denen der Miniserver
    `Delta3_Grid_ByPass` und `Delta3_P_ChargeLimit` selbst beschrieben hat, und diese beiden Eingänge.
 5. Speichern und übertragen.
 
 ### 5. Testen
 
-- **Webhook direkt:** Im Browser (aus dem Heimnetz) `http://<HA-IP>:8123/api/webhook/<id>?v=800` aufrufen.
+- **Webhook direkt:** Im Browser (aus dem Heimnetz) `http://<HA-IP>:<Port>/api/webhook/<id>?v=800` aufrufen.
   `number.<device>_ac_charging_power` muss auf 800 gehen. Werte werden auf 100 bis 1500 W begrenzt und
   auf 50 W gerundet (`812.000` → 800).
 - **Bypass:** in Loxone Config F3 im Online-Monitor zwischen 0 und 1 wechseln, `switch.<device>_grid_bypass`
@@ -115,14 +120,22 @@ immer über die Mapping-Datei und neu generieren.
 
 ## Verhalten im Detail
 
-- **Wiederholung:** Der Virtuelle Ausgang wiederholt jeden Befehl alle 30 s (`repeat_seconds`, 0 = aus).
-  Damit kommt HA nach einem Neustart wieder auf den Sollwert. HA schaltet aber nur, wenn der Zielwert vom
+- **Wiederholung:** Der Virtuelle Ausgang wiederholt jeden Befehl im Intervall `repeat_seconds`
+  (Standard 30 s, Beispiel-Bypass 10 s, 0 = aus). Damit kommt HA nach einem Neustart wieder auf den
+  Sollwert. HA schaltet aber nur, wenn der Zielwert vom
   aktuellen Zustand abweicht – die EcoFlow-Cloud bekommt also keine Dauer-Schreibzugriffe.
 - **HA → Loxone** pusht bei jeder Änderung, beim HA-Start und optional alle `refresh_minutes` Minuten
   (z.B. nach einem Miniserver-Neustart). Nicht-numerische Zustände (`unavailable`, `unknown`) werden nicht
   gesendet.
 - **Netto-Leistung:** Der Template-Sensor wird `unavailable`, sobald einer der beiden EcoFlow-Sensoren
   fehlt – es wird also keine falsche 0 an Loxone gemeldet (die alte Vorlage rechnete mit `float(0)`).
+- **Schalter (Bypass): fehlendes „Ein“ gilt als „Aus“.** Ein digitaler Ausgang wiederholt „Ein“, sendet
+  „Aus“ aber nur einmal bei der Flanke (am Miniserver getestet). Die Automation läuft deshalb mit
+  `mode: restart`: Jedes „Ein“ startet eine Wartezeit neu (`off_after_seconds`, Standard 3 ×
+  Wiederholung, Beispiel 30 s). Läuft sie ab, schaltet HA aus (beim Bypass: Netz, der sichere Zustand) und
+  schreibt eine Warnung ins Protokoll (Logger `ha_loxone_bridge`). Nach einem HA-Start läuft die Wartezeit
+  sofort an, ein während des Neustarts verpasstes „Aus“ greift also trotzdem. Das ist dieselbe Regel wie
+  bei Earnies Push-Signalen.
 - **`local_only: true`:** Der Webhook nimmt nur Aufrufe aus dem lokalen Netz an. Soll er auch von außen
   erreichbar sein (nicht empfohlen), `ha.webhook_local_only` auf `false` setzen.
 
@@ -130,8 +143,9 @@ immer über die Mapping-Datei und neu generieren.
 
 - Ein **analoger** Virtueller Ausgang sendet bei Wert 0 nichts (kein Off-Befehl). Für die Ladeleistung der
   Delta 3 egal (Minimum 100 W), für andere Werte relevant.
-- Ein **digitaler** Ausgang sendet „Aus“ nur einmal bei der Flanke. Ob „Ein“ wiederholt wird, ist noch
-  nicht am Miniserver geprüft.
+- Ein Schalter braucht eine Wiederholung > 0 und eine Wartezeit größer als die Wiederholung, sonst bricht
+  der Generator ab. Fällt die Verbindung zu HA kurz aus, schaltet der Bypass nach der Wartezeit auf Netz
+  und mit dem nächsten „Ein“ wieder zurück.
 - Kein Scan von HA oder Loxone und keine Namensvorschläge – die Mapping-Datei wird von Hand gepflegt.
 - Unterstützte HA-Domains: `sensor`, `number`, `input_number` (beide Richtungen numerisch) sowie `switch`,
   `input_boolean` (nur Loxone → HA).
@@ -154,7 +168,8 @@ immer über die Mapping-Datei und neu generieren.
 | `points[].webhook_id` | nur `loxone_to_ha`: zufällige Webhook-ID |
 | `points[].loxone_cmd_title` | nur `loxone_to_ha`: Titel des Befehls im Virtuellen Ausgang (Standard `HA_<name>`) |
 | `points[].min`, `max`, `step` | nur `loxone_to_ha`, numerisch: Begrenzung und Raster |
-| `points[].repeat_seconds` | nur `loxone_to_ha`: Wiederholung des Befehls (Standard 30, 0 = aus) |
+| `points[].repeat_seconds` | nur `loxone_to_ha`: Wiederholung des Befehls (Standard 30, 0 = aus; Schalter: > 0) |
+| `points[].off_after_seconds` | nur Schalter: Wartezeit ohne „Ein“, danach schaltet HA aus (Standard 3 × `repeat_seconds`) |
 
 Unbekannte Schlüssel, doppelte Namen oder Webhook-IDs und nicht unterstützte Domains brechen mit einer
 Fehlermeldung ab.

@@ -40,6 +40,9 @@ class Point:
     maximum: float | None = None
     step: float | None = None
     repeat_seconds: int = 30  # loxone_to_ha only (VO Repeat; 0 = off)
+    # loxone_to_ha switch only: HA assumes Off when no On arrived for this long (Loxone sends Off
+    # once on the edge only, On is repeated). Default 3 x repeat_seconds, like Earnie's push freshness.
+    off_after_seconds: int | None = None
 
     @property
     def domain(self) -> str:
@@ -151,7 +154,7 @@ def _parse_point(raw: Any, ctx: str) -> Point:
     obj = _only_keys(
         raw,
         {"name", "direction", "ha_entity", "loxone_input", "loxone_cmd_title", "refresh_minutes",
-         "webhook_id", "min", "max", "step", "repeat_seconds"},
+         "webhook_id", "min", "max", "step", "repeat_seconds", "off_after_seconds"},
         ctx,
     )
     name = str(_req(obj, "name", ctx))
@@ -162,7 +165,7 @@ def _parse_point(raw: Any, ctx: str) -> Point:
     domain = entity.split(".", 1)[0]
 
     if direction == HA_TO_LOXONE:
-        for key in ("webhook_id", "min", "max", "step", "repeat_seconds", "loxone_cmd_title"):
+        for key in ("webhook_id", "min", "max", "step", "repeat_seconds", "off_after_seconds", "loxone_cmd_title"):
             if key in obj:
                 raise MappingError(f"{ctx}: '{key}' only applies to {LOXONE_TO_HA}")
         lox_name = str(_req(obj, "loxone_input", ctx))
@@ -193,8 +196,24 @@ def _parse_point(raw: Any, ctx: str) -> Point:
         if step is not None and step <= 0:
             raise MappingError(f"{ctx}: step must be > 0")
         repeat = _int(obj.get("repeat_seconds", 30), f"{ctx}.repeat_seconds", low=0, high=3600)
+        off_after = None
+        if domain in SWITCH_DOMAINS:
+            if repeat == 0:
+                raise MappingError(
+                    f"{ctx}: a switch needs repeat_seconds > 0 — Loxone sends Off only once, HA detects Off "
+                    f"from the missing On repeat"
+                )
+            off_after = _int(obj.get("off_after_seconds", 3 * repeat), f"{ctx}.off_after_seconds",
+                             low=1, high=86400)
+            if off_after <= repeat:
+                raise MappingError(
+                    f"{ctx}: off_after_seconds ({off_after}) must be greater than repeat_seconds ({repeat}), "
+                    f"otherwise a slightly late repeat switches off and on again"
+                )
+        elif "off_after_seconds" in obj:
+            raise MappingError(f"{ctx}: off_after_seconds only applies to a switch")
         point = Point(name, direction, entity, lox_name, webhook_id=webhook, minimum=low,
-                      maximum=high, step=step, repeat_seconds=repeat)
+                      maximum=high, step=step, repeat_seconds=repeat, off_after_seconds=off_after)
     else:
         raise MappingError(f"{ctx}: direction must be '{HA_TO_LOXONE}' or '{LOXONE_TO_HA}', got {direction!r}")
 

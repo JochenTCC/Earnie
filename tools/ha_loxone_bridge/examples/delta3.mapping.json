@@ -65,7 +65,9 @@
       "direction": "loxone_to_ha",
       "ha_entity": "switch.delta_3_grid_bypass",
       "loxone_cmd_title": "HA_Delta3_GridBypass",
-      "webhook_id": "CHANGE_ME_grid_bypass"
+      "webhook_id": "CHANGE_ME_grid_bypass",
+      "repeat_seconds": 10,
+      "off_after_seconds": 30
     }
   ]
 }

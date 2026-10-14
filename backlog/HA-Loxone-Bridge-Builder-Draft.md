@@ -12,7 +12,7 @@
 - **Mapping file = JSON**, not YAML: PyYAML is not a declared dependency of this repo. Example: `tools/ha_loxone_bridge/examples/delta3.mapping.json`. Validation fails loud (unknown keys, duplicate names / webhook ids, unsupported domains, `CHANGE_ME` webhook ids unless `--allow-placeholder`).
 - **HA → Loxone** (numeric `sensor` / `number` / `input_number`): `rest_command` `GET http://<Miniserver>/jdev/sps/io/<VI>/<value>` (Basic Auth from `secrets.yaml`) + automation on state change, HA start and optional `time_pattern` refresh; guarded by `is_number`.
 - **Derived sensors** (template, e.g. net ESS power = out − in) with an `availability` template instead of `float(0)` defaults, so a missing input never pushes a fake 0.
-- **Loxone → HA via webhook** (no PyLoxone, no mirrored Virtual Input): generated Loxone `VirtualOut` template (Config export shape, BOM, `<v>` placeholder) pointing at `http://<HA>:8123`, one command per point calling `/api/webhook/<id>?v=<v>`. Webhook automation (`GET`, `local_only` configurable, default `true`) for `number` / `input_number` (clamp + step rounding) and `switch` / `input_boolean` (`v ≥ 0.5` → on, digital VO with On `?v=1` / Off `?v=0`). Writes only when the target differs from the current state, so the VO repeat (default 30 s, resync after HA restart) does not hammer the EcoFlow cloud.
+- **Loxone → HA via webhook** (no PyLoxone, no mirrored Virtual Input): generated Loxone `VirtualOut` template (Config export shape, BOM, `<v>` placeholder) pointing at `http://<HA>[:port]` (port omitted for 80; `CmdSep=";"`, CRLF — checked against the operator's Config export 2026-10-14), one command per point calling `/api/webhook/<id>?v=<v>`. Webhook automation (`GET`, `local_only` configurable, default `true`) for `number` / `input_number` (clamp + step rounding) and `switch` / `input_boolean` (digital VO, On `?v=1` / Off `?v=0`; `v ≥ 0.5` → on; **missing On counts as Off**: `mode: restart`, every On restarts an `off_after_seconds` timer, default 3 × `repeat_seconds` like Earnie's push freshness; on timeout → off + `system_log` warning; HA start trigger runs the timer right away). Writes only when the target differs from the current state, so the VO repeat (default 30 s, resync after HA restart) does not hammer the EcoFlow cloud.
 - Output: one HA **package** file (`rest_command:` + `template:` + `automation:` with stable `id`s), `VO_HA_Bridge.xml`, German `Checkliste.md` (no webhook ids in it).
 - Tests: `tests/test_ha_loxone_bridge.py` (parses the package as YAML, evaluates the generated Jinja expressions, checks the VO template shape).
 - User doc (German): `docs/einrichtung/ha-loxone-bridge.md`.
@@ -20,7 +20,8 @@
 **Open for the POC:**
 
 - Live acceptance on the operator's HA + Miniserver (charge limit and bypass follow the Loxone logic for ≥ 24 h, no foreign values). Then close the bugfix item and rewrite steps 5/6 of the EcoFlow guide around the generator.
-- Verify on the Miniserver: digital VO repeat of the On command (pilot only verified the Off edge is not repeated), and that `?` in a VO command combines with the device address as expected (pilot used `?t=` the same way).
+- ~~Verify digital VO repeat~~ **Verified 2026-10-14 (live, Delta 3 bypass via webhook):** a digital VO repeats "On" every Repeat interval (tested 10 s) but sends "Off" once on the edge only. A lost Off call (HA restarting) would leave the bypass on (battery island, no recharge). Hence HA treats a missing On as Off (operator decision 2026-10-14, same rule as Earnie's push inbox; a two-command On-only variant was rejected). `?v=` in the VO command combined with the device address works.
+- ~~Live-test the off timer~~ **Verified 2026-10-14:** single `?v=1` from the browser while the Loxone output is Off → bypass on, back off after 30 s by the timer.
 - Analog VO sends nothing at value 0 (no Off command). Irrelevant for the Delta 3 charge limit (min 100 W), relevant for other numeric points.
 
 ### Goal (v1 scope, after the POC)
@@ -70,7 +71,8 @@ A generator that scans both sides, proposes a point mapping, and outputs **ready
 
 ### Deferred (explicitly out of scope, kept for later planning)
 
-- Loxone-side plain Virtual Input templates (no export sample yet; the checklist lists the inputs to create by hand)
+- Loxone-side plain Virtual Input templates (Loxone Config offers no template export for them; the checklist lists the inputs to create by hand)
+- **Option: HA → Loxone as pull via Virtual HTTP Inputs** (like Earnie's `status.json`; discussed 2026-10-14, parked). Loxone cannot send the HA bearer token, so HA would have to publish an unauthenticated JSON, e.g. a file in `config/www/` (served at `/local/…`) written by an automation via `shell_command`, or a Node-RED endpoint. Pros: no Loxone credentials in HA, automatic resync after a Miniserver reboot, VI HTTP templates generatable (export shape known from `VI_Earnie_*_v2.xml`). Cons: values readable without auth, up to one poll interval latency, file-write workaround; check `/local/` caching first. Revisit if Loxone credentials in HA or the re-push after Miniserver reboots become a problem.
 - Further non-numeric domains (covers, scenes, selects)
 - Direct write into a running HA instance via its Config API
 - Heartbeat / dead-man-fallback automation generation

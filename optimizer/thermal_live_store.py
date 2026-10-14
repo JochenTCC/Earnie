@@ -6,6 +6,7 @@ scalar kWh bounds only.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Any
 
 from optimizer.thermal_coupled import (
@@ -393,6 +394,54 @@ def plan_live_store_horizon(
     )
 
 
+def resolve_live_collector_solar_kw(
+    thermal: dict,
+    house_profile: dict | None,
+    horizon: int,
+    *,
+    start: datetime | None = None,
+) -> list[float]:
+    """Hourly collector heat into the store (kW_th ≈ kWh per hour) for Live.
+
+    Uses the last full Open-Meteo archive year at matching DOY/hour (same
+    irradiance source as year-sim). Returns zeros when ``solar_thermal_area_m2``
+    is not configured. Raises if area > 0 but lat/lon or climate cannot be loaded.
+    """
+    if horizon < 1:
+        raise ValueError("horizon muss mindestens 1 sein")
+    area_m2 = float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0)
+    if area_m2 <= 0.0:
+        return [0.0] * horizon
+    from data.modeled_climate import ModeledClimateContext, collector_surface_from_thermal
+    from data.open_meteo_solar_archive import last_full_archive_year
+
+    profile = dict(house_profile) if isinstance(house_profile, dict) else {}
+    if "latitude" not in profile or "longitude" not in profile:
+        import config as _cfg
+
+        if getattr(_cfg, "CONFIG", None) is None:
+            raise ValueError(
+                "solar_thermal_area_m2 > 0 requires house_profile latitude/longitude "
+                "or a loaded CONFIG for Live collector irradiance"
+            )
+        profile.setdefault("latitude", float(_cfg.get("LATITUDE", cast=float)))
+        profile.setdefault("longitude", float(_cfg.get("LONGITUDE", cast=float)))
+    climate = ModeledClimateContext.for_house_profile(profile, kwp=0.0)
+    archive_year = last_full_archive_year()
+    bundle = climate._bundle_for_calendar_year(archive_year)
+    surface = collector_surface_from_thermal(thermal, profile)
+    start_dt = (start or datetime.now()).replace(minute=0, second=0, microsecond=0)
+    solar: list[float] = []
+    for offset in range(horizon):
+        slot = start_dt + timedelta(hours=offset)
+        try:
+            archive_slot = slot.replace(year=archive_year)
+        except ValueError:
+            archive_slot = slot.replace(year=archive_year, day=28)
+        solar.append(float(bundle.thermal_kwh_at(surface, area_m2, archive_slot)))
+    return solar
+
+
 def plan_live_store_for_thermal_consumer(
     consumer: dict,
     *,
@@ -411,6 +460,11 @@ def plan_live_store_for_thermal_consumer(
     storage = normalize_heat_storage(storage_raw)
     if storage is None:
         return None
+    resolved_solar = solar_forecast_kw
+    if resolved_solar is None:
+        resolved_solar = resolve_live_collector_solar_kw(
+            thermal, house_profile, len(ambient_forecast_c)
+        )
     band = ThermalBand(storage["setpoint_c"], storage["tolerance_c"])
     readings = resolve_heat_storage_readings(
         consumer, house_doc=house_doc, heat_storage=storage
@@ -436,7 +490,7 @@ def plan_live_store_for_thermal_consumer(
         wp_electric_kw=wp_kw,
         jaz=heat_pump_jaz(str(thermal.get("heat_pump_type", "luft"))),
         temp_low_c=readings.temp_low_c,
-        solar_forecast_kw=solar_forecast_kw,
+        solar_forecast_kw=resolved_solar,
         living_area_m2=living,
         building_mass=thermal.get("building_mass"),
         target_temp_c=float(thermal.get("target_temp_c", 21.5) or 21.5),

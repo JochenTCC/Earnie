@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from .mapping import HA_TO_LOXONE, BridgeMapping
-from .loxone_xml import outgoing_points
+from .loxone_xml import ha_address, outgoing_points
 
 
 def render_checklist(mapping: BridgeMapping, *, package_file: str, xml_file: str | None) -> str:
@@ -40,8 +40,8 @@ def render_checklist(mapping: BridgeMapping, *, package_file: str, xml_file: str
         lines += [
             f"### Virtueller Ausgang (`{xml_file}`)",
             "",
-            f"Vorlage importieren. Adresse: `http://{mapping.ha_host}:{mapping.ha_port}` "
-            "(IP, kein Hostname). Jeden Befehl an die passende Programmlogik hängen:",
+            f"Vorlage importieren. Adresse: `{ha_address(mapping)}` (IP, kein Hostname). Jeden Befehl an die "
+            "passende Programmlogik hängen:",
             "",
             "| Befehl | Typ | setzt in HA | Verhalten |",
             "|---|---|---|---|",
@@ -49,7 +49,7 @@ def render_checklist(mapping: BridgeMapping, *, package_file: str, xml_file: str
         for p in outputs:
             kind = "digital" if p.is_switch else "analog"
             if p.is_switch:
-                behaviour = "1 → an, 0 → aus"
+                behaviour = f"Ein → `?v=1`, Aus → `?v=0`; ohne Ein für {p.off_after_seconds} s schaltet HA aus"
             else:
                 parts = []
                 if p.minimum is not None or p.maximum is not None:
@@ -66,6 +66,9 @@ def render_checklist(mapping: BridgeMapping, *, package_file: str, xml_file: str
             "vom aktuellen Zustand abweicht, die EcoFlow-Cloud bekommt also keine Dauer-Schreibzugriffe.",
             "- Ein analoger Ausgang sendet bei Wert 0 nichts (kein Off-Befehl); die Untergrenze des Mappings "
             "greift also nur bei Werten ≠ 0.",
+            "- Schalter: Ein digitaler Ausgang wiederholt „Ein“, sendet „Aus“ aber nur einmal bei der Flanke. "
+            "HA wertet deshalb ein ausbleibendes „Ein“ als „Aus“ (wie Earnie bei den Push-Signalen). Die "
+            "Wiederholung am Ausgang muss dafür eingeschaltet sein.",
             "",
         ]
     return "\n".join(lines)
