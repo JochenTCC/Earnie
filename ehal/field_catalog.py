@@ -12,8 +12,10 @@ from __future__ import annotations
 TELEMETRY_REQUIRED: tuple[str, ...] = (
     "sens_grid_power_active",
     "sens_pv_production_active",
-    "sens_ess_soc",
 )
+
+# SoC kind for mapping / propose only — not on the plant telemetry document (schema_version 4).
+TELEMETRY_ESS_SOC_KIND: tuple[str, ...] = ("sens_ess_soc",)
 
 # Intersection of HA numeric optional and static-hub optional (membership; order = HA).
 TELEMETRY_OPTIONAL_CORE: tuple[str, ...] = (
@@ -69,6 +71,7 @@ SETPOINT_FIELDS: tuple[str, ...] = (
 
 HA_MAP_FIELDS: tuple[str, ...] = (
     TELEMETRY_REQUIRED
+    + TELEMETRY_ESS_SOC_KIND
     + TELEMETRY_OPTIONAL_HA
     + TELEMETRY_BINARY_OPTIONAL
     + TELEMETRY_ENERGY_OPTIONAL
@@ -76,7 +79,10 @@ HA_MAP_FIELDS: tuple[str, ...] = (
 )
 
 STATIC_HUB_MAP_FIELDS: tuple[str, ...] = (
-    TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL_STATIC_HUB + SETPOINT_FIELDS
+    TELEMETRY_REQUIRED
+    + TELEMETRY_ESS_SOC_KIND
+    + TELEMETRY_OPTIONAL_STATIC_HUB
+    + SETPOINT_FIELDS
 )
 
 # Temporary aliases (rename cleanup); remove once all imports use the new names.

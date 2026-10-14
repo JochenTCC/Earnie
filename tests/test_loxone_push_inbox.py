@@ -27,7 +27,7 @@ def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 @pytest.mark.parametrize(
     "ehal_id",
     [
-        "sens_ess_soc",
+        "sens_pv_production_active",
         "get_ess_max_charge_power",
         "sens_absent_mode",
         "ess.ecoflow_delta_3.sens_ess_soc",
@@ -48,6 +48,7 @@ def test_valid_ids(ehal_id: str) -> None:
     "ehal_id",
     [
         "",
+        "sens_ess_soc",  # plant-flat SoC retired (flat SoC retired)
         "set_ess_charge_power_limit",  # setpoints are never pushed from Loxone
         "ess.x.set_ess_mode",
         "../etc/passwd",
@@ -83,10 +84,10 @@ def test_parse_push_value(raw: str, expected: float | None) -> None:
 
 def test_record_push_tracks_count_interval_and_peer() -> None:
     t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
-    assert inbox.record_push("sens_ess_soc", "55", "10.0.0.5", now=t0) == "new"
-    assert inbox.record_push("sens_ess_soc", "56", "10.0.0.5", now=t0 + timedelta(seconds=30)) == "ok"
-    assert inbox.record_push("sens_ess_soc", "56", "10.0.0.5", now=t0 + timedelta(seconds=60)) == "ok"
-    row = inbox.load_inbox()["sens_ess_soc"]
+    assert inbox.record_push("ess.house.sens_ess_soc", "55", "10.0.0.5", now=t0) == "new"
+    assert inbox.record_push("ess.house.sens_ess_soc", "56", "10.0.0.5", now=t0 + timedelta(seconds=30)) == "ok"
+    assert inbox.record_push("ess.house.sens_ess_soc", "56", "10.0.0.5", now=t0 + timedelta(seconds=60)) == "ok"
+    row = inbox.load_inbox()["ess.house.sens_ess_soc"]
     assert row["count"] == 3
     assert row["value"] == 56.0
     assert row["raw"] == "56"
@@ -96,8 +97,8 @@ def test_record_push_tracks_count_interval_and_peer() -> None:
 
 
 def test_unparseable_value_is_kept_for_inspection() -> None:
-    assert inbox.record_push("sens_ess_soc", "n/a", "x") == "new"
-    row = inbox.load_inbox()["sens_ess_soc"]
+    assert inbox.record_push("ess.house.sens_ess_soc", "n/a", "x") == "new"
+    row = inbox.load_inbox()["ess.house.sens_ess_soc"]
     assert row["parse_ok"] is False
     assert row["value"] is None
     assert row["raw"] == "n/a"
@@ -105,8 +106,8 @@ def test_unparseable_value_is_kept_for_inspection() -> None:
 
 def test_record_push_rejects_bad_input_and_caps_ids(monkeypatch: pytest.MonkeyPatch) -> None:
     assert inbox.record_push("bad id", "1") == "bad_id"
-    assert inbox.record_push("sens_ess_soc", "") == "bad_raw"
-    assert inbox.record_push("sens_ess_soc", "1" * 40) == "bad_raw"
+    assert inbox.record_push("ess.house.sens_ess_soc", "") == "bad_raw"
+    assert inbox.record_push("ess.house.sens_ess_soc", "1" * 40) == "bad_raw"
     monkeypatch.setattr(inbox, "MAX_IDS", 2)
     assert inbox.record_push("sens_a", "1") == "new"
     assert inbox.record_push("sens_b", "1") == "new"
@@ -120,8 +121,8 @@ def test_staleness_uses_configured_repeat_not_smoothed_gap(monkeypatch: pytest.M
     t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
     # Bursts of changes (7 s, 15 s gaps) pull the smoothed interval far below the repeat.
     for offset in (0, 7, 22, 37):
-        inbox.record_push("sens_ess_soc", "55", now=t0 + timedelta(seconds=offset))
-    row = inbox.load_inbox()["sens_ess_soc"]
+        inbox.record_push("ess.house.sens_ess_soc", "55", now=t0 + timedelta(seconds=offset))
+    row = inbox.load_inbox()["ess.house.sens_ess_soc"]
     assert row["interval_ema_s"] < 20
     last = t0 + timedelta(seconds=37)
     assert not inbox.is_stale(row, now=last + timedelta(seconds=10))  # next repeat is due
@@ -132,8 +133,8 @@ def test_staleness_uses_configured_repeat_not_smoothed_gap(monkeypatch: pytest.M
 def test_staleness_respects_repeat_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(inbox.REPEAT_ENV, "60")
     t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
-    inbox.record_push("sens_ess_soc", "55", now=t0)
-    row = inbox.load_inbox()["sens_ess_soc"]
+    inbox.record_push("ess.house.sens_ess_soc", "55", now=t0)
+    row = inbox.load_inbox()["ess.house.sens_ess_soc"]
     assert not inbox.is_stale(row, now=t0 + timedelta(seconds=170))
     assert inbox.is_stale(row, now=t0 + timedelta(seconds=190))
     monkeypatch.setenv(inbox.REPEAT_ENV, "garbage")
@@ -170,15 +171,15 @@ def test_endpoint_token_validation_and_storage(monkeypatch: pytest.MonkeyPatch) 
     port = http_mod.start_loxone_request_http(0).server_address[1]
     base = "/ehal/telemetry/"
     alias = "/ehal/loxone/telemetry/"
-    assert _get(port, base + "sens_ess_soc/55") == 401
-    assert _get(port, base + "sens_ess_soc/55?t=wrong") == 401
-    assert _get(port, base + "sens_ess_soc/55?t=s3cret") == 204
+    assert _get(port, base + "ess.house.sens_ess_soc/55") == 401
+    assert _get(port, base + "ess.house.sens_ess_soc/55?t=wrong") == 401
+    assert _get(port, base + "ess.house.sens_ess_soc/55?t=s3cret") == 204
     assert _get(port, base + "ess.ecoflow_delta_3.sens_ess_soc/61,5", {http_mod.PUSH_TOKEN_HEADER: "s3cret"}) == 204
     assert _get(port, alias + "sens_pv_production_active/2.5?t=s3cret") == 204  # alias
     assert _get(port, base + "set_ess_mode/1?t=s3cret") == 400
-    assert _get(port, base + "sens_ess_soc?t=s3cret") == 400  # no value
+    assert _get(port, base + "ess.house.sens_ess_soc?t=s3cret") == 400  # no value
     rows = inbox.load_inbox()
-    assert rows["sens_ess_soc"]["value"] == 55.0
+    assert rows["ess.house.sens_ess_soc"]["value"] == 55.0
     assert rows["ess.ecoflow_delta_3.sens_ess_soc"]["value"] == 61.5
     assert rows["sens_pv_production_active"]["value"] == 2.5
     assert "set_ess_mode" not in rows
@@ -208,8 +209,8 @@ def _row(value: float | None, age_s: float, *, parse_ok: bool = True) -> dict:
 
 def test_link_alive_from_fresh_nonzero_analog_or_heartbeat() -> None:
     assert inbox.link_alive({"heartbeat": _row(1.0, 5)}, now=_now())
-    assert inbox.link_alive({"sens_ess_soc": _row(55.0, 20)}, now=_now())
-    assert not inbox.link_alive({"sens_ess_soc": _row(55.0, 35)}, now=_now())  # older than 3 x 10 s
+    assert inbox.link_alive({"ess.house.sens_ess_soc": _row(55.0, 20)}, now=_now())
+    assert not inbox.link_alive({"ess.house.sens_ess_soc": _row(55.0, 35)}, now=_now())  # older than 3 x 10 s
     assert not inbox.link_alive({"sens_grid_power_active": _row(0.0, 5)}, now=_now())  # zero is no proof
     assert not inbox.link_alive({"sens_absent_mode": _row(1.0, 5)}, now=_now())  # digital is edge-based
     assert not inbox.link_alive({}, now=_now())
@@ -217,7 +218,7 @@ def test_link_alive_from_fresh_nonzero_analog_or_heartbeat() -> None:
 
 def test_derive_state_analog() -> None:
     def d(row, link):
-        return inbox.derive_state("sens_ess_soc", row, link=link, now=_now())
+        return inbox.derive_state("ess.house.sens_ess_soc", row, link=link, now=_now())
 
     assert d(_row(55.0, 20), True) == (inbox.STATE_OK, 55.0)
     assert d(_row(55.0, 200), True) == (inbox.STATE_ZERO_ASSUMED_SILENT, 0.0)
@@ -310,9 +311,9 @@ def test_endpoint_accepts_token_in_address_prefix(monkeypatch: pytest.MonkeyPatc
     port = http_mod.start_loxone_request_http(0).server_address[1]
     base = "/ehal/telemetry/"
     alias = "/ehal/loxone/telemetry/"
-    assert _get(port, "/t/s3cret-token" + base + "sens_ess_soc/55.5") == 204
-    assert _get(port, "/t/s3cret-token" + alias + "sens_ess_soc/56") == 204  # alias + prefix
-    assert _get(port, "/t/wrong" + base + "sens_ess_soc/57") == 401
+    assert _get(port, "/t/s3cret-token" + base + "ess.house.sens_ess_soc/55.5") == 204
+    assert _get(port, "/t/s3cret-token" + alias + "ess.house.sens_ess_soc/56") == 204  # alias + prefix
+    assert _get(port, "/t/wrong" + base + "ess.house.sens_ess_soc/57") == 401
     assert _get(port, "/t/s3cret-token" + base + "set_ess_mode/1") == 400  # setpoints never accepted
     assert _get(port, "/t/s3cret-token/ehal/loxone/status.json") == 404  # other routes not via prefix
     assert _get(port, "/t/s3cret-token/ehal/loxone/alive") == 404
@@ -320,19 +321,19 @@ def test_endpoint_accepts_token_in_address_prefix(monkeypatch: pytest.MonkeyPatc
     assert _get(port, base + "sens_pv_production_active/1?t=s3cret-token") == 204
     assert _get(port, alias + "heartbeat/1", {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"}) == 204
     rows = inbox.load_inbox()
-    assert rows["sens_ess_soc"]["value"] == 56.0  # last alias write
-    assert set(rows) == {"sens_ess_soc", "sens_pv_production_active", "heartbeat"}
+    assert rows["ess.house.sens_ess_soc"]["value"] == 56.0  # last alias write
+    assert set(rows) == {"ess.house.sens_ess_soc", "sens_pv_production_active", "heartbeat"}
 
 
 def test_header_wins_over_prefix_and_must_match(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret-token")
     port = http_mod.start_loxone_request_http(0).server_address[1]
-    path = "/t/s3cret-token/ehal/telemetry/sens_ess_soc/1"
+    path = "/t/s3cret-token/ehal/telemetry/ess.house.sens_ess_soc/1"
     assert _get(port, path, {http_mod.PUSH_TOKEN_HEADER: "wrong"}) == 401
 
 
 def test_prefix_endpoint_disabled_without_token() -> None:
     port = http_mod.start_loxone_request_http(0).server_address[1]
-    assert _get(port, "/t/anything/ehal/telemetry/sens_ess_soc/1") == 404
+    assert _get(port, "/t/anything/ehal/telemetry/ess.house.sens_ess_soc/1") == 404
     assert _get(port, "/t/anything/ehal/loxone/telemetry/sens_ess_soc/1") == 404
     assert inbox.load_inbox() == {}

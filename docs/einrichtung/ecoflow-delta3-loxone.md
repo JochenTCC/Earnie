@@ -30,7 +30,7 @@ multiple isolated battery … One-Way storage type“):
 
 | EHAL-Feld | Status |
 |---|---|
-| `sens_ess_soc`, `sens_ess_power` | ✅ heute nutzbar (reine Telemetrie/Anzeige) |
+| `ess.{id}.sens_ess_soc`, `sens_ess_power` | ✅ heute nutzbar (reine Telemetrie/Anzeige; SoC entity-scoped) |
 | `set_ess_charge_power_limit` | ✅ heute nutzbar (bestehendes EHAL-Feld) |
 | `ess.<id>.set_ess_source_select` *(2.7.h)* | ✅ Earnie schreibt Quellenwahl für physisches `role: standby_backup` (entity-scoped); Merker + Bridge zu `switch.<device>_grid_bypass` (Operator verdrahtet nach ID-Umzug) |
 | `set_ess_active_power`, `set_ess_discharge_power_limit`, `set_ess_mode` | ❌ nicht anlegen/mappen — für einen One-Way-Speicher grundsätzlich nicht zutreffend |
@@ -66,7 +66,7 @@ Earnies eigene Anbindung bleibt unverändert auf `ehal.backend=loxone`.
 
 | EHAL-Feld | Ecoflow-Entity (interner Key) | Loxone-Merker | Richtung | In Earnie mappen? |
 |---|---|---|---|---|
-| `sens_ess_soc` | `sensor.<device>_main_battery_level` (`bms_batt_soc`) | `Earnie_Batterie_SoC` | HA → Loxone | ✅ (Anzeige only) |
+| `ess.{id}.sens_ess_soc` | `sensor.<device>_main_battery_level` (`bms_batt_soc`) | `Earnie_Batterie_SoC` | HA → Loxone | ✅ (Anzeige only) |
 | `sens_ess_power` | Template-Sensor aus `pow_out_sum_w − pow_in_sum_w` | `Earnie_Batterie_Leistung` | HA → Loxone | ✅ (Anzeige only) |
 | `set_ess_charge_power_limit` | `number.<device>_ac_charging_power` (`plug_in_info_ac_in_chg_pow_max`, 100–1500 W) | `Earnie_LadeLeistungs-Limit` | Loxone → HA | ✅ |
 | `get_ess_soc_max` (optional) | `number.<device>_max_charge_level` (50–100 %) | `Earnie_Batterie_SOC_Max` | HA → Loxone | optional |
@@ -575,7 +575,7 @@ python -m scripts.verify_loxone_setup
 ```
 
 Danach in Earnie unter **Daemon Control → EHAL-Com → Loxone Structure → EHAL Mapping** nur
-`sens_ess_soc`, `sens_ess_power` und `set_ess_charge_power_limit` auf die drei Merker binden.
+`ess.{id}.sens_ess_soc`, `sens_ess_power` und `set_ess_charge_power_limit` auf die drei Merker binden.
 `Earnie_Speicher_Quellenwahl`, `Earnie_Batterie_Sollleistung`, `Earnie_EntladeLeistungs-Limit` und
 `Earnie_Steuerbefehl` bewusst **nicht** mappen. Das gilt, solange keine Loxone-Logik nach Schritt 8
 dahinter hängt: Dann müssen `set_ess_mode`, `set_ess_active_power` und

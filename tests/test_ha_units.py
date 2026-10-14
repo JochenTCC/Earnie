@@ -87,7 +87,7 @@ def test_compatible_entity_ids_drops_other_quantities():
 
 def test_binding_unit_issues_and_hint():
     issues = binding_unit_issues(
-        {"sens_grid_power_active": "sensor.grid_kwh", "sens_ess_soc": "sensor.soc"}, _ROWS
+        {"sens_grid_power_active": "sensor.grid_kwh", "ess.house.sens_ess_soc": "sensor.soc"}, _ROWS
     )
     assert len(issues) == 1
     assert "sens_grid_power_active" in issues[0] and "kWh" in issues[0]
@@ -102,7 +102,7 @@ def test_validate_mapping_save_rejects_wrong_quantity():
     ehal_map = {
         "sens_grid_power_active": "sensor.grid_kwh",
         "sens_pv_production_active": "sensor.grid_kw",
-        "sens_ess_soc": "sensor.soc",
+        "ess.house.sens_ess_soc": "sensor.soc",
     }
     error = _validate_mapping_save("plant", ehal_map, _ROWS)
     assert error is not None and "Einheit passt nicht" in error

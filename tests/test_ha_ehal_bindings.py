@@ -21,7 +21,7 @@ def test_migrate_ha_entities_to_plant_without_ev_consumer():
     house, changed = migrate_ha_entities_to_house({}, entities)
     assert changed
     plant = house["plant"]["ehal_bindings"]
-    assert plant["sens_ess_soc"] == entities["sens_ess_soc"]
+    assert plant["ess.house.sens_ess_soc"] == entities["ess.house.sens_ess_soc"]
     assert plant["sens_evcs_active_power"] == entities["sens_evcs_active_power"]
     assert plant["set_evcs_max_current"] == entities["set_evcs_max_current"]
     assert aggregate_ha_entities(house) == {
@@ -33,7 +33,7 @@ def test_migrate_ha_entities_ev_to_consumer():
     entities = {
         "sens_grid_power_active": "sensor.grid",
         "sens_pv_production_active": "sensor.pv",
-        "sens_ess_soc": "sensor.soc",
+        "ess.house.sens_ess_soc": "sensor.soc",
         "sens_evcs_active_power": "sensor.ev_power",
         "set_evcs_max_current": "number.ev_amps",
     }
@@ -47,7 +47,7 @@ def test_migrate_ha_entities_ev_to_consumer():
     house, changed = migrate_ha_entities_to_house(house, entities)
     assert changed
     plant = house["plant"]["ehal_bindings"]
-    assert plant["sens_ess_soc"] == "sensor.soc"
+    assert plant["ess.house.sens_ess_soc"] == "sensor.soc"
     assert "sens_evcs_active_power" not in plant
     ev = house["profiles"]["live"]["consumers"][0]["ehal_bindings"]
     assert ev["sens_evcs_active_power"] == "sensor.ev_power"
@@ -57,14 +57,14 @@ def test_migrate_ha_entities_ev_to_consumer():
 
 def test_migrate_empty_only_does_not_overwrite():
     house = {
-        "plant": {"ehal_bindings": {"sens_ess_soc": "sensor.keep"}},
+        "plant": {"ehal_bindings": {"ess.house.sens_ess_soc": "sensor.keep"}},
         "profiles": {},
     }
     house, changed = migrate_ha_entities_to_house(
-        house, {"sens_ess_soc": "sensor.other", "sens_grid_power_active": "sensor.grid"}
+        house, {"ess.house.sens_ess_soc": "sensor.other", "sens_grid_power_active": "sensor.grid"}
     )
     assert changed
-    assert house["plant"]["ehal_bindings"]["sens_ess_soc"] == "sensor.keep"
+    assert house["plant"]["ehal_bindings"]["ess.house.sens_ess_soc"] == "sensor.keep"
     assert house["plant"]["ehal_bindings"]["sens_grid_power_active"] == "sensor.grid"
 
 
@@ -85,7 +85,10 @@ def test_ensure_migrated_strips_ha_entities(tmp_path, monkeypatch):
     }
     house, config_out, changed = ensure_migrated({}, config)
     assert changed
-    assert aggregate_ha_entities(house)["sens_ess_soc"] == entities["sens_ess_soc"]
+    assert (
+        aggregate_ha_entities(house)["ess.house.sens_ess_soc"]
+        == entities["ess.house.sens_ess_soc"]
+    )
     assert config_out["ehal"]["ha"]["entities"] == {}
     assert config_out["ehal"]["ha"]["sign"]["sens_grid_power_active"] == "ehal"
     assert "base_url" not in config_out["ehal"]["ha"]
@@ -99,7 +102,7 @@ def test_apply_ha_entities_overwrites_and_clears():
     house = {
         "plant": {
             "ehal_bindings": {
-                "sens_ess_soc": "sensor.old",
+                "ess.house.sens_ess_soc": "sensor.old",
                 "sens_temperature_outside": "sensor.outside",
             }
         },
@@ -110,12 +113,12 @@ def test_apply_ha_entities_overwrites_and_clears():
     updated = apply_ha_entities_to_house(
         house,
         {
-            "sens_ess_soc": "sensor.new",
+            "ess.house.sens_ess_soc": "sensor.new",
             "sens_evcs_active_power": "sensor.ev",
         },
     )
     plant = updated["plant"]["ehal_bindings"]
-    assert plant["sens_ess_soc"] == "sensor.new"
+    assert plant["ess.house.sens_ess_soc"] == "sensor.new"
     assert plant["sens_temperature_outside"] == "sensor.outside"
     assert "sens_evcs_active_power" not in plant
     assert (
@@ -182,7 +185,7 @@ def test_get_ha_adapter_prefers_house_bindings(monkeypatch, tmp_path):
     entities = {
         "sens_grid_power_active": "sensor.grid",
         "sens_pv_production_active": "sensor.pv",
-        "sens_ess_soc": "sensor.soc",
+        "ess.house.sens_ess_soc": "sensor.soc",
     }
     house = {
         "plant": {"ehal_bindings": entities},
@@ -199,14 +202,14 @@ def test_get_ha_adapter_prefers_house_bindings(monkeypatch, tmp_path):
             "EHAL_HA_BASE_URL": "http://127.0.0.1:9",
             "EHAL_HA_TOKEN": "token",
             "EHAL_ADAPTER_ID": "earnie-hems",
-            "EHAL_HA_ENTITIES": {"sens_ess_soc": "sensor.legacy"},
+            "EHAL_HA_ENTITIES": {"ess.house.sens_ess_soc": "sensor.legacy"},
             "EHAL_HA_SIGN": {},
             "GLOBAL_TIMEOUT": 5,
         }.get(key, default),
     )
     ehal_live.reset_adapter_cache()
     adapter = ehal_live.get_ha_adapter()
-    assert adapter.cfg.entities["sens_ess_soc"] == "sensor.soc"
+    assert adapter.cfg.entities["ess.house.sens_ess_soc"] == "sensor.soc"
     assert adapter.cfg.entities["sens_grid_power_active"] == "sensor.grid"
     ehal_live.reset_adapter_cache()
 
@@ -228,7 +231,7 @@ def test_get_ha_adapter_legacy_fallback_when_house_empty(monkeypatch):
             "EHAL_HA_ENTITIES": {
                 "sens_grid_power_active": "sensor.legacy_grid",
                 "sens_pv_production_active": "sensor.legacy_pv",
-                "sens_ess_soc": "sensor.legacy_soc",
+                "ess.house.sens_ess_soc": "sensor.legacy_soc",
             },
             "EHAL_HA_SIGN": {},
             "GLOBAL_TIMEOUT": 5,
@@ -236,5 +239,5 @@ def test_get_ha_adapter_legacy_fallback_when_house_empty(monkeypatch):
     )
     ehal_live.reset_adapter_cache()
     adapter = ehal_live.get_ha_adapter()
-    assert adapter.cfg.entities["sens_ess_soc"] == "sensor.legacy_soc"
+    assert adapter.cfg.entities["ess.house.sens_ess_soc"] == "sensor.legacy_soc"
     ehal_live.reset_adapter_cache()

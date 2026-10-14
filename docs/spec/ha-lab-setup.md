@@ -369,7 +369,7 @@ Silent gate: `loxone_silent_mode` also blocks HA setpoint writes (same as OpenEM
 | --- | --- | --- |
 | `sens_grid_power_active` | yes | `sensor` (W; or kW → adapter converts) |
 | `sens_pv_production_active` | yes | `sensor` |
-| `sens_ess_soc` | yes | `sensor` (%) |
+| `ess.{id}.sens_ess_soc` | Live yes | `sensor` (%) — entity-scoped; not on plant telemetry doc |
 | `sens_ess_power` | no | `sensor` |
 | `sens_evcs_active_power` | no | `sensor` |
 | `get_ess_soc_min` / `get_ess_soc_max` | no | `sensor` / `number` (%) — device cut-offs when `limits_from_live` (2.7.j) |
@@ -423,7 +423,7 @@ IDs only (`sensor.evcc_grid_power`, …).
 1. Earnie http://localhost:8506 → **EHAL-Com** → **HA Entity → EHAL Mapping**.
 2. URL inside Compose: `http://homeassistant:8123` + LLAT (§2).
 3. **Entities scannen** → assign at least the three required reads
-   (`sens_grid_power_active`, `sens_pv_production_active`, `sens_ess_soc`).
+   (`sens_grid_power_active`, `sens_pv_production_active`, and `ess.{id}.sens_ess_soc` on the battery).
 4. Optional: `sens_ess_power`, `sens_evcs_active_power`, `set_evcs_max_current` (and ESS
    limit numbers if present).
 5. Sign: EHAL grid **+** = import, ESS **+** = discharge. If marq24 uses the

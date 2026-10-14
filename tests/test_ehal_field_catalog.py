@@ -7,6 +7,7 @@ from ehal.field_catalog import (
     STATIC_HUB_MAP_FIELDS,
     TELEMETRY_BINARY_OPTIONAL,
     TELEMETRY_ENERGY_OPTIONAL,
+    TELEMETRY_ESS_SOC_KIND,
     TELEMETRY_OPTIONAL_CORE,
     TELEMETRY_OPTIONAL_HA,
     TELEMETRY_OPTIONAL_STATIC_HUB,
@@ -18,7 +19,6 @@ def test_telemetry_required_membership():
     assert TELEMETRY_REQUIRED == (
         "sens_grid_power_active",
         "sens_pv_production_active",
-        "sens_ess_soc",
     )
 
 
@@ -78,8 +78,10 @@ def test_setpoint_and_energy_tuples():
 
 
 def test_ha_map_fields_concatenation():
+    assert TELEMETRY_ESS_SOC_KIND == ("sens_ess_soc",)
     assert HA_MAP_FIELDS == (
         TELEMETRY_REQUIRED
+        + TELEMETRY_ESS_SOC_KIND
         + TELEMETRY_OPTIONAL_HA
         + TELEMETRY_BINARY_OPTIONAL
         + TELEMETRY_ENERGY_OPTIONAL
@@ -89,7 +91,10 @@ def test_ha_map_fields_concatenation():
 
 def test_static_hub_map_fields_concatenation():
     assert STATIC_HUB_MAP_FIELDS == (
-        TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL_STATIC_HUB + SETPOINT_FIELDS
+        TELEMETRY_REQUIRED
+        + TELEMETRY_ESS_SOC_KIND
+        + TELEMETRY_OPTIONAL_STATIC_HUB
+        + SETPOINT_FIELDS
     )
 
 

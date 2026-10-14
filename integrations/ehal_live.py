@@ -426,8 +426,11 @@ def reset_adapter_cache() -> None:
 
 
 def read_ess_soc() -> float | None:
+    """Primary house-battery SoC (%) via entity-scoped path only."""
+    from house_config.powerstation import primary_house_battery
+
     try:
-        telemetry = prepare_live_telemetry(get_adapter().read_telemetry())
+        by_id = read_ess_soc_by_id()
     except (
         OpenemsHttpError,
         HaHttpError,
@@ -437,12 +440,23 @@ def read_ess_soc() -> float | None:
     ) as exc:
         logger.error("EHAL SoC read failed: %s", exc)
         return None
-    return float(telemetry["sens_ess_soc"])
+    batteries = _mappable_batteries_for_soc()
+    primary = primary_house_battery(batteries)
+    primary_id = str((primary or {}).get("id") or "").strip()
+    if primary_id and primary_id in by_id:
+        return float(by_id[primary_id])
+    if by_id:
+        # Single mapped SoC when primary id is unknown / empty
+        return float(next(iter(by_id.values())))
+    logger.error(
+        "EHAL SoC read failed: missing primary ess.{id}.sens_ess_soc"
+    )
+    return None
 
 
 def _soc_address_for_battery(bat: dict) -> str:
     """Resolve SoC read key: Loxone uses qualified ID; HA uses binding address."""
-    from ehal.ess_fields import binding_address, ess_field
+    from ehal.ess_fields import binding_address
     from ehal.qualified_ids import qualified_battery_id
 
     ess_id = str(bat.get("id") or "").strip()
@@ -450,18 +464,24 @@ def _soc_address_for_battery(bat: dict) -> str:
         return ""
     if is_loxone_backend() or not is_ehal_network_backend():
         return qualified_battery_id(ess_id, "sens_ess_soc")
+    if is_openems_backend():
+        bindings = bat.get("ehal_bindings")
+        if isinstance(bindings, dict):
+            addr = binding_address(bindings, ess_id, "sens_ess_soc")
+            if addr:
+                return addr
+        # Primary OpenEMS channel from adapter config (no plant telemetry key).
+        from house_config.powerstation import primary_house_battery
+
+        primary = primary_house_battery(_mappable_batteries_for_soc())
+        if primary and str(primary.get("id") or "").strip() == ess_id:
+            adapter = get_openems_adapter()
+            return f"{adapter.cfg.ess_component}/Soc"
+        return ""
     bindings = bat.get("ehal_bindings")
     if not isinstance(bindings, dict):
         return ""
-    addr = binding_address(bindings, ess_id, "sens_ess_soc")
-    if addr:
-        return addr
-    # Flat key still stored on some batteries before entity-scoped rewrite
-    return str(
-        bindings.get("sens_ess_soc")
-        or bindings.get(ess_field(ess_id, "sens_ess_soc"))
-        or ""
-    ).strip()
+    return str(binding_address(bindings, ess_id, "sens_ess_soc") or "").strip()
 
 
 def _read_soc_from_address(address: str) -> float | None:
@@ -469,6 +489,16 @@ def _read_soc_from_address(address: str) -> float | None:
     if not addr:
         return None
     try:
+        if is_openems_backend():
+            parts = _openems_channel_parts(addr)
+            if parts is None:
+                return None
+            component, channel = parts
+            adapter = get_openems_adapter()
+            raw = adapter.read_channel(component, channel)
+            if raw is None and channel == "Soc":
+                raw = adapter.read_channel("_sum", "EssSoc")
+            return None if raw is None else float(raw)
         if is_ha_backend():
             adapter = get_ha_adapter()
             entities = getattr(adapter.cfg, "entities", {}) or {}
@@ -557,23 +587,16 @@ def filter_planning_batteries_with_soc(
 def read_ess_soc_by_id() -> dict[str, float]:
     """SoC (%) per mappable battery id; omit when own SoC missing.
 
-    Primary house battery may use plant ``sens_ess_soc`` as its own alias.
-    Secondary house ESS and physical powerstations are never filled from primary.
+    Each battery needs its own ``ess.{{id}}.sens_ess_soc`` (or OpenEMS primary
+    channel for the primary house battery). No plant-flat SoC alias.
     """
-    from house_config.powerstation import primary_house_battery
-
-    plant_soc = read_ess_soc()
     batteries = _mappable_batteries_for_soc()
-    primary = primary_house_battery(batteries)
-    primary_id = str((primary or {}).get("id") or "").strip()
     out: dict[str, float] = {}
     for bat in batteries:
         ess_id = str(bat.get("id") or "").strip()
         if not ess_id:
             continue
         soc = _read_soc_from_address(_soc_address_for_battery(bat))
-        if soc is None and ess_id == primary_id and plant_soc is not None:
-            soc = float(plant_soc)
         if soc is None:
             _warn_soc_missing_once(ess_id)
             continue

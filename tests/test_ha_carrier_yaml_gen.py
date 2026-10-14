@@ -10,7 +10,6 @@ def _minimal_house() -> dict:
             "ehal_bindings": {
                 "sens_grid_power_active": "",
                 "sens_pv_production_active": "",
-                "sens_ess_soc": "",
             }
         },
         "profiles": {},
@@ -20,7 +19,15 @@ def _minimal_house() -> dict:
 def test_carrier_yaml_contains_push_and_status():
     text = build_carrier_yaml(
         _minimal_house(),
-        {"batteries": []},
+        {
+            "batteries": [
+                {
+                    "id": "house",
+                    "type": "house",
+                    "ehal_bindings": {"ess.house.sens_ess_soc": ""},
+                }
+            ]
+        },
         earnie_host="earnie-ha-lab",
         earnie_port=8541,
         token="TEST_TOKEN_12345678",

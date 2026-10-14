@@ -20,7 +20,7 @@ from integrations.loxone_adapter import LoxoneAdapter, LoxoneConfig
 TELEMETRY = {
     "sens_grid_power_active": "sensor.grid",
     "sens_pv_production_active": "sensor.pv",
-    "sens_ess_soc": "sensor.soc",
+    "ess.house.sens_ess_soc": "sensor.soc",
 }
 LIMITS = {
     "set_ess_charge_power_limit": "number.charge",

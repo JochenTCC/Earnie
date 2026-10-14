@@ -25,31 +25,33 @@ def test_read_ess_soc_by_id_no_primary_fallback_for_second_battery():
     ]
 
     def _read(addr: str):
-        if addr == "House_SoC":
+        if addr == "House_SoC" or addr.endswith("sens_ess_soc"):
+            if "pack_b" in addr:
+                return None
             return 55.0
         return None
 
     with patch.object(ehal_live, "_mappable_batteries_for_soc", return_value=batteries), patch.object(
-        ehal_live, "read_ess_soc", return_value=55.0
-    ), patch.object(ehal_live, "_read_soc_from_address", side_effect=_read):
+        ehal_live, "_read_soc_from_address", side_effect=_read
+    ):
         by_id = ehal_live.read_ess_soc_by_id()
 
     assert by_id == {"house": 55.0}
     assert "pack_b" not in by_id
 
 
-def test_read_ess_soc_by_id_primary_plant_alias():
-    """Primary may use plant sens_ess_soc when own binding is empty."""
+def test_read_ess_soc_by_id_no_plant_alias_for_primary():
+    """Primary without own SoC is omitted — no plant-flat alias."""
     ehal_live._soc_missing_warned.clear()
     batteries = [
         {"id": "house", "type": "house", "ehal_bindings": {}},
     ]
     with patch.object(ehal_live, "_mappable_batteries_for_soc", return_value=batteries), patch.object(
-        ehal_live, "read_ess_soc", return_value=42.0
-    ), patch.object(ehal_live, "_read_soc_from_address", return_value=None):
+        ehal_live, "_read_soc_from_address", return_value=None
+    ):
         by_id = ehal_live.read_ess_soc_by_id()
 
-    assert by_id == {"house": 42.0}
+    assert by_id == {}
 
 
 def test_read_ess_soc_by_id_warns_once_per_battery(caplog):
@@ -64,10 +66,8 @@ def test_read_ess_soc_by_id_warns_once_per_battery(caplog):
         },
     ]
     with patch.object(ehal_live, "_mappable_batteries_for_soc", return_value=batteries), patch.object(
-        ehal_live, "read_ess_soc", return_value=50.0
-    ), patch.object(ehal_live, "_read_soc_from_address", return_value=None), caplog.at_level(
-        "WARNING"
-    ):
+        ehal_live, "_read_soc_from_address", return_value=None
+    ), caplog.at_level("WARNING"):
         ehal_live.read_ess_soc_by_id()
         ehal_live.read_ess_soc_by_id()
 

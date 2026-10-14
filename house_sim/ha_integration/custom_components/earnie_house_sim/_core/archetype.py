@@ -199,6 +199,22 @@ def _derived_physics(physics: dict[str, Any]) -> dict[str, float]:
     }
 
 
+def _entity_id_for_kind(entities: dict[str, str], kind: str) -> str:
+    """Resolve a telemetry kind to an HA entity id (flat or ``ess.{id}.{kind}``).
+
+    No Earnie ``ehal`` import — HouseSim core must stay hub-agnostic (S4 pack).
+    """
+    direct = str(entities.get(kind) or "").strip()
+    if direct:
+        return direct
+    suffix = f".{kind}"
+    for key, eid in entities.items():
+        name = str(key or "").strip()
+        if name.endswith(suffix) and name.startswith("ess."):
+            return str(eid or "").strip()
+    return ""
+
+
 def physics_entity_values(
     package: ArchetypePackage, physics: dict[str, Any]
 ) -> dict[str, tuple[float, str]]:
@@ -210,7 +226,7 @@ def physics_entity_values(
     out: dict[str, tuple[float, str]] = {}
     entities = package.ehal_entities
     for field_name, (phys_key, quantity, to_base) in TELEMETRY_PROJECTION.items():
-        entity_id = entities.get(field_name)
+        entity_id = _entity_id_for_kind(entities, field_name)
         if not entity_id or phys_key not in physics:
             continue
         unit = entity_unit(package, entity_id)

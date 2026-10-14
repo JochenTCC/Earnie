@@ -1,6 +1,6 @@
 # EHAL — Earnie Hardware Access Layer (schema_version 4)
 
-**Status:** current (schema_version 4; entity-scoped bindings shipped *(formerly Pattern B)*; `set_ess_source_select` for 2.7.h; role `inverter` (entity-scoped, optional))  
+**Status:** current (schema_version 4; plant-flat `sens_ess_soc` retired — SoC only as `ess.{id}.sens_ess_soc`; entity-scoped bindings shipped *(formerly Pattern B)*; `set_ess_source_select` for 2.7.h; role `inverter` (entity-scoped, optional))  
 **History (backlog):** `2.4.a` (M1) → `2.4.j` (wire rename) → `2.4.k` (entity mapping) → `2.4.o` (Design C1 `set_ess_active_power`) → `2.7.h` (source select) → `2.7.l` (inverter entity)  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 §2.2, §2.5 Phase 1, §2.6  
 **Canonical field names:** `[docs/ui/ehal-com.md](../ui/ehal-com.md)` §B / §C  
@@ -122,7 +122,7 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), and Live 
 | `sens_grid_power_active`      | yes      | W      | PCC active power; sign as above                                                                            |
 | `sens_pv_production_active`   | yes*     | W      | ≥ 0; *optional when derived from complete grid-tied inv/pv maps                                            |
 | `pv.{id}.sens_pv_production_active` | no | W | ≥ 0; optional per-PV-system DC power (entity-scoped) |
-| `sens_ess_soc`                | yes      | %      | Home battery SoC                                                                                           |
+| `ess.{id}.sens_ess_soc`       | Live yes | %      | Home battery SoC; **not** on the plant telemetry document (entity-scoped binding / push only)              |
 | `sens_ess_power`              | no       | W      | Optional; sign as above                                                                                    |
 | `sens_evcs_active_power`      | no       | W      | ≥ 0 when present                                                                                           |
 | `sens_power_consumers`        | no       | W      | House load; mapped binding or derive                                                                       |
@@ -286,7 +286,7 @@ Machine schema: `[share/ehal/capabilities.schema.json](../../share/ehal/capabili
 | Faster internal polling                    | Allowed inside the adapter                                                                                       |
 | Stale samples                              | Core must tolerate unchanged values until the next sample; adapters should still refresh `ts` when re-publishing |
 | Missing **optional** telemetry             | Omit field or set `null` per schema (`sens_ess_power`, `sens_evcs_`*, …)                                         |
-| Missing **required** `sens_ess_soc` (Live) | Abort the Live run (same hard requirement as today’s house SOC)                                                  |
+| Missing primary `ess.{id}.sens_ess_soc` (Live) | Abort the Live run (house SoC is entity-scoped only; no plant-flat alias)                                     |
 | Missing required power telemetry           | Do not invent zeros; surface error / skip overlay as documented by the Live path                                 |
 
 
@@ -325,7 +325,7 @@ Machine schema: `[share/ehal/write_error.schema.json](../../share/ehal/write_err
 | Situation                      | Behavior                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------ |
 | Optional telemetry absent      | Omit / null; Core continues                                              |
-| Required `sens_ess_soc` absent | Live abort                                                               |
+| Primary `ess.{id}.sens_ess_soc` absent | Live abort                                                         |
 | Setpoint write fails           | Log + capability degrade + Write-Error-Telemetry; optimizer continues    |
 | Capability false from start    | Skip writes for that family; no repeated error spam beyond periodic hint |
 | Schema validation fail         | Reject document; adapter must not pass invalid JSON to Core              |
@@ -342,7 +342,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sens_grid_power_active`        | `_sum/GridActivePower` (normalize: `+` = import)                                                                                            |
 | `sens_pv_production_active`     | `_sum/ProductionActivePower`                                                                                                                |
-| `sens_ess_soc`                  | `ess0/Soc` / `_sum/EssSoc`                                                                                                                  |
+| `ess.{id}.sens_ess_soc`         | `ess0/Soc` / `_sum/EssSoc` (primary; not on plant telemetry doc)                                                                              |
 | `sens_ess_power`                | ESS ActivePower (OpenEMS sign; already EHAL-aligned)                                                                                        |
 | `sens_evcs_active_power`        | EVCS / EVSE active power channels                                                                                                           |
 | `set_ess_active_power`          | e.g. `SetActivePowerEquals` (signed W; omit on Automatik)                                                                                   |

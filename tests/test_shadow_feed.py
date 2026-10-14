@@ -189,7 +189,7 @@ def test_superset_ha_fetches_missing(tmp_path, monkeypatch):
         monkeypatch,
         adapter=adapter,
         entities={
-            "sens_ess_soc": "sensor.soc",
+            "ess.house.sens_ess_soc": "sensor.soc",
             "sens_grid_power_active": "sensor.grid",
         },
     )

@@ -1,6 +1,6 @@
 # Plant topology and metering — conclusion
 
-**Status:** Decided on the §8 questions (2026-10-12); backlog items filed under Version 2.7 as epic **Topology** P1–P5 ([`Backlog.md`](Backlog.md)); nothing is implemented.
+**Status:** Decided on the §8 questions (2026-10-12); backlog items filed as epic **Topology** P1–P5 ([`Backlog.md`](Backlog.md)); P1 implemented; since 2026-10-14 P2 stays in Version 2.7 and P3–P5 are in Version 2.+1 (§8.7).
 **Date:** 2026-10-12
 **Inputs:** [`Plant-Topology-Theses.md`](Plant-Topology-Theses.md), [`Plant-Topology-Theses-Review-Claude.md`](Plant-Topology-Theses-Review-Claude.md), [`Plant-Topology-Theses-Review-Grok.md`](Plant-Topology-Theses-Review-Grok.md), [`docs/spec/ehal.md`](../docs/spec/ehal.md), [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md), [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md). Every **[code]** claim below was re-read in this repository (file:line); vendor/forum sources were not re-checked.
 **Author:** Claude Fable 5.1 (`claude-fable-5-1`), run in Claude Code against this repository.
@@ -197,6 +197,7 @@ All Tier 1 fields are additive → `earnie_data_model` stays **4**; where an exi
 4. **Naming:** the entity is the **balance node** (German *Bilanzierungspunkt*, with n *connections* / Anschlüsse, typically 2–4); `balance_nodes[]`, `node_id`, wire `node.<id>.sens_node_*`; root stays `grid.meter.*`. No `meters[]` and no `meter.<id>` namespace.
 5. **Backlog:** epic **Topology** P1–P5 under Version 2.7, next to the Inverter follow-ups.
 6. **Data model:** stays 4; one-shot migration scripts with fail-fast loaders wherever an existing config changes shape.
+7. **Release scope (2026-10-14, supersedes the "all under 2.7" part of 5):** P1 is done and running on the productive plant. Version 2.7 keeps **P2** (fail-loud live balance) and the powerstation wording follow-up; **P3–P5** move to Version 2.+1. Reason: P3/P4 only widen what Earnie accepts (several house ESS, foreign regulator), which the productive plant does not need and P1 rejects on the live path; P4 changes the MILP and should be guarded by the Regression epic; P5 buys attribution only. The `ac_connection: island` rename travels with P5.
 
 ---
 

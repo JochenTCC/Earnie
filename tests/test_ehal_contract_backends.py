@@ -43,7 +43,7 @@ def _config_side_effect(backend: str):
         "EHAL_HA_ENTITIES": {
             "sens_grid_power_active": "sensor.grid",
             "sens_pv_production_active": "sensor.pv",
-            "sens_ess_soc": "sensor.soc",
+            "ess.house.sens_ess_soc": "sensor.soc",
             "sens_ess_power": "sensor.ess",
             "set_ess_charge_power_limit": "number.charge",
             "set_ess_discharge_power_limit": "number.discharge",

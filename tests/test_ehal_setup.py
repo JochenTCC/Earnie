@@ -239,7 +239,7 @@ def test_build_telemetry_rows():
             "sens_grid_power_active": 100,
         },
         "t0",
-        mapping={"sens_ess_soc": "sensor.soc"},
+        mapping={"ess.house.sens_ess_soc": "sensor.soc"},
         expected_fields=["sens_ess_soc", "sens_grid_power_active"],
     )
     assert len(rows) == 2

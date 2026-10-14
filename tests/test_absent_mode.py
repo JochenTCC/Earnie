@@ -329,7 +329,7 @@ def test_ha_all_fields_includes_absent_mode():
     house = {
         "plant": {
             "ehal_bindings": {
-                "sens_ess_soc": "sensor.soc",
+                "ess.house.sens_ess_soc": "sensor.soc",
                 "sens_absent_mode": "binary_sensor.holiday",
             }
         },

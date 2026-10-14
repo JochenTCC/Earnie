@@ -50,7 +50,6 @@ def test_valid_telemetry_with_optional_fields():
     doc = _envelope(
         sens_grid_power_active=1500.0,
         sens_pv_production_active=3200.0,
-        sens_ess_soc=55.0,
         sens_ess_power=-800.0,
         sens_evcs_active_power=11000.0,
         sens_power_consumers=2500.0,
@@ -59,13 +58,13 @@ def test_valid_telemetry_with_optional_fields():
     assert out["sens_grid_power_active"] == 1500.0
     assert out["sens_ess_power"] == -800.0
     assert out["sens_power_consumers"] == 2500.0
+    assert "sens_ess_soc" not in out
 
 
 def test_telemetry_allows_grid_export_negative():
     doc = _envelope(
         sens_grid_power_active=-2200.0,
         sens_pv_production_active=4000.0,
-        sens_ess_soc=80.0,
     )
     assert validate_telemetry(doc)["sens_grid_power_active"] == -2200.0
 
@@ -74,26 +73,25 @@ def test_telemetry_rejects_negative_pv():
     doc = _envelope(
         sens_grid_power_active=0.0,
         sens_pv_production_active=-1.0,
-        sens_ess_soc=50.0,
     )
     with pytest.raises(EhalValidationError):
         validate_telemetry(doc)
 
 
-def test_telemetry_rejects_missing_ess_soc():
+def test_telemetry_allows_missing_plant_soc():
+    """Plant telemetry no longer requires flat sens_ess_soc (flat SoC retired)."""
     doc = _envelope(
         sens_grid_power_active=0.0,
         sens_pv_production_active=0.0,
     )
-    with pytest.raises(EhalValidationError):
-        validate_telemetry(doc)
+    assert validate_telemetry(doc)["sens_pv_production_active"] == 0.0
 
 
-def test_telemetry_rejects_soc_out_of_range():
+def test_telemetry_rejects_flat_soc_property():
     doc = _envelope(
         sens_grid_power_active=0.0,
         sens_pv_production_active=0.0,
-        sens_ess_soc=101.0,
+        sens_ess_soc=55.0,
     )
     with pytest.raises(EhalValidationError):
         validate_telemetry(doc)
@@ -178,16 +176,26 @@ def test_canonicalize_ha_entity_keys_passes_through_canonical_names():
     mapped = canonicalize_ha_entity_keys(
         {
             "sens_grid_power_active": "sensor.grid",
-            "sens_ess_soc": "sensor.soc",
+            "ess.house.sens_ess_soc": "sensor.soc",
             "sens_pv_production_active": "sensor.pv",
             "sens_ess_power": "",
         }
     )
     assert mapped == {
         "sens_grid_power_active": "sensor.grid",
-        "sens_ess_soc": "sensor.soc",
+        "ess.house.sens_ess_soc": "sensor.soc",
         "sens_pv_production_active": "sensor.pv",
     }
+
+
+def test_canonicalize_ha_entity_keys_rejects_flat_soc():
+    with pytest.raises(ValueError, match="sens_ess_soc"):
+        canonicalize_ha_entity_keys(
+            {
+                "sens_grid_power_active": "sensor.grid",
+                "sens_ess_soc": "sensor.soc",
+            }
+        )
 
 
 def test_canonicalize_ha_entity_keys_rejects_removed_unprefixed_names():
@@ -195,6 +203,6 @@ def test_canonicalize_ha_entity_keys_rejects_removed_unprefixed_names():
         canonicalize_ha_entity_keys(
             {
                 "grid_power_active": "sensor.grid",
-                "sens_ess_soc": "sensor.soc",
+                "ess.house.sens_ess_soc": "sensor.soc",
             }
         )

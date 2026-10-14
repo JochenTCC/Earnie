@@ -38,7 +38,7 @@ def _sample_house() -> dict:
             "ehal_bindings": {
                 "sens_grid_power_active": "sensor.grid",
                 "sens_pv_production_active": "sensor.pv",
-                "sens_ess_soc": "sensor.soc",
+                "ess.house.sens_ess_soc": "sensor.soc",
             }
         },
         "profiles": {
@@ -83,7 +83,7 @@ def test_ha_consumer_fields_unchanged():
 
 def test_proposed_entity_id_reads_nested_and_ignores_junk():
     assert _proposed_entity_id({}, "sens_ess_soc") == ""
-    assert _proposed_entity_id({"sens_ess_soc": "sensor.x"}, "sens_ess_soc") == ""
+    assert _proposed_entity_id({"ess.house.sens_ess_soc": "sensor.x"}, "sens_ess_soc") == ""
     assert (
         _proposed_entity_id(
             {"sens_ess_soc": {"entity_id": " sensor.soc ", "score": 1}},
@@ -115,7 +115,7 @@ def test_field_select_caption_marks_required():
 
 
 def test_validate_mapping_save_requires_plant_telemetry():
-    err = _validate_mapping_save(PLANT_ENTITY_ID, {"sens_ess_soc": "sensor.soc"})
+    err = _validate_mapping_save(PLANT_ENTITY_ID, {"ess.house.sens_ess_soc": "sensor.soc"})
     assert err is not None and "Pflichtfelder fehlen" in err
     for name in PLANT_TELEMETRY_REQUIRED:
         assert name in err
@@ -141,13 +141,13 @@ def test_validate_mapping_save_requires_plant_telemetry():
 
 
 def test_persist_ha_ess_force_write_and_clear():
-    house = {"plant": {"ehal_bindings": {"sens_ess_soc": "sensor.soc"}}}
+    house = {"plant": {"ehal_bindings": {"ess.house.sens_ess_soc": "sensor.soc"}}}
     with_force = _persist_ha_ess_force(
         house,
         {"driver": "huawei_solar", "device_id": "dev-1", "duration_min": 20},
     )
     assert with_force["plant"]["ha_ess_force"]["device_id"] == "dev-1"
-    assert with_force["plant"]["ehal_bindings"]["sens_ess_soc"] == "sensor.soc"
+    assert with_force["plant"]["ehal_bindings"]["ess.house.sens_ess_soc"] == "sensor.soc"
     cleared = _persist_ha_ess_force(with_force, None)
     assert "ha_ess_force" not in cleared["plant"]
     empty = _persist_ha_ess_force({"other": 1}, None)
@@ -184,10 +184,10 @@ def test_adapter_from_form_requires_resolved_credentials(monkeypatch):
     with pytest.raises(ValueError, match="URL und Token"):
         ha_map._adapter_from_form("", "", {})
     adapter = ha_map._adapter_from_form(
-        "http://ha.local:8123", "tok", {"sens_ess_soc": "sensor.soc"}
+        "http://ha.local:8123", "tok", {"ess.house.sens_ess_soc": "sensor.soc"}
     )
     assert adapter.cfg.base_url == "http://ha.local:8123"
-    assert adapter.cfg.entities["sens_ess_soc"] == "sensor.soc"
+    assert adapter.cfg.entities["ess.house.sens_ess_soc"] == "sensor.soc"
 
 
 def test_clear_map_widget_keys_drops_session_entries(monkeypatch):
@@ -212,7 +212,7 @@ def test_ha_apply_entity_bindings_per_entity():
         bindings={
             "sens_grid_power_active": "sensor.grid2",
             "sens_pv_production_active": "sensor.pv",
-            "sens_ess_soc": "sensor.soc",
+            "ess.house.sens_ess_soc": "sensor.soc",
             "sens_pv_energy": "sensor.pv_energy",
         },
     )

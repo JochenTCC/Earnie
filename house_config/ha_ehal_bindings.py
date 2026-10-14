@@ -215,15 +215,19 @@ def aggregate_ha_entities(
         for key, value in entity_scoped_battery_bindings(batteries).items():
             if value and key not in out:
                 out[key] = value
-    # Plant may still hold flat ESS entity ids (HA) until migrate_ess_bindings_once;
-    # never invent flat aliases from battery entity-scoped (merge retired).
+    # Plant may still hold flat ESS entity ids (HA) until migrate_ess_bindings_once,
+    # or entity-scoped ess.{id}.* left on plant by HA flat-map migrate.
+    # Flat sens_ess_soc / plant Quellenwahl are never re-emitted.
+    from ehal.ess_fields import is_ess_entity_scoped_field
+
     for field, value in plant_bindings.items():
-        if (
-            is_plant_flat_ess_field(field)
-            and field != "set_ess_source_select"
-            and field not in out
-            and (value or weg_b)
-        ):
+        if field in ("sens_ess_soc", "set_ess_source_select") or field in out:
+            continue
+        if not (value or weg_b):
+            continue
+        if is_plant_flat_ess_field(field):
+            out[field] = value
+        elif is_ess_entity_scoped_field(field):
             out[field] = value
     return canonicalize_ha_entity_keys(out, keep_empty=weg_b)
 
@@ -300,6 +304,8 @@ def apply_ha_entities_to_house(
     canonical = canonicalize_ha_entity_keys(
         {str(k): str(v) for k, v in (entities or {}).items() if _nonempty(v)}
     )
+    from ehal.ess_fields import is_ess_entity_scoped_field
+
     plant = _ensure_plant(house)
     plant_bindings = _binding_map(plant.get("ehal_bindings"))
     for field in HA_PLANT_FIELDS:
@@ -307,6 +313,10 @@ def apply_ha_entities_to_house(
             plant_bindings[field] = canonical[field]
         else:
             plant_bindings.pop(field, None)
+    # Entity-scoped ESS keys (e.g. ess.{id}.sens_ess_soc) are not in HA_PLANT_FIELDS.
+    for field, eid in canonical.items():
+        if is_ess_entity_scoped_field(field):
+            plant_bindings[field] = eid
 
     ev_consumer = find_first_ev_consumer(house)
     if ev_consumer is not None:

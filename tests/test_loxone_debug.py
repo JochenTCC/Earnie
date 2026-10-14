@@ -377,7 +377,7 @@ def test_build_telemetry_rows_filters_and_maps():
             "sens_grid_power_active": 100,
         },
         "t0",
-        mapping={"sens_ess_soc": "sensor.soc", "sens_grid_power_active": "sensor.grid"},
+        mapping={"ess.house.sens_ess_soc": "sensor.soc", "sens_grid_power_active": "sensor.grid"},
         expected_fields=["sens_ess_soc", "sens_grid_power_active"],
     )
     assert len(rows) == 2
@@ -393,7 +393,7 @@ def test_build_telemetry_rows_pads_unmapped_expected():
     rows = build_telemetry_rows(
         {"sens_ess_soc": 10.0},
         "t0",
-        mapping={"sens_ess_soc": "sensor.soc"},
+        mapping={"ess.house.sens_ess_soc": "sensor.soc"},
         expected_fields=["sens_ess_soc", "sens_grid_power_active"],
     )
     assert len(rows) == 2
@@ -481,7 +481,8 @@ def test_expected_live_read_fields_include_plant_ambient():
         fields = expected_live_read_fields(network_backend=False)
     assert "sens_temperature_outside" in fields
     assert "sens_absent_mode" in fields
-    assert "sens_ess_soc" in fields
+    # Plant-flat SoC retired (flat SoC retired); without batteries there is no SoC row.
+    assert "sens_ess_soc" not in fields
     assert "grid.meter.sens_grid_power_active" in fields
     assert "grid.meter.sens_grid_energy_import" in fields
     assert "grid.meter.sens_grid_energy_export" in fields

@@ -51,7 +51,7 @@ Optional für Slot-Ist (ΔkWh → mittlere kW): auf der Anlage `sens_pv_energy` 
 Voraussetzung: Integration **evcc☀️🚘- Solar Charging** zeigt Geräte unter **Einstellungen → Geräte & Dienste**, URL im Lab `http://evcc:7070`.
 
 1. In HA **Entwicklerwerkzeuge → Zustände** die exakten `entity_id`s notieren (Filter z. B. `evcc`). Mit dem Lab-Stub (`ha_lab/evcc/evcc.yaml`) sind Leistungen oft **0 W**, SoC **50 %** — das reicht für den Pfadnachweis.
-2. Mindestens zuordnen: Netzleistung → `sens_grid_power_active`, PV → `sens_pv_production_active`, Batterie-SoC → `sens_ess_soc`. Optional: Batterie-/Ladeleistung, Maxstrom (`number`).
+2. Mindestens zuordnen: Netzleistung → `sens_grid_power_active`, PV → `sens_pv_production_active`, Batterie-SoC → `ess.{id}.sens_ess_soc` (auf der Batterie-Entity, nicht plant-flat). Optional: Batterie-/Ladeleistung, Maxstrom (`number`).
 3. Earnie http://localhost:8506 → **Smarthome-Backend** → Backend **Home Assistant** mit URL/Token verbinden (setzt `ehal.backend=ha`) → **EHAL-Com** → **HA Entity → EHAL Mapping** → scannen → Entity wählen → zuweisen → **Telemetrie testen** → **Mapping speichern**.
 4. Vorzeichen: EHAL Netz **+** = Bezug, ESS **+** = Entladen; bei abweichender Integration **negate** (weiterhin unter `ehal.ha.sign`).
 5. Erfolg: Telemetrie-Test OK, `config.json` mit `ehal.backend=ha`, Bindings im Hausprofil, Live ohne „Kein Zugriff auf EHAL SoC“.

@@ -7,6 +7,7 @@ from typing import NotRequired, TypedDict
 EHAL_SCHEMA_VERSION = 4
 
 # Legacy M1 unprefixed telemetry names — rejected, no longer remapped to §C.
+# Flat plant SoC is also rejected: use ess.{id}.sens_ess_soc.
 REMOVED_TELEMETRY_FIELD_NAMES: frozenset[str] = frozenset(
     {
         "grid_power_active",
@@ -14,6 +15,7 @@ REMOVED_TELEMETRY_FIELD_NAMES: frozenset[str] = frozenset(
         "ess_soc",
         "ess_power",
         "evcs_active_power",
+        "sens_ess_soc",
     }
 )
 
@@ -30,7 +32,6 @@ class EhalTelemetry(TypedDict):
     adapter_id: str
     sens_grid_power_active: float
     sens_pv_production_active: float
-    sens_ess_soc: float
     sens_ess_power: NotRequired[float | None]
     sens_evcs_active_power: NotRequired[float | None]
     sens_power_consumers: NotRequired[float | None]
@@ -99,7 +100,8 @@ def canonicalize_ha_entity_keys(
     if removed:
         raise ValueError(
             "Kritischer Konfigurationsfehler: entfernte EHAL-Feldnamen "
-            f"{', '.join(removed)} — kanonische §C-Namen (sens_*/set_*/get_*) verwenden."
+            f"{', '.join(removed)} — kanonische §C-Namen (sens_*/set_*/get_*) verwenden; "
+            "SoC nur als ess.{id}.sens_ess_soc."
         )
     out: dict[str, str] = {}
     for key, value in entities.items():

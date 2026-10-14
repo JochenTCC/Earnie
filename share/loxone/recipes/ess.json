@@ -5,9 +5,9 @@
   "recommended_markers": [
     {
       "ehal_field": "sens_ess_soc",
-      "loxone_blocks_key": "plant.ehal_bindings.sens_ess_soc",
+      "loxone_blocks_key": "batteries[].ehal_bindings.ess.{id}.sens_ess_soc",
       "suggested_name": "Earnie_Batterie_SoC",
-      "notes": "SoC in %."
+      "notes": "SoC in %; entity-scoped on batteries[]."
     },
     {
       "ehal_field": "sens_ess_power",

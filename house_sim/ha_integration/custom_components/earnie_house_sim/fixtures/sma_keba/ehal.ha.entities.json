@@ -2,7 +2,7 @@
   "entities": {
     "sens_grid_power_active": "sensor.netzleistung",
     "sens_pv_production_active": "sensor.sn_3012345678_pv_power",
-    "sens_ess_soc": "sensor.sn_3012345678_battery_soc_total",
+    "ess.house.sens_ess_soc": "sensor.sn_3012345678_battery_soc_total",
     "sens_ess_power": "sensor.batterieleistung",
     "sens_evcs_active_power": "sensor.keba_p30_charging_power",
     "sens_pv_energy": "sensor.sn_3012345678_total_yield",

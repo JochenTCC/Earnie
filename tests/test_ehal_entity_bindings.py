@@ -141,7 +141,7 @@ def test_ensure_migrated_refuses_plant_flat_ess_when_batteries_exist(
         lambda: str(path),
     )
     house = {"plant": {"ehal_bindings": {"sens_ess_soc": "Battery_SOC"}}}
-    with pytest.raises(ValueError, match="plant-flat ESS"):
+    with pytest.raises(ValueError, match="retired flat sens_ess_soc|plant-flat ESS"):
         ensure_migrated(house, {})
 
 

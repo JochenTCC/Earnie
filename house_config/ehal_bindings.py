@@ -565,8 +565,15 @@ def ensure_migrated(
     from runtime_store.migrate_v4 import residual_plant_flat_ess_keys
 
     residual_flat = residual_plant_flat_ess_keys(house)
-    # Fail only when batteries exist to hold entity-scoped — HA-only installs may
-    # still store flat ESS on plant until migrate_ess_bindings_once runs.
+    # Flat plant SoC is always illegal (schema_version 4); other plant-flat ESS
+    # fail when batteries exist to hold entity-scoped keys.
+    if "sens_ess_soc" in residual_flat:
+        raise ValueError(
+            "plant.ehal_bindings still has retired flat sens_ess_soc. "
+            "Use ess.{id}.sens_ess_soc on batteries[].ehal_bindings. "
+            "Run: python -m scripts.migrate_ess_bindings_once "
+            "--config-dir <config dir>"
+        )
     if residual_flat and mappable_batteries():
         raise ValueError(
             "plant.ehal_bindings still has plant-flat ESS keys "

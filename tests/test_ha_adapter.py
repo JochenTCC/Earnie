@@ -22,7 +22,7 @@ def _cfg(**kwargs) -> HaConfig:
         entities={
             "sens_grid_power_active": "sensor.grid_power",
             "sens_pv_production_active": "sensor.pv_power",
-            "sens_ess_soc": "sensor.battery_soc",
+            "ess.house.sens_ess_soc": "sensor.battery_soc",
             "sens_ess_power": "sensor.battery_power",
             "sens_evcs_active_power": "sensor.evcs_power",
             "set_ess_active_power": "input_number.ess_active_power_w",
@@ -113,7 +113,7 @@ def test_read_telemetry_normalizes(get_mock):
     telemetry = adapter.read_telemetry()
     assert telemetry["sens_grid_power_active"] == 100.0
     assert telemetry["sens_pv_production_active"] == 500.0
-    assert telemetry["sens_ess_soc"] == 55.0
+    assert "sens_ess_soc" not in telemetry
     assert telemetry["sens_ess_power"] == -200.0
     assert telemetry["sens_evcs_active_power"] == 1200.0
     # PV 500 + import 100 − charge 200
@@ -312,7 +312,7 @@ def test_read_telemetry_rejects_energy_entity_on_power_field(get_mock):
             entities={
                 "sens_grid_power_active": "sensor.grid_power",
                 "sens_pv_production_active": "sensor.pv_power",
-                "sens_ess_soc": "sensor.battery_soc",
+                "ess.house.sens_ess_soc": "sensor.battery_soc",
             }
         )
     )

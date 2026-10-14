@@ -27,8 +27,8 @@ PLANT_HOUSE_LIVE_READ_FIELDS: tuple[str, ...] = (
 )
 
 # Bare plant ESS kinds — Live rows only when no ehal-mappable battery exists.
+# SoC is never plant-flat (schema_version 4); only entity-scoped ess.{id}.sens_ess_soc.
 PLANT_ESS_LIVE_READ_KINDS: tuple[str, ...] = (
-    "sens_ess_soc",
     "sens_ess_power",
     "get_ess_soc_min",
     "get_ess_soc_max",
@@ -40,7 +40,6 @@ PLANT_ESS_LIVE_READ_KINDS: tuple[str, ...] = (
 PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_grid_power_active",
     "sens_pv_production_active",
-    "sens_ess_soc",
     "sens_ess_power",
     "sens_power_consumers",
     "sens_temperature_outside",
@@ -566,7 +565,6 @@ def openems_telemetry_mapping(
     return {
         "sens_grid_power_active": "_sum/GridActivePower",
         "sens_pv_production_active": "_sum/ProductionActivePower",
-        "sens_ess_soc": f"{ess}/Soc",
         "sens_ess_power": f"{ess}/ActivePower",
         "sens_evcs_active_power": f"{evcs}/ActivePower",
         "sens_power_consumers": _MAPPING_DERIVED,

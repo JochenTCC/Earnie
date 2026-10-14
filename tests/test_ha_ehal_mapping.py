@@ -50,7 +50,12 @@ def test_evcc_en_empty_map_matches_golden():
     rows = _scan_rows_from_fixture(pkg.entities)
     proposals = heuristic_propose(rows)
     proposed = {field: entry["entity_id"] for field, entry in proposals.items()}
-    assert proposed == pkg.ehal_entities
+    # Propose uses kind keys; golden may store SoC as ess.{id}.sens_ess_soc.
+    golden_kinds = {
+        ("sens_ess_soc" if k.endswith(".sens_ess_soc") else k): v
+        for k, v in pkg.ehal_entities.items()
+    }
+    assert proposed == golden_kinds
     assert "sensor.house_sim_buffer_temp" not in proposed.values()
     assert all(not eid.startswith("switch.") for eid in proposed.values())
 

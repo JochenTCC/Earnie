@@ -54,8 +54,15 @@ _memory: dict[str, dict[str, Any]] = {}
 _last_known: dict[str, tuple[float, datetime]] = {}
 
 
+# Plant-flat SoC retired (schema_version 4); push only ess.{id}.sens_ess_soc.
+_RETIRED_PLANT_FLAT_PUSH_IDS: frozenset[str] = frozenset({"sens_ess_soc"})
+
+
 def is_valid_ehal_id(ehal_id: object) -> bool:
-    return bool(_ID_PATTERN.match(str(ehal_id or "")))
+    text = str(ehal_id or "")
+    if text in _RETIRED_PLANT_FLAT_PUSH_IDS:
+        return False
+    return bool(_ID_PATTERN.match(text))
 
 
 def parse_push_value(raw: object) -> float | None:

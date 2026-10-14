@@ -92,7 +92,7 @@ def test_char_read_telemetry_kw_to_w_and_pv_clamp(fetch_mock) -> None:
         qualified_plant_id("sens_grid_power_active"): -1.2,
     }.get
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
-    assert telemetry["sens_ess_soc"] == 55.0
+    assert "sens_ess_soc" not in telemetry
     assert telemetry["sens_pv_production_active"] == 0.0
     assert telemetry["sens_grid_power_active"] == pytest.approx(-1200.0)
     assert telemetry["sens_ess_power"] == pytest.approx(500.0)
@@ -101,7 +101,7 @@ def test_char_read_telemetry_kw_to_w_and_pv_clamp(fetch_mock) -> None:
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
 def test_char_required_marker_missing_raises(fetch_mock) -> None:
     fetch_mock.return_value = None
-    with pytest.raises(LoxoneAdapterError, match="sens_ess_soc"):
+    with pytest.raises(LoxoneAdapterError, match="sens_pv_production_active|sens_grid_power_active|sens_ess_power"):
         LoxoneAdapter(_cfg()).read_telemetry()
 
 
@@ -229,13 +229,12 @@ def test_char_read_ess_soc_by_id_secondary_no_primary_fallback() -> None:
     assert "pack_b" not in by_id
 
 
-def test_char_read_ess_soc_by_id_primary_plant_alias() -> None:
+def test_char_read_ess_soc_by_id_no_plant_alias() -> None:
     ehal_live._soc_missing_warned.clear()
     batteries = [{"id": "house", "type": "house", "ehal_bindings": {}}]
 
     with (
         patch.object(ehal_live, "_mappable_batteries_for_soc", return_value=batteries),
-        patch.object(ehal_live, "read_ess_soc", return_value=42.0),
         patch.object(
             ehal_live.loxone_client,
             "fetch_loxone_generic_value",
@@ -244,7 +243,7 @@ def test_char_read_ess_soc_by_id_primary_plant_alias() -> None:
     ):
         by_id = ehal_live.read_ess_soc_by_id()
 
-    assert by_id == {"house": 42.0}
+    assert by_id == {}
 
 
 # ---------------------------------------------------------------------------
@@ -305,18 +304,20 @@ def _seed_required_push(*, soc: str | None = "55", now: datetime | None = None) 
     inbox.record_push(qualified_plant_id("sens_grid_power_active"), "0", now=ref)
 
 
-def test_char_push_missing_required_soc_raises(
+def test_char_push_missing_soc_still_reads_plant_telemetry(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Plant telemetry no longer requires SoC (flat SoC retired)."""
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     inbox.reset_memory_for_tests()
     _install_push_indexes(monkeypatch)
     _seed_required_push(soc=None)
-    with pytest.raises(LoxoneAdapterError, match="sens_ess_soc"):
-        LoxoneAdapter(_cfg()).read_telemetry()
+    telemetry = LoxoneAdapter(_cfg()).read_telemetry()
+    assert "sens_ess_soc" not in telemetry
+    assert telemetry["sens_pv_production_active"] == pytest.approx(0.0)
 
 
-def test_char_push_stale_required_soc_past_last_known_raises(
+def test_char_push_stale_soc_still_reads_plant_telemetry(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
@@ -324,10 +325,10 @@ def test_char_push_stale_required_soc_past_last_known_raises(
     _install_push_indexes(monkeypatch)
     old = _now() - timedelta(minutes=6)
     _seed_required_push(soc="55", now=old)
-    # Fresh heartbeat so link is alive; SoC row stays stale past last-known window.
+    # Fresh heartbeat so link is alive; SoC row stays stale — plant read still ok.
     inbox.record_push("heartbeat", "1", now=_now())
-    with pytest.raises(LoxoneAdapterError, match="sens_ess_soc"):
-        LoxoneAdapter(_cfg()).read_telemetry()
+    telemetry = LoxoneAdapter(_cfg()).read_telemetry()
+    assert "sens_ess_soc" not in telemetry
 
 
 def test_char_push_missing_optional_ess_soc_min_omitted(
@@ -338,5 +339,5 @@ def test_char_push_missing_optional_ess_soc_min_omitted(
     _install_push_indexes(monkeypatch)
     _seed_required_push()
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
-    assert telemetry["sens_ess_soc"] == pytest.approx(55.0)
+    assert "sens_ess_soc" not in telemetry
     assert "get_ess_soc_min" not in telemetry

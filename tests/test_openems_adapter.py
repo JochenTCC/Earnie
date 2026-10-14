@@ -72,7 +72,8 @@ def test_read_telemetry_normalizes(get_mock):
     telemetry = adapter.read_telemetry()
     assert telemetry["sens_grid_power_active"] == 100.0
     assert telemetry["sens_pv_production_active"] == 500.0
-    assert telemetry["sens_ess_soc"] == 55.0
+    assert "sens_ess_soc" not in telemetry
+    assert adapter.read_ess_soc_pct() == pytest.approx(55.0)
     assert telemetry["sens_ess_power"] == 200.0
     assert telemetry["sens_evcs_active_power"] == 1200.0
     # EHAL: PV 500 + import 100 + discharge 200

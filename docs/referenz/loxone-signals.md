@@ -239,7 +239,7 @@ Checking all configured signals:
 
 | Entity / area                                                          | Storage location                              | Typical EHAL fields / roles                                                                                                                               |
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Plant (battery, PV, grid, control command, house load, outside temp., absent)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers`, `set_ess_*` |
+| Plant (PV, grid, house load, outside temp., absent; ESS power/setpoints via primary battery)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers` (SoC: `batteries[].ehal_bindings` → `ess.{slug}.sens_ess_soc`) |
 | Request Optimize (ad hoc)                                               | Loxone VO → daemon HTTP                       | `Earnie_Request_Optimize` on port `system.ehal_loxone_http_port` (default **8541**)                                                                       |
 | Heat pump / Flex / Thermal                                              | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`                                                                                                  |
 | EV (`ev`)                                                                | `consumers[].ehal_bindings`                   | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*`                                                                                                                  |
@@ -255,7 +255,7 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 
 | EHAL field                       | Direction | Default name                                   | Value / unit                                                                            |
 | ---------------------------------- | --------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `sens_ess_soc`                    | Read      | `Earnie_Batterie_SoC`                            | Battery SoC, %                                                                             |
+| `ess.{slug}.sens_ess_soc`         | Read      | `Earnie_Batterie_SoC` / `Earnie_Batterie_<Slug>_SoC` | Battery SoC, % (entity-scoped; not plant-flat)                                          |
 | `sens_pv_production_active`       | Read      | `Earnie_PV_Leistung` (or EFM production)         | PV power, kW                                                                                |
 | `sens_ess_power`                  | Read      | `Earnie_Batterie_Leistung` (or EFM storage)      | Battery kW; **+ discharge**, − charge (same as EHAL, no inversion)                          |
 | `sens_grid_power_active`          | Read      | `Earnie_Netzleistung` (or EFM grid)              | Grid: + import, kW                                                                          |

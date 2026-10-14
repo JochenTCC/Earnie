@@ -35,13 +35,16 @@ def test_read_telemetry_units_via_mock(bench):
     telem = adapter.read_telemetry()
     # PV entity is kW 0.8 → W 800
     assert telem["sens_pv_production_active"] == pytest.approx(800.0)
-    assert telem["sens_ess_soc"] == pytest.approx(55.0)
+    assert "sens_ess_soc" not in telem
+    assert float(adapter.read_state("sensor.evcc_battery_soc")["state"]) == pytest.approx(
+        55.0
+    )
     assert telem["sens_grid_power_active"] == pytest.approx(0.0)
 
 
 def test_unavailable_required_raises(bench):
     _package, store, _physics, adapter, _base = bench
-    store.set_state("sensor.evcc_battery_soc", "unavailable")
+    store.set_state("sensor.evcc_grid_power", "unavailable")
     with pytest.raises((HaHttpError, ValueError)):
         adapter.read_telemetry()
 
@@ -130,13 +133,14 @@ def test_closed_loop_charge_moves_soc(bench):
         }
     )
     assert err is None
-    soc_before = adapter.read_telemetry()["sens_ess_soc"]
+    soc_before = float(adapter.read_state("sensor.evcc_battery_soc")["state"])
     nxt = physics
     for _ in range(3):
         nxt = step_physics(nxt, package=package, store=store, dt_h=0.25)
         project_physics_to_store(store, package=package, physics=nxt.as_dict())
     telem = adapter.read_telemetry()
-    assert telem["sens_ess_soc"] > soc_before
+    soc_after = float(adapter.read_state("sensor.evcc_battery_soc")["state"])
+    assert soc_after > soc_before
     # PV series advanced from tick 0 → 3
     assert telem["sens_pv_production_active"] == pytest.approx(
         package.pv_series_kw[3] * 1000.0

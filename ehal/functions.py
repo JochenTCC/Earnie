@@ -35,6 +35,7 @@ EHAL_FUNCTIONS: tuple[EhalFunction, ...] = (
     EhalFunction(
         "telemetry",
         "Grundtelemetrie (Netz, PV, SoC)",
+        # SoC kind is satisfied by entity-scoped ess.{id}.sens_ess_soc via _mapped_fields.
         ("sens_grid_power_active", "sens_pv_production_active", "sens_ess_soc"),
     ),
     EhalFunction(

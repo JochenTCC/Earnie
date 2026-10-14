@@ -141,7 +141,6 @@
             "single_tariff": true
         },
         "ehal_bindings": {
-            "sens_ess_soc": "",
             "sens_pv_production_active": "",
             "sens_ess_power": "",
             "sens_grid_power_active": "",

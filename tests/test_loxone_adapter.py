@@ -97,16 +97,16 @@ def test_capabilities_ess_false_without_markers():
 def test_read_telemetry_normalizes(fetch_mock):
     fetch_mock.side_effect = _plant_qid_values().get
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
-    assert telemetry["sens_ess_soc"] == 55.0
+    assert "sens_ess_soc" not in telemetry
     assert telemetry["sens_pv_production_active"] == 2000.0
     assert telemetry["sens_grid_power_active"] == 1000.0
     assert telemetry["sens_ess_power"] == pytest.approx(500.0)
     # PV 2000 + import 1000 + discharge 500
     assert telemetry["sens_power_consumers"] == pytest.approx(3500.0)
-    fetch_mock.assert_any_call(qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"))
     fetch_mock.assert_any_call(qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"))
     fetched = {c.args[0] for c in fetch_mock.call_args_list}
     assert "sens_ess_soc" not in fetched
+    assert qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc") not in fetched
     assert "sens_ess_power" not in fetched
 
 
@@ -134,8 +134,10 @@ def test_read_telemetry_ess_uses_entity_scoped_not_plant_flat(fetch_mock):
     fetch_mock.side_effect = _plant_qid_values().get
     LoxoneAdapter(_cfg()).read_telemetry()
     fetched = [c.args[0] for c in fetch_mock.call_args_list]
-    assert qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc") in fetched
+    assert qualified_battery_id(_PRIMARY_ESS, "sens_ess_power") in fetched
+    assert "sens_ess_power" not in fetched
     assert "sens_ess_soc" not in fetched
+    assert qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc") not in fetched
 
 
 @patch("integrations.loxone_writes._publish_setpoint_traced", side_effect=_pub_ok)

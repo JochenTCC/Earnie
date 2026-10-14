@@ -24,7 +24,6 @@ def _plant_house_push_only() -> dict:
             "ehal_bindings": {
                 "sens_grid_power_active": "",
                 "sens_pv_production_active": "",
-                "sens_ess_soc": "",
             }
         },
         "profiles": {},
@@ -37,14 +36,13 @@ def test_aggregate_ha_entities_weg_b_keeps_empty_activation():
     assert "sens_grid_power_active" not in pull
     weg = aggregate_ha_entities(house, transport="weg_b")
     assert weg["sens_grid_power_active"] == ""
-    assert weg["sens_ess_soc"] == ""
+    assert "sens_ess_soc" not in weg
 
 
 def test_read_telemetry_weg_b_from_inbox(monkeypatch):
     table = {
         "grid.meter.sens_grid_power_active": 500.0,
         "sens_pv_production_active": 2000.0,
-        "ess.house.sens_ess_soc": 55.0,
     }
 
     def _fake_read(qid: str, **_kw):
@@ -61,20 +59,18 @@ def test_read_telemetry_weg_b_from_inbox(monkeypatch):
         entities={
             "sens_grid_power_active": "",
             "sens_pv_production_active": "",
-            "sens_ess_soc": "",
         },
         transport="weg_b",
         push_read_qids={
             "sens_grid_power_active": "grid.meter.sens_grid_power_active",
             "sens_pv_production_active": "sens_pv_production_active",
-            "sens_ess_soc": "ess.house.sens_ess_soc",
         },
     )
     adapter = HaAdapter(cfg)
     tel = adapter.read_telemetry()
     assert tel["sens_grid_power_active"] == pytest.approx(500.0)
     assert tel["sens_pv_production_active"] == pytest.approx(2000.0)
-    assert tel["sens_ess_soc"] == pytest.approx(55.0)
+    assert "sens_ess_soc" not in tel
 
 
 def test_weg_b_fences_rest_for_push_field():
@@ -135,11 +131,10 @@ def test_pull_still_uses_rest(get_mock):
         response = MagicMock()
         response.status_code = 200
         entity = url.rsplit("/", 1)[-1]
-        unit = "%" if "soc" in entity else "W"
         payload = {
             "entity_id": entity,
-            "state": "100" if unit == "W" else "50",
-            "attributes": {"unit_of_measurement": unit},
+            "state": "100",
+            "attributes": {"unit_of_measurement": "W"},
         }
         response.json.return_value = payload
         return response
@@ -152,11 +147,11 @@ def test_pull_still_uses_rest(get_mock):
         entities={
             "sens_grid_power_active": "sensor.grid",
             "sens_pv_production_active": "sensor.pv",
-            "sens_ess_soc": "sensor.soc",
         },
         transport="pull",
     )
     adapter = HaAdapter(cfg)
     tel = adapter.read_telemetry()
     assert tel["sens_grid_power_active"] == pytest.approx(100.0)
+    assert "sens_ess_soc" not in tel
     assert get_mock.called

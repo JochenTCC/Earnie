@@ -238,13 +238,17 @@ class OpenemsAdapter:
                 status_code=response.status_code,
             )
 
-    def read_telemetry(self) -> EhalTelemetry:
-        grid_raw = self.read_channel("_sum", "GridActivePower")
-        pv_raw = self.read_channel("_sum", "ProductionActivePower")
+    def read_ess_soc_pct(self) -> float | None:
+        """Primary ESS SoC from OpenEMS channels (not on plant telemetry doc)."""
         soc = self.read_channel(self.cfg.ess_component, "Soc")
         if soc is None:
             soc = self.read_channel("_sum", "EssSoc")
-        if grid_raw is None or pv_raw is None or soc is None:
+        return None if soc is None else float(soc)
+
+    def read_telemetry(self) -> EhalTelemetry:
+        grid_raw = self.read_channel("_sum", "GridActivePower")
+        pv_raw = self.read_channel("_sum", "ProductionActivePower")
+        if grid_raw is None or pv_raw is None:
             raise OpenemsHttpError("OpenEMS telemetry missing required channel value(s)")
 
         grid_w = openems_grid_to_ehal_w(grid_raw)
@@ -255,7 +259,6 @@ class OpenemsAdapter:
             "adapter_id": self.cfg.adapter_id,
             "sens_grid_power_active": grid_w,
             "sens_pv_production_active": pv_w,
-            "sens_ess_soc": float(soc),
         }
         ess_power = self._optional_channel(self.cfg.ess_component, "ActivePower")
         if ess_power is None:

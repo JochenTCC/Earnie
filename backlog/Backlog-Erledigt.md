@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Retire flat plant `sens_ess_soc` (2026-10-14)
+
+- [x] **Remove `sens_ess_soc` from code as flat EHAL field** (full wire break; `EHAL_SCHEMA_VERSION` stays **4** — no public release since 3)
+  - Plant telemetry / `EhalTelemetry` no longer require or accept flat SoC; SoC is entity-scoped only (`ess.{id}.sens_ess_soc`).
+  - Adapters stop synthesizing plant SoC; `read_ess_soc` / `read_ess_soc_by_id` have no plant alias; bare push `/ehal/telemetry/sens_ess_soc/…` rejected.
+  - Residual `plant.ehal_bindings.sens_ess_soc` fails loud (migrate hint); HouseSim golden maps + docs updated.
+
 ### Bugfix Shadow SoC Lesefehler via VO silence (2026-10-14)
 
 - [x] **Shadow: feed-fresh `sens_ess_soc` became `Lesefehler` after ~30s**
