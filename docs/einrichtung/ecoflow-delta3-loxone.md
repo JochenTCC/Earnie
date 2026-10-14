@@ -62,6 +62,11 @@ Zwei neue, rein HTTP-basierte Bridge-Strecken (kein zusätzlicher MQTT-Broker n�
 
 Earnies eigene Anbindung bleibt unverändert auf `ehal.backend=loxone`.
 
+> **Neu (POC):** Der [Bridge-Generator](ha-loxone-bridge.md) erzeugt Schritt 2 bis 6 aus einer
+> Mapping-Datei – Loxone → HA dabei per Webhook statt über PyLoxone und selbst beschriebene Virtuelle
+> Eingänge (dort wurden Werte zwischendurch überschrieben). Schritt 8 (Logik im Miniserver) bleibt gültig.
+> Bis zum Live-Test bleibt diese Anleitung unverändert.
+
 ## Mapping-Tabelle
 
 | EHAL-Feld | Ecoflow-Entity (interner Key) | Loxone-Merker | Richtung | In Earnie mappen? |
@@ -411,7 +416,9 @@ Variante B über einen Webhook. Beide setzen `number.<device>_ac_charging_power`
    (Wert in Watt). Ins Programm ziehen, speichern, übertragen.
 2. Der Miniserver beschreibt diesen Eingang selbst (Umweg wie in Schritt 6): Miniserver als Gerät
    für Virtuelle Ausgänge anlegen, darunter ein **analoger** Virtueller Ausgangsbefehl. Der
-   Befehl bei Ein lautet `/dev/sps/io/Delta3_P_ChargeLimit/\v`. Der Name im Befehl muss **exakt**
+   Befehl bei Ein lautet `/dev/sps/io/Delta3_P_ChargeLimit/<v>`. Der Platzhalter in einem
+   Virtuellen **Ausgang** ist `<v>` – `\v` gilt nur im Virtuellen Eingang und kommt im Ausgang als
+   Steuerzeichen (0x0B) statt als Wert an. Der Name im Befehl muss **exakt**
    dem Namen des Eingangs entsprechen, sonst antwortet der Miniserver mit 404 und der Wert kommt
    nicht an. Das Ausgangs-Gerät braucht die Miniserver-Adresse und die Zugangsdaten eines Benutzers
    mit Schreibrecht.
@@ -445,7 +452,7 @@ Am bestehenden `Earnie_LadeLeistungs-Limit`-Merker (aus `VI_Earnie_Plant.xml`, s
 Wertänderung folgende URL aufruft:
 
 ```
-GET http://<HA-Host>:8123/api/webhook/earnie_charge_limit?v=\v
+GET http://<HA-Host>:8123/api/webhook/earnie_charge_limit?v=<v>
 ```
 
 `<HA-Host>` ist die IP-Adresse eures Home-Assistant-Systems (der Miniserver löst Hostnamen
@@ -471,8 +478,9 @@ actions:
       value: "{{ (trigger.query.v | int(1500)) | max(100) | min(1500) }}"
 ```
 
-Die Webhook-ID wirkt selbst als Geheimnis — kein zusätzlicher Bearer-Token nötig, passt zum
-`\v`-Platzhalter-Muster der bestehenden Earnie-VO-Templates.
+Die Webhook-ID wirkt selbst als Geheimnis – kein zusätzlicher Bearer-Token nötig. Der Platzhalter
+`<v>` ist derselbe wie in den Earnie-VO-Vorlagen (`share/loxone/templates/VirtualOut/`) und liefert den
+Wert mit Dezimalpunkt und drei Nachkommastellen (z.B. `800.000`); die Automation rechnet das um.
 
 ### 6. Quellenwahl-Merker (`ess.<id>.set_ess_source_select`, 2.7.h)
 
@@ -542,12 +550,17 @@ wieder steht und der Eingang einen neuen Zustand meldet.
 
 #### Variante B: über einen Webhook
 
-Robuster gegenüber Verbindungsabbrüchen der Loxone-Integration, dafür aufwendiger. Virtueller
-Ausgang am Merker `Earnie_Speicher_Quellenwahl`:
+Robuster gegenüber Verbindungsabbrüchen der Loxone-Integration, dafür aufwendiger. **Digitaler**
+Virtueller Ausgangsbefehl am Merker `Earnie_Speicher_Quellenwahl`, mit festen Werten statt
+Platzhalter:
 
 ```
-GET http://<HA-Host>:8123/api/webhook/earnie_speicher_quelle?v=\v
+Befehl bei Ein:  GET http://<HA-Host>:8123/api/webhook/earnie_speicher_quelle?v=1
+Befehl bei Aus:  GET http://<HA-Host>:8123/api/webhook/earnie_speicher_quelle?v=0
 ```
+
+Ein analoger Ausgang mit `?v=<v>` taugt hier nicht: Bei Wert 0 sendet er nichts (es gibt keinen
+Aus-Befehl), der Wechsel auf Netz käme in HA also nie an.
 
 In HA — Automation über die Oberfläche anlegen (wie in Schritt 4/5):
 

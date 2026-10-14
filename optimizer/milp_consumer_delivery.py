@@ -239,6 +239,12 @@ def filter_feasible_consumers(
             consumer, capacity_indices, dt_h=dt_h
         )
         if target > max_deliverable + 1e-6 and verbose:
+            from .thermal_flex_context import is_thermal_flex_consumer
+
+            # Thermal_annual uses day/forced constraints, not this remaining delivery path.
+            if is_thermal_flex_consumer(consumer):
+                feasible.append(consumer)
+                continue
             _log_infeasible_consumer_warning(
                 consumer,
                 target=target,

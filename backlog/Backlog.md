@@ -7,6 +7,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Research Items
 
 - [ ] **HA-Loxone-Bridge-Builder:** standalone tool (no Earnie/EHAL runtime dependency) to auto-generate HA `rest_command:`/`automation:` YAML for numeric HA→Loxone writes. Design draft: [backlog/HA-Loxone-Bridge-Builder-Draft.md](HA-Loxone-Bridge-Builder-Draft.md). **Not part of Version 2.6.** A different audience (any HA+Loxone install). Do not share code with **2.6.b** / **2.6.e** (those map HA entities onto a fixed EHAL vocabulary inside Earnie). Deferred Loxone Virtual-In/Out XML in the draft is also not the Version 2.+1 “Earnie → Loxone template XML” item.
+  - **POC (2026-10-14):** EcoFlow Delta 3 bridge, both directions, Loxone → HA via webhook (no PyLoxone). Generator `tools/ha_loxone_bridge/` (fixed JSON mapping, no scan / matching yet); tests `tests/test_ha_loxone_bridge.py`; user doc `docs/einrichtung/ha-loxone-bridge.md`. Live acceptance pending (see Bugfixes: Delta 3 bridge self-write).
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
@@ -28,15 +29,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - **Note:** Shadow architecture review + **R1**–**R4** → [Erledigt](Backlog-Erledigt.md) / [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); spec §11.1 / §12. S4 Soll/Soll stays **2.+1**.
 - **Note:** Plant topology (balance nodes / Bilanzierungspunkte, control rule): theses [`Plant-Topology-Theses.md`](Plant-Topology-Theses.md), reviews [`Plant-Topology-Theses-Review-Claude.md`](Plant-Topology-Theses-Review-Claude.md) / [`Plant-Topology-Theses-Review-Grok.md`](Plant-Topology-Theses-Review-Grok.md), decision record [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md) (2026-10-12). Work items: epic **Topology** below.
 
-- [ ] Full orchestration of model version migration
-  - Target is that after an update - the user is guided through migration as flawless as possible
-  - Users with older Earnie versions shall be guided through the migration after software update and be informed before!
-  - If Earnie recognizes that data should be migrated it asks if migration shall be done and give hints for manual to-dos (if needed)
-  - Prepare a complete v3 config data set for regression testing from Earnie_env_home history
-  - For all future version increments we need the same capability for Earnie (save this as a rule)
-
-- **Note:** Plant topology epic **Topology** — **P1** + **P2** + Powerstation AC wording → [Erledigt](Backlog-Erledigt.md). **P3–P5** (widen acceptance, MILP change, balance nodes) remain under **Version 2.+1 — Plant topology**. Decision record [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md). `inverters[].ac_connection: island` = bus participation (not “off the grid”); flag stays until the port model in 2.+1 / P5.
-
 - [ ] **Release regression suite (golden-master cases, public + private data)** (epic **Regression**; moved from Version 2.8 to 2.7 on 2026-10-14: the suite should guard the 2.7 multi-storage changes and let customer reports be captured as cases from the first 2.7 release on; independent of **2.7.a–h**; spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md))
   - Goal: Earnie's behaviour must not change unnoticed between releases. Frozen inputs (config, consumption, prices, PV forecast, start state) → offline deterministic run → compact metrics → compare against committed golden. Runs **before a release / publish**, never per commit (pytest marker `regression`, deselected by default).
   - Data split: runner + synthetic/own cases in the public repo (`tests/regression/cases/`); customer cases in a **private repo** `Earnie-regression-private` (never in the public repo or its history). Public issues reference a case only by ID (`REG-<issue>-<slug>`); report records the SHA of the private repo.
@@ -47,6 +39,15 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [ ] **Regression P1 — MVP:** case format + schema, runner for L1 (cycle replay) and L2 (backtest window), `--update-golden`, markdown report; 4–6 public cases (winter, summer, negative prices, EV deadline, heat storage); migrate the existing `tests/fixtures/prod_dumps/` cases; tolerances and solver mode from R0; release-checklist item. Pre-check: existing public fixtures (`tests/fixtures/prod_dumps/`, `tests/fixtures/backtesting/uploads/`) contain no entity names / location / third-party data.
   - [ ] **Regression P2 — customer data:** private repo `Earnie-regression-private` + private-root support (`$EARNIE_REGRESSION_PRIVATE_DIR`; private cases reported as skipped when missing), `--intake` (debug-dump ZIP → case folder + ID; L1 from the single-cycle inputs, plus the recorder window once R-Rec dumps carry it), case-ID / issue-reference convention, public + private SHAs in the report.
   - **Open decisions:** soft vs. hard gate (proposal: soft first); customer-facing data-handling wording beyond the private repo; regression solver mode beyond the R0 result (deterministic vs. production-path sample).
+  
+- [ ] Full orchestration of model version migration
+  - Target is that after an update - the user is guided through migration as flawless as possible
+  - Users with older Earnie versions shall be guided through the migration after software update and be informed before!
+  - If Earnie recognizes that data should be migrated it asks if migration shall be done and give hints for manual to-dos (if needed)
+  - Prepare a complete v3 config data set for regression testing from Earnie_env_home history
+  - For all future version increments we need the same capability for Earnie (save this as a rule)
+
+- **Note:** Plant topology epic **Topology** — **P1** + **P2** + Powerstation AC wording → [Erledigt](Backlog-Erledigt.md). **P3–P5** (widen acceptance, MILP change, balance nodes) remain under **Version 2.+1 — Plant topology**. Decision record [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md). `inverters[].ac_connection: island` = bus participation (not “off the grid”); flag stays until the port model in 2.+1 / P5.
 
 - [ ] Anonymous install counter (daily ping, no ID)
 

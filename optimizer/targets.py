@@ -125,11 +125,55 @@ def resolve_daily_target_kwh(
     return float(resolved.get(cid, consumer.get("daily_target_kwh", 0.0)))
 
 
+def _live_heat_storage_horizon_need_kwh(
+    source: dict,
+    profile: dict,
+    optimization_matrix: list,
+) -> float | None:
+    """Live + heat_storage: floor + opp electric kWh (HDD calendar sum is wrong here)."""
+    from data.outdoor_forecast import get_outdoor_forecast_with_fallback
+    from optimizer.thermal_coupled import heat_storage_enabled
+    from optimizer.thermal_live_store import plan_live_store_for_thermal_consumer
+    from optimizer.thermal_targets import thermal_horizon_hours_from_slots
+
+    thermal = source.get("thermal") or source
+    if not heat_storage_enabled(thermal.get("heat_storage")):
+        return None
+    horizon_h = thermal_horizon_hours_from_slots(len(optimization_matrix))
+    fallback_ambient = 10.0
+    try:
+        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
+        from settings.ehal_marker_resolve import marker_sens_temperature_outside
+
+        live_amb = _read_optional_temp_c(marker_sens_temperature_outside(house_doc=None))
+        if live_amb is not None:
+            fallback_ambient = float(live_amb)
+    except Exception:
+        pass
+    ambient_forecast, _src = get_outdoor_forecast_with_fallback(
+        horizon=horizon_h,
+        fallback_ambient_c=fallback_ambient,
+    )
+    plan = plan_live_store_for_thermal_consumer(
+        source,
+        house_profile=profile,
+        ambient_forecast_c=ambient_forecast,
+        house_doc=None,
+    )
+    if plan is None:
+        return None
+    return round(float(plan.floor_electric_kwh) + float(plan.opp_cap_electric_kwh), 3)
+
+
 def resolve_thermal_annual_horizon_kwh(
     consumer: dict,
     optimization_matrix: list | None,
 ) -> float:
-    """Summe der HDD-Tagesziele über alle Kalendertage im Planungshorizont."""
+    """Horizon WP electric target for thermal_annual.
+
+    Live + heat_storage: open-loop store floor + opp (not full-calendar HDD).
+    Otherwise: sum of HDD day targets over calendar dates in the matrix.
+    """
     if not optimization_matrix:
         return 0.0
     profile = config.get_resolved_runtime_settings().get("_house_profile")
@@ -150,11 +194,18 @@ def resolve_thermal_annual_horizon_kwh(
     if not source:
         return 0.0
     live_absent = False
-    if matrix_is_live_snapshot(optimization_matrix):
+    is_live = matrix_is_live_snapshot(optimization_matrix)
+    if is_live:
         live_absent = bool(resolve_absent_status(profile)["effective"])
     source = thermal_source_with_live_absent(
         source, live_absent_active=live_absent
     )
+    if is_live:
+        live_need = _live_heat_storage_horizon_need_kwh(
+            source, profile, optimization_matrix
+        )
+        if live_need is not None:
+            return float(live_need)
     total = 0.0
     dates = sorted(
         {
@@ -355,7 +406,13 @@ def build_applied_targets_detail(
                 "thermal": "thermal (RC-Modell)",
                 "thermal_annual": "thermal_annual (HDD-Tagesziel)",
             }
-            source = source_labels.get(source_key, source_key)
+            if (
+                source_key == "thermal_annual"
+                and consumption_mode == "live_snapshot"
+            ):
+                source = "thermal_annual (Wärmespeicher Live)"
+            else:
+                source = source_labels.get(source_key, source_key)
         details.append({
             "id": cid,
             "name": consumer["name"],

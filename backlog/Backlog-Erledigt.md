@@ -2,6 +2,37 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Chart1 powerstation SoC dips at Jetzt / hour boundary (2026-10-14)
+
+- [x] **Chart1: powerstation SoC dips at Jetzt / next hour boundary** — fix implemented; **Verified live** (2026-10-14)
+  - Symptom: physical + virtual PS SoC lines dipped toward house SoC at Jetzt and again at the next hour `:00` when Jetzt was in the last QH; overlapping virtual lines hard to tell apart.
+  - Cause: per-ESS Jetzt / hour-end ramps anchored to primary `Simulierter SoC (%)` (`_soc_at_chart_now` / `_soc_tail_y_from_row`).
+  - Fix: series-local anchors in `_milp_part_soc_ramps` / `_ramp_end_point`; virtual PS non-solid dash cycle.
+  - Tests: `tests/test_chart1_multi_ess_soc.py` (`test_powerstation_soc_ramps_stay_on_own_series_not_house`).
+
+### Document Review EcoFlow guide: Virtual Output placeholder (2026-10-14)
+
+- [x] **`docs/einrichtung/ecoflow-delta3-loxone.md` prescribed `\v` in Virtual Output commands**
+  - `\v` is the Virtual **Input** placeholder; in a Virtual Output it is sent as the control character 0x0B. Replaced with `<v>` in step 5 variant A (Miniserver self-write) and variant B (charge-limit webhook); removed the claim that `\v` matches the Earnie VO templates (they use `<v>`).
+  - Step 6 variant B (bypass webhook): switched to a **digital** VO with fixed `?v=1` / `?v=0`, since an analog VO sends nothing at value 0 and the switch to grid would never reach HA.
+  - Possible root cause of the open bug "Miniserver self-write of a Virtual Input is overwritten" — noted there for verification.
+
+### Bugfix — Physical standby PS Chart1 SoC held flat (2026-10-14)
+
+- [x] **SOC of Delta 3 Powerstation stayed constant in Chart1 despite wired `dev-pc` 0.1 kW 24/7** — fix implemented; **Verified live** (2026-10-14)
+  - Cause (1): Chart1 held physical PS SoC (“Forecast gehalten”) and never applied the `standby_backup` island/charge plan.
+  - Cause (2): `load_standby_packs` let flex consumers overwrite appliances, so `default_power_kw` was lost and a pack sizing hint (0.375 kW) was used instead of 0.1 kW.
+  - Fix: resolve attached load from appliance/`default_power_kw` → recommendation → nominal; Chart1 advances physical standby SoC from the standby plan (`advance_physical_standby_soc_after_slot`); docs `docs/ui/charts.md`.
+  - Tests: `tests/test_powerstation_2_7_h.py` (`test_attached_load_falls_back_to_nominal_not_sizing_hint`, `test_attached_load_uses_appliance_recommendation_nested`, `test_advance_physical_standby_soc_islands_then_charges`).
+
+### Bugfix Haus Wärme over-request / Best-Effort HDD target (2026-10-14)
+
+- [x] **Earnie requested much more heating energy than expected** — live verified (2026-10-14)
+  - Symptom: Best-Effort warning `Haus Wärme: Ziel (25.57 kWh) … mit 37 h à 1.90 kW` while store was hot (T_eq above band_max) and Freigabe correctly stayed 0. (“37 h” was 37 QH slots → max deliverable ≈ 17.6 kWh.)
+  - Cause: (1) Live remaining used full-calendar HDD sum, not store floor+opp; (2) space-heat climb pulled `C·ΔT` in one hour and emptied the buffer early; (3) Best-Effort warned on thermal_annual remaining even though delivery uses forced/day constraints.
+  - Fix: `resolve_thermal_annual_horizon_kwh` Live+heat_storage → floor+opp; climb rate-limited to 0.1 K/h in `_space_heat_demand_kw`; skip Best-Effort for `thermal_annual`.
+  - Tests: `tests/test_thermal_live_store.py` (`test_space_heat_climb_rate_limited_at_band_min`, `test_live_horizon_need_uses_floor_not_hdd`).
+
 ### Topology P2 + Powerstation AC wording (2026-10-14)
 
 - [x] **Topology P2 — generator-side coverage in the live balance** (epic **Topology**; [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md) §4)

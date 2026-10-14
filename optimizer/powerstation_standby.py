@@ -24,20 +24,40 @@ SOURCE_GRID = 0
 SOURCE_BATTERY = 1
 
 
+def _appliance_continuous_kw(app: dict | None) -> float:
+    """Resolve continuous kW from appliance or consumer-shaped dict."""
+    if not isinstance(app, dict):
+        return 0.0
+    raw = app.get("default_power_kw")
+    if raw is None:
+        rec = app.get("appliance_recommendation")
+        if isinstance(rec, dict) and rec.get("default_power_kw") is not None:
+            raw = rec.get("default_power_kw")
+    if raw is None:
+        raw = app.get("nominal_power_kw")
+    try:
+        return max(0.0, float(raw or 0.0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def attached_load_kw(ps: dict, appliances_by_id: dict[str, dict] | None = None) -> float:
     """Continuous load kW = sum of attached consumers' default_power_kw."""
     apps = appliances_by_id or {}
+    ids = normalize_attached_consumer_ids(ps)
     total = 0.0
-    for cid in normalize_attached_consumer_ids(ps):
-        app = apps.get(cid)
-        if isinstance(app, dict):
-            total += max(0.0, float(app.get("default_power_kw") or 0.0))
-        else:
-            # Fallback: nominal_power_kw on consumer-shaped dicts
-            total += max(0.0, float((app or {}).get("nominal_power_kw") or 0.0))
+    for cid in ids:
+        total += _appliance_continuous_kw(apps.get(cid))
     if total > 0.0:
         return total
-    # Last resort: use a fraction of pack charge power as sizing hint
+    if ids:
+        # Attached ids present but no usable power — do not invent a sizing load.
+        logger.warning(
+            "standby attached consumers %s have no default/nominal power_kw; load_kw=0",
+            ids,
+        )
+        return 0.0
+    # No attached consumers: sizing hint from pack charge power.
     return max(0.05, float(ps.get("battery_max_charge_power_kw") or 0.15) * 0.25)
 
 
@@ -285,3 +305,53 @@ def live_source_and_charge(
             else:
                 charges[ps_id] = 0.0
     return sources, charges
+
+
+def advance_physical_standby_soc_after_slot(
+    soc_by_ess: dict[str, float],
+    *,
+    plans: dict[str, dict[str, Any]],
+    packs_by_id: dict[str, dict[str, Any]],
+    slot_index: int,
+    dt_h: float,
+) -> None:
+    """Advance Chart1 physical standby SoC one slot from the standby plan.
+
+    Energy balance mirrors ``_solve_one_pack``:
+    ``E[t] = E[t-1] + (charge·η − discharge/η)·dt`` with discharge = load when island.
+    """
+    validate_dt_h(dt_h)
+    if not plans or not soc_by_ess:
+        return
+    for ps_id, plan in plans.items():
+        if ps_id not in soc_by_ess:
+            continue
+        pack = packs_by_id.get(ps_id) or {}
+        capacity = max(0.0, float(pack.get("capacity_kwh") or 0.0))
+        if capacity <= 1e-9:
+            continue
+        eta = max(0.05, min(1.0, float(pack.get("efficiency") or 0.95)))
+        min_soc = float(pack.get("min_soc") or 0.0)
+        max_soc = float(pack.get("max_soc") or 100.0)
+        e_min = (min_soc / 100.0) * capacity
+        e_max = (max_soc / 100.0) * capacity
+        selects = plan.get("source_select") or []
+        charges = plan.get("charge_kw") or []
+        if slot_index >= len(selects):
+            continue
+        island = int(selects[slot_index]) == SOURCE_BATTERY
+        load_kw = max(0.0, float(plan.get("load_kw") or 0.0))
+        if island:
+            charge_kw = 0.0
+            discharge_kw = load_kw
+        else:
+            charge_kw = (
+                max(0.0, float(charges[slot_index]))
+                if slot_index < len(charges)
+                else 0.0
+            )
+            discharge_kw = 0.0
+        energy = max(e_min, min(e_max, (float(soc_by_ess[ps_id]) / 100.0) * capacity))
+        energy = energy + (charge_kw * eta - discharge_kw / eta) * float(dt_h)
+        energy = max(e_min, min(e_max, energy))
+        soc_by_ess[ps_id] = (energy / capacity) * 100.0

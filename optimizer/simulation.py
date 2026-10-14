@@ -173,6 +173,8 @@ class _HorizonSetup:
     options: _HorizonOptions
     current_soc_by_id: dict[str, float] | None = None
     chart_soc_entities: tuple[dict, ...] = ()
+    standby_plans: dict | None = None
+    standby_packs_by_id: dict | None = None
 
 
 class _SlotInputs(NamedTuple):
@@ -280,6 +282,9 @@ def _prepare_horizon_state(
         horizon_terminal_soc = (
             None if options.sunrise_soc_min_index is not None else initial_soc
         )
+    standby_plans, standby_packs_by_id = _resolve_standby_chart_plans(
+        optimization_matrix, current_soc_by_id
+    )
     return _HorizonSetup(
         matrix=optimization_matrix,
         consumers_cfg=consumers_cfg,
@@ -292,7 +297,42 @@ def _prepare_horizon_state(
         options=options,
         current_soc_by_id=current_soc_by_id,
         chart_soc_entities=chart_entities,
+        standby_plans=standby_plans,
+        standby_packs_by_id=standby_packs_by_id,
     )
+
+
+def _resolve_standby_chart_plans(
+    matrix: list,
+    current_soc_by_id: dict[str, float] | None,
+) -> tuple[dict, dict]:
+    """Standby island/charge plan + pack meta for Chart1 physical PS SoC."""
+    if not current_soc_by_id:
+        return {}, {}
+    try:
+        from optimizer.powerstation_live import load_standby_packs
+        from optimizer.powerstation_standby import plan_standby_horizon
+
+        packs = load_standby_packs()
+        if not packs:
+            return {}, {}
+        packs_by_id = {
+            str(p["powerstation_id"]): p
+            for p in packs
+            if str(p.get("powerstation_id") or "").strip()
+        }
+        plans = plan_standby_horizon(
+            matrix,
+            packs,
+            current_soc_by_id=current_soc_by_id,
+            dt_h=DEFAULT_DT_H,
+        )
+        return plans or {}, packs_by_id
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).warning(
+            "standby chart SoC plan unavailable: %s", exc
+        )
+        return {}, {}
 
 
 def _slot_solve_inputs(
@@ -508,10 +548,12 @@ def _advance_chart_soc_after_slot(
     soc_by_ess: dict[str, float],
     *,
     slot: dict | None,
+    slot_index: int,
     virtual_entries: list[dict],
 ) -> None:
-    """Update house/virtual SoC maps for the next Chart1 attach (physical held)."""
+    """Update house / physical-standby / virtual SoC maps for the next Chart1 attach."""
     from optimizer.powerstation_soc_chart import simulate_virtual_reserve_soc_after_slot
+    from optimizer.powerstation_standby import advance_physical_standby_soc_after_slot
 
     planned_by = (slot or {}).get("planned_soc_by_ess") or {}
     if planned_by:
@@ -525,6 +567,14 @@ def _advance_chart_soc_after_slot(
         ]
         if len(house_ids) == 1 and COL_SOC in chart_row:
             soc_by_ess[house_ids[0]] = float(chart_row[COL_SOC])
+    if setup.standby_plans:
+        advance_physical_standby_soc_after_slot(
+            soc_by_ess,
+            plans=setup.standby_plans,
+            packs_by_id=setup.standby_packs_by_id or {},
+            slot_index=slot_index,
+            dt_h=DEFAULT_DT_H,
+        )
     if virtual_entries:
         plan_kw = float(chart_row.get(COL_BATTERIE_AKTION, 0.0) or 0.0)
         soc_by_ess.update(
@@ -585,6 +635,7 @@ def _run_horizon_slots(
                 chart_row,
                 soc_by_ess,
                 slot=slot,
+                slot_index=i,
                 virtual_entries=virtual_entries,
             )
             sim_soc = _advance_delivered_and_flex_run(

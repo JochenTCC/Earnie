@@ -45,6 +45,8 @@ from ui.chart_soc_ramps import (
     _soc_at_chart_now,
     _soc_hover_labels_for_times,
     _soc_tail_y_from_row,
+    _soc_y_at_moment,
+    _soc_y_for_chart_now,
 )
 
 
@@ -335,10 +337,30 @@ def _milp_part_soc_ramps(
         return None, None
     y_at_now: float | None = None
     if history_slot_count is not None and history_slot_count > 0:
-        y_at_now = _soc_at_chart_now(
-            axis, df, chart_now, history_slot_count,
-            battery_params=battery_params,
-        )
+        series_name = str(getattr(soc, "name", "") or "")
+        # Primary house column: existing Jetzt logic (log extrap / MILP polyline).
+        # Per-ESS/PS columns must anchor to *this* series — never to primary SoC
+        # (that forced a spike/drop at Jetzt on powerstation lines).
+        if series_name in ("", "Simulierter SoC (%)"):
+            y_at_now = _soc_at_chart_now(
+                axis, df, chart_now, history_slot_count,
+                battery_params=battery_params,
+            )
+        else:
+            # Series-local Jetzt: MILP polyline when available; otherwise interpolate
+            # on this series only (no house-battery kW warp of PS SoC).
+            y_series = _soc_y_for_chart_now(
+                axis,
+                soc,
+                df,
+                chart_now,
+                history_slot_count,
+                battery_params=battery_params,
+            )
+            y_geom = _soc_y_at_moment(axis, soc, chart_now, len(soc))
+            # Held PS / virtual reserves: geometric keeps flat SoC through Jetzt.
+            # House multi-column values match primary; geom ≈ milp polyline mid-QH.
+            y_at_now = y_geom if not math.isnan(y_geom) else y_series
     ramp_before = _current_hour_soc_ramp_before_now(
         axis,
         soc,

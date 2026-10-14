@@ -201,15 +201,21 @@ def _resolve_house_live_params(
     )
 
 
+# Recover toward target at most this many K per Euler hour. Full C·ΔT in one hour
+# emptied a warm buffer (~5 K drop) and forced WP while T_eq was still above band_max.
+_MAX_HOUSE_CLIMB_K_PER_H = 0.1
+
+
 def _space_heat_demand_kw(
     house: _HouseLiveParams,
     house_temp: float,
     ambient: float,
 ) -> float:
-    """Store draw for space heat: envelope hold / climb — not full WP dump.
+    """Store draw for space heat: envelope hold / rate-limited climb — not WP dump.
 
     Using ``max_heat`` as continuous demand emptied a hot buffer (e.g. 67 °C) in
-    ~3 h and forced Freigabe while T_eq was still far above setpoint.
+    ~3 h and forced Freigabe while T_eq was still far above setpoint. Pulling
+    ``C·(target−T)`` in one hour (leicht Bauweise) caused the same early drain.
     """
     if not house.use_house:
         return 0.0
@@ -224,7 +230,8 @@ def _space_heat_demand_kw(
     ):
         return 0.0
     loss = house.house_h * (float(house_temp) - float(ambient))
-    climb = (house.house_target_c - float(house_temp)) * house.house_c
+    delta_k = max(0.0, house.house_target_c - float(house_temp))
+    climb = min(delta_k, _MAX_HOUSE_CLIMB_K_PER_H) * house.house_c
     return min(house.max_heat, max(0.0, loss + climb))
 
 

@@ -132,6 +132,18 @@ def _part_extrap_offsets(
     return None, None
 
 
+def _soc_line_style(ctx: dict) -> dict:
+    """Plotly line style for optimized SoC (optional dash for virtual PS)."""
+    style: dict = {
+        "color": ctx["color"],
+        "width": float(ctx.get("line_width") or 2.5),
+    }
+    dash = ctx.get("dash")
+    if dash:
+        style["dash"] = dash
+    return style
+
+
 def _add_soc_line_trace(
     fig: go.Figure,
     soc_x: pd.Series,
@@ -206,7 +218,7 @@ def _add_optimized_soc_segment(
         hover_labels=_soc_hover_labels_for_times(
             soc_x, ctx["uhrzeit"], ctx["axis"].starts,
         ),
-        line=dict(color=ctx["color"], width=float(ctx.get("line_width") or 2.5)),
+        line=_soc_line_style(ctx),
     )
 
 
@@ -259,6 +271,7 @@ def add_optimized_soc_trace(
     name: str = "SoC",
     color: str | None = None,
     line_width: float = 2.5,
+    dash: str | None = None,
 ) -> None:
     if soc_column not in df.columns:
         return
@@ -269,6 +282,7 @@ def add_optimized_soc_trace(
         "uhrzeit": df["Uhrzeit"],
         "length": len(df),
         "soc": df[soc_column],
+        "soc_column": soc_column,
         "tail_y": _optimized_soc_tail_y(
             df, soc_column, battery_params=battery_params
         ),
@@ -278,6 +292,7 @@ def add_optimized_soc_trace(
         "name": name,
         "color": color or COLOR_SOC,
         "line_width": float(line_width),
+        "dash": dash,
     }
     for part_start, part_end in _soc_split_points(ctx["length"], history_slot_count):
         part_extrap_start, part_extrap_end = _part_extrap_offsets(
@@ -330,6 +345,9 @@ def add_optimized_soc_traces(
         VIRTUAL_SOC_LINE_WIDTH,
     )
 
+    # Virtual PS: never solid (overlap when SoC values match); cycle styles.
+    _VIRTUAL_SOC_DASHES = ("dash", "dot", "dashdot", "longdash", "longdashdot")
+
     series = discover_ess_soc_series(df)
     if not series:
         add_optimized_soc_trace(
@@ -345,13 +363,21 @@ def add_optimized_soc_traces(
         )
         return
     virtual_labels = _resolve_virtual_soc_labels(chart_soc_entities)
+    virtual_dash_index = 0
     for index, (column, legend) in enumerate(series):
         label = legend.removeprefix("SoC · ").strip()
+        is_virtual = label in virtual_labels
         width = (
             VIRTUAL_SOC_LINE_WIDTH
-            if label in virtual_labels
+            if is_virtual
             else HOUSE_SOC_LINE_WIDTH
         )
+        dash = None
+        if is_virtual:
+            dash = _VIRTUAL_SOC_DASHES[
+                virtual_dash_index % len(_VIRTUAL_SOC_DASHES)
+            ]
+            virtual_dash_index += 1
         add_optimized_soc_trace(
             fig,
             df,
@@ -366,6 +392,7 @@ def add_optimized_soc_traces(
             name=legend,
             color=soc_color_for_index(index),
             line_width=width,
+            dash=dash,
         )
 
 

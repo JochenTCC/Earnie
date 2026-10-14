@@ -672,8 +672,10 @@ def load_standby_packs() -> list[dict[str, Any]]:
         flex = config.get_flexible_consumers(optimizer_only=False)
     except Exception:  # noqa: BLE001
         flex = []
+    # Flex fills gaps; appliances win so default_power_kw from Manuelle Geräte
+    # is not overwritten by consumer-shaped dicts that only have nominal_power_kw.
     by_id: dict[str, dict] = {}
-    for item in list(appliances or []) + list(flex or []):
+    for item in list(flex or []) + list(appliances or []):
         if isinstance(item, dict) and str(item.get("id") or "").strip():
             by_id[str(item["id"]).strip()] = item
     return collect_standby_packs(

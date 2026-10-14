@@ -435,6 +435,12 @@ def _current_hour_soc_ramp(
     return t_start, y_start, t_end, y_end
 
 
+def _is_primary_soc_series(soc: pd.Series) -> bool:
+    """True for the aggregate house SoC column (or unnamed legacy series)."""
+    name = str(getattr(soc, "name", "") or "")
+    return name in ("", "Simulierter SoC (%)")
+
+
 def _ramp_end_point(window: dict) -> tuple[datetime, float] | None:
     if window["later_milp"]:
         t_end = min(window["quarter_end"], window["hour_end"])
@@ -444,13 +450,25 @@ def _ramp_end_point(window: dict) -> tuple[datetime, float] | None:
         if end_idx is None:
             return None
         return t_end, _line_plot_float(window["soc"].iloc[end_idx])
+    t_end = window["hour_end"]
+    # Last QH of the hour: primary uses house battery tail; per-ESS/PS must
+    # stay on *this* series (otherwise EcoFlow/virtual snap to house SoC at :00).
+    if not _is_primary_soc_series(window["soc"]):
+        y_end = _soc_y_at_moment(
+            window["axis"], window["soc"], t_end, window["seg_end"],
+        )
+        if math.isnan(y_end):
+            y_end = _line_plot_float(window["soc"].iloc[window["milp_idx"]])
+        if math.isnan(y_end):
+            return None
+        return t_end, y_end
     y_end = _soc_tail_y_from_row(
         window["df"].iloc[window["milp_idx"]],
         battery_params=window["battery_params"],
     )
     if y_end is None:
         return None
-    return window["hour_end"], y_end
+    return t_end, y_end
 
 
 def _ramp_start_soc(window: dict) -> float:

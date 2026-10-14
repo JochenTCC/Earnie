@@ -118,6 +118,63 @@ def test_attached_load_and_reserve_sizing():
     ) == pytest.approx(0.6)
 
 
+def test_attached_load_falls_back_to_nominal_not_sizing_hint():
+    """Consumer-shaped dicts without default_power_kw must use nominal, not pack hint."""
+    load = attached_load_kw(
+        {
+            "attached_consumer_ids": ["dev-pc"],
+            "battery_max_charge_power_kw": 1.5,
+        },
+        {"dev-pc": {"id": "dev-pc", "nominal_power_kw": 0.12}},
+    )
+    assert load == pytest.approx(0.12)
+
+
+def test_attached_load_uses_appliance_recommendation_nested():
+    load = attached_load_kw(
+        {"attached_consumer_ids": ["dev-pc"], "battery_max_charge_power_kw": 1.5},
+        {
+            "dev-pc": {
+                "id": "dev-pc",
+                "nominal_power_kw": 0.12,
+                "appliance_recommendation": {"default_power_kw": 0.1},
+            }
+        },
+    )
+    assert load == pytest.approx(0.1)
+
+
+def test_advance_physical_standby_soc_islands_then_charges():
+    from optimizer.powerstation_standby import advance_physical_standby_soc_after_slot
+
+    soc = {"delta3": 80.0}
+    packs = {
+        "delta3": {
+            "capacity_kwh": 1.0,
+            "efficiency": 1.0,
+            "min_soc": 10.0,
+            "max_soc": 100.0,
+        }
+    }
+    plans = {
+        "delta3": {
+            "source_select": [SOURCE_BATTERY, SOURCE_GRID],
+            "charge_kw": [0.0, 0.4],
+            "load_kw": 0.2,
+        }
+    }
+    advance_physical_standby_soc_after_slot(
+        soc, plans=plans, packs_by_id=packs, slot_index=0, dt_h=0.25
+    )
+    # 0.2 kW × 0.25 h / 1 kWh → −5 %-points
+    assert soc["delta3"] == pytest.approx(75.0)
+    advance_physical_standby_soc_after_slot(
+        soc, plans=plans, packs_by_id=packs, slot_index=1, dt_h=0.25
+    )
+    # +0.4 kW × 0.25 h → +10 %-points
+    assert soc["delta3"] == pytest.approx(85.0)
+
+
 def test_plan_standby_islands_expensive_slots():
     # Cheap then expensive: expect charge in cheap, island in expensive when SoC allows.
     matrix = [

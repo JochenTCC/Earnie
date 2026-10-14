@@ -47,6 +47,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [OpenEMS-Lab](einrichtung/openems-lab.md) — Earnie + OpenEMS Edge/UI; Kommunikationscheck in der Spec
 - [Private Haus-Config](einrichtung/private-env.md) — privates Repo + Junction; öffentliche Vorlagen unter `share/config/`
 - [EcoFlow Delta 3 über Loxone](einrichtung/ecoflow-delta3-loxone.md) — One-Way-Speicher / Bridging-Hinweis
+- [HA ↔ Loxone Bridge-Generator](einrichtung/ha-loxone-bridge.md) — POC: Brücke für die Delta 3 aus einer Mapping-Datei, Loxone → HA per Webhook
 
 ### Konfiguration (`earnie_env/config/`)
 

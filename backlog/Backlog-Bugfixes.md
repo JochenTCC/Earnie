@@ -33,14 +33,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] There is always a drop in the SOC lines on Chart1 (Monitor) for the powerstation (both physical and virtual) at "Jetzt".
-  - The line for virtual Geschirrspüler is invisible - probably hided by virtual Waschen - check if it's plotted and give them different line styles (but no solid line)
-  - A possible x-Axis drift was introduced with the added SOC-lines. One symptom is that the forced charging / discharging markers are not aligned with SOC line anymore (main 15 kWH battery)
 - [ ] EcoFlow Delta 3 bridge: Miniserver self-write of a Virtual Input is overwritten by HA (2026-10-07, not analysed yet)
   - Setup: the Miniserver writes its own Virtual Input via a Virtual Output command (`/dev/sps/io/<Input>/\v`, device = the Miniserver itself), e.g. bypass state (`Delta3_Grid_ByPass`) and charge limit (`Delta3_P_ChargeLimit`). HA mirrors these inputs through the Loxone integration (PyLoxone) and drives the EcoFlow entities from automations (`docs/einrichtung/ecoflow-delta3-loxone.md`, steps 5/6).
   - Symptom: in between, the input value changes to a different value that the Miniserver logic did not write; HA seems to set it. Which writer and when is unknown.
   - To check: (1) does an HA `rest_command` (SoC / power / SOC min/max pushes) target the same input name, or does a name collision exist between inputs; (2) does the HA start trigger or a state-trigger automation push a value back into an input; (3) does the Virtual Output command repeat or fire on every cycle (Repeat setting); (4) does the Loxone integration write entity states back to the Miniserver; (5) compare timestamps of the HA log (`rest_command`) with the Miniserver's online monitor.
+  - **Likely cause (2026-10-14, to verify):** the self-write command uses `\v`, but in a Virtual **Output** command `\v` is sent as the control character 0x0B, not as the value (pilot finding, `Binding-Push-Only-Conversion.md` §3). The correct placeholder is `<v>`. The guide prescribed `\v` in step 5 variant A and in both webhook variants (corrected in the guide 2026-10-14). Check (6): in Loxone Config, does the command read `…/\v`? Replace it with `…/<v>` and watch the online monitor.
   - Fix idea if confirmed: let HA only read these inputs (no `rest_command` to them) or switch the bridge to the webhook variant (step 5/6, variant B). Update the guide's "Hinweis zum Eingang" once the cause is known.
+  - **Workaround in progress (2026-10-14):** Bridge-Builder POC (`tools/ha_loxone_bridge/`, `docs/einrichtung/ha-loxone-bridge.md`) removes the self-written Virtual Inputs and PyLoxone from the Loxone → HA path: a Virtual Output calls an HA webhook directly, so each value has a single writer. Root cause of the overwrite still unknown; close this item after the POC runs live (charge limit + bypass follow the Loxone logic for ≥ 24 h without foreign values) or after the cause is found.
 
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)

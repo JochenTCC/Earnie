@@ -1,0 +1,71 @@
+{
+  "title": "EcoFlow Delta 3",
+  "loxone": {
+    "host": "192.168.178.10",
+    "user_secret": "loxone_user",
+    "pass_secret": "loxone_pass"
+  },
+  "ha": {
+    "host": "192.168.178.20",
+    "port": 8123,
+    "webhook_local_only": true
+  },
+  "derived_sensors": [
+    {
+      "entity_id": "sensor.ecoflow_ess_power_ehal",
+      "name": "Ecoflow ESS Power EHAL",
+      "unit": "W",
+      "device_class": "power",
+      "state_class": "measurement",
+      "plus": ["sensor.delta_3_total_out_power"],
+      "minus": ["sensor.delta_3_total_in_power"]
+    }
+  ],
+  "points": [
+    {
+      "name": "ess_soc",
+      "direction": "ha_to_loxone",
+      "ha_entity": "sensor.delta_3_main_battery_level",
+      "loxone_input": "Earnie_Batterie_SoC",
+      "refresh_minutes": 5
+    },
+    {
+      "name": "ess_power",
+      "direction": "ha_to_loxone",
+      "ha_entity": "sensor.ecoflow_ess_power_ehal",
+      "loxone_input": "Earnie_Batterie_Leistung",
+      "refresh_minutes": 5
+    },
+    {
+      "name": "ess_soc_max",
+      "direction": "ha_to_loxone",
+      "ha_entity": "number.delta_3_max_charge_level",
+      "loxone_input": "Earnie_Batterie_SOC_Max",
+      "refresh_minutes": 15
+    },
+    {
+      "name": "ess_soc_min",
+      "direction": "ha_to_loxone",
+      "ha_entity": "number.delta_3_min_discharge_level",
+      "loxone_input": "Earnie_Batterie_SOC_Min",
+      "refresh_minutes": 15
+    },
+    {
+      "name": "ac_charge_limit",
+      "direction": "loxone_to_ha",
+      "ha_entity": "number.delta_3_ac_charging_power",
+      "loxone_cmd_title": "HA_Delta3_AcChargeLimit",
+      "webhook_id": "CHANGE_ME_ac_charge_limit",
+      "min": 100,
+      "max": 1500,
+      "step": 50
+    },
+    {
+      "name": "grid_bypass",
+      "direction": "loxone_to_ha",
+      "ha_entity": "switch.delta_3_grid_bypass",
+      "loxone_cmd_title": "HA_Delta3_GridBypass",
+      "webhook_id": "CHANGE_ME_grid_bypass"
+    }
+  ]
+}

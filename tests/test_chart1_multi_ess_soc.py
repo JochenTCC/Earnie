@@ -120,3 +120,78 @@ def test_add_optimized_soc_traces_virtual_ps_uses_slim_line():
     assert by_name["SoC · VirtPS"].line.width == VIRTUAL_SOC_LINE_WIDTH
     assert by_name["SoC · Haus"].line.color == soc_color_for_index(0)
     assert by_name["SoC · VirtPS"].line.color == soc_color_for_index(1)
+    assert by_name["SoC · VirtPS"].line.dash not in (None, "solid")
+
+
+def _y_at(trace, needle: str) -> float | None:
+    for x_val, y_val in zip(trace.x, trace.y):
+        if needle in str(x_val):
+            if y_val != y_val:  # NaN
+                return None
+            return round(float(y_val), 2)
+    return None
+
+
+def test_powerstation_soc_ramps_stay_on_own_series_not_house():
+    """Regression: PS SoC must not snap to house SoC at Jetzt or hour-end.
+
+    Chart1 per-ESS ramps previously anchored every line to primary
+    ``Simulierter SoC (%)``, causing a V-dip on physical/virtual PS at Jetzt
+    and again at the next hour boundary when ``chart_now`` is in the last QH.
+    """
+    start = datetime(2026, 10, 14, 13, 0, tzinfo=_TZ)
+    chart_now = datetime(2026, 10, 14, 14, 39, tzinfo=_TZ)
+    rows = []
+    for index in range(12):
+        slot = start + timedelta(minutes=15 * index)
+        house = 36.0 if index >= 4 else 30.0 + index
+        rows.append(
+            {
+                "slot_datetime": slot,
+                "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
+                "Strompreis (Cent/kWh)": 20.0,
+                "Preis extrapoliert": False,
+                "PV-Prognose (kW)": 2.0,
+                "Verbrauch-Prognose (kW)": 1.0,
+                "Geplante Batterie-Aktion (kW)": 0.0,
+                "Netzbezug (kW)": -1.0,
+                "Simulierter SoC (%)": house,
+                "Simulierter SoC 15 kWh (%)": house,
+                "Simulierter SoC EcoFlow (%)": 93.4,
+                "Simulierter SoC Waschen (%)": 100.0,
+                "Simulierter SoC Geschirr (%)": 100.0,
+                "Steuerbefehl": "Automatik",
+            }
+        )
+    df = pd.DataFrame(rows)
+    hist = next(
+        i + 1
+        for i, row in enumerate(rows)
+        if row["slot_datetime"] == datetime(2026, 10, 14, 14, 0, tzinfo=_TZ)
+    )
+    entities = [
+        {"id": "house", "label": "15 kWh", "virtual": False},
+        {"id": "eco", "label": "EcoFlow", "virtual": False},
+        {"id": "wasch", "label": "Waschen", "virtual": True},
+        {"id": "gs", "label": "Geschirr", "virtual": True},
+    ]
+    fig = go.Figure()
+    add_optimized_soc_traces(
+        fig,
+        df,
+        ChartSlotAxis.from_dataframe(df),
+        history_slot_count=hist,
+        chart_now=chart_now,
+        chart_soc_entities=entities,
+    )
+    by_name = {t.name: t for t in fig.data if str(t.name).startswith("SoC")}
+    eco = by_name["SoC · EcoFlow"]
+    wasch = by_name["SoC · Waschen"]
+    gs = by_name["SoC · Geschirr"]
+    for needle in ("14:39", "15:00"):
+        assert _y_at(eco, needle) == 93.4
+        assert _y_at(wasch, needle) == 100.0
+        assert _y_at(gs, needle) == 100.0
+    assert wasch.line.dash != gs.line.dash
+    assert wasch.line.dash not in (None, "solid")
+    assert gs.line.dash not in (None, "solid")

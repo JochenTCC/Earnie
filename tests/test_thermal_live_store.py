@@ -6,7 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
+from optimizer.thermal_house import house_capacity_kwh_per_k
 from optimizer.thermal_live_store import (
+    _MAX_HOUSE_CLIMB_K_PER_H,
+    _resolve_house_live_params,
+    _space_heat_demand_kw,
     build_heat_storage_observability,
     live_min_kwh_by_day,
     map_forced_hours_to_slot_indices,
@@ -289,3 +293,104 @@ def test_build_heat_storage_observability_includes_q(mock_readings):
         round(capacity * 42.0, 3)
     )
     assert len(item["horizon_q_sim_kwh"]) == 4
+
+
+def test_space_heat_climb_rate_limited_at_band_min():
+    """Regression: full C·ΔT climb emptied a warm store in one hour (~4.8 kW)."""
+    living = 157.0
+    mass = "leicht"
+    house_c = house_capacity_kwh_per_k(living, mass)
+    house = _resolve_house_live_params(
+        living_area_m2=living,
+        building_mass=mass,
+        target_temp_c=21.5,
+        house_tolerance_c=0.5,
+        house_heat_loss_kw_per_k=0.12,
+        heating_limit_c=15.0,
+        annual_heat_kwh=6280.0,
+        ambient_forecast_c=[13.0] * 8,
+        start_house_temp_c=21.0,  # band_min
+        max_heat=8.17,
+        house_profile=None,
+    )
+    demand = _space_heat_demand_kw(house, 21.0, 13.0)
+    full_climb = 0.5 * house_c  # pre-fix: recover whole tolerance in 1 h
+    expected = house.house_h * (21.0 - 13.0) + _MAX_HOUSE_CLIMB_K_PER_H * house_c
+    assert full_climb > 3.5
+    assert demand < full_climb
+    assert demand == pytest.approx(expected, rel=1e-6)
+    assert demand < 2.0
+
+
+def test_live_horizon_need_uses_floor_not_hdd(monkeypatch):
+    """Regression: Live+heat_storage remaining was full-calendar HDD (e.g. 25.57 kWh)."""
+    from datetime import date, datetime, time
+
+    from optimizer.targets import resolve_thermal_annual_horizon_kwh
+    from optimizer.thermal_live_store import LiveStorePlan
+    from optimizer.thermal_model import ThermalBand
+
+    profile = {
+        "id": "example_efh",
+        "latitude": 47.4,
+        "longitude": 9.7,
+        "consumers": [
+            {
+                "id": "waermepumpe",
+                "type": "thermal_annual",
+                "nominal_power_kw": 1.9,
+                "thermal": {
+                    "living_area_m2": 157.0,
+                    "heat_storage": {
+                        "volume_liters": 887.0,
+                        "heat_loss_kw_per_k": 0.01,
+                        "setpoint_c": 47.0,
+                        "tolerance_c": 5.0,
+                    },
+                },
+            }
+        ],
+    }
+    day = date(2026, 10, 14)
+    matrix = [
+        {
+            "date": day,
+            "slot_datetime": datetime.combine(day, time(14, 45)),
+            "consumption_mode": "live_snapshot",
+        }
+    ]
+    fake_plan = LiveStorePlan(
+        forced_hour_flags=[False] * 4,
+        floor_electric_kwh=3.25,
+        opp_cap_electric_kwh=0.0,
+        start_temp_c=54.7,
+        temp_low_c=54.3,
+        used_measured_eq=True,
+        used_measured_low=True,
+        band=ThermalBand(47.0, 5.0),
+        electric_by_hour=[0.0] * 4,
+    )
+
+    monkeypatch.setattr(
+        "config.get_resolved_runtime_settings",
+        lambda: {"_house_profile": profile},
+    )
+    monkeypatch.setattr(
+        "optimizer.absent_mode.resolve_absent_status",
+        lambda _profile: {"effective": False},
+    )
+    monkeypatch.setattr(
+        "optimizer.targets._live_heat_storage_horizon_need_kwh",
+        lambda source, house_profile, optimization_matrix: round(
+            fake_plan.floor_electric_kwh + fake_plan.opp_cap_electric_kwh, 3
+        ),
+    )
+    # If live path were skipped, HDD would still be computed — force a large dummy.
+    monkeypatch.setattr(
+        "optimizer.thermal_flex_context.thermal_daily_kwh_for_date",
+        lambda *_a, **_k: 25.57,
+    )
+
+    consumer = {"id": "waermepumpe", "daily_target_source": "thermal_annual"}
+    need = resolve_thermal_annual_horizon_kwh(consumer, matrix)
+    assert need == pytest.approx(3.25)
