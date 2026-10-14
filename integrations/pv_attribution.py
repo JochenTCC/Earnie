@@ -9,21 +9,12 @@ from typing import Any
 
 from ehal.inverter_fields import inv_field
 from ehal.pv_fields import pv_field
-from house_config.inverter import DEFAULT_INVERTER_EFFICIENCY
-from optimizer.milp_inverter import is_grid_tied
+from optimizer.milp_inverter import inverter_efficiency, is_grid_tied
 
 
 def _eta_inv(inv: dict) -> float:
-    raw = inv.get("efficiency")
-    if raw in (None, ""):
-        return float(DEFAULT_INVERTER_EFFICIENCY)
-    eta = float(raw)
-    if not (0.0 < eta <= 1.0):
-        raise ValueError(
-            f"Inverter '{inv.get('id', '?')}': efficiency must be in (0, 1] "
-            f"(got {eta!r})."
-        )
-    return eta
+    """η_inv for live attribution; fail loud when efficiency is missing."""
+    return inverter_efficiency(inv)
 
 
 def _pv_systems_for_inverter(
@@ -303,8 +294,11 @@ def with_attributed_plant_pv(
     scoped_live: dict[str, Any],
     inverters: list[dict],
     pv_systems: list[dict],
+    pv_covers_all_inverters: bool = False,
 ) -> dict[str, Any]:
     """Return telemetry copy with inv←Σpv fills and plant PV derived when missing."""
+    from integrations.plant_balance import assert_mapped_plant_pv_coverage
+
     out = dict(telemetry)
     plant = out.get("sens_pv_production_active")
     # Fail loud on partial PV maps only when plant must be derived.
@@ -324,6 +318,12 @@ def with_attributed_plant_pv(
         )
     else:
         out["sens_pv_production_active"] = max(0.0, float(plant))
+        assert_mapped_plant_pv_coverage(
+            inverters=inverters,
+            pv_systems=pv_systems,
+            scoped_live=filled,
+            pv_covers_all_inverters=pv_covers_all_inverters,
+        )
     return out
 
 

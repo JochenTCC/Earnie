@@ -111,7 +111,10 @@ def render_builtin_inverter_section(
         )
         return None
     inv_id = str(inverter.get("id") or "").strip()
-    st.caption(f"Kennung `{inv_id}` · owned_by `{battery_id}` · AC = Insel")
+    st.caption(
+        f"Kennung `{inv_id}` · owned_by `{battery_id}` · "
+        "AC = Insel (nur angeschlossene Verbraucher; AC-Eingang am Netz)"
+    )
     label = labeled_text_input(
         "WR-Bezeichnung",
         key=f"{session_scope}__planning_bat_inv_label",
@@ -202,7 +205,7 @@ def render_ecoflow_preset_button(*, is_new: bool) -> bool:
     if not st.button(
         "Vorlage: EcoFlow Delta 3",
         key="planning_battery_ecoflow_preset",
-        help="Legt physische Powerstation + integrierten Insel-Hybrid-WR an.",
+        help="Legt physische Powerstation + integrierten Powerstation-Hybrid-WR an.",
     ):
         return False
     battery, inverter = ecoflow_delta_3_seeds()

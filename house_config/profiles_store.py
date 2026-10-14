@@ -498,6 +498,41 @@ def _normalize_plant(raw: dict | None) -> dict:
     grid_meter = _normalize_grid_meter(raw.get("grid_meter"))
     if grid_meter is not None:
         out["grid_meter"] = grid_meter
+    if "pv_covers_all_inverters" in raw:
+        flag = raw["pv_covers_all_inverters"]
+        if not isinstance(flag, bool):
+            raise ValueError(
+                "plant.pv_covers_all_inverters muss boolean sein."
+            )
+        out["pv_covers_all_inverters"] = flag
+    if "balance_tolerance_pct" in raw and raw["balance_tolerance_pct"] not in (
+        None,
+        "",
+    ):
+        try:
+            pct = float(raw["balance_tolerance_pct"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"plant.balance_tolerance_pct ungültig: "
+                f"{raw['balance_tolerance_pct']!r}."
+            ) from exc
+        if pct < 0.0:
+            raise ValueError("plant.balance_tolerance_pct muss >= 0 sein.")
+        out["balance_tolerance_pct"] = pct
+    if "balance_tolerance_w" in raw and raw["balance_tolerance_w"] not in (
+        None,
+        "",
+    ):
+        try:
+            watts = float(raw["balance_tolerance_w"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"plant.balance_tolerance_w ungültig: "
+                f"{raw['balance_tolerance_w']!r}."
+            ) from exc
+        if watts < 0.0:
+            raise ValueError("plant.balance_tolerance_w muss >= 0 sein.")
+        out["balance_tolerance_w"] = watts
     return out
 
 

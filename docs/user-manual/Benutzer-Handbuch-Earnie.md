@@ -251,10 +251,10 @@ Folgende Parameter sind relevant:
 - nutzbare Kapazität (kWh)  
 - max. Lade-/Entladeleistung (kW)  
 - Wirkungsgrad, min./max. SOC  
-- zugeordneter **Wechselrichter** (Hausbatterie) bzw. integrierter Insel-WR bei physischer Powerstation  
+- zugeordneter **Wechselrichter** (Hausbatterie) bzw. integrierter Powerstation-WR bei physischer Powerstation  
 - optional **Verschleißkosten** (damit Earnie bei vielen Zyklen dies wirtschaftlich berücksichtigt)
 
-Wechselrichter pflegen Sie im Tab **Wechselrichter** (Typ, AC-Anschluss netzgekoppelt/Insel, optionale Leistungs-Caps). Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
+Wechselrichter pflegen Sie im Tab **Wechselrichter** (Typ, AC-Anschluss netzgekoppelt/Insel, optionale Leistungs-Caps). **Insel** bedeutet hier: speist nur angeschlossene Verbraucher, nicht den Haus-AC-Bus; der AC-Eingang kann am Netz hängen — nicht „netzlos“. Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
 
 Im Live-Betrieb steuert Earnie Ziel-SOC und Lade-/Entlade-Sollwerte über das Smarthome-System; die konkrete Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter selbst.
 

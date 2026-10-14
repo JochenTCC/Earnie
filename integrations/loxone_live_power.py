@@ -502,33 +502,91 @@ def fetch_flexible_consumers_live_kw(
 
 def fetch_loxone_live_power() -> Optional[dict]:
     """
-    Holt Echtzeit-Leistungswerte aus Loxone, normiert sie und prüft Vorzeichen.
+    Holt Echtzeit-Leistungswerte aus Loxone (hub kW → EHAL W → return kW).
     """
+    from ehal.field_registry import apply_loxone_read, loxone_spec
     from house_config.ehal_bindings import resolve_plant_binding
-    from house_config.ess_bindings import resolve_primary_ess_binding
+    from house_config.ess_bindings import resolve_battery_ess_binding
+    from integrations.plant_balance import (
+        balance_tolerances_from_plant,
+        derive_sens_power_consumers_w,
+        sum_grid_tied_house_ess_power_w,
+    )
     from optimizer.live_export_limit import load_house_doc
 
     house = load_house_doc()
     pv_io = resolve_plant_binding(house, "sens_pv_production_active")
     grid_io = resolve_plant_binding(house, "sens_grid_power_active")
-    battery_io = resolve_primary_ess_binding("sens_ess_power")
-    pv = fetch_loxone_generic_value(pv_io)
-    battery_raw = fetch_loxone_generic_value(battery_io)
-    grid_raw = fetch_loxone_generic_value(grid_io)
-
-    if pv is None or grid_raw is None or battery_raw is None:
+    pv_spec = loxone_spec("sens_pv_production_active")
+    grid_spec = loxone_spec("sens_grid_power_active")
+    ess_spec = loxone_spec("sens_ess_power")
+    if pv_spec is None or grid_spec is None or ess_spec is None:
+        return None
+    pv_w = apply_loxone_read(fetch_loxone_generic_value(pv_io), pv_spec)
+    grid_w = apply_loxone_read(fetch_loxone_generic_value(grid_io), grid_spec)
+    if pv_w is None or grid_w is None:
         return None
 
-    pv = max(0.0, float(pv))
-    battery = float(battery_raw)
-    grid = float(grid_raw)
-    house = pv + battery + grid
+    try:
+        from house_config.components_store import load_components_document
+        from runtime_store.persist_paths import resolve_components_json_path
+
+        path = resolve_components_json_path()
+        components = load_components_document(path) if path else {}
+    except Exception:  # noqa: BLE001
+        components = {}
+    batteries = [
+        b for b in (components.get("batteries") or []) if isinstance(b, dict)
+    ]
+    inverters = [
+        inv for inv in (components.get("inverters") or []) if isinstance(inv, dict)
+    ]
+    bat_by_id = {
+        str(b.get("id") or "").strip(): b
+        for b in batteries
+        if str(b.get("id") or "").strip()
+    }
+
+    def _read_ess(bid: str) -> float | None:
+        bat = bat_by_id.get(bid) or {}
+        qid = resolve_battery_ess_binding(bat, "sens_ess_power")
+        if not qid:
+            return None
+        return apply_loxone_read(fetch_loxone_generic_value(qid), ess_spec)
+
+    try:
+        battery_w = float(
+            sum_grid_tied_house_ess_power_w(
+                batteries=batteries,
+                inverters=inverters,
+                read_power_w=_read_ess,
+            )
+        )
+    except ValueError:
+        return None
+
+    pv_w = max(0.0, float(pv_w))
+    grid_w = float(grid_w)
+    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
+    pct, watts = balance_tolerances_from_plant(plant)
+    try:
+        house_w = derive_sens_power_consumers_w(
+            {
+                "sens_pv_production_active": pv_w,
+                "sens_grid_power_active": grid_w,
+                "sens_ess_power": battery_w,
+            },
+            tolerance_pct=pct,
+            tolerance_w=watts,
+        )
+    except ValueError:
+        return None
 
     return {
-        "pv": round(pv, 2),
-        "house": round(house, 2),
-        "battery": round(battery, 2),
-        "grid": round(grid, 2),
+        "pv": round(pv_w / 1000.0, 2),
+        "house": round(float(house_w) / 1000.0, 2),
+        "battery": round(battery_w / 1000.0, 2),
+        "grid": round(grid_w / 1000.0, 2),
     }
 
 

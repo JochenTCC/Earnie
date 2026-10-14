@@ -273,8 +273,42 @@ class OpenemsAdapter:
             if evcs_power is not None:
                 doc["sens_evcs_active_power"] = max(0.0, float(evcs_power))
 
-        ess_w = float(doc.get("sens_ess_power") or 0.0)
-        doc["sens_power_consumers"] = max(0.0, pv_w + grid_w + ess_w)
+        from integrations.plant_balance import (
+            balance_tolerances_from_plant,
+            derive_sens_power_consumers_w,
+            grid_tied_house_batteries,
+        )
+        from integrations.pv_attribution import (
+            load_components_for_attribution,
+            load_house_for_attribution,
+        )
+
+        house = load_house_for_attribution()
+        components = load_components_for_attribution()
+        plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
+        batteries = [
+            b for b in (components.get("batteries") or []) if isinstance(b, dict)
+        ]
+        inverters = [
+            inv
+            for inv in (components.get("inverters") or [])
+            if isinstance(inv, dict)
+        ]
+        eligible = grid_tied_house_batteries(batteries, inverters)
+        if eligible and doc.get("sens_ess_power") is None:
+            raise OpenemsHttpError(
+                "Cannot derive plant sens_ess_power: OpenEMS channel missing "
+                "while a grid-tied house battery is configured."
+            )
+        if doc.get("sens_ess_power") is None:
+            doc["sens_ess_power"] = 0.0
+        pct, watts = balance_tolerances_from_plant(plant)
+        try:
+            doc["sens_power_consumers"] = derive_sens_power_consumers_w(
+                doc, tolerance_pct=pct, tolerance_w=watts
+            )
+        except ValueError as exc:
+            raise OpenemsHttpError(str(exc)) from exc
         return validate_telemetry(doc)
 
     def _invalid_setpoint_error(

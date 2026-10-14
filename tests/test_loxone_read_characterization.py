@@ -27,11 +27,56 @@ from runtime_store import loxone_push_inbox as inbox
 _PRIMARY_ESS = "15_kwh_speicher"
 
 
+def _components_doc() -> dict:
+    return {
+        "batteries": [
+            {
+                "id": _PRIMARY_ESS,
+                "type": "house",
+                "inverter_id": "wr_main",
+                "regulates_on": "grid",
+                "ehal_bindings": {
+                    ess_field(_PRIMARY_ESS, "sens_ess_power"): "",
+                },
+            }
+        ],
+        "inverters": [
+            {
+                "id": "wr_main",
+                "type": "hybrid",
+                "ac_connection": "grid_tied",
+                "efficiency": 0.97,
+                "ehal_bindings": {},
+            }
+        ],
+        "pv_systems": [],
+    }
+
+
+def _house_doc() -> dict:
+    return {
+        "plant": {
+            "ehal_bindings": {
+                "sens_pv_production_active": "PV",
+                "sens_grid_power_active": "Grid",
+            }
+        }
+    }
+
+
 @pytest.fixture(autouse=True)
 def _primary_ess_id(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "integrations.loxone_adapter.primary_ess_id_for_plant_read",
         lambda: _PRIMARY_ESS,
+    )
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_components_for_attribution",
+        _components_doc,
+    )
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_house_for_attribution",
+        _house_doc,
     )
 
 
@@ -89,12 +134,13 @@ def test_char_read_telemetry_kw_to_w_and_pv_clamp(fetch_mock) -> None:
         qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"): 55.0,
         qualified_plant_id("sens_pv_production_active"): -0.1,  # clamped to 0 before ×1000
         qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"): 0.5,
-        qualified_plant_id("sens_grid_power_active"): -1.2,
+        # Keep derived load within Topology P2 night floor (−100 W).
+        qualified_plant_id("sens_grid_power_active"): -0.4,
     }.get
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert "sens_ess_soc" not in telemetry
     assert telemetry["sens_pv_production_active"] == 0.0
-    assert telemetry["sens_grid_power_active"] == pytest.approx(-1200.0)
+    assert telemetry["sens_grid_power_active"] == pytest.approx(-400.0)
     assert telemetry["sens_ess_power"] == pytest.approx(500.0)
 
 

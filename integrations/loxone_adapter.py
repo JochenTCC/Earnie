@@ -231,21 +231,45 @@ class LoxoneAdapter:
         return validate_capabilities(doc)
 
     def read_telemetry(self) -> EhalTelemetry:
+        from integrations.plant_balance import (
+            balance_tolerances_from_plant,
+            pv_covers_all_inverters_from_plant,
+            sum_grid_tied_house_ess_power_w,
+        )
         from integrations.pv_attribution import (
             collect_scoped_pv_live_from_bindings,
             load_components_for_attribution,
             load_house_for_attribution,
             plant_pv_may_be_derived,
+            read_scoped_pv_loxone,
             with_attributed_plant_pv,
         )
 
         house = load_house_for_attribution()
         components = load_components_for_attribution()
+        plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
+        batteries = [
+            b
+            for b in (components.get("batteries") or [])
+            if isinstance(b, dict)
+        ]
+        inverters = [
+            inv
+            for inv in (components.get("inverters") or [])
+            if isinstance(inv, dict)
+        ]
+        pv_systems = [
+            pv
+            for pv in (components.get("pv_systems") or [])
+            if isinstance(pv, dict)
+        ]
         derive_pv = plant_pv_may_be_derived(house, components)
+        # sens_ess_power comes from Σ ess.{id} (Topology P2), not primary-only.
         required = tuple(
             f
             for f in PLANT_REQUIRED_READ_FIELDS
-            if not (derive_pv and f == "sens_pv_production_active")
+            if f != "sens_ess_power"
+            and not (derive_pv and f == "sens_pv_production_active")
         )
         doc: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
@@ -254,22 +278,45 @@ class LoxoneAdapter:
         }
         for field in required:
             doc[field] = self._require_field(field)
-        if derive_pv and "sens_pv_production_active" not in doc:
-            from integrations.pv_attribution import read_scoped_pv_loxone
-
-            scoped = collect_scoped_pv_live_from_bindings(
-                components, read_value=read_scoped_pv_loxone
-            )
+        scoped = collect_scoped_pv_live_from_bindings(
+            components, read_value=read_scoped_pv_loxone
+        )
+        try:
             doc = with_attributed_plant_pv(
                 doc,
                 scoped_live=scoped,
-                inverters=list(components.get("inverters") or []),
-                pv_systems=list(components.get("pv_systems") or []),
+                inverters=inverters,
+                pv_systems=pv_systems,
+                pv_covers_all_inverters=pv_covers_all_inverters_from_plant(
+                    plant
+                ),
             )
-        pv_w = float(doc["sens_pv_production_active"])
-        grid_w = float(doc["sens_grid_power_active"])
-        ess_w = float(doc["sens_ess_power"])
-        doc["sens_power_consumers"] = self._read_or_derive_consumers(pv_w, grid_w, ess_w)
+        except ValueError as exc:
+            raise LoxoneAdapterError(str(exc)) from exc
+        bat_by_id = {
+            str(b.get("id") or "").strip(): b
+            for b in batteries
+            if str(b.get("id") or "").strip()
+        }
+
+        def _read_ess(bid: str) -> float | None:
+            return self._read_ess_power_w_for_battery(bat_by_id.get(bid) or {})
+
+        try:
+            doc["sens_ess_power"] = sum_grid_tied_house_ess_power_w(
+                batteries=batteries,
+                inverters=inverters,
+                read_power_w=_read_ess,
+            )
+        except ValueError as exc:
+            raise LoxoneAdapterError(str(exc)) from exc
+        pct, watts = balance_tolerances_from_plant(plant)
+        try:
+            doc["sens_power_consumers"] = self._read_or_derive_consumers(
+                doc, tolerance_pct=pct, tolerance_w=watts
+            )
+        except ValueError as exc:
+            raise LoxoneAdapterError(str(exc)) from exc
         for field in PLANT_OPTIONAL_READ_FIELDS:
             value = self._read_optional_field(field)
             if value is not None:
@@ -283,6 +330,22 @@ class LoxoneAdapter:
             )
         }
         return validate_telemetry(plant_doc)
+
+    def _read_ess_power_w_for_battery(self, battery: dict) -> float | None:
+        """Read one ``ess.{id}.sens_ess_power`` (W); None if binding/value missing."""
+        from house_config.ess_bindings import resolve_battery_ess_binding
+
+        spec = loxone_spec("sens_ess_power")
+        if spec is None:
+            return None
+        qid = resolve_battery_ess_binding(battery, "sens_ess_power")
+        if not qid:
+            return None
+        raw = loxone_client.fetch_loxone_generic_value(qid)
+        value = apply_loxone_read(raw, spec)
+        if value is None:
+            return None
+        return float(value)
 
     def _read_optional_field(self, field: str) -> float | None:
         spec = loxone_spec(field)
@@ -471,11 +534,23 @@ class LoxoneAdapter:
             field="set_evcs_mode",
         )
 
-    def _read_or_derive_consumers(self, pv_w: float, grid_w: float, ess_w: float) -> float:
+    def _read_or_derive_consumers(
+        self,
+        telemetry: dict[str, Any],
+        *,
+        tolerance_pct: float,
+        tolerance_w: float,
+    ) -> float:
+        from integrations.plant_balance import derive_sens_power_consumers_w
+
         measured = self._read_optional_field("sens_power_consumers")
         if measured is not None:
             return measured
-        return max(0.0, pv_w + grid_w + ess_w)
+        return derive_sens_power_consumers_w(
+            telemetry,
+            tolerance_pct=tolerance_pct,
+            tolerance_w=tolerance_w,
+        )
 
     def _require_field(self, field: str) -> float:
         spec = loxone_spec(field)

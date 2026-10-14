@@ -62,7 +62,7 @@ def migrate_components_inverters(doc: dict) -> tuple[dict, bool]:
                 inverters.append(
                     {
                         "id": island_id,
-                        "label": f"Insel-WR {bat_out.get('label') or bat_id}",
+                        "label": f"Powerstation-WR {bat_out.get('label') or bat_id}",
                         "type": "hybrid",
                         "ac_connection": "island",
                         "control": "full",

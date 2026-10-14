@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Topology P2 + Powerstation AC wording (2026-10-14)
+
+- [x] **Topology P2 — generator-side coverage in the live balance** (epic **Topology**; [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md) §4)
+  - Plant `sens_ess_power` = Σ grid-tied house `ess.{id}.sens_ess_power` (fail loud on missing binding); battery-less → `0`
+  - Mapped plant PV + several grid-tied inverters with PV → complete `inv.*`/`pv.*` coverage or `plant.pv_covers_all_inverters: true`
+  - Derived-load tolerance `plant.balance_tolerance_pct` / `balance_tolerance_w` (defaults 5 / 100 W); below floor → telemetry error
+  - `pv_attribution._eta_inv` → `inverter_efficiency` (no 0.97 soft default)
+  - Helpers in `integrations/plant_balance.py`; wired in Loxone / HA / OpenEMS / `ehal_live` / `loxone_live_power`; UI checkbox; `tests/test_topology_p2.py`
+- [x] **Topology follow-up — Powerstation AC wording (`island`)**
+  - Auto labels `Powerstation-WR …` (lifecycle / presets / migrate_inverters; existing stored labels unchanged)
+  - UI + German user docs + `docs/spec/ehal.md` / `ehal-com.md`: Insel = bus participation, not off-grid
+
 ### Retire flat plant `sens_ess_soc` (2026-10-14)
 
 - [x] **Remove `sens_ess_soc` from code as flat EHAL field** (full wire break; `EHAL_SCHEMA_VERSION` stays **4** — no public release since 3)

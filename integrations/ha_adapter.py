@@ -297,11 +297,9 @@ class HaAdapter:
         if self._weg_b:
             return self._read_telemetry_weg_b()
         from integrations.pv_attribution import (
-            collect_scoped_pv_live_from_bindings,
             load_components_for_attribution,
             load_house_for_attribution,
             plant_pv_may_be_derived,
-            with_attributed_plant_pv,
         )
 
         house = load_house_for_attribution()
@@ -328,6 +326,17 @@ class HaAdapter:
         for field_name in required:
             doc[field_name] = self._read_mapped_numeric(field_name)
         for field_name in TELEMETRY_OPTIONAL:
+            # sens_ess_power / load derive handled in Topology P2 balance step.
+            if field_name in ("sens_ess_power", "sens_power_consumers"):
+                if field_name == "sens_power_consumers" and self._entity_key_for_kind(
+                    field_name
+                ):
+                    try:
+                        value = self._read_mapped_numeric(field_name)
+                    except (HaHttpError, ValueError):
+                        continue
+                    doc[field_name] = max(0.0, value)
+                continue
             if not self._entity_key_for_kind(field_name):
                 continue
             try:
@@ -338,34 +347,7 @@ class HaAdapter:
                 value = max(0.0, value)
             doc[field_name] = value
 
-        if derive_pv and "sens_pv_production_active" not in doc:
-            from integrations.pv_attribution import read_scoped_pv_ha
-
-            def _read_field(field: str) -> float | None:
-                return read_scoped_pv_ha(field, adapter=self)
-
-            scoped = collect_scoped_pv_live_from_bindings(
-                components, read_value=_read_field
-            )
-            doc = with_attributed_plant_pv(
-                doc,
-                scoped_live=scoped,
-                inverters=list(components.get("inverters") or []),
-                pv_systems=list(components.get("pv_systems") or []),
-            )
-
-        if "sens_pv_production_active" in doc:
-            doc["sens_pv_production_active"] = max(
-                0.0, float(doc["sens_pv_production_active"])
-            )
-        if doc.get("sens_power_consumers") is None:
-            ess = float(doc.get("sens_ess_power") or 0.0)
-            doc["sens_power_consumers"] = max(
-                0.0,
-                float(doc["sens_pv_production_active"])
-                + float(doc["sens_grid_power_active"])
-                + ess,
-            )
+        doc = self._apply_topology_p2_balance(doc, house=house, components=components)
         plant_doc = {
             k: v
             for k, v in doc.items()
@@ -391,11 +373,9 @@ class HaAdapter:
     def _read_telemetry_weg_b(self) -> EhalTelemetry:
         from integrations.ha_push_read import PushReadError, read_push_ehal_value
         from integrations.pv_attribution import (
-            collect_scoped_pv_live_from_bindings,
             load_components_for_attribution,
             load_house_for_attribution,
             plant_pv_may_be_derived,
-            with_attributed_plant_pv,
         )
 
         house = load_house_for_attribution()
@@ -430,6 +410,21 @@ class HaAdapter:
             except PushReadError as exc:
                 raise HaHttpError(str(exc)) from exc
         for field_name in TELEMETRY_OPTIONAL:
+            if field_name in ("sens_ess_power", "sens_power_consumers"):
+                if field_name == "sens_power_consumers":
+                    resolved = self._push_qid_for_kind(field_name)
+                    if resolved is not None:
+                        adapter_key, qid = resolved
+                        try:
+                            value = read_push_ehal_value(
+                                qid,
+                                sign=self.cfg.sign,
+                                adapter_field=adapter_key,
+                            )
+                        except PushReadError:
+                            continue
+                        doc[field_name] = max(0.0, value)
+                continue
             resolved = self._push_qid_for_kind(field_name)
             if resolved is None:
                 continue
@@ -446,7 +441,57 @@ class HaAdapter:
                 value = max(0.0, value)
             doc[field_name] = value
 
-        if derive_pv and "sens_pv_production_active" not in doc:
+        doc = self._apply_topology_p2_balance(doc, house=house, components=components)
+        plant_doc = {
+            k: v
+            for k, v in doc.items()
+            if not (str(k).startswith("inv.") or str(k).startswith("pv."))
+        }
+        return validate_telemetry(plant_doc)
+
+    def _apply_topology_p2_balance(
+        self,
+        doc: dict[str, Any],
+        *,
+        house: dict,
+        components: dict,
+    ) -> dict[str, Any]:
+        """PV coverage, Σ ESS power, derived load with tolerance (Topology P2)."""
+        from integrations.plant_balance import (
+            balance_tolerances_from_plant,
+            derive_sens_power_consumers_w,
+            grid_tied_house_batteries,
+            pv_covers_all_inverters_from_plant,
+            sum_grid_tied_house_ess_power_w,
+        )
+        from integrations.pv_attribution import (
+            collect_scoped_pv_live_from_bindings,
+            read_scoped_pv_ha,
+            with_attributed_plant_pv,
+        )
+
+        plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
+        batteries = [
+            b for b in (components.get("batteries") or []) if isinstance(b, dict)
+        ]
+        inverters = [
+            inv
+            for inv in (components.get("inverters") or [])
+            if isinstance(inv, dict)
+        ]
+        pv_systems = [
+            pv
+            for pv in (components.get("pv_systems") or [])
+            if isinstance(pv, dict)
+        ]
+        eligible = grid_tied_house_batteries(batteries, inverters)
+
+        def _read_field(field: str) -> float | None:
+            return read_scoped_pv_ha(field, adapter=self)
+
+        if self._weg_b:
+            from integrations.ha_push_read import PushReadError, read_push_ehal_value
+
             def _read_push_scoped(field: str) -> float | None:
                 qid = self.cfg.push_read_qids.get(field)
                 if not qid:
@@ -468,31 +513,87 @@ class HaAdapter:
             scoped = collect_scoped_pv_live_from_bindings(
                 components, read_value=_read_push_scoped
             )
-            doc = with_attributed_plant_pv(
+        else:
+            scoped = collect_scoped_pv_live_from_bindings(
+                components, read_value=_read_field
+            )
+        try:
+            out = with_attributed_plant_pv(
                 doc,
                 scoped_live=scoped,
-                inverters=list(components.get("inverters") or []),
-                pv_systems=list(components.get("pv_systems") or []),
+                inverters=inverters,
+                pv_systems=pv_systems,
+                pv_covers_all_inverters=pv_covers_all_inverters_from_plant(
+                    plant
+                ),
+            )
+        except ValueError as exc:
+            raise HaHttpError(str(exc)) from exc
+        if "sens_pv_production_active" in out:
+            out["sens_pv_production_active"] = max(
+                0.0, float(out["sens_pv_production_active"])
             )
 
-        if "sens_pv_production_active" in doc:
-            doc["sens_pv_production_active"] = max(
-                0.0, float(doc["sens_pv_production_active"])
-            )
-        if doc.get("sens_power_consumers") is None:
-            ess = float(doc.get("sens_ess_power") or 0.0)
-            doc["sens_power_consumers"] = max(
-                0.0,
-                float(doc["sens_pv_production_active"])
-                + float(doc["sens_grid_power_active"])
-                + ess,
-            )
-        plant_doc = {
-            k: v
-            for k, v in doc.items()
-            if not (str(k).startswith("inv.") or str(k).startswith("pv."))
+        bat_by_id = {
+            str(b.get("id") or "").strip(): b
+            for b in batteries
+            if str(b.get("id") or "").strip()
         }
-        return validate_telemetry(plant_doc)
+
+        def _read_ess(bid: str) -> float | None:
+            return self._read_ess_power_w_for_battery(
+                bat_by_id.get(bid) or {},
+                eligible_count=len(eligible),
+            )
+
+        try:
+            out["sens_ess_power"] = sum_grid_tied_house_ess_power_w(
+                batteries=batteries,
+                inverters=inverters,
+                read_power_w=_read_ess,
+            )
+        except ValueError as exc:
+            raise HaHttpError(str(exc)) from exc
+
+        if out.get("sens_power_consumers") is None:
+            pct, watts = balance_tolerances_from_plant(plant)
+            try:
+                out["sens_power_consumers"] = derive_sens_power_consumers_w(
+                    out, tolerance_pct=pct, tolerance_w=watts
+                )
+            except ValueError as exc:
+                raise HaHttpError(str(exc)) from exc
+        return out
+
+    def _read_ess_power_w_for_battery(
+        self,
+        battery: dict,
+        *,
+        eligible_count: int,
+    ) -> float | None:
+        """Read ``ess.{id}.sens_ess_power``; legacy plant-flat only for single ESS."""
+        from ehal.ess_fields import ess_field
+
+        bid = str(battery.get("id") or "").strip()
+        if not bid:
+            return None
+        field = ess_field(bid, "sens_ess_power")
+        try:
+            if self._weg_b:
+                resolved = self._push_qid_for_kind(field)
+                if resolved is not None:
+                    return float(self._read_mapped_numeric(field))
+            elif field in self.cfg.entities or self._entity_key_for_kind(field):
+                return float(self._read_mapped_numeric(field))
+        except (HaHttpError, ValueError):
+            return None
+        # Single grid-tied house battery may still use plant-flat sens_ess_power.
+        if eligible_count == 1 and self._entity_key_for_kind("sens_ess_power"):
+            try:
+                return float(self._read_mapped_numeric("sens_ess_power"))
+            except (HaHttpError, ValueError):
+                return None
+        return None
 
     def _fence_rest_field(self, field_name: str) -> None:
         if not self._weg_b:

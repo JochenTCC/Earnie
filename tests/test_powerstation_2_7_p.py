@@ -301,3 +301,25 @@ def test_milp_deadline_prefers_cheap_slot_within_24h():
     assert target_soc is not None
     # Slot-0 charge (positive target_power under force-charge conventions) or Automatik.
     assert float(target_power or 0.0) >= -1e-6
+
+
+def test_save_falls_back_to_direct_write_on_winerror_5(tmp_path, monkeypatch):
+    """Regression: WinError 5 on os.replace must not abort the Durchlauf."""
+    from runtime_store import powerstation_reserves as store
+
+    path = tmp_path / "reserves.json"
+    monkeypatch.setattr(store, "_path", lambda: str(path))
+
+    def _fail_replace(src, dst):
+        raise PermissionError(13, "Zugriff verweigert", dst, dst, 5)
+
+    monkeypatch.setattr(store.os, "replace", _fail_replace)
+    store.save_reserve_states(
+        {
+            "virtual_gs": store.default_state(1.0),
+        }
+    )
+    assert path.is_file()
+    loaded = store.load_reserve_states()
+    assert "virtual_gs" in loaded
+    assert loaded["virtual_gs"]["target_kwh"] == pytest.approx(1.0)

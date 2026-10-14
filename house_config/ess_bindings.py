@@ -34,12 +34,8 @@ def primary_battery(
     return primary_house_battery(mappable_batteries(batteries))
 
 
-def resolve_primary_ess_binding(
-    kind: str,
-    *,
-    batteries: list[dict] | None = None,
-) -> str:
-    """Merker or Q8 entity-scoped exchange id for the primary house battery.
+def resolve_battery_ess_binding(battery: dict, kind: str) -> str:
+    """Merker or Q8 entity-scoped exchange id for one battery.
 
     Empty Merker with key present → ``ess.{id}.{kind}`` for ``set_*`` / pushable
     reads. Never invents plant-flat ``sens_ess_*`` / ``set_ess_*`` aliases.
@@ -47,13 +43,12 @@ def resolve_primary_ess_binding(
     kind_s = str(kind or "").strip()
     if kind_s not in ESS_FIELD_KINDS:
         raise ValueError(f"Unknown ESS EHAL kind '{kind_s}'.")
-    bat = primary_battery(batteries)
-    if not bat:
+    if not isinstance(battery, dict):
         return ""
-    bid = str(bat.get("id") or "").strip()
+    bid = str(battery.get("id") or "").strip()
     if not bid:
         return ""
-    bindings = bat.get("ehal_bindings")
+    bindings = battery.get("ehal_bindings")
     bind_map = bindings if isinstance(bindings, dict) else {}
     merker = binding_address(bind_map, bid, kind_s)
     if merker:
@@ -66,6 +61,18 @@ def resolve_primary_ess_binding(
     if kind_s.startswith("set_") or is_pushable_kind(kind_s):
         return field
     return ""
+
+
+def resolve_primary_ess_binding(
+    kind: str,
+    *,
+    batteries: list[dict] | None = None,
+) -> str:
+    """Merker or Q8 entity-scoped exchange id for the primary house battery."""
+    bat = primary_battery(batteries)
+    if not bat:
+        return ""
+    return resolve_battery_ess_binding(bat, kind)
 
 
 def entity_scoped_battery_bindings(

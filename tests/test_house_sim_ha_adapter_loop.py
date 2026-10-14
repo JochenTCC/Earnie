@@ -10,7 +10,7 @@ from integrations.ha_adapter import HaAdapter, HaConfig, HaHttpError
 
 
 @pytest.fixture
-def bench():
+def bench(monkeypatch):
     package = load_archetype("evcc_en")
     store = package.build_store()
     physics = initial_physics(package)
@@ -26,6 +26,36 @@ def bench():
         sign=dict(package.ehal_sign),
     )
     adapter = HaAdapter(cfg)
+    # Topology P2 reads live house/components — isolate from local profiles.
+    house = {"plant": {"ehal_bindings": {}}, "profiles": {}}
+    components = {
+        "batteries": [
+            {
+                "id": "bat1",
+                "type": "house",
+                "inverter_id": "wr1",
+                "regulates_on": "grid",
+            }
+        ],
+        "inverters": [
+            {
+                "id": "wr1",
+                "type": "hybrid",
+                "ac_connection": "grid_tied",
+                "control": "full",
+                "efficiency": 0.97,
+            }
+        ],
+        "pv_systems": [],
+    }
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_house_for_attribution",
+        lambda: house,
+    )
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_components_for_attribution",
+        lambda: components,
+    )
     yield package, store, physics, adapter, base_url
     stop_mock_rest()
 
@@ -49,11 +79,12 @@ def test_unavailable_required_raises(bench):
         adapter.read_telemetry()
 
 
-def test_unknown_optional_skipped(bench):
+def test_unknown_ess_power_raises_with_house_battery(bench):
+    """Topology P2: grid-tied house ESS power is required, not optional."""
     _package, store, _physics, adapter, _base = bench
     store.set_state("sensor.evcc_battery_power", "unknown")
-    telem = adapter.read_telemetry()
-    assert "sens_ess_power" not in telem or telem.get("sens_ess_power") is None
+    with pytest.raises(HaHttpError, match="sens_ess_power"):
+        adapter.read_telemetry()
 
 
 def test_write_setpoints_updates_mock(bench):

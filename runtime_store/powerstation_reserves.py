@@ -68,13 +68,41 @@ def load_reserve_states() -> dict[str, dict[str, Any]]:
     return out
 
 
-def save_reserve_states(states: dict[str, dict[str, Any]]) -> None:
-    path = _path()
+def _atomic_replace_unavailable(exc: OSError) -> bool:
+    """True when tmp→dest replace cannot complete (Windows lock / SMB / UNC)."""
+    if getattr(exc, "errno", None) in (13, 16):
+        return True
+    return getattr(exc, "winerror", None) == 5
+
+
+def _write_json_direct(path: str, data: dict[str, dict[str, Any]]) -> None:
     _ensure_parent(path)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=False)
+
+
+def save_reserve_states(states: dict[str, dict[str, Any]]) -> None:
+    """Atomically write reserve state; fall back to direct write on WinError 5 / SMB."""
+    path = _path()
     tmp = f"{path}.tmp"
-    with open(tmp, "w", encoding="utf-8") as handle:
-        json.dump(states, handle, indent=2, ensure_ascii=False)
-    os.replace(tmp, path)
+    try:
+        _write_json_direct(tmp, states)
+        os.replace(tmp, path)
+    except OSError as exc:
+        if not _atomic_replace_unavailable(exc):
+            raise
+        logger.warning(
+            "powerstation_reserves: atomic replace to %s failed (%s), writing directly",
+            path,
+            exc,
+        )
+        _write_json_direct(path, states)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def default_state(target_kwh: float) -> dict[str, Any]:

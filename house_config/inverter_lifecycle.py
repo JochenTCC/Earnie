@@ -13,7 +13,7 @@ from house_config.powerstation import BACKING_VIRTUAL, BATTERY_TYPE_POWERSTATION
 def owned_island_inverter_id(battery_id: str) -> str:
     bat_id = str(battery_id or "").strip()
     if not bat_id:
-        raise ValueError("battery_id fehlt für Insel-Wechselrichter.")
+        raise ValueError("battery_id fehlt für Powerstation-Wechselrichter.")
     return f"wr_{bat_id}"
 
 
@@ -69,7 +69,7 @@ def ensure_owned_island_inverter(
         cleaned.append(
             {
                 "id": inv_id,
-                "label": f"Insel-WR {label}",
+                "label": f"Powerstation-WR {label}",
                 "type": INVERTER_TYPE_HYBRID,
                 "ac_connection": AC_ISLAND,
                 "control": DEFAULT_INVERTER_CONTROL,

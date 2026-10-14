@@ -54,7 +54,7 @@ Mehrere manuelle Geräte können dieselbe virtuelle Powerstation nutzen: gemeins
 
 Ausgeblendet und beim Speichern/Normalisieren von der Hausbatterie übernommen (bzw. feste Defaults, falls keine Hausbatterie existiert): Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungs-Schwelle, Standby, Steuerbarkeit, `limits_from_live`, Verschleiß. Entladeleistung der virtuellen Powerstation wird immer `0` gesetzt; Verschleiß bleibt aus (Zyklen zählen auf der Hausbatterie). Kein `inverter_id`.
 
-Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular und bekommen einen **integrierten Insel-Wechselrichter** (`owned_by` = Batterie-ID, Abschnitt „Integrierter Wechselrichter“ im Hauskonfigurator).
+Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular und bekommen einen **integrierten Powerstation-Wechselrichter** (`owned_by` = Batterie-ID, Abschnitt „Integrierter Wechselrichter“ im Hauskonfigurator). Der speist nur angeschlossene Verbraucher, nicht den Haus-AC-Bus; der AC-Eingang kann am Netz hängen (einseitige Last) — das ist **kein** „netzloses“ Gerät.
 
 ### Standby-Backup (`role: standby_backup`, 2.7.h)
 
@@ -65,16 +65,16 @@ Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earni
 - **Quellenwahl vs. Ladegrenzen:** Quellenwahl und Lade-/Entladegrenzen der physischen Powerstation brauchen jeweils ein **eigenes** Pattern-B-Binding an der Powerstation und greifen **nicht** auf die Hausbatterie-Mappings zurück (sonst würden Haus-Lade-/Entladegrenzen überschrieben).
 - Reserve-Größe: angeschlossene Last × teure Stunden im Horizont (kein Energie-pro-Lauf-Lernen wie bei `single_use`).
 
-Live-PV-Leistung (AC-Summe der Anlage) kommt über `plant.ehal_bindings.sens_pv_production_active`. Fehlt dieses Mapping und sind alle netzgekoppelten Wechselrichter mit PV vollständig über `inv.{id}.sens_inv_power_pv` (oder alle zugehörigen `pv.{id}.sens_pv_production_active`) gemappt, leitet Earnie die Anlagen-PV aus Σ(WR-PV · η_inv) ab — Insel-WR zählen nicht mit; unvollständige Maps schlagen fehl. Optional je PV-Anlage: `pv_systems[].ehal_bindings` mit `pv.{id}.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Anlagen-Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
+Live-PV-Leistung (AC-Summe der Anlage) kommt über `plant.ehal_bindings.sens_pv_production_active`. Fehlt dieses Mapping und sind alle netzgekoppelten Wechselrichter mit PV vollständig über `inv.{id}.sens_inv_power_pv` (oder alle zugehörigen `pv.{id}.sens_pv_production_active`) gemappt, leitet Earnie die Anlagen-PV aus Σ(WR-PV · η_inv) ab — Powerstation-/Insel-WR (`ac_connection: island`) zählen nicht mit; unvollständige Maps schlagen fehl. Optional je PV-Anlage: `pv_systems[].ehal_bindings` mit `pv.{id}.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Anlagen-Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
 
 ## Wechselrichter (`inverters[]`, 2.7.l)
 
-PV-Anlagen und Batterien referenzieren denselben Wechselrichter über `inverter_id` (n:1). Im Hauskonfigurator: Tab **Wechselrichter** plus Auswahl in den PV-/Batterie-Formularen. Geräte-Vorlage **EcoFlow Delta 3** legt physische Powerstation + integrierten Insel-Hybrid-WR in einem Schritt an.
+PV-Anlagen und Batterien referenzieren denselben Wechselrichter über `inverter_id` (n:1). Im Hauskonfigurator: Tab **Wechselrichter** plus Auswahl in den PV-/Batterie-Formularen. Geräte-Vorlage **EcoFlow Delta 3** legt physische Powerstation + integrierten Powerstation-Hybrid-WR in einem Schritt an.
 
 | Feld | Bedeutung |
 |------|-----------|
 | `type` | `hybrid` (PV+Batterie DC), `pv_string` (nur PV), `battery` (AC-gekoppelter Batterie-WR; keine PV-Seite) |
-| `ac_connection` | `grid_tied` = AC am Hausbus (Automatik/Optimieren möglich); `island` = nur angeschlossene Lasten, PV dieses WR zählt nicht in der Hausbilanz. Ersetzt das frühere `batteries[].kind` (`isolated` ⇒ `island`). |
+| `ac_connection` | `grid_tied` = AC am Hausbus (Automatik/Optimieren möglich); `island` = speist nur angeschlossene Verbraucher, **nicht** den Haus-AC-Bus (PV dieses WR zählt nicht in der Hausbilanz); AC-Eingang kann am Netz hängen (einseitige Last) — meint **Bus-Teilnahme**, nicht „netzlos“. Ersetzt das frühere `batteries[].kind` (`isolated` ⇒ `island`). |
 | `max_ac_power_kw` | Optional: AC-Clipping / Entlade-Cap; fehlt = kein Cap |
 | `max_pv_input_kw` | Optional: DC/MPPT-Cap |
 | `max_ac_charge_kw` | Optional: Netzladen über den WR |
@@ -99,7 +99,9 @@ Beide `plant.grid_meter`-Flags müssen im Live-Pfad `true` sein. Migration beste
 python -m scripts.migrate_topology_once --config-dir <config-dir>
 ```
 
-setzt `regulates_on: grid` für jede Hausbatterie und legt `plant.grid_meter` mit `true`/`true` an — die drei Fragen danach bestätigen. Szenarien-Explorer und Backtesting sind von den Live-Ablehnungen ausgenommen (Schema-Regeln wie Batterie an `pv_string`-WR gelten überall). Details: [EHAL-Spec § Plant topology](../spec/ehal.md).
+setzt `regulates_on: grid` für jede Hausbatterie und legt `plant.grid_meter` mit `true`/`true` an — die drei Fragen danach bestätigen. Szenarien-Explorer und Backtesting sind von den Live-Ablehnungen ausgenommen (Schema-Regeln wie Batterie an `pv_string`-WR gelten überall).
+
+**Live-Bilanz (Topology P2):** Anlagen-`sens_ess_power` ist die Summe der gemappten `ess.{id}.sens_ess_power` aller netzgekoppelten Hausbatterien (fehlendes Binding → Fehler). Bei gemappter Anlagen-PV und mehreren netzgekoppelten WR mit PV: vollständige `inv.*`/`pv.*`-Maps **oder** `plant.pv_covers_all_inverters: true` (Hauskonfigurator). Abgeleitete Hauslast: negative Restbilanz unter der Toleranz (`plant.balance_tolerance_pct` / `balance_tolerance_w`, Defaults 5 % / 100 W) ist ein Telemetrie-Fehler, kein stilles `0`. Details: [EHAL-Spec § Plant topology](../spec/ehal.md).
 
 ## Steuerbarkeit (`control`)
 

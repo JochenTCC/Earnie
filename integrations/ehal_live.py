@@ -134,25 +134,46 @@ def load_write_error() -> EhalWriteError | None:
         return None
 
 
-def derive_sens_power_consumers_w(telemetry: dict[str, Any]) -> float:
-    """House load W: mapped value if present, else max(0, PV + grid + ESS).
+def _plant_from_house_profiles() -> dict:
+    try:
+        from integrations.pv_attribution import load_house_for_attribution
 
-    EHAL signs: grid ``+`` = import, ESS ``+`` = discharge.
-    """
-    mapped = telemetry.get("sens_power_consumers")
-    if mapped is not None:
-        return max(0.0, float(mapped))
-    pv = float(telemetry["sens_pv_production_active"])
-    grid = float(telemetry["sens_grid_power_active"])
-    ess = float(telemetry.get("sens_ess_power") or 0.0)
-    return max(0.0, pv + grid + ess)
+        house = load_house_for_attribution()
+        plant = house.get("plant") if isinstance(house, dict) else None
+        return plant if isinstance(plant, dict) else {}
+    except Exception:  # noqa: BLE001 — derive must stay usable in tests
+        return {}
 
 
-def with_derived_sens_power_consumers(telemetry: dict[str, Any]) -> dict[str, Any]:
+def derive_sens_power_consumers_w(
+    telemetry: dict[str, Any],
+    *,
+    plant: dict | None = None,
+) -> float:
+    """House load W: mapped value if present, else PV + grid + ESS with P2 tolerance."""
+    from integrations.plant_balance import (
+        balance_tolerances_from_plant,
+        derive_sens_power_consumers_w as derive_balanced,
+    )
+
+    plant_map = plant if isinstance(plant, dict) else _plant_from_house_profiles()
+    pct, watts = balance_tolerances_from_plant(plant_map)
+    return derive_balanced(
+        telemetry, tolerance_pct=pct, tolerance_w=watts
+    )
+
+
+def with_derived_sens_power_consumers(
+    telemetry: dict[str, Any],
+    *,
+    plant: dict | None = None,
+) -> dict[str, Any]:
     """Return a copy with sens_power_consumers filled when missing/null."""
     out = dict(telemetry)
     if out.get("sens_power_consumers") is None:
-        out["sens_power_consumers"] = derive_sens_power_consumers_w(out)
+        out["sens_power_consumers"] = derive_sens_power_consumers_w(
+            out, plant=plant
+        )
     return out
 
 
@@ -184,11 +205,15 @@ def with_live_pv_attribution(telemetry: dict[str, Any]) -> dict[str, Any]:
     Also derives missing ``inv.*.sens_inv_power_pv`` from complete per-PV maps.
     Fail loud on partial coverage when plant must be derived.
     """
+    from integrations.plant_balance import pv_covers_all_inverters_from_plant
     from integrations.pv_attribution import (
         load_components_for_attribution,
+        load_house_for_attribution,
         with_attributed_plant_pv,
     )
 
+    house = load_house_for_attribution()
+    plant = house.get("plant") if isinstance(house, dict) else {}
     components = load_components_for_attribution()
     inverters = list(components.get("inverters") or [])
     pv_systems = list(components.get("pv_systems") or [])
@@ -208,6 +233,9 @@ def with_live_pv_attribution(telemetry: dict[str, Any]) -> dict[str, Any]:
         scoped_live=scoped,
         inverters=inverters,
         pv_systems=pv_systems,
+        pv_covers_all_inverters=pv_covers_all_inverters_from_plant(
+            plant if isinstance(plant, dict) else {}
+        ),
     )
     if out.get("sens_pv_production_active") is None:
         raise ValueError(

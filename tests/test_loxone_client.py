@@ -116,10 +116,60 @@ class TestFetchLoxoneGenericValue:
 
 
 class TestFetchLoxoneLivePower:
+    def _patch_topology(self, *, values: dict[str, float | None]):
+        house = {
+            "plant": {
+                "ehal_bindings": {
+                    "sens_pv_production_active": "PV",
+                    "sens_grid_power_active": "Grid",
+                }
+            }
+        }
+        components = {
+            "batteries": [
+                {
+                    "id": "bat1",
+                    "type": "house",
+                    "inverter_id": "wr1",
+                    "regulates_on": "grid",
+                    "ehal_bindings": {"ess.bat1.sens_ess_power": "Bat"},
+                }
+            ],
+            "inverters": [
+                {
+                    "id": "wr1",
+                    "type": "hybrid",
+                    "ac_connection": "grid_tied",
+                    "control": "full",
+                }
+            ],
+        }
+
+        def _fetch(io_name: str):
+            return values.get(str(io_name))
+
+        return (
+            patch(
+                "optimizer.live_export_limit.load_house_doc",
+                return_value=house,
+            ),
+            patch(
+                "runtime_store.persist_paths.resolve_components_json_path",
+                return_value="components.json",
+            ),
+            patch(
+                "house_config.components_store.load_components_document",
+                return_value=components,
+            ),
+            patch.object(lc, "fetch_loxone_generic_value", side_effect=_fetch),
+            patch.object(lc.config, "get", return_value="io"),
+        )
+
     def test_computes_house_from_components(self):
-        with patch.object(
-            lc, "fetch_loxone_generic_value", side_effect=[2.5, -1.0, 0.5]
-        ), patch.object(lc.config, "get", return_value="io"):
+        patches = self._patch_topology(
+            values={"PV": 2.5, "Bat": -1.0, "Grid": 0.5}
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
             result = lc.fetch_loxone_live_power()
 
         assert result == {
@@ -130,18 +180,20 @@ class TestFetchLoxoneLivePower:
         }
 
     def test_negative_pv_is_clamped_to_zero(self):
-        with patch.object(
-            lc, "fetch_loxone_generic_value", side_effect=[-0.3, 1.0, 0.2]
-        ), patch.object(lc.config, "get", return_value="io"):
+        patches = self._patch_topology(
+            values={"PV": -0.3, "Bat": 1.0, "Grid": 0.2}
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
             result = lc.fetch_loxone_live_power()
 
         assert result["pv"] == 0.0
         assert result["house"] == pytest.approx(1.2)
 
     def test_returns_none_when_any_value_missing(self):
-        with patch.object(
-            lc, "fetch_loxone_generic_value", side_effect=[1.0, None, 0.5]
-        ), patch.object(lc.config, "get", return_value="io"):
+        patches = self._patch_topology(
+            values={"PV": 1.0, "Bat": None, "Grid": 0.5}
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
             assert lc.fetch_loxone_live_power() is None
 
 

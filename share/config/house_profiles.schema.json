@@ -75,6 +75,20 @@
               "description": "True when there is exactly one import and one export price behind that meter."
             }
           }
+        },
+        "pv_covers_all_inverters": {
+          "type": "boolean",
+          "description": "Topology P2: when plant PV is mapped and several grid-tied inverters own PV, true acknowledges that the plant sum covers all of them (otherwise complete inv.*/pv.* maps are required)."
+        },
+        "balance_tolerance_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Topology P2: derived-load negative-balance tolerance as percent of P_PV (default 5 when absent)."
+        },
+        "balance_tolerance_w": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Topology P2: absolute floor for derived-load negative-balance tolerance in W (default 100 when absent)."
         }
       }
     },

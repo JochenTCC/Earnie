@@ -202,7 +202,7 @@ An inverter is a first-class device in `components.json` → `inverters[]`. PV s
 | `battery` | — | AC-coupled | charge/discharge ≤ `max_ac` |
 
 
-`ac_connection`: `grid_tied` = AC side on the house bus; `island` = AC side feeds only attached loads, its PV is not part of the house balance, battery never runs in Automatik (replaces `batteries[].kind = isolated`).
+`ac_connection`: **bus participation, not grid connectivity.** `grid_tied` = AC side on the house bus; `island` = AC side feeds only attached loads (not the house AC bus), its PV is not part of the house balance, battery never runs in Automatik (replaces `batteries[].kind = isolated`). An `island` inverter may still have a grid-fed AC input as a one-way load (typical powerstation); that is not “off the grid”.
 
 Built-in inverters (`owned_by`): lifecycle/UI flag only; created and deleted with the battery. Virtual powerstations have no inverter (carve-out of the house battery).
 
@@ -210,9 +210,9 @@ Built-in inverters (`owned_by`): lifecycle/UI flag only; created and deleted wit
 
 A battery attached to an inverter with `type: pv_string` is **rejected** (schema / topology validation).
 
-## Plant topology (Topology P1)
+## Plant topology (Topology P1–P2)
 
-Decision record: [`backlog/Plant-Topology-Conclusion.md`](../../backlog/Plant-Topology-Conclusion.md). Earnie balances at exactly one **root balance node** = one tariff boundary. Sub-nodes (`balance_nodes[]`, wire `node.*`) arrive in Topology P5; until then the root meter stays `grid.meter.*` on `plant.ehal_bindings`.
+Decision record: [`backlog/Plant-Topology-Conclusion.md`](../../backlog/Plant-Topology-Conclusion.md). Earnie balances at exactly one **root balance node** = one tariff boundary. Sub-nodes (`balance_nodes[]`, wire `node.*`) arrive in Topology P5 (Version 2.+1); until then the root meter stays `grid.meter.*` on `plant.ehal_bindings`.
 
 **Model (condensed M1–M9):**
 
@@ -225,7 +225,7 @@ Decision record: [`backlog/Plant-Topology-Conclusion.md`](../../backlog/Plant-To
 | M5 | Read per device, control per actuator; generator side of the root must be covered (P2) |
 | M6 | At most one active closed-loop **grid** regulator per node (`regulates_on`, not `control`) |
 | M7 | A second billing meter is a second economic node — non-goal in v1 (`single_tariff`) |
-| M8 | Island / standby stay as today (`ac_connection: island`) |
+| M8 | Island / standby stay as today (`ac_connection: island` = bus participation, not “off-grid”) |
 | M9 | No readable root → refuse (assertion in v1; opt-in approximation later) |
 
 **Config (P1):**
@@ -244,7 +244,14 @@ Migration (data model stays **4**): `python -m scripts.migrate_topology_once --c
 | (ii) Multi house-ESS | At most one grid-tied house battery in the live plan until P3 + P4; second → refuse (no warn-and-exclude). |
 | (iii) Single foreign loop | One `read_only` / `limits_only` house battery with `regulates_on: grid` stays accepted (today’s self-consumption pin). |
 
-**Accepted topologies (v1 after P1):** (a)/(a′) one hybrid (+ read-only PV strings); (d)/(g)/(h) with documented limits; island / standby. **Rejected on live:** (b′) foreign self-consumption beside another loop, (c)/(c′) multi house-ESS / dual vendor loops, (e) no root assertion, (f) second tariff (`single_tariff: false`). Full table: Conclusion §2. P2–P5 widen acceptance (coverage, per-ESS writes, reactive MILP, balance nodes).
+**Config / live balance (P2 — generator-side coverage):**
+
+- Plant `sens_ess_power` := Σ over grid-tied house batteries of `ess.{id}.sens_ess_power`. Missing binding/value for any eligible battery → fail loud. Battery-less plants omit ESS → `0`.
+- When plant PV is mapped **and** more than one grid-tied inverter owns PV: require complete `inv.*`/`pv.*` coverage **or** `plant.pv_covers_all_inverters: true` (user acknowledgement, logged).
+- Derived load: `plant.balance_tolerance_pct` (default **5**) and `plant.balance_tolerance_w` (default **100**). Raw `PV + grid + ESS` below `−max(w, pct/100 · P_PV)` → telemetry error (not silent `0`); within tolerance → clamp to `0`.
+- Live attribution uses required inverter `efficiency` (η_inv); no soft default.
+
+**Accepted topologies (v1 after P1+P2):** (a)/(a′) one hybrid (+ read-only PV strings with coverage); (d)/(g)/(h) with documented limits; island / standby. **Rejected on live:** (b′) foreign self-consumption beside another loop, (c)/(c′) multi house-ESS / dual vendor loops, (e) no root assertion, (f) second tariff (`single_tariff: false`). Full table: Conclusion §2. P3–P5 (Version 2.+1) widen acceptance (per-ESS writes, reactive MILP, balance nodes).
 
 ### HA vendor force: `plant.ha_ess_force`
 

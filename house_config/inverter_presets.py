@@ -39,7 +39,7 @@ def ecoflow_delta_3_seeds(*, battery_id: str = "ecoflow_delta_3") -> tuple[dict,
     }
     inverter = {
         "id": inv_id,
-        "label": "Insel-WR EcoFlow Delta 3",
+        "label": "Powerstation-WR EcoFlow Delta 3",
         "type": INVERTER_TYPE_HYBRID,
         "ac_connection": AC_ISLAND,
         "control": DEFAULT_INVERTER_CONTROL,

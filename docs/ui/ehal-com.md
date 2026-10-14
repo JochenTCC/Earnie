@@ -127,7 +127,7 @@ Victron sources: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 **Multi-ESS / per-battery mapping (2.7.c / 2.7.m):** In EHAL-Com each mappable battery is its own entity (house batteries and **physical** powerstations). **Virtual** powerstations are omitted — they inherit the house ESS and have no EHAL bindings. Bindings are stored on `components.json` → `batteries[].ehal_bindings` as entity-scoped `ess.{slug}.sens_ess_soc` / `set_ess_*` / `get_ess_*` (slug = battery id). Quellenwahl is `ess.{slug}.set_ess_source_select` on physical `role: standby_backup` only (not on plant or house ESS). The plant row keeps grid/PV/load/export. Plant-flat `sens_ess_soc` is retired (no wire-version bump) — SoC is entity-scoped only; bare push `/ehal/telemetry/sens_ess_soc/…` is rejected. Multi-ESS Loxone Merker titles use slug infix `Earnie_Batterie_<Slug>_…`.
 
-A battery belongs to an inverter via `batteries[].inverter_id`. `batteries[].kind` (topology) no longer exists; `inverters[].ac_connection` (`grid_tied` | `island`) replaces it.
+A battery belongs to an inverter via `batteries[].inverter_id`. `batteries[].kind` (topology) no longer exists; `inverters[].ac_connection` (`grid_tied` | `island`) replaces it. `island` means bus participation only (feeds attached loads, not the house AC bus) — not “off the grid”; AC input may be grid-fed.
 
 
 | Area / meaning                  | Type          | EHAL value name                                              | OpenEMS                                       | evcc (YAML attribute)          | Victron GX / EVCS (Modbus)                                                                                              | Loxone / Loxone extra                                        |

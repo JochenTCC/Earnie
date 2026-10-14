@@ -18,6 +18,21 @@ def _reset_inbox():
     inbox.reset_memory_for_tests()
 
 
+@pytest.fixture(autouse=True)
+def _isolate_topology_house(monkeypatch):
+    """Avoid local house_profiles / components leaking into Topology P2."""
+    empty_house = {"plant": {"ehal_bindings": {}}, "profiles": {}}
+    empty_components = {"batteries": [], "inverters": [], "pv_systems": []}
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_house_for_attribution",
+        lambda: empty_house,
+    )
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_components_for_attribution",
+        lambda: empty_components,
+    )
+
+
 def _plant_house_push_only() -> dict:
     return {
         "plant": {

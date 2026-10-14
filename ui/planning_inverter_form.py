@@ -52,7 +52,7 @@ _TYPE_LABELS_DE = {
 }
 _AC_LABELS_DE = {
     AC_GRID_TIED: "Netzgekoppelt (Hausbus)",
-    AC_ISLAND: "Insel (nur angeschlossene Lasten)",
+    AC_ISLAND: "Insel (nur angeschlossene Verbraucher, nicht Haus-AC-Bus)",
 }
 _TYPE_VALUES = (
     INVERTER_TYPE_HYBRID,
@@ -292,7 +292,9 @@ def _render_inv_fields(session_scope: str, *, existing: dict) -> dict:
         "AC-Anschluss",
         options=[_AC_LABELS_DE[v] for v in _AC_VALUES],
         key=_scoped_key(session_scope, "planning_inv_ac"),
-        help="netzgekoppelt = Hausbus; Insel = nur angeschlossene Lasten "
+        help="netzgekoppelt = Hausbus; Insel = speist nur angeschlossene "
+        "Verbraucher, nicht den Haus-AC-Bus; AC-Eingang hängt am Netz "
+        "(einseitige Last). Nicht „netzlos“. "
         "(ersetzt früheres batteries[].kind=isolated).",
     )
     label_to_ac = {v: k for k, v in _AC_LABELS_DE.items()}
@@ -481,7 +483,7 @@ def _render_inv_delete(stable_id: str) -> None:
 def render_inverter_planning_tab() -> None:
     st.caption(
         "Wechselrichter verknüpfen PV-Anlagen und Batterien (`inverter_id`). "
-        "Insel-WR mit `owned_by` entstehen mit physischen Powerstations; "
+        "Powerstation-WR mit `owned_by` entstehen mit physischen Powerstations; "
         "EHAL-Namespace später `inv.<Kennung>.*`."
     )
     ctx = _render_inv_select()

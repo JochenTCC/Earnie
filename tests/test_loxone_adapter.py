@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from ehal import EHAL_SCHEMA_VERSION
+from ehal.ess_fields import ess_field
 from ehal.field_registry import require_loxone_write
 from ehal.qualified_ids import qualified_battery_id, qualified_plant_id
 from integrations.loxone_adapter import (
@@ -19,11 +20,56 @@ from integrations.loxone_comm_trace import LoxoneWriteRecord
 _PRIMARY_ESS = "15_kwh_speicher"
 
 
+def _components_doc() -> dict:
+    return {
+        "batteries": [
+            {
+                "id": _PRIMARY_ESS,
+                "type": "house",
+                "inverter_id": "wr_main",
+                "regulates_on": "grid",
+                "ehal_bindings": {
+                    ess_field(_PRIMARY_ESS, "sens_ess_power"): "",
+                },
+            }
+        ],
+        "inverters": [
+            {
+                "id": "wr_main",
+                "type": "hybrid",
+                "ac_connection": "grid_tied",
+                "efficiency": 0.97,
+                "ehal_bindings": {},
+            }
+        ],
+        "pv_systems": [],
+    }
+
+
+def _house_doc() -> dict:
+    return {
+        "plant": {
+            "ehal_bindings": {
+                "sens_pv_production_active": "PV",
+                "sens_grid_power_active": "Grid",
+            }
+        }
+    }
+
+
 @pytest.fixture(autouse=True)
 def _primary_ess_id(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "integrations.loxone_adapter.primary_ess_id_for_plant_read",
         lambda: _PRIMARY_ESS,
+    )
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_components_for_attribution",
+        _components_doc,
+    )
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_house_for_attribution",
+        _house_doc,
     )
 
 
