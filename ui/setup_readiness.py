@@ -375,18 +375,33 @@ _REQUIRED_PLANT_LIVE_FIELDS = (
 )
 
 
+def _resolve_required_live_binding(
+    field: str,
+    *,
+    house: dict,
+    raw: dict,
+) -> str:
+    """Plant fields via plant bindings; ESS kinds via primary battery (2.7.m)."""
+    from ehal.ess_fields import is_plant_flat_ess_field
+    from house_config.ehal_bindings import resolve_plant_binding
+    from house_config.ess_bindings import resolve_primary_ess_binding
+
+    if is_plant_flat_ess_field(field):
+        return str(resolve_primary_ess_binding(field) or "").strip()
+    return str(resolve_plant_binding(house, field, raw) or "").strip()
+
+
 def _required_plant_live_bindings_present() -> bool:
     """True when required plant telemetry + primary ESS setpoints resolve.
 
     ESS SoC/setpoints come from ``batteries[].ehal_bindings`` via
-    ``resolve_plant_binding`` primary aliases (2.7.m).
+    ``resolve_primary_ess_binding`` (2.7.m); plant telemetry via
+    ``resolve_plant_binding``.
     """
-    from house_config.ehal_bindings import resolve_plant_binding
-
     raw = _read_json_document(resolve_config_json_path())
     house = _read_json_document(resolve_house_profiles_json_path())
     for field in _REQUIRED_PLANT_LIVE_FIELDS:
-        if not str(resolve_plant_binding(house, field, raw) or "").strip():
+        if not _resolve_required_live_binding(field, house=house, raw=raw):
             return False
     return True
 

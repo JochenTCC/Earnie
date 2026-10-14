@@ -34,6 +34,9 @@ INBOX_FILENAME = "loxone_push_inbox.json"
 MAX_IDS = 200
 MAX_RAW_LEN = 32
 HEARTBEAT_ID = "heartbeat"  # constant non-zero push that proves the Miniserver link
+# Rows built from Shadow feed already passed lookup_record freshness (vs cycle_ts).
+# Do not re-apply the live VO silence window (3×repeat) on those timestamps.
+SHADOW_FEED_SOURCE = "shadow_feed"
 # Loxone pushes measurements (sens_*) and inputs (get_*) only; never setpoints.
 _ID_PATTERN = re.compile(
     r"^(?:" + HEARTBEAT_ID + r"|(?:(?:" + id_namespace_alternation()
@@ -193,6 +196,7 @@ def _inbox_row_from_shadow_feed(ehal_id: str) -> dict[str, Any] | None:
             "parse_ok": False,
             "last_ts": record.get("ts"),
             "count": 1,
+            "source": SHADOW_FEED_SOURCE,
         }
     value = parse_push_value(raw)
     return {
@@ -202,6 +206,7 @@ def _inbox_row_from_shadow_feed(ehal_id: str) -> dict[str, Any] | None:
         "last_ts": record.get("ts")
         or datetime.now(timezone.utc).isoformat(),
         "count": 1,
+        "source": SHADOW_FEED_SOURCE,
     }
 
 
@@ -359,7 +364,13 @@ def is_stale(
 
     Not based on ``interval_ema_s``: changes arrive between repeats, so the smoothed
     gap is shorter than the repeat interval and would flag quiet signals as stale.
+
+    Shadow-feed rows are never inbox-stale: ``lookup_record`` already gated them
+    against feed ``max_age`` / ``cycle_ts``. Re-applying the VO silence window
+    falsely marks slow-changing signals (e.g. SoC) as ``Lesefehler``.
     """
+    if str(row.get("source") or "") == SHADOW_FEED_SOURCE:
+        return False
     age = age_seconds(row, now=now)
     if age is None:
         return False

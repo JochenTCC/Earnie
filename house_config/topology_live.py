@@ -150,7 +150,9 @@ def validate_live_topology_from_config_dir() -> None:
     )
 
     config = load_config_or_exit()
-    raw = getattr(config, "_raw_config", None)
+    # Raw JSON lives on Config instance (config.CONFIG), not the module.
+    cfg = getattr(config, "CONFIG", None)
+    raw = getattr(cfg, "_raw_config", None) if cfg is not None else None
     if not isinstance(raw, dict):
         raise ValueError("Live-Pfad: config.json roh nicht lesbar für Topology-Check.")
 

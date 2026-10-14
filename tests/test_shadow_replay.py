@@ -277,6 +277,44 @@ def test_shadow_read_push_value_uses_feed_soc(monkeypatch, tmp_path) -> None:
     assert (value, state) == (61.5, inbox.STATE_OK)
 
 
+def test_shadow_soc_older_than_vo_silence_still_ok(monkeypatch, tmp_path) -> None:
+    """Feed-fresh SoC must not hit Lesefehler via the live VO 30s silence window."""
+    from runtime_store import loxone_push_inbox as inbox
+
+    eid = "ess.15_kwh_speicher.sens_ess_soc"
+    feed = tmp_path / "feed"
+    # SoC push ~45s ago: past 3×10s VO silence, still within feed max_age (120s).
+    _write_feed(
+        feed,
+        {
+            f"loxone:io:{eid}": {
+                "key": f"loxone:io:{eid}",
+                "ts": _utc(-45),
+                "ok": True,
+                "status": None,
+                "payload": {"LL": {"value": "14.0"}},
+                "error": None,
+            },
+            "loxone:io:heartbeat": {
+                "key": "loxone:io:heartbeat",
+                "ts": _utc(-45),
+                "ok": True,
+                "status": None,
+                "payload": {"LL": {"value": "1"}},
+                "error": None,
+            },
+        },
+        heartbeat_offset=0,
+        cycle_offset=0,
+    )
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    inbox.reset_memory_for_tests()
+    value, state = inbox.read_push_value(eid)
+    assert (value, state) == (14.0, inbox.STATE_OK)
+
+
 def test_shadow_read_push_value_ignores_prod_inbox_file(monkeypatch, tmp_path) -> None:
     """R2 hard cut: feed miss must not rescue from shared Prod inbox file."""
     from runtime_store import loxone_push_inbox as inbox

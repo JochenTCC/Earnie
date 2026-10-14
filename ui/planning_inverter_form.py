@@ -210,6 +210,30 @@ def _inv_by_id() -> dict[str, dict]:
     return {item["id"]: item for item in list_inverters()}
 
 
+def _initial_inv_index(inv_ids: list[str]) -> int | None:
+    """Prefer an existing inverter on first open — never auto-land on — neu —."""
+    if "planning_inv_select" in st.session_state:
+        return None
+    if inv_ids:
+        return 1  # options[0] is NEW_OPTION
+    return None
+
+
+def _inv_selectbox(options: list[str], initial_index: int | None) -> str:
+    if initial_index is not None:
+        return labeled_selectbox(
+            "Wechselrichter",
+            options=options,
+            index=initial_index,
+            key="planning_inv_select",
+        )
+    return labeled_selectbox(
+        "Wechselrichter",
+        options=options,
+        key="planning_inv_select",
+    )
+
+
 def _render_inv_select() -> dict:
     _apply_pending_inv_select()
     inv_map = _inv_by_id()
@@ -222,11 +246,8 @@ def _render_inv_select() -> dict:
         entity_ids=inv_ids,
         id_by_display=id_by_display,
     )
-    selected_display = labeled_selectbox(
-        "Wechselrichter",
-        options=options,
-        key="planning_inv_select",
-    )
+    initial_index = _initial_inv_index(inv_ids)
+    selected_display = _inv_selectbox(options, initial_index)
     selected = resolve_label_select(selected_display, id_by_display)
     is_new = selected == NEW_OPTION
     if is_new:

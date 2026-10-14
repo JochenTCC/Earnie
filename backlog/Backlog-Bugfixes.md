@@ -1,4 +1,4 @@
-﻿﻿# Open Bugs
+﻿# Open Bugs
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md) (sections `### Bugfix …` / `### Document Review …` / regressions)
 
@@ -30,13 +30,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Cause: `get_or_init_state(..., target_kwh=0.0)` always overwrote the configured target on every slot advance / trigger latch, so charge credit was capped at `min(0, …)`.
   - Fix: `update_target=False` for advance + trigger; collect/learn still refresh the target.
   - Tests: `tests/test_powerstation_2_7_p.py` (`test_advance_and_trigger_preserve_target_kwh`).
-
-- [ ] **Negative `house_kw` live snapshot → Automatik instead of Entladesperre / missed Zwangsladen (08:00)** — fix implemented (2026-10-11); live acceptance pending
-  - Dump: `debug-dumps/debug_dump_20261011_082448` (meta: „Zwangsladen nicht ausgeführt um 8:00“); chart slot 08:00 `battery_forced_charge_missing`.
-  - Symptom: at 07:52 optimizer wrote Automatik (`mode=0`, discharge limits open); 07:45–08:00 battery discharged; 08:00 mean charge only ~0.06 kW vs planned Zwangsladen 0.213 kW.
-  - Cause: glitchy `house_kw=-0.04` → `baseload_kw=0` → live matrix overwrite zeroed `expected_p_act` → Entladesperre skipped → Automatik.
-  - Fix: `reject_live_matrix_snapshot_reason` (`negative_house` / `all_zero`) keeps forecast in `main.py` + UI opt-in.
-  - Tests: `tests/test_live_consumption.py` (`test_reject_live_matrix_snapshot_negative_house`).
 
 ## New Bugs (Do not remove this chapter — even if empty)
 

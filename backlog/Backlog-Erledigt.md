@@ -2,6 +2,28 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Shadow SoC Lesefehler via VO silence (2026-10-14)
+
+- [x] **Shadow: feed-fresh `sens_ess_soc` became `Lesefehler` after ~30s**
+  - Cause: inbox re-applied live VO silence (3×repeat) on shadow-feed rows that `lookup_record` already gated vs `cycle_ts`.
+  - Fix: tag feed rows `source=shadow_feed`; `is_stale` skips silence for that source (`runtime_store/loxone_push_inbox.py`).
+  - Tests: `tests/test_shadow_replay.py` (`test_shadow_soc_older_than_vo_silence_still_ok`).
+
+### Bugfix Negative house_kw live snapshot → Automatik (2026-10-14)
+
+- [x] **Negative `house_kw` live snapshot → Automatik instead of Entladesperre / missed Zwangsladen (08:00)** — verified live (2026-10-14); fix implemented 2026-10-11
+  - Dump: `debug-dumps/debug_dump_20261011_082448` (meta: „Zwangsladen nicht ausgeführt um 8:00“); chart slot 08:00 `battery_forced_charge_missing`.
+  - Symptom: at 07:52 optimizer wrote Automatik (`mode=0`, discharge limits open); 07:45–08:00 battery discharged; 08:00 mean charge only ~0.06 kW vs planned Zwangsladen 0.213 kW.
+  - Cause: glitchy `house_kw=-0.04` → `baseload_kw=0` → live matrix overwrite zeroed `expected_p_act` → Entladesperre skipped → Automatik.
+  - Fix: `reject_live_matrix_snapshot_reason` (`negative_house` / `all_zero`) keeps forecast in `main.py` + UI opt-in.
+  - Tests: `tests/test_live_consumption.py` (`test_reject_live_matrix_snapshot_negative_house`).
+
+### Bugfix Wechselrichter auto-create on open (2026-10-14)
+
+- [x] **Wechselrichter subpage auto-created default WR on open**
+  - Cause: selectbox defaulted to `— neu —` when session unset; `auto_persist` wrote `Haupt-Wechselrichter N`.
+  - Fix: `_initial_inv_index` / `_inv_selectbox` prefer first existing inverter (index 1) on first open (`ui/planning_inverter_form.py`).
+
 ### Topology P1 — root assertion + regulates_on (2026-10-12)
 
 - [x] **Topology P1 — explicit root, regulator declaration, validation** (epic **Topology**; decision [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md))
