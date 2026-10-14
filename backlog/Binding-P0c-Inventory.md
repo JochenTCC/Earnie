@@ -35,7 +35,7 @@
 
 `pv_counter_state.json` (plant PV integral), aggregate `consumption_profiles.csv` / `total_consumption_profiles.csv`, `shadow_writes.jsonl` / shadow feed (backend/HA transport keys), HouseSim HA golden maps (EHAL field → HA `entity_id`), `earnie.log`, `main.lock`, `local_settings.json`, heartbeat/auth.
 
-`tests/regression/` is not built yet — plan ids into cases when **2.7.i** lands.
+`tests/regression/` is not built yet — plan ids into cases when the **Regression** epic lands (Version 2.7).
 
 PV system ids appear in **config/scenarios**, not as history dict keys (plant `pv_kw` is aggregate). EVs are consumers (`type=ev`) — same consumer-id maps + `ev.` / `evcs.` wire ids.
 

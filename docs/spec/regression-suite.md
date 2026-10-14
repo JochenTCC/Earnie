@@ -1,7 +1,7 @@
 # Specification: Release Regression Suite (golden-master cases)
 
 **Version:** 0.2 (proposal; adds L3 live replay, cycle recorder, solver-determinism findings §14–§16)  
-**Status:** Not implemented — backlog **2.7.i**  
+**Status:** Not implemented — backlog Version 2.7 (R-Rec, R0 reduced, P1, P2); L3 and P3 follow in Version 2.8  
 **Epic short name:** **Regression** (phases **R0**, **R-Rec**, **P1**–**P3**, **L3**)  
 **Related:** [Release Checklist](release-checklist.md), [House simulator](house-sim.md), [Shadow Mode](shadow-mode.md), `tests/fixtures/prod_dumps/README.md`, `.cursor/rules/test-health.mdc`, `optimizer/cbc_solver.py`
 
@@ -150,14 +150,16 @@ Before P1 ships, check that `tests/fixtures/prod_dumps/` and `tests/fixtures/bac
 
 | Phase | Content |
 |---|---|
-| **Regression R0** (spike, first) | Solver-determinism / tolerance study (§16). Needs input data, therefore runs **after R-Rec** has produced recordings. Outcome: regression solver mode + per-metric tolerances. |
+| **Regression R0** (spike, first) | Solver-determinism / tolerance study (§16). Needs input data, therefore runs **after R-Rec** has produced recordings. Outcome: regression solver mode + per-metric tolerances. **Reduced scope in 2.7:** deterministic mode + spread measured on 2–3 full 96-slot cases (HiGHS, idle vs. parallel load); the full factor matrix is optional follow-up. |
 | **Regression R-Rec** (recorder) | Always-on cycle recorder with ring buffer (§14), capture-point test (record → replay == live). Prerequisite for R0 and L3; also feeds debug dumps. |
 | **Regression P1** (MVP) | Case format + schema, runner (L1 + L2), `--update-golden`, report; 4–6 public cases (winter, summer, negative prices, EV deadline, heat storage); migrate existing prod-dump cases; tolerances and solver mode from R0; checklist item |
 | **Regression P2** (customer data) | Private repo `Earnie-regression-private`, private-root support + skip logic, `--intake`, case-ID / issue-reference convention, SHA in report |
 | **Regression P3** (gate + scrub) | CI job before `promote`, scrubber script + tests, optional metric trend across releases |
 | **Regression L3** (live replay) | Replay runner for recorder windows, case creation from a time window (§15). After R-Rec and P1. |
 
-Order: **R-Rec → R0 → P1 → L3 → P2 → P3.**
+Order: **R-Rec → R0 → P1 → P2 → L3 → P3.**
+
+**Release scope (decided 2026-10-14):** R-Rec, R0 (reduced), P1 and P2 ship with Version 2.7; L3 and P3 follow in Version 2.8. Reason: P1 alone has no safe place for customer data (P2) and no inputs for problems noticed days later (R-Rec); L3 and the CI gate are comfort on top.
 
 ## 13. Open decisions
 
