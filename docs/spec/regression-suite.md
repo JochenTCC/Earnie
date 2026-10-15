@@ -39,6 +39,21 @@ The suite is **not** part of the per-commit pytest run. It runs **before a relea
 | **Public case** | Synthetic or maintainer-owned data; lives in the main repo. |
 | **Private case** | Customer data; lives in the private repo `Earnie-regression-private`. |
 
+### 3a. Pytest regression (A) vs. golden case (B)
+
+A bugfix can be guarded in two ways. Keep both; do not collapse them.
+
+| Kind | Where | When to use |
+|---|---|---|
+| **A — Pytest regression** | Public `tests/test_*_regression.py` (or a focused module) | Small, scrubbed / synthetic inputs; runs every commit. Prefer for logic bugs that do not need full customer matrices, and for bugs that are **not visible in the compared metrics** (below). |
+| **B — Golden case** | Public `tests/regression/cases/` (`REG-O-` / `REG-S-`) or private `Earnie-regression-private` (`REG-<issue>-<slug>`) | Behaviour lock across releases; customer data → **private only**. Runs before release (`run_regression`), not per commit. |
+
+**A golden only guards what §7 compares:** hard invariants (SoC limits, energy balance, EV deadline, export limit, unavailable functions) and metrics (total cost, grid import / export, self-sufficiency, battery cycles, per-consumer energy). A bug that only shows up elsewhere (heat-store temperature curve, UI value, live write) passes a golden unchanged — use **A** for it.
+
+**Minimum bar for B:** the debug dump has `recorder/` (§14), the bug is plan / optimizer behaviour, **and** it is visible in a compared invariant or metric. A **B** case is locked only after a red→green proof: a pre-fix baseline (uncommitted) reproduces the symptom, and the fixed run differs exactly on that metric before `--update-golden`.
+
+The step-by-step agent workflow (triage, intake, baseline, fix, lock, full run, Verifications Pending) lives in skill `bugfix-regression-test` (`.cursor/skills/bugfix-regression-test/SKILL.md`); release reminders in [release-checklist.md](release-checklist.md) §1.
+
 ## 4. Repository split
 
 | What | Where | Content |
@@ -85,9 +100,14 @@ Existing `tests/fixtures/prod_dumps/<id>/` cases are migrated into this format i
 ## 6. Case IDs and issue references
 
 - Schema: `REG-<issue-number>-<slug>` for issue-driven cases, `REG-S-<slug>` for synthetic ones, `REG-O-<slug>` for own data.
-- A **public issue** only says: *"Reproduced in private case REG-142"*. No customer name, no data.
-- The mapping from case to customer lives **only** in the private repo (`cases/REG-142/case.yaml` + a local alias, same stable aliases as `.cursor/rules/backlog-anonymize-users.mdc`).
-- Every report records the **commit SHA of the private repo** (and the public commit) so a release can later be traced to the exact data state.
+- **Issue number is mandatory** for private customer cases: `--intake` rejects IDs that do not match `REG-<number>-<slug>`. A report without an issue (mail, Streamlit Kontakt) first gets a public issue from the maintainer — symptom + version only.
+- A **public issue** only says: *"Reproduced in private case REG-142"*. No customer name, no addresses, no load profiles, no data.
+- **Public issue / public Earnie tree:** case IDs and scrubbed pytest fixtures only.
+- **Private repo:** raw customer recorder data with `source: customer`, `anonymized: false`.
+- **Own data** (maintainer installation) still carries a real load profile → private by default; a public `REG-O-` case only from data the maintainer explicitly accepts as public (until the P3 scrubber exists).
+- The mapping from case to customer lives **only** in the private repo (`cases/REG-142/case.yaml` + a local alias, same stable aliases as `.cursor/rules/backlog-anonymize-users.mdc`). Real-name ↔ alias maps stay local and are never committed.
+- **Data minimisation:** intake a dump only when it adds a check (§3a minimum bar) — not every dump is archived.
+- Every report records the **commit SHA of the private repo** (and the public commit) so a release can later be traced to the exact data state. The SHA is taken from `HEAD` only: uncommitted case or golden changes are not visible in it, so the private repo must be clean and pushed before a release run.
 
 ## 7. What is compared
 
@@ -171,6 +191,7 @@ Order: **R-Rec → R0 → P1 → P2 → L3 → P3.**
 4. Regression solver mode (§16): **Decided (R0, 2026-10-14):** goldens use deterministic **`EARNIE_CBC_STRICT=1`** (HiGHS, no wall-clock limit). Production-path sample stays open as a follow-up (not required for P1 goldens).
 5. Recorder defaults (§14): retention days (default 7). **Decided:** debug dumps include the matching recorder window automatically. **Decided (R-Rec):** default dump window = the **whole ring buffer** (retention days); no UI narrowing in R-Rec (optional narrowing later with L3). ZIP size is accepted as a consequence (~7–14 MB for 7 days).
 6. Intake cycle selection / no-recorder fallback — **Decided (P2):** `--seed-anchor` or `--cycle-index` required; dump without `recorder/` fails loud.
+7. Bug → golden workflow — **Decided (2026-10-15):** golden **B** is a branch of skill `bugfix-regression-test` (no separate skill); skill `session-abschluss` **warns, never blocks** when a Verifications Pending item cites a `REG-\d+-` case and the private repo is missing, dirty or unpushed (hard gate is P3); minimum bar per §3a. Open follow-ups: a `--list-cycles` helper for the intake selector; a dirty-tree flag next to public / private SHA in the report; deleting a customer's data on request (cases live in private git **history**, so removal needs a history rewrite of `Earnie-regression-private` — process to be defined with the legal review).
 
 ## 14. Cycle recorder (R-Rec)
 
@@ -190,7 +211,7 @@ Order: **R-Rec → R0 → P1 → P2 → L3 → P3.**
 
 **Acceptance test:** record a cycle, replay it offline from the recording, and assert the replay produces the same plan as the live run (under the solver mode of §16). This doubles as the first determinism evidence.
 
-**Debug-dump integration (decided):** the unified debug-dump ZIP (schema v3) automatically contains the matching recorder window (`recorder/` segments plus the referenced config snapshots) — **whole ring buffer** by default. Consequence: **every user report becomes a potential golden case.** `--intake` (P2) turns such a ZIP into a case folder; L3 (§15) cuts the relevant time window from the recorded cycles. The dump manifest records the window (`recorder.from`, `recorder.to`, cycle count, config hashes) as an **optional** `manifest.recorder` block (no schema bump). Dumps without recorder data (older versions, recorder off) stay valid; intake then falls back to L1 from the single-cycle inputs. Privacy: a dump now carries up to N days of load profile; the dump dialog and `docs/einrichtung/betrieb.md` disclose this and require sharing only with the maintainer.
+**Debug-dump integration (decided):** the unified debug-dump ZIP (schema v3) automatically contains the matching recorder window (`recorder/` segments plus the referenced config snapshots) — **whole ring buffer** by default. Consequence: **every user report becomes a potential golden case.** `--intake` (P2) turns such a ZIP into a case folder; L3 (§15) cuts the relevant time window from the recorded cycles. The dump manifest records the window (`recorder.from`, `recorder.to`, cycle count, config hashes) as an **optional** `manifest.recorder` block (no schema bump). Dumps without recorder data (older versions, recorder off) stay valid for replay, but `--intake` rejects them (fail loud, no synthetic fallback — §9, §13.6); such reports get a pytest regression instead. Privacy: a dump now carries up to N days of load profile; the dump dialog and `docs/einrichtung/betrieb.md` disclose this and require sharing only with the maintainer.
 
 ## 15. L3 live replay
 

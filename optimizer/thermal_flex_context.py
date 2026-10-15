@@ -97,28 +97,24 @@ def _slot_aligned_thermal_energy_kwh(
     climate: ModeledClimateContext | None = None,
 ) -> list[float]:
     """Modeled thermal kWh per matrix slot (same basis as profile_spec)."""
-    from data.consumption_profiles import modeled_consumer_kw_at_datetime
+    from data.consumption_profiles import modeled_consumer_kw_for_slots
     from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw, validate_dt_h
 
     validate_dt_h(DEFAULT_DT_H)
+    slot_dts = [row.get("slot_datetime") for row in matrix]
+    kw_values = iter(
+        modeled_consumer_kw_for_slots(
+            source,
+            [slot_dt for slot_dt in slot_dts if slot_dt is not None],
+            climate=climate,
+        )
+    )
     energies: list[float] = []
-    for row in matrix:
-        slot_dt = row.get("slot_datetime")
+    for slot_dt in slot_dts:
         if slot_dt is None:
             energies.append(0.0)
             continue
-        energies.append(
-            float(
-                energy_kwh_from_kw(
-                    [
-                        modeled_consumer_kw_at_datetime(
-                            source, slot_dt, climate=climate
-                        )
-                        or 0.0
-                    ]
-                )
-            )
-        )
+        energies.append(float(energy_kwh_from_kw([next(kw_values) or 0.0])))
     return energies
 
 

@@ -4,7 +4,9 @@ description: >-
   Ends a development session: maintain backlog/Backlog.md, backlog/Backlog-Bugfixes.md, and
   backlog/Backlog-Erledigt.md,
   commit and push all open changes, ask whether private earnie-env / Earnie-env-home
-  files should be committed, pushed, and tagged, then guide the user through publish choices
+  files should be committed, pushed, and tagged, after a code bugfix ask whether a private
+  regression golden in Earnie-regression-private should be committed and pushed (publish guide
+  warns, never blocks, when a cited REG case is not clean+pushed), then guide the user through publish choices
   (A skip / B community pre-release / C official / D bump version.py first)
   before any tag (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
   A tag only builds a release candidate; the user tests it on the target platform and
@@ -30,6 +32,7 @@ Run in parallel:
 - `git log -5 --oneline` (commit style)
 - Chat history for this session: what was completed, what remains open?
 - **Private earnie-env (if present):** `git status` / `git diff` in the sibling private site-pack repo (default `..\Earnie-env-home`, see `docs/einrichtung/private-env.md` / `scripts/link_private_env.ps1`). Do not invent a second path; if the junction exists, follow its target.
+- **Private regression repo (if present):** `git status -sb` in `Earnie-regression-private` (parent of `$EARNIE_REGRESSION_PRIVATE_DIR`, default sibling `..\Earnie-regression-private`, see `docs/spec/regression-suite.md` §4). Needed for §2b and the publish-guide warning.
 
 ### 2. Classify changes
 
@@ -63,6 +66,19 @@ Rules:
 - Only commit/push/tag the private repo after explicit user OK — never silently.
 - If the private repo is missing or not a git checkout: say so once and skip (do not create it).
 
+### 2b. Private regression golden — ask after a code bugfix
+
+Only if this session included a **code** bugfix (same trigger as the soft regression reminder in §3). Ask:
+
+> Was a private golden case intaken for this fix (skill `bugfix-regression-test`, golden **B**), and should it be committed / pushed on `Earnie-regression-private`?
+
+Rules:
+
+- If the private repo is dirty or ahead of its upstream: summarize changed case dirs (`cases/REG-…/case.yaml`, `recorder/`, `expected.json`), then wait for yes/no on **commit** and **push**.
+- An `expected.json` recorded as **pre-fix baseline** (skill step B4) is never committed — only the golden locked after the red→green proof. Commit message: behaviour locked, metric delta, `Earnie <sha>` (commit the Earnie fix first so the SHA exists).
+- If no golden **B** was done: accept the skip (pytest **A** or exception per skill triage); no further action.
+- Only commit/push after explicit user OK. If the repo is missing: say so once and skip.
+
 ### 3. Update backlog
 
 Keep the schema from `backlog/Backlog.md` / `backlog/Backlog-Bugfixes.md` / `backlog/Backlog-Erledigt.md` (see also `.cursor/rules/backlog.mdc`, chapter nomenclature in `roadmap-nomenclature.mdc`):
@@ -75,7 +91,7 @@ Keep the schema from `backlog/Backlog.md` / `backlog/Backlog-Bugfixes.md` / `bac
 - **backlog/Backlog-Bugfixes.md:** open prod bugs/regressions; when done **suggest PATCH only** and ask the user — do not change silently
 - **`## Bugfix Verifications Pending`:** implemented fixes awaiting live verification — move here after commit, **not** to `backlog/Backlog-Erledigt.md`; archive only after successful verification (see `.cursor/rules/backlog.mdc`)
 - **`## Document Review Findings`:** docs corrections only — after fix, archive directly in `backlog/Backlog-Erledigt.md` (`### Document Review …`); **skip** Verifications Pending (skill `doc-review-findings`)
-- **Bugfix regression test (soft):** If this session included a **code** bugfix, apply skill `bugfix-regression-test` before finishing Phase 1 — remind and propose a dedicated regression test (cite GitHub `#N` when available). Do not block commit if the user declines or an exception applies (docs-only, config/env, hardware-only); note the skip reason briefly.
+- **Bugfix regression (soft):** If this session included a **code** bugfix, apply skill `bugfix-regression-test` before finishing Phase 1 — remind and propose a pytest regression (**A**; cite GitHub `#N` when available) and, when a recorder dump shows the bug in a compared metric, a private golden case (**B**, see §2b). Do not block commit if the user declines or an exception applies (docs-only, config/env, hardware-only); note the skip reason briefly. Verifications Pending entries name the pytest path and/or the `REG-…` case.
 - **backlog/Backlog.md:** feature backlog (version blocks), packaging, reference — only remaining open phases/sub-items
 - **backlog/Backlog-Erledigt.md:** New section `### <Topic> (YYYY-MM-DD)` with date **today** (local time Europe/Vienna)
 - Document only what was actually completed in the session/diff — do not invent items
@@ -116,6 +132,7 @@ Briefly summarize:
 - Push status
 - Excluded files (if any)
 - Private earnie-env decision (skipped / committed+pushed / tagged or not)
+- Private regression golden decision (none / committed+pushed / skipped), if §2b applied
 
 Then **always** present the publish decision guide below (read `version.py` first; fill in concrete values). Do **not** skip this block after Phase 1 — even if publish seems unlikely; the user may still choose **D**.
 
@@ -143,6 +160,9 @@ If B or C with current version: I will tag v<ACTUAL> on main after your OK.
 The tag builds a candidate only — you test it on HA / LoxBerry, then approve
 "promote" in the Actions run; only then do users see it.
 If D: propose the exact new version string and wait for approval before editing version.py.
+
+Before B or C: run `python -m scripts.run_regression --workers N` (public + private)
+and attach the report (release checklist §1). Private regression repo: <clean+pushed @ SHA | WARNING …>
 ```
 
 ### How to choose (tell the user briefly)
@@ -163,6 +183,7 @@ If D: propose the exact new version string and wait for approval before editing 
 5. Never bump `version.py` or push a tag until the user picks a letter (or equivalent clear wording: “publish alpha”, “official release”, “skip”).
 6. After **D**: propose exact string → wait → edit `version.py` → **run Alpha compose sync** (below) when the new string is a pre-release → commit (include synced YAML) → push → re-show the guide with the new `version.py` → user picks **B** or **C** (or **A**).
 7. Before **B**: **run Alpha compose sync** (or verify already matching). Do not tag until the three `*-alpha.yml` files pin `version.py`.
+8. **Regression warning (soft, never blocks):** scan `## Bugfix Verifications Pending` in `backlog/Backlog-Bugfixes.md` for case IDs matching `REG-\d+-`. If any is cited and `Earnie-regression-private` is **missing**, **dirty** (`git status --porcelain` non-empty) or **unpushed** (ahead of / no upstream), add a visible warning to the guide, e.g. “⚠ REG-142-eauto-deadline cited, private repo has uncommitted changes — the regression report only records the private `HEAD` SHA, so the release gate would not see this golden.” Fill in the live state; otherwise show “clean+pushed @ <short SHA>”. The user may still pick any letter (hard gate only with Regression P3).
 
 ---
 
@@ -208,6 +229,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 - [ ] **If B:** all three `docker/compose/*-alpha.yml` have `image: ghcr.io/jochentcc/earnie-energy:<version.py>`
 - [ ] Release notes exist or default notes are OK: `.github/release-notes/v….md`
 - [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/spec/release-checklist.md` §1
+- [ ] Regression suite run (public + private) and report attached; `Earnie-regression-private` clean and pushed, or the user consciously accepted the guide's warning (soft gate — `docs/spec/release-checklist.md` §1)
 - [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)
 - [ ] GitHub environment `release-approval` exists with the user as *Required reviewer* (otherwise job `release` fails early by design)
 - [ ] **Private earnie-env:** user asked whether to commit/push/tag `Earnie-env-home` (or sibling env packs) with the same tag; done or explicitly skipped

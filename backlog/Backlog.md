@@ -32,18 +32,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - **Note:** Epic **Regression** 2.7 scope (**R-Rec** → **R0** → **P1** → **P2**) → [Erledigt](Backlog-Erledigt.md). Continuation (**L3** + **P3**) in Version 2.8. Spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md).
 - **Note:** R0 / P1 L1 goldens used recorder-format cycles **seeded from historical backtesting windows** (scrubbed for public commit). **From now on:** substitute with **newer live `runtime/recorder/` cycles ASAP** before trusting goldens as production-representative; re-check tolerances if spread changes. Production-path sample as an extra gate case remains an R0 follow-up.
   
-
-- [ ] Full orchestration of model version migration
-  - Target is that after an update - the user is guided through migration as flawless as possible
-  - Users with older Earnie versions shall be guided through the migration after software update and be informed before!
-  - If Earnie recognizes that data should be migrated it asks if migration shall be done and give hints for manual to-dos (if needed)
-  - Prepare a complete v3 config data set for regression testing from Earnie_env_home history
-  - For all future version increments we need the same capability for Earnie (save this as a rule)
-
-- **Note:** Plant topology epic **Topology** — **P1** + **P2** + Powerstation AC wording → [Erledigt](Backlog-Erledigt.md). **P3–P5** (widen acceptance, MILP change, balance nodes) remain under **Version 2.+1 — Plant topology**. Decision record [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md). `inverters[].ac_connection: island` = bus participation (not “off the grid”); flag stays until the port model in 2.+1 / P5.
-
-- [ ] Anonymous install counter (daily ping, no ID)
-
 - [ ] Make a profiling session for main.py to identify acceleration potentials for optimization cycle
   - **Instrumentation ready:** `EARNIE_CYCLE_TIMING=1` / `EARNIE_CYCLE_PROFILE=1` → `runtime/timing/cycles.jsonl` (+ optional `runtime/profile/`); docs [betrieb.md](../docs/einrichtung/betrieb.md) / [container.md](../docs/einrichtung/container.md) § Live-Zyklus-Profiling; summarize with `python -m scripts.summarize_cycle_timing …`.
   - **Still open:** one NAS productive window (manual local Synology image), collect JSONL, rank phases, add concrete acceleration backlog bullets. Provisional code-path candidates: `savings` / `savings_optimized` (second full-horizon MILP) vs `milp_live`.
@@ -61,6 +49,22 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Open:** threshold fixed %-pt. vs. relative to slot energy.
 - [ ] **EarlyStart follow-up — clock-skew check** (spec §7.5): compare system time with an HTTP `Date` header of an already used endpoint; warn > 2 s, late mode > 10 s.
 - [ ] **EarlyStart follow-up — cockpit punctuality display** (spec §7.6): lead, last duration, P95, on-time rate (24 h / 7 d), "platform too slow" warning.
+
+- [ ] check if tests from Testsuite could be moved to regression tests (nightly run)
+
+- [ ] Full orchestration of model version migration
+  - Target is that after an update - the user is guided through migration as flawless as possible
+  - Users with older Earnie versions shall be guided through the migration after software update and be informed before!
+  - If Earnie recognizes that data should be migrated it asks if migration shall be done and give hints for manual to-dos (if needed)
+  - Prepare a complete v3 config data set for regression testing from Earnie_env_home history
+  - For all future version increments we need the same capability for Earnie (save this as a rule)
+
+- [ ] first alpha quality review
+- [ ] alpha release
+
+- [ ] Anonymous install counter (daily ping, no ID)
+
+- **Note:** Plant topology epic **Topology** — **P1** + **P2** + Powerstation AC wording → [Erledigt](Backlog-Erledigt.md). **P3–P5** (widen acceptance, MILP change, balance nodes) remain under **Version 2.+1 — Plant topology**. Decision record [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md). `inverters[].ac_connection: island` = bus participation (not “off the grid”); flag stays until the port model in 2.+1 / P5.
 
 ### Version 2.8
   

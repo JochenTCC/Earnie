@@ -227,6 +227,47 @@ def test_thermal_book_slots_use_slot_aligned_energy_not_calendar_prorate(
     assert solve_with_strict_fallback(model.prob, msg=False) == "Optimal"
 
 
+def test_slot_aligned_thermal_energy_builds_year_model_once(monkeypatch):
+    """One 8760 h year model per call, not per slot (was ~5 s per MILP solve)."""
+    from data import consumption_profiles
+    from optimizer.slot_duration import energy_kwh_from_kw
+    from optimizer.thermal_flex_context import _slot_aligned_thermal_energy_kwh
+
+    calls: list[int] = []
+
+    def fake_year(_consumer, *, hours):
+        calls.append(hours)
+        return [0.01 * (i % 500) for i in range(hours)]
+
+    monkeypatch.setattr(consumption_profiles, "_modeled_consumer_hourly_kw", fake_year)
+    consumer = _wp_consumer()
+    start = datetime.combine(date(2024, 1, 15), time(0, 0))
+    matrix = [
+        {"slot_datetime": start + timedelta(minutes=15 * i)} for i in range(96)
+    ]
+    matrix.insert(10, {"slot_datetime": None})
+
+    energies = _slot_aligned_thermal_energy_kwh(consumer, matrix)
+
+    assert calls == [consumption_profiles.MODELED_PROFILE_HOURS_PER_YEAR]
+    per_slot = [
+        0.0
+        if row["slot_datetime"] is None
+        else float(
+            energy_kwh_from_kw(
+                [
+                    consumption_profiles.modeled_consumer_kw_at_datetime(
+                        consumer, row["slot_datetime"]
+                    )
+                ]
+            )
+        )
+        for row in matrix
+    ]
+    assert energies == pytest.approx(per_slot)
+    assert energies[10] == 0.0
+
+
 def test_prorate_thermal_day_target_scales_partial_days():
     from optimizer.thermal_flex_context import (
         _max_on_slots_with_limits,
