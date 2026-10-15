@@ -183,15 +183,37 @@ def resolve_thermal_flex_contexts(
             # Live + heat storage: horizon plan only, no year profile (ThermalHorizon P2).
             contexts[cid] = live_ctx
             continue
-        slot_energy = _slot_aligned_thermal_energy_kwh(
-            source, matrix, climate=climate
-        )
+        if is_live:
+            # Live without storage: house-only horizon plan (ThermalHorizon P4).
+            slot_energy = _live_house_slot_energy_kwh(matrix, source, house_profile)
+        else:
+            slot_energy = _slot_aligned_thermal_energy_kwh(
+                source, matrix, climate=climate
+            )
         contexts[cid] = {
             "daily_targets": _daily_targets_from_slot_energy(matrix, slot_energy),
             "slot_energy_kwh": slot_energy,
             "targets_slot_aligned": True,
         }
     return contexts
+
+
+def _live_house_slot_energy_kwh(
+    matrix: list,
+    source: dict,
+    house_profile: dict,
+) -> list[float]:
+    from optimizer.thermal_live_store import (
+        hourly_electric_to_slot_energy_kwh,
+        live_house_plan_for_matrix,
+    )
+
+    plan = live_house_plan_for_matrix(source, house_profile, matrix)
+    if plan is None:
+        raise ValueError(
+            f"Live-Hausplan für '{source.get('id')}' fehlt (Wärmespeicher aktiv?)."
+        )
+    return hourly_electric_to_slot_energy_kwh(matrix, plan.electric_by_hour)
 
 
 def _live_store_flex_overlay(

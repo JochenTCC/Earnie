@@ -1,6 +1,6 @@
 # Thermal horizon simulation — year model once for parameters, horizon only in Live
 
-**Status:** Approved 2026-10-15 — P1–P3 implemented on branch, P4–P5 open  
+**Status:** Approved 2026-10-15 — P1–P4 implemented on branch, P5 open  
 **Date:** 2026-10-15  
 **Branch:** `feat/thermal-horizon-sim` (based on `perf/thermal-year-cache`, PR #36)  
 **Related:** [`thermals-p2.md`](thermals-p2.md) (§ Live / MILP store floor), [`early-start-scheduling.md`](early-start-scheduling.md), backlog epic **ThermalHorizon** P1–P5 (Version 2.7)
@@ -72,7 +72,7 @@ New `plan_live_house_horizon(...)` in `thermal_live_store.py` (reuses `step_hous
 - Ambient: outdoor forecast over the horizon (hourly, mapped to slots as today).
 - Output: hourly electric kWh → `slot_energy_kwh` + `daily_targets` (`targets_slot_aligned = True`) — same context keys, so `add_thermal_flex_constraints` is unchanged.
 - `resolve_thermal_annual_horizon_kwh` Live branch: Σ slot energy of the horizon plan instead of calendar-day sums.
-- Legacy path `living_area_m2 <= 0` (open-loop HDD): horizon = Σ over forecast hours of the HDD formula with the annual parameter from §4.1 — no year series.
+- Legacy path `living_area_m2 <= 0` (open-loop HDD): the year model has no space heat there (annual heat = area × HWB = 0), only warm water minus the collector credit. Horizon = warm water over the forecast hours minus the forecast collector heat (§4.4), netted per calendar day like the year model — no year series.
 - **Result change:** day targets follow the forecast instead of last year's weather; the hourly shape is bang-bang from the RC model instead of the PWM spread of a daily total.
 
 ### 4.4 Collector irradiance from the forecast

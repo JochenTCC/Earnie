@@ -98,6 +98,8 @@ Bei `type: thermal_annual` kann unter `thermal.heat_storage` ein **Pufferspeiche
 
 **Live-Prognose über den Planungshorizont:** Der Live-Optimierer simuliert den Speicher nur über den Planungshorizont – ab der gemessenen Speichertemperatur, mit Außentemperatur **und Kollektor-Einstrahlung aus der Open-Meteo-Wetterprognose** (Neigung/Ausrichtung aus `solar_thermal_tilt_deg` / `solar_thermal_azimuth_deg`). Fällt die Einstrahlungsprognose aus, nutzt Earnie die Werte des letzten vollständigen Kalenderjahres am selben Tag und zur selben Stunde und schreibt eine Warnung ins `earnie.log`; welche Quelle verwendet wurde, steht je Lauf in `optimization_history.jsonl` (`collector_solar_source`: `open_meteo`, `fallback_archive_year` oder `none`). Den Wärmeverlust des Gebäudes (H, ohne eigenen Wert in `house_heat_loss_kw_per_k`) kalibriert Earnie aus dem **letzten vollständigen Kalenderjahr** des Open-Meteo-Archivs – nicht aus dem laufenden, unvollständigen Jahr.
 
+**Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet der Live-Optimierer nur über den Planungshorizont: Er simuliert das Haus ab der Solltemperatur (`target_temp_c`, es gibt keinen Innentemperatur-Fühler) mit der Außentemperatur-Prognose und denselben Regeln wie die Jahressimulation; daraus ergeben sich WP-Bedarf je Viertelstunde und die Tagesziele. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen weiterhin die Jahressimulation mit historischem Wetter.
+
 Entwickler-Spec: [thermals-p2.md](../spec/thermals-p2.md).
 
 ## E-Auto: `charging_schedule`

@@ -139,6 +139,28 @@ def _live_heat_storage_horizon_need_kwh(
     return round(float(plan.floor_electric_kwh) + float(plan.opp_cap_electric_kwh), 3)
 
 
+def _live_house_horizon_need_kwh(
+    source: dict,
+    profile: dict,
+    optimization_matrix: list,
+) -> float:
+    """Live without storage: WP electric of the house horizon plan over the matrix slots."""
+    from optimizer.thermal_live_store import (
+        hourly_electric_to_slot_energy_kwh,
+        live_house_plan_for_matrix,
+    )
+
+    plan = live_house_plan_for_matrix(source, profile, optimization_matrix)
+    if plan is None:
+        raise ValueError(
+            f"Live-Hausplan für '{source.get('id')}' fehlt (Wärmespeicher aktiv?)."
+        )
+    slot_energy = hourly_electric_to_slot_energy_kwh(
+        optimization_matrix, plan.electric_by_hour
+    )
+    return round(sum(slot_energy), 3)
+
+
 def resolve_thermal_annual_horizon_kwh(
     consumer: dict,
     optimization_matrix: list | None,
@@ -146,7 +168,8 @@ def resolve_thermal_annual_horizon_kwh(
     """Horizon WP electric target for thermal_annual.
 
     Live + heat_storage: open-loop store floor + opp (not full-calendar HDD).
-    Otherwise: sum of HDD day targets over calendar dates in the matrix.
+    Live without storage: house horizon plan over the matrix slots (ThermalHorizon P4).
+    Otherwise (SE / backtesting): sum of HDD day targets over calendar dates in the matrix.
     """
     if not optimization_matrix:
         return 0.0
@@ -180,6 +203,7 @@ def resolve_thermal_annual_horizon_kwh(
         )
         if live_need is not None:
             return float(live_need)
+        return _live_house_horizon_need_kwh(source, profile, optimization_matrix)
     total = 0.0
     dates = sorted(
         {
