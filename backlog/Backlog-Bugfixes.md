@@ -38,9 +38,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Create new debug-dump for missing PS charging energy
-- [ ] Create new debug-dump for missing assignment of consumption to specific consumers
-- [ ] Alignment mismatch (time-wise) between SOC line and forced charging / discharging decoration (we had this error already in the past) - check and fix
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 

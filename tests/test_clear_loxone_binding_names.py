@@ -160,6 +160,40 @@ def test_empty_thermal_rc_activation_uses_pool_namespace() -> None:
     )
 
 
+def test_empty_activation_resolves_sens_power_act_qids() -> None:
+    """Live/exchange qids (consumer|pool|heatpump.*) must resolve for Chart/Sankey meters."""
+    from settings.ehal_marker_resolve import marker_flex_power
+
+    known = {
+        "id": "kochen",
+        "type": "generic",
+        "earnie_role": "known",
+        "ehal_bindings": {"consumer.kochen.sens_power_act": ""},
+    }
+    assert marker_flex_power(known) == "consumer.kochen.sens_power_act"
+
+    pool = {
+        "id": "pool_swimspa",
+        "type": "thermal_rc",
+        "ehal_bindings": {"pool.pool_swimspa.sens_power_act": ""},
+    }
+    assert marker_flex_power(pool) == "pool.pool_swimspa.sens_power_act"
+
+    heatpump = {
+        "id": "waermepumpe",
+        "type": "thermal_annual",
+        "ehal_bindings": {"heatpump.waermepumpe.sens_power_act": ""},
+    }
+    assert marker_flex_power(heatpump) == "heatpump.waermepumpe.sens_power_act"
+
+    legacy_flex = {
+        "id": "tv",
+        "type": "generic",
+        "ehal_bindings": {"flex.tv.sens_power_act": "Zaehler TV"},
+    }
+    assert marker_flex_power(legacy_flex) == "Zaehler TV"
+
+
 def test_empty_activation_resolves_write_qids() -> None:
     from house_config.ehal_bindings import resolve_plant_binding
     from settings.ehal_marker_resolve import (

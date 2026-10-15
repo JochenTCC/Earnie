@@ -2,6 +2,34 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Minor — Debug-dump includes powerstation_reserves.json (2026-10-15)
+
+- [x] **powerstation_reserves.json in debug-dump** — added to `_OPTIONAL_RUNTIME` in `runtime_store/debug_dump_archive.py` (copied when present); docs `docs/einrichtung/betrieb.md`; test `test_write_debug_dump_zip_without_chart`.
+
+### Bugfix — Chart 1 SoC vs Zwangsladen/Zwangsentladen underlay time alignment (2026-10-15)
+
+- [x] **Alignment mismatch (time-wise) between SOC line and forced charging / discharging decoration** — **Verified** (2026-10-15, Monitor Chart 1)
+  - Symptom: thick ESS-mode underlay (Zwangsladen / Zwangsentladen) looked shifted vs the visible SoC line (e.g. tomorrow ~18:15).
+  - Cause: underlay followed aggregate `Simulierter SoC (%)` while Chart 1 drew per-ESS `SoC · {label}`; multi-ESS horizon also lagged the controlled battery column by one slot (start-of-slot written back into `soc_by_ess`).
+  - Fix: underlay resolves the Steuerbefehl battery via `battery_params` label/id; `_advance_chart_soc_after_slot` uses end-of-slot SoC for the controlled ESS.
+  - Tests: `tests/test_ess_mode_soc_underlay.py` (`test_underlay_follows_controlled_battery_column_not_aggregate`).
+
+### Bugfix — Metered consumers missing in Sankey + Chart 1 (2026-10-15)
+
+- [x] **Consumption of consumers with provided current power neither shown as Sankey paths nor Chart 1 bars** — **Verified** (2026-10-15, shadow Monitor)
+  - Symptom: known/manual/thermal consumers with mapped `sens_power_act` (e.g. Kochen, TV, appliances, pool) missing as separate Sankey paths and as consumer-specific Chart 1 bars; live power still visible on EHAL-Com / sampler.
+  - Cause: `marker_flex_power` only accepted `flex.{id}.sens_power_act`; house profile stores Live/exchange qids (`consumer|pool|heatpump.{id}.sens_power_act`, often empty Merker / push-only), so meters never entered live resolve / Sankey `meter_ids`. Chart 1 history also omitted known metered Ist columns.
+  - Fix: `marker_flex_power` resolves qualified `*.sens_power_act` like `marker_flex_enable`; `entry_to_chart_row` attaches known metered Ist via `_attach_known_meter_flex_columns`.
+  - Tests: `tests/test_clear_loxone_binding_names.py` (`test_empty_activation_resolves_sens_power_act_qids`); `tests/test_history_timeline.py` (`test_entry_to_chart_row_attaches_known_meter_ist`).
+
+### Bugfix — Standby Powerstation charge not covered by house grid/battery energy (2026-10-15)
+
+- [x] **Standby Powerstation charge not covered by house grid/battery energy** — **Verified** (2026-10-15) on `fix/powerstation-charge-energy-balance`
+  - Symptom (dump `debug_dump_20261015_145649`, Ecoflow `standby_backup`): Chart1 SoC rises (e.g. 67.8→100%) while house battery/grid cover is short.
+  - Cause: standby `charge_kw` planned + SoC advanced, but not added to house `expected_p_act` (live and Chart1 horizon).
+  - Fix: `apply_standby_load_relief` also adds grid-pass-through charge; wired in `main.py` + `simulation.py` horizon setup.
+  - Tests: `tests/test_powerstation_2_7_h.py` (`test_apply_standby_load_relief_adds_grid_charge_to_house_load`).
+
 ### Bugfix — Heat storage: Live never applied solar-collector heat (2026-10-15)
 
 - [x] **Heat storage: Live never applied solar-collector heat** — **Verified live** (2026-10-15)

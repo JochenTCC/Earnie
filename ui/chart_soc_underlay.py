@@ -452,6 +452,60 @@ def _add_underlay_part(
             )
 
 
+def _resolve_underlay_soc_column(
+    df: pd.DataFrame,
+    battery_params: dict | None = None,
+) -> str | None:
+    """
+    SoC column for the ESS-mode underlay.
+
+    Steuerbefehl applies to the controlled plant battery (``battery_params``).
+    When Chart 1 has per-ESS lines, the underlay must follow that battery's
+    ``Simulierter SoC {label} (%)`` series — not aggregate ``Simulierter SoC (%)``
+    and not an arbitrary other ESS/PS line.
+    """
+    primary = "Simulierter SoC (%)"
+    # Lazy import: chart_soc re-exports this module.
+    from ui.chart_soc import discover_ess_soc_series
+
+    series = discover_ess_soc_series(df)
+    if not series:
+        return primary if primary in df.columns else None
+    by_label = {
+        legend.removeprefix("SoC · ").strip(): column
+        for column, legend in series
+        if column in df.columns
+    }
+    params = battery_params or {}
+    for key in ("label", "id"):
+        token = str(params.get(key) or "").strip()
+        if token and token in by_label:
+            return by_label[token]
+    # Fall back: per-ESS column that matches aggregate (controlled plant SoC).
+    if primary in df.columns:
+        agg = df[primary]
+        for column, _legend in series:
+            other = df[column]
+            if len(other) != len(agg):
+                continue
+            matched = True
+            for left, right in zip(agg, other):
+                if pd.isna(left) and pd.isna(right):
+                    continue
+                if pd.isna(left) or pd.isna(right):
+                    matched = False
+                    break
+                if abs(float(left) - float(right)) > 0.05:
+                    matched = False
+                    break
+            if matched:
+                return column
+    first_column = series[0][0]
+    if first_column in df.columns:
+        return first_column
+    return primary if primary in df.columns else None
+
+
 def add_ess_mode_soc_underlay_traces(
     fig: go.Figure,
     df: pd.DataFrame,
@@ -464,7 +518,10 @@ def add_ess_mode_soc_underlay_traces(
     battery_params: dict | None = None,
 ) -> None:
     """Thicker translucent SoC underlay by ESS mode (hold/charge/discharge)."""
-    if "Steuerbefehl" not in df.columns or "Simulierter SoC (%)" not in df.columns:
+    if "Steuerbefehl" not in df.columns:
+        return
+    soc_column = _resolve_underlay_soc_column(df, battery_params=battery_params)
+    if soc_column is None:
         return
     params = _resolve_battery_params(battery_params)
     max_power_kw = float(params.get("max_power_kw") or 0.0)
@@ -473,9 +530,10 @@ def add_ess_mode_soc_underlay_traces(
         classify_ess_soc_underlay(df["Steuerbefehl"].iloc[i], max_power_kw)
         for i in range(length)
     ]
+    soc = df[soc_column]
     ctx = {
         "axis": axis,
-        "soc": df["Simulierter SoC (%)"],
+        "soc": soc,
         "uhrzeit": df["Uhrzeit"],
         "df": df,
         "length": length,

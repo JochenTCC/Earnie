@@ -201,6 +201,10 @@ def test_write_debug_dump_zip_without_chart(tmp_path, monkeypatch):
             '{"ok":true}',
             encoding="utf-8",
         )
+        (tmp_path / "runtime" / "powerstation_reserves.json").write_text(
+            "{}",
+            encoding="utf-8",
+        )
         zip_path = write_debug_dump_zip(
             title="EV miss",
             symptom="deadline",
@@ -213,6 +217,7 @@ def test_write_debug_dump_zip_without_chart(tmp_path, monkeypatch):
         assert "runtime/optimization_history.jsonl" in names
         assert "runtime/optimization_history_window.jsonl" not in names
         assert "runtime/optimizer_run_state.json" in names
+        assert "runtime/powerstation_reserves.json" in names
         manifest = json.loads(archive.read("manifest.json"))
         assert manifest["schema_version"] == DUMP_SCHEMA_VERSION
         assert manifest["dump_type"] == DUMP_TYPE_DEBUG
@@ -223,6 +228,9 @@ def test_write_debug_dump_zip_without_chart(tmp_path, monkeypatch):
             "required_present"
         ]
         assert "runtime/optimizer_run_state.json" in manifest["files"][
+            "optional_present"
+        ]
+        assert "runtime/powerstation_reserves.json" in manifest["files"][
             "optional_present"
         ]
 

@@ -290,6 +290,42 @@ def test_entry_to_chart_row_uses_measured_flex_live(monkeypatch):
     assert row[consumer_column_name(swimspa)] == pytest.approx(0.07)
 
 
+def test_entry_to_chart_row_attaches_known_meter_ist(monkeypatch):
+    """Known generics with measured sens_power_act get Chart-1 Ist columns."""
+    from optimizer.targets import consumer_column_name
+
+    monkeypatch.setattr(
+        history_timeline.config,
+        "get_flexible_consumers",
+        lambda optimizer_only=False: [],
+    )
+    known = {
+        "id": "kochen",
+        "name": "Kochen",
+        "label": "Kochen",
+        "chart_color_index": 3,
+    }
+    monkeypatch.setattr(
+        "house_config.known_chart_display.chart_known_generics",
+        lambda *args, **kwargs: [known],
+    )
+    entry = _entry(
+        datetime(2026, 10, 15, 12, 0, 0),
+        flex_live_kw={"kochen": 0.11},
+        flex_measured_ids=["kochen"],
+        consumption_snapshot={
+            "house_kw": 1.0,
+            "baseload_kw": 0.89,
+            "flex_kw": {"kochen": 0.11},
+            "pv_kw": 0.0,
+            "grid_kw": 1.0,
+            "battery_kw": 0.0,
+        },
+    )
+    row = history_timeline.entry_to_chart_row(entry, datetime(2026, 10, 15, 12, 0, 0))
+    assert row[consumer_column_name(known)] == pytest.approx(0.11)
+
+
 def test_entry_to_chart_row_omits_unmeasured_flex(monkeypatch):
     from optimizer.targets import consumer_column_name
 

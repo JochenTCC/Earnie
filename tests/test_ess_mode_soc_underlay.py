@@ -262,3 +262,74 @@ def test_hold_underlay_y_matches_soc_at_chart_now():
         )[1]
 
     assert _y_at(under_ys, now) == pytest.approx(_y_at(soc_ys, now), abs=0.05)
+
+
+def test_underlay_follows_controlled_battery_column_not_aggregate():
+    """
+    Multi-ESS Chart 1: underlay must track the Steuerbefehl battery's SoC line.
+
+    ``battery_params.label`` selects ``Simulierter SoC {label} (%)`` — not
+    aggregate and not another ESS/PS series.
+    """
+    from ui.chart_soc import add_optimized_soc_traces
+    from ui.chart_soc_underlay import _resolve_underlay_soc_column
+
+    controlled_col = "Simulierter SoC 15 kWh Speicher (%)"
+    params = {
+        **_BATTERY,
+        "id": "15_kwh_speicher",
+        "label": "15 kWh Speicher",
+    }
+    slots = [
+        datetime(2026, 10, 16, 18, 0, tzinfo=_TZ),
+        datetime(2026, 10, 16, 18, 15, tzinfo=_TZ),
+        datetime(2026, 10, 16, 18, 30, tzinfo=_TZ),
+        datetime(2026, 10, 16, 18, 45, tzinfo=_TZ),
+    ]
+    discharge = bat.steuerbefehl_for_mode(bat.MODE_ZWANGS_ENTLADEN, 5.0)
+    auto = bat.steuerbefehl_for_mode(bat.MODE_AUTOMATIK, 0.0)
+    # Controlled battery drops with Steuerbefehl; aggregate wrongly leads by 1 slot;
+    # Ecoflow is a different series and must not be used for underlay Y.
+    controlled = [100.0, 91.1, 82.2, 77.9]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [s.strftime("%H:%M") for s in slots],
+        "Steuerbefehl": [discharge, discharge, discharge, auto],
+        "Simulierter SoC (%)": [100.0, 100.0, 91.1, 82.2],
+        controlled_col: controlled,
+        "Simulierter SoC Ecoflow (%)": [82.4, 79.9, 77.3, 74.8],
+        "Preis extrapoliert": [False] * 4,
+        "PV-Prognose (kW)": [0.0] * 4,
+        "Verbrauch-Prognose (kW)": [1.0] * 4,
+        "Geplante Batterie-Aktion (kW)": [-5.0, -5.0, -2.4, 0.0],
+    })
+    assert _resolve_underlay_soc_column(df, battery_params=params) == controlled_col
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_ess_mode_soc_underlay_traces(fig, df, axis, battery_params=params)
+    add_optimized_soc_traces(fig, df, axis, battery_params=params)
+    under = next(
+        t for t in fig.data
+        if t.name == _ESS_UNDERLAY_TRACE_NAMES[ESS_UNDERLAY_DISCHARGE]
+    )
+    soc = next(t for t in fig.data if t.name == "SoC · 15 kWh Speicher")
+    t_1815 = datetime(2026, 10, 16, 18, 15, tzinfo=_TZ)
+
+    def _y_at(trace, moment: datetime) -> float:
+        pairs = {
+            pd.Timestamp(x).tz_localize(_TZ)
+            if pd.Timestamp(x).tzinfo is None
+            else pd.Timestamp(x).tz_convert(_TZ): float(y)
+            for x, y in zip(trace.x, trace.y)
+        }
+        key = pd.Timestamp(moment)
+        if key in pairs:
+            return pairs[key]
+        return min(
+            pairs.items(),
+            key=lambda item: abs((item[0] - key).total_seconds()),
+        )[1]
+
+    assert _y_at(under, t_1815) == pytest.approx(91.1, abs=0.05)
+    assert _y_at(soc, t_1815) == pytest.approx(91.1, abs=0.05)
+    assert _y_at(under, t_1815) == pytest.approx(_y_at(soc, t_1815), abs=0.05)

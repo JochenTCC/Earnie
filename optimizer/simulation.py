@@ -285,8 +285,15 @@ def _prepare_horizon_state(
     standby_plans, standby_packs_by_id = _resolve_standby_chart_plans(
         optimization_matrix, current_soc_by_id
     )
+    matrix = optimization_matrix
+    if standby_plans:
+        from optimizer.powerstation_standby import apply_standby_load_relief
+
+        # Island relief + grid-pass-through charge must hit house MILP / Chart1
+        # energy balance (same as main.py live path).
+        matrix = apply_standby_load_relief(optimization_matrix, standby_plans)
     return _HorizonSetup(
-        matrix=optimization_matrix,
+        matrix=matrix,
         consumers_cfg=consumers_cfg,
         battery_params=agg_battery,
         batteries=batteries,
@@ -550,6 +557,7 @@ def _advance_chart_soc_after_slot(
     slot: dict | None,
     slot_index: int,
     virtual_entries: list[dict],
+    end_soc: float | None = None,
 ) -> None:
     """Update house / physical-standby / virtual SoC maps for the next Chart1 attach."""
     from optimizer.powerstation_soc_chart import simulate_virtual_reserve_soc_after_slot
@@ -565,8 +573,13 @@ def _advance_chart_soc_after_slot(
             for b in setup.batteries
             if str(b.get("id") or "").strip()
         ]
-        if len(house_ids) == 1 and COL_SOC in chart_row:
-            soc_by_ess[house_ids[0]] = float(chart_row[COL_SOC])
+        if len(house_ids) == 1:
+            # End-of-slot SoC for the controlled ESS (Steuerbefehl / plant battery).
+            # COL_SOC is start-of-slot — never write it back here.
+            if end_soc is not None:
+                soc_by_ess[house_ids[0]] = float(end_soc)
+            elif COL_SOC in chart_row and house_ids[0] not in soc_by_ess:
+                soc_by_ess[house_ids[0]] = float(chart_row[COL_SOC])
     if setup.standby_plans:
         advance_physical_standby_soc_after_slot(
             soc_by_ess,
@@ -629,15 +642,11 @@ def _run_horizon_slots(
                     setup.consumers_cfg,
                     slot,
                 )
+            # Attach start-of-slot per-ESS SoC (same timing as COL_SOC), then finalize
+            # end-of-slot plant SoC, then advance maps for the next attach. Writing
+            # COL_SOC (start) back into soc_by_ess lagged house columns by one slot
+            # vs aggregate / Steuerbefehl underlay.
             attach_ess_soc_columns(chart_row, soc_by_ess, chart_entities)
-            _advance_chart_soc_after_slot(
-                setup,
-                chart_row,
-                soc_by_ess,
-                slot=slot,
-                slot_index=i,
-                virtual_entries=virtual_entries,
-            )
             sim_soc = _advance_delivered_and_flex_run(
                 setup,
                 chart_row,
@@ -645,6 +654,15 @@ def _run_horizon_slots(
                 target_power,
                 delivered_horizon,
                 generic_flex_run,
+            )
+            _advance_chart_soc_after_slot(
+                setup,
+                chart_row,
+                soc_by_ess,
+                slot=slot,
+                slot_index=i,
+                virtual_entries=virtual_entries,
+                end_soc=sim_soc,
             )
             chart_rows.append(chart_row)
             if on_progress is not None:
