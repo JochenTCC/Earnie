@@ -173,6 +173,7 @@ class CycleStats:
             "late_by_sec": late_by,
             "on_time": on_time,
             "events": list(self.events),
+            "clock_skew_sec": _clock_skew_sec(),
             "horizon_slots": self.horizon_slots,
             "version": version,
             "platform": platform_info()["id"],
@@ -199,6 +200,15 @@ def collect_events() -> Iterator[list[str]]:
         yield collector.events
     finally:
         _active.reset(token)
+
+
+def _clock_skew_sec() -> float | None:
+    """Host clock offset vs. HTTP Date headers (+ = local clock behind); warns if large."""
+    from runtime_store import clock_skew
+
+    estimate = clock_skew.current_estimate()
+    clock_skew.maybe_warn(estimate)
+    return None if estimate is None else estimate.offset_sec
 
 
 def record_event(name: str) -> None:

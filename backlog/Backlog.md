@@ -35,7 +35,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - **Note:** Epic **ThermalHorizon** P1–P5 (`2.7.0-dev.57`, PR #37) → [Erledigt](Backlog-Erledigt.md). Spec [`docs/spec/thermal-horizon-simulation.md`](../docs/spec/thermal-horizon-simulation.md). Profiling session (NAS timing + acceleration ranking) → [Erledigt](Backlog-Erledigt.md).
 
 - **Note:** Epic **EarlyStart** (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md)): **P0** (punctuality log) and **P1** (adaptive lead 15–90 s, plan for the tick, write at the tick; no state projection — owner decision 2026-10-15) and the **prefetch** follow-up → [Erledigt](Backlog-Erledigt.md). Success is judged from the `Pünktlichkeit:` line in `earnie.log` / `runtime/cycle_stats.jsonl`. Dropped with P1 scope: SoC/thermal/EV projection to T, pre-commit SoC drift check, MILP solver deadline (MILP < 1 s on NAS since dev.57).
-- [ ] **Clock-skew diagnostics** (spec early-start-scheduling §7; no longer part of EarlyStart): estimate the host clock offset from the HTTP `Date` header of requests already made (no extra request); offset > 2 s → warning with NTP hint, optional `clock_skew_sec` in `cycle_stats.jsonl`. No early-start gate — the hold writes at the system-clock tick either way. Low priority while the NAS runs NTP.
 
 - [ ] Full orchestration of model version migration
   - Target is that after an update - the user is guided through migration as flawless as possible

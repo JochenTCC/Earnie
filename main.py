@@ -990,6 +990,10 @@ if __name__ == "__main__":
     )
     from integrations.loxone_request_http import start_loxone_request_http
 
+    from runtime_store.clock_skew import install_requests_hook
+
+    # Clock-skew diagnostics from Date headers of responses the cycle receives anyway.
+    install_requests_hook()
     run_tariff_plausibility_on_startup()
     run_live_scenario_entity_check_on_startup()
     prepare_loxone_push_inbox_for_startup(

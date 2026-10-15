@@ -106,6 +106,8 @@ Ob es gelingt, protokolliert jeder Optimierungslauf — unabhängig vom optional
 
 Keine Einstellung nötig; die Datei bleibt lokal. Voraussetzung ist eine per NTP synchronisierte Systemuhr (bei NAS/Docker Standard).
 
+**Systemuhr-Prüfung:** Takt und Pünktlichkeitslog richten sich nach der Systemuhr — geht sie falsch, merkt das Log das nicht. Earnie schätzt deshalb die Abweichung aus dem `Date`-Feld der Antworten, die es ohnehin von Internet-Diensten bekommt (Strompreise, Wetter, PV-Prognose; keine zusätzlichen Abrufe, Geräte im Heimnetz zählen nicht). Weicht die Uhr um mehr als 2 s ab, steht in `earnie.log` höchstens stündlich eine Warnung *„Systemuhr geht ca. … s vor/nach … Zeitsynchronisation (NTP) des Hosts prüfen“*. Der Schätzwert steht je Lauf als `clock_skew_sec` in `runtime/cycle_stats.jsonl` (positiv = Systemuhr geht nach; leer, solange weniger als 3 Antworten vorliegen). Die Genauigkeit liegt bei etwa ±0,5–1 s.
+
 ### Cycle-Recorder (Regression R-Rec)
 
 Earnie speichert die vollständigen Optimizer-Eingaben jedes Zyklus in einem Ringpuffer unter `runtime/recorder/` (Spec: [`docs/spec/regression-suite.md`](../spec/regression-suite.md) §14). Damit lassen sich Fehler, die erst Tage später auffallen, noch als golden-master-Fall nachziehen. Die Dateien enthalten **Lastprofile** und bleiben **lokal** — Earnie lädt sie nicht hoch.

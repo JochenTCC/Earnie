@@ -10,6 +10,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Fix: `resolve_live_collector_solar_kw` (Open-Meteo archive DOY/hour; later horizon path uses forecast irradiance) auto-fills when callers omit solar; wired in `plan_live_store_for_thermal_consumer`.
   - Tests: `tests/test_collector_irradiance_forecast.py` (resolve); `tests/test_thermal_live_collector_regression.py` (store T rises above setpoint when `solar_forecast_kw=None` + sunny midday + `solar_thermal_area_m2` > 0).
 
+### Clock-skew diagnostics (2026-10-15)
+
+- [x] **Clock-skew diagnostics** (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §7; not part of EarlyStart): `runtime_store/clock_skew.py` — daemon installs a hook on `requests.Session.send` and reads the `Date` header of HTTPS responses from public hosts the cycle already receives (no extra request; LAN/plain-HTTP hosts ignored). Sample = (Date + 0.5 s) − (received − elapsed/2); responses slower than 2 s dropped; estimate = median of ≥ 3 samples from the last hour. |offset| > 2 s → `clock_skew` WARNING with NTP hint (at most hourly). `clock_skew_sec` in each `cycle_stats.jsonl` record (+ = system clock behind). No early-start gate.
+  - Tests: `tests/test_clock_skew.py`. Docs: `docs/einrichtung/betrieb.md` § Zyklus-Pünktlichkeit und Vorlauf.
+
 ### EarlyStart follow-up — prefetch slow inputs off the critical path (2026-10-15)
 
 - [x] **EarlyStart follow-up — prefetch slow inputs off the critical path** (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §8)
