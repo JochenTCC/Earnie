@@ -1,6 +1,7 @@
 """Tests for Earnie_Request_Optimize HTTP wake."""
 from __future__ import annotations
 
+import threading
 import urllib.error
 import urllib.request
 
@@ -53,13 +54,71 @@ def test_wait_until_next_run_returns_request_optimize() -> None:
     assert sleeps
 
 
+class _FakeClock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, sec: float) -> None:
+        self.now += sec
+
+
 def test_wait_until_next_run_times_out() -> None:
+    clock = _FakeClock()
     result = wait_until_next_run(
         total_wait_sec=0.4,
         poll_interval_sec=0.2,
-        sleep_fn=lambda _s: None,
+        sleep_fn=clock.sleep,
+        clock_fn=clock,
     )
     assert result is None
+    assert clock.now == pytest.approx(1000.4)
+
+
+def test_wait_on_poll_cost_does_not_extend_total_wait() -> None:
+    """Regression: on_poll runtime must count towards the wait (daemon drift ~1 min/15 min)."""
+    clock = _FakeClock()
+    polls: list[float] = []
+
+    def on_poll() -> None:
+        polls.append(clock.now)
+        clock.now += 0.1  # e.g. sampler tick loading state JSON
+
+    fired = http_mod.wait_for_optimize_or_timeout(
+        900.0,
+        poll_interval_sec=1.0,
+        sleep_fn=clock.sleep,
+        event=threading.Event(),
+        on_poll=on_poll,
+        clock_fn=clock,
+    )
+    assert fired is False
+    # Deadline is 1900.0; the final on_poll may overrun by at most one poll cost.
+    assert clock.now == pytest.approx(1900.0, abs=0.11)
+    assert len(polls) > 800  # still polls roughly every second
+
+
+def test_wait_early_wake_with_fake_clock() -> None:
+    clock = _FakeClock()
+    ev = threading.Event()
+
+    def on_poll() -> None:
+        if clock.now >= 1005.0:
+            ev.set()
+
+    fired = http_mod.wait_for_optimize_or_timeout(
+        900.0,
+        poll_interval_sec=1.0,
+        sleep_fn=clock.sleep,
+        event=ev,
+        on_poll=on_poll,
+        clock_fn=clock,
+    )
+    assert fired is True
+    assert not ev.is_set()
+    assert clock.now == pytest.approx(1005.0)
 
 
 def test_http_post_request_optimize_sets_event() -> None:
