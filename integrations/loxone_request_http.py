@@ -249,18 +249,25 @@ def wait_for_optimize_or_timeout(
     sleep_fn: Callable[[float], None] | None = None,
     event: threading.Event | None = None,
     on_poll: Callable[[], None] | None = None,
+    clock_fn: Callable[[], float] | None = None,
 ) -> bool:
-    """Sleep until timeout or optimize Event; return True if Event fired."""
+    """Sleep until timeout or optimize Event; return True if Event fired.
+
+    The wait runs against a monotonic deadline (``clock_fn``, default
+    ``time.monotonic``), so time spent in ``on_poll`` counts towards
+    ``total_wait_sec`` instead of extending the wait.
+    """
     import time
 
     sleep = sleep_fn or time.sleep
+    clock = clock_fn or time.monotonic
     ev = event if event is not None else _optimize_event
-    remaining = float(total_wait_sec)
-    if remaining <= 0:
+    if float(total_wait_sec) <= 0:
         return consume_optimize_request() if event is None else ev.is_set()
 
+    deadline = clock() + float(total_wait_sec)
     poll = max(0.2, float(poll_interval_sec))
-    while remaining > 0:
+    while True:
         if on_poll is not None:
             try:
                 on_poll()
@@ -272,18 +279,7 @@ def wait_for_optimize_or_timeout(
             else:
                 ev.clear()
             return True
-        chunk = min(poll, remaining)
-        sleep(chunk)
-        remaining -= chunk
-    if on_poll is not None:
-        try:
-            on_poll()
-        except Exception:  # noqa: BLE001
-            logger.exception("wait_for_optimize_or_timeout: on_poll failed")
-    if ev.is_set():
-        if event is None:
-            clear_optimize_request()
-        else:
-            ev.clear()
-        return True
-    return False
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return False
+        sleep(min(poll, remaining))

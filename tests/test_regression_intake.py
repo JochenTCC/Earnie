@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import subprocess
 import zipfile
 from pathlib import Path
@@ -105,7 +106,11 @@ def test_resolve_private_cases_dir_missing(monkeypatch, tmp_path):
     assert resolve_private_cases_dir() is None
 
 
-def test_report_private_sha_and_skipped(tmp_path):
+def test_report_private_sha_and_skipped(tmp_path, monkeypatch):
+    # Inside a git hook GIT_DIR / GIT_INDEX_FILE point at the real repo; without
+    # this the git calls below would act on it instead of the tmp repo.
+    for key in [k for k in os.environ if k.startswith("GIT_")]:
+        monkeypatch.delenv(key)
     repo = tmp_path / "priv"
     repo.mkdir()
     subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
