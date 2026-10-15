@@ -35,6 +35,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Fix: `resolve_live_collector_solar_kw` (Open-Meteo archive DOY/hour) auto-fills when callers omit solar; wired in `plan_live_store_for_thermal_consumer`.
   - Tests: **add regression test after live verification** (mock sunny midday profile; assert store T rises above setpoint when `solar_forecast_kw=None` and `solar_thermal_area_m2` > 0).
 
+- [ ] **Daemon wait loop drifts ~1 min behind the quarter-hour tick** — fix implemented (2026-10-15); NAS productive acceptance pending
+  - Symptom (NAS productive `earnie.log`): regular cycles started 66–73 s after the tick (e.g. tick 09:15, `Live-Abfrage gestartet` 09:16:13), so setpoints landed ~1 min late every slot.
+  - Cause: `wait_for_optimize_or_timeout` (`integrations/loxone_request_http.py`) decremented `remaining` only by the sleep chunk; time spent in `on_poll` (`touch_daemon_heartbeat` + `power_interval_sampler.tick`, loads the ~190 KB state JSON each poll) extended the wait (~900 polls × ~0.07–0.1 s ≈ 1 min).
+  - Fix: wait against a monotonic deadline (`clock_fn`, default `time.monotonic`); early wake via Earnie_Request_Optimize unchanged. `wait_until_next_run` passes `clock_fn` through.
+  - Tests: `tests/test_loxone_request_http.py` (`test_wait_on_poll_cost_does_not_extend_total_wait`, `test_wait_early_wake_with_fake_clock`).
+  - Live verification: `wake_delay_sec` in `runtime/cycle_stats.jsonl` (EarlyStart P0) should drop to ~0–2 s for `quarter_hour` cycles.
+
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] Debug dump to triage: `debug-dumps/debug_dump_20261014_221410` (incomplete note — fill symptom / expected)
