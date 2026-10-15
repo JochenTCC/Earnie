@@ -45,10 +45,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] Debug dump to triage: `debug-dumps/debug_dump_20261014_221410` (incomplete note — fill symptom / expected)
-- [ ] **Daemon wait loop drifts ~1 min behind the quarter-hour tick** (found 2026-10-15 in NAS productive `earnie.log`)
-  - Symptom: regular cycles start 66–73 s after the tick (e.g. tick 09:15, `Live-Abfrage gestartet` 09:16:13), so setpoints land ~1 min later than necessary every slot.
-  - Suspected cause: `integrations/loxone_request_http.py` `wait_for_optimize_or_timeout` subtracts only the sleep chunk from `remaining`, not the time spent in `on_poll` (`touch_daemon_heartbeat` + `power_interval_sampler.tick`, which loads the ~190 KB state JSON every poll). ~600 polls per wait → ~1 min drift.
-  - Fix idea: wait against a monotonic deadline instead of a decremented counter. Confirm first with `wake_delay_sec` in `runtime/cycle_stats.jsonl` (EarlyStart P0).
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
