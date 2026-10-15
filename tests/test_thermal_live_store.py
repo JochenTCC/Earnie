@@ -218,7 +218,7 @@ def test_live_min_kwh_excludes_floor_when_above_setpoint():
         jaz=4.0,
         living_area_m2=157.0,
         building_mass="mittel",
-        annual_heat_kwh=6000.0,
+        house_heat_loss_kw_per_k=0.1,
         persons=2,
     )
     assert plan.opp_cap_electric_kwh == 0.0
@@ -226,10 +226,11 @@ def test_live_min_kwh_excludes_floor_when_above_setpoint():
 
 
 def test_hot_store_floor_does_not_force_within_few_hours():
-    """Regression Shadow 66 °C: short-forecast H must not empty the buffer by ~14:00."""
+    """Regression Shadow 66 °C: a year-calibrated H must not empty the buffer by ~14:00."""
     band = ThermalBand(setpoint_c=47.0, tolerance_c=5.0)
     capacity = capacity_kwh_per_k_from_volume(887.0)
-    # Cold short forecast would previously inflate H by ~8760/n and force WP in ~3 h.
+    # A short-forecast H (inflated ~8760/n) used to force WP in ~3 h; H now comes
+    # from ThermalParameters (reference-year calibration, ~0.1 kW/K for 157 m²).
     ambient = [8.0] * 8 + [14.0] * 16 + [8.0] * 24
     plan = plan_live_store_horizon(
         start_temp_c=66.6,
@@ -244,11 +245,10 @@ def test_hot_store_floor_does_not_force_within_few_hours():
         building_mass="mittel",
         target_temp_c=21.5,
         heating_limit_c=15.0,
-        annual_heat_kwh=6280.0,
+        house_heat_loss_kw_per_k=0.1,
         persons=2,
         used_measured_eq=True,
         used_measured_low=True,
-        house_profile=None,  # force short-forecast scale fallback
     )
     first = next((i for i, f in enumerate(plan.forced_hour_flags) if f), None)
     assert plan.opp_cap_electric_kwh == 0.0
@@ -307,11 +307,8 @@ def test_space_heat_climb_rate_limited_at_band_min():
         house_tolerance_c=0.5,
         house_heat_loss_kw_per_k=0.12,
         heating_limit_c=15.0,
-        annual_heat_kwh=6280.0,
-        ambient_forecast_c=[13.0] * 8,
         start_house_temp_c=21.0,  # band_min
         max_heat=8.17,
-        house_profile=None,
     )
     demand = _space_heat_demand_kw(house, 21.0, 13.0)
     full_climb = 0.5 * house_c  # pre-fix: recover whole tolerance in 1 h

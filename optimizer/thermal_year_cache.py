@@ -115,15 +115,19 @@ class YearModelCache:
 
 HOUSE_YEAR_CACHE = YearModelCache("house_year_result")
 THERMAL_RC_YEAR_CACHE = YearModelCache("thermal_rc_year")
+# ThermalHorizon P1: derived parameters (small frozen dataclasses).
+THERMAL_PARAMETERS_CACHE = YearModelCache("thermal_parameters", maxsize=64)
 
 
 def clear_year_model_caches() -> None:
     HOUSE_YEAR_CACHE.clear()
     THERMAL_RC_YEAR_CACHE.clear()
+    THERMAL_PARAMETERS_CACHE.clear()
 
 
 def year_model_cache_stats() -> dict[str, dict[str, int]]:
     return {
         HOUSE_YEAR_CACHE.name: HOUSE_YEAR_CACHE.stats(),
         THERMAL_RC_YEAR_CACHE.name: THERMAL_RC_YEAR_CACHE.stats(),
+        THERMAL_PARAMETERS_CACHE.name: THERMAL_PARAMETERS_CACHE.stats(),
     }

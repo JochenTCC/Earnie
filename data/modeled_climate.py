@@ -442,18 +442,13 @@ def _planning_timezone_for_thermal(thermal: dict, profile: dict) -> str:
     return "Europe/Berlin"
 
 
-def thermal_annual_kwh_from_archive(
+def reference_climate_for_thermal(
     thermal: dict,
     *,
-    house_profile: dict | None = None,
-    reference_year: int | None = None,
-) -> tuple[float, int]:
-    """
-    WP-Jahresbedarf (kWh/a) aus Open-Meteo-Archiv am Standort.
-
-    Returns (annual_kwh, reference_year).
-    """
-    year = reference_year if reference_year is not None else last_full_archive_year()
+    house_profile: dict | None,
+    year: int,
+) -> tuple[OpenMeteoClimateBundle, TiltedSurface]:
+    """Open-Meteo archive bundle (temperature + collector surface) for one calendar year."""
     lat = float(thermal["latitude"])
     lon = float(thermal["longitude"])
     profile = house_profile or {}
@@ -470,6 +465,24 @@ def thermal_annual_kwh_from_archive(
         lon=lon,
         timezone=timezone,
         surfaces=[collector],
+    )
+    return bundle, collector
+
+
+def thermal_annual_kwh_from_archive(
+    thermal: dict,
+    *,
+    house_profile: dict | None = None,
+    reference_year: int | None = None,
+) -> tuple[float, int]:
+    """
+    WP-Jahresbedarf (kWh/a) aus Open-Meteo-Archiv am Standort.
+
+    Returns (annual_kwh, reference_year).
+    """
+    year = reference_year if reference_year is not None else last_full_archive_year()
+    bundle, collector = reference_climate_for_thermal(
+        thermal, house_profile=house_profile, year=year
     )
     params = heating_params_from_thermal(thermal)
     area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)

@@ -1,9 +1,9 @@
 # Thermal horizon simulation — year model once for parameters, horizon only in Live
 
-**Status:** Draft (design, not implemented)  
+**Status:** Approved 2026-10-15 — P1 in progress  
 **Date:** 2026-10-15  
 **Branch:** `feat/thermal-horizon-sim` (based on `perf/thermal-year-cache`, PR #36)  
-**Related:** [`thermals-p2.md`](thermals-p2.md) (§ Live / MILP store floor), [`early-start-scheduling.md`](early-start-scheduling.md), backlog items *Cycle speed-up — …* (Version 2.7)
+**Related:** [`thermals-p2.md`](thermals-p2.md) (§ Live / MILP store floor), [`early-start-scheduling.md`](early-start-scheduling.md), backlog epic **ThermalHorizon** P1–P5 (Version 2.7)
 
 ## 1. Problem
 
@@ -68,7 +68,7 @@ def thermal_rc_parameters_for_consumer(consumer: dict) -> ThermalParameters: ...
 
 New `plan_live_house_horizon(...)` in `thermal_live_store.py` (reuses `step_house_hour`, `house_requests_heat`, `_step_hour_direct_wp` semantics of the year sim):
 
-- Start house temperature: **open question Q2** — (a) target temperature (steady state), or (b) carried state: the simulated house temperature at `T+15 min` persisted in `optimizer_run_state.json` (`thermal_state[consumer_id] = {temp_c, at}`), used when ≤ 1 h old, otherwise (a). No indoor sensor exists in EHAL today.
+- Start house temperature: target temperature (steady state; §7 Q2). No indoor sensor exists in EHAL today; carrying the simulated state between cycles stays a possible later refinement.
 - Ambient: outdoor forecast over the horizon (hourly, mapped to slots as today).
 - Output: hourly electric kWh → `slot_energy_kwh` + `daily_targets` (`targets_slot_aligned = True`) — same context keys, so `add_thermal_flex_constraints` is unchanged.
 - `resolve_thermal_annual_horizon_kwh` Live branch: Σ slot energy of the horizon plan instead of calendar-day sums.
@@ -82,7 +82,7 @@ New `plan_live_house_horizon(...)` in `thermal_live_store.py` (reuses `step_hous
 - Extend the existing Open-Meteo forecast request in `data/outdoor_forecast.py` (`hourly=temperature_2m` → `temperature_2m,global_tilted_irradiance` with `tilt` / `azimuth` of the collector surface): one request, one cache, one shadow-feed key per surface. Open-Meteo takes one tilt/azimuth per request; installations have one collector surface today.
 - Azimuth convention: map `collector_surface_from_thermal` (as used by the archive path) to Open-Meteo's (0° = south, −90° = east); unit test with a known surface.
 - Convert W/m² → kW_th with the same function as the year sim (`open_meteo_solar_archive.irradiance_wm2_to_thermal_kwh`), so forecast and parameters stay on one collector model.
-- Source label like the ambient (`open_meteo` / fallback, **open question Q4**) in `thermal_observability`; a fallback logs a warning.
+- Source label like the ambient (`open_meteo` / `fallback_archive_year`, §7 Q4) in `thermal_observability`; a fallback logs a warning.
 - **Result change:** forced WP hours / store plan follow the forecast sunshine instead of last year's.
 
 ## 5. Phases
@@ -106,9 +106,10 @@ Backtesting / SE: untouched in all phases.
 - **Timing:** local bench on the NAS config snapshot (same script as PR #36); NAS `EARNIE_CYCLE_TIMING=1` after deploy (no `EARNIE_CYCLE_PROFILE`).
 - **Live plausibility:** compare `thermal_observability` Q_sim vs Q_meas (Analyse Verbrauch & Kosten) for a few days after P1/P3.
 
-## 7. Open questions
+## 7. Decisions (owner, 2026-10-15)
 
-- **Q1** Epic name and backlog slot: proposal epic **ThermalHorizon** (P1–P5) in Version 2.7, after the *Cycle speed-up* items; add to `roadmap-nomenclature.mdc`.
-- **Q2** Start state without storage (§4.3): target temperature vs. carried simulated state.
-- **Q3** Reference year for `H`: last full archive year (proposal) — confirm that `H` may move slightly for existing installations.
-- **Q4** Irradiance forecast unavailable (§4.4): (a) last year's value at the same DOY/hour (today's behaviour), labelled `fallback_archive_year` + warning — proposal; (b) zero collector heat (conservative: more forced WP hours); (c) fail the thermal plan loudly.
+- **Q1** Epic **ThermalHorizon** P1–P5 in Version 2.7, after the *Cycle speed-up* items; listed in `roadmap-nomenclature.mdc`.
+- **Q2** Start state without storage (§4.3): target temperature.
+- **Q3** Reference year for `H` and parameters: last full archive year; slight `H` shifts for existing installations accepted.
+- **Q4** Irradiance forecast unavailable (§4.4): last year's value at the same DOY/hour, labelled `fallback_archive_year`, with a warning.
+- Regression deltas: slight changes accepted; reviewed per case in the PR before `--update-golden`.

@@ -18,7 +18,6 @@ from optimizer.thermal_house import (
     DEFAULT_HOUSE_TOLERANCE_C,
     house_capacity_kwh_per_k,
     house_requests_heat,
-    resolve_house_heat_loss_kw_per_k,
     step_house_hour,
 )
 from optimizer.thermal_model import ThermalBand, capacity_kwh_per_k_from_volume, heat_content_kwh
@@ -102,58 +101,6 @@ class _HouseLiveParams:
     heating_limit_c: float
 
 
-def _year_ambient_for_house_h(house_profile: dict | None) -> list[float] | None:
-    """Full-year outdoor series for envelope H calibration (not the Live forecast)."""
-    if not isinstance(house_profile, dict):
-        return None
-    try:
-        from datetime import datetime
-
-        from data.modeled_climate import ModeledClimateContext
-
-        climate = ModeledClimateContext.for_house_profile(house_profile, kwp=0.0)
-        bundle = climate._bundle_for_calendar_year(datetime.now().year)
-        temps = bundle.temperature_c
-        if temps is None or len(temps) < 24 * 30:
-            return None
-        return [float(t) for t in temps.tolist()]
-    except Exception:
-        return None
-
-
-def _resolve_live_house_heat_loss_kw_per_k(
-    *,
-    override_kw_per_k: float | None,
-    annual_heat_kwh: float,
-    ambient_forecast_c: list[float],
-    target_temp_c: float,
-    heating_limit_c: float,
-    house_profile: dict | None = None,
-) -> float:
-    """Calibrate H from year climate when possible; never from a short Live forecast alone."""
-    if override_kw_per_k is not None and float(override_kw_per_k) > 0.0:
-        return float(override_kw_per_k)
-    year_ambient = _year_ambient_for_house_h(house_profile)
-    if year_ambient:
-        return resolve_house_heat_loss_kw_per_k(
-            override_kw_per_k=None,
-            annual_heat_kwh=float(annual_heat_kwh),
-            ambient_c=year_ambient,
-            target_temp_c=float(target_temp_c),
-            heating_limit_c=float(heating_limit_c),
-        )
-    # Fallback: scale short-forecast calibration up to year length (order-of-magnitude).
-    n = max(1, len(ambient_forecast_c))
-    raw = resolve_house_heat_loss_kw_per_k(
-        override_kw_per_k=None,
-        annual_heat_kwh=float(annual_heat_kwh),
-        ambient_c=[float(t) for t in ambient_forecast_c],
-        target_temp_c=float(target_temp_c),
-        heating_limit_c=float(heating_limit_c),
-    )
-    return float(raw) * (n / 8760.0)
-
-
 def _resolve_house_live_params(
     *,
     living_area_m2: float,
@@ -162,11 +109,8 @@ def _resolve_house_live_params(
     house_tolerance_c: float | None,
     house_heat_loss_kw_per_k: float | None,
     heating_limit_c: float,
-    annual_heat_kwh: float,
-    ambient_forecast_c: list[float],
     start_house_temp_c: float | None,
     max_heat: float,
-    house_profile: dict | None = None,
 ) -> _HouseLiveParams:
     house_temp = float(
         start_house_temp_c if start_house_temp_c is not None else target_temp_c
@@ -178,6 +122,13 @@ def _resolve_house_live_params(
         return _HouseLiveParams(
             False, 0.0, 0.0, target, house_temp, max_heat, target, limit
         )
+    if house_heat_loss_kw_per_k is None or float(house_heat_loss_kw_per_k) <= 0.0:
+        # H comes from ThermalParameters (reference-year calibration); a short
+        # Live forecast alone inflates H by ~8760/n (thermals-p2 §Live store floor).
+        raise ValueError(
+            "Live-Speicherplan mit Wohnfläche braucht house_heat_loss_kw_per_k "
+            "(optimizer.thermal_parameters.house_thermal_parameters)."
+        )
     tol = (
         DEFAULT_HOUSE_TOLERANCE_C
         if house_tolerance_c is None
@@ -186,14 +137,7 @@ def _resolve_house_live_params(
     return _HouseLiveParams(
         True,
         house_capacity_kwh_per_k(living_area_m2, building_mass),
-        _resolve_live_house_heat_loss_kw_per_k(
-            override_kw_per_k=house_heat_loss_kw_per_k,
-            annual_heat_kwh=float(annual_heat_kwh),
-            ambient_forecast_c=ambient_forecast_c,
-            target_temp_c=target,
-            heating_limit_c=limit,
-            house_profile=house_profile,
-        ),
+        float(house_heat_loss_kw_per_k),
         target - tol,
         house_temp,
         max_heat,
@@ -323,12 +267,10 @@ def plan_live_store_horizon(
     house_tolerance_c: float | None = None,
     house_heat_loss_kw_per_k: float | None = None,
     heating_limit_c: float = 15.0,
-    annual_heat_kwh: float = 0.0,
     persons: int = 2,
     start_house_temp_c: float | None = None,
     used_measured_eq: bool = False,
     used_measured_low: bool = False,
-    house_profile: dict | None = None,
 ) -> LiveStorePlan:
     """Bang-bang floor on T_eq plus optional T_low near-term force; opp headroom."""
     horizon = len(ambient_forecast_c)
@@ -346,11 +288,8 @@ def plan_live_store_horizon(
         house_tolerance_c=house_tolerance_c,
         house_heat_loss_kw_per_k=house_heat_loss_kw_per_k,
         heating_limit_c=heating_limit_c,
-        annual_heat_kwh=annual_heat_kwh,
-        ambient_forecast_c=ambient_forecast_c,
         start_house_temp_c=start_house_temp_c,
         max_heat=wp_kw * jaz_f,
-        house_profile=house_profile,
     )
     forced, electric_by_hour, floor_electric, store_temps = _simulate_store_floor_hours(
         start_temp_c=start_temp_c,
@@ -451,7 +390,7 @@ def plan_live_store_for_thermal_consumer(
     house_doc: dict | None = None,
 ) -> LiveStorePlan | None:
     """Build Live store plan from a thermal_annual house consumer; None if no store."""
-    from data.heating_need import heat_pump_jaz, specific_heating_kwh_m2
+    from data.heating_need import heat_pump_jaz
 
     thermal = consumer.get("thermal") or consumer
     storage_raw = thermal.get("heat_storage")
@@ -476,11 +415,13 @@ def plan_live_store_for_thermal_consumer(
         or 3.0
     )
     living = float(thermal.get("living_area_m2", 0.0) or 0.0)
-    hwb = thermal.get("hwb_kwh_m2")
-    annual = living * specific_heating_kwh_m2(
-        int(thermal.get("building_class", 3) or 3),
-        hwb_kwh_m2=float(hwb) if hwb not in (None, "") else None,
-    )
+    house_h = None
+    if living > 0.0:
+        from optimizer.thermal_parameters import house_thermal_parameters
+
+        house_h = house_thermal_parameters(
+            _thermal_with_nominal(thermal, consumer), house_profile=house_profile
+        ).house_heat_loss_kw_per_k
     return plan_live_store_horizon(
         start_temp_c=readings.temp_eq_c,
         ambient_forecast_c=ambient_forecast_c,
@@ -495,14 +436,19 @@ def plan_live_store_for_thermal_consumer(
         building_mass=thermal.get("building_mass"),
         target_temp_c=float(thermal.get("target_temp_c", 21.5) or 21.5),
         house_tolerance_c=thermal.get("house_tolerance_c"),
-        house_heat_loss_kw_per_k=thermal.get("house_heat_loss_kw_per_k"),
+        house_heat_loss_kw_per_k=house_h,
         heating_limit_c=float(thermal.get("heating_limit_c", 15.0) or 15.0),
-        annual_heat_kwh=annual,
         persons=int(thermal.get("persons", 2) or 2),
         used_measured_eq=readings.used_measured_eq,
         used_measured_low=readings.used_measured_low,
-        house_profile=house_profile,
     )
+
+
+def _thermal_with_nominal(thermal: dict, consumer: dict) -> dict:
+    """Same parameter key as baseload (``consumer_annual_kwh``): WP kW on thermal."""
+    if "nominal_power_kw" in thermal:
+        return thermal
+    return {**thermal, "nominal_power_kw": float(consumer.get("nominal_power_kw", 3.0) or 3.0)}
 
 
 def map_forced_hours_to_slot_indices(
