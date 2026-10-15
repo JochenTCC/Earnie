@@ -1,7 +1,7 @@
 # Specification: Release Regression Suite (golden-master cases)
 
-**Version:** 0.4 (P1 MVP)  
-**Status:** R-Rec + R0 (reduced) + **P1** done; P2 still open in Version 2.7; L3 and P3 follow in Version 2.8  
+**Version:** 0.5 (P2 private + intake)  
+**Status:** R-Rec + R0 (reduced) + P1 + **P2** done in Version 2.7; L3 and P3 follow in Version 2.8  
 **Epic short name:** **Regression** (phases **R0**, **R-Rec**, **P1**–**P3**, **L3**)  
 **Related:** [Release Checklist](release-checklist.md), [House simulator](house-sim.md), [Shadow Mode](shadow-mode.md), `tests/fixtures/prod_dumps/README.md`, `.cursor/rules/test-health.mdc`, `optimizer/cbc_solver.py`
 
@@ -104,17 +104,19 @@ The solver and its settings must be identical for golden recording and verificat
 ```
 python -m scripts.run_regression [--cases-dir PATH]... [--case ID] [--workers N]
 python -m scripts.run_regression --update-golden --case REG-142-eauto-deadline
-python -m scripts.run_regression --intake <debug_dump.zip> --id REG-142-eauto-deadline --private
+python -m scripts.run_regression --intake <debug_dump.zip> --id REG-142-eauto-deadline --private \
+    --seed-anchor "..." | --cycle-index N
 ```
 
 - Pytest marker `regression`, **deselected by default** (`tests/conftest.py` removes marked items unless `-m regression` or `EARNIE_RUN_REGRESSION=1`), so neither the pre-commit hook nor the normal suite runs it. Prefer `python -m scripts.run_regression` before a release; `-m regression` also works.
 - `--workers N` per `.cursor/rules/backtesting-max-workers.mdc` (largest useful N). Runtime budget: ≤ 15 min parallel.
 - `--update-golden` rewrites `expected.json` only for the selected cases and prints the metric delta; the commit message must explain the intended behaviour change.
-- Output: console table + `regression_report.md` (Δ per case, tier-3 summary, public + private SHA, engine fingerprint).
+- Output: console table + `regression_report.md` (Δ per case, tier-3 summary, public + private SHA, skipped private-root note, engine fingerprint).
+- Default roots: `tests/regression/cases/` plus `$EARNIE_REGRESSION_PRIVATE_DIR` (or sibling `..\Earnie-regression-private\cases`). Missing private root → reported as skipped (`private-root-missing`), not silent.
 
 ## 9. Intake and anonymization
 
-**Intake (P2)** — `--intake` turns a unified debug-dump ZIP (schema v3, see `scripts/replay_debug_dump.py`) into a case folder, assigns the ID and writes `case.yaml`. With `--private` it targets the private repo and does not scrub.
+**Intake (P2)** — `--intake` turns a unified debug-dump ZIP (schema v3, see `scripts/replay_debug_dump.py`) into a private L1 case folder (`source: customer`), assigns the ID and writes `case.yaml` + case-local `recorder/`. Requires `--private` and an explicit cycle selector (`--seed-anchor` or `--cycle-index`). Does not scrub. Does not write `expected.json` (follow with `--update-golden`). Dump without `recorder/` **fails loud** (no synthetic fallback).
 
 **Scrub (P3)** — only needed when a customer case should become public (e.g. as a minimal repro). Whitelist-based: unknown fields are dropped, not copied.
 
@@ -153,7 +155,7 @@ Before P1 ships, check that `tests/fixtures/prod_dumps/` and `tests/fixtures/bac
 | **Regression R0** (spike) | Solver-determinism / tolerance study (§16). **Done 2026-10-14 (reduced):** strict HiGHS goldens, ±0.05 % default tolerance, `highspy==1.15.1` pin. Full §16 factor matrix optional follow-up. |
 | **Regression R-Rec** (recorder) | Always-on cycle recorder with ring buffer (§14), capture-point test (record → replay == live). Prerequisite for R0 and L3; also feeds debug dumps. |
 | **Regression P1** (MVP) | Case format + schema, runner (L1 + L2), `--update-golden`, report; 4–6 public cases (winter, summer, negative prices, EV deadline, heat storage); migrate existing prod-dump cases; tolerances and solver mode from R0; checklist item. **Done 2026-10-15:** `scripts/run_regression.py`, `tests/regression/`; prod_dumps as `L1-invariants` only (MILP goldens from recorder-shaped / backtesting fixtures); pytest marker `regression` deselected by default via `tests/conftest.py`. |
-| **Regression P2** (customer data) | Private repo `Earnie-regression-private`, private-root support + skip logic, `--intake`, case-ID / issue-reference convention, SHA in report |
+| **Regression P2** (customer data) | Private repo `Earnie-regression-private`, private-root support + skip logic, `--intake`, case-ID / issue-reference convention, SHA in report. **Done 2026-10-15:** dual roots + skip, case-local `recorder.root`, `--intake --private` with mandatory selector, public+private SHA in report. |
 | **Regression P3** (gate + scrub) | CI job before `promote`, scrubber script + tests, optional metric trend across releases |
 | **Regression L3** (live replay) | Replay runner for recorder windows, case creation from a time window (§15). After R-Rec and P1. |
 
@@ -163,11 +165,12 @@ Order: **R-Rec → R0 → P1 → P2 → L3 → P3.**
 
 ## 13. Open decisions
 
-1. Soft vs. hard release gate (§11) — default proposal: soft first.
-2. Whether a customer-facing statement about data handling is needed beyond the private repo (consent / contract wording).
+1. Soft vs. hard release gate (§11) — **Decided (P2):** stay **soft** (checklist + maintainer `promote`); hard CI gate is P3.
+2. Customer-facing data-handling wording beyond the private repo — **Decided (P2):** dump dialog + `docs/einrichtung/betrieb.md` already disclose recorder contents in dumps and require sharing only with the maintainer; no extra consent prose in P2. Broader contract wording stays out of scope until legal review.
 3. Solver pinning: **Decided (R0, 2026-10-14):** pin `highspy==1.15.1` in `pyproject.toml` (local install verified 1.15.1; Docker/CI install from the same pin). Re-verify after any intentional HiGHS bump before trusting goldens.
 4. Regression solver mode (§16): **Decided (R0, 2026-10-14):** goldens use deterministic **`EARNIE_CBC_STRICT=1`** (HiGHS, no wall-clock limit). Production-path sample stays open as a follow-up (not required for P1 goldens).
 5. Recorder defaults (§14): retention days (default 7). **Decided:** debug dumps include the matching recorder window automatically. **Decided (R-Rec):** default dump window = the **whole ring buffer** (retention days); no UI narrowing in R-Rec (optional narrowing later with L3). ZIP size is accepted as a consequence (~7–14 MB for 7 days).
+6. Intake cycle selection / no-recorder fallback — **Decided (P2):** `--seed-anchor` or `--cycle-index` required; dump without `recorder/` fails loud.
 
 ## 14. Cycle recorder (R-Rec)
 

@@ -1,6 +1,6 @@
 # Public regression cases
 
-Golden-master cases for the release regression suite (epic **Regression** P1).
+Golden-master cases for the release regression suite (epic **Regression** P1+P2).
 
 | ID | Level | Source |
 |---|---|---|
@@ -13,6 +13,8 @@ Golden-master cases for the release regression suite (epic **Regression** P1).
 | `REG-O-prod-*` | L1-invariants | Wrappers around `tests/fixtures/prod_dumps/` (tier-1 only) |
 
 Shared recorder data lives under `tests/regression/fixtures/` (not duplicated per case).
+
+**Customer cases** live in the private sibling repo `Earnie-regression-private` (`$EARNIE_REGRESSION_PRIVATE_DIR` or `..\Earnie-regression-private\cases`). See [`docs/einrichtung/private-env.md`](../../../docs/einrichtung/private-env.md) and `python -m scripts.run_regression --intake … --private`.
 
 **Live refresh:** replace seed-based L1 windows with real `runtime/recorder/` cycles when dogfood has them; re-run `--update-golden` and re-check ±0.05 % tolerances.
 

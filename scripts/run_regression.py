@@ -2,6 +2,8 @@
 
   python -m scripts.run_regression [--cases-dir PATH]... [--case ID] [--workers N]
   python -m scripts.run_regression --update-golden --case REG-O-winter-jan
+  python -m scripts.run_regression --intake DUMP.zip --id REG-142-slug --private \\
+      --seed-anchor "..." | --cycle-index N
 
 Deselected from the default pytest run (marker ``regression``). Run before
 release / publish — see docs/spec/regression-suite.md and release-checklist.md.
@@ -34,7 +36,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         action="append",
         default=None,
-        help="Case root (repeatable). Default: tests/regression/cases/",
+        help=(
+            "Case root (repeatable). Default: public tests/regression/cases/ "
+            "plus private root when present."
+        ),
     )
     parser.add_argument(
         "--case",
@@ -65,15 +70,71 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="List cases only; do not execute.",
     )
+    parser.add_argument(
+        "--intake",
+        type=Path,
+        default=None,
+        help="Debug-dump ZIP → private L1 case (requires --private and selector).",
+    )
+    parser.add_argument(
+        "--id",
+        dest="intake_id",
+        default=None,
+        help="Case id for --intake (REG-<issue>-<slug>).",
+    )
+    parser.add_argument(
+        "--private",
+        action="store_true",
+        help="Target private cases root (required for --intake).",
+    )
+    parser.add_argument(
+        "--seed-anchor",
+        default=None,
+        help="L1 cycle seed_anchor for --intake (mutually exclusive with --cycle-index).",
+    )
+    parser.add_argument(
+        "--cycle-index",
+        type=int,
+        default=None,
+        help="L1 cycle index for --intake (mutually exclusive with --seed-anchor).",
+    )
+    parser.add_argument(
+        "--issue",
+        default=None,
+        help="Optional public issue ref for --intake (e.g. JochenTCC/Earnie#142).",
+    )
+    parser.add_argument(
+        "--title",
+        default=None,
+        help="Optional case title for --intake (defaults to dump meta.title).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing case dir during --intake.",
+    )
     return parser.parse_args(argv)
 
 
-def _case_roots(args: argparse.Namespace) -> list[Path]:
-    from tests.regression.loader import DEFAULT_CASES_DIR
+def _case_roots(args: argparse.Namespace) -> tuple[list[Path], list[str], Path | None]:
+    """Return (roots, skipped labels, private_cases_dir_or_None)."""
+    from tests.regression.loader import (
+        DEFAULT_CASES_DIR,
+        SKIP_PRIVATE_ROOT_MISSING,
+        resolve_private_cases_dir,
+    )
 
     if args.cases_dir:
-        return [Path(p) for p in args.cases_dir]
-    return [DEFAULT_CASES_DIR]
+        return [Path(p) for p in args.cases_dir], [], None
+
+    roots: list[Path] = [DEFAULT_CASES_DIR]
+    skipped: list[str] = []
+    private = resolve_private_cases_dir()
+    if private is not None:
+        roots.append(private)
+    else:
+        skipped.append(SKIP_PRIVATE_ROOT_MISSING)
+    return roots, skipped, private
 
 
 def _worker_count(requested: int | None, n_cases: int) -> int:
@@ -182,10 +243,38 @@ def _run_one_case_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _run_intake(args: argparse.Namespace) -> int:
+    from tests.regression.intake import IntakeError, intake_debug_dump
+
+    if not args.intake_id:
+        print("--intake requires --id REG-<issue>-<slug>", file=sys.stderr)
+        return 2
+    try:
+        case_dir = intake_debug_dump(
+            Path(args.intake),
+            case_id=str(args.intake_id),
+            seed_anchor=args.seed_anchor,
+            cycle_index=args.cycle_index,
+            private=bool(args.private),
+            issue=args.issue,
+            title=args.title,
+            force=bool(args.force),
+        )
+    except IntakeError as exc:
+        print(f"intake failed: {exc}", file=sys.stderr)
+        return 2
+    print(f"Intake wrote case: {case_dir}")
+    print(
+        "Next: python -m scripts.run_regression --update-golden "
+        f"--case {args.intake_id}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     from tests.regression.compare import CompareResult, TierResult
     from tests.regression.engine_info import engine_fingerprint
-    from tests.regression.loader import load_cases
+    from tests.regression.loader import load_cases, private_repo_root_from_cases
     from tests.regression.report import (
         git_sha,
         render_console_table,
@@ -193,7 +282,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = _parse_args(argv)
-    roots = _case_roots(args)
+    if args.intake is not None:
+        return _run_intake(args)
+
+    roots, skipped, private_cases = _case_roots(args)
     case_ids = set(args.case) if args.case else None
     cases = load_cases(
         *roots,
@@ -202,10 +294,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     if not cases:
         print("No regression cases found.", file=sys.stderr)
+        if skipped:
+            print(f"Skipped: {', '.join(skipped)}", file=sys.stderr)
         return 2
     if args.dry_run:
         for case in cases:
             print(f"{case.id}\t{case.level}\t{case.case_dir}")
+        if skipped:
+            print(f"# skipped: {', '.join(skipped)}")
         return 0
 
     workers = _worker_count(args.workers, len(cases))
@@ -255,11 +351,17 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     print(render_console_table(compare_results))
+    if skipped:
+        print(f"Skipped: {', '.join(skipped)}")
     public_sha = git_sha(ROOT)
+    private_root = private_repo_root_from_cases(private_cases)
+    private_sha = git_sha(private_root) if private_root is not None else None
     report_path = write_markdown_report(
         Path(args.report),
         results=compare_results,
         public_sha=public_sha,
+        private_sha=private_sha,
+        skipped=skipped,
         engine_fingerprint=engine_fingerprint(solver_mode="strict"),
     )
     print(f"Report: {report_path}")

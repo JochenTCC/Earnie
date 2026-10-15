@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Archiviert einen Produktiv-Dump als versionierte Regression-Fixture."""
+"""Archiviert einen Produktiv-Dump als versionierte Regression-Fixture.
+
+Customer / production dumps with personal data must **not** land in the public
+``tests/fixtures/prod_dumps/`` tree. Prefer::
+
+    python -m scripts.run_regression --intake DUMP.zip --id REG-<issue>-<slug> \\
+        --private --seed-anchor "..."   # or --cycle-index N
+
+into the private repo ``Earnie-regression-private`` (Regression P2).
+"""
 from __future__ import annotations
 
 import argparse
@@ -221,7 +230,9 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Produktiv-Dump nach tests/fixtures/prod_dumps/ archivieren "
-            "(Ordner, NAS-ZIP oder debug_dump_*.zip)"
+            "(Ordner, NAS-ZIP oder debug_dump_*.zip). "
+            "Kundendaten: nicht hier — "
+            "python -m scripts.run_regression --intake … --private"
         ),
     )
     parser.add_argument("--id", required=True, help="Eindeutige Fall-Kennung (Ordnername)")

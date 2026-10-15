@@ -44,19 +44,31 @@ def write_markdown_report(
     *,
     results: list[CompareResult],
     public_sha: str,
+    private_sha: str | None = None,
+    skipped: list[str] | None = None,
     engine_fingerprint: dict[str, Any] | None = None,
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     passed = sum(1 for r in results if r.passed)
+    skipped_list = list(skipped or [])
+    private_label = private_sha if private_sha else "n/a"
     lines = [
         "# Regression report",
         "",
         f"- Generated: `{now}`",
         f"- Public SHA: `{public_sha}`",
+        f"- Private SHA: `{private_label}`",
         f"- Cases: {passed}/{len(results)} passed",
+        f"- Skipped: {len(skipped_list)}",
         "",
     ]
+    if skipped_list:
+        lines.append("## Skipped")
+        lines.append("")
+        for item in skipped_list:
+            lines.append(f"- `{item}`")
+        lines.append("")
     if engine_fingerprint:
         lines.append("## Engine fingerprint")
         lines.append("")

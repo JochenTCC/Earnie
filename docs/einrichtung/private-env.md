@@ -48,3 +48,21 @@ Danach im Earnie-Repo committen. Deploy-Gate: `python -m scripts.validate_tariff
 ## ZIP speichern/laden
 
 Sidebar-ZIP bleibt der portable Transfer der Laufzeit-Config; siehe [Speichern / Laden](../konfiguration/speichern-laden.md).
+
+## Private Regression-Fälle (Earnie-regression-private)
+
+Kundendaten für die Release-Regression liegen **nicht** im öffentlichen Repo, sondern im privaten Sibling-Repo `Earnie-regression-private` (Ordner `cases/`).
+
+| Einstellung | Bedeutung |
+|-------------|-----------|
+| Standardpfad | `..\Earnie-regression-private\cases` neben dem Earnie-Clone |
+| `$EARNIE_REGRESSION_PRIVATE_DIR` | Überschreibt den Cases-Root (kein Junction nötig) |
+
+Fehlt der private Root, überspringt `python -m scripts.run_regression` die privaten Fälle und vermerkt `private-root-missing` im Report (kein stilles Weglassen). Intake:
+
+```powershell
+.venv\Scripts\python.exe -m scripts.run_regression --intake DUMP.zip `
+  --id REG-142-eauto-deadline --private --seed-anchor "2026-06-26T18:00:00"
+```
+
+Details: [`docs/spec/regression-suite.md`](../spec/regression-suite.md) §4 / §9.

@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Regression P2 — customer data + intake (2026-10-15)
+
+- [x] **Regression P2 — customer data:** private repo `JochenTCC/Earnie-regression-private` + `$EARNIE_REGRESSION_PRIVATE_DIR` (default sibling `..\Earnie-regression-private\cases`); missing private root reported as skipped (`private-root-missing`); public + private SHAs in `regression_report.md`.
+  - `--intake` ZIP → private L1 case (`tests/regression/intake.py`): requires `--private`, `--id REG-<issue>-<slug>`, and `--seed-anchor` or `--cycle-index`; dump without `recorder/` fails loud; no `expected.json` (follow with `--update-golden`); case-local `recorder/`.
+  - `resolve_recorder_root` prefers case-dir then `tests/regression/`; `archive_prod_dump.py` help points customer dumps to `--intake --private`.
+  - Docs: spec v0.5; `docs/einrichtung/private-env.md` private-regression section; soft gate kept (hard CI = P3).
+  - Tests: `tests/test_regression_intake.py`, loader skip coverage in `tests/test_regression_loader.py`.
+
 ### Regression P1 — MVP golden-master suite (2026-10-15)
 
 - [x] **Regression P1 — MVP:** case format + schema, runner for L1 (cycle replay) and L2 (backtest window), `--update-golden`, markdown report; public cases (winter/autumn L1, negative prices L1, summer/EV/heat L2); prod_dumps as `L1-invariants` wrappers only (MILP goldens stay recorder/backtesting-shaped); tolerances and solver mode from R0 (`EARNIE_CBC_STRICT=1`, ±0.05 %); release-checklist item; privacy scrub on seed fixtures (address/geo/`cons_data` stub).

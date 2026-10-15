@@ -3,8 +3,16 @@ from __future__ import annotations
 
 import pytest
 
-from tests.regression.loader import DEFAULT_CASES_DIR, discover_case_dirs, load_case
+from tests.regression.loader import (
+    DEFAULT_CASES_DIR,
+    ENV_PRIVATE_CASES_DIR,
+    SKIP_PRIVATE_ROOT_MISSING,
+    discover_case_dirs,
+    load_case,
+    resolve_private_cases_dir,
+)
 from tests.regression.schema import validate_case_meta
+from scripts import run_regression
 
 
 def test_public_cases_discoverable():
@@ -13,6 +21,16 @@ def test_public_cases_discoverable():
     assert "REG-O-winter-jan" in ids
     assert "REG-S-negative-prices" in ids
     assert "REG-O-prod-eauto-deadline" in ids
+
+
+def test_case_roots_skip_when_private_missing(monkeypatch, tmp_path):
+    monkeypatch.setenv(ENV_PRIVATE_CASES_DIR, str(tmp_path / "missing-cases"))
+    assert resolve_private_cases_dir() is None
+    args = run_regression._parse_args([])
+    roots, skipped, private = run_regression._case_roots(args)
+    assert DEFAULT_CASES_DIR in roots
+    assert private is None
+    assert SKIP_PRIVATE_ROOT_MISSING in skipped
 
 
 def test_load_l1_case_meta():
