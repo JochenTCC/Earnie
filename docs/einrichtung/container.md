@@ -241,6 +241,45 @@ python -m scripts.verify_loxone_setup
 
 `docker/compose/synology_productive.yml` referenziert `ghcr.io/jochentcc/earnie-energy:latest`.
 
+### Live-Zyklus-Profiling (NAS-Einmal-Test)
+
+Phasen-Timing und optional `cProfile` sind env-gesteuert (`EARNIE_CYCLE_TIMING` / `EARNIE_CYCLE_PROFILE`, siehe [betrieb.md](betrieb.md) § Live-Zyklus-Profiling). Repo-Compose bleibt unverändert — nur auf der NAS für das Testfenster setzen.
+
+**1. Image lokal bauen** (Entwicklungsrechner, Synology amd64, ohne GHCR-Push):
+
+```powershell
+python -m scripts.build_container --target synology
+```
+
+Tags kommen aus `version.py` (u. a. `:next` und `:<version>`; bei Dev-Versionen kein `:latest`).
+
+**2. Image auf die NAS bringen** (Beispiel `docker save` / `load`; Tag ggf. anpassen):
+
+```powershell
+docker save -o earnie-timing.tar ghcr.io/jochentcc/earnie-energy:next
+# Datei auf die NAS kopieren, dann:
+docker load -i earnie-timing.tar
+```
+
+**3. Produktiv-Compose auf der NAS** vorübergehend:
+
+- `image:` auf den geladenen Tag zeigen (z. B. `…:next` oder `…:<version>`), **oder** lokal geladenes Image als `…:latest` retaggen, wenn die Compose-Datei `:latest` behalten soll.
+- Unter `environment:` für das Testfenster:
+
+```yaml
+EARNIE_CYCLE_TIMING: "1"
+# optional nur 1–2 Zyklen:
+# EARNIE_CYCLE_PROFILE: "1"
+```
+
+Dann `docker compose up -d`. Nach einigen Viertelstunden: `EARNIE_CYCLE_PROFILE` entfernen (falls gesetzt), `timing/` und ggf. `profile/` aus `earnie_env/runtime/` kopieren, Flags entfernen, Image wieder auf den vorherigen Stand stellen.
+
+**4. Auswerten:**
+
+```powershell
+python -m scripts.summarize_cycle_timing path/to/cycles.jsonl
+```
+
 ### 3. Lokaler Test vor dem NAS-Deploy
 
 ```powershell

@@ -227,23 +227,27 @@ def _run_savings_horizons(
         resolve_matched_baseline_horizon_targets,
     )
 
+    from runtime_store.cycle_timing import record_phase
+
     # Open-loop: one CBC solve for the display horizon (not commit_hours=1 MPC).
-    optimized_rows = simulate_horizon(
-        matrix,
-        initial_soc,
-        consumer_daily_targets_kwh=targets,
-        verbose=False,
-        charging_contexts=charging_contexts,
-        filter_contexts=filters,
-        matrix_prepared=True,
-        sunrise_soc_min_index=sunrise_soc_min_index,
-        flexible_consumers=consumers,
-        commit_hours=len(matrix),
-        current_soc_by_id=current_soc_by_id,
-    )
-    baseline_rows = simulate_baseline_horizon(
-        matrix, initial_soc, charging_contexts=charging_contexts
-    )
+    with record_phase("savings_optimized"):
+        optimized_rows = simulate_horizon(
+            matrix,
+            initial_soc,
+            consumer_daily_targets_kwh=targets,
+            verbose=False,
+            charging_contexts=charging_contexts,
+            filter_contexts=filters,
+            matrix_prepared=True,
+            sunrise_soc_min_index=sunrise_soc_min_index,
+            flexible_consumers=consumers,
+            commit_hours=len(matrix),
+            current_soc_by_id=current_soc_by_id,
+        )
+    with record_phase("savings_baseline"):
+        baseline_rows = simulate_baseline_horizon(
+            matrix, initial_soc, charging_contexts=charging_contexts
+        )
     horizon_targets = resolve_horizon_consumer_targets_kwh(
         matrix,
         targets,
@@ -255,12 +259,13 @@ def _run_savings_horizons(
         targets,
         charging_contexts,
     )
-    matched_baseline_rows = simulate_matched_baseline_horizon(
-        matrix,
-        initial_soc,
-        matched_targets,
-        charging_contexts,
-    )
+    with record_phase("savings_matched"):
+        matched_baseline_rows = simulate_matched_baseline_horizon(
+            matrix,
+            initial_soc,
+            matched_targets,
+            charging_contexts,
+        )
     return _SavingsRows(optimized_rows, baseline_rows, matched_baseline_rows)
 
 

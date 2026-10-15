@@ -23,6 +23,7 @@ from runtime_store.soc_plausibility import (
     sanitize_soc_reading,
 )
 from runtime_store import live_optimization_debug
+from runtime_store.cycle_timing import CycleTimer
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
@@ -46,6 +47,15 @@ logger = logging.getLogger("main")
 
 
 def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
+    timing = CycleTimer(slot_key=optimization_schedule.quarter_hour_slot_key())
+    timing.activate()
+    try:
+        _main_cycle(run_trigger, timing)
+    finally:
+        timing.finish()
+
+
+def _main_cycle(run_trigger: str, timing: CycleTimer):
     config.reload_config()
     config.require_runtime_params_loaded()
     out_of_band = is_out_of_band_trigger(run_trigger)
@@ -83,14 +93,15 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
 
     profile_manager.check_and_update_profile_if_new_month()
 
-    current_soc = ehal_live.read_ess_soc()
-    if current_soc is None:
-        if ehal_live.is_ehal_network_backend():
-            logger.error("Optimierung abgebrochen: Kein Zugriff auf EHAL SoC.")
-        else:
-            logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
-        return
-    current_soc_by_id = ehal_live.read_ess_soc_by_id()
+    with timing.phase("ehal_read"):
+        current_soc = ehal_live.read_ess_soc()
+        if current_soc is None:
+            if ehal_live.is_ehal_network_backend():
+                logger.error("Optimierung abgebrochen: Kein Zugriff auf EHAL SoC.")
+            else:
+                logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
+            return
+        current_soc_by_id = ehal_live.read_ess_soc_by_id()
 
     config.is_sunrise_planning_horizon()
     planning_window = profile_manager.compute_live_planning_window()
@@ -104,84 +115,87 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         planning_window.sunrise_anchor.strftime("%Y-%m-%d %H:%M"),
     )
 
-    market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
-    if not market_data:
-        logger.error("Optimierung abgebrochen: Keine Day-Ahead-Preise empfangen.")
-        return
+    with timing.phase("prices_matrix"):
+        market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
+        if not market_data:
+            logger.error("Optimierung abgebrochen: Keine Day-Ahead-Preise empfangen.")
+            return
 
-    if out_of_band:
-        pv_delta = pv_tuner.get_pv_delta_peek()
-    else:
-        pv_delta = pv_tuner.get_pv_delta_and_update()
-    if pv_delta is None:
-        logger.warning(
-            "Kein PV-Zähler-Delta verfügbar — cons_data nutzt 0.0 kWh für dieses Intervall."
-        )
-        pv_delta = 0.0
-
-    logger.info(
-        "PV-Energie-Delta (Integral letztes Intervall): %.3f kWh", pv_delta
-    )
-
-    optimization_matrix = profile_manager.build_live_planning_matrix(
-        market_data, planning_window
-    )
-    pv_api_status = pv_forecast.get_api_status()
-    if pv_api_status["retry_at"]:
-        logger.warning(
-            "forecast.solar Rate-Limit (HTTP 429): Nächster API-Aufruf erlaubt ab %s "
-            "(PV-Quelle: %s, Cache: %s).",
-            pv_api_status["retry_at"],
-            pv_api_status["source"],
-            "ja" if pv_api_status["cache_available"] else "nein",
-        )
-    elif pv_api_status["using_synthetic_fallback"]:
-        logger.warning(
-            "forecast.solar: Synthetischer PV-Fallback aktiv (keine API-Daten)."
-        )
-    from data.planning_window import sunrise_anchor_slot_index
-
-    sunrise_soc_min_index = sunrise_anchor_slot_index(planning_window)
-    pv_forecast_kw_for_log = float(optimization_matrix[0]["expected_p_pv"])
-
-    live_power = ehal_live.read_live_power_kw()
-    flex_kw_for_matrix: dict[str, float] = {}
-    if live_power:
-        if ehal_live.is_ehal_network_backend():
-            flex_kw_for_matrix = {}
+        if out_of_band:
+            pv_delta = pv_tuner.get_pv_delta_peek()
         else:
-            flex_kw_for_matrix = ehal_live.fetch_flexible_consumers_live_kw()
-        matrix_snapshot = live_consumption.build_consumption_snapshot(
-            live_power, flex_kw_for_matrix
+            pv_delta = pv_tuner.get_pv_delta_and_update()
+        if pv_delta is None:
+            logger.warning(
+                "Kein PV-Zähler-Delta verfügbar — cons_data nutzt 0.0 kWh für dieses Intervall."
+            )
+            pv_delta = 0.0
+
+        logger.info(
+            "PV-Energie-Delta (Integral letztes Intervall): %.3f kWh", pv_delta
         )
-        reject_reason = live_consumption.reject_live_matrix_snapshot_reason(
-            matrix_snapshot
+
+        optimization_matrix = profile_manager.build_live_planning_matrix(
+            market_data, planning_window
         )
-        if reject_reason == "all_zero":
+        pv_api_status = pv_forecast.get_api_status()
+        if pv_api_status["retry_at"]:
             logger.warning(
-                "Live-Telemetrie liefert Nullwerte (PV/Haus/Netz/Batterie) — "
-                "Optimierungsmatrix behält Prognose-Werte."
+                "forecast.solar Rate-Limit (HTTP 429): Nächster API-Aufruf erlaubt ab %s "
+                "(PV-Quelle: %s, Cache: %s).",
+                pv_api_status["retry_at"],
+                pv_api_status["source"],
+                "ja" if pv_api_status["cache_available"] else "nein",
             )
-        elif reject_reason == "negative_house":
+        elif pv_api_status["using_synthetic_fallback"]:
             logger.warning(
-                "Live-Telemetrie: house_kw=%.3f ungültig (negativ) — "
-                "Optimierungsmatrix behält Prognose-Werte.",
-                float(matrix_snapshot.get("house_kw") or 0.0),
+                "forecast.solar: Synthetischer PV-Fallback aktiv (keine API-Daten)."
             )
-        elif reject_reason is None:
-            optimization_matrix = live_consumption.apply_live_snapshot_to_matrix(
-                optimization_matrix, matrix_snapshot, hour_index=0
+        from data.planning_window import sunrise_anchor_slot_index
+
+        sunrise_soc_min_index = sunrise_anchor_slot_index(planning_window)
+        pv_forecast_kw_for_log = float(optimization_matrix[0]["expected_p_pv"])
+
+    with timing.phase("ehal_read"):
+        live_power = ehal_live.read_live_power_kw()
+        flex_kw_for_matrix: dict[str, float] = {}
+        if live_power:
+            if ehal_live.is_ehal_network_backend():
+                flex_kw_for_matrix = {}
+            else:
+                flex_kw_for_matrix = ehal_live.fetch_flexible_consumers_live_kw()
+            matrix_snapshot = live_consumption.build_consumption_snapshot(
+                live_power, flex_kw_for_matrix
             )
-            logger.info(
-                "Live-Snapshot in Optimierungsmatrix: PV=%.2f kW, Grundlast=%.2f kW",
-                matrix_snapshot["pv_kw"],
-                matrix_snapshot["baseload_kw"],
+            reject_reason = live_consumption.reject_live_matrix_snapshot_reason(
+                matrix_snapshot
             )
-        else:
-            logger.warning(
-                "Live-Telemetrie abgelehnt (%s) — Optimierungsmatrix behält Prognose-Werte.",
-                reject_reason,
-            )
+            if reject_reason == "all_zero":
+                logger.warning(
+                    "Live-Telemetrie liefert Nullwerte (PV/Haus/Netz/Batterie) — "
+                    "Optimierungsmatrix behält Prognose-Werte."
+                )
+            elif reject_reason == "negative_house":
+                logger.warning(
+                    "Live-Telemetrie: house_kw=%.3f ungültig (negativ) — "
+                    "Optimierungsmatrix behält Prognose-Werte.",
+                    float(matrix_snapshot.get("house_kw") or 0.0),
+                )
+            elif reject_reason is None:
+                optimization_matrix = live_consumption.apply_live_snapshot_to_matrix(
+                    optimization_matrix, matrix_snapshot, hour_index=0
+                )
+                logger.info(
+                    "Live-Snapshot in Optimierungsmatrix: PV=%.2f kW, Grundlast=%.2f kW",
+                    matrix_snapshot["pv_kw"],
+                    matrix_snapshot["baseload_kw"],
+                )
+            else:
+                logger.warning(
+                    "Live-Telemetrie abgelehnt (%s) — Optimierungsmatrix behält Prognose-Werte.",
+                    reject_reason,
+                )
+
 
     reported_soc = float(current_soc)
     prev_logged_soc = optimization_history.latest_logged_soc_percent()
@@ -322,474 +336,487 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     except Exception as exc:  # noqa: BLE001 — never abort live run
         logger.warning("cycle_recorder: begin_cycle failed: %s", exc)
         recorder_token = None
-    optimization_matrix, charging_contexts, targets = optimizer.prepare_optimization_matrix(
-        optimization_matrix,
-        targets,
-        consumers=live_consumers,
-    )
-    delivery_plausibility: dict = {}
-    filter_contexts = optimizer.resolve_filter_contexts(optimization_matrix, live_consumers)
-    consumer_remaining = optimizer.get_consumer_remaining_kwh(
-        consumer_daily_targets_kwh=targets,
-        optimization_matrix=optimization_matrix,
-        charging_contexts=charging_contexts,
-        filter_contexts=filter_contexts,
-        live_flex_kw=flex_kw_for_matrix,
-        trigger_snapshot=None,
-        delivery_plausibility=delivery_plausibility,
-    )
-    for consumer in live_consumers:
-        lox = (consumer.get("charging_schedule") or {}).get("loxone") or {}
-        if lox.get("get_evcs_nominal_current") or lox.get(
-            "sens_evcs_nominal_current"
-        ) or lox.get("nominal_power_kw_name"):
-            marker = (
-                lox.get("get_evcs_nominal_current")
-                or lox.get("sens_evcs_nominal_current")
-                or lox.get("nominal_power_kw_name")
-            )
-            logger.info(
-                "Verbraucher %s: Nennleistung live = %.2f kW (Loxone: %s)",
-                consumer["name"],
-                consumer["nominal_power_kw"],
-                marker,
-            )
-    from optimizer.live_export_limit import resolve_live_export_context
-
-    telemetry_for_export = None
-    try:
-        telemetry_for_export = ehal_live.get_adapter().read_telemetry()
-    except Exception as exc:  # noqa: BLE001 — Live continues without inbound cap
-        logger.warning("Export-Limit Telemetrie nicht lesbar: %s", exc)
-    from settings.ess_limits_resolve import apply_effective_ess_limits
-
-    get_battery_list = getattr(config, "get_battery_params_list", None)
-    listed_batteries = get_battery_list() if callable(get_battery_list) else None
-    if listed_batteries and len(listed_batteries) > 1:
-        battery_params = [
-            apply_effective_ess_limits(bat, telemetry=telemetry_for_export)
-            for bat in listed_batteries
-            if isinstance(bat, dict)
-        ]
-    else:
-        battery_params = apply_effective_ess_limits(
-            config.get_battery_params(), telemetry=telemetry_for_export
+    with timing.phase("prepare"):
+        optimization_matrix, charging_contexts, targets = optimizer.prepare_optimization_matrix(
+            optimization_matrix,
+            targets,
+            consumers=live_consumers,
         )
-    from optimizer.powerstation_live import (
-        advance_virtual_reserves_from_plan,
-        apply_reserves_to_battery_params,
-        cycle_powerstation_charge_kw,
-        cycle_standby_source_selects,
-        load_active_reserves,
-        load_standby_packs,
-        physical_charge_setpoints_kw,
-        planned_powerstation_loxone_sent,
-        sync_triggers_from_telemetry,
-        write_cycle_powerstation_setpoints,
-    )
-    from optimizer.powerstation_standby import (
-        apply_standby_load_relief,
-        live_source_and_charge,
-        plan_standby_horizon,
-    )
-    from optimizer.slot_duration import DEFAULT_DT_H
-
-    active_reserves = load_active_reserves()
-    sync_triggers_from_telemetry(telemetry_for_export, active_reserves)
-    # Re-load after trigger updates so MILP sees discharging state.
-    active_reserves = load_active_reserves()
-    battery_params = apply_reserves_to_battery_params(
-        battery_params, active_reserves
-    )
-    battery_params = ehal_live.filter_planning_batteries_with_soc(
-        battery_params, current_soc_by_id
-    )
-    standby_packs = load_standby_packs()
-    standby_plans = plan_standby_horizon(
-        optimization_matrix,
-        standby_packs,
-        current_soc_by_id=current_soc_by_id or None,
-        dt_h=DEFAULT_DT_H,
-    )
-    if standby_plans:
-        optimization_matrix = apply_standby_load_relief(
-            optimization_matrix, standby_plans
+        delivery_plausibility: dict = {}
+        filter_contexts = optimizer.resolve_filter_contexts(optimization_matrix, live_consumers)
+        consumer_remaining = optimizer.get_consumer_remaining_kwh(
+            consumer_daily_targets_kwh=targets,
+            optimization_matrix=optimization_matrix,
+            charging_contexts=charging_contexts,
+            filter_contexts=filter_contexts,
+            live_flex_kw=flex_kw_for_matrix,
+            trigger_snapshot=None,
+            delivery_plausibility=delivery_plausibility,
         )
-        logger.info(
-            "standby_backup plans: %s",
-            {
-                ps: {
-                    "slot0_source": (plan.get("source_select") or [None])[0],
-                    "load_kw": plan.get("load_kw"),
-                }
-                for ps, plan in standby_plans.items()
-            },
-        )
-    export_ctx = resolve_live_export_context(
-        matrix_row=optimization_matrix[0] if optimization_matrix else None,
-        telemetry=telemetry_for_export,
-    )
-    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan, urgent_obs = optimizer.milp_optimizer(
-        optimization_matrix,
-        current_hour,
-        current_soc,
-        battery_params=battery_params,
-        consumers=live_consumers,
-        consumer_remaining_kwh=consumer_remaining,
-        charging_contexts=charging_contexts,
-        filter_contexts=filter_contexts,
-        sunrise_soc_min_index=sunrise_soc_min_index,
-        consumer_continue_on=optimizer.get_generic_flex_continue_on(
-            charging_contexts, live_consumers
-        ),
-        hk_max_export_kw=export_ctx["hk_max_export_kw"],
-        inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
-        current_soc_by_id=current_soc_by_id or None,
-    )
-    plant_curtail_kw = float((milp_plan or {}).get("p_pv_curtail") or 0.0)
-    # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
-    export_cap = export_ctx["effective_export_cap_kw"]
-    if isinstance(battery_params, list):
-        from optimizer.milp_horizon import aggregate_battery_params_for_load
+        for consumer in live_consumers:
+            lox = (consumer.get("charging_schedule") or {}).get("loxone") or {}
+            if lox.get("get_evcs_nominal_current") or lox.get(
+                "sens_evcs_nominal_current"
+            ) or lox.get("nominal_power_kw_name"):
+                marker = (
+                    lox.get("get_evcs_nominal_current")
+                    or lox.get("sens_evcs_nominal_current")
+                    or lox.get("nominal_power_kw_name")
+                )
+                logger.info(
+                    "Verbraucher %s: Nennleistung live = %.2f kW (Loxone: %s)",
+                    consumer["name"],
+                    consumer["nominal_power_kw"],
+                    marker,
+                )
+        from optimizer.live_export_limit import resolve_live_export_context
 
-        primary_battery = aggregate_battery_params_for_load(battery_params)
-    else:
-        primary_battery = battery_params
-    battery_plan_kw = optimizer.battery_plan_kw_from_control(
-        mode,
-        target_power,
-        optimization_matrix[0]["expected_p_pv"],
-        optimization_matrix[0]["expected_p_act"],
-        sum(consumer_powers.values()),
-        primary_battery["max_power_kw"],
-    )
-    advance_virtual_reserves_from_plan(
-        battery_plan_kw=float(battery_plan_kw),
-        dt_h=DEFAULT_DT_H,
-        reserves=active_reserves,
-    )
-    reserve_charges = physical_charge_setpoints_kw(active_reserves)
-    standby_sources, standby_charges = live_source_and_charge(standby_plans, slot=0)
-    # Refresh all mapped PS set_* Merkers every cycle (idle → charge 0 / mode 0 / grid).
-    phys_charge = cycle_powerstation_charge_kw(reserve_charges, standby_charges)
-    standby_sources = cycle_standby_source_selects(standby_sources)
-    if standby_sources:
-        logger.info(
-            "standby_backup source_select (0=grid/1=battery): %s", standby_sources
-        )
-    powerstation_writes = write_cycle_powerstation_setpoints(
-        phys_charge, standby_sources
-    )
+        telemetry_for_export = None
+        try:
+            telemetry_for_export = ehal_live.get_adapter().read_telemetry()
+        except Exception as exc:  # noqa: BLE001 — Live continues without inbound cap
+            logger.warning("Export-Limit Telemetrie nicht lesbar: %s", exc)
+        from settings.ess_limits_resolve import apply_effective_ess_limits
 
-    logger.info(
-        "Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW | "
-        "TARGET_SOC: %s | Verbraucher: %s | pv_follow: %s",
-        mode, target_power, target_soc, consumer_powers, consumer_pv_follow,
-    )
-
-    current_market_item = optimization_matrix[0]
-
-    ehal_writes: list[dict] | None = None
-    from runtime_store.shadow.writes import should_invoke_setpoint_writes
-
-    if not should_invoke_setpoint_writes(silent=config.is_loxone_silent_mode()):
-        if ehal_live.is_ehal_network_backend():
-            logger.info(
-                "Silent-Modus: Steuerwerte (EHAL ESS+EVCS) werden nicht gesendet."
-            )
+        get_battery_list = getattr(config, "get_battery_params_list", None)
+        listed_batteries = get_battery_list() if callable(get_battery_list) else None
+        if listed_batteries and len(listed_batteries) > 1:
+            battery_params = [
+                apply_effective_ess_limits(bat, telemetry=telemetry_for_export)
+                for bat in listed_batteries
+                if isinstance(bat, dict)
+            ]
         else:
-            logger.info(
-                "Silent-Modus: Steuerwerte (Huawei-Modbus, flexible Verbraucher) "
-                "werden nicht an Loxone gesendet."
+            battery_params = apply_effective_ess_limits(
+                config.get_battery_params(), telemetry=telemetry_for_export
             )
-        loxone_writes: list[dict] | None = None
-    elif ehal_live.is_ehal_network_backend():
-        backend = "HA" if ehal_live.is_ha_backend() else "OpenEMS"
-        logger.info("Sende EHAL ESS-Limits an %s...", backend)
-        err_ess, ess_records = ehal_live.write_ess_setpoints_from_control(
-            mode,
-            target_power,
-            export_cap_kw=export_cap,
+        from optimizer.powerstation_live import (
+            advance_virtual_reserves_from_plan,
+            apply_reserves_to_battery_params,
+            cycle_powerstation_charge_kw,
+            cycle_standby_source_selects,
+            load_active_reserves,
+            load_standby_packs,
+            physical_charge_setpoints_kw,
+            planned_powerstation_loxone_sent,
+            sync_triggers_from_telemetry,
+            write_cycle_powerstation_setpoints,
+        )
+        from optimizer.powerstation_standby import (
+            apply_standby_load_relief,
+            live_source_and_charge,
+            plan_standby_horizon,
+        )
+        from optimizer.slot_duration import DEFAULT_DT_H
+
+        active_reserves = load_active_reserves()
+        sync_triggers_from_telemetry(telemetry_for_export, active_reserves)
+        # Re-load after trigger updates so MILP sees discharging state.
+        active_reserves = load_active_reserves()
+        battery_params = apply_reserves_to_battery_params(
+            battery_params, active_reserves
+        )
+        battery_params = ehal_live.filter_planning_batteries_with_soc(
+            battery_params, current_soc_by_id
+        )
+        standby_packs = load_standby_packs()
+        standby_plans = plan_standby_horizon(
+            optimization_matrix,
+            standby_packs,
+            current_soc_by_id=current_soc_by_id or None,
+            dt_h=DEFAULT_DT_H,
+        )
+        if standby_plans:
+            optimization_matrix = apply_standby_load_relief(
+                optimization_matrix, standby_plans
+            )
+            logger.info(
+                "standby_backup plans: %s",
+                {
+                    ps: {
+                        "slot0_source": (plan.get("source_select") or [None])[0],
+                        "load_kw": plan.get("load_kw"),
+                    }
+                    for ps, plan in standby_plans.items()
+                },
+            )
+        export_ctx = resolve_live_export_context(
+            matrix_row=optimization_matrix[0] if optimization_matrix else None,
             telemetry=telemetry_for_export,
         )
-        logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
-        err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(
-            consumer_powers, charging_contexts
-        )
-        logger.info("Sende EHAL WR-AC-Limits an %s...", backend)
-        err_inv, inv_records = ehal_live.write_inv_ac_limits_from_plan(
-            plant_curtail_kw=plant_curtail_kw,
-            matrix_row=optimization_matrix[0] if optimization_matrix else None,
-            milp_plan=milp_plan if isinstance(milp_plan, dict) else None,
-        )
-        if err_ess is None and err_evcs is None and err_inv is None:
-            ehal_live.clear_write_error()
-        ehal_writes = list(ess_records) + list(evcs_records) + list(inv_records)
-        loxone_writes = None
-    else:
-        logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
-        huawei_writes = ehal_live.write_huawei_modbus_states(
-            mode, target_power, target_soc, export_cap_kw=export_cap
-        )
-        logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
-        flex_writes = ehal_live.write_flexible_consumer_states(
-            consumer_powers, charging_contexts, consumer_pv_follow
-        )
-        logger.info("📤 Sende WR-AC-Limits an Loxone...")
-        _err_inv, inv_rows = ehal_live.write_inv_ac_limits_from_plan(
-            plant_curtail_kw=plant_curtail_kw,
-            matrix_row=optimization_matrix[0] if optimization_matrix else None,
-            milp_plan=milp_plan if isinstance(milp_plan, dict) else None,
-        )
-        loxone_writes = serialize_write_records(
-            list(huawei_writes) + list(flex_writes) + list(powerstation_writes)
-        ) + list(inv_rows)
-
-    if live_power is None:
-        live_power = ehal_live.read_live_power_kw()
-    total_kw = live_power["house"] if live_power else None
-    from optimizer.charging_context import matrix_slot_datetime
-
-    if ehal_live.is_ehal_network_backend():
-        flex_kw = {c["id"]: 0.0 for c in live_consumers}
-        flex_chart_kw = dict(flex_kw)
-        live_flex_measured: set[str] = set()
-    else:
-        live_flex = ehal_live.resolve_flexible_consumers_live_power(
-            fallbacks=consumer_powers,
+    with timing.phase("milp_live"):
+        mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan, urgent_obs = optimizer.milp_optimizer(
+            optimization_matrix,
+            current_hour,
+            current_soc,
+            battery_params=battery_params,
             consumers=live_consumers,
+            consumer_remaining_kwh=consumer_remaining,
+            charging_contexts=charging_contexts,
             filter_contexts=filter_contexts,
-            slot_datetime=matrix_slot_datetime(optimization_matrix, 0),
+            sunrise_soc_min_index=sunrise_soc_min_index,
+            consumer_continue_on=optimizer.get_generic_flex_continue_on(
+                charging_contexts, live_consumers
+            ),
+            hk_max_export_kw=export_ctx["hk_max_export_kw"],
+            inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
+            current_soc_by_id=current_soc_by_id or None,
         )
-        flex_kw = live_flex.kw
-        flex_chart_kw = live_flex.chart_kw
-        live_flex_measured = live_flex.measured_ids
-    logger.info("cons_data Flex live (kW): %s", flex_kw)
-    logger.info(
-        "Chart-Ist Flex (kW): %s | gemessen: %s",
-        flex_chart_kw,
-        sorted(live_flex_measured),
-    )
+    with timing.phase("writes"):
+        plant_curtail_kw = float((milp_plan or {}).get("p_pv_curtail") or 0.0)
+        # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
+        export_cap = export_ctx["effective_export_cap_kw"]
+        if isinstance(battery_params, list):
+            from optimizer.milp_horizon import aggregate_battery_params_for_load
 
-    loxone_sent = ehal_live.build_sent_loxone_snapshot(
-        mode,
-        target_power,
-        target_soc,
-        consumer_powers,
-        charging_contexts,
-        consumer_pv_follow,
-        export_cap_kw=export_cap,
-    )
-    loxone_sent.update(
-        planned_powerstation_loxone_sent(phys_charge, standby_sources)
-    )
-    sent_flex_kw: dict[str, float] = {}
-    for consumer in live_consumers:
-        setpoint_name = marker_set_evcs_max_current(consumer)
-        if not setpoint_name:
-            continue
-        amps = float(loxone_sent.get(setpoint_name, 0.0) or 0.0)
-        voltage_v, phases = ev_nominal_power_conversion(consumer)
-        sent_flex_kw[consumer["id"]] = round(
-            ampere_to_kw(amps, voltage_v=voltage_v, phases=phases), 3
+            primary_battery = aggregate_battery_params_for_load(battery_params)
+        else:
+            primary_battery = battery_params
+        battery_plan_kw = optimizer.battery_plan_kw_from_control(
+            mode,
+            target_power,
+            optimization_matrix[0]["expected_p_pv"],
+            optimization_matrix[0]["expected_p_act"],
+            sum(consumer_powers.values()),
+            primary_battery["max_power_kw"],
+        )
+        advance_virtual_reserves_from_plan(
+            battery_plan_kw=float(battery_plan_kw),
+            dt_h=DEFAULT_DT_H,
+            reserves=active_reserves,
+        )
+        reserve_charges = physical_charge_setpoints_kw(active_reserves)
+        standby_sources, standby_charges = live_source_and_charge(standby_plans, slot=0)
+        # Refresh all mapped PS set_* Merkers every cycle (idle → charge 0 / mode 0 / grid).
+        phys_charge = cycle_powerstation_charge_kw(reserve_charges, standby_charges)
+        standby_sources = cycle_standby_source_selects(standby_sources)
+        if standby_sources:
+            logger.info(
+                "standby_backup source_select (0=grid/1=battery): %s", standby_sources
+            )
+        powerstation_writes = write_cycle_powerstation_setpoints(
+            phys_charge, standby_sources
         )
 
-    delivery_compliance = optimizer.register_consumer_delivery(
-        consumer_powers,
-        charging_contexts=charging_contexts,
-        consumers=live_consumers,
-        live_flex_kw=flex_kw,
-        sent_flex_kw=sent_flex_kw,
-        book_planned=not out_of_band,
-    )
+        logger.info(
+            "Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW | "
+            "TARGET_SOC: %s | Verbraucher: %s | pv_follow: %s",
+            mode, target_power, target_soc, consumer_powers, consumer_pv_follow,
+        )
+
+        current_market_item = optimization_matrix[0]
+
+        ehal_writes: list[dict] | None = None
+        from runtime_store.shadow.writes import should_invoke_setpoint_writes
+
+        if not should_invoke_setpoint_writes(silent=config.is_loxone_silent_mode()):
+            if ehal_live.is_ehal_network_backend():
+                logger.info(
+                    "Silent-Modus: Steuerwerte (EHAL ESS+EVCS) werden nicht gesendet."
+                )
+            else:
+                logger.info(
+                    "Silent-Modus: Steuerwerte (Huawei-Modbus, flexible Verbraucher) "
+                    "werden nicht an Loxone gesendet."
+                )
+            loxone_writes: list[dict] | None = None
+        elif ehal_live.is_ehal_network_backend():
+            backend = "HA" if ehal_live.is_ha_backend() else "OpenEMS"
+            logger.info("Sende EHAL ESS-Limits an %s...", backend)
+            err_ess, ess_records = ehal_live.write_ess_setpoints_from_control(
+                mode,
+                target_power,
+                export_cap_kw=export_cap,
+                telemetry=telemetry_for_export,
+            )
+            logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
+            err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(
+                consumer_powers, charging_contexts
+            )
+            logger.info("Sende EHAL WR-AC-Limits an %s...", backend)
+            err_inv, inv_records = ehal_live.write_inv_ac_limits_from_plan(
+                plant_curtail_kw=plant_curtail_kw,
+                matrix_row=optimization_matrix[0] if optimization_matrix else None,
+                milp_plan=milp_plan if isinstance(milp_plan, dict) else None,
+            )
+            if err_ess is None and err_evcs is None and err_inv is None:
+                ehal_live.clear_write_error()
+            ehal_writes = list(ess_records) + list(evcs_records) + list(inv_records)
+            loxone_writes = None
+        else:
+            logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
+            huawei_writes = ehal_live.write_huawei_modbus_states(
+                mode, target_power, target_soc, export_cap_kw=export_cap
+            )
+            logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
+            flex_writes = ehal_live.write_flexible_consumer_states(
+                consumer_powers, charging_contexts, consumer_pv_follow
+            )
+            logger.info("📤 Sende WR-AC-Limits an Loxone...")
+            _err_inv, inv_rows = ehal_live.write_inv_ac_limits_from_plan(
+                plant_curtail_kw=plant_curtail_kw,
+                matrix_row=optimization_matrix[0] if optimization_matrix else None,
+                milp_plan=milp_plan if isinstance(milp_plan, dict) else None,
+            )
+            loxone_writes = serialize_write_records(
+                list(huawei_writes) + list(flex_writes) + list(powerstation_writes)
+            ) + list(inv_rows)
+
+        if live_power is None:
+            live_power = ehal_live.read_live_power_kw()
+        total_kw = live_power["house"] if live_power else None
+        from optimizer.charging_context import matrix_slot_datetime
+
+        if ehal_live.is_ehal_network_backend():
+            flex_kw = {c["id"]: 0.0 for c in live_consumers}
+            flex_chart_kw = dict(flex_kw)
+            live_flex_measured: set[str] = set()
+        else:
+            live_flex = ehal_live.resolve_flexible_consumers_live_power(
+                fallbacks=consumer_powers,
+                consumers=live_consumers,
+                filter_contexts=filter_contexts,
+                slot_datetime=matrix_slot_datetime(optimization_matrix, 0),
+            )
+            flex_kw = live_flex.kw
+            flex_chart_kw = live_flex.chart_kw
+            live_flex_measured = live_flex.measured_ids
+        logger.info("cons_data Flex live (kW): %s", flex_kw)
+        logger.info(
+            "Chart-Ist Flex (kW): %s | gemessen: %s",
+            flex_chart_kw,
+            sorted(live_flex_measured),
+        )
+
+        loxone_sent = ehal_live.build_sent_loxone_snapshot(
+            mode,
+            target_power,
+            target_soc,
+            consumer_powers,
+            charging_contexts,
+            consumer_pv_follow,
+            export_cap_kw=export_cap,
+        )
+        loxone_sent.update(
+            planned_powerstation_loxone_sent(phys_charge, standby_sources)
+        )
+        sent_flex_kw: dict[str, float] = {}
+        for consumer in live_consumers:
+            setpoint_name = marker_set_evcs_max_current(consumer)
+            if not setpoint_name:
+                continue
+            amps = float(loxone_sent.get(setpoint_name, 0.0) or 0.0)
+            voltage_v, phases = ev_nominal_power_conversion(consumer)
+            sent_flex_kw[consumer["id"]] = round(
+                ampere_to_kw(amps, voltage_v=voltage_v, phases=phases), 3
+            )
+
+        delivery_compliance = optimizer.register_consumer_delivery(
+            consumer_powers,
+            charging_contexts=charging_contexts,
+            consumers=live_consumers,
+            live_flex_kw=flex_kw,
+            sent_flex_kw=sent_flex_kw,
+            book_planned=not out_of_band,
+        )
 
     savings_snapshot = None
     savings_info = None
-    try:
-        savings_info = optimizer.calculate_optimization_savings(
-            optimization_matrix,
-            float(current_soc),
-            consumer_daily_targets_kwh=targets,
-            sunrise_soc_min_index=sunrise_soc_min_index,
-            filter_contexts=filter_contexts,
-            consumers=live_consumers,
-            current_soc_by_id=current_soc_by_id or None,
-        )
-        savings_snapshot = optimizer.build_savings_snapshot(savings_info)
-        logger.info(
-            "Prognostizierte Ersparnis (%d h): %.3f € vs BL Ziel "
-            "(%.3f € optimiert / %.3f € BL Ziel)",
-            len(optimization_matrix),
-            savings_snapshot["savings_matched_euro"],
-            savings_snapshot["optimized_cost_euro"],
-            savings_snapshot["matched_baseline_cost_euro"],
-        )
-    except Exception as exc:
-        logger.warning("Einsparungs-Prognose konnte nicht berechnet werden: %s", exc)
-
-    if not out_of_band:
+    with timing.phase("savings"):
         try:
-            written = cons_data_store.record_and_maybe_flush(
-                total_kw=total_kw,
-                pv_kwh_interval=pv_delta,
-                flex_kw=flex_kw,
+            savings_info = optimizer.calculate_optimization_savings(
+                optimization_matrix,
+                float(current_soc),
+                consumer_daily_targets_kwh=targets,
+                sunrise_soc_min_index=sunrise_soc_min_index,
+                filter_contexts=filter_contexts,
+                consumers=live_consumers,
+                current_soc_by_id=current_soc_by_id or None,
             )
-            if written:
-                logger.info("cons_data: %s Stunde(n) in cons_data.csv geschrieben.", written)
-        except Exception as e:
-            logger.warning("cons_data: Messwerte konnten nicht gespeichert werden: %s", e)
-
-    consumption_snapshot = None
-    if live_power:
-        consumption_snapshot = live_consumption.build_consumption_snapshot(
-            live_power, flex_chart_kw
-        )
-        if live_consumption.is_dead_telemetry_snapshot(consumption_snapshot):
-            logger.warning(
-                "Live-Telemetrie liefert Nullwerte (PV/Haus/Netz/Batterie) — "
-                "consumption_snapshot wird nicht ins Produktiv-Log geschrieben."
+            savings_snapshot = optimizer.build_savings_snapshot(savings_info)
+            logger.info(
+                "Prognostizierte Ersparnis (%d h): %.3f € vs BL Ziel "
+                "(%.3f € optimiert / %.3f € BL Ziel)",
+                len(optimization_matrix),
+                savings_snapshot["savings_matched_euro"],
+                savings_snapshot["optimized_cost_euro"],
+                savings_snapshot["matched_baseline_cost_euro"],
             )
-            consumption_snapshot = None
+        except Exception as exc:
+            logger.warning("Einsparungs-Prognose konnte nicht berechnet werden: %s", exc)
 
-    try:
-        if "k_act" not in current_market_item:
-            raise KeyError(
-                "optimization_matrix[0] fehlt 'k_act' (Bezugspreis Cent/kWh) "
-                "für market_price_cent im Produktiv-Log."
-            )
-        market_price_cent = round(float(current_market_item["k_act"]), 4)
-        epex_price_cent = round(float(current_market_item["price_buy"]), 4)
-        from integrations.ehal_write import load_published_records
-        from optimizer.powerstation_soc_chart import load_virtual_soc_by_id
-
-        soc_percent_by_ess = {
-            str(ess_id): round(float(soc), 2)
-            for ess_id, soc in (current_soc_by_id or {}).items()
-        }
-        soc_percent_by_ess.update(load_virtual_soc_by_id())
-
-        run_payload = {
-            "source": "main.py",
-            "success": True,
-            "run_trigger": run_trigger,
-            "silent_mode": config.is_silent_mode(),
-            "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
-            "event_trigger_snapshot": {},
-            "loxone_sent": loxone_sent,
-            "loxone_writes": loxone_writes,
-            "ehal_writes": ehal_writes,
-            "ehal_published": load_published_records(),
-            "soc_percent": round(float(current_soc), 2),
-            "soc_percent_by_ess": soc_percent_by_ess,
-            "reported_soc_percent": round(float(reported_soc), 2),
-            "pv_delta_kwh": round(float(pv_delta), 4),
-            "market_price_cent": market_price_cent,
-            "epex_price_cent": epex_price_cent,
-            "k_push_act": round(
-                k_push_act_for_matrix_row(
-                    current_market_item,
-                    config.get_push_price_cent(),
-                ),
-                4,
-            ),
-            "forecast_pv_kw": round(pv_forecast_kw_for_log, 3),
-            "forecast_consumption_kw": round(float(optimization_matrix[0]["expected_p_act"]), 3),
-            "mode": int(mode),
-            "target_power_kw": round(float(target_power), 3),
-            "target_soc_percent": round(float(target_soc), 1),
-            "battery_plan_kw": battery_plan_kw,
-            "consumer_powers_kw": {
-                k: round(float(v), 3) for k, v in consumer_powers.items()
-            },
-            "consumer_remaining_kwh": {
-                k: round(float(v), 3) for k, v in consumer_remaining.items()
-            },
-            "charging_contexts": optimizer.serialize_charging_contexts(charging_contexts),
-            "filter_contexts": optimizer.serialize_filter_contexts(filter_contexts),
-            "urgent_rule_observability": urgent_obs,
-            "consumer_pv_follow": {
-                k: int(v) for k, v in consumer_pv_follow.items()
-            },
-            "flex_live_kw": flex_chart_kw,
-            "flex_measured_ids": sorted(live_flex_measured),
-            "delivery_compliance": delivery_compliance,
-            "delivery_plausibility": delivery_plausibility,
-            "thermal_observability": thermal_observability,
-            "savings_snapshot": savings_snapshot,
-            "consumption_snapshot": consumption_snapshot,
-            "closed_interval": closed_interval,
-            "current_hour": int(current_hour),
-        }
-        if consumption_snapshot is not None:
-            power_interval_sampler.note_decision_sample(
-                consumption_snapshot,
-                soc_percent=float(current_soc),
-            )
-        run_state.save_run_state(run_payload)
-        if savings_info:
+    with timing.phase("persist"):
+        if not out_of_band:
             try:
-                overlaid_rows = optimizer.overlay_main_run_on_rows(
-                    savings_info["optimized_rows"],
-                    run_payload,
+                written = cons_data_store.record_and_maybe_flush(
+                    total_kw=total_kw,
+                    pv_kwh_interval=pv_delta,
+                    flex_kw=flex_kw,
                 )
-                debug_payload = live_optimization_debug.build_debug_payload(
-                    savings_info,
-                    overlaid_rows,
-                    savings_info["baseline_rows"],
-                    kind="live",
-                    initial_soc=float(current_soc),
-                    main_state=run_payload,
-                    quarter_hour_slot=optimization_schedule.quarter_hour_slot_key(),
-                    sync_reason="main_synced",
-                    optimized_rows_raw=savings_info["optimized_rows"],
-                    matched_baseline_rows=savings_info.get("matched_baseline_rows"),
-                    baseline_same_flex_rows=savings_info.get(
-                        "baseline_same_flex_rows"
-                    ),
-                    source="main.py",
-                    planning_matrix=optimization_matrix,
-                    planning_window=serialize_planning_window(planning_window),
-                )
-                live_optimization_debug.save_debug_snapshot(debug_payload)
-                logger.info(
-                    "live_optimization_debug: Anzeige-Snapshot gespeichert (%d Sim-Zeilen).",
-                    len(overlaid_rows),
-                )
-            except Exception as exc:
+                if written:
+                    logger.info(
+                        "cons_data: %s Stunde(n) in cons_data.csv geschrieben.", written
+                    )
+            except Exception as e:
                 logger.warning(
-                    "live_optimization_debug: Snapshot konnte nicht gespeichert werden: %s",
-                    exc,
+                    "cons_data: Messwerte konnten nicht gespeichert werden: %s", e
                 )
-        try:
-            optimization_history.append_production_run(run_payload)
-        except OSError as exc:
-            logger.warning("optimization_history: Anhängen fehlgeschlagen: %s", exc)
-        logger.info("run_state: Durchlauf in optimizer_run_state.json gespeichert.")
-    except Exception as e:
-        logger.warning("run_state: Zustand konnte nicht gespeichert werden: %s", e)
 
-    try:
-        immediate = any(
-            bool((ctx or {}).get("immediate_charge"))
-            for ctx in (charging_contexts or {}).values()
-        )
-        cycle_recorder.finish_cycle(
-            recorder_token,
-            mode=int(mode),
-            target_power_kw=round(float(target_power), 3),
-            battery_plan_kw=battery_plan_kw,
-            consumer_powers_kw={
-                k: round(float(v), 3) for k, v in consumer_powers.items()
-            },
-            flags={
-                "override": bool(config.is_silent_mode()),
-                "immediate_charging": immediate,
-                "outage": bool(out_of_band),
-                "manual_intervention": False,
-            },
-        )
-    except Exception as exc:  # noqa: BLE001 — never abort live run
-        logger.warning("cycle_recorder: finish_cycle failed: %s", exc)
+        consumption_snapshot = None
+        if live_power:
+            consumption_snapshot = live_consumption.build_consumption_snapshot(
+                live_power, flex_chart_kw
+            )
+            if live_consumption.is_dead_telemetry_snapshot(consumption_snapshot):
+                logger.warning(
+                    "Live-Telemetrie liefert Nullwerte (PV/Haus/Netz/Batterie) — "
+                    "consumption_snapshot wird nicht ins Produktiv-Log geschrieben."
+                )
+                consumption_snapshot = None
+
+        try:
+            if "k_act" not in current_market_item:
+                raise KeyError(
+                    "optimization_matrix[0] fehlt 'k_act' (Bezugspreis Cent/kWh) "
+                    "für market_price_cent im Produktiv-Log."
+                )
+            market_price_cent = round(float(current_market_item["k_act"]), 4)
+            epex_price_cent = round(float(current_market_item["price_buy"]), 4)
+            from integrations.ehal_write import load_published_records
+            from optimizer.powerstation_soc_chart import load_virtual_soc_by_id
+
+            soc_percent_by_ess = {
+                str(ess_id): round(float(soc), 2)
+                for ess_id, soc in (current_soc_by_id or {}).items()
+            }
+            soc_percent_by_ess.update(load_virtual_soc_by_id())
+
+            run_payload = {
+                "source": "main.py",
+                "success": True,
+                "run_trigger": run_trigger,
+                "silent_mode": config.is_silent_mode(),
+                "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
+                "event_trigger_snapshot": {},
+                "loxone_sent": loxone_sent,
+                "loxone_writes": loxone_writes,
+                "ehal_writes": ehal_writes,
+                "ehal_published": load_published_records(),
+                "soc_percent": round(float(current_soc), 2),
+                "soc_percent_by_ess": soc_percent_by_ess,
+                "reported_soc_percent": round(float(reported_soc), 2),
+                "pv_delta_kwh": round(float(pv_delta), 4),
+                "market_price_cent": market_price_cent,
+                "epex_price_cent": epex_price_cent,
+                "k_push_act": round(
+                    k_push_act_for_matrix_row(
+                        current_market_item,
+                        config.get_push_price_cent(),
+                    ),
+                    4,
+                ),
+                "forecast_pv_kw": round(pv_forecast_kw_for_log, 3),
+                "forecast_consumption_kw": round(
+                    float(optimization_matrix[0]["expected_p_act"]), 3
+                ),
+                "mode": int(mode),
+                "target_power_kw": round(float(target_power), 3),
+                "target_soc_percent": round(float(target_soc), 1),
+                "battery_plan_kw": battery_plan_kw,
+                "consumer_powers_kw": {
+                    k: round(float(v), 3) for k, v in consumer_powers.items()
+                },
+                "consumer_remaining_kwh": {
+                    k: round(float(v), 3) for k, v in consumer_remaining.items()
+                },
+                "charging_contexts": optimizer.serialize_charging_contexts(
+                    charging_contexts
+                ),
+                "filter_contexts": optimizer.serialize_filter_contexts(filter_contexts),
+                "urgent_rule_observability": urgent_obs,
+                "consumer_pv_follow": {
+                    k: int(v) for k, v in consumer_pv_follow.items()
+                },
+                "flex_live_kw": flex_chart_kw,
+                "flex_measured_ids": sorted(live_flex_measured),
+                "delivery_compliance": delivery_compliance,
+                "delivery_plausibility": delivery_plausibility,
+                "thermal_observability": thermal_observability,
+                "savings_snapshot": savings_snapshot,
+                "consumption_snapshot": consumption_snapshot,
+                "closed_interval": closed_interval,
+                "current_hour": int(current_hour),
+            }
+            if consumption_snapshot is not None:
+                power_interval_sampler.note_decision_sample(
+                    consumption_snapshot,
+                    soc_percent=float(current_soc),
+                )
+            run_state.save_run_state(run_payload)
+            if savings_info:
+                try:
+                    overlaid_rows = optimizer.overlay_main_run_on_rows(
+                        savings_info["optimized_rows"],
+                        run_payload,
+                    )
+                    debug_payload = live_optimization_debug.build_debug_payload(
+                        savings_info,
+                        overlaid_rows,
+                        savings_info["baseline_rows"],
+                        kind="live",
+                        initial_soc=float(current_soc),
+                        main_state=run_payload,
+                        quarter_hour_slot=optimization_schedule.quarter_hour_slot_key(),
+                        sync_reason="main_synced",
+                        optimized_rows_raw=savings_info["optimized_rows"],
+                        matched_baseline_rows=savings_info.get("matched_baseline_rows"),
+                        baseline_same_flex_rows=savings_info.get(
+                            "baseline_same_flex_rows"
+                        ),
+                        source="main.py",
+                        planning_matrix=optimization_matrix,
+                        planning_window=serialize_planning_window(planning_window),
+                    )
+                    live_optimization_debug.save_debug_snapshot(debug_payload)
+                    logger.info(
+                        "live_optimization_debug: Anzeige-Snapshot gespeichert (%d Sim-Zeilen).",
+                        len(overlaid_rows),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "live_optimization_debug: Snapshot konnte nicht gespeichert werden: %s",
+                        exc,
+                    )
+            try:
+                optimization_history.append_production_run(run_payload)
+            except OSError as exc:
+                logger.warning("optimization_history: Anhängen fehlgeschlagen: %s", exc)
+            logger.info("run_state: Durchlauf in optimizer_run_state.json gespeichert.")
+        except Exception as e:
+            logger.warning("run_state: Zustand konnte nicht gespeichert werden: %s", e)
+
+        try:
+            immediate = any(
+                bool((ctx or {}).get("immediate_charge"))
+                for ctx in (charging_contexts or {}).values()
+            )
+            cycle_recorder.finish_cycle(
+                recorder_token,
+                mode=int(mode),
+                target_power_kw=round(float(target_power), 3),
+                battery_plan_kw=battery_plan_kw,
+                consumer_powers_kw={
+                    k: round(float(v), 3) for k, v in consumer_powers.items()
+                },
+                flags={
+                    "override": bool(config.is_silent_mode()),
+                    "immediate_charging": immediate,
+                    "outage": bool(out_of_band),
+                    "manual_intervention": False,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001 — never abort live run
+            logger.warning("cycle_recorder: finish_cycle failed: %s", exc)
 
 if __name__ == "__main__":
     from runtime_store import bootstrap

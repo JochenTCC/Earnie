@@ -55,11 +55,30 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `live_day_ahead_<zone>.json` | Cache der letzten erfolgreichen Live-Day-Ahead-Serie (QH; Zone z. B. `AT`; `source` ENTSO-E oder Energy-Charts); Live nutzt ihn statt erneutem API-Abruf bzw. vor aWATTar-Fallback |
 | `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode` — auch UI **Optimierer-Dienst**, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`, Cycle-Recorder `recorder_enabled` / `recorder_retention_days`)     |
 | `recorder/`                     | Cycle-Recorder-Ringpuffer (`cycles_YYYY-MM-DD.jsonl.gz`, Config-Snapshots unter `configs/`) — Lastprofile für Regression; lokal, standardmäßig an |
+| `timing/`                       | Optional: Phasen-Zeiten des Live-Zyklus (`cycles.jsonl`) — nur bei `EARNIE_CYCLE_TIMING=1` |
+| `profile/`                      | Optional: `cProfile`-Dumps (`cycle_*.prof`, `*_top30.txt`) — nur bei `EARNIE_CYCLE_PROFILE=1` (kurz halten) |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
 
 
 Die App liest diese Dateien **read-only** für Panels und Abgleich.
+
+### Live-Zyklus-Profiling (optional)
+
+Zur Suche nach Beschleunigungspotenzialen im Optimierungszyklus (`main.py`) können Phasen-Zeiten und optional Call-Profile geschrieben werden. **Standard: aus** (kein Overhead, keine Dateien).
+
+| Variable | Wirkung |
+| -------- | ------- |
+| `EARNIE_CYCLE_TIMING=1` | Pro Zyklus eine Zeile in `runtime/timing/cycles.jsonl` (Phasen: `prices_matrix`, `ehal_read`, `prepare`, `milp_live`, `writes`, `savings`, ggf. `savings_*`, `persist`, `total`) plus eine INFO-Zeile in `earnie.log` |
+| `EARNIE_CYCLE_PROFILE=1` | Zusätzlich `cProfile` → `runtime/profile/cycle_<slot>.prof` und Top-30-Text. **Nur 1–2 Zyklen**, danach Variable entfernen |
+
+Auswertung lokal (nach Kopieren von `timing/` von der NAS):
+
+```powershell
+python -m scripts.summarize_cycle_timing earnie_env/runtime/timing/cycles.jsonl
+```
+
+Einmal-Deploy auf der NAS (lokales Image, Compose-Env): siehe [container.md](container.md) § Live-Zyklus-Profiling (NAS-Einmal-Test).
 
 ### Cycle-Recorder (Regression R-Rec)
 

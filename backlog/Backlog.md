@@ -45,6 +45,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Anonymous install counter (daily ping, no ID)
 
 - [ ] Make a profiling session for main.py to identify acceleration potentials for optimization cycle
+  - **Instrumentation ready:** `EARNIE_CYCLE_TIMING=1` / `EARNIE_CYCLE_PROFILE=1` → `runtime/timing/cycles.jsonl` (+ optional `runtime/profile/`); docs [betrieb.md](../docs/einrichtung/betrieb.md) / [container.md](../docs/einrichtung/container.md) § Live-Zyklus-Profiling; summarize with `python -m scripts.summarize_cycle_timing …`.
+  - **Still open:** one NAS productive window (manual local Synology image), collect JSONL, rank phases, add concrete acceleration backlog bullets. Provisional code-path candidates: `savings` / `savings_optimized` (second full-horizon MILP) vs `milp_live`.
 
 ### Version 2.8
   
