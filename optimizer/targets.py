@@ -178,10 +178,10 @@ def resolve_thermal_annual_horizon_kwh(
         return 0.0
     from house_config.planning_flex_bridge import _house_thermal_consumers
     from optimizer.absent_mode import (
-        matrix_is_live_snapshot,
         resolve_absent_status,
         thermal_source_with_live_absent,
     )
+    from optimizer.live_cycle_scope import is_live_thermal_planning
     from optimizer.thermal_flex_context import thermal_daily_kwh_for_date
 
     thermal_by_id = {
@@ -191,7 +191,7 @@ def resolve_thermal_annual_horizon_kwh(
     if not source:
         return 0.0
     live_absent = False
-    is_live = matrix_is_live_snapshot(optimization_matrix)
+    is_live = is_live_thermal_planning(optimization_matrix)
     if is_live:
         live_absent = bool(resolve_absent_status(profile)["effective"])
     source = thermal_source_with_live_absent(

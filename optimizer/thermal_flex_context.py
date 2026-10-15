@@ -150,17 +150,17 @@ def resolve_thermal_flex_contexts(
         return {}
     from house_config.planning_flex_bridge import _house_thermal_consumers
     from optimizer.absent_mode import (
-        matrix_is_live_snapshot,
         resolve_absent_status,
         thermal_source_with_live_absent,
     )
+    from optimizer.live_cycle_scope import is_live_thermal_planning
 
     thermal_by_id = {
         str(item["id"]): item
         for item in _house_thermal_consumers(house_profile)
     }
     live_absent = False
-    is_live = matrix_is_live_snapshot(matrix)
+    is_live = is_live_thermal_planning(matrix)
     if is_live:
         live_absent = bool(resolve_absent_status(house_profile)["effective"])
     contexts: dict[str, dict] = {}

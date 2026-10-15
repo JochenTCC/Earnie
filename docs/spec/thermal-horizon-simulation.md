@@ -1,6 +1,6 @@
 # Thermal horizon simulation — year model once for parameters, horizon only in Live
 
-**Status:** Approved 2026-10-15 — P1–P4 implemented on branch, P5 open  
+**Status:** Approved 2026-10-15 — P1–P5 implemented on branch; NAS validation pending  
 **Date:** 2026-10-15  
 **Branch:** `feat/thermal-horizon-sim` (based on `perf/thermal-year-cache`, PR #36)  
 **Related:** [`thermals-p2.md`](thermals-p2.md) (§ Live / MILP store floor), [`early-start-scheduling.md`](early-start-scheduling.md), backlog epic **ThermalHorizon** P1–P5 (Version 2.7)
@@ -31,7 +31,7 @@ Out of scope: backtesting / Szenario-Explorer (`consumption_mode = profile_spec`
 
 1. **Parameters** (slow, rare): one year simulation per `(thermal config, reference climate year)` yields a small, explicit parameter set. Reference year = `last_full_archive_year()` everywhere.
 2. **Horizon** (fast, every cycle): RC simulation over the planning horizon only (≤ ~48 h), start state = measurement where available. **All weather inputs come from the forecast:** ambient = `get_outdoor_forecast_with_fallback` (Open-Meteo forecast, existing fallback to the live outdoor reading with its source logged), collector irradiance = Open-Meteo forecast (§4.4).
-3. Live never calls `house_year_result` / `_modeled_thermal_annual_hourly_kw` / `thermal_daily_kwh_for_date`. A test enforces this (§6).
+3. Live never calls `house_year_result` / `_modeled_thermal_annual_hourly_kw` / `thermal_daily_kwh_for_date`. A test enforces this (§6). "Live" for thermal planning = the matrix is processed inside `main`'s Live cycle scope (`optimizer.live_cycle_scope.is_live_thermal_planning`), not only when the first row carries the `live_snapshot` marker — a rejected telemetry snapshot must not switch a Live cycle to the SE year-profile path.
 
 ## 4. Design
 

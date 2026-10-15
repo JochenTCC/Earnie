@@ -46,17 +46,26 @@ def house_thermal_parameters(
     reference_year: int | None = None,
 ) -> ThermalParameters:
     """Annual WP electric kWh and envelope H for a ``thermal_annual`` consumer."""
-    from data.modeled_climate import _planning_timezone_for_thermal
+    from data.modeled_climate import (
+        _planning_timezone_for_thermal,
+        collector_surface_from_thermal,
+    )
     from data.open_meteo_solar_archive import last_full_archive_year
     from optimizer.thermal_year_cache import THERMAL_PARAMETERS_CACHE, fingerprint_json
 
     geo = thermal_with_geo(thermal, house_profile)
     year = reference_year if reference_year is not None else last_full_archive_year()
+    profile = house_profile or {}
+    # The house profile only enters via timezone and collector surface; keying on
+    # those (not the whole profile) lets baseload and Live share one derivation.
+    surface = collector_surface_from_thermal(
+        geo, {**profile, "latitude": geo["latitude"], "longitude": geo["longitude"]}
+    )
     key = (
         "house",
         fingerprint_json(geo),
-        fingerprint_json(house_profile or {}),
-        _planning_timezone_for_thermal(geo, house_profile or {}),
+        _planning_timezone_for_thermal(geo, profile),
+        (surface.tilt_deg, surface.azimuth_deg),
         year,
     )
     return THERMAL_PARAMETERS_CACHE.get_or_compute(
