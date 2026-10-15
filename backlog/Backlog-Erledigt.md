@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### EarlyStart P0 — always-on cycle duration + punctuality log (2026-10-15)
+
+- [x] **EarlyStart P0 — always-on duration, event + punctuality recording** (epic **EarlyStart**; spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §5.1, §5.2, §5.6)
+  - `runtime_store/cycle_duration_stats.py` → rolling `runtime/cycle_stats.jsonl` (7 d): tick, woke/start/writes-done/finish, wake/start delay, duration, `late_by_sec`, `on_time` (≤ 2 s), outcome (`ok` / `no_writes` / `error`), events, horizon slots, version, platform fingerprint (CPU, Python, solver; no hostname).
+  - Event hooks: `pv_forecast_fetch`, `weather_fetch`, `price_feature_refresh`, `day_ahead_fetch` (network instead of cache) + `cold_start`.
+  - `earnie.log`: one `Pünktlichkeit: …` line per regular cycle with 24 h / 7 d on-time rate and P95 lateness; out-of-band runs excluded.
+  - Independent of the env-gated profiling (`runtime_store/cycle_timing.py`), which stays removable on its own. Not in P0 (moved to follow-ups): `will_refresh(at)`, MILP status.
+  - Docs: `docs/einrichtung/betrieb.md` § Zyklus-Pünktlichkeit. Tests: `tests/test_cycle_duration_stats.py`.
+  - Live check on NAS productive: `wake_delay_sec` should confirm the wait-loop drift bug (`Backlog-Bugfixes.md`).
+
 ### Regression P2 — customer data + intake (2026-10-15)
 
 - [x] **Regression P2 — customer data:** private repo `JochenTCC/Earnie-regression-private` + `$EARNIE_REGRESSION_PRIVATE_DIR` (default sibling `..\Earnie-regression-private\cases`); missing private root reported as skipped (`private-root-missing`); public + private SHAs in `regression_report.md`.

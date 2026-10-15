@@ -23,6 +23,7 @@ from runtime_store.soc_plausibility import (
     sanitize_soc_reading,
 )
 from runtime_store import live_optimization_debug
+from runtime_store import cycle_duration_stats
 from runtime_store.cycle_timing import CycleTimer
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
@@ -46,13 +47,24 @@ from version import __version__
 logger = logging.getLogger("main")
 
 
-def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
-    timing = CycleTimer(slot_key=optimization_schedule.quarter_hour_slot_key())
-    timing.activate()
-    try:
-        _main_cycle(run_trigger, timing)
-    finally:
-        timing.finish()
+def main(
+    run_trigger: str = TRIGGER_QUARTER_HOUR,
+    *,
+    woke_at: datetime | None = None,
+    cold_start: bool = False,
+):
+    with cycle_duration_stats.cycle_stats_session(
+        trigger=run_trigger,
+        version=__version__,
+        woke_at=woke_at,
+        cold_start=cold_start,
+    ):
+        timing = CycleTimer(slot_key=optimization_schedule.quarter_hour_slot_key())
+        timing.activate()
+        try:
+            _main_cycle(run_trigger, timing)
+        finally:
+            timing.finish()
 
 
 def _main_cycle(run_trigger: str, timing: CycleTimer):
@@ -138,6 +150,7 @@ def _main_cycle(run_trigger: str, timing: CycleTimer):
         optimization_matrix = profile_manager.build_live_planning_matrix(
             market_data, planning_window
         )
+        cycle_duration_stats.set_horizon_slots(len(optimization_matrix))
         pv_api_status = pv_forecast.get_api_status()
         if pv_api_status["retry_at"]:
             logger.warning(
@@ -619,6 +632,7 @@ def _main_cycle(run_trigger: str, timing: CycleTimer):
             sent_flex_kw=sent_flex_kw,
             book_planned=not out_of_band,
         )
+    cycle_duration_stats.mark_writes_done()
 
     savings_snapshot = None
     savings_info = None
@@ -877,6 +891,8 @@ if __name__ == "__main__":
     _SETUP_WAIT_SEC = 60
     _setup_gate_state: dict = {}
     next_trigger = TRIGGER_QUARTER_HOUR
+    cold_start = True
+    woke_at: datetime | None = None
 
     def _wait_poll() -> None:
         touch_daemon_heartbeat()
@@ -1010,7 +1026,13 @@ if __name__ == "__main__":
                 time.sleep(_SETUP_WAIT_SEC)
                 continue
 
-            main(run_trigger=next_trigger)
+            cycle_woke_at, woke_at = woke_at, None
+            cycle_cold_start, cold_start = cold_start, False
+            main(
+                run_trigger=next_trigger,
+                woke_at=cycle_woke_at,
+                cold_start=cycle_cold_start,
+            )
             clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
             after_prod_cycle()
@@ -1026,6 +1048,7 @@ if __name__ == "__main__":
                 total_wait_sec=wait_sec,
                 on_poll=_wait_poll,
             )
+            woke_at = datetime.now()
             next_trigger = resolve_next_trigger(
                 early,
                 next_trigger,

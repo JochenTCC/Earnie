@@ -80,6 +80,19 @@ python -m scripts.summarize_cycle_timing earnie_env/runtime/timing/cycles.jsonl
 
 Einmal-Deploy auf der NAS (lokales Image, Compose-Env): siehe [container.md](container.md) § Live-Zyklus-Profiling (NAS-Einmal-Test).
 
+### Zyklus-Pünktlichkeit (immer aktiv)
+
+Earnie schreibt die Sollwerte für eine Viertelstunde idealerweise genau zu deren Beginn (`hh:00`, `:15`, `:30`, `:45` — dem Takt der 15-Minuten-Strompreise). Ob das gelingt, protokolliert jeder Optimierungslauf — unabhängig vom optionalen Profiling oben:
+
+- **`earnie.log`:** eine Zeile pro regulärem Lauf, z. B.
+  `Pünktlichkeit: Tick 09:15 | Weckzeit +70 s | Start +73 s | Sollwerte +177 s | Dauer 202 s | 24 h: 0/96 pünktlich, P95 +240 s | 7 d: …`
+  - *Weckzeit* = wann die Warteschleife geendet hat, *Start* = Beginn des Laufs, *Sollwerte* = wann die Befehle an das Smarthome-Backend gingen, jeweils relativ zum Viertelstundenbeginn.
+  - *pünktlich* = Sollwerte spätestens 2 s nach Viertelstundenbeginn. Außerplanmäßige Läufe (`Earnie_Request_Optimize`) zählen nicht mit.
+  - *Ereignisse* nennt bekannte langsame Schritte des Laufs: `cold_start` (erster Lauf nach Start), `pv_forecast_fetch`, `weather_fetch`, `price_feature_refresh`, `day_ahead_fetch` (Abruf aus dem Netz statt Cache).
+- **`runtime/cycle_stats.jsonl`:** dieselben Werte als eine JSON-Zeile pro Lauf (rollierend 7 Tage), außerdem Horizontlänge, Earnie-Version und eine Plattform-Kennung (CPU, Python, Solver). Grundlage für den späteren automatischen Vorlauf des Optimierungsstarts.
+
+Keine Einstellung nötig; die Datei bleibt lokal.
+
 ### Cycle-Recorder (Regression R-Rec)
 
 Earnie speichert die vollständigen Optimizer-Eingaben jedes Zyklus in einem Ringpuffer unter `runtime/recorder/` (Spec: [`docs/spec/regression-suite.md`](../spec/regression-suite.md) §14). Damit lassen sich Fehler, die erst Tage später auffallen, noch als golden-master-Fall nachziehen. Die Dateien enthalten **Lastprofile** und bleiben **lokal** — Earnie lädt sie nicht hoch.
@@ -159,6 +172,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `main_stdio.log`                     | **aktiv**                      | stdout/stderr bei UI-/Auto-Start von `main.py`                    |
 | `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf                     |
 | `live_optimization_debug.json`       | **aktiv**                      | 24h-Anzeige-Snapshot für die Streamlit-App                    |
+| `cycle_stats.jsonl`                  | **aktiv**                      | Dauer und Pünktlichkeit je Optimierungslauf (rollierend 7 Tage), siehe [Zyklus-Pünktlichkeit](#zyklus-pünktlichkeit-immer-aktiv) |
 | `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis von Szenario-Explorer — nicht für Produktiv-NAS   |
 
 

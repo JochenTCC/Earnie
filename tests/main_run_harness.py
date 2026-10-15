@@ -152,6 +152,8 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
     monkeypatch.setattr(main_module.optimization_history, "append_production_run", lambda _p: None)
     monkeypatch.setattr(main_module.cycle_recorder, "begin_cycle", lambda **_k: None)
     monkeypatch.setattr(main_module.cycle_recorder, "finish_cycle", lambda *_a, **_k: False)
+    monkeypatch.setattr(main_module.cycle_duration_stats, "append_record", lambda *_a, **_k: None)
+    monkeypatch.setattr(main_module.cycle_duration_stats, "load_records", lambda *_a, **_k: [])
     monkeypatch.setattr(main_module.pv_tuner, "get_pv_delta_and_update", lambda: 0.0)
     monkeypatch.setattr(main_module, "collect_thermal_observability", lambda *a, **k: [])
     monkeypatch.setattr(main_module.optimizer, "calculate_optimization_savings", lambda *a, **k: None)

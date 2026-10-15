@@ -3,6 +3,10 @@ import requests
 from datetime import datetime, timedelta
 from typing import List, Optional
 import config
+from runtime_store.cycle_duration_stats import (
+    EVENT_PV_FORECAST_FETCH,
+    record_event as record_cycle_event,
+)
 
 # =========================================================================
 # GLOBALE CACHE-VARIABLEN (Für Rate-Limiting & API-Schonung)
@@ -219,6 +223,7 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
         should_return, early = _pre_fetch_cached_or_none(now_time, cached)
         if should_return:
             return early
+        record_cycle_event(EVENT_PV_FORECAST_FETCH)
         try:
             response = requests.get(url, timeout=config.get_global_timeout())
             return _store_hourly_watts_from_response(url, response, cached, now_time)

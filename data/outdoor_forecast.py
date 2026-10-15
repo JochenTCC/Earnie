@@ -8,6 +8,10 @@ from typing import Optional
 import requests
 
 import config
+from runtime_store.cycle_duration_stats import (
+    EVENT_WEATHER_FETCH,
+    record_event as record_cycle_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +177,7 @@ def get_hourly_outdoor_forecast_c(
     if cached and now - cached[0] < _CACHE_TTL:
         hourly = cached[1]
     else:
+        record_cycle_event(EVENT_WEATHER_FETCH)
         hourly = _fetch_open_meteo_hourly(lat, lon, forecast_days=forecast_days)
         _CACHE[cache_key] = (now, hourly)
 

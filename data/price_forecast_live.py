@@ -17,6 +17,10 @@ from data.price_forecast_model import (
 )
 
 from data.market_prices import PRICE_SOURCE_PREDICTED
+from runtime_store.cycle_duration_stats import (
+    EVENT_PRICE_FEATURE_REFRESH,
+    record_event as record_cycle_event,
+)
 from runtime_store.persist_paths import resolve_runtime_prefixed_path
 
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
@@ -296,6 +300,7 @@ def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | N
     if cached is not None:
         return cached
 
+    record_cycle_event(EVENT_PRICE_FEATURE_REFRESH)
     try:
         frame = (
             _build_archive_feature_frame(hour_slots)

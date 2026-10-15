@@ -27,6 +27,10 @@ from data.live_price_cache import (
 from data.market_prices import awattar_fetch_window, normalize_price_slot
 from data.tariff_pricing import market_zone_for_land
 from optimizer.slot_duration import normalize_quarter_hour_slot
+from runtime_store.cycle_duration_stats import (
+    EVENT_DAY_AHEAD_FETCH,
+    record_event as record_cycle_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +255,7 @@ def fetch_live_day_ahead_prices(
     if cached_hit is not None:
         return cached_hit
 
+    record_cycle_event(EVENT_DAY_AHEAD_FETCH)
     try:
         entsoe_live = _fetch_and_cache_entsoe(
             zone, start, end, fetched_at=now

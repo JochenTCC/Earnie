@@ -48,6 +48,7 @@ alwaysApply: true
 * **Plant topology (`Topology`, 2.7):** P1 (explicit root + regulator declaration + validation), P2 (live-balance coverage), P3 (per-ESS setpoint writes), P4 (reactive regulator in the MILP), P5 (balance nodes + attribution)
 * **Session Conclusion:** Phases P1-P2
 * **Migration (`MIGRATION.md`):** Phases P1-P7
+* **Early-start scheduling (`EarlyStart`, 2.7):** P0 (always-on duration, event + punctuality recording), P1 (early start on by default: lead estimator + split cycle, commit at tick)
 
 ## 5. Commit & Chat Syntax
 
