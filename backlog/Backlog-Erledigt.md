@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Chart 1 SoC vs Zwangsladen/Zwangsentladen underlay time alignment (2026-10-15)
+
+- [x] **Alignment mismatch (time-wise) between SOC line and forced charging / discharging decoration** — **Verified** (2026-10-15, Monitor Chart 1)
+  - Symptom: thick ESS-mode underlay (Zwangsladen / Zwangsentladen) looked shifted vs the visible SoC line (e.g. tomorrow ~18:15).
+  - Cause: underlay followed aggregate `Simulierter SoC (%)` while Chart 1 drew per-ESS `SoC · {label}`; multi-ESS horizon also lagged the controlled battery column by one slot (start-of-slot written back into `soc_by_ess`).
+  - Fix: underlay resolves the Steuerbefehl battery via `battery_params` label/id; `_advance_chart_soc_after_slot` uses end-of-slot SoC for the controlled ESS.
+  - Tests: `tests/test_ess_mode_soc_underlay.py` (`test_underlay_follows_controlled_battery_column_not_aggregate`).
+
 ### Bugfix — Metered consumers missing in Sankey + Chart 1 (2026-10-15)
 
 - [x] **Consumption of consumers with provided current power neither shown as Sankey paths nor Chart 1 bars** — **Verified** (2026-10-15, shadow Monitor)

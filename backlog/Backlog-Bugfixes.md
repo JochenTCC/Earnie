@@ -38,7 +38,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Alignment mismatch (time-wise) between SOC line and forced charging / discharging decoration (we had this error already in the past) - check and fix
+- [ ] Check if "Simulierter SOC" is still needed (for Chart 1)
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
