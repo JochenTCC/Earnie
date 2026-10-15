@@ -16,6 +16,7 @@ from runtime_store.persist_paths import (
     flexible_consumer_profiles_file,
     total_consumption_profiles_file,
 )
+from runtime_store.planning_clock import planning_now
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +197,7 @@ def check_and_update_profile_if_new_month() -> None:
     else:
         file_time = os.path.getmtime(profile_path)
         file_date = datetime.fromtimestamp(file_time)
-        current_date = datetime.now()
+        current_date = planning_now()
         
         if file_date.month != current_date.month or file_date.year != current_date.year:
             update_reason = (
@@ -415,7 +416,7 @@ def compute_live_planning_window(now: datetime | None = None):
     tz_name = config.get_planning_timezone()
     tz = ZoneInfo(tz_name)
     if now is None:
-        now = datetime.now(tz)
+        now = planning_now(tz)
     elif now.tzinfo is None:
         raise ValueError(
             "compute_live_planning_window: now muss timezone-aware sein "
@@ -459,7 +460,7 @@ def get_forecast_vectors(market_data) -> Tuple[List[float], List[float], List[di
     Lädt das passende historische Verbrauchsprofil und die PV-Prognose 
     für die NÄCHSTEN 24 STUNDEN (rollierender Horizont ab der aktuellen Stunde).
     """
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now = planning_now().replace(minute=0, second=0, microsecond=0)
     check_and_update_profile_if_new_month()
     target_hours = [now + timedelta(hours=i) for i in range(24)]
     

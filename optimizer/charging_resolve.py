@@ -29,6 +29,7 @@ from settings.ehal_marker_resolve import marker_sens_evcs_connected
 from settings.flexible_consumers import flex_kw_lookup
 from optimizer.charging_urgent import urgent_min_kwh_from_soc
 from optimizer.consumer_power import power_limits_kw
+from runtime_store.planning_clock import planning_now
 
 
 def _cc():
@@ -446,7 +447,7 @@ def _load_open_charging_deadlines() -> dict[str, str]:
         {str(cid): str(dl) for cid, dl in open_raw.items() if dl},
         {},
         plug_cycle_fulfilled=fulfilled,
-        now=datetime.now(),
+        now=planning_now(),
     )
 
 

@@ -357,6 +357,7 @@ def fetch_eu_weather_hourly(start: date, end: date) -> pd.DataFrame:
 def _forecast_days_for_range(start: date, end: date) -> int:
     """Open-Meteo forecast_days covering [start, end)."""
     tz = planning_timezone()
+    # Real clock: Open-Meteo counts forecast_days from the request's real today.
     today = datetime.now(tz).date()
     last_needed = end - timedelta(days=1)
     days_ahead = (last_needed - today).days + 1

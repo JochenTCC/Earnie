@@ -308,3 +308,59 @@ def test_refresh_fetches_from_today_and_merges_cache_history(tmp_path, monkeypat
     by_ts = {row["timestamp"]: row["price_buy"] for row in result}
     assert by_ts[_slot(2026, 9, 27, 0)] == pytest.approx(cached[0]["price_buy"])
     assert by_ts[today] == pytest.approx(90.0)
+
+
+def test_published_cover_end_caps_window_at_last_day_ahead_day():
+    from data.live_price_cache import published_cover_end
+
+    window_end = _slot(2026, 10, 17, 7, 30)
+    # Before the 12:00 publish hour: only today's prices exist.
+    assert published_cover_end(window_end, _slot(2026, 10, 15, 11, 45)) == _slot(
+        2026, 10, 15, 23, 45
+    )
+    # After it: tomorrow's prices.
+    assert published_cover_end(window_end, _slot(2026, 10, 15, 13)) == _slot(
+        2026, 10, 16, 23, 45
+    )
+    # Short window: its own end.
+    short_end = _slot(2026, 10, 15, 20)
+    assert published_cover_end(short_end, _slot(2026, 10, 15, 13)) == short_end
+
+
+def _sunrise_window_case(tmp_path, monkeypatch, *, cached_until: datetime):
+    """Window into D+2 (sunrise horizon); cache fetched after publish up to ``cached_until``."""
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    monkeypatch.setattr(lmp.config, "get_planning_timezone", lambda: "Europe/Vienna")
+    start = _slot(2026, 10, 8, 0)
+    end = _slot(2026, 10, 17, 7, 30)
+    hours = int((cached_until - start).total_seconds() // 3600) + 1
+    live = [p for p in _qh_series(start, hours=hours) if p["timestamp"] <= cached_until]
+    save_live_price_cache(
+        "AT", live, fetched_at=_slot(2026, 10, 15, 12, 45),
+        window_start=start, window_end=cached_until,
+    )
+    with patch.object(lmp, "_runtime_market_zone", return_value="AT"):
+        with patch.object(lmp, "_now_slot", return_value=_slot(2026, 10, 15, 13, 15)):
+            with patch.object(lmp, "awattar_fetch_window", return_value=(start, end)):
+                with patch.object(
+                    lmp, "fetch_energy_charts_prices", side_effect=RuntimeError("net")
+                ) as fetch_ec:
+                    with patch.object(
+                        lmp, "_fetch_awattar_live_fallback", return_value=None
+                    ):
+                        lmp.fetch_live_day_ahead_prices(planning_end=end)
+    return fetch_ec
+
+
+def test_sunrise_window_into_d2_uses_cache_once_tomorrow_is_published(tmp_path, monkeypatch):
+    fetch_ec = _sunrise_window_case(
+        tmp_path, monkeypatch, cached_until=_slot(2026, 10, 16, 23, 45)
+    )
+    fetch_ec.assert_not_called()
+
+
+def test_cache_without_tomorrow_still_refetches_after_publish(tmp_path, monkeypatch):
+    fetch_ec = _sunrise_window_case(
+        tmp_path, monkeypatch, cached_until=_slot(2026, 10, 15, 23, 45)
+    )
+    fetch_ec.assert_called_once()

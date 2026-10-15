@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, time
 
 from integrations import ehal_live
 from settings.ehal_marker_resolve import marker_get_evcs_ready_by_time
+from runtime_store.planning_clock import planning_now
 
 _LOXONE_WEEKDAY_NAMES = {
     "montag": 0,
@@ -41,7 +42,7 @@ def matrix_slot_datetime(matrix: list, index: int) -> datetime:
         if isinstance(row_date, datetime):
             row_date = row_date.date()
         return datetime.combine(row_date, time(hour=hour))
-    return datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
+    return planning_now().replace(hour=hour, minute=0, second=0, microsecond=0)
 
 
 def matrix_charging_anchor(matrix: list) -> datetime | None:

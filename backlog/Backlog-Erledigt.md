@@ -2,6 +2,34 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Heat storage: Live never applied solar-collector heat (2026-10-15)
+
+- [x] **Heat storage: Live never applied solar-collector heat** — **Verified live** (2026-10-15)
+  - Symptom: heat storage appeared never to collect energy via the solar collector on NAS productive.
+  - Cause: Live callers (`_live_store_flex_overlay`, horizon need, observability) never passed `solar_forecast_kw`; planner defaulted to zeros. Year-sim already injected collector yield.
+  - Fix: `resolve_live_collector_solar_kw` (Open-Meteo archive DOY/hour; later horizon path uses forecast irradiance) auto-fills when callers omit solar; wired in `plan_live_store_for_thermal_consumer`.
+  - Tests: `tests/test_collector_irradiance_forecast.py` (resolve); `tests/test_thermal_live_collector_regression.py` (store T rises above setpoint when `solar_forecast_kw=None` + sunny midday + `solar_thermal_area_m2` > 0).
+
+### EarlyStart P1 — adaptive lead, plan for the tick, write at the tick (2026-10-15)
+
+- [x] **EarlyStart P1 — early start on by default** (epic **EarlyStart**; spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) v2) — reduced scope after the NAS dev.57 measurements (cycles 12–19 s, setpoints +8…16 s; outlier +72 s from Open-Meteo/ENTSO-E I/O)
+  - `optimizer/start_scheduler.py` (pure): goal = minimal age of the written setpoints in both directions → lead = clamp(**median** time to plan of the last 96 regular cycles on this platform, **15 s, 90 s**) — start between T−90 s and T−15 s (median minimises mean |ready − T|); < 8 samples → 60 s bootstrap; estimate > 90 s → capped + warning (once per transition). `EARNIE_EARLY_START=on|off` (default `on`, other values fail loud).
+  - `runtime_store/planning_clock.py`: `planning_anchor(T)` / `planning_now()` = max(real now, T). Planning-relevant "now" (slot start/key, planning window, `current_hour`, today's targets, forecast/thermal start, price windows, EV sessions, appliance schedules) reads it; measurements keep the real clock (PV integral, sampler, cons_data, API guards, write timestamps).
+  - `main.py`: daemon starts the regular cycle `lead` before the next tick; `_hold_until_tick` before the first write (no setpoint before T; late plan → write at once, info up to T+90 s, warning beyond); `finalize_closed_interval` + PV delta after the hold; SoC plausibility uses the previous cycle's closed interval. No state projection (owner decision). First cycle after start, out-of-band runs and `off` keep today's behaviour.
+  - Punctuality log: `lead_sec`, `ready_at`, `ready_by_sec`; wake/start delay vs. planned start; log line `Vorlauf … | Plan fertig …`.
+  - Docs: `docs/einrichtung/betrieb.md` § Zyklus-Pünktlichkeit + env table. Tests: `tests/test_start_scheduler.py`, `tests/test_planning_clock.py`, `tests/test_main_early_start.py`, `tests/test_cycle_duration_stats.py`.
+  - Equivalence test `tests/test_early_start_equivalence.py` (full offline cycle, wall clock frozen with `time-machine` — new dev dependency): early start at T−15 s / T−90 s plans and writes exactly what a cycle at T does, for quarter/hour/12:00/midnight/month/New Year/DST ticks. It found and fixed: Open-Meteo `forecast_days` must use the real date (API semantics; a 23:58 cycle asked for one day too few → heat-pump target off by 3 kWh); `MODELED_PROFILE_REF_START` evaluated at import (stale archive year after New Year in a long-running daemon) → `modeled_profile_ref_start()`; `last_full_archive_year` follows the planning date. Known availability difference (not fixed): forecast.solar returns today + tomorrow of the request date, so the cycle just before midnight lacks PV for the day after the tick (synthetic fallback) for one cycle.
+  - Live check on NAS productive: `Pünktlichkeit:` lines should show `Sollwerte +0…2 s` for most ticks; misses cluster at cache-expiry ticks → prefetch follow-up.
+
+### Bugfix — Daemon wait loop drifted ~1 min behind the quarter-hour tick (2026-10-15)
+
+- [x] **Daemon wait loop drifts ~1 min behind the quarter-hour tick** — **Verified live** (2026-10-15)
+  - Symptom (NAS productive `earnie.log`): regular cycles started 66–73 s after the tick (e.g. tick 09:15, `Live-Abfrage gestartet` 09:16:13), so setpoints landed ~1 min late every slot.
+  - Cause: `wait_for_optimize_or_timeout` (`integrations/loxone_request_http.py`) decremented `remaining` only by the sleep chunk; time spent in `on_poll` (`touch_daemon_heartbeat` + `power_interval_sampler.tick`, loads the ~190 KB state JSON each poll) extended the wait (~900 polls × ~0.07–0.1 s ≈ 1 min).
+  - Fix: wait against a monotonic deadline (`clock_fn`, default `time.monotonic`); early wake via Earnie_Request_Optimize unchanged. `wait_until_next_run` passes `clock_fn` through.
+  - Tests: `tests/test_loxone_request_http.py` (`test_wait_on_poll_cost_does_not_extend_total_wait`, `test_wait_early_wake_with_fake_clock`).
+  - Live verification: NAS `runtime/cycle_stats.jsonl` from 11:00 on: `wake_delay_sec` 0.006–0.09 s (2.04 s once) vs. 66–73 s before.
+
 ### Profiling session — main.py optimization cycle (2026-10-15)
 
 - [x] **Make a profiling session for main.py to identify acceleration potentials for optimization cycle**

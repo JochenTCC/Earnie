@@ -14,6 +14,7 @@ import config
 from integrations import ehal_live
 from settings.flexible_consumers import flex_kw_lookup
 from . import profile_manager
+from runtime_store.planning_clock import planning_now
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def _target_from_thermal(
     matrix: list | None,
     cache: dict,
 ) -> float:
-    today = datetime.now().date()
+    today = planning_now().date()
     if target_date != today:
         return _historical_target_kwh(consumer, target_date, matrix, cache)
     from optimizer.thermal_targets import (
@@ -129,7 +130,7 @@ def _target_from_loxone(
 ) -> float:
     cid = consumer["id"]
     loxone_name = consumer.get("loxone_target_kwh_name", "")
-    today = datetime.now().date()
+    today = planning_now().date()
     if loxone_name and target_date == today:
         value = ehal_live.read_generic_value(loxone_name)
         if value is not None and value >= 0:
@@ -150,7 +151,7 @@ def _target_from_loxone_remaining_hours(
 
     cid = consumer["id"]
     loxone_name = marker_get_filter_remaining_hours(consumer)
-    today = datetime.now().date()
+    today = planning_now().date()
     if loxone_name and target_date == today:
         hours = ehal_live.read_generic_value(loxone_name)
         return _loxone_remaining_hours_target_kwh(consumer, hours)
@@ -251,13 +252,13 @@ def resolve_consumer_daily_targets(
                 }
                 for day in dates
             }
-        day = dates[0] if dates else (target_date or datetime.now().date())
+        day = dates[0] if dates else (target_date or planning_now().date())
         return {
             c["id"]: _resolve_single_consumer_daily_target_kwh(c, day, matrix, historical_cache)
             for c in consumers
         }
 
-    day = target_date or datetime.now().date()
+    day = target_date or planning_now().date()
     return {
         c["id"]: _resolve_single_consumer_daily_target_kwh(c, day, None, historical_cache)
         for c in consumers
@@ -273,9 +274,9 @@ def resolve_historical_baseline_targets_kwh(
     cache: dict = {}
     if matrix:
         dates = sorted({row["date"] for row in matrix if row.get("date") is not None})
-        day = dates[0] if dates else (target_date or datetime.now().date())
+        day = dates[0] if dates else (target_date or planning_now().date())
     else:
-        day = target_date or datetime.now().date()
+        day = target_date or planning_now().date()
     return {
         c["id"]: _historical_target_kwh(c, day, matrix, cache)
         for c in consumers

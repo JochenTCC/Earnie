@@ -10,6 +10,7 @@ from .charging_context import (
     charging_schedule_enabled,
     resolve_charging_contexts,
 )
+from runtime_store.planning_clock import planning_now
 
 
 def consumer_column_name(consumer: dict) -> str:
@@ -107,7 +108,7 @@ def resolve_daily_target_kwh(
     ):
         return float(horizon_flex_kwh)
     from data import consumer_targets
-    day = row_date or datetime.now().date()
+    day = row_date or planning_now().date()
     when = ref_datetime or datetime.combine(day, time(12, 0))
     if (
         consumer.get("daily_target_source", "config") == "config"
@@ -283,7 +284,7 @@ def resolve_horizon_consumer_targets_kwh(
         ref_dt = (
             datetime.combine(ref_date, time(12, 0))
             if ref_date is not None
-            else datetime.now()
+            else planning_now()
         )
     if is_flat_target_override(consumer_daily_targets_kwh) and logged_targets_only:
         return {

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +62,20 @@ def cache_covers_window(
     start = normalize_price_slot(window_start)
     end = normalize_price_slot(window_end)
     return first <= start and last >= end
+
+
+def published_cover_end(window_end: datetime, now: datetime) -> datetime:
+    """Last slot a day-ahead series can hold as of ``now`` (capped at ``window_end``).
+
+    Prices exist up to the end of ``last_day_ahead_calendar_date(now)``; a
+    planning window reaching further (sunrise horizon into D+2) can never be
+    covered, so coverage is checked only up to that day's last quarter-hour.
+    """
+    from data.backtesting_prices import last_day_ahead_calendar_date
+
+    last_day = last_day_ahead_calendar_date(now)
+    day_end = datetime.combine(last_day, time(23, 45), tzinfo=now.tzinfo)
+    return min(window_end, day_end)
 
 
 def cache_is_fresh_for_day_ahead(

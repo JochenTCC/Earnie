@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from runtime_store.planning_clock import planning_now
 
 QUARTER_HOUR_MINUTES = 15
 QUARTER_HOUR_SECONDS = QUARTER_HOUR_MINUTES * 60
@@ -20,7 +21,7 @@ APP_MAIN_SYNC_GRACE_SECONDS = APP_MAIN_SYNC_EXTRA_GRACE_SECONDS
 
 def _normalize_now(now: datetime | None) -> datetime:
     if now is None:
-        return datetime.now()
+        return planning_now()
     return now
 
 

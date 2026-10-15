@@ -88,6 +88,7 @@ from runtime_store.file_metadata import (
 )
 
 from runtime_store.persist_paths import consumer_state_file
+from runtime_store.planning_clock import planning_now
 
 CONSUMER_STATE_FILE = consumer_state_file()
 
@@ -177,7 +178,7 @@ def _load_consumer_state(
     charging_contexts: dict[str, dict] | None = None,
     consumers: list | None = None,
 ) -> dict:
-    today = datetime.now().date().isoformat()
+    today = planning_now().date().isoformat()
     consumers_by_id = _consumers_by_id(consumers)
     if not os.path.exists(CONSUMER_STATE_FILE):
         return normalize_consumer_state(
@@ -367,7 +368,7 @@ def _update_plug_cycle_after_delivery(
         dict(state.get("open_charging_deadlines") or {}),
         charging_contexts or {},
         plug_cycle_fulfilled=state["plug_cycle_fulfilled"],
-        now=datetime.now(),
+        now=planning_now(),
     )
 
 

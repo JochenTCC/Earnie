@@ -22,6 +22,7 @@ from optimizer.thermal_house import (
     step_house_hour,
 )
 from optimizer.thermal_model import ThermalBand, capacity_kwh_per_k_from_volume, heat_content_kwh
+from runtime_store.planning_clock import planning_now
 
 logger = logging.getLogger(__name__)
 
@@ -369,7 +370,7 @@ def resolve_live_collector_solar_kw(
 
     profile = _profile_with_geo(house_profile)
     surface = collector_surface_from_thermal(thermal, profile)
-    start_dt = (start or datetime.now()).replace(minute=0, second=0, microsecond=0)
+    start_dt = (start or planning_now()).replace(minute=0, second=0, microsecond=0)
     try:
         wm2 = get_hourly_tilted_irradiance_forecast_wm2(
             horizon=horizon,
@@ -709,7 +710,7 @@ def _plan_live_legacy_ww(
 ) -> LiveHousePlan:
     """Legacy open-loop path (no Wohnfläche): warm water minus collector, netted per day."""
     horizon = len(ambient_forecast_c)
-    start_dt = (start or datetime.now()).replace(minute=0, second=0, microsecond=0)
+    start_dt = (start or planning_now()).replace(minute=0, second=0, microsecond=0)
     solar, solar_source = resolve_live_collector_solar_kw(
         thermal, house_profile, horizon, start=start_dt
     )

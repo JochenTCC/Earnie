@@ -33,6 +33,8 @@ dev = [
     "pytest-xdist>=3.5.0",
     "vulture>=2.11",
     "pytest-deadfixtures>=2.2.1",
+    # EarlyStart equivalence test: freezes the wall clock globally.
+    "time-machine>=3.0",
 ]
 mutation = [
     "mutmut>=2.4.0,<3",

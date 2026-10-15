@@ -8,6 +8,7 @@ from typing import Any
 import pandas as pd
 
 import config
+from runtime_store.planning_clock import planning_now
 
 PRICE_SOURCE_DAY_AHEAD = "day_ahead"
 PRICE_SOURCE_MIRRORED = "mirrored"
@@ -397,9 +398,9 @@ def awattar_fetch_window(planning_end: datetime | None = None) -> tuple[datetime
 
     tz = planning_end.tzinfo if planning_end is not None and planning_end.tzinfo else None
     if tz is not None:
-        now = normalize_quarter_hour_slot(datetime.now(tz))
+        now = normalize_quarter_hour_slot(planning_now(tz))
     else:
-        now = normalize_quarter_hour_slot(datetime.now())
+        now = normalize_quarter_hour_slot(planning_now())
     start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
         days=MAX_MIRROR_LOOKBACK_DAYS
     )

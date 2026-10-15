@@ -17,8 +17,13 @@ from house_config.baseload import consumer_annual_kwh
 from house_config.consumption_csv import consumer_uses_profile_csv, load_hourly_profile_csv
 from house_config.ev_profile import ev_hourly_kw_for_day
 
-MODELED_PROFILE_REF_START = datetime(last_full_archive_year(), 1, 1)
 MODELED_PROFILE_HOURS_PER_YEAR = 8760
+
+
+def modeled_profile_ref_start() -> datetime:
+    """Jan 1 of the reference archive year — per call, so a long-running daemon
+    (and an early-started cycle before New Year) follows the planning year."""
+    return datetime(last_full_archive_year(), 1, 1)
 
 if TYPE_CHECKING:
     from data.modeled_climate import ModeledClimateContext
@@ -51,7 +56,7 @@ def _consumer_id(consumer: dict, fallback_index: int) -> str:
 def _modeled_hour_index(slot_dt: datetime) -> int:
     naive = slot_dt.replace(tzinfo=None) if slot_dt.tzinfo else slot_dt
     return (
-        int((naive - MODELED_PROFILE_REF_START).total_seconds() // 3600)
+        int((naive - modeled_profile_ref_start()).total_seconds() // 3600)
         % MODELED_PROFILE_HOURS_PER_YEAR
     )
 
@@ -154,7 +159,7 @@ def _flat_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
 
 def _modeled_ev_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     hourly = [0.0] * hours
-    start_day = MODELED_PROFILE_REF_START.date()
+    start_day = modeled_profile_ref_start().date()
     for hour_index in range(hours):
         day = start_day + timedelta(days=hour_index // 24)
         day_hourly = ev_hourly_kw_for_day(consumer, day)
@@ -277,7 +282,7 @@ def _modeled_generic_schedule_hourly_kw(consumer: dict, *, hours: int) -> list[f
     from house_config.generic_schedule import generic_hourly_kw_for_day
 
     hourly = [0.0] * hours
-    start_day = MODELED_PROFILE_REF_START.date()
+    start_day = modeled_profile_ref_start().date()
     for hour_index in range(hours):
         day = start_day + timedelta(days=hour_index // 24)
         day_hourly = generic_hourly_kw_for_day(consumer, day)
@@ -289,7 +294,7 @@ def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     if consumer_uses_profile_csv(consumer):
         path = consumer["profile_csv"]
         return [
-            csv_kw_at_datetime(path, MODELED_PROFILE_REF_START + timedelta(hours=i))
+            csv_kw_at_datetime(path, modeled_profile_ref_start() + timedelta(hours=i))
             for i in range(hours)
         ]
     if consumer.get("type") == "ev":

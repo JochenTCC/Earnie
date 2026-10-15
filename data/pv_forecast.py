@@ -7,6 +7,7 @@ from runtime_store.cycle_duration_stats import (
     EVENT_PV_FORECAST_FETCH,
     record_event as record_cycle_event,
 )
+from runtime_store.planning_clock import planning_now
 
 # =========================================================================
 # GLOBALE CACHE-VARIABLEN (Für Rate-Limiting & API-Schonung)
@@ -325,7 +326,7 @@ def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[
 def _generate_seasonal_fallback(target_hours: list, kwp: float) -> list:
     """Generiert eine saisonale Fallback-Prognose."""
     pv_vector = [0.0] * len(target_hours)
-    current_month = datetime.now().month
+    current_month = planning_now().month
 
     if current_month in [11, 12, 1]:
         max_peak = kwp * 0.15
@@ -470,7 +471,7 @@ def get_hourly_pv_forecast() -> List[float]:
     Holt die stündliche PV-Prognose für die nächsten 24 Stunden (ab der aktuellen Stunde).
     Schützt die forecast.solar API durch ein integriertes 15-Minuten-Caching.
     """
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now = planning_now().replace(minute=0, second=0, microsecond=0)
     target_hours = [now + timedelta(hours=i) for i in range(24)]
     return get_hourly_pv_forecast_for_hours(target_hours)
 

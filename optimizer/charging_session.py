@@ -5,6 +5,7 @@ import datetime as dt
 from typing import Any
 
 from .charging_context import charging_schedule_enabled
+from runtime_store.planning_clock import planning_now
 
 SESSION_FULFILL_EPSILON_KWH = 0.05
 
@@ -363,7 +364,7 @@ def normalize_consumer_state(
     Tägliche delivered-Werte nur für Nicht-Session-Verbraucher zurücksetzen.
     charging_sessions bleiben bis zur Deadline erhalten.
     """
-    current = now or dt.datetime.now()
+    current = now or planning_now()
     sessions, fulfilled, open_deadlines = _coerce_flag_maps(raw)
     fulfilled, open_deadlines = _sync_session_flags(
         sessions,

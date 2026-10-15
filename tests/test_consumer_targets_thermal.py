@@ -9,9 +9,8 @@ from data import consumer_targets
 _FIXED_TODAY = date(2026, 7, 11)
 
 
-def _patch_consumer_today(mock_dt):
-    mock_dt.now.return_value = datetime.combine(_FIXED_TODAY, time(12, 0))
-    mock_dt.combine = datetime.combine
+def _patch_consumer_today(mock_now):
+    mock_now.return_value = datetime.combine(_FIXED_TODAY, time(12, 0))
 
 
 def _swimspa() -> dict:
@@ -32,7 +31,7 @@ def _swimspa() -> dict:
     }
 
 
-@patch("data.consumer_targets.datetime")
+@patch("data.consumer_targets.planning_now")
 @patch("optimizer.thermal_targets.resolve_thermal_daily_target_kwh")
 def test_resolve_thermal_source_for_today(mock_resolve, mock_dt):
     _patch_consumer_today(mock_dt)
@@ -63,7 +62,7 @@ def test_resolve_thermal_uses_historical_for_other_dates(mock_historical):
 
 @patch("data.consumer_targets.config.get_flexible_consumers")
 @patch("optimizer.thermal_targets.resolve_thermal_daily_target_kwh")
-@patch("data.consumer_targets.datetime")
+@patch("data.consumer_targets.planning_now")
 def test_resolve_consumer_daily_targets_multi_day_matrix(mock_dt, mock_resolve, mock_consumers):
     _patch_consumer_today(mock_dt)
     mock_consumers.return_value = [_swimspa()]
@@ -80,7 +79,7 @@ def test_resolve_consumer_daily_targets_multi_day_matrix(mock_dt, mock_resolve, 
     mock_resolve.assert_called_once()
 
 
-@patch("data.consumer_targets.datetime")
+@patch("data.consumer_targets.planning_now")
 @patch("optimizer.thermal_targets.resolve_thermal_daily_target_kwh")
 def test_resolve_thermal_qh_matrix_uses_wall_hour_horizon(mock_resolve, mock_dt):
     _patch_consumer_today(mock_dt)

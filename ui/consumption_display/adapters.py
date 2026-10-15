@@ -360,9 +360,9 @@ def _consumer_labels_from_profile(profile: dict) -> dict[str, str]:
 def _hourly_timestamps(hours: int) -> list[str]:
     from datetime import timedelta
 
-    from data.consumption_profiles import MODELED_PROFILE_REF_START
+    from data.consumption_profiles import modeled_profile_ref_start
 
-    start = MODELED_PROFILE_REF_START
+    start = modeled_profile_ref_start()
     return [
         (start + timedelta(hours=index)).strftime("%Y-%m-%d %H:%M:%S")
         for index in range(hours)

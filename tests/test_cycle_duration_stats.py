@@ -163,3 +163,39 @@ def test_outdoor_forecast_cache_miss_reports_weather_fetch(runtime, monkeypatch)
             horizon=2, latitude=47.4, longitude=9.7, start=start
         )
         assert stats.events == [EVENT_WEATHER_FETCH]
+
+
+def test_early_start_record_uses_target_tick_and_planned_start():
+    tick = datetime(2026, 10, 15, 13, 0)
+    stats = CycleStats(
+        trigger=TRIGGER_QH,
+        started_at=datetime(2026, 10, 15, 12, 59, 0, 300000),
+        woke_at=datetime(2026, 10, 15, 12, 59, 0, 100000),
+        tick=tick,
+        lead_sec=60.0,
+    )
+    stats.mark_ready(datetime(2026, 10, 15, 12, 59, 20))
+    stats.mark_writes_done(datetime(2026, 10, 15, 13, 0, 0, 500000))
+    row = stats.to_record(
+        outcome=OUTCOME_OK, finished_at=datetime(2026, 10, 15, 13, 0, 4), version="t"
+    )
+    assert row["tick"].startswith("2026-10-15T13:00:00")
+    assert row["lead_sec"] == 60.0
+    assert row["wake_delay_sec"] == pytest.approx(0.1)
+    assert row["start_delay_sec"] == pytest.approx(0.3)
+    assert row["ready_by_sec"] == pytest.approx(-40.0)
+    assert row["late_by_sec"] == pytest.approx(0.5)
+    assert row["on_time"] is True
+
+
+def test_early_start_punctuality_line_shows_lead_and_ready(runtime, caplog):
+    tick = datetime.now().replace(second=0, microsecond=0) + timedelta(minutes=1)
+    with caplog.at_level(logging.INFO, logger="cycle_stats"):
+        with cycle_stats_session(
+            trigger=TRIGGER_QH, version="t", tick=tick, lead_sec=60.0
+        ):
+            stats_mod.mark_ready()
+            mark_writes_done()
+    line = next(r.getMessage() for r in caplog.records if "Pünktlichkeit" in r.getMessage())
+    assert "Vorlauf 60 s" in line
+    assert "Plan fertig" in line

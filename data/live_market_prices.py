@@ -21,6 +21,7 @@ from data.live_price_cache import (
     load_live_price_cache,
     merge_live_price_series,
     network_fetch_start,
+    published_cover_end,
     save_live_price_cache,
     trim_live_price_series,
 )
@@ -31,6 +32,7 @@ from runtime_store.cycle_duration_stats import (
     EVENT_DAY_AHEAD_FETCH,
     record_event as record_cycle_event,
 )
+from runtime_store.planning_clock import planning_now
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ def _planning_tz() -> ZoneInfo:
 
 def _now_slot(planning_end: datetime | None) -> datetime:
     tz = planning_end.tzinfo if planning_end is not None else _planning_tz()
-    return normalize_quarter_hour_slot(datetime.now(tz))
+    return normalize_quarter_hour_slot(planning_now(tz))
 
 
 def _dataframe_to_live_market_data(df: pd.DataFrame) -> list[dict[str, Any]]:
@@ -114,10 +116,13 @@ def _try_cached_live(
     if cached is None:
         return None
     cover_start = window_start if require_fresh else now
+    # Fresh path: prices beyond the last published day-ahead date do not exist
+    # yet, so a sunrise window into D+2 must not force a fetch every cycle.
+    cover_end = published_cover_end(window_end, now) if require_fresh else window_end
     if not cache_covers_window(
         cached["prices"],
         cover_start,
-        window_end,
+        cover_end,
         fallback_tz=_planning_tz(),
     ):
         return None

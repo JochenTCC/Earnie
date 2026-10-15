@@ -10,6 +10,7 @@ from typing import Any
 import config
 from data.planning_window import align_to_planning_timezone
 from runtime_store.persist_paths import runtime_path
+from runtime_store.planning_clock import planning_now
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ def remove_schedule(appliance_id: str) -> None:
 def purge_expired(now: datetime | None = None) -> dict[str, dict[str, Any]]:
     """Entfernt abgelaufene Pläne; gibt verbleibende Schedules zurück."""
     current = align_to_planning_timezone(
-        now or datetime.now().astimezone(), config.get_planning_timezone()
+        now or planning_now().astimezone(), config.get_planning_timezone()
     )
     schedules = load_schedules()
     kept: dict[str, dict[str, Any]] = {}

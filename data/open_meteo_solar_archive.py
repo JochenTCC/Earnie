@@ -65,7 +65,9 @@ def irradiance_wm2_to_thermal_kwh(
 def last_full_archive_year(*, reference: date | None = None) -> int:
     """Letztes vollständiges Archiv-Kalenderjahr (z. B. 2025 bei Referenz 2026-07-13)."""
     if reference is None:
-        reference = date.today()
+        from runtime_store.planning_clock import planning_now
+
+        reference = planning_now().date()
     return reference.year - 1
 
 

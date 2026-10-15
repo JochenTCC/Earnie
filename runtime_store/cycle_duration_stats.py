@@ -2,9 +2,12 @@
 
 One JSON line per ``main()`` cycle in ``runtime/cycle_stats.jsonl`` (rolling,
 ``RETENTION_DAYS``). Records when the daemon woke up, when the cycle started,
-when setpoints were written (``writes_done_at``) and how late that was against
-the quarter-hour tick of the slot (``late_by_sec``). Data modules report
-network fetches via :func:`record_event`.
+when the plan was ready (``ready_at``, before holding for the tick), when
+setpoints were written (``writes_done_at``) and how late that was against the
+quarter-hour tick of the slot (``late_by_sec``). With early start (P1) the
+cycle starts ``lead_sec`` before its tick; wake/start delays are measured
+against that planned start. Data modules report network fetches via
+:func:`record_event`.
 
 Independent of the env-gated profiling in ``runtime_store.cycle_timing``.
 Spec: ``docs/spec/early-start-scheduling.md`` §5.1, §5.2, §5.6.
@@ -116,16 +119,23 @@ class CycleStats:
     trigger: str
     started_at: datetime
     woke_at: datetime | None = None
-    tick: datetime = field(init=False)
+    tick: datetime | None = None
+    lead_sec: float = 0.0
+    ready_at: datetime | None = None
     writes_done_at: datetime | None = None
     horizon_slots: int | None = None
     events: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        from optimizer.schedule import quarter_hour_slot_start
+        if self.tick is None:
+            from optimizer.schedule import quarter_hour_slot_start
 
-        # Today's mode: the cycle computes for the slot it runs in.
-        self.tick = quarter_hour_slot_start(self.started_at)
+            # No early start: the cycle computes for the slot it runs in.
+            self.tick = quarter_hour_slot_start(self.started_at)
+
+    @property
+    def planned_start(self) -> datetime:
+        return self.tick - timedelta(seconds=self.lead_sec)
 
     @property
     def regular(self) -> bool:
@@ -134,6 +144,9 @@ class CycleStats:
     def note_event(self, name: str) -> None:
         if name not in self.events:
             self.events.append(name)
+
+    def mark_ready(self, at: datetime | None = None) -> None:
+        self.ready_at = at or datetime.now()
 
     def mark_writes_done(self, at: datetime | None = None) -> None:
         self.writes_done_at = at or datetime.now()
@@ -147,13 +160,16 @@ class CycleStats:
             "tick": _iso(self.tick),
             "trigger": self.trigger,
             "outcome": outcome,
+            "lead_sec": self.lead_sec,
             "woke_at": _iso(self.woke_at),
             "started_at": _iso(self.started_at),
+            "ready_at": _iso(self.ready_at),
             "writes_done_at": _iso(self.writes_done_at),
             "finished_at": _iso(finished_at),
-            "wake_delay_sec": _seconds(self.woke_at, self.tick),
-            "start_delay_sec": _seconds(self.started_at, self.tick),
+            "wake_delay_sec": _seconds(self.woke_at, self.planned_start),
+            "start_delay_sec": _seconds(self.started_at, self.planned_start),
             "duration_sec": _seconds(finished_at, self.started_at),
+            "ready_by_sec": _seconds(self.ready_at, self.tick),
             "late_by_sec": late_by,
             "on_time": on_time,
             "events": list(self.events),
@@ -168,6 +184,13 @@ def record_event(name: str) -> None:
     stats = _active.get()
     if stats is not None:
         stats.note_event(name)
+
+
+def mark_ready() -> None:
+    """Plan computed; the cycle may now hold until its tick before writing."""
+    stats = _active.get()
+    if stats is not None:
+        stats.mark_ready()
 
 
 def mark_writes_done() -> None:
@@ -189,9 +212,21 @@ def cycle_stats_session(
     version: str,
     woke_at: datetime | None = None,
     cold_start: bool = False,
+    tick: datetime | None = None,
+    lead_sec: float = 0.0,
 ) -> Iterator[CycleStats]:
-    """Track one ``main()`` cycle and append its record when it ends."""
-    stats = CycleStats(trigger=trigger, started_at=datetime.now(), woke_at=woke_at)
+    """Track one ``main()`` cycle and append its record when it ends.
+
+    ``tick`` is the slot start an early-started cycle plans for (``None``: the
+    slot the cycle starts in); ``lead_sec`` is how early it was scheduled.
+    """
+    stats = CycleStats(
+        trigger=trigger,
+        started_at=datetime.now(),
+        woke_at=woke_at,
+        tick=tick,
+        lead_sec=float(lead_sec),
+    )
     if cold_start:
         stats.note_event(EVENT_COLD_START)
     token = _active.set(stats)
@@ -293,10 +328,14 @@ def _log_cycle(record: dict) -> None:
             record["outcome"],
         )
         return
-    parts = [
-        f"Tick {record['tick'][11:16]}",
+    parts = [f"Tick {record['tick'][11:16]}"]
+    lead = float(record.get("lead_sec") or 0.0)
+    if lead > 0:
+        parts.append(f"Vorlauf {lead:.0f} s")
+    parts += [
         f"Weckzeit {_fmt_sec(record['wake_delay_sec'])}",
         f"Start {_fmt_sec(record['start_delay_sec'])}",
+        f"Plan fertig {_fmt_sec(record.get('ready_by_sec'))}",
         f"Sollwerte {_fmt_sec(record['late_by_sec'])}",
         f"Dauer {float(record['duration_sec'] or 0.0):.0f} s",
     ]

@@ -34,6 +34,12 @@ from optimizer.thermal_targets import (
     thermal_horizon_hours_from_slots,
 )
 from optimizer.thermal_live_store import collect_heat_storage_observability
+from optimizer.start_scheduler import (
+    LEAD_MAX_SEC,
+    decide_lead,
+    early_start_enabled,
+    next_regular_start,
+)
 from optimizer.run_trigger import (
     TRIGGER_QUARTER_HOUR,
     TRIGGER_REQUEST_OPTIMIZE,
@@ -44,8 +50,15 @@ import optimizer
 from settings.ehal_marker_resolve import marker_set_evcs_max_current
 from settings.ev_power import ampere_to_kw, ev_nominal_power_conversion
 from version import __version__
+from runtime_store.planning_clock import planning_anchor, planning_now
 
 logger = logging.getLogger("main")
+
+# Closed interval finalized by the previous regular cycle. An early-started cycle
+# plans before its own interval [T-15, T) is closed, so its SoC plausibility
+# check uses [T-30, T-15) (spec early-start-scheduling.md §4).
+_last_closed_interval: dict | None = None
+
 
 
 def main(
@@ -53,33 +66,132 @@ def main(
     *,
     woke_at: datetime | None = None,
     cold_start: bool = False,
+    tick: datetime | None = None,
+    lead_sec: float = 0.0,
 ):
-    with cycle_duration_stats.cycle_stats_session(
+    """One optimization cycle.
+
+    ``tick``: early start (EarlyStart P1) — the cycle runs before this
+    quarter-hour boundary, plans for slot ``[tick, tick+15)`` and writes no
+    setpoint before ``tick``. ``None``: plan for the current slot, write when
+    ready (out-of-band runs, first run after start, ``EARNIE_EARLY_START=off``).
+    """
+    if tick is not None and is_out_of_band_trigger(run_trigger):
+        raise ValueError("Out-of-band runs are never early-started (tick must be None).")
+    with planning_anchor(tick), cycle_duration_stats.cycle_stats_session(
         trigger=run_trigger,
         version=__version__,
         woke_at=woke_at,
         cold_start=cold_start,
+        tick=tick,
+        lead_sec=lead_sec if tick is not None else 0.0,
     ):
         timing = CycleTimer(slot_key=optimization_schedule.quarter_hour_slot_key())
         timing.activate()
         try:
             # One Live store plan (readings + forecast) per cycle: ThermalHorizon P2.
             with live_cycle_scope():
-                _main_cycle(run_trigger, timing)
+                _main_cycle(run_trigger, timing, tick=tick)
         finally:
             timing.finish()
 
 
-def _main_cycle(run_trigger: str, timing: CycleTimer):
+def _finalize_previous_interval() -> dict | None:
+    """Close ``[slot-15, slot)`` of the current (planning) slot in the sampler."""
+    global _last_closed_interval
+    previous_slot = optimization_schedule.quarter_hour_slot_start() - timedelta(
+        minutes=optimization_schedule.QUARTER_HOUR_MINUTES
+    )
+    _last_closed_interval = power_interval_sampler.finalize_closed_interval(previous_slot)
+    return _last_closed_interval
+
+
+def _daemon_wait_poll() -> None:
+    """Heartbeat + power-interval sampler tick while the daemon waits."""
+    from runtime_store.daemon_heartbeat import touch_daemon_heartbeat
+
+    touch_daemon_heartbeat()
+    if power_interval_sampler.tick():
+        from runtime_store.shadow import maybe_flush_after_sampler
+
+        maybe_flush_after_sampler()
+
+
+def _hold_until_tick(
+    tick: datetime,
+    *,
+    poll_interval_sec: float = 1.0,
+    on_poll=_daemon_wait_poll,
+    sleep_fn=time.sleep,
+    clock_fn=time.monotonic,
+    now_fn=datetime.now,
+) -> None:
+    """Block until ``tick`` (real clock) so no setpoint is written before it.
+
+    A plan that is ready only after the tick is written at once (late, as
+    without early start). Later than ``LATE_WARN_SEC`` after the tick →
+    warning, otherwise info.
+    """
+    from optimizer.start_scheduler import LATE_WARN_SEC
+
+    remaining = (tick - now_fn()).total_seconds()
+    if remaining <= 0:
+        late = -remaining
+        level = logging.WARNING if late > LATE_WARN_SEC else logging.INFO
+        logger.log(
+            level,
+            "Plan für %s %.0f s nach dem Takt fertig%s — "
+            "Sollwerte werden sofort geschrieben.",
+            tick.strftime("%H:%M"),
+            late,
+            f" (> {LATE_WARN_SEC:.0f} s)" if late > LATE_WARN_SEC else "",
+        )
+        return
+    logger.info(
+        "Plan für %s fertig — Sollwerte werden in %.0f s zum Takt geschrieben.",
+        tick.strftime("%H:%M"),
+        remaining,
+    )
+    deadline = clock_fn() + remaining
+    while True:
+        left = deadline - clock_fn()
+        if left <= 0:
+            return
+        sleep_fn(min(poll_interval_sec, left))
+        if on_poll is not None:
+            on_poll()
+
+
+def _read_pv_delta(out_of_band: bool) -> float:
+    if out_of_band:
+        pv_delta = pv_tuner.get_pv_delta_peek()
+    else:
+        pv_delta = pv_tuner.get_pv_delta_and_update()
+    if pv_delta is None:
+        logger.warning(
+            "Kein PV-Zähler-Delta verfügbar — cons_data nutzt 0.0 kWh für dieses Intervall."
+        )
+        pv_delta = 0.0
+    logger.info(
+        "PV-Energie-Delta (Integral letztes Intervall): %.3f kWh", pv_delta
+    )
+    return pv_delta
+
+
+def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None = None):
     config.reload_config()
     config.require_runtime_params_loaded()
     out_of_band = is_out_of_band_trigger(run_trigger)
+    early_start = tick is not None
     closed_interval = None
-    if not out_of_band:
-        previous_slot = optimization_schedule.quarter_hour_slot_start() - timedelta(
-            minutes=optimization_schedule.QUARTER_HOUR_MINUTES
-        )
-        closed_interval = power_interval_sampler.finalize_closed_interval(previous_slot)
+    if early_start:
+        # [T-15, T) is still open; finalized after the hold, right before the writes.
+        plausibility_interval = _last_closed_interval
+    elif not out_of_band:
+        closed_interval = _finalize_previous_interval()
+        plausibility_interval = closed_interval
+    else:
+        plausibility_interval = None
 
     if out_of_band:
         logger.info(
@@ -135,20 +247,6 @@ def _main_cycle(run_trigger: str, timing: CycleTimer):
         if not market_data:
             logger.error("Optimierung abgebrochen: Keine Day-Ahead-Preise empfangen.")
             return
-
-        if out_of_band:
-            pv_delta = pv_tuner.get_pv_delta_peek()
-        else:
-            pv_delta = pv_tuner.get_pv_delta_and_update()
-        if pv_delta is None:
-            logger.warning(
-                "Kein PV-Zähler-Delta verfügbar — cons_data nutzt 0.0 kWh für dieses Intervall."
-            )
-            pv_delta = 0.0
-
-        logger.info(
-            "PV-Energie-Delta (Integral letztes Intervall): %.3f kWh", pv_delta
-        )
 
         optimization_matrix = profile_manager.build_live_planning_matrix(
             market_data, planning_window
@@ -229,7 +327,7 @@ def _main_cycle(run_trigger: str, timing: CycleTimer):
             history_raw, reported_soc
         )
         closed_confirms = closed_interval_confirms_reported(
-            closed_interval, reported_soc, prev_logged_soc
+            plausibility_interval, reported_soc, prev_logged_soc
         )
         if closed_confirms:
             consecutive_reported = max(consecutive_reported, 2)
@@ -253,12 +351,12 @@ def _main_cycle(run_trigger: str, timing: CycleTimer):
                 "SoC-Kette verworfen: Miniserver %.1f%% bestätigt durch "
                 "Intervall-Sampler (Start %.1f%% → Ende %.1f%%), Historie war %.1f%%.",
                 reported_soc,
-                float((closed_interval or {}).get("soc_start_percent") or reported_soc),
-                float((closed_interval or {}).get("soc_end_percent") or reported_soc),
+                float((plausibility_interval or {}).get("soc_start_percent") or reported_soc),
+                float((plausibility_interval or {}).get("soc_end_percent") or reported_soc),
                 float(prev_logged_soc),
             )
 
-    current_hour = datetime.now().hour
+    current_hour = planning_now().hour
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)
     if ehal_live.is_ehal_network_backend():
         live_consumers = config.get_flexible_consumers()
@@ -478,6 +576,13 @@ def _main_cycle(run_trigger: str, timing: CycleTimer):
             inbound_export_limit_kw=export_ctx["inbound_export_limit_kw"],
             current_soc_by_id=current_soc_by_id or None,
         )
+    cycle_duration_stats.mark_ready()
+    if early_start:
+        with timing.phase("hold"):
+            _hold_until_tick(tick)
+        closed_interval = _finalize_previous_interval()
+    pv_delta = _read_pv_delta(out_of_band)
+
     with timing.phase("writes"):
         plant_curtail_kw = float((milp_plan or {}).get("p_pv_curtail") or 0.0)
         # Export cap travels only on set_grid_export_power_limit; set_ess_mode stays battery-only.
@@ -896,13 +1001,12 @@ if __name__ == "__main__":
     next_trigger = TRIGGER_QUARTER_HOUR
     cold_start = True
     woke_at: datetime | None = None
-
-    def _wait_poll() -> None:
-        touch_daemon_heartbeat()
-        if power_interval_sampler.tick():
-            from runtime_store.shadow import maybe_flush_after_sampler
-
-            maybe_flush_after_sampler()
+    # Early start (EarlyStart P1): tick + lead of the next regular cycle; None for
+    # the first run after start and after an out-of-band wake.
+    early_start_on = early_start_enabled()
+    pending_tick: datetime | None = None
+    pending_lead_sec = 0.0
+    lead_was_capped = False
 
     while True:
         touch_daemon_heartbeat()
@@ -1031,25 +1135,62 @@ if __name__ == "__main__":
 
             cycle_woke_at, woke_at = woke_at, None
             cycle_cold_start, cold_start = cold_start, False
+            cycle_tick, pending_tick = pending_tick, None
+            if next_trigger != TRIGGER_QUARTER_HOUR or (
+                # Stale after a skipped/failed iteration: plan for the current slot.
+                cycle_tick is not None
+                and datetime.now() >= cycle_tick
+                + timedelta(minutes=optimization_schedule.QUARTER_HOUR_MINUTES)
+            ):
+                cycle_tick = None
             main(
                 run_trigger=next_trigger,
                 woke_at=cycle_woke_at,
                 cold_start=cycle_cold_start,
+                tick=cycle_tick,
+                lead_sec=pending_lead_sec,
             )
             clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
             after_prod_cycle()
 
-            wait_sec = optimization_schedule.seconds_until_next_quarter_hour()
-            next_run = optimization_schedule.next_quarter_hour_datetime()
-            logger.info(
-                "✅ Durchlauf erfolgreich beendet. Nächster regulärer Lauf um %s (in %.0f s).",
-                next_run.strftime("%H:%M:%S"),
-                wait_sec,
+            decision = decide_lead(
+                cycle_duration_stats.load_records(),
+                platform=cycle_duration_stats.platform_info()["id"],
+                enabled=early_start_on,
             )
+            if decision.capped and not lead_was_capped:
+                logger.warning(
+                    "Vorlauf-Schätzung %.0f s > %.0f s (Median der letzten %d Läufe) — "
+                    "Start wird nicht weiter vorverlegt; Sollwerte können zu spät kommen.",
+                    decision.estimate_sec,
+                    LEAD_MAX_SEC,
+                    decision.samples,
+                )
+            lead_was_capped = decision.capped
+            now = datetime.now()
+            next_tick, start_at = next_regular_start(now, decision.lead_sec)
+            wait_sec = max(0.0, (start_at - now).total_seconds())
+            if early_start_on:
+                pending_tick, pending_lead_sec = next_tick, decision.lead_sec
+                logger.info(
+                    "✅ Durchlauf erfolgreich beendet. Nächster regulärer Lauf um %s "
+                    "für den Takt %s (Vorlauf %.0f s, %s; in %.0f s).",
+                    start_at.strftime("%H:%M:%S"),
+                    next_tick.strftime("%H:%M"),
+                    decision.lead_sec,
+                    decision.reason,
+                    wait_sec,
+                )
+            else:
+                logger.info(
+                    "✅ Durchlauf erfolgreich beendet. Nächster regulärer Lauf um %s (in %.0f s).",
+                    start_at.strftime("%H:%M:%S"),
+                    wait_sec,
+                )
             early = wait_until_next_run(
                 total_wait_sec=wait_sec,
-                on_poll=_wait_poll,
+                on_poll=_daemon_wait_poll,
             )
             woke_at = datetime.now()
             next_trigger = resolve_next_trigger(

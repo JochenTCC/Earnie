@@ -1,18 +1,23 @@
 # Early-start scheduling — compute before the tick, commit on the tick
 
-**Status:** Draft (design, not implemented)  
-**Date:** 2026-10-15  
-**Backlog:** epic **EarlyStart** P0–P1 + follow-ups (Version 2.7 in `backlog/Backlog.md`, after the profiling item)  
-**Related:** `docs/spec/quarter-hour-slots.md`, `optimizer/schedule.py`, `runtime_store/cycle_timing.py`, `main.py`
+**Status:** v2 — EarlyStart P0 + P1 implemented (2026-10-15)
+**Date:** 2026-10-15
+**Backlog:** epic **EarlyStart** (P0, P1 → `backlog/Backlog-Erledigt.md`; follow-ups in `backlog/Backlog.md`, Version 2.7)
+**Related:** `docs/spec/quarter-hour-slots.md`, `optimizer/start_scheduler.py`, `runtime_store/planning_clock.py`, `runtime_store/cycle_duration_stats.py`, `main.py`
 
-## 1. Problem
+## 1. Problem and goal
 
-The live cycle in `main.py` starts on the quarter-hour tick (`seconds_until_next_quarter_hour`) and currently takes ~4 min end-to-end. Setpoints therefore reach the backend at ~T+4 min:
+The live cycle used to start on the quarter-hour tick `T`, so setpoints for `[T, T+15)` reached the backend only after the cycle finished. Goal: start each regular cycle so that its plan is ready **at** `T` and write it at `T` — never before. The written setpoints should have **minimal age in both directions**: a plan ready long before `T` is built on old telemetry; a plan ready after `T` leaves the slot on the previous setpoints.
 
-- for ~4 of 15 min (≈27 %) the slot runs on the *previous* cycle's setpoints, planned for a different slot and price;
-- the decision for slot `[T, T+15)` is effectively applied to `[T+4, T+19)` and bleeds into the next slot.
+Measured on the owner NAS (EarlyStart P0 log, 2026-10-15):
 
-Goal: start each regular cycle early enough that the result is ready **before** tick `T`, and apply it **exactly at** `T`. The lead time must adapt to the platform (Raspberry Pi vs. NUC vs. dev PC) and to known expensive events (forecast refreshes, new day-ahead prices).
+| Version | Cycle | Setpoints after `T` | Notes |
+|---------|-------|---------------------|-------|
+| `2.7.0-dev.54` | ~212 s | +3…4 min, plus 66–73 s wake drift | ~810 thermal year simulations per cycle; wait-loop drift bug |
+| `2.7.0-dev.57` | 12–19 s | +8…16 s | wake drift fixed (`wake_delay_sec` < 0.1 s) |
+| `2.7.0-dev.57`, 13:00 | 76 s | +72 s | network only: ENTSO-E 17 s, two Open-Meteo calls 24 s + 22 s |
+
+The remaining lateness is short and dominated by network I/O. P1 therefore keeps the design minimal: an adaptive lead of 15–90 s and **no state projection** to `T` (owner decision 2026-10-15). With ≤ 90 s lead, the SoC read at `T − L` differs from the SoC at `T` by at most ~0.1 kWh at 5 kW.
 
 ## 2. Market facts — is there an official tick?
 
@@ -27,255 +32,148 @@ Yes. The relevant boundary is the start of a quarter-hour delivery period at `hh
 | Timezone | CET/CEST offsets are whole hours, so the quarter-hour grid is identical in UTC and local time. DST days only change the slot count. |
 | Tariff caveat | Some catalog tariffs still settle hourly (`settlement_mtu = "60min"`, see `quarter-hour-slots.md` §3.3). Their *price* changes only at `hh:00`, but the plan grid, meter intervals and battery accounting stay on 15 min. The tick stays the quarter-hour. |
 
-Consequence: the "official tick" is the quarter-hour boundary of the system clock, provided the host is NTP-synchronised. **Early start depends on clock accuracy**; a clock skew check (§7.5) belongs to the design.
+Consequence: the "official tick" is the quarter-hour boundary of the system clock, provided the host is NTP-synchronised. Clock accuracy is a requirement of the quarter-hour operation as a whole, not of early start: the hold (§4) writes at the system-clock tick, exactly like a cycle started on the tick, so a skewed clock shifts both by the same amount. The optional skew measurement (§7) is diagnostics only.
 
-## 3. Current cycle — what is anchored to "now"
+## 3. What is anchored to "now"
 
-Starting the existing cycle earlier is **not** a pure scheduling change. Several steps implicitly assume `now ∈ [T, T+15)`:
+Starting before `T` is not only a scheduling change: many steps derive the slot, hour or day from the clock. Inside an early-started cycle these must refer to `T`, not to the slot the cycle runs in.
 
-| Step (main.py / module) | Assumption today | Impact of early start |
-|-------------------------|------------------|-----------------------|
-| `power_interval_sampler.finalize_closed_interval(previous_slot)` | previous slot `[T-15, T)` is already closed | Slot is still open at `T-L` → wrong or partial interval |
-| `pv_tuner.get_pv_delta_and_update()` | PV meter delta covers the closed interval | Delta would cover a partial interval |
-| `ehal_live.read_ess_soc()` → `current_soc` | SoC at slot start | SoC at `T-L` ≠ SoC at `T` (battery keeps running on old setpoint) |
-| `compute_live_planning_window()` → `quarter_hour_slot_start(now)` | row 0 = current slot | row 0 would be `[T-15, T)` instead of `[T, T+15)` |
-| `current_hour = datetime.now().hour` | hour of current slot | wrong hour at `hh:4x` → `hh+1:00` |
-| live snapshot → `apply_live_snapshot_to_matrix(..., hour_index=0)` | snapshot describes row 0 | still a reasonable persistence forecast for `[T, T+15)`, just 1–4 min older |
-| `writes` phase | setpoints apply immediately | must **not** apply before `T`, otherwise the *current* slot is changed early |
-| `run_state.completed_at` / `schedule.completed_at_in_current_slot` | completion lies inside the slot it was computed for | completion at `T-ε` lands in the previous slot → `app.py` waits / shows stale data |
-| `pv_forecast` 15-min API guard (`_LAST_API_CALL < 15 min`) | runs are exactly 15 min apart | variable lead → spacing occasionally < 15 min → forecast.solar fetch skipped every other run |
+**Planning clock** (`runtime_store/planning_clock.py`): `main()` runs the cycle inside `planning_anchor(T)`. `planning_now(tz)` returns `max(datetime.now(tz), T)` — frozen at `T` until the tick, real time afterwards (a late cycle stays in slot `T`). Outside an anchor it is plain `datetime.now(tz)`.
 
-`compute_live_planning_window(now=...)` already accepts an explicit timestamp, which keeps the anchoring change small.
+| Uses `planning_now` (plans for `T`) | Keeps the real clock (measures) |
+|--------------------------------------|----------------------------------|
+| `schedule._normalize_now` → slot start / slot key / timing key | PV integral (`pv_tuner`) |
+| `compute_live_planning_window`, `current_hour` (`main.py`) | power-interval sampler ticks |
+| day-ahead price window (`awattar_fetch_window`, `_now_slot`) | cons_data samples |
+| daily consumer targets, `optimizer.targets` | API guards / cache TTLs (`pv_forecast` 15-min guard, Open-Meteo cache) |
+| PV forecast target hours, outdoor / tilted irradiance start, price-feature "yesterday", EU market forecast days | write / push timestamps |
+| Live thermal plans (collector irradiance, house plan start) | `run_state` / history timestamps (written after `T`) |
+| EV charging sessions / schedules, appliance schedules, delivery "today" | |
 
-## 4. Design overview
+Rule for new code in the Live path: derive "now" for *planning* from `planning_now()` (or from matrix row 0); use `datetime.now()` only for measurements, timestamps and **external API semantics**. Tests that freeze planning time patch the module's `planning_now`.
 
-Split every regular cycle into three parts with a clear time contract:
+External APIs count from their own (real) today: Open-Meteo `forecast_days` (`outdoor_forecast._required_forecast_days`, `eu_market_features._forecast_days_for_range`) must be computed from the real date, otherwise a cycle at 23:58 for 00:00 requests one day too few and the end of the horizon falls back. Likewise forecast.solar returns today + tomorrow of the request date: a cycle shortly before midnight lacks PV for the day after the tick (synthetic fallback there) — an availability difference of one cycle, not an anchoring error.
 
-```
-            T-L                      T-L+d          T-δ   T                    T+15-L'
- ───────────┬────────────────────────┬──────────────┬────┬──────────────────────┬──────
-            │ PREPARE + SOLVE        │   HOLD       │ CHK│ COMMIT + BOOKKEEPING │ next PREPARE
-            │ (anchored to slot T)   │ (idle/poll)  │    │ (writes, closed int.)│
-```
+Import-time "now" is a bug in a long-running daemon: `consumption_profiles.MODELED_PROFILE_REF_START` (reference archive year) became `modeled_profile_ref_start()` (per call, planning year).
 
-1. **Prepare + solve** (starts at `T - L`): read telemetry, project state to `T`, fetch/refresh inputs, build the matrix with row 0 = `[T, T+15)`, run MILP. Result = a *staged plan* (setpoints + plan + metadata). Nothing is written to the backend.
-2. **Hold**: wait for `T` with the existing `wait_until_next_run` polling (sampler ticks, `Earnie_Request_Optimize`).
-3. **Pre-commit check** (`T - δ`, δ ≈ 2 s): cheap re-read of SoC. If the drift vs. projection exceeds a threshold, or the staged plan is invalid, follow §6.
-4. **Commit at `T`**: execute the `writes` phase with the staged setpoints, then the bookkeeping that needs the closed interval: `finalize_closed_interval([T-15, T))`, `pv_tuner` delta, `cons_data`, `cycle_recorder`, `optimization_history`, `run_state` (with `target_slot = T`).
-
-Out-of-band runs (`TRIGGER_REQUEST_OPTIMIZE`) keep today's behaviour: anchored to the current slot, written immediately.
-
-### 4.1 State projection to T
-
-The plan for `[T, T+15)` needs the SoC at `T`, not at `T-L`:
+## 4. Cycle split
 
 ```
-soc_T = soc_now + (P_ess_measured_kw × η(sign) × (T - now)_h) / capacity_kwh × 100
+      T-L                         ready          T                          end
+ ─────┬───────────────────────────┬──────────────┬──────────────────────────┬────
+      │ PREPARE + SOLVE (for T)   │ HOLD (polls) │ CLOSE + WRITES + PERSIST │
 ```
 
-- `P_ess_measured_kw` from the live telemetry already read for the snapshot (better than the previous plan's setpoint, because it reflects reality incl. limits).
-- Use the existing conversion-loss parameters (`docs/spec/conversion-losses.md`) for η; clamp to [SoC_min, SoC_max] per ESS.
-- Multi-ESS: project `current_soc_by_id` per ESS.
-- Thermal storages and EV SoC: same pattern where a live power reading exists; otherwise no projection (L ≤ a few minutes keeps the error small). Listed explicitly in the implementation backlog, not silently skipped.
+1. **Prepare + solve** from `T − L`: read telemetry, fetch inputs, matrix row 0 = `[T, T+15)`, MILP. Nothing is written.
+2. **Hold** (`main._hold_until_tick`): wait on a monotonic deadline until `T`, with the daemon poll (heartbeat + power-interval sampler). **No setpoint is written before `T`.** If the plan is ready only after `T`, write at once (= behaviour without early start); log INFO, and WARNING when later than `T + 90 s`.
+3. **Close the interval** `[T−15, T)` (`finalize_closed_interval`) and take the PV delta — both need the closed interval, so they run after the hold.
+4. **Writes + persist** as before; `run_state.completed_at` lies after `T`, so `app.py` slot sync is unchanged.
 
-### 4.2 Closed interval and learning data
+SoC plausibility (`closed_interval_confirms_reported`) runs before the solve and therefore uses the interval closed by the previous regular cycle (`[T−30, T−15)`, kept in-process; `None` after a restart). It is a sanity check, not a MILP input.
 
-The bookkeeping that needs `[T-15, T)` closed moves to the commit step. It is I/O-light (file appends), so it does not delay the writes noticeably. The *previous* cycle's closed interval is not needed for the solve itself except for SoC plausibility (`closed_interval_confirms_reported`), which then uses `[T-30, T-15)` plus the live SoC — acceptable, as the plausibility logic is a sanity check, not an input to the MILP.
+Not early-started (behaviour as before P1, `tick=None`): the first cycle after process start, out-of-band runs (`Earnie_Request_Optimize`), `EARNIE_EARLY_START=off`, and an iteration whose pending tick is already a slot old (skipped/failed iteration). An `Earnie_Request_Optimize` during the hold is not polled; it wakes the next wait right after the commit.
 
-## 5. Lead-time estimation (the statistics part)
+## 5. Lead estimation
 
-### 5.1 Always-on duration recording
+### 5.1 Punctuality log (P0, extended in P1)
 
-**Implemented in EarlyStart P0.** `runtime_store/cycle_duration_stats.py` appends one record per `main()` cycle to `runtime/cycle_stats.jsonl` (rolling 7 days, pruned at most once per day). It is independent of the env-gated profiling in `runtime_store/cycle_timing.py` (`EARNIE_CYCLE_TIMING`, phase times): the profiling code can be removed without touching this module. Phase times are a profiling concern; the estimator needs totals, events and punctuality only.
+`runtime_store/cycle_duration_stats.py` appends one record per `main()` cycle to `runtime/cycle_stats.jsonl` (rolling 7 days):
 
 ```json
 {
-  "tick": "2026-10-15T09:15:00.000",
+  "tick": "2026-10-15T13:00:00.000",
   "trigger": "quarter_hour",
   "outcome": "ok",
-  "woke_at": "2026-10-15T09:16:10.204",
-  "started_at": "2026-10-15T09:16:13.020",
-  "writes_done_at": "2026-10-15T09:17:57.410",
-  "finished_at": "2026-10-15T09:19:35.180",
-  "wake_delay_sec": 70.204,
-  "start_delay_sec": 73.02,
-  "duration_sec": 202.16,
-  "late_by_sec": 177.41,
-  "on_time": false,
-  "events": ["weather_fetch"],
-  "horizon_slots": 186,
-  "version": "2.7.0-dev.54",
-  "platform": "3f9c0a1b2d4e"
+  "lead_sec": 15.0,
+  "woke_at": "2026-10-15T12:59:45.005",
+  "started_at": "2026-10-15T12:59:45.017",
+  "ready_at": "2026-10-15T12:59:57.712",
+  "writes_done_at": "2026-10-15T13:00:00.410",
+  "finished_at": "2026-10-15T13:00:04.100",
+  "wake_delay_sec": 0.005,
+  "start_delay_sec": 0.017,
+  "duration_sec": 19.083,
+  "ready_by_sec": -2.288,
+  "late_by_sec": 0.41,
+  "on_time": true,
+  "events": ["pv_forecast_fetch"],
+  "horizon_slots": 169,
+  "version": "2.7.0-dev.58",
+  "platform": "58f9645a66ee"
 }
 ```
 
-- `tick` = start of the slot the cycle computes for (today: the slot it starts in; with EarlyStart P1: the target slot).
-- `outcome`: `ok` (setpoints written), `no_writes` (cycle returned early, e.g. no SoC / no prices), `error` (exception).
-- `platform` = hash of CPU model, CPU count, machine, Python version and MILP solver + version. Hostname is left out (Docker gives each recreated container a new one); the Earnie version is a separate field so the estimator can decide whether an update resets its statistics.
-- MILP status is not recorded in P0; the solver-deadline follow-up (§6.1) adds it where it needs it.
+- `tick` = slot the cycle plans for (early start: the target tick).
+- `wake_delay_sec` / `start_delay_sec` against the planned start `tick − lead_sec`.
+- `ready_by_sec` = plan ready relative to the tick (negative = plan waited, positive = late); `late_by_sec` = setpoints written relative to the tick; `on_time` = `late_by_sec ≤ 2 s`.
+- `platform` = hash of CPU model/count, machine, Python and MILP solver (no hostname).
 
-### 5.2 Events (known causes of slow cycles)
+`earnie.log` gets one line per regular cycle, e.g. `Pünktlichkeit: Tick 13:00 | Vorlauf 15 s | Weckzeit +0 s | Start +0 s | Plan fertig -2 s | Sollwerte +0 s | Dauer 17 s | 24 h: 80/96 pünktlich, P95 +9 s | 7 d: …`.
 
-Each data source reports whether this cycle hit the network or the cache. The scheduler can *predict* most of them for the next run, because the cache TTLs are known:
+### 5.2 Events
 
-| Event | Source | Predictable? |
-|-------|--------|--------------|
-| `pv_forecast_fetch` | `data/pv_forecast.py` (15-min guard, 429 back-off) | yes — last call time + guard |
-| `weather_fetch` | `data/outdoor_forecast.py` (`_CACHE_TTL` 30 min) | yes |
-| `price_feature_refresh` | `data/price_forecast_live.py` (`LIVE_FEATURE_CACHE_TTL_SEC` 45 min) | yes |
-| `day_ahead_refresh` | `data/live_market_prices.py` (new auction ~12:45–13:00, cache staleness) | yes (time window) |
-| `cold_start` | first cycle after process start (imports, caches empty) | yes |
-| `month_rollover` | `profile_manager.check_and_update_profile_if_new_month` | yes |
-| horizon length | sunset horizon varies over the day | yes — `compute_live_planning_window(T)` is cheap |
+Data modules report network fetches on the running cycle: `pv_forecast_fetch`, `weather_fetch`, `price_feature_refresh`, `day_ahead_fetch`, plus `cold_start`. P1 does not use them; they explain outliers and show whether the prefetch (§8) keeps fetches off the critical path.
 
-### 5.3 Estimator
+### 5.3 Estimator (P1, `optimizer/start_scheduler.py`)
 
-Use a **high quantile**, not the mean — the cost of a miss (late setpoints) is higher than the cost of starting a minute too early (slightly older telemetry).
+Objective: minimal age of the setpoints at the tick in both directions, i.e. minimise the mean absolute gap `|ready − T|` over cycles. For a lead `L` and time to plan `d`, `ready − T = d − L`; the `L` that minimises `mean |d − L|` is the **median** of `d`. A high quantile would systematically start too early.
 
-Two stages:
-
-**Stage 1 (simple, robust):**
+Pure function `decide_lead(records, platform=…, enabled=…) → LeadDecision(lead_sec, reason, estimate_sec, samples)`, evaluated after every cycle:
 
 ```
-L = clamp( Q95(duration of last N regular cycles) × (1 + m) + s,  L_min, L_max )
+time_to_plan = ready_at − started_at            (old records: writes_done_at − started_at)
+estimate     = median(time_to_plan of the last 96 regular "ok" cycles on this platform)
+lead         = clamp(⌈estimate⌉, 15 s, 90 s)      → start between T−90 s and T−15 s
 ```
 
-- N = 96 (one day), m = 0.15 relative margin, s = 15 s fixed margin (pre-commit check, writes jitter).
-- Fewer than 8 samples → conservative bootstrap `L = L_max_bootstrap` (e.g. 300 s) — explicit, logged, never silent.
+| Case | Lead | `reason` |
+|------|------|----------|
+| `EARNIE_EARLY_START=off` | 0 (start on the tick) | `off` |
+| < 8 samples on this platform | 60 s (middle of the bounds) | `bootstrap` |
+| estimate < 15 s | 15 s | `min` |
+| 15 s ≤ estimate ≤ 90 s | ⌈estimate⌉ | `median` |
+| estimate > 90 s | 90 s, start not moved further; WARNING once when entering this state | `capped` |
 
-**Stage 2 (event-aware):**
+The 15 s floor (start at the latest at `T − 15 s`) is an owner decision: with the dev.57 NAS times (median ~12.5 s) the floor applies and the plan waits ~2–3 s for the tick on a typical cycle. A plan that is still late is warned about by the hold when it is ready later than `T + 90 s` (§4).
 
-```
-L = base_Q95(horizon bucket) + Σ_e∈predicted_events extra_Q90(e) + s
-```
+`next_regular_start(now, lead)` → `(tick, start_at)`: `tick` = next quarter-hour after `now`; `start_at = max(now, tick − lead)` — a previous cycle that ends inside the lead window starts the next one at once. Lead ≤ 90 s < 15 min, so cycles never overlap.
 
-- `base` = cycles without network events, bucketed by `horizon_slots` (e.g. bins of 24 slots).
-- `extra(e)` = observed duration minus base median for cycles with event `e` (quantile per event).
-- Fallback to Stage 1 per bucket while it has too few samples.
+### 5.4 Dropped: event-aware lead
 
-### 5.4 Continuous re-evaluation and adaptation
+Idea: per-event medians with `will_refresh(at)` from the data modules, so predictable slow cycles (cache expiry, day-ahead auction) start earlier. Dropped 2026-10-15: the prefetch (§8) removes the cache-expiry fetches from the critical path instead of planning around them; the remaining day-ahead fetch after the auction (results ~12:45–13:08) cannot be predicted to the tick; fast cycles sit at the 15 s floor, so a lower per-event lead gains nothing. Revisit only if the punctuality log shows recurring late ticks around the auction after the prefetch.
 
-- The lead is recomputed **after every cycle**, before scheduling the next start.
-- **Fast attack / slow decay:** after a deadline miss, raise `L` immediately to `observed_duration × 1.2 + s`; afterwards let it sink towards the estimator value by at most e.g. 10 s per cycle. Prevents oscillation between "just in time" and "late".
-- **Platform fingerprint:** hash of hostname, CPU count, CPU model, Python version, solver + version, Earnie version. On change, old samples get weight 0 (or are kept but marked) → bootstrap again. Earnie updates can change runtime, so the version is part of it.
-- **Exponential age weighting** (half-life ~2 days) inside the quantile so gradual drifts (more consumers, seasonal horizon) are followed.
+## 6. Configuration
 
-### 5.5 Bounds and guard rails
+| Variable | Values | Default |
+|----------|--------|---------|
+| `EARNIE_EARLY_START` | `on` / `off` (case-insensitive; anything else fails loud at daemon start) | `on` |
 
-| Parameter | Proposal | Reason |
-|-----------|----------|--------|
-| `L_min` | 20 s | pre-commit check + writes |
-| `L_max` | 600 s | beyond that, telemetry is too old; log **warning** "platform too slow for 15-min cycle" and surface it in the UI |
-| sequencing | next start ≥ previous commit + 5 s | a cycle never overlaps the previous one |
-| `L + duration > 15 min` | impossible to hit | fall back to "late mode" (today's behaviour) with a loud warning |
+Bounds (15 s / 90 s), bootstrap (60 s), window (96 cycles) and minimum samples (8) are constants in `optimizer/start_scheduler.py`.
 
-### 5.6 Punctuality log
+## 7. Follow-ups (backlog)
 
-Every regular cycle records how late its setpoints reached the backend, in early-start mode and in today's mode alike:
+- **Prefetch** slow inputs after the commit (§8).
+- **Clock-skew diagnostics** (not part of the epic, §2): estimate the host clock offset from the HTTP `Date` header of requests the cycle already makes (ENTSO-E, Energy-Charts, Open-Meteo; no extra request), using the request/response midpoint and +0.5 s for the truncated 1 s resolution, median over several responses; offset > 2 s → warning with an NTP hint, optional `clock_skew_sec` in the punctuality record. No gate on early start: the punctuality log measures against the host clock and cannot see a skew, and disabling early start would not change the write time.
+- **Cockpit display:** lead, time to plan, gap to tick, on-time rate, capped warning.
 
-- `late_by_sec = committed_at − T` (≤ 0 means on time), `on_time = late_by_sec ≤ tolerance` (proposal: 2 s for write jitter).
-- One log line per cycle, plus a rolling summary (on-time rate, P95 lateness) over 24 h and 7 d.
-
-Today's mode gives the baseline (~0 % on time, ~240 s late). The summary shows whether early start works on a platform (§9). It replaces a separate shadow phase: a miss in early-start mode writes late, which is exactly today's behaviour, so the live run cannot do worse than the baseline.
-
-## 6. Deadline handling and pre-commit check
-
-| Situation at `T` | Action |
-|------------------|--------|
-| plan ready, SoC drift ≤ threshold (e.g. 3 %-pt.) | commit staged plan at `T` |
-| plan ready, drift > threshold | commit staged plan anyway (it is still better than the old one) **and** trigger an out-of-band re-run anchored to `T` |
-| plan not ready | keep the previous setpoints, commit as soon as the solve finishes (= today's behaviour), record `deadline_missed`, fast-attack the lead |
-| `Earnie_Request_Optimize` during HOLD | discard staged plan, run out-of-band immediately (today's behaviour) |
-| solve failed / no prices | as today: log error, no writes |
-
-### 6.1 Solver deadline (optional, strong guarantee)
-
-`optimizer/cbc_solver.py` already supports time limits (strict stage + `gapRel`). The scheduler can pass a deadline `T - δ - now - writes_reserve` to the HiGHS stage so a slow solve returns the best incumbent instead of missing the tick. Only if the status is a feasible incumbent; otherwise the deadline-miss path applies. This must be visible in the log and `milp_status` — not a silent quality drop.
-
-## 7. Affected code (implementation sketch)
-
-### 7.1 `optimizer/schedule.py`
-
-```python
-def next_tick(now: datetime | None = None) -> datetime: ...          # = next_quarter_hour_datetime
-def run_start_for_tick(tick: datetime, lead_sec: float) -> datetime: ...
-def target_slot_for_regular_run(now: datetime, lead_sec: float) -> datetime:
-    """Slot the next regular run computes for (the tick the run will commit on)."""
-```
-
-`completed_at_in_current_slot` gets a sibling that compares a stored `target_slot` key instead of the completion timestamp.
-
-### 7.2 New `optimizer/start_scheduler.py`
-
-```python
-@dataclass(frozen=True)
-class StartDecision:
-    tick: datetime
-    start_at: datetime
-    lead_sec: float
-    reason: str          # "stage1_q95" | "stage2_events" | "bootstrap" | "fast_attack" | "late_mode"
-    predicted_events: tuple[str, ...]
-
-def decide_next_start(now: datetime, stats: DurationStats, *, mode: str) -> StartDecision: ...
-```
-
-Pure function on top of the stats → unit-testable without clock or I/O.
-
-### 7.3 `main.py`
-
-- `_main_cycle` is split into `prepare_and_solve(target_slot) -> StagedPlan` and `commit(staged, closed_interval)`.
-- All `now`-derived anchors in the solve path use `target_slot` (`compute_live_planning_window(now=target_slot)`, `current_hour = target_slot.hour`).
-- Daemon loop: `decision = decide_next_start(...)`; wait until `decision.start_at`; solve; wait until `decision.tick - δ`; check; wait until `tick`; commit; record stats.
-
-### 7.4 Data modules
-
-- `pv_forecast`: replace the "≥ 15 min since last call" guard by "at most one live call per target slot" (or 14 min), so variable start times do not suppress every other fetch.
-- `pv_forecast`, `outdoor_forecast`, `price_forecast_live`, `live_market_prices`: expose `will_refresh(at: datetime) -> bool` and report `fetched_live` per call → events list.
-
-### 7.5 Clock check
-
-On startup and hourly: compare system time with an HTTP `Date` header of an already used endpoint (Energy-Charts / ENTSO-E) or `timedatectl` status on Linux. Skew > 2 s → warning; > 10 s → early start disabled (late mode) until fixed. No silent correction.
-
-### 7.6 `app.py` / UI
-
-- `run_state` stores `target_slot` and `committed_at`; UI sync uses the slot key.
-- Cockpit shows: current lead, last duration, P95, deadline misses (24 h), platform-too-slow warning.
+Dropped with the P1 scope decision: SoC / thermal / EV projection to `T`, pre-commit SoC drift check and re-run, MILP solver deadline (MILP < 1 s on the NAS since dev.57), `target_slot` in `run_state`, `pv_forecast` guard rework (regular runs stay ~15 min apart).
 
 ## 8. Complementary measure: move I/O out of the critical path
 
-Most of the variance comes from network fetches. During the HOLD/idle phase after a commit, a **prefetch** step can refresh the caches that will expire before the next run (`will_refresh(next_start)`). The next solve then sees warm caches, the event surcharge disappears, and `L` shrinks to roughly `base_Q95`. This is independent of early start and can be implemented first if quick wins are wanted.
+With the thermal cost gone, the variance is network I/O (Open-Meteo price features and weather, PV forecast, day-ahead around the auction). During the idle time after a commit, a prefetch step can refresh caches that expire before the next start, so the next solve sees warm caches.
 
-Before tuning either, run one day with `EARNIE_CYCLE_TIMING=1` on the target platform: if ~4 min is dominated by `milp_live`, the solver deadline (§6.1) and model size matter most; if by `prices_matrix`/`ehal_read`, prefetch (§8) is the bigger lever.
+Why it matters with P1: the 13:00 cycle above (start on the tick, +72 s) would still be ~+57 s late with the 15 s lead at the floor. The cache TTLs are multiples of 15 min (`data/outdoor_forecast.py` `_CACHE_TTL` = 30 min, `data/price_forecast_live.py` `LIVE_FEATURE_CACHE_TTL_SEC` = 45 min), so whether a tick hits the cache depends on seconds of start jitter, which the adaptive lead increases. The prefetch needs the next cycle's cache keys (location and forecast days for the weather, hour slots for the price features). It cannot warm the day-ahead fetch around the auction (prices not yet published).
 
-## 9. Rollout
+Fixed alongside P1: the Live day-ahead cache was never used with a sunrise horizon into D+2, because coverage was checked up to the planning end while prices exist only up to D+1 23:45. Coverage is now checked up to `published_cover_end(window_end, now)` (`data/live_price_cache.py`).
 
-`EARNIE_EARLY_START` is a new environment variable (values `on` | `off`). Unset means `on`; `off` = today's behaviour (start on the tick, write when ready).
+## 9. Tests
 
-| Phase | Mode (`EARNIE_EARLY_START`) | Behaviour |
-|-------|-----------------------------|-----------|
-| **EarlyStart P0** | — (variable does not exist yet) | Always-on duration, events and punctuality recording (§5.1, §5.2, §5.6). No scheduling change; records today's baseline. |
-| **EarlyStart P1** | `on` (default) | Lead estimator (§5.3 Stage 1, §5.4, §5.5), split cycle with commit at tick (§3, §4), deadline-miss path (§6), German user docs. Estimator checked by replaying P0 records offline before release. |
-
-No shadow and no gate phase (owner decision 2026-10-15): a missed tick writes late, which is today's behaviour, so early start cannot do worse than now. Success is judged from the punctuality log (§5.6) in `earnie.log`.
-
-Follow-ups (separate backlog items, not phases): event-aware estimator (§5.3 Stage 2, needs `will_refresh(at)` from §7.4), solver deadline (§6.1), prefetch (§8), thermal/EV projection (§4.1), pre-commit SoC drift check (§6), clock-skew check (§7.5), cockpit display (§7.6).
-
-## 10. Tests
-
-- `start_scheduler`: bootstrap, Q95, event surcharges, fast attack / slow decay, bounds, platform change, `L + d > 15 min` → late mode.
-- `schedule`: target slot across `hh:45 → hh+1:00`, midnight, DST switch days (92/100 slots).
-- SoC projection: charge/discharge with η, clamping, multi-ESS.
-- `main` loop with fake clock: commit happens at `T`, not at `ready_at`; out-of-band trigger during HOLD discards the staged plan; deadline miss path writes late and records the miss.
-- `pv_forecast` guard: run spacing of 14:30 min still fetches once per slot.
-- Punctuality log: `late_by_sec` / `on_time` for on-time commit, late commit and out-of-band runs (excluded from the rate); rolling 24 h / 7 d summary.
-- Estimator replay: recorded P0 durations through `decide_next_start` give the expected on-time rate before `on` is switched.
-
-## 11. Open questions
-
-1. SoC drift threshold for the re-run (§6): fixed %-pt. or relative to slot energy?
-2. Should the solver deadline (§6.1) be enabled by default, or only after a miss?
-3. Thermal/EV projection: required for **EarlyStart P1** or acceptable as follow-up?
-4. Where is the ~4 min spent on the target platform? (**EarlyStart P0** data decides between §6.1 and §8 as the first lever.)
+- `tests/test_start_scheduler.py`: env switch, bootstrap, 15 s floor, median estimate (and that it minimises the mean absolute gap), 90 s cap, outlier robustness, record filters, next start (hour rollover, midnight, inside the lead window).
+- `tests/test_planning_clock.py`: frozen at the tick, timezone, past anchor, slot key.
+- `tests/test_main_early_start.py`: hold waits on a monotonic deadline with polls; late plan → no wait, WARNING beyond 90 s; early cycle plans for `T` (`current_hour`, slot key) and runs solve → hold → close interval → writes in that order; no hold without a tick; out-of-band rejects a tick.
+- `tests/test_cycle_duration_stats.py`: tick, lead, ready and delays of early-started records; log line.
+- `tests/test_live_price_cache.py`: published cover end; sunrise window into D+2 served from cache; cache without tomorrow refetches.
+- `tests/test_early_start_equivalence.py` (slow, `time-machine`): **equivalence of the full cycle**. Per boundary tick a seed cycle runs at `T − 15 min`; from copies of that runtime, run A at `T` without early start and runs B at `T − 15 s` / `T − 90 s` with `tick=T`. The wall clock is frozen globally, inputs are deterministic functions of absolute time (`tests/early_start_runner.py`: fake Open-Meteo / forecast.solar / Energy-Charts, fixed telemetry, network blocked, each run a fresh interpreter with its own config copy). Planning window, daily targets, MILP inputs and result, every write call, `run_state` and history row must be identical (run timestamps excluded). Ticks: quarter, hour, 12:00, midnight, month, New Year, DST spring forward, DST fall back. A mutation that ignores the anchor fails all of them. Diagnostics: `EARLY_START_TRACE_CLOCK=1` lists project call sites that read the wall clock directly before the hold.
 
 ## Sources
 

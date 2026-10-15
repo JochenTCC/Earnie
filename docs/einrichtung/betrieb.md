@@ -80,18 +80,30 @@ python -m scripts.summarize_cycle_timing earnie_env/runtime/timing/cycles.jsonl
 
 Einmal-Deploy auf der NAS (lokales Image, Compose-Env): siehe [container.md](container.md) § Live-Zyklus-Profiling (NAS-Einmal-Test).
 
-### Zyklus-Pünktlichkeit (immer aktiv)
+### Zyklus-Pünktlichkeit und Vorlauf (immer aktiv)
 
-Earnie schreibt die Sollwerte für eine Viertelstunde idealerweise genau zu deren Beginn (`hh:00`, `:15`, `:30`, `:45` — dem Takt der 15-Minuten-Strompreise). Ob das gelingt, protokolliert jeder Optimierungslauf — unabhängig vom optionalen Profiling oben:
+Earnie schreibt die Sollwerte für eine Viertelstunde genau zu deren Beginn (`hh:00`, `:15`, `:30`, `:45` — dem Takt der 15-Minuten-Strompreise), **nie früher**. Dazu startet der reguläre Optimierungslauf etwas vor dem Takt (**Vorlauf**), rechnet schon für die kommende Viertelstunde und wartet mit dem Schreiben bis zum Takt.
+
+- **Vorlauf automatisch:** Earnie misst, wie lange die Läufe bis zum fertigen Plan brauchen, und nimmt den **Median** der letzten 96 regulären Läufe (ein Tag). So ist der Plan im Mittel möglichst genau zum Takt fertig — weder lange vorher (sonst wären die Messwerte, auf denen er beruht, alt) noch danach (sonst laufen die alten Sollwerte weiter).
+- **Grenzen:** mindestens **15 s**, höchstens **90 s** — der Lauf startet also frühestens 90 s und spätestens 15 s vor dem Takt. Ohne Messwerte (neue Hardware, < 8 Läufe) gilt 60 s.
+- **Warnungen in `earnie.log`:**
+  - *„Vorlauf-Schätzung … > 90 s — Start wird nicht weiter vorverlegt“*: die Läufe sind auf dieser Hardware zu langsam; Sollwerte kommen dann oft zu spät.
+  - *„Plan für … s nach dem Takt fertig (> 90 s)“*: ein einzelner Lauf war mehr als 90 s zu spät. Kürzere Verspätungen stehen mit demselben Text nur als Info im Log.
+- **Ohne Vorlauf** laufen: der erste Lauf nach dem Start, außerplanmäßige Läufe (`Earnie_Request_Optimize` — sie schreiben sofort) und der Betrieb mit `EARNIE_EARLY_START=off` (siehe [Umgebungsvariablen](#umgebungsvariablen-optional)). Ein `Earnie_Request_Optimize` während der Wartezeit bis zum Takt wird direkt danach ausgeführt.
+- Den aktuellen Zustand (Ladestand, Leistung) liest Earnie zu Beginn des Laufs, also höchstens 90 s vor dem Takt. Er wird nicht auf den Takt hochgerechnet; der Unterschied ist bei so kurzer Zeit vernachlässigbar.
+
+Ob es gelingt, protokolliert jeder Optimierungslauf — unabhängig vom optionalen Profiling oben:
 
 - **`earnie.log`:** eine Zeile pro regulärem Lauf, z. B.
-  `Pünktlichkeit: Tick 09:15 | Weckzeit +70 s | Start +73 s | Sollwerte +177 s | Dauer 202 s | 24 h: 0/96 pünktlich, P95 +240 s | 7 d: …`
-  - *Weckzeit* = wann die Warteschleife geendet hat, *Start* = Beginn des Laufs, *Sollwerte* = wann die Befehle an das Smarthome-Backend gingen, jeweils relativ zum Viertelstundenbeginn.
-  - *pünktlich* = Sollwerte spätestens 2 s nach Viertelstundenbeginn. Außerplanmäßige Läufe (`Earnie_Request_Optimize`) zählen nicht mit.
+  `Pünktlichkeit: Tick 13:00 | Vorlauf 15 s | Weckzeit +0 s | Start +0 s | Plan fertig -2 s | Sollwerte +0 s | Dauer 17 s | 24 h: 80/96 pünktlich, P95 +9 s | 7 d: …`
+  - *Tick* = Viertelstunde, für die der Lauf rechnet; *Vorlauf* = wie viel früher er gestartet wurde.
+  - *Weckzeit* / *Start* = wann die Warteschleife geendet bzw. der Lauf begonnen hat, relativ zum geplanten Start (Tick minus Vorlauf).
+  - *Plan fertig* = wann der Plan stand, relativ zum Tick (negativ = Plan hat auf den Tick gewartet, positiv = zu spät). *Sollwerte* = wann die Befehle an das Smarthome-Backend gingen, relativ zum Tick.
+  - *pünktlich* = Sollwerte spätestens 2 s nach dem Tick. Außerplanmäßige Läufe zählen nicht mit.
   - *Ereignisse* nennt bekannte langsame Schritte des Laufs: `cold_start` (erster Lauf nach Start), `pv_forecast_fetch`, `weather_fetch`, `price_feature_refresh`, `day_ahead_fetch` (Abruf aus dem Netz statt Cache).
-- **`runtime/cycle_stats.jsonl`:** dieselben Werte als eine JSON-Zeile pro Lauf (rollierend 7 Tage), außerdem Horizontlänge, Earnie-Version und eine Plattform-Kennung (CPU, Python, Solver). Grundlage für den späteren automatischen Vorlauf des Optimierungsstarts.
+- **`runtime/cycle_stats.jsonl`:** dieselben Werte als eine JSON-Zeile pro Lauf (rollierend 7 Tage), außerdem Horizontlänge, Earnie-Version und eine Plattform-Kennung (CPU, Python, Solver). Daraus berechnet Earnie den Vorlauf; Läufe auf anderer Hardware zählen nicht mit.
 
-Keine Einstellung nötig; die Datei bleibt lokal.
+Keine Einstellung nötig; die Datei bleibt lokal. Voraussetzung ist eine per NTP synchronisierte Systemuhr (bei NAS/Docker Standard).
 
 ### Cycle-Recorder (Regression R-Rec)
 
@@ -172,7 +184,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `main_stdio.log`                     | **aktiv**                      | stdout/stderr bei UI-/Auto-Start; Rotation bei Spawn (≥ 5 MiB oder Monat, max. 12 Archive) |
 | `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf                     |
 | `live_optimization_debug.json`       | **aktiv**                      | 24h-Anzeige-Snapshot für die Streamlit-App                    |
-| `cycle_stats.jsonl`                  | **aktiv**                      | Dauer und Pünktlichkeit je Optimierungslauf (rollierend 7 Tage), siehe [Zyklus-Pünktlichkeit](#zyklus-pünktlichkeit-immer-aktiv) |
+| `cycle_stats.jsonl`                  | **aktiv**                      | Dauer, Vorlauf und Pünktlichkeit je Optimierungslauf (rollierend 7 Tage), siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv) |
 | `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis von Szenario-Explorer — nicht für Produktiv-NAS   |
 
 
@@ -184,6 +196,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_ENV_PATH`                       | Wurzelverzeichnis für Persistenz (Standard: `earnie_env`). Daraus leiten sich `…/config` und `…/runtime` ab, sofern nicht separat gesetzt. |
 | `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; ältere Ordner: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
 | `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; ältere Ordner: `runtime`). |
+| `EARNIE_EARLY_START`                    | `on` (Standard, auch wenn nicht gesetzt) oder `off`. `on`: reguläre Läufe starten 15–90 s vor dem Viertelstundentakt und schreiben die Sollwerte genau zum Takt; `off`: Lauf startet erst zum Takt und schreibt, sobald er fertig ist. Andere Werte → Fehler beim Start. Siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv). |
 | `EARNIE_SHADOW_FEED_PATH`               | Optional: Verzeichnis für den Prod-Shadow-Feed (sonst `{Config}/shadow_feed/`). Siehe [Shadow-Feed](#shadow-feed-prod-recorder-optional). |
 | `EARNIE_SHADOW`                         | `1` = Shadow-Modus (Dev-Client): Eingänge aus Feed, keine Backend-Schreibzugriffe. Config schreibgeschützt nur bei geteilter Prod-Config; private lokale Config (externer Feed) ist schreibbar. Siehe [Shadow-Modus](#shadow-modus-dev-client). |
 | `EARNIE_SHADOW_MAX_AGE_SEC`             | Max. Alter eines Feed-Eintrags relativ zur Prod-`cycle_ts` (Fallback: Heartbeat; Standard 120). |

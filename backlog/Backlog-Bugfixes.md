@@ -29,18 +29,12 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Fix: `update_target=False` for advance + trigger; collect/learn still refresh the target.
   - Tests: `tests/test_powerstation_2_7_p.py` (`test_advance_and_trigger_preserve_target_kwh`).
 
-- [ ] **Heat storage: Live never applied solar-collector heat** — fix implemented (2026-10-14); NAS productive acceptance pending
-  - Symptom: heat storage appeared never to collect energy via the solar collector on NAS productive.
-  - Cause: Live callers (`_live_store_flex_overlay`, horizon need, observability) never passed `solar_forecast_kw`; planner defaulted to zeros. Year-sim already injected collector yield.
-  - Fix: `resolve_live_collector_solar_kw` (Open-Meteo archive DOY/hour) auto-fills when callers omit solar; wired in `plan_live_store_for_thermal_consumer`.
-  - Tests: **add regression test after live verification** (mock sunny midday profile; assert store T rises above setpoint when `solar_forecast_kw=None` and `solar_thermal_area_m2` > 0).
-
-- [ ] **Daemon wait loop drifts ~1 min behind the quarter-hour tick** — fix implemented (2026-10-15); NAS productive acceptance pending
-  - Symptom (NAS productive `earnie.log`): regular cycles started 66–73 s after the tick (e.g. tick 09:15, `Live-Abfrage gestartet` 09:16:13), so setpoints landed ~1 min late every slot.
-  - Cause: `wait_for_optimize_or_timeout` (`integrations/loxone_request_http.py`) decremented `remaining` only by the sleep chunk; time spent in `on_poll` (`touch_daemon_heartbeat` + `power_interval_sampler.tick`, loads the ~190 KB state JSON each poll) extended the wait (~900 polls × ~0.07–0.1 s ≈ 1 min).
-  - Fix: wait against a monotonic deadline (`clock_fn`, default `time.monotonic`); early wake via Earnie_Request_Optimize unchanged. `wait_until_next_run` passes `clock_fn` through.
-  - Tests: `tests/test_loxone_request_http.py` (`test_wait_on_poll_cost_does_not_extend_total_wait`, `test_wait_early_wake_with_fake_clock`).
-  - Live verification: `wake_delay_sec` in `runtime/cycle_stats.jsonl` (EarlyStart P0) should drop to ~0–2 s for `quarter_hour` cycles.
+- [ ] **Live day-ahead prices re-fetched from ENTSO-E every cycle** — fix implemented (2026-10-15); NAS productive acceptance pending
+  - Symptom (NAS productive `earnie.log`, 2026-10-15): `ENTSO-E AT request …` in every cycle, never `Using cached day-ahead`; `day_ahead_fetch` event in every `cycle_stats.jsonl` record; 4–17 s per cycle in `prices_matrix`.
+  - Cause: `_try_cached_live` required the cache to cover the full planning window; the sunrise horizon reaches into D+2 (e.g. 17.10. 07:30), but day-ahead prices exist at most up to D+1 23:45, so coverage always failed.
+  - Fix: fresh-cache coverage is checked up to `published_cover_end(window_end, now)` (last quarter-hour of `last_day_ahead_calendar_date(now)`); a cache without tomorrow after the publish hour still refetches. Outage path unchanged.
+  - Tests: `tests/test_live_price_cache.py` (`test_published_cover_end_caps_window_at_last_day_ahead_day`, `test_sunrise_window_into_d2_uses_cache_once_tomorrow_is_published`, `test_cache_without_tomorrow_still_refetches_after_publish`).
+  - Live verification: `Using cached day-ahead` in most cycles; `day_ahead_fetch` only around the auction publish (~12:45–13:00) and after restarts.
 
 ## New Bugs (Do not remove this chapter — even if empty)
 

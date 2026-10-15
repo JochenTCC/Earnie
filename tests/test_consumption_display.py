@@ -188,9 +188,9 @@ def test_iso_weeks_in_timestamps_nav_bounds():
 
 
 def test_slice_bundle_for_month():
-    from data.consumption_profiles import MODELED_PROFILE_REF_START
+    from data.consumption_profiles import modeled_profile_ref_start
 
-    month_key = f"{MODELED_PROFILE_REF_START.year}-01"
+    month_key = f"{modeled_profile_ref_start().year}-01"
     bundle = bundle_from_modeled_profile(_sample_profile(), hours=72)
     sliced = slice_bundle_for_month(bundle, month_key)
     assert sliced.hour_count() == 72

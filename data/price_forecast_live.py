@@ -22,6 +22,7 @@ from runtime_store.cycle_duration_stats import (
     record_event as record_cycle_event,
 )
 from runtime_store.persist_paths import resolve_runtime_prefixed_path
+from runtime_store.planning_clock import planning_now
 
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
 MISSING_PRICE_STRATEGY_FORECAST = "forecast"
@@ -177,7 +178,7 @@ def _archive_latest_complete_day() -> date:
         except Exception:
             tz_name = "UTC"
     tz = ZoneInfo(tz_name)
-    return datetime.now(tz).date() - timedelta(days=1)
+    return planning_now(tz).date() - timedelta(days=1)
 
 
 def _archive_covers_slot_range(slot_datetimes: list) -> bool:
