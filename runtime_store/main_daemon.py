@@ -58,6 +58,9 @@ def python_executable() -> str:
     return sys.executable
 
 
+_STDIO_ROTATE_MAX_BYTES = 5 * 1024 * 1024  # 5 MiB
+
+
 def _subprocess_env() -> dict[str, str]:
     root = str(project_root())
     env = os.environ.copy()
@@ -66,6 +69,8 @@ def _subprocess_env() -> dict[str, str]:
             del env[key]
     existing = env.get("PYTHONPATH", "").strip()
     env["PYTHONPATH"] = f"{root}{os.pathsep}{existing}" if existing else root
+    # Child stderr is captured into main_stdio.log — skip console log mirror.
+    env["EARNIE_DAEMON_STDIO_CAPTURE"] = "1"
     return env
 
 
@@ -75,10 +80,48 @@ def _stdio_log_path() -> Path:
     return Path(daemon_stdio_log_file())
 
 
+def _stdio_needs_rotation(path: Path, *, now: float | None = None) -> bool:
+    """True if non-empty stdio log is oversized or from a prior calendar month."""
+    if not path.is_file():
+        return False
+    try:
+        st = path.stat()
+    except OSError:
+        return False
+    if st.st_size <= 0:
+        return False
+    if st.st_size >= _STDIO_ROTATE_MAX_BYTES:
+        return True
+    now_ts = time.time() if now is None else now
+    mtime_lt = time.localtime(st.st_mtime)
+    now_lt = time.localtime(now_ts)
+    return (mtime_lt.tm_year, mtime_lt.tm_mon) != (now_lt.tm_year, now_lt.tm_mon)
+
+
+def _maybe_rotate_stdio_on_spawn(path: Path, *, now: float | None = None) -> bool:
+    """Archive main_stdio.log on size/month; prune to 12 siblings. Returns did_rotate."""
+    from runtime_store.month_file_rotation import (
+        DEFAULT_BACKUP_COUNT,
+        prune_archives,
+        rotate_file,
+        unique_archive_path,
+    )
+
+    if not _stdio_needs_rotation(path, now=now):
+        return False
+    path_str = str(path)
+    when = time.time() if now is None else now
+    dest = unique_archive_path(path_str, when=when)
+    rotate_file(path_str, dest)
+    prune_archives(path_str, DEFAULT_BACKUP_COUNT)
+    return True
+
+
 def _open_daemon_stdio():
     """Append handle for child stdout+stderr; caller closes after Popen."""
     path = _stdio_log_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    _maybe_rotate_stdio_on_spawn(path)
     handle = open(path, "a", encoding="utf-8", newline="\n")
     handle.write(
         f"\n---- main.py spawn {time.strftime('%Y-%m-%d %H:%M:%S')} ----\n"

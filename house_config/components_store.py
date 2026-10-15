@@ -81,7 +81,46 @@ def normalize_components_document(doc: dict) -> dict:
     }
 
 
+# Process-wide mtime memo: abs_path → (file_mtime_ns, shadow, overlay_mtime_ns, doc).
+_components_doc_cache: dict[str, tuple[int, bool, int, dict]] = {}
+
+
+def clear_components_doc_cache() -> None:
+    """Reset components document memo (tests / forced reload)."""
+    _components_doc_cache.clear()
+
+
+def _file_mtime_ns(path: str) -> int:
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return -1
+
+
+def _components_stamp(path: str, *, shadow: bool) -> tuple[int, bool, int]:
+    overlay_mtime = -1
+    if shadow:
+        try:
+            from runtime_store.shadow.ehal_overlay import overlay_path
+
+            overlay_mtime = _file_mtime_ns(overlay_path())
+        except Exception:  # noqa: BLE001 — overlay optional on load path
+            overlay_mtime = -1
+    return (_file_mtime_ns(path), shadow, overlay_mtime)
+
+
 def load_components_document(path: str) -> dict:
+    try:
+        from runtime_store.shadow.mode import is_shadow_config_readonly
+
+        shadow = is_shadow_config_readonly()
+    except Exception:  # noqa: BLE001 — shadow optional
+        shadow = False
+    abs_path = os.path.abspath(path)
+    stamp = _components_stamp(abs_path, shadow=shadow)
+    cached = _components_doc_cache.get(abs_path)
+    if cached is not None and cached[0] == stamp[0] and cached[1] == stamp[1] and cached[2] == stamp[2]:
+        return cached[3]
     doc = _read_json(path)
     if not isinstance(doc, dict):
         raise ValueError("components.json muss ein Objekt sein.")
@@ -102,15 +141,14 @@ def load_components_document(path: str) -> dict:
         "batteries": batteries,
         "pv_systems": pv_systems,
     }
-    try:
-        from runtime_store.shadow.mode import is_shadow_config_readonly
-
-        if is_shadow_config_readonly():
+    if shadow:
+        try:
             from runtime_store.shadow.ehal_overlay import apply_overlay_to_components
 
-            return apply_overlay_to_components(out)
-    except Exception:
-        pass
+            out = apply_overlay_to_components(out)
+        except Exception:
+            pass
+    _components_doc_cache[abs_path] = (*stamp, out)
     return out
 
 
@@ -257,3 +295,4 @@ def save_components_document(path: str, doc: dict) -> None:
         json.dump(serializable, handle, indent=4, ensure_ascii=False)
         handle.write("\n")
     os.replace(tmp, target)
+    clear_components_doc_cache()

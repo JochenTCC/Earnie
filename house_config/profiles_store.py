@@ -581,15 +581,50 @@ def normalize_house_profiles_document(doc: dict) -> dict:
     return out
 
 
+# Process-wide mtime memo: abs_path → (file_mtime_ns, shadow, overlay_mtime_ns, doc).
+_house_profiles_doc_cache: dict[str, tuple[int, bool, int, dict]] = {}
+
+
+def clear_house_profiles_doc_cache() -> None:
+    """Reset house_profiles document memo (tests / forced reload)."""
+    _house_profiles_doc_cache.clear()
+
+
+def _file_mtime_ns(path: str) -> int:
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return -1
+
+
+def _house_profiles_stamp(path: str, *, shadow: bool) -> tuple[int, bool, int]:
+    overlay_mtime = -1
+    if shadow:
+        try:
+            from runtime_store.shadow.ehal_overlay import overlay_path
+
+            overlay_mtime = _file_mtime_ns(overlay_path())
+        except Exception:  # noqa: BLE001 — overlay optional on load path
+            overlay_mtime = -1
+    return (_file_mtime_ns(path), shadow, overlay_mtime)
+
+
 def load_house_profiles_document(path: str) -> dict:
-    doc = normalize_house_profiles_document(_read_json(path))
     from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    if not is_shadow_config_readonly():
-        return doc
-    from runtime_store.shadow.ehal_overlay import apply_overlay_to_house
+    abs_path = os.path.abspath(path)
+    shadow = is_shadow_config_readonly()
+    stamp = _house_profiles_stamp(abs_path, shadow=shadow)
+    cached = _house_profiles_doc_cache.get(abs_path)
+    if cached is not None and cached[0] == stamp[0] and cached[1] == stamp[1] and cached[2] == stamp[2]:
+        return cached[3]
+    doc = normalize_house_profiles_document(_read_json(path))
+    if shadow:
+        from runtime_store.shadow.ehal_overlay import apply_overlay_to_house
 
-    return apply_overlay_to_house(doc)
+        doc = apply_overlay_to_house(doc)
+    _house_profiles_doc_cache[abs_path] = (*stamp, doc)
+    return doc
 
 
 def load_default_house_profiles_doc() -> dict | None:
@@ -661,6 +696,7 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
         json.dump(serializable, handle, indent=4, ensure_ascii=False)
         handle.write("\n")
     os.replace(tmp, target)
+    clear_house_profiles_doc_cache()
 
 
 def _refuse_shadow_config_write(path: str) -> None:

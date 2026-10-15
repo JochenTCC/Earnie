@@ -15,6 +15,12 @@ from runtime_store.month_file_rotation import (
 )
 
 _DEFAULT_BACKUP_COUNT = DEFAULT_BACKUP_COUNT
+_STDIO_CAPTURE_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def _daemon_stdio_capture_enabled() -> bool:
+    raw = os.environ.get("EARNIE_DAEMON_STDIO_CAPTURE", "").strip().lower()
+    return raw in _STDIO_CAPTURE_TRUTHY
 
 
 def configure_utf8_stdio() -> None:
@@ -176,15 +182,14 @@ def setup_logging(log_file="earnie.log", level=logging.INFO):
     )
     file_handler.setLevel(level)
     file_handler.setFormatter(file_formatter)
-
-    # --- 2. CONSOLE HANDLER (Für Live-Ausgabe im Terminal) ---
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(console_formatter)
-
-    # Handler an Root-Logger binden
     root_logger.addHandler(file_handler)
-    root_logger.addHandler(console_handler)
+
+    # --- 2. CONSOLE HANDLER (Terminal only; skip when stderr is main_stdio capture) ---
+    if not _daemon_stdio_capture_enabled():
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(console_formatter)
+        root_logger.addHandler(console_handler)
 
     logging.info(
         "Logging-System initialisiert. Log-Datei: '%s' (monatlich, max %d Archive)",

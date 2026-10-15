@@ -13,7 +13,7 @@ Nur `main.py` steuert die Anlage im Produktivbetrieb (Loxone-/EHAL-Schreibvorgä
 
 Beim Daemon-Start schreibt Earnie **einmal** sichere Sollwerte (ESS Automatik / Freigabe und EVCS aus), bevor der erste Optimierungslauf läuft — auf allen EHAL-Backends (Loxone, HA, OpenEMS). Im Silent-Modus entfällt dieser Schreibvorgang. Silent/Loud stellt ihr unter **Daemon Control → Optimierer-Dienst** um (gespeichert in `runtime/local_settings.json` → `silent_mode`); ein Neustart von `main.py` ist dafür nicht nötig. Zum Überspringen der Safe-Setpoints: `EARNIE_SKIP_SAFE_SETPOINTS_ON_START=1`.
 
-Unter **Optimierer-Dienst → Dienst-Log** zeigt die App den Schluss (Tail) von `runtime/earnie.log` in einem Expander. Die Anzeige aktualisiert sich automatisch alle 10 Sekunden; **Aktualisieren** oben und unten am Log lädt sofort neu. Unten daneben bringt **Gehe nach Oben** zurück zum Anfang des Log-Bereichs. Log-Level (`INFO` / `WARNING` / …) sind filterbar; Standard ist INFO und höher. Bei jedem erfolgreichen Start von `main.py` schreibt Earnie einen klaren Trennstreifen (Separator) mit PID und Version in `earnie.log`, damit Läufe leichter unterscheidbar sind. Startet die UI den Daemon (`EARNIE_AUTO_START_MAIN` oder Neustart-Button), landet die Konsolen-Ausgabe zusätzlich in `runtime/main_stdio.log` (nicht `DEVNULL`) — hilfreich, wenn `earnie.log` ausbleibt.
+Unter **Optimierer-Dienst → Dienst-Log** zeigt die App den Schluss (Tail) von `runtime/earnie.log` in einem Expander. Die Anzeige aktualisiert sich automatisch alle 10 Sekunden; **Aktualisieren** oben und unten am Log lädt sofort neu. Unten daneben bringt **Gehe nach Oben** zurück zum Anfang des Log-Bereichs. Log-Level (`INFO` / `WARNING` / …) sind filterbar; Standard ist INFO und höher. Bei jedem erfolgreichen Start von `main.py` schreibt Earnie einen klaren Trennstreifen (Separator) mit PID und Version in `earnie.log`, damit Läufe leichter unterscheidbar sind. Startet die UI den Daemon (`EARNIE_AUTO_START_MAIN` oder Neustart-Button), landet echte stdout/stderr-Ausgabe in `runtime/main_stdio.log` (nicht `DEVNULL`) — hilfreich bei Startfehlern, bevor File-Logging greift. Das Python-Logging geht dann nur in `earnie.log` (kein Konsolen-Spiegel in `main_stdio.log`). Beim Spawn rotiert Earnie `main_stdio.log` bei ≥ 5 MiB oder Monatswechsel (max. 12 Archive `main_stdio.log.YYYY-MM-DD_HH-MM-SS`).
 
 **Docker (empfohlen):** Ein Container (`earnie`). Die UI startet `main.py` automatisch, wenn `EARNIE_AUTO_START_MAIN=1` gesetzt ist (Standard in den Compose-Dateien).
 
@@ -47,7 +47,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `cons_data_pending.json`        | Pending-Puffer für cons_data-Samples                                                         |
 | `consumption_profiles.csv`      | Berechnete Grundlast-Profile                                                                 |
 | `earnie.log`                    | Rotierendes Python-Log von main.py (absoluter Pfad; monatlich; max. 12 Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`) |
-| `main_stdio.log`                | stdout/stderr des per UI/Auto-Start gestarteten `main.py` (Diagnose, wenn File-Logging fehlt) |
+| `main_stdio.log`                | stdout/stderr des per UI/Auto-Start gestarteten `main.py` (Diagnose bei Startfehlern; Rotation bei Spawn: ≥ 5 MiB oder Monatswechsel, max. 12 Archive `main_stdio.log.YYYY-MM-DD_HH-MM-SS`; Logging nur in `earnie.log`) |
 | `main.lock` / `main.pid`        | Single-Instance-Sperre des Produktiv-Daemons (`main.lock` gehalten; PID zusätzlich in `main.pid` für Status/Stop unter Windows) |
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; monatlich rotiert, max. 12 Archive; u. a. `consumption_snapshot`, optional `closed_interval`) |
@@ -169,7 +169,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | ------------------------------------ | ------------------------------ | ------------------------------------------------------------- |
 | `optimization_history.jsonl`         | **kanonisch**                  | Produktiv-Historie (eine JSON-Zeile pro Optimierungslauf; monatlich, max. 12 Archive `optimization_history.jsonl.YYYY-MM-DD_HH-MM-SS`) |
 | `earnie.log`                         | **aktiv**                      | Rotierendes Python-Log von `main.py` (monatlich, max. 12 Archive) |
-| `main_stdio.log`                     | **aktiv**                      | stdout/stderr bei UI-/Auto-Start von `main.py`                    |
+| `main_stdio.log`                     | **aktiv**                      | stdout/stderr bei UI-/Auto-Start; Rotation bei Spawn (≥ 5 MiB oder Monat, max. 12 Archive) |
 | `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf                     |
 | `live_optimization_debug.json`       | **aktiv**                      | 24h-Anzeige-Snapshot für die Streamlit-App                    |
 | `cycle_stats.jsonl`                  | **aktiv**                      | Dauer und Pünktlichkeit je Optimierungslauf (rollierend 7 Tage), siehe [Zyklus-Pünktlichkeit](#zyklus-pünktlichkeit-immer-aktiv) |

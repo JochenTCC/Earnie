@@ -87,7 +87,7 @@ def test_record_push_tracks_count_interval_and_peer() -> None:
     assert inbox.record_push("ess.house.sens_ess_soc", "55", "10.0.0.5", now=t0) == "new"
     assert inbox.record_push("ess.house.sens_ess_soc", "56", "10.0.0.5", now=t0 + timedelta(seconds=30)) == "ok"
     assert inbox.record_push("ess.house.sens_ess_soc", "56", "10.0.0.5", now=t0 + timedelta(seconds=60)) == "ok"
-    row = inbox.load_inbox()["ess.house.sens_ess_soc"]
+    row = inbox.memory_snapshot()["ess.house.sens_ess_soc"]
     assert row["count"] == 3
     assert row["value"] == 56.0
     assert row["raw"] == "56"
@@ -98,7 +98,7 @@ def test_record_push_tracks_count_interval_and_peer() -> None:
 
 def test_unparseable_value_is_kept_for_inspection() -> None:
     assert inbox.record_push("ess.house.sens_ess_soc", "n/a", "x") == "new"
-    row = inbox.load_inbox()["ess.house.sens_ess_soc"]
+    row = inbox.memory_snapshot()["ess.house.sens_ess_soc"]
     assert row["parse_ok"] is False
     assert row["value"] is None
     assert row["raw"] == "n/a"
@@ -113,7 +113,7 @@ def test_record_push_rejects_bad_input_and_caps_ids(monkeypatch: pytest.MonkeyPa
     assert inbox.record_push("sens_b", "1") == "new"
     assert inbox.record_push("sens_c", "1") == "full"
     assert inbox.record_push("sens_a", "2") == "ok"  # existing IDs keep updating
-    assert set(inbox.load_inbox()) == {"sens_a", "sens_b"}
+    assert set(inbox.memory_snapshot()) == {"sens_a", "sens_b"}
 
 
 def test_staleness_uses_configured_repeat_not_smoothed_gap(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,7 +122,7 @@ def test_staleness_uses_configured_repeat_not_smoothed_gap(monkeypatch: pytest.M
     # Bursts of changes (7 s, 15 s gaps) pull the smoothed interval far below the repeat.
     for offset in (0, 7, 22, 37):
         inbox.record_push("ess.house.sens_ess_soc", "55", now=t0 + timedelta(seconds=offset))
-    row = inbox.load_inbox()["ess.house.sens_ess_soc"]
+    row = inbox.memory_snapshot()["ess.house.sens_ess_soc"]
     assert row["interval_ema_s"] < 20
     last = t0 + timedelta(seconds=37)
     assert not inbox.is_stale(row, now=last + timedelta(seconds=10))  # next repeat is due
@@ -134,11 +134,47 @@ def test_staleness_respects_repeat_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(inbox.REPEAT_ENV, "60")
     t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
     inbox.record_push("ess.house.sens_ess_soc", "55", now=t0)
-    row = inbox.load_inbox()["ess.house.sens_ess_soc"]
+    row = inbox.memory_snapshot()["ess.house.sens_ess_soc"]
     assert not inbox.is_stale(row, now=t0 + timedelta(seconds=170))
     assert inbox.is_stale(row, now=t0 + timedelta(seconds=190))
     monkeypatch.setenv(inbox.REPEAT_ENV, "garbage")
     assert inbox.expected_repeat_s() == inbox.DEFAULT_REPEAT_S
+
+
+def test_record_push_debounces_disk_flush(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rapid pushes update memory immediately but write disk at most once until flush."""
+    writes: list[int] = []
+    real_write = inbox._write_inbox
+
+    def counting_write(rows: dict) -> None:
+        writes.append(len(rows))
+        real_write(rows)
+
+    monkeypatch.setattr(inbox, "_write_inbox", counting_write)
+    # Prevent the Timer(0) from racing the assert; flush explicitly.
+    monkeypatch.setattr(inbox, "_schedule_flush_unlocked", lambda: None)
+
+    t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
+    for i in range(5):
+        inbox.record_push("heartbeat", "1", now=t0 + timedelta(milliseconds=i * 50))
+        inbox.record_push(
+            "ess.house.sens_ess_soc",
+            str(50 + i),
+            now=t0 + timedelta(milliseconds=i * 50 + 10),
+        )
+
+    value, state = inbox.read_push_value("ess.house.sens_ess_soc", now=t0)
+    assert value == 54.0
+    assert state == inbox.STATE_OK
+    assert writes == []
+    assert inbox.load_inbox() == {}
+
+    inbox.flush_inbox_now()
+    assert len(writes) == 1
+    disk = inbox.load_inbox()
+    assert disk == inbox.memory_snapshot()
+    assert disk["ess.house.sens_ess_soc"]["value"] == 54.0
+    assert disk["ess.house.sens_ess_soc"]["count"] == 5
 
 
 def _get(port: int, path: str, headers: dict[str, str] | None = None) -> int:
@@ -178,6 +214,7 @@ def test_endpoint_token_validation_and_storage(monkeypatch: pytest.MonkeyPatch) 
     assert _get(port, alias + "sens_pv_production_active/2.5?t=s3cret") == 204  # alias
     assert _get(port, base + "set_ess_mode/1?t=s3cret") == 400
     assert _get(port, base + "ess.house.sens_ess_soc?t=s3cret") == 400  # no value
+    inbox.flush_inbox_now()
     rows = inbox.load_inbox()
     assert rows["ess.house.sens_ess_soc"]["value"] == 55.0
     assert rows["ess.ecoflow_delta_3.sens_ess_soc"]["value"] == 61.5
@@ -320,6 +357,7 @@ def test_endpoint_accepts_token_in_address_prefix(monkeypatch: pytest.MonkeyPatc
     # older variants still work
     assert _get(port, base + "sens_pv_production_active/1?t=s3cret-token") == 204
     assert _get(port, alias + "heartbeat/1", {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"}) == 204
+    inbox.flush_inbox_now()
     rows = inbox.load_inbox()
     assert rows["ess.house.sens_ess_soc"]["value"] == 56.0  # last alias write
     assert set(rows) == {"ess.house.sens_ess_soc", "sens_pv_production_active", "heartbeat"}

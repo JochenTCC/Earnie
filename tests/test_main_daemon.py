@@ -207,3 +207,99 @@ def test_is_pid_alive_other_alive_process() -> None:
     assert is_pid_alive(os.getpid()) is True
     # Current process must be detected; a very high unused PID must not.
     assert is_pid_alive(2_147_000_000) is False
+
+
+def test_subprocess_env_sets_stdio_capture_flag() -> None:
+    env = main_daemon._subprocess_env()
+    assert env.get("EARNIE_DAEMON_STDIO_CAPTURE") == "1"
+
+
+def test_stdio_rotate_on_spawn_when_oversized(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    path = tmp_path / "main_stdio.log"
+    path.write_bytes(b"x" * (main_daemon._STDIO_ROTATE_MAX_BYTES + 1))
+
+    handle = main_daemon._open_daemon_stdio()
+    try:
+        handle.close()
+    except OSError:
+        pass
+
+    assert path.is_file()
+    text = path.read_text(encoding="utf-8")
+    assert "main.py spawn" in text
+    assert b"x" * 10 not in path.read_bytes()
+    archives = sorted(
+        p for p in tmp_path.iterdir() if p.name.startswith("main_stdio.log.") and p.is_file()
+    )
+    assert len(archives) == 1
+    assert archives[0].stat().st_size == main_daemon._STDIO_ROTATE_MAX_BYTES + 1
+
+
+def test_stdio_append_without_rotate_when_small(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    path = tmp_path / "main_stdio.log"
+    path.write_text("keep-me\n", encoding="utf-8")
+
+    handle = main_daemon._open_daemon_stdio()
+    try:
+        handle.close()
+    except OSError:
+        pass
+
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith("keep-me\n")
+    assert "main.py spawn" in text
+    archives = [
+        p for p in tmp_path.iterdir() if p.name.startswith("main_stdio.log.") and p.is_file()
+    ]
+    assert archives == []
+
+
+def test_stdio_rotate_on_spawn_when_prior_month(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    path = tmp_path / "main_stdio.log"
+    path.write_text("old-month\n", encoding="utf-8")
+    # Force mtime into previous calendar month.
+    now = time.time()
+    lt = time.localtime(now)
+    year, month = lt.tm_year, lt.tm_mon
+    if month == 1:
+        year -= 1
+        month = 12
+    else:
+        month -= 1
+    prior = time.mktime((year, month, 15, 12, 0, 0, -1, -1, -1))
+    os.utime(path, (prior, prior))
+
+    assert main_daemon._maybe_rotate_stdio_on_spawn(path, now=now) is True
+    assert not path.exists() or path.stat().st_size == 0
+    archives = [
+        p for p in tmp_path.iterdir() if p.name.startswith("main_stdio.log.") and p.is_file()
+    ]
+    assert len(archives) == 1
+    assert archives[0].read_text(encoding="utf-8") == "old-month\n"
+
+
+def test_stdio_prune_keeps_max_12_archives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    path = tmp_path / "main_stdio.log"
+    for i in range(12):
+        stamp = f"2025-01-{i + 1:02d}_00-00-00"
+        (tmp_path / f"main_stdio.log.{stamp}").write_text(f"old-{i}\n", encoding="utf-8")
+    path.write_bytes(b"y" * (main_daemon._STDIO_ROTATE_MAX_BYTES + 1))
+
+    assert main_daemon._maybe_rotate_stdio_on_spawn(path) is True
+    archives = sorted(
+        p for p in tmp_path.iterdir() if p.name.startswith("main_stdio.log.") and p.is_file()
+    )
+    assert len(archives) == 12
+    assert not any(p.name.endswith("2025-01-01_00-00-00") for p in archives)

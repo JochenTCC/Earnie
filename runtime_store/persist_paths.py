@@ -397,6 +397,71 @@ def _config_directory_from_env() -> str | None:
     return _config_dir_from_config_path_env(env)
 
 
+# Process-wide memo for sidecar path resolution (skips repeated isfile on bind mounts).
+_sidecar_path_cache: dict[tuple, str] = {}
+
+
+def clear_sidecar_path_cache() -> None:
+    """Reset sidecar path memo (tests / env changes)."""
+    _sidecar_path_cache.clear()
+
+
+def _sidecar_path_cache_key(
+    *,
+    env_suffix: str,
+    filename: str,
+    default_path: str,
+    legacy_basename: str | None,
+    session_root: str | None,
+    sidecar_env: str,
+    install_context: str,
+    config_path_env: str,
+) -> tuple:
+    return (
+        env_suffix,
+        filename,
+        default_path,
+        legacy_basename,
+        session_root,
+        sidecar_env,
+        install_context,
+        config_path_env,
+    )
+
+
+def _resolve_sidecar_json_path_uncached(
+    *,
+    env_suffix: str,
+    filename: str,
+    default_path: str,
+    legacy_basename: str | None,
+    session_root: str | None,
+    sidecar_env: str,
+    install_context: str,
+) -> str:
+    if session_root:
+        return os.path.join(config_dir(), filename)
+    if sidecar_env:
+        return sidecar_env
+    config_directory = _config_directory_from_env()
+    if config_directory and install_context.strip().lower() == "homeassistant_addon":
+        return os.path.join(config_directory, filename)
+    if config_directory:
+        co_located = os.path.join(config_directory, filename)
+        if os.path.isfile(co_located):
+            return co_located
+    if os.path.isfile(default_path):
+        return default_path
+    legacy_in_config = os.path.join(_LEGACY_CONFIG_DIR, filename)
+    if os.path.isfile(legacy_in_config):
+        return legacy_in_config
+    if legacy_basename and os.path.isfile(legacy_basename):
+        return legacy_basename
+    if config_directory:
+        return os.path.join(config_directory, filename)
+    return default_path
+
+
 def _resolve_sidecar_json_path(
     *,
     env_suffix: str,
@@ -417,30 +482,34 @@ def _resolve_sidecar_json_path(
     """
     from runtime_store.cloud_demo import get_session_env_root
 
-    if get_session_env_root():
-        return os.path.join(config_dir(), filename)
-    env = read_env(env_suffix)
-    if env:
-        return env
-    config_directory = _config_directory_from_env()
-    if config_directory and (
-        read_env("INSTALL_CONTEXT").strip().lower() == "homeassistant_addon"
-    ):
-        return os.path.join(config_directory, filename)
-    if config_directory:
-        co_located = os.path.join(config_directory, filename)
-        if os.path.isfile(co_located):
-            return co_located
-    if os.path.isfile(default_path):
-        return default_path
-    legacy_in_config = os.path.join(_LEGACY_CONFIG_DIR, filename)
-    if os.path.isfile(legacy_in_config):
-        return legacy_in_config
-    if legacy_basename and os.path.isfile(legacy_basename):
-        return legacy_basename
-    if config_directory:
-        return os.path.join(config_directory, filename)
-    return default_path
+    session_root = get_session_env_root()
+    sidecar_env = read_env(env_suffix)
+    install_context = read_env("INSTALL_CONTEXT")
+    config_path_env = _effective_config_path_env()
+    key = _sidecar_path_cache_key(
+        env_suffix=env_suffix,
+        filename=filename,
+        default_path=default_path,
+        legacy_basename=legacy_basename,
+        session_root=session_root,
+        sidecar_env=sidecar_env,
+        install_context=install_context,
+        config_path_env=config_path_env,
+    )
+    cached = _sidecar_path_cache.get(key)
+    if cached is not None:
+        return cached
+    resolved = _resolve_sidecar_json_path_uncached(
+        env_suffix=env_suffix,
+        filename=filename,
+        default_path=default_path,
+        legacy_basename=legacy_basename,
+        session_root=session_root,
+        sidecar_env=sidecar_env,
+        install_context=install_context,
+    )
+    _sidecar_path_cache[key] = resolved
+    return resolved
 
 
 def local_settings_file() -> str:

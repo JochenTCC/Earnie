@@ -1,8 +1,11 @@
 """Inbox for Loxone Virtual Output pushes (spike/vo-push-pilot → push-only read path).
 
 The :8541 listener and the optimizer read path share one process (``main.py``).
-``record_push`` updates an in-process cache used by ``read_push_value``; the JSON
-file under ``runtime/`` is for the Streamlit UI (separate process).
+``record_push`` updates an in-process cache used by ``read_push_value`` immediately.
+The JSON file under ``runtime/`` is for the Streamlit UI (separate process) and is
+flushed at most once per second (``INBOX_FLUSH_INTERVAL_S``); the UI may lag up to
+that interval. Call ``flush_inbox_now`` for an immediate durable write (tests /
+shutdown).
 
 A Virtual Output command (repeated, default 10 s) calls
 ``GET /ehal/telemetry/<EHAL-ID>/<value>`` (alias ``/ehal/loxone/telemetry/…``);
@@ -11,12 +14,14 @@ signal this is.
 """
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import math
 import os
 import re
 import threading
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -31,6 +36,7 @@ from runtime_store.persist_paths import runtime_path
 logger = logging.getLogger(__name__)
 
 INBOX_FILENAME = "loxone_push_inbox.json"
+INBOX_FLUSH_INTERVAL_S = 1.0
 MAX_IDS = 200
 MAX_RAW_LEN = 32
 HEARTBEAT_ID = "heartbeat"  # constant non-zero push that proves the Miniserver link
@@ -52,6 +58,9 @@ _lock = threading.Lock()
 _memory: dict[str, dict[str, Any]] = {}
 # Last usable numeric value per ID (for the 5-minute hold on required fields).
 _last_known: dict[str, tuple[float, datetime]] = {}
+_dirty = False
+_flush_timer: threading.Timer | None = None
+_last_flush_mono = 0.0
 
 
 # Plant-flat SoC retired (schema_version 4); push only ess.{id}.sens_ess_soc.
@@ -99,9 +108,57 @@ def load_inbox() -> dict[str, dict[str, Any]]:
     return {str(k): v for k, v in rows.items() if isinstance(v, dict)} if isinstance(rows, dict) else {}
 
 
+def _cancel_flush_timer_unlocked() -> None:
+    global _flush_timer
+    if _flush_timer is not None:
+        _flush_timer.cancel()
+        _flush_timer = None
+
+
+def _schedule_flush_unlocked() -> None:
+    """Arm at most one timer for the next allowed flush (caller holds ``_lock``)."""
+    global _flush_timer
+    if _flush_timer is not None:
+        return
+    if _last_flush_mono <= 0.0:
+        delay = 0.0
+    else:
+        delay = max(0.0, INBOX_FLUSH_INTERVAL_S - (time.monotonic() - _last_flush_mono))
+    timer = threading.Timer(delay, flush_inbox_now)
+    timer.daemon = True
+    _flush_timer = timer
+    timer.start()
+
+
+def _mark_dirty_unlocked() -> None:
+    global _dirty
+    _dirty = True
+    _schedule_flush_unlocked()
+
+
+def flush_inbox_now() -> None:
+    """Write the in-process inbox to disk immediately (tests / shutdown / timer)."""
+    global _dirty, _last_flush_mono
+    with _lock:
+        if not _dirty:
+            return
+        snapshot = {k: dict(v) for k, v in _memory.items()}
+        _dirty = False
+        _cancel_flush_timer_unlocked()
+        _last_flush_mono = time.monotonic()
+    _write_inbox(snapshot)
+    with _lock:
+        if _dirty:
+            _schedule_flush_unlocked()
+
+
 def clear_inbox() -> None:
     """Delete all stored pushes (pilot button)."""
+    global _dirty, _last_flush_mono
     with _lock:
+        _cancel_flush_timer_unlocked()
+        _dirty = False
+        _last_flush_mono = 0.0
         _memory.clear()
         _last_known.clear()
         try:
@@ -113,8 +170,12 @@ def clear_inbox() -> None:
 
 
 def reset_memory_for_tests() -> None:
-    """Clear in-process cache only (unit tests)."""
+    """Clear in-process cache and pending flush state (unit tests)."""
+    global _dirty, _last_flush_mono
     with _lock:
+        _cancel_flush_timer_unlocked()
+        _dirty = False
+        _last_flush_mono = 0.0
         _memory.clear()
         _last_known.clear()
 
@@ -135,7 +196,7 @@ def hydrate_memory_from_disk() -> None:
 def _write_inbox(rows: dict[str, dict[str, Any]]) -> None:
     path = _inbox_path()
     parent = os.path.dirname(path)
-    if parent:
+    if parent and not os.path.isdir(parent):
         os.makedirs(parent, exist_ok=True)
     tmp = f"{path}.tmp"
     raw = json.dumps({"signals": rows}, indent=2, ensure_ascii=False)
@@ -151,6 +212,9 @@ def _write_inbox(rows: dict[str, dict[str, Any]]) -> None:
                 os.remove(tmp)
             except OSError:
                 pass
+
+
+atexit.register(flush_inbox_now)
 
 
 def _shadow_feed_key(ehal_id: str) -> str:
@@ -295,7 +359,7 @@ def record_push(
         _memory[ehal_id] = dict(row)
         if value is not None:
             _last_known[ehal_id] = (float(value), stamp)
-        _write_inbox(rows)
+        _mark_dirty_unlocked()
     _record_push_to_shadow_feed(ehal_id, text, parse_ok=value is not None)
     if is_new:
         logger.info("loxone push inbox: new signal %s (peer %s)", ehal_id, row["peer"])

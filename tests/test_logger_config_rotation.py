@@ -177,3 +177,32 @@ def test_setup_logging_resolves_relative_path(tmp_path: Path, monkeypatch) -> No
         h for h in root.handlers if isinstance(h, logger_config.MonthRotatingFileHandler)
     )
     assert handler.baseFilename == str((tmp_path / "earnie.log").resolve())
+
+
+def test_setup_logging_skips_console_when_stdio_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EARNIE_DAEMON_STDIO_CAPTURE", "1")
+    log_path = tmp_path / "earnie.log"
+    logger_config.setup_logging(log_file=str(log_path), level=logging.INFO)
+    root = logging.getLogger()
+    assert any(isinstance(h, logger_config.MonthRotatingFileHandler) for h in root.handlers)
+    assert not any(isinstance(h, logging.StreamHandler) and not isinstance(
+        h, logger_config.MonthRotatingFileHandler
+    ) for h in root.handlers)
+
+
+def test_setup_logging_keeps_console_without_stdio_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("EARNIE_DAEMON_STDIO_CAPTURE", raising=False)
+    log_path = tmp_path / "earnie.log"
+    logger_config.setup_logging(log_file=str(log_path), level=logging.INFO)
+    root = logging.getLogger()
+    stream_handlers = [
+        h
+        for h in root.handlers
+        if isinstance(h, logging.StreamHandler)
+        and not isinstance(h, logger_config.MonthRotatingFileHandler)
+    ]
+    assert len(stream_handlers) == 1

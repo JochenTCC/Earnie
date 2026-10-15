@@ -137,7 +137,8 @@ def record(
 def _append_jsonl_unlocked(entry: dict[str, Any]) -> None:
     global _jsonl_dirty
     directory = feed_dir()
-    directory.mkdir(parents=True, exist_ok=True)
+    if not directory.is_dir():
+        directory.mkdir(parents=True, exist_ok=True)
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     path = directory / f"feed-{day}.jsonl"
     with path.open("a", encoding="utf-8") as handle:
@@ -146,7 +147,9 @@ def _append_jsonl_unlocked(entry: dict[str, Any]) -> None:
 
 
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    parent = path.parent
+    if not parent.is_dir():
+        parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     text = json.dumps(data, ensure_ascii=False, indent=2, default=str)
     tmp.write_text(text + "\n", encoding="utf-8")

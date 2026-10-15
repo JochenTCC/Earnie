@@ -181,6 +181,7 @@ def test_fetch_hourly_archive_chunk_retries_502(monkeypatch):
 def test_open_meteo_cache_roundtrip(monkeypatch, tmp_path):
     from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
+    archive.clear_open_meteo_bundle_mem_cache()
     install_open_meteo_climate_mock(monkeypatch)
     surface = archive.TiltedSurface(tilt_deg=20.0, azimuth_deg=0.0)
     kwargs = {
@@ -212,7 +213,103 @@ def test_open_meteo_cache_roundtrip(monkeypatch, tmp_path):
     assert len(first.temperature_c) == len(second.temperature_c)
 
 
+def test_open_meteo_mem_cache_skips_read_json(monkeypatch, tmp_path):
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    archive.clear_open_meteo_bundle_mem_cache()
+    install_open_meteo_climate_mock(monkeypatch)
+    surface = archive.TiltedSurface(tilt_deg=20.0, azimuth_deg=0.0)
+    kwargs = {
+        "lat": 48.0,
+        "lon": 10.0,
+        "timezone": "Europe/Berlin",
+        "surfaces": [surface],
+        "cache_dir": tmp_path,
+    }
+    archive.build_open_meteo_climate_bundle(
+        date(2024, 7, 13),
+        date(2024, 7, 13),
+        **kwargs,
+    )
+    archive.clear_open_meteo_bundle_mem_cache()
+    read_count = {"n": 0}
+    original_read = archive.pd.read_json
+
+    def _counting_read(*args, **kwargs):
+        read_count["n"] += 1
+        return original_read(*args, **kwargs)
+
+    monkeypatch.setattr(archive.pd, "read_json", _counting_read)
+    archive.build_open_meteo_climate_bundle(
+        date(2024, 7, 13),
+        date(2024, 7, 13),
+        **kwargs,
+    )
+    assert read_count["n"] == 1
+    archive.build_open_meteo_climate_bundle(
+        date(2024, 7, 13),
+        date(2024, 7, 13),
+        **kwargs,
+    )
+    assert read_count["n"] == 1
+
+
+def test_open_meteo_mem_cache_invalidates_on_mtime(monkeypatch, tmp_path):
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    archive.clear_open_meteo_bundle_mem_cache()
+    install_open_meteo_climate_mock(monkeypatch)
+    surface = archive.TiltedSurface(tilt_deg=20.0, azimuth_deg=0.0)
+    kwargs = {
+        "lat": 48.0,
+        "lon": 10.0,
+        "timezone": "Europe/Berlin",
+        "surfaces": [surface],
+        "cache_dir": tmp_path,
+    }
+    archive.build_open_meteo_climate_bundle(
+        date(2024, 7, 13),
+        date(2024, 7, 13),
+        **kwargs,
+    )
+    path = archive.open_meteo_cache_path(
+        48.0,
+        10.0,
+        "Europe/Berlin",
+        date(2024, 7, 13),
+        date(2024, 7, 13),
+        [surface],
+        cache_dir=tmp_path,
+    )
+    read_count = {"n": 0}
+    original_read = archive.pd.read_json
+
+    def _counting_read(*args, **kwargs):
+        read_count["n"] += 1
+        return original_read(*args, **kwargs)
+
+    monkeypatch.setattr(archive.pd, "read_json", _counting_read)
+    archive.build_open_meteo_climate_bundle(
+        date(2024, 7, 13),
+        date(2024, 7, 13),
+        **kwargs,
+    )
+    assert read_count["n"] == 0
+    # Bump mtime without changing content so mem-cache must re-read.
+    new_mtime = path.stat().st_mtime + 2.0
+    import os
+
+    os.utime(path, (new_mtime, new_mtime))
+    archive.build_open_meteo_climate_bundle(
+        date(2024, 7, 13),
+        date(2024, 7, 13),
+        **kwargs,
+    )
+    assert read_count["n"] == 1
+
+
 def test_open_meteo_cache_read_failure_raises(tmp_path):
+    archive.clear_open_meteo_bundle_mem_cache()
     surface = archive.TiltedSurface(tilt_deg=20.0, azimuth_deg=0.0)
     path = archive.open_meteo_cache_path(
         48.0,

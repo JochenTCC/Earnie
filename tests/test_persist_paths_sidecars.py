@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import runtime_store.persist_paths as persist_paths
 from runtime_store.persist_paths import (
+    clear_sidecar_path_cache,
     resolve_backtesting_log_dir,
     resolve_backtesting_scenarios_json_path,
     resolve_components_json_path,
@@ -14,6 +16,7 @@ from runtime_store.persist_paths import (
 
 
 def test_sidecars_resolve_next_to_config_path(tmp_path, monkeypatch):
+    clear_sidecar_path_cache()
     config_dir = tmp_path / "greenfield" / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "config.json").write_text("{}", encoding="utf-8")
@@ -36,12 +39,39 @@ def test_sidecars_resolve_next_to_config_path(tmp_path, monkeypatch):
     )
 
 
+def test_sidecar_path_cache_skips_repeated_isfile(tmp_path, monkeypatch):
+    clear_sidecar_path_cache()
+    config_dir = tmp_path / "cfg"
+    config_dir.mkdir()
+    (config_dir / "config.json").write_text("{}", encoding="utf-8")
+    (config_dir / "house_profiles.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.delenv("EARNIE_HOUSE_PROFILES_PATH", raising=False)
+    monkeypatch.delenv("EARNIE_INSTALL_CONTEXT", raising=False)
+
+    first = resolve_house_profiles_json_path()
+    assert first == str(config_dir / "house_profiles.json")
+
+    calls = {"n": 0}
+    original = persist_paths.os.path.isfile
+
+    def _counting_isfile(path):
+        calls["n"] += 1
+        return original(path)
+
+    monkeypatch.setattr(persist_paths.os.path, "isfile", _counting_isfile)
+    second = resolve_house_profiles_json_path()
+    assert second == first
+    assert calls["n"] == 0
+
+
 def test_backtesting_log_dir_uses_runtime_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     assert resolve_backtesting_log_dir() == str(tmp_path / "runtime")
 
 
 def test_explicit_sidecar_env_overrides_co_located(tmp_path, monkeypatch):
+    clear_sidecar_path_cache()
     config_dir = tmp_path / "cfg"
     other_dir = tmp_path / "other"
     config_dir.mkdir()
@@ -60,6 +90,7 @@ def test_explicit_sidecar_env_overrides_co_located(tmp_path, monkeypatch):
 def test_sidecar_falls_back_to_default_config_when_missing_beside_config(
     tmp_path, monkeypatch
 ):
+    clear_sidecar_path_cache()
     config_dir = tmp_path / "isolated"
     config_dir.mkdir()
     (config_dir / "config.json").write_text("{}", encoding="utf-8")

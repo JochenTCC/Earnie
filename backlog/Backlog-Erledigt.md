@@ -2,6 +2,42 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Profiling session — main.py optimization cycle (2026-10-15)
+
+- [x] **Make a profiling session for main.py to identify acceleration potentials for optimization cycle**
+  - Instrumentation: `EARNIE_CYCLE_TIMING=1` / `EARNIE_CYCLE_PROFILE=1` → `runtime/timing/cycles.jsonl` (+ optional `runtime/profile/`); docs `betrieb.md` / `container.md` § Live-Zyklus-Profiling; summarize with `python -m scripts.summarize_cycle_timing …`.
+  - NAS window 2026-10-15 (`2.7.0-dev.54`, 7 cycles timed / 2 with cProfile): Ø cycle ≈ 212 s — dominant cost ~810 full-year thermal simulations. Follow-ups shipped: **dev.55** slot-series, **dev.56** year-model memo, **ThermalHorizon P1–P5** (`2.7.0-dev.57`, PR #37). Mid-path NAS sample after dev.55 alone: ~211 s → 54 s.
+  - **Do not** use `EARNIE_CYCLE_PROFILE=1` in production again (Python ≥ 3.12 `sys.monitoring` instruments all threads; slowed Loxone push HTTP ~3× → Miniserver `state=Lesefehler`). Prefer local recorder-cycle replay or py-spy.
+  - Closed with owner decision: remaining NAS re-measure / `thermal_observability` Q_sim vs Q_meas no longer tracked as an open backlog item; further speed-ups live under EarlyStart follow-ups and ad-hoc timing.
+
+### Rotate `main_stdio.log` like `earnie.log` (2026-10-15)
+
+- [x] **Rotate `main_stdio.log` like `earnie.log`:** spawn-time rotation in `runtime_store/main_daemon.py` (`_maybe_rotate_stdio_on_spawn`: ≥ 5 MiB or prior calendar month; archives `main_stdio.log.YYYY-MM-DD_HH-MM-SS`, max 12 via `month_file_rotation`). UI/auto-start sets `EARNIE_DAEMON_STDIO_CAPTURE=1`; `logger_config.setup_logging` skips the console `StreamHandler` so INFO is not mirrored into the capture (prints/tracebacks remain). Docs: `docs/einrichtung/betrieb.md`. Tests: `tests/test_main_daemon.py`, `tests/test_logger_config_rotation.py`.
+
+### Cycle speed-up — batch Loxone push inbox writes (2026-10-15)
+
+- [x] **Cycle speed-up — batch Loxone push inbox writes:** `record_push` keeps `_memory` / `_last_known` synchronous; disk flush of `loxone_push_inbox.json` is debounced (`INBOX_FLUSH_INTERVAL_S` = 1.0, `threading.Timer`, write outside `_lock`); `flush_inbox_now()` for tests/shutdown (`atexit`). Shadow feed JSONL append stays per-push. Daemon `read_push_*` unchanged; UI may lag ≤1 s. Tests: `tests/test_loxone_push_inbox.py` (`test_record_push_debounces_disk_flush`).
+
+### Cycle speed-up — Open-Meteo + config I/O caches (2026-10-15)
+
+- [x] **Cycle speed-up — in-process cache for Open-Meteo climate bundles:** process-wide path+mtime memo in `data/open_meteo_solar_archive.py` (`_load_bundle_from_cache` / `_save_bundle_to_cache`); `clear_open_meteo_bundle_mem_cache()` for tests. Avoids re-`pandas.read_json` across fresh `ModeledClimateContext` / thermal callers (~1269×/cycle before). Tests: `tests/test_open_meteo_solar_archive.py` (mem hit + mtime invalidation).
+- [x] **Cycle speed-up — cache config documents and sidecar path resolution:** `_resolve_sidecar_json_path` memo by env key (`clear_sidecar_path_cache`); mtime/shadow memo for `load_house_profiles_document` and `load_components_document` (save clears); push/shadow writers use mkdir-only-if-missing. Tests: `tests/test_persist_paths_sidecars.py`, `tests/test_config_doc_caches.py`.
+
+### ThermalHorizon P1–P5 — year model for parameters only, horizon in Live (2026-10-15)
+
+- [x] **Thermal horizon simulation — year model once for parameters, horizon only in Live** (epic **ThermalHorizon**; spec [`docs/spec/thermal-horizon-simulation.md`](../docs/spec/thermal-horizon-simulation.md); `2.7.0-dev.57`, PR #37 → `main` `25a1a601`)
+  - **P1:** `optimizer/thermal_parameters.py` — annual WP/RC electric kWh + envelope `H` from last full archive year, memoized; baseload + Live store read it; missing climate fails loud. Owner install `H` 0.110 → 0.069 kW/K (partial-year calibration removed).
+  - **P2:** Live store flex context from `LiveStorePlan`; `optimizer/live_cycle_scope.py` shares one plan per cycle (readings + forecast) across flex / targets / both MILPs.
+  - **P3:** collector irradiance from Open-Meteo `global_tilted_irradiance` (`get_hourly_tilted_irradiance_forecast_wm2`); fallback last year + warning; `collector_solar_source` in observability; user doc `docs/konfiguration/flexible-verbraucher.md`.
+  - **P4:** `plan_live_house_horizon` / `live_house_plan_for_matrix` for Live without storage; legacy no-Wohnfläche = warm water minus forecast collector heat.
+  - **P5:** `tests/test_thermal_live_guard.py` — no year-model calls in Live outside parameter derivation; rejected telemetry no longer drops Live thermal semantics (`is_live_thermal_planning`).
+  - Tests: `tests/test_thermal_parameters.py`, `test_thermal_live_context.py`, `test_thermal_live_house.py`, `test_collector_irradiance_forecast.py`, `test_thermal_live_guard.py`.
+  - NAS re-measure / Q_sim vs Q_meas follow-up closed with the profiling session archive above.
+
+### Cycle speed-up — memoize thermal year models (2026-10-15)
+
+- [x] **Cycle speed-up — memoize the thermal year models:** process-wide LRU `optimizer/thermal_year_cache.py` for `house_year_result` and `thermal_rc` year model (`thermal_rc_hourly_kw_and_temp_from_ambient`). Keys hash full inputs (climate by content; offline fixture by path + mtime); hits return list copies (bit-identical). Shipped as `2.7.0-dev.56` on the ThermalHorizon branch; merged via PR #37. Tests: `tests/test_thermal_year_cache.py`. Local bench: identical outputs; residual baseload cost = climate bundle `read_json` → closed under *Open-Meteo + config I/O caches* above.
+
 ### Cycle speed-up — deploy dev.55 thermal slot-series fix (2026-10-15)
 
 - [x] **Cycle speed-up — deploy dev.55 thermal slot-series fix to the NAS:** `9eb1cbe9` (`modeled_consumer_kw_for_slots`) was not in the profiled image. Live passes `climate=None`, so it removes ~360 of ~810 year simulations (2 × 181 slots in `_slot_aligned_thermal_energy_kwh`). Expected ~−25…35 % cycle time; confirm with `EARNIE_CYCLE_TIMING=1`. Merged via PR #35 (`53e937f9`).

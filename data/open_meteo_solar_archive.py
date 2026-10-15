@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+import threading
 import time
 
 import pandas as pd
@@ -23,6 +24,16 @@ DEFAULT_THERMAL_EFFICIENCY = 0.40
 _ARCHIVE_RETRY_ATTEMPTS = 5
 _ARCHIVE_RETRY_BASE_SECONDS = 2.0
 _ARCHIVE_RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
+
+# Process-wide mem-cache: disk JSON → bundle; invalidate on file mtime change.
+_bundle_mem_cache: dict[str, tuple[int, "OpenMeteoClimateBundle"]] = {}
+_bundle_mem_lock = threading.Lock()
+
+
+def clear_open_meteo_bundle_mem_cache() -> None:
+    """Reset in-process climate bundle cache (tests / forced reload)."""
+    with _bundle_mem_lock:
+        _bundle_mem_cache.clear()
 
 
 @dataclass(frozen=True)
@@ -431,6 +442,19 @@ def _frame_to_bundle(
     )
 
 
+def _cache_path_key(path: Path) -> str:
+    return str(path.resolve())
+
+
+def _store_bundle_mem(path: Path, bundle: OpenMeteoClimateBundle) -> None:
+    try:
+        mtime_ns = path.stat().st_mtime_ns
+    except OSError:
+        return
+    with _bundle_mem_lock:
+        _bundle_mem_cache[_cache_path_key(path)] = (mtime_ns, bundle)
+
+
 def _load_bundle_from_cache(
     lat: float,
     lon: float,
@@ -452,12 +476,24 @@ def _load_bundle_from_cache(
     )
     if not path.exists():
         return None
+    key = _cache_path_key(path)
+    try:
+        mtime_ns = path.stat().st_mtime_ns
+    except OSError:
+        return None
+    with _bundle_mem_lock:
+        hit = _bundle_mem_cache.get(key)
+        if hit is not None and hit[0] == mtime_ns:
+            return hit[1]
     try:
         frame = pd.read_json(path, orient="split")
         frame.index = pd.to_datetime(frame.index)
     except Exception as exc:
         raise ValueError(f"Open-Meteo cache unlesbar ({path}): {exc}") from exc
-    return _frame_to_bundle(frame, surfaces)
+    bundle = _frame_to_bundle(frame, surfaces)
+    with _bundle_mem_lock:
+        _bundle_mem_cache[key] = (mtime_ns, bundle)
+    return bundle
 
 
 def _save_bundle_to_cache(
@@ -482,6 +518,7 @@ def _save_bundle_to_cache(
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     _bundle_to_frame(bundle).to_json(path, orient="split", date_format="iso")
+    _store_bundle_mem(path, bundle)
 
 
 def build_open_meteo_climate_bundle(
