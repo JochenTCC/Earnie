@@ -25,7 +25,37 @@ def thermal_rc_hourly_kw_and_temp_from_ambient(
     *,
     start_temp_c: float | None = None,
 ) -> tuple[list[float], list[float]]:
-    """Stündliches Heizprofil (kW) und Wassertemperatur (°C) aus RC + Außenluft."""
+    """Stündliches Heizprofil (kW) und Wassertemperatur (°C) aus RC + Außenluft.
+
+    Memoized on RC params, ``nominal_power_kw``, ambient content and start temp.
+    """
+    from optimizer.thermal_year_cache import (
+        THERMAL_RC_YEAR_CACHE,
+        fingerprint_json,
+        fingerprint_series,
+    )
+
+    key = (
+        fingerprint_json(thermal_rc_params(consumer)),
+        consumer.get("nominal_power_kw"),
+        fingerprint_series(ambient_c),
+        start_temp_c,
+    )
+    return THERMAL_RC_YEAR_CACHE.get_or_compute(
+        key,
+        lambda: _simulate_thermal_rc_year(
+            consumer, ambient_c, start_temp_c=start_temp_c
+        ),
+        lambda result: (list(result[0]), list(result[1])),
+    )
+
+
+def _simulate_thermal_rc_year(
+    consumer: dict,
+    ambient_c: list[float],
+    *,
+    start_temp_c: float | None,
+) -> tuple[list[float], list[float]]:
     rc = thermal_rc_params(consumer)
     band = ThermalBand(
         setpoint_c=float(rc["setpoint_c"]),

@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Cycle speed-up — deploy dev.55 thermal slot-series fix (2026-10-15)
+
+- [x] **Cycle speed-up — deploy dev.55 thermal slot-series fix to the NAS:** `9eb1cbe9` (`modeled_consumer_kw_for_slots`) was not in the profiled image. Live passes `climate=None`, so it removes ~360 of ~810 year simulations (2 × 181 slots in `_slot_aligned_thermal_energy_kwh`). Expected ~−25…35 % cycle time; confirm with `EARNIE_CYCLE_TIMING=1`. Merged via PR #35 (`53e937f9`).
+
 ### EarlyStart P0 — always-on cycle duration + punctuality log (2026-10-15)
 
 - [x] **EarlyStart P0 — always-on duration, event + punctuality recording** (epic **EarlyStart**; spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §5.1, §5.2, §5.6)
