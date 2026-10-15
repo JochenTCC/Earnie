@@ -371,6 +371,12 @@ class Config:
     def get_shadow_feed_retention_days(self) -> int:
         return int(self.get("SHADOW_FEED_RETENTION_DAYS", default=14))
 
+    def is_recorder_enabled(self) -> bool:
+        return bool(self.get("RECORDER_ENABLED", default=True))
+
+    def get_recorder_retention_days(self) -> int:
+        return int(self.get("RECORDER_RETENTION_DAYS", default=7))
+
     def get_ui_streamlit_port(self) -> int:
         return int(self.get("UI_STREAMLIT_PORT", default=8501))
 
@@ -656,6 +662,14 @@ def is_shadow_feed_enabled() -> bool:
 
 def get_shadow_feed_retention_days() -> int:
     return CONFIG.get_shadow_feed_retention_days()
+
+
+def is_recorder_enabled() -> bool:
+    return CONFIG.is_recorder_enabled()
+
+
+def get_recorder_retention_days() -> int:
+    return CONFIG.get_recorder_retention_days()
 
 
 def get_ui_streamlit_port() -> int:

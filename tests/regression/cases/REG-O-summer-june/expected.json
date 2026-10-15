@@ -1,0 +1,27 @@
+{
+  "engine": {
+    "earnie_version": "2.7.0-dev.53",
+    "solver": "highs",
+    "solver_mode": "strict",
+    "highspy": "1.15.1",
+    "EARNIE_CBC_STRICT": "1"
+  },
+  "tolerances": {
+    "default_pct": 0.05,
+    "per_metric_pct": {}
+  },
+  "invariants": [],
+  "metrics": {
+    "status_optimal": 1,
+    "n_slots": 96,
+    "cost_euro": -1.5388625,
+    "import_kwh": 0.0,
+    "export_kwh": 43.9675,
+    "battery_throughput_kwh": 0.0,
+    "plausibility_failures": 0.0
+  },
+  "plan": {
+    "plan_hash": null,
+    "diff_slots": null
+  }
+}

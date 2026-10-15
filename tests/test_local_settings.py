@@ -179,6 +179,45 @@ def test_shadow_feed_defaults_off(tmp_path, monkeypatch):
     assert cfg.get_shadow_feed_retention_days() == 14
 
 
+def test_recorder_from_local_settings(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(
+        json.dumps(
+            {
+                "silent_mode": False,
+                "recorder_enabled": False,
+                "recorder_retention_days": 3,
+            }
+        ),
+        encoding="utf-8",
+    )
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_recorder_enabled() is False
+    assert cfg.get_recorder_retention_days() == 3
+
+
+def test_recorder_defaults_on(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(json.dumps({"silent_mode": False}), encoding="utf-8")
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_recorder_enabled() is True
+    assert cfg.get_recorder_retention_days() == 7
+
+
 def test_bootstrap_creates_local_settings(tmp_path, monkeypatch):
     from runtime_store import bootstrap
 

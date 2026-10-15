@@ -1,0 +1,12 @@
+id: REG-O-autumn-nov
+title: Late-autumn L1 cycle (November seed window)
+level: L1
+source: own
+anonymized: true
+app_version: "2.7.0-dev"
+recorder:
+  root: fixtures/seed_recorder
+  seed_anchor: "2025-11-28T07:00:00"
+window:
+  start: "2025-11-27T07:00:00"
+  end: "2025-11-28T07:00:00"

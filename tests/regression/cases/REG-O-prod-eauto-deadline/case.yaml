@@ -1,0 +1,7 @@
+id: REG-O-prod-eauto-deadline
+title: Prod-dump invariants — EV deadline miss (2026-06-27)
+level: L1-invariants
+source: own
+anonymized: true
+prod_dump_id: eauto_deadline_missed_2026-06-27
+app_version: "1.9.3"

@@ -16,12 +16,14 @@ dependencies = [
     "plotly>=5.18.0",
     "pandas>=2.0.0",
     "pulp>=2.8.0,<4",
-    "highspy",
+    # Regression R0: pin so goldens stay comparable across dev / Docker / CI.
+    "highspy==1.15.1",
     "python-dotenv>=1.0.0",
     "astral>=3.2",
     "jsonschema>=4.0.0",
     "cryptography>=42.0.0",
     "zeroconf>=0.130.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -69,11 +71,15 @@ include = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+# Regression cases are auto-deselected in tests/conftest.py unless -m regression
+# (or EARNIE_RUN_REGRESSION=1). Do not put -m "not regression" in addopts — that
+# would AND with -m regression and select nothing.
 markers = [
     "requires_loxone: Integrationstest gegen echten Loxone-Miniserver",
     "slow: Längerer Backtesting- oder MILP-Integrationslauf",
     "test_health_protected: Nie automatisch als Review-Kandidat markieren",
     "apptest: Streamlit-AppTest UI-Smoketest (rendert echte Seiten headless)",
+    "regression: Release golden-master suite (deselected by default; see docs/spec/regression-suite.md)",
 ]
 
 [tool.coverage.run]

@@ -1,0 +1,13 @@
+id: REG-O-summer-june
+title: Summer L2 window (backtesting fixture low-EV day)
+level: L2
+source: own
+anonymized: true
+app_version: "2.7.0-dev"
+window:
+  start: "2026-06-25"
+  end: "2026-06-25"
+inputs:
+  kind: backtesting_fixtures
+  scenario_id: fixture_5kwh_fixed
+  initial_soc: 50.0

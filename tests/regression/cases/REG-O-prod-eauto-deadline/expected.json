@@ -1,0 +1,24 @@
+{
+  "engine": {
+    "earnie_version": "2.7.0-dev.53",
+    "solver": "highs",
+    "solver_mode": "strict",
+    "highspy": "1.15.1",
+    "EARNIE_CBC_STRICT": "1"
+  },
+  "tolerances": {
+    "default_pct": 0.05,
+    "per_metric_pct": {}
+  },
+  "invariants": [
+    {
+      "id": "prod_dump",
+      "prod_dump_id": "eauto_deadline_missed_2026-06-27"
+    }
+  ],
+  "metrics": {},
+  "plan": {
+    "plan_hash": null,
+    "diff_slots": null
+  }
+}

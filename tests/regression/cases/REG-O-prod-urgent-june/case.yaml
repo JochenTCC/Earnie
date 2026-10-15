@@ -1,0 +1,7 @@
+id: REG-O-prod-urgent-june
+title: Prod-dump invariants — urgent deferred cheap hours (2026-06-28)
+level: L1-invariants
+source: own
+anonymized: true
+prod_dump_id: eauto_urgent_deferred_cheap_hours_2026-06-28
+app_version: "1.10.4"

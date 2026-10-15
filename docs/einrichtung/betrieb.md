@@ -53,12 +53,30 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; monatlich rotiert, max. 12 Archive; u. a. `consumption_snapshot`, optional `closed_interval`) |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
 | `live_day_ahead_<zone>.json` | Cache der letzten erfolgreichen Live-Day-Ahead-Serie (QH; Zone z. B. `AT`; `source` ENTSO-E oder Energy-Charts); Live nutzt ihn statt erneutem API-Abruf bzw. vor aWATTar-Fallback |
-| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode` — auch UI **Optimierer-Dienst**, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`)     |
+| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode` — auch UI **Optimierer-Dienst**, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`, Cycle-Recorder `recorder_enabled` / `recorder_retention_days`)     |
+| `recorder/`                     | Cycle-Recorder-Ringpuffer (`cycles_YYYY-MM-DD.jsonl.gz`, Config-Snapshots unter `configs/`) — Lastprofile für Regression; lokal, standardmäßig an |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
 
 
 Die App liest diese Dateien **read-only** für Panels und Abgleich.
+
+### Cycle-Recorder (Regression R-Rec)
+
+Earnie speichert die vollständigen Optimizer-Eingaben jedes Zyklus in einem Ringpuffer unter `runtime/recorder/` (Spec: [`docs/spec/regression-suite.md`](../spec/regression-suite.md) §14). Damit lassen sich Fehler, die erst Tage später auffallen, noch als golden-master-Fall nachziehen. Die Dateien enthalten **Lastprofile** und bleiben **lokal** — Earnie lädt sie nicht hoch.
+
+In `runtime/local_settings.json`:
+
+```json
+{
+  "recorder_enabled": true,
+  "recorder_retention_days": 7
+}
+```
+
+- Standard: an (`true` / Schlüssel fehlt). Abschalten: `"recorder_enabled": false`.
+- Retention: Tage, die Segmentdateien `cycles_YYYY-MM-DD.jsonl.gz` behalten werden (Default 7).
+- Ein Debug-Dump (siehe unten) hängt automatisch das aktuelle Recorder-Fenster an (`recorder/` im ZIP, `manifest.recorder`). Nur an den Maintainer weitergeben.
 
 ### Shadow-Feed (Prod-Recorder, optional)
 
@@ -157,8 +175,12 @@ Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. D
 | ------ | ------------------ |
 | `runtime/optimization_history.jsonl` | Pflicht (vollständig) |
 | `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json` | Optional, falls vorhanden |
+| `recorder/` (Cycle-Recorder-Ringpuffer inkl. Config-Snapshots) | Optional; Fenster = Retention (Default 7 Tage); enthält Lastprofile |
 | `manifest.chart` | Optional (nur mit Live-Anzeige) |
+| `manifest.recorder` | Optional (`from` / `to` / `cycle_count` / `config_hashes`) |
 | Titel / Symptom | Optional (`manifest.meta`) |
+
+**Datenschutz:** Das ZIP kann bis zu N Tage Lastprofile aus dem Cycle-Recorder enthalten. Nur an den Maintainer weitergeben, nicht in öffentliche Issues hochladen. Recorder abschalten: `recorder_enabled: false` in `local_settings.json` (siehe [Cycle-Recorder](#cycle-recorder-regression-r-rec)).
 
 Gemeinsam in jedem ZIP:
 

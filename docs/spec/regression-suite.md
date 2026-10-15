@@ -1,7 +1,7 @@
 # Specification: Release Regression Suite (golden-master cases)
 
-**Version:** 0.2 (proposal; adds L3 live replay, cycle recorder, solver-determinism findings §14–§16)  
-**Status:** Not implemented — backlog Version 2.7 (R-Rec, R0 reduced, P1, P2); L3 and P3 follow in Version 2.8  
+**Version:** 0.4 (P1 MVP)  
+**Status:** R-Rec + R0 (reduced) + **P1** done; P2 still open in Version 2.7; L3 and P3 follow in Version 2.8  
 **Epic short name:** **Regression** (phases **R0**, **R-Rec**, **P1**–**P3**, **L3**)  
 **Related:** [Release Checklist](release-checklist.md), [House simulator](house-sim.md), [Shadow Mode](shadow-mode.md), `tests/fixtures/prod_dumps/README.md`, `.cursor/rules/test-health.mdc`, `optimizer/cbc_solver.py`
 
@@ -94,7 +94,7 @@ Existing `tests/fixtures/prod_dumps/<id>/` cases are migrated into this format i
 Slot-exact equality would break on every solver or float-level change. Three tiers:
 
 1. **Hard invariants** — always fail: SoC within limits, energy balance closes, EV full at deadline, export limit respected, no write to unavailable functions.
-2. **Metrics with tolerance** — fail when exceeded: total cost (€), grid import / export (kWh), self-sufficiency, battery cycles, per-consumer energy. Default tolerance ±0.5 %, overridable per metric in `expected.json`.
+2. **Metrics with tolerance** — fail when exceeded: total cost (€), grid import / export (kWh), self-sufficiency, battery cycles, per-consumer energy. Default tolerance **±0.05 %** after R0 (was ±0.5 % placeholder); overridable per metric in `expected.json`.
 3. **Plan diff** — informational only: number of slots whose setpoint differs and a plan hash. Shown in the report, never fails.
 
 The solver and its settings must be identical for golden recording and verification; the engine fingerprint in `expected.json` makes a mismatch visible instead of producing phantom diffs. **Note:** the production default solver is **HiGHS** (`DEFAULT_MILP_SOLVER`), not CBC, and the production path is wall-clock dependent — see §16 before choosing tolerances or the regression solver mode.
@@ -107,7 +107,7 @@ python -m scripts.run_regression --update-golden --case REG-142-eauto-deadline
 python -m scripts.run_regression --intake <debug_dump.zip> --id REG-142-eauto-deadline --private
 ```
 
-- Pytest marker `regression`, **deselected by default** (`addopts = -m "not regression"` in `pyproject.toml`), so neither the pre-commit hook nor the normal suite runs it. The runner or `-m regression` selects it.
+- Pytest marker `regression`, **deselected by default** (`tests/conftest.py` removes marked items unless `-m regression` or `EARNIE_RUN_REGRESSION=1`), so neither the pre-commit hook nor the normal suite runs it. Prefer `python -m scripts.run_regression` before a release; `-m regression` also works.
 - `--workers N` per `.cursor/rules/backtesting-max-workers.mdc` (largest useful N). Runtime budget: ≤ 15 min parallel.
 - `--update-golden` rewrites `expected.json` only for the selected cases and prints the metric delta; the commit message must explain the intended behaviour change.
 - Output: console table + `regression_report.md` (Δ per case, tier-3 summary, public + private SHA, engine fingerprint).
@@ -150,9 +150,9 @@ Before P1 ships, check that `tests/fixtures/prod_dumps/` and `tests/fixtures/bac
 
 | Phase | Content |
 |---|---|
-| **Regression R0** (spike, first) | Solver-determinism / tolerance study (§16). Needs input data, therefore runs **after R-Rec** has produced recordings. Outcome: regression solver mode + per-metric tolerances. **Reduced scope in 2.7:** deterministic mode + spread measured on 2–3 full 96-slot cases (HiGHS, idle vs. parallel load); the full factor matrix is optional follow-up. |
+| **Regression R0** (spike) | Solver-determinism / tolerance study (§16). **Done 2026-10-14 (reduced):** strict HiGHS goldens, ±0.05 % default tolerance, `highspy==1.15.1` pin. Full §16 factor matrix optional follow-up. |
 | **Regression R-Rec** (recorder) | Always-on cycle recorder with ring buffer (§14), capture-point test (record → replay == live). Prerequisite for R0 and L3; also feeds debug dumps. |
-| **Regression P1** (MVP) | Case format + schema, runner (L1 + L2), `--update-golden`, report; 4–6 public cases (winter, summer, negative prices, EV deadline, heat storage); migrate existing prod-dump cases; tolerances and solver mode from R0; checklist item |
+| **Regression P1** (MVP) | Case format + schema, runner (L1 + L2), `--update-golden`, report; 4–6 public cases (winter, summer, negative prices, EV deadline, heat storage); migrate existing prod-dump cases; tolerances and solver mode from R0; checklist item. **Done 2026-10-15:** `scripts/run_regression.py`, `tests/regression/`; prod_dumps as `L1-invariants` only (MILP goldens from recorder-shaped / backtesting fixtures); pytest marker `regression` deselected by default via `tests/conftest.py`. |
 | **Regression P2** (customer data) | Private repo `Earnie-regression-private`, private-root support + skip logic, `--intake`, case-ID / issue-reference convention, SHA in report |
 | **Regression P3** (gate + scrub) | CI job before `promote`, scrubber script + tests, optional metric trend across releases |
 | **Regression L3** (live replay) | Replay runner for recorder windows, case creation from a time window (§15). After R-Rec and P1. |
@@ -165,15 +165,15 @@ Order: **R-Rec → R0 → P1 → P2 → L3 → P3.**
 
 1. Soft vs. hard release gate (§11) — default proposal: soft first.
 2. Whether a customer-facing statement about data handling is needed beyond the private repo (consent / contract wording).
-3. Solver pinning: the solver actually used (HiGHS by default, `highspy` version) identical on dev machine, Docker image and CI — verified in R0 before any golden is trusted.
-4. Regression solver mode (§16): deterministic mode (no wall-clock limit, small gap) vs. production path; possibly both (deterministic for goldens, production path as sample).
-5. Recorder defaults (§14): retention days (default 7). **Decided:** debug dumps include the matching recorder window automatically. Still open: default window length (proposal: the whole ring buffer, optionally narrowed by the user) and the resulting ZIP size.
+3. Solver pinning: **Decided (R0, 2026-10-14):** pin `highspy==1.15.1` in `pyproject.toml` (local install verified 1.15.1; Docker/CI install from the same pin). Re-verify after any intentional HiGHS bump before trusting goldens.
+4. Regression solver mode (§16): **Decided (R0, 2026-10-14):** goldens use deterministic **`EARNIE_CBC_STRICT=1`** (HiGHS, no wall-clock limit). Production-path sample stays open as a follow-up (not required for P1 goldens).
+5. Recorder defaults (§14): retention days (default 7). **Decided:** debug dumps include the matching recorder window automatically. **Decided (R-Rec):** default dump window = the **whole ring buffer** (retention days); no UI narrowing in R-Rec (optional narrowing later with L3). ZIP size is accepted as a consequence (~7–14 MB for 7 days).
 
 ## 14. Cycle recorder (R-Rec)
 
 **Purpose:** provide the *complete inputs* of real cycles. `optimization_history.jsonl` only holds results and display values (SoC, mode, target power, current price, forecast values, plan), not the price/PV vectors over the horizon, the configuration or the start state, so it cannot drive a replay on its own.
 
-**Capture point:** the central input is `optimization_matrix` in `main.py` (per slot: `k_act`, `expected_p_pv`, `expected_p_act`, …) plus `planning_window`. The matrix is modified afterwards (live snapshot, `prepare_optimization_matrix`, standby relief), so it is captured **directly before `prepare_optimization_matrix`** — a well-defined replay entry point. The debug snapshot already serializes `planning_matrix` / `planning_window`; the recorder does the same every cycle.
+**Capture point:** the central input is `optimization_matrix` in `main.py` (per slot: `k_act`, `expected_p_pv`, `expected_p_act`, …) plus `planning_window`. Live snapshot / thermal prep run **before** this hook; afterwards the matrix is still modified (`prepare_optimization_matrix`, standby relief), so it is captured **directly before `prepare_optimization_matrix`** — a well-defined replay entry point. The debug snapshot already serializes `planning_matrix` / `planning_window`; the recorder does the same every cycle.
 
 **Entry per cycle:** timestamp, `app_version`, config hash; matrix + window (columnar arrays, not row dicts); start state (SoC, `flexible_consumers_state`, charging contexts, run state, PV counter state); **outputs:** setpoints actually written, plan hash, flags (override, immediate charging, outage, manual intervention).
 
@@ -187,7 +187,7 @@ Order: **R-Rec → R0 → P1 → P2 → L3 → P3.**
 
 **Acceptance test:** record a cycle, replay it offline from the recording, and assert the replay produces the same plan as the live run (under the solver mode of §16). This doubles as the first determinism evidence.
 
-**Debug-dump integration (decided):** the unified debug-dump ZIP (schema v3) automatically contains the matching recorder window (`recorder/` segments plus the referenced config snapshots), so faults noticed days later still have their inputs. Consequence: **every user report becomes a potential golden case.** `--intake` (P2) turns such a ZIP into a case folder; L3 (§15) cuts the relevant time window from the recorded cycles. The dump manifest records the window (`recorder.from`, `recorder.to`, cycle count, config hashes). Dumps without recorder data (older versions, recorder off) stay valid; intake then falls back to L1 from the single-cycle inputs. The dump schema version needs a bump or an optional `recorder` block; decide when implementing. Privacy: a dump now carries up to N days of load profile, so the existing note in the dump dialog (what the file contains, only share with the maintainer) must say so.
+**Debug-dump integration (decided):** the unified debug-dump ZIP (schema v3) automatically contains the matching recorder window (`recorder/` segments plus the referenced config snapshots) — **whole ring buffer** by default. Consequence: **every user report becomes a potential golden case.** `--intake` (P2) turns such a ZIP into a case folder; L3 (§15) cuts the relevant time window from the recorded cycles. The dump manifest records the window (`recorder.from`, `recorder.to`, cycle count, config hashes) as an **optional** `manifest.recorder` block (no schema bump). Dumps without recorder data (older versions, recorder off) stay valid; intake then falls back to L1 from the single-cycle inputs. Privacy: a dump now carries up to N days of load profile; the dump dialog and `docs/einrichtung/betrieb.md` disclose this and require sharing only with the maintainer.
 
 ## 15. L3 live replay
 
@@ -221,3 +221,19 @@ Frozen inputs remove time and price as sources of deviation. What remains is the
 Per run: stage reached, runtime, objective value, cost (€), plan hash, number of slots differing from the reference (strict without limit). Cases: full 96-slot problems with several consumers and battery (recorder windows or backtesting engine with HouseSim fixtures; **not** the hourly prod-dump scenarios).
 
 **Expected decision:** if strict without limit finishes in acceptable time, goldens use that deterministic mode and tolerances can be tight; otherwise a small `gapRel` with no wall-clock limit as a dedicated regression solver mode, plus a production-path sample so the real path is still exercised. Per-metric tolerances in `expected.json` are derived from the measured spread, not guessed (the ±0.5 % default of §7 is a placeholder until then).
+
+### R0 reduced study result (2026-10-14)
+
+Harness: `scripts/run_regression_r0_study.py` + offline replay `runtime_store/recorder_replay.py`. Cases: 3× 96-slot recorder cycles (seeded via recorder API from historical windows into recorder format; no live prod recorder yet on this machine). Factors: HiGHS only; modes production vs `EARNIE_CBC_STRICT=1`; load idle vs 3 parallel workers; 5 reps.
+
+**Follow-up (from now on):** replace those historical `--seed` windows with **live `runtime/recorder/` cycles as soon as they exist** (re-run the study / refresh P1 public cases from real recordings). Do not keep historical backtesting seed as the long-term case source.
+
+| Observation | Result |
+|---|---|
+| Strict plan hash (Optimal cases) | Stable across idle + parallel (1 hash / group) |
+| Strict cost spread | **0.0 %** on Optimal groups |
+| Production path (same inputs) | Same plan hash as strict on Optimal groups (≤ ~1 s wall time; no fallback observed) |
+| One seeded window | `no_optimal` offline (excluded from tolerance derivation) |
+| `highspy` | **1.15.1** pinned in `pyproject.toml` |
+
+**Decisions for P1:** regression solver mode = **strict** (`EARNIE_CBC_STRICT=1`); default metric tolerance **±0.05 %** (2× measured spread with floor); production-path sample remains open follow-up; full §16 factor matrix remains optional follow-up.

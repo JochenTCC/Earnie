@@ -1,0 +1,9 @@
+id: REG-S-negative-prices
+title: Synthetic L1 cycle with negative buy prices
+level: L1
+source: synthetic
+anonymized: true
+app_version: "2.7.0-dev"
+recorder:
+  root: fixtures/negative_prices_recorder
+  seed_anchor: "synthetic-negative-prices"

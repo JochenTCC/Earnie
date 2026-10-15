@@ -176,8 +176,35 @@ def pytest_configure(config):
         "markers",
         "requires_live_config: bewusst NAS/Prod-config.json (EARNIE_TEST_USE_LIVE_CONFIG=1)",
     )
+    config.addinivalue_line(
+        "markers",
+        "regression: Release golden-master suite (deselected by default)",
+    )
 
 
-def pytest_collection_modifyitems(items):
-    """`slow`-Tests ans Ende: bei --maxfail-Abbruch sparen wir uns ihre Laufzeit."""
+def _regression_explicitly_selected(config) -> bool:
+    if os.environ.get("EARNIE_RUN_REGRESSION") == "1":
+        return True
+    markexpr = (getattr(config.option, "markexpr", None) or "").strip()
+    if not markexpr:
+        return False
+    # Plain "-m regression" (or expressions that require regression).
+    if "not regression" in markexpr:
+        return False
+    return "regression" in markexpr
+
+
+def pytest_collection_modifyitems(config, items):
+    """Deselect regression by default; keep ``slow`` tests at the end."""
+    if not _regression_explicitly_selected(config):
+        kept: list = []
+        deselected: list = []
+        for item in items:
+            if item.get_closest_marker("regression") is not None:
+                deselected.append(item)
+            else:
+                kept.append(item)
+        if deselected:
+            config.hook.pytest_deselected(items=deselected)
+            items[:] = kept
     items.sort(key=lambda item: item.get_closest_marker("slow") is not None)

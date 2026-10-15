@@ -109,6 +109,12 @@ def load_system_and_ui_params(
         "SHADOW_FEED_RETENTION_DAYS": system_settings.load_shadow_feed_retention_days(
             local_settings, local_settings_path
         ),
+        "RECORDER_ENABLED": system_settings.load_recorder_enabled(
+            local_settings, local_settings_path
+        ),
+        "RECORDER_RETENTION_DAYS": system_settings.load_recorder_retention_days(
+            local_settings, local_settings_path
+        ),
     }
 
 

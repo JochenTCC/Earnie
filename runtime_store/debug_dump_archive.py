@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 import zipfile
@@ -14,6 +15,8 @@ from runtime_store import optimization_history
 from runtime_store.debug_dump_inputs import collect_dump_context, write_inputs_to_zip
 from runtime_store.live_optimization_debug import _json_safe
 from runtime_store.persist_paths import runtime_dir, runtime_path
+
+logger = logging.getLogger(__name__)
 
 DUMP_SCHEMA_VERSION = 3
 DUMP_TYPE_DEBUG = "debug"
@@ -118,8 +121,11 @@ def _readme_text() -> str:
     return (
         f"Earnie Debug-Dump (dump_type={DUMP_TYPE_DEBUG}, "
         f"schema_version={DUMP_SCHEMA_VERSION})\n"
-        "manifest.json – Metadaten, optional chart + meta (Titel/Symptom)\n"
+        "manifest.json – Metadaten, optional chart + meta (Titel/Symptom), "
+        "optional recorder window\n"
         "inputs/* – aktive Konfigurationen fuer spaetere Reproduktion\n"
+        "recorder/* – optional cycle-recorder ring buffer "
+        "(Lastprofile, nur an Maintainer weitergeben)\n"
         f"Required runtime: {required}\n"
         f"Optional runtime: {optional}\n"
         "Replay: python -m scripts.replay_debug_dump <zip-or-dir>\n"
@@ -207,9 +213,13 @@ def write_debug_dump_zip(
             if written:
                 optional_present.append(written)
 
+        recorder_arcnames = _write_recorder_to_zip(
+            archive, manifest, runtime_base=runtime_base
+        )
+
         manifest["files"] = {
             "required_present": required_present,
-            "optional_present": optional_present,
+            "optional_present": optional_present + recorder_arcnames,
         }
         archive.writestr(
             "manifest.json",
@@ -218,6 +228,33 @@ def write_debug_dump_zip(
         archive.writestr("README.txt", _readme_text())
 
     return zip_path
+
+
+def _write_recorder_to_zip(
+    archive: zipfile.ZipFile,
+    manifest: dict[str, Any],
+    *,
+    runtime_base: str,
+) -> list[str]:
+    """Optional recorder ring buffer; never fails the dump."""
+    try:
+        from runtime_store.cycle_recorder import collect_recorder_dump_payload
+
+        payload = collect_recorder_dump_payload(
+            recorder_root=os.path.join(runtime_base, "recorder"),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("debug_dump: recorder attachment failed: %s", exc)
+        return []
+    written: list[str] = []
+    for source_path, arcname in payload.get("files") or []:
+        if os.path.isfile(source_path):
+            archive.write(source_path, arcname=arcname)
+            written.append(arcname)
+    recorder_meta = payload.get("manifest")
+    if recorder_meta:
+        manifest["recorder"] = recorder_meta
+    return written
 
 
 def read_zip_bytes(zip_path: str) -> bytes:

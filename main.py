@@ -16,6 +16,7 @@ from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, l
 from data.live_market_prices import fetch_live_day_ahead_prices
 from data.feed_in_prices import k_push_act_for_matrix_row
 from runtime_store import run_state, optimization_history
+from runtime_store import cycle_recorder
 from runtime_store.soc_plausibility import (
     closed_interval_confirms_reported,
     count_consecutive_reported_soc,
@@ -306,6 +307,21 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 else ""
             ),
         )
+    recorder_token = None
+    try:
+        recorder_token = cycle_recorder.begin_cycle(
+            optimization_matrix=optimization_matrix,
+            planning_window=planning_window,
+            soc_percent=float(current_soc),
+            soc_percent_by_ess={
+                str(ess_id): float(soc)
+                for ess_id, soc in (current_soc_by_id or {}).items()
+            },
+            targets=targets,
+        )
+    except Exception as exc:  # noqa: BLE001 — never abort live run
+        logger.warning("cycle_recorder: begin_cycle failed: %s", exc)
+        recorder_token = None
     optimization_matrix, charging_contexts, targets = optimizer.prepare_optimization_matrix(
         optimization_matrix,
         targets,
@@ -751,6 +767,29 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         logger.info("run_state: Durchlauf in optimizer_run_state.json gespeichert.")
     except Exception as e:
         logger.warning("run_state: Zustand konnte nicht gespeichert werden: %s", e)
+
+    try:
+        immediate = any(
+            bool((ctx or {}).get("immediate_charge"))
+            for ctx in (charging_contexts or {}).values()
+        )
+        cycle_recorder.finish_cycle(
+            recorder_token,
+            mode=int(mode),
+            target_power_kw=round(float(target_power), 3),
+            battery_plan_kw=battery_plan_kw,
+            consumer_powers_kw={
+                k: round(float(v), 3) for k, v in consumer_powers.items()
+            },
+            flags={
+                "override": bool(config.is_silent_mode()),
+                "immediate_charging": immediate,
+                "outage": bool(out_of_band),
+                "manual_intervention": False,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 — never abort live run
+        logger.warning("cycle_recorder: finish_cycle failed: %s", exc)
 
 if __name__ == "__main__":
     from runtime_store import bootstrap

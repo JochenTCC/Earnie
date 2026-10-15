@@ -2,6 +2,30 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Regression P1 — MVP golden-master suite (2026-10-15)
+
+- [x] **Regression P1 — MVP:** case format + schema, runner for L1 (cycle replay) and L2 (backtest window), `--update-golden`, markdown report; public cases (winter/autumn L1, negative prices L1, summer/EV/heat L2); prod_dumps as `L1-invariants` wrappers only (MILP goldens stay recorder/backtesting-shaped); tolerances and solver mode from R0 (`EARNIE_CBC_STRICT=1`, ±0.05 %); release-checklist item; privacy scrub on seed fixtures (address/geo/`cons_data` stub).
+  - Runner: `scripts/run_regression.py`; package `tests/regression/` (loader, compare, L1/L2, prod-dump invariants); fixtures under `tests/regression/fixtures/`.
+  - Pytest marker `regression` deselected by default in `tests/conftest.py` (`-m regression` or `EARNIE_RUN_REGRESSION=1`); entry `tests/regression/test_regression_suite.py`.
+  - Spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md) v0.4; checklist [`docs/spec/release-checklist.md`](../docs/spec/release-checklist.md) §1.
+  - Decisions: **1A** seed/backtesting cases now (live recorder refresh later); **2B** prod_dumps tier-1 only; keep `tests/test_prod_dump_regression.py`.
+
+### Regression R0 — solver determinism / tolerance study (2026-10-14)
+
+- [x] **Regression R0 — solver determinism / tolerance study (reduced scope for 2.7)** (epic **Regression**; after R-Rec; spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md) §16)
+  - Offline replay: `runtime_store/recorder_replay.py` (config snapshot → prepare → MILP); study harness `scripts/run_regression_r0_study.py` (`--seed` / `--recorder-dir`).
+  - Measured on 3× 96-slot recorder-format cases (HiGHS; production vs `EARNIE_CBC_STRICT`; idle vs parallel; 5 reps): Optimal groups bit-stable (plan hash + **0.0 %** cost spread). Cases were **historical `--seed`** (no live recorder yet) — backlog note: replace with live recorder cycles ASAP.
+  - **Decision:** regression goldens use **`EARNIE_CBC_STRICT=1`**; default metric tolerance **±0.05 %**; pin **`highspy==1.15.1`** in `pyproject.toml`. Production-path sample + full §16 matrix remain follow-ups.
+  - Test: `tests/test_recorder_replay.py`.
+
+### Regression R-Rec — cycle recorder (2026-10-14)
+
+- [x] **Regression R-Rec — cycle recorder (first)** (epic **Regression**; Version 2.7; spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md) §14)
+  - Always-on production recorder: `runtime/recorder/cycles_YYYY-MM-DD.jsonl.gz`, config snapshots by hash, `recorder_enabled` (default on) / `recorder_retention_days` (default 7) in `local_settings.json`.
+  - Capture immediately before `prepare_optimization_matrix` in `main.py`; finish with setpoints / plan hash / flags; soft-fail never aborts the live run.
+  - Debug dumps (schema v3) auto-include the whole ring buffer under `recorder/` + optional `manifest.recorder`; dump dialog + `docs/einrichtung/betrieb.md` privacy/opt-out.
+  - Module `runtime_store/cycle_recorder.py`; tests `tests/test_cycle_recorder.py` (incl. capture-point record → prepare replay).
+
 ### Bugfix — Chart1 powerstation SoC dips at Jetzt / hour boundary (2026-10-14)
 
 - [x] **Chart1: powerstation SoC dips at Jetzt / next hour boundary** — fix implemented; **Verified live** (2026-10-14)

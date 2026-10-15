@@ -147,7 +147,12 @@ def _debug_dump_meta_dialog(
     current_soc: float | None,
     live_power: dict[str, Any] | None,
 ) -> None:
-    st.caption("Titel und Symptom sind optional und landen in manifest.meta.")
+    st.caption(
+        "Titel und Symptom sind optional und landen in manifest.meta. "
+        "Das ZIP kann den Cycle-Recorder-Ringpuffer enthalten "
+        f"(bis zu {config.get_recorder_retention_days()} Tage Lastprofile) — "
+        "nur an den Maintainer weitergeben, nicht öffentlich teilen."
+    )
     st.text_input("Titel (optional)", key="debug_dump_title")
     st.text_area("Symptom (optional)", key="debug_dump_symptom")
     col_create, col_download = st.columns(2)
@@ -196,9 +201,11 @@ def render_chart_debug_capture_controls(
 
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
     st.caption(
-        "Debug-Dump: Archiv als ZIP sichern (volle Historie, optional Chart-Payload; "
+        "Debug-Dump: Archiv als ZIP sichern (volle Historie, optional Chart-Payload "
+        "und Cycle-Recorder-Fenster mit Lastprofilen; "
         "config.json, `runtime/local_settings.json` oder "
-        "`EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED=1`)."
+        "`EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED=1`). "
+        "Nur an den Maintainer weitergeben."
     )
     if bundle is None:
         st.info("Ohne Live-Anzeige: Dump ohne Chart-Payload (nur Historie/Inputs).")

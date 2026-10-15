@@ -1,0 +1,7 @@
+id: REG-O-prod-false-complete
+title: Prod-dump invariants — false complete / immediate charge (2026-06-29)
+level: L1-invariants
+source: own
+anonymized: true
+prod_dump_id: eauto_false_complete_2026-06-29
+app_version: "1.10.6"

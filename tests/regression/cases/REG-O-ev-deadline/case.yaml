@@ -1,0 +1,13 @@
+id: REG-O-ev-deadline
+title: EV-heavy L2 window (backtesting fixture high-EV day)
+level: L2
+source: own
+anonymized: true
+app_version: "2.7.0-dev"
+window:
+  start: "2026-06-23"
+  end: "2026-06-23"
+inputs:
+  kind: backtesting_fixtures
+  scenario_id: fixture_5kwh_fixed
+  initial_soc: 50.0

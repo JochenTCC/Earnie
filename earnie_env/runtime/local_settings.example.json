@@ -2,5 +2,7 @@
   "silent_mode": false,
   "chart_debug_capture_enabled": false,
   "shadow_feed_enabled": false,
-  "shadow_feed_retention_days": 14
+  "shadow_feed_retention_days": 14,
+  "recorder_enabled": true,
+  "recorder_retention_days": 7
 }

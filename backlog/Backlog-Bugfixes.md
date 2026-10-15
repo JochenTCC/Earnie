@@ -37,6 +37,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] Debug dump to triage: `debug-dumps/debug_dump_20261014_221410` (incomplete note — fill symptom / expected)
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 

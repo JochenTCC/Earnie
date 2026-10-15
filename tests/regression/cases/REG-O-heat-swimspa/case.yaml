@@ -1,0 +1,13 @@
+id: REG-O-heat-swimspa
+title: Heat-like flex (SwimSpa) L2 two-day window
+level: L2
+source: own
+anonymized: true
+app_version: "2.7.0-dev"
+window:
+  start: "2026-06-24"
+  end: "2026-06-25"
+inputs:
+  kind: backtesting_fixtures
+  scenario_id: fixture_5kwh_fixed
+  initial_soc: 50.0

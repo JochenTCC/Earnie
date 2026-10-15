@@ -1,0 +1,31 @@
+{
+  "engine": {
+    "earnie_version": "2.7.0-dev.53",
+    "solver": "highs",
+    "solver_mode": "strict",
+    "highspy": "1.15.1",
+    "EARNIE_CBC_STRICT": "1"
+  },
+  "tolerances": {
+    "default_pct": 0.05,
+    "per_metric_pct": {}
+  },
+  "invariants": [],
+  "metrics": {
+    "status_optimal": 1,
+    "n_slots": 96,
+    "cost_euro": 5.430768990468664,
+    "objective_raw": 543.0768990468664,
+    "mode": 2,
+    "target_power_kw": 0.0,
+    "battery_plan_kw": 0.0,
+    "consumer_energy_kw_slot0_e_auto": 0.0,
+    "consumer_energy_kw_slot0_pool_swimspa": 2.8,
+    "consumer_energy_kw_slot0_waermepumpe": 1.9,
+    "consumer_energy_kw_slot0_waschmaschine": 0.0
+  },
+  "plan": {
+    "plan_hash": "c3f4b35c1ef466d3",
+    "diff_slots": null
+  }
+}
