@@ -51,7 +51,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - **Note:** Plant topology epic **Topology** — **P1** + **P2** + Powerstation AC wording → [Erledigt](Backlog-Erledigt.md). **P3–P5** (widen acceptance, MILP change, balance nodes) remain under **Version 2.+1 — Plant topology**. Decision record [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md). `inverters[].ac_connection: island` = bus participation (not “off the grid”); flag stays until the port model in 2.+1 / P5.
 
 ### Version 2.8
-  
+
+- [ ] Make a review for Chart1 on Monitor page and check if code related to simulated trajectories might be substituted by results from main.py (to prevent drift / misalignment)
+
 - [ ] Enable multiple EV / Wallboxes *(reuse entity-scoped namespacing approach from **2.7.c** multi-ESS)*
 - Parametrize EVs as now (+ sensors)
 - Parametrize Wallboxes 

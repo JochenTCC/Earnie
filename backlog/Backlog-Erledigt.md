@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Minor — Debug-dump includes powerstation_reserves.json (2026-10-15)
+
+- [x] **powerstation_reserves.json in debug-dump** — added to `_OPTIONAL_RUNTIME` in `runtime_store/debug_dump_archive.py` (copied when present); docs `docs/einrichtung/betrieb.md`; test `test_write_debug_dump_zip_without_chart`.
+
 ### Bugfix — Chart 1 SoC vs Zwangsladen/Zwangsentladen underlay time alignment (2026-10-15)
 
 - [x] **Alignment mismatch (time-wise) between SOC line and forced charging / discharging decoration** — **Verified** (2026-10-15, Monitor Chart 1)

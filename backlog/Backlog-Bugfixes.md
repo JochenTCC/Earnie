@@ -38,7 +38,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Check if "Simulierter SOC" is still needed (for Chart 1)
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 

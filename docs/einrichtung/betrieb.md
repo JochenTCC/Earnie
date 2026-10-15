@@ -58,6 +58,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `timing/`                       | Optional: Phasen-Zeiten des Live-Zyklus (`cycles.jsonl`) — nur bei `EARNIE_CYCLE_TIMING=1` |
 | `profile/`                      | Optional: `cProfile`-Dumps (`cycle_*.prof`, `*_top30.txt`) — nur bei `EARNIE_CYCLE_PROFILE=1` (kurz halten) |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
+| `powerstation_reserves.json`    | Reserve-Zustand virtueller/physischer Powerstations (stored/target kWh, Trigger)           |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
 
 
@@ -223,7 +224,7 @@ Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. D
 | Inhalt | Pflicht / optional |
 | ------ | ------------------ |
 | `runtime/optimization_history.jsonl` | Pflicht (vollständig) |
-| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json` | Optional, falls vorhanden |
+| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json`, `powerstation_reserves.json` | Optional, falls vorhanden |
 | `recorder/` (Cycle-Recorder-Ringpuffer inkl. Config-Snapshots) | Optional; Fenster = Retention (Default 7 Tage); enthält Lastprofile |
 | `manifest.chart` | Optional (nur mit Live-Anzeige) |
 | `manifest.recorder` | Optional (`from` / `to` / `cycle_count` / `config_hashes`) |
