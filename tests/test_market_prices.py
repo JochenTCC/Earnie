@@ -280,6 +280,8 @@ def test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex():
                 missing_price_strategy="forecast",
                 forecast_model=model,
                 forecast_feature_frame=feature_frame,
+                # Live bias fetches Open-Meteo archive weather (network, minutes).
+                live_bias_enabled=False,
             )
     by_src = {row["price_source"]: row for row in out}
     assert by_src[PRICE_SOURCE_DAY_AHEAD]["k_act"] == pytest.approx(expected)

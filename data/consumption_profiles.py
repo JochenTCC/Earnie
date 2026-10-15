@@ -117,6 +117,35 @@ def modeled_consumer_kw_at_datetime(
     return consumer_kwh / MODELED_PROFILE_HOURS_PER_YEAR
 
 
+def modeled_consumer_kw_for_slots(
+    consumer: dict,
+    slot_datetimes: list[datetime],
+    *,
+    climate: ModeledClimateContext | None = None,
+) -> list[float]:
+    """kW per slot like ``modeled_consumer_kw_at_datetime``; year models built once."""
+    # thermal_* without climate: modeled_consumer_kw_at_datetime rebuilds the
+    # full 8760 h year model per slot (~0.1 s each → seconds per MILP solve).
+    if (
+        climate is None
+        and not consumer_uses_profile_csv(consumer)
+        and consumer.get("type") in ("thermal_annual", "thermal_rc")
+    ):
+        year = _modeled_consumer_hourly_kw(
+            consumer,
+            hours=MODELED_PROFILE_HOURS_PER_YEAR,
+        )
+        values: list[float] = []
+        for slot_dt in slot_datetimes:
+            idx = _modeled_hour_index(slot_dt)
+            values.append(float(year[idx]) if idx < len(year) else 0.0)
+        return values
+    return [
+        modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate)
+        for slot_dt in slot_datetimes
+    ]
+
+
 def _flat_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     consumer_kwh = consumer_annual_kwh(consumer)
     add_kw = consumer_kwh / max(1, hours)
@@ -311,22 +340,10 @@ def _modeled_kw_series_for_timestamps(
             )
             for ts in timestamps
         ]
-    ctype = consumer.get("type")
-    # thermal_*: modeled_consumer_kw_at_datetime rebuilt the full year per slot.
-    if ctype in ("thermal_annual", "thermal_rc"):
-        year = _modeled_consumer_hourly_kw(
-            consumer,
-            hours=MODELED_PROFILE_HOURS_PER_YEAR,
-        )
-        values: list[float] = []
-        for ts in timestamps:
-            idx = _modeled_hour_index(_parse_profile_timestamp(ts))
-            values.append(float(year[idx]) if idx < len(year) else 0.0)
-        return values
-    return [
-        modeled_consumer_kw_at_datetime(consumer, _parse_profile_timestamp(ts))
-        for ts in timestamps
-    ]
+    return modeled_consumer_kw_for_slots(
+        consumer,
+        [_parse_profile_timestamp(ts) for ts in timestamps],
+    )
 
 
 def build_modeled_kw_for_timestamps(

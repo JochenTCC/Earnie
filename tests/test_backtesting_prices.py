@@ -64,6 +64,8 @@ def test_resolve_market_slots_forecast_uses_model():
         missing_price_strategy="forecast",
         forecast_model=model,
         forecast_feature_frame=feature_frame,
+        # Live bias fetches Open-Meteo archive weather (network, minutes).
+        live_bias_enabled=False,
     )
     assert len(resolved) == 1
     assert resolved[0]["price_source"] == PRICE_SOURCE_PREDICTED
