@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Metered consumers missing in Sankey + Chart 1 (2026-10-15)
+
+- [x] **Consumption of consumers with provided current power neither shown as Sankey paths nor Chart 1 bars** — **Verified** (2026-10-15, shadow Monitor)
+  - Symptom: known/manual/thermal consumers with mapped `sens_power_act` (e.g. Kochen, TV, appliances, pool) missing as separate Sankey paths and as consumer-specific Chart 1 bars; live power still visible on EHAL-Com / sampler.
+  - Cause: `marker_flex_power` only accepted `flex.{id}.sens_power_act`; house profile stores Live/exchange qids (`consumer|pool|heatpump.{id}.sens_power_act`, often empty Merker / push-only), so meters never entered live resolve / Sankey `meter_ids`. Chart 1 history also omitted known metered Ist columns.
+  - Fix: `marker_flex_power` resolves qualified `*.sens_power_act` like `marker_flex_enable`; `entry_to_chart_row` attaches known metered Ist via `_attach_known_meter_flex_columns`.
+  - Tests: `tests/test_clear_loxone_binding_names.py` (`test_empty_activation_resolves_sens_power_act_qids`); `tests/test_history_timeline.py` (`test_entry_to_chart_row_attaches_known_meter_ist`).
+
 ### Bugfix — Standby Powerstation charge not covered by house grid/battery energy (2026-10-15)
 
 - [x] **Standby Powerstation charge not covered by house grid/battery energy** — **Verified** (2026-10-15) on `fix/powerstation-charge-energy-balance`

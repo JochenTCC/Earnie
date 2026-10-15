@@ -211,6 +211,33 @@ def _consumer_kw_from_entry(
     return 0.0
 
 
+def _attach_known_meter_flex_columns(
+    row: dict[str, Any],
+    entry: dict[str, Any],
+    snapshot: dict[str, Any] | None,
+) -> None:
+    """Attach Ist kW for known house loads that have a live power meter.
+
+    Optimizer flex columns are written separately; known generics with
+    ``sens_power_act`` only appear in Chart 1 when logged in flex_kw / flex_live_kw.
+    """
+    from house_config.known_chart_display import chart_known_generics
+
+    seen = {
+        str(c.get("id") or "")
+        for c in config.get_flexible_consumers(optimizer_only=True)
+    }
+    for known in chart_known_generics():
+        cid = str(known.get("id") or "")
+        if not cid or cid in seen:
+            continue
+        flex_kw = _consumer_kw_from_entry(entry, known, ist_snapshot=snapshot)
+        if flex_kw is None:
+            continue
+        row[consumer_column_name(known)] = round(flex_kw, 2)
+        seen.add(cid)
+
+
 def _immediate_charge_flags_from_entry(entry: dict[str, Any] | None) -> dict[str, int]:
     """Sofort-Laden-Flags aus dem gespeicherten charging_contexts (falls vorhanden)."""
     contexts = (entry or {}).get("charging_contexts") or {}
@@ -328,6 +355,7 @@ def entry_to_chart_row(
             row[consumer_pv_follow_column_name(consumer)] = int(
                 pv_follow_map.get(cid, 0) or 0
             )
+    _attach_known_meter_flex_columns(row, entry, snapshot)
     if snapshot.get("pv_kw") is not None:
         row[PV_IST_COLUMN] = round(float(snapshot["pv_kw"]), 3)
     row["Netzbezug (kW)"] = _netzbezug_kw_from_entry(

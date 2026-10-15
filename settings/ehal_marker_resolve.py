@@ -79,8 +79,14 @@ def resolve_output_marker(consumer: dict, ehal_field: str) -> str:
 
 
 def marker_flex_power(consumer: dict) -> str:
-    """Consumer Messwert power from ``ehal_bindings`` (entity-scoped)."""
+    """Consumer Messwert power from ``ehal_bindings`` (entity-scoped).
+
+    Accepts ``flex.{id}.sens_power_act`` and Live/exchange qids
+    (``consumer|pool|heatpump.{id}.sens_power_act``), including empty Merker
+    activation flags (push-only).
+    """
     from ehal.flex_fields import KIND_SENS_POWER_ACT, binding_address, flex_field
+    from ehal.qualified_ids import field_kind
 
     cid = str(consumer.get("id") or "").strip()
     if not cid:
@@ -89,10 +95,15 @@ def marker_flex_power(consumer: dict) -> str:
     merker = binding_address(bindings, cid, KIND_SENS_POWER_ACT)
     if merker:
         return merker
-    key = flex_field(cid, KIND_SENS_POWER_ACT)
-    if key not in bindings and KIND_SENS_POWER_ACT not in bindings:
-        return ""
-    return _consumer_pilot_id(consumer, KIND_SENS_POWER_ACT)
+    qid = _consumer_pilot_id(consumer, KIND_SENS_POWER_ACT)
+    for key, value in bindings.items():
+        if field_kind(str(key)) != KIND_SENS_POWER_ACT:
+            continue
+        text = str(value or "").strip()
+        return text or qid
+    if flex_field(cid, KIND_SENS_POWER_ACT) in bindings or KIND_SENS_POWER_ACT in bindings:
+        return qid
+    return ""
 
 
 def marker_sens_evcs_active_power(consumer: dict) -> str:
