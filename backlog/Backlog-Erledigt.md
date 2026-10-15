@@ -10,6 +10,16 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Fix: `resolve_live_collector_solar_kw` (Open-Meteo archive DOY/hour; later horizon path uses forecast irradiance) auto-fills when callers omit solar; wired in `plan_live_store_for_thermal_consumer`.
   - Tests: `tests/test_collector_irradiance_forecast.py` (resolve); `tests/test_thermal_live_collector_regression.py` (store T rises above setpoint when `solar_forecast_kw=None` + sunny midday + `solar_thermal_area_m2` > 0).
 
+### EarlyStart follow-up — prefetch slow inputs off the critical path (2026-10-15)
+
+- [x] **EarlyStart follow-up — prefetch slow inputs off the critical path** (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §8)
+  - Finding: the EU-feature cache was keyed by slot range, so it missed at every full hour (planning window moves); NAS 13:00 cycle spent 24 s + 22 s on two Open-Meteo calls.
+  - `data/price_forecast_live.py`: network inputs cached per `(kind, start date, end date)` (`forecast_weather`, `archive_weather`, `archive_power`), 45 min TTL; `price_feature_refresh` only on a real fetch; routine cached builds log at DEBUG.
+  - `runtime_store/planning_clock.py`: `cache_valid_until` / `cache_entry_fresh` (refresh-ahead), used by the feature cache and the Open-Meteo outdoor / tilted caches.
+  - `data/live_prefetch.py` + `main._prefetch_for_next_cycle`: after each cycle (≥ 120 s idle), under `planning_anchor(next tick)` and `cache_valid_until(start + 120 s)`: day-ahead, `resolve_market_slots` (features + bias lookback), outdoor temperature + collector irradiance. forecast.solar excluded. Failing steps → WARNING, cycle fetches itself. Log `Prefetch für HH:MM: … in X s`.
+  - Tests: `tests/test_live_prefetch.py`, `tests/test_planning_clock.py`, `tests/test_early_start_equivalence.py::test_prefetch_keeps_the_plan_and_takes_fetches_off_the_cycle`. Docs: `docs/einrichtung/betrieb.md`.
+  - Live check on NAS: `weather_fetch` / `price_feature_refresh` should disappear from the `Pünktlichkeit:` events; `day_ahead_fetch` only once right after the auction.
+
 ### EarlyStart P1 — adaptive lead, plan for the tick, write at the tick (2026-10-15)
 
 - [x] **EarlyStart P1 — early start on by default** (epic **EarlyStart**; spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) v2) — reduced scope after the NAS dev.57 measurements (cycles 12–19 s, setpoints +8…16 s; outlier +72 s from Open-Meteo/ENTSO-E I/O)

@@ -48,3 +48,25 @@ def test_none_anchor_keeps_real_clock():
     with planning_anchor(None):
         assert anchored_tick() is None
         assert abs((planning_now() - datetime.now()).total_seconds()) < 1
+
+
+def test_cache_entry_fresh_without_horizon_uses_now():
+    import time
+
+    from runtime_store.planning_clock import cache_entry_fresh
+
+    assert cache_entry_fresh(time.time() - 100, ttl_sec=300)
+    assert not cache_entry_fresh(time.time() - 400, ttl_sec=300)
+
+
+def test_cache_valid_until_marks_entries_expiring_before_it_stale():
+    import time
+
+    from runtime_store.planning_clock import cache_entry_fresh, cache_valid_until
+
+    stored = time.time() - 100  # 200 s left of a 300 s TTL
+    with cache_valid_until(datetime.now() + timedelta(seconds=150)):
+        assert cache_entry_fresh(stored, ttl_sec=300)
+    with cache_valid_until(datetime.now() + timedelta(seconds=250)):
+        assert not cache_entry_fresh(stored, ttl_sec=300)
+    assert cache_entry_fresh(stored, ttl_sec=300)

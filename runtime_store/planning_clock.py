@@ -59,3 +59,40 @@ def planning_now(tz: tzinfo | None = None) -> datetime:
     else:
         anchor_local = anchor.astimezone(tz)
     return max(real, anchor_local)
+
+
+# --- Refresh-ahead for in-process caches (EarlyStart prefetch) -------------
+
+# Epoch seconds until which a cache entry must still be valid, or None.
+_valid_until: ContextVar[float | None] = ContextVar("earnie_cache_valid_until", default=None)
+
+
+@contextmanager
+def cache_valid_until(moment: datetime | None) -> Iterator[None]:
+    """Within this block, cache entries expiring before ``moment`` count as stale.
+
+    The prefetch after a commit uses it so entries that would expire before the
+    next cycle are refreshed now, in the idle time, instead of during the cycle.
+    """
+    token = _valid_until.set(None if moment is None else _to_utc(moment).timestamp())
+    try:
+        yield
+    finally:
+        _valid_until.reset(token)
+
+
+def cache_entry_fresh(
+    stored_at_epoch: float, ttl_sec: float, *, now_epoch: float | None = None
+) -> bool:
+    """True when an entry stored at ``stored_at_epoch`` is valid now — and, inside
+    :func:`cache_valid_until`, still at that moment.
+
+    ``now_epoch``: the clock the cache stamped its entries with (default ``time.time()``).
+    """
+    import time
+
+    reference = time.time() if now_epoch is None else now_epoch
+    until = _valid_until.get()
+    if until is not None and until > reference:
+        reference = until
+    return reference - stored_at_epoch < ttl_sec

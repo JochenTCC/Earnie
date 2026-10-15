@@ -179,6 +179,28 @@ class CycleStats:
         }
 
 
+class _EventCollector:
+    """Collects ``record_event`` calls outside a cycle (prefetch)."""
+
+    def __init__(self) -> None:
+        self.events: list[str] = []
+
+    def note_event(self, name: str) -> None:
+        if name not in self.events:
+            self.events.append(name)
+
+
+@contextmanager
+def collect_events() -> Iterator[list[str]]:
+    """Gather data-module events (network fetches) for a block outside a cycle."""
+    collector = _EventCollector()
+    token = _active.set(collector)  # type: ignore[arg-type]
+    try:
+        yield collector.events
+    finally:
+        _active.reset(token)
+
+
 def record_event(name: str) -> None:
     """Note a known slow-path event (e.g. network fetch) on the running cycle."""
     stats = _active.get()

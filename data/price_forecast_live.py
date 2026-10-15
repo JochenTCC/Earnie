@@ -36,7 +36,9 @@ LIVE_FEATURE_CACHE_TTL_SEC = 45 * 60
 logger = logging.getLogger(__name__)
 
 _model_fallback_warned = False
-_live_feature_cache: dict[tuple[str, str, str], tuple[float, pd.DataFrame]] = {}
+# Network inputs of the EU features, keyed by (kind, start date, end date): the
+# planning window moves every hour, its calendar days do not.
+_feature_input_cache: dict[tuple[str, date, date], tuple[float, pd.DataFrame]] = {}
 _power_day_cache: dict[date, pd.DataFrame] = {}
 
 
@@ -216,13 +218,41 @@ def _cached_eu_power_day(ref_day: date) -> pd.DataFrame:
     return frame
 
 
+def _cached_feature_input(kind: str, start: date, end: date, fetch) -> pd.DataFrame:
+    """Network input for ``[start, end)`` from the process cache, else ``fetch()``.
+
+    Fresh for ``LIVE_FEATURE_CACHE_TTL_SEC`` (refresh-ahead aware, see
+    ``runtime_store.planning_clock.cache_valid_until``). Only a real fetch is
+    reported as ``price_feature_refresh``.
+    """
+    import time
+
+    from runtime_store.planning_clock import cache_entry_fresh
+
+    key = (kind, start, end)
+    entry = _feature_input_cache.get(key)
+    if entry is not None and cache_entry_fresh(entry[0], LIVE_FEATURE_CACHE_TTL_SEC):
+        return entry[1]
+    record_cycle_event(EVENT_PRICE_FEATURE_REFRESH)
+    value = fetch()
+    now = time.time()
+    for stale in [k for k, (at, _v) in _feature_input_cache.items() if now - at >= LIVE_FEATURE_CACHE_TTL_SEC]:
+        _feature_input_cache.pop(stale, None)
+    _feature_input_cache[key] = (now, value)
+    return value
+
+
 def _build_archive_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
     from data.eu_market_features import fetch_eu_power_hourly, fetch_eu_weather_hourly
 
     start = min(slot.date() for slot in slots)
     end = max(slot.date() for slot in slots) + timedelta(days=1)
-    weather = fetch_eu_weather_hourly(start, end)
-    power = fetch_eu_power_hourly(start, end)
+    weather = _cached_feature_input(
+        "archive_weather", start, end, lambda: fetch_eu_weather_hourly(start, end)
+    )
+    power = _cached_feature_input(
+        "archive_power", start, end, lambda: fetch_eu_power_hourly(start, end)
+    )
     return _enrich_merged_features(power.join(weather, how="inner"))
 
 
@@ -238,13 +268,15 @@ def _build_forecast_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
     start = min(slot.date() for slot in slots)
     end = max(slot.date() for slot in slots) + timedelta(days=1)
     t0 = time.perf_counter()
-    logger.info(
+    logger.debug(
         "Preisprognose: Live-Features %s..%s (%d Stunden-Slots)…",
         start.isoformat(),
         (end - timedelta(days=1)).isoformat(),
         len(slots),
     )
-    weather = fetch_eu_weather_forecast_hourly(start, end)
+    weather = _cached_feature_input(
+        "forecast_weather", start, end, lambda: fetch_eu_weather_forecast_hourly(start, end)
+    )
     t_weather = time.perf_counter() - t0
     ref_day = _archive_latest_complete_day()
     power_ref = _cached_eu_power_day(ref_day)
@@ -252,8 +284,12 @@ def _build_forecast_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
     merged = power.join(weather, how="inner")
     frame = _enrich_merged_features(merged)
     elapsed = time.perf_counter() - t0
-    logger.info(
-        "Preisprognose: Live-Features fertig in %.1fs (Wetter %.1fs, rows=%s).",
+    # INFO only when it took noticeable time (network); cached builds are routine.
+    logger.log(
+        logging.INFO if elapsed >= 1.0 else logging.DEBUG,
+        "Preisprognose: Live-Features %s..%s fertig in %.1fs (Wetter %.1fs, rows=%s).",
+        start.isoformat(),
+        (end - timedelta(days=1)).isoformat(),
         elapsed,
         t_weather,
         0 if frame is None else len(frame),
@@ -261,31 +297,8 @@ def _build_forecast_feature_frame(slots: list[datetime]) -> pd.DataFrame | None:
     return frame
 
 
-def _feature_cache_key(slots: list[datetime], mode: str) -> tuple[str, str, str]:
-    start = min(slots).isoformat()
-    end = max(slots).isoformat()
-    return (mode, start, end)
-
-
-def _get_cached_feature_frame(
-    key: tuple[str, str, str],
-) -> pd.DataFrame | None:
-    import time
-
-    entry = _live_feature_cache.get(key)
-    if entry is None:
-        return None
-    stored_at, frame = entry
-    if time.time() - stored_at > LIVE_FEATURE_CACHE_TTL_SEC:
-        _live_feature_cache.pop(key, None)
-        return None
-    return frame
-
-
 def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | None:
     """EU-Features für OLS-Prognose fehlender Day-Ahead-Slots (ohne AT-Preise)."""
-    import time
-
     from data.market_prices import normalize_price_slot
 
     if not slot_datetimes:
@@ -296,12 +309,6 @@ def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | N
     hour_slots = sorted({s.replace(minute=0, second=0, microsecond=0) for s in slots})
     use_archive = _archive_covers_slot_range(slot_datetimes)
     mode = "archive" if use_archive else "live_forecast"
-    cache_key = _feature_cache_key(hour_slots, mode)
-    cached = _get_cached_feature_frame(cache_key)
-    if cached is not None:
-        return cached
-
-    record_cycle_event(EVENT_PRICE_FEATURE_REFRESH)
     try:
         frame = (
             _build_archive_feature_frame(hour_slots)
@@ -310,7 +317,6 @@ def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | N
         )
         if frame is None or frame.empty:
             return None
-        _live_feature_cache[cache_key] = (time.time(), frame)
         return frame
     except (OSError, ValueError, requests.HTTPError, RuntimeError) as exc:
         logger.warning(

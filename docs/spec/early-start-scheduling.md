@@ -152,19 +152,31 @@ Bounds (15 s / 90 s), bootstrap (60 s), window (96 cycles) and minimum samples (
 
 ## 7. Follow-ups (backlog)
 
-- **Prefetch** slow inputs after the commit (§8).
 - **Clock-skew diagnostics** (not part of the epic, §2): estimate the host clock offset from the HTTP `Date` header of requests the cycle already makes (ENTSO-E, Energy-Charts, Open-Meteo; no extra request), using the request/response midpoint and +0.5 s for the truncated 1 s resolution, median over several responses; offset > 2 s → warning with an NTP hint, optional `clock_skew_sec` in the punctuality record. No gate on early start: the punctuality log measures against the host clock and cannot see a skew, and disabling early start would not change the write time.
 - **Cockpit display:** lead, time to plan, gap to tick, on-time rate, capped warning.
 
 Dropped with the P1 scope decision: SoC / thermal / EV projection to `T`, pre-commit SoC drift check and re-run, MILP solver deadline (MILP < 1 s on the NAS since dev.57), `target_slot` in `run_state`, `pv_forecast` guard rework (regular runs stay ~15 min apart).
 
-## 8. Complementary measure: move I/O out of the critical path
+## 8. Prefetch: move I/O out of the critical path (implemented)
 
-With the thermal cost gone, the variance is network I/O (Open-Meteo price features and weather, PV forecast, day-ahead around the auction). During the idle time after a commit, a prefetch step can refresh caches that expire before the next start, so the next solve sees warm caches.
+With the thermal cost gone, the variance is network I/O. NAS 2026-10-15: the EU weather for the price forecast took 0.2–24 s per call, twice per refresh (forecast + bias lookback), plus up to 36 s for the EU power archive after a restart.
 
-Why it matters with P1: the 13:00 cycle above (start on the tick, +72 s) would still be ~+57 s late with the 15 s lead at the floor. The cache TTLs are multiples of 15 min (`data/outdoor_forecast.py` `_CACHE_TTL` = 30 min, `data/price_forecast_live.py` `LIVE_FEATURE_CACHE_TTL_SEC` = 45 min), so whether a tick hits the cache depends on seconds of start jitter, which the adaptive lead increases. The prefetch needs the next cycle's cache keys (location and forecast days for the weather, hour slots for the price features). It cannot warm the day-ahead fetch around the auction (prices not yet published).
+**Feature cache by calendar days** (`data/price_forecast_live.py`): the network inputs of the EU features are cached per `(kind, start date, end date)` — `forecast_weather`, `archive_weather`, `archive_power` — for `LIVE_FEATURE_CACHE_TTL_SEC` (45 min). The slot-specific frame (remap + enrich) is rebuilt per call, which is cheap. Before, the frame was cached per slot range; the planning window moves every hour, so the cache missed at every full hour. `price_feature_refresh` is now recorded only for a real fetch.
 
-Fixed alongside P1: the Live day-ahead cache was never used with a sunrise horizon into D+2, because coverage was checked up to the planning end while prices exist only up to D+1 23:45. Coverage is now checked up to `published_cover_end(window_end, now)` (`data/live_price_cache.py`).
+**Refresh-ahead** (`runtime_store/planning_clock.cache_valid_until` / `cache_entry_fresh`): inside `cache_valid_until(t)`, an entry counts as fresh only if it is still valid at `t`. Used by the feature-input cache and the Open-Meteo outdoor / tilted-irradiance caches.
+
+**Prefetch** (`data/live_prefetch.prefetch_live_inputs`, called from the daemon after each cycle via `main._prefetch_for_next_cycle`):
+
+1. Right after the cycle, once the next `(tick, start_at)` is known; skipped when the next start is less than 120 s away.
+2. Runs under `planning_anchor(next tick)` and `cache_valid_until(start_at + 120 s)`, so it builds exactly the cache keys the next cycle will look up and renews entries that would expire before it reads them.
+3. Steps: planning window → day-ahead prices (`fetch_live_day_ahead_prices`, picks up the auction as soon as it is published) → `resolve_market_slots` with the same kwargs as the matrix build (EU features for missing slots + bias lookback) → outdoor temperature for the thermal horizon and collector irradiance for consumers with `solar_thermal_area_m2 > 0`.
+4. forecast.solar is not prefetched (15-min API guard and rate limit stay with the cycle).
+5. A failing step is logged as WARNING and skipped; the cycle then fetches that input itself, as before. The prefetch never raises into the daemon.
+6. One log line per prefetch: `Prefetch für 13:00: weather_fetch, price_feature_refresh in 23.4 s` or `… alles aus dem Cache …`.
+
+A day-ahead auction published between prefetch and cycle still makes the cycle fetch once — the data did not exist at prefetch time.
+
+Also fixed alongside P1: the Live day-ahead cache was never used with a sunrise horizon into D+2, because coverage was checked up to the planning end while prices exist only up to D+1 23:45. Coverage is now checked up to `published_cover_end(window_end, now)` (`data/live_price_cache.py`).
 
 ## 9. Tests
 
@@ -173,7 +185,9 @@ Fixed alongside P1: the Live day-ahead cache was never used with a sunrise horiz
 - `tests/test_main_early_start.py`: hold waits on a monotonic deadline with polls; late plan → no wait, WARNING beyond 90 s; early cycle plans for `T` (`current_hour`, slot key) and runs solve → hold → close interval → writes in that order; no hold without a tick; out-of-band rejects a tick.
 - `tests/test_cycle_duration_stats.py`: tick, lead, ready and delays of early-started records; log line.
 - `tests/test_live_price_cache.py`: published cover end; sunrise window into D+2 served from cache; cache without tomorrow refetches.
-- `tests/test_early_start_equivalence.py` (slow, `time-machine`): **equivalence of the full cycle**. Per boundary tick a seed cycle runs at `T − 15 min`; from copies of that runtime, run A at `T` without early start and runs B at `T − 15 s` / `T − 90 s` with `tick=T`. The wall clock is frozen globally, inputs are deterministic functions of absolute time (`tests/early_start_runner.py`: fake Open-Meteo / forecast.solar / Energy-Charts, fixed telemetry, network blocked, each run a fresh interpreter with its own config copy). Planning window, daily targets, MILP inputs and result, every write call, `run_state` and history row must be identical (run timestamps excluded). Ticks: quarter, hour, 12:00, midnight, month, New Year, DST spring forward, DST fall back. A mutation that ignores the anchor fails all of them. Diagnostics: `EARLY_START_TRACE_CLOCK=1` lists project call sites that read the wall clock directly before the hold.
+- `tests/test_live_prefetch.py`: feature cache keyed by days (hour shift hits), refresh-ahead refetch, failing step logged not raised, daemon skip below 120 s idle, daemon survives a prefetch crash.
+- `tests/test_early_start_equivalence.py` (slow, `time-machine`): additionally `test_prefetch_keeps_the_plan_and_takes_fetches_off_the_cycle` — prefetch 14 min before, then the early cycle in the same process: identical plan and writes, and no `day_ahead_fetch` / `price_feature_refresh` / `weather_fetch` in the cycle (15:00 and midnight).
+- Full-cycle equivalence (slow, `time-machine`): **equivalence of the full cycle**. Per boundary tick a seed cycle runs at `T − 15 min`; from copies of that runtime, run A at `T` without early start and runs B at `T − 15 s` / `T − 90 s` with `tick=T`. The wall clock is frozen globally, inputs are deterministic functions of absolute time (`tests/early_start_runner.py`: fake Open-Meteo / forecast.solar / Energy-Charts, fixed telemetry, network blocked, each run a fresh interpreter with its own config copy). Planning window, daily targets, MILP inputs and result, every write call, `run_state` and history row must be identical (run timestamps excluded). Ticks: quarter, hour, 12:00, midnight, month, New Year, DST spring forward, DST fall back. A mutation that ignores the anchor fails all of them. Diagnostics: `EARLY_START_TRACE_CLOCK=1` lists project call sites that read the wall clock directly before the hold.
 
 ## Sources
 

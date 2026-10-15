@@ -110,7 +110,7 @@ def test_archive_covers_slot_range_false_for_future_slot():
 def test_build_live_feature_frame_uses_forecast_path_for_future_slots():
     from data import price_forecast_live as pfl
 
-    pfl._live_feature_cache.clear()
+    pfl._feature_input_cache.clear()
     pfl._power_day_cache.clear()
     tz = ZoneInfo("Europe/Vienna")
     future_slot = datetime(2099, 1, 1, 12, tzinfo=tz)
@@ -161,7 +161,7 @@ def test_resolve_market_slots_kwargs_forecast_without_features_uses_mirror():
 def test_build_live_feature_frame_logs_error_on_forecast_failure(caplog):
     from data import price_forecast_live as pfl
 
-    pfl._live_feature_cache.clear()
+    pfl._feature_input_cache.clear()
     pfl._power_day_cache.clear()
     tz = ZoneInfo("Europe/Vienna")
     future_slot = datetime(2099, 1, 1, 12, tzinfo=tz)

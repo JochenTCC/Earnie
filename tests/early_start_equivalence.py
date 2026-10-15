@@ -31,6 +31,8 @@ _VOLATILE_KEYS = frozenset(
         "recorded_at",
         "fetched_at",
         "duration_sec",
+        "cycle_events",
+        "prefetch",
     }
 )
 
@@ -73,12 +75,26 @@ def _runner_slot() -> Iterator[None]:
         time.sleep(0.2)
 
 
-def run_cycle(runtime: Path, out: Path, *, frozen: datetime, tick: datetime | None) -> dict:
+def run_cycle(
+    runtime: Path,
+    out: Path,
+    *,
+    frozen: datetime,
+    tick: datetime | None,
+    prefetch_at: datetime | None = None,
+) -> dict:
     with _runner_slot():
-        return _run_cycle(runtime, out, frozen=frozen, tick=tick)
+        return _run_cycle(runtime, out, frozen=frozen, tick=tick, prefetch_at=prefetch_at)
 
 
-def _run_cycle(runtime: Path, out: Path, *, frozen: datetime, tick: datetime | None) -> dict:
+def _run_cycle(
+    runtime: Path,
+    out: Path,
+    *,
+    frozen: datetime,
+    tick: datetime | None,
+    prefetch_at: datetime | None,
+) -> dict:
     cmd = [
         sys.executable,
         "-m",
@@ -92,6 +108,8 @@ def _run_cycle(runtime: Path, out: Path, *, frozen: datetime, tick: datetime | N
     ]
     if tick is not None:
         cmd += ["--tick", tick.isoformat()]
+    if prefetch_at is not None:
+        cmd += ["--prefetch-at", prefetch_at.isoformat()]
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
     proc = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8")
     if proc.returncode != 0:
@@ -107,10 +125,20 @@ def seed_runtime(base: Path, tick: datetime) -> Path:
     return seed
 
 
-def run_from_seed(seed: Path, base: Path, name: str, *, frozen: datetime, tick: datetime | None) -> dict:
+def run_from_seed(
+    seed: Path,
+    base: Path,
+    name: str,
+    *,
+    frozen: datetime,
+    tick: datetime | None,
+    prefetch_at: datetime | None = None,
+) -> dict:
     runtime = base / name
     shutil.copytree(seed, runtime)
-    return run_cycle(runtime, base / f"{name}.json", frozen=frozen, tick=tick)
+    return run_cycle(
+        runtime, base / f"{name}.json", frozen=frozen, tick=tick, prefetch_at=prefetch_at
+    )
 
 
 def strip_volatile(value: Any) -> Any:

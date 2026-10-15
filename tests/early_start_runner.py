@@ -87,7 +87,12 @@ def _jsonable(value: Any) -> Any:
     return repr(value)
 
 
-def run(runtime: Path, frozen: datetime, tick: datetime | None) -> dict:
+def run(
+    runtime: Path,
+    frozen: datetime,
+    tick: datetime | None,
+    prefetch_at: datetime | None = None,
+) -> dict:
     _configure_env(runtime)
     _block_network()
     import time_machine
@@ -97,6 +102,17 @@ def run(runtime: Path, frozen: datetime, tick: datetime | None) -> dict:
         import main as main_module
 
         _install_stubs(main_module, capture, traveller)
+        if prefetch_at is not None:
+            # Daemon order: prefetch in the idle time, then the cycle — same process,
+            # so the in-process caches carry over as in production.
+            from data.live_prefetch import prefetch_live_inputs
+
+            traveller.move_to(prefetch_at)
+            result = prefetch_live_inputs(
+                (tick or frozen).replace(tzinfo=None), frozen.replace(tzinfo=None)
+            )
+            capture["prefetch"] = {"events": list(result.events), "errors": list(result.errors)}
+            traveller.move_to(frozen)
         if os.environ.get("EARLY_START_TRACE_CLOCK") == "1":
             _trace_clock_reads(capture)
         main_module.main(
@@ -309,6 +325,14 @@ def _install_stubs(main_module, capture: dict, traveller) -> None:
 
     main_module._hold_until_tick = hold
 
+    real_append = main_module.cycle_duration_stats.append_record
+
+    def append_record(record, **kwargs):
+        capture["cycle_events"] = list(record.get("events") or [])
+        return real_append(record, **kwargs)
+
+    main_module.cycle_duration_stats.append_record = append_record
+
     def save_run_state(payload):
         capture["run_state"] = payload
 
@@ -348,11 +372,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runtime", required=True, type=Path)
     parser.add_argument("--frozen", required=True)
     parser.add_argument("--tick")
+    parser.add_argument("--prefetch-at")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
     frozen = datetime.fromisoformat(args.frozen)
     tick = datetime.fromisoformat(args.tick) if args.tick else None
-    capture = run(args.runtime, frozen, tick)
+    prefetch_at = datetime.fromisoformat(args.prefetch_at) if args.prefetch_at else None
+    capture = run(args.runtime, frozen, tick, prefetch_at)
     args.out.write_text(json.dumps(capture, indent=1, sort_keys=True), encoding="utf-8")
     return 0
 

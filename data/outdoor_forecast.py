@@ -12,7 +12,7 @@ from runtime_store.cycle_duration_stats import (
     EVENT_WEATHER_FETCH,
     record_event as record_cycle_event,
 )
-from runtime_store.planning_clock import planning_now
+from runtime_store.planning_clock import cache_entry_fresh, planning_now
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +201,9 @@ def get_hourly_outdoor_forecast_c(
     cache_key = (round(lat, 4), round(lon, 4), forecast_days)
     cached = _CACHE.get(cache_key)
     now = datetime.now()
-    if cached and now - cached[0] < _CACHE_TTL:
+    if cached and cache_entry_fresh(
+        cached[0].timestamp(), _CACHE_TTL.total_seconds(), now_epoch=now.timestamp()
+    ):
         hourly = cached[1]
     else:
         record_cycle_event(EVENT_WEATHER_FETCH)
@@ -242,7 +244,9 @@ def get_hourly_tilted_irradiance_forecast_wm2(
     cache_key = (round(lat, 4), round(lon, 4), forecast_days, tilt, azimuth)
     cached = _TILTED_CACHE.get(cache_key)
     now = datetime.now()
-    if cached and now - cached[0] < _CACHE_TTL:
+    if cached and cache_entry_fresh(
+        cached[0].timestamp(), _CACHE_TTL.total_seconds(), now_epoch=now.timestamp()
+    ):
         hourly = cached[1]
     else:
         record_cycle_event(EVENT_WEATHER_FETCH)

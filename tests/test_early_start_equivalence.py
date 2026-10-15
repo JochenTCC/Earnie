@@ -51,3 +51,37 @@ def test_early_start_plans_and_writes_like_a_cycle_at_the_tick(name, tmp_path):
             f"{name} lead {lead}s: early cycle differs from the cycle at the tick:\n"
             + "\n".join(differences[:30])
         )
+
+
+# Network-fetch events the prefetch is meant to take off the cycle.
+_PREFETCHED_EVENTS = {"day_ahead_fetch", "price_feature_refresh", "weather_fetch"}
+
+
+# Ticks without a day-ahead publication between prefetch and cycle (the fake
+# auction publishes at 12:52; then the cycle legitimately fetches once more).
+_PREFETCH_TICKS = {
+    "afternoon_hour": datetime(2026, 10, 15, 15, 0, tzinfo=TZ),
+    "midnight": TICKS["midnight"],
+}
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("name", sorted(_PREFETCH_TICKS))
+def test_prefetch_keeps_the_plan_and_takes_fetches_off_the_cycle(name, tmp_path):
+    """Daemon order: prefetch ~14 min before the next start, then the early cycle.
+
+    The cycle must plan and write the same as without prefetch, and must not hit
+    the network for the prefetched inputs (warm, still-valid caches).
+    """
+    tick = _PREFETCH_TICKS[name]
+    seed = seed_runtime(tmp_path, tick)
+    start = shift(tick, -60)
+    plain = run_from_seed(seed, tmp_path, "plain", frozen=start, tick=tick)
+    warmed = run_from_seed(
+        seed, tmp_path, "warmed", frozen=start, tick=tick, prefetch_at=shift(tick, -14 * 60)
+    )
+    assert warmed["prefetch"]["errors"] == []
+    assert set(plain["cycle_events"]) & _PREFETCHED_EVENTS, "baseline fetched nothing"
+    assert not set(warmed["cycle_events"]) & _PREFETCHED_EVENTS, warmed["cycle_events"]
+    differences = diff(strip_volatile(plain), strip_volatile(warmed))
+    assert not differences, "\n".join(differences[:30])

@@ -162,6 +162,20 @@ def _hold_until_tick(
             on_poll()
 
 
+def _prefetch_for_next_cycle(tick: datetime, start_at: datetime) -> None:
+    """Warm slow input caches for the next cycle in the idle time (spec §8)."""
+    from data.live_prefetch import MIN_IDLE_SEC, prefetch_live_inputs
+
+    idle = (start_at - datetime.now()).total_seconds()
+    if idle < MIN_IDLE_SEC:
+        logger.info("Prefetch übersprungen: nur %.0f s bis zum nächsten Start.", idle)
+        return
+    try:
+        prefetch_live_inputs(tick, start_at)
+    except Exception as exc:  # noqa: BLE001 — the cycle fetches its inputs itself
+        logger.warning("Prefetch für %s abgebrochen (%s).", tick.strftime("%H:%M"), exc)
+
+
 def _read_pv_delta(out_of_band: bool) -> float:
     if out_of_band:
         pv_delta = pv_tuner.get_pv_delta_peek()
@@ -1170,6 +1184,8 @@ if __name__ == "__main__":
             lead_was_capped = decision.capped
             now = datetime.now()
             next_tick, start_at = next_regular_start(now, decision.lead_sec)
+            _prefetch_for_next_cycle(next_tick, start_at)
+            now = datetime.now()
             wait_sec = max(0.0, (start_at - now).total_seconds())
             if early_start_on:
                 pending_tick, pending_lead_sec = next_tick, decision.lead_sec
