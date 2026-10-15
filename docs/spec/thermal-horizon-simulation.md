@@ -1,6 +1,6 @@
 # Thermal horizon simulation — year model once for parameters, horizon only in Live
 
-**Status:** Approved 2026-10-15 — P1 in progress  
+**Status:** Approved 2026-10-15 — P1–P2 implemented on branch, P3–P5 open  
 **Date:** 2026-10-15  
 **Branch:** `feat/thermal-horizon-sim` (based on `perf/thermal-year-cache`, PR #36)  
 **Related:** [`thermals-p2.md`](thermals-p2.md) (§ Live / MILP store floor), [`early-start-scheduling.md`](early-start-scheduling.md), backlog epic **ThermalHorizon** P1–P5 (Version 2.7)

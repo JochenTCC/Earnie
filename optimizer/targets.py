@@ -131,35 +131,9 @@ def _live_heat_storage_horizon_need_kwh(
     optimization_matrix: list,
 ) -> float | None:
     """Live + heat_storage: floor + opp electric kWh (HDD calendar sum is wrong here)."""
-    from data.outdoor_forecast import get_outdoor_forecast_with_fallback
-    from optimizer.thermal_coupled import heat_storage_enabled
-    from optimizer.thermal_live_store import plan_live_store_for_thermal_consumer
-    from optimizer.thermal_targets import thermal_horizon_hours_from_slots
+    from optimizer.thermal_live_store import live_store_plan_for_matrix
 
-    thermal = source.get("thermal") or source
-    if not heat_storage_enabled(thermal.get("heat_storage")):
-        return None
-    horizon_h = thermal_horizon_hours_from_slots(len(optimization_matrix))
-    fallback_ambient = 10.0
-    try:
-        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
-        from settings.ehal_marker_resolve import marker_sens_temperature_outside
-
-        live_amb = _read_optional_temp_c(marker_sens_temperature_outside(house_doc=None))
-        if live_amb is not None:
-            fallback_ambient = float(live_amb)
-    except Exception:
-        pass
-    ambient_forecast, _src = get_outdoor_forecast_with_fallback(
-        horizon=horizon_h,
-        fallback_ambient_c=fallback_ambient,
-    )
-    plan = plan_live_store_for_thermal_consumer(
-        source,
-        house_profile=profile,
-        ambient_forecast_c=ambient_forecast,
-        house_doc=None,
-    )
+    plan = live_store_plan_for_matrix(source, profile, optimization_matrix)
     if plan is None:
         return None
     return round(float(plan.floor_electric_kwh) + float(plan.opp_cap_electric_kwh), 3)

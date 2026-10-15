@@ -451,6 +451,84 @@ def _thermal_with_nominal(thermal: dict, consumer: dict) -> dict:
     return {**thermal, "nominal_power_kw": float(consumer.get("nominal_power_kw", 3.0) or 3.0)}
 
 
+def live_store_plan_for_matrix(
+    source: dict,
+    house_profile: dict,
+    matrix: list,
+) -> LiveStorePlan | None:
+    """Live store plan over the matrix horizon; built once per Live cycle.
+
+    Flex contexts, horizon targets and both MILP runs of a cycle share one plan
+    (one set of readings + forecast) via ``optimizer.live_cycle_scope``.
+    """
+    thermal = source.get("thermal") or source
+    if not heat_storage_enabled(thermal.get("heat_storage")) or not matrix:
+        return None
+    from optimizer.charging_context import matrix_slot_datetime
+    from optimizer.live_cycle_scope import cycle_memo
+    from optimizer.thermal_targets import thermal_horizon_hours_from_slots
+    from optimizer.thermal_year_cache import fingerprint_json
+
+    horizon_h = thermal_horizon_hours_from_slots(len(matrix))
+    key = (
+        "live_store_plan",
+        fingerprint_json(source),
+        horizon_h,
+        matrix_slot_datetime(matrix, 0).isoformat(),
+    )
+    return cycle_memo(
+        key, lambda: _build_live_store_plan(source, house_profile, horizon_h)
+    )
+
+
+def _build_live_store_plan(
+    source: dict,
+    house_profile: dict,
+    horizon_h: int,
+) -> LiveStorePlan | None:
+    from data.outdoor_forecast import get_outdoor_forecast_with_fallback
+
+    fallback_ambient = 10.0
+    try:
+        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
+        from settings.ehal_marker_resolve import marker_sens_temperature_outside
+
+        live_amb = _read_optional_temp_c(marker_sens_temperature_outside(house_doc=None))
+        if live_amb is not None:
+            fallback_ambient = float(live_amb)
+    except Exception:
+        pass
+    ambient_forecast, _src = get_outdoor_forecast_with_fallback(
+        horizon=horizon_h,
+        fallback_ambient_c=fallback_ambient,
+    )
+    return plan_live_store_for_thermal_consumer(
+        source,
+        house_profile=house_profile,
+        ambient_forecast_c=ambient_forecast,
+        house_doc=None,
+    )
+
+
+def live_store_slot_energy_kwh(matrix: list, plan: LiveStorePlan) -> list[float]:
+    """WP electric kWh per matrix slot from the plan's hourly electric (wall-clock hour)."""
+    from optimizer.charging_context import matrix_slot_datetime
+    from optimizer.slot_duration import energy_kwh_from_kw
+
+    if not matrix:
+        return []
+    start = matrix_slot_datetime(matrix, 0)
+    energies: list[float] = []
+    for index in range(len(matrix)):
+        hour_offset = int((matrix_slot_datetime(matrix, index) - start).total_seconds() // 3600)
+        if 0 <= hour_offset < len(plan.electric_by_hour):
+            # electric_by_hour is kWh per hour == mean kW over that hour.
+            energies.append(float(energy_kwh_from_kw([plan.electric_by_hour[hour_offset]])))
+        else:
+            energies.append(0.0)
+    return energies
+
+
 def map_forced_hours_to_slot_indices(
     matrix: list,
     forced_hour_flags: list[bool],

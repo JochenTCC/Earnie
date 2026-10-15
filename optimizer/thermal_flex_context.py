@@ -174,21 +174,23 @@ def resolve_thermal_flex_contexts(
         source = thermal_source_with_live_absent(
             source, live_absent_active=live_absent
         )
+        live_ctx = (
+            _live_store_flex_overlay(matrix, source, house_profile, consumer)
+            if is_live
+            else None
+        )
+        if live_ctx is not None:
+            # Live + heat storage: horizon plan only, no year profile (ThermalHorizon P2).
+            contexts[cid] = live_ctx
+            continue
         slot_energy = _slot_aligned_thermal_energy_kwh(
             source, matrix, climate=climate
         )
-        ctx: dict = {
+        contexts[cid] = {
             "daily_targets": _daily_targets_from_slot_energy(matrix, slot_energy),
             "slot_energy_kwh": slot_energy,
             "targets_slot_aligned": True,
         }
-        if is_live:
-            live_ctx = _live_store_flex_overlay(
-                matrix, source, house_profile, consumer
-            )
-            if live_ctx:
-                ctx.update(live_ctx)
-        contexts[cid] = ctx
     return contexts
 
 
@@ -198,41 +200,15 @@ def _live_store_flex_overlay(
     house_profile: dict,
     milp_consumer: dict,
 ) -> dict | None:
-    """Open-loop store floor + opportunistic scalars for Live snapshots only."""
-    from data.outdoor_forecast import get_outdoor_forecast_with_fallback
-    from optimizer.thermal_coupled import heat_storage_enabled
+    """Live + heat storage: store floor, opportunistic scalars and plan slot energy."""
     from optimizer.thermal_live_store import (
         live_min_kwh_by_day,
+        live_store_plan_for_matrix,
+        live_store_slot_energy_kwh,
         map_forced_hours_to_slot_indices,
-        plan_live_store_for_thermal_consumer,
     )
-    from optimizer.thermal_targets import thermal_horizon_hours_from_slots
 
-    thermal = source.get("thermal") or source
-    if not heat_storage_enabled(thermal.get("heat_storage")):
-        return None
-    horizon_h = thermal_horizon_hours_from_slots(len(matrix))
-    fallback_ambient = 10.0
-    try:
-        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
-        from settings.ehal_marker_resolve import marker_sens_temperature_outside
-
-        ambient_io = marker_sens_temperature_outside(house_doc=None)
-        live_amb = _read_optional_temp_c(ambient_io)
-        if live_amb is not None:
-            fallback_ambient = float(live_amb)
-    except Exception:
-        pass
-    ambient_forecast, _src = get_outdoor_forecast_with_fallback(
-        horizon=horizon_h,
-        fallback_ambient_c=fallback_ambient,
-    )
-    plan = plan_live_store_for_thermal_consumer(
-        source,
-        house_profile=house_profile,
-        ambient_forecast_c=ambient_forecast,
-        house_doc=None,
-    )
+    plan = live_store_plan_for_matrix(source, house_profile, matrix)
     if plan is None:
         return None
     eligible = consumer_thermal_eligible_indices(
@@ -241,7 +217,11 @@ def _live_store_flex_overlay(
     forced = map_forced_hours_to_slot_indices(
         matrix, plan.forced_hour_flags, eligible_indices=eligible
     )
+    slot_energy = live_store_slot_energy_kwh(matrix, plan)
     return {
+        "daily_targets": _daily_targets_from_slot_energy(matrix, slot_energy),
+        "slot_energy_kwh": slot_energy,
+        "targets_slot_aligned": True,
         "forced_indices": forced,
         "floor_kwh": plan.floor_electric_kwh,
         "opp_cap_kwh": plan.opp_cap_electric_kwh,
@@ -408,7 +388,10 @@ def _add_one_thermal_flex_consumer(
     daily_targets: dict[date, float] = dict(ctx.get("daily_targets") or {})
     live_day_min: dict[date, float] = dict(ctx.get("live_day_min_kwh") or {})
     forced_indices = [int(i) for i in (ctx.get("forced_indices") or [])]
-    if not daily_targets and not live_day_min and not forced_indices:
+    # Live store overlay: day targets are informational (plan energy), so an
+    # empty plan day must not skip the structural pulse limits below.
+    live_overlay = ctx.get("live_store_start_c") is not None
+    if not daily_targets and not live_day_min and not forced_indices and not live_overlay:
         return
     on_vars = model.consumer_on[cid]
     max_hours = _max_on_hours(consumer)
@@ -452,7 +435,6 @@ def _add_one_thermal_flex_consumer(
             )
         live_min = float(live_day_min.get(day, 0.0) or 0.0)
         # Live store overlay: HDD ignored; floor via forced_indices; live_min = opp only.
-        live_overlay = ctx.get("live_store_start_c") is not None
         want = live_min if live_overlay else max(prorated, live_min)
         if forced_indices:
             op_max_kwh = max_deliverable
