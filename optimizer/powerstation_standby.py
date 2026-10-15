@@ -268,20 +268,37 @@ def apply_standby_load_relief(
     matrix: list[dict[str, Any]],
     plans: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Subtract islanded attached load from house ``expected_p_act`` (copy)."""
+    """Adjust house ``expected_p_act`` for standby island/charge (copy).
+
+    - Island (battery source): subtract attached ``load_kw`` (served by the pack).
+    - Grid pass-through with planned ``charge_kw``: add that charge so the house
+      MILP covers it from grid buy and/or house-battery discharge.
+    """
     if not plans or not matrix:
         return matrix
     out = [dict(row) for row in matrix]
     for t, row in enumerate(out):
+        if "expected_p_act" not in row:
+            continue
         relief = 0.0
+        charge_kw = 0.0
         for plan in plans.values():
             selects = plan.get("source_select") or []
+            charges = plan.get("charge_kw") or []
             if t < len(selects) and int(selects[t]) == SOURCE_BATTERY:
                 relief += float(plan.get("load_kw") or 0.0)
-        if relief <= 0.0:
-            continue
-        if "expected_p_act" in row:
-            row["expected_p_act"] = max(0.0, float(row["expected_p_act"] or 0.0) - relief)
+            if (
+                t < len(selects)
+                and int(selects[t]) == SOURCE_GRID
+                and t < len(charges)
+            ):
+                charge_kw += max(0.0, float(charges[t] or 0.0))
+        p_act = float(row["expected_p_act"] or 0.0)
+        if relief > 0.0:
+            p_act = max(0.0, p_act - relief)
+        if charge_kw > 0.0:
+            p_act = p_act + charge_kw
+        row["expected_p_act"] = p_act
     return out
 
 

@@ -285,8 +285,15 @@ def _prepare_horizon_state(
     standby_plans, standby_packs_by_id = _resolve_standby_chart_plans(
         optimization_matrix, current_soc_by_id
     )
+    matrix = optimization_matrix
+    if standby_plans:
+        from optimizer.powerstation_standby import apply_standby_load_relief
+
+        # Island relief + grid-pass-through charge must hit house MILP / Chart1
+        # energy balance (same as main.py live path).
+        matrix = apply_standby_load_relief(optimization_matrix, standby_plans)
     return _HorizonSetup(
-        matrix=optimization_matrix,
+        matrix=matrix,
         consumers_cfg=consumers_cfg,
         battery_params=agg_battery,
         batteries=batteries,

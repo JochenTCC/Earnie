@@ -564,6 +564,7 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
                     ps: {
                         "slot0_source": (plan.get("source_select") or [None])[0],
                         "load_kw": plan.get("load_kw"),
+                        "slot0_charge_kw": (plan.get("charge_kw") or [None])[0],
                     }
                     for ps, plan in standby_plans.items()
                 },

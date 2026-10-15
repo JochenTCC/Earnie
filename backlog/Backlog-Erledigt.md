@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Standby Powerstation charge not covered by house grid/battery energy (2026-10-15)
+
+- [x] **Standby Powerstation charge not covered by house grid/battery energy** — **Verified** (2026-10-15) on `fix/powerstation-charge-energy-balance`
+  - Symptom (dump `debug_dump_20261015_145649`, Ecoflow `standby_backup`): Chart1 SoC rises (e.g. 67.8→100%) while house battery/grid cover is short.
+  - Cause: standby `charge_kw` planned + SoC advanced, but not added to house `expected_p_act` (live and Chart1 horizon).
+  - Fix: `apply_standby_load_relief` also adds grid-pass-through charge; wired in `main.py` + `simulation.py` horizon setup.
+  - Tests: `tests/test_powerstation_2_7_h.py` (`test_apply_standby_load_relief_adds_grid_charge_to_house_load`).
+
 ### Bugfix — Heat storage: Live never applied solar-collector heat (2026-10-15)
 
 - [x] **Heat storage: Live never applied solar-collector heat** — **Verified live** (2026-10-15)

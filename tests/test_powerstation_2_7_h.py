@@ -225,6 +225,25 @@ def test_apply_standby_load_relief():
     assert matrix[0]["expected_p_act"] == pytest.approx(1.0)  # original untouched
 
 
+def test_apply_standby_load_relief_adds_grid_charge_to_house_load():
+    """Standby charge on grid pass-through must raise house expected_p_act."""
+    matrix = [
+        {"expected_p_act": 1.0, "k_act": 0.05},
+        {"expected_p_act": 1.0, "k_act": 0.40},
+    ]
+    plans = {
+        "delta3": {
+            "source_select": [SOURCE_GRID, SOURCE_BATTERY],
+            "charge_kw": [0.5, 0.0],
+            "load_kw": 0.2,
+        }
+    }
+    out = apply_standby_load_relief(matrix, plans)
+    assert out[0]["expected_p_act"] == pytest.approx(1.5)
+    assert out[1]["expected_p_act"] == pytest.approx(0.8)
+    assert matrix[0]["expected_p_act"] == pytest.approx(1.0)
+
+
 def test_ha_switch_write_source_select():
     adapter = HaAdapter(
         HaConfig(
