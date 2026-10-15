@@ -96,6 +96,8 @@ Bei `type: thermal_annual` kann unter `thermal.heat_storage` ein **Pufferspeiche
 
 **Live-Band:** Mit aktivem `heat_storage` erzwingt der Live-Optimierer WP-Freigabe, wenn die Open-Loop-Prognose von `T_eq` unter `setpoint − tolerance` fiele (wie in der Jahressimulation), und zusätzlich kurzfristig wenn `T_low` unter derselben Grenze liegt. Darüber hinaus kann Live opportunistisch Energie bis zum Sollwert einplanen; die Jahressimulation bleibt reines Bang-Bang am Boden.
 
+**Live-Prognose über den Planungshorizont:** Der Live-Optimierer simuliert den Speicher nur über den Planungshorizont – ab der gemessenen Speichertemperatur, mit Außentemperatur **und Kollektor-Einstrahlung aus der Open-Meteo-Wetterprognose** (Neigung/Ausrichtung aus `solar_thermal_tilt_deg` / `solar_thermal_azimuth_deg`). Fällt die Einstrahlungsprognose aus, nutzt Earnie die Werte des letzten vollständigen Kalenderjahres am selben Tag und zur selben Stunde und schreibt eine Warnung ins `earnie.log`; welche Quelle verwendet wurde, steht je Lauf in `optimization_history.jsonl` (`collector_solar_source`: `open_meteo`, `fallback_archive_year` oder `none`). Den Wärmeverlust des Gebäudes (H, ohne eigenen Wert in `house_heat_loss_kw_per_k`) kalibriert Earnie aus dem **letzten vollständigen Kalenderjahr** des Open-Meteo-Archivs – nicht aus dem laufenden, unvollständigen Jahr.
+
 Entwickler-Spec: [thermals-p2.md](../spec/thermals-p2.md).
 
 ## E-Auto: `charging_schedule`

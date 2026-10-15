@@ -5,7 +5,8 @@ scalar kWh bounds only.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import logging
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -21,6 +22,8 @@ from optimizer.thermal_house import (
     step_house_hour,
 )
 from optimizer.thermal_model import ThermalBand, capacity_kwh_per_k_from_volume, heat_content_kwh
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,8 @@ class LiveStorePlan:
     electric_by_hour: list[float]
     store_temp_c: list[float] = field(default_factory=list)
     q_sim_kwh: list[float] = field(default_factory=list)
+    # Collector heat input: SOLAR_SOURCE_* (ThermalHorizon P3); "provided" when passed in.
+    solar_source: str = "provided"
 
 
 def resolve_heat_storage_setpoint_band(heat_storage: dict) -> ThermalBand:
@@ -333,27 +338,65 @@ def plan_live_store_horizon(
     )
 
 
+SOLAR_SOURCE_NONE = "none"
+SOLAR_SOURCE_FORECAST = "open_meteo"
+SOLAR_SOURCE_ARCHIVE_FALLBACK = "fallback_archive_year"
+
+
 def resolve_live_collector_solar_kw(
     thermal: dict,
     house_profile: dict | None,
     horizon: int,
     *,
     start: datetime | None = None,
-) -> list[float]:
-    """Hourly collector heat into the store (kW_th ≈ kWh per hour) for Live.
+) -> tuple[list[float], str]:
+    """Hourly collector heat into the store (kW_th ≈ kWh per hour) for Live, plus source.
 
-    Uses the last full Open-Meteo archive year at matching DOY/hour (same
-    irradiance source as year-sim). Returns zeros when ``solar_thermal_area_m2``
-    is not configured. Raises if area > 0 but lat/lon or climate cannot be loaded.
+    Open-Meteo forecast irradiance on the collector surface (ThermalHorizon P3).
+    If the forecast fails: last full archive year at the same DOY/hour, with a
+    warning and source ``fallback_archive_year`` (owner decision 2026-10-15).
+    Zeros when ``solar_thermal_area_m2`` is not configured. Raises if area > 0
+    but lat/lon cannot be resolved.
     """
     if horizon < 1:
         raise ValueError("horizon muss mindestens 1 sein")
     area_m2 = float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0)
     if area_m2 <= 0.0:
-        return [0.0] * horizon
-    from data.modeled_climate import ModeledClimateContext, collector_surface_from_thermal
-    from data.open_meteo_solar_archive import last_full_archive_year
+        return [0.0] * horizon, SOLAR_SOURCE_NONE
+    from data.modeled_climate import collector_surface_from_thermal
+    from data.open_meteo_solar_archive import irradiance_wm2_to_thermal_kwh
+    from data.outdoor_forecast import get_hourly_tilted_irradiance_forecast_wm2
 
+    profile = _profile_with_geo(house_profile)
+    surface = collector_surface_from_thermal(thermal, profile)
+    start_dt = (start or datetime.now()).replace(minute=0, second=0, microsecond=0)
+    try:
+        wm2 = get_hourly_tilted_irradiance_forecast_wm2(
+            horizon=horizon,
+            tilt_deg=surface.tilt_deg,
+            azimuth_deg=surface.azimuth_deg,
+            latitude=float(profile["latitude"]),
+            longitude=float(profile["longitude"]),
+            start=start_dt,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Kollektor-Einstrahlungsprognose fehlgeschlagen (%s) – nutze Vorjahreswerte "
+            "(Open-Meteo-Archiv) für den Speicherplan.",
+            exc,
+        )
+        return (
+            _archive_year_collector_solar_kw(profile, surface, area_m2, start_dt, horizon),
+            SOLAR_SOURCE_ARCHIVE_FALLBACK,
+        )
+    # Same conversion and rounding as the archive bundle (thermal_kwh_at).
+    return (
+        [round(irradiance_wm2_to_thermal_kwh(value, area_m2), 6) for value in wm2],
+        SOLAR_SOURCE_FORECAST,
+    )
+
+
+def _profile_with_geo(house_profile: dict | None) -> dict:
     profile = dict(house_profile) if isinstance(house_profile, dict) else {}
     if "latitude" not in profile or "longitude" not in profile:
         import config as _cfg
@@ -365,11 +408,23 @@ def resolve_live_collector_solar_kw(
             )
         profile.setdefault("latitude", float(_cfg.get("LATITUDE", cast=float)))
         profile.setdefault("longitude", float(_cfg.get("LONGITUDE", cast=float)))
+    return profile
+
+
+def _archive_year_collector_solar_kw(
+    profile: dict,
+    surface,
+    area_m2: float,
+    start_dt: datetime,
+    horizon: int,
+) -> list[float]:
+    """Last full archive year at the same DOY/hour (pre-P3 behaviour, now fallback only)."""
+    from data.modeled_climate import ModeledClimateContext
+    from data.open_meteo_solar_archive import last_full_archive_year
+
     climate = ModeledClimateContext.for_house_profile(profile, kwp=0.0)
     archive_year = last_full_archive_year()
     bundle = climate._bundle_for_calendar_year(archive_year)
-    surface = collector_surface_from_thermal(thermal, profile)
-    start_dt = (start or datetime.now()).replace(minute=0, second=0, microsecond=0)
     solar: list[float] = []
     for offset in range(horizon):
         slot = start_dt + timedelta(hours=offset)
@@ -400,8 +455,9 @@ def plan_live_store_for_thermal_consumer(
     if storage is None:
         return None
     resolved_solar = solar_forecast_kw
+    solar_source = "provided"
     if resolved_solar is None:
-        resolved_solar = resolve_live_collector_solar_kw(
+        resolved_solar, solar_source = resolve_live_collector_solar_kw(
             thermal, house_profile, len(ambient_forecast_c)
         )
     band = ThermalBand(storage["setpoint_c"], storage["tolerance_c"])
@@ -422,7 +478,7 @@ def plan_live_store_for_thermal_consumer(
         house_h = house_thermal_parameters(
             _thermal_with_nominal(thermal, consumer), house_profile=house_profile
         ).house_heat_loss_kw_per_k
-    return plan_live_store_horizon(
+    plan = plan_live_store_horizon(
         start_temp_c=readings.temp_eq_c,
         ambient_forecast_c=ambient_forecast_c,
         band=band,
@@ -442,6 +498,7 @@ def plan_live_store_for_thermal_consumer(
         used_measured_eq=readings.used_measured_eq,
         used_measured_low=readings.used_measured_low,
     )
+    return replace(plan, solar_source=solar_source)
 
 
 def _thermal_with_nominal(thermal: dict, consumer: dict) -> dict:
@@ -624,6 +681,7 @@ def build_heat_storage_observability(
         },
         "used_measured_eq": plan.used_measured_eq,
         "used_measured_low": plan.used_measured_low,
+        "collector_solar_source": plan.solar_source,
         "horizon_q_sim_kwh": [round(v, 3) for v in plan.q_sim_kwh],
     }
 

@@ -1,6 +1,6 @@
 # Thermal horizon simulation — year model once for parameters, horizon only in Live
 
-**Status:** Approved 2026-10-15 — P1–P2 implemented on branch, P3–P5 open  
+**Status:** Approved 2026-10-15 — P1–P3 implemented on branch, P4–P5 open  
 **Date:** 2026-10-15  
 **Branch:** `feat/thermal-horizon-sim` (based on `perf/thermal-year-cache`, PR #36)  
 **Related:** [`thermals-p2.md`](thermals-p2.md) (§ Live / MILP store floor), [`early-start-scheduling.md`](early-start-scheduling.md), backlog epic **ThermalHorizon** P1–P5 (Version 2.7)
@@ -79,8 +79,8 @@ New `plan_live_house_horizon(...)` in `thermal_live_store.py` (reuses `step_hous
 
 `resolve_live_collector_solar_kw` reads last year's irradiance at today's DOY/hour. The collector heat is an input of the same horizon simulation as the outdoor temperature (store energy balance in `step_coupled_hour`), so it belongs to this epic — with storage it moves the forced WP hours directly.
 
-- Extend the existing Open-Meteo forecast request in `data/outdoor_forecast.py` (`hourly=temperature_2m` → `temperature_2m,global_tilted_irradiance` with `tilt` / `azimuth` of the collector surface): one request, one cache, one shadow-feed key per surface. Open-Meteo takes one tilt/azimuth per request; installations have one collector surface today.
-- Azimuth convention: map `collector_surface_from_thermal` (as used by the archive path) to Open-Meteo's (0° = south, −90° = east); unit test with a known surface.
+- `data/outdoor_forecast.get_hourly_tilted_irradiance_forecast_wm2`: one Open-Meteo forecast request `hourly=temperature_2m,global_tilted_irradiance` with `tilt` / `azimuth` of the collector surface, cached per surface (30 min TTL); the temperature part seeds the outdoor-temperature cache for the same location. Open-Meteo takes one tilt/azimuth per request; installations have one collector surface today.
+- Azimuth convention: `collector_surface_from_thermal` already uses Open-Meteo's convention (0° = south) — the archive path passes it unchanged; the forecast rounds tilt/azimuth to whole degrees like the archive.
 - Convert W/m² → kW_th with the same function as the year sim (`open_meteo_solar_archive.irradiance_wm2_to_thermal_kwh`), so forecast and parameters stay on one collector model.
 - Source label like the ambient (`open_meteo` / `fallback_archive_year`, §7 Q4) in `thermal_observability`; a fallback logs a warning.
 - **Result change:** forced WP hours / store plan follow the forecast sunshine instead of last year's.
