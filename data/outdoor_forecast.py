@@ -15,7 +15,14 @@ from runtime_store.cycle_duration_stats import (
 
 logger = logging.getLogger(__name__)
 
+HOURLY_TEMP_VAR = "temperature_2m"
+HOURLY_TILTED_VAR = "global_tilted_irradiance"
+
 _CACHE: dict[tuple[float, float, int], tuple[datetime, list[tuple[datetime, float]]]] = {}
+# (lat, lon, forecast_days, tilt, azimuth) → (fetched_at, hourly W/m²)
+_TILTED_CACHE: dict[
+    tuple[float, float, int, int, int], tuple[datetime, list[tuple[datetime, float]]]
+] = {}
 _CACHE_TTL = timedelta(minutes=30)
 _OPEN_METEO_MAX_FORECAST_DAYS = 16
 _OPEN_METEO_MIN_FORECAST_DAYS = 2
@@ -40,14 +47,29 @@ def _fetch_open_meteo_hourly(
     *,
     forecast_days: int,
 ) -> list[tuple[datetime, float]]:
+    return _fetch_open_meteo_hourly_vars(
+        lat, lon, forecast_days=forecast_days, hourly_vars=(HOURLY_TEMP_VAR,)
+    )[HOURLY_TEMP_VAR]
+
+
+def _fetch_open_meteo_hourly_vars(
+    lat: float,
+    lon: float,
+    *,
+    forecast_days: int,
+    hourly_vars: tuple[str, ...],
+    extra_params: dict | None = None,
+) -> dict[str, list[tuple[datetime, float]]]:
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
         "longitude": lon,
-        "hourly": "temperature_2m",
+        "hourly": ",".join(hourly_vars),
         "forecast_days": forecast_days,
         "timezone": "auto",
     }
+    if extra_params:
+        params.update(extra_params)
     from runtime_store.shadow.feed import url_hash
     from runtime_store.shadow.mode import is_shadow_mode
     from runtime_store.shadow.replay import replay_ext_payload
@@ -98,14 +120,16 @@ def _fetch_open_meteo_hourly(
     payload = ext_get(
         replay=_replay, live=_live, allow_live_fallback=True
     )
-    times = payload.get("hourly", {}).get("time", []) if isinstance(payload, dict) else []
-    temps = payload.get("hourly", {}).get("temperature_2m", []) if isinstance(payload, dict) else []
-    if not times or not temps or len(times) != len(temps):
-        raise ValueError("Open-Meteo: hourly temperature_2m unvollständig")
-    parsed: list[tuple[datetime, float]] = []
-    for ts_text, temp in zip(times, temps):
-        parsed.append((datetime.fromisoformat(str(ts_text)), float(temp)))
-    return parsed
+    hourly = payload.get("hourly", {}) if isinstance(payload, dict) else {}
+    times = hourly.get("time", [])
+    parsed_times = [datetime.fromisoformat(str(ts_text)) for ts_text in times]
+    out: dict[str, list[tuple[datetime, float]]] = {}
+    for var in hourly_vars:
+        values = hourly.get(var, [])
+        if not times or not values or len(times) != len(values) or None in values:
+            raise ValueError(f"Open-Meteo: hourly {var} unvollständig")
+        out[var] = [(ts, float(value)) for ts, value in zip(parsed_times, values)]
+    return out
 
 
 def _map_to_horizon(
@@ -186,6 +210,50 @@ def get_hourly_outdoor_forecast_c(
     except ValueError as exc:
         logger.warning("Open-Meteo-Mapping fehlgeschlagen: %s", exc)
         raise
+
+
+def get_hourly_tilted_irradiance_forecast_wm2(
+    *,
+    horizon: int,
+    tilt_deg: float,
+    azimuth_deg: float,
+    latitude: float,
+    longitude: float,
+    start: datetime | None = None,
+) -> list[float]:
+    """Hourly global tilted irradiance (W/m²) for one surface over ``horizon`` hours.
+
+    Same Open-Meteo conventions as the archive path (``tilt``/``azimuth`` rounded
+    to whole degrees, azimuth 0° = south). One request also carries
+    ``temperature_2m`` and seeds the outdoor-temperature cache for the location.
+    """
+    if horizon < 1:
+        raise ValueError("horizon muss mindestens 1 sein")
+    lat = float(latitude)
+    lon = float(longitude)
+    tilt = int(round(float(tilt_deg)))
+    azimuth = int(round(float(azimuth_deg)))
+    start_dt = (start or datetime.now()).replace(minute=0, second=0, microsecond=0)
+    forecast_days = _required_forecast_days(start_dt, horizon)
+
+    cache_key = (round(lat, 4), round(lon, 4), forecast_days, tilt, azimuth)
+    cached = _TILTED_CACHE.get(cache_key)
+    now = datetime.now()
+    if cached and now - cached[0] < _CACHE_TTL:
+        hourly = cached[1]
+    else:
+        record_cycle_event(EVENT_WEATHER_FETCH)
+        series = _fetch_open_meteo_hourly_vars(
+            lat,
+            lon,
+            forecast_days=forecast_days,
+            hourly_vars=(HOURLY_TEMP_VAR, HOURLY_TILTED_VAR),
+            extra_params={"tilt": tilt, "azimuth": azimuth},
+        )
+        hourly = series[HOURLY_TILTED_VAR]
+        _TILTED_CACHE[cache_key] = (now, hourly)
+        _CACHE[(round(lat, 4), round(lon, 4), forecast_days)] = (now, series[HOURLY_TEMP_VAR])
+    return _map_to_horizon(hourly, start_dt, horizon)
 
 
 def get_outdoor_forecast_with_fallback(

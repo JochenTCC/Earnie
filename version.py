@@ -7,7 +7,7 @@ from pathlib import Path
 
 # Local/UI may append a temporary debug id after -dev.N (e.g. 2.7.0-dev.48D1).
 # Image/packaging always normalize that away via normalize_for_image_build().
-__version__ = "2.7.0-dev.55"
+__version__ = "2.7.0-dev.57"
 
 # SemVer core + optional pre-release used for community candidates.
 # Trailing debug letters on -dev.N (e.g. D1) are intentionally not captured.

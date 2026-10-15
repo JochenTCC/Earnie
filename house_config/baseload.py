@@ -108,10 +108,9 @@ def consumer_annual_kwh(consumer: dict) -> float:
         # Open-Meteo only after Config() finished — during profile normalize inside
         # Config.__init__, modeled_climate → config is a circular import.
         if lat is not None and lon is not None and _config_ready_for_open_meteo():
-            from data.modeled_climate import thermal_annual_kwh_from_archive
+            from optimizer.thermal_parameters import house_thermal_parameters
 
-            annual_kwh, _year = thermal_annual_kwh_from_archive(thermal)
-            return annual_kwh
+            return house_thermal_parameters(thermal).annual_electric_kwh
         from data.heating_need import estimate_annual_kwh, heating_params_from_thermal
 
         return estimate_annual_kwh(**heating_params_from_thermal(thermal))
@@ -124,10 +123,9 @@ def consumer_annual_kwh(consumer: dict) -> float:
         lat = rc.get("latitude")
         lon = rc.get("longitude")
         if lat is not None and lon is not None and _config_ready_for_open_meteo():
-            from house_config.thermal_rc_profile import estimate_thermal_rc_annual_kwh
+            from optimizer.thermal_parameters import thermal_rc_parameters
 
-            annual_kwh, _year = estimate_thermal_rc_annual_kwh(consumer)
-            return annual_kwh
+            return thermal_rc_parameters(consumer).annual_electric_kwh
         return float(consumer.get("annual_kwh", 0.0) or 0.0)
     return float(consumer.get("annual_kwh", 0.0) or 0.0)
 

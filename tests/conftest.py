@@ -135,6 +135,16 @@ def _restore_default_test_config_after_test():
     _reinit_config_offline()
 
 
+@pytest.fixture(autouse=True)
+def _clear_thermal_year_caches():
+    """Year-model memo is process-wide; a monkeypatched loader must not see old hits."""
+    from optimizer.thermal_year_cache import clear_year_model_caches
+
+    clear_year_model_caches()
+    yield
+    clear_year_model_caches()
+
+
 def _loxone_integration_enabled() -> bool:
     if os.getenv("EARNIE_SKIP_LOXONE_INTEGRATION") == "1":
         return False

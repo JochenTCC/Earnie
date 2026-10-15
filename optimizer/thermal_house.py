@@ -206,7 +206,43 @@ def _step_hour_direct_wp(
     return next_house, electric
 
 
-def house_year_result(
+def _house_year_cache_key(kwargs: dict) -> tuple:
+    from optimizer.thermal_year_cache import call_key
+
+    key = call_key(kwargs)
+    uses_fixture = kwargs.get("hourly_temperature_c") is None and (
+        kwargs.get("daily_temps") is None or kwargs.get("daily_radiation_mj") is None
+    )
+    if not uses_fixture:
+        return key
+    # Offline climate fixture is read inside the simulation: key on its file state.
+    from data.heating_need import _resolve_climate_fixture_path
+
+    path = _resolve_climate_fixture_path()
+    stamp = (str(path), path.stat().st_mtime_ns) if path is not None else None
+    return key + (("_climate_fixture", stamp),)
+
+
+def _copy_house_year_result(result: HouseYearResult) -> HouseYearResult:
+    return HouseYearResult(
+        daily_electric_kwh=list(result.daily_electric_kwh),
+        hourly_house_temp_c=list(result.hourly_house_temp_c),
+        hourly_store_temp_c=list(result.hourly_store_temp_c),
+    )
+
+
+def house_year_result(**kwargs) -> HouseYearResult:
+    """Year simulation with house RC; memoized on the full inputs (see ``_simulate_house_year``)."""
+    from optimizer.thermal_year_cache import HOUSE_YEAR_CACHE
+
+    return HOUSE_YEAR_CACHE.get_or_compute(
+        _house_year_cache_key(kwargs),
+        lambda: _simulate_house_year(**kwargs),
+        _copy_house_year_result,
+    )
+
+
+def _simulate_house_year(
     *,
     living_area_m2: float,
     building_class: int,

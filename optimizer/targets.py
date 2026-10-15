@@ -131,38 +131,34 @@ def _live_heat_storage_horizon_need_kwh(
     optimization_matrix: list,
 ) -> float | None:
     """Live + heat_storage: floor + opp electric kWh (HDD calendar sum is wrong here)."""
-    from data.outdoor_forecast import get_outdoor_forecast_with_fallback
-    from optimizer.thermal_coupled import heat_storage_enabled
-    from optimizer.thermal_live_store import plan_live_store_for_thermal_consumer
-    from optimizer.thermal_targets import thermal_horizon_hours_from_slots
+    from optimizer.thermal_live_store import live_store_plan_for_matrix
 
-    thermal = source.get("thermal") or source
-    if not heat_storage_enabled(thermal.get("heat_storage")):
-        return None
-    horizon_h = thermal_horizon_hours_from_slots(len(optimization_matrix))
-    fallback_ambient = 10.0
-    try:
-        from integrations.ehal_live import read_optional_temp_c as _read_optional_temp_c
-        from settings.ehal_marker_resolve import marker_sens_temperature_outside
-
-        live_amb = _read_optional_temp_c(marker_sens_temperature_outside(house_doc=None))
-        if live_amb is not None:
-            fallback_ambient = float(live_amb)
-    except Exception:
-        pass
-    ambient_forecast, _src = get_outdoor_forecast_with_fallback(
-        horizon=horizon_h,
-        fallback_ambient_c=fallback_ambient,
-    )
-    plan = plan_live_store_for_thermal_consumer(
-        source,
-        house_profile=profile,
-        ambient_forecast_c=ambient_forecast,
-        house_doc=None,
-    )
+    plan = live_store_plan_for_matrix(source, profile, optimization_matrix)
     if plan is None:
         return None
     return round(float(plan.floor_electric_kwh) + float(plan.opp_cap_electric_kwh), 3)
+
+
+def _live_house_horizon_need_kwh(
+    source: dict,
+    profile: dict,
+    optimization_matrix: list,
+) -> float:
+    """Live without storage: WP electric of the house horizon plan over the matrix slots."""
+    from optimizer.thermal_live_store import (
+        hourly_electric_to_slot_energy_kwh,
+        live_house_plan_for_matrix,
+    )
+
+    plan = live_house_plan_for_matrix(source, profile, optimization_matrix)
+    if plan is None:
+        raise ValueError(
+            f"Live-Hausplan für '{source.get('id')}' fehlt (Wärmespeicher aktiv?)."
+        )
+    slot_energy = hourly_electric_to_slot_energy_kwh(
+        optimization_matrix, plan.electric_by_hour
+    )
+    return round(sum(slot_energy), 3)
 
 
 def resolve_thermal_annual_horizon_kwh(
@@ -172,7 +168,8 @@ def resolve_thermal_annual_horizon_kwh(
     """Horizon WP electric target for thermal_annual.
 
     Live + heat_storage: open-loop store floor + opp (not full-calendar HDD).
-    Otherwise: sum of HDD day targets over calendar dates in the matrix.
+    Live without storage: house horizon plan over the matrix slots (ThermalHorizon P4).
+    Otherwise (SE / backtesting): sum of HDD day targets over calendar dates in the matrix.
     """
     if not optimization_matrix:
         return 0.0
@@ -181,10 +178,10 @@ def resolve_thermal_annual_horizon_kwh(
         return 0.0
     from house_config.planning_flex_bridge import _house_thermal_consumers
     from optimizer.absent_mode import (
-        matrix_is_live_snapshot,
         resolve_absent_status,
         thermal_source_with_live_absent,
     )
+    from optimizer.live_cycle_scope import is_live_thermal_planning
     from optimizer.thermal_flex_context import thermal_daily_kwh_for_date
 
     thermal_by_id = {
@@ -194,7 +191,7 @@ def resolve_thermal_annual_horizon_kwh(
     if not source:
         return 0.0
     live_absent = False
-    is_live = matrix_is_live_snapshot(optimization_matrix)
+    is_live = is_live_thermal_planning(optimization_matrix)
     if is_live:
         live_absent = bool(resolve_absent_status(profile)["effective"])
     source = thermal_source_with_live_absent(
@@ -206,6 +203,7 @@ def resolve_thermal_annual_horizon_kwh(
         )
         if live_need is not None:
             return float(live_need)
+        return _live_house_horizon_need_kwh(source, profile, optimization_matrix)
     total = 0.0
     dates = sorted(
         {

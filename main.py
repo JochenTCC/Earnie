@@ -25,6 +25,7 @@ from runtime_store.soc_plausibility import (
 from runtime_store import live_optimization_debug
 from runtime_store import cycle_duration_stats
 from runtime_store.cycle_timing import CycleTimer
+from optimizer.live_cycle_scope import live_cycle_scope
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
@@ -62,7 +63,9 @@ def main(
         timing = CycleTimer(slot_key=optimization_schedule.quarter_hour_slot_key())
         timing.activate()
         try:
-            _main_cycle(run_trigger, timing)
+            # One Live store plan (readings + forecast) per cycle: ThermalHorizon P2.
+            with live_cycle_scope():
+                _main_cycle(run_trigger, timing)
         finally:
             timing.finish()
 
