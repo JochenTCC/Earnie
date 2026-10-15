@@ -22,7 +22,7 @@ Goal: run a year simulation **only to derive parameters** (once per configuratio
 | B | `optimizer/thermal_live_store._year_ambient_for_house_h` | envelope `H` calibration from a year of outdoor temperature (no simulation, but needs a year series) | uses `datetime.now().year` → **current, partial** year; year sim uses `last_full_archive_year()` → two different `H` for the same house | **parameter** (§4.1), one reference year |
 | C | `optimizer/thermal_flex_context._slot_aligned_thermal_energy_kwh` → `modeled_consumer_kw_for_slots` | slot kWh from the year PWM profile → `daily_targets`, `slot_energy_kwh` | with heat storage (Live overlay) the MILP **ignores** it (`want = live_min`, thermals-p2 §5) — computed, then discarded; without storage it **is** the day target | horizon (§4.2, §4.3) |
 | D | `optimizer/targets.resolve_thermal_annual_horizon_kwh` | horizon target = Σ `thermal_daily_kwh_for_date` (year sim) | with storage: already Live plan; without storage: year sim | horizon (§4.3) |
-| E | `thermal_live_store.resolve_live_collector_solar_kw` | collector irradiance from the archive year at the same DOY/hour (lookup, no sim) | weather of last year on today's date | follow-up (§4.4) |
+| E | `thermal_live_store.resolve_live_collector_solar_kw` | collector irradiance from the archive year at the same DOY/hour (lookup, no sim) | **last year's** sunshine drives the Live store plan (forced WP hours) — material for any installation with `solar_thermal_area_m2 > 0` (owner installation: 10.3 m²) | horizon input (§4.4) |
 | F | `thermal_targets` (`daily_target_source = thermal`, pool `thermal_control`) | — | already horizon (`plan_minimum_heating` from measured water temp + forecast) | unchanged |
 
 Out of scope: backtesting / Szenario-Explorer (`consumption_mode = profile_spec`, `ModeledClimateContext`) and the HK temperature charts (`data/modeled_temperatures.py`). There the continuous year simulation **is** the simulated ground truth (state carried across days, historical weather); the memo of PR #36 covers their cost.
@@ -30,7 +30,7 @@ Out of scope: backtesting / Szenario-Explorer (`consumption_mode = profile_spec`
 ## 3. Principle
 
 1. **Parameters** (slow, rare): one year simulation per `(thermal config, reference climate year)` yields a small, explicit parameter set. Reference year = `last_full_archive_year()` everywhere.
-2. **Horizon** (fast, every cycle): RC simulation over the planning horizon only (≤ ~48 h), start state = measurement where available, ambient = `get_outdoor_forecast_with_fallback` (Open-Meteo forecast, existing fallback to the live outdoor reading with its source logged).
+2. **Horizon** (fast, every cycle): RC simulation over the planning horizon only (≤ ~48 h), start state = measurement where available. **All weather inputs come from the forecast:** ambient = `get_outdoor_forecast_with_fallback` (Open-Meteo forecast, existing fallback to the live outdoor reading with its source logged), collector irradiance = Open-Meteo forecast (§4.4).
 3. Live never calls `house_year_result` / `_modeled_thermal_annual_hourly_kw` / `thermal_daily_kwh_for_date`. A test enforces this (§6).
 
 ## 4. Design
@@ -75,9 +75,15 @@ New `plan_live_house_horizon(...)` in `thermal_live_store.py` (reuses `step_hous
 - Legacy path `living_area_m2 <= 0` (open-loop HDD): horizon = Σ over forecast hours of the HDD formula with the annual parameter from §4.1 — no year series.
 - **Result change:** day targets follow the forecast instead of last year's weather; the hourly shape is bang-bang from the RC model instead of the PWM spread of a daily total.
 
-### 4.4 Follow-up (separate item): forecast irradiance for the collector
+### 4.4 Collector irradiance from the forecast
 
-`resolve_live_collector_solar_kw` reads last year's irradiance at today's DOY/hour. Replace with Open-Meteo forecast `global_tilted_irradiance` for the collector surface (tilt/azimuth from config). Needs a new forecast fetch + cache; not required for §4.1–§4.3.
+`resolve_live_collector_solar_kw` reads last year's irradiance at today's DOY/hour. The collector heat is an input of the same horizon simulation as the outdoor temperature (store energy balance in `step_coupled_hour`), so it belongs to this epic — with storage it moves the forced WP hours directly.
+
+- Extend the existing Open-Meteo forecast request in `data/outdoor_forecast.py` (`hourly=temperature_2m` → `temperature_2m,global_tilted_irradiance` with `tilt` / `azimuth` of the collector surface): one request, one cache, one shadow-feed key per surface. Open-Meteo takes one tilt/azimuth per request; installations have one collector surface today.
+- Azimuth convention: map `collector_surface_from_thermal` (as used by the archive path) to Open-Meteo's (0° = south, −90° = east); unit test with a known surface.
+- Convert W/m² → kW_th with the same function as the year sim (`open_meteo_solar_archive.irradiance_wm2_to_thermal_kwh`), so forecast and parameters stay on one collector model.
+- Source label like the ambient (`open_meteo` / fallback, **open question Q4**) in `thermal_observability`; a fallback logs a warning.
+- **Result change:** forced WP hours / store plan follow the forecast sunshine instead of last year's.
 
 ## 5. Phases
 
@@ -85,8 +91,11 @@ New `plan_live_house_horizon(...)` in `thermal_live_store.py` (reuses `step_hous
 |-------|-------|---------------|------|
 | **P1** | §4.1 parameters + callers A, B | `H` (reference year) → Live floor hours slightly | unit tests; regression deltas reviewed |
 | **P2** | §4.2 Live store context from Live plan, plan once per cycle | debug/savings `daily_targets` only | MILP plan hashes of store cases unchanged |
-| **P3** | §4.3 house-only horizon + legacy HDD horizon; remove year-sim calls from Live | targets for installations **without** storage | regression deltas reviewed, goldens updated with rationale |
-| **P4** | §6 guard: zero year sims in a Live cycle except §4.1 | none | test |
+| **P3** | §4.4 collector irradiance from the forecast | Live store plan / forced WP hours with solar thermal | unit tests (fetch, azimuth, conversion); NAS observability Q_sim vs Q_meas |
+| **P4** | §4.3 house-only horizon + legacy HDD horizon; remove year-sim calls from Live | targets for installations **without** storage | regression deltas reviewed, goldens updated with rationale |
+| **P5** | §6 guard: zero year sims in a Live cycle except §4.1 | none | test |
+
+Order rationale: P1–P3 change the owner installation (storage + 10.3 m² collector), P4 only installations without storage.
 
 Backtesting / SE: untouched in all phases.
 
@@ -99,7 +108,7 @@ Backtesting / SE: untouched in all phases.
 
 ## 7. Open questions
 
-- **Q1** Epic name and backlog slot: proposal epic **ThermalHorizon** (P1–P4) in Version 2.7, after the *Cycle speed-up* items; add to `roadmap-nomenclature.mdc`.
+- **Q1** Epic name and backlog slot: proposal epic **ThermalHorizon** (P1–P5) in Version 2.7, after the *Cycle speed-up* items; add to `roadmap-nomenclature.mdc`.
 - **Q2** Start state without storage (§4.3): target temperature vs. carried simulated state.
 - **Q3** Reference year for `H`: last full archive year (proposal) — confirm that `H` may move slightly for existing installations.
-- **Q4** Collector forecast irradiance (§4.4): separate follow-up item now, or later.
+- **Q4** Irradiance forecast unavailable (§4.4): (a) last year's value at the same DOY/hour (today's behaviour), labelled `fallback_archive_year` + warning — proposal; (b) zero collector heat (conservative: more forced WP hours); (c) fail the thermal plan loudly.
