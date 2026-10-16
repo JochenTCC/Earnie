@@ -50,6 +50,7 @@ alwaysApply: true
 * **Migration (`MIGRATION.md`):** Phases P1-P7
 * **Config migration (`ConfigMigration`, 2.7):** P0 (inventory + fixtures), P1 (step registry + planner/runner + CLI), P2 (startup gate), P3 (wizard UI), P4 (rule, release process, docs)
 * **Early-start scheduling (`EarlyStart`, 2.7):** P0 (always-on duration, event + punctuality recording), P1 (early start on by default: lead estimator + split cycle, commit at tick)
+* **Opt-in install counter (`UsagePing`, 2.7):** P1 (client + mock tests), P2 (daemon hook + milestones), P3 (consent UI), P4 (receiver + deployment), P5 (docs + privacy)
 * **Thermal horizon simulation (`ThermalHorizon`, 2.7):** P1 (thermal parameters from one year sim), P2 (Live store context without year profile), P3 (collector irradiance forecast), P4 (house-only horizon without storage), P5 (guard test)
 
 ## 5. Commit & Chat Syntax

@@ -36,15 +36,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - **Note:** Epic **EarlyStart** (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md)): **P0** (punctuality log) and **P1** (adaptive lead 15–90 s, plan for the tick, write at the tick; no state projection — owner decision 2026-10-15) and the **prefetch** follow-up → [Erledigt](Backlog-Erledigt.md). Success is judged from the `Pünktlichkeit:` line in `earnie.log` / `runtime/cycle_stats.jsonl`. Dropped with P1 scope: SoC/thermal/EV projection to T, pre-commit SoC drift check, MILP solver deadline (MILP < 1 s on NAS since dev.57).
 
-- [ ] **Epic ConfigMigration — guided config migration v3 → v4** (replaces *Full orchestration of model version migration*; design + owner decisions 2026-10-16: [`Config-Migration-Draft.md`](Config-Migration-Draft.md); inventory [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md))
-  - **Goal:** after an update the user is guided through the migration of the config JSON files (scope: the pack files only, no runtime state / history); chain from `earnie_data_model` 3 (models 1/2 = blocker "zu alt"); informed beforehand via release notes; Earnie asks before migrating, shows manual to-dos (text; download only where an export exists); `main.py` starts only after the migration; backup of the old JSON files, nothing else.
-  - **Note:** ConfigMigration **P0** (inventory + fixtures) → [Erledigt](Backlog-Erledigt.md). Inventory [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md); fixtures `tests/fixtures/migration/`.
-  - **Note:** ConfigMigration **P1** (registry + runner + CLI + goldens) → [Erledigt](Backlog-Erledigt.md). Package `runtime_store/migration/`; CLI `python -m scripts.migrate_config`.
-  - **Note:** ConfigMigration **P2** (startup gate) → [Erledigt](Backlog-Erledigt.md). Gate `runtime_store/migration/gate.py`; migration-mode stub `ui/pages/page_config_migration.py`.
-  - **Note:** ConfigMigration **P3** (wizard German) → [Erledigt](Backlog-Erledigt.md). Full wizard in `ui/pages/page_config_migration.py`; AppTest pair under `tests/apptest/`.
-  - [ ] **ConfigMigration P4 — process + docs:** rule `.cursor/rules/config-migration.mdc` + `CLAUDE.md` pointer; release checklist item + release-notes "Migration" section helper; German user docs (update + migration, backup location per channel: Docker / LoxBerry / HA add-on); spec `docs/spec/config-migration.md`.
-  - **Note:** Not in 2.7 → Edbert integration (Version 2.8): own tariff format version (`tariff_format`) for `grid_fees.json` / `tariffs.json` / `user_tariffs.json` and the Netznutzung split (draft §3.7). Until then `grid_fees.json` stays untagged and is exempt from the untagged blocker; `earnie_data_model` stamping on `grid_fees.json` fixed in P2 (Verifications Pending).
+- **Note:** Epic **ConfigMigration** P0–P4 (guided pack JSON migration v3→v4 + process/docs) → [Erledigt](Backlog-Erledigt.md). Spec [`docs/spec/config-migration.md`](../docs/spec/config-migration.md); draft [`Config-Migration-Draft.md`](Config-Migration-Draft.md). Tariff track (`tariff_format`, Netznutzung split) remains under **Version 2.8** Edbert integration; until then `grid_fees.json` stays untagged and exempt from the untagged blocker.
 
+- [ ] Introduce a proper Release-Notes workflow with my review and acceptance first
 - [ ] first alpha quality review
 - [ ] alpha release
 

@@ -89,6 +89,8 @@ Neue Einträge in `share/config/config.example.json` (Image-Vorlage) werden **ni
 - In der Streamlit-App: gelbes Banner mit fehlenden Pfaden und Beispielwerten
 - Fehlende Keys manuell in `earnie_env/config/config.json` ergänzen
 
+Das ist **kein** Datenmodell-Assistent. Wenn Earnie nach einem Image-Update nur den Migrations-Assistenten zeigt (Pack-JSON-Form), siehe [Betrieb → Update und Migration](betrieb.md#update-und-migration). Backups liegen dann unter `earnie_env/config/backups/pre-migration-…/`.
+
 
 
 ## Bootstrap manuell

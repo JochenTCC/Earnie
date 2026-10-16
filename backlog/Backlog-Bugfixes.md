@@ -42,8 +42,12 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] This warning pops up quite often:
+  2026-10-16 07:44:45 [WARNING] (data.price_forecast_live:322) - Preisprognose: EU-Features nicht ladbar (ValueError, mode=live_forecast) — Spiegelung als Fallback für fehlende Slots.
+  Can you find the reason and propose fixing (better than fallback to mirroring)?
+
+
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
-- [ ] Übernimm im HA-Addon die Positionsdaten aus HA, wenn möglich
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

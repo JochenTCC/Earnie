@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,22 @@ def _configure_console_utf8() -> None:
 
 
 _configure_console_utf8()
+
+TEST_TIMEZONE = "Europe/Vienna"
+
+
+def _pin_local_timezone() -> None:
+    """Naive local time in the code under test must match the Vienna fixtures.
+
+    CI runners are UTC; without this the early-start equivalence tests see
+    1-2 h shifted hours/days. Windows has no ``tzset`` (uses the system zone).
+    """
+    if hasattr(time, "tzset"):
+        os.environ["TZ"] = TEST_TIMEZONE
+        time.tzset()
+
+
+_pin_local_timezone()
 
 ROOT = Path(__file__).resolve().parents[1]
 DOTENV_PATHS = (ROOT / "earnie_env" / "config" / ".env", ROOT / ".env")

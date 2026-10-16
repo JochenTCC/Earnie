@@ -38,8 +38,8 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [Loxone-Anbindung](einrichtung/loxone-anbindung.md) — HTTP-Schnittstelle, Prüfskript
 - [Home Assistant + evcc](einrichtung/ha-evcc.md) — DACH-Pfad A2 (Compose) vs. Pfad B (bestehendes HA)
 - [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md) — Earnie als Supervisor-Add-on (Ingress, Options)
-- [Betrieb](einrichtung/betrieb.md) — `main.py` vs. App, Laufzeitdateien, Optimierungs-Takt
-- [Container](einrichtung/container.md) — Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, Migration
+- [Betrieb](einrichtung/betrieb.md) — `main.py` vs. App, Laufzeitdateien, Optimierungs-Takt, [Update und Migration](einrichtung/betrieb.md#update-und-migration)
+- [Container](einrichtung/container.md) — Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, fehlende Config-Keys nach Upgrade
 - [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) — Scope-A-Plugin (Docker-Wrapper) vs. manuelle Compose
 - [Proxmox LXC](einrichtung/proxmox-lxc.md) — Unprivileged LXC mit Docker Compose
 - [VMware `vctl`](einrichtung/vmware-vctl.md) — Windows-PC ohne Docker Desktop

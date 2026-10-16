@@ -1,7 +1,7 @@
 # Config migration orchestration — design draft
 
 Backlog item: epic **ConfigMigration** (Version 2.7, [Backlog.md](Backlog.md)); formerly *Full orchestration of model version migration*.
-Status: draft 2026-10-16, owner decisions from chat the same day (see §1 and §7). Backlog: epic **ConfigMigration** (Version 2.7); §8 is open for Version 2.8 only.
+Status: implemented P0–P4 (2026-10-16); living contract [`docs/spec/config-migration.md`](../docs/spec/config-migration.md). Owner decisions from chat the same day (see §1 and §7). Backlog: epic **ConfigMigration** → Erledigt; §8 remains open for Version 2.8 only.
 
 ## 1. Owner decisions (2026-10-16)
 

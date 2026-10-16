@@ -228,6 +228,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 - [ ] Channel correct: `-` in version → pre-release (**B**); clean `X.Y.Z` → official (**C**)
 - [ ] **If B:** all three `docker/compose/*-alpha.yml` have `image: ghcr.io/jochentcc/earnie-energy:<version.py>`
 - [ ] Release notes exist or default notes are OK: `.github/release-notes/v….md`
+- [ ] If `runtime_store/migration/` gained steps since the previous tag: notes include `## Migration` (draft via `python -m scripts.migration_release_notes --since <tag>`) — see `docs/spec/release-checklist.md` §1
 - [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/spec/release-checklist.md` §1
 - [ ] Regression suite run (public + private) and report attached; `Earnie-regression-private` clean and pushed, or the user consciously accepted the guide's warning (soft gate — `docs/spec/release-checklist.md` §1)
 - [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)

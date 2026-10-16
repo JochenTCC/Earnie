@@ -263,8 +263,52 @@ python scripts/archive_prod_dump.py \
 
 Details: `tests/fixtures/prod_dumps/README.md`.
 
+## Update und Migration
+
+Nach einem Image-/Add-on-Update kann Earnie eine **Anpassung der Config-JSON** verlangen (Datenmodell / strukturelle Schritte). Das ist etwas anderes als fehlende Keys in `config.json` nach einem Upgrade (siehe [Container → Config-Updates](container.md#config-updates-nach-programm-upgrade)): dort fehlen nur neue Einstellungsfelder; hier ändert sich die Form der Pack-Dateien.
+
+### Ablauf
+
+1. Earnie startet im **Migrationsmodus**: nur der Assistent (plus Log/Debug), **kein** normaler Hauskonfigurator und **kein** Auto-Start von `main.py`.
+2. Der Assistent zeigt Hinweis (inkl. letzter laufender Version), ausstehende Schritte, JSON-Diffs, ggf. Fragen und manuelle To-dos außerhalb von Earnie.
+3. **Backup anlegen und migrieren** legt zuerst ein Backup an, schreibt danach die neuen JSON-Dateien und zeigt den Report.
+4. **Weiter zur App** lädt die normale UI; der Optimierer-Dienst startet nur, wenn Auto-Start aktiv ist (sonst unter **Optimierer-Dienst** starten).
+
+Release Notes informieren vorab (Abschnitt **Migration**), wenn eine Version neue Schritte mitbringt.
+
+### Backup
+
+Vor dem Schreiben legt Earnie ein Verzeichnis an:
+
+`{config}/backups/pre-migration-dm<von>-dm<nach>-<UTC-Zeitstempel>/`
+
+Darin liegen die alten Pack-JSON, `manifest.json` (Earnie-Version, from/to, Schritt-IDs) und nach dem Lauf `report.json`. **Alle** Backups bleiben liegen — Earnie löscht sie nicht. Alte Ordner unter `backups/` kannst du manuell entfernen, wenn du sie nicht mehr brauchst.
+
+| Kanal | Config-Wurzel | Backup-Pfad |
+| --- | --- | --- |
+| **Docker** (Synology, Proxmox, …) | Host `earnie_env/config/` → Container `/app/config` | `earnie_env/config/backups/pre-migration-…/` — siehe [Container](container.md) |
+| **LoxBerry** | `…/data/plugins/earnie/earnie_env/config/` | `…/earnie_env/config/backups/pre-migration-…/` — siehe [LoxBerry-Plugin](loxberry-plugin.md) |
+| **HA-Add-on** | Container `/config/` (= Host `addon_configs/…_earnie/` bzw. `_earnie_prerelease`) | `/config/backups/pre-migration-…/` — gehört zu den HA-Backups des Add-ons; siehe [Home-Assistant-Add-on](homeassistant-addon.md) |
+
+Es gibt **kein** automatisches Downgrade. Eine ältere Earnie-Version lehnt ein neueres Datenmodell ab. Rückweg: Backup-Ordner manuell zurückkopieren.
+
+### Support-CLI
+
+Für Entwickler / Support (gleiche Kette wie der Assistent):
+
+```powershell
+python -m scripts.migrate_config --config-dir PATH --dry-run
+python -m scripts.migrate_config --config-dir PATH
+```
+
+### Wann die Migration blockiert
+
+- **Datenmodell 1 oder 2:** zu alt — Support kontaktieren oder neu einrichten (keine automatische Kette).
+- **Earnie-Pack-Datei ohne `earnie_data_model`:** Version unbekannt — kein Raten, kein stilles Stempeln. (`grid_fees.json` ist davon ausgenommen, bis die Tarif-Spur mit Edbert kommt.)
+
 ## Typische Betriebsfehler
 
 - **App zeigt alte Werte:** `optimizer_run_state.json` fehlt oder `main.py` läuft nicht — Kopfzeile im Sankey „Energiefluss (Live)“ prüfen.
 - **Keine aWATTar-Preise:** Simulation bricht in der App mit Fehlermeldung ab; Netzwerk oder API prüfen.
+- **Nur Migrations-Assistent nach Update:** Config muss angepasst werden — Abschnitt [Update und Migration](#update-und-migration); `main.py` startet erst danach.
 

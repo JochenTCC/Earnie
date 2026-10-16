@@ -108,6 +108,8 @@ Die Add-on-`version:` in `config.yaml` **entspricht der Earnie-App-Version**. Es
 
 Der Supervisor zeigt **Update verfügbar**, sobald die neue `version:` im Repository ankommt. Images kommen vorgebaut von GHCR (`image:` in `config.yaml`) — kein Build auf dem Gerät.
 
+Nach dem Update kann Earnie den **Migrations-Assistenten** zeigen (Config-Pack-Form); der Optimierer startet erst danach. Backups unter `/config/backups/pre-migration-…/` (Host: `addon_configs/…`) — auch in HA-Backups des Add-ons enthalten. Details: [Betrieb → Update und Migration](betrieb.md#update-und-migration).
+
 ### Stabile Version oder Vorabversion
 
 | | Stabil (`earnie`) | Vorab (`earnie_prerelease`) |

@@ -97,6 +97,8 @@ Die Plugin-SemVer ist **unabhängig** von Earnie `version.py`. LoxBerry-`AUTOMAT
 
 Bei Plugin-Upgrade stoppt der Installer die Unit kurz, erhält `plugin.env` und die Bind-Mounts unter `earnie_env/`, und startet Compose danach neu. Fehlt `EARNIE_CHANNEL`, setzt `postupgrade.sh` `stable` (und `EARNIE_AUTO_UPDATE=1` falls fehlend); eine tote `IMAGE=`-Zeile wird entfernt. Config und Runtime bleiben erhalten.
 
+Nach einem Earnie-Image-Update kann der Container im **Migrationsmodus** starten (Assistent statt normaler UI). Backups: `…/data/plugins/earnie/earnie_env/config/backups/pre-migration-…/`. Details: [Betrieb → Update und Migration](betrieb.md#update-und-migration).
+
 ## Deinstallation
 
 Das Uninstall-Skript:

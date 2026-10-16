@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### ConfigMigration P4 — process + docs (2026-10-16)
+
+- [x] **ConfigMigration P4 — process + docs:** rule `.cursor/rules/config-migration.mdc` + `CLAUDE.md` Area notes pointer; release checklist Migration item + helper `python -m scripts.migration_release_notes --since <tag>` (`tests/test_migration_release_notes.py`); German user docs `docs/einrichtung/betrieb.md` → Update und Migration (backup paths Docker / LoxBerry / HA add-on) + TOC/cross-links; spec `docs/spec/config-migration.md`. Epic **ConfigMigration** (P0–P4) complete for Version 2.7; tariff track deferred to 2.8 Edbert integration.
+
 ### ConfigMigration P3 — wizard (German) (2026-10-16)
 
 - [x] **ConfigMigration P3 — wizard (German):** hint + last run version + release-notes link; pending steps (`title_de` / files) with expandable diffs; questions (`str` / `bool` / `choice`); blockers; manual to-dos (download only when `export_kind` is known); button **Backup anlegen und migrieren** → `run_migration` → report; **Weiter zur App** calls `maybe_auto_start()` (respects `EARNIE_AUTO_START_MAIN` / add-on `auto_start_main`) then `st.rerun()` into normal UI; AppTest `tests/apptest/test_page_config_migration_apptest.py` + unit helpers `tests/test_page_config_migration.py`. Process/docs remain **P4**.

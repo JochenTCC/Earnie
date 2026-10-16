@@ -1,0 +1,49 @@
+---
+description: Structural pack JSON changes must go through the migration registry — no silent bootstrap/load migration
+globs: runtime_store/migration/**/*.py,scripts/migrate_*.py,scripts/migration_release_notes.py,runtime_store/bootstrap.py,settings/json_io.py,ui/pages/page_config_migration.py,tests/test_migration*.py,tests/fixtures/migration/**
+alwaysApply: false
+---
+
+# Config migration — registry only
+
+Persisted config pack JSON must not be reshaped silently. Spec: [`docs/spec/config-migration.md`](../../docs/spec/config-migration.md). Design history: [`backlog/Config-Migration-Draft.md`](../../backlog/Config-Migration-Draft.md).
+
+## Tracks
+
+| Track | Key | Files (2.7) | Owner |
+|---|---|---|---|
+| Earnie data model | `earnie_data_model` (int) | `config`, `components`, `house_profiles`, `backtesting_scenarios`, `deviation_rules` (+ `tariffs.json` until Edbert) | Earnie registry |
+| Tariff format | `tariff_format` (int, **2.8**) | `grid_fees.json` now untagged/exempt; later + `tariffs` / `user_tariffs` | Edbert; Earnie wraps steps |
+
+Until the Edbert integration, `grid_fees.json` stays untagged and is exempt from the untagged blocker. Do not stamp it with `earnie_data_model`.
+
+## Do
+
+- Any structural change of a persisted pack JSON → bump **its track** version + register a `MigrationStep` in `runtime_store/migration/` + fixture under `tests/fixtures/migration/` + release-notes **Migration** section + German user docs.
+- Ambiguity → `Question` or blocker with German text — never a silent default (`no-implicit-fallbacks.mdc`).
+- Point operators at the wizard and `python -m scripts.migrate_config`.
+- For release notes: `python -m scripts.migration_release_notes --since <tag>`.
+
+## Do not
+
+```text
+❌ Silent stamp/migrate of live pack files in bootstrap or on load
+❌ New standalone migrate_*_once scripts for structural changes
+❌ Guess untagged files as data model 1 / stamp them to current
+❌ Dual-read old + new shapes "just so it keeps working"
+❌ Stamp earnie_data_model onto tariff-track files (grid_fees.json)
+✅ MigrationStep.detect / apply (pure, in-memory docs)
+✅ Planner blocker or Question when ambiguous
+✅ Release-notes ## Migration + betrieb.md Update und Migration
+```
+
+- Tariff-track format changes: change the Edbert spec/library first; Earnie only wraps the step.
+- A change of a file that the other side parses strictly (`netznutzung` in `house_profiles.json`, `grid_fees.json`) needs a matching release on both sides.
+
+## Checklist (new or changed pack shape)
+
+1. Which track owns the file (`earnie_data_model` vs `tariff_format`)?
+2. Is there a registered `MigrationStep` with detect/apply, questions/blockers, and a fixture?
+3. Does the release checklist / notes get a **Migration** section (helper `--since` previous tag)?
+4. Are German user docs (`docs/einrichtung/betrieb.md` → Update und Migration) updated?
+5. Loaders fail loud and point to the wizard/CLI — no silent bootstrap path?
