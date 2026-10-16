@@ -402,6 +402,8 @@ Im Produktivbetrieb läuft der Optimierer dauerhaft (Docker: mit der UI; lokal: 
 
 Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart, Umschalter **Silent / Loud** und Dienst-Log (`earnie.log`, Level-Filter, Standard INFO+, Auto-Aktualisierung alle 10 s, **Gehe nach Oben**). Details: [Betrieb](../einrichtung/betrieb.md).
 
+Optional **Nutzungsstatistik**: Beim ersten Öffnen des Szenarienkonfigurators kann Earnie fragen, ob es anonym melden darf, dass diese Installation aktiv ist (Versionszähler). Es werden keine Preise, Orte, Gerätenamen oder Konfigurationsinhalte gesendet; die Meldung ist freiwillig, jederzeit widerrufbar und hat keinen Einfluss auf die Optimierung. Unter **Optimierer-Dienst** können Sie die Zustimmung umschalten und unter **Was wird gesendet?** die exakte Feldliste sehen. Details und Abschalten: [Betrieb — Nutzungsstatistik](../einrichtung/betrieb.md#nutzungsstatistik).
+
 ### Monitor
 
 Earnie Monitor

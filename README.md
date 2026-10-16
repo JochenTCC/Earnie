@@ -75,6 +75,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 - [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox](https://www.proxmox.com/) LXC oder PC (weitere Systeme folgen bei Bedarf)
 - Streamlit-**Optimierer-Dienst**: Start/Stop/Neustart von `main.py` in der UI; ein Docker-Container (`earnie`) mit Auto-Start
 - Persistente Laufzeitdaten für Nachvollziehbarkeit und Debug-Dumps
+- Optionale anonyme **Nutzungsstatistik** (opt-in): [Betrieb — Nutzungsstatistik](docs/einrichtung/betrieb.md#nutzungsstatistik)
 
 ![Earnie Monitor](docs/assets/Monitor-48h-Vorschau.png)
 *Earnie Monitor: Kompletter Optimierungs-Horizont mit Energiefluss, SOC und Verbraucherverhalten.*

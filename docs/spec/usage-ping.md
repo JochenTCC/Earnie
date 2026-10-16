@@ -1,6 +1,6 @@
 # Opt-in usage ping (installation statistics)
 
-**Status:** draft — client P1 + daemon/milestones P2 + consent UI P3 implemented in this repo; **receiver** lives in private **`JochenTCC/earnie-server`** (LAN lab compose + VPS/Caddy TBD); open hosting provider in §9.
+**Status:** draft — client P1 + daemon/milestones P2 + consent UI P3 + German docs/privacy P5 implemented in this repo; **receiver** lives in private **`JochenTCC/earnie-server`** (LAN lab compose; VPS/Caddy edge = P4 remainder). Production host: **hosttech** (EU) with AV — see §6 / §9.
 
 ## 1. Goal
 
@@ -61,8 +61,9 @@ Minimal HTTPS endpoint `POST /ping` on a rented VPS: **Caddy** terminates TLS an
 
 ## 6. Privacy / legal
 
-- IP is personal data under GDPR even if not stored: the server must not persist it; mention it in the privacy note. Legal basis: consent (Art. 6(1)(a)), documented by `consent_at`.
-- German user docs: new section in `docs/user-manual/` + `docs/einrichtung/betrieb.md` ("Was wird gesendet, wie abschalten"); repo `README` gets a one-line note.
+- IP is personal data under GDPR even if not stored: the server must not persist it (no access log for this route; User-Agent not stored). Legal basis: consent (Art. 6(1)(a)), documented by `consent_at`.
+- Production endpoint: rented VPS at **hosttech** in the **EU**; **Auftragsverarbeitung (AV)** with the host is in place.
+- German user docs: `docs/user-manual/Benutzer-Handbuch-Earnie.md` (Live-Betrieb blurb) + `docs/einrichtung/betrieb.md` § Nutzungsstatistik (payload, how to switch off, Datenschutz); repo `README` one-line note under Betrieb.
 
 ## 7. Tests
 
@@ -72,21 +73,23 @@ Minimal HTTPS endpoint `POST /ping` on a rented VPS: **Caddy** terminates TLS an
 
 ## 8. Work packages (proposal)
 
-1. Client module + state + payload + tests
-2. Daemon hook + kill-switch + HA add-on option
-3. UI consent dialog + settings toggle + "show payload"
-4. Server + daily aggregation file + deployment
-5. German docs + privacy text
+1. Client module + state + payload + tests — done
+2. Daemon hook + kill-switch + HA add-on option — done
+3. UI consent dialog + settings toggle + "show payload" — done
+4. Server + daily aggregation file + deployment — open (earnie-server; VPS/Caddy remainder)
+5. German docs + privacy text — done
 
 ## 9. Open questions
 
 ### Decided
 
 - **Q1** Random install ID, server hashes with a daily rotating salt; only daily counters stored (no 7/30-day active values).
-- **Q3** Production receiver = own VPS only (not internet-facing home NAS), implemented in private **`JochenTCC/earnie-server`**. `docker compose` with two containers — **Caddy** (auto-TLS, only published service, access log off, body limit 1 KB, only `POST /ping`) and a **minimal stdlib receiver** on an internal-only network (plain HTTP, non-root, read-only rootfs, `cap_drop: ALL`, `no-new-privileges`, one writable volume, no outbound network, in-app per-IP rate limit in memory). Pre-deploy against Earnie client mock / pytest, optional **LAN-only** lab on NAS (compose in `earnie-server`, no port-forward / DDNS / DSM proxy), then deploy on the VPS. Hosting provider / location / AV contract still open (see Still open).
+- **Q3** Production receiver = own VPS only (not internet-facing home NAS), implemented in private **`JochenTCC/earnie-server`**. `docker compose` with two containers — **Caddy** (auto-TLS, only published service, access log off, body limit 1 KB, only `POST /ping`) and a **minimal stdlib receiver** on an internal-only network (plain HTTP, non-root, read-only rootfs, `cap_drop: ALL`, `no-new-privileges`, one writable volume, no outbound network, in-app per-IP rate limit in memory). Pre-deploy against Earnie client mock / pytest, optional **LAN-only** lab on NAS (compose in `earnie-server`, no port-forward / DDNS / DSM proxy), then deploy on the VPS.
+- **Q3 hosting** Provider **hosttech**, location **EU**, **AV** (Auftragsverarbeitung) with the host in place.
 - **Q3a / Q3b** Synology as **public** endpoint / DSM reverse-proxy — **won't do**. LAN-only lab on NAS via `earnie-server` is allowed.
 - **Q4** Payload extras: install context only (payload §4 stays `v`, `id`, `app_version`, `context`, plus the stage from Q2).
 - **Q5** CSV columns (in `earnie-server`): `date, installs_total, explorer, live, ctx_loxberry, ctx_ha, ctx_manual, versions_json`.
+- **P5 docs** German user docs + README privacy note shipped (handbook Live-Betrieb, `betrieb.md` § Nutzungsstatistik).
 
 ### Q2 (interpretation to confirm)
 
@@ -96,5 +99,4 @@ Two counters instead of one: a `stage` field in the payload, e.g. `explorer` (fi
 
 ### Still open
 
-- Hosting provider and location (hosttech enquiry: Switzerland vs. EU via Virtual Datacenter), AV contract.
 - VPS compose with Caddy edge (P4 remainder in `earnie-server`).

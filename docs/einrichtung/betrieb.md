@@ -60,6 +60,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
 | `powerstation_reserves.json`    | Reserve-Zustand virtueller/physischer Powerstations (stored/target kWh, Trigger)           |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
+| `usage_ping.json`               | Zustimmung und Zustand der optionalen Nutzungsstatistik (siehe [Nutzungsstatistik](#nutzungsstatistik)) |
 
 
 Die App liest diese Dateien **read-only** für Panels und Abgleich.
@@ -158,9 +159,44 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls nicht schon laufend (Docker-Compose setzt das). Ohne Variable / lokal aus.                                                                              |
 | `EARNIE_OFFLINE`                        | `1` = kein Loxone-/Live-Zwang; Bootstrap füllt leere Live-Szenario-Entitäts-IDs aus den Katalogen (sinnvoll für Streamlit Community Cloud). |
 | `EARNIE_CLOUD_DEMO`                     | `1` = Streamlit Community Cloud: pro Browser-Sitzung leerer Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator, Willkommenshinweis; nach Szenario-Explorer-Start Feedback-Banner mit GitHub-Issue (`cloud-demo`); optional lokale Config-ZIP; kein Offline-Demo-Seed. Typisch zusammen mit `EARNIE_OFFLINE=1`. |
+| `EARNIE_USAGE_PING`                     | `off` = Kill-Switch: es wird **nichts** gesendet, auch wenn die Zustimmung in der UI eingeschaltet ist. Andere Werte bzw. unset: Kill-Switch aus (Zustimmung steuert). Siehe [Nutzungsstatistik](#nutzungsstatistik). |
+| `EARNIE_USAGE_PING_URL`                 | HTTPS-URL des Zähler-Endpunkts (`POST`). Ohne URL und ohne internen Transport: kein Versand (WARNING im Log), Optimierung unverändert. |
 
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
+
+## Nutzungsstatistik
+
+Ab Version 2.7 kann Earnie optional und anonym melden, dass eine Installation aktiv ist (Versionszähler). Ziel: zählen, wie viele Installationen pro Tag aktiv sind — keine Nutzungsanalyse, kein Feature-Tracking, kein Fehlerreporting.
+
+**Zustimmung (drei Zustände):** noch nicht gefragt (`unset`) / zugestimmt (`on`) / abgelehnt (`off`). Nur bei `on` wird gesendet. Beim ersten Öffnen des **Szenarienkonfigurators** erscheint ein Dialog; unter **Daemon Control → Optimierer-Dienst** können Sie die Zustimmung jederzeit umschalten und unter **Was wird gesendet?** die exakte JSON-Vorschau sehen. Ein fehlgeschlagener Ping hat **keinen Einfluss** auf die Optimierung.
+
+**Was wird gesendet** (feste Feldliste, sonst nichts):
+
+| Feld | Bedeutung |
+| ---- | --------- |
+| `v` | Schema-Version (aktuell `1`) |
+| `id` | Zufällige Installations-ID (UUIDv4, erst bei Zustimmung erzeugt; bei Widerruf gelöscht) |
+| `app_version` | Earnie-Versionsstring |
+| `context` | Installationskontext: `loxberry`, `homeassistant_addon` oder `manual` |
+| `stage` | Höchster erreichter Meilenstein: `explorer` (Szenarienkonfigurator) bzw. `live` (erster erfolgreicher Live-Zyklus) |
+
+**Nicht** gesendet werden u. a.: Preise, Orte, Gerätenamen, Konfigurationsinhalte, Hardware-Fingerprint.
+
+**Abschalten:**
+
+1. UI: Toggle **Anonyme Nutzungsstatistik senden** unter Optimierer-Dienst aus
+2. Kill-Switch: Umgebungsvariable `EARNIE_USAGE_PING=off` (überschreibt die UI)
+3. Home-Assistant-Add-on: optionale Option `usage_ping` (`true`/`false`) spiegelt die Zustimmung, wenn gesetzt; weglassen lässt den bestehenden Zustand unverändert
+
+Lokal liegt der Zustand in `runtime/usage_ping.json`.
+
+### Datenschutz
+
+- **Rechtsgrundlage:** Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), dokumentiert mit dem Zustimmungsdatum.
+- **IP-Adresse / User-Agent:** werden vom Empfänger **nicht** gespeichert (kein Access-Log für diese Route). Die IP ist dennoch personenbezogene Daten beim Transport — daher diese Transparenz.
+- **Speicherung serverseitig:** die Installations-ID wird mit einem täglich wechselnden Salt gehasht; gespeichert werden nur Tageszähler (keine geräteübergreifende Profilbildung über Tage).
+- **Hosting:** der Zähler-Endpunkt läuft auf einem gemieteten VPS bei **hosttech** in der **EU**. Mit dem Hoster besteht ein **Auftragsverarbeitungsvertrag (AV)**.
 
 ## Debug-Dump
 

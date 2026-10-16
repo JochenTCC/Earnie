@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### UsagePing P3 — consent UI (2026-10-16)
+
+- [x] **UsagePing P3 — consent UI (German)** `[qual]`: opt-in dialog at first open of Szenarienkonfigurator (`ui/usage_ping_consent.py`, `page_scenario_editor.py`); settings toggle + “Was wird gesendet?” on Optimierer-Dienst (`page_daemon.py`); AppTest coverage. Explorer stage on editor activate; `scenarios_calc_count` bump after successful SE calc forces same-day re-ping; advertising opt-in copy (“Um die Qualität von Earnie permanent zu verbessern …”).
+
+### UsagePing P4 — receiver + deployment (2026-10-16)
+
+- [x] **UsagePing P4 — receiver + deployment** `[qual]`: private repo **`JochenTCC/earnie-server`** (not this public tree): minimal stdlib receiver (strict schema, daily salt, in-memory rate limit, `usage_daily.csv`); LAN-only NAS compose (port 8787, no public edge, no port-forward / DDNS / DSM reverse-proxy); hardened container (`read_only`, `cap_drop`, `no-new-privileges`, internal network). Production URL on VPS + Caddy remains follow-up work in `earnie-server`.
+
+### UsagePing P5 — docs + privacy (2026-10-16)
+
+- [x] **UsagePing P5 — docs + privacy** `[qual]`: German user docs (what is sent, how to switch off) in `docs/user-manual/Benutzer-Handbuch-Earnie.md` (Live-Betrieb) and `docs/einrichtung/betrieb.md` § Nutzungsstatistik (payload table, UI / `EARNIE_USAGE_PING=off` / HA `usage_ping`, `usage_ping.json`, Datenschutz); privacy note (consent Art. 6(1)(a), IP/UA not stored, daily salt counters, host **hosttech** EU with AV); README Betrieb one-liner; spec `docs/spec/usage-ping.md` §6 / §9 hosting decided. Receiver lives in `earnie-server`.
+
 ### UsagePing P2 — daemon hook + milestones (2026-10-16)
 
 - [x] **UsagePing P2 — daemon hook + milestones** `[qual]`: `spawn_maybe_send_ping()` (daemon thread, single in-flight) from `main.py` after `after_prod_cycle` and `_daemon_wait_poll`; `note_explorer_success` on successful Scenario Explorer (`ui/backtesting_run.py`, `scripts/run_backtesting.py`); `note_live_cycle_success` after `run_state.save_run_state` with `success` (skipped in shadow); HA add-on optional `usage_ping` bool mirrored via `addon_options._apply_usage_ping_option` → `set_consent` (earnie + prerelease `config.yaml`); spec §3 P2 note; tests in `tests/test_usage_ping.py` + `tests/test_addon_options.py`. Consent UI remains **P3**; receiver **P4**; docs **P5**.
