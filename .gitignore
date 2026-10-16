@@ -7,6 +7,7 @@
 config.py
 config.json
 !tests/fixtures/backtesting/config.json
+!tests/fixtures/migration/**/config.json
 # Site-specific config (private repo / local junction) — templates live in share/config/
 earnie_env/config/*
 !earnie_env/config/.gitkeep

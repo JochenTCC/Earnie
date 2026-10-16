@@ -1,0 +1,47 @@
+{
+  "$schema": "./config.schema.json",
+  "earnie_data_model": 4,
+  "market_prices": {
+    "missing_price_strategy": "forecast",
+    "live_bias_enabled": true,
+    "live_bias_cap_cent_kwh": 12.0,
+    "forecast_model_path": "runtime/price_model_coefficients.json"
+  },
+  "ui": {
+    "fragment_refresh_charts_sec": 60,
+    "fragment_refresh_status_sec": 10,
+    "main_sync_poll_sec": 15,
+    "chart_debug_capture_enabled": false,
+    "chart_debug_capture_dir": "chart_debug",
+    "streamlit_port": 8501,
+    "price_forecast_page_enabled": false
+  },
+  "system": {
+    "global_timeout": 5,
+    "loop_timeout": 900
+  },
+  "planning_horizon": {
+    "mode": "sunrise_window"
+  },
+  "flexible_consumers": [],
+  "appliance_recommendation": {
+    "abs_margin_cent": 0.05,
+    "pct_stars_4": 10.0,
+    "pct_stars_1": 30.0
+  },
+  "live_scenario_id": "live",
+  "scenario_explorer_conf": {
+    "path_cons_data": "runtime/cons_data_hourly.csv",
+    "cons_data_retention_months": 24,
+    "cons_data_write_mode": "hourly",
+    "price_source": "api",
+    "price_provider": "awattar",
+    "price_range": "last_12_months",
+    "season_mirror_to_last_month": true,
+    "export_price_series": false
+  },
+  "ehal": {
+    "backend": "loxone",
+    "adapter_id": "loxone-home"
+  }
+}
