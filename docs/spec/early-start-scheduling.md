@@ -105,14 +105,14 @@ Not early-started (behaviour as before P1, `tick=None`): the first cycle after p
 
 - `tick` = slot the cycle plans for (early start: the target tick).
 - `wake_delay_sec` / `start_delay_sec` against the planned start `tick − lead_sec`.
-- `ready_by_sec` = plan ready relative to the tick (negative = plan waited, positive = late); `late_by_sec` = setpoints written relative to the tick; `on_time` = `late_by_sec ≤ 2 s`.
+- `ready_by_sec` = plan ready relative to the tick (negative = plan waited, positive = late); `late_by_sec` = setpoints written relative to the tick; `on_time` = `late_by_sec ≤ 2 s` when the cycle was scheduled for that tick. `on_time` is `null` when no tick was passed (`main(tick=None)`: first cycle after process start, `EARNIE_EARLY_START=off`, a pending tick already a slot old) and for out-of-band runs. The record stays in the log; the on-time rate and P95 skip `on_time: null`.
 - `platform` = hash of CPU model/count, machine, Python and MILP solver (no hostname).
 
 `earnie.log` gets one line per regular cycle, e.g. `Pünktlichkeit: Tick 13:00 | Vorlauf 15 s | Weckzeit +0 s | Start +0 s | Plan fertig -2 s | Sollwerte +0 s | Dauer 17 s | 24 h: 80/96 pünktlich, P95 +9 s | 7 d: …`.
 
 ### 5.2 Events
 
-Data modules report network fetches on the running cycle: `pv_forecast_fetch`, `weather_fetch`, `price_feature_refresh`, `day_ahead_fetch`, plus `cold_start`. P1 does not use them; they explain outliers and show whether the prefetch (§8) keeps fetches off the critical path.
+Data modules report network fetches on the running cycle: `pv_forecast_fetch`, `weather_fetch`, `price_feature_refresh`, `day_ahead_fetch`, plus `cold_start`. The lead estimator skips `cold_start` records (§5.3). The other events explain outliers and show whether the prefetch (§8) keeps fetches off the critical path.
 
 ### 5.3 Estimator (P1, `optimizer/start_scheduler.py`)
 
@@ -122,7 +122,7 @@ Pure function `decide_lead(records, platform=…, enabled=…) → LeadDecision(
 
 ```
 time_to_plan = ready_at − started_at            (old records: writes_done_at − started_at)
-estimate     = median(time_to_plan of the last 96 regular "ok" cycles on this platform)
+estimate     = median(time_to_plan of the last 96 regular "ok" cycles on this platform, excluding `cold_start`)
 lead         = clamp(⌈estimate⌉, 15 s, 90 s)      → start between T−90 s and T−15 s
 ```
 

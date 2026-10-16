@@ -105,6 +105,21 @@ def test_rare_outliers_do_not_move_the_lead():
     assert ss.decide_lead(records).lead_sec == ss.LEAD_MIN_SEC
 
 
+def test_cold_start_records_are_ignored_by_decide_lead():
+    """A restart's time to plan (imports, archive) must not pull the median up."""
+    normal = [_record(12.0) for _ in range(ss.MIN_SAMPLES)]
+    cold = []
+    for _ in range(ss.MIN_SAMPLES):
+        row = _record(40.0)
+        row["events"] = ["cold_start"]
+        cold.append(row)
+    decision = ss.decide_lead(normal + cold, platform="p1")
+    assert ss.plan_durations(normal + cold, platform="p1") == [12.0] * ss.MIN_SAMPLES
+    assert decision.samples == ss.MIN_SAMPLES
+    assert decision.lead_sec == ss.LEAD_MIN_SEC
+    assert decision.estimate_sec == pytest.approx(12.0)
+
+
 def test_only_regular_ok_cycles_on_this_platform_count():
     records = [_record(15.0)] * 10 + [
         _record(200.0, trigger="request_optimize"),

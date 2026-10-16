@@ -88,12 +88,16 @@ def plan_durations(records: list[dict], *, platform: str | None = None) -> list[
     """Time-to-plan of the last ``WINDOW_CYCLES`` regular cycles that wrote setpoints.
 
     Records from another compute platform are ignored (a new host starts fresh).
+    ``cold_start`` records are ignored: their time to plan includes process
+    import and the power-archive load, not a steady cycle.
     """
     out: list[float] = []
     for row in records:
         if row.get("trigger") != "quarter_hour" or row.get("outcome") != "ok":
             continue
         if platform is not None and row.get("platform") != platform:
+            continue
+        if "cold_start" in (row.get("events") or []):
             continue
         value = time_to_plan_sec(row)
         if value is not None and value >= 0:

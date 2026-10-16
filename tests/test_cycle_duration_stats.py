@@ -34,8 +34,8 @@ def runtime(monkeypatch, tmp_path):
     return tmp_path
 
 
-def _record(started: datetime, writes: datetime | None, *, trigger=TRIGGER_QH, woke=None):
-    stats = CycleStats(trigger=trigger, started_at=started, woke_at=woke)
+def _record(started: datetime, writes: datetime | None, *, trigger=TRIGGER_QH, woke=None, tick=None):
+    stats = CycleStats(trigger=trigger, started_at=started, woke_at=woke, tick=tick)
     if writes is not None:
         stats.mark_writes_done(writes)
     return stats.to_record(
@@ -56,15 +56,42 @@ def test_record_measures_delays_against_the_slot_tick():
     assert row["start_delay_sec"] == pytest.approx(73.0)
     assert row["late_by_sec"] == pytest.approx(177.0)
     assert row["duration_sec"] == pytest.approx(250.0)
-    assert row["on_time"] is False
+    assert row["on_time"] is None
 
 
 def test_writes_within_tolerance_count_as_on_time():
-    row = _record(datetime(2026, 10, 15, 9, 15, 0), datetime(2026, 10, 15, 9, 15, 1))
+    tick = datetime(2026, 10, 15, 9, 15)
+    row = _record(tick, datetime(2026, 10, 15, 9, 15, 1), tick=tick)
     assert row["late_by_sec"] == pytest.approx(1.0)
     assert row["on_time"] is True
-    late = _record(datetime(2026, 10, 15, 9, 15, 0), datetime(2026, 10, 15, 9, 15, 3))
+    late = _record(tick, datetime(2026, 10, 15, 9, 15, 3), tick=tick)
     assert late["on_time"] is False
+
+
+def test_first_cycle_after_start_is_excluded_from_punctuality():
+    """A regular cycle with no planned tick stays in the log but not in rate or P95.
+
+    NAS 2026-10-15: the restart at 12:17 (late_by_sec +213 s) alone made P95 +213 s.
+    """
+    started = datetime(2026, 10, 15, 12, 17)
+    writes = datetime(2026, 10, 15, 12, 18, 33)
+    stats = CycleStats(trigger=TRIGGER_QH, started_at=started)
+    stats.note_event(EVENT_COLD_START)
+    stats.mark_writes_done(writes)
+    row = stats.to_record(outcome=OUTCOME_OK, finished_at=writes, version="t")
+    assert row["tick"].startswith("2026-10-15T12:15:00")
+    assert row["late_by_sec"] == pytest.approx(213.0)
+    assert row["on_time"] is None
+    now = datetime(2026, 10, 15, 13, 0)
+    regular = {
+        "tick": (now - timedelta(minutes=15)).isoformat(),
+        "late_by_sec": 0.4,
+        "on_time": True,
+    }
+    summary = punctuality_summary([regular, row], now=now, window=timedelta(hours=24))
+    assert summary["cycles"] == 1
+    assert summary["on_time"] == 1
+    assert summary["p95_late_sec"] == pytest.approx(0.4)
 
 
 def test_out_of_band_cycle_has_no_punctuality():
@@ -141,8 +168,9 @@ def test_prune_drops_records_beyond_retention(runtime):
 
 
 def test_regular_cycle_logs_punctuality_line(runtime, caplog):
+    tick = datetime.now().replace(microsecond=0)
     with caplog.at_level(logging.INFO, logger="cycle_stats"):
-        with cycle_stats_session(trigger=TRIGGER_QH, version="t"):
+        with cycle_stats_session(trigger=TRIGGER_QH, version="t", tick=tick):
             mark_writes_done()
     lines = [r.getMessage() for r in caplog.records if r.name == "cycle_stats"]
     assert any(line.startswith("Pünktlichkeit: Tick ") and "24 h: " in line for line in lines)

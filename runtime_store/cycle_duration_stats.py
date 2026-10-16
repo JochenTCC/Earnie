@@ -125,8 +125,13 @@ class CycleStats:
     writes_done_at: datetime | None = None
     horizon_slots: int | None = None
     events: list[str] = field(default_factory=list)
+    # True only when the caller passed a tick this cycle was planned for.
+    scheduled: bool = False
 
     def __post_init__(self) -> None:
+        # Captured before the slot fill-in below: an omitted tick is not a
+        # punctuality sample (first cycle after start, early start off, stale tick).
+        self.scheduled = self.tick is not None
         if self.tick is None:
             from optimizer.schedule import quarter_hour_slot_start
 
@@ -154,7 +159,7 @@ class CycleStats:
     def to_record(self, *, outcome: str, finished_at: datetime, version: str) -> dict:
         late_by = _seconds(self.writes_done_at, self.tick)
         on_time = None
-        if self.regular and late_by is not None:
+        if self.regular and self.scheduled and late_by is not None:
             on_time = late_by <= ON_TIME_TOLERANCE_SEC
         return {
             "tick": _iso(self.tick),

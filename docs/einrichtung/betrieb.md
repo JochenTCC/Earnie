@@ -85,7 +85,7 @@ Einmal-Deploy auf der NAS (lokales Image, Compose-Env): siehe [container.md](con
 
 Earnie schreibt die Sollwerte für eine Viertelstunde genau zu deren Beginn (`hh:00`, `:15`, `:30`, `:45` — dem Takt der 15-Minuten-Strompreise), **nie früher**. Dazu startet der reguläre Optimierungslauf etwas vor dem Takt (**Vorlauf**), rechnet schon für die kommende Viertelstunde und wartet mit dem Schreiben bis zum Takt.
 
-- **Vorlauf automatisch:** Earnie misst, wie lange die Läufe bis zum fertigen Plan brauchen, und nimmt den **Median** der letzten 96 regulären Läufe (ein Tag). So ist der Plan im Mittel möglichst genau zum Takt fertig — weder lange vorher (sonst wären die Messwerte, auf denen er beruht, alt) noch danach (sonst laufen die alten Sollwerte weiter).
+- **Vorlauf automatisch:** Earnie misst, wie lange die Läufe bis zum fertigen Plan brauchen, und nimmt den **Median** der letzten 96 regulären Läufe (ein Tag). Der erste Lauf nach einem Prozessstart (`cold_start`) zählt nicht mit: er enthält den Import und das Nachladen des Stromarchivs. So ist der Plan im Mittel möglichst genau zum Takt fertig — weder lange vorher (sonst wären die Messwerte, auf denen er beruht, alt) noch danach (sonst laufen die alten Sollwerte weiter).
 - **Grenzen:** mindestens **15 s**, höchstens **90 s** — der Lauf startet also frühestens 90 s und spätestens 15 s vor dem Takt. Ohne Messwerte (neue Hardware, < 8 Läufe) gilt 60 s.
 - **Warnungen in `earnie.log`:**
   - *„Vorlauf-Schätzung … > 90 s — Start wird nicht weiter vorverlegt“*: die Läufe sind auf dieser Hardware zu langsam; Sollwerte kommen dann oft zu spät.
@@ -101,7 +101,7 @@ Ob es gelingt, protokolliert jeder Optimierungslauf — unabhängig vom optional
   - *Tick* = Viertelstunde, für die der Lauf rechnet; *Vorlauf* = wie viel früher er gestartet wurde.
   - *Weckzeit* / *Start* = wann die Warteschleife geendet bzw. der Lauf begonnen hat, relativ zum geplanten Start (Tick minus Vorlauf).
   - *Plan fertig* = wann der Plan stand, relativ zum Tick (negativ = Plan hat auf den Tick gewartet, positiv = zu spät). *Sollwerte* = wann die Befehle an das Smarthome-Backend gingen, relativ zum Tick.
-  - *pünktlich* = Sollwerte spätestens 2 s nach dem Tick. Außerplanmäßige Läufe zählen nicht mit.
+  - *pünktlich* = Sollwerte spätestens 2 s nach dem Tick. Nicht in Quote und P95: außerplanmäßige Läufe und Läufe ohne geplanten Takt (erster Lauf nach dem Start, `EARNIE_EARLY_START=off`, verpasster Takt). Diese Läufe bleiben in der Datei; `on_time` ist dort leer.
   - *Ereignisse* nennt bekannte langsame Schritte des Laufs: `cold_start` (erster Lauf nach Start), `pv_forecast_fetch`, `weather_fetch`, `price_feature_refresh`, `day_ahead_fetch` (Abruf aus dem Netz statt Cache).
 - **`runtime/cycle_stats.jsonl`:** dieselben Werte als eine JSON-Zeile pro Lauf (rollierend 7 Tage), außerdem Horizontlänge, Earnie-Version und eine Plattform-Kennung (CPU, Python, Solver). Daraus berechnet Earnie den Vorlauf; Läufe auf anderer Hardware zählen nicht mit.
 

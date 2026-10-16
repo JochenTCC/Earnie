@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Restart cycle counted in punctuality and early-start lead (2026-10-16)
+
+- [x] **Punctuality stats and early-start lead include the first cycle after a `main.py` restart** — **Verified** (2026-10-16)
+  - Symptom: the first cycle after a daemon (re)start is recorded with `trigger = quarter_hour`, `outcome = ok` and therefore counts like a regular cycle. NAS 2026-10-15: the restart at 12:17 (`cold_start`, `late_by_sec` +213 s) alone made the 24 h summary report `P95 +213 s`.
+  - Cause 1 — punctuality (`runtime_store/cycle_duration_stats.py`, `CycleStats.to_record`): `on_time` is set for every `quarter_hour` cycle. The first cycle after start is not planned for a tick (`tick=None`), starts somewhere inside the slot and is counted as late in the on-time rate and P95.
+  - Cause 2 — lead estimator (`optimizer/start_scheduler.py`, `plan_durations`): filters only by trigger, outcome and platform, not by the `cold_start` event. A cold start's time to plan includes imports, profile recomputation and the EU power-archive load (30–45 s vs. 8–16 s on dev.57). The median is robust to a few restarts per day, but several deploys in a row would push the lead up.
+  - Fix: (1) cycles not scheduled for a tick (first cycle after start; `main.main(tick=None)` on the regular trigger) get `on_time = null` → excluded from rate and P95 like out-of-band runs; the record stays in `cycle_stats.jsonl`. (2) `plan_durations` skips records with event `cold_start`.
+  - Tests: `tests/test_cycle_duration_stats.py` (`test_first_cycle_after_start_is_excluded_from_punctuality`), `tests/test_start_scheduler.py` (`test_cold_start_records_are_ignored_by_decide_lead`).
+
 ### Minor — Debug-dump includes powerstation_reserves.json (2026-10-15)
 
 - [x] **powerstation_reserves.json in debug-dump** — added to `_OPTIONAL_RUNTIME` in `runtime_store/debug_dump_archive.py` (copied when present); docs `docs/einrichtung/betrieb.md`; test `test_write_debug_dump_zip_without_chart`.
