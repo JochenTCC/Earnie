@@ -266,11 +266,18 @@ def maybe_send_ping(
     *,
     transport: Transport | None = None,
     endpoint_url: str | None = None,
+    force: bool = False,
 ) -> bool:
-    """Attempt one daily ping when gates allow. Returns True on HTTP 2xx."""
+    """Attempt one daily ping when gates allow. Returns True on HTTP 2xx.
+
+    ``force=True`` skips the once-per-day and 1 h retry gates (consent + kill-switch
+    still apply). Intended for debug / lab; production callers leave it false.
+    """
     stamp = _utc_now(now)
     state = load_state()
-    if not _should_attempt(state, stamp):
+    if not _should_attempt(state, stamp) and not force:
+        return False
+    if force and (is_kill_switch_off() or str(state.get("consent") or "unset") != "on"):
         return False
 
     url = (endpoint_url if endpoint_url is not None else endpoint_url_from_env()).strip()
@@ -293,7 +300,14 @@ def maybe_send_ping(
         save_state(state)
         return True
     save_state(state)
-    logger.warning("usage_ping: send failed with status %s", status)
+    logger.warning(
+        "usage_ping: send failed with status %s (payload v=%s stage=%s keys=%s) — "
+        "receiver may reject this schema (redeploy earnie-server if v2)",
+        status,
+        payload.get("v"),
+        payload.get("stage"),
+        sorted(payload.keys()),
+    )
     return False
 
 

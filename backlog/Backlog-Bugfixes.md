@@ -40,7 +40,15 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Tests: `tests/test_live_price_cache.py` (`test_published_cover_end_caps_window_at_last_day_ahead_day`, `test_sunrise_window_into_d2_uses_cache_once_tomorrow_is_published`, `test_cache_without_tomorrow_still_refetches_after_publish`).
   - Live verification: `Using cached day-ahead` in most cycles; `day_ahead_fetch` only around the auction publish (~12:45–13:00) and after restarts.
 
+- [ ] **usage_ping send failed with HTTP 400 (v2 vs stale LAN receiver)** — fix implemented (2026-10-16); LAN/prod acceptance pending
+  - Symptom: `usage_ping: send failed with status 400` when consent on and live+points (schema v2). Explorer/v1 pings to the same URL succeeded (204).
+  - Cause: LAN receiver at `EARNIE_USAGE_PING_URL` (`…:8787/ping`) still ran the committed v1-only image (`v must be 1`); Earnie correctly POSTed v2 (`points` / `points_v`). Schema v2 existed only as uncommitted `earnie-server` working-tree changes until redeploy.
+  - Fix: rebuild/redeploy `earnie-usage-ping:lan` from earnie-server with v2; client: `maybe_send_ping(force=True)` for lab resend (skips once-per-day / 1 h gate); WARNING on failure includes `v` / `stage` / keys + redeploy hint. Endpoint stays in `.env` as `EARNIE_USAGE_PING_URL`.
+  - Live verification: force-send or next daily ping → HTTP 2xx; `last_sent_date` set; no 400 for live+points.
+
 ## New Bugs (Do not remove this chapter — even if empty)
+
+- [ ] 2026-10-16 20:57:54 [ERROR] (integrations.ehal_live:479) - EHAL SoC read failed: missing primary ess.{id}.sens_ess_soc at main.py start is ambigous. Message should be clearer (error from productive NAS)
 
 - [ ] **`normalize_backend` silently maps unknown `ehal.backend` values to Loxone** (found 2026-10-16 while testing ConfigMigration `dm4.loxone_binding_names`)
   - Symptom: `config.json` → `ehal.backend: "homeassistant"` (typo for `"ha"`), or any other unknown value, runs Earnie as a Loxone install without any error or warning. In the migration the Loxone-only step `dm4.loxone_binding_names` then treats HA entity ids as Merker names and offers to clear them.
