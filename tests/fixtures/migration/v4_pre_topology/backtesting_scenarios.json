@@ -1,0 +1,27 @@
+{
+  "$schema": "./backtesting_scenarios.schema.json",
+  "earnie_data_model": 4,
+  "cbc_gap_rel": 0.2,
+  "commit_hours": 24,
+  "cbc_strict_time_limit_sec": 2,
+  "scenarios": [
+    {
+      "id": "live",
+      "label": "Live",
+      "enabled": true,
+      "own_reference": true,
+      "settings": {
+        "battery_ids": [
+          "15_kwh_speicher"
+        ],
+        "pv_system_ids": [
+          "dach_sued",
+          "dach_nord"
+        ],
+        "import_tariff_id": "at_vkw_strom_dynamisch",
+        "export_tariff_id": "at_vkw_pv_dynamisch",
+        "house_profile_id": "example_efh"
+      }
+    }
+  ]
+}

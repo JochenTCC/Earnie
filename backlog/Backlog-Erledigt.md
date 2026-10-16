@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### ConfigMigration P0 — inventory + fixtures (2026-10-16)
+
+- [x] **ConfigMigration P0 — inventory + fixtures:** documented order / inputs / idempotency / loader rejections for v3→v4 and the seven in-model one-shots in [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md); scrubbed before-snapshots from Earnie-env-home (`v3_last`, `v3_single_battery`, `v3_pre_ehal`, `v4_pre_quellenwahl`, `v4_pre_inverter_gridfee`, `v4_pre_conversion`, `v4_pre_topology`) under `tests/fixtures/migration/`; re-extract via `python -m scripts.extract_migration_fixtures --env-home <Earnie-env-home>`. Goldens and registry tests remain **P1**.
+
 ### Bugfix — Restart cycle counted in punctuality and early-start lead (2026-10-16)
 
 - [x] **Punctuality stats and early-start lead include the first cycle after a `main.py` restart** — **Verified** (2026-10-16)

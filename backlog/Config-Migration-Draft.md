@@ -22,6 +22,8 @@ Status: draft 2026-10-16, owner decisions from chat the same day (see §1 and §
 
 ## 2. Today (inventory)
 
+P0 table (order, detect, files, idempotency, loader rejections, fixture map): [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md).
+
 - **Data-model gate:** `runtime_store/data_model.py` — `CURRENT_DATA_MODEL = 4`, `MIGRATABLE_DATA_MODELS = {3}`; `ensure_compatible()` rejects v3 with a CLI hint.
 - **v3 → v4:** `runtime_store/migrate_v4.py` (`migrate_pack_docs`), CLI `scripts/migrate_data_model_v4.py`, also called from config-pack import (`runtime_store/config_pack.py`).
 - **In-model one-shot migrations** (data model stays 4, each its own CLI, loaders fail loud with a script hint):
@@ -137,18 +139,20 @@ Two independent **version tracks**; each file belongs to exactly one:
 ## 4. Regression data set (v3 → current)
 
 - Source: private repo **Earnie-env-home** (`github.com/JochenTCC/Earnie-env-home`, local clone `C:\Users\Test\Documents\Smarthome\Earnie-env-home`), folder `config/`. Never commit raw content from it to the public repo.
-- History found 2026-10-16 (14 commits, `earnie_data_model` per live pack file):
+- History found 2026-10-16 (exact "before" SHAs for fixtures — see [Config-Migration-Inventory.md](Config-Migration-Inventory.md)):
 
-  | Commits | Date | Data model | Note |
-  |---------|------|-----------|------|
-  | `26c9daf` … `d6388e2` | 2026-07-19 … 07-21 | **1** | initial site pack; not migratable today (`MIGRATABLE_DATA_MODELS = {3}`) |
-  | `1cbee2f`, `7269b26` | 2026-10-02 … 10-03 | **3** | v3 snapshots for the chain test |
-  | `760ab99` … `6f8dfaf` | 2026-10-07 … 10-14 | **4** | in-model steps visible in the messages: plant Quellenwahl drop (`66b31de`), Loxone Merker names cleared (`968e4b6`), inverter model + `netznutzung` (`49fc6a2`), conversion efficiency (`c0cd597`), `regulates_on` / grid meter flags (`cf1454b`), inverter limits + topology (`a9f0dc4`) |
+  | SHA | Date | Data model | Fixture / note |
+  |-----|------|-----------|----------------|
+  | 26c9daf | 2026-07-19 | **1** | nest source for reconstructed 3_pre_ehal only (not a chain fixture) |
+  | 7269b26 | 2026-10-03 | **3** | last v3 → 3_last / 3_single_battery |
+  | 760ab99 | 2026-10-07 | **4** | → 4_pre_quellenwahl |
+  | 515ea9a | 2026-10-11 | **4** | → 4_pre_inverter_gridfee |
+  | 49fc6a2 | 2026-10-12 | **4** | → 4_pre_conversion (also first grid_fees.json) |
+  | c0cd597 | 2026-10-12 | **4** | → 4_pre_topology |
+  | cf1454b … 6f8dfaf | 2026-10-13 … 10-14 | **4** | post-topology; not extracted as "before" |
 
-  `tariffs.json` is not in the repo (deliberately excluded); `grid_fees.json` exists from `49fc6a2` on and carries **no** `earnie_data_model` (see §8). `config/uploads/` holds CSVs with real names / addresses — not part of the fixtures.
-- Extract snapshots of the 7 pack files at the commits **just before** each structural change (one per registered step + the oldest v3 state); helper script walks `git log -- config/*.json` of that repo.
-- Scrub before commit (names, IDs, location, IPs, tokens, HA URLs, Loxone addresses → stable aliases; same bar as the R0 golden scrub).
-- Fixtures: `tests/fixtures/migration/<snapshot>/` + golden of the migrated result.
+  	ariffs.json is not in the repo (deliberately excluded); grid_fees.json exists from 49fc6a2 on and carries **no** earnie_data_model (see §8). config/uploads/ holds CSVs with real names / addresses — not part of the fixtures.
+- Extract + scrub: python -m scripts.extract_migration_fixtures --env-home <Earnie-env-home> → 	ests/fixtures/migration/<snapshot>/. Goldens of migrated results land in **P1**.
 - Tests:
   - full chain from every snapshot → result passes `ensure_compatible`, schema and real loaders;
   - golden diff of the migrated output;

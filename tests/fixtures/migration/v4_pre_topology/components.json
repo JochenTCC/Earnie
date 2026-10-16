@@ -1,0 +1,164 @@
+{
+  "inverters": [
+    {
+      "id": "wr_ecoflow_delta_3",
+      "label": "Insel-WR Ecoflow Powerstation Delta 3",
+      "type": "battery",
+      "ac_connection": "island",
+      "control": "full",
+      "owned_by": "ecoflow_delta_3",
+      "id_locked": true,
+      "efficiency": 0.97
+    },
+    {
+      "id": "wr_main",
+      "label": "Haupt-Wechselrichter",
+      "type": "hybrid",
+      "ac_connection": "grid_tied",
+      "control": "full",
+      "id_locked": true,
+      "efficiency": 0.97
+    }
+  ],
+  "batteries": [
+    {
+      "id": "virtual_gs",
+      "label": "1.0 kWh Virtuell (Geschirrspüler)",
+      "type": "powerstation",
+      "battery_capacity_kwh": 1.0,
+      "battery_max_charge_power_kw": 5.0,
+      "battery_max_discharge_power_kw": 0.0,
+      "battery_efficiency": 0.9690721649484536,
+      "battery_min_soc": 5.0,
+      "battery_max_soc": 100.0,
+      "threshold_power": 0.03,
+      "limits_from_live": false,
+      "control": "limits_only",
+      "backing": "virtual",
+      "role": "single_use",
+      "attached_consumer_ids": [
+        "geschirrspueler"
+      ],
+      "attached_consumer_id": "geschirrspueler",
+      "battery_wear": {
+        "enabled": false
+      },
+      "ehal_bindings": {}
+    },
+    {
+      "id": "virtual_washing",
+      "label": "1.5 kWh Virtuell (Waschen)",
+      "type": "powerstation",
+      "battery_capacity_kwh": 0.1,
+      "battery_max_charge_power_kw": 5.0,
+      "battery_max_discharge_power_kw": 0.0,
+      "battery_efficiency": 0.9690721649484536,
+      "battery_min_soc": 5.0,
+      "battery_max_soc": 100.0,
+      "threshold_power": 0.03,
+      "limits_from_live": false,
+      "control": "limits_only",
+      "backing": "virtual",
+      "role": "single_use",
+      "attached_consumer_ids": [
+        "trockner",
+        "waschmaschine"
+      ],
+      "attached_consumer_id": "trockner",
+      "battery_wear": {
+        "enabled": false
+      },
+      "ehal_bindings": {}
+    },
+    {
+      "id": "15_kwh_speicher",
+      "label": "15 kWh Speicher",
+      "type": "house",
+      "battery_capacity_kwh": 15.0,
+      "battery_max_charge_power_kw": 5.0,
+      "battery_max_discharge_power_kw": 5.0,
+      "battery_efficiency": 0.9690721649484536,
+      "battery_min_soc": 5.0,
+      "battery_max_soc": 100.0,
+      "threshold_power": 0.03,
+      "limits_from_live": true,
+      "control": "full",
+      "inverter_id": "wr_main",
+      "standby_power_kw": 0.026,
+      "ehal_bindings": {
+        "ess.15_kwh_speicher.get_ess_max_charge_power": "",
+        "ess.15_kwh_speicher.get_ess_max_discharge_power": "",
+        "ess.15_kwh_speicher.get_ess_soc_max": "",
+        "ess.15_kwh_speicher.get_ess_soc_min": "",
+        "ess.15_kwh_speicher.sens_ess_power": "",
+        "ess.15_kwh_speicher.sens_ess_soc": "",
+        "ess.15_kwh_speicher.set_ess_active_power": "",
+        "ess.15_kwh_speicher.set_ess_charge_power_limit": "",
+        "ess.15_kwh_speicher.set_ess_discharge_power_limit": "",
+        "ess.15_kwh_speicher.set_ess_mode": ""
+      },
+      "battery_wear": {
+        "enabled": false
+      },
+      "id_locked": true
+    },
+    {
+      "id": "ecoflow_delta_3",
+      "label": "Ecoflow Powerstation Delta 3",
+      "type": "powerstation",
+      "battery_capacity_kwh": 1.024,
+      "battery_max_charge_power_kw": 1.5,
+      "battery_max_discharge_power_kw": 2.2,
+      "battery_efficiency": 0.9278350515463918,
+      "battery_min_soc": 10.0,
+      "battery_max_soc": 100.0,
+      "threshold_power": 0.03,
+      "limits_from_live": true,
+      "control": "full",
+      "inverter_id": "wr_ecoflow_delta_3",
+      "backing": "physical",
+      "role": "standby_backup",
+      "attached_consumer_ids": [
+        "dev-pc"
+      ],
+      "attached_consumer_id": "dev-pc",
+      "standby_power_kw": 0.02,
+      "ehal_bindings": {
+        "ess.ecoflow_delta_3.get_ess_soc_max": "",
+        "ess.ecoflow_delta_3.get_ess_soc_min": "",
+        "ess.ecoflow_delta_3.sens_ess_power": "",
+        "ess.ecoflow_delta_3.sens_ess_soc": "",
+        "ess.ecoflow_delta_3.set_ess_charge_power_limit": "",
+        "ess.ecoflow_delta_3.set_ess_discharge_power_limit": "",
+        "ess.ecoflow_delta_3.set_ess_mode": "",
+        "ess.ecoflow_delta_3.set_ess_active_power": "",
+        "ess.ecoflow_delta_3.set_ess_source_select": ""
+      },
+      "battery_wear": {
+        "enabled": false
+      },
+      "id_locked": true
+    }
+  ],
+  "pv_systems": [
+    {
+      "id": "dach_sued",
+      "label": "Dach Süd",
+      "kwp": 5.7,
+      "pv_tilt": 18.0,
+      "pv_azimuth": 26.0,
+      "inverter_id": "wr_main",
+      "id_locked": true
+    },
+    {
+      "id": "dach_nord",
+      "label": "Dach Nord",
+      "kwp": 6.8,
+      "pv_tilt": 18.0,
+      "pv_azimuth": -154.0,
+      "inverter_id": "wr_main",
+      "id_locked": true
+    }
+  ],
+  "earnie_data_model": 4
+}

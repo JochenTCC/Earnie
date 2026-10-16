@@ -1,0 +1,314 @@
+{
+  "profiles": [
+    {
+      "id": "profile_a",
+      "label": "House A",
+      "annual_kwh": 13000.0,
+      "absent_mode": false,
+      "total_profile_csv": "fixture/data.csv",
+      "pv_profile_csv": "fixture/data.csv",
+      "battery_profile_csv": "fixture/data.csv",
+      "grid_profile_csv": "fixture/data.csv",
+      "historical_csv_source": "fixture/separate",
+      "baseload_distribution": "equal",
+      "consumers": [
+        {
+          "id": "waermepumpe",
+          "label": "Wärmepumpe",
+          "type": "thermal_annual",
+          "nominal_power_kw": 1.9,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "living_area_m2": 157.0,
+          "building_class": 2,
+          "heat_pump_type": "erde",
+          "persons": 2,
+          "target_temp_c": 21.5,
+          "absent_temp_reduction_c": 6.5,
+          "heating_limit_c": 15.0,
+          "solar_thermal_area_m2": 10.3,
+          "solar_thermal_tilt_deg": 18.0,
+          "solar_thermal_azimuth_deg": 26.0,
+          "building_mass": "leicht",
+          "house_tolerance_c": 0.5,
+          "hwb_kwh_m2": 40.0,
+          "heat_storage": {
+            "volume_liters": 887.0,
+            "heat_loss_kw_per_k": 0.01,
+            "setpoint_c": 47.0,
+            "tolerance_c": 5.0
+          },
+          "timezone_name": "Europe/Vienna",
+          "min_on_quarterhours": 1,
+          "ehal_bindings": {
+            "heatpump.waermepumpe.sens_power_act": "",
+            "heatpump.waermepumpe.set_enable": "",
+            "sens_temperature_heat_storage": "",
+            "sens_temperature_heat_storage_low": ""
+          }
+        },
+        {
+          "id": "e_auto",
+          "label": "smart",
+          "type": "ev",
+          "nominal_power_kw": 3.5,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "min_power_kw": 1.4,
+          "min_on_quarterhours": 1,
+          "battery_capacity_kwh": 16.0,
+          "charging_schedule": {
+            "target_soc_percent": 100.0,
+            "charging_efficiency": 0.96,
+            "forecast_when_absent": true,
+            "weekday": {
+              "car_available_from_hour": 20,
+              "ready_by_hour": 7,
+              "daily_rest_soc": 40.0
+            },
+            "weekend": {
+              "car_available_from_hour": 20,
+              "ready_by_hour": 12,
+              "daily_rest_soc": 80.0
+            },
+            "nominal_power_voltage_v": 220.0,
+            "nominal_power_phases": 1,
+            "milp": {
+              "live_modus_a_min_remaining_kwh": 2.8,
+              "tie_break_on_epsilon": 0.001,
+              "tie_break_time_epsilon": 0.0001
+            }
+          },
+          "ehal_bindings": {
+            "sens_evcs_active_power": "",
+            "set_evcs_max_current": "",
+            "set_evcs_mode": "",
+            "sens_evcs_connected": "",
+            "sens_evcs_soc_act": "",
+            "get_evcs_nominal_current": "",
+            "sens_evcs_bat_capacity": "",
+            "get_evcs_ready_by_time": "",
+            "get_evcs_limit_soc": "",
+            "get_evcs_soc_min_immediate": ""
+          }
+        },
+        {
+          "id": "pool_swimspa",
+          "label": "Pool / SwimSpa",
+          "type": "thermal_rc",
+          "nominal_power_kw": 2.8,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "thermal_rc": {
+            "water_volume_liters": 5900.0,
+            "setpoint_c": 35.0,
+            "tolerance_c": 1.5,
+            "heat_loss_kw_per_k": 0.02,
+            "heating_efficiency": 0.99,
+            "latitude": 47.0,
+            "longitude": 10.0,
+            "timezone_name": "Europe/Vienna"
+          },
+          "min_on_quarterhours": 1,
+          "ehal_bindings": {
+            "pool.pool_swimspa.sens_power_act": "",
+            "pool.pool_swimspa.set_enable": "",
+            "sens_temperature_water": "",
+            "get_temperature_water_setpoint": "",
+            "get_temperature_tolerance_c": "",
+            "sens_heating_active": ""
+          }
+        },
+        {
+          "id": "pool_filter",
+          "label": "Pool-Filter",
+          "type": "generic",
+          "nominal_power_kw": 0.18,
+          "use_profile_csv": false,
+          "absent_mode_enabled": false,
+          "annual_kwh": 262.08,
+          "schedule": {
+            "runs_per_week": 7,
+            "duration_h": 4.0,
+            "start_hour": 12,
+            "start_shift_h": 0.0
+          },
+          "earnie_role": "known",
+          "ehal_bindings": {
+            "get_filter_remaining_hours": "",
+            "pool.pool_filter.set_enable": "",
+            "sens_filter_active": "",
+            "get_filter_native_start_hour": "",
+            "get_filter_native_duration_hours": ""
+          }
+        },
+        {
+          "id": "geschirrspueler",
+          "label": "Geschirrspüler",
+          "type": "generic",
+          "nominal_power_kw": 0.35,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "annual_kwh": 272.99999999999994,
+          "schedule": {
+            "runs_per_week": 5,
+            "duration_h": 3.0,
+            "start_hour": 12,
+            "start_shift_h": 8.0
+          },
+          "earnie_role": "manual",
+          "appliance_recommendation": {
+            "mode": "reserve",
+            "power_source": "manual",
+            "default_power_kw": 0.35,
+            "powerstation_id": "virtual_gs"
+          },
+          "ehal_bindings": {
+            "consumer.geschirrspueler.sens_power_act": ""
+          }
+        },
+        {
+          "id": "kochen",
+          "label": "Kochen",
+          "type": "generic",
+          "nominal_power_kw": 1.5,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "annual_kwh": 468.0,
+          "schedule": {
+            "runs_per_week": 6,
+            "duration_h": 1.0,
+            "start_hour": 19,
+            "start_shift_h": 0.0
+          },
+          "earnie_role": "known",
+          "ehal_bindings": {
+            "consumer.kochen.sens_power_act": "",
+            "consumer.kochen.sens_energy_total": ""
+          }
+        },
+        {
+          "id": "trockner",
+          "label": "Trockner",
+          "type": "generic",
+          "nominal_power_kw": 1.0,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "annual_kwh": 312.0,
+          "schedule": {
+            "runs_per_week": 3,
+            "duration_h": 2.0,
+            "start_hour": 16,
+            "start_shift_h": 4.0
+          },
+          "earnie_role": "manual",
+          "appliance_recommendation": {
+            "mode": "reserve",
+            "power_source": "manual",
+            "default_power_kw": 1.0,
+            "powerstation_id": "virtual_washing"
+          },
+          "ehal_bindings": {
+            "consumer.trockner.sens_power_act": "",
+            "consumer.trockner.sens_energy_total": ""
+          }
+        },
+        {
+          "id": "tv",
+          "label": "TV",
+          "type": "generic",
+          "nominal_power_kw": 0.2,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "annual_kwh": 436.8000000000001,
+          "schedule": {
+            "runs_per_week": 7,
+            "duration_h": 6.0,
+            "start_hour": 18,
+            "start_shift_h": 0.0
+          },
+          "earnie_role": "known",
+          "ehal_bindings": {
+            "consumer.tv.sens_power_act": "",
+            "consumer.tv.sens_energy_total": ""
+          }
+        },
+        {
+          "id": "waschmaschine",
+          "label": "Waschmaschine",
+          "type": "generic",
+          "nominal_power_kw": 0.6,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "annual_kwh": 374.4,
+          "schedule": {
+            "runs_per_week": 4,
+            "duration_h": 3.0,
+            "start_hour": 15,
+            "start_shift_h": 4.0
+          },
+          "earnie_role": "manual",
+          "appliance_recommendation": {
+            "mode": "reserve",
+            "power_source": "manual",
+            "default_power_kw": 0.6,
+            "powerstation_id": "virtual_washing"
+          },
+          "ehal_bindings": {
+            "consumer.waschmaschine.sens_power_act": "",
+            "consumer.waschmaschine.sens_energy_total": ""
+          }
+        },
+        {
+          "id": "dev-pc",
+          "label": "Dev-PC",
+          "type": "generic",
+          "nominal_power_kw": 0.12,
+          "use_profile_csv": false,
+          "absent_mode_enabled": true,
+          "annual_kwh": 1048.32,
+          "schedule": {
+            "runs_per_week": 7,
+            "duration_h": 24.0,
+            "start_hour": 12,
+            "start_shift_h": 6.0
+          },
+          "earnie_role": "manual",
+          "appliance_recommendation": {
+            "mode": "reserve",
+            "power_source": "manual",
+            "default_power_kw": 0.1,
+            "powerstation_id": "ecoflow_delta_3"
+          }
+        }
+      ],
+      "land": "AT",
+      "latitude": 47.0,
+      "longitude": 10.0,
+      "timezone_name": "Europe/Vienna",
+      "default_pv_tilt": 18.0,
+      "default_pv_azimuth": 26.0,
+      "netznutzung": {
+        "area_id": null,
+        "power_metering": "unmetered_power",
+        "quarter_hour_meter": false,
+        "base_cent_kwh": 5.353,
+        "include_status": [
+          "verordnet"
+        ]
+      }
+    }
+  ],
+  "plant": {
+    "max_export_power_kw": 11.0,
+    "ehal_bindings": {
+      "sens_grid_power_active": "",
+      "get_grid_export_power_limit": "",
+      "set_grid_export_power_limit": "",
+      "sens_pv_production_active": "",
+      "sens_temperature_outside": "",
+      "sens_absent_mode": ""
+    }
+  },
+  "earnie_data_model": 4
+}

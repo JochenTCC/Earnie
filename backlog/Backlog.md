@@ -36,9 +36,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - **Note:** Epic **EarlyStart** (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md)): **P0** (punctuality log) and **P1** (adaptive lead 15–90 s, plan for the tick, write at the tick; no state projection — owner decision 2026-10-15) and the **prefetch** follow-up → [Erledigt](Backlog-Erledigt.md). Success is judged from the `Pünktlichkeit:` line in `earnie.log` / `runtime/cycle_stats.jsonl`. Dropped with P1 scope: SoC/thermal/EV projection to T, pre-commit SoC drift check, MILP solver deadline (MILP < 1 s on NAS since dev.57).
 
-- [ ] **Epic ConfigMigration — guided config migration v3 → v4** (replaces *Full orchestration of model version migration*; design + owner decisions 2026-10-16: [`Config-Migration-Draft.md`](Config-Migration-Draft.md))
+- [ ] **Epic ConfigMigration — guided config migration v3 → v4** (replaces *Full orchestration of model version migration*; design + owner decisions 2026-10-16: [`Config-Migration-Draft.md`](Config-Migration-Draft.md); inventory [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md))
   - **Goal:** after an update the user is guided through the migration of the config JSON files (scope: the pack files only, no runtime state / history); chain from `earnie_data_model` 3 (models 1/2 = blocker "zu alt"); informed beforehand via release notes; Earnie asks before migrating, shows manual to-dos (text; download only where an export exists); `main.py` starts only after the migration; backup of the old JSON files, nothing else.
-  - [ ] **ConfigMigration P0 — inventory + fixtures:** order / inputs / idempotency / loader rejections of v3→v4 and the seven in-model one-shots (`migrate_ehal_bindings`, `migrate_ess_bindings_once`, `migrate_inverters_once`, `migrate_conversion_efficiency_once`, `migrate_topology_once`, `migrate_pool_filter_milp`, `migrate_grid_fee_profile`); scrubbed v3 / v4 snapshots from the private Earnie-env-home history (one before each structural change) as `tests/fixtures/migration/`.
+  - **Note:** ConfigMigration **P0** (inventory + fixtures) → [Erledigt](Backlog-Erledigt.md). Inventory [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md); fixtures `tests/fixtures/migration/`.
   - [ ] **ConfigMigration P1 — registry + runner:** `MigrationStep` registry (pure detect / apply, questions, blockers, manual to-dos); planner (dry run + per-file diff) and runner (validate with the real loaders → backup `config/backups/pre-migration-…` → atomic replace); one CLI `scripts.migrate_config`; v3→v4 + the seven legacy steps as registry steps (detect-based, data model stays 4); config-pack import on the same chain; tests per draft §4 (chain, golden, idempotency, coverage meta test, failure injection).
   - [ ] **ConfigMigration P2 — startup gate:** bootstrap without silent stamping / partial migration of live pack files; untagged live file = blocker (except `grid_fees.json`, see note); `run_streamlit` migration mode (no `load_config_or_exit`, no daemon auto-start, wizard only); `main.py` + `main_daemon.start()` refuse while pending; Shadow never migrates; loader messages point to the wizard / CLI.
   - [ ] **ConfigMigration P3 — wizard (German):** hint + last run version, steps with diff, questions, blockers, manual to-dos, "Backup anlegen und migrieren", report, reload and daemon start (respects `EARNIE_AUTO_START_MAIN` / add-on `auto_start_main`); AppTest coverage.
@@ -54,7 +54,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.8
 
-- [ ] Make a review for Chart1 on Monitor page and check if code related to simulated trajectories might be substituted by results from main.py (to prevent drift / misalignment)
+- [ ] Make a review for Chart1 implementation on Monitor page and check if code related to simulated trajectories might be substituted by results from main.py (to prevent drift / misalignment / code duplication)
 
 - [ ] Enable multiple EV / Wallboxes *(reuse entity-scoped namespacing approach from **2.7.c** multi-ESS)*
 - Parametrize EVs as now (+ sensors)
