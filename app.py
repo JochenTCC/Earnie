@@ -8,6 +8,7 @@ import logger_config
 logger_config.configure_utf8_stdio()
 
 import logging
+import sys
 
 import streamlit as st
 
@@ -19,49 +20,48 @@ from runtime_store import bootstrap
 
 bootstrap.run()
 
-from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
-
-config = load_config_or_exit()
-reinit_config_or_exit(config)
-
-from runtime_store.shadow import refuse_shadow_startup_or_exit
-
-refuse_shadow_startup_or_exit()
-
-from runtime_store.config_drift import (
-    format_drift_message,
-    load_config_drift_items,
-    should_show_config_drift,
+from runtime_store.migration.gate import (
+    abort_message_de,
+    migration_blocks_normal_startup,
+    plan_for_active_config,
 )
-from runtime_store.dotenv_io import needs_loxone_setup, require_loxone_credentials_for_config
-from ui.setup_dotenv import render_ehal_setup_page
-from ui.chunk_load_recovery import inject_chunk_load_recovery
-from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
-from ui.navigation import build_navigation
-from ui.setup_progress import render_setup_progress_notice
-from ui.config_pack import render_config_pack_sidebar
-from ui.info_sidebar import render_info_sidebar, render_missing_next_month_tariff_sidebar
+from runtime_store.shadow.mode import is_shadow_mode
+
+_migration_plan = plan_for_active_config()
+_migration_mode = migration_blocks_normal_startup(_migration_plan)
+
+if _migration_mode and is_shadow_mode():
+    print(abort_message_de(_migration_plan), file=sys.stderr)
+    print(
+        "Abbruch (Shadow): geteilte Konfiguration muss zuerst auf Prod "
+        "migriert werden (Shadow migriert nie).",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+config = None
+if not _migration_mode:
+    from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
+    from runtime_store.shadow import refuse_shadow_startup_or_exit
+
+    config = load_config_or_exit()
+    reinit_config_or_exit(config)
+    refuse_shadow_startup_or_exit()
+
 from ui.branding import render_app_logo
-from ui.styles import (
-    inject_checkbox_highlight_css,
-    inject_compact_numeric_css,
-    inject_compact_top_layout_css,
-    inject_help_hint_css,
-    inject_single_file_uploader_css,
-)
-from ui.truth_banner import render_truth_banner
 from ui.shadow_banner import render_shadow_banner
 
 logger = logging.getLogger("app")
 
 
 st.set_page_config(
-    page_title="Monitor",
+    page_title="Monitor" if not _migration_mode else "Konfigurations-Migration",
     page_icon="🔋",
     layout="wide",
 )
 render_app_logo()
-render_shadow_banner()
+if not _migration_mode:
+    render_shadow_banner()
 
 
 def _render_downgrade_warning() -> None:
@@ -73,6 +73,12 @@ def _render_downgrade_warning() -> None:
 
 
 def _render_drift_warning() -> None:
+    from runtime_store.config_drift import (
+        format_drift_message,
+        load_config_drift_items,
+        should_show_config_drift,
+    )
+
     if not should_show_config_drift():
         return
     try:
@@ -90,11 +96,39 @@ def _render_loxone_auth_warning() -> None:
 
 
 def main() -> None:
+    if _migration_mode:
+        from ui.pages.page_config_migration import render as render_migration
+
+        # No full sidebar (config pack export would touch live files).
+        render_migration(_migration_plan)
+        st.stop()
+
+    from runtime_store.dotenv_io import (
+        needs_loxone_setup,
+        require_loxone_credentials_for_config,
+    )
+    from ui.chunk_load_recovery import inject_chunk_load_recovery
+    from ui.config_pack import render_config_pack_sidebar
+    from ui.info_sidebar import render_info_sidebar, render_missing_next_month_tariff_sidebar
+    from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
+    from ui.navigation import build_navigation
+    from ui.setup_dotenv import render_ehal_setup_page
+    from ui.setup_progress import render_setup_progress_notice
+    from ui.styles import (
+        inject_checkbox_highlight_css,
+        inject_compact_numeric_css,
+        inject_compact_top_layout_css,
+        inject_help_hint_css,
+        inject_single_file_uploader_css,
+    )
+    from ui.truth_banner import render_truth_banner
+
     if needs_loxone_setup():
         render_ehal_setup_page()
         render_info_sidebar()
         st.stop()
 
+    assert config is not None
     config.reinit_config(require_loxone_credentials=require_loxone_credentials_for_config())
     inject_chunk_load_recovery()
     inject_compact_top_layout_css()

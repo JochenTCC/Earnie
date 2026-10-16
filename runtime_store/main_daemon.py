@@ -162,6 +162,16 @@ def status() -> DaemonStatus:
 
 def start(*, wait_sec: float = _START_WAIT_SEC) -> DaemonStatus:
     """Spawn ``python main.py`` if not already running."""
+    from runtime_store.migration.gate import (
+        daemon_refuse_message,
+        migration_blocks_normal_startup,
+        plan_for_active_config,
+    )
+
+    plan = plan_for_active_config()
+    if migration_blocks_normal_startup(plan):
+        raise DaemonError(daemon_refuse_message(plan))
+
     current = status()
     if current.state == "running":
         pid_part = f" (PID {current.pid})" if current.pid is not None else ""

@@ -23,6 +23,10 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **`grid_fees.json` gets `earnie_data_model` stamped by config-pack export / import** — fix implemented (2026-10-16, ConfigMigration P2); acceptance pending
+  - Export (`build_config_pack_bytes`) and `write_json_dict` no longer stamp `earnie_data_model` onto `grid_fees.json`; import already skipped stamp. Existing stamped keys are not stripped on load (migration step later).
+  - Tests: `tests/test_config_pack_and_paths.py` round trip; `tests/test_json_io.py` (`test_write_json_dict_does_not_stamp_grid_fees`).
+
 - [ ] **Virtual reserve: `advance_reserve_after_slot` / `set_trigger` wiped `target_kwh` to 0** — fix implemented (2026-10-10); live acceptance pending
   - Symptom (Nas productive, Geschirrspüler / `virtual_gs`): dishwasher running, MILP ZWANGSLADEN toward ~11.8% (≈1 kWh refill), but `powerstation_reserves.json` stayed `empty` / `stored_kwh=0` / `target_kwh=0`.
   - Cause: `get_or_init_state(..., target_kwh=0.0)` always overwrote the configured target on every slot advance / trigger latch, so charge credit was capped at `min(0, …)`.
@@ -37,14 +41,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Live verification: `Using cached day-ahead` in most cycles; `day_ahead_fetch` only around the auction publish (~12:45–13:00) and after restarts.
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
-- [ ] **`grid_fees.json` gets `earnie_data_model` stamped by config-pack export / import** (found 2026-10-16 while planning the config migration, [Config-Migration-Draft.md](Config-Migration-Draft.md) §2 / §3.7)
-  - Symptom: the seed `share/config/grid_fees.json` and the bootstrap site copy carry no version key; after a config-pack export + import the site copy carries `earnie_data_model: 4`. The same file therefore exists in two states, depending on the install's history.
-  - Cause: `build_config_pack_bytes()` calls `stamp_data_model()` on every pack JSON (`runtime_store/config_pack.py:60`); `_migrate_and_validate_pack_docs()` stamps + `ensure_compatible()` on import, and `write_json_dict()` (`settings/json_io.py:56`) stamps every file it writes — `grid_fees.json` is a tariff-domain catalog, not an Earnie data-model file.
-  - Impact: none inside Earnie (`data/grid_fees.normalize_grid_fee_catalog` ignores unknown root keys). Edbert's strict loader (`edbert/gridfee.py` `parse_grid_fee_catalog`, allowed root keys `description` / `rule_sets` / `areas`) rejects the stamped file — matters for the Edbert CLI `--grid-catalog` today and for the Edbert integration in Version 2.8.
-  - Fix direction: exclude `grid_fees.json` from `earnie_data_model` stamping and from `ensure_compatible()` in export, import and `write_json_dict`; strip an existing `earnie_data_model` from the site copy only via the planned migration step (no silent strip on load). The file's own format version (`tariff_format`, aligned with Edbert) comes with the config migration item, not with this fix.
-  - Tests: export / import round trip leaves `grid_fees.json` without `earnie_data_model`; `write_json_dict` on a `grid_fees.json` path does not stamp.
-
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 

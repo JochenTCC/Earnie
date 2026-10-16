@@ -1,7 +1,6 @@
 """Streamlit-Server-Port aus config.json (ui.streamlit_port) mit Env-Override."""
 from __future__ import annotations
 
-import config
 from runtime_store.env_vars import read_env
 
 _DEFAULT_PORT = 8501
@@ -26,9 +25,17 @@ def _parse_env_port() -> int | None:
     return value
 
 
-def streamlit_port() -> int:
-    """Port für `streamlit run` (Env-Override hat Vorrang vor config.json)."""
+def streamlit_port(*, require_config: bool = True) -> int:
+    """Port für `streamlit run` (Env-Override hat Vorrang vor config.json).
+
+    When ``require_config`` is False (ConfigMigration mode), env or default
+    ``8501`` is used without importing ``config``.
+    """
     env = _parse_env_port()
     if env is not None:
         return env
+    if not require_config:
+        return _DEFAULT_PORT
+    import config
+
     return config.get_ui_streamlit_port()

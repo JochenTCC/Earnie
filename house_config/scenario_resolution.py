@@ -77,7 +77,7 @@ def resolve_scenario_settings(
     und house_profile_id auf. Liefert flaches Dict kompatibel mit simulation/engine.py.
     """
     out = dict(settings)
-    # Tolerate on-disk legacy singular until bootstrap migrate persists battery_ids[].
+    # Tolerate on-disk legacy singular until ConfigMigration persists battery_ids[].
     if "battery_id" in out:
         raw = out.pop("battery_id")
         existing = out.get("battery_ids")

@@ -101,10 +101,29 @@ def main(argv: list[str] | None = None) -> int:
     from runtime_store import bootstrap
     from runtime_store.config_load import load_config_or_exit
     from runtime_store.dotenv_loader import load_app_dotenv
+    from runtime_store.migration.gate import (
+        abort_message_de,
+        migration_blocks_normal_startup,
+        plan_for_active_config,
+    )
+    from runtime_store.shadow.mode import is_shadow_mode
 
     load_app_dotenv(override=True)
     bootstrap.run()
-    load_config_or_exit()
+
+    plan = plan_for_active_config()
+    migration_mode = migration_blocks_normal_startup(plan)
+    if migration_mode and is_shadow_mode():
+        print(abort_message_de(plan), flush=True)
+        print(
+            "Abbruch (Shadow): geteilte Konfiguration muss zuerst auf Prod "
+            "migriert werden (Shadow migriert nie).",
+            flush=True,
+        )
+        return 1
+
+    if not migration_mode:
+        load_config_or_exit()
 
     import logger_config
     from ui.streamlit_server import streamlit_port
@@ -112,12 +131,19 @@ def main(argv: list[str] | None = None) -> int:
     logger_config.configure_utf8_stdio()
 
     args = _parse_args(argv)
-    port = streamlit_port()
+    port = streamlit_port(require_config=not migration_mode)
     print(
         f"Streamlit Port {port} (ui.streamlit_port / EARNIE_UI_STREAMLIT_PORT)",
         flush=True,
     )
-    _maybe_auto_start_main()
+    if migration_mode:
+        print(
+            "ConfigMigration: Migrationsmodus — kein Config-Load, "
+            "kein main.py Auto-Start.",
+            flush=True,
+        )
+    else:
+        _maybe_auto_start_main()
     return _run_streamlit_cli(_streamlit_argv(port, args.extra))
 
 

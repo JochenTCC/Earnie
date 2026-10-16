@@ -49,6 +49,9 @@ def prepare_config_path() -> str:
 def load_config_or_exit() -> ModuleType:
     """Importiert config; bei fehlendem Pfad oder ungültigem Inhalt ohne Traceback abbrechen."""
     prepare_config_path()
+    from runtime_store.migration.gate import abort_if_migration_pending
+
+    abort_if_migration_pending()
     try:
         import config as config_module
 

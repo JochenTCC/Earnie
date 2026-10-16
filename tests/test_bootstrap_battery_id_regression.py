@@ -1,4 +1,4 @@
-"""Regression: bootstrap migrates settings.battery_id on already-v4 scenarios."""
+"""Regression: legacy settings.battery_id — soft coerce without silent bootstrap migrate."""
 from __future__ import annotations
 
 import json
@@ -8,8 +8,8 @@ from runtime_store import bootstrap
 from runtime_store.data_model import CURRENT_DATA_MODEL
 
 
-def test_bootstrap_migrates_v4_scenarios_battery_id(tmp_path, monkeypatch):
-    """Regression: NAS abort when earnie_data_model=4 still had settings.battery_id."""
+def test_bootstrap_does_not_silently_migrate_battery_id(tmp_path, monkeypatch):
+    """ConfigMigration P2: live pack content migrates via wizard/CLI, not bootstrap."""
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(tmp_path / "config" / "config.json"))
     monkeypatch.delenv("EARNIE_BACKTESTING_SCENARIOS_PATH", raising=False)
     monkeypatch.delenv("EARNIE_COMPONENTS_PATH", raising=False)
@@ -59,13 +59,12 @@ def test_bootstrap_migrates_v4_scenarios_battery_id(tmp_path, monkeypatch):
         lambda: False,
     )
 
-    modified = bootstrap._migrate_pack_legacy_keys()
-    assert str(scenarios_path) in modified
-
-    scenarios = json.loads(scenarios_path.read_text(encoding="utf-8"))
-    settings = scenarios["scenarios"][0]["settings"]
-    assert "battery_id" not in settings
-    assert settings["battery_ids"] == ["10_kwh_speicher"]
+    before = scenarios_path.read_text(encoding="utf-8")
+    bootstrap._bootstrap_runtime_data_artifacts(shadow=False)
+    after = scenarios_path.read_text(encoding="utf-8")
+    assert after == before
+    scenarios = json.loads(after)
+    assert "battery_id" in scenarios["scenarios"][0]["settings"]
 
 
 def test_resolve_scenario_settings_coerces_legacy_battery_id(monkeypatch):

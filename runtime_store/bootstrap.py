@@ -109,6 +109,32 @@ def _ensure_directory(path: str) -> None:
     logger.info("bootstrap: Verzeichnis bereit: %s", path)
 
 
+# Live Earnie-track pack files (not grid_fees): stamp CURRENT only when newly created.
+_EARNIE_TRACK_LIVE_BASENAMES = frozenset(
+    {
+        "config.json",
+        "backtesting_scenarios.json",
+        "components.json",
+        "deviation_rules.json",
+        "house_profiles.json",
+        "tariffs.json",
+    }
+)
+
+
+def _stamp_new_earnie_track_live_file(path: str) -> None:
+    """Stamp earnie_data_model on a just-created live pack file (greenfield only)."""
+    from pathlib import Path
+
+    if Path(path).name not in _EARNIE_TRACK_LIVE_BASENAMES:
+        return
+    from settings.json_io import read_json_dict, write_json_dict
+
+    doc = read_json_dict(path)
+    if isinstance(doc, dict):
+        write_json_dict(path, doc)
+
+
 def _copy_template_if_missing(dest_path: str, source_path: str, label: str) -> bool:
     if not _is_missing_file(dest_path):
         return False
@@ -121,6 +147,7 @@ def _copy_template_if_missing(dest_path: str, source_path: str, label: str) -> b
         return False
     _ensure_parent_dir(dest_path)
     shutil.copyfile(source_path, dest_path)
+    _stamp_new_earnie_track_live_file(dest_path)
     logger.info("bootstrap: %s aus %s angelegt.", dest_path, label)
     return True
 
@@ -216,6 +243,7 @@ def _bootstrap_config_json() -> bool:
         )
     _ensure_parent_dir(config_path)
     shutil.copyfile(template_path, config_path)
+    _stamp_new_earnie_track_live_file(config_path)
     logger.info(
         "bootstrap: %s aus %s erstellt – Hausdaten im Hauskonfigurator und in der Konfiguration anlegen.",
         config_path,
@@ -252,26 +280,9 @@ def _bootstrap_backtesting_scenarios_json() -> bool:
     )
 
 
-def _read_data_model_version(doc: dict) -> int:
-    raw = doc.get("earnie_data_model")
-    if raw is None:
-        return 1
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return 1
-
-
-def _pack_json_stamp_candidates() -> list[str]:
-    """Live pack JSONs plus local example/minimal sidecars that carry earnie_data_model."""
-    paths = [
-        resolve_config_json_path(),
-        resolve_backtesting_scenarios_json_path(),
-        resolve_components_json_path(),
-        resolve_deviation_rules_json_path(),
-        resolve_house_profiles_json_path(),
-        resolve_tariffs_json_path(),
-    ]
+def _template_stamp_candidates() -> list[str]:
+    """Shipped ``*.example.json`` / ``*.minimal.json`` only (not live pack files)."""
+    paths: list[str] = []
     for basename in (
         "config.example.json",
         "config.minimal.json",
@@ -289,98 +300,40 @@ def _pack_json_stamp_candidates() -> list[str]:
     return paths
 
 
-def _stamp_pack_jsons_to_current_data_model() -> list[str]:
+def _stamp_template_jsons_to_current_data_model() -> list[str]:
     """
-    Persist CURRENT_DATA_MODEL on pack/sidecar JSONs still tagged older (or missing).
+    Persist CURRENT_DATA_MODEL on shipped example/minimal templates only.
 
-    Ensures schemas with const=CURRENT stay valid for local/example files.
-    Skipped when Shadow shares Prod config (read-only).
+    Live pack files are never stamped here (ConfigMigration P2 — use the
+    planner / wizard). Skipped when Shadow shares Prod config (read-only).
     """
     from runtime_store.shadow.mode import is_shadow_config_readonly
 
     if is_shadow_config_readonly():
         return []
 
-    from runtime_store.data_model import CURRENT_DATA_MODEL
+    from runtime_store.data_model import CURRENT_DATA_MODEL, read_data_model
     from settings.json_io import read_json_dict, write_json_dict
 
     modified: list[str] = []
-    for path in _pack_json_stamp_candidates():
+    for path in _template_stamp_candidates():
         if not os.path.isfile(path):
             continue
         doc = read_json_dict(path)
         if not isinstance(doc, dict):
             continue
-        if _read_data_model_version(doc) >= CURRENT_DATA_MODEL:
+        version = read_data_model(doc)
+        if version is not None and version >= CURRENT_DATA_MODEL:
             continue
         # write_json_dict stamps CURRENT_DATA_MODEL
         write_json_dict(path, doc)
         modified.append(path)
     if modified:
         logger.info(
-            "bootstrap: stamped earnie_data_model=%s on %s",
+            "bootstrap: stamped earnie_data_model=%s on templates %s",
             CURRENT_DATA_MODEL,
             ", ".join(modified),
         )
-    return modified
-
-
-def _scenarios_have_legacy_battery_id(doc: dict) -> bool:
-    scenarios = doc.get("scenarios")
-    if not isinstance(scenarios, list):
-        return False
-    for entry in scenarios:
-        if not isinstance(entry, dict):
-            continue
-        settings = entry.get("settings")
-        if isinstance(settings, dict) and "battery_id" in settings:
-            return True
-    return False
-
-
-def _migrate_pack_legacy_keys() -> list[str]:
-    """
-    Persist v4 key renames even when earnie_data_model is already current.
-
-    Stamp alone can leave settings.battery_id on disk; live resolve then aborts.
-    Skipped when Shadow shares Prod config (read-only).
-    """
-    from runtime_store.shadow.mode import is_shadow_config_readonly
-
-    if is_shadow_config_readonly():
-        return []
-
-    from runtime_store.migrate_v4 import migrate_document
-    from settings.json_io import read_json_dict, write_json_dict
-
-    modified: list[str] = []
-    scenarios_path = resolve_backtesting_scenarios_json_path()
-    if os.path.isfile(scenarios_path):
-        doc = read_json_dict(scenarios_path)
-        if isinstance(doc, dict) and _scenarios_have_legacy_battery_id(doc):
-            migrated = migrate_document(doc, kind="scenarios")
-            write_json_dict(scenarios_path, migrated)
-            modified.append(scenarios_path)
-            logger.info(
-                "bootstrap: migrated settings.battery_id → battery_ids[] in %s",
-                scenarios_path,
-            )
-
-    components_path = resolve_components_json_path()
-    if os.path.isfile(components_path):
-        doc = read_json_dict(components_path)
-        if isinstance(doc, dict):
-            before = json.dumps(doc, sort_keys=True, ensure_ascii=False)
-            migrated = migrate_document(doc, kind="components")
-            after = json.dumps(migrated, sort_keys=True, ensure_ascii=False)
-            if after != before:
-                write_json_dict(components_path, migrated)
-                if components_path not in modified:
-                    modified.append(components_path)
-                logger.info(
-                    "bootstrap: migrated components.json defaults/kind in %s",
-                    components_path,
-                )
     return modified
 
 
@@ -638,11 +591,8 @@ def _bootstrap_runtime_data_artifacts(*, shadow: bool = False) -> list[str]:
     """Local settings, dotenv, cons_data, consumer state, profile CSVs, log."""
     created: list[str] = []
     if not shadow:
-        for path in _stamp_pack_jsons_to_current_data_model():
+        for path in _stamp_template_jsons_to_current_data_model():
             created.append(path)
-        for path in _migrate_pack_legacy_keys():
-            if path not in created:
-                created.append(path)
     if _bootstrap_local_settings_json():
         created.append(resolve_local_settings_json_path())
     if not shadow and _bootstrap_dotenv():
@@ -702,10 +652,21 @@ def run() -> None:
         check_and_record_version()
 
         from runtime_store.cloud_demo import is_cloud_demo
+        from runtime_store.migration.gate import (
+            plan_for_active_config,
+            should_skip_offline_seed,
+        )
         from runtime_store.offline_demo_seed import seed_offline_live_scenario
 
         if is_cloud_demo():
             logger.debug("bootstrap: cloud demo — skip offline live-scenario seed.")
+            return
+        # ConfigMigration P2: do not rewrite pack JSONs while a model bump /
+        # untagged blocker is open (detect-based dm4 steps alone still allow seed).
+        if should_skip_offline_seed(plan_for_active_config()):
+            logger.info(
+                "bootstrap: skip offline demo seed — config migration pending."
+            )
             return
         if seed_offline_live_scenario():
             logger.info("bootstrap: offline demo live-scenario refs seeded.")

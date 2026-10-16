@@ -70,16 +70,19 @@ def ensure_compatible(doc: dict[str, Any], *, label: str) -> int:
     Config documents are also checked for removed structural keys.
     """
     version = read_data_model(doc)
+    _hint = (
+        "Streamlit-Seite „Konfigurations-Migration“ oder "
+        "python -m scripts.migrate_config --config-dir <config>"
+    )
     if version is None:
         raise DataModelError(
             f"{label}: earnie_data_model fehlt "
-            f"(erforderlich: {CURRENT_DATA_MODEL})."
+            f"(erforderlich: {CURRENT_DATA_MODEL}) — {_hint}."
         )
     if version in MIGRATABLE_DATA_MODELS:
         raise DataModelError(
             f"{label}: earnie_data_model={version} muss zuerst nach "
-            f"{CURRENT_DATA_MODEL} migriert werden "
-            f"(python -m scripts.migrate_config --config-dir <config>)."
+            f"{CURRENT_DATA_MODEL} migriert werden ({_hint})."
         )
     if version not in COMPATIBLE_DATA_MODELS:
         raise DataModelError(

@@ -218,7 +218,6 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
             "rules": [],
         },
         "grid_fees.json": {
-            DATA_MODEL_KEY: CURRENT_DATA_MODEL,
             "rule_sets": {},
             "areas": [],
         },
@@ -246,7 +245,8 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
         exported = json.loads(zf.read("tariffs.json").decode("utf-8"))
         assert exported[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
         grid_fees = json.loads(zf.read("grid_fees.json").decode("utf-8"))
-        assert grid_fees[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
+        assert DATA_MODEL_KEY not in grid_fees
+        assert grid_fees["areas"] == []
 
     # Import into a second stack via ENV (directory semantics)
     other = tmp_path / "other" / "config"
@@ -266,6 +266,7 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
     assert (other / "uploads" / "sample.csv").is_file()
     imported_fees = json.loads((other / "grid_fees.json").read_text(encoding="utf-8"))
     assert imported_fees["areas"] == []
+    assert DATA_MODEL_KEY not in imported_fees
 
 
 def test_config_pack_rejects_v1_manifest(monkeypatch, tmp_path: Path) -> None:

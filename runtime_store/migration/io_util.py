@@ -29,14 +29,15 @@ GRID_FEES_FILE = "grid_fees.json"
 
 def load_pack_docs(config_dir: str | Path) -> Docs:
     """Load pack JSON files that exist under ``config_dir``."""
+    from settings.json_io import read_json_dict
+
     root = Path(config_dir)
     docs: Docs = {}
     for name in PACK_FILENAMES:
         path = root / name
         if not path.is_file():
             continue
-        with path.open(encoding="utf-8") as handle:
-            raw = json.load(handle)
+        raw = read_json_dict(str(path))
         if not isinstance(raw, dict):
             raise ValueError(f"{name}: erwartet JSON-Objekt.")
         docs[name] = raw

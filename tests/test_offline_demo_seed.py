@@ -8,12 +8,19 @@ from pathlib import Path
 import pytest
 
 from runtime_store import bootstrap, offline_demo_seed
+from runtime_store.data_model import CURRENT_DATA_MODEL, DATA_MODEL_KEY
 from settings import config_loaders
 
 
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _with_model(payload: dict) -> dict:
+    out = dict(payload)
+    out[DATA_MODEL_KEY] = CURRENT_DATA_MODEL
+    return out
 
 
 def _prepare_cloud_like(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -44,97 +51,125 @@ def _prepare_cloud_like(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
 
     _write_json(
         config_dir / "config.json",
-        {
-            "live_scenario_id": "live",
-            "flexible_consumers": [],
-            "planning_horizon": {"mode": "sunrise_window"},
-            "loxone_blocks": {
-                "soc_name": "Battery_SOC",
-                "pv_power_name": "PV_Act",
-                "battery_power_name": "Battery_Act",
-                "grid_power_name": "Grid_Act",
-                "target_charge_power_name": "Target_Charge",
-                "target_discharge_power_name": "Target_Discharge",
-                "control_cmd_name": "Control_Cmd",
-            },
-            "system": {"global_timeout": 10, "loop_timeout": 900},
-            "ui": {"streamlit_port": 8501},
-            "market_prices": {"missing_price_strategy": "forecast"},
-        },
+        _with_model(
+            {
+                "live_scenario_id": "live",
+                "flexible_consumers": [],
+                "planning_horizon": {"mode": "sunrise_window"},
+                "loxone_blocks": {
+                    "soc_name": "Battery_SOC",
+                    "pv_power_name": "PV_Act",
+                    "battery_power_name": "Battery_Act",
+                    "grid_power_name": "Grid_Act",
+                    "target_charge_power_name": "Target_Charge",
+                    "target_discharge_power_name": "Target_Discharge",
+                    "control_cmd_name": "Control_Cmd",
+                },
+                "system": {"global_timeout": 10, "loop_timeout": 900},
+                "ui": {"streamlit_port": 8501},
+                "market_prices": {"missing_price_strategy": "forecast"},
+            }
+        ),
     )
     _write_json(
         config_dir / "backtesting_scenarios.json",
-        {
-            "cbc_gap_rel": 0.1,
-            "scenarios": [
-                {
-                    "id": "live",
-                    "label": "Live",
-                    "settings": {
-                        "battery_ids": [],
-                        "pv_system_ids": [],
-                        "import_tariff_id": "",
-                        "export_tariff_id": "",
-                        "house_profile_id": "",
-                    },
-                }
-            ],
-        },
+        _with_model(
+            {
+                "cbc_gap_rel": 0.1,
+                "scenarios": [
+                    {
+                        "id": "live",
+                        "label": "Live",
+                        "settings": {
+                            "battery_ids": [],
+                            "pv_system_ids": [],
+                            "import_tariff_id": "",
+                            "export_tariff_id": "",
+                            "house_profile_id": "",
+                        },
+                    }
+                ],
+            }
+        ),
     )
     _write_json(
         config_dir / "components.json",
-        {
-            "batteries": [
-                {
-                    "id": "10_kwh_speicher",
-                    "label": "10 kWh",
-                    "battery_capacity_kwh": 10.0,
-                    "battery_max_power_kw": 5.0,
-                    "battery_efficiency": 0.97,
-                    "battery_min_soc": 10.0,
-                    "battery_max_soc": 100.0,
-                    "threshold_power": 0.05,
-                }
-            ],
-            "pv_systems": [{"id": "dach_sued", "label": "Dach", "kwp": 6.0, "pv_tilt": 18, "pv_azimuth": 26}],
-        },
+        _with_model(
+            {
+                "batteries": [
+                    {
+                        "id": "10_kwh_speicher",
+                        "label": "10 kWh",
+                        "battery_capacity_kwh": 10.0,
+                        "battery_max_power_kw": 5.0,
+                        "battery_efficiency": 0.97,
+                        "battery_min_soc": 10.0,
+                        "battery_max_soc": 100.0,
+                        "threshold_power": 0.05,
+                    }
+                ],
+                "pv_systems": [
+                    {
+                        "id": "dach_sued",
+                        "label": "Dach",
+                        "kwp": 6.0,
+                        "pv_tilt": 18,
+                        "pv_azimuth": 26,
+                    }
+                ],
+            }
+        ),
     )
     _write_json(
         config_dir / "tariffs.json",
-        {
-            "import_tariffs": [
-                {"id": "awattar_at", "label": "aWATTar", "type": "spot_hourly", "land": "AT"},
-            ],
-            "export_tariffs": [
-                {"id": "fixed_37ct", "label": "Fix", "type": "fixed", "k_push_cent": 3.7},
-            ],
-        },
+        _with_model(
+            {
+                "import_tariffs": [
+                    {
+                        "id": "awattar_at",
+                        "label": "aWATTar",
+                        "type": "spot_hourly",
+                        "land": "AT",
+                    },
+                ],
+                "export_tariffs": [
+                    {
+                        "id": "fixed_37ct",
+                        "label": "Fix",
+                        "type": "fixed",
+                        "k_push_cent": 3.7,
+                    },
+                ],
+            }
+        ),
     )
     _write_json(
         config_dir / "house_profiles.json",
-        {
-            "profiles": [
-                {
-                    "id": "example_efh",
-                    "label": "Demo",
-                    "annual_kwh": 12000.0,
-                    "latitude": 48.2,
-                    "longitude": 16.3,
-                    "consumers": [
-                        {
-                            "id": "ev",
-                            "label": "EV",
-                            "type": "ev",
-                            "nominal_power_kw": 3.5,
-                            "battery_capacity_kwh": 17.0,
-                            "min_power_kw": 1.4,
-                            "loxone_inputs": {"power_name": "EV_P"},
-                            "loxone_outputs": {"enable_name": "EV_En"},
-                        }
-                    ],
-                }
-            ]
-        },
+        _with_model(
+            {
+                "profiles": [
+                    {
+                        "id": "example_efh",
+                        "label": "Demo",
+                        "annual_kwh": 12000.0,
+                        "latitude": 48.2,
+                        "longitude": 16.3,
+                        "consumers": [
+                            {
+                                "id": "ev",
+                                "label": "EV",
+                                "type": "ev",
+                                "nominal_power_kw": 3.5,
+                                "battery_capacity_kwh": 17.0,
+                                "min_power_kw": 1.4,
+                                "loxone_inputs": {"power_name": "EV_P"},
+                                "loxone_outputs": {"enable_name": "EV_En"},
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
     )
     return tmp_path
 

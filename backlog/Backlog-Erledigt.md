@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### ConfigMigration P2 — startup gate (2026-10-16)
+
+- [x] **ConfigMigration P2 — startup gate:** bootstrap no longer silently stamps/migrates live pack files (templates only; new greenfield live files stamped once on create); untagged Earnie-track file = planner blocker (`grid_fees.json` exempt); `runtime_store/migration/gate.py`; `run_streamlit` + `app.py` migration mode (skip `load_config_or_exit`, no daemon auto-start, stub page + log); `load_config_or_exit` / `main_daemon.start` / Shadow refuse while pending; `ensure_compatible` messages point to wizard + CLI; `grid_fees.json` no longer stamped on export/`write_json_dict`; tests `tests/test_migration_startup_gate.py`. Full wizard UI remains **P3**.
+
 ### ConfigMigration P1 — registry + runner (2026-10-16)
 
 - [x] **ConfigMigration P1 — registry + runner:** `MigrationStep` registry in [`runtime_store/migration/`](../runtime_store/migration/) (pure detect / apply, questions, blockers, manual to-dos); planner (dry run + per-file diff) and runner (validate with real loaders → backup `config/backups/pre-migration-…` → atomic replace); CLI `python -m scripts.migrate_config`; v3→v4 + seven legacy steps as detect-based dm4 steps; config-pack import on the same chain; legacy `migrate_*` CLIs thin-wrapped; goldens under `tests/fixtures/migration/goldens/`; tests `tests/test_migration_registry.py` (chain, golden, idempotency, meta coverage, failure injection, dual-track synthetic, pack import). CLI dogfood on fixture copies accepted 2026-10-16.

@@ -152,6 +152,19 @@ def ensure_shadow_startup() -> dict:
             "Shadow-Modus erfordert EARNIE_RUNTIME_PATH oder EARNIE_ENV_PATH "
             "(kein Fallback auf die Standard-Runtime von Prod)."
         )
+    from runtime_store.migration.gate import (
+        abort_message_de,
+        migration_blocks_normal_startup,
+        plan_for_active_config,
+    )
+
+    plan = plan_for_active_config()
+    if migration_blocks_normal_startup(plan):
+        raise ShadowStartupError(
+            "Shadow startet nicht, solange die geteilte Prod-Konfiguration "
+            "migriert werden muss (Shadow migriert nie).\n"
+            + abort_message_de(plan)
+        )
     meta = _load_meta()
     _check_feed_schema(meta)
     _check_data_model(meta)

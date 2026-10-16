@@ -9,7 +9,13 @@ from house_config.ehal_bindings import (
     needs_ehal_bindings_migration,
     strip_migrated_config_keys,
 )
-from runtime_store.migration.types import Answers, Docs, MigrationStep, StepResult
+from runtime_store.migration.types import (
+    Answers,
+    Blocker,
+    Docs,
+    MigrationStep,
+    StepResult,
+)
 
 STEP_ID = "dm4.ehal_bindings"
 
@@ -53,12 +59,19 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
             config_doc = dict(config_doc)
             config_doc.pop("loxone_blocks", None)
 
-    house_out, config_out, changed = ensure_migrated(
-        house_doc,
-        config_doc,
-        strip_legacy=True,
-        migrate_secrets=False,
-    )
+    try:
+        house_out, config_out, changed = ensure_migrated(
+            house_doc,
+            config_doc,
+            strip_legacy=True,
+            migrate_secrets=False,
+        )
+    except ValueError as exc:
+        return StepResult(
+            docs=docs,
+            changed_files=(),
+            blockers=(Blocker(step_id=STEP_ID, message_de=str(exc)),),
+        )
     changed_files: list[str] = []
     if changed or house_out != house:
         out["house_profiles.json"] = house_out

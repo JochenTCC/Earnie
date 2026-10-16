@@ -57,7 +57,9 @@ def build_config_pack_bytes() -> bytes:
             if not os.path.isfile(path):
                 continue
             doc = read_json_dict(path)
-            stamp_data_model(doc)
+            # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
+            if arcname != "grid_fees.json":
+                stamp_data_model(doc)
             archive.writestr(
                 arcname,
                 json.dumps(doc, indent=4, ensure_ascii=False) + "\n",

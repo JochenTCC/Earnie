@@ -202,7 +202,8 @@ def test_bootstrap_upgrades_stale_schema_from_bundled(tmp_path, monkeypatch):
     assert "oemag_monthly_feed_in_rates" in schema["properties"]
 
 
-def test_bootstrap_stamps_other_pack_jsons_to_current(tmp_path, monkeypatch):
+def test_bootstrap_stamps_templates_not_live_pack(tmp_path, monkeypatch):
+    """ConfigMigration P2: templates get CURRENT; live pack files stay as-is."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(tmp_path / "config"))
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
@@ -248,7 +249,7 @@ def test_bootstrap_stamps_other_pack_jsons_to_current(tmp_path, monkeypatch):
     components = json.loads((config_dir / "components.json").read_text(encoding="utf-8"))
     minimal = json.loads((config_dir / "config.minimal.json").read_text(encoding="utf-8"))
     tariffs = json.loads((config_dir / "tariffs.json").read_text(encoding="utf-8"))
-    assert config["earnie_data_model"] == CURRENT_DATA_MODEL
-    assert components["earnie_data_model"] == CURRENT_DATA_MODEL
+    assert config["earnie_data_model"] == 1
+    assert components["earnie_data_model"] == 1
+    assert tariffs["earnie_data_model"] == 2
     assert minimal["earnie_data_model"] == CURRENT_DATA_MODEL
-    assert tariffs["earnie_data_model"] == CURRENT_DATA_MODEL
