@@ -2,26 +2,34 @@
 	"folders": [
 		{
 			"name": "Earnie",
-			"path": "."
+			"path": ".",
+			"settings": {
+				"python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+				"python.terminal.activateEnvironment": true
+			}
 		},
 		{
-			"path": "../../../TechCreaCon/Earnie-Projekt"
+			"name": "Earnie-Projekt",
+			"path": "../Earnie-Projekt"
 		},
 		{
-			"path": "../ha-addon-earnie"
+			"name": "edbert",
+			"path": "../edbert",
+			"settings": {
+				"python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+				"python.terminal.activateEnvironment": true
+			}
 		},
 		{
+			"name": "Earnie-env-home",
 			"path": "../Earnie-env-home"
-		},
-		{
-			"path": "../Edbert"
 		}
 	],
 	"settings": {
 		"terminal.integrated.env.windows": {
 			"PYTHONUTF8": "1"
 		},
-		"containers.imageBuildContextPath": "${workspaceFolder}",
-		"docker.imageBuildContextPath": "${workspaceFolder}"
+		"python-envs.defaultEnvManager": "ms-python.python:venv",
+		"files.encoding": "utf8"
 	}
 }

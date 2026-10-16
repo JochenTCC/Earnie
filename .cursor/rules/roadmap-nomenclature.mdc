@@ -48,6 +48,7 @@ alwaysApply: true
 * **Plant topology (`Topology`, 2.7):** P1 (explicit root + regulator declaration + validation), P2 (live-balance coverage), P3 (per-ESS setpoint writes), P4 (reactive regulator in the MILP), P5 (balance nodes + attribution)
 * **Session Conclusion:** Phases P1-P2
 * **Migration (`MIGRATION.md`):** Phases P1-P7
+* **Config migration (`ConfigMigration`, 2.7):** P0 (inventory + fixtures), P1 (step registry + planner/runner + CLI), P2 (startup gate), P3 (wizard UI), P4 (rule, release process, docs)
 * **Early-start scheduling (`EarlyStart`, 2.7):** P0 (always-on duration, event + punctuality recording), P1 (early start on by default: lead estimator + split cycle, commit at tick)
 * **Thermal horizon simulation (`ThermalHorizon`, 2.7):** P1 (thermal parameters from one year sim), P2 (Live store context without year profile), P3 (collector irradiance forecast), P4 (house-only horizon without storage), P5 (guard test)
 

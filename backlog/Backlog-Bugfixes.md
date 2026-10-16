@@ -38,6 +38,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] **`grid_fees.json` gets `earnie_data_model` stamped by config-pack export / import** (found 2026-10-16 while planning the config migration, [Config-Migration-Draft.md](Config-Migration-Draft.md) §2 / §3.7)
+  - Symptom: the seed `share/config/grid_fees.json` and the bootstrap site copy carry no version key; after a config-pack export + import the site copy carries `earnie_data_model: 4`. The same file therefore exists in two states, depending on the install's history.
+  - Cause: `build_config_pack_bytes()` calls `stamp_data_model()` on every pack JSON (`runtime_store/config_pack.py:60`); `_migrate_and_validate_pack_docs()` stamps + `ensure_compatible()` on import, and `write_json_dict()` (`settings/json_io.py:56`) stamps every file it writes — `grid_fees.json` is a tariff-domain catalog, not an Earnie data-model file.
+  - Impact: none inside Earnie (`data/grid_fees.normalize_grid_fee_catalog` ignores unknown root keys). Edbert's strict loader (`edbert/gridfee.py` `parse_grid_fee_catalog`, allowed root keys `description` / `rule_sets` / `areas`) rejects the stamped file — matters for the Edbert CLI `--grid-catalog` today and for the Edbert integration in Version 2.8.
+  - Fix direction: exclude `grid_fees.json` from `earnie_data_model` stamping and from `ensure_compatible()` in export, import and `write_json_dict`; strip an existing `earnie_data_model` from the site copy only via the planned migration step (no silent strip on load). The file's own format version (`tariff_format`, aligned with Edbert) comes with the config migration item, not with this fix.
+  - Tests: export / import round trip leaves `grid_fees.json` without `earnie_data_model`; `write_json_dict` on a `grid_fees.json` path does not stamp.
+
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
