@@ -8,7 +8,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Audience marker `[feat]` / `[qual]` / `[dev]` on every top-level backlog entry (`backlog.mdc` §7, AI asks when missing; bugfixes need none); 117 existing archive entries backfilled; `.github/release-notes/audience.toml` pre-classifies commits and `dev_terms`.
   - No internal backlog version IDs (`2.7.n`, `2.+1`, …) in release notes or user docs: finalize/CI reject them, `tests/test_user_docs_audience.py` guards user docs; IDs removed from 15 user docs (`efm-auto-sync-2.4.l.md` renamed to `efm-auto-sync.md`).
   - Tests: `tests/test_release_notes_collect.py`, `tests/test_release_notes_finalize.py`, `tests/test_user_docs_audience.py`.
-  - Open follow-ups: move Shadow/HouseSim sections out of user docs (`docs/entwicklung/`, `docs_allowlist` in `audience.toml`); dry run for 2.7.0-alpha.1 draft pending review; `gh` required for automatic baseline.
+  - Shadow-Modus/Feed sections moved from `docs/einrichtung/betrieb.md` to `docs/entwicklung/shadow-betrieb.md`; developer index `docs/entwicklung/README.md`; `docs_allowlist` is empty. Open: dry-run draft for 2.7.0-alpha.1 pending review; `gh` required for automatic baseline.
 
 ### ConfigMigration P4 — process + docs (2026-10-16)
 

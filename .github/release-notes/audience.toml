@@ -13,16 +13,9 @@ dev_terms = ["Shadow Mode", "Shadow-Modus", "Shadow-Feed", "Shadow-Client", "Sha
 # End-user doc scope checked by tests/test_user_docs_audience.py.
 user_doc_paths = ["docs/README.md", "docs/user-manual", "docs/einrichtung", "docs/konfiguration", "docs/ui", "docs/referenz", "README.md"]
 
-# BASELINE of known violations (ratchet): these files may still mention dev_terms until the
-# sections move to docs/entwicklung/. Do not add new entries; shrink this list.
-docs_allowlist = [
-  "docs/README.md",
-  "docs/einrichtung/betrieb.md",
-  "docs/ui/ehal-com.md",
-  "README.md",
-]
+# Known violations of dev_terms (ratchet, currently empty). Do not add entries; move content to docs/entwicklung/ or docs/spec/.
+docs_allowlist = []
 
 # BASELINE of internal backlog version IDs (2.7.n, 2.+1, ...) per user doc: counts may only shrink.
 # Remove the ID from the doc, then lower/delete the entry (tests/test_user_docs_audience.py).
 [backlog_id_baseline]
-"docs/README.md" = 2   # Shadow line: leaves with the doc move to docs/entwicklung/

@@ -330,7 +330,7 @@ Under **Live-Schreiben**, the **Schreibtest** expander lists all activated write
 | `set_evcs_max_current` | `0 … min(Nennstrom, 6 A)` |
 | `set_ess_mode` | `0` Automatik / `1` Laden / `2` Entladen |
 
-**Force ESS-Leistung:** ``set_ess_active_power`` (inkl. entity-scoped) ist in der Tabelle immer sichtbar; die Force-Checkbox **entsperrt Senden** (Default 100 W, hart ±200 W) mit **zweiter** Bestätigung. Ohne Force bleibt die Zeile gesperrt. HouseSim nutzt für die Physik nur die Active-Power-Sollwert-Entity, nicht den Mode-Hint.
+**Force ESS-Leistung:** ``set_ess_active_power`` (inkl. entity-scoped) ist in der Tabelle immer sichtbar; die Force-Checkbox **entsperrt Senden** (Default 100 W, hart ±200 W) mit **zweiter** Bestätigung. Ohne Force bleibt die Zeile gesperrt.
 
 **Auto-Roundtrip**
 
@@ -340,7 +340,7 @@ Under **Live-Schreiben**, the **Schreibtest** expander lists all activated write
 | Partial | Schreiben OK, aber kein lesbares Echo (z. B. OpenEMS ohne Channel-Readback) |
 | Fail / Write-Error | Mismatch oder Adapterfehler |
 
-Nach Auto-Roundtrip werden immer sichere Sollwerte geschrieben (ESS Automatik, EVCS 0 A). Manuell: Button **Sicher wiederherstellen**. HouseSim/Lab-Adapter werden nur per Hinweis erkannt (kein Hard-Block).
+Nach Auto-Roundtrip werden immer sichere Sollwerte geschrieben (ESS Automatik, EVCS 0 A). Manuell: Button **Sicher wiederherstellen**. Lab-Adapter werden nur per Hinweis erkannt (kein Hard-Block).
 
 ### HA Entity → EHAL Mapping
 

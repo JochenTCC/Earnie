@@ -123,7 +123,7 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 
 ## Roadmap (Kurz)
 
-- **2.6 / 2.7** — HA-Kopplung vertiefen; Shadow-Client; Exportbegrenzung; Mehrspeicher (siehe Backlog)
+- **2.6 / 2.7** — HA-Kopplung vertiefen; Exportbegrenzung; Mehrspeicher (siehe Backlog)
 - **Adaptation** — PV- und thermische Parameter-Anpassung über die Zeit
 - **Thermals** — Gekoppelte Haus-/Speicher-/Solar-Modelle
 - **Smartere Geräte-Empfehlungen** — adaptive Leistung und Laufzeit für Haushaltsgeräte

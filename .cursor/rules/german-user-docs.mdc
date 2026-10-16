@@ -18,7 +18,7 @@ End-user documentation is **German**. Do not translate it to English unless the 
 | `docs/ui/` | Streamlit-Oberfläche, Charts, Betrieb |
 | `docs/referenz/` | Loxone-Signale, Ports, Tabellen |
 
-**Not user docs:** `docs/spec/` (Entwickler-Specs, English OK), `Backlog*.md`. Root `README.md` is the public landing (German prose OK; keep in sync with user docs when facts change).
+**Not user docs:** `docs/spec/` (Entwickler-Specs, English OK), `docs/entwicklung/` (Entwickler-Betrieb, z. B. Shadow-Modus), `Backlog*.md`. Root `README.md` is the public landing (German prose OK; keep in sync with user docs when facts change).
 
 ## When editing or adding user docs
 

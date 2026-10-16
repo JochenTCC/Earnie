@@ -53,7 +53,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; monatlich rotiert, max. 12 Archive; u. a. `consumption_snapshot`, optional `closed_interval`) |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
 | `live_day_ahead_<zone>.json` | Cache der letzten erfolgreichen Live-Day-Ahead-Serie (QH; Zone z. B. `AT`; `source` ENTSO-E oder Energy-Charts); Live nutzt ihn statt erneutem API-Abruf bzw. vor aWATTar-Fallback |
-| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode` — auch UI **Optimierer-Dienst**, `chart_debug_capture_enabled`, optional `shadow_feed_enabled`, Cycle-Recorder `recorder_enabled` / `recorder_retention_days`)     |
+| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode` — auch UI **Optimierer-Dienst**, `chart_debug_capture_enabled`, Cycle-Recorder `recorder_enabled` / `recorder_retention_days`)     |
 | `recorder/`                     | Cycle-Recorder-Ringpuffer (`cycles_YYYY-MM-DD.jsonl.gz`, Config-Snapshots unter `configs/`) — Lastprofile für Regression; lokal, standardmäßig an |
 | `timing/`                       | Optional: Phasen-Zeiten des Live-Zyklus (`cycles.jsonl`) — nur bei `EARNIE_CYCLE_TIMING=1` |
 | `profile/`                      | Optional: `cProfile`-Dumps (`cycle_*.prof`, `*_top30.txt`) — nur bei `EARNIE_CYCLE_PROFILE=1` (kurz halten) |
@@ -126,56 +126,6 @@ In `runtime/local_settings.json`:
 - Retention: Tage, die Segmentdateien `cycles_YYYY-MM-DD.jsonl.gz` behalten werden (Default 7).
 - Ein Debug-Dump (siehe unten) hängt automatisch das aktuelle Recorder-Fenster an (`recorder/` im ZIP, `manifest.recorder`). Nur an den Maintainer weitergeben.
 
-### Shadow-Feed (Prod-Recorder, optional)
-
-Für eine spätere Dev-/Shadow-Instanz kann die Produktivinstanz Rohantworten der Backend-Reads in ein Feed-Verzeichnis schreiben (Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md)).
-
-In `runtime/local_settings.json` (nicht in der gemeinsamen `config.json`):
-
-```json
-{
-  "shadow_feed_enabled": true,
-  "shadow_feed_retention_days": 14
-}
-```
-
-- Standard: aus (`false` / Schlüssel fehlt) — kein Verhaltensunterschied.
-- Feed-Pfad: `{Config-Verzeichnis}/shadow_feed/` (`meta.json`, `latest.json`, `feed-YYYY-MM-DD.jsonl`). Überschreiben: Umgebungsvariable `EARNIE_SHADOW_FEED_PATH`.
-- Nur auf der Produktivinstanz aktivieren. Mit `EARNIE_SHADOW=1` wird der Recorder ignoriert.
-
-### Shadow-Modus (Dev-Client)
-
-Eine Entwicklungsinstanz kann parallel zur Produktivinstanz laufen und Eingänge aus dem Shadow-Feed lesen — ohne Backend-Schreibzugriffe und ohne Änderungen an der gemeinsamen Konfiguration (Ausnahme: EHAL-Mapping kann in `{Runtime}/shadow_ehal_bindings.json` landen und wird beim Laden der Hausprofile nur in Shadow gemerged). Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md).
-
-Voraussetzungen:
-
-1. Prod mit `shadow_feed_enabled: true` (siehe oben).
-2. Eigenes Runtime-Verzeichnis (`EARNIE_RUNTIME_PATH` oder `EARNIE_ENV_PATH` — Pflicht).
-3. Gemeinsames Config-Verzeichnis (z. B. SMB-Share der HA-Add-on-Config) bzw. `EARNIE_SHADOW_FEED_PATH`.
-4. Bei **Loxone**-Backend: Prod muss `loxone_feed: "push"` in `shadow_feed/meta.json` schreiben (VO-Push in den Feed). Ältere Prod-Builds ohne diese Capability lehnt Shadow beim Start ab — es gibt keinen Fallback auf die Prod-Datei `loxone_push_inbox.json`.
-
-Beispiel (PowerShell):
-
-```powershell
-$env:EARNIE_SHADOW='1'
-$env:EARNIE_CONFIG_PATH='\\HOMEASSISTANT\addon_configs\<prod-slug>'
-$env:EARNIE_RUNTIME_PATH='C:\earnie-shadow\runtime'
-$env:EARNIE_UI_STREAMLIT_PORT='8532'   # bei gleicher Host-Maschine wie Prod
-$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
-.venv\Scripts\python.exe main.py
-```
-
-Optional: Runtime aus Prod vorbelegen (gelernten Zustand kopieren, ohne Logs/Locks/`local_settings.json`):
-
-```powershell
-.venv\Scripts\python.exe -m scripts.shadow_seed_runtime --from <prod-runtime> --to <shadow-runtime>
-```
-
-Die Streamlit-UI zeigt ein dauerhaftes Shadow-Banner; unter EHAL-Com erscheint die Tabelle der blockierten Schreibvorgänge (`shadow_writes.jsonl`).
-
-- **Geteilte Prod-Config** (Feed liegt unter dem Config-Verzeichnis): Config schreibgeschützt; EHAL-Mapping „Speichern“ schreibt nur das Runtime-Overlay `shadow_ehal_bindings.json`.
-- **Private lokale Config** (`EARNIE_SHADOW_FEED_PATH` zeigt auf den Prod-Feed außerhalb der lokalen Config): Hauskonfigurator, `.env` und EHAL-Mapping schreiben in die lokale `earnie_env` — Backend-Schreibzugriffe bleiben blockiert.
-
 ### Log- und Historiendateien
 
 Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-06):
@@ -201,9 +151,6 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; ältere Ordner: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
 | `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; ältere Ordner: `runtime`). |
 | `EARNIE_EARLY_START`                    | `on` (Standard, auch wenn nicht gesetzt) oder `off`. `on`: reguläre Läufe starten 15–90 s vor dem Viertelstundentakt und schreiben die Sollwerte genau zum Takt; `off`: Lauf startet erst zum Takt und schreibt, sobald er fertig ist. Andere Werte → Fehler beim Start. Siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv). |
-| `EARNIE_SHADOW_FEED_PATH`               | Optional: Verzeichnis für den Prod-Shadow-Feed (sonst `{Config}/shadow_feed/`). Siehe [Shadow-Feed](#shadow-feed-prod-recorder-optional). |
-| `EARNIE_SHADOW`                         | `1` = Shadow-Modus (Dev-Client): Eingänge aus Feed, keine Backend-Schreibzugriffe. Config schreibgeschützt nur bei geteilter Prod-Config; private lokale Config (externer Feed) ist schreibbar. Siehe [Shadow-Modus](#shadow-modus-dev-client). |
-| `EARNIE_SHADOW_MAX_AGE_SEC`             | Max. Alter eines Feed-Eintrags relativ zur Prod-`cycle_ts` (Fallback: Heartbeat; Standard 120). |
 | `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable: `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Prod-Compose setzt oft `sunset2sunset,live_environment`; Cloud: `scenario_explorer` — siehe [Betriebsmodi](../ui/betriebsmodi.md). |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
 | `EARNIE_EHAL_LOXONE_HTTP_PORT`          | TCP-Port für Daemon-HTTP (`Earnie_Request_Optimize` / `/alive`; überschreibt `system.ehal_loxone_http_port`, Standard **8541**)                                                                                                       |
