@@ -23,6 +23,9 @@
 		{
 			"name": "Earnie-env-home",
 			"path": "../Earnie-env-home"
+		},
+		{
+			"path": "../earnie-server"
 		}
 	],
 	"settings": {
