@@ -35,7 +35,8 @@ Module `runtime_store/usage_ping.py` (pure logic + `maybe_send_ping`), state in 
 - Dates (`consent_at`, `last_sent_date`) and the once-per-day gate use **UTC** calendar days (`YYYY-MM-DD`), matching server UTC day aggregation.
 - `install_id`: random UUIDv4, generated on opt-in, deleted on opt-out. **Not** derived from `hardware_identity`.
 - `stage`: highest milestone reached (`explorer` → `live`); set on opt-in to `explorer`; raised via `set_highest_stage` / `note_explorer_activated` / `note_live_cycle_success`.
-- `scenarios_calc_count`: local lifetime counter of successfully calculated scenarios (not in wire payload). Bumped by `note_scenarios_calculated(n)` after a successful Scenario Explorer run (`scripts/run_backtesting.py` after log save, `n = len(enabled scenarios)`). When consent is `on`, a bump clears `last_sent_date` and `last_attempt_at` and calls `spawn_maybe_send_ping()` so the client may POST again the same UTC day. Server still daily-dedups by salted install id until Earnie-points.
+- `points`, `points_v`, `points_stamp` (optional): Earnie-Points of the live plant, rule version and the config mtime stamp used to skip recomputation (see [`earnie-points.md`](earnie-points.md) §4). Removed again when the calculation fails.
+- `scenarios_calc_count`: local lifetime counter of successfully calculated scenarios (not in wire payload). Bumped by `note_scenarios_calculated(n)` after a successful Scenario Explorer run (`scripts/run_backtesting.py` after log save, `n = len(enabled scenarios)`). When consent is `on`, a bump clears `last_sent_date` and `last_attempt_at` and calls `spawn_maybe_send_ping()` so the client may POST again the same UTC day. Server still daily-dedups by salted install id (first-wins for counters; `points` latest-wins, see §4 schema v2).
 - `maybe_send_ping(now, *, transport=None, endpoint_url=None)`: no-op unless consent is `on`, `EARNIE_USAGE_PING != off`, `last_sent_date != today (UTC)`, and `last_attempt_at` is older than 1 h (or missing). POST JSON with timeout 5 s. `last_sent_date` updates only on HTTP 2xx; every attempt stamps `last_attempt_at`. Endpoint URL from `EARNIE_USAGE_PING_URL` (or `endpoint_url`); if unset and no injected transport → WARNING no-op.
 - **P2 wiring:** `spawn_maybe_send_ping()` (daemon thread, at most one in flight) from `main.py` after `after_prod_cycle` and from `_daemon_wait_poll`. Live milestone after `run_state.save_run_state` with `success: true`, skipped in shadow mode. HA add-on optional bool `usage_ping` mirrored by `addon_options._apply_usage_ping_option` → `set_consent` when the key is present (absent = leave state unchanged).
 - Opt-out: set consent `off`, delete `install_id` (keep `consent_at` / `last_sent_date` / `stage` / `scenarios_calc_count` as historical). No DELETE/"bye".
@@ -48,6 +49,18 @@ Module `runtime_store/usage_ping.py` (pure logic + `maybe_send_ping`), state in 
 ```
 
 Exact keys only: `v`, `id`, `app_version`, `context`, `stage`. `context` = `detect_install_context()` (`loxberry` / `homeassistant_addon` / `manual`). `app_version` from `version.__version__`. `stage` is the highest stage stored in state. Date is taken from the server (UTC), never sent by the client. IP is not stored (§5). No other extras (backend kind, OS/arch, country) without an explicit decision.
+
+### Schema v2 (Earnie-Points)
+
+```json
+{"v": 2, "id": "<uuid4>", "app_version": "2.7.0", "context": "homeassistant_addon", "stage": "live", "points": 5, "points_v": 1}
+```
+
+- Exact keys: `v`, `id`, `app_version`, `context`, `stage`, `points`, `points_v`.
+- The client sends v2 **only** when `stage == "live"` and the state holds valid points (`points` int ≥ 0, `points_v` int ≥ 1); otherwise it sends v1 exactly as above. `points` is the total of the Earnie-Points of the **live** plant (rule and breakdown: [`earnie-points.md`](earnie-points.md)); no tariff name is sent.
+- A change of `points` while consent is `on` clears `last_sent_date` / `last_attempt_at` and triggers a send, so the daily statistic is current (same mechanism as the scenario counter).
+- **Receiver:** accepts v1 and v2. v2 requires `stage == "live"`, `points` int 0–99, `points_v` int ≥ 1. Per UTC day and salted id, install counters (stage, context, version) stay first-wins; `points` is **latest-wins**. `usage_daily.csv` gets a `points_hist` column (JSON histogram, buckets `"0"` … `"20"` and `"21+"`). The tariff split S / M / L is computed offline from the histogram with the then-current ranges.
+- Consent: no re-prompt for installs that already opted in; "Was wird gesendet?" shows the exact v2 JSON and the German docs / privacy note describe `points`.
 
 ## 5. Server design
 

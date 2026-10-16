@@ -16,6 +16,7 @@ from ui.house_config_profile_thermal import (
     _render_thermal_rc_fields,
 )
 from ui.house_config_profile_csv import _render_consumer_profile_csv_fields
+from ui.house_config_profile_points import _render_points_fields
 
 import streamlit as st
 
@@ -319,6 +320,7 @@ def _render_consumer_form_body(
             },
         )
     )
+    item.update(_render_points_fields(consumer, index, c_type, session_scope=session_scope))
     item.update(
         _render_consumer_profile_csv_fields(
             consumer,

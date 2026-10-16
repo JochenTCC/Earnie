@@ -175,13 +175,37 @@ Ab Version 2.7 kann Earnie optional und anonym melden, dass eine Installation ak
 
 | Feld | Bedeutung |
 | ---- | --------- |
-| `v` | Schema-Version (aktuell `1`) |
+| `v` | Schema-Version: `1`, bzw. `2`, sobald `points` mitgesendet wird |
 | `id` | Zufällige Installations-ID (UUIDv4, erst bei Zustimmung erzeugt; bei Widerruf gelöscht) |
 | `app_version` | Earnie-Versionsstring |
 | `context` | Installationskontext: `loxberry`, `homeassistant_addon` oder `manual` |
 | `stage` | Höchster erreichter Meilenstein: `explorer` (Szenarienkonfigurator) bzw. `live` (erster erfolgreicher Live-Zyklus) |
+| `points` | Nur im Live-Betrieb: Summe der **Earnie-Points** der Live-Anlage (ganze Zahl, siehe [Earnie-Points](#earnie-points)) |
+| `points_v` | Nur zusammen mit `points`: Version der Berechnungsregel (aktuell `1`) |
 
-**Nicht** gesendet werden u. a.: Preise, Orte, Gerätenamen, Konfigurationsinhalte, Hardware-Fingerprint.
+**Nicht** gesendet werden u. a.: Preise, Orte, Gerätenamen, Konfigurationsinhalte, Hardware-Fingerprint, Einzelwerte der Anlage (nur die Punktesumme).
+
+Wer bereits zugestimmt hat, wird wegen `points` nicht erneut gefragt: Die exakte JSON-Vorschau unter **Was wird gesendet?** zeigt jederzeit, was gesendet wird. Wer das nicht möchte, schaltet die Nutzungsstatistik ab (siehe unten).
+
+### Earnie-Points
+
+Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standort). Sie werden aus dem **Live-Szenario** berechnet (nicht aus Szenarien des Szenarienkonfigurators) und unter **Optimierer-Dienst → Earnie-Points dieser Anlage** mit Aufschlüsselung angezeigt. Die Berechnung bleibt dauerhaft konstant; die Zuordnung der Punktebereiche zu Tarifen kann sich dagegen ändern und wird nicht vom Client gesendet.
+
+| Bestandteil | Punkte |
+| ----------- | ------ |
+| PV-Generatoren (Summe der kWp der im Live-Szenario gewählten PV-Anlagen) | 1 Punkt bis 6 kWp, danach je angefangene 4 kWp ein weiterer Punkt |
+| Speicher (Summe der kWh der im Live-Szenario gewählten Batterien und aller Powerstations) | 1 Punkt bis 5 kWh, danach je angefangene 5 kWh ein weiterer Punkt |
+| Wallbox (ein Verbraucher vom Typ **E-Auto** = eine Wallbox) | einphasig 1 Punkt, dreiphasig 2 Punkte, bidirektional 3 Punkte |
+| Wärmepumpe / Klimaanlage | je Gerät 1 Punkt |
+| Weitere flexible Großverbraucher | je Verbraucher 1 Punkt ab 2,5 kW Nennleistung |
+
+Hinweise:
+
+- Die **Anzahl der E-Autos** wird nicht bewertet, nur die Wallboxen. Die Phasenzahl der Wallbox stammt aus den Ladeeinstellungen des E-Auto-Verbrauchers (Standard: 1 Phase; gewertet werden nur 1 und 3 Phasen). **Bidirektional** wird im Hauskonfigurator am E-Auto-Verbraucher mit **Wallbox bidirektional (V2G)** gesetzt.
+- Eine **Klimaanlage** wird im Hauskonfigurator über das Feld **Geräteart** (Klimaanlage) an einem Verbraucher vom Typ **Allgemein** oder **Temperatur (RC)** gekennzeichnet. Die Wärmepumpe zählt über den Typ **Haus Wärme**.
+- **Manuelle** Verbraucher (z. B. Waschmaschine, Backofen) und Verbraucher mit bekanntem Verbrauchsprofil werden **nicht** gezählt, da Earnie sie nicht steuert. Flexible Großverbraucher zählen nur, wenn sie von Earnie verschoben werden dürfen.
+- Jeder Verbraucher zählt höchstens einmal; Punkte werden **nicht standortübergreifend** addiert.
+- Ist die Berechnung nicht möglich (z. B. fehlende Angaben im Live-Szenario), zeigt Earnie den Grund an und sendet keine Punkte; die Statistik bleibt gültig.
 
 **Abschalten:**
 
@@ -195,7 +219,8 @@ Lokal liegt der Zustand in `runtime/usage_ping.json`.
 
 - **Rechtsgrundlage:** Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), dokumentiert mit dem Zustimmungsdatum.
 - **IP-Adresse / User-Agent:** werden vom Empfänger **nicht** gespeichert (kein Access-Log für diese Route). Die IP ist dennoch personenbezogene Daten beim Transport — daher diese Transparenz.
-- **Speicherung serverseitig:** die Installations-ID wird mit einem täglich wechselnden Salt gehasht; gespeichert werden nur Tageszähler (keine geräteübergreifende Profilbildung über Tage).
+- **Speicherung serverseitig:** die Installations-ID wird mit einem täglich wechselnden Salt gehasht; gespeichert werden nur Tageszähler (keine geräteübergreifende Profilbildung über Tage). Die Earnie-Points gehen nur als Verteilung (Histogramm der Punktesummen pro Tag) ein, nicht als Wert je Installation.
+- **Earnie-Points:** eine grobe abgeleitete Zahl ohne Konfigurationsinhalte; sie ist aus der Anlage nicht rückrechenbar und dient nur der Statistik (keine Lizenz- oder Abrechnungsprüfung).
 - **Hosting:** der Zähler-Endpunkt läuft auf einem gemieteten VPS bei **hosttech** in der **EU**. Mit dem Hoster besteht ein **Auftragsverarbeitungsvertrag (AV)**.
 
 ## Debug-Dump

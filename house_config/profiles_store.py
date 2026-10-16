@@ -14,6 +14,10 @@ from house_config.earnie_role import (
     EARNIE_ROLES,
     infer_earnie_role_from_legacy,
 )
+from house_config.consumer_points_fields import (
+    normalize_points_fields,
+    serialize_points_fields,
+)
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.ev_profile import normalize_ev_charging_schedule
 from house_config.geo_timezone import timezone_for_land
@@ -328,6 +332,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
         _normalize_thermal_annual_consumer(raw, spec)
     elif consumer_type == "thermal_rc":
         _normalize_thermal_rc_consumer(raw, spec, profile_id=profile_id, index=index)
+    normalize_points_fields(raw, spec, profile_id=profile_id, index=index)
     _copy_ehal_entity_fields(raw, spec)
     return spec
 
@@ -793,6 +798,7 @@ def _serialize_consumer(consumer: dict) -> dict:
             out["loxone_outputs"] = dict(consumer["loxone_outputs"])
         if consumer.get("thermal_control"):
             out["thermal_control"] = dict(consumer["thermal_control"])
+    serialize_points_fields(consumer, out)
     _attach_ehal_entity_fields(out, consumer)
     return out
 

@@ -23,8 +23,18 @@ _DIALOG_INTRO = (
     "Um die Qualität von Earnie permanent zu verbessern, kann Earnie anonym "
     "melden, dass diese Installation aktiv ist (Versionszähler). Es werden "
     "**keine** Preise, Orte, Gerätenamen oder Konfigurationsinhalte gesendet. "
+    "Im Live-Betrieb kommt eine grobe Größenkennzahl der Anlage hinzu "
+    "(Earnie-Points, nur die Summe). "
     "Die Meldung ist **freiwillig**, jederzeit widerrufbar und hat **keinen "
     "Einfluss** auf die Optimierung."
+)
+
+_POINTS_EXPLANATION = (
+    "`points` ist die Summe der **Earnie-Points** der Live-Anlage (grobe "
+    "Größenkennzahl aus PV, Speicher, Wallboxen, Wärmepumpen / Klimaanlagen und "
+    "flexiblen Großverbrauchern), `points_v` die Version der Berechnungsregel. "
+    "Beide Felder erscheinen erst im Live-Betrieb und enthalten keine "
+    "Konfigurationsinhalte."
 )
 
 
@@ -34,6 +44,13 @@ def consent_is_unset() -> bool:
 
 def _payload_json() -> str:
     return json.dumps(preview_payload(), indent=2, ensure_ascii=False)
+
+
+def _render_payload_preview() -> None:
+    try:
+        st.code(_payload_json(), language="json")
+    except ValueError as exc:
+        st.error(f"Vorschau nicht möglich (Zustand in runtime/usage_ping.json prüfen): {exc}")
 
 
 def _apply_consent(value: str) -> bool:
@@ -130,4 +147,5 @@ def render_usage_ping_settings() -> None:
             "Exakte Feldliste. Die Installations-ID wird erst bei Zustimmung "
             "zufällig erzeugt."
         )
-        st.code(_payload_json(), language="json")
+        _render_payload_preview()
+        st.caption(_POINTS_EXPLANATION)

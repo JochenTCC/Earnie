@@ -313,9 +313,11 @@ def render() -> None:
     daemon = status()
     _render_status(daemon)
     _render_silent_mode_toggle()
+    from ui.earnie_points_view import render_earnie_points
     from ui.usage_ping_consent import render_usage_ping_settings
 
     render_usage_ping_settings()
+    render_earnie_points()
     do_start, do_stop, do_restart = _render_lifecycle_buttons(
         running=daemon.state == "running",
         stopped=daemon.state == "stopped",

@@ -14,6 +14,8 @@ Die Optimierung entscheidet **wann** sie laufen, nicht ob die Anlage technisch k
 | `nominal_power_kw`  | Nennleistung für die MILP                                              |
 | `chart_color_index` | Farbindex 0–7 für Chart 1 und Sankey (siehe [Charts](../ui/charts.md)) |
 | `optimizer_enabled` | `false` = von Optimierung ausgeschlossen                               |
+| `bidirectional`     | Nur Typ `ev`, optional (`true`/`false`, fehlt = `false`): Wallbox kann entladen (V2G). Fließt in die [Earnie-Points](../einrichtung/betrieb.md#earnie-points) ein (3 Punkte). Hauskonfigurator: **Wallbox bidirektional (V2G)** |
+| `appliance_kind`    | Nur Typ `generic` und `thermal_rc`, optional: `air_conditioner` kennzeichnet eine Klimaanlage (zählt in den [Earnie-Points](../einrichtung/betrieb.md#earnie-points) wie eine Wärmepumpe). Hauskonfigurator: **Geräteart** |
 
 
 

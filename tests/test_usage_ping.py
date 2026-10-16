@@ -121,7 +121,7 @@ def test_payload_whitelist_and_context(
     monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "loxberry")
     state = up.set_consent("on", now=_now())
     payload = up.build_payload(state)
-    assert set(payload.keys()) == up.PAYLOAD_KEYS
+    assert set(payload.keys()) == up.PAYLOAD_KEYS_V1
     assert payload == {
         "v": 1,
         "id": state["install_id"],
@@ -159,7 +159,7 @@ def test_fake_transport_records_json_body(runtime_dir: Path) -> None:
     assert timeout == up.TIMEOUT_SEC
     parsed = json.loads(body.decode("utf-8"))
     assert parsed["id"] == state["install_id"]
-    assert set(parsed.keys()) == up.PAYLOAD_KEYS
+    assert set(parsed.keys()) == up.PAYLOAD_KEYS_V1
 
 
 class _PingHandler(BaseHTTPRequestHandler):
@@ -196,7 +196,7 @@ def test_mock_http_server_receives_ping(runtime_dir: Path) -> None:
         hit = _PingHandler.received[0]
         assert hit["path"] == "/ping"
         assert hit["content_type"] == "application/json"
-        assert set(hit["body"].keys()) == up.PAYLOAD_KEYS
+        assert set(hit["body"].keys()) == up.PAYLOAD_KEYS_V1
         assert up.load_state()["last_sent_date"] == "2026-10-16"
     finally:
         server.shutdown()
@@ -205,14 +205,72 @@ def test_mock_http_server_receives_ping(runtime_dir: Path) -> None:
 
 def test_preview_payload_placeholder_when_unset(runtime_dir: Path) -> None:
     preview = up.preview_payload()
-    assert set(preview.keys()) == up.PAYLOAD_KEYS
+    assert set(preview.keys()) == up.PAYLOAD_KEYS_V1
     assert preview["id"] == up.PREVIEW_ID_PLACEHOLDER
     assert preview["stage"] == "explorer"
 
     state = up.set_consent("on", now=_now())
     preview_on = up.preview_payload(state)
     assert preview_on["id"] == state["install_id"]
-    assert set(preview_on.keys()) == up.PAYLOAD_KEYS
+    assert set(preview_on.keys()) == up.PAYLOAD_KEYS_V1
+
+
+def _live_state_with_points(points: object = 5, points_v: object = 1) -> dict[str, Any]:
+    state = up.set_consent("on", now=_now())
+    state.update({"stage": "live", "points": points, "points_v": points_v})
+    return state
+
+
+def test_payload_v2_when_live_with_points(runtime_dir: Path) -> None:
+    state = _live_state_with_points()
+    payload = up.build_payload(state)
+    assert set(payload.keys()) == up.PAYLOAD_KEYS_V2
+    assert payload["v"] == 2
+    assert payload["points"] == 5
+    assert payload["points_v"] == 1
+    assert up.preview_payload(state) == payload
+
+
+def test_payload_v1_without_points_or_before_live(runtime_dir: Path) -> None:
+    live = up.set_consent("on", now=_now())
+    live["stage"] = "live"
+    assert set(up.build_payload(live).keys()) == up.PAYLOAD_KEYS_V1
+    explorer = {**live, "stage": "explorer", "points": 5, "points_v": 1}
+    payload = up.build_payload(explorer)
+    assert set(payload.keys()) == up.PAYLOAD_KEYS_V1
+    assert payload["v"] == 1
+
+
+def test_payload_zero_points_is_sent(runtime_dir: Path) -> None:
+    payload = up.build_payload(_live_state_with_points(points=0))
+    assert payload["v"] == 2
+    assert payload["points"] == 0
+
+
+@pytest.mark.parametrize(
+    ("points", "points_v"),
+    [(-1, 1), (True, 1), ("5", 1), (5, 0), (5, None), (5, 1.0)],
+)
+def test_invalid_points_state_raises(runtime_dir: Path, points: object, points_v: object) -> None:
+    with pytest.raises(ValueError, match="invalid points state"):
+        up.build_payload(_live_state_with_points(points, points_v))
+
+
+def test_points_without_points_v_raises(runtime_dir: Path) -> None:
+    state = _live_state_with_points()
+    del state["points_v"]
+    with pytest.raises(ValueError, match="invalid points state"):
+        up.build_payload(state)
+
+
+def test_v2_ping_is_sent_with_points(runtime_dir: Path) -> None:
+    state = _live_state_with_points(points=7)
+    up.save_state(state)
+    fake = _FakeTransport(204)
+    assert up.maybe_send_ping(_now(), transport=fake, endpoint_url="http://mock/ping") is True
+    parsed = json.loads(fake.calls[0][1].decode("utf-8"))
+    assert set(parsed.keys()) == up.PAYLOAD_KEYS_V2
+    assert parsed["points"] == 7
 
 
 def test_note_explorer_activated(runtime_dir: Path) -> None:

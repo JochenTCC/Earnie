@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 Consent = Literal["unset", "on", "off"]
 Stage = Literal["explorer", "live"]
 
-PAYLOAD_KEYS = frozenset({"v", "id", "app_version", "context", "stage"})
+PAYLOAD_KEYS_V1 = frozenset({"v", "id", "app_version", "context", "stage"})
+PAYLOAD_KEYS_V2 = PAYLOAD_KEYS_V1 | {"points", "points_v"}
 VALID_STAGES = frozenset({"explorer", "live"})
 _STAGE_RANK = {"explorer": 0, "live": 1}
 
@@ -173,8 +174,40 @@ def _app_version() -> str:
 PREVIEW_ID_PLACEHOLDER = "<wird bei Zustimmung erzeugt>"
 
 
+def _is_plain_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _points_fields(data: dict[str, Any], stage: str) -> dict[str, int]:
+    """``points`` / ``points_v`` for schema v2; empty (v1) unless live with points in state."""
+    if stage != "live" or ("points" not in data and "points_v" not in data):
+        return {}
+    points = data.get("points")
+    points_v = data.get("points_v")
+    if not _is_plain_int(points) or points < 0 or not _is_plain_int(points_v) or points_v < 1:
+        raise ValueError(
+            f"usage_ping: invalid points state (points={points!r}, points_v={points_v!r})"
+        )
+    return {"points": points, "points_v": points_v}
+
+
+def _assemble_payload(install_id: str, stage: str, points: dict[str, int]) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "v": 2 if points else 1,
+        "id": install_id,
+        "app_version": _app_version(),
+        "context": detect_install_context(),
+        "stage": stage,
+        **points,
+    }
+    expected = PAYLOAD_KEYS_V2 if points else PAYLOAD_KEYS_V1
+    if set(payload.keys()) != expected:
+        raise ValueError("usage_ping: payload key set drifted from whitelist")
+    return payload
+
+
 def build_payload(state: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Build the fixed v1 payload whitelist from state."""
+    """Build the fixed payload whitelist from state (v2 only when live with points, else v1)."""
     data = state if state is not None else load_state()
     install_id = str(data.get("install_id") or "").strip()
     if not install_id:
@@ -182,16 +215,7 @@ def build_payload(state: dict[str, Any] | None = None) -> dict[str, Any]:
     stage = str(data.get("stage") or "explorer")
     if stage not in VALID_STAGES:
         raise ValueError(f"usage_ping: invalid stage {stage!r}")
-    payload = {
-        "v": 1,
-        "id": install_id,
-        "app_version": _app_version(),
-        "context": detect_install_context(),
-        "stage": stage,
-    }
-    if set(payload.keys()) != PAYLOAD_KEYS:
-        raise ValueError("usage_ping: payload key set drifted from whitelist")
-    return payload
+    return _assemble_payload(install_id, stage, _points_fields(data, stage))
 
 
 def preview_payload(state: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -201,16 +225,9 @@ def preview_payload(state: dict[str, Any] | None = None) -> dict[str, Any]:
     stage = str(data.get("stage") or "explorer")
     if stage not in VALID_STAGES:
         stage = "explorer"
-    payload = {
-        "v": 1,
-        "id": install_id or PREVIEW_ID_PLACEHOLDER,
-        "app_version": _app_version(),
-        "context": detect_install_context(),
-        "stage": stage,
-    }
-    if set(payload.keys()) != PAYLOAD_KEYS:
-        raise ValueError("usage_ping: preview key set drifted from whitelist")
-    return payload
+    return _assemble_payload(
+        install_id or PREVIEW_ID_PLACEHOLDER, stage, _points_fields(data, stage)
+    )
 
 
 def _default_transport(url: str, body: bytes, timeout: float) -> int:
@@ -324,6 +341,9 @@ def note_live_cycle_success() -> None:
         if is_shadow_mode():
             return
         set_highest_stage("live")
+        from runtime_store.usage_points import refresh_points
+
+        refresh_points()
     except Exception as exc:
         logger.warning("usage_ping: live milestone failed: %s", exc)
 
