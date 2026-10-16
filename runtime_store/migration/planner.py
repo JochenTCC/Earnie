@@ -22,6 +22,7 @@ from runtime_store.migration.types import (
     MigrationPlan,
     MigrationStep,
     Question,
+    step_is_pending,
 )
 
 
@@ -96,11 +97,12 @@ def _pending_and_questions(
     docs: Docs, registry: tuple[MigrationStep, ...]
 ) -> tuple[tuple[str, ...], tuple[Question, ...]]:
     """List steps that detect true along a dry-run chain (stops at first blocker)."""
+    start = copy.deepcopy(docs)
     current = copy.deepcopy(docs)
     pending: list[str] = []
     questions: list[Question] = []
     for step in registry:
-        if not step.detect(current):
+        if not step_is_pending(step, start, current):
             continue
         pending.append(step.id)
         questions.extend(step.questions)

@@ -21,10 +21,18 @@ from runtime_store.migration import (
     run_migration,
 )
 from runtime_store.migration.io_util import load_pack_docs
+from runtime_store.migration.steps.loxone_binding_names import (
+    CHOICE_CLEAR,
+    CHOICE_KEEP,
+    Q_NAMES,
+)
 from runtime_store.migration.validate import validate_migrated_docs
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "migration"
 GOLDENS = FIXTURES / "goldens"
+
+# Goldens keep the Loxone Merker names (dm4.loxone_binding_names "Behalten").
+KEEP_NAMES = {Q_NAMES: CHOICE_KEEP}
 
 HAPPY_SNAPSHOTS = (
     "v3_single_battery",
@@ -61,7 +69,7 @@ def test_chain_golden_and_idempotent(tmp_path, name):
     plan = plan_migration(config_dir)
     assert plan.can_run, plan.blockers
     assert plan.pending_step_ids
-    report = run_migration(config_dir, {})
+    report = run_migration(config_dir, KEEP_NAMES)
     assert report.applied_step_ids
     assert Path(report.backup_dir).is_dir()
     assert (Path(report.backup_dir) / "manifest.json").is_file()
@@ -115,6 +123,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm4.ehal_bindings": "v3_pre_ehal",
         "dm4.v3_to_v4": "v3_single_battery",
         "dm4.ess_bindings": "v4_pre_quellenwahl",
+        "dm4.loxone_binding_names": "v3_single_battery",
         "dm4.inverters": "v4_pre_inverter_gridfee",
         "dm4.conversion_efficiency": "v4_pre_conversion",
         "dm4.topology": "v4_pre_topology",
@@ -339,3 +348,112 @@ def test_cli_dry_run(tmp_path):
     config_dir = _copy_snapshot(tmp_path, "v3_last")
     code = main(["--config-dir", str(config_dir), "--dry-run"])
     assert code == 2
+
+
+@pytest.mark.parametrize("name", (*HAPPY_SNAPSHOTS, "v3_last"))
+def test_fixture_scenarios_reference_existing_house_profiles(name):
+    """Scrubbed fixtures keep house_profile_id refs in sync with profile ids."""
+    for folder in (FIXTURES / name, GOLDENS / name):
+        if not folder.is_dir():
+            continue
+        house = json.loads((folder / "house_profiles.json").read_text(encoding="utf-8"))
+        profiles = house["profiles"]
+        ids = set(profiles) if isinstance(profiles, dict) else {p["id"] for p in profiles}
+        scenarios = json.loads(
+            (folder / "backtesting_scenarios.json").read_text(encoding="utf-8")
+        )
+        refs = {
+            sc["settings"]["house_profile_id"]
+            for sc in scenarios["scenarios"]
+            if sc.get("settings", {}).get("house_profile_id")
+        }
+        assert refs <= ids, (folder, refs - ids)
+
+
+def test_run_rejects_unknown_house_profile_ref_before_writing(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    path = config_dir / "backtesting_scenarios.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["scenarios"][0]["settings"]["house_profile_id"] = "example_efh"
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    before = {p.name: p.read_text(encoding="utf-8") for p in config_dir.glob("*.json")}
+    with pytest.raises(ValueError, match="example_efh"):
+        run_migration(config_dir, KEEP_NAMES)
+    after = {p.name: p.read_text(encoding="utf-8") for p in config_dir.glob("*.json")}
+    assert after == before
+    assert not (config_dir / "backups").exists()
+
+
+def _binding_maps(config_dir: Path) -> list[dict]:
+    house = json.loads((config_dir / "house_profiles.json").read_text(encoding="utf-8"))
+    components = json.loads((config_dir / "components.json").read_text(encoding="utf-8"))
+    maps = [(house.get("plant") or {}).get("ehal_bindings") or {}]
+    profiles = house.get("profiles")
+    for profile in profiles.values() if isinstance(profiles, dict) else profiles:
+        for consumer in profile.get("consumers") or []:
+            maps.append(consumer.get("ehal_bindings") or {})
+    for section in ("batteries", "inverters", "pv_systems"):
+        for entity in components.get(section) or []:
+            maps.append(entity.get("ehal_bindings") or {})
+    return maps
+
+
+def test_v3_loxone_names_question_is_required(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    plan = plan_migration(config_dir)
+    assert "dm4.loxone_binding_names" in plan.pending_step_ids
+    question = next(q for q in plan.questions if q.id == Q_NAMES)
+    assert question.required
+    assert question.choices == (CHOICE_KEEP, CHOICE_CLEAR)
+    with pytest.raises(MigrationError, match=Q_NAMES):
+        run_migration(config_dir, {})
+    assert not (config_dir / "backups").exists()
+
+
+def test_v3_loxone_names_clear_keeps_activation_keys(tmp_path):
+    keep_dir = _copy_snapshot(tmp_path / "keep", "v3_single_battery")
+    clear_dir = _copy_snapshot(tmp_path / "clear", "v3_single_battery")
+    run_migration(keep_dir, KEEP_NAMES)
+    report = run_migration(clear_dir, {Q_NAMES: CHOICE_CLEAR})
+    assert "dm4.loxone_binding_names" in report.applied_step_ids
+    assert any(t.step_id == "dm4.loxone_binding_names" for t in report.manual_todos)
+
+    kept = _binding_maps(keep_dir)
+    cleared = _binding_maps(clear_dir)
+    # Same keys (ESS keys moved onto the battery first), all values empty.
+    assert [sorted(m) for m in cleared] == [sorted(m) for m in kept]
+    assert any(k.startswith("ess.") for m in cleared for k in m)
+    assert all(v == "" for m in cleared for v in m.values())
+    assert any(v for m in kept for v in m.values())
+    validate_migrated_docs(load_pack_docs(clear_dir))
+
+    plan2 = plan_migration(clear_dir)
+    assert plan2.pending_step_ids == ()
+
+
+def test_loxone_names_question_not_asked_on_v4(tmp_path):
+    """Model-4 packs with names (pre-Q8 dev installs) are never asked again."""
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_quellenwahl")
+    assert any(v for m in _binding_maps(config_dir) for v in m.values())
+    plan = plan_migration(config_dir)
+    assert "dm4.loxone_binding_names" not in plan.pending_step_ids
+    assert all(q.id != Q_NAMES for q in plan.questions)
+
+
+def test_loxone_names_question_not_asked_for_home_assistant(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    path = config_dir / "config.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["ehal"] = {"backend": "ha", "adapter_id": "earnie-hems"}
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    plan = plan_migration(config_dir)
+    assert "dm4.loxone_binding_names" not in plan.pending_step_ids
+    report = run_migration(config_dir, {})
+    assert "dm4.loxone_binding_names" not in report.applied_step_ids
+
+
+def test_loxone_names_unknown_answer_blocks(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    with pytest.raises(MigrationError, match="Unbekannte Antwort"):
+        run_migration(config_dir, {Q_NAMES: "vielleicht"})
+    assert not (config_dir / "backups").exists()

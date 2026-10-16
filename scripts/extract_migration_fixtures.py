@@ -154,19 +154,52 @@ def scrub_pack(pack: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
         name: _scrub_node(copy.deepcopy(doc), counter) for name, doc in pack.items()
     }
     house = scrubbed.get("house_profiles.json")
+    profile_ids: dict[str, str] = {}
     if isinstance(house, dict):
         profiles = house.get("profiles")
         if isinstance(profiles, list):
-            for profile in profiles:
+            for index, profile in enumerate(profiles):
                 if not isinstance(profile, dict):
                     continue
-                profile["id"] = PLACEHOLDER_PROFILE_ID
-                profile["label"] = PLACEHOLDER_PROFILE_LABEL
+                placeholder_id = _placeholder_profile_id(index)
+                old_id = str(profile.get("id") or "").strip()
+                if old_id:
+                    profile_ids[old_id] = placeholder_id
+                profile["id"] = placeholder_id
+                profile["label"] = _placeholder_profile_label(index)
                 if "latitude" in profile:
                     profile["latitude"] = PLACEHOLDER_LAT
                 if "longitude" in profile:
                     profile["longitude"] = PLACEHOLDER_LON
+    for doc in scrubbed.values():
+        _rename_profile_refs(doc, profile_ids)
     return scrubbed
+
+
+def _placeholder_profile_id(index: int) -> str:
+    return PLACEHOLDER_PROFILE_ID if index == 0 else f"profile_{chr(ord('a') + index)}"
+
+
+def _placeholder_profile_label(index: int) -> str:
+    return PLACEHOLDER_PROFILE_LABEL if index == 0 else f"House {chr(ord('A') + index)}"
+
+
+def _rename_profile_refs(node: Any, profile_ids: dict[str, str]) -> None:
+    """Rewrite ``house_profile_id`` references to the scrubbed profile ids."""
+    if isinstance(node, dict):
+        for key, val in node.items():
+            if key == "house_profile_id" and isinstance(val, str):
+                ref = val.strip()
+                if ref not in profile_ids:
+                    raise SystemExit(
+                        f"house_profile_id '{ref}' has no profile in house_profiles.json"
+                    )
+                node[key] = profile_ids[ref]
+            else:
+                _rename_profile_refs(val, profile_ids)
+    elif isinstance(node, list):
+        for item in node:
+            _rename_profile_refs(item, profile_ids)
 
 
 def _write_pack(out_dir: Path, pack: dict[str, dict[str, Any]]) -> None:

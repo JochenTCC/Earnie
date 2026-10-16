@@ -89,3 +89,12 @@ class MigrationStep:
     apply: Callable[[Docs, Answers], StepResult]
     questions: tuple[Question, ...] = ()
     manual_todos: Callable[[Docs, Docs], list[ManualTodo]] = _empty_manual_todos
+    # Optional gate on the docs the chain started from (e.g. "only from model 3").
+    detect_on_start: Callable[[Docs], bool] | None = None
+
+
+def step_is_pending(step: MigrationStep, start: Docs, current: Docs) -> bool:
+    """``detect_on_start`` (on the chain's input) and ``detect`` (on current docs)."""
+    if step.detect_on_start is not None and not step.detect_on_start(start):
+        return False
+    return step.detect(current)

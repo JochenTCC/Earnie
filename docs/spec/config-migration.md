@@ -38,6 +38,10 @@ scripts.migrate_config →  same planner / runner for support
 
 Ordered `MigrationStep` list in [`runtime_store/migration/registry.py`](../../runtime_store/migration/registry.py): pure `detect` / `apply` on in-memory docs, optional `Question`s, blockers, `manual_todos` (computed from before/after docs). Legacy in-model steps under model 4 stay **detect-based** (model is not bumped for them). Future structural changes bump the track version and add a step — no new standalone `migrate_*_once` scripts.
 
+Optional `detect_on_start` gates a step on the docs the chain **started** from (`types.step_is_pending`): `dm4.loxone_binding_names` (2.7.q Q8 Merker names) only runs when the chain starts at model 3, so the required question (`loxone_binding_names.keep`: `Behalten` / `Leeren`) is asked once and never again on model 4 — also when the user keeps the names. It runs after `dm4.ess_bindings` (names first move onto the batteries), only for `ehal.backend` Loxone, and clears plant, consumer, battery, inverter and PV values (keys stay as activation flags). Rationale: names are functionally tolerated (writes publish qualified IDs, reads map Merker → ID via the binding index) and kept names show up as „Bisheriger Name“ in the Loxone signal-list export.
+
+Required `choice` questions start empty in the wizard (no implicit default); the runner rejects missing answers before any write.
+
 ### 3.2 Planner and runner
 
 - `plan_migration(config_dir)` — read-only plan: from/to model, pending step ids, questions, blockers, manual to-dos, per-file diffs.

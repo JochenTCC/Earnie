@@ -13,6 +13,7 @@ from runtime_store.migration.types import (
     MigrationStep,
     Question,
     StepResult,
+    step_is_pending,
 )
 
 
@@ -24,6 +25,7 @@ def apply_chain(
     stop_on_blocker: bool = True,
 ) -> ChainResult:
     """Run pending steps in order. Pure — no file I/O."""
+    start = copy.deepcopy(docs)
     current = copy.deepcopy(docs)
     applied: list[str] = []
     blockers: list[Blocker] = []
@@ -31,7 +33,7 @@ def apply_chain(
     questions: list[Question] = []
 
     for step in steps:
-        if not step.detect(current):
+        if not step_is_pending(step, start, current):
             continue
         questions.extend(step.questions)
         before = copy.deepcopy(current)

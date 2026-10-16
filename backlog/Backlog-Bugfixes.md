@@ -42,6 +42,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] **`normalize_backend` silently maps unknown `ehal.backend` values to Loxone** (found 2026-10-16 while testing ConfigMigration `dm4.loxone_binding_names`)
+  - Symptom: `config.json` → `ehal.backend: "homeassistant"` (typo for `"ha"`), or any other unknown value, runs Earnie as a Loxone install without any error or warning. In the migration the Loxone-only step `dm4.loxone_binding_names` then treats HA entity ids as Merker names and offers to clear them.
+  - Cause: `runtime_store/ehal_setup.py` `normalize_backend()` — `""`, `"loxone"`, `"none"` → Loxone (documented), but the final `return BACKEND_LOXONE` also catches every unknown value. The schema (`share/config/config.schema.json`, enum `openems` / `ha` / `loxone` / `none`) would reject it, but the runtime path does not validate against the schema.
+  - Callers: `active_ehal_backend` / `default_adapter_id` / adapter + connection helpers in `runtime_store/ehal_setup.py`, `settings/config_loaders.py:134`, `ui/ehal_connection.py:46`, `runtime_store/migration/steps/loxone_binding_names.py:59`.
+  - Fix direction: unknown value → `ValueError` with the allowed values (like `normalize_ha_transport` in the same module); missing / empty / `loxone` / `none` stay Loxone. Check UI paths that pass free text before raising there. If an existing install could carry an unknown value, decide fail-loud on load vs. a ConfigMigration step — ask before choosing.
+  - Tests: unknown value raises; `""` / `None` / `"none"` / `"loxone"` → Loxone; `"ha"` / `"openems"` unchanged; migration planner surfaces the error instead of offering the Loxone names step.
+
 - [ ] This warning pops up quite often:
   2026-10-16 07:44:45 [WARNING] (data.price_forecast_live:322) - Preisprognose: EU-Features nicht ladbar (ValueError, mode=live_forecast) — Spiegelung als Fallback für fehlende Slots.
   Can you find the reason and propose fixing (better than fallback to mirroring)?

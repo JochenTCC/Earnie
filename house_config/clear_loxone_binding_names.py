@@ -59,19 +59,20 @@ def clear_loxone_binding_names_in_house(house_doc: dict) -> dict:
 
 
 def clear_loxone_binding_names_in_components(components_doc: dict) -> dict:
-    """Return a copy of components.json with empty battery binding values."""
+    """Return a copy of components.json with empty battery / inverter / PV binding values."""
     doc = deepcopy(components_doc) if isinstance(components_doc, dict) else {}
-    batteries = doc.get("batteries")
-    if not isinstance(batteries, list):
-        return doc
-    out_batteries = []
-    for battery in batteries:
-        if not isinstance(battery, dict):
-            out_batteries.append(battery)
+    for section in ("batteries", "inverters", "pv_systems"):
+        entities = doc.get(section)
+        if not isinstance(entities, list):
             continue
-        battery = dict(battery)
-        if isinstance(battery.get("ehal_bindings"), dict):
-            battery["ehal_bindings"] = clear_binding_values(battery.get("ehal_bindings"))
-        out_batteries.append(battery)
-    doc["batteries"] = out_batteries
+        out_entities = []
+        for entity in entities:
+            if not isinstance(entity, dict):
+                out_entities.append(entity)
+                continue
+            entity = dict(entity)
+            if isinstance(entity.get("ehal_bindings"), dict):
+                entity["ehal_bindings"] = clear_binding_values(entity.get("ehal_bindings"))
+            out_entities.append(entity)
+        doc[section] = out_entities
     return doc

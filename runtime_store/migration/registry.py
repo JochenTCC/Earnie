@@ -6,6 +6,7 @@ from runtime_store.migration.steps.ehal_bindings import STEP as EHAL
 from runtime_store.migration.steps.ess_bindings import STEP as ESS
 from runtime_store.migration.steps.grid_fee_profile import STEP as GRID_FEE
 from runtime_store.migration.steps.inverters import STEP as INVERTERS
+from runtime_store.migration.steps.loxone_binding_names import STEP as LOXONE_NAMES
 from runtime_store.migration.steps.pool_filter import STEP as POOL_FILTER
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
 from runtime_store.migration.steps.v3_to_v4 import STEP as V3_TO_V4
@@ -16,6 +17,7 @@ STEPS: tuple[MigrationStep, ...] = (
     EHAL,
     V3_TO_V4,
     ESS,
+    LOXONE_NAMES,
     INVERTERS,
     CONVERSION,
     TOPOLOGY,

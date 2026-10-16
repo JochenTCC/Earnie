@@ -17,7 +17,7 @@
                 ],
                 "import_tariff_id": "at_vkw_strom_dynamisch",
                 "export_tariff_id": "at_vkw_pv_dynamisch",
-                "house_profile_id": "example_efh",
+                "house_profile_id": "profile_a",
                 "battery_ids": [
                     "10_kwh_speicher"
                 ]
@@ -34,7 +34,7 @@
                 ],
                 "import_tariff_id": "at_vkw_strom_dynamisch",
                 "export_tariff_id": "at_vkw_pv_dynamisch",
-                "house_profile_id": "example_efh",
+                "house_profile_id": "profile_a",
                 "battery_ids": [
                     "5_0_kwh_speicher"
                 ]
@@ -52,7 +52,7 @@
                 ],
                 "import_tariff_id": "at_vkw_strom_dynamisch",
                 "export_tariff_id": "at_vkw_pv_dynamisch",
-                "house_profile_id": "example_efh",
+                "house_profile_id": "profile_a",
                 "battery_ids": [
                     "5_0_kwh_speicher"
                 ]
@@ -69,7 +69,7 @@
                 ],
                 "import_tariff_id": "at_vkw_strom_dynamisch",
                 "export_tariff_id": "at_vkw_pv_dynamisch",
-                "house_profile_id": "example_efh",
+                "house_profile_id": "profile_a",
                 "battery_ids": [
                     "10_kwh_speicher"
                 ]
@@ -87,7 +87,7 @@
                 ],
                 "import_tariff_id": "at_vkw_strom_dynamisch",
                 "export_tariff_id": "at_vkw_pv_dynamisch",
-                "house_profile_id": "example_efh",
+                "house_profile_id": "profile_a",
                 "battery_ids": [
                     "10_kwh_speicher"
                 ]

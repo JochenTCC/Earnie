@@ -276,6 +276,15 @@ Nach einem Image-/Add-on-Update kann Earnie eine **Anpassung der Config-JSON** v
 
 Release Notes informieren vorab (Abschnitt **Migration**), wenn eine Version neue Schritte mitbringt.
 
+### Loxone: alte Merkernamen behalten oder leeren
+
+Beim Wechsel von Datenmodell 3 (offizielle 2.6) auf 4 fragt der Assistent bei Loxone-Installationen, ob die alten **Merkernamen** in den Bindungen erhalten bleiben sollen. Earnie braucht sie nicht mehr: Lesen läuft per Push mit der EHAL-ID, Schreiben über `status.json` mit der EHAL-ID.
+
+- **Behalten:** Die Namen bleiben stehen. Im VI/VO-Export der Signalliste (Echtzeit-Umgebung → EHAL-Com → Signalliste) stehen sie in der Spalte **„Bisheriger Name“** — so findest du die Stellen in deiner Loxone Config.
+- **Leeren:** Die Bindungen bleiben aktiv (Schlüssel mit leerem Wert), nur die Namen verschwinden — wie bei einer Neueinrichtung.
+
+Die Frage kommt nur einmal (beim Wechsel 3 → 4). In beiden Fällen musst du in der Loxone Config die virtuellen Ein-/Ausgänge auf die neuen Titel umstellen; der Assistent zeigt das als manuellen Schritt. Home Assistant / OpenEMS sind nicht betroffen (dort sind die Werte Entity-IDs).
+
 ### Backup
 
 Vor dem Schreiben legt Earnie ein Verzeichnis an:
@@ -300,6 +309,8 @@ Für Entwickler / Support (gleiche Kette wie der Assistent):
 python -m scripts.migrate_config --config-dir PATH --dry-run
 python -m scripts.migrate_config --config-dir PATH
 ```
+
+Pflichtfragen (z. B. Loxone-Merkernamen) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`). Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
 
 ### Wann die Migration blockiert
 

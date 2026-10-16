@@ -485,3 +485,16 @@ def test_try_marker_write_allows_empty_display_merker() -> None:
         ok, msg = adapter._try_marker_write("", 0.0, field="set_ess_mode")
     assert ok and msg == ""
     pub.assert_called_once_with("set_ess_mode", 0.0, io_name="set_ess_mode")
+
+
+def test_clear_components_includes_inverters_and_pv() -> None:
+    doc = {
+        "batteries": [{"id": "b", "ehal_bindings": {"ess.b.sens_ess_soc": "SoC"}}],
+        "inverters": [{"id": "i", "ehal_bindings": {"inv.i.set_inv_ac_power_limit": "WR"}}],
+        "pv_systems": [{"id": "p", "ehal_bindings": {"pv.p.sens_pv_production_active": "PV"}}],
+    }
+    out = clear_loxone_binding_names_in_components(doc)
+    assert out["batteries"][0]["ehal_bindings"] == {"ess.b.sens_ess_soc": ""}
+    assert out["inverters"][0]["ehal_bindings"] == {"inv.i.set_inv_ac_power_limit": ""}
+    assert out["pv_systems"][0]["ehal_bindings"] == {"pv.p.sens_pv_production_active": ""}
+    assert doc["inverters"][0]["ehal_bindings"] == {"inv.i.set_inv_ac_power_limit": "WR"}

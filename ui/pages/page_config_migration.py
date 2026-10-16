@@ -162,8 +162,13 @@ def _render_questions(questions: tuple[Question, ...]) -> Answers:
             if not question.choices:
                 st.error(f"Frage `{question.id}` hat keine Auswahloptionen.")
                 continue
+            # Required choices start empty: no silent default (runner checks answers).
             answers[question.id] = st.selectbox(
-                label, options=list(question.choices), key=key
+                label,
+                options=list(question.choices),
+                index=None if question.required else 0,
+                placeholder="Bitte wählen",
+                key=key,
             )
         elif question.kind == "str":
             answers[question.id] = st.text_input(label, key=key)
