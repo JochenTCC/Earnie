@@ -1,6 +1,6 @@
 # Opt-in usage ping (installation statistics)
 
-**Status:** draft — open questions in §9. No code yet.
+**Status:** draft — client P1 + daemon/milestones P2 + consent UI P3 implemented in this repo; **receiver** lives in private **`JochenTCC/earnie-server`** (LAN lab compose + VPS/Caddy TBD); open hosting provider in §9.
 
 ## 1. Goal
 
@@ -10,40 +10,51 @@ Non-goals: usage analytics, feature tracking, error reporting, any per-user prof
 
 ## 2. Principles
 
-- **Opt-in, tri-state:** `unset` (never asked) / `on` / `off`. Only `on` sends. `unset` and `off` send nothing.
+- **Opt-in, tri-state:** `unset` (never asked) / `on` / `off`. Only `on` sends. `unset` and `off` send nothing. Missing state file = `unset`.
 - **Hard kill-switch:** env `EARNIE_USAGE_PING=off` overrides config (for packagers / paranoid users).
 - **Data minimisation:** payload is a fixed whitelist (§4); no free-form fields, no config content, no prices, no locations, no device names.
-- **Fire-and-forget:** ping runs off the optimisation path, short timeout, one attempt per day plus a few retries; failure is logged at WARNING and never affects the cycle.
+- **Fire-and-forget:** ping runs off the optimisation path, short timeout, one attempt per day plus retries after failure; failure is logged at WARNING and never affects the cycle.
 - **Transparency:** the UI shows the exact JSON that would be sent ("Show what is sent").
 
 ## 3. Client design
 
-New module `runtime_store/usage_ping.py` (pure logic + one `send` function), state in `runtime/usage_ping.json`:
+Module `runtime_store/usage_ping.py` (pure logic + `maybe_send_ping`), state in `runtime/usage_ping.json` (path helper `usage_ping_state_file()`):
 
 ```json
-{"consent": "on", "consent_at": "2026-10-16", "install_id": "<uuid4>", "last_sent_date": "2026-10-16"}
+{
+  "consent": "on",
+  "consent_at": "2026-10-16",
+  "install_id": "<uuid4>",
+  "stage": "explorer",
+  "scenarios_calc_count": 3,
+  "last_sent_date": "2026-10-16",
+  "last_attempt_at": "2026-10-16T12:00:00+00:00"
+}
 ```
 
-- `install_id`: random UUIDv4, generated on opt-in, deleted on opt-out. **Not** derived from `hardware_identity` (that fingerprint is stable and re-identifiable by design).
-- `maybe_send_ping(now)`: no-op unless consent is `on`, `EARNIE_USAGE_PING != off` and `last_sent_date != today`. Called from the daemon loop in `main.py` (cheap check each cycle), executes the HTTP POST in a short-lived thread (timeout ~5 s). `last_sent_date` is updated only on HTTP 2xx → retried in the next cycle, naturally rate-limited by a min-interval (e.g. 1 h) after failure.
-- Opt-out: set consent `off`, delete `install_id`. Optional: send one `DELETE`/"bye" is **not** needed if the server never stores the ID long-term (§5).
-- Consent UI: Streamlit dialog + a toggle in the settings page; HA add-on gets an option mirrored from `addon_options.py`. UI state rules: `streamlit-ui-state.mdc`.
-- Consent prompt timing: see Q2.
+- Dates (`consent_at`, `last_sent_date`) and the once-per-day gate use **UTC** calendar days (`YYYY-MM-DD`), matching server UTC day aggregation.
+- `install_id`: random UUIDv4, generated on opt-in, deleted on opt-out. **Not** derived from `hardware_identity`.
+- `stage`: highest milestone reached (`explorer` → `live`); set on opt-in to `explorer`; raised via `set_highest_stage` / `note_explorer_activated` / `note_live_cycle_success`.
+- `scenarios_calc_count`: local lifetime counter of successfully calculated scenarios (not in wire payload). Bumped by `note_scenarios_calculated(n)` after a successful Scenario Explorer run (`scripts/run_backtesting.py` after log save, `n = len(enabled scenarios)`). When consent is `on`, a bump clears `last_sent_date` and `last_attempt_at` and calls `spawn_maybe_send_ping()` so the client may POST again the same UTC day. Server still daily-dedups by salted install id until Earnie-points.
+- `maybe_send_ping(now, *, transport=None, endpoint_url=None)`: no-op unless consent is `on`, `EARNIE_USAGE_PING != off`, `last_sent_date != today (UTC)`, and `last_attempt_at` is older than 1 h (or missing). POST JSON with timeout 5 s. `last_sent_date` updates only on HTTP 2xx; every attempt stamps `last_attempt_at`. Endpoint URL from `EARNIE_USAGE_PING_URL` (or `endpoint_url`); if unset and no injected transport → WARNING no-op.
+- **P2 wiring:** `spawn_maybe_send_ping()` (daemon thread, at most one in flight) from `main.py` after `after_prod_cycle` and from `_daemon_wait_poll`. Live milestone after `run_state.save_run_state` with `success: true`, skipped in shadow mode. HA add-on optional bool `usage_ping` mirrored by `addon_options._apply_usage_ping_option` → `set_consent` when the key is present (absent = leave state unchanged).
+- Opt-out: set consent `off`, delete `install_id` (keep `consent_at` / `last_sent_date` / `stage` / `scenarios_calc_count` as historical). No DELETE/"bye".
+- **P3 consent UI (German):** `ui/usage_ping_consent.py`. Dialog on first open of Szenarienkonfigurator (`page_scenario_editor.py`) when consent is `unset` (`maybe_prompt_consent_on_editor` → Zustimmen / Ablehnen; Abbrechen leaves unset). Explorer stage via `note_explorer_activated` after consent is decided or when already set. Settings on Optimierer-Dienst (`page_daemon.py`): toggle + expander “Was wird gesendet?”. Preview via `preview_payload()` (placeholder `id` until opt-in); live `build_payload()` when consent is `on`. Kill-switch caption when `EARNIE_USAGE_PING=off`. UI state rules: `streamlit-ui-state.mdc`.
 
 ## 4. Payload (schema v1)
 
 ```json
-{"v": 1, "id": "<uuid4>", "app_version": "2.7.0", "context": "homeassistant_addon"}
+{"v": 1, "id": "<uuid4>", "app_version": "2.7.0", "context": "homeassistant_addon", "stage": "explorer"}
 ```
 
-`context` = `detect_install_context()` (`loxberry` / `homeassistant_addon` / `manual`). Date is taken from the server (UTC), never sent by the client. IP is not stored (§5). Candidate extras (each needs an explicit yes): backend kind (loxone/ha/openems), OS/arch, country (derived server-side from IP, then discarded).
+Exact keys only: `v`, `id`, `app_version`, `context`, `stage`. `context` = `detect_install_context()` (`loxberry` / `homeassistant_addon` / `manual`). `app_version` from `version.__version__`. `stage` is the highest stage stored in state. Date is taken from the server (UTC), never sent by the client. IP is not stored (§5). No other extras (backend kind, OS/arch, country) without an explicit decision.
 
 ## 5. Server design
 
-Minimal HTTPS endpoint `POST /ping` (details depend on Q3: Cloudflare Worker / small FastAPI behind the existing Caddy / other).
+Minimal HTTPS endpoint `POST /ping` on a rented VPS: **Caddy** terminates TLS and is the only published service; a **stdlib HTTP receiver** sits on an internal Docker network (no TLS in-process). Implementation and deploy artifacts live in the private repo **`JochenTCC/earnie-server`** (not this public tree). See §9 Q3.
 
 - Validate schema + size; reject everything else.
-- **No IP / User-Agent logging** (disable access logs for this route).
+- **No IP / User-Agent logging** (disable access logs for this route; Caddy access log off).
 - Count unique per UTC day: keep `{date: set(hash(id + daily_salt))}`; the salt is random per day and discarded after the day closes, so stored hashes cannot be linked across days. At day end, write `{date, installs, by_version, by_context}` and drop the set.
 - Output: append-only `usage_daily.csv` / `.json` (one row per day). Optional derived views: 7-day / 30-day active (needs cross-day linkage → conflicts with the rotating salt, see Q1).
 - Rate limit per IP (in memory only) against flooding; a public counter is trivially fakeable — accepted, it is a statistic, not a licence check.
@@ -72,18 +83,18 @@ Minimal HTTPS endpoint `POST /ping` (details depend on Q3: Cloudflare Worker / s
 ### Decided
 
 - **Q1** Random install ID, server hashes with a daily rotating salt; only daily counters stored (no 7/30-day active values).
-- **Q3** Receiver = own mini server on a Synology NAS (reachability from the internet, TLS and logging to be clarified, see below).
+- **Q3** Production receiver = own VPS only (not internet-facing home NAS), implemented in private **`JochenTCC/earnie-server`**. `docker compose` with two containers — **Caddy** (auto-TLS, only published service, access log off, body limit 1 KB, only `POST /ping`) and a **minimal stdlib receiver** on an internal-only network (plain HTTP, non-root, read-only rootfs, `cap_drop: ALL`, `no-new-privileges`, one writable volume, no outbound network, in-app per-IP rate limit in memory). Pre-deploy against Earnie client mock / pytest, optional **LAN-only** lab on NAS (compose in `earnie-server`, no port-forward / DDNS / DSM proxy), then deploy on the VPS. Hosting provider / location / AV contract still open (see Still open).
+- **Q3a / Q3b** Synology as **public** endpoint / DSM reverse-proxy — **won't do**. LAN-only lab on NAS via `earnie-server` is allowed.
 - **Q4** Payload extras: install context only (payload §4 stays `v`, `id`, `app_version`, `context`, plus the stage from Q2).
+- **Q5** CSV columns (in `earnie-server`): `date, installs_total, explorer, live, ctx_loxberry, ctx_ha, ctx_manual, versions_json`.
 
 ### Q2 (interpretation to confirm)
 
 Two counters instead of one: a `stage` field in the payload, e.g. `explorer` (first scenario exploration, i.e. the user has tried Earnie) and `live` (first successful live cycle, i.e. a real installation). Server aggregates `installs_by_stage` per day.
 
-**Confirmed:** one opt-in, asked at the first milestone (first scenario exploration). Payload field `stage` goes `explorer` -> `live`; each ping carries the highest stage reached, sent daily as long as consent is on.
+**Confirmed:** one opt-in, asked at the first milestone (first open of Szenarienkonfigurator). Payload field `stage` goes `explorer` -> `live`; each ping carries the highest stage reached. While consent is on, the daemon sends at most once per UTC day unless a successful scenario calc bumps `scenarios_calc_count` (same-day force POST; server still dedups).
 
 ### Still open
 
-- Q3 proposal (hosting, to confirm): `docker compose` with two containers — Caddy (auto-TLS, only published service, access log off, body limit 1 KB, only `POST /ping`) and the receiver on an internal-only network (non-root, read-only rootfs, `cap_drop: ALL`, `no-new-privileges`, one writable volume, no outbound network, in-app per-IP rate limit in memory). Identical compose file runs on the NAS or a later EU VPS; only DNS and port forwarding change. On a home NAS: place it in a DMZ/VLAN, since an exposed port at home is the main residual risk.
-- Q3a (original): Synology exposure — DDNS + reverse proxy (DSM) + Let's Encrypt, or Cloudflare Tunnel (no open port)? Container (Docker on DSM) vs. DSM Task Scheduler script.
-- Q3b: DSM reverse proxy writes access logs with IPs by default → disable/anonymise for the ping host.
-- Q5: output file format (CSV vs. JSON) and location.
+- Hosting provider and location (hosttech enquiry: Switzerland vs. EU via Virtual Datacenter), AV contract.
+- VPS compose with Caddy edge (P4 remainder in `earnie-server`).

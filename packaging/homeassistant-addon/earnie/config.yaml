@@ -58,6 +58,8 @@ options:
   ui_modes: "sunset2sunset,scenario_explorer,live_environment"
   auto_start_main: true
   timezone: "Europe/Vienna"
+  # Optional: omit or leave unset for no change to Earnie consent state.
+  # usage_ping: true
 
 schema:
   streamlit_port: "port?"
@@ -65,3 +67,4 @@ schema:
   ui_modes: "str?"
   auto_start_main: "bool?"
   timezone: "str?"
+  usage_ping: "bool?"

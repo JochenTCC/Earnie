@@ -79,3 +79,49 @@ def test_port_merge_from_options(tmp_path, monkeypatch):
     assert payload["ui"]["streamlit_port"] == 8511
     assert payload["system"]["ehal_loxone_http_port"] == 8551
     assert payload["ehal"]["backend"] == "ha"
+
+
+def test_usage_ping_option_sets_consent(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    config_path = tmp_path / "config.json"
+    options_path = tmp_path / "options.json"
+    _write_json(
+        config_path,
+        {"ehal": {"backend": "ha", "adapter_id": "earnie-hems"}, "ui": {}, "system": {}},
+    )
+    _write_json(options_path, {"usage_ping": True})
+    monkeypatch.setattr(addon_options, "resolve_config_json_path", lambda: str(config_path))
+    monkeypatch.setattr(addon_options, "options_path", lambda: str(options_path))
+    from runtime_store import usage_ping as up
+
+    assert addon_options.apply_addon_options(config_just_created=False) is False
+    assert up.load_state()["consent"] == "on"
+    assert up.load_state().get("install_id")
+
+    _write_json(options_path, {"usage_ping": False})
+    assert addon_options.apply_addon_options(config_just_created=False) is False
+    assert up.load_state()["consent"] == "off"
+    assert "install_id" not in up.load_state()
+
+
+def test_usage_ping_option_absent_leaves_consent(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    config_path = tmp_path / "config.json"
+    options_path = tmp_path / "options.json"
+    _write_json(
+        config_path,
+        {"ehal": {"backend": "ha", "adapter_id": "earnie-hems"}, "ui": {}, "system": {}},
+    )
+    _write_json(options_path, {})
+    monkeypatch.setattr(addon_options, "resolve_config_json_path", lambda: str(config_path))
+    monkeypatch.setattr(addon_options, "options_path", lambda: str(options_path))
+    from runtime_store import usage_ping as up
+
+    up.set_consent("on")
+    install_id = up.load_state()["install_id"]
+    assert addon_options.apply_addon_options(config_just_created=False) is False
+    state = up.load_state()
+    assert state["consent"] == "on"
+    assert state["install_id"] == install_id

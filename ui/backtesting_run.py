@@ -347,7 +347,9 @@ def _render_run_buttons(
         _execute_backtesting_run(
             start_month=test_month,
             end_month=test_month,
-            status_label=f"Szenario-Explorer-Testlauf (Monat {test_month}/{BACKTESTING_YEAR})…",
+            status_label=(
+                f"Szenario-Explorer-Testlauf (Monat {test_month}/{BACKTESTING_YEAR})…"
+            ),
             horizon_mode=horizon_mode,
         )
     if not cons_data_ready:

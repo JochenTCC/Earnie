@@ -37,8 +37,19 @@ def test_parse_default_options_matches_shipped_addon_schema():
     text = smoke.ADDON_CONFIG_YAML.read_text(encoding="utf-8")
     options = smoke.parse_default_options(text)
     schema_block = text.split("\nschema:\n", 1)[1]
-    schema_keys = {line.split(":", 1)[0].strip() for line in schema_block.splitlines() if line.startswith("  ")}
-    assert set(options) == schema_keys
+    schema_entries = {}
+    for line in schema_block.splitlines():
+        if not line.startswith("  "):
+            continue
+        key, _, typ = line.partition(":")
+        schema_entries[key.strip()] = typ.strip().strip('"').strip("'")
+    schema_keys = set(schema_entries)
+    assert set(options) <= schema_keys
+    # Optional schema keys (suffix ?) may be omitted from options so absent = no change.
+    missing = schema_keys - set(options)
+    assert missing <= {
+        key for key, typ in schema_entries.items() if typ.endswith("?")
+    }
     assert options["auto_start_main"] is True
 
 

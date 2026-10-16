@@ -1004,6 +1004,10 @@ def main(argv: list[str] | None = None):
         },
         prices=prices if sim_cfg.get("export_price_series", False) else None,
     )
+    from runtime_store.usage_ping import note_scenarios_calculated
+
+    if scenarios:
+        note_scenarios_calculated(len(scenarios))
     plausibility_payload = {
         sid: {"consumption_totals": consumption_totals_from_report(rep)}
         for sid, rep in plausibility_by_scenario.items()

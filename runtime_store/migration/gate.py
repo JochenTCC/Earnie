@@ -35,11 +35,24 @@ def should_skip_offline_seed(plan: MigrationPlan) -> bool:
     return False
 
 
+def model_range_label_de(plan: MigrationPlan) -> str:
+    """German label for the from/to range (avoids confusing ``4 → 4``).
+
+    Same-model pending steps are detect-based structural work inside the
+    current data model (see ``docs/spec/config-migration.md`` §3.1).
+    """
+    if plan.from_model is None:
+        return f"Datenmodell ? → {plan.to_model}"
+    if plan.from_model == plan.to_model:
+        return f"strukturelle Schritte innerhalb Datenmodell {plan.to_model}"
+    return f"Datenmodell {plan.from_model} → {plan.to_model}"
+
+
 def abort_message_de(plan: MigrationPlan) -> str:
     """German refuse message pointing at the Streamlit migration page and CLI."""
     lines = [
         "Abbruch: Konfiguration muss zuerst migriert werden "
-        f"(Datenmodell {plan.from_model} → {plan.to_model}).",
+        f"({model_range_label_de(plan)}).",
     ]
     if plan.blockers:
         lines.append("Blocker:")

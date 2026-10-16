@@ -87,6 +87,25 @@ def test_pending_plan_shows_step_and_hint(monkeypatch, _mock_pending_plan):
     assert any(b.label == "Backup anlegen und migrieren" for b in at.button)
 
 
+def test_same_model_hint_avoids_arrow(monkeypatch):
+    """In-model detect steps must not show confusing „Datenmodell 4 → 4“."""
+    plan = _plan(
+        from_model=4,
+        to_model=4,
+        pending_step_ids=("dm4.topology",),
+    )
+    monkeypatch.setattr(
+        "ui.pages.page_config_migration.plan_for_active_config",
+        lambda: plan,
+    )
+    at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT).run()
+    assert not at.exception
+    assert any(
+        "strukturelle Schritte innerhalb Datenmodell 4" in w.value for w in at.warning
+    )
+    assert not any("Datenmodell 4 → 4" in w.value for w in at.warning)
+
+
 def test_blockers_disable_migrate(monkeypatch):
     plan = _plan(
         can_run=False,

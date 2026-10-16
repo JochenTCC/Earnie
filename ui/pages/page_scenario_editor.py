@@ -120,6 +120,9 @@ def render() -> None:
         key="scenario_editor_help",
         page_docs_key="scenario-editor",
     )
+    from ui.usage_ping_consent import maybe_prompt_consent_on_editor
+
+    maybe_prompt_consent_on_editor()
     st.caption(f"Datei: `{resolve_backtesting_scenarios_json_path()}`")
 
     catalog_meta = load_tariffs_catalog_meta()

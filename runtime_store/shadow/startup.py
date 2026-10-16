@@ -171,6 +171,10 @@ def ensure_shadow_startup() -> dict:
     _check_loxone_feed_capability(meta)
     _check_runtime_vs_prod(meta)
     ensure_shadow_runtime_marker()
+    # Stale Prod/local auth gates are irrelevant: Shadow never probes Loxone.
+    from runtime_store.loxone_auth_error import clear_loxone_auth_error
+
+    clear_loxone_auth_error()
     logger.info(
         "shadow: startup OK (Prod v%s, feed_schema=%s, cycle_seq=%s)",
         meta.get("earnie_version"),

@@ -4,6 +4,7 @@ On add-on start:
 - Fresh ``config.json`` (just bootstrapped from minimal) → seed ``ehal.backend=ha``
 - Every start → merge ``streamlit_port`` / ``ehal_loxone_http_port`` from
   ``/data/options.json`` into the matching config keys
+- Optional ``usage_ping`` bool → ``usage_ping.set_consent`` when the key is present
 
 Non-add-on installs are a no-op. Existing user configs are never force-switched
 away from a chosen backend.
@@ -54,6 +55,7 @@ def apply_addon_options(*, config_just_created: bool) -> bool:
     options = _load_options(options_path())
     if options is not None:
         changed = _merge_port_options(payload, options) or changed
+        _apply_usage_ping_option(options)
 
     if not changed:
         return False
@@ -106,6 +108,26 @@ def _merge_port_options(payload: dict[str, Any], options: dict[str, Any]) -> boo
             system["ehal_loxone_http_port"] = loxone_http_port
             changed = True
     return changed
+
+
+def _apply_usage_ping_option(options: dict[str, Any]) -> None:
+    """Mirror HA add-on ``usage_ping`` bool into consent state when the key is present."""
+    if "usage_ping" not in options:
+        return
+    raw = options.get("usage_ping")
+    if isinstance(raw, bool):
+        enabled = raw
+    elif isinstance(raw, str):
+        enabled = raw.strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        logger.warning("addon_options: usage_ping must be bool, got %r", type(raw).__name__)
+        return
+    try:
+        from runtime_store.usage_ping import set_consent
+
+        set_consent("on" if enabled else "off")
+    except Exception as exc:
+        logger.warning("addon_options: usage_ping consent update failed: %s", exc)
 
 
 def _load_options(path: str) -> dict[str, Any] | None:

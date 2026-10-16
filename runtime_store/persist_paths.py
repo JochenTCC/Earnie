@@ -204,6 +204,10 @@ def consumer_state_file() -> str:
     return runtime_path("flexible_consumers_state.json")
 
 
+def usage_ping_state_file() -> str:
+    return runtime_path("usage_ping.json")
+
+
 def pv_counter_state_file() -> str:
     return runtime_path("pv_counter_state.json")
 

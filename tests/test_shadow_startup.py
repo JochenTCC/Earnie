@@ -119,6 +119,32 @@ def test_startup_ok_writes_marker(monkeypatch, tmp_path):
     ensure_shadow_runtime_marker()  # idempotent
 
 
+def test_startup_clears_stale_loxone_auth_error(monkeypatch, tmp_path):
+    """Shadow must drop leftover auth gates from prior non-Shadow runs."""
+    from runtime_store.loxone_auth_error import (
+        AUTH_ERROR_FILENAME,
+        load_loxone_auth_error,
+        persist_loxone_auth_error,
+    )
+
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    shadow_rt = tmp_path / "shadow_rt"
+    shadow_rt.mkdir()
+    feed = tmp_path / "feed"
+    _write_meta(feed, prod_runtime=str(tmp_path / "prod_rt"))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(shadow_rt))
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    persist_loxone_auth_error(
+        message="Loxone auth failed (HTTP 401)",
+        http_status=401,
+        source="startup_checks",
+    )
+    assert load_loxone_auth_error() is not None
+    ensure_shadow_startup()
+    assert load_loxone_auth_error() is None
+    assert not (shadow_rt / AUTH_ERROR_FILENAME).is_file()
+
+
 def test_startup_refuses_loxone_without_feed_capability(monkeypatch, tmp_path):
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     shadow_rt = tmp_path / "shadow_rt"

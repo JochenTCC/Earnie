@@ -109,8 +109,10 @@ def _finalize_previous_interval() -> dict | None:
 def _daemon_wait_poll() -> None:
     """Heartbeat + power-interval sampler tick while the daemon waits."""
     from runtime_store.daemon_heartbeat import touch_daemon_heartbeat
+    from runtime_store.usage_ping import spawn_maybe_send_ping
 
     touch_daemon_heartbeat()
+    spawn_maybe_send_ping()
     if power_interval_sampler.tick():
         from runtime_store.shadow import maybe_flush_after_sampler
 
@@ -890,6 +892,10 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
                     soc_percent=float(current_soc),
                 )
             run_state.save_run_state(run_payload)
+            if run_payload.get("success"):
+                from runtime_store.usage_ping import note_live_cycle_success
+
+                note_live_cycle_success()
             if savings_info:
                 try:
                     overlaid_rows = optimizer.overlay_main_run_on_rows(
@@ -1172,6 +1178,9 @@ if __name__ == "__main__":
             clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
             after_prod_cycle()
+            from runtime_store.usage_ping import spawn_maybe_send_ping
+
+            spawn_maybe_send_ping()
 
             decision = decide_lead(
                 cycle_duration_stats.load_records(),

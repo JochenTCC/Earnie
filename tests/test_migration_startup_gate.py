@@ -11,9 +11,12 @@ from runtime_store import bootstrap, main_daemon
 from runtime_store.config_load import load_config_or_exit
 from runtime_store.data_model import CURRENT_DATA_MODEL, DATA_MODEL_KEY
 from runtime_store.migration.gate import (
+    abort_message_de,
     migration_blocks_normal_startup,
+    model_range_label_de,
     plan_for_active_config,
 )
+from runtime_store.migration.types import MigrationPlan
 from runtime_store.migration.planner import plan_migration
 from runtime_store.shadow.errors import ShadowStartupError
 
@@ -132,6 +135,36 @@ def test_clean_config_allows_gate(tmp_path, monkeypatch):
     _point_config(monkeypatch, config_dir)
     plan = plan_for_active_config()
     assert not migration_blocks_normal_startup(plan)
+
+
+def test_same_model_range_label_avoids_arrow():
+    plan = MigrationPlan(
+        config_dir="/tmp/x",
+        from_model=4,
+        to_model=4,
+        pending_step_ids=("dm4.topology",),
+        questions=(),
+        blockers=(),
+        manual_todos=(),
+        file_diffs=(),
+        can_run=True,
+    )
+    assert model_range_label_de(plan) == (
+        "strukturelle Schritte innerhalb Datenmodell 4"
+    )
+    assert "4 → 4" not in abort_message_de(plan)
+    bump = MigrationPlan(
+        config_dir="/tmp/x",
+        from_model=3,
+        to_model=4,
+        pending_step_ids=("dm4.v3_to_v4",),
+        questions=(),
+        blockers=(),
+        manual_todos=(),
+        file_diffs=(),
+        can_run=True,
+    )
+    assert model_range_label_de(bump) == "Datenmodell 3 → 4"
 
 
 def test_shadow_pending_refuses_startup(tmp_path, monkeypatch):

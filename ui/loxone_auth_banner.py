@@ -9,7 +9,10 @@ from runtime_store.loxone_auth_error import load_loxone_auth_error
 
 def render_loxone_auth_error_banner() -> None:
     """Show persisted Loxone auth failure from runtime/loxone_auth_error.json."""
-    error = load_loxone_auth_error()
+    from runtime_store.shadow.mode import is_shadow_mode
+
+    # Shadow never contacts the Miniserver; ignore leftover auth-gate files.
+    error = None if is_shadow_mode() else load_loxone_auth_error()
     conflict = loxone_dotenv_conflict()
     if not error and not conflict:
         return

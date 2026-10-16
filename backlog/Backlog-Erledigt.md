@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### UsagePing P2 — daemon hook + milestones (2026-10-16)
+
+- [x] **UsagePing P2 — daemon hook + milestones** `[qual]`: `spawn_maybe_send_ping()` (daemon thread, single in-flight) from `main.py` after `after_prod_cycle` and `_daemon_wait_poll`; `note_explorer_success` on successful Scenario Explorer (`ui/backtesting_run.py`, `scripts/run_backtesting.py`); `note_live_cycle_success` after `run_state.save_run_state` with `success` (skipped in shadow); HA add-on optional `usage_ping` bool mirrored via `addon_options._apply_usage_ping_option` → `set_consent` (earnie + prerelease `config.yaml`); spec §3 P2 note; tests in `tests/test_usage_ping.py` + `tests/test_addon_options.py`. Consent UI remains **P3**; receiver **P4**; docs **P5**.
+
+### UsagePing P1 — client (2026-10-16)
+
+- [x] **UsagePing P1 — client** `[qual]`: `runtime_store/usage_ping.py` (consent tri-state `unset`/`on`/`off`, random UUIDv4 install ID, payload whitelist `v`/`id`/`app_version`/`context`/`stage`, once-per-day UTC, 1 h retry via `last_attempt_at`, kill-switch `EARNIE_USAGE_PING=off`, endpoint `EARNIE_USAGE_PING_URL`, injected clock + fake transport); state `runtime/usage_ping.json` via `usage_ping_state_file()`; spec `docs/spec/usage-ping.md` §3–4 synced; tests `tests/test_usage_ping.py` (fake transport + local mock HTTP server). Daemon hook / milestones **P2** → done; consent UI **P3**; receiver **P4**; docs **P5**.
+
 ### Release-Notes workflow — draft, review, finalize (2026-10-16)
 
 - [x] **Release-Notes workflow with maintainer review** `[dev]`: spec `docs/spec/release-notes-workflow.md`; rule `.cursor/rules/release-notes.mdc` + skill `release-notes` (AI writes drafts only to `.github/release-notes/drafts/`, no notes for `-dev` versions); `scripts/release_notes_collect.py` (evidence pack since the last published productive release, audience classification, unmerged-hotfix-tag warning, migration section from `HEAD`) and `scripts/release_notes_finalize.py` (`--approved` promote, `--check` CI gate); `release-publish.yml` fails without reviewed notes (generic fallback removed); `session-abschluss`, `versioning.mdc`, release checklist updated.

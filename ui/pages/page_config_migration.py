@@ -6,7 +6,11 @@ from typing import Any
 
 import streamlit as st
 
-from runtime_store.migration.gate import abort_message_de, plan_for_active_config
+from runtime_store.migration.gate import (
+    abort_message_de,
+    model_range_label_de,
+    plan_for_active_config,
+)
 from runtime_store.migration.registry import STEP_BY_ID
 from runtime_store.migration.runner import MigrationError, run_migration
 from runtime_store.migration.types import (
@@ -109,10 +113,9 @@ def _clear_report_session() -> None:
 
 
 def _render_hint(plan: MigrationPlan) -> None:
-    from_label = "?" if plan.from_model is None else str(plan.from_model)
     st.warning(
         f"Earnie {__version__} braucht eine Anpassung deiner Konfiguration "
-        f"(Datenmodell {from_label} → {plan.to_model})."
+        f"({model_range_label_de(plan)})."
     )
     previous = _last_run_version()
     if previous:
