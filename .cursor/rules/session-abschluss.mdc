@@ -14,7 +14,8 @@ When the user wants to **end session**, **backlog sync**, **commit and push**, o
 5. For local or possibly temporary files **ask first** (e.g. personal VS Code settings, local paths)
 6. **Always ask** whether private earnie-env / `Earnie-env-home` changes should be committed, pushed, and tagged (skill §2a)
 7. After Phase 1: present the skill’s **Publish decision guide** (**A** skip / **B** pre-release / **C** official / **D** bump then publish) with live `version.py` and one recommended choice
-8. **Phase 2** (tag / Docker) **only** after the user picks B, C, or D→B/C — never automatically
-9. A tag builds a **candidate** only; the user tests it on the target platform and approves job `promote` (environment `release-approval`) themselves — never approve/reject on their behalf; `streamlitcloud` reset only after approval
+8. **Release notes before B / C:** reviewed `.github/release-notes/v<version>.md` required — draft via skill `release-notes` (`release-notes.mdc`); none for `-dev`
+9. **Phase 2** (tag / Docker) **only** after the user picks B, C, or D→B/C — never automatically
+10. A tag builds a **candidate** only; the user tests it on the target platform and approves job `promote` (environment `release-approval`) themselves — never approve/reject on their behalf; `streamlitcloud` reset only after approval
 
 Commit and push approval is implied by the end-session request; still do not commit secrets or gitignored files.

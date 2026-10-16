@@ -85,6 +85,9 @@ jobs:
           echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
           echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE})"
 
+      - name: Release notes gate (reviewed notes required, none for -dev)
+        run: python -m scripts.release_notes_finalize --check --version "${{ steps.version.outputs.version }}"
+
       - name: Shadow release guard (no EARNIE_SHADOW in packaging/docker)
         run: |
           set -euo pipefail
@@ -162,38 +165,8 @@ jobs:
           PRERELEASE="${{ steps.version.outputs.prerelease }}"
           NOTES_FILE=".github/release-notes/${TAG}.md"
           OUT="${RUNNER_TEMP}/release-notes.md"
-          if [ -f "$NOTES_FILE" ]; then
-            cp "$NOTES_FILE" "$OUT"
-          else
-            {
-              echo "## Earnie ${VERSION}"
-              echo ""
-              if [ "$PRERELEASE" = "true" ]; then
-                echo "### Pre-release (community test)"
-                echo ""
-                echo "This is **not** an official release. Do not use \`:latest\` — use \`:next\` or pin the version tag."
-                echo ""
-                echo "### Docker images"
-                echo ""
-                echo "- \`ghcr.io/jochentcc/earnie-energy:${VERSION}\`"
-                echo "- \`ghcr.io/jochentcc/earnie-energy:next\`"
-                echo "- Legacy aliases: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\` / \`:next\`"
-              else
-                echo "### Docker images"
-                echo ""
-                echo "- \`ghcr.io/jochentcc/earnie-energy:${VERSION}\`"
-                echo "- \`ghcr.io/jochentcc/earnie-energy:latest\`"
-                echo "- \`ghcr.io/jochentcc/earnie-energy:next\`"
-                echo "- Legacy aliases: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\` / \`:latest\` / \`:next\`"
-              fi
-              echo ""
-              echo "HA add-on images: \`ghcr.io/jochentcc/earnie-addon-{amd64,aarch64}:${VERSION}\`"
-              echo ""
-              echo "Deploy: [docs/einrichtung/container.md](https://github.com/${{ github.repository }}/blob/main/docs/einrichtung/container.md)"
-              echo ""
-              echo "Multi-arch: \`linux/amd64\` (Synology / Proxmox) · \`linux/arm64\` (LoxBerry)."
-            } > "$OUT"
-          fi
+          # Existence/review checked by "Release notes gate" — no generic fallback.
+          cp "$NOTES_FILE" "$OUT"
           echo "path=${OUT}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release (draft until approval)

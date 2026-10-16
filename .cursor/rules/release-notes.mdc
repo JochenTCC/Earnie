@@ -1,0 +1,21 @@
+---
+description: Release notes — AI drafts from changes since the last productive release, maintainer reviews, no notes for -dev versions
+alwaysApply: false
+---
+
+# Release notes
+
+Spec: [`docs/spec/release-notes-workflow.md`](../../docs/spec/release-notes-workflow.md). Procedure: skill `.cursor/skills/release-notes/SKILL.md`. Applies when the user mentions release notes, changelog, tagging or publishing (`session-abschluss` B/C).
+
+## Rules
+
+- **No release notes for `-dev.N` versions.** `scripts/release_notes_collect.py` refuses them; do not write a notes file for a dev version.
+- **Baseline** = newest productive tag `vX.Y.Z` (never alpha / beta / rc / dev) that is an ancestor of `HEAD` and has a **published** (non-draft) GitHub Release — declined candidates are skipped (needs `gh`; otherwise pass `--since <tag>`). Productive tags released on a hotfix branch and not merged are listed as a warning in the evidence — do not announce their fixes as new.
+- **The AI writes drafts only**, to `.github/release-notes/drafts/v<version>.draft.md`. Never write or overwrite `.github/release-notes/v<version>.md` directly, and never mark a draft as reviewed on the maintainer's behalf.
+- **Review gate:** the maintainer reviews (edits the draft or requests changes). Only an explicit approval in chat ("Release Notes freigegeben") for that version lets the draft become `v<version>.md`. Approval does not carry over to later versions.
+- Pre-release (alpha / beta / rc) notes: short, cumulative since the last productive release, with the pre-release banner. Official notes: the full set.
+- **Language:** German body for end users; only the Docker / deploy boilerplate stays English. First prose line = end-user sentence for the HA add-on Änderungsprotokoll (no pin / `latest` / channel jargon, no backlog IDs).
+- Visible text contains **no backlog IDs and no real user/customer names** (`backlog-anonymize-users.mdc`). Maintainer hints from `.github/release-notes/UNRELEASED.md` must appear (breaking items first).
+- Every statement must trace to the evidence pack; no invented features. Unclear items get a `<!-- REVIEW: … -->` marker, not a guess.
+- New `MigrationStep`s since the baseline → `## Migration` section (`config-migration.mdc`, `python -m scripts.migration_release_notes --since <tag>`).
+- Do not tag or publish with an unreviewed draft. The `version.py` rule stays: never change it without approval (`versioning.mdc`).

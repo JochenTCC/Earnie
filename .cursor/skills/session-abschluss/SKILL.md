@@ -183,7 +183,8 @@ and attach the report (release checklist §1). Private regression repo: <clean+p
 5. Never bump `version.py` or push a tag until the user picks a letter (or equivalent clear wording: “publish alpha”, “official release”, “skip”).
 6. After **D**: propose exact string → wait → edit `version.py` → **run Alpha compose sync** (below) when the new string is a pre-release → commit (include synced YAML) → push → re-show the guide with the new `version.py` → user picks **B** or **C** (or **A**).
 7. Before **B**: **run Alpha compose sync** (or verify already matching). Do not tag until the three `*-alpha.yml` files pin `version.py`.
-8. **Regression warning (soft, never blocks):** scan `## Bugfix Verifications Pending` in `backlog/Backlog-Bugfixes.md` for case IDs matching `REG-\d+-`. If any is cited and `Earnie-regression-private` is **missing**, **dirty** (`git status --porcelain` non-empty) or **unpushed** (ahead of / no upstream), add a visible warning to the guide, e.g. “⚠ REG-142-eauto-deadline cited, private repo has uncommitted changes — the regression report only records the private `HEAD` SHA, so the release gate would not see this golden.” Fill in the live state; otherwise show “clean+pushed @ <short SHA>”. The user may still pick any letter (hard gate only with Regression P3).
+8. **Release notes (B / C):** if `.github/release-notes/v<version>.md` does not exist, the next step is skill `release-notes` (draft → maintainer review), **before** any tag. Never write the final file from an unreviewed draft. For `-dev` versions and choice **A**: no release notes.
+9. **Regression warning (soft, never blocks):** scan `## Bugfix Verifications Pending` in `backlog/Backlog-Bugfixes.md` for case IDs matching `REG-\d+-`. If any is cited and `Earnie-regression-private` is **missing**, **dirty** (`git status --porcelain` non-empty) or **unpushed** (ahead of / no upstream), add a visible warning to the guide, e.g. “⚠ REG-142-eauto-deadline cited, private repo has uncommitted changes — the regression report only records the private `HEAD` SHA, so the release gate would not see this golden.” Fill in the live state; otherwise show “clean+pushed @ <short SHA>”. The user may still pick any letter (hard gate only with Regression P3).
 
 ---
 
@@ -227,7 +228,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 - [ ] `version.py` on `origin/main` equals the intended tag without `v`
 - [ ] Channel correct: `-` in version → pre-release (**B**); clean `X.Y.Z` → official (**C**)
 - [ ] **If B:** all three `docker/compose/*-alpha.yml` have `image: ghcr.io/jochentcc/earnie-energy:<version.py>`
-- [ ] Release notes exist or default notes are OK: `.github/release-notes/v….md`
+- [ ] **Reviewed** release notes exist: `.github/release-notes/v<version>.md`, produced via skill `release-notes` (draft → maintainer review → `release_notes_finalize`). No generic default notes; **no notes and no tag for `-dev` versions**
 - [ ] If `runtime_store/migration/` gained steps since the previous tag: notes include `## Migration` (draft via `python -m scripts.migration_release_notes --since <tag>`) — see `docs/spec/release-checklist.md` §1
 - [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/spec/release-checklist.md` §1
 - [ ] Regression suite run (public + private) and report attached; `Earnie-regression-private` clean and pushed, or the user consciously accepted the guide's warning (soft gate — `docs/spec/release-checklist.md` §1)
