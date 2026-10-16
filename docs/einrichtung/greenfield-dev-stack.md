@@ -1,4 +1,4 @@
-# Greenfield Dev-Stack (1.24.c)
+# Greenfield Dev-Stack 
 
 Lokaler Container-Stack im Zustand **nach Ersteinrichtung** — Abnahme-Infrastruktur für Hauskonfigurator und Backtesting auf dem Dev-PC. Kein Schreibzugriff auf produktive Loxone nötig; getrennt von pytest-Fixtures und von Silent-/Simuliert-Stacks (Backlog **7g**).
 
@@ -61,7 +61,7 @@ Nach **Speichern** in der Ersteinrichtung:
 docker compose --project-directory . -f docker/compose/greenfield.yml logs -f earnie
 ```
 
-## Manuelle Abnahme (1.24.e)
+## Manuelle Abnahme 
 
 Mit abgeschlossener Ersteinrichtung und vollständiger Planungs-Konfiguration:
 

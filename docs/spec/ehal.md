@@ -465,7 +465,7 @@ Values in the telemetry URL path must already be in **canonical EHAL units** (§
 - **Greenfield presence probe:** `integrations/loxone_greenfield_import.probe_marker_names` classifies known `greenfield_device_map.json` names against LoxAPP3 control names (no Merker HTTP). EFM meters still need LoxAPP3.
 - HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Heuristic proposals + manual selects; confirm writes `plant` / `consumers[].ehal_bindings` via house profiles, ESS via `batteries[].ehal_bindings`, and inverter via `inverters[].ehal_bindings` on `components.json`. Field rows grouped by device role (incl. Wechselrichter).
 - Optional LLM (code retained, **not** exposed in UI): local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP.
-- EFM interpretation C (meter tree → Hausprofil consumers + optional flex power): research note `[efm-auto-sync-2.4.l.md](efm-auto-sync-2.4.l.md)`; library `integrations/loxone_efm_meters.py` via greenfield `merge_efm` (Smarthome-Backend Loxone-Import).
+- EFM interpretation C (meter tree → Hausprofil consumers + optional flex power): research note `[efm-auto-sync.md](efm-auto-sync.md)`; library `integrations/loxone_efm_meters.py` via greenfield `merge_efm` (Smarthome-Backend Loxone-Import).
 
 
 

@@ -83,3 +83,20 @@ def test_check_final(tmp_path):
     assert check_final("2.7.0", repo=tmp_path) == notes / "v2.7.0.md"
     with pytest.raises(ValueError, match="-dev"):
         check_final("2.7.0-dev.1", repo=tmp_path)
+
+
+def test_backlog_ids_in_visible_text_block_finalize_but_not_in_comments():
+    ok = "## Earnie 2.7.0\n\nText <!-- src: 2.7.n Session F -->\n"
+    assert finalize_text(ok, approved=True).startswith("## Earnie 2.7.0")
+    for bad in ("Siehe 2.7.n.", "Folgt in 2.+1.", "Kapitel 2.6.a"):
+        with pytest.raises(ValueError, match="backlog version IDs"):
+            finalize_text(f"## Earnie 2.7.0\n\n{bad}\n", approved=True)
+    assert "2.7.0-alpha.1" not in "" and finalize_text("## Earnie 2.7.0-alpha.1\n", approved=True)
+
+
+def test_check_final_rejects_backlog_ids(tmp_path):
+    notes = tmp_path / ".github" / "release-notes"
+    notes.mkdir(parents=True)
+    (notes / "v2.7.0.md").write_text("## Earnie 2.7.0\n\nNeu in 2.7.q\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="backlog version IDs"):
+        check_final("2.7.0", repo=tmp_path)

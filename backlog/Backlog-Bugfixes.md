@@ -58,3 +58,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
+
+- [ ] **`docs/einrichtung/ha-evcc.md` (Home Assistant `weg_b` transport) is probably outdated** — to clarify (2026-10-16, found while removing internal backlog IDs from user docs)
+  - Current text (line 38): `weg_b` switches the live paths to push and `status.json`, "bisher nur im Labor erprobt" — productive use stays `pull`. Before the ID cleanup the sentence said `weg_b` would only switch the live paths with a later step and `pull` should be used until then; the code already does it (`integrations/ha_push_read.py`, `ehal.ha.transport` in `settings/config_loaders.py`).
+  - Maintainer view: the document is not up to date. Open: what is the real status of `weg_b` (productive, supported, still lab-only)? Rewrite the transport paragraph accordingly.
+  - Check the same statement in: `docs/ui/ehal-com.md` (lines ~18 and ~291), `docs/spec/ehal.md` § Home Assistant, `docs/spec/ha-lab-setup.md` §9 ("optional after 2.7.r"), `docs/einrichtung/homeassistant-addon.md`, and the HA notes in the 2.7.0-alpha.1 release-notes draft ("Plattformhinweise → Home Assistant").
+  - Related open item: Binding P5 "Home Assistant Weg B comfort" in `Backlog.md` (full YAML package pre-filled from bindings).

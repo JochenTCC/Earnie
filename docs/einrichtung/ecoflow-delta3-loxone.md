@@ -32,10 +32,10 @@ multiple isolated battery … One-Way storage type“):
 |---|---|
 | `ess.{id}.sens_ess_soc`, `sens_ess_power` | ✅ heute nutzbar (reine Telemetrie/Anzeige; SoC entity-scoped) |
 | `set_ess_charge_power_limit` | ✅ heute nutzbar (bestehendes EHAL-Feld) |
-| `ess.<id>.set_ess_source_select` *(2.7.h)* | ✅ Earnie schreibt Quellenwahl für physisches `role: standby_backup` (entity-scoped); Merker + Bridge zu `switch.<device>_grid_bypass` (Operator verdrahtet nach ID-Umzug) |
+| `ess.<id>.set_ess_source_select` | ✅ Earnie schreibt Quellenwahl für physisches `role: standby_backup` (entity-scoped); Merker + Bridge zu `switch.<device>_grid_bypass` (Operator verdrahtet nach ID-Umzug) |
 | `set_ess_active_power`, `set_ess_discharge_power_limit`, `set_ess_mode` | ❌ nicht anlegen/mappen — für einen One-Way-Speicher grundsätzlich nicht zutreffend |
 
-**Konsequenz für `components.json` (2.7.g):** Die Delta 3 ist eine Powerstation
+**Konsequenz für `components.json`:** Die Delta 3 ist eine Powerstation
 (`type: powerstation`, `backing: physical`, `role: single_use` oder später `standby_backup`),
 **nicht** eine Hausbatterie in Szenario-`battery_ids[]`. Anbindung über ein manuelles Gerät mit
 `appliance_recommendation.mode: reserve` und `powerstation_id`. Die MILP plant kein
@@ -76,7 +76,7 @@ Earnies eigene Anbindung bleibt unverändert auf `ehal.backend=loxone`.
 | `set_ess_charge_power_limit` | `number.<device>_ac_charging_power` (`plug_in_info_ac_in_chg_pow_max`, 100–1500 W) | `Earnie_LadeLeistungs-Limit` | Loxone → HA | ✅ |
 | `get_ess_soc_max` (optional) | `number.<device>_max_charge_level` (50–100 %) | `Earnie_Batterie_SOC_Max` | HA → Loxone | optional |
 | `get_ess_soc_min` (optional) | `number.<device>_min_discharge_level` (0–30 %) | `Earnie_Batterie_SOC_Min` | HA → Loxone | optional |
-| `ess.<id>.set_ess_source_select` *(2.7.h)* | `switch.<device>_grid_bypass` (`ban_bypass_en`) | Pattern-B Merker (legacy oft `Earnie_Speicher_Quellenwahl`) | Loxone → HA | ✅ bei physischem `standby_backup` |
+| `ess.<id>.set_ess_source_select` | `switch.<device>_grid_bypass` (`ban_bypass_en`) | Pattern-B Merker (legacy oft `Earnie_Speicher_Quellenwahl`) | Loxone → HA | ✅ bei physischem `standby_backup` |
 | `set_ess_discharge_power_limit`, `set_ess_active_power`, `set_ess_mode` | – | – | – | ❌ nicht anlegen |
 
 **Polarität `ess.<id>.set_ess_source_select` ↔ `switch.<device>_grid_bypass`:** 1:1-Abbildung, kein
@@ -545,7 +545,7 @@ Speichern heißt: `<device>` wurde nicht ersetzt.
 wenn `select.<device>_ac_charging_mode` auf **Custom** steht (siehe Schritt 8). Ändert sich nichts, zeigt
 die Ablaufverfolgung (Trace) der Automation, an welcher Stelle sie stehen geblieben ist.
 
-### 6. Quellenwahl-Merker (`ess.<id>.set_ess_source_select`, 2.7.h)
+### 6. Quellenwahl-Merker (`ess.<id>.set_ess_source_select`)
 
 Earnie schreibt entity-scoped `ess.<id>.set_ess_source_select` für physische Powerstations mit
 `role: standby_backup` (status.json-Key gleich dem Pattern-B-Feld). Der Loxone-Merker-Name ist frei

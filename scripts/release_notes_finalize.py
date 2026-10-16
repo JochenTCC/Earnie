@@ -14,7 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-from scripts.release_notes_collect import channel_of
+from scripts.release_notes_collect import channel_of, find_backlog_ids
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _NOTES_REL = Path(".github/release-notes")
@@ -35,7 +35,17 @@ def finalize_text(draft: str, *, approved: bool) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
     if not text.lstrip().startswith("## "):
         raise ValueError("final notes must start with '## Earnie <version>'")
+    _reject_backlog_ids(text)
     return text
+
+
+def _reject_backlog_ids(text: str) -> None:
+    ids = find_backlog_ids(text)
+    if ids:
+        raise ValueError(
+            f"internal backlog version IDs in visible text: {', '.join(ids)} "
+            "(remove them; keep IDs only in <!-- src: --> comments)"
+        )
 
 
 def reset_unreleased(text: str) -> str:
@@ -79,6 +89,7 @@ def check_final(version: str, *, repo: Path = _REPO_ROOT) -> Path:
         raise ValueError(f"{path.name} still contains DRAFT/REVIEW markers (unreviewed)")
     if not text.lstrip().startswith("## "):
         raise ValueError(f"{path.name} must start with '## Earnie <version>'")
+    _reject_backlog_ids(text)
     return path
 
 

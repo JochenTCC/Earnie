@@ -13,6 +13,7 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
@@ -25,6 +26,17 @@ _ERLEDIGT_HEADING_RE = re.compile(r"^###\s+(.*)\((\d{4}-\d{2}-\d{2})\)\s*$")
 _ISSUE_RE = re.compile(r"(?<![\w/])#(\d+)\b")
 _PREFIX_RE = re.compile(r"^([a-zA-Z0-9_\-]+)(?:\(([^)]*)\))?:")
 _NOISE_PREFIXES = frozenset({"backlog", "merge"})
+_AUDIENCE_RE = re.compile(r"\[(feat|qual|dev)\]")
+# Internal backlog version chapters (2.7.n, 2.6.a, 2.+1) — never shown to readers.
+BACKLOG_ID_RE = re.compile(r"\b[1-3]\.\d+\.[a-z]\b|\b\d+\.\+\d+\b")
+
+
+def find_backlog_ids(text: str) -> list[str]:
+    """Internal backlog version IDs in the *visible* text (HTML comments are ignored)."""
+    visible = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    return sorted(set(BACKLOG_ID_RE.findall(visible)))
+_ENTRY_RE = re.compile(r"^- \[[ xX]\] (.*)$")
+_AUDIENCE_TOML = _REPO_ROOT / ".github" / "release-notes" / "audience.toml"
 
 STRUCTURAL_DIRS = (
     "runtime_store/migration/",
@@ -137,6 +149,33 @@ def unmerged_productive_tags(repo: Path = _REPO_ROOT) -> list[str]:
     return [t for t in all_tags if _PRODUCTIVE_TAG_RE.match(t) and t not in merged]
 
 
+def load_audience_config(path: Path = _AUDIENCE_TOML) -> dict:
+    """Pre-classification config; fails loud when missing or incomplete."""
+    if not path.is_file():
+        raise ValueError(f"audience config missing: {path}")
+    cfg = tomllib.loads(path.read_text(encoding="utf-8"))
+    for key in ("dev_prefixes", "dev_terms"):
+        if not isinstance(cfg.get(key), list):
+            raise ValueError(f"{path.name}: '{key}' must be a list")
+    return cfg
+
+
+def classify_entry(text: str, section_title: str, cfg: dict) -> dict:
+    """Audience of one backlog entry (first line ``text``).
+
+    Explicit marker wins. Bugfix sections/entries count as ``fix``. Everything else is
+    ``unmarked`` with a ``suggestion`` from ``dev_terms`` (never auto-decided).
+    """
+    marker = _AUDIENCE_RE.search(text)
+    if marker:
+        return {"audience": marker.group(1), "suggestion": None}
+    if re.match(r"(?i)\s*(\*\*)?bugfix\b", text) or re.match(r"(?i)bugfix\b", section_title):
+        return {"audience": "fix", "suggestion": None}
+    haystack = f"{section_title} {text}".lower()
+    hit = any(term.lower() in haystack for term in cfg["dev_terms"])
+    return {"audience": "unmarked", "suggestion": "dev" if hit else None}
+
+
 def classify_subject(subject: str) -> str:
     """Group key for a commit subject: its prefix, ``merge`` or ``other``."""
     if subject.startswith("Merge "):
@@ -146,7 +185,7 @@ def classify_subject(subject: str) -> str:
 
 
 def group_commits(commits: list[dict]) -> tuple[dict[str, list[dict]], list[dict]]:
-    """Split commits into (feature-relevant groups, noise)."""
+    """Split commits into (groups by prefix, noise). Dev groups are split at render time."""
     groups: dict[str, list[dict]] = defaultdict(list)
     noise: list[dict] = []
     for commit in commits:
@@ -158,8 +197,12 @@ def group_commits(commits: list[dict]) -> tuple[dict[str, list[dict]], list[dict
     return dict(groups), noise
 
 
-def parse_erledigt(text: str, since: date) -> list[dict]:
-    """Archive sections whose heading date is on/after ``since`` (heading + body)."""
+def parse_erledigt(text: str, since: date, cfg: dict | None = None) -> list[dict]:
+    """Archive sections whose heading date is on/after ``since``.
+
+    Each section has ``title``, ``date``, ``body`` and (when ``cfg`` is given) ``entries``:
+    top-level checkbox lines with their audience classification.
+    """
     sections: list[dict] = []
     current: dict | None = None
     for line in text.splitlines():
@@ -176,7 +219,14 @@ def parse_erledigt(text: str, since: date) -> list[dict]:
         elif current is not None:
             current["body"].append(line)
     for section in sections:
-        section["body"] = "\n".join(section["body"]).strip()
+        lines = section["body"]
+        section["body"] = "\n".join(lines).strip()
+        if cfg is not None:
+            section["entries"] = [
+                {"text": m.group(1)[:200], **classify_entry(m.group(1), section["title"], cfg)}
+                for m in (_ENTRY_RE.match(ln) for ln in lines)
+                if m
+            ]
     return sections
 
 
@@ -243,10 +293,12 @@ def collect(since: str, target: str, repo: Path = _REPO_ROOT) -> dict:
         return path.read_text(encoding="utf-8") if path.is_file() else ""
 
     migration = migration_section(baseline, repo)
+    cfg = load_audience_config(repo / ".github" / "release-notes" / "audience.toml")
 
     unreleased = _read(".github/release-notes/UNRELEASED.md")
     regression = _read("backtesting_logs/regression/regression_report.md")
     return {
+        "audience_config": cfg,
         "target": target,
         "channel": channel,
         "baseline": baseline,
@@ -257,7 +309,7 @@ def collect(since: str, target: str, repo: Path = _REPO_ROOT) -> dict:
         "commit_groups": groups,
         "noise_commits": noise,
         "archived_items": parse_erledigt(
-            _read("backlog/Backlog-Erledigt.md"), date.fromisoformat(base_date)
+            _read("backlog/Backlog-Erledigt.md"), date.fromisoformat(base_date), cfg
         ),
         "paths": classify_paths(changed),
         "migration_section": migration,
@@ -267,6 +319,11 @@ def collect(since: str, target: str, repo: Path = _REPO_ROOT) -> dict:
             _read("backlog/Backlog-Bugfixes.md")
         ),
     }
+
+
+def _entry_line(entry: dict) -> str:
+    hint = f" (suggestion: {entry['suggestion']})" if entry.get("suggestion") else ""
+    return f"- [{entry['audience']}] {entry['text']}{hint}"
 
 
 def render_markdown(ev: dict) -> str:
@@ -294,14 +351,32 @@ def render_markdown(ev: dict) -> str:
         "## Archived backlog items since baseline (primary wording source)",
         "",
     ]
+    out += [
+        "Audience per entry: `feat` = feature, `qual` = quality (one short line), "
+        "`fix` = bugfix, `dev` = internal (see last section), "
+        "`unmarked` = ask the maintainer.",
+        "",
+    ]
     for item in ev["archived_items"]:
-        out += [f"### {item['title']} ({item['date']})", "", item["body"], ""]
+        entries = item.get("entries", [])
+        if entries and all(e["audience"] == "dev" for e in entries):
+            continue  # listed under "Internal" below
+        out += [f"### {item['title']} ({item['date']})", ""]
+        out += [_entry_line(e) for e in entries if e["audience"] != "dev"]
+        out += ["", item["body"], ""]
     if not ev["archived_items"]:
         out += ["_none_", ""]
-    out += ["## Commits by prefix", ""]
-    for key in sorted(ev["commit_groups"], key=lambda k: -len(ev["commit_groups"][k])):
-        out.append(f"### {key} ({len(ev['commit_groups'][key])})")
-        out += [f"- `{c['sha']}` {c['subject']}" for c in ev["commit_groups"][key]]
+    unmarked = [e for i in ev["archived_items"] for e in i.get("entries", []) if e["audience"] == "unmarked"]
+    out += [f"## Unmarked entries — ASK the maintainer ({len(unmarked)})", ""]
+    out += [_entry_line(e) for e in unmarked] or ["_none_"]
+    out.append("")
+    dev_prefixes = set(ev["audience_config"]["dev_prefixes"])
+    public_groups = {k: v for k, v in ev["commit_groups"].items() if k not in dev_prefixes}
+    internal_groups = {k: v for k, v in ev["commit_groups"].items() if k in dev_prefixes}
+    out += ["## Commits by prefix (public candidates)", ""]
+    for key in sorted(public_groups, key=lambda k: -len(public_groups[k])):
+        out.append(f"### {key} ({len(public_groups[key])})")
+        out += [f"- `{c['sha']}` {c['subject']}" for c in public_groups[key]]
         out.append("")
     out.append(f"_{len(ev['noise_commits'])} merge/backlog-only commits omitted._")
     out += ["", "## Data model / config", "", ev["migration_section"], ""]
@@ -319,6 +394,18 @@ def render_markdown(ev: dict) -> str:
     out += [ev["verifications_pending"] or "_none_", ""]
     if ev["regression_report_head"]:
         out += ["## Regression report (head)", "", ev["regression_report_head"], ""]
+    internal_items = [
+        e for i in ev["archived_items"] for e in i.get("entries", []) if e["audience"] == "dev"
+    ]
+    out += [
+        "## Internal — DO NOT OUTPUT in release notes or user docs",
+        "",
+        "Listed only so you know what to leave out.",
+        "",
+    ]
+    out += [_entry_line(e) for e in internal_items]
+    out += [f"- commits `{key}`: {len(commits)}" for key, commits in internal_groups.items()]
+    out.append("")
     return "\n".join(out)
 
 

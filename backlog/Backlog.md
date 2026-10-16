@@ -38,8 +38,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - **Note:** Epic **ConfigMigration** P0–P4 (guided pack JSON migration v3→v4 + process/docs) → [Erledigt](Backlog-Erledigt.md). Spec [`docs/spec/config-migration.md`](../docs/spec/config-migration.md); draft [`Config-Migration-Draft.md`](Config-Migration-Draft.md). Tariff track (`tariff_format`, Netznutzung split) remains under **Version 2.8** Edbert integration; until then `grid_fees.json` stays untagged and exempt from the untagged blocker.
 
-- [ ] Introduce a proper Release-Notes workflow with my review and acceptance first
 - [ ] first alpha quality review
+- [ ] semi-automatic review of docs / manuals (remove obsolete ones)
 - [ ] alpha release
 
 - [ ] **Epic UsagePing — opt-in anonymous install counter** (spec / draft [`docs/spec/usage-ping.md`](../docs/spec/usage-ping.md); owner decisions 2026-10-16)

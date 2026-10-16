@@ -170,11 +170,11 @@ Waschmaschine, Trockner usw. als `generic`**-Verbraucher** in `house_profiles.js
 | `appliance_recommendation.powerstation_id`                       | Bei `reserve`: id der Powerstation in `components.json`        |
 | `appliance_recommendation.power_source`                          | `loxone` oder `manual` (Config-Enum; `loxone` = Live-Binding)  |
 | `loxone_inputs.power_name`                                       | Bei `power_source: loxone`: Legacy-Adresse für Ist-Leistung (`known` und `manual`); Mapping bevorzugt über `ehal_bindings` |
-| `ehal_bindings.flex.{id}.sens_consumer_active`                   | Storage key; Live/VO exchange: `consumer.{id}.sens_consumer_active` (2.7.p) |
+| `ehal_bindings.flex.{id}.sens_consumer_active`                   | Storage key; Live/VO exchange: `consumer.{id}.sens_consumer_active` |
 | `appliance_recommendation.default_power_kw`                      | Standard-Leistung für Empfehlung bzw. Reserve                  |
 | `schedule.duration_h`                                            | Laufzeit pro Lauf (auch Advice/Reserve: Ziel kWh ≈ P×t)        |
 
-**Reserve-Release (2.7.p):** Beim Start eines angeschlossenen Geräts (digital aktiv **oder** Leistung ≥ Schwelle **oder** UI-Button) gibt Earnie die virtuelle Energiereserve frei. Nachlauf: Restvorrat abbuchen, danach Nachladen preisoptimal binnen 24 h. Exchange: `consumer.{hk_id}.sens_consumer_active`; Loxone-Default-VO/Merker `Earnie_Verbraucher_<Slug>_Aktiv` in `VO_Earnie_Consumer.xml`.
+**Reserve-Release:** Beim Start eines angeschlossenen Geräts (digital aktiv **oder** Leistung ≥ Schwelle **oder** UI-Button) gibt Earnie die virtuelle Energiereserve frei. Nachlauf: Restvorrat abbuchen, danach Nachladen preisoptimal binnen 24 h. Exchange: `consumer.{hk_id}.sens_consumer_active`; Loxone-Default-VO/Merker `Earnie_Verbraucher_<Slug>_Aktiv` in `VO_Earnie_Consumer.xml`.
 
 
 
@@ -215,4 +215,4 @@ Bei `earnie_role: known` oder `manual` kann optional eine **Live-Leistungsquelle
 | `schedule.duration_h`                        | Nenndauer pro Lauf — auch Laufzeit für Advice/Reserve                 |
 
 
-Die Adresse wird gespeichert; Live-Abfrage und Adaption der Nennleistung folgen in **Version 2.+1**. Bis dahin nutzt die Grundlast-Overlay bzw. die Startzeit-Empfehlung die Werte aus dem Profil.
+Die Adresse wird gespeichert; Live-Abfrage und Adaption der Nennleistung folgen in einer späteren Version. Bis dahin nutzt die Grundlast-Overlay bzw. die Startzeit-Empfehlung die Werte aus dem Profil.

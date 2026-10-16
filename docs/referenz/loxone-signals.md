@@ -26,7 +26,7 @@ In the docs, the canonical template/import path is called **Default** (formerly 
 
 Earnie Core writes and reads the same Merker names on the Miniserver. The library adds the **Loxone-side** HTTP mirroring and enables an **Earnie-dead** fallback in Config (see below).
 
-**Virtual Inputs** = Earnie→Loxone (`set_*` / enables / setpoints, heartbeat) via `GET http://<Earnie>:8541/ehal/loxone/status.json` (daemon HTTP; `heartbeat_ts` = Unix now; setpoints from the publish ledger / `loxone_sent`). After **2.7.q Q5**, Loud writes are **push-only** (no `/dev/sps/io/<Merker>/<value>` for cycle setpoints). After **Q8**, `status.json` publishes qualified Check keys only.
+**Virtual Inputs** = Earnie→Loxone (`set_*` / enables / setpoints, heartbeat) via `GET http://<Earnie>:8541/ehal/loxone/status.json` (daemon HTTP; `heartbeat_ts` = Unix now; setpoints from the publish ledger / `loxone_sent`). Loud writes are **push-only** (no `/dev/sps/io/<Merker>/<value>` for cycle setpoints). After **Q8**, `status.json` publishes qualified Check keys only.
 
 **Virtual Outputs** = Loxone→Earnie push of `sens_*` / `get_*` / flex power (qualified path IDs). Core reads those fields from the push inbox.
 
@@ -44,9 +44,9 @@ Earnie Core writes and reads the same Merker names on the Miniserver. The librar
 
 `{hk_id}` / `{ev_id}` = house profile entity `id` (snake_case). Templates leave the placeholders in place — replace them in Config.
 
-**Qualified Checks only (2.7.q Q8):** `status.json` publishes qualified EHAL IDs (`consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable`, `pool.{slug}.set_enable`, `evcs.{slug}.set_evcs_max_current` / `set_evcs_mode`; plant ESS bare / `grid.meter.*` — including write `grid.meter.set_grid_export_power_limit` — and powerstation `ess.{id}.set_*`). Legacy Merker Check peers are no longer dual-emitted — VI templates must use the qualified keys (`VI_Earnie_*_v2.xml` / Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`).
+**Qualified Checks only:** `status.json` publishes qualified EHAL IDs (`consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable`, `pool.{slug}.set_enable`, `evcs.{slug}.set_evcs_max_current` / `set_evcs_mode`; plant ESS bare / `grid.meter.*` — including write `grid.meter.set_grid_export_power_limit` — and powerstation `ess.{id}.set_*`). Legacy Merker Check peers are no longer dual-emitted — VI templates must use the qualified keys (`VI_Earnie_*_v2.xml` / Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`).
 
-**VI v2 + Pilot (2.7.q q.C):** Library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (Titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen: `python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …` → `VI_Pilot_*.xml`. VO Pilot titles come from the qualified ID (`Push_<id>` with dots → `_`): `python -m scripts.pilot_vo_template_gen …`. See [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Q5 write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Q5.
+**VI v2 + Pilot:** Library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (Titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen: `python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …` → `VI_Pilot_*.xml`. VO Pilot titles come from the qualified ID (`Push_<id>` with dots → `_`): `python -m scripts.pilot_vo_template_gen …`. See [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Q5 write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Q5.
 
 ---
 
@@ -89,7 +89,7 @@ Source: `share/loxone/templates/VirtualOut/`
 | File                      | Content (short)                                             |
 | ------------------------- | ------------------------------------------------------------ |
 | `VO_Earnie_Status.xml`    | optional alive / `Earnie_Request_Optimize` (port **8541**)  |
-| `VO_Earnie_Plant.xml`     | plant `sens_*` / `get_*` (ESS SOC cut-offs + max power, 2.7.j), outside temperature |
+| `VO_Earnie_Plant.xml`     | plant `sens_*` / `get_*` (ESS SOC cut-offs + max power), outside temperature |
 | `VO_Earnie_EV.xml`        | EV telemetry                                                 |
 | `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
 | `VO_Earnie_Consumer.xml`  | flex power                                                   |
@@ -193,7 +193,7 @@ One template `VI_Earnie_Consumer` / `VO_Earnie_Consumer` covers **one** consumer
 | Signal   | Merker title (1st / additional)                                       | VI check / VO path                                |
 | -------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
 | Power    | `Earnie_Verbraucher_Leistung` → `Earnie_Verbraucher_<Slug>_Leistung`   | VO: `flex.{hk_id}.sens_power_act`                  |
-| Active   | `Earnie_Verbraucher_<Slug>_Aktiv` (Kennung required)                   | VO: `consumer.{hk_id}.sens_consumer_active` (0/1; 2.7.p) |
+| Active   | `Earnie_Verbraucher_<Slug>_Aktiv` (Kennung required)                   | VO: `consumer.{hk_id}.sens_consumer_active` (0/1) |
 | Enable   | `Earnie_Verbraucher_Freigabe` → `…_<Slug>_Freigabe`                    | Check: `flex.{hk_id}.Earnie_Verbraucher_Freigabe`  |
 
 
@@ -250,7 +250,7 @@ Editing in the UI: **only** under **Daemon Control → EHAL-Com → Loxone Struc
 
 ## Core Signals (`plant.ehal_bindings`)
 
-Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter designation.
+Default names. Grid/PV/battery **power** preferably via the EFM meter designation.
 
 
 | EHAL field                       | Direction | Default name                                   | Value / unit                                                                            |
@@ -259,11 +259,11 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | `sens_pv_production_active`       | Read      | `Earnie_PV_Leistung` (or EFM production)         | PV power, kW                                                                                |
 | `sens_ess_power`                  | Read      | `Earnie_Batterie_Leistung` (or EFM storage)      | Battery kW; **+ discharge**, − charge (same as EHAL, no inversion)                          |
 | `sens_grid_power_active`          | Read      | `Earnie_Netzleistung` (or EFM grid)              | Grid: + import, kW                                                                          |
-| `get_grid_export_power_limit`     | Read      | `Earnie_Netz_Einspeisegrenze_In` (optional)      | Inbound max export kW (2.7.a); EHAL W                                                       |
-| `get_ess_soc_min`                 | Read      | `Earnie_Batterie_SOC_Min` (optional)             | Discharge cut-off SoC % (2.7.j); MILP when `limits_from_live`                               |
-| `get_ess_soc_max`                 | Read      | `Earnie_Batterie_SOC_Max` (optional)             | Charge cut-off SoC % (2.7.j)                                                                |
-| `get_ess_max_charge_power`        | Read      | `Earnie_Batterie_Max_Ladeleistung` (optional)    | Device max charge (Loxone kW → EHAL W) (2.7.j)                                              |
-| `get_ess_max_discharge_power`     | Read      | `Earnie_Batterie_Max_Entladeleistung` (optional) | Device max discharge (Loxone kW → EHAL W) (2.7.j)                                           |
+| `get_grid_export_power_limit`     | Read      | `Earnie_Netz_Einspeisegrenze_In` (optional)      | Inbound max export kW; EHAL W                                                       |
+| `get_ess_soc_min`                 | Read      | `Earnie_Batterie_SOC_Min` (optional)             | Discharge cut-off SoC %; MILP when `limits_from_live`                               |
+| `get_ess_soc_max`                 | Read      | `Earnie_Batterie_SOC_Max` (optional)             | Charge cut-off SoC %                                                                |
+| `get_ess_max_charge_power`        | Read      | `Earnie_Batterie_Max_Ladeleistung` (optional)    | Device max charge (Loxone kW → EHAL W)                                              |
+| `get_ess_max_discharge_power`     | Read      | `Earnie_Batterie_Max_Entladeleistung` (optional) | Device max discharge (Loxone kW → EHAL W)                                           |
 | `sens_power_consumers`            | Read      | (optional)                                        | House load; otherwise derived                                                               |
 | `sens_temperature_outside`        | Read      | `Earnie_Aussentemperatur`                        | Outside temperature °C (house-wide; heat pump/pool)                                        |
 | `sens_absent_mode`                | Read      | `Earnie_Abwesend`                                | House absent / holiday mode 0/1 (OR with HK `absent_mode`)                                 |
@@ -271,14 +271,14 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | `set_ess_charge_power_limit`      | Write     | `Earnie_LadeLeistungs-Limit`                     | Max. charge power (true limit)                                                              |
 | `set_ess_discharge_power_limit`   | Write     | `Earnie_EntladeLeistungs-Limit`                  | Max. discharge power (true limit)                                                           |
 | `set_ess_mode`                    | Write     | `Earnie_Steuerbefehl`                            | Sticky: always write; `0` = automatic; battery only; OpenEMS ignores                        |
-| `ess.<id>.set_ess_source_select`  | Write     | Pattern-B Merker (z. B. legacy `Earnie_Speicher_Quellenwahl`) | 2.7.h physical `standby_backup` only; `0` = grid pass-through, `1` = battery-only island (capability `supports_ess_source_select`); not on plant |
-| `set_grid_export_power_limit`     | Write     | `Earnie_EinspeiseLeistungs-Limit`                | Max export kW (magnitude ≥ 0); `0` = no export; unconstrained = PV kWp + max battery discharge kW (2.7.a) |
+| `ess.<id>.set_ess_source_select`  | Write     | Pattern-B Merker (z. B. legacy `Earnie_Speicher_Quellenwahl`) | physical `standby_backup` only; `0` = grid pass-through, `1` = battery-only island (capability `supports_ess_source_select`); not on plant |
+| `set_grid_export_power_limit`     | Write     | `Earnie_EinspeiseLeistungs-Limit`                | Max export kW (magnitude ≥ 0); `0` = no export; unconstrained = PV kWp + max battery discharge kW |
 | *(watchdog)*                       | Read      | `Earnie_Heartbeat`                               | entity-scoped; not an EHAL field                                                                |
 
 
 Legacy role names (`soc_name`, `pv_power_name`, …) in `loxone_blocks` have been removed — only `plant.ehal_bindings` with §C field names.
 
-**Sticky Merker:** Loxone keeps the last written value. Automatic is `set_ess_mode = 0` — Config must not apply the setpoint power in mode 0, even if `Earnie_Batterie_Sollleistung` still holds an old value. For export curtailment: `set_grid_export_power_limit` is a non-negative magnitude (kW, like the charge/discharge limits). Config curtails grid feed-in to `min(limit, inverter rating)`; `0` = no export (Einspeisesperre), unconstrained is written as the plant maximum = PV kWp sum + **sum** of max discharge kW of every selected force-dischargeable battery (`control = full`; 2.7.c; fallback `1000` kW if unknown). Multi-ESS Merker titles use slug infix `Earnie_Batterie_<Slug>_…`; entity-scoped binding keys are `ess.{slug}.sens_ess_soc` / `set_ess_*` on `batteries[].ehal_bindings`. `set_ess_mode` / `Earnie_Steuerbefehl` is battery-only and never signals export curtailment.
+**Sticky Merker:** Loxone keeps the last written value. Automatic is `set_ess_mode = 0` — Config must not apply the setpoint power in mode 0, even if `Earnie_Batterie_Sollleistung` still holds an old value. For export curtailment: `set_grid_export_power_limit` is a non-negative magnitude (kW, like the charge/discharge limits). Config curtails grid feed-in to `min(limit, inverter rating)`; `0` = no export (Einspeisesperre), unconstrained is written as the plant maximum = PV kWp sum + **sum** of max discharge kW of every selected force-dischargeable battery (`control = full`; fallback `1000` kW if unknown). Multi-ESS Merker titles use slug infix `Earnie_Batterie_<Slug>_…`; entity-scoped binding keys are `ess.{slug}.sens_ess_soc` / `set_ess_*` on `batteries[].ehal_bindings`. `set_ess_mode` / `Earnie_Steuerbefehl` is battery-only and never signals export curtailment.
 
 ## Flexible Consumers — `ehal_bindings` on the Consumer
 
@@ -290,13 +290,13 @@ The control signal definitions live in the active house profile (`house_profiles
 | EHAL field                        | Direction | Default / example                                                                          | Value       |
 | ------------------------------------ | --------- | ---------------------------------------------------------------------------------------------- | ------------ |
 | `flex.{slug}.sens_power_act`       | Read      | Heat pump: `Earnie_Waermepumpe_Leistung`; generic: `Earnie_Verbraucher_Leistung`; or EFM load  | kW or 0/1   |
-| `consumer.{slug}.sens_consumer_active` | Read  | Generic: `Earnie_Verbraucher_<Slug>_Aktiv` (digital; reserve release OR-trigger, 2.7.p). Storage binding may still use `flex.{slug}.sens_consumer_active`. | `0`/`1` |
+| `consumer.{slug}.sens_consumer_active` | Read  | Generic: `Earnie_Verbraucher_<Slug>_Aktiv` (digital; reserve release OR-trigger). Storage binding may still use `flex.{slug}.sens_consumer_active`. | `0`/`1` |
 | `flex.{slug}.set_enable`           | Write     | Heat pump: `Earnie_Waermepumpe_Freigabe`; generic: `Earnie_Verbraucher_Freigabe`               | `0`/`1`     |
 
 
 Pool enables: default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` in `ehal_bindings`.
 
-**Heat storage Ist (Live, 2.7.b):** on the `thermal_annual` consumer:
+**Heat storage Ist (Live):** on the `thermal_annual` consumer:
 
 | EHAL field | Meaning | Default Merker |
 | --- | --- | --- |

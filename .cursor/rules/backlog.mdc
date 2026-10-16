@@ -71,3 +71,17 @@ Before committing `backlog/Backlog-Bugfixes.md` or `backlog/Backlog-Erledigt.md`
 * **Rule:** Changes to `version.py` must **never be made without explicit user approval**.
 
 * During an ongoing MINOR cycle (letter steps/release chapters), **no automatic bump** occurs – instead, generate a proposal and request approval.
+
+## 7. Audience marker (release notes)
+
+Spec: `docs/spec/release-notes-workflow.md` §8. Every top-level checkbox entry in `backlog/Backlog.md` and `backlog/Backlog-Erledigt.md` carries exactly one marker behind its bold title:
+
+* `` `[feat]` `` real, productively usable feature -> release notes + user docs
+* `` `[qual]` `` no user feature, but improves quality/stability (regression suite, cycle recorder, ...) -> one short line in release notes
+* `` `[dev]` `` internal test / analysis / development (Shadow Mode, HouseSim, spikes, ...) -> **never** in release notes or user docs
+
+Example: ``- [x] **Shadow R4 — Feed gaps** `[dev]`: …``. Sub-bullets inherit.
+
+* **Missing marker:** when creating or archiving an entry without a marker, **ask the user** which one applies (propose one) and write the entry only after the answer.
+* **Bugfixes** (`Backlog-Bugfixes.md`, "Bugfix —" entries) need no marker — they count as fixes. Add `[dev]` only to hide an internal-only bug.
+* Hints (`- **Note:**`) are not entries and need no marker.

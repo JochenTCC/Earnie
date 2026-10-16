@@ -65,7 +65,7 @@ Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Typ `f
 
 **Hinweis:** Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. gewählte `export_tariff_id` aktuell halten.
 
-## Planung & Backtesting (ab 1.24.f)
+## Planung & Backtesting 
 
 Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/config/tariffs.json) mit Root-Feld `catalog_as_of`. Zur Laufzeit nutzt Earnie `earnie_env/config/tariffs.json` (Bootstrap kopiert den Katalog bei Bedarf aus share). Szenarien in `backtesting_scenarios.json` referenzieren `import_tariff_id` und `export_tariff_id` (oder `__user_fixed__` mit szenario-lokalen Cent-Feldern, siehe oben).
 

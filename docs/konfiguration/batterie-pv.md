@@ -2,7 +2,7 @@
 
 Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in `earnie_env/config/components.json` (`inverters[]`, `batteries[]`, `pv_systems[]`).
 
-Ein Szenario kann **mehrere PV-Anlagen** referenzieren (`pv_system_ids`) und **mehrere Batterien** (`battery_ids`, 2.7.c). Die Prognose und die Optimierung nutzen die **Summe** aller Anlagen bzw. aller gewählten Speicher. Welche Wechselrichter im Spiel sind, folgt aus `inverter_id` an PV/Batterie (kein `inverter_ids[]` im Szenario).
+Ein Szenario kann **mehrere PV-Anlagen** referenzieren (`pv_system_ids`) und **mehrere Batterien** (`battery_ids`). Die Prognose und die Optimierung nutzen die **Summe** aller Anlagen bzw. aller gewählten Speicher. Welche Wechselrichter im Spiel sind, folgt aus `inverter_id` an PV/Batterie (kein `inverter_ids[]` im Szenario).
 
 Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 
@@ -14,9 +14,9 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | Parameter               | Einheit  | Quelle                               | Bedeutung                                                                                                                             |
 | ----------------------- | -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `pv_system_ids`         | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf `pv_systems[].id`                                                                                    |
-| `battery_ids`           | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf **Hausbatterien** `batteries[].id` mit `type: house` (2.7.c; ersetzt `battery_id`). Keine Powerstations. |
+| `battery_ids`           | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf **Hausbatterien** `batteries[].id` mit `type: house` (ersetzt `battery_id`). Keine Powerstations. |
 | `id` / `id_locked` / `id_provisional_label` | — | `components.json` → `inverters[]` / `batteries[]` / `pv_systems[]` | Interne ID (EHAL-Slug / Kennung). Neu/Kopie: zuerst freigegeben (`id_locked: false`, Seed in `id_provisional_label`); erste geänderte **Bezeichnung** setzt `id` aus dem Label und sperrt. Bestehende Einträge ohne Flag gelten als gesperrt. Einmalig: UI-Button „ID aus Bezeichnung übernehmen“. Offline-Batch für schmutzige Envs: `python -m scripts.clean_entity_ids_once --config-dir <config>` (Dry-Run; `--apply` schreibt; optional `--only-copy`). |
-| `type`                  | enum     | `components.json` → `batteries[]`    | `house` (Default) oder `powerstation` (2.7.g/h Reserve; Anbindung über manuelles Gerät `mode: reserve`) |
+| `type`                  | enum     | `components.json` → `batteries[]`    | `house` (Default) oder `powerstation` (Reserve; Anbindung über manuelles Gerät `mode: reserve`) |
 | `backing` / `role` / `attached_consumer_ids` | — | `components.json` → Powerstation | Nur bei `type: powerstation`: `virtual`\|`physical`, `single_use`\|`standby_backup`; `attached_consumer_ids` (Liste) optional — Zuordnung auch über manuelle Geräte `mode: reserve` + `powerstation_id`. Legacy: `attached_consumer_id` = erstes Listenelement. |
 | `inverter_id`           | —        | `components.json` → `batteries[]` / `pv_systems[]` | Referenz auf `inverters[].id`. Pflicht für Hausbatterien, physische Powerstations und alle PV-Anlagen. Virtuelle Powerstations haben **keinen** Wechselrichter. |
 | `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung je Anlage; aufgelöst als Summe `pv_kwp`                                                                      |
@@ -25,8 +25,8 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `latitude`, `longitude` | °        | `house_profiles.json` (via Szenario) | Standort für PV-Prognose (Forecast.Solar / Open-Meteo)                                                                                |
 | `k_push_cent`           | Cent/kWh | `tariffs.json` (Export-Tarif)        | **Einspeisevergütung**                                                                                                                |
 | `battery_capacity_kwh`  | kWh      | `components.json` → `batteries[]`    | Nutzbare Speicherkapazität                                                                                                            |
-| `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung (2.7.j; ersetzt gemeinsames `battery_max_power_kw`) |
-| `battery_max_discharge_power_kw` | kW | `components.json` → `batteries[]` | Max. Entladeleistung (2.7.j) |
+| `battery_max_charge_power_kw` | kW | `components.json` → `batteries[]` | Max. Ladeleistung (ersetzt gemeinsames `battery_max_power_kw`) |
+| `battery_max_discharge_power_kw` | kW | `components.json` → `batteries[]` | Max. Entladeleistung |
 | `battery_max_power_kw`  | kW       | `components.json` → `batteries[]`    | **Deprecated:** früher eine Grenze für beide Richtungen; beim Laden in charge/discharge migriert |
 | `limits_from_live` | bool | `components.json` → `batteries[]` | Wenn true: Live `get_ess_*` für SOC-Min/Max und Max. Lade-/Entladeleistung (Fallback HK) |
 | `efficiency`            | 0–1      | `components.json` → `inverters[]`    | Einweg-Wirkungsgrad DC↔AC (**η_inv**). Pflicht. Wirkt auf PV DC→AC und als Teil des Speicher-Pfads. Migration bestehender Envs: `python -m scripts.migrate_conversion_efficiency_once --config-dir <config>` |
@@ -50,13 +50,13 @@ Bei `type: powerstation` und `backing: virtual` ist die Powerstation **kein eige
 
 Mehrere manuelle Geräte können dieselbe virtuelle Powerstation nutzen: gemeinsame Energiereserve (Ziel-kWh = Summe der Gerätebedarfe, begrenzt durch Kapazität); Trigger von jedem angeschlossenen Gerät.
 
-**Release-Trigger (2.7.p, ODER):** digitales `consumer.{slug}.sens_consumer_active` (0/1 „Gerät läuft“, VO/Merker `Earnie_Verbraucher_<Slug>_Aktiv`), **oder** Leistungs-Schwelle auf `consumer.{slug}.sens_power_act` (Binding ggf. noch `flex.{slug}.*`), **oder** bei physischer PS die Ausgangsleistung `ess.{id}.sens_ess_power`, **oder** Button auf **Manuelle Geräte**. Solange ein Gerät aktiv ist, wird die gehaltene Reserve freigegeben (SoC-Floor der Hausbatterie fällt). Nach dem Lauf wird Restvorrat weiter abgebucht; danach Nachladen **preisoptimal** mit harter Frist **24 h**.
+**Release-Trigger (ODER):** digitales `consumer.{slug}.sens_consumer_active` (0/1 „Gerät läuft“, VO/Merker `Earnie_Verbraucher_<Slug>_Aktiv`), **oder** Leistungs-Schwelle auf `consumer.{slug}.sens_power_act` (Binding ggf. noch `flex.{slug}.*`), **oder** bei physischer PS die Ausgangsleistung `ess.{id}.sens_ess_power`, **oder** Button auf **Manuelle Geräte**. Solange ein Gerät aktiv ist, wird die gehaltene Reserve freigegeben (SoC-Floor der Hausbatterie fällt). Nach dem Lauf wird Restvorrat weiter abgebucht; danach Nachladen **preisoptimal** mit harter Frist **24 h**.
 
 Ausgeblendet und beim Speichern/Normalisieren von der Hausbatterie übernommen (bzw. feste Defaults, falls keine Hausbatterie existiert): Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungs-Schwelle, Standby, Steuerbarkeit, `limits_from_live`, Verschleiß. Entladeleistung der virtuellen Powerstation wird immer `0` gesetzt; Verschleiß bleibt aus (Zyklen zählen auf der Hausbatterie). Kein `inverter_id`.
 
 Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular und bekommen einen **integrierten Powerstation-Wechselrichter** (`owned_by` = Batterie-ID, Abschnitt „Integrierter Wechselrichter“ im Hauskonfigurator). Der speist nur angeschlossene Verbraucher, nicht den Haus-AC-Bus; der AC-Eingang kann am Netz hängen (einseitige Last) — das ist **kein** „netzloses“ Gerät.
 
-### Standby-Backup (`role: standby_backup`, 2.7.h)
+### Standby-Backup (`role: standby_backup`)
 
 Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earnie schaltet die Versorgung der angeschlossenen Verbraucher **preisgetrieben** zwischen Netz-Pass-Through und Batterie-Insel um (`ess.<id>.set_ess_source_select`: `0` = Netz, `1` = Batterie). In günstigen Slots darf die Powerstation parallel laden (`set_ess_charge_power_limit`).
 
@@ -67,7 +67,7 @@ Für Dauerläufer (PC, Router, NAS, Hub, …) ohne einzelnen Lauf-Trigger: Earni
 
 Live-PV-Leistung (AC-Summe der Anlage) kommt über `plant.ehal_bindings.sens_pv_production_active`. Fehlt dieses Mapping und sind alle netzgekoppelten Wechselrichter mit PV vollständig über `inv.{id}.sens_inv_power_pv` (oder alle zugehörigen `pv.{id}.sens_pv_production_active`) gemappt, leitet Earnie die Anlagen-PV aus Σ(WR-PV · η_inv) ab — Powerstation-/Insel-WR (`ac_connection: island`) zählen nicht mit; unvollständige Maps schlagen fehl. Optional je PV-Anlage: `pv_systems[].ehal_bindings` mit `pv.{id}.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Anlagen-Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
 
-## Wechselrichter (`inverters[]`, 2.7.l)
+## Wechselrichter (`inverters[]`)
 
 PV-Anlagen und Batterien referenzieren denselben Wechselrichter über `inverter_id` (n:1). Im Hauskonfigurator: Tab **Wechselrichter** plus Auswahl in den PV-/Batterie-Formularen. Geräte-Vorlage **EcoFlow Delta 3** legt physische Powerstation + integrierten Powerstation-Hybrid-WR in einem Schritt an.
 

@@ -1,0 +1,28 @@
+# Audience classification helpers for release notes and user docs.
+# Spec: docs/spec/release-notes-workflow.md section 8. Rule: .cursor/rules/release-notes.mdc
+#
+# Backlog markers are authoritative: [feat] feature, [qual] quality/stability, [dev] internal.
+# This file only PRE-CLASSIFIES unmarked material; the AI confirms with the maintainer.
+
+# Commit subject prefixes (before the first colon) that are internal by default.
+dev_prefixes = ["shadow", "spike", "research", "regression", "test", "chore", "skills", "releasenotes", "backlog", "contributing", "license"]
+
+# Terms that must not appear in end-user docs or release notes ([dev] features).
+dev_terms = ["Shadow Mode", "Shadow-Modus", "Shadow-Feed", "Shadow-Client", "Shadow-Banner", "EARNIE_SHADOW", "HouseSim"]
+
+# End-user doc scope checked by tests/test_user_docs_audience.py.
+user_doc_paths = ["docs/README.md", "docs/user-manual", "docs/einrichtung", "docs/konfiguration", "docs/ui", "docs/referenz", "README.md"]
+
+# BASELINE of known violations (ratchet): these files may still mention dev_terms until the
+# sections move to docs/entwicklung/. Do not add new entries; shrink this list.
+docs_allowlist = [
+  "docs/README.md",
+  "docs/einrichtung/betrieb.md",
+  "docs/ui/ehal-com.md",
+  "README.md",
+]
+
+# BASELINE of internal backlog version IDs (2.7.n, 2.+1, ...) per user doc: counts may only shrink.
+# Remove the ID from the doc, then lower/delete the entry (tests/test_user_docs_audience.py).
+[backlog_id_baseline]
+"docs/README.md" = 2   # Shadow line: leaves with the doc move to docs/entwicklung/

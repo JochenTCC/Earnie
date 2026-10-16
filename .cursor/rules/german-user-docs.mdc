@@ -38,3 +38,11 @@ End-user documentation is **German**. Do not translate it to English unless the 
 
 - `german-markdown.mdc`: applies to **reading** German project markdown for implementation — **not** to translating user docs away from German.
 - `english-chat.mdc`: assistant chat stays English; user docs stay German.
+
+## Internal (`[dev]`) features
+
+Features marked `[dev]` in the backlog (Shadow Mode, HouseSim, test/analysis tooling) must **not** be described in user docs. Put such content under `docs/spec/` (English) or, for developer operations, `docs/entwicklung/` (German). `[qual]` items may get at most a short note. `tests/test_user_docs_audience.py` checks `dev_terms` from `.github/release-notes/audience.toml`; its `docs_allowlist` is a shrinking baseline — never add to it.
+
+## No internal backlog version IDs
+
+Do not write internal backlog chapter IDs (`2.7.n`, `2.6.a`, `2.+1`, epic phases like `P5` / `Q8`) in user docs — they confuse readers; describe the behaviour or the release (`ab Version 2.7`) instead. `tests/test_user_docs_audience.py` blocks new occurrences; existing ones are a shrinking per-file baseline (`backlog_id_baseline` in `.github/release-notes/audience.toml`) — remove IDs when you touch a doc and lower the baseline.

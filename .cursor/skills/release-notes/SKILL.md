@@ -43,13 +43,14 @@ Write `.github/release-notes/drafts/v<target>.draft.md` (create the folder). Nev
 ### Highlights
 ### Neue Funktionen
 ### Verbesserungen & Korrekturen
+### Qualität & Stabilität          (only `[qual]` items, 1–3 lines)
 ### Datenmodell & Migration      (only if migration steps are new — German `## Migration` text from the helper, edited)
 ### Plattformhinweise            (only affected: Home Assistant · LoxBerry · Synology/Docker · Proxmox)
 ### Bekannte Einschränkungen     (optional, from Verifications Pending)
 ### Docker images                (English boilerplate as in v2.6.0.md; pre-release: banner + no :latest)
 ```
 
-Classify each evidence item: Highlight / Feature / Improvement / Fix / Data model / Platform / **Internal (omit)** — internal = refactor, tests, backlog bookkeeping, sonar, spikes, research. Archived backlog items are the best wording source; rewrite for end users (no backlog IDs, no real names). Uncertain items → `<!-- REVIEW: … -->`. Add `<!-- src: <sha> -->` comments for traceability (removed on finalize).
+Use the audience markers of the evidence pack (`backlog.mdc` §7): `feat` -> Highlights / Neue Funktionen; `qual` -> section "Qualität & Stabilität" (1–3 lines, no details); `fix` -> Verbesserungen & Korrekturen; `dev` -> **omit completely** (also in user docs). **`unmarked` entries: ask the maintainer first** (propose a marker per entry, wait for the answer, and offer to write the marker into `Backlog-Erledigt.md`) — never guess. Further internal material (refactors, tests, backlog bookkeeping, sonar, spikes, research) is omitted as well. Archived backlog items are the best wording source; rewrite for end users (no internal backlog version IDs such as 2.7.n / 2.+1 / P5 in visible text — only inside `<!-- src: -->` comments; finalize rejects them — and no real names). Uncertain items → `<!-- REVIEW: … -->`. Add `<!-- src: <sha> -->` comments for traceability (removed on finalize).
 
 - **Pre-release:** keep short; add the "not an official release — use `:next` or pin the tag" banner; still cumulative since the last productive release.
 - **Official:** full set.

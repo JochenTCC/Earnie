@@ -137,3 +137,24 @@ Replace the silent generic-notes fallback in step "Prepare release notes":
 4. **CI:** fail loud for **all** tags without reviewed notes (no generic fallback, also for pre-releases).
 5. **Baseline on hotfix branches:** nearest productive ancestor tag.
 6. **Evidence pack:** local only (gitignored), not committed.
+
+## 8. Audience marker (decided 2026-10-16, implemented; backfill of old entries and doc move are still proposals)
+
+Every backlog entry carries exactly one marker behind its bold title: `[feat]`, `[qual]` or `[dev]`.
+
+| Marker | Meaning | Release notes / user docs |
+|--------|---------|---------------------------|
+| `[feat]` | real, productively usable feature | yes (Highlights / Neue Funktionen) |
+| `[qual]` | no user feature, but improves quality/stability (e.g. regression suite, cycle recorder) | yes, short, in section "Qualität & Stabilität" (1–3 lines, no details) |
+| `[dev]` | internal: test, analysis, development (e.g. Shadow Mode, HouseSim, spikes) | **never** |
+
+Rules:
+
+- Scope: each top-level `- [ ]` / `- [x]` entry in `Backlog.md` / `Backlog-Erledigt.md`; sub-bullets inherit.
+- **Missing marker → the AI asks actively** when creating or archiving the entry and writes only after the answer (rules `backlog.mdc`, skill `session-abschluss`). Legacy entries without marker: the collector hands them to the AI as `REVIEW`; backfill of existing `Backlog-Erledigt.md` entries is proposed as a list for approval.
+- **Bugfixes** need no marker: everything in `Backlog-Bugfixes.md` and every "Bugfix —" entry counts as a fix ("Verbesserungen & Korrekturen"). `[dev]` may be added to hide an internal-only bug.
+- `.github/release-notes/audience.toml` (planned): `dev_prefixes` (commit prefixes), `dev_terms`, `user_doc_paths`, `docs_allowlist` (shrinking baseline). The collector pre-classifies commits/evidence with it; `[dev]` items go into a collapsed "internal — do not output" section of the evidence pack.
+- User docs (`docs/einrichtung`, `konfiguration`, `ui`, `referenz`, `user-manual`) must not mention `[dev]` features: test `tests/test_user_docs_audience.py` checks `dev_terms` with a small allowlist. Such sections (e.g. Shadow/Recorder parts of `betrieb.md`) move to `docs/entwicklung/` (German, developer operations), linked separately from `docs/README.md`. `docs/spec/` stays the English developer area.
+- **No internal backlog version IDs** (`2.7.n`, `2.6.a`, `2.+1`, also epic phases like `P5`/`Q8`) in release notes or user docs — they only confuse readers. IDs may stay in `<!-- src: -->` comments of the draft. `release_notes_finalize` (and `--check` in CI) fail on `X.Y.<letter>` / `X.+N` patterns in visible text; `tests/test_user_docs_audience.py` fails when a user doc gains such IDs (user docs are cleaned; only a Shadow line in `docs/README.md` remains in the baseline until the doc move).
+- Rule updates: `backlog.mdc` (marker + ask), `release-notes.mdc` (classes), `german-user-docs.mdc` (no `[dev]` features).
+

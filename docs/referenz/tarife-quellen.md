@@ -169,7 +169,7 @@ Nachrechnen der Formeln: diese Seite. Technisches Mapping: [preise.md](../konfig
 
 Day-Ahead Live: optional [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) (persönlicher Token); sonst [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
-## 7. Audit / Abweichungen (Stand 2.3.b, 2026-07-21)
+## 7. Audit / Abweichungen (Stand 2026-07-21)
 
 Transparenz zur Katalogpflege: Abgleich öffentlicher Quellen mit `tariffs.json`. Sekundärseiten können Grundgebühren weglassen oder USt falsch zuordnen — Primärquellen (Produktseite / Tarifblatt) haben Vorrang.
 

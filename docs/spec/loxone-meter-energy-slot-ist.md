@@ -1,7 +1,7 @@
 # Loxone Meter energy for slot Ist (ΔkWh)
 
 **Status:** **Go** — live path is VO push into the inbox (**2.7.q Q6**, 2026-10-09). HA plant energy entities remain (**2.6.c**).  
-**Related:** [`efm-auto-sync-2.4.l.md`](efm-auto-sync-2.4.l.md), backlog **2.7.q** Q6, **2.6.c** (HA plant)
+**Related:** [`efm-auto-sync.md`](efm-auto-sync.md), backlog **2.7.q** Q6, **2.6.c** (HA plant)
 
 ## Verdict
 

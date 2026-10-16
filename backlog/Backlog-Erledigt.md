@@ -2,25 +2,33 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Release-Notes workflow — draft, review, finalize (2026-10-16)
+
+- [x] **Release-Notes workflow with maintainer review** `[dev]`: spec `docs/spec/release-notes-workflow.md`; rule `.cursor/rules/release-notes.mdc` + skill `release-notes` (AI writes drafts only to `.github/release-notes/drafts/`, no notes for `-dev` versions); `scripts/release_notes_collect.py` (evidence pack since the last published productive release, audience classification, unmerged-hotfix-tag warning, migration section from `HEAD`) and `scripts/release_notes_finalize.py` (`--approved` promote, `--check` CI gate); `release-publish.yml` fails without reviewed notes (generic fallback removed); `session-abschluss`, `versioning.mdc`, release checklist updated.
+  - Audience marker `[feat]` / `[qual]` / `[dev]` on every top-level backlog entry (`backlog.mdc` §7, AI asks when missing; bugfixes need none); 117 existing archive entries backfilled; `.github/release-notes/audience.toml` pre-classifies commits and `dev_terms`.
+  - No internal backlog version IDs (`2.7.n`, `2.+1`, …) in release notes or user docs: finalize/CI reject them, `tests/test_user_docs_audience.py` guards user docs; IDs removed from 15 user docs (`efm-auto-sync-2.4.l.md` renamed to `efm-auto-sync.md`).
+  - Tests: `tests/test_release_notes_collect.py`, `tests/test_release_notes_finalize.py`, `tests/test_user_docs_audience.py`.
+  - Open follow-ups: move Shadow/HouseSim sections out of user docs (`docs/entwicklung/`, `docs_allowlist` in `audience.toml`); dry run for 2.7.0-alpha.1 draft pending review; `gh` required for automatic baseline.
+
 ### ConfigMigration P4 — process + docs (2026-10-16)
 
-- [x] **ConfigMigration P4 — process + docs:** rule `.cursor/rules/config-migration.mdc` + `CLAUDE.md` Area notes pointer; release checklist Migration item + helper `python -m scripts.migration_release_notes --since <tag>` (`tests/test_migration_release_notes.py`); German user docs `docs/einrichtung/betrieb.md` → Update und Migration (backup paths Docker / LoxBerry / HA add-on) + TOC/cross-links; spec `docs/spec/config-migration.md`. Epic **ConfigMigration** (P0–P4) complete for Version 2.7; tariff track deferred to 2.8 Edbert integration.
+- [x] **ConfigMigration P4 — process + docs:** `[feat]` rule `.cursor/rules/config-migration.mdc` + `CLAUDE.md` Area notes pointer; release checklist Migration item + helper `python -m scripts.migration_release_notes --since <tag>` (`tests/test_migration_release_notes.py`); German user docs `docs/einrichtung/betrieb.md` → Update und Migration (backup paths Docker / LoxBerry / HA add-on) + TOC/cross-links; spec `docs/spec/config-migration.md`. Epic **ConfigMigration** (P0–P4) complete for Version 2.7; tariff track deferred to 2.8 Edbert integration.
 
 ### ConfigMigration P3 — wizard (German) (2026-10-16)
 
-- [x] **ConfigMigration P3 — wizard (German):** hint + last run version + release-notes link; pending steps (`title_de` / files) with expandable diffs; questions (`str` / `bool` / `choice`); blockers; manual to-dos (download only when `export_kind` is known); button **Backup anlegen und migrieren** → `run_migration` → report; **Weiter zur App** calls `maybe_auto_start()` (respects `EARNIE_AUTO_START_MAIN` / add-on `auto_start_main`) then `st.rerun()` into normal UI; AppTest `tests/apptest/test_page_config_migration_apptest.py` + unit helpers `tests/test_page_config_migration.py`. Process/docs remain **P4**.
+- [x] **ConfigMigration P3 — wizard (German):** `[feat]` hint + last run version + release-notes link; pending steps (`title_de` / files) with expandable diffs; questions (`str` / `bool` / `choice`); blockers; manual to-dos (download only when `export_kind` is known); button **Backup anlegen und migrieren** → `run_migration` → report; **Weiter zur App** calls `maybe_auto_start()` (respects `EARNIE_AUTO_START_MAIN` / add-on `auto_start_main`) then `st.rerun()` into normal UI; AppTest `tests/apptest/test_page_config_migration_apptest.py` + unit helpers `tests/test_page_config_migration.py`. Process/docs remain **P4**.
 
 ### ConfigMigration P2 — startup gate (2026-10-16)
 
-- [x] **ConfigMigration P2 — startup gate:** bootstrap no longer silently stamps/migrates live pack files (templates only; new greenfield live files stamped once on create); untagged Earnie-track file = planner blocker (`grid_fees.json` exempt); `runtime_store/migration/gate.py`; `run_streamlit` + `app.py` migration mode (skip `load_config_or_exit`, no daemon auto-start, stub page + log); `load_config_or_exit` / `main_daemon.start` / Shadow refuse while pending; `ensure_compatible` messages point to wizard + CLI; `grid_fees.json` no longer stamped on export/`write_json_dict`; tests `tests/test_migration_startup_gate.py`. Full wizard UI remains **P3**.
+- [x] **ConfigMigration P2 — startup gate:** `[feat]` bootstrap no longer silently stamps/migrates live pack files (templates only; new greenfield live files stamped once on create); untagged Earnie-track file = planner blocker (`grid_fees.json` exempt); `runtime_store/migration/gate.py`; `run_streamlit` + `app.py` migration mode (skip `load_config_or_exit`, no daemon auto-start, stub page + log); `load_config_or_exit` / `main_daemon.start` / Shadow refuse while pending; `ensure_compatible` messages point to wizard + CLI; `grid_fees.json` no longer stamped on export/`write_json_dict`; tests `tests/test_migration_startup_gate.py`. Full wizard UI remains **P3**.
 
 ### ConfigMigration P1 — registry + runner (2026-10-16)
 
-- [x] **ConfigMigration P1 — registry + runner:** `MigrationStep` registry in [`runtime_store/migration/`](../runtime_store/migration/) (pure detect / apply, questions, blockers, manual to-dos); planner (dry run + per-file diff) and runner (validate with real loaders → backup `config/backups/pre-migration-…` → atomic replace); CLI `python -m scripts.migrate_config`; v3→v4 + seven legacy steps as detect-based dm4 steps; config-pack import on the same chain; legacy `migrate_*` CLIs thin-wrapped; goldens under `tests/fixtures/migration/goldens/`; tests `tests/test_migration_registry.py` (chain, golden, idempotency, meta coverage, failure injection, dual-track synthetic, pack import). CLI dogfood on fixture copies accepted 2026-10-16.
+- [x] **ConfigMigration P1 — registry + runner:** `[feat]` `MigrationStep` registry in [`runtime_store/migration/`](../runtime_store/migration/) (pure detect / apply, questions, blockers, manual to-dos); planner (dry run + per-file diff) and runner (validate with real loaders → backup `config/backups/pre-migration-…` → atomic replace); CLI `python -m scripts.migrate_config`; v3→v4 + seven legacy steps as detect-based dm4 steps; config-pack import on the same chain; legacy `migrate_*` CLIs thin-wrapped; goldens under `tests/fixtures/migration/goldens/`; tests `tests/test_migration_registry.py` (chain, golden, idempotency, meta coverage, failure injection, dual-track synthetic, pack import). CLI dogfood on fixture copies accepted 2026-10-16.
 
 ### ConfigMigration P0 — inventory + fixtures (2026-10-16)
 
-- [x] **ConfigMigration P0 — inventory + fixtures:** documented order / inputs / idempotency / loader rejections for v3→v4 and the seven in-model one-shots in [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md); scrubbed before-snapshots from Earnie-env-home (`v3_last`, `v3_single_battery`, `v3_pre_ehal`, `v4_pre_quellenwahl`, `v4_pre_inverter_gridfee`, `v4_pre_conversion`, `v4_pre_topology`) under `tests/fixtures/migration/`; re-extract via `python -m scripts.extract_migration_fixtures --env-home <Earnie-env-home>`. Goldens and registry tests remain **P1**.
+- [x] **ConfigMigration P0 — inventory + fixtures:** `[dev]` documented order / inputs / idempotency / loader rejections for v3→v4 and the seven in-model one-shots in [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md); scrubbed before-snapshots from Earnie-env-home (`v3_last`, `v3_single_battery`, `v3_pre_ehal`, `v4_pre_quellenwahl`, `v4_pre_inverter_gridfee`, `v4_pre_conversion`, `v4_pre_topology`) under `tests/fixtures/migration/`; re-extract via `python -m scripts.extract_migration_fixtures --env-home <Earnie-env-home>`. Goldens and registry tests remain **P1**.
 
 ### Bugfix — Restart cycle counted in punctuality and early-start lead (2026-10-16)
 
@@ -33,7 +41,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Minor — Debug-dump includes powerstation_reserves.json (2026-10-15)
 
-- [x] **powerstation_reserves.json in debug-dump** — added to `_OPTIONAL_RUNTIME` in `runtime_store/debug_dump_archive.py` (copied when present); docs `docs/einrichtung/betrieb.md`; test `test_write_debug_dump_zip_without_chart`.
+- [x] **powerstation_reserves.json in debug-dump** `[feat]` — added to `_OPTIONAL_RUNTIME` in `runtime_store/debug_dump_archive.py` (copied when present); docs `docs/einrichtung/betrieb.md`; test `test_write_debug_dump_zip_without_chart`.
 
 ### Bugfix — Chart 1 SoC vs Zwangsladen/Zwangsentladen underlay time alignment (2026-10-15)
 
@@ -69,12 +77,12 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Clock-skew diagnostics (2026-10-15)
 
-- [x] **Clock-skew diagnostics** (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §7; not part of EarlyStart): `runtime_store/clock_skew.py` — daemon installs a hook on `requests.Session.send` and reads the `Date` header of HTTPS responses from public hosts the cycle already receives (no extra request; LAN/plain-HTTP hosts ignored). Sample = (Date + 0.5 s) − (received − elapsed/2); responses slower than 2 s dropped; estimate = median of ≥ 3 samples from the last hour. |offset| > 2 s → `clock_skew` WARNING with NTP hint (at most hourly). `clock_skew_sec` in each `cycle_stats.jsonl` record (+ = system clock behind). No early-start gate.
+- [x] **Clock-skew diagnostics** `[qual]` (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §7; not part of EarlyStart): `runtime_store/clock_skew.py` — daemon installs a hook on `requests.Session.send` and reads the `Date` header of HTTPS responses from public hosts the cycle already receives (no extra request; LAN/plain-HTTP hosts ignored). Sample = (Date + 0.5 s) − (received − elapsed/2); responses slower than 2 s dropped; estimate = median of ≥ 3 samples from the last hour. |offset| > 2 s → `clock_skew` WARNING with NTP hint (at most hourly). `clock_skew_sec` in each `cycle_stats.jsonl` record (+ = system clock behind). No early-start gate.
   - Tests: `tests/test_clock_skew.py`. Docs: `docs/einrichtung/betrieb.md` § Zyklus-Pünktlichkeit und Vorlauf.
 
 ### EarlyStart follow-up — prefetch slow inputs off the critical path (2026-10-15)
 
-- [x] **EarlyStart follow-up — prefetch slow inputs off the critical path** (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §8)
+- [x] **EarlyStart follow-up — prefetch slow inputs off the critical path** `[feat]` (spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §8)
   - Finding: the EU-feature cache was keyed by slot range, so it missed at every full hour (planning window moves); NAS 13:00 cycle spent 24 s + 22 s on two Open-Meteo calls.
   - `data/price_forecast_live.py`: network inputs cached per `(kind, start date, end date)` (`forecast_weather`, `archive_weather`, `archive_power`), 45 min TTL; `price_feature_refresh` only on a real fetch; routine cached builds log at DEBUG.
   - `runtime_store/planning_clock.py`: `cache_valid_until` / `cache_entry_fresh` (refresh-ahead), used by the feature cache and the Open-Meteo outdoor / tilted caches.
@@ -84,7 +92,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### EarlyStart P1 — adaptive lead, plan for the tick, write at the tick (2026-10-15)
 
-- [x] **EarlyStart P1 — early start on by default** (epic **EarlyStart**; spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) v2) — reduced scope after the NAS dev.57 measurements (cycles 12–19 s, setpoints +8…16 s; outlier +72 s from Open-Meteo/ENTSO-E I/O)
+- [x] **EarlyStart P1 — early start on by default** `[feat]` (epic **EarlyStart**; spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) v2) — reduced scope after the NAS dev.57 measurements (cycles 12–19 s, setpoints +8…16 s; outlier +72 s from Open-Meteo/ENTSO-E I/O)
   - `optimizer/start_scheduler.py` (pure): goal = minimal age of the written setpoints in both directions → lead = clamp(**median** time to plan of the last 96 regular cycles on this platform, **15 s, 90 s**) — start between T−90 s and T−15 s (median minimises mean |ready − T|); < 8 samples → 60 s bootstrap; estimate > 90 s → capped + warning (once per transition). `EARNIE_EARLY_START=on|off` (default `on`, other values fail loud).
   - `runtime_store/planning_clock.py`: `planning_anchor(T)` / `planning_now()` = max(real now, T). Planning-relevant "now" (slot start/key, planning window, `current_hour`, today's targets, forecast/thermal start, price windows, EV sessions, appliance schedules) reads it; measurements keep the real clock (PV integral, sampler, cons_data, API guards, write timestamps).
   - `main.py`: daemon starts the regular cycle `lead` before the next tick; `_hold_until_tick` before the first write (no setpoint before T; late plan → write at once, info up to T+90 s, warning beyond); `finalize_closed_interval` + PV delta after the hold; SoC plausibility uses the previous cycle's closed interval. No state projection (owner decision). First cycle after start, out-of-band runs and `off` keep today's behaviour.
@@ -104,7 +112,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Profiling session — main.py optimization cycle (2026-10-15)
 
-- [x] **Make a profiling session for main.py to identify acceleration potentials for optimization cycle**
+- [x] **Make a profiling session for main.py to identify acceleration potentials for optimization cycle** `[dev]`
   - Instrumentation: `EARNIE_CYCLE_TIMING=1` / `EARNIE_CYCLE_PROFILE=1` → `runtime/timing/cycles.jsonl` (+ optional `runtime/profile/`); docs `betrieb.md` / `container.md` § Live-Zyklus-Profiling; summarize with `python -m scripts.summarize_cycle_timing …`.
   - NAS window 2026-10-15 (`2.7.0-dev.54`, 7 cycles timed / 2 with cProfile): Ø cycle ≈ 212 s — dominant cost ~810 full-year thermal simulations. Follow-ups shipped: **dev.55** slot-series, **dev.56** year-model memo, **ThermalHorizon P1–P5** (`2.7.0-dev.57`, PR #37). Mid-path NAS sample after dev.55 alone: ~211 s → 54 s.
   - **Do not** use `EARNIE_CYCLE_PROFILE=1` in production again (Python ≥ 3.12 `sys.monitoring` instruments all threads; slowed Loxone push HTTP ~3× → Miniserver `state=Lesefehler`). Prefer local recorder-cycle replay or py-spy.
@@ -112,20 +120,20 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Rotate `main_stdio.log` like `earnie.log` (2026-10-15)
 
-- [x] **Rotate `main_stdio.log` like `earnie.log`:** spawn-time rotation in `runtime_store/main_daemon.py` (`_maybe_rotate_stdio_on_spawn`: ≥ 5 MiB or prior calendar month; archives `main_stdio.log.YYYY-MM-DD_HH-MM-SS`, max 12 via `month_file_rotation`). UI/auto-start sets `EARNIE_DAEMON_STDIO_CAPTURE=1`; `logger_config.setup_logging` skips the console `StreamHandler` so INFO is not mirrored into the capture (prints/tracebacks remain). Docs: `docs/einrichtung/betrieb.md`. Tests: `tests/test_main_daemon.py`, `tests/test_logger_config_rotation.py`.
+- [x] **Rotate `main_stdio.log` like `earnie.log`:** `[dev]` spawn-time rotation in `runtime_store/main_daemon.py` (`_maybe_rotate_stdio_on_spawn`: ≥ 5 MiB or prior calendar month; archives `main_stdio.log.YYYY-MM-DD_HH-MM-SS`, max 12 via `month_file_rotation`). UI/auto-start sets `EARNIE_DAEMON_STDIO_CAPTURE=1`; `logger_config.setup_logging` skips the console `StreamHandler` so INFO is not mirrored into the capture (prints/tracebacks remain). Docs: `docs/einrichtung/betrieb.md`. Tests: `tests/test_main_daemon.py`, `tests/test_logger_config_rotation.py`.
 
 ### Cycle speed-up — batch Loxone push inbox writes (2026-10-15)
 
-- [x] **Cycle speed-up — batch Loxone push inbox writes:** `record_push` keeps `_memory` / `_last_known` synchronous; disk flush of `loxone_push_inbox.json` is debounced (`INBOX_FLUSH_INTERVAL_S` = 1.0, `threading.Timer`, write outside `_lock`); `flush_inbox_now()` for tests/shutdown (`atexit`). Shadow feed JSONL append stays per-push. Daemon `read_push_*` unchanged; UI may lag ≤1 s. Tests: `tests/test_loxone_push_inbox.py` (`test_record_push_debounces_disk_flush`).
+- [x] **Cycle speed-up — batch Loxone push inbox writes:** `[feat]` `record_push` keeps `_memory` / `_last_known` synchronous; disk flush of `loxone_push_inbox.json` is debounced (`INBOX_FLUSH_INTERVAL_S` = 1.0, `threading.Timer`, write outside `_lock`); `flush_inbox_now()` for tests/shutdown (`atexit`). Shadow feed JSONL append stays per-push. Daemon `read_push_*` unchanged; UI may lag ≤1 s. Tests: `tests/test_loxone_push_inbox.py` (`test_record_push_debounces_disk_flush`).
 
 ### Cycle speed-up — Open-Meteo + config I/O caches (2026-10-15)
 
-- [x] **Cycle speed-up — in-process cache for Open-Meteo climate bundles:** process-wide path+mtime memo in `data/open_meteo_solar_archive.py` (`_load_bundle_from_cache` / `_save_bundle_to_cache`); `clear_open_meteo_bundle_mem_cache()` for tests. Avoids re-`pandas.read_json` across fresh `ModeledClimateContext` / thermal callers (~1269×/cycle before). Tests: `tests/test_open_meteo_solar_archive.py` (mem hit + mtime invalidation).
-- [x] **Cycle speed-up — cache config documents and sidecar path resolution:** `_resolve_sidecar_json_path` memo by env key (`clear_sidecar_path_cache`); mtime/shadow memo for `load_house_profiles_document` and `load_components_document` (save clears); push/shadow writers use mkdir-only-if-missing. Tests: `tests/test_persist_paths_sidecars.py`, `tests/test_config_doc_caches.py`.
+- [x] **Cycle speed-up — in-process cache for Open-Meteo climate bundles:** `[feat]` process-wide path+mtime memo in `data/open_meteo_solar_archive.py` (`_load_bundle_from_cache` / `_save_bundle_to_cache`); `clear_open_meteo_bundle_mem_cache()` for tests. Avoids re-`pandas.read_json` across fresh `ModeledClimateContext` / thermal callers (~1269×/cycle before). Tests: `tests/test_open_meteo_solar_archive.py` (mem hit + mtime invalidation).
+- [x] **Cycle speed-up — cache config documents and sidecar path resolution:** `[dev]` `_resolve_sidecar_json_path` memo by env key (`clear_sidecar_path_cache`); mtime/shadow memo for `load_house_profiles_document` and `load_components_document` (save clears); push/shadow writers use mkdir-only-if-missing. Tests: `tests/test_persist_paths_sidecars.py`, `tests/test_config_doc_caches.py`.
 
 ### ThermalHorizon P1–P5 — year model for parameters only, horizon in Live (2026-10-15)
 
-- [x] **Thermal horizon simulation — year model once for parameters, horizon only in Live** (epic **ThermalHorizon**; spec [`docs/spec/thermal-horizon-simulation.md`](../docs/spec/thermal-horizon-simulation.md); `2.7.0-dev.57`, PR #37 → `main` `25a1a601`)
+- [x] **Thermal horizon simulation — year model once for parameters, horizon only in Live** `[feat]` (epic **ThermalHorizon**; spec [`docs/spec/thermal-horizon-simulation.md`](../docs/spec/thermal-horizon-simulation.md); `2.7.0-dev.57`, PR #37 → `main` `25a1a601`)
   - **P1:** `optimizer/thermal_parameters.py` — annual WP/RC electric kWh + envelope `H` from last full archive year, memoized; baseload + Live store read it; missing climate fails loud. Owner install `H` 0.110 → 0.069 kW/K (partial-year calibration removed).
   - **P2:** Live store flex context from `LiveStorePlan`; `optimizer/live_cycle_scope.py` shares one plan per cycle (readings + forecast) across flex / targets / both MILPs.
   - **P3:** collector irradiance from Open-Meteo `global_tilted_irradiance` (`get_hourly_tilted_irradiance_forecast_wm2`); fallback last year + warning; `collector_solar_source` in observability; user doc `docs/konfiguration/flexible-verbraucher.md`.
@@ -136,15 +144,15 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Cycle speed-up — memoize thermal year models (2026-10-15)
 
-- [x] **Cycle speed-up — memoize the thermal year models:** process-wide LRU `optimizer/thermal_year_cache.py` for `house_year_result` and `thermal_rc` year model (`thermal_rc_hourly_kw_and_temp_from_ambient`). Keys hash full inputs (climate by content; offline fixture by path + mtime); hits return list copies (bit-identical). Shipped as `2.7.0-dev.56` on the ThermalHorizon branch; merged via PR #37. Tests: `tests/test_thermal_year_cache.py`. Local bench: identical outputs; residual baseload cost = climate bundle `read_json` → closed under *Open-Meteo + config I/O caches* above.
+- [x] **Cycle speed-up — memoize the thermal year models:** `[feat]` process-wide LRU `optimizer/thermal_year_cache.py` for `house_year_result` and `thermal_rc` year model (`thermal_rc_hourly_kw_and_temp_from_ambient`). Keys hash full inputs (climate by content; offline fixture by path + mtime); hits return list copies (bit-identical). Shipped as `2.7.0-dev.56` on the ThermalHorizon branch; merged via PR #37. Tests: `tests/test_thermal_year_cache.py`. Local bench: identical outputs; residual baseload cost = climate bundle `read_json` → closed under *Open-Meteo + config I/O caches* above.
 
 ### Cycle speed-up — deploy dev.55 thermal slot-series fix (2026-10-15)
 
-- [x] **Cycle speed-up — deploy dev.55 thermal slot-series fix to the NAS:** `9eb1cbe9` (`modeled_consumer_kw_for_slots`) was not in the profiled image. Live passes `climate=None`, so it removes ~360 of ~810 year simulations (2 × 181 slots in `_slot_aligned_thermal_energy_kwh`). Expected ~−25…35 % cycle time; confirm with `EARNIE_CYCLE_TIMING=1`. Merged via PR #35 (`53e937f9`).
+- [x] **Cycle speed-up — deploy dev.55 thermal slot-series fix to the NAS:** `[feat]` `9eb1cbe9` (`modeled_consumer_kw_for_slots`) was not in the profiled image. Live passes `climate=None`, so it removes ~360 of ~810 year simulations (2 × 181 slots in `_slot_aligned_thermal_energy_kwh`). Expected ~−25…35 % cycle time; confirm with `EARNIE_CYCLE_TIMING=1`. Merged via PR #35 (`53e937f9`).
 
 ### EarlyStart P0 — always-on cycle duration + punctuality log (2026-10-15)
 
-- [x] **EarlyStart P0 — always-on duration, event + punctuality recording** (epic **EarlyStart**; spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §5.1, §5.2, §5.6)
+- [x] **EarlyStart P0 — always-on duration, event + punctuality recording** `[qual]` (epic **EarlyStart**; spec [`docs/spec/early-start-scheduling.md`](../docs/spec/early-start-scheduling.md) §5.1, §5.2, §5.6)
   - `runtime_store/cycle_duration_stats.py` → rolling `runtime/cycle_stats.jsonl` (7 d): tick, woke/start/writes-done/finish, wake/start delay, duration, `late_by_sec`, `on_time` (≤ 2 s), outcome (`ok` / `no_writes` / `error`), events, horizon slots, version, platform fingerprint (CPU, Python, solver; no hostname).
   - Event hooks: `pv_forecast_fetch`, `weather_fetch`, `price_feature_refresh`, `day_ahead_fetch` (network instead of cache) + `cold_start`.
   - `earnie.log`: one `Pünktlichkeit: …` line per regular cycle with 24 h / 7 d on-time rate and P95 lateness; out-of-band runs excluded.
@@ -154,7 +162,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Regression P2 — customer data + intake (2026-10-15)
 
-- [x] **Regression P2 — customer data:** private repo `JochenTCC/Earnie-regression-private` + `$EARNIE_REGRESSION_PRIVATE_DIR` (default sibling `..\Earnie-regression-private\cases`); missing private root reported as skipped (`private-root-missing`); public + private SHAs in `regression_report.md`.
+- [x] **Regression P2 — customer data:** `[qual]` private repo `JochenTCC/Earnie-regression-private` + `$EARNIE_REGRESSION_PRIVATE_DIR` (default sibling `..\Earnie-regression-private\cases`); missing private root reported as skipped (`private-root-missing`); public + private SHAs in `regression_report.md`.
   - `--intake` ZIP → private L1 case (`tests/regression/intake.py`): requires `--private`, `--id REG-<issue>-<slug>`, and `--seed-anchor` or `--cycle-index`; dump without `recorder/` fails loud; no `expected.json` (follow with `--update-golden`); case-local `recorder/`.
   - `resolve_recorder_root` prefers case-dir then `tests/regression/`; `archive_prod_dump.py` help points customer dumps to `--intake --private`.
   - Docs: spec v0.5; `docs/einrichtung/private-env.md` private-regression section; soft gate kept (hard CI = P3).
@@ -162,7 +170,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Regression P1 — MVP golden-master suite (2026-10-15)
 
-- [x] **Regression P1 — MVP:** case format + schema, runner for L1 (cycle replay) and L2 (backtest window), `--update-golden`, markdown report; public cases (winter/autumn L1, negative prices L1, summer/EV/heat L2); prod_dumps as `L1-invariants` wrappers only (MILP goldens stay recorder/backtesting-shaped); tolerances and solver mode from R0 (`EARNIE_CBC_STRICT=1`, ±0.05 %); release-checklist item; privacy scrub on seed fixtures (address/geo/`cons_data` stub).
+- [x] **Regression P1 — MVP:** `[qual]` case format + schema, runner for L1 (cycle replay) and L2 (backtest window), `--update-golden`, markdown report; public cases (winter/autumn L1, negative prices L1, summer/EV/heat L2); prod_dumps as `L1-invariants` wrappers only (MILP goldens stay recorder/backtesting-shaped); tolerances and solver mode from R0 (`EARNIE_CBC_STRICT=1`, ±0.05 %); release-checklist item; privacy scrub on seed fixtures (address/geo/`cons_data` stub).
   - Runner: `scripts/run_regression.py`; package `tests/regression/` (loader, compare, L1/L2, prod-dump invariants); fixtures under `tests/regression/fixtures/`.
   - Pytest marker `regression` deselected by default in `tests/conftest.py` (`-m regression` or `EARNIE_RUN_REGRESSION=1`); entry `tests/regression/test_regression_suite.py`.
   - Spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md) v0.4; checklist [`docs/spec/release-checklist.md`](../docs/spec/release-checklist.md) §1.
@@ -170,7 +178,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Regression R0 — solver determinism / tolerance study (2026-10-14)
 
-- [x] **Regression R0 — solver determinism / tolerance study (reduced scope for 2.7)** (epic **Regression**; after R-Rec; spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md) §16)
+- [x] **Regression R0 — solver determinism / tolerance study (reduced scope for 2.7)** `[dev]` (epic **Regression**; after R-Rec; spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md) §16)
   - Offline replay: `runtime_store/recorder_replay.py` (config snapshot → prepare → MILP); study harness `scripts/run_regression_r0_study.py` (`--seed` / `--recorder-dir`).
   - Measured on 3× 96-slot recorder-format cases (HiGHS; production vs `EARNIE_CBC_STRICT`; idle vs parallel; 5 reps): Optimal groups bit-stable (plan hash + **0.0 %** cost spread). Cases were **historical `--seed`** (no live recorder yet) — backlog note: replace with live recorder cycles ASAP.
   - **Decision:** regression goldens use **`EARNIE_CBC_STRICT=1`**; default metric tolerance **±0.05 %**; pin **`highspy==1.15.1`** in `pyproject.toml`. Production-path sample + full §16 matrix remain follow-ups.
@@ -178,7 +186,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Regression R-Rec — cycle recorder (2026-10-14)
 
-- [x] **Regression R-Rec — cycle recorder (first)** (epic **Regression**; Version 2.7; spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md) §14)
+- [x] **Regression R-Rec — cycle recorder (first)** `[qual]` (epic **Regression**; Version 2.7; spec [`docs/spec/regression-suite.md`](../docs/spec/regression-suite.md) §14)
   - Always-on production recorder: `runtime/recorder/cycles_YYYY-MM-DD.jsonl.gz`, config snapshots by hash, `recorder_enabled` (default on) / `recorder_retention_days` (default 7) in `local_settings.json`.
   - Capture immediately before `prepare_optimization_matrix` in `main.py`; finish with setpoints / plan hash / flags; soft-fail never aborts the live run.
   - Debug dumps (schema v3) auto-include the whole ring buffer under `recorder/` + optional `manifest.recorder`; dump dialog + `docs/einrichtung/betrieb.md` privacy/opt-out.
@@ -194,7 +202,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Document Review EcoFlow guide: Virtual Output placeholder (2026-10-14)
 
-- [x] **`docs/einrichtung/ecoflow-delta3-loxone.md` prescribed `\v` in Virtual Output commands**
+- [x] **`docs/einrichtung/ecoflow-delta3-loxone.md` prescribed `\v` in Virtual Output commands** `[dev]`
   - `\v` is the Virtual **Input** placeholder; in a Virtual Output it is sent as the control character 0x0B. Replaced with `<v>` in step 5 variant A (Miniserver self-write) and variant B (charge-limit webhook); removed the claim that `\v` matches the Earnie VO templates (they use `<v>`).
   - Step 6 variant B (bypass webhook): switched to a **digital** VO with fixed `?v=1` / `?v=0`, since an analog VO sends nothing at value 0 and the switch to grid would never reach HA.
   - Possible root cause of the open bug "Miniserver self-write of a Virtual Input is overwritten" — noted there for verification.
@@ -219,19 +227,19 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Topology P2 + Powerstation AC wording (2026-10-14)
 
-- [x] **Topology P2 — generator-side coverage in the live balance** (epic **Topology**; [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md) §4)
+- [x] **Topology P2 — generator-side coverage in the live balance** `[qual]` (epic **Topology**; [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md) §4)
   - Plant `sens_ess_power` = Σ grid-tied house `ess.{id}.sens_ess_power` (fail loud on missing binding); battery-less → `0`
   - Mapped plant PV + several grid-tied inverters with PV → complete `inv.*`/`pv.*` coverage or `plant.pv_covers_all_inverters: true`
   - Derived-load tolerance `plant.balance_tolerance_pct` / `balance_tolerance_w` (defaults 5 / 100 W); below floor → telemetry error
   - `pv_attribution._eta_inv` → `inverter_efficiency` (no 0.97 soft default)
   - Helpers in `integrations/plant_balance.py`; wired in Loxone / HA / OpenEMS / `ehal_live` / `loxone_live_power`; UI checkbox; `tests/test_topology_p2.py`
-- [x] **Topology follow-up — Powerstation AC wording (`island`)**
+- [x] **Topology follow-up — Powerstation AC wording (`island`)** `[feat]`
   - Auto labels `Powerstation-WR …` (lifecycle / presets / migrate_inverters; existing stored labels unchanged)
   - UI + German user docs + `docs/spec/ehal.md` / `ehal-com.md`: Insel = bus participation, not off-grid
 
 ### Retire flat plant `sens_ess_soc` (2026-10-14)
 
-- [x] **Remove `sens_ess_soc` from code as flat EHAL field** (full wire break; `EHAL_SCHEMA_VERSION` stays **4** — no public release since 3)
+- [x] **Remove `sens_ess_soc` from code as flat EHAL field** `[feat]` (full wire break; `EHAL_SCHEMA_VERSION` stays **4** — no public release since 3)
   - Plant telemetry / `EhalTelemetry` no longer require or accept flat SoC; SoC is entity-scoped only (`ess.{id}.sens_ess_soc`).
   - Adapters stop synthesizing plant SoC; `read_ess_soc` / `read_ess_soc_by_id` have no plant alias; bare push `/ehal/telemetry/sens_ess_soc/…` rejected.
   - Residual `plant.ehal_bindings.sens_ess_soc` fails loud (migrate hint); HouseSim golden maps + docs updated.
@@ -260,7 +268,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Topology P1 — root assertion + regulates_on (2026-10-12)
 
-- [x] **Topology P1 — explicit root, regulator declaration, validation** (epic **Topology**; decision [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md))
+- [x] **Topology P1 — explicit root, regulator declaration, validation** `[feat]` (epic **Topology**; decision [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md))
   - Design pack: theses / Claude+Grok reviews / conclusion; epic phases P1–P5 in [`Backlog.md`](Backlog.md); nomenclature in `roadmap-nomenclature.mdc`
   - `plant.grid_meter` (`at_house_connection`, `single_tariff`) required `true` on live path; `batteries[].regulates_on` (`grid` | `none`); optional `inverters[].regulates_on`
   - One-shot `scripts.migrate_topology_once` + fail-fast loader; live validation (≤1 loop at root; ≤1 grid-tied house battery until P3+P4); reject battery on `pv_string` inverter
@@ -269,14 +277,14 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Inverter follow-ups — η split + live PV attribution (2026-10-12)
 
-- [x] Design note [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md)
-- [x] Schema + MILP/sim `η_inv` / `η_batt` + migration of lumped `battery_efficiency` (AC-path only in v1; `scripts.migrate_conversion_efficiency_once`)
-- [x] Multi-inverter live attribution of `sens_pv_production_active` + first `pv.{pv_system_id}.*` (derive plant from Σ grid-tied inv · η_inv; fail-loud partial maps; curtailment stays forecast)
+- [x] Design note [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md) `[feat]`
+- [x] Schema + MILP/sim `η_inv` / `η_batt` + migration of lumped `battery_efficiency` (AC-path only in v1; `scripts.migrate_conversion_efficiency_once`) `[feat]`
+- [x] Multi-inverter live attribution of `sens_pv_production_active` + first `pv.{pv_system_id}.*` (derive plant from Σ grid-tied inv · η_inv; fail-loud partial maps; curtailment stays forecast) `[feat]`
 - Open remain in [`Backlog.md`](Backlog.md): curtailment live weights; device catalog deferred
 
 ### Shadow R4 — Feed gaps / ENTSO-E (2026-10-12)
 
-- [x] **Shadow R4 — Feed gaps:** ENTSO-E record/replay (`ext:prices:entsoe`); S4 Soll/Soll stays **2.+1**
+- [x] **Shadow R4 — Feed gaps:** `[dev]` ENTSO-E record/replay (`ext:prices:entsoe`); S4 Soll/Soll stays **2.+1**
   - Family-B `ext_get`/`safe_record` in `integrations/entsoe_client.py`; raw A44 XML payload; no token in feed
   - Inventory: Energy-Charts / aWATTar / outdoor / PV already covered (R3); no other live `ext:*` gaps
   - Tests: Prod record, Shadow replay hit, Shadow miss live-fallback unrecorded (`tests/test_entsoe_client.py`)
@@ -285,7 +293,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Shadow R3 — Transport intercept (2026-10-12)
 
-- [x] **Shadow R3 — Transport intercept**
+- [x] **Shadow R3 — Transport intercept** `[dev]`
   - Shared helpers: `runtime_store/shadow/transport.py` (`safe_record`, `hub_get`, `ext_get`); rewrote HA / OpenEMS / aWATTar / outdoor / energy_charts / PV call sites (Loxone push left asymmetric)
   - `assert_not_shadow_backend` on MCP, greenfield import, Loxone HTTP probe, HA `list_mappable_entities`, `scan_structure`
   - Daemon orchestration: `runtime_store/shadow/daemon.py`; thin wiring in `main.py`
@@ -295,7 +303,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Shadow R2 — Single Loxone input contract (2026-10-12)
 
-- [x] **Shadow R2 — Single Loxone input contract** (hard cut)
+- [x] **Shadow R2 — Single Loxone input contract** `[dev]` (hard cut)
   - Prod `meta.json` advertises `loxone_feed: "push"` when `ehal_backend` is Loxone (`runtime_store/shadow/feed.py`)
   - Shadow startup refuses Loxone feeds without that capability (`runtime_store/shadow/startup.py`)
   - Deleted Prod-inbox file fallback / path sniff; Shadow VO reads are feed-only (`runtime_store/loxone_push_inbox.py`); Merker-superset stays no-op
@@ -305,28 +313,28 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Shadow R1 — Policy façade (2026-10-12)
 
-- [x] **Shadow R1 — Policy façade** (behavior-preserving)
+- [x] **Shadow R1 — Policy façade** `[dev]` (behavior-preserving)
   - Landed `is_shadow_config_readonly()` (shared feed → RO; external feed → private writable) + VO push → `loxone:io:*` feed with Prod-inbox fallback (compat until R2)
   - Gate checklist in `DEVELOPER.md`; call-site audit in [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md) §3 R1 (no wrong-gate fixes needed)
   - No new helpers; R2–R4 archived above (same day)
 
 ### 2.7.l — Inverter entity P1–P5 (2026-10-12)
 
-- [x] **2.7.l — Inverter entity (PV × battery topology)** (epic **Inverter**; draft [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md))
+- [x] **2.7.l — Inverter entity (PV × battery topology)** `[feat]` (epic **Inverter**; draft [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md))
   - Model: `inverters[]` in `components.json`; PV/batteries reference via `inverter_id` (n:1); scenario keeps `pv_system_ids[]` / `battery_ids[]` (no `inverter_ids[]`)
   - `type` `hybrid` | `pv_string` | `battery`; caps `max_ac_power_kw` / `max_pv_input_kw` / `max_ac_charge_kw`; `control`; `ac_connection` `grid_tied` | `island` (replaces `batteries[].kind` / Topologie)
   - Built-in inverter: `owned_by` battery (UI/lifecycle); virtual PS none; physical PS owned `island`; EHAL role optional `inv.{id}.*`
   - Data model stays `earnie_data_model` **4**; structural fail-fast + one-off `scripts/migrate_inverters_once.py` (no permanent loader shim)
-- [x] **Inverter P1 — schema + resolution:** `components.schema.json`, `inverter_id`, `entity_resolution` (`_planning_inverters`, validation), migrate + fail-fast, tests (`tests/test_inverter_p1.py`)
-- [x] **Inverter P2 — UI + docs:** house-configurator inverter editor, PV/battery selects, built-in section + presets, remove Topologie; German `docs/konfiguration/batterie-pv.md`; `entity_id_lock` from day one
-- [x] **Inverter P3 — MILP:** per-inverter PV node, AC/DC clipping, grid-charge rules, island outside house balance (`optimizer/milp_inverter.py`); efficiency deferred to follow-ups
-- [x] **Inverter P4 — EHAL:** role `share/ehal/roles/inverter.json`, Live/mapping, HA/Loxone/OpenEMS, export-limit unconstrained per inverter, `qualified_inverter_id()`, docs `ehal.md` / `ehal-com.md`
-- [x] **Inverter P5 — curtailment write:** `inv.{id}.set_inv_ac_power_limit` from plant `p_pv_curtail[t0]` (`optimizer/inv_ac_power_limit.py`, `write_inv_ac_limits_from_plan`); sticky rating release when no curtail
+- [x] **Inverter P1 — schema + resolution:** `[feat]` `components.schema.json`, `inverter_id`, `entity_resolution` (`_planning_inverters`, validation), migrate + fail-fast, tests (`tests/test_inverter_p1.py`)
+- [x] **Inverter P2 — UI + docs:** `[feat]` house-configurator inverter editor, PV/battery selects, built-in section + presets, remove Topologie; German `docs/konfiguration/batterie-pv.md`; `entity_id_lock` from day one
+- [x] **Inverter P3 — MILP:** `[feat]` per-inverter PV node, AC/DC clipping, grid-charge rules, island outside house balance (`optimizer/milp_inverter.py`); efficiency deferred to follow-ups
+- [x] **Inverter P4 — EHAL:** `[feat]` role `share/ehal/roles/inverter.json`, Live/mapping, HA/Loxone/OpenEMS, export-limit unconstrained per inverter, `qualified_inverter_id()`, docs `ehal.md` / `ehal-com.md`
+- [x] **Inverter P5 — curtailment write:** `[feat]` `inv.{id}.set_inv_ac_power_limit` from plant `p_pv_curtail[t0]` (`optimizer/inv_ac_power_limit.py`, `write_inv_ac_limits_from_plan`); sticky rating release when no curtail
 - Open remain were Inverter follow-ups (η + live PV attribution → archive above; curtailment weights still open); device catalog deferred
 
 ### Shadow architecture review — proposal (2026-10-12)
 
-- [x] Review entire Shadow architecture after 2.7 changes and propose refactoring (attention: post-commit bugfixes)
+- [x] Review entire Shadow architecture after 2.7 changes and propose refactoring (attention: post-commit bugfixes) `[dev]`
   - Verdict: S1–S3 match the spec; debt is call-site scatter + Prod-inbox fallback compat — not a broken core
   - Classification: keep push-only Loxone feed, `is_shadow_config_readonly` (shared vs private), `should_invoke_setpoint_writes`; retire inbox-file fallback only after R2 capability gate; do not revive Merker-superset
   - Proposal: **R1–R4** in [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); locked in [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) §11.1 / §12
@@ -334,39 +342,39 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Thermal Wärmeinhalt — latest-12 forecast fan (2026-10-11)
 
-- [x] **Improve chart for thermal simulation** — Analyse Verbrauch & Kosten Wärmeinhalt: keep Sim/Ist; overlay latest 12 hourly Q-forecast lines (`horizon_q_sim_kwh`) for heat storage + pools; common horizon ≤ 24 h
+- [x] **Improve chart for thermal simulation** `[feat]` — Analyse Verbrauch & Kosten Wärmeinhalt: keep Sim/Ist; overlay latest 12 hourly Q-forecast lines (`horizon_q_sim_kwh`) for heat storage + pools; common horizon ≤ 24 h
   - Persist pool/thermal_control `horizon_q_sim_kwh` in `optimizer/thermal_targets.py`; heat storage already had it via `thermal_live_store`
   - Loader + Plotly fan: `ui/consumption_display/heat_content_history.py`, `charts.py`, `page_consumer_analysis.py`
   - Docs: `docs/konfiguration/waermespeicher-schichtung-teq.md`, `docs/ui/charts.md`, `docs/spec/thermals-p2.md`
 
 ### Time-dependent Netznutzung Arbeitspreis SNAP / WiNAP (2026-10-11)
 
-- [x] **Time-variable grid fee (Netznutzung Arbeitspreis)** — Austria SNAP/WiNAP catalog + profile `netznutzung` object (PR [#32](https://github.com/JochenTCC/Earnie/pull/32))
+- [x] **Time-variable grid fee (Netznutzung Arbeitspreis)** `[feat]` — Austria SNAP/WiNAP catalog + profile `netznutzung` object (PR [#32](https://github.com/JochenTCC/Earnie/pull/32))
   - `data/grid_fees.py` + `share/config/grid_fees.json` (areas / rule sets); migrate `scripts/migrate_grid_fee_profile.py`
   - Pricing / SE / invoice use resolved per-slot fees; house-profile UI + `house_profiles.schema.json`
   - Later (still open elsewhere): Leistungspreis / import cap — see Leistungstarif Entwicklungsdokument L1→L5
 
 ### Push before 2.7.l inverter (2026-10-11)
 
-- [x] Push `main` (and site pack tag) before starting **2.7.l** inverter — tag `2.7.0-dev.49` (no GHCR publish)
+- [x] Push `main` (and site pack tag) before starting **2.7.l** inverter — tag `2.7.0-dev.49` (no GHCR publish) `[feat]`
 
 ### 2.7.r — HA live I/O contract / Binding P5 transport (2026-10-11)
 
-- [x] **T1 — Contract & transport switch:** Single Earnie↔HA I/O story in `docs/spec/ehal.md` and user docs; config `ehal.ha.transport` (`pull`|`weg_b`, default `pull`) via `runtime_store/ehal_setup.py` / `settings/config_loaders.py`; canonical `GET /ehal/status.json` with `/ehal/loxone/status.json` alias (`integrations/loxone_status_json.py`); HA push telemetry on the wire in canonical EHAL units (W/kWh/%/A; carrier converts in HA).
-- [x] **T2 — HA → Earnie push read:** With `transport=weg_b`, `integrations/ha_adapter.py` reads activated fields from the push inbox (`integrations/ha_push_read.py`, `runtime_store/loxone_push_inbox.py`); REST is fenced for push-covered fields; missing/stale push fails loud (no pull fallback).
-- [x] **T3 — Earnie → HA via status.json:** Setpoints published to the status ledger for weg_b; service-call writes skipped for covered fields (`integrations/ehal_live.py`); `ha_ess_force`/Huawei paths remain REST exceptions.
-- [x] **T4 — Minimal carrier YAML + lab:** `scripts/ha_carrier_yaml_gen.py` + `integrations/ha_carrier_yaml.py`, example `share/config/ehal.ha.snippet.json`, lab checklist in `docs/spec/ha-lab-setup.md` §9 (not Add-on / full Binding P5 comfort).
+- [x] **T1 — Contract & transport switch:** `[feat]` Single Earnie↔HA I/O story in `docs/spec/ehal.md` and user docs; config `ehal.ha.transport` (`pull`|`weg_b`, default `pull`) via `runtime_store/ehal_setup.py` / `settings/config_loaders.py`; canonical `GET /ehal/status.json` with `/ehal/loxone/status.json` alias (`integrations/loxone_status_json.py`); HA push telemetry on the wire in canonical EHAL units (W/kWh/%/A; carrier converts in HA).
+- [x] **T2 — HA → Earnie push read:** `[feat]` With `transport=weg_b`, `integrations/ha_adapter.py` reads activated fields from the push inbox (`integrations/ha_push_read.py`, `runtime_store/loxone_push_inbox.py`); REST is fenced for push-covered fields; missing/stale push fails loud (no pull fallback).
+- [x] **T3 — Earnie → HA via status.json:** `[feat]` Setpoints published to the status ledger for weg_b; service-call writes skipped for covered fields (`integrations/ehal_live.py`); `ha_ess_force`/Huawei paths remain REST exceptions.
+- [x] **T4 — Minimal carrier YAML + lab:** `[feat]` `scripts/ha_carrier_yaml_gen.py` + `integrations/ha_carrier_yaml.py`, example `share/config/ehal.ha.snippet.json`, lab checklist in `docs/spec/ha-lab-setup.md` §9 (not Add-on / full Binding P5 comfort).
 
 ### Rename Pattern B → entity-scoped bindings (2026-10-11)
 
-- [x] Chosen term **entity-scoped bindings** (replacing internal name Pattern B); wire shapes unchanged (`ess.{slug}.*`, `flex.{slug}.*`, qualified exchange IDs)
-- [x] Python API renames (`parse_ess_entity_scoped`, `is_ess_entity_scoped_field`, `entity_scoped_battery_bindings`, `ha_entity_scoped_live_mapping`, `_ENTITY_SCOPED`, `_write_entity_scoped_probes`, …)
-- [x] Docs, spec, user docs, share templates, backlog notes, and `.cursor` rules/skills updated to entity-scoped prose
-- [x] Historical release notes, packaging changelogs, and `.cursor/plans` left unchanged
+- [x] Chosen term **entity-scoped bindings** (replacing internal name Pattern B); wire shapes unchanged (`ess.{slug}.*`, `flex.{slug}.*`, qualified exchange IDs) `[feat]`
+- [x] Python API renames (`parse_ess_entity_scoped`, `is_ess_entity_scoped_field`, `entity_scoped_battery_bindings`, `ha_entity_scoped_live_mapping`, `_ENTITY_SCOPED`, `_write_entity_scoped_probes`, …) `[feat]`
+- [x] Docs, spec, user docs, share templates, backlog notes, and `.cursor` rules/skills updated to entity-scoped prose `[feat]`
+- [x] Historical release notes, packaging changelogs, and `.cursor/plans` left unchanged `[feat]`
 
 ### Binding P5 — Telemetry path rename (2026-10-11)
 
-- [x] **Binding P5 path rename:** canonical `/ehal/telemetry/…`; keep `/ehal/loxone/telemetry/…` as alias for deployed VOs
+- [x] **Binding P5 path rename:** `[feat]` canonical `/ehal/telemetry/…`; keep `/ehal/loxone/telemetry/…` as alias for deployed VOs
   - Receiver: `integrations/loxone_request_http.py` (`match_telemetry_prefix`, dual strip)
   - Emitters: `scripts/pilot_vo_template_gen.py` + `share/loxone/templates/VirtualOut/VO_Earnie_*.xml`
   - Docs: `docs/einrichtung/loxone-anbindung.md`, `docs/referenz/loxone-signals.md`, `docs/ui/ehal-com.md`, templates README
@@ -374,29 +382,29 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Retire LOXONE_* plant loud names, loxone_blocks migrate, plant-flat ESS merge (2026-10-11)
 
-- [x] Removed all `LOXONE_*` plant loud-name config slots (`load_loxone_block_params` / `_LOXONE_BLOCK_ATTRS`) — reads and writes
-- [x] ESS writes/reads resolve primary-battery entity-scoped via `house_config.ess_bindings.resolve_primary_ess_binding`; plant non-ESS via `resolve_plant_binding`
-- [x] Retired `merge_ess_bindings_into_plant` plant-flat ESS alias merge; HA aggregate keeps plant-stored flat ESS until `migrate_ess_bindings_once` when batteries exist
-- [x] `ensure_migrated` refuses non-empty `loxone_blocks` (CLI `scripts/migrate_ehal_bindings.py` migrates explicitly); refuses residual plant-flat ESS when mappable batteries exist
-- [x] Docs/schema/tests updated (`docs/spec/ehal.md`, `share/config/config.schema.json`)
+- [x] Removed all `LOXONE_*` plant loud-name config slots (`load_loxone_block_params` / `_LOXONE_BLOCK_ATTRS`) — reads and writes `[dev]`
+- [x] ESS writes/reads resolve primary-battery entity-scoped via `house_config.ess_bindings.resolve_primary_ess_binding`; plant non-ESS via `resolve_plant_binding` `[dev]`
+- [x] Retired `merge_ess_bindings_into_plant` plant-flat ESS alias merge; HA aggregate keeps plant-stored flat ESS until `migrate_ess_bindings_once` when batteries exist `[dev]`
+- [x] `ensure_migrated` refuses non-empty `loxone_blocks` (CLI `scripts/migrate_ehal_bindings.py` migrates explicitly); refuses residual plant-flat ESS when mappable batteries exist `[dev]`
+- [x] Docs/schema/tests updated (`docs/spec/ehal.md`, `share/config/config.schema.json`) `[dev]`
 
 ### SH concentration Phases A–D (2026-10-11)
 
-- [x] **Phase A** — Named ops in `integrations/ehal_live_ops.py`, re-exported from `ehal_live` (`read_generic_value`, flex live/write, `read_absent_mode`, `publish_setpoint_traced`, …); `load_default_house_profiles_doc` in `house_config/profiles_store.py`.
-- [x] **Phase B** — `main.py`, `optimizer/*`, `data/*`, `runtime_store/power_interval_sampler.py` use `ehal_live` (no `loxone_client` / `loxone_writes` imports).
-- [x] **Phase C** — Production import ban outside `integrations/` (`tests/test_no_loxone_client_outside_integrations.py`); UI/settings/scripts migrated; CONTRIBUTING updated.
-- [x] **Phase D** — Canonical backend flags on `ehal_live`; UI debug uses them; `config.is_ehal_*` wrappers removed.
+- [x] **Phase A** `[feat]` — Named ops in `integrations/ehal_live_ops.py`, re-exported from `ehal_live` (`read_generic_value`, flex live/write, `read_absent_mode`, `publish_setpoint_traced`, …); `load_default_house_profiles_doc` in `house_config/profiles_store.py`.
+- [x] **Phase B** `[feat]` — `main.py`, `optimizer/*`, `data/*`, `runtime_store/power_interval_sampler.py` use `ehal_live` (no `loxone_client` / `loxone_writes` imports).
+- [x] **Phase C** `[feat]` — Production import ban outside `integrations/` (`tests/test_no_loxone_client_outside_integrations.py`); UI/settings/scripts migrated; CONTRIBUTING updated.
+- [x] **Phase D** `[feat]` — Canonical backend flags on `ehal_live`; UI debug uses them; `config.is_ehal_*` wrappers removed.
 - Review: [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md). Binding P5 path rename → done (see section above).
 
 ### EHAL / SH-backend cleanup — concentration review, binding rollback, Loxone-agnostic naming (2026-10-11)
 
-- [x] **SH-Backend communication concentration — review** — Findings: [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md). Façade `ehal_live.get_adapter()` already exists; scatter documented; Phases A–D implemented (see section above).
-- [x] **Remove Binding rollback legacy** — Dead Merker HTTP write (`_send_loxone_value_traced` / `send_loxone_value`); deprecated push-entity stubs; unused `ui/loxone_marker_forms.py` + `ui/smarthome_marker_fields.py` (moved `assemble_filter_bindings` to `house_config/ehal_bindings.py`); reverse `loxone_blocks` helpers; legacy `ascii_title`; non-`_v2` `VI_Earnie_*.xml`; doc scrub (dual-emit / Q5 rollback / Merker-HTTP drift); Binding walkthroughs marked STALE. Follow-up done: `LOXONE_*` loud names / `loxone_blocks` migrate / plant-flat ESS merge retired (see section above).
-- [x] **EHAL naming Loxone-agnostic (hub-agnostic layer)** — `TELEMETRY_OPTIONAL_STATIC_HUB` / `STATIC_HUB_MAP_FIELDS` (+ temporary aliases); docs/schema/UI reword (Merker → binding/hub channel; sticky hubs; Smarthome-Binding); role JSON `"loxone"` + `apply_loxone_*` unchanged. Follow-up Binding P5 path rename → done (see section above); SH concentration A–D done.
+- [x] **SH-Backend communication concentration — review** `[dev]` — Findings: [`SH-Backend-Concentration-Review.md`](SH-Backend-Concentration-Review.md). Façade `ehal_live.get_adapter()` already exists; scatter documented; Phases A–D implemented (see section above).
+- [x] **Remove Binding rollback legacy** `[dev]` — Dead Merker HTTP write (`_send_loxone_value_traced` / `send_loxone_value`); deprecated push-entity stubs; unused `ui/loxone_marker_forms.py` + `ui/smarthome_marker_fields.py` (moved `assemble_filter_bindings` to `house_config/ehal_bindings.py`); reverse `loxone_blocks` helpers; legacy `ascii_title`; non-`_v2` `VI_Earnie_*.xml`; doc scrub (dual-emit / Q5 rollback / Merker-HTTP drift); Binding walkthroughs marked STALE. Follow-up done: `LOXONE_*` loud names / `loxone_blocks` migrate / plant-flat ESS merge retired (see section above).
+- [x] **EHAL naming Loxone-agnostic (hub-agnostic layer)** `[dev]` — `TELEMETRY_OPTIONAL_STATIC_HUB` / `STATIC_HUB_MAP_FIELDS` (+ temporary aliases); docs/schema/UI reword (Merker → binding/hub channel; sticky hubs; Smarthome-Binding); role JSON `"loxone"` + `apply_loxone_*` unchanged. Follow-up Binding P5 path rename → done (see section above); SH concentration A–D done.
 
 ### EHAL Loxone vs HA mapping review (2026-10-11)
 
-- [x] Code review comparing EHAL field mapping / binding for Loxone and HA (similarities, duplications, reuse)
+- [x] Code review comparing EHAL field mapping / binding for Loxone and HA (similarities, duplications, reuse) `[dev]`
   - Findings: [EHAL-Mapping-Review.md](EHAL-Mapping-Review.md)
   - Safe unification: hub-agnostic membership catalogs in `ehal/field_catalog.py`; adapters/UI import shared tuples
   - Transport, unit conversion, Live-Lesen catalogs, HITL UIs, and Loxone read-loop membership stay separate
@@ -410,7 +418,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Remove remaining `/jdev/sps/io` Merker HTTP (2026-10-11)
 
-- [x] **No `/jdev/sps/io` in production Python** — inventory + removal after 2.7.o/q push-only
+- [x] **No `/jdev/sps/io` in production Python** `[dev]` — inventory + removal after 2.7.o/q push-only
   - Dead `/all` AlarmClock path removed (`_fetch_loxone_io_all`, Tna helpers)
   - Live reads fail-closed on VO push inbox; shadow Loxone superset is a no-op
   - Greenfield/structure/UI presence = LoxAPP3 control-name membership (no Merker ping)
@@ -437,7 +445,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Shadow recorder + client regression check (2026-10-10)
 
-- [x] Review code for shadow functionality on host and client side
+- [x] Review code for shadow functionality on host and client side `[dev]`
   - Suite green: 84 passed (`tests/test_shadow_*.py`, `test_auto_persist_shadow`, `test_local_settings`, `test_loxone_write_characterization`)
   - Wiring still intact after **2.7.n** / **2.7.q** (record/replay, push-only write block, listener off, config RO, release guard)
   - Dogfood gaps noted (not fixed): ENTSO-E not in feed; push-only sensors skipped by design; a few structure probes without `assert_not_shadow_backend`
@@ -445,14 +453,14 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### EHAL-Com — units, raw↔converted, Live-Lesen readability (2026-10-10)
 
-- [x] **EHAL-Com — units, raw↔converted, Live-Lesen readability** (follow-up to EHAL unit conversion registry)
+- [x] **EHAL-Com — units, raw↔converted, Live-Lesen readability** `[feat]` (follow-up to EHAL unit conversion registry)
   - **Phase A:** shared `ui/ehal_unit_display.py` (registry / `ha_units` only); Signalliste **Hub-Einheit** / **EHAL-Einheit**; Live-Lesen **Wert (EHAL)** + unit suffixes; Live-Schreiben **Wert (Hub)** with Loxone hub-trace normalized to EHAL; same headers on all backends (`—` when no path); `docs/ui/ehal-com.md`
   - **Phase B:** Pandas Styler row colours (optional gray / cached blue / stale yellow / error red) + optional empty-row fallback hint; Status text remains authoritative
   - Tests: `tests/test_ehal_unit_display.py`, Signalliste + Live row assertions
 
 ### Q8 — Clear Loxone Merker names + write activation by key presence (2026-10-10)
 
-- [x] Remove remaining Merker name values from `ehal_bindings` (keep keys as activation flags) or mark code still needing Merker poll / non-empty HA entity_ids
+- [x] Remove remaining Merker name values from `ehal_bindings` (keep keys as activation flags) or mark code still needing Merker poll / non-empty HA entity_ids `[feat]`
   - Write resolvers: key presence → qualified EHAL ID (`settings/ehal_marker_resolve.py`, `resolve_plant_binding` for `set_*`, `_binding_for_ps`); adapter publish allows empty display Merker
   - `clear_loxone_binding_names_in_house` also clears list-shaped `profiles` (was dict-only)
   - Cleared Earnie-env-home `house_profiles.json` / `components.json` + `share/config/house_profiles.example.json`
@@ -461,7 +469,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### `set_ess_source_select` → entity-scoped `ess.<id>.*` (2026-10-10)
 
-- [x] **`set_ess_source_select` → entity-scoped `ess.<id>.set_ess_source_select`** (follow-up to **2.7.h** / **2.7.m**)
+- [x] **`set_ess_source_select` → entity-scoped `ess.<id>.set_ess_source_select`** `[feat]` (follow-up to **2.7.h** / **2.7.m**)
   - Quellenwahl is a physical `standby_backup` capability only — not plant / house ESS.
   - Removed plant `ehal_bindings` / plant-flat remap (`_PLANT_FLAT_ALLOWED_KINDS`); `status.json` / Live-Schreiben / Signalliste use `ess.<id>.set_ess_source_select`.
   - One-off migrate: `migrate_plant_source_select_to_standby` + phase 2 in `scripts/migrate_ess_bindings_once.py`.
@@ -470,14 +478,14 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Optimierer-Dienst — earnie.log auto-refresh + Gehe nach Oben (2026-10-10)
 
-- [x] Make an automatic update every 10 sec on page Optimierer-Dienst for the display on earnie.log
+- [x] Make an automatic update every 10 sec on page Optimierer-Dienst for the display on earnie.log `[feat]`
   - [x] Add a "Gehe nach Oben" button near the "Aktualisieren" button at the lower end
   - `@st.fragment(run_every=10s)` for log body; expander keyed `daemon_log_expander`; scroll via `st.html` to `#daemon-log-top`
   - Docs: `docs/einrichtung/betrieb.md`, handbook; AppTest: `tests/apptest/test_page_daemon_apptest.py`
 
 ### Monitor Chart1 — multi-battery + virtual PS SoC lines (2026-10-10)
 
-- [x] Add additional SOC lines in chart1 of Monitor page for all batteries and also virtual powerstations
+- [x] Add additional SOC lines in chart1 of Monitor page for all batteries and also virtual powerstations `[feat]`
   - Different greens via `soc_color_for_index`; very slim lines for virtual powerstation SoCs (`VIRTUAL_SOC_LINE_WIDTH`)
   - Entities: house ESS + physical PS + virtual PS; virtual `% = stored_kwh / capacity`; forecast from house battery-plan attribution (mirror of reserve advance)
   - `optimizer/powerstation_soc_chart.py`; history `soc_percent_by_ess` includes virtual; docs `docs/ui/charts.md`; tests `test_powerstation_soc_chart.py`, `test_chart1_multi_ess_soc.py`
@@ -506,7 +514,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### EHAL unit conversion — no hardcoding (write registry + hub audit) (2026-10-10)
 
-- [x] **EHAL unit conversion — no hardcoding (all backends, read + write):** After **2.7.n Session F** (Loxone **read** registry), finish writes + remaining hubs so adapters never embed `* 1000` / `/ 1000` / ad-hoc sign flips per field.
+- [x] **EHAL unit conversion — no hardcoding (all backends, read + write):** `[feat]` After **2.7.n Session F** (Loxone **read** registry), finish writes + remaining hubs so adapters never embed `* 1000` / `/ 1000` / ad-hoc sign flips per field.
   - **Loxone write:** setpoint `loxone` blocks on `set_ess_active_power` / charge+discharge limits / `set_grid_export_power_limit` in `share/ehal/roles/{ess,grid}.json`; `apply_loxone_write` / `require_loxone_write` in `ehal/field_registry.py`; adapter + powerstation + Schreibtest driven from registry; retired `ehal_*_w_to_loxone_kw` and battery-read `*1000` fallbacks.
   - **HA:** runtime conversion only via `integrations/ha_units.py`; removed dead `parse_ha_numeric_state` hardcode.
   - **OpenEMS:** optional `openems` polarity blocks + `apply_openems_read` / `apply_openems_write`; adapter helpers delegate to registry.
@@ -514,26 +522,26 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.n Session F — Field registry + generic Loxone read (2026-10-10)
 
-- [x] **2.7.n — Binding 1.0: stable identifiers + generic EHAL read path** (slice of epic **Binding**; write side + Signal list = archived **2.7.q**): Sessions A–F complete. Identifier contract frozen (`ehal/qualified_ids.py`); Loxone **read** conversion data-driven. Full Binding tools (HA, import hardening, Kennung cascade) stay in **2.+1** (P4–P6).
-- [x] **Session F — 2.7.n-5 field registry + generic Loxone read:** nested `loxone` blocks on read fields in `share/ehal/roles/{grid,pv,ess}.json` + `device_roles.schema.json` (unit / ehal_unit / factor / sign / clamp / `omit_if` / `read_required`); `ehal/field_registry.py`; `LoxoneAdapter.read_telemetry` inbox by qualified ID → registry convert → required/optional; `LoxoneConfig` read Merker fields removed; per-battery SoC via `qualified_battery_id`; unbound EHAL IDs push-only (no Merker poll). Scope: Loxone only. Characterization (`tests/test_loxone_read_characterization.py`) + `tests/test_field_registry.py` green. Spec: `docs/spec/ehal.md` units table + Loxone registry note.
+- [x] **2.7.n — Binding 1.0: stable identifiers + generic EHAL read path** `[feat]` (slice of epic **Binding**; write side + Signal list = archived **2.7.q**): Sessions A–F complete. Identifier contract frozen (`ehal/qualified_ids.py`); Loxone **read** conversion data-driven. Full Binding tools (HA, import hardening, Kennung cascade) stay in **2.+1** (P4–P6).
+- [x] **Session F — 2.7.n-5 field registry + generic Loxone read:** `[feat]` nested `loxone` blocks on read fields in `share/ehal/roles/{grid,pv,ess}.json` + `device_roles.schema.json` (unit / ehal_unit / factor / sign / clamp / `omit_if` / `read_required`); `ehal/field_registry.py`; `LoxoneAdapter.read_telemetry` inbox by qualified ID → registry convert → required/optional; `LoxoneConfig` read Merker fields removed; per-battery SoC via `qualified_battery_id`; unbound EHAL IDs push-only (no Merker poll). Scope: Loxone only. Characterization (`tests/test_loxone_read_characterization.py`) + `tests/test_field_registry.py` green. Spec: `docs/spec/ehal.md` units table + Loxone registry note.
   - **Decided (namespaces):** `ess`, `evcs`, `ev`, `inv`, `grid` (`grid.meter.*`), `heatpump`, `pool`, `consumer`; plant house-wide / PV bare until deferred `pv.*`; storage may still hold `flex.{slug}.*` / bare grid keys.
   - **Decided:** `ev.` + `evcs.`; `sens_evcs_connected` not renamed in 2.7.n. Write conversion registry → archived **EHAL unit conversion — no hardcoding** (2026-10-10).
 
 ### 2.7.n Session E — Read characterization extend (2026-10-10)
 
-- [x] **Session E — 2.7.n-4 characterization extend** (gate for F): extended `tests/test_loxone_read_characterization.py` with optional ESS `get_*` (clamp / kW→W / omit), per-battery SoC via `read_ess_soc_by_id` (entity-scoped address, secondary refuse, primary plant alias), and push-inbox composition (missing/stale required → `LoxoneAdapterError`; optional omit). Baseline kW→W / clamps / required missing / export-limit omit kept. Write half = **2.7.q Q1** (already done). Must stay green through Session F.
+- [x] **Session E — 2.7.n-4 characterization extend** `[dev]` (gate for F): extended `tests/test_loxone_read_characterization.py` with optional ESS `get_*` (clamp / kW→W / omit), per-battery SoC via `read_ess_soc_by_id` (entity-scoped address, secondary refuse, primary plant alias), and push-inbox composition (missing/stale required → `LoxoneAdapterError`; optional omit). Baseline kW→W / clamps / required missing / export-limit omit kept. Write half = **2.7.q Q1** (already done). Must stay green through Session F.
 
 ### 2.7.n Session D — Wire cleanup export limit (2026-10-10)
 
-- [x] **Session D — 2.7.n-2a wire cleanup**: loud write / `status.json` / stock VI emit `grid.meter.set_grid_export_power_limit` (align Live-Schreiben / Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`). Schreibtest probe ID + merge of stale bare ledger → qualified wire key. Deferred: PV namespace; kind rename to `set_export_power_limit`.
+- [x] **Session D — 2.7.n-2a wire cleanup** `[feat]`: loud write / `status.json` / stock VI emit `grid.meter.set_grid_export_power_limit` (align Live-Schreiben / Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`). Schreibtest probe ID + merge of stale bare ledger → qualified wire key. Deferred: PV namespace; kind rename to `set_export_power_limit`.
 
 ### 2.7.n Session C — Kennung lock for consumers / EVs (2026-10-10)
 
-- [x] **Session C — 2.7.n-3 Kennung lock for consumers / EVs** (Binding P6 core): lock-on-first-change via `house_config/entity_id_lock.py` on consumer/EV upsert paths (same pattern as battery/PV). Full “Kennung ändern” cascade + alias/rewrite stays in 2.+1 / Binding P6. **Decided (P0c):** alias table **yes** — see [`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md).
+- [x] **Session C — 2.7.n-3 Kennung lock for consumers / EVs** `[feat]` (Binding P6 core): lock-on-first-change via `house_config/entity_id_lock.py` on consumer/EV upsert paths (same pattern as battery/PV). Full “Kennung ändern” cascade + alias/rewrite stays in 2.+1 / Binding P6. **Decided (P0c):** alias table **yes** — see [`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md).
 
 ### Binding P0c — Entity-id persistence inventory (2026-10-10)
 
-- [x] **Session B — Binding P0c spike** (**2.7.n**): inventory which persisted files key by house-config entity id (history, run_state, shadow, dumps, fixtures).
+- [x] **Session B — Binding P0c spike** `[dev]` (**2.7.n**): inventory which persisted files key by house-config entity id (history, run_state, shadow, dumps, fixtures).
   - Deliverable: [`Binding-P0c-Inventory.md`](Binding-P0c-Inventory.md).
   - **Alias table: yes** — alias-on-read for `optimization_history.jsonl` (+ archives); rewrite-on-rename for small live runtime files (flex state, reserves, schedules, sampler, run_state, shadow overlay, `ehal_published`, push inbox, cons_data/profile CSVs); dumps/fixtures out of runtime alias scope (re-record).
   - No separate immutable `uid`. Unblocks Session C (alias required when Kennung cascade lands) and Inverter P1 (no history alias for inverter migration; battery renames still need the path above).
@@ -548,11 +556,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Powerstation savings study 2025 (2026-10-09)
 
-- [x] **Savings study** (done 2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive dogfood deferred until Quellenwahl is entity-scoped (see [Backlog.md](Backlog.md) Version 2.7).
+- [x] **Savings study** `[dev]` (done 2026-10-05, private `Earnie-env-home/studies/powerstation-savings-2025.md`, home plant, 2025). Cash bill: virtual reserves/floors are flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €). Bill savings alone do not carry **2.7.h**; a virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced. **2.7.g** shipped for UX; **2.7.h** implemented (physical only; virtual floor declined) — productive dogfood deferred until Quellenwahl is entity-scoped (see [Backlog.md](Backlog.md) Version 2.7).
 
 ### Loxone-verify hydrate/wait + warn on missing VO (2026-10-09)
 
-- [x] **Loxone-verify: hydrate / wait before verify + warn on missing VO**
+- [x] **Loxone-verify: hydrate / wait before verify + warn on missing VO** `[feat]`
   - `prepare_loxone_push_inbox_for_startup`: hydrate inbox → start VO HTTP → `wait_for_push_link` (token), then startup verify
   - Push miss / outdated last-known → Live Read + startup **Warnung**; last-known ≤5 min still OK; unbound stays error
   - Tests: `tests/test_loxone_connectivity.py`, `tests/test_startup_checks.py`; docs: `docs/ui/ehal-com.md`
@@ -587,7 +595,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.q — Binding push-only write path + retire the Loxone mapping (2026-10-09)
 
-- [x] **2.7.q — Binding push-only write path + retire the Loxone mapping** (epic **Binding**; follows archived **2.7.o**)
+- [x] **2.7.q — Binding push-only write path + retire the Loxone mapping** `[feat]` (epic **Binding**; follows archived **2.7.o**)
   - **Packages (all code done):** q.A/Q1 · q.B/Q2+Q3 · q.C/Q4 · q.D/Q5 (live dogfood verified) · q.E/Q6 (meter energy VO push; **Verified live** 2026-10-09) · q.F/Q7+Q8 — detail sections below
   - **Outcome:** Loud writes publish only via qualified IDs in `status.json` (VI poll ≤10 s); no Merker HTTP for setpoints; meter-energy `/all` poll removed in code; EHAL-Com mapping chapter → Signal list; empty-string activation flags; dual-emit legacy peers removed
   - **Deferred (Shadow future undecided):** Shadow would-write old-vs-new comparison; silent publish gate so planned `status.json` setpoints never actuate
@@ -595,14 +603,14 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.q q.F — Contract UI + storage Q7+Q8 (2026-10-09)
 
-- [x] **q.F — Contract UI + storage** (Q7+Q8; done 2026-10-09)
+- [x] **q.F — Contract UI + storage** `[feat]` (Q7+Q8; done 2026-10-09)
   - **Note (adapted after Q5/Q6):** Loud Live-Schreiben was already push-only; VO/VI CLI gens (q.C) reused for UI ZIP export.
   - [x] **Q7 — EHAL-Com Signalliste:** mapping chapter replaced; Schreibtest = publish + callback; SpecialState10 poll removed; verify/watchdog on inbox/callback; docs updated.
   - [x] **Q8 — Storage cleanup:** empty-string activation flags; `_mapped_fields(require_nonempty_value=…)`; import writes empty values; `scripts/clear_loxone_binding_names_once`; dual-emit legacy peers removed from `status.json`.
 
 ### 2.7.q q.E / Q6 — Meter energy as VO push (2026-10-09)
 
-- [x] **q.E / Q6 — Meter energy as VO push** (decided 2026-10-08): each meter gets a second VO for cumulative kWh (bipolar: consumption + delivery). No averaging / integration of pushed power. QH-open/close anchors read last pushed counter from the inbox; `*_kw = ΔE / 0.25` unchanged (negative Δ rejects that channel).
+- [x] **q.E / Q6 — Meter energy as VO push** `[dev]` (decided 2026-10-08): each meter gets a second VO for cumulative kWh (bipolar: consumption + delivery). No averaging / integration of pushed power. QH-open/close anchors read last pushed counter from the inbox; `*_kw = ΔE / 0.25` unchanged (negative Δ rejects that channel).
   - Fields: plant `sens_pv_energy`, `sens_grid_energy_import` / `_export`; consumers `sens_energy_total` (+ `sens_energy_export` when bipolar); batteries `sens_ess_energy_charge` / `_discharge` (push IO ready; slot overlay deferred)
   - Code: energy kinds pushable in `ehal/loxone_push_source.py`; inbox / `read_signals_from_docs`; `integrations/loxone_meter_energy.py` inbox-only (no `/all`, no `loxone_meter_energy` profile names); EFM import activates energy bindings; stale (> 3 × repeat) / never received → no overlay, sample-mean fallback; never zero-assumed
   - Templates: `VO_Earnie_Plant` / `Consumer` / `Battery` + generator; spec `docs/spec/loxone-meter-energy-slot-ist.md` push section; docs `ehal-com.md`, `loxone-signals.md`
@@ -611,44 +619,44 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Minor — Live-Lesen push zero / last-known Status (2026-10-09)
 
-- [x] **Finding from 2.7.q q.D / Q5 dogfood:** Live-Lesen showed **Kein Mapping** (or bare OK) for push signals at / assumed `0` instead of Push-Inbox style Status
+- [x] **Finding from 2.7.q q.D / Q5 dogfood:** `[feat]` Live-Lesen showed **Kein Mapping** (or bare OK) for push signals at / assumed `0` instead of Push-Inbox style Status
   - `LoxoneCheck.state` from `read_push_value`; `build_read_rows` uses push-state labels (`0 angenommen …`, `Zuletzt bekannt …`) and inbox `last_ts`
   - Empty Merker entity-scoped ESS → EHAL-ID in `collect_read_checks`; Kein Mapping only when unbound / push resolve fails
   - Tests: `tests/test_loxone_debug.py`, `tests/test_loxone_connectivity.py`; docs: `docs/ui/ehal-com.md` Live Read
 
 ### 2.7.q q.D / Q5 — Write push-only cutover + live dogfood (2026-10-09)
 
-- [x] **Q5 code — version cut:** Loud cycle, Schreibtest, Loxone adapter, and watchdog restore publish only via `status.json` (`integrations/loxone_writes.py::_publish_setpoint_traced`); no Merker HTTP for setpoints. Dual-emit of legacy Check keys kept until Q8.
+- [x] **Q5 code — version cut:** `[feat]` Loud cycle, Schreibtest, Loxone adapter, and watchdog restore publish only via `status.json` (`integrations/loxone_writes.py::_publish_setpoint_traced`); no Merker HTTP for setpoints. Dual-emit of legacy Check keys kept until Q8.
   - Call sites: `send_huawei_modbus_states`, flex/EV outputs, `optimizer/powerstation_live.py`, `integrations/ehal_write_test.py`, `integrations/loxone_adapter.py`, `integrations/loxone_watchdog.py`
   - Tests: `tests/test_ehal_write.py`, `test_loxone_client.py` (Huawei/flex), `test_powerstation_2_7_h.py`, `test_loxone_watchdog.py`, `test_loxone_adapter.py`, `test_loxone_status_json.py`
   - Docs: `docs/ui/ehal-com.md` § Q5 staged VI checklist; `docs/referenz/loxone-signals.md`; `docs/einrichtung/loxone-anbindung.md`; `share/loxone/templates/README.md`
   - Pilot VIs regenerated: `tmp/vi_pilot_out/` from Earnie-env-home config
   - **Decided:** accept ≤10 s VI poll for EV / powerstation writes; Freigabe stays Analog
-- [x] **Q5 ops — plant dogfood verified live** (2026-10-09): Loxone Config VI Checks (2026-10-08); cut build `2.7.0-dev.28`; no Merker HTTP for cycle setpoints; actuators follow VI within ≤10 s; Loud ≥24 h OK
+- [x] **Q5 ops — plant dogfood verified live** `[feat]` (2026-10-09): Loxone Config VI Checks (2026-10-08); cut build `2.7.0-dev.28`; no Merker HTTP for cycle setpoints; actuators follow VI within ≤10 s; Loud ≥24 h OK
 
 ### 2.7.q q.C — Templates + VI generator Q4 (2026-10-08)
 
-- [x] **q.C / Q4 — Templates + generator:** VI library v2 (`VI_Earnie_*_v2.xml`) with qualified Check keys; keep legacy `VI_Earnie_*.xml` for Q5 rollback; `scripts/pilot_vi_template_gen.py` fills real Kennungen from config (`VI_Pilot_*.xml` + CSV); VO titles from qualified ID (`title_from_qualified_id` / `Push_<id>`); `write_signals_from_docs` + `heartbeat_write_signal` in `ehal/push_signals.py`
+- [x] **q.C / Q4 — Templates + generator:** `[feat]` VI library v2 (`VI_Earnie_*_v2.xml`) with qualified Check keys; keep legacy `VI_Earnie_*.xml` for Q5 rollback; `scripts/pilot_vi_template_gen.py` fills real Kennungen from config (`VI_Pilot_*.xml` + CSV); VO titles from qualified ID (`title_from_qualified_id` / `Push_<id>`); `write_signals_from_docs` + `heartbeat_write_signal` in `ehal/push_signals.py`
   - Tests: `tests/test_pilot_vi_template_gen.py`, updated `test_pilot_vo_template_gen.py` / `test_loxone_vo_template_shape.py`
   - Docs: `share/loxone/templates/README.md`, `docs/referenz/loxone-signals.md`, `docs/ui/ehal-com.md`
 
 ### 2.7.q q.B — Dual-run write Q2+Q3 (2026-10-08)
 
-- [x] **q.B / Q2 — Key scheme:** `status.json` dual-emits qualified IDs next to legacy keys for one version (`evcs.<slug>.set_evcs_*`, `consumer.` / `heatpump.` / `pool.<slug>.set_enable`; plant bare + powerstation `ess.<id>.set_*` unchanged). Built from `ehal/qualified_ids.py`; title sniffing only for legacy keys
-- [x] **q.B / Q3 — Writer** (former 2.7.n-6): `integrations/ehal_write.py::write_field` publishes ledger (`ehal_published.json` + run_state); wired in `send_huawei_modbus_states`, flex/EV outputs, powerstation Loxone writes, Schreibtest; success = published + Miniserver callback `ts`; direct `/dev/sps/io/…` stays (dual-run)
+- [x] **q.B / Q2 — Key scheme:** `[feat]` `status.json` dual-emits qualified IDs next to legacy keys for one version (`evcs.<slug>.set_evcs_*`, `consumer.` / `heatpump.` / `pool.<slug>.set_enable`; plant bare + powerstation `ess.<id>.set_*` unchanged). Built from `ehal/qualified_ids.py`; title sniffing only for legacy keys
+- [x] **q.B / Q3 — Writer** `[feat]` (former 2.7.n-6): `integrations/ehal_write.py::write_field` publishes ledger (`ehal_published.json` + run_state); wired in `send_huawei_modbus_states`, flex/EV outputs, powerstation Loxone writes, Schreibtest; success = published + Miniserver callback `ts`; direct `/dev/sps/io/…` stays (dual-run)
   - Tests: `tests/test_ehal_write.py`, dual-emit asserts in `test_loxone_write_characterization.py` / `test_loxone_status_json.py`
   - Docs: `docs/referenz/loxone-signals.md`, `docs/ui/ehal-com.md`
 
 ### 2.7.q q.A — Write-path characterization gate Q1 (2026-10-08)
 
-- [x] **q.A / Q1 — Write characterization** (former write half of 2.7.n-4; gate for 2.7.q dual-run)
+- [x] **q.A / Q1 — Write characterization** `[dev]` (former write half of 2.7.n-4; gate for 2.7.q dual-run)
   - Thin pins in `tests/test_loxone_write_characterization.py`: ESS modes (incl. sticky active `0`, asymmetric limits), flex enable + status key shapes, EV current/mode/Sofort, powerstation W→kW + Pattern-B status keys (house flat untouched), frozen legacy `status.json` payload snapshot
   - Minimal silent/Shadow: Shadow does not start status.json listener; silent still serves planned `loxone_sent` (characterized as known risk)
   - **Deferred** (Shadow future undecided): Shadow would-write old-vs-new; silent publish gate so planned status.json values never actuate
 
 ### 2.7.p — Virtual powerstation consumer-start release (2026-10-08)
 
-- [x] **2.7.p — Virtual powerstation consumer-start release**
+- [x] **2.7.p — Virtual powerstation consumer-start release** `[feat]`
   - EHAL exchange/Live/VO: `consumer.{Kennung}.sens_consumer_active` (digital; storage may still be `flex.{slug}.*`); Merker `Earnie_Verbraucher_<Slug>_Aktiv`; Live-Lesen; recipe/role/HITL
   - OR-trigger: digital active **or** `sens_power_act` threshold **or** physical `ess.*.sens_ess_power` **or** UI button (live reads, not plant telemetry alone; accepts `consumer.*` and `flex.*` telemetry keys)
   - Release while active; after inactive drain leftover `stored_kwh`; refill price-optimal with hard **24 h** deadline (`refill_opened_at`, MILP deadline charge window replaces ASAP front-load)
@@ -656,7 +664,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.o — Push-only Loxone read path + cleanup (2026-10-08)
 
-- [x] **2.7.o — Binding push-only read path** (WP1–WP8 + post Phase C cleanup; procedure [`Binding-Push-Only-Conversion.md`](Binding-Push-Only-Conversion.md))
+- [x] **2.7.o — Binding push-only read path** `[feat]` (WP1–WP8 + post Phase C cleanup; procedure [`Binding-Push-Only-Conversion.md`](Binding-Push-Only-Conversion.md))
   - Inbox `read_push_value` / `read_push_ready_by_time`, zero rule + 5 min last-known, start-up wait, EHAL-Com Quelle
   - Push is unconditional for pushable `sens_*` / `get_*` (`ehal.loxone_push.entities` deprecated/ignored)
   - No Merker poll fallback for bound push fields; meter `*_energy` / writes / probe / watchdog stay on poll
@@ -664,25 +672,25 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - READ Merker optional (EHAL-ID fallback when binding key present); WRITE Merkers required
   - Removed EHAL-Com **Push-Inbox** UI (`ui/loxone_push_inbox_ui.py`); daemon inbox kept
   - Docs: `docs/ui/ehal-com.md`, `docs/referenz/loxone-signals.md`
-- [x] Former backlog “Push works for all EHAL values…” checklist (opt-in removal, Wecker path, Merker read strip) folded into this item
+- [x] Former backlog “Push works for all EHAL values…” checklist (opt-in removal, Wecker path, Merker read strip) folded into this item `[feat]`
 
 ### Powerstation every-cycle set_* writes + Schreibtest full field list (2026-10-07)
 
-- [x] **Physical powerstation Merkers refreshed every optimize cycle** (sticky Loxone state)
+- [x] **Physical powerstation Merkers refreshed every optimize cycle** `[feat]` (sticky Loxone state)
   - `write_cycle_powerstation_setpoints` / `build_cycle_powerstation_fields` in [`optimizer/powerstation_live.py`](../optimizer/powerstation_live.py): all **mapped** `ess.{slug}.set_*` (charge from plan else 0; discharge/active → 0; mode → 0 Automatik; source_select → plan else grid)
   - Wired in [`main.py`](../main.py); idle packs no longer skip writes when no reserve/standby charge
   - Loxone wire units: charge/discharge/active W→kW; records returned for Live-Schreiben
-- [x] **Live-Schreiben includes powerstation Merker writes** in last-run table
+- [x] **Live-Schreiben includes powerstation Merker writes** `[feat]` in last-run table
   - PS `LoxoneWriteRecord`s merged into `loxone_writes` with house ESS + flex (`serialize_write_records`)
   - entity-scoped write IO index: batteries + plant `set_ess_source_select` in [`integrations/ehal_debug_mapping.py`](../integrations/ehal_debug_mapping.py)
-- [x] **Schreibtest lists all mapped write fields** (plant, entity-scoped, EV, Flex)
+- [x] **Schreibtest lists all mapped write fields** `[feat]` (plant, entity-scoped, EV, Flex)
   - [`integrations/ehal_write_test.py`](../integrations/ehal_write_test.py) / [`ui/ehal_write_test.py`](../ui/ehal_write_test.py): auto rows from `expected_live_write_fields` ∩ mapped; **Senden** default unchecked
   - `set_ess_active_power` (incl. entity-scoped) always visible; Force checkbox unlocks send only (±200 W + second confirm)
   - Docs [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md); tests `tests/test_powerstation_2_7_h.py`, `tests/test_ehal_write_test.py`
 
 ### 2.7.m — Per-battery EHAL mapping (EHAL-Com) (2026-10-06)
 
-- [x] **2.7.m — Per-battery EHAL mapping (EHAL-Com)** (before **2.7.l**; unblocks **2.7.h** dogfood mapping)
+- [x] **2.7.m — Per-battery EHAL mapping (EHAL-Com)** `[feat]` (before **2.7.l**; unblocks **2.7.h** dogfood mapping)
   - Decisions: ESS off plant row (runtime primary flat aliases only); per-battery Loxone Merker `Earnie_Batterie_<Slug>_…`; shared plant `set_ess_source_select` / `Earnie_Speicher_Quellenwahl`; virtual powerstations excluded from EHAL binding
   - **2.7.m-1:** `kind: battery` rows in `build_entity_rows` (house + physical PS only); persist via `apply_battery_bindings` → `components.json`; Shadow `battery_bindings`
   - **2.7.m-2:** `aggregate_ha_entities` merges entity-scoped + primary aliases; Live-Lesen per-battery rows; plant-flat ESS fallback until migrate
@@ -692,7 +700,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Monthly rotation — optimization_history.jsonl + earnie.log (2026-10-06)
 
-- [x] Monthly rotation for `optimization_history.jsonl` and `earnie.log` (no size trigger; `backupCount=12` ≈ one year)
+- [x] Monthly rotation for `optimization_history.jsonl` and `earnie.log` (no size trigger; `backupCount=12` ≈ one year) `[qual]`
   - Shared helpers: `runtime_store/month_file_rotation.py` (`compute_next_month_rollover`, archive naming, rename→copy/truncate, prune)
   - `logger_config.MonthRotatingFileHandler` (replaces size+weekly `W0`); history rotates on append; loaders merge active + archives
   - Debug dump + shadow seed include history archive siblings; docs `docs/einrichtung/betrieb.md`
@@ -718,7 +726,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.h — Powerstation smart standby-backup for continuous loads (2026-10-06)
 
-- [x] **2.7.h — Powerstation smart standby-backup for continuous loads** (`role: standby_backup`; shared model with **2.7.g**)
+- [x] **2.7.h — Powerstation smart standby-backup for continuous loads** `[feat]` (`role: standby_backup`; shared model with **2.7.g**)
   - Physical only: virtual floor declined (savings study / go/no-go — not worth more than raising house `min_soc`)
   - Rolling per-slot MILP: expensive → battery island, cheap → grid pass-through (+ optional recharge); reserve = load kW × expensive hours, capped by pack capacity
   - EHAL `set_ess_source_select` (0 = grid / 1 = battery) + capability `supports_ess_source_select`; setpoint schema_version **4**; HA boolean invert for EcoFlow `switch.*_grid_bypass` (`ban_bypass_en`)
@@ -737,7 +745,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.k — ENTSO-E first in live day-ahead price chain (2026-10-05)
 
-- [x] **2.7.k — ENTSO-E Transparency as additional EPEX day-ahead source (user token)**
+- [x] **2.7.k — ENTSO-E Transparency as additional EPEX day-ahead source (user token)** `[feat]`
   - Live chain: ENTSO-E (when `ENTSOE_API_TOKEN` in `config/.env`) → Energy-Charts (Fraunhofer) → QH disk cache → aWATTar; no token → INFO skip with checked `.env` path
   - Client [`integrations/entsoe_client.py`](../integrations/entsoe_client.py): A44, EIC map AT/DE-LU/CH; PT15M native, PT60M (CH) → QH expand; token never logged; env + `.env` file fallback for token
   - Cache rename `live_day_ahead_<zone>.json` (`CACHE_VERSION` 2, optional `source`); orchestrator [`data/live_market_prices.py`](../data/live_market_prices.py)
@@ -748,7 +756,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### EV coming-back prognosis review and refactor (2026-10-05)
 
-- [x] Thorough review of EV coming-back / connect prognosis (too-early planning + day skip)
+- [x] Thorough review of EV coming-back / connect prognosis (too-early planning + day skip) `[dev]`
   - Spec: [`docs/spec/ev-return-prognosis.md`](../docs/spec/ev-return-prognosis.md) (current algorithm, Jul–Oct 2026 history, phase model)
   - Single resolver `resolve_connect_prognosis` in [`optimizer/ev_connect_prognosis.py`](../optimizer/ev_connect_prognosis.py); phases `before_arrival` / `late_return` / `open_cycle` / `overnight_open` / `inactive`
   - ReadyAt: live FertigUm, else config `ready_by_hour` (both Loxone and config paths) — no day skip when only config ReadyAt exists
@@ -757,7 +765,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.g — Powerstation reserve for single-use manual devices (2026-10-05)
 
-- [x] **2.7.g — Powerstation reserve for single-use manual devices** (`role: single_use`; shared model with **2.7.h**)
+- [x] **2.7.g — Powerstation reserve for single-use manual devices** `[feat]` (`role: single_use`; shared model with **2.7.h**)
   - Assist mode XOR: `appliance_recommendation.mode` `advice` | `reserve` + `powerstation_id` when reserve (Hausprofil + Manuelle Geräte UI)
   - Shared data model: `type: powerstation`, `backing: virtual|physical`, `attached_consumer_ids[]` (legacy singular = first; virtual multi, physical max 1), `role: single_use`
   - Virtual carve-out: UI hide/inherit electrical fields from primary Hausbatterie; capacity = reserve cap
@@ -770,7 +778,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Virtual Powerstation multi-consumer attach (2.7.g partial) (2026-10-05)
 
-- [x] **Multiple consumers on one virtual Powerstation**
+- [x] **Multiple consumers on one virtual Powerstation** `[feat]`
   - Canonical field `attached_consumer_ids[]` (+ legacy `attached_consumer_id` = first); physical stays max 1
   - Hauskonfigurator: multiselect for virtual; profile caption; sync from all reserve-mode manuals
   - Runtime: one shared reserve pool per PS (summed target, cap by capacity); trigger from any attached appliance
@@ -778,7 +786,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Virtual Powerstation UI hide / inherit (2.7.g partial) (2026-10-05)
 
-- [x] **Virtual Powerstation (`backing: virtual`): hide nonsensical Hausbatterie parameters** and inherit from the primary `type: house` battery on save/normalize
+- [x] **Virtual Powerstation (`backing: virtual`): hide nonsensical Hausbatterie parameters** `[feat]` and inherit from the primary `type: house` battery on save/normalize
   - UI ([`ui/planning_battery_form.py`](../ui/planning_battery_form.py)): only Bezeichnung, Typ, Backing, Rolle, Verbraucher, Kapazität (carve-out cap); caption / warning when no Hausbatterie
   - Inheritance helpers: [`house_config/powerstation.py`](../house_config/powerstation.py) (`apply_virtual_powerstation_inheritance`); applied in [`components_store.py`](../house_config/components_store.py) + [`upsert_battery`](../ui/house_config_entities_io.py)
   - Hidden → inherit charge/efficiency/SoC/threshold from main ESS; discharge `0`, standby `0`, `limits_from_live` false, `control: limits_only`, wear off; fixed defaults if no Hausbatterie
@@ -788,7 +796,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Powerstation savings study 2.7.g / 2.7.h (2026-10-05)
 
-- [x] Prepare and execute a small study about saving potentials for 2.7.g and 2.7.h
+- [x] Prepare and execute a small study about saving potentials for 2.7.g and 2.7.h `[dev]`
   - Private result: `Earnie-env-home/studies/powerstation-savings-2025.md` (home plant, 2025, aWATTar hourly day-ahead; Energy-Charts was down)
   - Cash bill: virtual reserves/floors flat or more expensive (about 2–21 €/year). Physical packs save about 4–18 €/year (150 W on 1024 Wh: 18 €; late Trockner starts about 21 €)
   - Bill savings alone do not carry **2.7.g** / **2.7.h**. A virtual floor is not worth more than the 15 kWh battery alone. Outage value is not priced
@@ -796,7 +804,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### EV late-return connect prognosis (2026-10-04)
 
-- [x] Improve prognosis for EV coming back (connecting for charging)
+- [x] Improve prognosis for EV coming back (connecting for charging) `[feat]`
   - Take schedule from config as start
   - If scheduled time passed without connected EV: last possible start = ReadyAt − charge duration − 1h buffer as internal connecting schedule (`late_return_available_from` in `optimizer/charging_resolve.py`)
   - Only skip future charging completely when no ReadyAt from smarthome-backend (or deadline already expired)
@@ -804,7 +812,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### SE calendar month buttons (2026-10-04)
 
-- [x] Instead of Previous/Next (Zurück/Vor) on Detaillierte Simulationsansicht on SE page: one button per month to change visible month (`ui/backtesting_deviation_calendar.py`; months without in-run days disabled)
+- [x] Instead of Previous/Next (Zurück/Vor) on Detaillierte Simulationsansicht on SE page: one button per month to change visible month (`ui/backtesting_deviation_calendar.py`; months without in-run days disabled) `[feat]`
 
 ### Bugfix NAS live startup / price fallback (2026-10-04)
 
@@ -813,7 +821,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.c — Multiple isolated battery / battery+inverter entities (2026-10-03)
 
-- [x] **2.7.c — Multiple isolated battery / battery+inverter entities** (bidirectional)
+- [x] **2.7.c — Multiple isolated battery / battery+inverter entities** `[feat]` (bidirectional)
   - Isolated battery modes: charging / discharging / standby
   - batt+inverter modes: optimizing / charging / discharging
   - All batteries participate in optimization
@@ -834,14 +842,14 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Version 2.6 - Enhancements for HA coupling (2026-10-03)
 
-- [x] **Version 2.6 — Enhancements for HA coupling** (chapter closed; official **2.6.0** on `main`, supersedes **2.5.3** on `:latest`)
+- [x] **Version 2.6 — Enhancements for HA coupling** `[feat]` (chapter closed; official **2.6.0** on `main`, supersedes **2.5.3** on `:latest`)
   - Scope: easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (entity-scoped, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items in [Backlog.md](Backlog.md). Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
   - Documents: [House simulator spec](../docs/spec/house-sim.md) (HouseSim S1–S4); [EHAL spec — entity-scoped / Loxone HITL](../docs/spec/ehal.md); [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) (channel work **2.6.k**)
   - Letter archive: **2.6.a**…**2.6.p**, **2.6.r**, alphas through **2.6.0-alpha.12**, and official **2.6.0** — see sections below in this file
 
 ### 2.7.j — Additional ESS parameters (2026-10-03)
 
-- [x] **2.7.j — Additional ESS parameters**
+- [x] **2.7.j — Additional ESS parameters** `[feat]`
   - Four plant EHAL **reads** (W / %), HK switch `limits_from_live` on `batteries[]`; plant bindings until **2.7.c** namespaces multi-ESS:
     - `get_ess_soc_min` / `get_ess_soc_max` [%] — read/MILP only (no `set_ess_soc_*`); Huawei LUNA 47082 / 47081
     - `get_ess_max_charge_power` / `get_ess_max_discharge_power` [W ≥ 0]; Huawei LUNA 47075 / 47077
@@ -872,7 +880,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.b — Thermals P2 (2026-09-30)
 
-- [x] **2.7.b — Thermals P2** — Coupled single-node models
+- [x] **2.7.b — Thermals P2** `[feat]` — Coupled single-node models
   - [x] **Slice 1 — House ↔ heat storage ↔ solar (linear)** — optional `thermal.heat_storage` on `thermal_annual`; coupled day targets via `optimizer/thermal_coupled.py`; HK fields; spec [`docs/spec/thermals-p2.md`](../docs/spec/thermals-p2.md); legacy open-loop when volume ≤ 0
   - [x] **House indoor RC** — DIN V 18599 Bauweise `leicht`/`mittel`/`schwer` → C from Wohnfläche; H calibrated from HWB (override optional); band control; `T_house` state; HK fields; chart Haus-Ist; [`optimizer/thermal_house.py`](../optimizer/thermal_house.py)
   - [x] House parameters from energy certificate — **research only** (manual mapping; no automatic PDF/import). Reference: local GEQ EAW EFH Dornbirn 2014 (not in repo). Usable seeds: HWB ≈ 40 kWh/m²a, BGF ≈ 157 m² (≠ Wohnfläche), θi = 20 °C, Sole/Wasser-WP, solar Neigung 18° + Verdrehung 26° (WW-only). **Superseded for the reference installation by the hydraulic plan (2015, local, not in repo) and the tank datasheet:** one combined buffer of **887 l** gross / 861 l net (INHAUS PR 1000; the "1000" is only the type name) → `heat_storage.volume_liters` = **887** (not ≈ 500 from the EAW tank split 100 l RH + 400 l WW); solar collector **10.6 m²** (not 6 m²) → `solar_thermal_area_m2`. Tank: H 2040 mm without insulation, Ø 790 mm, 100 mm PU foam, solar register 3.1 m² (310–1030 mm), four ½" sensor wells at 310 / 745 / 1250 / 1710 mm. Start value `heat_loss_kw_per_k` ≈ 0.006 (estimate, to be calibrated; code default 0.02 is ~3× too high for this tank). **Do not** map building LT+LV ≈ 0.125 kW/K onto `heat_storage.heat_loss_kw_per_k` (tank U only; EAW standby ≈ 4.7 kWh/d → U ≈ 0.006–0.01). BRI ≈ 489 m³ optional for volume heuristics; house C uses Wohnfläche × Bauweise. Monthly Hausprofil model uses Open-Meteo + collector irradiance (same as Live metric), not the offline climate fixture alone.
@@ -894,7 +902,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Minor: Remove EHAL flex.set_power_setpoint (2026-09-30)
 
-- [x] **Remove EHAL `flex.{slug}.set_power_setpoint` permanently** — unused for live control (non-EV flex writes only `set_enable`; variable kW/A is EV-only via `set_evcs_max_current`). Stripped entity-scoped field + legacy stub `flex.power_setpoint_name` / non-EV migrate from `loxone_outputs.power_setpoint_name`; mapping UI / Live-Schreiben expected fields / `share/ehal/roles/consumer.json` / greenfield recipes / docs (`loxone-signals`, `ehal-com`). EV `set_evcs_max_current` kept. Heat-pump Prio3 temperature-setpoint path (2.+1) unrelated.
+- [x] **Remove EHAL `flex.{slug}.set_power_setpoint` permanently** `[feat]` — unused for live control (non-EV flex writes only `set_enable`; variable kW/A is EV-only via `set_evcs_max_current`). Stripped entity-scoped field + legacy stub `flex.power_setpoint_name` / non-EV migrate from `loxone_outputs.power_setpoint_name`; mapping UI / Live-Schreiben expected fields / `share/ehal/roles/consumer.json` / greenfield recipes / docs (`loxone-signals`, `ehal-com`). EV `set_evcs_max_current` kept. Heat-pump Prio3 temperature-setpoint path (2.+1) unrelated.
 
 ### Bugfix Loxone Live-Lesen range checks removed (2026-09-30)
 
@@ -906,7 +914,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.a dogfood — Loxone productive + live test (2026-09-30)
 
-- [x] **2.7.a dogfood — Loxone productive + live test** (wiring archived 2026-09-29)
+- [x] **2.7.a dogfood — Loxone productive + live test** `[feat]` (wiring archived 2026-09-29)
   - Live-test: static HK cap, inbound grid limit override, pay-to-export soft behaviour, release (unconstrained = PV kWp sum + battery max discharge kW)
   - Prefer Shadow dogfood via **2.7.f**; completes the open live-test from wiring-only archive
 
@@ -940,8 +948,8 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Official 2.6.0 release (2026-09-30)
 
-- [x] Bump `version.py` **2.6.0-alpha.12** → **2.6.0**; release notes `.github/release-notes/v2.6.0.md`
-- [x] Candidate tag `v2.6.0` (promote after platform test → `:latest` + official HA add-on)
+- [x] Bump `version.py` **2.6.0-alpha.12** → **2.6.0**; release notes `.github/release-notes/v2.6.0.md` `[feat]`
+- [x] Candidate tag `v2.6.0` (promote after platform test → `:latest` + official HA add-on) `[feat]`
 
 ### 2.6.0-alpha.12 pre-release (2026-09-29)
 
