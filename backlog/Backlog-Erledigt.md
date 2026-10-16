@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### ConfigMigration P3 — wizard (German) (2026-10-16)
+
+- [x] **ConfigMigration P3 — wizard (German):** hint + last run version + release-notes link; pending steps (`title_de` / files) with expandable diffs; questions (`str` / `bool` / `choice`); blockers; manual to-dos (download only when `export_kind` is known); button **Backup anlegen und migrieren** → `run_migration` → report; **Weiter zur App** calls `maybe_auto_start()` (respects `EARNIE_AUTO_START_MAIN` / add-on `auto_start_main`) then `st.rerun()` into normal UI; AppTest `tests/apptest/test_page_config_migration_apptest.py` + unit helpers `tests/test_page_config_migration.py`. Process/docs remain **P4**.
+
 ### ConfigMigration P2 — startup gate (2026-10-16)
 
 - [x] **ConfigMigration P2 — startup gate:** bootstrap no longer silently stamps/migrates live pack files (templates only; new greenfield live files stamped once on create); untagged Earnie-track file = planner blocker (`grid_fees.json` exempt); `runtime_store/migration/gate.py`; `run_streamlit` + `app.py` migration mode (skip `load_config_or_exit`, no daemon auto-start, stub page + log); `load_config_or_exit` / `main_daemon.start` / Shadow refuse while pending; `ensure_compatible` messages point to wizard + CLI; `grid_fees.json` no longer stamped on export/`write_json_dict`; tests `tests/test_migration_startup_gate.py`. Full wizard UI remains **P3**.
