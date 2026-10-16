@@ -2,6 +2,12 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Epic UsagePing — opt-in anonymous install counter (2026-10-16)
+
+- [x] **Epic UsagePing — opt-in anonymous install counter** `[qual]` (spec [`docs/spec/usage-ping.md`](../docs/spec/usage-ping.md); owner decisions 2026-10-16): count active installations per day. Strictly opt-in and revocable, one daily ping while consent is on, nothing sent otherwise; a failed ping never affects the optimisation. Payload is a fixed whitelist: `v`, random `id`, `app_version`, `context` (install context), `stage` (`explorer` → `live`, highest stage reached). The server hashes the ID with a daily rotating salt and stores only daily counters (`usage_daily.csv`), no IP, no access log.
+  - **Decided:** one opt-in at the first milestone (first scenario exploration); second counter stage at the first successful live cycle. Install ID is random (not `hardware_identity`). Kill-switch `EARNIE_USAGE_PING=off`. Receiver = private **`JochenTCC/earnie-server`**. Deploy target = own VPS with **Caddy** TLS edge and stdlib receiver on an internal network; pre-deploy via mock/LAN lab; production host **hosttech** (EU) with AV. CSV columns: `date, installs_total, explorer, live, ctx_loxberry, ctx_ha, ctx_manual, versions_json`.
+  - **Phases:** **P1**–**P5** in this archive below. Follow-on **EarniePoints** EP0–EP4 (schema v2 `points` / `points_v`) → next section below.
+
 ### EarniePoints EP0–EP4 — Earnie-Points in the usage ping (2026-10-16)
 
 - [x] **Epic EarniePoints — Earnie-Points of the live plant in the ping (EP0–EP4)** `[qual]`: the daily ping (schema v2) additionally carries `points` + `points_v` of the **live** plant; the tariff mapping (S / M / L) happens offline at analysis time. Rule `points_v: 1` (business plan §5.2) is mirrored in `docs/spec/earnie-points.md`.
