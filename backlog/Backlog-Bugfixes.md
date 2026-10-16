@@ -53,6 +53,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   2026-10-16 07:44:45 [WARNING] (data.price_forecast_live:322) - Preisprognose: EU-Features nicht ladbar (ValueError, mode=live_forecast) — Spiegelung als Fallback für fehlende Slots.
   Can you find the reason and propose fixing (better than fallback to mirroring)?
 
+- [ ] `debug-dumps\debug_dump_20261016_150238`
+
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
