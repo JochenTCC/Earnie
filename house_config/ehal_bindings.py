@@ -540,12 +540,15 @@ def ensure_migrated(
     config_doc: dict | None,
     *,
     strip_legacy: bool = True,
+    migrate_secrets: bool = True,
 ) -> tuple[dict, dict, bool]:
     """One-shot in-memory migration of blocks/consumer nests → entity bindings.
 
     Also migrates flat ``ehal.ha.entities`` → entity-scoped (2.6.g) and strips the
-    flat map when ``strip_legacy`` is true. With ``strip_legacy``, also moves
-    ``ehal.ha`` URL/token into ``.env`` and strips those JSON keys (2.6.i).
+    flat map when ``strip_legacy`` is true. With ``strip_legacy`` and
+    ``migrate_secrets``, also moves ``ehal.ha`` URL/token into ``.env`` and
+    strips those JSON keys (2.6.i). Pack migration chain sets
+    ``migrate_secrets=False`` (pure docs).
     """
     from house_config.ha_ehal_bindings import (
         migrate_ha_entities_to_house,
@@ -619,13 +622,38 @@ def ensure_migrated(
             config, stripped = strip_ha_entities_from_config(config)
             if stripped:
                 changed = True
-    if strip_legacy:
+    if strip_legacy and migrate_secrets:
         from runtime_store.ha_secrets_migrate import migrate_ha_secrets_to_dotenv
 
         config, secret_changed = migrate_ha_secrets_to_dotenv(config)
         if secret_changed:
             changed = True
     return house, config, changed
+
+
+def needs_ehal_bindings_migration(
+    house_doc: dict | None,
+    config_doc: dict | None = None,
+) -> bool:
+    """True when pack still has legacy Loxone nests or flat HA entities."""
+    config = config_doc if isinstance(config_doc, dict) else {}
+    blocks = config.get("loxone_blocks")
+    if isinstance(blocks, dict) and blocks:
+        return True
+    ehal = config.get("ehal") if isinstance(config.get("ehal"), dict) else {}
+    ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
+    entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
+    if entities:
+        return True
+    house = house_doc if isinstance(house_doc, dict) else {}
+    for profile in _profiles_iterable(house):
+        consumers = profile.get("consumers")
+        if not isinstance(consumers, list):
+            continue
+        for consumer in consumers:
+            if isinstance(consumer, dict) and _consumer_has_legacy_markers(consumer):
+                return True
+    return False
 
 
 def _consumer_has_legacy_markers(consumer: dict) -> bool:

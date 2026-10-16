@@ -184,6 +184,48 @@ def promote_pool_filter_in_profile(profile: dict) -> tuple[bool, list[str]]:
     return changed, warnings
 
 
+def _pool_filter_incomplete(consumer: dict) -> bool:
+    if str(consumer.get("id") or "").strip() != POOL_FILTER_ID:
+        return False
+    if str(consumer.get("daily_target_source") or "") != "loxone_remaining_hours":
+        return True
+    if not isinstance(consumer.get("filter_schedule"), dict):
+        return True
+    return False
+
+
+def needs_pool_filter_migration(
+    house_doc: dict | None,
+    deviation_doc: dict | None = None,
+) -> bool:
+    """True when pool_filter MILP fields, nests, or deviation scopes need migrate."""
+    house = house_doc if isinstance(house_doc, dict) else {}
+    for profile in _profiles_iterable(house):
+        consumers = profile.get("consumers")
+        if not isinstance(consumers, list):
+            continue
+        for consumer in consumers:
+            if not isinstance(consumer, dict):
+                continue
+            stored = consumer.get("swimspa_filter_bindings")
+            if isinstance(stored, dict) and stored:
+                return True
+            if _pool_filter_incomplete(consumer):
+                return True
+            if (
+                _milp_thermal_rc_present([c for c in consumers if isinstance(c, dict)])
+                and _find_pool_filter(consumers) is None
+                and _nest_ehal_from_thermal(consumers)
+            ):
+                return True
+    rules = deviation_doc.get("rules") if isinstance(deviation_doc, dict) else None
+    if isinstance(rules, list):
+        for rule in rules:
+            if isinstance(rule, dict) and str(rule.get("scope") or "").strip() == "swimspa_filter":
+                return True
+    return False
+
+
 def promote_pool_filter_milp(house_doc: dict | None) -> tuple[dict, bool, list[str]]:
     """Return (new_house, changed, warnings)."""
     house = copy.deepcopy(house_doc) if isinstance(house_doc, dict) else {}

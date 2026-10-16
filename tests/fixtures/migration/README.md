@@ -11,7 +11,7 @@ $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
 .venv\Scripts\python.exe -m scripts.extract_migration_fixtures --env-home <path-to-Earnie-env-home>
 ```
 
-Goldens of migrated results are **not** in this folder yet (P1).
+Goldens of migrated results: [`goldens/<snapshot>/`](goldens/) (ConfigMigration P1).
 
 ## Snapshots
 

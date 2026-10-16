@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### ConfigMigration P1 — registry + runner (2026-10-16)
+
+- [x] **ConfigMigration P1 — registry + runner:** `MigrationStep` registry in [`runtime_store/migration/`](../runtime_store/migration/) (pure detect / apply, questions, blockers, manual to-dos); planner (dry run + per-file diff) and runner (validate with real loaders → backup `config/backups/pre-migration-…` → atomic replace); CLI `python -m scripts.migrate_config`; v3→v4 + seven legacy steps as detect-based dm4 steps; config-pack import on the same chain; legacy `migrate_*` CLIs thin-wrapped; goldens under `tests/fixtures/migration/goldens/`; tests `tests/test_migration_registry.py` (chain, golden, idempotency, meta coverage, failure injection, dual-track synthetic, pack import). CLI dogfood on fixture copies accepted 2026-10-16.
+
 ### ConfigMigration P0 — inventory + fixtures (2026-10-16)
 
 - [x] **ConfigMigration P0 — inventory + fixtures:** documented order / inputs / idempotency / loader rejections for v3→v4 and the seven in-model one-shots in [`Config-Migration-Inventory.md`](Config-Migration-Inventory.md); scrubbed before-snapshots from Earnie-env-home (`v3_last`, `v3_single_battery`, `v3_pre_ehal`, `v4_pre_quellenwahl`, `v4_pre_inverter_gridfee`, `v4_pre_conversion`, `v4_pre_topology`) under `tests/fixtures/migration/`; re-extract via `python -m scripts.extract_migration_fixtures --env-home <Earnie-env-home>`. Goldens and registry tests remain **P1**.

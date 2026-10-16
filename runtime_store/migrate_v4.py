@@ -293,6 +293,20 @@ def residual_plant_flat_ess_keys(house_doc: dict[str, Any] | None) -> list[str]:
         del plant  # only need keys
         keys.extend(sorted(flat))
     return sorted(set(keys))
+
+
+def needs_ess_bindings_migration(
+    house_doc: dict[str, Any] | None,
+    components_doc: dict[str, Any] | None = None,
+) -> bool:
+    """True when plant still holds phase-1 flat ESS or Quellenwahl."""
+    del components_doc  # reserved for future multi-battery detect
+    house = house_doc if isinstance(house_doc, dict) else {}
+    if _collect_plants_with_flat_ess(house):
+        return True
+    return any(_plant_source_select_address(p) for p in _iter_plants(house))
+
+
 def migrate_document(doc: dict[str, Any], *, kind: str) -> dict[str, Any]:
     """Migrate a single document by kind: scenarios|components|generic."""
     version = read_data_model(doc)

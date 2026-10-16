@@ -69,18 +69,38 @@ def migrate_components_topology(doc: dict) -> tuple[dict, list[str]]:
     return out, migrated_ids
 
 
+def needs_grid_meter_migration(doc: dict | None) -> bool:
+    """True when plant.grid_meter is missing or incomplete."""
+    if not isinstance(doc, dict):
+        return False
+    plant = doc.get("plant")
+    if not isinstance(plant, dict):
+        return True
+    gm = plant.get("grid_meter")
+    if not isinstance(gm, dict):
+        return True
+    return "at_house_connection" not in gm or "single_tariff" not in gm
+
+
+def needs_topology_pack_migration(
+    components_doc: dict | None,
+    house_doc: dict | None,
+) -> bool:
+    """True when components or house_profiles still need Topology P1 seeds."""
+    if isinstance(components_doc, dict) and needs_topology_migration(components_doc):
+        return True
+    return needs_grid_meter_migration(house_doc)
+
+
 def migrate_house_profiles_grid_meter(doc: dict) -> tuple[dict, bool]:
     """Seed plant.grid_meter when missing. Return (doc, changed)."""
     if not isinstance(doc, dict):
         raise ValueError("house_profiles.json muss ein Objekt sein.")
-    plant_raw = doc.get("plant")
-    plant = dict(plant_raw) if isinstance(plant_raw, dict) else {}
-    if isinstance(plant.get("grid_meter"), dict):
-        gm = plant["grid_meter"]
-        if "at_house_connection" in gm and "single_tariff" in gm:
-            return doc, False
+    if not needs_grid_meter_migration(doc):
+        return doc, False
     out = dict(doc)
-    plant = dict(plant)
+    plant_raw = out.get("plant")
+    plant = dict(plant_raw) if isinstance(plant_raw, dict) else {}
     plant["grid_meter"] = dict(DEFAULT_GRID_METER)
     out["plant"] = plant
     stamp_data_model(out)

@@ -79,7 +79,7 @@ def ensure_compatible(doc: dict[str, Any], *, label: str) -> int:
         raise DataModelError(
             f"{label}: earnie_data_model={version} muss zuerst nach "
             f"{CURRENT_DATA_MODEL} migriert werden "
-            f"(python -m scripts.migrate_data_model_v4)."
+            f"(python -m scripts.migrate_config --config-dir <config>)."
         )
     if version not in COMPATIBLE_DATA_MODELS:
         raise DataModelError(

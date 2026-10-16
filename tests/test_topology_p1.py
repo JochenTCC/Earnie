@@ -184,6 +184,7 @@ def test_migrate_script_roundtrip(tmp_path):
     (config_dir / "components.json").write_text(
         json.dumps(
             {
+                "earnie_data_model": 4,
                 "inverters": [_hybrid()],
                 "batteries": [
                     {
@@ -198,7 +199,7 @@ def test_migrate_script_roundtrip(tmp_path):
         encoding="utf-8",
     )
     (config_dir / "house_profiles.json").write_text(
-        json.dumps({"profiles": [], "plant": {}}),
+        json.dumps({"earnie_data_model": 4, "profiles": [], "plant": {}}),
         encoding="utf-8",
     )
     main(["--config-dir", str(config_dir)])

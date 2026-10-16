@@ -1,0 +1,221 @@
+{
+    "description": "Netznutzungsentgelt-Arbeitspreis je Netzbereich (Netzebene 7) und zeitgebundene Regeln. Preise netto, Cent/kWh. Modell: docs/konfiguration/preise.md.",
+    "rule_sets": {
+        "AT_NE7": [
+            {
+                "id": "SNAP",
+                "label": "Sommer-Nieder-Arbeitspreis",
+                "status": "verordnet",
+                "valid_from": "2026-04-01",
+                "valid_to": null,
+                "months": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9
+                ],
+                "time": {
+                    "from": "10:00",
+                    "to": "16:00"
+                },
+                "weekdays": null,
+                "effect": {
+                    "mode": "percent_off",
+                    "value": 20.0
+                },
+                "requires": [
+                    "quarter_hour_meter"
+                ],
+                "source": "SNE-V 2018, BGBl. II Nr. 305/2025 (§ 5 Abs. 1b); 20 % laut Netzbetreibern/AK (Sekundärquellen)",
+                "note": "Voraussetzung laut Netzbetreibern: Viertelstundenwerte am Zähler. Opt-in je Netzbetreiber möglich - im Preisblatt prüfen."
+            },
+            {
+                "id": "WiNAP",
+                "label": "Winter-Nieder-Arbeitspreis",
+                "status": "entwurf",
+                "valid_from": "2027-01-01",
+                "valid_to": null,
+                "months": [
+                    10,
+                    11,
+                    12,
+                    1,
+                    2,
+                    3
+                ],
+                "time": {
+                    "from": "22:00",
+                    "to": "04:00"
+                },
+                "weekdays": null,
+                "effect": {
+                    "mode": "percent_off",
+                    "value": null
+                },
+                "requires": [
+                    "quarter_hour_meter"
+                ],
+                "source": "SNE-G-V Begutachtungsentwurf 29.06.2026, § 7 Abs. 4",
+                "note": "Höhe und Startdatum offen (Tarifverordnung SNE-T-V erwartet ca. 12/2026; Branche fordert Start 01.10.2027). Wert erst eintragen, wenn verordnet."
+            }
+        ]
+    },
+    "areas": [
+        {
+            "id": "AT-BGLD",
+            "label": "Burgenland",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 8.46,
+                "metered_power": 5.83
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-KTN",
+            "label": "Kärnten",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 9.67,
+                "metered_power": 5.47
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-KLGF",
+            "label": "Klagenfurt",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 6.9,
+                "metered_power": 4.36
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-NOE",
+            "label": "Niederösterreich",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 8.79,
+                "metered_power": 6.65
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-OOE",
+            "label": "Oberösterreich",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 6.29,
+                "metered_power": 4.68
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-LINZ",
+            "label": "Linz",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 5.57,
+                "metered_power": 3.26
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-SBG",
+            "label": "Salzburg",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 6.59,
+                "metered_power": 3.91
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-STMK",
+            "label": "Steiermark",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 8.82,
+                "metered_power": 6.78
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-GRAZ",
+            "label": "Graz",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 5.17,
+                "metered_power": 4.23
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-TIROL",
+            "label": "Tirol",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 6.81,
+                "metered_power": 3.66
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-IBK",
+            "label": "Innsbruck",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 8.03,
+                "metered_power": 5.72
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-VBG",
+            "label": "Vorarlberg",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 4.96,
+                "metered_power": 2.84
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-WIEN",
+            "label": "Wien",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 6.98,
+                "metered_power": 4.21
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        },
+        {
+            "id": "AT-KLWT",
+            "label": "Kleinwalsertal",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 17.73,
+                "metered_power": 11.4
+            },
+            "rule_set": "AT_NE7",
+            "source": "Netznutzungsentgelte_Oesterreich_NE7.xlsx (SNE-V 2018, Fassung 01.04.2026; Recherche, nicht gegen Preisblatt geprüft)"
+        }
+    ]
+}

@@ -1,0 +1,97 @@
+{
+    "$schema": "./backtesting_scenarios.schema.json",
+    "earnie_data_model": 4,
+    "cbc_gap_rel": 0.2,
+    "commit_hours": 24,
+    "cbc_strict_time_limit_sec": 2,
+    "scenarios": [
+        {
+            "id": "live",
+            "label": "Live",
+            "enabled": true,
+            "own_reference": true,
+            "settings": {
+                "pv_system_ids": [
+                    "dach_sued",
+                    "dach_nord"
+                ],
+                "import_tariff_id": "at_vkw_strom_dynamisch",
+                "export_tariff_id": "at_vkw_pv_dynamisch",
+                "house_profile_id": "example_efh",
+                "battery_ids": [
+                    "10_kwh_speicher"
+                ]
+            }
+        },
+        {
+            "id": "mein_szenario_4",
+            "label": "Live VKW - Dynamischer Export",
+            "enabled": true,
+            "own_reference": false,
+            "settings": {
+                "pv_system_ids": [
+                    "dach_sued"
+                ],
+                "import_tariff_id": "at_vkw_strom_dynamisch",
+                "export_tariff_id": "at_vkw_pv_dynamisch",
+                "house_profile_id": "example_efh",
+                "battery_ids": [
+                    "5_0_kwh_speicher"
+                ]
+            }
+        },
+        {
+            "id": "15_kwh_mit_pv_auf_nordseite_copy",
+            "label": "5 kWh mit PV Auf Nordseite",
+            "enabled": true,
+            "own_reference": false,
+            "settings": {
+                "pv_system_ids": [
+                    "dach_sued",
+                    "dach_nord"
+                ],
+                "import_tariff_id": "at_vkw_strom_dynamisch",
+                "export_tariff_id": "at_vkw_pv_dynamisch",
+                "house_profile_id": "example_efh",
+                "battery_ids": [
+                    "5_0_kwh_speicher"
+                ]
+            }
+        },
+        {
+            "id": "mein_szenario",
+            "label": "15 kWh ohne zweite PV",
+            "enabled": true,
+            "own_reference": false,
+            "settings": {
+                "pv_system_ids": [
+                    "dach_sued"
+                ],
+                "import_tariff_id": "at_vkw_strom_dynamisch",
+                "export_tariff_id": "at_vkw_pv_dynamisch",
+                "house_profile_id": "example_efh",
+                "battery_ids": [
+                    "10_kwh_speicher"
+                ]
+            }
+        },
+        {
+            "id": "15_kwh_ohne_zweite_pv_copy",
+            "label": "15 kWh mit PV Auf Nordseite",
+            "enabled": true,
+            "own_reference": false,
+            "settings": {
+                "pv_system_ids": [
+                    "dach_sued",
+                    "dach_nord"
+                ],
+                "import_tariff_id": "at_vkw_strom_dynamisch",
+                "export_tariff_id": "at_vkw_pv_dynamisch",
+                "house_profile_id": "example_efh",
+                "battery_ids": [
+                    "10_kwh_speicher"
+                ]
+            }
+        }
+    ]
+}

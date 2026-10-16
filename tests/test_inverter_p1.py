@@ -118,6 +118,7 @@ def test_migrate_script_roundtrip(tmp_path):
     path.write_text(
         json.dumps(
             {
+                "earnie_data_model": 4,
                 "batteries": [
                     {
                         "id": "a",

@@ -1,0 +1,96 @@
+{
+    "batteries": [
+        {
+            "id": "5_0_kwh_speicher",
+            "label": "5 kWh Speicher",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_charge_power_kw": 2.5,
+            "battery_max_discharge_power_kw": 2.5,
+            "battery_efficiency": 0.92,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.01,
+            "limits_from_live": false,
+            "control": "full",
+            "standby_power_kw": 0.026,
+            "battery_wear": {
+                "enabled": true,
+                "replacement_cost_euro": 1500.0,
+                "expected_cycles": 6000.0,
+                "cycle_cost_fraction": 0.5
+            },
+            "ehal_bindings": {},
+            "inverter_id": "wr_main",
+            "regulates_on": "grid"
+        },
+        {
+            "id": "10_kwh_speicher",
+            "label": "15 kWh Speicher",
+            "battery_capacity_kwh": 15.0,
+            "battery_max_charge_power_kw": 5.0,
+            "battery_max_discharge_power_kw": 5.0,
+            "battery_efficiency": 0.94,
+            "battery_min_soc": 5.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.03,
+            "limits_from_live": false,
+            "control": "full",
+            "standby_power_kw": 0.026,
+            "battery_wear": {
+                "enabled": false
+            },
+            "ehal_bindings": {},
+            "inverter_id": "wr_main",
+            "regulates_on": "grid"
+        },
+        {
+            "id": "5_kwh_speicher",
+            "label": "10 kWh Speicher",
+            "battery_capacity_kwh": 10.0,
+            "battery_max_charge_power_kw": 5.0,
+            "battery_max_discharge_power_kw": 5.0,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+            "limits_from_live": true,
+            "control": "full",
+            "battery_wear": {
+                "enabled": false
+            },
+            "ehal_bindings": {},
+            "inverter_id": "wr_main",
+            "regulates_on": "grid"
+        }
+    ],
+    "pv_systems": [
+        {
+            "id": "dach_nord",
+            "label": "Dach Nord",
+            "kwp": 6.8,
+            "pv_tilt": 18.0,
+            "pv_azimuth": -154.0,
+            "inverter_id": "wr_main"
+        },
+        {
+            "id": "dach_sued",
+            "label": "Dach Süd",
+            "kwp": 5.7,
+            "pv_tilt": 18.0,
+            "pv_azimuth": 26.0,
+            "inverter_id": "wr_main"
+        }
+    ],
+    "earnie_data_model": 4,
+    "inverters": [
+        {
+            "id": "wr_main",
+            "label": "Haupt-Wechselrichter",
+            "type": "hybrid",
+            "ac_connection": "grid_tied",
+            "control": "full",
+            "efficiency": 0.97,
+            "ehal_bindings": {}
+        }
+    ]
+}

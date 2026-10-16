@@ -87,17 +87,19 @@ def build_config_pack_bytes() -> bytes:
 def _migrate_and_validate_pack_docs(
     json_payloads: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
-    """Migrate v3→v4 when needed, then ensure every member is compatible."""
-    from runtime_store.data_model import MIGRATABLE_DATA_MODELS, read_data_model
-    from runtime_store.migrate_v4 import migrate_pack_docs
+    """Run the ConfigMigration registry chain, then ensure members are compatible."""
+    from runtime_store.migration.chain import apply_chain
+    from runtime_store.migration.registry import STEPS
+    from runtime_store.migration.validate import validate_migrated_docs
 
-    needs = any(
-        read_data_model(doc) in MIGRATABLE_DATA_MODELS
-        for doc in json_payloads.values()
-    )
-    if needs:
-        json_payloads = migrate_pack_docs(json_payloads)
+    chain = apply_chain(json_payloads, {}, STEPS, stop_on_blocker=True)
+    if chain.blockers:
+        raise DataModelError(chain.blockers[0].message_de)
+    json_payloads = chain.docs
+    validate_migrated_docs(json_payloads)
     for name, doc in json_payloads.items():
+        if name == "grid_fees.json":
+            continue
         stamp_data_model(doc)
         ensure_compatible(doc, label=name)
     return json_payloads
@@ -165,7 +167,17 @@ def import_config_pack_bytes(payload: bytes) -> list[str]:
                     continue
                 dest = Path(resolver())
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                write_json_dict(str(dest), json_payloads[arcname])
+                if arcname == "grid_fees.json":
+                    # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
+                    dest.write_text(
+                        json.dumps(
+                            json_payloads[arcname], indent=4, ensure_ascii=False
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                else:
+                    write_json_dict(str(dest), json_payloads[arcname])
                 written.append(arcname)
 
             uploads_dest = Path(resolve_uploads_dir())
