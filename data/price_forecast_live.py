@@ -45,8 +45,17 @@ _power_day_cache: dict[date, pd.DataFrame] = {}
 def _feature_load_error_summary(exc: BaseException) -> str:
     """Kurzbeschreibung für Logs (ohne volle Request-URL)."""
     if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        # Status only — request exception strings often embed the full URL.
         return f"HTTP {exc.response.status_code}"
-    return type(exc).__name__
+    detail = type(exc).__name__
+    msg = str(exc).strip()
+    if not msg:
+        return detail
+    # Drop query strings that may appear in request-related messages.
+    compact = msg.split("?")[0]
+    if len(compact) > 180:
+        compact = compact[:177] + "..."
+    return f"{detail}: {compact}"
 
 
 def get_missing_price_strategy() -> str:

@@ -1,6 +1,7 @@
 """EU-Wetter- und Erzeugungsfeatures für Preisprognose-Training (Spec: price-forecast-renewables)."""
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -19,6 +20,11 @@ AT_BIDDING_ZONE = "AT"
 API_RETRY_ATTEMPTS = 5
 API_RETRY_BASE_SECONDS = 2.0
 API_PAUSE_SECONDS = 0.75
+# Energy-Charts often needs longer than GLOBAL_TIMEOUT (default 5s), especially
+# when 12 countries are fetched sequentially on a slow NAS uplink.
+ENERGY_CHARTS_TIMEOUT_FLOOR_SEC = 30.0
+
+logger = logging.getLogger(__name__)
 WIND_PRODUCTION_NAMES = frozenset({"Wind onshore", "Wind offshore"})
 SOLAR_PRODUCTION_NAME = "Solar"
 LOAD_PRODUCTION_NAME = "Load"
@@ -96,14 +102,24 @@ def month_ranges(start: date, end: date) -> list[tuple[date, date]]:
     return ranges
 
 
-def _http_get_json(url: str, params: dict[str, Any]) -> dict[str, Any]:
+def _energy_charts_timeout_sec() -> float:
+    return max(float(config.get_global_timeout()), ENERGY_CHARTS_TIMEOUT_FLOOR_SEC)
+
+
+def _http_get_json(
+    url: str,
+    params: dict[str, Any],
+    *,
+    timeout_sec: float | None = None,
+) -> dict[str, Any]:
     last_error: Exception | None = None
+    timeout = float(config.get_global_timeout() if timeout_sec is None else timeout_sec)
     for attempt in range(API_RETRY_ATTEMPTS):
         try:
             response = requests.get(
                 url,
                 params=params,
-                timeout=config.get_global_timeout(),
+                timeout=timeout,
             )
             if response.status_code == 429:
                 wait = API_RETRY_BASE_SECONDS * (2 ** attempt)
@@ -191,6 +207,7 @@ def fetch_country_power_hourly(
                 if chunk_end > chunk_start
                 else chunk_start.isoformat(),
             },
+            timeout_sec=_energy_charts_timeout_sec(),
         )
         frames.append(_public_power_hourly(payload))
     if not frames:
@@ -211,10 +228,32 @@ def fetch_country_renewables_hourly(
 
 
 def fetch_eu_power_hourly(start: date, end: date) -> pd.DataFrame:
-    """Summierte EU-Wind, Solar, Last und Residuallast (MW) je Stunde."""
+    """Summierte EU-Wind, Solar, Last und Residuallast (MW) je Stunde.
+
+    Single-country failures (timeout, empty payload) are skipped so the
+    remaining countries still feed the live price forecast. Mirror fallback
+    only when every country fails.
+    """
     total: pd.DataFrame | None = None
+    failed: list[str] = []
     for country in GENERATION_COUNTRIES:
-        country_frame = fetch_country_power_hourly(country, start, end)
+        try:
+            country_frame = fetch_country_power_hourly(country, start, end)
+        except (
+            OSError,
+            ValueError,
+            requests.HTTPError,
+            RuntimeError,
+            requests.RequestException,
+        ) as exc:
+            failed.append(country)
+            logger.warning(
+                "EU-Leistungsdaten: Land %s übersprungen (%s: %s).",
+                country,
+                type(exc).__name__,
+                str(exc).split("?")[0][:180],
+            )
+            continue
         country_frame = country_frame.rename(
             columns={col: f"{col}_{country}" for col in country_frame.columns}
         )
@@ -223,7 +262,21 @@ def fetch_eu_power_hourly(start: date, end: date) -> pd.DataFrame:
         else:
             total = total.join(country_frame, how="outer")
     if total is None:
-        raise ValueError("EU-Leistungsdaten konnten nicht geladen werden.")
+        raise ValueError(
+            "EU-Leistungsdaten konnten nicht geladen werden"
+            + (
+                f" (alle Länder fehlgeschlagen: {', '.join(failed)})."
+                if failed
+                else "."
+            )
+        )
+    if failed:
+        logger.warning(
+            "EU-Leistungsdaten: Summe ohne %s (%d/%d Länder ok).",
+            ", ".join(failed),
+            len(GENERATION_COUNTRIES) - len(failed),
+            len(GENERATION_COUNTRIES),
+        )
     result = pd.DataFrame(index=total.index)
     for base, eu_name in (
         ("wind_mw", "eu_wind_mw"),
@@ -256,6 +309,7 @@ def fetch_at_day_ahead_hourly(start: date, end: date) -> pd.Series:
                 if chunk_end > chunk_start
                 else chunk_start.isoformat(),
             },
+            timeout_sec=_energy_charts_timeout_sec(),
         )
         seconds = payload.get("unix_seconds") or []
         prices = payload.get("price") or []
