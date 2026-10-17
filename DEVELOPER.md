@@ -10,19 +10,23 @@ Earnie/
 ├── config.py                # Configuration loader
 ├── docker/                  # Dockerfile, Compose, build scripts (see docker/README.md)
 ├── backlog/                 # Roadmap (Backlog.md, Backlog-Bugfixes.md, Backlog-Erledigt.md)
-├── config/
-│   ├── config.json          # House configuration (gitignored, persistent)
-│   ├── config.example.json  # Template for new installations
-│   └── config.schema.json   # JSON schema (editor hover)
+├── share/config/            # Templates (config.example.json, schema, snippets)
+├── earnie_env/              # Local persistence (gitignored): config/ + runtime/
+├── ehal/                    # EHAL field catalog, qualified IDs, roles
+├── house_config/            # House profiles, planning bridges
+├── settings/                # System / silent_mode loaders
 ├── optimizer/               # MILP, simulation, charging context, facade
-├── integrations/            # Loxone, Awattar, log import
+├── integrations/            # Loxone, HA, OpenEMS, Awattar, log import
 ├── data/                    # Profiles, consumption, PV forecast
 ├── simulation/              # Backtesting engine
 ├── runtime_store/           # JSON persistence, bootstrap, config drift
+├── packaging/               # HA add-on, LoxBerry
+├── house_sim/               # Lab house simulator
 ├── ui/                      # Streamlit components
 ├── scripts/                 # CLI (bootstrap, migrate, generate_cons_data, …)
+├── docs/                    # User docs (German), workflow docs, dev notes
 ├── tests/
-└── runtime/                 # Runtime data (CSV, JSON, logs — gitignored)
+└── tools/                   # Standalone helpers (e.g. HA–Loxone bridge)
 ```
 
 ## Local Development
@@ -47,11 +51,11 @@ For a Linux-aligned editor/runtime (Docker Desktop required):
 
 1. Command Palette → **Dev Containers: Reopen in Container**
 2. Wait for `post-create` (`pip install --only-binary=:all: -e ".[dev]"`, bootstrap `earnie_env/`; remote user `vscode`)
-3. F5 with **Streamlit app.py (:8531 lokal (earnie_env))**
+3. F5 with a **Streamlit app.py … (earnie_env)** launch configuration (launch configs live in the gitignored, machine-specific `.vscode/launch.json`)
 
-Config: `.devcontainer/` (Python 3.14-slim, env aligned with `.vscode/launch.json`). UI: `http://localhost:8531`.
+Config: `.devcontainer/` (Python 3.14-slim). The Dev Container sets `EARNIE_UI_STREAMLIT_PORT=8531` and forwards ports 8531 and 8541. Outside the container the UI port defaults to `8501` (`ui.streamlit_port` / `EARNIE_UI_STREAMLIT_PORT`), so a plain local run opens `http://localhost:8501`.
 
-One process is enough for local UI work: Streamlit (`app.py`). Start/stop `main.py` from **Real-Time Environment → Optimizer Service**, or set `$env:EARNIE_AUTO_START_MAIN = "1"` before `run_streamlit` (as in Docker Compose). Only run `python main.py` in a second terminal when you need exclusive daemon debugging (local auto-start is off by default).
+One process is enough for local UI work: Streamlit (`app.py`). Start/stop `main.py` from **Daemon Control → Optimierer-Dienst**, or set `$env:EARNIE_AUTO_START_MAIN = "1"` before `run_streamlit` (as in Docker Compose). Only run `python main.py` in a second terminal when you need exclusive daemon debugging (local auto-start is off by default).
 
 If `Activate.ps1` is missing: remove `.venv` and recreate with `py -3 -m venv .venv`. Confirm `.\.venv\Scripts\Activate.ps1` exists before activating.
 
@@ -59,7 +63,7 @@ Canonical metadata and dependencies: `pyproject.toml` (`version.py` = version so
 
 CLI after `pip install -e .` (optional): `earnie-bootstrap`, `earnie-build-image`, `earnie-verify-loxone`, … (legacy aliases: `ernie-*`).
 
-Legacy: `config.json` in the project root is still supported when `config/config.json` is missing.
+Primary config path: `earnie_env/config/config.json` (via `EARNIE_ENV_PATH`). Legacy fallbacks: repo-root `config/config.json`, then root `config.json`. Templates: `share/config/`.
 
 ## Container (Synology / LoxBerry / Proxmox / Docker)
 
@@ -90,7 +94,7 @@ git push origin vX.Y.Z-alpha.N
 ```
 
 - Tag must match `version.py` exactly (`v2.0.0` ↔ `__version__ = "2.0.0"`; `v2.2.0-alpha.1` ↔ `2.2.0-alpha.1`); mismatch fails the workflow.
-- Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body). **Required care for HA:** the first non-heading prose line becomes the add-on CHANGELOG / Änderungsprotokoll bullet — write it for end users (German, no pin/`latest` jargon); checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md) §1.
+- **Required** reviewed notes for every non-`-dev` tag: `.github/release-notes/vX.Y.Z.md` (also `-alpha.N` / `-beta.N` / `-rc.N`); CI has no generic fallback (`scripts.release_notes_finalize --check`). **Required care for HA:** the first non-heading prose line becomes the add-on CHANGELOG / Änderungsprotokoll bullet — write it for end users (German, no pin/`latest` jargon); checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md) §1.
 - Official (after `promote`): GitHub Latest Release; images `:<version>`, `:next`, and `:latest` (+ legacy aliases).
 - Pre-release (after `promote`): GitHub Pre-release (not Latest); images `:<version>` and `:next` (no `:latest`).
 - **Candidate → approve → publish:** a tag push builds a *candidate* only — `:<version>` images (app + HA add-on), GitHub Release as **draft**. Pre-gate checks: `addon_smoke` (`scripts/ha_addon_smoke.py` starts `earnie-addon-{arch}:<version>` like the Supervisor; amd64 blocking, aarch64 under QEMU soft), `addon_lint` (pin bump + addon-linter, no commit), `qemu_smoke` (soft). Job `promote` then **waits for manual approval** (environment `release-approval`, required reviewer): Actions run → *Review deployments* → **Approve** sets `:next` (official also `:latest`), publishes the release and lets `publish_ha_addon` pin the add-on; **Reject** drops the candidate — nothing user-visible happened (next attempt = next version, no tag rewrite). Checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md).
@@ -128,9 +132,9 @@ Proxmox: LXC with `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh`
 
 ## Notes
 
-- `config/config.json` (or legacy `config.json`) is local and gitignored.
-- Runtime data lives under `runtime/` (`EARNIE_RUNTIME_PATH`).
-- Persistence root: `EARNIE_ENV_PATH` (default `earnie_env`). Config directory: `EARNIE_CONFIG_PATH` (default `{ENV_PATH}/config`). Runtime: `EARNIE_RUNTIME_PATH` or `{ENV_PATH}/runtime`.
+- `config.json` and the other config sidecars are local and gitignored.
+- Persistence root: `EARNIE_ENV_PATH` (default `earnie_env`). Config directory: `EARNIE_CONFIG_PATH` (default `{ENV_PATH}/config`). Runtime data (CSV, JSON, logs): `EARNIE_RUNTIME_PATH` or `{ENV_PATH}/runtime`.
+- Legacy layouts (repo-root `config/` and `runtime/`) are still picked up only when the default `earnie_env` root is in use and the new directory does not exist (`runtime_store/persist_paths.py`).
 
 ## Shadow Mode (Dev client)
 
@@ -166,7 +170,7 @@ New live HTTP clients that feed the optimizer cycle (hub GET or `ext:*`) must go
 | `ext_get(replay=…, live=…, allow_live_fallback=…)` | External APIs — Soft fallback (prices/outdoor) may live-fetch in Shadow **without** recording; PV uses `allow_live_fallback=False` |
 | `safe_record(...)` | Replace ad-hoc try/except wrappers around `record_transport` |
 
-Structure / setup probes (MCP, greenfield, EHAL mapping scan, credential probe) must call `assert_not_shadow_backend` — UI disable alone is not enough. Daemon loop glue lives in `runtime_store.shadow.daemon` (not `main_daemon.py`).
+Structure / setup probes (MCP, greenfield, EHAL mapping scan, credential probe) must call `assert_not_shadow_backend` — UI disable alone is not enough. Daemon loop glue lives in `runtime_store.shadow.daemon` (not `runtime_store/main_daemon.py`).
 
 ## Roadmap
 

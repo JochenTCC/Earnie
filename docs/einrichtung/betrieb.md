@@ -1,5 +1,7 @@
 # Betrieb
 
+Diese Seite beschreibt, wie Optimierer-Dienst und App zusammenarbeiten, welche Laufzeitdateien entstehen und was nach einem Update zu tun ist.
+
 ## Einstiegspunkte
 
 
@@ -26,24 +28,24 @@ Unter **Optimierer-Dienst → Dienst-Log** zeigt die App das Ende (Tail) von `ru
 - **Navigation:** Unten daneben führt **Gehe nach Oben** zurück zum Anfang des Log-Bereichs.
 - **Filter:** Log-Level (`INFO` / `WARNING` / …) sind filterbar; Standard ist INFO und höher.
 - **Trennstreifen:** Bei jedem erfolgreichen Start von `main.py` schreibt Earnie einen klaren Trennstreifen (Separator) mit PID und Version in `earnie.log`. So lassen sich Läufe leichter unterscheiden.
-- **Startausgabe:** Startet die UI den Daemon (`EARNIE_AUTO_START_MAIN` oder Neustart-Button), landet die echte stdout/stderr-Ausgabe in `runtime/main_stdio.log` (nicht `DEVNULL`). Das hilft bei Startfehlern, bevor das File-Logging greift. Das Python-Logging geht dann nur in `earnie.log`; `main_stdio.log` enthält keinen Konsolen-Spiegel.
-- **Rotation:** Beim Spawn rotiert Earnie `main_stdio.log` bei ≥ 5 MiB oder Monatswechsel (max. 12 Archive `main_stdio.log.YYYY-MM-DD_HH-MM-SS`).
+- **Startausgabe:** Startet die UI den Daemon (`EARNIE_AUTO_START_MAIN` oder Neustart-Button), landet die echte stdout/stderr-Ausgabe in `runtime/main_stdio.log` (nicht `DEVNULL`). Das hilft bei Startfehlern, bevor die Protokollierung in die Log-Datei beginnt. Das Python-Logging geht dann nur in `earnie.log`; `main_stdio.log` spiegelt die Konsolen-Ausgabe des Loggings nicht.
+- **Rotation:** Bei jedem Start von `main.py` durch die App rotiert Earnie `main_stdio.log` bei ≥ 5 MiB oder Monatswechsel (max. 12 Archive `main_stdio.log.YYYY-MM-DD_HH-MM-SS`).
 
 ### Docker oder lokal
 
-**Docker (empfohlen):** Ein Container (`earnie`). Die UI startet `main.py` automatisch, wenn `EARNIE_AUTO_START_MAIN=1` gesetzt ist (Standard in den Compose-Dateien).
+**Docker (empfohlen):** Alles läuft in einem Container (`earnie-productive` in den Synology-/LoxBerry-/Proxmox-Compose-Dateien; Dev-Stack: `earnie`). Die UI startet `main.py` automatisch, wenn `EARNIE_AUTO_START_MAIN=1` gesetzt ist (Standard in den Compose-Dateien).
 
-**Lokal (venv / VS Code):** `main.py` und Streamlit können getrennt laufen. Der Auto-Start ist aus, solange `EARNIE_AUTO_START_MAIN` nicht auf `1` steht. So bleibt das Debugging von `main.py` exklusiv.
+**Lokal (venv / VS Code):** `main.py` und Streamlit können getrennt laufen. Der Auto-Start ist aus, solange `EARNIE_AUTO_START_MAIN` nicht auf `1` steht. So bleibt `main.py` beim Debugging unter eigener Kontrolle.
 
-Die Konfiguration schreiben die Seiten **Hauskonfigurator**, **Szenarienkonfigurator** und **Manuelle Geräte**. Hausbezogene Daten lokal bzw. im privaten Repo ablegen: [Private Haus-Config](private-env.md).
+Die Konfiguration schreiben die Seiten **Hauskonfigurator**, **Szenarienkonfigurator** und **Manuelle Geräte**. Wo hausbezogene Daten lokal bzw. in einem privaten Repo liegen, beschreibt [Private Haus-Config](private-env.md).
 
 ## Optimierungs-Takt
 
 - **Viertelstunden-Grenzen:** Ein Lauf startet an jeder Viertelstunden-Grenze (`:00`, `:15`, `:30`, `:45`).
-- **Sofort auf Anfrage:** Zusätzlich startet ein Lauf sofort, wenn das Loxone Virtual Out **`Earnie_Request_Optimize`** den Daemon-HTTP trifft (`POST /ehal/loxone/request_optimize`).
+- **Sofort auf Anfrage:** Zusätzlich startet ein Lauf sofort, wenn das Loxone Virtual Out **`Earnie_Request_Optimize`** den HTTP-Dienst des Daemons aufruft (`POST /ehal/loxone/request_optimize`).
 - **Port:** `system.ehal_loxone_http_port` in `config.json` bzw. `EARNIE_EHAL_LOXONE_HTTP_PORT` (Standard **8541**). Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`.
 - **Link-Nachweis (Hub → Earnie):** Ein wiederholendes Heartbeat-VO `Push_Earnie_Heartbeat` ruft `GET /ehal/telemetry/heartbeat/<v>` auf.
-- **Status für Virtual In:** Der entity-scoped Status liegt am selben Port unter `GET /ehal/loxone/status.json`.
+- **Status für Virtual In:** Der Status je Entität liegt am selben Port unter `GET /ehal/loxone/status.json`.
 - **Maximale Wartezeit:** `system.loop_timeout` in `config.json` legt die maximale Wartezeit zwischen Durchläufen in Sekunden fest (Standard 900 = 15 Min.).
 - **Cockpit-Aktualisierung:** Die App lädt den Cockpit-Snapshot nach dem Viertelstunden-Wechsel, sobald `main.py` den aktuellen Slot abgeschlossen hat (typisch wenige Sekunden).
 
@@ -60,11 +62,11 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `flexible_consumers_state.json` | Tagesenergie je Flex-Verbraucher.                                                            |
 | `pv_counter_state.json`         | PV-Zählerstand für das Stunden-Delta.                                                        |
 | `power_interval_sampler_state.json` | Zwischenpuffer der Leistungsproben (≤ 60 s) für Viertelstunden-Mittel im Produktiv-Log. Optional mit Energie-Ankern (`energy_anchors`): Aus Loxone-Zählern (ΔkWh) wird die mittlere Slot-Leistung berechnet. |
-| `cons_data_pending.json`        | Pending-Puffer für cons_data-Samples.                                                        |
+| `cons_data_pending.json`        | Puffer für noch ausstehende `cons_data`-Messwerte (Samples).                                 |
 | `consumption_profiles.csv`      | Berechnete Grundlast-Profile.                                                                |
-| `earnie.log`                    | Rotierendes Python-Log von main.py (absoluter Pfad). Rotation monatlich, max. 12 Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`. |
-| `main_stdio.log`                | stdout/stderr des per UI/Auto-Start gestarteten `main.py`, zur Diagnose bei Startfehlern. Rotation beim Spawn: ≥ 5 MiB oder Monatswechsel, max. 12 Archive `main_stdio.log.YYYY-MM-DD_HH-MM-SS`. Das Logging geht nur in `earnie.log`. |
-| `main.lock` / `main.pid`        | Single-Instance-Sperre des Produktiv-Daemons. `main.lock` wird gehalten; die PID steht zusätzlich in `main.pid` (für Status/Stop unter Windows). |
+| `earnie.log`                    | Rotierendes Python-Log von `main.py` (absoluter Pfad). Rotation monatlich, max. 12 Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`. |
+| `main_stdio.log`                | stdout/stderr des per UI/Auto-Start gestarteten `main.py`, zur Diagnose bei Startfehlern. Rotation bei jedem Start durch die App: ≥ 5 MiB oder Monatswechsel, max. 12 Archive `main_stdio.log.YYYY-MM-DD_HH-MM-SS`. Das Logging geht nur in `earnie.log`. |
+| `main.lock` / `main.pid`        | Sperre gegen eine zweite Instanz des Produktiv-Daemons. `main.lock` wird gehalten; die PID steht zusätzlich in `main.pid` (für Status/Stop unter Windows). |
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll).          |
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe, eine Zeile JSON pro Lauf. Monatlich rotiert, max. 12 Archive. Enthält u. a. `consumption_snapshot`, optional `closed_interval`. |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen). |
@@ -83,7 +85,7 @@ Die App liest diese Dateien **read-only** für Panels und Abgleich.
 
 ### Live-Zyklus-Profiling (optional)
 
-Phasen-Zeiten und optional Call-Profile des Optimierungszyklus (`main.py`) lassen sich aufzeichnen, um Beschleunigungspotenzial zu finden. **Standard: aus** (kein Overhead, keine Dateien).
+Earnie kann die Phasen-Zeiten und optional Aufruf-Profile des Optimierungszyklus (`main.py`) aufzeichnen. Daraus lässt sich ablesen, wo ein Lauf Zeit verliert. **Standard: aus** (kein Zusatzaufwand, keine Dateien).
 
 | Variable | Wirkung |
 | -------- | ------- |
@@ -96,7 +98,7 @@ Lokale Auswertung (nach dem Kopieren von `timing/` von der NAS):
 python -m scripts.summarize_cycle_timing earnie_env/runtime/timing/cycles.jsonl
 ```
 
-Einmal-Deploy auf der NAS (lokales Image, Compose-Env): siehe [Container – Live-Zyklus-Profiling (NAS-Einmal-Test)](container.md#live-zyklus-profiling-nas-einmal-test).
+Einmaliger Test auf der NAS (lokales Image, Compose-Env): siehe [Container – Live-Zyklus-Profiling (NAS-Einmal-Test)](container.md#live-zyklus-profiling-nas-einmal-test).
 
 ### Zyklus-Pünktlichkeit und Vorlauf (immer aktiv)
 
@@ -147,7 +149,7 @@ Eine Einstellung ist nicht nötig; die Datei bleibt lokal. Voraussetzung ist ein
 
 ### Cycle-Recorder (Ringpuffer für Regressionstests)
 
-Earnie speichert die vollständigen Eingaben der Optimierung für jeden Zyklus in einem Ringpuffer unter `runtime/recorder/` (Spec: [`docs/workflow/regression-suite.md`](../workflow/regression-suite.md) §14). Damit lassen sich Fehler, die erst Tage später auffallen, noch als golden-master-Fall nachziehen. Die Dateien enthalten **Lastprofile** und bleiben **lokal**; Earnie lädt sie nicht hoch.
+Earnie speichert die vollständigen Eingaben der Optimierung für jeden Zyklus in einem Ringpuffer unter `runtime/recorder/` (Spec: [`docs/workflow/regression-suite.md`](../workflow/regression-suite.md) §14). Damit lassen sich auch Fehler, die erst Tage später auffallen, noch als Referenzfall (Golden Master) nachstellen. Die Dateien enthalten **Lastprofile** und bleiben **lokal**; Earnie lädt sie nicht hoch.
 
 In `runtime/local_settings.json`:
 
@@ -159,7 +161,7 @@ In `runtime/local_settings.json`:
 ```
 
 - **Standard:** an (`true` / Schlüssel fehlt). Abschalten mit `"recorder_enabled": false`.
-- **Retention:** Anzahl der Tage, die die Segmentdateien `cycles_YYYY-MM-DD.jsonl.gz` behalten werden (Default 7).
+- **Aufbewahrung (Retention):** So viele Tage behält Earnie die Segmentdateien `cycles_YYYY-MM-DD.jsonl.gz` (Default 7).
 - **Debug-Dump:** Ein Debug-Dump (siehe unten) hängt automatisch das aktuelle Recorder-Fenster an (`recorder/` im ZIP, `manifest.recorder`). Den Dump nur an den Maintainer weitergeben.
 
 ### Log- und Historiendateien
@@ -249,7 +251,7 @@ Hinweise:
 
 **Abschalten:**
 
-1. **UI:** Den Toggle **Anonyme Nutzungsstatistik senden** unter **Optimierer-Dienst** ausschalten.
+1. **UI:** Den Schalter **Anonyme Nutzungsstatistik senden** unter **Optimierer-Dienst** ausschalten.
 2. **Kill-Switch:** Umgebungsvariable `EARNIE_USAGE_PING=off` setzen (überschreibt die UI).
 3. **Home-Assistant-Add-on:** Die optionale Option `usage_ping` (`true`/`false`) spiegelt die Zustimmung, wenn sie gesetzt ist. Ohne die Option bleibt der bestehende Zustand unverändert.
 
@@ -273,7 +275,7 @@ Ablauf im Live-Cockpit:
 2. Im Dialog optional Titel/Symptom eintragen.
 3. „ZIP erstellen“ wählen (nur speichern) oder „ZIP erstellen und herunterladen“ (speichern und Browser-Download in einem Schritt).
 
-Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. Die Chart-UI-Payload wird mitgeschrieben, wenn die Live-Anzeige (Display-Bundle) vorhanden ist. Sonst enthält der Dump nur Historie und Inputs; die UI weist darauf hin.
+Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. Die Chart-Daten der Oberfläche (UI-Payload) schreibt Earnie mit, wenn die Live-Anzeige (Display-Bundle) vorhanden ist. Sonst enthält der Dump nur Historie und Inputs; die UI weist darauf hin.
 
 | Inhalt | Pflicht / optional |
 | ------ | ------------------ |
@@ -357,7 +359,7 @@ Es gibt **kein** automatisches Downgrade. Eine ältere Earnie-Version lehnt ein 
 
 ### Support-CLI
 
-Für Entwickler und Support gibt es dieselbe Kette wie im Assistenten auch auf der Kommandozeile:
+Für Entwicklung und Support gibt es dieselbe Kette wie im Assistenten auch auf der Kommandozeile:
 
 ```powershell
 python -m scripts.migrate_config --config-dir PATH --dry-run
@@ -369,7 +371,7 @@ Pflichtfragen (z. B. Loxone-Merkernamen) beantwortet die CLI über eine JSON-Dat
 ### Wann die Migration blockiert
 
 - **Datenmodell 1 oder 2:** zu alt. Support kontaktieren oder neu einrichten; eine automatische Kette gibt es nicht.
-- **Earnie-Pack-Datei ohne `earnie_data_model`:** Die Version ist unbekannt. Earnie rät nicht und stempelt nicht still. Ausgenommen ist `grid_fees.json`, bis die Tarifverwaltung mit dem Tarif-Editor kommt.
+- **Earnie-Pack-Datei ohne `earnie_data_model`:** Die Version ist unbekannt. Earnie rät sie nicht und trägt sie auch nicht stillschweigend nach. Ausgenommen ist `grid_fees.json`, bis die Tarifverwaltung mit dem Tarif-Editor kommt.
 
 ## Typische Betriebsfehler
 

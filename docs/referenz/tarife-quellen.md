@@ -1,8 +1,8 @@
 # Tarife und Preise nachrechnen
 
-Anleitung für Anwender:innen, die im **Szenarienkonfigurator** oder **Szenario-Explorer** verstehen wollen, wie Earnie Bezugs- und Einspeisepreise sowie die ungefähren Monatskosten bildet. Sprache der Anwenderdoku: Deutsch; Identifier, URLs und JSON-Keys unverändert.
+Diese Seite erklärt, wie Earnie Bezugs- und Einspeisepreise sowie die ungefähren Monatskosten bildet. Sie hilft beim Nachvollziehen der Werte im **Szenarienkonfigurator** und im **Szenario-Explorer** (kurz SE).
 
-Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration/Typen) · [OeMAG und Referenzmarktwert](oemag-referenzmarktwert.md)
+Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration und Tariftypen) · [OeMAG und Referenzmarktwert](oemag-referenzmarktwert.md)
 
 ## 1. Was Earnie berechnet (und was nicht)
 
@@ -19,23 +19,32 @@ Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration/Typen) �
 | **Netznutzung Leistungspreis** / netzgebietsspezifische Tabellen | **nein** | **nein** |
 | PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
 
-**Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Der Arbeitspreis kann zeitabhängig sein (SNAP, vorbereitet WiNAP; Laufzeitkatalog `earnie_env/config/grid_fees.json`, Seed aus `share/config/grid_fees.json`). Der Leistungspreis fehlt weiterhin. Optionaler Katalog-Stub `grid_monthly_fee_eur` bleibt nur SE-Monatsfixgebühr.
+> **Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Er kann zeitabhängig sein (SNAP, vorbereitet WiNAP). Die Werte stammen aus dem Laufzeitkatalog `earnie_env/config/grid_fees.json`; die Vorlage dafür liegt in `share/config/grid_fees.json`. Der Leistungspreis fehlt weiterhin. Das optionale Katalogfeld `grid_monthly_fee_eur` dient nur als monatliche Fixgebühr im Szenario-Explorer.
 
-Earnie liefert **gute-genug-€** für Vergleiche und Demos — **keine** Abrechnung gegen echte Stromrechnungen. Katalogwerte können unvollständig oder veraltet sein; bitte die Parameter im Szenarienkonfigurator prüfen.
+Earnie liefert **ausreichend genaue Eurobeträge** für Vergleiche und Demos. Eine Abrechnung gegen echte Stromrechnungen ist damit **nicht** möglich. Katalogwerte können unvollständig oder veraltet sein; die Parameter im Szenarienkonfigurator daher prüfen.
 
-Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Markdown unter `{Log-Ordner}/invoices/{szenario_label}_jahresrechnung.md` (Dateiname aus der Szenario-Bezeichnung; Bezug/Einspeisung getrennt mit Ø Tarif- und Ø Ist-Preis, Fixkosten ausgewiesen, Tarifnamen im Kopf, Katalogparameter am Ende). Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschnitt **Netznutzung** und die Jahrestabelle trennt **Energiebezug (Lieferant)** und **Netznutzung Arbeitspreis** (Summe unverändert — kein Doppelzählen).
+### Fake-Jahresrechnung
+
+Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Markdown-Datei unter `{Log-Ordner}/invoices/{szenario_label}_jahresrechnung.md`. Der Dateiname ergibt sich aus der Szenario-Bezeichnung. Die Rechnung enthält:
+
+- **Kopf:** die Tarifnamen.
+- **Bezug und Einspeisung:** getrennt ausgewiesen, jeweils mit Ø Tarif- und Ø Ist-Preis.
+- **Fixkosten:** als eigene Position.
+- **Katalogparameter:** am Ende der Datei.
+
+Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschnitt **Netznutzung**. Die Jahrestabelle trennt dann **Energiebezug (Lieferant)** und **Netznutzung Arbeitspreis**. Die Summe bleibt dabei gleich, es wird nichts doppelt gezählt.
 
 - **Ø Tarif Cent/kWh:** arithmetisches Mittel der stündlichen Tarifpreise über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`).
 - **Ø Ist Cent/kWh:** `Energiekosten € / Netzenergie kWh × 100`.
 
 ## 2. Bezugspreis Schritt für Schritt
 
-Für Spot-/aWATTar-Tarife gilt (Cent/kWh), wie im Katalog und in der Vorschau:
+Für Spot- und aWATTar-Tarife gilt folgende Reihenfolge (Cent/kWh), wie im Katalog und in der Vorschau:
 
-1. **Börsenpreis** der Stunde (Day-Ahead / EPEX-Zone zum Land des Tarifs).
-2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
+1. **Börsenpreis** der Stunde (Day-Ahead, EPEX-Zone zum Land des Tarifs).
+2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
 3. **Fixer Aufschlag** (`settlement_fee_cent_kwh`) in Cent/kWh.
-4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto; je Slot, mit Zeitregeln wie SNAP).
+4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto, je Slot, mit Zeitregeln wie SNAP).
 5. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100).
 
 Formel:
@@ -45,49 +54,49 @@ Formel:
   × (1 + vat_percent/100)   falls prices_include_vat = false
 ```
 
-Bei Festpreis-Tarifen (`fixed_cent`) ist der Arbeitspreis `fix_cent_kwh` (ebenfalls mit USt-Regel).
+Bei Festpreis-Tarifen (`fixed_cent`) ist der Arbeitspreis `fix_cent_kwh`. Auch hier gilt die USt-Regel.
 
 ### Eigener Festpreis (szenario-lokal)
 
-Im Szenarienkonfigurator gibt es in den Dropdowns Bezug und Einspeise den Eintrag **Eigener Festpreis**. Earnie speichert die Cent/kWh am Szenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, Tarif-ID `__user_fixed__`) — **nicht** in `tariffs.json`.
+Im Szenarienkonfigurator enthalten die Dropdowns für Bezug und Einspeisung den Eintrag **Eigener Festpreis**. Earnie speichert den Cent/kWh-Wert am Szenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, Tarif-ID `__user_fixed__`). In `tariffs.json` landet er **nicht**.
 
 | Richtung | Bedeutung |
 | -------- | --------- |
 | Bezug | Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`); **Netznutzung Arbeitspreis** aus dem Hausprofil wird weiterhin addiert |
-| Einspeise | eingegebene Vergütung ohne weitere Aufschläge |
+| Einspeisung | eingegebene Vergütung ohne weitere Aufschläge |
 
-Keine Katalog-Vorschau und keine Lieferant-/Netz-Fixkosten aus dem Tarifkatalog — Fixkosten in SE-Gesamtkosten bleiben 0, sofern nicht über andere Szenario-/Hauswerte abgebildet. Details: [Preise & aWATTar](../konfiguration/preise.md).
+Für den eigenen Festpreis gibt es keine Katalog-Vorschau und keine Lieferant- oder Netz-Fixkosten aus dem Tarifkatalog. Die Fixkosten in den SE-Gesamtkosten bleiben daher 0, sofern sie nicht über andere Szenario- oder Hauswerte abgebildet sind. Details: [Preise & aWATTar](../konfiguration/preise.md).
 
 ### Beispiel: aWATTar HOURLY (AT)
 
-Katalog (`awattar_at`): Aufschlag 1,5 Cent/kWh netto, Markup 3 %, Preise **ohne** USt, USt 20 %.
+Katalog (`awattar_at`): Aufschlag 1,5 Cent/kWh netto, Markup 3 %, Preise **ohne** USt, USt 20 %.
 
-Angenommen Börsenpreis = **5,00** Cent/kWh:
+Angenommener Börsenpreis: **5,00** Cent/kWh.
 
 1. 5,00 × 1,03 = 5,15  
 2. 5,15 + 1,50 = 6,65  
-3. 6,65 × 1,20 = **7,98 Cent/kWh** (brutto, wie Earnie ihn für die Kostenrechnung nutzt)
+3. 6,65 × 1,20 = **7,98 Cent/kWh** (brutto, so nutzt Earnie den Preis in der Kostenrechnung)
 
-Zusätzlich kann der Tarif eine **Monatsgebühr** haben (bei aWATTar AT ca. 4,79 € netto / Monat) — die fließt nur in die SE-Gesamt-/Monatskosten ein, nicht in den Stundenpreis.
+Zusätzlich kann der Tarif eine **Monatsgebühr** haben (bei aWATTar AT ca. 4,79 € netto pro Monat). Sie fließt nur in die SE-Gesamt- und Monatskosten ein, nicht in den Stundenpreis.
 
 ### Beispiel: VKW Strom Dynamisch
 
-Katalog: +1,20 Cent/kWh **netto**, ohne Markup, `prices_include_vat` = nein. Bei Börse 10,00 Cent/kWh → (10,00 + 1,20) × 1,20 = **13,44 Cent/kWh** brutto.
+Katalog: +1,20 Cent/kWh **netto**, ohne Markup, `prices_include_vat` = nein. Bei einem Börsenpreis von 10,00 Cent/kWh ergibt sich (10,00 + 1,20) × 1,20 = **13,44 Cent/kWh** brutto.
 
 ## 3. Einspeisevergütung
 
-Je nach Export-Tariftyp:
+Die Vergütung hängt vom Export-Tariftyp ab:
 
-- **Fest** (`fixed`): konstanter Cent/kWh (`k_push_cent`).
+- **Fest** (`fixed`): konstanter Cent/kWh-Wert (`k_push_cent`).
 - **Spot** (`spot_hourly`): Börsenpreis minus Abschlag (`settlement_fee_cent_kwh`).
-- **Monatspreis** (`monthly_table`): ein Cent/kWh-Wert für den Kalendermonat (`monthly_rates`).
-- **Eigener Festpreis** (`__user_fixed__`): szenario-lokaler Cent/kWh (`user_export_cent_kwh`), siehe §2.
+- **Monatspreis** (`monthly_table`): ein Cent/kWh-Wert je Kalendermonat (`monthly_rates`).
+- **Eigener Festpreis** (`__user_fixed__`): szenario-lokaler Cent/kWh-Wert (`user_export_cent_kwh`), siehe §2.
 
 ### Beispiel: VKW PV-Einspeisetarif Dynamisch
 
-Vergütung ≈ EPEX − **0,60** Cent/kWh (**ohne USt** laut Produktseite). Bei Börse 10,00 Cent/kWh → **9,40 Cent/kWh** (kein ×1,20 — Katalog: `prices_include_vat` false, `vat_percent` 0).
+Vergütung ≈ EPEX − **0,60** Cent/kWh (**ohne USt** laut Produktseite). Bei einem Börsenpreis von 10,00 Cent/kWh ergibt sich **9,40 Cent/kWh**. Ein Faktor ×1,20 entfällt, weil der Katalog `prices_include_vat` false und `vat_percent` 0 setzt.
 
-Gleiches USt-Muster für `at_vkw_pv_flex` (`monthly_table`) und die meisten sonstigen Einspeise-Monats-/Spot-Tarife (OeMAG-Familie, SUNNY): Vergütung **ohne** USt-Aufschlag.
+Dasselbe USt-Muster gilt für `at_vkw_pv_flex` (`monthly_table`) und die meisten anderen Einspeise-Monats- und Spot-Tarife (OeMAG-Familie, SUNNY): Die Vergütung erhält **keinen** USt-Aufschlag.
 
 Details zu Typen und JSON: [Preise & aWATTar](../konfiguration/preise.md).
 
@@ -95,8 +104,8 @@ Details zu Typen und JSON: [Preise & aWATTar](../konfiguration/preise.md).
 
 ### Lieferant-Grundpreis
 
-- Feld im Katalog: `monthly_fee_eur` (optional; fehlt = 0).
-- Pflichtfeld **`supplier_id`** (Stromlieferant-Slug): gleiche Anbieter bei Bezug und Einspeise teilen sich **eine** Gebühr (`max` der beiden Werte), unterschiedliche Anbieter werden **addiert**.
+- **Katalogfeld:** `monthly_fee_eur` ist optional; fehlt es, gilt 0.
+- **Pflichtfeld `supplier_id`** (Kennung des Stromlieferanten): Ist der Anbieter bei Bezug und Einspeisung derselbe, fällt nur **eine** Gebühr an (der höhere der beiden Werte, `max`). Gebühren unterschiedlicher Anbieter werden **addiert**.
 
 ### Hausanschluss-Fixkosten (einmal je Szenario)
 
@@ -104,35 +113,36 @@ Details zu Typen und JSON: [Preise & aWATTar](../konfiguration/preise.md).
 | ---- | --------- |
 | `grid_monthly_fee_eur` | Netznutzungs-/Netzentgelt-Grundpreis |
 | `metering_monthly_fee_eur` | Messstellenbetrieb / Zählergebühr |
-| `other_monthly_fee_eur` | Sonstige Fixkosten (z. B. bekannte Abgabenpauschale) |
+| `other_monthly_fee_eur` | Sonstige Fixkosten (z. B. bekannte Abgabenpauschale) |
 
-Regel: Wert aus dem **Bezugstarif**; fehlt er dort, aus dem Einspeisetarif — **nicht** Summe aus beiden. PLZ-/Netzgebiet-Tabellen sind nicht hinterlegt; fehlende Werte = 0.
+Earnie übernimmt jeden Wert aus dem **Bezugstarif**. Fehlt er dort, kommt er aus dem Einspeisetarif; die beiden Werte werden **nicht** summiert. Tabellen nach PLZ oder Netzgebiet sind nicht hinterlegt, fehlende Werte zählen als 0.
 
 ### Gemeinsame Regeln
 
-- **EPEX-/Spot-Tarife:** `prices_include_vat` = nein; volumetrische Aufschläge **und** `monthly_fee_eur` immer **netto** speichern (USt nur über `vat_percent` auf den Arbeitspreis).
-- **Festpreis-Tarife:** Netto oder brutto wie `prices_include_vat` (oft brutto/`true`).
-- Pro **Kalendermonat** im SE-Zeitraum: **eine volle** Gebühr — keine anteilige Kürzung.
-- Jahres-/Gesamtwert: Summe aller Fixkosten über alle Monate + volumetrische Energiekosten (Bezug minus Einspeiseerlös).
-- **Nicht** in Live-MILP, **nicht** in den stündlichen `sim_cost`-Kurven.
-- Volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil (`netznutzung`) und dem Netzentgelt-Katalog, nicht aus dem Tarifkatalog.
-- **Leistungspreis** wird derzeit **nicht** modelliert.
+- **EPEX-/Spot-Tarife:** `prices_include_vat` = nein. Volumetrische Aufschläge **und** `monthly_fee_eur` immer **netto** speichern; die USt kommt nur über `vat_percent` auf den Arbeitspreis.
+- **Festpreis-Tarife:** Netto oder brutto je nach `prices_include_vat` (oft brutto, also `true`).
+- **Abrechnung je Kalendermonat:** Für jeden Kalendermonat im SE-Zeitraum fällt **eine volle** Gebühr an, ohne anteilige Kürzung.
+- **Jahres- und Gesamtwert:** Summe aller Fixkosten über alle Monate plus volumetrische Energiekosten (Bezug minus Einspeiseerlös).
+- **Live-Planung:** Die Fixkosten fehlen im Live-MILP und in den stündlichen `sim_cost`-Kurven.
+- **Netznutzung Arbeitspreis:** Der volumetrische Wert kommt aus dem Hausprofil (`netznutzung`) und dem Netzentgelt-Katalog, nicht aus dem Tarifkatalog.
+- **Leistungspreis:** Earnie modelliert ihn derzeit **nicht**.
 
-In der UI: Szenario-Explorer → Gesamtkosten und Monatliche Stromkosten (Hinweis „Näherung Monatsgebühren“, wenn Gebühren vorhanden; Hinweis zu Netznutzungsentgelten). Fake-Jahresrechnung: siehe §1.
+In der Oberfläche erscheinen die Fixkosten im Szenario-Explorer unter Gesamtkosten und Monatliche Stromkosten. Sind Gebühren vorhanden, zeigt die Seite den Hinweis „Näherung Monatsgebühren“ sowie einen Hinweis zu Netznutzungsentgelten. Zur Fake-Jahresrechnung siehe §1.
 
 ## 5. Katalogparameter prüfen
 
-Im Szenarienkonfigurator erscheint nach Tarifwahl eine **read-only-Vorschau** (Land, `supplier_id`, Aufschläge, USt-Flag, ggf. Lieferant-/Netz-/Messstellen-Fixkosten ca.).
+Nach der Tarifwahl zeigt der Szenarienkonfigurator eine **Vorschau ohne Bearbeitungsmöglichkeit**. Sie enthält Land, `supplier_id`, Aufschläge, USt-Flag und ggf. die ungefähren Lieferant-, Netz- und Messstellen-Fixkosten.
 
-Prüfen Sie insbesondere:
+Besonders lohnt sich ein Blick auf diese Punkte:
 
 - Stimmen Aufschlag und USt-Flag mit dem Tarifblatt des Anbieters überein?
-- Ist ein Lieferant-Grundpreis hinterlegt, den Sie erwarten — oder fehlt er (dann 0 in der SE-Rechnung)?
-- Bei gleichem Anbieter (z. B. aWATTar Bezug + SUNNY): erscheint die Lieferant-Gebühr nur **einmal**?
-- Netz-/Messstellenwerte sind oft netzgebietsspezifisch — ohne Katalogeintrag bleiben sie 0; volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil.
-- Es gibt **keine Garantie** für Vollständigkeit oder Aktualität des Katalogs.
+- Ist der erwartete Lieferant-Grundpreis hinterlegt? Fehlt er, rechnet der Szenario-Explorer mit 0.
+- Erscheint die Lieferant-Gebühr bei gleichem Anbieter (z. B. aWATTar Bezug + SUNNY) nur **einmal**?
+- Netz- und Messstellenwerte sind oft netzgebietsspezifisch. Ohne Katalogeintrag bleiben sie 0; der volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil.
 
-Nachrechnen der Formeln: diese Seite. Technisches Mapping: [preise.md](../konfiguration/preise.md).
+Für Vollständigkeit und Aktualität des Katalogs gibt es **keine Garantie**.
+
+Die Formeln zum Nachrechnen stehen auf dieser Seite, das technische Mapping in [preise.md](../konfiguration/preise.md).
 
 ## 6. Quellen und Herkunft der Katalogwerte
 
@@ -141,27 +151,27 @@ Nachrechnen der Formeln: diese Seite. Technisches Mapping: [preise.md](../konfig
 | Quelle | Zugang | Rolle in Earnie |
 | ------ | ------ | --------------- |
 | **Offizielle EPEX** SFTP / MATS API | Kostenpflichtig ([Market Data Services](https://www.epexspot.com/en/marketdataservices), [EEX Webshop](https://webshop.eex-group.com/epex-spot-public-market-data)) | **Nicht** angebunden |
-| **ENTSO-E Transparency** `documentType=A44` | Persönlicher API-Token (`ENTSOE_API_TOKEN` in `config/.env`); [transparency.entsoe.eu](https://transparency.entsoe.eu/) | **Primäre** Live-Day-Ahead-Quelle, wenn Token gesetzt (AT / DE-LU / CH) |
-| **Energy-Charts** `GET /price?bzn=…` | Kostenlos; Fraunhofer ISE, CC BY 4.0 ([api.energy-charts.info](https://api.energy-charts.info/)) | Live-Fallback ohne/bei Ausfall ENTSO-E; **primäre** SE-/Backtesting-Quelle für AT, DE-LU, CH |
+| **ENTSO-E Transparency** `documentType=A44` | Persönlicher API-Token (`ENTSOE_API_TOKEN` in `config/.env`); [transparency.entsoe.eu](https://transparency.entsoe.eu/) | **Primäre** Live-Day-Ahead-Quelle, wenn ein Token gesetzt ist (AT / DE-LU / CH) |
+| **Energy-Charts** `GET /price?bzn=…` | Kostenlos; Fraunhofer ISE, CC BY 4.0 ([api.energy-charts.info](https://api.energy-charts.info/)) | Live-Fallback ohne ENTSO-E oder bei dessen Ausfall; **primäre** SE-/Backtesting-Quelle für AT, DE-LU, CH |
 | **aWATTar** `api.awattar.at` / `.de` | Kostenlos, Fair Use | Letzter Live-Fallback (AT) bzw. optional (DE); Katalog-Tarife als `spot_hourly` (API-URL aus `land`) |
 | **APG** markt.apg.at | Öffentliche Charts | Nur manuelle Referenz |
 
 ### OeMAG Marktpreis
 
-- Offiziell: [oem-ag.at/marktpreis](https://www.oem-ag.at/marktpreis)
-- Katalog: `oemag_monthly_feed_in_rates`; Export `at_oemag_gesetzlicher_marktpreis`
+- **Offizielle Quelle:** [oem-ag.at/marktpreis](https://www.oem-ag.at/marktpreis)
+- **Katalog:** `oemag_monthly_feed_in_rates`; Export `at_oemag_gesetzlicher_marktpreis`
 
 ### E-Control Referenzmarktwert
 
-- [e-control.at/referenzmarktwert](https://www.e-control.at/referenzmarktwert) · Abgrenzung: [oemag-referenzmarktwert.md](oemag-referenzmarktwert.md)
-- Katalog: `econtrol_referenzmarktwert_pv_monthly`
+- **Offizielle Quelle:** [e-control.at/referenzmarktwert](https://www.e-control.at/referenzmarktwert) · Abgrenzung: [oemag-referenzmarktwert.md](oemag-referenzmarktwert.md)
+- **Katalog:** `econtrol_referenzmarktwert_pv_monthly`
 
 ### VKW (Vorarlberg)
 
 | Produkt | Formel (Energie) | Katalog-ID |
 | ------- | ---------------- | ---------- |
 | Strom Dynamisch | EPEX + 1,20 ct netto | `at_vkw_strom_dynamisch` |
-| Strom Duo | Fixpreis als `monthly_table`: Okt–Mar 9,40 ct netto; Apr–Sep 9,15 ct netto (Blend aus Normaltarif 9,40 + Sommerfenster 8,40, 10–16 Uhr) | `at_vkw_strom_duo` |
+| Strom Duo | Fixpreis als `monthly_table`: Okt–Mär 9,40 ct netto; Apr–Sep 9,15 ct netto (Mischwert aus Normaltarif 9,40 und Sommerfenster 8,40, 10–16 Uhr) | `at_vkw_strom_duo` |
 | PV Dynamisch | EPEX − 0,60 ct netto | `at_vkw_pv_dynamisch` |
 | PV Flex | RefMarkt PV − 0,60 ct | `at_vkw_pv_flex` |
 
@@ -171,34 +181,34 @@ Day-Ahead Live: optional [ENTSO-E Transparency Platform](https://transparency.en
 
 ## 7. Audit / Abweichungen (Stand 2026-07-21)
 
-Transparenz zur Katalogpflege: Abgleich öffentlicher Quellen mit `tariffs.json`. Sekundärseiten können Grundgebühren weglassen oder USt falsch zuordnen — Primärquellen (Produktseite / Tarifblatt) haben Vorrang.
+Dieser Abschnitt macht die Katalogpflege transparent: Er gleicht öffentliche Quellen mit `tariffs.json` ab. Sekundärseiten lassen Grundgebühren mitunter weg oder ordnen die USt falsch zu. Primärquellen (Produktseite, Tarifblatt) haben daher Vorrang.
 
-### Monatsgebühren (geseedet, Näherung)
+### Monatsgebühren (vorbelegt, Näherung)
 
 | Katalog-ID | `monthly_fee_eur` | Basis | Quelle |
 | ---------- | ----------------- | ----- | ------ |
 | `awattar_at` | 4,79 | netto | [awattar.at/tariffs/hourly](https://www.awattar.at/tariffs/hourly) |
-| `at_vkw_strom_dynamisch` | 3,00 | netto | [vkw.at Strom Dynamisch](https://www.vkw.at/produkte/strom/strom-dynamisch) (36 €/Jahr netto) |
-| `at_vkw_strom_duo` | 3,00 | netto | [vkw.at Strom Duo](https://www.vkw.at/produkte/strom/strom-duo) (36 €/Jahr netto) |
+| `at_vkw_strom_dynamisch` | 3,00 | netto | [vkw.at Strom Dynamisch](https://www.vkw.at/produkte/strom/strom-dynamisch) (36 €/Jahr netto) |
+| `at_vkw_strom_duo` | 3,00 | netto | [vkw.at Strom Duo](https://www.vkw.at/produkte/strom/strom-duo) (36 €/Jahr netto) |
 | `at_smartenergy_smartcontrol` | 2,49 | netto | [smartenergy.at/smartcontrol](https://smartenergy.at/smartcontrol) (2,99 brutto) |
 | `at_spotty_smart_active` | 2,00 | netto | Spotty-Rechnung / Portale (2,40 brutto) |
 | `at_verbund_v_strom_spot` | 3,99 | netto | Selectra / Verbund-Grundpreis (ca. 4,79 brutto) |
 | `de_tibber_tibber_dynamic` | 5,03 | netto | [Tibber Support](https://support.tibber.com/de/articles/12310314-grund-und-arbeitspreis-bei-tibber) (5,99 inkl. MwSt.) |
 | `de_awattar_de_hourly_de` | 4,58 | netto (Näherung) | [awattar.de HOURLY](https://www.awattar.de/tariffs/hourly) (ggf. PLZ-abhängig) |
 
-**Falle:** Manche Vergleichsportale behaupten für aWATTar AT „kein Grundpreis“ — das widerspricht der offiziellen aWATTar-Seite.
+> **Hinweis:** Manche Vergleichsportale geben für aWATTar AT „kein Grundpreis“ an. Die offizielle aWATTar-Seite nennt dagegen einen Grundpreis.
 
 ### Volumetrische Werte (Energieaufschläge)
 
 | ID | Katalog | Prüfung | Status |
 | -- | ------- | ------- | ------ |
-| `awattar_at` | 1,5 ct + 3 % Markup, netto | Tarifblatt enthält 3 %; Marketingseite oft ohne 3 % | Match (Katalog vollständiger) |
+| `awattar_at` | 1,5 ct + 3 % Markup, netto | Tarifblatt enthält 3 %; Marketingseite oft ohne 3 % | Match (Katalog vollständiger) |
 | `at_vkw_strom_dynamisch` | 1,2 ct netto | Offiziell +1,20 ct netto | Match |
 | `at_vkw_pv_dynamisch` / `at_vkw_pv_flex` | Abschlag 0,6; `vat_percent` 0 (ohne USt) | Offiziell ohne USt | Match |
 | `at_smartenergy_smartcontrol` | 1,20 ct netto (`prices_include_vat` false) | Offiziell 1,20 netto / 1,44 inkl. | Match |
 | `at_spotty_smart_active` | 1,49 ct netto | ≈ 1,79 inkl. / 1,2 | Match |
 | `de_tibber_tibber_dynamic` | 1,81 ct netto | Support 2,15 ct brutto / 1,19 | Match |
-| `at_verbund_v_strom_spot` | 1,3 + 4 % | Selectra eher Fix-ct; Formel unsicher | Offen — nur Monatsgebühr geseedet |
-| `de_awattar_de_hourly_de` | 2,25 + 3 % | Seite betont EPEX+3 %; 2,25 unklar | Offen — Monatsgebühr ca. 4,58 |
+| `at_verbund_v_strom_spot` | 1,3 + 4 % | Selectra eher Fix-ct; Formel unsicher | Offen, nur Monatsgebühr vorbelegt |
+| `de_awattar_de_hourly_de` | 2,25 + 3 % | Seite betont EPEX + 3 %; 2,25 unklar | Offen, Monatsgebühr ca. 4,58 |
 
 Technische Typen und APIs: [Preise & aWATTar](../konfiguration/preise.md).

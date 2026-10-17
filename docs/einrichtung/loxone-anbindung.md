@@ -1,13 +1,17 @@
 # Loxone-Anbindung
 
-Earnie kommuniziert mit dem Loxone Miniserver über **HTTP**: Telemetrie kommt per VO-Push in die Inbox; Sollwerte und Freigaben liegen in `status.json` und werden vom Miniserver per Virtual Input (poll ~10 s) gelesen. Die konkrete Schaltlogik in Loxone (Wechselrichter, Wallbox, Pool, …) liegt außerhalb von Earnie.
+Earnie kommuniziert mit dem Loxone Miniserver über **HTTP**:
 
-Andere Hubs (HA+evcc, OpenEMS): [Smarthome-Backend wählen](smarthome-backend-wahl.md).
+- **Telemetrie:** Der Miniserver schickt Messwerte per Virtual Output (VO) in die Push-Inbox von Earnie.
+- **Sollwerte und Freigaben:** Earnie legt sie in `status.json` ab. Der Miniserver liest sie per Virtual Input (VI) und fragt etwa alle 10 s ab.
 
-**Default / Library:** Virtual-In/Out-Vorlagen einspielen, Zähler am EFM, Earnie-tot-Fallback und Import: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
+Die eigentliche Schaltlogik in Loxone (Wechselrichter, Wallbox, Pool, …) liegt außerhalb von Earnie.
+
+Andere Hubs (HA + evcc, OpenEMS): [Smarthome-Backend wählen](smarthome-backend-wahl.md).
+
+**Standard-Einrichtung mit der Earnie-Library:** Virtual-In/Out-Vorlagen einspielen, Zähler am EFM anlegen, Rückfallebene bei ausgefallenem Earnie und Import – beschrieben unter [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
 
 ## Zugangsdaten (`config/.env`)
-
 
 | Variable      | Bedeutung                              |
 | ------------- | -------------------------------------- |
@@ -15,52 +19,75 @@ Andere Hubs (HA+evcc, OpenEMS): [Smarthome-Backend wählen](smarthome-backend-wa
 | `LOXONE_USER` | Benutzername (HTTP Basic Auth)         |
 | `LOXONE_PASS` | Passwort                               |
 
+Vorlage: [.env.example](../../.env.example) nach `config/.env` kopieren. Im Produktivbetrieb (Docker) legt der Container-Start (Entrypoint) die Datei selbst an.
 
-Vorlage: [.env.example](../../.env.example) → nach `config/.env` kopieren (Prod/Docker legt der Entrypoint die Datei an). 
+Die Zugangsdaten lassen sich auch über die Web-Oberfläche eingeben.
 
-Die Zugangsdaten können auch bequem über die Web-Oberfläche eingegeben werden.
-
-Bei abgelehnten Zugangsdaten (HTTP **401** oder **403**) pausiert der Optimierer (`main.py`) die Miniserver-Zugriffe und zeigt in der Web-Oberfläche einen Fehlerhinweis. Korrigieren Sie IP, Benutzer und Passwort unter **Smarthome-Backend → Anbindung** und testen Sie die Merker erneut.
+Lehnt der Miniserver die Zugangsdaten ab (HTTP **401** oder **403**), pausiert der Optimierer-Dienst (`main.py`) alle Miniserver-Zugriffe. Die Web-Oberfläche zeigt dann einen Fehlerhinweis. Abhilfe: IP, Benutzer und Passwort unter **Smarthome-Backend → Anbindung** korrigieren und die Merker erneut testen.
 
 ## HTTP-Schnittstelle
 
-- **Lesen (Live):** Loxone schickt Messwerte per Virtual Output an Earnie (`GET /ehal/telemetry/<EHAL-ID>/<v>` auf dem Daemon-Port, typisch **8541**; Alias `/ehal/loxone/telemetry/…` für bestehende VOs). Earnie pollt den Miniserver **nicht** mehr per Merker-HTTP.
-- **Schreiben (Loud):** Sollwerte erscheinen in `status.json` unter qualifizierten EHAL-IDs; der Miniserver liest sie per Virtual Input.
-- **Struktur/Import:** `GET http://{LOXONE_IP}/data/LoxAPP3.json` (Control-Namen für Mapping/Import).
+- **Lesen (Live):** Loxone schickt Messwerte per Virtual Output an Earnie, und zwar per `GET /ehal/telemetry/<EHAL-ID>/<v>` auf den Daemon-Port (typisch **8541**). Für bestehende VOs gilt der Alias `/ehal/loxone/telemetry/…`. Earnie fragt den Miniserver **nicht** mehr per HTTP nach Merkern ab.
+- **Schreiben (Loud):** Sollwerte erscheinen in `status.json` unter qualifizierten EHAL-IDs. Der Miniserver liest sie per Virtual Input.
+- **Struktur und Import:** `GET http://{LOXONE_IP}/data/LoxAPP3.json` liefert die Control-Namen für Mapping und Import.
 
-Aktivierte Signale liegen als Schlüssel in `plant.ehal_bindings` / `consumers[].ehal_bindings` / `batteries[].ehal_bindings` (Werte leer — nur Aktivierungsflag). Vertrag und Match-Status: **EHAL-Com → Signalliste**. Details: [Loxone-Signale](../referenz/loxone-signals.md).
+Aktivierte Signale stehen als Schlüssel in `plant.ehal_bindings`, `consumers[].ehal_bindings` bzw. `batteries[].ehal_bindings`. Die Werte bleiben leer, der Schlüssel dient nur als Aktivierungsflag. Vertrag und Match-Status zeigt **EHAL-Com → Signalliste**. Details: [Loxone-Signale](../referenz/loxone-signals.md).
 
-## Was der Optimizer liest
+<a id="was-der-optimizer-liest"></a>
 
+## Was Earnie liest
 
 | Bereich              | Konfiguration                                      | Zweck                                             |
 | -------------------- | -------------------------------------------------- | ------------------------------------------------- |
-| Anlage (Plant)       | `plant.ehal_bindings`                              | SOC, Netz/PV/ESS-Leistungen, Außentemperatur      |
+| Anlage (Plant)       | `plant.ehal_bindings`                              | Netz-/PV-Leistungen, Außentemperatur              |
+| Speicher (ESS)       | `batteries[].ehal_bindings` (`ess.{slug}.*`)       | SOC, ESS-Leistung, Grenzen und Sollwerte          |
 | Steuer-Rückmeldung   | dieselben Soll-/Ist-Bindings (Live-Lesen)          | Prüfen, ob Schreiben ankommt                      |
-| Flexible Verbraucher | `consumers[].ehal_bindings`                        | Live-Leistung / Freigaben für `cons_data`  |
+| Flexible Verbraucher | `consumers[].ehal_bindings`                        | Live-Leistung / Freigaben für `cons_data`         |
 | E-Auto-Status        | EVCS-Felder in `ehal_bindings` / Ladeplan          | Anschluss, Rest-SOC, Fertig-um, max. Ladeleistung |
 
+<a id="was-der-optimizer-schreibt"></a>
 
-
-
-## Was der Optimizer schreibt
-
+## Was Earnie schreibt
 
 | Signal               | Konfiguration                                             | Wirkung (Schnittstelle)                                                 |
 | -------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
 | ESS-Sollleistung     | `batteries[].ehal_bindings.set_ess_active_power` (`ess.{slug}.*`) | kW; `+` = Entladung, `−` = Ladung; bei Automatik weglassen / 0          |
-| Ladegrenze           | `batteries[].ehal_bindings.set_ess_charge_power_limit` | kW; echte Max. Ladeleistung                                             |
-| Entladegrenze        | `batteries[].ehal_bindings.set_ess_discharge_power_limit` | kW; echte Max. Entladeleistung                                          |
+| Ladegrenze           | `batteries[].ehal_bindings.set_ess_charge_power_limit` | kW; echte max. Ladeleistung                                             |
+| Entladegrenze        | `batteries[].ehal_bindings.set_ess_discharge_power_limit` | kW; echte max. Entladeleistung                                          |
 | Steuerbefehl / ESS-Modus | `batteries[].ehal_bindings.set_ess_mode` | **Pflicht bei jedem Zyklus:** `0` = Automatik (Sollleistung ignorieren), `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen (nur Batterie) |
-| Einspeisegrenze (outbound) | `plant.ehal_bindings.set_grid_export_power_limit` | kW, Betrag ≥ 0; harte Decke für Netz-Einspeisung; `0` = keine Einspeisung; **unbegrenzt = PV-Nennleistung + max. Entladeleistung** |
-| Einspeisegrenze (inbound, optional) | `plant.ehal_bindings.get_grid_export_power_limit` | kW; variable Grenze vom Netz/HEMS → Earnie |
+| Einspeisegrenze (outbound) | `plant.ehal_bindings.set_grid_export_power_limit` | kW, Betrag ≥ 0; harte Obergrenze für die Netz-Einspeisung; `0` = keine Einspeisung; Wert ohne Begrenzung: siehe [Einspeisegrenze](#einspeisegrenze) |
+| Einspeisegrenze (inbound, optional) | `plant.ehal_bindings.get_grid_export_power_limit` | kW; variable Grenze vom Netz/HEMS an Earnie |
 | Verbraucher-Freigabe | `consumers[].ehal_bindings` (Flex enable) | `0` = gesperrt, `1` = Freigabe (SwimSpa, Wärmepumpe, Filter)            |
 | E-Auto Sollstrom     | `ehal_bindings.set_evcs_max_current` | Ziel-Ladestrom / -leistung                                              |
 | E-Auto PV-Follow     | `ehal_bindings` / `set_evcs_mode`          | `0`/`1` bzw. Modus                                                      |
 
-Frühere Rollen `target_soc_name` und `pv_counter_name` entfallen. Force über `set_ess_active_power`, Grenzen als echte Caps. Virtual-In-Werte sind **sticky** (letzter Wert bleibt am Miniserver) — Automatik ist `set_ess_mode = 0`, nicht „Sollleistung weggelassen“. PV-Intervallenergie aus ∫ `sens_pv_production_active`.
-Statische HK-Decke: optional `plant.max_export_power_kw` im Hauskonfigurator. Effektive Decke = `min` aus HK, inbound EHAL und **0** wenn der Einspeisetarif negativ ist (Nutzer zahlt für Einspeisung). Config setzt `set_grid_export_power_limit` als Wechselrichter-Curtailment um, am einfachsten als `MIN(Limit; WR-Nennleistung)`: `0` = Einspeisesperre; ohne Begrenzung schreibt Earnie die maximal mögliche Einspeisung der Anlage = Summe der PV-Nennleistungen (kWp) + Summe der maximalen Entladeleistungen aller gewählten Batterien, die zwangsentladen werden können (`Batteriesteuerung = voll`; `limits_only` / `read_only` zählen nicht). Sind beide unbekannt, steht `1000` kW im Status. ESS-Bindings liegen je Speicher unter entity-scoped `ess.{slug}.*` in `batteries[].ehal_bindings`. Der Steuerbefehl (`set_ess_mode`) gilt pro Batterie und signalisiert keine Einspeisebegrenzung.
-**Vorzeichenkonvention (verbindlich):** Alle Leistungen, die *ins Haus* fließen, sind positiv. Ohne Wechselrichterverluste gilt:
+### Batteriesteuerung
+
+- **Entfallene Rollen:** Die früheren Rollen `target_soc_name` und `pv_counter_name` gibt es nicht mehr.
+- **Zwangsladen und -entladen:** Beides läuft über `set_ess_active_power`. Lade- und Entladegrenze sind echte Obergrenzen.
+- **Automatik:** Virtual-In-Werte sind **sticky**, der letzte Wert bleibt am Miniserver stehen. Automatik bedeutet deshalb `set_ess_mode = 0`; eine weggelassene Sollleistung reicht dafür nicht.
+- **Pro Speicher:** ESS-Bindings liegen je Speicher entity-scoped unter `ess.{slug}.*` in `batteries[].ehal_bindings`. Der Steuerbefehl (`set_ess_mode`) gilt pro Batterie und signalisiert keine Einspeisebegrenzung.
+- **PV-Energie:** Die PV-Energie je Intervall ergibt sich aus dem Integral über `sens_pv_production_active`.
+
+### Einspeisegrenze
+
+Eine statische Obergrenze lässt sich optional im Hauskonfigurator setzen (`plant.max_export_power_kw`). Die wirksame Obergrenze ist das Minimum aus:
+
+- dem Wert aus dem Hauskonfigurator,
+- der inbound-Grenze über EHAL,
+- **0**, wenn der Einspeisetarif negativ ist (Einspeisung kostet dann Geld).
+
+In Loxone Config wird `set_grid_export_power_limit` als Abregelung (Curtailment) des Wechselrichters umgesetzt, am einfachsten als `MIN(Limit; WR-Nennleistung)`. `0` bedeutet Einspeisesperre.
+
+Ohne Begrenzung schreibt Earnie die maximal mögliche Einspeisung der Anlage. Dafür summiert Earnie über alle netzgekoppelten Wechselrichter `min(max_ac_power_kw, PV-kWp begrenzt durch max_pv_input_kw + Zwangsentlade-kW)`:
+
+- **Insel-Wechselrichter** zählen nicht.
+- **Ohne geplante Wechselrichter** gilt die bisherige Rechnung (Legacy): Summe PV-kWp plus max. Entladeleistung der Batterien mit `Batteriesteuerung = voll`. Batterien mit `limits_only` oder `read_only` zählen nicht.
+- **Sind beide unbekannt,** steht `1000` kW im Status.
+
+### Vorzeichenkonvention (verbindlich)
+
+Alle Leistungen, die *ins Haus* fließen, sind positiv. Ohne Wechselrichterverluste gilt:
 
 ```
 P_cons = P_PV + P_Grid + P_Bat
@@ -68,15 +95,18 @@ P_cons = P_PV + P_Grid + P_Bat
 
 | Größe | Merker / EHAL-Feld | `+` | `−` |
 |---|---|---|---|
-| `P_PV` | PV-Leistung / `sens_pv_production_active` | Erzeugung | — (≥ 0) |
+| `P_PV` | PV-Leistung / `sens_pv_production_active` | Erzeugung | – (≥ 0) |
 | `P_Grid` | `Earnie_Netzleistung` / `sens_grid_power_active` | Bezug | Einspeisung |
 | `P_Bat` | `Earnie_Batterie_Leistung` bzw. EFM-Speicher / `sens_ess_power` | Entladen | Laden |
-| `P_cons` | Hausverbrauch / `sens_power_consumers` | Verbrauch | — (≥ 0) |
+| `P_cons` | Hausverbrauch / `sens_power_consumers` | Verbrauch | – (≥ 0) |
 
-Earnie dreht keine Vorzeichen — die Loxone-Merker müssen bereits so geliefert werden. Huawei-Register haben teils andere Vorzeichen und müssen in Loxone gedreht werden: 37113 (Netz, `+` = Einspeisung) und 37765 (Batterie, `+` = Laden).
-Historische Verbrauchsdaten kommen über CSV-Upload / Energiemonitor bzw. `cons_data` (kein Miniserver-FTP-Log mehr).
+Earnie dreht keine Vorzeichen. Die Loxone-Merker müssen die Werte bereits in dieser Konvention liefern. Huawei-Register haben teils andere Vorzeichen, die in Loxone gedreht werden müssen: 37113 (Netz, `+` = Einspeisung) und 37765 (Batterie, `+` = Laden).
 
-Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-Logik hinter diesen virtuellen Eingängen. Config muss `Steuerbefehl = 0` als Freigabe/Automatik behandeln, auch wenn `Earnie_Batterie_Sollleistung` noch einen alten Wert hält.
+Historische Verbrauchsdaten kommen über CSV-Upload, Energiemonitor bzw. `cons_data`. Ein FTP-Log vom Miniserver wird nicht mehr genutzt.
+
+### Umsetzung in Loxone
+
+Wann die Anlage tatsächlich lädt, entscheidet die Loxone-Logik hinter diesen virtuellen Eingängen. Loxone Config muss `Steuerbefehl = 0` als Freigabe bzw. Automatik behandeln, auch wenn `Earnie_Batterie_Sollleistung` noch einen alten Wert hält.
 
 ## Verbindung prüfen
 
@@ -85,9 +115,13 @@ Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-
 python -m scripts.verify_loxone_setup
 ```
 
-Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit EHAL-ID und Detailtext. Typische Fehler: Signal nicht in der Push-Inbox, fehlender Miniserver-Callback auf `status.json`, Benutzer ohne Rechte.
+Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit EHAL-ID und Detailtext. Typische Fehler:
 
-Die Verbindung kann auch bequem über die Web-Oberfläche auf der Seite **Smarthome-Backend** (Anbindung) geprüft werden.
+- Das Signal fehlt in der Push-Inbox.
+- Der Miniserver-Callback auf `status.json` fehlt.
+- Der Benutzer hat nicht die nötigen Rechte.
+
+Die Verbindung lässt sich auch in der Web-Oberfläche prüfen, auf der Seite **Smarthome-Backend** (Bereich Anbindung).
 
 ## Datenfluss (Überblick)
 
@@ -101,4 +135,4 @@ Virtuelle Eingänge (VI)       ◄──   status.json (push-only)
   poll ~10 s, qualified Checks ◄──   Freigaben / ESS / EV-Soll
 ```
 
-Die Streamlit-App liest Live-Werte für Anzeige (Sankey, SOC) und übernimmt die Optimierung aus dem letzten `main.py`-Durchlauf. Schreibpfad: siehe [EHAL-Com — Write push-only](../ui/ehal-com.md#write-push-only).
+Die Web-Oberfläche (Streamlit) liest Live-Werte für die Anzeige (Sankey, SOC). Die Optimierung übernimmt sie aus dem letzten Durchlauf des Optimierer-Dienstes (`main.py`). Zum Schreibpfad: [EHAL-Com – Write push-only](../ui/ehal-com.md#write-push-only).

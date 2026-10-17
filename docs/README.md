@@ -1,28 +1,32 @@
-# Earnie — Anwender-Dokumentation
+# Earnie – Anwender-Dokumentation
 
-Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfiguration, Streamlit-Oberfläche und die Smarthome-Anbindung (Loxone, Home Assistant/evcc oder OpenEMS).
+Diese Dokumentation richtet sich an alle, die Earnie betreiben. Die Themen sind Einrichtung, Konfiguration, die Streamlit-Oberfläche und die Smarthome-Anbindung (Loxone, Home Assistant/evcc oder OpenEMS).
 
-**Einstieg aus Anwendersicht (Handbuch):** [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md)
+**Einstieg aus Anwendersicht:** [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md)
 
-Produktüberblick und Landing: [README.md](../README.md) (Repo-Root).  
-Für Entwickler (Projektstruktur, Tests, Container): [DEVELOPER.md](../DEVELOPER.md).
+- **Produktüberblick:** [README.md](../README.md) im Repo-Root.
+- **Für Entwickler:innen** (Projektstruktur, Tests, Container): [DEVELOPER.md](../DEVELOPER.md).
 
-Zum Ausprobieren des Szenario-Explorers ohne Installation:
+Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://earnie.streamlit.app)
 
 ## Erste Schritte
 
-1. **Konfiguration:** `share/config/config.example.json` → Bootstrap legt `earnie_env/config/config.json` an (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime`. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
-2. **Smarthome-Backend wählen:** [Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md) (Default Loxone; alternativ HA+evcc oder OpenEMS-Lab). Auswahl und Zugangsdaten in der UI: [Smarthome-Backend](ui/smarthome-backend.md). Bei Loxone: `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an). Bei HA: URL/Token in `config/.env` (`EHAL_HA_*`).
-3. **Feld-Mapping:** Bei Loxone Merker in `plant.ehal_bindings` / Hausprofil über **EHAL-Com** ([Loxone-Signale und Earnie-Library](referenz/loxone-signals.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md) (entity-scoped: `plant` / `consumers[].ehal_bindings`).
-4. **Verbindung prüfen:** EHAL-Com (Live-Lesen) bzw. bei Loxone:
+1. **Konfiguration anlegen:** Der Bootstrap erzeugt aus `share/config/config.example.json` die Datei `earnie_env/config/config.json` (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime` ausführen. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
+2. **Smarthome-Backend wählen:** Standard ist Loxone, alternativ HA+evcc oder OpenEMS-Lab ([Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md)). Auswahl und Zugangsdaten stehen in der UI unter [Smarthome-Backend](ui/smarthome-backend.md).
+   - **Loxone:** `.env.example` nach `earnie_env/config/.env` kopieren und `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` eintragen. Im Docker-Betrieb legt der Entrypoint die `.env` im Config-Volume an.
+   - **Home Assistant:** URL und Token in `config/.env` eintragen (`EHAL_HA_*`).
+3. **Felder zuordnen:**
+   - **Loxone:** Merker in `plant.ehal_bindings` bzw. im Hausprofil über **EHAL-Com** zuordnen ([Loxone-Signale und Earnie-Library](referenz/loxone-signals.md)).
+   - **Home Assistant:** Entities auf [EHAL-Com](ui/ehal-com.md) den EHAL-Feldern zuordnen, je Entität in `plant` bzw. `consumers[].ehal_bindings`.
+4. **Verbindung prüfen:** über EHAL-Com (Live-Lesen), bei Loxone alternativ mit dem Prüfskript:
   ```powershell
    python -m scripts.verify_loxone_setup
   ```
-5. **Produktivbetrieb:** Docker-Container starten (UI + `main.py` Auto-Start) oder lokal `python main.py` / UI **Optimierer-Dienst**. HAOS: [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md).
-6. **Monitor öffnen:** `python -m scripts.run_streamlit` (Port: `ui.streamlit_port` / `EARNIE_UI_STREAMLIT_PORT`; lokal venv typisch **8501**, siehe [Streamlit-Ports](referenz/streamlit-ports.md))
+5. **Produktivbetrieb starten:** Docker-Container starten (UI und `main.py` starten automatisch). Lokal geht es mit `python main.py` oder über die UI-Seite **Optimierer-Dienst**. Unter HAOS: [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md).
+6. **Monitor öffnen:** `python -m scripts.run_streamlit` ausführen. Der Port kommt aus `ui.streamlit_port` bzw. `EARNIE_UI_STREAMLIT_PORT`; in einer lokalen venv ist er typischerweise **8501** (siehe [Streamlit-Ports](referenz/streamlit-ports.md)).
 
-Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `config.json` `"$schema": "./config.schema.json"` gesetzt ist.
+> **Hinweis:** Cursor und VS Code zeigen die Parameter-Beschreibungen als Hover-Hilfe an, wenn in `config.json` `"$schema": "./config.schema.json"` gesetzt ist.
 
 **Container-Betrieb:** [Container](einrichtung/container.md) · [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) · [Proxmox LXC](einrichtung/proxmox-lxc.md) · [VMware `vctl`](einrichtung/vmware-vctl.md) · [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md)
 
@@ -30,50 +34,50 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Benutzer-Handbuch
 
-- [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md) — Überblick, Einrichtung Was-wäre-wenn, Smarthome, Live-Betrieb
+- [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md) – Überblick, Einrichtung der Was-wäre-wenn-Analyse, Smarthome, Live-Betrieb
 
 ### Einrichtung
 
-- [Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md) — Loxone / HA+evcc / OpenEMS über `ehal.backend`
-- [Loxone-Anbindung](einrichtung/loxone-anbindung.md) — HTTP-Schnittstelle, Prüfskript
-- [Home Assistant + evcc](einrichtung/ha-evcc.md) — DACH-Pfad A2 (Compose) vs. Pfad B (bestehendes HA)
-- [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md) — Earnie als Supervisor-Add-on (Ingress, Options)
-- [Betrieb](einrichtung/betrieb.md) — `main.py` vs. App, Laufzeitdateien, Optimierungs-Takt, [Update und Migration](einrichtung/betrieb.md#update-und-migration)
-- [Container](einrichtung/container.md) — Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, fehlende Config-Keys nach Upgrade
-- [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) — Scope-A-Plugin (Docker-Wrapper) vs. manuelle Compose
-- [Proxmox LXC](einrichtung/proxmox-lxc.md) — Unprivileged LXC mit Docker Compose
-- [VMware `vctl`](einrichtung/vmware-vctl.md) — Windows-PC ohne Docker Desktop
-- [Greenfield Dev-Stack](einrichtung/greenfield-dev-stack.md) — lokale Ersteinrichtung für Hauskonfigurator/Backtesting
-- [OpenEMS-Lab](einrichtung/openems-lab.md) — Earnie + OpenEMS Edge/UI; Kommunikationscheck in der Spec
-- [Private Haus-Config](einrichtung/private-env.md) — privates Repo + Junction; öffentliche Vorlagen unter `share/config/`
-- [EcoFlow Delta 3 über Loxone](einrichtung/ecoflow-delta3-loxone.md) — One-Way-Speicher / Bridging-Hinweis
-- [HA ↔ Loxone Bridge-Generator](einrichtung/ha-loxone-bridge.md) — POC: Brücke für die Delta 3 aus einer Mapping-Datei, Loxone → HA per Webhook
+- [Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md) – Loxone, HA+evcc oder OpenEMS über `ehal.backend`
+- [Loxone-Anbindung](einrichtung/loxone-anbindung.md) – HTTP-Schnittstelle und Prüfskript
+- [Home Assistant + evcc](einrichtung/ha-evcc.md) – DACH-Pfad A2 (Compose) und Pfad B (bestehendes HA) im Vergleich
+- [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md) – Earnie als Supervisor-Add-on (Ingress, Options)
+- [Betrieb](einrichtung/betrieb.md) – `main.py` und App, Laufzeitdateien, Optimierungs-Takt, [Update und Migration](einrichtung/betrieb.md#update-und-migration)
+- [Container](einrichtung/container.md) – Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, fehlende Config-Keys nach einem Upgrade
+- [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) – Scope-A-Plugin (Docker-Wrapper) und manuelle Compose-Installation im Vergleich
+- [Proxmox LXC](einrichtung/proxmox-lxc.md) – Unprivileged LXC mit Docker Compose
+- [VMware `vctl`](einrichtung/vmware-vctl.md) – Windows-PC ohne Docker Desktop
+- [Greenfield Dev-Stack](einrichtung/greenfield-dev-stack.md) – lokale Ersteinrichtung für Hauskonfigurator und Backtesting
+- [OpenEMS-Lab](einrichtung/openems-lab.md) – Earnie mit OpenEMS Edge/UI; der Kommunikationscheck steht in der Spezifikation
+- [Private Haus-Config](einrichtung/private-env.md) – privates Repo mit Junction; öffentliche Vorlagen liegen unter `share/config/`
+- [EcoFlow Delta 3 über Loxone](einrichtung/ecoflow-delta3-loxone.md) – One-Way-Speicher und Hinweise zum Bridging
+- [HA ↔ Loxone Bridge-Generator](einrichtung/ha-loxone-bridge.md) – Prototyp (POC): erzeugt die Brücke für die Delta 3 aus einer Mapping-Datei, Loxone → HA per Webhook
 
 ### Konfiguration (`earnie_env/config/`)
 
-- [Überblick](konfiguration/overview.md) — Aufbau der Datei, Szenarien, Dateipfade
-- [Speichern / Laden](konfiguration/speichern-laden.md) — `earnie_env`, Auto-Save, ZIP-Export/Import
-- [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
-- [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
-- [Wärmespeicher Schichtung / T_eq](konfiguration/waermespeicher-schichtung-teq.md) — Schichtfühler → äquivalente Temperatur für Earnie (Loxone-Formel, Gewichte)
-- [Historische Leistungsprofil-CSV](konfiguration/verbrauchs-csv.md) — Last-/PV-/Verbraucher-Profile, Normalisierung, Loxone-Import
-- [Preise & aWATTar](konfiguration/preise.md) — Bezugspreis, Einspeisevergütung, Preis-Prognose
+- [Überblick](konfiguration/overview.md) – Aufbau der Datei, Szenarien, Dateipfade
+- [Speichern / Laden](konfiguration/speichern-laden.md) – `earnie_env`, Auto-Save, ZIP-Export/Import
+- [PV & Batterie](konfiguration/batterie-pv.md) – Live-Szenario, Entitäts-Referenzen
+- [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) – SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
+- [Wärmespeicher Schichtung / T_eq](konfiguration/waermespeicher-schichtung-teq.md) – aus Schichtfühlern die äquivalente Temperatur für Earnie bilden (Loxone-Formel, Gewichte)
+- [Historische Leistungsprofil-CSV](konfiguration/verbrauchs-csv.md) – Last-, PV- und Verbraucher-Profile, Normalisierung, Loxone-Import
+- [Preise & aWATTar](konfiguration/preise.md) – Bezugspreis, Einspeisevergütung, Preis-Prognose
 
 ### Benutzeroberfläche (Streamlit)
 
-- [Betriebsmodi & Navigation](ui/betriebsmodi.md) — Seitenstruktur, Monitor (Sunset-2-Sunset), Szenario-Explorer
-- [Charts & Panels](ui/charts.md) — Diagramme, Metriken, Sankey, Soll/Ist-Icons
-- [Smarthome-Backend](ui/smarthome-backend.md) — Hub-Erkennung, Anbindung, Loxone-Import
-- [EHAL-Com](ui/ehal-com.md) — Live-Lesen / Live-Schreiben / Mapping (Loxone, HA, OpenEMS; English)
+- [Betriebsmodi & Navigation](ui/betriebsmodi.md) – Seitenstruktur, Monitor (Sunset-2-Sunset), Szenario-Explorer
+- [Charts & Panels](ui/charts.md) – Diagramme, Metriken, Sankey, Soll/Ist-Icons
+- [Smarthome-Backend](ui/smarthome-backend.md) – Hub-Erkennung, Anbindung, Loxone-Import
+- [EHAL-Com](ui/ehal-com.md) – Live-Lesen, Live-Schreiben und Mapping für Loxone, HA und OpenEMS (auf Englisch)
 
 ### Referenz
 
-- [Abkürzungen](referenz/abbreviations.md) — EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
-- [Streamlit-Ports](referenz/streamlit-ports.md) — Port pro Stack/Plattform
-- [Loxone-Signale und Earnie-Library](referenz/loxone-signals.md) — VI/VO-Vorlagen (entity-scoped), Default-Merker, EFM, Signal-Tabellen
-- [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) — OeMAG-Marktpreis vs. E-Control RefMarkt PV
-- [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) — Bezugs-/Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung
+- [Abkürzungen](referenz/abbreviations.md) – EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
+- [Streamlit-Ports](referenz/streamlit-ports.md) – Port je Stack und Plattform
+- [Loxone-Signale und Earnie-Library](referenz/loxone-signals.md) – VI/VO-Vorlagen je Entität, Default-Merker, EFM, Signal-Tabellen
+- [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) – OeMAG-Marktpreis und E-Control-RefMarkt PV im Vergleich
+- [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) – Bezugs- und Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung
 
-### Für Entwickler
+### Für Entwickler:innen
 
 Specs, Labs, Release-Prozess und Entwickler-Betrieb: [Entwickler-Index](entwicklung/README.md) und [DEVELOPER.md](../DEVELOPER.md).

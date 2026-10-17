@@ -1,19 +1,23 @@
 # Entwickler-Dokumentation
 
-Nicht Teil der Anwender-Dokumentation ([Anwender-Doku](../README.md)). Englisch/technisch bzw. Entwickler-Betrieb.
+Diese Seiten gehören nicht zur [Anwender-Dokumentation](../README.md). Sie sind technisch, teils englisch, und richten sich an Entwickler:innen sowie an den Entwickler-Betrieb.
 
 ## Specs (Englisch/technisch)
 
-Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) stehen nur hier — **nicht** Teil der Anwender-Einrichtung.
+Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) sind nur hier beschrieben und gehören nicht zur Anwender-Einrichtung.
 
-- [EHAL](../referenz/ehal.md) — Hardware Access Layer contract
-- [HA + evcc lab setup](../dev/ha-lab-setup.md) — Compose Earnie ↔ Home Assistant
-- [House simulator](../dev/house-sim.md) — interne Mock-/Dogfood-Bank (`house_sim/`)
-- [OpenEMS lab setup](../dev/openems-lab-setup.md) — Compose + Earnie ↔ OpenEMS
-- [Branching & Hotfix Playbook](../workflow/branching-hotfix-playbook.md) — Tags, hotfixes, `main`
-- [Release Checklist](../workflow/release-checklist.md) — Kandidat → Test auf HA / LoxBerry → Freigabe
-- [Shadow Mode](../dev/shadow-mode.md) — Prod-Feed-Recorder (S1) + Shadow-Client (S2+S3, **2.7.f**) implemented; S4 → **2.+1**
-- [Regression Suite](../workflow/regression-suite.md) — Golden-Master-Cases vor Release, öffentliche + private Daten (Entwurf)
-- [EV return prognosis](../dev/done/ev-return-prognosis.md) — Connect-Phasen bei abwesendem E-Auto (`forecast_when_absent`)
-- Arbeitsnotizen, Entwürfe und abgeschlossene Epics: [`docs/dev/`](../dev/) (nicht Teil von Doku-Reviews)
-- [Shadow-Betrieb](shadow-betrieb.md) — Prod-Feed-Recorder und Shadow-Client einrichten (Dev)
+- [EHAL](../referenz/ehal.md) – Vertrag des Hardware Access Layer.
+- [HA + evcc lab setup](../dev/ha-lab-setup.md) – Compose-Umgebung Earnie ↔ Home Assistant.
+- [House simulator](../dev/house-sim.md) – interne Mock- und Dogfood-Umgebung (`house_sim/`).
+- [OpenEMS lab setup](../dev/openems-lab-setup.md) – Compose-Umgebung Earnie ↔ OpenEMS.
+- [Branching & Hotfix Playbook](../workflow/branching-hotfix-playbook.md) – Tags, Hotfixes und der Umgang mit `main`.
+- [Release Checklist](../workflow/release-checklist.md) – Ablauf vom Kandidaten über den Test auf HA / LoxBerry bis zur Freigabe.
+- [Shadow Mode](../dev/shadow-mode.md) – Prod-Feed-Recorder (S1) und Shadow-Client (S2+S3, **2.7.f**) sind umgesetzt; S4 folgt in **2.+1**.
+- [Regression Suite](../workflow/regression-suite.md) – Golden-Master-Cases vor jedem Release, mit öffentlichen und privaten Daten.
+- [EV return prognosis](../dev/done/ev-return-prognosis.md) – Connect-Phasen bei abwesendem E-Auto (`forecast_when_absent`).
+
+Arbeitsnotizen, Entwürfe und abgeschlossene Epics liegen unter [`docs/dev/`](../dev/). Sie sind nicht Teil der Doku-Reviews.
+
+## Entwickler-Betrieb
+
+- [Shadow-Betrieb](shadow-betrieb.md) – Prod-Feed-Recorder und Shadow-Client einrichten.

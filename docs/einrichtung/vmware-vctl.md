@@ -1,8 +1,8 @@
 # Earnie unter VMware Workstation (`vctl`)
 
-Earnie auf einem **Windows-PC** mit **VMware Workstation Pro** (oder Player for Windows) über die mitgelieferte Container-CLI **`vctl`** — ohne Docker Desktop und ohne eigene Linux-VM.
+Earnie läuft auf einem **Windows-PC** mit **VMware Workstation Pro** (oder Player for Windows) über die mitgelieferte Container-CLI **`vctl`**. Docker Desktop und eine eigene Linux-VM sind dafür nicht nötig.
 
-Gleiches Image und gleiche Persistenz wie Synology/Proxmox: `ghcr.io/jochentcc/earnie-energy:latest`, Ordner `earnie_env/config/` und `earnie_env/runtime/`, UI-Port **8501**.
+Image und Persistenz sind dieselben wie bei Synology und Proxmox: `ghcr.io/jochentcc/earnie-energy:latest`, die Ordner `earnie_env/config/` und `earnie_env/runtime/`, UI-Port **8501**.
 
 **Hilfsskript:** [`scripts/run_earnie_vctl.ps1`](../../scripts/run_earnie_vctl.ps1)  
 **Ports:** [streamlit-ports.md](../referenz/streamlit-ports.md)  
@@ -13,28 +13,28 @@ Gleiches Image und gleiche Persistenz wie Synology/Proxmox: `ghcr.io/jochentcc/e
 
 | Passend | Weniger passend |
 |---------|-----------------|
-| Windows-PC mit VMware Workstation, kein Docker Desktop gewünscht | Dauerbetrieb 24/7 wie NAS/Proxmox (besser: Compose auf Linux/NAS) |
-| Live oder Was-wäre-wenn auf dem Desktop-PC | Automatischer Start mit Windows ohne Extra-Arbeit |
-| Schneller Zugriff auf das veröffentlichte GHCR-Image | Erwartung von `docker compose up` (vctl hat **kein** Compose) |
-| `vctl system start` lädt `crx.vmdk` erfolgreich | DNS/Download von `download3.vmware.com` schlägt fehl (häufig seit Broadcom-Migration) |
+| Windows-PC mit VMware Workstation, kein Docker Desktop gewünscht | Dauerbetrieb rund um die Uhr wie auf NAS oder Proxmox (besser: Compose auf Linux oder NAS) |
+| Live oder Was-wäre-wenn auf dem Desktop-PC | Automatischer Start mit Windows ohne Zusatzaufwand |
+| Schneller Zugriff auf das veröffentlichte GHCR-Image | Erwartung von `docker compose up` (`vctl` hat **kein** Compose) |
+| `vctl system start` lädt `crx.vmdk` erfolgreich | DNS-Auflösung oder Download von `download3.vmware.com` schlägt fehl (häufig seit der Broadcom-Migration) |
 
-`vctl` startet jeden Container in einer leichten **CRX-VM** und braucht dafür die Datei **`crx.vmdk`** (Download beim ersten `vctl system start` / `vctl kind`). Der Runtime-Dienst startet **nicht** automatisch mit Workstation — nach jedem Reboot einmal `vctl system start` (bzw. Skript `-Action start`).
+`vctl` startet jeden Container in einer leichten **CRX-VM**. Dafür braucht es die Datei **`crx.vmdk`**, die beim ersten `vctl system start` bzw. `vctl kind` heruntergeladen wird. Der Runtime-Dienst startet nicht automatisch mit Workstation. Nach jedem Neustart des PCs daher einmal `vctl system start` ausführen (bzw. das Skript mit `-Action start`).
 
-**Wichtig:** Wenn der Download von `crx.vmdk` fehlschlägt, ist das ein **VMware-/Broadcom-Problem**, kein Earnie-Fehler. Siehe [Troubleshooting](#troubleshooting-crxvmdk).
+> **Hinweis:** Schlägt der Download von `crx.vmdk` fehl, liegt ein Problem bei VMware bzw. Broadcom vor, kein Earnie-Fehler. Siehe [Troubleshooting](#troubleshooting-crxvmdk).
 
 ## Voraussetzungen
 
-| Kriterium | Go | No-Go |
-|-----------|----|-------|
+| Kriterium | Geeignet | Nicht geeignet |
+|-----------|----------|----------------|
 | Windows | 10 1809+ / 11 | ältere Windows-Versionen ohne `vctl` |
-| VMware | Workstation Pro oder Player for Windows **mit** `vctl` | reines ESXi / nur klassische VMs ohne `vctl` |
-| Architektur Image | `linux/amd64` (wie Synology) | ARM-only-Host |
+| VMware | Workstation Pro oder Player for Windows **mit** `vctl` | reines ESXi bzw. nur klassische VMs ohne `vctl` |
+| Architektur Image | `linux/amd64` (wie Synology) | Host nur mit ARM |
 | Disk | SSD empfohlen | sehr langsame HDD als Systemplatte |
-| Netz | PC erreicht Loxone/HA im LAN | Port 8501 ungeschützt ins Internet |
+| Netz | PC erreicht Loxone bzw. HA im LAN | Port 8501 ungeschützt im Internet |
 
 ## 1. Runtime starten
 
-PowerShell:
+In PowerShell:
 
 ```powershell
 vctl system info
@@ -42,26 +42,26 @@ vctl system start
 vctl system info
 ```
 
-Erwartung: **Container runtime is running**.
+Erwartete Ausgabe: **Container runtime is running**.
 
-`vctl.exe` liegt typisch unter:
+`vctl.exe` liegt üblicherweise unter:
 
 `C:\Program Files (x86)\VMware\VMware Workstation\bin\vctl.exe`
 
 ## 2. Persistente Ordner
 
-Standardpfad des Hilfsskripts: `%USERPROFILE%\Earnie\earnie_env\…`
+Das Hilfsskript verwendet standardmäßig den Pfad `%USERPROFILE%\Earnie\earnie_env\…`.
 
 ```powershell
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\Earnie\earnie_env\config"
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\Earnie\earnie_env\runtime"
 ```
 
-`vctl`-Volumes: nur **absolute Ordnerpfade** (keine relativen Pfade, keine einzelnen Dateien, keine Docker-Named-Volumes).
+`vctl`-Volumes akzeptieren nur **absolute Ordnerpfade**. Relative Pfade, einzelne Dateien und Docker-Named-Volumes funktionieren nicht.
 
 ## 3. Mit Hilfsskript (empfohlen)
 
-Vom Repo-Root (oder Skript-Pfad anpassen):
+Aus dem Repo-Root aufrufen (oder den Skript-Pfad anpassen):
 
 ```powershell
 # Erststart: Runtime + Image-Pull + Container anlegen
@@ -83,17 +83,17 @@ Vom Repo-Root (oder Skript-Pfad anpassen):
 .\scripts\run_earnie_vctl.ps1 -Action up -SkipLoxoneVerify
 
 # Bestimmte Version
-.\scripts\run_earnie_vctl.ps1 -Action up -Image ghcr.io/jochentcc/earnie-energy:2.5.2
+.\scripts\run_earnie_vctl.ps1 -Action up -Image ghcr.io/jochentcc/earnie-energy:2.6.2
 ```
 
-Bei Auth-Fehler beim Pull:
+Bei einem Authentifizierungsfehler beim Pull zuerst anmelden:
 
 ```powershell
 .\scripts\run_earnie_vctl.ps1 -Action login
 # GitHub-Benutzer + PAT mit read:packages
 ```
 
-Weitere Parameter: `-DataRoot`, `-ContainerName`, `-UiPort`, `-DaemonPort` — siehe Kommentarblock im Skript.
+Der Kommentarblock im Skript beschreibt die weiteren Parameter `-DataRoot`, `-ContainerName`, `-UiPort` und `-DaemonPort`.
 
 ## 4. Manuell mit `vctl` (ohne Skript)
 
@@ -122,18 +122,18 @@ vctl run --name earnie-productive -d `
 ## 5. Konfiguration nach dem ersten Start
 
 1. UI öffnen: `http://localhost:8501`
-2. Auf dem Windows-Host anpassen:
-   - `earnie_env\config\.env` — Backend-Zugang (z. B. Loxone)
-   - `earnie_env\config\config.json`, `tariffs.json` — Haus und Tarife
+2. Auf dem Windows-Host diese Dateien anpassen:
+   - `earnie_env\config\.env`: Zugang zum Backend (z. B. Loxone).
+   - `earnie_env\config\config.json` und `tariffs.json`: Haus und Tarife.
 3. Container neu starten:
 
 ```powershell
 .\scripts\run_earnie_vctl.ps1 -Action restart
 ```
 
-Fehlende Dateien legt der Image-Entrypoint an; bestehende werden nicht überschrieben. Details: [container.md](container.md).
+Fehlende Dateien legt der Entrypoint des Images an, bestehende Dateien bleiben unverändert. Details: [container.md](container.md).
 
-Log-Datei: `%USERPROFILE%\Earnie\earnie_env\runtime\earnie.log`
+Die Log-Datei liegt unter `%USERPROFILE%\Earnie\earnie_env\runtime\earnie.log`.
 
 ```powershell
 .\scripts\run_earnie_vctl.ps1 -Action logs-hint
@@ -145,16 +145,16 @@ Log-Datei: `%USERPROFILE%\Earnie\earnie_env\runtime\earnie.log`
 .\scripts\run_earnie_vctl.ps1 -Action update
 ```
 
-Entspricht: Runtime starten → Image pullen → Container entfernen → mit gleichen Volume-Mounts neu anlegen. Persistente Daten unter `earnie_env\` bleiben erhalten.
+Das Skript startet die Runtime, lädt das Image neu, entfernt den Container und legt ihn mit denselben Volume-Mounts wieder an. Die persistenten Daten unter `earnie_env\` bleiben erhalten.
 
-Vorabversionen (Community): Image-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.5.3-alpha.2` — **nicht** `:latest` (bleibt auf der letzten offiziellen Version).
+Für Vorabversionen (Community) den Image-Tag fest angeben, z. B. `ghcr.io/jochentcc/earnie-energy:X.Y.Z-alpha.N`. Der Tag `:latest` zeigt weiterhin auf die letzte offizielle Version.
 
 ## Einschränkungen
 
-- **Kein Docker Compose** — Start/Stop/Update über `vctl` bzw. das Hilfsskript.
-- **Kein Auto-Start** mit Windows — nach Reboot Runtime + Container starten (Taskplaner optional selbst einrichten).
-- **LAN / Loxone** — Ports liegen auf dem Windows-Host; Erreichbarkeit des Miniservers zuerst vom PC aus prüfen. Der Miniserver muss Earnie auf Port **8541** erreichen können — dafür braucht die VM **Bridged**-Netz (nicht NAT) und eine **feste IP** bzw. DHCP-Reservierung für den Earnie-Host (siehe [container.md](container.md) § Netzwerk). Bei Problemen alternativ Linux-VM mit bridged Netz + Compose ([proxmox-lxc.md](proxmox-lxc.md) als Muster).
-- Compose-Äquivalent Prod: [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml) / [`synology_productive.yml`](../../docker/compose/synology_productive.yml).
+- **Kein Docker Compose:** Start, Stopp und Update laufen über `vctl` bzw. das Hilfsskript.
+- **Kein Auto-Start mit Windows:** Nach einem Neustart Runtime und Container von Hand starten. Ein Eintrag im Taskplaner lässt sich optional selbst einrichten.
+- **LAN und Loxone:** Die Ports liegen auf dem Windows-Host. Die Erreichbarkeit des Miniservers zuerst vom PC aus prüfen. Der Miniserver muss Earnie auf Port **8541** erreichen. Dafür braucht die VM ein **Bridged**-Netz (kein NAT) und der Earnie-Host eine **feste IP** bzw. DHCP-Reservierung (siehe [container.md](container.md#netzwerk-docker-bridge-heimnetz-und-miniserver-rückkanal)). Bei Problemen ist eine Linux-VM mit Bridged-Netz und Compose die Alternative ([proxmox-lxc.md](proxmox-lxc.md) als Muster).
+- **Compose-Entsprechung für den Produktivbetrieb:** [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml) bzw. [`synology_productive.yml`](../../docker/compose/synology_productive.yml).
 
 ## Troubleshooting: `crx.vmdk`
 
@@ -167,13 +167,13 @@ Error downloading from https://download3.vmware.com/software/fusion/file/crx.vmd
 ERROR failed to create container: require file crx.vmdk, check if it has been downloaded correctly
 ```
 
-Danach meldet `-Action start` oft: Container existiert nicht — weil `-Action up` den Container nie anlegen konnte.
+Danach meldet `-Action start` oft, dass der Container nicht existiert. Der Grund: `-Action up` konnte den Container nie anlegen.
 
 ### Ursache
 
-`vctl` muss die CRX-Festplatte `crx.vmdk` von Broadcom/VMware herunterladen. Der Hostname **`download3.vmware.com`** löst bei vielen Installationen **nicht mehr auf** (bekanntes Community-Thema; betraf auch aktuelle Workstation 17.6.x). Earnie und GHCR sind dabei nicht beteiligt.
+`vctl` muss die CRX-Festplatte `crx.vmdk` von Broadcom bzw. VMware herunterladen. Der Hostname **`download3.vmware.com`** lässt sich bei vielen Installationen nicht mehr auflösen. Das Problem ist in der Community bekannt und betraf auch aktuelle Versionen von Workstation 17.6.x. Earnie und GHCR sind daran nicht beteiligt.
 
-Erwarteter Speicherort nach erfolgreichem Download:
+Nach einem erfolgreichen Download liegt die Datei hier:
 
 `%USERPROFILE%\.vctl\bin\crx.vmdk`
 
@@ -187,20 +187,20 @@ Get-Item "$env:USERPROFILE\.vctl\bin\crx.vmdk" -ErrorAction SilentlyContinue |
 vctl system start
 ```
 
-### Was versuchen (vctl retten)
+### Lösungsversuche für `vctl`
 
-1. **Workstation aktualisieren** auf die neueste verfügbare Version (Broadcom Support/Portal).
-2. **Anderes DNS / Netz** — z. B. anderer Resolver, VPN aus, Firmen-Proxy prüfen; danach erneut `vctl system start`.
-3. **Datei von einem funktionierenden PC übernehmen** — wenn ein anderer Rechner bereits `%USERPROFILE%\.vctl\bin\crx.vmdk` hat (gleiche Workstation-Major-Version): Ordner `.vctl\bin\` mit `crx.vmdk` (und ggf. mitgelieferten Tools) auf den Ziel-PC kopieren, dann `vctl system start` und erneut `.\scripts\run_earnie_vctl.ps1 -Action up`.
-4. **Broadcom Community / Support** — Stichwort `vctl crx.vmdk download3.vmware.com`.
+1. **Workstation aktualisieren:** auf die neueste verfügbare Version (Broadcom Support bzw. Portal).
+2. **Anderes DNS oder Netz probieren:** z. B. einen anderen Resolver verwenden, VPN abschalten, den Firmen-Proxy prüfen. Danach erneut `vctl system start` ausführen.
+3. **Datei von einem funktionierenden PC übernehmen:** Hat ein anderer Rechner mit derselben Workstation-Hauptversion bereits `%USERPROFILE%\.vctl\bin\crx.vmdk`, den Ordner `.vctl\bin\` mit `crx.vmdk` (und ggf. mitgelieferten Tools) auf den Ziel-PC kopieren. Danach `vctl system start` und erneut `.\scripts\run_earnie_vctl.ps1 -Action up` ausführen.
+4. **Broadcom Community bzw. Support fragen:** Suchbegriff `vctl crx.vmdk download3.vmware.com`.
 
-Es gibt **keinen** offiziellen Earnie-Workaround, der `crx.vmdk` selbst bereitstellt (Lizenz/Distribution der VMware-Datei).
+Einen offiziellen Earnie-Workaround, der `crx.vmdk` selbst bereitstellt, gibt es nicht. Lizenz und Verteilung dieser VMware-Datei lassen das nicht zu.
 
 ### Empfohlener Ausweichweg (Earnie trotzdem betreiben)
 
-Gleiches Image, ohne `vctl`:
+Beide Wege nutzen dasselbe Image, ohne `vctl`.
 
-**Option A — Docker Desktop auf dem Windows-PC**
+**Option A: Docker Desktop auf dem Windows-PC**
 
 ```powershell
 mkdir earnie_env\config, earnie_env\runtime
@@ -208,8 +208,8 @@ docker compose --project-directory . -f docker/compose/synology_productive.yml p
 docker compose --project-directory . -f docker/compose/synology_productive.yml up -d
 ```
 
-UI: `http://localhost:8501` — Details: [container.md](container.md).
+UI: `http://localhost:8501`. Details: [container.md](container.md).
 
-**Option B — kleine Linux-VM in VMware** (bridged Netz) mit Docker Engine + Compose — Muster wie [proxmox-lxc.md](proxmox-lxc.md), nur als volle VM statt LXC.
+**Option B: kleine Linux-VM in VMware** mit Bridged-Netz, Docker Engine und Compose. Das Vorgehen folgt [proxmox-lxc.md](proxmox-lxc.md), nur als vollständige VM statt LXC.
 
-Bestehende Daten unter `%USERPROFILE%\Earnie\earnie_env\` können bei Option A nach `.\earnie_env\` im Compose-Projektordner kopiert werden (gleiche Unterordner `config/` und `runtime/`).
+Bei Option A lassen sich bestehende Daten aus `%USERPROFILE%\Earnie\earnie_env\` nach `.\earnie_env\` im Compose-Projektordner kopieren. Die Unterordner `config/` und `runtime/` bleiben gleich.

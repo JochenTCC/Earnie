@@ -1,34 +1,34 @@
 # Charts & Panels
 
-Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Modus-Übersicht: [Betriebsmodi](betriebsmodi.md). **Szenario-Explorer** nutzt teils dieselben Chart-Komponenten, eigene Kosten- und Monatscharts.
+Diese Seite beschreibt Charts und Panels der Seite **Monitor** (Sunset-2-Sunset; Code: `ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Überblick über die Modi: [Betriebsmodi](betriebsmodi.md). Der **Szenario-Explorer** nutzt teilweise dieselben Chart-Komponenten, hat aber eigene Kosten- und Monatscharts.
 
 ## Seitenaufbau (Monitor / Sunset-2-Sunset)
 
 | Bereich | Inhalt |
 |---------|--------|
-| Kopf | Seitentitel, **?** mit Modus-Scope (Sunset-2-Sunset / Szenario-Explorer) |
-| Sidebar | Env-/Setup-Hinweise, Fortschritt Ersteinrichtung, **Konfiguration speichern / laden** (ZIP); unten **Info / About** (Banner / Version / Kontakt) — **keine** PV-/Batterie-Parameter (diese auf **Szenarienkonfigurator** / Hauskonfigurator) |
-| Menü | `st.navigation`: Abschnitte Live-Cockpit, Konfiguration, Daemon Control |
-| Charts | Chart 1 → Navigation ←/→ → Sankey → Chart 2 → Simulations-Tabelle → Energievergleich (Expander) |
-| Sankey | Live-Energiefluss unter Chart 1 (nach Navigation): Plant über EHAL-Backend; Flex/EV-SoC siehe unten |
-| Footer | Trennlinie → **Datenbasis** (Expander, Log-Pfad) → Optimierungs-Takt / Countdown |
+| Kopf | Seitentitel mit **?** (Geltungsbereich des Modus: Sunset-2-Sunset bzw. Szenario-Explorer) |
+| Sidebar | Hinweise zu Env und Setup, Fortschritt der Ersteinrichtung, **Konfiguration speichern / laden** (ZIP); unten **Info / About** (Banner, Version, Kontakt). PV- und Batterie-Parameter liegen im **Szenarienkonfigurator** bzw. Hauskonfigurator, nicht in der Sidebar. |
+| Menü | `st.navigation` mit den Abschnitten Live-Cockpit, Konfiguration, Daemon Control |
+| Charts | Reihenfolge: Chart 1 → Navigation ←/→ → Sankey → Chart 2 → Simulations-Tabelle → Energievergleich (Expander) |
+| Sankey | Live-Energiefluss unter Chart 1 (nach der Navigation). Anlagenwerte (Plant) kommen über das EHAL-Backend; Flex und EV-SoC siehe [Energiefluss](#energiefluss-live-sankey). |
+| Footer | Trennlinie, dann **Datenbasis** (Expander, Log-Pfad), dann Optimierungs-Takt / Countdown |
 
-Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdown + **?**); im Footer zusätzlich **?** beim nächsten main.py-Takt.
+Wartet die Seite auf **main.py**, erscheint **über** den Charts ein blauer Sync-Hinweis (Countdown und **?**). Im Footer steht zusätzlich ein **?** beim nächsten main.py-Takt.
 
 ## Chart 1: Leistung, SoC & Preis
 
-**Überschrift:** Fenster-Label (z. B. „SA₀→SA₂ (Live)“ Desktop bzw. „SA₀→SA₁ (Live)“ Mobil · Datumsbereich) mit **?** (Hintergrundzonen grau/neutral/grün, Navigation).
+**Überschrift:** Fensterbezeichnung und Datumsbereich, z. B. „SA₀→SA₂ (Live)“ am Desktop bzw. „SA₀→SA₁ (Live)“ mobil. Das **?** daneben erklärt die Hintergrundzonen (grau, neutral, grün) und die Navigation.
 
-**Linke Y-Achse (kW):** Balkenhöhe = Leistung. Die Balkenbreite folgt der Slotdauer (**15 min** über den Horizont) — Fläche ∝ Energie. **Ausnahme Verbraucher:** Bei Generic-Schedules, die intern stündlich modelliert und auf QH gehalten werden, können Läufe mit `duration_h < 1` als mittlere Leistung (`nominal × duration_h` in `generic_schedule`) erscheinen.
+**Linke Y-Achse (kW):** Die Balkenhöhe zeigt die Leistung. Die Balkenbreite folgt der Slotdauer (**15 min** über den ganzen Horizont), die Fläche ist also proportional zur Energie. **Ausnahme Verbraucher:** Generic-Schedules werden intern stündlich modelliert und auf Viertelstunden gehalten. Läufe mit `duration_h < 1` können deshalb als mittlere Leistung erscheinen (`nominal × duration_h` in `generic_schedule`).
 
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
-| PV | Gelbe Linie | PV-Prognose (durchgängig grau/neutral/grün) |
-| Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig** PV (gelb), Netzbezug (blau); **↓ kräftig** Grundlast (braun), Flex; **gedämpft** Batterie→Last grün, Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz blassgelb — Up- und Down-Säule gleich hoch |
+| PV | Gelbe Linie | PV-Prognose (durchgängig über grau, neutral und grün) |
+| Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig:** PV (gelb), Netzbezug (blau). **↓ kräftig:** Grundlast (braun), Flex. **Gedämpft:** Batterie→Last grün, Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz blassgelb. Rauf- und Runter-Säule sind gleich hoch. |
 
 ### Rauf/Runter-Algorithmus (Wasserfall)
 
-Pro Slot werden Leistungen aus den Chart-Feldern auf Flüsse verteilt (`ui/flow_balance_allocate.py`):
+Pro Slot verteilt Earnie die Leistungen aus den Chart-Feldern auf einzelne Flüsse (`ui/flow_balance_allocate.py`):
 
 ```
 PV-Rest  := PV − min(PV, Last)
@@ -41,9 +41,7 @@ Einspeisung (Batterie) ← Rest der Einspeisung (≤ Entlade-Rest)
 Entladen → Last ← verbleibende Entladung
 ```
 
-**Analyse Verbrauch & Kosten (Live-Cockpit):** Dieselbe Slot-Zuordnung (`allocate_slot_flows`) wird pro-rata auf Grundlast und gemessene Flex-Verbraucher verteilt. Kosten am Verbrauchsort nur für den **Netzanteil** × Importpreis (PV/Batterie-Entladung = 0 €). Quelle: Produktiv-Log; Charts für rollierende **7-/28-Tage**-Fenster (Navigation), Kennzahlen zusätzlich für die letzten **365 Tage** vorhandener Log-Daten. **Batterie-Energieflüsse:** gestapelte Laden-/Entladen-Balken inkl. **Standby** aus HK (`standby_power_kw` × Fensterstunden). Caption: gemessener Wirkungsgrad `η = √(E_Entladen / E_Laden)` als Empfehlung für den Hauskonfigurator (Nominalwert bleibt genannt); Standby HK (A) vs. Rest nach Roundtrip mit nominalem η (B); konkrete Empfehlung `Standby-Leistung ≈ B / Fensterstunden` in kW (Nominalwert genannt); Hinweis bei relativer Abweichung &gt; 20 %. **Wärmeinhalt:** darunter Chart Sim `Q_sim` / Ist `Q_meas` aus `thermal_observability`, plus Fächer der letzten 12 stündlichen Q-Prognosen (`horizon_q_sim_kwh`, gemeinsamer Horizont ≤ 24 h) für Wärmespeicher und Pools.
-
-**Sonderfälle:** `Netzbezug` und `Geplante Batterie-Aktion` sind vorzeichenkodiert (Bezug/Laden positiv, Einspeisung/Entladen negativ). Fehlt eine explizite Einspeisung in der Zeile, wird PV-Überschuss (`offset_kw > 0`) als gedämpfte PV-Einspeisung gezeichnet. **Grauer Bereich (Produktiv-Log):** PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** nutzen Ist-Werte aus dem Produktiv-Log. Ab Daemon-Builds mit Viertelstunden-Mittelung schreibt `main.py` zusätzlich `closed_interval` (Mittelwert der Leistungsproben ≤ 60 s über die *vorherige* Viertelstunde, typisch alle 30 s). Chart 1, Verbrauch & Kosten und Soll/Ist-Ist nutzen diese Mittelwerte, sobald `sample_count ≥ 3`; sonst Fallback auf die Entscheidungspunktprobe `consumption_snapshot` (ältere Log-Zeilen ohne `closed_interval` bleiben Punktproben). **Loxone-Zähler (optional, VO-Push):** Sind die Energie-Felder aktiviert (`sens_pv_energy` / `sens_grid_energy_*` bzw. `consumer.*.sens_energy_total`), liest der Sampler die vom Miniserver gepushten Zählerstände aus der Inbox und setzt für diese Kanäle die mittlere Slot-Leistung aus ΔkWh / 0,25 h (`ist_power_source`: `counter`). Veraltete oder fehlende Zähler (kein Push / älter als 3 × VO-Repeat) lassen den Kanal auf dem Leistungsmittel. Gemeinsame Zähler mit `subtract_consumer_ids` bleiben auf dem Leistungsmittel. **HA-Energiezähler (optional):** Zusätzliche Entities `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export` in `plant.ehal_bindings` (`device_class=energy`, bevorzugt `state_class=total_increasing`); gleicher ΔE/0,25-h-Vertrag für PV/Netz; Batterie und Flex bleiben auf dem Leistungsmittel. Die Aufteilung Laden/Einspeisung leitet sich aus gemessener Batterieleistung (`Ist Batterie-Leistung (kW)`) ab, nicht aus `battery_plan_kw`. Widerspricht das Ist-Vorzeichen dem SoC-Schritt zum nächsten Log-Slot und fehlt ein brauchbares Slot-Mittel, wird die Batterieleistung für die Balken aus dem SoC-Delta abgeleitet. **MILP/neutral/grün:** geplanter Batteriewert; am oberen/unteren SoC-Limit wird geplanter Lade-/Entladeanteil nicht gezeichnet, Überschuss erscheint als PV-Einspeisung bzw. Netzbezug. Im neutralen MILP-Bereich wird `Netzbezug` nach Live-Overlay aus Last, Flex, PV und Batterie neu abgeleitet.
+Die gedämpften Segmente im Chart:
 
 | Segment (Chart) | Farbe gedämpft | Bedeutung |
 |-----------------|----------------|-----------|
@@ -53,45 +51,73 @@ Entladen → Last ← verbleibende Entladung
 | `export_battery` | Cyan | Einspeisung aus Entladung (Batterie→Netz) |
 | `battery_discharge_load` | Grün | Entladen in die Last (0-Bilanz) |
 
-**Flexible Verbraucher** (gestapelte Down-Segmente): Farbe aus fester **8er-Palette** in `ui/chart_colors.py` (`CONSUMER_PALETTE`, Hue **260→40**, S≈90, L≈50). In `config.json` je Verbraucher **`chart_color_index`** (0–7), nicht mehr freies Hex. Auflösung zentral über `consumer_chart_color()` — Chart 1 und Sankey nutzen dieselben Vollfarben.
+Dieselbe Slot-Zuordnung nutzt auch die Auswertung [Analyse Verbrauch & Kosten](#analyse-verbrauch--kosten-live-cockpit).
 
-**Generic `earnie_role: known` and `manual`:** In der Optimierung Teil der Grundlast-Overlay; in Chart 1 werden die geplanten Slot-Leistungen **sichtbar** aus `Verbrauch-Prognose` in eigene Down-Segmente herausgezogen (`house_config/known_chart_display.py`). `manual` bleibt für die Empfehlungs-UI; SE/Live rechnen die Default-Schedule mit (Nutzer startet wie empfohlen).
+### Sonderfälle
 
-**Zonenabhängige Sättigung (nur Chart-1-Flex-Balken):** Grauer Bereich (Vergangenheit) volle Palette-Sättigung; neutraler Bereich (laufender Plan) und grüner Bereich (Preis-Prognose) gemeinsam gedämpft (`CONSUMER_CHART_SATURATION_MUTED`, derzeit 0,6). Slot → Zone über `chart_zone_kind_for_slot_start()` / `UiChartZones`; Legende bleibt in Vollfarbe (`visible='legendonly'`). Sankey unverändert volle Sättigung.
+- **Vorzeichen:** `Netzbezug` und `Geplante Batterie-Aktion` sind vorzeichenkodiert. Bezug und Laden sind positiv, Einspeisung und Entladen negativ.
+- **Fehlende Einspeisung:** Fehlt in der Zeile eine explizite Einspeisung, zeichnet der Chart den PV-Überschuss (`offset_kw > 0`) als gedämpfte PV-Einspeisung.
+- **MILP (neutraler und grüner Bereich):** Gezeichnet wird der geplante Batteriewert. Am oberen bzw. unteren SoC-Limit entfällt der geplante Lade- bzw. Entladeanteil; der Überschuss erscheint dann als PV-Einspeisung bzw. Netzbezug. Im neutralen MILP-Bereich wird `Netzbezug` nach dem Live-Overlay aus Last, Flex, PV und Batterie neu abgeleitet.
 
-**PV im grauen Bereich:** Eine Prognose-Linie (Forecast.Solar-Wert **vor** Live-Overlay, Feld `forecast_pv_kw` im Log) über alle Zonen; PV-Balken (Flow-Balance ↑) nutzen im Log **Ist** (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`). Abweichung sichtbar ab dem nächsten Worker-Lauf nach dem Fix; ältere Log-Einträge können identische Werte haben (früher wurde Ist fälschlich als Prognose geloggt).
+### Ist-Werte im grauen Bereich (Produktiv-Log)
 
-**Legende (Monitor Chart 1/2):** Plotly-`showlegend` ist aus; unter dem Chart ein ausklappbares HTML-`<details>` mit Farbfeldern auf allen Viewports (`ui/chart_legend_mobile.py`, `margin.b` = 0). Kein toter Legendenstreifen im Chart.
+PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** zeigen im grauen Bereich Ist-Werte aus dem Produktiv-Log.
 
-**Rechte Y-Achse (0–100, skaliert):**
+- **Viertelstunden-Mittel:** Ab Builds des Optimierer-Dienstes mit Viertelstunden-Mittelung schreibt `main.py` zusätzlich `closed_interval`. Das ist der Mittelwert der Leistungsproben (≤ 60 s) über die *vorherige* Viertelstunde, typisch alle 30 s.
+- **Nutzung der Mittelwerte:** Chart 1, Verbrauch & Kosten und die Ist-Seite von Soll/Ist nutzen diese Mittelwerte, sobald `sample_count ≥ 3`. Andernfalls dient die Probe am Entscheidungspunkt (`consumption_snapshot`) als Fallback. Ältere Log-Zeilen ohne `closed_interval` bleiben Punktproben.
+- **Loxone-Zähler (optional, VO-Push):** Sind die Energie-Felder aktiviert (`sens_pv_energy` / `sens_grid_energy_*` bzw. `consumer.*.sens_energy_total`), liest der Sampler die vom Miniserver gepushten Zählerstände aus der Inbox. Für diese Kanäle setzt er die mittlere Slot-Leistung aus ΔkWh / 0,25 h (`ist_power_source`: `counter`). Veraltete oder fehlende Zähler (kein Push bzw. älter als 3 × VO-Repeat) lassen den Kanal auf dem Leistungsmittel. Dasselbe gilt für gemeinsame Zähler mit `subtract_consumer_ids`.
+- **HA-Energiezähler (optional):** Zusätzliche Entities `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export` in `plant.ehal_bindings` (`device_class=energy`, bevorzugt `state_class=total_increasing`). Für PV und Netz gilt derselbe Vertrag ΔE / 0,25 h; Batterie und Flex bleiben auf dem Leistungsmittel.
+- **Batterie:** Die Aufteilung in Laden und Einspeisung ergibt sich aus der gemessenen Batterieleistung (`Ist Batterie-Leistung (kW)`), nicht aus `battery_plan_kw`. Widerspricht das Ist-Vorzeichen dem SoC-Schritt zum nächsten Log-Slot und fehlt ein brauchbares Slot-Mittel, leitet Earnie die Batterieleistung für die Balken aus dem SoC-Delta ab.
+
+**PV im grauen Bereich:** Eine Prognose-Linie läuft über alle Zonen. Sie zeigt den Forecast.Solar-Wert **vor** dem Live-Overlay (Feld `forecast_pv_kw` im Log). Die PV-Balken (Rauf-Seite der Energiebilanz) nutzen im Log dagegen den **Ist**-Wert (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`). Die Abweichung ist ab dem nächsten Worker-Lauf nach dem Fix sichtbar. Ältere Log-Einträge können identische Werte haben, weil früher der Ist-Wert fälschlich als Prognose geloggt wurde.
+
+### Flexible Verbraucher
+
+**Farben:** Flexible Verbraucher erscheinen als gestapelte Runter-Segmente. Ihre Farbe stammt aus der festen **8er-Palette** in `ui/chart_colors.py` (`CONSUMER_PALETTE`, Farbton **260→40**, S≈90, L≈50). In `config.json` legt **`chart_color_index`** (0–7) die Farbe je Verbraucher fest; freie Hex-Werte gibt es nicht mehr. Die Auflösung läuft zentral über `consumer_chart_color()`, sodass Chart 1 und Sankey dieselben Vollfarben zeigen.
+
+**Generic `earnie_role: known` und `manual`:** Die Optimierung zählt diese Verbraucher zum Grundlast-Overlay. Chart 1 zieht ihre geplanten Slot-Leistungen trotzdem **sichtbar** aus `Verbrauch-Prognose` heraus und zeigt sie als eigene Runter-Segmente (`house_config/known_chart_display.py`). `manual` bleibt für die Empfehlungs-UI relevant. SE und Live rechnen den Default-Schedule mit, unter der Annahme, dass der Start wie empfohlen erfolgt.
+
+**Zonenabhängige Sättigung (nur Flex-Balken in Chart 1):** Im grauen Bereich (Vergangenheit) erscheinen die Palettenfarben voll gesättigt. Im neutralen Bereich (laufender Plan) und im grünen Bereich (Preis-Prognose) sind sie gemeinsam gedämpft (`CONSUMER_CHART_SATURATION_MUTED`, derzeit 0,8). Die Zuordnung Slot → Zone erfolgt über `chart_zone_kind_for_slot_start()` / `UiChartZones`. Die Legende bleibt in Vollfarbe (`visible='legendonly'`), der Sankey ebenfalls in voller Sättigung.
+
+**Legende (Monitor, Chart 1 und 2):** Die Plotly-Legende (`showlegend`) ist ausgeschaltet. Stattdessen steht unter dem Chart auf allen Bildschirmgrößen ein ausklappbares HTML-`<details>` mit Farbfeldern (`ui/chart_legend_mobile.py`, `margin.b` = 0). Im Chart bleibt so kein leerer Legendenstreifen.
+
+### Rechte Y-Achse (0–100, skaliert)
 
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
-| SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`); bei ≥2 SoC-Trägern (Haus-ESS, physische Powerstation, virtuelle Powerstation) eine Linie pro Entität (`SoC · {Bezeichnung}`, Farbvarianten um `_HSL_SOC`); virtuelle Powerstations als sehr schmale **gestrichelte** Linien (Dash-Zyklus, nie durchgezogen — damit sich überlappende Reserven unterscheidbar bleiben) | Simulierter Batterie-/Reserve-SOC (Haus-ESS live/MILP; physische `standby_backup`-PS live + Forecast aus Standby-Plan Inseln/Laden; virtuelle PS = `stored_kwh` / Kapazität, Forecast aus Haus-Batterieplan-Attribution) |
-| ESS-Mode-Underlay | Dickere, halbtransparente Linie hinter dem SoC | Cyan = Entladesperre / Hold bzw. Zwangsleistung unter 5 % von `max_power_kw`; Blau = Zwangsladen ≥ 5 %; Magenta = Zwangsentladen ≥ 5 %; Automatik ohne Underlay — nur am Primär-SoC |
-| SoC BL Ziel | Dieselbe Farbe, gestrichelt ab **Jetzt** (nicht davor) | Referenz-SOC (Baseline) der Primärbatterie; Anker = Log-SOC am Jetzt-Marker |
+| SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`). Bei ≥2 SoC-Trägern (Haus-ESS, physische Powerstation, virtuelle Powerstation) eine Linie pro Entität (`SoC · {Bezeichnung}`, Farbvarianten um `_HSL_SOC`). Virtuelle Powerstations erscheinen als sehr schmale **gestrichelte** Linien (Dash-Zyklus, nie durchgezogen), damit sich überlappende Reserven unterscheiden lassen. | Simulierter Batterie- bzw. Reserve-SOC: Haus-ESS live/MILP; physische `standby_backup`-PS live plus Forecast aus dem Standby-Plan (Inseln/Laden); virtuelle PS = `stored_kwh` / Kapazität, Forecast aus der Attribution des Haus-Batterieplans |
+| ESS-Mode-Underlay | Dickere, halbtransparente Linie hinter dem SoC | Cyan = Entladesperre / Hold bzw. Zwangsleistung unter 5 % von `max_power_kw`; Blau = Zwangsladen ≥ 5 %; Magenta = Zwangsentladen ≥ 5 %; Automatik ohne Underlay. Das Underlay erscheint nur am Primär-SoC. |
+| SoC BL Ziel | Dieselbe Farbe, gestrichelt ab **Jetzt** (nicht davor) | Referenz-SOC (Baseline) der Primärbatterie; Anker ist der Log-SOC am Jetzt-Marker |
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 | Einspeisepreis (orange, gestrichelt) | Einspeisevergütung skaliert | Hover: Cent/kWh |
 
-**SoC-Plausibilität (Live-Monitor):** Abstand **SoC BL Ziel → SoC** kommt von Lastverschiebung (Flex/E-Auto anders zeitlich platziert) und/oder der Batteriestrategie (Netzladen, Entladen, Halten). Umrandete Flex-Balken (**Original-Schedule**, nur Kanten, keine Füllung) zeigen, wo Flex laut BL-Ziel gelaufen wäre — gefüllte Flex-Balken bleiben die Optimierung. Ghost-Segmente mit Energie-Äquivalent unter **1 kWh** (`kW × Slotdauer`) werden nicht gezeichnet.
+**SoC-Plausibilität (Live-Monitor):** Der Abstand zwischen **SoC BL Ziel** und **SoC** entsteht durch Lastverschiebung (Flex oder E-Auto zeitlich anders platziert) und/oder durch die Batteriestrategie (Netzladen, Entladen, Halten). Umrandete Flex-Balken (**Original-Schedule**, nur Kanten, ohne Füllung) zeigen, wo Flex laut BL-Ziel gelaufen wäre. Die gefüllten Flex-Balken zeigen weiterhin die Optimierung. Solche Ghost-Segmente entfallen, wenn ihr Energie-Äquivalent (`kW × Slotdauer`) unter **1 kWh** liegt.
 
-**Hintergrundzonen** (Details im **?** der Chart-1-Überschrift): grau = Vergangenheit (Log), neutral = laufende Stunde, grün = extrapolierte Preise bis Fensterrand.
+### Hintergrundzonen und Marker
 
-Vertikale Marker **SA₀**, **SA₁**, **SA₂**; **Jetzt**, sobald die aktuelle Zeit im sichtbaren Fenster liegt.
+Die Hintergrundzonen (Details im **?** der Chart-1-Überschrift):
 
-**Soll/Ist-Icons** im grauen Log-Bereich (nur Slots mit echtem Produktiv-Eintrag, `slot_quality == present`):
+- **Grau:** Vergangenheit (Log).
+- **Neutral:** laufende Stunde.
+- **Grün:** extrapolierte Preise bis zum Fensterrand.
+
+Vertikale Marker zeigen **SA₀**, **SA₁** und **SA₂** sowie **Jetzt**, sobald die aktuelle Zeit im sichtbaren Fenster liegt.
+
+### Soll/Ist-Icons
+
+Soll/Ist-Icons erscheinen im grauen Log-Bereich, und zwar nur für Slots mit echtem Produktiv-Eintrag (`slot_quality == present`):
 
 | Symbol | Kategorie | Farbe | Bedeutung |
 |--------|-----------|-------|-----------|
-| ▲ | Hinweis | gelb | Unkritische Abweichung (z. B. Wärmepumpe: Freigabe ohne Anlauf) |
-| ◆ | Warnung | orange | Erwartete Abweichung — Loxone handelt bewusst anders |
+| ▲ | Hinweis | gelb | Unkritische Abweichung (z. B. Wärmepumpe: Freigabe ohne Anlauf) |
+| ◆ | Warnung | orange | Erwartete Abweichung – Loxone handelt bewusst anders |
 | ⬡ | Fehler | rot | Anweisung von Earnie nicht befolgt |
 
-Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Regeltext. Mehrere Icons pro Slot möglich (verschiedene Scopes, z. B. Batterie + E-Auto).
+Die Marker liegen oberhalb der Chart-Fläche; beim **Hover** erscheinen Kategorie-Label und Regeltext. Pro Slot sind mehrere Icons möglich (verschiedene Scopes, z. B. Batterie und E-Auto).
 
 **Regelwerk:** `config/deviation_rules.json` (Schema: `deviation_rules.schema.json`). Pflegehinweis: [Spec Soll-Ist §5.3](../dev/done/soll-ist-abweichung.md).
 
-**Aktive Regeln (Stand Epic-Abschluss):**
+**Aktive Regeln (Stand bei Einführung der Soll/Ist-Icons):**
 
 | Regel-ID | Scope | Kategorie |
 |----------|-------|-----------|
@@ -105,7 +131,7 @@ Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Re
 | `swimspa_filter_runs_unexpectedly` | pool_filter | Fehler |
 | `swimspa_filter_over_nominal` | pool_filter | Warnung |
 
-**Entwickler-Test:** VS Code Launch **Streamlit app.py (Deviation-Test)** — seedet fiktives Log (`scripts/seed_deviation_test_log.py`) in lokales `runtime/` und startet Streamlit. Manuell: `python -m scripts.seed_deviation_test_log --force`.
+**Entwickler-Test:** Der VS-Code-Launch **Streamlit app.py (Deviation-Test)** schreibt ein fiktives Log (`scripts/seed_deviation_test_log.py`) in das lokale `runtime/` und startet Streamlit. Manuell: `python -m scripts.seed_deviation_test_log --force`.
 
 **Rauf/Runter-Balken (Szenarien A–H):** Launch **Streamlit app.py (Flow-Balance-Test)** (`scripts/seed_flow_balance_test_log.py`) oder HTML-Vorschau: `python -m scripts.export_flow_balance_chart_html --open` → `runtime/flow_balance_preview.html`.
 
@@ -113,39 +139,37 @@ Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Re
 
 | Steuerung | Verhalten |
 |-----------|-----------|
-| ← Zurück | Weitere SA-Zyklen zurück im Produktiv-Log |
-| Vor → | Desktop: einen Zyklus Richtung Live (bei Live deaktiviert). Mobil: SA₀→SA₁ ↔ SA₁→SA₂ bzw. Zyklus Richtung Live |
+| ← Zurück | Blättert SA-Zyklen im Produktiv-Log zurück |
+| Vor → | Desktop: einen Zyklus Richtung Live (im Live-Fenster deaktiviert). Mobil: Wechsel SA₀→SA₁ ↔ SA₁→SA₂ bzw. einen Zyklus Richtung Live |
 
-Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich), **zwischen Chart 1 und Sankey** (Chart 2 folgt darunter). Desktop zeigt standardmäßig SA₀→SA₂; Mobil behält die 24h-Segmente.
+Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich) und liegen **zwischen Chart 1 und Sankey**; Chart 2 folgt darunter. Der Desktop zeigt standardmäßig SA₀→SA₂, mobil bleibt es bei 24-h-Segmenten.
 
 ## Chart 2: Kumulierte Kosten & Verbrauch
 
-**Überschrift** mit **?** (Ist vs. Prognose, orange Lücken) — im S-2-Split-Modus getrennte Kurven:
+**Überschrift** mit **?** (Ist vs. Prognose, orange Lücken). Im Sunset-2-Sunset-Fenster sind Ist und Prognose getrennte Kurven:
 
 | Bereich | Kurven |
 |---------|--------|
-| Grau (Log) | **Ist bisher** — kumuliert aus Produktiv-Log; **Ersparnis bisher** — geplante BL−Opt-Differenz der abgelaufenen Slots (pro SA-Tag, Neustart bei SA₁) |
-| Neutral/Grün | **Prognose** — BL Ziel / optimiert ab Log-Grenze (an Ist angeschlossen) |
+| Grau (Log) | **Ist bisher:** kumuliert aus dem Produktiv-Log. **Ersparnis bisher:** geplante Differenz BL−Opt der abgelaufenen Slots (pro SA-Tag, Neustart bei SA₁). |
+| Neutral/Grün | **Prognose:** BL Ziel / optimiert ab der Log-Grenze (an die Ist-Kurve angeschlossen) |
 
-Fehlende Log-Slots: orange Markierung, Lücken in Ist-Kurven.
+Fehlende Log-Slots sind orange markiert; die Ist-Kurven haben dort Lücken.
 
-Kennzahlen **BL Ziel**, **Optimiert** (Annotationen) beziehen sich **pro SA-Tag**: Mobil nur der sichtbare Tag; Desktop SA₀→SA₂ zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** zusätzlich **Ersparnis bisher** (SA→Jetzt, geplante Differenz der abgelaufenen Slots) und **Ersparnis erwartet** (ganzer SA-Tag bis SA₁ bzw. SA₂). Der MILP-Matching-Horizont (Jetzt → SA₂) bleibt unverändert — siehe Energievergleich. Linienfarben: `_HSL_COST_*` in `ui/chart_colors.py`.
+Die Kennzahlen **BL Ziel** und **Optimiert** (Annotationen) beziehen sich **pro SA-Tag**: mobil nur auf den sichtbaren Tag, am Desktop (SA₀→SA₂) auf zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** kommen **Ersparnis bisher** (SA bis Jetzt, geplante Differenz der abgelaufenen Slots) und **Ersparnis erwartet** (ganzer SA-Tag bis SA₁ bzw. SA₂) hinzu. Der MILP-Matching-Horizont (Jetzt → SA₂) bleibt davon unberührt, siehe [Energievergleich](#expander-energievergleich-baseline-vs-optimierung). Linienfarben: `_HSL_COST_*` in `ui/chart_colors.py`.
 
 ## Expander: Simulations-Details
 
-Rohdaten-Tabelle aller Slots im sichtbaren S-2-Fenster (15-min Log + MILP); Spalte **Datenquelle**; orange Zeilen = fehlende Log-Einträge. Erklär-Markdown bleibt im Expander.
+Rohdaten-Tabelle aller Slots im sichtbaren Sunset-2-Sunset-Fenster (15-min-Log und MILP) mit der Spalte **Datenquelle**. Orange Zeilen markieren fehlende Log-Einträge. Der Erklärtext steht im Expander.
 
 ## Expander: Energievergleich Baseline vs. Optimierung
 
-Tabelle je flexiblem Verbraucher über Horizont SA_0-->SA_2:
-
-- **BL Profil**, **BL Ziel**, **Optimierung** (kWh)
+Tabelle je flexiblem Verbraucher über den Horizont SA₀→SA₂ mit den Spalten **BL Profil**, **BL Ziel** und **Optimierung** (kWh).
 
 ## Energiefluss (Live-Sankey)
 
 <a id="energiefluss-live-sankey"></a>
 
-Aktualisierung ca. alle 10 Sekunden (`STATUS`-Fragment). Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex), sofern ein Lauf vorliegt.
+Der Sankey aktualisiert sich etwa alle 10 Sekunden (`STATUS`-Fragment). Die Flex-Knoten nutzen dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Liegt ein Optimierungslauf vor, kommt das Produktiv-Overlay (Soll vs. Ist an Batterie und Flex) aus `runtime/optimizer_run_state.json`.
 
 | Teil | Quelle im Code | Backends heute |
 |------|----------------|----------------|
@@ -153,18 +177,29 @@ Aktualisierung ca. alle 10 Sekunden (`STATUS`-Fragment). Flex-Knotenfarben: dies
 | Flex-Leistungen (Verbraucherknoten, Grundlast-Aufteilung) | `live_consumption.fetch_live_flex_kw_for_ui` → `loxone_client.resolve_flexible_consumers_live_power` | **nur Loxone** (bei HA/OpenEMS keine Live-Flex-Aufschlüsselung über Merker) |
 | EV-SoC in der Knotenbeschriftung beim Laden | `fetch_loxone_actual_soc_percent` | **nur Loxone** |
 
-Beim Laden eines E-Autos zeigt der Flex-Knoten den aktuellen SoC in der Beschriftung — nur wenn der Loxone-Pfad den SoC liefert.
+Lädt ein E-Auto, zeigt der Flex-Knoten den aktuellen SoC in der Beschriftung, sofern der Loxone-Pfad den SoC liefert.
 
 ## Footer
 
 | Element | Inhalt |
 |---------|--------|
-| **Datenbasis** | Expander: eingeklappt Produktiv-Log-Pfad; ausgeklappt Runtime, Merge-Pfad, Flex-Soll |
-| **Optimierungs-Takt** | Viertelstunden; letzter Lauf main.py/App |
-| **Nächster main.py-Takt** | Countdown + **?** (Sync-Erklärung) |
+| **Datenbasis** | Expander: eingeklappt der Pfad zum Produktiv-Log; ausgeklappt Runtime, Merge-Pfad und Flex-Soll |
+| **Optimierungs-Takt** | Viertelstunden; letzter Lauf von main.py bzw. App |
+| **Nächster main.py-Takt** | Countdown und **?** (Erklärung zur Synchronisation) |
+
+## Analyse Verbrauch & Kosten (Live-Cockpit)
+
+Die Auswertung nutzt dieselbe Slot-Zuordnung wie Chart 1 (`allocate_slot_flows`, siehe [Rauf/Runter-Algorithmus](#raufrunter-algorithmus-wasserfall)).
+
+- **Verteilung:** Die Zuordnung wird anteilig (pro rata) auf Grundlast und gemessene Flex-Verbraucher verteilt.
+- **Kosten am Verbrauchsort:** Kosten entstehen nur für den **Netzanteil** (Netzanteil × Importpreis); PV und Batterie-Entladung zählen mit 0 €.
+- **Quelle und Zeitraum:** Grundlage ist das Produktiv-Log. Die Charts zeigen rollierende **7-** bzw. **28-Tage**-Fenster (mit Navigation), die Kennzahlen zusätzlich die letzten **365 Tage** vorhandener Log-Daten.
+- **Batterie-Energieflüsse:** Gestapelte Lade- und Entladebalken, inklusive **Standby** aus dem Hauskonfigurator (`standby_power_kw` × Fensterstunden).
+- **Caption zur Batterie:** Sie nennt den gemessenen Wirkungsgrad `η = √(E_Entladen / E_Laden)` als Empfehlung für den Hauskonfigurator; der Nominalwert bleibt genannt. Außerdem vergleicht sie den Standby laut Hauskonfigurator (A) mit dem Rest nach Roundtrip mit nominalem η (B) und empfiehlt konkret `Standby-Leistung ≈ B / Fensterstunden` in kW (Nominalwert genannt). Bei einer relativen Abweichung über 20 % erscheint ein Hinweis.
+- **Wärmeinhalt:** Darunter folgt ein Chart mit Sim `Q_sim` und Ist `Q_meas` aus `thermal_observability`. Dazu kommt ein Fächer der letzten 12 stündlichen Q-Prognosen (`horizon_q_sim_kwh`, gemeinsamer Horizont ≤ 24 h) für Wärmespeicher und Pools.
 
 ## Szenario-Explorer
 
-Eigene Charts und Monatsauswertung aus `runtime/backtesting_log.json` — ohne S-2-Navigation und ohne Produktiv-Log-Merge. UI-Seite: **Szenario-Explorer** (`scenario_explorer`).
+Eigene Charts und Monatsauswertung auf Basis von `runtime/backtesting_log.json`, ohne Sunset-2-Sunset-Navigation und ohne Zusammenführung mit dem Produktiv-Log. UI-Seite: **Szenario-Explorer** (`scenario_explorer`).
 
-**Gesamtkosten und -Verbrauch — Jahres Verbrauch:** Die Spalte mischt Ist-Zähler (`cons_data`) für die Historisch-Zeile und Modell-/Optimierungssummen für alle anderen Zeilen. Erklärung: [Betriebsmodi](betriebsmodi.md#gesamtkosten-und--verbrauch), [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).
+**Gesamtkosten und -Verbrauch, Spalte „Jahres Verbrauch“:** Die Spalte mischt Ist-Zähler (`cons_data`) in der Zeile Historisch mit Modell- bzw. Optimierungssummen in allen anderen Zeilen. Erklärung: [Betriebsmodi](betriebsmodi.md#gesamtkosten-und--verbrauch), [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).

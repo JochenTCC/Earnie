@@ -1,19 +1,21 @@
 # Konfiguration speichern und laden
 
-Earnie speichert die Haus- und Szenario-Konfiguration unter `earnie_env/config/` (Laufzeitdaten unter `earnie_env/runtime/`). Ältere Installationen mit `./config` und `./runtime` bleiben über Umgebungsvariablen oder Legacy-Pfade nutzbar — für neue Setups gilt `earnie_env/`.
+Earnie speichert die Haus- und Szenario-Konfiguration unter `earnie_env/config/`, Laufzeitdaten unter `earnie_env/runtime/`. Für neue Setups gilt `earnie_env/`. Ältere Installationen mit `./config` und `./runtime` bleiben über Umgebungsvariablen oder die bisherigen Pfade (Legacy-Pfade) nutzbar.
 
-Hausbezogene JSON/CSVs sind **nicht** Teil des öffentlichen Earnie-Repos (privates Repo / Junction); der veröffentlichte Tarifkatalog liegt unter `share/config/tariffs.json`. Details: [Private Haus-Config](../einrichtung/private-env.md). Das Sidebar-ZIP bleibt der portable Transfer zwischen Installationen.
+Hausbezogene JSON- und CSV-Dateien sind **nicht** Teil des öffentlichen Earnie-Repos; sie liegen in einem privaten Repo oder werden per Junction eingebunden. Der veröffentlichte Tarifkatalog liegt unter `share/config/tariffs.json`. Details: [Private Haus-Config](../einrichtung/private-env.md). Für den Transfer zwischen Installationen dient weiterhin das ZIP aus der Sidebar.
 
 ## Auto-Speichern
 
-Im **Hauskonfigurator** und **Szenarienkonfigurator** werden gültige Änderungen automatisch auf die Festplatte geschrieben (kein separater Speichern-Button). Unvollständige Formulare (z. B. leere Bezeichnung) werden nicht persistiert. Im Szenarienkonfigurator können gespeicherte Nicht-Live-Szenarien mit **Szenario entfernen** gelöscht werden (das aktuelle Live-Szenario ist geschützt).
+Im **Hauskonfigurator** und im **Szenarienkonfigurator** schreibt Earnie gültige Änderungen automatisch auf die Festplatte. Einen eigenen Speichern-Button gibt es nicht. Unvollständige Formulare (z. B. mit leerer Bezeichnung) speichert Earnie nicht.
+
+Im Szenarienkonfigurator lassen sich gespeicherte Szenarien mit **Szenario entfernen** löschen. Das aktuelle Live-Szenario ist davon ausgenommen.
 
 ## ZIP-Export / -Import (Sidebar)
 
-In der Streamlit-Seitenleiste unter **„Konfiguration speichern / laden“**:
+Die Streamlit-Seitenleiste bietet unter **„Konfiguration speichern / laden“** zwei Aktionen:
 
-- **ZIP herunterladen** — packt die aktuellen JSON-Dateien und alle CSV unter `uploads/`
-- **ZIP importieren** — ersetzt die gleichen Dateien nach Versionsprüfung
+- **ZIP herunterladen:** Packt die aktuellen JSON-Dateien und alle CSV-Dateien unter `uploads/` in ein ZIP.
+- **ZIP importieren:** Ersetzt nach einer Versionsprüfung dieselben Dateien durch die Inhalte des ZIP.
 
 Enthaltene Dateien:
 
@@ -28,15 +30,25 @@ Enthaltene Dateien:
 | `deviation_rules.json` | Soll/Ist-Regeln |
 | `uploads/*` | Profil-CSVs |
 
-**Nicht** enthalten: `config/.env` (Loxone- und HA-Zugangsdaten bleiben lokal).
+**Nicht** enthalten ist `config/.env`. Die Zugangsdaten für Loxone und Home Assistant bleiben damit lokal.
 
-Jedes JSON trägt das Feld `earnie_data_model` (aktuell `4`). Beim Import akzeptiert Earnie Packs mit Version `4` unverändert; Version `3` wird über den [Migrations-Assistenten](../einrichtung/betrieb.md#update-und-migration) auf `4` angehoben. Ältere oder fehlende Versionen (`1`, `2`, fehlendes Feld) werden abgelehnt — Earnie stempelt sie nicht still um.
+### Datenmodell-Version
 
-**Frühere Schritte (Hintergrund):** Gemeinsame Referenzkurven (`oemag_monthly_feed_in_rates`, `monthly_float_reference_cent_kwh`, `econtrol_referenzmarktwert_pv_monthly`) liegen in `tariffs.json`. Monatskonstante Einspeisetarife nutzen Typ `monthly_table` mit eigenen `monthly_rates`. In `config.json` heißt der frühere Block `file_paths_battery_simulation` jetzt `scenario_explorer_conf`; den alten Schlüssel lehnt Earnie ab.
+Jede JSON-Datei trägt das Feld `earnie_data_model` (aktuell `4`). Beim Import behandelt Earnie die Versionen so:
+
+- **Version `4`:** Earnie übernimmt die Dateien unverändert.
+- **Version `3`:** Der [Migrations-Assistent](../einrichtung/betrieb.md#update-und-migration) hebt die Dateien auf Version `4` an.
+- **Ältere oder fehlende Versionen** (`1`, `2`, fehlendes Feld): Earnie lehnt den Import ab und ändert die Version nicht stillschweigend.
+
+**Hintergrund zu früheren Umstellungen:**
+
+- Gemeinsame Referenzkurven (`oemag_monthly_feed_in_rates`, `monthly_float_reference_cent_kwh`, `econtrol_referenzmarktwert_pv_monthly`) liegen in `tariffs.json`.
+- Monatskonstante Einspeisetarife nutzen den Typ `monthly_table` mit eigenen `monthly_rates`.
+- In `config.json` heißt der frühere Block `file_paths_battery_simulation` jetzt `scenario_explorer_conf`. Den alten Schlüssel lehnt Earnie ab.
 
 ## Migration von `./config` + `./runtime`
 
-Bestehende Daten einmalig verschieben:
+Bestehende Daten lassen sich einmalig verschieben:
 
 ```powershell
 mkdir earnie_env
@@ -44,6 +56,6 @@ Move-Item config earnie_env\config
 Move-Item runtime earnie_env\runtime
 ```
 
-Oder die bisherigen Pfade per Env belassen, z. B. `EARNIE_CONFIG_PATH=config` und `EARNIE_RUNTIME_PATH=runtime` (bzw. `EARNIE_ENV_PATH=.` mit Unterordnern `config/` und `runtime/`).
+Alternativ bleiben die bisherigen Pfade über Umgebungsvariablen erhalten, z. B. `EARNIE_CONFIG_PATH=config` und `EARNIE_RUNTIME_PATH=runtime`. Ebenso möglich ist `EARNIE_ENV_PATH=.` mit den Unterordnern `config/` und `runtime/`.
 
-Docker-Compose (Dev/Prod) mountet Host-`./earnie_env/config` bzw. `./earnie_env/runtime` weiterhin als `/app/config` und `/app/runtime` im Container und setzt `EARNIE_ENV_PATH=.`.
+Docker Compose (Dev und Prod) bindet die Host-Ordner `./earnie_env/config` und `./earnie_env/runtime` weiterhin als `/app/config` und `/app/runtime` in den Container ein und setzt `EARNIE_ENV_PATH=.`.

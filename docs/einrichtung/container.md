@@ -6,26 +6,33 @@
 
 **Windows-PC mit VMware Workstation (`vctl`):** [vmware-vctl.md](vmware-vctl.md)
 
-**Docker-Artefakte:** [docker/README.md](../../docker/README.md) — Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .`.
+**Docker-Artefakte:** [docker/README.md](../../docker/README.md). Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .` ausführen.
 
 ## CPU-Voraussetzung (amd64)
 
 Auf x86 (`amd64`: Synology, Proxmox, VMware, HA-Add-on) braucht Earnie eine CPU mit dem Befehlssatz **x86-64-v2** (u. a. SSE4.2, POPCNT – jede x86-CPU ab ca. 2009). Die mitgelieferten Bibliotheken NumPy und pyarrow laufen ohne diese Befehle nicht. Auf `arm64` (LoxBerry, Home Assistant Green) spielt das keine Rolle.
 
-Der Container prüft das beim Start (`docker/preflight.sh`). Fehlt x86-64-v2, bricht er mit der Meldung `earnie: FEHLER - die CPU unterstützt den Befehlssatz x86-64-v2 nicht` ab, statt mit einem Python-Traceback. Dieselbe Startprüfung bricht ab, wenn Config-/Runtime-Verzeichnis nicht beschreibbar ist oder die Systemuhr vor dem Image-Build-Datum liegt (kurz auf NTP warten). Bei wenig RAM (< 2 GB) oder wenig freiem Speicher (< 500 MB) erscheint nur eine Warnung.
+Der Container prüft das beim Start (`docker/preflight.sh`). Fehlt x86-64-v2, bricht er mit einer klaren Meldung ab statt mit einem Python-Traceback: `earnie: FEHLER - die CPU unterstützt den Befehlssatz x86-64-v2 nicht`. Dieselbe Startprüfung bricht auch in diesen Fällen ab:
 
-In der Regel liegt das nicht an der Hardware, sondern an einer **VM mit CPU-Typ `kvm64`/`qemu64`** (bei älteren Proxmox-VMs Standard). Abhilfe in Proxmox:
+- Das Config- oder Runtime-Verzeichnis ist nicht beschreibbar.
+- Die Systemuhr liegt vor dem Build-Datum des Images (kurz auf NTP warten).
+
+Bei wenig RAM (< 2 GB) oder wenig freiem Speicher (< 500 MB) erscheint nur eine Warnung.
+
+Meist liegt die Ursache nicht in der Hardware. Häufiger steckt eine **VM mit CPU-Typ `kvm64`/`qemu64`** dahinter (bei älteren Proxmox-VMs Standard). Abhilfe in Proxmox:
 
 1. VM herunterfahren (**Shutdown**).
 2. VM → **Hardware** → **Prozessoren** → **Bearbeiten**.
 3. **Typ** `host` wählen (alternativ `x86-64-v2-AES`) → **OK**.
-4. VM wieder starten – ein Neustart aus der VM heraus reicht nicht, sie muss aus- und wieder eingeschaltet werden.
+4. VM wieder starten. Ein Neustart aus der VM heraus reicht nicht, sie muss aus- und wieder eingeschaltet werden.
 
-Proxmox-**LXC** nutzt die CPU des Hosts direkt; dort tritt das Problem nur bei sehr alter Hardware auf. Prüfen: `grep -o -w -E 'sse4_2|popcnt' /proc/cpuinfo | sort -u` muss beide Begriffe ausgeben.
+Proxmox-**LXC** nutzt die CPU des Hosts direkt; dort tritt das Problem nur bei sehr alter Hardware auf. Zur Prüfung muss `grep -o -w -E 'sse4_2|popcnt' /proc/cpuinfo | sort -u` beide Begriffe ausgeben.
 
 ## Gesundheitsprüfung (Docker HEALTHCHECK)
 
-Das Image enthält einen `HEALTHCHECK` auf `http://127.0.0.1:<Streamlit-Port>/_stcore/health` (Standard **8501**; im HA-Add-on intern **8502**). Läuft der Optimizer-Daemon (`main.py`), muss zusätzlich die Datei `runtime/daemon_heartbeat.json` frisch sein (sonst `unhealthy`). Compose/Synology: `docker inspect --format='{{.State.Health.Status}}' <container>`.
+Das Image enthält einen `HEALTHCHECK` auf `http://127.0.0.1:<Streamlit-Port>/_stcore/health` (Standard **8501**; im HA-Add-on intern **8502**). Läuft der Optimierer-Dienst (`main.py`), muss zusätzlich die Datei `runtime/daemon_heartbeat.json` frisch sein, sonst meldet der Container `unhealthy`.
+
+Status abfragen (Compose/Synology): `docker inspect --format='{{.State.Health.Status}}' <container>`.
 
 ## Persistente Daten
 
@@ -39,6 +46,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/grid_fees.json`             | Netzentgelt-Katalog (Netzbereiche / Zeitregeln); Sidecar; Bootstrap aus `share/config/`                                 |
 | `./earnie_env/config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline                                                                                           |
 | `./earnie_env/config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
+| `./earnie_env/config/components.json`            | Gerätekomponenten (`batteries[]`, `pv_systems`, `inverters[]` inkl. `ehal_bindings`)                                    |
 | `./earnie_env/config/deviation_rules.json`       | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an)                                                                    |
 | `./earnie_env/config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./earnie_env/runtime/`                          | `cons_data.csv`, Zustands-JSONs, Profile, Logs                                                                   |
@@ -46,50 +54,51 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/.env`                       | Loxone- und HA-Zugangsdaten (`LOXONE_*` / `EHAL_HA_*`); optional `EARNIE_LAN_SUBNET` |
 
 
-Umgebungsvariable in Compose: `EARNIE_ENV_PATH=.` (leitet `/app/config` und `/app/runtime` ab; Host-Mounts `./…/config` → `/app/config`, `./…/runtime` → `/app/runtime`)
+Umgebungsvariable in Compose: `EARNIE_ENV_PATH=.`. Daraus leitet Earnie `/app/config` und `/app/runtime` ab; die Host-Mounts lauten `./…/config` → `/app/config` und `./…/runtime` → `/app/runtime`.
 
 ## Netzwerk: Docker-Bridge, Heimnetz und Miniserver-Rückkanal
 
-Earnie läuft in Compose **ohne** `network_mode: host`. Die Container-IP liegt typischerweise in `172.16.0.0/12` (Docker-Bridge). Dadurch:
+Earnie läuft in Compose **ohne** `network_mode: host`. Die Container-IP liegt typischerweise in `172.16.0.0/12` (Docker-Bridge). Das hat zwei Folgen:
 
-- **mDNS/SSDP** (Suche nach Home Assistant / Loxone) erreicht oft das Heimnetz nicht.
+- **mDNS/SSDP** (Suche nach Home Assistant / Loxone) erreicht das Heimnetz oft nicht.
 - Ein aktiver Portscan ohne Angabe würde fälschlich das **Docker-Netz** durchsuchen.
 
-**Heimnetz für die erweiterte Suche:** `EARNIE_LAN_SUBNET` als `/24`-CIDR setzen, z. B. `192.168.178.0/24`:
+**Heimnetz für die erweiterte Suche:** `EARNIE_LAN_SUBNET` als `/24`-CIDR setzen, z. B. `192.168.178.0/24`. Dafür gibt es zwei Wege:
 
-- in `earnie_env/config/.env` bzw. Compose-`.env`, oder
+- in `earnie_env/config/.env` bzw. in der Compose-`.env`,
 - auf der Seite **Smarthome-Backend**, wenn Earnie nach dem LAN fragt.
 
-LoxBerry setzt `EARNIE_LAN_SUBNET` beim Install/Upgrade aus der Host-IP. Im HA-Add-on wird die Host-LAN-IP über die Supervisor-API (`/network/info`) ermittelt.
+LoxBerry setzt `EARNIE_LAN_SUBNET` bei Installation und Upgrade aus der Host-IP. Im HA-Add-on ermittelt Earnie die LAN-IP des Hosts über die Supervisor-API (`/network/info`).
 
-**Home Assistant als Backend (nicht Add-on):** Wenn die Suche leer bleibt, auf **Smarthome-Backend** direkt `EHAL_HA_BASE_URL` und Long-Lived Token eintragen (nicht auf mDNS warten).
+**Home Assistant als Backend (nicht Add-on):** Bleibt die Suche leer, auf **Smarthome-Backend** direkt `EHAL_HA_BASE_URL` und Long-Lived Token eintragen, statt auf mDNS zu warten.
 
 **Miniserver → Earnie (Port 8541):** Der Miniserver muss den Earnie-Host unter einer stabilen Adresse erreichen (`VO_Earnie_Status` / Virtual In → Host:8541). Dazu:
 
-- VM/Container im **Bridged**-LAN (nicht NAT) betreiben, und
-- dem Earnie-Host eine **feste IP** oder **DHCP-Reservierung** geben, damit die Adresse in der Loxone Config gültig bleibt.
+- VM bzw. Container im **Bridged**-LAN betreiben (nicht NAT).
+- Dem Earnie-Host eine **feste IP** oder **DHCP-Reservierung** geben, damit die Adresse in der Loxone Config gültig bleibt.
 
-Auf **Smarthome-Backend** und **EHAL-Com** zeigt Earnie „Letzter Aufruf vom Miniserver: vor X min von IP Y“ — so prüft man den Rückkanal ohne Extra-Tools.
+Auf **Smarthome-Backend** und **EHAL-Com** zeigt Earnie „Letzter Aufruf vom Miniserver: vor X min von IP Y“. Damit lässt sich der Rückkanal ohne zusätzliche Werkzeuge prüfen.
 
 ## Erstinstallation (NAS)
 
-1. Projektordner mit `docker/compose/synology_productive.yml` anlegen (auf der NAS oft als `compose.yaml` kopiert)
-2. `mkdir -p earnie_env/config earnie_env/runtime`
-3. Container starten — der **Entrypoint** legt fehlende Dateien an (`.env`, `config.json`, `tariffs.json`, weitere Sidecars, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
-4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
-5. Optional: historische `cons_data` aus Dev nach `earnie_env/runtime/cons_data.csv` kopieren
+1. Projektordner mit `docker/compose/synology_productive.yml` anlegen (auf der NAS oft als `compose.yaml` kopiert).
+2. Verzeichnisse anlegen: `mkdir -p earnie_env/config earnie_env/runtime`.
+3. Container starten. Der **Entrypoint** legt fehlende Dateien an: `.env`, `config.json`, `tariffs.json`, weitere Sidecars, bei Bedarf Vorlagen aus `share/config/` sowie leere Runtime-Dateien.
+4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien).
+5. Optional: historische `cons_data` aus Dev nach `earnie_env/runtime/cons_data.csv` kopieren.
 
 
 
 ## Config-Updates nach Programm-Upgrade
 
-Neue Einträge in `share/config/config.example.json` (Image-Vorlage) werden **nicht** automatisch in die Anwender-Config geschrieben.
+Neue Einträge in `share/config/config.example.json` (Image-Vorlage) übernimmt Earnie **nicht** automatisch in die Anwender-Config. Stattdessen weist Earnie auf fehlende Einträge hin:
 
-- Beim Start von `main.py`: Hinweis im Log
-- In der Streamlit-App: gelbes Banner mit fehlenden Pfaden und Beispielwerten
-- Fehlende Keys manuell in `earnie_env/config/config.json` ergänzen
+- **Beim Start von `main.py`:** Hinweis im Log.
+- **In der Streamlit-App:** gelbes Banner mit den fehlenden Pfaden und Beispielwerten.
 
-Das ist **kein** Datenmodell-Assistent. Wenn Earnie nach einem Image-Update nur den Migrations-Assistenten zeigt (Pack-JSON-Form), siehe [Betrieb → Update und Migration](betrieb.md#update-und-migration). Backups liegen dann unter `earnie_env/config/backups/pre-migration-…/`.
+Die fehlenden Keys manuell in `earnie_env/config/config.json` ergänzen.
+
+Davon zu unterscheiden ist der Migrations-Assistent für das Datenmodell. Zeigt Earnie nach einem Image-Update nur diesen Assistenten (Pack-JSON-Form), beschreibt [Betrieb → Update und Migration](betrieb.md#update-und-migration) das Vorgehen. Backups liegen dann unter `earnie_env/config/backups/pre-migration-…/`.
 
 
 
@@ -99,23 +108,25 @@ Das ist **kein** Datenmodell-Assistent. Wenn Earnie nach einem Image-Update nur 
 python -m scripts.bootstrap_runtime
 ```
 
-Legt nur fehlende Dateien an; bestehende bleiben unverändert.
+Der Befehl legt nur fehlende Dateien an; bestehende bleiben unverändert.
 
 ## Image bauen und deployen
 
 Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/arm64` für LoxBerry). Beide Hosts referenzieren denselben Tag `ghcr.io/jochentcc/earnie-energy:latest`.
 
-**Veröffentlichte Images** kommen über GitHub Actions: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml) und baut zuerst nur den **Release-Kandidaten** `ghcr.io/jochentcc/earnie-energy:X.Y.Z` (kein `:latest` / `:next` am Tag allein). Nach manueller Freigabe des Jobs `promote` (Environment `release-approval`) folgen `:latest` (nur offizielle Versionen) bzw. `:next` sowie die veröffentlichte GitHub Release. Details: [DEVELOPER.md](../../DEVELOPER.md) § Release.
+**Veröffentlichte Images** entstehen über GitHub Actions. Ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml). Der Workflow baut zuerst nur den **Release-Kandidaten** `ghcr.io/jochentcc/earnie-energy:X.Y.Z`; der Tag allein setzt weder `:latest` noch `:next`. Nach manueller Freigabe des Jobs `promote` (Environment `release-approval`) folgen `:latest` (nur offizielle Versionen) bzw. `:next` sowie die veröffentlichte GitHub Release. Details: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
-**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt denselben Ablauf: zuerst Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release** — **nicht** `:latest`. Zum Testen `:next` (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.6.1-beta.1`). Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
+**Vorabversionen (Community-Test):** Ein Tag `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) durchläuft denselben Ablauf. Zuerst entsteht der Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release**, jedoch **kein** `:latest`.
+
+Zum Testen entweder `:next` verwenden (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.6.1-beta.1`). Die produktiven Compose-Dateien (`*_productive.yml`) mit `:latest` bleiben auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
-Eigene Compose-Dateien (nicht in der Prod-YAML): `docker/compose/synology-alpha.yml`, `loxberry-alpha.yml`, `proxmox-alpha.yml`.
+Für die Alpha gibt es eigene Compose-Dateien, getrennt von der Prod-YAML: `docker/compose/synology-alpha.yml`, `loxberry-alpha.yml`, `proxmox-alpha.yml`.
 
-- Container `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`
-- Compose-Projektname `earnie-alpha` (kollidiert nicht mit Prod `earnie-productive`)
-- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.1-beta.1`)
+- **Container:** `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`.
+- **Compose-Projektname:** `earnie-alpha`; er kollidiert nicht mit dem Prod-Projekt `earnie-productive`.
+- **Image-Tag:** in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.1-beta.1`).
 
 ```powershell
 mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime
@@ -123,11 +134,13 @@ docker compose --project-directory . -f docker/compose/synology-alpha.yml pull
 docker compose --project-directory . -f docker/compose/synology-alpha.yml up -d
 ```
 
-UI: `http://<host>:8511`. Ports: [streamlit-ports.md](../referenz/streamlit-ports.md). **Nicht** zwei Daemonen mit Schreibzugriff auf denselben Miniserver ohne Silent-Mode / Absprache.
+UI: `http://<host>:8511`. Ports: [streamlit-ports.md](../referenz/streamlit-ports.md).
+
+> **Hinweis:** Zwei Optimierer-Dienste dürfen nicht gleichzeitig mit Schreibzugriff auf denselben Miniserver laufen, außer mit Silent-Mode oder nach Absprache.
 
 ### Einmaliges buildx-Setup (Entwicklungsrechner)
 
-Für Multi-Arch-Builds von Windows/Linux:
+Für Multi-Arch-Builds unter Windows oder Linux:
 
 ```powershell
 docker buildx create --name earnie-builder --use
@@ -138,7 +151,7 @@ Unter Windows nutzt Docker Desktop QEMU für arm64-Cross-Builds automatisch.
 
 ### 1. Build (Entwicklungsrechner)
 
-Kanonischer Befehl — nur Synology (amd64), wie bisher:
+Standardbefehl, baut wie bisher nur für Synology (amd64):
 
 ```powershell
 python -m scripts.build_container
@@ -165,21 +178,21 @@ Vor `--push` prüft der Build automatisch den gebündelten Tarifkatalog (`share/
 python -m scripts.validate_tariffs --check-catalog
 ```
 
-Auf der NAS vor dem ersten Prod-Cutover die produktive Sidecar-Datei prüfen:
+Auf der NAS vor der ersten Umstellung auf den Produktivbetrieb die produktive Sidecar-Datei prüfen:
 
 ```powershell
 python -m scripts.validate_tariffs --tariffs share/config/tariffs.json --check-catalog
 ```
 
-Bei Fehlern bricht `main.py` mit `EARNIE_STRICT_TARIFF_VALIDATE=1` ab (siehe Compose).
+Mit `EARNIE_STRICT_TARIFF_VALIDATE=1` bricht `main.py` bei Fehlern ab (siehe Compose).
 
-Lokaler `build_container` (ohne CI): Standard-Tags aus `version.py` (kanonisch + Legacy-Alias):
+Ein lokaler `build_container` (ohne CI) setzt Standard-Tags aus `version.py`, jeweils für den kanonischen Namen und den Legacy-Alias:
 
-- Jede Version: `:next` und `:<version>` für `earnie-energy` und Legacy `ernie-energy`
-- Offizielle Version (`X.Y.Z`) zusätzlich: `:latest`
-- Vorabversion (`X.Y.Z-alpha.N` / `-rc.N`): kein `:latest`
+- **Jede Version:** `:next` und `:<version>` für `earnie-energy` und Legacy `ernie-energy`.
+- **Offizielle Version (`X.Y.Z`):** zusätzlich `:latest`.
+- **Vorabversion (`X.Y.Z-alpha.N` / `-beta.N` / `-rc.N`):** kein `:latest`.
 
-Im **CI-Release** (Tag → `release-publish.yml`) gilt abweichend: Tag-Build nur `:<version>`; `:next` / `:latest` erst nach Job `promote`.
+Im **CI-Release** (Tag → `release-publish.yml`) gilt abweichend: Der Tag-Build setzt nur `:<version>`; `:next` / `:latest` folgen erst nach dem Job `promote`.
 
 Nach `docker login ghcr.io`:
 
@@ -207,21 +220,21 @@ docker manifest inspect ghcr.io/jochentcc/earnie-energy:latest
 
 ### 2. Deploy (Synology)
 
-Im Projektordner auf der NAS (nur Compose + persistente Daten, kein Quellcode nötig):
+Im Projektordner auf der NAS (nur Compose und persistente Daten, kein Quellcode nötig):
 
 ```bash
 docker compose --project-directory . -f docker/compose/synology_productive.yml pull
 docker compose --project-directory . -f docker/compose/synology_productive.yml up -d
 ```
 
-Auf der NAS (nur `compose.yaml` im Projektordner, ohne Repo-Checkout):
+Liegt auf der NAS nur `compose.yaml` im Projektordner (ohne Repo-Checkout):
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-Beim Start von `main.py` (auch nach Auto-Start aus der UI) laufen automatisch Tarif-Plausibilität und `verify_loxone_setup`. Ergebnis steht in `runtime/earnie.log` (`Tarif-Startup-Prüfung`, `[loxone-verify]`).
+Beim Start von `main.py` (auch nach Auto-Start aus der UI) laufen automatisch die Tarif-Plausibilitätsprüfung und `verify_loxone_setup`. Das Ergebnis steht in `runtime/earnie.log` (`Tarif-Startup-Prüfung`, `[loxone-verify]`).
 
 Optional:
 
@@ -233,7 +246,7 @@ Optional:
 | `EARNIE_STRICT_LOXONE_VERIFY=1`   | Container startet nicht, wenn eine Prüfung fehlschlägt |
 
 
-Manuell (z. B. nach Config-Änderung ohne Neustart):
+Manuell (z. B. nach einer Config-Änderung ohne Neustart):
 
 ```powershell
 python -m scripts.verify_loxone_setup
@@ -243,7 +256,7 @@ python -m scripts.verify_loxone_setup
 
 ### Live-Zyklus-Profiling (NAS-Einmal-Test)
 
-Phasen-Timing und optional `cProfile` sind env-gesteuert (`EARNIE_CYCLE_TIMING` / `EARNIE_CYCLE_PROFILE`, siehe [betrieb.md](betrieb.md) § Live-Zyklus-Profiling). Repo-Compose bleibt unverändert — nur auf der NAS für das Testfenster setzen.
+Phasen-Timing und optional `cProfile` lassen sich über Umgebungsvariablen einschalten (`EARNIE_CYCLE_TIMING` / `EARNIE_CYCLE_PROFILE`, siehe [betrieb.md](betrieb.md) § Live-Zyklus-Profiling). Die Compose-Dateien im Repository bleiben unverändert; die Variablen nur auf der NAS für das Testfenster setzen.
 
 **1. Image lokal bauen** (Entwicklungsrechner, Synology amd64, ohne GHCR-Push):
 
@@ -251,9 +264,9 @@ Phasen-Timing und optional `cProfile` sind env-gesteuert (`EARNIE_CYCLE_TIMING` 
 python -m scripts.build_container --target synology
 ```
 
-Tags kommen aus `version.py` (u. a. `:next` und `:<version>`; bei Dev-Versionen kein `:latest`).
+Die Tags kommen aus `version.py` (u. a. `:next` und `:<version>`; bei Dev-Versionen kein `:latest`).
 
-**2. Image auf die NAS bringen** (Beispiel `docker save` / `load`; Tag ggf. anpassen):
+**2. Image auf die NAS bringen** (Beispiel mit `docker save` / `load`; Tag ggf. anpassen):
 
 ```powershell
 docker save -o earnie-timing.tar ghcr.io/jochentcc/earnie-energy:next
@@ -261,10 +274,10 @@ docker save -o earnie-timing.tar ghcr.io/jochentcc/earnie-energy:next
 docker load -i earnie-timing.tar
 ```
 
-**3. Produktiv-Compose auf der NAS** vorübergehend:
+**3. Produktiv-Compose auf der NAS** vorübergehend anpassen:
 
-- `image:` auf den geladenen Tag zeigen (z. B. `…:next` oder `…:<version>`), **oder** lokal geladenes Image als `…:latest` retaggen, wenn die Compose-Datei `:latest` behalten soll.
-- Unter `environment:` für das Testfenster:
+- `image:` auf den geladenen Tag zeigen lassen (z. B. `…:next` oder `…:<version>`). Alternativ das lokal geladene Image als `…:latest` retaggen, wenn die Compose-Datei `:latest` behalten soll.
+- Unter `environment:` für das Testfenster ergänzen:
 
 ```yaml
 EARNIE_CYCLE_TIMING: "1"
@@ -272,7 +285,11 @@ EARNIE_CYCLE_TIMING: "1"
 # EARNIE_CYCLE_PROFILE: "1"
 ```
 
-Dann `docker compose up -d`. Nach einigen Viertelstunden: `EARNIE_CYCLE_PROFILE` entfernen (falls gesetzt), `timing/` und ggf. `profile/` aus `earnie_env/runtime/` kopieren, Flags entfernen, Image wieder auf den vorherigen Stand stellen.
+Danach `docker compose up -d` ausführen. Nach einigen Viertelstunden aufräumen:
+
+1. `EARNIE_CYCLE_PROFILE` entfernen (falls gesetzt).
+2. `timing/` und ggf. `profile/` aus `earnie_env/runtime/` kopieren.
+3. Die Flags entfernen und das Image wieder auf den vorherigen Stand stellen.
 
 **4. Auswerten:**
 
@@ -287,15 +304,17 @@ docker compose --project-directory . -f docker/compose/dev.yml build
 docker compose --project-directory . -f docker/compose/dev.yml up -d
 ```
 
-Nutzt `docker/compose/dev.yml` mit lokalem Build und denselben Mounts (`./earnie_env/config` → `/app/config`, `./earnie_env/runtime` → `/app/runtime`).
+Dieser Test nutzt `docker/compose/dev.yml` mit lokalem Build und denselben Mounts (`./earnie_env/config` → `/app/config`, `./earnie_env/runtime` → `/app/runtime`).
 
 ### Greenfield Dev-Stack (Ersteinrichtung)
 
-Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port **8502**, getrennte Container-Namen): [greenfield-dev-stack.md](greenfield-dev-stack.md) und `docker/compose/greenfield.yml`.
+Für die Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port **8502**, getrennte Container-Namen): [greenfield-dev-stack.md](greenfield-dev-stack.md) und `docker/compose/greenfield.yml`.
 
 ## LoxBerry (RPi 4B, arm64)
 
-**Empfohlen für die meisten Nutzer:** Installation über das [LoxBerry-Plugin (Scope A)](loxberry-plugin.md) (ZIP in der Plugin-Verwaltung). Die Abschnitte unten beschreiben die **manuelle** Compose-Installation unter z. B. `/opt/earnie-energy/` — nicht parallel zum Plugin betreiben (gleicher Container-Name `earnie-productive`, Port 8501).
+**Empfohlen für die meisten Installationen:** das [LoxBerry-Plugin](loxberry-plugin.md) (ZIP in der Plugin-Verwaltung). Die folgenden Abschnitte beschreiben die **manuelle** Compose-Installation, z. B. unter `/opt/earnie-energy/`.
+
+> **Hinweis:** Plugin und manuelle Compose-Installation nicht parallel betreiben. Beide nutzen denselben Container-Namen `earnie-productive` und Port 8501.
 
 ### Voraussetzungen
 
@@ -307,17 +326,17 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 
 ### Erstinstallation
 
-1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker/compose/loxberry_productive.yml`
-2. `mkdir -p earnie_env/config earnie_env/runtime`
-3. Container starten — der **Entrypoint** legt fehlende Dateien an (`earnie_env/config/.env`, `config.json`, … im gemounteten Volume)
-4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
-5. Optional: historische `cons_data` nach `earnie_env/runtime/cons_data.csv` kopieren
+1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker/compose/loxberry_productive.yml`.
+2. Verzeichnisse anlegen: `mkdir -p earnie_env/config earnie_env/runtime`.
+3. Container starten. Der **Entrypoint** legt fehlende Dateien im gemounteten Volume an (`earnie_env/config/.env`, `config.json`, …).
+4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien).
+5. Optional: historische `cons_data` nach `earnie_env/runtime/cons_data.csv` kopieren.
 
 
 
 ### Deploy (LoxBerry)
 
-Im Projektordner auf dem LoxBerry (nur Compose + persistente Daten, kein Quellcode nötig):
+Im Projektordner auf dem LoxBerry (nur Compose und persistente Daten, kein Quellcode nötig):
 
 ```bash
 docker compose --project-directory . -f docker/compose/loxberry_productive.yml pull
@@ -330,7 +349,7 @@ docker compose --project-directory . -f docker/compose/loxberry_productive.yml u
 
 Im Hausnetz: `http://<loxberry-ip>:8501`
 
-Von außen gibt es keinen eingebauten Reverse Proxy wie bei Synology DSM. Externer Zugriff nur mit eigenem Reverse Proxy, VPN oder vergleichbarem Setup — Port 8501 nicht ungeschützt in der Fritzbox freigeben.
+Anders als Synology DSM bringt LoxBerry keinen eingebauten Reverse Proxy mit. Externer Zugriff ist nur über einen eigenen Reverse Proxy, ein VPN oder ein vergleichbares Setup möglich. Port 8501 nicht ungeschützt in der Fritzbox freigeben.
 
 ### Go/No-Go (LoxBerry)
 
@@ -344,13 +363,13 @@ Von außen gibt es keinen eingebauten Reverse Proxy wie bei Synology DSM. Extern
 | MILP-Performance | langsamer als NAS akzeptabel, Log prüfen | Erwartung identischer Laufzeit wie x86-NAS |
 
 
-Vor Produktivbetrieb: Daemon-Log (`runtime/earnie.log`) auf MILP-Timing und Startfehler prüfen. Standard-Solver ist **HiGHS** (`highspy`); CBC bleibt Fallback über `EARNIE_MILP_SOLVER=cbc` bzw. SE-`milp_solver`.
+Vor dem Produktivbetrieb das Daemon-Log (`runtime/earnie.log`) auf MILP-Laufzeiten und Startfehler prüfen. Standard-Solver ist **HiGHS** (`highspy`); CBC bleibt als Fallback über `EARNIE_MILP_SOLVER=cbc` bzw. SE-`milp_solver` verfügbar.
 
 ## Proxmox LXC (amd64)
 
-Unprivileged LXC mit Docker (`nesting=1`, `keyctl=1`), Compose [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml), Bootstrap und `pct`-Beispiel: [proxmox-lxc.md](proxmox-lxc.md).
+Unprivilegierter LXC mit Docker (`nesting=1`, `keyctl=1`), Compose [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml), Bootstrap und `pct`-Beispiel: [proxmox-lxc.md](proxmox-lxc.md).
 
-Kurzform nach CT-Erstellung:
+Kurzform nach dem Anlegen des Containers (CT):
 
 ```bash
 pct enter <VMID>
@@ -364,7 +383,7 @@ UI: `http://<lxc-ip>:8501`
 
 ## Windows-PC mit VMware Workstation (`vctl`)
 
-Ohne Docker Desktop: veröffentlichtes Image über VMware **`vctl`**, Persistenz unter `%USERPROFILE%\Earnie\earnie_env\`. Hilfsskript und Schritt-für-Schritt: [vmware-vctl.md](vmware-vctl.md).
+Ohne Docker Desktop läuft das veröffentlichte Image über VMware **`vctl`**; die Daten liegen unter `%USERPROFILE%\Earnie\earnie_env\`. Hilfsskript und Schritt-für-Schritt-Anleitung: [vmware-vctl.md](vmware-vctl.md).
 
 ```powershell
 .\scripts\run_earnie_vctl.ps1 -Action up

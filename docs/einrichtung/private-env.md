@@ -9,56 +9,64 @@ Hausbezogene Dateien unter `earnie_env/config/` gehören **nicht** ins öffentli
 | `share/config/` (öffentlich) | `*.minimal.json`, `*.example.json`, `*.schema.json`, **`tariffs.json`** |
 | Privates Repo `Earnie-env-home` | `config.json`, Szenarien, `house_profiles.json`, `components.json`, `deviation_rules.json`, `uploads/`, **`vscode/launch.json`** |
 | `earnie_env/config/` (lokal) | Windows-**Junction** auf das private `config/` |
-| `.vscode/launch.json` (lokal) | Aus privatem `vscode/launch.json` (Hardlink/Kopie via Link-Skript); im öffentlichen Repo gitignored |
-| `earnie_env/runtime/` | Laufzeitdaten (gitignored), lokal |
+| `.vscode/launch.json` (lokal) | Aus dem privaten `vscode/launch.json` (Hardlink oder Kopie über das Link-Skript); im öffentlichen Repo per gitignore ausgeschlossen |
+| `earnie_env/runtime/` | Laufzeitdaten, lokal (per gitignore ausgeschlossen) |
 
-`.env` (Loxone) wird nirgends versioniert.
+Die Datei `.env` (Loxone) wird nirgends versioniert.
 
 ## Einrichtung (Windows)
 
-1. Privates Repo neben dem Earnie-Clone ablegen, z. B. `..\Earnie-env-home` (GitHub: privat).
-2. Im Earnie-Root:
+1. Privates Repo neben dem Earnie-Clone ablegen, z. B. `..\Earnie-env-home` (auf GitHub als privates Repo).
+2. Im Earnie-Root das Link-Skript ausführen:
 
 ```powershell
 .\scripts\link_private_env.ps1
 ```
 
-Beim ersten Mal mit vorhandenem echtem `earnie_env\config`-Ordner: `-Force` (legt ein Backup `config.bak-…` an).
+Existiert beim ersten Aufruf bereits ein echter Ordner `earnie_env\config`, ist `-Force` nötig. Das Skript legt dann ein Backup `config.bak-…` an.
 
-Das Skript installiert außerdem `.vscode/launch.json` aus dem privaten `vscode/launch.json` (Hardlink wenn möglich, sonst Kopie). So bleibt die Launch-Config nach Branch-/Tag-Syncs wiederherstellbar, ohne sie im öffentlichen Repo zu versionieren.
+Außerdem installiert das Skript `.vscode/launch.json` aus dem privaten `vscode/launch.json` (als Hardlink, wenn möglich, sonst als Kopie). So lässt sich die Launch-Konfiguration nach dem Wechsel von Branch oder Tag wiederherstellen, ohne sie im öffentlichen Repo zu versionieren.
 
-Fehlendes `tariffs.json` im Link-Ziel wird aus `share/config/tariffs.json` kopiert (lokal; nicht ins private Repo committen).
+Fehlt `tariffs.json` im Link-Ziel, kopiert das Skript sie aus `share/config/tariffs.json`. Diese Kopie bleibt lokal und gehört nicht ins private Repo.
 
 ## Bootstrap / Community Cloud
 
-Ohne privates Repo und ohne Junction: leeres `earnie_env/config/` + Vorlagen in `share/config/` → Bootstrap legt minimale Haus-Dateien an und seeded Tarifkatalog sowie Netzentgeltkatalog aus `share/config/tariffs.json` bzw. `share/config/grid_fees.json`. Sinnvoll mit `EARNIE_OFFLINE=1` und ggf. `EARNIE_UI_MODES=scenario_explorer`.
+Ohne privates Repo und ohne Junction genügen ein leeres `earnie_env/config/` und die Vorlagen in `share/config/`. Der Bootstrap legt dann minimale Haus-Dateien an. Tarifkatalog und Netzentgeltkatalog übernimmt er aus `share/config/tariffs.json` bzw. `share/config/grid_fees.json`. Sinnvoll ist das zusammen mit `EARNIE_OFFLINE=1` und ggf. `EARNIE_UI_MODES=scenario_explorer`.
 
-Für die öffentliche Demo auf Streamlit Community Cloud zusätzlich **`EARNIE_CLOUD_DEMO=1`**: jede Browser-Sitzung erhält einen eigenen temporären Greenfield-Workspace (leere Minimal-Config), startet im **Hauskonfigurator** und zeigt eine kurze Willkommenshinweis. Nach dem Start einer Szenario-Explorer-Berechnung erscheint ein Feedback-Hinweis mit vorbereitetem **GitHub-Issue** (Label `cloud-demo`; optional Konfigurations-ZIP nur lokal herunterladen — nicht in öffentliche Issues; bei Bedarf privat an `support@earnie-hems.com`). Offline-Demo-Seed der Live-Szenario-IDs entfällt in diesem Modus. Empfohlene Secrets: `EARNIE_CLOUD_DEMO=1`, `EARNIE_OFFLINE=1`, `EARNIE_UI_MODES=scenario_explorer`.
+Für die öffentliche Demo auf Streamlit Community Cloud kommt **`EARNIE_CLOUD_DEMO=1`** hinzu. In diesem Modus gilt:
+
+- **Eigener Workspace:** Jede Browser-Sitzung erhält einen eigenen temporären Greenfield-Workspace mit leerer Minimal-Config.
+- **Start:** Die Sitzung beginnt im **Hauskonfigurator** und zeigt einen kurzen Willkommenshinweis.
+- **Feedback:** Nach dem Start einer Szenario-Explorer-Berechnung erscheint ein Feedback-Hinweis mit vorbereitetem **GitHub-Issue** (Label `cloud-demo`).
+- **Konfigurations-ZIP:** Das ZIP lässt sich optional herunterladen. Es bleibt lokal und gehört nicht in öffentliche Issues; bei Bedarf kann es privat an `support@earnie-hems.com` gehen.
+- **Kein Offline-Seed:** Der Offline-Demo-Seed der Live-Szenario-IDs entfällt.
+
+Empfohlene Secrets: `EARNIE_CLOUD_DEMO=1`, `EARNIE_OFFLINE=1`, `EARNIE_UI_MODES=scenario_explorer`.
 
 ## Tarifkatalog veröffentlichen
 
-UI/Auto-Save schreibt `earnie_env/config/tariffs.json` (Junction). Öffentlichen Stand aktualisieren:
+Die Oberfläche schreibt per Auto-Save nach `earnie_env/config/tariffs.json` (Junction). Den öffentlichen Stand aktualisiert dieser Befehl:
 
 ```powershell
 Copy-Item earnie_env\config\tariffs.json share\config\tariffs.json -Force
 ```
 
-Danach im Earnie-Repo committen. Deploy-Gate: `python -m scripts.validate_tariffs --tariffs share/config/tariffs.json --check-catalog`.
+Danach die Änderung im Earnie-Repo committen. Vor dem Deploy prüft dieser Befehl den Katalog: `python -m scripts.validate_tariffs --tariffs share/config/tariffs.json --check-catalog`.
 
 ## ZIP speichern/laden
 
-Sidebar-ZIP bleibt der portable Transfer der Laufzeit-Config; siehe [Speichern / Laden](../konfiguration/speichern-laden.md).
+Das ZIP aus der Sidebar bleibt der portable Weg, die Laufzeit-Config zwischen Installationen zu übertragen. Details: [Speichern / Laden](../konfiguration/speichern-laden.md).
 
 ## Private Regression-Fälle (Earnie-regression-private)
 
-Kundendaten für die Release-Regression liegen **nicht** im öffentlichen Repo, sondern im privaten Sibling-Repo `Earnie-regression-private` (Ordner `cases/`).
+Kundendaten für die Release-Regression liegen im privaten Nachbar-Repo `Earnie-regression-private` (Ordner `cases/`) und **nicht** im öffentlichen Repo.
 
 | Einstellung | Bedeutung |
 |-------------|-----------|
 | Standardpfad | `..\Earnie-regression-private\cases` neben dem Earnie-Clone |
-| `$EARNIE_REGRESSION_PRIVATE_DIR` | Überschreibt den Cases-Root (kein Junction nötig) |
+| `$EARNIE_REGRESSION_PRIVATE_DIR` | Überschreibt den Cases-Root (keine Junction nötig) |
 
-Fehlt der private Root, überspringt `python -m scripts.run_regression` die privaten Fälle und vermerkt `private-root-missing` im Report (kein stilles Weglassen). Intake:
+Fehlt der private Root, überspringt `python -m scripts.run_regression` die privaten Fälle. Der Report vermerkt das als `private-root-missing`, die Fälle fallen also nicht stillschweigend weg. Neuen Fall aufnehmen (Intake):
 
 ```powershell
 .venv\Scripts\python.exe -m scripts.run_regression --intake DUMP.zip `

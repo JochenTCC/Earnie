@@ -27,7 +27,7 @@ Earnie lässt sich auf zwei Arten nutzen:
 | **Was-wäre-wenn (ohne Smarthome)** | Haus und Varianten konfigurieren und einen Jahresvergleich rechnen – z. B. ob sich ein Speicher, eine größere PV-Anlage oder ein Spot-Tarif lohnt. |
 | **Live-Betrieb (mit Smarthome)** | Dauerhaft optimieren und Sollwerte an Loxone, Home Assistant (+ evcc) oder OpenEMS (Lab) schreiben. Der Monitor zeigt Plan und Ist-Werte. |
 
-Im Hintergrund steuert der **Optimierer-Dienst** die Anlage – als einzige Instanz. Die Web-Oberfläche (Streamlit) dient als Cockpit für Anzeige, Konfiguration und Analyse. Dort lässt sich der Optimierer-Dienst auch starten, stoppen und neu starten.
+Im Hintergrund steuert allein der **Optimierer-Dienst** die Anlage. Die Web-Oberfläche (Streamlit) dient als Cockpit für Anzeige, Konfiguration und Analyse. Dort lässt sich der Optimierer-Dienst auch starten, stoppen und neu starten.
 
 ### Voraussetzungen
 
@@ -71,7 +71,7 @@ Die Datei `earnie_registry.json` bindet eine Earnie-Installation einmalig an ihr
 
 Die signierte Datei lässt sich **nicht selbst erzeugen**. Earnie berechnet nur den Fingerprint, die Datei stellt das Earnie-Projekt aus (derzeit per E-Mail, später ggf. über ein Cloud-Portal). Offizielle Images prüfen die Signatur mit einem öffentlichen Schlüssel; der private Schlüssel bleibt beim Aussteller.
 
-**So wird die Datei angefordert:**
+**Datei anfordern:**
 
 1. Earnie starten (Docker oder lokal).
 2. In der Sidebar **Info / About** öffnen und den vollständigen, 64-stelligen **Hardware-Fingerprint** kopieren (Anzeige als Code-Block).
@@ -92,7 +92,7 @@ Die signierte Datei lässt sich **nicht selbst erzeugen**. Earnie berechnet nur 
    | eigener Runtime-Pfad | Ordner aus `EARNIE_RUNTIME_PATH` bzw. `…/runtime/` |
    | abweichender Pfad | Umgebungsvariable `EARNIE_REGISTRY_PATH` auf die Datei setzen |
 
-7. Oberfläche neu laden und unter **Info / About** prüfen. Die Registry sollte als gebunden (`bound` / `valid`) erscheinen.
+7. Oberfläche neu laden und unter **Info / About** prüfen. Die Registry sollte als `valid` erscheinen.
    - **mismatch:** Fingerprint und Datei passen nicht mehr zusammen (z. B. anderer Host) – neuen Fingerprint senden und die Datei neu anfordern.
    - **invalid_sig:** Die Datei ist beschädigt oder nicht gültig signiert – neu anfordern.
 
@@ -100,11 +100,12 @@ Die signierte Datei lässt sich **nicht selbst erzeugen**. Earnie berechnet nur 
 
 **Inhalt der Datei (kurz):** Fingerprint, Ausstellungszeit, optional ein Ablaufdatum, Aussteller und eine Ed25519-Signatur. Eine selbst gebaute Datei ohne passende Signatur ist ungültig (`invalid_sig`).
 
-Die Datei entsteht beim Aussteller (Signatur mit dem privaten Schlüssel), nicht in der Earnie-Oberfläche. Technische Aussteller-Anleitung: Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
+Technische Aussteller-Anleitung: Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
 
 ### Support
 
-- **Kontakt in der App:** Sidebar **Info / About** – Art, Thema und Beschreibung eintragen, dann **GitHub-Issue öffnen** (öffentlich, daher keine Zugangsdaten oder andere Geheimnisse). Optional **Informationen in ZIP sammeln** (die ZIP bleibt lokal). Für die Registry und Vertrauliches: Expander **Privater Support** an `support@earnie-hems.com`.
+- **Kontakt in der App:** In der Sidebar unter **Info / About** Art, Thema und Beschreibung eintragen, dann **GitHub-Issue öffnen**. Issues sind öffentlich, daher gehören keine Zugangsdaten oder andere Geheimnisse hinein. Optional stellt **Informationen in ZIP sammeln** eine ZIP zusammen, die lokal bleibt.
+- **Registry und Vertrauliches:** Expander **Privater Support** an `support@earnie-hems.com`.
 - **Projekt und Issues:** [GitHub – JochenTCC/Earnie](https://github.com/JochenTCC/Earnie/issues)
 - **Website:** [earnie-hems.com](https://earnie-hems.com)
 - **Community:** z. B. Diskussionen im Loxone-Umfeld (LoxForum u. Ä.)
@@ -169,7 +170,7 @@ Ein **Hausprofil** beschreibt den Standort und wer bzw. was im Haus Strom verbra
 - **Standort:** Breite, Länge und Land. Daraus leitet Earnie die Zeitzone ab, die für Sonnenzeiten und PV-Prognose wichtig ist.
 - **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool oder generische Geräte.
 - **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen).
-- **Abwesend / Urlaub:** Schalter für den Abwesenheitsmodus im Live-Betrieb; je Verbraucher optional **„Inaktiv wenn abwesend“**. Der Modus wirkt, sobald der Earnie-Schalter **oder** das Smarthome-Signal `sens_absent_mode` am aktiven Backend eingeschaltet ist (Loxone: z. B. `Earnie_Abwesend`, HA: Entity, OpenEMS: `component/Channel`). Details: [Flexible Verbraucher – Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
+- **Abwesend / Urlaub:** Schalter für den Abwesenheitsmodus im Live-Betrieb; je Verbraucher optional **„Inaktiv wenn abwesend“**. Der Modus wirkt, sobald der Earnie-Schalter **oder** das Abwesenheitssignal am aktiven Smarthome-Backend eingeschaltet ist (EHAL-Feld `sens_absent_mode`; Loxone: z. B. `Earnie_Abwesend`, HA: Entity, OpenEMS: `component/Channel`). Details: [Flexible Verbraucher – Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
 Zuerst das Profil anlegen, danach die Geräte ergänzen. Ohne Standort und ein sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig.
 
@@ -199,10 +200,10 @@ Je genauer die thermischen Angaben, desto realistischer der Jahresvergleich. Fü
 
 E-Auto und Wallbox als planbarer Verbraucher:
 
-- Akkukapazität, Ladeleistung und Wirkungsgrad
-- **Zeitfenster:** ab wann das Auto da ist und bis wann es geladen sein soll – getrennt für Werktage und Wochenende
-- Ziel-SoC beim Abfahren
-- **Prognose, wenn nicht angeschlossen:** optionale Lade-Prognose, auch wenn das Auto nicht an der Wallbox hängt (unabhängig vom Abwesenheitsmodus des Hauses)
+- **Fahrzeug und Wallbox:** Akkukapazität, Ladeleistung und Wirkungsgrad.
+- **Zeitfenster:** ab wann das Auto da ist und bis wann es geladen sein soll, getrennt für Werktage und Wochenende.
+- **Ziel-SoC:** gewünschter Ladestand beim Abfahren.
+- **Prognose, wenn nicht angeschlossen:** optionale Lade-Prognose, auch wenn das Auto nicht an der Wallbox hängt (unabhängig vom Abwesenheitsmodus des Hauses).
 
 Earnie entscheidet, **wann** am günstigsten geladen wird (günstige Viertelstunden, PV-Überschuss), sodass das Auto zum angegebenen Zeitpunkt den gewünschten Ladestand hat. Im Live-Betrieb meldet das Smarthome-Backend in der Regel „angesteckt“, den aktuellen SoC und die Fertig-Zeit. Earnie schreibt die Lade-Sollleistung und – falls genutzt – PV-Follow, damit genau der PV-Überschuss ins Auto fließt.
 
@@ -212,7 +213,7 @@ Ein Pool besteht meist aus mehreren Komponenten, die sich getrennt steuern lasse
 
 - **Heizung:** thermisches Modell (Wasservolumen, Solltemperatur, Wärmeverlust); die Tagesenergie ergibt sich aus dem Modell.
 - **Filter:** Laufzeitbedarf in Stunden, ggf. mit eigenem Zeitfenster der Poolsteuerung. Earnie kann **zusätzlich** außerhalb dieses Fensters freigeben.
-- **Jetdüsen**
+- **Jetdüsen:** eigene, getrennt steuerbare Komponente.
 
 Für die Was-wäre-wenn-Analyse reichen Volumen, Solltemperatur und Filterstunden. Für den Live-Betrieb braucht es passende Signale für Temperaturen und Freigaben.
 
@@ -234,9 +235,9 @@ Anzugeben sind Leistung und typische Laufzeit. Optional lässt sich später ein 
 
 Im Komponenten-Katalog unter PV-Anlagen:
 
-- installierte Leistung (**kWp**)
-- Dachneigung und Ausrichtung (Azimut: Süd ≈ 0°, Ost negativ, West positiv)
-- zugeordneter **Wechselrichter** (`inverter_id`)
+- **Leistung:** installierte Leistung in **kWp**.
+- **Ausrichtung:** Dachneigung und Azimut (Süd ≈ 0°, Ost negativ, West positiv).
+- **Wechselrichter:** der zugeordnete Wechselrichter (`inverter_id`).
 
 Es können mehrere PV-Anlagen angelegt werden. Szenarien können sie einzeln auswählen und kombinieren – so lässt sich z. B. eine geplante Erweiterung vorab durchrechnen.
 
@@ -246,11 +247,11 @@ Den Standort übernimmt Earnie aus dem Hausprofil. Für die Ertragsprognose nutz
 
 Relevante Parameter:
 
-- nutzbare Kapazität (kWh)
-- maximale Lade- und Entladeleistung (kW)
-- Wirkungsgrad, minimaler und maximaler SoC
-- zugeordneter **Wechselrichter** (Hausbatterie) bzw. der integrierte Wechselrichter einer physischen Powerstation
-- optional **Verschleißkosten**, damit Earnie viele Ladezyklen wirtschaftlich bewertet
+- **Kapazität:** nutzbare Kapazität in kWh.
+- **Leistung:** maximale Lade- und Entladeleistung in kW.
+- **Wirkungsgrad und SoC-Grenzen:** Wirkungsgrad sowie minimaler und maximaler SoC.
+- **Wechselrichter:** der zugeordnete Wechselrichter (Hausbatterie) bzw. der integrierte Wechselrichter einer physischen Powerstation.
+- **Verschleißkosten (optional):** Damit bewertet Earnie viele Ladezyklen wirtschaftlich.
 
 Wechselrichter werden im Tab **Wechselrichter** gepflegt (Typ, AC-Anschluss netzgekoppelt oder Insel, optionale Leistungsgrenzen). **Insel** bedeutet hier: Der Wechselrichter versorgt nur angeschlossene Verbraucher, nicht den AC-Bus des Hauses. Sein AC-Eingang kann trotzdem am Netz hängen – „Insel“ heißt also nicht „netzlos“. Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
 
@@ -280,11 +281,11 @@ Typische Vergleiche:
 **Pro Szenario einstellbar:**
 
 - **Aktiv für Szenario-Explorer:** Deaktivierte Varianten überspringt der Szenario-Explorer. Vorhandene Ergebnisse werden dadurch ungültig.
-- **Eigene Referenz ohne Optimierung:** legt fest, ob für die Variante eine eigene Referenz ohne Optimierung berechnet wird. Die Vorbelegung folgt einer Heuristik nach Tarif und PV; reine Batterie-Varianten teilen standardmäßig die Live-Referenz. In dieser Referenz ist der Earnie-Optimierungsalgorithmus nicht aktiv.
+- **Eigene Referenz ohne Optimierung:** Legt fest, ob Earnie für die Variante eine eigene Referenz berechnet, in der die Earnie-Optimierung nicht aktiv ist. Die Vorbelegung folgt einer Heuristik nach Tarif und PV; reine Batterie-Varianten teilen standardmäßig die Live-Referenz.
 
 **Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
-- Nach der Auswahl aus dem Katalog zeigt der Editor dessen **Katalogparameter** (nur lesend). Diese Werte bitte prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
+- Nach der Auswahl aus dem Katalog zeigt der Editor dessen **Katalogparameter** (nur lesend). Diese Werte prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
 - **Monatliche Fixkosten** (Grundpreis des Lieferanten, optional Netz-, Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
 - Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
 - Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
@@ -351,7 +352,7 @@ Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Koste
 
 ##### Gesamtkosten und -Verbrauch: Jahres Verbrauch [kWh]
 
-Die Spalte stammt **nicht in jeder Zeile aus derselben Quelle**. Die Zeile **Historisch** kann daher andere kWh-Werte zeigen als die Referenz- und Optimierungszeilen. Das ist beabsichtigt und kein Anzeigefehler.
+Die Werte der Spalte stammen **nicht in jeder Zeile aus derselben Quelle**. Die Zeile **Historisch** kann daher andere kWh-Werte zeigen als die Referenz- und Optimierungszeilen. Das ist beabsichtigt und kein Anzeigefehler.
 
 | Zeilentyp | Was die Spalte zählt | Herkunft |
 | --------- | -------------------- | -------- |
@@ -386,7 +387,7 @@ Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt
 
 1. **Benutzer bzw. Token** am Smarthome-Backend anlegen – mit Rechten zum Lesen und Schreiben der benötigten IOs bzw. Entities.
 2. **Signale** anlegen bzw. zuordnen, u. a. Batterie-SoC und -Leistung, PV, Netz, Freigaben und E-Auto-Status. Beispielnamen für Loxone: [Loxone-Signale](../referenz/loxone-signals.md).
-3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** die Merker bzw. HA-Entities den EHAL-Feldern zuweisen (`plant.ehal_bindings` / `consumers[].ehal_bindings`). Bei Loxone empfiehlt sich zuerst der **Loxone-Import** auf der Seite **Smarthome-Backend**, danach die Prüfung des Mappings.
+3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** die Merker bzw. HA-Entities den EHAL-Feldern zuweisen. Bei Loxone empfiehlt sich zuerst der **Loxone-Import** auf der Seite **Smarthome-Backend**, danach die Prüfung des Mappings (Konfigurationsschlüssel: `plant.ehal_bindings`, `batteries[].ehal_bindings`, `consumers[].ehal_bindings`).
 4. **Jahres-Leistungsprofile (optional):** per CSV-Upload hinterlegen ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Die Offline-Daten für den Szenario-Explorer liegen danach in `cons_data.csv`.
 
 Earnie liest Werte im Live-Betrieb oft als Text mit Einheit (z. B. `3.5 kW`); die Einheit wird dabei ignoriert.
@@ -401,12 +402,12 @@ Details: [PV & Batterie](../konfiguration/batterie-pv.md) · [Überblick](../kon
 
 ### EHAL-Com
 
-Die Seite **Daemon Control → EHAL-Com** bündelt Live-Lesen und -Schreiben, die Mapping-Assistenten und den Status (u. a. Silent/Loud).
+Die Seite **Daemon Control → EHAL-Com** bündelt Live-Lesen und -Schreiben, die Mapping-Assistenten und den Status (u. a. Silent / Loud).
 
 - Der Umschalter **Silent / Loud** liegt auf der Seite **Optimierer-Dienst** (gespeichert in `runtime/local_settings.json`).
 - Zugangsdaten und Backend-Wechsel liegen auf der Seite **Smarthome-Backend** (Anbindung).
 - Empfohlene Reihenfolge beim Umstieg: Lesen OK → Schreiben OK → Monitor plausibel.
-- Signal für den Abwesenheitsmodus: `sens_absent_mode` in `plant.ehal_bindings` (Loxone-Standardmerker `Earnie_Abwesend`, sonst HA-Entity bzw. OpenEMS `component/Channel`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
+- **Abwesenheitsmodus:** Das Signal ist das EHAL-Feld `sens_absent_mode` in `plant.ehal_bindings` (Loxone-Standardmerker `Earnie_Abwesend`, sonst HA-Entity bzw. OpenEMS `component/Channel`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
 
 Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md). Bei Loxone optional zusätzlich: `python -m scripts.verify_loxone_setup`.
 
@@ -414,7 +415,7 @@ Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md). Bei Loxone optional zus
 
 ## Live-Betrieb
 
-Im Produktivbetrieb läuft der Optimierer dauerhaft – mit Docker zusammen mit der Oberfläche, lokal über `python main.py`. Er rechnet im **15-Minuten-Takt** (oder sofort, wenn das Smarthome-Backend eine Optimierung anfordert) und plant in **Viertelstunden-Slots**.
+Im Produktivbetrieb läuft der Optimierer dauerhaft: unter Docker gemeinsam mit der Oberfläche, lokal über `python main.py`. Er rechnet im **15-Minuten-Takt** (oder sofort, wenn das Smarthome-Backend eine Optimierung anfordert) und plant in **Viertelstunden-Slots**.
 
 Die Seite **Daemon Control → Optimierer-Dienst** enthält:
 
@@ -440,7 +441,7 @@ Details, Berechnungsregel der Earnie-Points und Abschalten: [Betrieb – Nutzung
 
 *Monitor (Chart 1): Vergangenheit, laufender Plan und Preisprognose in einem Sunset-2-Sunset-Fenster.*
 
-Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangenheit, Gegenwart und Vorausschau in einem Cockpit. Am Desktop umfasst das Fenster SA₀→SA₂, auf dem Smartphone wird es in Abschnitte von Sonnenaufgang zu Sonnenaufgang geteilt. Chart 1, SoC-Linien und Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md)
+Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangenheit, Gegenwart und Vorausschau in einem Cockpit. Am Desktop umfasst das Fenster SA₀→SA₂ (SA = Sonnenaufgang), auf dem Smartphone wird es in Abschnitte von Sonnenaufgang zu Sonnenaufgang geteilt. Chart 1, SoC-Linien und Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md)
 
 **Abwesenheitsmodus:** Ist er wirksam (Earnie-Schalter und/oder Smarthome-Signal `sens_absent_mode`), erscheint oben der Hinweis „Abwesenheitsmodus aktiv“ mit der Quelle. Verbraucher mit der Option „Inaktiv wenn abwesend“ fallen dann aus der Live-Optimierung – außer der Haus-Wärme, die mit abgesenkter Temperatur weiterläuft.
 
@@ -461,7 +462,7 @@ Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der R
 
 ### Analyse Verbrauch & Kosten
 
-Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur mit `live_environment` und einer Live-Verbindung. Sie wertet das Produktiv-Log aus:
+Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Sie wertet das Produktiv-Log aus:
 
 - die letzten **7** oder **28 Tage** (verschiebbar),
 - eine Kennzahl für die letzten **365 Tage** vorhandener Log-Daten,
@@ -484,4 +485,4 @@ Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 6. Live-Szenario und EHAL-Com prüfen, dann auf **Optimierer-Dienst** von Silent auf Loud umschalten.
 7. Den Dienst dauerhaft laufen lassen, den Monitor beobachten und nachjustieren.
 
-Bei Fragen helfen die Hover-Hilfe in `config.json` (Schema) und die [Anwender-Dokumentation](../README.md). Bleibt etwas unklar, melden Sie sich gerne über die [Support-Kanäle](#support).
+Bei Fragen helfen die [Anwender-Dokumentation](../README.md) und die Hover-Hilfe zu `config.json` im Code-Editor (Schema). Bleibt etwas unklar, melden Sie sich gerne über die [Support-Kanäle](#support).
