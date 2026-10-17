@@ -26,7 +26,7 @@ The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-back
 | Backend        | Storage                                       | Contract UI on this page                                 |
 | -------------- | --------------------------------------------- | ------------------------------------------------------ |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | **Signalliste** (qualified IDs · match · VO/VI export) |
-| Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); `sign` + `transport` in `config.json` → `ehal.ha` (`pull` default, `weg_b` = Loxone-like push + `status.json`) | HA Entity → EHAL Mapping → `plant` / `batteries[]` / `consumers[].ehal_bindings` (Signalliste match status is **Loxone-only**; HA uses the mapping UI) |
+| Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); `sign` + `transport` in `config.json` → `ehal.ha` (`pull` default, `push` = Loxone-like push + `status.json`) | HA Entity → EHAL Mapping → `plant` / `batteries[]` / `consumers[].ehal_bindings` (Signalliste match status is **Loxone-only**; HA uses the mapping UI) |
 | OpenEMS        | `config.json` → `ehal.openems`                | (credentials on Smarthome-Backend)                     |
 
 
@@ -308,7 +308,7 @@ Only `sens_*` and `get_*` (measurements / inputs). The table lists **all** expec
 - **`get_evcs_ready_by_time`:** Analog VO numeric next-entry, or fresh Tna text (`Morgen, 07:00`).
 - **Counters:** numeric counters (Loxone epoch since 2009-01-01) are converted to Unix time and shown in readable local form in the `Wert` column (`YYYY-MM-DD HH:MM:SS (unix …)`).
 
-**HA / OpenEMS:** With **`ehal.ha.transport=pull`** (default), Live-Lesen uses REST entity states (`HaAdapter`; only `sens_*` / `get_*` in the table). With **`weg_b`**, live read/write uses the Loxone-like push inbox + `GET /ehal/status.json`; telemetry on the wire is canonical EHAL units (carrier converts in HA). Derived house load: `—(derived)`. Optional caption for live power in kW.
+**HA / OpenEMS:** With **`ehal.ha.transport=pull`** (default), Live-Lesen uses REST entity states (`HaAdapter`; only `sens_*` / `get_*` in the table). With **`push`**, live read/write uses the Loxone-like push inbox + `GET /ehal/status.json`; telemetry on the wire is canonical EHAL units (carrier converts in HA). Derived house load: `—(derived)`. Optional caption for live power in kW.
 
 Units and signs: see §B. Full role matrix: §C.
 

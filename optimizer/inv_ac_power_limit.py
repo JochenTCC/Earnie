@@ -144,6 +144,52 @@ def _has_pv_curtail_weight(inv: dict) -> bool:
     return inv_type != INVERTER_TYPE_BATTERY
 
 
+def _base_pv_ac_by_inverter(
+    inv_list: Sequence[dict], writable_ids: set[str], raw_pv: dict[str, float]
+) -> dict[str, float]:
+    """AC-clipped PV output per writable grid-tied inverter (0 without PV weight)."""
+    base_pv_ac: dict[str, float] = {}
+    for inv in inv_list:
+        inv_id = str(inv.get("id") or "").strip()
+        if not inv_id or inv_id not in writable_ids:
+            continue
+        if not is_grid_tied(inv):
+            continue
+        if not _has_pv_curtail_weight(inv):
+            base_pv_ac[inv_id] = 0.0
+            continue
+        pv_dc = apply_dc_pv_cap(raw_pv.get(inv_id, 0.0), inv)
+        pv_ac, _ = ac_clip_pv_and_max_discharge(pv_dc, inv)
+        base_pv_ac[inv_id] = max(0.0, float(pv_ac))
+    return base_pv_ac
+
+
+def _allocate_curtail_shares(
+    writable_ids: set[str], base_pv_ac: dict[str, float], curtail: float
+) -> dict[str, float]:
+    """Split plant curtail kW over inverters proportional to their PV AC output."""
+    allocated: dict[str, float] = {i: 0.0 for i in writable_ids}
+    if curtail <= CURTAIL_EPS_KW:
+        return allocated
+    weight_ids = sorted(
+        i for i in writable_ids if base_pv_ac.get(i, 0.0) > CURTAIL_EPS_KW
+    )
+    weight_sum = sum(base_pv_ac[i] for i in weight_ids)
+    remaining = curtail
+    for inv_id in weight_ids:
+        if inv_id == weight_ids[-1]:
+            share = remaining
+        else:
+            share = (
+                curtail * (base_pv_ac[inv_id] / weight_sum)
+                if weight_sum > 0.0
+                else 0.0
+            )
+            remaining = max(0.0, remaining - share)
+        allocated[inv_id] = share
+    return allocated
+
+
 def allocate_inv_ac_limits_kw(
     *,
     inverters: Sequence[dict],
@@ -166,40 +212,8 @@ def allocate_inv_ac_limits_kw(
         matrix_row, inverters=list(inv_list), pv_systems=list(pv_systems)
     )
 
-    base_pv_ac: dict[str, float] = {}
-    for inv in inv_list:
-        inv_id = str(inv.get("id") or "").strip()
-        if not inv_id or inv_id not in writable_ids:
-            continue
-        if not is_grid_tied(inv):
-            continue
-        if not _has_pv_curtail_weight(inv):
-            base_pv_ac[inv_id] = 0.0
-            continue
-        pv_dc = apply_dc_pv_cap(raw_pv.get(inv_id, 0.0), inv)
-        pv_ac, _ = ac_clip_pv_and_max_discharge(pv_dc, inv)
-        base_pv_ac[inv_id] = max(0.0, float(pv_ac))
-
-    allocated: dict[str, float] = {i: 0.0 for i in writable_ids}
-    if curtail > CURTAIL_EPS_KW:
-        weight_ids = sorted(
-            i
-            for i in writable_ids
-            if base_pv_ac.get(i, 0.0) > CURTAIL_EPS_KW
-        )
-        weight_sum = sum(base_pv_ac[i] for i in weight_ids)
-        remaining = curtail
-        for inv_id in weight_ids:
-            if inv_id == weight_ids[-1]:
-                share = remaining
-            else:
-                share = (
-                    curtail * (base_pv_ac[inv_id] / weight_sum)
-                    if weight_sum > 0.0
-                    else 0.0
-                )
-                remaining = max(0.0, remaining - share)
-            allocated[inv_id] = share
+    base_pv_ac = _base_pv_ac_by_inverter(inv_list, writable_ids, raw_pv)
+    allocated = _allocate_curtail_shares(writable_ids, base_pv_ac, curtail)
 
     limits: dict[str, float] = {}
     for inv in inv_list:

@@ -1,4 +1,4 @@
-﻿"""Tests für 1.26.0 P3 — Live/Backtesting-Preisparität, P3a-Fenster, P3b-Thermal."""
+"""Tests für 1.26.0 P3 — Live/Backtesting-Preisparität, P3a-Fenster, P3b-Thermal."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -262,7 +262,11 @@ def test_thermal_on_off_preserves_weekly_kwh():
         assert sum(profile[start:end]) == pytest.approx(week_kwh, rel=1e-3)
 
 
-def test_thermal_hourly_overlay_maps_slots():
+def test_thermal_hourly_overlay_maps_slots(monkeypatch):
+    # Keep offline: CI sonarcloud hit ReadTimeout on archive-api.open-meteo.com.
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     profile = {
         "consumers": [
             {

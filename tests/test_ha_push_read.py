@@ -1,4 +1,4 @@
-"""HA Weg B push read path (2.7.r-T2)."""
+"""HA push-transport read path (inbox + status.json)."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -45,16 +45,16 @@ def _plant_house_push_only() -> dict:
     }
 
 
-def test_aggregate_ha_entities_weg_b_keeps_empty_activation():
+def test_aggregate_ha_entities_push_keeps_empty_activation():
     house = _plant_house_push_only()
     pull = aggregate_ha_entities(house, transport="pull")
     assert "sens_grid_power_active" not in pull
-    weg = aggregate_ha_entities(house, transport="weg_b")
+    weg = aggregate_ha_entities(house, transport="push")
     assert weg["sens_grid_power_active"] == ""
     assert "sens_ess_soc" not in weg
 
 
-def test_read_telemetry_weg_b_from_inbox(monkeypatch):
+def test_read_telemetry_push_from_inbox(monkeypatch):
     table = {
         "grid.meter.sens_grid_power_active": 500.0,
         "sens_pv_production_active": 2000.0,
@@ -75,7 +75,7 @@ def test_read_telemetry_weg_b_from_inbox(monkeypatch):
             "sens_grid_power_active": "",
             "sens_pv_production_active": "",
         },
-        transport="weg_b",
+        transport="push",
         push_read_qids={
             "sens_grid_power_active": "grid.meter.sens_grid_power_active",
             "sens_pv_production_active": "sens_pv_production_active",
@@ -88,13 +88,13 @@ def test_read_telemetry_weg_b_from_inbox(monkeypatch):
     assert "sens_ess_soc" not in tel
 
 
-def test_weg_b_fences_rest_for_push_field():
+def test_push_fences_rest_for_push_field():
     cfg = HaConfig(
         base_url="http://ha:8123",
         token="t",
         adapter_id="test",
         entities={"sens_grid_power_active": "sensor.grid"},
-        transport="weg_b",
+        transport="push",
         push_read_qids={"sens_grid_power_active": "grid.meter.sens_grid_power_active"},
     )
     adapter = HaAdapter(cfg)
@@ -103,7 +103,7 @@ def test_weg_b_fences_rest_for_push_field():
 
 
 @patch("integrations.ha_adapter.requests.post")
-def test_weg_b_write_publishes_no_service(post_mock):
+def test_push_write_publishes_no_service(post_mock):
     from integrations.ehal_write import clear_published_for_tests, load_published
 
     clear_published_for_tests()
@@ -116,7 +116,7 @@ def test_weg_b_write_publishes_no_service(post_mock):
             "set_ess_discharge_power_limit": "",
             "set_ess_mode": "",
         },
-        transport="weg_b",
+        transport="push",
         setpoint_qids={
             "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
             "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",

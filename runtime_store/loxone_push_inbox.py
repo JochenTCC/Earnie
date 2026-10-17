@@ -17,9 +17,7 @@ from __future__ import annotations
 import atexit
 import json
 import logging
-import math
 import os
-import re
 import threading
 import time
 from datetime import datetime, timezone
@@ -28,35 +26,35 @@ from typing import Any
 from ehal.qualified_ids import (
     DIGITAL_KINDS,
     field_kind,
-    id_namespace_alternation,
     is_digital_id,
 )
 from runtime_store.persist_paths import runtime_path
+from runtime_store.loxone_push_parse import (  # noqa: F401  (re-exported)
+    HEARTBEAT_ID,
+    REQUEST_OPTIMIZE_ID,
+    SHADOW_FEED_SOURCE,
+    _ID_PATTERN,
+    _RETIRED_PLANT_FLAT_PUSH_IDS,
+    _UNIT_SUFFIXES,
+    is_valid_ehal_id,
+    parse_push_value,
+)
+from runtime_store.loxone_push_parse import (  # noqa: F401  (re-exported)
+    MAX_RAW_LEN,
+)
+from runtime_store.loxone_push_shadow_feed import (  # noqa: F401  (re-exported)
+    _inbox_row_from_shadow_feed,
+    _record_push_to_shadow_feed,
+    _shadow_feed_key,
+    _shadow_feed_overlay_if_active,
+    _shadow_feed_signals_for_read,
+)
 
 logger = logging.getLogger(__name__)
 
 INBOX_FILENAME = "loxone_push_inbox.json"
 INBOX_FLUSH_INTERVAL_S = 1.0
 MAX_IDS = 200
-MAX_RAW_LEN = 32
-HEARTBEAT_ID = "heartbeat"  # constant non-zero push that proves the Miniserver link
-# Control receipt (POST /ehal/loxone/request_optimize) — not a telemetry field kind.
-REQUEST_OPTIMIZE_ID = "request_optimize"
-# Rows built from Shadow feed already passed lookup_record freshness (vs cycle_ts).
-# Do not re-apply the live VO silence window (3×repeat) on those timestamps.
-SHADOW_FEED_SOURCE = "shadow_feed"
-# Loxone pushes measurements (sens_*) and inputs (get_*) only; never setpoints.
-# Plus synthetic control IDs (heartbeat, request_optimize).
-_ID_PATTERN = re.compile(
-    r"^(?:"
-    + HEARTBEAT_ID
-    + r"|"
-    + REQUEST_OPTIMIZE_ID
-    + r"|(?:(?:"
-    + id_namespace_alternation()
-    + r")\.[a-z0-9_]{1,64}\.)?(?:sens|get)_[a-z0-9_]{1,64})$"
-)
-_UNIT_SUFFIXES = ("kWh", "kW", "W", "%", "°C", "A", "h")
 _EMA_MIN_S = 0.5
 _EMA_MAX_S = 3600.0
 _EMA_WEIGHT = 0.3
@@ -71,31 +69,10 @@ _flush_timer: threading.Timer | None = None
 _last_flush_mono = 0.0
 
 
-# Plant-flat SoC retired (schema_version 4); push only ess.{id}.sens_ess_soc.
-_RETIRED_PLANT_FLAT_PUSH_IDS: frozenset[str] = frozenset({"sens_ess_soc"})
 
 
-def is_valid_ehal_id(ehal_id: object) -> bool:
-    text = str(ehal_id or "")
-    if text in _RETIRED_PLANT_FLAT_PUSH_IDS:
-        return False
-    return bool(_ID_PATTERN.match(text))
 
 
-def parse_push_value(raw: object) -> float | None:
-    """Parse a pushed value; ``None`` when empty, too long or not finite."""
-    text = str(raw if raw is not None else "").strip().replace(",", ".")
-    if not text or len(text) > MAX_RAW_LEN:
-        return None
-    for suffix in _UNIT_SUFFIXES:
-        if text.endswith(suffix):
-            text = text[: -len(suffix)].strip()
-            break
-    try:
-        value = float(text)
-    except ValueError:
-        return None
-    return value if math.isfinite(value) else None
 
 
 def _inbox_path() -> str:
@@ -225,97 +202,14 @@ def _write_inbox(rows: dict[str, dict[str, Any]]) -> None:
 atexit.register(flush_inbox_now)
 
 
-def _shadow_feed_key(ehal_id: str) -> str:
-    return f"loxone:io:{ehal_id}"
 
 
-def _record_push_to_shadow_feed(ehal_id: str, text: str, *, parse_ok: bool) -> None:
-    """Prod: mirror VO push into the shadow feed (never raises)."""
-    try:
-        from runtime_store.shadow.hooks import record_transport
-
-        record_transport(
-            _shadow_feed_key(ehal_id),
-            ok=parse_ok,
-            payload={"LL": {"value": text}},
-            error=None if parse_ok else "parse_failed",
-        )
-    except Exception:  # noqa: BLE001 — recorder must never break Prod
-        pass
 
 
-def _inbox_row_from_shadow_feed(ehal_id: str) -> dict[str, Any] | None:
-    """Shadow: inbox-shaped row from ``loxone:io:<id>``, or None if missing/stale.
-
-    Does not warn on miss — callers warn if the feed has no row for *ehal_id*.
-    """
-    try:
-        from runtime_store.shadow.mode import is_shadow_mode
-        from runtime_store.shadow.replay import lookup_record
-
-        if not is_shadow_mode():
-            return None
-        record = lookup_record(_shadow_feed_key(ehal_id), log_missing=False)
-    except Exception:  # noqa: BLE001
-        return None
-    if not isinstance(record, dict):
-        return None
-    payload = record.get("payload")
-    raw = ""
-    if isinstance(payload, dict):
-        raw = str((payload.get("LL") or {}).get("value") or "").strip()
-    elif payload is not None:
-        raw = str(payload).strip()
-    if not raw:
-        if record.get("ok"):
-            return None
-        return {
-            "value": None,
-            "raw": "",
-            "parse_ok": False,
-            "last_ts": record.get("ts"),
-            "count": 1,
-            "source": SHADOW_FEED_SOURCE,
-        }
-    value = parse_push_value(raw)
-    return {
-        "value": value,
-        "raw": raw,
-        "parse_ok": value is not None,
-        "last_ts": record.get("ts")
-        or datetime.now(timezone.utc).isoformat(),
-        "count": 1,
-        "source": SHADOW_FEED_SOURCE,
-    }
 
 
-def _shadow_feed_signals_for_read(ehal_id: str) -> dict[str, dict[str, Any]]:
-    """Feed rows for *ehal_id* (+ heartbeat). Feed-only — no Prod-inbox file."""
-    out: dict[str, dict[str, Any]] = {}
-    for key_id in (ehal_id, HEARTBEAT_ID):
-        row = _inbox_row_from_shadow_feed(key_id)
-        if row is not None:
-            out[key_id] = row
-    if ehal_id not in out:
-        try:
-            from runtime_store.shadow.replay import warn_missing_feed_key
-
-            warn_missing_feed_key(_shadow_feed_key(ehal_id), "missing")
-        except Exception:  # noqa: BLE001
-            pass
-    return out
 
 
-def _shadow_feed_overlay_if_active(ehal_id: str) -> dict[str, dict[str, Any]]:
-    """Shadow-only: feed rows for *ehal_id*; else ``{}``."""
-    try:
-        from runtime_store.shadow.mode import is_shadow_mode
-
-        if is_shadow_mode():
-            return _shadow_feed_signals_for_read(ehal_id)
-    except Exception:  # noqa: BLE001
-        return {}
-    return {}
 
 
 def record_push(

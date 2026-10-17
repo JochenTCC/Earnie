@@ -4,6 +4,19 @@ from __future__ import annotations
 import copy
 
 from integrations.loxone_ehal_mapping import EHAL_TO_BLOCKS
+from house_config.ehal_bindings_filter import (  # noqa: F401  (re-exported)
+    FILTER_EHAL_FIELDS,
+    FILTER_ENTITY_ID,
+    assemble_filter_bindings,
+    ehal_map_to_filter_bindings,
+    filter_bindings_to_ehal_map,
+    filter_ehal_fields_for_consumer,
+    migrate_swimspa_filter_bindings,
+)
+from house_config.ehal_bindings_util import (  # noqa: F401  (re-exported)
+    _nonempty,
+    _put_binding,
+)
 
 # Inverse of plant EHAL_TO_BLOCKS for §C keys only (not legacy unprefixed aliases).
 BLOCKS_TO_EHAL: dict[str, str] = {
@@ -78,14 +91,8 @@ _LEGACY_SYSTEM_TRIGGER_KEYS: frozenset[str] = frozenset(
 )
 
 
-def _nonempty(value: object) -> str:
-    return str(value or "").strip()
 
 
-def _put_binding(bindings: dict[str, str], field: str, address: object) -> None:
-    name = _nonempty(address)
-    if field and name and field not in bindings:
-        bindings[field] = name
 
 
 def migrate_loxone_blocks_to_plant(blocks: dict | None) -> dict[str, str]:
@@ -208,114 +215,18 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     return bindings
 
 
-FILTER_ENTITY_ID = "pool_filter"
 
 
-def filter_ehal_fields_for_consumer(cid: str) -> tuple[str, ...]:
-    """HITL / Live filter field catalog with slug-aware flex power + enable."""
-    from ehal.flex_fields import KIND_SENS_POWER_ACT, KIND_SET_ENABLE, flex_field
-
-    slug = str(cid or "").strip() or FILTER_ENTITY_ID
-    return (
-        "get_filter_remaining_hours",
-        flex_field(slug, KIND_SENS_POWER_ACT),
-        flex_field(slug, KIND_SET_ENABLE),
-        "sens_filter_active",
-        "get_filter_native_start_hour",
-        "get_filter_native_duration_hours",
-    )
 
 
-FILTER_EHAL_FIELDS: tuple[str, ...] = filter_ehal_fields_for_consumer(FILTER_ENTITY_ID)
 
 
-def filter_bindings_to_ehal_map(stored: dict | None) -> dict[str, str]:
-    """Normalize legacy ``swimspa_filter_bindings`` nest → EHAL field map (pool_filter keys)."""
-    from ehal.flex_fields import (
-        KIND_SENS_POWER_ACT,
-        KIND_SET_ENABLE,
-        expand_flex_bindings,
-        flex_field,
-    )
-
-    raw = stored if isinstance(stored, dict) else {}
-    out: dict[str, str] = {}
-    existing = raw.get("ehal_bindings")
-    if isinstance(existing, dict):
-        for key, value in existing.items():
-            _put_binding(out, str(key), value)
-    _put_binding(out, "get_filter_remaining_hours", raw.get("loxone_target_hours_name"))
-    inputs = raw.get("loxone_inputs") if isinstance(raw.get("loxone_inputs"), dict) else {}
-    outputs = raw.get("loxone_outputs") if isinstance(raw.get("loxone_outputs"), dict) else {}
-    flox = {}
-    sched = raw.get("filter_schedule")
-    if isinstance(sched, dict) and isinstance(sched.get("loxone"), dict):
-        flox = sched["loxone"]
-    # Prefer already-migrated pool_filter flex keys; fall back to swimspa bridge keys.
-    power = inputs.get("power_name") or out.get(
-        flex_field("swimspa_filter", KIND_SENS_POWER_ACT)
-    )
-    enable = outputs.get("enable_name") or out.get(
-        flex_field("swimspa_filter", KIND_SET_ENABLE)
-    )
-    out.pop(flex_field("swimspa_filter", KIND_SENS_POWER_ACT), None)
-    out.pop(flex_field("swimspa_filter", KIND_SET_ENABLE), None)
-    _put_binding(out, flex_field(FILTER_ENTITY_ID, KIND_SENS_POWER_ACT), power)
-    _put_binding(out, flex_field(FILTER_ENTITY_ID, KIND_SET_ENABLE), enable)
-    _put_binding(out, "sens_filter_active", inputs.get("alternate_binary_power_name"))
-    _put_binding(out, "get_filter_native_start_hour", flox.get("native_start_hour_name"))
-    _put_binding(
-        out, "get_filter_native_duration_hours", flox.get("native_duration_hours_name")
-    )
-    return expand_flex_bindings(out, FILTER_ENTITY_ID)
 
 
-def ehal_map_to_filter_bindings(ehal_map: dict[str, str] | None) -> dict:
-    """Normalize HITL map → ``ehal_bindings`` dict for ``pool_filter``."""
-    from ehal.flex_fields import expand_flex_bindings
-
-    cleaned = expand_flex_bindings(
-        {str(k): _nonempty(v) for k, v in (ehal_map or {}).items() if _nonempty(v)},
-        FILTER_ENTITY_ID,
-    )
-    return cleaned
 
 
-def assemble_filter_bindings(values: dict[str, str]) -> dict:
-    """Build ``ehal_bindings`` map for ``pool_filter`` from edited marker addresses."""
-    ehal_map: dict[str, str] = {}
-    target_hours = str(values.get("loxone_target_hours_name") or "").strip()
-    if target_hours:
-        ehal_map["get_filter_remaining_hours"] = target_hours
-    power_name = str(values.get("power_name") or "").strip()
-    if power_name:
-        ehal_map["flex.pool_filter.sens_power_act"] = power_name
-    alt_power = str(values.get("alternate_binary_power_name") or "").strip()
-    if alt_power:
-        ehal_map["sens_filter_active"] = alt_power
-    enable_name = str(values.get("enable_name") or "").strip()
-    if enable_name:
-        ehal_map["flex.pool_filter.set_enable"] = enable_name
-    native_start = str(values.get("native_start_hour_name") or "").strip()
-    if native_start:
-        ehal_map["get_filter_native_start_hour"] = native_start
-    native_dur = str(values.get("native_duration_hours_name") or "").strip()
-    if native_dur:
-        ehal_map["get_filter_native_duration_hours"] = native_dur
-    return {"ehal_bindings": ehal_map_to_filter_bindings(ehal_map)}
 
 
-def migrate_swimspa_filter_bindings(consumer: dict) -> bool:
-    """Legacy no-op: nests are lifted onto ``pool_filter`` by ``promote_pool_filter_milp``."""
-    stored = consumer.get("swimspa_filter_bindings")
-    if not isinstance(stored, dict) or not stored:
-        return False
-    migrated = filter_bindings_to_ehal_map(stored)
-    cleaned = {"ehal_bindings": migrated} if migrated else {}
-    if cleaned == stored:
-        return False
-    consumer["swimspa_filter_bindings"] = cleaned
-    return True
 
 
 def _strip_consumer_marker_nests(consumer: dict) -> bool:
@@ -535,6 +446,62 @@ def _strip_entity_event_triggers(house: dict) -> bool:
     return changed
 
 
+def _assert_no_residual_flat_ess(house: dict) -> None:
+    """Fail when retired plant-flat ESS bindings remain (entity-scoped keys required)."""
+    from house_config.ess_bindings import mappable_batteries
+    from runtime_store.migrate_v4 import residual_plant_flat_ess_keys
+
+    residual_flat = residual_plant_flat_ess_keys(house)
+    # Flat plant SoC is always illegal (schema_version 4); other plant-flat ESS
+    # fail when batteries exist to hold entity-scoped keys.
+    if "sens_ess_soc" in residual_flat:
+        raise ValueError(
+            "plant.ehal_bindings still has retired flat sens_ess_soc. "
+            "Use ess.{id}.sens_ess_soc on batteries[].ehal_bindings. "
+            "Run: python -m scripts.migrate_ess_bindings_once "
+            "--config-dir <config dir>"
+        )
+    if residual_flat and mappable_batteries():
+        raise ValueError(
+            "plant.ehal_bindings still has plant-flat ESS keys "
+            f"({', '.join(residual_flat)}). "
+            "Run: python -m scripts.migrate_ess_bindings_once "
+            "--config-dir <config dir>"
+        )
+
+
+def _migrate_house_bindings_in_memory(house: dict, *, strip_legacy: bool) -> bool:
+    """Migrate consumer nests / plant bindings in ``house`` in place; True if changed."""
+    changed = False
+    plant = dict(house.get("plant") or {}) if isinstance(house.get("plant"), dict) else {}
+    bindings = {
+        str(k): _nonempty(v)
+        for k, v in (plant.get("ehal_bindings") or {}).items()
+        if _nonempty(v)
+    }
+    if _migrate_all_consumers(house):
+        changed = True
+    if _promote_ambient_to_plant(house, bindings):
+        changed = True
+    if bindings != (plant.get("ehal_bindings") or {}):
+        plant["ehal_bindings"] = bindings
+        changed = True
+    if plant:
+        house["plant"] = plant
+    if _strip_consumer_ambient_bindings(house):
+        changed = True
+    if _strip_consumer_energy_export_bindings(house):
+        changed = True
+    if _strip_entity_event_triggers(house):
+        changed = True
+    if strip_legacy:
+        for profile in _profiles_iterable(house):
+            for consumer in profile.get("consumers") or []:
+                if isinstance(consumer, dict) and _strip_consumer_marker_nests(consumer):
+                    changed = True
+    return changed
+
+
 def ensure_migrated(
     house_doc: dict | None,
     config_doc: dict | None,
@@ -564,53 +531,8 @@ def ensure_migrated(
             "Run: python -m scripts.migrate_ehal_bindings "
             "--path <house_profiles.json> --config <config.json>"
         )
-    from house_config.ess_bindings import mappable_batteries
-    from runtime_store.migrate_v4 import residual_plant_flat_ess_keys
-
-    residual_flat = residual_plant_flat_ess_keys(house)
-    # Flat plant SoC is always illegal (schema_version 4); other plant-flat ESS
-    # fail when batteries exist to hold entity-scoped keys.
-    if "sens_ess_soc" in residual_flat:
-        raise ValueError(
-            "plant.ehal_bindings still has retired flat sens_ess_soc. "
-            "Use ess.{id}.sens_ess_soc on batteries[].ehal_bindings. "
-            "Run: python -m scripts.migrate_ess_bindings_once "
-            "--config-dir <config dir>"
-        )
-    if residual_flat and mappable_batteries():
-        raise ValueError(
-            "plant.ehal_bindings still has plant-flat ESS keys "
-            f"({', '.join(residual_flat)}). "
-            "Run: python -m scripts.migrate_ess_bindings_once "
-            "--config-dir <config dir>"
-        )
-    changed = False
-    plant = dict(house.get("plant") or {}) if isinstance(house.get("plant"), dict) else {}
-    bindings = {
-        str(k): _nonempty(v)
-        for k, v in (plant.get("ehal_bindings") or {}).items()
-        if _nonempty(v)
-    }
-    if _migrate_all_consumers(house):
-        changed = True
-    if _promote_ambient_to_plant(house, bindings):
-        changed = True
-    if bindings != (plant.get("ehal_bindings") or {}):
-        plant["ehal_bindings"] = bindings
-        changed = True
-    if plant:
-        house["plant"] = plant
-    if _strip_consumer_ambient_bindings(house):
-        changed = True
-    if _strip_consumer_energy_export_bindings(house):
-        changed = True
-    if _strip_entity_event_triggers(house):
-        changed = True
-    if strip_legacy:
-        for profile in _profiles_iterable(house):
-            for consumer in profile.get("consumers") or []:
-                if isinstance(consumer, dict) and _strip_consumer_marker_nests(consumer):
-                    changed = True
+    _assert_no_residual_flat_ess(house)
+    changed = _migrate_house_bindings_in_memory(house, strip_legacy=strip_legacy)
     ehal = config.get("ehal") if isinstance(config.get("ehal"), dict) else {}
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
     ha_entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}

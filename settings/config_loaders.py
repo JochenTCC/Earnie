@@ -126,7 +126,7 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     live in ``plant`` / ``consumers[].ehal_bindings`` (2.6.g).
 
     ``EHAL_HA_TRANSPORT``: ``pull`` (default when ``ehal.ha.transport`` is missing)
-    or ``weg_b`` (2.7.r-T1; live inbox/status parity lands in T2–T4).
+    or ``push`` (legacy ``weg_b`` accepted via ``normalize_ha_transport``).
     """
     ehal = raw_config.get("ehal")
     if not isinstance(ehal, dict):

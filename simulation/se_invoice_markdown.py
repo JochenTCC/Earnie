@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -11,95 +10,40 @@ import pandas as pd
 from data.tariff_parameter_preview import tariff_parameter_rows
 from simulation.monthly_fees import ScenarioFeeBreakdown
 from simulation.period_clip import clip_results_to_period
+from simulation.se_invoice_format import (  # noqa: F401  (re-exported)
+    _fmt_cent,
+    _fmt_eur,
+    _fmt_kwh,
+    _month_keys,
+    _month_mask,
+    _monthly_sum,
+    _safe_filename,
+    _series_or_nan,
+    _series_or_zero,
+)
+from simulation.se_invoice_netznutzung import (  # noqa: F401  (re-exported)
+    _NetznutzungComponent,
+    _grid_fee_from_params,
+    _netznutzung_ap_gross_cent,
+    _netznutzung_components,
+    _netznutzung_section_lines,
+)
 
 
-def _safe_filename(scenario_id: str) -> str:
-    cleaned = re.sub(r"[^\w.\-]+", "_", str(scenario_id).strip(), flags=re.UNICODE)
-    return cleaned.strip("._") or "scenario"
 
 
-def _fmt_eur(value: float) -> str:
-    return f"{float(value):.2f} €"
 
 
-def _fmt_kwh(value: float) -> str:
-    return f"{float(value):.1f} kWh"
 
 
-def _fmt_cent(value: float | None) -> str:
-    if value is None:
-        return "—"
-    return f"{float(value):.2f}"
 
 
-def _grid_fee_from_params(params: dict | None) -> dict | None:
-    """Aufgelöste Netzentgelt-Spec (``_grid_fee_spec``) aus SE-Params."""
-    if not isinstance(params, dict):
-        return None
-    spec = params.get("_grid_fee_spec")
-    return spec if isinstance(spec, dict) else None
 
 
-def _netznutzung_ap_gross_cent(
-    ap_net_cent: float,
-    import_spec: dict | None,
-) -> float:
-    """Arbeitspreis Cent/kWh wie in k_act (USt laut Bezugstarif)."""
-    if ap_net_cent <= 0.0:
-        return 0.0
-    spec = import_spec if isinstance(import_spec, dict) else {}
-    if bool(spec.get("prices_include_vat", True)):
-        return float(ap_net_cent)
-    vat = float(spec.get("vat_percent", 0.0) or 0.0)
-    return float(ap_net_cent) * (1.0 + vat / 100.0)
 
 
-@dataclass(frozen=True)
-class _NetznutzungComponent:
-    """Ein Preisbestandteil (Basis oder Zeitregel) des Netz-Arbeitspreises."""
-
-    label: str
-    ap_net_cent: float
-    import_kwh: float
-    eur: float
 
 
-def _netznutzung_components(
-    df: pd.DataFrame,
-    *,
-    grid_fee: dict | None,
-    import_spec: dict | None,
-) -> list[_NetznutzungComponent]:
-    """Netzbezug je Slot × (zeitabhängiger) brutto-Arbeitspreis, gruppiert je Regel."""
-    if grid_fee is None or df.empty or "import_kwh" not in df.columns:
-        return []
-    from data.grid_fees import grid_fee_work_cent, matching_rule
-
-    kwh_by_key: dict[str, float] = {}
-    eur_by_key: dict[str, float] = {}
-    net_by_key: dict[str, float] = {}
-    labels: dict[str, str] = {"": "Basis"}
-    order: list[str] = [""]
-    for rule in grid_fee["rules"]:
-        labels[rule["id"]] = f"{rule['id']} ({rule['label']})"
-        order.append(rule["id"])
-    for ts, kwh in df["import_kwh"].fillna(0.0).items():
-        kwh = float(kwh)
-        if kwh <= 0.0:
-            continue
-        slot = pd.Timestamp(ts).to_pydatetime()
-        rule = matching_rule(grid_fee, slot)
-        key = rule["id"] if rule else ""
-        net = grid_fee_work_cent(grid_fee, slot)
-        gross = _netznutzung_ap_gross_cent(net, import_spec)
-        kwh_by_key[key] = kwh_by_key.get(key, 0.0) + kwh
-        eur_by_key[key] = eur_by_key.get(key, 0.0) + kwh * gross / 100.0
-        net_by_key[key] = net
-    return [
-        _NetznutzungComponent(labels[key], net_by_key[key], kwh_by_key[key], eur_by_key[key])
-        for key in order
-        if key in kwh_by_key
-    ]
 
 
 def _tariff_line(spec: dict | None, *, kind: str) -> str:
@@ -112,37 +56,14 @@ def _tariff_line(spec: dict | None, *, kind: str) -> str:
     return f"{kind}: {label}"
 
 
-def _series_or_zero(df: pd.DataFrame, column: str) -> pd.Series:
-    if column in df.columns and not df.empty:
-        return df[column].fillna(0.0).astype(float)
-    return pd.Series(0.0, index=df.index, dtype=float)
 
 
-def _series_or_nan(df: pd.DataFrame, column: str) -> pd.Series:
-    if column in df.columns and not df.empty:
-        return pd.to_numeric(df[column], errors="coerce")
-    return pd.Series(float("nan"), index=df.index, dtype=float)
 
 
-def _month_keys(df: pd.DataFrame) -> list[str]:
-    if df.empty:
-        return []
-    return sorted({pd.Timestamp(ts).strftime("%Y-%m") for ts in df.index})
 
 
-def _month_mask(series: pd.Series, month_key: str) -> pd.Series:
-    if series.empty:
-        return pd.Series(dtype=bool)
-    return pd.Series(
-        pd.DatetimeIndex(series.index).strftime("%Y-%m") == month_key,
-        index=series.index,
-    )
 
 
-def _monthly_sum(series: pd.Series, month_key: str) -> float:
-    if series.empty:
-        return 0.0
-    return float(series.loc[_month_mask(series, month_key)].sum())
 
 
 def _mean_tariff_cent(price: pd.Series, month_key: str | None = None) -> float | None:
@@ -294,56 +215,6 @@ def _year_summary_lines(
     return lines
 
 
-def _netznutzung_section_lines(
-    *,
-    ap_net_cent: float,
-    ap_gross_cent: float,
-    import_kwh_year: float,
-    netznutzung_ap_eur: float,
-    components: list[_NetznutzungComponent],
-    skipped: list[dict],
-    fees: ScenarioFeeBreakdown,
-    month_count: int,
-) -> list[str]:
-    """Separate Netznutzung block (Arbeitspreis breakout + Grundpreis-Stub)."""
-    lines = [
-        "## Netznutzung",
-        "",
-        "| Position | Wert |",
-        "| --- | ---: |",
-        f"| Arbeitspreis netto (Basis) | {_fmt_cent(ap_net_cent)} Cent/kWh |",
-        f"| Arbeitspreis in k_act (Basis) | {_fmt_cent(ap_gross_cent)} Cent/kWh |",
-        f"| Netzbezug | {_fmt_kwh(import_kwh_year)} |",
-        f"| Arbeitspreis (Jahr) | {_fmt_eur(netznutzung_ap_eur)} |",
-        f"| Grundpreis (Katalog-Stub) | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
-        "",
-    ]
-    if len(components) > 1 or any(c.label != "Basis" for c in components):
-        lines.extend(
-            [
-                "| Arbeitspreis nach Zeitfenster | Netzbezug | Cent/kWh netto | Betrag |",
-                "| --- | ---: | ---: | ---: |",
-            ]
-        )
-        for comp in components:
-            lines.append(
-                f"| {comp.label} | {_fmt_kwh(comp.import_kwh)} | "
-                f"{_fmt_cent(comp.ap_net_cent)} | {_fmt_eur(comp.eur)} |"
-            )
-        lines.append("")
-    if skipped:
-        skipped_text = ", ".join(f"{item['id']} ({item['reason']})" for item in skipped)
-        lines.extend([f"Nicht berücksichtigte Regeln: {skipped_text}.", ""])
-    lines.extend(
-        [
-            "Der Arbeitspreis kommt aus dem Hausprofil (`netznutzung`) und dem "
-            "Netzentgelt-Katalog, unabhängig vom Lieferantentarif. In der "
-            "Jahressumme ist er aus dem Energiebezug herausgerechnet (kein "
-            "Doppelzählen). Leistungspreis fehlt.",
-            "",
-        ]
-    )
-    return lines
 
 
 def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:

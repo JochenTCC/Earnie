@@ -1,4 +1,4 @@
-"""HA Weg B push read helpers (inbox + qualified IDs; wire = canonical EHAL units)."""
+"""HA push-transport read helpers (inbox + qualified IDs; wire = canonical EHAL units)."""
 from __future__ import annotations
 
 from typing import Any

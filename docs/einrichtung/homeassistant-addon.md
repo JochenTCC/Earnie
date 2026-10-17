@@ -95,7 +95,7 @@ Erreichbar sind die Ordner z. B. über das Add-on **Samba** oder **SSH & Web Ter
 |---|---|
 | Ingress | Primäre Earnie-Web-UI in der HA-Seitenleiste / OPEN WEB UI |
 | `8501/tcp` | Optionaler Direktzugriff (Streamlit) |
-| `8541/tcp` | EHAL Loxone-HTTP (Request-Optimize, Telemetry/Heartbeat, Pattern-B-Status). Relevant bei `ehal.backend=loxone` sowie bei Home Assistant mit `ehal.ha.transport=weg_b`; bei `pull` nicht nötig |
+| `8541/tcp` | EHAL Loxone-HTTP (Request-Optimize, Telemetry/Heartbeat, Pattern-B-Status). Relevant bei `ehal.backend=loxone` sowie bei Home Assistant mit `ehal.ha.transport=push`; bei `pull` nicht nötig |
 
 Gesamtübersicht der Ports: [`docs/dev/streamlit-ports.md`](../dev/streamlit-ports.md).
 

@@ -196,17 +196,72 @@ def _solve_one_pack(
     max_soc = float(pack["max_soc"])
     eta = max(0.05, min(1.0, float(pack["efficiency"])))
     if capacity <= 1e-9 or load_kw <= 1e-9:
-        return {
-            "source_select": [SOURCE_GRID] * horizon,
-            "charge_kw": [0.0] * horizon,
-            "load_kw": load_kw,
-        }
+        return _grid_only_plan(horizon, load_kw)
 
     e_min = (min_soc / 100.0) * capacity
     e_max = (max_soc / 100.0) * capacity
     e0 = max(e_min, min(e_max, (current_soc / 100.0) * capacity))
 
-    prob = pulp.LpProblem(f"standby_{pack['powerstation_id']}", pulp.LpMinimize)
+    prob, island, p_charge = _build_standby_problem(
+        matrix,
+        str(pack["powerstation_id"]),
+        load_kw=load_kw,
+        max_charge=max_charge,
+        eta=eta,
+        energy_bounds=(e_min, e_max, e0),
+        dt_h=dt_h,
+    )
+
+    status = prob.solve(pulp.PULP_CBC_CMD(msg=False))
+    if pulp.LpStatus[status] not in ("Optimal", "Not Solved"):
+        logger.warning(
+            "standby MILP failed for %s: %s",
+            pack["powerstation_id"],
+            pulp.LpStatus[status],
+        )
+        return _grid_only_plan(horizon, load_kw)
+
+    source = [
+        SOURCE_BATTERY if pulp.value(island[t]) and pulp.value(island[t]) > 0.5 else SOURCE_GRID
+        for t in range(horizon)
+    ]
+    charge = [float(pulp.value(p_charge[t]) or 0.0) for t in range(horizon)]
+    expensive_h = sum(1 for s in source if s == SOURCE_BATTERY) * dt_h
+    return {
+        "source_select": source,
+        "charge_kw": charge,
+        "load_kw": load_kw,
+        "reserve_target_kwh": reserve_target_kwh_for_standby(
+            load_kw=load_kw,
+            expensive_hours=expensive_h,
+            capacity_kwh=capacity,
+        ),
+    }
+
+
+def _grid_only_plan(horizon: int, load_kw: float) -> dict[str, Any]:
+    """Plan without islanding or charging (grid pass-through for every slot)."""
+    return {
+        "source_select": [SOURCE_GRID] * horizon,
+        "charge_kw": [0.0] * horizon,
+        "load_kw": load_kw,
+    }
+
+
+def _build_standby_problem(
+    matrix: list[dict[str, Any]],
+    ps_id: str,
+    *,
+    load_kw: float,
+    max_charge: float,
+    eta: float,
+    energy_bounds: tuple[float, float, float],
+    dt_h: float,
+):
+    """Standby MILP; returns ``(problem, island_vars, charge_vars)``."""
+    horizon = len(matrix)
+    e_min, e_max, e0 = energy_bounds
+    prob = pulp.LpProblem(f"standby_{ps_id}", pulp.LpMinimize)
     island = [
         pulp.LpVariable(f"island_{t}", cat=pulp.LpBinary) for t in range(horizon)
     ]
@@ -232,36 +287,7 @@ def _solve_one_pack(
         + prices[t] * p_charge[t] * dt_h
         for t in range(horizon)
     )
-
-    status = prob.solve(pulp.PULP_CBC_CMD(msg=False))
-    if pulp.LpStatus[status] not in ("Optimal", "Not Solved"):
-        logger.warning(
-            "standby MILP failed for %s: %s",
-            pack["powerstation_id"],
-            pulp.LpStatus[status],
-        )
-        return {
-            "source_select": [SOURCE_GRID] * horizon,
-            "charge_kw": [0.0] * horizon,
-            "load_kw": load_kw,
-        }
-
-    source = [
-        SOURCE_BATTERY if pulp.value(island[t]) and pulp.value(island[t]) > 0.5 else SOURCE_GRID
-        for t in range(horizon)
-    ]
-    charge = [float(pulp.value(p_charge[t]) or 0.0) for t in range(horizon)]
-    expensive_h = sum(1 for s in source if s == SOURCE_BATTERY) * dt_h
-    return {
-        "source_select": source,
-        "charge_kw": charge,
-        "load_kw": load_kw,
-        "reserve_target_kwh": reserve_target_kwh_for_standby(
-            load_kw=load_kw,
-            expensive_hours=expensive_h,
-            capacity_kwh=capacity,
-        ),
-    }
+    return prob, island, p_charge
 
 
 def apply_standby_load_relief(

@@ -198,6 +198,14 @@ def fetch_entsoe_day_ahead_prices(
         eic,
     )
 
+    xml_text = _fetch_entsoe_xml(params, zone, timeout)
+    if not isinstance(xml_text, str) or not xml_text.strip():
+        raise ValueError("ENTSO-E returned no XML payload")
+    return parse_entsoe_a44_xml(xml_text)
+
+
+def _fetch_entsoe_xml(params: dict, zone: str, timeout: int):
+    """A44 XML via the shadow-aware transport (replay in shadow, record in prod)."""
     from runtime_store.shadow.mode import is_shadow_mode
     from runtime_store.shadow.replay import replay_ext_payload
     from runtime_store.shadow.transport import ext_get, safe_record
@@ -246,7 +254,4 @@ def fetch_entsoe_day_ahead_prices(
                 safe_record(FEED_KEY, ok=False, error=str(exc))
             raise
 
-    xml_text = ext_get(replay=_replay, live=_live, allow_live_fallback=True)
-    if not isinstance(xml_text, str) or not xml_text.strip():
-        raise ValueError("ENTSO-E returned no XML payload")
-    return parse_entsoe_a44_xml(xml_text)
+    return ext_get(replay=_replay, live=_live, allow_live_fallback=True)

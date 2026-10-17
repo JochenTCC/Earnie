@@ -446,8 +446,8 @@
           "properties": {
             "transport": {
               "type": "string",
-              "enum": ["pull", "weg_b"],
-              "description": "Live I/O transport (2.7.r-T1): pull = HaAdapter REST states/services (default); weg_b = push telemetry to Earnie + poll GET /ehal/status.json (carrier converts to canonical EHAL units on the wire)."
+              "enum": ["pull", "push"],
+              "description": "Live I/O transport: pull = HaAdapter REST states/services (default); push = HA pushes telemetry to Earnie and polls GET /ehal/status.json (carrier converts to canonical EHAL units on the wire). Legacy value weg_b is accepted at load time and normalized to push."
             },
             "entities": {
               "type": "object",

@@ -269,23 +269,8 @@ def _simulate_house_year(
     start_store_temp_c: float | None = None,
 ) -> HouseYearResult:
     """Year simulation with house RC; optional heat storage coupling."""
-    from data.heating_need import (
-        _resolve_climate_series,
-        daily_solar_thermal_kwh,
-        heat_pump_jaz,
-        specific_heating_kwh_m2,
-        warm_water_kwh_week,
-    )
-    from optimizer.thermal_coupled import (
-        _group_hourly_by_day,
-        _hourly_solar_from_daily,
-        heat_storage_enabled,
-        normalize_heat_storage,
-    )
-    from optimizer.thermal_model import (
-        ThermalBand,
-        capacity_kwh_per_k_from_volume,
-    )
+    from data.heating_need import _resolve_climate_series, daily_solar_thermal_kwh
+    from optimizer.thermal_coupled import _group_hourly_by_day, _hourly_solar_from_daily
 
     if float(living_area_m2) <= 0.0:
         raise ValueError("living_area_m2 muss > 0 sein für House-RC")
@@ -300,60 +285,42 @@ def _simulate_house_year(
         hourly_temperature_c=hourly_temperature_c,
         hourly_collector_wm2=hourly_collector_wm2,
     )
-    annual_heat = float(living_area_m2) * specific_heating_kwh_m2(
-        building_class, hwb_kwh_m2=hwb_kwh_m2
+    sim_common = _house_year_shared_params(
+        living_area_m2=living_area_m2,
+        building_class=building_class,
+        heat_pump_type=heat_pump_type,
+        persons=persons,
+        hp_electric_kw=hp_electric_kw,
+        target_temp_c=target_temp_c,
+        hwb_kwh_m2=hwb_kwh_m2,
+        building_mass=building_mass,
+        house_tolerance_c=house_tolerance_c,
+        heat_storage=heat_storage,
     )
-    ww_day = warm_water_kwh_week(persons) / 7.0
-    jaz = heat_pump_jaz(heat_pump_type)
-    wp_kw = max(0.1, float(hp_electric_kw))
-    max_heat = wp_kw * jaz
-    house_c = house_capacity_kwh_per_k(living_area_m2, building_mass)
-    tol = (
-        DEFAULT_HOUSE_TOLERANCE_C
-        if house_tolerance_c is None
-        else max(0.05, float(house_tolerance_c))
-    )
-    band_min = float(target_temp_c) - tol
-    storage = (
-        normalize_heat_storage(heat_storage)
-        if heat_storage_enabled(heat_storage)
-        else None
+    annual_heat = sim_common.pop("annual_heat")
+    sim_common["start_house_temp_c"] = start_house_temp_c
+    sim_common["start_store_temp_c"] = start_store_temp_c
+
+    house_h_args = dict(
+        override_kw_per_k=house_heat_loss_kw_per_k,
+        annual_heat_kwh=annual_heat,
+        target_temp_c=target_temp_c,
+        heating_limit_c=heating_limit_c,
     )
 
     if hourly_temperature_c is not None:
         day_rows = _group_hourly_by_day(
             hourly_temperature_c, hourly_collector_wm2, area_m2
         )
-        ambient_flat = _flat_ambient_from_day_rows(day_rows)
         house_h = resolve_house_heat_loss_kw_per_k(
-            override_kw_per_k=house_heat_loss_kw_per_k,
-            annual_heat_kwh=annual_heat,
-            ambient_c=ambient_flat,
-            target_temp_c=target_temp_c,
-            heating_limit_c=heating_limit_c,
+            ambient_c=_flat_ambient_from_day_rows(day_rows), **house_h_args
         )
         return _simulate_house_hourly_rows(
-            day_rows=day_rows,
-            ww_day=ww_day,
-            house_c=house_c,
-            house_h=house_h,
-            band_min=band_min,
-            max_heat=max_heat,
-            wp_kw=wp_kw,
-            jaz=jaz,
-            target_temp_c=target_temp_c,
-            storage=storage,
-            start_house_temp_c=start_house_temp_c,
-            start_store_temp_c=start_store_temp_c,
+            day_rows=day_rows, house_h=house_h, **sim_common
         )
 
-    ambient_flat = _flat_ambient_from_daily(daily_temps)
     house_h = resolve_house_heat_loss_kw_per_k(
-        override_kw_per_k=house_heat_loss_kw_per_k,
-        annual_heat_kwh=annual_heat,
-        ambient_c=ambient_flat,
-        target_temp_c=target_temp_c,
-        heating_limit_c=heating_limit_c,
+        ambient_c=_flat_ambient_from_daily(daily_temps), **house_h_args
     )
     return _simulate_house_daily_climate(
         daily_temps=daily_temps,
@@ -362,20 +329,84 @@ def _simulate_house_year(
         latitude=latitude,
         solar_thermal_tilt_deg=float(solar_thermal_tilt_deg),
         solar_thermal_azimuth_deg=float(solar_thermal_azimuth_deg),
-        ww_day=ww_day,
-        house_c=house_c,
         house_h=house_h,
-        band_min=band_min,
-        max_heat=max_heat,
-        wp_kw=wp_kw,
-        jaz=jaz,
-        target_temp_c=target_temp_c,
-        storage=storage,
-        start_house_temp_c=start_house_temp_c,
-        start_store_temp_c=start_store_temp_c,
         daily_solar_thermal_kwh=daily_solar_thermal_kwh,
         hourly_solar_from_daily=_hourly_solar_from_daily,
+        **sim_common,
     )
+
+
+def _house_year_shared_params(
+    *,
+    living_area_m2: float,
+    building_class: int,
+    heat_pump_type: str,
+    persons: int,
+    hp_electric_kw: float,
+    target_temp_c: float,
+    hwb_kwh_m2: float | None,
+    building_mass: str | None,
+    house_tolerance_c: float | None,
+    heat_storage: dict | None,
+) -> dict:
+    """Heat-demand, heat-pump and house-RC inputs shared by both year simulations."""
+    from data.heating_need import (
+        heat_pump_jaz,
+        specific_heating_kwh_m2,
+        warm_water_kwh_week,
+    )
+    from optimizer.thermal_coupled import (
+        heat_storage_enabled,
+        normalize_heat_storage,
+    )
+
+    annual_heat = float(living_area_m2) * specific_heating_kwh_m2(
+        building_class, hwb_kwh_m2=hwb_kwh_m2
+    )
+    ww_day = warm_water_kwh_week(persons) / 7.0
+    jaz = heat_pump_jaz(heat_pump_type)
+    wp_kw = max(0.1, float(hp_electric_kw))
+    tol = (
+        DEFAULT_HOUSE_TOLERANCE_C
+        if house_tolerance_c is None
+        else max(0.05, float(house_tolerance_c))
+    )
+    storage = (
+        normalize_heat_storage(heat_storage)
+        if heat_storage_enabled(heat_storage)
+        else None
+    )
+    return {
+        "annual_heat": annual_heat,
+        "ww_day": ww_day,
+        "jaz": jaz,
+        "wp_kw": wp_kw,
+        "max_heat": wp_kw * jaz,
+        "house_c": house_capacity_kwh_per_k(living_area_m2, building_mass),
+        "band_min": float(target_temp_c) - tol,
+        "storage": storage,
+        "target_temp_c": target_temp_c,
+    }
+
+
+def _init_store_state(
+    storage: dict | None, start_store_temp_c: float | None
+) -> tuple[float, float, float, object | None]:
+    """Initial (temp, capacity kWh/K, loss kW/K, band) of the heat store; zeros/None without store."""
+    from optimizer.thermal_model import (
+        ThermalBand,
+        capacity_kwh_per_k_from_volume,
+    )
+
+    if storage is None:
+        return 0.0, 0.0, 0.0, None
+    store_capacity = capacity_kwh_per_k_from_volume(storage["volume_liters"])
+    store_u = float(storage["heat_loss_kw_per_k"])
+    store_band = ThermalBand(storage["setpoint_c"], storage["tolerance_c"])
+    store_temp = float(
+        start_store_temp_c if start_store_temp_c is not None else store_band.setpoint_c
+    )
+    return store_temp, store_capacity, store_u, store_band
 
 
 def _simulate_house_hourly_rows(
@@ -393,11 +424,6 @@ def _simulate_house_hourly_rows(
     start_house_temp_c: float | None,
     start_store_temp_c: float | None,
 ) -> HouseYearResult:
-    from optimizer.thermal_model import (
-        ThermalBand,
-        capacity_kwh_per_k_from_volume,
-    )
-
     ww_kw = ww_day / 24.0
     house_temp = float(
         start_house_temp_c if start_house_temp_c is not None else target_temp_c
@@ -405,19 +431,9 @@ def _simulate_house_hourly_rows(
     daily_out: list[float] = []
     house_temps: list[float] = []
     store_temps: list[float] = []
-    store_temp = 0.0
-    store_capacity = 0.0
-    store_u = 0.0
-    store_band = None
-    if storage is not None:
-        store_capacity = capacity_kwh_per_k_from_volume(storage["volume_liters"])
-        store_u = float(storage["heat_loss_kw_per_k"])
-        store_band = ThermalBand(storage["setpoint_c"], storage["tolerance_c"])
-        store_temp = float(
-            start_store_temp_c
-            if start_store_temp_c is not None
-            else store_band.setpoint_c
-        )
+    store_temp, store_capacity, store_u, store_band = _init_store_state(
+        storage, start_store_temp_c
+    )
 
     for _day, amb, solar_hours in day_rows:
         day_electric = 0.0
@@ -480,11 +496,6 @@ def _simulate_house_daily_climate(
     daily_solar_thermal_kwh,
     hourly_solar_from_daily,
 ) -> HouseYearResult:
-    from optimizer.thermal_model import (
-        ThermalBand,
-        capacity_kwh_per_k_from_volume,
-    )
-
     ww_kw = ww_day / 24.0
     house_temp = float(
         start_house_temp_c if start_house_temp_c is not None else target_temp_c
@@ -492,19 +503,9 @@ def _simulate_house_daily_climate(
     daily_out: list[float] = []
     house_temps: list[float] = []
     store_temps: list[float] = []
-    store_temp = 0.0
-    store_capacity = 0.0
-    store_u = 0.0
-    store_band = None
-    if storage is not None:
-        store_capacity = capacity_kwh_per_k_from_volume(storage["volume_liters"])
-        store_u = float(storage["heat_loss_kw_per_k"])
-        store_band = ThermalBand(storage["setpoint_c"], storage["tolerance_c"])
-        store_temp = float(
-            start_store_temp_c
-            if start_store_temp_c is not None
-            else store_band.setpoint_c
-        )
+    store_temp, store_capacity, store_u, store_band = _init_store_state(
+        storage, start_store_temp_c
+    )
 
     for day_idx, ambient_day in enumerate(daily_temps):
         solar_day = 0.0

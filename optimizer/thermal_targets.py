@@ -190,21 +190,35 @@ def build_thermal_observability(
     if readings.get("missing_signals"):
         snapshot["missing_signals"] = readings["missing_signals"]
     if readings.get("heating_active") is not None:
-        snapshot["readings_c"]["heating_active"] = readings["heating_active"]
-        total_kw = ehal_live.read_consumer_meter_kw(consumer)
-        heating_kw = resolve_live_heating_power_kw(
-            total_kw=total_kw,
-            filter_kw=_resolve_subtracted_filter_kw(consumer),
-            heating_active=readings["heating_active"],
-        )
-        if heating_kw is not None:
-            snapshot["readings_kw"] = {
-                "total": total_kw,
-                "heating": heating_kw,
-            }
+        _attach_live_heating_readings(snapshot, consumer, readings)
+    _attach_heat_content(snapshot, plan, band, readings.get("actual_c"), capacity)
+    return snapshot
+
+
+def _attach_live_heating_readings(
+    snapshot: dict[str, Any], consumer: dict, readings: dict
+) -> None:
+    """Add ``heating_active`` and, when derivable, live total/heating kW."""
+    snapshot["readings_c"]["heating_active"] = readings["heating_active"]
+    total_kw = ehal_live.read_consumer_meter_kw(consumer)
+    heating_kw = resolve_live_heating_power_kw(
+        total_kw=total_kw,
+        filter_kw=_resolve_subtracted_filter_kw(consumer),
+        heating_active=readings["heating_active"],
+    )
+    if heating_kw is not None:
+        snapshot["readings_kw"] = {
+            "total": total_kw,
+            "heating": heating_kw,
+        }
+
+
+def _attach_heat_content(
+    snapshot: dict[str, Any], plan, band, actual_c: float | None, capacity: float
+) -> None:
+    """Add measured/simulated heat content and the simulated horizon profile."""
     from optimizer.thermal_model import heat_content_kwh
 
-    actual_c = readings.get("actual_c")
     q_meas = (
         round(heat_content_kwh(float(actual_c), capacity), 3)
         if actual_c is not None
@@ -219,7 +233,6 @@ def build_thermal_observability(
     snapshot["horizon_q_sim_kwh"] = [
         round(heat_content_kwh(float(temp_c), capacity), 3) for temp_c in forecast
     ]
-    return snapshot
 
 
 def collect_thermal_observability(

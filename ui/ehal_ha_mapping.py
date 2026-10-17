@@ -5,20 +5,13 @@ from typing import Any
 
 import streamlit as st
 
-from ehal.models import canonicalize_ha_entity_keys
-from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
-from house_config.ehal_bindings import ensure_migrated
+from ehal.profiles import group_fields_by_role, role_group_label
 from house_config.ha_ehal_bindings import aggregate_ha_entities
-from integrations.ehal_live import reset_adapter_cache
-from ehal.field_catalog import TELEMETRY_ENERGY_OPTIONAL
 from integrations.ha_adapter import (
-    HaAdapter,
-    HaConfig,
     HaHttpError,
 )
 from integrations.ha_ehal_mapping import (
     binding_conversion_hint,
-    binding_unit_issues,
     compatible_entity_ids,
     heuristic_propose,
     resolve_field_select_default,
@@ -29,7 +22,7 @@ from ui.ehal_function_status import (
     render_function_status,
     render_inverter_control_capability_warnings,
 )
-from ehal.ess_fields import ess_field, ess_field_kind
+from ehal.ess_fields import ess_field
 from ui.ehal_loxone_mapping import (
     BATTERY_ENTITY_KIND,
     PLANT_ENTITY_ID,
@@ -46,125 +39,48 @@ from ui.ehal_loxone_mapping import (
 )
 from ui.house_config_io import (
     load_house_profiles,
-    load_main_config,
-    save_house_profiles,
-    save_main_config,
+)
+from ui.ehal_ha_mapping_common import (  # noqa: F401  (re-exported)
+    _FIELD_LABELS,
+    _NONE,
+    _PLANT_SIGN_FIELDS,
+    _SESSION_AUTO_SCAN,
+    _SESSION_ENTITY,
+    _SESSION_PROPOSALS,
+    _SESSION_SCAN,
+    _SESSION_SCAN_ERROR,
+    _adapter_from_form,
+    _clear_map_widget_keys,
+    _ensure_ha_migrated,
+    _entity_options,
+    _field_select_caption,
+    _ha_credentials,
+    _ha_entity_fields,
+    _proposed_entity_id,
+)
+from ui.ehal_ha_mapping_save import (  # noqa: F401  (re-exported)
+    _persist_ha_ess_force,
+    _save_entity_mapping,
+    _validate_mapping_save,
 )
 
-_NONE = "— nicht gemappt —"
-_SESSION_SCAN = "ehal_ha_scan_entities"
-_SESSION_SCAN_ERROR = "ehal_ha_scan_error"
-_SESSION_PROPOSALS = "ehal_ha_proposals"
-_SESSION_ENTITY = "ehal_ha_entity_id"
-_SESSION_AUTO_SCAN = "ehal_ha_auto_scan_done"
-
-_FIELD_LABELS: dict[str, str] = role_field_labels()
-_PLANT_SIGN_FIELDS = ("sens_grid_power_active", "sens_ess_power")
 
 
-def _clear_map_widget_keys(entity_id: str, fields: tuple[str, ...] | list[str]) -> None:
-    """Drop selectbox keys so defaults re-seed from propose / saved map."""
-    for field in fields:
-        st.session_state.pop(f"ehal_ha_map_{entity_id}_{field}", None)
 
 
-def _proposed_entity_id(proposals: dict[str, dict[str, Any]], field: str) -> str:
-    if not isinstance(proposals, dict):
-        return ""
-    keys = [field]
-    kind = ess_field_kind(field)
-    if kind and kind not in keys:
-        keys.append(kind)
-    for key in keys:
-        entry = proposals.get(key)
-        if isinstance(entry, dict):
-            eid = str(entry.get("entity_id") or "").strip()
-            if eid:
-                return eid
-    return ""
 
 
-def _ha_credentials(data: dict) -> dict[str, Any]:
-    from runtime_store.dotenv_io import read_ha_credentials
-
-    ehal = data.get("ehal") if isinstance(data.get("ehal"), dict) else {}
-    ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
-    raw_sign = dict(ha.get("sign") or {}) if isinstance(ha.get("sign"), dict) else {}
-    base_url, token = read_ha_credentials()
-    return {
-        "backend": str(ehal.get("backend") or ""),
-        "adapter_id": resolve_adapter_id(ehal.get("adapter_id"), BACKEND_HA),
-        "base_url": base_url,
-        "token": token,
-        "sign": canonicalize_ha_entity_keys(
-            {str(k): str(v) for k, v in raw_sign.items()}
-        ),
-    }
 
 
-def _ensure_ha_migrated() -> tuple[dict, dict]:
-    """One-shot migrate flat entities → entity-scoped; return (config, house)."""
-    from runtime_store.shadow.mode import is_shadow_config_readonly
-
-    config_doc = load_main_config()
-    house = load_house_profiles()
-    new_house, new_config, changed = ensure_migrated(house, config_doc)
-    if changed:
-        if is_shadow_config_readonly():
-            return new_config, new_house
-        save_house_profiles(new_house)
-        save_main_config(new_config)
-        return new_config, new_house
-    return config_doc, house
 
 
-def _adapter_from_form(base_url: str, token: str, entities: dict[str, str]) -> HaAdapter:
-    from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
-
-    resolved_url = resolve_ha_base_url(base_url)
-    resolved_token = resolve_ha_token(token)
-    if not resolved_url or not resolved_token:
-        raise ValueError(
-            "URL und Token sind erforderlich "
-            "(oder SUPERVISOR_TOKEN beim Betrieb als Home-Assistant-Add-on)."
-        )
-    return HaAdapter(
-        HaConfig(
-            base_url=resolved_url,
-            token=resolved_token,
-            adapter_id=default_adapter_id(BACKEND_HA),
-            entities=entities,
-        )
-    )
 
 
-def _entity_options(rows: list[dict[str, Any]], current_values: list[str]) -> list[str]:
-    ids = [str(row["entity_id"]) for row in rows if str(row.get("entity_id") or "").strip()]
-    for value in current_values:
-        text = str(value or "").strip()
-        if text and text not in ids:
-            ids.append(text)
-    return [_NONE] + ids
 
 
-def _field_select_caption(field: str, *, required: bool = False) -> str:
-    from ehal.ess_fields import ess_field_kind
-
-    kind = ess_field_kind(field)
-    meaning = _FIELD_LABELS.get(kind or field, _FIELD_LABELS.get(field, field))
-    suffix = " *" if required else ""
-    return f"{meaning} (`{field}`){suffix}"
 
 
-def _ha_entity_fields(entity: dict[str, Any]) -> tuple[str, ...]:
-    """Plant gets Slot-Ist energy counters in addition to Loxone plant fields."""
-    fields = tuple(entity.get("fields") or ())
-    if str(entity.get("kind") or "") == BATTERY_ENTITY_KIND:
-        return fields
-    if str(entity.get("id") or "") != PLANT_ENTITY_ID:
-        return fields
-    extra = [f for f in TELEMETRY_ENERGY_OPTIONAL if f not in fields]
-    return fields + tuple(extra)
+
 
 
 def _select_entity(
@@ -409,146 +325,8 @@ def _render_sign_selects(
     return sign
 
 
-def _validate_mapping_save(
-    entity_id: str,
-    ehal_map: dict[str, str],
-    scan_rows: list[dict[str, Any]] | None = None,
-    *,
-    entity_kind: str = "",
-) -> str | None:
-    kind = str(entity_kind or "").strip()
-    if entity_id == PLANT_ENTITY_ID or kind == "plant":
-        missing = [name for name in PLANT_TELEMETRY_REQUIRED if name not in ehal_map]
-        if missing:
-            return "Pflichtfelder fehlen: " + ", ".join(missing)
-    elif kind == BATTERY_ENTITY_KIND:
-        soc = ess_field(entity_id, "sens_ess_soc")
-        if soc not in ehal_map:
-            return f"Pflichtfelder fehlen: {soc}"
-    issues = binding_unit_issues(ehal_map, scan_rows or [])
-    if issues:
-        return "Einheit passt nicht zum Feld: " + "; ".join(issues)
-    return None
 
 
-def _save_entity_mapping(
-    house: dict,
-    config_doc: dict,
-    *,
-    profile_id: str,
-    entity_id: str,
-    ehal_map: dict[str, str],
-    base_url: str,
-    token: str,
-    adapter_id: str,
-    sign: dict[str, str],
-    scan_rows: list[dict[str, Any]] | None = None,
-    entity_kind: str = "",
-) -> None:
-    from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
-    from runtime_store.dotenv_io import write_ha_dotenv
-    from runtime_store.dotenv_loader import load_app_dotenv
-    from runtime_store.shadow.ehal_overlay import upsert_entity_bindings
-    from runtime_store.shadow.mode import is_shadow_config_readonly
-    from ui.house_config_io import _load_components_document, _save_components_document
-
-    kind = str(entity_kind or "").strip() or entity_kind_for_id(
-        house, profile_id, entity_id
-    )
-    error = _validate_mapping_save(
-        entity_id, ehal_map, scan_rows, entity_kind=kind
-    )
-    if error:
-        st.error(error)
-        return
-    shadow_readonly = is_shadow_config_readonly()
-    if not shadow_readonly:
-        resolved_url = resolve_ha_base_url(base_url)
-        if not resolved_url or not resolve_ha_token(token):
-            st.error(
-                "URL und Token sind erforderlich "
-                "(oder SUPERVISOR_TOKEN beim Betrieb als Home-Assistant-Add-on)."
-            )
-            return
-        try:
-            # Never persist SUPERVISOR_TOKEN — empty token stays empty in .env.
-            write_ha_dotenv(resolved_url, token)
-        except (OSError, PermissionError) as exc:
-            st.error(f"Speichern der .env fehlgeschlagen: {exc}")
-            return
-        load_app_dotenv(override=True)
-    migrated_house, migrated_config, _ = ensure_migrated(house, config_doc)
-    if shadow_readonly:
-        path = upsert_entity_bindings(
-            profile_id=profile_id,
-            entity_id=entity_id,
-            bindings=ehal_map,
-            entity_kind=kind,
-        )
-        reset_adapter_cache()
-        st.success(
-            f"HA-EHAL-Mapping für `{entity_id}` im Shadow-Overlay gespeichert "
-            f"(`{path}`; Prod-Config unverändert)."
-        )
-        st.rerun()
-        return
-    if kind == BATTERY_ENTITY_KIND:
-        components = apply_battery_bindings(
-            _load_components_document(),
-            battery_id=entity_id,
-            bindings=ehal_map,
-        )
-        _save_components_document(components)
-        detail = "`components.json` (`batteries[].ehal_bindings`)"
-    elif kind == INVERTER_ENTITY_KIND:
-        components = apply_inverter_bindings(
-            _load_components_document(),
-            inverter_id=entity_id,
-            bindings=ehal_map,
-        )
-        _save_components_document(components)
-        detail = "`components.json` (`inverters[].ehal_bindings`)"
-    elif kind == PV_ENTITY_KIND:
-        components = apply_pv_system_bindings(
-            _load_components_document(),
-            pv_system_id=entity_id,
-            bindings=ehal_map,
-        )
-        _save_components_document(components)
-        detail = "`components.json` (`pv_systems[].ehal_bindings`)"
-    else:
-        updated = apply_entity_bindings(
-            migrated_house,
-            profile_id=profile_id,
-            entity_id=entity_id,
-            bindings=ehal_map,
-        )
-        save_house_profiles(updated)
-        detail = "`plant`/`consumers[].ehal_bindings`"
-    payload = dict(migrated_config)
-    ehal = dict(payload.get("ehal") or {}) if isinstance(payload.get("ehal"), dict) else {}
-    ehal["backend"] = "ha"
-    ehal["adapter_id"] = adapter_id
-    existing_ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
-    existing_sign = (
-        dict(existing_ha.get("sign") or {})
-        if isinstance(existing_ha.get("sign"), dict)
-        else {}
-    )
-    merged_sign = dict(existing_sign)
-    merged_sign.update(sign)
-    ehal["ha"] = {
-        "entities": {},
-        "sign": merged_sign,
-    }
-    payload["ehal"] = ehal
-    save_main_config(payload)
-    reset_adapter_cache()
-    st.success(
-        f"HA-EHAL-Mapping für `{entity_id}` gespeichert "
-        f"({detail}, `ehal.backend=ha`)."
-    )
-    st.rerun()
 
 
 def _render_ha_mapping_intro() -> None:
@@ -680,19 +458,54 @@ def _render_ha_ess_force(house: dict) -> dict[str, Any] | None:
     }
 
 
-def _persist_ha_ess_force(house: dict, force: dict[str, Any] | None) -> dict:
-    """Write or clear plant.ha_ess_force on the house document."""
-    out = dict(house)
-    plant = dict(out.get("plant") or {}) if isinstance(out.get("plant"), dict) else {}
-    if force:
-        plant["ha_ess_force"] = force
-    else:
-        plant.pop("ha_ess_force", None)
-    if plant:
-        out["plant"] = plant
-    elif "plant" in out and not plant:
-        out.pop("plant", None)
-    return out
+
+
+def _render_capability_warnings(
+    entity: dict[str, Any],
+    kind: str,
+    ehal_map: dict[str, str],
+    ha_ess_force: dict[str, Any] | None,
+) -> None:
+    """Control-capability warnings for plant/battery/inverter entities."""
+    try:
+        import config as app_config
+
+        control = str(app_config.get_battery_params().get("control") or "full")
+    except Exception:
+        control = "full"
+    if str(entity["id"]) == PLANT_ENTITY_ID or kind == BATTERY_ENTITY_KIND:
+        bat_control = control
+        if kind == BATTERY_ENTITY_KIND:
+            bat = entity.get("battery") if isinstance(entity.get("battery"), dict) else {}
+            bat_control = str(bat.get("control") or control)
+        render_control_capability_warnings(
+            control=bat_control,
+            ehal_map=ehal_map,
+            ha_ess_force=ha_ess_force if kind != BATTERY_ENTITY_KIND else None,
+        )
+    elif kind == INVERTER_ENTITY_KIND:
+        inv = entity.get("inverter") if isinstance(entity.get("inverter"), dict) else {}
+        inv_control = str(inv.get("control") or "full")
+        render_inverter_control_capability_warnings(
+            control=inv_control, ehal_map=ehal_map
+        )
+
+
+def _render_entity_sign(
+    entity: dict[str, Any], kind: str, current_sign: dict[str, str]
+) -> dict[str, str]:
+    """Sign selects for plant / battery entities; other entities keep the current map."""
+    sign = dict(current_sign)
+    if str(entity["id"]) == PLANT_ENTITY_ID:
+        sign = _render_sign_selects(current_sign)
+    elif kind == BATTERY_ENTITY_KIND:
+        power_field = ess_field(str(entity["id"]), "sens_ess_power")
+        sign = _render_sign_selects(
+            current_sign,
+            (power_field,),
+            inherit_from=current_sign,
+        )
+    return sign
 
 
 def _render_entity_mapping_body(
@@ -723,39 +536,9 @@ def _render_entity_mapping_body(
     render_function_status(
         ehal_map, _ha_entity_fields(entity), vendor_ess_active=vendor
     )
-    try:
-        import config as app_config
+    _render_capability_warnings(entity, kind, ehal_map, ha_ess_force)
 
-        control = str(app_config.get_battery_params().get("control") or "full")
-    except Exception:
-        control = "full"
-    if str(entity["id"]) == PLANT_ENTITY_ID or kind == BATTERY_ENTITY_KIND:
-        bat_control = control
-        if kind == BATTERY_ENTITY_KIND:
-            bat = entity.get("battery") if isinstance(entity.get("battery"), dict) else {}
-            bat_control = str(bat.get("control") or control)
-        render_control_capability_warnings(
-            control=bat_control,
-            ehal_map=ehal_map,
-            ha_ess_force=ha_ess_force if kind != BATTERY_ENTITY_KIND else None,
-        )
-    elif kind == INVERTER_ENTITY_KIND:
-        inv = entity.get("inverter") if isinstance(entity.get("inverter"), dict) else {}
-        inv_control = str(inv.get("control") or "full")
-        render_inverter_control_capability_warnings(
-            control=inv_control, ehal_map=ehal_map
-        )
-
-    sign = dict(current["sign"])
-    if str(entity["id"]) == PLANT_ENTITY_ID:
-        sign = _render_sign_selects(current["sign"])
-    elif kind == BATTERY_ENTITY_KIND:
-        power_field = ess_field(str(entity["id"]), "sens_ess_power")
-        sign = _render_sign_selects(
-            current["sign"],
-            (power_field,),
-            inherit_from=current["sign"],
-        )
+    sign = _render_entity_sign(entity, kind, current["sign"])
 
     test_clicked, save_clicked = _render_mapping_action_buttons()
     if test_clicked:

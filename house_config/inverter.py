@@ -129,13 +129,10 @@ def _optional_positive_kw(raw: object, *, field: str, inv_id: str, index: int) -
     return value
 
 
-def normalize_inverter(raw: dict, index: int) -> dict:
-    if not isinstance(raw, dict):
-        raise ValueError(f"inverters[{index}] muss ein Objekt sein.")
-    inv_id = str(raw.get("id", "")).strip()
-    if not inv_id:
-        raise ValueError(f"inverters[{index}]: id fehlt.")
-    label = str(raw.get("label", inv_id)).strip() or inv_id
+def _normalize_inverter_choices(
+    raw: dict, inv_id: str, index: int
+) -> tuple[str, str, str]:
+    """Validated ``(type, ac_connection, control)`` of a raw inverter entry."""
     inv_type = str(raw.get("type") or DEFAULT_INVERTER_TYPE).strip().lower()
     if inv_type not in _TYPES:
         raise ValueError(
@@ -153,13 +150,11 @@ def normalize_inverter(raw: dict, index: int) -> dict:
         raise ValueError(
             f"inverters[{index}] ('{inv_id}'): control ungültig ({raw.get('control')!r})."
         )
-    ehal_bindings = raw.get("ehal_bindings")
-    if ehal_bindings is None:
-        ehal_bindings = {}
-    if not isinstance(ehal_bindings, dict):
-        raise ValueError(
-            f"inverters[{index}] ('{inv_id}'): ehal_bindings muss ein Objekt sein."
-        )
+    return inv_type, ac, control
+
+
+def _parse_inverter_efficiency(raw: dict, inv_id: str, index: int) -> float:
+    """η_inv in (0, 1]; raises when missing, unparsable or out of range."""
     if "efficiency" not in raw:
         raise ValueError(
             f"inverters[{index}] ('{inv_id}'): efficiency (η_inv) fehlt. "
@@ -176,6 +171,25 @@ def normalize_inverter(raw: dict, index: int) -> dict:
             f"inverters[{index}] ('{inv_id}'): efficiency muss in (0, 1] liegen "
             f"(got {efficiency!r})."
         )
+    return efficiency
+
+
+def normalize_inverter(raw: dict, index: int) -> dict:
+    if not isinstance(raw, dict):
+        raise ValueError(f"inverters[{index}] muss ein Objekt sein.")
+    inv_id = str(raw.get("id", "")).strip()
+    if not inv_id:
+        raise ValueError(f"inverters[{index}]: id fehlt.")
+    label = str(raw.get("label", inv_id)).strip() or inv_id
+    inv_type, ac, control = _normalize_inverter_choices(raw, inv_id, index)
+    ehal_bindings = raw.get("ehal_bindings")
+    if ehal_bindings is None:
+        ehal_bindings = {}
+    if not isinstance(ehal_bindings, dict):
+        raise ValueError(
+            f"inverters[{index}] ('{inv_id}'): ehal_bindings muss ein Objekt sein."
+        )
+    efficiency = _parse_inverter_efficiency(raw, inv_id, index)
     out: dict = {
         "id": inv_id,
         "label": label,
@@ -261,11 +275,15 @@ def validate_inverter_topology(
     pv_systems: dict[str, dict],
 ) -> None:
     """Cross-entity checks after normalize (unknown id, owned_by, island PV)."""
-    from house_config.powerstation import (
-        BATTERY_TYPE_POWERSTATION,
-        BACKING_VIRTUAL,
-        is_virtual_powerstation,
-    )
+    _validate_battery_inverters(inverters, batteries)
+    _validate_pv_inverters(inverters, pv_systems)
+    _validate_inverter_ownership(inverters, batteries)
+
+
+def _validate_battery_inverters(
+    inverters: dict[str, dict], batteries: dict[str, dict]
+) -> None:
+    from house_config.powerstation import is_virtual_powerstation
 
     for bat_id, bat in batteries.items():
         if is_virtual_powerstation(bat):
@@ -292,6 +310,10 @@ def validate_inverter_topology(
                 "(nur PV, keine Batterie)."
             )
 
+
+def _validate_pv_inverters(
+    inverters: dict[str, dict], pv_systems: dict[str, dict]
+) -> None:
     for pv_id, pv in pv_systems.items():
         inv_id = str(pv.get("inverter_id") or "").strip()
         if not inv_id:
@@ -306,6 +328,15 @@ def validate_inverter_topology(
                 f"PV-Anlage '{pv_id}': inverter '{inv_id}' ist type=battery "
                 "(keine PV-Seite)."
             )
+
+
+def _validate_inverter_ownership(
+    inverters: dict[str, dict], batteries: dict[str, dict]
+) -> None:
+    from house_config.powerstation import (
+        BATTERY_TYPE_POWERSTATION,
+        BACKING_VIRTUAL,
+    )
 
     for inv_id, inv in inverters.items():
         owned = str(inv.get("owned_by") or "").strip()

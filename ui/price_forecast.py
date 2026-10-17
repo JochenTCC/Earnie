@@ -173,6 +173,43 @@ def _hourly_mae_chart(summary: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def _render_holdout_table(evaluation) -> None:
+    with st.expander("Holdout-Tabelle"):
+        show = evaluation.test[
+            ["actual_cent_kwh", "model_cent_kwh", "mirror_cent_kwh", "model_error", "mirror_error"]
+        ].copy()
+        show.index = show.index.strftime("%Y-%m-%d %H:%M")
+        st.dataframe(show.round(3), width="stretch")
+
+
+def _render_live_bias_expander() -> None:
+    with st.expander("Live bias (green-zone correction)"):
+        st.caption(
+            "Rolling Day-Ahead − OLS residual on predicted slots "
+            "(`market_prices.live_bias_*`). Spec §11."
+        )
+        from data.price_forecast_live import (
+            get_live_bias_cap_cent_kwh,
+            get_live_bias_enabled,
+            get_live_bias_lookback_hours,
+        )
+
+        try:
+            st.write(
+                {
+                    "live_bias_enabled": get_live_bias_enabled(),
+                    "live_bias_lookback_hours": get_live_bias_lookback_hours(),
+                    "live_bias_cap_cent_kwh": get_live_bias_cap_cent_kwh(),
+                }
+            )
+        except ValueError as exc:
+            st.warning(str(exc))
+        st.code(
+            "python -m scripts.compare_live_price_prognosis_research --hours 12 --with-live-bias",
+            language="powershell",
+        )
+
+
 def render_price_forecast_block() -> None:
     docs = get_page_docs("price-forecast")
     help_text = (
@@ -215,35 +252,5 @@ def render_price_forecast_block() -> None:
     with right:
         st.plotly_chart(_hourly_mae_chart(hourly_error_summary(evaluation.test)), width="stretch")
 
-    with st.expander("Holdout-Tabelle"):
-        show = evaluation.test[
-            ["actual_cent_kwh", "model_cent_kwh", "mirror_cent_kwh", "model_error", "mirror_error"]
-        ].copy()
-        show.index = show.index.strftime("%Y-%m-%d %H:%M")
-        st.dataframe(show.round(3), width="stretch")
-
-    with st.expander("Live bias (green-zone correction)"):
-        st.caption(
-            "Rolling Day-Ahead − OLS residual on predicted slots "
-            "(`market_prices.live_bias_*`). Spec §11."
-        )
-        from data.price_forecast_live import (
-            get_live_bias_cap_cent_kwh,
-            get_live_bias_enabled,
-            get_live_bias_lookback_hours,
-        )
-
-        try:
-            st.write(
-                {
-                    "live_bias_enabled": get_live_bias_enabled(),
-                    "live_bias_lookback_hours": get_live_bias_lookback_hours(),
-                    "live_bias_cap_cent_kwh": get_live_bias_cap_cent_kwh(),
-                }
-            )
-        except ValueError as exc:
-            st.warning(str(exc))
-        st.code(
-            "python -m scripts.compare_live_price_prognosis_research --hours 12 --with-live-bias",
-            language="powershell",
-        )
+    _render_holdout_table(evaluation)
+    _render_live_bias_expander()

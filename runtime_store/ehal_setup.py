@@ -12,8 +12,10 @@ BACKEND_HA = "ha"
 BACKEND_OPENEMS = "openems"
 
 HA_TRANSPORT_PULL = "pull"
-HA_TRANSPORT_WEG_B = "weg_b"
-_HA_TRANSPORTS = frozenset({HA_TRANSPORT_PULL, HA_TRANSPORT_WEG_B})
+HA_TRANSPORT_PUSH = "push"
+# Legacy config alias (pre-rename); normalize_ha_transport maps it to ``push``.
+HA_TRANSPORT_WEG_B_ALIAS = "weg_b"
+_HA_TRANSPORTS = frozenset({HA_TRANSPORT_PULL, HA_TRANSPORT_PUSH})
 
 _BACKEND_LABELS = {
     BACKEND_LOXONE: "Loxone",
@@ -34,14 +36,17 @@ def backend_label(backend: str) -> str:
 
 
 def normalize_ha_transport(raw: object) -> str:
-    """``ehal.ha.transport``: ``pull`` (default when missing/empty) or ``weg_b``."""
+    """``ehal.ha.transport``: ``pull`` (default when missing/empty) or ``push``.
+
+    Legacy value ``weg_b`` is accepted and normalized to ``push``.
+    """
     value = str(raw or "").strip().lower()
     if value in ("", HA_TRANSPORT_PULL):
         return HA_TRANSPORT_PULL
-    if value == HA_TRANSPORT_WEG_B:
-        return HA_TRANSPORT_WEG_B
+    if value in (HA_TRANSPORT_PUSH, HA_TRANSPORT_WEG_B_ALIAS):
+        return HA_TRANSPORT_PUSH
     raise ValueError(
-        f"ehal.ha.transport must be {HA_TRANSPORT_PULL!r} or {HA_TRANSPORT_WEG_B!r}, got {raw!r}"
+        f"ehal.ha.transport must be {HA_TRANSPORT_PULL!r} or {HA_TRANSPORT_PUSH!r}, got {raw!r}"
     )
 
 

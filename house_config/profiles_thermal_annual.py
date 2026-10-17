@@ -20,13 +20,8 @@ def _raw_thermal_field(raw: dict, key: str):
     return None
 
 
-def normalize_thermal_annual_consumer(
-    raw: dict,
-    spec: dict,
-    *,
-    copy_loxone_binding,
-) -> None:
-    """Fill ``spec['thermal']`` and related flex fields for thermal_annual."""
+def _build_thermal_block(raw: dict) -> dict:
+    """``spec['thermal']`` dict of a thermal_annual consumer (defaults for missing fields)."""
     from optimizer.thermal_coupled import normalize_heat_storage
     from optimizer.thermal_house import (
         DEFAULT_BUILDING_MASS,
@@ -46,7 +41,7 @@ def normalize_thermal_annual_consumer(
         if tol_raw not in (None, "")
         else DEFAULT_HOUSE_TOLERANCE_C
     )
-    spec["thermal"] = {
+    thermal = {
         "living_area_m2": float(
             _raw_thermal_field(raw, "living_area_m2") or 0.0
         ),
@@ -75,16 +70,27 @@ def normalize_thermal_annual_consumer(
         "house_tolerance_c": house_tol,
     }
     if hwb_value > 0:
-        spec["thermal"]["hwb_kwh_m2"] = hwb_value
+        thermal["hwb_kwh_m2"] = hwb_value
     h_override = _raw_thermal_field(raw, "house_heat_loss_kw_per_k")
     if h_override not in (None, "") and float(h_override) > 0.0:
-        spec["thermal"]["house_heat_loss_kw_per_k"] = float(h_override)
+        thermal["house_heat_loss_kw_per_k"] = float(h_override)
     nested = raw.get("heat_storage")
     if nested is None and isinstance(raw.get("thermal"), dict):
         nested = raw["thermal"].get("heat_storage")
     storage = normalize_heat_storage(nested)
     if storage is not None:
-        spec["thermal"]["heat_storage"] = storage
+        thermal["heat_storage"] = storage
+    return thermal
+
+
+def normalize_thermal_annual_consumer(
+    raw: dict,
+    spec: dict,
+    *,
+    copy_loxone_binding,
+) -> None:
+    """Fill ``spec['thermal']`` and related flex fields for thermal_annual."""
+    spec["thermal"] = _build_thermal_block(raw)
     if "optimizer_flex" in raw:
         spec["optimizer_flex"] = bool(raw["optimizer_flex"])
     window = raw.get("thermal_flex_window")

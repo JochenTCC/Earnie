@@ -133,52 +133,32 @@ def apply_overlay_to_components(components: dict) -> dict:
         "pv_systems": [],
         "inverters": [],
     }
-    if isinstance(by_bat, dict) and by_bat:
-        batteries = out.get("batteries")
-        if isinstance(batteries, list):
-            for index, battery in enumerate(batteries):
-                if not isinstance(battery, dict):
-                    continue
-                bid = str(battery.get("id") or "").strip()
-                raw = by_bat.get(bid)
-                if not isinstance(raw, dict):
-                    continue
-                updated = dict(battery)
-                updated["ehal_bindings"] = _clean_bindings(
-                    {str(k): str(v) for k, v in raw.items()}
-                )
-                batteries[index] = updated
-    if isinstance(by_inv, dict) and by_inv:
-        inverters = out.get("inverters")
-        if isinstance(inverters, list):
-            for index, inverter in enumerate(inverters):
-                if not isinstance(inverter, dict):
-                    continue
-                iid = str(inverter.get("id") or "").strip()
-                raw = by_inv.get(iid)
-                if not isinstance(raw, dict):
-                    continue
-                updated = dict(inverter)
-                updated["ehal_bindings"] = _clean_bindings(
-                    {str(k): str(v) for k, v in raw.items()}
-                )
-                inverters[index] = updated
-    if isinstance(by_pv, dict) and by_pv:
-        systems = out.get("pv_systems")
-        if isinstance(systems, list):
-            for index, pv in enumerate(systems):
-                if not isinstance(pv, dict):
-                    continue
-                pid = str(pv.get("id") or "").strip()
-                raw = by_pv.get(pid)
-                if not isinstance(raw, dict):
-                    continue
-                updated = dict(pv)
-                updated["ehal_bindings"] = _clean_bindings(
-                    {str(k): str(v) for k, v in raw.items()}
-                )
-                systems[index] = updated
+    for key, by_id in (
+        ("batteries", by_bat),
+        ("inverters", by_inv),
+        ("pv_systems", by_pv),
+    ):
+        if isinstance(by_id, dict) and by_id:
+            _overlay_entity_bindings(out.get(key), by_id)
     return out
+
+
+def _overlay_entity_bindings(entities: object, by_id: dict) -> None:
+    """Replace ``ehal_bindings`` of listed entities (matched by ``id``) in place."""
+    if not isinstance(entities, list):
+        return
+    for index, entity in enumerate(entities):
+        if not isinstance(entity, dict):
+            continue
+        entity_id = str(entity.get("id") or "").strip()
+        raw = by_id.get(entity_id)
+        if not isinstance(raw, dict):
+            continue
+        updated = dict(entity)
+        updated["ehal_bindings"] = _clean_bindings(
+            {str(k): str(v) for k, v in raw.items()}
+        )
+        entities[index] = updated
 
 
 def _apply_consumer_overlay(house: dict, by_profile: dict) -> None:

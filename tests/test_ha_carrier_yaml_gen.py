@@ -1,4 +1,4 @@
-"""Golden checks for HA Weg B carrier YAML generator (2.7.r-T4)."""
+"""Golden checks for HA push carrier YAML generator (2.7.r-T4)."""
 from __future__ import annotations
 
 from integrations.ha_carrier_yaml import build_carrier_yaml

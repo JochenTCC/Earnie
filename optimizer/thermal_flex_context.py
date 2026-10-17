@@ -394,6 +394,36 @@ def _force_thermal_on_slots(
         model.prob += (on_vars[index] >= 1, f"{cid}_thermal_forced_{index}")
 
 
+def _thermal_day_want_kwh(
+    ctx: dict,
+    day: date,
+    day_indices: list[int],
+    daily_targets: dict[date, float],
+    live_day_min: dict[date, float],
+) -> float:
+    """Energy [kWh] the thermal consumer should deliver on ``day`` (before caps)."""
+    slot_energy = list(ctx.get("slot_energy_kwh") or [])
+    slot_aligned = bool(ctx.get("targets_slot_aligned")) and bool(slot_energy)
+    if slot_aligned:
+        prorated = round(
+            sum(
+                float(slot_energy[index])
+                for index in day_indices
+                if index < len(slot_energy)
+            ),
+            3,
+        )
+    else:
+        prorated = _prorate_thermal_day_target_kwh(
+            float(daily_targets.get(day, 0.0) or 0.0), len(day_indices)
+        )
+    live_min = float(live_day_min.get(day, 0.0) or 0.0)
+    # Live store overlay: HDD ignored; floor via forced_indices; live_min = opp only.
+    if ctx.get("live_store_start_c") is not None:
+        return live_min
+    return max(prorated, live_min)
+
+
 def _add_one_thermal_flex_consumer(
     model: MilpHorizonModel,
     matrix: list,
@@ -429,8 +459,6 @@ def _add_one_thermal_flex_consumer(
         consumer_thermal_eligible_indices(matrix, consumer, schedule_indices)
     )
     _force_thermal_on_slots(model, cid, on_vars, forced_indices, eligible_set)
-    slot_energy = list(ctx.get("slot_energy_kwh") or [])
-    slot_aligned = bool(ctx.get("targets_slot_aligned")) and bool(slot_energy)
     for day in sorted(set(daily_targets) | set(live_day_min)):
         matrix_day_indices = _indices_for_date(matrix, day)
         day_indices = [
@@ -442,22 +470,7 @@ def _add_one_thermal_flex_consumer(
         max_deliverable = _max_deliverable_kwh(
             consumer, day_indices, dt_h=model.dt_h
         )
-        if slot_aligned:
-            prorated = round(
-                sum(
-                    float(slot_energy[index])
-                    for index in day_indices
-                    if index < len(slot_energy)
-                ),
-                3,
-            )
-        else:
-            prorated = _prorate_thermal_day_target_kwh(
-                float(daily_targets.get(day, 0.0) or 0.0), len(day_indices)
-            )
-        live_min = float(live_day_min.get(day, 0.0) or 0.0)
-        # Live store overlay: HDD ignored; floor via forced_indices; live_min = opp only.
-        want = live_min if live_overlay else max(prorated, live_min)
+        want = _thermal_day_want_kwh(ctx, day, day_indices, daily_targets, live_day_min)
         if forced_indices:
             op_max_kwh = max_deliverable
         else:

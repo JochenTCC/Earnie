@@ -48,43 +48,53 @@ from .milp_result import (
     _log_milp_decision,
     extract_horizon_schedule,
 )
+from .milp_defaults import (  # noqa: F401  (re-exported for recorder_replay / facades)
+    _default_battery_params,
+    _default_inverter_params,
+    _default_pv_systems,
+    _primary_battery_params,
+)
 
 logger = logging.getLogger(__name__)
 
 _AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN, {})
 
 
-def _default_battery_params() -> dict | list[dict]:
-    """Prefer multi-ESS list (2.7.c); fall back to singular snapshot."""
-    get_list = getattr(config, "get_battery_params_list", None)
-    if callable(get_list):
-        batteries = get_list()
-        if batteries:
-            return batteries
-    return config.get_battery_params()
+def _add_virtual_reserve_refill(
+    model: MilpHorizonModel, matrix: list[dict[str, Any]], primary: dict
+) -> None:
+    """Deadline-bound virtual-reserve refill charge constraint (no-op without refill)."""
+    refill_kwh = float(
+        primary.get("_virtual_reserve_refill_kwh")
+        or primary.get("_virtual_reserve_asap_kwh")
+        or 0.0
+    )
+    if refill_kwh <= 1e-9:
+        return
+    from datetime import datetime, timezone
 
+    from .milp_horizon import _add_virtual_reserve_deadline_charge
 
-def _default_inverter_params() -> list[dict]:
-    get_list = getattr(config, "get_planning_inverters", None)
-    if callable(get_list):
-        return list(get_list() or [])
-    return list(getattr(config, "_planning_inverters", None) or [])
-
-
-def _default_pv_systems() -> list[dict]:
-    get_list = getattr(config, "get_planning_pv_systems", None)
-    if callable(get_list):
-        return list(get_list() or [])
-    return list(getattr(config, "_planning_pv_systems", None) or [])
-
-
-def _primary_battery_params(battery_params: dict | list[dict]) -> dict:
-    from .milp_horizon import aggregate_battery_params_for_load, coerce_battery_params_list
-
-    batteries = coerce_battery_params_list(battery_params)
-    if not batteries:
-        return {}
-    return aggregate_battery_params_for_load(batteries)
+    deadline_raw = primary.get("_virtual_reserve_refill_deadline_utc")
+    deadline = None
+    if deadline_raw:
+        try:
+            deadline = datetime.fromisoformat(str(deadline_raw).replace("Z", "+00:00"))
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
+        except ValueError:
+            deadline = None
+    _add_virtual_reserve_deadline_charge(
+        model,
+        matrix=matrix,
+        refill_kwh=refill_kwh,
+        max_charge_kw=float(
+            primary.get("max_charge_power_kw", primary.get("max_power_kw") or 0.0)
+            or 0.0
+        ),
+        efficiency=float(primary.get("efficiency") or 1.0),
+        deadline=deadline,
+    )
 
 
 def _build_milp_model_with_objective(
@@ -137,38 +147,7 @@ def _build_milp_model_with_objective(
     )
     wear_cent_per_kwh = 0.0
     primary = _primary_battery_params(battery_params)
-    refill_kwh = float(
-        primary.get("_virtual_reserve_refill_kwh")
-        or primary.get("_virtual_reserve_asap_kwh")
-        or 0.0
-    )
-    if refill_kwh > 1e-9:
-        from datetime import datetime, timezone
-
-        from .milp_horizon import _add_virtual_reserve_deadline_charge
-
-        deadline_raw = primary.get("_virtual_reserve_refill_deadline_utc")
-        deadline = None
-        if deadline_raw:
-            try:
-                deadline = datetime.fromisoformat(
-                    str(deadline_raw).replace("Z", "+00:00")
-                )
-                if deadline.tzinfo is None:
-                    deadline = deadline.replace(tzinfo=timezone.utc)
-            except ValueError:
-                deadline = None
-        _add_virtual_reserve_deadline_charge(
-            model,
-            matrix=matrix,
-            refill_kwh=refill_kwh,
-            max_charge_kw=float(
-                primary.get("max_charge_power_kw", primary.get("max_power_kw") or 0.0)
-                or 0.0
-            ),
-            efficiency=float(primary.get("efficiency") or 1.0),
-            deadline=deadline,
-        )
+    _add_virtual_reserve_refill(model, matrix, primary)
     if float(primary.get("battery_capacity_kwh") or 0.0) > 0.0:
         # Wear from primary ESS capacity (multi-ESS wear refinement later).
         wear_cent_per_kwh = config.get_battery_wear_cent_per_kwh(
@@ -527,6 +506,11 @@ def milp_optimizer(
             remaining, controls.consumer_powers, controls.consumer_pv_follow,
             controls.mode, controls.target_power, controls.target_soc,
         )
+    return _optimizer_result_tuple(controls, urgent_observability)
+
+
+def _optimizer_result_tuple(controls, urgent_observability: dict[str, dict]) -> tuple:
+    """Public ``milp_optimizer`` result from the extracted controls."""
     return (
         controls.mode,
         controls.target_power,

@@ -236,7 +236,6 @@ def derive_control_from_milp_plan(
     """Leitet Loxone-Modus/Leistung aus MILP-Planwerten einer Stunde ab."""
     from house_config.battery_control import (
         BATTERY_CONTROL_FULL,
-        BATTERY_CONTROL_LIMITS_ONLY,
         BATTERY_CONTROL_READ_ONLY,
         control_from_battery_params,
     )
@@ -253,19 +252,12 @@ def derive_control_from_milp_plan(
     if battery_capacity <= 0.0 or control == BATTERY_CONTROL_READ_ONLY:
         return MODE_AUTOMATIK, 0.0, round(float(current_soc), 1)
 
-    from house_config.inverter import AC_GRID_TIED, allows_automatik
+    from house_config.inverter import AC_GRID_TIED
 
     ac_connection = str(
         battery_params.get("ac_connection") or AC_GRID_TIED
     ).strip().lower()
-    ess_plan = milp_plan
-    if isinstance(milp_plan.get("ess"), dict):
-        ess_id = str(battery_params.get("id") or "").strip()
-        if ess_id and ess_id in milp_plan["ess"]:
-            ess_plan = {
-                **milp_plan,
-                **milp_plan["ess"][ess_id],
-            }
+    ess_plan = _ess_plan_for_battery(milp_plan, battery_params)
 
     net_pv_surplus = (
         matrix_row["expected_p_pv"]
@@ -302,6 +294,22 @@ def derive_control_from_milp_plan(
             round(current_soc, 1),
         )
 
+    return _apply_control_overrides(
+        control, ac_connection, (mode, target_power, target_soc), current_soc
+    )
+
+
+def _apply_control_overrides(
+    control: str,
+    ac_connection: str,
+    setpoint: tuple[int, float, float],
+    current_soc: float,
+) -> tuple[int, float, float]:
+    """limits_only drops forced modes; island inverters never stay in Automatik."""
+    from house_config.battery_control import BATTERY_CONTROL_LIMITS_ONLY
+    from house_config.inverter import allows_automatik
+
+    mode, target_power, target_soc = setpoint
     if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (
         MODE_ZWANGS_LADEN,
         MODE_ZWANGS_ENTLADEN,
@@ -321,6 +329,17 @@ def derive_control_from_milp_plan(
         )
 
     return mode, target_power, target_soc
+
+
+def _ess_plan_for_battery(
+    milp_plan: dict[str, float], battery_params: dict
+) -> dict[str, float]:
+    """Plan values of this battery: merge ``milp_plan['ess'][id]`` over the plant plan."""
+    if isinstance(milp_plan.get("ess"), dict):
+        ess_id = str(battery_params.get("id") or "").strip()
+        if ess_id and ess_id in milp_plan["ess"]:
+            return {**milp_plan, **milp_plan["ess"][ess_id]}
+    return milp_plan
 
 
 def _derive_control_from_milp(

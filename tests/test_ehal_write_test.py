@@ -327,7 +327,7 @@ def test_write_probe_builds_setpoint(ehal_live_mock, loud_mode):
 def test_read_back_ha_numeric(ehal_live_mock):
     ehal_live_mock.is_ha_backend.return_value = True
     ehal_live_mock.is_openems_backend.return_value = False
-    ehal_live_mock.is_ha_weg_b_transport.return_value = False
+    ehal_live_mock.is_ha_push_transport.return_value = False
     adapter = MagicMock()
     adapter.cfg.entities = {"set_ess_charge_power_limit": "number.charge_limit"}
     adapter.read_state.return_value = {

@@ -1,4 +1,4 @@
-"""Generate minimal HA Weg B carrier YAML from house_profiles + components bindings."""
+"""Generate minimal HA push carrier YAML from house_profiles + components bindings."""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +11,7 @@ from scripts.pilot_vo_template_gen import TOKEN_PLACEHOLDER
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="HA Weg B carrier YAML fragment (2.7.r-T4)")
+    parser = argparse.ArgumentParser(description="HA push carrier YAML fragment (2.7.r-T4)")
     parser.add_argument("--config-dir", type=Path, required=True)
     parser.add_argument("--host", required=True, help="Earnie listener host (IP or Docker DNS)")
     parser.add_argument("--port", type=int, default=8541)

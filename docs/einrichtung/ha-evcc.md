@@ -40,9 +40,9 @@ Wie bei Loxone liegen die Entity-IDs **entity-scoped** bei der jeweiligen Kompon
 **Live-Laufzeit – Transport:** Der Schlüssel `ehal.ha.transport` in `config.json` legt fest, wie Earnie mit Home Assistant Daten austauscht:
 
 - **`pull`** (Standard): Ablauf siehe nächster Absatz.
-- **`weg_b`:** Gleicher HTTP-Vertrag wie bei Loxone, also Push nach `/ehal/telemetry/…` und Setpoints per `GET /ehal/status.json`. `weg_b` schaltet die Live-Pfade auf Push und `status.json` um. Details und die **EHAL-Basiseinheiten auf der Push-Leitung** beschreibt die [EHAL-Spec § Home Assistant](../referenz/ehal.md#implementation-notes--home-assistant--evcc).
+- **`push`:** Gleicher HTTP-Vertrag wie bei Loxone, also Push nach `/ehal/telemetry/…` und Setpoints per `GET /ehal/status.json`. `push` schaltet die Live-Pfade auf Push und `status.json` um. Details und die **EHAL-Basiseinheiten auf der Push-Leitung** beschreibt die [EHAL-Spec § Home Assistant](../referenz/ehal.md#implementation-notes--home-assistant--evcc).
 
-> **Hinweis:** `weg_b` ist bisher nur im Labor erprobt. Im Produktivbetrieb weiterhin **`pull`** verwenden.
+> **Hinweis:** `push` ist bisher nur im Labor erprobt. Im Produktivbetrieb weiterhin **`pull`** verwenden.
 
 **Live-Laufzeit (`pull`, HA-Adapter):** Der HA-Adapter liest und schreibt die Felder, die `aggregate_ha_entities` / `HA_ALL_FIELDS` zusammenführen. Typisch sind:
 

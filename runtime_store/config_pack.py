@@ -117,85 +117,108 @@ def import_config_pack_bytes(payload: bytes) -> list[str]:
     """
     with zipfile.ZipFile(io.BytesIO(payload), "r") as archive:
         names = set(archive.namelist())
-        if MANIFEST_NAME not in names:
-            raise ValueError(f"Ungültiges Config-Paket: '{MANIFEST_NAME}' fehlt.")
-        manifest = json.loads(archive.read(MANIFEST_NAME).decode("utf-8"))
-        if not isinstance(manifest, dict):
-            raise ValueError("Ungültiges Config-Paket: Manifest ist kein Objekt.")
-
-        json_payloads: dict[str, dict[str, Any]] = {}
-        for arcname, _resolver in PACK_JSON_FILES:
-            if arcname not in names:
-                continue
-            doc = json.loads(archive.read(arcname).decode("utf-8"))
-            if not isinstance(doc, dict):
-                raise ValueError(f"Ungültiges Config-Paket: '{arcname}' ist kein Objekt.")
-            json_payloads[arcname] = doc
-
-        from runtime_store.data_model import MIGRATABLE_DATA_MODELS, read_data_model
-
-        manifest_ver = read_data_model(manifest)
-        if manifest_ver in MIGRATABLE_DATA_MODELS or any(
-            read_data_model(d) in MIGRATABLE_DATA_MODELS for d in json_payloads.values()
-        ):
-            json_payloads = _migrate_and_validate_pack_docs(json_payloads)
-            stamp_data_model(manifest)
-        else:
-            ensure_compatible(manifest, label=MANIFEST_NAME)
-            json_payloads = _migrate_and_validate_pack_docs(json_payloads)
-
+        manifest, json_payloads = _read_pack_documents(archive, names)
+        json_payloads = _migrate_pack_documents(manifest, json_payloads)
         upload_members = [
             n for n in names if n.startswith("uploads/") and not n.endswith("/")
         ]
+        return _write_pack_to_config_dir(archive, json_payloads, upload_members)
 
-        with tempfile.TemporaryDirectory(prefix="earnie_pack_") as tmp:
-            tmp_root = Path(tmp)
-            for arcname, doc in json_payloads.items():
-                dest = tmp_root / arcname
+
+def _read_pack_documents(
+    archive: zipfile.ZipFile, names: set[str]
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    """Manifest and the JSON documents of a pack zip (objects only)."""
+    if MANIFEST_NAME not in names:
+        raise ValueError(f"Ungültiges Config-Paket: '{MANIFEST_NAME}' fehlt.")
+    manifest = json.loads(archive.read(MANIFEST_NAME).decode("utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError("Ungültiges Config-Paket: Manifest ist kein Objekt.")
+
+    json_payloads: dict[str, dict[str, Any]] = {}
+    for arcname, _resolver in PACK_JSON_FILES:
+        if arcname not in names:
+            continue
+        doc = json.loads(archive.read(arcname).decode("utf-8"))
+        if not isinstance(doc, dict):
+            raise ValueError(f"Ungültiges Config-Paket: '{arcname}' ist kein Objekt.")
+        json_payloads[arcname] = doc
+    return manifest, json_payloads
+
+
+def _migrate_pack_documents(
+    manifest: dict[str, Any], json_payloads: dict[str, dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Migrate (when needed) and validate the pack documents; stamps a migrated manifest."""
+    from runtime_store.data_model import MIGRATABLE_DATA_MODELS, read_data_model
+
+    manifest_ver = read_data_model(manifest)
+    if manifest_ver in MIGRATABLE_DATA_MODELS or any(
+        read_data_model(d) in MIGRATABLE_DATA_MODELS for d in json_payloads.values()
+    ):
+        json_payloads = _migrate_and_validate_pack_docs(json_payloads)
+        stamp_data_model(manifest)
+    else:
+        ensure_compatible(manifest, label=MANIFEST_NAME)
+        json_payloads = _migrate_and_validate_pack_docs(json_payloads)
+    return json_payloads
+
+
+def _write_pack_to_config_dir(
+    archive: zipfile.ZipFile,
+    json_payloads: dict[str, dict[str, Any]],
+    upload_members: list[str],
+) -> list[str]:
+    """Stage the pack in a temp dir, then copy JSON files and uploads into place."""
+    with tempfile.TemporaryDirectory(prefix="earnie_pack_") as tmp:
+        tmp_root = Path(tmp)
+        for arcname, doc in json_payloads.items():
+            dest = tmp_root / arcname
+            dest.write_text(
+                json.dumps(doc, indent=4, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        for member in upload_members:
+            target = tmp_root / member
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(member) as src, target.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+        written: list[str] = []
+        for arcname, resolver in PACK_JSON_FILES:
+            src = tmp_root / arcname
+            if not src.is_file():
+                continue
+            dest = Path(resolver())
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if arcname == "grid_fees.json":
+                # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
                 dest.write_text(
-                    json.dumps(doc, indent=4, ensure_ascii=False) + "\n",
+                    json.dumps(json_payloads[arcname], indent=4, ensure_ascii=False)
+                    + "\n",
                     encoding="utf-8",
                 )
-            for member in upload_members:
-                target = tmp_root / member
-                target.parent.mkdir(parents=True, exist_ok=True)
-                with archive.open(member) as src, target.open("wb") as dst:
-                    shutil.copyfileobj(src, dst)
-
-            written: list[str] = []
-            for arcname, resolver in PACK_JSON_FILES:
-                src = tmp_root / arcname
-                if not src.is_file():
-                    continue
-                dest = Path(resolver())
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                if arcname == "grid_fees.json":
-                    # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
-                    dest.write_text(
-                        json.dumps(
-                            json_payloads[arcname], indent=4, ensure_ascii=False
-                        )
-                        + "\n",
-                        encoding="utf-8",
-                    )
-                else:
-                    write_json_dict(str(dest), json_payloads[arcname])
-                written.append(arcname)
-
-            uploads_dest = Path(resolve_uploads_dir())
-            uploads_src = tmp_root / "uploads"
-            if uploads_src.is_dir():
-                uploads_dest.mkdir(parents=True, exist_ok=True)
-                for file_path in uploads_src.rglob("*"):
-                    if not file_path.is_file():
-                        continue
-                    rel = file_path.relative_to(uploads_src)
-                    target = uploads_dest / rel
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(file_path, target)
-                    written.append(f"uploads/{rel.as_posix()}")
-
+            else:
+                write_json_dict(str(dest), json_payloads[arcname])
+            written.append(arcname)
+        _copy_pack_uploads(tmp_root / "uploads", written)
     return written
+
+
+def _copy_pack_uploads(uploads_src: Path, written: list[str]) -> None:
+    """Copy staged upload files into the uploads dir; appends relative names to ``written``."""
+    uploads_dest = Path(resolve_uploads_dir())
+    if not uploads_src.is_dir():
+        return
+    uploads_dest.mkdir(parents=True, exist_ok=True)
+    for file_path in uploads_src.rglob("*"):
+        if not file_path.is_file():
+            continue
+        rel = file_path.relative_to(uploads_src)
+        target = uploads_dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(file_path, target)
+        written.append(f"uploads/{rel.as_posix()}")
 
 
 def default_pack_filename() -> str:

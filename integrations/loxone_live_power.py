@@ -500,41 +500,24 @@ def fetch_flexible_consumers_live_kw(
     ).kw
 
 
-def fetch_loxone_live_power() -> Optional[dict]:
-    """
-    Holt Echtzeit-Leistungswerte aus Loxone (hub kW → EHAL W → return kW).
-    """
-    from ehal.field_registry import apply_loxone_read, loxone_spec
-    from house_config.ehal_bindings import resolve_plant_binding
-    from house_config.ess_bindings import resolve_battery_ess_binding
-    from integrations.plant_balance import (
-        balance_tolerances_from_plant,
-        derive_sens_power_consumers_w,
-        sum_grid_tied_house_ess_power_w,
-    )
-    from optimizer.live_export_limit import load_house_doc
-
-    house = load_house_doc()
-    pv_io = resolve_plant_binding(house, "sens_pv_production_active")
-    grid_io = resolve_plant_binding(house, "sens_grid_power_active")
-    pv_spec = loxone_spec("sens_pv_production_active")
-    grid_spec = loxone_spec("sens_grid_power_active")
-    ess_spec = loxone_spec("sens_ess_power")
-    if pv_spec is None or grid_spec is None or ess_spec is None:
-        return None
-    pv_w = apply_loxone_read(fetch_loxone_generic_value(pv_io), pv_spec)
-    grid_w = apply_loxone_read(fetch_loxone_generic_value(grid_io), grid_spec)
-    if pv_w is None or grid_w is None:
-        return None
-
+def _load_live_components() -> dict:
+    """Components document for live power; empty dict when it cannot be loaded."""
     try:
         from house_config.components_store import load_components_document
         from runtime_store.persist_paths import resolve_components_json_path
 
         path = resolve_components_json_path()
-        components = load_components_document(path) if path else {}
+        return load_components_document(path) if path else {}
     except Exception:  # noqa: BLE001
-        components = {}
+        return {}
+
+
+def _live_house_ess_power_w(components: dict, ess_spec) -> float | None:
+    """Σ grid-tied house ESS power [W]; None when the topology is inconsistent."""
+    from ehal.field_registry import apply_loxone_read
+    from house_config.ess_bindings import resolve_battery_ess_binding
+    from integrations.plant_balance import sum_grid_tied_house_ess_power_w
+
     batteries = [
         b for b in (components.get("batteries") or []) if isinstance(b, dict)
     ]
@@ -555,7 +538,7 @@ def fetch_loxone_live_power() -> Optional[dict]:
         return apply_loxone_read(fetch_loxone_generic_value(qid), ess_spec)
 
     try:
-        battery_w = float(
+        return float(
             sum_grid_tied_house_ess_power_w(
                 batteries=batteries,
                 inverters=inverters,
@@ -563,6 +546,36 @@ def fetch_loxone_live_power() -> Optional[dict]:
             )
         )
     except ValueError:
+        return None
+
+
+def fetch_loxone_live_power() -> Optional[dict]:
+    """
+    Holt Echtzeit-Leistungswerte aus Loxone (hub kW → EHAL W → return kW).
+    """
+    from ehal.field_registry import apply_loxone_read, loxone_spec
+    from house_config.ehal_bindings import resolve_plant_binding
+    from integrations.plant_balance import (
+        balance_tolerances_from_plant,
+        derive_sens_power_consumers_w,
+    )
+    from optimizer.live_export_limit import load_house_doc
+
+    house = load_house_doc()
+    pv_io = resolve_plant_binding(house, "sens_pv_production_active")
+    grid_io = resolve_plant_binding(house, "sens_grid_power_active")
+    pv_spec = loxone_spec("sens_pv_production_active")
+    grid_spec = loxone_spec("sens_grid_power_active")
+    ess_spec = loxone_spec("sens_ess_power")
+    if pv_spec is None or grid_spec is None or ess_spec is None:
+        return None
+    pv_w = apply_loxone_read(fetch_loxone_generic_value(pv_io), pv_spec)
+    grid_w = apply_loxone_read(fetch_loxone_generic_value(grid_io), grid_spec)
+    if pv_w is None or grid_w is None:
+        return None
+
+    battery_w = _live_house_ess_power_w(_load_live_components(), ess_spec)
+    if battery_w is None:
         return None
 
     pv_w = max(0.0, float(pv_w))

@@ -1,4 +1,4 @@
-"""Minimal Home Assistant Weg B carrier YAML (rest_command push + status.json poll)."""
+"""Minimal Home Assistant push carrier YAML (rest_command push + status.json poll)."""
 from __future__ import annotations
 
 from ehal.push_signals import (
@@ -20,7 +20,7 @@ def build_carrier_yaml(
     base = f"http://{earnie_host}:{earnie_port}"
     token_q = f"?t={token}"
     lines: list[str] = [
-        "# Earnie Weg B carrier fragment (2.7.r-T4) — merge into configuration.yaml",
+        "# Earnie push carrier fragment (2.7.r-T4) — merge into configuration.yaml",
         "# Push path values must already be in canonical EHAL units (W, kWh, %, A).",
         "# Replace ENTITY_* placeholders with mapped HA entity_ids from EHAL-Com.",
         "rest_command:",

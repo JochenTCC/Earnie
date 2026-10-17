@@ -227,16 +227,57 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
     _render_recommendation(appliance, matrix, power_kw, runtime_h)
 
 
-def _render_reserve_appliance(appliance: dict) -> None:
+def _render_reserve_refill_caption(entry: dict, state: str) -> None:
     from datetime import datetime, timezone
 
-    from optimizer.powerstation_reserve import reserve_target_kwh
     from runtime_store.powerstation_reserves import (
         REFILL_DEADLINE_H,
+        refill_deadline_utc,
+    )
+
+    deadline = refill_deadline_utc(entry)
+    if state in ("empty", "charging") and deadline is not None:
+        remaining_h = (deadline - datetime.now(timezone.utc)).total_seconds() / 3600.0
+        st.caption(
+            f"Nachladen bis **{deadline.astimezone().strftime('%d.%m. %H:%M')}** "
+            f"(max. {REFILL_DEADLINE_H:.0f} h, preisoptimal"
+            + (
+                f", noch ca. {max(0.0, remaining_h):.1f} h"
+                if remaining_h > 0
+                else ", Frist erreicht"
+            )
+            + ")."
+        )
+
+
+def _render_reserve_trigger_buttons(appliance: dict, ps_id: str) -> None:
+    from runtime_store.powerstation_reserves import set_trigger
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button(
+            "Gerät läuft jetzt (Trigger)",
+            key=f"reserve_trigger_on_{appliance['id']}",
+        ):
+            set_trigger(ps_id, active=True)
+            invalidate_live_optimization_cache()
+            st.rerun()
+    with col_b:
+        if st.button(
+            "Trigger zurücksetzen",
+            key=f"reserve_trigger_off_{appliance['id']}",
+            help="Löscht den Vorrat und startet das Nachladen neu (manueller Reset).",
+        ):
+            set_trigger(ps_id, active=False)
+            invalidate_live_optimization_cache()
+            st.rerun()
+
+
+def _render_reserve_appliance(appliance: dict) -> None:
+    from optimizer.powerstation_reserve import reserve_target_kwh
+    from runtime_store.powerstation_reserves import (
         get_or_init_state,
         load_reserve_states,
-        refill_deadline_utc,
-        set_trigger,
     )
 
     st.markdown(f"#### {appliance['name']}")
@@ -260,19 +301,7 @@ def _render_reserve_appliance(appliance: dict) -> None:
         f"Powerstation: `{ps_id}` · Ziel: **{target:.2f} kWh** · "
         f"Vorrat: **{stored:.2f} kWh** · Status: **{state}**"
     )
-    deadline = refill_deadline_utc(entry)
-    if state in ("empty", "charging") and deadline is not None:
-        remaining_h = (deadline - datetime.now(timezone.utc)).total_seconds() / 3600.0
-        st.caption(
-            f"Nachladen bis **{deadline.astimezone().strftime('%d.%m. %H:%M')}** "
-            f"(max. {REFILL_DEADLINE_H:.0f} h, preisoptimal"
-            + (
-                f", noch ca. {max(0.0, remaining_h):.1f} h"
-                if remaining_h > 0
-                else ", Frist erreicht"
-            )
-            + ")."
-        )
+    _render_reserve_refill_caption(entry, state)
     st.caption(
         "Trigger (ODER): digitales `consumer.<id>.sens_consumer_active` "
         "(Gerät läuft), Leistungs-Schwelle auf `sens_power_act`, "
@@ -281,24 +310,7 @@ def _render_reserve_appliance(appliance: dict) -> None:
     merker = _appliance_loxone_power_name(appliance)
     if merker:
         st.caption(f"Leistungsmerker: `{merker}`.")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button(
-            "Gerät läuft jetzt (Trigger)",
-            key=f"reserve_trigger_on_{appliance['id']}",
-        ):
-            set_trigger(ps_id, active=True)
-            invalidate_live_optimization_cache()
-            st.rerun()
-    with col_b:
-        if st.button(
-            "Trigger zurücksetzen",
-            key=f"reserve_trigger_off_{appliance['id']}",
-            help="Löscht den Vorrat und startet das Nachladen neu (manueller Reset).",
-        ):
-            set_trigger(ps_id, active=False)
-            invalidate_live_optimization_cache()
-            st.rerun()
+    _render_reserve_trigger_buttons(appliance, ps_id)
 
 
 def _recommendation_horizon_h(appliance: dict) -> int:

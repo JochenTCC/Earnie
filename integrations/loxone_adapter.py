@@ -152,6 +152,41 @@ class LoxoneAdapterError(RuntimeError):
     """Raised when required Loxone marker reads fail."""
 
 
+def _dict_items(components: dict, key: str) -> list[dict]:
+    """Dict entries of ``components[key]`` (non-dict entries dropped)."""
+    return [item for item in (components.get(key) or []) if isinstance(item, dict)]
+
+
+def _attribute_plant_pv(
+    doc: dict[str, Any],
+    components: dict,
+    plant: dict,
+    inverters: list[dict],
+    pv_systems: list[dict],
+) -> dict[str, Any]:
+    """Merge per-inverter/PV scoped Loxone reads into the plant telemetry doc."""
+    from integrations.plant_balance import pv_covers_all_inverters_from_plant
+    from integrations.pv_attribution import (
+        collect_scoped_pv_live_from_bindings,
+        read_scoped_pv_loxone,
+        with_attributed_plant_pv,
+    )
+
+    scoped = collect_scoped_pv_live_from_bindings(
+        components, read_value=read_scoped_pv_loxone
+    )
+    try:
+        return with_attributed_plant_pv(
+            doc,
+            scoped_live=scoped,
+            inverters=inverters,
+            pv_systems=pv_systems,
+            pv_covers_all_inverters=pv_covers_all_inverters_from_plant(plant),
+        )
+    except ValueError as exc:
+        raise LoxoneAdapterError(str(exc)) from exc
+
+
 def _utc_ts() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -231,38 +266,19 @@ class LoxoneAdapter:
         return validate_capabilities(doc)
 
     def read_telemetry(self) -> EhalTelemetry:
-        from integrations.plant_balance import (
-            balance_tolerances_from_plant,
-            pv_covers_all_inverters_from_plant,
-            sum_grid_tied_house_ess_power_w,
-        )
+        from integrations.plant_balance import balance_tolerances_from_plant
         from integrations.pv_attribution import (
-            collect_scoped_pv_live_from_bindings,
             load_components_for_attribution,
             load_house_for_attribution,
             plant_pv_may_be_derived,
-            read_scoped_pv_loxone,
-            with_attributed_plant_pv,
         )
 
         house = load_house_for_attribution()
         components = load_components_for_attribution()
         plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
-        batteries = [
-            b
-            for b in (components.get("batteries") or [])
-            if isinstance(b, dict)
-        ]
-        inverters = [
-            inv
-            for inv in (components.get("inverters") or [])
-            if isinstance(inv, dict)
-        ]
-        pv_systems = [
-            pv
-            for pv in (components.get("pv_systems") or [])
-            if isinstance(pv, dict)
-        ]
+        batteries = _dict_items(components, "batteries")
+        inverters = _dict_items(components, "inverters")
+        pv_systems = _dict_items(components, "pv_systems")
         derive_pv = plant_pv_may_be_derived(house, components)
         # sens_ess_power comes from Σ ess.{id} (Topology P2), not primary-only.
         required = tuple(
@@ -278,38 +294,8 @@ class LoxoneAdapter:
         }
         for field in required:
             doc[field] = self._require_field(field)
-        scoped = collect_scoped_pv_live_from_bindings(
-            components, read_value=read_scoped_pv_loxone
-        )
-        try:
-            doc = with_attributed_plant_pv(
-                doc,
-                scoped_live=scoped,
-                inverters=inverters,
-                pv_systems=pv_systems,
-                pv_covers_all_inverters=pv_covers_all_inverters_from_plant(
-                    plant
-                ),
-            )
-        except ValueError as exc:
-            raise LoxoneAdapterError(str(exc)) from exc
-        bat_by_id = {
-            str(b.get("id") or "").strip(): b
-            for b in batteries
-            if str(b.get("id") or "").strip()
-        }
-
-        def _read_ess(bid: str) -> float | None:
-            return self._read_ess_power_w_for_battery(bat_by_id.get(bid) or {})
-
-        try:
-            doc["sens_ess_power"] = sum_grid_tied_house_ess_power_w(
-                batteries=batteries,
-                inverters=inverters,
-                read_power_w=_read_ess,
-            )
-        except ValueError as exc:
-            raise LoxoneAdapterError(str(exc)) from exc
+        doc = _attribute_plant_pv(doc, components, plant, inverters, pv_systems)
+        doc["sens_ess_power"] = self._sum_ess_power_w(batteries, inverters)
         pct, watts = balance_tolerances_from_plant(plant)
         try:
             doc["sens_power_consumers"] = self._read_or_derive_consumers(
@@ -330,6 +316,30 @@ class LoxoneAdapter:
             )
         }
         return validate_telemetry(plant_doc)
+
+    def _sum_ess_power_w(
+        self, batteries: list[dict], inverters: list[dict]
+    ) -> float:
+        """Σ grid-tied house ESS power [W] from per-battery Loxone reads."""
+        from integrations.plant_balance import sum_grid_tied_house_ess_power_w
+
+        bat_by_id = {
+            str(b.get("id") or "").strip(): b
+            for b in batteries
+            if str(b.get("id") or "").strip()
+        }
+
+        def _read_ess(bid: str) -> float | None:
+            return self._read_ess_power_w_for_battery(bat_by_id.get(bid) or {})
+
+        try:
+            return sum_grid_tied_house_ess_power_w(
+                batteries=batteries,
+                inverters=inverters,
+                read_power_w=_read_ess,
+            )
+        except ValueError as exc:
+            raise LoxoneAdapterError(str(exc)) from exc
 
     def _read_ess_power_w_for_battery(self, battery: dict) -> float | None:
         """Read one ``ess.{id}.sens_ess_power`` (W); None if binding/value missing."""
@@ -436,41 +446,24 @@ class LoxoneAdapter:
         ):
             if field_name in doc and not supported:
                 self._skip(field_name)
-        if "set_ess_active_power" in doc and self._supports_ess_active:
-            ok, msg = self._try_marker_write(
-                self.cfg.active_power_name,
-                require_loxone_write(
-                    "set_ess_active_power", doc["set_ess_active_power"]
-                ),
-                field="set_ess_active_power",
-            )
-            if not ok:
-                failed.append("set_ess_active_power")
-                messages.append(msg)
-                flip = True
-        if "set_ess_charge_power_limit" in doc and self._supports_ess_write:
-            ok, msg = self._try_marker_write(
-                self.cfg.charge_power_name,
-                require_loxone_write(
-                    "set_ess_charge_power_limit", doc["set_ess_charge_power_limit"]
-                ),
-                field="set_ess_charge_power_limit",
-            )
-            if not ok:
-                failed.append("set_ess_charge_power_limit")
-                messages.append(msg)
-                flip = True
-        if "set_ess_discharge_power_limit" in doc and self._supports_ess_write:
-            ok, msg = self._try_marker_write(
+        for field_name, supported, marker_name in (
+            ("set_ess_active_power", self._supports_ess_active, self.cfg.active_power_name),
+            ("set_ess_charge_power_limit", self._supports_ess_write, self.cfg.charge_power_name),
+            (
+                "set_ess_discharge_power_limit",
+                self._supports_ess_write,
                 self.cfg.discharge_power_name,
-                require_loxone_write(
-                    "set_ess_discharge_power_limit",
-                    doc["set_ess_discharge_power_limit"],
-                ),
-                field="set_ess_discharge_power_limit",
+            ),
+        ):
+            if field_name not in doc or not supported:
+                continue
+            ok, msg = self._try_marker_write(
+                marker_name,
+                require_loxone_write(field_name, doc[field_name]),
+                field=field_name,
             )
             if not ok:
-                failed.append("set_ess_discharge_power_limit")
+                failed.append(field_name)
                 messages.append(msg)
                 flip = True
         if "set_grid_export_power_limit" in doc:

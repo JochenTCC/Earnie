@@ -1,141 +1,47 @@
-"""EHAL Live-Lesen / Live-Schreiben table helpers (field ↔ backend Mapping)."""
+"""EHAL Live-Lesen / Live-Schreiben table helpers (field ↔ backend Mapping).
+
+Field tables live in ``integrations.ehal_debug_fields`` and the HA/OpenEMS mapping
+helpers in ``integrations.ehal_debug_ha``; all names stay importable from here.
+"""
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Sequence
 
-from ehal.field_catalog import (
-    SETPOINT_FIELDS,
-    TELEMETRY_OPTIONAL_STATIC_HUB as TELEMETRY_OPTIONAL,
-    TELEMETRY_REQUIRED,
+from integrations.ehal_debug_fields import (  # noqa: F401 — re-exports (field tables)
+    _MAPPING_DERIVED,
+    _MAPPING_EMPTY,
+    BATTERY_ESS_LIVE_READ_KINDS,
+    BATTERY_ESS_LIVE_WRITE_KINDS,
+    BATTERY_SOURCE_SELECT_KIND,
+    CONSUMER_ENERGY_LIVE_READ_FIELDS,
+    EV_LIVE_READ_FIELDS,
+    EV_LIVE_WRITE_FIELDS,
+    FILTER_LIVE_READ_FIELDS,
+    INVERTER_LIVE_READ_KINDS,
+    INVERTER_LIVE_WRITE_KINDS,
+    NETWORK_LIVE_READ_FIELDS,
+    NETWORK_LIVE_WRITE_FIELDS,
+    PLANT_ESS_LIVE_READ_KINDS,
+    PLANT_HOUSE_LIVE_READ_FIELDS,
+    PLANT_LIVE_READ_FIELDS,
+    PLANT_LIVE_WRITE_FIELDS,
+    PV_LIVE_READ_KINDS,
+    THERMAL_ANNUAL_LIVE_READ_FIELDS,
+    THERMAL_LIVE_READ_FIELDS,
+)
+from integrations.ehal_debug_ha import (  # noqa: F401 — re-exports (HA / OpenEMS mapping)
+    _binding_map,
+    _consumers_from_house_doc,
+    _ha_live_consumers,
+    expand_ha_telemetry_for_live,
+    expand_ha_writes_for_live,
+    ha_entity_scoped_live_mapping,
+    ha_setpoint_mapping,
+    ha_telemetry_mapping,
+    openems_setpoint_mapping,
+    openems_telemetry_mapping,
 )
 
-# Unmapped Mapping cells stay empty (not an em-dash).
-_MAPPING_EMPTY = ""
-_MAPPING_DERIVED = "—(abgeleitet)"
-
-# House-wide plant reads (grid kinds are storage-bare; Live shows grid.meter.*).
-PLANT_HOUSE_LIVE_READ_FIELDS: tuple[str, ...] = (
-    "sens_grid_power_active",
-    "sens_pv_production_active",
-    "sens_power_consumers",
-    "sens_temperature_outside",
-    "sens_absent_mode",
-    "get_grid_export_power_limit",
-    "sens_pv_energy",
-    "sens_grid_energy_import",
-    "sens_grid_energy_export",
-)
-
-# Bare plant ESS kinds — Live rows only when no ehal-mappable battery exists.
-# SoC is never plant-flat (schema_version 4); only entity-scoped ess.{id}.sens_ess_soc.
-PLANT_ESS_LIVE_READ_KINDS: tuple[str, ...] = (
-    "sens_ess_power",
-    "get_ess_soc_min",
-    "get_ess_soc_max",
-    "get_ess_max_charge_power",
-    "get_ess_max_discharge_power",
-)
-
-# Union for callers that still inspect the full plant read set.
-PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
-    "sens_grid_power_active",
-    "sens_pv_production_active",
-    "sens_ess_power",
-    "sens_power_consumers",
-    "sens_temperature_outside",
-    "sens_absent_mode",
-    "get_grid_export_power_limit",
-    "get_ess_soc_min",
-    "get_ess_soc_max",
-    "get_ess_max_charge_power",
-    "get_ess_max_discharge_power",
-    "sens_pv_energy",
-    "sens_grid_energy_import",
-    "sens_grid_energy_export",
-)
-
-CONSUMER_ENERGY_LIVE_READ_FIELDS: tuple[str, ...] = (
-    "sens_energy_total",
-)
-
-# Per-battery entity-scoped read kinds (2.7.m).
-BATTERY_ESS_LIVE_READ_KINDS: tuple[str, ...] = (
-    "sens_ess_soc",
-    "sens_ess_power",
-    "sens_ess_energy_charge",
-    "sens_ess_energy_discharge",
-    "get_ess_soc_min",
-    "get_ess_soc_max",
-    "get_ess_max_charge_power",
-    "get_ess_max_discharge_power",
-)
-
-BATTERY_ESS_LIVE_WRITE_KINDS: tuple[str, ...] = (
-    "set_ess_active_power",
-    "set_ess_charge_power_limit",
-    "set_ess_discharge_power_limit",
-    "set_ess_mode",
-)
-
-BATTERY_SOURCE_SELECT_KIND = "set_ess_source_select"
-
-# Per-inverter entity-scoped read/write kinds (2.7.l P4).
-INVERTER_LIVE_READ_KINDS: tuple[str, ...] = (
-    "sens_inv_power_ac",
-    "sens_inv_power_pv",
-    "get_inv_max_ac_power",
-    "get_inv_max_pv_power",
-)
-
-INVERTER_LIVE_WRITE_KINDS: tuple[str, ...] = ("set_inv_ac_power_limit",)
-
-# Per-PV-system entity-scoped read kinds.
-PV_LIVE_READ_KINDS: tuple[str, ...] = ("sens_pv_production_active",)
-
-PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
-    "set_ess_active_power",
-    "set_ess_charge_power_limit",
-    "set_ess_discharge_power_limit",
-    "set_ess_mode",
-    "set_grid_export_power_limit",
-)
-EV_LIVE_READ_FIELDS: tuple[str, ...] = (
-    "sens_evcs_active_power",
-    "sens_evcs_connected",
-    "sens_evcs_soc_act",
-    "get_evcs_nominal_current",
-    "sens_evcs_bat_capacity",
-    "get_evcs_ready_by_time",
-    "get_evcs_limit_soc",
-    "get_evcs_soc_min_immediate",
-)
-
-EV_LIVE_WRITE_FIELDS: tuple[str, ...] = (
-    "set_evcs_max_current",
-    "set_evcs_mode",
-)
-
-FILTER_LIVE_READ_FIELDS: tuple[str, ...] = (
-    "get_filter_remaining_hours",
-    "sens_filter_active",
-    "get_filter_native_start_hour",
-    "get_filter_native_duration_hours",
-)
-
-THERMAL_LIVE_READ_FIELDS: tuple[str, ...] = (
-    "sens_temperature_water",
-    "get_temperature_water_setpoint",
-    "get_temperature_tolerance_c",
-    "sens_heating_active",
-)
-
-THERMAL_ANNUAL_LIVE_READ_FIELDS: tuple[str, ...] = (
-    "sens_temperature_heat_storage",
-    "sens_temperature_heat_storage_low",
-)
-
-NETWORK_LIVE_READ_FIELDS: tuple[str, ...] = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
-NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS
 
 
 def is_live_read_field(field: str) -> bool:
@@ -392,14 +298,24 @@ def _all_live_pv_systems() -> list[dict]:
 
 def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
     """Canonical Live-Lesen field ids (plant + batteries + inverters + PV + consumers)."""
+    if network_backend:
+        return list(NETWORK_LIVE_READ_FIELDS)
+    fields = _plant_entity_live_read_fields(_all_live_batteries())
+    for consumer in _all_live_consumers():
+        fields.extend(_consumer_live_read_fields(consumer))
+    from ehal.push_signals import REQUEST_OPTIMIZE_ID
+
+    fields.append(REQUEST_OPTIMIZE_ID)
+    return fields
+
+
+def _plant_entity_live_read_fields(batteries: list[dict]) -> list[str]:
+    """Plant, battery, inverter and PV-system Live-Lesen ids."""
     from ehal.ess_fields import ess_field
     from ehal.inverter_fields import inv_field
     from ehal.pv_fields import pv_field
     from ehal.qualified_ids import qualified_plant_id
 
-    if network_backend:
-        return list(NETWORK_LIVE_READ_FIELDS)
-    batteries = _all_live_batteries()
     has_batteries = bool(batteries)
     # Plant GRID_KINDS exchange as ``grid.meter.*`` (same form as Push-Inbox).
     plant_names = list(PLANT_HOUSE_LIVE_READ_FIELDS)
@@ -421,57 +337,59 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
         if not pid:
             continue
         fields.extend(pv_field(pid, kind) for kind in PV_LIVE_READ_KINDS)
-    for consumer in _all_live_consumers():
-        cid = str(consumer.get("id") or "").strip()
-        if not cid:
-            continue
-        if _consumer_is_ev(consumer):
-            fields.extend(
-                live_read_consumer_field(consumer, name) for name in EV_LIVE_READ_FIELDS
-            )
-            fields.extend(
-                live_read_consumer_field(consumer, name)
-                for name in CONSUMER_ENERGY_LIVE_READ_FIELDS
-            )
-        elif _consumer_is_filter(consumer):
-            from ehal.flex_fields import flex_sens_power_act
+    return fields
 
-            fields.append(live_read_consumer_field(consumer, flex_sens_power_act(cid)))
-            fields.extend(
-                live_read_consumer_field(consumer, name)
-                for name in FILTER_LIVE_READ_FIELDS
-            )
-            fields.extend(
-                live_read_consumer_field(consumer, name)
-                for name in CONSUMER_ENERGY_LIVE_READ_FIELDS
-            )
-        else:
-            from ehal.flex_fields import (
-                flex_sens_consumer_active,
-                flex_sens_power_act,
-            )
 
-            fields.append(live_read_consumer_field(consumer, flex_sens_power_act(cid)))
-            fields.append(
-                live_read_consumer_field(consumer, flex_sens_consumer_active(cid))
-            )
+def _consumer_live_read_fields(consumer: dict) -> list[str]:
+    """Live-Lesen ids of one flexible consumer (EV / filter / generic / thermal)."""
+    cid = str(consumer.get("id") or "").strip()
+    if not cid:
+        return []
+    fields: list[str] = []
+    if _consumer_is_ev(consumer):
+        fields.extend(
+            live_read_consumer_field(consumer, name) for name in EV_LIVE_READ_FIELDS
+        )
+        fields.extend(
+            live_read_consumer_field(consumer, name)
+            for name in CONSUMER_ENERGY_LIVE_READ_FIELDS
+        )
+    elif _consumer_is_filter(consumer):
+        from ehal.flex_fields import flex_sens_power_act
+
+        fields.append(live_read_consumer_field(consumer, flex_sens_power_act(cid)))
+        fields.extend(
+            live_read_consumer_field(consumer, name)
+            for name in FILTER_LIVE_READ_FIELDS
+        )
+        fields.extend(
+            live_read_consumer_field(consumer, name)
+            for name in CONSUMER_ENERGY_LIVE_READ_FIELDS
+        )
+    else:
+        from ehal.flex_fields import (
+            flex_sens_consumer_active,
+            flex_sens_power_act,
+        )
+
+        fields.append(live_read_consumer_field(consumer, flex_sens_power_act(cid)))
+        fields.append(
+            live_read_consumer_field(consumer, flex_sens_consumer_active(cid))
+        )
+        fields.extend(
+            live_read_consumer_field(consumer, name)
+            for name in CONSUMER_ENERGY_LIVE_READ_FIELDS
+        )
+        if _consumer_is_thermal(consumer):
             fields.extend(
                 live_read_consumer_field(consumer, name)
-                for name in CONSUMER_ENERGY_LIVE_READ_FIELDS
+                for name in THERMAL_LIVE_READ_FIELDS
             )
-            if _consumer_is_thermal(consumer):
-                fields.extend(
-                    live_read_consumer_field(consumer, name)
-                    for name in THERMAL_LIVE_READ_FIELDS
-                )
-            if _consumer_is_thermal_annual(consumer):
-                fields.extend(
-                    live_read_consumer_field(consumer, name)
-                    for name in THERMAL_ANNUAL_LIVE_READ_FIELDS
-                )
-    from ehal.push_signals import REQUEST_OPTIMIZE_ID
-
-    fields.append(REQUEST_OPTIMIZE_ID)
+        if _consumer_is_thermal_annual(consumer):
+            fields.extend(
+                live_read_consumer_field(consumer, name)
+                for name in THERMAL_ANNUAL_LIVE_READ_FIELDS
+            )
     return fields
 
 
@@ -549,47 +467,10 @@ def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
     return fields
 
 
-def ha_telemetry_mapping(entities: dict[str, str] | None) -> dict[str, str]:
-    """EHAL field → HA entity_id (or derived / empty)."""
-    ents = entities if isinstance(entities, dict) else {}
-    out: dict[str, str] = {}
-    for field, entity_id in ents.items():
-        name = str(entity_id or "").strip()
-        if name:
-            out[str(field)] = name
-    return out
 
 
-def openems_telemetry_mapping(
-    *,
-    ess_component: str = "ess0",
-    evcs_component: str = "evcs0",
-) -> dict[str, str]:
-    """Canonical OpenEMS channel labels for Live-Lesen Mapping column."""
-    ess = str(ess_component or "ess0").strip() or "ess0"
-    evcs = str(evcs_component or "evcs0").strip() or "evcs0"
-    return {
-        "sens_grid_power_active": "_sum/GridActivePower",
-        "sens_pv_production_active": "_sum/ProductionActivePower",
-        "sens_ess_power": f"{ess}/ActivePower",
-        "sens_evcs_active_power": f"{evcs}/ActivePower",
-        "sens_power_consumers": _MAPPING_DERIVED,
-    }
 
 
-def openems_setpoint_mapping(
-    *,
-    ess_component: str = "ess0",
-    evcs_component: str = "evcs0",
-) -> dict[str, str]:
-    ess = str(ess_component or "ess0").strip() or "ess0"
-    evcs = str(evcs_component or "evcs0").strip() or "evcs0"
-    return {
-        "set_ess_active_power": f"{ess}/SetActivePowerEquals",
-        "set_ess_charge_power_limit": f"{ess}/SetActivePowerGreaterOrEquals",
-        "set_ess_discharge_power_limit": f"{ess}/SetActivePowerLessOrEquals",
-        "set_evcs_max_current": f"{evcs}/SetChargePowerLimit",
-    }
 
 
 def mapping_or_dash(mapping: dict[str, str], field: str) -> str:
@@ -722,156 +603,18 @@ def resolve_loxone_write_field(io_name: str, index: dict[str, str] | None = None
     return _MAPPING_EMPTY
 
 
-def ha_setpoint_mapping(entities: dict[str, str] | None) -> dict[str, str]:
-    ents = entities if isinstance(entities, dict) else {}
-    out: dict[str, str] = {}
-    for field in SETPOINT_FIELDS:
-        entity_id = str(ents.get(field) or "").strip()
-        if entity_id:
-            out[field] = entity_id
-    return out
 
 
-def _binding_map(raw: object) -> dict[str, str]:
-    if not isinstance(raw, dict):
-        return {}
-    return {
-        str(k): str(v).strip()
-        for k, v in raw.items()
-        if str(v or "").strip()
-    }
 
 
-def _consumers_from_house_doc(house_doc: dict) -> list[dict]:
-    """All consumers across profiles in a house_profiles document."""
-    profiles = house_doc.get("profiles")
-    out: list[dict] = []
-    if isinstance(profiles, dict):
-        iterable = profiles.values()
-    elif isinstance(profiles, list):
-        iterable = profiles
-    else:
-        return out
-    for profile in iterable:
-        if not isinstance(profile, dict):
-            continue
-        for consumer in profile.get("consumers") or []:
-            if isinstance(consumer, dict):
-                out.append(consumer)
-    return out
 
 
-def _ha_live_consumers(house_doc: dict | None) -> list[dict]:
-    """Live consumers with house bindings; house_doc-only when ids do not overlap."""
-    live: list[dict] = []
-    try:
-        live = _all_live_consumers()
-    except Exception:
-        live = []
-    if house_doc is None:
-        return live
-    house_consumers = _consumers_from_house_doc(house_doc)
-    if not live:
-        return house_consumers
-    by_id = {
-        str(c.get("id") or "").strip(): c
-        for c in house_consumers
-        if str(c.get("id") or "").strip()
-    }
-    live_ids = {str(c.get("id") or "").strip() for c in live if str(c.get("id") or "").strip()}
-    if by_id and not (live_ids & set(by_id)):
-        # Unit tests / fixtures whose consumer ids differ from ambient Live profile.
-        return house_consumers
-    return [by_id.get(str(c.get("id") or "").strip()) or c for c in live]
 
 
-def ha_entity_scoped_live_mapping(house_doc: dict | None = None) -> dict[str, str]:
-    """Entity-centric EHAL-Feld → HA entity_id (exchange IDs for Live tables)."""
-    if house_doc is None:
-        from ui.house_config_io import load_house_profiles
-
-        house_doc = load_house_profiles()
-    from ehal.qualified_ids import qualified_plant_id
-
-    out: dict[str, str] = {}
-    plant = house_doc.get("plant") if isinstance(house_doc.get("plant"), dict) else {}
-    for field, entity_id in _binding_map(plant.get("ehal_bindings")).items():
-        if is_live_read_field(field):
-            out[qualified_plant_id(field)] = entity_id
-        else:
-            out[qualified_plant_id(field)] = entity_id
-    for consumer in _ha_live_consumers(house_doc):
-        if not str(consumer.get("id") or "").strip():
-            continue
-        for field, entity_id in _binding_map(consumer.get("ehal_bindings")).items():
-            if is_live_read_field(field):
-                out[live_read_consumer_field(consumer, field)] = entity_id
-            else:
-                out[live_write_consumer_field(consumer, field)] = entity_id
-    for inverter in _all_live_inverters():
-        bindings = inverter.get("ehal_bindings")
-        if not isinstance(bindings, dict):
-            continue
-        for field, entity_id in _binding_map(bindings).items():
-            out[str(field)] = entity_id
-    for pv in _all_live_pv_systems():
-        bindings = pv.get("ehal_bindings")
-        if not isinstance(bindings, dict):
-            continue
-        for field, entity_id in _binding_map(bindings).items():
-            out[str(field)] = entity_id
-    return out
 
 
-def expand_ha_telemetry_for_live(
-    telemetry: dict[str, Any],
-    house_doc: dict | None = None,
-) -> dict[str, Any]:
-    """Alias flat HA wire keys onto qualified Live-Lesen IDs; drop bare EV/grid keys."""
-    from ehal.qualified_ids import GRID_KINDS, field_kind, qualified_plant_id
-
-    flat = {str(k): v for k, v in telemetry.items()}
-    out: dict[str, Any] = dict(flat)
-    for name, value in list(flat.items()):
-        kind = field_kind(name)
-        if kind in GRID_KINDS:
-            out[qualified_plant_id(kind)] = value
-            if name != qualified_plant_id(kind):
-                out.pop(name, None)
-    for consumer in _ha_live_consumers(house_doc):
-        cid = str(consumer.get("id") or "").strip()
-        if not cid or not _consumer_is_ev(consumer):
-            continue
-        for name in EV_LIVE_READ_FIELDS:
-            if name in flat:
-                out[live_read_consumer_field(consumer, name)] = flat[name]
-    for name in EV_LIVE_READ_FIELDS:
-        out.pop(name, None)
-    return out
 
 
-def expand_ha_writes_for_live(
-    writes: list[dict[str, Any]],
-    house_doc: dict | None = None,
-) -> list[dict[str, Any]]:
-    """Rewrite flat EV setpoint field ids to qualified Live-Schreiben IDs."""
-    ev_consumer: dict | None = None
-    for consumer in _ha_live_consumers(house_doc):
-        if str(consumer.get("id") or "").strip() and _consumer_is_ev(consumer):
-            ev_consumer = consumer
-            break
-    out: list[dict[str, Any]] = []
-    for entry in writes:
-        row = dict(entry)
-        field = str(row.get("field") or "").strip()
-        if ev_consumer is not None and field in EV_LIVE_WRITE_FIELDS:
-            row["field"] = live_write_consumer_field(ev_consumer, field)
-        else:
-            canon = canonicalize_live_display_field(field)
-            if canon:
-                row["field"] = canon
-        out.append(row)
-    return out
 
 
 def parse_check_wert(detail: str, *, passed: bool) -> str:

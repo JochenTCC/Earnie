@@ -73,6 +73,12 @@ def _fetch_open_meteo_hourly_vars(
     }
     if extra_params:
         params.update(extra_params)
+    payload = _open_meteo_payload(url, params)
+    return _parse_open_meteo_hourly(payload, hourly_vars)
+
+
+def _open_meteo_payload(url: str, params: dict):
+    """Open-Meteo JSON via the shadow-aware transport (replay in shadow, record in prod)."""
     from runtime_store.shadow.feed import url_hash
     from runtime_store.shadow.mode import is_shadow_mode
     from runtime_store.shadow.replay import replay_ext_payload
@@ -120,9 +126,12 @@ def _fetch_open_meteo_hourly_vars(
             safe_record(feed_key, ok=False, error=str(exc))
             raise
 
-    payload = ext_get(
-        replay=_replay, live=_live, allow_live_fallback=True
-    )
+    return ext_get(replay=_replay, live=_live, allow_live_fallback=True)
+
+
+def _parse_open_meteo_hourly(
+    payload, hourly_vars: tuple[str, ...]
+) -> dict[str, list[tuple[datetime, float]]]:
     hourly = payload.get("hourly", {}) if isinstance(payload, dict) else {}
     times = hourly.get("time", [])
     parsed_times = [datetime.fromisoformat(str(ts_text)) for ts_text in times]

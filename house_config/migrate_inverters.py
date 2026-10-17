@@ -47,35 +47,7 @@ def migrate_components_inverters(doc: dict) -> tuple[dict, bool]:
     for bat in batteries:
         if not isinstance(bat, dict):
             continue
-        bat_out = dict(bat)
-        kind = str(bat_out.pop("kind", "") or "battery_inverter").strip().lower()
-        bat_id = str(bat_out.get("id") or "").strip()
-        bat_type = str(bat_out.get("type") or "house").strip().lower()
-        backing = str(bat_out.get("backing") or "").strip().lower()
-        if bat_type == "powerstation" and backing == "virtual":
-            bat_out.pop("inverter_id", None)
-            new_batteries.append(bat_out)
-            continue
-        if kind == "isolated":
-            island_id = f"wr_{bat_id}" if bat_id else f"wr_island_{len(inverters)}"
-            if island_id not in existing_ids:
-                inverters.append(
-                    {
-                        "id": island_id,
-                        "label": f"Powerstation-WR {bat_out.get('label') or bat_id}",
-                        "type": "hybrid",
-                        "ac_connection": "island",
-                        "control": "full",
-                        "efficiency": DEFAULT_INVERTER_EFFICIENCY,
-                        "owned_by": bat_id,
-                        "ehal_bindings": {},
-                    }
-                )
-                existing_ids.add(island_id)
-            bat_out["inverter_id"] = island_id
-        else:
-            bat_out["inverter_id"] = str(bat_out.get("inverter_id") or main_id)
-        new_batteries.append(bat_out)
+        new_batteries.append(_migrate_battery(bat, inverters, existing_ids, main_id))
 
     new_pv: list[dict] = []
     for pv in pv_systems:
@@ -91,3 +63,37 @@ def migrate_components_inverters(doc: dict) -> tuple[dict, bool]:
     out["pv_systems"] = new_pv
     stamp_data_model(out)
     return out, True
+
+
+def _migrate_battery(
+    bat: dict, inverters: list[dict], existing_ids: set[str], main_id: str
+) -> dict:
+    """Drop ``kind`` and assign ``inverter_id`` (adds an island inverter for isolated)."""
+    bat_out = dict(bat)
+    kind = str(bat_out.pop("kind", "") or "battery_inverter").strip().lower()
+    bat_id = str(bat_out.get("id") or "").strip()
+    bat_type = str(bat_out.get("type") or "house").strip().lower()
+    backing = str(bat_out.get("backing") or "").strip().lower()
+    if bat_type == "powerstation" and backing == "virtual":
+        bat_out.pop("inverter_id", None)
+        return bat_out
+    if kind == "isolated":
+        island_id = f"wr_{bat_id}" if bat_id else f"wr_island_{len(inverters)}"
+        if island_id not in existing_ids:
+            inverters.append(
+                {
+                    "id": island_id,
+                    "label": f"Powerstation-WR {bat_out.get('label') or bat_id}",
+                    "type": "hybrid",
+                    "ac_connection": "island",
+                    "control": "full",
+                    "efficiency": DEFAULT_INVERTER_EFFICIENCY,
+                    "owned_by": bat_id,
+                    "ehal_bindings": {},
+                }
+            )
+            existing_ids.add(island_id)
+        bat_out["inverter_id"] = island_id
+    else:
+        bat_out["inverter_id"] = str(bat_out.get("inverter_id") or main_id)
+    return bat_out

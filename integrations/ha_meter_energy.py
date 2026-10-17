@@ -16,11 +16,11 @@ from integrations.loxone_meter_energy import CHANNEL_GRID, CHANNEL_PV
 logger = logging.getLogger(__name__)
 
 
-def _adapter_weg_b(adapter: Any) -> bool:
-    from runtime_store.ehal_setup import HA_TRANSPORT_WEG_B
+def _adapter_push(adapter: Any) -> bool:
+    from runtime_store.ehal_setup import HA_TRANSPORT_PUSH
 
     transport = str(getattr(getattr(adapter, "cfg", None), "transport", "") or "")
-    return transport == HA_TRANSPORT_WEG_B
+    return transport == HA_TRANSPORT_PUSH
 
 FIELD_PV_ENERGY = "sens_pv_energy"
 FIELD_GRID_IMPORT = "sens_grid_energy_import"
@@ -86,7 +86,7 @@ def _read_entity_kwh(
         return None
 
 
-def _weg_b_energy_readings(
+def _push_energy_readings(
     adapter: Any,
     mapped: dict[str, str],
 ) -> dict[str, dict[str, float]]:
@@ -138,13 +138,13 @@ def read_plant_energy_readings(
     mapped = plant_energy_entity_ids(entities if entities is not None else adapter.cfg.entities)
     if "slot_energy" not in available_functions(
         mapped,
-        require_nonempty_value=not _adapter_weg_b(adapter),
+        require_nonempty_value=not _adapter_push(adapter),
     ):
         if mapped:
             logger.debug("ha_meter_energy: counters incomplete %s — slot Ist stays on mean", sorted(mapped))
         return {}
-    if _adapter_weg_b(adapter):
-        return _weg_b_energy_readings(adapter, mapped)
+    if _adapter_push(adapter):
+        return _push_energy_readings(adapter, mapped)
     readings: dict[str, dict[str, float]] = {}
     pv_id = mapped.get(FIELD_PV_ENERGY)
     if pv_id:

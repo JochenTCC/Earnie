@@ -8,20 +8,25 @@ import pytest
 from runtime_store import ehal_setup
 
 
-def test_normalize_ha_transport_pull_default_and_weg_b():
+def test_normalize_ha_transport_pull_default_and_push():
     assert ehal_setup.normalize_ha_transport(None) == "pull"
     assert ehal_setup.normalize_ha_transport("") == "pull"
     assert ehal_setup.normalize_ha_transport("pull") == "pull"
-    assert ehal_setup.normalize_ha_transport("weg_b") == "weg_b"
+    assert ehal_setup.normalize_ha_transport("push") == "push"
+    assert ehal_setup.normalize_ha_transport("weg_b") == "push"  # legacy alias
     with pytest.raises(ValueError, match="ehal.ha.transport"):
         ehal_setup.normalize_ha_transport("mqtt")
 
 
-def test_load_ehal_params_ha_transport_weg_b():
+def test_load_ehal_params_ha_transport_push():
     from settings.config_loaders import load_ehal_params
 
-    params = load_ehal_params({"ehal": {"backend": "ha", "ha": {"transport": "weg_b"}}})
-    assert params["EHAL_HA_TRANSPORT"] == "weg_b"
+    params = load_ehal_params({"ehal": {"backend": "ha", "ha": {"transport": "push"}}})
+    assert params["EHAL_HA_TRANSPORT"] == "push"
+    legacy = load_ehal_params(
+        {"ehal": {"backend": "ha", "ha": {"transport": "weg_b"}}}
+    )
+    assert legacy["EHAL_HA_TRANSPORT"] == "push"
 
 
 def test_normalize_backend_defaults_to_loxone():

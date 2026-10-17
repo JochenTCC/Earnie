@@ -3,47 +3,28 @@ from __future__ import annotations
 
 from ui.house_config_profile_session import _live_markers_enabled, _scoped_key
 
-import os
 
 import streamlit as st
 
-from house_config.earnie_role import (
-    DEFAULT_MANUAL_HORIZON_H,
-    EARNIE_ROLE_FLEX,
-    EARNIE_ROLE_KNOWN,
-    EARNIE_ROLE_MANUAL,
-    resolve_earnie_role,
-)
-from house_config.generic_schedule import (
-    DEFAULT_START_HOUR,
-    MAX_START_SHIFT_H,
-    format_start_window_caption,
-    generic_annual_kwh,
-    reject_legacy_start_flexibility,
-)
-from house_config.id_slug import slug_id
 from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
-    building_class_option_label,
 )
-from runtime_store.persist_paths import resolve_house_profiles_json_path
-from ui.house_config_io import (
-    apply_csv_path_pending,
-    csv_upload_widget_key,
-    load_house_profiles,
-    preview_baseload,
-    queue_csv_path_update,
-    save_profile_consumption_csv,
-    single_csv_upload,
-    upsert_house_profile,
-)
-from ui.auto_persist import auto_persist
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_checkbox,
     labeled_number_input,
     labeled_selectbox,
-    labeled_text_input,
+)
+from ui.house_config_profile_thermal_annual import (  # noqa: F401  (re-exported)
+    _live_consumer_for_annual,
+    _profile_geo_from_session,
+    _render_thermal_annual_building_fields,
+    _render_thermal_annual_fields,
+    _render_thermal_annual_wp_preview,
+    _render_thermal_comfort_fields,
+    _render_thermal_solar_fields,
+    _render_thermal_storage_fields,
+    _render_wp_annual_metric,
 )
 
 
@@ -158,11 +139,10 @@ def _load_grid_fee_catalog_for_ui() -> dict:
     return load_grid_fee_catalog(resolve_grid_fees_json_path())
 
 
-def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
-    """Netznutzung: Netzbereich aus Katalog oder eigener Wert; Messart; Zeitregeln."""
-    from data.grid_fees import resolve_grid_fee_spec
-
-    catalog = _load_grid_fee_catalog_for_ui()
+def _render_nne_area_fields(
+    catalog: dict, *, session_scope: str
+) -> tuple[str, str, float]:
+    """Netzbereich select plus manual Arbeitspreis or Leistungsmessung (area-dependent)."""
     areas = catalog["areas"]
     area_key = _scoped_key(session_scope, "house_profile_nne_area")
     options = [NNE_AREA_MANUAL, *areas.keys()]
@@ -203,6 +183,35 @@ def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, "house_profile_nne_metering"),
         )
+    return area_choice, metering, base_manual
+
+
+def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
+    """Resolved base price and active time rules of the chosen Netzbereich."""
+    from data.grid_fees import resolve_grid_fee_spec
+
+    try:
+        spec = resolve_grid_fee_spec(config, catalog, timezone_name="Europe/Vienna")
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    active = ", ".join(rule["id"] for rule in spec["rules"]) or "keine"
+    skipped = ", ".join(
+        f"{item['id']} ({item['reason']})" for item in spec["skipped"]
+    )
+    st.caption(
+        f"Basis-Arbeitspreis: **{spec['base_cent_kwh']:.2f} Cent/kWh** netto · "
+        f"aktive Zeitregeln: **{active}**"
+        + (f" · übersprungen: {skipped}" if skipped else "")
+    )
+
+
+def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
+    """Netznutzung: Netzbereich aus Katalog oder eigener Wert; Messart; Zeitregeln."""
+    catalog = _load_grid_fee_catalog_for_ui()
+    area_choice, metering, base_manual = _render_nne_area_fields(
+        catalog, session_scope=session_scope
+    )
     qh_meter = bool(
         labeled_checkbox(
             "Viertelstunden-Smart-Meter (Voraussetzung für SNAP/WiNAP)",
@@ -223,21 +232,9 @@ def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
         "include_status": ["verordnet", "entwurf"] if include_draft else ["verordnet"],
     }
     if config["area_id"] is not None:
-        try:
-            spec = resolve_grid_fee_spec(config, catalog, timezone_name="Europe/Vienna")
-        except ValueError as exc:
-            st.error(str(exc))
-        else:
-            active = ", ".join(rule["id"] for rule in spec["rules"]) or "keine"
-            skipped = ", ".join(
-                f"{item['id']} ({item['reason']})" for item in spec["skipped"]
-            )
-            st.caption(
-                f"Basis-Arbeitspreis: **{spec['base_cent_kwh']:.2f} Cent/kWh** netto · "
-                f"aktive Zeitregeln: **{active}**"
-                + (f" · übersprungen: {skipped}" if skipped else "")
-            )
+        _show_nne_spec_caption(config, catalog)
     return config
+
 
 def _render_location_fields(*, session_scope: str) -> dict:
     st.subheader("Standort")
@@ -325,409 +322,21 @@ def _render_thermal_rc_fields(
         )
     return item
 
-def _render_thermal_annual_building_fields(
-    consumer: dict,
-    thermal: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> dict:
-    item: dict = {
-        "min_on_quarterhours": labeled_number_input(
-            "Mindestlaufzeit (Viertelstunden)",
-            min_value=0,
-            value=int(consumer.get("min_on_quarterhours", 4)),
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_ta_min_qh_{index}"),
-        ),
-        "living_area_m2": labeled_number_input(
-            "Wohnfläche (m²)",
-            min_value=0.0,
-            value=float(thermal.get("living_area_m2", 120.0)),
-            key=_scoped_key(session_scope, f"hc_area_{index}"),
-        ),
-    }
-    building_class = int(thermal.get("building_class", 3))
-    item["building_class"] = labeled_selectbox(
-        "Gebäudeklasse",
-        options=[1, 2, 3, 4],
-        index=max(0, min(3, building_class - 1)),
-        format_func=building_class_option_label,
-        key=_scoped_key(session_scope, f"hc_class_{index}"),
-    )
-    from optimizer.thermal_house import (
-        BUILDING_MASS_C_WH_PER_M2K,
-        DEFAULT_BUILDING_MASS,
-        normalize_building_mass,
-    )
-
-    mass_options = list(BUILDING_MASS_C_WH_PER_M2K.keys())
-    mass_current = normalize_building_mass(thermal.get("building_mass"))
-    item["building_mass"] = labeled_selectbox(
-        "Bauweise (Wärmespeicher)",
-        options=mass_options,
-        index=mass_options.index(mass_current)
-        if mass_current in mass_options
-        else mass_options.index(DEFAULT_BUILDING_MASS),
-        format_func=lambda key: {
-            "leicht": "Leicht (50 Wh/m²K)",
-            "mittel": "Mittel (90 Wh/m²K)",
-            "schwer": "Schwer (130 Wh/m²K)",
-        }.get(key, key),
-        key=_scoped_key(session_scope, f"hc_building_mass_{index}"),
-    )
-    st.caption(
-        "DIN V 18599-2: wirksame Wärmekapazität C = Wert × Wohnfläche "
-        "(für Aufheizen/Auskühlen in Übergangszeiten)."
-    )
-    use_exact_hwb = labeled_checkbox(
-        "Genaue HWB-Angabe",
-        value=bool(float(thermal.get("hwb_kwh_m2", 0.0) or 0.0) > 0),
-        key=_scoped_key(session_scope, f"hc_hwb_use_{index}"),
-    )
-    if use_exact_hwb:
-        from data.heating_need import specific_heating_kwh_m2
-
-        default_hwb = float(thermal.get("hwb_kwh_m2", 0.0) or 0.0)
-        if default_hwb <= 0:
-            default_hwb = specific_heating_kwh_m2(int(item["building_class"]))
-        item["hwb_kwh_m2"] = labeled_number_input(
-            "HWB (kWh/m²a)",
-            min_value=0.1,
-            value=default_hwb,
-            step=1.0,
-            key=_scoped_key(session_scope, f"hc_hwb_{index}"),
-        )
-    return item
 
 
-def _render_thermal_comfort_fields(
-    item: dict,
-    thermal: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> None:
-    item["heat_pump_type"] = labeled_selectbox(
-        "WP-Typ",
-        options=["luft", "erde"],
-        index=0 if thermal.get("heat_pump_type") != "erde" else 1,
-        key=_scoped_key(session_scope, f"hc_wp_{index}"),
-    )
-    item["persons"] = labeled_number_input(
-        "Personen",
-        min_value=0,
-        value=int(thermal.get("persons", 2)),
-        key=_scoped_key(session_scope, f"hc_persons_{index}"),
-    )
-    item["target_temp_c"] = labeled_number_input(
-        "Solltemperatur (°C)",
-        value=float(thermal.get("target_temp_c", 21.5)),
-        step=0.5,
-        key=_scoped_key(session_scope, f"hc_target_temp_{index}"),
-    )
-    from optimizer.thermal_house import DEFAULT_HOUSE_TOLERANCE_C
-
-    item["house_tolerance_c"] = labeled_number_input(
-        "Heizband Toleranz (K)",
-        min_value=0.05,
-        value=float(thermal.get("house_tolerance_c", DEFAULT_HOUSE_TOLERANCE_C)),
-        step=0.1,
-        key=_scoped_key(session_scope, f"hc_house_tol_{index}"),
-    )
-    h_existing = thermal.get("house_heat_loss_kw_per_k")
-    h_value = float(h_existing) if h_existing not in (None, "") else 0.0
-    item_h = labeled_number_input(
-        "Haus-Verlustkoeffizient H (kW/K, 0 = auto aus HWB)",
-        min_value=0.0,
-        value=h_value,
-        step=0.01,
-        format="%.3f",
-        key=_scoped_key(session_scope, f"hc_house_h_{index}"),
-    )
-    if float(item_h) > 0.0:
-        item["house_heat_loss_kw_per_k"] = float(item_h)
-    item["absent_temp_reduction_c"] = labeled_number_input(
-        "Temperaturabsenkung wenn abwesend",
-        min_value=0.0,
-        value=float(thermal.get("absent_temp_reduction_c", 6.5)),
-        step=0.5,
-        key=_scoped_key(session_scope, f"hc_absent_temp_red_{index}"),
-        help=(
-            "Bei wirksamem Abwesenheitsmodus und aktiver Verbraucher-Option: "
-            "Live-Soll = Solltemperatur − Absenkung; Warmwasser dann 0."
-        ),
-    )
 
 
-def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
-    from data.modeled_climate import thermal_annual_kwh_from_archive
-
-    latitude = location["latitude"]
-    longitude = location["longitude"]
-    thermal_preview = {**item, "latitude": latitude, "longitude": longitude}
-    wp_annual, ref_year = thermal_annual_kwh_from_archive(
-        thermal_preview,
-        house_profile={
-            "latitude": latitude,
-            "longitude": longitude,
-            "default_pv_tilt": location["default_pv_tilt"],
-            "default_pv_azimuth": location["default_pv_azimuth"],
-        },
-    )
-    st.metric("Geschätzter WP-Jahresbedarf (kWh/a)", f"{wp_annual:.0f}")
-    st.caption(
-        f"Basis: Open-Meteo-Archiv {ref_year} "
-        f"({latitude:.4f}°N, {longitude:.4f}°E)"
-    )
 
 
-def _render_thermal_storage_fields(
-    thermal: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> dict | None:
-    """Optional heat storage; volume 0 disables coupled path (legacy open-loop)."""
-    existing = thermal.get("heat_storage") if isinstance(thermal.get("heat_storage"), dict) else {}
-    volume = labeled_number_input(
-        "Wärmespeicher Volumen (Liter)",
-        min_value=0.0,
-        value=float(existing.get("volume_liters", 0.0) or 0.0),
-        step=50.0,
-        help=(
-            "0 = bisheriges Modell (Solar als Tages-Gutschrift). "
-            ">0 = gekoppelt: Solar und WP speisen den Speicher, Hausbedarf entnimmt."
-        ),
-        ratios=WIDE_LABEL_RATIOS,
-        key=_scoped_key(session_scope, f"hc_storage_vol_{index}"),
-    )
-    if float(volume) <= 0.0:
-        return None
-    return {
-        "volume_liters": float(volume),
-        "heat_loss_kw_per_k": labeled_number_input(
-            "Wärmespeicher Verlust (kW/K)",
-            min_value=0.0,
-            value=float(existing.get("heat_loss_kw_per_k", 0.02) or 0.02),
-            step=0.005,
-            format="%.3f",
-            help=(
-                "U des Speichers gegen Umgebung (typ. ~0.005–0.02), "
-                "nicht Gebäude-LT+LV aus dem Energieausweis. "
-                "Zu groß → Sommer-WP-Bedarf trotz Solar zu hoch."
-            ),
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_storage_u_{index}"),
-        ),
-        "setpoint_c": labeled_number_input(
-            "Wärmespeicher Soll (°C)",
-            value=float(existing.get("setpoint_c", 45.0)),
-            step=1.0,
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_storage_set_{index}"),
-        ),
-        "tolerance_c": labeled_number_input(
-            "Wärmespeicher Toleranz (K)",
-            min_value=0.1,
-            value=float(existing.get("tolerance_c", 5.0) or 5.0),
-            step=0.5,
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_storage_tol_{index}"),
-        ),
-    }
 
 
-def _render_thermal_annual_wp_preview(
-    item: dict,
-    thermal: dict,
-    index: int,
-    *,
-    session_scope: str,
-    location: dict,
-) -> None:
-    _render_thermal_comfort_fields(
-        item, thermal, index, session_scope=session_scope
-    )
-    item.update(
-        _render_thermal_solar_fields(
-            thermal,
-            index,
-            session_scope=session_scope,
-            default_tilt=location["default_pv_tilt"],
-            default_azimuth=location["default_pv_azimuth"],
-        )
-    )
-    storage = _render_thermal_storage_fields(
-        thermal, index, session_scope=session_scope
-    )
-    if storage is not None:
-        item["heat_storage"] = storage
-    if _live_markers_enabled():
-        st.caption(
-            "WP-Bindings unter **Daemon Control → EHAL-Com** "
-            "(Entity-Mapping, `flex.*`) pflegen."
-        )
-    _render_wp_annual_metric(item, location=location)
 
 
-def _render_thermal_annual_fields(
-    consumer: dict,
-    index: int,
-    *,
-    session_scope: str,
-    location: dict,
-) -> dict:
-    thermal = consumer.get("thermal") or consumer
-    item = _render_thermal_annual_building_fields(
-        consumer, thermal, index, session_scope=session_scope
-    )
-    _render_thermal_annual_wp_preview(
-        item,
-        thermal,
-        index,
-        session_scope=session_scope,
-        location=location,
-    )
-    return item
 
 
-def _render_thermal_solar_fields(
-    thermal: dict,
-    index: int,
-    *,
-    session_scope: str,
-    default_tilt: float = 18.0,
-    default_azimuth: float = 0.0,
-) -> dict:
-    tilt_fallback = int(thermal.get("solar_thermal_tilt_deg", default_tilt))
-    azimuth_fallback = int(thermal.get("solar_thermal_azimuth_deg", default_azimuth))
-    return {
-        "solar_thermal_area_m2": labeled_number_input(
-            "Solar-Kollektor Fläche (m²)",
-            min_value=0.0,
-            value=float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0),
-            step=1.0,
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_solar_area_{index}"),
-        ),
-        "solar_thermal_tilt_deg": labeled_number_input(
-            "Solar-Kollektor Neigung (°)",
-            min_value=0,
-            max_value=90,
-            value=tilt_fallback,
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_solar_tilt_{index}"),
-        ),
-        "solar_thermal_azimuth_deg": labeled_number_input(
-            "Solar-Kollektor Azimut (°)",
-            min_value=-180,
-            max_value=180,
-            value=azimuth_fallback,
-            help="0 = Süd, -90 = Ost, 90 = West",
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_solar_azimuth_{index}"),
-        ),
-    }
-
-def _profile_geo_from_session(session_scope: str) -> tuple[float | None, float | None, str | None]:
-    """Live Standort widgets — form edit drops lat/lon from thermal_rc until save."""
-    lat_key = _scoped_key(session_scope, "house_profile_latitude")
-    lon_key = _scoped_key(session_scope, "house_profile_longitude")
-    land_key = _scoped_key(session_scope, "house_profile_land")
-    lat = float(st.session_state[lat_key]) if lat_key in st.session_state else None
-    lon = float(st.session_state[lon_key]) if lon_key in st.session_state else None
-    timezone_name = None
-    if land_key in st.session_state:
-        from house_config.geo_timezone import timezone_for_land
-
-        timezone_name = timezone_for_land(str(st.session_state[land_key]))
-    return lat, lon, timezone_name
 
 
-def _live_consumer_for_annual(
-    consumer: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> dict:
-    """Overlay live widget values onto consumer so expander kWh/a matches edits."""
-    preview = dict(consumer)
-    nom_key = _scoped_key(session_scope, f"hc_nom_{index}")
-    if nom_key in st.session_state:
-        preview["nominal_power_kw"] = float(st.session_state[nom_key])
-    type_key = _scoped_key(session_scope, f"hc_type_{index}")
-    if type_key in st.session_state:
-        preview["type"] = st.session_state[type_key]
-    c_type = str(preview.get("type", "generic"))
-    if c_type == "generic":
-        sched = dict(preview.get("schedule") or {})
-        runs_key = _scoped_key(session_scope, f"hc_runs_{index}")
-        dur_key = _scoped_key(session_scope, f"hc_duration_{index}")
-        if runs_key in st.session_state:
-            sched["runs_per_week"] = int(st.session_state[runs_key])
-        if dur_key in st.session_state:
-            sched["duration_h"] = float(st.session_state[dur_key])
-        preview["schedule"] = sched
-    elif c_type == "thermal_annual":
-        for field, key_suffix, cast in (
-            ("living_area_m2", f"hc_area_{index}", float),
-            ("building_class", f"hc_class_{index}", int),
-            ("building_mass", f"hc_building_mass_{index}", str),
-            ("persons", f"hc_persons_{index}", int),
-            ("heat_pump_type", f"hc_wp_{index}", str),
-            ("hwb_kwh_m2", f"hc_hwb_{index}", float),
-            ("house_tolerance_c", f"hc_house_tol_{index}", float),
-            ("house_heat_loss_kw_per_k", f"hc_house_h_{index}", float),
-        ):
-            key = _scoped_key(session_scope, key_suffix)
-            if key in st.session_state:
-                preview[field] = cast(st.session_state[key])
-        lat, lon, timezone_name = _profile_geo_from_session(session_scope)
-        if lat is not None:
-            preview["latitude"] = lat
-        if lon is not None:
-            preview["longitude"] = lon
-        if timezone_name:
-            preview["timezone_name"] = timezone_name
-    elif c_type == "ev":
-        for field, key_suffix, cast in (
-            ("battery_capacity_kwh", f"hc_ev_cap_{index}", float),
-            ("min_power_kw", f"hc_ev_min_{index}", float),
-        ):
-            key = _scoped_key(session_scope, key_suffix)
-            if key in st.session_state:
-                preview[field] = cast(st.session_state[key])
-        sched = dict(preview.get("charging_schedule") or {})
-        for field, key_suffix, cast in (
-            ("target_soc_percent", f"hc_ev_target_soc_{index}", float),
-            ("charging_efficiency", f"hc_ev_eff_{index}", float),
-        ):
-            key = _scoped_key(session_scope, key_suffix)
-            if key in st.session_state:
-                sched[field] = cast(st.session_state[key])
-        preview["charging_schedule"] = sched
-    elif c_type == "thermal_rc":
-        rc = dict(preview.get("thermal_rc") or {})
-        for field, key_suffix, cast in (
-            ("water_volume_liters", f"hc_rc_vol_{index}", float),
-            ("setpoint_c", f"hc_rc_set_{index}", float),
-            ("tolerance_c", f"hc_rc_tol_{index}", float),
-            ("heat_loss_kw_per_k", f"hc_rc_u_{index}", float),
-            ("heating_efficiency", f"hc_rc_eff_{index}", float),
-        ):
-            key = _scoped_key(session_scope, key_suffix)
-            if key in st.session_state:
-                rc[field] = cast(st.session_state[key])
-        lat, lon, timezone_name = _profile_geo_from_session(session_scope)
-        if lat is not None:
-            rc["latitude"] = lat
-        if lon is not None:
-            rc["longitude"] = lon
-        if timezone_name:
-            rc["timezone_name"] = timezone_name
-        preview["thermal_rc"] = rc
-    return preview
+
 
 def _consumer_expander_title(
     consumer: dict, index: int, *, session_scope: str

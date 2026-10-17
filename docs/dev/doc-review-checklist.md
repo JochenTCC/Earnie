@@ -1,6 +1,6 @@
-# Doc review checklist — 2.7 first alpha quality review
+# Doc review checklist — 2.7 quality / release hardening
 
-Temporary quality-gate step 5 checklist (skill `quality-gate`). One row per in-scope document. When the release is created, move to `docs/dev/done/doc-review-checklist-<version>.md`.
+Temporary quality-gate step 5 checklist (skill `quality-gate`). One row per in-scope document. When the release is created, move to `docs/dev/done/doc-review-checklist-<version>.md`. Confirmed complete (thin) during **2.7 quality / release hardening** — no rewalk.
 
 Rules: `.cursor/rules/user-docs-style.mdc`, `german-user-docs.mdc`; agents `docs-editor-de` / `docs-editor-en`, **one run per document**. Findings → `## Document Review Findings` in `backlog/Backlog-Bugfixes.md`.
 

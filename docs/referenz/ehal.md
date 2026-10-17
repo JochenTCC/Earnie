@@ -38,7 +38,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Adapter duty  | Map hub channels/entities → EHAL; normalize signs and units inside the adapter                                                                                                                                                                                                                                                       |
 | Transport     | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS)                                                                                                                                                                                                |
 | Loxone today  | Default `ehal.backend=loxone` uses `[integrations/loxone_adapter.py](../../integrations/loxone_adapter.py)` for plant telemetry/setpoints. Entity-scoped keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` / `inverters[].ehal_bindings` are **activation flags** (empty Merker values after **2.7.q Q8**); wire I/O is VO push + `status.json` under qualified IDs. ESS reads/writes use `ess.{id}.*` on batteries (no `LOXONE_*` loud-name config slots, no plant-flat ESS alias merge). Structure/greenfield presence uses LoxAPP3 (no Merker HTTP in production Python). Mapping UI: EHAL-Com. |
-| HA today      | `ehal.backend=ha`; **`ehal.ha.transport`** `pull` (default) or `weg_b`. **pull:** `[integrations/ha_adapter.py](../../integrations/ha_adapter.py)` REST (`/api/states`, services). **weg_b:** same HTTP story as Loxone — HA pushes activated reads to `GET /ehal/telemetry/<qualified-id>/<value>` (token); setpoints on `GET /ehal/status.json` (alias `/ehal/loxone/status.json`). Entity IDs in entity-scoped maps for pull + HITL; URL/token in `config/.env` (`EHAL_HA_*`); optional `sign` in `ehal.ha`. Flat `ehal.ha.entities` migrated once.                          |
+| HA today      | `ehal.backend=ha`; **`ehal.ha.transport`** `pull` (default) or `push`. **pull:** `[integrations/ha_adapter.py](../../integrations/ha_adapter.py)` REST (`/api/states`, services). **push:** same HTTP story as Loxone — HA pushes activated reads to `GET /ehal/telemetry/<qualified-id>/<value>` (token); setpoints on `GET /ehal/status.json` (alias `/ehal/loxone/status.json`). Entity IDs in entity-scoped maps for pull + HITL; URL/token in `config/.env` (`EHAL_HA_*`); optional `sign` in `ehal.ha`. Flat `ehal.ha.entities` migrated once.                          |
 | Inverter today | Optional role `inverter`: bindings `inv.{id}.*` on `inverters[].ehal_bindings` (entity-scoped, same storage idea as `ess.{id}.*`). Without mapped inverter fields the plant behaves as before; `sens_pv_production_active` stays the plant PV sum. |
 
 
@@ -46,7 +46,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 
 ## Qualified EHAL IDs (2.7.n-2)
 
-Exchange / display form of every signal on the push/exchange wire and in `status.json` keys (Loxone VO; HA **weg_b** uses the same qualified IDs). Implemented in `ehal/qualified_ids.py` (builders + `parse_qualified_id`).
+Exchange / display form of every signal on the push/exchange wire and in `status.json` keys (Loxone VO; HA **push** uses the same qualified IDs). Implemented in `ehal/qualified_ids.py` (builders + `parse_qualified_id`).
 
 | Form | Example | Notes |
 | ---- | ------- | ----- |
@@ -441,22 +441,22 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 | Value | Live I/O |
 | ----- | --------------------------- |
 | **`pull`** (default when omitted) | **Shipped:** `integrations/ha_adapter.py` REST only (`/api/states`, `/api/services/...`). Prefer HA entities from evcc. Units: Earnie converts at the adapter boundary via `integrations/ha_units.py` from each entity's `unit_of_measurement`. |
-| **`weg_b`** | Same Earnie↔SB HTTP contract as Loxone. **Read:** HA automations / `rest_command` push activated telemetry to Earnie `GET /ehal/telemetry/<qualified-EHAL-id>/<value>` (see Loxone push rules: token, inbox freshness, zero rule, last-known). **Write:** HA polls Earnie `GET /ehal/status.json` (canonical; `/ehal/loxone/status.json` kept as alias) for setpoints under qualified keys; payload includes `heartbeat_ts` like Loxone VI fetch. Listener: `integrations/loxone_request_http.py` on `system.ehal_loxone_http_port` (default **8541**). **Token:** `EARNIE_PILOT_PUSH_TOKEN` env (header `X-Earnie-Token`, or `/t/<token>/…`, or `?t=` — same as Loxone pilot push). Setting `weg_b` switches live read/write to this push + `status.json` path. |
+| **`push`** | Same Earnie↔SB HTTP contract as Loxone. **Read:** HA automations / `rest_command` push activated telemetry to Earnie `GET /ehal/telemetry/<qualified-EHAL-id>/<value>` (see Loxone push rules: token, inbox freshness, zero rule, last-known). **Write:** HA polls Earnie `GET /ehal/status.json` (canonical; `/ehal/loxone/status.json` kept as alias) for setpoints under qualified keys; payload includes `heartbeat_ts` like Loxone VI fetch. Listener: `integrations/loxone_request_http.py` on `system.ehal_loxone_http_port` (default **8541**). **Token:** `EARNIE_PILOT_PUSH_TOKEN` env (header `X-Earnie-Token`, or `/t/<token>/…`, or `?t=` — same as Loxone pilot push). Setting `push` switches live read/write to this path. Legacy config value `weg_b` is accepted and normalized to `push`. |
 
-### Units on the HA telemetry wire (weg_b)
+### Units on the HA telemetry wire (push)
 
 Values in the telemetry URL path must already be in **canonical EHAL units** (§ Units table): active power **W**, energy **kWh**, SoC/ratios **%**, EVCS current **A**, etc. Earnie does not receive HA `unit_of_measurement` on push — the **HA carrier** (YAML template / automation) must convert native entity units before calling `/ehal/telemetry/…`. Setpoints in `status.json` use the same EHAL numeric units as Loxone (e.g. ESS limits in **W**).
 
 ### Config and mapping
 
 - Config: `ehal.backend=ha`; `ehal.ha.transport` as above; URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` under `ehal.ha` in `config.json`. Loader: `settings/config_loaders.load_ehal_params` → `EHAL_HA_TRANSPORT` (invalid values raise). Snippet: `share/config/ehal.ha.snippet.json`.
-- Entity IDs in `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` (entity-scoped; ESS per battery). **pull:** required for live I/O. **weg_b:** HITL mapping remains the contract UI; live reads/writes use push + `status.json`. Legacy flat `ehal.ha.entities` migrated once and cleared.
+- Entity IDs in `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` (entity-scoped; ESS per battery). **pull:** required for live I/O. **push:** HITL mapping remains the contract UI; live reads/writes use push + `status.json`. Legacy flat `ehal.ha.entities` migrated once and cleared.
 - Live aggregation (`aggregate_ha_entities`) for **pull**: plant grid/PV/export + optional energy counters + `sens_absent_mode`; battery `ess.{slug}.*`; inverter `inv.{id}.*`; first EV EVCS fields; extras saved in HITL may be ignored until wired. Built-in inverter devices may map `ess.{id}.*` and `inv.{id}.*` to the same HA device (Kennungen differ; `owned_by` links them).
 - Compose lab: `docker/compose/ha-lab.yml`. Setup: `[ha-lab-setup.md](../dev/ha-lab-setup.md)`. German A2/B: `[../einrichtung/ha-evcc.md](../einrichtung/ha-evcc.md)`.
 - HITL: `ui/ehal_ha_mapping.py` on EHAL-Com; heuristic `integrations/ha_ehal_mapping.py` + `ha_units` on **pull**.
 - Optional slot-Ist energy (pull path): `integrations/ha_meter_energy.py` — see `[loxone-meter-energy-slot-ist.md](../dev/done/loxone-meter-energy-slot-ist.md)`.
 - Sign mode: `ehal.ha.sign` (`ehal` | `negate`) applies to **pull** adapter reads/writes.
-- **pull** setpoints: `number.set_value` on mapped entities. **weg_b** setpoints: poll `status.json`; `plant.ha_ess_force` / Huawei forcible charge stays REST exception when configured.
+- **pull** setpoints: `number.set_value` on mapped entities. **push** setpoints: poll `status.json`; `plant.ha_ess_force` / Huawei forcible charge stays REST exception when configured.
 - Optimizer exclusivity + Modbus: `ha-evcc.md`. Same Live façade / write-error path as OpenEMS (`is_ehal_network_backend()`).
 
 

@@ -7,22 +7,36 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta
 from typing import Any
 
 from optimizer.thermal_coupled import (
     heat_storage_enabled,
     normalize_heat_storage,
-    step_coupled_hour,
-)
-from optimizer.thermal_house import (
-    DEFAULT_HOUSE_TOLERANCE_C,
-    house_capacity_kwh_per_k,
-    house_requests_heat,
-    step_house_hour,
 )
 from optimizer.thermal_model import ThermalBand, capacity_kwh_per_k_from_volume, heat_content_kwh
-from runtime_store.planning_clock import planning_now
+from optimizer.thermal_live_solar import (  # noqa: F401  (re-exported)
+    SOLAR_SOURCE_ARCHIVE_FALLBACK,
+    SOLAR_SOURCE_FORECAST,
+    SOLAR_SOURCE_NONE,
+    _archive_year_collector_solar_kw,
+    _profile_with_geo,
+    resolve_live_collector_solar_kw,
+)
+from optimizer.thermal_live_floor import (  # noqa: F401  (re-exported)
+    _HouseLiveParams,
+    _MAX_HOUSE_CLIMB_K_PER_H,
+    _apply_t_low_near_term_force,
+    _resolve_house_live_params,
+    _simulate_store_floor_hours,
+    _space_heat_demand_kw,
+    _ww_kw,
+)
+from optimizer.thermal_live_house import (  # noqa: F401  (re-exported)
+    LiveHousePlan,
+    _plan_live_legacy_ww,
+    _thermal_with_nominal,
+    plan_live_house_horizon,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,171 +103,18 @@ def resolve_heat_storage_readings(
     )
 
 
-def _ww_kw(persons: int) -> float:
-    from data.heating_need import warm_water_kwh_week
-
-    return warm_water_kwh_week(int(persons)) / 7.0 / 24.0
 
 
-@dataclass(frozen=True)
-class _HouseLiveParams:
-    use_house: bool
-    house_c: float
-    house_h: float
-    house_band_min: float
-    house_temp: float
-    max_heat: float
-    house_target_c: float
-    heating_limit_c: float
 
 
-def _resolve_house_live_params(
-    *,
-    living_area_m2: float,
-    building_mass: str | None,
-    target_temp_c: float,
-    house_tolerance_c: float | None,
-    house_heat_loss_kw_per_k: float | None,
-    heating_limit_c: float,
-    start_house_temp_c: float | None,
-    max_heat: float,
-) -> _HouseLiveParams:
-    house_temp = float(
-        start_house_temp_c if start_house_temp_c is not None else target_temp_c
-    )
-    target = float(target_temp_c)
-    limit = float(heating_limit_c)
-    use_house = float(living_area_m2) > 0.0
-    if not use_house:
-        return _HouseLiveParams(
-            False, 0.0, 0.0, target, house_temp, max_heat, target, limit
-        )
-    if house_heat_loss_kw_per_k is None or float(house_heat_loss_kw_per_k) <= 0.0:
-        # H comes from ThermalParameters (reference-year calibration); a short
-        # Live forecast alone inflates H by ~8760/n (thermals-p2 §Live store floor).
-        raise ValueError(
-            "Live-Speicherplan mit Wohnfläche braucht house_heat_loss_kw_per_k "
-            "(optimizer.thermal_parameters.house_thermal_parameters)."
-        )
-    tol = (
-        DEFAULT_HOUSE_TOLERANCE_C
-        if house_tolerance_c is None
-        else max(0.05, float(house_tolerance_c))
-    )
-    return _HouseLiveParams(
-        True,
-        house_capacity_kwh_per_k(living_area_m2, building_mass),
-        float(house_heat_loss_kw_per_k),
-        target - tol,
-        house_temp,
-        max_heat,
-        target,
-        limit,
-    )
 
 
-# Recover toward target at most this many K per Euler hour. Full C·ΔT in one hour
-# emptied a warm buffer (~5 K drop) and forced WP while T_eq was still above band_max.
-_MAX_HOUSE_CLIMB_K_PER_H = 0.1
 
 
-def _space_heat_demand_kw(
-    house: _HouseLiveParams,
-    house_temp: float,
-    ambient: float,
-) -> float:
-    """Store draw for space heat: envelope hold / rate-limited climb — not WP dump.
-
-    Using ``max_heat`` as continuous demand emptied a hot buffer (e.g. 67 °C) in
-    ~3 h and forced Freigabe while T_eq was still far above setpoint. Pulling
-    ``C·(target−T)`` in one hour (leicht Bauweise) caused the same early drain.
-    """
-    if not house.use_house:
-        return 0.0
-    if float(ambient) >= house.heating_limit_c - 1e-9:
-        return 0.0
-    if not house_requests_heat(
-        house_temp,
-        ambient,
-        capacity_kwh_per_k=house.house_c,
-        heat_loss_kw_per_k=house.house_h,
-        band_min_c=house.house_band_min,
-    ):
-        return 0.0
-    loss = house.house_h * (float(house_temp) - float(ambient))
-    delta_k = max(0.0, house.house_target_c - float(house_temp))
-    climb = min(delta_k, _MAX_HOUSE_CLIMB_K_PER_H) * house.house_c
-    return min(house.max_heat, max(0.0, loss + climb))
 
 
-def _simulate_store_floor_hours(
-    *,
-    start_temp_c: float,
-    ambient_forecast_c: list[float],
-    solar: list[float],
-    band: ThermalBand,
-    capacity_kwh_per_k: float,
-    heat_loss_kw_per_k: float,
-    wp_kw: float,
-    jaz_f: float,
-    ww: float,
-    house: _HouseLiveParams,
-) -> tuple[list[bool], list[float], float, list[float]]:
-    store_temp = float(start_temp_c)
-    house_temp = house.house_temp
-    forced: list[bool] = []
-    electric_by_hour: list[float] = []
-    store_temps: list[float] = []
-    floor_electric = 0.0
-    for hour, ambient_raw in enumerate(ambient_forecast_c):
-        ambient = float(ambient_raw)
-        space_kw = _space_heat_demand_kw(house, house_temp, ambient)
-        result = step_coupled_hour(
-            store_temp,
-            ambient,
-            solar_kw=float(solar[hour]),
-            demand_kw=space_kw + ww,
-            capacity_kwh_per_k=capacity_kwh_per_k,
-            heat_loss_kw_per_k=heat_loss_kw_per_k,
-            band=band,
-            wp_electric_kw=wp_kw,
-            jaz=jaz_f,
-        )
-        forced.append(bool(result.wp_on))
-        electric_by_hour.append(float(result.electric_kwh))
-        if result.wp_on:
-            floor_electric += float(result.electric_kwh)
-        store_temp = result.temp_c
-        store_temps.append(float(store_temp))
-        if house.use_house:
-            house_temp = step_house_hour(
-                house_temp,
-                ambient,
-                heat_in_kw=space_kw,
-                capacity_kwh_per_k=house.house_c,
-                heat_loss_kw_per_k=house.house_h,
-            )
-    return forced, electric_by_hour, floor_electric, store_temps
 
 
-def _apply_t_low_near_term_force(
-    forced: list[bool],
-    electric_by_hour: list[float],
-    floor_electric: float,
-    *,
-    temp_low_c: float | None,
-    band: ThermalBand,
-    wp_kw: float,
-) -> tuple[list[bool], list[float], float, bool]:
-    if temp_low_c is None or float(temp_low_c) >= band.min_c - 1e-9:
-        return forced, electric_by_hour, floor_electric, False
-    forced = list(forced)
-    electric_by_hour = list(electric_by_hour)
-    forced[0] = True
-    if electric_by_hour[0] <= 1e-12:
-        electric_by_hour[0] = wp_kw
-        floor_electric += wp_kw
-    return forced, electric_by_hour, floor_electric, True
 
 
 def plan_live_store_horizon(
@@ -339,102 +200,12 @@ def plan_live_store_horizon(
     )
 
 
-SOLAR_SOURCE_NONE = "none"
-SOLAR_SOURCE_FORECAST = "open_meteo"
-SOLAR_SOURCE_ARCHIVE_FALLBACK = "fallback_archive_year"
 
 
-def resolve_live_collector_solar_kw(
-    thermal: dict,
-    house_profile: dict | None,
-    horizon: int,
-    *,
-    start: datetime | None = None,
-) -> tuple[list[float], str]:
-    """Hourly collector heat into the store (kW_th ≈ kWh per hour) for Live, plus source.
-
-    Open-Meteo forecast irradiance on the collector surface (ThermalHorizon P3).
-    If the forecast fails: last full archive year at the same DOY/hour, with a
-    warning and source ``fallback_archive_year`` (owner decision 2026-10-15).
-    Zeros when ``solar_thermal_area_m2`` is not configured. Raises if area > 0
-    but lat/lon cannot be resolved.
-    """
-    if horizon < 1:
-        raise ValueError("horizon muss mindestens 1 sein")
-    area_m2 = float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0)
-    if area_m2 <= 0.0:
-        return [0.0] * horizon, SOLAR_SOURCE_NONE
-    from data.modeled_climate import collector_surface_from_thermal
-    from data.open_meteo_solar_archive import irradiance_wm2_to_thermal_kwh
-    from data.outdoor_forecast import get_hourly_tilted_irradiance_forecast_wm2
-
-    profile = _profile_with_geo(house_profile)
-    surface = collector_surface_from_thermal(thermal, profile)
-    start_dt = (start or planning_now()).replace(minute=0, second=0, microsecond=0)
-    try:
-        wm2 = get_hourly_tilted_irradiance_forecast_wm2(
-            horizon=horizon,
-            tilt_deg=surface.tilt_deg,
-            azimuth_deg=surface.azimuth_deg,
-            latitude=float(profile["latitude"]),
-            longitude=float(profile["longitude"]),
-            start=start_dt,
-        )
-    except Exception as exc:
-        logger.warning(
-            "Kollektor-Einstrahlungsprognose fehlgeschlagen (%s) – nutze Vorjahreswerte "
-            "(Open-Meteo-Archiv) für den Speicherplan.",
-            exc,
-        )
-        return (
-            _archive_year_collector_solar_kw(profile, surface, area_m2, start_dt, horizon),
-            SOLAR_SOURCE_ARCHIVE_FALLBACK,
-        )
-    # Same conversion and rounding as the archive bundle (thermal_kwh_at).
-    return (
-        [round(irradiance_wm2_to_thermal_kwh(value, area_m2), 6) for value in wm2],
-        SOLAR_SOURCE_FORECAST,
-    )
 
 
-def _profile_with_geo(house_profile: dict | None) -> dict:
-    profile = dict(house_profile) if isinstance(house_profile, dict) else {}
-    if "latitude" not in profile or "longitude" not in profile:
-        import config as _cfg
-
-        if getattr(_cfg, "CONFIG", None) is None:
-            raise ValueError(
-                "solar_thermal_area_m2 > 0 requires house_profile latitude/longitude "
-                "or a loaded CONFIG for Live collector irradiance"
-            )
-        profile.setdefault("latitude", float(_cfg.get("LATITUDE", cast=float)))
-        profile.setdefault("longitude", float(_cfg.get("LONGITUDE", cast=float)))
-    return profile
 
 
-def _archive_year_collector_solar_kw(
-    profile: dict,
-    surface,
-    area_m2: float,
-    start_dt: datetime,
-    horizon: int,
-) -> list[float]:
-    """Last full archive year at the same DOY/hour (pre-P3 behaviour, now fallback only)."""
-    from data.modeled_climate import ModeledClimateContext
-    from data.open_meteo_solar_archive import last_full_archive_year
-
-    climate = ModeledClimateContext.for_house_profile(profile, kwp=0.0)
-    archive_year = last_full_archive_year()
-    bundle = climate._bundle_for_calendar_year(archive_year)
-    solar: list[float] = []
-    for offset in range(horizon):
-        slot = start_dt + timedelta(hours=offset)
-        try:
-            archive_slot = slot.replace(year=archive_year)
-        except ValueError:
-            archive_slot = slot.replace(year=archive_year, day=28)
-        solar.append(float(bundle.thermal_kwh_at(surface, area_m2, archive_slot)))
-    return solar
 
 
 def plan_live_store_for_thermal_consumer(
@@ -502,11 +273,6 @@ def plan_live_store_for_thermal_consumer(
     return replace(plan, solar_source=solar_source)
 
 
-def _thermal_with_nominal(thermal: dict, consumer: dict) -> dict:
-    """Same parameter key as baseload (``consumer_annual_kwh``): WP kW on thermal."""
-    if "nominal_power_kw" in thermal:
-        return thermal
-    return {**thermal, "nominal_power_kw": float(consumer.get("nominal_power_kw", 3.0) or 3.0)}
 
 
 def live_store_plan_for_matrix(
@@ -599,15 +365,6 @@ def live_store_slot_energy_kwh(matrix: list, plan: LiveStorePlan) -> list[float]
     return hourly_electric_to_slot_energy_kwh(matrix, plan.electric_by_hour)
 
 
-@dataclass(frozen=True)
-class LiveHousePlan:
-    """Live horizon plan of a ``thermal_annual`` consumer without heat storage (P4)."""
-
-    electric_by_hour: list[float]
-    # Simulated indoor temperature; empty on the legacy path without Wohnfläche.
-    house_temp_c: list[float]
-    # Collector credit source (legacy path only); SOLAR_SOURCE_NONE otherwise.
-    solar_source: str
 
 
 def live_house_plan_for_matrix(
@@ -641,91 +398,8 @@ def live_house_plan_for_matrix(
     )
 
 
-def plan_live_house_horizon(
-    consumer: dict,
-    *,
-    house_profile: dict,
-    ambient_forecast_c: list[float],
-    start: datetime | None = None,
-) -> LiveHousePlan:
-    """House RC + WP over the horizon, same hourly rules as the year sim without store.
-
-    Start = target temperature (no indoor sensor; spec section 7 Q2). Envelope H
-    from ``ThermalParameters``. Without Wohnfläche: legacy warm-water need minus
-    a per-day collector credit (forecast irradiance, P3).
-    """
-    from data.heating_need import heat_pump_jaz, warm_water_kwh_week
-    from optimizer.thermal_house import _step_hour_direct_wp
-
-    if not ambient_forecast_c:
-        raise ValueError("ambient_forecast_c darf nicht leer sein")
-    thermal = consumer.get("thermal") or consumer
-    jaz = heat_pump_jaz(str(thermal.get("heat_pump_type", "luft")))
-    ww_kw = warm_water_kwh_week(int(thermal.get("persons", 2) or 2)) / 7.0 / 24.0
-    living = float(thermal.get("living_area_m2", 0.0) or 0.0)
-    if living <= 0.0:
-        return _plan_live_legacy_ww(
-            thermal, house_profile, ambient_forecast_c, ww_kw=ww_kw, jaz=jaz, start=start
-        )
-    from optimizer.thermal_parameters import house_thermal_parameters
-
-    house_h = house_thermal_parameters(
-        _thermal_with_nominal(thermal, consumer), house_profile=house_profile
-    ).house_heat_loss_kw_per_k
-    wp_kw = max(
-        0.1,
-        float(thermal.get("nominal_power_kw") or consumer.get("nominal_power_kw") or 3.0),
-    )
-    target = float(thermal.get("target_temp_c", 21.5) or 21.5)
-    tol_raw = thermal.get("house_tolerance_c")
-    tol = DEFAULT_HOUSE_TOLERANCE_C if tol_raw in (None, "") else max(0.05, float(tol_raw))
-    house_c = house_capacity_kwh_per_k(living, thermal.get("building_mass"))
-    house_temp = target
-    electric_by_hour: list[float] = []
-    house_temps: list[float] = []
-    for ambient in ambient_forecast_c:
-        house_temp, electric = _step_hour_direct_wp(
-            house_temp=house_temp,
-            ambient_c=float(ambient),
-            house_c=house_c,
-            house_h=float(house_h),
-            house_band_min=target - tol,
-            max_heat_kw=wp_kw * jaz,
-            wp_kw=wp_kw,
-            ww_electric_kw=ww_kw / jaz if jaz > 0 else 0.0,
-        )
-        electric_by_hour.append(float(electric))
-        house_temps.append(float(house_temp))
-    return LiveHousePlan(electric_by_hour, house_temps, SOLAR_SOURCE_NONE)
 
 
-def _plan_live_legacy_ww(
-    thermal: dict,
-    house_profile: dict,
-    ambient_forecast_c: list[float],
-    *,
-    ww_kw: float,
-    jaz: float,
-    start: datetime | None,
-) -> LiveHousePlan:
-    """Legacy open-loop path (no Wohnfläche): warm water minus collector, netted per day."""
-    horizon = len(ambient_forecast_c)
-    start_dt = (start or planning_now()).replace(minute=0, second=0, microsecond=0)
-    solar, solar_source = resolve_live_collector_solar_kw(
-        thermal, house_profile, horizon, start=start_dt
-    )
-    offsets_by_day: dict[Any, list[int]] = {}
-    for offset in range(horizon):
-        day = (start_dt + timedelta(hours=offset)).date()
-        offsets_by_day.setdefault(day, []).append(offset)
-    electric_by_hour = [0.0] * horizon
-    for offsets in offsets_by_day.values():
-        heat = ww_kw * len(offsets)
-        credit = sum(solar[offset] for offset in offsets)
-        net_electric = max(0.0, heat - credit) / jaz if jaz > 0 else 0.0
-        for offset in offsets:
-            electric_by_hour[offset] = net_electric / len(offsets)
-    return LiveHousePlan(electric_by_hour, [], solar_source)
 
 
 def map_forced_hours_to_slot_indices(

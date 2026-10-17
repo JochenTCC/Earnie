@@ -297,14 +297,11 @@ def _require_push_price_cent(config_module: Any) -> float:
 
 
 def _run_milp_replay(ctx: _PreparedReplay, *, verbose: bool) -> ReplayResult:
-    import pulp
-    from optimizer import battery_plan_kw_from_control, milp_optimizer
     from optimizer.milp import (
         _extract_optimizer_controls_from_model,
         _primary_battery_params,
         _solve_milp_to_model,
     )
-    from runtime_store.cycle_recorder import compute_plan_hash
 
     solved = _solve_milp_to_model(
         ctx.prepared,
@@ -334,6 +331,17 @@ def _run_milp_replay(ctx: _PreparedReplay, *, verbose: bool) -> ReplayResult:
     controls = _extract_optimizer_controls_from_model(
         model, ctx.prepared, preset_by_slot, ctx.soc, primary
     )
+    return _milp_replay_result(ctx, model, controls, primary)
+
+
+def _milp_replay_result(
+    ctx: _PreparedReplay, model, controls, primary: dict
+) -> ReplayResult:
+    """Replay result (plan hash, cost, controls) from the solved MILP model."""
+    import pulp
+    from optimizer import battery_plan_kw_from_control
+    from runtime_store.cycle_recorder import compute_plan_hash
+
     battery_plan = battery_plan_kw_from_control(
         controls.mode,
         controls.target_power,

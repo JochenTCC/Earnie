@@ -501,15 +501,15 @@ Bind mounts (`ha_lab/…`) are kept. To factory-reset HA only, remove files unde
 
 ---
 
-## 9. Weg B (push + status.json) — optional after 2.7.r
+## 9. Push transport (telemetry + status.json) — optional after 2.7.r
 
 Default lab path remains **`ehal.ha.transport=pull`** (§5–§6). For the Loxone-like HTTP contract:
 
-1. Set `"transport": "weg_b"` under `ehal.ha` in `ha_lab/config/config.json` (see [`ehal.md`](../referenz/ehal.md) § Home Assistant).
+1. Set `"transport": "push"` under `ehal.ha` in `ha_lab/config/config.json` (see [`ehal.md`](../referenz/ehal.md) § Home Assistant).
 2. Ensure Earnie listens on **`system.ehal_loxone_http_port`** (default **8541**) and `EARNIE_PILOT_PUSH_TOKEN` is set in `ha_lab/config/.env` (same rules as Loxone pilot push).
 3. Generate a carrier fragment from current bindings:
    ```powershell
-   .venv\Scripts\python.exe -m scripts.ha_carrier_yaml_gen --config-dir ha_lab\config --host earnie-ha-lab --port 8541 --out ha_lab\homeassistant\earnie_weg_b.yaml
+   .venv\Scripts\python.exe -m scripts.ha_carrier_yaml_gen --config-dir ha_lab\config --host earnie-ha-lab --port 8541 --out ha_lab\homeassistant\earnie_push.yaml
    ```
    Merge `rest_command` + `sensor` blocks into HA `configuration.yaml` (or packages). **Convert entity units to canonical EHAL units in Jinja before calling** `/ehal/telemetry/<qualified-id>/<value>`.
 4. Map bindings in EHAL-Com (entity IDs still document the HA side; push-only activation may leave entity_id empty).

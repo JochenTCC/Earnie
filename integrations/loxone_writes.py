@@ -348,6 +348,44 @@ def _write_flexible_consumer_output(
 _OMIT_EXPORT_CAP = object()
 
 
+def _battery_max_powers_kw(battery_params: dict) -> tuple[float, float]:
+    """(max charge kW, max discharge kW) from battery params; ``max_power_kw`` as shared cap."""
+    max_charge = float(
+        battery_params.get("max_charge_power_kw")
+        or battery_params.get("max_power_kw")
+        or 0.0
+    )
+    max_discharge = float(
+        battery_params.get("max_discharge_power_kw")
+        or battery_params.get("max_power_kw")
+        or 0.0
+    )
+    return max_charge, max_discharge
+
+
+def _export_cap_marker_and_value(
+    export_cap_kw: float | None | object,
+) -> tuple[str, float] | None:
+    """Plant export-limit marker name and setpoint [kW]; None when no marker is bound."""
+    from house_config.ehal_bindings import resolve_plant_binding
+    from optimizer.export_power_limit import export_limit_setpoint_kw
+    from optimizer.live_export_limit import (
+        live_unconstrained_export_kw,
+        load_house_doc,
+    )
+
+    export_marker = resolve_plant_binding(
+        load_house_doc(), "set_grid_export_power_limit"
+    )
+    if not export_marker:
+        return None
+    cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
+    value = float(
+        export_limit_setpoint_kw(cap, unconstrained_kw=live_unconstrained_export_kw())
+    )
+    return str(export_marker), value
+
+
 def build_sent_loxone_snapshot(
     mode: int,
     target_power_kw: float,
@@ -359,17 +397,7 @@ def build_sent_loxone_snapshot(
     export_cap_kw: float | None | object = _OMIT_EXPORT_CAP,
 ) -> dict[str, float]:
     """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
-    battery_params = config.get_battery_params()
-    max_charge = float(
-        battery_params.get("max_charge_power_kw")
-        or battery_params.get("max_power_kw")
-        or 0.0
-    )
-    max_discharge = float(
-        battery_params.get("max_discharge_power_kw")
-        or battery_params.get("max_power_kw")
-        or 0.0
-    )
+    max_charge, max_discharge = _battery_max_powers_kw(config.get_battery_params())
     active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
         mode, target_power_kw, max_charge, max_discharge
     )
@@ -403,23 +431,9 @@ def build_sent_loxone_snapshot(
         snapshot[key] = send_value
 
     if export_cap_kw is not _OMIT_EXPORT_CAP:
-        from house_config.ehal_bindings import resolve_plant_binding
-        from optimizer.export_power_limit import export_limit_setpoint_kw
-        from optimizer.live_export_limit import (
-            live_unconstrained_export_kw,
-            load_house_doc,
-        )
-
-        export_marker = resolve_plant_binding(
-            load_house_doc(), "set_grid_export_power_limit"
-        )
-        if export_marker:
-            cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
-            snapshot[str(export_marker)] = float(
-                export_limit_setpoint_kw(
-                    cap, unconstrained_kw=live_unconstrained_export_kw()
-                )
-            )
+        export = _export_cap_marker_and_value(export_cap_kw)
+        if export is not None:
+            snapshot[export[0]] = export[1]
 
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         _write_flexible_consumer_output(
@@ -473,16 +487,7 @@ def send_huawei_modbus_states(
     if control == BATTERY_CONTROL_READ_ONLY:
         return []
 
-    max_charge = float(
-        battery_params.get("max_charge_power_kw")
-        or battery_params.get("max_power_kw")
-        or 0.0
-    )
-    max_discharge = float(
-        battery_params.get("max_discharge_power_kw")
-        or battery_params.get("max_power_kw")
-        or 0.0
-    )
+    max_charge, max_discharge = _battery_max_powers_kw(battery_params)
     if control == BATTERY_CONTROL_LIMITS_ONLY and mode in (1, 3):
         mode = 0
         target_power_kw = 0.0
@@ -503,23 +508,45 @@ def send_huawei_modbus_states(
         control_cmd,
     )
 
-    records: list[LoxoneWriteRecord] = []
+    records = _publish_ess_c1_setpoints(
+        (
+            ("set_ess_active_power", active_kw),
+            ("set_ess_charge_power_limit", charge_kw),
+            ("set_ess_discharge_power_limit", discharge_kw),
+            ("set_ess_mode", float(control_cmd)),
+        )
+    )
+    if export_cap_kw is not _OMIT_EXPORT_CAP:
+        from ehal.qualified_ids import qualified_plant_id
+
+        export = _export_cap_marker_and_value(export_cap_kw)
+        if export is not None:
+            records.append(
+                _publish_setpoint_traced(
+                    qualified_plant_id("set_grid_export_power_limit"),
+                    export[1],
+                    io_name=export[0],
+                )
+            )
+    return records
+
+
+def _publish_ess_c1_setpoints(
+    kind_values: tuple[tuple[str, float | None], ...],
+) -> list[LoxoneWriteRecord]:
+    """Publish each wired ESS setpoint (kind, value) into the status.json ledger."""
     from house_config.ess_bindings import resolve_primary_ess_binding
     from integrations.ehal_debug_mapping import (
         build_loxone_setpoint_io_index,
         has_mappable_live_batteries,
     )
 
+    records: list[LoxoneWriteRecord] = []
     io_to_field = build_loxone_setpoint_io_index()
     has_batteries = bool(has_mappable_live_batteries())
     active_wired = resolve_primary_ess_binding("set_ess_active_power")
 
-    for kind, value in (
-        ("set_ess_active_power", active_kw),
-        ("set_ess_charge_power_limit", charge_kw),
-        ("set_ess_discharge_power_limit", discharge_kw),
-        ("set_ess_mode", float(control_cmd)),
-    ):
+    for kind, value in kind_values:
         wired = resolve_primary_ess_binding(kind)
         if not wired:
             continue
@@ -540,34 +567,6 @@ def send_huawei_modbus_states(
             continue
         # Trace/Live-Schreiben key = exchange id (entity-scoped when batteries exist).
         records.append(_publish_setpoint_traced(field, send_value, io_name=field))
-
-    if export_cap_kw is not _OMIT_EXPORT_CAP:
-        from house_config.ehal_bindings import resolve_plant_binding
-        from optimizer.export_power_limit import export_limit_setpoint_kw
-        from optimizer.live_export_limit import (
-            live_unconstrained_export_kw,
-            load_house_doc,
-        )
-
-        from ehal.qualified_ids import qualified_plant_id
-
-        export_marker = resolve_plant_binding(
-            load_house_doc(), "set_grid_export_power_limit"
-        )
-        if export_marker:
-            cap = None if export_cap_kw is None else float(export_cap_kw)  # type: ignore[arg-type]
-            export_val = float(
-                export_limit_setpoint_kw(
-                    cap, unconstrained_kw=live_unconstrained_export_kw()
-                )
-            )
-            records.append(
-                _publish_setpoint_traced(
-                    qualified_plant_id("set_grid_export_power_limit"),
-                    export_val,
-                    io_name=str(export_marker),
-                )
-            )
     return records
 
 

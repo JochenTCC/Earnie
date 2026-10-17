@@ -143,6 +143,45 @@ def migrate_ha_entities_to_house(
     return house, changed
 
 
+def _merge_entity_ehal_bindings(
+    out: dict[str, str],
+    entities: list[dict],
+    bind,
+    *,
+    push: bool,
+    require_id: bool = False,
+) -> None:
+    """Add entity-owned bindings (battery / inverter / PV) not yet in ``out``."""
+    for entity in entities:
+        if require_id and not str(entity.get("id") or "").strip():
+            continue
+        raw_bind = entity.get("ehal_bindings")
+        entity_map = bind(raw_bind if isinstance(raw_bind, dict) else None)
+        for field, value in entity_map.items():
+            if (value or push) and field not in out:
+                out[field] = value
+
+
+def _merge_plant_ess_bindings(
+    out: dict[str, str], plant_bindings: dict[str, str], *, push: bool
+) -> None:
+    """Plant may still hold flat ESS entity ids (HA) until migrate_ess_bindings_once,
+    or entity-scoped ess.{id}.* left on plant by HA flat-map migrate.
+    Flat sens_ess_soc / plant Quellenwahl are never re-emitted.
+    """
+    from ehal.ess_fields import is_ess_entity_scoped_field, is_plant_flat_ess_field
+
+    for field, value in plant_bindings.items():
+        if field in ("sens_ess_soc", "set_ess_source_select") or field in out:
+            continue
+        if not (value or push):
+            continue
+        if is_plant_flat_ess_field(field):
+            out[field] = value
+        elif is_ess_entity_scoped_field(field):
+            out[field] = value
+
+
 def aggregate_ha_entities(
     house_doc: dict | None,
     *,
@@ -153,15 +192,17 @@ def aggregate_ha_entities(
 
     ESS is entity-scoped ``ess.{id}.*`` only (no plant-flat aliases).
 
-    ``transport=weg_b``: include activated binding keys even when ``entity_id`` is empty
+    ``transport=push``: include activated binding keys even when ``entity_id`` is empty
     (push-only reads / status.json writes). ``pull`` keeps non-empty entity ids only.
     """
     from ehal.ess_fields import is_plant_flat_ess_field
     from house_config.ess_bindings import entity_scoped_battery_bindings
-    from runtime_store.ehal_setup import HA_TRANSPORT_WEG_B, normalize_ha_transport
+    from runtime_store.ehal_setup import HA_TRANSPORT_PUSH, normalize_ha_transport
 
-    weg_b = normalize_ha_transport(transport) == HA_TRANSPORT_WEG_B if transport else False
-    bind = _activation_map if weg_b else _binding_map
+    push = (
+        normalize_ha_transport(transport) == HA_TRANSPORT_PUSH if transport else False
+    )
+    bind = _activation_map if push else _binding_map
 
     house = house_doc if isinstance(house_doc, dict) else {}
     out: dict[str, str] = {}
@@ -174,7 +215,7 @@ def aggregate_ha_entities(
         if is_plant_flat_ess_field(field):
             continue
         value = plant_bindings.get(field)
-        if value or (weg_b and field in plant_bindings):
+        if value or (push and field in plant_bindings):
             out[field] = value
     # EV keys: prefer consumer; fall back to plant (migrate without EV consumer).
     ev_consumer = find_first_ev_consumer(house)
@@ -182,54 +223,24 @@ def aggregate_ha_entities(
     for field in HA_EV_FIELDS:
         value = ev_bindings.get(field) or plant_bindings.get(field)
         if value or (
-            weg_b and (field in ev_bindings or field in plant_bindings)
+            push and (field in ev_bindings or field in plant_bindings)
         ):
             out[field] = value
 
     batteries = _batteries_for_aggregate(components_doc)
-    for bat in batteries:
-        bid = str(bat.get("id") or "").strip()
-        if not bid:
-            continue
-        raw_bind = bat.get("ehal_bindings")
-        bat_map = bind(raw_bind if isinstance(raw_bind, dict) else None)
-        for field, value in bat_map.items():
-            if value or weg_b:
-                if field not in out:
-                    out[field] = value
-    for inv in _inverters_for_aggregate(components_doc):
-        raw_bind = inv.get("ehal_bindings")
-        inv_map = bind(raw_bind if isinstance(raw_bind, dict) else None)
-        for field, value in inv_map.items():
-            if value or weg_b:
-                if field not in out:
-                    out[field] = value
-    for pv in _pv_systems_for_aggregate(components_doc):
-        raw_bind = pv.get("ehal_bindings")
-        pv_map = bind(raw_bind if isinstance(raw_bind, dict) else None)
-        for field, value in pv_map.items():
-            if value or weg_b:
-                if field not in out:
-                    out[field] = value
-    if not weg_b:
+    _merge_entity_ehal_bindings(out, batteries, bind, push=push, require_id=True)
+    _merge_entity_ehal_bindings(
+        out, _inverters_for_aggregate(components_doc), bind, push=push
+    )
+    _merge_entity_ehal_bindings(
+        out, _pv_systems_for_aggregate(components_doc), bind, push=push
+    )
+    if not push:
         for key, value in entity_scoped_battery_bindings(batteries).items():
             if value and key not in out:
                 out[key] = value
-    # Plant may still hold flat ESS entity ids (HA) until migrate_ess_bindings_once,
-    # or entity-scoped ess.{id}.* left on plant by HA flat-map migrate.
-    # Flat sens_ess_soc / plant Quellenwahl are never re-emitted.
-    from ehal.ess_fields import is_ess_entity_scoped_field
-
-    for field, value in plant_bindings.items():
-        if field in ("sens_ess_soc", "set_ess_source_select") or field in out:
-            continue
-        if not (value or weg_b):
-            continue
-        if is_plant_flat_ess_field(field):
-            out[field] = value
-        elif is_ess_entity_scoped_field(field):
-            out[field] = value
-    return canonicalize_ha_entity_keys(out, keep_empty=weg_b)
+    _merge_plant_ess_bindings(out, plant_bindings, push=push)
+    return canonicalize_ha_entity_keys(out, keep_empty=push)
 
 def _batteries_for_aggregate(components_doc: dict | None) -> list[dict]:
     from house_config.powerstation import ehal_mappable_batteries

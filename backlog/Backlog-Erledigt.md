@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7 quality / release hardening (2026-10-17)
+
+- [x] **2.7 quality / release hardening** `[qual]`: full gate before first community alpha (skill `quality-gate`; no `version.py` bump; letter `2.7.r` already used for Binding HA transport)
+  - [x] Coverage baseline — **3905** passed / **14** skipped (final suite); overall **83.0%** (`data` 74.5, `ehal` 90.6, `house_config` 85.3, `optimizer` 85.2, `runtime_store` 83.7, `settings` 79.1, `simulation` 87.1); no package &lt; 40% (vs 2.6.r re-check 80.7% / 2728 passed). First `run --coverage` had 2 xdist-flaky local-HTTP failures (`test_endpoint_token_validation_and_storage`, `test_http_get_status_json`); both green sequential and on final suite.
+  - [x] Dead-code / obsolete-test audit — vulture `--min-confidence 80`: **0** hits; `--dead-fixtures`: all fixtures used; health-report flags are expected mock-heavy / always-skipped (no removals).
+  - [x] Simplify redundant / complex / unneeded — no behavior-changing removals this pass (no `_backup` / `_tmp` leftovers; comment-block scan clean); triage deferred.
+  - [x] KPI refactor — all core/UI files ≤ 600 code LOC (mega-file sibling splits + facades/re-exports; `optimizer/milp.py` → `milp_defaults.py`); functions > 60 LOC cleared except exempt MILP constraint blocks `_create_grid_battery_vars` / `_add_slot_power_balance_and_soc` in `milp_horizon.py`.
+  - [x] Official docs review (thin) — prior [`docs/dev/doc-review-checklist.md`](../docs/dev/doc-review-checklist.md) P1/P2 Check+Style complete; `## Document Review Findings` empty; no docs-editor rewalk (KPI splits did not change user-facing behavior).
+  - [x] Fix last failed sonarcloud Action — [run 39016600274](https://github.com/JochenTCC/Earnie/actions/runs/39016600274): `test_thermal_hourly_overlay_maps_slots` Open-Meteo `ReadTimeout`; offline mock via `install_open_meteo_climate_mock` in `tests/test_price_pipeline_p3.py`.
+
 ### Semi-automatic docs / manuals review (2026-10-17)
 
 - [x] **Semi-automatic review of docs / manuals** `[qual]` — remove obsolete ones
@@ -159,7 +169,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Document Review homeassistant-addon.md port 8541 (2026-10-17)
 
-- [x] **`homeassistant-addon.md` — port 8541 scope:** Ports table now states the port is relevant for `ehal.backend=loxone` and for Home Assistant with `ehal.ha.transport=weg_b` (same HTTP contract), not needed for `pull`. Add-on `config.yaml` port descriptions (`earnie`, `earnie_prerelease`) aligned ("bei Loxone-Backend oder HA-Transport weg_b").
+- [x] **`homeassistant-addon.md` — port 8541 scope:** Ports table now states the port is relevant for `ehal.backend=loxone` and for Home Assistant with `ehal.ha.transport=push` (same HTTP contract), not needed for `pull`. Add-on `config.yaml` port descriptions (`earnie`, `earnie_prerelease`) aligned ("bei Loxone-Backend oder HA-Transport push").
 
 ### Document Review homeassistant-addon.md internal vocabulary (2026-10-17)
 
@@ -644,9 +654,9 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.7.r — HA live I/O contract / Binding P5 transport (2026-10-11)
 
-- [x] **T1 — Contract & transport switch:** `[feat]` Single Earnie↔HA I/O story in `docs/spec/ehal.md` and user docs; config `ehal.ha.transport` (`pull`|`weg_b`, default `pull`) via `runtime_store/ehal_setup.py` / `settings/config_loaders.py`; canonical `GET /ehal/status.json` with `/ehal/loxone/status.json` alias (`integrations/loxone_status_json.py`); HA push telemetry on the wire in canonical EHAL units (W/kWh/%/A; carrier converts in HA).
-- [x] **T2 — HA → Earnie push read:** `[feat]` With `transport=weg_b`, `integrations/ha_adapter.py` reads activated fields from the push inbox (`integrations/ha_push_read.py`, `runtime_store/loxone_push_inbox.py`); REST is fenced for push-covered fields; missing/stale push fails loud (no pull fallback).
-- [x] **T3 — Earnie → HA via status.json:** `[feat]` Setpoints published to the status ledger for weg_b; service-call writes skipped for covered fields (`integrations/ehal_live.py`); `ha_ess_force`/Huawei paths remain REST exceptions.
+- [x] **T1 — Contract & transport switch:** `[feat]` Single Earnie↔HA I/O story in `docs/spec/ehal.md` and user docs; config `ehal.ha.transport` (`pull`|`push`, default `pull`) via `runtime_store/ehal_setup.py` / `settings/config_loaders.py`; canonical `GET /ehal/status.json` with `/ehal/loxone/status.json` alias (`integrations/loxone_status_json.py`); HA push telemetry on the wire in canonical EHAL units (W/kWh/%/A; carrier converts in HA).
+- [x] **T2 — HA → Earnie push read:** `[feat]` With `transport=push`, `integrations/ha_adapter.py` reads activated fields from the push inbox (`integrations/ha_push_read.py`, `runtime_store/loxone_push_inbox.py`); REST is fenced for push-covered fields; missing/stale push fails loud (no pull fallback).
+- [x] **T3 — Earnie → HA via status.json:** `[feat]` Setpoints published to the status ledger for push; service-call writes skipped for covered fields (`integrations/ehal_live.py`); `ha_ess_force`/Huawei paths remain REST exceptions.
 - [x] **T4 — Minimal carrier YAML + lab:** `[feat]` `scripts/ha_carrier_yaml_gen.py` + `integrations/ha_carrier_yaml.py`, example `share/config/ehal.ha.snippet.json`, lab checklist in `docs/dev/ha-lab-setup.md` §9 (not Add-on / full Binding P5 comfort).
 
 ### Rename Pattern B → entity-scoped bindings (2026-10-11)

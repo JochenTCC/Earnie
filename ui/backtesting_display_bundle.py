@@ -406,6 +406,52 @@ def _snapshot_missing_multi_ess_soc(snapshot: dict) -> bool:
     return not bool(discover_ess_soc_series(pd.DataFrame(rows[:1])))
 
 
+def _on_demand_window_snapshot(
+    log_dir: str,
+    window_anchor: str,
+    scenario_id: str,
+    meta: dict,
+    hourly_df: pd.DataFrame,
+    *,
+    log_horizon: str,
+    replace_stale: bool,
+) -> dict:
+    """Cached single-window simulation; persists a new snapshot into the JSONL log."""
+    from simulation.backtesting_single_window import (
+        cache_key_for_window,
+        initial_soc_for_anchor,
+        simulate_window_snapshot,
+    )
+
+    cache_key = cache_key_for_window(window_anchor, scenario_id, log_horizon)
+    if replace_stale:
+        cache_key = (*cache_key, "multi_ess_soc_v1")
+    snapshot_cache = _on_demand_snapshot_cache()
+    snapshot = snapshot_cache.get(cache_key)
+    if snapshot is not None:
+        return snapshot
+    anchor_dt = pd.Timestamp(window_anchor).to_pydatetime()
+    initial_soc = initial_soc_for_anchor(anchor_dt, scenario_id, hourly_df)
+    with st.spinner("Fenster wird berechnet…"):
+        snapshot = simulate_window_snapshot(
+            anchor_dt,
+            scenario_id,
+            meta,
+            initial_soc=initial_soc,
+            horizon_mode=log_horizon,
+        )
+    snapshot_cache[cache_key] = snapshot
+    if replace_stale:
+        from simulation.backtesting_snapshots import upsert_window_snapshot
+
+        upsert_window_snapshot(log_dir, snapshot)
+    else:
+        from simulation.backtesting_snapshots import append_window_snapshot
+
+        append_window_snapshot(log_dir, snapshot)
+    return snapshot
+
+
 def resolve_backtesting_display_bundle(
     log_dir: str,
     window_anchor: str,
@@ -451,37 +497,15 @@ def resolve_backtesting_display_bundle(
             log_horizon_mode=log_horizon,
         )
     if bundle is None or replace_stale:
-        from simulation.backtesting_single_window import (
-            cache_key_for_window,
-            initial_soc_for_anchor,
-            simulate_window_snapshot,
+        snapshot = _on_demand_window_snapshot(
+            log_dir,
+            window_anchor,
+            scenario_id,
+            meta,
+            hourly_df,
+            log_horizon=log_horizon,
+            replace_stale=replace_stale,
         )
-
-        cache_key = cache_key_for_window(window_anchor, scenario_id, log_horizon)
-        if replace_stale:
-            cache_key = (*cache_key, "multi_ess_soc_v1")
-        snapshot_cache = _on_demand_snapshot_cache()
-        snapshot = snapshot_cache.get(cache_key)
-        if snapshot is None:
-            anchor_dt = pd.Timestamp(window_anchor).to_pydatetime()
-            initial_soc = initial_soc_for_anchor(anchor_dt, scenario_id, hourly_df)
-            with st.spinner("Fenster wird berechnet…"):
-                snapshot = simulate_window_snapshot(
-                    anchor_dt,
-                    scenario_id,
-                    meta,
-                    initial_soc=initial_soc,
-                    horizon_mode=log_horizon,
-                )
-            snapshot_cache[cache_key] = snapshot
-            if replace_stale:
-                from simulation.backtesting_snapshots import upsert_window_snapshot
-
-                upsert_window_snapshot(log_dir, snapshot)
-            else:
-                from simulation.backtesting_snapshots import append_window_snapshot
-
-                append_window_snapshot(log_dir, snapshot)
         bundle = build_backtesting_display_bundle(
             snapshot,
             view_mode=view_mode,

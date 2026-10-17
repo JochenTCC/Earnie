@@ -275,7 +275,8 @@ def _optional_positive_from_widget(value: float) -> float | None:
     return float(value)
 
 
-def _render_inv_fields(session_scope: str, *, existing: dict) -> dict:
+def _render_inv_choice_fields(session_scope: str) -> tuple[str, str, str, str]:
+    """Bezeichnung, Typ, AC-Anschluss and Steuerbarkeit widgets → stored values."""
     label = labeled_text_input(
         "Bezeichnung",
         key=_scoped_key(session_scope, "planning_inv_label"),
@@ -307,6 +308,11 @@ def _render_inv_fields(session_scope: str, *, existing: dict) -> dict:
     )
     label_to_control = {v: k for k, v in CONTROL_LABELS_DE.items()}
     control = label_to_control.get(str(control_label), DEFAULT_BATTERY_CONTROL)
+    return label, inv_type, ac, control
+
+
+def _render_inv_limit_fields(session_scope: str) -> tuple[float, float, float, float]:
+    """η_inv and the three power-cap widgets (efficiency, max AC, max PV, max charge)."""
     efficiency = labeled_number_input(
         "Wirkungsgrad DC↔AC (η_inv)",
         min_value=0.5,
@@ -334,6 +340,12 @@ def _render_inv_fields(session_scope: str, *, existing: dict) -> dict:
         step=0.1,
         key=_scoped_key(session_scope, "planning_inv_max_charge"),
     )
+    return efficiency, max_ac, max_pv, max_charge
+
+
+def _render_inv_fields(session_scope: str, *, existing: dict) -> dict:
+    label, inv_type, ac, control = _render_inv_choice_fields(session_scope)
+    efficiency, max_ac, max_pv, max_charge = _render_inv_limit_fields(session_scope)
     owned_by = str(existing.get("owned_by") or "").strip()
     if owned_by:
         st.caption(

@@ -354,6 +354,91 @@ def probe_http_markers(
     )
 
 
+def _scan_loxapp3_variant(
+    *, host: str, username: str, password: str, timeout_sec: float
+) -> tuple[StructureScanResult, dict[str, Any] | None]:
+    """LoxAPP3.json variant and the parsed document (None when the fetch failed)."""
+    try:
+        loxapp3_doc = fetch_loxapp3_json(
+            host=host,
+            username=username,
+            password=password,
+            timeout_sec=timeout_sec,
+        )
+    except LoxoneStructureError as exc:
+        logger.info("LoxAPP3 scan failed: %s", exc)
+        return (
+            StructureScanResult(
+                source=SOURCE_LOXAPP3,
+                structure_complete=False,
+                errors=[str(exc)],
+            ),
+            None,
+        )
+    return (
+        StructureScanResult(
+            source=SOURCE_LOXAPP3,
+            structure_complete=True,
+            items=normalize_loxapp3(loxapp3_doc),
+        ),
+        loxapp3_doc,
+    )
+
+
+def _scan_http_probe_variant(
+    variants: list[StructureScanResult],
+    loxapp3_doc: dict[str, Any] | None,
+    *,
+    host: str,
+    username: str,
+    password: str,
+    configured_names: list[str] | None,
+    timeout_sec: float,
+) -> StructureScanResult:
+    loxapp3_for_probe = next(
+        (v for v in variants if v.source == SOURCE_LOXAPP3 and v.ok),
+        None,
+    )
+    earnie_from_loxapp3 = [
+        item.name
+        for item in (loxapp3_for_probe.items if loxapp3_for_probe else [])
+        if str(item.name or "").casefold().startswith("earnie_")
+    ]
+    return probe_http_markers(
+        host=host,
+        username=username,
+        password=password,
+        configured_names=configured_names or [],
+        extra_names=earnie_from_loxapp3,
+        timeout_sec=timeout_sec,
+        loxapp3_doc=loxapp3_doc,
+    )
+
+
+def _scan_mcp17_variant(
+    variants: list[StructureScanResult],
+    mcp_base_url: str,
+    *,
+    username: str,
+    password: str,
+    configured_names: list[str] | None,
+    timeout_sec: float,
+) -> StructureScanResult:
+    loxapp3 = next(
+        (v for v in variants if v.source == SOURCE_LOXAPP3 and v.ok),
+        None,
+    )
+    seed_from_loxapp3 = [item.name for item in loxapp3.items[:80]] if loxapp3 else []
+    return probe_mcp17(
+        mcp_base_url,
+        username=username,
+        password=password,
+        timeout_sec=max(timeout_sec, 45.0),
+        configured_names=configured_names or [],
+        seed_names=seed_from_loxapp3,
+    )
+
+
 def scan_structure(
     *,
     host: str,
@@ -379,68 +464,33 @@ def scan_structure(
     loxapp3_doc: dict[str, Any] | None = None
 
     if SOURCE_LOXAPP3 in wanted:
-        try:
-            loxapp3_doc = fetch_loxapp3_json(
-                host=host,
-                username=username,
-                password=password,
-                timeout_sec=timeout_sec,
-            )
-            variants.append(
-                StructureScanResult(
-                    source=SOURCE_LOXAPP3,
-                    structure_complete=True,
-                    items=normalize_loxapp3(loxapp3_doc),
-                )
-            )
-        except LoxoneStructureError as exc:
-            logger.info("LoxAPP3 scan failed: %s", exc)
-            variants.append(
-                StructureScanResult(
-                    source=SOURCE_LOXAPP3,
-                    structure_complete=False,
-                    errors=[str(exc)],
-                )
-            )
+        loxapp3_variant, loxapp3_doc = _scan_loxapp3_variant(
+            host=host, username=username, password=password, timeout_sec=timeout_sec
+        )
+        variants.append(loxapp3_variant)
 
     if SOURCE_HTTP_PROBE in wanted:
-        loxapp3_for_probe = next(
-            (v for v in variants if v.source == SOURCE_LOXAPP3 and v.ok),
-            None,
-        )
-        earnie_from_loxapp3 = [
-            item.name
-            for item in (loxapp3_for_probe.items if loxapp3_for_probe else [])
-            if str(item.name or "").casefold().startswith("earnie_")
-        ]
         variants.append(
-            probe_http_markers(
+            _scan_http_probe_variant(
+                variants,
+                loxapp3_doc,
                 host=host,
                 username=username,
                 password=password,
-                configured_names=configured_names or [],
-                extra_names=earnie_from_loxapp3,
+                configured_names=configured_names,
                 timeout_sec=timeout_sec,
-                loxapp3_doc=loxapp3_doc,
             )
         )
 
     if SOURCE_MCP17 in wanted:
-        loxapp3 = next(
-            (v for v in variants if v.source == SOURCE_LOXAPP3 and v.ok),
-            None,
-        )
-        seed_from_loxapp3 = (
-            [item.name for item in loxapp3.items[:80]] if loxapp3 else []
-        )
         variants.append(
-            probe_mcp17(
+            _scan_mcp17_variant(
+                variants,
                 mcp_base_url,
                 username=username,
                 password=password,
-                timeout_sec=max(timeout_sec, 45.0),
-                configured_names=configured_names or [],
-                seed_names=seed_from_loxapp3,
+                configured_names=configured_names,
+                timeout_sec=timeout_sec,
             )
         )
 
