@@ -170,12 +170,46 @@ def test_refresh_requires_consent(plant: Path, spawns: list[int]) -> None:
     assert spawns == []
 
 
+def test_set_consent_on_refreshes_points_without_live_cycle(
+    plant: Path, spawns: list[int]
+) -> None:
+    """Opt-in computes Earnie-Points from config; no optimiser cycle required."""
+    state = up.set_consent("on")
+    assert state["points"] == 6
+    assert state["points_v"] == 1
+    assert state["stage"] == "explorer"
+    assert state["points_stamp"] == pts.config_stamp()
+    assert spawns == [1]
+    # Wire schema stays v1 until stage is live.
+    assert up.build_payload(state)["v"] == 1
+    assert "points" not in up.build_payload(state)
+
+
+def test_set_consent_on_with_live_stage_yields_payload_v2(
+    plant: Path, spawns: list[int]
+) -> None:
+    up.save_state({"consent": "unset", "stage": "live"})
+    state = up.set_consent("on")
+    assert state["stage"] == "live"
+    assert state["points"] == 6
+    payload = up.build_payload(state)
+    assert payload["v"] == 2
+    assert payload["points"] == 6
+    assert spawns == [1]
+
+
 def test_refresh_stores_points_and_triggers_resend(plant: Path, spawns: list[int]) -> None:
-    up.set_consent("on")
-    state = up.load_state()
-    state["last_sent_date"] = "2026-10-16"
-    state["last_attempt_at"] = "2026-10-16T10:00:00+00:00"
-    up.save_state(state)
+    # Manual consent so the first refresh is under test (set_consent also refreshes).
+    up.save_state(
+        {
+            "consent": "on",
+            "install_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "stage": "explorer",
+            "consent_at": "2026-10-16",
+            "last_sent_date": "2026-10-16",
+            "last_attempt_at": "2026-10-16T10:00:00+00:00",
+        }
+    )
 
     assert pts.refresh_points() is True
     state = up.load_state()
@@ -191,7 +225,7 @@ def test_refresh_skips_when_stamp_unchanged(
     plant: Path, spawns: list[int], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     up.set_consent("on")
-    assert pts.refresh_points() is True
+    assert spawns == [1]
 
     def _boom() -> dict:
         raise AssertionError("must not recompute for an unchanged stamp")
@@ -203,7 +237,6 @@ def test_refresh_skips_when_stamp_unchanged(
 
 def test_refresh_recomputes_on_config_change(plant: Path, spawns: list[int]) -> None:
     up.set_consent("on")
-    pts.refresh_points()
     _write(plant / "house_profiles.json", _profiles(phases=1))
     assert pts.refresh_points() is True
     assert up.load_state()["points"] == 5
@@ -212,7 +245,6 @@ def test_refresh_recomputes_on_config_change(plant: Path, spawns: list[int]) -> 
 
 def test_changed_config_with_same_total_does_not_resend(plant: Path, spawns: list[int]) -> None:
     up.set_consent("on")
-    pts.refresh_points()
     _write(plant / "config.json", {"live_scenario_id": "live", "note": "touch"})
     assert pts.refresh_points() is False
     assert up.load_state()["points"] == 6
@@ -223,7 +255,6 @@ def test_error_clears_points_and_warns_once_per_stamp(
     plant: Path, spawns: list[int], caplog: pytest.LogCaptureFixture
 ) -> None:
     up.set_consent("on")
-    pts.refresh_points()
     assert up.load_state()["points"] == 6
 
     _write(plant / "backtesting_scenarios.json", _scenarios(pv_system_ids=["gone"]))
@@ -250,7 +281,15 @@ def test_note_live_cycle_success_refreshes_points(plant: Path, spawns: list[int]
 def test_note_live_cycle_success_skips_points_in_shadow(
     plant: Path, spawns: list[int], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    up.set_consent("on")
+    # Consent without set_consent auto-refresh so the live-cycle path is isolated.
+    up.save_state(
+        {
+            "consent": "on",
+            "install_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "stage": "explorer",
+            "consent_at": "2026-10-16",
+        }
+    )
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     up.note_live_cycle_success()
     assert "points" not in up.load_state()

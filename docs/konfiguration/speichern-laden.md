@@ -34,11 +34,11 @@ Enthaltene Dateien:
 
 ### Datenmodell-Version
 
-Das Manifest des ZIP (`earnie_config_pack.json`) und die JSON-Dateien tragen das Feld `earnie_data_model` (aktuell `4`). Ausgenommen ist `grid_fees.json`: Earnie schreibt das Feld dort weder beim Export noch beim Import. Beim Import entscheidet die Version im Manifest:
+Das Manifest des ZIP (`earnie_config_pack.json`) und die JSON-Dateien tragen das Feld `earnie_data_model` (aktuell `4`). Ausgenommen ist `grid_fees.json`: Earnie schreibt das Feld dort weder beim Export noch beim Import. Beim Import prüft Earnie Manifest und jede Earnie-Track-Datei:
 
 - **Version `4`:** Earnie übernimmt die Dateien. Beim Schreiben setzt Earnie das Feld in den Dateien auf `4`.
 - **Version `3`:** Earnie hebt die Dateien automatisch auf Version `4` an. Dieselbe Migrationskette läuft auch im [Migrations-Assistenten](../einrichtung/betrieb.md#update-und-migration) für die Konfiguration im Betrieb.
-- **Ältere oder fehlende Versionen** (`1`, `2`, fehlendes Feld im Manifest): Earnie lehnt den Import ab und ändert die Version nicht stillschweigend.
+- **Ältere oder fehlende Versionen** (`1`, `2`, fehlendes Feld) in Manifest oder Mitgliedsdatei: Earnie lehnt den Import ab und ändert die Version nicht stillschweigend. `grid_fees.json` bleibt von dieser Prüfung ausgenommen.
 
 **Hintergrund zu früheren Umstellungen:**
 

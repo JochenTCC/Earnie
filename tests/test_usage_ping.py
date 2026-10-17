@@ -233,7 +233,11 @@ def test_payload_v2_when_live_with_points(runtime_dir: Path) -> None:
 
 def test_payload_v1_without_points_or_before_live(runtime_dir: Path) -> None:
     live = up.set_consent("on", now=_now())
+    # Strip any points from consent-time refresh (local plant may be resolvable).
     live["stage"] = "live"
+    live.pop("points", None)
+    live.pop("points_v", None)
+    live.pop("points_stamp", None)
     assert set(up.build_payload(live).keys()) == up.PAYLOAD_KEYS_V1
     explorer = {**live, "stage": "explorer", "points": 5, "points_v": 1}
     payload = up.build_payload(explorer)
@@ -361,7 +365,10 @@ def test_note_live_cycle_success_skips_shadow(
 def test_spawn_maybe_send_ping_single_flight(
     runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Avoid consent-time points refresh spawning a real send before this test.
+    monkeypatch.setattr("runtime_store.usage_points.refresh_points", lambda: False)
     up.set_consent("on", now=_now())
+    up.reset_send_in_flight_for_tests()
     started = threading.Event()
     release = threading.Event()
     calls: list[int] = []

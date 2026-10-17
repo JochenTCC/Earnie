@@ -199,7 +199,7 @@ Ab Version 2.7 kann Earnie optional und anonym melden, dass eine Installation ak
 
 **Zustimmung (drei Zustände):** noch nicht gefragt (`unset`), zugestimmt (`on`) oder abgelehnt (`off`). Gesendet wird nur bei `on`.
 
-- Beim ersten Öffnen des **Szenarienkonfigurators** erscheint ein Dialog.
+- Beim ersten Öffnen des **Szenario-Explorers** erscheint ein Dialog (ohne `scenario_explorer` in `EARNIE_UI_MODES`: beim **Szenarienkonfigurator**).
 - Unter **Daemon Control → Optimierer-Dienst** können Sie die Zustimmung jederzeit umschalten.
 - Unter **Was wird gesendet?** sehen Sie die exakte JSON-Vorschau.
 - Ein fehlgeschlagener Ping hat **keinen Einfluss** auf die Optimierung.
@@ -212,7 +212,7 @@ Ab Version 2.7 kann Earnie optional und anonym melden, dass eine Installation ak
 | `id` | Zufällige Installations-ID (UUIDv4). Sie entsteht erst bei Zustimmung und wird bei Widerruf gelöscht. |
 | `app_version` | Earnie-Versionsstring. |
 | `context` | Installationskontext: `loxberry`, `homeassistant_addon` oder `manual`. |
-| `stage` | Höchster erreichter Meilenstein: `explorer` (Szenarienkonfigurator) bzw. `live` (erster erfolgreicher Live-Zyklus). |
+| `stage` | Höchster erreichter Meilenstein: `explorer` (Szenario-Explorer bzw. Fallback Szenarienkonfigurator) bzw. `live` (erster erfolgreicher Live-Zyklus). |
 | `points` | Nur im Live-Betrieb: Summe der **Earnie-Points** der Live-Anlage (ganze Zahl, siehe [Earnie-Points](#earnie-points)). |
 | `points_v` | Nur zusammen mit `points`: Version der Berechnungsregel (aktuell `1`). |
 

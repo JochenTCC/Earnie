@@ -129,7 +129,11 @@ def endpoint_url_from_env() -> str:
 
 
 def set_consent(value: Literal["on", "off"], *, now: datetime | None = None) -> dict[str, Any]:
-    """Opt in (mint install ID) or opt out (wipe install ID)."""
+    """Opt in (mint install ID) or opt out (wipe install ID).
+
+    On opt-in, recomputes live-plant Earnie-Points immediately (config-based; no
+    optimisation cycle required). Wire schema stays v1 until ``stage`` is ``live``.
+    """
     state = load_state()
     stamp = _utc_now(now)
     if value == "on":
@@ -143,6 +147,14 @@ def set_consent(value: Literal["on", "off"], *, now: datetime | None = None) -> 
         state["consent"] = "off"
         state.pop("install_id", None)
     save_state(state)
+    if value == "on":
+        try:
+            from runtime_store.usage_points import refresh_points
+
+            refresh_points()
+        except Exception as exc:
+            logger.warning("usage_ping: points refresh after consent failed: %s", exc)
+        return load_state()
     return state
 
 

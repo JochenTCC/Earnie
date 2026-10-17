@@ -292,6 +292,83 @@ def test_config_pack_rejects_v1_manifest(monkeypatch, tmp_path: Path) -> None:
         import_config_pack_bytes(buf.getvalue())
 
 
+def test_config_pack_rejects_v2_member_with_v4_manifest(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Regression: incompatible members must fail; never stamp-before-ensure."""
+    import io
+
+    monkeypatch.chdir(tmp_path)
+    _clear_sidecar_path_overrides(monkeypatch)
+    cfg = tmp_path / "earnie_env" / "config"
+    cfg.mkdir(parents=True)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg))
+    (cfg / "config.json").write_text("{}", encoding="utf-8")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(
+            MANIFEST_NAME,
+            json.dumps(
+                {DATA_MODEL_KEY: CURRENT_DATA_MODEL, "files": ["config.json"]}
+            ),
+        )
+        zf.writestr(
+            "config.json",
+            json.dumps({DATA_MODEL_KEY: 2, "live_scenario_id": "live"}),
+        )
+    with pytest.raises(DataModelError, match=r"config\.json.*nicht kompatibel"):
+        import_config_pack_bytes(buf.getvalue())
+
+
+def test_migrate_and_validate_ensures_before_stamp(monkeypatch) -> None:
+    """Defense: ensure_compatible must see the original member version, then stamp."""
+    from runtime_store import config_pack as cp
+    from runtime_store.data_model import ensure_compatible as real_ensure
+    from runtime_store.data_model import stamp_data_model as real_stamp
+    from runtime_store.migration import chain as chain_mod
+    from runtime_store.migration import validate as validate_mod
+    from runtime_store.migration.types import ChainResult
+
+    order: list[str] = []
+
+    def tracking_ensure(doc, *, label: str):
+        order.append(f"ensure:{doc.get(DATA_MODEL_KEY)}")
+        return real_ensure(doc, label=label)
+
+    def tracking_stamp(doc):
+        order.append(f"stamp:{doc.get(DATA_MODEL_KEY)}")
+        return real_stamp(doc)
+
+    monkeypatch.setattr(cp, "ensure_compatible", tracking_ensure)
+    monkeypatch.setattr(cp, "stamp_data_model", tracking_stamp)
+    monkeypatch.setattr(
+        chain_mod,
+        "apply_chain",
+        lambda docs, answers, steps, *, stop_on_blocker=True: ChainResult(
+            docs=docs,
+            applied_step_ids=(),
+            blockers=(),
+            manual_todos=(),
+            questions=(),
+        ),
+    )
+    monkeypatch.setattr(validate_mod, "validate_migrated_docs", lambda docs: None)
+
+    docs = {
+        "config.json": {
+            DATA_MODEL_KEY: CURRENT_DATA_MODEL,
+            "live_scenario_id": "live",
+        },
+        "grid_fees.json": {"areas": []},
+    }
+    out = cp._migrate_and_validate_pack_docs(docs)
+    assert order == [
+        f"ensure:{CURRENT_DATA_MODEL}",
+        f"stamp:{CURRENT_DATA_MODEL}",
+    ]
+    assert DATA_MODEL_KEY not in out["grid_fees.json"]
+
+
 def test_config_pack_rejects_bad_model(monkeypatch, tmp_path: Path) -> None:
     import io
 

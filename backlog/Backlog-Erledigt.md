@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — usage_ping opt-in `v: 1` vs v2 + points on consent (2026-10-17)
+
+- [x] **usage_ping: opt-in preview `v: 1` (clarified) + points refresh on consent** — **Verified** (2026-10-17)
+  - Clarified: wire schema `v` is 2 only when `stage == live` **and** `points` are in state; explorer / pre-points preview correctly shows v1.
+  - Fix: `set_consent("on")` calls `refresh_points()` so Earnie-Points are stored from live plant config without an optimiser cycle; payload becomes v2 once stage is live.
+  - Tests: `test_set_consent_on_refreshes_points_without_live_cycle`, `test_set_consent_on_with_live_stage_yields_payload_v2`; live UI showed v2 with `points: 10`.
+
 ### 2.7 quality / release hardening (2026-10-17)
 
 - [x] **2.7 quality / release hardening** `[qual]`: full gate before first community alpha (skill `quality-gate`; no `version.py` bump; letter `2.7.r` already used for Binding HA transport)

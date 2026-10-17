@@ -24,6 +24,33 @@ from settings.flexible_consumers import reject_legacy_id
 
 CONSUMER_TYPES = frozenset({"generic", "thermal_annual", "ev", "thermal_rc"})
 
+# MILP pool_filter fields (dm4.pool_filter). Must survive normalize→serialize or
+# Hauskonfigurator auto_persist reverts migration and the wizard loops forever.
+_POOL_FILTER_ID = "pool_filter"
+_POOL_FILTER_MILP_KEYS = (
+    "daily_target_source",
+    "daily_target_kwh",
+    "filter_schedule",
+    "signal_type",
+    "min_on_quarterhours",
+)
+
+
+def _is_pool_filter_consumer(consumer: dict) -> bool:
+    return str(consumer.get("id") or "").strip() == _POOL_FILTER_ID
+
+
+def _copy_pool_filter_milp_fields(source: dict, target: dict) -> None:
+    """Copy pool_filter MILP keys present on ``source`` onto ``target``."""
+    for key in _POOL_FILTER_MILP_KEYS:
+        if key not in source:
+            continue
+        value = source[key]
+        if key == "filter_schedule" and isinstance(value, dict):
+            target[key] = dict(value)
+        else:
+            target[key] = value
+
 
 def _copy_loxone_binding(raw: dict, spec: dict) -> None:
     loxone_inputs = raw.get("loxone_inputs")
@@ -300,13 +327,17 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     if consumer_type == "generic":
         spec["schedule"] = _normalize_schedule(raw.get("schedule"), consumer=raw)
         spec["annual_kwh"] = generic_annual_kwh(spec)
-        _normalize_earnie_role(
-            spec,
-            raw,
-            consumer_id=consumer_id,
-            profile_id=profile_id,
-            index=index,
-        )
+        if _is_pool_filter_consumer(spec):
+            # MILP Sollstunden path — no earnie_role overlay (dm4.pool_filter).
+            _copy_pool_filter_milp_fields(raw, spec)
+        else:
+            _normalize_earnie_role(
+                spec,
+                raw,
+                consumer_id=consumer_id,
+                profile_id=profile_id,
+                index=index,
+            )
     elif consumer_type == "ev":
         _normalize_ev_consumer(raw, spec, profile_id=profile_id, index=index)
     if consumer_type == "thermal_annual":
@@ -334,7 +365,9 @@ def _serialize_generic_fields(consumer: dict, out: dict) -> None:
     out["annual_kwh"] = consumer.get("annual_kwh", 0.0)
     if consumer.get("schedule"):
         out["schedule"] = consumer["schedule"]
-    if consumer.get("earnie_role"):
+    if _is_pool_filter_consumer(consumer):
+        _copy_pool_filter_milp_fields(consumer, out)
+    elif consumer.get("earnie_role"):
         out["earnie_role"] = consumer["earnie_role"]
     rec = consumer.get("appliance_recommendation")
     if isinstance(rec, dict):

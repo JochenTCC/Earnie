@@ -108,9 +108,10 @@ def _apply_points(state: dict[str, Any], breakdown: dict[str, int] | None) -> bo
 def refresh_points() -> bool:
     """Recompute live points when the config stamp changed; return True if the value changed.
 
-    Consent must be ``on``. A calculation error logs a WARNING and removes ``points`` so a
-    stale value is never sent (the ping then goes out as schema v1). The stamp is stored
-    either way, so a broken config is evaluated once per change, not every cycle.
+    Consent must be ``on``. Called from ``set_consent("on")`` and after a successful live
+    cycle. A calculation error logs a WARNING and removes ``points`` so a stale value is
+    never sent (the ping then goes out as schema v1). The stamp is stored either way, so
+    a broken config is evaluated once per change, not every cycle.
     """
     from runtime_store import usage_ping as up
 

@@ -28,11 +28,14 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Cause: `get_or_init_state(..., target_kwh=0.0)` always overwrote the configured target on every slot advance / trigger latch, so charge credit was capped at `min(0, …)`.
   - Fix: `update_target=False` for advance + trigger; collect/learn still refresh the target.
   - Tests: `tests/test_powerstation_2_7_p.py` (`test_advance_and_trigger_preserve_target_kwh`).
+- [ ] **Bug — config pack import accepts incompatible member files** — fix implemented (2026-10-17); live acceptance pending
+  - Cause: `_migrate_and_validate_pack_docs` stamped members to current before `ensure_compatible` (would whitewash v1/v2/untagged if validate were bypassed). `validate_migrated_docs` already rejected incompatible members first.
+  - Fix: ensure then stamp; `grid_fees.json` still exempt; doc `speichern-laden.md` now states members are checked too.
+  - Tests: `tests/test_config_pack_and_paths.py` (`test_config_pack_rejects_v2_member_with_v4_manifest`, `test_migrate_and_validate_ensures_before_stamp`).
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] "debug-dumps\debug_dump_20261015_222809"
-- [ ] **Bug — config pack import accepts incompatible member files:** in `runtime_store/config_pack.py` `_migrate_and_validate_pack_docs`, `stamp_data_model(doc)` overwrites each member's `earnie_data_model` with the current version *before* `ensure_compatible(doc, ...)`, so members at version 1/2 or without the field pass silently. Only the manifest version is really checked. Expected: fail loud for incompatible members (no stamping before the check); `grid_fees.json` stays exempt. Needs a regression test (pack with v2 member and v4 manifest must be rejected). Doc `docs/konfiguration/speichern-laden.md` currently describes "manifest decides" — update after the fix.
 - [ ] On HK side I'm asked always "Earnie 2.7.0-dev.61 braucht eine Anpassung deiner Konfiguration (strukturelle Schritte innerhalb Datenmodell 4).
 Zuletzt gelaufene Version: 2.7.0-dev.61" without a change in the data model. Is this do to the Version bump?
 

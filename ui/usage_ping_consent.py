@@ -17,7 +17,7 @@ from runtime_store.usage_ping import (
 logger = logging.getLogger(__name__)
 
 _SESSION_DIALOG_CHOICE = "usage_ping_dialog_choice"
-_SESSION_EDITOR_ACTIVATED = "usage_ping_editor_activated"
+_SESSION_EXPLORER_ACTIVATED = "usage_ping_explorer_activated"
 
 _DIALOG_INTRO = (
     "Um die Qualität von Earnie permanent zu verbessern, kann Earnie anonym "
@@ -88,11 +88,12 @@ def _consent_dialog() -> None:
             st.rerun()
 
 
-def maybe_prompt_consent_on_editor() -> None:
-    """On Szenarienkonfigurator open: consent dialog if unset; always mark explorer.
+def maybe_prompt_consent_on_explorer() -> None:
+    """On Szenario-Explorer open: consent dialog if unset; always mark explorer.
 
     Idempotent per session for the activation milestone. Abbrechen leaves consent
-    ``unset`` and does not record explorer activation this visit.
+    ``unset`` and does not record explorer activation this visit. Stage stays
+    ``explorer`` (live comes later from a successful live cycle).
     """
     if is_kill_switch_off():
         return
@@ -102,12 +103,26 @@ def maybe_prompt_consent_on_editor() -> None:
         return
 
     if choice == "answered" or not consent_is_unset():
-        if not st.session_state.get(_SESSION_EDITOR_ACTIVATED):
+        if not st.session_state.get(_SESSION_EXPLORER_ACTIVATED):
             note_explorer_activated()
-            st.session_state[_SESSION_EDITOR_ACTIVATED] = True
+            st.session_state[_SESSION_EXPLORER_ACTIVATED] = True
         return
 
     _consent_dialog()
+
+
+def maybe_prompt_consent_on_editor() -> None:
+    """Fallback when ``scenario_explorer`` is not in ``EARNIE_UI_MODES``.
+
+    Szenarienkonfigurator still records the explorer milestone and may ask for
+    opt-in so installs without the SE page are not skipped. When SE is enabled,
+    the Szenario-Explorer page owns the prompt instead.
+    """
+    from ui.mode_selector import get_enabled_ui_mode_keys
+
+    if "scenario_explorer" in get_enabled_ui_mode_keys():
+        return
+    maybe_prompt_consent_on_explorer()
 
 
 def render_usage_ping_settings() -> None:

@@ -1,4 +1,4 @@
-"""UsagePing P3 — consent gate helpers (editor open; no Streamlit dialog rendering)."""
+"""UsagePing P3 — consent gate helpers (explorer / editor fallback; no dialog render)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,7 +16,7 @@ def runtime_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path / "runtime"
 
 
-def test_editor_prompt_opens_dialog_when_unset(
+def test_explorer_prompt_opens_dialog_when_unset(
     runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from ui import usage_ping_consent as consent
@@ -26,13 +26,13 @@ def test_editor_prompt_opens_dialog_when_unset(
     opened: list[int] = []
     monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
 
-    consent.maybe_prompt_consent_on_editor()
+    consent.maybe_prompt_consent_on_explorer()
     assert opened == [1]
     assert up.load_state().get("stage") != "explorer"
-    assert consent._SESSION_EDITOR_ACTIVATED not in session  # noqa: SLF001
+    assert consent._SESSION_EXPLORER_ACTIVATED not in session  # noqa: SLF001
 
 
-def test_editor_prompt_activates_when_consent_on(
+def test_explorer_prompt_activates_when_consent_on(
     runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from ui import usage_ping_consent as consent
@@ -43,16 +43,16 @@ def test_editor_prompt_activates_when_consent_on(
     opened: list[int] = []
     monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
 
-    consent.maybe_prompt_consent_on_editor()
+    consent.maybe_prompt_consent_on_explorer()
     assert opened == []
     assert up.load_state()["stage"] == "explorer"
-    assert session[consent._SESSION_EDITOR_ACTIVATED] is True  # noqa: SLF001
+    assert session[consent._SESSION_EXPLORER_ACTIVATED] is True  # noqa: SLF001
 
-    consent.maybe_prompt_consent_on_editor()
+    consent.maybe_prompt_consent_on_explorer()
     assert opened == []
 
 
-def test_editor_prompt_after_answered_choice(
+def test_explorer_prompt_after_answered_choice(
     runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from ui import usage_ping_consent as consent
@@ -65,13 +65,13 @@ def test_editor_prompt_after_answered_choice(
     opened: list[int] = []
     monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
 
-    consent.maybe_prompt_consent_on_editor()
+    consent.maybe_prompt_consent_on_explorer()
     assert opened == []
     assert consent._SESSION_DIALOG_CHOICE not in session  # noqa: SLF001
     assert up.load_state()["stage"] == "explorer"
 
 
-def test_editor_prompt_cancel_skips_activation(
+def test_explorer_prompt_cancel_skips_activation(
     runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from ui import usage_ping_consent as consent
@@ -83,10 +83,46 @@ def test_editor_prompt_cancel_skips_activation(
     opened: list[int] = []
     monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
 
+    consent.maybe_prompt_consent_on_explorer()
+    assert opened == []
+    assert up.load_state().get("stage") != "explorer"
+    assert consent._SESSION_EXPLORER_ACTIVATED not in session  # noqa: SLF001
+
+
+def test_editor_fallback_skipped_when_scenario_explorer_mode_on(
+    runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ui import usage_ping_consent as consent
+
+    monkeypatch.setattr(
+        "ui.mode_selector.get_enabled_ui_mode_keys",
+        lambda: ["sunset2sunset", "scenario_explorer"],
+    )
+    opened: list[int] = []
+    monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
+    monkeypatch.setattr(consent.st, "session_state", {})
+
     consent.maybe_prompt_consent_on_editor()
     assert opened == []
     assert up.load_state().get("stage") != "explorer"
-    assert consent._SESSION_EDITOR_ACTIVATED not in session  # noqa: SLF001
+
+
+def test_editor_fallback_prompts_when_scenario_explorer_mode_off(
+    runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ui import usage_ping_consent as consent
+
+    monkeypatch.setattr(
+        "ui.mode_selector.get_enabled_ui_mode_keys",
+        lambda: ["sunset2sunset", "live_environment"],
+    )
+    session: dict[str, Any] = {}
+    monkeypatch.setattr(consent.st, "session_state", session)
+    opened: list[int] = []
+    monkeypatch.setattr(consent, "_consent_dialog", lambda: opened.append(1))
+
+    consent.maybe_prompt_consent_on_editor()
+    assert opened == [1]
 
 
 def test_dialog_intro_advertising_copy() -> None:

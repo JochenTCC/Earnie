@@ -427,7 +427,7 @@ Details: [Betrieb](../einrichtung/betrieb.md)
 
 ### Nutzungsstatistik (optional)
 
-Beim ersten Öffnen des Szenarienkonfigurators fragt Earnie, ob es anonym melden darf, dass diese Installation aktiv ist (Versionszähler). So sehen wir, wie viele Installationen tatsächlich in Betrieb sind. Wenn Sie zustimmen, unterstützen Sie damit die Weiterentwicklung – ganz ohne Aufwand.
+Beim ersten Öffnen des Szenario-Explorers fragt Earnie, ob es anonym melden darf, dass diese Installation aktiv ist (Versionszähler). Fehlt der Szenario-Explorer in den UI-Modi, erscheint die Frage im Szenarienkonfigurator. So sehen wir, wie viele Installationen tatsächlich in Betrieb sind. Wenn Sie zustimmen, unterstützen Sie damit die Weiterentwicklung – ganz ohne Aufwand.
 
 - **Was gesendet wird:** keine Preise, Orte, Gerätenamen oder Konfigurationsinhalte. Im Live-Betrieb kommt nur die Summe der **Earnie-Points** hinzu – eine grobe Kennzahl für die Größe der Anlage, die unter **Optimierer-Dienst** mit Aufschlüsselung angezeigt wird.
 - **Freiwillig:** Die Zustimmung ist jederzeit widerrufbar und hat keinen Einfluss auf die Optimierung.

@@ -102,8 +102,9 @@ def _migrate_and_validate_pack_docs(
     for name, doc in json_payloads.items():
         if name == "grid_fees.json":
             continue
-        stamp_data_model(doc)
+        # Compatibility first — never stamp before ensure (would whitewash v1/v2/untagged).
         ensure_compatible(doc, label=name)
+        stamp_data_model(doc)
     return json_payloads
 
 
