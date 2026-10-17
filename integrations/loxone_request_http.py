@@ -1,4 +1,4 @@
-"""Minimal hub → Earnie HTTP (Request Optimize, alive, status.json, telemetry push)."""
+"""Minimal hub → Earnie HTTP (Request Optimize, status.json, telemetry push)."""
 from __future__ import annotations
 
 import hmac
@@ -13,7 +13,6 @@ from urllib.parse import parse_qs, unquote, urlparse
 logger = logging.getLogger(__name__)
 
 REQUEST_OPTIMIZE_PATH = "/ehal/loxone/request_optimize"
-ALIVE_PATH = "/ehal/loxone/alive"
 STATUS_PATH = "/ehal/loxone/status.json"
 STATUS_PATH_CANONICAL = "/ehal/status.json"
 _STATUS_PATHS = frozenset(
@@ -109,11 +108,6 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
                 self.send_error(404)
             return
         path = _normalize_path(self.path)
-        if path == ALIVE_PATH.rstrip("/") or path == ALIVE_PATH:
-            self._record_peer()
-            self.send_response(204)
-            self.end_headers()
-            return
         if path in _STATUS_PATHS:
             self._send_status_json()
             return
@@ -159,11 +153,14 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
             self.send_error(401)
             return
         ehal_id, _, raw = unquote(parsed.path[len(matched):]).partition("/")
+        from ehal.push_signals import HEARTBEAT_ID
         from runtime_store.loxone_push_inbox import record_push
 
         peer = self.client_address[0] if self.client_address else ""
         result = record_push(ehal_id, raw, peer)
         if result in ("ok", "new"):
+            if ehal_id == HEARTBEAT_ID:
+                self._record_peer()
             self.send_response(204)
             self.end_headers()
             return
@@ -178,6 +175,14 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
                 self.rfile.read(length)
             self._record_peer()
             signal_optimize_request()
+            try:
+                from ehal.push_signals import REQUEST_OPTIMIZE_ID
+                from runtime_store.loxone_push_inbox import record_push
+
+                peer = self.client_address[0] if self.client_address else ""
+                record_push(REQUEST_OPTIMIZE_ID, "1", peer)
+            except Exception:  # noqa: BLE001 — never fail the Miniserver callback path
+                logger.exception("loxone_request_http: failed to record request_optimize")
             try:
                 from runtime_store.shadow.hooks import record_event
 
@@ -219,11 +224,10 @@ def start_loxone_request_http(
         _server = server
         _thread = thread
         logger.info(
-            "Loxone request HTTP listening on %s:%s (%s, %s, %s, %s)",
+            "Loxone request HTTP listening on %s:%s (%s, %s, %s)",
             host,
             port,
             REQUEST_OPTIMIZE_PATH,
-            ALIVE_PATH,
             STATUS_PATH,
             STATUS_PATH_CANONICAL,
         )

@@ -146,9 +146,14 @@ def _read_check(
     warn_if_missing: bool = False,
     validate_filter_start_hour: bool = False,
 ) -> LoxoneCheck:
+    from ehal.push_signals import REQUEST_OPTIMIZE_ID
+
     io_name = str(io_name or "").strip()
     if not io_name:
         return LoxoneCheck(label, io_name, False, "IO-Name fehlt in config.json")
+
+    if label == REQUEST_OPTIMIZE_ID or io_name == REQUEST_OPTIMIZE_ID:
+        return _read_control_receipt_check(label, io_name)
 
     if read_raw:
         # FertigUm / ready-by: push inbox only (Q7 — Merker / SpecialState10 poll retired).
@@ -324,6 +329,25 @@ def _append_io_check(
     name = str(io_name or "").strip()
     if name:
         checks.append((label, name, opts or {}))
+
+
+def _read_control_receipt_check(label: str, io_name: str) -> LoxoneCheck:
+    """Live-Lesen row for rare daemon HTTP receipts (no zero-assumption)."""
+    from runtime_store.loxone_push_inbox import read_control_receipt
+
+    value, state, _last_ts = read_control_receipt(label)
+    if value is None:
+        return LoxoneCheck(
+            label,
+            io_name,
+            False,
+            state,
+            severity="warning",
+            state=state,
+        )
+    return LoxoneCheck(
+        label, io_name, True, f"Wert={value}", state=state
+    )
 
 
 def ev_ehal_binding_collisions(consumer: dict) -> list[tuple[str, str, list[str]]]:
@@ -663,6 +687,9 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
     _append_battery_ess_read_checks(checks)
     _append_inverter_read_checks(checks)
     _append_pv_system_read_checks(checks)
+    from ehal.push_signals import REQUEST_OPTIMIZE_ID, REQUEST_OPTIMIZE_TITLE
+
+    checks.append((REQUEST_OPTIMIZE_ID, REQUEST_OPTIMIZE_TITLE, {}))
     return checks
 
 

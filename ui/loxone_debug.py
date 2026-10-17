@@ -239,8 +239,9 @@ def render_live_reads_section() -> None:
         return
 
     st.caption(
-        "Nur `sens_*` / `get_*` und qualifizierte IDs "
-        "(`consumer.*` / `heatpump.*` / `pool.*` / `evcs.*` / `ev.*` / `ess.*`) · "
+        "Nur `sens_*` / `get_*`, qualifizierte IDs "
+        "(`consumer.*` / `heatpump.*` / `pool.*` / `evcs.*` / `ev.*` / `ess.*`) "
+        "und `request_optimize` (VO `Earnie_Request_Optimize`) · "
         "Tabelle aktualisiert sich automatisch (ca. alle 10 Sekunden)."
     )
     if st.button("Jetzt aktualisieren", key="loxone_debug_refresh_reads"):

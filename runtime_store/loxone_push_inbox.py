@@ -40,12 +40,20 @@ INBOX_FLUSH_INTERVAL_S = 1.0
 MAX_IDS = 200
 MAX_RAW_LEN = 32
 HEARTBEAT_ID = "heartbeat"  # constant non-zero push that proves the Miniserver link
+# Control receipt (POST /ehal/loxone/request_optimize) — not a telemetry field kind.
+REQUEST_OPTIMIZE_ID = "request_optimize"
 # Rows built from Shadow feed already passed lookup_record freshness (vs cycle_ts).
 # Do not re-apply the live VO silence window (3×repeat) on those timestamps.
 SHADOW_FEED_SOURCE = "shadow_feed"
 # Loxone pushes measurements (sens_*) and inputs (get_*) only; never setpoints.
+# Plus synthetic control IDs (heartbeat, request_optimize).
 _ID_PATTERN = re.compile(
-    r"^(?:" + HEARTBEAT_ID + r"|(?:(?:" + id_namespace_alternation()
+    r"^(?:"
+    + HEARTBEAT_ID
+    + r"|"
+    + REQUEST_OPTIMIZE_ID
+    + r"|(?:(?:"
+    + id_namespace_alternation()
     + r")\.[a-z0-9_]{1,64}\.)?(?:sens|get)_[a-z0-9_]{1,64})$"
 )
 _UNIT_SUFFIXES = ("kWh", "kW", "W", "%", "°C", "A", "h")
@@ -588,6 +596,34 @@ def resolve_push_read(
     if power and link:
         return (STATE_ZERO_ASSUMED_NEVER, 0.0)
     return hold()
+
+
+def read_control_receipt(
+    ehal_id: str,
+    *,
+    now: datetime | None = None,
+) -> tuple[float | None, str, str | None]:
+    """Diagnostic read for rare control receipts (e.g. ``request_optimize``).
+
+    Returns ``(value, state_label, last_ts_iso)``. Does **not** apply the
+    power/digital zero-assumption: never received → ``(None, "nie empfangen", None)``;
+    any stored push (even hours old) → value + ``OK`` / age text.
+    """
+    eid = str(ehal_id or "").strip()
+    if not eid or not is_valid_ehal_id(eid):
+        return None, STATE_READ_ERROR, None
+    ref = now if now is not None else datetime.now(timezone.utc)
+    with _lock:
+        signals = dict(_memory) if _memory else load_inbox()
+        row = signals.get(eid)
+    if row is None or not str(row.get("last_ts") or "").strip():
+        return None, "nie empfangen", None
+    last_ts = str(row.get("last_ts") or "").strip() or None
+    age = age_seconds(row, now=ref)
+    age_txt = f"vor {int(age)} s" if age is not None else last_ts
+    if not row.get("parse_ok", True) or row.get("value") is None:
+        return None, f"Nicht lesbar ({age_txt})", last_ts
+    return float(row["value"]), f"OK ({age_txt})", last_ts
 
 
 def read_push_value(

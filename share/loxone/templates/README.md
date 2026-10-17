@@ -67,7 +67,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 
 1. Restart **Loxone Config**.
 2. Insert via periphery **Device Templates** / Virtual In / Virtual Out (Earnie entries should appear).
-3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize` / `/alive`) use port **8541** (`system.ehal_loxone_http_port`). Telemetry VOs also use port **8541** (canonical `/ehal/telemetry/…`; alias `/ehal/loxone/telemetry/…` for existing VOs). The value placeholder in a Virtual Output command is `<v>`, written `&lt;v&gt;` in the XML (`\v` would be sent as the control character 0x0B).
+3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize`) use port **8541** (`system.ehal_loxone_http_port`). Telemetry VOs (incl. repeating **`Push_Earnie_Heartbeat`**) also use port **8541** (canonical `/ehal/telemetry/…`; alias `/ehal/loxone/telemetry/…` for existing VOs). Delete obsolete **`Earnie_Push_Alive`** cmds if still present (`/ehal/loxone/alive` returns 404). The value placeholder in a Virtual Output command is `<v>`, written `&lt;v&gt;` in the XML (`\v` would be sent as the control character 0x0B).
 
 ## Files (repo layout)
 
@@ -78,7 +78,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 | `VirtualIn/VI_Earnie_EV_v2.xml` | `evcs.{ev_id}.set_evcs_max_current` / `set_evcs_mode` |
 | `VirtualIn/VI_Earnie_Consumer_v2.xml` | `consumer.{hk_id}.set_enable` |
 | `VirtualIn/VI_Earnie_Pool_v2.xml` | `pool.{hk_id}.set_enable` + `pool.pool_filter.set_enable` |
-| `VirtualOut/VO_Earnie_Status.xml` | Optional alive / `Earnie_Request_Optimize` (port **8541**) |
+| `VirtualOut/VO_Earnie_Status.xml` | Optional `Earnie_Request_Optimize` (port **8541**) |
 | `VirtualOut/VO_Earnie_Plant.xml` | Plant grid/PV/outside/absent + energy Q6; Titles = `Push_<EHAL-ID>`; no ESS (per-battery) |
 | `VirtualOut/VO_Earnie_Battery.xml` | Per-battery `ess.{bat_id}.*`: SoC, power, bipolar energy charge/discharge, optional `get_ess_*` |
 | `VirtualOut/VO_Earnie_EV.xml` | EV `sens_*` / `get_*` (`Earnie_EAuto_Leistung`, …) |

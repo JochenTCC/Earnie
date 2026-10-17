@@ -489,6 +489,7 @@ def test_expected_live_read_fields_include_plant_ambient():
     assert "grid.meter.get_grid_export_power_limit" in fields
     assert "sens_grid_energy_import" not in fields
     assert "sens_grid_power_active" not in fields
+    assert "request_optimize" in fields
 
 
 def test_expected_live_read_fields_omit_bare_ess_when_batteries():

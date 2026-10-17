@@ -1,6 +1,6 @@
 # EHAL-Com (Connection & Debug)
 
-The **EHAL-Com** page under **Daemon Control** is the central place for smarthome connectivity and live debugging: **Loxone**, **Home Assistant (EHAL)**, or **OpenEMS**. It shows live read/write from the last production run of `main.py`. For Loxone, the **Signal list** shows the contract (qualified EHAL IDs, match status, VO/VI export). Binding keys on `plant` / consumers / batteries are activation flags (empty Merker values). Ad hoc optimization runs via the output to Earnie `Earnie_Request_Optimize` (daemon HTTP, port `system.ehal_loxone_http_port`, default **8541**).
+The **EHAL-Com** page under **Daemon Control** is the central place for smarthome connectivity and live debugging: **Loxone**, **Home Assistant (EHAL)**, or **OpenEMS**. It shows live read/write from the last production run of `main.py`. For Loxone, the **Signal list** shows the contract (qualified EHAL IDs, match status, VO/VI export). Binding keys on `plant` / consumers / batteries are activation flags (empty Merker values). Ad hoc optimization runs via Virtual Out `Earnie_Request_Optimize` → `POST /ehal/loxone/request_optimize` (daemon HTTP, port `system.ehal_loxone_http_port`, default **8541**); receipt ID `request_optimize` appears on the **Signalliste** and in **Live Read** so you can verify the Miniserver hit Earnie.
 
 ## Access
 
@@ -369,6 +369,8 @@ Only with backend **Loxone** . Replaces the former *Loxone Structure → EHAL Ma
 | Match (read) | Last received in the push inbox (age) / never |
 | Match (write) | Last Miniserver fetch of `status.json` (callback) / never published |
 | Export | ZIP of VO + VI pilot templates + README; **needed** = activated bindings |
+
+Always listed (not a binding): `heartbeat` / `heartbeat_ts`, and control receipt `request_optimize` (VO cmd `Earnie_Request_Optimize` → daemon POST; age stays OK even when older than five minutes).
 
 **Loxone import** (on **Smarthome-Backend**) still creates typed entities from Merker/EFM names but writes **empty** binding values (activation flags only). Clear existing Merker strings once with `python -m scripts.clear_loxone_binding_names_once --config-dir <config>`.
 

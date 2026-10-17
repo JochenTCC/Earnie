@@ -205,11 +205,33 @@ def _try_push_live_row(
 ) -> dict[str, str] | None:
     """Build a Live-Lesen row from the push inbox when a numeric value resolves."""
     from ehal.loxone_push_source import is_pushable_kind
+    from ehal.push_signals import REQUEST_OPTIMIZE_ID
     from ehal.qualified_ids import field_kind
-    from runtime_store.loxone_push_inbox import read_push_value
+    from runtime_store.loxone_push_inbox import read_control_receipt, read_push_value
 
     ehal_id = _live_field_to_push_ehal_id(field)
-    if not ehal_id or not is_pushable_kind(field_kind(ehal_id)):
+    if not ehal_id:
+        return None
+    if ehal_id == REQUEST_OPTIMIZE_ID:
+        try:
+            value, state, last_ts = read_control_receipt(ehal_id)
+        except Exception:  # noqa: BLE001
+            return None
+        if value is None:
+            return None
+        last = _inbox_last_read_local(ehal_id) or last_ts or read_at
+        return _enrich_read_row(
+            {
+                "EHAL-Feld": field,
+                "Wert": str(value),
+                "Status": state,
+                "Detail": "",
+                "Zuletzt gelesen": last,
+            },
+            backend=backend,
+            value_space="hub",
+        )
+    if not is_pushable_kind(field_kind(ehal_id)):
         return None
     try:
         value, state = read_push_value(ehal_id)

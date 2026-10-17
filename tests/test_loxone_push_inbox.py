@@ -38,6 +38,7 @@ def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "evcs.garage.sens_evcs_connected",
         "ev.garage.sens_evcs_soc_act",
         "heartbeat",
+        "request_optimize",
     ],
 )
 def test_valid_ids(ehal_id: str) -> None:
@@ -225,7 +226,7 @@ def test_endpoint_token_validation_and_storage(monkeypatch: pytest.MonkeyPatch) 
 def test_existing_endpoints_unaffected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret")
     port = http_mod.start_loxone_request_http(0).server_address[1]
-    assert _get(port, "/ehal/loxone/alive") == 204
+    assert _get(port, "/ehal/loxone/alive") == 404
     assert _get(port, "/ehal/loxone/status.json") == 200
     assert _get(port, "/nope") == 404
 

@@ -39,7 +39,7 @@ services:
     restart: on-failure:3
     ports:
       - "8502:8501"
-      # Host 8542 → Daemon Earnie_Request_Optimize /alive (container 8541).
+      # Host 8542 → Daemon Earnie_Request_Optimize / telemetry / status.json (container 8541).
       - "8542:8541"
     volumes: *persist-volumes
     environment:

@@ -2,6 +2,23 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Cleanup — drop `/alive`; keep `heartbeat` (2026-10-17)
+
+- [x] **Hard-remove `GET /ehal/loxone/alive` / `Earnie_Push_Alive`** `[qual]` — hub→Earnie link proof is synthetic `heartbeat` only
+  - Removed `ALIVE_PATH` handler (now 404); dropped VO cmd from `VO_Earnie_Status.xml`.
+  - Successful `heartbeat` telemetry push also updates `loxone_last_callback` (former `/alive` role).
+  - Kept: `heartbeat_ts` VI / `status.json`, `request_optimize`, callback on status poll.
+  - Tests: `test_loxone_request_http` (`test_http_alive_removed`, `test_http_heartbeat_records_callback`), `test_loxone_push_inbox`.
+  - Docs/schema/compose: scrub `/alive`; note to delete obsolete Push_Alive in existing Config.
+
+### Bugfix — request_optimize missing from Signalliste / Live-Lesen (2026-10-17)
+
+- [x] **`request_optimize` missing from EHAL-Com Signalliste / Live-Lesen** — **Verified** (2026-10-17, local Streamlit)
+  - Still used: VO `Earnie_Request_Optimize` → `POST /ehal/loxone/request_optimize` wakes the daemon.
+  - Fix: receipt recorded in push inbox (`request_optimize`); listed on Signalliste (Status) and Live-Lesen (Mapping `Earnie_Request_Optimize`); age stays OK (not stale after 5 min).
+  - Tests: `test_ehal_signal_list`, `test_loxone_request_http`, `test_loxone_connectivity`, `test_loxone_push_inbox`, `test_qualified_ids`.
+  - Docs: `docs/ui/ehal-com.md`, `docs/referenz/loxone-signals.md`, `docs/spec/ehal.md`.
+
 ### Bugfix — EV unplugged live slot planned charge (2026-10-17)
 
 - [x] **EV unplugged: live slot still planned charge** — **Verified** (2026-10-17, Shadow)

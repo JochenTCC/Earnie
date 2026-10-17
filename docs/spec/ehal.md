@@ -47,8 +47,9 @@ Exchange / display form of every signal on the push/exchange wire and in `status
 | EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Same Kennung; namespace chosen by field kind |
 | Inverter | `inv.<Kennung>.*` | Entity-scoped on `inverters[].ehal_bindings` (**2.7.l P4**) |
 | Heartbeat | `heartbeat` | Link proof; not a field kind |
+| Request optimize | `request_optimize` | Daemon HTTP wake receipt (`POST /ehal/loxone/request_optimize`); not a field kind |
 
-`parse_qualified_id(id)` → `ParsedQualifiedId(namespace, kennung, kind, raw)` or `None`. Plant bare and `heartbeat` have `namespace` / `kennung` = `None`. Round-trip: builders → parse → `format_qualified_id` restores the exchange string. Field kinds are not renamed in 2.7.n.
+`parse_qualified_id(id)` → `ParsedQualifiedId(namespace, kennung, kind, raw)` or `None`. Plant bare, `heartbeat`, and `request_optimize` have `namespace` / `kennung` = `None`. Round-trip: builders → parse → `format_qualified_id` restores the exchange string. Field kinds are not renamed in 2.7.n.
 
 ## Schema version and envelope
 

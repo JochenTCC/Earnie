@@ -93,7 +93,7 @@ Erreichbar z. B. über das **Samba** oder **SSH & Web Terminal** Add-on.
 |---|---|
 | Ingress | Primäre Earnie Web-UI in der HA-Seitenleiste / OPEN WEB UI |
 | `8501/tcp` | Optionaler Direktzugriff (Streamlit) |
-| `8541/tcp` | EHAL Loxone-HTTP (Request-Optimize, `/alive`, Pattern-B-Status) — nur bei `ehal.backend=loxone` relevant |
+| `8541/tcp` | EHAL Loxone-HTTP (Request-Optimize, Telemetry/Heartbeat, Pattern-B-Status) — nur bei `ehal.backend=loxone` relevant |
 
 Port-Gesamtübersicht: [`docs/referenz/streamlit-ports.md`](../referenz/streamlit-ports.md).
 

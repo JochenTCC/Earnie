@@ -1,11 +1,10 @@
-﻿﻿<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  DRAFT (2.4.n entity-scoped) — optional Loxone → Earnie status push.
-  Replace EARNIE_HOST. Paths are placeholders; adjust method/body after Earnie API exists.
-  Analog=true for heartbeat age / last status code style values.
+  Optional Loxone → Earnie control push (Request Optimize).
+  Replace EARNIE_HOST. Link proof is the repeating heartbeat VO
+  (Push_Earnie_Heartbeat → /ehal/telemetry/heartbeat/…), not this Status VO.
 -->
-<VirtualOut HintText="" Title="Earnie Status Push" Comment="entity-scoped: optional push to Earnie (draft)" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
+<VirtualOut HintText="" Title="Earnie Status Push" Comment="entity-scoped: optional Request Optimize to Earnie" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<Info templateType="3" minVersion="17010630"/>
-	<VirtualOutCmd Title="Earnie_Push_Alive" Comment="Notify Earnie that Miniserver is alive" CmdOnMethod="GET" CmdOffMethod="GET" CmdOn="/ehal/loxone/alive" CmdOnHTTP="" CmdOnPost="" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="false" Repeat="0" RepeatRate="0" HintText=""/>
 	<VirtualOutCmd Title="Earnie_Request_Optimize" Comment="Optional: request out-of-band optimize" CmdOnMethod="POST" CmdOffMethod="GET" CmdOn="/ehal/loxone/request_optimize" CmdOnHTTP="Content-Type: application/json" CmdOnPost="{}" CmdOff="" CmdOffHTTP="" CmdOffPost="" CmdAnswer="" Analog="false" Repeat="0" RepeatRate="0" HintText=""/>
 </VirtualOut>

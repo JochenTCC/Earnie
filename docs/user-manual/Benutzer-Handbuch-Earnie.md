@@ -1,444 +1,487 @@
-# EARNIE — Benutzer-Handbuch
+# Earnie – Benutzer-Handbuch
 
-Dieses Handbuch beschreibt Earnie aus Anwendersicht.  
-Technische Details (Container, Config-Schema, Entwickler) stehen in der [Anwender-Dokumentation](../README.md) und im [README](../../README.md).  
-Häufige Kurzformen (EHAL, SE, SoC, …): [Abkürzungen](../referenz/abbreviations.md).
+Dieses Handbuch beschreibt Earnie aus Sicht der Anwendung: vom ersten Start über die Was-wäre-wenn-Analyse bis zum Live-Betrieb.
+
+- Technische Details (Container, Config-Schema, Entwicklung): [Anwender-Dokumentation](../README.md) und [README](../../README.md)
+- Kurzformen wie EHAL, SE oder SoC: [Abkürzungen](../referenz/abbreviations.md)
 
 ---
 
 ## Übersicht
 
-### Sinn und Zweck von Earnie
+### Wofür ist Earnie gedacht?
 
-**Earnie** ist ein Energie-Optimierer für Privathaushalte. Er plant und steuert, wann Strom bezogen, gespeichert, verbraucht oder eingespeist wird — mit dem Ziel, **Stromkosten zu senken** und den **Eigenverbrauch** zu erhöhen.
+**Earnie** ist ein Energie-Optimierer für Privathaushalte. Er plant und steuert, wann Strom bezogen, gespeichert, verbraucht oder eingespeist wird. Das Ziel: niedrigere Stromkosten und mehr Eigenverbrauch.
 
-Besonders wirksam ist Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar), bei denen die Preise (viertel-) stündlich schwanken. Statt fester Regeln berechnet Earnie regelmäßig einen **Plan für die nächsten etwa 24–48 Stunden** und berücksichtigt dabei:
+Am meisten bringt Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar), deren Preise sich stündlich oder viertelstündlich ändern. Statt fester Regeln berechnet Earnie regelmäßig einen **Plan für die nächsten 24 bis 48 Stunden**. Dabei berücksichtigt er:
 
-- aktuelle (und wenn nötig prognostizierte) Strompreise  
-- PV-Ertragsprognose (Wetter am Standort)  
-- Zustand und Grenzen des Batteriespeichers  
-- Steuerbare Verbraucher (E-Auto, Wärmepumpe, Pool, Haushaltsgeräte, …)
+- aktuelle Strompreise (und eine Prognose, falls die Börse noch keine Preise veröffentlicht hat),
+- die PV-Ertragsprognose aus dem Wetter am Standort,
+- Ladezustand und Grenzen des Batteriespeichers,
+- steuerbare Verbraucher wie E-Auto, Wärmepumpe, Pool und Haushaltsgeräte.
 
-**Zwei Nutzungsarten:**
+Earnie lässt sich auf zwei Arten nutzen:
 
+| Nutzung | Zweck |
+| ------- | ----- |
+| **Was-wäre-wenn (ohne Smarthome)** | Haus und Varianten konfigurieren und einen Jahresvergleich rechnen – z. B. ob sich ein Speicher, eine größere PV-Anlage oder ein Spot-Tarif lohnt. |
+| **Live-Betrieb (mit Smarthome)** | Dauerhaft optimieren und Sollwerte an Loxone, Home Assistant (+ evcc) oder OpenEMS (Lab) schreiben. Der Monitor zeigt Plan und Ist-Werte. |
 
-| Nutzung                             | Was Sie damit machen                                                                                                           |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Was-wäre-wenn (ohne Smart-Home)** | Haus und Varianten konfigurieren, Jahresvergleich rechnen — z. B. ob sich Speicher, größere PV oder ein Spot-Tarif lohnen      |
-| **Live-Betrieb (mit Smarthome)**    | Dauerhaft optimieren und Sollwerte an Loxone, Home Assistant (+ evcc) oder OpenEMS (Lab) schreiben; Monitor zeigt Plan und Ist |
-
-
-Im Hintergrund läuft ein Optimierer-Dienst, der exklusiv die Anlage steuert. Die Web-Oberfläche (Streamlit) ist das **Cockpit**: Anzeige, Konfiguration und Analyse — und mit der Möglichkeit, den **Optimierer-Dienst** zu starten / stoppen /oder neu zu starten.
+Im Hintergrund steuert der **Optimierer-Dienst** die Anlage – als einzige Instanz. Die Web-Oberfläche (Streamlit) dient als Cockpit für Anzeige, Konfiguration und Analyse. Dort lässt sich der Optimierer-Dienst auch starten, stoppen und neu starten.
 
 ### Voraussetzungen
 
-**Für Was-wäre-wenn-Analysen (ohne Live-Steuerung):**
+**Für die Was-wäre-wenn-Analyse (ohne Live-Steuerung):**
 
-- PC oder Server mit Docker **oder** lokaler Python-Umgebung  
-- Webbrowser für die Oberfläche  
-- Grobe Angaben zu Haus, Verbrauchern, optional PV/Speicher und Strom-Tarif(en)  
-- Internet für Wetter- und Preisdaten (je nach Szenario)
+- PC oder Server mit Docker oder einer lokalen Python-Umgebung
+- Webbrowser für die Oberfläche
+- grobe Angaben zu Haus, Verbrauchern, Strom-Tarif(en) und – falls vorhanden – PV und Speicher
+- Internetzugang für Wetter- und Preisdaten (je nach Szenario)
 
-**Für den produktiven Live-Betrieb zusätzlich:**
+**Für den Live-Betrieb zusätzlich:**
 
-- Erreichbares Smarthome-Backend: [Loxone](https://www.loxone.com/) (Default), [Home Assistant](https://www.home-assistant.io/) + evcc (DACH-Pfad A2) oder OpenEMS (Lab-/Industrie-Prototyp) — siehe [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)  
-- Sinnvolle Merker / Entities für SOC, Leistungen, Freigaben und Sollwerte (Kapitel *Verbindung zu Smarthome*)  
-- Typischerweise: PV und/oder Batteriespeicher sowie steuerbare Verbraucher  
-- Empfohlen: dynamischer Bezugs- und/oder Einspeisetarif
+- ein erreichbares Smarthome-Backend: [Loxone](https://www.loxone.com/) (Standard), [Home Assistant](https://www.home-assistant.io/) + evcc oder OpenEMS (Lab-/Industrie-Prototyp). Welches passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md).
+- Signale bzw. Entities für Ladezustand, Leistungen, Freigaben und Sollwerte (siehe [Verbindung zum Smarthome](#verbindung-zu-smarthome))
+- in der Regel PV und/oder Batteriespeicher sowie steuerbare Verbraucher
+- empfohlen: ein dynamischer Bezugs- und/oder Einspeisetarif
 
-Earnie ist **unabhängig von Energieversorger und Systemlieferant** gedacht.
+Earnie ist unabhängig von Energieversorger und Systemlieferant.
 
 ### Lizenzbedingungen
 
-Earnie ist **Source-Available** und für die **private, nicht-kommerzielle Nutzung** in Privathaushalten vorgesehen. Kommerzielle Nutzung, Weiterverkauf oder SaaS-Angebote sind ohne schriftliche Zustimmung nicht erlaubt.
+Earnie ist **Source-Available** und für die **private, nicht-kommerzielle Nutzung** in Privathaushalten vorgesehen. Kommerzielle Nutzung, Weiterverkauf und SaaS-Angebote sind nur mit schriftlicher Zustimmung erlaubt.
 
-Die Software wird „wie besehen“ bereitgestellt. Eingriffe in Speicher und Großverbraucher erfolgen auf **eigenes Risiko** des Betreibers.
+Die Software wird „wie besehen“ bereitgestellt. Eingriffe in Speicher und Großverbraucher erfolgen auf eigenes Risiko.
 
-Zu einem späteren Zeitpunkt werden verschiedene kommerzielle Angebote verfügbar sein für Nutzer, die die Konfiguration und Wartung nicht selbst vornehmen wollen.
+Für alle, die Konfiguration und Wartung nicht selbst übernehmen möchten, sind kommerzielle Angebote geplant.
 
 Vollständige Bedingungen: [LICENSE.md](../../LICENSE.md).
 
 ### Banner der Wahrheit
 
-In der Sidebar unter **Info / About** (unten) und zusätzlich **am unteren Ende des Hauptbereichs** erscheint ein kurzes Attributions-Banner (Name, nicht-kommerzieller Hinweis, Link zum offiziellen Repository, Version). Es kennzeichnet Earnie und die Nutzungsbedingungen.
+Ein kurzes Attributions-Banner kennzeichnet Earnie und seine Nutzungsbedingungen: Name, Hinweis auf die nicht-kommerzielle Nutzung, Link zum offiziellen Repository und Version. Es erscheint in der Sidebar unter **Info / About** (unten) und zusätzlich am unteren Ende des Hauptbereichs.
 
-Bei erkennbar inoffiziellen oder geänderten Builds (z. B. abweichende Git-Remote) kann zusätzlich ein Warnhinweis erscheinen. Das Banner ist bewusst sichtbar gehalten.
+Bei erkennbar inoffiziellen oder veränderten Builds (z. B. abweichende Git-Remote) kann zusätzlich ein Warnhinweis erscheinen. Das Banner ist bewusst gut sichtbar.
 
-Unter **Info / About** erscheinen zusätzlich der **Hardware-Fingerprint** (vollständig, kopierbar) und der Registry-Status (`unbound` / `valid` bzw. gebunden / `mismatch` / `invalid_sig`). Das ist optional und sperrt den Start **nicht**.
+Unter **Info / About** stehen außerdem der vollständige **Hardware-Fingerprint** (kopierbar) und der Registry-Status (`unbound`, `valid` bzw. gebunden, `mismatch` oder `invalid_sig`). Die Registry ist optional und blockiert den Start nicht.
 
 ### Hardware-Registry (`earnie_registry.json`)
 
-Die Datei `earnie_registry.json` ist eine **einmalig ausgestellte Bindung** Ihrer Earnie-Installation an Ihren Hardware-Fingerprint (Host und optional Smart-Home-IDs). Private Nutzung ohne diese Datei bleibt möglich; der Status bleibt dann `unbound`.
+Die Datei `earnie_registry.json` bindet eine Earnie-Installation einmalig an ihren Hardware-Fingerprint (Host und optional Smarthome-IDs). Ohne diese Datei bleibt die private Nutzung möglich; der Status lautet dann `unbound`.
 
-**Wichtig:** Sie erzeugen die signierte Datei **nicht selbst**. Earnie berechnet nur den Fingerprint. Die Datei stellt der Rechteinhaber aus (derzeit per E-Mail; später ggf. Cloud-Portal). Offizielle Images prüfen die Signatur mit einem **öffentlichen** Schlüssel; der private Schlüssel bleibt beim Aussteller.
+Die signierte Datei lässt sich **nicht selbst erzeugen**. Earnie berechnet nur den Fingerprint, die Datei stellt das Earnie-Projekt aus (derzeit per E-Mail, später ggf. über ein Cloud-Portal). Offizielle Images prüfen die Signatur mit einem öffentlichen Schlüssel; der private Schlüssel bleibt beim Aussteller.
 
-**So erhalten Sie die Datei:**
+**So wird die Datei angefordert:**
 
 1. Earnie starten (Docker oder lokal).
-2. In der Sidebar **Info / About** öffnen und den **vollständigen 64-stelligen Hardware-Fingerprint** kopieren (Anzeige als Code-Block).
+2. In der Sidebar **Info / About** öffnen und den vollständigen, 64-stelligen **Hardware-Fingerprint** kopieren (Anzeige als Code-Block).
 3. Alternativ auf dem Host (Projektwurzel, mit Python-Umgebung):
-  ```text
+   ```text
    python -m scripts.print_hardware_fingerprint
-  ```
+   ```
    Die Ausgabe enthält `fingerprint=` (vollständig) und `fingerprint_display=` (Kurzform).
-4. Per **Info / About → Registry per E-Mail anfordern** an `support@earnie-hems.com` senden (Betreff „Earnie Registry“, Fingerprint und Datenschutzhinweis sind bereits im Mailtext). Bei Bedarf die Speicherung der Absenderadresse für Supportzwecke von **Nein** auf **Ja** ändern (DSGVO; Standard: keine Speicherung). Optional zusätzlich die Kontakt-ZIP über **Privater Support** anhängen (nicht in öffentliche GitHub-Issues).
-5. Sie erhalten zurück die Datei `earnie_registry.json`.
-6. Datei ablegen unter:
+4. Über **Info / About → Registry per E-Mail anfordern** an `support@earnie-hems.com` senden. Betreff („Earnie Registry“), Fingerprint und Datenschutzhinweis sind im Mailtext bereits enthalten.
+   - Die Speicherung der Absenderadresse für Supportzwecke ist standardmäßig aus (**Nein**, DSGVO); bei Bedarf auf **Ja** stellen.
+   - Optional die Kontakt-ZIP über **Privater Support** anhängen – nicht in öffentlichen GitHub-Issues.
+5. Die Antwort enthält die Datei `earnie_registry.json`.
+6. Datei ablegen:
 
-  | Installation         | Ablageort                                                     |
-  | -------------------- | ------------------------------------------------------------- |
-  | Docker / typisch     | `earnie_env/runtime/earnie_registry.json`                     |
-  | eigener Runtime-Pfad | Ordner aus `EARNIE_RUNTIME_PATH` bzw. `…/runtime/`            |
-  | abweichender Pfad    | Umgebungsvariable `EARNIE_REGISTRY_PATH` auf die Datei setzen |
+   | Installation | Ablageort |
+   | ------------ | --------- |
+   | Docker / typisch | `earnie_env/runtime/earnie_registry.json` |
+   | eigener Runtime-Pfad | Ordner aus `EARNIE_RUNTIME_PATH` bzw. `…/runtime/` |
+   | abweichender Pfad | Umgebungsvariable `EARNIE_REGISTRY_PATH` auf die Datei setzen |
 
-7. Oberfläche neu laden und unter **Info / About** prüfen: Registry sollte als gebunden (`bound` / `valid`) erscheinen. Bei **mismatch** passt der Fingerprint nicht mehr zur Datei (z. B. anderer Host) — neuen Fingerprint senden und Datei erneut anfordern. Bei **invalid_sig** ist die Datei beschädigt oder nicht gültig signiert — neu anfordern. In beiden Fällen startet Earnie trotzdem (soft check).
+7. Oberfläche neu laden und unter **Info / About** prüfen. Die Registry sollte als gebunden (`bound` / `valid`) erscheinen.
+   - **mismatch:** Fingerprint und Datei passen nicht mehr zusammen (z. B. anderer Host) – neuen Fingerprint senden und die Datei neu anfordern.
+   - **invalid_sig:** Die Datei ist beschädigt oder nicht gültig signiert – neu anfordern.
 
-**Was die Datei enthält (Kurz):** Fingerprint, Ausstellungszeit, optional Ablaufdatum, Aussteller und eine Ed25519-Signatur. Eine selbst gebaute Datei ohne passende Signatur ist ungültig (`invalid_sig`).
+   In beiden Fällen startet Earnie trotzdem (weiche Prüfung).
 
-Die Datei wird **beim Rechteinhaber** erzeugt (Signatur mit dem privaten Schlüssel), nicht in der Earnie-Oberfläche. Technische Aussteller-Anleitung: Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
+**Inhalt der Datei (kurz):** Fingerprint, Ausstellungszeit, optional ein Ablaufdatum, Aussteller und eine Ed25519-Signatur. Eine selbst gebaute Datei ohne passende Signatur ist ungültig (`invalid_sig`).
+
+Die Datei entsteht beim Aussteller (Signatur mit dem privaten Schlüssel), nicht in der Earnie-Oberfläche. Technische Aussteller-Anleitung: Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
 
 ### Support
 
-- **Kontakt in der App:** Sidebar **Info / About** — Art, Thema, Beschreibung → **GitHub-Issue öffnen** (öffentlich; keine Secrets). Optional **Informationen in ZIP sammeln** (bleibt lokal). Registry / Vertrauliches: Expander **Privater Support** an `support@earnie-hems.com`
-- **Projekt & Issues:** [GitHub — JochenTCC/Earnie](https://github.com/JochenTCC/Earnie/issues)  
-- **Website:** [earnie-hems.com](https://earnie-hems.com)  
-- **Community:** z. B. Diskussionen im Loxone-Umfeld (loxforum u. Ä.)  
+- **Kontakt in der App:** Sidebar **Info / About** – Art, Thema und Beschreibung eintragen, dann **GitHub-Issue öffnen** (öffentlich, daher keine Zugangsdaten oder andere Geheimnisse). Optional **Informationen in ZIP sammeln** (die ZIP bleibt lokal). Für die Registry und Vertrauliches: Expander **Privater Support** an `support@earnie-hems.com`.
+- **Projekt und Issues:** [GitHub – JochenTCC/Earnie](https://github.com/JochenTCC/Earnie/issues)
+- **Website:** [earnie-hems.com](https://earnie-hems.com)
+- **Community:** z. B. Diskussionen im Loxone-Umfeld (LoxForum u. Ä.)
 - **Technische Doku:** [docs/README.md](../README.md)
 
-Es gibt derzeit keinen vertraglichen Herstellersupport. Rückmeldungen zu neuen Hardware-Typen und Konfigurationen helfen der Weiterentwicklung.
+Einen vertraglichen Herstellersupport gibt es derzeit nicht. Umso mehr freuen wir uns über Ihre Rückmeldungen – gerade zu Hardware-Typen und Konfigurationen, die wir noch nicht kennen. Jeder Hinweis hilft, Earnie für alle besser zu machen.
 
 ---
-
-
 
 ## Installation
 
-Kurzfassung der typischen Wege:
+Die typischen Wege im Überblick:
 
+| Weg | Für wen | Hinweis |
+| --- | ------- | ------- |
+| **Docker (empfohlen für den Produktivbetrieb)** | Synology NAS, LoxBerry, Proxmox LXC, PC (auch VMware `vctl`) | Persistente Ordner `earnie_env/config/` und `earnie_env/runtime/` außerhalb des Images |
+| **Greenfield / Ersteinrichtung** | erste Was-wäre-wenn-Tests auf dem eigenen Rechner | eigener Stack, oft Port **8502** – getrennt vom Produktivsystem |
+| **Lokal ohne Container** | Entwicklung, Tests | siehe [DEVELOPER.md](../../DEVELOPER.md) |
 
-| Weg                              | Für wen                                 | Hinweis                                                                                |
-| -------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------- |
-| **Docker (empfohlen Produktiv)** | Synology NAS, LoxBerry, Proxmox LXC, PC (auch VMware `vctl`) | Persistente Ordner `earnie_env/config/` und `earnie_env/runtime/` außerhalb des Images |
-| **Greenfield / Ersteinrichtung** | Erste Was-wäre-wenn-Tests lokal         | Eigener Stack, oft Port **8502** — getrennt vom Produktivsystem                        |
-| **Lokal ohne Container**         | Entwickler, Tests                       | siehe [DEVELOPER.md](../../DEVELOPER.md)                                               |
+**Typischer Ablauf mit Docker:**
 
+1. Projekt bzw. Compose-Datei bereitstellen und die Verzeichnisse `earnie_env/config/` und `earnie_env/runtime/` anlegen.
+2. Container starten. Fehlende Dateien legt Earnie beim ersten Start an (Bootstrap).
+3. Oberfläche im Browser öffnen (im Produktivbetrieb meist Port **8501**, siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).
+4. Für den späteren Live-Betrieb: auf der Seite **Smarthome-Backend** das Backend wählen und den Zugang hinterlegen ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)). Danach mit dem Hauskonfigurator weitermachen.
 
-**Typischer Ablauf (Docker):**
+Details: [Container](../einrichtung/container.md) · [VMware `vctl` (Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md)
 
-1. Projekt bzw. Compose-Datei bereitstellen, Verzeichnisse `earnie_env/config/` und `earnie_env/runtime/` anlegen.
-2. Container starten — fehlende Dateien werden beim ersten Start angelegt (Bootstrap).
-3. Oberfläche im Browser öffnen (Produktiv oft Port **8501**, siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).
-4. Bei geplantem Live-Betrieb: Auf der Seite **Smarthome-Backend** das Backend wählen und den Zugang hinterlegen (siehe [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach mit dem Hauskonfigurator fortfahren.
-
-Details: [Container](../einrichtung/container.md) · [VMware `vctl` (Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md).
-
-Nach dem Start erscheinen in der Navigation zunächst vor allem **Konfiguration** und **Daemon Control**. Weitere Seiten (Monitor, Szenario-Explorer, …) werden freigeschaltet, sobald die Einrichtung weit genug ist.
+Nach dem ersten Start zeigt die Navigation vor allem **Konfiguration** und **Daemon Control**. Weitere Seiten wie Monitor oder Szenario-Explorer erscheinen, sobald die Einrichtung weit genug ist.
 
 ---
 
+## Erste Einrichtung (für die Was-wäre-wenn-Analyse)
 
-
-## Erste Einrichtung (für Was-Wäre-Wenn-Analyse)
-
-Ziel dieser Phase: Ihr Haus so abbilden, dass Earnie **Vergleichsszenarien** rechnen kann — noch ohne echte Steuerung der Anlage. Ideal, um Investitionen und Tarifwahl vorab zu prüfen oder sich von der Leistungsfähigkeit von Earnie zu überzeugen.
+In dieser Phase wird das Haus so abgebildet, dass Earnie **Vergleichsszenarien** rechnen kann – noch ohne echte Steuerung der Anlage. Das eignet sich, um Investitionen und Tarifwahl vorab zu prüfen oder um Earnie kennenzulernen.
 
 Empfohlene Reihenfolge:
 
-1. Hauskonfigurator (Haus, Verbraucher, PV, Speicher)
-2. Szenarienkonfigurator (Varianten: mit/ohne Speicher, anderer Tarif, …)
-3. Live-Szenario zuweisen (welche Entitäten „gelten“ als Basis)
-4. Szenario-Explorer: Verbrauch generieren, Rechnung starten, Ergebnisse lesen
+1. **Hauskonfigurator:** Haus, Verbraucher, PV und Speicher anlegen.
+2. **Szenarienkonfigurator:** Varianten bilden (mit/ohne Speicher, anderer Tarif, …).
+3. **Live-Szenario zuweisen:** festlegen, welche Bausteine als Basis gelten.
+4. **Szenario-Explorer:** Verbrauch erzeugen, Rechnung starten, Ergebnisse auswerten.
 
-Anmerkung: Zu Vergleichszwecken muss KEIN Szenario ohne PV und Batterie angelegt werden. Das macht Earnie als Referenz automatisch.
-
-
+> **Hinweis:** Ein eigenes Szenario ohne PV und Batterie ist nicht nötig. Diese Referenz berechnet Earnie automatisch (Zeile **Historisch** im Szenario-Explorer).
 
 ### Hauskonfigurator
 
-Hauskonfigurator
+![Hauskonfigurator](../assets/Hauskonfigurator.png)
 
 *Hauskonfigurator: Hausprofil, Verbraucher, PV und Speicher als Kataloge.*
 
-Unter **Konfiguration → Hauskonfigurator** pflegen Sie die baulichen und technischen Bausteine Ihres Haushalts. Gespeichert werden Kataloge (Hausprofile, Komponenten), die später von Szenarien **referenziert** werden.
+Unter **Konfiguration → Hauskonfigurator** werden die baulichen und technischen Bausteine des Haushalts gepflegt. Gespeichert werden sie als Kataloge (Hausprofile, Komponenten), auf die die Szenarien später verweisen.
 
-In der Sidebar sehen Sie fehlende Schritte der Ersteinrichtung.
+Die Sidebar zeigt, welche Schritte der Ersteinrichtung noch fehlen.
 
-#### Konfiguration eines Hauses
+Änderungen im Hauskonfigurator und im Szenarienkonfigurator speichert Earnie **automatisch**. Komplette Konfigurationspakete (ZIP) lassen sich in der Sidebar unter **„Konfiguration speichern / laden“** exportieren und importieren – siehe [Speichern / Laden](../konfiguration/speichern-laden.md).
 
-Ein **Hausprofil** beschreibt Standort und „Wer lebt / was verbraucht hier“:
+#### Hausprofil anlegen
 
-- **Standort:** Breite, Länge, Land (daraus wird die Zeitzone abgeleitet — wichtig für Sonnenzeiten und PV-Prognose)  
-- **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool, generische Geräte  
-- **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen)
-- **Abwesend / Urlaub:** Profil-Schalter für den Live-Abwesenheitsmodus; je Verbraucher optional **„Inaktiv wenn abwesend“**. Wirksam wird der Modus, wenn der Earnie-Schalter **oder** das Smarthome-Signal `sens_absent_mode` am aktiven Backend an ist (Loxone: z. B. `Earnie_Abwesend`; HA: Entity; OpenEMS: `component/Channel`). Details: [Flexible Verbraucher — Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
+Ein **Hausprofil** beschreibt den Standort und wer bzw. was im Haus Strom verbraucht:
 
-Legen Sie zuerst ein Profil an und ergänzen Sie danach die Geräte. Ein bestehendes Profil entfernen Sie mit **Entfernen** rechts neben der Profilauswahl — das Profil des Live-Szenarios und Profile, die noch von anderen Szenarien referenziert werden, können nicht gelöscht werden. Ohne Standort und sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig. Je mehr Freiheiten sie Earnie beim Verschieben der Aktivierung der verschiedenen Verbraucher geben, umso höher sind die Einsparungspotenziale.
+- **Standort:** Breite, Länge und Land. Daraus leitet Earnie die Zeitzone ab, die für Sonnenzeiten und PV-Prognose wichtig ist.
+- **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool oder generische Geräte.
+- **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen).
+- **Abwesend / Urlaub:** Schalter für den Abwesenheitsmodus im Live-Betrieb; je Verbraucher optional **„Inaktiv wenn abwesend“**. Der Modus wirkt, sobald der Earnie-Schalter **oder** das Smarthome-Signal `sens_absent_mode` am aktiven Backend eingeschaltet ist (Loxone: z. B. `Earnie_Abwesend`, HA: Entity, OpenEMS: `component/Channel`). Details: [Flexible Verbraucher – Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
-Optional: **Historische Jahres-Leistungsprofile [kW] (CSV)** — Lastprofil (direkt oder als **Bilanz** aus PV + Batterie + Netz), optional PV-Erzeugungsprofil und Verbraucher — für Ist-vs-Modell-Vergleich und realistischere Explorer-Rechnungen. Pro Verbraucher: Checkbox **„Von Basis-Last abziehen“** steuert, ob die CSV-Last die Synthese ersetzt und von der Basislast abgezogen wird.
+Zuerst das Profil anlegen, danach die Geräte ergänzen. Ohne Standort und ein sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig.
 
-Earnie kennt verschiedene generische Verbrauchstypen (siehe unten), bei denen die Leistungsprofile unterschiedlich behandelt werden. Siehe dazu auch[Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). 
+Ein Profil wird mit **Entfernen** rechts neben der Profilauswahl gelöscht. Das gilt nicht für das Profil des Live-Szenarios und für Profile, auf die noch andere Szenarien verweisen.
 
-Unter **Gesamt-Lastverhalten** können Sie die Basislast als **Jahres-Rest gleichmäßig** oder **Monats-Rest je Monat** wählen — letzteres gilt auch für den Szenario-Explorer (Pfad A), solange nicht alle steuerbaren Verbraucher ein CSV haben (Pfad B).
+Je mehr Spielraum Earnie beim Verschieben der Verbraucher bekommt, desto größer ist das Einsparpotenzial.
 
-Änderungen im Hauskonfigurator und Szenarienkonfigurator werden **automatisch gespeichert**. Komplette Config-Pakete (ZIP) exportieren/importieren Sie in der Sidebar unter **„Konfiguration speichern / laden“** — siehe [Speichern / Laden](../konfiguration/speichern-laden.md).
+**Historische Leistungsprofile (optional):** Unter **Historische Jahres-Leistungsprofile [kW] (CSV)** lassen sich gemessene Verläufe hinterlegen – das Lastprofil (direkt oder als **Bilanz** aus PV, Batterie und Netz), optional ein PV-Erzeugungsprofil und Profile einzelner Verbraucher. Damit werden Ist und Modell vergleichbar, und die Rechnungen im Szenario-Explorer werden realistischer.
+
+- Pro Verbraucher legt die Checkbox **„Von Basis-Last abziehen“** fest, ob die CSV-Last die berechnete Last ersetzt und von der Basislast abgezogen wird.
+- Wie Earnie die Profile je Verbrauchstyp behandelt, beschreibt [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md).
+
+**Gesamt-Lastverhalten:** Die Basislast kann als **Jahres-Rest gleichmäßig** oder als **Monats-Rest je Monat** verteilt werden. Die zweite Variante gilt auch für den Szenario-Explorer (Pfad A), solange nicht alle steuerbaren Verbraucher eine eigene CSV haben (Pfad B).
 
 #### Haus-Wärme
 
-Thermischer Verbraucher für Heizung / Wärmepumpe (je nach Modell im Profil):
+Thermischer Verbraucher für Heizung bzw. Wärmepumpe (je nach Modell im Profil):
 
-- Solltemperaturen und thermische Parameter (Wärmeverlust, Volumen bzw. Gebäudekennwerte). Dafür ist ein Energieausweis des Gebäudes hilfreich.  
-- **Temperaturabsenkung wenn abwesend:** bei wirksamem Abwesenheitsmodus und aktiver Verbraucher-Option gilt Live-Soll = Solltemperatur − Absenkung; Warmwasserbedarf wird dann mit 0 Personen gerechnet.  
-- Earnie schätzt den **Wärmebedarf aus Wetterdaten** und den thermischen Parametern und plant den Strombedarf zeitlich mit ein.  
-- Im Live-Betrieb erfolgt später die Anbindung über EHAL-Bindings (Leistung, Freigabe, ggf. Temperaturen)
+- **Solltemperaturen und thermische Parameter** (Wärmeverlust, Volumen bzw. Gebäudekennwerte). Ein Energieausweis des Gebäudes hilft dabei.
+- **Temperaturabsenkung wenn abwesend:** Bei wirksamem Abwesenheitsmodus und aktiver Verbraucher-Option gilt im Live-Betrieb Solltemperatur minus Absenkung. Den Warmwasserbedarf rechnet Earnie dann mit 0 Personen.
+- **Wärmebedarf:** Earnie schätzt ihn aus Wetterdaten und den thermischen Parametern und plant den Strombedarf zeitlich ein.
+- **Live-Betrieb:** Die Anbindung erfolgt später über EHAL-Bindings (Leistung, Freigabe, ggf. Temperaturen).
 
-Je genauer die thermischen Angaben, desto realistischer der Jahresvergleich — aber grobe Werte reichen für eine erste Orientierung.
+Je genauer die thermischen Angaben, desto realistischer der Jahresvergleich. Für eine erste Orientierung reichen grobe Werte.
 
 #### Elektro-Auto
 
-E-Auto / Wallbox als planbarer Verbraucher:
+E-Auto und Wallbox als planbarer Verbraucher:
 
-- Akkukapazität, Ladeleistung, Wirkungsgrad  
-- **Zeitfenster:** wann das Auto da ist und bis wann es „geladen“ sein soll (getrennt für Werktage / Wochenende).  
-- Ziel-SOC beim Abfahren  
-- **Prognose, wenn nicht angeschlossen:** optionale Lade-Prognose ohne Wallbox-Anschluss (unabhängig vom Haus-Abwesenheitsmodus)
+- Akkukapazität, Ladeleistung und Wirkungsgrad
+- **Zeitfenster:** ab wann das Auto da ist und bis wann es geladen sein soll – getrennt für Werktage und Wochenende
+- Ziel-SoC beim Abfahren
+- **Prognose, wenn nicht angeschlossen:** optionale Lade-Prognose, auch wenn das Auto nicht an der Wallbox hängt (unabhängig vom Abwesenheitsmodus des Hauses)
 
-Earnie entscheidet **wann** am günstigsten geladen wird (günstige Stunden, PV-Überschuss) unter der Vorgabe, dass es zum angegebenen Zeitpunkt den gewünschten End-SOC hat. Im Live-Betrieb liefert das Smarthome-Backend typischerweise „angesteckt“, Ist-SOC und Fertig-Zeit; Earnie schreibt Lade-Sollleistung und ggf. PV-Follow um genau den PV-Überschuss ins E-Auto zu laden.
+Earnie entscheidet, **wann** am günstigsten geladen wird (günstige Viertelstunden, PV-Überschuss), sodass das Auto zum angegebenen Zeitpunkt den gewünschten Ladestand hat. Im Live-Betrieb meldet das Smarthome-Backend in der Regel „angesteckt“, den aktuellen SoC und die Fertig-Zeit. Earnie schreibt die Lade-Sollleistung und – falls genutzt – PV-Follow, damit genau der PV-Überschuss ins Auto fließt.
 
 #### Pool
 
-Ein Pool kann als komplexer Verbraucher angesehen werden, der mehrere Einzelkomponenten umfasst, die getrennt gesteuert werden können:
+Ein Pool besteht meist aus mehreren Komponenten, die sich getrennt steuern lassen:
 
-- **Heizung** — thermisches Modell (Wasservolumen, Solltemperatur, Wärmeverlust); Tagesenergie ergibt sich aus dem Modell  
-- **Filter** — Laufzeitbedarf (Stunden), ggf. natives Zeitfenster der Poolsteuerung; Earnie kann **zusätzlich** außerhalb dieses Fensters freigeben
+- **Heizung:** thermisches Modell (Wasservolumen, Solltemperatur, Wärmeverlust); die Tagesenergie ergibt sich aus dem Modell.
+- **Filter:** Laufzeitbedarf in Stunden, ggf. mit eigenem Zeitfenster der Poolsteuerung. Earnie kann **zusätzlich** außerhalb dieses Fensters freigeben.
 - **Jetdüsen**
 
-Für Was-wäre-wenn reichen Volumen, Solltemperatur und Filterstunden. Der Live-Betrieb braucht passende Merker für Temperaturen und Freigaben.
+Für die Was-wäre-wenn-Analyse reichen Volumen, Solltemperatur und Filterstunden. Für den Live-Betrieb braucht es passende Signale für Temperaturen und Freigaben.
 
-##### Hinweis
-
-Pools haben meistens keine standardisierte Schnittstelle zur Anbindung an Smarthome-Systeme. Daher ist hier Eigenleistung gefragt oder mit erhöhtem Aufwand zu rechnen, wenn eine Anbindung durch Fachkräfte vorgenommen werden soll. Das Einsparpotenzial ist aber enorm!!
+> **Hinweis:** Pools haben meist keine standardisierte Schnittstelle zum Smarthome. Die Anbindung erfordert daher Eigenleistung oder – durch einen Fachbetrieb – erhöhten Aufwand. Das Einsparpotenzial ist allerdings hoch.
 
 #### Allgemeine Verbraucher
 
-Waschmaschine, Trockner, Geschirrspüler und ähnliche Geräte als **generische** Verbraucher:
+Waschmaschine, Trockner, Geschirrspüler und ähnliche Geräte sind **generische** Verbraucher. Earnie kennt drei Rollen:
 
+| Rolle | Bedeutung |
+| ----- | --------- |
+| **Bekannt** (`known`) | Feste oder geplante Laufzeiten fließen in die Grundlast ein. Earnie verschiebt sie nicht, berücksichtigt sie aber bei der Optimierung. |
+| **Flexibel** (`flex`) | Earnie darf den Start innerhalb des erlaubten Zeitfensters verschieben. |
+| **Manuell** (`manual`) | Erscheint auf der Seite *Manuelle Geräte* – entweder mit **Start-Empfehlung** (Sterne) oder als **Energiereserve** (Powerstation). Die Wahl erfolgt im Hauskonfigurator, beides zugleich ist nicht möglich. Bei der Start-Empfehlung rechnen Live-Optimierung und Szenario-Explorer die typische Zeitplan-Last trotzdem wie bei *bekannt* mit. |
 
-| Rolle in Earnie      | Bedeutung für Sie                                                                                                                                                                                                                   |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Bekannt (known)**  | Feste / geplante Zeiten fließen als Grundlast ein — Earnie verschiebt sie nicht, berücksichtigt sie aber bei der Optimierung                                                                                                        |
-| **Flexibel (flex)**  | Earnie darf den Start im erlaubten Zeiffenster verschieben                                                                                                                                                                          |
-| **Manuell (manual)** | Auf *Manuelle Geräte*: entweder **Start-Empfehlung** (Sterne) oder **Energiereserve** (Powerstation) — Wahl im Hauskonfigurator, nicht beides. In Live-Optimierung und Szenario-Explorer wird die typische Zeitplan-Last bei Advice trotzdem wie bei *bekannt* mitgerechnet. |
-
-
-Leistung und typische Laufzeit angeben. Optional später ein Loxone-Leistungsmerker für Ist-Anzeige und zur Kontrolle.
+Anzugeben sind Leistung und typische Laufzeit. Optional lässt sich später ein Loxone-Leistungsmerker zuordnen – für die Ist-Anzeige und zur Kontrolle.
 
 #### PV-Anlagen
 
-Unter PV-Anlagen (Komponenten-Katalog):
+Im Komponenten-Katalog unter PV-Anlagen:
 
-- installierte Leistung (**kWp**)  
-- Dachneigung und Ausrichtung (Azimut: Süd ≈ 0°, Ost negativ, West positiv)  
+- installierte Leistung (**kWp**)
+- Dachneigung und Ausrichtung (Azimut: Süd ≈ 0°, Ost negativ, West positiv)
 - zugeordneter **Wechselrichter** (`inverter_id`)
 
-Es können mehrere PV-Anlagen konfiguriert werden. Die konfigurierten PV-Anlagen können in den Szenarios selektiert und kombiniert werden. So kann in einer Was-Wäre-Wenn Analyse auch eine mögliche Erweiterung vorab analysiert werden.
+Es können mehrere PV-Anlagen angelegt werden. Szenarien können sie einzeln auswählen und kombinieren – so lässt sich z. B. eine geplante Erweiterung vorab durchrechnen.
 
-Der Standort wird aus dem Hausprofil entnommen. Earnie nutzt frei verfügbare, historische Wetterdaten für die Ertragsprognose. 
+Den Standort übernimmt Earnie aus dem Hausprofil. Für die Ertragsprognose nutzt Earnie frei verfügbare, historische Wetterdaten.
 
 #### Batteriespeicher
 
-Folgende Parameter sind relevant:
+Relevante Parameter:
 
-- nutzbare Kapazität (kWh)  
-- max. Lade-/Entladeleistung (kW)  
-- Wirkungsgrad, min./max. SOC  
-- zugeordneter **Wechselrichter** (Hausbatterie) bzw. integrierter Powerstation-WR bei physischer Powerstation  
-- optional **Verschleißkosten** (damit Earnie bei vielen Zyklen dies wirtschaftlich berücksichtigt)
+- nutzbare Kapazität (kWh)
+- maximale Lade- und Entladeleistung (kW)
+- Wirkungsgrad, minimaler und maximaler SoC
+- zugeordneter **Wechselrichter** (Hausbatterie) bzw. der integrierte Wechselrichter einer physischen Powerstation
+- optional **Verschleißkosten**, damit Earnie viele Ladezyklen wirtschaftlich bewertet
 
-Wechselrichter pflegen Sie im Tab **Wechselrichter** (Typ, AC-Anschluss netzgekoppelt/Insel, optionale Leistungs-Caps). **Insel** bedeutet hier: speist nur angeschlossene Verbraucher, nicht den Haus-AC-Bus; der AC-Eingang kann am Netz hängen — nicht „netzlos“. Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
+Wechselrichter werden im Tab **Wechselrichter** gepflegt (Typ, AC-Anschluss netzgekoppelt oder Insel, optionale Leistungsgrenzen). **Insel** bedeutet hier: Der Wechselrichter versorgt nur angeschlossene Verbraucher, nicht den AC-Bus des Hauses. Sein AC-Eingang kann trotzdem am Netz hängen – „Insel“ heißt also nicht „netzlos“. Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
 
-Im Live-Betrieb steuert Earnie Ziel-SOC und Lade-/Entlade-Sollwerte über das Smarthome-System; die konkrete Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter selbst.
+Im Live-Betrieb gibt Earnie Ziel-SoC sowie Lade- und Entlade-Sollwerte über das Smarthome-System vor. Die eigentliche Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter.
 
 ### Szenarienkonfigurator
 
-Unter **Konfiguration → Szenarienkonfigurator** bauen Sie **Varianten** Ihres Haushalts, ohne den Live-Betrieb zu ändern.
+Unter **Konfiguration → Szenarienkonfigurator** entstehen **Varianten** des Haushalts, ohne dass sich am Live-Betrieb etwas ändert.
 
-Ein Szenario verknüpft typischerweise:
+Ein Szenario verknüpft in der Regel:
 
-- Hausprofil  
-- Batterie und/oder PV-Anlage(n)  
-- Bezugs- und Einspeisetarif
+- ein Hausprofil,
+- Batterie und/oder PV-Anlage(n),
+- einen Bezugs- und einen Einspeisetarif.
 
-**Es ist kein eigenes Szenario „ohne PV und ohne Batterie“ nötig:** Diese Referenz berechnet Earnie im Szenario-Explorer automatisch als Zeile **Historisch** (Live-Tarife, Last ohne PV/Speicher und ohne Flex-Optimierung). Sie müssen dafür kein zusätzliches Szenario im Szenarienkonfigurator anlegen.
+Typische Vergleiche:
 
-Beispiele für Vergleiche:
+- Ist-Zustand gegenüber einem größeren Speicher
+- eine PV-Anlage gegenüber mehreren
+- Fixpreis gegenüber Spot-Tarif
+- ohne Batterie, aber mit PV, oder verschiedene Batteriegrößen
 
-- Ist-Zustand vs. größerer Speicher  
-- mit einer PV vs. mehreren PVs  
-- Fixpreis vs. Spot-Tarif  
-- ohne Batterie, aber mit PV / verschiedene Batteriegrößen 
-- ...
+**Live-Szenario:** Das Live-Szenario (meist ID `live`) ist die Basis für den späteren Produktivbetrieb. Alle weiteren Szenarien dienen nur der Analyse im Szenario-Explorer.
 
-Das **Live-Szenario** (meist ID `live`) ist die Basis für den späteren Produktivbetrieb. Weitere Szenarien dienen der Analyse im Szenario-Explorer. Die Szenarien wählen Sie in einer **Liste** (nicht Dropdown); rechts daneben verschieben ↑/↓ die Reihenfolge der weiteren Szenarien (Live bleibt oben) — so erscheinen sie später in Listen und Kostenvergleichen (Dient nur einer verständlicheren Darstellung). 
+**Auswahl und Reihenfolge:** Die Szenarien stehen in einer Liste. Mit ↑/↓ rechts daneben lässt sich die Reihenfolge der weiteren Szenarien ändern (das Live-Szenario bleibt oben). In dieser Reihenfolge erscheinen sie später in Listen und Kostenvergleichen – das dient nur der Übersicht.
 
-Pro Szenario können Sie **Aktiv für Szenario-Explorer** setzen; deaktivierte Varianten werden in der Explorer-Rechnung übersprungen (vorhandene Ergebnisse werden dadurch ungültig). Mit **Eigene Referenz ohne Optimierung** legen Sie fest, ob für die Variante eine eigene Nicht-Opt-Referenz berechnet wird (Vorbelegung nach Tarif/PV-Heuristik; Batterie-only-Varianten teilen standardmäßig die Live-Referenz); der Earnie-Optimierungs-Algorithmus ist dann **NICHT** aktiv.
+**Pro Szenario einstellbar:**
 
-Tarife wählen Sie aus dem Tarifkatalog (Bezug/Einspeise) oder als **Eigener Festpreis** mit eigener Cent/kWh-Eingabe (Werte am Szenario, nicht im Katalog). Nach Katalog-Auswahl zeigt der Editor die **Katalogparameter** des gewählten Tarifs (read-only). Bitte prüfen Sie diese Werte — es gibt **keine Garantie** für Vollständigkeit oder Aktualität. **Monatliche Fixkosten** (Lieferant-Grundpreis, optional Netz-/Messstellen-/Sonstige) fließen als **Näherung** in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung. Den volumetrischen **Netznutzung Arbeitspreis** pflegen Sie am Hausprofil (Standort); er fließt in Live und SE ein und erscheint in Fake-Jahresrechnungen getrennt vom Lieferantenanteil. Nach jedem SE-Lauf liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/` (Bezug/Einspeisung mit Ø Tarif- und Ø Ist-Preis, Katalogparameter am Ende). Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md). Technik: [Preise & aWATTar](../konfiguration/preise.md).
+- **Aktiv für Szenario-Explorer:** Deaktivierte Varianten überspringt der Szenario-Explorer. Vorhandene Ergebnisse werden dadurch ungültig.
+- **Eigene Referenz ohne Optimierung:** legt fest, ob für die Variante eine eigene Referenz ohne Optimierung berechnet wird. Die Vorbelegung folgt einer Heuristik nach Tarif und PV; reine Batterie-Varianten teilen standardmäßig die Live-Referenz. In dieser Referenz ist der Earnie-Optimierungsalgorithmus nicht aktiv.
 
-### Szenario-Explorer (Was-Wäre-Wenn-Analyse)
+**Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
-Monatliche Stromkosten
+- Nach der Auswahl aus dem Katalog zeigt der Editor dessen **Katalogparameter** (nur lesend). Diese Werte bitte prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
+- **Monatliche Fixkosten** (Grundpreis des Lieferanten, optional Netz-, Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
+- Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
+- Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
 
-*Szenario-Explorer: Monatliche Stromkosten im Vergleich (Was-wäre-wenn).*
+Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) · Technik: [Preise & aWATTar](../konfiguration/preise.md)
 
-Unter **Konfiguration → Szenario-Explorer** (erscheint nach ausreichender Planungs-Konfiguration).
+### Szenario-Explorer (Was-wäre-wenn-Analyse)
 
-Hier analysieren Sie **Langzeitvergleiche** typischerweise über 12 Monate (für Tests auch kürzer, z. B. nur März) zwischen Referenzen und Ihren Szenarien:
+![Monatliche Stromkosten](../assets/Monatliche-Stromkosten.png)
 
-- **Historisch** — „nacktes Haus“ ohne PV und ohne Speicher (Live-Tarife, Last ohne Flex-Optimierung); **automatisch** berechnet, kein eigenes Szenario konfigurieren  
-- **Referenzen ohne Optimierung** — je nach Szenario-Einstellung und Heuristik: Live-Referenz und ggf. eigene Spalten bei abweichendem Tarif/PV (steuerbar im Szenarienkonfigurator)  
-- **optimierte Szenarien** — mit Earnie-Planung (Batterie/Flex, sofern im Szenario vorhanden)
+*Szenario-Explorer: monatliche Stromkosten im Vergleich.*
 
-Das ist **kein** tägliches Live-Cockpit und ändert keine Steuerwerte am Hub.
+Der Szenario-Explorer steht unter **Konfiguration → Szenario-Explorer**, sobald die Planungs-Konfiguration vollständig genug ist.
 
-> Hinweis: Ergebnisse sind Modellrechnungen. Es gibt **keine Garantie**, dass Live-Einsparungen exakt den Simulationen entsprechen (Wetter, Verhalten, Tarifdetails, Hardwaregrenzen).
+Er vergleicht Referenzen und eigene Szenarien über einen langen Zeitraum, typischerweise 12 Monate (für Tests auch kürzer, z. B. nur März):
 
-**WICHTIG**: Für eine Vergleichbarkeit versucht Earnie bei allen Szenarios (Ausnahme: Historisch-Szenario - siehe unten) den Gesamt-Jahres-Verbrauch **gleich** zu halten. Es kann zu kleinen Abweichungen kommen aufgrund der Optimierung. Etwaige Abweichungen werden angezeigt und können mit berücksichtigt werden. Earnie nimmt **KEINE** Verbrauchs-Einsparung vor!!!
+- **Historisch:** das „nackte Haus“ ohne PV und ohne Speicher, mit den Tarifen des Live-Szenarios und ohne Lastverschiebung. Earnie berechnet diese Zeile automatisch.
+- **Referenzen ohne Optimierung:** die Live-Referenz und – je nach Szenario-Einstellung und Heuristik – eigene Referenzen bei abweichendem Tarif oder abweichender PV.
+- **Optimierte Szenarien:** mit Earnie-Planung (Batterie und flexible Verbraucher, sofern im Szenario vorhanden).
 
-#### Verbrauchsdaten generieren und sichten
+Der Szenario-Explorer ist kein tägliches Cockpit und ändert keine Steuerwerte an der Anlage.
 
-Vor oder beim Start einer Explorer-Rechnung brauchen Sie eine belastbare **Lastgrundlage**:
+> **Hinweis:** Die Ergebnisse sind Modellrechnungen. Live-Einsparungen können davon abweichen (Wetter, Verhalten, Tarifdetails, Grenzen der Hardware).
 
-- aus dem **Hausprofil** (Zeitpläne / thermische Modelle / Flex-Fenster), und/oder  
-- aus historischen Verbrauchsdaten, falls vorhanden
+**Gleicher Jahresverbrauch:** Damit die Szenarien vergleichbar bleiben, hält Earnie den Gesamt-Jahresverbrauch in allen Szenarien gleich (Ausnahme: die Zeile Historisch, siehe [unten](#warum-weicht-historisch-beim-jahresverbrauch-ab)). Durch die Optimierung sind kleine Abweichungen möglich; sie werden angezeigt. Earnie reduziert den Verbrauch nicht – er optimiert nur, wann er anfällt.
 
-Im Explorer bzw. zugehörigen Schritten können Sie Verbrauchsverläufe erzeugen und prüfen (Plausibilität, Monatsprofile). Stimmen Größenordnung und Tagesgang nicht, zuerst Profil und Geräte korrigieren — sonst sind Kostenvergleiche irreführend. Wenn sich Synthese-Parameter (Hausprofil/PV) geändert haben, müssen die Verbrauchsdaten **neu generiert** werden — sonst bleibt der Start der Rechnung gesperrt.
+#### Verbrauchsdaten erzeugen und prüfen
+
+Vor oder beim Start einer Rechnung braucht der Szenario-Explorer eine belastbare **Lastgrundlage**:
+
+- aus dem **Hausprofil** (Zeitpläne, thermische Modelle, Zeitfenster der flexiblen Verbraucher) und/oder
+- aus historischen Verbrauchsdaten, falls vorhanden.
+
+Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilität, Monatsprofile). Stimmen Größenordnung oder Tagesgang nicht, zuerst Profil und Geräte korrigieren – sonst führen die Kostenvergleiche in die Irre.
+
+Ändern sich Parameter, aus denen der Verbrauch berechnet wird (Hausprofil, PV), müssen die Verbrauchsdaten **neu erzeugt** werden. Bis dahin bleibt der Start der Rechnung gesperrt.
 
 #### Szenario-Explorer ausführen
 
-Optional: Checkbox **Verbrauchsdaten auf letzten Kalendermonat spiegeln (aktuelle Tarife)** — die Verbrauchsmuster werden nach Kalendermonat auf die letzten 12 vollständigen Monate vom jeweiligen Kalendertag gelegt, damit Spot-/Tarifpreise aktuell sind; die CSV auf der Festplatte bleibt unverändert. Auswahl wird in `scenario_explorer_conf` gespeichert.
+1. Die Auswahl der Szenarien prüfen und ggf. im Szenarienkonfigurator anpassen.
+2. Optional **Verbrauchsdaten auf letzten Kalendermonat spiegeln (aktuelle Tarife)** aktivieren: Earnie legt die Verbrauchsmuster je Kalendermonat auf die letzten 12 vollständigen Monate, damit aktuelle Spot- und Tarifpreise gelten. Die CSV-Datei bleibt unverändert; die Auswahl wird in `scenario_explorer_conf` gespeichert.
+3. Rechnung starten. Je nach Umfang kann das länger dauern.
+4. Warten, bis die Auswertung fertig ist. Die Ergebnisse legt Earnie in der Laufzeitablage des Explorers ab.
 
-1. Die Auswahl der gewünschten Szenarien kontrollieren und ggf. im Szenarien-Konfigurator anpassen.
-2. Rechnung starten (kann je nach Umfang länger dauern).
-3. Warten, bis die Auswertung fertig ist; Ergebnisse landen in der Laufzeitablage für den Explorer.
+> **Rechenzeit:** Earnie startet für jedes Szenario einen eigenen Prozess auf einem eigenen Prozessorkern. Auf Rechnern mit wenigen Kernen dauert die Rechnung entsprechend länger. Den Szenario-Explorer daher besser nicht auf der Hardware ausführen, die später den Live-Betrieb übernimmt.
 
-Anmerkung: Für minimale Rechenzeiten startet Earnie für jedes Szenario einen eigenen Prozess, der auf einem eigenen Prozessor-Kernel läuft. Bei Rechnern mit wenigen Kernels kann das zu verlängerten Rechenzeiten führen. Daher ist es auch nicht ratsam, den Szenarien-Explorer auf einer Hardware auszuführen, die für den späteren Live-Betrieb gedacht ist.
-
-Die Zeile **Historisch** rechnet Earnie **automatisch**: Zuvor generierte Last im Tarifsetting des Live-Szenarios **ohne** PV und **ohne** Batterie (Dafür brauchen Sie kein eigenes Szenario im Szenarienkonfigurator anlegen). Zusätzliche Referenzen ohne Optimierung entstehen nach Heuristik bzw. der Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag dieses Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante — nicht zum Historisch-Szenario.
+**Was rechnet die Zeile Historisch?** Die zuvor erzeugte Last mit den Tarifen des Live-Szenarios, **ohne** PV und **ohne** Batterie. Weitere Referenzen ohne Optimierung entstehen per Heuristik bzw. über die Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag des jeweiligen Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante, nicht zur Zeile Historisch.
 
 #### Ergebnisse des Szenario-Explorers
 
-Auswertung u. a.:
+Die Auswertung umfasst unter anderem:
 
-- **Gesamtkosten und -Verbrauch** (Tabelle: Jahres Verbrauch, Jahres Kosten, Δ vs. Live-Referenz, Hinweis)  
-- **Kostenvergleich** monatlich (Referenz vs. optimierte Szenarien)  
-- **Monatsverläufe** und Plausibilitätsansichten  
-- Charts zu Leistung, Verbrauch und PV je nach gewählter Ansicht
+- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Jahres Kosten, Δ zur Live-Referenz und Hinweis
+- **Kostenvergleich** je Monat (Referenz und optimierte Szenarien)
+- **Monatsverläufe** und Plausibilitätsansichten
+- Charts zu Leistung, Verbrauch und PV, je nach gewählter Ansicht
 
-Nutzen Sie die Ergebnisse als **Entscheidungsgrundlage** (Investition, Tarif), nicht als exakte Prognose der nächsten Stromrechnung. Es wird keine Gewähr dafür übernommen, dass die Ergebnisse genau so eintreffen werden. Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die SE-Kosten ein; Leistungspreis und netzgebietsspezifische Tabellen fehlen.
+Die Ergebnisse sind eine **Entscheidungsgrundlage** für Investition und Tarifwahl, keine exakte Prognose der nächsten Stromrechnung. Eine Gewähr, dass sie genau so eintreffen, gibt es nicht.
+
+Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Leistungspreis und netzgebietsspezifische Tabellen sind nicht berücksichtigt.
+
+<a id="gesamtkosten-und-verbrauch-jahres-verbrauch-kwh"></a>
+<a id="gesamtkosten-jahres-verbrauch-kwh"></a>
 
 ##### Gesamtkosten und -Verbrauch: Jahres Verbrauch [kWh]
 
-Die Spalte zeigt **nicht überall dieselbe Datenquelle**. Deshalb kann die Zeile **Historisch** andere kWh-Werte haben als Referenz- und Optimierungszeilen — das ist kein Anzeigefehler, sondern Absicht.
+Die Spalte stammt **nicht in jeder Zeile aus derselben Quelle**. Die Zeile **Historisch** kann daher andere kWh-Werte zeigen als die Referenz- und Optimierungszeilen. Das ist beabsichtigt und kein Anzeigefehler.
 
+| Zeilentyp | Was die Spalte zählt | Herkunft |
+| --------- | -------------------- | -------- |
+| **Historisch** (ohne Optimierung, …) | Summe des **Ist-Verbrauchs** über den Zeitraum | Live-Zählerdatei `cons_data` (`total_kw`, Stundenwerte) |
+| **Referenz** (…) ohne Optimierung | Summe der **Referenzlast** aller gebuchten Fenster (bei `sunrise_window`: Sonnenaufgang bis Sonnenaufgang je ready_by-Tag; bei `fixed_24h`: 24 h) | Hausprofil-Modell (`profile_spec`: Jahresverbrauch, Zeitpläne, Profile), sofern das Szenario ein Hausprofil hat |
+| **Optimiertes Szenario** | Summe der **gelieferten** Last (Grundlast und flexible Verbraucher) aller gebuchten Fenster | Ergebnis der Optimierung (MILP); sollte nahe an der Referenzlast liegen |
 
-| Zeilentyp                            | Was die Spalte zählt                                                                                                             | Herkunft                                                                                                          |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Historisch (ohne Optimierung, …)** | Summe des **Ist-Verbrauchs** über den Laufzeitraum                                                                               | Live-Zählerdatei `cons_data` (`total_kw`, Stundenwerte)                                                           |
-| **Referenz (…)** ohne Optimierung    | Summe der **Referenzlast** aller gebuchten Fenster (bei `sunrise_window`: Sunrise→Sunrise je ready_by-Tag; bei `fixed_24h`: 24h) | Hausprofil-Modell (`profile_spec`: Jahresverbrauch + Zeitpläne / Profile), sofern das Szenario ein Hausprofil hat |
-| **Optimiertes Szenario**             | Summe der **gelieferten** Last (Grundlast + flexible Verbraucher) aller gebuchten Fenster                                        | MILP-Ergebnis; soll nahe an der Referenzlast liegen (Plausibilität)                                               |
+<a id="warum-weicht-historisch-beim-jahresverbrauch-ab"></a>
 
+**Warum weicht Historisch beim Jahresverbrauch ab?**
 
-**Warum Historisch oft abweicht**
+1. **Ist und Modell:** Historisch spiegelt den gemessenen Hausverbrauch. Alle anderen Zeilen rechnen mit dem konfigurierten Hausprofil (Soll-Jahresverbrauch, Grundlast, Verbraucherprofile – inklusive manueller Geräte mit ihrem Standard-Zeitplan). Weichen Ist und Modell voneinander ab (unvollständige CSV, anderer Jahresverbrauch, synthetische Profile), weichen auch die kWh-Werte ab.
+2. **Kosten und kWh derselben Zeile:** Die €-Kosten der Zeile Historisch rechnet Earnie mit der Last des Live-Hausprofils (ohne PV und Batterie) und den Live-Tarifen. Die kWh-Spalte derselben Zeile kommt dagegen aus `cons_data`. Passen Ist und Modell nicht zusammen, gehören € und kWh in dieser einen Zeile nicht 1:1 zusammen.
+3. **PV und Batterie** verändern die Spalte „Jahres Verbrauch“ nicht. Gezählt wird der **Hausverbrauch** (Last), nicht der Netzbezug nach Abzug von PV und Speicher.
+4. **Kleine Differenzen** zwischen Referenz und Optimierung desselben Szenarios sind normal (Lastverschiebung, Toleranz der Plausibilitätsprüfung).
 
-1. **Ist vs. Modell:** Historisch spiegelt den gemessenen Hausverbrauch. Die übrigen Zeilen rechnen mit dem konfigurierten Hausprofil (Soll-Jahresverbrauch, Grundlast, Verbraucherprofile — inkl. manueller Geräte mit ihrer Default-Schedule). Weichen Ist und Modell ab (unvollständige CSV, anderer Jahresverbrauch, synthetische Profile), weichen auch die kWh-Zahlen ab.
-2. **Kosten und kWh der Historisch-Zeile:** Die **€-Kosten** der Historisch-Zeile werden mit der Last des Live-Hausprofils (ohne PV/Batterie) und den Live-Tarifen berechnet. Die **kWh-Spalte** derselben Zeile kommt dagegen aus `cons_data`. Stimmen Ist und Modell nicht überein, passen € und kWh in dieser einen Zeile inhaltlich nicht 1:1 zusammen.
-3. **PV und Batterie** ändern die Spalte „Jahres Verbrauch“ nicht: gezählt wird der **Hausverbrauch** (Last), nicht Netzbezug nach Abzug von PV/Speicher.
-4. **Kleine Differenzen** zwischen Referenz und Optimierung derselben Szenario-Familie sind normal (Lastverschiebung, Toleranz der Plausibilitätsprüfung).
+Für den Abgleich von Ist und Modell eignen sich der Hauskonfigurator mit der Leistungsprofil-CSV sowie die Tabellen **Gesamtkosten und -Verbrauch** und **Verbrauchsvergleich** im Explorer.
 
-Zum Abgleich Ist vs. Modell: Hauskonfigurator / Leistungsprofil-CSV und die Tabellen **Gesamtkosten und -Verbrauch** sowie **Verbrauchsvergleich** im Explorer. Weicht der Jahresverbrauch einer Zeile um **mehr als 5%** von der **Live-Referenz** ab, erscheint in der Spalte **Hinweis** eine Warnung — dann über **Info / About → Kontakt** ein öffentliches Issue ohne Secrets melden bzw. die Config-ZIP privat an `support@earnie-hems.com` senden. Technische Details: [Betriebsmodi — Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch), [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md).
+Weicht der Jahresverbrauch einer Zeile um **mehr als 5 %** von der Live-Referenz ab, zeigt die Spalte **Hinweis** eine Warnung. Dahinter kann ein Simulationsproblem stecken, das wir gerne nachvollziehen möchten. Melden Sie es am besten über **Info / About → Kontakt** als öffentliches Issue (ohne Zugangsdaten) oder senden Sie die Config-ZIP privat an `support@earnie-hems.com` – vielen Dank!
+
+Technische Details: [Betriebsmodi – Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch) · [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)
 
 ---
-
-
 
 ## Verbindung zu Smarthome
 
-Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die konkrete Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend.
+Überzeugt die Was-wäre-wenn-Analyse, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die eigentliche Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend.
 
-Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt; welches Backend zu Ihrer Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Bei Loxone kommen zusätzlich VI/VO-Vorlagen und Merker aus [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md) hinzu.
+Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt. Welches Backend zur Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Für Loxone gibt es zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
 
 ### Vorbereitung der Smarthome-Konfiguration
 
-1. **Benutzer / Token** am Smarthome-Backend mit Rechten zum Lesen und Schreiben der benötigten IOs / Entities einrichten.
-2. **Signale** anlegen bzw. zuordnen — u. a. Batterie-SOC und Leistungen, PV, Netz, Freigaben, E-Auto-Status. Beispielnamen (Loxone): [Loxone-Signale](../referenz/loxone-signals.md).
-3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** Merker bzw. HA-Entities den EHAL-Feldern zuweisen (`plant.ehal_bindings` / `consumers[].ehal_bindings`). Bei Loxone oft zuerst **Loxone-Import** auf **Smarthome-Backend**, dann Mapping prüfen.
-4. Wenn Jahres-Leistungsprofile berücksichtigt werden sollen (ist optional): CSV-Upload nuten ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)) Offline-Daten für den Szenario-Explorerliegen später unter`cons_data.csv`.
+1. **Benutzer bzw. Token** am Smarthome-Backend anlegen – mit Rechten zum Lesen und Schreiben der benötigten IOs bzw. Entities.
+2. **Signale** anlegen bzw. zuordnen, u. a. Batterie-SoC und -Leistung, PV, Netz, Freigaben und E-Auto-Status. Beispielnamen für Loxone: [Loxone-Signale](../referenz/loxone-signals.md).
+3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** die Merker bzw. HA-Entities den EHAL-Feldern zuweisen (`plant.ehal_bindings` / `consumers[].ehal_bindings`). Bei Loxone empfiehlt sich zuerst der **Loxone-Import** auf der Seite **Smarthome-Backend**, danach die Prüfung des Mappings.
+4. **Jahres-Leistungsprofile (optional):** per CSV-Upload hinterlegen ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Die Offline-Daten für den Szenario-Explorer liegen danach in `cons_data.csv`.
 
-Earnie liest Werte im Live-Betrief oft als Text mit Einheit (z. B. `3.5 kW`); die Einheit wird ignoriert.
+Earnie liest Werte im Live-Betrieb oft als Text mit Einheit (z. B. `3.5 kW`); die Einheit wird dabei ignoriert.
 
-Weitere Informationen dazu: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Home Assistant + evcc](../einrichtung/ha-evcc.md) · [EHAL-Com](../ui/ehal-com.md).
+Weitere Informationen: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Home Assistant + evcc](../einrichtung/ha-evcc.md) · [EHAL-Com](../ui/ehal-com.md)
 
 ### Live-Szenario (Szenarienkonfigurator)
 
-Unter **Konfiguration → Szenarienkonfigurator** wählen Sie das Live-Szenario und die Entitäten (Hausprofil, Batterie, PV, Tarife). Die Bezeichnung des Live-Szenarios ist fest. 
+Unter **Konfiguration → Szenarienkonfigurator** werden das Live-Szenario und seine Bausteine gewählt (Hausprofil, Batterie, PV, Tarife). Die Bezeichnung des Live-Szenarios ist fest.
 
-Details dazu: [PV & Batterie](../konfiguration/batterie-pv.md), [Überblick](../konfiguration/overview.md).
+Details: [PV & Batterie](../konfiguration/batterie-pv.md) · [Überblick](../konfiguration/overview.md)
 
 ### EHAL-Com
 
-Unter **Daemon Control → EHAL-Com**: Live-Lesen/Schreiben, Mapping-Assistenten und Status (u. a. Silent/Loud). Umschalten **Silent / Loud** liegt auf **Optimierer-Dienst** (gespeichert in `runtime/local_settings.json`). Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend** (Anbindung). Cutover: Lesen OK → Schreiben OK → Monitor plausibel. Plant-Signal für Abwesenheit: `sens_absent_mode` (Loxone-Default-Merker `Earnie_Abwesend`; HA-Entity bzw. OpenEMS `component/Channel` in `plant.ehal_bindings`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
+Die Seite **Daemon Control → EHAL-Com** bündelt Live-Lesen und -Schreiben, die Mapping-Assistenten und den Status (u. a. Silent/Loud).
 
-Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md).
+- Der Umschalter **Silent / Loud** liegt auf der Seite **Optimierer-Dienst** (gespeichert in `runtime/local_settings.json`).
+- Zugangsdaten und Backend-Wechsel liegen auf der Seite **Smarthome-Backend** (Anbindung).
+- Empfohlene Reihenfolge beim Umstieg: Lesen OK → Schreiben OK → Monitor plausibel.
+- Signal für den Abwesenheitsmodus: `sens_absent_mode` in `plant.ehal_bindings` (Loxone-Standardmerker `Earnie_Abwesend`, sonst HA-Entity bzw. OpenEMS `component/Channel`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
 
-Bei Loxone optional: `python -m scripts.verify_loxone_setup`.
+Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md). Bei Loxone optional zusätzlich: `python -m scripts.verify_loxone_setup`.
 
 ---
-
-
 
 ## Live-Betrieb
 
-Im Produktivbetrieb läuft der Optimierer dauerhaft (Docker: mit der UI; lokal: `python main.py`) im **15-Minuten-Takt** (oder auf Anforderung durch das Smarthome-Backend). Daemon und Optimierungsalgo nutzen **Viertelstunden-Slots**.
+Im Produktivbetrieb läuft der Optimierer dauerhaft – mit Docker zusammen mit der Oberfläche, lokal über `python main.py`. Er rechnet im **15-Minuten-Takt** (oder sofort, wenn das Smarthome-Backend eine Optimierung anfordert) und plant in **Viertelstunden-Slots**.
 
-Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart, Umschalter **Silent / Loud** und Dienst-Log (`earnie.log`, Level-Filter, Standard INFO+, Auto-Aktualisierung alle 10 s, **Gehe nach Oben**). Details: [Betrieb](../einrichtung/betrieb.md).
+Die Seite **Daemon Control → Optimierer-Dienst** enthält:
 
-Optional **Nutzungsstatistik**: Beim ersten Öffnen des Szenarienkonfigurators kann Earnie fragen, ob es anonym melden darf, dass diese Installation aktiv ist (Versionszähler). Es werden keine Preise, Orte, Gerätenamen oder Konfigurationsinhalte gesendet (im Live-Betrieb nur zusätzlich die Summe der **Earnie-Points**, einer groben Größenkennzahl der Anlage, die unter **Optimierer-Dienst** mit Aufschlüsselung angezeigt wird); die Meldung ist freiwillig, jederzeit widerrufbar und hat keinen Einfluss auf die Optimierung. Unter **Optimierer-Dienst** können Sie die Zustimmung umschalten und unter **Was wird gesendet?** die exakte Feldliste sehen. Details, Berechnungsregel der Earnie-Points und Abschalten: [Betrieb — Nutzungsstatistik](../einrichtung/betrieb.md#nutzungsstatistik).
+- Start, Stopp und Neustart des Dienstes,
+- den Umschalter **Silent / Loud**,
+- das Dienst-Log (`earnie.log`) mit Level-Filter (Standard: INFO und höher), automatischer Aktualisierung alle 10 Sekunden und der Schaltfläche **Gehe nach Oben**.
+
+Details: [Betrieb](../einrichtung/betrieb.md)
+
+### Nutzungsstatistik (optional)
+
+Beim ersten Öffnen des Szenarienkonfigurators fragt Earnie, ob es anonym melden darf, dass diese Installation aktiv ist (Versionszähler). So sehen wir, wie viele Installationen tatsächlich in Betrieb sind. Wenn Sie zustimmen, unterstützen Sie damit die Weiterentwicklung – ganz ohne Aufwand.
+
+- **Was gesendet wird:** keine Preise, Orte, Gerätenamen oder Konfigurationsinhalte. Im Live-Betrieb kommt nur die Summe der **Earnie-Points** hinzu – eine grobe Kennzahl für die Größe der Anlage, die unter **Optimierer-Dienst** mit Aufschlüsselung angezeigt wird.
+- **Freiwillig:** Die Zustimmung ist jederzeit widerrufbar und hat keinen Einfluss auf die Optimierung.
+- **Einstellung:** Unter **Optimierer-Dienst** lässt sich die Zustimmung umschalten; **Was wird gesendet?** zeigt die exakte Feldliste.
+
+Details, Berechnungsregel der Earnie-Points und Abschalten: [Betrieb – Nutzungsstatistik](../einrichtung/betrieb.md#nutzungsstatistik)
 
 ### Monitor
 
-Earnie Monitor
+![Earnie Monitor](../assets/Live-Monitoring-Chart1-2.png)
 
 *Monitor (Chart 1): Vergangenheit, laufender Plan und Preisprognose in einem Sunset-2-Sunset-Fenster.*
 
-Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset): einheitliches Cockpit über Vergangenheit, Jetzt und Vorausschau — Desktop als SA₀→SA₂-Fenster, Mobil in Sonnenaufgangs-Segmenten. Chart 1 / SoC-Linien / Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
+Der Monitor unter **Live-Cockpit → Monitor** (Sunset-2-Sunset) zeigt Vergangenheit, Gegenwart und Vorausschau in einem Cockpit. Am Desktop umfasst das Fenster SA₀→SA₂, auf dem Smartphone wird es in Abschnitte von Sonnenaufgang zu Sonnenaufgang geteilt. Chart 1, SoC-Linien und Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md)
 
-Ist der **Abwesenheitsmodus** wirksam (Earnie-Schalter und/oder Smarthome `sens_absent_mode`), erscheint oben ein Hinweis „Abwesenheitsmodus aktiv“ inkl. Quelle. Opt-in-Verbraucher außer Haus-Wärme fallen dann aus der Live-Optimierung; Haus-Wärme läuft mit Absenktemperatur.
-Kennzahlen zur Ersparnis in Chart 2 beziehen sich **pro Sonnenaufgangs-Tag** (Mobil: sichtbarer Tag; Desktop: zwei Spalten für SA₀→SA₁ und SA₁→SA₂). Am laufenden Tag sehen Sie **Ersparnis bisher** (seit Sonnenaufgang bis jetzt) und **Ersparnis erwartet** (bis zum nächsten Sonnenaufgang). Der Energievergleich im Expander bleibt auf dem vollen Planungshorizont (Jetzt bis übernächster Sonnenaufgang).
+**Abwesenheitsmodus:** Ist er wirksam (Earnie-Schalter und/oder Smarthome-Signal `sens_absent_mode`), erscheint oben der Hinweis „Abwesenheitsmodus aktiv“ mit der Quelle. Verbraucher mit der Option „Inaktiv wenn abwesend“ fallen dann aus der Live-Optimierung – außer der Haus-Wärme, die mit abgesenkter Temperatur weiterläuft.
+
+**Ersparnis in Chart 2:** Die Kennzahlen gelten **je Sonnenaufgangs-Tag** (Smartphone: der sichtbare Tag; Desktop: zwei Spalten für SA₀→SA₁ und SA₁→SA₂). Am laufenden Tag zeigt Chart 2 die **Ersparnis bisher** (seit Sonnenaufgang) und die **Ersparnis erwartet** (bis zum nächsten Sonnenaufgang). Der Energievergleich im Expander bezieht sich dagegen auf den vollen Planungshorizont (jetzt bis übernächster Sonnenaufgang).
 
 #### Chart 1: SoC-Linien (Plausibilität)
 
-Ab **Jetzt** können zwei SoC-Verläufe liegen — **SoC** (MILP-Plan) und **SoC BL Ziel** (Gegenprobe ohne smarte Batterie / ohne Preis-Lastverschiebung). Kurzfassung und Farben: [Charts & Panels — Chart 1](../ui/charts.md#chart-1-leistung-soc--preis).
+Ab **Jetzt** können zwei SoC-Verläufe zu sehen sein: **SoC** (Plan der Optimierung) und **SoC BL Ziel** (Gegenprobe ohne smarte Batterie und ohne preisabhängige Lastverschiebung). Kurzfassung und Farben: [Charts & Panels – Chart 1](../ui/charts.md#chart-1-leistung-soc--preis)
 
 ### Manuelle Geräte
 
-Unter **Live-Cockpit → Manuelle Geräte**: Verbraucher mit Rolle **manuell**. Pro Gerät im Hauskonfigurator unter **Unterstützung** entweder Start-Empfehlung (Sterne + optionaler Tagesplan) oder Energiereserve (Powerstation-Status und Trigger). Geplante Läufe (Empfehlungsmodus) erscheinen in Chart 1.
+Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der Rolle **manuell**. Im Hauskonfigurator wird je Gerät unter **Unterstützung** eine von zwei Varianten gewählt:
+
+- **Start-Empfehlung:** Sterne und optional ein Tagesplan. Geplante Läufe erscheinen in Chart 1.
+- **Energiereserve:** Status der Powerstation und Trigger.
+
+<a id="analyse-verbrauch-kosten"></a>
 
 ### Analyse Verbrauch & Kosten
 
-Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur mit `live_environment` und Live-Verbindung): Auswertung der letzten **7** oder **28 Tage** aus dem Produktiv-Log (verschiebbar), Kennzahl für die letzten **365 Tage** vorhandener Log-Daten, Batterieflüsse sowie **Wärmeinhalt** (Sim vs. Ist) aus Live-Historie. Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
+Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur mit `live_environment` und einer Live-Verbindung. Sie wertet das Produktiv-Log aus:
+
+- die letzten **7** oder **28 Tage** (verschiebbar),
+- eine Kennzahl für die letzten **365 Tage** vorhandener Log-Daten,
+- Batterieflüsse,
+- den **Wärmeinhalt** (Simulation und Ist) aus der Live-Historie.
+
+Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 
 ---
 
+<a id="kurz-checkliste-vom-initial-zustand-zum-go-live"></a>
 
+## Kurz-Checkliste: vom ersten Start zum Go-Live
 
-## Kurz-Checkliste vom Initial-Zustand zum "Go-Live"
+1. Installieren (Docker oder Greenfield) und die Oberfläche öffnen.
+2. **Hauskonfigurator:** Profil, Wärme, Auto, Pool, Geräte, PV und Batterie anlegen.
+3. **Szenarienkonfigurator:** Live-Szenario und Vergleichsvarianten bilden.
+4. **Szenario-Explorer:** Verbrauch prüfen, Rechnung starten, Ergebnisse bewerten.
+5. **Smarthome-Backend:** Backend wählen und Zugang speichern ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach das Mapping auf **EHAL-Com** prüfen.
+6. Live-Szenario und EHAL-Com prüfen, dann auf **Optimierer-Dienst** von Silent auf Loud umschalten.
+7. Den Dienst dauerhaft laufen lassen, den Monitor beobachten und nachjustieren.
 
-1. Installieren (Docker/Greenfield) und UI öffnen
-2. Hauskonfigurator: Profil, Wärme, Auto, Pool, Geräte, PV, Batterie
-3. Szenarienkonfigurator: Live-Szenario + Vergleichsvarianten
-4. Szenario-Explorer: Verbrauch prüfen, Rechnung, Ergebnisse bewerten
-5. Backend auf **Smarthome-Backend** wählen und Zugang speichern ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach Mapping auf **EHAL-Com** prüfen
-6. Live-Szenario + EHAL-Com prüfen; auf **Optimierer-Dienst** von Silent auf Loud wechseln
-7. Daemon dauerhaft laufen lassen, Monitor beobachten, Feintuning
-
-Bei Unklarheiten: Hover-Hilfe in `config.json` (Schema) und [docs/README.md](../README.md).
+Bei Fragen helfen die Hover-Hilfe in `config.json` (Schema) und die [Anwender-Dokumentation](../README.md). Bleibt etwas unklar, melden Sie sich gerne über die [Support-Kanäle](#support).

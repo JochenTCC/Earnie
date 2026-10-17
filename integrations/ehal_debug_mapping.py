@@ -143,11 +143,14 @@ def is_live_read_field(field: str) -> bool:
     from ehal.ess_fields import ess_field_kind
     from ehal.flex_fields import is_flex_live_read_field
     from ehal.inverter_fields import inv_field_kind
+    from ehal.push_signals import REQUEST_OPTIMIZE_ID
     from ehal.qualified_ids import field_kind
 
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
+    if name == REQUEST_OPTIMIZE_ID:
+        return True
     kind = ess_field_kind(name) or inv_field_kind(name) or field_kind(name)
     return (
         kind.startswith("sens_")
@@ -466,6 +469,9 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
                     live_read_consumer_field(consumer, name)
                     for name in THERMAL_ANNUAL_LIVE_READ_FIELDS
                 )
+    from ehal.push_signals import REQUEST_OPTIMIZE_ID
+
+    fields.append(REQUEST_OPTIMIZE_ID)
     return fields
 
 

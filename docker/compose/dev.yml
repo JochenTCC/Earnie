@@ -26,7 +26,7 @@ services:
     container_name: earnie
     restart: on-failure:3
     # Host 8521 → Container 8501 (ui.streamlit_port im Container bleibt 8501).
-    # Host 8541 → Daemon Earnie_Request_Optimize /alive.
+    # Host 8541 → Daemon Earnie_Request_Optimize / telemetry / status.json.
     ports:
       - "8521:8501"
       - "8541:8541"

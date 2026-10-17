@@ -130,7 +130,10 @@ class TestCollectReadChecks:
         assert labels == [
             "sens_pv_production_active",
             "grid.meter.sens_grid_power_active",
+            "request_optimize",
         ]
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["request_optimize"] == "Earnie_Request_Optimize"
         assert "PV-Zähler" not in labels
         assert all(not lbl.startswith("set_") for lbl in labels)
 

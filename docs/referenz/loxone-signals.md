@@ -88,7 +88,7 @@ Source: `share/loxone/templates/VirtualOut/`
 
 | File                      | Content (short)                                             |
 | ------------------------- | ------------------------------------------------------------ |
-| `VO_Earnie_Status.xml`    | optional alive / `Earnie_Request_Optimize` (port **8541**)  |
+| `VO_Earnie_Status.xml`    | optional `Earnie_Request_Optimize` (port **8541**)  |
 | `VO_Earnie_Plant.xml`     | plant `sens_*` / `get_*` (ESS SOC cut-offs + max power), outside temperature |
 | `VO_Earnie_EV.xml`        | EV telemetry                                                 |
 | `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
@@ -102,7 +102,7 @@ Then **restart Loxone Config**. The templates appear under Peripherals / Device 
 
 ### 2. Set the Earnie Address
 
-In every inserted Virtual In/Out, replace the `EARNIE_HOST` placeholder with Earnie's LAN IP or hostname. UI/Streamlit typically uses port **8501**; the **daemon HTTP** (Virtual In status, `Earnie_Request_Optimize` / alive) uses port **8541** (`system.ehal_loxone_http_port`). See [Streamlit Ports](streamlit-ports.md).
+In every inserted Virtual In/Out, replace the `EARNIE_HOST` placeholder with Earnie's LAN IP or hostname. UI/Streamlit typically uses port **8501**; the **daemon HTTP** (Virtual In status, `Earnie_Request_Optimize`, telemetry heartbeat) uses port **8541** (`system.ehal_loxone_http_port`). See [Streamlit Ports](streamlit-ports.md).
 
 Example Virtual In address (entity-scoped status JSON):
 
@@ -333,8 +333,9 @@ Ad hoc optimization runs in `main.py` (between quarter hours) via Loxone → Ear
 | ----------------------------------- | ---------------------------------------------------------------------------------------------- |
 | Virtual Out                        | template `share/loxone/templates/VirtualOut/VO_Earnie_Status.xml`                             |
 | Address                            | `http://EARNIE_HOST:8541` (port = `system.ehal_loxone_http_port`, default **8541**)           |
-| Cmd `Earnie_Request_Optimize`      | `POST /ehal/loxone/request_optimize` — wakes the daemon before the next quarter hour          |
-| Cmd `Earnie_Push_Alive` / Alive    | `GET /ehal/loxone/alive` — reachability check                                                  |
+| Cmd `Earnie_Request_Optimize`      | `POST /ehal/loxone/request_optimize` — wakes the daemon before the next quarter hour; receipt ID `request_optimize` in EHAL-Com **Signalliste** and **Live-Lesen** |
+
+Link proof (hub → Earnie) is the repeating telemetry VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat/<v>` (not a Status cmd). Existing Configs that still have obsolete **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` should delete that command — the endpoint returns 404.
 
 
 Compose production stacks publish container port **8541** (see [Streamlit Ports](streamlit-ports.md)).

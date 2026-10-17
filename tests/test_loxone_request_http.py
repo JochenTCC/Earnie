@@ -121,7 +121,11 @@ def test_wait_early_wake_with_fake_clock() -> None:
     assert clock.now == pytest.approx(1005.0)
 
 
-def test_http_post_request_optimize_sets_event() -> None:
+def test_http_post_request_optimize_sets_event(tmp_path, monkeypatch) -> None:
+    from runtime_store import loxone_push_inbox as inbox
+
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    inbox.reset_memory_for_tests()
     server = http_mod.start_loxone_request_http(0)  # OS-assigned port
     port = server.server_address[1]
     req = urllib.request.Request(
@@ -135,30 +139,39 @@ def test_http_post_request_optimize_sets_event() -> None:
     assert http_mod.optimize_request_event().is_set()
     assert http_mod.consume_optimize_request() is True
     assert http_mod.consume_optimize_request() is False
+    value, state, last_ts = inbox.read_control_receipt("request_optimize")
+    assert value == 1.0
+    assert state.startswith("OK")
+    assert last_ts
+    assert "request_optimize" in inbox.memory_snapshot()
+    inbox.reset_memory_for_tests()
 
 
-def test_http_get_alive() -> None:
+def test_http_alive_removed() -> None:
     server = http_mod.start_loxone_request_http(0)
     port = server.server_address[1]
-    with urllib.request.urlopen(
-        f"http://127.0.0.1:{port}/ehal/loxone/alive", timeout=2
-    ) as resp:
-        assert resp.status == 204
+    with pytest.raises(urllib.error.HTTPError) as exc_info:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/ehal/loxone/alive", timeout=2)
+    assert exc_info.value.code == 404
 
 
-def test_http_alive_records_callback(tmp_path, monkeypatch) -> None:
+def test_http_heartbeat_records_callback(tmp_path, monkeypatch) -> None:
     from runtime_store import loxone_callback_status as cbs
+    from runtime_store import loxone_push_inbox as inbox
 
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret")
+    inbox.reset_memory_for_tests()
     server = http_mod.start_loxone_request_http(0)
     port = server.server_address[1]
     with urllib.request.urlopen(
-        f"http://127.0.0.1:{port}/ehal/loxone/alive", timeout=2
+        f"http://127.0.0.1:{port}/ehal/telemetry/heartbeat/1?t=s3cret", timeout=2
     ) as resp:
         assert resp.status == 204
     status = cbs.load_loxone_callback_status()
     assert status is not None
     assert status["client_ip"] in ("127.0.0.1", "::1", "localhost")
+    inbox.reset_memory_for_tests()
 
 
 def test_http_get_status_json_canonical_matches_loxone_path(monkeypatch) -> None:

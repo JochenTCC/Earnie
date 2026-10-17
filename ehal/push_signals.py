@@ -22,6 +22,10 @@ from ehal.qualified_ids import (
 HEARTBEAT_ID = "heartbeat"
 HEARTBEAT_TITLE = "Push_Earnie_Heartbeat"
 HEARTBEAT_WRITE_ID = "heartbeat_ts"
+# Daemon HTTP control receipt (VO Earnie_Request_Optimize → POST, not telemetry).
+REQUEST_OPTIMIZE_ID = "request_optimize"
+REQUEST_OPTIMIZE_TITLE = "Earnie_Request_Optimize"
+REQUEST_OPTIMIZE_MEANING = "Ad-hoc-Optimierung anfordern"
 
 # Kinds excluded from VO / VI generation (empty = none).
 SKIP_KINDS: frozenset[str] = frozenset()
@@ -59,6 +63,17 @@ def heartbeat_write_signal() -> Signal:
         old_name="(Heartbeat)",
         title=vi_title_from_qualified_id(HEARTBEAT_WRITE_ID),
         digital=False,
+    )
+
+
+def request_optimize_signal() -> Signal:
+    """Loxone → Earnie wake for an out-of-band optimize (control receipt)."""
+    return Signal(
+        group="Status",
+        ehal_id=REQUEST_OPTIMIZE_ID,
+        old_name="(Request Optimize)",
+        title=REQUEST_OPTIMIZE_TITLE,
+        digital=True,
     )
 
 

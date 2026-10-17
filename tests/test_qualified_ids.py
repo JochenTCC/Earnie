@@ -84,6 +84,7 @@ def test_digital_ids() -> None:
         ("sens_temperature_outside", None, None, "sens_temperature_outside"),
         ("set_grid_export_power_limit", None, None, "set_grid_export_power_limit"),
         ("heartbeat", None, None, "heartbeat"),
+        ("request_optimize", None, None, "request_optimize"),
         ("grid.meter.sens_grid_power_active", "grid", "meter", "sens_grid_power_active"),
         ("ess.ecoflow_delta_3.sens_ess_soc", "ess", "ecoflow_delta_3", "sens_ess_soc"),
         ("consumer.waschmaschine.set_enable", "consumer", "waschmaschine", "set_enable"),

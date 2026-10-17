@@ -26,7 +26,7 @@ Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonf
 - Auslösung an **Viertelstunden-Grenzen** (`:00`, `:15`, `:30`, `:45`)
 - Zusätzlich **sofort**, wenn Loxone Virtual Out **`Earnie_Request_Optimize`** den Daemon-HTTP trifft (`POST /ehal/loxone/request_optimize`)
 - Port: `system.ehal_loxone_http_port` in `config.json` bzw. `EARNIE_EHAL_LOXONE_HTTP_PORT` (Standard **8541**); Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`
-- Alive-Check am selben Port: `GET /ehal/loxone/alive`
+- Link-Nachweis (Hub → Earnie): wiederholendes Heartbeat-VO `Push_Earnie_Heartbeat` → `GET /ehal/telemetry/heartbeat/<v>`
 - entity-scoped Virtual In Status am selben Port: `GET /ehal/loxone/status.json`
 - `system.loop_timeout` in `config.json`: maximale Wartezeit zwischen Durchläufen in Sekunden (Standard 900 = 15 Min.)
 - Die App lädt den Cockpit-Snapshot nach dem Viertelstunden-Wechsel, sobald `main.py` den aktuellen Slot abgeschlossen hat (typisch wenige Sekunden)
@@ -154,7 +154,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_EARLY_START`                    | `on` (Standard, auch wenn nicht gesetzt) oder `off`. `on`: reguläre Läufe starten 15–90 s vor dem Viertelstundentakt und schreiben die Sollwerte genau zum Takt; `off`: Lauf startet erst zum Takt und schreibt, sobald er fertig ist. Andere Werte → Fehler beim Start. Siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv). |
 | `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable: `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Prod-Compose setzt oft `sunset2sunset,live_environment`; Cloud: `scenario_explorer` — siehe [Betriebsmodi](../ui/betriebsmodi.md). |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
-| `EARNIE_EHAL_LOXONE_HTTP_PORT`          | TCP-Port für Daemon-HTTP (`Earnie_Request_Optimize` / `/alive`; überschreibt `system.ehal_loxone_http_port`, Standard **8541**)                                                                                                       |
+| `EARNIE_EHAL_LOXONE_HTTP_PORT`          | TCP-Port für Daemon-HTTP (`Earnie_Request_Optimize` / Telemetry inkl. Heartbeat / `status.json`; überschreibt `system.ehal_loxone_http_port`, Standard **8541**)                                                                                                       |
 | `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls nicht schon laufend (Docker-Compose setzt das). Ohne Variable / lokal aus.                                                                              |
 | `EARNIE_OFFLINE`                        | `1` = kein Loxone-/Live-Zwang; Bootstrap füllt leere Live-Szenario-Entitäts-IDs aus den Katalogen (sinnvoll für Streamlit Community Cloud). |

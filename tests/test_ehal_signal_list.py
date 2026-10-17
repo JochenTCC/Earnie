@@ -69,6 +69,26 @@ def test_build_signal_rows_has_read_and_write() -> None:
     assert "ess.15_kwh_speicher.sens_ess_soc" in ids
     assert "heartbeat" in ids
     assert "heartbeat_ts" in ids
+    assert "request_optimize" in ids
+    opt = next(r for r in rows if r.ehal_id == "request_optimize")
+    assert opt.direction == "read"
+    assert opt.group == "Status"
+    assert opt.match_kind == "never"
+    old = build_signal_rows(
+        house,
+        components,
+        inbox={
+            "request_optimize": {
+                "last_ts": "2026-01-01T00:00:00+00:00",
+                "value": 1.0,
+            }
+        },
+        published={},
+        fetched_at=None,
+    )
+    opt_old = next(r for r in old if r.ehal_id == "request_optimize")
+    assert opt_old.match_kind == "ok"
+    assert opt_old.match_text.startswith("vor ")
     pv = next(r for r in rows if r.ehal_id == "sens_pv_production_active")
     assert pv.direction == "read"
     assert pv.match_kind in ("ok", "stale")

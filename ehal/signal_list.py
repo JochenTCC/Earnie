@@ -12,10 +12,13 @@ from ehal.flex_fields import flex_field_label
 from ehal.functions import EHAL_FUNCTIONS
 from ehal.profiles import role_field_labels
 from ehal.push_signals import (
+    REQUEST_OPTIMIZE_ID,
+    REQUEST_OPTIMIZE_MEANING,
     Signal,
     heartbeat_signal,
     heartbeat_write_signal,
     read_signals_from_docs,
+    request_optimize_signal,
     write_signals_from_docs,
 )
 from ehal.qualified_ids import field_kind, parse_qualified_id
@@ -38,6 +41,8 @@ class SignalRow:
 
 
 def _meaning_for(kind: str) -> str:
+    if kind == REQUEST_OPTIMIZE_ID:
+        return REQUEST_OPTIMIZE_MEANING
     labels = role_field_labels()
     return flex_field_label(kind) or labels.get(kind) or kind
 
@@ -67,6 +72,9 @@ def _read_match(ehal_id: str, inbox: dict[str, dict[str, Any]]) -> tuple[MatchKi
     age = _age_seconds(last_ts)
     if age is None:
         return "ok", last_ts
+    # Rare control receipts (request_optimize): keep OK with age — not a repeating VO.
+    if ehal_id == REQUEST_OPTIMIZE_ID:
+        return "ok", f"vor {int(age)} s"
     if age > 300:
         return "stale", f"vor {int(age)} s"
     return "ok", f"vor {int(age)} s"
@@ -87,7 +95,7 @@ def _write_match(
 
 
 def _entity_label(group: str, ehal_id: str) -> str:
-    if group in ("Plant", "Heartbeat"):
+    if group in ("Plant", "Heartbeat", "Status"):
         return group
     # Batterie_<id> / Verbraucher / …
     if group.startswith("Batterie_"):
@@ -107,7 +115,10 @@ def build_signal_rows(
     fetched_at: str | None = None,
     include_heartbeat: bool = True,
 ) -> list[SignalRow]:
-    """Rows for every activated binding (read + write) plus optional heartbeats."""
+    """Rows for every activated binding (read + write) plus optional heartbeats.
+
+    ``request_optimize`` is always listed (control receipt; not a VO telemetry export).
+    """
     inbox = inbox if inbox is not None else {}
     published = published if published is not None else {}
     rows: list[SignalRow] = []
@@ -139,6 +150,7 @@ def build_signal_rows(
     if include_heartbeat:
         _add(heartbeat_signal(), "read")
         _add(heartbeat_write_signal(), "write")
+    _add(request_optimize_signal(), "read")
 
     rows.sort(key=lambda r: (r.group, r.direction, r.ehal_id))
     return rows
