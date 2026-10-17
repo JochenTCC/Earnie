@@ -2,7 +2,7 @@
 
 Earnie nutzt für Einspeisetarife **zwei unterschiedliche** monatliche Referenzreihen. Diese Seite erklärt beide und grenzt sie voneinander ab.
 
-- Berechnungsformeln und Tariftypen: [Preise & aWATTar](../konfiguration/preise.md)
+- Berechnungsformeln und Tariftypen: [Preise und Marktdaten](../konfiguration/preise.md)
 - Quellenverzeichnis (URLs, Entscheidungen): [Tarife und Preise nachrechnen](tarife-quellen.md)
 
 ## Kurzüberblick

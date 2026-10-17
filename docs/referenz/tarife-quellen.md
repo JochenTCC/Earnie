@@ -2,7 +2,7 @@
 
 Diese Seite erklärt, wie Earnie Bezugs- und Einspeisepreise sowie die ungefähren Monatskosten bildet. Sie hilft beim Nachvollziehen der Werte im **Szenarienkonfigurator** und im **Szenario-Explorer** (kurz SE).
 
-Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration und Tariftypen) · [OeMAG und Referenzmarktwert](oemag-referenzmarktwert.md)
+Verwandt: [Preise und Marktdaten](../konfiguration/preise.md) (Konfiguration und Tariftypen) · [OeMAG und Referenzmarktwert](oemag-referenzmarktwert.md)
 
 ## 1. Was Earnie berechnet (und was nicht)
 
@@ -65,7 +65,7 @@ Im Szenarienkonfigurator enthalten die Dropdowns für Bezug und Einspeisung den 
 | Bezug | Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`); **Netznutzung Arbeitspreis** aus dem Hausprofil wird weiterhin addiert |
 | Einspeisung | eingegebene Vergütung ohne weitere Aufschläge |
 
-Für den eigenen Festpreis gibt es keine Katalog-Vorschau und keine Lieferant- oder Netz-Fixkosten aus dem Tarifkatalog. Die Fixkosten in den SE-Gesamtkosten bleiben daher 0, sofern sie nicht über andere Szenario- oder Hauswerte abgebildet sind. Details: [Preise & aWATTar](../konfiguration/preise.md).
+Für den eigenen Festpreis gibt es keine Katalog-Vorschau und keine Lieferant- oder Netz-Fixkosten aus dem Tarifkatalog. Die Fixkosten in den SE-Gesamtkosten bleiben daher 0, sofern sie nicht über andere Szenario- oder Hauswerte abgebildet sind. Details: [Preise und Marktdaten](../konfiguration/preise.md).
 
 ### Beispiel: aWATTar HOURLY (AT)
 
@@ -98,7 +98,7 @@ Vergütung ≈ EPEX − **0,60** Cent/kWh (**ohne USt** laut Produktseite). Bei 
 
 Dasselbe USt-Muster gilt für `at_vkw_pv_flex` (`monthly_table`) und die meisten anderen Einspeise-Monats- und Spot-Tarife (OeMAG-Familie, SUNNY): Die Vergütung erhält **keinen** USt-Aufschlag.
 
-Details zu Typen und JSON: [Preise & aWATTar](../konfiguration/preise.md).
+Details zu Typen und JSON: [Preise und Marktdaten](../konfiguration/preise.md).
 
 ## 4. Fixkosten in den SE-Gesamtkosten
 
@@ -179,9 +179,9 @@ Die Formeln zum Nachrechnen stehen auf dieser Seite, das technische Mapping in [
 
 Day-Ahead Live: optional [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) (persönlicher Token); sonst [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
-## 7. Audit / Abweichungen (Stand 2026-07-21)
+## 7. Audit / Abweichungen (Stand 2026-10-17, Katalogstand 2026-09-28)
 
-Dieser Abschnitt macht die Katalogpflege transparent: Er gleicht öffentliche Quellen mit `tariffs.json` ab. Sekundärseiten lassen Grundgebühren mitunter weg oder ordnen die USt falsch zu. Primärquellen (Produktseite, Tarifblatt) haben daher Vorrang.
+Dieser Abschnitt macht die Katalogpflege transparent: Er gleicht öffentliche Quellen mit `tariffs.json` ab. Zuletzt wurden die Tabellenwerte gegen den Katalog (`catalog_as_of` 2026-09-28) geprüft; die Anbieterseiten wurden dabei nicht erneut abgerufen. Sekundärseiten lassen Grundgebühren mitunter weg oder ordnen die USt falsch zu. Primärquellen (Produktseite, Tarifblatt) haben daher Vorrang.
 
 ### Monatsgebühren (vorbelegt, Näherung)
 
@@ -211,4 +211,4 @@ Dieser Abschnitt macht die Katalogpflege transparent: Er gleicht öffentliche Qu
 | `at_verbund_v_strom_spot` | 1,3 + 4 % | Selectra eher Fix-ct; Formel unsicher | Offen, nur Monatsgebühr vorbelegt |
 | `de_awattar_de_hourly_de` | 2,25 + 3 % | Seite betont EPEX + 3 %; 2,25 unklar | Offen, Monatsgebühr ca. 4,58 |
 
-Technische Typen und APIs: [Preise & aWATTar](../konfiguration/preise.md).
+Technische Typen und APIs: [Preise und Marktdaten](../konfiguration/preise.md).

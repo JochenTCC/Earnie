@@ -16,9 +16,10 @@ Earnie lässt sich auch als LoxBerry-Plugin installieren. Das Plugin ist ein **s
 | Architektur | **aarch64**                                               | 32-bit (`armv7l`)                             |
 | RAM         | mind. **4 GB** empfohlen                                  | unter 2 GB                                    |
 | Speicher    | **SSD** bevorzugt                                         | nur langsame SD ohne Puffer                   |
+| MILP-Performance | langsamer als NAS akzeptabel, Log prüfen             | Erwartung identischer Laufzeit wie x86-NAS    |
 
 
-Gleiche Tabelle wie in [Container – Go/No-Go (LoxBerry)](container.md#gono-go-loxberry).
+Dieselben Kriterien wie in [Container – Go/No-Go (LoxBerry)](container.md#gono-go-loxberry). Zusätzlich gilt für das Plugin: Docker-Plugin aktiv und Docker-Socket für den User `loxberry`. Vor dem Produktivbetrieb das Daemon-Log (`runtime/earnie.log`) auf MILP-Laufzeiten und Startfehler prüfen.
 
 ## Installation
 
@@ -95,7 +96,7 @@ Bei „Feste Version“ listet die Plugin-UI die Tags aus der GitHub-Releases-AP
 | Persistenz  | `plugin.env` (`STREAMLIT_PORT=…`); ein Upgrade stellt die Datei wieder her     |
 
 
-Der Link „Earnie öffnen“ folgt dem konfigurierten Port. Ein Parallelbetrieb mit manueller Compose auf demselben Host-Port ist zu vermeiden (siehe [Parallelbetrieb mit manueller Compose](#parallelbetrieb-mit-manueller-compose)).
+Der Link „Earnie öffnen“ folgt dem konfigurierten Port.
 
 ## Plugin-Update vs. Image-Update
 
@@ -129,7 +130,3 @@ Das Uninstall-Skript:
 - löscht absichtlich **nicht** `earnie_env/` und entfernt **nicht** das GHCR-Image.
 
 LoxBerry kann beim Deinstallieren trotzdem das Plugin-Datenverzeichnis entfernen. Werden Config und Runtime nach der Deinstallation noch gebraucht, `earnie_env/` **vorher** an einen sicheren Ort kopieren. Zum manuellen Löschen danach den Ordner `earnie_env` unter dem Plugin-Datenpfad entfernen.
-
-## Parallelbetrieb mit manueller Compose
-
-Ein Parallelbetrieb ist nicht empfohlen. Plugin und manuelle Installation unter `/opt/earnie-energy/` nutzen denselben Container-Namen `earnie-productive` und standardmäßig denselben Host-Port **8501**. Daher entweder das Plugin **oder** die manuelle Compose-Installation wählen. Alternativ im Plugin einen anderen Host-Port setzen.

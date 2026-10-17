@@ -69,7 +69,7 @@ If `ha_lab/config` only contains `.gitkeep`, Earnie has **no** `ehal` block yet 
 ## 0. Prerequisites and first start
 
 - Docker Desktop / Engine with Compose v2
-- Free host ports **8506**, **8123**, **7070** (see [`streamlit-ports.md`](../referenz/streamlit-ports.md))
+- Free host ports **8506**, **8123**, **7070** (see [`streamlit-ports.md`](streamlit-ports.md))
 - Stop stacks that collide on those ports (OpenEMS lab uses **8503**; prod often **8501**)
 
 From **repo root**:

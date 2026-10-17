@@ -47,7 +47,7 @@ Unten in der Sidebar liegt der Abschnitt **Info / About** mit folgenden Inhalten
 
 Während der Ersteinrichtung (Greenfield) sind zunächst nur **Konfiguration** und **Daemon Control** sichtbar. Die Daemon-Seiten erscheinen dabei auch dann, wenn `live_environment` in der Env fehlt. Solange kein Smarthome-Backend gewählt ist, zeigt Daemon Control nur **Smarthome-Backend**. Optimierer-Dienst und EHAL-Com erscheinen erst danach.
 
-Spezifikation (Entwicklerdokument): [UI Sunset-2-Sunset](../dev/done/ui-sunset2sunset.md). Chart- und Panel-Details: [Charts & Panels](charts.md).
+Chart- und Panel-Details: [Charts & Panels](charts.md).
 
 ## Sunset-2-Sunset (Seite Monitor)
 
@@ -59,7 +59,7 @@ Spezifikation (Entwicklerdokument): [UI Sunset-2-Sunset](../dev/done/ui-sunset2s
 
 **Abwesenheitsmodus:** Ist der wirksame Live-Abwesenheitsmodus aktiv, zeigt die Seite unter dem Titel den Hinweis „Abwesenheitsmodus aktiv“, optional mit der Quelle Earnie, Smarthome oder beide. Auslöser ist der Schalter im Hausprofil **oder** das Anlagen-Feld `sens_absent_mode` am aktiven Backend (Loxone-Merker, HA-Entity oder OpenEMS `component/Channel`). Konfiguration: [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
-**Ersetzt:** Der Monitor ersetzt die früheren Modi **Echtzeit** und **Historischer Tag** sowie den Button **Produktiv-Archiv**. Eine **Nachrechnung** beliebiger Kalendertage bietet der Monitor nicht; sie ist als Entwicklerfunktion im Szenario-Explorer geplant.
+**Ersetzt:** Der Monitor ersetzt die früheren Modi **Echtzeit** und **Historischer Tag** sowie den Button **Produktiv-Archiv**. Eine **Nachrechnung** beliebiger Kalendertage bietet der Monitor nicht.
 
 ### Sonnenaufgang-Anker SA₀, SA₁, SA₂
 
@@ -103,7 +103,7 @@ Stunde 0 stammt aus dem **Produktiv-Durchlauf** (`main.py` → `live_optimizatio
 
 ### Live-Szenario (Entitäts-Referenzen)
 
-Die Parameter für PV, Batterie und Einspeisung kommen über Entitäts-IDs aus dem **Live-Szenario**. Es liegt in `backtesting_scenarios.json` und wird über `live_scenario_id` in `config.json` gewählt; bearbeitet wird es auf der Seite **Szenarienkonfigurator**. Ein adaptives PV-Tuning gibt es nicht mehr; ein neuer Ansatz zur Parameter-Anpassung ist separat geplant.
+Die Parameter für PV, Batterie und Einspeisung kommen über Entitäts-IDs aus dem **Live-Szenario**. Es liegt in `backtesting_scenarios.json` und wird über `live_scenario_id` in `config.json` gewählt; bearbeitet wird es auf der Seite **Szenarienkonfigurator**. Ein adaptives PV-Tuning gibt es nicht mehr.
 
 ### Panels
 
@@ -143,15 +143,13 @@ Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und fü
 >
 > Standard-Horizont ist `sunrise_window`: Das MILP rechnet SA₀→SA₂, gebucht wird jeweils **[SA₁, SA₂)**, also von Sonnenaufgang zu Sonnenaufgang je `ready_by`-Tag. Der SoC wird an den Sonnenaufgang-Übergängen verkettet. `fixed_24h` bleibt als Vergleichsmodus erhalten (an `ready_by` ausgerichtete 24-h-Fenster).
 
-Geplant ist eine Nachrechnung beliebiger Kalendertage als Entwicklerfunktion. Sie ersetzt den früheren Modus **Historischer Tag**.
-
 ### Gesamtkosten und -Verbrauch
 
 Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
 
-Der volumetrische **Netznutzung Arbeitspreis** aus dem Hausprofil fließt in die Kosten des Szenario-Explorers ein. **Leistungspreis** und netzgebietsspezifische Tabellen fehlen. Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md).
+Der volumetrische **Netznutzung Arbeitspreis** (je Netzgebiet aus `grid_fees.json`) fließt in die Kosten des Szenario-Explorers ein. Ein **Leistungspreis** wird noch nicht berücksichtigt. Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md).
 
-**Datenquellen für `Jahres Verbrauch [kWh]`** (UI: `build_annual_cost_rows` / `_jahres_kwh_for_row`):
+**Datenquellen für `Jahres Verbrauch [kWh]`**:
 
 | Zeile | kWh-Quelle |
 | ----- | ---------- |

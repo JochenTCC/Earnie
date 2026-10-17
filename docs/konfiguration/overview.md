@@ -58,7 +58,7 @@ Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../share/confi
 2. **Hausprofil-CSVs** (`total_profile_csv` / `pv_profile_csv` / `profile_csv`): Planung sowie Vergleich von Ist-Werten und Modell (siehe [Verbrauchs-CSV](verbrauchs-csv.md)).
 3. **`path_consumption` / `path_production`:** entfernt (Datenmodell v3). Früher waren das Paare von Roh-CSVs aus Loxone, die nur die Zeitraumgrenzen lieferten.
 
-Details zu Preisen: [Preise & aWATTar](preise.md).
+Details zu Preisen: [Preise und Marktdaten](preise.md).
 
 ## Szenarienkonfigurator (Live-Szenario)
 
@@ -80,5 +80,5 @@ Die gewählten IDs landen im jeweiligen Szenario in `backtesting_scenarios.json`
 - [PV & Batterie](batterie-pv.md) (inkl. Anlagen-Topologie und der drei Fragen für den Live-Pfad)
 - [Flexible Verbraucher](flexible-verbraucher.md)
 - [Verbrauchs-CSV](verbrauchs-csv.md)
-- [Preise & aWATTar](preise.md)
+- [Preise und Marktdaten](preise.md)
 - [Loxone-Signale](../referenz/loxone-signals.md)

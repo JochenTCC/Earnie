@@ -95,7 +95,7 @@ Dieser Test beweist: Image baut, `run.sh`/`jq` funktionieren, Optionen-Defaults 
 
 Für die reguläre Installation des Add-ons in eine echte Home-Assistant-Instanz (Apps-Bereich, Optionen-UI — bis HA 2026.1 „Add-on Store" genannt) siehe [`docs/einrichtung/homeassistant-addon.md`](../../docs/einrichtung/homeassistant-addon.md#installation) — der lokale Docker-Build hier ersetzt das nicht, sondern ergänzt es nur für schnelle Entwicklungs-Iterationen.
 
-Full Supervisor-lifecycle verification (restart/update/backup-restore) needs a real Supervisor (HA OS/Supervised) — a local Docker run only proves the persistence *mechanism* (`EARNIE_ENV_PATH`, bootstrap idempotency), not Supervisor update/backup-restore itself. See [`docs/einrichtung/homeassistant-addon-testumgebung.md`](../../docs/einrichtung/homeassistant-addon-testumgebung.md) for a WSL2-Supervised walkthrough (Option A) and a Raspberry-Pi-4-SD-card walkthrough (Option B).
+Full Supervisor-lifecycle verification (restart/update/backup-restore) needs a real Supervisor (HA OS/Supervised) — a local Docker run only proves the persistence *mechanism* (`EARNIE_ENV_PATH`, bootstrap idempotency), not Supervisor update/backup-restore itself. See [`docs/dev/homeassistant-addon-testumgebung.md`](../../docs/dev/homeassistant-addon-testumgebung.md) for a WSL2-Supervised walkthrough (Option A) and a Raspberry-Pi-4-SD-card walkthrough (Option B).
 
 ## Sync mechanism
 

@@ -147,22 +147,13 @@ Eine Einstellung ist nicht nötig; die Datei bleibt lokal. Voraussetzung ist ein
 
 <a id="cycle-recorder-regression-r-rec"></a>
 
-### Cycle-Recorder (Ringpuffer für Regressionstests)
+### Cycle-Recorder
 
-Earnie speichert die vollständigen Eingaben der Optimierung für jeden Zyklus in einem Ringpuffer unter `runtime/recorder/` (Spec: [`docs/workflow/regression-suite.md`](../workflow/regression-suite.md) §14). Damit lassen sich auch Fehler, die erst Tage später auffallen, noch als Referenzfall (Golden Master) nachstellen. Die Dateien enthalten **Lastprofile** und bleiben **lokal**; Earnie lädt sie nicht hoch.
+Earnie speichert die Eingaben jedes Optimierungszyklus in einem lokalen Ringpuffer unter `runtime/recorder/`. Die Dateien enthalten **Lastprofile**, bleiben lokal und werden nicht hochgeladen.
 
-In `runtime/local_settings.json`:
-
-```json
-{
-  "recorder_enabled": true,
-  "recorder_retention_days": 7
-}
-```
-
-- **Standard:** an (`true` / Schlüssel fehlt). Abschalten mit `"recorder_enabled": false`.
-- **Aufbewahrung (Retention):** So viele Tage behält Earnie die Segmentdateien `cycles_YYYY-MM-DD.jsonl.gz` (Default 7).
-- **Debug-Dump:** Ein Debug-Dump (siehe unten) hängt automatisch das aktuelle Recorder-Fenster an (`recorder/` im ZIP, `manifest.recorder`). Den Dump nur an den Maintainer weitergeben.
+- **Standard:** an. Abschalten mit `recorder_enabled: false` in `runtime/local_settings.json`.
+- **Aufbewahrung:** `recorder_retention_days` (Standard 7 Tage).
+- **Debug-Dump:** Ein Debug-Dump (siehe unten) enthält das aktuelle Recorder-Fenster und sollte nur an den Maintainer gehen.
 
 ### Log- und Historiendateien
 
@@ -189,8 +180,8 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; ältere Ordner: `config/`). Enthält `config.json`, Sidecars, `.env` und `uploads/`. Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert. |
 | `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; ältere Ordner: `runtime`). |
 | `EARNIE_EARLY_START`                    | `on` (Standard, auch wenn nicht gesetzt) oder `off`. Bei `on` starten reguläre Läufe 15–90 s vor dem Viertelstundentakt und schreiben die Sollwerte genau zum Takt. Bei `off` startet der Lauf erst zum Takt und schreibt, sobald er fertig ist. Andere Werte führen zu einem Fehler beim Start. Siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv). |
-| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable gilt `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Die Compose-Dateien für den Produktivbetrieb setzen oft `sunset2sunset,live_environment`, die Cloud `scenario_explorer`. Siehe [Betriebsmodi](../ui/betriebsmodi.md). |
-| `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).                                                                                                                  |
+| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Monitor, Manuelle Geräte), `scenario_explorer`, `live_environment` (Smarthome-Backend, Optimierer-Dienst, EHAL-Com, Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable gilt `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Die Compose-Dateien für den Produktivbetrieb setzen oft `sunset2sunset,live_environment`, die Cloud `scenario_explorer`. Siehe [Betriebsmodi](../ui/betriebsmodi.md). |
+| `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../dev/streamlit-ports.md)).                                                                                                                  |
 | `EARNIE_EHAL_LOXONE_HTTP_PORT`          | TCP-Port für den Daemon-HTTP (`Earnie_Request_Optimize` / Telemetry inkl. Heartbeat / `status.json`). Überschreibt `system.ehal_loxone_http_port`; Standard **8541**.                                                                |
 | `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls es nicht schon läuft (Docker-Compose setzt das). Ohne Variable bzw. lokal: aus.                                                                     |
@@ -200,7 +191,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_USAGE_PING_URL`                 | HTTPS-URL des Zähler-Endpunkts (`POST`). Ohne URL und ohne internen Transport wird nichts gesendet (WARNING im Log); die Optimierung bleibt unverändert. |
 
 
-Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
+Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../dev/streamlit-ports.md).
 
 ## Nutzungsstatistik
 
@@ -304,20 +295,6 @@ python -m scripts.replay_debug_dump path/to/debug_dump_….zip --html-out /tmp/c
 ```
 
 Das Skript prüft die Pflichtdateien und führt einen Smoke-Pfad aus. Es parst die Historie und baut bei vorhandenem `chart.display_rows` zusätzlich Chart 1 neu auf. Akzeptiert werden nur Dumps mit `schema_version: 3` und `dump_type: debug`.
-
-### Prod-Dump als Regression-Fixture
-
-Ein gespeichertes Debug-ZIP lässt sich nach `tests/fixtures/prod_dumps/<id>/` übernehmen:
-
-```bash
-python scripts/archive_prod_dump.py \
-  --id mein_fall_2026-07-16 \
-  --title "Kurzbeschreibung" \
-  --symptom "Beobachtetes Fehlerbild" \
-  --source runtime/chart_debug/debug_dump_….zip
-```
-
-Details: `tests/fixtures/prod_dumps/README.md`.
 
 ## Update und Migration
 

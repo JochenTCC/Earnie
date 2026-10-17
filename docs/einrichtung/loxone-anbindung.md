@@ -93,14 +93,16 @@ Alle Leistungen, die *ins Haus* fließen, sind positiv. Ohne Wechselrichterverlu
 P_cons = P_PV + P_Grid + P_Bat
 ```
 
-| Größe | Merker / EHAL-Feld | `+` | `−` |
+| Größe | EHAL-Feld (Wire-ID) | `+` | `−` |
 |---|---|---|---|
-| `P_PV` | PV-Leistung / `sens_pv_production_active` | Erzeugung | – (≥ 0) |
-| `P_Grid` | `Earnie_Netzleistung` / `sens_grid_power_active` | Bezug | Einspeisung |
-| `P_Bat` | `Earnie_Batterie_Leistung` bzw. EFM-Speicher / `sens_ess_power` | Entladen | Laden |
-| `P_cons` | Hausverbrauch / `sens_power_consumers` | Verbrauch | – (≥ 0) |
+| `P_PV` | `sens_pv_production_active` | Erzeugung | – (≥ 0) |
+| `P_Grid` | `grid.meter.sens_grid_power_active` | Bezug | Einspeisung |
+| `P_Bat` | `ess.{id}.sens_ess_power` | Entladen | Laden |
+| `P_cons` | `sens_power_consumers` | Verbrauch | – (≥ 0) |
 
-Earnie dreht keine Vorzeichen. Die Loxone-Merker müssen die Werte bereits in dieser Konvention liefern. Huawei-Register haben teils andere Vorzeichen, die in Loxone gedreht werden müssen: 37113 (Netz, `+` = Einspeisung) und 37765 (Batterie, `+` = Laden).
+Die Werte kommen per Virtual Output unter der qualifizierten EHAL-ID in Earnie an (Vorlagen `VO_Earnie_*`, siehe [Loxone-Signale](../referenz/loxone-signals.md)). Die Namen `Earnie_Netzleistung` u. a. sind nur ein optionaler Namenskatalog.
+
+Earnie dreht keine Vorzeichen, die Virtual Outputs müssen die Werte bereits in dieser Konvention liefern. Huawei-Register haben teils andere Vorzeichen, die in Loxone gedreht werden müssen: 37113 (Netz, `+` = Einspeisung) und 37765 (Batterie, `+` = Laden).
 
 Historische Verbrauchsdaten kommen über CSV-Upload, Energiemonitor bzw. `cons_data`. Ein FTP-Log vom Miniserver wird nicht mehr genutzt.
 

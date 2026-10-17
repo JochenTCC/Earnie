@@ -35,7 +35,7 @@ Immer vom **Repo-Root** mit `--project-directory .`, damit Volume-Pfade (`./earn
 
 UsagePing **receiver** (private, not in this repo): GitHub `JochenTCC/earnie-server` · client contract: [`docs/workflow/usage-ping.md`](../docs/workflow/usage-ping.md)
 
-Port-Übersicht (venv, NAS-UI): [`docs/referenz/streamlit-ports.md`](../docs/referenz/streamlit-ports.md)
+Port-Übersicht (venv, NAS-UI): [`docs/dev/streamlit-ports.md`](../docs/dev/streamlit-ports.md)
 
 LoxBerry **Plugin** (Scope A, ZIP-Install): [`packaging/loxberry/`](../packaging/loxberry/) · Anwenderdok: [`docs/einrichtung/loxberry-plugin.md`](../docs/einrichtung/loxberry-plugin.md)
 

@@ -50,7 +50,7 @@ Wie bei Loxone liegen die Entity-IDs **entity-scoped** bei der jeweiligen Kompon
 - **Abwesenheit:** das optionale Plant-Signal `sens_absent_mode` (Abwesenheitsmodus, Side-Channel).
 - **E-Auto:** am **ersten EV**-Verbraucher `sens_evcs_active_power`, `set_evcs_max_current` und `set_evcs_mode`.
 
-Weitere Mapping-Zeilen (z. B. Außentemperatur, EV-SoC/connected, Flex-/Pool-Felder) lassen sich in der UI speichern, greifen im HA-Live-Pfad aber **noch nicht**.
+Außentemperatur, EV-SoC/connected sowie Flex- und Pool-Felder gehören nicht zu den HA-Mapping-Feldern. Der Mapping-Assistent bietet sie nicht an, und mit dem Backend Home Assistant stehen sie derzeit nicht zur Verfügung.
 
 1. In Home Assistant ein **Long-Lived Access Token** anlegen.
 2. Auf **Daemon Control → Smarthome-Backend** das Backend **Home Assistant** wählen und URL/Token eintragen. Die Seite setzt `ehal.backend=ha` und schreibt `EHAL_HA_*` in `config/.env`. Alternativ `ehal.backend` aus dem Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) übernehmen und die Zugangsdaten in `.env` setzen.

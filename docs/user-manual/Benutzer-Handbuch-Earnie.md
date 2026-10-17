@@ -100,7 +100,7 @@ Die signierte Datei lässt sich **nicht selbst erzeugen**. Earnie berechnet nur 
 
 **Inhalt der Datei (kurz):** Fingerprint, Ausstellungszeit, optional ein Ablaufdatum, Aussteller und eine Ed25519-Signatur. Eine selbst gebaute Datei ohne passende Signatur ist ungültig (`invalid_sig`).
 
-Technische Aussteller-Anleitung: Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
+Technische Details zum Prüfverfahren: [Hardware-Registry (Layer C)](../workflow/hardware-registry-layer-c.md).
 
 ### Support
 
@@ -129,12 +129,12 @@ Die typischen Wege im Überblick:
 
 1. Projekt bzw. Compose-Datei bereitstellen und die Verzeichnisse `earnie_env/config/` und `earnie_env/runtime/` anlegen.
 2. Container starten. Fehlende Dateien legt Earnie beim ersten Start an (Bootstrap).
-3. Oberfläche im Browser öffnen (im Produktivbetrieb meist Port **8501**, siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).
+3. Oberfläche im Browser öffnen (im Produktivbetrieb meist Port **8501**, siehe [Streamlit-Ports](../dev/streamlit-ports.md)).
 4. Für den späteren Live-Betrieb: auf der Seite **Smarthome-Backend** das Backend wählen und den Zugang hinterlegen ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)). Danach mit dem Hauskonfigurator weitermachen.
 
 Details: [Container](../einrichtung/container.md) · [VMware `vctl` (Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md)
 
-Nach dem ersten Start zeigt die Navigation vor allem **Konfiguration** und **Daemon Control**. Weitere Seiten wie Monitor oder Szenario-Explorer erscheinen, sobald die Einrichtung weit genug ist.
+Nach dem ersten Start öffnet Earnie die Seite **Smarthome-Backend** (unter **Daemon Control**). Dort wird das Backend gewählt und verbunden; **Optimierer-Dienst** und **EHAL-Com** sind erst danach freigeschaltet. Weitere Seiten wie Monitor oder Szenario-Explorer erscheinen, sobald die Einrichtung weit genug ist.
 
 ---
 
@@ -290,7 +290,7 @@ Typische Vergleiche:
 - Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
 - Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
 
-Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) · Technik: [Preise & aWATTar](../konfiguration/preise.md)
+Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) · Technik: [Preise und Marktdaten](../konfiguration/preise.md)
 
 ### Szenario-Explorer (Was-wäre-wenn-Analyse)
 
@@ -402,7 +402,7 @@ Details: [PV & Batterie](../konfiguration/batterie-pv.md) · [Überblick](../kon
 
 ### EHAL-Com
 
-Die Seite **Daemon Control → EHAL-Com** bündelt Live-Lesen und -Schreiben, die Mapping-Assistenten und den Status (u. a. Silent / Loud).
+Die Seite **Daemon Control → EHAL-Com** bündelt Live-Lesen und -Schreiben, die Mapping-Assistenten. **Live-Schreiben** zeigt das Ergebnis des letzten Laufs, auch einen Lauf im Silent-Modus.
 
 - Der Umschalter **Silent / Loud** liegt auf der Seite **Optimierer-Dienst** (gespeichert in `runtime/local_settings.json`).
 - Zugangsdaten und Backend-Wechsel liegen auf der Seite **Smarthome-Backend** (Anbindung).

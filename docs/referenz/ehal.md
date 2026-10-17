@@ -133,8 +133,8 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), and Live 
 | Field                         | Required | Unit   | Notes                                                                                                      |
 | ----------------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------- |
 | `sens_grid_power_active`      | yes      | W      | PCC active power; sign as above                                                                            |
-| `sens_pv_production_active`   | yes*     | W      | ≥ 0; *optional when derived from complete grid-tied inv/pv maps                                            |
-| `pv.{id}.sens_pv_production_active` | no | W | ≥ 0; optional per-PV-system DC power (entity-scoped) |
+| `sens_pv_production_active`   | yes*     | W      | ≥ 0; *always required on the telemetry document (`telemetry.schema.json`). The **mapping** may be omitted when Live derives it from complete grid-tied inv/pv maps (`with_live_pv_attribution`); validation then runs on the derived value, and Live fails loud if it cannot be derived. |
+| `pv.{id}.sens_pv_production_active` | no | W | ≥ 0; optional per-PV-system DC power. Entity-scoped binding / push key only; **not** a property of the telemetry document (the schema has `additionalProperties: false`) |
 | `ess.{id}.sens_ess_soc`       | Live yes | %      | Home battery SoC; **not** on the plant telemetry document (entity-scoped binding / push only)              |
 | `sens_ess_power`              | no       | W      | Optional; sign as above                                                                                    |
 | `sens_evcs_active_power`      | no       | W      | ≥ 0 when present                                                                                           |

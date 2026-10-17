@@ -14,7 +14,7 @@
 #   docker compose --project-directory . -f docker/compose/proxmox-alpha.yml up -d
 #
 # UI: http://<lxc-ip>:8511
-# Ports: docs/referenz/streamlit-ports.md Â· LXC: docs/einrichtung/proxmox-lxc.md
+# Ports: docs/dev/streamlit-ports.md Â· LXC: docs/einrichtung/proxmox-lxc.md
 
 name: earnie-alpha
 

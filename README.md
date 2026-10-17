@@ -99,7 +99,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 4. **Was-wäre-wenn-Analyse:** Mit der Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen.
 5. **Verbindung zum Smarthome herstellen:** zuerst die Seite **Smarthome-Backend** (Auswahl und Erkennung), danach **EHAL-Com** (Live-Lesen). Bei Loxone optional `python -m scripts.verify_loxone_setup` ausführen.
 6. **Produktiv starten:** `python main.py` dauerhaft betreiben (**nur eine Instanz**) bzw. Docker mit Auto-Start nutzen.
-7. **Monitor öffnen:** [Streamlit](https://streamlit.io/) im Browser aufrufen. Den Port je Stack nennt [Streamlit-Ports](docs/referenz/streamlit-ports.md) (Prod und lokale venv typisch **8501**).
+7. **Monitor öffnen:** [Streamlit](https://streamlit.io/) im Browser aufrufen. Den Port je Stack nennt [Streamlit-Ports](docs/dev/streamlit-ports.md) (Prod und lokale venv typisch **8501**).
 8. **Feintuning:** Hausprofil, Szenarien und flexible Verbraucher über die Planungs- und Betriebsseiten anpassen.
 
 Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Ersteinrichtung)

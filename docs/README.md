@@ -24,7 +24,7 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
    python -m scripts.verify_loxone_setup
   ```
 5. **Produktivbetrieb starten:** Docker-Container starten (UI und `main.py` starten automatisch). Lokal geht es mit `python main.py` oder über die UI-Seite **Optimierer-Dienst**. Unter HAOS: [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md).
-6. **Monitor öffnen:** `python -m scripts.run_streamlit` ausführen. Der Port kommt aus `ui.streamlit_port` bzw. `EARNIE_UI_STREAMLIT_PORT`; in einer lokalen venv ist er typischerweise **8501** (siehe [Streamlit-Ports](referenz/streamlit-ports.md)).
+6. **Monitor öffnen:** `python -m scripts.run_streamlit` ausführen. Der Port kommt aus `ui.streamlit_port` bzw. `EARNIE_UI_STREAMLIT_PORT`; in einer lokalen venv ist er typischerweise **8501** (siehe [Streamlit-Ports](dev/streamlit-ports.md)).
 
 > **Hinweis:** Cursor und VS Code zeigen die Parameter-Beschreibungen als Hover-Hilfe an, wenn in `config.json` `"$schema": "./config.schema.json"` gesetzt ist.
 
@@ -44,15 +44,10 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 - [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md) – Earnie als Supervisor-Add-on (Ingress, Options)
 - [Betrieb](einrichtung/betrieb.md) – `main.py` und App, Laufzeitdateien, Optimierungs-Takt, [Update und Migration](einrichtung/betrieb.md#update-und-migration)
 - [Container](einrichtung/container.md) – Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, fehlende Config-Keys nach einem Upgrade
-- [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) – Scope-A-Plugin (Docker-Wrapper) und manuelle Compose-Installation im Vergleich
+- [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) – Plugin (Docker-Wrapper) und manuelle Compose-Installation im Vergleich
 - [Proxmox LXC](einrichtung/proxmox-lxc.md) – Unprivileged LXC mit Docker Compose
 - [VMware `vctl`](einrichtung/vmware-vctl.md) – Windows-PC ohne Docker Desktop
-- [Greenfield Dev-Stack](einrichtung/greenfield-dev-stack.md) – lokale Ersteinrichtung für Hauskonfigurator und Backtesting
-- [OpenEMS-Lab](einrichtung/openems-lab.md) – Earnie mit OpenEMS Edge/UI; der Kommunikationscheck steht in der Spezifikation
-- [Private Haus-Config](einrichtung/private-env.md) – privates Repo mit Junction; öffentliche Vorlagen liegen unter `share/config/`
-- [EcoFlow Delta 3 über Loxone](einrichtung/ecoflow-delta3-loxone.md) – One-Way-Speicher und Hinweise zum Bridging
-- [HA ↔ Loxone Bridge-Generator](einrichtung/ha-loxone-bridge.md) – Prototyp (POC): erzeugt die Brücke für die Delta 3 aus einer Mapping-Datei, Loxone → HA per Webhook
-
+- [EcoFlow Delta 3 über Loxone](dev/done/ecoflow-delta3-loxone.md) – One-Way-Speicher und Hinweise zum Bridging
 ### Konfiguration (`earnie_env/config/`)
 
 - [Überblick](konfiguration/overview.md) – Aufbau der Datei, Szenarien, Dateipfade
@@ -61,7 +56,7 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 - [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) – SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
 - [Wärmespeicher Schichtung / T_eq](konfiguration/waermespeicher-schichtung-teq.md) – aus Schichtfühlern die äquivalente Temperatur für Earnie bilden (Loxone-Formel, Gewichte)
 - [Historische Leistungsprofil-CSV](konfiguration/verbrauchs-csv.md) – Last-, PV- und Verbraucher-Profile, Normalisierung, Loxone-Import
-- [Preise & aWATTar](konfiguration/preise.md) – Bezugspreis, Einspeisevergütung, Preis-Prognose
+- [Preise und Marktdaten](konfiguration/preise.md) – Bezugspreis, Einspeisevergütung, Preis-Prognose
 
 ### Benutzeroberfläche (Streamlit)
 
@@ -73,7 +68,7 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 ### Referenz
 
 - [Abkürzungen](referenz/abbreviations.md) – EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
-- [Streamlit-Ports](referenz/streamlit-ports.md) – Port je Stack und Plattform
+- [Streamlit-Ports](dev/streamlit-ports.md) – Port je Stack und Plattform
 - [Loxone-Signale und Earnie-Library](referenz/loxone-signals.md) – VI/VO-Vorlagen je Entität, Default-Merker, EFM, Signal-Tabellen
 - [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) – OeMAG-Marktpreis und E-Control-RefMarkt PV im Vergleich
 - [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) – Bezugs- und Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung

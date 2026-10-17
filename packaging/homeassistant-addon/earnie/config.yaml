@@ -38,7 +38,7 @@ ports:
   8541/tcp: 8541
 ports_description:
   8501/tcp: "Earnie Web-UI (optional direct; prefer Ingress)"
-  8541/tcp: "EHAL Loxone-HTTP (optional, nur bei Loxone-Backend)"
+  8541/tcp: "EHAL Loxone-HTTP (optional, bei Loxone-Backend oder HA-Transport weg_b)"
 
 # Config visible under /addon_configs/<hash>_earnie/ (Samba / File Editor).
 # /data is always present for runtime; no explicit map entry needed.

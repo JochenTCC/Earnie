@@ -119,7 +119,7 @@ PAGE_DOCS: dict[str, PageDocs] = {
                 "Tarife und Preise nachrechnen",
                 "docs/referenz/tarife-quellen.md",
             ),
-            DocLink("Preise & aWATTar", "docs/konfiguration/preise.md"),
+            DocLink("Preise und Marktdaten", "docs/konfiguration/preise.md"),
         ),
     ),
     "scenario-explorer": PageDocs(

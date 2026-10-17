@@ -2,8 +2,7 @@
 
 Earnie bildet den Wärmespeicher als **Einknoten-Modell** ab: eine Temperatur, ein Volumen. Viele Warmwasser- und Pufferspeicher sind dagegen **Schichtspeicher** mit mehreren Temperaturfühlern, typisch drei oder vier in unterschiedlicher Höhe. Für den Live-Vergleich und die spätere Adaptation muss das Smart Home deshalb **eine** Temperatur liefern, die denselben **Wärmeinhalt** wie der geschichtete Speicher abbildet.
 
-Entwickler-Kontext: [thermals-p2.md](../dev/done/thermals-p2.md) (Abschnitt *Stratified store → T_eq*). Konzept: Entwicklungsplan §3.5 im `Earnie-Projekt`-Repo.
-
+Entwickler-Kontext: [thermals-p2.md](../dev/done/thermals-p2.md) (Abschnitt *Stratified store → T_eq*).
 ## Physik (kurz)
 
 Die Wärmekapazität ergibt sich aus dem konfigurierten Volumen (wie im Code):

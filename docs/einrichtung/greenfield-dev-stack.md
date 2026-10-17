@@ -88,9 +88,9 @@ Voraussetzung: abgeschlossene Ersteinrichtung und vollständige Planungs-Konfigu
 | 1. Config | `greenfield/config/config.json` | `live_scenario_id: live`, **kein** Block `runtime_settings` |
 | 2. Live-Szenario | `greenfield/config/backtesting_scenarios.json` → Szenario `live` | Entitäts-IDs `battery_id`, `import_tariff_id`, `export_tariff_id`, `house_profile_id`, optional `pv_system_ids`; Geo-Daten und Zeitzone kommen aus `house_profiles.json` |
 | 3. Entitäts-Auflösung | Konfiguration → Szenarienkonfigurator (Live-Szenario) | Die Entitäts-IDs verweisen auf PV-, Batterie- und Tarifparameter aus `components.json` und `tariffs.json` |
-| 3. Live-Zyklus | `docker compose --project-directory . -f docker/compose/greenfield.yml logs -f earnie` | `main.py` durchläuft mindestens einen Optimierungszyklus ohne Config-Fehler |
-| 4. UI Sunset-2-Sunset | Seite **Monitor** (Live-Cockpit) | Aufgelöste Werte aus dem Live-Szenario, keine Sidebar-Eingaben für PV, Batterie oder Tarife |
-| 5. Szenario-Explorer-Parität | Gleiche Tarif-IDs, gleiches Zeitfenster | Import- und Export-Preise (cent/kWh) identisch zu Live (ein detaillierter Paritätstest folgt) |
+| 4. Live-Zyklus | `docker compose --project-directory . -f docker/compose/greenfield.yml logs -f earnie` | `main.py` durchläuft mindestens einen Optimierungszyklus ohne Config-Fehler |
+| 5. UI Sunset-2-Sunset | Seite **Monitor** (Live-Cockpit) | Aufgelöste Werte aus dem Live-Szenario, keine Sidebar-Eingaben für PV, Batterie oder Tarife |
+| 6. Szenario-Explorer-Parität | Gleiche Tarif-IDs, gleiches Zeitfenster | Import- und Export-Preise (cent/kWh) identisch zu Live |
 
 ```powershell
 docker compose --project-directory . -f docker/compose/greenfield.yml up -d --build
@@ -159,7 +159,7 @@ Hilfs-Tests ohne Docker: `tests/test_smoke_greenfield_docker.py`.
 
 ## Abgrenzung
 
-Port-Übersicht aller Stacks: [streamlit-ports.md](../referenz/streamlit-ports.md).
+Port-Übersicht aller Stacks: [streamlit-ports.md](../dev/streamlit-ports.md).
 
 | Stack | Zweck |
 |-------|--------|

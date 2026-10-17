@@ -32,7 +32,7 @@ Die Auswahl schreibt `ehal.backend` in `config.json` und leert dabei den Adapter
 
 Für Home Assistant und OpenEMS liegen passende Snippets unter `share/config/`:
 
-- **HA:** [ehal.ha.snippet.json](../../share/config/ehal.ha.snippet.json) enthält `ehal.backend` und `sign`. URL und Token gehören in `config/.env`.
+- **HA:** [ehal.ha.snippet.json](../../share/config/ehal.ha.snippet.json) enthält `ehal.backend`, `adapter_id`, `ha.transport` (Austauschweg, siehe [ha-evcc.md](ha-evcc.md)) sowie die optionalen Feldlisten `ha.sign` und `ha.boolean_invert`. URL und Token gehören in `config/.env`.
 - **OpenEMS:** [ehal.openems.snippet.json](../../share/config/ehal.openems.snippet.json).
 
 Die Zugangsdaten für Loxone und HA liegen in `config/.env`:
@@ -62,5 +62,4 @@ Neu zugeordnet werden je Backend folgende Mappings:
 - [EHAL-Com](../ui/ehal-com.md) – Live-Lesen und -Schreiben, Mapping
 - [Loxone-Anbindung](loxone-anbindung.md)
 - [Home Assistant + evcc](ha-evcc.md)
-- [OpenEMS-Lab](openems-lab.md)
 - Entwickler-Spec (Englisch): [docs/referenz/ehal.md](../referenz/ehal.md)

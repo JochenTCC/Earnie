@@ -27,7 +27,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 echo "==> Preparing ${EARNIE_DIR}"
-mkdir -p "${EARNIE_DIR}/config" "${EARNIE_DIR}/runtime"
+mkdir -p "${EARNIE_DIR}/earnie_env/config" "${EARNIE_DIR}/earnie_env/runtime"
 cd "${EARNIE_DIR}"
 
 if [[ ! -f compose.yaml ]]; then
@@ -47,7 +47,7 @@ docker compose --project-directory "${EARNIE_DIR}" -f compose.yaml up -d
 
 echo
 echo "Earnie is starting."
-echo "  Edit:  ${EARNIE_DIR}/config/.env and ${EARNIE_DIR}/config/config.json"
+echo "  Edit:  ${EARNIE_DIR}/earnie_env/config/.env and ${EARNIE_DIR}/earnie_env/config/config.json"
 echo "  UI:    http://$(hostname -I 2>/dev/null | awk '{print $1}'):8501"
 echo "  Logs:  docker compose -f ${EARNIE_DIR}/compose.yaml logs -f"
 echo "  After config edits: docker compose -f ${EARNIE_DIR}/compose.yaml restart earnie-productive"

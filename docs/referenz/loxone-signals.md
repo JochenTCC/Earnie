@@ -1,262 +1,255 @@
-# Loxone Signals and the Earnie Library
+# Loxone-Signale und Earnie-Library
 
 ## Motivation
 
-This page is the single reference for Earnie's Loxone integration. It covers two topics:
+Diese Seite ist die zentrale Referenz für die Loxone-Anbindung von Earnie. Sie behandelt zwei Themen:
 
-1. **Library setup:** installing the Virtual HTTP In/Out templates from `share/loxone/templates/` in Loxone Config, EFM meters, the Earnie dead-man fallback, and the Loxone import into the house profile.
-2. **Signal contract:** which Merker **titles** and EHAL roles (`ehal_bindings`) belong together (default names from `greenfield_device_map.json` and the recipes).
+1. **Library-Einrichtung:** Virtual-HTTP-In/Out-Vorlagen aus `share/loxone/templates/` in Loxone Config einspielen, EFM-Zähler, die Earnie-Dead-Man-Rückfallebene und den Loxone-Import ins Hausprofil.
+2. **Signalvertrag:** Welche Merker-**Titel** und EHAL-Rollen (`ehal_bindings`) zusammengehören (Standardnamen aus `greenfield_device_map.json` und den Rezepten).
 
-Without stable titles and bindings, Earnie can neither read nor control the plant reliably. Related pages:
+Ohne stabile Titel und Bindings kann Earnie die Anlage weder zuverlässig lesen noch steuern. Verwandte Seiten:
 
-- HTTP access and operation: [Loxone Integration](../einrichtung/loxone-anbindung.md)
-- Mapping UI: [EHAL-Com](../ui/ehal-com.md)
-- Template files and generators: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md)
+- HTTP-Zugriff und Betrieb: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md)
+- Mapping-Oberfläche: [EHAL-Com](../ui/ehal-com.md)
+- Vorlagendateien und Generatoren: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md)
 
-**Terminology (Smarthome Merker):** The **address** (a string, e.g. `Earnie_Waermepumpe_Freigabe`) is a *Smarthome Merker*. The **role** is the EHAL field name (`sens_ess_soc`, `flex.{slug}.sens_power_act`, …) in `ehal_bindings`. Do not confuse a Merker with chart markers or with `earnie_role` (Known/Controlled/Manual).
+**Begriffe (Smarthome-Merker):** Die **Adresse** (ein String, z. B. `Earnie_Waermepumpe_Freigabe`) ist ein *Smarthome-Merker*. Die **Rolle** ist der EHAL-Feldname (`sens_ess_soc`, `flex.{slug}.sens_power_act`, …) in `ehal_bindings`. Ein Merker ist nicht zu verwechseln mit Chart-Markern oder mit `earnie_role` (Bekannt/Gesteuert/Manuell).
 
-This page calls the canonical template/import path **Default** (formerly often "Greenfield"). The file `share/loxone/greenfield_device_map.json` keeps its filename.
+Diese Seite nennt den kanonischen Vorlagen- und Importweg **Default** (früher oft „Greenfield“). Die Datei `share/loxone/greenfield_device_map.json` behält ihren Namen.
 
 ---
 
 <a id="entity-scoped-overview"></a>
 
-## Overview
+## Überblick
 
-| Direction       | Building block                          | Role                                                                                              |
+| Richtung        | Baustein                                | Aufgabe                                                                                           |
 | --------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Earnie → Loxone | **Virtual HTTP In** (`VI_Earnie_*.xml`) | Loxone polls Earnie's `status.json`; setpoints, enables and heartbeat land in the named VI Cmds (`Earnie_*`) |
-| Loxone → Earnie | **Virtual Out** (`VO_Earnie_*.xml`)     | Loxone pushes telemetry into the Earnie inbox (qualified EHAL ID); no Merker poll for bound `sens_*` / `get_*` |
-| Meter           | EFM / Meter                             | Grid, PV, battery and flex **power**, preferably via the EFM designation                          |
+| Earnie → Loxone | **Virtual HTTP In** (`VI_Earnie_*.xml`) | Loxone fragt `status.json` von Earnie ab; Sollwerte, Freigaben und Heartbeat landen in den benannten VI-Cmds (`Earnie_*`) |
+| Loxone → Earnie | **Virtual Out** (`VO_Earnie_*.xml`)     | Loxone sendet Telemetrie in die Earnie-Inbox (qualifizierte EHAL-ID); kein Merker-Poll für gebundene `sens_*` / `get_*` |
+| Zähler          | EFM / Meter                             | **Leistung** von Netz, PV, Batterie und Flex, bevorzugt über die EFM-Bezeichnung                  |
 
-The library adds the **Loxone-side** HTTP mirroring and an **Earnie-dead** fallback in Config (see [Earnie Dead-Man Fallback](#earnie-dead-fallback-in-loxone-config)).
+Die Library ergänzt die **Loxone-seitige** HTTP-Spiegelung und eine **Earnie-tot**-Rückfallebene in Config (siehe [Earnie-Dead-Man-Rückfallebene](#earnie-dead-fallback-in-loxone-config)).
 
-**Virtual Inputs (Earnie → Loxone):** Setpoints, enables and the heartbeat are served by the daemon via `GET http://<Earnie>:8541/ehal/loxone/status.json`. `heartbeat_ts` is the current Unix time; setpoints come from the publish ledger (`loxone_sent`). Writes are **push-only**: Earnie does not call `/dev/sps/io/<Merker>/<value>` for cycle setpoints. `status.json` publishes qualified Check keys only.
+**Virtual Inputs (Earnie → Loxone):** Sollwerte, Freigaben und Heartbeat liefert der Daemon über `GET http://<Earnie>:8541/ehal/loxone/status.json`. `heartbeat_ts` ist die aktuelle Unix-Zeit; die Sollwerte stammen aus dem Publish-Ledger (`loxone_sent`). Schreibzugriffe sind **Push-only**: Earnie ruft für Zyklus-Sollwerte nicht `/dev/sps/io/<Merker>/<Wert>` auf. `status.json` veröffentlicht ausschließlich qualifizierte Check-Schlüssel.
 
-**Virtual Outputs (Loxone → Earnie):** Loxone pushes `sens_*` / `get_*` / flex power under qualified path IDs. Core reads those fields from the push inbox.
+**Virtual Outputs (Loxone → Earnie):** Loxone sendet `sens_*` / `get_*` / Flex-Leistung unter qualifizierten Pfad-IDs. Der Core liest diese Felder aus der Push-Inbox.
 
-**Enable Cmds (0/1) must be analog.** The VI templates set `Analog="true"`. Do **not** select "as digital input" / digital mode in Config. In digital mode the input briefly pulses to `1` on **every** poll, even when `status.json` permanently returns `0`. A sticky 0/1 only results from the `\v` value in analog mode.
+**Freigabe-Cmds (0/1) müssen analog sein.** Die VI-Vorlagen setzen `Analog="true"`. In Config darf **nicht** „als Digitaleingang“ bzw. der Digitalmodus gewählt werden. Im Digitalmodus springt der Eingang bei **jedem** Poll kurz auf `1`, auch wenn `status.json` dauerhaft `0` liefert. Ein dauerhaftes 0/1 entsteht nur über den Wert `\v` im Analogmodus.
 
-### Three Layers (Title / Check / VO Path)
+### Drei Ebenen (Titel / Check / VO-Pfad)
 
-
-| Layer                                  | Where                     | Flex example                                             | EV example                                                |
+| Ebene                                  | Ort                       | Flex-Beispiel                                            | EV-Beispiel                                               |
 | --------------------------------------- | -------------------------- | --------------------------------------------------------- | ------------------------------------------------------------ |
-| **Miniserver title**                   | Cmd title (jdev / import) | `Earnie_Verbraucher_Waschmaschine_Freigabe`               | `Earnie_EAuto_Garage_Soll_A`                                |
-| **Virtual-Input check / status JSON**  | Virtual In check pattern  | `consumer.{hk_id}.set_enable` (heatpump/pool: `heatpump.` / `pool.`) | `evcs.{ev_id}.set_evcs_max_current` / `set_evcs_mode` |
-| **Virtual-Output command when on**     | Virtual Out URL           | `/ehal/telemetry/flex.{hk_id}.sens_power_act/<v>`   | `/ehal/telemetry/ev.{ev_id}.sens_evcs_soc_act/<v>`    |
+| **Miniserver-Titel**                   | Cmd-Titel (jdev / Import) | `Earnie_Verbraucher_Waschmaschine_Freigabe`               | `Earnie_EAuto_Garage_Soll_A`                                |
+| **Virtual-Input-Check / Status-JSON**  | Check-Muster am Virtual In | `consumer.{hk_id}.set_enable` (Wärmepumpe/Pool: `heatpump.` / `pool.`) | `evcs.{ev_id}.set_evcs_max_current` / `set_evcs_mode` |
+| **Virtual-Output-Befehl bei Ein**      | Virtual-Out-URL           | `/ehal/telemetry/flex.{hk_id}.sens_power_act/<v>`   | `/ehal/telemetry/ev.{ev_id}.sens_evcs_soc_act/<v>`    |
 
+`{hk_id}` / `{ev_id}` ist die `id` der Entität im Hausprofil (snake_case). Die Vorlagen belassen die Platzhalter; sie werden in Config ersetzt.
 
-`{hk_id}` / `{ev_id}` is the house-profile entity `id` (snake_case). The templates leave the placeholders in place; replace them in Config.
-
-**Qualified Checks only.** `status.json` publishes qualified EHAL IDs:
+**Nur qualifizierte Checks.** `status.json` veröffentlicht qualifizierte EHAL-IDs:
 
 - `consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable`, `pool.{slug}.set_enable`
 - `evcs.{slug}.set_evcs_max_current` / `set_evcs_mode`
-- plant ESS keys (bare) and `grid.meter.*`, including the write `grid.meter.set_grid_export_power_limit`
-- powerstation `ess.{id}.set_*`
+- Anlagen-ESS-Schlüssel (ohne Präfix) und `grid.meter.*`, darunter der Schreibwert `grid.meter.set_grid_export_power_limit`
+- Powerstation `ess.{id}.set_*`
 
-Legacy Merker Check keys are no longer emitted alongside the qualified ones, so VI templates must use the qualified keys (`VI_Earnie_*_v2.xml` or Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`).
+Die alten Merker-Check-Schlüssel werden nicht mehr zusätzlich zu den qualifizierten ausgegeben. Die VI-Vorlagen müssen daher die qualifizierten Schlüssel verwenden (`VI_Earnie_*_v2.xml` oder Pilot-VI). Anlagen-Bindings bleiben ohne Präfix (`plant.ehal_bindings.set_grid_export_power_limit`).
 
-**VI v2 and Pilot templates.** The library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen, generate Pilot templates:
+**VI-v2- und Pilot-Vorlagen.** Die Library-Vorlagen `VI_Earnie_*_v2.xml` nutzen die qualifizierten Check-Schlüssel (Titel = ID bzw. Feldname; Platzhalter `{hk_id}` / `{ev_id}`). Für eine Live-Config mit echten Kennungen lassen sich Pilot-Vorlagen erzeugen:
 
 ```powershell
 python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …   # → VI_Pilot_*.xml
 python -m scripts.pilot_vo_template_gen --config-dir … --host … --out-dir …   # → VO_Pilot_*.xml
 ```
 
-VO Pilot titles derive from the qualified ID (`Push_<id>`, dots replaced by `_`). Further options: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
+VO-Pilot-Titel leiten sich aus der qualifizierten ID ab (`Push_<id>`, Punkte durch `_` ersetzt). Weitere Optionen: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Schritte zur Umstellung auf Push-only-Schreiben: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
 
 ---
 
-## Library Setup
+## Library-Einrichtung
 
 <a id="library-setup"></a>
 
-Once the templates are installed in Loxone Config, the **Loxone import** (see [step 6](#6-loxone-import-into-earnie)) produces typed house-profile entities and Merker bindings.
+Sind die Vorlagen in Loxone Config installiert, erzeugt der **Loxone-Import** (siehe [Schritt 6](#6-loxone-import-into-earnie)) typisierte Hausprofil-Entitäten und Merker-Bindings.
 
-### 1. Copy Templates into Loxone Config
+### 1. Vorlagen in Loxone Config kopieren
 
-Copy only the `.xml` files into the template folders. Do not copy `README.md`, and do not nest a whole folder tree as a subfolder.
+Nur die `.xml`-Dateien in die Vorlagenordner kopieren. `README.md` bleibt draußen, und ein ganzer Ordnerbaum wird nicht als Unterordner eingefügt.
 
 #### VirtualIn
 
-Source: `share/loxone/templates/VirtualIn/`
+Quelle: `share/loxone/templates/VirtualIn/`
 
-
-| File | Content (short) |
+| Datei | Inhalt (kurz) |
 | ---- | --------------- |
-| `VI_Earnie_Plant_v2.xml` | Heartbeat + ESS design-C1 (field-name Titles) |
+| `VI_Earnie_Plant_v2.xml` | Heartbeat + ESS (Titel = Feldnamen) |
 | `VI_Earnie_Heatpump_v2.xml` | `heatpump.{hk_id}.set_enable` |
 | `VI_Earnie_EV_v2.xml` | `evcs.*.set_evcs_*` |
 | `VI_Earnie_Consumer_v2.xml` | `consumer.{hk_id}.set_enable` |
 | `VI_Earnie_Pool_v2.xml` | `pool.*.set_enable` |
 
-For a config with real Kennungen, generate `VI_Pilot_*.xml` instead (see above).
+Für eine Config mit echten Kennungen stattdessen `VI_Pilot_*.xml` erzeugen (siehe oben).
 
-Target folder (use one of the existing Config paths; create the folder if needed):
+Zielordner (einen der vorhandenen Config-Pfade verwenden; Ordner bei Bedarf anlegen):
 
 - `%ProgramData%\Loxone\Loxone Config\<Version>\Template\VirtualIn\`
-- or `Documents\Loxone\Loxone Config\Templates\VirtualIn\`
+- oder `Documents\Loxone\Loxone Config\Templates\VirtualIn\`
 
 #### VirtualOut
 
-Source: `share/loxone/templates/VirtualOut/`
+Quelle: `share/loxone/templates/VirtualOut/`
 
-
-| File                      | Content (short)                                             |
+| Datei                     | Inhalt (kurz)                                               |
 | ------------------------- | ------------------------------------------------------------ |
-| `VO_Earnie_Status.xml`    | optional `Earnie_Request_Optimize` (port **8541**)  |
-| `VO_Earnie_Plant.xml`     | `grid.meter.*` (power, import/export energy, export limit), PV, outside temperature, absent mode |
-| `VO_Earnie_Battery.xml`   | battery / ESS telemetry and cut-offs (`ess.{slug}.*`: SoC, power, energy, `get_ess_*`) |
-| `VO_Earnie_EV.xml`        | EV telemetry                                                 |
+| `VO_Earnie_Status.xml`    | optional `Earnie_Request_Optimize` (Port **8541**)  |
+| `VO_Earnie_Plant.xml`     | `grid.meter.*` (Leistung, Import-/Export-Energie, Exportgrenze), PV, Außentemperatur, Abwesenheitsmodus |
+| `VO_Earnie_Battery.xml`   | Batterie-/ESS-Telemetrie und Grenzen (`ess.{slug}.*`: SoC, Leistung, Energie, `get_ess_*`) |
+| `VO_Earnie_EV.xml`        | EV-Telemetrie                                                |
 | `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
-| `VO_Earnie_Consumer.xml`  | flex power                                                   |
-| `VO_Earnie_Pool.xml`      | pool telemetry                                                |
+| `VO_Earnie_Consumer.xml`  | Flex-Leistung                                                |
+| `VO_Earnie_Pool.xml`      | Pool-Telemetrie                                               |
 
+Ziel: der jeweilige `VirtualOut`-Ordner.
 
-Target: the corresponding `VirtualOut` folder.
+Anschließend **Loxone Config neu starten**. Die Vorlagen erscheinen unter Peripherie / Gerätevorlagen (Virtual In / Virtual Out).
 
-Then **restart Loxone Config**. The templates appear under Peripherals / Device Templates (Virtual In / Virtual Out).
+### 2. Earnie-Adresse setzen
 
-### 2. Set the Earnie Address
+In jedem eingefügten Virtual In/Out den Platzhalter `EARNIE_HOST` durch die LAN-IP oder den Hostnamen von Earnie ersetzen. Die Streamlit-Oberfläche nutzt typischerweise Port **8501**. Das **Daemon-HTTP** (Virtual-In-Status, `Earnie_Request_Optimize`, Telemetrie-Heartbeat) nutzt Port **8541** (`system.ehal_loxone_http_port`). Siehe [Streamlit-Ports](../dev/streamlit-ports.md).
 
-In every inserted Virtual In/Out, replace the `EARNIE_HOST` placeholder with Earnie's LAN IP or hostname. The Streamlit UI typically uses port **8501**. The **daemon HTTP** (Virtual In status, `Earnie_Request_Optimize`, telemetry heartbeat) uses port **8541** (`system.ehal_loxone_http_port`). See [Streamlit Ports](streamlit-ports.md).
-
-Example Virtual In address (status JSON):
+Beispiel einer Virtual-In-Adresse (Status-JSON):
 
 `http://192.168.178.10:8541/ehal/loxone/status.json`
 
-Virtual Out address for **status / request optimize**:
+Virtual-Out-Adresse für **Status / Request Optimize**:
 
 `http://192.168.178.10:8541`
 
-Telemetry VOs (`VO_Earnie_*` except `Status`) also target the daemon port **8541**. Telemetry push works as follows:
+Auch Telemetrie-VOs (`VO_Earnie_*` außer `Status`) zielen auf den Daemon-Port **8541**. Der Telemetrie-Push arbeitet so:
 
-- **Receiver:** `/ehal/telemetry/<EHAL-ID>/<value>` (alias `/ehal/loxone/telemetry/…` for existing VOs). It accepts pushes only when `EARNIE_PILOT_PUSH_TOKEN` is set.
-- **Inbox reads:** all pushable `sens_*` / `get_*` fields are read from the inbox (no Merker poll). This includes the **meter energy** counters `sens_pv_energy`, `sens_grid_energy_import` / `_export` and `consumer.<id>.sens_energy_total`.
-- **Repeat interval:** recommended **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, default 10).
-- **Stale energy values** (older than 3 × repeat) are not assumed to be zero. Slot Ist keeps the sample mean for that channel.
-- **Heartbeat:** the synthetic heartbeat VO is always push.
-- **FertigUm** (`ev.<id>.get_evcs_ready_by_time`): pushed as an Analog VO. A numeric next-entry value is preferred. Tna-style text such as `Morgen, 07:00` is accepted while fresh and parsed by the optimizer.
-- **Value placeholder:** a Virtual Output command uses `<v>` (written `&lt;v&gt;` in the XML). `\v` is the Virtual **Input** check placeholder and arrives as the control character 0x0B in an output.
+- **Empfänger:** `/ehal/telemetry/<EHAL-ID>/<Wert>` (Alias `/ehal/loxone/telemetry/…` für bestehende VOs). Pushes werden nur akzeptiert, wenn `EARNIE_PILOT_PUSH_TOKEN` gesetzt ist.
+- **Inbox-Lesen:** Alle pushbaren `sens_*` / `get_*`-Felder werden aus der Inbox gelesen (kein Merker-Poll). Dazu zählen die **Zähler-Energiestände** `sens_pv_energy`, `sens_grid_energy_import` / `_export` und `consumer.<id>.sens_energy_total`.
+- **Wiederholintervall:** empfohlen **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, Standard 10).
+- **Veraltete Energiewerte** (älter als 3 × Wiederholintervall) werden nicht als null angenommen. Slot-Ist behält den Stichprobenmittelwert dieses Kanals.
+- **Heartbeat:** Der synthetische Heartbeat-VO ist immer Push.
+- **FertigUm** (`ev.<id>.get_evcs_ready_by_time`): wird als Analog-VO gepusht. Bevorzugt wird ein numerischer Wert für den nächsten Eintrag. Text im Tna-Stil wie `Morgen, 07:00` wird solange er frisch ist akzeptiert und vom Optimierer geparst.
+- **Wert-Platzhalter:** Ein Virtual-Output-Befehl verwendet `<v>` (im XML als `&lt;v&gt;`). `\v` ist der Platzhalter für den Virtual-**Input**-Check und kommt in einem Output als Steuerzeichen 0x0B an.
 
-Adjust the polling / Cmd check pattern to match the JSON keys (plant: `set_ess_*` / `heartbeat_ts`; flex: `consumer.{hk_id}.…` (heat pump `heatpump.…`, pool `pool.…`); EV: `evcs.{ev_id}.…`). Stable **titles** remain the contract for Core and the Default import.
+Das Polling bzw. das Cmd-Check-Muster ist an die JSON-Schlüssel anzupassen (Anlage: `set_ess_*` / `heartbeat_ts`; Flex: `consumer.{hk_id}.…` (Wärmepumpe `heatpump.…`, Pool `pool.…`); EV: `evcs.{ev_id}.…`). Stabile **Titel** bleiben der Vertrag für Core und den Default-Import.
 
-### 3. Insert Devices and Keep the Merker Names
+### 3. Geräte einfügen und Merker-Namen beibehalten
 
-1. Insert the matching template once per role (or multiple times for multiple flex consumers).
-2. Do not rename Cmd **titles** arbitrarily — they must match [`greenfield_device_map.json`](../../share/loxone/greenfield_device_map.json) and the tables below.
-3. **Multiple flex consumers / EVs:** titles follow a prefix + instance-ID scheme; the VI check and VO path use `{hk_id}` / `{ev_id}` (see [naming convention](#multiple-flex-consumers-naming-convention)).
-4. Save/load the program on the Miniserver.
+1. Die passende Vorlage einmal je Rolle einfügen (bei mehreren Flex-Verbrauchern mehrfach).
+2. Cmd-**Titel** nicht beliebig umbenennen. Sie müssen zu [`greenfield_device_map.json`](../../share/loxone/greenfield_device_map.json) und den folgenden Tabellen passen.
+3. **Mehrere Flex-Verbraucher / EVs:** Die Titel folgen einem Schema aus Präfix + Instanz-ID. Das VI-Check-Muster und der VO-Pfad verwenden `{hk_id}` / `{ev_id}` (siehe [Namenskonvention](#multiple-flex-consumers-naming-convention)).
+4. Programm auf dem Miniserver speichern bzw. laden.
 
-### 4. Meters and Energy Flow Monitor (EFM)
+### 4. Zähler und Energy Flow Monitor (EFM)
 
-The templates contain **no** meter hardware, but the import also picks up the meter blocks in use. In Loxone Config:
+Die Vorlagen enthalten **keine** Zählerhardware, der Import übernimmt aber auch die verwendeten Zählerblöcke. In Loxone Config:
 
-1. Create or keep a meter with a **unique, stable designation**.
-2. Assign the meter to the **Energy Flow Monitor** (grid / PV / battery / loads).
-3. Do not use residual/remainder nodes as a separate flex consumer. The import skips typical remainder labels.
+1. Einen Zähler mit **eindeutiger, stabiler Bezeichnung** anlegen bzw. beibehalten.
+2. Den Zähler dem **Energy Flow Monitor** zuordnen (Netz / PV / Batterie / Verbraucher).
+3. Rest-/Differenzknoten nicht als eigenen Flex-Verbraucher verwenden. Der Import überspringt typische Restbezeichnungen.
 
-Power Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **may** come from the EFM; the Virtual Output Cmds remain an optional name catalog. Earnie prefers the EFM designation in the binding when available.
+Leistungs-Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **können** aus dem EFM stammen; die Virtual-Output-Cmds bleiben ein optionaler Namenskatalog. Earnie bevorzugt im Binding die EFM-Bezeichnung, sofern vorhanden.
 
-After **Smarthome-Backend → Loxone-Import**, check the signal mapping on EHAL-Com (**Signalliste**).
+Nach **Smarthome-Backend → Loxone-Import** das Signal-Mapping auf EHAL-Com prüfen (**Signalliste**).
 
-**EV ready-by time.** The Loxone import binds **AlarmClock** blocks to `get_evcs_ready_by_time` on the EV entity that already has meter/power bindings (same convention as the meter designation). Optional Analog VO: `/ehal/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numeric next-entry; the inbox also accepts short Tna-style text). Bound FertigUm fields always use the push inbox; the former SpecialState10 / `/all` Merker poll is retired.
+**EV-Fertig-bis-Zeit.** Der Loxone-Import bindet **AlarmClock**-Blöcke an `get_evcs_ready_by_time` der EV-Entität, die bereits Zähler-/Leistungs-Bindings hat (gleiche Konvention wie bei der Zählerbezeichnung). Optionaler Analog-VO: `/ehal/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numerischer nächster Eintrag; die Inbox akzeptiert auch kurzen Text im Tna-Stil). Gebundene FertigUm-Felder nutzen immer die Push-Inbox; der frühere Merker-Poll über SpecialState10 / `/all` entfällt.
 
-### 5. Earnie Dead-Man Fallback (in Loxone Config)
+### 5. Earnie-Dead-Man-Rückfallebene (in Loxone Config)
 
 <a id="earnie-dead-fallback-in-loxone-config"></a>
 
-Goal: if Earnie is unreachable or the Virtual In is no longer updated, the Miniserver must **ignore** Earnie's last setpoints and run local rules instead.
+Ziel: Ist Earnie nicht erreichbar oder wird das Virtual In nicht mehr aktualisiert, soll der Miniserver die letzten Sollwerte von Earnie **ignorieren** und stattdessen lokale Regeln ausführen.
 
-Recommended approach (logic blocks in Config, no Earnie code):
+Empfohlenes Vorgehen (Logikbausteine in Config, kein Earnie-Code):
 
-1. **Watchdog** on the heartbeat Cmd (`heartbeat_ts` in `VI_Earnie_Plant_v2.xml`, `Earnie_Heartbeat` in the Default naming; Unix timestamp): age = now − heartbeat, or "value unchanged for x seconds".
-2. **Threshold:** e.g. 2–3 × the Virtual In polling time, typically ≥ 30 s at a 10 s poll.
-3. **When the dead-man fallback triggers:**
-   - Set `Earnie_Steuerbefehl` / ESS mode locally to **automatic** (`0`), or apply the plant's safe ESS rules.
-   - Set flex **enables** (`Earnie_*_Freigabe`) to `0` (blocked), or apply known emergency logic.
-   - Stop taking EV setpoints from the Earnie Merker.
-4. **When Earnie is alive again:** pass the Earnie Merker through to the actuators/program as intended.
+1. **Watchdog** auf dem Heartbeat-Cmd (`heartbeat_ts` in `VI_Earnie_Plant_v2.xml`, `Earnie_Heartbeat` in der Default-Benennung; Unix-Zeitstempel): Alter = jetzt − Heartbeat, oder „Wert seit x Sekunden unverändert“.
+2. **Schwelle:** z. B. 2–3 × die Polling-Zeit des Virtual In, bei 10 s Poll typischerweise ≥ 30 s.
+3. **Wenn die Rückfallebene auslöst:**
+   - `Earnie_Steuerbefehl` / ESS-Modus lokal auf **Automatik** (`0`) setzen oder die sicheren ESS-Regeln der Anlage anwenden.
+   - Flex-**Freigaben** (`Earnie_*_Freigabe`) auf `0` (gesperrt) setzen oder bekannte Notfalllogik anwenden.
+   - Keine EV-Sollwerte mehr aus dem Earnie-Merker übernehmen.
+4. **Wenn Earnie wieder erreichbar ist:** Die Earnie-Merker wie vorgesehen an Aktoren bzw. Programm durchreichen.
 
-Earnie Core needs no change for this. The fallback is Config logic around the Merker only.
+Der Earnie-Core braucht dafür keine Änderung. Die Rückfallebene ist reine Config-Logik rund um die Merker.
 
-### 6. Loxone Import into Earnie
+### 6. Loxone-Import in Earnie
 
-Prerequisites: the Earnie templates are installed in Loxone Config, each consumer has a meter block (EFM), and the credentials are entered on **Smarthome-Backend → Anbindung**. The import button becomes active only once the Miniserver is reachable.
+<a id="6-loxone-import-into-earnie"></a>
 
-1. On **Daemon Control → Smarthome-Backend**, the **Loxone Import** section appears below the connection summary once Loxone is connected. On first setup, **No — continue manually** appears on the same row as the import button.
-2. Earnie loads `LoxAPP3.json`, classifies `Earnie_*` against the LoxAPP3 control names (exact or prefix + slug, case-insensitive), creates typed entities, and binds the EFM meters.
-3. Check the signal mapping on **EHAL-Com** ([Signalliste](../ui/ehal-com.md#signalliste-loxone-contract)). Follow up on parameters (kWh, schedules, living area, …) in the **House Configurator**.
+Voraussetzungen: Die Earnie-Vorlagen sind in Loxone Config installiert, jeder Verbraucher hat einen Zählerblock (EFM), und die Zugangsdaten sind unter **Smarthome-Backend → Anbindung** eingetragen. Der Import-Button wird erst aktiv, sobald der Miniserver erreichbar ist.
 
-### Library Checklist
+1. Auf **Daemon Control → Smarthome-Backend** erscheint unterhalb der Verbindungsübersicht der Abschnitt **Loxone-Import**, sobald Loxone verbunden ist. Bei der Ersteinrichtung steht **Nein – manuell weiter** in derselben Zeile wie der Import-Button.
+2. Earnie lädt `LoxAPP3.json`, ordnet `Earnie_*` den LoxAPP3-Control-Namen zu (exakt oder Präfix + Slug, ohne Beachtung der Groß-/Kleinschreibung), legt typisierte Entitäten an und bindet die EFM-Zähler.
+3. Das Signal-Mapping auf **EHAL-Com** prüfen ([Signalliste](../ui/ehal-com.md#signalliste-loxone-contract)). Parameter (kWh, Zeitpläne, Wohnfläche, …) anschließend im **Hauskonfigurator** nachpflegen.
 
-- [ ] `VI_` / `VO_` XMLs copied into the Config template folders, Config restarted
-- [ ] `EARNIE_HOST` set; devices inserted; titles stable
-- [ ] Multiple consumers / EVs: slug titles + check/VO `{hk_id}` / `{ev_id}` (if used)
-- [ ] Meters on the EFM with unique designations
-- [ ] Program saved on the Miniserver
-- [ ] Optional: heartbeat watchdog + fallback programmed
-- [ ] Smarthome-Backend: Loxone import → check mapping on EHAL-Com → parameters in the house profile
+### Library-Checkliste
+
+- [ ] `VI_`- / `VO_`-XMLs in die Config-Vorlagenordner kopiert, Config neu gestartet
+- [ ] `EARNIE_HOST` gesetzt; Geräte eingefügt; Titel stabil
+- [ ] Mehrere Verbraucher / EVs: Slug-Titel + Check/VO `{hk_id}` / `{ev_id}` (falls genutzt)
+- [ ] Zähler am EFM mit eindeutigen Bezeichnungen
+- [ ] Programm auf dem Miniserver gespeichert
+- [ ] Optional: Heartbeat-Watchdog + Rückfallebene programmiert
+- [ ] Smarthome-Backend: Loxone-Import → Mapping auf EHAL-Com prüfen → Parameter im Hausprofil
 
 ---
 
-## Presence check (for Binding and Import)
+## Präsenzprüfung (für Binding und Import)
 
-The template Cmd titles are **known** (`greenfield_device_map.json`). Earnie checks them against the **LoxAPP3 control names** (`GET /data/LoxAPP3.json`): a signal counts as present if its name (Bezeichnung) appears in `controls`, otherwise as missing. Titles that are not visible in the Loxone app, and are therefore absent from LoxAPP3, are not detected. A discovery inbox for unknown push IDs is planned.
+Die Cmd-Titel der Vorlagen sind **bekannt** (`greenfield_device_map.json`). Earnie prüft sie gegen die **LoxAPP3-Control-Namen** (`GET /data/LoxAPP3.json`): Ein Signal gilt als vorhanden, wenn sein Name (Bezeichnung) in `controls` auftaucht, sonst als fehlend. Titel, die in der Loxone-App nicht sichtbar und damit in LoxAPP3 nicht enthalten sind, werden nicht erkannt. Eine Discovery-Inbox für unbekannte Push-IDs ist geplant.
 
-The Default import uses the LoxAPP3 names. EFM meters also come from `LoxAPP3.json`.
+Der Default-Import nutzt die LoxAPP3-Namen. EFM-Zähler stammen ebenfalls aus `LoxAPP3.json`.
 
-## Multiple Flex Consumers (Naming Convention)
+## Mehrere Flex-Verbraucher (Namenskonvention)
 
 <a id="multiple-flex-consumers-naming-convention"></a>
 
-One template `VI_Earnie_Consumer` / `VO_Earnie_Consumer` covers **one** consumer. Miniserver designations must be unique. The house-profile `id` (lowercase, snake_case, e.g. `waschmaschine`) is the canonical **entity slug** (`{hk_id}`).
+Eine Vorlage `VI_Earnie_Consumer` / `VO_Earnie_Consumer` deckt **einen** Verbraucher ab. Miniserver-Bezeichnungen müssen eindeutig sein. Die `id` im Hausprofil (Kleinbuchstaben, snake_case, z. B. `waschmaschine`) ist der kanonische **Entity-Slug** (`{hk_id}`).
 
-
-| Signal   | Merker title (1st / additional)                                       | VI check / VO path                                |
+| Signal   | Merker-Titel (erster / weitere)                                       | VI-Check / VO-Pfad                                |
 | -------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
-| Power    | `Earnie_Verbraucher_Leistung` → `Earnie_Verbraucher_<Slug>_Leistung`   | VO: `flex.{hk_id}.sens_power_act`                  |
-| Active   | `Earnie_Verbraucher_<Slug>_Aktiv` (Kennung required)                   | VO: `consumer.{hk_id}.sens_consumer_active` (0/1) |
-| Enable   | `Earnie_Verbraucher_Freigabe` → `…_<Slug>_Freigabe`                    | Check: `consumer.{hk_id}.set_enable`               |
+| Leistung | `Earnie_Verbraucher_Leistung` → `Earnie_Verbraucher_<Slug>_Leistung`   | VO: `flex.{hk_id}.sens_power_act`                  |
+| Aktiv    | `Earnie_Verbraucher_<Slug>_Aktiv` (Kennung erforderlich)               | VO: `consumer.{hk_id}.sens_consumer_active` (0/1) |
+| Freigabe | `Earnie_Verbraucher_Freigabe` → `…_<Slug>_Freigabe`                    | Check: `consumer.{hk_id}.set_enable`               |
 
+**Beispiel Waschmaschine** (`id` = `waschmaschine`):
 
-**Example washing machine** (`id` = `waschmaschine`):
+- Titel: `Earnie_Verbraucher_Waschmaschine_Leistung`
+- VO-Befehl bei Ein: `/ehal/telemetry/flex.waschmaschine.sens_power_act/<v>`
+- VI-Check (Freigabe): `"consumer.waschmaschine.set_enable":\v` (der Titel bleibt `Earnie_Verbraucher_Waschmaschine_Freigabe`)
+- EHAL-Com-Binding: `flex.{hk_id}.sens_power_act` → Titel (bei `zaehler_<slug>`: Wire-Slug ohne `zaehler_`)
 
-- Title: `Earnie_Verbraucher_Waschmaschine_Leistung`
-- VO command when on: `/ehal/telemetry/flex.waschmaschine.sens_power_act/<v>`
-- VI check (enable): `"consumer.waschmaschine.set_enable":\v` (title stays `Earnie_Verbraucher_Waschmaschine_Freigabe`)
-- EHAL-Com binding: `flex.{hk_id}.sens_power_act` → title (for `zaehler_<slug>`: wire slug without `zaehler_`)
+`<Slug>` **im Merker:** kurzer, stabiler Token (z. B. `Waschmaschine`). `{hk_id}`: derselbe Verbraucher wie im Hausprofil.
 
-`<Slug>` **in the Merker:** short, stable token (e.g. `Waschmaschine`). `{hk_id}`: same consumer as in the house profile.
+## Mehrere EVs (Namenskonvention)
 
-## Multiple EVs (Naming Convention)
+Analog: Präfix `Earnie_EAuto_`, Entität `id` = `{ev_id}` (z. B. `eauto`, `garage`).
 
-Analogous: prefix `Earnie_EAuto_`, entity `id` = `{ev_id}` (e.g. `eauto`, `garage`).
-
-
-| Signal            | Merker title (1st / additional)                       | VI check / VO path                       |
+| Signal            | Merker-Titel (erster / weitere)                       | VI-Check / VO-Pfad                       |
 | ------------------ | -------------------------------------------------------- | ------------------------------------------ |
-| Target A          | `Earnie_EAuto_Soll_A` → `Earnie_EAuto_<Slug>_Soll_A`     | Check: `evcs.{ev_id}.set_evcs_max_current` |
-| Mode              | `Earnie_EAuto_Modus` → `…_<Slug>_Modus`                  | Check: `evcs.{ev_id}.set_evcs_mode`        |
-| Power             | `Earnie_EAuto_Leistung` → `…_<Slug>_Leistung`            | VO: `ev.{ev_id}.sens_evcs_active_power`   |
-| additional sens/get | `Earnie_EAuto_*` → `…_<Slug>_*`                         | VO: `ev.{ev_id}.<ehal_field>`             |
+| Soll A            | `Earnie_EAuto_Soll_A` → `Earnie_EAuto_<Slug>_Soll_A`     | Check: `evcs.{ev_id}.set_evcs_max_current` |
+| Modus             | `Earnie_EAuto_Modus` → `…_<Slug>_Modus`                  | Check: `evcs.{ev_id}.set_evcs_mode`        |
+| Leistung          | `Earnie_EAuto_Leistung` → `…_<Slug>_Leistung`            | VO: `ev.{ev_id}.sens_evcs_active_power`   |
+| weitere sens/get  | `Earnie_EAuto_*` → `…_<Slug>_*`                          | VO: `ev.{ev_id}.<ehal_field>`             |
 
+**Wärmepumpe:**
 
-**Heat pump:**
+- Titel: `Earnie_Waermepumpe_Leistung` / `Earnie_Waermepumpe_Freigabe`.
+- Speichertemperaturen: `Earnie_Waermespeicher_Temp_eq` / `Earnie_Waermespeicher_Temp_low`.
+- Pfade: VO `flex.{hk_id}.sens_power_act`, VI-Check `heatpump.{hk_id}.set_enable` (Standard-`id` `wp_heating`).
 
-- Titles: `Earnie_Waermepumpe_Leistung` / `Earnie_Waermepumpe_Freigabe`.
-- Store temperatures: `Earnie_Waermespeicher_Temp_eq` / `Earnie_Waermespeicher_Temp_low`.
-- Paths: VO `flex.{hk_id}.sens_power_act`, VI check `heatpump.{hk_id}.set_enable` (default `id` `wp_heating`).
+**Pool:** VO `flex.pool.sens_power_act` (oder `flex.{hk_id}.sens_power_act`), VI-Check `pool.{hk_id}.set_enable`.
 
-**Pool:** VO `flex.pool.sens_power_act` (or `flex.{hk_id}.sens_power_act`), VI check `pool.{hk_id}.set_enable`.
+**Import:** Der Default-Import ordnet Vorlagennamen **ohne Beachtung der Groß-/Kleinschreibung** zu, entweder exakt oder als **Präfix + Slug**. Beispiele: `Earnie_Verbraucher_Waschmaschine_Leistung` → Verbraucher `waschmaschine`; `Earnie_EAuto_Garage_Soll_A` → EV `garage`. Bindings behalten die Schreibweise des Miniservers.
 
-**Import:** the Default import matches template names **case-insensitively**, either exactly or as **prefix + slug**. Examples: `Earnie_Verbraucher_Waschmaschine_Leistung` → consumer `waschmaschine`; `Earnie_EAuto_Garage_Soll_A` → EV `garage`. Bindings keep the Miniserver spelling.
+In Config: Vorlage einfügen, Cmd-Titel sowie VI-Check / VO-Pfad `{id}` setzen und anschließend auf dem Miniserver speichern.
 
-In Config: insert the template, set the Cmd titles and the VI check / VO path `{id}`, then save to the Miniserver.
-
-To check all configured signals:
+Alle konfigurierten Signale lassen sich so prüfen:
 
 ```powershell
 .venv\Scripts\python.exe -m scripts.verify_loxone_setup
@@ -265,146 +258,134 @@ To check all configured signals:
 
 ---
 
-## Role ↔ Entity (Overview)
+## Rolle ↔ Entität (Überblick)
 
-
-| Entity / area                                                          | Storage location                              | Typical EHAL fields / roles                                                                                                                               |
+| Entität / Bereich                                                      | Speicherort                                   | Typische EHAL-Felder / Rollen                                                                                                                             |
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Plant (PV, grid, house load, outside temp., absent; ESS power/setpoints via primary battery)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers` (SoC: `batteries[].ehal_bindings` → `ess.{slug}.sens_ess_soc`) |
-| Request Optimize (ad hoc)                                               | Loxone VO → daemon HTTP                       | `Earnie_Request_Optimize` on port `system.ehal_loxone_http_port` (default **8541**)                                                                       |
-| Heat pump / Flex / Thermal                                              | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`                                                                                                  |
+| Anlage (PV, Netz, Hauslast, Außentemp., Abwesenheit; ESS-Leistung/Sollwerte über die primäre Batterie)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers` (SoC: `batteries[].ehal_bindings` → `ess.{slug}.sens_ess_soc`) |
+| Request Optimize (ad hoc)                                               | Loxone-VO → Daemon-HTTP                       | `Earnie_Request_Optimize` auf Port `system.ehal_loxone_http_port` (Standard **8541**)                                                                     |
+| Wärmepumpe / Flex / Thermik                                             | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`                                                                                                  |
 | EV (`ev`)                                                                | `consumers[].ehal_bindings`                   | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*`                                                                                                                  |
-| Pool / SwimSpa                                                           | `consumers[].ehal_bindings` + filter entity   | see default `Earnie_Pool_*` / EHAL-Com §C.6                                                                                                                |
+| Pool / SwimSpa                                                           | `consumers[].ehal_bindings` + Filter-Entität  | siehe Default `Earnie_Pool_*` / EHAL-Com, Abschnitt Pool / SwimSpa                                                                                        |
 
+Bearbeitet wird in der Oberfläche **ausschließlich** unter **Daemon Control → EHAL-Com → Signalliste** (und den zugehörigen Mapping-Abschnitten). Der Hauskonfigurator bearbeitet keine Merker-Adressen mehr.
 
-Editing in the UI: **only** under **Daemon Control → EHAL-Com → Signalliste** (and related mapping sections). The House Configurator no longer edits Merker addresses.
+## Kernsignale (`plant.ehal_bindings`)
 
-## Core Signals (`plant.ehal_bindings`)
+Default-Namen. Netz-/PV-/Batterie-**Leistung** bevorzugt über die EFM-Zählerbezeichnung.
 
-Default names. Grid/PV/battery **power** preferably via the EFM meter designation.
-
-
-| EHAL field                       | Direction | Default name                                   | Value / unit                                                                            |
+| EHAL-Feld                        | Richtung  | Default-Name                                   | Wert / Einheit                                                                          |
 | ---------------------------------- | --------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `ess.{slug}.sens_ess_soc`         | Read      | `Earnie_Batterie_SoC` / `Earnie_Batterie_<Slug>_SoC` | Battery SoC, % (entity-scoped; not plant-flat)                                          |
-| `sens_pv_production_active`       | Read      | `Earnie_PV_Leistung` (or EFM production)         | PV power, kW                                                                                |
-| `sens_ess_power`                  | Read      | `Earnie_Batterie_Leistung` (or EFM storage)      | Battery kW; **+ discharge**, − charge (same as EHAL, no inversion)                          |
-| `sens_grid_power_active`          | Read      | `Earnie_Netzleistung` (or EFM grid)              | Grid: + import, kW                                                                          |
-| `get_grid_export_power_limit`     | Read      | `Earnie_Netz_Einspeisegrenze_In` (optional)      | Max export limit read from Loxone, kW (EHAL: W)                                     |
-| `get_ess_soc_min`                 | Read      | `Earnie_Batterie_SOC_Min` (optional)             | Discharge cut-off SoC %; MILP when `limits_from_live`                               |
-| `get_ess_soc_max`                 | Read      | `Earnie_Batterie_SOC_Max` (optional)             | Charge cut-off SoC %                                                                |
-| `get_ess_max_charge_power`        | Read      | `Earnie_Batterie_Max_Ladeleistung` (optional)    | Device max charge (Loxone kW → EHAL W)                                              |
-| `get_ess_max_discharge_power`     | Read      | `Earnie_Batterie_Max_Entladeleistung` (optional) | Device max discharge (Loxone kW → EHAL W)                                           |
-| `sens_power_consumers`            | Read      | (optional)                                        | House load; otherwise derived                                                               |
-| `sens_temperature_outside`        | Read      | `Earnie_Aussentemperatur`                        | Outside temperature °C (house-wide; heat pump/pool)                                        |
-| `sens_absent_mode`                | Read      | `Earnie_Abwesend`                                | House absent / holiday mode 0/1 (OR with HK `absent_mode`)                                 |
-| `set_ess_active_power`            | Write     | `Earnie_Batterie_Sollleistung`                   | Forced power, kW; `+` discharge, `−` charge                                                 |
-| `set_ess_charge_power_limit`      | Write     | `Earnie_LadeLeistungs-Limit`                     | Max. charge power (true limit)                                                              |
-| `set_ess_discharge_power_limit`   | Write     | `Earnie_EntladeLeistungs-Limit`                  | Max. discharge power (true limit)                                                           |
-| `set_ess_mode`                    | Write     | `Earnie_Steuerbefehl`                            | Sticky: always write; `0` = automatic; battery only; OpenEMS ignores                        |
-| `ess.<id>.set_ess_source_select`  | Write     | Pattern-B Merker (e.g. legacy `Earnie_Speicher_Quellenwahl`) | physical `standby_backup` only; `0` = grid pass-through, `1` = battery-only island (capability `supports_ess_source_select`); not on plant |
-| `set_grid_export_power_limit`     | Write     | `Earnie_EinspeiseLeistungs-Limit`                | Max export kW (magnitude ≥ 0); `0` = no export; unconstrained = PV kWp + max battery discharge kW |
-| *(watchdog)*                       | Read      | `Earnie_Heartbeat`                               | entity-scoped; not an EHAL field                                                                |
+| `ess.{slug}.sens_ess_soc`         | Lesen     | `Earnie_Batterie_SoC` / `Earnie_Batterie_<Slug>_SoC` | Batterie-SoC, % (Entity-bezogen; nicht anlagenweit)                                  |
+| `sens_pv_production_active`       | Lesen     | `Earnie_PV_Leistung` (oder EFM-Erzeugung)        | PV-Leistung, kW                                                                             |
+| `sens_ess_power`                  | Lesen     | `Earnie_Batterie_Leistung` (oder EFM-Speicher)   | Batterie kW; **+ Entladen**, − Laden (wie EHAL, keine Invertierung)                         |
+| `sens_grid_power_active`          | Lesen     | `Earnie_Netzleistung` (oder EFM-Netz)            | Netz: + Bezug, kW                                                                           |
+| `get_grid_export_power_limit`     | Lesen     | `Earnie_Netz_Einspeisegrenze_In` (optional)      | Maximale Exportgrenze aus Loxone, kW (EHAL: W)                                      |
+| `get_ess_soc_min`                 | Lesen     | `Earnie_Batterie_SOC_Min` (optional)             | Entlade-Abschaltgrenze SoC %; MILP bei `limits_from_live`                           |
+| `get_ess_soc_max`                 | Lesen     | `Earnie_Batterie_SOC_Max` (optional)             | Lade-Abschaltgrenze SoC %                                                           |
+| `get_ess_max_charge_power`        | Lesen     | `Earnie_Batterie_Max_Ladeleistung` (optional)    | Maximale Ladeleistung des Geräts (Loxone kW → EHAL W)                               |
+| `get_ess_max_discharge_power`     | Lesen     | `Earnie_Batterie_Max_Entladeleistung` (optional) | Maximale Entladeleistung des Geräts (Loxone kW → EHAL W)                            |
+| `sens_power_consumers`            | Lesen     | (optional)                                        | Hauslast; sonst abgeleitet                                                                  |
+| `sens_temperature_outside`        | Lesen     | `Earnie_Aussentemperatur`                        | Außentemperatur °C (hausweit; Wärmepumpe/Pool)                                             |
+| `sens_absent_mode`                | Lesen     | `Earnie_Abwesend`                                | Haus abwesend / Urlaubsmodus 0/1 (ODER mit HK-`absent_mode`)                               |
+| `set_ess_active_power`            | Schreiben | `Earnie_Batterie_Sollleistung`                   | Zwangsleistung, kW; `+` Entladen, `−` Laden                                                 |
+| `set_ess_charge_power_limit`      | Schreiben | `Earnie_LadeLeistungs-Limit`                     | Max. Ladeleistung (echtes Limit)                                                            |
+| `set_ess_discharge_power_limit`   | Schreiben | `Earnie_EntladeLeistungs-Limit`                  | Max. Entladeleistung (echtes Limit)                                                         |
+| `set_ess_mode`                    | Schreiben | `Earnie_Steuerbefehl`                            | Sticky: immer schreiben; `0` = Automatik; nur Batterie; OpenEMS ignoriert                   |
+| `ess.<id>.set_ess_source_select`  | Schreiben | Pattern-B-Merker (z. B. alt `Earnie_Speicher_Quellenwahl`) | nur physisches `standby_backup`; `0` = Netzdurchleitung, `1` = reiner Batterie-Inselbetrieb (Fähigkeit `supports_ess_source_select`); nicht auf Anlagenebene |
+| `set_grid_export_power_limit`     | Schreiben | `Earnie_EinspeiseLeistungs-Limit`                | Max. Export kW (Betrag ≥ 0); `0` = kein Export; unbeschränkt = PV-kWp + max. Batterie-Entladung kW |
+| *(Watchdog)*                       | Lesen     | `Earnie_Heartbeat`                               | Entity-bezogen; kein EHAL-Feld                                                              |
 
+Die alten Rollennamen (`soc_name`, `pv_power_name`, …) in `loxone_blocks` sind entfernt. Verwendet werden nur noch `plant.ehal_bindings` mit den obigen EHAL-Feldnamen (siehe [EHAL-Vertrag](ehal.md)).
 
-The legacy role names (`soc_name`, `pv_power_name`, …) in `loxone_blocks` have been removed. Only `plant.ehal_bindings` with the EHAL field names above are used (see [EHAL contract](ehal.md)).
+**Sticky-Merker.** Loxone behält den zuletzt geschriebenen Wert.
 
-**Sticky Merker.** Loxone keeps the last written value.
+- **Automatikmodus:** `set_ess_mode = 0` bedeutet Automatik. In Modus 0 darf Config die Sollleistung nicht anwenden, auch wenn `Earnie_Batterie_Sollleistung` noch einen alten Wert enthält.
+- **Exportdrosselung:** `set_grid_export_power_limit` ist wie die Lade-/Entladegrenzen ein nichtnegativer Betrag in kW. Config drosselt die Netzeinspeisung auf `min(Grenze, Wechselrichterleistung)`. `0` bedeutet kein Export (Einspeisesperre).
+- **Unbeschränkter Export:** wird als Anlagenmaximum geschrieben, also PV-kWp-Summe plus die **Summe** der maximalen Entlade-kW jeder ausgewählten zwangsentladbaren Batterie (`control = full`). Ist dieser Wert unbekannt, wird `1000` kW geschrieben.
+- **Mehrere ESS:** Merker-Titel verwenden den Slug-Infix `Earnie_Batterie_<Slug>_…`. Die Entity-bezogenen Binding-Schlüssel sind `ess.{slug}.sens_ess_soc` / `set_ess_*` in `batteries[].ehal_bindings`.
+- **`set_ess_mode`** (`Earnie_Steuerbefehl`) gilt nur für die Batterie und signalisiert nie eine Exportdrosselung.
 
-- **Automatic mode:** `set_ess_mode = 0` means automatic. In mode 0, Config must not apply the setpoint power, even if `Earnie_Batterie_Sollleistung` still holds an old value.
-- **Export curtailment:** `set_grid_export_power_limit` is a non-negative magnitude in kW, like the charge/discharge limits. Config curtails grid feed-in to `min(limit, inverter rating)`. `0` means no export (Einspeisesperre).
-- **Unconstrained export:** written as the plant maximum, i.e. the PV kWp sum plus the **sum** of the max discharge kW of every selected force-dischargeable battery (`control = full`). If this is unknown, `1000` kW is written.
-- **Multi-ESS:** Merker titles use the slug infix `Earnie_Batterie_<Slug>_…`. The entity-scoped binding keys are `ess.{slug}.sens_ess_soc` / `set_ess_*` on `batteries[].ehal_bindings`.
-- **`set_ess_mode`** (`Earnie_Steuerbefehl`) is battery-only and never signals export curtailment.
+## Flexible Verbraucher: `ehal_bindings` am Verbraucher
 
-## Flexible Consumers — `ehal_bindings` on the Consumer
-
-The signal definitions live in the active house profile (`house_profiles.json`). The Merker are stored under `ehal_bindings`, keyed by EHAL field name. For existing profiles without bindings, run:
+Die Signaldefinitionen stehen im aktiven Hausprofil (`house_profiles.json`). Die Merker liegen unter `ehal_bindings`, geordnet nach EHAL-Feldname. Für bestehende Profile ohne Bindings:
 
 ```powershell
 python -m scripts.migrate_ehal_bindings --path <house_profiles.json> [--config <config.json>]
 ```
 
-### Flex / Thermal (Stub `flex.*`)
+### Flex / Thermik (Stub `flex.*`)
 
-
-| EHAL field                        | Direction | Default / example                                                                          | Value       |
+| EHAL-Feld                         | Richtung  | Default / Beispiel                                                                         | Wert        |
 | ------------------------------------ | --------- | ---------------------------------------------------------------------------------------------- | ------------ |
-| `flex.{slug}.sens_power_act`       | Read      | Heat pump: `Earnie_Waermepumpe_Leistung`; generic: `Earnie_Verbraucher_Leistung`; or EFM load  | kW or 0/1   |
-| `consumer.{slug}.sens_consumer_active` | Read  | Generic: `Earnie_Verbraucher_<Slug>_Aktiv` (digital; reserve release OR-trigger). Storage binding may still use `flex.{slug}.sens_consumer_active`. | `0`/`1` |
-| `flex.{slug}.set_enable`           | Write     | Heat pump: `Earnie_Waermepumpe_Freigabe`; generic: `Earnie_Verbraucher_Freigabe`               | `0`/`1`     |
+| `flex.{slug}.sens_power_act`       | Lesen     | Wärmepumpe: `Earnie_Waermepumpe_Leistung`; generisch: `Earnie_Verbraucher_Leistung`; oder EFM-Last | kW oder 0/1 |
+| `consumer.{slug}.sens_consumer_active` | Lesen | Generisch: `Earnie_Verbraucher_<Slug>_Aktiv` (digital; ODER-Trigger der Reservefreigabe). Das Speicher-Binding kann weiterhin `flex.{slug}.sens_consumer_active` nutzen. | `0`/`1` |
+| `flex.{slug}.set_enable`           | Schreiben | Wärmepumpe: `Earnie_Waermepumpe_Freigabe`; generisch: `Earnie_Verbraucher_Freigabe`            | `0`/`1`     |
 
+> **Hinweis (Binding-Schlüssel und Wire-Check):** `flex.{slug}.set_enable` ist nur der **Binding-Schlüssel** in `consumers[].ehal_bindings`. Er aktiviert das Schreiben. Das Check-Muster am Virtual Input und der Schlüssel in `status.json` verwenden die qualifizierte ID nach Verbrauchertyp: `consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable` oder `pool.{slug}.set_enable`.
 
-Pool enables: default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` in `ehal_bindings`.
+Pool-Freigaben: Default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` in `ehal_bindings`.
 
-**Heat storage Ist (Live):** on the `thermal_annual` consumer:
+**Wärmespeicher-Ist (Live):** am Verbraucher `thermal_annual`:
 
-| EHAL field | Meaning | Default Merker |
+| EHAL-Feld | Bedeutung | Default-Merker |
 | --- | --- | --- |
-| `sens_temperature_heat_storage` | Energy-equivalent `T_eq` (°C) | `Earnie_Waermespeicher_Temp_eq` |
-| `sens_temperature_heat_storage_low` | Lowest immersion sensor `T_low` (°C) — WP-on hint when bottom is cold | `Earnie_Waermespeicher_Temp_low` |
+| `sens_temperature_heat_storage` | Energieäquivalent `T_eq` (°C) | `Earnie_Waermespeicher_Temp_eq` |
+| `sens_temperature_heat_storage_low` | Unterster Tauchfühler `T_low` (°C): Hinweis auf Wärmepumpe-ein, wenn der Boden kalt ist | `Earnie_Waermespeicher_Temp_low` |
 
-For stratified tanks `T_eq` must be the energy-equivalent mean (volume-weighted), not the top sensor alone. Guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md).
+Bei geschichteten Speichern muss `T_eq` der energieäquivalente (volumengewichtete) Mittelwert sein, nicht allein der obere Fühler. Anleitung: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md).
 
-### EV (Prefix `Earnie_EAuto_`)
+### EV (Präfix `Earnie_EAuto_`)
 
-
-| EHAL field                  | Direction | Default name                                                                                            | Value                                                                                                                                                                                                              |
+| EHAL-Feld                   | Richtung  | Default-Name                                                                                            | Wert                                                                                                                                                                                                               |
 | ------------------------------ | --------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sens_evcs_active_power`     | Read      | `Earnie_EAuto_Leistung` (or EFM load; dual `flex.{slug}.sens_power_act`)                                   | kW                                                                                                                                                                                                                  |
-| `sens_evcs_connected`        | Read      | `Earnie_EAuto_Angeschlossen`                                                                                | `1` = connected                                                                                                                                                                                                    |
-| `sens_evcs_soc_act`          | Read      | `Earnie_EAuto_SOC`                                                                                          | Current SOC, %                                                                                                                                                                                                    |
-| `sens_evcs_bat_capacity`     | Read      | `Earnie_EAuto_Kapazitaet`                                                                                   | kWh                                                                                                                                                                                                                |
-| `get_evcs_nominal_current`   | Read      | `Earnie_EAuto_MaxStrom`                                                                                     | A                                                                                                                                                                                                                  |
-| `get_evcs_ready_by_time`     | Read      | AlarmClock **designation** (legacy); VO Title `Earnie_EAuto_FertigUm` | Push inbox: Analog VO numeric next-entry preferred; Tna text (`Morgen, 07:00`) accepted while fresh and parsed by the optimizer. |
-| `get_evcs_limit_soc`         | Read      | `Earnie_EAuto_LimitSOC`                                                                                     | Target charge SOC %                                                                                                                                                                                               |
-| `get_evcs_soc_min_immediate` | Read      | `Earnie_EAuto_SOCMinSofort`                                                                                 | ASAP minimum SOC %; ≤0 or empty = inactive; capped at the limit SOC                                                                                                                                               |
-| `set_evcs_max_current`       | Write     | `Earnie_EAuto_Soll_A`                                                                                       | Target/max current A                                                                                                                                                                                              |
-| `set_evcs_mode`              | Write     | `Earnie_EAuto_Modus`                                                                                        | `off`=0 / `pv`=1 / `now`=2                                                                                                                                                                                         |
+| `sens_evcs_active_power`     | Lesen     | `Earnie_EAuto_Leistung` (oder EFM-Last; dual `flex.{slug}.sens_power_act`)                                 | kW                                                                                                                                                                                                                  |
+| `sens_evcs_connected`        | Lesen     | `Earnie_EAuto_Angeschlossen`                                                                                | `1` = angeschlossen                                                                                                                                                                                                |
+| `sens_evcs_soc_act`          | Lesen     | `Earnie_EAuto_SOC`                                                                                          | Aktueller SOC, %                                                                                                                                                                                                  |
+| `sens_evcs_bat_capacity`     | Lesen     | `Earnie_EAuto_Kapazitaet`                                                                                   | kWh                                                                                                                                                                                                                |
+| `get_evcs_nominal_current`   | Lesen     | `Earnie_EAuto_MaxStrom`                                                                                     | A                                                                                                                                                                                                                  |
+| `get_evcs_ready_by_time`     | Lesen     | AlarmClock-**Bezeichnung** (alt); VO-Titel `Earnie_EAuto_FertigUm` | Push-Inbox: numerischer Analog-VO-Wert für den nächsten Eintrag bevorzugt; Tna-Text (`Morgen, 07:00`) wird solange er frisch ist akzeptiert und vom Optimierer geparst. |
+| `get_evcs_limit_soc`         | Lesen     | `Earnie_EAuto_LimitSOC`                                                                                     | Ziel-Lade-SOC %                                                                                                                                                                                                   |
+| `get_evcs_soc_min_immediate` | Lesen     | `Earnie_EAuto_SOCMinSofort`                                                                                 | Sofort-Mindest-SOC %; ≤0 oder leer = inaktiv; auf den Limit-SOC begrenzt                                                                                                                                          |
+| `set_evcs_max_current`       | Schreiben | `Earnie_EAuto_Soll_A`                                                                                       | Soll-/Maximalstrom A                                                                                                                                                                                              |
+| `set_evcs_mode`              | Schreiben | `Earnie_EAuto_Modus`                                                                                        | `off`=0 / `pv`=1 / `now`=2                                                                                                                                                                                         |
 
+Hinweise:
 
-Notes:
+- Der EV-Verbraucher benötigt außerdem das Feld `min_power_kw`.
+- Der **EV-Modus** wird ausschließlich über `set_evcs_mode` (`Earnie_EAuto_Modus`) geschrieben. Earnie schreibt weder `pv_follow` noch Sofortbefehl-Merker.
+- **Poolfilter:** Der Hausprofil-Verbraucher `pool_filter` führt seine EHAL-Rollen (u. a. `get_filter_remaining_hours`) unter `ehal_bindings`. Standardpräfix: `Earnie_Pool_*` / `Earnie_Pool_Filter_*` (siehe [ehal-com.md](../ui/ehal-com.md), Abschnitt Pool / SwimSpa).
 
-- The EV consumer also requires the field `min_power_kw`.
-- **EV mode** is written only through `set_evcs_mode` (`Earnie_EAuto_Modus`). Earnie does not write `pv_follow` or immediate-command Merker.
-- **Pool filter:** the house-profile consumer `pool_filter` carries its EHAL roles (among others `get_filter_remaining_hours`) under `ehal_bindings`. Default prefix: `Earnie_Pool_*` / `Earnie_Pool_Filter_*` (see [ehal-com.md](../ui/ehal-com.md) § C.6).
+## Request Optimize (Ad-hoc-Läufe)
 
-## Request Optimize (Ad Hoc Runs)
+Ad-hoc-Optimierungsläufe in `main.py` (zwischen den Viertelstunden) laufen über HTTP von Loxone zu Earnie.
 
-Ad hoc optimization runs in `main.py` (between quarter hours) via Loxone → Earnie HTTP.
-
-
-| Element                          | Meaning                                                                                    |
+| Element                          | Bedeutung                                                                                  |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Virtual Out                        | template `share/loxone/templates/VirtualOut/VO_Earnie_Status.xml`                             |
-| Address                            | `http://EARNIE_HOST:8541` (port = `system.ehal_loxone_http_port`, default **8541**)           |
-| Cmd `Earnie_Request_Optimize`      | `POST /ehal/loxone/request_optimize` — wakes the daemon before the next quarter hour; receipt ID `request_optimize` in EHAL-Com **Signalliste** and **Live-Lesen** |
+| Virtual Out                        | Vorlage `share/loxone/templates/VirtualOut/VO_Earnie_Status.xml`                              |
+| Adresse                            | `http://EARNIE_HOST:8541` (Port = `system.ehal_loxone_http_port`, Standard **8541**)          |
+| Cmd `Earnie_Request_Optimize`      | `POST /ehal/loxone/request_optimize`: weckt den Daemon vor der nächsten Viertelstunde; Empfangs-ID `request_optimize` in EHAL-Com **Signalliste** und **Live-Lesen** |
 
-Link proof (hub → Earnie) is the repeating telemetry VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat/<v>`, not a Status cmd. Existing Configs that still contain the obsolete **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` command should delete it; the endpoint returns 404.
+Der Verbindungsnachweis (Hub → Earnie) ist der sich wiederholende Telemetrie-VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat/<v>`, kein Status-Cmd. Bestehende Configs, die noch das veraltete Cmd **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` enthalten, sollten es löschen; der Endpunkt liefert 404.
 
+Compose-Produktivstacks veröffentlichen Container-Port **8541** (siehe [Streamlit-Ports](../dev/streamlit-ports.md)).
 
-Compose production stacks publish container port **8541** (see [Streamlit Ports](streamlit-ports.md)).
+## Beispiel-Mapping
 
-## Example Mapping
-
-
-| Consumer (`id`)   | Control (write)                                            | Power (read)                                                    |
+| Verbraucher (`id`) | Steuerung (Schreiben)                                      | Leistung (Lesen)                                                |
 | ------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `swimspa` / pool    | `flex.{slug}.set_enable` → `Earnie_Pool_Freigabe`              | `flex.{slug}.sens_power_act` → `Earnie_Pool_P_act`                  |
+| `swimspa` / Pool    | `flex.{slug}.set_enable` → `Earnie_Pool_Freigabe`              | `flex.{slug}.sens_power_act` → `Earnie_Pool_P_act`                  |
 | `ev`                | `set_evcs_max_current` / `set_evcs_mode`                       | `sens_evcs_*` / `flex.{slug}.sens_power_act`                        |
 | `wp_heating`        | `flex.{slug}.set_enable` → `Earnie_Waermepumpe_Freigabe`       | `flex.{slug}.sens_power_act` → `Earnie_Waermepumpe_Leistung`; `sens_temperature_heat_storage` / `_low` → `Earnie_Waermespeicher_Temp_eq` / `_low` |
 
+## Lesen und Schreiben in `main.py`
 
-## Reading vs. Writing in `main.py`
-
-
-| Phase        | Action                                             |
+| Phase        | Aktion                                             |
 | ------------- | ---------------------------------------------------- |
-| Read         | SOC, powers, PV, flex inputs, EV status              |
-| Optimization | MILP over the planning horizon (15-min slots; `dt_h = 0.25`) |
-| Write        | ESS limits / mode, enables / EV current per 15-min write cycle |
+| Lesen        | SOC, Leistungen, PV, Flex-Eingänge, EV-Status        |
+| Optimierung  | MILP über den Planungshorizont (15-Min-Slots; `dt_h = 0.25`) |
+| Schreiben    | ESS-Grenzen / Modus, Freigaben / EV-Strom je 15-Min-Schreibzyklus |
 
+Die App **liest** dieselben Live-Werte für die Anzeige; Steuerwerte **schreibt** sie nur im Live-Modus. Merker-Zuordnung: [EHAL-Com](../ui/ehal-com.md).
 
-The app **reads** the same live values for display; it only **writes** control values in live mode. Merker mapping: [EHAL-Com](../ui/ehal-com.md).
-
-Further details: [Loxone Integration](../einrichtung/loxone-anbindung.md) · [Abbreviations](abbreviations.md).
+Weitere Details: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Abkürzungen](abbreviations.md).

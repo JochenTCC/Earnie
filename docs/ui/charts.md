@@ -131,10 +131,6 @@ Die Marker liegen oberhalb der Chart-Fläche; beim **Hover** erscheinen Kategori
 | `swimspa_filter_runs_unexpectedly` | pool_filter | Fehler |
 | `swimspa_filter_over_nominal` | pool_filter | Warnung |
 
-**Entwickler-Test:** Der VS-Code-Launch **Streamlit app.py (Deviation-Test)** schreibt ein fiktives Log (`scripts/seed_deviation_test_log.py`) in das lokale `runtime/` und startet Streamlit. Manuell: `python -m scripts.seed_deviation_test_log --force`.
-
-**Rauf/Runter-Balken (Szenarien A–H):** Launch **Streamlit app.py (Flow-Balance-Test)** (`scripts/seed_flow_balance_test_log.py`) oder HTML-Vorschau: `python -m scripts.export_flow_balance_chart_html --open` → `runtime/flow_balance_preview.html`.
-
 ## Navigation nach Chart 1
 
 | Steuerung | Verhalten |

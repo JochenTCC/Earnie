@@ -1,6 +1,6 @@
 # Home-Assistant-Add-on
 
-Earnie lässt sich auch als **Home Assistant Supervisor Add-on** installieren, vorrangig auf **Home Assistant Green** (HA OS, `aarch64`). Wie das LoxBerry-Plugin ist das Add-on ein **schlanker Docker-Wrapper**. Der Add-on-Installer startet dasselbe produktiv genutzte Image wie die manuelle Compose-Installation (`ghcr.io/jochentcc/earnie-energy`).
+Earnie lässt sich auch als **Home Assistant Supervisor Add-on** installieren, vorrangig auf **Home Assistant Green** (HA OS, `aarch64`). Wie das LoxBerry-Plugin ist das Add-on ein **schlanker Docker-Wrapper**. Der Add-on-Installer startet ein schlankes Add-on-Image (`ghcr.io/jochentcc/earnie-addon-{arch}`), das auf demselben produktiv genutzten Image wie die manuelle Compose-Installation (`ghcr.io/jochentcc/earnie-energy`) aufbaut.
 
 Quellbaum im Repo: [`packaging/homeassistant-addon/earnie/`](../../packaging/homeassistant-addon/earnie/). Veröffentlicht wird das Add-on über ein eigenes Custom-Repository (`https://github.com/JochenTCC/ha-addon-earnie`), also nicht über die offizielle Liste der HA-Community-Add-ons.
 
@@ -59,7 +59,7 @@ Die Add-on-Optionen (`config.yaml` → `options`) sind ein optionales Zusatzange
 
 Zugangsdaten für Loxone und HA gehören **nicht** in die Supervisor-Optionen. Sie werden in der Earnie-Oberfläche unter **Smarthome-Backend** oder in `config/.env` gepflegt. Im Add-on bleiben sie oft leer; dann greift der Supervisor-Proxy.
 
-### Options → `config.json` (Add-on 0.2)
+### Optionen und `config.json`
 
 - **Frische Installation:** Eine fehlende `config.json` wird aus der Minimal-Vorlage angelegt und im Add-on-Kontext auf `ehal.backend=ha` / `adapter_id=earnie-hems` gesetzt. URL und Token bleiben leer; zur Laufzeit übernimmt der Supervisor-Proxy.
 - **Jeder Start:** `streamlit_port` und `ehal_loxone_http_port` aus `/data/options.json` werden in die genannten `config.json`-Keys geschrieben. Eine bestehende Backend-Wahl (z. B. bewusst Loxone) bleibt unverändert.
@@ -68,7 +68,7 @@ Zugangsdaten für Loxone und HA gehören **nicht** in die Supervisor-Optionen. S
 
 Das Manifest setzt `homeassistant_api: true`. Dadurch stellt der Supervisor `SUPERVISOR_TOKEN` bereit und erlaubt den Zugriff auf die Core-API unter `http://supervisor/core`. Die Suche auf der Seite Smarthome-Backend findet diesen lokalen Core ohne mDNS. Für `ehal.backend=ha` reicht die URL `http://supervisor/core`; ein manuelles Long-Lived Access Token ist nicht nötig. Bei leerem Token nutzt Earnie zur Laufzeit `SUPERVISOR_TOKEN`.
 
-### Ingress (Add-on 0.2)
+### Ingress
 
 Mit `ingress: true` / `ingress_port: 8501` ist die UI in die HA-Oberfläche eingebettet. Im Add-on lauscht **nginx** auf Port `8501` und leitet an Streamlit auf dem internen Port `8502` weiter. Dabei stellt nginx den Ingress-Pfad (`ingress_entry`), den HA abschneidet, wieder voran; Streamlit startet mit `server.baseUrlPath`. Ohne diesen Proxy liefert Streamlit unter Ingress und unter `http://<host>:8501/` nur „Not found“.
 
@@ -95,9 +95,9 @@ Erreichbar sind die Ordner z. B. über das Add-on **Samba** oder **SSH & Web Ter
 |---|---|
 | Ingress | Primäre Earnie-Web-UI in der HA-Seitenleiste / OPEN WEB UI |
 | `8501/tcp` | Optionaler Direktzugriff (Streamlit) |
-| `8541/tcp` | EHAL Loxone-HTTP (Request-Optimize, Telemetry/Heartbeat, Pattern-B-Status), nur bei `ehal.backend=loxone` relevant |
+| `8541/tcp` | EHAL Loxone-HTTP (Request-Optimize, Telemetry/Heartbeat, Pattern-B-Status). Relevant bei `ehal.backend=loxone` sowie bei Home Assistant mit `ehal.ha.transport=weg_b`; bei `pull` nicht nötig |
 
-Gesamtübersicht der Ports: [`docs/referenz/streamlit-ports.md`](../referenz/streamlit-ports.md).
+Gesamtübersicht der Ports: [`docs/dev/streamlit-ports.md`](../dev/streamlit-ports.md).
 
 ## Add-on-Update vs. Image-Update
 
@@ -125,29 +125,10 @@ Nach dem Update kann Earnie den **Migrations-Assistenten** zeigen (Form des Conf
 
 Unterschied zum LoxBerry-Plugin: Dort wird der Kanal in der Plugin-UI gewählt (`:latest` / `:next` / fest). Beim HA-Add-on bestimmt das installierte Add-on den Kanal.
 
-## Einschränkungen (Feature-Stufe 0.2)
-
-Die Add-on-`version:` folgt der Earnie-App (Kanal `earnie` / `earnie_prerelease` im Add-on-Repository). „0.2“ bezeichnet hier den ausgelieferten Umfang von Optionen und Ingress, nicht die SemVer-Nummer.
+## Einschränkungen
 
 - Die Add-on-Optionen decken nur die gängigsten Werte ab. Die vollständige Konfiguration von Haus und Entities erfolgt weiterhin in der App oder dateibasiert.
 - Es gibt kein MQTT Discovery, keine nativen HA-Entitäten und keine Integration ins Energy-Dashboard. Diese sind für Add-on **1.0** in einer späteren Version geplant und nicht Teil der aktuellen 2.7-Linie.
-
-## Testumgebung
-
-Für Entwickler:innen: [`homeassistant-addon-testumgebung.md`](homeassistant-addon-testumgebung.md) beschreibt den Aufbau einer Testumgebung mit echtem Supervisor (M3-Persistenz-Nachweis).
-
-### Dogfood-Checkliste (Ingress / Options 0.2)
-
-Auf der HAOS-in-VM-Instanz (Synology):
-
-1. Add-on ab **`2.5.3`** (oder neuer) mit Ingress starten. Earnie erscheint in der Seitenleiste bzw. unter OPEN WEB UI **ohne** `:8501` oder IP-Lookup. Direkt nach dem Start erscheint die Hinweis-Seite „Earnie startet noch“ oder kurz ein 502; nach ca. 30 s ist die UI erreichbar.
-2. Charts und Navigation laden (kein „Not found“, kein leeres Blatt, keine massenhaften 404-Fehler unter `/static` oder `_stcore`).
-3. Optional: `http://<ha-ip>:8501` direkt (nginx) öffnet dieselbe UI.
-4. Frische Daten: Smarthome-Backend zielt auf HA; die Authentifizierung über den Supervisor-Proxy funktioniert.
-5. Neustart: `/config` (addon_config), `/data/earnie_env/runtime` sowie die gemergte bzw. neu angelegte `config.json` bleiben erhalten.
-6. Optional: HA-Backup des Add-ons → Restore. `addon_config` muss `config.json` wiederherstellen (manueller Gate für Sprint 2).
-
-> **Hinweis:** `2.5.3-alpha.4` setzte nur den Streamlit-`baseUrlPath`, ohne dass nginx den Pfad wieder voranstellte. Dadurch meldeten Ingress und Host`:8501` „Not found“.
 
 ## Deinstallation
 

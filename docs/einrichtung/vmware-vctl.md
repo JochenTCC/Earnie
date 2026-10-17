@@ -5,7 +5,7 @@ Earnie läuft auf einem **Windows-PC** mit **VMware Workstation Pro** (oder Play
 Image und Persistenz sind dieselben wie bei Synology und Proxmox: `ghcr.io/jochentcc/earnie-energy:latest`, die Ordner `earnie_env/config/` und `earnie_env/runtime/`, UI-Port **8501**.
 
 **Hilfsskript:** [`scripts/run_earnie_vctl.ps1`](../../scripts/run_earnie_vctl.ps1)  
-**Ports:** [streamlit-ports.md](../referenz/streamlit-ports.md)  
+**Ports:** [streamlit-ports.md](../dev/streamlit-ports.md)  
 **Allgemeiner Container-Betrieb:** [container.md](container.md)  
 **Hintergrund (VMware):** [vctl-Dokumentation (Broadcom)](https://techdocs.broadcom.com/us/en/vmware-cis/desktop-hypervisors/workstation-pro/17-0/using-vmware-workstation-pro/using-vctl-command-to-manage-containers-and-run-kubernetes-cluster/using-the-vctl-utility.html)
 

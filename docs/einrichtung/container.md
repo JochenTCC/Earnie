@@ -1,6 +1,6 @@
 # Container-Betrieb (Synology / LoxBerry / Proxmox / Docker)
 
-**Streamlit-Ports aller Stacks:** [streamlit-ports.md](../referenz/streamlit-ports.md)
+**Streamlit-Ports aller Stacks:** [streamlit-ports.md](../dev/streamlit-ports.md)
 
 **Proxmox VE (LXC + Docker Compose):** [proxmox-lxc.md](proxmox-lxc.md)
 
@@ -118,7 +118,7 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Vorabversionen (Community-Test):** Ein Tag `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) durchläuft denselben Ablauf. Zuerst entsteht der Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release**, jedoch **kein** `:latest`.
 
-Zum Testen entweder `:next` verwenden (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.6.1-beta.1`). Die produktiven Compose-Dateien (`*_productive.yml`) mit `:latest` bleiben auf der letzten offiziellen Version.
+Zum Testen entweder `:next` verwenden (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.6.1-beta.1`). Der Pin wird erst mit der nächsten Vorabversion aktualisiert und kann daher älter sein als die letzte offizielle Version. Die produktiven Compose-Dateien (`*_productive.yml`) mit `:latest` bleiben auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
@@ -134,7 +134,7 @@ docker compose --project-directory . -f docker/compose/synology-alpha.yml pull
 docker compose --project-directory . -f docker/compose/synology-alpha.yml up -d
 ```
 
-UI: `http://<host>:8511`. Ports: [streamlit-ports.md](../referenz/streamlit-ports.md).
+UI: `http://<host>:8511`. Ports: [streamlit-ports.md](../dev/streamlit-ports.md).
 
 > **Hinweis:** Zwei Optimierer-Dienste dürfen nicht gleichzeitig mit Schreibzugriff auf denselben Miniserver laufen, außer mit Silent-Mode oder nach Absprache.
 

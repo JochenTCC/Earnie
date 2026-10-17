@@ -20,4 +20,8 @@ Arbeitsnotizen, Entwürfe und abgeschlossene Epics liegen unter [`docs/dev/`](..
 
 ## Entwickler-Betrieb
 
+- [Greenfield Dev-Stack](../einrichtung/greenfield-dev-stack.md) – lokale Ersteinrichtung für Hauskonfigurator und Backtesting.
+- [OpenEMS-Lab](../einrichtung/openems-lab.md) – Earnie mit OpenEMS Edge/UI; der Kommunikationscheck steht in der Spezifikation.
+- [HA ↔ Loxone Bridge-Generator](../dev/done/ha-loxone-bridge.md) – Prototyp (POC): erzeugt die Brücke für die Delta 3 aus einer Mapping-Datei, Loxone → HA per Webhook.
+
 - [Shadow-Betrieb](shadow-betrieb.md) – Prod-Feed-Recorder und Shadow-Client einrichten.

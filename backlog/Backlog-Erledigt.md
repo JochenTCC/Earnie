@@ -2,6 +2,137 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Document Review abbreviations.md language (2026-10-17)
+
+- [x] **`abbreviations.md` language:** decided — the glossary stays fully English (already is); no translation. German TOC link texts "Abkürzungen" in German docs are unchanged.
+
+### Document Review abbreviations.md EHAL-Com row (2026-10-17)
+
+- [x] **`abbreviations.md` EHAL-Com row:** removed the outdated "backend choice" (moved to Smarthome-Backend); row now reads "live read/write, mapping".
+
+### Document Review entwicklung/README.md Shadow status (2026-10-17)
+
+- [x] **`entwicklung/README.md` Shadow status verified:** the line (S1 recorder + S2+S3 client done in 2.7.f, S4 in 2.+1) matches the backlog — 2.7.f is archived as done, "Shadow Mode S4" is open under `### Version 2.+1` in `Backlog.md`. No doc change needed.
+
+### Document Review greenfield-dev-stack.md checklist (2026-10-17)
+
+- [x] **`greenfield-dev-stack.md`** backlog IDs already scrubbed; Live-Pfad checklist renumbered 1–6 (duplicate “3.” fixed) and the stale “detaillierter Paritätstest folgt” note removed (price parity is covered by `tests/test_price_pipeline_p3.py`).
+
+### Document Review proxmox bootstrap.sh paths (2026-10-17)
+
+- [x] **`proxmox` bootstrap.sh** now creates `earnie_env/config` and `earnie_env/runtime` under the Earnie dir, matching the compose volumes; closing hint paths updated.
+
+### Document Review tarife-quellen.md audit date (2026-10-17)
+
+- [x] **`tarife-quellen.md` § 7 audit refreshed:** all audited values (monthly fees, energy markups, VKW formulas) re-checked against `share/config/tariffs.json` (`catalog_as_of` 2026-09-28) and match; heading now states audit date 2026-10-17 and catalog stand. Provider pages were not re-fetched.
+
+### Document Review verbrauchs-csv.md Cursor plan link (2026-10-17)
+
+- [x] **Cursor plan reference removed:** `docs/konfiguration/verbrauchs-csv.md` no longer points to the repo plan `energieflussmonitor_hausprofil_blueprint_a`; the EFM-Auto-Sync spec link remains.
+
+### Document Review waermespeicher-schichtung-teq.md external concept link (2026-10-17)
+
+- [x] **Internal ID / external link removed:** the "Thermals P3" ID was already gone from `docs/konfiguration/waermespeicher-schichtung-teq.md`; the remaining "Konzept: Entwicklungsplan §3.5 im `Earnie-Projekt`-Repo" sentence (unreachable external reference) was dropped.
+
+### Document Review lab docs in TOC / link lists (2026-10-17)
+
+- [x] **Lab docs removed from TOC-style lists:** `docs/README.md` TOC never listed the lab docs (`private-env.md` entry removed); `OpenEMS-Lab` entries removed from the link lists in `docs/einrichtung/smarthome-backend-wahl.md` ("Weiterlesen") and `docs/ui/ehal-com.md` ("See Also"). Inline cross-links to `greenfield-dev-stack.md` / `openems-lab.md` and moving the lab files to `docs/entwicklung/` / `docs/dev/` were not part of this pass.
+
+### Document Review smarthome-backend.md Loxone-Import section (2026-10-17)
+
+- [x] **`docs/ui/smarthome-backend.md` „Loxone-Import“:** heading and button label match the UI (`ui/ehal_greenfield_import.py`); history wording („war früher im Hauskonfigurator … jetzt“) removed so the section states current behaviour only.
+
+### Document Review docs/README.md Scope-A wording (2026-10-17)
+
+- [x] **`docs/README.md` „Scope-A-Plugin“:** internal term removed from the LoxBerry-Plugin TOC line (now "Plugin (Docker-Wrapper) und manuelle Compose-Installation im Vergleich"); no other "Scope-A" occurrences under `docs/`.
+
+### Document Review charts.md developer tests (2026-10-17)
+
+- [x] **`charts.md` developer test paragraphs moved** (Deviation-Test, Flow-Balance-Test) to `docs/dev/charts-dev-tests.md` (English). No changelog wording found in `charts.md`.
+
+### Document Review betriebsmodi.md planned features / internal names (2026-10-17)
+
+- [x] **`betriebsmodi.md` scrubbed:** removed the "planned" statements (calendar-day recalc developer function, new Parameter-Anpassung approach) and the internal function names `build_annual_cost_rows` / `_jahres_kwh_for_row` from the Jahres-Verbrauch heading. The kWh source table (internal keys like `reference_kwh_for_period`, `plausibility[...]`) is left as is.
+
+### Document Review loxberry-plugin.md Go/No-Go table sync (2026-10-17)
+
+- [x] **`loxberry-plugin.md` Go/No-Go table** synced with `container.md`: added the MILP-performance row, aligned the reference sentence, kept the plugin-specific Docker row.
+
+### Document Review loxberry-plugin.md parallel operation (2026-10-17)
+
+- [x] **`loxberry-plugin.md` parallelbetrieb:** Internal section "Parallelbetrieb mit manueller Compose" (container-name clash with `earnie-productive`, host-port workaround) and the link sentence in the port chapter removed from the user doc.
+
+### Document Review docs/README.md TOC developer pages (2026-10-17)
+
+- [x] **`docs/README.md` TOC:** Greenfield Dev-Stack, OpenEMS-Lab and HA ↔ Loxone Bridge-Generator moved from the user Einrichtung list to `docs/entwicklung/README.md` (Entwickler-Betrieb). The pages themselves stay under `docs/einrichtung/`; only the TOC entries moved.
+
+### Document Review betrieb.md developer sections (2026-10-17)
+
+- [x] **`betrieb.md` Cycle-Recorder / Prod-Dump:** developer content moved to `docs/dev/cycle-recorder-and-prod-dump.md` (English). `betrieb.md` keeps only a short Cycle-Recorder note (default on, load profiles stay local, how to disable, retention) because the debug-dump privacy hint links to it; the Prod-Dump fixture section was removed.
+
+### Document Review handbook Silent/Loud status (2026-10-17)
+
+- [x] **Handbuch Silent/Loud:** the EHAL-Com sentence no longer claims a Silent / Loud status; it now says that **Live-Schreiben** shows the last run's result (including a silent run). The switch stays on **Optimierer-Dienst**.
+
+### Document Review handbook first-start nav (2026-10-17)
+
+- [x] **Handbuch first-start nav:** sentence now states that the app opens on **Smarthome-Backend** and that **Optimierer-Dienst** / **EHAL-Com** unlock after connecting (matches `page_smarthome_backend.py`).
+
+### Document Review handbook internal path (2026-10-17)
+
+- [x] **Handbuch → `Entwicklungsplan/Hardware-Registry-Ausstellung.md`:** internal Earnie-Projekt path replaced by a link to `docs/workflow/hardware-registry-layer-c.md` ("Technische Details zum Prüfverfahren").
+
+### Document Review doc aligned to code (2026-10-17)
+
+- [x] **`betrieb.md` `EARNIE_UI_MODES`:** `sunset2sunset` now lists Monitor / Manuelle Geräte, `live_environment` lists Smarthome-Backend, Optimierer-Dienst, EHAL-Com, Analyse (as in `betriebsmodi.md` and `ui/mode_selector.py`).
+- [x] **`container.md` tariff validation command:** no change needed. The command intentionally validates the bundled catalog `share/config/tariffs.json` before `--push`; the productive `earnie_env/config/tariffs.json` is documented separately.
+- [x] **`loxone-anbindung.md` Vorzeichen table:** Merker titles replaced by qualified wire IDs (`grid.meter.sens_grid_power_active`, `ess.{id}.sens_ess_power`); old names marked as optional name catalog.
+- [x] **`preise.md` „Fehlende Zukunftspreise“:** refers to the whole source cascade (ENTSO-E, Energy-Charts, cache, aWATTar) instead of aWATTar alone.
+- [x] **`preise.md` heading:** renamed to „Preise und Marktdaten“; links in `docs/`, handbook and `ui/doc_links.py` updated.
+- [x] **`loxone-signals.md` Flex enable:** note added that `flex.{slug}.set_enable` is the binding key, while the wire check uses `consumer.` / `heatpump.` / `pool.{slug}.set_enable`.
+
+### Document Review envelope schema version (2026-10-17)
+
+- [x] **`envelope.schema.json` `schema_version` const 1 vs wire version 4:** schema set to `const: 4` (title and descriptions updated), matching `ehal.md` and `telemetry.schema.json`. `tests/test_ehal.py` passes.
+
+### Document Review ehal.md PV telemetry required vs optional (2026-10-17)
+
+- [x] **`ehal.md` `sens_pv_production_active` asterisk / entity-scoped fields:** doc aligned to code (schema unchanged). The plant field is always required on the validated telemetry document; only its mapping may be omitted when Live derives it (`with_live_pv_attribution`, fail loud otherwise). `pv.{id}.sens_pv_production_active` is documented as binding/push key only, outside the schema (`additionalProperties: false`).
+
+### Document Review ehal-com.md backlog IDs and cutover tables (2026-10-17)
+
+- [x] **`ehal-com.md` backlog IDs:** no `Q5` / `Q8` / `q.D` left in `docs/ui/`; `backlog_id_baseline` has no entry for the file, nothing to lower.
+- [x] **`ehal-com.md` Write push-only / historical cutover tables:** staged rollout checklist moved to `docs/dev/loxone-write-push-only-cutover.md`; `### Write push-only` kept as a short summary (inbound anchor `#write-push-only` still valid).
+
+### Document Review streamlit-ports.md launch names (2026-10-17)
+
+- [x] **`streamlit-ports.md` VS Code launch names:** local `.vscode/launch.json` aligned to the doc (untracked file): local venv entries now `:8501` (port 8501), NAS entry `NAS` on 8504 (8503 stays free for the OpenEMS lab). Shadow (8531) and chart_debug_review (8502) are `[dev]`: not in the user doc, noted in `DEVELOPER.md` (Shadow Mode section).
+- [x] **`streamlit-ports.md` audience:** moved from `docs/referenz/` to `docs/dev/streamlit-ports.md` (still German, translation pending); all inbound links updated (user docs, READMEs, compose comments, `DEVELOPER.md`).
+
+### Document Review loxone-signals.md language (2026-10-17)
+
+- [x] **`loxone-signals.md` language:** translated to German in place (`docs/referenz/loxone-signals.md`, link targets and anchors unchanged). The English original is kept as developer reference `docs/dev/loxone-signals-en.md`.
+
+### Document Review flexible-verbraucher.md legacy overlay (2026-10-17)
+
+- [x] **`flexible-verbraucher.md` legacy overlay:** "beim Laden abgelehnt bzw. ignoriert" replaced by the actual behaviour: `flexible_consumers[]` is still loaded and merged with the house-profile consumers; on equal `id` the overlay entry wins. Behavior review → `Backlog.md` Version 2.8.
+
+### Document Review speichern-laden.md stamping (2026-10-17)
+
+- [x] **`speichern-laden.md` stamping claims:** "Jede JSON-Datei trägt `earnie_data_model`" replaced by the actual behaviour: manifest + JSON files carry it, `grid_fees.json` is never stamped (export/import); the manifest version decides the import; v3 is migrated automatically with the same chain the wizard uses.
+
+### Document Review betriebsmodi.md dev link (2026-10-17)
+
+- [x] **`betriebsmodi.md` dev-doc link:** dropped the "Spezifikation (Entwicklerdokument)" link to `docs/dev/done/ui-sunset2sunset.md` from the user doc.
+
+### Document Review internal jargon in user docs (2026-10-17)
+
+- [x] **Internal jargon in user docs:** `S-2-Modus`, `(v0.8.1)`, `Pool C.6`, `design-C1` — only `loxone-signals.md` still contained any (`design-C1`, `§C.6` x2); scrubbed there. `betriebsmodi.md`, `charts.md`, `flexible-verbraucher.md` were already clean (remaining `S-2-Modus` hits are in `docs/spec/` and `docs/dev/done/`, not user docs).
+
+### Document Review betriebsmodi.md Leistungspreis (2026-10-17)
+
+- [x] **`betriebsmodi.md` — Leistungspreis:** doc claimed "Leistungspreis und netzgebietsspezifische Tabellen fehlen". Reworded: the Netznutzung Arbeitspreis is taken per Netzgebiet from `grid_fees.json`; only the Leistungspreis is not yet considered.
+
 ### Bugfix — Preisprognose EU-Features Spiegelung (2026-10-17)
 
 - [x] **Preisprognose: EU-Features → Spiegelung (NAS)** — **Verified** (2026-10-17)
@@ -9,6 +140,27 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Cause: all-or-nothing Energy-Charts load — one flaky country (e.g. Italy timeout under `GLOBAL_TIMEOUT=5`) aborted the whole EU power day → mirror for green slots.
   - Fix: soft-skip failed countries and sum the rest; Energy-Charts HTTP timeout floor 30s; warning includes exception text. Mirror only if every country fails.
   - Tests: `tests/test_eu_market_features.py` (`test_fetch_eu_power_hourly_skips_failed_country`, `test_fetch_eu_power_hourly_raises_when_all_countries_fail`, `test_energy_charts_timeout_floors_at_30`).
+
+### Document Review smarthome-backend-wahl.md HA snippet (2026-10-17)
+
+- [x] **`smarthome-backend-wahl.md` — HA snippet:** doc said the snippet contains only `ehal.backend` and `sign`. Extended to list `adapter_id`, `ha.transport` (link to `ha-evcc.md`), `ha.sign` and `ha.boolean_invert`.
+
+### Document Review ha-evcc.md optional map fields (2026-10-17)
+
+- [x] **`ha-evcc.md` — optional map fields:** doc claimed outdoor temperature, EV-SoC/connected and Flex-/Pool fields could be stored in the UI but did not run in the HA live path. Reworded: these fields are not part of `HA_MAP_FIELDS`, the mapping assistant does not offer them, and they are currently unavailable with the Home Assistant backend (live reads go through the Loxone push inbox).
+
+### Document Review container.md alpha compose pin (2026-10-17)
+
+- [x] **`container.md` — alpha compose pin `2.6.1-beta.1`:** doc now states the pin is only updated with the next pre-release and may be older than the latest official release (`v2.6.2`). Compose pins stay unchanged until the next approved pre-release bump (release process, `version.py` needs approval).
+
+### Document Review homeassistant-addon.md port 8541 (2026-10-17)
+
+- [x] **`homeassistant-addon.md` — port 8541 scope:** Ports table now states the port is relevant for `ehal.backend=loxone` and for Home Assistant with `ehal.ha.transport=weg_b` (same HTTP contract), not needed for `pull`. Add-on `config.yaml` port descriptions (`earnie`, `earnie_prerelease`) aligned ("bei Loxone-Backend oder HA-Transport weg_b").
+
+### Document Review homeassistant-addon.md internal vocabulary (2026-10-17)
+
+- [x] **`homeassistant-addon.md` — internal planning vocabulary:** headings reworded for users ("Add-on 0.2" / "Feature-Stufe 0.2" removed, "M3-Persistenz-Nachweis" and "Sprint 2" dropped); Dogfood checklist (HAOS-in-VM) moved to `docs/dev/homeassistant-addon-dogfood.md`.
+- [x] **`homeassistant-addon.md` — image name:** intro now names the add-on image `ghcr.io/jochentcc/earnie-addon-{arch}` and states it builds on `earnie-energy`.
 
 ### Document Review P1 DE Check fact fixes (2026-10-17)
 
@@ -1603,7 +1755,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Home Assistant Supervisor Add-on MVP 0.1 — M3 persistence proof (2026-08-18)
 
-- [x] M3 on a real Supervisor: add-on restart, add-on update, and Supervisor backup-restore keep `config.json`, sidecars, and `runtime/` (Entwicklungsplan MVP 0.1). Walkthrough: [`docs/einrichtung/homeassistant-addon-testumgebung.md`](../docs/einrichtung/homeassistant-addon-testumgebung.md) (WSL2 Supervised and Pi 4 HA OS). M1/M2/M4/M5 already archived 2026-08-17.
+- [x] M3 on a real Supervisor: add-on restart, add-on update, and Supervisor backup-restore keep `config.json`, sidecars, and `runtime/` (Entwicklungsplan MVP 0.1). Walkthrough: [`docs/einrichtung/homeassistant-addon-testumgebung.md`](../docs/dev/homeassistant-addon-testumgebung.md) (WSL2 Supervised and Pi 4 HA OS). M1/M2/M4/M5 already archived 2026-08-17.
 
 ### SB / HK follow-ups (2026-08-18)
 

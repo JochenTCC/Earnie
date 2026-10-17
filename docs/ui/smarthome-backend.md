@@ -53,7 +53,7 @@ Das Speichern der Zugangsdaten setzt `ehal.backend` und schaltet **EHAL-Com** so
 
 ## Loxone-Import
 
-Der Import von Loxone ins Hausprofil war früher im Hauskonfigurator untergebracht. Er läuft jetzt von dieser Seite aus, sobald Loxone verbunden ist. Danach die Verbraucherliste im Hauskonfigurator und das Signal-Mapping auf EHAL-Com prüfen.
+Der Import von Loxone ins Hausprofil läuft von dieser Seite aus, sobald Loxone verbunden ist. Danach die Verbraucherliste im Hauskonfigurator und das Signal-Mapping auf EHAL-Com prüfen.
 
 ## Siehe auch
 

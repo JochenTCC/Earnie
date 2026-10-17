@@ -1,6 +1,6 @@
 # Flexible Verbraucher
 
-Ab Version **2.0** liegen steuerbare Verbraucher (SwimSpa, E-Auto, Wärmepumpe, Filter, Generics) primär im **Hausprofil** (`earnie_env/config/house_profiles.json`). Live-Parameter und Bindings stehen dort je Verbraucher unter `consumers[].ehal_bindings`. Der Block `flexible_consumers[]` in `config.json` ist **Legacy** (meist leer) und wird beim Laden abgelehnt bzw. ignoriert.
+Ab Version **2.0** liegen steuerbare Verbraucher (SwimSpa, E-Auto, Wärmepumpe, Filter, Generics) primär im **Hausprofil** (`earnie_env/config/house_profiles.json`). Live-Parameter und Bindings stehen dort je Verbraucher unter `consumers[].ehal_bindings`. Der Block `flexible_consumers[]` in `config.json` ist **Legacy** (meist leer). Er wird weiterhin geladen und mit den Verbrauchern aus dem Hausprofil zusammengeführt; bei gleicher `id` hat der Eintrag in `flexible_consumers[]` Vorrang vor dem Hausprofil. Neue Verbraucher werden im Hausprofil angelegt.
 
 Die Optimierung legt fest, **wann** die Verbraucher laufen. Ob die Anlage technisch laufen kann, entscheidet sie nicht. Die Freigabe an das Smarthome ist ein 0/1-Signal (E-Auto: Leistungs-Sollwert + PV-Follow). Die Feldnamen unten gelten für die aufgelöste Flex-Struktur im Hausprofil.
 

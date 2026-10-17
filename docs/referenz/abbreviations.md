@@ -14,7 +14,7 @@ New entries come from terms used in the main user docs (handbook, UI docs).
 | **DSGVO** | GDPR – General Data Protection Regulation (EU) |
 | **EFM** | Energieflussmonitor (Loxone) – Energy Flow Monitor: meter and power statistics for import and mapping |
 | **EHAL** | Earnie Hardware Access Layer – unified interface between the optimizer and the smarthome backend |
-| **EHAL-Com** | Streamlit page **EHAL-Com** (live read/write, mapping, backend choice) |
+| **EHAL-Com** | Streamlit page **EHAL-Com** (live read/write, mapping) |
 | **EPEX** | European Power Exchange – day-ahead market prices (the basis for many spot tariffs) |
 | **ESS** | Energy Storage System – battery storage (power, SoC, mode) |
 | **EV** | Electric Vehicle |

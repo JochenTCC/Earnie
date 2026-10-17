@@ -145,7 +145,8 @@ Run a development build in parallel to Prod on the same live inputs without touc
 - Shared-config exception: EHAL-Com mapping may write `{runtime}/shadow_ehal_bindings.json` (merged on house-profile load); Prod config files stay untouched.
 - Prod must run with `"shadow_feed_enabled": true` in its `local_settings.json`.
 - Optional seed: `python -m scripts.shadow_seed_runtime --from <prod-runtime> --to <shadow-runtime>`.
-- Same-host UI port: `EARNIE_UI_STREAMLIT_PORT` (existing override).
+- Same-host UI port: `EARNIE_UI_STREAMLIT_PORT` (existing override). The local VS Code launch entries "Streamlit app.py (:8531 Shadow …)" use 8531 so they can run next to the 8501 local run.
+- Debug review of a chart-debug dump: local launch entry "Streamlit app.py (chart_debug_review :8502)" uses 8502 (collides with the Greenfield Docker stack, [`docs/dev/streamlit-ports.md`](docs/dev/streamlit-ports.md)).
 - Package trees must never set `EARNIE_SHADOW` (release gate in `release-publish.yml`).
 
 ### Shadow gates (which helper to call)

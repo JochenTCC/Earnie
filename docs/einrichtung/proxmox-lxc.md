@@ -5,7 +5,7 @@ Diese Anleitung beschreibt den Betrieb von Earnie auf einem **Proxmox VE**-Host 
 **Compose (Produktivbetrieb):** [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml)  
 **Compose (Alpha, Port 8511):** [`docker/compose/proxmox-alpha.yml`](../../docker/compose/proxmox-alpha.yml)  
 **LXC-Hilfen:** [`docker/proxmox/`](../../docker/proxmox/)  
-**Ports:** [streamlit-ports.md](../referenz/streamlit-ports.md)  
+**Ports:** [streamlit-ports.md](../dev/streamlit-ports.md)  
 **Allgemeiner Container-Betrieb:** [container.md](container.md)
 
 ## Voraussetzungen
@@ -118,4 +118,4 @@ Im Hausnetz ist die Oberfläche über Port **8501** erreichbar. Von außen nur �
 
 - [Container](container.md): Image-Build, Bootstrap, Config-Drift
 - [Betrieb](betrieb.md): Worker und Streamlit-Oberfläche
-- [Streamlit-Ports](../referenz/streamlit-ports.md)
+- [Streamlit-Ports](../dev/streamlit-ports.md)
