@@ -5,7 +5,7 @@ Usage:
   python -m scripts.release_notes_finalize --version <version> --check   # CI gate
 
 ``--approved`` may only be passed after the maintainer explicitly approved the draft
-for this version in chat (rule release-notes.mdc). Spec: docs/spec/release-notes-workflow.md
+for this version in chat (rule release-notes.mdc). Spec: docs/workflow/release-notes-workflow.md
 """
 from __future__ import annotations
 

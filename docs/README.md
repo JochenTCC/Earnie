@@ -20,7 +20,7 @@ Zum Ausprobieren des Szenario-Explorers ohne Installation:
    python -m scripts.verify_loxone_setup
   ```
 5. **Produktivbetrieb:** Docker-Container starten (UI + `main.py` Auto-Start) oder lokal `python main.py` / UI **Optimierer-Dienst**. HAOS: [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md).
-6. **Monitor öffnen:** `python -m scripts.run_streamlit` (Port: `ui.streamlit_port` / `EARNIE_UI_STREAMLIT_PORT`; lokal venv typisch **8531**, siehe [Streamlit-Ports](referenz/streamlit-ports.md))
+6. **Monitor öffnen:** `python -m scripts.run_streamlit` (Port: `ui.streamlit_port` / `EARNIE_UI_STREAMLIT_PORT`; lokal venv typisch **8501**, siehe [Streamlit-Ports](referenz/streamlit-ports.md))
 
 Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `config.json` `"$schema": "./config.schema.json"` gesetzt ist.
 

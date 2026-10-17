@@ -1,4 +1,4 @@
-"""Earnie-Points calculation (docs/spec/earnie-points.md)."""
+"""Earnie-Points calculation (docs/workflow/earnie-points.md)."""
 from __future__ import annotations
 
 import pytest

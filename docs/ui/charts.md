@@ -89,7 +89,7 @@ Vertikale Marker **SA₀**, **SA₁**, **SA₂**; **Jetzt**, sobald die aktuelle
 
 Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Regeltext. Mehrere Icons pro Slot möglich (verschiedene Scopes, z. B. Batterie + E-Auto).
 
-**Regelwerk:** `config/deviation_rules.json` (Schema: `deviation_rules.schema.json`). Pflegehinweis: [Spec Soll-Ist §5.3](../spec/soll-ist-abweichung.md).
+**Regelwerk:** `config/deviation_rules.json` (Schema: `deviation_rules.schema.json`). Pflegehinweis: [Spec Soll-Ist §5.3](../dev/done/soll-ist-abweichung.md).
 
 **Aktive Regeln (Stand Epic-Abschluss):**
 

@@ -1,7 +1,7 @@
 """Compare SE calc runs: actual cons_data vs Live-ref vs optimized.
 
-Writes docs/spec/se-calc-test-results.json and updates the results appendix
-in docs/spec/se-calculation-test-plan.md.
+Writes docs/dev/done/se-calc-test-results.json and updates the results appendix
+in docs/dev/done/se-calculation-test-plan.md.
 
 Example:
   python -m scripts.se_calc_test_compare

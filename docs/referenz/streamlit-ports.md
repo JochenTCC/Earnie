@@ -8,12 +8,11 @@ Konfiguration im Container/venv: `config.json` → `ui.streamlit_port` oder `EAR
 
 | Port | Stack / Betrieb | Plattform | Daemon (`main.py`) | UI-Zugriff | Compose / Start |
 |------|-----------------|-----------|--------------------|------------|-----------------|
-| **8501** | **Produktion** | Synology NAS, LoxBerry, Proxmox LXC, Home Assistant (Add-on), Windows-PC (**VMware `vctl`**) | im Container `earnie-productive` (Auto-Start) | LAN: `http://<host>:8501`; lokal `vctl`: `http://localhost:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501; **HA-Add-on:** primär per **Ingress** (Seitenleiste / OPEN WEB UI), Host-Port `8501` nur optional | `docker/compose/synology_productive.yml`, `loxberry_productive.yml`, `proxmox_productive.yml`; LoxBerry auch via [Plugin](../einrichtung/loxberry-plugin.md) (Host-Port dort in der Admin-UI bzw. `plugin.env` `STREAMLIT_PORT` änderbar; Container intern bleibt 8501); Home Assistant via [Add-on](../einrichtung/homeassistant-addon.md) (Ingress-first; `streamlit_port`-Option; Container intern bleibt 8501); PC/`vctl`: [vmware-vctl.md](../einrichtung/vmware-vctl.md), `scripts/run_earnie_vctl.ps1` |
+| **8501** | **Produktion** | Synology NAS, LoxBerry, Proxmox LXC, Home Assistant (Add-on), Windows-PC (**VMware `vctl`**), **lokal ohne Docker (venv)** | im Container `earnie-productive` (Auto-Start) bzw. lokal `python main.py` / UI **Optimierer-Dienst** | LAN: `http://<host>:8501`; lokal `vctl`/venv: `http://localhost:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501; **HA-Add-on:** primär per **Ingress** (Seitenleiste / OPEN WEB UI), Host-Port `8501` nur optional (nginx auf 8501 reicht an Streamlit intern **8502** weiter) | `docker/compose/synology_productive.yml`, `loxberry_productive.yml`, `proxmox_productive.yml`; LoxBerry auch via [Plugin](../einrichtung/loxberry-plugin.md) (Host-Port in der Admin-UI bzw. `plugin.env` `STREAMLIT_PORT`); Home Assistant via [Add-on](../einrichtung/homeassistant-addon.md); lokal: `python -m scripts.run_streamlit`, VS Code „Streamlit app.py (:8501 lokal)“ (`EARNIE_UI_STREAMLIT_PORT=8501`); PC/`vctl`: [vmware-vctl.md](../einrichtung/vmware-vctl.md) |
 | **8541** | **Produktion — EHAL Loxone request HTTP** | Synology NAS, LoxBerry, Proxmox LXC, Home Assistant (Add-on) | Daemon im selben Container (`Earnie_Request_Optimize` / Telemetry inkl. Heartbeat / entity-scoped `GET /ehal/loxone/status.json`) | LAN: `http://<host>:8541` (nicht Streamlit) | Compose: `8541:8541` neben Streamlit; auch LoxBerry-Plugin [`packaging/loxberry/data/docker/docker-compose.yml`](../../packaging/loxberry/data/docker/docker-compose.yml) und HA-Add-on [`packaging/homeassistant-addon/earnie/config.yaml`](../../packaging/homeassistant-addon/earnie/config.yaml); Config `system.ehal_loxone_http_port` (Default 8541); VI `VI_Earnie_*.xml`, VO `VO_Earnie_Status.xml` |
 | **8511** | **Alpha** | Synology NAS, LoxBerry, Proxmox LXC | im Container `earnie-alpha` (Auto-Start) | LAN: `http://<host>:8511` | `docker/compose/synology-alpha.yml`, `loxberry-alpha.yml`, `proxmox-alpha.yml` (Volumes: `earnie_env_alpha/`) |
 | **8551** | **Alpha — EHAL Loxone request HTTP** | Synology NAS, LoxBerry, Proxmox LXC | Daemon im Alpha-Container | LAN: `http://<host>:8551` → Container **8541** | Alpha-Compose: `8551:8541` |
 | **8521** | **Lokaler Dev-Stack (Docker)** | Windows/Linux Dev-PC | im Container `earnie` (Auto-Start) | `http://localhost:8521` | `docker/compose/dev.yml` (`8521:8501`) |
-| **8531** | **Lokal ohne Docker (venv)** | Dev-PC (venv) | `python main.py` (lokal) oder UI **Optimierer-Dienst** | `http://localhost:8531` (`EARNIE_UI_STREAMLIT_PORT`; Schema-Default im Container bleibt 8501) | `python -m scripts.run_streamlit`, VS Code „Streamlit app.py (:8531 lokal)“ |
 | **8502** | **Greenfield (Docker)** | Dev-PC (Docker) | im Container `earnie-greenfield` (Auto-Start) | `http://localhost:8502` | `docker/compose/greenfield.yml` (`8502:8501`) |
 | **8542** | **Greenfield — EHAL Loxone request HTTP** | Dev-PC (Docker) | Daemon im Greenfield-Container | `http://localhost:8542` → Container **8541** | `greenfield.yml` (`8542:8541`); VO-Address auf Dev ggf. `:8542` |
 | **8532** | **Greenfield (venv)** | Dev-PC (venv) | `python main.py` mit `greenfield/config` | `http://localhost:8532` | VS Code „Streamlit app.py (Greenfield :8532)“ |
@@ -26,13 +25,13 @@ Konfiguration im Container/venv: `config.json` → `ui.streamlit_port` oder `EAR
 Typisch gleichzeitig möglich:
 
 - NAS-Produktion unter `http://<nas-ip>:8501` und optional Alpha unter `http://<nas-ip>:8511` (remote; getrennte Volumes)
-- Lokaler Dev-Stack Docker unter `http://localhost:8521` und/oder venv unter `http://localhost:8531`
+- Lokaler Dev-Stack Docker unter `http://localhost:8521` und/oder venv unter `http://localhost:8501`
 - Greenfield unter `http://localhost:8502` (Docker) oder `http://localhost:8532` (venv)
 - OpenEMS-Lab unter `http://localhost:8503` (Docker; Earnie + OpenEMS)
 - HA + evcc Lab unter `http://localhost:8506` (Docker; Earnie + Home Assistant + evcc)
 - Optional: lokales Cockpit gegen NAS-Log unter `http://localhost:8504` (nur UI lokal, Daemon bleibt auf der NAS)
 
-**Nicht** parallel starten: zwei Prozesse auf dem **selben** Host-Port (z. B. zwei venv-Streamlit-Instanzen beide auf 8531).
+**Nicht** parallel starten: zwei Prozesse auf dem **selben** Host-Port (z. B. zwei venv-Streamlit-Instanzen beide auf 8501, oder Dev-Docker 8521 und eine zweite Instanz auf demselben Port).
 
 ## Umgebungsvariable
 
@@ -40,16 +39,7 @@ Typisch gleichzeitig möglich:
 EARNIE_UI_STREAMLIT_PORT=8503
 ```
 
-Überschreibt `ui.streamlit_port` aus `config.json` (siehe `ui/streamlit_server.py`).
-
-## Geplant (Backlog 7g)
-
-| Port | Stack | Status |
-|------|-------|--------|
-| **8504** (Vorschlag) | Silent-Stack (Prod-Loxone lesen) | noch offen |
-| **8505** (Vorschlag) | Simuliert-Stack | noch offen |
-
-Konkrete Ports für 7g werden beim Umsetzen hier ergänzt.
+Überschreibt `ui.streamlit_port` aus `config.json` (siehe `ui/streamlit_server.py`). Schema-Default ist **8501**.
 
 ## Siehe auch
 

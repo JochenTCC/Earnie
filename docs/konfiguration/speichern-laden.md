@@ -30,11 +30,9 @@ Enthaltene Dateien:
 
 **Nicht** enthalten: `config/.env` (Loxone- und HA-Zugangsdaten bleiben lokal).
 
-Jedes JSON trägt das Feld `earnie_data_model` (aktuell `3`; Import akzeptiert weiterhin `1` und `2` und stuft beim Laden/Schreiben auf `3` hoch). Beim Import prüft Earnie die Kompatibilität; unbekannte Versionen werden abgelehnt.
+Jedes JSON trägt das Feld `earnie_data_model` (aktuell `4`). Beim Import akzeptiert Earnie Packs mit Version `4` unverändert; Version `3` wird über den [Migrations-Assistenten](../einrichtung/betrieb.md#update-und-migration) auf `4` angehoben. Ältere oder fehlende Versionen (`1`, `2`, fehlendes Feld) werden abgelehnt — Earnie stempelt sie nicht still um.
 
-**Datenmodell v2:** Die gemeinsamen Referenzkurven (`oemag_monthly_feed_in_rates`, `monthly_float_reference_cent_kwh`, `econtrol_referenzmarktwert_pv_monthly`) liegen in `tariffs.json` (nicht mehr in `backtesting_scenarios.json`). Monatskonstante Einspeisetarife nutzen Typ `monthly_table` mit eigenen `monthly_rates`. Beim Start migriert Bootstrap die Shared-Keys und setzt `earnie_data_model` auf allen Pack-/Template-JSONs auf die aktuelle Version.
-
-**Datenmodell v3:** In `config.json` heißt der frühere Block `file_paths_battery_simulation` jetzt `scenario_explorer_conf`. Ein automatischer Rename-Helper (v2→v3) ist noch ausstehend — bis dahin lehnt Earnie den alten Schlüssel ab.
+**Frühere Schritte (Hintergrund):** Gemeinsame Referenzkurven (`oemag_monthly_feed_in_rates`, `monthly_float_reference_cent_kwh`, `econtrol_referenzmarktwert_pv_monthly`) liegen in `tariffs.json`. Monatskonstante Einspeisetarife nutzen Typ `monthly_table` mit eigenen `monthly_rates`. In `config.json` heißt der frühere Block `file_paths_battery_simulation` jetzt `scenario_explorer_conf`; den alten Schlüssel lehnt Earnie ab.
 
 ## Migration von `./config` + `./runtime`
 

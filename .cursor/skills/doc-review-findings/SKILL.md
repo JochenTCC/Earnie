@@ -11,7 +11,7 @@ description: >-
 # Document Review Findings
 
 Source chapter: `## Document Review Findings` in [`backlog/Backlog-Bugfixes.md`](backlog/Backlog-Bugfixes.md).  
-Checklist context (optional): [`backlog/Doc-Review-Checklist.md`](backlog/Doc-Review-Checklist.md).
+Checklist context (optional): the temporary `docs/dev/doc-review-checklist.md` of the running quality gate (see skill `quality-gate`, step 5).
 
 Unlike code bugfixes, these items **skip** `## Bugfix Verifications Pending` — after the doc change is done, move straight to [`backlog/Backlog-Erledigt.md`](backlog/Backlog-Erledigt.md).
 

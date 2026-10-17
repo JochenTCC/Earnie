@@ -16,7 +16,8 @@ def _user_doc_files(cfg: dict) -> list[Path]:
             files.append(path)
         elif path.is_dir():
             files.extend(sorted(path.rglob("*.md")))
-    return files
+    excluded = {_ROOT / rel for rel in cfg.get("user_doc_exclude", [])}
+    return [f for f in files if f not in excluded]
 
 
 def test_user_docs_do_not_mention_dev_terms_beyond_baseline():
@@ -30,7 +31,7 @@ def test_user_docs_do_not_mention_dev_terms_beyond_baseline():
         hits = sorted(t for t in terms if t in text)
         if hits and rel not in allow:
             offenders[rel] = hits
-    assert not offenders, f"[dev] terms in user docs (move to docs/entwicklung/ or docs/spec/): {offenders}"
+    assert not offenders, f"[dev] terms in user docs (move to docs/entwicklung/ or docs/dev/): {offenders}"
 
 
 def test_allowlist_only_contains_files_that_still_violate():

@@ -14,7 +14,7 @@ Every Earnie git tag triggers [`.github/workflows/release-publish.yml`](../../.g
 4. Job **`publish_ha_addon`** (after approval only): bump add-on trees (`auto` channel), lint, commit Earnie `main`, mirror to **`ha-addon-earnie` `main`** — from this moment HA offers the update.
    - Official → `earnie/` + `earnie_prerelease/`
    - Pre-release → `earnie_prerelease/` only
-   - **CHANGELOG / Änderungsprotokoll:** `bump_ha_addon` inserts a section whose first bullet is the first non-heading prose line of `.github/release-notes/v<version>.md`. Before tagging, rewrite that line for HA users (German, no release-ops jargon) — see [release-checklist.md](../../docs/spec/release-checklist.md) §1.
+   - **CHANGELOG / Änderungsprotokoll:** `bump_ha_addon` inserts a section whose first bullet is the first non-heading prose line of `.github/release-notes/v<version>.md`. Before tagging, rewrite that line for HA users (German, no release-ops jargon) — see [release-checklist.md](../../docs/workflow/release-checklist.md) §1.
 
 **No GitHub Release/tag is needed in `ha-addon-earnie`.** The Supervisor reads the tracked branch and detects updates from `config.yaml` `version:`.
 
@@ -22,7 +22,7 @@ The tagged commit itself does not contain the new add-on pins — the bot commit
 
 ### Test a release candidate on your own HA (before approving)
 
-While `promote` waits, the candidate images already exist on GHCR but no user is offered them. Install them on your HA as a **local add-on** (visible on this instance only). Full per-release checklist incl. test points: [docs/spec/release-checklist.md](../../docs/spec/release-checklist.md).
+While `promote` waits, the candidate images already exist on GHCR but no user is offered them. Install them on your HA as a **local add-on** (visible on this instance only). Full per-release checklist incl. test points: [docs/workflow/release-checklist.md](../../docs/workflow/release-checklist.md).
 
 1. Copy `earnie_prerelease/` to `/addons/local/earnie_dev/` on the HA host (Samba or SSH add-on; share `addons`).
 2. In the copy's `config.yaml` set `slug: earnie_dev`, `name: "Earnie (Dev)"` and `version: "<candidate version>"`. Keep `image:` — the Supervisor then **pulls** `earnie-addon-{arch}:<version>`, i.e. exactly the artifact users will get (no local build).

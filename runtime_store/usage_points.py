@@ -1,4 +1,4 @@
-"""Earnie-Points of the **live** plant for the usage ping (``docs/spec/earnie-points.md`` §4).
+"""Earnie-Points of the **live** plant for the usage ping (``docs/workflow/earnie-points.md`` §4).
 
 Resolves the live scenario (config.json ``live_scenario_id`` → backtesting_scenarios.json),
 selects its PV systems / house batteries (powerstations are always part of the plant) and its

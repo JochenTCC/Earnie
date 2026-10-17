@@ -1,4 +1,4 @@
-"""Optional consumer keys that feed the Earnie-Points rule (``docs/spec/earnie-points.md``).
+"""Optional consumer keys that feed the Earnie-Points rule (``docs/workflow/earnie-points.md``).
 
 * ``bidirectional`` (bool) — only ``ev`` consumers: wallbox can discharge (V2G), 3 points.
 * ``appliance_kind`` (str) — only ``generic`` / ``thermal_rc`` consumers; currently

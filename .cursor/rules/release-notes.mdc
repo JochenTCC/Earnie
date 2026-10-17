@@ -5,7 +5,7 @@ alwaysApply: false
 
 # Release notes
 
-Spec: [`docs/spec/release-notes-workflow.md`](../../docs/spec/release-notes-workflow.md). Procedure: skill `.cursor/skills/release-notes/SKILL.md`. Applies when the user mentions release notes, changelog, tagging or publishing (`session-abschluss` B/C).
+Spec: [`docs/workflow/release-notes-workflow.md`](../../docs/workflow/release-notes-workflow.md). Procedure: skill `.cursor/skills/release-notes/SKILL.md`. Applies when the user mentions release notes, changelog, tagging or publishing (`session-abschluss` B/C).
 
 ## Rules
 

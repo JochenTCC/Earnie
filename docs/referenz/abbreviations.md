@@ -2,7 +2,7 @@
 
 Short explanations of abbreviations and short forms used in the Earnie documentation and UI. Alphabetical; not exhaustive.
 
-Sources for additions (scan): entries from `backlog/Doc-Review-Checklist.md` (priority-1 user docs).
+Sources for additions (scan): terms used in the priority-1 user docs (handbook, UI docs).
 
 | Abbreviation | Meaning |
 | --------- | ----------- |

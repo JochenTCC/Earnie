@@ -9,7 +9,7 @@
 
 ## 0. Scope and method
 
-- Read the theses paper, the linked documents ([`docs/spec/ehal.md`](../docs/spec/ehal.md), [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md), [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md)) and the code the paper cites, plus the MILP battery-control and live-load paths it depends on.
+- Read the theses paper, the linked documents ([`docs/referenz/ehal.md`](../docs/referenz/ehal.md), [`docs/dev/done/conversion-losses.md`](../docs/dev/done/conversion-losses.md), [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md)) and the code the paper cites, plus the MILP battery-control and live-load paths it depends on.
 - Same evidence tags as the paper: **[code]** = verified in this repository (file:line), **[inference]** = reasoning by the reviewer.
 - **Not re-checked:** vendor and forum sources in §5 of the paper (Victron, Huawei, SMA, VBEW). Counter-examples below are installation *types*, not documented real cases.
 
@@ -135,7 +135,7 @@ T6 is right that foreign generators must be read. [code] Today a mapped plant PV
 **T9 details:**
 
 - `set_grid_export_power_limit` / `get_grid_export_power_limit` do not belong to a meter (a meter cannot limit). They belong to the plant or to the regulating cluster that enforces them. Only the `sens_grid_*` kinds move to the root meter.
-- The sub-meter namespace `meter.<id>.*` contradicts [`ehal.md:44`](../docs/spec/ehal.md) ("more `grid.<Kennung>.*` meters may follow") and the comment at [`qualified_ids.py:30`](../ehal/qualified_ids.py). This can be a deliberate change, but the paper should name it as one.
+- The sub-meter namespace `meter.<id>.*` contradicts [`ehal.md:44`](../docs/referenz/ehal.md) ("more `grid.<Kennung>.*` meters may follow") and the comment at [`qualified_ids.py:30`](../ehal/qualified_ids.py). This can be a deliberate change, but the paper should name it as one.
 - Field kinds would then read `meter.<id>.sens_grid_*`, which is misleading for a sub-meter. The namespace `meter` also clashes visually with the Kennung `meter` in `grid.meter`.
 - Replace the validation "at most one non-`read_only` cluster per meter" with the regulator rule from §4.1.
 - `meters[]` must stay optional: backtesting scenarios share `components.json` and have no meters (Q10).

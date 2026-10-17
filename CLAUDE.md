@@ -30,12 +30,13 @@ Windows PowerShell 5.x: no `&&` / `||` (`.cursor/rules/powershell-shell.mdc`). I
 
 ## Chat language
 
-Reply in **German** in Claude Code chat (the user switches language spontaneously when needed — follow that). `.cursor/rules/english-chat.mdc` applies to Cursor only. Commit messages, backlog and `docs/spec/` stay English as in the rules below.
+Reply in **German** in Claude Code chat (the user switches language spontaneously when needed — follow that). `.cursor/rules/english-chat.mdc` applies to Cursor only. Commit messages, backlog and `docs/dev/` + `docs/workflow/` stay English as in the rules below.
 
 ## Docs language
 
 - User docs (`docs/README.md`, `docs/user-manual/`, `docs/einrichtung/`, `docs/konfiguration/`, `docs/ui/`, `docs/referenz/`) are **German**; update them in the same change when behaviour changes (`german-user-docs.mdc`).
-- `docs/spec/` and backlog: English.
+- `docs/dev/` (development and design docs, incl. `docs/dev/done/`), `docs/workflow/`, `docs/referenz/ehal.md` and backlog: **English**. New development/design docs go to `docs/dev/`; German ones are translated in one pass later.
+- `docs/dev/` (working notes, drafts) and `docs/dev/done/` (finished epics, historical plans): excluded from doc reviews and the quality gate (`.cursor/skills/quality-gate/`).
 
 ## Code changes
 
@@ -44,8 +45,8 @@ Reply in **German** in Claude Code chat (the user switches language spontaneousl
 ## Area notes
 
 - **Streamlit UI state:** `.cursor/rules/streamlit-ui-state.mdc`, skills `streamlit-ui-state`, `streamlit-apptest`.
-- **HouseSim** (`house_sim/`, spec `docs/spec/house-sim.md`): after changing `house_sim/core/` or `house_sim/fixtures/`, run `python -m scripts.sync_house_sim_integration` (UTF-8 env) — the S4 integration copy is generated and checked by `tests/test_house_sim_s4_packaging.py`.
+- **HouseSim** (`house_sim/`, spec `docs/dev/house-sim.md`): after changing `house_sim/core/` or `house_sim/fixtures/`, run `python -m scripts.sync_house_sim_integration` (UTF-8 env) — the S4 integration copy is generated and checked by `tests/test_house_sim_s4_packaging.py`.
 - **HA mapping:** units via `integrations/ha_units.py` (only physically compatible bindings, factor from `unit_of_measurement` at runtime); function completeness via `ehal/functions.py` (a function is unavailable until all its fields are mapped).
 - **EHAL unit conversion:** no hardcoded `*1000` / sign flips in adapters — Loxone via role `loxone` blocks + `ehal/field_registry.py`; HA via `ha_units` only (`.cursor/rules/ehal-unit-conversion.mdc`).
-- **Config migration:** structural pack JSON changes go through `runtime_store/migration/` (wizard `ui/pages/page_config_migration.py`, CLI `python -m scripts.migrate_config`); rule `.cursor/rules/config-migration.mdc`, spec `docs/spec/config-migration.md`; release notes helper `python -m scripts.migration_release_notes --since <tag>`.
+- **Config migration:** structural pack JSON changes go through `runtime_store/migration/` (wizard `ui/pages/page_config_migration.py`, CLI `python -m scripts.migrate_config`); rule `.cursor/rules/config-migration.mdc`, spec `docs/workflow/config-migration.md`; release notes helper `python -m scripts.migration_release_notes --since <tag>`.
 - `.cursorignore`: if something is blocked, ask the user instead of guessing (`cursorignore-access.mdc`).

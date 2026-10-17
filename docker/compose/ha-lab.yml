@@ -19,7 +19,7 @@
 # Stop (volumes retained for HA; host dirs for Earnie/evcc):
 #   docker compose --project-directory . -f docker/compose/ha-lab.yml down
 #
-# Setup: docs/spec/ha-lab-setup.md
+# Setup: docs/dev/ha-lab-setup.md
 # German: docs/einrichtung/ha-evcc.md
 
 version: "3.8"

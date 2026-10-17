@@ -1,7 +1,7 @@
 # Smarthome Backend (SB) page — development plan
 
-**Status:** Drafted 2026-08-18, implemented same day (M1–M6 done). Backlog item: [`backlog/Backlog.md`](../../backlog/Backlog.md) § Version 2.5.0 ("Create 'Smarthome Backend' page (SB)"). See §5 for deviations from the original plan discovered during implementation.
-**Related:** Detection design draft [`backlog/SB-Identification-Draft.md`](../../backlog/SB-Identification-Draft.md); EHAL spec [`docs/spec/ehal.md`](ehal.md); UI mode doc [`docs/ui/betriebsmodi.md`](../ui/betriebsmodi.md).
+**Status:** Drafted 2026-08-18, implemented same day (M1–M6 done). Backlog item: [`backlog/Backlog.md`](../../../backlog/Backlog.md) § Version 2.5.0 ("Create 'Smarthome Backend' page (SB)"). See §5 for deviations from the original plan discovered during implementation.
+**Related:** Detection design draft [`backlog/SB-Identification-Draft.md`](../../../backlog/SB-Identification-Draft.md); EHAL spec [`docs/referenz/ehal.md`](../../referenz/ehal.md); UI mode doc [`docs/ui/betriebsmodi.md`](../../ui/betriebsmodi.md).
 
 ## 1. Goal
 

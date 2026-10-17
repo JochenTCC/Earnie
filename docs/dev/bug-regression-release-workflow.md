@@ -2,7 +2,7 @@
 
 **Status:** Draft (2026-10-15) — maintainer / agent operating model  
 **Not yet:** a dedicated Cursor skill; this document is the design target.  
-**Related:** [regression-suite.md](regression-suite.md), [release-checklist.md](release-checklist.md), skill `bugfix-regression-test`, skill `session-abschluss`, `.cursor/rules/backlog.mdc`
+**Related:** [regression-suite.md](../workflow/regression-suite.md), [release-checklist.md](../workflow/release-checklist.md), skill `bugfix-regression-test`, skill `session-abschluss`, `.cursor/rules/backlog.mdc`
 
 ## 1. Goal
 

@@ -73,6 +73,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 ### Betrieb
 
 - [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox](https://www.proxmox.com/) LXC oder PC (weitere Systeme folgen bei Bedarf)
+- **Home-Assistant-Add-on** (HA OS / Supervised): [docs/einrichtung/homeassistant-addon.md](docs/einrichtung/homeassistant-addon.md)
 - Streamlit-**Optimierer-Dienst**: Start/Stop/Neustart von `main.py` in der UI; ein Docker-Container (`earnie`) mit Auto-Start
 - Persistente Laufzeitdaten für Nachvollziehbarkeit und Debug-Dumps
 - Optionale anonyme **Nutzungsstatistik** (opt-in): [Betrieb — Nutzungsstatistik](docs/einrichtung/betrieb.md#nutzungsstatistik)
@@ -88,7 +89,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 4. **Was-wäre-wenn-Analyse** — Mit Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen
 5. **Verbindung zu Smarthome** — **Smarthome-Backend** (Auswahl/Erkennung), dann **EHAL-Com** (Live-Lesen); bei Loxone optional `python -m scripts.verify_loxone_setup`
 6. **Produktiv starten** — `python main.py` dauerhaft (**nur eine Instanz**) bzw. Docker Auto-Start
-7. **Monitor öffnen** — [Streamlit](https://streamlit.io/); Port je Stack: [Streamlit-Ports](docs/referenz/streamlit-ports.md) (Prod **8501**, lokal venv typisch **8531**)
+7. **Monitor öffnen** — [Streamlit](https://streamlit.io/); Port je Stack: [Streamlit-Ports](docs/referenz/streamlit-ports.md) (Prod und lokal venv typisch **8501**)
 8. **Feintuning** — Hausprofil, Szenarien, flexible Verbraucher über Planungs- und Betriebsseiten
 
 Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Ersteinrichtung)
@@ -116,6 +117,7 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 | Weg                              | Für wen                                                                                                               | Detail                                                                                                             |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | **Docker (empfohlen Prod)**      | [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/), [Proxmox](https://www.proxmox.com/) LXC | [docs/einrichtung/container.md](docs/einrichtung/container.md) · [proxmox-lxc.md](docs/einrichtung/proxmox-lxc.md) |
+| **Home-Assistant-Add-on**        | HA OS / Supervised (z. B. Home Assistant Green)                                                                       | [docs/einrichtung/homeassistant-addon.md](docs/einrichtung/homeassistant-addon.md)                                 |
 | **VMware `vctl` (Windows-PC)**   | VMware Workstation Pro/Player, kein Docker Desktop                                                                    | [docs/einrichtung/vmware-vctl.md](docs/einrichtung/vmware-vctl.md) · `scripts/run_earnie_vctl.ps1`                    |
 | **Lokal (Dev / ohne Container)** | Entwickler, Tests                                                                                                     | [DEVELOPER.md](DEVELOPER.md)                                                                                       |
 
@@ -124,7 +126,8 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 
 ## Roadmap (Kurz)
 
-- **2.6 / 2.7** — HA-Kopplung vertiefen; Exportbegrenzung; Mehrspeicher (siehe Backlog)
+- **2.7** — Mehrspeicher / Exportbegrenzung / Binding-Komfort; erste Alpha-Qualitätsprüfung (siehe Backlog)
+- **2.8** — Edbert-Tarife, Regression-Gate, Monitor-Charts (siehe Backlog)
 - **Adaptation** — PV- und thermische Parameter-Anpassung über die Zeit
 - **Thermals** — Gekoppelte Haus-/Speicher-/Solar-Modelle
 - **Smartere Geräte-Empfehlungen** — adaptive Leistung und Laufzeit für Haushaltsgeräte

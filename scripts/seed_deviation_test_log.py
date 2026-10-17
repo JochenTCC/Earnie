@@ -3,7 +3,7 @@
 Erzeugt ein fiktives Produktiv-Log zum Testen der Soll/Ist-Abweichungsregeln.
 
 Die letzten sieben Einträge entsprechen dem Szenario-Katalog S1–S7
-(docs/spec/soll-ist-abweichung.md inkl. Zwangs-Entladen und pv_follow).
+(docs/dev/done/soll-ist-abweichung.md inkl. Zwangs-Entladen und pv_follow).
 Davor liegen neutrale Baseline-Slots.
 Zeitstempel werden auf aufeinanderfolgende 15-Min-Slots bis kurz vor den
 Live-Anker gelegt (analog seed_history_test_logs.py).

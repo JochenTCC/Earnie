@@ -1,4 +1,4 @@
-"""Live-plant Earnie-Points resolution + usage-ping state (docs/spec/earnie-points.md §4)."""
+"""Live-plant Earnie-Points resolution + usage-ping state (docs/workflow/earnie-points.md §4)."""
 from __future__ import annotations
 
 import json

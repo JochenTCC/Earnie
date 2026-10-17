@@ -47,7 +47,7 @@ alwaysApply: true
 * **EHAL-Com signal contract (`Binding`):** P0 (spikes), P1 (qualified EHAL ID + parser), P2 (Signal list + match status), P3 (Loxone VO / VI export), P4 (import hardening + discovery), P5 (HA Weg B: HTTP contract + YAML package), P6 (Kennung as editable variable)
 * **Plant topology (`Topology`, 2.7):** P1 (explicit root + regulator declaration + validation), P2 (live-balance coverage), P3 (per-ESS setpoint writes), P4 (reactive regulator in the MILP), P5 (balance nodes + attribution)
 * **Session Conclusion:** Phases P1-P2
-* **Migration (`MIGRATION.md`):** Phases P1-P7
+* **Migration (`docs/dev/done/MIGRATION.md`):** Phases P1-P7
 * **Config migration (`ConfigMigration`, 2.7):** P0 (inventory + fixtures), P1 (step registry + planner/runner + CLI), P2 (startup gate), P3 (wizard UI), P4 (rule, release process, docs)
 * **Early-start scheduling (`EarlyStart`, 2.7):** P0 (always-on duration, event + punctuality recording), P1 (early start on by default: lead estimator + split cycle, commit at tick)
 * **Opt-in install counter (`UsagePing`, 2.7):** P1 (client + mock tests), P2 (daemon hook + milestones), P3 (consent UI), P4 (receiver + deployment), P5 (docs + privacy)

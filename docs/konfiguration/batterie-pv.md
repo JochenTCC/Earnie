@@ -101,7 +101,7 @@ python -m scripts.migrate_topology_once --config-dir <config-dir>
 
 setzt `regulates_on: grid` für jede Hausbatterie und legt `plant.grid_meter` mit `true`/`true` an — die drei Fragen danach bestätigen. Szenarien-Explorer und Backtesting sind von den Live-Ablehnungen ausgenommen (Schema-Regeln wie Batterie an `pv_string`-WR gelten überall).
 
-**Live-Bilanz (Topology P2):** Anlagen-`sens_ess_power` ist die Summe der gemappten `ess.{id}.sens_ess_power` aller netzgekoppelten Hausbatterien (fehlendes Binding → Fehler). Bei gemappter Anlagen-PV und mehreren netzgekoppelten WR mit PV: vollständige `inv.*`/`pv.*`-Maps **oder** `plant.pv_covers_all_inverters: true` (Hauskonfigurator). Abgeleitete Hauslast: negative Restbilanz unter der Toleranz (`plant.balance_tolerance_pct` / `balance_tolerance_w`, Defaults 5 % / 100 W) ist ein Telemetrie-Fehler, kein stilles `0`. Details: [EHAL-Spec § Plant topology](../spec/ehal.md).
+**Live-Bilanz:** Anlagen-`sens_ess_power` ist die Summe der gemappten `ess.{id}.sens_ess_power` aller netzgekoppelten Hausbatterien (fehlendes Binding → Fehler). Bei gemappter Anlagen-PV und mehreren netzgekoppelten WR mit PV: vollständige `inv.*`/`pv.*`-Maps **oder** `plant.pv_covers_all_inverters: true` (Hauskonfigurator). Abgeleitete Hauslast: negative Restbilanz unter der Toleranz (`plant.balance_tolerance_pct` / `balance_tolerance_w`, Defaults 5 % / 100 W) ist ein Telemetrie-Fehler, kein stilles `0`. Details: [EHAL-Spec § Plant topology](../referenz/ehal.md).
 
 ## Steuerbarkeit (`control`)
 
@@ -111,7 +111,7 @@ setzt `regulates_on: grid` für jede Hausbatterie und legt `plant.grid_meter` mi
 | `limits_only` | Nur PV-Überschuss laden, nur Hauslast decken | Nur Automatik / Entladesperre (Lade-/Entladegrenzen) |
 | `read_only` | Eigenverbrauch-Kopplung (kein freier Fahrplan) | Keine ESS-Setpoints |
 
-Wenn `control` mehr verlangt als das EHAL-Mapping hergibt (z. B. `full` ohne `set_ess_active_power` und ohne `plant.ha_ess_force`), warnt EHAL-Com. Huawei ohne Wirkleistungs-Entity: optional `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`) — siehe [EHAL-Spec](../spec/ehal.md) und [EHAL-Com](../ui/ehal-com.md).
+Wenn `control` mehr verlangt als das EHAL-Mapping hergibt (z. B. `full` ohne `set_ess_active_power` und ohne `plant.ha_ess_force`), warnt EHAL-Com. Huawei ohne Wirkleistungs-Entity: optional `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`) — siehe [EHAL-Spec](../referenz/ehal.md) und [EHAL-Com](../ui/ehal-com.md).
 
 Einspeise-„unconstrained“-Wert = PV-kWp-Summe + Summe der Max-Entladeleistung aller gewählten Hausbatterien mit `control = full`. Powerstations (`type: powerstation`) zählen nicht mit — sie speisen nicht ins Hausnetz zurück.
 
@@ -128,7 +128,7 @@ Block `planning_horizon` in `config.json`:
 }
 ```
 
-Details: [Spezifikation Sunset-Planungshorizont](../spec/planning-horizon-sunset.md).
+Details: [Spezifikation Sunset-Planungshorizont](../dev/done/planning-horizon-sunset.md).
 
 ## Batterieverschleiß (`battery_wear`)
 

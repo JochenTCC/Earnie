@@ -5,7 +5,7 @@
 **Scope:** How Earnie models the electrical topology of a plant (meters, inverters, PV, batteries, loads) and which topologies it accepts.
 **Audience:** An independent reviewer (LLM or human). Please challenge the theses; do not just confirm them.
 
-Related: [`docs/spec/ehal.md`](../docs/spec/ehal.md), [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md), [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md).
+Related: [`docs/referenz/ehal.md`](../docs/referenz/ehal.md), [`docs/dev/done/conversion-losses.md`](../docs/dev/done/conversion-losses.md), [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md).
 **Follow-up (2026-10-12):** reviews [`Plant-Topology-Theses-Review-Claude.md`](Plant-Topology-Theses-Review-Claude.md), [`Plant-Topology-Theses-Review-Grok.md`](Plant-Topology-Theses-Review-Grok.md); decisions in [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md) (T5 replaced by the regulator rule, balance nodes instead of `meters[]`, epic **Topology** P1–P5 in [`Backlog.md`](Backlog.md)).
 
 ---
@@ -24,7 +24,7 @@ Please answer, per thesis (T1–T10): *agree / agree with changes / disagree*, w
 - **[code]** Validation checks unknown ids and rejects PV on a `battery` inverter. It does **not** reject a battery on a `pv_string` inverter, although the spec table says "no battery" there.
 - **[code]** The MILP clips per inverter (`pv + discharge <= max_ac`, optional DC cap, optional grid-charge cap); `island` inverters contribute nothing to the house balance. (`optimizer/milp_inverter.py`)
 - **[code]** The grid meter is **not** an entity in `components.json`. It exists as plant-level bindings in `house_profiles.json` under `plant.ehal_bindings` (bare keys such as `sens_grid_power_active`, `sens_grid_energy_import/export`, `get/set_grid_export_power_limit`). On the exchange wire they appear as `grid.meter.<kind>`. `GRID_METER_ID = "meter"` is hard-coded with the comment "first (and currently only) grid meter Kennung; more meters may follow"; `qualified_grid_id(key, meter_id=...)` already accepts a meter id. (`ehal/qualified_ids.py`, `share/config/house_profiles.schema.json`)
-- **[code]** House load is derived: `P_cons = max(0, P_PV + P_grid + P_ess)` with grid `+` = import and ESS `+` = discharge, unless a house-load binding is mapped. (`integrations/ehal_live.py`, `docs/spec/ehal.md`)
+- **[code]** House load is derived: `P_cons = max(0, P_PV + P_grid + P_ess)` with grid `+` = import and ESS `+` = discharge, unless a house-load binding is mapped. (`integrations/ehal_live.py`, `docs/referenz/ehal.md`)
 - **[code]** Plant PV (AC) can be derived as the sum of grid-tied inverter PV times η_inv; island inverters are excluded; incomplete maps fail loudly. (`integrations/pv_attribution.py`)
 - **[code]** `grid.meter` appears in ~99 places in 31 files, including Loxone Virtual-Out/In templates and tests. Data model version is `earnie_data_model = 4`; one-shot migration scripts and fail-fast loaders already exist for earlier shape changes (e.g. `migrate_inverters_once`).
 - **[code]** The configuration is unpublished, so the data model can still change.

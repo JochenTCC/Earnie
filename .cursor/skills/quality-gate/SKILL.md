@@ -30,7 +30,7 @@ Quality gate:
 - [ ] 2. Dead-code / obsolete-test audit (vulture, --dead-fixtures, health-report)
 - [ ] 3. Identify redundant, unnecessarily complex, or unneeded code without changing functionality
 - [ ] 4. KPI refactor — functions + files over hard limits; do not defer mega-file splits
-- [ ] 5. Official docs (landing/handbook/charts/specs vs this MINOR)
+- [ ] 5. Official docs (landing/handbook/charts/specs vs this MINOR; `docs/dev/` excluded)
 - [ ] 6. SonarCloud snapshot (new issues vs last .r; record gate status)
 - [ ] 7. Record results in the open `X.Y.r` backlog chapter (do not bump version.py)
 ```
@@ -102,7 +102,14 @@ Keep cyclomatic complexity ≤ 10 and nesting ≤ 3; extract named helpers inste
 
 ## 5. Official docs
 
-Walk [`backlog/Doc-Review-Checklist.md`](../../../backlog/Doc-Review-Checklist.md) for this MINOR. User docs stay **German** (`german-user-docs.mdc`). Fix landing (`README.md`, `docs/README.md`), handbook, charts, issue templates, and specs that still describe the **previous** planning granularity or removed features.
+**Temporary checklist.** At the start of this step create `docs/dev/doc-review-checklist.md` (copy of the scope below, one row per document with `Check` / `Style` columns) and walk it for this MINOR. When the release is created, move it to `docs/dev/done/doc-review-checklist-<version>.md`; the next gate starts a fresh one. Do not keep a standing checklist.
+
+**In scope** (derive the checklist rows from these folders; a document leaves the scope only by moving to `docs/dev/`):
+- User docs, **German** (`german-user-docs.mdc`, editor `docs-editor-de`): `README.md`, `docs/README.md`, `docs/user-manual/`, `docs/einrichtung/`, `docs/konfiguration/`, `docs/ui/`, `docs/referenz/`; fix the landing pages, handbook, charts, issue templates and anything that still describes the **previous** planning granularity or removed features.
+- English technical docs (editor `docs-editor-en`): `DEVELOPER.md`, `docs/referenz/ehal.md`, `docs/ui/ehal-com.md`.
+- German developer operations (editor `docs-editor-de`): `docs/entwicklung/`.
+
+**Excluded:** `docs/dev/` (development and design docs, working notes, drafts, research; English), `docs/workflow/` (process docs: release, branching, regression, migration, …; English) including all subfolders, and `docs/dev/done/` (finished epics, historical plans, old checklists) are **not** reviewed or updated in this gate. Only move a document out of `docs/dev/` into a user-doc folder when it becomes a maintained reference — from then on it is in scope.
 
 New findings that are not fixed in this pass go under `## Document Review Findings` in `backlog/Backlog-Bugfixes.md` (skill [doc-review-findings](../doc-review-findings/SKILL.md)). If headings/nav change, [streamlit-doc-links](../streamlit-doc-links/SKILL.md).
 

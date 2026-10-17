@@ -67,7 +67,7 @@ Hauskonfigurator **Stündlicher Verlauf** secondary **°C** axis:
 
 - Außentemperatur, Haus-Solltemperatur, **Haus-Isttemperatur**, Wärmespeicher (if configured), Pool/SwimSpa (`thermal_rc`)
 
-Builder: [`data/modeled_temperatures.py`](../../data/modeled_temperatures.py). When `solar_thermal_area_m2 > 0`, the chart path loads Open-Meteo tilted collector irradiance and passes it into `house_year_result` (same as the modeled WP load profile) so store temps can rise above setpoint from solar.
+Builder: [`data/modeled_temperatures.py`](../../../data/modeled_temperatures.py). When `solar_thermal_area_m2 > 0`, the chart path loads Open-Meteo tilted collector irradiance and passes it into `house_year_result` (same as the modeled WP load profile) so store temps can rise above setpoint from solar.
 
 ## Stratified store → energy-equivalent `T_eq`
 
@@ -103,16 +103,16 @@ Same `C` for both until adaptation changes effective capacity.
 
 **Shipped:**
 
-- Helper: [`optimizer/thermal_model.py`](../../optimizer/thermal_model.py) `heat_content_kwh`
-- Year-sim / HK: `Q_sim` hour series on `ConsumptionSeriesBundle.heat_content_*` ([`data/modeled_temperatures.py`](../../data/modeled_temperatures.py)); HK Stündlicher Verlauf keeps model °C only (no Wärmeinhalt chart)
-- Live: each cycle appends heat-storage (+ pool) `heat_content_kwh` and `horizon_q_sim_kwh` into `thermal_observability` on `runtime/optimization_history.jsonl` ([`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py) `collect_heat_storage_observability`, [`optimizer/thermal_targets.py`](../../optimizer/thermal_targets.py) `build_thermal_observability`); Analyse Verbrauch & Kosten plots Live `Q_sim` vs `Q_meas` for the selected 7-/28-day window and overlays the latest 12 hourly Q-forecast lines (common horizon ≤ 24 h)
+- Helper: [`optimizer/thermal_model.py`](../../../optimizer/thermal_model.py) `heat_content_kwh`
+- Year-sim / HK: `Q_sim` hour series on `ConsumptionSeriesBundle.heat_content_*` ([`data/modeled_temperatures.py`](../../../data/modeled_temperatures.py)); HK Stündlicher Verlauf keeps model °C only (no Wärmeinhalt chart)
+- Live: each cycle appends heat-storage (+ pool) `heat_content_kwh` and `horizon_q_sim_kwh` into `thermal_observability` on `runtime/optimization_history.jsonl` ([`optimizer/thermal_live_store.py`](../../../optimizer/thermal_live_store.py) `collect_heat_storage_observability`, [`optimizer/thermal_targets.py`](../../../optimizer/thermal_targets.py) `build_thermal_observability`); Analyse Verbrauch & Kosten plots Live `Q_sim` vs `Q_meas` for the selected 7-/28-day window and overlays the latest 12 hourly Q-forecast lines (common horizon ≤ 24 h)
 - Stratified-tank **weights `w_i`** remain operator/field work (not coded in Earnie)
 
 ### Loxone guideline (operator-facing)
 
 German step-by-step (formula Merker, default equal weights, identifying `w_i` from geometry / quiet vs stratified periods):
 
-[`docs/konfiguration/waermespeicher-schichtung-teq.md`](../konfiguration/waermespeicher-schichtung-teq.md)
+[`docs/konfiguration/waermespeicher-schichtung-teq.md`](../../konfiguration/waermespeicher-schichtung-teq.md)
 
 Concept anchor (Earnie-Projekt): Entwicklungsplan §3.5.
 
@@ -133,17 +133,17 @@ When `heat_storage.volume_liters > 0` on a Live snapshot:
 
 1. Read `sens_temperature_heat_storage` (`T_eq`) and optional `sens_temperature_heat_storage_low` (`T_low`).
 2. Missing `T_eq` → start at `setpoint_c`. Missing `T_low` → skip bottom hint.
-3. Open-loop horizon plan ([`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py)) uses the same store step as year-sim (`step_coupled_hour`). Envelope `H` comes from `optimizer/thermal_parameters.py` (ThermalHorizon P1): calibrated on the **last full archive year** — the same series and calibration as the year sim — or the config override. Never from the short Live outdoor forecast (HWB÷48h HDD inflates H by ~100× and Freigabe fires while the store is still hot) and no longer from the partial current year; missing climate fails loud. Space-heat store draw uses envelope hold/climb power, not full WP `max_heat`. Collector heat into the store comes from the Open-Meteo forecast (`global_tilted_irradiance`, ThermalHorizon P3); on forecast failure the last full archive year at the same DOY/hour is used with a warning (`collector_solar_source` in observability).
+3. Open-loop horizon plan ([`optimizer/thermal_live_store.py`](../../../optimizer/thermal_live_store.py)) uses the same store step as year-sim (`step_coupled_hour`). Envelope `H` comes from `optimizer/thermal_parameters.py` (ThermalHorizon P1): calibrated on the **last full archive year** — the same series and calibration as the year sim — or the config override. Never from the short Live outdoor forecast (HWB÷48h HDD inflates H by ~100× and Freigabe fires while the store is still hot) and no longer from the partial current year; missing climate fails loud. Space-heat store draw uses envelope hold/climb power, not full WP `max_heat`. Collector heat into the store comes from the Open-Meteo forecast (`global_tilted_irradiance`, ThermalHorizon P3); on forecast failure the last full archive year at the same DOY/hour is used with a warning (`collector_solar_source` in observability).
 4. Forced ON QH when the plan would turn WP on; additionally if `T_low < setpoint − tolerance`, force the near-term hour even when `T_eq` is still above the floor.
 5. Live: bang-bang floor → `forced_indices` only (correct timing). Flexible day lower bound = opportunistic headroom to setpoint (`opp_cap` / `live_day_min_kwh` on the first day). Climate/HDD day targets are **not** applied when the Live store overlay is active. Live = inside `main`'s cycle scope (`is_live_thermal_planning`), also when the telemetry snapshot was rejected. Since ThermalHorizon P2 the overlay context is built from the Live plan alone (`slot_energy_kwh` / `daily_targets` = plan electric per slot, informational); no year profile is computed, and one plan per cycle is shared via `optimizer/live_cycle_scope.py`. Year-sim stays floor bang-bang only. SE / non-Live keep climate day targets only.
 6. SE / non-Live matrices keep climate day targets only (no forced ON overlay).
 
 ## Code
 
-- House RC: [`optimizer/thermal_house.py`](../../optimizer/thermal_house.py)
-- Store step + wrappers: [`optimizer/thermal_coupled.py`](../../optimizer/thermal_coupled.py)
-- Live store floor planner: [`optimizer/thermal_live_store.py`](../../optimizer/thermal_live_store.py)
-- Heat content helper: [`optimizer/thermal_model.py`](../../optimizer/thermal_model.py) `heat_content_kwh`
-- Year-sim series: [`data/modeled_temperatures.py`](../../data/modeled_temperatures.py); Live Analyse chart [`ui/consumption_display/charts.py`](../../ui/consumption_display/charts.py) `live_heat_content_chart`
-- Day targets: [`data/heating_need.py`](../../data/heating_need.py) `daily_electric_kwh` → `house_year_result` when Wohnfläche > 0
-- Live flex: [`optimizer/thermal_flex_context.py`](../../optimizer/thermal_flex_context.py)
+- House RC: [`optimizer/thermal_house.py`](../../../optimizer/thermal_house.py)
+- Store step + wrappers: [`optimizer/thermal_coupled.py`](../../../optimizer/thermal_coupled.py)
+- Live store floor planner: [`optimizer/thermal_live_store.py`](../../../optimizer/thermal_live_store.py)
+- Heat content helper: [`optimizer/thermal_model.py`](../../../optimizer/thermal_model.py) `heat_content_kwh`
+- Year-sim series: [`data/modeled_temperatures.py`](../../../data/modeled_temperatures.py); Live Analyse chart [`ui/consumption_display/charts.py`](../../../ui/consumption_display/charts.py) `live_heat_content_chart`
+- Day targets: [`data/heating_need.py`](../../../data/heating_need.py) `daily_electric_kwh` → `house_year_result` when Wohnfläche > 0
+- Live flex: [`optimizer/thermal_flex_context.py`](../../../optimizer/thermal_flex_context.py)

@@ -2,7 +2,7 @@
 
 Earnie kann auch als Loxberry-Plugin installiert werden. Dafür wird ein **schlanker Docker-Wrapper** als LoxBerry Plugin genutzt. Der Plugin-Installer startet denselben Container wie die manuelle Compose-Installation (`ghcr.io/jochentcc/earnie-energy`, Host-Port standardmäßig **8501**, im Container immer **8501**). Welches Image-Tag gezogen wird, steuert der **Versionskanal** in der Plugin-UI (Standard: Stabil → `:latest`).
 
-Quellbaum im Repo: `[packaging/loxberry/](../../packaging/loxberry/)`. Packaging-Hinweise (ZIP, Version-Bump): `[packaging/loxberry/README.md](../../packaging/loxberry/README.md)`.
+Quellbaum im Repo: [packaging/loxberry/](../../packaging/loxberry/). Packaging-Hinweise (ZIP, Version-Bump): [packaging/loxberry/README.md](../../packaging/loxberry/README.md).
 
 Manuelle Compose-Alternative (ohne Plugin): [Container — LoxBerry](container.md#loxberry-rpi-4b-arm64).
 

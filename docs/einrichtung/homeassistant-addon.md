@@ -4,7 +4,7 @@ Earnie kann auch als **Home Assistant Supervisor Add-on** installiert werden, pr
 
 Quellbaum im Repo: [`packaging/homeassistant-addon/earnie/`](../../packaging/homeassistant-addon/earnie/). Veröffentlicht wird das Add-on über ein eigenes Custom-Repository, `https://github.com/JochenTCC/ha-addon-earnie` (nicht die offizielle HA-Community-Add-on-Liste).
 
-**Abgrenzung zum EHAL-HA-Adapter:** Der bestehende EHAL-HA-Adapter (`ehal.backend=ha`, siehe [Loxone-Anbindung](loxone-anbindung.md)) lässt Earnie **außerhalb** von Home Assistant laufen und spricht die HA-REST-API als Southbound-Ziel an. Dieses Add-on ist das Gegenteil: Earnie läuft **innerhalb** von Home Assistant. Beide schließen sich nicht aus.
+**Abgrenzung zum EHAL-HA-Adapter:** Der bestehende EHAL-HA-Adapter (`ehal.backend=ha`, siehe [Home Assistant + evcc](ha-evcc.md)) lässt Earnie **außerhalb** von Home Assistant laufen und spricht die HA-REST-API als Southbound-Ziel an. Dieses Add-on ist das Gegenteil: Earnie läuft **innerhalb** von Home Assistant. Beide schließen sich nicht aus.
 
 **Begriff „Add-on" vs. „App":** Seit Home Assistant 2026.2 heißt der Menüpunkt in der Oberfläche **„Apps"** statt „Add-ons" (nur die UI-Beschriftung — Repository-Format, `config.yaml` und Supervisor-API heißen technisch weiterhin „Add-on"). Diese Doku nutzt weiter „Add-on" für das hier beschriebene Earnie-Paket; in der HA-Oberfläche findest du es unter **Einstellungen → Apps**.
 
@@ -54,6 +54,7 @@ Add-on-Optionen (`config.yaml` → `options`) sind ein optionales Zusatzangebot,
 | `ui_modes` (Default `sunset2sunset,scenario_explorer,live_environment`) | `EARNIE_UI_MODES` | nein |
 | `auto_start_main` (Default `true`) | `EARNIE_AUTO_START_MAIN` | nein |
 | `timezone` (Default `Europe/Vienna`) | `TZ` | nein |
+| `usage_ping` (optional, `true`/`false`) | Spiegelt die Zustimmung zur optionalen Nutzungsstatistik; ohne Option bleibt der bestehende Zustand unverändert (siehe [Betrieb → Nutzungsstatistik](betrieb.md#nutzungsstatistik)) | nein |
 
 Loxone- und HA-Zugangsdaten gehören **nicht** in die Supervisor-Optionen — sie werden in der Earnie-Oberfläche unter **Smarthome-Backend** bzw. in `config/.env` gepflegt (im Add-on oft leer → Supervisor-Proxy).
 
@@ -125,10 +126,10 @@ Unterschied zum LoxBerry-Plugin: dort wählst du den Kanal in der Plugin-UI (`:l
 
 ## Einschränkungen (Feature-Stufe 0.2)
 
-Die Add-on-`version:` folgt der Earnie-App (z. B. `2.6.0-alpha.10`). „0.2“ meint hier den ausgelieferten Options-/Ingress-Umfang, nicht die SemVer-Nummer.
+Die Add-on-`version:` folgt der Earnie-App (Kanal `earnie` / `earnie_prerelease` im Add-on-Repository). „0.2“ meint hier den ausgelieferten Options-/Ingress-Umfang, nicht die SemVer-Nummer.
 
 - Add-on-Optionen decken nur die gängigsten Werte ab; volle Haus-/Entity-Konfiguration bleibt in-App bzw. dateibasiert.
-- Kein MQTT Discovery, keine nativen HA-Entitäten, keine Energy-Dashboard-Integration (Add-on **1.0** → für eine spätere Version geplant, nicht Teil von 2.6).
+- Kein MQTT Discovery, keine nativen HA-Entitäten, keine Energy-Dashboard-Integration (Add-on **1.0** ist für eine spätere Version geplant, nicht Teil der aktuellen 2.7-Linie).
 
 ## Testumgebung
 
@@ -149,4 +150,9 @@ Hinweis: `2.5.3-alpha.4` setzte nur Streamlit-`baseUrlPath` ohne nginx-Pfad-Rein
 
 ## Deinstallation
 
-Add-on in **Einstellungen → Apps → Earnie** stoppen und deinstallieren. Das Add-on-Datenverzeichnis (`/data/earnie_env/…`) wird dabei vom Supervisor entfernt — vorher sichern, falls Config/Runtime weiter gebraucht werden.
+Add-on in **Einstellungen → Apps → Earnie** stoppen und deinstallieren. Vorher sichern, falls die Daten weiter gebraucht werden:
+
+- Konfiguration unter Host-`addon_configs/<hash>_earnie/` (Container `/config/`)
+- Laufzeit unter dem Add-on-Datenvolume (`/data/earnie_env/…`)
+
+Der Supervisor entfernt diese Pfade mit dem Add-on.

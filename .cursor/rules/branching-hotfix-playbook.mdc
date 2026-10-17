@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Branching / Hotfix Playbook Guard
 
-Canonical playbook: `docs/spec/branching-hotfix-playbook.md`.
+Canonical playbook: `docs/workflow/branching-hotfix-playbook.md`.
 
 ## When this applies
 

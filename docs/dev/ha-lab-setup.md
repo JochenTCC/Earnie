@@ -12,7 +12,7 @@
 | Doc | Role |
 | --- | --- |
 | [`docker/compose/ha-lab.yml`](../../docker/compose/ha-lab.yml) | Reference Compose |
-| [`ehal.md`](ehal.md) | Frozen EHAL contract + HA adapter notes |
+| [`ehal.md`](../referenz/ehal.md) | Frozen EHAL contract + HA adapter notes |
 | [`house-sim.md`](house-sim.md) | HouseSim S1 mock REST + S4 HA integration (`house_sim/`, not this Compose stack); open: S2→S3→**2.6.e** |
 | [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) | Config fragment to merge into Earnie `config.json` |
 | [`ha_lab/evcc/evcc.yaml`](../../ha_lab/evcc/evcc.yaml) | Committed lab stub (const meters / demo charger) |
@@ -505,7 +505,7 @@ Bind mounts (`ha_lab/…`) are kept. To factory-reset HA only, remove files unde
 
 Default lab path remains **`ehal.ha.transport=pull`** (§5–§6). For the Loxone-like HTTP contract:
 
-1. Set `"transport": "weg_b"` under `ehal.ha` in `ha_lab/config/config.json` (see [`ehal.md`](ehal.md) § Home Assistant).
+1. Set `"transport": "weg_b"` under `ehal.ha` in `ha_lab/config/config.json` (see [`ehal.md`](../referenz/ehal.md) § Home Assistant).
 2. Ensure Earnie listens on **`system.ehal_loxone_http_port`** (default **8541**) and `EARNIE_PILOT_PUSH_TOKEN` is set in `ha_lab/config/.env` (same rules as Loxone pilot push).
 3. Generate a carrier fragment from current bindings:
    ```powershell

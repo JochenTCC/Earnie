@@ -3,7 +3,7 @@
 **Status:** v2 — EarlyStart P0 + P1 implemented (2026-10-15)
 **Date:** 2026-10-15
 **Backlog:** epic **EarlyStart** (P0, P1 → `backlog/Backlog-Erledigt.md`; follow-ups in `backlog/Backlog.md`, Version 2.7)
-**Related:** `docs/spec/quarter-hour-slots.md`, `optimizer/start_scheduler.py`, `runtime_store/planning_clock.py`, `runtime_store/cycle_duration_stats.py`, `main.py`
+**Related:** `docs/dev/done/quarter-hour-slots.md`, `optimizer/start_scheduler.py`, `runtime_store/planning_clock.py`, `runtime_store/cycle_duration_stats.py`, `main.py`
 
 ## 1. Problem and goal
 

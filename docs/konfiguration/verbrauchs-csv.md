@@ -173,7 +173,7 @@ Optional: `--cons-data`, `--from`, `--to`. Die Dateien sind Loxone-kompatibel un
 
 ## Von Loxone Energieflussmonitor zum Hausprofil
 
-Kurzweg für die Einrichtung (Details und Rollen-Tabelle: Spec [EFM-Auto-Sync-Spezifikation](../spec/efm-auto-sync.md), manueller Blueprint im Repo-Plan `energieflussmonitor_hausprofil_blueprint_a`):
+Kurzweg für die Einrichtung (Details und Rollen-Tabelle: Spec [EFM-Auto-Sync-Spezifikation](../dev/done/efm-auto-sync.md), manueller Blueprint im Repo-Plan `energieflussmonitor_hausprofil_blueprint_a`):
 
 1. In Loxone **Energieflussmonitor** + **Zähler** für Netz / PV / Speicher / Verbraucher anlegen (flach oder bewusst flachhalten).
 2. Auf **Smarthome-Backend** den **Loxone-Import** ausführen (Merker + EFM-Zähler → Hausprofil / `ehal_bindings`, inkl. optional Live-`flex.{slug}.sens_power_act` = Zähler-Bezeichnung). Freigabe-Merker (`flex.{slug}.set_enable`) sowie Feintuning weiterhin manuell unter **EHAL-Com → Loxone Struktur → EHAL Mapping**.

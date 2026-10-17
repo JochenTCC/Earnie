@@ -65,4 +65,4 @@ Fehlt der private Root, überspringt `python -m scripts.run_regression` die priv
   --id REG-142-eauto-deadline --private --seed-anchor "2026-06-26T18:00:00"
 ```
 
-Details: [`docs/spec/regression-suite.md`](../spec/regression-suite.md) §4 / §9.
+Details: [`docs/workflow/regression-suite.md`](../workflow/regression-suite.md) §4 / §9.

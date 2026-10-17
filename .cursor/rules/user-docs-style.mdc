@@ -6,7 +6,7 @@ alwaysApply: false
 
 # User docs — writing style
 
-Applies when writing or editing German user docs (scope: `german-user-docs.mdc`). Reference example: [`docs/user-manual/Benutzer-Handbuch-Earnie.md`](../../docs/user-manual/Benutzer-Handbuch-Earnie.md) (edited pilot, 2026-10-17). `docs/ui/ehal-com.md` stays English; `docs/spec/` and `docs/entwicklung/` are out of scope.
+Applies when writing or editing German user docs (scope: `german-user-docs.mdc`). Reference example: [`docs/user-manual/Benutzer-Handbuch-Earnie.md`](../../docs/user-manual/Benutzer-Handbuch-Earnie.md) (edited pilot, 2026-10-17). `docs/ui/ehal-com.md` stays English; `docs/workflow/`, `docs/referenz/ehal.md`, `docs/entwicklung/` and `docs/dev/` are out of scope.
 
 ## Address and tone
 
@@ -35,6 +35,12 @@ Applies when writing or editing German user docs (scope: `german-user-docs.mdc`)
 - Avoid sentence starts with „Aber“, „Und“, „Dennoch“ — join sentences or use „Allerdings …“ sparingly.
 - Avoid the rhetorical „nicht X, sondern Y“ pattern and filler phrases („Es ist wichtig zu beachten, dass …“, „nahtlos“, „ganzheitlich“).
 - No internal backlog / epic IDs (`2.7.n`, `P5`, `Q8`, codenames) — see `german-user-docs.mdc`.
+
+## Delegation: one subagent run per document
+
+- German user docs → subagent **`docs-editor-de`** (`.cursor/agents/docs-editor-de.md`, Claude Opus 5.5, Cursor-Slug `claude-opus-5-5-medium`).
+- English technical docs (`docs/referenz/ehal.md`, `DEVELOPER.md`, `docs/ui/ehal-com.md`) → subagent **`docs-editor-en`** (`.cursor/agents/docs-editor-en.md`, Claude Sonnet 5.5).
+- **Start a new, separate subagent run for every document** — never pass several files to one run, never continue a previous run for the next file. The parent agent collects each report and adds suspected stale facts to `## Document Review Findings`.
 
 ## When editing an existing doc
 

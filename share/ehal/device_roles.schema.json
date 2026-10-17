@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/device_roles.schema.json",
   "title": "EHAL Device Role Template (2.4.g / 2.7.n-5)",
-  "description": "Groups M1 EHAL fields by device role for adapter mapping aids. Does not extend the Live wire contract. Units/signs follow docs/spec/ehal.md. Optional loxone / openems blocks hold hub ↔ EHAL conversion (factor/sign = hub → EHAL; write applies inverse). Stub roles (consumer, heatpump) may list future/flex fields with kind=stub.",
+  "description": "Groups M1 EHAL fields by device role for adapter mapping aids. Does not extend the Live wire contract. Units/signs follow docs/referenz/ehal.md. Optional loxone / openems blocks hold hub ↔ EHAL conversion (factor/sign = hub → EHAL; write applies inverse). Stub roles (consumer, heatpump) may list future/flex fields with kind=stub.",
   "type": "object",
   "required": ["role_id", "label", "description", "ehal_fields"],
   "properties": {

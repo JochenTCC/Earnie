@@ -2,7 +2,7 @@
 
 Earnies Wärmespeicher-RC ist ein **Einknoten-Modell** (eine Temperatur, ein Volumen). Viele Warmwasser-/Pufferspeicher sind **Schichtspeicher** mit mehreren Temperatursensoren (typisch drei oder vier Fühler in unterschiedlicher Höhe). Für Live-Vergleich und spätere Adaptation muss das Smart Home **eine** Temperatur liefern, die denselben **Wärmeinhalt** wie der geschichtete Speicher abbildet.
 
-Entwickler-Kontext: [thermals-p2.md](../spec/thermals-p2.md) (Abschnitt *Stratified store → T_eq*). Konzept: Entwicklungsplan §3.5 im `Earnie-Projekt`-Repo.
+Entwickler-Kontext: [thermals-p2.md](../dev/done/thermals-p2.md) (Abschnitt *Stratified store → T_eq*). Konzept: Entwicklungsplan §3.5 im `Earnie-Projekt`-Repo.
 
 ## Physik (kurz)
 

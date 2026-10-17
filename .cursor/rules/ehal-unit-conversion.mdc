@@ -6,7 +6,7 @@ alwaysApply: true
 
 # EHAL unit conversion — no hardcoding
 
-Adapters **must not** invent per-field unit or sign math in Python. EHAL wire units stay frozen in [`docs/spec/ehal.md`](../../docs/spec/ehal.md) (§ Units and sign convention). Hub ↔ EHAL conversion is **data-driven**.
+Adapters **must not** invent per-field unit or sign math in Python. EHAL wire units stay frozen in [`docs/referenz/ehal.md`](../../docs/referenz/ehal.md) (§ Units and sign convention). Hub ↔ EHAL conversion is **data-driven**.
 
 ## Allowed sources of conversion
 
@@ -21,7 +21,7 @@ Adapters **must not** invent per-field unit or sign math in Python. EHAL wire un
 - Add or extend a role `loxone` (or shared registry) entry when a new Loxone field needs scale/sign/clamp.
 - For HA, map only compatible quantities; let `ha_units` derive the factor at read/write time.
 - Keep **decision** logic in code (which field to write, Automatik omit, derive `sens_power_consumers`) — not the unit math.
-- Point new fields at the frozen EHAL unit table in `docs/spec/ehal.md`.
+- Point new fields at the frozen EHAL unit table in `docs/referenz/ehal.md`.
 
 ## Do not
 
@@ -39,7 +39,7 @@ Adapters **must not** invent per-field unit or sign math in Python. EHAL wire un
 
 ## Checklist (new or changed EHAL field / adapter path)
 
-1. What is the EHAL unit in `docs/spec/ehal.md`?
+1. What is the EHAL unit in `docs/referenz/ehal.md`?
 2. What is the hub unit (Loxone kW / HA entity unit / …)?
 3. Is conversion in role JSON / `ha_units` — not a new literal factor in the adapter?
 4. Characterization or unit test covers the conversion without re-embedding the factor in production branches?

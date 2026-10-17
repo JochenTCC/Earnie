@@ -1,6 +1,6 @@
 # Shadow architecture review (post-2.7)
 
-Review for Backlog 2.7: *Review entire Shadow architecture after all changes for 2.7 and propose a refactoring*. Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md).
+Review for Backlog 2.7: *Review entire Shadow architecture after all changes for 2.7 and propose a refactoring*. Spec: [`docs/dev/shadow-mode.md`](../docs/dev/shadow-mode.md).
 
 **Verdict:** S1–S3 match the spec. The package under [`runtime_store/shadow/`](../runtime_store/shadow/) is layered correctly. Debt is **scatter** (transport/config hooks at many call sites) plus two **post-commit dual-paths**, not a broken core design. Refactor is phased follow-up (**R1–R4**); no greenfield rewrite.
 

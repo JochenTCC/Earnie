@@ -78,11 +78,11 @@ Bei `daily_target_source: thermal` steuert das RC-Modell das Tagesenergieziel au
 | `thermal_control.history_logs`               | CSV-Pfade für Kalibrierung; optional `heating_active_csv` / `filter_active_csv` statt reiner Leistungsschwelle |
 
 
-Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (Loxone-Defaults), [SwimSpa Filter](../spec/swimspa-filter.md).
+Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (Loxone-Defaults), [SwimSpa Filter](../dev/done/swimspa-filter.md).
 
 ## Haus Wärme: optionaler Wärmespeicher (`heat_storage`)
 
-Bei `type: thermal_annual` kann unter `thermal.heat_storage` ein **Pufferspeicher** modelliert werden (Thermals P2). Solarthermie und Wärmepumpe speisen den Speicher; Raumheizung und Warmwasser entnehmen Wärme nur aus dem Speicher. Ohne Speicher bzw. bei `volume_liters = 0` bleibt das bisherige Modell (Solar als Tages-Gutschrift auf den WP-Bedarf).
+Bei `type: thermal_annual` kann unter `thermal.heat_storage` ein **Pufferspeicher** modelliert werden. Solarthermie und Wärmepumpe speisen den Speicher; Raumheizung und Warmwasser entnehmen Wärme nur aus dem Speicher. Ohne Speicher bzw. bei `volume_liters = 0` bleibt das bisherige Modell (Solar als Tages-Gutschrift auf den WP-Bedarf).
 
 **Temperaturband (Jahressimulation):** Die Speichertemperatur darf zwischen `setpoint_c − tolerance_c` und **95 °C** liegen. Die Wärmepumpe heizt hart nach, wenn die Temperatur unter die Untergrenze fallen würde, und speist höchstens bis zum Sollwert (`setpoint_c`); darüber bleibt sie aus. Überschusswärme oberhalb des Sollwerts kommt nur von der Solarthermie (Eingang wird erst oberhalb von 95 °C begrenzt).
 
@@ -102,7 +102,7 @@ Bei `type: thermal_annual` kann unter `thermal.heat_storage` ein **Pufferspeiche
 
 **Live ohne Wärmespeicher:** Auch ohne `heat_storage` rechnet der Live-Optimierer nur über den Planungshorizont: Er simuliert das Haus ab der Solltemperatur (`target_temp_c`, es gibt keinen Innentemperatur-Fühler) mit der Außentemperatur-Prognose und denselben Regeln wie die Jahressimulation; daraus ergeben sich WP-Bedarf je Viertelstunde und die Tagesziele. Ohne Wohnfläche (`living_area_m2 = 0`) plant Earnie nur Warmwasser und zieht den prognostizierten Kollektorertrag pro Tag ab. Szenario-Explorer und Backtesting nutzen weiterhin die Jahressimulation mit historischem Wetter.
 
-Entwickler-Spec: [thermals-p2.md](../spec/thermals-p2.md).
+Entwickler-Spec: [thermals-p2.md](../dev/done/thermals-p2.md).
 
 ## E-Auto: `charging_schedule`
 
@@ -117,7 +117,7 @@ Wenn gesetzt und `enabled: true`:
 | `weekday` / `weekend`  | `car_available_from_hour`, `ready_by_hour`, `daily_rest_soc`                                                                               |
 | `loxone`               | Legacy-Block (Config-Key): `plugged_in_name`, `ready_by_time_name`, `soc_at_plug_in_name`, `battery_capacity_kwh_name`, `nominal_power_kw_name`, `charge_immediate_*` — Adressen gehören heute unter `ehal_bindings` / EHAL-Com |
 
-**Verspätete Rückkehr:** Startpunkt ist `car_available_from_hour`. Ist dieser Ankunfts-Slot vorbei und das Auto noch nicht angeschlossen, setzt Earnie den internen Connect-Zeitpunkt auf ReadyAt − benötigte Ladezeit − 1 h (mindestens „jetzt“). ReadyAt kommt zuerst aus FertigUm/`get_evcs_ready_by_time`, sonst aus der Config-`ready_by_hour`. Der Ladezyklus wird nur ganz übersprungen, wenn weder Live-FertigUm noch Config-`ready_by` eine gültige Frist liefern (oder die Frist schon abgelaufen ist). Vor der geplanten Ankunft bleibt der Connect-Zeitpunkt die Ankunftsstunde (kein „ab jetzt“). Solange das Auto nicht angesteckt ist, bleibt der **aktuelle** Viertelstunden-Slot ohne Ladeplan (und ohne Live-Sollwert); zukünftige Slots dürfen weiter geplant werden. Entwickler-Spec: [ev-return-prognosis.md](../spec/ev-return-prognosis.md).
+**Verspätete Rückkehr:** Startpunkt ist `car_available_from_hour`. Ist dieser Ankunfts-Slot vorbei und das Auto noch nicht angeschlossen, setzt Earnie den internen Connect-Zeitpunkt auf ReadyAt − benötigte Ladezeit − 1 h (mindestens „jetzt“). ReadyAt kommt zuerst aus FertigUm/`get_evcs_ready_by_time`, sonst aus der Config-`ready_by_hour`. Der Ladezyklus wird nur ganz übersprungen, wenn weder Live-FertigUm noch Config-`ready_by` eine gültige Frist liefern (oder die Frist schon abgelaufen ist). Vor der geplanten Ankunft bleibt der Connect-Zeitpunkt die Ankunftsstunde (kein „ab jetzt“). Solange das Auto nicht angesteckt ist, bleibt der **aktuelle** Viertelstunden-Slot ohne Ladeplan (und ohne Live-Sollwert); zukünftige Slots dürfen weiter geplant werden. Entwickler-Spec: [ev-return-prognosis.md](../dev/done/ev-return-prognosis.md).
 
 Ladeziel in kWh (vereinfacht, Kapazität aus Live-EHAL wenn gebunden):
 
@@ -148,7 +148,7 @@ Getrennter Verbraucher `pool_filter` (Heizung bleibt z. B. `pool_swimspa` / `s
 | `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein natives Live-Fenster)                            |
 
 
-Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`flex.pool_filter.set_enable`). Spec: [SwimSpa Filter](../spec/swimspa-filter.md).
+Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`flex.pool_filter.set_enable`). Spec: [SwimSpa Filter](../dev/done/swimspa-filter.md).
 
 ## Manuelle Geräte (Hausprofil, `type: generic`)
 
@@ -217,4 +217,4 @@ Bei `earnie_role: known` oder `manual` kann optional eine **Live-Leistungsquelle
 | `schedule.duration_h`                        | Nenndauer pro Lauf — auch Laufzeit für Advice/Reserve                 |
 
 
-Die Adresse wird gespeichert; Live-Abfrage und Adaption der Nennleistung folgen in einer späteren Version. Bis dahin nutzt die Grundlast-Overlay bzw. die Startzeit-Empfehlung die Werte aus dem Profil.
+Die Adresse wird gespeichert. Live-Leistung (`sens_power_act` / aktiv) fließt bereits in die Reserve-Freigabe ein. Die **Adaption** der konfigurierten Nennleistung für Overlay und Startzeit-Empfehlung folgt in einer späteren Version — bis dahin nutzen Overlay und Empfehlung die Werte aus dem Profil.

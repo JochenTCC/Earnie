@@ -15,7 +15,7 @@ Lead = clamp(median(time to plan), 15 s, 90 s), i.e. the cycle starts
 between T−90 s and T−15 s; with fewer than ``MIN_SAMPLES`` records (new
 platform) the lead is 60 s. Above 90 s the start is not moved further forward
 (``capped``); the daemon warns.
-Spec: ``docs/spec/early-start-scheduling.md`` §5.
+Spec: ``docs/dev/done/early-start-scheduling.md`` §5.
 """
 from __future__ import annotations
 

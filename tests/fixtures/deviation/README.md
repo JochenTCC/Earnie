@@ -1,6 +1,6 @@
 # Soll/Ist-Szenarien (Epic Soll-Ist)
 
-Acceptance-Katalog für Abweichungsregeln in Chart 1. Vollständige Spec: [docs/spec/soll-ist-abweichung.md](../../../docs/spec/soll-ist-abweichung.md) §5.2.
+Acceptance-Katalog für Abweichungsregeln in Chart 1. Vollständige Spec: [docs/dev/done/soll-ist-abweichung.md](../../../docs/dev/done/soll-ist-abweichung.md) §5.2.
 
 ## Szenario-Tabelle
 

@@ -173,7 +173,7 @@ Neue Domänenkenntnis = neues Prädikat (Python + Test) + JSON-Regelzeile.
 
 ### 5.2 Szenario-Katalog (Acceptance)
 
-Abgedeckt durch `tests/test_deviation_eval.py`, `tests/test_deviation_scenario_catalog.py` und fiktives Log (`scripts/seed_deviation_test_log.py`). Übersicht: [tests/fixtures/deviation/README.md](../../tests/fixtures/deviation/README.md).
+Abgedeckt durch `tests/test_deviation_eval.py`, `tests/test_deviation_scenario_catalog.py` und fiktives Log (`scripts/seed_deviation_test_log.py`). Übersicht: [tests/fixtures/deviation/README.md](../../../tests/fixtures/deviation/README.md).
 
 | ID | Situation | Regel (ID) | Kategorie |
 |----|-----------|------------|-----------|
@@ -245,7 +245,7 @@ Commit-Präfix: `deviation(soll-ist): P1a …` bzw. kurz `soll-ist: P1 …`.
 - Bestehende Abgleich-Logik: `integrations/loxone_watchdog.py`, `ui/sankey_produktiv.py` (`KW_TOLERANCE`)
 - Thermik: `optimizer/thermal_targets.py` (`thermal_observability`)
 - Lieferung: `optimizer/delivery_tracking.py` (`delivery_plausibility`)
-- UI-Doku: [charts.md](../ui/charts.md) § Soll/Ist-Icons
+- UI-Doku: [charts.md](../../ui/charts.md) § Soll/Ist-Icons
 - Dev-Test: `python -m scripts.seed_deviation_test_log --force`; VS Code **Streamlit app.py (Deviation-Test)**
 
 ## Änderungshistorie

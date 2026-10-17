@@ -38,7 +38,7 @@ Zielzone Preise: **AT Day-Ahead** (`bzn=AT`, EPEX-kompatibel).
 | Neutral | Day-Ahead verfügbar | aWATTar / EPEX |
 | Grün | Kein Day-Ahead | **`forecast` (Standard):** OLS → `price_source=predicted`; Fallback Spiegelung bei Modell-/Feature-Ausfall. Alternativ Config `mirror`. |
 
-Prognose ersetzt **nur** grüne Slots. Config: `market_prices.missing_price_strategy` = `forecast` \| `mirror`; Modellpfad Default `share/data/price_model_coefficients.json`. User doc: [preise.md](../konfiguration/preise.md).
+Prognose ersetzt **nur** grüne Slots. Config: `market_prices.missing_price_strategy` = `forecast` \| `mirror`; Modellpfad Default `share/data/price_model_coefficients.json`. User doc: [preise.md](../../konfiguration/preise.md).
 
 ## 4. Phase 0 — Scope (festgelegt)
 
@@ -240,7 +240,7 @@ Compare script: `python -m scripts.compare_live_price_prognosis_research` (optio
 
 ## 12. Bezug
 
-- Preise Live: [preise.md](../konfiguration/preise.md)
+- Preise Live: [preise.md](../../konfiguration/preise.md)
 - UI grüne Zone: [ui-sunset2sunset.md](ui-sunset2sunset.md) §5
 - Backlog: `backlog/Backlog.md` Research Items
 

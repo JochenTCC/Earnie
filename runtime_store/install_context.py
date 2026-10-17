@@ -6,7 +6,7 @@ add-on entrypoint (``packaging/homeassistant-addon/earnie/run.sh``) both export
 ``EARNIE_INSTALL_CONTEXT``. Any other deployment (plain docker-compose, bare
 metal, dev checkout) leaves it unset — "manual", no narrowing possible.
 
-See docs/spec/smarthome-backend-page.md (M2) and backlog/SB-Identification-Draft.md.
+See docs/dev/done/smarthome-backend-page.md (M2) and backlog/SB-Identification-Draft.md.
 """
 from __future__ import annotations
 

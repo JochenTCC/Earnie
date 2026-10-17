@@ -36,7 +36,7 @@ Aktivierte Signale liegen als Schlüssel in `plant.ehal_bindings` / `consumers[]
 | Bereich              | Konfiguration                                      | Zweck                                             |
 | -------------------- | -------------------------------------------------- | ------------------------------------------------- |
 | Anlage (Plant)       | `plant.ehal_bindings`                              | SOC, Netz/PV/ESS-Leistungen, Außentemperatur      |
-| Steuer-Rückmeldung   | dieselben Soll-/Ist-Merker                         | Prüfen, ob Schreiben ankommt                      |
+| Steuer-Rückmeldung   | dieselben Soll-/Ist-Bindings (Live-Lesen)          | Prüfen, ob Schreiben ankommt                      |
 | Flexible Verbraucher | `consumers[].ehal_bindings`                        | Live-Leistung / Freigaben für `cons_data`  |
 | E-Auto-Status        | EVCS-Felder in `ehal_bindings` / Ladeplan          | Anschluss, Rest-SOC, Fertig-um, max. Ladeleistung |
 
@@ -48,18 +48,18 @@ Aktivierte Signale liegen als Schlüssel in `plant.ehal_bindings` / `consumers[]
 
 | Signal               | Konfiguration                                             | Wirkung (Schnittstelle)                                                 |
 | -------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| ESS-Sollleistung     | `plant.ehal_bindings.set_ess_active_power` | kW; `+` = Entladung, `−` = Ladung; bei Automatik weglassen / 0          |
-| Ladegrenze           | `plant.ehal_bindings.set_ess_charge_power_limit` | kW; echte Max. Ladeleistung                                             |
-| Entladegrenze        | `plant.ehal_bindings.set_ess_discharge_power_limit` | kW; echte Max. Entladeleistung                                          |
-| Steuerbefehl / ESS-Modus | `plant.ehal_bindings.set_ess_mode` | **Pflicht bei jedem Zyklus:** `0` = Automatik (Sollleistung ignorieren), `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen (nur Batterie) |
+| ESS-Sollleistung     | `batteries[].ehal_bindings.set_ess_active_power` (`ess.{slug}.*`) | kW; `+` = Entladung, `−` = Ladung; bei Automatik weglassen / 0          |
+| Ladegrenze           | `batteries[].ehal_bindings.set_ess_charge_power_limit` | kW; echte Max. Ladeleistung                                             |
+| Entladegrenze        | `batteries[].ehal_bindings.set_ess_discharge_power_limit` | kW; echte Max. Entladeleistung                                          |
+| Steuerbefehl / ESS-Modus | `batteries[].ehal_bindings.set_ess_mode` | **Pflicht bei jedem Zyklus:** `0` = Automatik (Sollleistung ignorieren), `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen (nur Batterie) |
 | Einspeisegrenze (outbound) | `plant.ehal_bindings.set_grid_export_power_limit` | kW, Betrag ≥ 0; harte Decke für Netz-Einspeisung; `0` = keine Einspeisung; **unbegrenzt = PV-Nennleistung + max. Entladeleistung** |
 | Einspeisegrenze (inbound, optional) | `plant.ehal_bindings.get_grid_export_power_limit` | kW; variable Grenze vom Netz/HEMS → Earnie |
 | Verbraucher-Freigabe | `consumers[].ehal_bindings` (Flex enable) | `0` = gesperrt, `1` = Freigabe (SwimSpa, Wärmepumpe, Filter)            |
 | E-Auto Sollstrom     | `ehal_bindings.set_evcs_max_current` | Ziel-Ladestrom / -leistung                                              |
 | E-Auto PV-Follow     | `ehal_bindings` / `set_evcs_mode`          | `0`/`1` bzw. Modus                                                      |
 
-Frühere Rollen `target_soc_name` und `pv_counter_name` entfallen. Force über `set_ess_active_power`, Grenzen als echte Caps. Loxone-Merker sind **sticky** — Automatik ist `set_ess_mode = 0`, nicht „Sollleistung weggelassen“. PV-Intervallenergie aus ∫ `sens_pv_production_active`.
-Statische HK-Decke: optional `plant.max_export_power_kw` im Hauskonfigurator. Effektive Decke = `min` aus HK, inbound EHAL und **0** wenn der Einspeisetarif negativ ist (Nutzer zahlt für Einspeisung). Config setzt `set_grid_export_power_limit` als Wechselrichter-Curtailment um, am einfachsten als `MIN(Limit; WR-Nennleistung)`: `0` = Einspeisesperre; ohne Begrenzung schreibt Earnie die maximal mögliche Einspeisung der Anlage = Summe der PV-Nennleistungen (kWp) + Summe der maximalen Entladeleistungen aller gewählten Batterien, die zwangsentladen werden können (`Batteriesteuerung = voll`; `limits_only` / `read_only` zählen nicht). Sind beide unbekannt, steht `1000` kW im Merker. ESS-Bindings liegen je Speicher unter entity-scoped `ess.{slug}.*` in `batteries[].ehal_bindings` (plant-flach nur noch als Alias der Primärbatterie). Der Steuerbefehl (`set_ess_mode`) gilt pro Batterie und signalisiert keine Einspeisebegrenzung.
+Frühere Rollen `target_soc_name` und `pv_counter_name` entfallen. Force über `set_ess_active_power`, Grenzen als echte Caps. Virtual-In-Werte sind **sticky** (letzter Wert bleibt am Miniserver) — Automatik ist `set_ess_mode = 0`, nicht „Sollleistung weggelassen“. PV-Intervallenergie aus ∫ `sens_pv_production_active`.
+Statische HK-Decke: optional `plant.max_export_power_kw` im Hauskonfigurator. Effektive Decke = `min` aus HK, inbound EHAL und **0** wenn der Einspeisetarif negativ ist (Nutzer zahlt für Einspeisung). Config setzt `set_grid_export_power_limit` als Wechselrichter-Curtailment um, am einfachsten als `MIN(Limit; WR-Nennleistung)`: `0` = Einspeisesperre; ohne Begrenzung schreibt Earnie die maximal mögliche Einspeisung der Anlage = Summe der PV-Nennleistungen (kWp) + Summe der maximalen Entladeleistungen aller gewählten Batterien, die zwangsentladen werden können (`Batteriesteuerung = voll`; `limits_only` / `read_only` zählen nicht). Sind beide unbekannt, steht `1000` kW im Status. ESS-Bindings liegen je Speicher unter entity-scoped `ess.{slug}.*` in `batteries[].ehal_bindings`. Der Steuerbefehl (`set_ess_mode`) gilt pro Batterie und signalisiert keine Einspeisebegrenzung.
 **Vorzeichenkonvention (verbindlich):** Alle Leistungen, die *ins Haus* fließen, sind positiv. Ohne Wechselrichterverluste gilt:
 
 ```
@@ -97,8 +97,8 @@ Loxone Miniserver                    Earnie
 Telemetrie (VO push / Inbox)  ──►   main.py liest
 E-Auto-Status, Flex-Leistung  ──►   Optimierung (MILP)
                                      │
-Virtuelle Eingänge (VI)       ◄──   status.json (push-only, Q5)
+Virtuelle Eingänge (VI)       ◄──   status.json (push-only)
   poll ~10 s, qualified Checks ◄──   Freigaben / ESS / EV-Soll
 ```
 
-Die Streamlit-App liest Live-Werte für Anzeige (Sankey, SOC) und übernimmt die Optimierung aus dem letzten `main.py`-Durchlauf. Schreibpfad: siehe [EHAL-Com § Q5](../ui/ehal-com.md#q5--write-push-only-27q-qd).
+Die Streamlit-App liest Live-Werte für Anzeige (Sankey, SOC) und übernimmt die Optimierung aus dem letzten `main.py`-Durchlauf. Schreibpfad: siehe [EHAL-Com — Write push-only](../ui/ehal-com.md#write-push-only).

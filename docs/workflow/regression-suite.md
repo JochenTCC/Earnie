@@ -3,7 +3,7 @@
 **Version:** 0.5 (P2 private + intake)  
 **Status:** R-Rec + R0 (reduced) + P1 + **P2** done in Version 2.7; L3 and P3 follow in Version 2.8  
 **Epic short name:** **Regression** (phases **R0**, **R-Rec**, **P1**–**P3**, **L3**)  
-**Related:** [Release Checklist](release-checklist.md), [House simulator](house-sim.md), [Shadow Mode](shadow-mode.md), `tests/fixtures/prod_dumps/README.md`, `.cursor/rules/test-health.mdc`, `optimizer/cbc_solver.py`
+**Related:** [Release Checklist](release-checklist.md), [House simulator](../dev/house-sim.md), [Shadow Mode](../dev/shadow-mode.md), `tests/fixtures/prod_dumps/README.md`, `.cursor/rules/test-health.mdc`, `optimizer/cbc_solver.py`
 
 ## 1. Goal
 

@@ -20,7 +20,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     default_start, default_end = default_training_range()
     parser = argparse.ArgumentParser(
         description=(
-            "Preis-Training-Dataset bauen (Spec: docs/spec/price-forecast-renewables.md). "
+            "Preis-Training-Dataset bauen (Spec: docs/dev/done/price-forecast-renewables.md). "
             "Lädt AT Day-Ahead, EU-Wind/Solar-Erzeugung und EU-Wetter."
         )
     )

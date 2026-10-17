@@ -1,7 +1,7 @@
 """Opt-in anonymous usage ping client (UsagePing P1–P3).
 
 State lives in ``runtime/usage_ping.json``. Nothing is sent unless consent is
-``on`` and ``EARNIE_USAGE_PING`` is not ``off``. See ``docs/spec/usage-ping.md``.
+``on`` and ``EARNIE_USAGE_PING`` is not ``off``. See ``docs/workflow/usage-ping.md``.
 """
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 # EV coming-back / connect prognosis
 
-Developer spec for unplugged-EV charge planning (`forecast_when_absent`). User-facing summary: [flexible-verbraucher.md](../konfiguration/flexible-verbraucher.md) § E-Auto / Verspätete Rückkehr.
+Developer spec for unplugged-EV charge planning (`forecast_when_absent`). User-facing summary: [flexible-verbraucher.md](../../konfiguration/flexible-verbraucher.md) § E-Auto / Verspätete Rückkehr.
 
 ## Goal
 

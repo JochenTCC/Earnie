@@ -2,7 +2,7 @@
 
 Produktiver Southbound für Gerätevolumen in DACH: Earnie spricht den **HA-EHAL-Adapter** (REST) an. **evcc** läuft als Sidecar unter Home Assistant und liefert typische Wallbox-/Zähler-/WR-Entities — Earnie schreibt auf **stabile HA-Entities**, nicht parallel direkt gegen die evcc-API.
 
-Vergleich Loxone / HA / OpenEMS und Umschaltung: [Smarthome-Backend wählen](smarthome-backend-wahl.md). Entwickler-Setup (Compose, Token, Mapping): [HA-Lab Spec](../spec/ha-lab-setup.md).
+Vergleich Loxone / HA / OpenEMS und Umschaltung: [Smarthome-Backend wählen](smarthome-backend-wahl.md). Entwickler-Setup (Compose, Token, Mapping): [HA-Lab Spec](../dev/ha-lab-setup.md).
 
 ## Pfad A2 (Default) vs Pfad B
 
@@ -35,7 +35,7 @@ Persistenz Earnie: `ha_lab/config/` und `ha_lab/runtime/`. HA-Konfiguration: `ha
 
 Entity-IDs liegen wie bei Loxone in **entity-scoped**: `plant.ehal_bindings` / `consumers[].ehal_bindings` im Hausprofil (`house_profiles.json`). In `config.json` bleiben unter `ehal.ha` nur Zugangsdaten-Hinweis/`sign` (URL/Token in `config/.env`). Das frühere flache `ehal.ha.entities` wird beim Laden **einmalig migriert und geleert** — neue Installationen nicht mehr befüllen.
 
-**Live-Laufzeit — Transport:** In `config.json` unter `ehal.ha.transport`: **`pull`** (Standard, unten) oder **`weg_b`** (gleicher HTTP-Vertrag wie Loxone: Push nach `/ehal/telemetry/…`, Setpoints per `GET /ehal/status.json`; Details und **EHAL-Basiseinheiten auf der Push-Leitung** in der [EHAL-Spec § Home Assistant](../spec/ehal.md#implementation-notes--home-assistant--evcc)). **`weg_b`** schaltet die Live-Pfade auf Push und `status.json` um; bisher nur im Labor erprobt — im Produktivbetrieb weiterhin **`pull`** verwenden.
+**Live-Laufzeit — Transport:** In `config.json` unter `ehal.ha.transport`: **`pull`** (Standard, unten) oder **`weg_b`** (gleicher HTTP-Vertrag wie Loxone: Push nach `/ehal/telemetry/…`, Setpoints per `GET /ehal/status.json`; Details und **EHAL-Basiseinheiten auf der Push-Leitung** in der [EHAL-Spec § Home Assistant](../referenz/ehal.md#implementation-notes--home-assistant--evcc)). **`weg_b`** schaltet die Live-Pfade auf Push und `status.json` um; bisher nur im Labor erprobt — im Produktivbetrieb weiterhin **`pull`** verwenden.
 
 **Live-Laufzeit (`pull`, HA-Adapter):** Es werden die von `aggregate_ha_entities` / `HA_ALL_FIELDS` aggregierten Felder gelesen und geschrieben — typisch Anlagen-Leistungen/ESS (`sens_grid_*`, `sens_pv_*`, `sens_ess_*`, optionale Energiezähler, ESS-Setpoints), optionales Plant-Signal `sens_absent_mode` (Abwesenheitsmodus, Side-Channel), plus am **ersten EV**-Verbraucher `sens_evcs_active_power` / `set_evcs_max_current` / `set_evcs_mode`. Weitere Mapping-Zeilen (z. B. Außentemperatur, EV-SoC/connected, Flex-/Pool-Felder) können in der UI gespeichert werden, greifen im HA-Live-Pfad aber **noch nicht**.
 
@@ -56,7 +56,7 @@ Voraussetzung: Integration **evcc☀️🚘- Solar Charging** zeigt Geräte unte
 4. Vorzeichen: EHAL Netz **+** = Bezug, ESS **+** = Entladen; bei abweichender Integration **negate** (weiterhin unter `ehal.ha.sign`).
 5. Erfolg: Telemetrie-Test OK, `config.json` mit `ehal.backend=ha`, Bindings im Hausprofil, Live ohne „Kein Zugriff auf EHAL SoC“.
 
-Schritt-für-Schritt (Englisch, inkl. Abnahmetabelle): [HA-Lab Spec §5.1](../spec/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up). Installation der Integration: [§3.5 Option 2](../spec/ha-lab-setup.md#35-expose-evcc-entities-into-home-assistant).
+Schritt-für-Schritt (Englisch, inkl. Abnahmetabelle): [HA-Lab Spec §5.1](../dev/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up). Installation der Integration: [§3.5 Option 2](../dev/ha-lab-setup.md#35-expose-evcc-entities-into-home-assistant).
 
 ## Optimizer-Exklusivität (Checkliste)
 

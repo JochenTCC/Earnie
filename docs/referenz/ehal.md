@@ -4,11 +4,11 @@
 **History (backlog):** `2.4.a` (M1) → `2.4.j` (wire rename) → `2.4.k` (entity mapping) → `2.4.o` (Design C1 `set_ess_active_power`) → `2.7.h` (source select) → `2.7.l` (inverter entity)  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 §2.2, §2.5 Phase 1, §2.6  
 **Canonical field names:** `[docs/ui/ehal-com.md](../ui/ehal-com.md)` §B / §C  
-**Schemas:** `[share/ehal/](../../share/ehal/)`  
-**Python:** `[ehal/](../../ehal/)`  
-**Lab mapping (OpenEMS):** `[openems-testing-platform-todo.md](openems-testing-platform-todo.md)`  
-**Lab setup (Compose + Earnie ↔ OpenEMS):** `[openems-lab-setup.md](openems-lab-setup.md)`  
-**Lab setup (Compose + Earnie ↔ HA + evcc):** `[ha-lab-setup.md](ha-lab-setup.md)`
+**Schemas:** `[share/ehal/](../../share/ehal)`  
+**Python:** `[ehal/](../../ehal)`  
+**Lab mapping (OpenEMS):** `[openems-testing-platform-todo.md](../dev/openems-testing-platform-todo.md)`  
+**Lab setup (Compose + Earnie ↔ OpenEMS):** `[openems-lab-setup.md](../dev/openems-lab-setup.md)`  
+**Lab setup (Compose + Earnie ↔ HA + evcc):** `[ha-lab-setup.md](../dev/ha-lab-setup.md)`
 
 ## Purpose and naming
 
@@ -343,7 +343,7 @@ Numeric hub-tolerance thresholds beyond the above are left to adapter implementa
 
 ## OpenEMS light alignment
 
-Fields map to known OpenEMS Edge channels (semantic reference). Channel architecture, Compose, and lab write tests: `[openems-lab-setup.md](openems-lab-setup.md)`.
+Fields map to known OpenEMS Edge channels (semantic reference). Channel architecture, Compose, and lab write tests: `[openems-lab-setup.md](../dev/openems-lab-setup.md)`.
 
 
 | EHAL field                      | OpenEMS (prototype)                                                                                                                         |
@@ -389,10 +389,10 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Device-role schema      | `[share/ehal/device_roles.schema.json](../../share/ehal/device_roles.schema.json)`                                   | Groups M1 fields by role; optional per-field `loxone` / `openems` conversion blocks |
 | Field registry          | `[ehal/field_registry.py](../../ehal/field_registry.py)`                                                             | Loads hub blocks; `apply_loxone_read` / `apply_loxone_write` (+ OpenEMS apply)       |
-| Role instances          | `[share/ehal/roles/](../../share/ehal/roles/)`                                                                       | One JSON per `role_id`                                                               |
+| Role instances          | `[share/ehal/roles/](../../share/ehal/roles)`                                                                       | One JSON per `role_id`                                                               |
 | Hardware-profile schema | `[share/hardware_profiles/hardware_profile.schema.json](../../share/hardware_profiles/hardware_profile.schema.json)` | SunSpec / proprietary Modbus outline → EHAL bindings                                 |
-| Outline examples        | `[share/hardware_profiles/examples/](../../share/hardware_profiles/examples/)`                                       | `sunspec_inverter_ess.outline.json`, `huawei_via_loxone.outline.json`                |
-| Loxone recipes          | `[share/loxone/recipes/](../../share/loxone/recipes/)`                                                               | JSON Merker / Baustein tips → `ehal_bindings` (no `.loxone` binary)                  |
+| Outline examples        | `[share/hardware_profiles/examples/](../../share/hardware_profiles/examples)`                                       | `sunspec_inverter_ess.outline.json`, `huawei_via_loxone.outline.json`                |
+| Loxone recipes          | `[share/loxone/recipes/](../../share/loxone/recipes)`                                                               | JSON Merker / Baustein tips → `ehal_bindings` (no `.loxone` binary)                  |
 | Python loader           | `[ehal/profiles.py](../../ehal/profiles.py)`                                                                         | `list_*` / `load_*` + HITL `role_field_labels` / `group_fields_by_role`              |
 
 
@@ -410,7 +410,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 ## Implementation notes — OpenEMS
 
 - Adapter: `integrations/openems_adapter.py` (REST only). Live façade: `integrations/ehal_live.py`.
-- Compose lab: `docker/compose/openems-lab.yml`. Config snippet: `share/config/ehal.openems.snippet.json`. Step-by-step: `[openems-lab-setup.md](openems-lab-setup.md)`.
+- Compose lab: `docker/compose/openems-lab.yml`. Config snippet: `share/config/ehal.openems.snippet.json`. Step-by-step: `[openems-lab-setup.md](../dev/openems-lab-setup.md)`.
 - Cadence: Core expects ≥ 60 s telemetry refresh; adapter may poll faster.
 - EVCS: EHAL `set_evcs_max_current` (A) → OpenEMS `evcs0/SetChargePowerLimit` (W) via house-profile V/phases.
 - Optional absent / holiday: set `plant.ehal_bindings.sens_absent_mode` to `componentId/ChannelId` (read via `read_channel`; no HITL plant mapper yet).
@@ -438,9 +438,9 @@ Values in the telemetry URL path must already be in **canonical EHAL units** (§
 - Config: `ehal.backend=ha`; `ehal.ha.transport` as above; URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` under `ehal.ha` in `config.json`. Loader: `settings/config_loaders.load_ehal_params` → `EHAL_HA_TRANSPORT` (invalid values raise). Snippet: `share/config/ehal.ha.snippet.json`.
 - Entity IDs in `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` (entity-scoped; ESS per battery). **pull:** required for live I/O. **weg_b:** HITL mapping remains the contract UI; live reads/writes move to push + `status.json` (T2/T3). Legacy flat `ehal.ha.entities` migrated once and cleared.
 - Live aggregation (`aggregate_ha_entities`) for **pull**: plant grid/PV/export + optional energy counters + `sens_absent_mode`; battery `ess.{slug}.*`; inverter `inv.{id}.*`; first EV EVCS fields; extras saved in HITL may be ignored until wired. Built-in inverter devices may map `ess.{id}.*` and `inv.{id}.*` to the same HA device (Kennungen differ; `owned_by` links them).
-- Compose lab: `docker/compose/ha-lab.yml`. Setup: `[ha-lab-setup.md](ha-lab-setup.md)`. German A2/B: `[../einrichtung/ha-evcc.md](../einrichtung/ha-evcc.md)`.
+- Compose lab: `docker/compose/ha-lab.yml`. Setup: `[ha-lab-setup.md](../dev/ha-lab-setup.md)`. German A2/B: `[../einrichtung/ha-evcc.md](../einrichtung/ha-evcc.md)`.
 - HITL: `ui/ehal_ha_mapping.py` on EHAL-Com; heuristic `integrations/ha_ehal_mapping.py` + `ha_units` on **pull**.
-- Optional slot-Ist energy (pull path): `integrations/ha_meter_energy.py` — see `[loxone-meter-energy-slot-ist.md](loxone-meter-energy-slot-ist.md)`.
+- Optional slot-Ist energy (pull path): `integrations/ha_meter_energy.py` — see `[loxone-meter-energy-slot-ist.md](../dev/done/loxone-meter-energy-slot-ist.md)`.
 - Sign mode: `ehal.ha.sign` (`ehal` | `negate`) applies to **pull** adapter reads/writes.
 - **pull** setpoints: `number.set_value` on mapped entities. **weg_b** setpoints: poll `status.json` (T3); `plant.ha_ess_force` / Huawei forcible charge stays REST exception when configured.
 - Optimizer exclusivity + Modbus: `ha-evcc.md`. Same Live façade / write-error path as OpenEMS (`is_ehal_network_backend()`).
@@ -466,7 +466,7 @@ Values in the telemetry URL path must already be in **canonical EHAL units** (§
 - **Greenfield presence probe:** `integrations/loxone_greenfield_import.probe_marker_names` classifies known `greenfield_device_map.json` names against LoxAPP3 control names (no Merker HTTP). EFM meters still need LoxAPP3.
 - HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Heuristic proposals + manual selects; confirm writes `plant` / `consumers[].ehal_bindings` via house profiles, ESS via `batteries[].ehal_bindings`, and inverter via `inverters[].ehal_bindings` on `components.json`. Field rows grouped by device role (incl. Wechselrichter).
 - Optional LLM (code retained, **not** exposed in UI): local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP.
-- EFM interpretation C (meter tree → Hausprofil consumers + optional flex power): research note `[efm-auto-sync.md](efm-auto-sync.md)`; library `integrations/loxone_efm_meters.py` via greenfield `merge_efm` (Smarthome-Backend Loxone-Import).
+- EFM interpretation C (meter tree → Hausprofil consumers + optional flex power): research note `[efm-auto-sync.md](../dev/done/efm-auto-sync.md)`; library `integrations/loxone_efm_meters.py` via greenfield `merge_efm` (Smarthome-Backend Loxone-Import).
 
 
 

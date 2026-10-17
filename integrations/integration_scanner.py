@@ -3,7 +3,7 @@
 Suggestions only — nothing here writes config or connects to a backend; callers
 (the Smarthome-Backend UI page) must get explicit user confirmation before
 persisting a result. See ``backlog/SB-Identification-Draft.md`` for the design
-and ``docs/spec/smarthome-backend-page.md`` for how this module is used.
+and ``docs/dev/done/smarthome-backend-page.md`` for how this module is used.
 
 Passive methods (mDNS for Home Assistant, SSDP/UPnP for Loxone) are verified
 against real hardware (Home Assistant 2026.8, Loxone Miniserver-Gen2). The

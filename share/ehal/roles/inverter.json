@@ -86,5 +86,5 @@
       "notes": "True when set_inv_ac_power_limit can be written (omitted = false)."
     }
   ],
-  "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention / Inverter topology."
+  "unit_sign_notes": "See docs/referenz/ehal.md § Units and sign convention / Inverter topology."
 }

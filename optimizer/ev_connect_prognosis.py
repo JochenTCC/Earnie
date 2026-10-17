@@ -1,6 +1,6 @@
 """EV connect / coming-back prognosis phases (unplugged + forecast_when_absent).
 
-See docs/spec/ev-return-prognosis.md.
+See docs/dev/done/ev-return-prognosis.md.
 """
 from __future__ import annotations
 

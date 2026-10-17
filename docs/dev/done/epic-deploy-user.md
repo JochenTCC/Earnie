@@ -1,6 +1,6 @@
 # Epic: Automatisierte Multi-Plattform-Builds für GitHub Releases via GitHub Actions
 
-**Status:** historical draft — superseded for container/release flow by [`branching-hotfix-playbook.md`](branching-hotfix-playbook.md) and `.github/workflows/release.yml` (GHCR + GitHub Release). Native `.exe`/`.dmg` packaging below was never the shipping path.
+**Status:** historical draft — superseded for container/release flow by [`branching-hotfix-playbook.md`](../../workflow/branching-hotfix-playbook.md) and `.github/workflows/release.yml` (GHCR + GitHub Release). Native `.exe`/`.dmg` packaging below was never the shipping path.
 
 ---
 

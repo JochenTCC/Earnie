@@ -19,7 +19,7 @@ Cursor is master: rule + skill live in `.cursor/`; Claude Code follows them via 
 | `.github/release-notes/UNRELEASED.md` | Manual collector for breaking / user-action items *(exists)* |
 | `scripts/migration_release_notes.py --since <tag>` | Drafts the `## Migration` section from the step registry *(exists)* |
 | `scripts/bump_ha_addon.py` | Copies the **first prose line** of the notes into the HA add-on `CHANGELOG.md` *(exists)* |
-| `docs/spec/release-checklist.md` §1 | Lists "write notes before tag" but no drafting / review gate |
+| `docs/workflow/release-checklist.md` §1 | Lists "write notes before tag" but no drafting / review gate |
 | `session-abschluss` skill | Checklist item "release notes exist or default notes are OK" — the "default OK" is the loophole |
 | Tags | Productive `vX.Y.Z`; pre-release `vX.Y.Z-alpha.N/-beta.N/-rc.N`; dev tags `2.7.0-dev.N` (**no `v`**, no CI trigger) |
 
@@ -62,7 +62,7 @@ Refuses with exit 2 when target contains `-dev.`. Writes an **evidence pack** (`
 
 AI steps:
 
-1. Run collect; read evidence pack. Read `docs/spec/release-checklist.md` §1 for required sections.
+1. Run collect; read evidence pack. Read `docs/workflow/release-checklist.md` §1 for required sections.
 2. Classify every evidence item: **Highlight / Feature / Improvement / Fix / Data model & migration / Platform-specific / Internal (omit)**. Internal = refactors, tests, backlog bookkeeping, sonar, spikes. When unsure: list under a separate `<!-- REVIEW: … -->` marker rather than guessing.
 3. Write the draft to **`.github/release-notes/drafts/v<target>.draft.md`** (never directly to `v<target>.md`). Structure:
 
@@ -114,7 +114,7 @@ Replace the silent generic-notes fallback in step "Prepare release notes":
 | `.cursor/skills/release-notes/SKILL.md` (new) | Section 4.1–4.4 as agent procedure |
 | `.cursor/rules/versioning.mdc` | One line: pre-release / official publish requires reviewed notes; `-dev` has none |
 | `.cursor/skills/session-abschluss/SKILL.md` | Publish guide **B/C**: first step = run `release-notes` skill if no reviewed `v<ver>.md`; **A / dev bump**: skip. Replace checklist item "or default notes are OK" with "reviewed notes exist (finalized)" |
-| `docs/spec/release-checklist.md` §1 | Replace manual "write notes" bullets with the pipeline; keep Migration + HA-changelog bullets as review criteria |
+| `docs/workflow/release-checklist.md` §1 | Replace manual "write notes" bullets with the pipeline; keep Migration + HA-changelog bullets as review criteria |
 | `.github/release-notes/UNRELEASED.md` | Header text: now explicitly "maintainer hints, input for the draft" |
 | `CLAUDE.md` | Pointer line under *Versioning, backlog, branching*: "Release notes: `.cursor/rules/release-notes.mdc` — drafts only, never final without review" |
 | `scripts/migration_release_notes.py` | Unchanged; imported by collect |

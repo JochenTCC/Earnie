@@ -2,7 +2,7 @@
 
 **Status:** Phase 1 (AC-path η_inv / η_batt) **implemented**. Multi-inverter live PV attribution **implemented** (derive + first `pv.{id}.*`; curtailment still forecast weights).  
 **Origin:** Inverter follow-ups after **2.7.l** (epic **Inverter**)  
-**Related:** [`ehal.md`](ehal.md) (plant PV sum + derive), [`optimizer/milp_horizon.py`](../../optimizer/milp_horizon.py), [`optimizer/milp_inverter.py`](../../optimizer/milp_inverter.py), [`integrations/pv_attribution.py`](../../integrations/pv_attribution.py)
+**Related:** [`ehal.md`](../../referenz/ehal.md) (plant PV sum + derive), [`optimizer/milp_horizon.py`](../../../optimizer/milp_horizon.py), [`optimizer/milp_inverter.py`](../../../optimizer/milp_inverter.py), [`integrations/pv_attribution.py`](../../../integrations/pv_attribution.py)
 
 ## Guiding principle
 
@@ -18,7 +18,7 @@ e[t] = e[t−1] + (P_chg · η − P_dis / η) · dt_h
 
 Round-trip energy factor ≈ **η²**. `P_chg` / `P_dis` sit on the house **AC** balance; η never appears as an AC loss term.
 
-Inverter MILP ([`milp_inverter.py`](../../optimizer/milp_inverter.py)) applies DC/AC **clipping** only (`pv_dc` → AC clip). DC↔AC conversion efficiency is explicitly deferred.
+Inverter MILP ([`milp_inverter.py`](../../../optimizer/milp_inverter.py)) applies DC/AC **clipping** only (`pv_dc` → AC clip). DC↔AC conversion efficiency is explicitly deferred.
 
 **Side effect:** PV→load and grid↔load through the inverter are lossless; only storage cycling is punished. The solver therefore under-penalises “use the inverter, avoid the battery” relative to reality. When inverter losses are introduced, battery chemistry η should be **higher** than today’s lumped value, because part of today’s η already stands in for the inverter.
 
@@ -81,7 +81,7 @@ When efficiency is implemented:
 
 ## Multi-inverter live attribution of `sens_pv_production_active`
 
-**Implemented** in [`integrations/pv_attribution.py`](../../integrations/pv_attribution.py) + `prepare_live_telemetry` in [`integrations/ehal_live.py`](../../integrations/ehal_live.py).
+**Implemented** in [`integrations/pv_attribution.py`](../../../integrations/pv_attribution.py) + `prepare_live_telemetry` in [`integrations/ehal_live.py`](../../../integrations/ehal_live.py).
 
 ### Topology
 
@@ -131,6 +131,6 @@ flowchart TB
 
 ## Pointers
 
-- EHAL plant PV sum and optional Σ derive: [`ehal.md`](ehal.md) § PV / out of scope
-- Inverter entity draft (historical): [`backlog/EHAL-Inverter-Draft.md`](../../backlog/EHAL-Inverter-Draft.md)
-- Backlog: Inverter follow-ups in [`backlog/Backlog.md`](../../backlog/Backlog.md)
+- EHAL plant PV sum and optional Σ derive: [`ehal.md`](../../referenz/ehal.md) § PV / out of scope
+- Inverter entity draft (historical): [`backlog/EHAL-Inverter-Draft.md`](../../../backlog/EHAL-Inverter-Draft.md)
+- Backlog: Inverter follow-ups in [`backlog/Backlog.md`](../../../backlog/Backlog.md)

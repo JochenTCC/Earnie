@@ -18,7 +18,9 @@ End-user documentation is **German**. Do not translate it to English unless the 
 | `docs/ui/` | Streamlit-Oberfläche, Charts, Betrieb |
 | `docs/referenz/` | Loxone-Signale, Ports, Tabellen |
 
-**Not user docs:** `docs/spec/` (Entwickler-Specs, English OK), `docs/entwicklung/` (Entwickler-Betrieb, z. B. Shadow-Modus), `Backlog*.md`. Root `README.md` is the public landing (German prose OK; keep in sync with user docs when facts change).
+**Not user docs:** `docs/workflow/` (Entwickler-Abläufe, English), `docs/entwicklung/` (Entwickler-Betrieb, z. B. Shadow-Modus), `docs/dev/` (working notes, drafts; `docs/dev/done/` = finished/historical — excluded from doc reviews and the quality gate), `Backlog*.md`. Root `README.md` is the public landing (German prose OK; keep in sync with user docs when facts change).
+
+**New developer and design documents** (specs, plans, research, lab setups) go to `docs/dev/` and are written in **English**. Finished ones move to `docs/dev/done/`.
 
 ## When editing or adding user docs
 
@@ -31,8 +33,9 @@ End-user documentation is **German**. Do not translate it to English unless the 
 
 - Brief English fragments (UI labels, proper nouns, API names) inside German docs are fine.
 - Do **not** silently anglicize whole sections or migrate user docs to English.
+- **`docs/referenz/ehal.md`** — English developer contract (EHAL), not a user doc; do not translate.
 - **`docs/ui/ehal-com.md`** — intentionally **English** (operator deep-dive / field tables). Do not translate to German unless the user asks.
-- **HouseSim** (`docs/spec/house-sim.md`, `house_sim/`) — internal lab/dev only. Do not add to the German Anwender-TOC under Einrichtung; keep under Entwickler-Specs.
+- **HouseSim** (`docs/dev/house-sim.md`, `house_sim/`) — internal lab/dev only. Do not add to the German Anwender-TOC under Einrichtung; keep under Entwickler-Specs.
 
 ## Relation to other rules
 
@@ -41,7 +44,7 @@ End-user documentation is **German**. Do not translate it to English unless the 
 
 ## Internal (`[dev]`) features
 
-Features marked `[dev]` in the backlog (Shadow Mode, HouseSim, test/analysis tooling) must **not** be described in user docs. Put such content under `docs/spec/` (English) or, for developer operations, `docs/entwicklung/` (German). `[qual]` items may get at most a short note. `tests/test_user_docs_audience.py` checks `dev_terms` from `.github/release-notes/audience.toml`; its `docs_allowlist` is a shrinking baseline — never add to it.
+Features marked `[dev]` in the backlog (Shadow Mode, HouseSim, test/analysis tooling) must **not** be described in user docs. Put such content under `docs/dev/` (English: lab setups, HouseSim, Shadow Mode, design docs, drafts), `docs/workflow/` (English, maintained process docs) or, for developer operations, `docs/entwicklung/` (German). `[qual]` items may get at most a short note. `tests/test_user_docs_audience.py` checks `dev_terms` from `.github/release-notes/audience.toml`; its `docs_allowlist` is a shrinking baseline — never add to it.
 
 ## No internal backlog version IDs
 

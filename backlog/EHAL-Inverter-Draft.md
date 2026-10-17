@@ -1,7 +1,7 @@
 # EHAL — Inverter entity: doc change draft (2.7.l)
 
 **Status:** draft, nothing applied. Backlog: [Backlog.md](Backlog.md) → **2.7.l — Inverter entity**.
-**Target files:** [`docs/spec/ehal.md`](../docs/spec/ehal.md) and [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) (both English). Apply in **Inverter P4**; German user docs (`docs/konfiguration/batterie-pv.md`) follow in **Inverter P2**.
+**Target files:** [`docs/referenz/ehal.md`](../docs/referenz/ehal.md) and [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) (both English). Apply in **Inverter P4**; German user docs (`docs/konfiguration/batterie-pv.md`) follow in **Inverter P2**.
 
 Decided: wire `schema_version` stays **4** (2.7 is unreleased, all new fields are optional). No version bump in the envelope row or section titles.
 
@@ -26,7 +26,7 @@ An inverter is a first-class device (`components.json` → `inverters[]`). PV sy
 
 ---
 
-## Changes to `docs/spec/ehal.md`
+## Changes to `docs/referenz/ehal.md`
 
 ### 1. Header / history
 

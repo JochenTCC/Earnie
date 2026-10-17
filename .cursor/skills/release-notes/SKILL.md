@@ -11,7 +11,7 @@ description: >-
 
 # Release notes (draft → review → final)
 
-Rule: `.cursor/rules/release-notes.mdc` · Spec: `docs/spec/release-notes-workflow.md`.
+Rule: `.cursor/rules/release-notes.mdc` · Spec: `docs/workflow/release-notes-workflow.md`.
 
 ## 1. Preconditions
 

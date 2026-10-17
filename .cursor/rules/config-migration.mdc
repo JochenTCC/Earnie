@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Config migration — registry only
 
-Persisted config pack JSON must not be reshaped silently. Spec: [`docs/spec/config-migration.md`](../../docs/spec/config-migration.md). Design history: [`backlog/Config-Migration-Draft.md`](../../backlog/Config-Migration-Draft.md).
+Persisted config pack JSON must not be reshaped silently. Spec: [`docs/workflow/config-migration.md`](../../docs/workflow/config-migration.md). Design history: [`backlog/Config-Migration-Draft.md`](../../backlog/Config-Migration-Draft.md).
 
 ## Tracks
 

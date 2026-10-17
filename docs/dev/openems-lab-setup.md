@@ -12,7 +12,7 @@
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `[docker/compose/openems-lab.yml](../../docker/compose/openems-lab.yml)`                 | Reference Compose                                                               |
 | `[openems-testing-platform-todo.md](openems-testing-platform-todo.md)`                   | OpenEMS-only plant checklist (simulators, REST channels) — first verified on Pi |
-| `[ehal.md](ehal.md)`                                                                     | Frozen EHAL contract                                                            |
+| `[ehal.md](../referenz/ehal.md)`                                                                     | Frozen EHAL contract                                                            |
 | `[share/config/ehal.openems.snippet.json](../../share/config/ehal.openems.snippet.json)` | Config fragment to merge into Earnie `config.json`                              |
 
 
@@ -150,7 +150,7 @@ For **read-only** communication check, silent mode can stay on.
 For **write** acceptance (ESS / EVCS setpoints from Live):
 
 - Set `openems_lab/runtime/local_settings.json` → `"loxone_silent_mode": false`  
-(same flag gates OpenEMS southbound writes; see `[ehal.md](ehal.md)` implementation notes).
+(same flag gates OpenEMS southbound writes; see `[ehal.md](../referenz/ehal.md)` implementation notes).
 
 
 

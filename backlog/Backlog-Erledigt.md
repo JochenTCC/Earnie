@@ -2,6 +2,27 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Preisprognose EU-Features Spiegelung (2026-10-17)
+
+- [x] **Preisprognose: EU-Features → Spiegelung (NAS)** — **Verified** (2026-10-17)
+  - Symptom: frequent `Preisprognose: EU-Features nicht ladbar (ValueError, mode=live_forecast) — Spiegelung als Fallback`.
+  - Cause: all-or-nothing Energy-Charts load — one flaky country (e.g. Italy timeout under `GLOBAL_TIMEOUT=5`) aborted the whole EU power day → mirror for green slots.
+  - Fix: soft-skip failed countries and sum the rest; Energy-Charts HTTP timeout floor 30s; warning includes exception text. Mirror only if every country fails.
+  - Tests: `tests/test_eu_market_features.py` (`test_fetch_eu_power_hourly_skips_failed_country`, `test_fetch_eu_power_hourly_raises_when_all_countries_fail`, `test_energy_charts_timeout_floors_at_30`).
+
+### Document Review P1 DE Check fact fixes (2026-10-17)
+
+- [x] **Priority-1 German docs Check** against code (checklist § 2026-10-17); clear fact/link fixes applied
+  - Data model: `speichern-laden.md` → `earnie_data_model` **4** (import 4 / migrate 3).
+  - Container: alpha pin `2.6.1-beta.1`, backtick link, drop `2.0 P6` / obsolete log rename.
+  - HA add-on: link → `ha-evcc.md`, `usage_ping` option, uninstall `addon_configs` + `/data`, drop stale 2.6 version wording.
+  - Loxone: ESS writes on `batteries[].ehal_bindings` / `ess.{slug}.*`; sticky = Virtual In; Write push-only anchor.
+  - `loxone-signals.md`: Signalliste anchors, drop Q5/Q8/P4, add `VO_Earnie_Battery.xml`.
+  - Ports/README: venv **8501** (not 8531); HA add-on in Betrieb + install table; roadmap 2.7/2.8.
+  - Misc: `smarthome-backend` backlog draft link removed; `batterie-pv` / `flexible-verbraucher` epic IDs + Nennleistung wording; loxberry backtick links.
+  - Verified OK (no doc change): Sankey Flex/EV-SoC still Loxone-only; handbook Jahres-Verbrauch explicit anchors; `preise.md` Leistungspreis; `overview.md`.
+  - Checklist: all Priority-1 DE **Check = x**. Style and maintainer decisions remain open in Findings.
+
 ### Cleanup — drop `/alive`; keep `heartbeat` (2026-10-17)
 
 - [x] **Hard-remove `GET /ehal/loxone/alive` / `Earnie_Push_Alive`** `[qual]` — hub→Earnie link proof is synthetic `heartbeat` only
@@ -414,7 +435,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Prod `meta.json` advertises `loxone_feed: "push"` when `ehal_backend` is Loxone (`runtime_store/shadow/feed.py`)
   - Shadow startup refuses Loxone feeds without that capability (`runtime_store/shadow/startup.py`)
   - Deleted Prod-inbox file fallback / path sniff; Shadow VO reads are feed-only (`runtime_store/loxone_push_inbox.py`); Merker-superset stays no-op
-  - Spec / docs: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) §5.3 / §5.4 / §11.1 / §12; [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md); review §3 R2
+  - Spec / docs: [`docs/dev/shadow-mode.md`](../docs/dev/shadow-mode.md) §5.3 / §5.4 / §11.1 / §12; [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md); review §3 R2
   - Tests: capability + startup refuse; feed-miss ignores Prod inbox; keep push→feed / `test_superset_loxone_is_noop`
   - Open remain were **R3–R4** (R3 → archive above)
 
@@ -444,7 +465,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] Review entire Shadow architecture after 2.7 changes and propose refactoring (attention: post-commit bugfixes) `[dev]`
   - Verdict: S1–S3 match the spec; debt is call-site scatter + Prod-inbox fallback compat — not a broken core
   - Classification: keep push-only Loxone feed, `is_shadow_config_readonly` (shared vs private), `should_invoke_setpoint_writes`; retire inbox-file fallback only after R2 capability gate; do not revive Merker-superset
-  - Proposal: **R1–R4** in [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); locked in [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) §11.1 / §12
+  - Proposal: **R1–R4** in [`Shadow-Architecture-Review.md`](Shadow-Architecture-Review.md); locked in [`docs/dev/shadow-mode.md`](../docs/dev/shadow-mode.md) §11.1 / §12
   - Proposal-only at the time; R1–R4 implemented and archived above (2026-10-12)
 
 ### Thermal Wärmeinhalt — latest-12 forecast fan (2026-10-11)
@@ -470,7 +491,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **T1 — Contract & transport switch:** `[feat]` Single Earnie↔HA I/O story in `docs/spec/ehal.md` and user docs; config `ehal.ha.transport` (`pull`|`weg_b`, default `pull`) via `runtime_store/ehal_setup.py` / `settings/config_loaders.py`; canonical `GET /ehal/status.json` with `/ehal/loxone/status.json` alias (`integrations/loxone_status_json.py`); HA push telemetry on the wire in canonical EHAL units (W/kWh/%/A; carrier converts in HA).
 - [x] **T2 — HA → Earnie push read:** `[feat]` With `transport=weg_b`, `integrations/ha_adapter.py` reads activated fields from the push inbox (`integrations/ha_push_read.py`, `runtime_store/loxone_push_inbox.py`); REST is fenced for push-covered fields; missing/stale push fails loud (no pull fallback).
 - [x] **T3 — Earnie → HA via status.json:** `[feat]` Setpoints published to the status ledger for weg_b; service-call writes skipped for covered fields (`integrations/ehal_live.py`); `ha_ess_force`/Huawei paths remain REST exceptions.
-- [x] **T4 — Minimal carrier YAML + lab:** `[feat]` `scripts/ha_carrier_yaml_gen.py` + `integrations/ha_carrier_yaml.py`, example `share/config/ehal.ha.snippet.json`, lab checklist in `docs/spec/ha-lab-setup.md` §9 (not Add-on / full Binding P5 comfort).
+- [x] **T4 — Minimal carrier YAML + lab:** `[feat]` `scripts/ha_carrier_yaml_gen.py` + `integrations/ha_carrier_yaml.py`, example `share/config/ehal.ha.snippet.json`, lab checklist in `docs/dev/ha-lab-setup.md` §9 (not Add-on / full Binding P5 comfort).
 
 ### Rename Pattern B → entity-scoped bindings (2026-10-11)
 
@@ -951,7 +972,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Version 2.6 — Enhancements for HA coupling** `[feat]` (chapter closed; official **2.6.0** on `main`, supersedes **2.5.3** on `:latest`)
   - Scope: easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (entity-scoped, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items in [Backlog.md](Backlog.md). Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
-  - Documents: [House simulator spec](../docs/spec/house-sim.md) (HouseSim S1–S4); [EHAL spec — entity-scoped / Loxone HITL](../docs/spec/ehal.md); [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) (channel work **2.6.k**)
+  - Documents: [House simulator spec](../docs/dev/house-sim.md) (HouseSim S1–S4); [EHAL spec — entity-scoped / Loxone HITL](../docs/spec/ehal.md); [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) (channel work **2.6.k**)
   - Letter archive: **2.6.a**…**2.6.p**, **2.6.r**, alphas through **2.6.0-alpha.12**, and official **2.6.0** — see sections below in this file
 
 ### 2.7.j — Additional ESS parameters (2026-10-03)
@@ -1046,7 +1067,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 ### 2.7.f — Shadow Mode S2+S3: Dev client (2026-09-29)
 
 - [x] **2.7.f — Shadow Mode S2+S3: Dev client** (depends on Prod running **2.6.o** recorder)
-  - Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) — `EARNIE_SHADOW=1` only (`runtime_store.shadow.is_shadow_mode()`); implies silent; never a config key
+  - Spec: [`docs/dev/shadow-mode.md`](../docs/dev/shadow-mode.md) — `EARNIE_SHADOW=1` only (`runtime_store.shadow.is_shadow_mode()`); implies silent; never a config key
   - **S2:** transport replay (§6.1–6.2), central write block + `shadow_writes.jsonl` (§6.3), config read-only / skip load-time migrations that write (§6.4), startup checks (§4.2), release guard (§4.4); own mandatory runtime dir + optional `scripts.shadow_seed_runtime`
   - Accept Prod’s `earnie_data_model` if in `COMPATIBLE_DATA_MODELS`; never migrate/re-stamp shared config. No Shadow `config_overlay` in v1 (Prod-rejected keys not testable)
   - **S3:** UI banner + feed health + would-write table; `EARNIE_UI_STREAMLIT_PORT`; German user docs (`docs/einrichtung/`) + `DEVELOPER.md`
@@ -1162,7 +1183,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.6.o — Shadow Mode S1: Prod feed recorder (2026-09-28)
 
-- [x] **2.6.o — Shadow Mode S1 (Prod recorder)** — Spec: [`docs/spec/shadow-mode.md`](../docs/spec/shadow-mode.md) (Epic **Shadow**; S1 only). Ships in a **2.6** Prod build so Dev can feed Shadow during **2.7**.
+- [x] **2.6.o — Shadow Mode S1 (Prod recorder)** — Spec: [`docs/dev/shadow-mode.md`](../docs/dev/shadow-mode.md) (Epic **Shadow**; S1 only). Ships in a **2.6** Prod build so Dev can feed Shadow during **2.7**.
   - Opt-in `"shadow_feed_enabled": true` (+ optional `"shadow_feed_retention_days"`, default 14) in Prod `local_settings.json`; default off; ignored + warning if `EARNIE_SHADOW=1`
   - Record raw backend responses at transport primitives (Loxone `fetch_loxone_raw_value` / `_fetch_loxone_io_all`, HA `HaAdapter._get_json`, OpenEMS GET, `ext:pv_forecast` / prices / outdoor, optimize-trigger events) — no secrets/auth in records
   - Feed layout under `{config_dir}/shadow_feed/` (`meta.json`, atomic `latest.json`, daily JSONL + retention); override `EARNIE_SHADOW_FEED_PATH`
@@ -1304,7 +1325,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### HouseSim S2 — Vendor archetypes (2026-09-26)
 
-- [x] **HouseSim S2 — 2–3 more hand-authored archetypes on the same physics; write-back per archetype.** Three archetypes (vendor choice by AT/DE market share), entities checked against the integration source code; provenance, verified and unverified points per archetype in `meta.json`. Spec: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md) § S2.
+- [x] **HouseSim S2 — 2–3 more hand-authored archetypes on the same physics; write-back per archetype.** Three archetypes (vendor choice by AT/DE market share), entities checked against the integration source code; provenance, verified and unverified points per archetype in `meta.json`. Spec: [`docs/dev/house-sim.md`](../docs/dev/house-sim.md) § S2.
   - [x] `fronius_de` — Fronius GEN24 Plus + BYD HVS (Core `fronius`) + Fronius Wattpilot (HACS `goecharger_api2`): German entity ids/names, energy counters in **Wh**, no ESS setpoints (read-only), wallbox mode as `select`.
   - [x] `huawei_en` — Huawei SUN2000 + LUNA2000 + DTSU666 (HACS `huawei_solar`) + go-e Gemini: vendor sign (meter + = export, battery + = charge → `negate`), only charge/discharge **limits**, SoC as "state of capacity", battery totals `state_class: total`.
   - [x] `sma_keba` — SMA Sunny Tripower Smart Energy (Core `sma`) + KEBA P30 (Core `keba`): mixed language, **kW** power and kW setpoint/limit helpers (DIY Modbus `input_number`), SMA split channels behind signed template sensors, distractor `…_grid_power`, wallbox without writable current, no heat pump.
@@ -1383,11 +1404,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### HouseSim S4 — HAOS acceptance verified (2026-09-25)
 
-- [x] **HouseSim S4 — HAOS acceptance** (concept §5 Abnahme; Spec [`docs/spec/house-sim.md`](../docs/spec/house-sim.md) § S4). Verified on live HA: sync/copy integration → restart; config flow `evcc_en` (+ weather PV); Earnie `ehal.backend=ha` via **2.6.h** EHAL-Com; read path (PV/SoC/grid±/counters — early wrong EVCS/PV bindings corrected); faults (`reject_writes` / `set_unavailable`); HA restart keeps energy counters monotonic. Write path (battery setpoint → SoC/grid) covered by **EHAL-Com Schreibtest** (verified 2026-09-25).
+- [x] **HouseSim S4 — HAOS acceptance** (concept §5 Abnahme; Spec [`docs/dev/house-sim.md`](../docs/dev/house-sim.md) § S4). Verified on live HA: sync/copy integration → restart; config flow `evcc_en` (+ weather PV); Earnie `ehal.backend=ha` via **2.6.h** EHAL-Com; read path (PV/SoC/grid±/counters — early wrong EVCS/PV bindings corrected); faults (`reject_writes` / `set_unavailable`); HA restart keeps energy counters monotonic. Write path (battery setpoint → SoC/grid) covered by **EHAL-Com Schreibtest** (verified 2026-09-25).
 
 ### HouseSim S4 — Simulated house as HA custom integration (2026-09-24)
 
-- [x] **HouseSim S4 — Simulated house as HA custom integration.** Optional follow-up after **2.6.h** (no S2/S3). Custom integration `earnie_house_sim` for Synology HAOS / `ha_lab/haos-docker`: config flow (archetype + PV source), coordinator ticks pure core on wall clock, native `sensor` / `number` / `switch` with archetype IDs (fixture `input_number.ess_*` → `number.ess_*`), one HA device per component. Shared core `house_sim/core/` (no HA/Earnie imports; thermal Euler + weather PV + scenario overlay); used by mock REST and integration. Packaging variant 1: `scripts/sync_house_sim_integration.py` → `_core/` + `fixtures/` (generated); pytest equality + import-isolation. Energy counters `total_increasing` persisted; PV from HA `weather` `cloud_coverage` or synthetic series; services for scenarios/faults. Earnie via **2.6.h** UI unchanged. Code home `house_sim/ha_integration/custom_components/earnie_house_sim/`. Spec: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md). Live HAOS acceptance → verified 2026-09-25 (Write path later covered by EHAL-Com Schreibtest).
+- [x] **HouseSim S4 — Simulated house as HA custom integration.** Optional follow-up after **2.6.h** (no S2/S3). Custom integration `earnie_house_sim` for Synology HAOS / `ha_lab/haos-docker`: config flow (archetype + PV source), coordinator ticks pure core on wall clock, native `sensor` / `number` / `switch` with archetype IDs (fixture `input_number.ess_*` → `number.ess_*`), one HA device per component. Shared core `house_sim/core/` (no HA/Earnie imports; thermal Euler + weather PV + scenario overlay); used by mock REST and integration. Packaging variant 1: `scripts/sync_house_sim_integration.py` → `_core/` + `fixtures/` (generated); pytest equality + import-isolation. Energy counters `total_increasing` persisted; PV from HA `weather` `cloud_coverage` or synthetic series; services for scenarios/faults. Earnie via **2.6.h** UI unchanged. Code home `house_sim/ha_integration/custom_components/earnie_house_sim/`. Spec: [`docs/dev/house-sim.md`](../docs/dev/house-sim.md). Live HAOS acceptance → verified 2026-09-25 (Write path later covered by EHAL-Com Schreibtest).
 
 ### 2.6.h — HA EHAL-Com UX parity with Loxone (2026-09-23)
 
@@ -1403,11 +1424,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.6.b — Suggest-and-confirm HA binding (2026-09-23)
 
-- [x] **2.6.b — Suggest-and-confirm HA binding (interim flat map).** `integrations/ha_ehal_mapping.py`: empty-only `heuristic_propose` (domain / `device_class` / unit / name tokens; no LLM; no overwrite of saved bindings). EHAL-Com HA mapping: scan → propose → confirm → save `ehal.ha.entities`. Scan rows expose attrs for scoring. Regression: `evcc_en` empty map matches golden; buffer temp / `switch.*` left out; ambiguous names empty. Tests: `tests/test_ha_ehal_mapping.py`. Interim until **2.6.g** / **2.6.h**. Spec cross-links: `docs/spec/ehal.md`, `docs/spec/house-sim.md`.
+- [x] **2.6.b — Suggest-and-confirm HA binding (interim flat map).** `integrations/ha_ehal_mapping.py`: empty-only `heuristic_propose` (domain / `device_class` / unit / name tokens; no LLM; no overwrite of saved bindings). EHAL-Com HA mapping: scan → propose → confirm → save `ehal.ha.entities`. Scan rows expose attrs for scoring. Regression: `evcc_en` empty map matches golden; buffer temp / `switch.*` left out; ambiguous names empty. Tests: `tests/test_ha_ehal_mapping.py`. Interim until **2.6.g** / **2.6.h**. Spec cross-links: `docs/spec/ehal.md`, `docs/dev/house-sim.md`.
 
 ### 2.6.a + HouseSim S1 — Developer bench (2026-09-22)
 
-- [x] **2.6.a + HouseSim S1 — Developer bench.** `house_sim/`: mock HA REST (`GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer) with fixture `evcc_en` (golden `ehal.ha.entities`, `switch.*` negative case, no WP). Short closed-loop stepper (SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c`). Pytest against live mock (`tests/test_house_sim_*`). Spec note: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md). Concept: [HA compatibility tests](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md).
+- [x] **2.6.a + HouseSim S1 — Developer bench.** `house_sim/`: mock HA REST (`GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer) with fixture `evcc_en` (golden `ehal.ha.entities`, `switch.*` negative case, no WP). Short closed-loop stepper (SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c`). Pytest against live mock (`tests/test_house_sim_*`). Spec note: [`docs/dev/house-sim.md`](../docs/dev/house-sim.md). Concept: [HA compatibility tests](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md).
 
 ### 2.6 Phase 2 — HA/OpenEMS port UX + Loxone HTTP env override (2026-09-22)
 
@@ -1479,7 +1500,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Remove EHAL-Com Energieflussmonitor → Verbraucher (2026-09-16)
 
-- [x] **Remove redundant EFM HITL chapter on EHAL-Com** — Dropped UI `ui/ehal_efm_import.py` and EHAL-Com expander; EFM meter → consumers/plant stays in Smarthome-Backend **Loxone-Import** via `merge_efm` / `integrations/loxone_efm_meters.py`. Docs retargeted: `docs/ui/ehal-com.md`, `docs/konfiguration/verbrauchs-csv.md`, `docs/referenz/loxone-signals.md`, `docs/spec/efm-auto-sync-2.4.l.md`, `docs/spec/ehal.md`, `docs/spec/loxone-meter-energy-slot-ist.md`. Backlog **2.+1**.
+- [x] **Remove redundant EFM HITL chapter on EHAL-Com** — Dropped UI `ui/ehal_efm_import.py` and EHAL-Com expander; EFM meter → consumers/plant stays in Smarthome-Backend **Loxone-Import** via `merge_efm` / `integrations/loxone_efm_meters.py`. Docs retargeted: `docs/ui/ehal-com.md`, `docs/konfiguration/verbrauchs-csv.md`, `docs/referenz/loxone-signals.md`, `docs/dev/done/efm-auto-sync.md`, `docs/spec/ehal.md`, `docs/spec/loxone-meter-energy-slot-ist.md`. Backlog **2.+1**.
 
 ### Loxone auth gate on HTTP 401/403 (2026-09-16)
 
@@ -1602,7 +1623,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Smarthome-Backend (SB) page — M1/M2/M3/M4/M5/M6 (2026-08-18)
 
-Dev plan drafted and implemented same day, 2026-08-18: [docs/spec/smarthome-backend-page.md](../docs/spec/smarthome-backend-page.md) (see its §5 "Implementation notes" for deviations from the original plan found during implementation). Detection design draft: [backlog/SB-Identification-Draft.md](SB-Identification-Draft.md).
+Dev plan drafted and implemented same day, 2026-08-18: [docs/dev/done/smarthome-backend-page.md](../docs/dev/done/smarthome-backend-page.md) (see its §5 "Implementation notes" for deviations from the original plan found during implementation). Detection design draft: [backlog/SB-Identification-Draft.md](SB-Identification-Draft.md).
 
 - [x] **M1 — `integrations/integration_scanner.py`** (detection engine): passive mDNS (Home Assistant, `_home-assistant._tcp.local.`) and SSDP/UPnP (Loxone, `239.255.255.250:1900`) discovery, verified live against a real Miniserver-Gen2 and a real HA 2026.8 instance on the user's LAN; opt-in active TCP port scan (8080/8085) for OpenEMS with a best-effort Felix-console signature check. `scan_for_backends(mode, only_kinds=...)` dispatches `targeted` / `full_passive` / `full_active`. New dependency `zeroconf` (`pyproject.toml`). The proprietary Loxone UDP-broadcast protocol (port 7070) was tried against the real Miniserver and got no response on any tested payload — dropped in favor of the (confirmed-working) SSDP path rather than shipped unverified.
 - [x] **M2 — install-context detection + readiness predicate**: `runtime_store/install_context.py` (`EARNIE_INSTALL_CONTEXT` — `loxberry` / `homeassistant_addon`, unset = `manual`) narrows the targeted scan; set in the LoxBerry plugin compose, the two `docker/compose/loxberry-*.yml` files, and the Home-Assistant add-on `run.sh`. `ui/setup_readiness.py::is_sb_configured()` / `needs_sb_setup()` — thin wrapper over the existing `hub_credentials_configured()`, no new persisted flag.
@@ -1622,7 +1643,7 @@ Closed the residual gap noted above: `ui/navigation.py::_echtzeit_page_specs(inc
 - [x] Test-hygiene audit of the ~9 test files touching Optimierer-Dienst/EHAL-Com nav visibility, to check whether their passing status depended on a developer's real local `.env` Loxone credentials (loaded process-wide by `tests/conftest.py`) rather than on an explicit, deterministic environment. Only `tests/test_ui_navigation.py` needed fixing — 3 tests (`test_default_pages_include_core_and_scenario_explorer`, `test_only_sunset_hides_dev_and_scenario_explorer`, `test_sections_are_assigned`) asserted daemon pages were shown without pinning `LOXONE_IP`/`LOXONE_USER`/`LOXONE_PASS`; `test_sections_are_assigned` would have hard-failed with a `KeyError` once the general-case gating went live. Fixed with explicit `monkeypatch.setenv(...)`, mirroring the existing pattern in `tests/test_loxone_connectivity.py::TestLoxoneEnvHelpers`. The remaining candidates (`test_navigation_setup.py`, `test_cloud_demo.py`, `test_house_config_markers_ui.py`, `test_setup_progress.py`, `test_doc_links.py`, `test_daemon_log_tail.py`, the `apptest` files) were already hermetic or structurally unaffected by the gating change.
 - [x] New regression coverage in `tests/test_navigation_setup.py`: `test_general_nav_hides_daemon_pages_for_mature_config_without_backend` / `..._once_sb_configured` — exercises the exact "mature config, no backend ever configured, `live_environment` mode" case. Verified the new test actually fails against the pre-fix code (reverted `navigation.py` locally, ran it, confirmed the `AssertionError`, then restored the fix) before trusting it as real coverage.
 - [x] Full suite before/after (`pytest tests -q -k "not slow"`): 2217 → 2219 passed / 8 skipped, both runs with the same single pre-existing flaky failure (`tests/test_main_daemon.py::test_start_stop_with_stub_script`, a Windows PID-liveness race unrelated to this change). No regressions.
-- Doc updated: [docs/spec/smarthome-backend-page.md](../docs/spec/smarthome-backend-page.md) §5.
+- Doc updated: [docs/dev/done/smarthome-backend-page.md](../docs/dev/done/smarthome-backend-page.md) §5.
 
 ### Home Assistant Supervisor Add-on MVP 0.1 — M1/M2/M4/M5 (2026-08-17)
 
@@ -2042,7 +2063,7 @@ EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`,
 
 ### 2.4.l EFM auto-sync Interpretation C (2026-07-30)
 
-- [x] **2.4.l — EFM auto-sync (interpretation C)** — Lab: LoxAPP3 Meter/EFM `nodes` + live `/jdev/sps/io/{name}` as `flex.power_name`; MCP has no `control_bind`. Research note [`docs/spec/efm-auto-sync-2.4.l.md`](../docs/spec/efm-auto-sync-2.4.l.md); HITL [`integrations/loxone_efm_meters.py`](../integrations/loxone_efm_meters.py) + [`ui/ehal_efm_import.py`](../ui/ehal_efm_import.py) on EHAL-Com; CSV still manual; enable/setpoint not from Zähler; German [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/konfiguration/verbrauchs-csv.md`](../docs/konfiguration/verbrauchs-csv.md).
+- [x] **2.4.l — EFM auto-sync (interpretation C)** — Lab: LoxAPP3 Meter/EFM `nodes` + live `/jdev/sps/io/{name}` as `flex.power_name`; MCP has no `control_bind`. Research note [`docs/dev/done/efm-auto-sync.md`](../docs/dev/done/efm-auto-sync.md); HITL [`integrations/loxone_efm_meters.py`](../integrations/loxone_efm_meters.py) + [`ui/ehal_efm_import.py`](../ui/ehal_efm_import.py) on EHAL-Com; CSV still manual; enable/setpoint not from Zähler; German [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/konfiguration/verbrauchs-csv.md`](../docs/konfiguration/verbrauchs-csv.md).
 
 
 ### Bugfix LoxBerry Plugin Stop button (2026-07-30)
@@ -2109,7 +2130,7 @@ EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`,
 
 ### 2.4.c HA-EHAL + evcc under HA (2026-07-28)
 
-- [x] **2.4.c — HA-EHAL + evcc under HA (Phase 2b / M1.5, DACH default)** — REST-only `integrations/ha_adapter.py` + Live bridge; Compose [`docker/compose/ha-lab.yml`](../docker/compose/ha-lab.yml) (Earnie :8506 + HA :8123 + evcc :7070); HITL entity→EHAL mapping UI; exclusivity/Modbus docs ([`docs/spec/ha-lab-setup.md`](../docs/spec/ha-lab-setup.md), [`docs/einrichtung/ha-evcc.md`](../docs/einrichtung/ha-evcc.md)); contract-tests vs OpenEMS; lab stub `ha_lab/evcc/evcc.yaml` (demo charger)
+- [x] **2.4.c — HA-EHAL + evcc under HA (Phase 2b / M1.5, DACH default)** — REST-only `integrations/ha_adapter.py` + Live bridge; Compose [`docker/compose/ha-lab.yml`](../docker/compose/ha-lab.yml) (Earnie :8506 + HA :8123 + evcc :7070); HITL entity→EHAL mapping UI; exclusivity/Modbus docs ([`docs/dev/ha-lab-setup.md`](../docs/dev/ha-lab-setup.md), [`docs/einrichtung/ha-evcc.md`](../docs/einrichtung/ha-evcc.md)); contract-tests vs OpenEMS; lab stub `ha_lab/evcc/evcc.yaml` (demo charger)
 - [x] **HA lab smoke (Path A helpers)** — Earnie ↔ HA REST via helpers / LLAT path exercised
 - [x] **Follow-up — Lab HA ↔ evcc entity exposure** — marq24 ha-evcc (`http://evcc:7070`) entities in HA; mapped in Earnie HITL; Compose `hacs-init` + docs §5.1 / [`ha-evcc.md`](../docs/einrichtung/ha-evcc.md) (MQTT discovery path documented as alternative, not required once marq24 is connected)
 
@@ -2123,7 +2144,7 @@ EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`,
 ### 2.4.b OpenEMS EHAL prototype (2026-07-27)
 
 - [x] **2.4.b — OpenEMS EHAL prototype (Phase 2 / M1)** — REST-only `integrations/openems_adapter.py` + thin Live bridge `integrations/ehal_live.py` (`ehal.backend=openems`); lab Compose [`docker/compose/openems-lab.yml`](../docker/compose/openems-lab.yml); write-lock degrade → `runtime/ehal_write_error.json` + Streamlit hint; config schema/snippet; mocked tests; no OpenEMS libs in-repo (→ 2.4.c / 2.4.e)
-- [x] **OpenEMS lab acceptance (combined Compose)** — Pi/lab host `192.168.178.34`: Earnie ↔ OpenEMS REST communication verified per [`docs/spec/openems-lab-setup.md`](../docs/spec/openems-lab-setup.md); Live-Cockpit Loxone-marker gate still stubbed (expected)
+- [x] **OpenEMS lab acceptance (combined Compose)** — Pi/lab host `192.168.178.34`: Earnie ↔ OpenEMS REST communication verified per [`docs/dev/openems-lab-setup.md`](../docs/dev/openems-lab-setup.md); Live-Cockpit Loxone-marker gate still stubbed (expected)
 
 
 ### 2.4.a EHAL specification (2026-07-27)
@@ -2269,7 +2290,7 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
 
 - [x] `scripts/se_calc_test_run.py`: default `--workers` = max useful (`min(CPU, parallel jobs)`), Live-only ≈ 3
 - [x] Cursor rule `.cursor/rules/backtesting-max-workers.mdc` for SE / backtesting worker choice
-- [x] Spec note in `docs/spec/se-calculation-test-plan.md` after Live `export_tariff_id` re-run
+- [x] Spec note in `docs/dev/done/se-calculation-test-plan.md` after Live `export_tariff_id` re-run
 
 
 ### Energieflussmonitor → Hausprofil blueprint research (2026-07-23)
@@ -2285,7 +2306,7 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
 
 - [x] Comprehensive SE calculation test plan for Live/`example_efh` (path-A matrix; path B blocked until manuals have CSV)
 - [x] Scripts: `se_calc_test_matrix` / `se_calc_test_run` / `se_calc_test_compare` (+ `se_calc_test_common`)
-- [x] Executed M0/M1/M2 × months 2025-01/04/07/10; actual vs Live-ref vs optimized recorded in `docs/spec/se-calculation-test-plan.md` + `se-calc-test-results.json`
+- [x] Executed M0/M1/M2 × months 2025-01/04/07/10; actual vs Live-ref vs optimized recorded in `docs/dev/done/se-calculation-test-plan.md` + `se-calc-test-results.json`
 
 
 ### Consumer editors UI polish (2026-07-23)
@@ -2945,7 +2966,7 @@ Plan [`.cursor/plans/consumer_roles_follow-up_08c02579.plan.md`](../.cursor/plan
 - [x] **Hauskonfigurator** — shared Leistungsquelle UI for `known` and `manual`; marker stored in `loxone_inputs`
 - [x] **Manuelle Geräte read-only** — Nennleistung/Laufzeit from Hausprofil only; per-device Empfehlungshorizont; no save form on page
 - [x] **Examples & migration** — `house_profiles.example.json`, `migrate_flex_consumers.py`
-- [x] **Tests & docs** — `test_earnie_role.py`, `test_appliance_config.py`, `test_page_devices_display.py`; [`docs/konfiguration/flexible-verbraucher.md`](../docs/konfiguration/flexible-verbraucher.md), [`docs/spec/ui-menu-structure.md`](../docs/spec/ui-menu-structure.md)
+- [x] **Tests & docs** — `test_earnie_role.py`, `test_appliance_config.py`, `test_page_devices_display.py`; [`docs/konfiguration/flexible-verbraucher.md`](../docs/konfiguration/flexible-verbraucher.md), [`docs/dev/done/ui-menu-structure.md`](../docs/dev/done/ui-menu-structure.md)
 
 
 ### New features — PV tuning removal + Simulations-Details columns (2026-07-15)
@@ -3069,7 +3090,7 @@ Plan [`.cursor/plans/ui_relies_on_main.py_a1f9f67e.plan.md`](../.cursor/plans/ui
 - [x] **Sync semantics** — `live_simulation_readiness`: `main_synced` / `wait_main` / `main_down`; removed auto-`fallback` UI MILP (`optimizer/schedule.py`, `PERSISTED_DISPLAY_MAX_AGE_SECONDS = 3600`)
 - [x] **Help text** — `ui/main_py_sync.py`, `ui/countdown.py` (no “Fallback mit Altplan nach 30 s”)
 - [x] **Tests** — `tests/test_schedule.py`, `tests/test_live_display_loader.py`, `tests/test_main_py_sync_ui.py`, `tests/test_main_loxone_writes.py` (debug snapshot on run)
-- [x] **Docs** — [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md), [`docs/ui/betriebsmodi.md`](../docs/ui/betriebsmodi.md), [`docs/spec/ui-sunset2sunset.md`](../docs/spec/ui-sunset2sunset.md) v0.8.0, [`docs/spec/ui-menu-structure.md`](../docs/spec/ui-menu-structure.md) §6
+- [x] **Docs** — [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md), [`docs/ui/betriebsmodi.md`](../docs/ui/betriebsmodi.md), [`docs/spec/ui-sunset2sunset.md`](../docs/spec/ui-sunset2sunset.md) v0.8.0, [`docs/dev/done/ui-menu-structure.md`](../docs/dev/done/ui-menu-structure.md) §6
 - [x] **Live verification** — Cockpit + Manuelle Geräte after one `main.py` quarter-hour run on silent stack / NAS.
 
 
@@ -3326,7 +3347,7 @@ Greenfield matrix: `greenfield/config/backtesting_scenarios.json` — `live`, `s
   - Finding: `s2-kein-pv` / `s1-kein-pv-keine-battery` show higher costs than baseline that is with PV --> Take PV out of baseline
   - Notice: "Zeitverschiebung (Energie ≈ Spec)" - what does that mean? --> More precise wording
 - [x] **Bulk classify** — per scenario: plausibility ok/total, Δ€ vs matched reference, deviation kinds; tool: `scripts/analyze_plausibility_failures.py`
-- [x] **Structural flex under-delivery (`s2-kein-pv` Jan 2 & 7)** — Phase 1 done: rolling `min_on` continuation in MILP. Spec: [`docs/spec/backtesting-plausibility-s2-kein-pv-jan-2-7.md`](docs/spec/backtesting-plausibility-s2-kein-pv-jan-2-7.md#phase-1-implementation-2026-07-13)
+- [x] **Structural flex under-delivery (`s2-kein-pv` Jan 2 & 7)** — Phase 1 done: rolling `min_on` continuation in MILP. Spec: [`docs/dev/done/backtesting-plausibility-s2-kein-pv-jan-2-7.md`](docs/dev/done/backtesting-plausibility-s2-kein-pv-jan-2-7.md#phase-1-implementation-2026-07-13)
 
 
 ### Smoketest Phase B — Variable tariff scenario (2026-07-13)
@@ -3667,7 +3688,7 @@ Completes entity-catalog split from 1.26.0 / 1.93 P2: `batteries[]` and `pv_syst
 - [x] **Snapshot cache:** on-demand windows appended to `backtesting_window_snapshots.jsonl` (`append_window_snapshot`)
 - [x] **diag_single_window:** CLI command + optional run from detail expander (`ui/backtesting_diag_single_window.py`)
 - [x] **Scenario picker:** radio list with deviation markers; single scenario detail/charts
-- [x] **Spec:** `docs/spec/backtesting-deviation-calendar.md`
+- [x] **Spec:** `docs/dev/done/backtesting-deviation-calendar.md`
 
 
 
@@ -4042,7 +4063,7 @@ Target order: cons_data (status/generation/consumption UI) → scenarios + run b
 
 ### UI menu structure & recommendation mode manual appliances (2026-07-07)
 
-Spec: [docs/spec/ui-menu-structure.md](docs/spec/ui-menu-structure.md). `### Version 1.21` feature block completed together.
+Spec: [docs/dev/done/ui-menu-structure.md](docs/dev/done/ui-menu-structure.md). `### Version 1.21` feature block completed together.
 
 - [x] **Menu structure as sidebar replacement** (`st.navigation` + `st.Page`) — `app.py` as router, `ui/pages/`; existing modes (cockpit, backtesting, price forecast dev) as pages (env gating preserved); raw JSON config editor (`page_config.py`); mockup pages (scenario editor, house configurator, consumer analysis); backtesting/price forecast controls moved to page body
 - [x] **Recommendation mode manual appliances** — `optimizer/appliance_recommendation.py` (pure start-time/cost logic: ranking of start hours in 6-h horizon by grid import cost, 1–5 stars linear, savings vs. immediate) + tests

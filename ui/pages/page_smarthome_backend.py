@@ -3,7 +3,7 @@
 Runs both as a normal nav page (Daemon Control → Smarthome-Backend) and as the
 blocking first-run screen (``ui.setup_dotenv.render_ehal_setup_page``) once
 planning is complete and no backend is configured yet — same implementation,
-one place to pick/verify a backend. See docs/spec/smarthome-backend-page.md.
+one place to pick/verify a backend. See docs/dev/done/smarthome-backend-page.md.
 """
 from __future__ import annotations
 

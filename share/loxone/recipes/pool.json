@@ -70,5 +70,5 @@
       "notes": "Native filter window duration hours."
     }
   ],
-  "reference": "docs/ui/ehal-com.md §C.6; docs/spec/swimspa-filter.md"
+  "reference": "docs/ui/ehal-com.md §C.6; docs/dev/done/swimspa-filter.md"
 }

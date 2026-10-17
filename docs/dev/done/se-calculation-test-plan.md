@@ -2,7 +2,7 @@
 
 Executable matrix for Scenario Explorer (SE) consumption: Live house profile, CSV / Basislast axes, seasonal months, actual vs non-optimized reference kWh.
 
-Related: [scenario-explorer-consumption.md](scenario-explorer-consumption.md), [betriebsmodi.md](../ui/betriebsmodi.md), [verbrauchs-csv.md](../konfiguration/verbrauchs-csv.md).
+Related: [scenario-explorer-consumption.md](scenario-explorer-consumption.md), [betriebsmodi.md](../../ui/betriebsmodi.md), [verbrauchs-csv.md](../../konfiguration/verbrauchs-csv.md).
 
 ## Baseline
 
@@ -78,7 +78,7 @@ Artifacts:
 | ---- | ------- |
 | `earnie_env/runtime/se_calc_test/cells/<cell>/` | Patched `house_profiles.json`, Live-only `backtesting_scenarios.json` |
 | `earnie_env/runtime/se_calc_test/runs/<cell>/<YYYY>-<MM>/` | `backtesting_log.json` (+ hourly CSV) |
-| `docs/spec/se-calc-test-results.json` | Machine-readable comparison |
+| `docs/dev/done/se-calc-test-results.json` | Machine-readable comparison |
 | Results appendix below | Filled after compare |
 
 CLI note: stock `scripts/run_backtesting.py` maps `--start-month` to the cons_data **max year**. The SE calc runner forces `--year` (2025) via a patched `backtesting_base_year` so Oct/Jan land in 2025, not 2026.

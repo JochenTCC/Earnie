@@ -18,7 +18,7 @@ Die Seite **Smarthome-Backend** unter **Daemon Control** wählt und verbindet de
 
 Bei verbundenem Loxone zeigt die Seite (und EHAL-Com) den **letzten Aufruf vom Miniserver** auf Port 8541 (Zeit + Peer-IP).
 
-Hintergrund: [SB-Identification-Draft](../../backlog/SB-Identification-Draft.md) und [Entwicklungsplan](../spec/smarthome-backend-page.md).
+Einrichtungspfad: [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md).
 
 ## Anbindung / Zugangsdaten
 

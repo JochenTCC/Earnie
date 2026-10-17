@@ -10,7 +10,7 @@ against that planned start. Data modules report network fetches via
 :func:`record_event`.
 
 Independent of the env-gated profiling in ``runtime_store.cycle_timing``.
-Spec: ``docs/spec/early-start-scheduling.md`` §5.1, §5.2, §5.6.
+Spec: ``docs/dev/done/early-start-scheduling.md`` §5.1, §5.2, §5.6.
 """
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 # Loxone-Binding im Ist-Zustand — Walkthrough
 
-> **STALE (historical):** Pre–2.7.q/n cutover snapshot (2026-10-07). Describes Merker HTTP poll/write paths that are **no longer** production. Current contract: VO push + qualified `status.json` (see `docs/spec/ehal.md`, `docs/referenz/loxone-signals.md`). Kept for archaeology only.
+> **STALE (historical):** Pre–2.7.q/n cutover snapshot (2026-10-07). Describes Merker HTTP poll/write paths that are **no longer** production. Current contract: VO push + qualified `status.json` (see `docs/referenz/ehal.md`, `docs/referenz/loxone-signals.md`). Kept for archaeology only.
 
 **Arbeitsdokument zum Verständnis, nicht zum Veröffentlichen.** Stand 2026-10-07, aus dem Code gelesen (Working Tree von `main`, inkl. uncommitteter 2.7.m-Arbeit). In Loxone Config selbst nicht geprüft; wo die Doku etwas behauptet, was ich im Code nicht sehe, steht es als „laut Doku“; Aussagen aus reinem Code-Lesen (nicht ausgeführt) sind mit „nach Code-Lage“ markiert.
 

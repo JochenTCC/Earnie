@@ -81,7 +81,7 @@ markers = [
     "slow: Längerer Backtesting- oder MILP-Integrationslauf",
     "test_health_protected: Nie automatisch als Review-Kandidat markieren",
     "apptest: Streamlit-AppTest UI-Smoketest (rendert echte Seiten headless)",
-    "regression: Release golden-master suite (deselected by default; see docs/spec/regression-suite.md)",
+    "regression: Release golden-master suite (deselected by default; see docs/workflow/regression-suite.md)",
 ]
 
 [tool.coverage.run]

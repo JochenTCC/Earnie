@@ -4,7 +4,7 @@ Usage:
   python -m scripts.release_notes_collect [--since auto|<tag>] [--target <version>]
 
 Deterministic, no LLM. Refuses -dev versions. Output stays local (backtesting_logs/).
-Spec: docs/spec/release-notes-workflow.md
+Spec: docs/workflow/release-notes-workflow.md
 """
 from __future__ import annotations
 

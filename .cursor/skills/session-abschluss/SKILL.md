@@ -32,7 +32,7 @@ Run in parallel:
 - `git log -5 --oneline` (commit style)
 - Chat history for this session: what was completed, what remains open?
 - **Private earnie-env (if present):** `git status` / `git diff` in the sibling private site-pack repo (default `..\Earnie-env-home`, see `docs/einrichtung/private-env.md` / `scripts/link_private_env.ps1`). Do not invent a second path; if the junction exists, follow its target.
-- **Private regression repo (if present):** `git status -sb` in `Earnie-regression-private` (parent of `$EARNIE_REGRESSION_PRIVATE_DIR`, default sibling `..\Earnie-regression-private`, see `docs/spec/regression-suite.md` §4). Needed for §2b and the publish-guide warning.
+- **Private regression repo (if present):** `git status -sb` in `Earnie-regression-private` (parent of `$EARNIE_REGRESSION_PRIVATE_DIR`, default sibling `..\Earnie-regression-private`, see `docs/workflow/regression-suite.md` §4). Needed for §2b and the publish-guide warning.
 
 ### 2. Classify changes
 
@@ -230,9 +230,9 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 - [ ] Channel correct: `-` in version → pre-release (**B**); clean `X.Y.Z` → official (**C**)
 - [ ] **If B:** all three `docker/compose/*-alpha.yml` have `image: ghcr.io/jochentcc/earnie-energy:<version.py>`
 - [ ] **Reviewed** release notes exist: `.github/release-notes/v<version>.md`, produced via skill `release-notes` (draft → maintainer review → `release_notes_finalize`). No generic default notes; **no notes and no tag for `-dev` versions**
-- [ ] If `runtime_store/migration/` gained steps since the previous tag: notes include `## Migration` (draft via `python -m scripts.migration_release_notes --since <tag>`) — see `docs/spec/release-checklist.md` §1
-- [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/spec/release-checklist.md` §1
-- [ ] Regression suite run (public + private) and report attached; `Earnie-regression-private` clean and pushed, or the user consciously accepted the guide's warning (soft gate — `docs/spec/release-checklist.md` §1)
+- [ ] If `runtime_store/migration/` gained steps since the previous tag: notes include `## Migration` (draft via `python -m scripts.migration_release_notes --since <tag>`) — see `docs/workflow/release-checklist.md` §1
+- [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/workflow/release-checklist.md` §1
+- [ ] Regression suite run (public + private) and report attached; `Earnie-regression-private` clean and pushed, or the user consciously accepted the guide's warning (soft gate — `docs/workflow/release-checklist.md` §1)
 - [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)
 - [ ] GitHub environment `release-approval` exists with the user as *Required reviewer* (otherwise job `release` fails early by design)
 - [ ] **Private earnie-env:** user asked whether to commit/push/tag `Earnie-env-home` (or sibling env packs) with the same tag; done or explicitly skipped
@@ -263,7 +263,7 @@ git push origin vX.Y.Z
 
 ### 2a. User tests the candidate, then approves
 
-Job `promote` (environment `release-approval`) **waits for the user's approval**. Point the user to the maintainer checklist [docs/spec/release-checklist.md](../../../docs/spec/release-checklist.md) (steps 3–6) and tell them:
+Job `promote` (environment `release-approval`) **waits for the user's approval**. Point the user to the maintainer checklist [docs/workflow/release-checklist.md](../../../docs/workflow/release-checklist.md) (steps 3–6) and tell them:
 
 - Actions run URL; wait until the pre-gate checks are green.
 - **HA:** local add-on `earnie_dev` on the candidate image — bump `version:` in `/addons/local/earnie_dev/config.yaml` to `<version>` → *Check for updates* → update/start (stop the regular Earnie add-on first). Setup: `packaging/homeassistant-addon/README.md` → *Test a release candidate*.

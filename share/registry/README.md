@@ -15,4 +15,4 @@ offline / in a password manager. See Earnie-Projekt
 [`examples/dev_entitlement.json`](examples/dev_entitlement.json) uses secret
 `example-dev-secret` and the empty-parts fingerprint.
 
-See [`docs/spec/hardware-registry-layer-c.md`](../../docs/spec/hardware-registry-layer-c.md).
+See [`docs/workflow/hardware-registry-layer-c.md`](../../docs/workflow/hardware-registry-layer-c.md).

@@ -162,7 +162,7 @@ Wenn die aWATTar-API für späte Stunden des Horizonts noch keine Preise liefert
 - `forecast` (Standard): OLS-Korrelationsmodell extrapoliert fehlende Stunden — Live-Features aus Open-Meteo-Wetterprognose plus stündlichem EU-Leistungs-Stand-in aus dem letzten Archivtag; in Charts als grüner Bereich (siehe [Charts](../ui/charts.md)). Mit Standard-`live_bias_enabled` wird auf prognostizierte EPEX-Werte eine rollierende Korrektur (Day-Ahead − OLS) angewendet, begrenzt durch `live_bias_cap_cent_kwh`.
 - `mirror`: gleiche Uhrzeit vom Vortag; Fallback auch automatisch, wenn Modell oder Features nicht geladen werden können.
 
-Spec: [Preis-Prognose (Dev)](../spec/price-forecast-renewables.md).
+Spec: [Preis-Prognose (Dev)](../dev/done/price-forecast-renewables.md).
 
 ## Historische Preise
 

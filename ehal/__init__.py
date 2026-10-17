@@ -1,7 +1,7 @@
 """EHAL — Earnie Hardware Access Layer (M1 wire types + schema validation).
 
 No network I/O. No OpenEMS / Home Assistant / Loxone imports.
-Canonical spec: docs/spec/ehal.md
+Canonical spec: docs/referenz/ehal.md
 
 Device-role / hardware-profile / Loxone recipe loaders: ``ehal.profiles`` (2.4.g).
 """

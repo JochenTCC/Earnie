@@ -6,7 +6,7 @@
       --seed-anchor "..." | --cycle-index N
 
 Deselected from the default pytest run (marker ``regression``). Run before
-release / publish — see docs/spec/regression-suite.md and release-checklist.md.
+release / publish — see docs/workflow/regression-suite.md and release-checklist.md.
 """
 from __future__ import annotations
 

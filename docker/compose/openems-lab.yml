@@ -5,7 +5,7 @@
 # First start:
 #   mkdir openems_lab\config openems_lab\runtime
 #   docker compose --project-directory . -f docker/compose/openems-lab.yml up -d --build
-#   # Then configure Earnie ehal + OpenEMS plant — see docs/spec/openems-lab-setup.md
+#   # Then configure Earnie ehal + OpenEMS plant — see docs/dev/openems-lab-setup.md
 #
 # UI:
 #   Earnie Streamlit: http://localhost:8503
@@ -16,8 +16,8 @@
 # Stop (volumes retained):
 #   docker compose --project-directory . -f docker/compose/openems-lab.yml down
 #
-# Setup + communication check: docs/spec/openems-lab-setup.md
-# OpenEMS plant checklist:     docs/spec/openems-testing-platform-todo.md
+# Setup + communication check: docs/dev/openems-lab-setup.md
+# OpenEMS plant checklist:     docs/dev/openems-testing-platform-todo.md
 # German pointer:              docs/einrichtung/openems-lab.md
 
 version: "3.8"

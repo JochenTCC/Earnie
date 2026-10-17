@@ -3,7 +3,7 @@
 **Status:** current lab checklist (plant / REST channels; first verified on Raspberry Pi). Bring-up steps: [`openems-lab-setup.md`](openems-lab-setup.md).  
 **Purpose:** Local lab stack for the OpenEMS EHAL prototype (backlog history: **2.4.b**).  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §2.2, §2.5 Phase 2, §2.6; backlog `2.4.b`.  
-**EHAL wire contract (frozen):** [`docs/spec/ehal.md`](ehal.md) — schemas in `share/ehal/`, Python package `ehal`. Adapters must emit/consume only that contract.  
+**EHAL wire contract (frozen):** [`docs/referenz/ehal.md`](../referenz/ehal.md) — schemas in `share/ehal/`, Python package `ehal`. Adapters must emit/consume only that contract.  
 **Goal:** Run `openems-edge` so Earnie can talk **network API only** (REST/WS) — Separate Works / AGPL shield. No OpenEMS source or libraries in Earnie repos.  
 **Host IP:** `192.168.178.34` (Pi lab; on a Dev-PC use that machine’s LAN IP / `localhost`)
 
@@ -265,7 +265,7 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 
 
 
-### Target channels → EHAL (frozen contract: [`ehal.md`](ehal.md); Entwicklungsplan §2.4.1)
+### Target channels → EHAL (frozen contract: [`ehal.md`](../referenz/ehal.md); Entwicklungsplan §2.4.1)
 
 
 | EHAL field                      | OpenEMS (prototype)                                   |
@@ -307,7 +307,7 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 - [x] Negativtests: write lock → log + UI hint + capability degrade (unit-tested with mocked HTTP 403; lab: guest password / ReadOnly REST)
 - [x] Lab acceptance on combined Compose: follow [`openems-lab-setup.md`](openems-lab-setup.md) §4 (Earnie reads SoC via `openems-edge:8084`)
 
-*(Implementation: backlog `2.4.b`. EHAL schemas frozen under `2.4.a` / [`ehal.md`](ehal.md).)*
+*(Implementation: backlog `2.4.b`. EHAL schemas frozen under `2.4.a` / [`ehal.md`](../referenz/ehal.md).)*
 
 ---
 
@@ -316,7 +316,7 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 ## Out of scope for this platform TODO
 
 - Home Assistant + evcc (A2 DACH) — see `docker/compose/ha-lab.yml`, [`ha-lab-setup.md`](ha-lab-setup.md)
-- Loxone (default backend) — see [`ehal.md`](ehal.md) and German [Loxone-Anbindung](../einrichtung/loxone-anbindung.md)
+- Loxone (default backend) — see [`ehal.md`](../referenz/ehal.md) and German [Loxone-Anbindung](../einrichtung/loxone-anbindung.md)
 - Real FEMS/OEM hardware (optional later; expect write locks)
 - MQTT/Matter as first-class hubs
 

@@ -33,7 +33,7 @@ Immer vom **Repo-Root** mit `--project-directory .`, damit Volume-Pfade (`./earn
 | Proxmox LXC (Alpha) | `docker/compose/proxmox-alpha.yml` | 8511 → 8501 | `earnie_env_alpha/` |
 | Greenfield | `docker/compose/greenfield.yml` | 8502 → 8501 | `greenfield/` |
 
-UsagePing **receiver** (private, not in this repo): GitHub `JochenTCC/earnie-server` · client contract: [`docs/spec/usage-ping.md`](../docs/spec/usage-ping.md)
+UsagePing **receiver** (private, not in this repo): GitHub `JochenTCC/earnie-server` · client contract: [`docs/workflow/usage-ping.md`](../docs/workflow/usage-ping.md)
 
 Port-Übersicht (venv, NAS-UI): [`docs/referenz/streamlit-ports.md`](../docs/referenz/streamlit-ports.md)
 

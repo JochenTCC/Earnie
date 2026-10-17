@@ -1,10 +1,10 @@
 # Shadow-Betrieb (Entwickler)
 
-Nur für Entwicklung und Test, **nicht** Teil der Anwender-Einrichtung. Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md). Anwender-Betrieb: [betrieb.md](../einrichtung/betrieb.md).
+Nur für Entwicklung und Test, **nicht** Teil der Anwender-Einrichtung. Spec: [`docs/dev/shadow-mode.md`](../dev/shadow-mode.md). Anwender-Betrieb: [betrieb.md](../einrichtung/betrieb.md).
 
 ### Shadow-Feed (Prod-Recorder, optional)
 
-Für eine spätere Dev-/Shadow-Instanz kann die Produktivinstanz Rohantworten der Backend-Reads in ein Feed-Verzeichnis schreiben (Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md)).
+Für eine spätere Dev-/Shadow-Instanz kann die Produktivinstanz Rohantworten der Backend-Reads in ein Feed-Verzeichnis schreiben (Spec: [`docs/dev/shadow-mode.md`](../dev/shadow-mode.md)).
 
 In `runtime/local_settings.json` (nicht in der gemeinsamen `config.json`):
 
@@ -21,7 +21,7 @@ In `runtime/local_settings.json` (nicht in der gemeinsamen `config.json`):
 
 ### Shadow-Modus (Dev-Client)
 
-Eine Entwicklungsinstanz kann parallel zur Produktivinstanz laufen und Eingänge aus dem Shadow-Feed lesen — ohne Backend-Schreibzugriffe und ohne Änderungen an der gemeinsamen Konfiguration (Ausnahme: EHAL-Mapping kann in `{Runtime}/shadow_ehal_bindings.json` landen und wird beim Laden der Hausprofile nur in Shadow gemerged). Spec: [`docs/spec/shadow-mode.md`](../spec/shadow-mode.md).
+Eine Entwicklungsinstanz kann parallel zur Produktivinstanz laufen und Eingänge aus dem Shadow-Feed lesen — ohne Backend-Schreibzugriffe und ohne Änderungen an der gemeinsamen Konfiguration (Ausnahme: EHAL-Mapping kann in `{Runtime}/shadow_ehal_bindings.json` landen und wird beim Laden der Hausprofile nur in Shadow gemerged). Spec: [`docs/dev/shadow-mode.md`](../dev/shadow-mode.md).
 
 Voraussetzungen:
 

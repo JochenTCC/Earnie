@@ -161,7 +161,7 @@ def render_ehal_setup_page() -> None:
     """Blocking first-run: same Smarthome-Backend (SB) flow as the nav page.
 
     One implementation for "pick + configure a backend" — see
-    ui/pages/page_smarthome_backend.py and docs/spec/smarthome-backend-page.md.
+    ui/pages/page_smarthome_backend.py and docs/dev/done/smarthome-backend-page.md.
     """
     from ui.pages.page_smarthome_backend import render as render_smarthome_backend_page
 

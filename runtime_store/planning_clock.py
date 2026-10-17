@@ -12,7 +12,7 @@ Outside an anchor — UI, backtesting, out-of-band runs, tests —
 Measurements keep the real clock on purpose (PV integral, power-interval
 sampler, cons_data samples, API rate-limit guards, write timestamps).
 
-Spec: ``docs/spec/early-start-scheduling.md`` §4.
+Spec: ``docs/dev/done/early-start-scheduling.md`` §4.
 """
 from __future__ import annotations
 

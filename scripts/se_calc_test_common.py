@@ -14,8 +14,8 @@ WORK_ROOT = DEFAULT_ENV / "runtime" / "se_calc_test"
 CELLS_DIR = WORK_ROOT / "cells"
 RUNS_DIR = WORK_ROOT / "runs"
 DESCRIPTORS_PATH = WORK_ROOT / "matrix_descriptors.json"
-RESULTS_JSON = ROOT / "docs" / "spec" / "se-calc-test-results.json"
-RESULTS_MD_ANCHOR = ROOT / "docs" / "spec" / "se-calculation-test-plan.md"
+RESULTS_JSON = ROOT / "docs" / "dev" / "done" / "se-calc-test-results.json"
+RESULTS_MD_ANCHOR = ROOT / "docs" / "dev" / "done" / "se-calculation-test-plan.md"
 
 SEASONAL_MONTHS = (1, 4, 7, 10)
 DEFAULT_YEAR = 2025

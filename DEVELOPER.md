@@ -77,7 +77,7 @@ Local `build_container` default tags from `version.py`: every version → `:next
 
 ### Release (tag → GitHub Actions)
 
-**Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release-publish.yml`) builds a release candidate (multi-arch image to GHCR, draft GitHub Release) and publishes it after your approval. Per-release checklist: [docs/spec/release-checklist.md](docs/spec/release-checklist.md).
+**Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release-publish.yml`) builds a release candidate (multi-arch image to GHCR, draft GitHub Release) and publishes it after your approval. Per-release checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md).
 
 ```powershell
 # Official — after version.py == X.Y.Z is on origin/main:
@@ -90,16 +90,16 @@ git push origin vX.Y.Z-alpha.N
 ```
 
 - Tag must match `version.py` exactly (`v2.0.0` ↔ `__version__ = "2.0.0"`; `v2.2.0-alpha.1` ↔ `2.2.0-alpha.1`); mismatch fails the workflow.
-- Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body). **Required care for HA:** the first non-heading prose line becomes the add-on CHANGELOG / Änderungsprotokoll bullet — write it for end users (German, no pin/`latest` jargon); checklist: [docs/spec/release-checklist.md](docs/spec/release-checklist.md) §1.
+- Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body). **Required care for HA:** the first non-heading prose line becomes the add-on CHANGELOG / Änderungsprotokoll bullet — write it for end users (German, no pin/`latest` jargon); checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md) §1.
 - Official (after `promote`): GitHub Latest Release; images `:<version>`, `:next`, and `:latest` (+ legacy aliases).
 - Pre-release (after `promote`): GitHub Pre-release (not Latest); images `:<version>` and `:next` (no `:latest`).
-- **Candidate → approve → publish:** a tag push builds a *candidate* only — `:<version>` images (app + HA add-on), GitHub Release as **draft**. Pre-gate checks: `addon_smoke` (`scripts/ha_addon_smoke.py` starts `earnie-addon-{arch}:<version>` like the Supervisor; amd64 blocking, aarch64 under QEMU soft), `addon_lint` (pin bump + addon-linter, no commit), `qemu_smoke` (soft). Job `promote` then **waits for manual approval** (environment `release-approval`, required reviewer): Actions run → *Review deployments* → **Approve** sets `:next` (official also `:latest`), publishes the release and lets `publish_ha_addon` pin the add-on; **Reject** drops the candidate — nothing user-visible happened (next attempt = next version, no tag rewrite). Checklist: [docs/spec/release-checklist.md](docs/spec/release-checklist.md).
+- **Candidate → approve → publish:** a tag push builds a *candidate* only — `:<version>` images (app + HA add-on), GitHub Release as **draft**. Pre-gate checks: `addon_smoke` (`scripts/ha_addon_smoke.py` starts `earnie-addon-{arch}:<version>` like the Supervisor; amd64 blocking, aarch64 under QEMU soft), `addon_lint` (pin bump + addon-linter, no commit), `qemu_smoke` (soft). Job `promote` then **waits for manual approval** (environment `release-approval`, required reviewer): Actions run → *Review deployments* → **Approve** sets `:next` (official also `:latest`), publishes the release and lets `publish_ha_addon` pin the add-on; **Reject** drops the candidate — nothing user-visible happened (next attempt = next version, no tag rewrite). Checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md).
   - Before approving, test the candidate yourself: HA → local add-on on the `:<version>` image (`packaging/homeassistant-addon/README.md`, *Test a release candidate*); LoxBerry / Docker → pin `EARNIE_PINNED_VERSION` / image tag to `<version>`.
   - One-time setup: repo Settings → Environments → `release-approval` → *Required reviewers* = you. The `release` job fails early if the environment or its reviewer rule is missing (an unprotected environment would publish without waiting).
 - **HA Add-on:** every approved release runs job `publish_ha_addon` — official bumps `earnie` + `earnie_prerelease`; pre-release bumps only `earnie_prerelease`. Also pushes prebuilt `ghcr.io/jochentcc/earnie-addon-{arch}:<version>` (H6). Requires repo secret `HA_ADDON_REPO_TOKEN`. Manual retry: workflow **HA Add-on publish**. Details: `packaging/homeassistant-addon/README.md`.
 - **GHCR tags:** every release gets `:<version>` on build (`build_container --versioned-only`) and `:next` on approval; official also `:latest` (`build_container --promote`, retag via `buildx imagetools`, no rebuild).
 - Publish from `main`; leave the pre-release string on `main` until the next approved bump.
-- Parallel feature work + urgent fix for an already tagged build: [docs/spec/branching-hotfix-playbook.md](docs/spec/branching-hotfix-playbook.md) (`main` + tags; short-lived `hotfix/…` only when needed).
+- Parallel feature work + urgent fix for an already tagged build: [docs/workflow/branching-hotfix-playbook.md](docs/workflow/branching-hotfix-playbook.md) (`main` + tags; short-lived `hotfix/…` only when needed).
 - **GHCR auth for Actions:** store a classic PAT with `write:packages` (and `read:packages`) as repo secret `GHCR_TOKEN`. Without it, `GITHUB_TOKEN` only works if each package (`earnie-energy`, `ernie-energy`) grants this repository **Write** under Package settings → Manage Actions access. Also set packages **Public** if anonymous `docker pull` is required.
 
 **Fallback** (CI down / emergency): local multi-arch push:
@@ -134,7 +134,7 @@ Proxmox: LXC with `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh`
 
 ## Shadow Mode (Dev client)
 
-Run a development build in parallel to Prod on the same live inputs without touching the smarthome backend. Spec: [`docs/spec/shadow-mode.md`](docs/spec/shadow-mode.md) (§6.4 shared vs private config, §6.6 silent relation). User-facing German notes: [`docs/einrichtung/betrieb.md`](docs/einrichtung/betrieb.md) (Shadow-Feed + Shadow-Modus). Architecture / refactor phases: [`backlog/Shadow-Architecture-Review.md`](backlog/Shadow-Architecture-Review.md).
+Run a development build in parallel to Prod on the same live inputs without touching the smarthome backend. Spec: [`docs/dev/shadow-mode.md`](docs/dev/shadow-mode.md) (§6.4 shared vs private config, §6.6 silent relation). User-facing German notes: [`docs/einrichtung/betrieb.md`](docs/einrichtung/betrieb.md) (Shadow-Feed + Shadow-Modus). Architecture / refactor phases: [`backlog/Shadow-Architecture-Review.md`](backlog/Shadow-Architecture-Review.md).
 
 - Activate **only** with `EARNIE_SHADOW=1` (never a config key). Implies silent mode.
 - Requires an explicit `EARNIE_RUNTIME_PATH` or `EARNIE_ENV_PATH`. Classic: shares Prod’s config (read-only) and feed under `{config}/shadow_feed/`. Private Dev: local `EARNIE_ENV_PATH` + `EARNIE_SHADOW_FEED_PATH` → Prod feed; local config is writable (`is_shadow_config_readonly()`).

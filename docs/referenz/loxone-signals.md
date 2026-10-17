@@ -26,7 +26,7 @@ In the docs, the canonical template/import path is called **Default** (formerly 
 
 Earnie Core writes and reads the same Merker names on the Miniserver. The library adds the **Loxone-side** HTTP mirroring and enables an **Earnie-dead** fallback in Config (see below).
 
-**Virtual Inputs** = Earnie→Loxone (`set_*` / enables / setpoints, heartbeat) via `GET http://<Earnie>:8541/ehal/loxone/status.json` (daemon HTTP; `heartbeat_ts` = Unix now; setpoints from the publish ledger / `loxone_sent`). Loud writes are **push-only** (no `/dev/sps/io/<Merker>/<value>` for cycle setpoints). After **Q8**, `status.json` publishes qualified Check keys only.
+**Virtual Inputs** = Earnie→Loxone (`set_*` / enables / setpoints, heartbeat) via `GET http://<Earnie>:8541/ehal/loxone/status.json` (daemon HTTP; `heartbeat_ts` = Unix now; setpoints from the publish ledger / `loxone_sent`). Loud writes are **push-only** (no `/dev/sps/io/<Merker>/<value>` for cycle setpoints). `status.json` publishes qualified Check keys only.
 
 **Virtual Outputs** = Loxone→Earnie push of `sens_*` / `get_*` / flex power (qualified path IDs). Core reads those fields from the push inbox.
 
@@ -46,7 +46,7 @@ Earnie Core writes and reads the same Merker names on the Miniserver. The librar
 
 **Qualified Checks only:** `status.json` publishes qualified EHAL IDs (`consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable`, `pool.{slug}.set_enable`, `evcs.{slug}.set_evcs_max_current` / `set_evcs_mode`; plant ESS bare / `grid.meter.*` — including write `grid.meter.set_grid_export_power_limit` — and powerstation `ess.{id}.set_*`). Legacy Merker Check peers are no longer dual-emitted — VI templates must use the qualified keys (`VI_Earnie_*_v2.xml` / Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`).
 
-**VI v2 + Pilot:** Library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (Titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen: `python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …` → `VI_Pilot_*.xml`. VO Pilot titles come from the qualified ID (`Push_<id>` with dots → `_`): `python -m scripts.pilot_vo_template_gen …`. See [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Q5 write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Q5.
+**VI v2 + Pilot:** Library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (Titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen: `python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …` → `VI_Pilot_*.xml`. VO Pilot titles come from the qualified ID (`Push_<id>` with dots → `_`): `python -m scripts.pilot_vo_template_gen …`. See [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
 
 ---
 
@@ -90,6 +90,7 @@ Source: `share/loxone/templates/VirtualOut/`
 | ------------------------- | ------------------------------------------------------------ |
 | `VO_Earnie_Status.xml`    | optional `Earnie_Request_Optimize` (port **8541**)  |
 | `VO_Earnie_Plant.xml`     | plant `sens_*` / `get_*` (ESS SOC cut-offs + max power), outside temperature |
+| `VO_Earnie_Battery.xml`   | battery / ESS telemetry (`ess.{slug}.*`)                     |
 | `VO_Earnie_EV.xml`        | EV telemetry                                                 |
 | `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
 | `VO_Earnie_Consumer.xml`  | flex power                                                   |
@@ -133,7 +134,7 @@ The templates contain **no** meter hardware. Still, meter blocks in use are also
 
 Power Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **may** come from the EFM; the Virtual Output Cmds remain an optional name catalog. Earnie prefers the EFM designation in the binding when available.
 
-Manual follow-up: after **Smarthome-Backend → Loxone-Import**, check signal mapping on EHAL-Com (**Loxone Structure → EHAL Mapping**).
+Manual follow-up: after **Smarthome-Backend → Loxone-Import**, check signal mapping on EHAL-Com (**Signalliste**).
 
 **EV ready-by time:** the Loxone import binds **AlarmClock** blocks to `get_evcs_ready_by_time` on the EV entity that already has meter/power bindings — same convention as the meter designation. Optional Analog VO: `/ehal/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numeric next-entry; inbox also accepts short Tna-style text).
 
@@ -163,7 +164,7 @@ Prerequisite: Earnie templates are installed in Loxone Config and each consumer 
 
 1. **Daemon Control → Smarthome-Backend**: once Loxone is connected, the **Loxone Import** section appears below the connection summary — on first setup, **No — continue manually** is shown on the same row as the import button.
 2. Earnie loads `LoxAPP3.json`, classifies `Earnie_*` against LoxAPP3 control names (also prefix+slug, case-insensitive), creates typed entities, and binds in EFM meters.
-3. Check the signal mapping on **EHAL-Com** ([Loxone Structure → EHAL Mapping](../ui/ehal-com.md#loxone-structure--ehal-mapping)); follow up on parameters (kWh, schedules, living area, …) in the **House Configurator**.
+3. Check the signal mapping on **EHAL-Com** ([Signalliste](../ui/ehal-com.md#signalliste-loxone-contract)); follow up on parameters (kWh, schedules, living area, …) in the **House Configurator**.
 
 ### Library Checklist
 
@@ -179,7 +180,7 @@ Prerequisite: Earnie templates are installed in Loxone Config and each consumer 
 
 ## Presence check (for Binding and Import)
 
-The template Cmd titles are **known** (`greenfield_device_map.json`). Earnie classifies them against **LoxAPP3 control names** (`GET /data/LoxAPP3.json`): present if the Bezeichnung appears in `controls`, otherwise missing. Titles that are not visible in the Loxone app (and thus absent from LoxAPP3) are not detected here — Binding **P4** discovery inbox covers unknown push IDs later.
+The template Cmd titles are **known** (`greenfield_device_map.json`). Earnie classifies them against **LoxAPP3 control names** (`GET /data/LoxAPP3.json`): present if the Bezeichnung appears in `controls`, otherwise missing. Titles that are not visible in the Loxone app (and thus absent from LoxAPP3) are not detected here — a discovery inbox for unknown push IDs is planned.
 
 Default import uses LoxAPP3 names. EFM meters still come from `LoxAPP3.json`.
 
@@ -246,7 +247,7 @@ Checking all configured signals:
 | Pool / SwimSpa                                                           | `consumers[].ehal_bindings` + filter entity   | see default `Earnie_Pool_*` / EHAL-Com §C.6                                                                                                                |
 
 
-Editing in the UI: **only** under **Daemon Control → EHAL-Com → Loxone Structure → EHAL Mapping** (choose an entity). The House Configurator no longer edits Merker addresses.
+Editing in the UI: **only** under **Daemon Control → EHAL-Com → Signalliste** (and related mapping sections). The House Configurator no longer edits Merker addresses.
 
 ## Core Signals (`plant.ehal_bindings`)
 

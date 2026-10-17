@@ -189,7 +189,7 @@ PAGE_DOCS: dict[str, PageDocs] = {
     "price-forecast": PageDocs(
         primary=DocLink(
             "Preisprognose (Spec)",
-            "docs/spec/price-forecast-renewables.md",
+            "docs/dev/done/price-forecast-renewables.md",
         ),
     ),
 }

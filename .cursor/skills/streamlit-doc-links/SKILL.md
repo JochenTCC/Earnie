@@ -5,7 +5,7 @@ description: >-
   nav sections, help text, or linked Markdown headings change. Use when editing
   ui/pages/**, ui/help_hint.py, ui/doc_links.py, ui/backtesting.py captions that
   mention docs, or headings in docs/user-manual/**, docs/ui/**,
-  docs/konfiguration/**, docs/einrichtung/**, docs/referenz/** (or docs/spec/**
+  docs/konfiguration/**, docs/einrichtung/**, docs/referenz/** (or docs/workflow/**, docs/dev/**
   for Dev pages) that are targets of PAGE_DOCS / MANUAL_URL.
 ---
 

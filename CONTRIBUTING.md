@@ -44,13 +44,13 @@ Technischer Einstieg: **[DEVELOPER.md](DEVELOPER.md)** (venv, pytest, Container,
 
 **Pull Requests:** Fork → Branch → PR gegen `main`. Kurze Beschreibung des *Warum*; bei Verhaltensänderungen Tests mitdenken. Große Architektur-Themen bitte vorher kurz absprechen (Issue oder Kontakt).
 
-**Hotfixes für bereits getaggte Builds** (während `main` weiterläuft): Playbook [docs/spec/branching-hotfix-playbook.md](docs/spec/branching-hotfix-playbook.md) — Standard bleibt Fix auf `main`; kurzlebige `hotfix/…`-Branches nur bei dringendem Patch vom Release-Tag.
+**Hotfixes für bereits getaggte Builds** (während `main` weiterläuft): Playbook [docs/workflow/branching-hotfix-playbook.md](docs/workflow/branching-hotfix-playbook.md) — Standard bleibt Fix auf `main`; kurzlebige `hotfix/…`-Branches nur bei dringendem Patch vom Release-Tag.
 
 ### 3. EHAL-Connectoren (Adapter)
 
 Southbound-Anbindungen laufen über den **Earnie Hardware Access Layer (EHAL)** — normiertes JSON für Telemetrie, Setpoints und Capability-Flags.
 
-**Verbindliche Spec (Englisch):** [docs/spec/ehal.md](docs/spec/ehal.md) · JSON-Schemas: `share/ehal/` · Python: Paket `ehal`.
+**Verbindliche Spec (Englisch):** [docs/referenz/ehal.md](docs/referenz/ehal.md) · JSON-Schemas: `share/ehal/` · Python: Paket `ehal`.
 
 **Adapter-Vertrag:**
 
@@ -87,7 +87,7 @@ Laut `LICENSE.md` § 3: Bei Hardware ohne offizielles Profil bist du freiwillig 
 | Loxone Merker-Rezepte (JSON, kein `.loxone`) | `share/loxone/recipes/` |
 | Loader / Validierung | Python-Paket `ehal.profiles` |
 
-Neue Profile bitte als JSON gegen die jeweiligen Schemas validieren (siehe Tests `tests/test_ehal_profiles.py`). Spec: [docs/spec/ehal.md](docs/spec/ehal.md) Abschnitt *Device roles and hardware profiles*.
+Neue Profile bitte als JSON gegen die jeweiligen Schemas validieren (siehe Tests `tests/test_ehal_profiles.py`). Spec: [docs/referenz/ehal.md](docs/referenz/ehal.md) Abschnitt *Device roles and hardware profiles*.
 
 Profile und Hinweise zu neuen Geräten gern über Info / About (GitHub-Issue) oder direkt als Issue einreichen.
 

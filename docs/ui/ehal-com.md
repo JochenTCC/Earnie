@@ -203,11 +203,11 @@ Role template: `share/ehal/roles/heatpump.json`. Greenfield prefix `Earnie_Waerm
 
 Notes: entity-scoped — VI = enable from Earnie (`flex.{hk_id}.…` in the check); VO = optional push `flex.{hk_id}.sens_power_act` plus store temps. Outside temperature only on the plant (`sens_temperature_outside`, see C.1) — not on the heat-pump VO. No target-kW Merker in this Greenfield round. Recipe: `share/loxone/recipes/heatpump.json`; VO: `VO_Earnie_Heatpump.xml`.
 
-**Heat storage:** stratified tanks must expose energy-equivalent `T_eq` (volume-weighted mean) as `sens_temperature_heat_storage`, plus raw bottom sensor `T_low` as `sens_temperature_heat_storage_low`. Do not bind a single top-layer sensor as the RC state. On HA, map two temperature entities onto those EHAL fields on the `thermal_annual` consumer (same entity-scoped HITL as Loxone). Operator guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md); physics in [thermals-p2.md](../spec/thermals-p2.md).
+**Heat storage:** stratified tanks must expose energy-equivalent `T_eq` (volume-weighted mean) as `sens_temperature_heat_storage`, plus raw bottom sensor `T_low` as `sens_temperature_heat_storage_low`. Do not bind a single top-layer sensor as the RC state. On HA, map two temperature entities onto those EHAL fields on the `thermal_annual` consumer (same entity-scoped HITL as Loxone). Operator guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md); physics in [thermals-p2.md](../dev/done/thermals-p2.md).
 
 ### C.6 Pool / SwimSpa (Stub)
 
-Covers heating + filter. Two live entities: heat (`daily_target_source: thermal`) and filter (`loxone_remaining_hours`). Greenfield prefix `Earnie_Pool_*` / `Earnie_Pool_Filter_*`. Filter spec: [swimspa-filter.md](../spec/swimspa-filter.md). Recipe: `share/loxone/recipes/pool.json`.
+Covers heating + filter. Two live entities: heat (`daily_target_source: thermal`) and filter (`loxone_remaining_hours`). Greenfield prefix `Earnie_Pool_*` / `Earnie_Pool_Filter_*`. Filter spec: [swimspa-filter.md](../dev/done/swimspa-filter.md). Recipe: `share/loxone/recipes/pool.json`.
 
 
 | Area / meaning              | Type          | EHAL value name (stub)                     | OpenEMS | evcc | Victron | Loxone / Loxone extra                                             |
@@ -233,7 +233,7 @@ Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.
 
 <a id="c7-inverter-per-device"></a>
 
-Bindings live on `inverters[].ehal_bindings` as entity-scoped `inv.{id}.*` (id = inverter Kennung). Optional; role template `share/ehal/roles/inverter.json`. Built-in inverters (`owned_by`) share a physical device with an ESS: map both Kennungen to that device's entities. Optional per-PV-system power: `pv.{id}.sens_pv_production_active` on `pv_systems[].ehal_bindings`. See also [Inverter topology](../spec/ehal.md#inverter-topology-inverters-27l) in `ehal.md`.
+Bindings live on `inverters[].ehal_bindings` as entity-scoped `inv.{id}.*` (id = inverter Kennung). Optional; role template `share/ehal/roles/inverter.json`. Built-in inverters (`owned_by`) share a physical device with an ESS: map both Kennungen to that device's entities. Optional per-PV-system power: `pv.{id}.sens_pv_production_active` on `pv_systems[].ehal_bindings`. See also [Inverter topology](../referenz/ehal.md#inverter-topology-inverters-27l) in `ehal.md`.
 
 
 | Area / meaning | Type | EHAL value name | OpenEMS | evcc | Victron GX | Loxone / Loxone extra |
@@ -348,10 +348,10 @@ Only with backend **Home Assistant**: entity-centric HITL (same entity-scoped sh
 
 Workflow: scan `/api/states` once per Streamlit session (button refreshes) → heuristic proposes **empty** fields only → confirm → save. Saved bindings are never overwritten by propose; **no LLM**. After save, Live-Lesen and Live-Schreiben both use exchange EHAL IDs (qualified `consumer.*` / `evcs.*` / `ev.*` / `grid.meter.*` / `ess.<id>.*`; bare plant flats only where that is still the wire form).
 
-Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on plant bindings (`device_class=energy`, preferably `state_class=total_increasing`). Heuristic proposes them empty-only like other fields. Spec: [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md) (HA section).
+Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on plant bindings (`device_class=energy`, preferably `state_class=total_increasing`). Heuristic proposes them empty-only like other fields. Spec: [loxone-meter-energy-slot-ist](../dev/done/loxone-meter-energy-slot-ist.md) (HA section).
 
 - Overview / HITL: [Home Assistant + evcc](../einrichtung/ha-evcc.md) (section *If marq24 / evcc is already connected in HA*)
-- Lab acceptance including stub values and table: [HA Lab Spec §5.1](../spec/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up)
+- Lab acceptance including stub values and table: [HA Lab Spec §5.1](../dev/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up)
 
 
 
@@ -374,7 +374,7 @@ Always listed (not a binding): `heartbeat` / `heartbeat_ts`, and control receipt
 
 **Loxone import** (on **Smarthome-Backend**) still creates typed entities from Merker/EFM names but writes **empty** binding values (activation flags only). Clear existing Merker strings once with `python -m scripts.clear_loxone_binding_names_once --config-dir <config>`.
 
-**EFM meters:** applied by **Smarthome-Backend → Loxone-Import** (`merge_efm`). That path activates energy push fields on `ehal_bindings` (`sens_pv_energy` / `sens_grid_energy_*` / consumer `sens_energy_total` mono only) so the daemon can derive slot Ist from VO-pushed counters (see [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md)). Wire the matching energy VOs next to power. Spec: [EFM-Auto-Sync-Spezifikation](../spec/efm-auto-sync.md); SB page: [Smarthome-Backend](smarthome-backend.md). Library templates: [Loxone Signals](../referenz/loxone-signals.md#library-setup).
+**EFM meters:** applied by **Smarthome-Backend → Loxone-Import** (`merge_efm`). That path activates energy push fields on `ehal_bindings` (`sens_pv_energy` / `sens_grid_energy_*` / consumer `sens_energy_total` mono only) so the daemon can derive slot Ist from VO-pushed counters (see [loxone-meter-energy-slot-ist](../dev/done/loxone-meter-energy-slot-ist.md)). Wire the matching energy VOs next to power. Spec: [EFM-Auto-Sync-Spezifikation](../dev/done/efm-auto-sync.md); SB page: [Smarthome-Backend](smarthome-backend.md). Library templates: [Loxone Signals](../referenz/loxone-signals.md#library-setup).
 
 ## Silent Mode vs. Loud Mode
 

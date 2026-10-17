@@ -1,7 +1,7 @@
 # Config migration orchestration — design draft
 
 Backlog item: epic **ConfigMigration** (Version 2.7, [Backlog.md](Backlog.md)); formerly *Full orchestration of model version migration*.
-Status: implemented P0–P4 (2026-10-16); living contract [`docs/spec/config-migration.md`](../docs/spec/config-migration.md). Owner decisions from chat the same day (see §1 and §7). Backlog: epic **ConfigMigration** → Erledigt; §8 remains open for Version 2.8 only.
+Status: implemented P0–P4 (2026-10-16); living contract [`docs/workflow/config-migration.md`](../docs/workflow/config-migration.md). Owner decisions from chat the same day (see §1 and §7). Backlog: epic **ConfigMigration** → Erledigt; §8 remains open for Version 2.8 only.
 
 ## 1. Owner decisions (2026-10-16)
 
@@ -32,7 +32,7 @@ P0 table (order, detect, files, idempotency, loader rejections, fixture map): [`
 - **Startup path (all channels):** `docker/entrypoint.sh` → `scripts.bootstrap_runtime` → `scripts.run_streamlit` (`bootstrap.run()` → `load_config_or_exit()` → auto-start `main.py` when `EARNIE_AUTO_START_MAIN=1` → Streamlit). HA add-on `run.sh` and LoxBerry compose end in the same entrypoint. **Consequence:** an incompatible config aborts *before* Streamlit is up — there is no UI to guide the user.
 - **Finding — `grid_fees.json` gets `earnie_data_model` by side effect** (bug entry in [Backlog-Bugfixes.md](Backlog-Bugfixes.md)): the seed `share/config/grid_fees.json` and the bootstrap copy carry no version key, but `build_config_pack_bytes()` stamps `earnie_data_model` on every pack file (`runtime_store/config_pack.py:60`), and the import stamps again via `stamp_data_model` + `write_json_dict` (`settings/json_io.py:56`, stamps every file it writes). After an export / import round trip the site copy carries `earnie_data_model: 4`; without one it carries nothing. Earnie's own loader (`data/grid_fees.py` `normalize_grid_fee_catalog`) ignores unknown root keys, so nothing breaks in Earnie — but Edbert's strict loader rejects the stamped file, and the file has two possible states. Target (§3.7): stamping is track-aware, tariff files never get `earnie_data_model`.
 - **Version tracking:** `runtime_store/version_track.py` (`last_run_version`, downgrade warning).
-- **Release notes:** `.github/release-notes/v<version>.md` per `docs/spec/release-checklist.md`.
+- **Release notes:** `.github/release-notes/v<version>.md` per `docs/workflow/release-checklist.md`.
 
 - **Edbert** (`C:\Users\Test\Documents\Smarthome\edbert`, spec `docs/spec/tariff-format.md`, `docs/spec/architecture.md`), checked 2026-10-16:
   - reads `tariffs.json` (catalog) and `user_tariffs.json` (user file, editor-written, IDs `user_…`) — `src/edbert/store.py`; root keys are checked strictly (`ROOT_FIELDS`), `earnie_data_model`, `catalog_as_of`, `user_tariffs_as_of` are tolerated and ignored. Edbert has **no format version of its own**.
@@ -165,7 +165,7 @@ Two independent **version tracks**; each file belongs to exactly one:
 
 ## 5. Phases (epic **ConfigMigration**, Version 2.7)
 
-Registered in `roadmap-nomenclature.mdc` (2026-10-16; the name `Migration` is taken by the file-structure plan `MIGRATION.md`). **2.7 scope:** v3 → v4 + legacy in-model steps on the Earnie track only. The tariff track (§3.7: `tariff_format`, `grid_fees.json` step, Netznutzung split) moves to the Edbert integration in **Version 2.8**; until then `grid_fees.json` stays untagged and is exempt from the untagged blocker (§7.1), and the stamping bug ([Backlog-Bugfixes.md](Backlog-Bugfixes.md)) is fixed first.
+Registered in `roadmap-nomenclature.mdc` (2026-10-16; the name `Migration` is taken by the file-structure plan `docs/dev/done/MIGRATION.md`). **2.7 scope:** v3 → v4 + legacy in-model steps on the Earnie track only. The tariff track (§3.7: `tariff_format`, `grid_fees.json` step, Netznutzung split) moves to the Edbert integration in **Version 2.8**; until then `grid_fees.json` stays untagged and is exempt from the untagged blocker (§7.1), and the stamping bug ([Backlog-Bugfixes.md](Backlog-Bugfixes.md)) is fixed first.
 
 | Phase | Content | Depends on |
 |-------|---------|------------|
@@ -173,7 +173,7 @@ Registered in `roadmap-nomenclature.mdc` (2026-10-16; the name `Migration` is ta
 | **P1** | Registry, planner, runner (backup + atomic write), CLI; port v3→v4 and the 7 legacy steps; config-pack import on the chain; tests from §4 | P0 fixtures (tests can start with synthetic docs) |
 | **P2** | Startup gate: bootstrap without silent migration, migration mode in `run_streamlit`, `main.py` / daemon guard, Shadow handling, loader messages | P1 |
 | **P3** | Wizard UI (§3.4), AppTest coverage | P2 |
-| **P4** | Process: rule (`.cursor/rules/config-migration.mdc`), `CLAUDE.md` pointer, release checklist item + notes helper, German user docs (`docs/einrichtung/betrieb.md` → "Update und Migration"), spec `docs/spec/config-migration.md` | P1–P3 |
+| **P4** | Process: rule (`.cursor/rules/config-migration.mdc`), `CLAUDE.md` pointer, release checklist item + notes helper, German user docs (`docs/einrichtung/betrieb.md` → "Update und Migration"), spec `docs/workflow/config-migration.md` | P1–P3 |
 
 ## 6. Rule content (for P4)
 

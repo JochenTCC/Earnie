@@ -9,7 +9,7 @@
 
 ## 0. Scope and method
 
-- Read the theses paper, the linked documents ([`docs/spec/ehal.md`](../docs/spec/ehal.md), [`docs/spec/conversion-losses.md`](../docs/spec/conversion-losses.md), [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md)) and the code the paper cites, plus the MILP balance, inverter clip, live PV attribution, and standby-powerstation paths.
+- Read the theses paper, the linked documents ([`docs/referenz/ehal.md`](../docs/referenz/ehal.md), [`docs/dev/done/conversion-losses.md`](../docs/dev/done/conversion-losses.md), [`EHAL-Inverter-Draft.md`](EHAL-Inverter-Draft.md)) and the code the paper cites, plus the MILP balance, inverter clip, live PV attribution, and standby-powerstation paths.
 - Same evidence tags as the paper: **[code]** = verified in this repository, **[inference]** = reasoning by the reviewer.
 - **Not re-checked:** vendor and forum sources in §5 of the paper (Victron, Huawei, SMA, VBEW). Counter-examples below are installation types, not documented real cases.
 
@@ -34,7 +34,7 @@ The core idea holds: one AC balance at the root meter, a tree of sub-meters for 
 | MILP clips `pv + discharge <= max_ac`, plus optional DC cap and grid-charge cap | imprecise | [code] PV is not a decision variable in the clip. `pv_ac = min(P_pv_dc · η_inv, max_ac)`, then `discharge <= max_ac − pv_ac` (`ac_clip_pv_and_max_discharge`). Plant curtailment (`p_pv_curtail`) does not give that headroom back to discharge. Charge is a separate cap: `max_ac` on a `battery` inverter, optional `max_ac_charge_kw` otherwise. |
 | Island inverters contribute nothing to the house balance | overstated | [code] Grid-tied PV only (`house_balance_pv_kw`); island batteries dropped (`filter_house_balance_batteries`). A physical powerstation still has an owned island inverter (`house_config/inverter_lifecycle.py`) and `apply_standby_load_relief` removes its attached load from `expected_p_act` in battery-fed slots (`optimizer/powerstation_standby.py`). |
 | Grid meter is plant bindings, wire id `grid.meter.<kind>`, `GRID_METER_ID = "meter"` | correct | [code] `ehal/qualified_ids.py` (`GRID_METER_ID`, `GRID_KINDS`, `qualified_grid_id`). Bindings: `share/config/house_profiles.schema.json` `plant.ehal_bindings`. |
-| `P_cons = max(0, P_PV + P_grid + P_ess)` | correct | [code] `integrations/ehal_live.py` `derive_sens_power_consumers_w`. Signs match `docs/spec/ehal.md`. A missing `sens_ess_power` is treated as 0. The `max(0, …)` clamp means a negative balance cannot show up as house load. |
+| `P_cons = max(0, P_PV + P_grid + P_ess)` | correct | [code] `integrations/ehal_live.py` `derive_sens_power_consumers_w`. Signs match `docs/referenz/ehal.md`. A missing `sens_ess_power` is treated as 0. The `max(0, …)` clamp means a negative balance cannot show up as house load. |
 | Plant AC PV = Σ grid-tied inverter PV · η_inv; island excluded; partial map fails | correct, with a unit condition | [code] `integrations/pv_attribution.py` `derive_plant_pv_ac_w`. [code] `sens_inv_power_pv` and `pv.{id}.sens_pv_production_active` are DC input (`share/ehal/roles/inverter.json`, `share/ehal/roles/pv.json`). Multiplying an already-AC reading by η_inv would apply the loss twice. |
 | `grid.meter` in ~99 places / 31 files | about right | [code] Workspace search is on that order, including Loxone Virtual-Out/In templates. The exact count depends on whether the theses and this review folder are included. |
 | `earnie_data_model = 4`; one-shot migration and fail-fast loaders exist | correct | [code] `runtime_store/data_model.py` `CURRENT_DATA_MODEL = 4`. `scripts/migrate_inverters_once.py` stays on 4 and detects the old shape. |
@@ -57,7 +57,7 @@ p_pv + p_grid_buy + p_discharge
 
 ### 3.1 The single-node identity is right; the worked example is not
 
-With EHAL signs, `P_last = P_netz + P_PV + P_bat` is the spec identity `P_cons = P_PV + P_Grid + P_Bat` (`docs/spec/ehal.md`, losses ignored because the terms are AC-side). T1 matches that if `P_gen = P_PV + P_bat` and charge is negative generation.
+With EHAL signs, `P_last = P_netz + P_PV + P_bat` is the spec identity `P_cons = P_PV + P_Grid + P_Bat` (`docs/referenz/ehal.md`, losses ignored because the terms are AC-side). T1 matches that if `P_gen = P_PV + P_bat` and charge is negative generation.
 
 A fourth storage port does not change Kirchhoff at the AC node. Storage is a state on the generator side (Q1).
 
@@ -79,7 +79,7 @@ Residual = parent − Σ children is the right attribution identity with that or
 
 [inference] Mapping a string inverter's AC output onto `sens_inv_power_pv` applies η_inv twice. The paper should state that unit condition under Q7. Sub-meters are not the error source.
 
-[code] `docs/spec/conversion-losses.md` leaves the DC-bus shortcut (PV → battery without paying η_inv) out of scope. The MILP therefore prices all PV through the AC path. That is a known planning approximation, not a topology-tree defect.
+[code] `docs/dev/done/conversion-losses.md` leaves the DC-bus shortcut (PV → battery without paying η_inv) out of scope. The MILP therefore prices all PV through the AC path. That is a known planning approximation, not a topology-tree defect.
 
 ### 3.3 A series master does not pass all load current
 

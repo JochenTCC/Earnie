@@ -74,5 +74,5 @@
   "capability_expectations": {
     "supports_evcs_current": true
   },
-  "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."
+  "unit_sign_notes": "See docs/referenz/ehal.md § Units and sign convention."
 }

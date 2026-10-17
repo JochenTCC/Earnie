@@ -6,7 +6,7 @@
 
 **Windows-PC mit VMware Workstation (`vctl`):** [vmware-vctl.md](vmware-vctl.md)
 
-**Docker-Artefakte:** `[docker/README.md](../../docker/README.md)` — Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .`.
+**Docker-Artefakte:** [docker/README.md](../../docker/README.md) — Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .`.
 
 ## CPU-Voraussetzung (amd64)
 
@@ -107,7 +107,7 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Veröffentlichte Images** kommen über GitHub Actions: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml) und baut zuerst nur den **Release-Kandidaten** `ghcr.io/jochentcc/earnie-energy:X.Y.Z` (kein `:latest` / `:next` am Tag allein). Nach manueller Freigabe des Jobs `promote` (Environment `release-approval`) folgen `:latest` (nur offizielle Versionen) bzw. `:next` sowie die veröffentlichte GitHub Release. Details: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
-**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt denselben Ablauf: zuerst Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release** — **nicht** `:latest`. Zum Testen `:next` (nach Freigabe) oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.12`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
+**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt denselben Ablauf: zuerst Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release** — **nicht** `:latest`. Zum Testen `:next` (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.6.1-beta.1`). Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
@@ -115,7 +115,7 @@ Eigene Compose-Dateien (nicht in der Prod-YAML): `docker/compose/synology-alpha.
 
 - Container `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`
 - Compose-Projektname `earnie-alpha` (kollidiert nicht mit Prod `earnie-productive`)
-- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.0-alpha.12`)
+- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.1-beta.1`)
 
 ```powershell
 mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime
@@ -165,7 +165,7 @@ Vor `--push` prüft der Build automatisch den gebündelten Tarifkatalog (`share/
 python -m scripts.validate_tariffs --check-catalog
 ```
 
-Auf der NAS vor dem ersten Prod-Cutover (Backlog **2.0 P6**) die produktive Sidecar-Datei prüfen:
+Auf der NAS vor dem ersten Prod-Cutover die produktive Sidecar-Datei prüfen:
 
 ```powershell
 python -m scripts.validate_tariffs --tariffs share/config/tariffs.json --check-catalog
@@ -222,8 +222,6 @@ docker compose up -d
 ```
 
 Beim Start von `main.py` (auch nach Auto-Start aus der UI) laufen automatisch Tarif-Plausibilität und `verify_loxone_setup`. Ergebnis steht in `runtime/earnie.log` (`Tarif-Startup-Prüfung`, `[loxone-verify]`).
-
-**Log-Datei nach Upgrade:** Ab Version 2.0 heißt die Daemon-Logdatei `earnie.log` (früher `energy_optimizer.log`). Beim ersten Start nach dem Upgrade entsteht eine neue Datei; optional die alte manuell umbenennen oder archivieren.
 
 Optional:
 

@@ -74,7 +74,7 @@ Before committing `backlog/Backlog-Bugfixes.md` or `backlog/Backlog-Erledigt.md`
 
 ## 7. Audience marker (release notes)
 
-Spec: `docs/spec/release-notes-workflow.md` §8. Every top-level checkbox entry in `backlog/Backlog.md` and `backlog/Backlog-Erledigt.md` carries exactly one marker behind its bold title:
+Spec: `docs/workflow/release-notes-workflow.md` §8. Every top-level checkbox entry in `backlog/Backlog.md` and `backlog/Backlog-Erledigt.md` carries exactly one marker behind its bold title:
 
 * `` `[feat]` `` real, productively usable feature -> release notes + user docs
 * `` `[qual]` `` no user feature, but improves quality/stability (regression suite, cycle recorder, ...) -> one short line in release notes

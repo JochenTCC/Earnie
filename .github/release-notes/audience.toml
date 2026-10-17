@@ -1,5 +1,5 @@
 # Audience classification helpers for release notes and user docs.
-# Spec: docs/spec/release-notes-workflow.md section 8. Rule: .cursor/rules/release-notes.mdc
+# Spec: docs/workflow/release-notes-workflow.md section 8. Rule: .cursor/rules/release-notes.mdc
 #
 # Backlog markers are authoritative: [feat] feature, [qual] quality/stability, [dev] internal.
 # This file only PRE-CLASSIFIES unmarked material; the AI confirms with the maintainer.
@@ -12,8 +12,10 @@ dev_terms = ["Shadow Mode", "Shadow-Modus", "Shadow-Feed", "Shadow-Client", "Sha
 
 # End-user doc scope checked by tests/test_user_docs_audience.py.
 user_doc_paths = ["docs/README.md", "docs/user-manual", "docs/einrichtung", "docs/konfiguration", "docs/ui", "docs/referenz", "README.md"]
+# English developer contract inside docs/referenz/ - not an end-user doc.
+user_doc_exclude = ["docs/referenz/ehal.md"]
 
-# Known violations of dev_terms (ratchet, currently empty). Do not add entries; move content to docs/entwicklung/ or docs/spec/.
+# Known violations of dev_terms (ratchet, currently empty). Do not add entries; move content to docs/entwicklung/ or docs/dev/.
 docs_allowlist = []
 
 # BASELINE of internal backlog version IDs (2.7.n, 2.+1, ...) per user doc: counts may only shrink.

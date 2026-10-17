@@ -17,7 +17,7 @@ Soft gate: for every **code** bugfix, remind and **propose** an appropriate
 regression so the same failure cannot silently return. Do **not** block the fix,
 commit, or backlog move if the user declines — record the skip reason briefly.
 
-Two kinds of regression (spec: [regression-suite.md §3a](../../../docs/spec/regression-suite.md)):
+Two kinds of regression (spec: [regression-suite.md §3a](../../../docs/workflow/regression-suite.md)):
 
 | Kind | Where | Runs |
 |------|-------|------|
@@ -48,7 +48,7 @@ Decide before fixing — golden **B** needs a baseline recorded on the **unfixed
 - **B** only when **all** hold:
   1. A debug dump with `recorder/` exists (schema v3, cycle recorder on).
   2. The bug is plan / optimizer behaviour.
-  3. It shows up in something the suite compares ([regression-suite.md §7](../../../docs/spec/regression-suite.md)): a hard invariant (SoC limits, energy balance, EV deadline, export limit, write to unavailable functions) or a metric (total cost, grid import / export, self-sufficiency, battery cycles, per-consumer energy).
+  3. It shows up in something the suite compares ([regression-suite.md §7](../../../docs/workflow/regression-suite.md)): a hard invariant (SoC limits, energy balance, EV deadline, export limit, write to unavailable functions) or a metric (total cost, grid import / export, self-sufficiency, battery cycles, per-consumer energy).
 
   A bug visible only elsewhere (heat-store temperature curve, UI value, live write) passes a golden unchanged → **A**. Not every dump becomes a case: a recorder dump carries days of load profile, so archive customer data only when it adds a check (data minimisation).
 - **A** for logic bugs reproducible with small scrubbed inputs, and for anything golden **B** cannot see.
@@ -202,7 +202,7 @@ Every red case → fix, or a conscious `--update-golden` with its own rationale 
 - When moving the item to `## Bugfix Verifications Pending`, note commit / version and the regression paths: pytest file and/or `REG-…` case (or “no test: &lt;exception&gt;”).
 - After live / prod acceptance: archive to `backlog/Backlog-Erledigt.md` (dated heading).
 - Close or comment on the public issue (user OK): “Fixed in v…; guarded by private case REG-… / pytest …” — case ID only, no customer data.
-- Remind before the next tag: `Earnie-regression-private` clean and pushed, `run_regression` run ([release-checklist.md §1](../../../docs/spec/release-checklist.md)).
+- Remind before the next tag: `Earnie-regression-private` clean and pushed, `run_regression` run ([release-checklist.md §1](../../../docs/workflow/release-checklist.md)).
 
 ## Quality bar
 
@@ -210,12 +210,12 @@ Every red case → fix, or a conscious `--update-golden` with its own rationale 
 - Avoid mock-only “tests” that never exercise the buggy path.
 - Prefer deterministic unit/integration over live network.
 - Do not invent large generated datasets — ask first (test-data-generation rule).
-- Customer data stays private: public tree / issue get case IDs and scrubbed fixtures only ([regression-suite.md §6](../../../docs/spec/regression-suite.md)).
+- Customer data stays private: public tree / issue get case IDs and scrubbed fixtures only ([regression-suite.md §6](../../../docs/workflow/regression-suite.md)).
 
 ## Related
 
-- Golden suite spec: [`docs/spec/regression-suite.md`](../../../docs/spec/regression-suite.md)
-- Release gate: [`docs/spec/release-checklist.md`](../../../docs/spec/release-checklist.md) §1
+- Golden suite spec: [`docs/workflow/regression-suite.md`](../../../docs/workflow/regression-suite.md)
+- Release gate: [`docs/workflow/release-checklist.md`](../../../docs/workflow/release-checklist.md) §1
 - Bugfix lifecycle: [`.cursor/rules/backlog.mdc`](../../rules/backlog.mdc)
 - Test health / protected regressions: [`.cursor/rules/test-health.mdc`](../../rules/test-health.mdc)
 - Session check: [session-abschluss](../session-abschluss/SKILL.md)

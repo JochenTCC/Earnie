@@ -1,4 +1,4 @@
-"""Earnie-Points of one plant (rule: ``docs/spec/earnie-points.md``).
+"""Earnie-Points of one plant (rule: ``docs/workflow/earnie-points.md``).
 
 Pure calculation: no I/O, no Streamlit, no network. Invalid input raises ``ValueError``.
 """

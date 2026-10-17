@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "2.4.n greenfield import contract: match loxapp3 control Bezeichnung to HK entity + ehal_bindings. Exact names preferred; prefix groups multi-signal devices. EFM meter roles still apply per docs/spec/efm-auto-sync-2.4.l.md.",
+  "description": "2.4.n greenfield import contract: match loxapp3 control Bezeichnung to HK entity + ehal_bindings. Exact names preferred; prefix groups multi-signal devices. EFM meter roles still apply per docs/dev/done/efm-auto-sync.md.",
   "markers": [
     {
       "name": "Earnie_Heartbeat",

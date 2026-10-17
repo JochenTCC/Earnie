@@ -116,13 +116,13 @@ Hold-Forward (bisher „hellorange / gehalten“) gilt im S-2-Modus **nicht**. F
 
 | Panel | Verhalten |
 |-------|-----------|
-| Sankey | **zwischen Navigation und Chart 2** — Plant über aktives EHAL-Backend; Flex/EV-SoC siehe [charts.md](../ui/charts.md#energiefluss-live-sankey) |
+| Sankey | **zwischen Navigation und Chart 2** — Plant über aktives EHAL-Backend; Flex/EV-SoC siehe [charts.md](../../ui/charts.md#energiefluss-live-sankey) |
 | Countdown | immer |
 | Auto-Refresh | Desktop: `cycle_offset=0` (SA₀→SA₂); Mobil: nur Fenster SA₀→SA₁ |
 
 ### 7.1 UI-Layout (Follow-up, umgesetzt 2026-07-05)
 
-Kompaktere Chart-UI; Details in [docs/ui/charts.md](../ui/charts.md).
+Kompaktere Chart-UI; Details in [docs/ui/charts.md](../../ui/charts.md).
 
 | Element | Verhalten |
 |---------|-----------|

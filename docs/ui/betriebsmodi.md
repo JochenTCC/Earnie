@@ -33,7 +33,7 @@ In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version
 
 Während der Greenfield-Ersteinrichtung sind zunächst nur **Konfiguration** und **Daemon Control** sichtbar (Daemon-Seiten werden für die Ersteinrichtung auch ohne `live_environment` in der Env erzwungen). Solange kein Smarthome-Backend gewählt ist, zeigt Daemon Control zunächst nur **Smarthome-Backend** — Optimierer-Dienst und EHAL-Com erscheinen erst danach.
 
-Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.8.1). Chart- und Panel-Details: [Charts & Panels](charts.md).
+Spezifikation: [UI Sunset-2-Sunset](../dev/done/ui-sunset2sunset.md) (v0.8.1). Chart- und Panel-Details: [Charts & Panels](charts.md).
 
 ## Sunset-2-Sunset (Seite Monitor)
 

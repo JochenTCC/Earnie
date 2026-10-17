@@ -39,7 +39,7 @@ def model_range_label_de(plan: MigrationPlan) -> str:
     """German label for the from/to range (avoids confusing ``4 → 4``).
 
     Same-model pending steps are detect-based structural work inside the
-    current data model (see ``docs/spec/config-migration.md`` §3.1).
+    current data model (see ``docs/workflow/config-migration.md`` §3.1).
     """
     if plan.from_model is None:
         return f"Datenmodell ? → {plan.to_model}"

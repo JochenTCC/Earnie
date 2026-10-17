@@ -86,7 +86,7 @@ then:
 
 For **aWATTar HOURLY / SUNNY 60 min**, plan and bill share hourly grain → mismatch is small (API vs Energy-Charts source differences aside).
 
-OeMAG / E-Control RefMarkt: still **monthly** aggregates; E-Control notes QH market inputs but hourly aggregates while EAG requires hours — see [`docs/referenz/oemag-referenzmarktwert.md`](../referenz/oemag-referenzmarktwert.md).
+OeMAG / E-Control RefMarkt: still **monthly** aggregates; E-Control notes QH market inputs but hourly aggregates while EAG requires hours — see [`docs/referenz/oemag-referenzmarktwert.md`](../../referenz/oemag-referenzmarktwert.md).
 
 ---
 
@@ -121,7 +121,7 @@ Config names already use quarter-hours; MILP currently **throws away** that reso
 
 `simulate_horizon(..., commit_hours=K)` and SE defaults (`DEFAULT_BACKTESTING_COMMIT_HOURS`) are **wall-clock hours**. Under QH slots, either keep K as hours (commit 4K slots) or rename to avoid slot/hour confusion.
 
-Horizon semantics: MILP end is **sunrise SA₂**, not sunset — [`docs/spec/planning-horizon-sunset.md`](planning-horizon-sunset.md) §2.3 still documents hourly grain.
+Horizon semantics: MILP end is **sunrise SA₂**, not sunset — [`docs/dev/done/planning-horizon-sunset.md`](planning-horizon-sunset.md) §2.3 still documents hourly grain.
 
 ### 4.3 Light HiGHS timing probe (2026-08-11)
 
@@ -142,9 +142,9 @@ Environment: `EARNIE_MILP_SOLVER=highs`, trivial fast-path off. Synthetic matrix
 | `cons_data` | Hourly CSV + hour flush (`data/cons_data_store.py`, `main.py`) |
 | PV forecast | `data/pv_forecast.py` — hourly watts map |
 | Outdoor / archive PV | `data/outdoor_forecast.py`, `data/open_meteo_solar_archive.py` |
-| Price features | `docs/spec/price-forecast-renewables.md` — EC 15‑min → hourly mean for features |
-| Charts | Mixed 15‑min log + 1‑h MILP (`ui/chart_context.py`, `docs/spec/ui-sunset2sunset.md`) — would need redefinition if MILP becomes QH |
-| Loxone write cadence | Can remain 15 min regardless of MILP grain; **doc drift:** [`docs/referenz/loxone-signals.md`](../referenz/loxone-signals.md) claims “MILP … 15-Min-Slots intern” — **false today** |
+| Price features | `docs/dev/done/price-forecast-renewables.md` — EC 15‑min → hourly mean for features |
+| Charts | Mixed 15‑min log + 1‑h MILP (`ui/chart_context.py`, `docs/dev/done/ui-sunset2sunset.md`) — would need redefinition if MILP becomes QH |
+| Loxone write cadence | Can remain 15 min regardless of MILP grain; **doc drift:** [`docs/referenz/loxone-signals.md`](../../referenz/loxone-signals.md) claims “MILP … 15-Min-Slots intern” — **false today** |
 | SE commit-K / scripts | `optimizer/simulation.py`, `scripts/run_commit_hours_backtests.py` |
 
 ---

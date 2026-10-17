@@ -9,7 +9,7 @@ fungiert als Bridge zu Home Assistant / EcoFlow.
 Andere Hubs (HA+evcc direkt, OpenEMS): [Smarthome-Backend wählen](smarthome-backend-wahl.md).
 Grundlagen Merker-Namen / Virtual In-Out: [Loxone-Integration](loxone-anbindung.md) ·
 [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md). EHAL-Feldkontrakt:
-[`docs/spec/ehal.md`](../spec/ehal.md).
+[`docs/referenz/ehal.md`](../referenz/ehal.md).
 
 ## Einordnung: One-Way-Speicher, kein vollwertiger ESS
 

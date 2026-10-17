@@ -3,7 +3,7 @@
 **Version:** 0.3  
 **Status:** S1 (Prod recorder) implemented; S2+S3 (Shadow client) implemented — backlog **2.6.o** → **2.7.f** → **2.+1** (S4). Post-2.7 architecture review + follow-up **R1–R4** done: [`backlog/Shadow-Architecture-Review.md`](../../backlog/Shadow-Architecture-Review.md).  
 **Epic short name:** **Shadow**  
-**Related:** Silent mode (`config.is_silent_mode()`), [EHAL](ehal.md), [Release Checklist](release-checklist.md)
+**Related:** Silent mode (`config.is_silent_mode()`), [EHAL](../referenz/ehal.md), [Release Checklist](../workflow/release-checklist.md)
 
 ## 1. Goal
 

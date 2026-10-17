@@ -103,7 +103,7 @@ def test_restricted_navigation_defaults_to_smarthome_backend_when_live_environme
     """live_environment during onboarding: a real backend connection is the
     prerequisite for everything else, so land on Smarthome-Backend first
     instead of Hauskonfigurator (matches EARNIE_UI_MODES-dependent flow
-    agreed for greenfield installs — see docs/spec/smarthome-backend-page.md §5)."""
+    agreed for greenfield installs — see docs/dev/done/smarthome-backend-page.md §5)."""
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     monkeypatch.delenv("LOXONE_IP", raising=False)
     monkeypatch.delenv("LOXONE_USER", raising=False)
