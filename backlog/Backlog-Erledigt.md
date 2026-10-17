@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Semi-automatic docs / manuals review (2026-10-17)
+
+- [x] **Semi-automatic review of docs / manuals** `[qual]` — remove obsolete ones
+
 ### Document Review abbreviations.md language (2026-10-17)
 
 - [x] **`abbreviations.md` language:** decided — the glossary stays fully English (already is); no translation. German TOC link texts "Abkürzungen" in German docs are unchanged.

@@ -22,7 +22,6 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 
 - [ ] first alpha quality review
 - [ ] Review current binding with HA
-- [ ] semi-automatic review of docs / manuals (remove obsolete ones)
 - [ ] Install earnie-server on VDC from Hosttech
   - clarify how to reuse "earnie-hems.com" on VDC
   - establish deploy process

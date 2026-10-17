@@ -33,6 +33,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 - [ ] "debug-dumps\debug_dump_20261015_222809"
 - [ ] **Bug — config pack import accepts incompatible member files:** in `runtime_store/config_pack.py` `_migrate_and_validate_pack_docs`, `stamp_data_model(doc)` overwrites each member's `earnie_data_model` with the current version *before* `ensure_compatible(doc, ...)`, so members at version 1/2 or without the field pass silently. Only the manifest version is really checked. Expected: fail loud for incompatible members (no stamping before the check); `grid_fees.json` stays exempt. Needs a regression test (pack with v2 member and v4 manifest must be rejected). Doc `docs/konfiguration/speichern-laden.md` currently describes "manifest decides" — update after the fix.
+- [ ] On HK side I'm asked always "Earnie 2.7.0-dev.61 braucht eine Anpassung deiner Konfiguration (strukturelle Schritte innerhalb Datenmodell 4).
+Zuletzt gelaufene Version: 2.7.0-dev.61" without a change in the data model. Is this do to the Version bump?
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
