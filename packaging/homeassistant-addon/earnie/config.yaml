@@ -4,6 +4,7 @@
 name: Earnie
 version: "2.6.2"
 slug: earnie
+stage: stable
 description: "Energiemanagement und Optimierung für Smart Homes. Nach dem Start ca. 20–40 s warten, bis die Web-UI (Ingress) bereit ist."
 url: https://github.com/JochenTCC/Earnie
 # Prebuilt per-arch images (H6); Supervisor pulls — no on-device apt build.

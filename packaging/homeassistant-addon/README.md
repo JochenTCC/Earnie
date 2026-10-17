@@ -14,7 +14,7 @@ Every Earnie git tag triggers [`.github/workflows/release-publish.yml`](../../.g
 4. Job **`publish_ha_addon`** (after approval only): bump add-on trees (`auto` channel), lint, commit Earnie `main`, mirror to **`ha-addon-earnie` `main`** — from this moment HA offers the update.
    - Official → `earnie/` + `earnie_prerelease/`
    - Pre-release → `earnie_prerelease/` only
-   - **CHANGELOG / Änderungsprotokoll:** `bump_ha_addon` inserts a section whose first bullet is the first non-heading prose line of `.github/release-notes/v<version>.md`. Before tagging, rewrite that line for HA users (German, no release-ops jargon) — see [release-checklist.md](../../docs/workflow/release-checklist.md) §1.
+   - **CHANGELOG / Änderungsprotokoll:** `bump_ha_addon` inserts a section whose first bullet is the first non-heading prose line of `.github/release-notes/v<version>.md`, followed by the compact bullet list directly below that line as nested bullets. Before tagging, rewrite that line for HA users (German, no release-ops jargon) — see [release-checklist.md](../../docs/workflow/release-checklist.md) §1.
 
 **No GitHub Release/tag is needed in `ha-addon-earnie`.** The Supervisor reads the tracked branch and detects updates from `config.yaml` `version:`.
 
