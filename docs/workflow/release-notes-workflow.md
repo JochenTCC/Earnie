@@ -18,7 +18,7 @@ Cursor is master: rule + skill live in `.cursor/`; Claude Code follows them via 
 | `.github/release-notes/v<tag>.md` | Hand/AI-written per tag *(exists)*; CI `release-publish.yml` step "Prepare release notes" **silently falls back** to generic boilerplate when the file is missing → violates `no-implicit-fallbacks.mdc` |
 | `.github/release-notes/UNRELEASED.md` | Manual collector for breaking / user-action items *(exists)* |
 | `scripts/migration_release_notes.py --since <tag>` | Drafts the `## Migration` section from the step registry *(exists)* |
-| `scripts/bump_ha_addon.py` | Copies the **first prose line** of the notes into the HA add-on `CHANGELOG.md` *(exists)* |
+| `scripts/bump_ha_addon.py` | Copies the **first prose line** plus the compact bullet list directly below it into the HA add-on `CHANGELOG.md` *(exists)* |
 | `docs/workflow/release-checklist.md` §1 | Lists "write notes before tag" but no drafting / review gate |
 | `session-abschluss` skill | Checklist item "release notes exist or default notes are OK" — the "default OK" is the loophole |
 | Tags | Productive `vX.Y.Z`; pre-release `vX.Y.Z-alpha.N/-beta.N/-rc.N`; dev tags `2.7.0-dev.N` (**no `v`**, no CI trigger) |

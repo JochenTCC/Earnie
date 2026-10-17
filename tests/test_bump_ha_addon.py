@@ -126,3 +126,43 @@ def test_release_notes_blurb_uses_first_non_heading_paragraph(tmp_path: Path, mo
     )
     monkeypatch.setattr(bha, "RELEASE_NOTES_DIR", notes_dir)
     assert bha._release_notes_blurb("9.9.9") == "Custom release summary line."
+
+
+def test_release_notes_summary_collects_bullets_below_first_line(tmp_path: Path, monkeypatch):
+    notes_dir = tmp_path / "release-notes"
+    notes_dir.mkdir()
+    notes_dir.joinpath("v9.9.9.md").write_text(
+        "## Earnie 9.9.9\n\nSummary sentence.\n\n- First change\n- Second change\n\n"
+        "> Banner\n\n### Highlights\n\n- Not part of the summary\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(bha, "RELEASE_NOTES_DIR", notes_dir)
+    assert bha._release_notes_summary("9.9.9") == (
+        "Summary sentence.",
+        ["First change", "Second change"],
+    )
+
+
+def test_bump_changelog_nests_summary_bullets(tmp_path: Path, monkeypatch):
+    notes_dir = tmp_path / "release-notes"
+    notes_dir.mkdir()
+    notes_dir.joinpath("v2.5.0.md").write_text(
+        "## Earnie 2.5.0\n\nSummary sentence.\n\n- First change\n- Second change\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(bha, "RELEASE_NOTES_DIR", notes_dir)
+    after = bha.bump_changelog("# Changelog\n\n## 0.1.0\n\n- Initial.\n", "2.5.0")
+    assert (
+        "## 2.5.0\n\n- Summary sentence.\n  - First change\n  - Second change\n- Earnie release:"
+        in after
+    )
+
+
+def test_release_notes_summary_without_bullets(tmp_path: Path, monkeypatch):
+    notes_dir = tmp_path / "release-notes"
+    notes_dir.mkdir()
+    notes_dir.joinpath("v9.9.9.md").write_text(
+        "## T\n\nOnly a sentence.\n\n### Highlights\n\n- x\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(bha, "RELEASE_NOTES_DIR", notes_dir)
+    assert bha._release_notes_summary("9.9.9") == ("Only a sentence.", [])

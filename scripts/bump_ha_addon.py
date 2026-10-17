@@ -107,15 +107,33 @@ def bump_dockerfile(content: str, version: str) -> str:
     )
 
 
-def _release_notes_blurb(version: str) -> str:
+def _release_notes_summary(version: str) -> tuple[str, list[str]]:
+    """Return (first prose line, compact bullets directly below it).
+
+    The bullet list is the contiguous ``- `` block after the first prose line
+    (blank lines in between allowed); it ends at the first other line.
+    """
     notes_path = RELEASE_NOTES_DIR / f"v{version}.md"
     if notes_path.is_file():
         lines = _read(notes_path).splitlines()
-        for line in lines:
-            stripped = line.strip()
-            if stripped and not stripped.startswith("#"):
-                return stripped
-    return f"Pins Earnie `{version}` (`{image_ref(version)}`)."
+        for idx, line in enumerate(lines):
+            blurb = line.strip()
+            if not blurb or blurb.startswith("#"):
+                continue
+            bullets: list[str] = []
+            for follow in lines[idx + 1 :]:
+                stripped = follow.strip()
+                if not stripped:
+                    continue
+                if not stripped.startswith("- "):
+                    break
+                bullets.append(stripped[2:].strip())
+            return blurb, bullets
+    return f"Pins Earnie `{version}` (`{image_ref(version)}`).", []
+
+
+def _release_notes_blurb(version: str) -> str:
+    return _release_notes_summary(version)[0]
 
 
 def changelog_has_version(content: str, version: str) -> bool:
@@ -123,13 +141,16 @@ def changelog_has_version(content: str, version: str) -> bool:
 
 
 def bump_changelog(content: str, version: str) -> str:
+    """Insert a section: first prose line + nested summary bullets from the notes."""
     if changelog_has_version(content, version):
         return content
-    blurb = _release_notes_blurb(version)
+    blurb, bullets = _release_notes_summary(version)
     release_url = EARNIE_RELEASE_URL.format(version=version)
+    nested = "".join(f"  - {item}\n" for item in bullets)
     section = (
         f"## {version}\n\n"
         f"- {blurb}\n"
+        f"{nested}"
         f"- Earnie release: [{version}]({release_url})\n\n"
     )
     lines = content.splitlines(keepends=True)
