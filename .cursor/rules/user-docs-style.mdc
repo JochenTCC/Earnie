@@ -1,0 +1,43 @@
+---
+description: Writing style for German end-user docs — impersonal and factual, friendly "Sie" only where readers are invited to contribute
+globs: docs/README.md,docs/user-manual/**/*.md,docs/einrichtung/**/*.md,docs/konfiguration/**/*.md,docs/ui/**/*.md,docs/referenz/**/*.md
+alwaysApply: false
+---
+
+# User docs — writing style
+
+Applies when writing or editing German user docs (scope: `german-user-docs.mdc`). Reference example: [`docs/user-manual/Benutzer-Handbuch-Earnie.md`](../../docs/user-manual/Benutzer-Handbuch-Earnie.md) (edited pilot, 2026-10-17). `docs/ui/ehal-com.md` stays English; `docs/spec/` and `docs/entwicklung/` are out of scope.
+
+## Address and tone
+
+- **Default: impersonal, neutral, factual — no direct address** (no „Sie“, „du“, „ihr“).
+  - Instructions as infinitive steps: „Profil anlegen, danach Geräte ergänzen.“, „Container starten.“
+  - Otherwise Earnie (or the page / the feature) as subject instead of passive chains: „Earnie berechnet …“, „Die Seite zeigt …“.
+- **Exception — passages that invite readers to contribute** (feedback, reporting problems, usage statistics, support, community): friendly tone, address with **„Sie“**, project in the **wir** form. Examples: „Umso mehr freuen wir uns über Ihre Rückmeldungen …“, „Melden Sie sich gerne über …“, „– vielen Dank!“.
+- Honest and grounded: no exaggeration or sales talk; state limits plainly („Leistungspreis … sind nicht berücksichtigt“, „keine Garantie“).
+- People: prefer neutral terms („Fachbetrieb“, „Earnie-Projekt“); if persons are really meant, gender with colon („Nutzer:innen“).
+
+## Sentences and structure
+
+- Medium-length sentences (about 10–15 words); split long sentences and run-on paragraphs into lists.
+- List items are full sentences or „**Stichwort:** erklärender Satz“, not bare keywords.
+- Headings may be questions where they answer a reader's doubt („Warum weicht Historisch beim Jahresverbrauch ab?“).
+- Say a fact once in the right place; elsewhere link to it instead of repeating it.
+- Notes as a blockquote: `> **Hinweis:** …` (also `> **Rechenzeit:** …` etc.).
+- Code identifiers, JSON keys, paths, env vars stay verbatim (`german-user-docs.mdc`); in narrative docs (handbook) put them in parentheses or at the end of a sentence, details belong in `docs/konfiguration/`.
+
+## Mechanics
+
+- Dash: en dash with spaces („ – “). **Never** the em dash „—“ and no dashes without spaces.
+- Quotes: „…“ (German).
+- „z. B.“, „u. a.“, „ggf.“ as in the existing docs; percent with space („5 %“).
+- No capitals for emphasis („KEINE“, „NICHT“), no „!!!“, no emoticons or emoji. Use **bold** sparingly for the key term of a sentence.
+- Avoid sentence starts with „Aber“, „Und“, „Dennoch“ — join sentences or use „Allerdings …“ sparingly.
+- Avoid the rhetorical „nicht X, sondern Y“ pattern and filler phrases („Es ist wichtig zu beachten, dass …“, „nahtlos“, „ganzheitlich“).
+- No internal backlog / epic IDs (`2.7.n`, `P5`, `Q8`, codenames) — see `german-user-docs.mdc`.
+
+## When editing an existing doc
+
+- Change wording and structure only; **do not change facts** in the same pass. Stale or doubtful statements go to `## Document Review Findings` in `backlog/Backlog-Bugfixes.md` (skill `doc-review-findings`).
+- Keep heading slugs that are link targets (`ui/doc_links.py`, inbound `#…` links); when a heading changes, add an explicit `<a id="old-slug"></a>` (skill `streamlit-doc-links`).
+- After the edit run: `.venv\Scripts\python.exe -m scripts.run_pytest tests/test_doc_links.py tests/test_user_docs_audience.py -q`.
