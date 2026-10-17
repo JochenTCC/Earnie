@@ -2,6 +2,60 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — EV unplugged live slot planned charge (2026-10-17)
+
+- [x] **EV unplugged: live slot still planned charge** — **Verified** (2026-10-17, Shadow)
+  - Dump: `debug-dumps/debug_dump_20261016_150238` (title: planned charging although not connected).
+  - Symptom: with `forecast_when_absent` / `open_cycle`, MILP could fill the **current** quarter-hour while `plugged_in=false` (future slots OK; live setpoint already 0 via `suppresses_live_charging_output`).
+  - Fix: `consumer_charging_eligible_indices` skips `t==0` when `anticipated` and not plugged in (`optimizer/charging_schedule.py`).
+  - Tests: `tests/test_charging_context.py::TestEligibleIndices` (`test_late_return_skips_live_slot_keeps_future`, `test_anticipated_open_cycle_blocks_current_slot_only`).
+  - Docs: `docs/spec/ev-return-prognosis.md`, `docs/konfiguration/flexible-verbraucher.md`.
+  - Verification: Shadow — live slot `smart=0.0`, future slots still planned; eligibility log `slot0_eligible: false`.
+
+### Bugfix — normalize_backend unknown → Loxone (2026-10-17)
+
+- [x] **`normalize_backend` silently maps unknown `ehal.backend` values to Loxone** (found 2026-10-16 while testing ConfigMigration `dm4.loxone_binding_names`)
+  - Symptom: typo like `ehal.backend: "homeassistant"` (meant `"ha"`) ran Earnie as Loxone with no error; migration step `dm4.loxone_binding_names` then treated HA entity ids as Merker names.
+  - Cause: final `return BACKEND_LOXONE` caught every unknown value; schema enum was not enforced on the runtime path.
+  - Fix: unknown → `ValueError` (fail-loud, same as `normalize_ha_transport`); empty / `None` / `loxone` / `none` → Loxone; `ha` / `openems` unchanged.
+  - Tests: `tests/test_ehal_setup.py::test_normalize_backend_defaults_to_loxone`; `tests/test_migration_registry.py::test_loxone_names_unknown_backend_surfaces_error`.
+
+### Bugfix — EHAL SoC error logged literal `ess.{id}` (2026-10-17)
+
+- [x] **EHAL SoC read error logged literal `ess.{id}`** — **Verified** (2026-10-17)
+  - Symptom: at `main.py` start, `EHAL SoC read failed: missing primary ess.{id}.sens_ess_soc` — placeholder not replaced; ambiguous on NAS.
+  - Cause: `integrations.ehal_live.read_ess_soc` logged a docs-style template; `primary_id` was already resolved but unused in the message.
+  - Fix: log concrete `ess.<primary_id>.sens_ess_soc` (or a clear no-primary-id branch) plus a short map/Live hint.
+  - Tests: `tests/test_ess_soc_by_id.py` (`test_read_ess_soc_error_names_concrete_primary_id`).
+
+### Bugfix — grid_fees.json earnie_data_model stamp (2026-10-17)
+
+- [x] **`grid_fees.json` gets `earnie_data_model` stamped by config-pack export / import** — **Verified** (2026-10-17; ConfigMigration P2)
+  - Export (`build_config_pack_bytes`) and `write_json_dict` no longer stamp `earnie_data_model` onto `grid_fees.json`; import already skipped stamp. Existing stamped keys are not stripped on load (migration step later).
+  - Tests: `tests/test_config_pack_and_paths.py` round trip; `tests/test_json_io.py` (`test_write_json_dict_does_not_stamp_grid_fees`).
+  - Live check (NAS productive): live `grid_fees.json` and pre-migration backup have no stamp; Earnie-track siblings in the same backup are stamped `4`.
+
+### Bugfix — Live day-ahead ENTSO-E re-fetch every cycle (2026-10-17)
+
+- [x] **Live day-ahead prices re-fetched from ENTSO-E every cycle** — **Verified** on NAS productive (2026-10-17, `2.7.0-dev.60`)
+  - Symptom (NAS productive `earnie.log`, 2026-10-15): `ENTSO-E AT request …` in every cycle, never `Using cached day-ahead`; `day_ahead_fetch` event in every `cycle_stats.jsonl` record; 4–17 s per cycle in `prices_matrix`.
+  - Cause: `_try_cached_live` required the cache to cover the full planning window; the sunrise horizon reaches into D+2 (e.g. 17.10. 07:30), but day-ahead prices exist at most up to D+1 23:45, so coverage always failed.
+  - Fix: fresh-cache coverage is checked up to `published_cover_end(window_end, now)` (last quarter-hour of `last_day_ahead_calendar_date(now)`); a cache without tomorrow after the publish hour still refetches. Outage path unchanged.
+  - Tests: `tests/test_live_price_cache.py` (`test_published_cover_end_caps_window_at_last_day_ahead_day`, `test_sunrise_window_into_d2_uses_cache_once_tomorrow_is_published`, `test_cache_without_tomorrow_still_refetches_after_publish`).
+  - Live verification (NAS `earnie.log` + `cycle_stats.jsonl`): after the bug day 2026-10-15, cache hits dominate — 2026-10-16: 195× `Using cached day-ahead`, **1×** `ENTSO-E AT request` at 11:45 (auction); 2026-10-17 to ~05:30: 45× cached, **0** ENTSO fetches. `live_day_ahead_AT.json` mtime 16.10. 11:45. `day_ahead_fetch` in cycle_stats: last on 2026-10-15 15:00; **0/121** records since 2026-10-16.
+
+### Bugfix — usage_ping HTTP 400 (v2 vs stale LAN receiver) (2026-10-17)
+
+- [x] **usage_ping send failed with HTTP 400 (v2 vs stale LAN receiver)** — **Verified** (2026-10-17)
+  - Symptom: `usage_ping: send failed with status 400` when consent on and live+points (schema v2). Explorer/v1 pings to the same URL succeeded (204).
+  - Cause: LAN receiver at `EARNIE_USAGE_PING_URL` (`…:8787/ping`) still ran the committed v1-only image (`v must be 1`); Earnie correctly POSTed v2 (`points` / `points_v`). Schema v2 existed only as uncommitted `earnie-server` working-tree changes until redeploy.
+  - Fix: rebuild/redeploy `earnie-usage-ping:lan` from earnie-server with v2; client: `maybe_send_ping(force=True)` for lab resend (skips once-per-day / 1 h gate); WARNING on failure includes `v` / `stage` / keys + redeploy hint. Endpoint stays in `.env` as `EARNIE_USAGE_PING_URL`.
+  - Live verification: force-send or next daily ping → HTTP 2xx; `last_sent_date` set; no 400 for live+points.
+
+### Hauskonfigurator tab order (2026-10-17)
+
+- [x] **Change order of sub-pages in HK** `[qual]`: segmented tabs Hausprofil → Wechselrichter → PV-Anlagen → Batterien (`ui/pages/page_house_config.py`); AppTest options assert; greenfield walkthrough lists.
+
 ### Epic UsagePing — opt-in anonymous install counter (2026-10-16)
 
 - [x] **Epic UsagePing — opt-in anonymous install counter** `[qual]` (spec [`docs/spec/usage-ping.md`](../docs/spec/usage-ping.md); owner decisions 2026-10-16): count active installations per day. Strictly opt-in and revocable, one daily ping while consent is on, nothing sent otherwise; a failed ping never affects the optimisation. Payload is a fixed whitelist: `v`, random `id`, `app_version`, `context` (install context), `stage` (`explorer` → `live`, highest stage reached). The server hashes the ID with a daily rotating salt and stores only daily counters (`usage_daily.csv`), no IP, no access log.

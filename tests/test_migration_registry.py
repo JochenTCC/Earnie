@@ -452,6 +452,17 @@ def test_loxone_names_question_not_asked_for_home_assistant(tmp_path):
     assert "dm4.loxone_binding_names" not in report.applied_step_ids
 
 
+def test_loxone_names_unknown_backend_surfaces_error(tmp_path):
+    """Regression: typo like 'homeassistant' must not offer the Loxone names step."""
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    path = config_dir / "config.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["ehal"] = {"backend": "homeassistant", "adapter_id": "earnie-hems"}
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    with pytest.raises(ValueError, match="ehal.backend"):
+        plan_migration(config_dir)
+
+
 def test_loxone_names_unknown_answer_blocks(tmp_path):
     config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
     with pytest.raises(MigrationError, match="Unbekannte Antwort"):

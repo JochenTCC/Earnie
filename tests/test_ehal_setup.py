@@ -25,10 +25,17 @@ def test_load_ehal_params_ha_transport_weg_b():
 
 
 def test_normalize_backend_defaults_to_loxone():
+    """Regression: unknown ehal.backend must not silently map to Loxone."""
     assert ehal_setup.normalize_backend("") == "loxone"
+    assert ehal_setup.normalize_backend(None) == "loxone"
     assert ehal_setup.normalize_backend("none") == "loxone"
+    assert ehal_setup.normalize_backend("loxone") == "loxone"
     assert ehal_setup.normalize_backend("HA") == "ha"
     assert ehal_setup.normalize_backend("openems") == "openems"
+    with pytest.raises(ValueError, match="ehal.backend"):
+        ehal_setup.normalize_backend("homeassistant")
+    with pytest.raises(ValueError, match="ehal.backend"):
+        ehal_setup.normalize_backend("mqtt")
 
 
 def test_load_ehal_params_defaults_to_loxone_backend():

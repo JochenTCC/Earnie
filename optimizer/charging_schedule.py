@@ -320,6 +320,14 @@ def _is_slot_charging_eligible(
         return False
     if deadline is not None and slot_dt >= deadline:
         return False
+    # Unplugged anticipated plan may reserve future slots, but never the live
+    # current slot — the car is not here to take charge now.
+    if (
+        t == 0
+        and ctx.get("anticipated")
+        and ctx.get("plugged_in") is not True
+    ):
+        return False
     if not use_time_window:
         return True
     day_sched = ctx.get("config_day_schedule") or config_day_schedule(consumer, slot_dt)

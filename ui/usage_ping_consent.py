@@ -134,8 +134,9 @@ def render_usage_ping_settings() -> None:
         disabled=kill,
         key="usage_ping_settings_toggle",
         help=(
-            "Bei Zustimmung anonymes JSON-Paket (ohne persönliche Daten), "
-            "wenn die Installation aktiv ist bzw. Szenarien berechnet wurden."
+            "Bei Zustimmung sendet Earnie täglich ein anonymes JSON-Paket "
+            "ohne persönliche Daten — wenn die Installation aktiv ist oder "
+            "Szenarien erstellt wurden."
         ),
     )
     if not kill and toggled != enabled:

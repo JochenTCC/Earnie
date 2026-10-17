@@ -618,13 +618,14 @@ class TestEligibleIndices:
       assert 6 in eligible_hours
       assert 7 not in eligible_hours
 
-  def test_late_return_eligible_from_current_hour(self):
+  def test_late_return_skips_live_slot_keeps_future(self):
       consumer = _eauto_consumer()
       start = datetime(2026, 6, 22, 21, 0)
       matrix = _hour_matrix(start, 6)
       ctx = {
           "active": True,
           "anticipated": True,
+          "plugged_in": False,
           "available_from": start,
           "deadline": datetime(2026, 6, 23, 7, 0),
           "use_time_window": True,
@@ -632,8 +633,27 @@ class TestEligibleIndices:
       eligible = cc.consumer_charging_eligible_indices(
           matrix, consumer, list(range(6)), ctx
       )
-      assert eligible[0] == 0
-      assert len(eligible) == 6
+      assert 0 not in eligible
+      assert eligible[0] == 1
+      assert len(eligible) == 5
+
+  def test_anticipated_open_cycle_blocks_current_slot_only(self):
+      consumer = _eauto_consumer()
+      start = datetime(2026, 10, 17, 6, 0)
+      matrix = _hour_matrix(start, 4)
+      ctx = {
+          "active": True,
+          "anticipated": True,
+          "plugged_in": False,
+          "connect_phase": "open_cycle",
+          "available_from": start,
+          "deadline": datetime(2026, 10, 17, 13, 0),
+          "use_time_window": False,
+      }
+      eligible = cc.consumer_charging_eligible_indices(
+          matrix, consumer, list(range(4)), ctx
+      )
+      assert eligible == [1, 2, 3]
 
   def test_fertig_um_deadline_allows_midday_hours(self):
       consumer = _eauto_consumer()

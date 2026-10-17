@@ -476,9 +476,18 @@ def read_ess_soc() -> float | None:
     if by_id:
         # Single mapped SoC when primary id is unknown / empty
         return float(next(iter(by_id.values())))
-    logger.error(
-        "EHAL SoC read failed: missing primary ess.{id}.sens_ess_soc"
-    )
+    if primary_id:
+        logger.error(
+            "EHAL SoC read failed: missing ess.%s.sens_ess_soc for primary "
+            "battery (map SoC on that battery in EHAL-Com / "
+            "batteries[].ehal_bindings, or ensure Live delivers it)",
+            primary_id,
+        )
+    else:
+        logger.error(
+            "EHAL SoC read failed: no primary house battery id and no "
+            "ess.*.sens_ess_soc values available"
+        )
     return None
 
 

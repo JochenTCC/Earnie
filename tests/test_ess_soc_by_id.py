@@ -54,6 +54,23 @@ def test_read_ess_soc_by_id_no_plant_alias_for_primary():
     assert by_id == {}
 
 
+def test_read_ess_soc_error_names_concrete_primary_id(caplog):
+    """Regression: log must name ess.<id>.sens_ess_soc, not literal {id}."""
+    ehal_live._soc_missing_warned.clear()
+    batteries = [
+        {"id": "15_kwh_speicher", "type": "house", "ehal_bindings": {}},
+    ]
+    with patch.object(ehal_live, "_mappable_batteries_for_soc", return_value=batteries), patch.object(
+        ehal_live, "_read_soc_from_address", return_value=None
+    ), caplog.at_level("ERROR"):
+        assert ehal_live.read_ess_soc() is None
+
+    errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+    assert errors
+    assert "ess.15_kwh_speicher.sens_ess_soc" in errors[0]
+    assert "ess.{id}" not in errors[0]
+
+
 def test_read_ess_soc_by_id_warns_once_per_battery(caplog):
     ehal_live._soc_missing_warned.clear()
     batteries = [

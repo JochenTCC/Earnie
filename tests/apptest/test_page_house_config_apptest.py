@@ -26,9 +26,9 @@ def test_title_and_default_tab():
     [tabs] = at.segmented_control
     assert tabs.options == [
         "Hausprofil",
+        "Wechselrichter",
         "PV-Anlagen",
         "Batterien",
-        "Wechselrichter",
     ]
     assert tabs.value == "Hausprofil"
 

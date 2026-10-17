@@ -46,12 +46,18 @@ def normalize_ha_transport(raw: object) -> str:
 
 
 def normalize_backend(raw: object) -> str:
+    """``ehal.backend``: empty/``loxone``/``none`` → Loxone; ``ha`` / ``openems`` as-is.
+
+    Unknown values raise (same bar as ``normalize_ha_transport``); they must not
+    silently become Loxone.
+    """
     value = str(raw or "").strip().lower()
     if value in ("", "loxone", "none"):
         return BACKEND_LOXONE
     if value in (BACKEND_HA, BACKEND_OPENEMS):
         return value
-    return BACKEND_LOXONE
+    allowed = f"{BACKEND_HA!r}, {BACKEND_OPENEMS!r}, {BACKEND_LOXONE!r}, or 'none'"
+    raise ValueError(f"ehal.backend must be {allowed}, got {raw!r}")
 
 
 def default_adapter_id(backend: str) -> str:

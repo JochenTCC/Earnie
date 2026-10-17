@@ -37,6 +37,17 @@ def test_usage_ping_settings_section_present():
     assert "Was wird gesendet?" in expander_labels
 
 
+def test_usage_and_points_below_dienst_log():
+    """Nutzungsstatistik + Earnie-Points stay below Dienst-Log."""
+    at = AppTest.from_file(str(_SCRIPT)).run()
+    assert not at.exception
+    subheaders = [h.value for h in at.subheader]
+    log_i = subheaders.index("Dienst-Log")
+    usage_i = subheaders.index("Nutzungsstatistik")
+    points_i = subheaders.index("Earnie-Points dieser Anlage")
+    assert log_i < usage_i < points_i
+
+
 def test_earnie_points_section_present():
     """Read-only Earnie-Points block: shows a number or the reason it cannot be computed."""
     at = AppTest.from_file(str(_SCRIPT)).run()

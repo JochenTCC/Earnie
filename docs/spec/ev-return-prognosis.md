@@ -4,7 +4,7 @@ Developer spec for unplugged-EV charge planning (`forecast_when_absent`). User-f
 
 ## Goal
 
-When the car is **not plugged in**, Earnie may still plan a charging window (`anticipated=True`) so MILP can reserve cheap slots and house ESS energy — but **live setpoints stay 0 A** until plug-in (`suppresses_live_charging_output`).
+When the car is **not plugged in**, Earnie may still plan a charging window (`anticipated=True`) so MILP can reserve cheap **future** slots and house ESS energy — but the **live current slot stays ineligible** (`consumer_charging_eligible_indices` skips `t==0`) and **live setpoints stay 0 A** until plug-in (`suppresses_live_charging_output`).
 
 Symptoms this design addresses:
 

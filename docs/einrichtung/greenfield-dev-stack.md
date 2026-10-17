@@ -25,7 +25,7 @@ Im Browser: `http://localhost:8502`
 ## Ablauf Ersteinrichtung
 
 1. **Bootstrap** — Entrypoint legt fehlende Dateien an (`python -m scripts.bootstrap_runtime`, siehe [Container](container.md)). `config.json` und die Planungs-Dateien starten **minimal** (leere Kataloge, keine Earnie-Beispieldaten).
-2. **Planungs-Konfiguration** — Solange die Planung nicht abgeschlossen ist, zeigt die Navigation nur **Konfiguration** (Hauskonfigurator, nach Freischaltung Szenarienkonfigurator und Szenario-Explorer) und **Daemon Control** (Optimierer-Dienst, EHAL-Com); die Backend-Einrichtung wird bewusst zurückgestellt (`loxone_setup_deferred`). Im Hauskonfigurator: **Hausprofil**, **PV-Anlagen**, **Batterien**. Im Szenarienkonfigurator: Live-Szenario und Varianten (Entitäts-Referenzen). Die Sidebar zeigt die noch fehlenden Schritte. Während der Planung erscheint **kein** Config-Drift-Hinweis zu `flexible_consumers` aus `config.example.json`.
+2. **Planungs-Konfiguration** — Solange die Planung nicht abgeschlossen ist, zeigt die Navigation nur **Konfiguration** (Hauskonfigurator, nach Freischaltung Szenarienkonfigurator und Szenario-Explorer) und **Daemon Control** (Optimierer-Dienst, EHAL-Com); die Backend-Einrichtung wird bewusst zurückgestellt (`loxone_setup_deferred`). Im Hauskonfigurator: **Hausprofil**, **Wechselrichter**, **PV-Anlagen**, **Batterien**. Im Szenarienkonfigurator: Live-Szenario und Varianten (Entitäts-Referenzen). Die Sidebar zeigt die noch fehlenden Schritte. Während der Planung erscheint **kein** Config-Drift-Hinweis zu `flexible_consumers` aus `config.example.json`.
 3. **Smarthome-Backend (nur für den Live-Pfad)** — Sobald die Planung abgeschlossen und noch kein Backend konfiguriert ist, blockiert die App vor der übrigen Navigation mit der Seite **Smarthome-Backend** (`ui/pages/page_smarthome_backend.py`, siehe [Smarthome-Backend](../ui/smarthome-backend.md)). Für Greenfield ohne echte Miniserver-Anbindung genügt Backend **Loxone** mit Dummy-Zugangsdaten, z. B. IP `192.168.178.99`, beliebiger Benutzer/Passwort, und **Speichern**.
 4. **Szenario-Explorer** — Nach vollständiger Planungs-Konfiguration erscheint die Szenario-Explorer-Seite unter **Konfiguration**; für reine Was-wäre-wenn-Rechnungen ist dafür kein Smarthome-Backend nötig.
 5. **Daemon** — `main.py` startet mit der UI (`EARNIE_AUTO_START_MAIN=1`); die Loxone-Startup-Prüfung ist deaktiviert (`EARNIE_VERIFY_LOXONE_ON_START=0`).
@@ -65,7 +65,7 @@ docker compose --project-directory . -f docker/compose/greenfield.yml logs -f ea
 
 Mit abgeschlossener Ersteinrichtung und vollständiger Planungs-Konfiguration:
 
-1. **Hauskonfigurator** — Tabs Hausprofil (thermischer Verbraucher „Haus Wärme“, auto-IDs), PV, Batterien; Grundlast-Vorschau prüfen.
+1. **Hauskonfigurator** — Tabs Hausprofil (thermischer Verbraucher „Haus Wärme“, auto-IDs), Wechselrichter, PV, Batterien; Grundlast-Vorschau prüfen.
 2. **Szenarienkonfigurator** — Live-Szenario und Entitäts-Referenzen speichern; optionale Varianten.
 3. **Szenario-Explorer** — Seite erscheint nach Freischaltung; Planung starten.
 

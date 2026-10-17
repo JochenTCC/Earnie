@@ -23,46 +23,17 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **`grid_fees.json` gets `earnie_data_model` stamped by config-pack export / import** — fix implemented (2026-10-16, ConfigMigration P2); acceptance pending
-  - Export (`build_config_pack_bytes`) and `write_json_dict` no longer stamp `earnie_data_model` onto `grid_fees.json`; import already skipped stamp. Existing stamped keys are not stripped on load (migration step later).
-  - Tests: `tests/test_config_pack_and_paths.py` round trip; `tests/test_json_io.py` (`test_write_json_dict_does_not_stamp_grid_fees`).
-
 - [ ] **Virtual reserve: `advance_reserve_after_slot` / `set_trigger` wiped `target_kwh` to 0** — fix implemented (2026-10-10); live acceptance pending
   - Symptom (Nas productive, Geschirrspüler / `virtual_gs`): dishwasher running, MILP ZWANGSLADEN toward ~11.8% (≈1 kWh refill), but `powerstation_reserves.json` stayed `empty` / `stored_kwh=0` / `target_kwh=0`.
   - Cause: `get_or_init_state(..., target_kwh=0.0)` always overwrote the configured target on every slot advance / trigger latch, so charge credit was capped at `min(0, …)`.
   - Fix: `update_target=False` for advance + trigger; collect/learn still refresh the target.
   - Tests: `tests/test_powerstation_2_7_p.py` (`test_advance_and_trigger_preserve_target_kwh`).
 
-- [ ] **Live day-ahead prices re-fetched from ENTSO-E every cycle** — fix implemented (2026-10-15); NAS productive acceptance pending
-  - Symptom (NAS productive `earnie.log`, 2026-10-15): `ENTSO-E AT request …` in every cycle, never `Using cached day-ahead`; `day_ahead_fetch` event in every `cycle_stats.jsonl` record; 4–17 s per cycle in `prices_matrix`.
-  - Cause: `_try_cached_live` required the cache to cover the full planning window; the sunrise horizon reaches into D+2 (e.g. 17.10. 07:30), but day-ahead prices exist at most up to D+1 23:45, so coverage always failed.
-  - Fix: fresh-cache coverage is checked up to `published_cover_end(window_end, now)` (last quarter-hour of `last_day_ahead_calendar_date(now)`); a cache without tomorrow after the publish hour still refetches. Outage path unchanged.
-  - Tests: `tests/test_live_price_cache.py` (`test_published_cover_end_caps_window_at_last_day_ahead_day`, `test_sunrise_window_into_d2_uses_cache_once_tomorrow_is_published`, `test_cache_without_tomorrow_still_refetches_after_publish`).
-  - Live verification: `Using cached day-ahead` in most cycles; `day_ahead_fetch` only around the auction publish (~12:45–13:00) and after restarts.
-
-- [ ] **usage_ping send failed with HTTP 400 (v2 vs stale LAN receiver)** — fix implemented (2026-10-16); LAN/prod acceptance pending
-  - Symptom: `usage_ping: send failed with status 400` when consent on and live+points (schema v2). Explorer/v1 pings to the same URL succeeded (204).
-  - Cause: LAN receiver at `EARNIE_USAGE_PING_URL` (`…:8787/ping`) still ran the committed v1-only image (`v must be 1`); Earnie correctly POSTed v2 (`points` / `points_v`). Schema v2 existed only as uncommitted `earnie-server` working-tree changes until redeploy.
-  - Fix: rebuild/redeploy `earnie-usage-ping:lan` from earnie-server with v2; client: `maybe_send_ping(force=True)` for lab resend (skips once-per-day / 1 h gate); WARNING on failure includes `v` / `stage` / keys + redeploy hint. Endpoint stays in `.env` as `EARNIE_USAGE_PING_URL`.
-  - Live verification: force-send or next daily ping → HTTP 2xx; `last_sent_date` set; no 400 for live+points.
-
 ## New Bugs (Do not remove this chapter — even if empty)
-
-- [ ] 2026-10-16 20:57:54 [ERROR] (integrations.ehal_live:479) - EHAL SoC read failed: missing primary ess.{id}.sens_ess_soc at main.py start is ambigous. Message should be clearer (error from productive NAS)
-
-- [ ] **`normalize_backend` silently maps unknown `ehal.backend` values to Loxone** (found 2026-10-16 while testing ConfigMigration `dm4.loxone_binding_names`)
-  - Symptom: `config.json` → `ehal.backend: "homeassistant"` (typo for `"ha"`), or any other unknown value, runs Earnie as a Loxone install without any error or warning. In the migration the Loxone-only step `dm4.loxone_binding_names` then treats HA entity ids as Merker names and offers to clear them.
-  - Cause: `runtime_store/ehal_setup.py` `normalize_backend()` — `""`, `"loxone"`, `"none"` → Loxone (documented), but the final `return BACKEND_LOXONE` also catches every unknown value. The schema (`share/config/config.schema.json`, enum `openems` / `ha` / `loxone` / `none`) would reject it, but the runtime path does not validate against the schema.
-  - Callers: `active_ehal_backend` / `default_adapter_id` / adapter + connection helpers in `runtime_store/ehal_setup.py`, `settings/config_loaders.py:134`, `ui/ehal_connection.py:46`, `runtime_store/migration/steps/loxone_binding_names.py:59`.
-  - Fix direction: unknown value → `ValueError` with the allowed values (like `normalize_ha_transport` in the same module); missing / empty / `loxone` / `none` stay Loxone. Check UI paths that pass free text before raising there. If an existing install could carry an unknown value, decide fail-loud on load vs. a ConfigMigration step — ask before choosing.
-  - Tests: unknown value raises; `""` / `None` / `"none"` / `"loxone"` → Loxone; `"ha"` / `"openems"` unchanged; migration planner surfaces the error instead of offering the Loxone names step.
 
 - [ ] This warning pops up quite often:
   2026-10-16 07:44:45 [WARNING] (data.price_forecast_live:322) - Preisprognose: EU-Features nicht ladbar (ValueError, mode=live_forecast) — Spiegelung als Fallback für fehlende Slots.
   Can you find the reason and propose fixing (better than fallback to mirroring)?
-
-- [ ] `debug-dumps\debug_dump_20261016_150238`
-
 
 ## Minor changes (no bugs - do not remove this chapter - even if empty)
 
@@ -74,3 +45,35 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Maintainer view: the document is not up to date. Open: what is the real status of `weg_b` (productive, supported, still lab-only)? Rewrite the transport paragraph accordingly.
   - Check the same statement in: `docs/ui/ehal-com.md` (lines ~18 and ~291), `docs/spec/ehal.md` § Home Assistant, `docs/spec/ha-lab-setup.md` §9 ("optional after 2.7.r"), `docs/einrichtung/homeassistant-addon.md`, and the HA notes in the 2.7.0-alpha.1 release-notes draft ("Plattformhinweise → Home Assistant").
   - Related open item: Binding P5 "Home Assistant Weg B comfort" in `Backlog.md` (full YAML package pre-filled from bindings).
+
+- [ ] **Pre-2.7.0-alpha doc↔code audit (2026-10-17) — broken links / anchors**
+  - `ui/doc_links.py`: in-app help fragments `analyse-verbrauch-kosten` and `gesamtkosten-und-verbrauch-jahres-verbrauch-kwh` do not match the GitHub slugs (`&` / ` -` produce double hyphens: `analyse-verbrauch--kosten`, `gesamtkosten-und--verbrauch-jahres-verbrauch-kwh`) — help links land at page top. Fix fragments or add explicit `<a id>` in the handbook; extend `tests/test_doc_links.py` to verify fragments against headings.
+  - `docs/ui/betriebsmodi.md:147` and `docs/ui/charts.md:170` link to handbook `#gesamtkosten-jahres-verbrauch-kwh` — the explicit anchor was removed in b64bc626 (2.4.0).
+  - `docs/einrichtung/loxone-anbindung.md:104` → `ehal-com.md#q5--write-push-only-27q-qd` (heading is now "Write push-only").
+  - `docs/referenz/loxone-signals.md:166` → `ehal-com.md#loxone-structure--ehal-mapping` (heading no longer exists).
+  - Markdown links wrapped in backticks render as code, not links: `smarthome-backend-wahl.md:35-36`, `loxberry-plugin.md:5`, `container.md:9`.
+  - `docs/einrichtung/homeassistant-addon.md:7`: "EHAL-HA-Adapter … siehe Loxone-Anbindung" — should point to `ha-evcc.md`.
+- [ ] **Handbook lost its screenshots** — `docs/user-manual/Benutzer-Handbuch-Earnie.md` lines ~158, ~289, ~409 only show the alt text ("Hauskonfigurator", "Monatliche Stromkosten", "Earnie Monitor"); the image links were dropped in b64bc626 (2.4.0). Assets still exist under `docs/assets/` (also unused: HA add-on installation screenshots, Sankey, Szenenkonfigurator, …). Re-add images (check they still match the current UI).
+- [ ] **Stale facts in user docs**
+  - `docs/konfiguration/speichern-laden.md:33-37`: says `earnie_data_model` is `3`, import accepts `1`/`2`, v2→v3 rename helper "noch ausstehend". Code: `CURRENT_DATA_MODEL = 4`, only 4 compatible, 3 migratable via the migration wizard (`runtime_store/data_model.py`, `runtime_store/migration/`); DM 1/2 blocked (as `betrieb.md` says). Rewrite and link `betrieb.md#update-und-migration`.
+  - `docs/einrichtung/betrieb.md:291`: "Echtzeit-Umgebung → EHAL-Com" — nav section is **Daemon Control**. Line 22: "Planungs- und Echtzeit-Seiten" (old naming). Line 9: "Liest Loxone" — backend-agnostic now (EHAL).
+  - `docs/einrichtung/betrieb.md:326`: internal codename "Tarif-Spur mit Edbert" in a user doc.
+  - `docs/einrichtung/greenfield-dev-stack.md:43,159`: `loxone_silent_mode` — bootstrap writes `silent_mode`; line 28/58 nav description predates Smarthome-Backend-first onboarding; many internal IDs (`1.26.0 P0`, `2.0 P2`, `7g Silent`).
+  - `docs/einrichtung/homeassistant-addon.md`: options table lacks `usage_ping` (exists in `config.yaml`, mentioned in `betrieb.md`); "nicht Teil von 2.6" / version example `2.6.0-alpha.10` stale for 2.7; "Dogfood-Checkliste", "M3-Persistenz-Nachweis", "Sprint 2" are developer content; uninstall section only mentions `/data`, not `addon_configs`.
+  - `docs/einrichtung/container.md:118`: alpha compose image "aktuell 2.6.0-alpha.12" — files pin `2.6.1-beta.1` (also a release-checklist step for 2.7.0-alpha); line 168 "Backlog 2.0 P6"; line 226 2.0 log rename note obsolete.
+  - `docs/einrichtung/loxone-anbindung.md`: tables still talk about "Merker" read/write and list ESS setpoints as `plant.ehal_bindings.set_ess_*` although line 62 says ESS bindings are entity-scoped `ess.{slug}.*` on `batteries[]`; "Loxone-Merker sind sticky" wording vs. push/`status.json`.
+  - `docs/user-manual/Benutzer-Handbuch-Earnie.md:377`: "die Einheit wird ignoriert" — check against `ehal-unit-conversion` (Loxone role blocks / HA `ha_units`); line 98 points users to a private-repo file (`Entwicklungsplan/Hardware-Registry-Ausstellung.md`).
+  - `docs/ui/smarthome-backend.md:21`: links `backlog/SB-Identification-Draft.md` and labels a spec "Entwicklungsplan" in a user doc.
+  - `docs/ui/betriebsmodi.md:139-145`: internal function names (`build_annual_cost_rows`, `_jahres_kwh_for_row`) in a user doc; line 36 spec version "(v0.8.1)".
+  - `docs/konfiguration/flexible-verbraucher.md:220`: "Live-Abfrage und Adaption der Nennleistung folgen in einer späteren Version" — verify (live `sens_power_act` is used for reserve release).
+  - `docs/ui/charts.md:156`, `docs/ui/betriebsmodi.md:95`: Sankey flex nodes / EV SoC label "heute nur Loxone" — verify for HA.
+  - `README.md`: Roadmap "2.6 / 2.7" stale for 2.7.0; HA add-on missing in "Betrieb" and the installation table.
+- [ ] **Developer content in the user-doc scope** (`german-user-docs.mdc`) — move to `docs/entwicklung/` or `DEVELOPER.md`, keep a short pointer: `einrichtung/private-env.md` (maintainer's private repos, regression intake), `einrichtung/greenfield-dev-stack.md`, `einrichtung/homeassistant-addon-testumgebung.md`, `container.md` §§ "Image bauen und deployen", buildx, "Live-Zyklus-Profiling (NAS-Einmal-Test)", `betrieb.md` §§ "Live-Zyklus-Profiling", "Cycle-Recorder (Regression R-Rec)", "Prod-Dump als Regression-Fixture"; `ha-evcc.md` § "Compose starten (A2)" (HA lab stack).
+- [ ] **Epic phase IDs still in user docs** although `german-user-docs.mdc` forbids them (`P5`/`Q8` style is not caught by `tests/test_user_docs_audience.py`, `backlog_id_baseline` is empty): `Q5`/`Q8` in `loxone-anbindung.md`, `referenz/loxone-signals.md`, `ui/ehal-com.md`; `P4` in `loxone-signals.md:182`; `Topology P2` (`batterie-pv.md:104`), `Thermals P2/P3` (`flexible-verbraucher.md:85`, `waermespeicher-schichtung-teq.md:143`). Remove and consider extending the test regex.
+- [ ] **Inconsistent reader address in user docs** — handbook and most pages use "Sie"; `homeassistant-addon.md`, `betrieb.md` (migration section) use "du"; `betrieb.md:14`, `ha-loxone-bridge.md`, `ecoflow-delta3-loxone.md` use "ihr/eure". Decide one form and align (part of the style edit).
+- [ ] **Stale developer specs** (`docs/spec/`)
+  - `release-notes-workflow.md`: header says "DRAFT — not yet implemented" — scripts `release_notes_collect` / `release_notes_finalize`, `audience.toml` and tests exist.
+  - `thermal-horizon-simulation.md`: "implemented on branch" — merged via PR #37 (2.7.0-dev.57); line 22 references `optimizer/thermal_live_store._year_ambient_for_house_h`, which no longer exists.
+  - `ui-menu-structure.md:6,83`, `MIGRATION.md`: reference removed `ui/config_forms.py` (historical docs — mark or leave).
+  - `epic-deploy-user.md`, `hardware-registry-layer-c.md:93`: `.github/workflows/release.yml` — workflow is `release-publish.yml`.
+  - `docs/entwicklung/README.md`: Shadow line still carries backlog IDs (`2.7.f`, `2.+1`) — fine for dev docs, but check wording after 2.7.0.
