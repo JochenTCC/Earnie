@@ -75,6 +75,9 @@ chart_debug_review/
 # Local VS Code / Cursor launch configs (machine-specific)
 .vscode/launch.json
 
+# Multi-root workspace files live in the private earnie-workspace repo
+*.code-workspace
+
 # Local real-name → backlog alias map (never commit)
 .cursor/user-aliases.local.md
 loxone-online-access.txt
