@@ -269,11 +269,18 @@ def ensure_live_profile(house_doc: dict) -> tuple[dict, str]:
 
 
 def _stub_consumer(*, consumer_id: str, label: str, hk_type: str, bindings: dict[str, str]) -> dict:
+    from house_config.entity_id_lock import ID_LOCKED_KEY, ID_PROVISIONAL_LABEL_KEY
+
+    label_s = str(label or "").strip() or consumer_id
+    # New imports start unlocked so the first intentional Bezeichnung change
+    # can rename id + rewrite ehal_bindings (entity_id_lock contract).
     consumer: dict[str, Any] = {
         "id": consumer_id,
-        "label": label,
+        "label": label_s,
         "type": hk_type,
         "nominal_power_kw": 1.0,
+        ID_LOCKED_KEY: False,
+        ID_PROVISIONAL_LABEL_KEY: label_s,
         "ehal_bindings": dict(bindings),
     }
     if hk_type == "generic":

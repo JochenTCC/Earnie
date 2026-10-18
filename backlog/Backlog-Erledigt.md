@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Loxone import consumer Bezeichnung / id / type sync (2026-10-18)
+
+- [x] **house_profiles consumers after Loxone import: Bezeichnung / id / type mess** — **Verified** (2026-10-18)
+  - Symptom: after import + editing consumers, `id` / Bezeichnung / types drifted (and imports treated as permanently locked so Bezeichnung never renamed Kennung).
+  - Cause: Loxone/EFM-created consumers omitted `id_locked` / `id_provisional_label` (missing flag ⇒ legacy locked); EFM-only Wärmepumpe stayed `generic`; `_resolve_consumer_ids` used already-merged session rows as `existing`.
+  - Fix: import stubs set `id_locked: false` + provisional label; EFM Wärmepumpe/WP → `thermal_annual`; resolve uses pre-merge session as `existing` so first Bezeichnung change renames id + rewrites bindings.
+  - Tests: `tests/test_loxone_greenfield_import.py`, `tests/test_loxone_efm_meters.py` (`test_efm_only_waermepumpe_create_is_thermal_and_unlocked`), existing `tests/test_entity_id_lock.py`.
+  - Follow-up (open): stored bindings still use legacy `flex.*` — see Bugfixes.
+
 ### Bugfix — Greenfield Live / SK missing after reload (2026-10-18)
 
 - [x] **Greenfield: Live scenario / SK missing after reload** — **Verified** (2026-10-18)

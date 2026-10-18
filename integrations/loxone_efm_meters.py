@@ -464,6 +464,39 @@ def _bind_meter_power(
         activate_consumer_energy_bindings(consumer)
 
 
+def _efm_create_hk_type(label: str, consumer_id: str) -> str:
+    """Infer HK type for EFM-only creates (typed Earnie_* path wins when present)."""
+    tokens = identity_tokens(label) | identity_tokens(consumer_id)
+    # Heatpump alias set from _MERGE_ALIASES (not "smart" — that is EV/brand noise).
+    if tokens_match(tokens, frozenset({"waermepumpe", "wp"})):
+        return "thermal_annual"
+    return "generic"
+
+
+def _new_efm_consumer(*, consumer_id: str, label: str) -> dict[str, Any]:
+    from house_config.entity_id_lock import ID_LOCKED_KEY, ID_PROVISIONAL_LABEL_KEY
+
+    label_s = str(label or "").strip() or consumer_id
+    hk_type = _efm_create_hk_type(label_s, consumer_id)
+    consumer: dict[str, Any] = {
+        "id": consumer_id,
+        "label": label_s,
+        "type": hk_type,
+        ID_LOCKED_KEY: False,
+        ID_PROVISIONAL_LABEL_KEY: label_s,
+        "nominal_power_kw": 1.0,
+        "use_profile_csv": False,
+    }
+    if hk_type == "generic":
+        consumer["earnie_role"] = "known"
+    elif hk_type == "thermal_annual":
+        consumer["living_area_m2"] = 0.0
+        consumer["building_class"] = 3
+        consumer["heat_pump_type"] = "luft"
+        consumer["persons"] = 2
+    return consumer
+
+
 def apply_consumer_imports(
     house_doc: dict,
     *,
@@ -504,14 +537,7 @@ def apply_consumer_imports(
                 str(row.get("name") or row.get("label") or label),
             )
         else:
-            consumer = {
-                "id": cid,
-                "label": label,
-                "type": "generic",
-                "earnie_role": "known",
-                "use_profile_csv": False,
-                "nominal_power_kw": 1.0,
-            }
+            consumer = _new_efm_consumer(consumer_id=cid, label=label)
         if bind_power and power:
             _bind_meter_power(
                 consumer,

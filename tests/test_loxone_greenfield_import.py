@@ -291,8 +291,12 @@ def test_run_import_creates_typed_and_efm_consumers():
     assert "waermepumpe" in by_id
     assert by_id["waermepumpe"]["type"] == "thermal_annual"
     assert by_id["waermepumpe"]["ehal_bindings"]["flex.waermepumpe.set_enable"] == ""
+    assert by_id["waermepumpe"]["id_locked"] is False
+    assert by_id["waermepumpe"]["id_provisional_label"] == by_id["waermepumpe"]["label"]
     assert "e_auto" in by_id
     assert by_id["e_auto"]["type"] == "ev"
+    assert by_id["e_auto"]["id_locked"] is False
+    assert by_id["kochen"]["id_locked"] is False
     assert by_id["e_auto"]["battery_capacity_kwh"] == 50.0
     assert by_id["e_auto"]["nominal_power_kw"] == 3.5
     assert by_id["e_auto"]["min_power_kw"] == 1.4

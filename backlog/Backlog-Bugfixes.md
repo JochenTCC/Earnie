@@ -54,6 +54,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   Make the popup dialog reusable (Open parameter is a review-ID, the overall-question text and the 5-star-questions (max three))
 - [ ] In the Signalliste (EHAL-com page) there are two signals "heartbeat" and "hearbeat_ts" one for reading - one for writing / both optional. Please rename these signals to make it clearer what is what - and both must be mandatory (however they are not shown in the expander "Optionale Signale aktiveren ...")
 - [ ] Earnie-Host (LAN-IP für den Hub) -> rephrase to "IP-Adresse des Geräts, auf dem Earnie läuft" and pre-fill it with the local-host IP (because this is usually the host)
+- [ ] **Consumer EHAL storage still uses legacy `flex.{id}.*` keys** — Loxone import / EFM create and Kennung rename write `ehal_bindings` as `flex.<slug>.sens_power_act` (etc.) while exchange / Signalliste emit `consumer.<Kennung>.*` (docs: `flex` parse-only legacy). Persist and rewrite should use `consumer.` / `heatpump.` / `pool.` namespaces on write; migrate existing `flex.*` keys.
 - [ ] in default .env file replace "YOUR-NAS\docker" with something more device-agnostic
 
 - [ ] "debug-dumps\debug_dump_20261015_222809"

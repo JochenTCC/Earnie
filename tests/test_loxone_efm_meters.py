@@ -162,6 +162,31 @@ def test_apply_match_prefers_smart_label_over_e_auto():
     assert cons["ehal_bindings"]["sens_evcs_active_power"] == ""
 
 
+def test_efm_only_waermepumpe_create_is_thermal_and_unlocked():
+    """EFM Zähler Wärmepumpe without Earnie_* typed merkers → Haus Wärme, unlocked id."""
+    house = {
+        "profiles": {"live": {"id": "live", "label": "Live", "consumers": []}},
+        "plant": {},
+    }
+    selected = [
+        {
+            "action": "create",
+            "consumer_id": "waermepumpe",
+            "label": "Wärmepumpe",
+            "name": "Zähler Wärmepumpe",
+            "power_address": "Zähler Wärmepumpe",
+            "bind_power": True,
+        }
+    ]
+    out = apply_consumer_imports(house, profile_id="live", selected=selected)
+    cons = out["profiles"]["live"]["consumers"][0]
+    assert cons["id"] == "waermepumpe"
+    assert cons["type"] == "thermal_annual"
+    assert cons["id_locked"] is False
+    assert cons["id_provisional_label"] == "Wärmepumpe"
+    assert cons.get("heat_pump_type") == "luft"
+
+
 def test_apply_consumer_imports_sets_flex_power_only():
     house = {
         "plant": {"ehal_bindings": {}},
@@ -182,6 +207,8 @@ def test_apply_consumer_imports_sets_flex_power_only():
     assert cons[0]["id"] == "kochen"
     assert cons[0]["label"] == "Kochen"
     assert cons[0]["earnie_role"] == "known"
+    assert cons[0]["id_locked"] is False
+    assert cons[0]["id_provisional_label"] == "Kochen"
     assert cons[0]["ehal_bindings"]["flex.kochen.sens_power_act"] == ""
     assert "sens_energy_total" in cons[0]["ehal_bindings"]
     assert "loxone_meter_energy" not in cons[0]

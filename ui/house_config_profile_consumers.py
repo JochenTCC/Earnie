@@ -220,17 +220,19 @@ def _render_consumer_identity_fields(
             "Nur ein Verbraucher vom Typ „Haus Wärme“ ist erlaubt. "
             "Bitte einen anderen Typ wählen."
         )
+    type_key = _scoped_key(session_scope, f"hc_type_{index}")
+    label_key = _scoped_key(session_scope, f"hc_label_{index}")
     c_type = labeled_selectbox(
         "Typ",
         options=type_options,
         index=_type_index(current_type, type_options),
         format_func=lambda value: CONSUMER_TYPE_LABELS.get(value, value),
-        key=_scoped_key(session_scope, f"hc_type_{index}"),
+        key=type_key,
     )
     c_label = labeled_text_input(
         "Bezeichnung",
         value=consumer.get("label", ""),
-        key=_scoped_key(session_scope, f"hc_label_{index}"),
+        key=label_key,
     )
     force_id = _render_consumer_id_from_label(
         consumer, index, session_scope=session_scope, label=c_label

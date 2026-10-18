@@ -240,20 +240,10 @@ def _edit_and_sync_consumers(session_scope: str, location: dict) -> tuple[list, 
         )
         for index, consumer in enumerate(consumers)
     ]
-    # Keep session list in sync with edited fields so expander titles
-    # (consumer_annual_kwh from schedule/nominal/thermal) stay correct next run.
-    synced_consumers = []
-    for index, original in enumerate(consumers):
-        if index < len(edited):
-            merged = _merge_passthrough_consumer_fields(original, dict(edited[index]))
-            if original.get("id"):
-                merged["id"] = original["id"]
-        else:
-            merged = dict(original)
-        synced_consumers.append(merged)
     # Form fields omit thermal_rc lat/lon; keep session geo so expander kWh/a
     # does not fall back to 0 on the next rerun.
-    resolved = _resolve_consumer_ids(synced_consumers, edited)
+    # Pre-merge session rows as `existing` so unlock/rename sees the prior label.
+    resolved = _resolve_consumer_ids(consumers, edited)
     resolved_for_preview = _inject_profile_geo(
         resolved,
         location["latitude"],
