@@ -62,6 +62,10 @@ jobs:
         run: |
           set -euo pipefail
           CHANNEL="${CHANNEL:-auto}"
+          if [[ "$VERSION" == *-dev* ]]; then
+            echo "::error::Dev version '${VERSION}' is never published to an HA add-on channel (use the local Earnie (Dev) add-on)"
+            exit 1
+          fi
           if [ "$CHANNEL" = "auto" ]; then
             if [[ "$VERSION" == *-* ]]; then
               CHANNEL="earnie_prerelease"

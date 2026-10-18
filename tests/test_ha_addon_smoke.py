@@ -160,3 +160,20 @@ def test_release_workflow_addon_lint_checks_out_tag():
     job = text.split("\n  addon_lint:\n", 1)[1].split("\n  promote:\n", 1)[0]
     assert "ref: ${{ needs.release.outputs.tag }}" in job
     assert "ref: main" not in job
+
+
+def test_release_workflow_dev_builds_stop_before_publish():
+    """-dev tags build :<version> candidates only: no notes, no release, no promote, no pin."""
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    release_job = text.split("\n  release:\n", 1)[1].split("\n  addon_smoke:\n", 1)[0]
+    for step in (
+        "Release notes gate",
+        "Prepare release notes",
+        "Create GitHub Release (draft until approval)",
+    ):
+        block = release_job.split(f"- name: {step}", 1)[1].split("- name:", 1)[0]
+        assert "if: steps.version.outputs.dev != 'true'" in block, step
+    promote = text.split("\n  promote:\n", 1)[1].split("\n    steps:\n", 1)[0]
+    assert "needs.release.outputs.dev != 'true'" in promote
+    addon_publish = (RELEASE_WORKFLOW.parent / "ha-addon-publish.yml").read_text(encoding="utf-8")
+    assert '"$VERSION" == *-dev*' in addon_publish

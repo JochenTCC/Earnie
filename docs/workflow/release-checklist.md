@@ -12,6 +12,8 @@ Background: a tag push builds a **candidate** only; nothing reaches users until 
 | HA add-on update (`earnie` / `earnie_prerelease`) | no | yes |
 | `streamlitcloud` branch | unchanged | reset to the tag (manual step) |
 
+**Dev builds** (`vX.Y.Z-dev.N`, never released): the run stops after `addon_smoke` / `addon_lint` — only GHCR `:<version>` exists; no release notes, GitHub Release, `promote` or HA pin. Test via the local **Earnie (Dev)** add-on (set its `version:` to the dev version). Skip steps 4–6 below.
+
 ---
 
 ## One-time setup (done 2026-09-27)

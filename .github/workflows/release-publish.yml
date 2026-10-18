@@ -3,6 +3,8 @@
 #   (e.g. v2.0.0, v2.2.0-alpha.1).
 # Prerequisite: version.py __version__ must equal the tag without the leading "v".
 # Pre-releases (version contains "-"): GitHub --prerelease, no --latest, no Docker :latest.
+# Dev builds (X.Y.Z-dev.N): candidate only — images :<version> + smoke/lint, then stop.
+#   No release notes, no GitHub Release, no promote (:next), no HA add-on pin; never released.
 #
 # Candidate → approve → publish:
 #   1. release         build + push only :<version> images, GitHub Release as *draft*
@@ -13,6 +15,7 @@
 #                      approval; then :next (+ :latest if official) and publishes the release
 #   4. publish_ha_addon  pins ha-addon-earnie → only now HA offers the update
 # Nothing user-visible happens before step 3. Reject the deployment to drop a bad candidate.
+# Dev builds end after step 2; install them on your own HA via the local add-on (:<version>).
 
 name: Release
 
@@ -42,6 +45,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       prerelease: ${{ steps.version.outputs.prerelease }}
+      dev: ${{ steps.version.outputs.dev }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -80,12 +84,22 @@ jobs:
           else
             PRERELEASE=false
           fi
+          if [[ "$ACTUAL" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]]; then
+            DEV=true
+          elif [[ "$ACTUAL" == *-dev* ]]; then
+            echo "::error::Dev version '${ACTUAL}' must be X.Y.Z-dev.N (no debug suffix in a tag)"
+            exit 1
+          else
+            DEV=false
+          fi
           echo "version=${ACTUAL}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
-          echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE})"
+          echo "dev=${DEV}" >> "$GITHUB_OUTPUT"
+          echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE}, dev=${DEV})"
 
       - name: Release notes gate (reviewed notes required, none for -dev)
+        if: steps.version.outputs.dev != 'true'
         run: python -m scripts.release_notes_finalize --check --version "${{ steps.version.outputs.version }}"
 
       - name: Shadow release guard (no EARNIE_SHADOW in packaging/docker)
@@ -157,6 +171,7 @@ jobs:
           done
 
       - name: Prepare release notes
+        if: steps.version.outputs.dev != 'true'
         id: notes
         run: |
           set -euo pipefail
@@ -170,6 +185,7 @@ jobs:
           echo "path=${OUT}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release (draft until approval)
+        if: steps.version.outputs.dev != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -282,11 +298,13 @@ jobs:
   # this job waits in the Actions UI (Review deployments → Approve / Reject).
   # Test the candidate on your own HA first (local add-on on the :<version> image).
   # qemu_smoke is soft and deliberately not part of the condition.
+  # Dev builds never get here: no approval, no :next, no release, no add-on pin.
   promote:
     needs: [release, addon_smoke, addon_lint, qemu_smoke]
     if: >-
       ${{ !cancelled()
       && needs.release.result == 'success'
+      && needs.release.outputs.dev != 'true'
       && needs.addon_smoke.result == 'success'
       && needs.addon_lint.result == 'success' }}
     runs-on: ubuntu-latest
