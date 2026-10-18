@@ -8,6 +8,10 @@ from house_sim.mock_rest import DEFAULT_BENCH_TOKEN, start_mock_rest, stop_mock_
 from house_sim.stepper import initial_physics, step_physics
 from integrations.ha_adapter import HaAdapter, HaConfig, HaHttpError
 
+pytestmark = pytest.mark.skip(
+    reason="Binding P5e: REST pull HaAdapter loop retired; use HouseSim contract tests"
+)
+
 
 @pytest.fixture
 def bench(monkeypatch):

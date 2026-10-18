@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Callable
 
-from integrations.loxone_request_http import wait_for_optimize_or_timeout
+from integrations.ehal_request_http import wait_for_optimize_or_timeout
 
 logger = logging.getLogger(__name__)
 

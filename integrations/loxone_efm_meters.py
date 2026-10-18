@@ -580,4 +580,6 @@ def apply_plant_power_suggestions(
     if changed:
         plant["ehal_bindings"] = bindings
         house["plant"] = plant
-    return house
+    from house_config.required_signal_activation import activate_required_in_house
+
+    return activate_required_in_house(house)

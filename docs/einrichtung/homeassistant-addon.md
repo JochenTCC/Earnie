@@ -4,7 +4,7 @@ Earnie lässt sich auch als **Home Assistant Supervisor Add-on** installieren, v
 
 Quellbaum im Repo: [`packaging/homeassistant-addon/earnie/`](../../packaging/homeassistant-addon/earnie/). Veröffentlicht wird das Add-on über ein eigenes Custom-Repository (`https://github.com/JochenTCC/ha-addon-earnie`), also nicht über die offizielle Liste der HA-Community-Add-ons.
 
-**Abgrenzung zum EHAL-HA-Adapter:** Mit dem bestehenden EHAL-HA-Adapter (`ehal.backend=ha`, siehe [Home Assistant + evcc](ha-evcc.md)) läuft Earnie **außerhalb** von Home Assistant und spricht die HA-REST-API als Southbound-Ziel an. Beim Add-on läuft Earnie dagegen **innerhalb** von Home Assistant. Beide Wege schließen sich nicht aus.
+**Abgrenzung zur HA-Anbindung:** Mit `ehal.backend=ha` (siehe [Home Assistant + evcc](ha-evcc.md)) tauscht Earnie Live-Daten per **Push** mit Home Assistant aus (Telemetrie an den Daemon-Port, Sollwerte über `status.json`). Earnie kann dabei **außerhalb** von Home Assistant laufen (Compose/NAS) oder **innerhalb** als Add-on. Beide Wege schließen sich nicht aus.
 
 **Begriff „Add-on“ und „App“:** Seit Home Assistant 2026.2 heißt der Menüpunkt in der Oberfläche **„Apps“** statt „Add-ons“. Das betrifft nur die Beschriftung; Repository-Format, `config.yaml` und Supervisor-API heißen technisch weiterhin „Add-on“. Diese Doku bleibt beim Begriff „Add-on“ für das Earnie-Paket. In der HA-Oberfläche steht es unter **Einstellungen → Apps**.
 
@@ -42,7 +42,7 @@ Zusätzlich prüft der Image-Entrypoint die Schreibrechte unter `/config` und `/
    - die HA-Meldung **„Bad Gateway / 502“**, falls der Proxy noch gar nicht antwortet.
 
    Beides ist beim Kaltstart normal. Kurz warten, dann die Seite neu laden oder OPEN WEB UI erneut öffnen.
-6. Danach Haus und Entities in der Earnie-Oberfläche konfigurieren (Smarthome-Backend, Hauskonfigurator) oder optional dateibasiert unter dem Datenpfad des Add-ons. Beim ersten Start legt der Entrypoint fehlende Dateien an und setzt im Add-on-Kontext `ehal.backend=ha`.
+6. Danach Haus und Signale in der Earnie-Oberfläche konfigurieren (Smarthome-Backend, Hauskonfigurator, EHAL-Com) oder optional dateibasiert unter dem Datenpfad des Add-ons. Beim ersten Start legt der Entrypoint fehlende Dateien an und setzt im Add-on-Kontext `ehal.backend=ha`.
 
 ## Konfiguration
 
@@ -67,6 +67,20 @@ Zugangsdaten für Loxone und HA gehören **nicht** in die Supervisor-Optionen. S
 ### Home-Assistant-Anbindung im Add-on
 
 Das Manifest setzt `homeassistant_api: true`. Dadurch stellt der Supervisor `SUPERVISOR_TOKEN` bereit und erlaubt den Zugriff auf die Core-API unter `http://supervisor/core`. Die Suche auf der Seite Smarthome-Backend findet diesen lokalen Core ohne mDNS. Für `ehal.backend=ha` reicht die URL `http://supervisor/core`; ein manuelles Long-Lived Access Token ist nicht nötig. Bei leerem Token nutzt Earnie zur Laufzeit `SUPERVISOR_TOKEN`.
+
+Live-Telemetrie und Sollwerte laufen über den **Push-Vertrag** (nicht über REST-Pull von Entity-States):
+
+1. Haus und Komponenten im Hauskonfigurator speichern – Earnie aktiviert die Pflichtsignale.
+2. Auf **Daemon Control → EHAL-Com** die **Signalliste** prüfen (Pflicht / optional / aktiviert, Match-Status).
+3. Unter **HA Push-Carrier** das **YAML-Paket** herunterladen (`ENTITY_*`-Platzhalter, periodischer Push, Heartbeat, `status.json`).
+4. Das Paket in Home Assistant als Package einbinden und die Platzhalter durch echte `entity_id`s ersetzen. Der Push muss periodisch laufen (Standard-Wiederholintervall 10 s) – nicht nur bei Wertänderung. Details zur Null-Annahme: [Loxone-Signale – Push-Takt](../referenz/loxone-signals.md#push-cadence-sb-neutral).
+5. Live-Lesen / Live-Schreiben auf EHAL-Com bestätigen, dass Werte ankommen und Sollwerte abgerufen werden.
+
+> **Hinweis:** Der Schlüssel `ehal.ha.transport` entfällt. Alte Configs bereinigt der Migrations-Assistent. Earnie speichert keine HA-`entity_id`s mehr – die Bindung liegt im YAML-Paket.
+
+### YAML-Paket und Add-on 1.0
+
+Das YAML-Paket erzeugt die Earnie-App (Download auf EHAL-Com bzw. CLI `python -m scripts.ha_carrier_yaml_gen`). Das Add-on-Repository [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) ist getrennt vom App-Image. Erwartung für **Add-on 1.0**: das Add-on kann das generierte Package mitliefern oder den Import in HA vereinfachen. Bis dahin bleibt der manuelle Download und die Einbindung als HA-Package der unterstützte Weg.
 
 ### Ingress
 
@@ -95,7 +109,7 @@ Erreichbar sind die Ordner z. B. über das Add-on **Samba** oder **SSH & Web Ter
 |---|---|
 | Ingress | Primäre Earnie-Web-UI in der HA-Seitenleiste / OPEN WEB UI |
 | `8501/tcp` | Optionaler Direktzugriff (Streamlit) |
-| `8541/tcp` | EHAL Loxone-HTTP (Request-Optimize, Telemetry/Heartbeat, Pattern-B-Status). Relevant bei `ehal.backend=loxone` sowie bei Home Assistant mit `ehal.ha.transport=push`; bei `pull` nicht nötig |
+| `8541/tcp` | Daemon-HTTP für den EHAL-Push-Vertrag (Telemetrie, Heartbeat, `status.json`, Request-Optimize). **Immer freigeben** – nötig für Loxone und für Home Assistant (`ehal.backend=ha`). Ohne diesen Port erreichen Virtual Outputs bzw. das HA-YAML-Paket Earnie nicht. |
 
 Gesamtübersicht der Ports: [`docs/dev/streamlit-ports.md`](../dev/streamlit-ports.md).
 
@@ -128,7 +142,7 @@ Unterschied zum LoxBerry-Plugin: Dort wird der Kanal in der Plugin-UI gewählt (
 ## Einschränkungen
 
 - Die Add-on-Optionen decken nur die gängigsten Werte ab. Die vollständige Konfiguration von Haus und Entities erfolgt weiterhin in der App oder dateibasiert.
-- Es gibt kein MQTT Discovery, keine nativen HA-Entitäten und keine Integration ins Energy-Dashboard. Diese sind für Add-on **1.0** in einer späteren Version geplant und nicht Teil der aktuellen 2.7-Linie.
+- Es gibt kein MQTT Discovery, keine nativen HA-Entitäten und keine Integration ins Energy-Dashboard. Mitlieferung bzw. vereinfachter Import des Earnie-YAML-Pakets ist für Add-on **1.0** vorgesehen (siehe oben); bis dahin Download auf EHAL-Com.
 
 ## Deinstallation
 

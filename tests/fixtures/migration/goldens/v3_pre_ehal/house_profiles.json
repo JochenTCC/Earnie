@@ -44,7 +44,8 @@
                         "flex.waermepumpe.sens_power_act": "alias_7",
                         "flex.waermepumpe.set_enable": "alias_8",
                         "sens_temperature_heat_storage": "alias_9",
-                        "sens_temperature_heat_storage_low": "alias_10"
+                        "sens_temperature_heat_storage_low": "alias_10",
+                        "heatpump.waermepumpe.set_enable": ""
                     }
                 },
                 {
@@ -90,7 +91,8 @@
                         "get_evcs_ready_by_time": "alias_20",
                         "get_evcs_limit_soc": "alias_21",
                         "get_evcs_soc_min_immediate": "alias_22",
-                        "flex.e_auto.sens_power_act": "alias_23"
+                        "flex.e_auto.sens_power_act": "alias_23",
+                        "evcs.e_auto.set_evcs_max_current": ""
                     }
                 },
                 {
@@ -117,7 +119,8 @@
                         "sens_temperature_water": "alias_28",
                         "get_temperature_water_setpoint": "alias_29",
                         "get_temperature_tolerance_c": "alias_30",
-                        "sens_heating_active": "alias_31"
+                        "sens_heating_active": "alias_31",
+                        "pool.pool_swimspa.set_enable": ""
                     },
                     "loxone_inputs": {
                         "subtract_consumer_ids": [

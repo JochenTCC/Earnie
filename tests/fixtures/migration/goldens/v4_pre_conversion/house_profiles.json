@@ -89,7 +89,8 @@
                         "sens_evcs_bat_capacity": "",
                         "get_evcs_ready_by_time": "",
                         "get_evcs_limit_soc": "",
-                        "get_evcs_soc_min_immediate": ""
+                        "get_evcs_soc_min_immediate": "",
+                        "evcs.e_auto.set_evcs_max_current": ""
                     }
                 },
                 {

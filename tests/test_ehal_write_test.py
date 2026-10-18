@@ -327,15 +327,20 @@ def test_write_probe_builds_setpoint(ehal_live_mock, loud_mode):
 def test_read_back_ha_numeric(ehal_live_mock):
     ehal_live_mock.is_ha_backend.return_value = True
     ehal_live_mock.is_openems_backend.return_value = False
-    ehal_live_mock.is_ha_push_transport.return_value = False
-    adapter = MagicMock()
-    adapter.cfg.entities = {"set_ess_charge_power_limit": "number.charge_limit"}
-    adapter.read_state.return_value = {
-        "state": "1500",
-        "attributes": {"unit_of_measurement": "W"},
-    }
-    ehal_live_mock.get_ha_adapter.return_value = adapter
-    assert ewt.read_back("set_ess_charge_power_limit") == pytest.approx(1500.0)
+    ehal_live_mock.is_ha_push_transport.return_value = True
+    with patch(
+        "integrations.ehal_write.load_published_records",
+        return_value={
+            "ess.house.set_ess_charge_power_limit": {"value": 1500.0},
+        },
+    ), patch(
+        "integrations.ehal_write.published_fetched_at",
+        return_value="2026-01-01T00:00:00Z",
+    ), patch(
+        "integrations.ehal_write_readback._publish_id_for_probe",
+        return_value="ess.house.set_ess_charge_power_limit",
+    ):
+        assert ewt.read_back("set_ess_charge_power_limit") == pytest.approx(1500.0)
 
 
 def test_publish_id_for_probe_qualifies_export_limit() -> None:

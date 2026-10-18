@@ -83,7 +83,9 @@ def load_system_and_ui_params(
         "SILENT_MODE": system_settings.load_silent_mode(
             raw_config, local_settings, local_settings_path
         ),
-        "EHAL_LOXONE_HTTP_PORT": system_settings.load_ehal_loxone_http_port(raw_config),
+        "EHAL_HTTP_PORT": system_settings.load_ehal_http_port(raw_config),
+        # Legacy alias key kept for callers still reading EHAL_LOXONE_HTTP_PORT.
+        "EHAL_LOXONE_HTTP_PORT": system_settings.load_ehal_http_port(raw_config),
         "UI_FRAGMENT_REFRESH_CHARTS_SEC": system_settings.load_ui_fragment_refresh_sec(
             raw_config, "fragment_refresh_charts_sec", 60
         ),
@@ -125,8 +127,8 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     ``EHAL_HA_ENTITIES`` remains for legacy fallback only — entity-scoped bindings
     live in ``plant`` / ``consumers[].ehal_bindings`` (2.6.g).
 
-    ``EHAL_HA_TRANSPORT``: ``pull`` (default when ``ehal.ha.transport`` is missing)
-    or ``push`` (legacy ``weg_b`` accepted via ``normalize_ha_transport``).
+    HA is push-only (Binding P5e): leftover ``ehal.ha.transport`` fails loud.
+    ``EHAL_HA_TRANSPORT`` stays ``push`` for callers that still read it.
     """
     ehal = raw_config.get("ehal")
     if not isinstance(ehal, dict):
@@ -134,14 +136,17 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     backend = normalize_backend(ehal.get("backend"))
     openems = ehal.get("openems") if isinstance(ehal.get("openems"), dict) else {}
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
+    from runtime_store.ehal_setup import (
+        HA_TRANSPORT_PUSH,
+        reject_leftover_ha_transport,
+    )
+
+    reject_leftover_ha_transport(ha)
     entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
     sign = ha.get("sign") if isinstance(ha.get("sign"), dict) else {}
     boolean_invert = (
         ha.get("boolean_invert") if isinstance(ha.get("boolean_invert"), dict) else {}
     )
-    from runtime_store.ehal_setup import normalize_ha_transport
-
-    ha_transport = normalize_ha_transport(ha.get("transport"))
     return {
         "EHAL_BACKEND": backend,
         "EHAL_ADAPTER_ID": resolve_adapter_id(ehal.get("adapter_id"), backend),
@@ -166,7 +171,7 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
             for key, value in boolean_invert.items()
             if str(value).strip()
         },
-        "EHAL_HA_TRANSPORT": ha_transport,
+        "EHAL_HA_TRANSPORT": HA_TRANSPORT_PUSH,
     }
 
 

@@ -8,7 +8,10 @@
             "control": "full",
             "owned_by": "ecoflow_delta_3",
             "id_locked": true,
-            "efficiency": 0.97
+            "efficiency": 0.97,
+            "ehal_bindings": {
+                "inv.wr_ecoflow_delta_3.set_inv_ac_power_limit": ""
+            }
         },
         {
             "id": "wr_main",
@@ -17,7 +20,10 @@
             "ac_connection": "grid_tied",
             "control": "full",
             "id_locked": true,
-            "efficiency": 0.97
+            "efficiency": 0.97,
+            "ehal_bindings": {
+                "inv.wr_main.set_inv_ac_power_limit": ""
+            }
         }
     ],
     "batteries": [
@@ -43,7 +49,11 @@
             "battery_wear": {
                 "enabled": false
             },
-            "ehal_bindings": {}
+            "ehal_bindings": {
+                "ess.virtual_gs.sens_ess_soc": "",
+                "ess.virtual_gs.set_ess_charge_power_limit": "",
+                "ess.virtual_gs.set_ess_discharge_power_limit": ""
+            }
         },
         {
             "id": "virtual_washing",
@@ -68,7 +78,11 @@
             "battery_wear": {
                 "enabled": false
             },
-            "ehal_bindings": {}
+            "ehal_bindings": {
+                "ess.virtual_washing.sens_ess_soc": "",
+                "ess.virtual_washing.set_ess_charge_power_limit": "",
+                "ess.virtual_washing.set_ess_discharge_power_limit": ""
+            }
         },
         {
             "id": "15_kwh_speicher",
@@ -149,7 +163,10 @@
             "pv_tilt": 18.0,
             "pv_azimuth": 26.0,
             "inverter_id": "wr_main",
-            "id_locked": true
+            "id_locked": true,
+            "ehal_bindings": {
+                "pv.dach_sued.sens_pv_production_active": ""
+            }
         },
         {
             "id": "dach_nord",
@@ -158,7 +175,10 @@
             "pv_tilt": 18.0,
             "pv_azimuth": -154.0,
             "inverter_id": "wr_main",
-            "id_locked": true
+            "id_locked": true,
+            "ehal_bindings": {
+                "pv.dach_nord.sens_pv_production_active": ""
+            }
         }
     ],
     "earnie_data_model": 4

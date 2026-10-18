@@ -613,7 +613,45 @@ class TestReadCheckPushState:
             result = lc._read_check("sens_ess_soc", "Missing_Merker")
         assert result.passed is False
         assert result.severity == "error"
-        assert "Merker-Poll entfernt" in result.detail
+        assert "kein Mapping" in result.detail or "Hub-Poll entfernt" in result.detail
+
+    def test_read_check_activated_ehal_id_never_received_is_warning(self):
+        """Binding Lx2: empty-activated qualified ID without VO → warning + export hint."""
+        with patch(
+            "ehal.loxone_push_source.resolve_push_binding",
+            return_value=None,
+        ):
+            result = lc._read_check(
+                "ess.house.sens_ess_soc", "ess.house.sens_ess_soc"
+            )
+        assert result.passed is False
+        assert result.severity == "warning"
+        assert lc._check_counts_as_ok(result) is True
+        assert "Signalliste" in result.detail
+
+    def test_read_check_assumed_never_is_warning(self):
+        from runtime_store.loxone_push_inbox import STATE_ZERO_ASSUMED_NEVER
+
+        class _Binding:
+            ehal_id = "sens_grid_power_active"
+            kind = "sens_grid_power_active"
+
+        with patch(
+            "ehal.loxone_push_source.resolve_push_binding",
+            return_value=_Binding(),
+        ), patch(
+            "ehal.loxone_push_source.is_pushable_kind",
+            return_value=True,
+        ), patch(
+            "runtime_store.loxone_push_inbox.read_push_value",
+            return_value=(0.0, STATE_ZERO_ASSUMED_NEVER),
+        ):
+            result = lc._read_check("sens_grid_power_active", "Ernie_Grid")
+        assert result.passed is False
+        assert result.severity == "warning"
+        assert result.state == STATE_ZERO_ASSUMED_NEVER
+        assert "Signalliste" in result.detail
+        assert lc._check_counts_as_ok(result) is True
 
 
 class TestBatteryEssEmptyMerker:

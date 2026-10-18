@@ -35,7 +35,10 @@
             "kwp": 6.8,
             "pv_tilt": 18.0,
             "pv_azimuth": -154.0,
-            "inverter_id": "wr_main"
+            "inverter_id": "wr_main",
+            "ehal_bindings": {
+                "pv.dach_nord.sens_pv_production_active": ""
+            }
         },
         {
             "id": "dach_sued",
@@ -43,7 +46,10 @@
             "kwp": 5.7,
             "pv_tilt": 18.0,
             "pv_azimuth": 26.0,
-            "inverter_id": "wr_main"
+            "inverter_id": "wr_main",
+            "ehal_bindings": {
+                "pv.dach_sued.sens_pv_production_active": ""
+            }
         }
     ],
     "earnie_data_model": 4,
@@ -55,7 +61,9 @@
             "ac_connection": "grid_tied",
             "control": "full",
             "efficiency": 0.97,
-            "ehal_bindings": {}
+            "ehal_bindings": {
+                "inv.wr_main.set_inv_ac_power_limit": ""
+            }
         }
     ]
 }

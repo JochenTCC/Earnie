@@ -76,7 +76,7 @@ def _values_match(expected: float, actual: float, tolerance: float) -> bool:
 
 
 def _restore_via_publish(io_name: str, expected_value: float) -> bool:
-    """Re-publish setpoint (2.7.q Q5); no Merker HTTP restore."""
+    """Re-publish setpoint (2.7.q Q5); no hub HTTP restore."""
     from integrations.ehal_debug_mapping import build_loxone_setpoint_io_index
     from integrations.loxone_writes import _publish_setpoint_traced
 
@@ -96,7 +96,7 @@ def verify_and_restore_loxone_states(
 ) -> list[LoxoneMismatch]:
     """Compare Soll to the publish ledger + Miniserver callback (Q7).
 
-    No Merker HTTP reads. Missing callback or ledger drift → re-publish.
+    No hub HTTP reads. Missing callback or ledger drift → re-publish.
     """
     from integrations.ehal_write import load_published_records, published_fetched_at
 
@@ -151,7 +151,7 @@ def verify_and_restore_loxone_states(
 
 
 def _qualified_id_for_watchdog_key(io_name: str) -> str:
-    """Map a loxone_sent key (Merker or qualified) to the publish ledger ID."""
+    """Map a loxone_sent key (hub address or qualified ID) to the publish ledger ID."""
     from integrations.ehal_debug_mapping import build_loxone_setpoint_io_index
 
     field = str(build_loxone_setpoint_io_index().get(io_name) or "").strip()
@@ -171,5 +171,5 @@ def run_watchdog_cycle() -> list[LoxoneMismatch]:
         return []
 
     completed = (state or {}).get("completed_at", "?")
-    logger.debug("Prüfe %s Loxone-Merker (main.py %s)", len(expected), completed)
+    logger.debug("Prüfe %s Loxone-Sollwerte (main.py %s)", len(expected), completed)
     return verify_and_restore_loxone_states(expected)

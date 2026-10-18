@@ -64,11 +64,11 @@ def _resolve_ha_credentials() -> tuple[str, str]:
     return base_url, token
 
 
-def _ha_entities(house, transport: str) -> dict:
-    """Aggregated HA entity map from house profiles; configured legacy map when empty."""
+def _ha_entities(house) -> dict:
+    """Activated HA binding keys from house profiles; legacy flat map when empty."""
     from house_config.ha_ehal_bindings import aggregate_ha_entities
 
-    aggregated = aggregate_ha_entities(house, transport=transport)
+    aggregated = aggregate_ha_entities(house)
     if aggregated:
         return aggregated
     legacy = live.config.get("EHAL_HA_ENTITIES") or {}
@@ -84,12 +84,11 @@ def _config_dict(key: str) -> dict:
 def get_ha_adapter() -> HaAdapter:
     global _ha_adapter
     from house_config.ha_ehal_bindings import load_house_profiles_for_ha
-    from runtime_store.ehal_setup import HA_TRANSPORT_PUSH, normalize_ha_transport
+    from runtime_store.ehal_setup import HA_TRANSPORT_PUSH
 
     base_url, token = _resolve_ha_credentials()
     house = load_house_profiles_for_ha()
-    transport = normalize_ha_transport(live.config.get("EHAL_HA_TRANSPORT"))
-    entities = _ha_entities(house, transport)
+    entities = _ha_entities(house)
     from integrations.ha_push_read import (
         load_house_components_for_ha,
         push_read_qualified_ids,
@@ -114,7 +113,7 @@ def get_ha_adapter() -> HaAdapter:
         adapter_id=str(live.config.get("EHAL_ADAPTER_ID") or "earnie-hems"),
         entities=canonicalize_ha_entity_keys(
             {str(k): str(v) for k, v in entities.items()},
-            keep_empty=transport == HA_TRANSPORT_PUSH,
+            keep_empty=True,
         ),
         sign=canonicalize_ha_entity_keys({str(k): str(v) for k, v in sign.items()}),
         boolean_invert=canonicalize_ha_entity_keys(
@@ -122,7 +121,7 @@ def get_ha_adapter() -> HaAdapter:
         ),
         timeout_sec=float(live.config.get("GLOBAL_TIMEOUT") or 10),
         ha_ess_force=ha_ess_force if isinstance(ha_ess_force, dict) else None,
-        transport=transport,
+        transport=HA_TRANSPORT_PUSH,
         push_read_qids=push_qids,
         setpoint_qids=setpoint_qids,
     )

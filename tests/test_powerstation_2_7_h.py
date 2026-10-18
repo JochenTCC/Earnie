@@ -244,21 +244,23 @@ def test_apply_standby_load_relief_adds_grid_charge_to_house_load():
     assert matrix[0]["expected_p_act"] == pytest.approx(1.0)
 
 
-def test_ha_switch_write_source_select():
+def test_ha_source_select_publishes_with_invert():
+    """Binding P5e: Quellenwahl publishes to status.json (YAML owns the switch)."""
+    from integrations.ehal_write import clear_published_for_tests, load_published
+
+    clear_published_for_tests()
     adapter = HaAdapter(
         HaConfig(
             base_url="http://ha.local",
             token="t",
             adapter_id="test",
-            entities={"set_ess_source_select": "switch.delta_3_grid_bypass"},
+            entities={"set_ess_source_select": ""},
+            boolean_invert={"set_ess_source_select": "invert"},
+            setpoint_qids={
+                "set_ess_source_select": "ess.house.set_ess_source_select",
+            },
         )
     )
-    calls: list[tuple] = []
-
-    def fake_service(domain, service, data):
-        calls.append((domain, service, data))
-
-    adapter.call_service = fake_service  # type: ignore[method-assign]
     error = adapter.write_setpoints(
         {
             "schema_version": EHAL_SCHEMA_VERSION,
@@ -268,45 +270,8 @@ def test_ha_switch_write_source_select():
         }
     )
     assert error is None
-    assert calls == [
-        ("switch", "turn_on", {"entity_id": "switch.delta_3_grid_bypass"})
-    ]
-
-    calls.clear()
-    adapter.write_setpoints(
-        {
-            "schema_version": EHAL_SCHEMA_VERSION,
-            "ts": "2026-10-06T00:00:00Z",
-            "adapter_id": "test",
-            "set_ess_source_select": 0,
-        }
-    )
-    assert calls == [
-        ("switch", "turn_off", {"entity_id": "switch.delta_3_grid_bypass"})
-    ]
-
-
-def test_ha_switch_write_with_invert():
-    adapter = HaAdapter(
-        HaConfig(
-            base_url="http://ha.local",
-            token="t",
-            adapter_id="test",
-            entities={"set_ess_source_select": "switch.odd"},
-            boolean_invert={"set_ess_source_select": "invert"},
-        )
-    )
-    calls: list[tuple] = []
-    adapter.call_service = lambda d, s, data: calls.append((d, s, data))  # type: ignore
-    adapter.write_setpoints(
-        {
-            "schema_version": EHAL_SCHEMA_VERSION,
-            "ts": "2026-10-06T00:00:00Z",
-            "adapter_id": "test",
-            "set_ess_source_select": 1,
-        }
-    )
-    assert calls[0][1] == "turn_off"
+    # invert: EHAL 1 → published 0
+    assert load_published()["ess.house.set_ess_source_select"] == pytest.approx(0.0)
 
 
 def test_write_standby_source_selects_loxone_marker():

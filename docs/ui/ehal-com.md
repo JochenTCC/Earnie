@@ -3,9 +3,9 @@
 The **EHAL-Com** page under **Daemon Control** is the place for live connectivity checks and debugging of the active smarthome backend: **Loxone**, **Home Assistant (EHAL)**, or **OpenEMS**.
 
 - It shows live reads (**Live-Lesen**) and the writes of the last production run of `main.py` (**Live-Schreiben**).
-- For Loxone, the **Signalliste** shows the contract: qualified EHAL IDs, match status, and the VO/VI export.
-- Binding keys on `plant` / consumers / batteries are activation flags (empty Merker values).
-- An ad hoc optimization run is triggered by the Virtual Output `Earnie_Request_Optimize`, which calls `POST /ehal/loxone/request_optimize` on the daemon HTTP listener. The port is `system.ehal_loxone_http_port` (default **8541**; the environment variable `EARNIE_EHAL_LOXONE_HTTP_PORT` takes precedence). The receipt ID `request_optimize` appears on the **Signalliste** and in **Live-Lesen**, so you can verify that the Miniserver reached Earnie.
+- The **Signalliste** is the binding UI for **all** backends: qualified EHAL IDs, Pflicht / optional / aktiviert, match status, and SB-specific export (Loxone VO/VI ZIP; HA YAML package). There is no separate HA entity-mapping chapter.
+- Binding keys on `plant` / consumers / batteries / inverters are activation flags (empty values — Earnie stores no Loxone Merker names and no HA `entity_id`s).
+- An ad hoc optimization run is triggered by the Virtual Output `Earnie_Request_Optimize`, which calls `POST /ehal/loxone/request_optimize` on the daemon HTTP listener. The port is `system.ehal_loxone_http_port` (default **8541**; the environment variable `EARNIE_EHAL_LOXONE_HTTP_PORT` takes precedence). The receipt ID `request_optimize` appears on the **Signalliste** and in **Live-Lesen**, so you can verify that the hub reached Earnie.
 
 Table and button labels on the page are German. This document uses the German label where a UI element is named, with an English gloss on first use.
 
@@ -25,9 +25,9 @@ The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-back
 
 | Backend        | Storage                                       | Contract UI on this page                                 |
 | -------------- | --------------------------------------------- | ------------------------------------------------------ |
-| Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | **Signalliste** (qualified IDs · match · VO/VI export) |
-| Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); `sign` + `transport` in `config.json` → `ehal.ha` (`pull` default, `push` = Loxone-like push + `status.json`) | HA Entity → EHAL Mapping → `plant` / `batteries[]` / `consumers[].ehal_bindings` (Signalliste match status is **Loxone-only**; HA uses the mapping UI) |
-| OpenEMS        | `config.json` → `ehal.openems`                | (credentials on Smarthome-Backend)                     |
+| Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | **Signalliste** (qualified IDs · Pflicht/aktiviert · match · VO/VI export) |
+| Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` / `boolean_invert` in `config.json` → `ehal.ha` (no `transport` — push-only) | **Signalliste** + **HA YAML-Paket** download (`ENTITY_*` · periodic push · `status.json`) |
+| OpenEMS        | `config.json` → `ehal.openems`                | **Signalliste** (credentials on Smarthome-Backend) |
 
 
 `ehal.backend` controls the live path in `main.py` (Loxone HTTP vs. EHAL REST). Which backend choice makes sense when: [Choose Smarthome-Backend](../einrichtung/smarthome-backend-wahl.md).
@@ -266,7 +266,8 @@ Top to bottom, the page shows:
 
 1. The path of the active configuration, the Live-Cockpit lock notice (while it applies), and the result of the **live topology check**. A rejected topology appears as the error `Live-Topologie abgelehnt: …`; an unreadable one as a warning.
 2. **Live-Lesen** (Live Read) and **Live-Schreiben** (Live Write), including the **Schreibtest** expander.
-3. Backend-specific: **HA Entity → EHAL Mapping** (Home Assistant) or the **Signalliste** (Loxone).
+3. For Home Assistant: **HA Push-Carrier** / **YAML-Paket** download.
+4. **Signalliste** (all backends) — contract table and export.
 
 ### Optimizer service and write mode
 
@@ -285,12 +286,12 @@ Only `sens_*` and `get_*` (measurements / inputs). The table lists **all** expec
 | ---------------------- | ------- |
 | `EHAL-Feld` (EHAL field) | Exchange EHAL ID (qualified where that is the wire form). |
 | `Wert` (value)         | Hub/raw side (Loxone push/check value with hub unit when known). Same header on HA/OpenEMS: filled only when reverse conversion is possible, else `—`. |
-| `Wert (EHAL)`          | Value after registry / `ha_units` conversion to EHAL (with EHAL unit). `—` when no conversion path exists. |
-| `Status`               | `OK`, `Warnung`, error states, or `Kein Mapping`. For Loxone push also push-state strings (`0 angenommen …`, `0 (gehalten)`, `Zuletzt bekannt (gehalten)`, …). |
+| `Wert (EHAL)`          | Value in EHAL units (Loxone: after role-registry conversion; HA push: already canonical on the wire). `—` when no conversion path exists. |
+| `Status`               | `OK`, `Warnung`, error states, or `Kein Mapping`. For push backends also push-state strings (`0 angenommen (verstummt)`, `0 (gehalten)`, `Zuletzt bekannt (gehalten)`, …). |
 | `Detail`               | Error text (empty when OK); optional empty rows may show a fallback hint. |
 | `Zuletzt gelesen` (last read) | Timestamp of the query; for push rows the inbox `last_ts` (local clock) is preferred when available. |
 
-**Units:** from role `loxone` / `openems` blocks in `share/ehal/roles/*.json` (and HA quantity base units via `ha_units`) — not hard-coded in the UI. Every value cell shows its unit as a suffix when known.
+**Units:** from role `loxone` / `openems` blocks in `share/ehal/roles/*.json` (HA: EHAL wire units; conversion happens in the carrier YAML Jinja) — not hard-coded in the UI. Every value cell shows its unit as a suffix when known.
 
 **Row colours (additive; Status stays authoritative):** black/default = mandatory fresh OK; gray = optional; blue = cached held; yellow = outdated/assumed/warning; red = no mapping or read error.
 
@@ -308,7 +309,9 @@ Only `sens_*` and `get_*` (measurements / inputs). The table lists **all** expec
 - **`get_evcs_ready_by_time`:** Analog VO numeric next-entry, or fresh Tna text (`Morgen, 07:00`).
 - **Counters:** numeric counters (Loxone epoch since 2009-01-01) are converted to Unix time and shown in readable local form in the `Wert` column (`YYYY-MM-DD HH:MM:SS (unix …)`).
 
-**HA / OpenEMS:** With **`ehal.ha.transport=pull`** (default), Live-Lesen uses REST entity states (`HaAdapter`; only `sens_*` / `get_*` in the table). With **`push`**, live read/write uses the Loxone-like push inbox + `GET /ehal/status.json`; telemetry on the wire is canonical EHAL units (carrier converts in HA). Derived house load: `—(derived)`. Optional caption for live power in kW.
+**HA:** Live read/write uses the same push inbox + `GET /ehal/status.json` as Loxone (no REST pull). Telemetry on the wire is canonical EHAL units (carrier converts in HA). Fill `ENTITY_*` in the downloaded YAML and keep the periodic push cadence (default 10 s) — see [push cadence](../referenz/loxone-signals.md#push-cadence-sb-neutral). Derived house load: `—(derived)`. Optional caption for live power in kW.
+
+**OpenEMS:** Live-Lesen uses the OpenEMS adapter channels (`sens_*` / `get_*` in the table).
 
 Units and signs: see §B. Full role matrix: §C.
 
@@ -321,7 +324,7 @@ The table lists **all** expected write fields. Values and success come from the 
 | Column (UI label)      | Meaning |
 | ---------------------- | ------- |
 | `EHAL-Feld` (EHAL field) | Qualified EHAL ID of the `set_*` field, for example `consumer.<slug>.set_enable`. |
-| `Mapping auf Loxone` / `Mapping auf Home Assistant` / `Mapping auf OpenEMS` | Merker / HA entity / OpenEMS write channel. The title follows the active backend; empty if not yet mapped. |
+| `Mapping auf Loxone` / `Mapping auf Home Assistant` / `Mapping auf OpenEMS` | Activation / channel column (title follows the active backend). For push backends the binding key may be present with an empty hub name; empty if not activated. |
 | `Wert`                 | EHAL / internal setpoint (with EHAL unit). Loxone loud traces that store hub units are normalized here. |
 | `Wert (Hub)`           | Value after conversion to hub units (what is published / mirrored). `—` when no conversion path exists. |
 | `Erfolg` (success)     | `Ja` / `Nein`; Loxone rows can also show `Übersprungen` (skipped). |
@@ -330,11 +333,12 @@ The table lists **all** expected write fields. Values and success come from the 
 
 
 - **Loxone:** trace `loxone_writes` (IO name is traced back to the EHAL field); silent: planned setpoints from `loxone_sent` with status "not sent".
-- **HA / OpenEMS:** `ehal_writes` (field, value, success, time, message); error banner from `runtime/ehal_write_error.json`.
+- **HA:** setpoints published to `status.json` (qualified keys); Schreibtest success = published ledger + HA (or test client) fetched `status.json` (`published_fetched_at`). Error banner from `runtime/ehal_write_error.json`.
+- **OpenEMS:** `ehal_writes` (field, value, success, time, message); error banner from `runtime/ehal_write_error.json`.
 
 ### Schreibtest
 
-Under **Live-Schreiben**, the **Schreibtest** expander lists all activated write fields (plant, entity-scoped `ess.{slug}.set_*`, EV, flex enable). Enable **Senden** per row, set values, then write. Optional **Auto-Roundtrip**: for Loxone, success = published into the ledger + Miniserver `status.json` callback `fetched_at` (no Merker HTTP echo; true VO value-echo deferred). HA still uses entity read-back.
+Under **Live-Schreiben**, the **Schreibtest** expander lists all activated write fields (plant, entity-scoped `ess.{slug}.set_*`, EV, flex enable). Enable **Senden** per row, set values, then write. Optional **Auto-Roundtrip**: for Loxone and HA, success = published into the ledger + hub `status.json` callback `fetched_at` (no Merker HTTP echo; true VO value-echo deferred).
 
 **Preconditions**
 
@@ -366,33 +370,36 @@ Under **Live-Schreiben**, the **Schreibtest** expander lists all activated write
 
 After an Auto-Roundtrip, safe setpoints are always written (ESS automatic, EVCS 0 A). To do this manually, use the **Sicher wiederherstellen** button. Lab adapters are only flagged by a hint, not blocked.
 
-### HA Entity → EHAL Mapping
+### HA YAML package
 
-Only with backend **Home Assistant**: entity-centric manual mapping (same entity-scoped shape as Loxone). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials live in `config/.env` (`EHAL_HA_*`); optional **`sign`** (plant) stays in `config.json` → `ehal.ha`.
+Only with backend **Home Assistant**. Under **HA Push-Carrier**, download a YAML package generated from **activated** signals:
 
-Workflow: scan `/api/states` once per Streamlit session (button refreshes) → heuristic proposes **empty** fields only → confirm → save. Saved bindings are never overwritten by propose; **no LLM**. After save, Live-Lesen and Live-Schreiben both use exchange EHAL IDs (qualified `consumer.*` / `evcs.*` / `ev.*` / `grid.meter.*` / `ess.<id>.*`; bare plant flats only where that is still the wire form).
+- Per read signal: `rest_command` + automation with **periodic** `time_pattern` (interval = `EARNIE_PILOT_PUSH_REPEAT_S`, default **10 s** — not only on state change).
+- Heartbeat push; REST sensor on Earnie `status.json`; setpoint automations (`status.json` attribute → service on the target entity), including `ha_ess_force` where configured.
+- Placeholders `ENTITY_*` only — replace them in HA with real `entity_id`s. Earnie never stores those names.
+- Jinja converts entity units to canonical EHAL units before the push URL is called.
 
-Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on plant bindings (`device_class=energy`, preferably `state_class=total_increasing`). Heuristic proposes them empty-only like other fields. Spec: [loxone-meter-energy-slot-ist](../dev/done/loxone-meter-energy-slot-ist.md) (HA section).
+CLI equivalent: `python -m scripts.ha_carrier_yaml_gen --config-dir <config> --host <Earnie-host> --port 8541 --out earnie_ha_carrier.yaml`. Lab checklist: [HA Lab Spec](../dev/ha-lab-setup.md). Cadence / zero rule: [Loxone Signals](../referenz/loxone-signals.md#push-cadence-sb-neutral).
 
-- Overview and manual mapping: [Home Assistant + evcc](../einrichtung/ha-evcc.md) (section *Wenn marq24 / evcc bereits in HA verbunden ist*)
-- Lab acceptance including stub values and table: [HA Lab Spec §5.1](../dev/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up)
+<a id="signalliste-loxone-contract"></a>
 
+### Signalliste (signal contract)
 
-
-### Signalliste (Loxone contract)
-
-Only with backend **Loxone**. Replaces the former *Loxone Structure → EHAL Mapping* chapter.
+Shown for **every** backend. This is the binding UI (replaces the former Loxone structure mapping and the HA entity-mapping chapter).
 
 | Column | Meaning |
 | ------ | ------- |
-| Qualified EHAL ID | Exchange form (`grid.meter.*`, `ess.{id}.*`, `consumer.` / `heatpump.` / `pool.` / `evcs.` / `ev.`) |
+| Direction | Read (`sens_*` / `get_*`) or write (`set_*` / enables) |
+| Qualified EHAL ID | Exchange form (`grid.meter.*`, `ess.{id}.*`, `consumer.` / `heatpump.` / `pool.` / `evcs.` / `ev.` / `inv.{id}.*`) |
 | Meaning | Entity Bezeichnung + field label |
-| Hub unit | Expected hub unit from role `loxone` / hub block (e.g. Loxone **kW** for ESS power); `—` if none |
-| EHAL unit | EHAL wire unit from the same registry block (e.g. **W**); `—` if none |
+| Pflicht / aktiviert | Required vs optional; whether the binding key is present |
+| Hub unit | Loxone only — expected hub unit from role `loxone` block (e.g. **kW**); omitted for HA |
+| EHAL unit | EHAL wire unit from the registry (e.g. **W**); `—` if none |
 | Required by | EHAL functions from `ehal/functions.py` that need the field |
-| Match (read) | Last received in the push inbox (age) / never |
-| Match (write) | Last Miniserver fetch of `status.json` (callback) / never published |
-| Export | ZIP of VO + VI pilot templates + README; **needed** = activated bindings |
+| Match | Read = last received in the push inbox (age) / never; write = last hub fetch of `status.json` / never published |
+| Export | Loxone: ZIP of VO + VI pilot templates + README; HA: use the **YAML-Paket** section (activated signals) |
+
+Optional signals default off; toggle them in the Signalliste (on = add activation key, off = remove). Required signals are activated when a component is saved in the Hauskonfigurator.
 
 Always listed (not a binding): `heartbeat` / `heartbeat_ts`, and control receipt `request_optimize` (VO cmd `Earnie_Request_Optimize` → daemon POST; age stays OK even when older than five minutes).
 
@@ -402,7 +409,7 @@ Always listed (not a binding): `heartbeat` / `heartbeat_ts`, and control receipt
 
 ## Write push-only
 
-Loud writes publish only to `status.json` under qualified EHAL IDs; the Miniserver VI polls every **10 s**. VI templates must use `VI_Earnie_*_v2.xml` or the Pilot VI. The staged rollout checklist lives in [loxone-write-push-only-cutover](../dev/loxone-write-push-only-cutover.md).
+Loud writes publish only to `status.json` under qualified EHAL IDs. Loxone VI and HA REST sensors / automations poll on the repeat interval (default **10 s**). Loxone VI templates must use `VI_Earnie_*_v2.xml` or the Pilot VI. The staged Loxone rollout checklist lives in [loxone-write-push-only-cutover](../dev/loxone-write-push-only-cutover.md).
 
 ## See Also
 

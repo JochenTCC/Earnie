@@ -34,7 +34,8 @@ from ehal.push_signals import (  # noqa: F401 — re-exported for callers and te
     title_from_qualified_id,
 )
 
-TOKEN_ENV = "EARNIE_PILOT_PUSH_TOKEN"
+TOKEN_ENV = "EARNIE_PUSH_TOKEN"
+TOKEN_ENV_LEGACY = "EARNIE_PILOT_PUSH_TOKEN"
 TOKEN_PLACEHOLDER = "PILOT_TOKEN_HIER_ERSETZEN"
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{8,}$")
 
@@ -118,9 +119,15 @@ def write_template(path: Path, text: str) -> None:
 
 
 def read_token(env_file: Path) -> str:
-    token = str(dotenv_values(env_file).get(TOKEN_ENV) or "").strip()
+    values = dotenv_values(env_file)
+    token = str(
+        values.get(TOKEN_ENV) or values.get(TOKEN_ENV_LEGACY) or ""
+    ).strip()
     if not _TOKEN_RE.match(token):
-        raise ValueError(f"{TOKEN_ENV} missing or not URL-safe (>= 8 chars of A-Z a-z 0-9 _ -) in {env_file}")
+        raise ValueError(
+            f"{TOKEN_ENV} (or {TOKEN_ENV_LEGACY}) missing or not URL-safe "
+            f"(>= 8 chars of A-Z a-z 0-9 _ -) in {env_file}"
+        )
     return token
 
 

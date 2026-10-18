@@ -1,7 +1,7 @@
 """EHAL functions: available only when all required fields are mapped."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -10,9 +10,8 @@ from ehal.functions import (
     function_statuses,
     incomplete_function_messages,
 )
-from house_sim.archetype import load_archetype
-from house_sim.mock_rest import DEFAULT_BENCH_TOKEN, start_mock_rest, stop_mock_rest
 from integrations.ehal_live import SKIPPED_MESSAGE, build_ehal_write_records
+from integrations.ehal_write import clear_published_for_tests, load_published
 from integrations.ha_adapter import HaAdapter, HaConfig
 from integrations.ha_meter_energy import read_plant_energy_readings
 from integrations.loxone_adapter import LoxoneAdapter, LoxoneConfig
@@ -26,6 +25,9 @@ LIMITS = {
     "set_ess_charge_power_limit": "number.charge",
     "set_ess_discharge_power_limit": "number.discharge",
 }
+# Binding P5e activation maps (empty values) for HaAdapter.
+TELEMETRY_PUSH = {k: "" for k in TELEMETRY}
+LIMITS_PUSH = {k: "" for k in LIMITS}
 SETPOINT_TS = {"schema_version": 4, "ts": "2026-01-01T00:00:00Z", "adapter_id": "earnie-hems"}
 
 
@@ -82,67 +84,62 @@ def test_active_power_without_limits_warns():
     assert "Automatik" in messages[0]
 
 
-@pytest.fixture
-def huawei_bench():
-    package = load_archetype("huawei_en")
-    store = package.build_store()
-    _server, base_url = start_mock_rest(store, host="127.0.0.1", port=0, token=DEFAULT_BENCH_TOKEN)
-    adapter = HaAdapter(
-        HaConfig(
-            base_url=base_url,
-            token=DEFAULT_BENCH_TOKEN,
-            adapter_id="earnie-hems",
-            entities=dict(package.ehal_entities),
-            sign=dict(package.ehal_sign),
-        )
-    )
-    yield store, adapter
-    stop_mock_rest()
-
-
-def test_ha_limits_only_skips_active_power_without_degrading(huawei_bench):
-    store, adapter = huawei_bench
-    for _ in range(2):  # a second cycle must still write the limits
-        err = adapter.write_setpoints(
-            {
-                **SETPOINT_TS,
-                "set_ess_active_power": -2000.0,
-                "set_ess_charge_power_limit": 3000.0,
-                "set_ess_discharge_power_limit": 0.0,
-            }
-        )
-        assert err is None
-        assert adapter.last_skipped_fields() == []
-        assert adapter.capabilities()["supports_ess_write"] is True
-    assert store.numeric_state("number.batteries_maximum_charging_power") == pytest.approx(3000.0)
-    assert store.numeric_state("number.batteries_maximum_discharging_power") == pytest.approx(0.0)
-
-
-@patch("integrations.ha_adapter.requests.post")
-def test_ha_active_only_mapping_writes_nothing(post_mock):
+def test_ha_limits_publish_without_active_power():
+    clear_published_for_tests()
     adapter = HaAdapter(
         HaConfig(
             base_url="http://ha:8123",
             token="t",
             adapter_id="earnie-hems",
-            entities={**TELEMETRY, "set_ess_active_power": "number.active"},
+            entities={**TELEMETRY_PUSH, **LIMITS_PUSH},
+            setpoint_qids={
+                "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
+                "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",
+            },
+        )
+    )
+    err = adapter.write_setpoints(
+        {
+            **SETPOINT_TS,
+            "set_ess_active_power": -2000.0,
+            "set_ess_charge_power_limit": 3000.0,
+            "set_ess_discharge_power_limit": 0.0,
+        }
+    )
+    assert err is None
+    # Never-configured active power is skipped without listing in last_skipped.
+    assert adapter.last_skipped_fields() == []
+    assert adapter.capabilities()["supports_ess_write"] is True
+    published = load_published()
+    assert published["ess.house.set_ess_charge_power_limit"] == pytest.approx(3000.0)
+    assert published["ess.house.set_ess_discharge_power_limit"] == pytest.approx(0.0)
+
+
+def test_ha_active_only_mapping_writes_nothing():
+    clear_published_for_tests()
+    adapter = HaAdapter(
+        HaConfig(
+            base_url="http://ha:8123",
+            token="t",
+            adapter_id="earnie-hems",
+            entities={**TELEMETRY_PUSH, "set_ess_active_power": ""},
         )
     )
     assert adapter.capabilities()["supports_ess_write"] is False
     err = adapter.write_setpoints({**SETPOINT_TS, "set_ess_active_power": -1000.0})
     assert err is None
     assert adapter.last_skipped_fields() == ["set_ess_active_power"]
-    post_mock.assert_not_called()
+    assert load_published() == {}
 
 
-@patch("integrations.ha_adapter.requests.post")
-def test_partial_limits_are_reported_as_skipped(post_mock):
+def test_partial_limits_are_reported_as_skipped():
+    clear_published_for_tests()
     adapter = HaAdapter(
         HaConfig(
             base_url="http://ha:8123",
             token="t",
             adapter_id="earnie-hems",
-            entities={**TELEMETRY, "set_ess_charge_power_limit": "number.charge"},
+            entities={**TELEMETRY_PUSH, "set_ess_charge_power_limit": ""},
         )
     )
     err = adapter.write_setpoints(
@@ -157,7 +154,7 @@ def test_partial_limits_are_reported_as_skipped(post_mock):
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",
     ]
-    post_mock.assert_not_called()
+    assert load_published() == {}
 
 
 def test_loxone_active_without_limits_is_skipped():
@@ -178,12 +175,13 @@ def test_loxone_active_without_limits_is_skipped():
 
 def test_partial_energy_counters_are_ignored():
     adapter = MagicMock()
-    adapter.read_state.return_value = {"state": "5", "attributes": {"unit_of_measurement": "kWh"}}
-    partial = {"sens_pv_energy": "sensor.pv_e", "sens_grid_energy_import": "sensor.imp"}
+    adapter.cfg.entities = {}
+    adapter.cfg.push_read_qids = {}
+    partial = {"sens_pv_energy": "", "sens_grid_energy_import": ""}
     assert read_plant_energy_readings(adapter, entities=partial) == {}
-    adapter.read_state.assert_not_called()
-    full = {**partial, "sens_grid_energy_export": "sensor.exp"}
-    assert read_plant_energy_readings(adapter, entities=full)
+    full = {**partial, "sens_grid_energy_export": ""}
+    # Full activation without push qids → empty readings (no REST fallback).
+    assert read_plant_energy_readings(adapter, entities=full) == {}
 
 
 def test_write_records_mark_skipped_fields():
@@ -198,10 +196,26 @@ def test_write_records_mark_skipped_fields():
     assert rows[1]["success"] is True and "skipped" not in rows[1]
 
 
-def test_ha_unmapped_mode_is_reported_as_skipped(huawei_bench):
-    _store, adapter = huawei_bench
+def test_ha_unmapped_mode_is_not_listed_as_incomplete_skip():
+    clear_published_for_tests()
+    adapter = HaAdapter(
+        HaConfig(
+            base_url="http://ha:8123",
+            token="t",
+            adapter_id="earnie-hems",
+            entities={**LIMITS_PUSH},
+            setpoint_qids={
+                "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
+                "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",
+            },
+        )
+    )
     err = adapter.write_setpoints(
         {**SETPOINT_TS, "set_ess_mode": 1, "set_ess_charge_power_limit": 2000.0}
     )
     assert err is None
+    # Unmapped mode is skipped quietly (not an incomplete-function skip).
     assert adapter.last_skipped_fields() == []
+    assert load_published()["ess.house.set_ess_charge_power_limit"] == pytest.approx(
+        2000.0
+    )

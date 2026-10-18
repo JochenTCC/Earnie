@@ -68,7 +68,7 @@ def test_port_merge_from_options(tmp_path, monkeypatch):
         {
             "ehal": {"backend": "ha", "adapter_id": "earnie-hems"},
             "ui": {"streamlit_port": 8501},
-            "system": {"ehal_loxone_http_port": 8541},
+            "system": {"ehal_http_port": 8541},
         },
     )
     _write_json(options_path, {"streamlit_port": 8511, "ehal_loxone_http_port": 8551})
@@ -77,7 +77,8 @@ def test_port_merge_from_options(tmp_path, monkeypatch):
     assert addon_options.apply_addon_options(config_just_created=False) is True
     payload = _read_json(config_path)
     assert payload["ui"]["streamlit_port"] == 8511
-    assert payload["system"]["ehal_loxone_http_port"] == 8551
+    assert payload["system"]["ehal_http_port"] == 8551
+    assert "ehal_loxone_http_port" not in payload["system"]
     assert payload["ehal"]["backend"] == "ha"
 
 

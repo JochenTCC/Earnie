@@ -82,8 +82,8 @@ def test_empty_merker_still_in_ehal_index() -> None:
     }
     ehal = src.build_ehal_index(house, {})
     assert "grid.meter.sens_grid_power_active" in ehal
-    assert ehal["grid.meter.sens_grid_power_active"].merker == ""
-    assert src.build_merker_index(house, {}) == {}
+    assert ehal["grid.meter.sens_grid_power_active"].address == ""
+    assert src.build_address_index(house, {}) == {}
 
 
 def test_pushable_kinds_include_energy_counters() -> None:
@@ -107,7 +107,7 @@ def test_fetch_uses_push_for_all_indexed(
     inbox.record_push("grid.meter.sens_grid_power_active", "2.25", now=now)
     monkeypatch.setattr(
         src,
-        "get_merker_index",
+        "get_address_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
     monkeypatch.setattr(
@@ -132,7 +132,7 @@ def test_fetch_by_ehal_id_without_merker(
     inbox.record_push("heartbeat", "1", now=now)
     inbox.record_push("grid.meter.sens_grid_power_active", "3.0", now=now)
     house = {"plant": {"ehal_bindings": {"sens_grid_power_active": ""}}, "profiles": {}}
-    monkeypatch.setattr(src, "get_merker_index", lambda: src.build_merker_index(house, {}))
+    monkeypatch.setattr(src, "get_address_index", lambda: src.build_merker_index(house, {}))
     monkeypatch.setattr(src, "get_ehal_index", lambda: src.build_ehal_index(house, {}))
     assert loxone_client.fetch_loxone_generic_value(
         "grid.meter.sens_grid_power_active"
@@ -149,7 +149,7 @@ def test_fetch_pushable_qid_reads_inbox_when_binding_index_empty(
     qid = "ess.15_kwh_speicher.sens_ess_soc"
     inbox.record_push("heartbeat", "1", now=now)
     inbox.record_push(qid, "36.0", now=now)
-    monkeypatch.setattr(src, "get_merker_index", lambda: {})
+    monkeypatch.setattr(src, "get_address_index", lambda: {})
     monkeypatch.setattr(src, "get_ehal_index", lambda: {})
     assert loxone_client.fetch_loxone_generic_value(qid) == pytest.approx(36.0)
 
@@ -159,7 +159,7 @@ def test_fetch_setpoint_qid_without_binding_stays_none(
 ) -> None:
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     inbox.reset_memory_for_tests()
-    monkeypatch.setattr(src, "get_merker_index", lambda: {})
+    monkeypatch.setattr(src, "get_address_index", lambda: {})
     monkeypatch.setattr(src, "get_ehal_index", lambda: {})
     assert (
         loxone_client.fetch_loxone_generic_value(
@@ -179,7 +179,7 @@ def test_ready_by_time_uses_push_numeric(
     inbox.record_push("ev.e_auto.get_evcs_ready_by_time", "1735689600", now=now)
     monkeypatch.setattr(
         src,
-        "get_merker_index",
+        "get_address_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
     monkeypatch.setattr(
@@ -202,7 +202,7 @@ def test_ready_by_time_push_text_reaches_wecker_parser(
     inbox.record_push("ev.e_auto.get_evcs_ready_by_time", "Morgen, 07:00", now=now)
     monkeypatch.setattr(
         src,
-        "get_merker_index",
+        "get_address_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
     monkeypatch.setattr(
@@ -227,7 +227,7 @@ def test_ev_nominal_and_capacity_use_inbox_not_merker(
     inbox.record_push("ev.e_auto.sens_evcs_bat_capacity", "77", now=now)
     monkeypatch.setattr(
         src,
-        "get_merker_index",
+        "get_address_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
     monkeypatch.setattr(
@@ -251,7 +251,7 @@ def test_ready_by_time_no_poll_fallback_when_bound(
     inbox.reset_memory_for_tests()
     monkeypatch.setattr(
         src,
-        "get_merker_index",
+        "get_address_index",
         lambda: src.build_merker_index(HOUSE, COMPONENTS),
     )
     monkeypatch.setattr(

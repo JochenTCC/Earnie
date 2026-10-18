@@ -215,21 +215,21 @@ def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
         return None
     try:
         from ehal.loxone_push_source import resolve_push_binding
-        from runtime_store.loxone_push_inbox import read_push_ready_by_time
+        from runtime_store.ehal_push_inbox import read_push_ready_by_time
 
         binding = resolve_push_binding(name)
         ehal_id = binding.ehal_id if binding is not None else name
         value = read_push_ready_by_time(ehal_id)
         if value is None:
             logger.warning(
-                "Loxone push: no ready_by_time for '%s' (%s)",
+                "EHAL push: no ready_by_time for '%s' (%s)",
                 name,
                 ehal_id,
             )
         return value
-    except Exception:  # noqa: BLE001 — no SpecialState10 / Merker poll fallback
+    except Exception:  # noqa: BLE001 — no SpecialState10 / hub poll fallback
         logger.exception(
-            "Loxone push ready_by_time failed for '%s'; poll path removed (Q7)",
+            "EHAL push ready_by_time failed for '%s'; poll path removed (Q7)",
             name,
         )
         return None
@@ -249,12 +249,13 @@ def _looks_like_ehal_id(name: str) -> bool:
 
 
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
-    """Numeric live read from the VO push inbox only (no Merker poll).
+    """Numeric live read from the VO push inbox only (no hub poll).
 
     FertigUm uses ``fetch_loxone_ready_by_time``. Qualified/bare pushable EHAL IDs
     always use the inbox (even when the binding index has no activation key).
-    Non-pushable EHAL IDs (``set_*``) and unbound Merker names → ``None``.
-    ``io_name`` may be a Merker name (resolved via binding index) or a qualified/bare ID.
+    Non-pushable EHAL IDs (``set_*``) and unbound hub addresses → ``None``.
+    Prefer qualified EHAL IDs; legacy hub addresses resolve only when they do
+    not look like an EHAL token (Binding Lx4 / CHOICE_KEEP).
     """
     name = str(io_name or "").strip()
     if not name:
@@ -262,14 +263,14 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
     try:
         from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
         from ehal.qualified_ids import field_kind
-        from runtime_store.loxone_push_inbox import read_push_value
+        from runtime_store.ehal_push_inbox import read_push_value
 
         binding = resolve_push_binding(name)
         if binding is not None:
             value, state = read_push_value(binding.ehal_id)
             if value is None:
                 logger.warning(
-                    "Loxone push: no value for '%s' (%s, state=%s)",
+                    "EHAL push: no value for '%s' (%s, state=%s)",
                     name,
                     binding.ehal_id,
                     state,
@@ -280,20 +281,20 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
                 value, state = read_push_value(name)
                 if value is None:
                     logger.warning(
-                        "Loxone push: no value for unbound '%s' (state=%s)",
+                        "EHAL push: no value for unbound '%s' (state=%s)",
                         name,
                         state,
                     )
                 return value
             return None
         logger.warning(
-            "Loxone push: unbound Merker '%s' (Merker poll removed)",
+            "EHAL push: unbound hub address '%s' (qualified-ID path required)",
             name,
         )
         return None
-    except Exception:  # noqa: BLE001 — never fall back to Merker HTTP
+    except Exception:  # noqa: BLE001 — never fall back to hub HTTP poll
         logger.exception(
-            "Loxone push read failed for '%s'; Merker poll removed", name
+            "EHAL push read failed for '%s'; hub poll removed", name
         )
         return None
 

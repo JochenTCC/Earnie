@@ -273,7 +273,7 @@ def _persist_ha_connection(data: dict, ha: dict, *, adapter_id: str) -> None:
 
 
 def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
-    """Persist HA URL/token to .env (+ backend=ha); mapping stays in ehal_ha_mapping."""
+    """Persist HA URL/token to .env (+ backend=ha); bindings via Signal list."""
     data = load_main_config()
     ehal = _ehal_block(data)
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}

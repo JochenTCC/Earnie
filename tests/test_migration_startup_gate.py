@@ -137,6 +137,41 @@ def test_clean_config_allows_gate(tmp_path, monkeypatch):
     assert not migration_blocks_normal_startup(plan)
 
 
+def test_greenfield_bootstrap_gate_stays_open(tmp_path, monkeypatch):
+    """Empty config + real share minimals → silent dm4 seed, no Migration UI."""
+    from runtime_store.persist_paths import clear_sidecar_path_cache
+
+    repo_root = Path(__file__).resolve().parents[1]
+    config_dir = tmp_path / "config"
+    env_root = tmp_path / "earnie_env"
+    env_root.mkdir()
+    _point_config(monkeypatch, config_dir)
+    monkeypatch.setenv("EARNIE_ENV_PATH", str(env_root))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(env_root / "runtime"))
+    # HA first-start: sidecars co-locate under CONFIG_PATH even when missing.
+    monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+    monkeypatch.chdir(repo_root)
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
+    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    clear_sidecar_path_cache()
+
+    bootstrap.run()
+
+    house = json.loads(
+        (config_dir / "house_profiles.json").read_text(encoding="utf-8")
+    )
+    grid_meter = house.get("plant", {}).get("grid_meter")
+    assert isinstance(grid_meter, dict)
+    assert "at_house_connection" in grid_meter
+    assert "single_tariff" in grid_meter
+
+    plan = plan_for_active_config()
+    assert plan.pending_step_ids == ()
+    assert plan.blockers == ()
+    assert not migration_blocks_normal_startup(plan)
+    assert "dm4.topology" not in plan.pending_step_ids
+
+
 def test_same_model_range_label_avoids_arrow():
     plan = MigrationPlan(
         config_dir="/tmp/x",

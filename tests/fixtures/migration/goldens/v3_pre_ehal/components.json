@@ -19,7 +19,12 @@
                 "expected_cycles": 6000.0,
                 "cycle_cost_fraction": 0.5
             },
-            "ehal_bindings": {},
+            "ehal_bindings": {
+                "ess.5_0_kwh_speicher.sens_ess_soc": "",
+                "ess.5_0_kwh_speicher.set_ess_charge_power_limit": "",
+                "ess.5_0_kwh_speicher.set_ess_discharge_power_limit": "",
+                "ess.5_0_kwh_speicher.set_ess_active_power": ""
+            },
             "inverter_id": "wr_main",
             "regulates_on": "grid"
         },
@@ -39,7 +44,12 @@
             "battery_wear": {
                 "enabled": false
             },
-            "ehal_bindings": {},
+            "ehal_bindings": {
+                "ess.10_kwh_speicher.sens_ess_soc": "",
+                "ess.10_kwh_speicher.set_ess_charge_power_limit": "",
+                "ess.10_kwh_speicher.set_ess_discharge_power_limit": "",
+                "ess.10_kwh_speicher.set_ess_active_power": ""
+            },
             "inverter_id": "wr_main",
             "regulates_on": "grid"
         },
@@ -58,7 +68,12 @@
             "battery_wear": {
                 "enabled": false
             },
-            "ehal_bindings": {},
+            "ehal_bindings": {
+                "ess.5_kwh_speicher.sens_ess_soc": "",
+                "ess.5_kwh_speicher.set_ess_charge_power_limit": "",
+                "ess.5_kwh_speicher.set_ess_discharge_power_limit": "",
+                "ess.5_kwh_speicher.set_ess_active_power": ""
+            },
             "inverter_id": "wr_main",
             "regulates_on": "grid"
         }
@@ -70,7 +85,10 @@
             "kwp": 6.8,
             "pv_tilt": 18.0,
             "pv_azimuth": -154.0,
-            "inverter_id": "wr_main"
+            "inverter_id": "wr_main",
+            "ehal_bindings": {
+                "pv.dach_nord.sens_pv_production_active": ""
+            }
         },
         {
             "id": "dach_sued",
@@ -78,7 +96,10 @@
             "kwp": 5.7,
             "pv_tilt": 18.0,
             "pv_azimuth": 26.0,
-            "inverter_id": "wr_main"
+            "inverter_id": "wr_main",
+            "ehal_bindings": {
+                "pv.dach_sued.sens_pv_production_active": ""
+            }
         }
     ],
     "earnie_data_model": 4,
@@ -90,7 +111,9 @@
             "ac_connection": "grid_tied",
             "control": "full",
             "efficiency": 0.97,
-            "ehal_bindings": {}
+            "ehal_bindings": {
+                "inv.wr_main.set_inv_ac_power_limit": ""
+            }
         }
     ]
 }

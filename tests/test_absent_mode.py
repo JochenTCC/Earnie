@@ -272,21 +272,21 @@ def test_read_ehal_absent_ha(monkeypatch):
     from optimizer import absent_mode
 
     class _Cfg:
-        entities = {"sens_absent_mode": "input_boolean.holiday"}
+        entities = {"sens_absent_mode": ""}
+        push_read_qids = {"sens_absent_mode": "sens_absent_mode"}
+        sign = {}
 
     class _Adapter:
         cfg = _Cfg()
 
-        def read_state(self, entity_id: str) -> dict:
-            assert entity_id == "input_boolean.holiday"
-            return {"state": "on"}
-
     monkeypatch.setattr("integrations.ehal_live.is_ha_backend", lambda: True)
     monkeypatch.setattr("integrations.ehal_live.is_openems_backend", lambda: False)
     monkeypatch.setattr("integrations.ehal_live.get_ha_adapter", lambda: _Adapter())
-    value, bound = absent_mode.read_ehal_absent_mode(
-        _plant_doc("input_boolean.holiday")
+    monkeypatch.setattr(
+        "integrations.ha_push_read.read_push_ehal_value",
+        lambda qid, **_kw: 1.0,
     )
+    value, bound = absent_mode.read_ehal_absent_mode(_plant_doc(""))
     assert bound is True
     assert value is True
 

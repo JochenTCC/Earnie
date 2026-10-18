@@ -326,25 +326,34 @@ class Config:
         return self.is_silent_mode()
 
 
-    def get_ehal_loxone_http_port(self) -> int:
+    def get_ehal_http_port(self) -> int:
+        """Daemon HTTP port; env ``EARNIE_EHAL_HTTP_PORT`` or legacy ``…_LOXONE_…``."""
         from runtime_store.env_vars import read_env
 
-        raw = read_env("EHAL_LOXONE_HTTP_PORT")
+        raw = read_env("EHAL_HTTP_PORT") or read_env("EHAL_LOXONE_HTTP_PORT")
         if raw:
             try:
                 value = int(raw)
             except ValueError as exc:
                 raise ValueError(
-                    "Umgebungsvariable EARNIE_EHAL_LOXONE_HTTP_PORT muss eine "
+                    "Umgebungsvariable EARNIE_EHAL_HTTP_PORT "
+                    "(oder EARNIE_EHAL_LOXONE_HTTP_PORT) muss eine "
                     f"ganze Zahl sein, erhalten: {raw!r}."
                 ) from exc
             if not 1024 <= value <= 65535:
                 raise ValueError(
-                    "Umgebungsvariable EARNIE_EHAL_LOXONE_HTTP_PORT muss "
+                    "Umgebungsvariable EARNIE_EHAL_HTTP_PORT "
+                    "(oder EARNIE_EHAL_LOXONE_HTTP_PORT) muss "
                     "zwischen 1024 und 65535 liegen."
                 )
             return value
-        return int(self.get("EHAL_LOXONE_HTTP_PORT", default=8541))
+        return int(
+            self.get("EHAL_HTTP_PORT", default=self.get("EHAL_LOXONE_HTTP_PORT", default=8541))
+        )
+
+    def get_ehal_loxone_http_port(self) -> int:
+        """Deprecated alias for :meth:`get_ehal_http_port`."""
+        return self.get_ehal_http_port()
 
     def get_ui_fragment_charts_sec(self) -> int:
         return int(self.get("UI_FRAGMENT_REFRESH_CHARTS_SEC", default=60))
@@ -632,8 +641,13 @@ def is_loxone_silent_mode() -> bool:
 
 
 
+def get_ehal_http_port() -> int:
+    return CONFIG.get_ehal_http_port()
+
+
 def get_ehal_loxone_http_port() -> int:
-    return CONFIG.get_ehal_loxone_http_port()
+    """Deprecated alias for :func:`get_ehal_http_port`."""
+    return CONFIG.get_ehal_http_port()
 
 
 def get_ui_fragment_charts_sec() -> int:

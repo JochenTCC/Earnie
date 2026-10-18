@@ -18,7 +18,7 @@ _README = """Earnie Signal-list export (VO / VI)
 
 1. Copy VO_Pilot_*.xml into Loxone Config Virtual Output templates.
 2. Copy VI_Pilot_*.xml into Virtual Input templates.
-3. Replace PILOT_TOKEN_HIER_ERSETZEN in VO addresses with EARNIE_PILOT_PUSH_TOKEN.
+3. Replace PILOT_TOKEN_HIER_ERSETZEN in VO addresses with EARNIE_PUSH_TOKEN.
 4. Wire VO sources to real measurements; VI Checks poll status.json on Earnie.
 
 Mode: {mode}

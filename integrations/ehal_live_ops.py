@@ -255,21 +255,25 @@ def _read_absent_loxone(binding: str) -> bool | None:
 
 
 def _read_absent_ha(binding: str) -> bool | None:
-    from integrations.ehal_live import get_ha_adapter
+    """Read plant absent mode from the push inbox (Binding P5e)."""
+    from integrations.ha_push_read import PushReadError, read_push_ehal_value
     from integrations.loxone_value_parse import parse_binary_value
 
-    entity_id = str(binding or "").strip()
+    del binding  # SB name unused; activation uses qualified EHAL id
+    qid = ABSENT_EHAL_FIELD
+    sign: dict = {}
     try:
+        from integrations.ehal_live import get_ha_adapter
+
         adapter = get_ha_adapter()
+        qid = str((adapter.cfg.push_read_qids or {}).get(ABSENT_EHAL_FIELD) or qid)
+        sign = dict(getattr(adapter.cfg, "sign", {}) or {})
     except Exception:
+        pass
+    try:
+        raw = read_push_ehal_value(qid, sign=sign, adapter_field=ABSENT_EHAL_FIELD)
+    except PushReadError:
         return None
-    mapped = str((adapter.cfg.entities or {}).get(ABSENT_EHAL_FIELD) or "").strip()
-    if mapped:
-        entity_id = mapped
-    if not entity_id:
-        return None
-    state_doc = adapter.read_state(entity_id)
-    raw = state_doc.get("state") if isinstance(state_doc, dict) else state_doc
     return parse_binary_value(raw)
 
 

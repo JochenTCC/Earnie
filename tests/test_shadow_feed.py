@@ -175,14 +175,9 @@ def _patch_ha_superset(monkeypatch, *, adapter, entities: dict[str, str]) -> Non
     assert shadow_feed.is_feed_recording_enabled()
 
 
-def test_superset_ha_fetches_missing(tmp_path, monkeypatch):
+def test_superset_ha_is_noop(tmp_path, monkeypatch):
+    """HA shadow superset is a no-op (Binding P5e push-only; no REST pull)."""
     _enable_feed(tmp_path, monkeypatch)
-    record_transport(
-        "ha:get:/api/states/sensor.soc",
-        ok=True,
-        payload={"state": "50"},
-        status=200,
-    )
     adapter = MagicMock()
     adapter.read_state = MagicMock(return_value={"state": "100", "attributes": {}})
     _patch_ha_superset(
@@ -193,11 +188,8 @@ def test_superset_ha_fetches_missing(tmp_path, monkeypatch):
             "sens_grid_power_active": "sensor.grid",
         },
     )
-
     run_after_cycle(budget_sec=5)
-    called_ids = [c.args[0] for c in adapter.read_state.call_args_list]
-    assert "sensor.grid" in called_ids
-    assert "sensor.soc" not in called_ids
+    adapter.read_state.assert_not_called()
 
 
 def test_superset_loxone_is_noop(tmp_path, monkeypatch):
@@ -255,26 +247,6 @@ def test_meta_omits_loxone_feed_when_backend_ha(tmp_path, monkeypatch):
     shadow_feed.flush_after_cycle()
     meta = json.loads((feed_path / "meta.json").read_text(encoding="utf-8"))
     assert "loxone_feed" not in meta
-
-
-def test_superset_budget_stops_early(tmp_path, monkeypatch):
-    _enable_feed(tmp_path, monkeypatch)
-    house_bindings = {f"sensor.e{i}": f"sensor.e{i}" for i in range(20)}
-    calls: list[str] = []
-    clock = {"t": 1000.0}
-
-    class BudgetAdapter:
-        def read_state(self, entity_id):
-            calls.append(entity_id)
-            clock["t"] += 0.05
-            return {"state": "1"}
-
-    import runtime_store.shadow.superset as superset_mod
-
-    monkeypatch.setattr(superset_mod.time, "monotonic", lambda: clock["t"])
-    _patch_ha_superset(monkeypatch, adapter=BudgetAdapter(), entities=house_bindings)
-    run_after_cycle(budget_sec=0.12)
-    assert 0 < len(calls) < 20
 
 
 def test_packaging_trees_lack_earnie_shadow():

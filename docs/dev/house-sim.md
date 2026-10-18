@@ -1,16 +1,29 @@
 # House simulator (`house_sim/`) — HouseSim S1–S4
 
-**Status:** current (Energy-Optimizer **2.6.a** / HouseSim S1; bindings **2.6.g** entity-scoped; **HouseSim S4** custom integration)  
-**Purpose:** Fixture-based house physics for HA binding tests — as a **mock REST** bench (S1) and optionally as a real HA custom integration (S4).
+**Status:** current (Energy-Optimizer **2.6.a** / HouseSim S1; bindings **2.6.g** entity-scoped; **HouseSim S4** custom integration; **Binding P5d** contract push harness)  
+**Purpose:** Fixture-based house physics for HA binding tests — as a **mock REST** bench (S1), a **contract push** harness (P5d), and optionally as a real HA custom integration (S4).
 
 ## What this is (and is not)
 
 | Mode | What it is |
 | --- | --- |
-| **S1 mock** (`python -m house_sim`) | A **mock for Home Assistant REST**, not a running HAOS. Implements the few endpoints `HaAdapter` needs. |
+| **S1 mock** (`python -m house_sim --mode fixture`) | A **mock for Home Assistant REST**, not a running HAOS. Implements the few endpoints `HaAdapter` needs (Mode A goldens). |
+| **Contract push** (`python -m house_sim --mode contract`) | **Binding P5d:** entities from Earnie activated keys; periodic push to `/ehal/telemetry/…` and `status.json` setpoints. No `entity_id` stored in Earnie bindings. |
 | **S4 integration** (`earnie_house_sim`) | A **custom integration** inside a real HAOS (Synology dogfood or `ha_lab/haos-docker`). Native `sensor` / `number` / `switch` entities; Earnie talks plain HA REST. Production Earnie code unchanged. |
 
 **Not the same as:** [`ha-lab-setup.md`](ha-lab-setup.md) / `ha_lab/` (Compose Earnie+HAOS+evcc = "HA Lab"). Do not put this simulator under `ha_lab/`. Simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4").
+
+### Contract mode vs Mode A goldens
+
+| | **Contract mode (P5d)** | **Mode A goldens (S1/S2)** |
+| --- | --- | --- |
+| Entity source | Activated `ehal_bindings` keys from a pack (or minimal test pack) | Hand-authored `fixtures/<name>/entities.json` + `ehal.ha.entities.json` |
+| HA `entity_id` | Deterministic `sensor.earnie_<slug>` / `number.earnie_<slug>` | Vendor-like ids (`sensor.evcc_…`, …) |
+| Earnie bindings | Keys only (empty values) — **no** stored `entity_id` | Golden map merges field→entity into bindings (pull path) |
+| Transport | Push to Earnie inbox + poll `status.json` | REST pull via `HaAdapter` (retired for P5 gate; pull removal = **P5e**) |
+| Vendor fixtures | Deferred — not required for the P5 gate | `evcc_en`, `fronius_de`, `huawei_en`, `sma_keba` |
+
+Code: `house_sim/contract.py`, `house_sim/push_harness.py`. YAML placeholder fill for tests: `fill_yaml_placeholders` / `fill_carrier_yaml_for_contract`.
 
 **Concept (German):** [Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) §5 S4.
 
@@ -21,8 +34,10 @@
 ```text
 house_sim/
   core/                 # pure Python (no HA, no Earnie imports)
-  fixtures/<name>/      # archetypes (single source)
-  mock_rest.py          # S1 HTTP mock
+  fixtures/<name>/      # archetypes (single source) — Mode A goldens
+  mock_rest.py          # S1 HTTP mock (pull bench)
+  contract.py           # P5d: entities from activated keys
+  push_harness.py       # P5d: push client + status.json apply
   stepper.py            # S1 adapter: StateStore → core setpoints
   ha_integration/
     custom_components/earnie_house_sim/
@@ -67,20 +82,40 @@ Token constant: `house_sim.mock_rest.DEFAULT_BENCH_TOKEN`.
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
-.venv\Scripts\python.exe -m house_sim --fixture evcc_en --port 8124
+.venv\Scripts\python.exe -m house_sim --mode fixture --fixture evcc_en --port 8124
 ```
 
 Closed-loop ticks without a long-lived server:
 
 ```powershell
-.venv\Scripts\python.exe -m house_sim --fixture evcc_en --ticks 3 --dt-h 0.25
+.venv\Scripts\python.exe -m house_sim --mode fixture --fixture evcc_en --ticks 3 --dt-h 0.25
 ```
 
-### Pytest (S1 + core + packaging)
+### Contract mode (Binding P5d)
+
+Start Earnie with push token (`EARNIE_PILOT_PUSH_TOKEN`) and daemon HTTP on **8541**, then:
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
+$env:EARNIE_PILOT_PUSH_TOKEN='your-token'
+.venv\Scripts\python.exe -m house_sim --mode contract --earnie-url http://127.0.0.1:8541 --interval 10
+```
+
+One-shot smoke (N cycles then exit):
+
+```powershell
+.venv\Scripts\python.exe -m house_sim --mode contract --token your-token --cycles 1
+```
+
+Default pack is the minimal activated-key fixture in `house_sim.contract.minimal_contract_docs` (plant grid/PV + house battery). Entity ids are local to HouseSim; Earnie bindings stay empty.
+
+### Pytest (S1 + core + packaging + contract)
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
 .venv\Scripts\python.exe -m scripts.run_pytest `
+  tests/test_house_sim_contract.py `
+  tests/test_ha_carrier_yaml_gen.py `
   tests/test_house_sim_mock_rest.py `
   tests/test_house_sim_stepper.py `
   tests/test_house_sim_ha_adapter_loop.py `
@@ -89,6 +124,8 @@ $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'
   tests/test_house_sim_s2_archetypes.py `
   tests/test_ha_adapter.py -q --tb=short
 ```
+
+`tests/test_house_sim_ha_adapter_loop.py` is skipped until **Binding P5e** removes pull (`reason: Binding P5d: pull retired pending P5e`). Prefer `tests/test_house_sim_contract.py` for the push path.
 
 ---
 

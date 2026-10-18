@@ -16,7 +16,9 @@ from runtime_store import loxone_push_inbox as inbox
 def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     monkeypatch.delenv(http_mod.PUSH_TOKEN_ENV, raising=False)
+    monkeypatch.delenv(http_mod.PUSH_TOKEN_ENV_LEGACY, raising=False)
     monkeypatch.delenv(inbox.REPEAT_ENV, raising=False)
+    monkeypatch.delenv(inbox.REPEAT_ENV_LEGACY, raising=False)
     inbox.reset_memory_for_tests()
     http_mod.stop_loxone_request_http()
     yield

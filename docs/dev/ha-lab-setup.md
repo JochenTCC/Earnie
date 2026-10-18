@@ -1,9 +1,9 @@
 # HA + evcc lab setup — Earnie ↔ Home Assistant
 
 **Status:** current  
-**Purpose:** Bring up and configure the **combined** Compose stack (`earnie` + `homeassistant` + `evcc`) so you can prove Earnie talks to Home Assistant over **REST only** (EHAL / DACH path A2; backlog history **2.4.c**).
+**Purpose:** Bring up and configure the **combined** Compose stack (`earnie` + `homeassistant` + `evcc`) so you can prove Earnie talks to Home Assistant over the **push HTTP contract** (HA → Earnie telemetry on **:8541**, HA polls `status.json` for setpoints). REST pull of `/api/states` for live I/O is **removed**.
 
-**Audience:** Operator of the lab on a Dev-PC or Pi. Containers may already be running; this guide finishes **HA onboarding**, **token**, **evcc**, **Earnie HA Anbindung** (`.env` + entity-scoped bindings), and a **communication check**.
+**Audience:** Operator of the lab on a Dev-PC or Pi. Containers may already be running; this guide finishes **HA onboarding**, **token**, **evcc**, **Earnie HA Anbindung** (`.env` + activated signals + carrier YAML), and a **communication check**.
 
 **German user overview (A2 vs B):** [`docs/einrichtung/ha-evcc.md`](../einrichtung/ha-evcc.md)
 
@@ -12,9 +12,10 @@
 | Doc | Role |
 | --- | --- |
 | [`docker/compose/ha-lab.yml`](../../docker/compose/ha-lab.yml) | Reference Compose |
-| [`ehal.md`](../referenz/ehal.md) | Frozen EHAL contract + HA adapter notes |
-| [`house-sim.md`](house-sim.md) | HouseSim S1 mock REST + S4 HA integration (`house_sim/`, not this Compose stack); open: S2→S3→**2.6.e** |
-| [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) | Config fragment to merge into Earnie `config.json` |
+| [`ehal.md`](../referenz/ehal.md) | Frozen EHAL contract + HA push notes |
+| [`ehal-com.md`](../ui/ehal-com.md) | Signalliste + HA YAML download |
+| [`house-sim.md`](house-sim.md) | HouseSim contract / push harness (`house_sim/`, not this Compose stack) |
+| [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) | Config fragment to merge into Earnie `config.json` (no `transport`) |
 | [`ha_lab/evcc/evcc.yaml`](../../ha_lab/evcc/evcc.yaml) | Committed lab stub (const meters / demo charger) |
 | [`ha_lab/evcc/evcc.example.yaml`](../../ha_lab/evcc/evcc.example.yaml) | Commented Earnie-mode template |
 | [`openems-lab-setup.md`](openems-lab-setup.md) | Sibling Path C (OpenEMS) — config-switch peer |
@@ -23,11 +24,12 @@
 
 ## Goal (done when)
 
-1. Host can open HA UI on **:8123**, finish onboarding, and call `GET /api/` with a **Long-Lived Access Token**.
-2. Earnie container resolves `http://homeassistant:8123` and authenticates with the same token.
-3. At least required EHAL telemetry entities exist in HA (`sensor`/`number`…) and are mapped in Earnie.
-4. Live cycle with `ehal.backend=ha` logs a successful SoC read (not “Kein Zugriff auf EHAL SoC”).
-5. Optional write path: ESS / EVCS setpoints via HA services when silent mode is **off**; failed writes degrade capabilities + `runtime/ehal_write_error.json`.
+1. Host can open HA UI on **:8123**, finish onboarding, and create a **Long-Lived Access Token** (still useful for HA Developer tools / optional Earnie `.env`).
+2. Earnie listens on **:8541** with `EARNIE_PILOT_PUSH_TOKEN` set; HA can reach that port (Compose service name or host).
+3. Required EHAL signals are **activated** (Hauskonfigurator / migration); HA helpers or evcc entities exist for those fields.
+4. Carrier YAML is generated, `ENTITY_*` placeholders filled, package loaded in HA; periodic push reaches Earnie.
+5. Live cycle with `ehal.backend=ha` shows SoC / powers in EHAL-Com **Live-Lesen** (push inbox — not “Kein Zugriff auf EHAL SoC”).
+6. Optional write path: setpoints appear in `GET /ehal/status.json`; HA automations apply them when silent mode is **off**.
 
 ---
 
@@ -35,21 +37,22 @@
 
 ```text
 Browser ──► :8506 ──► earnie-ha-lab (Streamlit + main.py)
+                              ▲
+                              │ :8541  GET /ehal/telemetry/<qid>/<v>   (HA rest_command)
+                              │ :8541  GET /ehal/status.json          (HA REST sensor / poll)
                               │
-                              │ Docker DNS: http://homeassistant:8123
-                              │ Authorization: Bearer <LLAT>
-                              ▼
-Host/PC ──► :8123 ──► homeassistant (REST /api/states, /api/services)
+Host/PC ──► :8123 ──► homeassistant  (entities + generated earnie_ha_carrier.yaml)
                               ▲
                               │ entities (MQTT discovery / HA integration / helpers)
 Host/PC ──► :7070 ──► evcc (device I/O sidecar — not Earnie’s API target)
 ```
 
-| Audience | Home Assistant REST base URL |
-| --- | --- |
-| Earnie **inside** Compose | `http://homeassistant:8123` (service name — **not** `localhost`) |
-| curl / browser on the **Docker host** | `http://localhost:8123` (or LAN IP of the lab host) |
-| Another PC on the LAN | `http://<lab-host-lan-ip>:8123` |
+| Audience | Earnie daemon HTTP (push) | Optional HA REST (credentials / Dev tools) |
+| --- | --- | --- |
+| HA **inside** Compose → Earnie | `http://earnie-ha-lab:8541` | Earnie `.env` may still hold `EHAL_HA_BASE_URL=http://homeassistant:8123` |
+| HA on host → Earnie on host | `http://localhost:8541` (or LAN IP) | `http://localhost:8123` |
+| curl / browser on the **Docker host** | Earnie UI `:8506`, daemon `:8541`, HA `:8123` | — |
+| Another PC on the LAN | `http://<lab-host-lan-ip>:8541` | `http://<lab-host-lan-ip>:8123` |
 
 **Volumes (bind mounts from repo root):**
 
@@ -69,7 +72,7 @@ If `ha_lab/config` only contains `.gitkeep`, Earnie has **no** `ehal` block yet 
 ## 0. Prerequisites and first start
 
 - Docker Desktop / Engine with Compose v2
-- Free host ports **8506**, **8123**, **7070** (see [`streamlit-ports.md`](streamlit-ports.md))
+- Free host ports **8506**, **8541**, **8123**, **7070** (see [`streamlit-ports.md`](streamlit-ports.md))
 - Stop stacks that collide on those ports (OpenEMS lab uses **8503**; prod often **8501**)
 
 From **repo root**:
@@ -151,11 +154,12 @@ Connection refused → HA not ready or wrong port.
 
 ### 2.3 Where Earnie stores the token
 
-- Prefer Streamlit **Daemon Control → Smarthome-Backend** for `ehal.backend=ha` + URL/token (writes `EHAL_HA_*` into `config/.env`; optional `sign` stays in `config.json` → `ehal.ha`).
-- Entity mapping: **EHAL-Com → HA Entity → EHAL Mapping** (writes entity-scoped `plant` / `consumers[].ehal_bindings` into `house_profiles.json`).
-- Or merge [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) for `backend` / `adapter_id` / `sign` only — the snippet has **no** `token` / `base_url` keys after **2.6.i**.
+- Prefer Streamlit **Daemon Control → Smarthome-Backend** for `ehal.backend=ha` + URL/token (writes `EHAL_HA_*` into `config/.env`; optional `sign` stays in `config.json` → `ehal.ha`). Do **not** set `ehal.ha.transport` (removed).
+- Activate signals via the Hauskonfigurator (required keys) and the EHAL-Com **Signalliste** (optional toggles). Earnie stores empty activation flags — no HA `entity_id`.
+- Download / generate the **HA YAML package** (§5) and bind real entities in HA by replacing `ENTITY_*`.
+- Or merge [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) for `backend` / `adapter_id` / `sign` only — the snippet has **no** `token` / `base_url` / `transport` keys.
 
-Treat `config/.env` as secret-bearing. Do not commit lab tokens.
+Treat `config/.env` as secret-bearing. Do not commit lab tokens (`EARNIE_PILOT_PUSH_TOKEN`, `EHAL_HA_TOKEN`).
 
 ---
 
@@ -188,16 +192,16 @@ Open http://localhost:7070 — UI should load; fix YAML errors from the logs if 
 
 ### 3.3 Path A — Dry-run without hardware (HA helpers)
 
-Use this to prove Earnie ↔ HA REST **before** wiring real devices:
+Use this to prove Earnie ↔ HA **push** **before** wiring real devices:
 
 1. In HA: **Settings → Devices & services → Helpers** (or YAML `input_number` / `sensor` templates).
-2. Create helpers that cover M1 fields, for example:
+2. Create helpers that cover required reads / writes, for example:
    - `sensor` or template sensors: grid W, PV W, battery SoC %, optional battery power W, EVCS power W  
    - `input_number` / `number`: charge limit W, discharge limit W, EVCS max current A
 3. Skip evcc entity exposure for this path (evcc stub can keep running idle).
-4. Map those `entity_id`s in the Earnie HITL UI (§5).
+4. Activate the matching EHAL signals in Earnie, generate the carrier YAML (§5), and put the helper `entity_id`s into the `ENTITY_*` placeholders.
 
-Sign convention in EHAL: `sens_grid_power_active` **+** = import; `sens_ess_power` **+** = discharge. If a helper uses the opposite sign, set mapping **sign** to `negate` for that field (`ehal.ha.sign`).
+Sign convention in EHAL: `sens_grid_power_active` **+** = import; `sens_ess_power` **+** = discharge. Prefer helpers that already match; otherwise adjust the Jinja / entity choice in the package (Earnie does not pull HA units at runtime).
 
 ### 3.4 Path B — Lab stub / templates in `evcc.yaml`
 
@@ -282,21 +286,22 @@ HACS: copy upstream `custom_components/evcc_intg` into that same tree yourself.
      `entity_id`s**; do not assume the placeholders in
      [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json).
 
-6. **Map in Earnie (§5 / §5.1)**
+6. **Wire into the carrier YAML (§5 / §5.1)**
    - Prefer stable entities that survive HA/evcc restarts.
    - Reads: grid W, PV W, SoC % (required); ESS power / EVCS power optional.
    - Writes (if present): charge/discharge limits, loadpoint max current.
-   - Sign: EHAL grid **+** = import, ESS **+** = discharge; use mapping **negate**
-     if the integration’s sign differs.
-   - When the integration is already green: follow **§5.1** (copy IDs → HITL →
-     accept table).
+   - Sign: EHAL grid **+** = import, ESS **+** = discharge; choose entities / Jinja
+     so the pushed value matches.
+   - When the integration is already green: follow **§5.1** (copy IDs → YAML
+     placeholders → accept table).
 
 7. **Earnie-mode cautions**
-   - Do **not** use HA automations that write the same setpoint entities Earnie owns.
+   - Do **not** use HA automations that write the same setpoint entities Earnie owns
+     (except the generated carrier setpoint automations).
    - Keep evcc loadpoint mode compatible with external max-current (§3.4 / §3.6) —
      no competing surplus / smart-cost planner.
-   - This option still keeps Earnie → **HA REST only**; Earnie must not call the
-     evcc API directly.
+   - Live path is HA → Earnie **push** on **:8541** plus HA poll of `status.json`;
+     Earnie must not call the evcc API directly.
 
 8. **If discovery fails**
    - From the HA network: reachability check to `http://evcc:7070` inside the
@@ -341,56 +346,43 @@ Expect on the host:
 
 Either:
 
-1. **UI (preferred):** **Smarthome-Backend** for `ehal.backend=ha` + URL/token → `config/.env`; §5 mapping expander for entity-scoped entity IDs (`plant` / `consumers[].ehal_bindings`) and optional `ehal.ha.sign`.
-2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json` (backend + `sign` only). Put URL/token into `ha_lab/config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`). Put entity IDs into `house_profiles.json` entity-scoped maps — do **not** refill flat `ehal.ha.entities` for new labs (legacy map is one-shot migrated). Fixture golden maps under `house_sim/fixtures/*/ehal.ha.entities.json` are still the field→entity source for the mock bench; merge those keys into plant/consumer bindings when wiring Earnie.
+1. **UI (preferred):** **Smarthome-Backend** for `ehal.backend=ha` + URL/token → `config/.env`; optional `ehal.ha.sign`. Activate components in the Hauskonfigurator so required EHAL keys exist.
+2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json` (backend + `sign` only — **no** `transport`). Put URL/token and `EARNIE_PILOT_PUSH_TOKEN` into `ha_lab/config/.env`. Do **not** store HA `entity_id`s in Earnie bindings (activation keys only).
 
-Inside Compose, `EHAL_HA_BASE_URL` **must** be:
+Inside Compose, if `EHAL_HA_*` is set, `EHAL_HA_BASE_URL` is typically:
 
 ```text
 http://homeassistant:8123
 ```
 
-If Earnie runs on the **host** venv against lab HA, use `http://localhost:8123` (or LAN IP) instead.
-
-Silent gate: `loxone_silent_mode` also blocks HA setpoint writes (same as OpenEMS). Turn silent **off** only when you intend to write.
+Silent gate: `loxone_silent_mode` also blocks HA setpoint publish (same as OpenEMS). Turn silent **off** only when you intend to write.
 
 ---
 
-## 5. Entity → EHAL mapping (HITL)
+## 5. Push carrier YAML (lab path)
 
-1. Open Earnie: http://localhost:8506  
-2. Navigate to **EHAL-Com** (Smarthome / debug page).  
-3. Expand **HA Entity → EHAL Mapping**.  
-4. Paste **URL** + **Long-Lived Access Token** (prefilled from config if already saved).  
-5. **Entities scannen** — lists `sensor` / `number` / `select` / `input_number`.  
-6. Assign fields:
+Live I/O is **push-only**. There is no HA entity-mapping UI on EHAL-Com.
 
-| EHAL field | Required | Typical domain |
-| --- | --- | --- |
-| `sens_grid_power_active` | yes | `sensor` (W; or kW → adapter converts) |
-| `sens_pv_production_active` | yes | `sensor` |
-| `ess.{id}.sens_ess_soc` | Live yes | `sensor` (%) — entity-scoped; not on plant telemetry doc |
-| `sens_ess_power` | no | `sensor` |
-| `sens_evcs_active_power` | no | `sensor` |
-| `get_ess_soc_min` / `get_ess_soc_max` | no | `sensor` / `number` (%) — device cut-offs when `limits_from_live` (2.7.j) |
-| `get_ess_max_charge_power` / `get_ess_max_discharge_power` | no | `sensor` / `number` (W or kW → adapter) — device ceilings (2.7.j); may reuse the same entities as the set limits when the integration exposes R/W numbers |
-| `set_ess_charge_power_limit` | no* | `number` / `input_number` |
-| `set_ess_discharge_power_limit` | no* | `number` / `input_number` |
-| `set_evcs_max_current` | no* | `number` (A) |
+1. Ensure Earnie listens on **`system.ehal_loxone_http_port`** (default **8541**) and `EARNIE_PILOT_PUSH_TOKEN` is set in `ha_lab/config/.env`.
+2. Confirm required signals are activated (Signalliste: Pflicht = ja, aktiviert = ja). Toggle optional signals as needed.
+3. Generate the carrier package (UI: **EHAL-Com → HA Push-Carrier → YAML-Paket**, or CLI):
 
-\*Needed for write capabilities; omit → capability stays false / writes skipped.
+```powershell
+.venv\Scripts\python.exe -m scripts.ha_carrier_yaml_gen --config-dir ha_lab\config --host earnie-ha-lab --port 8541 --out ha_lab\homeassistant\packages\earnie_ha_carrier.yaml
+```
 
-7. Set **sign** `ehal` vs `negate` for grid / ESS power if needed (`ehal.ha.sign` in `config.json`).  
-8. **Telemetrie testen** → expect validated JSON (SoC, powers).  
-9. **Mapping speichern** → writes that entity’s bindings into `plant` / `consumers[].ehal_bindings` in `house_profiles.json` (entity-scoped; legacy flat `ehal.ha.entities` is migrated once and cleared) and reloads runtime config.
+4. In the YAML, replace every `ENTITY_*` placeholder with a real HA `entity_id` (helpers Path A, or marq24/evcc entities §5.1). Keep the generated **periodic** automations (`time_pattern` = repeat interval, default **10 s**) — do not switch them to “on change only” (silent power would be assumed 0 while the heartbeat is fresh; energy is never assumed 0).
+5. Load the package in HA (`packages:` / include) and restart HA if needed. Jinja already converts W/kW/MW → W and Wh/kWh/MWh → kWh before the push URL.
+6. **Read check:** values appear in EHAL-Com **Live-Lesen** (inbox age / push state).
+7. **Write check:** with silent mode off, setpoints land in `GET /ehal/status.json`; Schreibtest success = published ledger + HA fetched status.json (`published_fetched_at`). `ha_ess_force` is emitted as YAML setpoint automation(s) when configured.
 
-LLM-assisted proposals are **not** in the shipping UI (optional Ollama code may exist in `integrations/` for later re-integration).
+Cadence details: [`loxone-signals.md` § push cadence](../referenz/loxone-signals.md#push-cadence-sb-neutral). Contract overview: [`ehal.md`](../referenz/ehal.md) § Home Assistant.
 
 ### 5.1 After marq24 ha-evcc is connected (lab follow-up)
 
 Use this when HACS + **evcc☀️🚘- Solar Charging** are already installed and the
 integration reaches `http://evcc:7070` (§3.5 Option 2). Goal: stable HA
-`sensor`/`number` entities mapped in Earnie (Path A helpers smoke is **not**
+`sensor`/`number` entities wired into the **carrier YAML** (Path A helpers smoke is **not**
 enough for this follow-up).
 
 **A — Copy exact `entity_id`s from HA**
@@ -415,29 +407,22 @@ enough for this follow-up).
 | Max charge current | `number` | loadpoint max current (A) — write path |
 | Battery charge/discharge limits | `number` | only if the integration exposes them |
 
-[`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) shows **example**
-IDs only (`sensor.evcc_grid_power`, …).
+**B — Wire into the YAML package (§5)**
 
-**B — Map in Earnie HITL (§5 steps 1–9)**
-
-1. Earnie http://localhost:8506 → **EHAL-Com** → **HA Entity → EHAL Mapping**.
-2. URL inside Compose: `http://homeassistant:8123` + LLAT (§2).
-3. **Entities scannen** → assign at least the three required reads
-   (`sens_grid_power_active`, `sens_pv_production_active`, and `ess.{id}.sens_ess_soc` on the battery).
-4. Optional: `sens_ess_power`, `sens_evcs_active_power`, `set_evcs_max_current` (and ESS
-   limit numbers if present).
-5. Sign: EHAL grid **+** = import, ESS **+** = discharge. If marq24 uses the
-   opposite convention, set that field to **negate**.
-6. **Telemetrie testen** → SoC ~50 and powers ~0 with the lab stub is **OK**.
-7. **Mapping speichern**.
+1. Earnie http://localhost:8506 → **EHAL-Com** → activate required signals → download / regenerate YAML.
+2. Host for Compose HA → Earnie: `earnie-ha-lab`, port **8541**, plus the push token.
+3. Replace `ENTITY_*` for at least the required reads (`sens_grid_power_active`, `sens_pv_production_active`, `ess.{id}.sens_ess_soc`).
+4. Optional: power, EVCS current, ESS limit numbers if present.
+5. Sign: EHAL grid **+** = import, ESS **+** = discharge — pick entities / Jinja so the pushed value matches.
+6. Reload HA package → Live-Lesen shows SoC ~50 and powers ~0 with the lab stub.
 
 **C — Accept (follow-up done)**
 
 | Check | Pass |
 | --- | --- |
-| HA States shows mapped `entity_id`s | yes |
-| HITL **Telemetrie testen** returns SoC (+ powers) | yes |
-| `ha_lab/config/config.json` has `ehal.backend=ha`; entity IDs in `house_profiles.json` entity-scoped bindings | yes |
+| HA States shows the entities used in `ENTITY_*` | yes |
+| Periodic push reaches Earnie (Live-Lesen OK / push state) | yes |
+| `ha_lab/config/config.json` has `ehal.backend=ha`; **no** `ehal.ha.transport` | yes |
 | Live / logs: no “Kein Zugriff auf EHAL SoC” (§6.3) | yes |
 | Optimizer exclusivity still true (§3.6) | yes |
 
@@ -448,7 +433,15 @@ until you intentionally test writes (§6.4).
 
 ## 6. Communication check
 
-### 6.1 Host → HA API
+### 6.1 Host → Earnie daemon (push)
+
+```powershell
+$token = "<EARNIE_PILOT_PUSH_TOKEN>"
+Invoke-RestMethod -Uri "http://localhost:8541/ehal/telemetry/heartbeat/1?t=$token"
+Invoke-RestMethod -Uri "http://localhost:8541/ehal/status.json?t=$token"
+```
+
+### 6.2 Host → HA API (optional Dev tools)
 
 ```powershell
 $token = "<LLAT>"
@@ -456,30 +449,17 @@ Invoke-RestMethod -Uri "http://localhost:8123/api/" -Headers @{ Authorization = 
 Invoke-RestMethod -Uri "http://localhost:8123/api/states/sensor.YOUR_SOC_ENTITY" -Headers @{ Authorization = "Bearer $token" }
 ```
 
-### 6.2 Earnie container → HA (Docker DNS)
-
-```powershell
-docker exec earnie-ha-lab python -c "import os,requests; t=os.environ.get('TOKEN',''); print('set TOKEN');"
-```
-
-Prefer a one-off with the token from config, or from the host:
-
-```powershell
-docker exec earnie-ha-lab wget -qO- --header="Authorization: Bearer <LLAT>" http://homeassistant:8123/api/
-```
-
-(If `wget` is missing, use Python `requests` inside the container the same way.)
-
 ### 6.3 Earnie Live
 
-1. Confirm `ehal.backend` is `ha` in `ha_lab/config/config.json`.  
+1. Confirm `ehal.backend` is `ha` in `ha_lab/config/config.json` and `ehal.ha.transport` is absent.  
 2. Watch logs: `docker logs earnie-ha-lab --tail 100 -f`  
-3. Expect SoC / live power without “Kein Zugriff auf EHAL SoC”.  
-4. With silent mode **off**, a cycle may write ESS/EVCS setpoints; failures → Streamlit EHAL write-error banner + `ha_lab/runtime/ehal_write_error.json`.
+3. Expect SoC / live power in Live-Lesen from the push inbox (no “Kein Zugriff auf EHAL SoC”).  
+4. With silent mode **off**, a cycle publishes ESS/EVCS setpoints to `status.json`; HA automations apply them. Failures → Streamlit EHAL write-error banner + `ha_lab/runtime/ehal_write_error.json`.
 
-### 6.4 Negative write test
+### 6.4 Negative write / cadence test
 
-Map a read-only `sensor` as a setpoint entity (or revoke token write rights) → expect HTTP error, `supports_ess_write` / `supports_evcs_current` flipped false, write-error document persisted — same degrade path as OpenEMS.
+- Point a setpoint automation at a read-only entity (or break the service call) → expect write-error document / failed apply — same degrade path as OpenEMS.
+- Stop periodic push for a power signal while heartbeat stays fresh → Live-Lesen shows assumed **0** (`0 angenommen (verstummt)`). Energy counters must not invent 0 when silent.
 
 ---
 
@@ -501,26 +481,9 @@ Bind mounts (`ha_lab/…`) are kept. To factory-reset HA only, remove files unde
 
 ---
 
-## 9. Push transport (telemetry + status.json) — optional after 2.7.r
-
-Default lab path remains **`ehal.ha.transport=pull`** (§5–§6). For the Loxone-like HTTP contract:
-
-1. Set `"transport": "push"` under `ehal.ha` in `ha_lab/config/config.json` (see [`ehal.md`](../referenz/ehal.md) § Home Assistant).
-2. Ensure Earnie listens on **`system.ehal_loxone_http_port`** (default **8541**) and `EARNIE_PILOT_PUSH_TOKEN` is set in `ha_lab/config/.env` (same rules as Loxone pilot push).
-3. Generate a carrier fragment from current bindings:
-   ```powershell
-   .venv\Scripts\python.exe -m scripts.ha_carrier_yaml_gen --config-dir ha_lab\config --host earnie-ha-lab --port 8541 --out ha_lab\homeassistant\earnie_push.yaml
-   ```
-   Merge `rest_command` + `sensor` blocks into HA `configuration.yaml` (or packages). **Convert entity units to canonical EHAL units in Jinja before calling** `/ehal/telemetry/<qualified-id>/<value>`.
-4. Map bindings in EHAL-Com (entity IDs still document the HA side; push-only activation may leave entity_id empty).
-5. **Read check:** push values appear in EHAL-Com Live-Lesen (inbox age / push state, not `/api/states` for activated fields).
-6. **Write check:** with silent mode off, setpoints land in `GET /ehal/status.json`; Schreibtest success = published ledger + HA (or test client) fetched status.json (`published_fetched_at`). Huawei `ha_ess_force` stays on REST services when configured.
-
----
-
 ## Out of scope here
 
-- HA WebSocket state subscription (REST poll only)
+- HA WebSocket state subscription
 - Direct evcc REST/MQTT adapter from Earnie (lab-only option deferred)
-- LLM-assisted mapping in the shipping UI (optional Ollama helpers may exist off-UI)
-- Production Path B hardening beyond “point Earnie at existing HA URL + mapping UI”
+- REST pull / HITL entity-mapping UI (removed)
+- Shipping the YAML package inside the HA add-on image (tracked for Add-on 1.0 in the separate [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) repo; lab uses download / CLI gen)

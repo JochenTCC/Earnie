@@ -135,7 +135,7 @@ def assert_writes_allowed() -> None:
 
 
 def mapped_write_targets() -> dict[str, str]:
-    """Live-write field id → backend address (entity / Merker / channel label)."""
+    """Live-write field id → backend address (entity / qualified ID / channel)."""
     if ehal_live.is_ha_backend():
         return _ha_mapped_targets()
     if ehal_live.is_openems_backend():
@@ -166,7 +166,7 @@ def write_probes(
     max_power_kw: float | None = None,
     ev_nominal_a: float | None = None,
 ) -> tuple[EhalWriteError | None, dict[str, Any]]:
-    """Write clamped probes (adapter + entity-scoped / flex Merker paths)."""
+    """Write clamped probes (adapter + entity-scoped / flex qualified-ID paths)."""
     assert_writes_allowed()
     if max_power_kw is None:
         max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)

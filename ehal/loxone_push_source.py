@@ -1,8 +1,9 @@
-"""Loxone VO push binding index (push-only for pushable fields).
+"""Push binding index (push-only for pushable fields).
 
 Pushable ``sens_*`` / ``get_*`` (including meter energy counters) always read
 from the inbox. Legacy ``ehal.loxone_push.entities`` is tolerated in config but
-unused.
+unused. ``BindingSource.address`` may hold a legacy hub address (Loxone Merker
+name) for CHOICE_KEEP packs; the wire path is always ``ehal_id``.
 """
 from __future__ import annotations
 
@@ -20,13 +21,22 @@ NEVER_PUSH_KINDS: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
-class MerkerBinding:
-    """One pushable EHAL ID, optionally still keyed by a legacy Merker name."""
+class BindingSource:
+    """One pushable EHAL ID, optionally still keyed by a legacy hub address."""
 
-    merker: str
+    address: str
     ehal_id: str
     entity_key: str
     kind: str
+
+    @property
+    def merker(self) -> str:
+        """Deprecated alias for :attr:`address`."""
+        return self.address
+
+
+# Deprecated alias (Binding Lx4).
+MerkerBinding = BindingSource
 
 
 def entity_key(entity_kind: str, entity_id: str) -> str:
@@ -54,12 +64,12 @@ def is_pushable_kind(kind: str) -> bool:
     return k.startswith(("sens_", "get_"))
 
 
-def merker_bindings_from_docs(house: dict, components: dict) -> list[MerkerBinding]:
+def binding_sources_from_docs(house: dict, components: dict) -> list[BindingSource]:
     """All pushable field bindings from saved house/components docs.
 
-    Merker name may be empty (push-only read via qualified EHAL ID).
+    Hub address may be empty (push-only read via qualified EHAL ID).
     """
-    out: list[MerkerBinding] = []
+    out: list[BindingSource] = []
     entries: list[tuple[str, str, str, str, str]] = []
     for field, name in ((house.get("plant") or {}).get("ehal_bindings") or {}).items():
         entries.append(("plant", "plant", "", str(field), str(name)))
@@ -90,8 +100,8 @@ def merker_bindings_from_docs(house: dict, components: dict) -> list[MerkerBindi
         if ehal_id is None:
             continue
         out.append(
-            MerkerBinding(
-                merker=str(name or "").strip(),
+            BindingSource(
+                address=str(name or "").strip(),
                 ehal_id=ehal_id,
                 entity_key=entity_key(kind, eid),
                 kind=field_kind(field),
@@ -100,29 +110,41 @@ def merker_bindings_from_docs(house: dict, components: dict) -> list[MerkerBindi
     return out
 
 
+def merker_bindings_from_docs(house: dict, components: dict) -> list[BindingSource]:
+    """Deprecated alias for :func:`binding_sources_from_docs`."""
+    return binding_sources_from_docs(house, components)
+
+
+def build_address_index(
+    house: dict, components: dict
+) -> dict[str, BindingSource]:
+    """``{hub_address: BindingSource}`` for non-empty addresses (last wins)."""
+    index: dict[str, BindingSource] = {}
+    for binding in binding_sources_from_docs(house, components):
+        if binding.address:
+            index[binding.address] = binding
+    return index
+
+
 def build_merker_index(
     house: dict, components: dict
-) -> dict[str, MerkerBinding]:
-    """``{merker_name: MerkerBinding}`` for non-empty Merker names (last wins)."""
-    index: dict[str, MerkerBinding] = {}
-    for binding in merker_bindings_from_docs(house, components):
-        if binding.merker:
-            index[binding.merker] = binding
-    return index
+) -> dict[str, BindingSource]:
+    """Deprecated alias for :func:`build_address_index`."""
+    return build_address_index(house, components)
 
 
 def build_ehal_index(
     house: dict, components: dict
-) -> dict[str, MerkerBinding]:
-    """``{ehal_id: MerkerBinding}`` for every pushable binding (last wins)."""
-    index: dict[str, MerkerBinding] = {}
-    for binding in merker_bindings_from_docs(house, components):
+) -> dict[str, BindingSource]:
+    """``{ehal_id: BindingSource}`` for every pushable binding (last wins)."""
+    index: dict[str, BindingSource] = {}
+    for binding in binding_sources_from_docs(house, components):
         index[binding.ehal_id] = binding
     return index
 
 
-_index_cache: dict[str, MerkerBinding] | None = None
-_ehal_index_cache: dict[str, MerkerBinding] | None = None
+_index_cache: dict[str, BindingSource] | None = None
+_ehal_index_cache: dict[str, BindingSource] | None = None
 _index_mtime_key: tuple[float, float] | None = None
 
 
@@ -177,36 +199,52 @@ def _ensure_indexes() -> None:
         return
     try:
         house, components = _load_house_components()
-        _index_cache = build_merker_index(house, components)
+        _index_cache = build_address_index(house, components)
         _ehal_index_cache = build_ehal_index(house, components)
         _index_mtime_key = mtime_key
     except Exception:  # noqa: BLE001 — read path must keep working
-        logger.exception("loxone push: failed to build binding indexes")
+        logger.exception("push source: failed to build binding indexes")
         _index_cache = {}
         _ehal_index_cache = {}
         _index_mtime_key = mtime_key
 
 
-def get_merker_index() -> dict[str, MerkerBinding]:
+def get_address_index() -> dict[str, BindingSource]:
     _ensure_indexes()
     assert _index_cache is not None
     return _index_cache
 
 
-def get_ehal_index() -> dict[str, MerkerBinding]:
+# Same object so monkeypatches of either name apply (tests / Binding Lx4).
+get_merker_index = get_address_index
+
+
+def get_ehal_index() -> dict[str, BindingSource]:
     _ensure_indexes()
     assert _ehal_index_cache is not None
     return _ehal_index_cache
 
 
-def resolve_push_binding(io_or_ehal: str) -> MerkerBinding | None:
-    """Look up a pushable binding by Merker name or qualified/bare EHAL ID."""
+def _looks_like_ehal_token(name: str) -> bool:
+    """True when ``name`` is a qualified/bare EHAL field id, not a hub address."""
+    from ehal.qualified_ids import parse_qualified_id
+
+    if parse_qualified_id(name) is not None:
+        return True
+    kind = field_kind(name)
+    return kind.startswith(("sens_", "get_", "set_"))
+
+
+def resolve_push_binding(io_or_ehal: str) -> BindingSource | None:
+    """Look up a pushable binding by qualified/bare EHAL ID (preferred).
+
+    Legacy hub addresses are resolved only when the token does not look like an
+    EHAL id (CHOICE_KEEP packs). ``fetch_loxone_generic_value`` callers should
+    prefer qualified IDs.
+    """
     name = str(io_or_ehal or "").strip()
     if not name:
         return None
-    binding = get_merker_index().get(name)
-    if binding is not None:
-        return binding
     binding = get_ehal_index().get(name)
     if binding is not None:
         return binding
@@ -217,18 +255,27 @@ def resolve_push_binding(io_or_ehal: str) -> MerkerBinding | None:
     if kind in GRID_KINDS:
         qid = qualified_plant_id(kind)
         if qid != name:
-            return get_ehal_index().get(qid)
-    return None
+            binding = get_ehal_index().get(qid)
+            if binding is not None:
+                return binding
+    # Binding Lx4: skip plain hub-address lookup when the token looks like an
+    # EHAL id (activated empty keys use the qualified ID as io_name).
+    if _looks_like_ehal_token(name):
+        return None
+    return get_address_index().get(name)
 
 
-# Re-export for callers that already import pilot_id from push_signals.
 __all__ = [
+    "BindingSource",
     "MerkerBinding",
     "NEVER_PUSH_KINDS",
+    "binding_sources_from_docs",
+    "build_address_index",
     "build_ehal_index",
     "build_merker_index",
     "clear_source_caches",
     "entity_key",
+    "get_address_index",
     "get_ehal_index",
     "get_merker_index",
     "is_pushable_kind",

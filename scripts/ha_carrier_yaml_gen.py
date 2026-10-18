@@ -1,4 +1,4 @@
-"""Generate minimal HA push carrier YAML from house_profiles + components bindings."""
+"""Generate HA push carrier YAML package from house_profiles + components bindings."""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +11,9 @@ from scripts.pilot_vo_template_gen import TOKEN_PLACEHOLDER
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="HA push carrier YAML fragment (2.7.r-T4)")
+    parser = argparse.ArgumentParser(
+        description="HA push carrier YAML package (Binding P5c)"
+    )
     parser.add_argument("--config-dir", type=Path, required=True)
     parser.add_argument("--host", required=True, help="Earnie listener host (IP or Docker DNS)")
     parser.add_argument("--port", type=int, default=8541)
@@ -19,7 +21,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--token",
         default=TOKEN_PLACEHOLDER,
-        help="Push token (default placeholder — set EARNIE_PILOT_PUSH_TOKEN in lab)",
+        help="Push token (default placeholder — set EARNIE_PUSH_TOKEN in lab)",
+    )
+    parser.add_argument(
+        "--repeat-s",
+        type=float,
+        default=None,
+        help="Push time_pattern interval seconds (default: EARNIE_PUSH_REPEAT_S or 10)",
     )
     args = parser.parse_args(argv)
     config_dir = args.config_dir
@@ -31,6 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         earnie_host=args.host,
         earnie_port=args.port,
         token=args.token,
+        repeat_s=args.repeat_s,
     )
     if args.out:
         args.out.write_text(text, encoding="utf-8")

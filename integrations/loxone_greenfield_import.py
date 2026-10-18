@@ -622,11 +622,15 @@ def run_greenfield_import(
     if probe_result is not None:
         report.probed_present = sorted(probe_result.present)
         report.probed_missing = sorted(probe_result.missing)
+    from house_config.required_signal_activation import activate_required_in_house
+
     house = apply_typed_matches(house, matches, profile_id=resolved_id, report=report)
     house = merge_efm(house, doc, profile_id=resolved_id, report=report)
     house = merge_alarm_clock_ready_by(
         house, doc, profile_id=resolved_id, report=report
     )
+    # After EFM so required plant keys do not suppress efm_plant_filled reporting.
+    house = activate_required_in_house(house)
     out: dict[str, Any] = {"house_doc": house, "report": report.as_dict(), "matches": matches}
     if probe_result is not None:
         out["probe"] = probe_result.as_dict()

@@ -1,5 +1,15 @@
 {
     "$schema": "./house_profiles.schema.json",
     "earnie_data_model": 4,
-    "profiles": []
+    "profiles": [],
+    "plant": {
+        "grid_meter": {
+            "at_house_connection": true,
+            "single_tariff": true
+        },
+        "ehal_bindings": {
+            "sens_grid_power_active": "",
+            "sens_pv_production_active": ""
+        }
+    }
 }

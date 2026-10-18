@@ -69,24 +69,36 @@ def write_silent_mode_to_local_settings(local_settings_path: str, silent: bool) 
         handle.write("\n")
 
 
-def load_ehal_loxone_http_port(raw_config: dict) -> int:
-    """Daemon port for Earnie_Request_Optimize / alive (default 8541)."""
-    raw = raw_config.get("system", {}).get("ehal_loxone_http_port")
+def load_ehal_http_port(raw_config: dict) -> int:
+    """Daemon port for Request Optimize / telemetry / status.json (default 8541).
+
+    Prefers ``system.ehal_http_port``; falls back to legacy
+    ``system.ehal_loxone_http_port`` (Binding Lx3).
+    """
+    system = raw_config.get("system") if isinstance(raw_config.get("system"), dict) else {}
+    raw = system.get("ehal_http_port")
+    if raw is None:
+        raw = system.get("ehal_loxone_http_port")
     if raw is None:
         return 8541
     try:
         value = int(raw)
     except (TypeError, ValueError) as exc:
         raise ValueError(
-            "Kritischer Konfigurationsfehler: system.ehal_loxone_http_port "
+            "Kritischer Konfigurationsfehler: system.ehal_http_port "
             "muss eine ganze Zahl sein."
         ) from exc
     if not 1024 <= value <= 65535:
         raise ValueError(
-            "Kritischer Konfigurationsfehler: system.ehal_loxone_http_port "
+            "Kritischer Konfigurationsfehler: system.ehal_http_port "
             "muss zwischen 1024 und 65535 liegen."
         )
     return value
+
+
+def load_ehal_loxone_http_port(raw_config: dict) -> int:
+    """Deprecated alias for :func:`load_ehal_http_port`."""
+    return load_ehal_http_port(raw_config)
 
 
 def load_ui_fragment_refresh_sec(raw_config: dict, key: str, default: int) -> int:

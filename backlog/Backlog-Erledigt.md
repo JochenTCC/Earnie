@@ -2,6 +2,24 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Binding P5 — signal contract for all backends, HA push-only (2026-10-18)
+
+- [x] **Binding P5 — signal contract for all backends, HA push-only** `[feat]` (epic **Binding**; target [`docs/dev/EHAL-Binding-UX-Draft.md`](../docs/dev/EHAL-Binding-UX-Draft.md) **§0.6**; live transport **2.7.r** was already done)
+  - [x] **Binding P5a — required-signal activation:** `ehal/required_signals.py`, `house_config/required_signal_activation.py`; Hauskonfigurator save/delete; migration `dm4.required_signal_activation`
+  - [x] **Binding P5b — Signal list for all backends:** catalog + Pflicht/aktiviert + optional toggle; HA render; `signals_for_export(mode="all")`; Lx2 soft never-received warnings
+  - [x] **Binding P5c — HA YAML package:** periodic `time_pattern`, Jinja units, setpoints, `ha_ess_force` automations, EHAL-Com download
+  - [x] **Binding P5d — HouseSim contract / push harness:** `house_sim/contract.py`, `push_harness.py`; pull adapter-loop tests skipped pending P5e (then removed)
+  - [x] **Binding P5e — remove pull (atomic):** migration `dm4.ha_pull_removal`; mapping UI / pull paths gone; leftover transport fails loud
+  - [x] **Binding P5f — docs, cadence, add-on:** ehal.md, ehal-com.md, ha-lab-setup.md, homeassistant-addon.md, loxone-signals.md, ha-evcc.md (push-only)
+
+### Binding — Loxone follow-ups for the shared contract (2026-10-18)
+
+- [x] **Binding — Loxone follow-ups for the shared contract** `[qual]` (epic **Binding**)
+  - [x] **Binding Lx1 — one activation path:** greenfield / EFM use `activate_required_in_house`
+  - [x] **Binding Lx2 — soft "never received":** Live-Lesen / startup verify = warning + export hint
+  - [x] **Binding Lx3 — backend-neutral names:** `ehal_request_http` / `ehal_push_inbox` / `system.ehal_http_port` / `EARNIE_PUSH_*` with aliases; migration `dm4.ehal_http_port`; URL path aliases kept
+  - [x] **Binding Lx4 — Merker naming leftovers:** `MerkerBinding` → `BindingSource`; watchdog / write-test wording
+
 ### Bugfix — usage_ping opt-in `v: 1` vs v2 + points on consent (2026-10-17)
 
 - [x] **usage_ping: opt-in preview `v: 1` (clarified) + points refresh on consent** — **Verified** (2026-10-17)

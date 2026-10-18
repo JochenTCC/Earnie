@@ -240,15 +240,19 @@ def test_read_absent_mode_loxone(read_mock, _ha, _oe):
 @patch("integrations.ehal_live.get_ha_adapter")
 def test_read_absent_mode_ha(adapter_factory, _ha, _oe):
     adapter = MagicMock()
-    adapter.cfg.entities = {"sens_absent_mode": "binary_sensor.absent"}
-    adapter.read_state.return_value = {"state": "on"}
+    adapter.cfg.entities = {"sens_absent_mode": ""}
+    adapter.cfg.push_read_qids = {"sens_absent_mode": "sens_absent_mode"}
+    adapter.cfg.sign = {}
     adapter_factory.return_value = adapter
     with patch(
         "house_config.ehal_bindings.resolve_plant_binding",
-        return_value="binary_sensor.absent",
+        return_value="sens_absent_mode",
     ), patch(
         "house_config.profiles_store.load_default_house_profiles_doc",
-        return_value={"plant": {}},
+        return_value={"plant": {"ehal_bindings": {"sens_absent_mode": ""}}},
+    ), patch(
+        "integrations.ha_push_read.read_push_ehal_value",
+        return_value=1.0,
     ):
         value, bound = ehal_live.read_absent_mode()
     assert bound is True

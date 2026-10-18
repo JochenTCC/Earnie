@@ -995,7 +995,7 @@ if __name__ == "__main__":
         run_loxone_verify_on_startup,
         run_tariff_plausibility_on_startup,
     )
-    from integrations.loxone_request_http import start_loxone_request_http
+    from integrations.ehal_request_http import start_ehal_request_http
 
     from runtime_store.clock_skew import install_requests_hook
 
@@ -1004,9 +1004,7 @@ if __name__ == "__main__":
     run_tariff_plausibility_on_startup()
     run_live_scenario_entity_check_on_startup()
     prepare_loxone_push_inbox_for_startup(
-        start_http_fn=lambda: start_loxone_request_http(
-            config.get_ehal_loxone_http_port()
-        ),
+        start_http_fn=lambda: start_ehal_request_http(config.get_ehal_http_port()),
     )
     run_loxone_verify_on_startup()
     ehal_live.push_safe_setpoints_on_startup()

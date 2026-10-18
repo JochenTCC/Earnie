@@ -32,12 +32,14 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Cause: `_migrate_and_validate_pack_docs` stamped members to current before `ensure_compatible` (would whitewash v1/v2/untagged if validate were bypassed). `validate_migrated_docs` already rejected incompatible members first.
   - Fix: ensure then stamp; `grid_fees.json` still exempt; doc `speichern-laden.md` now states members are checked too.
   - Tests: `tests/test_config_pack_and_paths.py` (`test_config_pack_rejects_v2_member_with_v4_manifest`, `test_migrate_and_validate_ensures_before_stamp`).
+- [ ] **Greenfield / HA first start opens Migration UI** — fix implemented (2026-10-18); live HA acceptance pending
+  - Cause: `house_profiles.minimal.json` stamped dm4 but lacked `plant.grid_meter`, so `dm4.topology` stayed pending and Streamlit entered migration mode.
+  - Fix: seed `plant.grid_meter` (`DEFAULT_GRID_METER`) in `share/config/house_profiles.minimal.json`.
+  - Tests: `tests/test_migration_startup_gate.py` (`test_greenfield_bootstrap_gate_stays_open`).
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] "debug-dumps\debug_dump_20261015_222809"
-- [ ] On HK side I'm asked always "Earnie 2.7.0-dev.61 braucht eine Anpassung deiner Konfiguration (strukturelle Schritte innerhalb Datenmodell 4).
-Zuletzt gelaufene Version: 2.7.0-dev.61" without a change in the data model. Is this do to the Version bump?
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 

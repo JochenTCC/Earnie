@@ -184,12 +184,19 @@
           "type": "boolean",
           "description": "Veraltet — verwenden Sie silent_mode. true = nur lesen, keine Schreibbefehle."
         },
+        "ehal_http_port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535,
+          "default": 8541,
+          "description": "Daemon-HTTP for Request Optimize / telemetry (heartbeat) / status.json (Standard: 8541). Env-Override: EARNIE_EHAL_HTTP_PORT (legacy: EARNIE_EHAL_LOXONE_HTTP_PORT)."
+        },
         "ehal_loxone_http_port": {
           "type": "integer",
           "minimum": 1024,
           "maximum": 65535,
           "default": 8541,
-          "description": "Daemon-HTTP for Earnie_Request_Optimize / telemetry (heartbeat) / status.json (Standard: 8541). Env-Override: EARNIE_EHAL_LOXONE_HTTP_PORT."
+          "description": "Veraltet — verwenden Sie ehal_http_port. Env-Override legacy: EARNIE_EHAL_LOXONE_HTTP_PORT."
         }
       }
     },
@@ -444,11 +451,6 @@
           "type": "object",
           "description": "Home Assistant non-secret settings (2.6.i). URL/token live in config/.env as EHAL_HA_BASE_URL / EHAL_HA_TOKEN.",
           "properties": {
-            "transport": {
-              "type": "string",
-              "enum": ["pull", "push"],
-              "description": "Live I/O transport: pull = HaAdapter REST states/services (default); push = HA pushes telemetry to Earnie and polls GET /ehal/status.json (carrier converts to canonical EHAL units on the wire). Legacy value weg_b is accepted at load time and normalized to push."
-            },
             "entities": {
               "type": "object",
               "description": "Deprecated flat map EHAL field → entity_id (cleared after entity-scoped migrate).",

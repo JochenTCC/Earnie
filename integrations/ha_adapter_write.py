@@ -1,6 +1,8 @@
-"""HA adapter setpoint write paths (REST services and push publish) as a mixin.
+"""HA adapter setpoint write paths (push publish only) as a mixin.
 
 Split out of ``integrations.ha_adapter``; ``HaAdapter`` inherits these methods.
+Binding P5e: REST service writes and ``ha_ess_force`` Huawei REST are removed;
+``plant.ha_ess_force`` is owned by the HA YAML package automations.
 """
 from __future__ import annotations
 
@@ -17,19 +19,15 @@ from ehal.field_catalog import SETPOINT_FIELDS
 from ehal.validate import EhalValidationError
 from integrations.ha_adapter_core import (
     BOOLEAN_INVERT_FIELDS,
-    WRITE_DOMAINS,
-    HaHttpError,
     _HaWriteOutcome,
     _utc_ts,
     apply_boolean_invert,
-    entity_domain,
     logger,
 )
-from integrations.ha_units import UnitMismatchError, field_quantity, from_ehal
 
 
 class HaWriteMixin:
-    """Setpoint writes, Huawei force services and write-error bookkeeping."""
+    """Setpoint writes via status.json publish (push-only)."""
 
     def _invalid_setpoint_error(
         self,
@@ -62,21 +60,6 @@ class HaWriteMixin:
         if flip_ess:
             outcome.flip_ess = True
 
-    def _write_ess_vendor_force(
-        self, doc: dict[str, Any], outcome: _HaWriteOutcome
-    ) -> None:
-        """Huawei force charge/discharge via vendor services (stop when no active power)."""
-        if not self._vendor_ess_active:
-            return
-        if "set_ess_active_power" in doc:
-            ok, status, msg = self._write_huawei_force(float(doc["set_ess_active_power"]))
-        else:
-            ok, status, msg = self._stop_huawei_force()
-        if not ok:
-            self._record_write_failure(
-                outcome, "set_ess_active_power", status, msg, flip_ess=True
-            )
-
     def _write_optional_setpoint(
         self,
         doc: dict[str, Any],
@@ -100,9 +83,7 @@ class HaWriteMixin:
         doc: dict[str, Any],
         outcome: _HaWriteOutcome,
     ) -> None:
-        """ESS-Leistung/Grenzen sowie den Modus schreiben (Modus flippt kein Capability)."""
-        self._write_ess_vendor_force(doc, outcome)
-
+        """ESS power/limits and mode via status.json (YAML may own ha_ess_force)."""
         for field_name in (
             "set_ess_active_power",
             "set_ess_charge_power_limit",
@@ -110,8 +91,6 @@ class HaWriteMixin:
         ):
             if field_name not in doc:
                 continue
-            if field_name == "set_ess_active_power" and self._vendor_ess_active:
-                continue  # already handled via huawei_solar services
             supported = (
                 self._supports_ess_active
                 if field_name == "set_ess_active_power"
@@ -148,73 +127,16 @@ class HaWriteMixin:
             supported=bool(self.cfg.entities.get("set_grid_export_power_limit")),
         )
 
-    def _huawei_force_payload(self, power_w: float) -> dict[str, Any]:
-        force = self.cfg.ha_ess_force or {}
-        duration = int(force.get("duration_min") or 20)
-        return {
-            "device_id": str(force.get("device_id") or ""),
-            "power": int(round(abs(float(power_w)))),
-            "duration": duration,
-        }
-
-    def _write_huawei_force(
-        self, active_power_w: float
-    ) -> tuple[bool, str | None, str]:
-        """Call huawei_solar.forcible_charge or forcible_discharge."""
-        force = self.cfg.ha_ess_force or {}
-        if str(force.get("driver") or "").strip().lower() != "huawei_solar":
-            return False, None, "Unsupported ha_ess_force.driver"
-        payload = self._huawei_force_payload(active_power_w)
-        if not payload["device_id"]:
-            return False, None, "Missing ha_ess_force.device_id"
-        service = (
-            "forcible_discharge" if active_power_w > 0 else "forcible_charge"
-        )
-        try:
-            self.call_service("huawei_solar", service, payload)
-            return True, None, ""
-        except HaHttpError as exc:
-            logger.warning(
-                "HA huawei_solar.%s failed adapter_id=%s: %s",
-                service,
-                self.cfg.adapter_id,
-                exc,
-            )
-            status = str(exc.status_code) if exc.status_code is not None else None
-            return False, status, str(exc)
-
-    def _stop_huawei_force(self) -> tuple[bool, str | None, str]:
-        force = self.cfg.ha_ess_force or {}
-        if str(force.get("driver") or "").strip().lower() != "huawei_solar":
-            return True, None, ""
-        device_id = str(force.get("device_id") or "").strip()
-        if not device_id:
-            return False, None, "Missing ha_ess_force.device_id"
-        try:
-            self.call_service(
-                "huawei_solar",
-                "stop_forcible_charge",
-                {"device_id": device_id},
-            )
-            return True, None, ""
-        except HaHttpError as exc:
-            logger.warning(
-                "HA huawei_solar.stop_forcible_charge failed adapter_id=%s: %s",
-                self.cfg.adapter_id,
-                exc,
-            )
-            status = str(exc.status_code) if exc.status_code is not None else None
-            return False, status, str(exc)
     def _write_evcs_setpoints(
         self,
         doc: dict[str, Any],
         outcome: _HaWriteOutcome,
     ) -> None:
-        """EVCS-Strom (Ampere) und Modus schreiben, sofern Entities gemappt sind."""
+        """EVCS current and mode via status.json when activated."""
         for field_name in ("set_evcs_max_current", "set_evcs_mode"):
             if field_name not in doc:
                 continue
-            if not self._supports_evcs_current or not self.cfg.entities.get(field_name):
+            if not self._supports_evcs_current or field_name not in self.cfg.entities:
                 self._skip(field_name, outcome)
                 continue
             value = doc[field_name]
@@ -234,7 +156,7 @@ class HaWriteMixin:
         evcs_phases: int = 1,
     ) -> EhalWriteError | None:
         """Write setpoints; on failure degrade capabilities and return write_error."""
-        del evcs_voltage_v, evcs_phases  # HA current entities are already Amps
+        del evcs_voltage_v, evcs_phases
         raw = dict(setpoint)
         try:
             doc = validate_setpoint(raw)
@@ -262,17 +184,13 @@ class HaWriteMixin:
     def write_mapped_fields(
         self, fields: dict[str, float | int | str]
     ) -> EhalWriteError | None:
-        """Write mapped entities by key (flat or Pattern-B), no envelope validation.
-
-        Used for multi-ESS / powerstation Pattern-B setpoints that are not part of
-        the plant-flat setpoint schema document.
-        """
+        """Write activated fields by key (no envelope validation)."""
         outcome = _HaWriteOutcome()
         for field_name, value in fields.items():
             key = str(field_name or "").strip()
             if not key or key not in self.cfg.entities:
                 outcome.failed.append(key or "unknown")
-                outcome.messages.append(f"Missing HA write entity for {key}")
+                outcome.messages.append(f"Missing HA write binding for {key}")
                 continue
             ok, status, msg = self._try_setpoint_write(key, value)
             if not ok:
@@ -325,108 +243,7 @@ class HaWriteMixin:
     def _try_setpoint_write(
         self, field_name: str, value: float | str
     ) -> tuple[bool, str | None, str]:
-        if self._push:
-            return self._publish_setpoint_push(field_name, value)
-        entity_id = str(self.cfg.entities.get(field_name) or "").strip()
-        if not entity_id:
-            return False, None, f"Missing HA write entity for {field_name}"
-        domain = entity_domain(entity_id)
-        if domain not in WRITE_DOMAINS:
-            return False, None, f"Unsupported write domain for {entity_id}"
-        try:
-            if domain == "switch":
-                from ehal.ess_fields import ess_field_kind
-
-                kind = ess_field_kind(field_name) or field_name
-                if kind not in BOOLEAN_INVERT_FIELDS and field_name not in BOOLEAN_INVERT_FIELDS:
-                    return False, None, f"Unsupported write domain for {entity_id}"
-                return self._try_switch_write(field_name, entity_id, value)
-            if domain != "select" and field_quantity(field_name) is not None:
-                value = self._to_entity_unit(field_name, entity_id, float(value))
-            if domain == "select":
-                self.call_service(
-                    "select",
-                    "select_option",
-                    {"entity_id": entity_id, "option": str(value)},
-                )
-            elif domain == "input_number":
-                self.call_service(
-                    "input_number",
-                    "set_value",
-                    {"entity_id": entity_id, "value": value},
-                )
-            else:
-                self.call_service(
-                    "number",
-                    "set_value",
-                    {"entity_id": entity_id, "value": value},
-                )
-            return True, None, ""
-        except UnitMismatchError as exc:
-            logger.warning(
-                "HA setpoint unit mismatch adapter_id=%s field=%s: %s",
-                self.cfg.adapter_id,
-                field_name,
-                exc,
-            )
-            return False, None, f"Unit mismatch for {entity_id}: {exc}"
-        except HaHttpError as exc:
-            logger.warning(
-                "HA setpoint write failed adapter_id=%s field=%s: %s",
-                self.cfg.adapter_id,
-                field_name,
-                exc,
-            )
-            status = str(exc.status_code) if exc.status_code is not None else None
-            return False, status, str(exc)
-
-    def _try_switch_write(
-        self,
-        field_name: str,
-        entity_id: str,
-        value: float | str,
-    ) -> tuple[bool, str | None, str]:
-        """Write boolean/enum EHAL fields onto a HA ``switch`` entity."""
-        try:
-            numeric = float(value)
-        except (TypeError, ValueError):
-            return False, None, f"Non-numeric switch value for {field_name}: {value!r}"
-        from ehal.ess_fields import ess_field_kind
-        from ehal.inverter_fields import inv_field_kind
-
-        kind = ess_field_kind(field_name) or inv_field_kind(field_name) or field_name
-        mode = None
-        if kind in BOOLEAN_INVERT_FIELDS or field_name in BOOLEAN_INVERT_FIELDS:
-            mode = (
-                self.cfg.boolean_invert.get(field_name)
-                or self.cfg.boolean_invert.get(kind)
-            )
-        ha_on = apply_boolean_invert(numeric, mode) >= 0.5
-        service = "turn_on" if ha_on else "turn_off"
-        try:
-            self.call_service("switch", service, {"entity_id": entity_id})
-            return True, None, ""
-        except HaHttpError as exc:
-            logger.warning(
-                "HA switch write failed adapter_id=%s field=%s: %s",
-                self.cfg.adapter_id,
-                field_name,
-                exc,
-            )
-            status = str(exc.status_code) if exc.status_code is not None else None
-            return False, status, str(exc)
-
-    def _to_entity_unit(self, field_name: str, entity_id: str, value: float) -> float:
-        """EHAL base unit → target entity unit, read fresh from HA on every write."""
-        payload = self.read_state(entity_id)
-        attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
-        converted = from_ehal(field_name, value, attrs.get("unit_of_measurement"))
-        if field_name == "set_grid_export_power_limit":
-            # Unconstrained export = high magnitude; clamp to the number entity's range.
-            entity_max = attrs.get("max")
-            if isinstance(entity_max, (int, float)):
-                converted = min(converted, float(entity_max))
-        return round(converted, 6)
+        return self._publish_setpoint_push(field_name, value)
 
     def _record_write_error(
         self,

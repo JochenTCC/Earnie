@@ -160,7 +160,9 @@ def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dic
             item.pop(ID_LOCKED_KEY, None)
             item.pop(ID_PROVISIONAL_LABEL_KEY, None)
         taken.add(consumer_id)
-        resolved.append(item)
+        from house_config.required_signal_activation import activate_consumer_required
+
+        resolved.append(activate_consumer_required(item))
     return resolved
 
 def _perform_house_profile_save(

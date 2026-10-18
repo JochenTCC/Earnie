@@ -39,7 +39,7 @@ def _render_write_test_intro() -> None:
         "Alle gemappten Schreib-Felder (Plant, Batterien entity-scoped, EV, Flex). "
         "**Senden** je Zeile aktivieren, Werte setzen, dann schreiben. "
         "Optional Auto-Roundtrip: Loxone = Publish + Miniserver-Callback "
-        "(kein Merker-HTTP-Echo)."
+        "(kein Hub-HTTP-Echo)."
     )
     if looks_like_housesim():
         st.info(

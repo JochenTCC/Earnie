@@ -141,6 +141,9 @@ def upsert_pv_system(
     if not id_locked and provisional:
         save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
     normalize_pv_system(save_spec, 0)  # validate before persist
+    from house_config.required_signal_activation import activate_pv_system_required
+
+    save_spec = activate_pv_system_required(save_spec)
     if old_id and old_id != entity_id:
         _rewrite_id_list_in_scenarios("pv_system_ids", old_id, entity_id)
     data["pv_systems"] = _replace_entity_in_list(systems, save_spec, {entity_id, old_id})
@@ -256,6 +259,9 @@ def upsert_inverter(
     if not id_locked and provisional:
         save_spec[ID_PROVISIONAL_LABEL_KEY] = provisional
     normalize_inverter(save_spec, 0)
+    from house_config.required_signal_activation import activate_inverter_required
+
+    save_spec = activate_inverter_required(save_spec)
     if old_id and old_id != entity_id:
         _rewrite_inverter_refs_in_doc(data, old_id, entity_id)
     data["inverters"] = _replace_entity_in_list(

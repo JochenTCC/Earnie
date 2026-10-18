@@ -10,7 +10,7 @@ Diese Seite ist die zentrale Referenz für die Loxone-Anbindung von Earnie. Sie 
 Ohne stabile Titel und Bindings kann Earnie die Anlage weder zuverlässig lesen noch steuern. Verwandte Seiten:
 
 - HTTP-Zugriff und Betrieb: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md)
-- Mapping-Oberfläche: [EHAL-Com](../ui/ehal-com.md)
+- Signalliste / Export: [EHAL-Com](../ui/ehal-com.md)
 - Vorlagendateien und Generatoren: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md)
 
 **Begriffe (Smarthome-Merker):** Die **Adresse** (ein String, z. B. `Earnie_Waermepumpe_Freigabe`) ist ein *Smarthome-Merker*. Die **Rolle** ist der EHAL-Feldname (`sens_ess_soc`, `flex.{slug}.sens_power_act`, …) in `ehal_bindings`. Ein Merker ist nicht zu verwechseln mit Chart-Markern oder mit `earnie_role` (Bekannt/Gesteuert/Manuell).
@@ -130,11 +130,26 @@ Auch Telemetrie-VOs (`VO_Earnie_*` außer `Status`) zielen auf den Daemon-Port *
 
 - **Empfänger:** `/ehal/telemetry/<EHAL-ID>/<Wert>` (Alias `/ehal/loxone/telemetry/…` für bestehende VOs). Pushes werden nur akzeptiert, wenn `EARNIE_PILOT_PUSH_TOKEN` gesetzt ist.
 - **Inbox-Lesen:** Alle pushbaren `sens_*` / `get_*`-Felder werden aus der Inbox gelesen (kein Merker-Poll). Dazu zählen die **Zähler-Energiestände** `sens_pv_energy`, `sens_grid_energy_import` / `_export` und `consumer.<id>.sens_energy_total`.
-- **Wiederholintervall:** empfohlen **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, Standard 10).
-- **Veraltete Energiewerte** (älter als 3 × Wiederholintervall) werden nicht als null angenommen. Slot-Ist behält den Stichprobenmittelwert dieses Kanals.
+- **Wiederholintervall / Null-Regel:** siehe [Push-Takt (SB-neutral)](#push-cadence-sb-neutral).
 - **Heartbeat:** Der synthetische Heartbeat-VO ist immer Push.
 - **FertigUm** (`ev.<id>.get_evcs_ready_by_time`): wird als Analog-VO gepusht. Bevorzugt wird ein numerischer Wert für den nächsten Eintrag. Text im Tna-Stil wie `Morgen, 07:00` wird solange er frisch ist akzeptiert und vom Optimierer geparst.
 - **Wert-Platzhalter:** Ein Virtual-Output-Befehl verwendet `<v>` (im XML als `&lt;v&gt;`). `\v` ist der Platzhalter für den Virtual-**Input**-Check und kommt in einem Output als Steuerzeichen 0x0B an.
+
+<a id="push-cadence-sb-neutral"></a>
+
+### Push-Takt (SB-neutral)
+
+Dieselbe Inbox-Regel gilt für **Loxone** (VO-Wiederholung) und **Home Assistant** (YAML-`time_pattern`):
+
+| Regel | Verhalten |
+| --- | --- |
+| Mindest-Takt | Jedes Lesesignal mindestens alle `EARNIE_PILOT_PUSH_REPEAT_S` Sekunden pushen (Standard **10**). Frischegrenze in der Inbox: typisch 3 × Wiederholintervall. |
+| Link / Heartbeat | Solange die Verbindung frisch ist (Heartbeat oder ein anderer nicht-null Analogwert kürzlich angekommen), gilt die Null-Annahme unten. |
+| Verstummt (Leistung u. a.) | Bleibt ein Signal länger als die Frischegrenze aus und der Link ist frisch, nimmt Earnie **0** an. Status in Live-Lesen: `0 angenommen (verstummt)` (`STATE_ZERO_ASSUMED_SILENT`). Nie gesendet bei frischem Link: `0 angenommen (nie gesendet)`. |
+| Energiezähler | Kumulierte kWh-Felder (`*energy*`) werden **niemals** als 0 angenommen. Veraltet oder nie empfangen → kein Wert (kein Slot-Ist aus erfundener Null). |
+| Explizite 0 | Ein gepushter Wert `0` gilt als gehaltenes Off (`0 (gehalten)`), nicht als „verstummt“. |
+
+> **Hinweis:** Eine HA-Automation, die nur bei Zustandsänderung pusht, meldet einen konstanten Nicht-Null-Wert nach dem Takt als 0. Deshalb periodisch pushen – nicht nur `state` trigger.
 
 Das Polling bzw. das Cmd-Check-Muster ist an die JSON-Schlüssel anzupassen (Anlage: `set_ess_*` / `heartbeat_ts`; Flex: `consumer.{hk_id}.…` (Wärmepumpe `heatpump.…`, Pool `pool.…`); EV: `evcs.{ev_id}.…`). Stabile **Titel** bleiben der Vertrag für Core und den Default-Import.
 

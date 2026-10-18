@@ -102,13 +102,8 @@ def is_ha_backend() -> bool:
 
 
 def is_ha_push_transport() -> bool:
-    from runtime_store.ehal_setup import HA_TRANSPORT_PUSH
-
-    return (
-        is_ha_backend()
-        and str(config.get("EHAL_HA_TRANSPORT") or "").strip().lower()
-        == HA_TRANSPORT_PUSH
-    )
+    """HA is push-only (Binding P5e); True whenever the HA backend is active."""
+    return is_ha_backend()
 
 
 def is_loxone_backend() -> bool:

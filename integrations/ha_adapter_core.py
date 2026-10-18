@@ -14,18 +14,6 @@ from integrations.ha_units import to_ehal
 # Keep the historic logger name so log filters keep working after the split.
 logger = logging.getLogger("integrations.ha_adapter")
 
-MAPPABLE_DOMAINS = frozenset(
-    {
-        "sensor",
-        "number",
-        "select",
-        "input_number",
-        "binary_sensor",
-        "input_boolean",
-        "switch",
-    }
-)
-WRITE_DOMAINS = frozenset({"number", "select", "input_number", "switch"})
 # Boolean/enum invert for fields where HA ON/high does not match EHAL polarity.
 # Modes: "ehal" (identity) or "invert" (flip 0↔1 / on↔off). Separate from numeric sign.
 BOOLEAN_INVERT_FIELDS = frozenset({"set_ess_source_select"})
@@ -63,7 +51,8 @@ class HaConfig:
     boolean_invert: dict[str, str] = field(default_factory=dict)
     timeout_sec: float = 10.0
     ha_ess_force: dict[str, Any] | None = None
-    transport: str = "pull"
+    # Binding P5e: push-only; ``transport`` kept for call-site compatibility (ignored).
+    transport: str = "push"
     push_read_qids: dict[str, str] = field(default_factory=dict)
     setpoint_qids: dict[str, str] = field(default_factory=dict)
 

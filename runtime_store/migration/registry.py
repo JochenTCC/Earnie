@@ -8,6 +8,11 @@ from runtime_store.migration.steps.grid_fee_profile import STEP as GRID_FEE
 from runtime_store.migration.steps.inverters import STEP as INVERTERS
 from runtime_store.migration.steps.loxone_binding_names import STEP as LOXONE_NAMES
 from runtime_store.migration.steps.pool_filter import STEP as POOL_FILTER
+from runtime_store.migration.steps.ehal_http_port import STEP as EHAL_HTTP_PORT
+from runtime_store.migration.steps.ha_pull_removal import STEP as HA_PULL_REMOVAL
+from runtime_store.migration.steps.required_signal_activation import (
+    STEP as REQUIRED_SIGNALS,
+)
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
 from runtime_store.migration.steps.v3_to_v4 import STEP as V3_TO_V4
 from runtime_store.migration.types import MigrationStep
@@ -23,6 +28,9 @@ STEPS: tuple[MigrationStep, ...] = (
     TOPOLOGY,
     POOL_FILTER,
     GRID_FEE,
+    REQUIRED_SIGNALS,
+    HA_PULL_REMOVAL,
+    EHAL_HTTP_PORT,
 )
 
 STEP_BY_ID: dict[str, MigrationStep] = {step.id: step for step in STEPS}

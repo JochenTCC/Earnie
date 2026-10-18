@@ -36,6 +36,7 @@ def _utc() -> str:
     )
 
 
+@pytest.mark.skip(reason="Binding P5e: HA REST pull feed recording removed; push-only")
 def test_housesim_prod_records_and_shadow_replays(monkeypatch, tmp_path):
     package = load_archetype("evcc_en")
     store = package.build_store()

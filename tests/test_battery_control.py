@@ -1,8 +1,6 @@
 """2.6.n — battery control levels + Huawei HA force services."""
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
 from house_config.battery_control import (
@@ -186,87 +184,50 @@ def test_control_capability_warns_full_without_ess_active():
     assert any("full" in m for m in msgs)
 
 
-def test_ha_adapter_calls_huawei_forcible_charge():
-    calls: list[tuple[str, str, dict]] = []
+def test_ha_adapter_ha_ess_force_publishes_active_power():
+    """Binding P5e: ha_ess_force enables ess_active; Earnie publishes to status.json."""
+    from integrations.ehal_write import clear_published_for_tests, load_published
 
-    def _capture(domain, service, data):
-        calls.append((domain, service, dict(data)))
-
+    clear_published_for_tests()
     adapter = HaAdapter(
         HaConfig(
             base_url="http://ha.test",
             token="t",
             adapter_id="test",
             entities={
-                "set_ess_charge_power_limit": "number.charge",
-                "set_ess_discharge_power_limit": "number.discharge",
+                "set_ess_active_power": "",
+                "set_ess_charge_power_limit": "",
+                "set_ess_discharge_power_limit": "",
+                "set_ess_mode": "",
             },
             ha_ess_force={
                 "driver": "huawei_solar",
                 "device_id": "dev-luna",
                 "duration_min": 20,
+            },
+            setpoint_qids={
+                "set_ess_active_power": "ess.house.set_ess_active_power",
+                "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
+                "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",
+                "set_ess_mode": "ess.house.set_ess_mode",
             },
         )
     )
     assert adapter._supports_ess_active is True
-    with patch.object(adapter, "call_service", side_effect=_capture):
-        with patch.object(adapter, "_try_setpoint_write", return_value=(True, None, "")):
-            err = adapter.write_setpoints(
-                {
-                    "schema_version": 4,
-                    "ts": "2026-01-01T00:00:00Z",
-                    "adapter_id": "test",
-                    "set_ess_active_power": -1500,
-                    "set_ess_charge_power_limit": 5000,
-                    "set_ess_discharge_power_limit": 0,
-                    "set_ess_mode": 1,
-                }
-            )
-    assert err is None
-    assert any(c[1] == "forcible_charge" for c in calls)
-    charge_call = next(c for c in calls if c[1] == "forcible_charge")
-    assert charge_call[0] == "huawei_solar"
-    assert charge_call[2]["device_id"] == "dev-luna"
-    assert charge_call[2]["power"] == 1500
-    assert charge_call[2]["duration"] == 20
-
-
-def test_ha_adapter_stops_huawei_force_on_automatik():
-    calls: list[str] = []
-
-    adapter = HaAdapter(
-        HaConfig(
-            base_url="http://ha.test",
-            token="t",
-            adapter_id="test",
-            entities={
-                "set_ess_charge_power_limit": "number.charge",
-                "set_ess_discharge_power_limit": "number.discharge",
-            },
-            ha_ess_force={
-                "driver": "huawei_solar",
-                "device_id": "dev-luna",
-                "duration_min": 20,
-            },
-        )
+    err = adapter.write_setpoints(
+        {
+            "schema_version": 4,
+            "ts": "2026-01-01T00:00:00Z",
+            "adapter_id": "test",
+            "set_ess_active_power": -1500,
+            "set_ess_charge_power_limit": 5000,
+            "set_ess_discharge_power_limit": 0,
+            "set_ess_mode": 1,
+        }
     )
-    with patch.object(
-        adapter,
-        "call_service",
-        side_effect=lambda d, s, data: calls.append(s),
-    ):
-        with patch.object(adapter, "_try_setpoint_write", return_value=(True, None, "")):
-            adapter.write_setpoints(
-                {
-                    "schema_version": 4,
-                    "ts": "2026-01-01T00:00:00Z",
-                    "adapter_id": "test",
-                    "set_ess_charge_power_limit": 5000,
-                    "set_ess_discharge_power_limit": 5000,
-                    "set_ess_mode": 0,
-                }
-            )
-    assert "stop_forcible_charge" in calls
+    assert err is None
+    published = load_published()
+    assert published["ess.house.set_ess_active_power"] == pytest.approx(-1500.0)
 
 
 def test_deviation_forced_predicates_gated_by_control():

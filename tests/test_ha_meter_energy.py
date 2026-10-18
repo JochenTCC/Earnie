@@ -1,9 +1,6 @@
-"""HA plant energy side channel for slot-Ist ΔkWh (2.6.c)."""
+"""HA plant energy side channel via push inbox (Binding P5e)."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,7 +12,6 @@ from integrations.ha_meter_energy import (
     read_plant_energy_readings,
 )
 from integrations.loxone_meter_energy import overlay_counter_on_closed
-from runtime_store import power_interval_sampler as sampler
 
 
 def test_parse_ha_energy_kwh_wh_to_kwh():
@@ -37,38 +33,43 @@ def test_parse_ha_energy_rejects_unavailable():
         parse_ha_energy_kwh("unavailable", unit="kWh")
 
 
-def test_plant_energy_entity_ids_omits_empty():
+def test_plant_energy_entity_ids_keeps_activation_keys():
     assert plant_energy_entity_ids(
         {
-            "sens_pv_energy": "sensor.pv_e",
+            "sens_pv_energy": "",
             "sens_grid_energy_import": "",
-            "sens_grid_power_active": "sensor.grid_p",
+            "sens_grid_power_active": "",
         }
-    ) == {"sens_pv_energy": "sensor.pv_e"}
-
-
-def test_read_plant_energy_readings_bipolar_shape():
-    adapter = MagicMock()
-    adapter.cfg.entities = {
-        "sens_pv_energy": "sensor.pv_e",
-        "sens_grid_energy_import": "sensor.grid_imp",
-        "sens_grid_energy_export": "sensor.grid_exp",
+    ) == {
+        "sens_pv_energy": "",
+        "sens_grid_energy_import": "",
     }
 
-    def _state(entity_id: str) -> dict[str, Any]:
-        values = {
-            "sensor.pv_e": ("10.5", "kWh"),
-            "sensor.grid_imp": ("100250", "Wh"),
-            "sensor.grid_exp": ("20.05", "kWh"),
-        }
-        state, unit = values[entity_id]
-        return {
-            "entity_id": entity_id,
-            "state": state,
-            "attributes": {"unit_of_measurement": unit},
-        }
 
-    adapter.read_state.side_effect = _state
+def test_read_plant_energy_readings_from_push(monkeypatch):
+    adapter = MagicMock()
+    adapter.cfg.entities = {
+        "sens_pv_energy": "",
+        "sens_grid_energy_import": "",
+        "sens_grid_energy_export": "",
+    }
+    adapter.cfg.push_read_qids = {
+        "sens_pv_energy": "grid.meter.sens_pv_energy",
+        "sens_grid_energy_import": "grid.meter.sens_grid_energy_import",
+        "sens_grid_energy_export": "grid.meter.sens_grid_energy_export",
+    }
+
+    def _read(qid: str) -> float | None:
+        table = {
+            "grid.meter.sens_pv_energy": 10.5,
+            "grid.meter.sens_grid_energy_import": 100.25,
+            "grid.meter.sens_grid_energy_export": 20.05,
+        }
+        return table.get(qid)
+
+    monkeypatch.setattr(
+        "integrations.ha_push_read.read_push_energy_kwh", _read
+    )
     readings = read_plant_energy_readings(adapter)
     assert readings["pv"]["total"] == pytest.approx(10.5)
     assert readings["grid"]["total"] == pytest.approx(100.25)
@@ -104,71 +105,3 @@ def test_read_ha_plant_energy_none_when_not_ha_backend(monkeypatch):
         "integrations.ehal_live.is_ha_backend", lambda: False
     )
     assert read_ha_plant_energy() is None
-
-
-def _plant(*, pv: float, grid: float) -> dict[str, float]:
-    return {"pv": pv, "house": 1.0, "grid": grid, "battery": -0.5}
-
-
-def test_sampler_ha_energy_overlay(tmp_path: Path):
-    state = tmp_path / "sampler.json"
-    start = datetime(2026, 9, 14, 14, 0, 0)
-    readings = {
-        "open": {
-            "pv": {"total": 10.0},
-            "grid": {"total": 100.0, "total_neg": 20.0},
-        },
-        "close": {
-            "pv": {"total": 10.5},
-            "grid": {"total": 100.25, "total_neg": 20.05},
-        },
-    }
-    phase = {"n": 0}
-
-    def read_energy():
-        phase["n"] += 1
-        return readings["open"] if phase["n"] == 1 else readings["close"]
-
-    for offset in (30, 60, 90):
-        assert sampler.tick(
-            now=start + timedelta(seconds=offset),
-            force=True,
-            state_path=str(state),
-            read_plant=lambda: _plant(pv=9.0, grid=9.0),
-            read_soc=lambda: 50.0,
-            read_flex_chart=lambda: {},
-            read_energy=read_energy,
-        )
-    closed = sampler.finalize_closed_interval(
-        start, state_path=str(state), read_energy=read_energy
-    )
-    assert closed is not None
-    assert closed["ist_power_source"]["pv"] == "counter"
-    assert closed["ist_power_source"]["grid"] == "counter"
-    assert closed["pv_kw"] == pytest.approx(2.0)
-
-
-def test_sampler_without_energy_map_stays_mean(tmp_path: Path):
-    state = tmp_path / "sampler.json"
-    start = datetime(2026, 9, 14, 14, 0, 0)
-
-    def read_energy():
-        return None
-
-    for offset in (30, 60, 90):
-        assert sampler.tick(
-            now=start + timedelta(seconds=offset),
-            force=True,
-            state_path=str(state),
-            read_plant=lambda: _plant(pv=2.0, grid=1.0),
-            read_soc=lambda: 50.0,
-            read_flex_chart=lambda: {},
-            read_energy=read_energy,
-        )
-    closed = sampler.finalize_closed_interval(
-        start, state_path=str(state), read_energy=read_energy
-    )
-    assert closed is not None
-    assert closed["ist_power_source"]["pv"] == "mean"
-    assert closed["ist_power_source"]["grid"] == "mean"
-    assert closed["pv_kw"] == pytest.approx(2.0)

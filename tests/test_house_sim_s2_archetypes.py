@@ -69,6 +69,7 @@ def test_unit_conversion_roundtrip_and_dimension_guard():
         base_to_native(1.0, quantity="power", unit="kwh")
 
 
+@pytest.mark.skip(reason="Binding P5e: REST pull HaAdapter retired; use HouseSim contract tests")
 @pytest.mark.parametrize("bench", ALL_ARCHETYPES, indirect=True)
 def test_adapter_reads_physics_in_ehal_units_and_sign(bench):
     package, store, adapter = bench
@@ -185,6 +186,7 @@ def test_self_consumption_never_overshoots_full_battery():
     )
 
 
+@pytest.mark.skip(reason="Binding P5e: REST pull HaAdapter retired; use HouseSim contract tests")
 def test_huawei_limit_writes_succeed_without_active_setpoint():
     package, store, adapter = _bench("huawei_en")
     try:
@@ -222,6 +224,7 @@ def test_mock_rejects_out_of_range_and_invalid_option():
     assert status == 200
 
 
+@pytest.mark.skip(reason="Binding P5e: REST pull HaAdapter retired; use HouseSim contract tests")
 def test_adapter_converts_setpoint_to_kw_entity():
     package, store, adapter = _bench("sma_keba")
     try:

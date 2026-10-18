@@ -55,6 +55,8 @@ def render_plant_export_limit() -> None:
         )
 
     def _persist() -> None:
+        from house_config.required_signal_activation import activate_plant_required
+
         doc = load_house_profiles()
         plant_out = (
             dict(doc.get("plant") or {})
@@ -66,7 +68,7 @@ def render_plant_export_limit() -> None:
         else:
             plant_out.pop("max_export_power_kw", None)
         if plant_out:
-            doc["plant"] = plant_out
+            doc["plant"] = activate_plant_required(plant_out)
         else:
             doc.pop("plant", None)
         save_house_profiles(doc)
@@ -136,6 +138,8 @@ def render_plant_grid_meter_assertions() -> None:
     )
 
     def _persist() -> None:
+        from house_config.required_signal_activation import activate_plant_required
+
         doc = load_house_profiles()
         plant_out = (
             dict(doc.get("plant") or {})
@@ -150,7 +154,7 @@ def render_plant_grid_meter_assertions() -> None:
             plant_out["pv_covers_all_inverters"] = True
         else:
             plant_out.pop("pv_covers_all_inverters", None)
-        doc["plant"] = plant_out
+        doc["plant"] = activate_plant_required(plant_out)
         save_house_profiles(doc)
 
     auto_persist(

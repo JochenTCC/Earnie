@@ -2,7 +2,7 @@
 
 On add-on start:
 - Fresh ``config.json`` (just bootstrapped from minimal) → seed ``ehal.backend=ha``
-- Every start → merge ``streamlit_port`` / ``ehal_loxone_http_port`` from
+- Every start → merge ``streamlit_port`` / ``ehal_loxone_http_port`` (→ ``ehal_http_port``) from
   ``/data/options.json`` into the matching config keys
 - Optional ``usage_ping`` bool → ``usage_ping.set_consent`` when the key is present
 
@@ -99,13 +99,19 @@ def _merge_port_options(payload: dict[str, Any], options: dict[str, Any]) -> boo
         if ui.get("streamlit_port") != streamlit_port:
             ui["streamlit_port"] = streamlit_port
             changed = True
-    loxone_http_port = _as_port(options.get("ehal_loxone_http_port"))
-    if loxone_http_port is not None:
+    http_port = _as_port(
+        options.get("ehal_http_port", options.get("ehal_loxone_http_port"))
+    )
+    if http_port is not None:
         system = payload.setdefault("system", {})
         if not isinstance(system, dict):
             payload["system"] = system = {}
-        if system.get("ehal_loxone_http_port") != loxone_http_port:
-            system["ehal_loxone_http_port"] = loxone_http_port
+        if system.get("ehal_http_port") != http_port:
+            system["ehal_http_port"] = http_port
+            changed = True
+        # Drop legacy key when writing the canonical port (Binding Lx3).
+        if "ehal_loxone_http_port" in system:
+            system.pop("ehal_loxone_http_port", None)
             changed = True
     return changed
 

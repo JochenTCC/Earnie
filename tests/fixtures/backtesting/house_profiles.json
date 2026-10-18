@@ -18,7 +18,10 @@
                     "living_area_m2": 100,
                     "building_class": 3,
                     "heat_pump_type": "luft",
-                    "persons": 2
+                    "persons": 2,
+                    "ehal_bindings": {
+                        "heatpump.wp.set_enable": ""
+                    }
                 }
             ]
         }
@@ -28,6 +31,10 @@
         "grid_meter": {
             "at_house_connection": true,
             "single_tariff": true
+        },
+        "ehal_bindings": {
+            "sens_grid_power_active": "",
+            "sens_pv_production_active": ""
         }
     }
 }

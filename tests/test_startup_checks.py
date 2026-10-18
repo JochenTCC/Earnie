@@ -115,7 +115,8 @@ class TestRunLoxoneVerifyOnStartup:
 
 class TestPrepareLoxonePushInboxForStartup:
     def test_order_hydrate_http_wait(self, monkeypatch):
-        monkeypatch.setenv("EARNIE_PILOT_PUSH_TOKEN", "tok")
+        monkeypatch.setenv("EARNIE_PUSH_TOKEN", "tok")
+        monkeypatch.delenv("EARNIE_PILOT_PUSH_TOKEN", raising=False)
         order: list[str] = []
 
         def _hydrate():
@@ -129,11 +130,11 @@ class TestPrepareLoxonePushInboxForStartup:
 
         with (
             patch(
-                "runtime_store.loxone_push_inbox.hydrate_memory_from_disk",
+                "runtime_store.ehal_push_inbox.hydrate_memory_from_disk",
                 side_effect=_hydrate,
             ),
             patch(
-                "runtime_store.loxone_push_inbox.wait_for_push_link",
+                "runtime_store.ehal_push_inbox.wait_for_push_link",
                 side_effect=_wait,
             ),
         ):
@@ -141,16 +142,17 @@ class TestPrepareLoxonePushInboxForStartup:
         assert order == ["hydrate", "http", "wait"]
 
     def test_skips_wait_without_token(self, monkeypatch):
+        monkeypatch.delenv("EARNIE_PUSH_TOKEN", raising=False)
         monkeypatch.delenv("EARNIE_PILOT_PUSH_TOKEN", raising=False)
         order: list[str] = []
 
         with (
             patch(
-                "runtime_store.loxone_push_inbox.hydrate_memory_from_disk",
+                "runtime_store.ehal_push_inbox.hydrate_memory_from_disk",
                 side_effect=lambda: order.append("hydrate"),
             ),
             patch(
-                "runtime_store.loxone_push_inbox.wait_for_push_link",
+                "runtime_store.ehal_push_inbox.wait_for_push_link",
                 side_effect=lambda: order.append("wait"),
             ),
         ):

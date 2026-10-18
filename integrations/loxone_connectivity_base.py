@@ -80,48 +80,67 @@ def _read_filter_start_hour_check(label: str, io_name: str) -> LoxoneCheck:
     )
 
 
-def _read_push_inbox_check(label: str, io_name: str) -> LoxoneCheck:
-    try:
-        from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
-        from runtime_store.loxone_push_inbox import read_push_value
+_EXPORT_HINT = "Signalliste → Export"
 
+
+def _never_received_warning(label: str, io_name: str, *, state: str | None) -> LoxoneCheck:
+    """Activated binding without VO push yet (Binding Lx2) — soft warning."""
+    base = "Kein frischer Push-Inbox-Wert"
+    if state:
+        base = f"{base} ({state})"
+    return LoxoneCheck(
+        label,
+        io_name,
+        False,
+        f"{base} — {_EXPORT_HINT}",
+        severity="warning",
+        state=state or "nie empfangen",
+    )
+
+
+def _read_push_inbox_check(label: str, io_name: str) -> LoxoneCheck:
+    from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
+    from runtime_store.loxone_push_inbox import (
+        STATE_ZERO_ASSUMED_NEVER,
+        is_valid_ehal_id,
+        read_push_value,
+    )
+
+    try:
         binding = resolve_push_binding(io_name)
     except Exception:  # noqa: BLE001
         binding = None
-    else:
-        if binding is not None and is_pushable_kind(binding.kind):
-            try:
-                value, state = read_push_value(binding.ehal_id)
-            except Exception:  # noqa: BLE001 — no Merker poll fallback for push
-                return LoxoneCheck(
-                    label,
-                    io_name,
-                    False,
-                    "Kein frischer Push-Inbox-Wert",
-                    severity="warning",
-                )
-            if value is None:
-                detail = "Kein frischer Push-Inbox-Wert"
-                if state:
-                    detail = f"{detail} ({state})"
-                return LoxoneCheck(
-                    label,
-                    io_name,
-                    False,
-                    detail,
-                    severity="warning",
-                    state=state,
-                )
+
+    if binding is not None and is_pushable_kind(binding.kind):
+        try:
+            value, state = read_push_value(binding.ehal_id)
+        except Exception:  # noqa: BLE001 — no Merker poll fallback for push
+            return _never_received_warning(label, io_name, state=None)
+        if value is None:
+            return _never_received_warning(label, io_name, state=state)
+        if state == STATE_ZERO_ASSUMED_NEVER:
+            # Soft: value assumed 0 because never pushed; still warn + export hint.
             return LoxoneCheck(
-                label, io_name, True, f"Wert={value}", state=state
+                label,
+                io_name,
+                False,
+                f"Wert={value}; {state} — {_EXPORT_HINT}",
+                severity="warning",
+                state=state,
             )
+        return LoxoneCheck(label, io_name, True, f"Wert={value}", state=state)
+
+    # Activated empty keys use the qualified EHAL ID as io_name; treat that as
+    # "never received" (Lx2), not a hard Merker-poll error.
+    if is_valid_ehal_id(io_name):
+        return _never_received_warning(label, io_name, state=None)
 
     # Q7: no Merker HTTP fallback — only push inbox (handled above) counts.
     return LoxoneCheck(
         label,
         io_name,
         False,
-        "Kein Push-Inbox-Wert (Merker-Poll entfernt)",
+        "Kein Push-Inbox-Wert (kein Mapping / Hub-Poll entfernt)",
     )
 
 

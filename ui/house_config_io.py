@@ -55,10 +55,12 @@ def house_doc_for_save(doc: dict) -> dict:
         profile_list = list(profiles)
     else:
         profile_list = []
+    from house_config.required_signal_activation import activate_plant_required
+
     out: dict = {"profiles": profile_list}
     plant = doc.get("plant")
     if isinstance(plant, dict) and plant:
-        out["plant"] = dict(plant)
+        out["plant"] = activate_plant_required(dict(plant))
     if "earnie_data_model" in doc:
         out["earnie_data_model"] = doc["earnie_data_model"]
     return out

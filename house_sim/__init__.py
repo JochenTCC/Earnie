@@ -8,6 +8,8 @@ __all__ = [
     "ArchetypePackage",
     "PhysicsState",
     "StateStore",
+    "ContractBundle",
+    "build_contract",
     "load_archetype",
     "start_mock_rest",
     "stop_mock_rest",
@@ -15,6 +17,7 @@ __all__ = [
 ]
 
 from house_sim.archetype import ArchetypePackage, FIXTURES_DIR, load_archetype
+from house_sim.contract import ContractBundle, build_contract
 from house_sim.mock_rest import DEFAULT_BENCH_TOKEN, start_mock_rest, stop_mock_rest
 from house_sim.state_store import StateStore
 from house_sim.stepper import PhysicsState, step_physics

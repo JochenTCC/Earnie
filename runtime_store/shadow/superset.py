@@ -53,25 +53,9 @@ def _superset_loxone(seen: frozenset[str], deadline: float) -> None:
 
 
 def _superset_ha(seen: frozenset[str], deadline: float) -> None:
-    from house_config.ha_ehal_bindings import aggregate_ha_entities
-    from integrations.ehal_live import get_ha_adapter
-
-    entities = aggregate_ha_entities(_house_profiles_doc())
-    try:
-        adapter = get_ha_adapter()
-    except Exception:  # noqa: BLE001
-        return
-    for entity_id in sorted({str(v).strip() for v in entities.values() if v}):
-        if not _budget_ok(deadline):
-            return
-        path = f"/api/states/{entity_id}"
-        key = f"ha:get:{path}"
-        if key in seen:
-            continue
-        try:
-            adapter.read_state(entity_id)
-        except Exception:  # noqa: BLE001
-            continue
+    """No REST pull: HA live reads are push-only (Binding P5e), like Loxone VO."""
+    del seen, deadline
+    return
 
 
 def _openems_channel_pairs(adapter: Any) -> list[tuple[str, str]]:

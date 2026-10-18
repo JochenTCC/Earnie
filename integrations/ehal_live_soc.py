@@ -78,6 +78,9 @@ def _soc_address_for_battery(bat: dict) -> str:
             adapter = live.get_openems_adapter()
             return f"{adapter.cfg.ess_component}/Soc"
         return ""
+    if live.is_ha_backend():
+        # Binding P5e: push-only — address is the qualified EHAL id.
+        return qualified_battery_id(ess_id, "sens_ess_soc")
     bindings = bat.get("ehal_bindings")
     if not isinstance(bindings, dict):
         return ""
@@ -100,14 +103,16 @@ def _read_soc_from_address(address: str) -> float | None:
                 raw = adapter.read_channel("_sum", "EssSoc")
             return None if raw is None else float(raw)
         if live.is_ha_backend():
-            adapter = live.get_ha_adapter()
-            entities = getattr(adapter.cfg, "entities", {}) or {}
-            entity_id = str(entities.get(addr) or addr).strip()
-            if not entity_id:
+            from integrations.ha_push_read import PushReadError, read_push_ehal_value
+
+            try:
+                adapter = live.get_ha_adapter()
+                sign = dict(getattr(adapter.cfg, "sign", {}) or {})
+                return float(
+                    read_push_ehal_value(addr, sign=sign, adapter_field=addr)
+                )
+            except PushReadError:
                 return None
-            payload = adapter.read_state(entity_id)
-            raw = payload.get("state")
-            return None if raw is None else float(raw)
         if live.is_loxone_backend() or not live.is_ehal_network_backend():
             from ehal.field_registry import apply_loxone_read, loxone_spec
 

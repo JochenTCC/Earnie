@@ -109,7 +109,7 @@ def test_v3_last_multi_battery_blocker(tmp_path):
 
 def test_meta_every_step_covered_by_fixture_detect(tmp_path):
     covered: set[str] = set()
-    for name in (*HAPPY_SNAPSHOTS, "v3_last"):
+    for name in (*HAPPY_SNAPSHOTS, "v3_last", "v4_pre_ha_pull"):
         docs = load_pack_docs(_copy_snapshot(tmp_path / "meta", name))
         for step in STEPS:
             if step.detect(docs):
@@ -129,6 +129,9 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm4.topology": "v4_pre_topology",
         "dm4.pool_filter": "v3_single_battery",
         "dm4.grid_fee_profile": "v4_pre_inverter_gridfee",
+        "dm4.required_signal_activation": "v4_pre_ha_pull",
+        "dm4.ha_pull_removal": "v4_pre_ha_pull",
+        "dm4.ehal_http_port": "v4_pre_ha_pull",
     }
     for step in STEPS:
         docs = load_pack_docs(_copy_snapshot(tmp_path / step.id, mapping[step.id]))

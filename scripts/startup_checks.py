@@ -39,9 +39,10 @@ def prepare_loxone_push_inbox_for_startup(
 
     Call before ``run_loxone_verify_on_startup`` so last-known (≤5 min) and a
     fresh VO cycle can populate the inbox. ``wait_for_link`` defaults to True
-    when ``EARNIE_PILOT_PUSH_TOKEN`` is set.
+    when ``EARNIE_PUSH_TOKEN`` (or legacy ``EARNIE_PILOT_PUSH_TOKEN``) is set.
     """
-    from runtime_store.loxone_push_inbox import (
+    from integrations.ehal_request_http import push_token
+    from runtime_store.ehal_push_inbox import (
         hydrate_memory_from_disk,
         wait_for_push_link,
     )
@@ -50,7 +51,7 @@ def prepare_loxone_push_inbox_for_startup(
     if start_http_fn is not None:
         start_http_fn()
     if wait_for_link is None:
-        wait_for_link = bool(os.getenv("EARNIE_PILOT_PUSH_TOKEN"))
+        wait_for_link = bool(push_token())
     if wait_for_link:
         wait_for_push_link()
 

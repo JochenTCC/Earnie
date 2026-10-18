@@ -330,7 +330,7 @@ def _install_push_indexes(monkeypatch: pytest.MonkeyPatch) -> None:
     src.clear_source_caches()
     monkeypatch.setattr(
         src,
-        "get_merker_index",
+        "get_address_index",
         lambda: src.build_merker_index(_PUSH_HOUSE, _PUSH_COMPONENTS),
     )
     monkeypatch.setattr(

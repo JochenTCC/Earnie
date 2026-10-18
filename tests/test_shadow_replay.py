@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from integrations.ha_adapter import HaAdapter, HaConfig, HaHttpError
 from runtime_store.shadow import feed as shadow_feed
 from runtime_store.shadow import reader as shadow_reader
 from runtime_store.shadow import replay as shadow_replay
@@ -163,43 +162,6 @@ def test_replay_sampler_newer_than_cycle_stays_fresh(monkeypatch, tmp_path):
     assert replay_loxone_io("loxone:io:Soc") == "55"
 
 
-def test_replay_ha_get(monkeypatch, tmp_path):
-    feed = tmp_path / "feed"
-    path = "/api/states/sensor.soc"
-    payload = {"entity_id": "sensor.soc", "state": "42", "attributes": {}}
-    _write_feed(
-        feed,
-        {
-            f"ha:get:{path}": {
-                "key": f"ha:get:{path}",
-                "ts": _utc(),
-                "ok": True,
-                "status": 200,
-                "payload": payload,
-                "error": None,
-            }
-        },
-    )
-    monkeypatch.setenv("EARNIE_SHADOW", "1")
-    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
-    adapter = HaAdapter(
-        HaConfig(base_url="http://unused", token="x", adapter_id="t", entities={})
-    )
-    assert adapter._get_json(path) == payload
-
-
-def test_replay_ha_missing_raises(monkeypatch, tmp_path):
-    feed = tmp_path / "feed"
-    _write_feed(feed, {})
-    monkeypatch.setenv("EARNIE_SHADOW", "1")
-    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
-    adapter = HaAdapter(
-        HaConfig(base_url="http://unused", token="x", adapter_id="t", entities={})
-    )
-    with pytest.raises(HaHttpError):
-        adapter._get_json("/api/states/sensor.x")
-
-
 def test_assert_backend_blocked_in_shadow(monkeypatch):
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     with pytest.raises(ShadowBackendAccessError):
@@ -207,9 +169,8 @@ def test_assert_backend_blocked_in_shadow(monkeypatch):
 
 
 def test_probe_entries_raise_in_shadow(monkeypatch):
-    """R3: MCP / greenfield / EHAL mapping probes must hard-forbid, not UI-only."""
+    """R3: MCP / greenfield probes must hard-forbid, not UI-only."""
     monkeypatch.setenv("EARNIE_SHADOW", "1")
-    from integrations.ha_adapter import HaAdapter, HaConfig
     from integrations.loxone_connectivity import probe_loxone_http_access
     from integrations.loxone_greenfield_import import run_greenfield_import
     # Import structure before mcp_probe to avoid circular import init order.
@@ -222,10 +183,6 @@ def test_probe_entries_raise_in_shadow(monkeypatch):
         probe_loxone_http_access(host="10.0.0.1", username="u", password="p")
     with pytest.raises(ShadowBackendAccessError):
         run_greenfield_import({"controls": {}})
-    with pytest.raises(ShadowBackendAccessError):
-        HaAdapter(
-            HaConfig(base_url="http://unused", token="x", adapter_id="t", entities={})
-        ).list_mappable_entities()
     with pytest.raises(ShadowBackendAccessError):
         scan_structure(host="10.0.0.1", username="u", password="p")
 

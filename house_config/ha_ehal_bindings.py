@@ -105,37 +105,43 @@ def migrate_ha_entities_to_house(
     house_doc: dict | None,
     entities: dict | None,
 ) -> tuple[dict, bool]:
-    """Empty-only merge of flat ``ehal.ha.entities`` into entity-scoped bindings."""
+    """Activate flat ``ehal.ha.entities`` keys as empty bindings (Binding P5e).
+
+    Entity_id values are discarded — Earnie stores no HA names (push-only).
+    """
     house = copy.deepcopy(house_doc) if isinstance(house_doc, dict) else {}
     if not isinstance(entities, dict) or not entities:
         return house, False
+    # Keys only (ignore stored entity_id values).
     canonical = canonicalize_ha_entity_keys(
-        {str(k): str(v) for k, v in entities.items() if _nonempty(v)}
+        {str(k): "" for k in entities if str(k or "").strip()},
+        keep_empty=True,
     )
     if not canonical:
         return house, False
 
     plant = _ensure_plant(house)
-    plant_bindings = _binding_map(plant.get("ehal_bindings"))
+    plant_bindings = _activation_map(plant.get("ehal_bindings"))
     ev_consumer = find_first_ev_consumer(house)
-    ev_bindings = _binding_map(ev_consumer.get("ehal_bindings") if ev_consumer else None)
+    ev_bindings = _activation_map(
+        ev_consumer.get("ehal_bindings") if ev_consumer else None
+    )
     changed = False
 
-    for field, entity_id in canonical.items():
-        eid = _nonempty(entity_id)
-        if not eid:
-            continue
+    for field in canonical:
         if field in HA_EV_FIELDS and ev_consumer is not None:
-            if _put_empty_only(ev_bindings, field, eid):
+            if field not in ev_bindings:
+                ev_bindings[field] = ""
                 changed = True
         else:
-            if _put_empty_only(plant_bindings, field, eid):
+            if field not in plant_bindings:
+                plant_bindings[field] = ""
                 changed = True
 
-    if plant_bindings != _binding_map(plant.get("ehal_bindings")):
+    if plant_bindings != _activation_map(plant.get("ehal_bindings")):
         plant["ehal_bindings"] = plant_bindings
         changed = True
-    if ev_consumer is not None and ev_bindings != _binding_map(
+    if ev_consumer is not None and ev_bindings != _activation_map(
         ev_consumer.get("ehal_bindings")
     ):
         ev_consumer["ehal_bindings"] = ev_bindings
@@ -188,21 +194,16 @@ def aggregate_ha_entities(
     components_doc: dict | None = None,
     transport: str | None = None,
 ) -> dict[str, str]:
-    """Field→entity_id map for ``HaAdapter``: plant + first EV + battery entity-scoped.
+    """Activated HA binding keys (push-only, Binding P5e).
 
-    ESS is entity-scoped ``ess.{id}.*`` only (no plant-flat aliases).
-
-    ``transport=push``: include activated binding keys even when ``entity_id`` is empty
-    (push-only reads / status.json writes). ``pull`` keeps non-empty entity ids only.
+    Values are empty activation flags — Earnie stores no ``entity_id``.
+    ``transport`` is ignored (kept for call-site compatibility); pull was removed.
     """
+    del transport  # Binding P5e: push-only; argument ignored
     from ehal.ess_fields import is_plant_flat_ess_field
-    from house_config.ess_bindings import entity_scoped_battery_bindings
-    from runtime_store.ehal_setup import HA_TRANSPORT_PUSH, normalize_ha_transport
 
-    push = (
-        normalize_ha_transport(transport) == HA_TRANSPORT_PUSH if transport else False
-    )
-    bind = _activation_map if push else _binding_map
+    bind = _activation_map
+    push = True
 
     house = house_doc if isinstance(house_doc, dict) else {}
     out: dict[str, str] = {}
@@ -214,18 +215,14 @@ def aggregate_ha_entities(
         # Battery-owned ESS (incl. Quellenwahl) come from components entity-scoped.
         if is_plant_flat_ess_field(field):
             continue
-        value = plant_bindings.get(field)
-        if value or (push and field in plant_bindings):
-            out[field] = value
+        if field in plant_bindings:
+            out[field] = plant_bindings.get(field) or ""
     # EV keys: prefer consumer; fall back to plant (migrate without EV consumer).
     ev_consumer = find_first_ev_consumer(house)
     ev_bindings = bind(ev_consumer.get("ehal_bindings") if ev_consumer else None)
     for field in HA_EV_FIELDS:
-        value = ev_bindings.get(field) or plant_bindings.get(field)
-        if value or (
-            push and (field in ev_bindings or field in plant_bindings)
-        ):
-            out[field] = value
+        if field in ev_bindings or field in plant_bindings:
+            out[field] = ev_bindings.get(field) or plant_bindings.get(field) or ""
 
     batteries = _batteries_for_aggregate(components_doc)
     _merge_entity_ehal_bindings(out, batteries, bind, push=push, require_id=True)
@@ -235,12 +232,8 @@ def aggregate_ha_entities(
     _merge_entity_ehal_bindings(
         out, _pv_systems_for_aggregate(components_doc), bind, push=push
     )
-    if not push:
-        for key, value in entity_scoped_battery_bindings(batteries).items():
-            if value and key not in out:
-                out[key] = value
     _merge_plant_ess_bindings(out, plant_bindings, push=push)
-    return canonicalize_ha_entity_keys(out, keep_empty=push)
+    return canonicalize_ha_entity_keys(out, keep_empty=True)
 
 def _batteries_for_aggregate(components_doc: dict | None) -> list[dict]:
     from house_config.powerstation import ehal_mappable_batteries
@@ -310,39 +303,42 @@ def apply_ha_entities_to_house(
     house_doc: dict | None,
     entities: dict[str, str] | None,
 ) -> dict:
-    """Overwrite HA-scoped bindings from a flat map (HITL giant-form save)."""
+    """Activate HA-scoped binding keys from a flat map (values always empty).
+
+    Binding P5e: no ``entity_id`` storage; HITL mapping UI removed.
+    """
     house = copy.deepcopy(house_doc) if isinstance(house_doc, dict) else {}
     canonical = canonicalize_ha_entity_keys(
-        {str(k): str(v) for k, v in (entities or {}).items() if _nonempty(v)}
+        {str(k): "" for k in (entities or {}) if str(k or "").strip()},
+        keep_empty=True,
     )
     from ehal.ess_fields import is_ess_entity_scoped_field
 
     plant = _ensure_plant(house)
-    plant_bindings = _binding_map(plant.get("ehal_bindings"))
+    plant_bindings = _activation_map(plant.get("ehal_bindings"))
     for field in HA_PLANT_FIELDS:
         if field in canonical:
-            plant_bindings[field] = canonical[field]
+            plant_bindings[field] = ""
         else:
             plant_bindings.pop(field, None)
-    # Entity-scoped ESS keys (e.g. ess.{id}.sens_ess_soc) are not in HA_PLANT_FIELDS.
-    for field, eid in canonical.items():
+    for field in canonical:
         if is_ess_entity_scoped_field(field):
-            plant_bindings[field] = eid
+            plant_bindings[field] = ""
 
     ev_consumer = find_first_ev_consumer(house)
     if ev_consumer is not None:
-        ev_bindings = _binding_map(ev_consumer.get("ehal_bindings"))
+        ev_bindings = _activation_map(ev_consumer.get("ehal_bindings"))
         for field in HA_EV_FIELDS:
             plant_bindings.pop(field, None)
             if field in canonical:
-                ev_bindings[field] = canonical[field]
+                ev_bindings[field] = ""
             else:
                 ev_bindings.pop(field, None)
         ev_consumer["ehal_bindings"] = ev_bindings
     else:
         for field in HA_EV_FIELDS:
             if field in canonical:
-                plant_bindings[field] = canonical[field]
+                plant_bindings[field] = ""
             else:
                 plant_bindings.pop(field, None)
 
