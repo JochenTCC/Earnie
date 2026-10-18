@@ -132,6 +132,7 @@ def build_command(
     no_cache: bool,
     push: bool,
     build_date: str | None = None,
+    revision: str | None = None,
 ) -> list[str]:
     if not tags:
         raise ValueError("Mindestens ein Image-Tag ist erforderlich.")
@@ -147,6 +148,9 @@ def build_command(
 
     stamp = build_date if build_date is not None else utc_build_date()
     build_arg = ["--build-arg", f"BUILD_DATE={stamp}"]
+    if revision:
+        # Read back by scripts.release_image_gate (idempotent release re-runs).
+        build_arg.extend(["--label", f"org.opencontainers.image.revision={revision}"])
 
     if is_multiarch(platform):
         cmd = ["docker", "buildx", "build", "--platform", platform, "-f", str(dockerfile)]
@@ -232,6 +236,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Nur :<version>-Tags pushen (Release-Kandidat); :next/:latest setzt --promote",
     )
     parser.add_argument(
+        "--revision",
+        metavar="GIT_SHA",
+        help="Git-Commit als OCI-Label org.opencontainers.image.revision (Release-Builds)",
+    )
+    parser.add_argument(
         "--promote",
         action="store_true",
         help="Kein Build: :next (offiziell auch :latest) auf das gepushte :<version> setzen",
@@ -261,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
             context=args.context,
             no_cache=args.no_cache,
             push=args.push,
+            revision=args.revision,
         )
         run_build(cmd)
         if args.push and not is_multiarch(platform):

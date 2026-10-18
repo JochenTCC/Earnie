@@ -6,7 +6,7 @@ Add-on `version:` in `earnie/config.yaml` / `earnie_prerelease/config.yaml` **mi
 
 ## Release workflow (automatic)
 
-Every Earnie git tag triggers [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml):
+Every Earnie git tag triggers [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml) (a manual run with `targets=docker` skips all add-on steps below, `targets=ha` skips moving `:next`/`:latest`):
 
 1. **Candidate** (job `release`): build and push `ghcr.io/jochentcc/earnie-energy:<version>` (multi-arch, `:<version>` only) and HA add-on images `ghcr.io/jochentcc/earnie-addon-{amd64,aarch64}:<version>` (H6); create the GitHub Release as **draft**.
 2. **Pre-gate checks:** `addon_smoke` (`python -m scripts.ha_addon_smoke` — starts the add-on image with `/data/options.json` + `/config`, waits for Streamlit health, checks `config.json` lands in `/config`; amd64 blocking, aarch64 under QEMU soft), `addon_lint` (pin bump + addon-linter in the workspace, no commit), `qemu_smoke` (soft).

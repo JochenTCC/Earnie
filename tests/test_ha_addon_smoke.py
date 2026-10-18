@@ -177,3 +177,35 @@ def test_release_workflow_dev_builds_stop_before_publish():
     assert "needs.release.outputs.dev != 'true'" in promote
     addon_publish = (RELEASE_WORKFLOW.parent / "ha-addon-publish.yml").read_text(encoding="utf-8")
     assert '"$VERSION" == *-dev*' in addon_publish
+
+
+def test_release_workflow_targets_select_docker_or_ha():
+    """targets=docker skips everything add-on; targets=ha keeps :next/:latest untouched."""
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    assert "      targets:\n" in text.split("\njobs:\n", 1)[0]
+    gate = text.split("- name: Version gate", 1)[1].split("- name:", 1)[0]
+    assert 'TARGETS="both"' in gate  # tag push → both
+    assert 'echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"' in gate
+    release_job = text.split("\n  release:\n", 1)[1].split("\n  addon_smoke:\n", 1)[0]
+    addon_build = release_job.split("- name: Build and push HA add-on images", 1)[1].split("- name:", 1)[0]
+    assert "if: steps.version.outputs.targets != 'docker'" in addon_build
+    for job in ("addon_smoke", "addon_lint", "publish_ha_addon"):
+        head = text.split(f"\n  {job}:\n", 1)[1].split("\n    steps:\n", 1)[0]
+        assert "if: needs.release.outputs.targets != 'docker'" in head, job
+    promote = text.split("\n  promote:\n", 1)[1].split("\n  publish_ha_addon:\n", 1)[0]
+    assert "needs.release.outputs.targets == 'docker'" in promote.split("\n    steps:\n", 1)[0]
+    floating = promote.split("- name: Promote floating tags", 1)[1].split("- name:", 1)[0]
+    assert "if: needs.release.outputs.targets != 'ha'" in floating
+    publish = promote.split("- name: Publish GitHub Release", 1)[1].split("run:", 1)[0]
+    assert "if:" not in publish  # the GitHub Release is always published
+
+
+def test_release_workflow_builds_are_idempotent():
+    """Re-runs reuse :<version> images of the same commit instead of rebuilding them."""
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    release_job = text.split("\n  release:\n", 1)[1].split("\n  addon_smoke:\n", 1)[0]
+    assert release_job.count("scripts.release_image_gate") == 2
+    base = release_job.split("- name: Build and push multi-arch image", 1)[1].split("- name:", 1)[0]
+    assert "if: steps.base_image.outputs.exists != 'true'" in base
+    assert "--revision" in base
+    assert "org.opencontainers.image.revision=${REVISION}" in release_job

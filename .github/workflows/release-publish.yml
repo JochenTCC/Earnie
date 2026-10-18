@@ -16,6 +16,15 @@
 #   4. publish_ha_addon  pins ha-addon-earnie → only now HA offers the update
 # Nothing user-visible happens before step 3. Reject the deployment to drop a bad candidate.
 # Dev builds end after step 2; install them on your own HA via the local add-on (:<version>).
+#
+# Targets (workflow_dispatch input; a tag push always means "both"):
+#   both    Docker channel (:next/:latest for LoxBerry/Synology) + HA add-on
+#   docker  Docker channel only — no add-on images, add-on smoke/lint or add-on pin
+#   ha      HA add-on only — :next/:latest stay where they are
+# The base image earnie-energy:<version> is always built (the add-on wraps it) and the
+# GitHub Release is always published. Builds are idempotent: an existing :<version>
+# image from the same commit is reused (scripts.release_image_gate), so the missing
+# half can be released later by re-running with the other target.
 
 name: Release
 
@@ -30,6 +39,15 @@ on:
         description: Existing git tag to release (e.g. v2.5.3-alpha.1)
         required: true
         type: string
+      targets:
+        description: What to publish (both | docker = LoxBerry/Synology channel | ha = HA add-on)
+        required: false
+        type: choice
+        options:
+          - both
+          - docker
+          - ha
+        default: both
 
 # Least privilege: write scopes live on the jobs that need them (S8233).
 permissions: {}
@@ -46,6 +64,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       prerelease: ${{ steps.version.outputs.prerelease }}
       dev: ${{ steps.version.outputs.dev }}
+      targets: ${{ steps.version.outputs.targets }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -64,15 +83,22 @@ jobs:
         id: version
         env:
           DISPATCH_TAG: ${{ github.event.inputs.tag }}
+          DISPATCH_TARGETS: ${{ github.event.inputs.targets }}
         run: |
           set -euo pipefail
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             TAG="${DISPATCH_TAG}"
             TAG="${TAG#v}"
             TAG="v${TAG}"
+            TARGETS="${DISPATCH_TARGETS:-both}"
           else
             TAG="${GITHUB_REF_NAME}"
+            TARGETS="both"
           fi
+          case "$TARGETS" in
+            both|docker|ha) ;;
+            *) echo "::error::Unknown targets '${TARGETS}' (both | docker | ha)"; exit 1 ;;
+          esac
           EXPECTED="${TAG#v}"
           ACTUAL="$(python -c 'from version import __version__; print(__version__)')"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
@@ -96,7 +122,8 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
           echo "dev=${DEV}" >> "$GITHUB_OUTPUT"
-          echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE}, dev=${DEV})"
+          echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"
+          echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE}, dev=${DEV}, targets=${TARGETS})"
 
       - name: Release notes gate (reviewed notes required, none for -dev)
         if: steps.version.outputs.dev != 'true'
@@ -143,18 +170,38 @@ jobs:
           # (write:packages) stored as repo secret GHCR_TOKEN.
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
+      - name: Base image already on GHCR? (idempotent re-run)
+        id: base_image
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: >-
+          python -m scripts.release_image_gate
+          --image "ghcr.io/jochentcc/earnie-energy:${VERSION}"
+          --revision "$(git rev-parse HEAD)"
+
+      # Always built: the HA add-on image is a wrapper around earnie-energy:<version>.
       - name: Build and push multi-arch image (candidate, :<version> only)
-        run: python -m scripts.build_container --target all --push --versioned-only
+        if: steps.base_image.outputs.exists != 'true'
+        run: python -m scripts.build_container --target all --push --versioned-only --revision "$(git rev-parse HEAD)"
         # Tariff deploy-gate runs inside build_container when --push is set.
         # :next / :latest are set by the promote job after approval.
 
       - name: Build and push HA add-on images (H6)
+        if: steps.version.outputs.targets != 'docker'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           CONTEXT="packaging/homeassistant-addon/earnie"
+          REVISION="$(git rev-parse HEAD)"
           for arch in amd64 aarch64; do
+            IMAGE="ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}"
+            GATE_OUT="${RUNNER_TEMP}/addon-gate-${arch}"
+            GITHUB_OUTPUT="$GATE_OUT" python -m scripts.release_image_gate --image "$IMAGE" --revision "$REVISION"
+            if grep -qx 'exists=true' "$GATE_OUT"; then
+              echo "Reusing ${IMAGE} (already built from ${REVISION})"
+              continue
+            fi
             if [ "$arch" = "amd64" ]; then
               platform="linux/amd64"
             else
@@ -163,11 +210,11 @@ jobs:
             docker buildx build \
               --platform "$platform" \
               --build-arg "EARNIE_VERSION=${VERSION}" \
-              -t "ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}" \
+              -t "${IMAGE}" --label "org.opencontainers.image.revision=${REVISION}" \
               -f "${CONTEXT}/Dockerfile" \
               "${CONTEXT}" \
               --push
-            echo "Pushed ghcr.io/jochentcc/earnie-addon-${arch}:${VERSION}"
+            echo "Pushed ${IMAGE}"
           done
 
       - name: Prepare release notes
@@ -210,6 +257,7 @@ jobs:
   # under QEMU emulation (slow, informative only).
   addon_smoke:
     needs: release
+    if: needs.release.outputs.targets != 'docker'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -264,6 +312,7 @@ jobs:
   # not main — main may have moved on since the tag.
   addon_lint:
     needs: release
+    if: needs.release.outputs.targets != 'docker'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -299,14 +348,16 @@ jobs:
   # Test the candidate on your own HA first (local add-on on the :<version> image).
   # qemu_smoke is soft and deliberately not part of the condition.
   # Dev builds never get here: no approval, no :next, no release, no add-on pin.
+  # targets=docker: add-on gates are skipped and not required.
   promote:
     needs: [release, addon_smoke, addon_lint, qemu_smoke]
     if: >-
       ${{ !cancelled()
       && needs.release.result == 'success'
       && needs.release.outputs.dev != 'true'
-      && needs.addon_smoke.result == 'success'
-      && needs.addon_lint.result == 'success' }}
+      && (needs.release.outputs.targets == 'docker'
+          || (needs.addon_smoke.result == 'success'
+              && needs.addon_lint.result == 'success')) }}
     runs-on: ubuntu-latest
     environment: release-approval
     permissions:
@@ -324,16 +375,20 @@ jobs:
           python-version: "3.14"
 
       - name: Set up Docker Buildx
+        if: needs.release.outputs.targets != 'ha'
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to GHCR
+        if: needs.release.outputs.targets != 'ha'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
+      # targets=ha: LoxBerry/Synology users following :next/:latest stay on the old build.
       - name: Promote floating tags (:next, official also :latest)
+        if: needs.release.outputs.targets != 'ha'
         run: python -m scripts.build_container --promote
 
       - name: Publish GitHub Release
@@ -354,6 +409,7 @@ jobs:
   # Runs only after the promote job was approved.
   publish_ha_addon:
     needs: [release, promote]
+    if: needs.release.outputs.targets != 'docker'
     runs-on: ubuntu-latest
     permissions:
       contents: write
