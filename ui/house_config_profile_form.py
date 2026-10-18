@@ -231,6 +231,7 @@ def _edit_and_sync_consumers(session_scope: str, location: dict) -> tuple[list, 
         _render_consumer_form(
             consumer,
             index,
+            consumers=consumers,
             latitude=location["latitude"],
             longitude=location["longitude"],
             session_scope=session_scope,

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from ui.house_config_profile_session import (
     _SESSION_CONSUMERS_KEY,
+    _bump_consumer_widget_gen,
     _clear_consumer_widget_keys,
     _consumer_type_options,
+    _other_consumers_have_thermal_annual,
     _scoped_key,
     _type_index,
 )
@@ -117,6 +119,7 @@ def _render_consumer_form(
     consumer: dict,
     index: int,
     *,
+    consumers: list[dict],
     latitude: float,
     longitude: float,
     session_scope: str,
@@ -143,9 +146,10 @@ def _render_consumer_form(
             "Entfernen",
             key=_scoped_key(session_scope, f"hc_remove_{index}"),
         ):
-            consumers = list(st.session_state[_SESSION_CONSUMERS_KEY])
-            del consumers[index]
-            st.session_state[_SESSION_CONSUMERS_KEY] = consumers
+            session_consumers = list(st.session_state[_SESSION_CONSUMERS_KEY])
+            del session_consumers[index]
+            st.session_state[_SESSION_CONSUMERS_KEY] = session_consumers
+            _bump_consumer_widget_gen(session_scope)
             _clear_consumer_widget_keys(session_scope)
             st.rerun()
     with exp_col:
@@ -161,6 +165,7 @@ def _render_consumer_form(
             return _render_consumer_form_body(
                 consumer,
                 index,
+                consumers=consumers,
                 latitude=latitude,
                 longitude=longitude,
                 session_scope=session_scope,
@@ -202,13 +207,17 @@ def _render_consumer_identity_fields(
     consumer: dict,
     index: int,
     *,
+    consumers: list[dict],
     session_scope: str,
 ) -> tuple[str, str, float, bool]:
-    type_options = _consumer_type_options(index)
+    type_options = _consumer_type_options(consumers, index)
     current_type = str(consumer.get("type", "generic"))
-    if index > 0 and current_type == "thermal_annual":
+    if (
+        current_type == "thermal_annual"
+        and _other_consumers_have_thermal_annual(consumers, index)
+    ):
         st.warning(
-            "Typ „Haus Wärme“ ist nur für Verbraucher 1 erlaubt. "
+            "Nur ein Verbraucher vom Typ „Haus Wärme“ ist erlaubt. "
             "Bitte einen anderen Typ wählen."
         )
     c_type = labeled_selectbox(
@@ -264,6 +273,7 @@ def _render_consumer_form_body(
     consumer: dict,
     index: int,
     *,
+    consumers: list[dict],
     latitude: float,
     longitude: float,
     session_scope: str,
@@ -281,7 +291,7 @@ def _render_consumer_form_body(
         if seed and not str(consumer.get(ID_PROVISIONAL_LABEL_KEY) or "").strip():
             consumer[ID_PROVISIONAL_LABEL_KEY] = seed
     c_type, c_label, nominal, force_id = _render_consumer_identity_fields(
-        consumer, index, session_scope=session_scope
+        consumer, index, consumers=consumers, session_scope=session_scope
     )
     item: dict = {
         "label": c_label,

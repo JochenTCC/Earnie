@@ -710,10 +710,23 @@ def test_default_additional_consumer_is_generic():
     assert "schedule" in consumer
 
 
-def test_consumer_type_options_thermal_only_on_first():
-    assert "thermal_annual" in _consumer_type_options(0)
-    assert "thermal_annual" not in _consumer_type_options(1)
-    assert _consumer_type_options(1) == ["generic", "thermal_rc", "ev"]
+def test_consumer_type_options_thermal_uniqueness():
+    none_thermal = [{"type": "generic"}, {"type": "ev"}]
+    assert "thermal_annual" in _consumer_type_options(none_thermal, 0)
+    assert "thermal_annual" in _consumer_type_options(none_thermal, 1)
+
+    self_thermal = [{"type": "generic"}, {"type": "thermal_annual"}]
+    assert "thermal_annual" in _consumer_type_options(self_thermal, 1)
+    assert "thermal_annual" not in _consumer_type_options(self_thermal, 0)
+    assert _consumer_type_options(self_thermal, 0) == [
+        "generic",
+        "thermal_rc",
+        "ev",
+    ]
+
+    first_thermal = [{"type": "thermal_annual"}, {"type": "generic"}]
+    assert "thermal_annual" in _consumer_type_options(first_thermal, 0)
+    assert "thermal_annual" not in _consumer_type_options(first_thermal, 1)
 
 
 def test_consumer_expander_title_includes_type_label():
@@ -750,7 +763,9 @@ def test_consumer_expander_title_uses_live_type_from_session():
     class _Session(dict):
         pass
 
-    session = _Session({"home__hc_type_1": "ev", "home__hc_label_1": "Garage"})
+    session = _Session(
+        {"home__hc_g0_type_1": "ev", "home__hc_g0_label_1": "Garage"}
+    )
     consumer = {"label": "Alt", "type": "generic", "nominal_power_kw": 11.0}
     import ui.house_config_profile_form as form
 
@@ -810,7 +825,7 @@ def test_seed_ev_defaults_on_type_switch_overwrites_generic_power():
     class _Session(dict):
         pass
 
-    session = _Session({"home__hc_type_1": "ev", "home__hc_nom_1": 1.0})
+    session = _Session({"home__hc_g0_type_1": "ev", "home__hc_g0_nom_1": 1.0})
     consumer = {
         "id": "e_auto",
         "label": "Garage",
@@ -834,16 +849,16 @@ def test_seed_ev_defaults_on_type_switch_overwrites_generic_power():
     assert seeded["type"] == "ev"
     assert seeded["nominal_power_kw"] == defaults["nominal_power_kw"]
     assert seeded["min_power_kw"] == defaults["min_power_kw"]
-    assert session["home__hc_nom_1"] == defaults["nominal_power_kw"]
-    assert session["home__hc_ev_min_1"] == defaults["min_power_kw"]
-    assert session["home__hc_ev_min_qh_1"] == defaults["min_on_quarterhours"]
+    assert session["home__hc_g0_nom_1"] == defaults["nominal_power_kw"]
+    assert session["home__hc_g0_ev_min_1"] == defaults["min_power_kw"]
+    assert session["home__hc_g0_ev_min_qh_1"] == defaults["min_on_quarterhours"]
 
 
 def test_seed_ev_defaults_skips_existing_ev_consumer():
     class _Session(dict):
         pass
 
-    session = _Session({"home__hc_type_0": "ev", "home__hc_nom_0": 11.0})
+    session = _Session({"home__hc_g0_type_0": "ev", "home__hc_g0_nom_0": 11.0})
     consumer = {
         "label": "smart",
         "type": "ev",
@@ -860,11 +875,43 @@ def test_seed_ev_defaults_skips_existing_ev_consumer():
         form.st.session_state = original
 
     assert out is consumer
-    assert session["home__hc_nom_0"] == 11.0
-    assert "home__hc_ev_min_0" not in session
+    assert session["home__hc_g0_nom_0"] == 11.0
+    assert "home__hc_g0_ev_min_0" not in session
 
 
-def test_profile_rejects_thermal_on_second_consumer(tmp_path):
+def test_consumer_widget_gen_bump_changes_scoped_hc_keys():
+    """Entfernen must invalidate index-keyed widgets so stale labels cannot stick."""
+    class _Session(dict):
+        pass
+
+    from ui.house_config_profile_session import (
+        _bump_consumer_widget_gen,
+        _clear_consumer_widget_keys,
+        _scoped_key,
+    )
+
+    session = _Session(
+        {
+            "home__hc_g0_label_0": "A",
+            "home__hc_g0_label_1": "B",
+        }
+    )
+    import ui.house_config_profile_session as profile_session
+
+    original = profile_session.st.session_state
+    profile_session.st.session_state = session
+    try:
+        assert _scoped_key("home", "hc_label_0") == "home__hc_g0_label_0"
+        assert _bump_consumer_widget_gen("home") == 1
+        _clear_consumer_widget_keys("home")
+        assert "home__hc_g0_label_0" not in session
+        assert _scoped_key("home", "hc_label_0") == "home__hc_g1_label_0"
+        assert session.get("home__house_consumer_widget_gen") == 1
+    finally:
+        profile_session.st.session_state = original
+
+
+def test_profile_accepts_thermal_on_second_consumer(tmp_path):
     path = tmp_path / "house_profiles.json"
     path.write_text(
         json.dumps(
@@ -889,10 +936,44 @@ def test_profile_rejects_thermal_on_second_consumer(tmp_path):
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="Verbraucher 1"):
-        load_house_profiles_document(str(path))
+    doc = load_house_profiles_document(str(path))
+    consumers = doc["profiles"]["home"]["consumers"]
+    assert consumers[1]["type"] == "thermal_annual"
     assert _profile_session_scope("— neu —", is_new=True) == "__new__"
     assert _profile_session_scope("example_efh", is_new=False) == "example_efh"
+
+
+def test_profile_rejects_two_thermal_annual_consumers(tmp_path):
+    path = tmp_path / "house_profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "annual_kwh": 5000,
+                        "latitude": 48.2,
+                        "longitude": 11.0,
+                        "consumers": [
+                            {
+                                "id": "heat",
+                                "type": "thermal_annual",
+                                "living_area_m2": 100,
+                            },
+                            {
+                                "id": "heat2",
+                                "type": "thermal_annual",
+                                "living_area_m2": 80,
+                            },
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="nur ein Verbraucher"):
+        load_house_profiles_document(str(path))
 
 
 def test_initial_profile_index_defaults_to_live_when_runtime_empty(monkeypatch):

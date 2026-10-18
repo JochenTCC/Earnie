@@ -2,6 +2,22 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Haus Wärme type after Loxone consumer import (2026-10-18)
+
+- [x] **Haus Wärme type after Loxone consumer import** — **Verified** (2026-10-18)
+  - Symptom: after Consumer-Import, imported heatpump could not be set to `thermal_annual` (Haus Wärme) when not at list index 0.
+  - Cause: UI `_consumer_type_options` and store validation required Haus Wärme only on Verbraucher 1; import appends consumers so heatpump often lands at index ≥ 1.
+  - Fix: offer `thermal_annual` whenever no *other* consumer already has that type; drop index-0-only store check (keep singleton).
+  - Tests: `tests/test_planning_editors.py` (`test_consumer_type_options_thermal_uniqueness`, `test_profile_accepts_thermal_on_second_consumer`, `test_profile_rejects_two_thermal_annual_consumers`).
+
+### Bugfix — Hausprofil Verbraucher Entfernen (2026-10-18)
+
+- [x] **Deleting consumer is flaky (wrong / deleted consumer edited after Entfernen)** — **Verified** (2026-10-18)
+  - Symptom: after Entfernen, editing a remaining Verbraucher changed the deleted one’s Bezeichnung; labels shifted across surviving IDs via auto_persist.
+  - Cause: index-keyed `hc_*` Streamlit widgets reused after list shift; clearing session keys was not enough — later reruns restored stale frontend values onto the same key names.
+  - Fix: bump `house_consumer_widget_gen` on Entfernen; `_scoped_key` embeds gen as `hc_g{N}_…` so widgets remount cleanly.
+  - Tests: `tests/test_planning_editors.py` (`test_consumer_widget_gen_bump_changes_scoped_hc_keys`).
+
 ### Bugfix — Greenfield Loxone Dogfood (2026-10-18)
 
 - [x] **Greenfield: unclear Anlagen-PV-Abdeckung checkbox** — **Verified** (2026-10-18)

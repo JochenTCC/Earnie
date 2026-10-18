@@ -88,7 +88,33 @@ _NEW_PROFILE_OPTION = "— neu —"
 
 _SESSION_FILE_STAMP_KEY = "house_profile_file_stamp"
 
+_SESSION_CONSUMER_WIDGET_GEN_KEY = "house_consumer_widget_gen"
+
+
+def _consumer_widget_gen(session_scope: str) -> int:
+    """Generation for index-scoped hc_* keys; bump on delete to drop stale frontend state."""
+    return int(
+        st.session_state.get(
+            f"{session_scope}__{_SESSION_CONSUMER_WIDGET_GEN_KEY}", 0
+        )
+        or 0
+    )
+
+
+def _bump_consumer_widget_gen(session_scope: str) -> int:
+    """Invalidate all index-keyed consumer widgets after list mutation."""
+    key = f"{session_scope}__{_SESSION_CONSUMER_WIDGET_GEN_KEY}"
+    nxt = _consumer_widget_gen(session_scope) + 1
+    st.session_state[key] = nxt
+    return nxt
+
+
 def _scoped_key(session_scope: str, base: str) -> str:
+    # Index-keyed consumer widgets (hc_*) include a generation so Entfernen cannot
+    # leave Streamlit frontend state on reused indices (label/id shift bug).
+    if base.startswith("hc_"):
+        gen = _consumer_widget_gen(session_scope)
+        base = f"hc_g{gen}_{base[3:]}"
     return f"{session_scope}__{base}"
 
 def _default_consumer() -> dict:
@@ -244,10 +270,22 @@ def _resolve_profile_id(
     others = set(profile_ids)
     return slug_id(label, existing=others)
 
-def _consumer_type_options(consumer_index: int) -> list[str]:
-    if consumer_index == 0:
-        return list(CONSUMER_TYPE_OPTIONS)
-    return [value for value in CONSUMER_TYPE_OPTIONS if value != "thermal_annual"]
+def _other_consumers_have_thermal_annual(
+    consumers: list[dict], consumer_index: int
+) -> bool:
+    return any(
+        i != consumer_index and str(c.get("type") or "") == "thermal_annual"
+        for i, c in enumerate(consumers)
+    )
+
+
+def _consumer_type_options(
+    consumers: list[dict], consumer_index: int
+) -> list[str]:
+    """Offer Haus Wärme when no *other* consumer already has that type."""
+    if _other_consumers_have_thermal_annual(consumers, consumer_index):
+        return [value for value in CONSUMER_TYPE_OPTIONS if value != "thermal_annual"]
+    return list(CONSUMER_TYPE_OPTIONS)
 
 def _type_index(consumer_type: str, options: list[str]) -> int:
     try:

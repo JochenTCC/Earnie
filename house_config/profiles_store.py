@@ -104,11 +104,6 @@ def _normalize_profile_consumers(
             f"profiles '{profile_id}': nur ein Verbraucher vom Typ "
             "'thermal_annual' (Haus Wärme) erlaubt."
         )
-    if thermal_consumer_indices and thermal_consumer_indices[0] != 0:
-        raise ValueError(
-            f"profiles '{profile_id}': Typ 'thermal_annual' (Haus Wärme) "
-            "nur für Verbraucher 1 erlaubt."
-        )
     return consumers
 
 
