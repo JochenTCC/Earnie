@@ -10,6 +10,13 @@ import pytest
 from dotenv import load_dotenv
 
 from tests.fixtures.historical_fixtures import CONS_DATA_FILE, fixture_available
+from tests.regression.baseline import GIT_LOCATION_ENV
+
+# pytest runs inside .githooks/pre-commit, where git exports GIT_DIR / GIT_INDEX_FILE.
+# Tests that run git in a tmp repo would inherit them and write to the real repo
+# (config, index, refs). Drop them for the whole test process.
+for _key in GIT_LOCATION_ENV:
+    os.environ.pop(_key, None)
 
 
 def _configure_console_utf8() -> None:
