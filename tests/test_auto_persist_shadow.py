@@ -59,6 +59,7 @@ def test_auto_persist_writes_with_private_shadow_config(monkeypatch, tmp_path):
     assert wrote is True
     assert calls == [1]
     assert captions == ["Gespeichert"]
+    assert session.get("_auto_persist_flash::plant_export") == "Gespeichert"
 
 
 def test_auto_persist_writes_when_not_shadow(monkeypatch):
@@ -78,3 +79,37 @@ def test_auto_persist_writes_when_not_shadow(monkeypatch):
     assert wrote is True
     assert calls == [1]
     assert captions == ["Gespeichert"]
+    assert session.get("_auto_persist_flash::plant_export") == "Gespeichert"
+
+
+def test_auto_persist_flash_survives_simulated_rerun(monkeypatch):
+    """Callers that ``st.rerun()`` after write still show Gespeichert once."""
+    calls: list[int] = []
+    session: dict = {}
+    captions: list[str] = []
+
+    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    monkeypatch.setattr(ap.st, "session_state", session)
+    monkeypatch.setattr(ap.st, "caption", lambda msg: captions.append(msg))
+
+    assert (
+        ap.auto_persist(
+            state_key="battery",
+            payload={"id": "b1", "kwh": 5},
+            save=lambda: calls.append(1),
+        )
+        is True
+    )
+    # Simulate rerun: fingerprint matches, but flash must still caption once.
+    captions.clear()
+    assert (
+        ap.auto_persist(
+            state_key="battery",
+            payload={"id": "b1", "kwh": 5},
+            save=lambda: calls.append(1),
+        )
+        is False
+    )
+    assert calls == [1]
+    assert captions == ["Gespeichert"]
+    assert "_auto_persist_flash::battery" not in session

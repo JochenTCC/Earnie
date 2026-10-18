@@ -28,7 +28,15 @@ def auto_persist(
     Returns True when a write was performed. Skips when ``ready`` is False
     (incomplete / invalid form). When Shadow shares Prod config (read-only),
     skips writes without crashing.
+
+    Success captions survive one ``st.rerun()`` via a session flash key so
+    callers that rerun after write still show ``Gespeichert``.
     """
+    flash_key = f"_auto_persist_flash::{state_key}"
+    pending_flash = st.session_state.pop(flash_key, None)
+    if pending_flash:
+        st.caption(str(pending_flash))
+
     if not ready:
         return False
     fingerprint = payload_fingerprint(payload)
@@ -53,5 +61,7 @@ def auto_persist(
         )
         return False
     st.session_state[last_key] = fingerprint
+    # Flash for post-rerun; caption now for callers that do not rerun.
+    st.session_state[flash_key] = success_caption
     st.caption(success_caption)
     return True

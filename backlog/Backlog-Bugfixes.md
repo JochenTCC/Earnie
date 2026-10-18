@@ -38,7 +38,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Placeholder `PUSH_TOKEN_HIER_ERSETZEN`; ZIP README step 3 updated.
   - Unset `EARNIE_PUSH_TOKEN` → open LAN telemetry (no 404); empty VO token omits `?t=` / `/t/`.
   - Tests: `test_ehal_signal_list`, `test_pilot_vi_template_gen`, `test_pilot_vo_template_gen`, `test_loxone_push_inbox`.
-
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] On SE page during opt-in ping pop up the shown data example is still "v1" - this should be more accurate --> currently "v2"
@@ -55,7 +54,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   Make the popup dialog reusable (Open parameter is a review-ID, the overall-question text and the 5-star-questions (max three))
 - [ ] In the Signalliste (EHAL-com page) there are two signals "heartbeat" and "hearbeat_ts" one for reading - one for writing / both optional. Please rename these signals to make it clearer what is what - and both must be mandatory (however they are not shown in the expander "Optionale Signale aktiveren ...")
 - [ ] Earnie-Host (LAN-IP für den Hub) -> rephrase to "IP-Adresse des Geräts, auf dem Earnie läuft" and pre-fill it with the local-host IP (because this is usually the host)
-- [ ] on env greenfield I configured a complete Live-scenario and made a first SE - however the live scenario is not shown anymore after reload - also the SK is not shown - check on disk if automated saving failed or if the UI state is wrong or if there are other reasons - then fix
+- [ ] in default .env file replace "YOUR-NAS\docker" with something more device-agnostic
 
 - [ ] "debug-dumps\debug_dump_20261015_222809"
 

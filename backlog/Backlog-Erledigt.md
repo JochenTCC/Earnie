@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Greenfield Live / SK missing after reload (2026-10-18)
+
+- [x] **Greenfield: Live scenario / SK missing after reload** — **Verified** (2026-10-18)
+  - Symptom: after configuring Live and a first SE, reload hid SK and Live entity refs looked empty.
+  - Cause: incomplete HK drafts (esp. Batterie without inverter) never auto-persisted; `st.rerun()` after a successful write hid “Gespeichert”, so users left tabs believing defaults were saved. Empty `components.batteries` kept SK locked and Live refs empty.
+  - Fix: `auto_persist` keeps a one-rerun “Gespeichert” flash; Batterien warns when not ready (draft would be lost on tab leave).
+  - Tests: `tests/test_auto_persist_shadow.py` (`test_auto_persist_flash_survives_simulated_rerun`).
+
 ### Bugfix — Haus Wärme type after Loxone consumer import (2026-10-18)
 
 - [x] **Haus Wärme type after Loxone consumer import** — **Verified** (2026-10-18)

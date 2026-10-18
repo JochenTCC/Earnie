@@ -342,6 +342,19 @@ def render_battery_planning_tab() -> None:
         and float(fields["capacity"] or 0) > 0
         and inv_ok
     )
+    if not ready:
+        blockers: list[str] = []
+        if not str(label or "").strip():
+            blockers.append("Bezeichnung")
+        if float(fields["capacity"] or 0) <= 0:
+            blockers.append("Kapazität > 0")
+        if needs_inv and not inv_ok:
+            blockers.append("Wechselrichter wählen (Tab Wechselrichter zuerst anlegen)")
+        st.warning(
+            "Batterie noch nicht gespeichert: "
+            + (", ".join(blockers) if blockers else "Formular unvollständig")
+            + ". Beim Verlassen des Tabs geht der Entwurf verloren."
+        )
     taken = {bid for bid in ctx["battery_ids"] if bid != stable_id}
     entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
     _persist_battery_form(
