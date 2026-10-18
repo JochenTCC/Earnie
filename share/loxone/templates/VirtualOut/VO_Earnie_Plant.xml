@@ -2,8 +2,8 @@
 <!--
   VO plant telemetry (2.7.q / 2.7.n): Titles = Push_<EHAL-ID> (dots → _), same as pilot_vo_template_gen.
   Grid fields use grid.meter.* (2.7.n); PV / outside / absent stay bare plant until pv.* lands.
-  No ESS/battery fields (per-battery ess.{id}.* via Pilot). Replace EARNIE_HOST; set Repeat in Config.
-  Value placeholder is <v> (written &lt;v&gt; in XML). Daemon port 8541; append ?t=TOKEN (EARNIE_PILOT_PUSH_TOKEN).
+  No ESS/battery fields (per-battery ess.{id}.* via Battery VO / export). Replace EARNIE_HOST; set Repeat in Config.
+  Value placeholder is <v> (written &lt;v&gt; in XML). Daemon port 8541; optional ?t=TOKEN (EARNIE_PUSH_TOKEN).
 -->
 <VirtualOut HintText="" Title="Earnie Plant Telemetry" Comment="Push plant telemetry (grid.meter.*; bare PV/house; no ESS)" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<Info templateType="3" minVersion="17010630"/>

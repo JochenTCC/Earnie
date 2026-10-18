@@ -1,6 +1,6 @@
-﻿﻿<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  v2 (2.7.q Q4): pool.{hk_id}.set_enable + pool.pool_filter.set_enable.
+  v2: pool.{hk_id}.set_enable + pool.pool_filter.set_enable.
   Replace {hk_id} for heat; filter Kennung is fixed (pool_filter).
   Legacy: VI_Earnie_Pool.xml (bare Earnie_Pool_*_Freigabe).
 -->

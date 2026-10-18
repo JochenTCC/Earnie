@@ -1,4 +1,4 @@
-# Earnie Loxone Templates (entity-scoped + 2.7.q Q4)
+# Earnie Loxone Templates (entity-scoped)
 
 Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTemplateBuilder](https://wiki.loxberry.de/entwickler/perl_develop_plugins_with_perl/perl_loxberry_sdk_dokumentation/perl_modul_loxberryloxonetemplatebuilder) (`VI_*.xml` / `VO_*.xml`).
 
@@ -10,13 +10,15 @@ Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTem
 
 **Freigabe 0/1:** VI cmds use `Analog="true"` (sticky value from `\v`). `Analog="false"` (digital) pulses true on every successful poll — do not use for Freigabe.
 
-## v2 vs Pilot
+## Library v2 vs generated export
 
 | Kind | Files | When to use |
 | ---- | ----- | ----------- |
 | **VI v2** | `VI_Earnie_*_v2.xml` | Library — Check keys = qualified EHAL IDs; Titles from the ID (placeholders `{hk_id}` / `{ev_id}`) |
-| **VI Pilot** | generated `VI_Pilot_*.xml` | Live config — real Kennungen filled by `python -m scripts.pilot_vi_template_gen` (or EHAL-Com Signal-list ZIP) |
-| **VO Pilot** | generated `VO_Pilot_*.xml` | Live config — paths + titles from qualified IDs via `python -m scripts.pilot_vo_template_gen` (or Signal-list ZIP) |
+| **VI export** | generated `VI_Earnie_*.xml` | Live config — real Kennungen filled by `python -m scripts.pilot_vi_template_gen` (or EHAL-Com Signal-list ZIP) |
+| **VO export** | generated `VO_Earnie_*.xml` | Live config — paths + titles from qualified IDs via `python -m scripts.pilot_vo_template_gen` (or Signal-list ZIP) |
+
+**VO token:** Generated VO addresses carry `PUSH_TOKEN_HIER_ERSETZEN` in `?t=` (or `/t/…` with `--token-in-address`). Replace with the value of `EARNIE_PUSH_TOKEN` from `.env`, or omit the token query/path if no token is needed (Earnie accepts open LAN push when the env var is unset).
 
 **Q8:** `status.json` publishes **qualified Check keys only** (no legacy Merker peers). After **2.7.q Q5**, Earnie no longer writes Merkers via `/dev/sps/io`; actuation is VI poll of `status.json` only (see `docs/ui/ehal-com.md`). Non-`_v2` library VI XMLs were removed after cutover.
 
@@ -94,7 +96,7 @@ Frozen Merker names (import / legacy): [`../greenfield_device_map.json`](../gree
 - `Earnie_LadeLeistungs-Limit` / `Earnie_EntladeLeistungs-Limit` → true caps (VI)
 - `Earnie_Steuerbefehl` → `set_ess_mode` (sticky: **0 = Automatik**; VI)
 - `Earnie_Speicher_Quellenwahl` → `set_ess_source_select` (2.7.h: **0 = Netz** / **1 = Batterie-Insel**; VI)
-- VO Plant Titles: `Push_grid_meter_*` / bare PV/house + energy Q6. No bare `sens_ess_*` / `get_ess_*` — use `VO_Earnie_Battery.xml` / Pilot `VO_Pilot_Batterie_*.xml` (`ess.{bat_id}.*`, incl. bipolar `sens_ess_energy_charge` / `sens_ess_energy_discharge`).
+- VO Plant Titles: `Push_grid_meter_*` / bare PV/house + energy Q6. No bare `sens_ess_*` / `get_ess_*` — use `VO_Earnie_Battery.xml` / generated `VO_Earnie_Batterie_*.xml` (`ess.{bat_id}.*`, incl. bipolar `sens_ess_energy_charge` / `sens_ess_energy_discharge`).
 
 **Zähler-Bausteine:** Plant/consumer power VOs **können auch vom jeweiligen EFM-Zähler kommen**. VO-Cmds bleiben im XML als Namenskatalog / optionaler Push — Earnie-Binding bevorzugt die EFM-Bezeichnung, wenn vorhanden.
 

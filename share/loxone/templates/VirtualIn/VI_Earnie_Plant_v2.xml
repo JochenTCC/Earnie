@@ -1,6 +1,6 @@
-﻿﻿<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  v2 (2.7.q Q4): Check keys unchanged (already bare / qualified-shaped). Titles = field names.
+  v2: Check keys unchanged (already bare / qualified-shaped). Titles = field names.
   Replace EARNIE_HOST. For multi-storage / standby_backup add Cmds with Check
   "ess.{slug}.set_*":\v (Quellenwahl = ess.{slug}.set_ess_source_select).
   Legacy Merker Titles: VI_Earnie_Plant.xml.

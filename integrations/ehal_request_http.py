@@ -140,27 +140,26 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
         """``GET /ehal/telemetry/<EHAL-ID>/<value>`` — pilot inbox (no control effect).
 
         Alias ``/ehal/loxone/telemetry/…`` is accepted for existing Virtual Outputs.
-        Disabled (404) unless ``EARNIE_PUSH_TOKEN`` (or legacy ``EARNIE_PILOT_PUSH_TOKEN``) is set. The token comes in the
-        ``X-Earnie-Token`` header, as a ``/t/<token>`` address prefix, or as ``?t=`` query
-        parameter (checked in this order; the first one present must match).
+        When ``EARNIE_PUSH_TOKEN`` (or legacy ``EARNIE_PILOT_PUSH_TOKEN``) is set, the token
+        must come in the ``X-Earnie-Token`` header, as a ``/t/<token>`` address prefix, or as
+        ``?t=`` query parameter (checked in this order; the first one present must match).
+        When unset, telemetry is accepted without a token (open LAN push).
         """
         expected = push_token()
-        if not expected:
-            self.send_error(404)
-            return
         parsed = urlparse(route)
         matched = match_telemetry_prefix(parsed.path)
         if matched is None:
             self.send_error(404)
             return
-        supplied = (
-            self.headers.get(PUSH_TOKEN_HEADER)
-            or prefix_token
-            or (parse_qs(parsed.query).get("t") or [""])[0]
-        )
-        if not hmac.compare_digest(str(supplied).encode(), expected.encode()):
-            self.send_error(401)
-            return
+        if expected:
+            supplied = (
+                self.headers.get(PUSH_TOKEN_HEADER)
+                or prefix_token
+                or (parse_qs(parsed.query).get("t") or [""])[0]
+            )
+            if not hmac.compare_digest(str(supplied).encode(), expected.encode()):
+                self.send_error(401)
+                return
         ehal_id, _, raw = unquote(parsed.path[len(matched):]).partition("/")
         from ehal.push_signals import HEARTBEAT_ID
         from runtime_store.ehal_push_inbox import record_push

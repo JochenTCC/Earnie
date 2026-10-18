@@ -1,6 +1,6 @@
-﻿﻿<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  v2 (2.7.q Q4): Check = heatpump.{hk_id}.set_enable. Replace {hk_id}.
+  v2: Check = heatpump.{hk_id}.set_enable. Replace {hk_id}.
   Legacy: VI_Earnie_Heatpump.xml (flex.{hk_id}.Earnie_Waermepumpe_Freigabe).
 -->
 <VirtualInHttp HintText="" Title="Earnie Waermepumpe v2" Comment="entity-scoped: heatpump Freigabe from Earnie" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="10">

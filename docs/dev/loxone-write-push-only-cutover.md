@@ -2,26 +2,26 @@
 
 Moved out of `docs/ui/ehal-com.md` (§ Silent Mode vs. Loud Mode, § Cutover Checklist, § Write push-only). Historical rollout checklist for switching Loud-mode writes to `status.json` push-only.
 
-Loud writes publish only to `status.json` (qualified EHAL IDs). The Miniserver VI polls every **10 s**. Only qualified Check keys are published, so VI templates must use `VI_Earnie_*_v2.xml` or the Pilot VI.
+Loud writes publish only to `status.json` (qualified EHAL IDs). The Miniserver VI polls every **10 s**. Only qualified Check keys are published, so VI templates must use `VI_Earnie_*_v2.xml` or generated `VI_Earnie_*.xml`.
 
 ## Preconditions
 
 1. Earnie runs a build that publishes writes via `status.json` only (no Merker HTTP on the Loud cycle).
-2. Regenerate Pilot VIs: `python -m scripts.pilot_vi_template_gen --config-dir <config> --host <Earnie-LAN-IP> --port 8541 --out-dir <dir>`.
+2. Regenerate VIs: `python -m scripts.pilot_vi_template_gen --config-dir <config> --host <Earnie-LAN-IP> --port 8541 --out-dir <dir>`.
 3. In Config: each write actuator is driven by the **VirtualInHttpCmd** (same object as the old Merker title).
 
 ## Stage VI Checks
 
 Rising risk; only qualified Check keys are emitted; observe ≥24 h per stage, day and night for EV and powerstations.
 
-| Stage | Group | Pilot / v2 file (home plant example) |
+| Stage | Group | Export / v2 file (home plant example) |
 | ----- | ----- | ------------------------------------ |
-| 1 | Consumers `consumer.*.set_enable` | `VI_Pilot_*` / `VI_Earnie_Consumer_v2` (if any) |
-| 2 | Heat pump `heatpump.*.set_enable` | `VI_Pilot_Waermepumpe.xml` |
-| 3 | Pool / filter `pool.*.set_enable` | `VI_Pilot_Pool.xml` — keep **Analog** |
-| 4 | Plant (forced ESS setpoint, export limit) + heartbeat | `VI_Pilot_Plant.xml`, `VI_Pilot_Heartbeat.xml`, house-battery Pilot |
-| 5 | EV `evcs.*.set_evcs_*` | `VI_Pilot_EV.xml` — accept ≤10 s latency |
-| 6 | Powerstations `ess.{id}.set_*` | `VI_Pilot_Batterie_*.xml` — accept ≤10 s latency |
+| 1 | Consumers `consumer.*.set_enable` | `VI_Earnie_*` / `VI_Earnie_Consumer_v2` (if any) |
+| 2 | Heat pump `heatpump.*.set_enable` | `VI_Earnie_Waermepumpe.xml` |
+| 3 | Pool / filter `pool.*.set_enable` | `VI_Earnie_Pool.xml` — keep **Analog** |
+| 4 | Plant (forced ESS setpoint, export limit) + heartbeat | `VI_Earnie_Plant.xml`, `VI_Earnie_Heartbeat.xml`, house-battery export |
+| 5 | EV `evcs.*.set_evcs_*` | `VI_Earnie_EV.xml` — accept ≤10 s latency |
+| 6 | Powerstations `ess.{id}.set_*` | `VI_Earnie_Batterie_*.xml` — accept ≤10 s latency |
 
 Per stage: switch Check to the qualified key → confirm `status.json` has the key → VI value updates within one poll → **Live-Schreiben** / callback `ts` advances. Legacy Check keys are no longer published, so keep the VI on qualified IDs.
 

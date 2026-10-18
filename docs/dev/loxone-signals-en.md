@@ -58,16 +58,16 @@ The library adds the **Loxone-side** HTTP mirroring and an **Earnie-dead** fallb
 - plant ESS keys (bare) and `grid.meter.*`, including the write `grid.meter.set_grid_export_power_limit`
 - powerstation `ess.{id}.set_*`
 
-Legacy Merker Check keys are no longer emitted alongside the qualified ones, so VI templates must use the qualified keys (`VI_Earnie_*_v2.xml` or Pilot VI). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`).
+Legacy Merker Check keys are no longer emitted alongside the qualified ones, so VI templates must use the qualified keys (`VI_Earnie_*_v2.xml` or generated `VI_Earnie_*.xml`). Plant bindings stay bare (`plant.ehal_bindings.set_grid_export_power_limit`).
 
-**VI v2 and Pilot templates.** The library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen, generate Pilot templates:
+**VI v2 and export templates.** The library templates `VI_Earnie_*_v2.xml` use the qualified Check keys (titles = ID / field name; placeholders `{hk_id}` / `{ev_id}`). For a live config with real Kennungen, generate templates:
 
 ```powershell
-python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …   # → VI_Pilot_*.xml
-python -m scripts.pilot_vo_template_gen --config-dir … --host … --out-dir …   # → VO_Pilot_*.xml
+python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …   # → VI_Earnie_*.xml
+python -m scripts.pilot_vo_template_gen --config-dir … --host … --out-dir …   # → VO_Earnie_*.xml
 ```
 
-VO Pilot titles derive from the qualified ID (`Push_<id>`, dots replaced by `_`). Further options: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
+VO titles derive from the qualified ID (`Push_<id>`, dots replaced by `_`). Further options: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
 
 ---
 
@@ -94,7 +94,7 @@ Source: `share/loxone/templates/VirtualIn/`
 | `VI_Earnie_Consumer_v2.xml` | `consumer.{hk_id}.set_enable` |
 | `VI_Earnie_Pool_v2.xml` | `pool.*.set_enable` |
 
-For a config with real Kennungen, generate `VI_Pilot_*.xml` instead (see above).
+For a config with real Kennungen, generate `VI_Earnie_*.xml` instead (see above).
 
 Target folder (use one of the existing Config paths; create the folder if needed):
 
@@ -135,7 +135,7 @@ Virtual Out address for **status / request optimize**:
 
 Telemetry VOs (`VO_Earnie_*` except `Status`) also target the daemon port **8541**. Telemetry push works as follows:
 
-- **Receiver:** `/ehal/telemetry/<EHAL-ID>/<value>` (alias `/ehal/loxone/telemetry/…` for existing VOs). It accepts pushes only when `EARNIE_PILOT_PUSH_TOKEN` is set.
+- **Receiver:** `/ehal/telemetry/<EHAL-ID>/<value>` (alias `/ehal/loxone/telemetry/…` for existing VOs). When `EARNIE_PUSH_TOKEN` (alias `EARNIE_PILOT_PUSH_TOKEN`) is set, the token is required; when unset, Earnie accepts open LAN push.
 - **Inbox reads:** all pushable `sens_*` / `get_*` fields are read from the inbox (no Merker poll). This includes the **meter energy** counters `sens_pv_energy`, `sens_grid_energy_import` / `_export` and `consumer.<id>.sens_energy_total`.
 - **Repeat interval:** recommended **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, default 10).
 - **Stale energy values** (older than 3 × repeat) are not assumed to be zero. Slot Ist keeps the sample mean for that channel.

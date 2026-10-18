@@ -1,13 +1,14 @@
-"""Pilot (spike/vo-push-pilot): generate Loxone Virtual Output templates for the push pilot.
+"""Generate Loxone Virtual Output templates for Earnie push telemetry.
 
 Reads the *read* bindings (``sens_*`` / ``get_*``) of an Earnie config dir and writes
-one ``VO_Pilot_*.xml`` per entity group plus ``Pilot-VO-Signalliste.csv``. Every new VO
+one ``VO_Earnie_*.xml`` per entity group plus ``Earnie-VO-Signalliste.csv``. Every new VO
 Cmd pushes its value to ``/ehal/telemetry/<EHAL-ID>/<v>?t=<token>`` (digital signals: fixed 1 for On, 0 for Off; analog outputs have no Off command) and is
 titled ``Push_<qualified-id>`` (dots → ``_``) so it can run in parallel to Merker Cmds.
 
-Without ``--env-file`` the XML carries the placeholder ``PILOT_TOKEN_HIER_ERSETZEN`` — replace it
-with a text editor before copying the files to Loxone. With ``--env-file`` the token
-(``EARNIE_PILOT_PUSH_TOKEN``) is written into the XML; keep such output out of the repository.
+Without ``--env-file`` the XML carries the placeholder ``PUSH_TOKEN_HIER_ERSETZEN`` — replace it
+with a text editor before copying the files to Loxone, or omit the ``?t=`` query if no token
+is needed. With ``--env-file`` the token (``EARNIE_PUSH_TOKEN``) is written into the XML;
+keep such output out of the repository.
 
 Usage:
     python -m scripts.pilot_vo_template_gen --config-dir <earnie_env/config> \
@@ -36,7 +37,7 @@ from ehal.push_signals import (  # noqa: F401 — re-exported for callers and te
 
 TOKEN_ENV = "EARNIE_PUSH_TOKEN"
 TOKEN_ENV_LEGACY = "EARNIE_PILOT_PUSH_TOKEN"
-TOKEN_PLACEHOLDER = "PILOT_TOKEN_HIER_ERSETZEN"
+TOKEN_PLACEHOLDER = "PUSH_TOKEN_HIER_ERSETZEN"
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{8,}$")
 
 def collect_read_signals(config_dir: Path) -> list[Signal]:
@@ -55,7 +56,8 @@ def _cmd_attrs(
     sig: Signal, token: str, repeat: str, repeat_rate: str, token_in_address: bool = False
 ) -> dict[str, str]:
     base = f"/ehal/telemetry/{sig.ehal_id}/"
-    query = "" if token_in_address else f"?t={token}"
+    use_token = bool(token) and not token_in_address
+    query = f"?t={token}" if use_token else ""
     if sig.digital:
         # Digital output: fixed values for On / Off (the value placeholder is for analog outputs).
         on_cmd, off_cmd = f"{base}1{query}", f"{base}0{query}"
@@ -93,13 +95,16 @@ def render_template(group: str, signals: list[Signal], *, host: str, port: int, 
     ``token_in_address``: put the token into the device address (``http://host:port/t/<token>``)
     instead of ``?t=`` in every command, so rotating it touches one field per device.
     """
-    address = f"http://{host}:{port}" + (f"/t/{token}" if token_in_address else "")
+    address = (
+        f"http://{host}:{port}"
+        + (f"/t/{token}" if token_in_address and token else "")
+    )
     root = ET.Element(
         "VirtualOut",
         {
             "HintText": "",
-            "Title": f"Earnie Push Pilot - {group}",
-            "Comment": "Pilot push to Earnie (spike/vo-push-pilot); parallel to the poll signals",
+            "Title": f"Earnie Push - {group}",
+            "Comment": "Push telemetry to Earnie; parallel to the poll signals",
             "Address": address,
             "CmdInit": "",
             "CloseAfterSend": "true",
@@ -134,7 +139,7 @@ def read_token(env_file: Path) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--config-dir", required=True, type=Path)
-    parser.add_argument("--host", required=True, help="IP of the pilot Earnie host (not a hostname)")
+    parser.add_argument("--host", required=True, help="IP of the Earnie host (not a hostname)")
     parser.add_argument("--port", type=int, default=8542)
     parser.add_argument("--env-file", type=Path, default=None,
                         help=f"optional .env containing {TOKEN_ENV}; default: write a placeholder")
@@ -153,17 +158,17 @@ def main() -> int:
     for sig in signals:
         groups.setdefault(sig.group, []).append(sig)
     for group, items in groups.items():
-        path = args.out_dir / f"VO_Pilot_{group}.xml"
+        path = args.out_dir / f"VO_Earnie_{group}.xml"
         write_template(path, render_template(group, items, host=args.host, port=args.port, token=token,
                                              repeat=args.repeat, repeat_rate=args.repeat_rate,
                                              token_in_address=args.token_in_address))
         print(f"{path.name}: {len(items)} Cmds")
-    with open(args.out_dir / "Pilot-VO-Signalliste.csv", "w", encoding="utf-8-sig", newline="") as handle:
+    with open(args.out_dir / "Earnie-VO-Signalliste.csv", "w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle, delimiter=";")
         writer.writerow(["Datei", "VO-Cmd-Titel", "EHAL-ID", "Bisheriger Name (Poll)", "Typ"])
         for group, items in groups.items():
             for sig in items:
-                writer.writerow([f"VO_Pilot_{group}.xml", sig.title, sig.ehal_id, sig.old_name,
+                writer.writerow([f"VO_Earnie_{group}.xml", sig.title, sig.ehal_id, sig.old_name,
                                  "digital" if sig.digital else "analog"])
     print(f"{len(signals)} signals in {len(groups)} files -> {args.out_dir}")
     if token == TOKEN_PLACEHOLDER:

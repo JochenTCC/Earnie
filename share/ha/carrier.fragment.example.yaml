@@ -5,13 +5,13 @@
 
 rest_command:
   earnie_push_heartbeat:
-    url: "http://earnie-ha-lab:8541/ehal/telemetry/heartbeat/1?t=PILOT_TOKEN_HIER_ERSETZEN"
+    url: "http://earnie-ha-lab:8541/ehal/telemetry/heartbeat/1?t=PUSH_TOKEN_HIER_ERSETZEN"
     method: GET
 
 sensor:
   - platform: rest
     name: earnie_ehal_status
-    resource: "http://earnie-ha-lab:8541/ehal/status.json?t=PILOT_TOKEN_HIER_ERSETZEN"
+    resource: "http://earnie-ha-lab:8541/ehal/status.json?t=PUSH_TOKEN_HIER_ERSETZEN"
     scan_interval: 10
     value_template: "{{ value_json.heartbeat_ts | default(0) }}"
     json_attributes_path: $

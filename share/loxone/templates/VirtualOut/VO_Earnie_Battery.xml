@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  VO battery telemetry (2.7.q / Pilot): Titles = Push_<EHAL-ID> (dots → _), same as pilot_vo_template_gen.
+  VO battery telemetry: Titles = Push_<EHAL-ID> (dots → _), same as pilot_vo_template_gen.
   Replace {bat_id} with the battery Kennung (e.g. 15_kwh_speicher). Per-battery ess.{bat_id}.* only —
   not on Plant VO. Bipolar energy: charge + discharge (Q6). Optional get_ess_* for limits_from_live.
-  Value placeholder is <v> (written &lt;v&gt; in XML). Daemon port 8541; append ?t=TOKEN (EARNIE_PILOT_PUSH_TOKEN).
+  Value placeholder is <v> (written &lt;v&gt; in XML). Daemon port 8541; optional ?t=TOKEN (EARNIE_PUSH_TOKEN).
 -->
 <VirtualOut HintText="" Title="Earnie Battery Telemetry" Comment="Push ess.{bat_id}.* telemetry (SoC/power/energy/get_*)" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<Info templateType="3" minVersion="17010630"/>

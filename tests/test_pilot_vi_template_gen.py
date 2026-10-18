@@ -1,4 +1,4 @@
-"""2.7.q Q4: VI template generator with qualified Check keys."""
+"""VI template generator with qualified Check keys."""
 from __future__ import annotations
 
 import csv
@@ -126,6 +126,8 @@ def test_render_check_and_sticky_analog(tmp_path: Path) -> None:
     text = gen.render_template("Verbraucher", sigs, host="192.168.1.10", port=8541)
     root = ET.fromstring(text.encode("utf-8"))
     assert root.tag == "VirtualInHttp"
+    assert root.get("Title") == "Earnie Status - Verbraucher"
+    assert "2.7.q" not in (root.get("Comment") or "")
     assert root.get("Address") == "http://192.168.1.10:8541/ehal/loxone/status.json"
     assert root.get("PollingTime") == "10"
     info, *cmds = list(root)
@@ -169,10 +171,10 @@ def test_main_writes_files_and_csv(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         ],
     )
     assert gen.main() == 0
-    xmls = sorted(out.glob("VI_Pilot_*.xml"))
+    xmls = sorted(out.glob("VI_Earnie_*.xml"))
     assert xmls
-    assert (out / "Pilot-VI-Signalliste.csv").is_file()
-    with open(out / "Pilot-VI-Signalliste.csv", encoding="utf-8-sig", newline="") as handle:
+    assert (out / "Earnie-VI-Signalliste.csv").is_file()
+    with open(out / "Earnie-VI-Signalliste.csv", encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.reader(handle, delimiter=";"))
     assert rows[0] == ["Datei", "VI-Cmd-Titel", "EHAL-ID", "Bisheriger Name (Merker)", "Typ"]
     ehal_ids = {r[2] for r in rows[1:]}

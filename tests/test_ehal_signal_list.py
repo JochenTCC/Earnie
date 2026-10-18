@@ -207,8 +207,12 @@ def test_export_zip_contains_vo_and_vi() -> None:
     payload = build_export_zip(house, components, host="192.168.1.10", port=8541)
     with zipfile.ZipFile(BytesIO(payload)) as zf:
         names = set(zf.namelist())
+        readme = zf.read("README.txt").decode("utf-8")
     assert "README.txt" in names
-    assert "Pilot-VO-Signalliste.csv" in names
-    assert "Pilot-VI-Signalliste.csv" in names
-    assert any(n.startswith("VO_Pilot_") and n.endswith(".xml") for n in names)
-    assert any(n.startswith("VI_Pilot_") and n.endswith(".xml") for n in names)
+    assert "Earnie-VO-Signalliste.csv" in names
+    assert "Earnie-VI-Signalliste.csv" in names
+    assert any(n.startswith("VO_Earnie_") and n.endswith(".xml") for n in names)
+    assert any(n.startswith("VI_Earnie_") and n.endswith(".xml") for n in names)
+    assert "PUSH_TOKEN_HIER_ERSETZEN" in readme
+    assert "PILOT_TOKEN_HIER_ERSETZEN" not in readme
+    assert "VO_Earnie_*.xml" in readme

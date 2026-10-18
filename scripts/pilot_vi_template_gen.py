@@ -1,7 +1,7 @@
-"""Generate Loxone Virtual Input templates with qualified Check keys (2.7.q Q4).
+"""Generate Loxone Virtual Input templates with qualified Check keys.
 
 Reads the *write* bindings (``set_*``) of an Earnie config dir and writes one
-``VI_Pilot_*.xml`` per entity group plus ``Pilot-VI-Signalliste.csv``. Every Cmd
+``VI_Earnie_*.xml`` per entity group plus ``Earnie-VI-Signalliste.csv``. Every Cmd
 polls ``/ehal/loxone/status.json`` and extracts the value with
 ``Check="\"<qualified-id>\":\\v"``. Titles come from the qualified ID.
 
@@ -163,8 +163,8 @@ def render_template(
         "VirtualInHttp",
         {
             "HintText": "",
-            "Title": f"Earnie Status Pilot - {group}",
-            "Comment": "Qualified Check keys from Earnie status.json (2.7.q Q4)",
+            "Title": f"Earnie Status - {group}",
+            "Comment": "Qualified Check keys from Earnie status.json",
             "Address": address,
             "PollingTime": polling_time,
         },
@@ -196,7 +196,7 @@ def main() -> int:
     for sig in signals:
         groups.setdefault(sig.group, []).append(sig)
     for group, items in groups.items():
-        path = args.out_dir / f"VI_Pilot_{group}.xml"
+        path = args.out_dir / f"VI_Earnie_{group}.xml"
         write_template(
             path,
             render_template(
@@ -204,14 +204,14 @@ def main() -> int:
             ),
         )
         print(f"{path.name}: {len(items)} Cmds")
-    with open(args.out_dir / "Pilot-VI-Signalliste.csv", "w", encoding="utf-8-sig", newline="") as handle:
+    with open(args.out_dir / "Earnie-VI-Signalliste.csv", "w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle, delimiter=";")
         writer.writerow(["Datei", "VI-Cmd-Titel", "EHAL-ID", "Bisheriger Name (Merker)", "Typ"])
         for group, items in groups.items():
             for sig in items:
                 writer.writerow(
                     [
-                        f"VI_Pilot_{group}.xml",
+                        f"VI_Earnie_{group}.xml",
                         sig.title,
                         sig.ehal_id,
                         sig.old_name,

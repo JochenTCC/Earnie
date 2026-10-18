@@ -445,7 +445,7 @@ Home Assistant uses the **same Earnie↔SB HTTP contract as Loxone**. There is *
 | **Read (HA → Earnie)** | HA automations / `rest_command` push activated telemetry to `GET /ehal/telemetry/<qualified-EHAL-id>/<value>` (token, inbox freshness, zero rule, last-known — same as Loxone). |
 | **Write (Earnie → HA)** | HA polls `GET /ehal/status.json` (canonical; `/ehal/loxone/status.json` kept as alias) for setpoints under qualified keys; payload includes `heartbeat_ts`. |
 | **Listener** | `integrations/loxone_request_http.py` on `system.ehal_loxone_http_port` (default **8541**). |
-| **Token** | `EARNIE_PILOT_PUSH_TOKEN` (header `X-Earnie-Token`, or `/t/<token>/…`, or `?t=` — same as Loxone). |
+| **Token** | Optional `EARNIE_PUSH_TOKEN` (alias `EARNIE_PILOT_PUSH_TOKEN`): when set, required via header `X-Earnie-Token`, `/t/<token>/…`, or `?t=`; when unset, open LAN push (same as Loxone). |
 | **Cadence** | Every read signal at least every `EARNIE_PILOT_PUSH_REPEAT_S` (default **10 s**). Silent power while the heartbeat link is fresh → assumed **0** (`STATE_ZERO_ASSUMED_SILENT`); **energy counters are never assumed 0**. See [Loxone Signals — push cadence](loxone-signals.md#push-cadence-sb-neutral). |
 | **Migration** | Leftover `ehal.ha.transport` is removed by `dm4.ha_pull_removal`; a leftover key afterwards fails loud with a migration hint. Stored HA `entity_id` values are discarded (activation keys kept). |
 

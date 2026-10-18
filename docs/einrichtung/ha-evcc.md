@@ -44,7 +44,7 @@ Earnie speichert keine HA-`entity_id`s. Die Komponenten tragen unter `ehal_bindi
 **Voraussetzungen:**
 
 - **Port `8541`:** Der Daemon-Port für den Push-Vertrag muss von Home Assistant aus erreichbar sein (`system.ehal_loxone_http_port`, Standard `8541`). Ohne diesen Port erreicht das YAML-Paket Earnie nicht.
-- **Push-Token:** `EARNIE_PUSH_TOKEN` (Alias `EARNIE_PILOT_PUSH_TOKEN`) muss gesetzt sein. Earnie nimmt Telemetrie nur mit gültigem Token an.
+- **Push-Token:** `EARNIE_PUSH_TOKEN` (Alias `EARNIE_PILOT_PUSH_TOKEN`) ist optional. Ist der Token gesetzt, muss er bei jedem Push mitgeschickt werden; ohne gesetztes Token akzeptiert Earnie Telemetrie ohne Authentifizierung (offenes LAN).
 
 **Ablauf:**
 

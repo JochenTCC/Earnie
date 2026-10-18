@@ -1,6 +1,6 @@
-﻿﻿<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  v2 (2.7.q Q4): VI Check keys = qualified EHAL IDs (status.json dual-emit peers).
+  v2: VI Check keys = qualified EHAL IDs (status.json dual-emit peers).
   Replace {hk_id} with the consumer Kennung. Analog=true for sticky 0/1 Freigabe.
   Legacy: VI_Earnie_Consumer.xml (flex.{hk_id}.Earnie_Verbraucher_Freigabe).
 -->

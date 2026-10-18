@@ -189,11 +189,13 @@ def _get(port: int, path: str, headers: dict[str, str] | None = None) -> int:
         return exc.code
 
 
-def test_endpoint_disabled_without_token() -> None:
+def test_endpoint_open_without_token() -> None:
     port = http_mod.start_loxone_request_http(0).server_address[1]
-    assert _get(port, "/ehal/telemetry/sens_ess_soc/55") == 404
-    assert _get(port, "/ehal/loxone/telemetry/sens_ess_soc/55") == 404
-    assert inbox.load_inbox() == {}
+    assert _get(port, "/ehal/telemetry/sens_pv_production_active/55") == 204
+    assert _get(port, "/ehal/loxone/telemetry/sens_pv_production_active/55.5") == 204
+    inbox.flush_inbox_now()
+    rows = inbox.load_inbox()
+    assert rows["sens_pv_production_active"]["value"] == 55.5
 
 
 def test_match_telemetry_prefix() -> None:
@@ -373,8 +375,11 @@ def test_header_wins_over_prefix_and_must_match(monkeypatch: pytest.MonkeyPatch)
     assert _get(port, path, {http_mod.PUSH_TOKEN_HEADER: "wrong"}) == 401
 
 
-def test_prefix_endpoint_disabled_without_token() -> None:
+def test_prefix_endpoint_open_without_token() -> None:
     port = http_mod.start_loxone_request_http(0).server_address[1]
-    assert _get(port, "/t/anything/ehal/telemetry/ess.house.sens_ess_soc/1") == 404
-    assert _get(port, "/t/anything/ehal/loxone/telemetry/sens_ess_soc/1") == 404
-    assert inbox.load_inbox() == {}
+    assert _get(port, "/t/anything/ehal/telemetry/ess.house.sens_ess_soc/1") == 204
+    assert _get(port, "/t/anything/ehal/loxone/telemetry/sens_pv_production_active/2") == 204
+    inbox.flush_inbox_now()
+    rows = inbox.load_inbox()
+    assert rows["ess.house.sens_ess_soc"]["value"] == 1.0
+    assert rows["sens_pv_production_active"]["value"] == 2.0

@@ -229,3 +229,17 @@ def test_default_keeps_the_token_in_every_command(tmp_path: Path) -> None:
     root = ET.fromstring(text.encode("utf-8"))
     assert root.get("Address") == "http://h:1"
     assert all("t=abcd1234efgh" in (c.get("CmdOn") or "") for c in root if c.tag == "VirtualOutCmd")
+
+
+def test_empty_token_omits_query_and_address_prefix(tmp_path: Path) -> None:
+    sigs = gen.collect_read_signals(_config(tmp_path))[:1]
+    text = gen.render_template("X", sigs, host="h", port=1, token="")
+    root = ET.fromstring(text.encode("utf-8"))
+    assert root.get("Address") == "http://h:1"
+    assert all("?t=" not in (c.get("CmdOn") or "") for c in root if c.tag == "VirtualOutCmd")
+    text_addr = gen.render_template(
+        "X", sigs, host="h", port=1, token="", token_in_address=True
+    )
+    root_addr = ET.fromstring(text_addr.encode("utf-8"))
+    assert root_addr.get("Address") == "http://h:1"
+    assert "/t/" not in (root_addr.get("Address") or "")

@@ -54,16 +54,16 @@ Die Library ergänzt die **Loxone-seitige** HTTP-Spiegelung und eine **Earnie-to
 - Anlagen-ESS-Schlüssel (ohne Präfix) und `grid.meter.*`, darunter der Schreibwert `grid.meter.set_grid_export_power_limit`
 - Powerstation `ess.{id}.set_*`
 
-Die alten Merker-Check-Schlüssel werden nicht mehr zusätzlich zu den qualifizierten ausgegeben. Die VI-Vorlagen müssen daher die qualifizierten Schlüssel verwenden (`VI_Earnie_*_v2.xml` oder Pilot-VI). Anlagen-Bindings bleiben ohne Präfix (`plant.ehal_bindings.set_grid_export_power_limit`).
+Die alten Merker-Check-Schlüssel werden nicht mehr zusätzlich zu den qualifizierten ausgegeben. Die VI-Vorlagen müssen daher die qualifizierten Schlüssel verwenden (`VI_Earnie_*_v2.xml` oder generierte `VI_Earnie_*.xml`). Anlagen-Bindings bleiben ohne Präfix (`plant.ehal_bindings.set_grid_export_power_limit`).
 
-**VI-v2- und Pilot-Vorlagen.** Die Library-Vorlagen `VI_Earnie_*_v2.xml` nutzen die qualifizierten Check-Schlüssel (Titel = ID bzw. Feldname; Platzhalter `{hk_id}` / `{ev_id}`). Für eine Live-Config mit echten Kennungen lassen sich Pilot-Vorlagen erzeugen:
+**VI-v2- und Export-Vorlagen.** Die Library-Vorlagen `VI_Earnie_*_v2.xml` nutzen die qualifizierten Check-Schlüssel (Titel = ID bzw. Feldname; Platzhalter `{hk_id}` / `{ev_id}`). Für eine Live-Config mit echten Kennungen lassen sich Vorlagen erzeugen:
 
 ```powershell
-python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …   # → VI_Pilot_*.xml
-python -m scripts.pilot_vo_template_gen --config-dir … --host … --out-dir …   # → VO_Pilot_*.xml
+python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …   # → VI_Earnie_*.xml
+python -m scripts.pilot_vo_template_gen --config-dir … --host … --out-dir …   # → VO_Earnie_*.xml
 ```
 
-VO-Pilot-Titel leiten sich aus der qualifizierten ID ab (`Push_<id>`, Punkte durch `_` ersetzt). Weitere Optionen: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Schritte zur Umstellung auf Push-only-Schreiben: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
+VO-Titel leiten sich aus der qualifizierten ID ab (`Push_<id>`, Punkte durch `_` ersetzt). Weitere Optionen: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Schritte zur Umstellung auf Push-only-Schreiben: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
 
 ---
 
@@ -89,7 +89,7 @@ Quelle: `share/loxone/templates/VirtualIn/`
 | `VI_Earnie_Consumer_v2.xml` | `consumer.{hk_id}.set_enable` |
 | `VI_Earnie_Pool_v2.xml` | `pool.*.set_enable` |
 
-Für eine Config mit echten Kennungen stattdessen `VI_Pilot_*.xml` erzeugen (siehe oben).
+Für eine Config mit echten Kennungen stattdessen `VI_Earnie_*.xml` erzeugen (siehe oben).
 
 Zielordner (einen der vorhandenen Config-Pfade verwenden; Ordner bei Bedarf anlegen):
 
@@ -128,7 +128,7 @@ Virtual-Out-Adresse für **Status / Request Optimize**:
 
 Auch Telemetrie-VOs (`VO_Earnie_*` außer `Status`) zielen auf den Daemon-Port **8541**. Der Telemetrie-Push arbeitet so:
 
-- **Empfänger:** `/ehal/telemetry/<EHAL-ID>/<Wert>` (Alias `/ehal/loxone/telemetry/…` für bestehende VOs). Pushes werden nur akzeptiert, wenn `EARNIE_PILOT_PUSH_TOKEN` gesetzt ist.
+- **Empfänger:** `/ehal/telemetry/<EHAL-ID>/<Wert>` (Alias `/ehal/loxone/telemetry/…` für bestehende VOs). Ist `EARNIE_PUSH_TOKEN` (Alias `EARNIE_PILOT_PUSH_TOKEN`) gesetzt, muss der Token mitgeschickt werden; ohne gesetztes Token akzeptiert Earnie Pushes ohne Authentifizierung (offenes LAN).
 - **Inbox-Lesen:** Alle pushbaren `sens_*` / `get_*`-Felder werden aus der Inbox gelesen (kein Merker-Poll). Dazu zählen die **Zähler-Energiestände** `sens_pv_energy`, `sens_grid_energy_import` / `_export` und `consumer.<id>.sens_energy_total`.
 - **Wiederholintervall / Null-Regel:** siehe [Push-Takt (SB-neutral)](#push-cadence-sb-neutral).
 - **Heartbeat:** Der synthetische Heartbeat-VO ist immer Push.
