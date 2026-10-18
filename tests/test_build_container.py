@@ -135,6 +135,40 @@ def test_build_command_multiarch_uses_buildx_and_push(tmp_path):
     assert cmd[1] == "buildx"
 
 
+def test_build_command_revision_adds_oci_label(tmp_path):
+    """Release builds carry the commit so scripts.release_image_gate can reuse them."""
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("FROM python:3.14-slim\n", encoding="utf-8")
+
+    cmd = bc.build_command(
+        tags=["ghcr.io/example/earnie:1.0.0"],
+        platform=bc.MULTIARCH_PLATFORM,
+        dockerfile=dockerfile,
+        context=tmp_path,
+        no_cache=False,
+        push=True,
+        revision="abc123",
+    )
+
+    assert cmd[cmd.index("--label") + 1] == "org.opencontainers.image.revision=abc123"
+
+
+def test_build_command_without_revision_has_no_label(tmp_path):
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("FROM python:3.14-slim\n", encoding="utf-8")
+
+    cmd = bc.build_command(
+        tags=["ghcr.io/example/earnie:test"],
+        platform="linux/amd64",
+        dockerfile=dockerfile,
+        context=tmp_path,
+        no_cache=False,
+        push=False,
+    )
+
+    assert "--label" not in cmd
+
+
 def test_build_command_multiarch_without_push_raises(tmp_path):
     dockerfile = tmp_path / "Dockerfile"
     dockerfile.write_text("FROM python:3.14-slim\n", encoding="utf-8")

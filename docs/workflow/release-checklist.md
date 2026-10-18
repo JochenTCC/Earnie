@@ -14,6 +14,8 @@ Background: a tag push builds a **candidate** only; nothing reaches users until 
 
 **Dev builds** (`vX.Y.Z-dev.N`, never released): the run stops after `addon_smoke` / `addon_lint` — only GHCR `:<version>` exists; no release notes, GitHub Release, `promote` or HA pin. Test via the local **Earnie (Dev)** add-on (set its `version:` to the dev version). Skip steps 4–6 below.
 
+**Only one channel** (`targets`): instead of (or after) the tag push, run **Release** via *Run workflow* with `tag` and `targets` = `docker` (LoxBerry/Synology: `:next`/`:latest` only, no HA add-on) or `ha` (HA add-on only, `:next`/`:latest` unchanged). A tag push always means `both`. The GitHub Release is published either way; existing `:<version>` images of the same commit are reused, so the missing channel can be released later with a second run (another approval). Skip the checklist items of the channel you leave out. Details: [DEVELOPER.md](../../DEVELOPER.md) (*Partial release*).
+
 ---
 
 ## One-time setup (done 2026-09-27)

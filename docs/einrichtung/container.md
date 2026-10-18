@@ -116,6 +116,8 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Veröffentlichte Images** entstehen über GitHub Actions. Ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release-publish.yml`](../../.github/workflows/release-publish.yml). Der Workflow baut zuerst nur den **Release-Kandidaten** `ghcr.io/jochentcc/earnie-energy:X.Y.Z`; der Tag allein setzt weder `:latest` noch `:next`. Nach manueller Freigabe des Jobs `promote` (Environment `release-approval`) folgen `:latest` (nur offizielle Versionen) bzw. `:next` sowie die veröffentlichte GitHub Release. Details: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
+Ein Release kann auch nur für einen Kanal erscheinen (manueller Start mit `targets` = `docker` oder `ha`). Bei einem reinen Home-Assistant-Release bleiben `:latest` und `:next` auf dem bisherigen Stand; LoxBerry- und Synology-Installationen, die diesen Tags folgen, bekommen die neue Version dann erst mit dem Docker-Release.
+
 **Vorabversionen (Community-Test):** Ein Tag `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) durchläuft denselben Ablauf. Zuerst entsteht der Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release**, jedoch **kein** `:latest`.
 
 Zum Testen entweder `:next` verwenden (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.7.0-alpha.2`). Der Pin wird erst mit der nächsten Vorabversion aktualisiert und kann daher älter sein als die letzte offizielle Version. Die produktiven Compose-Dateien (`*_productive.yml`) mit `:latest` bleiben auf der letzten offiziellen Version.
