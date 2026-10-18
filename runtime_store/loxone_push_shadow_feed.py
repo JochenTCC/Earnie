@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from ehal.push_signals import HEARTBEAT_ID
 from runtime_store.loxone_push_parse import (
-    HEARTBEAT_ID,
     SHADOW_FEED_SOURCE,
     parse_push_value,
 )

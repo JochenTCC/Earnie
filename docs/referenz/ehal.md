@@ -56,10 +56,11 @@ Exchange / display form of every signal on the push/exchange wire and in `status
 | Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Storage and exchange; legacy `flex.<slug>.*` accepted on parse / dual-read until migrated |
 | EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Same Kennung; namespace chosen by field kind |
 | Inverter | `inv.<Kennung>.*` | Entity-scoped on `inverters[].ehal_bindings` (**2.7.l P4**) |
-| Heartbeat | `heartbeat` | Link proof; not a field kind |
+| Heartbeat (read) | `heartbeat_smarthome` | Link proof Hub→Earnie; not a field kind |
+| Heartbeat (write) | `heartbeat_earnie` | Earnie→Hub Unix watchdog in `status.json`; not a field kind |
 | Request optimize | `request_optimize` | Daemon HTTP wake receipt (`POST /ehal/loxone/request_optimize`); not a field kind |
 
-`parse_qualified_id(id)` → `ParsedQualifiedId(namespace, kennung, kind, raw)` or `None`. Plant bare, `heartbeat`, and `request_optimize` have `namespace` / `kennung` = `None`. Round-trip: builders → parse → `format_qualified_id` restores the exchange string. Field kinds are not renamed in 2.7.n.
+`parse_qualified_id(id)` → `ParsedQualifiedId(namespace, kennung, kind, raw)` or `None`. Plant bare, heartbeats, and `request_optimize` have `namespace` / `kennung` = `None`. Round-trip: builders → parse → `format_qualified_id` restores the exchange string. Field kinds are not renamed in 2.7.n.
 
 ## Schema version and envelope
 
@@ -443,7 +444,7 @@ Home Assistant uses the **same Earnie↔SB HTTP contract as Loxone**. There is *
 | Direction | Live I/O |
 | --------- | -------- |
 | **Read (HA → Earnie)** | HA automations / `rest_command` push activated telemetry to `GET /ehal/telemetry/<qualified-EHAL-id>/<value>` (token, inbox freshness, zero rule, last-known — same as Loxone). |
-| **Write (Earnie → HA)** | HA polls `GET /ehal/status.json` (canonical; `/ehal/loxone/status.json` kept as alias) for setpoints under qualified keys; payload includes `heartbeat_ts`. |
+| **Write (Earnie → HA)** | HA polls `GET /ehal/status.json` (canonical; `/ehal/loxone/status.json` kept as alias) for setpoints under qualified keys; payload includes `heartbeat_earnie`. |
 | **Listener** | `integrations/loxone_request_http.py` on `system.ehal_loxone_http_port` (default **8541**). |
 | **Token** | Optional `EARNIE_PUSH_TOKEN` (alias `EARNIE_PILOT_PUSH_TOKEN`): when set, required via header `X-Earnie-Token`, `/t/<token>/…`, or `?t=`; when unset, open LAN push (same as Loxone). |
 | **Cadence** | Every read signal at least every `EARNIE_PILOT_PUSH_REPEAT_S` (default **10 s**). Silent power while the heartbeat link is fresh → assumed **0** (`STATE_ZERO_ASSUMED_SILENT`); **energy counters are never assumed 0**. See [Loxone Signals — push cadence](loxone-signals.md#push-cadence-sb-neutral). |

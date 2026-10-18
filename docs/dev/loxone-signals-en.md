@@ -33,7 +33,7 @@ This page calls the canonical template/import path **Default** (formerly often "
 
 The library adds the **Loxone-side** HTTP mirroring and an **Earnie-dead** fallback in Config (see [Earnie Dead-Man Fallback](#earnie-dead-fallback-in-loxone-config)).
 
-**Virtual Inputs (Earnie → Loxone):** Setpoints, enables and the heartbeat are served by the daemon via `GET http://<Earnie>:8541/ehal/loxone/status.json`. `heartbeat_ts` is the current Unix time; setpoints come from the publish ledger (`loxone_sent`). Writes are **push-only**: Earnie does not call `/dev/sps/io/<Merker>/<value>` for cycle setpoints. `status.json` publishes qualified Check keys only.
+**Virtual Inputs (Earnie → Loxone):** Setpoints, enables and the heartbeat are served by the daemon via `GET http://<Earnie>:8541/ehal/loxone/status.json`. `heartbeat_earnie` is the current Unix time; setpoints come from the publish ledger (`loxone_sent`). Writes are **push-only**: Earnie does not call `/dev/sps/io/<Merker>/<value>` for cycle setpoints. `status.json` publishes qualified Check keys only.
 
 **Virtual Outputs (Loxone → Earnie):** Loxone pushes `sens_*` / `get_*` / flex power under qualified path IDs. Core reads those fields from the push inbox.
 
@@ -143,7 +143,7 @@ Telemetry VOs (`VO_Earnie_*` except `Status`) also target the daemon port **8541
 - **FertigUm** (`ev.<id>.get_evcs_ready_by_time`): pushed as an Analog VO. A numeric next-entry value is preferred. Tna-style text such as `Morgen, 07:00` is accepted while fresh and parsed by the optimizer.
 - **Value placeholder:** a Virtual Output command uses `<v>` (written `&lt;v&gt;` in the XML). `\v` is the Virtual **Input** check placeholder and arrives as the control character 0x0B in an output.
 
-Adjust the polling / Cmd check pattern to match the JSON keys (plant: `set_ess_*` / `heartbeat_ts`; flex: `consumer.{hk_id}.…` (heat pump `heatpump.…`, pool `pool.…`); EV: `evcs.{ev_id}.…`). Stable **titles** remain the contract for Core and the Default import.
+Adjust the polling / Cmd check pattern to match the JSON keys (plant: `set_ess_*` / `heartbeat_earnie`; flex: `consumer.{hk_id}.…` (heat pump `heatpump.…`, pool `pool.…`); EV: `evcs.{ev_id}.…`). Stable **titles** remain the contract for Core and the Default import.
 
 ### 3. Insert Devices and Keep the Merker Names
 
@@ -174,7 +174,7 @@ Goal: if Earnie is unreachable or the Virtual In is no longer updated, the Minis
 
 Recommended approach (logic blocks in Config, no Earnie code):
 
-1. **Watchdog** on the heartbeat Cmd (`heartbeat_ts` in `VI_Earnie_Plant_v2.xml`, `Earnie_Heartbeat` in the Default naming; Unix timestamp): age = now − heartbeat, or "value unchanged for x seconds".
+1. **Watchdog** on the heartbeat Cmd (`heartbeat_earnie` in `VI_Earnie_Plant_v2.xml`, `Earnie_Heartbeat` in the Default naming; Unix timestamp): age = now − heartbeat, or "value unchanged for x seconds".
 2. **Threshold:** e.g. 2–3 × the Virtual In polling time, typically ≥ 30 s at a 10 s poll.
 3. **When the dead-man fallback triggers:**
    - Set `Earnie_Steuerbefehl` / ESS mode locally to **automatic** (`0`), or apply the plant's safe ESS rules.
@@ -382,7 +382,7 @@ Ad hoc optimization runs in `main.py` (between quarter hours) via Loxone → Ear
 | Address                            | `http://EARNIE_HOST:8541` (port = `system.ehal_loxone_http_port`, default **8541**)           |
 | Cmd `Earnie_Request_Optimize`      | `POST /ehal/loxone/request_optimize` — wakes the daemon before the next quarter hour; receipt ID `request_optimize` in EHAL-Com **Signalliste** and **Live-Lesen** |
 
-Link proof (hub → Earnie) is the repeating telemetry VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat/<v>`, not a Status cmd. Existing Configs that still contain the obsolete **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` command should delete it; the endpoint returns 404.
+Link proof (hub → Earnie) is the repeating telemetry VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat_smarthome/<v>`, not a Status cmd. Existing Configs that still contain the obsolete **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` command should delete it; the endpoint returns 404.
 
 
 Compose production stacks publish container port **8541** (see [Streamlit Ports](streamlit-ports.md)).

@@ -437,7 +437,7 @@ until you intentionally test writes (§6.4).
 
 ```powershell
 $token = "<EARNIE_PILOT_PUSH_TOKEN>"
-Invoke-RestMethod -Uri "http://localhost:8541/ehal/telemetry/heartbeat/1?t=$token"
+Invoke-RestMethod -Uri "http://localhost:8541/ehal/telemetry/heartbeat_smarthome/1?t=$token"
 Invoke-RestMethod -Uri "http://localhost:8541/ehal/status.json?t=$token"
 ```
 

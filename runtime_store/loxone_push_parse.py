@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import math
 import re
+
+from ehal.push_signals import HEARTBEAT_ID
 from ehal.qualified_ids import (
     id_namespace_alternation,
 )
-
-HEARTBEAT_ID = "heartbeat"  # constant non-zero push that proves the Miniserver link
-
 
 # Control receipt (POST /ehal/loxone/request_optimize) — not a telemetry field kind.
 REQUEST_OPTIMIZE_ID = "request_optimize"
@@ -20,7 +19,7 @@ SHADOW_FEED_SOURCE = "shadow_feed"
 
 
 # Loxone pushes measurements (sens_*) and inputs (get_*) only; never setpoints.
-# Plus synthetic control IDs (heartbeat, request_optimize).
+# Plus synthetic control IDs (heartbeat_smarthome, request_optimize).
 _ID_PATTERN = re.compile(
     r"^(?:"
     + HEARTBEAT_ID

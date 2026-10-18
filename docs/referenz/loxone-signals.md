@@ -31,7 +31,7 @@ Diese Seite nennt den kanonischen Vorlagen- und Importweg **Default** (früher o
 
 Die Library ergänzt die **Loxone-seitige** HTTP-Spiegelung und eine **Earnie-tot**-Rückfallebene in Config (siehe [Earnie-Dead-Man-Rückfallebene](#earnie-dead-fallback-in-loxone-config)).
 
-**Virtual Inputs (Earnie → Loxone):** Sollwerte, Freigaben und Heartbeat liefert der Daemon über `GET http://<Earnie>:8541/ehal/loxone/status.json`. `heartbeat_ts` ist die aktuelle Unix-Zeit; die Sollwerte stammen aus dem Publish-Ledger (`loxone_sent`). Schreibzugriffe sind **Push-only**: Earnie ruft für Zyklus-Sollwerte nicht `/dev/sps/io/<Merker>/<Wert>` auf. `status.json` veröffentlicht ausschließlich qualifizierte Check-Schlüssel.
+**Virtual Inputs (Earnie → Loxone):** Sollwerte, Freigaben und Heartbeat liefert der Daemon über `GET http://<Earnie>:8541/ehal/loxone/status.json`. `heartbeat_earnie` ist die aktuelle Unix-Zeit; die Sollwerte stammen aus dem Publish-Ledger (`loxone_sent`). Schreibzugriffe sind **Push-only**: Earnie ruft für Zyklus-Sollwerte nicht `/dev/sps/io/<Merker>/<Wert>` auf. `status.json` veröffentlicht ausschließlich qualifizierte Check-Schlüssel.
 
 **Virtual Outputs (Loxone → Earnie):** Loxone sendet `sens_*` / `get_*` / Flex-Leistung unter qualifizierten Pfad-IDs. Der Core liest diese Felder aus der Push-Inbox.
 
@@ -151,7 +151,7 @@ Dieselbe Inbox-Regel gilt für **Loxone** (VO-Wiederholung) und **Home Assistant
 
 > **Hinweis:** Eine HA-Automation, die nur bei Zustandsänderung pusht, meldet einen konstanten Nicht-Null-Wert nach dem Takt als 0. Deshalb periodisch pushen – nicht nur `state` trigger.
 
-Das Polling bzw. das Cmd-Check-Muster ist an die JSON-Schlüssel anzupassen (Anlage: `set_ess_*` / `heartbeat_ts`; Flex: `consumer.{hk_id}.…` (Wärmepumpe `heatpump.…`, Pool `pool.…`); EV: `evcs.{ev_id}.…`). Stabile **Titel** bleiben der Vertrag für Core und den Default-Import.
+Das Polling bzw. das Cmd-Check-Muster ist an die JSON-Schlüssel anzupassen (Anlage: `set_ess_*` / `heartbeat_earnie`; Flex: `consumer.{hk_id}.…` (Wärmepumpe `heatpump.…`, Pool `pool.…`); EV: `evcs.{ev_id}.…`). Stabile **Titel** bleiben der Vertrag für Core und den Default-Import.
 
 ### 3. Geräte einfügen und Merker-Namen beibehalten
 
@@ -182,7 +182,7 @@ Ziel: Ist Earnie nicht erreichbar oder wird das Virtual In nicht mehr aktualisie
 
 Empfohlenes Vorgehen (Logikbausteine in Config, kein Earnie-Code):
 
-1. **Watchdog** auf dem Heartbeat-Cmd (`heartbeat_ts` in `VI_Earnie_Plant_v2.xml`, `Earnie_Heartbeat` in der Default-Benennung; Unix-Zeitstempel): Alter = jetzt − Heartbeat, oder „Wert seit x Sekunden unverändert“.
+1. **Watchdog** auf dem Heartbeat-Cmd (`heartbeat_earnie` in `VI_Earnie_Plant_v2.xml`, `Earnie_Heartbeat` in der Default-Benennung; Unix-Zeitstempel): Alter = jetzt − Heartbeat, oder „Wert seit x Sekunden unverändert“.
 2. **Schwelle:** z. B. 2–3 × die Polling-Zeit des Virtual In, bei 10 s Poll typischerweise ≥ 30 s.
 3. **Wenn die Rückfallebene auslöst:**
    - `Earnie_Steuerbefehl` / ESS-Modus lokal auf **Automatik** (`0`) setzen oder die sicheren ESS-Regeln der Anlage anwenden.
@@ -381,7 +381,7 @@ Ad-hoc-Optimierungsläufe in `main.py` (zwischen den Viertelstunden) laufen übe
 | Adresse                            | `http://EARNIE_HOST:8541` (Port = `system.ehal_loxone_http_port`, Standard **8541**)          |
 | Cmd `Earnie_Request_Optimize`      | `POST /ehal/loxone/request_optimize`: weckt den Daemon vor der nächsten Viertelstunde; Empfangs-ID `request_optimize` in EHAL-Com **Signalliste** und **Live-Lesen** |
 
-Der Verbindungsnachweis (Hub → Earnie) ist der sich wiederholende Telemetrie-VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat/<v>`, kein Status-Cmd. Bestehende Configs, die noch das veraltete Cmd **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` enthalten, sollten es löschen; der Endpunkt liefert 404.
+Der Verbindungsnachweis (Hub → Earnie) ist der sich wiederholende Telemetrie-VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat_smarthome/<v>`, kein Status-Cmd. Bestehende Configs, die noch das veraltete Cmd **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` enthalten, sollten es löschen; der Endpunkt liefert 404.
 
 Compose-Produktivstacks veröffentlichen Container-Port **8541** (siehe [Streamlit-Ports](../dev/streamlit-ports.md)).
 

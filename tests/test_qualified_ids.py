@@ -75,7 +75,8 @@ def test_digital_ids() -> None:
     assert q.is_digital_id("pool.pool_filter.sens_filter_active")
     assert q.is_digital_id("consumer.waschmaschine.sens_consumer_active")
     assert not q.is_digital_id("evcs.e_auto.sens_evcs_active_power")
-    assert not q.is_digital_id("heartbeat")
+    assert not q.is_digital_id("heartbeat_smarthome")
+    assert not q.is_digital_id("heartbeat_earnie")
 
 
 @pytest.mark.parametrize(
@@ -83,7 +84,8 @@ def test_digital_ids() -> None:
     [
         ("sens_temperature_outside", None, None, "sens_temperature_outside"),
         ("set_grid_export_power_limit", None, None, "set_grid_export_power_limit"),
-        ("heartbeat", None, None, "heartbeat"),
+        ("heartbeat_smarthome", None, None, "heartbeat_smarthome"),
+        ("heartbeat_earnie", None, None, "heartbeat_earnie"),
         ("request_optimize", None, None, "request_optimize"),
         ("grid.meter.sens_grid_power_active", "grid", "meter", "sens_grid_power_active"),
         ("ess.ecoflow_delta_3.sens_ess_soc", "ess", "ecoflow_delta_3", "sens_ess_soc"),
@@ -113,6 +115,8 @@ def test_parse_qualified_id_rejects_junk() -> None:
     assert q.parse_qualified_id("unknown.slug.sens_x") is None
     assert q.parse_qualified_id("ess..sens_ess_soc") is None
     assert q.parse_qualified_id("ess.BadSlug.sens_ess_soc") is None
+    assert q.parse_qualified_id("heartbeat") is None
+    assert q.parse_qualified_id("heartbeat_ts") is None
 
 
 @pytest.mark.parametrize(

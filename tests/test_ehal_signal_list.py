@@ -71,13 +71,25 @@ def test_build_signal_rows_has_read_and_write() -> None:
     assert "grid.meter.set_grid_export_power_limit" in ids
     assert "consumer.waschmaschine.set_enable" in ids
     assert "ess.15_kwh_speicher.sens_ess_soc" in ids
-    assert "heartbeat" in ids
-    assert "heartbeat_ts" in ids
+    assert "heartbeat_smarthome" in ids
+    assert "heartbeat_earnie" in ids
     assert "request_optimize" in ids
+    hb_read = next(r for r in rows if r.ehal_id == "heartbeat_smarthome")
+    assert hb_read.direction == "read"
+    assert hb_read.is_required is True
+    assert hb_read.is_activated is True
+    assert hb_read.binding_key == ""
+    assert "Smarthome" in hb_read.meaning
+    hb_write = next(r for r in rows if r.ehal_id == "heartbeat_earnie")
+    assert hb_write.direction == "write"
+    assert hb_write.is_required is True
+    assert hb_write.binding_key == ""
+    assert "Earnie" in hb_write.meaning
     opt = next(r for r in rows if r.ehal_id == "request_optimize")
     assert opt.direction == "read"
     assert opt.group == "Status"
     assert opt.match_kind == "never"
+    assert opt.is_required is False
     old = build_signal_rows(
         house,
         components,

@@ -2,7 +2,7 @@
 <!--
   Optional Loxone → Earnie control push (Request Optimize).
   Replace EARNIE_HOST. Link proof is the repeating heartbeat VO
-  (Push_Earnie_Heartbeat → /ehal/telemetry/heartbeat/…), not this Status VO.
+  (Push_Earnie_Heartbeat → /ehal/telemetry/heartbeat_smarthome/…), not this Status VO.
 -->
 <VirtualOut HintText="" Title="Earnie Status Push" Comment="entity-scoped: optional Request Optimize to Earnie" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<Info templateType="3" minVersion="17010630"/>

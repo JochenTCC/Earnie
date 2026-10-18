@@ -19,9 +19,11 @@ from ehal.qualified_ids import (
     qualified_pv_id,
 )
 
-HEARTBEAT_ID = "heartbeat"
+HEARTBEAT_ID = "heartbeat_smarthome"
 HEARTBEAT_TITLE = "Push_Earnie_Heartbeat"
-HEARTBEAT_WRITE_ID = "heartbeat_ts"
+HEARTBEAT_WRITE_ID = "heartbeat_earnie"
+HEARTBEAT_READ_MEANING = "Link-Nachweis Smarthome → Earnie"
+HEARTBEAT_WRITE_MEANING = "Lebenszeichen Earnie → Smarthome (Unix-Zeit)"
 # Daemon HTTP control receipt (VO Earnie_Request_Optimize → POST, not telemetry).
 REQUEST_OPTIMIZE_ID = "request_optimize"
 REQUEST_OPTIMIZE_TITLE = "Earnie_Request_Optimize"
@@ -31,7 +33,7 @@ REQUEST_OPTIMIZE_MEANING = "Ad-hoc-Optimierung anfordern"
 SKIP_KINDS: frozenset[str] = frozenset()
 _UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue"})
 _WRITE_ID_RE = re.compile(
-    r"^(?:heartbeat_ts|(?:[a-z0-9_]{1,64}\.){0,2}set_[a-z0-9_]{1,64})$"
+    r"^(?:heartbeat_earnie|(?:[a-z0-9_]{1,64}\.){0,2}set_[a-z0-9_]{1,64})$"
 )
 
 
@@ -56,7 +58,7 @@ def heartbeat_signal() -> Signal:
 
 
 def heartbeat_write_signal() -> Signal:
-    """VI heartbeat from ``status.json`` (``heartbeat_ts`` Unix seconds)."""
+    """VI heartbeat from ``status.json`` (``heartbeat_earnie`` Unix seconds)."""
     return Signal(
         group="Heartbeat",
         ehal_id=HEARTBEAT_WRITE_ID,
@@ -102,7 +104,7 @@ def vi_title_from_qualified_id(ehal_id: str) -> str:
 
 
 def is_valid_write_ehal_id(ehal_id: object) -> bool:
-    """Accept bare or qualified ``set_*`` IDs and ``heartbeat_ts``."""
+    """Accept bare or qualified ``set_*`` IDs and heartbeat write IDs."""
     return bool(_WRITE_ID_RE.match(str(ehal_id or "")))
 
 

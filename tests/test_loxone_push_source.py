@@ -102,7 +102,7 @@ def test_fetch_uses_push_for_all_indexed(
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     inbox.reset_memory_for_tests()
     now = datetime.now(timezone.utc)
-    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("heartbeat_smarthome", "1", now=now)
     inbox.record_push("consumer.trockner.sens_power_act", "1.5", now=now)
     inbox.record_push("grid.meter.sens_grid_power_active", "2.25", now=now)
     monkeypatch.setattr(
@@ -129,7 +129,7 @@ def test_fetch_by_ehal_id_without_merker(
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     inbox.reset_memory_for_tests()
     now = datetime.now(timezone.utc)
-    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("heartbeat_smarthome", "1", now=now)
     inbox.record_push("grid.meter.sens_grid_power_active", "3.0", now=now)
     house = {"plant": {"ehal_bindings": {"sens_grid_power_active": ""}}, "profiles": {}}
     monkeypatch.setattr(src, "get_address_index", lambda: src.build_merker_index(house, {}))
@@ -147,7 +147,7 @@ def test_fetch_pushable_qid_reads_inbox_when_binding_index_empty(
     inbox.reset_memory_for_tests()
     now = datetime.now(timezone.utc)
     qid = "ess.15_kwh_speicher.sens_ess_soc"
-    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("heartbeat_smarthome", "1", now=now)
     inbox.record_push(qid, "36.0", now=now)
     monkeypatch.setattr(src, "get_address_index", lambda: {})
     monkeypatch.setattr(src, "get_ehal_index", lambda: {})
@@ -175,7 +175,7 @@ def test_ready_by_time_uses_push_numeric(
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     inbox.reset_memory_for_tests()
     now = datetime.now(timezone.utc)
-    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("heartbeat_smarthome", "1", now=now)
     inbox.record_push("ev.e_auto.get_evcs_ready_by_time", "1735689600", now=now)
     monkeypatch.setattr(
         src,
@@ -198,7 +198,7 @@ def test_ready_by_time_push_text_reaches_wecker_parser(
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     inbox.reset_memory_for_tests()
     now = datetime.now(timezone.utc)
-    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("heartbeat_smarthome", "1", now=now)
     inbox.record_push("ev.e_auto.get_evcs_ready_by_time", "Morgen, 07:00", now=now)
     monkeypatch.setattr(
         src,
@@ -222,7 +222,7 @@ def test_ev_nominal_and_capacity_use_inbox_not_merker(
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
     inbox.reset_memory_for_tests()
     now = datetime.now(timezone.utc)
-    inbox.record_push("heartbeat", "1", now=now)
+    inbox.record_push("heartbeat_smarthome", "1", now=now)
     inbox.record_push("evcs.e_auto.get_evcs_nominal_current", "16", now=now)
     inbox.record_push("ev.e_auto.sens_evcs_bat_capacity", "77", now=now)
     monkeypatch.setattr(

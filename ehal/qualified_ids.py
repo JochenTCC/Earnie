@@ -161,9 +161,9 @@ _SLUG_RE_PART = r"[a-z0-9_]{1,64}"
 class ParsedQualifiedId:
     """Decomposed exchange / display ID.
 
-    Plant bare fields, ``heartbeat``, and ``request_optimize`` have
-    ``namespace`` / ``kennung`` = ``None``. Legacy ``flex.*`` is accepted
-    (``namespace == "flex"``); builders never emit it.
+    Plant bare fields, ``heartbeat_smarthome`` / ``heartbeat_earnie``, and
+    ``request_optimize`` have ``namespace`` / ``kennung`` = ``None``. Legacy
+    ``flex.*`` is accepted (``namespace == "flex"``); builders never emit it.
     """
 
     namespace: str | None
@@ -185,15 +185,18 @@ def parse_qualified_id(ehal_id: object) -> ParsedQualifiedId | None:
 
     Accepted forms:
     - plant bare: ``sens_*`` / ``get_*`` / ``set_*`` / ``supports_*`` (no dots)
-    - ``heartbeat`` (link proof; not a field kind)
+    - ``heartbeat_smarthome`` (link proof; not a field kind)
+    - ``heartbeat_earnie`` (Earnie→hub Unix watchdog; not a field kind)
     - ``request_optimize`` (daemon HTTP wake receipt; not a field kind)
     - ``<ns>.<Kennung>.<kind>`` for namespaces in ``NAMESPACES`` plus legacy ``flex``
     """
     raw = str(ehal_id or "").strip()
     if not raw:
         return None
-    if raw == "heartbeat":
-        return ParsedQualifiedId(None, None, "heartbeat", raw)
+    if raw == "heartbeat_smarthome":
+        return ParsedQualifiedId(None, None, "heartbeat_smarthome", raw)
+    if raw == "heartbeat_earnie":
+        return ParsedQualifiedId(None, None, "heartbeat_earnie", raw)
     if raw == "request_optimize":
         return ParsedQualifiedId(None, None, "request_optimize", raw)
     if "." not in raw:

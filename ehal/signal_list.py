@@ -12,6 +12,10 @@ from ehal.flex_fields import flex_field_label
 from ehal.functions import EHAL_FUNCTIONS
 from ehal.profiles import role_field_labels
 from ehal.push_signals import (
+    HEARTBEAT_ID,
+    HEARTBEAT_READ_MEANING,
+    HEARTBEAT_WRITE_ID,
+    HEARTBEAT_WRITE_MEANING,
     REQUEST_OPTIMIZE_ID,
     REQUEST_OPTIMIZE_MEANING,
     Signal,
@@ -48,6 +52,10 @@ class SignalRow:
 def _meaning_for(kind: str) -> str:
     if kind == REQUEST_OPTIMIZE_ID:
         return REQUEST_OPTIMIZE_MEANING
+    if kind == HEARTBEAT_ID:
+        return HEARTBEAT_READ_MEANING
+    if kind == HEARTBEAT_WRITE_ID:
+        return HEARTBEAT_WRITE_MEANING
     labels = role_field_labels()
     return flex_field_label(kind) or labels.get(kind) or kind
 
@@ -151,6 +159,7 @@ def _control_row(
     inbox: dict[str, dict[str, Any]],
     published: dict[str, dict[str, Any]],
     fetched_at: str | None,
+    is_required: bool = False,
 ) -> SignalRow:
     kind = field_kind(sig.ehal_id)
     if direction == "read":
@@ -167,7 +176,7 @@ def _control_row(
         match_text=match_text,
         group=sig.group,
         digital=sig.digital,
-        is_required=False,
+        is_required=is_required,
         is_activated=True,
         binding_key="",
         component_kind="",
@@ -205,6 +214,7 @@ def build_signal_rows(
                 inbox=inbox,
                 published=published,
                 fetched_at=fetched_at,
+                is_required=True,
             )
         )
         rows.append(
@@ -214,6 +224,7 @@ def build_signal_rows(
                 inbox=inbox,
                 published=published,
                 fetched_at=fetched_at,
+                is_required=True,
             )
         )
     rows.append(

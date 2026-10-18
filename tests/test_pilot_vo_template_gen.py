@@ -191,7 +191,7 @@ def test_heartbeat_template_and_analog_has_no_off_command() -> None:
     )
     cmd = next(c for c in ET.fromstring(text.encode("utf-8")) if c.tag == "VirtualOutCmd")
     assert cmd.get("Title") == "Push_Earnie_Heartbeat"
-    assert cmd.get("CmdOn") == "/ehal/telemetry/heartbeat/<v>?t=abcd1234efgh"
+    assert cmd.get("CmdOn") == "/ehal/telemetry/heartbeat_smarthome/<v>?t=abcd1234efgh"
     assert cmd.get("Analog") == "true"
     assert cmd.get("CmdOff") == ""  # analog outputs have no Off command
     assert (cmd.get("Repeat"), cmd.get("RepeatRate")) == ("10", "10")

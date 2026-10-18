@@ -342,7 +342,7 @@ def _install_push_indexes(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _seed_required_push(*, soc: str | None = "55", now: datetime | None = None) -> None:
     ref = now if now is not None else _now()
-    inbox.record_push("heartbeat", "1", now=ref)
+    inbox.record_push("heartbeat_smarthome", "1", now=ref)
     if soc is not None:
         inbox.record_push(qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"), soc, now=ref)
     inbox.record_push(qualified_plant_id("sens_pv_production_active"), "0", now=ref)
@@ -372,7 +372,7 @@ def test_char_push_stale_soc_still_reads_plant_telemetry(
     old = _now() - timedelta(minutes=6)
     _seed_required_push(soc="55", now=old)
     # Fresh heartbeat so link is alive; SoC row stays stale — plant read still ok.
-    inbox.record_push("heartbeat", "1", now=_now())
+    inbox.record_push("heartbeat_smarthome", "1", now=_now())
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert "sens_ess_soc" not in telemetry
 

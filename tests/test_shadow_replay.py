@@ -252,8 +252,8 @@ def test_shadow_soc_older_than_vo_silence_still_ok(monkeypatch, tmp_path) -> Non
                 "payload": {"LL": {"value": "14.0"}},
                 "error": None,
             },
-            "loxone:io:heartbeat": {
-                "key": "loxone:io:heartbeat",
+            "loxone:io:heartbeat_smarthome": {
+                "key": "loxone:io:heartbeat_smarthome",
                 "ts": _utc(-45),
                 "ok": True,
                 "status": None,
@@ -293,7 +293,7 @@ def test_shadow_read_push_value_ignores_prod_inbox_file(monkeypatch, tmp_path) -
                         "last_ts": _utc(),
                         "count": 3,
                     },
-                    "heartbeat": {
+                    "heartbeat_smarthome": {
                         "value": 1.0,
                         "raw": "1",
                         "parse_ok": True,

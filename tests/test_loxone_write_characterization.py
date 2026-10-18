@@ -338,7 +338,8 @@ def test_char_status_json_legacy_payload_snapshot(monkeypatch) -> None:
     finally:
         psl._last_powerstation_sent.clear()
 
-    assert payload["heartbeat_ts"] == 1_700_000_000
+    assert payload["heartbeat_earnie"] == 1_700_000_000
+    assert "heartbeat_ts" not in payload
     assert payload["set_ess_active_power"] == -2.5
     assert payload["set_ess_charge_power_limit"] == 5.0
     assert payload["set_ess_discharge_power_limit"] == 4.0

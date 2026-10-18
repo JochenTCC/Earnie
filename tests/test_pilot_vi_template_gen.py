@@ -114,7 +114,7 @@ def test_vi_title_from_qualified_id() -> None:
     assert gen.vi_title_from_qualified_id("consumer.trockner.set_enable") == (
         "consumer_trockner_set_enable"
     )
-    assert gen.vi_title_from_qualified_id("heartbeat_ts") == "heartbeat_ts"
+    assert gen.vi_title_from_qualified_id("heartbeat_earnie") == "heartbeat_earnie"
 
 
 def test_render_check_and_sticky_analog(tmp_path: Path) -> None:
@@ -142,11 +142,11 @@ def test_render_check_and_sticky_analog(tmp_path: Path) -> None:
 
 def test_heartbeat_write_signal() -> None:
     sig = gen.heartbeat_write_signal()
-    assert sig.ehal_id == "heartbeat_ts"
-    assert sig.title == "heartbeat_ts"
+    assert sig.ehal_id == "heartbeat_earnie"
+    assert sig.title == "heartbeat_earnie"
     text = gen.render_template("Heartbeat", [sig], host="h", port=8541)
     cmd = next(c for c in ET.fromstring(text.encode("utf-8")) if c.tag == "VirtualInHttpCmd")
-    assert cmd.get("Check") == '"heartbeat_ts":\\v'
+    assert cmd.get("Check") == '"heartbeat_earnie":\\v'
 
 
 def test_write_template_has_bom(tmp_path: Path) -> None:
@@ -179,4 +179,4 @@ def test_main_writes_files_and_csv(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert rows[0] == ["Datei", "VI-Cmd-Titel", "EHAL-ID", "Bisheriger Name (Merker)", "Typ"]
     ehal_ids = {r[2] for r in rows[1:]}
     assert "consumer.trockner.set_enable" in ehal_ids
-    assert "heartbeat_ts" in ehal_ids
+    assert "heartbeat_earnie" in ehal_ids

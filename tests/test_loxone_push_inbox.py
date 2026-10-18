@@ -39,7 +39,7 @@ def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "pool.pool_swimspa.sens_temperature_water",
         "evcs.garage.sens_evcs_connected",
         "ev.garage.sens_evcs_soc_act",
-        "heartbeat",
+        "heartbeat_smarthome",
         "request_optimize",
     ],
 )
@@ -54,6 +54,7 @@ def test_valid_ids(ehal_id: str) -> None:
         "sens_ess_soc",  # plant-flat SoC retired (flat SoC retired)
         "set_ess_charge_power_limit",  # setpoints are never pushed from Loxone
         "ess.x.set_ess_mode",
+        "heartbeat",  # renamed to heartbeat_smarthome
         "../etc/passwd",
         "ess.Bad Slug.sens_ess_soc",
         "sens_ess_soc/extra",
@@ -159,7 +160,7 @@ def test_record_push_debounces_disk_flush(monkeypatch: pytest.MonkeyPatch) -> No
 
     t0 = datetime(2026, 10, 7, 12, 0, 0, tzinfo=timezone.utc)
     for i in range(5):
-        inbox.record_push("heartbeat", "1", now=t0 + timedelta(milliseconds=i * 50))
+        inbox.record_push("heartbeat_smarthome", "1", now=t0 + timedelta(milliseconds=i * 50))
         inbox.record_push(
             "ess.house.sens_ess_soc",
             str(50 + i),
@@ -250,7 +251,7 @@ def _row(value: float | None, age_s: float, *, parse_ok: bool = True) -> dict:
 
 
 def test_link_alive_from_fresh_nonzero_analog_or_heartbeat() -> None:
-    assert inbox.link_alive({"heartbeat": _row(1.0, 5)}, now=_now())
+    assert inbox.link_alive({"heartbeat_smarthome": _row(1.0, 5)}, now=_now())
     assert inbox.link_alive({"ess.house.sens_ess_soc": _row(55.0, 20)}, now=_now())
     assert not inbox.link_alive({"ess.house.sens_ess_soc": _row(55.0, 35)}, now=_now())  # older than 3 x 10 s
     assert not inbox.link_alive({"sens_grid_power_active": _row(0.0, 5)}, now=_now())  # zero is no proof
@@ -361,11 +362,23 @@ def test_endpoint_accepts_token_in_address_prefix(monkeypatch: pytest.MonkeyPatc
     assert _get(port, "/t/s3cret-token/ehal/loxone/alive") == 404
     # older variants still work
     assert _get(port, base + "sens_pv_production_active/1?t=s3cret-token") == 204
-    assert _get(port, alias + "heartbeat/1", {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"}) == 204
+    assert (
+        _get(
+            port,
+            alias + "heartbeat_smarthome/1",
+            {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"},
+        )
+        == 204
+    )
+    assert _get(port, alias + "heartbeat/1", {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"}) == 400
     inbox.flush_inbox_now()
     rows = inbox.load_inbox()
     assert rows["ess.house.sens_ess_soc"]["value"] == 56.0  # last alias write
-    assert set(rows) == {"ess.house.sens_ess_soc", "sens_pv_production_active", "heartbeat"}
+    assert set(rows) == {
+        "ess.house.sens_ess_soc",
+        "sens_pv_production_active",
+        "heartbeat_smarthome",
+    }
 
 
 def test_header_wins_over_prefix_and_must_match(monkeypatch: pytest.MonkeyPatch) -> None:

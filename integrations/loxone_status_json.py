@@ -283,7 +283,7 @@ def build_loxone_status_payload(
     plant_io_index: Mapping[str, str] | None = None,
     now_ts: float | None = None,
 ) -> dict[str, float | int]:
-    """Build VI status JSON (kW / A / 0|1 / mode; ``heartbeat_ts`` Unix seconds)."""
+    """Build VI status JSON (kW / A / 0|1 / mode; ``heartbeat_earnie`` Unix seconds)."""
     if loxone_sent is None:
         from runtime_store import run_state
 
@@ -297,6 +297,7 @@ def build_loxone_status_payload(
         if plant_io_index is not None
         else build_loxone_setpoint_io_index()
     )
+    from ehal.push_signals import HEARTBEAT_WRITE_ID
     from ehal.qualified_ids import field_kind
 
     plant_only = {
@@ -312,7 +313,7 @@ def build_loxone_status_payload(
         live_consumers = _live_consumers()
 
     payload: dict[str, float | int] = {
-        "heartbeat_ts": int(now_ts if now_ts is not None else time.time()),
+        HEARTBEAT_WRITE_ID: int(now_ts if now_ts is not None else time.time()),
     }
     payload.update(_plant_status_keys(sent, plant_only))
     # 2.7.h / 2.7.g physical powerstation writes cached by live hooks: Pattern-B

@@ -44,7 +44,7 @@ Die Konfiguration schreiben die Seiten **Hauskonfigurator**, **Szenarienkonfigur
 - **Viertelstunden-Grenzen:** Ein Lauf startet an jeder Viertelstunden-Grenze (`:00`, `:15`, `:30`, `:45`).
 - **Sofort auf Anfrage:** Zusätzlich startet ein Lauf sofort, wenn das Loxone Virtual Out **`Earnie_Request_Optimize`** den HTTP-Dienst des Daemons aufruft (`POST /ehal/loxone/request_optimize`).
 - **Port:** `system.ehal_loxone_http_port` in `config.json` bzw. `EARNIE_EHAL_LOXONE_HTTP_PORT` (Standard **8541**). Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`.
-- **Link-Nachweis (Hub → Earnie):** Ein wiederholendes Heartbeat-VO `Push_Earnie_Heartbeat` ruft `GET /ehal/telemetry/heartbeat/<v>` auf.
+- **Link-Nachweis (Hub → Earnie):** Ein wiederholendes Heartbeat-VO `Push_Earnie_Heartbeat` ruft `GET /ehal/telemetry/heartbeat_smarthome/<v>` auf.
 - **Status für Virtual In:** Der Status je Entität liegt am selben Port unter `GET /ehal/loxone/status.json`.
 - **Maximale Wartezeit:** `system.loop_timeout` in `config.json` legt die maximale Wartezeit zwischen Durchläufen in Sekunden fest (Standard 900 = 15 Min.).
 - **Cockpit-Aktualisierung:** Die App lädt den Cockpit-Snapshot nach dem Viertelstunden-Wechsel, sobald `main.py` den aktuellen Slot abgeschlossen hat (typisch wenige Sekunden).

@@ -401,7 +401,7 @@ Shown for **every** backend. This is the binding UI (replaces the former Loxone 
 
 Optional signals default off; toggle them in the Signalliste (on = add activation key, off = remove). Required signals are activated when a component is saved in the Hauskonfigurator.
 
-Always listed (not a binding): `heartbeat` / `heartbeat_ts`, and control receipt `request_optimize` (VO cmd `Earnie_Request_Optimize` → daemon POST; age stays OK even when older than five minutes).
+Always listed as **Pflicht** (not a binding, not in the optional-signals expander): `heartbeat_smarthome` (read / Hub→Earnie) and `heartbeat_earnie` (write / Earnie→Hub, Unix seconds). Control receipt `request_optimize` (VO cmd `Earnie_Request_Optimize` → daemon POST; age stays OK even when older than five minutes).
 
 **Loxone import** (on **Smarthome-Backend**) still creates typed entities from Merker/EFM names but writes **empty** binding values (activation flags only). Clear existing Merker strings once with `python -m scripts.clear_loxone_binding_names_once --config-dir <config>`.
 

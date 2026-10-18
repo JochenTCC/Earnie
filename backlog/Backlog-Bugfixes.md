@@ -53,7 +53,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   When user sends it could also be sent to the earnie-server
   The dialog emphasizes that only anonymous data is sent 
   Make the popup dialog reusable (Open parameter is a review-ID, the overall-question text and the 5-star-questions (max three))
-- [ ] In the Signalliste (EHAL-com page) there are two signals "heartbeat" and "hearbeat_ts" one for reading - one for writing / both optional. Please rename these signals to make it clearer what is what - and both must be mandatory (however they are not shown in the expander "Optionale Signale aktiveren ...")
 - [ ] "debug-dumps\debug_dump_20261015_222809"
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)

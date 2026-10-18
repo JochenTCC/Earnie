@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Signalliste heartbeat rename + Pflicht (2026-10-18)
+
+- [x] **Signalliste heartbeat rename + Pflicht** — **Verified** (2026-10-18)
+  - Wire IDs: read `heartbeat_smarthome`, write `heartbeat_earnie` (was `heartbeat` / `heartbeat_ts`); no dual-accept of old IDs.
+  - Both rows **Pflicht** with clear Bedeutung; still not in the optional-signals expander.
+  - VO Title stays `Push_Earnie_Heartbeat`; Cmd URL / VI Check / `status.json` use the new IDs.
+  - Tests: `test_ehal_signal_list`, `test_qualified_ids`, `test_pilot_*`, `test_loxone_status_json`, `test_loxone_push_inbox`, `test_ha_carrier_yaml_gen`.
+
 ### Bugfix — Signalliste Earnie-Host label + LAN IP prefill (2026-10-18)
 
 - [x] **Earnie-Host (LAN-IP für den Hub)** — **Verified** (2026-10-18)

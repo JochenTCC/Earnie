@@ -354,7 +354,9 @@ def _status_sensor(
     *,
     extra_attrs: list[str] | None = None,
 ) -> list[str]:
-    attrs = ["heartbeat_ts"] + [s.ehal_id for s in writes]
+    from ehal.push_signals import HEARTBEAT_WRITE_ID
+
+    attrs = [HEARTBEAT_WRITE_ID] + [s.ehal_id for s in writes]
     for extra in extra_attrs or []:
         if extra not in attrs:
             attrs.append(extra)
@@ -364,7 +366,7 @@ def _status_sensor(
         f"    name: {STATUS_SENSOR_NAME}",
         f'    resource: "{base}/ehal/status.json{token_q}"',
         f"    scan_interval: {_scan_interval_s(repeat_s)}",
-        f'    value_template: {_q("{{ value_json.heartbeat_ts | default(0) }}")}',
+        f'    value_template: {_q("{{ value_json." + HEARTBEAT_WRITE_ID + " | default(0) }}")}',
         "    json_attributes_path: $",
         "    json_attributes:",
     ]

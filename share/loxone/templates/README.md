@@ -75,7 +75,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 
 | Repo path | Role |
 | --------- | ---- |
-| `VirtualIn/VI_Earnie_Plant_v2.xml` | Heartbeat + ESS Design C1; Titles = field names (`heartbeat_ts`, `set_ess_*`, …) |
+| `VirtualIn/VI_Earnie_Plant_v2.xml` | Heartbeat + ESS Design C1; Titles = field names (`heartbeat_earnie`, `set_ess_*`, …) |
 | `VirtualIn/VI_Earnie_Heatpump_v2.xml` | `heatpump.{hk_id}.set_enable` |
 | `VirtualIn/VI_Earnie_EV_v2.xml` | `evcs.{ev_id}.set_evcs_max_current` / `set_evcs_mode` |
 | `VirtualIn/VI_Earnie_Consumer_v2.xml` | `consumer.{hk_id}.set_enable` |
@@ -120,4 +120,4 @@ Template defaults leave `{hk_id}` / `{ev_id}` placeholders — replace in Config
 ## Not in these XMLs
 
 - **Zähler / EFM hardware** — attach meters in Config; unique Bezeichnung; see EFM research note. Power VO Titles may still exist as optional aliases.
-- **Earnie-dead fallback** — watchdog on `Earnie_Heartbeat` / `heartbeat_ts` age in Config: [loxone-signals.md](../../../docs/referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config).
+- **Earnie-dead fallback** — watchdog on `Earnie_Heartbeat` / `heartbeat_earnie` age in Config: [loxone-signals.md](../../../docs/referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config).

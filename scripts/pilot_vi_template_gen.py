@@ -113,7 +113,7 @@ def collect_write_signals(config_dir: Path) -> list[Signal]:
 
 def _cmd_range(ehal_id: str) -> dict[str, str]:
     kind = field_kind(ehal_id)
-    if ehal_id == "heartbeat_ts" or kind == "heartbeat_ts":
+    if ehal_id == "heartbeat_earnie" or kind == "heartbeat_earnie":
         return dict(_HEARTBEAT_RANGE)
     if kind == "set_enable":
         return dict(_ENABLE_RANGE)

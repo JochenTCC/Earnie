@@ -103,7 +103,7 @@ def test_push_path_inbox_and_status_setpoints():
     report = push_cycle(bundle, client)
 
     assert "grid.meter.sens_grid_power_active" in report["pushed"]
-    assert "heartbeat" in report["pushed"]
+    assert "heartbeat_smarthome" in report["pushed"]
     assert "ess.house.set_ess_active_power" in report["setpoints_applied"]
 
     value, state = inbox.read_push_value("grid.meter.sens_grid_power_active")

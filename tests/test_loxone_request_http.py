@@ -165,12 +165,21 @@ def test_http_heartbeat_records_callback(tmp_path, monkeypatch) -> None:
     server = http_mod.start_loxone_request_http(0)
     port = server.server_address[1]
     with urllib.request.urlopen(
-        f"http://127.0.0.1:{port}/ehal/telemetry/heartbeat/1?t=s3cret", timeout=2
+        f"http://127.0.0.1:{port}/ehal/telemetry/heartbeat_smarthome/1?t=s3cret",
+        timeout=2,
     ) as resp:
         assert resp.status == 204
     status = cbs.load_loxone_callback_status()
     assert status is not None
     assert status["client_ip"] in ("127.0.0.1", "::1", "localhost")
+    inbox.flush_inbox_now()
+    assert "heartbeat_smarthome" in inbox.load_inbox()
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/ehal/telemetry/heartbeat/1?t=s3cret",
+            timeout=2,
+        )
+    assert exc.value.code == 400
     inbox.reset_memory_for_tests()
 
 
@@ -180,7 +189,7 @@ def test_http_get_status_json_canonical_matches_loxone_path(monkeypatch) -> None
     from integrations import loxone_status_json as status_mod
 
     payload = {
-        "heartbeat_ts": 42,
+        "heartbeat_earnie": 42,
         "set_ess_active_power": -1.5,
         "set_ess_charge_power_limit": 0.0,
         "set_ess_discharge_power_limit": 0.0,
@@ -214,7 +223,7 @@ def test_http_get_status_json(monkeypatch) -> None:
         status_mod,
         "build_loxone_status_payload",
         lambda: {
-            "heartbeat_ts": 42,
+            "heartbeat_earnie": 42,
             "set_ess_active_power": -1.5,
             "set_ess_charge_power_limit": 0.0,
             "set_ess_discharge_power_limit": 0.0,
@@ -229,7 +238,7 @@ def test_http_get_status_json(monkeypatch) -> None:
         assert resp.status == 200
         assert "application/json" in resp.headers.get("Content-Type", "")
         data = json.loads(resp.read().decode("utf-8"))
-    assert data["heartbeat_ts"] == 42
+    assert data["heartbeat_earnie"] == 42
     assert data["set_ess_active_power"] == -1.5
 
 

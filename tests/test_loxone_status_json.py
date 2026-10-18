@@ -23,7 +23,8 @@ def test_status_payload_defaults_plant_keys() -> None:
         plant_io_index={},
         now_ts=1_700_000_000.9,
     )
-    assert payload["heartbeat_ts"] == 1_700_000_000
+    assert payload["heartbeat_earnie"] == 1_700_000_000
+    assert "heartbeat_ts" not in payload
     assert payload["set_ess_active_power"] == 0.0
     assert payload["set_ess_charge_power_limit"] == 0.0
     assert payload["set_ess_discharge_power_limit"] == 0.0
