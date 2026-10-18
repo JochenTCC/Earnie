@@ -10,6 +10,14 @@ from scripts import startup_checks as sc
 
 
 class TestRunLoxoneVerifyOnStartup:
+    @pytest.fixture(autouse=True)
+    def _no_live_probe(self):
+        with patch(
+            "integrations.loxone_connectivity.probe_current_loxone_credentials",
+            return_value=(True, ""),
+        ):
+            yield
+
     def test_skipped_when_env_disabled(self, monkeypatch):
         monkeypatch.setenv("EARNIE_SKIP_LOXONE_VERIFY", "1")
         with patch.object(sc, "verify_loxone_setup") as mock_verify:

@@ -9,6 +9,7 @@ and depend only on absolute time (``tests/early_start_runner.py``).
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -33,8 +34,16 @@ TICKS = {
 }
 
 
+# Each tick costs 4 runner subprocesses (~9 s CPU each). The default run covers one
+# tick per distinct code path (day-ahead publication hour, DST, year/month/day
+# rollover); ``EARNIE_EARLY_START_FULL=1`` (or release CI) runs every tick.
+_FULL = os.environ.get("EARNIE_EARLY_START_FULL") == "1"
+_DEFAULT_TICKS = ("day_ahead_publish_hour", "dst_fall_back", "new_year")
+_EQUIVALENCE_TICKS = sorted(TICKS) if _FULL else sorted(_DEFAULT_TICKS)
+
+
 @pytest.mark.slow
-@pytest.mark.parametrize("name", sorted(TICKS))
+@pytest.mark.parametrize("name", _EQUIVALENCE_TICKS)
 def test_early_start_plans_and_writes_like_a_cycle_at_the_tick(name, tmp_path):
     tick = TICKS[name]
     seed = seed_runtime(tmp_path, tick)
@@ -65,8 +74,11 @@ _PREFETCH_TICKS = {
 }
 
 
+_PREFETCH_NAMES = sorted(_PREFETCH_TICKS) if _FULL else ["afternoon_hour"]
+
+
 @pytest.mark.slow
-@pytest.mark.parametrize("name", sorted(_PREFETCH_TICKS))
+@pytest.mark.parametrize("name", _PREFETCH_NAMES)
 def test_prefetch_keeps_the_plan_and_takes_fetches_off_the_cycle(name, tmp_path):
     """Daemon order: prefetch ~14 min before the next start, then the early cycle.
 

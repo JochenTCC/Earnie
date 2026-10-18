@@ -7,6 +7,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
 from optimizer.milp import (
     ENV_MILP_TRIVIAL_FAST_PATH,
     EMPTY_MILP_PLAN,
@@ -173,6 +175,7 @@ def test_env_zero_disables_skip_even_when_trivial(monkeypatch):
 
 
 def test_euro_parity_fast_path_on_vs_off(monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     matrix = _small_matrix(4)
 
     def _run() -> float:

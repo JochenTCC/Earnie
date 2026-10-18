@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import main as main_module
 from integrations.loxone_comm_trace import LoxoneWriteRecord
 from optimizer.run_trigger import TRIGGER_QUARTER_HOUR
+from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 from tests.main_run_harness import patch_main_run
 
 
@@ -113,6 +114,7 @@ def test_main_run_state_omits_loxone_writes_when_silent(monkeypatch):
 
 def test_main_invokes_setpoint_writes_when_shadow_silent(monkeypatch, tmp_path):
     """Shadow implies silent but still calls send_* so would-writes are logged."""
+    install_open_meteo_climate_mock(monkeypatch)
     patch_main_run(monkeypatch, silent=True)
     runtime = tmp_path / "rt"
     runtime.mkdir()

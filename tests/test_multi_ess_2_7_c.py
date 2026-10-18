@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import pytest
 
+from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
 from ehal.ess_fields import ess_field, expand_ess_bindings
 from house_config.inverter import AC_ISLAND, allows_automatik
 from house_config.entity_resolution import (
@@ -404,7 +406,8 @@ def test_extract_horizon_schedule_emits_planned_soc_by_ess():
     assert 10.0 <= float(by_ess["b"]) <= 100.0
 
 
-def test_simulate_horizon_writes_per_ess_soc_columns():
+def test_simulate_horizon_writes_per_ess_soc_columns(monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     from optimizer.simulation import simulate_horizon
     from optimizer.sim_chart_rows import ess_soc_column_name
 

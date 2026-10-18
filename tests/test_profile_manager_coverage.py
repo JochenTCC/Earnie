@@ -119,6 +119,7 @@ def test_build_optimization_matrix_builds_rows(monkeypatch):
             for t in targets
         ],
     )
+    monkeypatch.setattr(pm, "resolve_market_slots_kwargs", lambda _targets: {})
     monkeypatch.setattr(
         "data.backtesting_prices.enrich_slots_import_prices",
         lambda slots, *_a, **_k: slots,
