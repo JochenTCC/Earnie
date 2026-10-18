@@ -14,7 +14,10 @@ from tests.fixtures.backtesting_fixtures import (
     fixture_scenario_params,
     load_fixture_cache,
 )
+from tests.regression.climate_fixture import frozen_climate_fixture
+from tests.regression.fingerprint import l2_input_fingerprint
 from tests.regression.loader import RegressionCase
+from tests.regression.pv_shape import assert_pv_day_shape
 
 _ENV_KEYS = (
     "EARNIE_CONFIG_PATH",
@@ -29,7 +32,6 @@ _ENV_KEYS = (
 def activate_backtesting_fixture_env() -> Iterator[Any]:
     """Bind config to ``tests/fixtures/backtesting/`` without pytest monkeypatch."""
     import config as config_module
-    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
     previous = {key: os.environ.get(key) for key in _ENV_KEYS}
     os.environ["EARNIE_CONFIG_PATH"] = str(fixture_path("config.json"))
@@ -39,12 +41,11 @@ def activate_backtesting_fixture_env() -> Iterator[Any]:
     os.environ["EARNIE_TARIFFS_PATH"] = str(fixture_path("tariffs.json"))
     os.environ["EARNIE_HOUSE_PROFILES_PATH"] = str(fixture_path("house_profiles.json"))
     os.environ["EARNIE_OFFLINE"] = "1"
-    config_module.reinit_config()
-    # install_open_meteo_climate_mock needs monkeypatch; L2 uses synthetic prices CSV path
-    # via fixture config — Open-Meteo is not required for price_source=csv.
-    del install_open_meteo_climate_mock
     try:
-        yield config_module
+        # Climate (PV irradiance, temperature) comes from the committed fixture only.
+        with frozen_climate_fixture():
+            config_module.reinit_config()
+            yield config_module
     finally:
         for key, value in previous.items():
             if value is None:
@@ -86,7 +87,14 @@ def run_l2(case: RegressionCase) -> dict[str, Any]:
             ),
             initial_soc=float(case.meta.get("inputs", {}).get("initial_soc", 50.0)),
         )
-    return metrics_from_l2_frame(df, plausibility)
+    assert_pv_day_shape(df, case_id=case.id)
+    metrics = metrics_from_l2_frame(df, plausibility)
+    metrics["inputs"] = l2_input_fingerprint(
+        fixtures_root=FIXTURES_ROOT,
+        case_inputs=dict(case.meta.get("inputs") or {}),
+        result_df=df,
+    )
+    return metrics
 
 
 def metrics_from_l2_frame(df: pd.DataFrame, plausibility: Any) -> dict[str, Any]:

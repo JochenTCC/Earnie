@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from tests.regression.compare import CompareResult
+from tests.regression.baseline import bisect_commands
+from tests.regression.compare import INFO_TIERS, CompareResult
 
 
 def git_sha(repo_root: Path) -> str:
@@ -81,8 +82,12 @@ def write_markdown_report(
         status = "PASS" if result.passed else "FAIL"
         lines.append(f"### `{result.case_id}` — {status}")
         lines.append("")
+        lines.extend(_baseline_lines(result))
         for tier in result.tiers:
-            mark = "ok" if tier.passed else "FAIL"
+            if tier.name in INFO_TIERS:
+                mark = "info"
+            else:
+                mark = "ok" if tier.passed else "FAIL"
             lines.append(f"- **{tier.name}**: {mark}")
             for msg in tier.messages:
                 lines.append(f"  - {msg}")
@@ -93,6 +98,31 @@ def write_markdown_report(
         lines.append("")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+def _baseline_lines(result: CompareResult) -> list[str]:
+    baseline = result.baseline or {}
+    sha = baseline.get("git_sha")
+    if not sha:
+        return ["- **baseline**: none in expected.json (run --backfill-baseline)"]
+    head = (
+        f"- **baseline**: `{sha[:8]}` ({baseline.get('recorded_at')}, "
+        f"{baseline.get('source')})"
+    )
+    drift = baseline.get("drift") or {}
+    if drift.get("error"):
+        lines = [f"{head} — drift unknown: {drift['error']}"]
+    elif drift:
+        lines = [
+            f"{head} → HEAD `{str(drift['head_sha'])[:8]}`: "
+            f"{drift['commits_total']} commits, {drift['commits_code']} in code paths"
+        ]
+    else:
+        lines = [head]
+    if not result.passed and drift and not drift.get("error") and drift["commits_total"]:
+        lines.append("  - bisect:")
+        lines.extend(f"    - `{cmd}`" for cmd in bisect_commands(sha, result.case_id))
+    return lines
 
 
 def _fail():

@@ -6,6 +6,7 @@ from typing import Any
 
 from runtime_store.cycle_recorder import read_segment_cycles
 from runtime_store.recorder_replay import ReplayResult, replay_recorded_cycle
+from tests.regression.fingerprint import l1_input_fingerprint
 from tests.regression.loader import RegressionCase, resolve_recorder_root
 
 
@@ -42,7 +43,9 @@ def run_l1(case: RegressionCase) -> dict[str, Any]:
         solver_mode="strict",
         verbose=False,
     )
-    return metrics_from_replay(result)
+    metrics = metrics_from_replay(result)
+    metrics["inputs"] = l1_input_fingerprint(entry=entry, recorder_root=recorder_root)
+    return metrics
 
 
 def metrics_from_replay(result: ReplayResult) -> dict[str, Any]:

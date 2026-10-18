@@ -9,12 +9,12 @@
 
 Make sure Earnie's **behaviour does not change unnoticed or unintentionally** between releases.
 
-- A **case** freezes all inputs of an optimizer run (config, consumption, prices, PV forecast, start state).
+- A **case** fixes the inputs of an optimizer run (config, consumption, prices, PV forecast, start state). L1 cases freeze them in a recorder cycle; **L2 cases share `tests/fixtures/backtesting/`, derive prices in code and read PV / temperature from a frozen Open-Meteo fixture (§8)**, so their effective inputs can still drift through code changes — the input fingerprint (§7, tier 4) makes that visible.
 - The runner executes Earnie offline and deterministically, condenses the result into a few numbers, and compares them against a committed **golden** reference.
 - A deviation is not automatically a bug. The maintainer decides at release time: *bug* → fix; *intended change* → re-record the golden with a justification in the commit.
 - Cases may contain **customer data**. Those cases never enter the public repository, but each can still be referenced from a public issue.
 
-The suite is **not** part of the per-commit pytest run. It runs **before a release / publish**.
+The suite is **not** part of the pytest run. It runs **before a release / publish**, and until further notice also in the pre-push hook (§8).
 
 ## 2. Scope
 
@@ -93,7 +93,10 @@ app_version: 2.6.0                 # version the inputs were recorded with
 window: {start: "2026-06-26T18:00", end: "2026-06-27T10:00"}   # L2 / L1 context
 ```
 
-`expected.json` holds the three result tiers of §7 plus the engine fingerprint used for the golden (Earnie version, CBC/solver version).
+`expected.json` holds the result tiers of §7 plus the engine fingerprint used for the golden (Earnie version, CBC/solver version), and optionally:
+
+- `baseline` — `{git_sha, recorded_at, source}`: the public commit the golden was recorded from. `source: update-golden` (written by the runner) or `git-log-backfill` (last commit touching `expected.json`, for goldens older than this field; public cases only).
+- `inputs` — `{files, series, sums}`: input fingerprint of the golden run (tier 4). Written by `--update-golden`; never backfilled.
 
 Existing `tests/fixtures/prod_dumps/<id>/` cases are migrated into this format in **P1**; their hand-written invariants become tier-1 checks.
 
@@ -115,7 +118,12 @@ Slot-exact equality would break on every solver or float-level change. Three tie
 
 1. **Hard invariants** — always fail: SoC within limits, energy balance closes, EV full at deadline, export limit respected, no write to unavailable functions.
 2. **Metrics with tolerance** — fail when exceeded: total cost (€), grid import / export (kWh), self-sufficiency, battery cycles, per-consumer energy. Default tolerance **±0.05 %** after R0 (was ±0.5 % placeholder); overridable per metric in `expected.json`.
-3. **Plan diff** — informational only: number of slots whose setpoint differs and a plan hash. Shown in the report, never fails.
+3. **Plan diff** — informational only: number of slots whose setpoint differs and a plan hash. Shown in the report, never fails. L2 has no plan hash (`n/a`).
+4. **Inputs** — informational only, answers *"bug or changed inputs?"* for a red case. Two layers (`tests/regression/fingerprint.py`):
+   - `files`: digests of the input files (L2: every file in `tests/fixtures/backtesting/`, recursively — incl. the frozen climate in `open_meteo/` — with canonicalized JSON, plus the case's `inputs:` block; L1: the recorder cycle and its config snapshot).
+   - `series`: digests of the per-slot inputs the optimizer actually saw (L2: `pv_kw`, `baseload_kw`, `k_act`, `k_push_act` from the simulation result, rounded to 1e-6), plus readable `sums` (`pv_kwh`, `baseload_kwh`, `k_act_mean`, `n_slots`). L1 has no series layer: matrix preparation runs inside the replay.
+
+   When metrics fail, the report adds a verdict: *effective inputs changed* (check data / input preparation first), *input files changed but effective inputs identical* or *inputs identical* (behaviour change in code → bisect from the baseline).
 
 The solver and its settings must be identical for golden recording and verification; the engine fingerprint in `expected.json` makes a mismatch visible instead of producing phantom diffs. **Note:** the production default solver is **HiGHS** (`DEFAULT_MILP_SOLVER`), not CBC, and the production path is wall-clock dependent — see §16 before choosing tolerances or the regression solver mode.
 
@@ -128,10 +136,12 @@ python -m scripts.run_regression --intake <debug_dump.zip> --id REG-142-eauto-de
     --seed-anchor "..." | --cycle-index N
 ```
 
-- Pytest marker `regression`, **deselected by default** (`tests/conftest.py` removes marked items unless `-m regression` or `EARNIE_RUN_REGRESSION=1`), so neither the pre-commit hook nor the normal suite runs it. Prefer `python -m scripts.run_regression` before a release; `-m regression` also works.
+- Pytest marker `regression`, **deselected by default** (`tests/conftest.py` removes marked items unless `-m regression` or `EARNIE_RUN_REGRESSION=1`), so the normal suite does not run it. **Until further notice** `.githooks/pre-push` runs `python -m scripts.run_regression` and blocks the push on a red case (skipped when the pushed range only touches docs/PNG/YAML/workspace/Cursor/GitHub/hooks, same list as pre-commit). It tests the working tree, so it refuses — fail loud — when the pushed commit is not `HEAD` or tracked files have uncommitted changes. `.githooks/pre-commit` runs pytest only. Before a release run it explicitly as well; `-m regression` also works.
 - `--workers N` per `.cursor/rules/backtesting-max-workers.mdc` (largest useful N). Runtime budget: ≤ 15 min parallel.
-- `--update-golden` rewrites `expected.json` only for the selected cases and prints the metric delta; the commit message must explain the intended behaviour change.
-- Output: console table + `regression_report.md` (Δ per case, tier-3 summary, public + private SHA, skipped private-root note, engine fingerprint).
+- `--update-golden` rewrites `expected.json` only for the selected cases (incl. `baseline` and `inputs`); the commit message must explain the intended behaviour change. It **refuses to run** when the public worktree has uncommitted or untracked changes outside `tests/regression/cases/` — commit the code first, so `baseline.git_sha` is reproducible.
+- `--backfill-baseline` adds `baseline` (source `git-log-backfill`) to public goldens that lack it; it runs no cases. Private goldens are skipped: their public code SHA is only known from `--update-golden`.
+- Output: console table + `regression_report.md` (Δ per case, tier-3/4 summary, public + private SHA, skipped private-root note, engine fingerprint). Per case: baseline SHA → HEAD with the commit count (total and in code paths); for a red case also the `git bisect start` / `git bisect run` commands for that single case.
+- **L2 climate input is frozen** (`tests/regression/climate_fixture.py`): Open-Meteo irradiance/temperature come only from `tests/fixtures/backtesting/open_meteo/` (committed archive responses), with the wall clock frozen at `CLIMATE_FIXTURE_NOW` because cache keys contain the last archive day / last full archive year. A missing key raises `ClimateFixtureMissingError` — no network, no `data/cache/open_meteo`. Re-record only deliberately (needs network): `EARNIE_REGRESSION_RECORD_CLIMATE=1 python -m scripts.run_regression --workers 1`, then bump `CLIMATE_FIXTURE_NOW` to the recording date if the keys changed. `assert_pv_day_shape` (`tests/regression/pv_shape.py`) fails an L2 run whose PV is non-zero at night or constant.
 - Default roots: `tests/regression/cases/` plus `$EARNIE_REGRESSION_PRIVATE_DIR` (or sibling `..\Earnie-regression-private\cases`). Missing private root → reported as skipped (`private-root-missing`), not silent.
 
 ## 9. Intake and anonymization

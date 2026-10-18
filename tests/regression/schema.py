@@ -95,6 +95,34 @@ def validate_expected(expected: dict[str, Any], *, case_id: str) -> None:
         raise TypeError(f"expected.invariants must be a list ({case_id})")
     if not isinstance(expected["metrics"], dict):
         raise TypeError(f"expected.metrics must be a mapping ({case_id})")
+    if "baseline" in expected:
+        _validate_baseline(expected["baseline"], case_id)
+    if "inputs" in expected:
+        _validate_inputs(expected["inputs"], case_id)
+
+
+def _validate_baseline(baseline: Any, case_id: str) -> None:
+    from tests.regression.baseline import BASELINE_SOURCES
+
+    if not isinstance(baseline, dict):
+        raise TypeError(f"expected.baseline must be a mapping ({case_id})")
+    sha = baseline.get("git_sha")
+    if not isinstance(sha, str) or len(sha) != 40:
+        raise ValueError(f"expected.baseline.git_sha must be a full 40-char SHA ({case_id})")
+    if not isinstance(baseline.get("recorded_at"), str):
+        raise ValueError(f"expected.baseline.recorded_at missing ({case_id})")
+    if baseline.get("source") not in BASELINE_SOURCES:
+        raise ValueError(
+            f"expected.baseline.source must be one of {sorted(BASELINE_SOURCES)} ({case_id})"
+        )
+
+
+def _validate_inputs(inputs: Any, case_id: str) -> None:
+    if not isinstance(inputs, dict):
+        raise TypeError(f"expected.inputs must be a mapping ({case_id})")
+    for layer in ("files", "series", "sums"):
+        if not isinstance(inputs.get(layer), dict):
+            raise ValueError(f"expected.inputs.{layer} must be a mapping ({case_id})")
 
 
 def default_tolerances() -> dict[str, Any]:

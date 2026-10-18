@@ -2,6 +2,7 @@
 
   python -m scripts.run_regression [--cases-dir PATH]... [--case ID] [--workers N]
   python -m scripts.run_regression --update-golden --case REG-O-winter-jan
+  python -m scripts.run_regression --backfill-baseline
   python -m scripts.run_regression --intake DUMP.zip --id REG-142-slug --private \\
       --seed-anchor "..." | --cycle-index N
 
@@ -57,6 +58,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--update-golden",
         action="store_true",
         help="Rewrite expected.json for selected cases from actual metrics.",
+    )
+    parser.add_argument(
+        "--backfill-baseline",
+        action="store_true",
+        help=(
+            "Add expected.baseline (last commit touching expected.json) to public "
+            "goldens that lack it; does not run cases."
+        ),
     )
     parser.add_argument(
         "--report",
@@ -167,10 +176,12 @@ def _run_one_case_payload(payload: dict[str, Any]) -> dict[str, Any]:
     invariant_failures: list[str] = []
     actual: dict[str, Any] = {}
     plan_hash: str | None = None
+    inputs: dict[str, Any] | None = None
 
     if case.level == "L1":
         actual = run_l1(case)
         plan_hash = actual.pop("plan_hash", None)
+        inputs = actual.pop("inputs")
         if actual.get("status_optimal") != 1:
             invariant_failures.append(
                 f"solver status not Optimal (got metrics status_optimal="
@@ -179,6 +190,7 @@ def _run_one_case_payload(payload: dict[str, Any]) -> dict[str, Any]:
     elif case.level == "L2":
         actual = run_l2(case)
         plan_hash = actual.pop("plan_hash", None)
+        inputs = actual.pop("inputs")
         if float(actual.get("plausibility_failures") or 0) > 0:
             invariant_failures.append("plausibility failures > 0")
     elif case.level == "L1-invariants":
@@ -200,6 +212,8 @@ def _run_one_case_payload(payload: dict[str, Any]) -> dict[str, Any]:
             invariants=list((case.expected or {}).get("invariants") or []),
             plan_hash=plan_hash,
             tolerances=(case.expected or {}).get("tolerances"),
+            baseline=payload["baseline"],
+            inputs=inputs,
         )
         if case.level == "L1-invariants":
             expected["metrics"] = {}
@@ -228,6 +242,8 @@ def _run_one_case_payload(payload: dict[str, Any]) -> dict[str, Any]:
         actual_metrics=metric_keys,
         invariant_failures=invariant_failures,
         actual_plan_hash=plan_hash,
+        actual_inputs=inputs,
+        actual_engine=engine_fingerprint(solver_mode="strict"),
     )
     return {
         "case_id": case.id,
@@ -271,7 +287,57 @@ def _run_intake(args: argparse.Namespace) -> int:
     return 0
 
 
+def _baseline_with_drift(
+    baseline: dict[str, Any] | None,
+    cache: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    from tests.regression.baseline import baseline_drift
+
+    if not baseline:
+        return {}
+    sha = str(baseline["git_sha"])
+    if sha not in cache:
+        cache[sha] = baseline_drift(ROOT, sha)
+    return {**baseline, "drift": cache[sha]}
+
+
+def _backfill_baselines(cases: list[Any]) -> int:
+    from tests.regression.baseline import backfill_baseline
+
+    root = ROOT.resolve()
+    for case in cases:
+        expected_path = case.case_dir / "expected.json"
+        if root not in expected_path.resolve().parents:
+            print(
+                f"{case.id}: skipped — private golden; the public code SHA is only "
+                "known from --update-golden"
+            )
+            continue
+        if case.expected is None:
+            print(f"{case.id}: skipped — no expected.json")
+            continue
+        if "baseline" in case.expected:
+            print(f"{case.id}: skipped — baseline already set")
+            continue
+        baseline = backfill_baseline(ROOT, expected_path)
+        if baseline is None:
+            print(f"{case.id}: skipped — expected.json never committed")
+            continue
+        updated = {**case.expected, "baseline": baseline}
+        expected_path.write_text(
+            json.dumps(updated, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"{case.id}: baseline {baseline['git_sha'][:8]} ({baseline['recorded_at']})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    from tests.regression.baseline import (
+        DirtyWorktreeError,
+        baseline_for_update,
+        require_clean_worktree,
+    )
     from tests.regression.compare import CompareResult, TierResult
     from tests.regression.engine_info import engine_fingerprint
     from tests.regression.loader import load_cases, private_repo_root_from_cases
@@ -304,11 +370,24 @@ def main(argv: list[str] | None = None) -> int:
             print(f"# skipped: {', '.join(skipped)}")
         return 0
 
+    if args.backfill_baseline:
+        return _backfill_baselines(cases)
+
+    new_baseline: dict[str, Any] | None = None
+    if args.update_golden:
+        try:
+            require_clean_worktree(ROOT)
+        except DirtyWorktreeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        new_baseline = baseline_for_update(ROOT)
+
     workers = _worker_count(args.workers, len(cases))
     payloads = [
         {
             "case_dir": str(case.case_dir),
             "update_golden": bool(args.update_golden),
+            "baseline": new_baseline,
         }
         for case in cases
     ]
@@ -327,6 +406,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # Stable order by case id
     raw_results.sort(key=lambda r: r["case_id"])
+    case_by_id = {case.id: case for case in cases}
+    drift_cache: dict[str, dict[str, Any]] = {}
     compare_results: list[CompareResult] = []
     for raw in raw_results:
         tiers = [
@@ -347,6 +428,11 @@ def main(argv: list[str] | None = None) -> int:
                 tiers=tiers,
                 actual_metrics=dict(raw.get("actual_metrics") or {}),
                 plan_diff=dict(raw.get("plan_diff") or {}),
+                baseline=_baseline_with_drift(
+                    new_baseline
+                    or (case_by_id[raw["case_id"]].expected or {}).get("baseline"),
+                    drift_cache,
+                ),
             )
         )
 

@@ -23,5 +23,10 @@
   "plan": {
     "plan_hash": null,
     "diff_slots": null
+  },
+  "baseline": {
+    "git_sha": "5c4da1400dc0fd89cab12fbbebcf424b34658ecf",
+    "recorded_at": "2026-10-15T06:50:53+02:00",
+    "source": "git-log-backfill"
   }
 }

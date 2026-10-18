@@ -378,6 +378,7 @@ def _finalize_simulation_result(
                 else float("nan")
                 for row in all_chart_rows
             ],
+            "pv_kw": [float(row["PV-Prognose (kW)"]) for row in all_chart_rows],
             "sim_soc": [row["Simulierter SoC (%)"] for row in all_chart_rows],
             "batt_action_kw": [row["Geplante Batterie-Aktion (kW)"] for row in all_chart_rows],
             "steuerbefehl": [row["Steuerbefehl"] for row in all_chart_rows],
