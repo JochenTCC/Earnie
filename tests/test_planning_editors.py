@@ -1059,6 +1059,84 @@ def test_sync_battery_session_reseeds_when_widget_keys_missing():
     assert session["5_0_kwh_speicher__planning_battery_limits_from_live"] is False
 
 
+def test_default_live_entity_refs_fills_empty_live_from_catalogs():
+    import ui.pages.page_scenario_editor as editor
+
+    profiles = {
+        "house_a": {"id": "house_a", "label": "Haus A"},
+        "house_b": {"id": "house_b", "label": "Haus B"},
+    }
+    batteries = [
+        {"id": "bat_1", "label": "Bat 1"},
+        {"id": "bat_2", "label": "Bat 2"},
+    ]
+    pv_systems = [
+        {"id": "pv_1", "label": "PV 1"},
+        {"id": "pv_2", "label": "PV 2"},
+    ]
+    filled = editor._default_live_entity_refs(
+        {"house_profile_id": "", "battery_ids": [], "pv_system_ids": []},
+        scenario_id="live",
+        live_scenario_id="live",
+        profiles=profiles,
+        batteries=batteries,
+        pv_systems=pv_systems,
+    )
+    assert filled["house_profile_id"] == "house_a"
+    assert filled["battery_ids"] == ["bat_1", "bat_2"]
+    assert filled["pv_system_ids"] == ["pv_1", "pv_2"]
+
+
+def test_default_live_entity_refs_skips_when_any_field_set():
+    import ui.pages.page_scenario_editor as editor
+
+    settings = {
+        "house_profile_id": "house_a",
+        "battery_ids": [],
+        "pv_system_ids": [],
+    }
+    out = editor._default_live_entity_refs(
+        settings,
+        scenario_id="live",
+        live_scenario_id="live",
+        profiles={"house_a": {"id": "house_a"}},
+        batteries=[{"id": "bat_1"}],
+        pv_systems=[{"id": "pv_1"}],
+    )
+    assert out == settings
+
+
+def test_default_live_entity_refs_skips_non_live_scenario():
+    import ui.pages.page_scenario_editor as editor
+
+    settings = {"house_profile_id": "", "battery_ids": [], "pv_system_ids": []}
+    out = editor._default_live_entity_refs(
+        settings,
+        scenario_id="variant_a",
+        live_scenario_id="live",
+        profiles={"house_a": {"id": "house_a"}},
+        batteries=[{"id": "bat_1"}],
+        pv_systems=[{"id": "pv_1"}],
+    )
+    assert out == settings
+
+
+def test_default_live_entity_refs_empty_catalogs_leave_empty():
+    import ui.pages.page_scenario_editor as editor
+
+    filled = editor._default_live_entity_refs(
+        {},
+        scenario_id="live",
+        live_scenario_id="live",
+        profiles={},
+        batteries=[],
+        pv_systems=[],
+    )
+    assert "house_profile_id" not in filled
+    assert "battery_ids" not in filled
+    assert "pv_system_ids" not in filled
+
+
 def test_sync_scenario_session_reseeds_when_widget_keys_missing():
     class _Session(dict):
         pass

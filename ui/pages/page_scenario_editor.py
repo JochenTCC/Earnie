@@ -140,6 +140,7 @@ from ui.pages.scenario_editor_session import (  # noqa: E402
     _SESSION_SYNC_KEY,
     _SESSION_TEMPLATE_SOURCE_KEY,
     _apply_pending_scenario_select,
+    _default_live_entity_refs,
     _ensure_active_scenario_select,
     _resolve_scenario_selection,
     _scenario_widget_state_missing,

@@ -100,6 +100,81 @@ def _seed_user_tariff_cent_widgets(session_scope: str, settings: dict) -> None:
     st.session_state[exp_cent_key] = float(saved_exp) if saved_exp is not None else 0.0
 
 
+def _entity_ref_empty(settings: dict, key: str) -> bool:
+    """True when a live entity ref key is missing or blank (lists need a non-blank id)."""
+    value = settings.get(key)
+    if key in ("battery_ids", "pv_system_ids"):
+        return not (
+            isinstance(value, list) and any(str(item or "").strip() for item in value)
+        )
+    return not str(value or "").strip()
+
+
+def _settings_with_legacy_battery_ids(settings: dict) -> dict:
+    """Copy settings; promote legacy ``battery_id`` to ``battery_ids`` when needed."""
+    out = dict(settings)
+    if "battery_id" in out and "battery_ids" not in out:
+        bid = str(out.pop("battery_id") or "").strip()
+        out["battery_ids"] = [bid] if bid else []
+    return out
+
+
+def _live_entity_refs_unconfigured(settings: dict) -> bool:
+    """True when Hausprofil, Batterien, and PV are all empty (not started)."""
+    normalized = _settings_with_legacy_battery_ids(settings)
+    return (
+        _entity_ref_empty(normalized, "house_profile_id")
+        and _entity_ref_empty(normalized, "battery_ids")
+        and _entity_ref_empty(normalized, "pv_system_ids")
+    )
+
+
+def _ids_from_entities(items: list[dict]) -> list[str]:
+    return [
+        str(item.get("id") or "").strip()
+        for item in items
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    ]
+
+
+def _default_live_entity_refs(
+    settings: dict,
+    *,
+    scenario_id: str,
+    live_scenario_id: str,
+    profiles: dict[str, dict],
+    batteries: list[dict],
+    pv_systems: list[dict],
+) -> dict:
+    """Fill empty live entity refs from catalogs; no-op for non-live or partial config.
+
+    Pure helper: returns a new settings dict; never invents ids when catalogs are empty.
+    """
+    out = dict(settings)
+    live_id = str(live_scenario_id or "").strip()
+    sid = str(scenario_id or "").strip()
+    if not live_id or sid != live_id:
+        return out
+    if not _live_entity_refs_unconfigured(out):
+        return out
+
+    for profile_id in profiles:
+        pid = str(profile_id or "").strip()
+        if pid:
+            out["house_profile_id"] = pid
+            break
+
+    bat_ids = _ids_from_entities(batteries)
+    if bat_ids:
+        out["battery_ids"] = bat_ids
+    out.pop("battery_id", None)
+
+    pv_ids = _ids_from_entities(pv_systems)
+    if pv_ids:
+        out["pv_system_ids"] = pv_ids
+    return out
+
+
 def _seed_scenario_widget_state(
     session_scope: str,
     scenario: dict,
@@ -110,7 +185,14 @@ def _seed_scenario_widget_state(
     import_tariffs: list[dict],
     export_tariffs: list[dict],
 ) -> None:
-    settings = dict(scenario.get("settings", {}))
+    settings = _default_live_entity_refs(
+        dict(scenario.get("settings", {})),
+        scenario_id=str(scenario.get("id") or "").strip(),
+        live_scenario_id=str(config.get_live_scenario_id() or "").strip(),
+        profiles=profiles,
+        batteries=batteries,
+        pv_systems=pv_systems,
+    )
     st.session_state[scoped_widget_key(session_scope, "scenario_label")] = str(
         scenario.get("label", "Mein Szenario")
     )
@@ -126,10 +208,7 @@ def _seed_scenario_widget_state(
         normalize_pv_system_ids,
     )
 
-    bat_settings = dict(settings)
-    if "battery_id" in bat_settings and "battery_ids" not in bat_settings:
-        bid = str(bat_settings.pop("battery_id") or "").strip()
-        bat_settings["battery_ids"] = [bid] if bid else []
+    bat_settings = _settings_with_legacy_battery_ids(settings)
     seed_entity_multiselect_state(
         session_scope,
         "scenario_battery",

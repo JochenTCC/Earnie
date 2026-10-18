@@ -2,6 +2,22 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Greenfield Loxone Dogfood (2026-10-18)
+
+- [x] **Greenfield: unclear Anlagen-PV-Abdeckung checkbox** — **Verified** (2026-10-18)
+  - Cause: `plant.pv_covers_all_inverters` was only an acknowledgement that a flat plant PV total covered every grid-tied inverter; wording was easy to misread as load coverage.
+  - Fix: remove the Hauskonfigurator checkbox and the config flag; with several grid-tied inverters that own PV, always derive plant PV as Σ inv/pv · η_inv (flat plant EHAL value ignored); incomplete maps fail loud.
+  - Tests: `tests/test_topology_p2.py` (`test_multi_inv_ignores_mapped_plant_and_derives_sum`), `tests/test_pv_attribution.py` (`test_with_attributed_multi_inv_derives_even_when_plant_mapped`).
+- [x] **Greenfield: Netznutzung Messart / Viertelstunden-Zähler UI** — **Verified** (2026-10-18)
+  - Cause: `netznutzung.quarter_hour_meter` and `power_metering` were user toggles; not Earnie's concern.
+  - Fix: remove Hauskonfigurator Leistungsmessung select + QH-meter checkbox + migration QH question; always `quarter_hour_meter: true` and `power_metering: unmetered_power` on normalize; catalog still stores both base prices / `requires` for documentation.
+  - Tests: `tests/test_grid_fees.py` (`test_snap_applies_even_when_quarter_hour_meter_flag_false_in_raw`, `test_metered_power_raw_is_forced_to_unmetered_base`).
+- [x] **Szenarienkonfigurator: pre-select live Hausprofil / PV / Batterien when unconfigured** — **Verified** (2026-10-18)
+  - Symptom (Greenfield Loxone Dogfood): first open of Szenarienkonfigurator left Hausprofil / Batterien / PV empty (`— keine —` / `[]`) even when catalogs had entities.
+  - Cause: `_seed_scenario_widget_state` only mirrored disk; empty live refs stayed empty.
+  - Fix: when live scenario has all three entity refs empty, seed first Hausprofil + all selectable batteries + all PVs; auto_persist writes on ready. Partial / non-live unchanged.
+  - Tests: `tests/test_planning_editors.py` (`test_default_live_entity_refs_*`).
+
 ### Bugfix — Greenfield / HA first start Migration UI (2026-10-18)
 
 - [x] **Greenfield / HA first start opens Migration UI** — **Verified** (2026-10-18)
