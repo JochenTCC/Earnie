@@ -1,6 +1,6 @@
 # EHAL-Com Binding UX — Draft (epic `Binding`)
 
-**Status:** proposal 2026-10-07; **revised 2026-10-08 (§0 is authoritative; where §1–§8 contradict it, §0 wins)**. Backlog entry: [Backlog.md](Backlog.md) → *Version 2.+1 - Enhance Auto Binding functionality*. Language: English (backlog rule); UI strings German later.
+**Status:** proposal 2026-10-07; **revised 2026-10-08 and 2026-10-18 (§0 is authoritative; where §1–§8 contradict it, §0 wins; within §0, §0.6 wins)**. Backlog entry: [Backlog.md](Backlog.md) → *Version 2.+1 - Enhance Auto Binding functionality*; Binding P5 → *Version 2.7*. Language: English (backlog rule); UI strings German later.
 
 **Terms:** **SB** = smarthome backend (Loxone / Home Assistant / OpenEMS / later MQTT). **EHAL ID** = identifier of a signal on the Earnie side (`ess.ecoflow_delta_3.sens_ess_power`). **SB name** = identifier of the same signal on the SB side (Loxone Merker / VI-VO title, HA `entity_id`). **Kennung** = the entity slug (`ecoflow_delta_3`) that both identifiers embed.
 
@@ -11,13 +11,13 @@ The Loxone read path went push-only (backlog 2.7.o, `backlog/Binding-Push-Only-C
 1. **Writes go push-only too** (backlog **2.7.q**): Earnie publishes `set_*` / enables in `status.json` under their qualified EHAL IDs, the Miniserver VI picks them up. No direct `/dev/sps/io/<name>/<value>` call, no Merker name.
 2. **Meter-energy poll (`/all`) is retired.** Each meter gets a second VO that pushes the total energy next to its power VO (2.7.q Q6). The slot-Ist sampler reads the counter from the inbox; ΔkWh logic stays, no averaging or integration of power is added.
 3. **Principle:** Earnie defines the signals (qualified IDs); the smarthome backend maps them to its own objects (Loxone: the source in the VO command, the target at the VI output; HA: a generated YAML package). Earnie stores no SB names for Loxone.
-4. **Home Assistant: Push-Transport.** HA uses the same HTTP contract in both directions (HA pushes telemetry with `rest_command`, polls `status.json` for setpoints). Earnie generates the YAML and pre-fills `entity_id`s from today's bindings. The REST pull adapter and the HA mapping chapter stay until parity is proven.
+4. **Home Assistant: Push-Transport.** HA uses the same HTTP contract in both directions (HA pushes telemetry with `rest_command`, polls `status.json` for setpoints). Earnie generates the YAML with `ENTITY_*` placeholders; Earnie stores no SB names for HA either (revised 2026-10-18, see §0.6 — was: pre-fill `entity_id`s from today's bindings). The REST pull adapter and the HA mapping chapter are removed with P5 (revised 2026-10-18, §0.6 point 10 — was: stay until parity is proven).
 5. **Kennung rename risk accepted** as not worse than before (the Kennung is now part of the wire address, so a rename needs a matching Loxone change; the P6 report lists the affected addresses).
 
 ### 0.1 What stays true
 
 - The EHAL-Com page becomes the **signal contract page**: it shows which EHAL fields Earnie needs (and which function needs them), whether the backend delivers / fetches them (match), and offers the export (Loxone VO / VI templates; HA YAML).
-- Row: qualified EHAL ID · meaning (with entity) · required by · match status · export. Match status is derived at render time, never persisted: Loxone read = last received (age) / never; Loxone write = last fetched by the Miniserver; HA Push-Transport likewise; legacy HA pull = mapped `entity_id`. Colour always with a symbol.
+- Row: qualified EHAL ID · meaning (with entity) · required by · match status · export. Match status is derived at render time, never persisted: Loxone read = last received (age) / never; Loxone write = last fetched by the Miniserver; HA Push-Transport likewise (HA pull is removed, §0.6). Colour always with a symbol. Since 2026-10-18 the row also shows **Pflicht / optional** and **aktiviert** (§0.6 point 5).
 - Direction 1 (SB first) and direction 2 (Earnie first) collapse: the contract is always Earnie's; the SB side either already delivers it (green) or gets the export (open). Hybrid installs need no special case.
 - What remains of the SB name: the **Loxone import** (typed entities from Merker / EFM names, `greenfield_device_map.json`, prefix + slug). It creates entities, it no longer writes names into bindings.
 
@@ -28,7 +28,7 @@ The Loxone read path went push-only (backlog 2.7.o, `backlog/Binding-Push-Only-C
 | §1 idea 3 (three-field row with SB name), idea 4 (colours from SB-name existence) | Replaced by the row in §0.1; the SB-name column disappears for Loxone. |
 | §1 idea 5 / §7.3 (how does import learn EHAL IDs) | Answered: the ID arrives in the push; unknown IDs go to a discovery list (P4). No signal-catalog file needed. |
 | §2 bullet "EHAL ID is already inside Loxone … has no receiver" | Outdated: the receiver exists (2.7.o). |
-| F2, F3, F5 (existence needs a scan, state matrix, verification loop) | Largely replaced by "received / fetched" status, which needs no scan. Still relevant for HA pull (legacy) and for the Loxone import. |
+| F2, F3, F5 (existence needs a scan, state matrix, verification loop) | Largely replaced by "received / fetched" status, which needs no scan. Still relevant for the Loxone import (HA pull is removed, §0.6). |
 | F6 (VO not functional, `sens_*` export = name checklist only) | Obsolete: VO is the read path, export = VO templates. |
 | F7 (qualified ID before anything else) | Still the foundation (2.7.n-2). |
 | F8, F9 (always-slug suggestions, one naming table both directions) | Obsolete for Loxone reads / writes (no names). The VO title is derived from the qualified ID. Naming grammar only remains for the import. |
@@ -50,7 +50,7 @@ The Loxone read path went push-only (backlog 2.7.o, `backlog/Binding-Push-Only-C
 | P2 | Signal list + match status; first Loxone slice in **2.7.q Q7**; HA and polish later. |
 | P3 | Export of VO / VI templates ("needed only" / "all"); VI generator in 2.7.q Q4. |
 | P4 | Import preview, did-you-mean for near-miss names, discovery list of unknown incoming IDs. Signal catalog dropped. |
-| P5 | HA Push-Transport (HTTP contract, backend-neutral receiver `/ehal/telemetry/…`, YAML package pre-filled from bindings, units handled in HA or via a `unit` parameter, add-on can ship the package). Pull adapter and HA mapping chapter retire after parity. |
+| P5 | HA Push-Transport (HTTP contract, backend-neutral receiver `/ehal/telemetry/…`, YAML package with placeholders only and periodic push, units converted in the generated Jinja, add-on can ship the package) plus automatic activation of required signals, the backend-neutral Signal list, and removal of the pull adapter, the HA mapping UI and `ehal.ha.transport` (§0.6). **Pulled forward to Version 2.7** (2026-10-18); no P5-rest any more. |
 | P6 | Kennung as editable variable; rename report lists wire addresses. |
 
 ### 0.4 Write path (2.7.q) in one picture
@@ -59,8 +59,49 @@ Today: direct `GET /dev/sps/io/<Merker>/<value>` **and** a `status.json` mirror,
 
 ### 0.5 Not overlooked, but to verify
 
-- `ehal/functions.py::_mapped_fields` counts only non-empty binding values; empty-valued push-only Loxone keys would make functions look unavailable (2.7.q Q8).
+- ~~`ehal/functions.py::_mapped_fields` counts only non-empty binding values; empty-valued push-only Loxone keys would make functions look unavailable (2.7.q Q8).~~ Solved: `require_nonempty_value=False` counts key presence (checked 2026-10-18). Leftover: `HaAdapter` calls `incomplete_function_messages` without it → false "incomplete" warnings with HA `push` (moot once the pull code is removed, §0.6 point 10).
 - Schreibtest, `scripts/verify_loxone_setup.py`, the watchdog and the AlarmClock `SpecialState10` poll still use names or polls (2.7.q Q7).
+
+### 0.6 Revision 2026-10-18 — target behaviour for binding (all backends)
+
+Trigger: a fresh HA add-on setup with `ehal.ha.transport=push` + token creates no `ehal_bindings`; keys only appear after "Mapping speichern" per entity in the HA mapping UI. The maintainer decided:
+
+**Flow in short:** configure the house → Earnie defines the signals and activates the required ones → EHAL-Com Signal list shows the contract → SB-specific export on request → the user does the real binding in the SB → Live-Lesen / Live-Schreiben confirm that it works.
+
+1. **Earnie owns the contract:** signals are derived from the configured components (plant, batteries, inverters, PV, consumers) and the functions in `ehal/functions.py` — qualified EHAL ID, direction, required / optional, required by which function.
+2. **Activation = key in `ehal_bindings`** (value empty, as Loxone Q8). Only activated signals are read, published to `status.json` and exported.
+3. **Required signals are activated automatically** when a component is saved in the Hauskonfigurator, for **all backends** (Loxone too). "Required" depends on component type and control level (e.g. battery `read_only` → telemetry only; `full` → plus limits and forced mode). Deleting a component removes its keys. A one-shot migration activates required signals in existing configs. No silent activation on load. Consequence for Loxone: installs get required keys without the import; the Signal list shows "nie empfangen" until the VO exists (intended).
+4. **Optional signals** are off by default; the user switches them per signal in the Signal list (on = add key, off = remove key).
+5. **The Signal list ("Vertrag") in EHAL-Com shows all signals** Earnie can use for the configured components — required and optional, activated or not — with columns as §0.1 plus **Pflicht / optional** and **aktiviert**. It is the only binding UI, for all backends. **There is no EHAL mapping variant on EHAL-Com any more** (the HA mapping UI is removed, see point 10).
+6. **SB-specific export on request** from the Signal list: Loxone = VO / VI templates (ZIP, as today); HA = YAML package (point 8). The real binding is done by the user in the SB.
+7. **Live-Lesen / Live-Schreiben are the check** that the binding works (received values, push state, `status.json` fetch), not a place to bind.
+8. **Earnie stores no SB names** (Loxone and HA): no `entity_id` in `ehal_bindings`. Existing HA `entity_id`s are discarded, not used to pre-fill the package. **HA YAML package** generated from the activated signals with `ENTITY_*` placeholders only: per read signal a `rest_command` plus an automation that pushes **periodically** (`time_pattern`, interval = repeat interval, point 11) — not only on state change; heartbeat; REST sensor on `status.json`; setpoint automations (`status.json` attribute → service on the target entity). Downloadable in EHAL-Com.
+9. **Units:**
+   - **HA:** converted in HA. The export uses the definitions of both sides: Earnie's canonical EHAL unit per field (role JSON) and the entity's `unit_of_measurement`, which the generated Jinja reads at runtime (W/kW/MW → W, Wh/kWh/MWh → kWh, %, A). Unknown unit → no push, HA log entry. The HA wire carries canonical EHAL units only.
+   - **Loxone:** unchanged — converted in Earnie via the role `loxone` blocks (`factor` / `sign`, `ehal/field_registry.py` `apply_loxone_read` / `apply_loxone_write`); the Signal list keeps the "Hub-Einheit" column for Loxone.
+10. **Push only, pull removed:** data exchange works the same for Loxone and HA (`/ehal/telemetry/<qualified-id>/<value>` into the shared inbox, setpoints via `status.json`, same token, same inbox rules). `ehal.ha.transport` is dropped: a config migration (`runtime_store/migration/`) removes the key; a leftover value afterwards fails loud with the migration hint (no silent ignore). Existing installs must switch (few expected). Removed with it: the REST pull read/write paths of `HaAdapter`, `ha_units` (runtime factor from `unit_of_measurement`), the HA mapping UI and its entity scan / field heuristics ("Heuristik: … leere Felder vorgeschlagen"), and the remaining name-/poll-based binding code and lists used to guess bindings. This replaces the former "P5-rest" (no longer deferred to Version 2.+1).
+11. **Minimum push cadence in the SB:** every read signal must be pushed at least every repeat interval (`EARNIE_PILOT_PUSH_REPEAT_S`, default **10 s**; Loxone VO repeat, HA `time_pattern`). Earnie's inbox relies on it: while the link is alive (heartbeat fresh) a silent signal is assumed **0** (`STATE_ZERO_ASSUMED_SILENT` in `runtime_store/loxone_push_inbox.py`); energy counters are never assumed 0 (stale > 3 × repeat → no value). This applies to HA exactly as to Loxone, so an HA automation that only pushes on change would report a constant non-zero value as 0.
+12. **Loxone import stays** as entity creation (consumers / components from Merker / EFM names and the Loxone structure, `greenfield_device_map.json`); it no longer writes SB names into bindings (§0.1). Not removed by point 10.
+
+**Open points:**
+
+- `plant.ha_ess_force` (Huawei forcible charge) calls HA REST services directly — keep as a vendor exception (then HA URL / token stay in `.env`) or move to the YAML package as a setpoint automation?
+- HouseSim S1–S4 and the HA Lab golden maps test through the REST `HaAdapter`; they must move to the push path (or be retired) together with point 10.
+
+**Gaps (code check 2026-10-18):**
+
+| Gap | Where |
+| --- | --- |
+| No helper "component → required qualified IDs" (type + control level); no activation on save, no key cleanup on delete, no migration step | new; `ehal/functions.py`, role `required`, `runtime_store/migration/` |
+| Signal list lists activated bindings only; no optional / not-activated rows, no Pflicht/optional and aktiviert columns, no optional toggle | `ehal/signal_list.py` `build_signal_rows`, `ui/ehal_signal_list.py` |
+| Signal list rendered for Loxone only; texts and ZIP export are Loxone-specific; unit column only meaningful for Loxone | `ui/pages/page_loxone_debug.py`, `ui/ehal_signal_list.py` |
+| HA mapping UI (stores `entity_id`s) still on EHAL-Com | `ui/ehal_ha_mapping.py`, `ui/ehal_ha_mapping_save.py` → remove |
+| Pull path still present: REST reads/writes in `HaAdapter`, `ha_units`, `aggregate_ha_entities` pull branch, entity scan / heuristics | `integrations/ha_adapter*.py`, `integrations/ha_units.py`, `integrations/ha_ehal_mapping.py`, `house_config/ha_ehal_bindings.py` → remove |
+| `ehal.ha.transport` still parsed (`pull` default); no migration removing it; existing HA `entity_id` values not discarded | `settings/config_loaders.py`, `runtime_store/ehal_setup.py`, `runtime_store/migration/` |
+| YAML generator is a skeleton (rest_commands + `status.json` sensor only): no periodic automations, no unit conversion, no setpoint automations; CLI only | `integrations/ha_carrier_yaml.py`, `scripts/ha_carrier_yaml_gen.py` |
+| False "incomplete" warnings with `push` (moot once pull code is removed) | `integrations/ha_adapter.py` (`incomplete_function_messages`) |
+| HouseSim S1–S4 / HA Lab golden maps depend on REST pull | `house_sim/`, `ha_lab/`, tests |
+| Docs | `docs/referenz/ehal.md`, `docs/ui/ehal-com.md`, `docs/dev/ha-lab-setup.md`, `docs/einrichtung/homeassistant-addon.md`, `docs/referenz/loxone-signals.md` (cadence / zero rule for all SBs) |
 
 ## 1. Ideas (restated)
 
