@@ -9,11 +9,12 @@ config.json
 !tests/fixtures/backtesting/config.json
 !tests/fixtures/migration/**/config.json
 # Site-specific config (private repo / local junction) — templates live in share/config/
-earnie_env/config/*
-!earnie_env/config/.gitkeep
+# Whole dir ignored (no .gitkeep): link_private_env.ps1 replaces it with a junction
+earnie_env/config
 earnie_env_alpha/config/*
 !earnie_env_alpha/config/.gitkeep
-earnie_env/config.bak-*/# Legacy paths (pre-earnie_env) — keep ignored if still present locally
+earnie_env/config.bak-*/
+# Legacy paths (pre-earnie_env) — keep ignored if still present locally
 config/config.json
 config/backtesting_scenarios.json
 config/remote_backtesting.json
