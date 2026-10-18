@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.7.0-dev.53",
+    "earnie_version": "2.7.0-alpha.2",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -22,8 +22,8 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "5c4da1400dc0fd89cab12fbbebcf424b34658ecf",
-    "recorded_at": "2026-10-15T06:50:53+02:00",
-    "source": "git-log-backfill"
+    "git_sha": "f43e8bec3b877106b9fd75d3ee8501b3789e3f88",
+    "recorded_at": "2026-10-18T15:45:54Z",
+    "source": "update-golden"
   }
 }

@@ -15,6 +15,7 @@ Project rules live in `.cursor/rules/*.mdc` and `.cursor/skills/*/SKILL.md` (wri
 - UTF-8 env is required on Windows (cp1252 console crashes on `→`, umlauts). See `.cursor/skills/windows-unicode-console/`.
 - Test health / quality gate: `.cursor/rules/test-health.mdc`, `.cursor/skills/quality-gate/`.
 - Backtesting / SE runs: always `--workers N` with the largest useful N (`.cursor/rules/backtesting-max-workers.mdc`).
+- Red golden-master regression case (`scripts.run_regression`, pre-push hook): triage with `.cursor/skills/regression-triage/SKILL.md` (report verdict → `--compare-at <baseline-sha>` → bisect → bug / intended / test data) before any `--update-golden`.
 
 ## Shell
 

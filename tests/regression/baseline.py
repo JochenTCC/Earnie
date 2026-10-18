@@ -1,6 +1,7 @@
 """Golden baseline: which public commit a golden was recorded from, and drift since."""
 from __future__ import annotations
 
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,13 +16,31 @@ CODE_PATHS = ("optimizer", "simulation", "runtime_store", "tests/fixtures", "con
 _CASES_PATHSPEC = ":(exclude)tests/regression/cases"
 
 
+# Set by git for hooks (pre-commit / pre-push); they would override ``cwd`` and point
+# every git call at the hook's repository / index.
+GIT_LOCATION_ENV = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_PREFIX",
+)
+
+
 class DirtyWorktreeError(RuntimeError):
     """Uncommitted code changes would make the golden's baseline SHA unreproducible."""
 
 
+def git_env() -> dict[str, str]:
+    """Process env without hook-exported repo locations: git resolves the repo from cwd."""
+    return {k: v for k, v in os.environ.items() if k not in GIT_LOCATION_ENV}
+
+
 def _git_raw(repo: Path, *args: str) -> str:
     return subprocess.check_output(
-        ["git", *args], cwd=str(repo), stderr=subprocess.PIPE, text=True
+        ["git", *args], cwd=str(repo), stderr=subprocess.PIPE, text=True, env=git_env()
     )
 
 

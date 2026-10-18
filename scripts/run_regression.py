@@ -3,6 +3,7 @@
   python -m scripts.run_regression [--cases-dir PATH]... [--case ID] [--workers N]
   python -m scripts.run_regression --update-golden --case REG-O-winter-jan
   python -m scripts.run_regression --backfill-baseline
+  python -m scripts.run_regression --compare-at <sha> --case REG-O-summer-june
   python -m scripts.run_regression --intake DUMP.zip --id REG-142-slug --private \\
       --seed-anchor "..." | --cycle-index N
 
@@ -66,6 +67,31 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Add expected.baseline (last commit touching expected.json) to public "
             "goldens that lack it; does not run cases."
         ),
+    )
+    parser.add_argument(
+        "--compare-at",
+        metavar="REF",
+        default=None,
+        help=(
+            "Run the selected L1/L2 cases at REF (temporary worktree) and on the working "
+            "tree; write per-slot CSVs, diff, summary.md and plot.html under "
+            "backtesting_logs/regression/compare/. Requires --case."
+        ),
+    )
+    parser.add_argument(
+        "--worktree-root",
+        type=Path,
+        default=None,
+        help=(
+            "Parent dir for the --compare-at worktree (default: "
+            "$EARNIE_COMPARE_WORKTREE_ROOT or ../earnie-compare-wt next to the repo; "
+            "keep it short on Windows, never directly under a drive root)."
+        ),
+    )
+    parser.add_argument(
+        "--keep-worktree",
+        action="store_true",
+        help="Keep the --compare-at worktree for manual inspection.",
     )
     parser.add_argument(
         "--report",
@@ -332,6 +358,37 @@ def _backfill_baselines(cases: list[Any]) -> int:
     return 0
 
 
+def _compare_at(args: argparse.Namespace, cases: list[Any]) -> int:
+    from tests.regression.compare_at import (
+        CompareAtError,
+        compare_cases_at,
+        default_worktree_root,
+    )
+
+    if not args.case:
+        print("--compare-at requires --case (one or more)", file=sys.stderr)
+        return 2
+    unsupported = [c.id for c in cases if c.level not in ("L1", "L2")]
+    if unsupported:
+        print(f"--compare-at supports L1 / L2 cases only: {unsupported}", file=sys.stderr)
+        return 2
+    try:
+        summaries = compare_cases_at(
+            repo=ROOT,
+            ref=str(args.compare_at),
+            case_dirs=[c.case_dir for c in cases],
+            out_root=Path(args.report).parent / "compare",
+            worktree_root=args.worktree_root or default_worktree_root(ROOT),
+            keep_worktree=bool(args.keep_worktree),
+        )
+    except CompareAtError as exc:
+        print(f"compare-at failed: {exc}", file=sys.stderr)
+        return 2
+    for summary in summaries:
+        print(f"Summary: {summary}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     from tests.regression.baseline import (
         DirtyWorktreeError,
@@ -372,6 +429,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.backfill_baseline:
         return _backfill_baselines(cases)
+    if args.compare_at:
+        return _compare_at(args, cases)
 
     new_baseline: dict[str, Any] | None = None
     if args.update_golden:

@@ -52,7 +52,7 @@ A bugfix can be guarded in two ways. Keep both; do not collapse them.
 
 **Minimum bar for B:** the debug dump has `recorder/` (§14), the bug is plan / optimizer behaviour, **and** it is visible in a compared invariant or metric. A **B** case is locked only after a red→green proof: a pre-fix baseline (uncommitted) reproduces the symptom, and the fixed run differs exactly on that metric before `--update-golden`.
 
-The step-by-step agent workflow (triage, intake, baseline, fix, lock, full run, Verifications Pending) lives in skill `bugfix-regression-test` (`.cursor/skills/bugfix-regression-test/SKILL.md`); release reminders in [release-checklist.md](release-checklist.md) §1.
+The step-by-step agent workflow (triage, intake, baseline, fix, lock, full run, Verifications Pending) lives in skill `bugfix-regression-test` (`.cursor/skills/bugfix-regression-test/SKILL.md`); analysing a red case (bug vs. intended change vs. test data) in skill `regression-triage` (`.cursor/skills/regression-triage/SKILL.md`); release reminders in [release-checklist.md](release-checklist.md) §1.
 
 ## 4. Repository split
 
@@ -132,6 +132,7 @@ The solver and its settings must be identical for golden recording and verificat
 ```
 python -m scripts.run_regression [--cases-dir PATH]... [--case ID] [--workers N]
 python -m scripts.run_regression --update-golden --case REG-142-eauto-deadline
+python -m scripts.run_regression --compare-at <sha> --case REG-O-summer-june [--keep-worktree]
 python -m scripts.run_regression --intake <debug_dump.zip> --id REG-142-eauto-deadline --private \
     --seed-anchor "..." | --cycle-index N
 ```
@@ -140,6 +141,7 @@ python -m scripts.run_regression --intake <debug_dump.zip> --id REG-142-eauto-de
 - `--workers N` per `.cursor/rules/backtesting-max-workers.mdc` (largest useful N). Runtime budget: ≤ 15 min parallel.
 - `--update-golden` rewrites `expected.json` only for the selected cases (incl. `baseline` and `inputs`); the commit message must explain the intended behaviour change. It **refuses to run** when the public worktree has uncommitted or untracked changes outside `tests/regression/cases/` — commit the code first, so `baseline.git_sha` is reproducible.
 - `--backfill-baseline` adds `baseline` (source `git-log-backfill`) to public goldens that lack it; it runs no cases. Private goldens are skipped: their public code SHA is only known from `--update-golden`.
+- `--compare-at <ref>` (with `--case`, L1 / L2 only) checks `<ref>` out into a temporary git worktree (`$EARNIE_COMPARE_WORKTREE_ROOT`, default `..\earnie-compare-wt` next to the repo — short on purpose for Windows MAX_PATH, never directly under a drive root; `--worktree-root` overrides, `--keep-worktree` keeps it) and runs each case there and on the working tree, each in its own process (`tests/regression/trace.py`; Earnie code from that tree, offline fixture config — no `earnie_env` needed; `pv_kw` is added for trees that predate it; the PV-shape guard is recorded, not raised). Output per case in `backtesting_logs/regression/compare/<case>__<sha8>/`: `summary.md` (metrics base / head / Δ, input fingerprint diff, time axis, per-series slots differing and max Δ), `base_slots.csv`, `head_slots.csv`, `diff.csv` and `plot.html` (Plotly overlay, L2 only). Triage workflow: skill `regression-triage` (`.cursor/skills/regression-triage/SKILL.md`).
 - Output: console table + `regression_report.md` (Δ per case, tier-3/4 summary, public + private SHA, skipped private-root note, engine fingerprint). Per case: baseline SHA → HEAD with the commit count (total and in code paths); for a red case also the `git bisect start` / `git bisect run` commands for that single case.
 - **L2 climate input is frozen** (`tests/regression/climate_fixture.py`): Open-Meteo irradiance/temperature come only from `tests/fixtures/backtesting/open_meteo/` (committed archive responses), with the wall clock frozen at `CLIMATE_FIXTURE_NOW` because cache keys contain the last archive day / last full archive year. A missing key raises `ClimateFixtureMissingError` — no network, no `data/cache/open_meteo`. Re-record only deliberately (needs network): `EARNIE_REGRESSION_RECORD_CLIMATE=1 python -m scripts.run_regression --workers 1`, then bump `CLIMATE_FIXTURE_NOW` to the recording date if the keys changed. `assert_pv_day_shape` (`tests/regression/pv_shape.py`) fails an L2 run whose PV is non-zero at night or constant.
 - Default roots: `tests/regression/cases/` plus `$EARNIE_REGRESSION_PRIVATE_DIR` (or sibling `..\Earnie-regression-private\cases`). Missing private root → reported as skipped (`private-root-missing`), not silent.
