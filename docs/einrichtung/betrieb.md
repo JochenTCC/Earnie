@@ -79,6 +79,7 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `powerstation_reserves.json`    | Reserve-Zustand virtueller/physischer Powerstations (stored/target kWh, Trigger).            |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`.                                          |
 | `usage_ping.json`               | Zustimmung und Zustand der optionalen Nutzungsstatistik (siehe [Nutzungsstatistik](#nutzungsstatistik)). |
+| `feature_reviews.json`          | Zustand der einmaligen Feedback-Abfrage (gesendet oder abgebrochen, siehe [Feedback zum Szenario-Explorer](#feedback-zum-szenario-explorer)). |
 
 
 Die App liest diese Dateien **read-only** für Panels und Abgleich.
@@ -186,9 +187,10 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls es nicht schon läuft (Docker-Compose setzt das). Ohne Variable bzw. lokal: aus.                                                                     |
 | `EARNIE_OFFLINE`                        | `1` = keine Loxone-/Live-Verbindung erforderlich. Der Bootstrap füllt leere Entitäts-IDs im Live-Szenario aus den Katalogen. Sinnvoll für die Streamlit Community Cloud. |
-| `EARNIE_CLOUD_DEMO`                     | `1` = Betrieb in der Streamlit Community Cloud. Pro Browser-Sitzung gibt es einen leeren Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator und einen Willkommenshinweis. Nach dem Start des Szenario-Explorers erscheint ein Feedback-Banner mit GitHub-Issue (`cloud-demo`). Optional lokale Config-ZIP; kein Offline-Demo-Seed. Typisch zusammen mit `EARNIE_OFFLINE=1`. |
+| `EARNIE_CLOUD_DEMO`                     | `1` = Betrieb in der Streamlit Community Cloud. Pro Browser-Sitzung gibt es einen leeren Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator und einen Willkommenshinweis. Einen Offline-Demo-Seed gibt es nicht. Typisch zusammen mit `EARNIE_OFFLINE=1`. |
 | `EARNIE_USAGE_PING`                     | `off` = Kill-Switch: Es wird **nichts** gesendet, auch wenn die Zustimmung in der UI eingeschaltet ist. Andere Werte bzw. nicht gesetzt: Kill-Switch aus, die Zustimmung steuert. Siehe [Nutzungsstatistik](#nutzungsstatistik). |
 | `EARNIE_USAGE_PING_URL`                 | HTTPS-URL des Zähler-Endpunkts (`POST`). Ohne URL und ohne internen Transport wird nichts gesendet (WARNING im Log); die Optimierung bleibt unverändert. |
+| `EARNIE_REVIEW_URL`                     | HTTPS- oder HTTP-URL des anonymen Feedback-Endpunkts (`POST`). Earnie nutzt sie, wenn im Szenario-Explorer-Dialog eine Sternebewertung gesendet wird (siehe [Feedback zum Szenario-Explorer](#feedback-zum-szenario-explorer)). Ohne URL schlägt das Senden mit einer Fehlermeldung im Dialog fehl; die Optimierung bleibt unverändert. |
 
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../dev/streamlit-ports.md).
@@ -255,6 +257,15 @@ Lokal liegt der Zustand in `runtime/usage_ping.json`.
 - **Speicherung serverseitig:** Die Installations-ID wird mit einem täglich wechselnden Salt gehasht. Gespeichert werden nur Tageszähler, es gibt also keine geräteübergreifende Profilbildung über Tage. Die Earnie-Points gehen nur als Verteilung ein (Histogramm der Punktesummen pro Tag), nicht als Wert je Installation.
 - **Earnie-Points:** eine grobe abgeleitete Zahl ohne Konfigurationsinhalte. Aus ihr lässt sich die Anlage nicht zurückrechnen; sie dient nur der Statistik (keine Lizenz- oder Abrechnungsprüfung).
 - **Hosting:** Der Zähler-Endpunkt läuft auf einem gemieteten VPS bei **hosttech** in der **EU**. Mit dem Hoster besteht ein **Auftragsverarbeitungsvertrag (AV)**.
+
+### Feedback zum Szenario-Explorer
+
+Wurde in einer Sitzung eine Simulation im **Szenario-Explorer** gestartet, kann beim Verlassen der Seite einmalig ein kurzer Feedback-Dialog erscheinen. Ihre Bewertung hilft uns, den Szenario-Explorer verständlicher zu machen – vielen Dank!
+
+- **Inhalt:** Drei Fragen mit 1 bis 5 Sternen und ein optionaler Kommentar (max. 500 Zeichen).
+- **Was wird gesendet:** nur die Sternebewertungen, der Kommentar und die Earnie-Version. Konfiguration, Zugangsdaten, Geräte-, Preis- und Standortdaten werden nicht gesendet.
+- **Einmalig:** Nach **Senden** oder **Abbrechen** fragt Earnie auf dieser Installation nicht erneut. Der Zustand liegt in `runtime/feature_reviews.json`.
+- **Endpunkt:** `EARNIE_REVIEW_URL` (siehe [Umgebungsvariablen](#umgebungsvariablen-optional)). Schlägt das Senden fehl, zeigt der Dialog eine Fehlermeldung; die Optimierung ist nicht betroffen.
 
 ## Debug-Dump
 

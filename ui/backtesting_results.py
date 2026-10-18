@@ -272,11 +272,8 @@ def _deviation_labels_map(meta: dict) -> dict[str, str]:
     return labels
 
 def _render_backtesting_results(meta: dict, hourly_df: pd.DataFrame) -> None:
-    from runtime_store.cloud_demo import render_cloud_demo_feedback_banner
-
     render_backtesting_log_caption(meta)
     _render_imported_pv_results_notice(meta)
-    render_cloud_demo_feedback_banner()
     render_annual_cost_table(meta)
     render_backtesting_monthly_chart(meta)
     render_scenario_consumption_table(meta, hourly_df)

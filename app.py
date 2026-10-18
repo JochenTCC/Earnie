@@ -145,8 +145,24 @@ def main() -> None:
     _render_loxone_auth_warning()
     render_cloud_demo_intro()
 
+    from runtime_store.feature_review import (
+        SESSION_SE_ACTIVE_THIS_RUN_KEY,
+        SESSION_SE_WAS_ACTIVE_KEY,
+    )
+    from ui.star_review_dialog import (
+        arm_scenario_explorer_review_prompt,
+        maybe_prompt_scenario_explorer_review,
+    )
+
+    prev_on_se = bool(st.session_state.get(SESSION_SE_WAS_ACTIVE_KEY))
+    st.session_state[SESSION_SE_ACTIVE_THIS_RUN_KEY] = False
     navigation = build_navigation(get_enabled_ui_mode_keys())
     navigation.run()
+    now_on_se = bool(st.session_state.get(SESSION_SE_ACTIVE_THIS_RUN_KEY))
+    if prev_on_se and not now_on_se:
+        arm_scenario_explorer_review_prompt()
+    st.session_state[SESSION_SE_WAS_ACTIVE_KEY] = now_on_se
+    maybe_prompt_scenario_explorer_review()
     # After nav: Banner der Wahrheit at page bottom; Info / About at sidebar bottom.
     render_truth_banner(where="main")
     render_info_sidebar()

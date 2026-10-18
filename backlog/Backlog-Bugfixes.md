@@ -38,24 +38,23 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Placeholder `PUSH_TOKEN_HIER_ERSETZEN`; ZIP README step 3 updated.
   - Unset `EARNIE_PUSH_TOKEN` → open LAN telemetry (no 404); empty VO token omits `?t=` / `/t/`.
   - Tests: `test_ehal_signal_list`, `test_pilot_vi_template_gen`, `test_pilot_vo_template_gen`, `test_loxone_push_inbox`.
+- [ ] **SE 5-star review dialog + earnie-server `POST /review`** — fix implemented (2026-10-18); UI/cloud acceptance pending
+  - Replaced cloud-demo GitHub feedback banner with reusable `@st.dialog` (`ui/star_review_dialog.py`) for all SE installs.
+  - Trigger: leave Szenario-Explorer after a run was started; once per `review_id` (`runtime/feature_reviews.json`); send or abort.
+  - Always POST anonymous payload to `EARNIE_REVIEW_URL`; earnie-server appends `reviews.jsonl`.
+  - Tests: `tests/test_feature_review.py`, earnie-server `tests/test_usage_ping_receiver.py` (review route).
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] On SE page during opt-in ping pop up the shown data example is still "v1" - this should be more accurate --> currently "v2"
-- [ ] swap positions of EHAL-Com and Optimierer-Dienst in sidebar
-- [ ] substitute the message "Sie haben gerade den Szenario-Explorer gestartet. Was hat gut funktioniert, was war unklar oder fehlte? Kurzes Feedback hilft uns, Earnie zu verbessern (öffentliches GitHub-Issue — keine Secrets pasten)." with a pop-up dialog where the user can give a 5-star-review for these criterias:
-  - Die Konfiguration der Szenarios war einfach
-  - Die Ergebnisdarstellung ist verständlich
-  - Das Ergebnis ist plausibel
-  Also add an open field (optional) for comments
-  The pop-up appears when the user scrolls to "Detaillierte Simulationsansicht" (with a delay of 10 sec.)
-  The user can send the review or abort the dialog
-  When user sends it could also be sent to the earnie-server
-  The dialog emphasizes that only anonymous data is sent 
-  Make the popup dialog reusable (Open parameter is a review-ID, the overall-question text and the 5-star-questions (max three))
+- [ ] On SE page during opt-in ping pop up the shown data example is still "v1" - shouldn't it be "v2"?
 - [ ] "debug-dumps\debug_dump_20261015_222809"
+
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
+- [ ] swap positions of EHAL-Com and Optimierer-Dienst in sidebar
+
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
+
+- [ ] **Cloud demo vs „einmalig“ for SE star review** (`docs/einrichtung/betrieb.md`, `private-env.md`): with `EARNIE_CLOUD_DEMO=1` each browser session uses a temp workspace, so `feature_reviews.json` is session-scoped — “once per install” wording may overstate permanence on Community Cloud. Confirm whether docs should say once per session there.

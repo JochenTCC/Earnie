@@ -3,14 +3,11 @@ from __future__ import annotations
 
 import os
 import tempfile
-from datetime import datetime
 
 from runtime_store.env_vars import is_truthy
 
 SESSION_ENV_KEY = "_earnie_cloud_env_root"
 SESSION_INTRO_DISMISSED_KEY = "_earnie_cloud_intro_dismissed"
-SESSION_SE_SIM_STARTED_KEY = "_earnie_cloud_se_sim_started"
-SESSION_SE_FEEDBACK_DISMISSED_KEY = "_earnie_cloud_se_feedback_dismissed"
 
 # Test hook when Streamlit session_state is unavailable.
 _test_session_env_root: str | None = None
@@ -104,114 +101,3 @@ def render_cloud_demo_intro() -> None:
     if st.button("Verstanden", key="earnie_cloud_intro_dismiss"):
         st.session_state[SESSION_INTRO_DISMISSED_KEY] = True
         st.rerun()
-
-
-def mark_cloud_demo_se_simulation_started() -> None:
-    """Remember that this cloud-demo session started a Szenario-Explorer run."""
-    if not is_cloud_demo():
-        return
-    import streamlit as st
-
-    st.session_state[SESSION_SE_SIM_STARTED_KEY] = True
-
-
-def build_cloud_demo_feedback_issue_url(message: str = "") -> str:
-    """Build GitHub Issue URL for cloud-demo SE feedback (pure; no Streamlit)."""
-    from ui.github_issue_url import build_github_issue_url
-    from version import __version__
-
-    return build_github_issue_url(
-        "Verbesserung",
-        "Cloud-Demo Szenario-Explorer",
-        (message or "").strip() or "(Feedback hier ergänzen)",
-        extra_labels=("cloud-demo",),
-        version=__version__,
-    )
-
-
-def _feedback_config_zip_filename() -> str:
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"earnie_cloud_demo_config_{stamp}.zip"
-
-
-def _render_feedback_config_zip(st, SUPPORT_EMAIL: str) -> None:
-    import logging
-
-    try:
-        from runtime_store.config_pack import build_config_pack_bytes
-
-        pack = build_config_pack_bytes()
-    except Exception as exc:  # noqa: BLE001 — surface to user
-        logging.getLogger(__name__).exception(
-            "cloud demo feedback config pack failed"
-        )
-        st.error(f"ZIP-Erstellung fehlgeschlagen: {exc}")
-        pack = b""
-    if not pack:
-        return
-    st.download_button(
-        label="Konfigurations-ZIP herunterladen",
-        data=pack,
-        file_name=_feedback_config_zip_filename(),
-        mime="application/zip",
-        key="earnie_cloud_se_feedback_zip_download",
-    )
-    st.caption(
-        "ZIP bleibt lokal. Nicht in öffentliche Issues anhängen. "
-        f"Bei Bedarf an {SUPPORT_EMAIL} senden."
-    )
-
-
-def _render_feedback_actions(st, message: str) -> None:
-    issue_url = build_cloud_demo_feedback_issue_url(message)
-    col_issue, col_dismiss = st.columns(2)
-    with col_issue:
-        st.link_button(
-            "Feedback als GitHub-Issue",
-            issue_url,
-            width="stretch",
-        )
-    with col_dismiss:
-        if st.button(
-            "Später",
-            key="earnie_cloud_se_feedback_dismiss",
-            width="stretch",
-        ):
-            st.session_state[SESSION_SE_FEEDBACK_DISMISSED_KEY] = True
-            st.rerun()
-
-
-def render_cloud_demo_feedback_banner() -> None:
-    """Ask for feedback after SE simulation start; only in EARNIE_CLOUD_DEMO."""
-    if not is_cloud_demo():
-        return
-    import streamlit as st
-
-    from ui.truth_banner import SUPPORT_EMAIL
-
-    if not st.session_state.get(SESSION_SE_SIM_STARTED_KEY):
-        return
-    if st.session_state.get(SESSION_SE_FEEDBACK_DISMISSED_KEY):
-        return
-
-    st.info(
-        "**Wie war die Simulation?**\n\n"
-        "Sie haben gerade den **Szenario-Explorer** gestartet. "
-        "Was hat gut funktioniert, was war unklar oder fehlte? "
-        "Kurzes Feedback hilft uns, Earnie zu verbessern "
-        "(öffentliches GitHub-Issue — keine Secrets pasten)."
-    )
-    message = st.text_area(
-        "Ihr Feedback (optional)",
-        key="earnie_cloud_se_feedback_message",
-        height=100,
-        placeholder="z. B. Einrichtung, Ergebnisse, Verständnis der Charts …",
-    )
-    attach_config = st.checkbox(
-        "Konfigurations-ZIP lokal herunterladen "
-        "(nicht automatisch hochladen; nur für privaten Support nutzen).",
-        key="earnie_cloud_se_feedback_attach_config",
-    )
-    if attach_config:
-        _render_feedback_config_zip(st, SUPPORT_EMAIL)
-    _render_feedback_actions(st, message)

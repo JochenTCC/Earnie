@@ -134,9 +134,9 @@ def _prepare_backtesting_run_context() -> dict | None:
     if config_error:
         st.error(_format_config_error(config_error))
         return None
-    from runtime_store.cloud_demo import mark_cloud_demo_se_simulation_started
+    from runtime_store.feature_review import mark_se_simulation_started
 
-    mark_cloud_demo_se_simulation_started()
+    mark_se_simulation_started()
     scenarios, _ = try_get_backtesting_scenarios()
     live_scenario_id = config.get_live_scenario_id()
     parallel_task_count = count_backtesting_parallel_tasks(

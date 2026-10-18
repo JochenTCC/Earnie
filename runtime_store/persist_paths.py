@@ -41,6 +41,7 @@ from runtime_store.persist_paths_base import (  # noqa: F401  (re-exported)
     runtime_path,
     total_consumption_profiles_file,
     usage_ping_state_file,
+    feature_reviews_state_file,
 )
 from runtime_store.persist_paths_base import (  # noqa: F401  (re-exported)
     _config_directory_from_env,

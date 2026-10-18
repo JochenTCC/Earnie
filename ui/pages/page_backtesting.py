@@ -21,14 +21,16 @@ _RESULTS_DISCLAIMER = (
 
 
 def render() -> None:
+    from runtime_store.feature_review import note_se_page_active
+    from ui.usage_ping_consent import maybe_prompt_consent_on_explorer
+
+    note_se_page_active()
     render_page_title_with_help(
         "📊 Szenario-Explorer",
         _BACKTESTING_HELP,
         key="backtesting_scope_help",
         page_docs_key="scenario-explorer",
     )
-    from ui.usage_ping_consent import maybe_prompt_consent_on_explorer
-
     maybe_prompt_consent_on_explorer()
     st.info(_RESULTS_DISCLAIMER)
     st.caption(f"Konfiguration: `{config.CONFIG.config_path}`")
