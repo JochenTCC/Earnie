@@ -102,12 +102,15 @@ def test_rewrite_consumer_bindings_slug():
         f"ev.{old}.sens_evcs_soc_act": "SoC",
         "unrelated": "x",
     }
-    out = rewrite_consumer_bindings_slug(bindings, old_id=old, new_id=new)
-    assert out[flex_field(new, "sens_power_act")] == "Merker1"
+    out = rewrite_consumer_bindings_slug(
+        bindings, old_id=old, new_id=new, consumer_type="generic"
+    )
+    assert out[f"consumer.{new}.sens_power_act"] == "Merker1"
     assert out[f"consumer.{new}.set_enable"] == ""
     assert out[f"ev.{new}.sens_evcs_soc_act"] == "SoC"
     assert out["unrelated"] == "x"
     assert flex_field(old, "sens_power_act") not in out
+    assert flex_field(new, "sens_power_act") not in out
 
 
 @pytest.fixture
@@ -345,7 +348,7 @@ def test_resolve_consumer_locks_after_bezeichnung_change(profiles_env):
     assert second[0]["id"] == "waschkueche"
     assert second[0]["id_locked"] is True
     assert "id_provisional_label" not in second[0]
-    assert second[0]["ehal_bindings"][flex_field("waschkueche", "sens_power_act")] == "P"
+    assert second[0]["ehal_bindings"]["consumer.waschkueche.sens_power_act"] == "P"
 
     upsert_house_profile(
         {
@@ -390,5 +393,5 @@ def test_resolve_consumer_force_from_label_renames_locked():
     assert resolved[0]["id"] == "waschkueche"
     assert resolved[0]["id_locked"] is True
     assert (
-        resolved[0]["ehal_bindings"][flex_field("waschkueche", "sens_power_act")] == "P"
+        resolved[0]["ehal_bindings"]["consumer.waschkueche.sens_power_act"] == "P"
     )

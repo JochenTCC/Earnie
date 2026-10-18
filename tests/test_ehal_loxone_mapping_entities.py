@@ -50,9 +50,9 @@ def test_fields_for_consumer_ev_vs_flex():
         "sens_temperature_heat_storage_low",
     )
     assert fields_for_consumer({"id": "wp", "type": "thermal_annual"}) == (
-        "flex.wp.sens_power_act",
-        "flex.wp.sens_consumer_active",
-        "flex.wp.set_enable",
+        "heatpump.wp.sens_power_act",
+        "heatpump.wp.sens_consumer_active",
+        "heatpump.wp.set_enable",
         "sens_temperature_heat_storage",
         "sens_temperature_heat_storage_low",
     )
@@ -90,12 +90,12 @@ def test_proposal_for_mapping_field_entity_scoped_and_miss():
 
 def test_fields_for_consumer_pool_filter_includes_filter_roles():
     fields = fields_for_consumer({"id": "pool_filter", "type": "flexible"})
-    assert "flex.pool_filter.sens_power_act" in fields
+    assert "pool.pool_filter.sens_power_act" in fields
     assert "get_filter_remaining_hours" in fields
     assert "sens_filter_active" in fields
     assert "get_filter_native_start_hour" in fields
     assert "get_filter_native_duration_hours" in fields
-    assert "flex.pool_filter.set_enable" in fields
+    assert "pool.pool_filter.set_enable" in fields
     assert "flex.pool_filter.set_power_setpoint" not in fields
 
 
@@ -131,7 +131,7 @@ def test_build_entity_rows_pool_filter_only():
     assert ids == [PLANT_ENTITY_ID, "pool", "pool_filter"]
     filt = next(r for r in rows if r["id"] == "pool_filter")
     assert "get_filter_remaining_hours" in filt["fields"]
-    assert "flex.pool_filter.sens_power_act" in filt["fields"]
+    assert "pool.pool_filter.sens_power_act" in filt["fields"]
     assert filt["bindings"]["get_filter_remaining_hours"] == (
         "Earnie_Pool_Filter_Sollstunden"
     )
@@ -181,7 +181,7 @@ def test_build_entity_rows_includes_plant_and_consumers():
     assert "sens_ess_soc" not in rows[0]["fields"]
     assert "set_evcs_max_current" in rows[1]["fields"]
     assert "set_evcs_current" not in rows[1]["fields"]
-    assert "flex.wp.sens_power_act" in rows[2]["fields"]
+    assert "heatpump.wp.sens_power_act" in rows[2]["fields"]
 
 
 def test_build_entity_rows_includes_batteries():

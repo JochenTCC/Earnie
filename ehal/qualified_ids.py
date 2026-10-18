@@ -6,9 +6,9 @@ type*; where a field family has a stem the namespace equals it (``ess`` ↔ ``se
 ``*_grid_*``, ``pv`` ↔ plant / ``pv.{id}.sens_pv_*``). Plant house-wide PV sum stays
 bare ``sens_pv_production_active``; per-PV-system power uses ``pv.{id}.*``.
 
-Storage is unchanged: bindings stay under the keys they were saved with (``ess.{id}.*``,
-``pv.{id}.*``, legacy ``flex.{slug}.*``, bare plant/consumer fields). ``flex`` is only a
-legacy alias that is still accepted on input; it is not emitted in new exchange IDs.
+Consumer storage uses typed namespaces (``consumer|heatpump|pool.{slug}.*``), same as
+exchange. Legacy ``flex.{slug}.*`` is still accepted on parse / dual-read until packs
+migrate. ``ess.{id}.*`` / ``pv.{id}.*`` / bare plant fields are unchanged.
 """
 from __future__ import annotations
 

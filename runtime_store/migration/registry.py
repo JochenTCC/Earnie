@@ -1,6 +1,9 @@
 """Ordered MigrationStep registry (ConfigMigration P1)."""
 from __future__ import annotations
 
+from runtime_store.migration.steps.consumer_flex_bindings import (
+    STEP as CONSUMER_FLEX,
+)
 from runtime_store.migration.steps.conversion_efficiency import STEP as CONVERSION
 from runtime_store.migration.steps.ehal_bindings import STEP as EHAL
 from runtime_store.migration.steps.ess_bindings import STEP as ESS
@@ -31,6 +34,7 @@ STEPS: tuple[MigrationStep, ...] = (
     REQUIRED_SIGNALS,
     HA_PULL_REMOVAL,
     EHAL_HTTP_PORT,
+    CONSUMER_FLEX,
 )
 
 STEP_BY_ID: dict[str, MigrationStep] = {step.id: step for step in STEPS}

@@ -397,18 +397,21 @@ def match_controls(
             )
         )
     for group_key, bucket in groups.items():
-        from ehal.flex_fields import expand_flex_bindings
+        from ehal.flex_fields import canonicalize_consumer_bindings
 
         label = str(bucket["label"])
         # Expand role stubs using the same slug apply_typed_matches will use.
         proposed_id = slug_id(label)
+        hk_type = str(bucket["hk_type"])
         matches.append(
             EntityMatch(
                 entity_kind=str(bucket["entity_kind"]),
-                hk_type=str(bucket["hk_type"]),
+                hk_type=hk_type,
                 group_key=group_key,
                 label=label,
-                bindings=expand_flex_bindings(dict(bucket["bindings"]), proposed_id),
+                bindings=canonicalize_consumer_bindings(
+                    dict(bucket["bindings"]), proposed_id, hk_type
+                ),
             )
         )
     return matches, report

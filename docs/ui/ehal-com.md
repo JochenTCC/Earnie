@@ -185,16 +185,16 @@ A battery belongs to an inverter via `batteries[].inverter_id`. `batteries[].kin
 
 Live operation runs via house-profile flex Merker. Role template: `share/ehal/roles/consumer.json`. **Heat pump** → [C.5](#c5-heat-pump-stub); **Pool / SwimSpa** → [C.6](#c6-pool--swimspa-stub).
 
-`flex.` is a **role namespace** for stored bindings (entity-scoped: `flex.{slug}.sens_power_act` / `set_enable`). **Live-Lesen** shows qualified EHAL IDs (`consumer.{slug}.sens_power_act`, `heatpump.*`, `pool.*`, …). For meter IDs `zaehler_<slug>`, the wire slug has no prefix (example Live-Lesen: `consumer.trockner.sens_power_act`; binding key may still be `flex.trockner.sens_power_act`). Stubs like `flex.power_name` are no longer read (fail-fast).
+Stored consumer bindings use typed namespaces (`consumer.{slug}.*`, `heatpump.*`, `pool.*`). Role stubs (`flex.sens_power_act` / `flex.set_enable`) expand to those keys on import/save. Legacy entity-scoped `flex.{slug}.*` is still accepted on dual-read until the config migration rekeys them. **Live-Lesen** shows the same qualified IDs. For meter IDs `zaehler_<slug>`, the Kennung has no prefix (example: `consumer.trockner.sens_power_act`).
 
 **VO push telemetry:** Loxone Virtual Outputs call `GET /ehal/telemetry/<qualified-EHAL-ID>/<v>` on the daemon port (default **8541**; alias `/ehal/loxone/telemetry/…` for existing VOs), with optional token via `?t=`, header, or address prefix `/t/<token>`. When `EARNIE_PUSH_TOKEN` (alias `EARNIE_PILOT_PUSH_TOKEN`) is set, the token is required; when unset, Earnie accepts open LAN push. All pushable `sens_*` / `get_*` fields — including meter energy counters (`sens_pv_energy`, `grid.meter.sens_grid_energy_*`, `consumer.*.sens_energy_*`, `ess.*.sens_ess_energy_charge` / `_discharge`) — read from the push inbox (no Merker poll, no Meter `/all`). Battery library template: `VO_Earnie_Battery.xml` (or generated `VO_Earnie_Batterie_*.xml`). **Writes** are push-only via `status.json` under qualified Check keys; the legacy Merker Check keys are no longer published. See [Loxone Signals](../referenz/loxone-signals.md).
 
 
 | Area / meaning        | Type          | EHAL value name (stub)             | OpenEMS | evcc (YAML attribute) | Victron GX / EVCS (Modbus) | Loxone / Loxone extra                        |
 | ------------------------ | --------------- | ------------------------------------- | ------- | ------------------------ | ----------------------------- | ------------------------------------------------ |
-| Flex power / state      | Measurement   | `flex.{slug}.sens_power_act`         |         |                           |                                | `Earnie_Verbraucher_Leistung` or EFM load        |
-| Flex consumer active    | Measurement   | `consumer.{slug}.sens_consumer_active` (Live/VO; storage may be `flex.{slug}.sens_consumer_active`) |         |                           |                                | `Earnie_Verbraucher_<Slug>_Aktiv` (digital 0/1; reserve release) |
-| Flex enable             | Control value | `flex.{slug}.set_enable`             |         |                           |                                | `Earnie_Verbraucher_Freigabe`                     |
+| Flex power / state      | Measurement   | `consumer.{slug}.sens_power_act`     |         |                           |                                | `Earnie_Verbraucher_Leistung` or EFM load        |
+| Flex consumer active    | Measurement   | `consumer.{slug}.sens_consumer_active` |       |                           |                                | `Earnie_Verbraucher_<Slug>_Aktiv` (digital 0/1; reserve release) |
+| Flex enable             | Control value | `consumer.{slug}.set_enable`         |         |                           |                                | `Earnie_Verbraucher_Freigabe`                     |
 
 
 
@@ -206,8 +206,8 @@ Role template: `share/ehal/roles/heatpump.json`. Greenfield prefix `Earnie_Waerm
 
 | Area / meaning              | Type          | EHAL value name (stub / wire) | OpenEMS | evcc | Victron | HA / Loxone |
 | ------------------------------ | --------------- | -------------------------------- | ------- | ---- | ------- | ----------------------------------------------- |
-| Heat pump power               | Measurement   | `flex.{slug}.sens_power_act`    |         |      |         | HA power entity / `Earnie_Waermepumpe_Leistung` or EFM |
-| Heat pump enable / SG-Ready   | Control value | `flex.{slug}.set_enable`        |         |      |         | HA switch/input_boolean / `Earnie_Waermepumpe_Freigabe` |
+| Heat pump power               | Measurement   | `heatpump.{slug}.sens_power_act` |        |      |         | HA power entity / `Earnie_Waermepumpe_Leistung` or EFM |
+| Heat pump enable / SG-Ready   | Control value | `heatpump.{slug}.set_enable`    |         |      |         | HA switch/input_boolean / `Earnie_Waermepumpe_Freigabe` |
 | Heat storage `T_eq`           | Measurement   | `sens_temperature_heat_storage` |         |      |         | HA °C sensor / `Earnie_Waermespeicher_Temp_eq` |
 | Heat storage `T_low`          | Measurement   | `sens_temperature_heat_storage_low` |     |      |         | HA °C sensor (bottom) / `Earnie_Waermespeicher_Temp_low` |
 
@@ -223,14 +223,14 @@ Covers heating + filter. Two live entities: heat (`daily_target_source: thermal`
 
 | Area / meaning              | Type          | EHAL value name (stub)                     | OpenEMS | evcc | Victron | Loxone / Loxone extra                                             |
 | -------------------------------- | --------------- | ---------------------------------------------- | ------- | ---- | ------- | ---------------------------------------------------------------- |
-| Pool total power               | Measurement   | `flex.{slug}.sens_power_act`                  |         |      |         | `Earnie_Pool_P_act` or EFM load (case B: heating+filter+jets)     |
-| Pool heating enable             | Control value | `flex.{slug}.set_enable`                       |         |      |         | `Earnie_Pool_Freigabe`                                             |
+| Pool total power               | Measurement   | `pool.{slug}.sens_power_act`                  |         |      |         | `Earnie_Pool_P_act` or EFM load (case B: heating+filter+jets)     |
+| Pool heating enable             | Control value | `pool.{slug}.set_enable`                       |         |      |         | `Earnie_Pool_Freigabe`                                             |
 | Pool current temperature        | Measurement   | `sens_temperature_water`                       |         |      |         | `Earnie_Pool_Temp_Ist`                                              |
 | Pool target temperature         | Input value   | `get_temperature_water_setpoint`               |         |      |         | `Earnie_Pool_Temp_Soll`                                             |
 | Temperature tolerance           | Input value   | `get_temperature_tolerance_c`                  |         |      |         | `Earnie_Pool_Temp_Toleranz`                                         |
 | Heating active                  | Measurement   | `sens_heating_active`                          |         |      |         | `Earnie_Pool_Heizung_aktiv`                                         |
 | Filter target hours             | Input value   | `get_filter_remaining_hours`                   |         |      |         | `Earnie_Pool_Filter_Sollstunden`                                    |
-| Filter enable                   | Control value | `flex.{slug}.set_enable` (filter entity)       |         |      |         | `Earnie_Pool_Filter_Freigabe`                                       |
+| Filter enable                   | Control value | `pool.{slug}.set_enable` (filter entity)       |         |      |         | `Earnie_Pool_Filter_Freigabe`                                       |
 | Filter running (binary)         | Measurement   | `sens_filter_active`                           |         |      |         | `Earnie_Pool_Filter_aktiv`                                          |
 | Native filter start hour        | Input value   | `get_filter_native_start_hour`                 |         |      |         | `Earnie_Pool_Filter_NativeStart`                                    |
 | Native filter duration          | Input value   | `get_filter_native_duration_hours`             |         |      |         | `Earnie_Pool_Filter_NativeDauer`                                    |
@@ -238,7 +238,7 @@ Covers heating + filter. Two live entities: heat (`daily_target_source: thermal`
 
 Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.1). The chart may subtract filter power via `subtract_consumer_ids` (not an EHAL field). entity-scoped: `VI_Earnie_Pool_v2` (enables), `VO_Earnie_Pool` (telemetry). **VI Check / Pilot:** qualified IDs (`pool.{slug}.set_enable`, `pool.pool_filter.set_enable`, …); library `VI_Earnie_*_v2.xml` or `python -m scripts.pilot_vi_template_gen`. `status.json` publishes qualified Check keys only.
 
-**EHAL-Com mapping:** filter fields (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native start/duration, enable) are mapped on the house-profile consumer `pool_filter` under `ehal_bindings`. Without `pool_filter` there is no filter MILP and no synthetic filter entity. Without a mapping, the filter stays inactive.
+**EHAL-Com mapping:** filter fields (`get_filter_remaining_hours`, `pool.pool_filter.sens_power_act`, `sens_filter_active`, native start/duration, enable) are mapped on the house-profile consumer `pool_filter` under `ehal_bindings`. Without `pool_filter` there is no filter MILP and no synthetic filter entity. Without a mapping, the filter stays inactive.
 
 ### C.7 Inverter (per device)
 

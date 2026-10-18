@@ -309,6 +309,8 @@ Nach einem Image- oder Add-on-Update kann Earnie eine **Anpassung der Config-JSO
 
 Bringt eine Version neue Schritte mit, informieren die Release Notes vorab darüber (Abschnitt **Migration**).
 
+Ein Schritt schreibt Verbraucher-Bindings von Legacy-`flex.{Kennung}.*` auf die typisierten Schlüssel `consumer.` / `heatpump.` / `pool.` um (gleiche Form wie Signalliste und `status.json`). Bei widersprüchlichen Merkernamen blockiert die Migration mit Hinweis auf den betroffenen Verbraucher.
+
 ### Loxone: alte Merkernamen behalten oder leeren
 
 Beim Wechsel von Datenmodell 3 (offizielle 2.6) auf 4 fragt der Assistent bei Loxone-Installationen, ob die alten **Merkernamen** in den Bindungen erhalten bleiben sollen. Earnie braucht sie nicht mehr: Lesen läuft per Push mit der EHAL-ID, Schreiben über `status.json` mit der EHAL-ID.

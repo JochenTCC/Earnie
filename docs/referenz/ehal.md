@@ -53,7 +53,7 @@ Exchange / display form of every signal on the push/exchange wire and in `status
 | Plant bare | `sens_temperature_outside`, `sens_pv_production_active` | House-wide fields without a device Kennung; plant PV sum stays bare; per-PV-system power uses `pv.{id}.*` |
 | Grid meter | `grid.meter.sens_grid_power_active` | First Kennung `meter`; more `grid.<Kennung>.*` meters may follow. Plant **storage** keeps bare kind keys |
 | Battery | `ess.<Kennung>.sens_ess_soc` | Entity-scoped binding key |
-| Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Emitted namespaces; legacy `flex.<slug>.*` accepted on parse only |
+| Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Storage and exchange; legacy `flex.<slug>.*` accepted on parse / dual-read until migrated |
 | EV split | `evcs.<slug>.set_evcs_max_current`, `ev.<slug>.sens_evcs_soc_act` | Same Kennung; namespace chosen by field kind |
 | Inverter | `inv.<Kennung>.*` | Entity-scoped on `inverters[].ehal_bindings` (**2.7.l P4**) |
 | Heartbeat | `heartbeat` | Link proof; not a field kind |
@@ -389,7 +389,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 | Class            | When                                                                                                                                                                                                                                                                                                                                                           |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Heatpump         | Not on the core EHAL plant wire; stub role (`share/ehal/roles/heatpump.json`) + Loxone recipe/VO (`share/loxone/recipes/heatpump.json`, `VO_Earnie_Heatpump.xml`). Live: `thermal_annual` consumer `ehal_bindings` for `flex.*` plus `sens_temperature_heat_storage` / `sens_temperature_heat_storage_low` (HA entity IDs or Loxone Merker via entity-scoped HITL) |
-| Generic consumer | Flex fields mapped via `consumers[].ehal_bindings` (storage often still `flex.{slug}.*`); Live/VO exchange uses **`consumer.{Kennung}.*`** (2.7.n), incl. **`sens_consumer_active`** (2.7.p). Stub role + recipe; VO Merker `Earnie_Verbraucher_<Slug>_Aktiv`                                                                                                                                                                                    |
+| Generic consumer | Flex fields mapped via `consumers[].ehal_bindings` as **`consumer.{Kennung}.*`** (same as Live/VO), incl. **`sens_consumer_active`**. Legacy `flex.{slug}.*` accepted until config migration. Stub role + recipe; VO Merker `Earnie_Verbraucher_<Slug>_Aktiv`                                                                                                                                                                                    |
 
 
 

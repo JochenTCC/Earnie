@@ -41,11 +41,10 @@
                     "timezone_name": "Europe/Vienna",
                     "min_on_quarterhours": 1,
                     "ehal_bindings": {
-                        "flex.waermepumpe.sens_power_act": "alias_1",
-                        "flex.waermepumpe.set_enable": "alias_2",
                         "sens_temperature_heat_storage": "alias_3",
                         "sens_temperature_heat_storage_low": "alias_4",
-                        "heatpump.waermepumpe.set_enable": ""
+                        "heatpump.waermepumpe.set_enable": "alias_2",
+                        "heatpump.waermepumpe.sens_power_act": "alias_1"
                     }
                 },
                 {
@@ -113,13 +112,12 @@
                     },
                     "min_on_quarterhours": 1,
                     "ehal_bindings": {
-                        "flex.pool_swimspa.sens_power_act": "alias_15",
-                        "flex.pool_swimspa.set_enable": "alias_16",
                         "sens_temperature_water": "alias_17",
                         "get_temperature_water_setpoint": "alias_18",
                         "get_temperature_tolerance_c": "alias_19",
                         "sens_heating_active": "alias_20",
-                        "pool.pool_swimspa.set_enable": ""
+                        "pool.pool_swimspa.set_enable": "alias_16",
+                        "pool.pool_swimspa.sens_power_act": "alias_15"
                     }
                 },
                 {
@@ -138,10 +136,10 @@
                     },
                     "ehal_bindings": {
                         "get_filter_remaining_hours": "alias_21",
-                        "flex.pool_filter.set_enable": "alias_22",
                         "sens_filter_active": "alias_23",
                         "get_filter_native_start_hour": "alias_24",
-                        "get_filter_native_duration_hours": "alias_25"
+                        "get_filter_native_duration_hours": "alias_25",
+                        "pool.pool_filter.set_enable": "alias_22"
                     },
                     "daily_target_source": "loxone_remaining_hours",
                     "filter_schedule": {
@@ -176,7 +174,7 @@
                         "powerstation_id": "virtual_gs"
                     },
                     "ehal_bindings": {
-                        "flex.geschirrspueler.sens_power_act": "alias_26"
+                        "consumer.geschirrspueler.sens_power_act": "alias_26"
                     }
                 },
                 {
@@ -195,7 +193,7 @@
                     },
                     "earnie_role": "known",
                     "ehal_bindings": {
-                        "flex.kochen.sens_power_act": "alias_27"
+                        "consumer.kochen.sens_power_act": "alias_27"
                     }
                 },
                 {
@@ -220,7 +218,7 @@
                         "powerstation_id": "virtual_washing"
                     },
                     "ehal_bindings": {
-                        "flex.trockner.sens_power_act": "alias_28"
+                        "consumer.trockner.sens_power_act": "alias_28"
                     }
                 },
                 {
@@ -239,7 +237,7 @@
                     },
                     "earnie_role": "known",
                     "ehal_bindings": {
-                        "flex.tv.sens_power_act": "alias_29"
+                        "consumer.tv.sens_power_act": "alias_29"
                     }
                 },
                 {
@@ -264,7 +262,7 @@
                         "powerstation_id": "virtual_washing"
                     },
                     "ehal_bindings": {
-                        "flex.waschmaschine.sens_power_act": "alias_30"
+                        "consumer.waschmaschine.sens_power_act": "alias_30"
                     }
                 },
                 {

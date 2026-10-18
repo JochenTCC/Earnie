@@ -248,20 +248,21 @@ def _field_select_caption(
 
 def fields_for_consumer(consumer: dict) -> tuple[str, ...]:
     """EHAL mapping fields for a house-profile consumer type."""
-    if str(consumer.get("type") or "") == "ev":
+    ctype = str(consumer.get("type") or "").strip()
+    if ctype == "ev":
         return EV_FIELDS
-    from ehal.flex_fields import flex_fields_for_consumer
+    from ehal.flex_fields import consumer_fields_for_consumer
 
     cid = str(consumer.get("id") or "").strip()
     if cid == "pool_filter":
         return filter_ehal_fields_for_consumer("pool_filter")
     if cid:
-        base = flex_fields_for_consumer(cid)
+        base = consumer_fields_for_consumer(cid, ctype)
     else:
         base = FLEX_FIELDS
-    if str(consumer.get("type") or "") == "thermal_rc":
+    if ctype == "thermal_rc":
         return base + THERMAL_RC_EHAL_FIELDS
-    if str(consumer.get("type") or "") == "thermal_annual":
+    if ctype == "thermal_annual":
         return base + THERMAL_ANNUAL_EHAL_FIELDS
     return base
 

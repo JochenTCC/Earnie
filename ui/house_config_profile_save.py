@@ -138,6 +138,7 @@ def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dic
                 bindings if isinstance(bindings, dict) else {},
                 old_id=stable_id,
                 new_id=consumer_id,
+                consumer_type=str(item.get("type") or "").strip(),
             )
         item["id"] = consumer_id
         item["label"] = label or consumer_id

@@ -309,13 +309,16 @@ def _merge_typed_bindings(
     incoming: dict[str, str],
 ) -> None:
     """Union Merker bindings onto an existing consumer (keep first-writer keys)."""
-    from ehal.flex_fields import expand_flex_bindings
+    from ehal.flex_fields import canonicalize_consumer_bindings
 
+    ctype = str(existing.get("type") or "").strip()
     bindings = dict(existing.get("ehal_bindings") or {})
-    expanded = expand_flex_bindings(incoming, consumer_id)
+    expanded = canonicalize_consumer_bindings(incoming, consumer_id, ctype)
     for field, _io_name in expanded.items():
         bindings.setdefault(field, "")
-    existing["ehal_bindings"] = expand_flex_bindings(bindings, consumer_id)
+    existing["ehal_bindings"] = canonicalize_consumer_bindings(
+        bindings, consumer_id, ctype
+    )
 
 
 def _find_merge_target(
@@ -359,7 +362,7 @@ def apply_typed_matches(
     report: ImportReport | None = None,
 ) -> dict:
     """Write plant bindings and create typed consumers from Merker matches."""
-    from ehal.flex_fields import expand_flex_bindings
+    from ehal.flex_fields import canonicalize_consumer_bindings
 
     house = dict(house_doc)
     profiles = _profiles_as_dict(house)
@@ -400,7 +403,7 @@ def apply_typed_matches(
             consumer_id=cid,
             label=match.label,
             hk_type=hk_type,
-            bindings=expand_flex_bindings(match.bindings, cid),
+            bindings=canonicalize_consumer_bindings(match.bindings, cid, hk_type),
         )
         by_id[cid] = consumer
         rep.created_consumers.append(cid)

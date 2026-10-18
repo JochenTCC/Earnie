@@ -115,18 +115,20 @@ def _migrate_charging_loxone(lox: dict, bindings: dict[str, str]) -> None:
 
 def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
     from ehal.flex_fields import (
+        KIND_SENS_CONSUMER_ACTIVE,
         KIND_SENS_POWER_ACT,
         KIND_SET_ENABLE,
-        flex_field,
+        consumer_storage_field,
     )
 
     cid = _nonempty(consumer.get("id"))
+    ctype = str(consumer.get("type") or "").strip()
     inputs = consumer.get("loxone_inputs")
     if isinstance(inputs, dict):
         if cid:
             _put_binding(
                 bindings,
-                flex_field(cid, KIND_SENS_POWER_ACT),
+                consumer_storage_field(cid, ctype, KIND_SENS_POWER_ACT),
                 inputs.get("power_name"),
             )
         else:
@@ -136,10 +138,10 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
             _put_binding(bindings, "flex.alternate_binary_power_name", alt)
             # Manuals: alternate binary is the Gerät-läuft indicator (2.7.p).
             # Pool filter keeps sens_filter_active via _migrate_filter_bindings.
-            if cid and str(consumer.get("type") or "") != "pool_filter":
+            if cid and ctype != "pool_filter":
                 _put_binding(
                     bindings,
-                    flex_field(cid, "sens_consumer_active"),
+                    consumer_storage_field(cid, ctype, KIND_SENS_CONSUMER_ACTIVE),
                     alt,
                 )
     outputs = consumer.get("loxone_outputs")
@@ -147,12 +149,14 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
         return
     if cid:
         _put_binding(
-            bindings, flex_field(cid, KIND_SET_ENABLE), outputs.get("enable_name")
+            bindings,
+            consumer_storage_field(cid, ctype, KIND_SET_ENABLE),
+            outputs.get("enable_name"),
         )
     else:
         _put_binding(bindings, "flex.enable_name", outputs.get("enable_name"))
     # Non-EV flex never writes a kW setpoint (enable-only). EV uses set_evcs_max_current.
-    if consumer.get("type") == "ev":
+    if ctype == "ev":
         setpoint = (
             outputs.get("power_setpoint_name")
             or outputs.get("set_evcs_max_current")
@@ -187,7 +191,7 @@ def _migrate_thermal_loxone(consumer: dict, bindings: dict[str, str]) -> None:
 
 def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     """Flatten nested Loxone ``*_name`` nests into ``ehal_bindings`` (§C + transitional)."""
-    from ehal.flex_fields import expand_flex_bindings
+    from ehal.flex_fields import canonicalize_consumer_bindings
 
     bindings: dict[str, str] = {}
     existing = consumer.get("ehal_bindings")
@@ -209,7 +213,8 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     _strip_obsolete_flex_power_setpoint(bindings)
     cid = _nonempty(consumer.get("id"))
     if cid:
-        expanded = expand_flex_bindings(bindings, cid)
+        ctype = str(consumer.get("type") or "").strip()
+        expanded = canonicalize_consumer_bindings(bindings, cid, ctype)
         _strip_obsolete_flex_power_setpoint(expanded)
         return expanded
     return bindings

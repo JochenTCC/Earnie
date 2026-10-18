@@ -441,7 +441,11 @@ def _bind_meter_power(
     meter_meta: dict[str, Any] | None = None,
 ) -> None:
     """Attach Zähler power; prefer EFM address for sens_* power fields."""
-    from ehal.flex_fields import expand_flex_bindings, flex_sens_power_act
+    from ehal.flex_fields import (
+        KIND_SENS_POWER_ACT,
+        canonicalize_consumer_bindings,
+        consumer_storage_field,
+    )
     from integrations.loxone_meter_energy import (
         activate_consumer_energy_bindings,
         meter_has_energy_states,
@@ -452,11 +456,14 @@ def _bind_meter_power(
         if isinstance(consumer.get("ehal_bindings"), dict)
         else {}
     )
+    ctype = str(consumer.get("type") or "").strip()
     # Q8: activate fields; do not store Zähler Merker names in bindings.
-    bindings[flex_sens_power_act(consumer_id)] = ""
-    if str(consumer.get("type") or "") == "ev":
+    bindings[consumer_storage_field(consumer_id, ctype, KIND_SENS_POWER_ACT)] = ""
+    if ctype == "ev":
         bindings["sens_evcs_active_power"] = ""
-    consumer["ehal_bindings"] = expand_flex_bindings(bindings, consumer_id)
+    consumer["ehal_bindings"] = canonicalize_consumer_bindings(
+        bindings, consumer_id, ctype
+    )
     _ = power
     if meter_has_energy_states(meter_meta) or power:
         # EFM Zähler name: assume Meter energy states exist (LoxAPP3 optional).

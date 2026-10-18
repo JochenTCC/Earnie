@@ -209,13 +209,13 @@ def test_apply_consumer_imports_sets_flex_power_only():
     assert cons[0]["earnie_role"] == "known"
     assert cons[0]["id_locked"] is False
     assert cons[0]["id_provisional_label"] == "Kochen"
-    assert cons[0]["ehal_bindings"]["flex.kochen.sens_power_act"] == ""
+    assert cons[0]["ehal_bindings"]["consumer.kochen.sens_power_act"] == ""
     assert "sens_energy_total" in cons[0]["ehal_bindings"]
     assert "loxone_meter_energy" not in cons[0]
     assert "flex.enable_name" not in cons[0]["ehal_bindings"]
     assert "flex.power_setpoint_name" not in cons[0]["ehal_bindings"]
-    assert "flex.kochen.set_enable" not in cons[0]["ehal_bindings"]
-    assert "flex.kochen.set_power_setpoint" not in cons[0]["ehal_bindings"]
+    assert "flex.kochen.sens_power_act" not in cons[0]["ehal_bindings"]
+    assert "consumer.kochen.set_enable" not in cons[0]["ehal_bindings"]
 
 
 def test_apply_plant_power_suggestions():

@@ -59,8 +59,8 @@ def test_migrate_consumer_legacy_to_ehal_bindings_ev():
     assert bindings["charge_immediate_name"] == "EV_Now"
     assert bindings["set_evcs_max_current"] == "EV_SetA"
     assert "pv_follow_name" not in bindings
-    assert bindings["flex.ev1.sens_power_act"] == "EV_Power"
-    assert bindings["flex.ev1.set_enable"] == "EV_Enable"
+    assert bindings["ev.ev1.sens_power_act"] == "EV_Power"
+    assert bindings["ev.ev1.set_enable"] == "EV_Enable"
 
 
 def test_migrate_consumer_flex_power_setpoint_dropped():
@@ -71,8 +71,8 @@ def test_migrate_consumer_flex_power_setpoint_dropped():
         "loxone_outputs": {"power_setpoint_name": "Pump_Set", "enable_name": "Pump_En"},
     }
     bindings = migrate_consumer_legacy_to_ehal_bindings(consumer)
-    assert bindings["flex.pump.sens_power_act"] == "Pump_P"
-    assert bindings["flex.pump.set_enable"] == "Pump_En"
+    assert bindings["consumer.pump.sens_power_act"] == "Pump_P"
+    assert bindings["consumer.pump.set_enable"] == "Pump_En"
     assert "flex.pump.set_power_setpoint" not in bindings
     assert "set_evcs_max_current" not in bindings
 
@@ -89,8 +89,8 @@ def test_migrate_strips_existing_flex_power_setpoint_binding():
         },
     }
     bindings = migrate_consumer_legacy_to_ehal_bindings(consumer)
-    assert bindings["flex.pump.sens_power_act"] == "Pump_P"
-    assert bindings["flex.pump.set_enable"] == "Pump_En"
+    assert bindings["consumer.pump.sens_power_act"] == "Pump_P"
+    assert bindings["consumer.pump.set_enable"] == "Pump_En"
     assert "flex.pump.set_power_setpoint" not in bindings
     assert "flex.power_setpoint_name" not in bindings
 
@@ -239,8 +239,8 @@ def test_migrate_consumer_legacy_thermal_to_ehal_bindings():
     assert "sens_temperature_outside" not in bindings
     assert bindings["get_temperature_tolerance_c"] == "Spa_Tol"
     assert bindings["sens_heating_active"] == "Spa_Heat"
-    assert bindings["flex.swimspa.sens_power_act"] == "Spa_P"
-    assert bindings["flex.swimspa.set_enable"] == "Spa_En"
+    assert bindings["pool.swimspa.sens_power_act"] == "Spa_P"
+    assert bindings["pool.swimspa.set_enable"] == "Spa_En"
 
 
 def test_ensure_migrated_strips_thermal_loxone_and_promotes_ambient():

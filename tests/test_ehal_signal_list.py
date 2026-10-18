@@ -4,10 +4,12 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
+from unittest.mock import patch
+
 from ehal.signal_catalog import set_binding_activation
 from ehal.signal_export import build_export_zip
 from ehal.signal_list import build_signal_rows, signals_for_export
-from ui.ehal_signal_list import _table_records
+from ui.ehal_signal_list import _default_host, _table_records
 from ui.ehal_unit_display import units_for_field
 
 
@@ -216,3 +218,38 @@ def test_export_zip_contains_vo_and_vi() -> None:
     assert "PUSH_TOKEN_HIER_ERSETZEN" in readme
     assert "PILOT_TOKEN_HIER_ERSETZEN" not in readme
     assert "VO_Earnie_*.xml" in readme
+
+
+def test_default_host_prefers_env_over_local_ip(monkeypatch) -> None:
+    monkeypatch.setenv("EARNIE_LAN_IP", "192.168.178.40")
+    with patch(
+        "integrations.ha_supervisor.supervisor_host_lan_ipv4", return_value="10.0.0.1"
+    ), patch(
+        "integrations.integration_scanner.local_ipv4_address",
+        return_value="192.168.1.5",
+    ):
+        assert _default_host() == "192.168.178.40"
+
+
+def test_default_host_uses_local_ipv4_when_env_empty(monkeypatch) -> None:
+    monkeypatch.delenv("EARNIE_LAN_IP", raising=False)
+    monkeypatch.delenv("EARNIE_HOST", raising=False)
+    with patch(
+        "integrations.ha_supervisor.supervisor_host_lan_ipv4", return_value=None
+    ), patch(
+        "integrations.integration_scanner.local_ipv4_address",
+        return_value="192.168.1.5",
+    ):
+        assert _default_host() == "192.168.1.5"
+
+
+def test_default_host_skips_docker_bridge_ipv4(monkeypatch) -> None:
+    monkeypatch.delenv("EARNIE_LAN_IP", raising=False)
+    monkeypatch.delenv("EARNIE_HOST", raising=False)
+    with patch(
+        "integrations.ha_supervisor.supervisor_host_lan_ipv4", return_value=None
+    ), patch(
+        "integrations.integration_scanner.local_ipv4_address",
+        return_value="172.17.0.2",
+    ):
+        assert _default_host() == ""

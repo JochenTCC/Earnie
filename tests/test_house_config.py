@@ -10,6 +10,7 @@ import pytest
 
 import config
 from data.consumption_profiles import build_hourly_kw_profile
+from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 from house_config.baseload import compute_baseload_kwh, consumer_annual_kwh
 from house_config.entity_resolution import (
     batteries_by_id,
@@ -324,7 +325,8 @@ def test_consumer_annual_kwh_flat_thermal():
     assert consumer_annual_kwh(consumer) > 0.0
 
 
-def test_house_profile_thermal_annual():
+def test_house_profile_thermal_annual(monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
     path = config.HOUSE_PROFILES_JSON_PATH
     doc = load_house_profiles_document(path)
     profile = doc["profiles"]["test_home"]
@@ -1815,9 +1817,9 @@ def test_assemble_filter_bindings_shape():
     assert bindings == {
         "ehal_bindings": {
             "get_filter_remaining_hours": "Hours",
-            "flex.pool_filter.sens_power_act": "P2",
+            "pool.pool_filter.sens_power_act": "P2",
             "sens_filter_active": "P1",
-            "flex.pool_filter.set_enable": "En",
+            "pool.pool_filter.set_enable": "En",
             "get_filter_native_start_hour": "Start",
             "get_filter_native_duration_hours": "Dur",
         }

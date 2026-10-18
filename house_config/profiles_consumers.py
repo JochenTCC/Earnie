@@ -73,19 +73,19 @@ def _clean_ehal_bindings(bindings: dict) -> dict[str, str]:
 
 
 def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
-    from ehal.flex_fields import expand_flex_bindings
+    from ehal.flex_fields import canonicalize_consumer_bindings
 
     bindings = raw.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
         cleaned = _clean_ehal_bindings(bindings)
         if cleaned:
             cid = str(spec.get("id") or raw.get("id") or "").strip()
-            # expand_flex_bindings drops empty addresses — re-attach activation flags.
-            expanded = expand_flex_bindings(cleaned, cid) if cid else dict(cleaned)
-            for field, address in cleaned.items():
-                if not address:
-                    expanded.setdefault(field, "")
-            spec["ehal_bindings"] = expanded
+            ctype = str(spec.get("type") or raw.get("type") or "").strip()
+            spec["ehal_bindings"] = (
+                canonicalize_consumer_bindings(cleaned, cid, ctype)
+                if cid
+                else dict(cleaned)
+            )
 
 
 def _legacy_loxone_power_name(raw: dict) -> str:

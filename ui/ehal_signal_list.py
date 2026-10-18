@@ -157,7 +157,7 @@ def _render_export(house: dict, components: dict, *, backend: str) -> None:
             "Loxone-VO/VI-Export (ZIP). HA-YAML-Paket folgt mit Binding P5c."
         )
     host = st.text_input(
-        "Earnie-Host (LAN-IP für den Hub)",
+        "IP-Adresse des Geräts, auf dem Earnie läuft",
         value=_default_host(),
         key="ehal_signal_export_host",
     )
@@ -223,9 +223,27 @@ def _load_publish_state() -> tuple[dict[str, dict[str, Any]], str | None]:
 
 
 def _default_host() -> str:
+    """LAN IP for VI/VO Address: env override, else host/local IPv4."""
     import os
 
-    return str(os.environ.get("EARNIE_LAN_IP") or os.environ.get("EARNIE_HOST") or "").strip()
+    from integrations.ha_supervisor import supervisor_host_lan_ipv4
+    from integrations.integration_scanner import (
+        is_docker_bridge_ipv4,
+        local_ipv4_address,
+    )
+
+    from_env = str(
+        os.environ.get("EARNIE_LAN_IP") or os.environ.get("EARNIE_HOST") or ""
+    ).strip()
+    if from_env:
+        return from_env
+    host_ip = supervisor_host_lan_ipv4()
+    if host_ip and not is_docker_bridge_ipv4(host_ip):
+        return host_ip
+    local_ip = local_ipv4_address()
+    if local_ip and not is_docker_bridge_ipv4(local_ip):
+        return local_ip
+    return ""
 
 
 def _default_port() -> int:

@@ -51,12 +51,12 @@ def test_match_wp_and_ev_groups():
     by_group = {m.group_key: m for m in matches}
     wp = by_group["Earnie_Waermepumpe_"]
     assert wp.hk_type == "thermal_annual"
-    assert wp.bindings["flex.waermepumpe.sens_power_act"] == ''
-    assert wp.bindings["flex.waermepumpe.set_enable"] == ''
+    assert wp.bindings["heatpump.waermepumpe.sens_power_act"] == ''
+    assert wp.bindings["heatpump.waermepumpe.set_enable"] == ''
     ev = by_group["Earnie_EAuto_"]
     assert ev.hk_type == "ev"
     assert ev.bindings["sens_evcs_active_power"] == ''
-    assert ev.bindings["flex.e_auto.sens_power_act"] == ''
+    assert ev.bindings["ev.e_auto.sens_power_act"] == ''
     assert ev.bindings["set_evcs_max_current"] == ''
 
 
@@ -121,15 +121,15 @@ def test_match_merges_legacy_wp_alias_into_waermepumpe(monkeypatch):
     wp_matches = [m for m in matches if m.hk_type == "thermal_annual"]
     assert len(wp_matches) == 1
     assert wp_matches[0].group_key == "Earnie_Waermepumpe_"
-    assert wp_matches[0].bindings["flex.waermepumpe.sens_power_act"] == ''
-    assert wp_matches[0].bindings["flex.waermepumpe.set_enable"] == ''
+    assert wp_matches[0].bindings["heatpump.waermepumpe.sens_power_act"] == ''
+    assert wp_matches[0].bindings["heatpump.waermepumpe.set_enable"] == ''
     house, pid = ensure_live_profile(_empty_house())
     house = apply_typed_matches(house, matches, profile_id=pid)
     consumers = house["profiles"][pid]["consumers"]
     thermals = [c for c in consumers if c["type"] == "thermal_annual"]
     assert len(thermals) == 1
-    assert thermals[0]["ehal_bindings"]["flex.waermepumpe.sens_power_act"] == ""
-    assert thermals[0]["ehal_bindings"]["flex.waermepumpe.set_enable"] == ""
+    assert thermals[0]["ehal_bindings"]["heatpump.waermepumpe.sens_power_act"] == ""
+    assert thermals[0]["ehal_bindings"]["heatpump.waermepumpe.set_enable"] == ""
     normalize_house_profiles_document(
         {"profiles": [dict(house["profiles"][pid], id=pid)]}
     )
@@ -155,7 +155,7 @@ def test_match_controls_unions_http_probe_extra_names():
     plant = next(m for m in matches if m.entity_kind == "plant")
     assert plant.bindings["sens_ess_soc"] == ''
     wp = next(m for m in matches if m.group_key == "Earnie_Waermepumpe_")
-    assert wp.bindings["flex.waermepumpe.set_enable"] == ''
+    assert wp.bindings["heatpump.waermepumpe.set_enable"] == ''
 
 
 def test_match_controls_skips_source_select_autobind():
@@ -190,15 +190,15 @@ def test_slug_match_waschmaschine_creates_generic_consumer():
     wm = cons[0]
     assert wm.label == "Waschmaschine"
     assert wm.hk_type == "generic"
-    assert wm.bindings["flex.waschmaschine.sens_power_act"] == ''
-    assert wm.bindings["flex.waschmaschine.set_enable"] == ''
-    assert "flex.waschmaschine.set_power_setpoint" not in wm.bindings
+    assert wm.bindings["consumer.waschmaschine.sens_power_act"] == ''
+    assert wm.bindings["consumer.waschmaschine.set_enable"] == ''
+    assert "consumer.waschmaschine.set_power_setpoint" not in wm.bindings
     house, pid = ensure_live_profile(_empty_house())
     house = apply_typed_matches(house, matches, profile_id=pid)
     by_id = {c["id"]: c for c in house["profiles"][pid]["consumers"]}
     assert "waschmaschine" in by_id
-    assert "flex.waschmaschine.sens_power_act" in by_id["waschmaschine"]["ehal_bindings"]
-    assert by_id["waschmaschine"]["ehal_bindings"]["flex.waschmaschine.sens_power_act"] == ""
+    assert "consumer.waschmaschine.sens_power_act" in by_id["waschmaschine"]["ehal_bindings"]
+    assert by_id["waschmaschine"]["ehal_bindings"]["consumer.waschmaschine.sens_power_act"] == ""
 
 
 def test_slug_match_ev_creates_ev_consumer():
@@ -248,7 +248,7 @@ def test_slug_match_pool_filter_longest_prefix():
         by_kind.setdefault(m.entity_kind, []).append(m)
     assert len(by_kind.get("pool_filter", [])) == 1
     assert len(by_kind.get("pool", [])) == 1
-    assert by_kind["pool_filter"][0].bindings["flex.pool_filter.set_enable"] == ""
+    assert by_kind["pool_filter"][0].bindings["pool.pool_filter.set_enable"] == ""
 
 
 def test_exact_plant_case_insensitive():
@@ -290,7 +290,7 @@ def test_run_import_creates_typed_and_efm_consumers():
     by_id = {c["id"]: c for c in consumers}
     assert "waermepumpe" in by_id
     assert by_id["waermepumpe"]["type"] == "thermal_annual"
-    assert by_id["waermepumpe"]["ehal_bindings"]["flex.waermepumpe.set_enable"] == ""
+    assert by_id["waermepumpe"]["ehal_bindings"]["heatpump.waermepumpe.set_enable"] == ""
     assert by_id["waermepumpe"]["id_locked"] is False
     assert by_id["waermepumpe"]["id_provisional_label"] == by_id["waermepumpe"]["label"]
     assert "e_auto" in by_id
@@ -320,16 +320,21 @@ def test_run_import_creates_typed_and_efm_consumers():
 
 def test_efm_merges_swimspa_and_wallbox_onto_typed():
     """Zähler Swimspa / Wallbox merge into typed pool / EV (no duplicate generics)."""
-    from ehal.flex_fields import flex_sens_power_act
+    from ehal.flex_fields import KIND_SENS_POWER_ACT, consumer_storage_field
 
     result = run_greenfield_import(_doc(), _empty_house())
     consumers = result["house_doc"]["profiles"]["live"]["consumers"]
     by_id = {c["id"]: c for c in consumers}
     pool = next(c for c in consumers if c["type"] == "thermal_rc")
-    assert flex_sens_power_act(pool["id"]) in pool["ehal_bindings"]
-    assert pool["ehal_bindings"][flex_sens_power_act(pool["id"])] == ""
+    pool_power = consumer_storage_field(
+        pool["id"], str(pool.get("type") or ""), KIND_SENS_POWER_ACT
+    )
+    assert pool_power in pool["ehal_bindings"]
+    assert pool["ehal_bindings"][pool_power] == ""
     assert by_id["e_auto"]["ehal_bindings"]["sens_evcs_active_power"] == ""
-    assert by_id["waermepumpe"]["ehal_bindings"][flex_sens_power_act("waermepumpe")] == ""
+    assert by_id["waermepumpe"]["ehal_bindings"][
+        consumer_storage_field("waermepumpe", "thermal_annual", KIND_SENS_POWER_ACT)
+    ] == ""
     generic_ids = {c["id"] for c in consumers if c["type"] == "generic"}
     assert not {"zaehler_swimspa", "swimspa", "zaehler_wallbox", "wallbox", "zaehler_waermepumpe"} & generic_ids
 
@@ -356,7 +361,11 @@ def test_apply_typed_merges_same_id_ev():
 
 
 def test_efm_duplicate_power_skips_create():
-    from ehal.flex_fields import flex_sens_power_act, is_flex_sens_power_act_field
+    from ehal.flex_fields import (
+        KIND_SENS_POWER_ACT,
+        consumer_storage_field,
+        is_flex_sens_power_act_field,
+    )
 
     dmap = load_device_map()
     matches, report = match_controls(_doc(), dmap)
@@ -365,7 +374,9 @@ def test_efm_duplicate_power_skips_create():
     # Force typed power name to equal an EFM load Bezeichnung
     consumers = house["profiles"][pid]["consumers"]
     wp = next(c for c in consumers if c["type"] == "thermal_annual")
-    wp["ehal_bindings"][flex_sens_power_act(wp["id"])] = "Zähler Wärmepumpe"
+    wp["ehal_bindings"][
+        consumer_storage_field(wp["id"], "thermal_annual", KIND_SENS_POWER_ACT)
+    ] = "Zähler Wärmepumpe"
     house = merge_efm(house, _doc(), profile_id=pid, report=report)
     powers = [
         str(v)

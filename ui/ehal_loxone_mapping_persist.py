@@ -60,7 +60,12 @@ def apply_entity_bindings(
     consumers = [dict(c) for c in (profile.get("consumers") or []) if isinstance(c, dict)]
     for consumer in consumers:
         if _nonempty(consumer.get("id")) == entity_id:
-            consumer["ehal_bindings"] = cleaned
+            from ehal.flex_fields import canonicalize_consumer_bindings
+
+            ctype = str(consumer.get("type") or "").strip()
+            consumer["ehal_bindings"] = canonicalize_consumer_bindings(
+                cleaned, entity_id, ctype
+            )
             consumer.pop("event_triggers", None)
             break
     profile["consumers"] = consumers

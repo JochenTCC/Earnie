@@ -2,6 +2,27 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Signalliste Earnie-Host label + LAN IP prefill (2026-10-18)
+
+- [x] **Earnie-Host (LAN-IP für den Hub)** — **Verified** (2026-10-18)
+  - Label → `IP-Adresse des Geräts, auf dem Earnie läuft`.
+  - Prefill: `EARNIE_LAN_IP` / `EARNIE_HOST` → Supervisor host LAN IP → local IPv4 (Docker bridge skipped).
+  - Tests: `tests/test_ehal_signal_list.py` (`test_default_host_*`).
+
+### Bugfix — Example paths NAS-specific UNC placeholders (2026-10-18)
+
+- [x] **Example paths: NAS-specific UNC placeholders** — **Verified** (2026-10-18)
+  - `.env.example`: `\\YOUR-NAS\docker\earnie…` → relative `earnie_env` / `earnie_env/config` / `earnie_env/runtime`.
+  - `remote_backtesting.example.json`: aligned with script/tests (`\\NAS\EnergyOptimizer\backtesting-sync`).
+  - `_diag_swimspa_nas.py`: example UNC → `\\NAS\earnie_env\runtime`.
+
+### Bugfix — Consumer EHAL storage flex.* → typed namespaces (2026-10-18)
+
+- [x] **Consumer EHAL storage still uses legacy `flex.{id}.*` keys** — **Verified** (2026-10-18)
+  - Symptom: Loxone import / EFM create and Kennung rename wrote `ehal_bindings` as `flex.<slug>.*` while exchange / Signalliste emit `consumer.` / `heatpump.` / `pool.*`.
+  - Fix: writers persist typed namespaces; migration step `dm4.consumer_flex_bindings` rekeys existing `flex.*` (Merker conflicts → Blocker); dual-read of legacy `flex.*` kept until packs migrate.
+  - Tests: `test_flex_fields`, `test_migrate_consumer_flex_bindings`, greenfield/EFM/entity_id_lock updates.
+
 ### Bugfix — Loxone import consumer Bezeichnung / id / type sync (2026-10-18)
 
 - [x] **house_profiles consumers after Loxone import: Bezeichnung / id / type mess** — **Verified** (2026-10-18)
@@ -9,7 +30,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Cause: Loxone/EFM-created consumers omitted `id_locked` / `id_provisional_label` (missing flag ⇒ legacy locked); EFM-only Wärmepumpe stayed `generic`; `_resolve_consumer_ids` used already-merged session rows as `existing`.
   - Fix: import stubs set `id_locked: false` + provisional label; EFM Wärmepumpe/WP → `thermal_annual`; resolve uses pre-merge session as `existing` so first Bezeichnung change renames id + rewrites bindings.
   - Tests: `tests/test_loxone_greenfield_import.py`, `tests/test_loxone_efm_meters.py` (`test_efm_only_waermepumpe_create_is_thermal_and_unlocked`), existing `tests/test_entity_id_lock.py`.
-  - Follow-up (open): stored bindings still use legacy `flex.*` — see Bugfixes.
+  - Follow-up: stored bindings `flex.*` → typed namespaces — verified (see section above).
 
 ### Bugfix — Greenfield Live / SK missing after reload (2026-10-18)
 

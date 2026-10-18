@@ -41,7 +41,7 @@ def _require_nas_runtime() -> str:
     if not normalized.startswith("\\\\"):
         raise SystemExit(
             "EARNIE_RUNTIME_PATH muss auf NAS zeigen "
-            "(UNC, z. B. \\\\YOUR-NAS\\docker\\earnie\\runtime)."
+            "(UNC, z. B. \\\\NAS\\earnie_env\\runtime)."
         )
     if not os.path.isfile(optimization_history.HISTORY_FILE):
         raise SystemExit(f"NAS-Log fehlt: {optimization_history.HISTORY_FILE}")

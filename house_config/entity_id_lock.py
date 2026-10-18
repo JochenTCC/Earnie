@@ -83,16 +83,22 @@ def rewrite_consumer_bindings_slug(
     *,
     old_id: str,
     new_id: str,
+    consumer_type: str = "",
 ) -> dict[str, str]:
     """Rewrite entity-scoped keys whose Kennung matches the old consumer slug.
 
-    Namespaces: ``consumer`` / ``heatpump`` / ``pool`` / ``ev`` / ``evcs`` /
-    legacy ``flex``. Empty addresses (Loxone activation flags) are kept.
+    Namespaces: ``consumer`` / ``heatpump`` / ``pool`` / ``ev`` / ``evcs``.
+    Legacy ``flex.{old}.{kind}`` is normalized to the typed storage key for
+    ``new_id`` (not ``flex.{new}.*``). Already-typed keys only change Kennung.
+    Empty addresses (Loxone activation flags) are kept.
     """
+    from ehal.flex_fields import canonicalize_consumer_field
+
     if not isinstance(bindings, dict):
         return {}
     old_slug = flex_ehal_slug(old_id)
     new_slug = flex_ehal_slug(new_id)
+    ctype = str(consumer_type or "").strip()
     out: dict[str, str] = {}
     for key, value in bindings.items():
         field = str(key)
@@ -102,7 +108,10 @@ def rewrite_consumer_bindings_slug(
             and parsed.namespace in _CONSUMER_BINDING_NAMESPACES
             and parsed.kennung == old_slug
         ):
-            field = f"{parsed.namespace}.{new_slug}.{parsed.kind}"
+            if parsed.is_legacy_flex:
+                field = canonicalize_consumer_field(field, new_id, ctype)
+            else:
+                field = f"{parsed.namespace}.{new_slug}.{parsed.kind}"
         if field not in out:
             out[field] = str(value or "").strip()
     return out

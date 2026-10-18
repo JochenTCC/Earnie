@@ -237,7 +237,7 @@ Eine Vorlage `VI_Earnie_Consumer` / `VO_Earnie_Consumer` deckt **einen** Verbrau
 - Titel: `Earnie_Verbraucher_Waschmaschine_Leistung`
 - VO-Befehl bei Ein: `/ehal/telemetry/flex.waschmaschine.sens_power_act/<v>`
 - VI-Check (Freigabe): `"consumer.waschmaschine.set_enable":\v` (der Titel bleibt `Earnie_Verbraucher_Waschmaschine_Freigabe`)
-- EHAL-Com-Binding: `flex.{hk_id}.sens_power_act` → Titel (bei `zaehler_<slug>`: Wire-Slug ohne `zaehler_`)
+- EHAL-Com-Binding: `consumer.{hk_id}.sens_power_act` → Titel (bei `zaehler_<slug>`: Kennung ohne `zaehler_`)
 
 `<Slug>` **im Merker:** kurzer, stabiler Token (z. B. `Waschmaschine`). `{hk_id}`: derselbe Verbraucher wie im Hausprofil.
 
@@ -279,7 +279,7 @@ Alle konfigurierten Signale lassen sich so prüfen:
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Anlage (PV, Netz, Hauslast, Außentemp., Abwesenheit; ESS-Leistung/Sollwerte über die primäre Batterie)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers` (SoC: `batteries[].ehal_bindings` → `ess.{slug}.sens_ess_soc`) |
 | Request Optimize (ad hoc)                                               | Loxone-VO → Daemon-HTTP                       | `Earnie_Request_Optimize` auf Port `system.ehal_loxone_http_port` (Standard **8541**)                                                                     |
-| Wärmepumpe / Flex / Thermik                                             | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`                                                                                                  |
+| Wärmepumpe / Flex / Thermik                                             | `consumers[].ehal_bindings`                   | `consumer|heatpump|pool.{slug}.sens_power_act`, `….set_enable` (Legacy `flex.*` nur noch lesen)                                                         |
 | EV (`ev`)                                                                | `consumers[].ehal_bindings`                   | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*`                                                                                                                  |
 | Pool / SwimSpa                                                           | `consumers[].ehal_bindings` + Filter-Entität  | siehe Default `Earnie_Pool_*` / EHAL-Com, Abschnitt Pool / SwimSpa                                                                                        |
 
@@ -329,15 +329,15 @@ Die Signaldefinitionen stehen im aktiven Hausprofil (`house_profiles.json`). Die
 python -m scripts.migrate_ehal_bindings --path <house_profiles.json> [--config <config.json>]
 ```
 
-### Flex / Thermik (Stub `flex.*`)
+### Flex / Thermik (typisierte Namespaces)
 
 | EHAL-Feld                         | Richtung  | Default / Beispiel                                                                         | Wert        |
 | ------------------------------------ | --------- | ---------------------------------------------------------------------------------------------- | ------------ |
-| `flex.{slug}.sens_power_act`       | Lesen     | Wärmepumpe: `Earnie_Waermepumpe_Leistung`; generisch: `Earnie_Verbraucher_Leistung`; oder EFM-Last | kW oder 0/1 |
-| `consumer.{slug}.sens_consumer_active` | Lesen | Generisch: `Earnie_Verbraucher_<Slug>_Aktiv` (digital; ODER-Trigger der Reservefreigabe). Das Speicher-Binding kann weiterhin `flex.{slug}.sens_consumer_active` nutzen. | `0`/`1` |
-| `flex.{slug}.set_enable`           | Schreiben | Wärmepumpe: `Earnie_Waermepumpe_Freigabe`; generisch: `Earnie_Verbraucher_Freigabe`            | `0`/`1`     |
+| `consumer|heatpump|pool.{slug}.sens_power_act` | Lesen | Wärmepumpe: `Earnie_Waermepumpe_Leistung`; generisch: `Earnie_Verbraucher_Leistung`; oder EFM-Last | kW oder 0/1 |
+| `consumer.{slug}.sens_consumer_active` | Lesen | Generisch: `Earnie_Verbraucher_<Slug>_Aktiv` (digital; ODER-Trigger der Reservefreigabe) | `0`/`1` |
+| `consumer|heatpump|pool.{slug}.set_enable` | Schreiben | Wärmepumpe: `Earnie_Waermepumpe_Freigabe`; generisch: `Earnie_Verbraucher_Freigabe` | `0`/`1` |
 
-> **Hinweis (Binding-Schlüssel und Wire-Check):** `flex.{slug}.set_enable` ist nur der **Binding-Schlüssel** in `consumers[].ehal_bindings`. Er aktiviert das Schreiben. Das Check-Muster am Virtual Input und der Schlüssel in `status.json` verwenden die qualifizierte ID nach Verbrauchertyp: `consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable` oder `pool.{slug}.set_enable`.
+> **Hinweis:** Speicher- und Wire-Schlüssel sind gleich (`consumer.` / `heatpump.` / `pool.` nach Verbrauchertyp). Legacy-`flex.{slug}.*` wird beim Config-Migrationsschritt umgeschrieben; bis dahin akzeptiert Earnie es noch beim Lesen.
 
 Pool-Freigaben: Default `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` in `ehal_bindings`.
 

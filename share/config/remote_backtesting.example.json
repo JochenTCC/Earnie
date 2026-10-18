@@ -1,8 +1,8 @@
 {
     "$schema": "./remote_backtesting.schema.json",
     "_comment": "Kopie nach config/remote_backtesting.json (gitignored) und Host/Pfade anpassen.",
-    "share_root": "\\\\YOUR-NAS\\home\\Ernie\\backtesting-sync",
-    "remote_share_root": "\\\\YOUR-NAS\\home\\Ernie\\backtesting-sync",
+    "share_root": "\\\\NAS\\EnergyOptimizer\\backtesting-sync",
+    "remote_share_root": "\\\\NAS\\EnergyOptimizer\\backtesting-sync",
     "sync_paths": [
         "config/config.json",
         "config/backtesting_scenarios.json",

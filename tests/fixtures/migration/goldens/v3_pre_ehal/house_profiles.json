@@ -41,11 +41,10 @@
                     "timezone_name": "Europe/Vienna",
                     "min_on_quarterhours": 1,
                     "ehal_bindings": {
-                        "flex.waermepumpe.sens_power_act": "alias_7",
-                        "flex.waermepumpe.set_enable": "alias_8",
+                        "heatpump.waermepumpe.sens_power_act": "alias_7",
+                        "heatpump.waermepumpe.set_enable": "alias_8",
                         "sens_temperature_heat_storage": "alias_9",
-                        "sens_temperature_heat_storage_low": "alias_10",
-                        "heatpump.waermepumpe.set_enable": ""
+                        "sens_temperature_heat_storage_low": "alias_10"
                     }
                 },
                 {
@@ -91,7 +90,7 @@
                         "get_evcs_ready_by_time": "alias_20",
                         "get_evcs_limit_soc": "alias_21",
                         "get_evcs_soc_min_immediate": "alias_22",
-                        "flex.e_auto.sens_power_act": "alias_23",
+                        "ev.e_auto.sens_power_act": "alias_23",
                         "evcs.e_auto.set_evcs_max_current": ""
                     }
                 },
@@ -114,13 +113,12 @@
                     },
                     "min_on_quarterhours": 1,
                     "ehal_bindings": {
-                        "flex.pool_swimspa.sens_power_act": "alias_26",
-                        "flex.pool_swimspa.set_enable": "alias_27",
+                        "pool.pool_swimspa.sens_power_act": "alias_26",
+                        "pool.pool_swimspa.set_enable": "alias_27",
                         "sens_temperature_water": "alias_28",
                         "get_temperature_water_setpoint": "alias_29",
                         "get_temperature_tolerance_c": "alias_30",
-                        "sens_heating_active": "alias_31",
-                        "pool.pool_swimspa.set_enable": ""
+                        "sens_heating_active": "alias_31"
                     },
                     "loxone_inputs": {
                         "subtract_consumer_ids": [
@@ -144,7 +142,7 @@
                     },
                     "ehal_bindings": {
                         "get_filter_remaining_hours": "alias_34",
-                        "flex.pool_filter.set_enable": "alias_35",
+                        "pool.pool_filter.set_enable": "alias_35",
                         "sens_filter_active": "alias_36",
                         "get_filter_native_start_hour": "alias_37",
                         "get_filter_native_duration_hours": "alias_38"
@@ -181,7 +179,7 @@
                         "default_runtime_h": 3.0
                     },
                     "ehal_bindings": {
-                        "flex.geschirrspueler.sens_power_act": "alias_39"
+                        "consumer.geschirrspueler.sens_power_act": "alias_39"
                     }
                 },
                 {
@@ -200,7 +198,7 @@
                     },
                     "earnie_role": "known",
                     "ehal_bindings": {
-                        "flex.kochen.sens_power_act": "alias_40"
+                        "consumer.kochen.sens_power_act": "alias_40"
                     }
                 },
                 {
@@ -224,7 +222,7 @@
                         "default_runtime_h": 2.0
                     },
                     "ehal_bindings": {
-                        "flex.trockner.sens_power_act": "alias_41"
+                        "consumer.trockner.sens_power_act": "alias_41"
                     }
                 },
                 {
@@ -243,7 +241,7 @@
                     },
                     "earnie_role": "known",
                     "ehal_bindings": {
-                        "flex.tv.sens_power_act": "alias_42"
+                        "consumer.tv.sens_power_act": "alias_42"
                     }
                 },
                 {
@@ -267,7 +265,7 @@
                         "default_runtime_h": 3.0
                     },
                     "ehal_bindings": {
-                        "flex.waschmaschine.sens_power_act": "alias_43"
+                        "consumer.waschmaschine.sens_power_act": "alias_43"
                     }
                 }
             ],
