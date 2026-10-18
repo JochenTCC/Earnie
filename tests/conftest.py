@@ -194,6 +194,45 @@ def _clear_thermal_year_caches():
     clear_year_model_caches()
 
 
+class NetworkBlockedError(AssertionError):
+    """Raised when a test tries a real (non-loopback) HTTP request."""
+
+
+@pytest.fixture(autouse=True)
+def _block_real_http(request):
+    """Fail fast on real HTTP: unmocked calls otherwise burn minutes in retry/sleep loops.
+
+    Loopback hosts stay allowed (local test servers). Tests that really need the
+    network must carry ``@pytest.mark.requires_loxone`` / ``requires_live_config``.
+    """
+    if (
+        request.node.get_closest_marker("requires_loxone")
+        or request.node.get_closest_marker("requires_live_config")
+        or os.getenv(_USE_LIVE_CONFIG_ENV) == "1"
+    ):
+        yield
+        return
+    from urllib.parse import urlparse
+
+    import requests.adapters
+
+    original = requests.adapters.HTTPAdapter.send
+
+    def _send(self, req, *args, **kwargs):
+        host = urlparse(req.url).hostname or ""
+        if host not in {"localhost", "127.0.0.1", "::1"} and not host.endswith(".localhost"):
+            raise NetworkBlockedError(f"real HTTP request blocked in tests: {req.method} {req.url}")
+        return original(self, req, *args, **kwargs)
+
+    # No ``monkeypatch`` here: requesting it would tear it down after
+    # ``_restore_default_test_config_after_test`` and break its reinit.
+    requests.adapters.HTTPAdapter.send = _send
+    try:
+        yield
+    finally:
+        requests.adapters.HTTPAdapter.send = original
+
+
 def _loxone_integration_enabled() -> bool:
     if os.getenv("EARNIE_SKIP_LOXONE_INTEGRATION") == "1":
         return False

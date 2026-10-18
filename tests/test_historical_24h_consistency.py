@@ -7,6 +7,8 @@ import os
 import pandas as pd
 import pytest
 
+from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
 import config
 from data import cons_data_store
 from data.data_loader import load_market_prices
@@ -29,6 +31,11 @@ os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 # Real MILP over historical days — keep case count small for pre-commit.
 pytestmark = pytest.mark.slow
+
+
+@pytest.fixture(autouse=True)
+def _offline_open_meteo(monkeypatch):
+    install_open_meteo_climate_mock(monkeypatch)
 
 # Parametrized solves: last 2 calendar months × high/low PV (≈4 CBC runs).
 _MILP_MONTHS_BACK = 2
