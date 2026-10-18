@@ -60,6 +60,11 @@ def _configure_env(runtime: Path) -> None:
     os.environ["EARNIE_RUNTIME_PATH"] = str(runtime)
     os.environ.pop("EARNIE_CYCLE_TIMING", None)
     os.environ.pop("EARNIE_CYCLE_PROFILE", None)
+    # Fake Open-Meteo payloads must not land in the repo's data/cache/open_meteo
+    # (cwd = repo root): scripts.run_regression reads the same cache keys.
+    from data import open_meteo_solar_archive as archive
+
+    archive.OPEN_METEO_CACHE_DIR = runtime / "_open_meteo_cache"
 
 
 def _block_network() -> None:

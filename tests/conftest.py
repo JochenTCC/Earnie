@@ -112,6 +112,31 @@ _load_dotenv_for_tests()
 import config as _config_module
 
 
+def _isolate_open_meteo_disk_cache() -> Path:
+    """Point the Open-Meteo archive cache at a per-process temp dir.
+
+    The climate mock patches only the HTTP fetch; ``build_open_meteo_climate_bundle``
+    still writes its result to ``data/cache/open_meteo`` (relative to the repo).
+    Without this, every pytest run poisons the real cache with mock irradiance
+    (constant 500 W/m², day and night), which ``scripts.run_regression`` and the
+    app then read back as real PV input.
+    """
+    import atexit
+    import shutil
+    import tempfile
+
+    from data import open_meteo_solar_archive as _archive
+
+    cache_dir = Path(tempfile.mkdtemp(prefix="earnie-open-meteo-test-"))
+    _archive.OPEN_METEO_CACHE_DIR = cache_dir
+    _archive.clear_open_meteo_bundle_mem_cache()
+    atexit.register(shutil.rmtree, cache_dir, ignore_errors=True)
+    return cache_dir
+
+
+_isolate_open_meteo_disk_cache()
+
+
 def _reinit_config_offline() -> None:
     """reinit_config() ohne Live-Open-Meteo-Fetch (Fixture-Profile enthalten
     thermal_annual-Verbraucher, deren Baseload-Berechnung sonst
