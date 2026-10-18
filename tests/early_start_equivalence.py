@@ -66,6 +66,12 @@ def _runner_slot() -> Iterator[None]:
                 except OSError:
                     pass
                 continue
+            except PermissionError:
+                # Windows: O_EXCL on a lock another worker just unlinked (still
+                # delete-pending) raises EACCES instead of EEXIST -> slot busy.
+                if sys.platform != "win32":
+                    raise
+                continue
             os.close(fd)
             try:
                 yield
