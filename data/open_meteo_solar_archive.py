@@ -1,7 +1,6 @@
 """Open-Meteo archive irradiance and temperature for PV / solar-thermal synthesis."""
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -81,16 +80,6 @@ def archive_latest_complete_date() -> date:
 def _cap_inclusive_end(end: date) -> date:
     latest = archive_latest_complete_date()
     return min(end, latest)
-
-
-def _resolve_installation_params() -> tuple[float, float, float, float, float, str]:
-    lat = float(config.get("LATITUDE", cast=float))
-    lon = float(config.get("LONGITUDE", cast=float))
-    tilt = float(config.get("PV_TILT", cast=float))
-    azimuth = float(config.get("PV_AZIMUTH", cast=float))
-    kwp = float(config.get("PV_KWP", cast=float))
-    timezone = str(config.get_planning_timezone())
-    return lat, lon, tilt, azimuth, kwp, timezone
 
 
 def _parse_hourly_times(times: list[str]) -> list[datetime]:
@@ -614,66 +603,3 @@ def build_open_meteo_climate_bundle_for_year(
         use_cache=use_cache,
         cache_dir=cache_dir,
     )
-
-
-class OpenMeteoPvLookup:
-    """Maps naive local hour slots to PV kW from Open-Meteo archive data."""
-
-    def __init__(
-        self,
-        series: pd.Series,
-        *,
-        kwp: float,
-        fallback: Callable[[int, int, float], float],
-    ) -> None:
-        self._series = series
-        self._kwp = kwp
-        self._fallback = fallback
-
-    def kw_at(self, slot: datetime) -> float:
-        if self._kwp <= 0.0:
-            return 0.0
-        key = slot.replace(minute=0, second=0, microsecond=0)
-        if key in self._series.index:
-            return round(float(self._series.loc[key]), 3)
-        return self._fallback(key.hour, key.month, self._kwp)
-
-
-def build_open_meteo_pv_lookup(
-    start: date,
-    end: date,
-    *,
-    fallback: Callable[[int, int, float], float],
-) -> OpenMeteoPvLookup:
-    lat, lon, tilt, azimuth, kwp, timezone = _resolve_installation_params()
-    if kwp <= 0.0:
-        print("[INFO] PV deaktiviert (PV_KWP=0) – cons_data pv_kw bleibt 0.")
-        return OpenMeteoPvLookup(pd.Series(dtype=float), kwp=kwp, fallback=fallback)
-
-    try:
-        series = fetch_hourly_pv_kw_series(
-            start,
-            end,
-            lat=lat,
-            lon=lon,
-            tilt=tilt,
-            azimuth=azimuth,
-            kwp=kwp,
-            timezone=timezone,
-        )
-    except Exception as exc:
-        print(f"[WARN] Open-Meteo Solar Archive fehlgeschlagen: {exc}. Nutze PV-Fallback-Kurve.")
-        return OpenMeteoPvLookup(pd.Series(dtype=float), kwp=kwp, fallback=fallback)
-
-    expected_hours = int((datetime.combine(end, datetime.min.time()) - datetime.combine(start, datetime.min.time())).total_seconds() // 3600) + 24
-    covered = len(series)
-    print(
-        f"[OK] Open-Meteo Solar Archive: {covered} Stunden PV geladen "
-        f"({start}..{end}, {kwp:.1f} kWp, {tilt:.0f}°/{azimuth:.0f}°)."
-    )
-    if covered < expected_hours:
-        print(
-            f"[WARN] Open-Meteo PV: nur {covered}/{expected_hours} Stunden im Zeitraum – "
-            "fehlende Slots nutzen PV-Fallback."
-        )
-    return OpenMeteoPvLookup(series, kwp=kwp, fallback=fallback)
