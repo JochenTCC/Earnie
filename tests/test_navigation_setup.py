@@ -162,8 +162,8 @@ def test_restricted_navigation_shows_daemon_pages_once_sb_configured(tmp_path, m
     assert titles == [
         "Hauskonfigurator",
         "Smarthome-Backend",
-        "Optimierer-Dienst",
         "EHAL-Com",
+        "Optimierer-Dienst",
     ]
 
 

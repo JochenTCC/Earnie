@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Minor — sidebar order EHAL-Com before Optimierer-Dienst (2026-10-18)
+
+- [x] **Swap EHAL-Com and Optimierer-Dienst in sidebar** — Daemon Control order is now Smarthome-Backend → EHAL-Com → Optimierer-Dienst (`ui/navigation.py`). Docs `betriebsmodi.md` / `betrieb.md` aligned; test `test_navigation_setup.py`.
+
 ### Bugfix — Signalliste heartbeat rename + Pflicht (2026-10-18)
 
 - [x] **Signalliste heartbeat rename + Pflicht** — **Verified** (2026-10-18)

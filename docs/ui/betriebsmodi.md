@@ -17,7 +17,7 @@ Details zum Deployment: [Betrieb](../einrichtung/betrieb.md).
 |-----|-------|-----------|------------------|
 | `sunset2sunset` | **Monitor**, **Manuelle Geräte** | Live-Cockpit | ja (Hauptansicht; ohne Key kein Abschnitt Live-Cockpit) |
 | `scenario_explorer` | **Szenario-Explorer** | Konfiguration | optional (Entwicklung / Community Cloud) |
-| `live_environment` | **Smarthome-Backend**, **Optimierer-Dienst**, **EHAL-Com**, **Analyse Verbrauch & Kosten** (Live-Cockpit) | Daemon Control / Live-Cockpit | ja (ohne Key kein Live- und Daemon-Anteil) |
+| `live_environment` | **Smarthome-Backend**, **EHAL-Com**, **Optimierer-Dienst**, **Analyse Verbrauch & Kosten** (Live-Cockpit) | Daemon Control / Live-Cockpit | ja (ohne Key kein Live- und Daemon-Anteil) |
 | `price_forecast` | **Preis-Prognose (Dev)** | Live-Cockpit | nur Entwicklung |
 
 Beispiel Community Cloud (nur Szenario-Explorer): `EARNIE_UI_MODES=scenario_explorer`. Live-Cockpit und Daemon Control entfallen dann.
@@ -41,7 +41,7 @@ Unten in der Sidebar liegt der Abschnitt **Info / About** mit folgenden Inhalten
 |-----------|--------|
 | **Live-Cockpit** | Monitor, Manuelle Geräte, Analyse Verbrauch & Kosten (bei `live_environment`), Preis-Prognose (Dev) |
 | **Konfiguration** | Hauskonfigurator, Szenarienkonfigurator, Szenario-Explorer (wenn freigeschaltet) |
-| **Daemon Control** | Smarthome-Backend, Optimierer-Dienst, EHAL-Com |
+| **Daemon Control** | Smarthome-Backend, EHAL-Com, Optimierer-Dienst |
 
 **Optimierer-Dienst:** Die Seite bietet Start, Stopp und Neustart, das Dienst-Log und den Umschalter **Silent / Loud** (`silent_mode` in `runtime/local_settings.json`). Für den Umschalter ist kein Neustart von `main.py` nötig. Details: [Betrieb](../einrichtung/betrieb.md) · Schreibverhalten: [EHAL-Com](ehal-com.md).
 

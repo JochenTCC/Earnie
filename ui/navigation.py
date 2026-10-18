@@ -116,18 +116,18 @@ def _echtzeit_page_specs(
         specs.extend(
             [
                 PageSpec(
-                    page_daemon.render,
-                    "Optimierer-Dienst",
-                    "🛠️",
-                    SECTION_ECHTZEIT,
-                    "optimizer-daemon",
-                ),
-                PageSpec(
                     page_loxone_debug.render,
                     "EHAL-Com",
                     "🔗",
                     SECTION_ECHTZEIT,
                     "ehal-com",
+                ),
+                PageSpec(
+                    page_daemon.render,
+                    "Optimierer-Dienst",
+                    "🛠️",
+                    SECTION_ECHTZEIT,
+                    "optimizer-daemon",
                 ),
             ]
         )

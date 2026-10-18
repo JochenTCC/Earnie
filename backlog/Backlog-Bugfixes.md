@@ -52,9 +52,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
-- [ ] swap positions of EHAL-Com and Optimierer-Dienst in sidebar
-
-
 ## Document Review Findings (Do not remove this chapter — even if empty)
 
 - [ ] **Cloud demo vs „einmalig“ for SE star review** (`docs/einrichtung/betrieb.md`, `private-env.md`): with `EARNIE_CLOUD_DEMO=1` each browser session uses a temp workspace, so `feature_reviews.json` is session-scoped — “once per install” wording may overstate permanence on Community Cloud. Confirm whether docs should say once per session there.
