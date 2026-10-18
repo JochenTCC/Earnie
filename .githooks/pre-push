@@ -1,0 +1,66 @@
+#!/bin/sh
+# Bricht den Push ab, wenn die Golden-Master-Regression-Suite rot ist.
+# Läuft auf dem Arbeitsbaum — deshalb nur, wenn dieser exakt dem gepushten Commit
+# entspricht (sonst würde ein anderer Stand geprüft). Report mit Baseline-Drift,
+# Input-Fingerprint-Urteil und Bisect-Befehlen pro rotem Case.
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+ZERO="0000000000000000000000000000000000000000"
+# Same skip list as pre-commit: docs / images / YAML / workspace / Cursor / GitHub / hooks.
+SKIP_RE='\.(md|png|ya?ml|code-workspace)"?$|^"?docs/|^"?\.cursor/|^"?\.github/|^"?\.githooks/'
+
+HEAD_SHA="$(git rev-parse HEAD)"
+NEEDS_RUN=""
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+  [ -z "$LOCAL_REF" ] && continue
+  # Branch / tag deletion: nothing to test.
+  [ "$LOCAL_SHA" = "$ZERO" ] && continue
+  COMMIT="$(git rev-parse "$LOCAL_SHA^{commit}")"
+  if [ "$REMOTE_SHA" != "$ZERO" ] && git cat-file -e "$REMOTE_SHA^{commit}" 2>/dev/null; then
+    CHANGED="$(git diff --name-only "$REMOTE_SHA" "$COMMIT" | tr -d '\r')"
+    if [ -z "$CHANGED" ] || ! echo "$CHANGED" | grep -qvE "$SKIP_RE"; then
+      echo "pre-push: $REMOTE_REF — nur Doku/PNG/YAML/Workspace/Workflow/Hooks geändert, Regression übersprungen."
+      continue
+    fi
+  fi
+  if [ "$COMMIT" != "$HEAD_SHA" ]; then
+    echo "pre-push: $LOCAL_REF ($COMMIT) ist nicht HEAD ($HEAD_SHA)." >&2
+    echo "pre-push: Die Regression prüft den Arbeitsbaum — checke den Stand aus oder push mit --no-verify." >&2
+    exit 1
+  fi
+  NEEDS_RUN=1
+done
+
+if [ -z "$NEEDS_RUN" ]; then
+  exit 0
+fi
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "pre-push: Arbeitsbaum hat nicht committete Änderungen — die Regression würde nicht den gepushten Stand prüfen." >&2
+  echo "pre-push: Committe oder stashe sie (git stash), dann erneut pushen." >&2
+  exit 1
+fi
+
+if [ -x ".venv/Scripts/python.exe" ]; then
+  PYTHON=".venv/Scripts/python.exe"
+elif [ -x ".venv/bin/python" ]; then
+  PYTHON=".venv/bin/python"
+else
+  PYTHON="python"
+fi
+
+if ! command -v "$PYTHON" >/dev/null 2>&1 && ! [ -x "$PYTHON" ]; then
+  echo "pre-push: Python nicht gefunden (erwartet .venv oder python im PATH)." >&2
+  exit 1
+fi
+
+echo "pre-push: Starte Regression-Suite (scripts.run_regression) ..."
+if ! PYTHONIOENCODING=utf-8 PYTHONUTF8=1 "$PYTHON" -m scripts.run_regression; then
+  echo "pre-push: Regression-Suite rot — siehe backtesting_logs/regression/regression_report.md" >&2
+  exit 1
+fi
+
+echo "pre-push: Regression-Suite grün."

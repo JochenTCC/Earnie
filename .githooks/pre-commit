@@ -41,5 +41,6 @@ mkdir -p .pytest_cache/test-metrics
 # scripts.run_pytest: native pytest wrapper (pre-commit entry point).
 "$PYTHON" -m scripts.run_pytest tests -q --maxfail=5 --junitxml=.pytest_cache/test-metrics/junit-last.xml
 "$PYTHON" -m scripts.test_health_report ingest --junit .pytest_cache/test-metrics/junit-last.xml
+# Golden-master regression suite runs in .githooks/pre-push, not per commit.
 
 echo "pre-commit: Tests bestanden."
