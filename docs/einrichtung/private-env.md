@@ -7,9 +7,9 @@ Hausbezogene Dateien unter `earnie_env/config/` gehören **nicht** ins öffentli
 | Ort | Inhalt |
 |-----|--------|
 | `share/config/` (öffentlich) | `*.minimal.json`, `*.example.json`, `*.schema.json`, **`tariffs.json`** |
-| Privates Repo `Earnie-env-home` | `config.json`, Szenarien, `house_profiles.json`, `components.json`, `deviation_rules.json`, `uploads/`, **`vscode/launch.json`** |
+| Privates Repo `Earnie-env-home` | `config.json`, Szenarien, `house_profiles.json`, `components.json`, `deviation_rules.json`, `uploads/`, optional **`vscode/launch.json`** |
 | `earnie_env/config/` (lokal) | Windows-**Junction** auf das private `config/` |
-| `.vscode/launch.json` (lokal) | Aus dem privaten `vscode/launch.json` (Hardlink oder Kopie über das Link-Skript); im öffentlichen Repo per gitignore ausgeschlossen |
+| `.vscode/launch.json` (lokal) | Maschinenspezifisch, im öffentlichen Repo per gitignore ausgeschlossen. Optional aus dem privaten `vscode/launch.json` (Hardlink oder Kopie über das Link-Skript) |
 | `earnie_env/runtime/` | Laufzeitdaten, lokal (per gitignore ausgeschlossen) |
 
 Die Datei `.env` (Loxone) wird nirgends versioniert.
@@ -25,7 +25,7 @@ Die Datei `.env` (Loxone) wird nirgends versioniert.
 
 Existiert beim ersten Aufruf bereits ein echter Ordner `earnie_env\config`, ist `-Force` nötig. Das Skript legt dann ein Backup `config.bak-…` an.
 
-Außerdem installiert das Skript `.vscode/launch.json` aus dem privaten `vscode/launch.json` (als Hardlink, wenn möglich, sonst als Kopie). So lässt sich die Launch-Konfiguration nach dem Wechsel von Branch oder Tag wiederherstellen, ohne sie im öffentlichen Repo zu versionieren.
+Enthält das private Repo eine `vscode/launch.json`, installiert das Skript sie außerdem als `.vscode/launch.json` (als Hardlink, wenn möglich, sonst als Kopie). Fehlt sie, überspringt es diesen Schritt. So lässt sich die Launch-Konfiguration nach dem Wechsel von Branch oder Tag wiederherstellen, ohne sie im öffentlichen Repo zu versionieren.
 
 Fehlt `tariffs.json` im Link-Ziel, kopiert das Skript sie aus `share/config/tariffs.json`. Diese Kopie bleibt lokal und gehört nicht ins private Repo.
 
