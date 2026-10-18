@@ -76,12 +76,16 @@ def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> No
     """Formular für Miniserver-IP, Benutzer und Passwort."""
     dotenv_path = resolve_dotenv_path()
     env_ip, env_user, env_pass = read_loxone_credentials()
+    ip_key = f"{form_key}_ip"
+    discovered = str(st.session_state.get("sb_discovered_loxone_host") or "").strip()
+    if ip_key not in st.session_state:
+        st.session_state[ip_key] = discovered or env_ip
     st.caption(f"Zieldatei: `{dotenv_path}`")
     _render_loxone_dotenv_conflict_hint()
     with st.form(form_key):
         ip = st.text_input(
             "Miniserver-IP",
-            value=env_ip,
+            key=ip_key,
             placeholder="192.168.178.1",
             help=(
                 "IPv4-Adresse des Miniservers. Optionaler HTTP-Port mit Doppelpunkt, "
@@ -103,6 +107,10 @@ def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> No
     if error:
         st.error(error)
         return
+    # First-run wizard choice must not stick after connect (would reopen the
+    # credentials step inside Backend ändern on the configured SB page).
+    st.session_state.pop("sb_chosen_backend", None)
+    st.session_state.pop("sb_discovered_loxone_host", None)
     st.rerun()
 
 
@@ -140,7 +148,7 @@ def render_loxone_verify_results(*, button_key: str = "loxone_verify_button") ->
     """Button + Anzeige für run_loxone_setup_verify."""
     if not loxone_env_configured():
         st.caption(
-            "Zuerst Miniserver-Zugang speichern (Abschnitt **Anbindung** oben "
+            "Zuerst Miniserver-Zugang speichern (Abschnitt **Zugangsdaten** "
             "oder Ersteinrichtung)."
         )
         return

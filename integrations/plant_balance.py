@@ -1,19 +1,12 @@
 """Topology P2: generator-side coverage and derived house-load balance."""
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable, Mapping
 from typing import Any
 
 from ehal.ess_fields import ess_field
 from house_config.powerstation import BATTERY_TYPE_HOUSE
-from integrations.pv_attribution import (
-    grid_tied_inverters_with_pv,
-    plant_pv_derive_coverage_complete,
-)
 from optimizer.milp_inverter import filter_house_balance_batteries
-
-logger = logging.getLogger(__name__)
 
 DEFAULT_BALANCE_TOLERANCE_PCT = 5.0
 DEFAULT_BALANCE_TOLERANCE_W = 100.0
@@ -53,11 +46,6 @@ def balance_tolerances_from_plant(
     if w_f < 0.0:
         raise ValueError("plant.balance_tolerance_w muss >= 0 sein.")
     return pct_f, w_f
-
-
-def pv_covers_all_inverters_from_plant(plant: Mapping[str, Any] | None) -> bool:
-    raw = plant if isinstance(plant, Mapping) else {}
-    return bool(raw.get("pv_covers_all_inverters"))
 
 
 def grid_tied_house_batteries(
@@ -142,35 +130,3 @@ def derive_sens_power_consumers_w(
     if raw < 0.0:
         return 0.0
     return raw
-
-
-def assert_mapped_plant_pv_coverage(
-    *,
-    inverters: list[dict],
-    pv_systems: list[dict],
-    scoped_live: dict[str, Any] | None = None,
-    pv_covers_all_inverters: bool = False,
-) -> None:
-    """When plant PV is mapped and several grid-tied inverters own PV, require coverage or ack."""
-    eligible = grid_tied_inverters_with_pv(inverters, pv_systems)
-    if len(eligible) <= 1:
-        return
-    if plant_pv_derive_coverage_complete(
-        inverters, pv_systems, scoped_live=scoped_live
-    ):
-        return
-    if pv_covers_all_inverters:
-        logger.info(
-            "plant.pv_covers_all_inverters=true: accepting mapped plant PV "
-            "without complete inv/pv coverage (%s grid-tied inverters with PV).",
-            len(eligible),
-        )
-        return
-    ids = ", ".join(
-        str(inv.get("id") or "?").strip() or "?" for inv in eligible
-    )
-    raise ValueError(
-        "Mapped plant sens_pv_production_active with multiple grid-tied "
-        f"inverters owning PV requires complete inv.*/pv.* coverage or "
-        f"plant.pv_covers_all_inverters=true (inverters: {ids})."
-    )

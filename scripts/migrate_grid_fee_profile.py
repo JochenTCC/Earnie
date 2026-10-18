@@ -22,16 +22,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--path", required=True, help="Path to house_profiles.json")
     parser.add_argument("--area-id", default=None, help="Netzbereich-ID aus grid_fees.json")
-    parser.add_argument("--quarter-hour-meter", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
-    from runtime_store.migration.steps.grid_fee_profile import Q_AREA, Q_QHM
+    from runtime_store.migration.steps.grid_fee_profile import Q_AREA
 
-    answers = {
-        Q_AREA: args.area_id,
-        Q_QHM: bool(args.quarter_hour_meter),
-    }
+    answers = {Q_AREA: args.area_id}
     return run_config_migration(
         Path(args.path).parent, dry_run=args.dry_run, answers=answers
     )

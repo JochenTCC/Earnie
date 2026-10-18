@@ -20,11 +20,14 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalHorizon, EarlyStart, ConfigMigration, UsagePing/EarniePoints, Inverter P1–P5, Shadow R1–R4, Binding path work, …) → [Backlog-Erledigt.md](Backlog-Erledigt.md). Do not bump `version.py` to a publishable 2.7 without approval. Remaining open work below; Topology P3–P5 and Inverter follow-ups → **Version 2.+1**; Regression L3+P3 → **Version 2.8**.
 - **Note (deferred from 2.7.n):** Plant PV sum stays bare `sens_pv_production_active`; first entity-scoped `pv.{pv_system_id}.sens_pv_production_active` shipped with live attribution (Inverter follow-ups). Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
 
+- [ ] Dogfood greenfield Earnie configuration for a Loxone SB
+- [ ] Release for Loxone
 - [ ] Install earnie-server on VDC from Hosttech
   - clarify how to reuse "earnie-hems.com" on VDC
   - establish deploy process
   - quick thought about simple "Savings KPI" as additional payload
-- [ ] alpha release
+- [ ] Dogfood and finalize new HA binding
+- [ ] alpha release for HA
 
 
 ### Version 2.8

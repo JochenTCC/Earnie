@@ -32,9 +32,12 @@ Einrichtungspfad: [Smarthome-Backend wählen](../einrichtung/smarthome-backend-w
 
 Ist ein Backend verbunden, zeigt die Seite von oben nach unten:
 
-- **Anbindung:** Zugangsdaten erneut eingeben oder prüfen.
+- Erfolgsmeldung mit dem aktiven Backend (EHAL-Com und Optimierer-Dienst sind freigeschaltet).
+- **Zugangsdaten** (zuklappbar): Zugangsdaten erneut eingeben oder prüfen. Bei einem Loxone-Auth-Fehler öffnet sich der Bereich automatisch.
 - **Backend ändern:** Discovery starten oder das Backend wechseln.
 - **Loxone-Import:** nur bei Loxone.
+
+Während der Ersteinrichtung erscheinen die Zugangsdaten als eigener Schritt (noch ohne Erfolgsmeldung). Nach dem Speichern verschwindet dieser offene Anbindung-Abschnitt.
 
 Speicherorte:
 

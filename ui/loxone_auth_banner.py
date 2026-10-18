@@ -29,12 +29,12 @@ def render_loxone_auth_error_banner() -> None:
         st.error(
             f"**Loxone-Zugang verweigert ({status_txt})** — {detail}. "
             "Der Optimierer pausiert Miniserver-Zugriffe. "
-            f"Bitte Zugangsdaten unter **Smarthome-Backend → Anbindung** prüfen und speichern.{extra}"
+            f"Bitte Zugangsdaten unter **Smarthome-Backend → Zugangsdaten** prüfen und speichern.{extra}"
         )
     if conflict:
         canonical = conflict["canonical_path"]
         for item in conflict["conflicts"]:
             st.warning(
                 f"Abweichende Zugangsdaten in `{item['path']}` — aktiv ist `{canonical}`. "
-                "Unter **Smarthome-Backend → Anbindung** können Sie die anderen Werte übernehmen."
+                "Unter **Smarthome-Backend → Zugangsdaten** können Sie die anderen Werte übernehmen."
             )

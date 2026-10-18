@@ -69,6 +69,27 @@ def test_shows_single_hit_confirmation(monkeypatch):
     assert any(b.label == "Dieses Backend verwenden" for b in at.button)
 
 
+def test_selecting_discovered_loxone_prefills_miniserver_ip(monkeypatch):
+    """Discovery host must land in the credentials Miniserver-IP field."""
+    hit = DiscoveredBackend(
+        kind="loxone",
+        host="192.168.178.20",
+        method="ssdp",
+        port=80,
+        name="Loxone Miniserver Miniserver-Gen2",
+    )
+    monkeypatch.setattr(
+        "ui.pages.page_smarthome_backend.scan_for_backends",
+        MagicMock(return_value=[hit]),
+    )
+    at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT).run()
+    at.button(key="sb_use_single_hit").click().run()
+    assert not at.exception
+    ip_inputs = [t for t in at.text_input if t.label == "Miniserver-IP"]
+    assert ip_inputs, "expected Miniserver-IP on credentials step"
+    assert ip_inputs[0].value == "192.168.178.20"
+
+
 def test_shows_configured_summary_when_hub_credentials_present(monkeypatch):
     # LOXONE_IP is a real address on the dev LAN this was verified against — the
     # import section would otherwise make a real HTTP probe; not what this test
@@ -83,7 +104,9 @@ def test_shows_configured_summary_when_hub_credentials_present(monkeypatch):
     at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT).run()
     assert not at.exception
     assert any("Smarthome-Backend verbunden" in s.value for s in at.success)
-    assert any(sh.value == "Anbindung" for sh in at.subheader)
+    # After connect, credentials live under expander Zugangsdaten — no top-level
+    # Anbindung chapter (Greenfield dogfood / SB UX).
+    assert not any(sh.value == "Anbindung" for sh in at.subheader)
 
 
 def test_shadow_configured_skips_discovery_scan(monkeypatch, _mock_scan_no_network):

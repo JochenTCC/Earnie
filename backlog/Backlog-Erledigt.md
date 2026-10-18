@@ -2,6 +2,24 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Greenfield / HA first start Migration UI (2026-10-18)
+
+- [x] **Greenfield / HA first start opens Migration UI** — **Verified** (2026-10-18)
+  - Cause: `house_profiles.minimal.json` stamped dm4 but lacked `plant.grid_meter`, so `dm4.topology` stayed pending and Streamlit entered migration mode.
+  - Fix: seed `plant.grid_meter` (`DEFAULT_GRID_METER`) in `share/config/house_profiles.minimal.json`.
+  - Tests: `tests/test_migration_startup_gate.py` (`test_greenfield_bootstrap_gate_stays_open`).
+
+### Bugfix — Smarthome-Backend Anbindung / discovery IP (2026-10-18)
+
+- [x] **SB: Anbindung chapter stayed open after Loxone connect** — **Verified** (2026-10-18)
+  - Cause: configured summary always rendered top-level **Anbindung** once `is_sb_configured()`; first-run `sb_chosen_backend` also stuck and reopened credentials under Backend ändern.
+  - Fix: credentials under collapsed **Zugangsdaten** (auto-expand on Loxone auth recovery); clear `sb_chosen_backend` on save; docs/UI copy updated.
+  - Tests: `tests/apptest/test_page_smarthome_backend_apptest.py` (no Anbindung subheader when configured).
+- [x] **SB: discovered Miniserver IP not copied into Zugangsdaten** — **Verified** (2026-10-18)
+  - Cause: `_select_hit` stored only backend kind, not host/port.
+  - Fix: persist discovered host into session + credential form IP widgets (`sb_loxone_form` / `sb_anbindung_loxone_form`).
+  - Tests: `test_selecting_discovered_loxone_prefills_miniserver_ip`.
+
 ### Binding P5 — signal contract for all backends, HA push-only (2026-10-18)
 
 - [x] **Binding P5 — signal contract for all backends, HA push-only** `[feat]` (epic **Binding**; target [`docs/dev/EHAL-Binding-UX-Draft.md`](../docs/dev/EHAL-Binding-UX-Draft.md) **§0.6**; live transport **2.7.r** was already done)

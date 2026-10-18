@@ -160,12 +160,10 @@ def _dict_items(components: dict, key: str) -> list[dict]:
 def _attribute_plant_pv(
     doc: dict[str, Any],
     components: dict,
-    plant: dict,
     inverters: list[dict],
     pv_systems: list[dict],
 ) -> dict[str, Any]:
     """Merge per-inverter/PV scoped Loxone reads into the plant telemetry doc."""
-    from integrations.plant_balance import pv_covers_all_inverters_from_plant
     from integrations.pv_attribution import (
         collect_scoped_pv_live_from_bindings,
         read_scoped_pv_loxone,
@@ -181,7 +179,6 @@ def _attribute_plant_pv(
             scoped_live=scoped,
             inverters=inverters,
             pv_systems=pv_systems,
-            pv_covers_all_inverters=pv_covers_all_inverters_from_plant(plant),
         )
     except ValueError as exc:
         raise LoxoneAdapterError(str(exc)) from exc
@@ -294,7 +291,7 @@ class LoxoneAdapter:
         }
         for field in required:
             doc[field] = self._require_field(field)
-        doc = _attribute_plant_pv(doc, components, plant, inverters, pv_systems)
+        doc = _attribute_plant_pv(doc, components, inverters, pv_systems)
         doc["sens_ess_power"] = self._sum_ess_power_w(batteries, inverters)
         pct, watts = balance_tolerances_from_plant(plant)
         try:

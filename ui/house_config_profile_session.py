@@ -202,14 +202,8 @@ def _seed_profile_widget_state(
     st.session_state[_scoped_key(session_scope, "house_profile_nne_area")] = (
         netznutzung["area_id"] or "__manual__"
     )
-    st.session_state[_scoped_key(session_scope, "house_profile_nne_metering")] = netznutzung[
-        "power_metering"
-    ]
     st.session_state[_scoped_key(session_scope, "house_profile_nne_ap")] = netznutzung[
         "base_cent_kwh"
-    ]
-    st.session_state[_scoped_key(session_scope, "house_profile_nne_qh_meter")] = netznutzung[
-        "quarter_hour_meter"
     ]
     st.session_state[_scoped_key(session_scope, "house_profile_nne_include_draft")] = (
         "entwurf" in netznutzung["include_status"]

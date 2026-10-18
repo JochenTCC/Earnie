@@ -56,17 +56,20 @@ def test_snap_reduces_base_by_20_percent_in_window_only():
     assert grid_fee_work_cent(spec, datetime(2026, 3, 31, 12, 0, tzinfo=VIENNA)) == pytest.approx(4.96)
 
 
-def test_snap_skipped_without_quarter_hour_meter_and_reported():
+def test_snap_applies_even_when_quarter_hour_meter_flag_false_in_raw():
+    """Earnie assumes a QH meter; stored false is normalized away."""
     spec = _spec(quarter_hour_meter=False)
-    assert spec["rules"] == []
-    reasons = {item["id"]: item["reason"] for item in spec["skipped"]}
-    assert reasons["SNAP"] == "kein Viertelstundenzähler"
-    assert grid_fee_work_cent(spec, None) == pytest.approx(4.96)
+    ids = {rule["id"] for rule in spec["rules"]}
+    assert "SNAP" in ids
+    assert not any(
+        item.get("reason") == "kein Viertelstundenzähler" for item in spec["skipped"]
+    )
 
 
-def test_metered_power_uses_other_base():
+def test_metered_power_raw_is_forced_to_unmetered_base():
+    """Earnie assumes household unmetered; stored metered is normalized away."""
     spec = _spec(power_metering="metered_power")
-    assert spec["base_cent_kwh"] == pytest.approx(2.84)
+    assert spec["base_cent_kwh"] == pytest.approx(4.96)
 
 
 def test_draft_rule_without_value_is_skipped_by_default_and_fails_loud_when_included():
@@ -140,7 +143,7 @@ def test_catalog_validation_rejects_bad_input(mutate, message):
 def test_netznutzung_config_validation():
     assert normalize_netznutzung_config(None)["include_status"] == ["verordnet"]
     with pytest.raises(ValueError):
-        normalize_netznutzung_config({"power_metering": "x"})
+        normalize_netznutzung_config({"include_status": "not-a-list"})
     with pytest.raises(ValueError):
         normalize_netznutzung_config({"base_cent_kwh": -1})
     with pytest.raises(ValueError):
@@ -185,10 +188,11 @@ def test_legacy_profile_scalar_is_rejected_and_migrated():
     with pytest.raises(ValueError, match="migrate_grid_fee_profile"):
         _normalize_profile(copy.deepcopy(legacy), 0)
     doc = {"profiles": [copy.deepcopy(legacy)]}
-    assert migrate_document(doc, area_id="AT-VBG", quarter_hour_meter=True) == 1
+    assert migrate_document(doc, area_id="AT-VBG") == 1
     profile = _normalize_profile(doc["profiles"][0], 0)
     assert profile["netznutzung"]["area_id"] == "AT-VBG"
     assert profile["netznutzung"]["base_cent_kwh"] == pytest.approx(5.353)
+    assert profile["netznutzung"]["quarter_hour_meter"] is True
     assert "netznutzung_arbeitspreis_cent_kwh" not in profile
 
 

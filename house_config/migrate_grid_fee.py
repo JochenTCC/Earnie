@@ -20,7 +20,6 @@ def migrate_profile(
     profile: dict,
     *,
     area_id: str | None = None,
-    quarter_hour_meter: bool = False,
 ) -> bool:
     """Replace the legacy scalar in place. Returns True when the profile changed."""
     if LEGACY_KEY not in profile:
@@ -36,7 +35,7 @@ def migrate_profile(
     profile["netznutzung"] = {
         "area_id": area_id,
         "power_metering": "unmetered_power",
-        "quarter_hour_meter": bool(quarter_hour_meter),
+        "quarter_hour_meter": True,
         "base_cent_kwh": legacy,
         "include_status": ["verordnet"],
     }
@@ -47,15 +46,11 @@ def migrate_document(
     doc: dict,
     *,
     area_id: str | None = None,
-    quarter_hour_meter: bool = False,
 ) -> int:
     profiles = doc.get("profiles", [])
     items = profiles.values() if isinstance(profiles, dict) else profiles
     return sum(
         1
         for item in items
-        if isinstance(item, dict)
-        and migrate_profile(
-            item, area_id=area_id, quarter_hour_meter=quarter_hour_meter
-        )
+        if isinstance(item, dict) and migrate_profile(item, area_id=area_id)
     )

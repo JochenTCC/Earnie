@@ -258,13 +258,7 @@ def _normalize_plant(raw: dict | None) -> dict:
     grid_meter = _normalize_grid_meter(raw.get("grid_meter"))
     if grid_meter is not None:
         out["grid_meter"] = grid_meter
-    if "pv_covers_all_inverters" in raw:
-        flag = raw["pv_covers_all_inverters"]
-        if not isinstance(flag, bool):
-            raise ValueError(
-                "plant.pv_covers_all_inverters muss boolean sein."
-            )
-        out["pv_covers_all_inverters"] = flag
+    # Retired: multi-inv plant PV is always Σ inv/pv · η_inv (key dropped on load).
     for key in ("balance_tolerance_pct", "balance_tolerance_w"):
         tolerance = _plant_nonneg_float(raw, key)
         if tolerance is not None:

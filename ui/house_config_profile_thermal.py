@@ -126,10 +126,6 @@ def _render_pv_default_row(*, session_scope: str) -> tuple[float, float]:
     return float(default_pv_tilt), float(default_pv_azimuth)
 
 NNE_AREA_MANUAL = "__manual__"
-_NNE_METERING_LABELS = {
-    "unmetered_power": "Nicht gemessene Leistung (Standard Haushalt)",
-    "metered_power": "Gemessene Leistung",
-}
 
 
 def _load_grid_fee_catalog_for_ui() -> dict:
@@ -141,8 +137,8 @@ def _load_grid_fee_catalog_for_ui() -> dict:
 
 def _render_nne_area_fields(
     catalog: dict, *, session_scope: str
-) -> tuple[str, str, float]:
-    """Netzbereich select plus manual Arbeitspreis or Leistungsmessung (area-dependent)."""
+) -> tuple[str, float]:
+    """Netzbereich select plus manual Arbeitspreis when no catalog area is chosen."""
     areas = catalog["areas"]
     area_key = _scoped_key(session_scope, "house_profile_nne_area")
     options = [NNE_AREA_MANUAL, *areas.keys()]
@@ -159,9 +155,6 @@ def _render_nne_area_fields(
         ratios=WIDE_LABEL_RATIOS,
         key=area_key,
     )
-    metering = st.session_state.get(
-        _scoped_key(session_scope, "house_profile_nne_metering"), "unmetered_power"
-    )
     base_manual = 0.0
     if area_choice == NNE_AREA_MANUAL:
         base_manual = float(
@@ -175,15 +168,7 @@ def _render_nne_area_fields(
             )
             or 0.0
         )
-    else:
-        metering = labeled_selectbox(
-            "Leistungsmessung",
-            options=list(_NNE_METERING_LABELS),
-            format_func=lambda key: _NNE_METERING_LABELS[key],
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, "house_profile_nne_metering"),
-        )
-    return area_choice, metering, base_manual
+    return area_choice, base_manual
 
 
 def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
@@ -207,16 +192,12 @@ def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
 
 
 def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
-    """Netznutzung: Netzbereich aus Katalog oder eigener Wert; Messart; Zeitregeln."""
+    """Netznutzung: Netzbereich aus Katalog oder eigener Wert; Zeitregeln."""
+    from data.grid_fees import METERING_UNMETERED
+
     catalog = _load_grid_fee_catalog_for_ui()
-    area_choice, metering, base_manual = _render_nne_area_fields(
+    area_choice, base_manual = _render_nne_area_fields(
         catalog, session_scope=session_scope
-    )
-    qh_meter = bool(
-        labeled_checkbox(
-            "Viertelstunden-Smart-Meter (Voraussetzung für SNAP/WiNAP)",
-            key=_scoped_key(session_scope, "house_profile_nne_qh_meter"),
-        )
     )
     include_draft = bool(
         labeled_checkbox(
@@ -226,8 +207,8 @@ def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
     )
     config = {
         "area_id": None if area_choice == NNE_AREA_MANUAL else area_choice,
-        "power_metering": metering,
-        "quarter_hour_meter": qh_meter,
+        "power_metering": METERING_UNMETERED,
+        "quarter_hour_meter": True,
         "base_cent_kwh": base_manual,
         "include_status": ["verordnet", "entwurf"] if include_draft else ["verordnet"],
     }

@@ -32,12 +32,19 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Cause: `_migrate_and_validate_pack_docs` stamped members to current before `ensure_compatible` (would whitewash v1/v2/untagged if validate were bypassed). `validate_migrated_docs` already rejected incompatible members first.
   - Fix: ensure then stamp; `grid_fees.json` still exempt; doc `speichern-laden.md` now states members are checked too.
   - Tests: `tests/test_config_pack_and_paths.py` (`test_config_pack_rejects_v2_member_with_v4_manifest`, `test_migrate_and_validate_ensures_before_stamp`).
-- [ ] **Greenfield / HA first start opens Migration UI** — fix implemented (2026-10-18); live HA acceptance pending
-  - Cause: `house_profiles.minimal.json` stamped dm4 but lacked `plant.grid_meter`, so `dm4.topology` stayed pending and Streamlit entered migration mode.
-  - Fix: seed `plant.grid_meter` (`DEFAULT_GRID_METER`) in `share/config/house_profiles.minimal.json`.
-  - Tests: `tests/test_migration_startup_gate.py` (`test_greenfield_bootstrap_gate_stays_open`).
+- [ ] **Greenfield: unclear Anlagen-PV-Abdeckung checkbox** — fix implemented (2026-10-18); live acceptance pending
+  - Cause: `plant.pv_covers_all_inverters` was only an acknowledgement that a flat plant PV total covered every grid-tied inverter; wording was easy to misread as load coverage.
+  - Fix: remove the Hauskonfigurator checkbox and the config flag; with several grid-tied inverters that own PV, always derive plant PV as Σ inv/pv · η_inv (flat plant EHAL value ignored); incomplete maps fail loud.
+  - Tests: `tests/test_topology_p2.py` (`test_multi_inv_ignores_mapped_plant_and_derives_sum`), `tests/test_pv_attribution.py` (`test_with_attributed_multi_inv_derives_even_when_plant_mapped`).
+- [ ] **Greenfield: Netznutzung Messart / Viertelstunden-Zähler UI** — fix implemented (2026-10-18); live acceptance pending
+  - Cause: `netznutzung.quarter_hour_meter` and `power_metering` were user toggles; not Earnie's concern.
+  - Fix: remove Hauskonfigurator Leistungsmessung select + QH-meter checkbox + migration QH question; always `quarter_hour_meter: true` and `power_metering: unmetered_power` on normalize; catalog still stores both base prices / `requires` for documentation.
+  - Tests: `tests/test_grid_fees.py` (`test_snap_applies_even_when_quarter_hour_meter_flag_false_in_raw`, `test_metered_power_raw_is_forced_to_unmetered_base`).
 
 ## New Bugs (Do not remove this chapter — even if empty)
+
+- [ ] Greenfield Loxone Dogfood
+  - [ ] On page "Szenarienkonfigurator" pre-select House-Profil (there is only one) and also pre-select all existing PVs and Batteries when opened the first time and live scenario has not started to be configured (no selections for none of these fields)
 
 - [ ] "debug-dumps\debug_dump_20261015_222809"
 

@@ -1,4 +1,4 @@
-"""Topology P2: ESS sum, load tolerance, plant-PV coverage, η_inv fail-loud."""
+"""Topology P2: ESS sum, load tolerance, multi-inv plant-PV derive, η_inv fail-loud."""
 from __future__ import annotations
 
 import pytest
@@ -9,7 +9,6 @@ from house_config.profiles_store import _normalize_plant
 from integrations.plant_balance import (
     DEFAULT_BALANCE_TOLERANCE_PCT,
     DEFAULT_BALANCE_TOLERANCE_W,
-    assert_mapped_plant_pv_coverage,
     derive_sens_power_consumers_w,
     sum_grid_tied_house_ess_power_w,
 )
@@ -143,18 +142,18 @@ def test_derive_load_night_uses_absolute_floor() -> None:
         derive_sens_power_consumers_w(telem_bad)
 
 
-def test_mapped_plant_pv_coverage_requires_ack_or_maps() -> None:
+def test_multi_inv_ignores_mapped_plant_and_derives_sum() -> None:
     inverters = [
         {
             "id": "wr_a",
             "ac_connection": "grid_tied",
-            "efficiency": 0.97,
+            "efficiency": 1.0,
             "ehal_bindings": {},
         },
         {
             "id": "wr_b",
             "ac_connection": "grid_tied",
-            "efficiency": 0.97,
+            "efficiency": 1.0,
             "ehal_bindings": {},
         },
     ]
@@ -162,54 +161,22 @@ def test_mapped_plant_pv_coverage_requires_ack_or_maps() -> None:
         {"id": "p1", "inverter_id": "wr_a", "ehal_bindings": {}},
         {"id": "p2", "inverter_id": "wr_b", "ehal_bindings": {}},
     ]
-    with pytest.raises(ValueError, match="pv_covers_all_inverters"):
-        assert_mapped_plant_pv_coverage(
-            inverters=inverters, pv_systems=pv_systems
-        )
-    assert_mapped_plant_pv_coverage(
-        inverters=inverters,
-        pv_systems=pv_systems,
-        pv_covers_all_inverters=True,
-    )
-    inverters[0]["ehal_bindings"] = {inv_field("wr_a", "sens_inv_power_pv"): ""}
-    inverters[1]["ehal_bindings"] = {inv_field("wr_b", "sens_inv_power_pv"): ""}
-    assert_mapped_plant_pv_coverage(
-        inverters=inverters, pv_systems=pv_systems
-    )
-
-
-def test_with_attributed_mapped_plant_enforces_coverage() -> None:
-    inverters = [
-        {
-            "id": "wr_a",
-            "ac_connection": "grid_tied",
-            "efficiency": 0.97,
-            "ehal_bindings": {},
-        },
-        {
-            "id": "wr_b",
-            "ac_connection": "grid_tied",
-            "efficiency": 0.97,
-            "ehal_bindings": {},
-        },
-    ]
-    pv_systems = [
-        {"id": "p1", "inverter_id": "wr_a", "ehal_bindings": {}},
-        {"id": "p2", "inverter_id": "wr_b", "ehal_bindings": {}},
-    ]
-    with pytest.raises(ValueError, match="pv_covers_all_inverters"):
+    with pytest.raises(ValueError, match="incomplete"):
         with_attributed_plant_pv(
             {"sens_pv_production_active": 3000.0},
             scoped_live={},
             inverters=inverters,
             pv_systems=pv_systems,
         )
+    scoped = {
+        inv_field("wr_a", "sens_inv_power_pv"): 1000.0,
+        inv_field("wr_b", "sens_inv_power_pv"): 2000.0,
+    }
     out = with_attributed_plant_pv(
-        {"sens_pv_production_active": 3000.0},
-        scoped_live={},
+        {"sens_pv_production_active": 9999.0},
+        scoped_live=scoped,
         inverters=inverters,
         pv_systems=pv_systems,
-        pv_covers_all_inverters=True,
     )
     assert out["sens_pv_production_active"] == pytest.approx(3000.0)
 
@@ -227,7 +194,7 @@ def test_normalize_plant_p2_fields() -> None:
             "balance_tolerance_w": 50,
         }
     )
-    assert out["pv_covers_all_inverters"] is True
+    assert "pv_covers_all_inverters" not in out
     assert out["balance_tolerance_pct"] == pytest.approx(7.0)
     assert out["balance_tolerance_w"] == pytest.approx(50.0)
     empty = _normalize_plant({})

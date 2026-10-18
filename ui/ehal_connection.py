@@ -24,11 +24,17 @@ def _ehal_block(data: dict) -> dict[str, Any]:
     return dict(ehal)
 
 
-def render_anbindung_section(backend: str, *, form_key_prefix: str) -> None:
+def render_anbindung_section(
+    backend: str,
+    *,
+    form_key_prefix: str,
+    show_heading: bool = True,
+) -> None:
     """Credentials re-entry for the already-selected backend (SB Anbindung)."""
     from ui.setup_dotenv import render_loxone_credentials_form
 
-    st.subheader("Anbindung")
+    if show_heading:
+        st.subheader("Anbindung")
     st.caption(
         f"Backend: **{backend_label(backend)}** — Auswahl/Wechsel unter "
         "**Backend ändern**. Zugangsdaten können hier erneut geprüft werden."
@@ -143,6 +149,7 @@ def render_openems_connection_form(*, form_key: str = "ehal_openems_form") -> No
         return
     _persist_openems_connection(data, values)
     st.success("OpenEMS-Zugang gespeichert (`ehal.backend=openems`).")
+    st.session_state.pop("sb_chosen_backend", None)
     st.rerun()
 
 
@@ -291,4 +298,5 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
         return
     _persist_ha_connection(data, ha, adapter_id=adapter_id)
     st.success("HA-Zugang gespeichert (`ehal.backend=ha`, Zugangsdaten in `.env`).")
+    st.session_state.pop("sb_chosen_backend", None)
     st.rerun()

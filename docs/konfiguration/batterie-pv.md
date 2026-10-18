@@ -75,7 +75,7 @@ Diese Rolle ist für Dauerläufer ohne einzelnen Lauf-Auslöser gedacht (PC, Rou
 - **Quellenwahl und Ladegrenzen:** Beide brauchen an der physischen Powerstation jeweils ein **eigenes** Pattern-B-Binding. Sie greifen **nicht** auf die Mappings der Hausbatterie zurück, da sonst deren Lade-/Entladegrenzen überschrieben würden.
 - **Reserve-Größe:** angeschlossene Last × teure Stunden im Horizont. Ein Lernen der Energie pro Lauf wie bei `single_use` gibt es hier nicht.
 
-Die Live-PV-Leistung (AC-Summe der Anlage) kommt über `plant.ehal_bindings.sens_pv_production_active`. Fehlt dieses Mapping, kann Earnie die Anlagen-PV als Σ(WR-PV · η_inv) ableiten. Voraussetzung: Alle netzgekoppelten Wechselrichter mit PV sind vollständig über `inv.{id}.sens_inv_power_pv` gemappt (oder alle zugehörigen `pv.{id}.sens_pv_production_active`). Powerstation- und Insel-Wechselrichter (`ac_connection: island`) zählen nicht mit. Unvollständige Mappings führen zu einem Fehler. Optional je PV-Anlage: `pv_systems[].ehal_bindings` mit `pv.{id}.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) integriert Earnie aus der Anlagen-Leistung. Ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
+Die Live-PV-Leistung (AC-Summe der Anlage) kommt über `plant.ehal_bindings.sens_pv_production_active`, sofern höchstens ein netzgekoppelter Wechselrichter mit PV vorhanden ist. Bei mehreren solchen Wechselrichtern bildet Earnie die Anlagen-PV immer als Σ(WR-PV · η_inv); das flache Anlagen-Mapping wird dann nicht verwendet. Ableitung setzt vollständige `inv.{id}.sens_inv_power_pv`-Mappings voraus (oder alle zugehörigen `pv.{id}.sens_pv_production_active`). Powerstation- und Insel-Wechselrichter (`ac_connection: island`) zählen nicht mit. Unvollständige Mappings führen zu einem Fehler. Optional je PV-Anlage: `pv_systems[].ehal_bindings` mit `pv.{id}.sens_pv_production_active`. Die Intervallenergie für `cons_data` (`pv_kwh_interval`) integriert Earnie aus der Anlagen-Leistung. Ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
 
 ## Wechselrichter (`inverters[]`)
 
@@ -122,7 +122,7 @@ Das Skript setzt `regulates_on: grid` für jede Hausbatterie und legt `plant.gri
 **Live-Bilanz:**
 
 - **Speicherleistung:** Das Anlagen-`sens_ess_power` ist die Summe der gemappten `ess.{id}.sens_ess_power` aller netzgekoppelten Hausbatterien. Ein fehlendes Binding führt zu einem Fehler.
-- **PV bei mehreren Wechselrichtern:** Bei gemappter Anlagen-PV und mehreren netzgekoppelten Wechselrichtern mit PV sind entweder vollständige `inv.*`/`pv.*`-Mappings **oder** `plant.pv_covers_all_inverters: true` (Hauskonfigurator) nötig.
+- **PV bei mehreren Wechselrichtern:** Bei mehreren netzgekoppelten Wechselrichtern mit PV bildet Earnie die Anlagen-PV immer als Summe der gemappten `inv.*`/`pv.*`-Leistungen (× η_inv). Ein flaches Anlagen-PV-Mapping wird in diesem Fall nicht verwendet; unvollständige Mappings führen zu einem Fehler.
 - **Abgeleitete Hauslast:** Eine negative Restbilanz unterhalb der Toleranz (`plant.balance_tolerance_pct` / `balance_tolerance_w`, Defaults 5 % / 100 W) gilt als Telemetrie-Fehler. Earnie setzt sie nicht stillschweigend auf `0`.
 
 Details: [EHAL-Spec § Plant topology](../referenz/ehal.md).

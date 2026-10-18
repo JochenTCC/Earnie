@@ -117,12 +117,19 @@ def plant_pv_binding_mapped(house: dict | None) -> bool:
 
 
 def plant_pv_may_be_derived(house: dict | None, components: dict | None) -> bool:
-    """True when plant PV binding is absent and inv/pv coverage is complete."""
-    if plant_pv_binding_mapped(house):
-        return False
+    """True when plant PV should be Σ inv/pv (skip reading the plant binding).
+
+    Several grid-tied inverters with PV always derive (flat plant PV unused).
+    Otherwise derive only when the plant binding is absent and coverage is complete.
+    """
     comps = components if isinstance(components, dict) else {}
     inverters = list(comps.get("inverters") or [])
     pv_systems = list(comps.get("pv_systems") or [])
+    eligible = grid_tied_inverters_with_pv(inverters, pv_systems)
+    if len(eligible) > 1:
+        return True
+    if plant_pv_binding_mapped(house):
+        return False
     return plant_pv_derive_coverage_complete(inverters, pv_systems)
 
 
@@ -283,7 +290,12 @@ def derive_plant_pv_ac_w(
             "Cannot derive plant sens_pv_production_active: incomplete "
             f"grid-tied inverter PV coverage (missing: {', '.join(missing)}). "
             "Map inv.*.sens_inv_power_pv for every grid-tied inverter with PV "
-            "(or every attached pv.*.sens_pv_production_active), or map plant PV."
+            "(or every attached pv.*.sens_pv_production_active)"
+            + (
+                ", or map plant PV."
+                if len(eligible) <= 1
+                else "."
+            )
         )
     return total
 
@@ -294,15 +306,18 @@ def with_attributed_plant_pv(
     scoped_live: dict[str, Any],
     inverters: list[dict],
     pv_systems: list[dict],
-    pv_covers_all_inverters: bool = False,
 ) -> dict[str, Any]:
-    """Return telemetry copy with inv←Σpv fills and plant PV derived when missing."""
-    from integrations.plant_balance import assert_mapped_plant_pv_coverage
+    """Return telemetry copy with inv←Σpv fills and plant PV when needed.
 
+    Several grid-tied inverters with PV: always derive plant AC as
+    Σ inv PV · η_inv (mapped plant ``sens_pv_production_active`` ignored).
+    Otherwise keep a mapped plant value, or derive when it is missing.
+    """
     out = dict(telemetry)
     plant = out.get("sens_pv_production_active")
-    # Fail loud on partial PV maps only when plant must be derived.
-    fail_partial = plant is None
+    force_derive = len(grid_tied_inverters_with_pv(inverters, pv_systems)) > 1
+    # Fail loud on partial PV maps when plant must be derived.
+    fail_partial = plant is None or force_derive
     filled = fill_inv_pv_from_pv_systems(
         scoped_live, inverters, pv_systems, fail_partial=fail_partial
     )
@@ -312,18 +327,12 @@ def with_attributed_plant_pv(
             out[key] = value
         elif key.startswith("pv.") and key.endswith(".sens_pv_production_active"):
             out[key] = value
-    if plant is None:
+    if plant is None or force_derive:
         out["sens_pv_production_active"] = derive_plant_pv_ac_w(
             filled, inverters, pv_systems
         )
     else:
         out["sens_pv_production_active"] = max(0.0, float(plant))
-        assert_mapped_plant_pv_coverage(
-            inverters=inverters,
-            pv_systems=pv_systems,
-            scoped_live=filled,
-            pv_covers_all_inverters=pv_covers_all_inverters,
-        )
     return out
 
 

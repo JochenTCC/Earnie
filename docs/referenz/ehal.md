@@ -260,7 +260,7 @@ Migration (data model stays **4**): `python -m scripts.migrate_topology_once --c
 **Config / live balance (P2 — generator-side coverage):**
 
 - Plant `sens_ess_power` := Σ over grid-tied house batteries of `ess.{id}.sens_ess_power`. Missing binding/value for any eligible battery → fail loud. Battery-less plants omit ESS → `0`.
-- When plant PV is mapped **and** more than one grid-tied inverter owns PV: require complete `inv.*`/`pv.*` coverage **or** `plant.pv_covers_all_inverters: true` (user acknowledgement, logged).
+- When more than one grid-tied inverter owns PV: plant `sens_pv_production_active` is always derived as Σ inv/pv · η_inv (mapped plant PV is ignored); incomplete `inv.*`/`pv.*` coverage fails loud.
 - Derived load: `plant.balance_tolerance_pct` (default **5**) and `plant.balance_tolerance_w` (default **100**). Raw `PV + grid + ESS` below `−max(w, pct/100 · P_PV)` → telemetry error (not silent `0`); within tolerance → clamp to `0`.
 - Live attribution uses required inverter `efficiency` (η_inv); no soft default.
 

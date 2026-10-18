@@ -11,7 +11,6 @@ _PLANT_EXPORT_KEY = "house_config_plant_max_export_kw"
 _PLANT_EXPORT_ENABLED_KEY = "house_config_plant_max_export_enabled"
 _PLANT_GM_AT_HOUSE_KEY = "house_config_plant_grid_meter_at_house"
 _PLANT_GM_SINGLE_TARIFF_KEY = "house_config_plant_grid_meter_single_tariff"
-_PLANT_PV_COVERS_KEY = "house_config_plant_pv_covers_all_inverters"
 
 
 def _seed_plant_export_widgets(plant: dict) -> None:
@@ -92,20 +91,12 @@ def _seed_plant_grid_meter_widgets(plant: dict) -> None:
         )
 
 
-def _seed_plant_pv_covers_widget(plant: dict) -> None:
-    if _PLANT_PV_COVERS_KEY not in st.session_state:
-        st.session_state[_PLANT_PV_COVERS_KEY] = bool(
-            plant.get("pv_covers_all_inverters", False)
-        )
-
-
 def render_plant_grid_meter_assertions() -> None:
-    """Topology P1/P2: root meter assertions and plant-PV coverage ack."""
+    """Topology P1: root meter assertions for the live path."""
     house = load_house_profiles()
     plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
     plant_map = plant if isinstance(plant, dict) else {}
     _seed_plant_grid_meter_widgets(plant_map)
-    _seed_plant_pv_covers_widget(plant_map)
 
     st.markdown("##### Netz-Zähler (Anlage / Live)")
     st.caption(
@@ -125,17 +116,6 @@ def render_plant_grid_meter_assertions() -> None:
         key=_PLANT_GM_SINGLE_TARIFF_KEY,
         help="plant.grid_meter.single_tariff",
     )
-    st.markdown("##### Anlagen-PV-Abdeckung (Live)")
-    st.caption(
-        "Wenn die Anlagen-PV gemappt ist und mehrere netzgekoppelte WR "
-        "eigene PV haben: entweder vollständige `inv.*`/`pv.*`-Maps "
-        "oder diese Bestätigung."
-    )
-    pv_covers = labeled_checkbox(
-        "Anlagen-PV deckt alle netzgekoppelten Wechselrichter ab",
-        key=_PLANT_PV_COVERS_KEY,
-        help="plant.pv_covers_all_inverters",
-    )
 
     def _persist() -> None:
         from house_config.required_signal_activation import activate_plant_required
@@ -150,10 +130,7 @@ def render_plant_grid_meter_assertions() -> None:
             "at_house_connection": bool(at_house),
             "single_tariff": bool(single),
         }
-        if bool(pv_covers):
-            plant_out["pv_covers_all_inverters"] = True
-        else:
-            plant_out.pop("pv_covers_all_inverters", None)
+        plant_out.pop("pv_covers_all_inverters", None)
         doc["plant"] = activate_plant_required(plant_out)
         save_house_profiles(doc)
 
@@ -162,7 +139,6 @@ def render_plant_grid_meter_assertions() -> None:
         payload={
             "at_house": bool(at_house),
             "single": bool(single),
-            "pv_covers": bool(pv_covers),
         },
         save=_persist,
     )

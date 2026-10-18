@@ -76,10 +76,6 @@
             }
           }
         },
-        "pv_covers_all_inverters": {
-          "type": "boolean",
-          "description": "Topology P2: when plant PV is mapped and several grid-tied inverters own PV, true acknowledges that the plant sum covers all of them (otherwise complete inv.*/pv.* maps are required)."
-        },
         "balance_tolerance_pct": {
           "type": "number",
           "minimum": 0,
@@ -648,11 +644,11 @@
             "power_metering": {
               "type": "string",
               "enum": ["unmetered_power", "metered_power"],
-              "description": "Messart; wählt den Basis-Arbeitspreis im Katalog."
+              "description": "Persisted for pack shape; Earnie always uses unmetered_power (household; not user-configurable)."
             },
             "quarter_hour_meter": {
               "type": "boolean",
-              "description": "Viertelstunden-Smart-Meter vorhanden (Voraussetzung für SNAP/WiNAP)."
+              "description": "Persisted for pack shape; Earnie always treats as true (QH smart meter assumed, not user-configurable)."
             },
             "base_cent_kwh": {
               "type": "number",

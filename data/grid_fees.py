@@ -7,9 +7,9 @@ Modell (siehe ``docs/konfiguration/preise.md``):
 * Regelsatz: Liste zeitgebundener Regeln (z. B. SNAP, WiNAP). Eine Regel ändert den
   Basis-Arbeitspreis in einem Zeitfenster (``percent_off``, ``absolute_cent``,
   ``add_cent``).
-* Hausprofil (``netznutzung``): wählt Netzbereich, Messart und optional eigenen
-  Basiswert. :func:`resolve_grid_fee_spec` erzeugt daraus die aufgelöste Spec, die
-  :func:`grid_fee_work_cent` pro Slot auswertet.
+* Hausprofil (``netznutzung``): wählt Netzbereich und optional eigenen Basiswert.
+  Messart is always unmetered household (``unmetered_power``). :func:`resolve_grid_fee_spec`
+  erzeugt daraus die aufgelöste Spec, die :func:`grid_fee_work_cent` pro Slot auswertet.
 
 Alle Preise netto (ohne USt), Cent/kWh. Fehlkonfiguration schlägt laut fehl.
 """
@@ -32,6 +32,9 @@ VALID_MODES = frozenset({MODE_PERCENT_OFF, MODE_ABSOLUTE_CENT, MODE_ADD_CENT})
 
 REQUIRES_QUARTER_HOUR_METER = "quarter_hour_meter"
 VALID_REQUIRES = frozenset({REQUIRES_QUARTER_HOUR_METER})
+
+METERING_UNMETERED = "unmetered_power"
+METERING_METERED = "metered_power"  # catalog key only; profile always uses unmetered
 
 DEFAULT_INCLUDE_STATUS = (STATUS_VERORDNET,)
 
@@ -194,7 +197,7 @@ def normalize_grid_fee_catalog(doc: Any) -> dict[str, Any]:
         if not isinstance(base, dict):
             raise ValueError(f"grid_fees: Netzbereich '{area_id}': base_cent_kwh fehlt.")
         base_norm: dict[str, float] = {}
-        for key in ("unmetered_power", "metered_power"):
+        for key in (METERING_UNMETERED, METERING_METERED):
             value = float(base.get(key))
             if value < 0.0:
                 raise ValueError(f"grid_fees: Netzbereich '{area_id}': {key} muss >= 0 sein.")
@@ -224,16 +227,12 @@ def load_grid_fee_catalog(path: str) -> dict[str, Any]:
 # Profil-Konfiguration (Hausprofil-Feld ``netznutzung``)
 # --------------------------------------------------------------------------- #
 
-METERING_UNMETERED = "unmetered_power"
-METERING_METERED = "metered_power"
-VALID_METERING = frozenset({METERING_UNMETERED, METERING_METERED})
-
-
 def default_netznutzung_config() -> dict[str, Any]:
     return {
         "area_id": None,
         "power_metering": METERING_UNMETERED,
-        "quarter_hour_meter": False,
+        # Assumed present — not an Earnie configuration (SNAP/WiNAP catalog requires).
+        "quarter_hour_meter": True,
         "base_cent_kwh": 0.0,
         "include_status": list(DEFAULT_INCLUDE_STATUS),
     }
@@ -247,12 +246,8 @@ def normalize_netznutzung_config(raw: Any, *, label: str = "netznutzung") -> dic
         raise ValueError(f"{label} muss ein Objekt sein.")
     area_raw = raw.get("area_id")
     area_id = str(area_raw).strip() if area_raw not in (None, "") else None
-    metering = str(raw.get("power_metering", METERING_UNMETERED)).strip().lower()
-    if metering not in VALID_METERING:
-        raise ValueError(
-            f"{label}.power_metering '{metering}' ungültig. "
-            f"Erlaubt: {', '.join(sorted(VALID_METERING))}."
-        )
+    # Assumed household unmetered — not an Earnie configuration.
+    metering = METERING_UNMETERED
     base_raw = raw.get("base_cent_kwh")
     base = float(base_raw) if base_raw is not None else 0.0
     if base < 0.0:
@@ -270,7 +265,7 @@ def normalize_netznutzung_config(raw: Any, *, label: str = "netznutzung") -> dic
     return {
         "area_id": area_id,
         "power_metering": metering,
-        "quarter_hour_meter": bool(raw.get("quarter_hour_meter", False)),
+        "quarter_hour_meter": True,
         "base_cent_kwh": base,
         "include_status": include,
     }
@@ -288,11 +283,11 @@ def resolve_grid_fee_spec(
 ) -> dict[str, Any]:
     """Löst Profilfeld + Katalog zur auswertbaren Spec auf.
 
-    Ist ein Netzbereich gewählt, kommt der Basiswert aus dem Katalog (Messart);
-    ``base_cent_kwh`` am Profil wird dann ignoriert. Ohne Netzbereich gilt der
-    Profilwert ohne Regeln. Regeln mit ``status`` außerhalb ``include_status`` oder
-    unerfüllter Voraussetzung werden mit Grund in ``skipped`` vermerkt. Eine
-    einbezogene Regel ohne Wert (``effect.value`` null) ist ein Fehler.
+    Ist ein Netzbereich gewählt, kommt der Basiswert aus dem Katalog
+    (``unmetered_power``); ``base_cent_kwh`` am Profil wird dann ignoriert. Ohne
+    Netzbereich gilt der Profilwert ohne Regeln. Regeln mit ``status`` außerhalb
+    ``include_status`` werden mit Grund in ``skipped`` vermerkt. Eine einbezogene
+    Regel ohne Wert (``effect.value`` null) ist ein Fehler.
     """
     cfg = normalize_netznutzung_config(netznutzung)
     area_id = cfg["area_id"]
@@ -319,9 +314,7 @@ def resolve_grid_fee_spec(
             if rule["status"] not in cfg["include_status"]:
                 skipped.append({"id": rule["id"], "reason": f"status={rule['status']}"})
                 continue
-            if REQUIRES_QUARTER_HOUR_METER in rule["requires"] and not cfg["quarter_hour_meter"]:
-                skipped.append({"id": rule["id"], "reason": "kein Viertelstundenzähler"})
-                continue
+            # Catalog may list REQUIRES_QUARTER_HOUR_METER; Earnie assumes it exists.
             if rule["effect"]["value"] is None:
                 raise ValueError(
                     f"Regel '{rule['id']}' (status={rule['status']}) ist einbezogen, "

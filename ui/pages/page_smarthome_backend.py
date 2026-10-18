@@ -53,6 +53,7 @@ _KIND_TO_BACKEND = {
 _SESSION_RESULTS = "sb_scan_results"
 _SESSION_RAN_ACTIVE = "sb_ran_active_scan"
 _SESSION_CHOSEN_BACKEND = "sb_chosen_backend"
+_SESSION_DISCOVERED_LOXONE_HOST = "sb_discovered_loxone_host"
 
 
 def _run_scan(*, active: bool) -> list[DiscoveredBackend]:
@@ -140,6 +141,15 @@ def _render_backend_import_section(backend: str) -> None:
         )
 
 
+def _credentials_expander_expanded(backend: str) -> bool:
+    """Open Zugangsdaten when Loxone auth recovery needs a credential fix."""
+    if backend != BACKEND_LOXONE:
+        return False
+    from runtime_store.loxone_auth_error import needs_loxone_auth_recovery
+
+    return needs_loxone_auth_recovery()
+
+
 def _render_configured_summary(*, allow_change: bool = True) -> None:
     """Show connected backend. When ``allow_change`` is False (Shadow), skip
     discovery / greenfield — those probe the live hub and raise
@@ -150,7 +160,17 @@ def _render_configured_summary(*, allow_change: bool = True) -> None:
     st.caption("EHAL-Com und Optimierer-Dienst sind freigeschaltet.")
     if backend == BACKEND_LOXONE:
         _render_miniserver_callback_caption()
-    render_anbindung_section(backend, form_key_prefix="sb_anbindung")
+    # Top-level Anbindung is only for first-run credentials; after connect, keep
+    # re-entry under a collapsed expander so the chapter does not stay open.
+    with st.expander(
+        "Zugangsdaten",
+        expanded=_credentials_expander_expanded(backend),
+    ):
+        render_anbindung_section(
+            backend,
+            form_key_prefix="sb_anbindung",
+            show_heading=False,
+        )
     if not allow_change:
         return
     with st.expander("Backend ändern", expanded=False):
@@ -158,8 +178,38 @@ def _render_configured_summary(*, allow_change: bool = True) -> None:
     _render_backend_import_section(backend)
 
 
+def _loxone_host_for_credentials(hit: DiscoveredBackend) -> str:
+    """IP (and non-default HTTP port) for the Loxone credentials form."""
+    host = str(hit.host or "").strip()
+    if not host:
+        return ""
+    port = hit.port
+    try:
+        port_i = int(port) if port is not None else 80
+    except (TypeError, ValueError):
+        port_i = 80
+    if port_i not in (0, 80):
+        return f"{host}:{port_i}"
+    return host
+
+
+def _apply_discovered_loxone_host(hit: DiscoveredBackend) -> str:
+    """Persist discovered Miniserver address into session + credential form widgets."""
+    host = _loxone_host_for_credentials(hit)
+    if not host:
+        st.session_state.pop(_SESSION_DISCOVERED_LOXONE_HOST, None)
+        return ""
+    st.session_state[_SESSION_DISCOVERED_LOXONE_HOST] = host
+    # Force both first-run and Zugangsdaten expander IP widgets (Streamlit keys).
+    for form_key in ("sb_loxone_form", "sb_anbindung_loxone_form", "loxone_setup_form"):
+        st.session_state[f"{form_key}_ip"] = host
+    return host
+
+
 def _select_hit(hit: DiscoveredBackend) -> None:
     st.session_state[_SESSION_CHOSEN_BACKEND] = _KIND_TO_BACKEND[hit.kind]
+    if hit.kind == "loxone":
+        _apply_discovered_loxone_host(hit)
     st.rerun()
 
 
@@ -220,6 +270,7 @@ def _render_credentials_step(backend: str) -> None:
         render_openems_connection_form(form_key="sb_openems_form")
     if st.button("Andere Auswahl", key="sb_credentials_back"):
         st.session_state.pop(_SESSION_CHOSEN_BACKEND, None)
+        st.session_state.pop(_SESSION_DISCOVERED_LOXONE_HOST, None)
         st.rerun()
 
 

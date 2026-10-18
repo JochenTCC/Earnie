@@ -145,6 +145,22 @@ def test_with_attributed_keeps_mapped_plant() -> None:
     assert out["sens_pv_production_active"] == pytest.approx(2500.0)
 
 
+def test_with_attributed_multi_inv_derives_even_when_plant_mapped() -> None:
+    inverters = [_inv("wr_a", eta=1.0), _inv("wr_b", eta=1.0)]
+    pv_systems = [_pv("p1", "wr_a"), _pv("p2", "wr_b")]
+    scoped = {
+        inv_field("wr_a", "sens_inv_power_pv"): 400.0,
+        inv_field("wr_b", "sens_inv_power_pv"): 600.0,
+    }
+    out = with_attributed_plant_pv(
+        {"sens_pv_production_active": 2500.0},
+        scoped_live=scoped,
+        inverters=inverters,
+        pv_systems=pv_systems,
+    )
+    assert out["sens_pv_production_active"] == pytest.approx(1000.0)
+
+
 def test_curtail_allocation_still_forecast_only() -> None:
     """Live attribution helper must not be wired into curtail weights yet."""
     import inspect

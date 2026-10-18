@@ -190,20 +190,17 @@ def collect_scoped_pv_live_w() -> dict[str, float]:
 
 
 def with_live_pv_attribution(telemetry: dict[str, Any]) -> dict[str, Any]:
-    """Fill plant PV from Σ grid-tied inv PV · η_inv when plant is missing.
+    """Fill plant PV from Σ grid-tied inv PV · η_inv when needed.
 
+    Several grid-tied inverters with PV always derive (mapped plant PV ignored).
     Also derives missing ``inv.*.sens_inv_power_pv`` from complete per-PV maps.
     Fail loud on partial coverage when plant must be derived.
     """
-    from integrations.plant_balance import pv_covers_all_inverters_from_plant
     from integrations.pv_attribution import (
         load_components_for_attribution,
-        load_house_for_attribution,
         with_attributed_plant_pv,
     )
 
-    house = load_house_for_attribution()
-    plant = house.get("plant") if isinstance(house, dict) else {}
     components = load_components_for_attribution()
     inverters = list(components.get("inverters") or [])
     pv_systems = list(components.get("pv_systems") or [])
@@ -223,9 +220,6 @@ def with_live_pv_attribution(telemetry: dict[str, Any]) -> dict[str, Any]:
         scoped_live=scoped,
         inverters=inverters,
         pv_systems=pv_systems,
-        pv_covers_all_inverters=pv_covers_all_inverters_from_plant(
-            plant if isinstance(plant, dict) else {}
-        ),
     )
     if out.get("sens_pv_production_active") is None:
         raise ValueError(

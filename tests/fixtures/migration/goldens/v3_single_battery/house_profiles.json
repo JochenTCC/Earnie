@@ -274,7 +274,7 @@
             "netznutzung": {
                 "area_id": null,
                 "power_metering": "unmetered_power",
-                "quarter_hour_meter": false,
+                "quarter_hour_meter": true,
                 "base_cent_kwh": 5.353,
                 "include_status": [
                     "verordnet"

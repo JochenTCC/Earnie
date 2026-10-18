@@ -205,7 +205,6 @@ class HaTelemetryMixin:
         components: dict,
     ) -> dict[str, Any]:
         """PV coverage, Σ ESS power, derived load with tolerance (Topology P2)."""
-        from integrations.plant_balance import pv_covers_all_inverters_from_plant
         from integrations.pv_attribution import with_attributed_plant_pv
 
         plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
@@ -229,9 +228,6 @@ class HaTelemetryMixin:
                 scoped_live=scoped,
                 inverters=inverters,
                 pv_systems=pv_systems,
-                pv_covers_all_inverters=pv_covers_all_inverters_from_plant(
-                    plant
-                ),
             )
         except ValueError as exc:
             raise HaHttpError(str(exc)) from exc

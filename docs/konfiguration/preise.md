@@ -42,8 +42,8 @@ Der Arbeitspreis für die Netznutzung steht am Hausprofil unter Standort im Obje
 | Feld | Bedeutung |
 | --- | --- |
 | `area_id` | Netzbereich aus dem Katalog `earnie_env/config/grid_fees.json` (Seed aus öffentlichem [`share/config/grid_fees.json`](../../share/config/grid_fees.json); z. B. `AT-VBG`). `null` = eigener Wert ohne Zeitregeln. |
-| `power_metering` | `unmetered_power` (Standard Haushalt, nicht gemessene Leistung) oder `metered_power`; wählt den Basis-Arbeitspreis im Katalog. |
-| `quarter_hour_meter` | Viertelstunden-Smart-Meter vorhanden. Voraussetzung für SNAP/WiNAP; ohne diesen Zähler überspringt Earnie die Regeln und weist das in UI und Jahresrechnung aus. |
+| `power_metering` | Immer `unmetered_power` (nicht gemessene Leistung / Standard Haushalt). Wählt den Basis-Arbeitspreis im Katalog; keine UI-Einstellung. |
+| `quarter_hour_meter` | Immer `true`. Earnie setzt voraus, dass ein Viertelstunden-Smart-Meter vorhanden ist (Voraussetzung der Katalogregeln SNAP/WiNAP); keine UI-Einstellung. |
 | `base_cent_kwh` | Eigener Basis-Arbeitspreis (Cent/kWh netto); nur ohne `area_id` wirksam. |
 | `include_status` | Welche Regel-Stati gelten. Standard ist nur `verordnet`; `entwurf` und `illustrativ` müssen bewusst aktiviert werden. |
 
@@ -70,7 +70,7 @@ Die Katalogwerte stammen aus einer Recherche (SNE-V 2018, Fassung 01.04.2026; SN
 python -m scripts.migrate_grid_fee_profile --path earnie_env/config/house_profiles.json
 ```
 
-Der Preis bleibt dabei gleich. Danach den Netzbereich im Hausprofil wählen oder `--area-id AT-VBG --quarter-hour-meter` übergeben.
+Der Preis bleibt dabei gleich. Danach den Netzbereich im Hausprofil wählen oder `--area-id AT-VBG` übergeben.
 
 ### Land am Hausprofil
 

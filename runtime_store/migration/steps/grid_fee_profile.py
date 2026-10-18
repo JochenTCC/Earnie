@@ -19,7 +19,6 @@ from runtime_store.migration.types import (
 
 STEP_ID = "dm4.grid_fee_profile"
 Q_AREA = f"{STEP_ID}.area_id"
-Q_QHM = f"{STEP_ID}.quarter_hour_meter"
 
 QUESTIONS = (
     Question(
@@ -27,13 +26,6 @@ QUESTIONS = (
         step_id=STEP_ID,
         prompt_de="Netzbereich-ID aus grid_fees.json (leer = eigener Basispreis)",
         kind="str",
-        required=False,
-    ),
-    Question(
-        id=Q_QHM,
-        step_id=STEP_ID,
-        prompt_de="Viertelstunden-Zähler vorhanden?",
-        kind="bool",
         required=False,
     ),
 )
@@ -56,12 +48,9 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
         area_id = None
     else:
         area_id = str(raw_area).strip() or None
-    qhm = bool(answers.get(Q_QHM, False))
 
     try:
-        changed = migrate_document(
-            house, area_id=area_id, quarter_hour_meter=qhm
-        )
+        changed = migrate_document(house, area_id=area_id)
     except ValueError as exc:
         return StepResult(
             docs=docs,
