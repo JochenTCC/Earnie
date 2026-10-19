@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — SE detailed calendar disabled Okt–Dez on rolling 12-month window (2026-10-19)
+
+- [x] **SE detailed calendar disabled Okt–Dez on rolling 12-month window** — **Verified** (2026-10-19; greenfield 12-month SE)
+  - Symptom: After a 12-month SE, Okt/Nov/Dez (and the selected month) looked disabled in Detaillierte Simulationsansicht.
+  - Cause: Calendar built Jan–Dez only for `backtesting_year` (end year); rolling window `2025-10`–`2026-09` left Okt–Dez 2026 empty while run data lived in 2025. Selected month is intentionally non-clickable.
+  - Fix: Resolve each calendar month to the year overlapping the SE period; header shows year span.
+  - Tests: `tests/test_backtesting_deviation_calendar.py` (`test_build_index_rolling_window_maps_oct_dec_to_prior_year`).
+
 ### Bugfix — Powerstation planning ignored live SOC limits (2026-10-19)
 
 - [x] **Powerstation planning ignored live SOC limits** (dump `debug_dump_20261019_124658`) — **Verified** (2026-10-19; Shadow Chart1, live `max_soc` 95%)

@@ -146,6 +146,33 @@ def test_build_index_test_month_bounds():
     assert index[date(2025, 4, 1)].in_run is False
 
 
+def test_build_index_rolling_window_maps_oct_dec_to_prior_year():
+    """last_12_months ending Sep Y uses Okt–Dez of Y-1, not empty months of Y."""
+    from ui.backtesting_deviation_calendar import (
+        _month_has_in_run_days,
+        _month_years_in_period,
+    )
+
+    meta = _sample_meta(start="2025-10-01", end="2026-09-30")
+    meta["period"]["backtesting_year"] = 2026
+    month_years = _month_years_in_period(meta["period"])
+    assert month_years[10] == 2025
+    assert month_years[12] == 2025
+    assert month_years[1] == 2026
+    assert month_years[9] == 2026
+
+    run_anchors = _run_anchors_for_dates(
+        [date(2025, 10, 5), date(2025, 11, 5), date(2025, 12, 5), date(2026, 1, 5)]
+    )
+    index = build_deviation_calendar_index(meta, [], run_anchors=run_anchors)
+    assert index[date(2025, 10, 5)].in_run is True
+    assert date(2026, 10, 5) not in index
+    assert _month_has_in_run_days(index, year=2025, month=10) is True
+    assert _month_has_in_run_days(index, year=2025, month=11) is True
+    assert _month_has_in_run_days(index, year=2025, month=12) is True
+    assert _month_has_in_run_days(index, year=2026, month=1) is True
+
+
 def test_cases_for_date_and_scenario():
     day = date(2025, 9, 28)
     anchor = anchor_for_calendar_date(day)

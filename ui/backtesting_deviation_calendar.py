@@ -130,15 +130,54 @@ def _period_date_bounds(period: dict) -> tuple[date, date] | None:
     return start.date(), end.date()
 
 
+def _month_years_in_period(period: dict) -> dict[int, int]:
+    """Map calendar month 1–12 → year that overlaps the SE period.
+
+    Rolling last-12-month windows span two calendar years (e.g. Okt 2025–Sep 2026).
+    Each month number appears once; pick the year whose month interval overlaps
+    ``period.start``…``period.end``. Months with no overlap fall back to
+    ``backtesting_year`` (those buttons stay disabled).
+    """
+    fallback = int(period.get("backtesting_year") or BACKTESTING_YEAR)
+    bounds = _period_date_bounds(period)
+    if bounds is None:
+        return {month: fallback for month in range(1, 13)}
+    start, end = bounds
+    month_years: dict[int, int] = {}
+    for month in range(1, 13):
+        chosen: int | None = None
+        for year in range(start.year, end.year + 1):
+            first = date(year, month, 1)
+            last = date(year, month, calendar.monthrange(year, month)[1])
+            if first <= end and last >= start:
+                chosen = year
+                break
+        month_years[month] = chosen if chosen is not None else fallback
+    return month_years
+
+
+def _period_year_label(period: dict, month_years: dict[int, int]) -> str:
+    bounds = _period_date_bounds(period)
+    if bounds is not None:
+        start_year, end_year = bounds[0].year, bounds[1].year
+        if start_year != end_year:
+            return f"{start_year}–{end_year}"
+        return str(start_year)
+    years = sorted(set(month_years.values()))
+    if len(years) == 1:
+        return str(years[0])
+    return f"{years[0]}–{years[-1]}"
+
+
 def build_deviation_calendar_index(
     meta: dict,
     cases: list[dict],
     *,
     run_anchors: list[datetime],
 ) -> dict[date, CalendarCellState]:
-    """Baut Zellzustände für Jan–Dez des Backtesting-Jahres."""
+    """Baut Zellzustände für die 12 Kalendermonate im SE-Zeitraum."""
     period = meta.get("period") or {}
-    year = int(period.get("backtesting_year") or BACKTESTING_YEAR)
+    month_years = _month_years_in_period(period)
     period_bounds = _period_date_bounds(period)
     run_anchor_keys = {
         normalize_window_anchor_key(anchor) for anchor in run_anchors
@@ -153,7 +192,7 @@ def build_deviation_calendar_index(
         cases_by_anchor.setdefault(key, []).append(case)
 
     index: dict[date, CalendarCellState] = {}
-    for month in range(1, 13):
+    for month, year in month_years.items():
         days_in_month = calendar.monthrange(year, month)[1]
         for day in range(1, days_in_month + 1):
             cell_date = date(year, month, day)
@@ -241,12 +280,14 @@ def _stored_selected_date() -> date | None:
 def month_with_most_deviation_days(
     index: dict[date, CalendarCellState],
     *,
-    year: int,
+    year: int | None = None,
 ) -> int | None:
     """Monat mit den meisten in-run Tagen mit mindestens einer Abweichung."""
     counts = {month: 0 for month in range(1, 13)}
     for cell_date, cell in index.items():
-        if cell_date.year != year or not cell.in_run or not cell.cases_by_scenario:
+        if year is not None and cell_date.year != year:
+            continue
+        if not cell.in_run or not cell.cases_by_scenario:
             continue
         counts[cell_date.month] += 1
     best = max(counts.values())
@@ -274,7 +315,9 @@ def _default_visible_month(
     selected_date: date | None,
     period: dict | None = None,
 ) -> int:
+    del year  # resolved per month from period (rolling windows span two years)
     period = period or {}
+    month_years = _month_years_in_period(period)
     if is_single_month_test_run(period):
         test_month = int(period["start_month"])
         if 1 <= test_month <= 12:
@@ -283,23 +326,23 @@ def _default_visible_month(
     if (
         isinstance(stored, int)
         and 1 <= stored <= 12
-        and _month_has_in_run_days(index, year=year, month=stored)
+        and _month_has_in_run_days(
+            index, year=month_years[stored], month=stored
+        )
     ):
         return stored
-    if (
-        selected_date is not None
-        and selected_date.year == year
-        and _month_has_in_run_days(index, year=year, month=selected_date.month)
+    if selected_date is not None and _month_has_in_run_days(
+        index, year=selected_date.year, month=selected_date.month
     ):
         return selected_date.month
-    deviation_month = month_with_most_deviation_days(index, year=year)
+    deviation_month = month_with_most_deviation_days(index)
     if deviation_month is not None:
         return deviation_month
     default = default_calendar_date(index)
-    if default is not None and default.year == year:
+    if default is not None:
         return default.month
     for month in range(1, 13):
-        if _month_has_in_run_days(index, year=year, month=month):
+        if _month_has_in_run_days(index, year=month_years[month], month=month):
             return month
     return 1
 
@@ -345,17 +388,17 @@ def render_deviation_calendar(
 ) -> date | None:
     """Ein Monat mit 12 Monats-Buttons; gibt gewählten Kalendertag zurück."""
     period = meta.get("period") or {}
-    year = int(period.get("backtesting_year") or BACKTESTING_YEAR)
+    month_years = _month_years_in_period(period)
+    fallback_year = int(period.get("backtesting_year") or BACKTESTING_YEAR)
     selected_date = _stored_selected_date()
-    if selected_date is not None and not (
-        selected_date.year == year
-        and _month_has_in_run_days(index, year=year, month=selected_date.month)
-        and index.get(selected_date) is not None
-        and index[selected_date].in_run
-    ):
-        selected_date = None
-        st.session_state.pop(_SESSION_DATE_KEY, None)
-    visible_month = _default_visible_month(index, year, selected_date, period)
+    if selected_date is not None:
+        cell = index.get(selected_date)
+        if cell is None or not cell.in_run:
+            selected_date = None
+            st.session_state.pop(_SESSION_DATE_KEY, None)
+    visible_month = _default_visible_month(
+        index, fallback_year, selected_date, period
+    )
     st.session_state[_SESSION_MONTH_KEY] = visible_month
 
     st.caption(
@@ -365,10 +408,11 @@ def render_deviation_calendar(
         "ausgegraut = außerhalb Lauf"
     )
 
-    st.markdown(f"**{year}**")
+    st.markdown(f"**{_period_year_label(period, month_years)}**")
     month_cols = st.columns(12)
     for month in range(1, 13):
-        has_days = _month_has_in_run_days(index, year=year, month=month)
+        month_year = month_years[month]
+        has_days = _month_has_in_run_days(index, year=month_year, month=month)
         is_selected = month == visible_month
         with month_cols[month - 1]:
             if st.button(
@@ -380,7 +424,9 @@ def render_deviation_calendar(
                 st.session_state[_SESSION_MONTH_KEY] = month
                 st.rerun()
 
-    clicked_date = _render_month(year, visible_month, index, selected_date)
+    clicked_date = _render_month(
+        month_years[visible_month], visible_month, index, selected_date
+    )
     if clicked_date is not None:
         st.session_state[_SESSION_DATE_KEY] = clicked_date
         st.session_state[_SESSION_MONTH_KEY] = clicked_date.month

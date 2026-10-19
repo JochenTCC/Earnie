@@ -34,7 +34,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## New Bugs (Do not remove this chapter — even if empty)
 
 
-
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
 - [ ] Review and modify text in SE review pop-up dialogue
