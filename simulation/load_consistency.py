@@ -18,14 +18,42 @@ _CONSUMER_MIN_ABS_KWH = 50.0
 _CONSUMER_MIN_REL = 0.10
 
 
+def fixed_24h_windows(anchor: datetime) -> tuple[list[datetime], datetime]:
+    """Legacy window: the 24 h before the anchor, targets due by the anchor."""
+    from simulation.engine import window_slot_datetimes
+
+    return window_slot_datetimes(anchor), anchor
+
+
+def sunrise_book_windows(scenario_params: dict):
+    """Window provider for sunrise mode: book slots [SA1, SA2) and their end (as the SE uses it)."""
+    from optimizer.slot_duration import DEFAULT_DT_H
+    from datetime import timedelta
+    from simulation.matrix_builder import (
+        naive_backtesting_slot,
+        resolve_sunrise_book_step_for_scenario,
+    )
+
+    def provider(anchor: datetime) -> tuple[list[datetime], datetime]:
+        step = resolve_sunrise_book_step_for_scenario(anchor, scenario_params)
+        slots = [naive_backtesting_slot(slot) for slot in step.book_slots]
+        return slots, slots[-1] + timedelta(hours=DEFAULT_DT_H)
+
+    return provider
+
+
 def profile_spec_vs_reference(
     profile: dict,
     anchors: list[datetime],
     *,
     climate=None,
     tolerance: float = LOAD_TOLERANCE_REL,
+    window_for_anchor=None,
 ) -> dict:
     """Compare Σ spec (baseload + flex targets) with Σ reference load over all windows.
+
+    ``window_for_anchor(anchor) -> (slots, target_window_end)``; default: the 24 h before
+    the anchor. Use ``sunrise_book_windows`` to check what the sunrise SE really books.
 
     Returns ``{"status": "ok" | "deviation", "message": str | None, ...}`` with
     per-consumer ``consumers`` rows ``(id, reference_kwh, spec_kwh)`` for flex consumers.
@@ -40,8 +68,7 @@ def profile_spec_vs_reference(
         profile_flat_baseload_kw,
     )
     from data.consumption_profiles import modeled_consumer_kw_at_datetime
-    from simulation.engine import window_slot_datetimes
-
+    window_for_anchor = window_for_anchor or fixed_24h_windows
     flex = collect_planning_flex_consumers(profile)
     flex_ids = {consumer["id"] for consumer in flex}
     thermal_ids = milp_flex_thermal_annual_ids(flex)
@@ -52,7 +79,7 @@ def profile_spec_vs_reference(
     targets: Counter[str] = Counter()
     reference_by_flex: Counter[str] = Counter()
     for anchor in anchors:
-        slots = window_slot_datetimes(anchor)
+        slots, target_end = window_for_anchor(anchor)
         for consumer in consumers:
             kwh = energy_kwh_from_kw(
                 modeled_consumer_kw_at_datetime(consumer, slot, climate=climate)
@@ -73,7 +100,7 @@ def profile_spec_vs_reference(
         )
         spec_baseload += energy_kwh_from_kw(flat + extra for extra in overlay)
         for cid, kwh in resolve_profile_spec_flex_targets(
-            flex, profile, slots, window_end=anchor, climate=climate
+            flex, profile, slots, window_end=target_end, climate=climate
         ).items():
             targets[cid] += kwh
 

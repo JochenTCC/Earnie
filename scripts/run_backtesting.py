@@ -673,11 +673,15 @@ def _warn_cons_data_balance(scenarios: dict, start, end) -> None:
             logging.warning("Verbrauchsbilanz Profil '%s': %s", profile.get("id"), balance["message"])
 
 
-def _warn_load_consistency(scenarios: dict, anchors: list) -> None:
+def _warn_load_consistency(scenarios: dict, anchors: list, horizon_mode: str) -> None:
     """Log (not abort) when the optimisation load differs from the reference load."""
     from data.modeled_climate import ModeledClimateContext
     from house_config.planning_flex_bridge import PROFILE_SPEC, resolve_consumption_source
-    from simulation.load_consistency import profile_spec_vs_reference
+    from simulation.load_consistency import (
+        fixed_24h_windows,
+        profile_spec_vs_reference,
+        sunrise_book_windows,
+    )
 
     seen: set[str] = set()
     for scenario_id, scenario_params in scenarios.items():
@@ -691,6 +695,11 @@ def _warn_load_consistency(scenarios: dict, anchors: list) -> None:
             profile,
             anchors,
             climate=ModeledClimateContext.from_scenario(scenario_params),
+            window_for_anchor=(
+                sunrise_book_windows(scenario_params)
+                if horizon_mode == SUNRISE_WINDOW
+                else fixed_24h_windows
+            ),
         )
         if report["status"] != "ok":
             logging.warning("Lastkonsistenz Profil '%s': %s", profile.get("id"), report["message"])
@@ -826,7 +835,7 @@ def main(argv: list[str] | None = None):
             except BaseloadOverAllocatedError as exc:
                 raise SystemExit(str(exc)) from exc
     _warn_cons_data_balance(scenarios, start, end)
-    _warn_load_consistency(scenarios, anchors)
+    _warn_load_consistency(scenarios, anchors, horizon_mode)
     live_scenario_id = config.get_live_scenario_id()
     live_params = scenarios.get(live_scenario_id) or (
         next(iter(scenarios.values())) if scenarios else None

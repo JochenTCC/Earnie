@@ -1,7 +1,7 @@
 """Build historical / sunrise optimization matrices for backtesting."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import NamedTuple
 
 import pandas as pd
@@ -413,8 +413,16 @@ def build_historical_matrix_for_slots(
     price_resources: BacktestingPriceResources | None = None,
     planning_moment: datetime | None = None,
     scenario_params: dict | None = None,
+    target_window_end: datetime | None = None,
 ) -> tuple[list[dict], dict]:
-    """Baut eine Optimierungsmatrix für beliebige stündliche Slots aus historischen Logs."""
+    """Baut eine Optimierungsmatrix für beliebige stündliche Slots aus historischen Logs.
+
+    ``window_end`` bleibt Anker/Label (meta, Ladefenster). ``target_window_end`` ist der
+    Zeitpunkt, bis zu dem ein Referenzlauf der Generic-Flex-Verbraucher enden muss, um
+    dem Fenster zugerechnet zu werden (Default: ``window_end``). Bei Sunrise-Fenstern
+    liegen die Buchungs-Slots *nach* dem Anker, dort muss es das Fensterende sein —
+    sonst verfällt die Energie aller Zeitplan-Verbraucher.
+    """
     from house_config.planning_flex_bridge import resolve_consumption_source
 
     consumption_source = resolve_consumption_source(scenario_params)
@@ -433,7 +441,7 @@ def build_historical_matrix_for_slots(
         consumption_source,
         slot_datetimes,
         cache,
-        window_end,
+        target_window_end if target_window_end is not None else window_end,
         profile=profile,
         scenario_params=scenario_params,
         flexible_consumers=flexible_consumers,
@@ -516,6 +524,7 @@ def build_sunrise_window_matrix(
         "planning_moment": step.sa0,
         "scenario_params": scenario_params,
     }
+    slot_step = timedelta(hours=DEFAULT_DT_H)
     book_matrix, meta = build_historical_matrix_for_slots(
         book_slots,
         cache,
@@ -523,6 +532,7 @@ def build_sunrise_window_matrix(
         window_end=anchor,
         feed_in_settings=feed_in_settings,
         charging_anchor=anchor,
+        target_window_end=book_slots[-1] + slot_step,
         **matrix_kwargs,
     )
     matrix_full, _full_meta = build_historical_matrix_for_slots(
@@ -532,6 +542,7 @@ def build_sunrise_window_matrix(
         window_end=anchor,
         feed_in_settings=feed_in_settings,
         charging_anchor=anchor,
+        target_window_end=milp_slots[-1] + slot_step,
         **matrix_kwargs,
     )
     matrix_full = list(matrix_full)
