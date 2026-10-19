@@ -13,7 +13,7 @@ from data.heating_need import (
     weekly_electric_kwh,
 )
 from data.open_meteo_solar_archive import last_full_archive_year
-from house_config.baseload import consumer_annual_kwh
+from house_config.baseload import consumer_annual_kwh, profile_baseload_kwh
 from house_config.consumption_csv import consumer_uses_profile_csv, load_hourly_profile_csv
 from house_config.ev_profile import ev_hourly_kw_for_day
 
@@ -197,7 +197,10 @@ def _thermal_annual_daily_from_archive(consumer: dict) -> list[float] | None:
     import config as _cfg
 
     if getattr(_cfg, "CONFIG", None) is None:
-        return None
+        raise RuntimeError(
+            "WP-Wetterprofil vor dem Config-Aufbau angefordert "
+            f"(Verbraucher '{consumer.get('id') or consumer.get('label')}')."
+        )
 
     from data.modeled_climate import collector_surface_from_thermal
     from data.open_meteo_solar_archive import (
@@ -257,7 +260,10 @@ def _modeled_thermal_rc_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     import config as _cfg
 
     if getattr(_cfg, "CONFIG", None) is None:
-        return _flat_annual_hourly_kw(consumer, hours=hours)
+        raise RuntimeError(
+            "thermal_rc-Wetterprofil vor dem Config-Aufbau angefordert "
+            f"(Verbraucher '{consumer.get('id') or consumer.get('label')}')."
+        )
     from data.open_meteo_solar_archive import (
         build_open_meteo_climate_bundle_for_year,
         last_full_archive_year,
@@ -323,7 +329,7 @@ def build_modeled_hourly_kw_by_consumer(
             consumer,
             hours=hours,
         )
-    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
+    baseload_kwh = profile_baseload_kwh(profile)
     baseload_kw = baseload_kwh / max(1, hours)
     result["baseload"] = [baseload_kw] * hours
     return result
@@ -359,7 +365,7 @@ def build_modeled_kw_for_timestamps(
 
     Uses metric ``baseload_kwh`` as constant kW (÷ 8760), not meter residual.
     """
-    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
+    baseload_kwh = profile_baseload_kwh(profile)
     baseload_kw = baseload_kwh / MODELED_PROFILE_HOURS_PER_YEAR
     result: dict[str, list[float]] = {}
     for index, consumer in enumerate(profile.get("consumers", [])):

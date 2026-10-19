@@ -11,7 +11,12 @@ import pytest
 import config
 from data.consumption_profiles import build_hourly_kw_profile
 from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
-from house_config.baseload import compute_baseload_kwh, consumer_annual_kwh
+from house_config.baseload import (
+    compute_baseload_kwh,
+    consumer_annual_kwh,
+    profile_baseload_kwh,
+    resolve_profile_baseload,
+)
 from house_config.entity_resolution import (
     batteries_by_id,
     resolve_battery_into_settings,
@@ -187,7 +192,8 @@ def test_house_profile_without_consumers():
     profile = doc["profiles"]["minimal"]
     assert profile["consumers"] == []
     assert profile["land"] == "AT"
-    assert profile["baseload_kwh"] == pytest.approx(3000.0, rel=1e-3)
+    assert "baseload_kwh" not in profile  # derived lazily, see resolve_profile_baseload
+    assert profile_baseload_kwh(profile) == pytest.approx(3000.0, rel=1e-3)
 
 
 def _ev_profile_doc(**ev_overrides):
@@ -330,6 +336,7 @@ def test_house_profile_thermal_annual(monkeypatch):
     path = config.HOUSE_PROFILES_JSON_PATH
     doc = load_house_profiles_document(path)
     profile = doc["profiles"]["test_home"]
+    resolve_profile_baseload(profile)
     assert profile["baseload_kwh"] >= profile["baseload_min_kwh"]
     hourly = build_hourly_kw_profile(profile, hours=168)
     assert len(hourly) == 168
@@ -1319,9 +1326,11 @@ def test_planning_thermal_rc_with_pool_filter():
     )
 
 
-def test_consumer_annual_kwh_thermal_rc_with_geo():
+def test_consumer_annual_kwh_thermal_rc_with_geo(monkeypatch):
     # Open-Meteo RC path needs config.CONFIG (xdist workers may not have imported it yet).
     import config  # noqa: F401
+
+    install_open_meteo_climate_mock(monkeypatch)
 
     consumer = {
         "id": "swimspa",
@@ -1343,8 +1352,10 @@ def test_consumer_annual_kwh_thermal_rc_with_geo():
     assert annual < consumer["nominal_power_kw"] * 8760
 
 
-def test_inject_profile_geo_adds_thermal_rc_coordinates():
+def test_inject_profile_geo_adds_thermal_rc_coordinates(monkeypatch):
     import config  # noqa: F401
+
+    install_open_meteo_climate_mock(monkeypatch)
     from ui.house_config_profile_form import _inject_profile_geo
 
     consumers = [

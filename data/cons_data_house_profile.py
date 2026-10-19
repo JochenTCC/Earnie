@@ -15,6 +15,7 @@ from data.consumption_profiles import (
     csv_kw_at_datetime,
     modeled_consumer_kw_at_datetime,
 )
+from house_config.baseload import profile_baseload_kwh
 from house_config.profiles_store import load_house_profiles_document
 from runtime_store.persist_paths import resolve_house_profiles_json_path
 from settings.flexible_consumers import normalize_consumer, runtime_consumer_id
@@ -37,8 +38,7 @@ def total_kw_at_datetime(profile: dict, slot_dt: datetime) -> float:
         by_consumer[_consumer_id(consumer, index)] = modeled_consumer_kw_at_datetime(
             consumer, slot_dt
         )
-    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
-    baseload_kw = baseload_kwh / 8760.0
+    baseload_kw = profile_baseload_kwh(profile) / 8760.0
     return baseload_kw + sum(by_consumer.values())
 
 
@@ -52,8 +52,7 @@ def hourly_kw_by_consumer_for_timestamps(
     consumers = list(profile.get("consumers", []))
     consumer_ids = [_consumer_id(consumer, index) for index, consumer in enumerate(consumers)]
     series: dict[str, list[float]] = {cid: [] for cid in consumer_ids}
-    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
-    baseload_kw = baseload_kwh / 8760.0
+    baseload_kw = profile_baseload_kwh(profile) / 8760.0
     for ts_raw in timestamps:
         slot_dt = _parse_hourly_timestamp(ts_raw)
         for index, cid in enumerate(consumer_ids):
@@ -119,11 +118,20 @@ def house_profile_cons_data_fingerprint(
     *,
     pv_kwp: float | None = None,
 ) -> str:
-    """Stabiler Hash über alle für cons_data-Synthese relevanten Felder."""
+    """Stabiler Hash über alle für cons_data-Synthese relevanten Eingaben.
+
+    Nur Eingaben, keine abgeleiteten Felder (``baseload_kwh``, ``consumer_kwh``,
+    ``baseload_min_kwh``): Die Grundlast folgt deterministisch aus ``annual_kwh``,
+    den Verbrauchern und dem Klima-Referenzjahr. Das Referenzjahr ist Teil des Hashs,
+    damit ein Jahreswechsel die Daten als veraltet markiert (wird durch das
+    Referenzfenster ersetzt, siehe docs/dev/reference-climate-window-plan.md).
+    """
+    from data.open_meteo_solar_archive import last_full_archive_year
+
     payload = {
         "id": profile.get("id"),
         "annual_kwh": profile.get("annual_kwh"),
-        "baseload_kwh": profile.get("baseload_kwh"),
+        "climate_reference_year": last_full_archive_year(),
         "baseload_distribution": profile.get("baseload_distribution"),
         "latitude": profile.get("latitude"),
         "longitude": profile.get("longitude"),
@@ -204,8 +212,7 @@ def build_synthetic_dataframe_from_house_profile(
     if hours <= 0:
         raise ValueError("Ungültiger Zeitraum für cons_data-Synthese.")
 
-    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
-    default_baseload_kw = baseload_kwh / 8760.0
+    default_baseload_kw = profile_baseload_kwh(profile) / 8760.0
     consumers = list(profile.get("consumers", []))
     consumer_ids = [_consumer_id(consumer, index) for index, consumer in enumerate(consumers)]
     timestamps = pd.date_range(start_dt, periods=hours, freq="h")

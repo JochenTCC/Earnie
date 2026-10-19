@@ -143,6 +143,11 @@ def upsert_house_profile(profile: dict) -> None:
     assert_unique_label(profile.get("label"), profiles, exclude_id=profile_id)
     consumers = list(profile.get("consumers") or [])
     assert_unique_labels_in_list(consumers)
+    from house_config.baseload import ensure_baseload_not_over_allocated
+    from house_config.profiles_store import normalize_house_profiles_document
+
+    normalized = normalize_house_profiles_document({"profiles": [profile]})
+    ensure_baseload_not_over_allocated(normalized["profiles"][profile_id])
     profiles = [p for p in profiles if p.get("id") != profile["id"]]
     profiles.append(profile)
     payload: dict = {"profiles": profiles}

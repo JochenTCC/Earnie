@@ -8,6 +8,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from house_config.baseload import profile_baseload_kwh
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ENV = ROOT / "earnie_env"
 WORK_ROOT = DEFAULT_ENV / "runtime" / "se_calc_test"
@@ -136,7 +138,7 @@ def inventory_snapshot(env: Path | None = None) -> dict:
         "env": str(env_root(env)),
         "live_scenario_id": live_scenario_id(env),
         "house_profile_id": profile.get("id"),
-        "baseload_kwh": profile.get("baseload_kwh"),
+        "baseload_kwh": profile_baseload_kwh(profile),
         "total_profile_csv": profile.get("total_profile_csv"),
         "historical_csv_source": profile.get("historical_csv_source"),
         "b_gate": bool(se_uses_meter_residual_baseload(profile)),

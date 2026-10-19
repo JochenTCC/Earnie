@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from house_config.baseload import profile_baseload_kwh
 from house_config.consumption_csv import consumer_uses_profile_csv
 from house_config.planning_flex_converters import (
     _consumer_window_kwh,
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 
 def profile_flat_baseload_kw(house_profile: dict) -> float:
     """Konstante Grundlast (kW) aus profile.baseload_kwh."""
-    return float(house_profile.get("baseload_kwh", 0.0) or 0.0) / 8760.0
+    return profile_baseload_kwh(house_profile) / 8760.0
 
 
 def monthly_residual_baseload_kw(

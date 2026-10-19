@@ -5,6 +5,7 @@ import os
 
 import streamlit as st
 
+from house_config.baseload import baseload_allocation_message
 from house_config.earnie_role import (
     DEFAULT_MANUAL_HORIZON_H,
     EARNIE_ROLE_FLEX,
@@ -275,6 +276,16 @@ def _render_baseload_preview(
         f"Roh-Differenz {preview['raw_baseload_kwh']:.0f} kWh/a; "
         f"Untergrenze 2 % = {preview['baseload_min_kwh']:.0f} kWh/a"
     )
+    message = baseload_allocation_message(
+        annual_kwh,
+        preview["consumer_kwh"],
+        floor_fraction=float(preview["floor_fraction"]),
+    )
+    if message is not None:
+        if preview["over_allocated"]:
+            st.error(message)
+        else:
+            st.warning(message)
     return preview
 
 

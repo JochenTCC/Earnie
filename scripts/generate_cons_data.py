@@ -147,6 +147,11 @@ def build_synthetic(
     kwp = float(config.get("PV_KWP", cast=float) or 6.0)
     house_profile = resolve_runtime_house_profile()
     if house_profile and house_profile.get("consumers"):
+        from house_config.baseload import ensure_baseload_not_over_allocated
+
+        ensure_baseload_not_over_allocated(
+            house_profile, context="cons_data-Generierung"
+        )
         climate = ModeledClimateContext.for_house_profile(house_profile, kwp=kwp)
         df = build_synthetic_dataframe_from_house_profile(
             house_profile,

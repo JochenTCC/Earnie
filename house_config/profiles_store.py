@@ -5,7 +5,7 @@ import json
 import os
 
 from data.grid_fees import normalize_netznutzung_config
-from house_config.baseload import compute_baseload_kwh, normalize_baseload_distribution
+from house_config.baseload import normalize_baseload_distribution
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.geo_timezone import timezone_for_land
 from house_config.profiles_consumers import (  # noqa: F401  (re-exported)
@@ -172,7 +172,9 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         longitude=fields["longitude"],
         timezone_name=fields["timezone_name"],
     )
-    baseload = compute_baseload_kwh(fields["annual_kwh"], consumers)
+    # Grundlast (baseload_kwh / consumer_kwh / baseload_min_kwh) is NOT derived here:
+    # it needs Open-Meteo weather and thus a built Config. Resolve at the point of use
+    # via house_config.baseload.resolve_profile_baseload / profile_baseload_kwh.
     return {
         "id": profile_id,
         "label": label,
@@ -194,9 +196,6 @@ def _normalize_profile(raw: dict, index: int) -> dict:
             raw.get("baseload_distribution")
         ),
         "consumers": consumers,
-        "baseload_kwh": baseload["baseload_kwh"],
-        "consumer_kwh": baseload["consumer_kwh"],
-        "baseload_min_kwh": baseload["baseload_min_kwh"],
     }
 
 

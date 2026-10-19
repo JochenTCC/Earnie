@@ -760,6 +760,20 @@ def main(argv: list[str] | None = None):
     scenario_labels = config.get_scenario_labels()
     labels = _all_labels(scenario_labels)
     scenarios = config.get_backtesting_scenarios()
+    from house_config.baseload import (
+        BaseloadOverAllocatedError,
+        ensure_baseload_not_over_allocated,
+    )
+
+    for scenario_id, scenario_params in scenarios.items():
+        house_profile = scenario_params.get("_house_profile")
+        if isinstance(house_profile, dict):
+            try:
+                ensure_baseload_not_over_allocated(
+                    house_profile, context=f"Szenario '{scenario_id}'"
+                )
+            except BaseloadOverAllocatedError as exc:
+                raise SystemExit(str(exc)) from exc
     live_scenario_id = config.get_live_scenario_id()
     live_params = scenarios.get(live_scenario_id) or (
         next(iter(scenarios.values())) if scenarios else None

@@ -121,6 +121,11 @@ def _planning_timezone_for_rc(rc: dict) -> str:
         return str(tz)
     import config
 
+    if getattr(config, "CONFIG", None) is None:
+        raise RuntimeError(
+            "Zeitzone für thermal_rc fehlt (timezone_name nicht gesetzt) und Config "
+            "ist noch nicht aufgebaut."
+        )
     return str(config.get_planning_timezone())
 
 

@@ -433,13 +433,12 @@ def _planning_timezone_for_thermal(thermal: dict, profile: dict) -> str:
     tz = thermal.get("timezone_name") or profile.get("timezone_name")
     if tz:
         return str(tz)
-    getter = getattr(config, "get_planning_timezone", None)
-    if callable(getter):
-        try:
-            return str(getter())
-        except Exception:
-            pass
-    return "Europe/Berlin"
+    if getattr(config, "CONFIG", None) is None:
+        raise RuntimeError(
+            "Zeitzone für Wetterdaten fehlt (weder thermal noch Hausprofil setzen "
+            "timezone_name) und Config ist noch nicht aufgebaut."
+        )
+    return str(config.get_planning_timezone())
 
 
 def reference_climate_for_thermal(

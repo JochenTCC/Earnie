@@ -1735,7 +1735,9 @@ def test_upsert_two_consumers_roundtrip(tmp_path, monkeypatch):
         {
             "id": "home",
             "label": "Test",
-            "annual_kwh": 8000.0,
+            # Σ consumers ≈ 14.5 MWh (EV dominates); must stay below annual_kwh
+            # since over-allocation now fails loud on save.
+            "annual_kwh": 20000.0,
             "consumers": [
                 {
                     "id": "pool",
