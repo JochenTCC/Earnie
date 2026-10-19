@@ -64,7 +64,14 @@ def _hourly_window_kwh(profile: dict, slots: list[datetime], *, climate) -> floa
 
 
 def _attach_csv_thermal(profile: dict, tmp_path: Path, slots: list[datetime]) -> dict:
-    """Fill empty profile_csv on mixed_csv_thermal with a flat series covering the window."""
+    """Fill empty profile_csv on mixed_csv_thermal with a flat series covering the window.
+
+    The CSV only covers a few days, so it cannot define a yearly consumption: the
+    Grundlast is resolved from the modeled profile *before* the CSV is attached.
+    """
+    from house_config.baseload import resolve_profile_baseload
+
+    resolve_profile_baseload(profile)
     start = slots[0] - timedelta(hours=24)
     hours = len(slots) + 48
     path = tmp_path / "swimspa_window.csv"

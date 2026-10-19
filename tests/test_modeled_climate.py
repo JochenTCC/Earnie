@@ -160,3 +160,107 @@ def test_strip_assets_reference_has_no_zero_kwp_pv_surface():
 
     surfaces = _surfaces_for_profile(profile, climate._pv_surfaces())
     assert [(s.tilt_deg, s.azimuth_deg) for s in surfaces] == [(18.0, 26.0)]
+
+
+def _seasonal_bundle(year: int, hours: int):
+    """Synthetic seasonal temperature series (same weather for equal day-of-year)."""
+    import numpy as np
+    import pandas as pd
+
+    from data.open_meteo_solar_archive import OpenMeteoClimateBundle
+
+    index = pd.date_range(f"{year}-01-01", periods=hours, freq="h")
+    day = np.arange(8760)[:hours] / 24.0
+    temps = 9.0 - 11.0 * np.cos(2 * np.pi * day / 365.0)
+    return OpenMeteoClimateBundle(
+        temperature_c=pd.Series(temps, index=index, dtype=float),
+        tilted_wm2={},
+    )
+
+
+def _heat_pump_consumer() -> dict:
+    return {
+        "id": "waermepumpe",
+        "type": "thermal_annual",
+        "nominal_power_kw": 1.9,
+        "latitude": 47.4,
+        "longitude": 9.7,
+        "timezone_name": "Europe/Vienna",
+        "living_area_m2": 150.0,
+        "building_class": 2,
+        "heat_pump_type": "erde",
+        "persons": 2,
+        "target_temp_c": 21.5,
+        "heating_limit_c": 15.0,
+        "hwb_kwh_m2": 40.0,
+    }
+
+
+def _month_kwh(climate, consumer: dict, year: int, month: int) -> float:
+    from datetime import datetime, timedelta
+
+    total = 0.0
+    day = datetime(year, month, 1)
+    while day.month == month:
+        for hour in range(24):
+            total += climate.thermal_consumer_kw_at(consumer, day.replace(hour=hour))
+        day += timedelta(days=1)
+    return total
+
+
+def _climate_with_full_and_truncated_year():
+    from data.modeled_climate import ModeledClimateContext
+
+    climate = ModeledClimateContext(lat=47.4, lon=9.7, timezone="Europe/Vienna")
+    climate.seed_year_bundle(2025, _seasonal_bundle(2025, 8760))
+    climate.seed_year_bundle(2026, _seasonal_bundle(2026, 6984))  # ends 18 Oct
+    return climate
+
+
+def test_heat_pump_profile_of_incomplete_year_is_not_recalibrated(monkeypatch):
+    """Same weather + fixed envelope H => same demand, also in a truncated (current) year.
+
+    Regression: H was calibrated per bundle, so a year ending in October squeezed the
+    whole annual heat demand into fewer days (+50 % in winter months).
+    """
+    from data.modeled_climate import ModeledClimateContext
+
+    monkeypatch.setattr(
+        ModeledClimateContext, "_reference_house_heat_loss", lambda self, c, t: 0.25
+    )
+    climate = _climate_with_full_and_truncated_year()
+    consumer = _heat_pump_consumer()
+    for month in (1, 2, 3):
+        assert _month_kwh(climate, consumer, 2026, month) == pytest.approx(
+            _month_kwh(climate, consumer, 2025, month), rel=0.02
+        )
+    assert _month_kwh(climate, consumer, 2025, 1) > 50.0  # heating actually happens
+
+
+def test_per_bundle_calibration_inflates_incomplete_year(monkeypatch):
+    """Negative control: without a fixed H the truncated year is visibly inflated."""
+    from data.modeled_climate import ModeledClimateContext
+
+    monkeypatch.setattr(
+        ModeledClimateContext, "_reference_house_heat_loss", lambda self, c, t: None
+    )
+    climate = _climate_with_full_and_truncated_year()
+    consumer = _heat_pump_consumer()
+    full = _month_kwh(climate, consumer, 2025, 1)
+    truncated = _month_kwh(climate, consumer, 2026, 1)
+    assert truncated > full * 1.10
+
+
+def test_reference_house_heat_loss_comes_from_thermal_parameters(monkeypatch):
+    from data.modeled_climate import ModeledClimateContext
+    from optimizer import thermal_parameters as tp
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
+    tp.THERMAL_PARAMETERS_CACHE.clear() if hasattr(tp, "THERMAL_PARAMETERS_CACHE") else None
+    climate = ModeledClimateContext(lat=47.4, lon=9.7, timezone="Europe/Vienna")
+    consumer = _heat_pump_consumer()
+    h = climate._reference_house_heat_loss(consumer, consumer)
+    assert h is not None and h > 0.0
+    direct = tp.house_thermal_parameters(consumer).house_heat_loss_kw_per_k
+    assert h == pytest.approx(direct)

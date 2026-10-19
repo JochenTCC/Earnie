@@ -100,12 +100,10 @@ def consumer_annual_kwh(consumer: dict) -> float:
         path = str(consumer.get("profile_csv", "") or "").strip()
         if not path:
             return 0.0
-        try:
-            from house_config.consumption_csv import estimate_annual_kwh_from_profile_csv
+        from house_config.consumption_csv import estimate_annual_kwh_from_profile_csv
 
-            return estimate_annual_kwh_from_profile_csv(path)
-        except (OSError, ValueError, FileNotFoundError):
-            return 0.0
+        # No silent 0: unreadable or too short CSVs fail loud (message names the file).
+        return estimate_annual_kwh_from_profile_csv(path)
     if consumer.get("type") == "ev":
         from house_config.ev_profile import estimate_ev_annual_kwh
 

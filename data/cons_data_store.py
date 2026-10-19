@@ -304,6 +304,26 @@ def cons_data_consumer_match_reason(path: str | None = None) -> str | None:
     return None
 
 
+def ensure_cons_data_current(*, allow_stale: bool = False, path: str | None = None) -> None:
+    """Abort when cons_data does not match the current house profile.
+
+    Same condition that disables the start button in the SE UI
+    (``ui.backtesting_cons_data.cons_data_ready``). ``allow_stale`` is an explicit
+    opt-in (CLI ``--allow-stale-cons-data``) and only logs a warning.
+    """
+    reason = cons_data_consumer_match_reason(path)
+    if reason is None:
+        return
+    message = (
+        f"Verbrauchsdaten passen nicht zur aktuellen Konfiguration ({reason}) — "
+        "python -m scripts.generate_cons_data ausführen oder in der UI neu generieren."
+    )
+    if allow_stale:
+        logger.warning("%s (--allow-stale-cons-data: Lauf wird fortgesetzt)", message)
+        return
+    raise SystemExit(message)
+
+
 def invalidate_cons_data_meta(path: str | None = None) -> bool:
     """Entfernt Meta-Datei — cons_data gilt danach als veraltet bis Neu-Generierung."""
     path = path or get_output_path()

@@ -29,25 +29,56 @@ def consumer_uses_profile_csv(consumer: dict) -> bool:
     return bool(consumer.get("use_profile_csv"))
 
 
-def estimate_annual_kwh_from_profile_csv(path: str) -> float:
-    """Estimate kWh/a from a canonical hourly profile CSV.
+_REFERENCE_MONTHS = 12
 
-    Uses the most recent calendar year with the most samples. Missing hours in
-    that year count as 0 kW (no upscaling) — important for sparse digital logs.
-    Falls back to mean power × 8760 when no year bucket exists.
+
+def latest_full_12_month_window(
+    rows: list[tuple[str, float]],
+    *,
+    source: str = "",
+) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Most recent 12 whole calendar months covered by the CSV time span.
+
+    Returns ``(start, end_exclusive)`` (first of the first month, first of the month
+    after the last one). A month counts as covered when the whole month lies inside
+    ``[first timestamp, last timestamp]`` of the file. Density is deliberately not
+    checked: a missing hour means 0 kW (sparse digital logs, see ``csv_kw_at_datetime``).
+
+    Raises ``ValueError`` (no silent fallback) when the file spans fewer than 12 whole months.
+    """
+    bounds = profile_rows_bounds(rows)
+    if bounds is None:
+        raise ValueError(f"Profil-CSV '{source}' enthält keine auswertbaren Zeitstempel.")
+    first, last = bounds
+    # First whole month at/after the first sample, last whole month ending at/before the last sample.
+    first_month = first.to_period("M")
+    if first > first_month.start_time:
+        first_month += 1
+    last_month = last.to_period("M")
+    if last < last_month.end_time.floor("h"):
+        last_month -= 1
+    if (last_month - first_month).n + 1 < _REFERENCE_MONTHS:
+        raise ValueError(
+            f"Profil-CSV '{source}' deckt keine 12 vollständigen Kalendermonate ab "
+            f"({first:%Y-%m-%d %H:%M} – {last:%Y-%m-%d %H:%M}); für den "
+            "Jahresverbrauch werden die jüngsten 12 vollen Monate benötigt."
+        )
+    start = (last_month - (_REFERENCE_MONTHS - 1)).start_time
+    end_exclusive = (last_month + 1).start_time
+    return start, end_exclusive
+
+
+def estimate_annual_kwh_from_profile_csv(path: str) -> float:
+    """kWh/a from a canonical hourly profile CSV: sum over the most recent 12 whole months.
+
+    Missing hours inside the window count as 0 kW (no upscaling) — sparse digital logs.
+    A CSV spanning fewer than 12 whole months raises ``ValueError``.
     """
     rows = load_hourly_profile_csv(path)
-    if not rows:
-        return 0.0
-    by_year: dict[str, list[float]] = {}
-    for ts_raw, power_kw in rows:
-        year = ts_raw[:4]
-        by_year.setdefault(year, []).append(float(power_kw))
-    if not by_year:
-        return 0.0
-    # Prefer coverage, then recency (e.g. 2025 over 2024 when tied).
-    year = max(by_year, key=lambda key: (len(by_year[key]), key))
-    return float(sum(by_year[year]))
+    start, end_exclusive = latest_full_12_month_window(rows, source=path)
+    stamps = pd.to_datetime([ts.replace(" ", "T", 1)[:19] for ts, _ in rows])
+    values = pd.Series([float(kw) for _, kw in rows], index=stamps)
+    return float(values[(values.index >= start) & (values.index < end_exclusive)].sum())
 
 def load_hourly_profile_csv(path: str) -> list[tuple[str, float]]:
     """Liest bereits kanonisches stündliches Profil; liefert (ISO-timestamp, kW)-Paare."""

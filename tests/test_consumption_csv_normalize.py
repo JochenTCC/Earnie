@@ -267,20 +267,60 @@ def test_serialize_consumer_keeps_use_profile_csv_false() -> None:
         assert _serialize_consumer(consumer)["use_profile_csv"] is True
 
 
-def test_estimate_annual_kwh_from_profile_csv_calendar_year(tmp_path: Path) -> None:
+def _hourly_rows(start: str, hours: int, kw: float = 1.0) -> list[tuple[str, float]]:
+    idx = pd.date_range(start, periods=hours, freq="h")
+    return [(ts.strftime("%Y-%m-%d %H:%M:%S"), kw) for ts in idx]
+
+
+def test_estimate_annual_kwh_uses_latest_12_whole_months(tmp_path: Path) -> None:
+    from house_config.consumption_csv import (
+        estimate_annual_kwh_from_profile_csv,
+        latest_full_12_month_window,
+        load_hourly_profile_csv,
+    )
+
+    path = tmp_path / "dense.csv"
+    # 2023-12-15 .. 2025-03-20 at 1 kW: whole months Jan 2024 .. Feb 2025 (14),
+    # latest 12 = Mar 2024 .. Feb 2025 = 365 days.
+    rows = _hourly_rows("2023-12-15 00:00:00", hours=(463) * 24)
+    write_canonical_hourly_csv(str(path), rows)
+    start, end = latest_full_12_month_window(load_hourly_profile_csv(str(path)))
+    assert (start, end) == (pd.Timestamp("2024-03-01"), pd.Timestamp("2025-03-01"))
+    assert estimate_annual_kwh_from_profile_csv(str(path)) == pytest.approx(365 * 24.0)
+
+
+def test_estimate_annual_kwh_sparse_log_counts_missing_hours_as_zero(tmp_path: Path) -> None:
     from house_config.consumption_csv import estimate_annual_kwh_from_profile_csv
 
     path = tmp_path / "sparse.csv"
-    rows = []
-    # Sparse 2024: 10 hours at 2 kW → 20 kWh
-    for i in range(10):
-        rows.append((f"2024-01-01 {i:02d}:00:00", 2.0))
-    # Sparse 2025: 5 hours at 2 kW → 10 kWh (fewer samples)
-    for i in range(5):
-        rows.append((f"2025-06-01 {i:02d}:00:00", 2.0))
-    write_canonical_hourly_csv(str(path), rows)
-    # Prefer year with most samples (2024), missing hours count as 0.
+    rows = [("2024-01-01 00:00:00", 0.0), ("2025-02-28 23:00:00", 0.0)]  # span only
+    rows += [(f"2024-07-01 {i:02d}:00:00", 2.0) for i in range(10)]  # 20 kWh
+    write_canonical_hourly_csv(str(path), sorted(rows))
+    # Span 2024-01-01 .. 2025-02-28 23:00 = whole months Jan 2024 .. Feb 2025;
+    # latest 12 = Mar 2024 .. Feb 2025 contains the July burst only.
     assert estimate_annual_kwh_from_profile_csv(str(path)) == pytest.approx(20.0)
+
+
+def test_estimate_annual_kwh_short_csv_fails_loud(tmp_path: Path) -> None:
+    from house_config.consumption_csv import estimate_annual_kwh_from_profile_csv
+
+    path = tmp_path / "short.csv"
+    write_canonical_hourly_csv(str(path), _hourly_rows("2025-01-01 00:00:00", 24 * 200))
+    with pytest.raises(ValueError, match="12 vollständigen Kalendermonate"):
+        estimate_annual_kwh_from_profile_csv(str(path))
+
+
+def test_consumer_annual_kwh_csv_error_is_not_swallowed(tmp_path: Path) -> None:
+    from house_config.baseload import consumer_annual_kwh
+
+    path = tmp_path / "short.csv"
+    write_canonical_hourly_csv(str(path), _hourly_rows("2025-01-01 00:00:00", 24 * 30))
+    consumer = {"id": "x", "type": "generic", "profile_csv": str(path), "use_profile_csv": True}
+    with pytest.raises(ValueError, match="Kalendermonate"):
+        consumer_annual_kwh(consumer)
+    missing = {**consumer, "profile_csv": str(tmp_path / "nope.csv")}
+    with pytest.raises(FileNotFoundError):
+        consumer_annual_kwh(missing)
 
 def test_normalize_hourly_power_kw_direct() -> None:
     idx = pd.date_range("2023-01-01", periods=MIN_HOURS_FULL_YEAR, freq="h")

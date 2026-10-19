@@ -333,6 +333,26 @@ class ModeledClimateContext:
     def pv_system_labels(self) -> dict[str, str]:
         return {system.id: system.label for system in self.pv_systems}
 
+    def _reference_house_heat_loss(self, consumer: dict, thermal: dict) -> float | None:
+        """Envelope H [kW/K] calibrated once on the reference year.
+
+        ``house_year_result`` calibrates H on the series it is given so that the annual
+        heat demand equals the spec. For an incomplete calendar year (the current year,
+        archive ends yesterday) that squeezes the full-year demand into fewer days and
+        inflates every month. H is a building property: calibrate on the complete
+        reference year and apply it to the weather of any year.
+        """
+        from optimizer.thermal_parameters import house_thermal_parameters
+
+        thermal_with_nominal = dict(thermal)
+        if "nominal_power_kw" not in thermal_with_nominal:
+            thermal_with_nominal["nominal_power_kw"] = float(
+                consumer.get("nominal_power_kw", 3.0) or 3.0
+            )
+        return house_thermal_parameters(
+            thermal_with_nominal, house_profile=self.house_profile
+        ).house_heat_loss_kw_per_k
+
     def _thermal_hourly_profile_for_year(self, consumer: dict, year: int) -> list[float]:
         consumer_id = str(consumer.get("id") or consumer.get("label") or "thermal")
         key = (consumer_id, year)
@@ -353,6 +373,9 @@ class ModeledClimateContext:
             )
             hourly_wm2 = bundle.collector_surface_series(surface)
 
+        house_h = self._reference_house_heat_loss(consumer, thermal)
+        if house_h is not None and params.get("house_heat_loss_kw_per_k") is None:
+            params["house_heat_loss_kw_per_k"] = house_h
         daily = daily_electric_kwh(
             **params,
             hourly_temperature_c=bundle.temperature_c,

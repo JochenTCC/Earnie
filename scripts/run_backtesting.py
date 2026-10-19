@@ -242,6 +242,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "Legacy: einzelne *.json-Datei → Sibling .backtesting_workers/."
         ),
     )
+    parser.add_argument(
+        "--allow-stale-cons-data",
+        action="store_true",
+        help=(
+            "Backtest auch mit veralteten/nicht zur Konfiguration passenden Verbrauchsdaten "
+            "starten (Standard: Abbruch, wie der gesperrte Start-Button in der UI)."
+        ),
+    )
     return parser
 
 
@@ -648,6 +656,46 @@ def print_total_summary(results, labels: dict[str, str]):
     print("================================================")
 
 
+def _warn_cons_data_balance(scenarios: dict, start, end) -> None:
+    """Log (not abort) when cons_data in the run window misses a profile's Jahresverbrauch."""
+    from data import cons_data_store
+    from data.cons_data_balance import cons_data_window_balance
+
+    cons_df = cons_data_store.load_cons_data()
+    seen: set[str] = set()
+    for scenario_params in scenarios.values():
+        profile = scenario_params.get("_house_profile")
+        if not isinstance(profile, dict) or profile.get("id") in seen:
+            continue
+        seen.add(profile.get("id"))
+        balance = cons_data_window_balance(cons_df, profile, window=(start, end))
+        if balance["status"] != "ok":
+            logging.warning("Verbrauchsbilanz Profil '%s': %s", profile.get("id"), balance["message"])
+
+
+def _warn_load_consistency(scenarios: dict, anchors: list) -> None:
+    """Log (not abort) when the optimisation load differs from the reference load."""
+    from data.modeled_climate import ModeledClimateContext
+    from house_config.planning_flex_bridge import PROFILE_SPEC, resolve_consumption_source
+    from simulation.load_consistency import profile_spec_vs_reference
+
+    seen: set[str] = set()
+    for scenario_id, scenario_params in scenarios.items():
+        profile = scenario_params.get("_house_profile")
+        if not isinstance(profile, dict) or profile.get("id") in seen:
+            continue
+        if resolve_consumption_source(scenario_params) != PROFILE_SPEC:
+            continue
+        seen.add(profile.get("id"))
+        report = profile_spec_vs_reference(
+            profile,
+            anchors,
+            climate=ModeledClimateContext.from_scenario(scenario_params),
+        )
+        if report["status"] != "ok":
+            logging.warning("Lastkonsistenz Profil '%s': %s", profile.get("id"), report["message"])
+
+
 def main(argv: list[str] | None = None):
     logger_config.configure_utf8_stdio()
     logging.basicConfig(
@@ -721,6 +769,9 @@ def main(argv: list[str] | None = None):
         if forecast_model_path is not None:
             print(f"  Prognosemodell: {forecast_model_path}")
 
+    from data import cons_data_store as _cons_data_store
+
+    _cons_data_store.ensure_cons_data_current(allow_stale=args.allow_stale_cons_data)
     print("Lade historische Verbrauchsdaten (Loxone-Logs)...")
     from data.cons_data_season_mirror import is_season_mirror_enabled
 
@@ -774,6 +825,8 @@ def main(argv: list[str] | None = None):
                 )
             except BaseloadOverAllocatedError as exc:
                 raise SystemExit(str(exc)) from exc
+    _warn_cons_data_balance(scenarios, start, end)
+    _warn_load_consistency(scenarios, anchors)
     live_scenario_id = config.get_live_scenario_id()
     live_params = scenarios.get(live_scenario_id) or (
         next(iter(scenarios.values())) if scenarios else None

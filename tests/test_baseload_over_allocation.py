@@ -286,3 +286,12 @@ def test_fingerprint_changes_with_inputs_and_climate_reference_year(monkeypatch)
     )
     monkeypatch.setattr(archive, "last_full_archive_year", lambda **_kw: 2026)
     assert fp_2025 != house_profile_cons_data_fingerprint(profile, pv_kwp=5.0)
+
+
+def test_fingerprint_changes_with_synthesis_version(monkeypatch):
+    from data import cons_data_house_profile as module
+
+    profile = {"id": "home", "annual_kwh": 9000.0, "consumers": []}
+    before = module.house_profile_cons_data_fingerprint(profile, pv_kwp=5.0)
+    monkeypatch.setattr(module, "CONS_DATA_SYNTHESIS_VERSION", module.CONS_DATA_SYNTHESIS_VERSION + 1)
+    assert module.house_profile_cons_data_fingerprint(profile, pv_kwp=5.0) != before

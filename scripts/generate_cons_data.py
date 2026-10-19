@@ -240,7 +240,20 @@ def generate(
         raise SystemExit(f"Unbekannte Quelle: {source}")
 
     save_cons_data(df, output)
+    _warn_if_unbalanced(df)
     return df
+
+
+def _warn_if_unbalanced(df: pd.DataFrame) -> None:
+    """Print a warning when Σ cons_data in the SE window misses the Jahresverbrauch."""
+    from data.cons_data_balance import cons_data_window_balance
+
+    profile = resolve_runtime_house_profile()
+    if not profile:
+        return
+    balance = cons_data_window_balance(df, profile)
+    if balance["status"] != "ok":
+        print(f"[WARN] {balance['message']}")
 
 
 def print_stats(path: str | None = None) -> None:

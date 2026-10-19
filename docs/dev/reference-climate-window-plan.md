@@ -117,6 +117,32 @@ Synthesis rules (`build_synthetic_dataframe_from_house_profile`):
 
 ### PR 2 — reference climate window
 
+**Finding during the PR 2 spike (2026-10-19), corrects P5:** the +32 % WP energy in the SE window (1 927 vs 1 465 kWh)
+was **not weather**. `house_year_result` calibrates the envelope H on the series it is given
+(`resolve_house_heat_loss_kw_per_k`, annual heat = spec). The current calendar year bundle ends yesterday (291 days),
+so the full-year demand was squeezed into fewer days (Jan 2026 +59 %). Calibrating on the complete window gives
+1 451 kWh (cal. 2025: 1 465 kWh, −1 %).
+**Done (PR 2a):** `ModeledClimateContext._reference_house_heat_loss` passes the H calibrated on the reference year
+(same H as Live) into the year simulation; fingerprint carries `CONS_DATA_SYNTHESIS_VERSION = 2`.
+Greenfield dry run: window Σ = 12 978 kWh vs. Jahresverbrauch 13 000 kWh (−0.2 %), WP 1 432 kWh.
+Remaining weather effect for non-CSV profiles is therefore ≈ 1–2 %; the window resolver below is mainly needed
+for CSV-driven profiles (fixed period) — scope of 2b/2c to be re-confirmed.
+
+**Scope decision (maintainer, 2026-10-19):** no `rolling_12m` / resolver module / configurator caption / `window_mismatch`
+reason. Only the CSV case is kept: `estimate_annual_kwh_from_profile_csv` now sums the most recent 12 **whole calendar months
+covered by the CSV time span** (`latest_full_12_month_window`); fewer than 12 months, unreadable or missing file → `ValueError`
+(the old "year with most samples", "mean × 8760" and `except → 0.0` fallbacks are gone). Density is intentionally not checked
+(missing hour = 0 kW, sparse digital logs). The configurator preview shows the error instead of a Grundlast.
+
+**PR 3 (done, same session):**
+* `data/cons_data_balance.py::cons_data_window_balance` — Σ cons_data in the SE window vs. Jahresverbrauch (±3 %), per-consumer
+  deviations + baseload suggestion; used after `generate()` (WARN), in the SE cons_data status (st.warning) and in the CLI backtest (log).
+* `simulation/load_consistency.py::profile_spec_vs_reference` — optimisation load (baseload + flex targets) vs. hourly reference load
+  per flex consumer; CLI backtest logs a warning. Greenfield: names `dev-pc` (Plan-Ziel 300 instead of 1 051 kWh: 24 h run cannot fit
+  into the start window).
+* `cons_data_store.ensure_cons_data_current` + CLI `--allow-stale-cons-data`: the CLI aborts on stale cons_data like the gated UI button.
+* Not done: German user docs, backlog entries, release-notes draft (see CLAUDE.md), UI display of the spec-vs-reference check.
+
 1. New module `house_config/reference_window.py` with `ReferenceClimateWindow` + `resolve_reference_climate_window`.
    * `rolling_12m`: reuse `data.cons_data_season_mirror.wall_clock_simulation_window` (independent of the
      `season_mirror_to_last_month` flag).

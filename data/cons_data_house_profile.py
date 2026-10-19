@@ -113,6 +113,12 @@ def _house_profile_consumer_ids(profile: dict) -> list[str]:
     ]
 
 
+# Bump when the synthesis algorithm changes the generated series for unchanged inputs,
+# so existing cons_data files are reported as stale.
+# 2: WP envelope H fixed from the reference year (no per-bundle recalibration).
+CONS_DATA_SYNTHESIS_VERSION = 2
+
+
 def house_profile_cons_data_fingerprint(
     profile: dict,
     *,
@@ -132,6 +138,7 @@ def house_profile_cons_data_fingerprint(
         "id": profile.get("id"),
         "annual_kwh": profile.get("annual_kwh"),
         "climate_reference_year": last_full_archive_year(),
+        "synthesis_version": CONS_DATA_SYNTHESIS_VERSION,
         "baseload_distribution": profile.get("baseload_distribution"),
         "latitude": profile.get("latitude"),
         "longitude": profile.get("longitude"),

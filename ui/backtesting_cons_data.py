@@ -61,9 +61,27 @@ def _render_cons_data_status(path: str) -> bool:
     level, message = _format_match_status(match_reason)
     if level == "success":
         st.success(message)
+        _render_cons_data_balance(df)
     else:
         st.warning(message)
     return True
+
+
+def _render_cons_data_balance(df) -> None:
+    """Warn when Σ cons_data in the SE window misses the profile's Jahresverbrauch."""
+    from data.cons_data_balance import cons_data_window_balance
+    from data.cons_data_house_profile import resolve_runtime_house_profile
+
+    profile = resolve_runtime_house_profile()
+    if not profile:
+        return
+    try:
+        balance = cons_data_window_balance(df, profile)
+    except (ValueError, RuntimeError, OSError) as exc:
+        st.error(f"Verbrauchsbilanz nicht prüfbar: {exc}")
+        return
+    if balance["status"] != "ok":
+        st.warning(balance["message"])
 
 
 def _render_cons_data_generate_button() -> None:

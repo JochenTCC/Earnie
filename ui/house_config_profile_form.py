@@ -261,7 +261,12 @@ def _render_baseload_preview(
     existing: dict,
     preview_id: str,
 ) -> dict:
-    preview = preview_baseload(annual_kwh, resolved_for_preview)
+    try:
+        preview = preview_baseload(annual_kwh, resolved_for_preview)
+    except (ValueError, OSError) as exc:
+        # e.g. a consumer CSV that does not span 12 whole months, or an unreadable file
+        st.error(f"Grundlast nicht berechenbar: {exc}")
+        st.stop()
     csv_session_key = f"house_profile_csv_path_{preview_id}"
     preview["total_profile_csv"] = str(
         st.session_state.get(
