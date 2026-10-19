@@ -39,7 +39,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Transport     | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS)                                                                                                                                                                                                |
 | Loxone today  | Default `ehal.backend=loxone` uses `[integrations/loxone_adapter.py](../../integrations/loxone_adapter.py)` for plant telemetry/setpoints. Entity-scoped keys on `plant` / `consumers[]` / `batteries[].ehal_bindings` / `inverters[].ehal_bindings` are **activation flags** (empty Merker values after **2.7.q Q8**); wire I/O is VO push + `status.json` under qualified IDs. ESS reads/writes use `ess.{id}.*` on batteries (no `LOXONE_*` loud-name config slots, no plant-flat ESS alias merge). Structure/greenfield presence uses LoxAPP3 (no Merker HTTP in production Python). Mapping UI: EHAL-Com. |
 | HA today      | `ehal.backend=ha`; **push-only** (same HTTP contract as Loxone). HA pushes activated reads to `GET /ehal/telemetry/<qualified-id>/<value>` (token); setpoints on `GET /ehal/status.json` (alias `/ehal/loxone/status.json`). Listener: `system.ehal_loxone_http_port` (default **8541**). Entity-scoped `ehal_bindings` are **activation flags** (empty values — Earnie stores no HA `entity_id`). Carrier YAML from EHAL-Com (`ENTITY_*` placeholders + periodic push). `ehal.ha.transport` and REST pull are removed (migration `dm4.ha_pull_removal`). Optional `sign` / `boolean_invert` under `ehal.ha`; URL/token in `config/.env` (`EHAL_HA_*`) where still required by the loader / Supervisor proxy. |
-| Inverter today | Optional role `inverter`: bindings `inv.{id}.*` on `inverters[].ehal_bindings` (entity-scoped, same storage idea as `ess.{id}.*`). Without mapped inverter fields the plant behaves as before; `sens_pv_production_active` stays the plant PV sum. |
+| Inverter today | Role `inverter`: bindings `inv.{id}.*` on `inverters[].ehal_bindings`. When an inverter has attached PV systems, `sens_inv_power_pv` is required; plant AC PV is derived as Σ inv · η_inv (not a telemetry document field). |
 
 
 
@@ -50,7 +50,7 @@ Exchange / display form of every signal on the push/exchange wire and in `status
 
 | Form | Example | Notes |
 | ---- | ------- | ----- |
-| Plant bare | `sens_temperature_outside`, `sens_pv_production_active` | House-wide fields without a device Kennung; plant PV sum stays bare; per-PV-system power uses `pv.{id}.*` |
+| Plant bare | `sens_temperature_outside` | House-wide fields without a device Kennung; plant AC PV is derived from `inv.{id}.*`; optional per-PV-system power uses `pv.{id}.*` |
 | Grid meter | `grid.meter.sens_grid_power_active` | First Kennung `meter`; more `grid.<Kennung>.*` meters may follow. Plant **storage** keeps bare kind keys |
 | Battery | `ess.<Kennung>.sens_ess_soc` | Entity-scoped binding key |
 | Consumer by type | `consumer.<slug>.set_enable`, `heatpump.<slug>.*`, `pool.<slug>.*` (incl. `pool_filter`) | Storage and exchange; legacy `flex.<slug>.*` accepted on parse / dual-read until migrated |
@@ -98,9 +98,7 @@ EHAL base units (adapters normalize hub-native units into these):
 
 **Grid** (`sens_grid_power_active`)**:** `+` = grid **import** (Bezug), `−` = **export** (Einspeisung). Adapters normalize hub-native signs before emit.
 
-**PV** (`sens_pv_production_active`)**:** production ≥ `0` (W). Interval energy = ∫ power × Δt (no cumulative counter on the wire). Bare `sens_pv_production_active` is the plant **AC** sum. Optional entity-scoped fields: `pv.{pv_system_id}.sens_pv_production_active` on `pv_systems[].ehal_bindings` and `inv.{id}.sens_inv_power_pv` on inverters.
-
-When the plant field is unmapped and every **grid-tied** inverter that owns ≥1 PV system has inverter PV (mapped, or fully derived from its PV systems), post-read attribution sets plant = Σ (inverter PV · η_inv). Island inverters are excluded. Incomplete maps fail loud. Curtailment still uses forecast shares (live-weight switch deferred).
+**PV (plant AC, internal):** production ≥ `0` (W). Interval energy = ∫ power × Δt (no cumulative counter on the wire). Bare plant `sens_pv_production_active` is **not** on the telemetry document. Plant AC PV is always derived as Σ (grid-tied `inv.{id}.sens_inv_power_pv` · η_inv). Optional entity-scoped `pv.{pv_system_id}.sens_pv_production_active` may fill a missing inv value when every attached string is mapped. Island inverters are excluded. Incomplete maps fail loud. Curtailment still uses forecast shares (live-weight switch deferred).
 
 **EVCS** (`sens_evcs_active_power`)**:** charge power ≥ `0` (W) when charging; `0` when idle.
 
@@ -110,14 +108,14 @@ When the plant field is unmapped and every **grid-tied** inverter that owns ≥1
 
 ```text
 P_cons = P_PV + P_Grid + P_Bat
-         (sens_power_consumers = sens_pv_production_active + sens_grid_power_active + sens_ess_power)
+         (sens_power_consumers = plant_AC_PV + sens_grid_power_active + sens_ess_power)
 ```
 
-Per-inverter values refine `P_PV` / `P_Bat`; they never replace the plant-level identity.
+`P_PV` is derived plant AC PV (Σ inv · η_inv), not a telemetry document field. Per-inverter values define `P_PV`; they never replace the balance identity.
 
-| Term | Field | `+` | `−` |
+| Term | Field / source | `+` | `−` |
 |------|-------|-----|-----|
-| `P_PV` | `sens_pv_production_active` | production | — (≥ 0) |
+| `P_PV` | derived from `inv.*.sens_inv_power_pv` (· η_inv) | production | — (≥ 0) |
 | `P_Grid` | `sens_grid_power_active` | import (Bezug) | export (Einspeisung) |
 | `P_Bat` | `sens_ess_power` | discharge | charge |
 | `P_cons` | `sens_power_consumers` | house load | — (≥ 0) |
@@ -134,8 +132,7 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), and Live 
 | Field                         | Required | Unit   | Notes                                                                                                      |
 | ----------------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------- |
 | `sens_grid_power_active`      | yes      | W      | PCC active power; sign as above                                                                            |
-| `sens_pv_production_active`   | yes*     | W      | ≥ 0; *always required on the telemetry document (`telemetry.schema.json`). The **mapping** may be omitted when Live derives it from complete grid-tied inv/pv maps (`with_live_pv_attribution`); validation then runs on the derived value, and Live fails loud if it cannot be derived. |
-| `pv.{id}.sens_pv_production_active` | no | W | ≥ 0; optional per-PV-system DC power. Entity-scoped binding / push key only; **not** a property of the telemetry document (the schema has `additionalProperties: false`) |
+| `pv.{id}.sens_pv_production_active` | no | W | ≥ 0; optional per-PV-system DC power. Entity-scoped binding / push key only; **not** a property of the telemetry document |
 | `ess.{id}.sens_ess_soc`       | Live yes | %      | Home battery SoC; **not** on the plant telemetry document (entity-scoped binding / push only)              |
 | `sens_ess_power`              | no       | W      | Optional; sign as above                                                                                    |
 | `sens_evcs_active_power`      | no       | W      | ≥ 0 when present                                                                                           |
@@ -153,7 +150,7 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), and Live 
 | `get_ess_max_charge_power`    | no       | W      | Optional device max charge power magnitude (2.7.j)                                                         |
 | `get_ess_max_discharge_power` | no       | W      | Optional device max discharge power magnitude (2.7.j)                                                      |
 | `inv.{id}.sens_inv_power_ac`  | no       | W      | Per inverter; `+` = feeds the AC bus (2.7.l)                                                               |
-| `inv.{id}.sens_inv_power_pv`  | no       | W      | ≥ 0 (2.7.l)                                                                                                |
+| `inv.{id}.sens_inv_power_pv`  | yes*     | W      | ≥ 0; *required binding when the inverter has attached PV systems; plant AC PV is derived from these values |
 | `inv.{id}.get_inv_max_ac_power` | no     | W      | Device AC rating, magnitude (2.7.l)                                                                        |
 | `inv.{id}.get_inv_max_pv_power` | no     | W      | DC/MPPT limit, magnitude (2.7.l)                                                                           |
 
@@ -261,7 +258,7 @@ Migration (data model stays **4**): `python -m scripts.migrate_topology_once --c
 **Config / live balance (P2 — generator-side coverage):**
 
 - Plant `sens_ess_power` := Σ over grid-tied house batteries of `ess.{id}.sens_ess_power`. Missing binding/value for any eligible battery → fail loud. Battery-less plants omit ESS → `0`.
-- When more than one grid-tied inverter owns PV: plant `sens_pv_production_active` is always derived as Σ inv/pv · η_inv (mapped plant PV is ignored); incomplete `inv.*`/`pv.*` coverage fails loud.
+- Plant AC PV is always derived as Σ grid-tied inv/pv · η_inv; incomplete `inv.*`/`pv.*` coverage fails loud.
 - Derived load: `plant.balance_tolerance_pct` (default **5**) and `plant.balance_tolerance_w` (default **100**). Raw `PV + grid + ESS` below `−max(w, pct/100 · P_PV)` → telemetry error (not silent `0`); within tolerance → clamp to `0`.
 - Live attribution uses required inverter `efficiency` (η_inv); no soft default.
 

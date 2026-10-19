@@ -107,30 +107,22 @@ def plant_pv_derive_coverage_complete(
 
 
 def plant_pv_binding_mapped(house: dict | None) -> bool:
-    plant = house.get("plant") if isinstance(house, dict) else None
-    bindings = (
-        plant.get("ehal_bindings") if isinstance(plant, dict) else None
-    )
-    if not isinstance(bindings, dict):
-        return False
-    return "sens_pv_production_active" in bindings
+    """Retired: bare plant PV binding is no longer used."""
+    _ = house
+    return False
 
 
 def plant_pv_may_be_derived(house: dict | None, components: dict | None) -> bool:
-    """True when plant PV should be Σ inv/pv (skip reading the plant binding).
+    """True when plant AC PV must be derived from grid-tied inv/pv maps.
 
-    Several grid-tied inverters with PV always derive (flat plant PV unused).
-    Otherwise derive only when the plant binding is absent and coverage is complete.
+    Bare plant ``sens_pv_production_active`` is retired from telemetry — always
+    derive when any grid-tied inverter owns PV.
     """
+    _ = house
     comps = components if isinstance(components, dict) else {}
     inverters = list(comps.get("inverters") or [])
     pv_systems = list(comps.get("pv_systems") or [])
-    eligible = grid_tied_inverters_with_pv(inverters, pv_systems)
-    if len(eligible) > 1:
-        return True
-    if plant_pv_binding_mapped(house):
-        return False
-    return plant_pv_derive_coverage_complete(inverters, pv_systems)
+    return bool(grid_tied_inverters_with_pv(inverters, pv_systems))
 
 
 def load_house_for_attribution() -> dict:
@@ -268,14 +260,14 @@ def derive_plant_pv_ac_w(
     inverters: list[dict],
     pv_systems: list[dict],
 ) -> float:
-    """Plant AC PV = Σ grid-tied inv PV · η_inv. Fail loud on incomplete coverage."""
+    """Plant AC PV = Σ grid-tied inv PV · η_inv. Fail loud on incomplete coverage.
+
+    No eligible grid-tied inverter with PV → ``0.0`` (PV-less plant).
+    """
     filled = fill_inv_pv_from_pv_systems(scoped_live, inverters, pv_systems)
     eligible = grid_tied_inverters_with_pv(inverters, pv_systems)
     if not eligible:
-        raise ValueError(
-            "Cannot derive plant sens_pv_production_active: no grid-tied "
-            "inverter with PV systems."
-        )
+        return 0.0
     total = 0.0
     missing: list[str] = []
     for inv in eligible:
@@ -287,15 +279,10 @@ def derive_plant_pv_ac_w(
         total += max(0.0, float(filled[key])) * _eta_inv(inv)
     if missing:
         raise ValueError(
-            "Cannot derive plant sens_pv_production_active: incomplete "
-            f"grid-tied inverter PV coverage (missing: {', '.join(missing)}). "
+            "Cannot derive plant AC PV: incomplete grid-tied inverter PV "
+            f"coverage (missing: {', '.join(missing)}). "
             "Map inv.*.sens_inv_power_pv for every grid-tied inverter with PV "
-            "(or every attached pv.*.sens_pv_production_active)"
-            + (
-                ", or map plant PV."
-                if len(eligible) <= 1
-                else "."
-            )
+            "(or every attached pv.*.sens_pv_production_active)."
         )
     return total
 
@@ -307,33 +294,62 @@ def with_attributed_plant_pv(
     inverters: list[dict],
     pv_systems: list[dict],
 ) -> dict[str, Any]:
-    """Return telemetry copy with inv←Σpv fills and plant PV when needed.
+    """Return telemetry copy with inv←Σpv fills; never set plant PV on the doc.
 
-    Several grid-tied inverters with PV: always derive plant AC as
-    Σ inv PV · η_inv (mapped plant ``sens_pv_production_active`` ignored).
-    Otherwise keep a mapped plant value, or derive when it is missing.
+    Bare ``sens_pv_production_active`` is retired from the telemetry document.
+    Callers that need plant AC W use ``derive_plant_pv_ac_w``.
     """
     out = dict(telemetry)
-    plant = out.get("sens_pv_production_active")
-    force_derive = len(grid_tied_inverters_with_pv(inverters, pv_systems)) > 1
-    # Fail loud on partial PV maps when plant must be derived.
-    fail_partial = plant is None or force_derive
+    out.pop("sens_pv_production_active", None)
     filled = fill_inv_pv_from_pv_systems(
-        scoped_live, inverters, pv_systems, fail_partial=fail_partial
+        scoped_live, inverters, pv_systems, fail_partial=True
     )
-    # Surface derived inv/pv keys on the working dict for callers/tests (not schema).
     for key, value in filled.items():
         if key.startswith("inv.") and key.endswith(".sens_inv_power_pv"):
             out[key] = value
         elif key.startswith("pv.") and key.endswith(".sens_pv_production_active"):
             out[key] = value
-    if plant is None or force_derive:
-        out["sens_pv_production_active"] = derive_plant_pv_ac_w(
-            filled, inverters, pv_systems
-        )
-    else:
-        out["sens_pv_production_active"] = max(0.0, float(plant))
     return out
+
+
+def scoped_pv_live_from_telemetry(telemetry: dict[str, Any]) -> dict[str, Any]:
+    """Extract entity-scoped inv/pv PV power keys from a working telemetry dict."""
+    out: dict[str, Any] = {}
+    for key, value in telemetry.items():
+        key_s = str(key)
+        if value is None:
+            continue
+        if (
+            key_s.startswith("inv.") and key_s.endswith(".sens_inv_power_pv")
+        ) or (
+            key_s.startswith("pv.") and key_s.endswith(".sens_pv_production_active")
+        ):
+            out[key_s] = max(0.0, float(value))
+    return out
+
+
+def plant_pv_ac_w_from_telemetry(
+    telemetry: dict[str, Any],
+    *,
+    inverters: list[dict] | None = None,
+    pv_systems: list[dict] | None = None,
+) -> float:
+    """Derive plant AC PV W from scoped keys on ``telemetry`` (+ components)."""
+    comps = None
+    if inverters is None or pv_systems is None:
+        comps = load_components_for_attribution()
+    invs = (
+        list(inverters)
+        if inverters is not None
+        else list((comps or {}).get("inverters") or [])
+    )
+    pvs = (
+        list(pv_systems)
+        if pv_systems is not None
+        else list((comps or {}).get("pv_systems") or [])
+    )
+    scoped = scoped_pv_live_from_telemetry(telemetry)
+    return derive_plant_pv_ac_w(scoped, invs, pvs)
 
 
 def attribute_plant_pv_to_inverters_w(

@@ -138,6 +138,7 @@ def _plant_from_house_profiles() -> dict:
 def derive_sens_power_consumers_w(
     telemetry: dict[str, Any],
     *,
+    plant_pv_w: float,
     plant: dict | None = None,
 ) -> float:
     """House load W: mapped value if present, else PV + grid + ESS with P2 tolerance."""
@@ -149,20 +150,24 @@ def derive_sens_power_consumers_w(
     plant_map = plant if isinstance(plant, dict) else _plant_from_house_profiles()
     pct, watts = balance_tolerances_from_plant(plant_map)
     return derive_balanced(
-        telemetry, tolerance_pct=pct, tolerance_w=watts
+        telemetry,
+        plant_pv_w=plant_pv_w,
+        tolerance_pct=pct,
+        tolerance_w=watts,
     )
 
 
 def with_derived_sens_power_consumers(
     telemetry: dict[str, Any],
     *,
+    plant_pv_w: float,
     plant: dict | None = None,
 ) -> dict[str, Any]:
     """Return a copy with sens_power_consumers filled when missing/null."""
     out = dict(telemetry)
     if out.get("sens_power_consumers") is None:
         out["sens_power_consumers"] = derive_sens_power_consumers_w(
-            out, plant=plant
+            out, plant_pv_w=plant_pv_w, plant=plant
         )
     return out
 
@@ -190,11 +195,9 @@ def collect_scoped_pv_live_w() -> dict[str, float]:
 
 
 def with_live_pv_attribution(telemetry: dict[str, Any]) -> dict[str, Any]:
-    """Fill plant PV from Σ grid-tied inv PV · η_inv when needed.
+    """Fill missing ``inv.*.sens_inv_power_pv`` from complete per-PV maps.
 
-    Several grid-tied inverters with PV always derive (mapped plant PV ignored).
-    Also derives missing ``inv.*.sens_inv_power_pv`` from complete per-PV maps.
-    Fail loud on partial coverage when plant must be derived.
+    Does not write bare plant ``sens_pv_production_active`` (retired from telemetry).
     """
     from integrations.pv_attribution import (
         load_components_for_attribution,
@@ -215,23 +218,59 @@ def with_live_pv_attribution(telemetry: dict[str, Any]) -> dict[str, Any]:
         ):
             if value is not None:
                 scoped[key_s] = max(0.0, float(value))
-    out = with_attributed_plant_pv(
+    return with_attributed_plant_pv(
         telemetry,
         scoped_live=scoped,
         inverters=inverters,
         pv_systems=pv_systems,
     )
-    if out.get("sens_pv_production_active") is None:
+
+
+def plant_pv_ac_w_live(telemetry: dict[str, Any]) -> float:
+    """Plant AC PV W from scoped inv/pv on ``telemetry`` (OpenEMS: _sum channel)."""
+    from integrations.pv_attribution import (
+        derive_plant_pv_ac_w,
+        grid_tied_inverters_with_pv,
+        load_components_for_attribution,
+        plant_pv_derive_coverage_complete,
+        scoped_pv_live_from_telemetry,
+    )
+
+    components = load_components_for_attribution()
+    inverters = list(components.get("inverters") or [])
+    pv_systems = list(components.get("pv_systems") or [])
+    scoped = scoped_pv_live_from_telemetry(telemetry)
+    scoped.update(collect_scoped_pv_live_w())
+    eligible = grid_tied_inverters_with_pv(inverters, pv_systems)
+    if not eligible:
+        return 0.0
+    if plant_pv_derive_coverage_complete(
+        inverters, pv_systems, scoped_live=scoped
+    ):
+        return derive_plant_pv_ac_w(scoped, inverters, pv_systems)
+    backend = str(config.get("EHAL_BACKEND") or "loxone").strip().lower()
+    if backend == "openems":
+        return _openems_production_ac_w()
+    return derive_plant_pv_ac_w(scoped, inverters, pv_systems)
+
+
+def _openems_production_ac_w() -> float:
+    """OpenEMS ``_sum/ProductionActivePower`` as plant AC PV (already AC)."""
+    adapter = get_openems_adapter()
+    raw = adapter.read_channel("_sum", "ProductionActivePower")
+    if raw is None:
         raise ValueError(
-            "sens_pv_production_active missing after live PV attribution "
-            "(map plant PV or complete grid-tied inv/pv coverage)."
+            "OpenEMS ProductionActivePower missing; map inv.*.sens_inv_power_pv "
+            "or ensure _sum/ProductionActivePower is available."
         )
-    return out
+    return max(0.0, float(raw))
 
 
 def prepare_live_telemetry(telemetry: dict[str, Any]) -> dict[str, Any]:
-    """Post-read: PV attribution then house-load derive."""
-    return with_derived_sens_power_consumers(with_live_pv_attribution(telemetry))
+    """Post-read: inv/pv attribution then house-load derive from plant AC PV."""
+    attributed = with_live_pv_attribution(telemetry)
+    plant_pv = plant_pv_ac_w_live(attributed)
+    return with_derived_sens_power_consumers(attributed, plant_pv_w=plant_pv)
 
 
 
@@ -290,7 +329,7 @@ def read_live_power_kw() -> dict[str, float] | None:
         logger.error("EHAL live power read failed: %s", exc)
         return None
 
-    pv = max(0.0, float(telemetry["sens_pv_production_active"]) / 1000.0)
+    pv = max(0.0, plant_pv_ac_w_live(telemetry) / 1000.0)
     grid = float(telemetry["sens_grid_power_active"]) / 1000.0
     ess_w = telemetry.get("sens_ess_power")
     if ess_w is None:

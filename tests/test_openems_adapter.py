@@ -71,12 +71,12 @@ def test_read_telemetry_normalizes(get_mock):
     adapter = OpenemsAdapter(_cfg())
     telemetry = adapter.read_telemetry()
     assert telemetry["sens_grid_power_active"] == 100.0
-    assert telemetry["sens_pv_production_active"] == 500.0
+    assert "sens_pv_production_active" not in telemetry
     assert "sens_ess_soc" not in telemetry
     assert adapter.read_ess_soc_pct() == pytest.approx(55.0)
     assert telemetry["sens_ess_power"] == 200.0
     assert telemetry["sens_evcs_active_power"] == 1200.0
-    # EHAL: PV 500 + import 100 + discharge 200
+    # Plant AC PV from _sum (500) + import 100 + discharge 200
     assert telemetry["sens_power_consumers"] == pytest.approx(800.0)
 
 

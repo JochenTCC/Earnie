@@ -43,7 +43,6 @@ Overview of the **canonical EHAL wire fields** (the per-role matrix is in §C be
 | Envelope                | `ts`                               | yes      | ISO-8601 timestamp **with timezone** (UTC preferred)                                                          |
 | Envelope                | `adapter_id`                       | yes      | stable adapter ID (e.g. `openems-lab`, `earnie-hems`)                                                             |
 | Telemetry               | `sens_grid_power_active`           | yes      | **W**; `+` = grid **import**, `-` = **export**                                                                 |
-| Telemetry               | `sens_pv_production_active`        | yes      | **W**; >= 0                                                                                                    |
 | Live / binding          | `ess.{id}.sens_ess_soc`            | Live yes | **%**; 0…100; not on the plant telemetry document                                                              |
 | Telemetry (optional)    | `sens_ess_power`                   | no       | **W**; ESS sign **OpenEMS-aligned**: `+` = **discharge**, `-` = **charge**                                     |
 | Telemetry (optional)    | `sens_evcs_active_power`           | no       | **W**; >= 0 (typically 0 when idle)                                                                            |
@@ -54,8 +53,8 @@ Overview of the **canonical EHAL wire fields** (the per-role matrix is in §C be
 | Telemetry (optional)    | `get_ess_max_charge_power`         | no       | **W**; device max charge power magnitude                                                           |
 | Telemetry (optional)    | `get_ess_max_discharge_power`      | no       | **W**; device max discharge power magnitude                                                        |
 | Telemetry (optional)    | `inv.{id}.sens_inv_power_ac`       | no       | **W**; per inverter; `+` = feeds the AC bus                                                        |
-| Telemetry (optional)    | `inv.{id}.sens_inv_power_pv`       | no       | **W**; ≥ 0                                                                                         |
-| Telemetry (optional)    | `pv.{id}.sens_pv_production_active` | no      | **W**; ≥ 0; per-PV-system DC power on `pv_systems[].ehal_bindings`                                         |
+| Live / binding          | `inv.{id}.sens_inv_power_pv`       | yes*     | **W**; ≥ 0; *required when the inverter has attached PV; plant AC PV is derived (not on telemetry doc) |
+| Telemetry (optional)    | `pv.{id}.sens_pv_production_active` | no      | **W**; ≥ 0; optional per-PV-system DC power on `pv_systems[].ehal_bindings`                                         |
 | Telemetry (optional)    | `inv.{id}.get_inv_max_ac_power`    | no       | **W**; device AC rating magnitude                                                                  |
 | Telemetry (optional)    | `inv.{id}.get_inv_max_pv_power`    | no       | **W**; DC/MPPT limit magnitude                                                                     |
 | Setpoints (force)       | `set_ess_active_power`             | no*      | **W**; signed; OpenEMS-aligned: `+` = **discharge**, `−` = **charge**; omit for automatic mode (see [sign convention for `set_ess_active_power`](#sign-set_ess_active_power)) |

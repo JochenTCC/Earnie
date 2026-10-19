@@ -19,11 +19,11 @@ logger = logging.getLogger("integrations.ha_adapter")
 BOOLEAN_INVERT_FIELDS = frozenset({"set_ess_source_select"})
 _NONNEG_TELEMETRY = frozenset(
     {
-        "sens_pv_production_active",
         "sens_evcs_active_power",
         "sens_power_consumers",
         "get_ess_max_charge_power",
         "get_ess_max_discharge_power",
+        "sens_inv_power_pv",
     }
 )
 

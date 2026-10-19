@@ -17,7 +17,6 @@ def _minimal_docs() -> tuple[dict, dict]:
     house = {
         "plant": {
             "ehal_bindings": {
-                "sens_pv_production_active": "PV",
                 "sens_grid_power_active": "Grid",
                 "set_grid_export_power_limit": "ExportLimit",
             }
@@ -67,7 +66,8 @@ def test_build_signal_rows_has_read_and_write() -> None:
         fetched_at="2026-10-09T12:01:05+00:00",
     )
     ids = {r.ehal_id for r in rows}
-    assert "sens_pv_production_active" in ids
+    assert "grid.meter.sens_grid_power_active" in ids
+    assert "sens_pv_production_active" not in ids
     assert "grid.meter.set_grid_export_power_limit" in ids
     assert "consumer.waschmaschine.set_enable" in ids
     assert "ess.15_kwh_speicher.sens_ess_soc" in ids
@@ -105,11 +105,10 @@ def test_build_signal_rows_has_read_and_write() -> None:
     opt_old = next(r for r in old if r.ehal_id == "request_optimize")
     assert opt_old.match_kind == "ok"
     assert opt_old.match_text.startswith("vor ")
-    pv = next(r for r in rows if r.ehal_id == "sens_pv_production_active")
-    assert pv.direction == "read"
-    assert pv.match_kind in ("ok", "stale")
-    assert pv.is_required is True
-    assert pv.is_activated is True
+    grid = next(r for r in rows if r.ehal_id == "grid.meter.sens_grid_power_active")
+    assert grid.direction == "read"
+    assert grid.is_required is True
+    assert grid.is_activated is True
     write = next(r for r in rows if r.ehal_id == "grid.meter.set_grid_export_power_limit")
     assert write.direction == "write"
     assert write.match_kind == "published"

@@ -16,10 +16,7 @@ from ehal.field_catalog import (
 
 
 def test_telemetry_required_membership():
-    assert TELEMETRY_REQUIRED == (
-        "sens_grid_power_active",
-        "sens_pv_production_active",
-    )
+    assert TELEMETRY_REQUIRED == ("sens_grid_power_active",)
 
 
 def test_ha_optional_is_core_without_outdoor_or_absent():

@@ -133,19 +133,22 @@ def test_split_helper_proportional_to_live_ac_weights() -> None:
     assert sum(allocated.values()) == pytest.approx(4000.0)
 
 
-def test_with_attributed_keeps_mapped_plant() -> None:
-    inverters = [_inv("wr")]
+def test_with_attributed_strips_plant_pv_and_fills_inv() -> None:
+    inverters = [_inv("wr", eta=1.0)]
     pv_systems = [_pv("p1", "wr")]
+    scoped = {inv_field("wr", "sens_inv_power_pv"): 1200.0}
     out = with_attributed_plant_pv(
-        {"sens_pv_production_active": 2500.0},
-        scoped_live={},
+        {"sens_pv_production_active": 2500.0, "sens_grid_power_active": 0.0},
+        scoped_live=scoped,
         inverters=inverters,
         pv_systems=pv_systems,
     )
-    assert out["sens_pv_production_active"] == pytest.approx(2500.0)
+    assert "sens_pv_production_active" not in out
+    assert out[inv_field("wr", "sens_inv_power_pv")] == pytest.approx(1200.0)
+    assert derive_plant_pv_ac_w(scoped, inverters, pv_systems) == pytest.approx(1200.0)
 
 
-def test_with_attributed_multi_inv_derives_even_when_plant_mapped() -> None:
+def test_with_attributed_multi_inv_no_plant_field() -> None:
     inverters = [_inv("wr_a", eta=1.0), _inv("wr_b", eta=1.0)]
     pv_systems = [_pv("p1", "wr_a"), _pv("p2", "wr_b")]
     scoped = {
@@ -158,7 +161,8 @@ def test_with_attributed_multi_inv_derives_even_when_plant_mapped() -> None:
         inverters=inverters,
         pv_systems=pv_systems,
     )
-    assert out["sens_pv_production_active"] == pytest.approx(1000.0)
+    assert "sens_pv_production_active" not in out
+    assert derive_plant_pv_ac_w(scoped, inverters, pv_systems) == pytest.approx(1000.0)
 
 
 def test_curtail_allocation_still_forecast_only() -> None:

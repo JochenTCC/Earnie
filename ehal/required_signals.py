@@ -2,6 +2,9 @@
 
 Activation = key present in ``ehal_bindings`` (value may be empty). This module
 only lists *kinds* / qualified binding keys; it does not touch disk.
+
+Plant bare ``sens_pv_production_active`` is retired: live PV is mandatory as
+``inv.{id}.sens_inv_power_pv`` when the inverter has attached PV systems.
 """
 from __future__ import annotations
 
@@ -22,9 +25,9 @@ from house_config.inverter import DEFAULT_INVERTER_CONTROL
 ComponentKind = Literal["plant", "battery", "inverter", "pv_system", "consumer"]
 
 # Plant bare keys from telemetry (sens_ess_soc lives on the battery entity).
+# Plant PV is derived from inv.*.sens_inv_power_pv — not a plant binding.
 PLANT_REQUIRED_KINDS: tuple[str, ...] = (
     "sens_grid_power_active",
-    "sens_pv_production_active",
 )
 
 _BATTERY_TELEMETRY: tuple[str, ...] = ("sens_ess_soc",)
@@ -35,8 +38,27 @@ _BATTERY_LIMITS: tuple[str, ...] = (
 _BATTERY_FORCE: tuple[str, ...] = ("set_ess_active_power",)
 
 _INVERTER_LIMIT: tuple[str, ...] = ("set_inv_ac_power_limit",)
-_PV_TELEMETRY: tuple[str, ...] = ("sens_pv_production_active",)
+_INVERTER_PV_TELEMETRY: tuple[str, ...] = ("sens_inv_power_pv",)
 _EVCS_CURRENT: tuple[str, ...] = ("set_evcs_max_current",)
+
+PLANT_PV_BINDING_KIND = "sens_pv_production_active"
+PV_SYSTEM_PRODUCTION_KIND = "sens_pv_production_active"
+
+
+def inverter_has_attached_pv(
+    inverter_id: str,
+    pv_systems: list[Any] | tuple[Any, ...] | None,
+) -> bool:
+    """True when at least one PV system references ``inverter_id``."""
+    iid = str(inverter_id or "").strip()
+    if not iid:
+        return False
+    for pv in pv_systems or []:
+        if not isinstance(pv, dict):
+            continue
+        if str(pv.get("inverter_id") or "").strip() == iid:
+            return True
+    return False
 
 
 def required_kinds_for_battery(control: str | None) -> tuple[str, ...]:
@@ -52,16 +74,24 @@ def required_kinds_for_battery(control: str | None) -> tuple[str, ...]:
     return tuple(kinds)
 
 
-def required_kinds_for_inverter(control: str | None) -> tuple[str, ...]:
-    """Inverter kinds required for ``inverters[].control``."""
+def required_kinds_for_inverter(
+    control: str | None,
+    *,
+    has_attached_pv: bool = False,
+) -> tuple[str, ...]:
+    """Inverter kinds required for ``inverters[].control`` and PV attachment."""
     level = str(control or DEFAULT_INVERTER_CONTROL).strip().lower()
+    kinds: list[str] = []
+    if has_attached_pv:
+        kinds.extend(_INVERTER_PV_TELEMETRY)
     if level in ("full", "limits_only"):
-        return _INVERTER_LIMIT
-    return ()
+        kinds.extend(_INVERTER_LIMIT)
+    return tuple(kinds)
 
 
 def required_kinds_for_pv_system() -> tuple[str, ...]:
-    return _PV_TELEMETRY
+    """Per-string PV production is optional — no required kinds."""
+    return ()
 
 
 def required_kinds_for_plant() -> tuple[str, ...]:
@@ -113,6 +143,7 @@ def required_binding_keys(
     entity_id: str = "",
     control: str | None = None,
     consumer_type: str = "",
+    has_attached_pv: bool = False,
 ) -> tuple[str, ...]:
     """Required ``ehal_bindings`` keys for one component instance."""
     if component_kind == "plant":
@@ -120,7 +151,7 @@ def required_binding_keys(
     elif component_kind == "battery":
         kinds = required_kinds_for_battery(control)
     elif component_kind == "inverter":
-        kinds = required_kinds_for_inverter(control)
+        kinds = required_kinds_for_inverter(control, has_attached_pv=has_attached_pv)
     elif component_kind == "pv_system":
         kinds = required_kinds_for_pv_system()
     elif component_kind == "consumer":
@@ -177,3 +208,23 @@ def missing_required_keys(
 ) -> tuple[str, ...]:
     present = set((bindings or {}).keys()) if isinstance(bindings, dict) else set()
     return tuple(k for k in keys if k not in present)
+
+
+def strip_empty_pv_production_keys(
+    bindings: dict[str, Any] | None,
+    *,
+    pv_system_id: str,
+) -> dict[str, Any]:
+    """Drop empty unmapped ``pv.{id}.sens_pv_production_active`` leftovers."""
+    out = dict(bindings) if isinstance(bindings, dict) else {}
+    key = pv_field(str(pv_system_id or "").strip(), PV_SYSTEM_PRODUCTION_KIND)
+    if key in out and not str(out.get(key) or "").strip():
+        out.pop(key, None)
+    return out
+
+
+def strip_plant_pv_binding(bindings: dict[str, Any] | None) -> dict[str, Any]:
+    """Remove retired plant ``sens_pv_production_active`` binding key."""
+    out = dict(bindings) if isinstance(bindings, dict) else {}
+    out.pop(PLANT_PV_BINDING_KIND, None)
+    return out

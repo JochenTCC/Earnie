@@ -16,6 +16,9 @@ from runtime_store.migration.steps.ha_pull_removal import STEP as HA_PULL_REMOVA
 from runtime_store.migration.steps.required_signal_activation import (
     STEP as REQUIRED_SIGNALS,
 )
+from runtime_store.migration.steps.retire_plant_pv_binding import (
+    STEP as RETIRE_PLANT_PV,
+)
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
 from runtime_store.migration.steps.v3_to_v4 import STEP as V3_TO_V4
 from runtime_store.migration.types import MigrationStep
@@ -35,6 +38,7 @@ STEPS: tuple[MigrationStep, ...] = (
     HA_PULL_REMOVAL,
     EHAL_HTTP_PORT,
     CONSUMER_FLEX,
+    RETIRE_PLANT_PV,
 )
 
 STEP_BY_ID: dict[str, MigrationStep] = {step.id: step for step in STEPS}

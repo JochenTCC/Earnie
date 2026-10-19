@@ -13,6 +13,7 @@ import pytest
 
 from ehal import loxone_push_source as src
 from ehal.ess_fields import ess_field
+from ehal.inverter_fields import inv_field
 from ehal.qualified_ids import qualified_battery_id, qualified_plant_id
 from integrations import ehal_live, loxone_client
 from ehal.field_registry import require_loxone_write
@@ -45,11 +46,15 @@ def _components_doc() -> dict:
                 "id": "wr_main",
                 "type": "hybrid",
                 "ac_connection": "grid_tied",
-                "efficiency": 0.97,
-                "ehal_bindings": {},
+                "efficiency": 1.0,
+                "ehal_bindings": {
+                    inv_field("wr_main", "sens_inv_power_pv"): "PV",
+                },
             }
         ],
-        "pv_systems": [],
+        "pv_systems": [
+            {"id": "pv1", "kwp": 5.0, "inverter_id": "wr_main", "ehal_bindings": {}}
+        ],
     }
 
 
@@ -57,7 +62,6 @@ def _house_doc() -> dict:
     return {
         "plant": {
             "ehal_bindings": {
-                "sens_pv_production_active": "PV",
                 "sens_grid_power_active": "Grid",
             }
         }
@@ -95,7 +99,7 @@ def _cfg(**kwargs) -> LoxoneConfig:
 def _plant_fetch(**extra) -> dict:
     values = {
         qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"): 55.0,
-        qualified_plant_id("sens_pv_production_active"): 0.0,
+        inv_field("wr_main", "sens_inv_power_pv"): 0.0,
         qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"): 0.0,
         qualified_plant_id("sens_grid_power_active"): 0.0,
     }
@@ -129,25 +133,27 @@ def test_char_active_power_sign_preserved() -> None:
 
 
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
-def test_char_read_telemetry_kw_to_w_and_pv_clamp(fetch_mock) -> None:
+def test_char_read_telemetry_kw_to_w(fetch_mock) -> None:
     fetch_mock.side_effect = {
         qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"): 55.0,
-        qualified_plant_id("sens_pv_production_active"): -0.1,  # clamped to 0 before ×1000
+        inv_field("wr_main", "sens_inv_power_pv"): 0.0,
         qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"): 0.5,
         # Keep derived load within Topology P2 night floor (−100 W).
         qualified_plant_id("sens_grid_power_active"): -0.4,
     }.get
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert "sens_ess_soc" not in telemetry
-    assert telemetry["sens_pv_production_active"] == 0.0
+    assert "sens_pv_production_active" not in telemetry
     assert telemetry["sens_grid_power_active"] == pytest.approx(-400.0)
     assert telemetry["sens_ess_power"] == pytest.approx(500.0)
+    # plant AC PV derived 0 → consumers = 0 + (-400) + 500 = 100
+    assert telemetry["sens_power_consumers"] == pytest.approx(100.0)
 
 
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
 def test_char_required_marker_missing_raises(fetch_mock) -> None:
     fetch_mock.return_value = None
-    with pytest.raises(LoxoneAdapterError, match="sens_pv_production_active|sens_grid_power_active|sens_ess_power"):
+    with pytest.raises(LoxoneAdapterError, match="sens_grid_power_active|sens_ess_power"):
         LoxoneAdapter(_cfg()).read_telemetry()
 
 
@@ -300,7 +306,6 @@ def test_char_read_ess_soc_by_id_no_plant_alias() -> None:
 _PUSH_HOUSE = {
     "plant": {
         "ehal_bindings": {
-            "sens_pv_production_active": "PV",
             "sens_grid_power_active": "Grid",
         }
     },
@@ -312,13 +317,28 @@ _PUSH_COMPONENTS = {
         {
             "id": _PRIMARY_ESS,
             "type": "house",
+            "inverter_id": "wr_main",
             "ehal_bindings": {
                 ess_field(_PRIMARY_ESS, "sens_ess_soc"): "SoC",
                 ess_field(_PRIMARY_ESS, "sens_ess_power"): "Bat",
                 ess_field(_PRIMARY_ESS, "get_ess_soc_min"): "SocMin",
             },
         }
-    ]
+    ],
+    "inverters": [
+        {
+            "id": "wr_main",
+            "type": "hybrid",
+            "ac_connection": "grid_tied",
+            "efficiency": 1.0,
+            "ehal_bindings": {
+                inv_field("wr_main", "sens_inv_power_pv"): "PV",
+            },
+        }
+    ],
+    "pv_systems": [
+        {"id": "pv1", "kwp": 5.0, "inverter_id": "wr_main", "ehal_bindings": {}}
+    ],
 }
 
 
@@ -345,7 +365,7 @@ def _seed_required_push(*, soc: str | None = "55", now: datetime | None = None) 
     inbox.record_push("heartbeat_smarthome", "1", now=ref)
     if soc is not None:
         inbox.record_push(qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"), soc, now=ref)
-    inbox.record_push(qualified_plant_id("sens_pv_production_active"), "0", now=ref)
+    inbox.record_push(inv_field("wr_main", "sens_inv_power_pv"), "0", now=ref)
     inbox.record_push(qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"), "0", now=ref)
     inbox.record_push(qualified_plant_id("sens_grid_power_active"), "0", now=ref)
 
@@ -360,7 +380,8 @@ def test_char_push_missing_soc_still_reads_plant_telemetry(
     _seed_required_push(soc=None)
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert "sens_ess_soc" not in telemetry
-    assert telemetry["sens_pv_production_active"] == pytest.approx(0.0)
+    assert "sens_pv_production_active" not in telemetry
+    assert telemetry["sens_grid_power_active"] == pytest.approx(0.0)
 
 
 def test_char_push_stale_soc_still_reads_plant_telemetry(

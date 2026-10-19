@@ -1,7 +1,7 @@
 {
   "role_id": "inverter",
   "label": "Wechselrichter",
-  "description": "Optional per-device inverter telemetry and AC output limit (2.7.l P4). Entity-scoped inv.{id}.* on inverters[].ehal_bindings. Plant sens_pv_production_active stays the required PV sum.",
+  "description": "Per-device inverter telemetry and AC output limit. Entity-scoped inv.{id}.* on inverters[].ehal_bindings. When the inverter has attached PV systems, sens_inv_power_pv is required; plant AC PV is derived as Σ inv PV · η_inv.",
   "status": "m1",
   "ehal_fields": [
     {
@@ -21,7 +21,7 @@
       "field": "sens_inv_power_pv",
       "required": false,
       "kind": "telemetry",
-      "notes": "PV input power ≥ 0 (W). Exchange: inv.{id}.sens_inv_power_pv.",
+      "notes": "PV input power ≥ 0 (W). Exchange: inv.{id}.sens_inv_power_pv. Product activation requires this key when the inverter has attached PV systems.",
       "loxone": {
         "unit": "kW",
         "ehal_unit": "W",

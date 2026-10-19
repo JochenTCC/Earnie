@@ -151,8 +151,8 @@ def _entry(
 
 
 def _plant_kinds() -> tuple[str, ...]:
-    # Plant wire: grid role + plant PV sum (pv role bare).
-    return tuple(dict.fromkeys(_role_kinds("grid") + _role_kinds("pv")))
+    # Plant wire: grid role only (plant PV retired; PV lives on inv.*/pv.*).
+    return tuple(_role_kinds("grid"))
 
 
 def _consumer_role_id(consumer_type: str) -> str:
@@ -215,6 +215,9 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
                 )
             )
 
+    pv_systems = list(components.get("pv_systems") or [])
+    from ehal.required_signals import inverter_has_attached_pv
+
     for inverter in components.get("inverters") or []:
         if not isinstance(inverter, dict):
             continue
@@ -224,7 +227,10 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
         control = str(inverter.get("control") or DEFAULT_INVERTER_CONTROL).strip()
         required = set(
             required_binding_keys(
-                component_kind="inverter", entity_id=iid, control=control
+                component_kind="inverter",
+                entity_id=iid,
+                control=control,
+                has_attached_pv=inverter_has_attached_pv(iid, pv_systems),
             )
         )
         bindings = _bindings_of(inverter)

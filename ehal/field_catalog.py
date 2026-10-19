@@ -11,7 +11,6 @@ from __future__ import annotations
 
 TELEMETRY_REQUIRED: tuple[str, ...] = (
     "sens_grid_power_active",
-    "sens_pv_production_active",
 )
 
 # SoC kind for mapping / propose only — not on the plant telemetry document (schema_version 4).

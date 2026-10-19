@@ -35,12 +35,14 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Tests: `tests/test_ess_limits_2_7_j.py`, `tests/test_powerstation_2_7_h.py` (`test_collect_standby_packs_applies_hk_and_live_charge_cap`).
   - [ ] **Live golden dump (private REG):** when the fixed version is running on productive NAS, capture a debug dump (with `recorder/`) around a cheap-slot Delta 3 refill and intake as a private golden case confirming charge ≤ HK ∩ live.
 
+- [ ] **Inverter PV mandatory; bare plant PV removed from telemetry** — fix implemented (2026-10-19); live acceptance pending
+  - Symptom: EHAL push Lesefehler for `pv.dach_sued|nord.sens_pv_production_active` when only inverter-sum PV exists.
+  - Fix: require `inv.{id}.sens_inv_power_pv` when inverter has attached PV; per-string `pv.*` optional (empty keys stripped); bare plant `sens_pv_production_active` removed from telemetry document (plant AC derived via attribution); migration `dm4.retire_plant_pv_binding`.
+  - Tests: `tests/test_required_signals.py`, `tests/test_retire_plant_pv_binding.py`, `tests/test_pv_attribution.py`, topology P2 / adapter characterization updates.
+
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Earnie expects pv_production value for each PV generator - as an alternative it should be okay to get one pv_production per inverter (as sum over all attached strings)
-    EHAL push: no value for 'pv.dach_sued.sens_pv_production_active' (pv.dach_sued.sens_pv_production_active, state=Lesefehler)
-    EHAL push: no value for 'pv.dach_nord.sens_pv_production_active' (pv.dach_nord.sens_pv_production_active, state=Lesefehler)
 
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)

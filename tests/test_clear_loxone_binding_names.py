@@ -74,7 +74,7 @@ def test_clear_house_and_components() -> None:
 def test_mapped_fields_empty_loxone_activation() -> None:
     mapped = {
         "sens_grid_power_active": "",
-        "sens_pv_production_active": "",
+        "inv.wr.sens_inv_power_pv": "",
         "sens_ess_soc": "",
     }
     assert available_functions(mapped, require_nonempty_value=False) >= {"telemetry"}

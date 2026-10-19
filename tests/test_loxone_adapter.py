@@ -8,6 +8,7 @@ import pytest
 from ehal import EHAL_SCHEMA_VERSION
 from ehal.ess_fields import ess_field
 from ehal.field_registry import require_loxone_write
+from ehal.inverter_fields import inv_field
 from ehal.qualified_ids import qualified_battery_id, qualified_plant_id
 from integrations.loxone_adapter import (
     LoxoneAdapter,
@@ -38,11 +39,15 @@ def _components_doc() -> dict:
                 "id": "wr_main",
                 "type": "hybrid",
                 "ac_connection": "grid_tied",
-                "efficiency": 0.97,
-                "ehal_bindings": {},
+                "efficiency": 1.0,
+                "ehal_bindings": {
+                    inv_field("wr_main", "sens_inv_power_pv"): "PV",
+                },
             }
         ],
-        "pv_systems": [],
+        "pv_systems": [
+            {"id": "pv1", "kwp": 5.0, "inverter_id": "wr_main", "ehal_bindings": {}}
+        ],
     }
 
 
@@ -50,7 +55,6 @@ def _house_doc() -> dict:
     return {
         "plant": {
             "ehal_bindings": {
-                "sens_pv_production_active": "PV",
                 "sens_grid_power_active": "Grid",
             }
         }
@@ -103,7 +107,7 @@ def _cfg(**kwargs) -> LoxoneConfig:
 def _plant_qid_values(**extra) -> dict:
     values = {
         qualified_battery_id(_PRIMARY_ESS, "sens_ess_soc"): 55.0,
-        qualified_plant_id("sens_pv_production_active"): 2.0,
+        inv_field("wr_main", "sens_inv_power_pv"): 2.0,
         qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"): 0.5,
         qualified_plant_id("sens_grid_power_active"): 1.0,
     }
@@ -144,10 +148,10 @@ def test_read_telemetry_normalizes(fetch_mock):
     fetch_mock.side_effect = _plant_qid_values().get
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
     assert "sens_ess_soc" not in telemetry
-    assert telemetry["sens_pv_production_active"] == 2000.0
+    assert "sens_pv_production_active" not in telemetry
     assert telemetry["sens_grid_power_active"] == 1000.0
     assert telemetry["sens_ess_power"] == pytest.approx(500.0)
-    # PV 2000 + import 1000 + discharge 500
+    # Derived plant AC PV 2000 + import 1000 + discharge 500
     assert telemetry["sens_power_consumers"] == pytest.approx(3500.0)
     fetch_mock.assert_any_call(qualified_battery_id(_PRIMARY_ESS, "sens_ess_power"))
     fetched = {c.args[0] for c in fetch_mock.call_args_list}

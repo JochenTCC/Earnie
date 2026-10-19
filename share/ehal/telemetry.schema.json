@@ -2,14 +2,13 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/telemetry.schema.json",
   "title": "EHAL Telemetry-API (schema_version 4)",
-  "description": "Normalized plant telemetry. Power in W; grid + = import, − = export; ess_power + = discharge, − = charge (OpenEMS-aligned). Home battery SoC is entity-scoped only (ess.{id}.sens_ess_soc), not on this document. Field names: docs/ui/ehal-com.md §C.",
+  "description": "Normalized plant telemetry. Power in W; grid + = import, − = export; ess_power + = discharge, − = charge (OpenEMS-aligned). Home battery SoC is entity-scoped only (ess.{id}.sens_ess_soc). Plant AC PV is not on this document — derive from inv.{id}.sens_inv_power_pv. Field names: docs/ui/ehal-com.md §C.",
   "type": "object",
   "required": [
     "schema_version",
     "ts",
     "adapter_id",
-    "sens_grid_power_active",
-    "sens_pv_production_active"
+    "sens_grid_power_active"
   ],
   "properties": {
     "schema_version": {
@@ -28,11 +27,6 @@
     "sens_grid_power_active": {
       "type": "number",
       "description": "PCC active power in W. + = import, − = export."
-    },
-    "sens_pv_production_active": {
-      "type": "number",
-      "minimum": 0,
-      "description": "PV production in W (≥ 0)."
     },
     "sens_ess_power": {
       "type": ["number", "null"],

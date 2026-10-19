@@ -69,7 +69,7 @@ M1_EHAL_FIELDS: frozenset[str] = frozenset(
 # HITL display labels (German) for M1 mapping fields — single source for UI.
 _FIELD_LABELS_DE: dict[str, str] = {
     "sens_grid_power_active": "Netzleistung (W, +Bezug)",
-    "sens_pv_production_active": "PV-Produktion (W)",
+    "sens_pv_production_active": "PV-String Leistung (W, optional)",
     "sens_ess_soc": "Batterie-SoC (%)",
     "sens_ess_power": "Batterieleistung (W, +Entladung)",
     "sens_ess_energy_charge": "Batterie-Ladeenergie (kWh, kumulativ)",

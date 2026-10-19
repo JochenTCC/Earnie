@@ -18,12 +18,12 @@ from ehal.field_catalog import (
 logger = logging.getLogger(__name__)
 
 EHAL_MAP_FIELDS = STATIC_HUB_MAP_FIELDS
-EXTRAS_FIELDS: tuple[str, ...] = ()
+EXTRAS_FIELDS: tuple[str, ...] = ("sens_inv_power_pv",)
 
 # Canonical §C → loxone_blocks role keys.
 EHAL_TO_BLOCKS: dict[str, str] = {
     "sens_ess_soc": "soc_name",
-    "sens_pv_production_active": "pv_power_name",
+    "sens_inv_power_pv": "pv_power_name",
     "sens_ess_power": "battery_power_name",
     "sens_grid_power_active": "grid_power_name",
     "sens_power_consumers": "consumers_power_name",
@@ -64,7 +64,7 @@ except ImportError:  # pragma: no cover
 
 _HINTS: dict[str, tuple[str, ...]] = {
     "sens_grid_power_active": ("netz", "grid", "bezug", "energieversorger"),
-    "sens_pv_production_active": ("pv", "produktion", "solar", "erzeug"),
+    "sens_inv_power_pv": ("pv", "produktion", "solar", "erzeug", "wechselrichter"),
     "sens_ess_soc": ("soc", "ladezustand", "batterie soc", "akku soc"),
     "sens_ess_power": ("batterie", "speicher", "akku", "ess"),
     "sens_evcs_active_power": ("wallbox", "evcs", "e-auto", "eauto", "ladung leistung"),

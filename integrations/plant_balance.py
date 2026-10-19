@@ -102,18 +102,20 @@ def sum_grid_tied_house_ess_power_w(
 def derive_sens_power_consumers_w(
     telemetry: dict[str, Any],
     *,
+    plant_pv_w: float,
     tolerance_pct: float = DEFAULT_BALANCE_TOLERANCE_PCT,
     tolerance_w: float = DEFAULT_BALANCE_TOLERANCE_W,
 ) -> float:
     """House load W: mapped value if present, else PV + grid + ESS with tolerance.
 
-    EHAL signs: grid ``+`` = import, ESS ``+`` = discharge.
+    ``plant_pv_w`` is plant AC PV from ``derive_plant_pv_ac_w`` (not a telemetry
+    field). EHAL signs: grid ``+`` = import, ESS ``+`` = discharge.
     Raw balance below ``-max(w, pct/100 · P_PV)`` is a telemetry error, not ``0``.
     """
     mapped = telemetry.get("sens_power_consumers")
     if mapped is not None:
         return max(0.0, float(mapped))
-    pv = float(telemetry["sens_pv_production_active"])
+    pv = max(0.0, float(plant_pv_w))
     grid = float(telemetry["sens_grid_power_active"])
     # Battery-less plants may omit ESS (→ 0). Plants with grid-tied house
     # batteries must set sens_ess_power via sum_grid_tied_house_ess_power_w.

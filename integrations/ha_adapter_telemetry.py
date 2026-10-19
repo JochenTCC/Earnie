@@ -43,17 +43,11 @@ class HaTelemetryMixin:
         from integrations.pv_attribution import (
             load_components_for_attribution,
             load_house_for_attribution,
-            plant_pv_may_be_derived,
         )
 
         house = load_house_for_attribution()
         components = load_components_for_attribution()
-        derive_pv = plant_pv_may_be_derived(house, components)
-        required = tuple(
-            name
-            for name in TELEMETRY_REQUIRED
-            if not (derive_pv and name == "sens_pv_production_active")
-        )
+        required = tuple(TELEMETRY_REQUIRED)
         missing = [
             name for name in required if self._push_qid_for_kind(name) is None
         ]
@@ -83,7 +77,11 @@ class HaTelemetryMixin:
         plant_doc = {
             k: v
             for k, v in doc.items()
-            if not (str(k).startswith("inv.") or str(k).startswith("pv."))
+            if not (
+                str(k).startswith("inv.")
+                or str(k).startswith("pv.")
+                or str(k).startswith("_")
+            )
         }
         return validate_telemetry(plant_doc)
 
@@ -190,9 +188,13 @@ class HaTelemetryMixin:
 
         if out.get("sens_power_consumers") is None:
             pct, watts = balance_tolerances_from_plant(plant)
+            plant_pv_w = float(out.pop("_plant_pv_ac_w", 0.0))
             try:
                 out["sens_power_consumers"] = derive_sens_power_consumers_w(
-                    out, tolerance_pct=pct, tolerance_w=watts
+                    out,
+                    plant_pv_w=plant_pv_w,
+                    tolerance_pct=pct,
+                    tolerance_w=watts,
                 )
             except ValueError as exc:
                 raise HaHttpError(str(exc)) from exc
@@ -205,7 +207,11 @@ class HaTelemetryMixin:
         components: dict,
     ) -> dict[str, Any]:
         """PV coverage, Σ ESS power, derived load with tolerance (Topology P2)."""
-        from integrations.pv_attribution import with_attributed_plant_pv
+        from integrations.pv_attribution import (
+            derive_plant_pv_ac_w,
+            scoped_pv_live_from_telemetry,
+            with_attributed_plant_pv,
+        )
 
         plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
         batteries = [
@@ -229,12 +235,13 @@ class HaTelemetryMixin:
                 inverters=inverters,
                 pv_systems=pv_systems,
             )
+            merged = dict(scoped)
+            merged.update(scoped_pv_live_from_telemetry(out))
+            out["_plant_pv_ac_w"] = derive_plant_pv_ac_w(
+                merged, inverters, pv_systems
+            )
         except ValueError as exc:
             raise HaHttpError(str(exc)) from exc
-        if "sens_pv_production_active" in out:
-            out["sens_pv_production_active"] = max(
-                0.0, float(out["sens_pv_production_active"])
-            )
         self._apply_ess_sum_and_load(
             out, batteries=batteries, inverters=inverters, plant=plant
         )

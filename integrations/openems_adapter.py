@@ -252,13 +252,13 @@ class OpenemsAdapter:
             raise OpenemsHttpError("OpenEMS telemetry missing required channel value(s)")
 
         grid_w = openems_grid_to_ehal_w(grid_raw)
-        pv_w = max(0.0, float(pv_raw))
+        # Plant AC PV from _sum (already AC); not a telemetry document field.
+        plant_pv_w = max(0.0, float(pv_raw))
         doc: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),
             "adapter_id": self.cfg.adapter_id,
             "sens_grid_power_active": grid_w,
-            "sens_pv_production_active": pv_w,
         }
         ess_power = self._optional_channel(self.cfg.ess_component, "ActivePower")
         if ess_power is None:
@@ -305,7 +305,10 @@ class OpenemsAdapter:
         pct, watts = balance_tolerances_from_plant(plant)
         try:
             doc["sens_power_consumers"] = derive_sens_power_consumers_w(
-                doc, tolerance_pct=pct, tolerance_w=watts
+                doc,
+                plant_pv_w=plant_pv_w,
+                tolerance_pct=pct,
+                tolerance_w=watts,
             )
         except ValueError as exc:
             raise OpenemsHttpError(str(exc)) from exc

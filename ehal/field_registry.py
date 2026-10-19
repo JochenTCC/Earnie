@@ -53,7 +53,6 @@ class OpenemsConversionSpec:
 # LoxoneAdapter.read_telemetry membership (order fixed). Not ehal.field_catalog —
 # sens_ess_power is required here and membership differs from mapping catalogs.
 PLANT_REQUIRED_READ_FIELDS: tuple[str, ...] = (
-    "sens_pv_production_active",
     "sens_grid_power_active",
     "sens_ess_power",
 )

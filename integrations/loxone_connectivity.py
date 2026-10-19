@@ -193,9 +193,7 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
     checks: list[tuple[str, str, dict]] = []
     house_doc = loxone_client._default_house_profiles_doc()
     # ESS reads come from _append_battery_ess_read_checks (entity-scoped only).
-    pv_io = resolve_plant_binding(house_doc, "sens_pv_production_active")
-    if pv_io:
-        checks.append(("sens_pv_production_active", pv_io, {}))
+    # Plant PV is retired — Live uses inv.*.sens_inv_power_pv (inverter checks).
     grid_io = resolve_plant_binding(house_doc, "sens_grid_power_active")
     if grid_io:
         checks.append(

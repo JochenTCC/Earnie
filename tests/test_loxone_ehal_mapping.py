@@ -19,7 +19,7 @@ def test_heuristic_propose_energy_names():
         "Wohnzimmer Licht",
     ]
     proposals = heuristic_propose(names)
-    assert proposals["sens_pv_production_active"]["marker_name"] == "PV_Leistung_kW"
+    assert proposals["sens_inv_power_pv"]["marker_name"] == "PV_Leistung_kW"
     assert proposals["sens_grid_power_active"]["marker_name"] == "Netz_Leistung"
     assert proposals["sens_ess_soc"]["marker_name"] == "Batterie_SoC"
     assert 0.35 <= proposals["sens_ess_soc"]["confidence"] <= 0.75

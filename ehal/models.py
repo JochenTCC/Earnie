@@ -31,7 +31,6 @@ class EhalTelemetry(TypedDict):
     ts: str
     adapter_id: str
     sens_grid_power_active: float
-    sens_pv_production_active: float
     sens_ess_power: NotRequired[float | None]
     sens_evcs_active_power: NotRequired[float | None]
     sens_power_consumers: NotRequired[float | None]

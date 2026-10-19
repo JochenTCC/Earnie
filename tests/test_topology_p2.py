@@ -102,47 +102,50 @@ def test_sum_ess_excludes_island_bus_battery() -> None:
 def test_derive_load_within_tolerance_clamps_to_zero() -> None:
     # P_PV=1000 → floor = -max(100, 0.05*1000) = -100
     telem = {
-        "sens_pv_production_active": 1000.0,
         "sens_grid_power_active": -900.0,
         "sens_ess_power": -50.0,  # raw = 50 → ok
     }
-    assert derive_sens_power_consumers_w(telem) == pytest.approx(50.0)
+    assert derive_sens_power_consumers_w(telem, plant_pv_w=1000.0) == pytest.approx(
+        50.0
+    )
     telem_neg = {
-        "sens_pv_production_active": 1000.0,
         "sens_grid_power_active": -1050.0,
         "sens_ess_power": 0.0,  # raw = -50 → within floor → 0
     }
-    assert derive_sens_power_consumers_w(telem_neg) == pytest.approx(0.0)
+    assert derive_sens_power_consumers_w(
+        telem_neg, plant_pv_w=1000.0
+    ) == pytest.approx(0.0)
 
 
 def test_derive_load_below_floor_raises() -> None:
     telem = {
-        "sens_pv_production_active": 1000.0,
         "sens_grid_power_active": -1200.0,
         "sens_ess_power": 0.0,  # raw = -200 < -100
     }
     with pytest.raises(ValueError, match="House balance telemetry error"):
-        derive_sens_power_consumers_w(telem)
+        derive_sens_power_consumers_w(telem, plant_pv_w=1000.0)
 
 
 def test_derive_load_night_uses_absolute_floor() -> None:
     # P_PV=0 → floor = -100 W
     telem_ok = {
-        "sens_pv_production_active": 0.0,
         "sens_grid_power_active": -50.0,
         "sens_ess_power": 0.0,
     }
-    assert derive_sens_power_consumers_w(telem_ok) == pytest.approx(0.0)
+    assert derive_sens_power_consumers_w(telem_ok, plant_pv_w=0.0) == pytest.approx(
+        0.0
+    )
     telem_bad = {
-        "sens_pv_production_active": 0.0,
         "sens_grid_power_active": -150.0,
         "sens_ess_power": 0.0,
     }
     with pytest.raises(ValueError, match="House balance telemetry error"):
-        derive_sens_power_consumers_w(telem_bad)
+        derive_sens_power_consumers_w(telem_bad, plant_pv_w=0.0)
 
 
-def test_multi_inv_ignores_mapped_plant_and_derives_sum() -> None:
+def test_multi_inv_derives_sum_without_plant_field() -> None:
+    from integrations.pv_attribution import derive_plant_pv_ac_w
+
     inverters = [
         {
             "id": "wr_a",
@@ -162,12 +165,7 @@ def test_multi_inv_ignores_mapped_plant_and_derives_sum() -> None:
         {"id": "p2", "inverter_id": "wr_b", "ehal_bindings": {}},
     ]
     with pytest.raises(ValueError, match="incomplete"):
-        with_attributed_plant_pv(
-            {"sens_pv_production_active": 3000.0},
-            scoped_live={},
-            inverters=inverters,
-            pv_systems=pv_systems,
-        )
+        derive_plant_pv_ac_w({}, inverters, pv_systems)
     scoped = {
         inv_field("wr_a", "sens_inv_power_pv"): 1000.0,
         inv_field("wr_b", "sens_inv_power_pv"): 2000.0,
@@ -178,7 +176,8 @@ def test_multi_inv_ignores_mapped_plant_and_derives_sum() -> None:
         inverters=inverters,
         pv_systems=pv_systems,
     )
-    assert out["sens_pv_production_active"] == pytest.approx(3000.0)
+    assert "sens_pv_production_active" not in out
+    assert derive_plant_pv_ac_w(scoped, inverters, pv_systems) == pytest.approx(3000.0)
 
 
 def test_eta_inv_raises_when_efficiency_missing() -> None:

@@ -19,9 +19,9 @@
     {
       "name": "Earnie_PV_Leistung",
       "match": "exact",
-      "entity_kind": "plant",
-      "ehal_field": "sens_pv_production_active",
-      "notes": "kW production. Prefer EFM Production meter when present."
+      "entity_kind": "inverter",
+      "ehal_field": "sens_inv_power_pv",
+      "notes": "kW PV input on the primary inverter. Prefer EFM Production meter when present."
     },
     {
       "name": "Earnie_Batterie_SoC",

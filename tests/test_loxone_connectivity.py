@@ -108,7 +108,6 @@ class TestCollectReadChecks:
 
     def _plant_house(self, extra: dict | None = None) -> dict:
         bindings = {
-            "sens_pv_production_active": "PV",
             "sens_grid_power_active": "GRID",
         }
         if extra:
@@ -128,13 +127,13 @@ class TestCollectReadChecks:
 
         labels = [label for label, _, _ in checks]
         assert labels == [
-            "sens_pv_production_active",
             "grid.meter.sens_grid_power_active",
             "request_optimize",
         ]
         by_label = {label: io for label, io, _ in checks}
         assert by_label["request_optimize"] == "Earnie_Request_Optimize"
         assert "PV-Zähler" not in labels
+        assert "sens_pv_production_active" not in labels
         assert all(not lbl.startswith("set_") for lbl in labels)
 
     def test_omits_bare_plant_ess_when_batteries_exist(self):
@@ -157,7 +156,7 @@ class TestCollectReadChecks:
         assert "sens_ess_soc" not in labels
         assert "sens_ess_power" not in labels
         assert "get_ess_soc_min" not in labels
-        assert "sens_pv_production_active" in labels
+        assert "sens_pv_production_active" not in labels
         assert "grid.meter.sens_grid_power_active" in labels
 
     def test_collects_plant_ambient_from_house_profiles(self):

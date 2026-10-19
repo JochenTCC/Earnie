@@ -162,10 +162,11 @@ def _attribute_plant_pv(
     components: dict,
     inverters: list[dict],
     pv_systems: list[dict],
-) -> dict[str, Any]:
-    """Merge per-inverter/PV scoped Loxone reads into the plant telemetry doc."""
+) -> tuple[dict[str, Any], float]:
+    """Merge scoped inv/pv Loxone reads; return (working doc, plant AC PV W)."""
     from integrations.pv_attribution import (
         collect_scoped_pv_live_from_bindings,
+        derive_plant_pv_ac_w,
         read_scoped_pv_loxone,
         with_attributed_plant_pv,
     )
@@ -174,12 +175,18 @@ def _attribute_plant_pv(
         components, read_value=read_scoped_pv_loxone
     )
     try:
-        return with_attributed_plant_pv(
+        out = with_attributed_plant_pv(
             doc,
             scoped_live=scoped,
             inverters=inverters,
             pv_systems=pv_systems,
         )
+        from integrations.pv_attribution import scoped_pv_live_from_telemetry
+
+        merged = dict(scoped)
+        merged.update(scoped_pv_live_from_telemetry(out))
+        plant_pv = derive_plant_pv_ac_w(merged, inverters, pv_systems)
+        return out, plant_pv
     except ValueError as exc:
         raise LoxoneAdapterError(str(exc)) from exc
 
@@ -267,7 +274,6 @@ class LoxoneAdapter:
         from integrations.pv_attribution import (
             load_components_for_attribution,
             load_house_for_attribution,
-            plant_pv_may_be_derived,
         )
 
         house = load_house_for_attribution()
@@ -276,13 +282,9 @@ class LoxoneAdapter:
         batteries = _dict_items(components, "batteries")
         inverters = _dict_items(components, "inverters")
         pv_systems = _dict_items(components, "pv_systems")
-        derive_pv = plant_pv_may_be_derived(house, components)
         # sens_ess_power comes from Σ ess.{id} (Topology P2), not primary-only.
         required = tuple(
-            f
-            for f in PLANT_REQUIRED_READ_FIELDS
-            if f != "sens_ess_power"
-            and not (derive_pv and f == "sens_pv_production_active")
+            f for f in PLANT_REQUIRED_READ_FIELDS if f != "sens_ess_power"
         )
         doc: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
@@ -291,12 +293,17 @@ class LoxoneAdapter:
         }
         for field in required:
             doc[field] = self._require_field(field)
-        doc = _attribute_plant_pv(doc, components, inverters, pv_systems)
+        doc, plant_pv_w = _attribute_plant_pv(
+            doc, components, inverters, pv_systems
+        )
         doc["sens_ess_power"] = self._sum_ess_power_w(batteries, inverters)
         pct, watts = balance_tolerances_from_plant(plant)
         try:
             doc["sens_power_consumers"] = self._read_or_derive_consumers(
-                doc, tolerance_pct=pct, tolerance_w=watts
+                doc,
+                plant_pv_w=plant_pv_w,
+                tolerance_pct=pct,
+                tolerance_w=watts,
             )
         except ValueError as exc:
             raise LoxoneAdapterError(str(exc)) from exc
@@ -528,6 +535,7 @@ class LoxoneAdapter:
         self,
         telemetry: dict[str, Any],
         *,
+        plant_pv_w: float,
         tolerance_pct: float,
         tolerance_w: float,
     ) -> float:
@@ -538,6 +546,7 @@ class LoxoneAdapter:
             return measured
         return derive_sens_power_consumers_w(
             telemetry,
+            plant_pv_w=plant_pv_w,
             tolerance_pct=tolerance_pct,
             tolerance_w=tolerance_w,
         )

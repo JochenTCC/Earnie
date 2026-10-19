@@ -322,6 +322,8 @@ Bringt eine Version neue Schritte mit, informieren die Release Notes vorab darü
 
 Ein Schritt schreibt Verbraucher-Bindings von Legacy-`flex.{Kennung}.*` auf die typisierten Schlüssel `consumer.` / `heatpump.` / `pool.` um (gleiche Form wie Signalliste und `status.json`). Bei widersprüchlichen Merkernamen blockiert die Migration mit Hinweis auf den betroffenen Verbraucher.
 
+Ein weiterer Schritt entfernt das flache Anlagen-PV-Mapping (`plant.ehal_bindings.sens_pv_production_active`). Bei genau einem netzgekoppelten Wechselrichter mit PV wird die Merker-/Entity-Adresse auf `inv.{id}.sens_inv_power_pv` übernommen; bei mehreren Wechselrichtern blockiert die Migration mit Hinweis, die WR-PV-Mappings manuell zu setzen.
+
 ### Loxone: alte Merkernamen behalten oder leeren
 
 Beim Wechsel von Datenmodell 3 (offizielle 2.6) auf 4 fragt der Assistent bei Loxone-Installationen, ob die alten **Merkernamen** in den Bindungen erhalten bleiben sollen. Earnie braucht sie nicht mehr: Lesen läuft per Push mit der EHAL-ID, Schreiben über `status.json` mit der EHAL-ID.

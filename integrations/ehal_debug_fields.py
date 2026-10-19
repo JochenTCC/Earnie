@@ -14,7 +14,6 @@ _MAPPING_DERIVED = "—(abgeleitet)"
 # House-wide plant reads (grid kinds are storage-bare; Live shows grid.meter.*).
 PLANT_HOUSE_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_grid_power_active",
-    "sens_pv_production_active",
     "sens_power_consumers",
     "sens_temperature_outside",
     "sens_absent_mode",
@@ -37,7 +36,6 @@ PLANT_ESS_LIVE_READ_KINDS: tuple[str, ...] = (
 # Union for callers that still inspect the full plant read set.
 PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_grid_power_active",
-    "sens_pv_production_active",
     "sens_ess_power",
     "sens_power_consumers",
     "sens_temperature_outside",
