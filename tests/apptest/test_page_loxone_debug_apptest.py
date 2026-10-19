@@ -21,6 +21,10 @@ def _no_loxone_credentials(monkeypatch):
     monkeypatch.delenv("LOXONE_IP", raising=False)
     monkeypatch.delenv("LOXONE_USER", raising=False)
     monkeypatch.delenv("LOXONE_PASS", raising=False)
+    # Developer .env may still make loxone_env_configured() true — force offline.
+    monkeypatch.setattr(
+        "ui.loxone_debug.loxone_env_configured", lambda: False
+    )
 
 
 def test_renders_without_exception():

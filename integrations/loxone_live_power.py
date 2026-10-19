@@ -549,9 +549,42 @@ def _live_house_ess_power_w(components: dict, ess_spec) -> float | None:
         return None
 
 
+def _live_inv_pv_scoped_w(components: dict, inv_spec) -> dict[str, float]:
+    """Read mapped ``inv.*.sens_inv_power_pv`` values from Loxone (EHAL W)."""
+    from ehal.field_registry import apply_loxone_read
+    from ehal.inverter_fields import inv_field
+    from integrations.pv_attribution import grid_tied_inverters_with_pv
+
+    inverters = [i for i in (components.get("inverters") or []) if isinstance(i, dict)]
+    pv_systems = [
+        p for p in (components.get("pv_systems") or []) if isinstance(p, dict)
+    ]
+    scoped: dict[str, float] = {}
+    for inv in grid_tied_inverters_with_pv(inverters, pv_systems):
+        iid = str(inv.get("id") or "").strip()
+        if not iid:
+            continue
+        key = inv_field(iid, "sens_inv_power_pv")
+        bindings = inv.get("ehal_bindings")
+        if not isinstance(bindings, dict):
+            continue
+        io_name = str(bindings.get(key) or "").strip()
+        if not io_name:
+            continue
+        raw = fetch_loxone_generic_value(io_name)
+        value = apply_loxone_read(raw, inv_spec)
+        if value is None:
+            continue
+        scoped[key] = max(0.0, float(value))
+    return scoped
+
+
 def fetch_loxone_live_power() -> Optional[dict]:
     """
     Holt Echtzeit-Leistungswerte aus Loxone (hub kW → EHAL W → return kW).
+
+    Plant AC PV is derived from mapped ``inv.*.sens_inv_power_pv`` (bare plant PV
+    retired).
     """
     from ehal.field_registry import apply_loxone_read, loxone_spec
     from house_config.ehal_bindings import resolve_plant_binding
@@ -559,36 +592,45 @@ def fetch_loxone_live_power() -> Optional[dict]:
         balance_tolerances_from_plant,
         derive_sens_power_consumers_w,
     )
+    from integrations.pv_attribution import derive_plant_pv_ac_w
     from optimizer.live_export_limit import load_house_doc
 
     house = load_house_doc()
-    pv_io = resolve_plant_binding(house, "sens_pv_production_active")
     grid_io = resolve_plant_binding(house, "sens_grid_power_active")
-    pv_spec = loxone_spec("sens_pv_production_active")
     grid_spec = loxone_spec("sens_grid_power_active")
     ess_spec = loxone_spec("sens_ess_power")
-    if pv_spec is None or grid_spec is None or ess_spec is None:
+    inv_spec = loxone_spec("sens_inv_power_pv")
+    if grid_spec is None or ess_spec is None or inv_spec is None:
         return None
-    pv_w = apply_loxone_read(fetch_loxone_generic_value(pv_io), pv_spec)
     grid_w = apply_loxone_read(fetch_loxone_generic_value(grid_io), grid_spec)
-    if pv_w is None or grid_w is None:
+    if grid_w is None:
         return None
 
-    battery_w = _live_house_ess_power_w(_load_live_components(), ess_spec)
+    components = _load_live_components()
+    battery_w = _live_house_ess_power_w(components, ess_spec)
     if battery_w is None:
         return None
 
-    pv_w = max(0.0, float(pv_w))
+    inverters = [i for i in (components.get("inverters") or []) if isinstance(i, dict)]
+    pv_systems = [
+        p for p in (components.get("pv_systems") or []) if isinstance(p, dict)
+    ]
+    scoped = _live_inv_pv_scoped_w(components, inv_spec)
+    try:
+        pv_w = float(derive_plant_pv_ac_w(scoped, inverters, pv_systems))
+    except ValueError:
+        return None
+
     grid_w = float(grid_w)
     plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
     pct, watts = balance_tolerances_from_plant(plant)
     try:
         house_w = derive_sens_power_consumers_w(
             {
-                "sens_pv_production_active": pv_w,
                 "sens_grid_power_active": grid_w,
-                "sens_ess_power": battery_w,
+                "sens_ess_power": float(battery_w),
             },
+            plant_pv_w=pv_w,
             tolerance_pct=pct,
             tolerance_w=watts,
         )
@@ -598,7 +640,7 @@ def fetch_loxone_live_power() -> Optional[dict]:
     return {
         "pv": round(pv_w / 1000.0, 2),
         "house": round(float(house_w) / 1000.0, 2),
-        "battery": round(battery_w / 1000.0, 2),
+        "battery": round(float(battery_w) / 1000.0, 2),
         "grid": round(grid_w / 1000.0, 2),
     }
 

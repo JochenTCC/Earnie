@@ -120,7 +120,6 @@ class TestFetchLoxoneLivePower:
         house = {
             "plant": {
                 "ehal_bindings": {
-                    "sens_pv_production_active": "PV",
                     "sens_grid_power_active": "Grid",
                 }
             }
@@ -141,7 +140,12 @@ class TestFetchLoxoneLivePower:
                     "type": "hybrid",
                     "ac_connection": "grid_tied",
                     "control": "full",
+                    "efficiency": 1.0,
+                    "ehal_bindings": {"inv.wr1.sens_inv_power_pv": "PV"},
                 }
+            ],
+            "pv_systems": [
+                {"id": "roof", "inverter_id": "wr1", "ehal_bindings": {}}
             ],
         }
 
@@ -179,15 +183,13 @@ class TestFetchLoxoneLivePower:
             "house": 2.0,
         }
 
-    def test_negative_pv_is_clamped_to_zero(self):
+    def test_negative_pv_omitted_fails_coverage(self):
+        """Role omit_if=negative drops inv PV → incomplete coverage → None."""
         patches = self._patch_topology(
             values={"PV": -0.3, "Bat": 1.0, "Grid": 0.2}
         )
         with patches[0], patches[1], patches[2], patches[3], patches[4]:
-            result = lc.fetch_loxone_live_power()
-
-        assert result["pv"] == 0.0
-        assert result["house"] == pytest.approx(1.2)
+            assert lc.fetch_loxone_live_power() is None
 
     def test_returns_none_when_any_value_missing(self):
         patches = self._patch_topology(

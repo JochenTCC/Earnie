@@ -292,9 +292,9 @@
             "sens_grid_power_active": "alias_44",
             "get_grid_export_power_limit": "alias_45",
             "set_grid_export_power_limit": "alias_46",
-            "sens_pv_production_active": "alias_47",
             "sens_temperature_outside": "alias_48",
-            "sens_absent_mode": "alias_49"
+            "sens_absent_mode": "alias_49",
+            "sens_inv_power_pv": "alias_4"
         },
         "grid_meter": {
             "at_house_connection": true,

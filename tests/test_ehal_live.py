@@ -7,8 +7,49 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from ehal import EHAL_SCHEMA_VERSION
+from ehal.inverter_fields import inv_field
 from integrations import ehal_live
 from settings.ev_power import kw_to_ampere
+
+_WR_MAIN_PV = inv_field("wr_main", "sens_inv_power_pv")
+
+
+def _live_telemetry(**extra) -> dict:
+    """Plant telemetry for Live power tests (entity-scoped inv PV, no bare plant PV)."""
+    doc = {
+        "schema_version": EHAL_SCHEMA_VERSION,
+        "ts": "2026-07-28T12:00:00Z",
+        "adapter_id": "earnie-hems",
+        "sens_grid_power_active": 1000.0,
+        _WR_MAIN_PV: 2000.0,
+        "sens_ess_power": 500.0,
+    }
+    doc.update(extra)
+    return doc
+
+
+@pytest.fixture(autouse=True)
+def _isolate_live_pv_components(monkeypatch):
+    """η=1 and no hub re-reads — unit tests supply inv PV on the mock telemetry."""
+    components = {
+        "inverters": [
+            {
+                "id": "wr_main",
+                "ac_connection": "grid_tied",
+                "efficiency": 1.0,
+                "ehal_bindings": {_WR_MAIN_PV: "mapped"},
+            }
+        ],
+        "pv_systems": [
+            {"id": "test_pv", "inverter_id": "wr_main", "ehal_bindings": {}}
+        ],
+        "batteries": [],
+    }
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_components_for_attribution",
+        lambda: components,
+    )
+    monkeypatch.setattr("integrations.ehal_live.collect_scoped_pv_live_w", lambda: {})
 
 
 def test_kw_to_ampere_roundtrip():
@@ -34,15 +75,7 @@ def test_read_live_power_kw_ha_backend(config_mock, adapter_factory):
         "EHAL_BACKEND": "ha",
     }.get(key, default)
     adapter = MagicMock()
-    adapter.read_telemetry.return_value = {
-        "schema_version": EHAL_SCHEMA_VERSION,
-        "ts": "2026-07-28T12:00:00Z",
-        "adapter_id": "earnie-hems",
-        "sens_grid_power_active": 1000.0,
-        "sens_pv_production_active": 2000.0,
-        "sens_ess_soc": 50.0,
-        "sens_ess_power": 500.0,
-    }
+    adapter.read_telemetry.return_value = _live_telemetry(adapter_id="earnie-hems")
     adapter_factory.return_value = adapter
     power = ehal_live.read_live_power_kw()
     assert power is not None
@@ -58,15 +91,7 @@ def test_read_live_power_kw_loxone_backend(config_mock, adapter_factory):
         "EHAL_BACKEND": "loxone",
     }.get(key, default)
     adapter = MagicMock()
-    adapter.read_telemetry.return_value = {
-        "schema_version": EHAL_SCHEMA_VERSION,
-        "ts": "2026-07-28T12:00:00Z",
-        "adapter_id": "loxone-home",
-        "sens_grid_power_active": 1000.0,
-        "sens_pv_production_active": 2000.0,
-        "sens_ess_soc": 50.0,
-        "sens_ess_power": 500.0,
-    }
+    adapter.read_telemetry.return_value = _live_telemetry(adapter_id="loxone-home")
     adapter_factory.return_value = adapter
     power = ehal_live.read_live_power_kw()
     assert power is not None
@@ -84,15 +109,9 @@ def test_read_live_power_kw_sign(config_mock, adapter_factory):
         "EHAL_BACKEND": "openems",
     }.get(key, default)
     adapter = MagicMock()
-    adapter.read_telemetry.return_value = {
-        "schema_version": EHAL_SCHEMA_VERSION,
-        "ts": "2026-07-27T12:00:00Z",
-        "adapter_id": "openems-lab",
-        "sens_grid_power_active": 1000.0,
-        "sens_pv_production_active": 2000.0,
-        "sens_ess_soc": 50.0,
-        "sens_ess_power": 500.0,
-    }
+    adapter.read_telemetry.return_value = _live_telemetry(
+        adapter_id="openems-lab", ts="2026-07-27T12:00:00Z"
+    )
     adapter_factory.return_value = adapter
     power = ehal_live.read_live_power_kw()
     assert power is not None

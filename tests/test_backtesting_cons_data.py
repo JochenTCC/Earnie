@@ -167,7 +167,8 @@ def test_cons_data_consumer_match_reason_profile_mismatch(tmp_path, monkeypatch)
     assert cons_data_store.cons_data_consumer_match_reason(str(path)) == "profile_mismatch"
 
 
-def test_cons_data_consumer_match_reason_baseload_mismatch(tmp_path, monkeypatch):
+def test_cons_data_consumer_match_reason_ignores_derived_baseload(tmp_path, monkeypatch):
+    """baseload_kwh is derived — changing only that field must not stale cons_data."""
     path = tmp_path / "cons_data.csv"
     profile = {
         "id": "efh",
@@ -186,7 +187,7 @@ def test_cons_data_consumer_match_reason_baseload_mismatch(tmp_path, monkeypatch
     )
     cons_data_store.save_cons_data(_sample_df(), str(path), apply_retention=False)
     profile["baseload_kwh"] = 2500.0
-    assert cons_data_store.cons_data_consumer_match_reason(str(path)) == "profile_mismatch"
+    assert cons_data_store.cons_data_consumer_match_reason(str(path)) is None
 
 
 def test_cons_data_consumer_match_reason_pv_kwp_mismatch(tmp_path, monkeypatch):

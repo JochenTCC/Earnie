@@ -123,8 +123,12 @@ def test_redact_security_token_from_url():
     assert "securityToken=REDACTED" in redacted
 
 
-def test_fetch_returns_none_without_token(monkeypatch):
+def test_fetch_returns_none_without_token(monkeypatch, tmp_path):
     monkeypatch.delenv("ENTSOE_API_TOKEN", raising=False)
+    # Isolate from a developer .env that may still hold ENTSOE_API_TOKEN.
+    empty_dotenv = tmp_path / ".env"
+    empty_dotenv.write_text("", encoding="utf-8")
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", str(empty_dotenv))
     start = datetime(2026, 10, 5, 0, 0, tzinfo=TZ)
     end = datetime(2026, 10, 6, 0, 0, tzinfo=TZ)
     assert fetch_entsoe_day_ahead_prices(start, end, "AT") is None

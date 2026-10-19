@@ -86,9 +86,7 @@
             "pv_tilt": 18.0,
             "pv_azimuth": -154.0,
             "inverter_id": "wr_main",
-            "ehal_bindings": {
-                "pv.dach_nord.sens_pv_production_active": ""
-            }
+            "ehal_bindings": {}
         },
         {
             "id": "dach_sued",
@@ -97,9 +95,7 @@
             "pv_tilt": 18.0,
             "pv_azimuth": 26.0,
             "inverter_id": "wr_main",
-            "ehal_bindings": {
-                "pv.dach_sued.sens_pv_production_active": ""
-            }
+            "ehal_bindings": {}
         }
     ],
     "earnie_data_model": 4,
@@ -112,6 +108,7 @@
             "control": "full",
             "efficiency": 0.97,
             "ehal_bindings": {
+                "inv.wr_main.sens_inv_power_pv": "",
                 "inv.wr_main.set_inv_ac_power_limit": ""
             }
         }

@@ -315,7 +315,6 @@
             "sens_grid_power_active": "",
             "get_grid_export_power_limit": "",
             "set_grid_export_power_limit": "",
-            "sens_pv_production_active": "",
             "sens_temperature_outside": "",
             "sens_absent_mode": ""
         },

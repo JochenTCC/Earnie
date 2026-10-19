@@ -49,7 +49,7 @@ def test_schema_files_exist():
 def test_valid_telemetry_with_optional_fields():
     doc = _envelope(
         sens_grid_power_active=1500.0,
-        sens_pv_production_active=3200.0,
+        sens_inv_power_pv=3200.0,
         sens_ess_power=-800.0,
         sens_evcs_active_power=11000.0,
         sens_power_consumers=2500.0,
@@ -59,12 +59,13 @@ def test_valid_telemetry_with_optional_fields():
     assert out["sens_ess_power"] == -800.0
     assert out["sens_power_consumers"] == 2500.0
     assert "sens_ess_soc" not in out
+    assert "sens_pv_production_active" not in out
 
 
 def test_telemetry_allows_grid_export_negative():
     doc = _envelope(
         sens_grid_power_active=-2200.0,
-        sens_pv_production_active=4000.0,
+        sens_inv_power_pv=4000.0,
     )
     assert validate_telemetry(doc)["sens_grid_power_active"] == -2200.0
 
@@ -72,25 +73,32 @@ def test_telemetry_allows_grid_export_negative():
 def test_telemetry_rejects_negative_pv():
     doc = _envelope(
         sens_grid_power_active=0.0,
-        sens_pv_production_active=-1.0,
+        sens_inv_power_pv=-1.0,
     )
     with pytest.raises(EhalValidationError):
         validate_telemetry(doc)
 
 
-def test_telemetry_allows_missing_plant_soc():
-    """Plant telemetry no longer requires flat sens_ess_soc (flat SoC retired)."""
+def test_telemetry_rejects_retired_plant_pv():
+    """Bare plant sens_pv_production_active is retired from the telemetry schema."""
     doc = _envelope(
         sens_grid_power_active=0.0,
         sens_pv_production_active=0.0,
     )
-    assert validate_telemetry(doc)["sens_pv_production_active"] == 0.0
+    with pytest.raises(EhalValidationError, match="sens_pv_production_active"):
+        validate_telemetry(doc)
+
+
+def test_telemetry_allows_missing_plant_soc():
+    """Plant telemetry no longer requires flat sens_ess_soc (flat SoC retired)."""
+    doc = _envelope(sens_grid_power_active=0.0)
+    assert validate_telemetry(doc)["sens_grid_power_active"] == 0.0
+    assert "sens_ess_soc" not in validate_telemetry(doc)
 
 
 def test_telemetry_rejects_flat_soc_property():
     doc = _envelope(
         sens_grid_power_active=0.0,
-        sens_pv_production_active=0.0,
         sens_ess_soc=55.0,
     )
     with pytest.raises(EhalValidationError):

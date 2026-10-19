@@ -133,6 +133,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm4.ha_pull_removal": "v4_pre_ha_pull",
         "dm4.ehal_http_port": "v4_pre_ha_pull",
         "dm4.consumer_flex_bindings": "v4_pre_quellenwahl",
+        "dm4.retire_plant_pv_binding": "v4_pre_ha_pull",
     }
     for step in STEPS:
         docs = load_pack_docs(_copy_snapshot(tmp_path / step.id, mapping[step.id]))

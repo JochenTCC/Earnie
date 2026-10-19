@@ -6,16 +6,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from ehal import EHAL_SCHEMA_VERSION, validate_capabilities
+from ehal.inverter_fields import inv_field
 from integrations import ehal_live
 
+_WR_MAIN_PV = inv_field("wr_main", "sens_inv_power_pv")
 
 _FIXTURE_TELEMETRY = {
     "schema_version": EHAL_SCHEMA_VERSION,
     "ts": "2026-07-28T12:00:00Z",
     "adapter_id": "contract",
     "sens_grid_power_active": 1000.0,
-    "sens_pv_production_active": 2000.0,
-    "sens_ess_soc": 50.0,
+    _WR_MAIN_PV: 2000.0,
     "sens_ess_power": 500.0,
     "sens_evcs_active_power": 1200.0,
 }
@@ -42,7 +43,7 @@ def _config_side_effect(backend: str):
         "EHAL_HA_TOKEN": "token",
         "EHAL_HA_ENTITIES": {
             "sens_grid_power_active": "sensor.grid",
-            "sens_pv_production_active": "sensor.pv",
+            _WR_MAIN_PV: "sensor.pv",
             "ess.house.sens_ess_soc": "sensor.soc",
             "sens_ess_power": "sensor.ess",
             "set_ess_charge_power_limit": "number.charge",
@@ -57,6 +58,29 @@ def _config_side_effect(backend: str):
         return values.get(key, default)
 
     return _get
+
+
+@pytest.fixture(autouse=True)
+def _isolate_live_pv_components(monkeypatch):
+    components = {
+        "inverters": [
+            {
+                "id": "wr_main",
+                "ac_connection": "grid_tied",
+                "efficiency": 1.0,
+                "ehal_bindings": {_WR_MAIN_PV: "mapped"},
+            }
+        ],
+        "pv_systems": [
+            {"id": "test_pv", "inverter_id": "wr_main", "ehal_bindings": {}}
+        ],
+        "batteries": [],
+    }
+    monkeypatch.setattr(
+        "integrations.pv_attribution.load_components_for_attribution",
+        lambda: components,
+    )
+    monkeypatch.setattr("integrations.ehal_live.collect_scoped_pv_live_w", lambda: {})
 
 
 def test_live_power_identical_when_only_backend_switches():
@@ -227,15 +251,15 @@ def test_loxone_backend_is_not_network_backend(config_mock):
 def test_derive_sens_power_consumers_w():
     assert ehal_live.derive_sens_power_consumers_w(
         {
-            "sens_pv_production_active": 2000.0,
             "sens_grid_power_active": 1000.0,
             "sens_ess_power": 500.0,
-        }
+        },
+        plant_pv_w=2000.0,
     ) == pytest.approx(3500.0)  # PV + import + discharge
     assert ehal_live.derive_sens_power_consumers_w(
         {
-            "sens_pv_production_active": 2000.0,
             "sens_grid_power_active": 1000.0,
             "sens_power_consumers": 123.0,
-        }
+        },
+        plant_pv_w=2000.0,
     ) == pytest.approx(123.0)

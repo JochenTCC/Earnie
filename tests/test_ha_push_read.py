@@ -36,7 +36,6 @@ def _plant_house_push_only() -> dict:
         "plant": {
             "ehal_bindings": {
                 "sens_grid_power_active": "",
-                "sens_pv_production_active": "",
             }
         },
         "profiles": {},
@@ -47,14 +46,13 @@ def test_aggregate_ha_entities_keeps_empty_activation():
     house = _plant_house_push_only()
     aggregated = aggregate_ha_entities(house)
     assert aggregated["sens_grid_power_active"] == ""
-    assert aggregated["sens_pv_production_active"] == ""
+    assert "sens_pv_production_active" not in aggregated
     assert "sens_ess_soc" not in aggregated
 
 
 def test_read_telemetry_push_from_inbox(monkeypatch):
     table = {
         "grid.meter.sens_grid_power_active": 500.0,
-        "sens_pv_production_active": 2000.0,
     }
 
     def _fake_read(qid: str, **_kw):
@@ -70,17 +68,15 @@ def test_read_telemetry_push_from_inbox(monkeypatch):
         adapter_id="test",
         entities={
             "sens_grid_power_active": "",
-            "sens_pv_production_active": "",
         },
         push_read_qids={
             "sens_grid_power_active": "grid.meter.sens_grid_power_active",
-            "sens_pv_production_active": "sens_pv_production_active",
         },
     )
     adapter = HaAdapter(cfg)
     tel = adapter.read_telemetry()
     assert tel["sens_grid_power_active"] == pytest.approx(500.0)
-    assert tel["sens_pv_production_active"] == pytest.approx(2000.0)
+    assert "sens_pv_production_active" not in tel
     assert "sens_ess_soc" not in tel
 
 

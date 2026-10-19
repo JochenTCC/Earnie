@@ -311,7 +311,6 @@
             "sens_grid_power_active": "alias_31",
             "get_grid_export_power_limit": "alias_32",
             "set_grid_export_power_limit": "alias_33",
-            "sens_pv_production_active": "alias_34",
             "sens_temperature_outside": "alias_35",
             "sens_absent_mode": "alias_36"
         },

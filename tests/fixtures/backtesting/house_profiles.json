@@ -33,8 +33,7 @@
             "single_tariff": true
         },
         "ehal_bindings": {
-            "sens_grid_power_active": "",
-            "sens_pv_production_active": ""
+            "sens_grid_power_active": ""
         }
     }
 }
