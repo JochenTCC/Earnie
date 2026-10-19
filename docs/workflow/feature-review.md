@@ -53,7 +53,7 @@ Payload schema v1 (exact keys):
 
 ## 4. Server (earnie-server)
 
-Same process as UsagePing: `POST /review` → 204, append-only `reviews.jsonl` with server `received_at` (UTC). Shared in-memory per-IP rate limiter; no access log; no IP persistence. Body limit 2 KiB.
+Same process as UsagePing: `POST /review` → 204, append-only `reviews.jsonl` with server `received_at` (UTC). Shared in-memory per-IP rate limiter; no access log; no IP persistence. Body limit 4 KiB (a 500-char comment of 4-byte UTF-8 characters must fit). `review_id` must match `[a-z0-9_]{1,64}`.
 
 ## 5. SE call site
 
