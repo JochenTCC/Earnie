@@ -2,6 +2,30 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Powerstation planning ignored live SOC limits (2026-10-19)
+
+- [x] **Powerstation planning ignored live SOC limits** (dump `debug_dump_20261019_124658`) — **Verified** (2026-10-19; Shadow Chart1, live `max_soc` 95%)
+  - Symptom: Chart1 Ecoflow SoC planned up to 100% while live `get_ess_soc_max` was 95%.
+  - Cause: `read_telemetry` only carried plant-flat gets for the primary house ESS; standby packs require entity-scoped `ess.{id}.get_ess_*`. Chart path also called `load_standby_packs()` without telemetry.
+  - Fix: `enrich_telemetry_with_ess_live_limits` + use in `main.py` and Chart1 `_resolve_standby_chart_plans`.
+  - Tests: `tests/test_ehal_live_ess_limits_enrich.py`, `tests/test_powerstation_2_7_h.py` (`test_collect_standby_packs_applies_hk_and_live_soc_cap`).
+
+### Bugfix — Virtual reserve target_kwh wiped on advance/trigger (2026-10-19)
+
+- [x] **Virtual reserve: `advance_reserve_after_slot` / `set_trigger` wiped `target_kwh` to 0** — **Verified** (2026-10-19; NAS productive)
+  - Symptom (Nas productive, Geschirrspüler / `virtual_gs`): dishwasher running, MILP ZWANGSLADEN toward ~11.8% (≈1 kWh refill), but `powerstation_reserves.json` stayed `empty` / `stored_kwh=0` / `target_kwh=0`.
+  - Cause: `get_or_init_state(..., target_kwh=0.0)` always overwrote the configured target on every slot advance / trigger latch, so charge credit was capped at `min(0, …)`.
+  - Fix: `update_target=False` for advance + trigger; collect/learn still refresh the target.
+  - Tests: `tests/test_powerstation_2_7_p.py` (`test_advance_and_trigger_preserve_target_kwh`).
+
+### Bugfix — Cockpit pages disabled after EHAL PV retirement + migration (2026-10-19)
+
+- [x] **Cockpit pages disabled after EHAL PV retirement + migration** — **Verified** (2026-10-19; NAS productive; `v2.7.0-alpha.4`)
+  - Symptom: After `dm4.retire_plant_pv_binding` / inv-PV required signals, Live-Cockpit (Monitor / Manuelle Geräte) disappeared on NAS productive.
+  - Cause: (1) `_REQUIRED_PLANT_LIVE_FIELDS` still required retired plant `sens_pv_production_active`; (2) Binding-P5 consumers with only `ehal_bindings` kept `needs_planning_onboarding` true, so the markers gate applied.
+  - Fix: drop plant PV from Cockpit gate; require `inv.*.sens_inv_power_pv` activation; treat `ehal_bindings` consumers as live wiring.
+  - Tests: `tests/test_setup_readiness.py` (`test_needs_planning_onboarding_false_for_ehal_bindings_consumers`, `test_betrieb_unlocked_with_ehal_consumers_without_plant_pv`).
+
 ### Bugfix — Inverter PV mandatory; bare plant PV removed from telemetry (2026-10-19)
 
 - [x] **Inverter PV mandatory; bare plant PV removed from telemetry** — **Verified** (2026-10-19)

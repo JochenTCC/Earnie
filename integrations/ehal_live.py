@@ -43,6 +43,9 @@ from integrations.ehal_live_soc import (  # noqa: F401 — façade re-exports
     read_ess_soc,
     read_ess_soc_by_id,
 )
+from integrations.ehal_live_ess_limits import (  # noqa: F401 — façade re-exports
+    enrich_telemetry_with_ess_live_limits,
+)
 from integrations.ehal_live_ops import (  # noqa: F401 — façade re-exports
     OMIT_EXPORT_CAP,
     build_sent_loxone_snapshot,

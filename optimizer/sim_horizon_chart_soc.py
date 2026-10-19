@@ -67,7 +67,12 @@ def _resolve_standby_chart_plans(
         from optimizer.powerstation_live import load_standby_packs
         from optimizer.powerstation_standby import plan_standby_horizon
 
-        packs = load_standby_packs()
+        from integrations.ehal_live_ess_limits import (
+            enrich_telemetry_with_ess_live_limits,
+        )
+
+        chart_tel = enrich_telemetry_with_ess_live_limits({})
+        packs = load_standby_packs(telemetry=chart_tel)
         if not packs:
             return {}, {}
         packs_by_id = {

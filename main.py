@@ -506,6 +506,16 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
             telemetry_for_export = ehal_live.get_adapter().read_telemetry()
         except Exception as exc:  # noqa: BLE001 — Live continues without inbound cap
             logger.warning("Export-Limit Telemetrie nicht lesbar: %s", exc)
+        try:
+            from integrations.ehal_live_ess_limits import (
+                enrich_telemetry_with_ess_live_limits,
+            )
+
+            telemetry_for_export = enrich_telemetry_with_ess_live_limits(
+                telemetry_for_export
+            )
+        except Exception as exc:  # noqa: BLE001 — limits stay HK when enrich fails
+            logger.warning("ESS live-limit Telemetrie-Anreicherung fehlgeschlagen: %s", exc)
         from settings.ess_limits_resolve import apply_effective_ess_limits
 
         get_battery_list = getattr(config, "get_battery_params_list", None)

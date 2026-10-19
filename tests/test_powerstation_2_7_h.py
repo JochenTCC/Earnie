@@ -107,6 +107,56 @@ def test_collect_skips_virtual_standby():
     assert packs[0]["load_kw"] == pytest.approx(0.15)
 
 
+def test_collect_standby_packs_applies_hk_and_live_soc_cap():
+    """Standby SoC max must respect HK ∩ live (never above either)."""
+    packs = collect_standby_packs(
+        powerstations=[
+            {
+                "id": "ecoflow_delta_3",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": ROLE_STANDBY_BACKUP,
+                "attached_consumer_ids": ["dev-pc"],
+                "battery_capacity_kwh": 1.024,
+                "battery_max_charge_power_kw": 1.0,
+                "battery_max_discharge_power_kw": 2.2,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "limits_from_live": True,
+            }
+        ],
+        appliances=[{"id": "dev-pc", "default_power_kw": 0.1}],
+        telemetry={
+            "ess.ecoflow_delta_3.get_ess_soc_min": 10.0,
+            "ess.ecoflow_delta_3.get_ess_soc_max": 95.0,
+        },
+    )
+    assert len(packs) == 1
+    assert packs[0]["min_soc"] == pytest.approx(10.0)
+    assert packs[0]["max_soc"] == pytest.approx(95.0)
+
+    packs_no_tel = collect_standby_packs(
+        powerstations=[
+            {
+                "id": "ecoflow_delta_3",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": ROLE_STANDBY_BACKUP,
+                "attached_consumer_ids": ["dev-pc"],
+                "battery_capacity_kwh": 1.024,
+                "battery_max_charge_power_kw": 1.0,
+                "battery_max_discharge_power_kw": 2.2,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "limits_from_live": True,
+            }
+        ],
+        appliances=[{"id": "dev-pc", "default_power_kw": 0.1}],
+        telemetry=None,
+    )
+    assert packs_no_tel[0]["max_soc"] == pytest.approx(100.0)
+
+
 def test_collect_standby_packs_applies_hk_and_live_charge_cap():
     """Standby max charge must respect HK ∩ live (never above either)."""
     packs = collect_standby_packs(
