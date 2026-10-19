@@ -35,10 +35,11 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Tests: `tests/test_ess_limits_2_7_j.py`, `tests/test_powerstation_2_7_h.py` (`test_collect_standby_packs_applies_hk_and_live_charge_cap`).
   - [ ] **Live golden dump (private REG):** when the fixed version is running on productive NAS, capture a debug dump (with `recorder/`) around a cheap-slot Delta 3 refill and intake as a private golden case confirming charge ≤ HK ∩ live.
 
-- [ ] **Inverter PV mandatory; bare plant PV removed from telemetry** — fix implemented (2026-10-19); live acceptance pending
-  - Symptom: EHAL push Lesefehler for `pv.dach_sued|nord.sens_pv_production_active` when only inverter-sum PV exists.
-  - Fix: require `inv.{id}.sens_inv_power_pv` when inverter has attached PV; per-string `pv.*` optional (empty keys stripped); bare plant `sens_pv_production_active` removed from telemetry document (plant AC derived via attribution); migration `dm4.retire_plant_pv_binding`.
-  - Tests: `tests/test_required_signals.py`, `tests/test_retire_plant_pv_binding.py`, `tests/test_pv_attribution.py`, topology P2 / adapter characterization updates.
+- [ ] **Cockpit pages disabled after EHAL PV retirement + migration** — fix implemented (2026-10-19); live acceptance pending
+  - Symptom: After `dm4.retire_plant_pv_binding` / inv-PV required signals, Live-Cockpit (Monitor / Manuelle Geräte) disappeared on NAS productive.
+  - Cause: (1) `_REQUIRED_PLANT_LIVE_FIELDS` still required retired plant `sens_pv_production_active`; (2) Binding-P5 consumers with only `ehal_bindings` kept `needs_planning_onboarding` true, so the markers gate applied.
+  - Fix: drop plant PV from Cockpit gate; require `inv.*.sens_inv_power_pv` activation; treat `ehal_bindings` consumers as live wiring.
+  - Tests: `tests/test_setup_readiness.py` (`test_needs_planning_onboarding_false_for_ehal_bindings_consumers`, `test_betrieb_unlocked_with_ehal_consumers_without_plant_pv`).
 
 
 ## New Bugs (Do not remove this chapter — even if empty)

@@ -344,6 +344,31 @@ def test_needs_planning_onboarding_false_for_migrated_profile_loxone():
     )
 
 
+def test_needs_planning_onboarding_false_for_ehal_bindings_consumers():
+    """Binding P5: live stack uses ehal_bindings without legacy loxone_inputs."""
+    profiles_doc = {
+        "profiles": [
+            {
+                "id": "example_efh",
+                "consumers": [
+                    {
+                        "id": "ev",
+                        "type": "ev",
+                        "ehal_bindings": {"evcs.ev.set_evcs_max_current": ""},
+                    }
+                ],
+            }
+        ]
+    }
+    assert (
+        setup_readiness.needs_planning_onboarding_from_raw(
+            {"flexible_consumers": [], "live_scenario_id": "live"},
+            profiles_doc=profiles_doc,
+        )
+        is False
+    )
+
+
 def test_betrieb_unlocked_after_live_config(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(
@@ -358,6 +383,57 @@ def test_betrieb_unlocked_after_live_config(tmp_path, monkeypatch):
     )
 
     assert setup_readiness.is_betrieb_unlocked() is True
+
+
+def test_betrieb_unlocked_with_ehal_consumers_without_plant_pv(
+    tmp_path, monkeypatch
+):
+    """After dm4.retire_plant_pv_binding, Cockpit must not require plant PV."""
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(
+        config_dir / "config.json",
+        {"flexible_consumers": [], "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID},
+    )
+    _write(
+        config_dir / "components.json",
+        {
+            "batteries": [{"id": "bat"}],
+            "inverters": [
+                {
+                    "id": "wr",
+                    "control": "read_only",
+                    "ehal_bindings": {"inv.wr.sens_inv_power_pv": ""},
+                }
+            ],
+            "pv_systems": [{"id": "dach", "inverter_id": "wr"}],
+        },
+    )
+    _write(
+        config_dir / "house_profiles.json",
+        {
+            "profiles": [
+                {
+                    "id": "efh",
+                    "consumers": [
+                        {
+                            "id": "wp",
+                            "type": "flex",
+                            "ehal_bindings": {"flex.wp.set_enable": ""},
+                        }
+                    ],
+                }
+            ],
+            "plant": {
+                "ehal_bindings": {
+                    "sens_grid_power_active": "grid.meter.sens_grid_power_active",
+                }
+            },
+        },
+    )
+
+    assert setup_readiness.needs_planning_onboarding() is False
+    assert setup_readiness.is_betrieb_unlocked() is True
+    assert "sens_pv_production_active" not in setup_readiness._REQUIRED_PLANT_LIVE_FIELDS
 
 
 def test_scenario_editor_unlocked_after_house_config(tmp_path, monkeypatch):

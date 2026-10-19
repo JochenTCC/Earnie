@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Inverter PV mandatory; bare plant PV removed from telemetry (2026-10-19)
+
+- [x] **Inverter PV mandatory; bare plant PV removed from telemetry** — **Verified** (2026-10-19)
+  - Symptom: EHAL push Lesefehler for `pv.dach_sued|nord.sens_pv_production_active` when only inverter-sum PV exists.
+  - Fix: require `inv.{id}.sens_inv_power_pv` when inverter has attached PV; per-string `pv.*` optional (empty keys stripped); bare plant `sens_pv_production_active` removed from telemetry document (plant AC derived via attribution); migration `dm4.retire_plant_pv_binding`.
+  - Tests: `tests/test_required_signals.py`, `tests/test_retire_plant_pv_binding.py`, `tests/test_pv_attribution.py`, topology P2 / adapter characterization updates.
+
 ### Bugfix — config pack import accepts incompatible member files (2026-10-19)
 
 - [x] **Bug — config pack import accepts incompatible member files** — **Verified** (2026-10-19; greenfield `EARNIE_ENV_PATH`)

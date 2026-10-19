@@ -33,7 +33,8 @@ def _config_has_legacy_flex_entries(raw: dict) -> bool:
     return isinstance(flex, list) and len(flex) > 0
 
 
-def _consumer_has_live_loxone_wiring(consumer: dict) -> bool:
+def _consumer_has_live_wiring(consumer: dict) -> bool:
+    """True when a profile consumer is wired for live control (legacy or EHAL)."""
     if consumer.get("loxone_inputs") or consumer.get("loxone_outputs"):
         return True
     charging = consumer.get("charging_schedule")
@@ -44,20 +45,22 @@ def _consumer_has_live_loxone_wiring(consumer: dict) -> bool:
     if isinstance(thermal, dict) and isinstance(thermal.get("loxone"), dict):
         if thermal["loxone"]:
             return True
+    bindings = consumer.get("ehal_bindings")
+    if isinstance(bindings, dict) and any(str(k).strip() for k in bindings):
+        return True
     return False
 
 
 def _house_profile_has_live_loxone_consumers(profiles_doc: dict) -> bool:
-    """Post-migration 2.0: flex consumers live in house_profiles with Loxone wiring."""
+    """Post-migration 2.0 / Binding P5: live consumers in house_profiles."""
     for _profile_id, profile in _iter_profiles_from_doc(profiles_doc):
         consumers = profile.get("consumers", [])
         if not isinstance(consumers, list):
             continue
         for consumer in consumers:
-            if isinstance(consumer, dict) and _consumer_has_live_loxone_wiring(consumer):
+            if isinstance(consumer, dict) and _consumer_has_live_wiring(consumer):
                 return True
     return False
-
 
 def needs_planning_onboarding_from_raw(
     raw: dict,
@@ -80,7 +83,6 @@ def needs_planning_onboarding() -> bool:
     raw = _read_json_document(resolve_config_json_path())
     profiles_doc = _read_json_document(resolve_house_profiles_json_path())
     return needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc)
-
 
 def _iter_profiles_from_doc(doc: dict):
     profiles = doc.get("profiles", [])
@@ -363,10 +365,9 @@ def is_betrieb_unlocked() -> bool:
         return True
     return _loxone_markers_complete()
 
-
+# Plant PV is retired — live PV is ``inv.*.sens_inv_power_pv`` (activation keys).
 _REQUIRED_PLANT_LIVE_FIELDS = (
     "sens_grid_power_active",
-    "sens_pv_production_active",
     "sens_ess_soc",
     "set_ess_active_power",
     "set_ess_charge_power_limit",
@@ -391,19 +392,49 @@ def _resolve_required_live_binding(
     return str(resolve_plant_binding(house, field, raw) or "").strip()
 
 
+def _required_inv_pv_activations_present(components: dict) -> bool:
+    """True when every inverter with attached PV has ``sens_inv_power_pv`` activated."""
+    from ehal.required_signals import (
+        inverter_has_attached_pv,
+        missing_required_keys,
+        required_binding_keys,
+    )
+    from house_config.inverter import DEFAULT_INVERTER_CONTROL
+
+    pv_systems = list(components.get("pv_systems") or [])
+    for inv in components.get("inverters") or []:
+        if not isinstance(inv, dict):
+            continue
+        iid = str(inv.get("id") or "").strip()
+        if not iid or not inverter_has_attached_pv(iid, pv_systems):
+            continue
+        control = str(inv.get("control") or DEFAULT_INVERTER_CONTROL).strip().lower()
+        keys = required_binding_keys(
+            component_kind="inverter",
+            entity_id=iid,
+            control=control,
+            has_attached_pv=True,
+        )
+        if missing_required_keys(inv.get("ehal_bindings"), keys):
+            return False
+    return True
+
+
 def _required_plant_live_bindings_present() -> bool:
     """True when required plant telemetry + primary ESS setpoints resolve.
 
     ESS SoC/setpoints come from ``batteries[].ehal_bindings`` via
     ``resolve_primary_ess_binding`` (2.7.m); plant telemetry via
-    ``resolve_plant_binding``.
+    ``resolve_plant_binding``. Live PV uses inverter activation keys
+    (``inv.*.sens_inv_power_pv``), not retired plant ``sens_pv_production_active``.
     """
     raw = _read_json_document(resolve_config_json_path())
     house = _read_json_document(resolve_house_profiles_json_path())
+    components = _read_json_document(resolve_components_json_path())
     for field in _REQUIRED_PLANT_LIVE_FIELDS:
         if not _resolve_required_live_binding(field, house=house, raw=raw):
             return False
-    return True
+    return _required_inv_pv_activations_present(components)
 
 
 def _loxone_markers_complete() -> bool:
