@@ -3,6 +3,13 @@ from __future__ import annotations
 
 from typing import Any
 
+_LIVE_LIMIT_KINDS: tuple[str, ...] = (
+    "get_ess_soc_min",
+    "get_ess_soc_max",
+    "get_ess_max_charge_power",
+    "get_ess_max_discharge_power",
+)
+
 
 def _as_float(value: object) -> float | None:
     if value is None:
@@ -11,6 +18,28 @@ def _as_float(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def telemetry_for_ess(
+    telemetry: dict[str, Any] | None,
+    ess_id: str | None,
+) -> dict[str, Any] | None:
+    """Flat ``get_ess_*`` view for one ESS (entity-scoped keys win over plant-flat)."""
+    if not isinstance(telemetry, dict):
+        return telemetry
+    slug = str(ess_id or "").strip()
+    out: dict[str, Any] = {
+        kind: telemetry[kind] for kind in _LIVE_LIMIT_KINDS if kind in telemetry
+    }
+    if not slug:
+        return out or None
+    from ehal.ess_fields import ess_field
+
+    for kind in _LIVE_LIMIT_KINDS:
+        qid = ess_field(slug, kind)
+        if qid in telemetry:
+            out[kind] = telemetry[qid]
+    return out or None
 
 
 def _telemetry_power_kw(telemetry: dict[str, Any] | None, field: str) -> float | None:
@@ -59,25 +88,39 @@ def resolve_effective_ess_limits(
 ) -> dict[str, float]:
     """Effective SOC + charge/discharge caps for MILP / setpoints / export.
 
-    When ``limits_from_live`` is true, prefer mapped ``get_ess_*`` values; missing
-    mapping falls back to HK. When false, always use HK.
+    When ``limits_from_live`` is false: always HK.
+
+    When true: use mapped ``get_ess_*`` when present, but never loosen beyond HK
+    (``min`` for charge/discharge/max_soc, ``max`` for min_soc). Missing live
+    fields fall back to HK. Entity-scoped ``ess.{id}.*`` keys are preferred when
+    ``battery_params['id']`` is set.
     """
     hk = hk_ess_limits_from_battery_params(battery_params)
     if not bool(battery_params.get("limits_from_live", False)):
         return hk
 
-    live_min = _telemetry_soc_percent(telemetry, "get_ess_soc_min")
-    live_max = _telemetry_soc_percent(telemetry, "get_ess_soc_max")
-    live_charge = _telemetry_power_kw(telemetry, "get_ess_max_charge_power")
-    live_discharge = _telemetry_power_kw(telemetry, "get_ess_max_discharge_power")
+    ess_id = str(battery_params.get("id") or "").strip() or None
+    tel = telemetry_for_ess(telemetry, ess_id)
+    live_min = _telemetry_soc_percent(tel, "get_ess_soc_min")
+    live_max = _telemetry_soc_percent(tel, "get_ess_soc_max")
+    live_charge = _telemetry_power_kw(tel, "get_ess_max_charge_power")
+    live_discharge = _telemetry_power_kw(tel, "get_ess_max_discharge_power")
 
-    charge = live_charge if live_charge is not None else hk["max_charge_power_kw"]
-    discharge = (
-        live_discharge if live_discharge is not None else hk["max_discharge_power_kw"]
-    )
+    charge = hk["max_charge_power_kw"]
+    if live_charge is not None:
+        charge = min(charge, live_charge)
+    discharge = hk["max_discharge_power_kw"]
+    if live_discharge is not None:
+        discharge = min(discharge, live_discharge)
+    min_soc = hk["min_soc"]
+    if live_min is not None:
+        min_soc = max(min_soc, live_min)
+    max_soc = hk["max_soc"]
+    if live_max is not None:
+        max_soc = min(max_soc, live_max)
     return {
-        "min_soc": live_min if live_min is not None else hk["min_soc"],
-        "max_soc": live_max if live_max is not None else hk["max_soc"],
+        "min_soc": float(min_soc),
+        "max_soc": float(max_soc),
         "max_charge_power_kw": max(0.0, float(charge)),
         "max_discharge_power_kw": max(0.0, float(discharge)),
         "max_power_kw": max(0.0, float(charge), float(discharge)),

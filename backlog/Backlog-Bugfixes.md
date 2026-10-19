@@ -28,29 +28,25 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Cause: `get_or_init_state(..., target_kwh=0.0)` always overwrote the configured target on every slot advance / trigger latch, so charge credit was capped at `min(0, …)`.
   - Fix: `update_target=False` for advance + trigger; collect/learn still refresh the target.
   - Tests: `tests/test_powerstation_2_7_p.py` (`test_advance_and_trigger_preserve_target_kwh`).
-- [ ] **Bug — config pack import accepts incompatible member files** — fix implemented (2026-10-17); live acceptance pending
-  - Cause: `_migrate_and_validate_pack_docs` stamped members to current before `ensure_compatible` (would whitewash v1/v2/untagged if validate were bypassed). `validate_migrated_docs` already rejected incompatible members first.
-  - Fix: ensure then stamp; `grid_fees.json` still exempt; doc `speichern-laden.md` now states members are checked too.
-  - Tests: `tests/test_config_pack_and_paths.py` (`test_config_pack_rejects_v2_member_with_v4_manifest`, `test_migrate_and_validate_ensures_before_stamp`).
-- [ ] **Loxone VI/VO export: Pilot→Earnie + open push token** — fix implemented (2026-10-18); live Loxone import acceptance pending
-  - Remove `(2.7.q Q4)` from exported VI Comments / library VI_v2 HTML comments.
-  - Export filenames: `VO_Earnie_*` / `VI_Earnie_*`, `Earnie-*-Signalliste.csv` (was Pilot).
-  - Placeholder `PUSH_TOKEN_HIER_ERSETZEN`; ZIP README step 3 updated.
-  - Unset `EARNIE_PUSH_TOKEN` → open LAN telemetry (no 404); empty VO token omits `?t=` / `/t/`.
-  - Tests: `test_ehal_signal_list`, `test_pilot_vi_template_gen`, `test_pilot_vo_template_gen`, `test_loxone_push_inbox`.
-- [ ] **SE 5-star review dialog + earnie-server `POST /review`** — fix implemented (2026-10-18); UI/cloud acceptance pending
-  - Replaced cloud-demo GitHub feedback banner with reusable `@st.dialog` (`ui/star_review_dialog.py`) for all SE installs.
-  - Trigger: leave Szenario-Explorer after a run was started; once per `review_id` (`runtime/feature_reviews.json`); send or abort.
-  - Always POST anonymous payload to `EARNIE_REVIEW_URL`; earnie-server appends `reviews.jsonl`.
-  - Tests: `tests/test_feature_review.py`, earnie-server `tests/test_usage_ping_receiver.py` (review route).
+- [ ] **Delta 3 standby charge exceeds HK / live ESS limits** (dump `debug_dump_20261015_222809`) — fix implemented (2026-10-19); overnight Chart1 / write acceptance pending
+  - Symptom: Chart1 SoC for Ecoflow Delta 3 jumped steeply around 03:00 (implied ~1.5 kW/QH) above the intended HK / Smarthome max-charge ceiling.
+  - Cause: `collect_standby_packs` used raw HK charge power and skipped 2.7.j effective limits; live resolve could also loosen HK.
+  - Fix: standby packs + writes use HK ∩ live; live never loosens HK; PS live gets are entity-scoped only.
+  - Tests: `tests/test_ess_limits_2_7_j.py`, `tests/test_powerstation_2_7_h.py` (`test_collect_standby_packs_applies_hk_and_live_charge_cap`).
+  - [ ] **Live golden dump (private REG):** when the fixed version is running on productive NAS, capture a debug dump (with `recorder/`) around a cheap-slot Delta 3 refill and intake as a private golden case confirming charge ≤ HK ∩ live.
+
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] On SE page during opt-in ping pop up the shown data example is still "v1" - shouldn't it be "v2"?
-- [ ] "debug-dumps\debug_dump_20261015_222809"
+- [ ] Earnie expects pv_production value for each PV generator - as an alternative it should be okay to get one pv_production per inverter (as sum over all attached strings)
+    EHAL push: no value for 'pv.dach_sued.sens_pv_production_active' (pv.dach_sued.sens_pv_production_active, state=Lesefehler)
+    EHAL push: no value for 'pv.dach_nord.sens_pv_production_active' (pv.dach_nord.sens_pv_production_active, state=Lesefehler)
 
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
+
+- [ ] Review and modify text in SE review pop-up dialogue
+
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
 

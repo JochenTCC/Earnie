@@ -107,6 +107,50 @@ def test_collect_skips_virtual_standby():
     assert packs[0]["load_kw"] == pytest.approx(0.15)
 
 
+def test_collect_standby_packs_applies_hk_and_live_charge_cap():
+    """Standby max charge must respect HK ∩ live (never above either)."""
+    packs = collect_standby_packs(
+        powerstations=[
+            {
+                "id": "ecoflow_delta_3",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": ROLE_STANDBY_BACKUP,
+                "attached_consumer_ids": ["dev-pc"],
+                "battery_capacity_kwh": 1.024,
+                "battery_max_charge_power_kw": 1.5,
+                "battery_max_discharge_power_kw": 2.2,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "limits_from_live": True,
+            }
+        ],
+        appliances=[{"id": "dev-pc", "default_power_kw": 0.1}],
+        telemetry={"ess.ecoflow_delta_3.get_ess_max_charge_power": 1000.0},
+    )
+    assert len(packs) == 1
+    assert packs[0]["max_charge_power_kw"] == pytest.approx(1.0)
+
+    packs_hk_only = collect_standby_packs(
+        powerstations=[
+            {
+                "id": "ecoflow_delta_3",
+                "type": "powerstation",
+                "backing": "physical",
+                "role": ROLE_STANDBY_BACKUP,
+                "attached_consumer_ids": ["dev-pc"],
+                "battery_capacity_kwh": 1.024,
+                "battery_max_charge_power_kw": 1.0,
+                "battery_max_discharge_power_kw": 2.2,
+                "limits_from_live": True,
+            }
+        ],
+        appliances=[{"id": "dev-pc", "default_power_kw": 0.1}],
+        telemetry={"ess.ecoflow_delta_3.get_ess_max_charge_power": 1500.0},
+    )
+    assert packs_hk_only[0]["max_charge_power_kw"] == pytest.approx(1.0)
+
+
 def test_attached_load_and_reserve_sizing():
     load = attached_load_kw(
         {"attached_consumer_ids": ["a", "b"]},

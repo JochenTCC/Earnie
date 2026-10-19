@@ -2,6 +2,31 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — config pack import accepts incompatible member files (2026-10-19)
+
+- [x] **Bug — config pack import accepts incompatible member files** — **Verified** (2026-10-19; greenfield `EARNIE_ENV_PATH`)
+  - Cause: `_migrate_and_validate_pack_docs` stamped members to current before `ensure_compatible` (would whitewash v1/v2/untagged if validate were bypassed).
+  - Fix: ensure then stamp; `grid_fees.json` still exempt; doc `speichern-laden.md` states members are checked too.
+  - Live: v4 manifest + v2/`untagged` `config.json` → `DataModelError`, greenfield files unchanged; compatible re-import OK, `grid_fees.json` unstamped.
+  - Tests: `tests/test_config_pack_and_paths.py` (`test_config_pack_rejects_v2_member_with_v4_manifest`, `test_migrate_and_validate_ensures_before_stamp`).
+
+### Bugfix — SE 5-star review dialog + earnie-server `POST /review` (2026-10-19)
+
+- [x] **SE 5-star review dialog + earnie-server `POST /review`** — **Verified** (2026-10-19)
+  - Replaced cloud-demo GitHub feedback banner with reusable `@st.dialog` (`ui/star_review_dialog.py`) for all SE installs.
+  - Trigger: leave Szenario-Explorer after a run was started; once per `review_id` (`runtime/feature_reviews.json`); send or abort.
+  - Always POST anonymous payload to `EARNIE_REVIEW_URL`; earnie-server appends `reviews.jsonl`.
+  - Tests: `tests/test_feature_review.py`, earnie-server `tests/test_usage_ping_receiver.py` (review route).
+
+### Bugfix — Loxone VI/VO export: Pilot→Earnie + open push token (2026-10-19)
+
+- [x] **Loxone VI/VO export: Pilot→Earnie + open push token** — **Verified** (2026-10-19)
+  - Remove `(2.7.q Q4)` from exported VI Comments / library VI_v2 HTML comments.
+  - Export filenames: `VO_Earnie_*` / `VI_Earnie_*`, `Earnie-*-Signalliste.csv` (was Pilot).
+  - Placeholder `PUSH_TOKEN_HIER_ERSETZEN`; ZIP README step 3 updated.
+  - Unset `EARNIE_PUSH_TOKEN` → open LAN telemetry (no 404); empty VO token omits `?t=` / `/t/`.
+  - Tests: `test_ehal_signal_list`, `test_pilot_vi_template_gen`, `test_pilot_vo_template_gen`, `test_loxone_push_inbox`.
+
 ### Minor — sidebar order EHAL-Com before Optimierer-Dienst (2026-10-18)
 
 - [x] **Swap EHAL-Com and Optimierer-Dienst in sidebar** — Daemon Control order is now Smarthome-Backend → EHAL-Com → Optimierer-Dienst (`ui/navigation.py`). Docs `betriebsmodi.md` / `betrieb.md` aligned; test `test_navigation_setup.py`.

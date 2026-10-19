@@ -99,8 +99,25 @@ def test_resolve_effective_ess_limits_live_when_flag_on():
     assert out["min_soc"] == 20.0
     assert out["max_soc"] == 80.0
     assert out["max_charge_power_kw"] == 2.0
-    assert out["max_discharge_power_kw"] == 8.0
-    assert out["max_power_kw"] == 8.0
+    # Live discharge (8 kW) must not loosen HK discharge (6 kW).
+    assert out["max_discharge_power_kw"] == 6.0
+    assert out["max_power_kw"] == 6.0
+
+
+def test_resolve_effective_ess_limits_live_never_loosens_hk():
+    params = {
+        "id": "ecoflow_delta_3",
+        "min_soc": 10.0,
+        "max_soc": 100.0,
+        "max_charge_power_kw": 1.0,
+        "max_discharge_power_kw": 2.2,
+        "limits_from_live": True,
+    }
+    telemetry = {
+        "ess.ecoflow_delta_3.get_ess_max_charge_power": 1500.0,
+    }
+    out = resolve_effective_ess_limits(params, telemetry=telemetry)
+    assert out["max_charge_power_kw"] == pytest.approx(1.0)
 
 
 def test_resolve_effective_ess_limits_fallback_when_unmapped():

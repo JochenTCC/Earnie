@@ -549,7 +549,7 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
         battery_params = ehal_live.filter_planning_batteries_with_soc(
             battery_params, current_soc_by_id
         )
-        standby_packs = load_standby_packs()
+        standby_packs = load_standby_packs(telemetry=telemetry_for_export)
         standby_plans = plan_standby_horizon(
             optimization_matrix,
             standby_packs,
@@ -625,6 +625,16 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
         )
         reserve_charges = physical_charge_setpoints_kw(active_reserves)
         standby_sources, standby_charges = live_source_and_charge(standby_plans, slot=0)
+        # Hard clamp to effective pack max (HK ∩ live) — never write above resolve.
+        max_by_ps = {
+            str(p["powerstation_id"]): float(p.get("max_charge_power_kw") or 0.0)
+            for p in standby_packs
+            if str(p.get("powerstation_id") or "").strip()
+        }
+        for ps_id, kw in list(standby_charges.items()):
+            cap = max_by_ps.get(str(ps_id))
+            if cap is not None:
+                standby_charges[ps_id] = min(max(0.0, float(kw)), max(0.0, cap))
         # Refresh all mapped PS set_* Merkers every cycle (idle → charge 0 / mode 0 / grid).
         phys_charge = cycle_powerstation_charge_kw(reserve_charges, standby_charges)
         standby_sources = cycle_standby_source_selects(standby_sources)

@@ -75,12 +75,38 @@ def reserve_target_kwh_for_standby(
     return raw
 
 
+def _hk_limits_from_powerstation(ps: dict) -> dict[str, Any]:
+    """Optimizer-shaped limit fields + ``limits_from_live`` for resolve."""
+    return {
+        "id": str(ps.get("id") or "").strip(),
+        "max_charge_power_kw": float(
+            ps.get("battery_max_charge_power_kw")
+            or ps.get("max_charge_power_kw")
+            or 0.0
+        ),
+        "max_discharge_power_kw": float(
+            ps.get("battery_max_discharge_power_kw")
+            or ps.get("max_discharge_power_kw")
+            or 0.0
+        ),
+        "min_soc": float(ps.get("battery_min_soc") or ps.get("min_soc") or 0.0),
+        "max_soc": float(ps.get("battery_max_soc") or ps.get("max_soc") or 100.0),
+        "limits_from_live": bool(ps.get("limits_from_live", False)),
+    }
+
+
 def collect_standby_packs(
     *,
     powerstations: list[dict] | dict[str, dict],
     appliances: list[dict] | None = None,
+    telemetry: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Physical ``role: standby_backup`` packs only; virtual is skipped."""
+    """Physical ``role: standby_backup`` packs only; virtual is skipped.
+
+    Charge/SOC caps use the same HK ∩ live resolve as house ESS (2.7.j).
+    """
+    from settings.ess_limits_resolve import apply_effective_ess_limits
+
     if isinstance(powerstations, dict):
         items = list(powerstations.values())
     else:
@@ -109,6 +135,24 @@ def collect_standby_packs(
             )
             continue
         load_kw = attached_load_kw(ps, apps_by_id)
+        hk = _hk_limits_from_powerstation(ps)
+        # Powerstations: only entity-scoped live gets (never plant-flat house values).
+        from ehal.ess_fields import ess_field
+
+        scoped: dict[str, Any] | None = None
+        if isinstance(telemetry, dict):
+            sliced = {
+                kind: telemetry[ess_field(ps_id, kind)]
+                for kind in (
+                    "get_ess_soc_min",
+                    "get_ess_soc_max",
+                    "get_ess_max_charge_power",
+                    "get_ess_max_discharge_power",
+                )
+                if ess_field(ps_id, kind) in telemetry
+            }
+            scoped = sliced or None
+        effective = apply_effective_ess_limits(hk, telemetry=scoped)
         out.append(
             {
                 "powerstation_id": ps_id,
@@ -116,17 +160,9 @@ def collect_standby_packs(
                 "role": ROLE_STANDBY_BACKUP,
                 "load_kw": load_kw,
                 "capacity_kwh": float(ps.get("battery_capacity_kwh") or 0.0),
-                "max_charge_power_kw": float(
-                    ps.get("battery_max_charge_power_kw")
-                    or ps.get("max_charge_power_kw")
-                    or 0.0
-                ),
-                "min_soc": float(
-                    ps.get("battery_min_soc") or ps.get("min_soc") or 0.0
-                ),
-                "max_soc": float(
-                    ps.get("battery_max_soc") or ps.get("max_soc") or 100.0
-                ),
+                "max_charge_power_kw": float(effective["max_charge_power_kw"]),
+                "min_soc": float(effective["min_soc"]),
+                "max_soc": float(effective["max_soc"]),
                 "efficiency": float(ps.get("battery_efficiency") or ps.get("efficiency") or 0.95),
                 "attached_consumer_ids": normalize_attached_consumer_ids(ps),
                 "battery": ps,

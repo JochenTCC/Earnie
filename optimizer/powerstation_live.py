@@ -660,7 +660,9 @@ def write_standby_source_selects(source_by_id: dict[str, int]) -> list:
     return _write_powerstation_fields(fields)
 
 
-def load_standby_packs() -> list[dict[str, Any]]:
+def load_standby_packs(
+    telemetry: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     from optimizer.powerstation_standby import collect_standby_packs
 
     try:
@@ -681,4 +683,5 @@ def load_standby_packs() -> list[dict[str, Any]]:
     return collect_standby_packs(
         powerstations=_planning_powerstations(),
         appliances=list(by_id.values()),
+        telemetry=telemetry,
     )
