@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.7.0-alpha.2",
+    "earnie_version": "2.7.0-dev.62",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -13,11 +13,11 @@
   "invariants": [],
   "metrics": {
     "status_optimal": 1,
-    "n_slots": 192,
-    "cost_euro": -2.510375,
-    "import_kwh": 0.0,
-    "export_kwh": 71.725,
-    "battery_throughput_kwh": 5.6475,
+    "n_slots": 288,
+    "cost_euro": -2.6124,
+    "import_kwh": 1.9425000000000001,
+    "export_kwh": 88.51500000000001,
+    "battery_throughput_kwh": 17.125,
     "plausibility_failures": 0.0
   },
   "plan": {
@@ -25,34 +25,35 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "f43e8bec3b877106b9fd75d3ee8501b3789e3f88",
-    "recorded_at": "2026-10-18T15:45:54Z",
+    "git_sha": "6aa10992e9401feffbe01b7b04b7253ec1a363cd",
+    "recorded_at": "2026-10-20T17:02:54Z",
     "source": "update-golden"
   },
   "inputs": {
     "files": {
       "fixtures/backtesting_scenarios.json": "fa30790f3ccba557",
-      "fixtures/components.json": "53fcc088a852d484",
+      "fixtures/components.json": "da8d61bd10fa8cc8",
       "fixtures/config.json": "7cc3425b8a1d31ab",
       "fixtures/cons_data.csv": "9dcccd6817385b2e",
-      "fixtures/house_profiles.json": "4d5cb2ae4add9c4c",
+      "fixtures/house_profiles.json": "b7a432b1bcc12805",
       "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_18.0_0.0.json": "77f0a9e08afd1d08",
       "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "b8bb3205806bb411",
       "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "457bbdacb5e87ead",
       "fixtures/prices.csv": "57885d9ae16e27b0",
+      "fixtures/shadow_feed/feed-2026-10-20.jsonl": "c3117dd3d5d762cc",
       "fixtures/tariffs.json": "e7e44bae2c61aecd",
       "case.inputs": "30dae7c03dfb4cab"
     },
     "series": {
-      "pv_kw": "30e90a7fecbe7ea2",
-      "baseload_kw": "cc16a6976655293c",
-      "k_act": "fa22dd4f7e53cbfc",
-      "k_push_act": "8ead31b0410d1073"
+      "pv_kw": "b13ccee472d93ef1",
+      "baseload_kw": "cb3c1e2654d71872",
+      "k_act": "d3a387f8a80d5e2d",
+      "k_push_act": "fb7cf1c56a67bd18"
     },
     "sums": {
-      "n_slots": 192.0,
-      "pv_kwh": 91.119,
-      "baseload_kwh": 10.9707,
+      "n_slots": 288.0,
+      "pv_kwh": 138.206,
+      "baseload_kwh": 27.2737,
       "k_act_mean": 25.0
     }
   }
