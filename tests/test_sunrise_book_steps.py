@@ -358,3 +358,28 @@ def test_soc_hold_slot_anchors_book_start_soc():
         soc_hold_percent=None,
     )
     assert _soc_after_hold_slot(no_hold, 4, 70.2) == pytest.approx(70.2)
+
+
+def test_reference_books_same_sunrise_slots_as_optimized_run():
+    """Historisch / ref:* follow the optimized run's sunrise chain (start … end+1)."""
+    import config
+    from simulation.engine import compute_historical_reference_costs, run_simulation
+
+    scenario = fixture_scenario_params()
+    cache = load_fixture_cache()
+    start = pd.Timestamp(SOC_CHAIN_START_DAY)
+    end = pd.Timestamp(SOC_CHAIN_END_DAY)
+    prices = build_synthetic_prices_df(start, end)
+    reference = compute_historical_reference_costs(
+        start,
+        end,
+        prices,
+        config.get_backtesting_feed_in_settings(runtime_override=scenario),
+        cache=cache,
+        scenario_params=scenario,
+        horizon_mode=SUNRISE_WINDOW,
+    )
+    optimized, _plausibility, _cbc = run_simulation(
+        start, end, scenario, prices, cache=cache, horizon_mode=SUNRISE_WINDOW
+    )
+    assert list(reference.index) == list(optimized.index)

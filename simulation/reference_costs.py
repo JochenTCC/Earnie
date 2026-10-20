@@ -195,9 +195,20 @@ def compute_historical_reference_costs(
 
     from simulation.engine import (
         list_simulation_anchors,
+        list_sunrise_step_anchors,
         _hour_cost_parts_without_optimization,
     )
-    anchors = list_simulation_anchors(start, end, cache)
+    if parse_horizon_mode(horizon_mode) == SUNRISE_WINDOW:
+        if scenario_params is None:
+            raise ValueError(
+                "Referenz im Modus sunrise_window benötigt Szenario-Parameter "
+                "(latitude/longitude für die Sonnenaufgangs-Fenster)."
+            )
+        # Same sunrise chain as run_simulation (start … end+1), so references
+        # and optimized runs book identical slots.
+        anchors = list_sunrise_step_anchors(start, end, cache, scenario_params)
+    else:
+        anchors = list_simulation_anchors(start, end, cache)
     if not anchors:
         raise ValueError(
             f"Keine historischen Verbrauchsfenster zwischen {start.date()} und {end.date()}."
