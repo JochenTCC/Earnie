@@ -335,12 +335,15 @@ def _slot_hours(slots: int) -> str:
 
 
 def _booked_series_hints(scenario_id: str, booked: dict) -> list[str]:
-    """Duplicate slots in the series and slot-set differences to its reference."""
+    """Duplicate / missing slots in the series and slot-set differences to its reference."""
     block = booked.get(scenario_id) or {}
     hints: list[str] = []
     duplicates = int(block.get("duplicate_slots") or 0)
     if duplicates:
         hints.append(f"{_slot_hours(duplicates)} doppelt gebucht (einmal gezählt)")
+    gaps = int(block.get("gap_slots") or 0)
+    if gaps:
+        hints.append(f"{_slot_hours(gaps)} ohne Buchung (Lücken in der Reihe)")
     coverage = block.get("reference_coverage") or {}
     only_here = int(coverage.get("only_scenario_slots") or 0)
     only_ref = int(coverage.get("only_reference_slots") or 0)

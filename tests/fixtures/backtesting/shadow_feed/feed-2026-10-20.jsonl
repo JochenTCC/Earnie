@@ -1040,3 +1040,328 @@ ull}
 {"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:09:07Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
 {"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:09:10Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
 {"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:09:10Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:08Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610051000&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:08Z", "ok": true, "status": null, "payload": {"LL": {"value": "500.0"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:08Z", "ok": true, "status": null, "payload": {"LL": {"value": "800.0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:08Z", "ok": true, "status": null, "payload": {"LL": {"value": "55.0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:08Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:08Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202609262200&periodEnd=202610060526&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:08Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610042200&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:08Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610051000&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:09Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610142200&periodEnd=202610170530&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:09Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610122200&periodEnd=202610210400&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:10Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 07:00"}}, "error": "parse_failed"}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:evcs.e_auto.get_evcs_nominal_current", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "16"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.sens_evcs_bat_capacity", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "77"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:10Z", "ok": false, "status": null, "payload": {"LL": {"value": "n/a"}}, "error": "parse_failed"}
+{"key": "loxone:io:sens_a", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "55.5"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:sens_b", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_a", "ts": "2026-10-20T16:13:10Z", "ok": true, "status": null, "payload": {"LL": {"value": "2"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "50"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "51"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "52"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "53"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "54"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:request_optimize", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "trigger:request_optimize", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": null, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:11Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:12Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.ecoflow_delta_3.sens_ess_soc", "ts": "2026-10-20T16:13:12Z", "ok": true, "status": null, "payload": {"LL": {"value": "61,5"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:12Z", "ok": true, "status": null, "payload": {"LL": {"value": "2.5"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:12Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:12Z", "ok": true, "status": null, "payload": {"LL": {"value": "2"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:13Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:consumer.trockner.sens_power_act", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "1.5"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "2.25"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "3.0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "36.0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:14Z", "ok": true, "status": null, "payload": {"LL": {"value": "1735689600"}}, "error": null}
+{"key": "openems:get:/rest/channel/_sum/GridActivePower", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": 200, "payload": {"value": -100}, "error": null}
+{"key": "openems:get:/rest/channel/_sum/ProductionActivePower", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": 200, "payload": {"value": 500}, "error": null}
+{"key": "openems:get:/rest/channel/ess0/ActivePower", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": 200, "payload": {"value": 200}, "error": null}
+{"key": "loxone:io:sens_pv_energy", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": null, "payload": {"LL": {"value": "24120.12"}}, "error": null}
+{"key": "loxone:io:sens_pv_energy", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": null, "payload": {"LL": {"value": "1735689600"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:15Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 16:03"}}, "error": "parse_failed"}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": null, "payload": {"LL": {"value": "1735689600"}}, "error": null}
+{"key": "openems:get:/rest/channel/evcs0/ActivePower", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": 200, "payload": {"value": 1200}, "error": null}
+{"key": "openems:get:/rest/channel/ess0/Soc", "ts": "2026-10-20T16:13:15Z", "ok": true, "status": 200, "payload": {"value": 55}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:15Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 08:00"}}, "error": "parse_failed"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:17Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:17Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:17Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {"retry-at": "2026-07-15T12:30:00"}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:17Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:17Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:18Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:18Z", "ok": false, "status": 500, "payload": "<MagicMock name='get().json()' id='2861880569072'>", "error": "HTTP 500"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:18Z", "ok": false, "status": null, "payload": null, "error": "500"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:18Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:18Z", "ok": false, "status": null, "payload": null, "error": "timeout"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:18Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:18Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:24Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:24Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:24Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:25Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:26Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:26Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:26Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:30Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:13:30Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:47Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610051000&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:47Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202609262200&periodEnd=202610060526&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:47Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610042200&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:47Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610122200&periodEnd=202610210400&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:47Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610051000&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:13:48Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610142200&periodEnd=202610170530&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:48Z", "ok": true, "status": null, "payload": {"LL": {"value": "500.0"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:48Z", "ok": true, "status": null, "payload": {"LL": {"value": "800.0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:48Z", "ok": true, "status": null, "payload": {"LL": {"value": "55.0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:48Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "55.5"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": false, "status": null, "payload": {"LL": {"value": "n/a"}}, "error": "parse_failed"}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:sens_a", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_b", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_a", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "2"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "50"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "51"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "52"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "53"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "54"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:49Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 07:00"}}, "error": "parse_failed"}
+{"key": "loxone:io:request_optimize", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "trigger:request_optimize", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": null, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:evcs.e_auto.get_evcs_nominal_current", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "16"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.sens_evcs_bat_capacity", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "77"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:49Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.ecoflow_delta_3.sens_ess_soc", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "61,5"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "2.5"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:13:50Z", "ok": true, "status": null, "payload": {"LL": {"value": "2"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:51Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_grid_power_active", "ts": "2026-10-20T16:13:51Z", "ok": true, "status": null, "payload": {"LL": {"value": "0.8"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:51Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:consumer.trockner.sens_power_act", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "1.5"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "2.25"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "3.0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "36.0"}}, "error": null}
+{"key": "loxone:io:sens_pv_energy", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "24120.12"}}, "error": null}
+{"key": "loxone:io:sens_pv_energy", "ts": "2026-10-20T16:13:52Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:53Z", "ok": true, "status": null, "payload": {"LL": {"value": "1735689600"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:53Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 16:03"}}, "error": "parse_failed"}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:13:53Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:53Z", "ok": true, "status": null, "payload": {"LL": {"value": "1735689600"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:53Z", "ok": true, "status": null, "payload": {"LL": {"value": "1735689600"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:13:53Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 08:00"}}, "error": "parse_failed"}
+{"key": "openems:get:/rest/channel/_sum/GridActivePower", "ts": "2026-10-20T16:13:54Z", "ok": true, "status": 200, "payload": {"value": -100}, "error": null}
+{"key": "openems:get:/rest/channel/_sum/ProductionActivePower", "ts": "2026-10-20T16:13:54Z", "ok": true, "status": 200, "payload": {"value": 500}, "error": null}
+{"key": "openems:get:/rest/channel/ess0/ActivePower", "ts": "2026-10-20T16:13:54Z", "ok": true, "status": 200, "payload": {"value": 200}, "error": null}
+{"key": "openems:get:/rest/channel/evcs0/ActivePower", "ts": "2026-10-20T16:13:54Z", "ok": true, "status": 200, "payload": {"value": 1200}, "error": null}
+{"key": "openems:get:/rest/channel/ess0/Soc", "ts": "2026-10-20T16:13:54Z", "ok": true, "status": 200, "payload": {"value": 55}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {"retry-at": "2026-07-15T12:30:00"}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": false, "status": 500, "payload": "<MagicMock name='get().json()' id='2729245698304'>", "error": "HTTP 500"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": false, "status": null, "payload": null, "error": "500"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": false, "status": null, "payload": null, "error": "timeout"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:13:56Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:04Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:06Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:06Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:11Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:11Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:11Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:11Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:12Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:14:12Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:19:00Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610051000&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:19:00Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202609262200&periodEnd=202610060526&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:19:00Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610042200&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:19:00Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610032200&periodEnd=202610051000&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:19:00Z", "ok": true, "status": null, "payload": {"LL": {"value": "500.0"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:19:00Z", "ok": true, "status": null, "payload": {"LL": {"value": "800.0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:00Z", "ok": true, "status": null, "payload": {"LL": {"value": "55.0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:00Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:19:01Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610142200&periodEnd=202610170530&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "ext:prices:entsoe", "ts": "2026-10-20T16:19:01Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://web-api.tp.entsoe.eu/api?documentType=A44&contract_MarketAgreement.type=A01&in_Domain=10YAT-APG------L&out_Domain=10YAT-APG------L&periodStart=202610122200&periodEnd=202610210415&securityToken=1620299d-163f-4ef6-98d1-fa5168331ef2"}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1735689600"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:19:02Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 16:03"}}, "error": "parse_failed"}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:19:02Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 08:00"}}, "error": "parse_failed"}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": false, "status": null, "payload": {"LL": {"value": "n/a"}}, "error": "parse_failed"}
+{"key": "loxone:io:sens_a", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_b", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_a", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "2"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55.5"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "56"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "50"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "51"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "36.0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "52"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "53"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "54"}}, "error": null}
+{"key": "loxone:io:request_optimize", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "trigger:request_optimize", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": null, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1735689600"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.get_evcs_ready_by_time", "ts": "2026-10-20T16:19:02Z", "ok": false, "status": null, "payload": {"LL": {"value": "Morgen, 07:00"}}, "error": "parse_failed"}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:evcs.e_auto.get_evcs_nominal_current", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "16"}}, "error": null}
+{"key": "loxone:io:ev.e_auto.sens_evcs_bat_capacity", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "77"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_soc", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:inv.wr_main.sens_inv_power_pv", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.15_kwh_speicher.sens_ess_power", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:19:02Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:03Z", "ok": true, "status": null, "payload": {"LL": {"value": "55"}}, "error": null}
+{"key": "loxone:io:ess.ecoflow_delta_3.sens_ess_soc", "ts": "2026-10-20T16:19:03Z", "ok": true, "status": null, "payload": {"LL": {"value": "61,5"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:19:03Z", "ok": true, "status": null, "payload": {"LL": {"value": "2.5"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:03Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:ess.house.sens_ess_soc", "ts": "2026-10-20T16:19:04Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_pv_production_active", "ts": "2026-10-20T16:19:04Z", "ok": true, "status": null, "payload": {"LL": {"value": "2"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:04Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:sens_grid_power_active", "ts": "2026-10-20T16:19:04Z", "ok": true, "status": null, "payload": {"LL": {"value": "0.8"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:04Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "openems:get:/rest/channel/_sum/GridActivePower", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": 200, "payload": {"value": -100}, "error": null}
+{"key": "openems:get:/rest/channel/_sum/ProductionActivePower", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": 200, "payload": {"value": 500}, "error": null}
+{"key": "openems:get:/rest/channel/ess0/ActivePower", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": 200, "payload": {"value": 200}, "error": null}
+{"key": "openems:get:/rest/channel/evcs0/ActivePower", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": 200, "payload": {"value": 1200}, "error": null}
+{"key": "openems:get:/rest/channel/ess0/Soc", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": 200, "payload": {"value": 55}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:consumer.trockner.sens_power_act", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": null, "payload": {"LL": {"value": "1.5"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": null, "payload": {"LL": {"value": "2.25"}}, "error": null}
+{"key": "loxone:io:heartbeat_smarthome", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": null, "payload": {"LL": {"value": "1"}}, "error": null}
+{"key": "loxone:io:grid.meter.sens_grid_power_active", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": null, "payload": {"LL": {"value": "3.0"}}, "error": null}
+{"key": "loxone:io:sens_pv_energy", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": null, "payload": {"LL": {"value": "24120.12"}}, "error": null}
+{"key": "loxone:io:sens_pv_energy", "ts": "2026-10-20T16:19:05Z", "ok": true, "status": null, "payload": {"LL": {"value": "0"}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {"retry-at": "2026-07-15T12:30:00"}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": false, "status": 500, "payload": "<MagicMock name='get().json()' id='2157435507712'>", "error": "HTTP 500"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": false, "status": null, "payload": null, "error": "500"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": false, "status": null, "payload": null, "error": "timeout"}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": true, "status": 200, "payload": {"result": {"watts": {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000, "2026-07-15 12:00:00": 3000}}}, "error": null}
+{"key": "ext:pv_forecast:3bef89d144ccdeac", "ts": "2026-10-20T16:19:07Z", "ok": false, "status": 429, "payload": {"message": {"ratelimit": {}}}, "error": "rate_limited"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:12Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:12Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:13Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:13Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:13Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:14Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:14Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:14Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}
+{"key": "ext:outdoor:074c28ca8e2cc22f", "ts": "2026-10-20T16:19:15Z", "ok": false, "status": null, "payload": null, "error": "real HTTP request blocked in tests: GET https://api.open-meteo.com/v1/forecast?latitude=47.4&longitude=9.7&hourly=temperature_2m&forecast_days=2&timezone=auto"}

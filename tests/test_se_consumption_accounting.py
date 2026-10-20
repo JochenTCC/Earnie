@@ -169,6 +169,7 @@ def test_booked_totals_split_standby_and_count_each_slot_once():
     totals = booked_consumption_totals(duplicated, standby_kw=0.026)
     assert totals["slots"] == 96
     assert totals["duplicate_slots"] == 8
+    assert totals["gap_slots"] == 0
     assert totals["standby_kwh"] == pytest.approx(0.6)
     assert totals["consumption_kwh"] == pytest.approx(24.0)
     assert totals["components_kwh"] == {"baseload": 9.6, "pool_filter": 14.4}
@@ -253,3 +254,9 @@ def test_reference_slots_sunrise_requires_scenario_geo():
 
     with pytest.raises(ValueError, match="sunrise_window"):
         reference_slot_datetimes(datetime(2025, 12, 12, 7, 0), None, SUNRISE_WINDOW)
+
+
+def test_booked_totals_count_gaps_inside_the_series():
+    df = _frame("2026-05-01", 96, 1.0)
+    holed = df.drop(df.index[40:48])
+    assert booked_consumption_totals(holed, standby_kw=0.0)["gap_slots"] == 8

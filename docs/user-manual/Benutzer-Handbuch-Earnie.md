@@ -89,6 +89,8 @@ Details: [Container](../einrichtung/container.md) · [VMware](../einrichtung/vmw
 
 Nach dem ersten Start öffnet Earnie die Seite **Smarthome-Backend** (unter **Daemon Control**). Dort wird das Backend gewählt und verbunden; **Optimierer-Dienst** und **EHAL-Com** sind erst danach freigeschaltet. Weitere Seiten wie Monitor oder Szenario-Explorer erscheinen, sobald die Einrichtung weit genug ist.
 
+<!-- In this chapter the possibilities for Loxone Loxberry Plugin or HA Earnie Addon should be mentioned with reference to the right docs -->
+
 ---
 
 
@@ -99,7 +101,7 @@ In dieser Phase wird das Haus so abgebildet, dass Earnie **Vergleichsszenarien**
 
 Empfohlene Reihenfolge:
 
-1. **Hauskonfigurator:** Haus, Verbraucher, PV und Speicher anlegen.
+1. **Hauskonfigurator:** Haus, Verbraucher, Wechselrichter, PV-Felder und Speicher anlegen.
 2. **Szenarienkonfigurator:** Varianten bilden (mit/ohne Speicher, anderer Tarif, …).
 3. **Live-Szenario zuweisen:** festlegen, welche Bausteine als Basis gelten.
 4. **Szenario-Explorer:** Verbrauch erzeugen, Rechnung starten, Ergebnisse auswerten.

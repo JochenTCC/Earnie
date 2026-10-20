@@ -20,8 +20,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalHorizon, EarlyStart, ConfigMigration, UsagePing/EarniePoints, Inverter P1–P5, Shadow R1–R4, Binding path work, …) → [Backlog-Erledigt.md](Backlog-Erledigt.md). Do not bump `version.py` to a publishable 2.7 without approval. Remaining open work below; Topology P3–P5 and Inverter follow-ups → **Version 2.+1**; Regression L3+P3 → **Version 2.8**.
 - **Note (deferred from 2.7.n):** Plant PV sum stays bare `sens_pv_production_active`; first entity-scoped `pv.{pv_system_id}.sens_pv_production_active` shipped with live attribution (Inverter follow-ups). Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
 
-- [ ] Dogfood greenfield Earnie configuration for a Loxone SB
-- [ ] Release for Loxone
+- [x] Dogfood greenfield Earnie configuration for a Loxone SB
+- [ ] Rename "PV-Anlage" and similar namings to "PV-Felder" in UI and docs - ask if you are not sure
 - [ ] **LoxBerry plugin ZIP — ship Versionsvariante UI strings** `[qual]`: rebuild and publish a new plugin ZIP after the rename Versionskanal → Versionsvariante (`packaging/loxberry/templates/lang/language_{de,en}.ini`, docs). Bump `plugin.cfg` `VERSION` (currently `0.2.0`), package per [`packaging/loxberry/README.md`](../packaging/loxberry/README.md) (7-Zip / `zip` with `/` separators), attach to the GitHub Release / update `release.cfg` as usual. Existing installs only pick up the new labels via this Plugin-ZIP (not via Earnie image pull).
 - [ ] **earnie-server endpoints: hard-code in the code instead of `.env`.** Server is reachable at `cloudserver.earnie-hems.com` (DNS A-record, port 8787, plain HTTP for now).
   - Remove `EARNIE_USAGE_PING_URL` and `EARNIE_REVIEW_URL` from `.env` (`greenfield/config/.env`, example files) and stop reading them in `runtime_store/usage_ping.py` and `runtime_store/feature_review.py`.
@@ -29,6 +29,8 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
   - Keep the injectable `endpoint_url` / transport parameters so tests stay offline; adapt `tests/test_usage_ping.py`, `tests/test_usage_points.py`, `tests/test_feature_review.py` (no more env-based URL setup).
   - Behaviour change to settle: today a missing URL means "no-op with WARNING" (ping) and "error in dialog" (review). With a fixed URL these cases disappear; opt-out stays via consent / `EARNIE_USAGE_PING=off`.
   - Update docs: `docs/einrichtung/betrieb.md` (env table, feedback section), `docs/einrichtung/private-env.md`, `docs/workflow/usage-ping.md`, `docs/workflow/feature-review.md`.
+
+- [ ] Release for Loxone
 - [ ] Dogfood and finalize new HA binding
 - [ ] alpha release for HA
 

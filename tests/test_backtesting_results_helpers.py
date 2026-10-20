@@ -567,6 +567,7 @@ def test_annual_cost_rows_flag_duplicate_and_reference_slot_differences():
             "consumption_kwh": 1000.0,
             "standby_kwh": 0.0,
             "duplicate_slots": 8,
+            "gap_slots": 12,
         },
         "live": {
             "consumption_kwh": 990.0,
@@ -579,7 +580,9 @@ def test_annual_cost_rows_flag_duplicate_and_reference_slot_differences():
         },
     }
     rows = {row["Szenario"]: row for row in build_annual_cost_rows(_booked_meta(booked))}
-    assert rows["Referenz Live"]["Hinweis"] == "2 h doppelt gebucht (einmal gezählt)"
+    assert rows["Referenz Live"]["Hinweis"] == (
+        "2 h doppelt gebucht (einmal gezählt) · 3 h ohne Buchung (Lücken in der Reihe)"
+    )
     assert rows["Live"]["Hinweis"] == (
         "Referenz rechnet über andere Zeitslots (5 h nur hier, 1 h nur in der Referenz)"
     )

@@ -156,6 +156,7 @@ Der volumetrische **Netznutzung Arbeitspreis** (je Netzgebiet aus `grid_fees.jso
 | `consumption_kwh` | Σ `consumption_kw` × Slotdauer über den Zeitraum; jeder Zeitslot zählt einmal, ohne Speicher-Standby |
 | `standby_kwh` | Standby-Leistung der Hausbatterie (`standby_power_kw`) über alle gebuchten Slots; nur bei optimierten Szenarien |
 | `duplicate_slots` | Zeitslots, die mehrere Fenster gebucht haben (einmal gezählt) |
+| `gap_slots` | Zeitslots zwischen erstem und letztem gebuchten Slot, die kein Fenster gebucht hat |
 | `reference_coverage` | Zeitslots, die nur das Szenario bzw. nur seine Referenz rechnet |
 | `components_kwh` | Aufteilung je Verbraucherspalte (Grundlast ohne Standby, `other` = known-Verbraucher) |
 
@@ -166,6 +167,7 @@ Referenzen und Historisch rechnen über **dieselben Zeitslots** wie die optimier
 Die Spalte **Hinweis** zeigt:
 
 - **Doppelt gebuchte Zeitslots:** Die Reihe enthält Slots mehrfach; im Jahres Verbrauch zählen sie einmal, in den Kosten mehrfach.
+- **Zeitslots ohne Buchung:** Zwischen erstem und letztem Slot fehlen Stunden. Verbrauch und Kosten dieser Stunden fehlen in der Zeile.
 - **Andere Zeitslots als die Referenz:** Die gebuchten Slot-Mengen von Szenario und Referenz weichen ab (z. B. durch Fenster, die nur die Optimierung bucht). Kosten und Verbrauch beider Zeilen stehen dann nicht ganz auf derselben Basis.
 - **Abweichung > 5 % zur Live-Referenz** (`CONSUMPTION_TOLERANCE_REL`): Warnung mit Verweis auf **Info / About**, Bereich Kontakt. Dort ein öffentliches Issue ohne Secrets anlegen; die vollständige Config-ZIP nur privat an `support@earnie-hems.com` senden. Die Zeilen Historisch und Live-Referenz bleiben ohne diese Warnung.
 

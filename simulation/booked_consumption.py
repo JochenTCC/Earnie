@@ -66,13 +66,16 @@ def booked_consumption_totals(df: pd.DataFrame, *, standby_kw: float) -> dict:
         if abs(other) >= 0.05:
             raw["other"] = other
         components = {key: round(value, 1) for key, value in raw.items()}
+    first, last = unique.index.min(), unique.index.max()
+    span_slots = int(round((last - first) / pd.Timedelta(hours=dt_h))) + 1
     return {
         "consumption_kwh": round(total_kwh - standby_kwh, 1),
         "standby_kwh": round(standby_kwh, 1),
         "slots": slots,
         "duplicate_slots": duplicates,
-        "first_ts": unique.index.min().isoformat(),
-        "last_ts": unique.index.max().isoformat(),
+        "gap_slots": span_slots - slots,
+        "first_ts": first.isoformat(),
+        "last_ts": last.isoformat(),
         "components_kwh": components,
     }
 
