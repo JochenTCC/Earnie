@@ -296,7 +296,7 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 
 > **Rechenzeit:** Earnie startet für jedes Szenario einen eigenen Prozess auf einem eigenen Prozessorkern. Auf Rechnern mit wenigen Kernen dauert die Rechnung entsprechend länger. Den Szenario-Explorer daher besser nicht auf der Hardware ausführen, die später den Live-Betrieb übernimmt.
 
-**Was rechnet die Zeile "Historisch"?** Die zuvor erzeugte Last mit den Tarifen des Live-Szenarios, **ohne** PV und **ohne** Batterie. Weitere Referenzen ohne Optimierung entstehen per Heuristik bzw. über die Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag des jeweiligen Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante, nicht zur Zeile Historisch.
+**Was rechnet die Zeile „Historisch“?** Die zuvor erzeugte Last mit den Tarifen des Live-Szenarios, **ohne** PV und **ohne** Batterie. Weitere Referenzen ohne Optimierung entstehen per Heuristik bzw. über die Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag des jeweiligen Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante, nicht zur Zeile Historisch.
 
 #### Ergebnisse des Szenario-Explorers
 
@@ -338,25 +338,39 @@ Weicht der Jahresverbrauch einer Zeile um **mehr als 5 %** von der Live-Referenz
 
 Technische Details: [Betriebsmodi – Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch) · [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)
 
+#### Nutzungsstatistik (optional)
+
+Beim ersten Öffnen des Szenario-Explorers fragt Earnie, ob es anonym melden darf, dass diese Installation aktiv ist (Versionszähler). Fehlt der Szenario-Explorer in den UI-Modi, erscheint die Frage im Szenarienkonfigurator. So sehen wir, wie viele Installationen tatsächlich in Betrieb sind. Wenn Sie zustimmen, unterstützen Sie damit die Weiterentwicklung – ganz ohne Aufwand.
+
+- **Was gesendet wird:** keine Preise, Orte, Gerätenamen oder Konfigurationsinhalte. Im Live-Betrieb kommt nur die Summe der **Earnie-Points** hinzu – eine grobe Kennzahl für die Größe der Anlage, die unter **Optimierer-Dienst** mit Aufschlüsselung angezeigt wird.
+- **Freiwillig:** Die Zustimmung ist jederzeit widerrufbar und hat keinen Einfluss auf die Optimierung.
+- **Einstellung:** Unter **Optimierer-Dienst** lässt sich die Zustimmung umschalten; **Was wird gesendet?** zeigt die exakte Feldliste.
+
+Details, Berechnungsregel der Earnie-Points und Abschalten: [Betrieb – Nutzungsstatistik](../einrichtung/betrieb.md#nutzungsstatistik)
+
 ---
 
 
 
 ## Verbindung zu Smarthome
 
-Überzeugt die Was-wäre-wenn-Analyse, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die eigentliche Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend - auch aus Sicherheitsgründen oder bei Ausfall von Earnie.
+Überzeugt die Was-wäre-wenn-Analyse, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die eigentliche Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend – auch aus Sicherheitsgründen oder bei Ausfall von Earnie.
 
 Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt. Welches Backend zur Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Für Loxone gibt es zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
 
 ### Vorbereitung der Smarthome-Konfiguration
 
-1. **Gegebenenfalls Benutzer bzw. Token** am Smarthome-Backend anlegen – mit Rechten zum Lesen und Schreiben der benötigten IOs bzw. Entities.
-2. **Signale** anlegen bzw. zuordnen, u. a. Batterie-SoC und -Leistung, PV, Netz, Freigaben und E-Auto-Status. Beispielnamen für Loxone: [Loxone-Signale](../referenz/loxone-signals.md).
-3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** die Merker bzw. HA-Entities den EHAL-Feldern zuweisen. Bei Loxone empfiehlt sich zuerst der **Loxone-Import** auf der Seite **Smarthome-Backend**, danach die Prüfung des Mappings (Konfigurationsschlüssel: `plant.ehal_bindings`, `batteries[].ehal_bindings`, `consumers[].ehal_bindings`).
-<!-- 2. and 3. are not up-to-date. The better approach now is to configure the house - then export the Templates / YAML-Files etc on EHAL-Com page - then create reading and writing on Smarthome-Backend - then check for correctness in EHAL-Com / please modify accordingl -->
-4. **Jahres-Leistungsprofile (optional):** per CSV-Upload hinterlegen ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Die Offline-Daten für den Szenario-Explorer liegen danach in `cons_data.csv`.
+Ausgangspunkt ist ein fertig konfiguriertes Haus: Hauskonfigurator und Live-Szenario legen fest, welche Signale Earnie für den Live-Betrieb braucht.
 
-Earnie liest Werte im Live-Betrieb oft als Text mit Einheit (z. B. `3.5 kW`); die Einheit wird dabei ignoriert.
+1. **Gegebenenfalls Benutzer bzw. Token** am Smarthome-Backend anlegen – mit Rechten zum Lesen und Schreiben der benötigten IOs bzw. Entities.
+2. **Signale aktivieren und Vorlagen exportieren:** Auf **Daemon Control → EHAL-Com** listet die **Signalliste** alle Signale des konfigurierten Hauses. Benötigte optionale Signale dort aktivieren, danach die Vorlagen für das Backend exportieren: bei Loxone eine ZIP mit VO- und VI-Vorlagen, bei Home Assistant ein YAML-Paket (Abschnitt **HA Push-Carrier**).
+3. **Lese- und Schreibweg im Smarthome-Backend einrichten:** Anhand des Exports im Smarthome-Backend die Messwerte an Earnie senden (Lesen) und die Sollwerte von Earnie abholen (Schreiben über `status.json`, z. B. mit Loxone Virtual Inputs oder HA-Automationen). Earnie selbst speichert dabei nur, welche Signale aktiviert sind – ohne Merker-Namen oder Entity-IDs (leere Werte in `plant.ehal_bindings`, `batteries[].ehal_bindings`, `consumers[].ehal_bindings`).
+4. **Verbindung prüfen:** Zurück auf **EHAL-Com** kontrollieren, ob **Live-Lesen** die Werte empfängt und **Live-Schreiben** bzw. die Match-Spalte der Signalliste den Abruf der Sollwerte bestätigt.
+5. **Jahres-Leistungsprofile (optional):** per CSV-Upload hinterlegen ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Die Offline-Daten für den Szenario-Explorer liegen danach in `cons_data.csv`.
+
+Die einzelnen Schritte und Prüfkriterien beschreibt der Abschnitt [EHAL-Com](#ehal-com).
+
+> **Hinweis (nur Loxone):** Auf **Smarthome-Backend** kann der **Loxone-Import** optional aus bestehenden Merker- und EFM-Namen typisierte Komponenten und Aktivierungen anlegen. Das betrifft ausschließlich Loxone – nicht Home Assistant oder OpenEMS. Die eigentliche Kommunikation läuft danach weiter über den VO-/VI-Export der Signalliste; Merker-Namen speichert Earnie nicht mehr als Binding-Werte.
 
 Weitere Informationen: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Home Assistant + evcc](../einrichtung/ha-evcc.md) · [EHAL-Com](../ui/ehal-com.md)
 
@@ -368,14 +382,36 @@ Details: [PV & Batterie](../konfiguration/batterie-pv.md) · [Überblick](../kon
 
 ### EHAL-Com
 
-Die Seite **Daemon Control → EHAL-Com** bündelt Live-Lesen und -Schreiben, die Mapping-Assistenten. **Live-Schreiben** zeigt das Ergebnis des letzten Laufs, auch einen Lauf im Silent-Modus.
+Die Seite **Daemon Control → EHAL-Com** bündelt die Kommunikation mit dem Smarthome-Backend: **Live-Lesen**, **Live-Schreiben** mit **Schreibtest** und die **Signalliste**. **Live-Schreiben** zeigt das Ergebnis des letzten Laufs, auch eines Laufs im Silent-Modus.
 
-- Der Umschalter **Silent / Loud** liegt auf der Seite **Optimierer-Dienst** (gespeichert in `runtime/local_settings.json`).
-- Zugangsdaten und Backend-Wechsel liegen auf der Seite **Smarthome-Backend** (Anbindung).
-- Empfohlene Reihenfolge beim Umstieg: Lesen OK → Schreiben OK → Monitor plausibel.
+#### Kommunikation einrichten: empfohlene Reihenfolge
+
+Die Schritte 1–2 und 6–8 gelten für alle Backends. Bei Lesen und Schreiben (Schritte 3–5) unterscheiden sich **Loxone / Home Assistant** (Push und `status.json`) von **OpenEMS** (Adapter über die REST-API).
+
+1. **Backend wählen und Zugang hinterlegen:** Zugangsdaten und Backend-Wechsel liegen auf der Seite **Daemon Control → Smarthome-Backend** (Anbindung). Erst danach erscheinen **EHAL-Com** und **Optimierer-Dienst**.
+2. **Signalliste prüfen:** Die Signalliste ist für jedes Backend der Vertrag zwischen Earnie und Smarthome. Sie zeigt je Signal die Richtung (Lesen oder Schreiben), die EHAL-ID, Bedeutung und Einheit sowie, ob es Pflicht oder optional und ob es aktiviert ist. Pflichtsignale aktiviert Earnie beim Speichern der Komponenten im Hauskonfigurator; optionale Signale werden hier zugeschaltet.
+3. **Vorlagen exportieren (Loxone und Home Assistant):** Aus den aktivierten Signalen erzeugt die Seite die Vorlagen für das Smarthome-Backend (Loxone: ZIP mit VO- und VI-Vorlagen; Home Assistant: YAML-Paket unter **HA Push-Carrier**). Nach Änderungen an den aktivierten Signalen den Export erneut erzeugen. OpenEMS hat keinen solchen Export; die Signalliste und die Kanalzuordnung im Lab reichen.
+4. **Lesen einrichten:**
+   - **Loxone / Home Assistant:** Das Smarthome-Backend sendet die Messwerte (`sens_*`, `get_*`) regelmäßig an Earnie (Push, standardmäßig alle 10 Sekunden) – bei Loxone über Virtual Outputs, bei Home Assistant über das YAML-Paket.
+   - **OpenEMS:** Earnie liest die Messwerte selbst aus den OpenEMS-Kanälen über den OpenEMS-Adapter (REST-API). Ein Push vom Hub an Earnie ist dafür nicht nötig. Details: [OpenEMS-Lab](../einrichtung/openems-lab.md).
+5. **Schreiben einrichten:**
+   - **Loxone / Home Assistant:** Earnie veröffentlicht Sollwerte und Freigaben (`set_*`) in `status.json`. Das Smarthome-Backend ruft sie im selben Takt ab und setzt sie auf die Geräte um (Loxone Virtual Inputs bzw. HA-Automationen). Schaltlogik und Schutzfunktionen bleiben dabei im Smarthome-Backend.
+   - **OpenEMS:** Earnie schreibt die Sollwerte über denselben Adapter direkt in die OpenEMS-Kanäle (z. B. ESS-Sollleistung). Ein Abruf von `status.json` durch den Hub entfällt. Lab-Pfad: [OpenEMS-Lab](../einrichtung/openems-lab.md).
+6. **Lesen OK:** In **Live-Lesen** zeigen alle Pflichtwerte den Status **OK**. **Kein Mapping** bedeutet, dass das Signal nicht aktiviert ist, und nicht, dass der Wert 0 ist. Die Spalte **Match** der Signalliste zeigt, wann ein Wert zuletzt eingetroffen ist (bei Push-Backends) bzw. wann der Adapter zuletzt gelesen hat.
+7. **Schreiben OK:** Der **Schreibtest** unter **Live-Schreiben** sendet einzelne Sollwerte gezielt, die Reaktion der Anlage lässt sich so direkt kontrollieren. Er ist nur bei ausgeschaltetem Silent-Modus nutzbar und fragt vor jedem Schreiben nach. Bei Loxone und Home Assistant zeigt die Spalte **Match** für Schreibsignale, wann das Smarthome-Backend `status.json` zuletzt abgerufen hat.
+8. **Monitor plausibel:** Den Optimierer-Dienst zunächst im Silent-Modus laufen lassen und Plan und Ist-Werte im [Monitor](#monitor) vergleichen. Passt beides, auf **Loud** umschalten.
+
+#### Silent / Loud und Abwesenheitsmodus
+
+- **Silent / Loud:** Der Umschalter liegt auf der Seite [Optimierer-Dienst](#optimierer-dienst) (gespeichert in `runtime/local_settings.json`). Sollwerte erreichen das Smarthome-Backend nur im Loud-Modus und bei laufendem Dienst.
 - **Abwesenheitsmodus:** Das Signal ist das EHAL-Feld `sens_absent_mode` in `plant.ehal_bindings` (Loxone-Standardmerker `Earnie_Abwesend`, sonst HA-Entity bzw. OpenEMS `component/Channel`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
 
-Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md). Bei Loxone optional zusätzlich: `python -m scripts.verify_loxone_setup`.
+#### Backend-spezifische Details
+
+- **Loxone:** [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md). Optional und **nur Loxone:** Loxone-Import auf **Smarthome-Backend** (siehe Hinweis unter [Vorbereitung](#vorbereitung-der-smarthome-konfiguration)); zusätzlich `python -m scripts.verify_loxone_setup`.
+- **Home Assistant:** [Home Assistant + evcc](../einrichtung/ha-evcc.md)
+- **OpenEMS:** [OpenEMS-Lab](../einrichtung/openems-lab.md)
+- **Alle Backends:** Signalnamen, Feldlisten und vollständige Checkliste unter [EHAL-Com](../ui/ehal-com.md).
 
 ---
 
@@ -385,23 +421,7 @@ Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md). Bei Loxone optional zus
 
 Im Produktivbetrieb läuft der Optimierer dauerhaft: unter Docker gemeinsam mit der Oberfläche, lokal über `python main.py`. Er rechnet im **15-Minuten-Takt** (oder sofort, wenn das Smarthome-Backend eine Optimierung anfordert) und plant in **Viertelstunden-Slots**.
 
-Die Seite **Daemon Control → Optimierer-Dienst** enthält:
-
-- Start, Stopp und Neustart des Dienstes,
-- den Umschalter **Silent / Loud**,
-- das Dienst-Log (`earnie.log`) mit Level-Filter (Standard: INFO und höher), automatischer Aktualisierung alle 10 Sekunden und der Schaltfläche **Gehe nach Oben**.
-
-Details: [Betrieb](../einrichtung/betrieb.md)
-
-### Nutzungsstatistik (optional)
-
-Beim ersten Öffnen des Szenario-Explorers fragt Earnie, ob es anonym melden darf, dass diese Installation aktiv ist (Versionszähler). Fehlt der Szenario-Explorer in den UI-Modi, erscheint die Frage im Szenarienkonfigurator. So sehen wir, wie viele Installationen tatsächlich in Betrieb sind. Wenn Sie zustimmen, unterstützen Sie damit die Weiterentwicklung – ganz ohne Aufwand.
-
-- **Was gesendet wird:** keine Preise, Orte, Gerätenamen oder Konfigurationsinhalte. Im Live-Betrieb kommt nur die Summe der **Earnie-Points** hinzu – eine grobe Kennzahl für die Größe der Anlage, die unter **Optimierer-Dienst** mit Aufschlüsselung angezeigt wird.
-- **Freiwillig:** Die Zustimmung ist jederzeit widerrufbar und hat keinen Einfluss auf die Optimierung.
-- **Einstellung:** Unter **Optimierer-Dienst** lässt sich die Zustimmung umschalten; **Was wird gesendet?** zeigt die exakte Feldliste.
-
-Details, Berechnungsregel der Earnie-Points und Abschalten: [Betrieb – Nutzungsstatistik](../einrichtung/betrieb.md#nutzungsstatistik)
+Die Abschnitte folgen der Navigation: zuerst die Seiten unter **Live-Cockpit** (Monitor, Manuelle Geräte, Analyse Verbrauch & Kosten), danach der Optimierer-Dienst unter **Daemon Control**.
 
 ### Monitor
 
@@ -426,8 +446,6 @@ Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der R
 - **Start-Empfehlung:** Sterne und optional ein Tagesplan. Geplante Läufe erscheinen in Chart 1.
 - **Energiereserve:** Status der Powerstation und Trigger.
 
-
-
 ### Analyse Verbrauch & Kosten
 
 Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Sie wertet das Produktiv-Log aus:
@@ -439,6 +457,16 @@ Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Be
 
 Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 
+### Optimierer-Dienst
+
+Die Seite **Daemon Control → Optimierer-Dienst** steuert den Dienst, der im Hintergrund die Anlage regelt:
+
+- **Dienst:** Start, Stopp und Neustart.
+- **Silent / Loud:** Im Silent-Modus schreibt der Dienst keine Sollwerte an das Smarthome-Backend, im Loud-Modus schon (siehe [EHAL-Com](#ehal-com)).
+- **Dienst-Log:** `earnie.log` mit Level-Filter (Standard: INFO und höher), automatischer Aktualisierung alle 10 Sekunden und der Schaltfläche **Gehe nach Oben**.
+
+Details: [Betrieb](../einrichtung/betrieb.md)
+
 ---
 
 
@@ -449,7 +477,7 @@ Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 2. **Hauskonfigurator:** Profil, Wärme, Auto, Pool, Geräte, PV und Batterie anlegen.
 3. **Szenarienkonfigurator:** Live-Szenario und Vergleichsvarianten bilden.
 4. **Szenario-Explorer:** Verbrauch prüfen, Rechnung starten, Ergebnisse bewerten.
-5. **Smarthome-Backend:** Backend wählen und Zugang speichern ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach das Mapping auf **EHAL-Com** prüfen.
+5. **Smarthome-Backend:** Backend wählen und Zugang speichern ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)). Danach auf **EHAL-Com** die Vorlagen aus der Signalliste exportieren, Lesen und Schreiben im Smarthome-Backend einrichten und die Verbindung prüfen ([EHAL-Com](#ehal-com)).
 6. Live-Szenario und EHAL-Com prüfen, dann auf **Optimierer-Dienst** von Silent auf Loud umschalten.
 7. Den Dienst dauerhaft laufen lassen, den Monitor beobachten und nachjustieren.
 

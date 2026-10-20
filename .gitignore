@@ -96,3 +96,5 @@ modbus-test.py
 modbus_scan.py
 # Local shadow runtime (full tree)
 earnie_shadow/
+# Local shadow-feed JSONL dumps under backtesting fixtures (live writer; not golden data)
+tests/fixtures/backtesting/shadow_feed/
