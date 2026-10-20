@@ -50,7 +50,6 @@ Im Hintergrund steuert allein der **Optimierer-Dienst** die Anlage. Die Web-Ober
 
 Earnie ist unabhängig von Energieversorger und Systemlieferant.
 
-
 ### Support
 
 - **Kontakt in der App:** In der Sidebar unter **Info / About** Art, Thema und Beschreibung eintragen, dann **GitHub-Issue öffnen**. Issues sind öffentlich, daher gehören keine Zugangsdaten oder andere Geheimnisse hinein. Optional stellt **Informationen in ZIP sammeln** eine ZIP zusammen, die lokal bleibt.
@@ -89,7 +88,7 @@ Details: [Container](../einrichtung/container.md) · [VMware](../einrichtung/vmw
 
 Nach dem ersten Start öffnet Earnie die Seite **Smarthome-Backend** (unter **Daemon Control**). Dort wird das Backend gewählt und verbunden; **Optimierer-Dienst** und **EHAL-Com** sind erst danach freigeschaltet. Weitere Seiten wie Monitor oder Szenario-Explorer erscheinen, sobald die Einrichtung weit genug ist.
 
-<!-- In this chapter the possibilities for Loxone Loxberry Plugin or HA Earnie Addon should be mentioned with reference to the right docs -->
+
 
 ---
 
@@ -194,6 +193,10 @@ Waschmaschine, Trockner, Geschirrspüler und ähnliche Geräte sind **generische
 
 Anzugeben sind Leistung und typische Laufzeit. Optional lässt sich später ein Loxone-Leistungsmerker zuordnen – für die Ist-Anzeige und zur Kontrolle.
 
+Wechselrichter werden im Tab **Wechselrichter** gepflegt (Typ, AC-Anschluss netzgekoppelt oder Insel, optionale Leistungsgrenzen). **Insel** bedeutet hier: Der Wechselrichter versorgt nur angeschlossene Verbraucher, nicht den AC-Bus des Hauses. Sein AC-Eingang kann trotzdem am Netz hängen – „Insel“ heißt also nicht „netzlos“. Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
+
+
+
 #### PV-Anlagen
 
 Im Komponenten-Katalog unter PV-Anlagen:
@@ -216,8 +219,6 @@ Relevante Parameter:
 - **Wechselrichter:** der zugeordnete Wechselrichter (Hausbatterie) bzw. der integrierte Wechselrichter einer physischen Powerstation.
 - **Verschleißkosten (optional):** Damit bewertet Earnie viele Ladezyklen wirtschaftlich.
 
-Wechselrichter werden im Tab **Wechselrichter** gepflegt (Typ, AC-Anschluss netzgekoppelt oder Insel, optionale Leistungsgrenzen). **Insel** bedeutet hier: Der Wechselrichter versorgt nur angeschlossene Verbraucher, nicht den AC-Bus des Hauses. Sein AC-Eingang kann trotzdem am Netz hängen – „Insel“ heißt also nicht „netzlos“. Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
-
 Im Live-Betrieb gibt Earnie Ziel-SoC sowie Lade- und Entlade-Sollwerte über das Smarthome-System vor. Die eigentliche Wechselrichter-Logik bleibt in der Hausautomation bzw. im Wechselrichter.
 
 ### Szenarienkonfigurator
@@ -237,7 +238,7 @@ Typische Vergleiche:
 - Fixpreis gegenüber Spot-Tarif
 - ohne Batterie, aber mit PV, oder verschiedene Batteriegrößen
 
-**Live-Szenario:** Das Live-Szenario (meist ID `live`) ist die Basis für den späteren Produktivbetrieb. Alle weiteren Szenarien dienen nur der Analyse im Szenario-Explorer.
+**Live-Szenario:** Das Live-Szenario (ID `live`) ist die Basis für den späteren Produktivbetrieb. Alle weiteren Szenarien dienen nur der Analyse im Szenario-Explorer.
 
 **Auswahl und Reihenfolge:** Die Szenarien stehen in einer Liste. Mit ↑/↓ rechts daneben lässt sich die Reihenfolge der weiteren Szenarien ändern (das Live-Szenario bleibt oben). In dieser Reihenfolge erscheinen sie später in Listen und Kostenvergleichen – das dient nur der Übersicht.
 
@@ -248,9 +249,9 @@ Typische Vergleiche:
 
 **Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
-- Nach der Auswahl aus dem Katalog zeigt der Editor dessen **Katalogparameter** (nur lesend). Diese Werte prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
+- Nach der Auswahl aus dem Katalog zeigt der Editor dessen **Katalogparameter** (nur lesend). Bitte diese Werte auf Richtigkeit prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
 - **Monatliche Fixkosten** (Grundpreis des Lieferanten, optional Netz-, Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
-- Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
+- Der volumetrische **Netznutzung-Arbeitspreis** wird im Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
 - Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
 
 Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) · Technik: [Preise und Marktdaten](../konfiguration/preise.md)
@@ -295,7 +296,7 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 
 > **Rechenzeit:** Earnie startet für jedes Szenario einen eigenen Prozess auf einem eigenen Prozessorkern. Auf Rechnern mit wenigen Kernen dauert die Rechnung entsprechend länger. Den Szenario-Explorer daher besser nicht auf der Hardware ausführen, die später den Live-Betrieb übernimmt.
 
-**Was rechnet die Zeile Historisch?** Die zuvor erzeugte Last mit den Tarifen des Live-Szenarios, **ohne** PV und **ohne** Batterie. Weitere Referenzen ohne Optimierung entstehen per Heuristik bzw. über die Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag des jeweiligen Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante, nicht zur Zeile Historisch.
+**Was rechnet die Zeile "Historisch"?** Die zuvor erzeugte Last mit den Tarifen des Live-Szenarios, **ohne** PV und **ohne** Batterie. Weitere Referenzen ohne Optimierung entstehen per Heuristik bzw. über die Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag des jeweiligen Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante, nicht zur Zeile Historisch.
 
 #### Ergebnisse des Szenario-Explorers
 
@@ -310,9 +311,6 @@ Die Ergebnisse sind eine **Entscheidungsgrundlage** für Investition und Tarifwa
 
 Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Leistungspreis und netzgebietsspezifische Tabellen sind nicht berücksichtigt.
 
-
-
-
 ##### Gesamtkosten und -Verbrauch: Jahres Verbrauch [kWh]
 
 Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zeitreihe. Das ist die Reihe, aus der Earnie auch Kosten, Bezug und Einspeisung berechnet. Jeder Zeitslot zählt dabei einmal. Die Fake-Jahresrechnungen zeigen unter „Verbrauch (Info)“ denselben Wert.
@@ -326,8 +324,6 @@ Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zei
 
 
 Die Spalte **Speicher-Standby** zeigt den Eigenverbrauch der Hausbatterie (`standby_power_kw`). Er erhöht Bezug und Kosten der optimierten Szenarien, zählt aber nicht als Hausverbrauch. Der Pool-Filter zählt bei optimierten Szenarien mit seinem nativen Laufzeitfenster als feste Last, so wie in den Referenzen.
-
-
 
 **Warum weicht Historisch beim Jahresverbrauch ab?**
 
@@ -348,15 +344,16 @@ Technische Details: [Betriebsmodi – Szenario-Explorer](../ui/betriebsmodi.md#g
 
 ## Verbindung zu Smarthome
 
-Überzeugt die Was-wäre-wenn-Analyse, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die eigentliche Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend.
+Überzeugt die Was-wäre-wenn-Analyse, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die eigentliche Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend - auch aus Sicherheitsgründen oder bei Ausfall von Earnie.
 
 Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt. Welches Backend zur Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Für Loxone gibt es zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
 
 ### Vorbereitung der Smarthome-Konfiguration
 
-1. **Benutzer bzw. Token** am Smarthome-Backend anlegen – mit Rechten zum Lesen und Schreiben der benötigten IOs bzw. Entities.
+1. **Gegebenenfalls Benutzer bzw. Token** am Smarthome-Backend anlegen – mit Rechten zum Lesen und Schreiben der benötigten IOs bzw. Entities.
 2. **Signale** anlegen bzw. zuordnen, u. a. Batterie-SoC und -Leistung, PV, Netz, Freigaben und E-Auto-Status. Beispielnamen für Loxone: [Loxone-Signale](../referenz/loxone-signals.md).
 3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** die Merker bzw. HA-Entities den EHAL-Feldern zuweisen. Bei Loxone empfiehlt sich zuerst der **Loxone-Import** auf der Seite **Smarthome-Backend**, danach die Prüfung des Mappings (Konfigurationsschlüssel: `plant.ehal_bindings`, `batteries[].ehal_bindings`, `consumers[].ehal_bindings`).
+<!-- 2. and 3. are not up-to-date. The better approach now is to configure the house - then export the Templates / YAML-Files etc on EHAL-Com page - then create reading and writing on Smarthome-Backend - then check for correctness in EHAL-Com / please modify accordingl -->
 4. **Jahres-Leistungsprofile (optional):** per CSV-Upload hinterlegen ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Die Offline-Daten für den Szenario-Explorer liegen danach in `cons_data.csv`.
 
 Earnie liest Werte im Live-Betrieb oft als Text mit Einheit (z. B. `3.5 kW`); die Einheit wird dabei ignoriert.
