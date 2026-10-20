@@ -137,7 +137,7 @@ Nach dem Update kann Earnie den **Migrations-Assistenten** zeigen (Form des Conf
 
 **Nie beide gleichzeitig laufen lassen**, denn beide würden dieselben Geräte steuern. Beim Start prüft jedes Add-on über die Supervisor-API, ob das andere bereits läuft, und bricht in diesem Fall ab.
 
-Unterschied zum LoxBerry-Plugin: Dort wird der Kanal in der Plugin-UI gewählt (`:latest` / `:next` / fest). Beim HA-Add-on bestimmt das installierte Add-on den Kanal.
+Unterschied zum LoxBerry-Plugin: Dort wird die Versionsvariante in der Plugin-UI gewählt (`:latest` / `:next` / fest). Beim HA-Add-on bestimmt das installierte Add-on den Kanal (`earnie` / `earnie_prerelease`).
 
 ## Einschränkungen
 

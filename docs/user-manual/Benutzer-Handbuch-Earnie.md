@@ -17,15 +17,18 @@ Am meisten bringt Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar), deren
 
 - aktuelle Strompreise (und eine Prognose, falls die Börse noch keine Preise veröffentlicht hat),
 - die PV-Ertragsprognose aus dem Wetter am Standort,
+- Ggf. Heizbedarf für Haus oder Pool in Abhängigkeit von der aktuellen Wettervorhersage am Standort,
 - Ladezustand und Grenzen des Batteriespeichers,
 - steuerbare Verbraucher wie E-Auto, Wärmepumpe, Pool und Haushaltsgeräte.
 
 Earnie lässt sich auf zwei Arten nutzen:
 
-| Nutzung | Zweck |
-| ------- | ----- |
-| **Was-wäre-wenn (ohne Smarthome)** | Haus und Varianten konfigurieren und einen Jahresvergleich rechnen – z. B. ob sich ein Speicher, eine größere PV-Anlage oder ein Spot-Tarif lohnt. |
-| **Live-Betrieb (mit Smarthome)** | Dauerhaft optimieren und Sollwerte an Loxone, Home Assistant (+ evcc) oder OpenEMS (Lab) schreiben. Der Monitor zeigt Plan und Ist-Werte. |
+
+| Nutzung                                    | Zweck                                                                                                                                              |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Was-wäre-wenn (kein Smarthome nötig)**   | Haus und Varianten konfigurieren und einen Jahresvergleich rechnen – z. B. ob sich ein Speicher, eine größere PV-Anlage oder ein Spot-Tarif lohnt. |
+| **Live-Betrieb (Gekoppelt mit Smarthome)** | Dauerhaft optimieren und Sollwerte an das Smarthome-Backend schreiben. Der Monitor zeigt Plan und Ist-Werte.                                       |
+
 
 Im Hintergrund steuert allein der **Optimierer-Dienst** die Anlage. Die Web-Oberfläche (Streamlit) dient als Cockpit für Anzeige, Konfiguration und Analyse. Dort lässt sich der Optimierer-Dienst auch starten, stoppen und neu starten.
 
@@ -47,60 +50,6 @@ Im Hintergrund steuert allein der **Optimierer-Dienst** die Anlage. Die Web-Ober
 
 Earnie ist unabhängig von Energieversorger und Systemlieferant.
 
-### Lizenzbedingungen
-
-Earnie ist **Source-Available** und für die **private, nicht-kommerzielle Nutzung** in Privathaushalten vorgesehen. Kommerzielle Nutzung, Weiterverkauf und SaaS-Angebote sind nur mit schriftlicher Zustimmung erlaubt.
-
-Die Software wird „wie besehen“ bereitgestellt. Eingriffe in Speicher und Großverbraucher erfolgen auf eigenes Risiko.
-
-Für alle, die Konfiguration und Wartung nicht selbst übernehmen möchten, sind kommerzielle Angebote geplant.
-
-Vollständige Bedingungen: [LICENSE.md](../../LICENSE.md).
-
-### Banner der Wahrheit
-
-Ein kurzes Attributions-Banner kennzeichnet Earnie und seine Nutzungsbedingungen: Name, Hinweis auf die nicht-kommerzielle Nutzung, Link zum offiziellen Repository und Version. Es erscheint in der Sidebar unter **Info / About** (unten) und zusätzlich am unteren Ende des Hauptbereichs.
-
-Bei erkennbar inoffiziellen oder veränderten Builds (z. B. abweichende Git-Remote) kann zusätzlich ein Warnhinweis erscheinen. Das Banner ist bewusst gut sichtbar.
-
-Unter **Info / About** stehen außerdem der vollständige **Hardware-Fingerprint** (kopierbar) und der Registry-Status (`unbound`, `valid` bzw. gebunden, `mismatch` oder `invalid_sig`). Die Registry ist optional und blockiert den Start nicht.
-
-### Hardware-Registry (`earnie_registry.json`)
-
-Die Datei `earnie_registry.json` bindet eine Earnie-Installation einmalig an ihren Hardware-Fingerprint (Host und optional Smarthome-IDs). Ohne diese Datei bleibt die private Nutzung möglich; der Status lautet dann `unbound`.
-
-Die signierte Datei lässt sich **nicht selbst erzeugen**. Earnie berechnet nur den Fingerprint, die Datei stellt das Earnie-Projekt aus (derzeit per E-Mail, später ggf. über ein Cloud-Portal). Offizielle Images prüfen die Signatur mit einem öffentlichen Schlüssel; der private Schlüssel bleibt beim Aussteller.
-
-**Datei anfordern:**
-
-1. Earnie starten (Docker oder lokal).
-2. In der Sidebar **Info / About** öffnen und den vollständigen, 64-stelligen **Hardware-Fingerprint** kopieren (Anzeige als Code-Block).
-3. Alternativ auf dem Host (Projektwurzel, mit Python-Umgebung):
-   ```text
-   python -m scripts.print_hardware_fingerprint
-   ```
-   Die Ausgabe enthält `fingerprint=` (vollständig) und `fingerprint_display=` (Kurzform).
-4. Über **Info / About → Registry per E-Mail anfordern** an `support@earnie-hems.com` senden. Betreff („Earnie Registry“), Fingerprint und Datenschutzhinweis sind im Mailtext bereits enthalten.
-   - Die Speicherung der Absenderadresse für Supportzwecke ist standardmäßig aus (**Nein**, DSGVO); bei Bedarf auf **Ja** stellen.
-   - Optional die Kontakt-ZIP über **Privater Support** anhängen – nicht in öffentlichen GitHub-Issues.
-5. Die Antwort enthält die Datei `earnie_registry.json`.
-6. Datei ablegen:
-
-   | Installation | Ablageort |
-   | ------------ | --------- |
-   | Docker / typisch | `earnie_env/runtime/earnie_registry.json` |
-   | eigener Runtime-Pfad | Ordner aus `EARNIE_RUNTIME_PATH` bzw. `…/runtime/` |
-   | abweichender Pfad | Umgebungsvariable `EARNIE_REGISTRY_PATH` auf die Datei setzen |
-
-7. Oberfläche neu laden und unter **Info / About** prüfen. Die Registry sollte als `valid` erscheinen.
-   - **mismatch:** Fingerprint und Datei passen nicht mehr zusammen (z. B. anderer Host) – neuen Fingerprint senden und die Datei neu anfordern.
-   - **invalid_sig:** Die Datei ist beschädigt oder nicht gültig signiert – neu anfordern.
-
-   In beiden Fällen startet Earnie trotzdem (weiche Prüfung).
-
-**Inhalt der Datei (kurz):** Fingerprint, Ausstellungszeit, optional ein Ablaufdatum, Aussteller und eine Ed25519-Signatur. Eine selbst gebaute Datei ohne passende Signatur ist ungültig (`invalid_sig`).
-
-Technische Details zum Prüfverfahren: [Hardware-Registry (Layer C)](../workflow/hardware-registry-layer-c.md).
 
 ### Support
 
@@ -115,15 +64,19 @@ Einen vertraglichen Herstellersupport gibt es derzeit nicht. Umso mehr freuen wi
 
 ---
 
+
+
 ## Installation
 
 Die typischen Wege im Überblick:
 
-| Weg | Für wen | Hinweis |
-| --- | ------- | ------- |
+
+| Weg                                             | Für wen                                                      | Hinweis                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | **Docker (empfohlen für den Produktivbetrieb)** | Synology NAS, LoxBerry, Proxmox LXC, PC (auch VMware `vctl`) | Persistente Ordner `earnie_env/config/` und `earnie_env/runtime/` außerhalb des Images |
-| **Greenfield / Ersteinrichtung** | erste Was-wäre-wenn-Tests auf dem eigenen Rechner | eigener Stack, oft Port **8502** – getrennt vom Produktivsystem |
-| **Lokal ohne Container** | Entwicklung, Tests | siehe [DEVELOPER.md](../../DEVELOPER.md) |
+| **Greenfield / Ersteinrichtung**                | erste Was-wäre-wenn-Tests auf dem eigenen Rechner            | eigener Stack, oft Port **8502** – getrennt vom Produktivsystem                        |
+| **Lokal ohne Container**                        | Entwicklung, Tests                                           | siehe [DEVELOPER.md](../../DEVELOPER.md)                                               |
+
 
 **Typischer Ablauf mit Docker:**
 
@@ -132,11 +85,13 @@ Die typischen Wege im Überblick:
 3. Oberfläche im Browser öffnen (im Produktivbetrieb meist Port **8501**, siehe [Streamlit-Ports](../dev/streamlit-ports.md)).
 4. Für den späteren Live-Betrieb: auf der Seite **Smarthome-Backend** das Backend wählen und den Zugang hinterlegen ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)). Danach mit dem Hauskonfigurator weitermachen.
 
-Details: [Container](../einrichtung/container.md) · [VMware `vctl` (Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md)
+Details: [Container](../einrichtung/container.md) · [VMware](../einrichtung/vmware-vctl.md) `vctl` [(Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md)
 
 Nach dem ersten Start öffnet Earnie die Seite **Smarthome-Backend** (unter **Daemon Control**). Dort wird das Backend gewählt und verbunden; **Optimierer-Dienst** und **EHAL-Com** sind erst danach freigeschaltet. Weitere Seiten wie Monitor oder Szenario-Explorer erscheinen, sobald die Einrichtung weit genug ist.
 
 ---
+
+
 
 ## Erste Einrichtung (für die Was-wäre-wenn-Analyse)
 
@@ -150,6 +105,8 @@ Empfohlene Reihenfolge:
 4. **Szenario-Explorer:** Verbrauch erzeugen, Rechnung starten, Ergebnisse auswerten.
 
 > **Hinweis:** Ein eigenes Szenario ohne PV und Batterie ist nicht nötig. Diese Referenz berechnet Earnie automatisch (Zeile **Historisch** im Szenario-Explorer).
+
+
 
 ### Hauskonfigurator
 
@@ -219,15 +176,19 @@ Für die Was-wäre-wenn-Analyse reichen Volumen, Solltemperatur und Filterstunde
 
 > **Hinweis:** Pools haben meist keine standardisierte Schnittstelle zum Smarthome. Die Anbindung erfordert daher Eigenleistung oder – durch einen Fachbetrieb – erhöhten Aufwand. Das Einsparpotenzial ist allerdings hoch.
 
+
+
 #### Allgemeine Verbraucher
 
 Waschmaschine, Trockner, Geschirrspüler und ähnliche Geräte sind **generische** Verbraucher. Earnie kennt drei Rollen:
 
-| Rolle | Bedeutung |
-| ----- | --------- |
-| **Bekannt** (`known`) | Feste oder geplante Laufzeiten fließen in die Grundlast ein. Earnie verschiebt sie nicht, berücksichtigt sie aber bei der Optimierung. |
-| **Flexibel** (`flex`) | Earnie darf den Start innerhalb des erlaubten Zeitfensters verschieben. |
+
+| Rolle                  | Bedeutung                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bekannt** (`known`)  | Feste oder geplante Laufzeiten fließen in die Grundlast ein. Earnie verschiebt sie nicht, berücksichtigt sie aber bei der Optimierung.                                                                                                                                                                                                         |
+| **Flexibel** (`flex`)  | Earnie darf den Start innerhalb des erlaubten Zeitfensters verschieben.                                                                                                                                                                                                                                                                        |
 | **Manuell** (`manual`) | Erscheint auf der Seite *Manuelle Geräte* – entweder mit **Start-Empfehlung** (Sterne) oder als **Energiereserve** (Powerstation). Die Wahl erfolgt im Hauskonfigurator, beides zugleich ist nicht möglich. Bei der Start-Empfehlung rechnen Live-Optimierung und Szenario-Explorer die typische Zeitplan-Last trotzdem wie bei *bekannt* mit. |
+
 
 Anzugeben sind Leistung und typische Laufzeit. Optional lässt sich später ein Loxone-Leistungsmerker zuordnen – für die Ist-Anzeige und zur Kontrolle.
 
@@ -347,22 +308,24 @@ Die Ergebnisse sind eine **Entscheidungsgrundlage** für Investition und Tarifwa
 
 Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Leistungspreis und netzgebietsspezifische Tabellen sind nicht berücksichtigt.
 
-<a id="gesamtkosten-und-verbrauch-jahres-verbrauch-kwh"></a>
-<a id="gesamtkosten-jahres-verbrauch-kwh"></a>
+
+
 
 ##### Gesamtkosten und -Verbrauch: Jahres Verbrauch [kWh]
 
 Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zeitreihe. Das ist die Reihe, aus der Earnie auch Kosten, Bezug und Einspeisung berechnet. Jeder Zeitslot zählt dabei einmal. Die Fake-Jahresrechnungen zeigen unter „Verbrauch (Info)“ denselben Wert.
 
-| Zeilentyp | Was die Spalte zählt |
-| --------- | -------------------- |
-| **Historisch** (ohne Optimierung, …) | Last des Live-Hausprofils ohne PV und Batterie über dieselben Zeitfenster wie die Optimierung |
-| **Referenz** (…) ohne Optimierung | Last des Hausprofils des Szenarios über dieselben Zeitfenster wie die Optimierung |
-| **Optimiertes Szenario** | Gebuchte Last aus Grundlast und flexiblen Verbrauchern nach der Optimierung, ohne Speicher-Standby |
+
+| Zeilentyp                            | Was die Spalte zählt                                                                               |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| **Historisch** (ohne Optimierung, …) | Last des Live-Hausprofils ohne PV und Batterie über dieselben Zeitfenster wie die Optimierung      |
+| **Referenz** (…) ohne Optimierung    | Last des Hausprofils des Szenarios über dieselben Zeitfenster wie die Optimierung                  |
+| **Optimiertes Szenario**             | Gebuchte Last aus Grundlast und flexiblen Verbrauchern nach der Optimierung, ohne Speicher-Standby |
+
 
 Die Spalte **Speicher-Standby** zeigt den Eigenverbrauch der Hausbatterie (`standby_power_kw`). Er erhöht Bezug und Kosten der optimierten Szenarien, zählt aber nicht als Hausverbrauch. Der Pool-Filter zählt bei optimierten Szenarien mit seinem nativen Laufzeitfenster als feste Last, so wie in den Referenzen.
 
-<a id="warum-weicht-historisch-beim-jahresverbrauch-ab"></a>
+
 
 **Warum weicht Historisch beim Jahresverbrauch ab?**
 
@@ -378,6 +341,8 @@ Weicht der Jahresverbrauch einer Zeile um **mehr als 5 %** von der Live-Referenz
 Technische Details: [Betriebsmodi – Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch) · [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)
 
 ---
+
+
 
 ## Verbindung zu Smarthome
 
@@ -414,6 +379,8 @@ Die Seite **Daemon Control → EHAL-Com** bündelt Live-Lesen und -Schreiben, di
 Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md). Bei Loxone optional zusätzlich: `python -m scripts.verify_loxone_setup`.
 
 ---
+
+
 
 ## Live-Betrieb
 
@@ -460,7 +427,7 @@ Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der R
 - **Start-Empfehlung:** Sterne und optional ein Tagesplan. Geplante Läufe erscheinen in Chart 1.
 - **Energiereserve:** Status der Powerstation und Trigger.
 
-<a id="analyse-verbrauch-kosten"></a>
+
 
 ### Analyse Verbrauch & Kosten
 
@@ -475,7 +442,7 @@ Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 
 ---
 
-<a id="kurz-checkliste-vom-initial-zustand-zum-go-live"></a>
+
 
 ## Kurz-Checkliste: vom ersten Start zum Go-Live
 
@@ -488,3 +455,57 @@ Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 7. Den Dienst dauerhaft laufen lassen, den Monitor beobachten und nachjustieren.
 
 Bei Fragen helfen die [Anwender-Dokumentation](../README.md) und die Hover-Hilfe zu `config.json` im Code-Editor (Schema). Bleibt etwas unklar, melden Sie sich gerne über die [Support-Kanäle](#support).
+
+### Lizenzbedingungen
+
+Earnie ist **Source-Available** und für die **private, nicht-kommerzielle Nutzung** in Privathaushalten vorgesehen. Kommerzielle Nutzung, Weiterverkauf und SaaS-Angebote sind nur mit schriftlicher Zustimmung erlaubt.
+
+Die Software wird „wie besehen“ bereitgestellt. Eingriffe in Speicher und Großverbraucher erfolgen auf eigenes Risiko.
+
+Für alle, die Konfiguration und Wartung nicht selbst übernehmen möchten, sind kommerzielle Angebote geplant.
+
+Vollständige Bedingungen: [LICENSE.md](../../LICENSE.md).
+
+### Banner der Wahrheit
+
+Ein kurzes Attributions-Banner kennzeichnet Earnie und seine Nutzungsbedingungen: Name, Hinweis auf die nicht-kommerzielle Nutzung, Link zum offiziellen Repository und Version. Es erscheint in der Sidebar unter **Info / About** (unten) und zusätzlich am unteren Ende des Hauptbereichs.
+
+Bei erkennbar inoffiziellen oder veränderten Builds (z. B. abweichende Git-Remote) kann zusätzlich ein Warnhinweis erscheinen. Das Banner ist bewusst gut sichtbar.
+
+Unter **Info / About** stehen außerdem der vollständige **Hardware-Fingerprint** (kopierbar) und der Registry-Status (`unbound`, `valid` bzw. gebunden, `mismatch` oder `invalid_sig`). Die Registry ist optional und blockiert den Start nicht.
+
+### Hardware-Registry (`earnie_registry.json`)
+
+Die Datei `earnie_registry.json` bindet eine Earnie-Installation einmalig an ihren Hardware-Fingerprint (Host und optional Smarthome-IDs). Ohne diese Datei bleibt die private Nutzung möglich; der Status lautet dann `unbound`.
+
+Die signierte Datei lässt sich **nicht selbst erzeugen**. Earnie berechnet nur den Fingerprint, die Datei stellt das Earnie-Projekt aus (derzeit per E-Mail, später ggf. über ein Cloud-Portal). Offizielle Images prüfen die Signatur mit einem öffentlichen Schlüssel; der private Schlüssel bleibt beim Aussteller.
+
+**Datei anfordern:**
+
+1. Earnie starten (Docker oder lokal).
+2. In der Sidebar **Info / About** öffnen und den vollständigen, 64-stelligen **Hardware-Fingerprint** kopieren (Anzeige als Code-Block).
+3. Alternativ auf dem Host (Projektwurzel, mit Python-Umgebung):
+  ```text
+   python -m scripts.print_hardware_fingerprint
+  ```
+   Die Ausgabe enthält `fingerprint=` (vollständig) und `fingerprint_display=` (Kurzform).
+4. Über **Info / About → Registry per E-Mail anfordern** an `support@earnie-hems.com` senden. Betreff („Earnie Registry“), Fingerprint und Datenschutzhinweis sind im Mailtext bereits enthalten.
+  - Die Speicherung der Absenderadresse für Supportzwecke ist standardmäßig aus (**Nein**, DSGVO); bei Bedarf auf **Ja** stellen.
+  - Optional die Kontakt-ZIP über **Privater Support** anhängen – nicht in öffentlichen GitHub-Issues.
+5. Die Antwort enthält die Datei `earnie_registry.json`.
+6. Datei ablegen:
+
+  | Installation         | Ablageort                                                     |
+  | -------------------- | ------------------------------------------------------------- |
+  | Docker / typisch     | `earnie_env/runtime/earnie_registry.json`                     |
+  | eigener Runtime-Pfad | Ordner aus `EARNIE_RUNTIME_PATH` bzw. `…/runtime/`            |
+  | abweichender Pfad    | Umgebungsvariable `EARNIE_REGISTRY_PATH` auf die Datei setzen |
+
+7. Oberfläche neu laden und unter **Info / About** prüfen. Die Registry sollte als `valid` erscheinen.
+  - **mismatch:** Fingerprint und Datei passen nicht mehr zusammen (z. B. anderer Host) – neuen Fingerprint senden und die Datei neu anfordern.
+  - **invalid_sig:** Die Datei ist beschädigt oder nicht gültig signiert – neu anfordern.
+   In beiden Fällen startet Earnie trotzdem (weiche Prüfung).
+
+**Inhalt der Datei (kurz):** Fingerprint, Ausstellungszeit, optional ein Ablaufdatum, Aussteller und eine Ed25519-Signatur. Eine selbst gebaute Datei ohne passende Signatur ist ungültig (`invalid_sig`).
+
+Technische Details zum Prüfverfahren: [Hardware-Registry (Layer C)](../workflow/hardware-registry-layer-c.md).

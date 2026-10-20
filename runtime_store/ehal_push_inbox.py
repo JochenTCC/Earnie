@@ -9,8 +9,7 @@ Streamlit UI (separate process) and is flushed at most once per second
 
 Canonical file: ``runtime/ehal_push_inbox.json`` (legacy alias
 ``loxone_push_inbox.json`` is still loaded). A push command (repeated, default
-10 s) calls ``GET /ehal/telemetry/<EHAL-ID>/<value>`` (alias
-``/ehal/loxone/telemetry/…``); the EHAL ID travels in the path.
+10 s) calls ``GET /ehal/telemetry/<EHAL-ID>/<value>``; the EHAL ID travels in the path.
 """
 from __future__ import annotations
 

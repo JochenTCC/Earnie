@@ -128,7 +128,7 @@ Virtual-Out-Adresse für **Status / Request Optimize**:
 
 Auch Telemetrie-VOs (`VO_Earnie_*` außer `Status`) zielen auf den Daemon-Port **8541**. Der Telemetrie-Push arbeitet so:
 
-- **Empfänger:** `/ehal/telemetry/<EHAL-ID>/<Wert>` (Alias `/ehal/loxone/telemetry/…` für bestehende VOs). Ist `EARNIE_PUSH_TOKEN` (Alias `EARNIE_PILOT_PUSH_TOKEN`) gesetzt, muss der Token mitgeschickt werden; ohne gesetztes Token akzeptiert Earnie Pushes ohne Authentifizierung (offenes LAN).
+- **Empfänger:** `/ehal/telemetry/<EHAL-ID>/<Wert>`. Ist `EARNIE_PUSH_TOKEN` (Alias `EARNIE_PILOT_PUSH_TOKEN`) gesetzt, muss der Token mitgeschickt werden; ohne gesetztes Token akzeptiert Earnie Pushes ohne Authentifizierung (offenes LAN).
 - **Inbox-Lesen:** Alle pushbaren `sens_*` / `get_*`-Felder werden aus der Inbox gelesen (kein Merker-Poll). Dazu zählen die **Zähler-Energiestände** `sens_pv_energy`, `sens_grid_energy_import` / `_export` und `consumer.<id>.sens_energy_total`.
 - **Wiederholintervall / Null-Regel:** siehe [Push-Takt (SB-neutral)](#push-cadence-sb-neutral).
 - **Heartbeat:** Der synthetische Heartbeat-VO ist immer Push.

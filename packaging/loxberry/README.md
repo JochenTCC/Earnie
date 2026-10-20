@@ -2,17 +2,17 @@
 
 Thin Docker wrapper for LoxBerry **4.x** (aarch64). Source tree: this folder (`packaging/loxberry/`).
 
-Plugin SemVer (`plugin.cfg` `VERSION`) is **independent** of Earnie `version.py`. Image tag comes from `plugin.env` channels via `data/docker/sync_compose_env.sh` → compose `.env` `EARNIE_IMAGE_TAG`:
+Plugin SemVer (`plugin.cfg` `VERSION`) is **independent** of Earnie `version.py`. Image tag comes from the `plugin.env` version variant (`EARNIE_CHANNEL`) via `data/docker/sync_compose_env.sh` → compose `.env` `EARNIE_IMAGE_TAG`:
 
-| Channel (`EARNIE_CHANNEL`) | Tag | Auto image pull (`EARNIE_AUTO_UPDATE`) |
-|----------------------------|-----|------------------------------------------|
+| Version variant (`EARNIE_CHANNEL`) | Tag | Auto image pull (`EARNIE_AUTO_UPDATE`) |
+|------------------------------------|-----|------------------------------------------|
 | `stable` (default) | `latest` | yes when `1` (systemd timer ~03:30) |
 | `prerelease` | `next` | yes when `1` |
 | `pinned` | SemVer (e.g. `2.5.3`) | never |
 
-`:latest` / `:next` only move when an Earnie release is **approved** (job `promote` in `release-publish.yml`) with `targets` `both` or `docker` — an HA-only run (`targets=ha`) leaves them unchanged; a tag push alone publishes just `:<version>`. To test a candidate on your own LoxBerry before approving: channel `pinned` + `EARNIE_PINNED_VERSION=<candidate>`, then switch back.
+`:latest` / `:next` only move when an Earnie release is **approved** (job `promote` in `release-publish.yml`) with `targets` `both` or `docker` — an HA-only run (`targets=ha`) leaves them unchanged; a tag push alone publishes just `:<version>`. To test a candidate on your own LoxBerry before approving: variant `pinned` + `EARNIE_PINNED_VERSION=<candidate>`, then switch back.
 
-Refresh manually: Plugin Admin → **Image aktualisieren** / save settings, or `bin/earnie_ctl.sh pull`. Daily timer runs `earnie_ctl.sh auto-pull` (skips `pinned` and `AUTO_UPDATE=0`). LoxBerry `plugin.cfg` `AUTOMATIC_UPDATES` is **only** the plugin ZIP — separate from the image channel.
+Refresh manually: Plugin Admin → **Image aktualisieren** / save settings, or `bin/earnie_ctl.sh pull`. Daily timer runs `earnie_ctl.sh auto-pull` (skips `pinned` and `AUTO_UPDATE=0`). LoxBerry `plugin.cfg` `AUTOMATIC_UPDATES` is **only** the plugin ZIP — separate from the Earnie image version variant.
 
 ## Manual ZIP for Plugin Admin
 

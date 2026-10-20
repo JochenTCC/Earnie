@@ -13,7 +13,6 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 - **Wochenchart:** Je **eindeutiger PV-Anlage** erscheint eine Serie, zusätzlich die Summen der Mehrfach-Konfigurationen wie im Monatschart. Konfigurationen mit nur einer Anlage werden nicht doppelt gezeichnet.
 - **Farben:** Die PV-Linien nutzen eine gelbliche Palette. Die historische Summe aus `cons_data` („PV Ist“) zeigen diese Charts **nicht** an.
 
-
 | Parameter | Einheit | Quelle | Bedeutung |
 | --------- | ------- | ------ | --------- |
 | `pv_system_ids` | – | Szenario → `components.json` | Eine oder mehrere Referenzen auf `pv_systems[].id` |
@@ -43,7 +42,6 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `timezone_name` | – | `house_profiles.json` | IANA-Zeitzone für die astronomischen Sonnenzeiten. Sie wird aus `land` abgeleitet (`AT`→`Europe/Vienna`, `DE`→`Europe/Berlin`, `CH`→`Europe/Zurich`); siehe `planning_horizon` |
 | `netznutzung` | Objekt | `house_profiles.json` | Arbeitspreis der Netznutzung netto (ohne USt): Netzbereich aus dem Katalog (inkl. Zeitregeln SNAP/WiNAP) oder eigener Wert. Unabhängig vom Lieferantentarif, siehe [Preise](preise.md) |
 
-
 ### Virtuelle Powerstation (Carve-out)
 
 Bei `type: powerstation` mit `backing: virtual` ist die Powerstation **kein eigener Speicher**. Sie reserviert einen kWh-Anteil der ersten Hausbatterie (`type: house`), den sogenannten Carve-out. Im Hauskonfigurator → Batterien sind dann nur noch diese Felder sichtbar:
@@ -62,7 +60,11 @@ Mehrere manuelle Geräte können dieselbe virtuelle Powerstation nutzen. Sie tei
 
 Solange ein Gerät aktiv ist, gibt Earnie die gehaltene Reserve frei, der SoC-Floor der Hausbatterie sinkt also. Nach dem Lauf bucht Earnie den Restvorrat weiter ab. Danach lädt Earnie **preisoptimal** nach, mit einer harten Frist von **24 h**.
 
-Einige Felder sind ausgeblendet. Beim Speichern bzw. Normalisieren übernimmt Earnie sie von der Hausbatterie, ohne Hausbatterie gelten feste Defaults: Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungsschwelle, Standby, Steuerbarkeit, `limits_from_live` und Verschleiß. Die Entladeleistung der virtuellen Powerstation ist immer `0`. Der Verschleiß bleibt aus, weil die Zyklen auf der Hausbatterie zählen. Ein `inverter_id` gibt es nicht.
+Einige Felder sind ausgeblendet: Max. Lade-/Entladeleistung, Wirkungsgrad, SoC-Grenzen, Leistungsschwelle, Standby, Steuerbarkeit, `limits_from_live` und Verschleiß. Beim Speichern bzw. Normalisieren übernimmt Earnie diese Werte von der Hausbatterie. Ohne Hausbatterie gelten feste Defaults.
+
+- Die Entladeleistung der virtuellen Powerstation ist immer `0`.
+- Der Verschleiß bleibt aus, weil die Zyklen auf der Hausbatterie zählen.
+- Ein `inverter_id` gibt es nicht.
 
 Physische Powerstations (`backing: physical`) behalten das volle Batterie-Formular. Sie bekommen einen **integrierten Powerstation-Wechselrichter** (`owned_by` = Batterie-ID, Abschnitt „Integrierter Wechselrichter“ im Hauskonfigurator). Dieser speist nur die angeschlossenen Verbraucher, nicht den AC-Bus des Hauses. Sein AC-Eingang kann am Netz hängen (einseitige Last), das Gerät ist also **nicht** „netzlos“.
 
@@ -75,7 +77,15 @@ Diese Rolle ist für Dauerläufer ohne einzelnen Lauf-Auslöser gedacht (PC, Rou
 - **Quellenwahl und Ladegrenzen:** Beide brauchen an der physischen Powerstation jeweils ein **eigenes** Pattern-B-Binding. Sie greifen **nicht** auf die Mappings der Hausbatterie zurück, da sonst deren Lade-/Entladegrenzen überschrieben würden.
 - **Reserve-Größe:** angeschlossene Last × teure Stunden im Horizont. Ein Lernen der Energie pro Lauf wie bei `single_use` gibt es hier nicht.
 
-Die Live-PV-Leistung (AC-Summe der Anlage) leitet Earnie aus den netzgekoppelten Wechselrichtern ab: Σ(`inv.{id}.sens_inv_power_pv` · η_inv). Jeder Wechselrichter mit angeschlossenen PV-Anlagen braucht dieses Mapping. Fehlt die WR-PV, können vollständige String-Mappings `pv.{id}.sens_pv_production_active` die Summe je Wechselrichter ersetzen. Powerstation- und Insel-Wechselrichter (`ac_connection: island`) zählen nicht mit. Unvollständige Mappings führen zu einem Fehler. Ein flaches Anlagen-Feld `plant.ehal_bindings.sens_pv_production_active` gibt es nicht mehr (Migration übernimmt ein eindeutiges Mapping auf den einzigen WR). Die Intervallenergie für `cons_data` (`pv_kwh_interval`) integriert Earnie aus der abgeleiteten Anlagen-Leistung.
+### Live-PV-Leistung
+
+Die Live-PV-Leistung (AC-Summe der Anlage) leitet Earnie aus den netzgekoppelten Wechselrichtern ab: Σ(`inv.{id}.sens_inv_power_pv` · η_inv).
+
+- **Mapping je Wechselrichter:** Jeder Wechselrichter mit angeschlossenen PV-Anlagen braucht dieses Mapping. Fehlt die PV-Leistung des Wechselrichters, können vollständige String-Mappings `pv.{id}.sens_pv_production_active` die Summe je Wechselrichter ersetzen.
+- **Nicht berücksichtigt:** Powerstation- und Insel-Wechselrichter (`ac_connection: island`) zählen nicht mit.
+- **Unvollständige Mappings** führen zu einem Fehler.
+- **Kein flaches Anlagen-Feld mehr:** `plant.ehal_bindings.sens_pv_production_active` gibt es nicht mehr. Die Migration überträgt ein eindeutiges Mapping auf den einzigen Wechselrichter.
+- **Intervallenergie:** Die Intervallenergie für `cons_data` (`pv_kwh_interval`) integriert Earnie aus der abgeleiteten Anlagen-Leistung.
 
 ## Wechselrichter (`inverters[]`)
 
@@ -111,7 +121,7 @@ Vor dem Live-Betrieb muss die Wurzel der Bilanz klar sein: ein Zähler, ein Tari
 2. **Gibt es nur einen Tarif?** → `plant.grid_meter.single_tariff` (kein zweiter Abrechnungszähler hinter demselben Mapping).
 3. **Regelt ein anderes Gerät selbst auf diesen Zähler?** → Hausbatterie mit `regulates_on: grid` (Eigenverbrauch / Zero-Export) oder `none` (folgt nur den Sollwerten). Fremdregler zählen ebenfalls mit; `control: read_only` heißt nur, dass Earnie nicht schreibt.
 
-Im Live-Pfad müssen beide `plant.grid_meter`-Flags `true` sein. Migration bestehender Anlagen:
+Im Live-Betrieb müssen beide `plant.grid_meter`-Flags `true` sein. Migration bestehender Anlagen:
 
 ```text
 python -m scripts.migrate_topology_once --config-dir <config-dir>
@@ -137,8 +147,23 @@ Details: [EHAL-Spec § Plant topology](../referenz/ehal.md).
 
 Verlangt `control` mehr, als das EHAL-Mapping hergibt (z. B. `full` ohne `set_ess_active_power` und ohne `plant.ha_ess_force`), warnt EHAL-Com. Für Huawei ohne Wirkleistungs-Entity gibt es optional `plant.ha_ess_force` (`driver: huawei_solar`, `device_id`, `duration_min`), siehe [EHAL-Spec](../referenz/ehal.md) und [EHAL-Com](../ui/ehal-com.md).
 
-Die unbegrenzte Einspeiseleistung (Wert „unconstrained“) ergibt sich aus der PV-kWp-Summe plus der Summe der max. Entladeleistung aller gewählten Hausbatterien mit `control = full`. Powerstations (`type: powerstation`) zählen nicht mit, da sie nicht ins Hausnetz zurückspeisen.
+<a id="einspeisegrenze"></a>
 
+## Einspeisegrenze
+
+Optional lässt sich im Hauskonfigurator eine statische Obergrenze für die Einspeisung setzen (`plant.max_export_power_kw`). Die wirksame Obergrenze ist das Minimum aus:
+
+- dem Wert aus dem Hauskonfigurator,
+- der vom Smarthome gemeldeten Grenze über EHAL (inbound, `get_grid_export_power_limit`),
+- **0**, wenn der Einspeisetarif negativ ist (Einspeisung kostet dann Geld).
+
+Gilt keine Begrenzung, schreibt Earnie die maximal mögliche Einspeisung der Anlage auf `set_grid_export_power_limit`. Dafür summiert Earnie über alle netzgekoppelten Wechselrichter `min(max_ac_power_kw, PV-kWp begrenzt durch max_pv_input_kw + Zwangsentlade-kW)`:
+
+- **Insel-Wechselrichter** zählen nicht.
+- **Ohne geplante Wechselrichter** gilt die bisherige Rechnung (Legacy): Summe PV-kWp plus max. Entladeleistung der Batterien mit `control = full` (früher `Batteriesteuerung = voll`). Batterien mit `limits_only` oder `read_only` zählen nicht. Powerstations (`type: powerstation`) zählen nicht mit, da sie nicht ins Hausnetz zurückspeisen.
+- **Sind beide unbekannt,** steht `1000` kW im Status (EHAL: 1 000 000 W).
+
+Die Umsetzung im Smarthome-System (z. B. Abregelung in Loxone Config) beschreibt die jeweilige Anbindungs-Doku, für Loxone die [Loxone-Anbindung](../einrichtung/loxone-anbindung.md).
 
 ## SOC-Verhalten
 
@@ -162,7 +187,6 @@ Die Optimierung nutzt ein lineares Amortisationsmodell in der Zielfunktion. Pro 
 
 Beispiel (5 kWh, 1500 €, 6000 Zyklen, 50 % zyklenbedingt): **2,5 ct/kWh**.
 
-
 | Parameter | Bedeutung |
 | --------- | --------- |
 | `enabled` | `false` = kein Verschleiß-Term (explizit aus); `true` = die Parameter unten sind Pflicht |
@@ -176,7 +200,7 @@ Im Hauskonfigurator unter **Batterien** schaltet die Checkbox „Verschleiß ber
 
 ## Live-Szenario vs. `config.json`
 
-Auf der Seite **Szenarienkonfigurator** werden die Entitäts-Referenzen für das Live-Szenario gewählt (PV und Batterien als Mehrfachauswahl). Gespeichert wird das Live-Szenario in `backtesting_scenarios.json` (`live_scenario_id` in `config.json`, Standard: `live`). Die PV- und Batterie-Entitäten selbst werden im **Hauskonfigurator** gepflegt. Die Bezeichnung des Live-Szenarios ist fest.
+Auf der Seite **Szenarienkonfigurator** erfolgt die Auswahl der Entitäts-Referenzen für das Live-Szenario (PV und Batterien als Mehrfachauswahl). Earnie speichert das Live-Szenario in `backtesting_scenarios.json` (`live_scenario_id` in `config.json`, Standard: `live`). Die PV- und Batterie-Entitäten selbst entstehen im **Hauskonfigurator**. Die Bezeichnung des Live-Szenarios ist fest.
 
 ## Szenarien
 

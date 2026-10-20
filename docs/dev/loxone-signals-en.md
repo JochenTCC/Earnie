@@ -135,7 +135,7 @@ Virtual Out address for **status / request optimize**:
 
 Telemetry VOs (`VO_Earnie_*` except `Status`) also target the daemon port **8541**. Telemetry push works as follows:
 
-- **Receiver:** `/ehal/telemetry/<EHAL-ID>/<value>` (alias `/ehal/loxone/telemetry/…` for existing VOs). When `EARNIE_PUSH_TOKEN` (alias `EARNIE_PILOT_PUSH_TOKEN`) is set, the token is required; when unset, Earnie accepts open LAN push.
+- **Receiver:** `/ehal/telemetry/<EHAL-ID>/<value>`. When `EARNIE_PUSH_TOKEN` (alias `EARNIE_PILOT_PUSH_TOKEN`) is set, the token is required; when unset, Earnie accepts open LAN push.
 - **Inbox reads:** all pushable `sens_*` / `get_*` fields are read from the inbox (no Merker poll). This includes the **meter energy** counters `sens_pv_energy`, `sens_grid_energy_import` / `_export` and `consumer.<id>.sens_energy_total`.
 - **Repeat interval:** recommended **10 s** (`EARNIE_PILOT_PUSH_REPEAT_S`, default 10).
 - **Stale energy values** (older than 3 × repeat) are not assumed to be zero. Slot Ist keeps the sample mean for that channel.

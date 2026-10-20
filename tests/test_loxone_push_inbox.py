@@ -193,18 +193,15 @@ def _get(port: int, path: str, headers: dict[str, str] | None = None) -> int:
 def test_endpoint_open_without_token() -> None:
     port = http_mod.start_loxone_request_http(0).server_address[1]
     assert _get(port, "/ehal/telemetry/sens_pv_production_active/55") == 204
-    assert _get(port, "/ehal/loxone/telemetry/sens_pv_production_active/55.5") == 204
+    assert _get(port, "/ehal/loxone/telemetry/sens_pv_production_active/55.5") == 404
     inbox.flush_inbox_now()
     rows = inbox.load_inbox()
-    assert rows["sens_pv_production_active"]["value"] == 55.5
+    assert rows["sens_pv_production_active"]["value"] == 55.0
 
 
 def test_match_telemetry_prefix() -> None:
     assert http_mod.match_telemetry_prefix("/ehal/telemetry/sens_ess_soc/5") == "/ehal/telemetry/"
-    assert (
-        http_mod.match_telemetry_prefix("/ehal/loxone/telemetry/sens_ess_soc/5")
-        == "/ehal/loxone/telemetry/"
-    )
+    assert http_mod.match_telemetry_prefix("/ehal/loxone/telemetry/sens_ess_soc/5") is None
     assert http_mod.match_telemetry_prefix("/ehal/loxone/alive") is None
 
 
@@ -212,12 +209,12 @@ def test_endpoint_token_validation_and_storage(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret")
     port = http_mod.start_loxone_request_http(0).server_address[1]
     base = "/ehal/telemetry/"
-    alias = "/ehal/loxone/telemetry/"
     assert _get(port, base + "ess.house.sens_ess_soc/55") == 401
     assert _get(port, base + "ess.house.sens_ess_soc/55?t=wrong") == 401
     assert _get(port, base + "ess.house.sens_ess_soc/55?t=s3cret") == 204
     assert _get(port, base + "ess.ecoflow_delta_3.sens_ess_soc/61,5", {http_mod.PUSH_TOKEN_HEADER: "s3cret"}) == 204
-    assert _get(port, alias + "sens_pv_production_active/2.5?t=s3cret") == 204  # alias
+    assert _get(port, base + "sens_pv_production_active/2.5?t=s3cret") == 204
+    assert _get(port, "/ehal/loxone/telemetry/sens_pv_production_active/2.5?t=s3cret") == 404
     assert _get(port, base + "set_ess_mode/1?t=s3cret") == 400
     assert _get(port, base + "ess.house.sens_ess_soc?t=s3cret") == 400  # no value
     inbox.flush_inbox_now()
@@ -353,27 +350,27 @@ def test_endpoint_accepts_token_in_address_prefix(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv(http_mod.PUSH_TOKEN_ENV, "s3cret-token")
     port = http_mod.start_loxone_request_http(0).server_address[1]
     base = "/ehal/telemetry/"
-    alias = "/ehal/loxone/telemetry/"
     assert _get(port, "/t/s3cret-token" + base + "ess.house.sens_ess_soc/55.5") == 204
-    assert _get(port, "/t/s3cret-token" + alias + "ess.house.sens_ess_soc/56") == 204  # alias + prefix
+    assert _get(port, "/t/s3cret-token" + base + "ess.house.sens_ess_soc/56") == 204
+    assert _get(port, "/t/s3cret-token/ehal/loxone/telemetry/ess.house.sens_ess_soc/56") == 404
     assert _get(port, "/t/wrong" + base + "ess.house.sens_ess_soc/57") == 401
     assert _get(port, "/t/s3cret-token" + base + "set_ess_mode/1") == 400  # setpoints never accepted
     assert _get(port, "/t/s3cret-token/ehal/loxone/status.json") == 404  # other routes not via prefix
     assert _get(port, "/t/s3cret-token/ehal/loxone/alive") == 404
-    # older variants still work
+    # query / header variants still work
     assert _get(port, base + "sens_pv_production_active/1?t=s3cret-token") == 204
     assert (
         _get(
             port,
-            alias + "heartbeat_smarthome/1",
+            base + "heartbeat_smarthome/1",
             {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"},
         )
         == 204
     )
-    assert _get(port, alias + "heartbeat/1", {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"}) == 400
+    assert _get(port, base + "heartbeat/1", {http_mod.PUSH_TOKEN_HEADER: "s3cret-token"}) == 400
     inbox.flush_inbox_now()
     rows = inbox.load_inbox()
-    assert rows["ess.house.sens_ess_soc"]["value"] == 56.0  # last alias write
+    assert rows["ess.house.sens_ess_soc"]["value"] == 56.0
     assert set(rows) == {
         "ess.house.sens_ess_soc",
         "sens_pv_production_active",
@@ -391,7 +388,8 @@ def test_header_wins_over_prefix_and_must_match(monkeypatch: pytest.MonkeyPatch)
 def test_prefix_endpoint_open_without_token() -> None:
     port = http_mod.start_loxone_request_http(0).server_address[1]
     assert _get(port, "/t/anything/ehal/telemetry/ess.house.sens_ess_soc/1") == 204
-    assert _get(port, "/t/anything/ehal/loxone/telemetry/sens_pv_production_active/2") == 204
+    assert _get(port, "/t/anything/ehal/telemetry/sens_pv_production_active/2") == 204
+    assert _get(port, "/t/anything/ehal/loxone/telemetry/sens_pv_production_active/2") == 404
     inbox.flush_inbox_now()
     rows = inbox.load_inbox()
     assert rows["ess.house.sens_ess_soc"]["value"] == 1.0

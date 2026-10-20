@@ -69,7 +69,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 
 1. Restart **Loxone Config**.
 2. Insert via periphery **Device Templates** / Virtual In / Virtual Out (Earnie entries should appear).
-3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize`) use port **8541** (`system.ehal_loxone_http_port`). Telemetry VOs (incl. repeating **`Push_Earnie_Heartbeat`**) also use port **8541** (canonical `/ehal/telemetry/…`; alias `/ehal/loxone/telemetry/…` for existing VOs). Delete obsolete **`Earnie_Push_Alive`** cmds if still present (`/ehal/loxone/alive` returns 404). The value placeholder in a Virtual Output command is `<v>`, written `&lt;v&gt;` in the XML (`\v` would be sent as the control character 0x0B).
+3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize`) use port **8541** (`system.ehal_loxone_http_port`). Telemetry VOs (incl. repeating **`Push_Earnie_Heartbeat`**) also use port **8541** (`/ehal/telemetry/…`). Delete obsolete **`Earnie_Push_Alive`** cmds if still present (`/ehal/loxone/alive` returns 404). The value placeholder in a Virtual Output command is `<v>`, written `&lt;v&gt;` in the XML (`\v` would be sent as the control character 0x0B).
 
 ## Files (repo layout)
 

@@ -23,9 +23,8 @@ _STATUS_PATHS = frozenset(
         STATUS_PATH_CANONICAL,
     }
 )
-# Backend-neutral telemetry push; Loxone-prefixed path kept as alias for deployed VOs.
+# Backend-neutral telemetry push.
 TELEMETRY_PREFIX = "/ehal/telemetry/"
-TELEMETRY_PREFIX_ALIAS = "/ehal/loxone/telemetry/"
 PUSH_TOKEN_ENV = "EARNIE_PUSH_TOKEN"
 PUSH_TOKEN_ENV_LEGACY = "EARNIE_PILOT_PUSH_TOKEN"
 PUSH_TOKEN_HEADER = "X-Earnie-Token"
@@ -51,13 +50,8 @@ def split_token_prefix(raw_path: str) -> tuple[str | None, str]:
 
 
 def match_telemetry_prefix(path: str) -> str | None:
-    """Return the matched telemetry prefix, or None.
-
-    Checks the longer Loxone alias first so strip length is always correct.
-    """
+    """Return the matched telemetry prefix, or None."""
     path_only = urlparse(path).path
-    if path_only.startswith(TELEMETRY_PREFIX_ALIAS):
-        return TELEMETRY_PREFIX_ALIAS
     if path_only.startswith(TELEMETRY_PREFIX):
         return TELEMETRY_PREFIX
     return None
@@ -139,7 +133,6 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
     def _handle_telemetry_push(self, route: str, prefix_token: str | None) -> None:
         """``GET /ehal/telemetry/<EHAL-ID>/<value>`` — pilot inbox (no control effect).
 
-        Alias ``/ehal/loxone/telemetry/…`` is accepted for existing Virtual Outputs.
         When ``EARNIE_PUSH_TOKEN`` (or legacy ``EARNIE_PILOT_PUSH_TOKEN``) is set, the token
         must come in the ``X-Earnie-Token`` header, as a ``/t/<token>`` address prefix, or as
         ``?t=`` query parameter (checked in this order; the first one present must match).
