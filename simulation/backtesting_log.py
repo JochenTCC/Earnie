@@ -54,9 +54,10 @@ def consumption_totals_from_report(
 ) -> dict:
     """Summiert Soll- und geplanten Verbrauch über alle Fenster.
 
-    ``historical_kwh`` = Σ Fenster-Soll, ``optimized_kwh`` = Σ MILP-Plan je Fenster
-    (inkl. Foresight). With ``booked`` (``booked_consumption_totals`` of the same
-    scenario) ``booked_kwh`` / ``booked_delta_kwh`` show what the series really books.
+    ``historical_kwh`` = Σ Fenster-Soll, ``optimized_kwh`` = Σ MILP-Plan je Fenster,
+    both over whole books (the first/last sunrise book reaches past the period).
+    With ``booked`` (``booked_consumption_totals`` of the same scenario, clipped to
+    the period) ``booked_kwh`` / ``booked_delta_kwh`` show what the series really books.
     """
     if not report.results:
         return {}

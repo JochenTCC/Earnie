@@ -146,7 +146,7 @@ def validate_window_consumption(
         flexible_consumers=flexible_consumers,
     )
     optimized_flex = round(sum(delivered_flex.values()), 3)
-    # Sunrise: deadline-flex often sits in SA₀→SA₁ foresight (book cut drops it).
+    # Sunrise: flex of the whole MILP horizon; the stash fails loud on flex outside the book.
     if meta.get("plausibility_optimized_flex_kwh") is not None:
         optimized_flex = round(float(meta["plausibility_optimized_flex_kwh"]), 3)
     optimized_flex = round(optimized_flex + native_kwh, 3)
