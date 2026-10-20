@@ -1,4 +1,4 @@
-"""Backtesting: Matrixbau und Sunrise-Buchungsschritte (ready_by → SA₂).
+"""Backtesting: Matrixbau und Sunrise-Buchungsschritte (ready_by-Tag → SA₂).
 
 Defaults when not set explicitly
 --------------------------------
@@ -15,15 +15,14 @@ Defaults when not set explicitly
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import config
 from data.planning_window import (
     compute_planning_window,
     hourly_slots_inclusive,
-    next_sunrise_after,
-    previous_sunrise_before,
+    official_sun_times,
     sunrise_anchor_slot_index,
 )
 from simulation.horizon_mode import BACKTESTING_STEP_HOURS
@@ -104,6 +103,11 @@ def hourly_slots_half_open(start: datetime, end: datetime) -> tuple[datetime, ..
     return tuple(slots)
 
 
+def _sunrise_on(day: date, latitude: float, longitude: float, timezone_name: str) -> datetime:
+    sunrise, _sunset = official_sun_times(day, latitude, longitude, timezone_name)
+    return sunrise
+
+
 def resolve_ready_by_sunrise_step(
     ready_by: datetime,
     latitude: float,
@@ -111,22 +115,26 @@ def resolve_ready_by_sunrise_step(
     timezone_name: str,
 ) -> SunriseBookStep:
     """
-    SA₂ = first sunrise strictly after ready_by; book [SA₁, SA₂); MILP SA₀→SA₂.
+    Book the sunrise day that ends on ready_by's calendar date; MILP SA₀→SA₂.
 
-    ready_by must lie strictly between SA₁ and SA₂.
+    SA₂ = sunrise on ``ready_by.date()``, SA₁ / SA₀ = sunrise one / two days
+    earlier; book [SA₁, SA₂). The window depends only on the calendar date, so
+    consecutive days form a contiguous sunrise chain (book k starts where k−1
+    ended) whatever ready_by's clock time (07:00 weekday, 12:00 weekend) and
+    whether it lies before or after that day's sunrise.
+
+    ready_by is only the EV deadline: its charging night (evening before →
+    SA₂) lies inside the book, so EV target and charging slots share a window.
     """
     ready = _aware_ready_by(ready_by, timezone_name)
-    sa2 = next_sunrise_after(ready, latitude, longitude, timezone_name)
-    sa1 = previous_sunrise_before(
-        sa2 - timedelta(seconds=1), latitude, longitude, timezone_name
-    )
-    sa0 = previous_sunrise_before(
-        sa1 - timedelta(seconds=1), latitude, longitude, timezone_name
-    )
-    if not (sa1 < ready < sa2):
+    day = ready.date()
+    sa2 = _sunrise_on(day, latitude, longitude, timezone_name)
+    sa1 = _sunrise_on(day - timedelta(days=1), latitude, longitude, timezone_name)
+    sa0 = _sunrise_on(day - timedelta(days=2), latitude, longitude, timezone_name)
+    if not (sa0 < sa1 < sa2):
         raise ValueError(
-            f"ready_by {ready.isoformat()} liegt nicht strikt zwischen "
-            f"SA₁ {sa1.isoformat()} und SA₂ {sa2.isoformat()}."
+            f"Sonnenaufgänge nicht aufsteigend für ready_by {ready.isoformat()}: "
+            f"SA₀ {sa0.isoformat()}, SA₁ {sa1.isoformat()}, SA₂ {sa2.isoformat()}."
         )
     from optimizer.slot_duration import normalize_quarter_hour_slot
 

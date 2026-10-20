@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import config
+from .charging_schedule import contexts_within_book
 from .eauto_milp import (
     build_ev_milp_params_by_id,
     split_eauto_preset,
@@ -145,12 +146,17 @@ def _resolve_thermal_flex_contexts(
 
 @dataclass
 class _MilpInputs:
-    """Aufgelöste Eingaben eines Solve-Fensters (Verbraucher, Indizes, Kontexte)."""
+    """Aufgelöste Eingaben eines Solve-Fensters (Verbraucher, Indizes, Kontexte).
+
+    ``book_indices``: explicit ``flex_indices`` (SE book slice) — hard allow-list
+    for every flex consumer, deadline consumers included; ``None`` without one.
+    """
 
     active: list
     remaining: dict[str, float]
     horizon: int
     schedule_indices: list[int]
+    book_indices: list[int] | None
     contexts: dict
     filters: dict
     milp_consumers: list
@@ -179,7 +185,7 @@ def _prepare_milp_inputs(
     horizon = len(matrix)
     day_indices = _day_indices(matrix, horizon)
     schedule_indices = flex_indices if flex_indices is not None else day_indices
-    contexts = charging_contexts or {}
+    contexts = contexts_within_book(charging_contexts or {}, flex_indices)
     filters = (
         filter_contexts
         if filter_contexts is not None
@@ -209,6 +215,7 @@ def _prepare_milp_inputs(
         remaining=remaining,
         horizon=horizon,
         schedule_indices=schedule_indices,
+        book_indices=list(flex_indices) if flex_indices is not None else None,
         contexts=contexts,
         filters=filters,
         milp_consumers=milp_consumers,

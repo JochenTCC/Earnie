@@ -141,7 +141,7 @@ Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und fü
 
 > **Hinweis zur Neuoptimierung:** Der Szenario-Explorer steuert die MILP-Commit-Weite über `commit_hours` in `backtesting_scenarios.json`. Der Standard **24** entspricht ungefähr einer Planung ohne Rückkopplung (open-loop), **1** bedeutet stündliche Neuoptimierung. Das ist nicht dasselbe wie die periodische Neuoptimierung im Live-Betrieb; eine 1:1-Übereinstimmung mit der Live-Optimierung (MPC) ist nicht nachgewiesen.
 >
-> Standard-Horizont ist `sunrise_window`: Das MILP rechnet SA₀→SA₂, gebucht wird jeweils **[SA₁, SA₂)**, also von Sonnenaufgang zu Sonnenaufgang je `ready_by`-Tag. Der SoC wird an den Sonnenaufgang-Übergängen verkettet. `fixed_24h` bleibt als Vergleichsmodus erhalten (an `ready_by` ausgerichtete 24-h-Fenster).
+> Standard-Horizont ist `sunrise_window`: Das MILP rechnet SA₀→SA₂, gebucht wird jeweils **[SA₁, SA₂)**. SA₂ ist der Sonnenaufgang am `ready_by`-Tag, SA₁ der des Vortags. Die Buchungsfenster schließen damit lückenlos und ohne Doppelbuchung aneinander, auch wenn die Sonne erst nach `ready_by` aufgeht. `ready_by` ist nur die Lade-Deadline des E-Autos; die Ladenacht davor liegt im selben Buchungsfenster. Alle flexiblen Verbraucher laufen nur innerhalb des Buchungsfensters. Der SoC wird an den Sonnenaufgang-Übergängen verkettet. `fixed_24h` bleibt als Vergleichsmodus erhalten (an `ready_by` ausgerichtete 24-h-Fenster).
 
 ### Gesamtkosten und -Verbrauch
 
@@ -182,7 +182,7 @@ Diese Tabelle steht unter den Gesamtkosten und zeigt je optimiertem Szenario:
 | `Ohne PV und Speicher [kWh]` | gebuchter Verbrauch der Zeile Historisch |
 | `Reference (Live) - ohne Optimierung [kWh]` | gebuchter Verbrauch der Live-Referenz |
 | `Soll Fenster [kWh]` | Σ Fenster-Sollwerte (`consumption_totals.historical_kwh`) |
-| `Geplant MILP [kWh]` | Σ vom Optimierer je Fenster geplanter Verbrauch inkl. Vorlauf vor SA₁ (`consumption_totals.optimized_kwh`) |
+| `Geplant MILP [kWh]` | Σ vom Optimierer je Fenster geplanter Verbrauch; Flex läuft nur im Buchungsfenster [SA₁, SA₂) (`consumption_totals.optimized_kwh`) |
 | `Optimiert (kWh)` | gebuchter Verbrauch des Szenarios (`booked_consumption`, ohne Standby) |
 | `Δ kWh (Ref. ohne Optimierung)` | Optimiert minus Live-Referenz |
 

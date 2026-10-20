@@ -76,16 +76,17 @@ def test_critical_high_eauto_window_completes(
         cache=fixture_cache,
         scenario_id="fixture_5kwh_fixed",
     )
-    # Sunrise book ~24h QH; SA₀→SA₁ foresight flex may add slots for EV delivery.
+    # One calendar day = two abutting sunrise books (SA(d−1)→SA(d)→SA(d+1)).
     from optimizer.slot_duration import slots_for_wall_hours
 
     step = slots_for_wall_hours(24)
-    assert step - 4 <= len(df) <= step * 2
+    assert 2 * step - 8 <= len(df) <= 2 * step + 8
+    assert df.index.is_unique
     assert df["sim_cost"].notna().all()
     assert df["sim_soc"].between(0.0, 100.0).all()
     assert isinstance(cbc_events, list)
     # Plausibilität kann bei schweren E-Auto-Fenstern scheitern – Lauf selbst ist die Aussage.
-    assert len(plausibility.results) == 1
+    assert len(plausibility.results) == 2
 
 
 def test_critical_baseload_flex_exceeds_total_stays_non_negative(

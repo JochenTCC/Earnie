@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — SE sunrise windows: day gaps / double booking and foresight merge lost flex energy (2026-10-20)
+
+- [x] **SE sunrise book chain + foresight merge** — **Verified** (2026-10-20; greenfield 12-month SE, 3 scenarios)
+  - Symptom: Optimized scenarios booked different consumption (11,892 / 12,316 / 12,216 kWh) although their window targets were identical; battery discharge exceeded charge (ratio 1.11–1.37, 300–480 SoC jumps > 20 %-pts).
+  - Cause A: Book [SA₁, SA₂) derived from ready_by (SA₂ = first sunrise after ready_by). With sunrise after 07:00 the Saturday anchor (12:00) skipped Fri-SA→Sat-SA and Monday (07:00) re-booked Sun-SA→Mon-SA (25 weeks, ~2,400 duplicate / ~2,300 missing QH, −289 kWh targets).
+  - Cause B: EV deadline consumers ignored the book slice and the MILP never blocked flex outside it, so 82–94 % of EV energy (with gap tolerance also pool / WP / appliance energy) was planned before SA₁. `_merge_foresight_flex_into_series` then replaced whole rows of the previous window and deleted its flex energy and battery actions.
+  - Cause C: The SoC carry used the start SoC of the last book slot (its battery action dropped per window); the unbooked SA₀→SA₁ simulation could reach SA₁ away from the hold SoC.
+  - Fix: SA₂ = sunrise on ready_by's date (contiguous sunrise chain; the run books start … end+1 so every QH of the period is covered once). Explicit `flex_indices` are a hard allow-list for every flex consumer incl. EV deadline (`contexts_within_book`, `block_flex_outside_book`). Foresight merge removed; fail loud on flex outside the book and on duplicate slots. SoC carried from the slot after the book and anchored at the SA₁ hold. Period clip keeps 23:15–23:45 of the end day.
+  - Verified: greenfield year, 366 windows, 35,040 / 35,040 QH, 0 duplicates; booked flex per consumer = Σ window targets (Δ ≤ 0.05 kWh) in all three scenarios, except `pool_filter` (verification ran before the native filter booking fix 6109938c). Battery: no SoC jumps; discharge / charge 0.887–0.889 vs. η² = 0.884 (residual 2.5–12 kWh/yr from per-slot 0.1 % SoC rounding in the slot simulation, follow-up).
+  - Tests: `tests/test_sunrise_book_steps.py`, `tests/test_se_book_allow_list.py`, `tests/test_monthly_fees.py::test_clip_results_keeps_every_quarter_hour_of_end_day`.
+  - Regression: L2 goldens `REG-O-ev-deadline`, `REG-O-heat-swimspa`, `REG-O-summer-june` red as intended (extra book window covers the case day, SoC chain); re-record pending maintainer OK.
+
 ### Version 2.7 — earnie-server installed on easyname VPS (2026-10-20)
 
 - [x] **Install earnie-server on a VPS** — done on an easyname virtual server (originally planned on a Hosttech VDC); verified from the PC with `POST /ping` → `204`.

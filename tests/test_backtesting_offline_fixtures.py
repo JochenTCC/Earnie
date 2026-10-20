@@ -103,8 +103,8 @@ def test_run_simulation_single_window_on_fixture(
         cache=fixture_cache,
         scenario_id="fixture_5kwh_fixed",
     )
-    # Sunrise book ~24h QH; foresight flex may add SA₀→SA₁ slots.
-    assert 92 <= len(df) <= 192
+    # One calendar day = two abutting sunrise books (SA(d−1)→SA(d)→SA(d+1)).
+    assert 184 <= len(df) <= 200
     assert plausibility.failed == []
     assert df["sim_cost"].notna().all()
     assert isinstance(cbc_events, list)
@@ -182,9 +182,9 @@ def test_simulation_progress_reports_wall_hours_not_slots(
     )
     assert seen
     last_current, last_total = seen[-1]
-    assert last_total == 24
+    # Two sunrise books cover the day: ~48 wall hours, not 192 QH slots.
+    assert 47 <= last_total <= 49
     assert last_current == last_total
-    assert last_total < 50
 
 
 def test_backtesting_log_roundtrip_on_fixture(tmp_path, fixture_cache):

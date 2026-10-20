@@ -391,6 +391,26 @@ def _refill_commit_buffer(
     return schedule[:commit_slots]
 
 
+def _soc_after_hold_slot(options: _HorizonOptions, slot_index: int, sim_soc: float) -> float:
+    """SE sunrise carry-in: the book starts at SA₁ with exactly ``soc_hold_percent``.
+
+    The MILP fixes the SoC at the end of ``soc_hold_index``; the slot simulation of
+    the unbooked SA₀→SA₁ part can drift from it (control mapping, solver fallback).
+    Without this anchor the booked SoC chain gains or loses that drift per window.
+    """
+    hold = options.soc_hold_percent
+    if options.soc_hold_index is None or hold is None or slot_index != options.soc_hold_index:
+        return sim_soc
+    if abs(float(sim_soc) - float(hold)) > 1.0:
+        logger.info(
+            "SoC-Hold Slot %d: simuliert %.1f %% statt %.1f %% (MILP-Plan nicht erreicht)",
+            slot_index,
+            float(sim_soc),
+            float(hold),
+        )
+    return float(hold)
+
+
 def _advance_delivered_and_flex_run(
     setup: _HorizonSetup,
     chart_row: dict,
@@ -487,6 +507,7 @@ def _run_horizon_slots(
                 delivered_horizon,
                 generic_flex_run,
             )
+            sim_soc = _soc_after_hold_slot(setup.options, i, sim_soc)
             _advance_chart_soc_after_slot(
                 setup,
                 chart_row,

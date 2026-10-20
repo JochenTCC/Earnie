@@ -30,6 +30,7 @@ from .milp_consumers import (
     _log_urgent_rule_observability,
     add_generic_flex_rolling_constraints,
     add_min_on_time_constraints,
+    block_flex_outside_book,
     filter_feasible_consumers,
 )
 from .milp_horizon import (
@@ -172,6 +173,7 @@ def _add_flex_side_constraints(
     thermal_flex_contexts: dict[str, dict] | None,
 ) -> None:
     """Liefermengen, generische Flex-Rollfenster und thermische Randbedingungen."""
+    block_flex_outside_book(model, inputs.book_indices)
     _add_consumer_delivery_constraints(
         model,
         matrix,

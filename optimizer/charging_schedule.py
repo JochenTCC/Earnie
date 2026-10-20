@@ -401,6 +401,28 @@ def apply_charging_window_constraints(
     return eligible
 
 
+BOOK_INDICES_KEY = "book_indices"
+
+
+def contexts_within_book(
+    charging_contexts: dict[str, dict],
+    book_indices: list[int] | None,
+) -> dict[str, dict]:
+    """Bind deadline consumers to an explicit book slice (SE sunrise [SA₁, SA₂)).
+
+    Without it a deadline (EV ready_by) opens every horizon slot before the
+    deadline, including the SA₀→SA₁ part of the SE MILP that is never booked.
+    ``book_indices=None`` (Live: no explicit flex slice) leaves contexts as-is.
+    """
+    if book_indices is None:
+        return charging_contexts
+    allowed = list(book_indices)
+    return {
+        cid: {**ctx, BOOK_INDICES_KEY: allowed}
+        for cid, ctx in charging_contexts.items()
+    }
+
+
 def schedule_indices_for_consumer(
     matrix: list,
     horizon: int,
@@ -408,11 +430,14 @@ def schedule_indices_for_consumer(
     consumer: dict,
     charging_context: dict | None,
 ) -> list[int]:
-    """Tages- oder Deadline-Horizont: bei Fertigstellungszeit alle Slots bis Deadline."""
+    """Tages- oder Deadline-Horizont: bei Fertigstellungszeit alle Slots bis Deadline.
+
+    With ``BOOK_INDICES_KEY`` in the context only book slots are candidates.
+    """
     ctx = charging_context or {}
     deadline = ctx.get("deadline")
     if ctx.get("active", True) and isinstance(deadline, datetime):
-        return consumer_charging_eligible_indices(
-            matrix, consumer, list(range(horizon)), ctx
-        )
+        book = ctx.get(BOOK_INDICES_KEY)
+        candidates = list(range(horizon)) if book is None else list(book)
+        return consumer_charging_eligible_indices(matrix, consumer, candidates, ctx)
     return default_indices

@@ -77,26 +77,29 @@ MILP-Horizont: 24 h (identisch zum Output-Fenster)
 
 Kein Config-Schalter für End-SOC; Verhalten ist fest im Modus verankert (früher `battery_end_soc_equals_start`, entfernt).
 
-### 4.2 Modus `sunrise_window` (SE-Standard: ready_by → SA₂ book)
+### 4.2 Modus `sunrise_window` (SE-Standard: ready_by-Tag → SA₂ book)
 
-Pro SE-Schritt **ein ready_by-Tag** (Abfahrt/Anker wie `window_anchor_for_date`). Buchungslänge = **ein Sonnenaufgang→nächster Sonnenaufgang** (Astronomie/DST, typ. ~24 h, 23–25 um Zeitumstellung) — **nicht** abhängig von `ready_by_hour` 07 vs 10; die Uhrzeit wählt nur, welcher SA₂ gilt (erster Sonnenaufgang strikt nach ready_by).
+Pro SE-Schritt **ein ready_by-Tag** (Abfahrt/Anker wie `window_anchor_for_date`). Buchungslänge = **ein Sonnenaufgang→nächster Sonnenaufgang** (Astronomie/DST, typ. ~24 h, 23–25 um Zeitumstellung). Das Fenster hängt **nur vom Kalendertag** des ready_by ab, nicht von der Uhrzeit (07 vs 12) und nicht davon, ob ready_by vor oder nach dem Sonnenaufgang liegt.
 
 ```
-ready_by  = Anker des Tages (weekday/weekend ready_by_hour)
-SA₂       = next_sunrise_after(ready_by)
-SA₁       = previous_sunrise_before(SA₂)
-SA₀       = previous_sunrise_before(SA₁)
+ready_by  = Anker des Tages (weekday/weekend ready_by_hour) — nur EV-Deadline
+SA₂       = Sonnenaufgang am Kalendertag von ready_by
+SA₁       = Sonnenaufgang am Vortag
+SA₀       = Sonnenaufgang zwei Tage davor
 MILP      = SA₀ → SA₂   (volle Sunrise-Matrix; charging_anchor = ready_by)
 Book      = [SA₁, SA₂)  (Kosten / CSV / Progress / SoC-Kette)
 SOC in    = SoC an SA₁ = End-SoC an SA₂ des vorherigen Sunrise-Schritts
             (hartes SoC-Hold am Slot vor SA₁; kein terminal end=start am ready_by;
              kein SOC_min an SA₂ in SE v1)
-Flex      = nur im Book-Slice (flex_book_start / flex_book_hours)
+Flex      = nur im Book-Slice (flex_book_start / flex_book_hours) — harte Grenze für
+            alle Flex-Verbraucher inkl. EV-Deadline (kein Foresight-Merge)
 Daten     = historische Ist-Verbräuche/PV aus cons_data.csv
 Geo/Zeit  = latitude/longitude aus aufgelöstem Live-Szenario (Hausprofil)
 ```
 
-Aufeinanderfolgende Schritte buchen **aneinanderstoßende** Sunrise-Intervalle — auch wenn ready_by von 07→10 oder 10→07 springt (kein Wanduhr-Gap/Overlap wie früher bei [ready_by−24h, ready_by)).
+Aufeinanderfolgende Schritte buchen **aneinanderstoßende** Sunrise-Intervalle (Sonnenaufgang-Kette) — auch wenn ready_by von 07→12 springt oder die Sonne nach ready_by aufgeht. Die Ladenacht vor ready_by (Abend → SA₂) liegt im selben Buchungsfenster wie das EV-Ziel. Der Lauf bucht die Tage start … end+1, damit [start 00:00, end+1 00:00) lückenlos abgedeckt ist; der Überhang wird beim Schreiben des Logs abgeschnitten.
+
+**Korrektur 2026-10-20:** Bis 2.7.0-dev.62 galt SA₂ = erster Sonnenaufgang strikt nach ready_by. Lag der Sonnenaufgang nach 07:00 (Ende Sept. bis Anfang März), fehlte Fr-SA→Sa-SA und So-SA→Mo-SA wurde doppelt gebucht. Zusätzlich lag die EV-Ladenacht vor SA₁; der Foresight-Merge ersetzte dafür ganze Zeilen des Vorfensters und löschte dort Pool-/WP-/Geräte-Energie und Batterie-Aktionen.
 
 Key `sunrise_full_horizon_trial` ist entfernt (fail-fast beim Laden); das Produktverhalten ist immer MILP SA₀→SA₂ + Book [SA₁, SA₂).
 

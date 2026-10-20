@@ -64,15 +64,20 @@ def _apply_backtesting_step(
     return [chart_rows[i] for i in indices], [matrix[i] for i in indices]
 
 
+_UNBOOKED_FLEX_TOLERANCE_KW = 1e-6
+
+
 def _stash_sunrise_full_horizon_flex(
     meta: dict,
     full_chart_rows: list[dict],
     flexible_consumers: list,
 ) -> None:
     """
-    Deadline-Flex (EV) may land in SA₀→SA₁ foresight; book cut drops those hours.
+    Stash full-horizon flex for plausibility; fail loud on flex outside the book.
 
-    Stash full-horizon flex for plausibility and foresight rows for CSV merge.
+    The MILP binds every flex consumer to the book [SA₁, SA₂) (explicit
+    ``flex_indices``), so the SA₀→SA₁ part and the trailing SA₂ slot carry no
+    flex. Energy there would never reach the booked series.
     """
     delivered = _delivered_flex_kwh_from_rows(
         full_chart_rows,
@@ -81,42 +86,24 @@ def _stash_sunrise_full_horizon_flex(
     meta["plausibility_optimized_flex_kwh"] = round(
         sum(float(v) for v in delivered.values()), 3
     )
-    sa1 = naive_backtesting_slot(meta["sa1"])
-    foresight: list[dict] = []
+    book = {naive_backtesting_slot(slot) for slot in meta["step_slot_datetimes"]}
+    unbooked: list[str] = []
     for row in full_chart_rows:
         slot = naive_backtesting_slot(row["slot_datetime"])
-        if slot >= sa1:
+        if slot in book:
             continue
-        flex_kw = sum(
-            float(row.get(consumer_column_name(consumer), 0.0) or 0.0)
-            for consumer in flexible_consumers
+        for consumer in flexible_consumers:
+            column = consumer_column_name(consumer)
+            power = float(row.get(column, 0.0) or 0.0)
+            if power > _UNBOOKED_FLEX_TOLERANCE_KW:
+                unbooked.append(f"{slot.isoformat()} {column}={power:g}")
+    if unbooked:
+        raise ValueError(
+            f"Sunrise-Fenster ready_by {meta['ready_by']}: Flex außerhalb des "
+            f"Buchungsfensters [{meta['sa1']}, {meta['sa2']}) geplant: "
+            + ", ".join(unbooked[:5])
+            + ("…" if len(unbooked) > 5 else "")
         )
-        if flex_kw > 1e-6:
-            foresight.append(row)
-    meta["foresight_flex_rows"] = foresight
-
-
-def _merge_foresight_flex_into_series(
-    all_chart_rows: list[dict],
-    all_timestamps: list,
-    foresight_rows: list[dict],
-) -> None:
-    """Overwrite prior book hours with foresight flex (same slot) so EV energy is kept."""
-    if not foresight_rows:
-        return
-    by_ts = {
-        naive_backtesting_slot(ts): index for index, ts in enumerate(all_timestamps)
-    }
-    for row in foresight_rows:
-        slot = naive_backtesting_slot(row["slot_datetime"])
-        index = by_ts.get(slot)
-        if index is None:
-            all_chart_rows.append(row)
-            all_timestamps.append(row["slot_datetime"])
-            by_ts[slot] = len(all_timestamps) - 1
-        else:
-            all_chart_rows[index] = row
-            all_timestamps[index] = row["slot_datetime"]
 
 
 @dataclass
@@ -195,16 +182,30 @@ def _build_anchor_window_plan(
     )
 
 
+def _sunrise_book_end_soc(full_chart_rows: list[dict], meta: dict) -> float:
+    """SoC at SA₂: start SoC of the MILP slot right after the book.
+
+    Chart rows carry their start-of-slot SoC; chaining the last book row would
+    drop the battery action of the last book slot in every window.
+    """
+    from optimizer.slot_duration import slot_step
+
+    book_end = naive_backtesting_slot(meta["step_slot_datetimes"][-1]) + slot_step()
+    for row in full_chart_rows:
+        if naive_backtesting_slot(row["slot_datetime"]) == book_end:
+            return float(row["Simulierter SoC (%)"])
+    raise ValueError(
+        f"Sunrise-Fenster ready_by {meta['ready_by']}: MILP-Slot {book_end.isoformat()} "
+        "nach dem Buchungsfenster fehlt (End-SoC an SA₂ nicht bestimmbar)."
+    )
+
+
 def _anchor_step_end_soc(
     chart_rows: list[dict],
     step_start_soc: float,
     battery_params: dict | list[dict],
-    *,
-    horizon_mode: str,
 ) -> float:
-    """End-SoC des Schritts: Sunrise nimmt die letzte Buchstunde, sonst das Horizontende."""
-    if horizon_mode == SUNRISE_WINDOW and chart_rows:
-        return float(chart_rows[-1]["Simulierter SoC (%)"])
+    """End-SoC eines fixed_24h-Schritts (Horizontende); Sunrise: ``_sunrise_book_end_soc``."""
     end_soc = horizon_end_soc_from_chart_rows(chart_rows)
     if end_soc is None:
         end_soc = horizon_end_soc_percent(
@@ -278,7 +279,7 @@ def _simulate_anchor_step(
     list[dict] | None,
     int | None,
 ]:
-    """Ein Backtesting-Schritt für fixed_24h oder sunrise_window (ready_by → SA₂ book)."""
+    """Ein Backtesting-Schritt für fixed_24h oder sunrise_window (Book [SA₁, SA₂) je ready_by-Tag)."""
     step_start_soc = float(sim_soc)
     plan = _build_anchor_window_plan(
         anchor,
@@ -301,15 +302,15 @@ def _simulate_anchor_step(
     flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
     if horizon_mode == SUNRISE_WINDOW:
         _stash_sunrise_full_horizon_flex(plan.meta, chart_rows, flexible_consumers)
+        new_soc = _sunrise_book_end_soc(chart_rows, plan.meta)
     full_rows, full_matrix = _optional_full_horizon_snapshot(
         plan, chart_rows, collect_full_horizon=collect_full_horizon
     )
     chart_rows, matrix = _apply_backtesting_step(
         chart_rows, plan.matrix, plan.meta, horizon_mode=horizon_mode
     )
-    new_soc = _anchor_step_end_soc(
-        chart_rows, step_start_soc, battery_params, horizon_mode=horizon_mode
-    )
+    if horizon_mode != SUNRISE_WINDOW:
+        new_soc = _anchor_step_end_soc(chart_rows, step_start_soc, battery_params)
     return (
         chart_rows,
         matrix,

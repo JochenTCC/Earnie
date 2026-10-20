@@ -377,6 +377,30 @@ def _add_one_consumer_delivery_constraints(
     )
 
 
+def block_flex_outside_book(
+    model: MilpHorizonModel,
+    book_indices: list[int] | None,
+) -> None:
+    """Explicit book slice (SE sunrise [SA₁, SA₂)): no flex consumer runs outside it.
+
+    Delivery constraints only cover eligible slots; without this block the solver
+    may park flex energy in unbooked slots (gap tolerance), which is then lost.
+    """
+    if book_indices is None:
+        return
+    horizon_indices = list(range(model.horizon))
+    for consumer in model.planned_consumers:
+        apply_slot_availability_constraints(
+            model.prob,
+            model.consumer_on,
+            consumer,
+            horizon_indices,
+            list(book_indices),
+            model.consumer_p,
+            model.consumer_pv_follow,
+        )
+
+
 def _add_consumer_delivery_constraints(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],

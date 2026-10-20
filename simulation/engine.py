@@ -81,7 +81,6 @@ from simulation.anchor_step import (
     _apply_backtesting_step,
     _hour_cost_parts_without_optimization,
     _hour_cost_without_optimization,
-    _merge_foresight_flex_into_series,
     _simulate_anchor_step,
     _stash_sunrise_full_horizon_flex,
 )
@@ -160,6 +159,58 @@ def list_simulation_anchors(
             continue
         anchors.append(anchor)
     return anchors
+
+
+def list_sunrise_step_anchors(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    cache: HistoricalDataCache,
+    scenario_params: dict,
+) -> list[datetime]:
+    """
+    ready_by anchors whose sunrise books chain over ``[start 00:00, end+1 00:00)``.
+
+    A sunrise book ends at the sunrise of its anchor's calendar date
+    (``resolve_ready_by_sunrise_step``), so the chain needs the anchors dated
+    ``start`` … ``end+1``: the first book starts at SA(start−1), the last ends at
+    SA(end+1); the spill outside the period is clipped when the log is written.
+    Books without logged load are skipped, as in ``list_simulation_anchors``.
+    """
+    from simulation.backtesting_horizon import naive_backtesting_slot
+
+    cache.load()
+    first_day = start.normalize().date()
+    last_day = (end.normalize() + pd.Timedelta(days=1)).date()
+    anchors: list[datetime] = []
+    for day in pd.date_range(first_day - timedelta(days=1), last_day, freq="D"):
+        anchor = window_anchor_for_date(day.date())
+        if not first_day <= anchor.date() <= last_day:
+            continue
+        step = resolve_sunrise_book_step_for_scenario(anchor, scenario_params)
+        book_slots = [naive_backtesting_slot(slot) for slot in step.book_slots]
+        _, _, total_load, _ = cache.get_window_consumption(book_slots)
+        if sum(total_load) <= 0:
+            continue
+        anchors.append(anchor)
+    return anchors
+
+
+def _assert_unique_book_slots(timestamps: list[datetime]) -> None:
+    """Sunrise books chain without overlap; a repeated slot means double booking."""
+    from simulation.backtesting_horizon import naive_backtesting_slot
+
+    seen: set[datetime] = set()
+    duplicates: list[str] = []
+    for ts in timestamps:
+        slot = naive_backtesting_slot(ts)
+        if slot in seen:
+            duplicates.append(slot.isoformat())
+        seen.add(slot)
+    if duplicates:
+        raise ValueError(
+            f"Sunrise-Backtesting: {len(duplicates)} Slots doppelt gebucht, z. B. "
+            + ", ".join(duplicates[:5])
+        )
 
 
 
@@ -407,7 +458,8 @@ def run_simulation(
 
     horizon_mode:
       - fixed_24h: [Anker−24h, Anker), SOC frei am Fensterende (E-Auto-Anker)
-      - sunrise_window: MILP SA_0-->SA_2, SOC_min am Sonnenaufgang; Output weiter 24h/Schritt
+      - sunrise_window: lückenlose Sonnenaufgang-Kette, je Tag start…end+1 Book
+        [SA₁, SA₂) aus MILP SA₀→SA₂; SoC-Kette an den Sonnenaufgängen
     """
     horizon_mode = parse_horizon_mode(horizon_mode)
     if horizon_mode == SUNRISE_WINDOW:
@@ -416,7 +468,10 @@ def run_simulation(
     cache = cache or HistoricalDataCache()
     cache.load()
 
-    anchors = list_simulation_anchors(start, end, cache)
+    if horizon_mode == SUNRISE_WINDOW:
+        anchors = list_sunrise_step_anchors(start, end, cache, scenario_params)
+    else:
+        anchors = list_simulation_anchors(start, end, cache)
     if not anchors:
         raise ValueError(
             f"Keine historischen Verbrauchsfenster zwischen {start.date()} und {end.date()}."
@@ -450,11 +505,6 @@ def run_simulation(
         for anchor in anchors:
             step = _process_anchor_window(cfg, anchor, sim_soc, hours_done, plausibility)
             sim_soc = step.sim_soc
-            foresight_flex = list(step.meta.pop("foresight_flex_rows", []) or [])
-            if foresight_flex:
-                _merge_foresight_flex_into_series(
-                    all_chart_rows, all_timestamps, foresight_flex
-                )
             all_chart_rows.extend(step.chart_rows)
             all_timestamps.extend(row["slot_datetime"] for row in step.matrix)
 
@@ -466,6 +516,8 @@ def run_simulation(
         if collect_cbc:
             clear_cbc_milp_context()
 
+    if horizon_mode == SUNRISE_WINDOW:
+        _assert_unique_book_slots(all_timestamps)
     df_res = _finalize_simulation_result(
         all_chart_rows, all_timestamps, init.flexible_consumers
     )
@@ -494,7 +546,6 @@ __all__ = [
     "_hour_cost_without_optimization",
     "_hour_hold_reindex",
     "_imported_pv_kw_for_slots",
-    "_merge_foresight_flex_into_series",
     "_plausibility_reference_values",
     "_pricing_kwargs_from_scenario",
     "_ready_hour_for_date",
@@ -513,6 +564,7 @@ __all__ = [
     "flex_consumers_from_snapshot",
     "is_scenario_reference_id",
     "list_simulation_anchors",
+    "list_sunrise_step_anchors",
     "plan_per_scenario_reference_tasks",
     "print_plausibility_report",
     "resolve_reference_hourly_load",

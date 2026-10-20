@@ -27,6 +27,7 @@ from .milp_consumer_delivery import (
     _log_urgent_rule_observability,
     _max_deliverable_kwh,
     _parse_charging_deadline,
+    block_flex_outside_book,
     delivery_constraint_diagnostics,
     filter_feasible_consumers,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "add_generic_block_start_guard",
     "add_generic_flex_rolling_constraints",
     "add_min_on_time_constraints",
+    "block_flex_outside_book",
     "delivery_constraint_diagnostics",
     "filter_feasible_consumers",
 ]

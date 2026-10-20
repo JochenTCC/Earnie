@@ -18,9 +18,11 @@ from simulation.engine import (
     build_historical_window_matrix,
     build_sunrise_window_matrix,
     list_simulation_anchors,
+    list_sunrise_step_anchors,
     run_simulation,
     window_anchor_for_date,
 )
+from simulation.period_clip import clip_results_to_period
 from simulation.horizon_mode import (
     BACKTESTING_STEP_HOURS,
     FIXED_24H,
@@ -89,8 +91,8 @@ class TestSunriseBacktestingRun:
         )
         start = pd.Timestamp(SOC_CHAIN_START_DAY)
         end = pd.Timestamp(SOC_CHAIN_END_DAY)
-        anchors = list_simulation_anchors(start, end, cache)
-        assert len(anchors) == 2
+        anchors = list_sunrise_step_anchors(start, end, cache, scenario)
+        assert len(anchors) == 3
 
         df, plausibility, _ = run_simulation(
             start,
@@ -101,8 +103,10 @@ class TestSunriseBacktestingRun:
             initial_soc=50.0,
             horizon_mode=SUNRISE_WINDOW,
         )
-        # Two abutting sunrise books (~24h each; DST/astronomy may vary ±1h → ±4 QH).
-        assert 176 <= len(df) <= 208
+        # Three abutting sunrise books SA(start−1)→SA(end+1) (~24h each, ±4 QH).
+        assert 280 <= len(df) <= 296
+        assert df.index.is_unique
+        assert len(clip_results_to_period(df, start, end)) == 192
         assert plausibility.failed == []
         assert df["sim_soc"].notna().all()
 
@@ -123,7 +127,8 @@ class TestSunriseBacktestingRun:
             start, end, scenario, prices, cache=cache, horizon_mode=SUNRISE_WINDOW
         )
         assert len(df_fixed) == 192
-        assert abs(len(df_sunrise) - len(df_fixed)) <= 16
+        # Sunrise books spill past the period on both ends; the period itself matches.
+        assert len(clip_results_to_period(df_sunrise, start, end)) == len(df_fixed)
 
 
 class TestSunriseHorizonSizing:

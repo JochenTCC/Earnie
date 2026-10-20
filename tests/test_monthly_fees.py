@@ -160,6 +160,17 @@ def test_build_summary_zero_fee_matches_volumetric() -> None:
     assert summary["monthly_eur"]["2025-03"]["A"] == 12.0
 
 
+def test_clip_results_keeps_every_quarter_hour_of_end_day() -> None:
+    from simulation.period_clip import clip_results_to_period
+
+    idx = pd.date_range("2025-07-30 22:00:00", "2025-08-01 02:00:00", freq="15min")
+    df = pd.DataFrame({"sim_cost": [1.0] * len(idx)}, index=idx)
+    clipped = clip_results_to_period(df, "2025-07-31", "2025-07-31")
+    assert clipped.index.min() == pd.Timestamp("2025-07-31 00:00:00")
+    assert clipped.index.max() == pd.Timestamp("2025-07-31 23:45:00")
+    assert len(clipped) == 96
+
+
 def test_clip_results_drops_spill_months_for_fees() -> None:
     from simulation.period_clip import clip_results_to_period
 

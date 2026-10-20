@@ -41,6 +41,7 @@ from simulation.engine import (
     build_per_scenario_reference_costs,
     compute_historical_reference_costs,
     list_simulation_anchors,
+    list_sunrise_step_anchors,
     plan_per_scenario_reference_tasks,
     print_plausibility_report,
     run_simulation,
@@ -677,8 +678,20 @@ def _warn_cons_data_balance(scenarios: dict, start, end) -> None:
             logging.warning("Verbrauchsbilanz Profil '%s': %s", profile.get("id"), balance["message"])
 
 
-def _warn_load_consistency(scenarios: dict, anchors: list, horizon_mode: str) -> None:
-    """Log (not abort) when the optimisation load differs from the reference load."""
+def _warn_load_consistency(
+    scenarios: dict,
+    anchors: list,
+    horizon_mode: str,
+    *,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    cache: HistoricalDataCache,
+) -> None:
+    """Log (not abort) when the optimisation load differs from the reference load.
+
+    Sunrise mode checks the scenario's own book chain (``list_sunrise_step_anchors``);
+    ``anchors`` are the fixed_24h ones.
+    """
     from data.modeled_climate import ModeledClimateContext
     from house_config.planning_flex_bridge import PROFILE_SPEC, resolve_consumption_source
     from simulation.load_consistency import (
@@ -697,7 +710,11 @@ def _warn_load_consistency(scenarios: dict, anchors: list, horizon_mode: str) ->
         seen.add(profile.get("id"))
         report = profile_spec_vs_reference(
             profile,
-            anchors,
+            (
+                list_sunrise_step_anchors(start, end, cache, scenario_params)
+                if horizon_mode == SUNRISE_WINDOW
+                else anchors
+            ),
             climate=ModeledClimateContext.from_scenario(scenario_params),
             window_for_anchor=(
                 sunrise_book_windows(scenario_params)
@@ -839,7 +856,9 @@ def main(argv: list[str] | None = None):
             except BaseloadOverAllocatedError as exc:
                 raise SystemExit(str(exc)) from exc
     _warn_cons_data_balance(scenarios, start, end)
-    _warn_load_consistency(scenarios, anchors, horizon_mode)
+    _warn_load_consistency(
+        scenarios, anchors, horizon_mode, start=start, end=end, cache=cache
+    )
     live_scenario_id = config.get_live_scenario_id()
     live_params = scenarios.get(live_scenario_id) or (
         next(iter(scenarios.values())) if scenarios else None
