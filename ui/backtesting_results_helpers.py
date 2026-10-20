@@ -13,7 +13,9 @@ from simulation.engine import (
     is_scenario_reference_id,
     scenario_reference_id,
 )
-from simulation.jahres_verbrauch import jahres_verbrauch_kwh
+from optimizer.slot_duration import DEFAULT_DT_H
+from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
+from simulation.jahres_verbrauch import jahres_standby_kwh, jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
 
 _DASH = "—"
@@ -184,27 +186,40 @@ def exceeds_live_reference_rel(
     return abs(float(optimized_kwh) - float(live_ref_kwh)) / base > threshold
 
 
-def _live_reference_kwh(plausibility: dict, ref_kwh: float | None) -> float | None:
-    live_totals = (plausibility.get("live") or {}).get("consumption_totals") or {}
-    live_kwh = live_totals.get("historical_kwh")
-    if live_kwh is not None:
-        return float(live_kwh)
-    return ref_kwh
+def _booked(meta: dict) -> dict:
+    return meta.get(BOOKED_CONSUMPTION_KEY) or {}
+
+
+def _live_reference_kwh(meta: dict) -> float | None:
+    """Booked consumption of the Live scenario's reference series."""
+    live_id = _resolve_live_scenario_id(meta)
+    if not live_id:
+        return None
+    ref_id = (meta.get("reference_by_scenario") or {}).get(live_id)
+    if not ref_id:
+        return None
+    return jahres_verbrauch_kwh(ref_id, booked_consumption=_booked(meta))
 
 
 def build_scenario_consumption_rows(
     meta: dict,
-    ref_kwh: float | None,
     *,
     hourly_df=None,
     scenarios: dict | None = None,
     timestamps: list[str] | None = None,
 ) -> list[dict]:
-    """Vergleich Historisch/Live-Referenz vs. optimierter kWh je Szenario (Debug)."""
+    """Soll / MILP-Plan / gebuchte kWh je optimiertem Szenario (Debug).
+
+    ``Optimiert`` and both reference columns are booked series totals
+    (``booked_consumption``); ``Soll`` and ``Geplant`` come from the window
+    plausibility sums, so planned → booked losses are visible.
+    """
     labels = meta.get("labels", {})
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
     plausibility = meta.get("plausibility", {})
-    live_ref_kwh = _live_reference_kwh(plausibility, ref_kwh)
+    booked = _booked(meta)
+    historical_kwh = jahres_verbrauch_kwh(ref_id, booked_consumption=booked)
+    live_ref_kwh = _live_reference_kwh(meta)
 
     rows: list[dict] = []
     for scenario_id in meta.get("scenario_ids", []):
@@ -213,18 +228,19 @@ def build_scenario_consumption_rows(
         label = labels.get(scenario_id, scenario_id)
         block = plausibility.get(scenario_id)
         totals = (block or {}).get("consumption_totals") or {}
-        optimized = totals.get("optimized_kwh")
-        optimized_f = None if optimized is None else float(optimized)
+        booked_kwh = jahres_verbrauch_kwh(scenario_id, booked_consumption=booked)
         delta = None
-        if optimized_f is not None and live_ref_kwh is not None:
-            delta = round(optimized_f - float(live_ref_kwh), 1)
+        if booked_kwh is not None and live_ref_kwh is not None:
+            delta = round(booked_kwh - float(live_ref_kwh), 1)
 
         rows.append(
             {
                 "Szenario": label,
-                "Ohne PV und Speicher [kWh]": _format_kwh(ref_kwh),
+                "Ohne PV und Speicher [kWh]": _format_kwh(historical_kwh),
                 "Reference (Live) - ohne Optimierung [kWh]": _format_kwh(live_ref_kwh),
-                "Optimiert (kWh)": _format_kwh(optimized),
+                "Soll Fenster [kWh]": _format_kwh(totals.get("historical_kwh")),
+                "Geplant MILP [kWh]": _format_kwh(totals.get("optimized_kwh")),
+                "Optimiert (kWh)": _format_kwh(booked_kwh),
                 "Δ kWh (Ref. ohne Optimierung)": _format_delta_kwh(delta),
                 "Hinweis": _timing_shift_note(
                     scenario_id,
@@ -308,42 +324,32 @@ def ordered_monthly_chart_labels(meta: dict, present_labels: list[str]) -> list[
     return ordered
 
 
-def _jahres_kwh_value(
-    scenario_id: str,
-    *,
-    ref_id: str,
-    ref_kwh: float | None,
-    plausibility: dict,
-) -> float | None:
-    return jahres_verbrauch_kwh(
-        scenario_id,
-        reference_id=ref_id,
-        ref_kwh=ref_kwh,
-        plausibility=plausibility,
-    )
-
-
-def _jahres_kwh_for_row(
-    scenario_id: str,
-    *,
-    ref_id: str,
-    ref_kwh: float | None,
-    plausibility: dict,
-) -> str:
-    return _format_kwh(
-        _jahres_kwh_value(
-            scenario_id,
-            ref_id=ref_id,
-            ref_kwh=ref_kwh,
-            plausibility=plausibility,
-        )
-    )
-
-
 def _is_live_reference_row(scenario_id: str, live_id: str | None) -> bool:
     if not live_id:
         return False
     return scenario_id == scenario_reference_id(live_id)
+
+
+def _slot_hours(slots: int) -> str:
+    return f"{slots * float(DEFAULT_DT_H):.0f} h"
+
+
+def _booked_series_hints(scenario_id: str, booked: dict) -> list[str]:
+    """Duplicate slots in the series and slot-set differences to its reference."""
+    block = booked.get(scenario_id) or {}
+    hints: list[str] = []
+    duplicates = int(block.get("duplicate_slots") or 0)
+    if duplicates:
+        hints.append(f"{_slot_hours(duplicates)} doppelt gebucht (einmal gezählt)")
+    coverage = block.get("reference_coverage") or {}
+    only_here = int(coverage.get("only_scenario_slots") or 0)
+    only_ref = int(coverage.get("only_reference_slots") or 0)
+    if only_here or only_ref:
+        hints.append(
+            "Referenz rechnet über andere Zeitslots "
+            f"({_slot_hours(only_here)} nur hier, {_slot_hours(only_ref)} nur in der Referenz)"
+        )
+    return hints
 
 
 def _annual_cost_hinweis(
@@ -353,45 +359,43 @@ def _annual_cost_hinweis(
     ref_id: str,
     kwh_value: float | None,
     live_ref_kwh: float | None,
+    booked: dict,
 ) -> str:
+    hints = _booked_series_hints(scenario_id, booked)
     # Live-Referenz and Historisch (Ist-Zähler) are baselines, not optimized runs.
     # Historisch vs model Live-ref often differs when meter ≠ Hausprofil — not a sim bug.
-    if _is_live_reference_row(scenario_id, live_id):
-        return _DASH
-    if scenario_id == ref_id:
-        return _DASH
-    if exceeds_live_reference_rel(kwh_value, live_ref_kwh):
-        return _CONSUMPTION_DEVIATION_HINT
-    return _DASH
+    is_baseline = _is_live_reference_row(scenario_id, live_id) or scenario_id == ref_id
+    if not is_baseline and exceeds_live_reference_rel(kwh_value, live_ref_kwh):
+        hints.append(_CONSUMPTION_DEVIATION_HINT)
+    return " · ".join(hints) if hints else _DASH
 
 
-def build_annual_cost_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
+def build_annual_cost_rows(meta: dict) -> list[dict]:
+    """Gesamtkosten rows; Jahres Verbrauch / Standby from the booked series of every row."""
     summary = meta.get("summary", {})
     totals = summary.get("total_eur", {})
     labels = meta.get("labels", {})
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
-    plausibility = meta.get("plausibility", {})
+    booked = _booked(meta)
     live_ref_total = _live_reference_total_eur(meta, totals)
     live_id = _resolve_live_scenario_id(meta)
-    live_ref_kwh = _live_reference_kwh(plausibility, ref_kwh)
+    live_ref_kwh = _live_reference_kwh(meta)
 
     rows: list[dict] = []
     for scenario_id in _annual_cost_row_order(meta, totals):
         total_eur = totals[scenario_id]
         label = labels.get(scenario_id, scenario_id)
-        kwh_value = _jahres_kwh_value(
-            scenario_id,
-            ref_id=ref_id,
-            ref_kwh=ref_kwh,
-            plausibility=plausibility,
-        )
+        kwh_value = jahres_verbrauch_kwh(scenario_id, booked_consumption=booked)
         kwh_cell = _format_kwh(kwh_value)
+        standby = jahres_standby_kwh(scenario_id, booked_consumption=booked)
+        standby_cell = _format_kwh(standby) if standby else _DASH
         hinweis = _annual_cost_hinweis(
             scenario_id,
             live_id=live_id,
             ref_id=ref_id,
             kwh_value=kwh_value,
             live_ref_kwh=live_ref_kwh,
+            booked=booked,
         )
         is_reference = scenario_id == ref_id or is_scenario_reference_id(scenario_id)
         if is_reference:
@@ -399,6 +403,7 @@ def build_annual_cost_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
                 {
                     "Szenario": label,
                     "Jahres Verbrauch [kWh]": kwh_cell,
+                    "Speicher-Standby [kWh]": standby_cell,
                     "Jahres Kosten [€]": f"{total_eur:.2f} €",
                     "Δ vs Referenz [€]": _DASH,
                     "Hinweis": hinweis,
@@ -413,6 +418,7 @@ def build_annual_cost_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
             {
                 "Szenario": label,
                 "Jahres Verbrauch [kWh]": kwh_cell,
+                "Speicher-Standby [kWh]": standby_cell,
                 "Jahres Kosten [€]": f"{total_eur:.2f} €",
                 "Δ vs Referenz [€]": delta_cell,
                 "Hinweis": hinweis,

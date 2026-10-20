@@ -338,7 +338,7 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 
 Die Auswertung umfasst unter anderem:
 
-- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Jahres Kosten, Δ zur Live-Referenz und Hinweis
+- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Speicher-Standby, Jahres Kosten, Δ zur Live-Referenz und Hinweis
 - **Kostenvergleich** je Monat (Referenz und optimierte Szenarien)
 - **Monatsverläufe** und Plausibilitätsansichten
 - Charts zu Leistung, Verbrauch und PV, je nach gewählter Ansicht
@@ -352,21 +352,23 @@ Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Koste
 
 ##### Gesamtkosten und -Verbrauch: Jahres Verbrauch [kWh]
 
-Die Werte der Spalte stammen **nicht in jeder Zeile aus derselben Quelle**. Die Zeile **Historisch** kann daher andere kWh-Werte zeigen als die Referenz- und Optimierungszeilen. Das ist beabsichtigt und kein Anzeigefehler.
+Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zeitreihe. Das ist die Reihe, aus der Earnie auch Kosten, Bezug und Einspeisung berechnet. Jeder Zeitslot zählt dabei einmal. Die Fake-Jahresrechnungen zeigen unter „Verbrauch (Info)“ denselben Wert.
 
-| Zeilentyp | Was die Spalte zählt | Herkunft |
-| --------- | -------------------- | -------- |
-| **Historisch** (ohne Optimierung, …) | Summe des **Ist-Verbrauchs** über den Zeitraum | Live-Zählerdatei `cons_data` (`total_kw`, Stundenwerte) |
-| **Referenz** (…) ohne Optimierung | Summe der **Referenzlast** aller gebuchten Fenster (bei `sunrise_window`: Sonnenaufgang bis Sonnenaufgang je ready_by-Tag; bei `fixed_24h`: 24 h) | Hausprofil-Modell (`profile_spec`: Jahresverbrauch, Zeitpläne, Profile), sofern das Szenario ein Hausprofil hat |
-| **Optimiertes Szenario** | Summe der **gelieferten** Last (Grundlast und flexible Verbraucher) aller gebuchten Fenster | Ergebnis der Optimierung (MILP); sollte nahe an der Referenzlast liegen |
+| Zeilentyp | Was die Spalte zählt |
+| --------- | -------------------- |
+| **Historisch** (ohne Optimierung, …) | Last des Live-Hausprofils ohne PV und Batterie über dieselben Zeitfenster wie die Optimierung |
+| **Referenz** (…) ohne Optimierung | Last des Hausprofils des Szenarios über dieselben Zeitfenster wie die Optimierung |
+| **Optimiertes Szenario** | Gebuchte Last aus Grundlast und flexiblen Verbrauchern nach der Optimierung, ohne Speicher-Standby |
+
+Die Spalte **Speicher-Standby** zeigt den Eigenverbrauch der Hausbatterie (`standby_power_kw`). Er erhöht Bezug und Kosten der optimierten Szenarien, zählt aber nicht als Hausverbrauch. Der Pool-Filter zählt bei optimierten Szenarien mit seinem nativen Laufzeitfenster als feste Last, so wie in den Referenzen.
 
 <a id="warum-weicht-historisch-beim-jahresverbrauch-ab"></a>
 
 **Warum weicht Historisch beim Jahresverbrauch ab?**
 
-1. **Ist und Modell:** Historisch spiegelt den gemessenen Hausverbrauch. Alle anderen Zeilen rechnen mit dem konfigurierten Hausprofil (Soll-Jahresverbrauch, Grundlast, Verbraucherprofile – inklusive manueller Geräte mit ihrem Standard-Zeitplan). Weichen Ist und Modell voneinander ab (unvollständige CSV, anderer Jahresverbrauch, synthetische Profile), weichen auch die kWh-Werte ab.
-2. **Kosten und kWh derselben Zeile:** Die €-Kosten der Zeile Historisch rechnet Earnie mit der Last des Live-Hausprofils (ohne PV und Batterie) und den Live-Tarifen. Die kWh-Spalte derselben Zeile kommt dagegen aus `cons_data`. Passen Ist und Modell nicht zusammen, gehören € und kWh in dieser einen Zeile nicht 1:1 zusammen.
-3. **PV und Batterie** verändern die Spalte „Jahres Verbrauch“ nicht. Gezählt wird der **Hausverbrauch** (Last), nicht der Netzbezug nach Abzug von PV und Speicher.
+1. **Ist und Modell:** Die Zeile Historisch rechnet mit dem konfigurierten Live-Hausprofil, nicht mit dem gemessenen Zählerstand. Weichen Ist und Modell voneinander ab (unvollständige CSV, anderer Jahresverbrauch, synthetische Profile), unterscheidet sich die Spalte vom tatsächlich gemessenen Jahresverbrauch.
+2. **Zeitfenster:** Referenzen und Optimierung rechnen über dieselben Zeitfenster (bei `sunrise_window` von Sonnenaufgang zu Sonnenaufgang). Decken sie trotzdem nicht dieselben Stunden ab, nennt die Spalte **Hinweis** die Zahl der abweichenden Stunden.
+3. **PV und Batterie** verändern die Spalte „Jahres Verbrauch“ nicht. Gezählt wird der **Hausverbrauch** (Last), nicht der Netzbezug nach Abzug von PV und Speicher. Der Speicher-Standby steht in einer eigenen Spalte.
 4. **Kleine Differenzen** zwischen Referenz und Optimierung desselben Szenarios sind normal (Lastverschiebung, Toleranz der Plausibilitätsprüfung).
 
 Für den Abgleich von Ist und Modell eignen sich der Hauskonfigurator mit der Leistungsprofil-CSV sowie die Tabellen **Gesamtkosten und -Verbrauch** und **Verbrauchsvergleich** im Explorer.

@@ -147,14 +147,13 @@ def _catalog_table_lines(
 
 def _invoice_energy_series(
     df: pd.DataFrame,
-) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series, pd.Series, pd.Series]:
+) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series, pd.Series]:
     import_cost = _series_or_zero(df, "import_cost_eur")
     export_earn = _series_or_zero(df, "export_earn_eur")
     import_kwh = _series_or_zero(df, "import_kwh")
     export_kwh = _series_or_zero(df, "export_kwh")
     k_act = _series_or_nan(df, "k_act")
     k_push_act = _series_or_nan(df, "k_push_act")
-    consumption_kwh = _series_or_zero(df, "consumption_kw")
     if "sim_cost" in df.columns and not df.empty and "import_cost_eur" not in df.columns:
         net = df["sim_cost"].fillna(0.0).astype(float)
         import_cost = net.clip(lower=0.0)
@@ -166,7 +165,6 @@ def _invoice_energy_series(
         export_kwh,
         k_act,
         k_push_act,
-        consumption_kwh,
     )
 
 
@@ -177,6 +175,7 @@ def _year_summary_lines(
     import_kwh_year: float,
     export_kwh_year: float,
     consumption_kwh_year: float,
+    standby_kwh_year: float,
     fees: ScenarioFeeBreakdown,
     month_count: int,
     total_year: float,
@@ -204,6 +203,12 @@ def _year_summary_lines(
         [
             f"| Einspeiseerlös | −{_fmt_eur(export_year)} ({_fmt_kwh(export_kwh_year)}) |",
             f"| Verbrauch (Info) | {_fmt_kwh(consumption_kwh_year)} |",
+        ]
+    )
+    if standby_kwh_year > 0.0:
+        lines.append(f"| Speicher-Standby (Info) | {_fmt_kwh(standby_kwh_year)} |")
+    lines.extend(
+        [
             f"| Lieferant-Grundpreis | {_fmt_eur(fees.supplier_monthly_eur * month_count)} |",
             f"| Netzentgelt-Grundpreis | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
             f"| Messstellengebühr | {_fmt_eur(fees.metering_monthly_eur * month_count)} |",
@@ -233,9 +238,12 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
         nne_hint,
         "- **Leistungspreis** und netzgebietsspezifische Lookup-Tabellen werden "
         "**nicht** modelliert.",
-        "- Verbrauch (Info) = Jahres Verbrauch aus der SE-Tabelle Gesamtkosten "
-        "(nicht Summe der Stunden-CSV; bei Sunrise können die Werte abweichen).",
-        "- Verbrauch geht **nicht** in die Rechnungssumme ein.",
+        "- Verbrauch (Info) = gebuchter Verbrauch der Stundenreihe dieses Szenarios "
+        "(jeder Zeitslot einmal, ohne Speicher-Standby) – derselbe Wert wie "
+        "„Jahres Verbrauch“ in der SE-Tabelle Gesamtkosten.",
+        "- Speicher-Standby (Info) = Eigenverbrauch der Hausbatterie; steckt in "
+        "Bezug/Einspeisung, wird aber nicht als Hausverbrauch gezählt.",
+        "- Verbrauch und Standby gehen **nicht** direkt in die Rechnungssumme ein.",
         "- Ø Tarif Cent/kWh: arithmetisches Mittel der stündlichen Tarifpreise "
         "über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`); "
         "enthält ggf. den Netznutzung-Arbeitspreis.",
@@ -266,6 +274,7 @@ class _InvoiceYearContext:
     import_kwh_year: float
     export_kwh_year: float
     consumption_kwh_year: float
+    standby_kwh_year: float
     total_year: float
     ap_net_cent: float
     ap_gross_cent: float
@@ -283,7 +292,7 @@ def _build_invoice_year_context(
     *,
     fees: ScenarioFeeBreakdown,
     import_spec: dict | None,
-    verbrauch_info_kwh: float | None,
+    booked_consumption: dict,
     grid_fee: dict | None,
 ) -> _InvoiceYearContext:
     """Monatsreihen plus Jahressummen, Netznutzungs-AP und Gesamtbetrag."""
@@ -294,7 +303,6 @@ def _build_invoice_year_context(
         export_kwh,
         k_act,
         k_push_act,
-        consumption_kwh,
     ) = _invoice_energy_series(df)
     months = _month_keys(df)
     month_count = len(months)
@@ -302,11 +310,8 @@ def _build_invoice_year_context(
     export_year = float(export_earn.sum()) if not df.empty else 0.0
     import_kwh_year = float(import_kwh.sum()) if not df.empty else 0.0
     export_kwh_year = float(export_kwh.sum()) if not df.empty else 0.0
-    hourly_consumption_year = float(consumption_kwh.sum()) if not df.empty else 0.0
-    if verbrauch_info_kwh is not None:
-        consumption_kwh_year = float(verbrauch_info_kwh)
-    else:
-        consumption_kwh_year = hourly_consumption_year
+    consumption_kwh_year = float(booked_consumption["consumption_kwh"])
+    standby_kwh_year = float(booked_consumption["standby_kwh"])
     total_year = import_year - export_year + fees.total_monthly_eur * month_count
     components = _netznutzung_components(
         df, grid_fee=grid_fee, import_spec=import_spec
@@ -329,6 +334,7 @@ def _build_invoice_year_context(
         import_kwh_year=import_kwh_year,
         export_kwh_year=export_kwh_year,
         consumption_kwh_year=consumption_kwh_year,
+        standby_kwh_year=standby_kwh_year,
         total_year=total_year,
         ap_net_cent=ap_net,
         ap_gross_cent=ap_gross,
@@ -351,6 +357,7 @@ def _invoice_summary_lines(
             import_kwh_year=ctx.import_kwh_year,
             export_kwh_year=ctx.export_kwh_year,
             consumption_kwh_year=ctx.consumption_kwh_year,
+            standby_kwh_year=ctx.standby_kwh_year,
             fees=fees,
             month_count=ctx.month_count,
             total_year=ctx.total_year,
@@ -432,13 +439,13 @@ def render_scenario_invoice_markdown(
     fees: ScenarioFeeBreakdown,
     import_spec: dict | None,
     export_spec: dict | None,
-    verbrauch_info_kwh: float | None = None,
+    booked_consumption: dict,
     grid_fee: dict | None = None,
 ) -> str:
     """Build one German fake-Jahresrechnung markdown body.
 
-    ``verbrauch_info_kwh`` should match SE Gesamtkosten Jahres Verbrauch when set;
-    otherwise falls back to summing hourly ``consumption_kw`` (legacy).
+    ``booked_consumption`` is this result's ``booked_consumption_totals`` entry —
+    the same source as SE Gesamtkosten Jahres Verbrauch / Speicher-Standby.
 
     ``grid_fee`` is the resolved house-profile grid-fee spec (``data.grid_fees``).
     When set, Jahr splits Lieferant vs Netznutzung (same Gesamt; AP already in k_act).
@@ -447,7 +454,7 @@ def render_scenario_invoice_markdown(
         df,
         fees=fees,
         import_spec=import_spec,
-        verbrauch_info_kwh=verbrauch_info_kwh,
+        booked_consumption=booked_consumption,
         grid_fee=grid_fee,
     )
     lines = [
@@ -497,17 +504,21 @@ def write_se_invoices(
     extra_ref_specs: list[tuple[str, dict | None, str]] | None = None,
     period_start: str | None = None,
     period_end: str | None = None,
-    verbrauch_info_kwh_by_scenario: dict[str, float] | None = None,
+    booked_consumption_by_scenario: dict[str, dict],
 ) -> list[str]:
     """Write one markdown invoice per result scenario under ``log_dir/invoices/``.
 
-    Pass ``verbrauch_info_kwh_by_scenario`` from ``jahres_verbrauch_map`` so
-    Verbrauch (Info) matches SE Gesamtkosten Jahres Verbrauch.
+    ``booked_consumption_by_scenario`` (``booked_consumption_by_result``) feeds
+    Verbrauch (Info) / Speicher-Standby — same values as SE Gesamtkosten.
     """
+    missing = [sid for sid in results if sid not in booked_consumption_by_scenario]
+    if missing:
+        raise ValueError(
+            "Gebuchter Verbrauch fehlt für Rechnungen: " + ", ".join(sorted(missing))
+        )
     invoice_dir = os.path.join(log_dir, "invoices")
     os.makedirs(invoice_dir, exist_ok=True)
     written: list[str] = []
-    verbrauch_map = verbrauch_info_kwh_by_scenario or {}
     for scenario_id, df in results.items():
         frame = df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         if period_start and period_end and not frame.empty:
@@ -526,7 +537,6 @@ def write_se_invoices(
             export_spec = params.get("_export_tariff_spec")
         fees = fee_breakdown_by_scenario.get(scenario_id) or ScenarioFeeBreakdown()
         label = labels.get(scenario_id, scenario_id)
-        verbrauch_info = verbrauch_map.get(scenario_id)
         body = render_scenario_invoice_markdown(
             scenario_id=scenario_id,
             label=label,
@@ -534,7 +544,7 @@ def write_se_invoices(
             fees=fees,
             import_spec=import_spec if isinstance(import_spec, dict) else None,
             export_spec=export_spec if isinstance(export_spec, dict) else None,
-            verbrauch_info_kwh=verbrauch_info,
+            booked_consumption=booked_consumption_by_scenario[scenario_id],
             grid_fee=_grid_fee_from_params(params),
         )
         path = os.path.join(

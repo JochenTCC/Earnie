@@ -222,6 +222,7 @@ def test_invoice_splits_arbeitspreis_by_time_window():
         fees=ScenarioFeeBreakdown(),
         import_spec={"id": "fix", "label": "Fix", "type": "fixed_cent", "prices_include_vat": True},
         export_spec=None,
+        booked_consumption={"consumption_kwh": 0.5, "standby_kwh": 0.0},
         grid_fee=_spec(),
     )
     assert "SNAP (Sommer-Nieder-Arbeitspreis)" in body

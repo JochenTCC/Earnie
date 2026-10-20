@@ -324,6 +324,37 @@ def _matrix_price_inputs(
     return pv_profile, epex_prices, brutto_prices, price_sources
 
 
+def native_filter_kw_by_slot(
+    slot_datetimes: list[datetime],
+    flexible_consumers: list | None,
+) -> list[dict[str, float]]:
+    """Native filter duty cycle (kW per consumer) per slot — fixed load in SE.
+
+    The MILP blocks these slots and credits their energy against the filter
+    target (``adjust_targets_for_native_filter``), so SE must book the run as
+    fixed load or the energy is lost.
+    """
+    from optimizer.filter_context import logged_native_filter_windows, native_filter_kw_at
+
+    consumers = (
+        flexible_consumers
+        if flexible_consumers is not None
+        else config.get_flexible_consumers(optimizer_only=True)
+    )
+    windows = logged_native_filter_windows(consumers)
+    if not windows:
+        return [{} for _ in slot_datetimes]
+    return [native_filter_kw_at(windows, slot_dt) for slot_dt in slot_datetimes]
+
+
+def _native_filter_kwh_totals(native_kw: list[dict[str, float]]) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for by_id in native_kw:
+        for cid, kw in by_id.items():
+            totals[cid] = totals.get(cid, 0.0) + float(kw) * float(DEFAULT_DT_H)
+    return {cid: round(kwh, 3) for cid, kwh in totals.items()}
+
+
 def _matrix_rows_from_slots(
     slot_datetimes: list[datetime],
     consumption: _MatrixConsumption,
@@ -332,11 +363,16 @@ def _matrix_rows_from_slots(
     pv_profile: list[float],
     consumption_source: str,
     anchor: datetime,
+    native_filter_kw: list[dict[str, float]],
 ) -> list[dict]:
-    """Baut die Matrix-Zeilen aus Slots, Preisen, PV-Profil und Verbrauchsreihen."""
+    """Baut die Matrix-Zeilen aus Slots, Preisen, PV-Profil und Verbrauchsreihen.
+
+    ``expected_p_act`` includes the native filter run (fixed load in the energy
+    balance); the series split re-derives it per slot from the same window.
+    """
     epex_prices, brutto_prices, price_sources = prices
     matrix = []
-    for slot_dt, price, epex, pv, base, total, price_source in zip(
+    for slot_dt, price, epex, pv, base, total, price_source, native in zip(
         slot_datetimes,
         brutto_prices,
         epex_prices,
@@ -344,7 +380,9 @@ def _matrix_rows_from_slots(
         consumption.baseload_kw,
         consumption.matrix_total_kw,
         price_sources,
+        native_filter_kw,
     ):
+        native_sum = sum(native.values())
         row = {
             "hour": slot_dt.hour,
             "date": slot_dt.date(),
@@ -352,7 +390,7 @@ def _matrix_rows_from_slots(
             "k_act": price,
             "price_buy": epex,
             "price_source": price_source,
-            "expected_p_act": base,
+            "expected_p_act": round(base + native_sum, 3) if native_sum else base,
             "expected_p_total": total,
             "expected_p_pv": pv,
             "consumption_mode": consumption_source,
@@ -458,6 +496,7 @@ def build_historical_matrix_for_slots(
         price_resources=price_resources,
         planning_moment=planning_moment,
     )
+    native_filter_kw = native_filter_kw_by_slot(slot_datetimes, flexible_consumers)
     matrix = _matrix_rows_from_slots(
         slot_datetimes,
         consumption,
@@ -465,6 +504,7 @@ def build_historical_matrix_for_slots(
         pv_profile=pv_profile,
         consumption_source=consumption_source,
         anchor=charging_anchor if charging_anchor is not None else window_end,
+        native_filter_kw=native_filter_kw,
     )
     settings = feed_in_settings or config.get_feed_in_settings()
     feed_in_prices.enrich_matrix_feed_in_prices(matrix, settings)
@@ -477,6 +517,7 @@ def build_historical_matrix_for_slots(
         reference_total_kwh=round(sum(reference_total_load), 3),
         baseload_stored=baseload_stored,
     )
+    meta["native_filter_kwh"] = _native_filter_kwh_totals(native_filter_kw)
     if flexible_consumers:
         meta["_flexible_consumers"] = flexible_consumers
     return matrix, meta

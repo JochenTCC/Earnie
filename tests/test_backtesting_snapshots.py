@@ -225,5 +225,6 @@ def test_save_backtesting_log_removes_stale_snapshots_without_new_ones(tmp_path)
         {"start": "2025-06-01", "end": "2025-06-01", "horizon_mode": SUNRISE_WINDOW},
         log_dir=str(tmp_path),
         window_snapshots=[],
+        booked_consumption={},
     )
     assert not stale.is_file()

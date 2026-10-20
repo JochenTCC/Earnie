@@ -9,7 +9,7 @@ from data import feed_in_prices
 from data.market_prices import epex_prices_for_slots
 from optimizer.slot_duration import wall_hours_from_slots
 from simulation.historical_cache import HistoricalDataCache
-from simulation.horizon_mode import BACKTESTING_STEP_HOURS
+from simulation.horizon_mode import BACKTESTING_STEP_HOURS, SUNRISE_WINDOW, parse_horizon_mode
 
 
 HISTORICAL_REFERENCE_ID = "historical_reference"
@@ -83,16 +83,46 @@ def _reference_feed_in_settings(
     return config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
 
 
+def reference_slot_datetimes(
+    anchor: datetime,
+    scenario_params: dict | None,
+    horizon_mode: str,
+) -> list[datetime]:
+    """Slots a reference books for ``anchor`` — the same slots as the optimized run.
+
+    ``sunrise_window``: the scenario's book step [SA₁, SA₂); ``fixed_24h``: the
+    24 h before the anchor. Same-slot evaluation keeps Referenz and Optimierung
+    comparable (costs and Jahres Verbrauch over identical hours).
+    """
+    from simulation.engine import window_slot_datetimes
+
+    if parse_horizon_mode(horizon_mode) != SUNRISE_WINDOW:
+        return window_slot_datetimes(anchor)
+    if scenario_params is None:
+        raise ValueError(
+            "Referenz im Modus sunrise_window benötigt Szenario-Parameter "
+            "(latitude/longitude für die Sonnenaufgangs-Fenster)."
+        )
+    from simulation.backtesting_horizon import (
+        naive_backtesting_slot,
+        resolve_sunrise_book_step_for_scenario,
+    )
+
+    step = resolve_sunrise_book_step_for_scenario(anchor, scenario_params)
+    return [naive_backtesting_slot(slot) for slot in step.book_slots]
+
+
 def _reference_window_inputs(
     anchor: datetime,
     cache: HistoricalDataCache,
     prices_df: pd.DataFrame,
     scenario_params: dict | None,
+    horizon_mode: str,
 ) -> tuple[list[datetime], list[float], list[float], list[float], list[float]]:
     """Slots, Referenzlast, PV, Brutto- und EPEX-Preise eines Anker-Fensters."""
-    from simulation.engine import _brutto_prices_for_slots, window_slot_datetimes
+    from simulation.engine import _brutto_prices_for_slots
 
-    slot_datetimes = window_slot_datetimes(anchor)
+    slot_datetimes = reference_slot_datetimes(anchor, scenario_params, horizon_mode)
     total_load = resolve_reference_hourly_load(
         cache,
         slot_datetimes,
@@ -151,11 +181,14 @@ def compute_historical_reference_costs(
     cache: HistoricalDataCache | None = None,
     *,
     scenario_params: dict | None = None,
+    horizon_mode: str,
     on_progress=None,
 ) -> pd.DataFrame:
     """
     Referenzkosten: Referenz-Verbrauch + Szenario-PV, verrechnet mit Szenario-Tarifen,
     ohne Batterie- oder Flex-Optimierung (PV aus scenario_params, ggf. 0).
+
+    ``horizon_mode`` selects the slots per anchor (see ``reference_slot_datetimes``).
     """
     cache = cache or HistoricalDataCache()
     cache.load()
@@ -177,7 +210,9 @@ def compute_historical_reference_costs(
     hours_done = 0
     for anchor in anchors:
         slot_datetimes, total_load, pv_profile, brutto_prices, epex_prices = (
-            _reference_window_inputs(anchor, cache, prices_df, scenario_params)
+            _reference_window_inputs(
+                anchor, cache, prices_df, scenario_params, horizon_mode
+            )
         )
         for slot_dt, load, pv, price, epex in zip(
             slot_datetimes, total_load, pv_profile, brutto_prices, epex_prices
@@ -436,6 +471,7 @@ def build_per_scenario_reference_costs(
     live_scenario_id: str,
     scenario_labels: dict[str, str] | None = None,
     own_reference_by_scenario: dict[str, bool | None] | None = None,
+    horizon_mode: str,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, str], dict[str, str]]:
     """
     Referenzkosten je Szenario (Tarif + PV).
@@ -461,6 +497,7 @@ def build_per_scenario_reference_costs(
             ref_settings,
             cache=cache,
             scenario_params=params,
+            horizon_mode=horizon_mode,
         )
 
     return extra_results, extra_labels, reference_by_scenario

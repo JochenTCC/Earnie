@@ -17,6 +17,7 @@ from simulation.engine import (
     window_anchor_for_date,
     window_slot_datetimes,
 )
+from simulation.horizon_mode import FIXED_24H
 from tests.fixtures.backtesting_fixtures import (
     FIXTURES_ROOT,
     LOW_EAUTO_DAY,
@@ -127,6 +128,7 @@ def test_reference_costs_on_fixture(
         fixture_prices_df,
         ref_settings,
         cache=fixture_cache,
+        horizon_mode=FIXED_24H,
     )
     assert len(df) == slots_for_wall_hours(24)
     assert df["sim_cost"].notna().all()
@@ -153,6 +155,7 @@ def test_reference_progress_reports_wall_hours_not_slots(
         ref_settings,
         cache=fixture_cache,
         scenario_params=fixture_scenario,
+        horizon_mode=FIXED_24H,
         on_progress=lambda current, total: seen.append((current, total)),
     )
     assert seen
@@ -218,6 +221,7 @@ def test_backtesting_log_roundtrip_on_fixture(tmp_path, fixture_cache):
         plausibility,
         period_meta,
         log_dir=str(tmp_path),
+        booked_consumption={},
     )
     meta, hourly = load_backtesting_log(str(tmp_path))
     assert meta["period"]["windows"] == 1

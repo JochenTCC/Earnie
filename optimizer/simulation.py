@@ -228,8 +228,17 @@ def _prepare_horizon_state(
     filters = filter_contexts or resolve_filter_contexts(
         optimization_matrix, consumers_cfg
     )
+    # SE sunrise: the target belongs to the book window, so only native runs
+    # inside it are credited (the SA₀→SA₁ run is booked by the previous window).
+    credit_indices = (
+        _flex_indices_for_book_hours(
+            len(optimization_matrix), 0, options.flex_book_hours, options.flex_book_start
+        )
+        if options.flex_book_hours is not None
+        else None
+    )
     horizon_limits = adjust_targets_for_native_filter(
-        horizon_limits, consumers_cfg, optimization_matrix, filters
+        horizon_limits, consumers_cfg, optimization_matrix, filters, credit_indices
     )
     if disable_horizon_soc_anchor:
         horizon_terminal_soc = None

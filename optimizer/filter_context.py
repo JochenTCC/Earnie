@@ -185,13 +185,60 @@ def resolve_filter_contexts(
     return contexts
 
 
-def expected_native_delivery_kwh(consumer: dict, filter_context: dict | None) -> float:
-    """Erwartete native Filterenergie (kWh) für gesperrte Slots im Horizont."""
+def logged_native_filter_windows(consumers: list) -> dict[str, tuple[float, float, float]]:
+    """Native duty cycle per filter consumer for logged simulation (SE).
+
+    Returns ``{consumer_id: (start_hour, duration_hours, power_kw)}`` from
+    ``filter_schedule.config_fallback`` — the same window ``resolve_filter_contexts``
+    blocks for ``logged_day`` / ``profile_spec`` matrices. Consumers without a
+    complete fallback window are omitted (nothing is blocked for them either).
+    """
+    windows: dict[str, tuple[float, float, float]] = {}
+    for consumer in consumers or []:
+        if not filter_schedule_enabled(consumer):
+            continue
+        start, duration, _source, _extra = resolve_native_window(
+            consumer, logged_simulation=True
+        )
+        if start is None or duration is None or duration <= 0:
+            continue
+        power = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+        if power <= 0:
+            continue
+        windows[str(consumer["id"])] = (float(start), float(duration), power)
+    return windows
+
+
+def native_filter_kw_at(
+    windows: dict[str, tuple[float, float, float]],
+    slot_dt: datetime,
+) -> dict[str, float]:
+    """Native filter kW per consumer running in ``slot_dt`` (empty when none)."""
+    out: dict[str, float] = {}
+    for cid, (start, duration, power) in windows.items():
+        if slot_in_native_window(slot_dt, start, duration):
+            out[cid] = power
+    return out
+
+
+def expected_native_delivery_kwh(
+    consumer: dict,
+    filter_context: dict | None,
+    credit_indices: list[int] | None = None,
+) -> float:
+    """Erwartete native Filterenergie (kWh) für gesperrte Slots im Horizont.
+
+    ``credit_indices``: only blocked slots inside these matrix indices count
+    (SE sunrise: the book window the target belongs to). ``None`` = whole horizon.
+    """
     from .slot_duration import DEFAULT_DT_H
 
     if not filter_context or not filter_schedule_enabled(consumer):
         return 0.0
     blocked = filter_context.get("blocked_indices") or []
+    if credit_indices is not None:
+        allowed = set(credit_indices)
+        blocked = [t for t in blocked if t in allowed]
     power = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     return len(blocked) * power * float(DEFAULT_DT_H)
 
@@ -200,11 +247,14 @@ def ernie_filter_remaining_kwh(
     consumer: dict,
     debt_kwh: float,
     filter_context: dict | None,
+    credit_indices: list[int] | None = None,
 ) -> float:
     """Earnie-Zusatzziel: Loxone-Schulden minus erwartete native Lieferung im Horizont."""
     if debt_kwh <= 1e-9:
         return 0.0
-    native_kwh = expected_native_delivery_kwh(consumer, filter_context)
+    native_kwh = expected_native_delivery_kwh(
+        consumer, filter_context, credit_indices
+    )
     if native_kwh <= 1e-9:
         return debt_kwh
     ernie_kwh = max(0.0, debt_kwh - native_kwh)
@@ -225,8 +275,12 @@ def adjust_targets_for_native_filter(
     consumers: list,
     optimization_matrix: list,
     filter_contexts: dict[str, dict] | None = None,
+    credit_indices: list[int] | None = None,
 ) -> dict[str, float]:
-    """Reduziert Horizont-/Restziele um erwartete native Filterlieferung."""
+    """Reduziert Horizont-/Restziele um erwartete native Filterlieferung.
+
+    ``credit_indices`` limits the credited native slots (SE sunrise book window).
+    """
     if not optimization_matrix:
         return targets
     contexts = filter_contexts or resolve_filter_contexts(optimization_matrix, consumers)
@@ -238,7 +292,7 @@ def adjust_targets_for_native_filter(
         if cid not in adjusted:
             continue
         adjusted[cid] = ernie_filter_remaining_kwh(
-            consumer, float(adjusted[cid]), contexts.get(cid)
+            consumer, float(adjusted[cid]), contexts.get(cid), credit_indices
         )
     return adjusted
 

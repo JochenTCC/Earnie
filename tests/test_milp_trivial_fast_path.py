@@ -18,6 +18,7 @@ from optimizer.milp import (
     milp_trivial_fast_path_enabled,
 )
 from optimizer.simulation import calculate_cost_euro_from_rows, simulate_horizon
+from simulation.horizon_mode import FIXED_24H
 
 _ZERO_BATTERY = {
     "battery_capacity_kwh": 0.0,
@@ -238,6 +239,7 @@ def test_reference_costs_never_call_milp_solver(monkeypatch):
                     prices_df,
                     ref_settings,
                     cache=cache,
+                    horizon_mode=FIXED_24H,
                 )
         assert len(df) == 96
         assert df["sim_cost"].notna().all()

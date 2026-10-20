@@ -198,4 +198,4 @@ Die Auswertung nutzt dieselbe Slot-Zuordnung wie Chart 1 (`allocate_slot_flows`,
 
 Eigene Charts und Monatsauswertung auf Basis von `runtime/backtesting_log.json`, ohne Sunset-2-Sunset-Navigation und ohne Zusammenführung mit dem Produktiv-Log. UI-Seite: **Szenario-Explorer** (`scenario_explorer`).
 
-**Gesamtkosten und -Verbrauch, Spalte „Jahres Verbrauch“:** Die Spalte mischt Ist-Zähler (`cons_data`) in der Zeile Historisch mit Modell- bzw. Optimierungssummen in allen anderen Zeilen. Erklärung: [Betriebsmodi](betriebsmodi.md#gesamtkosten-und--verbrauch), [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).
+**Gesamtkosten und -Verbrauch, Spalte „Jahres Verbrauch“:** In allen Zeilen der gebuchte Verbrauch der jeweiligen Stundenreihe (jeder Zeitslot einmal); der Speicher-Standby steht in einer eigenen Spalte. Erklärung: [Betriebsmodi](betriebsmodi.md#gesamtkosten-und--verbrauch), [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).

@@ -22,6 +22,7 @@ from simulation.engine import (
     compute_historical_reference_costs,
     run_simulation,
 )
+from simulation.horizon_mode import FIXED_24H
 from tests.backtesting_case_selection import (
     DEFAULT_MAX_EAUTO_KWH,
     select_backtesting_smoke_anchor,
@@ -177,6 +178,7 @@ def test_backtesting_reference_costs_single_window(
         ref_settings,
         cache=historical_cache,
         scenario_params=scenario,
+        horizon_mode=FIXED_24H,
     )
     assert len(df) == slots_for_wall_hours(24)
     assert df["sim_cost"].notna().all()
@@ -219,6 +221,7 @@ def test_backtesting_log_roundtrip(tmp_path, smoke_anchor: pd.Timestamp):
         plausibility,
         period_meta,
         log_dir=str(tmp_path),
+        booked_consumption={},
     )
     assert os.path.isfile(log_path)
     meta, hourly = load_backtesting_log(str(tmp_path))
@@ -268,6 +271,7 @@ def test_backtesting_log_price_series_export(tmp_path, smoke_anchor: pd.Timestam
         period_meta,
         log_dir=str(tmp_path),
         prices=prices,
+        booked_consumption={},
     )
     meta, _ = load_backtesting_log(str(tmp_path))
     assert meta["price_series_file"] == BACKTESTING_PRICE_SERIES_CSV

@@ -249,7 +249,6 @@ from ui.backtesting_results import (
     _deviation_labels_map,
     _hourly_timestamps_for_scenario,
     _optimized_scenario_ids,
-    _reference_kwh_for_meta,
     _render_backtesting_results,
     _render_imported_pv_results_notice,
     render_annual_cost_table,

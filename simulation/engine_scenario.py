@@ -135,7 +135,13 @@ def _consumption_kw_columns_from_chart_rows(
     chart_rows: list[dict],
     flexible_consumers: list,
 ) -> dict[str, list[float]]:
-    """Extrahiert optimierte Stundenleistungen (Basislast + Flex je ID) aus Chart-Zeilen."""
+    """Extrahiert optimierte Stundenleistungen (Basislast + Flex je ID) aus Chart-Zeilen.
+
+    The native filter run is fixed load inside ``Verbrauch-Prognose`` (see
+    ``simulation.matrix_builder.native_filter_kw_by_slot``); it is booked on
+    the filter consumer's column, not as Grundlast.
+    """
+    from optimizer.filter_context import logged_native_filter_windows, native_filter_kw_at
     from optimizer.simulation import flexible_consumer_power_kw
     from optimizer.targets import consumer_column_name
 
@@ -145,17 +151,46 @@ def _consumption_kw_columns_from_chart_rows(
         "baseload_kw": [],
         **{key: [] for key in flex_keys},
     }
+    native_windows = logged_native_filter_windows(flexible_consumers)
     for row in chart_rows:
-        baseload = float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+        prognose = float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+        native = (
+            native_filter_kw_at(native_windows, row["slot_datetime"])
+            if native_windows
+            else {}
+        )
+        native_sum = sum(native.values())
+        if native_sum > prognose + 1e-6:
+            raise ValueError(
+                f"Slot {row.get('slot_datetime')}: Verbrauch-Prognose {prognose:.3f} kW "
+                f"enthält den nativen Filterlauf ({native_sum:.3f} kW) nicht."
+            )
+        baseload = prognose - native_sum
         columns["baseload_kw"].append(round(baseload, 4))
         for consumer in flexible_consumers:
             col = consumer_column_name(consumer)
             key = f"{consumer['id']}_kw"
-            columns[key].append(round(float(row.get(col, 0.0) or 0.0), 4))
+            columns[key].append(
+                round(
+                    float(row.get(col, 0.0) or 0.0)
+                    + native.get(str(consumer["id"]), 0.0),
+                    4,
+                )
+            )
         columns["consumption_kw"].append(
-            round(baseload + flexible_consumer_power_kw(row), 4)
+            round(prognose + flexible_consumer_power_kw(row), 4)
         )
     return columns
+
+
+def scenario_standby_power_kw(scenario_params: dict) -> float:
+    """Battery AC standby (kW) the MILP adds to every slot's Verbrauch-Prognose."""
+    battery_params = _scenario_to_battery_params(scenario_params)
+    if isinstance(battery_params, list):
+        return float(
+            sum(max(0.0, float(b.get("standby_power_kw") or 0.0)) for b in battery_params)
+        )
+    return max(0.0, float(battery_params.get("standby_power_kw") or 0.0))
 
 
 def _critical_snapshot_kind(

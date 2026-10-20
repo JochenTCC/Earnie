@@ -145,22 +145,43 @@ Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und fü
 
 ### Gesamtkosten und -Verbrauch
 
-Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
+Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
 
 Der volumetrische **Netznutzung Arbeitspreis** (je Netzgebiet aus `grid_fees.json`) fließt in die Kosten des Szenario-Explorers ein. Ein **Leistungspreis** wird noch nicht berücksichtigt. Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md).
 
-**Datenquellen für `Jahres Verbrauch [kWh]`**:
+**Datenquelle für `Jahres Verbrauch [kWh]` und `Speicher-Standby [kWh]`:** Alle Zeilen (Historisch, Szenario-Referenzen `ref:…`, optimierte Szenarien) lesen dieselbe Quelle `booked_consumption[<id>]` in `backtesting_log.json`. Das ist die Summe der gebuchten Stundenreihe aus `backtesting.csv`, also der Reihe, die auch Kosten, Bezug und Einspeisung trägt.
 
-| Zeile | kWh-Quelle |
-| ----- | ---------- |
-| `historical_reference` (Historisch) | `reference_kwh_for_period` → Summe `cons_data` `total_kw` über `meta.period` |
-| Szenario-Referenz (`ref__…`) | `plausibility[<parent>].consumption_totals.historical_kwh` (Summe der gebuchten Fenster) |
-| Optimiertes Szenario | `plausibility[<id>].consumption_totals.optimized_kwh` |
+| Feld | Bedeutung |
+| ---- | --------- |
+| `consumption_kwh` | Σ `consumption_kw` × Slotdauer über den Zeitraum; jeder Zeitslot zählt einmal, ohne Speicher-Standby |
+| `standby_kwh` | Standby-Leistung der Hausbatterie (`standby_power_kw`) über alle gebuchten Slots; nur bei optimierten Szenarien |
+| `duplicate_slots` | Zeitslots, die mehrere Fenster gebucht haben (einmal gezählt) |
+| `reference_coverage` | Zeitslots, die nur das Szenario bzw. nur seine Referenz rechnet |
+| `components_kwh` | Aufteilung je Verbraucherspalte (Grundlast ohne Standby, `other` = known-Verbraucher) |
 
-Mit Hausprofil ist `consumption_source` typischerweise `profile_spec`. Die Fenster-Referenz ist dann die Spec-Last aus Jahresverbrauch und Zeitplänen und stammt nicht vom Zähler. Die Zeile Historisch bleibt bewusst beim Ist-Zähler. Weicht der Ist-Verbrauch vom Modell ab, sind Unterschiede zu den übrigen Zeilen daher zu erwarten. Eine Kurzfassung steht in der UI-Caption unter der Tabelle; der Anwendertext steht im [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).
+Der Speicher-Standby steckt in der Verbrauch-Prognose der Optimierung und damit in Bezug und Kosten. Als Hausverbrauch zählt er nicht, deshalb steht er in einer eigenen Spalte. Die Zeile Historisch rechnet die Last des Live-Hausprofils ohne PV und Batterie; der Ist-Zähler `cons_data` geht nicht mehr direkt in die Spalte ein.
 
-Weicht der Jahresverbrauch einer Zeile relativ um **mehr als 5 %** (`CONSUMPTION_TOLERANCE_REL`) von der **Live-Referenz** ab, zeigt die Spalte **Hinweis** eine Warnung. Sie verweist auf **Info / About**, Bereich Kontakt: dort ein öffentliches Issue ohne Secrets anlegen; die vollständige Config-ZIP nur privat an `support@earnie-hems.com` senden. Die Zeile der Live-Referenz selbst bleibt ohne Warnung.
+Referenzen und Historisch rechnen über **dieselben Zeitslots** wie die optimierten Szenarien: bei `sunrise_window` je `ready_by`-Tag das Buchungsfenster [SA₁, SA₂) des Szenarios, bei `fixed_24h` die 24 h vor dem Anker. Der Anwendertext steht im [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).
+
+Die Spalte **Hinweis** zeigt:
+
+- **Doppelt gebuchte Zeitslots:** Die Reihe enthält Slots mehrfach; im Jahres Verbrauch zählen sie einmal, in den Kosten mehrfach.
+- **Andere Zeitslots als die Referenz:** Die gebuchten Slot-Mengen von Szenario und Referenz weichen ab (z. B. durch Fenster, die nur die Optimierung bucht). Kosten und Verbrauch beider Zeilen stehen dann nicht ganz auf derselben Basis.
+- **Abweichung > 5 % zur Live-Referenz** (`CONSUMPTION_TOLERANCE_REL`): Warnung mit Verweis auf **Info / About**, Bereich Kontakt. Dort ein öffentliches Issue ohne Secrets anlegen; die vollständige Config-ZIP nur privat an `support@earnie-hems.com` senden. Die Zeilen Historisch und Live-Referenz bleiben ohne diese Warnung.
+
+Ältere Läufe ohne `booked_consumption` zeigen „—“ und den Hinweis, den Szenario-Explorer neu zu berechnen.
 
 ### Verbrauchsvergleich (Debug)
 
-Diese Tabelle steht unter den Gesamtkosten. Sie summiert je optimiertem Szenario die gelieferten kWh über alle 24-h-Fenster, mit Δ gegen die Live-Referenz. Die Spalte **Hinweis** betrifft nur zeitliche Lastverschiebung bei gleicher Spec-Energie.
+Diese Tabelle steht unter den Gesamtkosten und zeigt je optimiertem Szenario:
+
+| Spalte | Quelle |
+| ------ | ------ |
+| `Ohne PV und Speicher [kWh]` | gebuchter Verbrauch der Zeile Historisch |
+| `Reference (Live) - ohne Optimierung [kWh]` | gebuchter Verbrauch der Live-Referenz |
+| `Soll Fenster [kWh]` | Σ Fenster-Sollwerte (`consumption_totals.historical_kwh`) |
+| `Geplant MILP [kWh]` | Σ vom Optimierer je Fenster geplanter Verbrauch inkl. Vorlauf vor SA₁ (`consumption_totals.optimized_kwh`) |
+| `Optimiert (kWh)` | gebuchter Verbrauch des Szenarios (`booked_consumption`, ohne Standby) |
+| `Δ kWh (Ref. ohne Optimierung)` | Optimiert minus Live-Referenz |
+
+Liegt `Optimiert` unter `Geplant MILP`, geht geplante Energie beim Zusammensetzen der Fenster zur Jahresreihe verloren. Die Plausibilitätsprüfung je Fenster (`Plausibilität`) prüft nur den Plan gegen das Soll. Die Plausibilitäts-Summen im Log enthalten zusätzlich `booked_kwh` und `booked_delta_kwh` (gebucht minus Soll). Die Spalte **Hinweis** betrifft nur zeitliche Lastverschiebung bei gleicher Spec-Energie.

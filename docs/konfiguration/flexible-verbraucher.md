@@ -148,6 +148,8 @@ Der Filter ist ein eigener Verbraucher `pool_filter`. Die Heizung bleibt ein sep
 
 Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`flex.pool_filter.set_enable`). Entwickler-Spec: [SwimSpa Filter](../dev/done/swimspa-filter.md).
 
+Im **Szenario-Explorer** läuft der Filter im Fenster aus `filter_schedule.config_fallback` mit `nominal_power_kw` als feste Last. Diese Energie bucht Earnie auf `pool_filter` und rechnet sie gegen das Tagesziel. Earnie plant nur den Rest außerhalb des Fensters. Bei Sonnenaufgang-Fenstern zählt dabei nur der native Lauf im jeweiligen Buchungsfenster.
+
 ## Manuelle Geräte (Hausprofil, `type: generic`)
 
 Waschmaschine, Trockner usw. sind **`generic`-Verbraucher** in `house_profiles.json` (optional mit `appliance_recommendation`). Die Seite **Manuelle Geräte** zeigt je nach Modus die Start-Empfehlung oder den Reserve-Status. Die Startpläne speichert Earnie in `runtime/appliance_schedules.json`, den Reserve-Zustand in `runtime/powerstation_reserves.json`. Geplante Laufzeiten (Advice) erscheinen in Chart 1 (Flow-Balance).

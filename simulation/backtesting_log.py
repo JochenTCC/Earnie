@@ -28,6 +28,7 @@ from .backtesting_snapshots import (
     remove_window_snapshots_jsonl,
     write_window_snapshots_jsonl,
 )
+from .booked_consumption import BOOKED_CONSUMPTION_KEY
 from .period_clip import clip_results_map_to_period
 
 logger = logging.getLogger(__name__)
@@ -47,8 +48,16 @@ def _compute_config_fingerprint(period: dict) -> str:
     return fingerprint_for_current_config(period=period)
 
 
-def consumption_totals_from_report(report: PlausibilityReport) -> dict:
-    """Summiert historischen und optimierten Verbrauch über alle 24h-Fenster."""
+def consumption_totals_from_report(
+    report: PlausibilityReport,
+    booked: dict | None = None,
+) -> dict:
+    """Summiert Soll- und geplanten Verbrauch über alle Fenster.
+
+    ``historical_kwh`` = Σ Fenster-Soll, ``optimized_kwh`` = Σ MILP-Plan je Fenster
+    (inkl. Foresight). With ``booked`` (``booked_consumption_totals`` of the same
+    scenario) ``booked_kwh`` / ``booked_delta_kwh`` show what the series really books.
+    """
     if not report.results:
         return {}
     historical = round(sum(r.historical_kwh for r in report.results), 1)
@@ -71,11 +80,14 @@ def consumption_totals_from_report(report: PlausibilityReport) -> dict:
         payload["optimized_flex_kwh"] = round(
             sum(r.optimized_flex_kwh or 0.0 for r in report.results), 1
         )
+    if booked is not None:
+        payload["booked_kwh"] = float(booked["consumption_kwh"])
+        payload["booked_delta_kwh"] = round(float(booked["consumption_kwh"]) - historical, 1)
     return payload
 
 
-def _serialize_plausibility(report: PlausibilityReport) -> dict:
-    totals = consumption_totals_from_report(report)
+def _serialize_plausibility(report: PlausibilityReport, booked: dict | None) -> dict:
+    totals = consumption_totals_from_report(report, booked)
     return {
         "total_windows": len(report.results),
         "ok_count": len(report.results) - len(report.failed),
@@ -455,6 +467,7 @@ def _build_log_payload(
     fee_parts: dict,
     *,
     config_fingerprint: str | None,
+    booked_consumption: dict[str, dict],
 ) -> dict:
     """Metadaten-Payload ohne CBC-Events, Snapshots und Periodengrenzen."""
     return stamp_payload(
@@ -464,9 +477,10 @@ def _build_log_payload(
             "labels": labels,
             **fee_parts,
             "plausibility": {
-                sid: _serialize_plausibility(rep)
+                sid: _serialize_plausibility(rep, booked_consumption.get(sid))
                 for sid, rep in plausibility_by_scenario.items()
             },
+            BOOKED_CONSUMPTION_KEY: booked_consumption,
             "series_file": BACKTESTING_CSV,
             "scenario_ids": list(results.keys()),
             "reference_id": HISTORICAL_REFERENCE_ID,
@@ -568,8 +582,14 @@ def save_backtesting_log(
     monthly_fee_by_scenario: dict[str, float] | None = None,
     fee_breakdown_by_scenario: dict[str, dict[str, float]] | None = None,
     prices: pd.DataFrame | None = None,
+    *,
+    booked_consumption: dict[str, dict],
 ) -> str:
-    """Schreibt Metadaten (JSON) und Stundenwerte (CSV). Gibt den JSON-Pfad zurück."""
+    """Schreibt Metadaten (JSON) und Stundenwerte (CSV). Gibt den JSON-Pfad zurück.
+
+    ``booked_consumption``: ``booked_consumption_by_result`` over the period-clipped
+    results (Jahres Verbrauch, Rechnungen, Plausibilität ``booked_kwh``).
+    """
     target_dir = _DEFAULT_LOG_DIR if log_dir is None else log_dir
     os.makedirs(target_dir, exist_ok=True)
     json_path = os.path.join(target_dir, BACKTESTING_LOG_JSON)
@@ -593,6 +613,7 @@ def save_backtesting_log(
             results, labels, monthly_fee_by_scenario, fee_breakdown_by_scenario
         ),
         config_fingerprint=config_fingerprint,
+        booked_consumption=booked_consumption,
     )
     _attach_cbc_events(payload, target_dir, period, cbc_events_by_scenario)
     _attach_critical_cases(payload, plausibility_by_scenario, cbc_events_by_scenario)

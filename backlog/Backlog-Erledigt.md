@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — SE consumption accounting: native pool filter never booked, Jahres Verbrauch from mixed sources (2026-10-20)
+
+- [x] **SE native pool-filter run never booked** — fix implemented (2026-10-20); greenfield May run: `pool_filter` 22.3 kWh (= 31 × 0.72) in every optimized scenario, plausibility 31/31 OK (was −262.8 kWh/yr and 33 failures with exactly 0.72 kWh flex Δ)
+  - Cause: `adjust_targets_for_native_filter` reduced the filter target by the expected native delivery and blocked the native slots, but in SE (`profile_spec` / `logged_day`) the native duty cycle was never booked as load.
+  - Fix: `simulation/matrix_builder.native_filter_kw_by_slot` adds the `config_fallback` window × `nominal_power_kw` to `expected_p_act` (fixed load in the energy balance); `_consumption_kw_columns_from_chart_rows` moves it from `baseload_kw` to `pool_filter_kw`; plausibility counts it as filter flex. Sunrise MILP credits only native runs inside the book window (`credit_indices`).
+- [x] **SE Jahres Verbrauch / invoices / plausibility hid booked differences** — fix implemented (2026-10-20)
+  - Cause: Historisch = `cons_data` calendar sum, `ref:*` = parent's Σ window targets, optimized = baseload + full-horizon MILP flex → all optimized scenarios showed the same value while `backtesting.csv` booked different energy; battery standby mixed into consumption; invoice fallback summed kW without slot duration.
+  - Fix: `simulation/booked_consumption.py` — one source per result series (unique slots, standby separate, duplicate slots and slot diff to the reference); stored as `booked_consumption` in `backtesting_log.json`, used by Gesamtkosten (new column `Speicher-Standby [kWh]`, Hinweis for duplicates / slot differences), Verbrauchsvergleich (Soll / Geplant MILP / gebucht), invoices (`Verbrauch (Info)`, `Speicher-Standby (Info)`) and `consumption_totals.booked_kwh` / `booked_delta_kwh`.
+  - References (Historisch, `ref:*`) now evaluate the optimized run's slots (`reference_slot_datetimes`: sunrise book step [SA₁, SA₂) resp. fixed 24 h).
+  - Tests: `tests/test_se_consumption_accounting.py`, `tests/test_backtesting_results_helpers.py`, `tests/test_monthly_fees.py`.
+  - Open: booked losses from foresight merge / sunrise window gaps (Verbrauchsanalyse U1/U3) are now visible but fixed separately (branch `fix/se-sunrise-book-chain`).
+
 ### Bugfix — SE detailed calendar disabled Okt–Dez on rolling 12-month window (2026-10-19)
 
 - [x] **SE detailed calendar disabled Okt–Dez on rolling 12-month window** — **Verified** (2026-10-19; greenfield 12-month SE)

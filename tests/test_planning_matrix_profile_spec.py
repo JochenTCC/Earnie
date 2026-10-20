@@ -21,6 +21,7 @@ from simulation.engine import (
     window_anchor_for_date,
     window_slot_datetimes,
 )
+from simulation.horizon_mode import FIXED_24H
 from tests.fixtures.backtesting_fixtures import build_synthetic_prices_df
 from tests.fixtures.historical_fixtures import CONS_DATA_FILE
 
@@ -456,6 +457,7 @@ def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
         scenarios,
         live_scenario_id="live",
         scenario_labels={"fixed_only": "Fixed"},
+        horizon_mode=FIXED_24H,
     )
     assert mapping["live"] == HISTORICAL_REFERENCE_ID
     ref_id = scenario_reference_id("fixed_only")
@@ -504,6 +506,7 @@ def test_build_per_scenario_reference_costs_pv_variant(
         scenarios,
         live_scenario_id="live",
         scenario_labels={"no_pv": "No PV", "no_battery": "No Battery"},
+        horizon_mode=FIXED_24H,
     )
     assert mapping["no_pv"] == HISTORICAL_REFERENCE_ID
     live_ref_id = scenario_reference_id("live")

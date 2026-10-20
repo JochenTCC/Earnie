@@ -13,10 +13,10 @@ import streamlit as st
 import pandas as pd
 
 import config
-from data import cons_data_store
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation import backtesting_log
 from simulation.backtesting_fingerprint import fingerprint_for_current_config
+from simulation.booked_consumption import BOOKED_CONSUMPTION_KEY
 from simulation.backtesting_progress import (
     ProgressEtaTracker,
     build_progress_display_rows,
@@ -34,7 +34,6 @@ from ui.backtesting_results_helpers import (
     format_test_run_caption,
     nav_bounds_from_period,
     ordered_monthly_chart_labels,
-    reference_kwh_for_period,
     scenario_consumption_subheader,
 )
 from ui.backtesting_runner import (
@@ -129,13 +128,6 @@ def _optimized_scenario_ids(meta: dict, scenarios: dict[str, dict]) -> list[str]
         and isinstance(scenarios.get(scenario_id, {}).get("_house_profile"), dict)
     ]
 
-def _reference_kwh_for_meta(meta: dict) -> float | None:
-    period = meta.get("period", {})
-    if not cons_data_store.is_cons_data_populated():
-        return None
-    cons_df = cons_data_store.load_cons_data()
-    return reference_kwh_for_period(cons_df, period)
-
 def _annual_cost_details_markdown() -> str:
     """Clickable doc links for the Jahres Verbrauch caption."""
     parts: list[str] = []
@@ -164,11 +156,15 @@ def _annual_cost_details_markdown() -> str:
 
 def render_annual_cost_table(meta: dict) -> None:
     st.subheader("Gesamtkosten und -Verbrauch")
-    ref_kwh = _reference_kwh_for_meta(meta)
-    rows = build_annual_cost_rows(meta, ref_kwh)
+    rows = build_annual_cost_rows(meta)
     if not rows:
         st.info("Keine Gesamtkosten im Log.")
         return
+    if not meta.get(BOOKED_CONSUMPTION_KEY):
+        st.info(
+            "Gebuchte Verbrauchssummen fehlen in diesem Log (älterer Lauf). "
+            "Bitte Szenario-Explorer neu berechnen."
+        )
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
     fee_map = meta.get("monthly_fee_by_scenario") or {}
     has_fees = any(float(v or 0) > 0 for v in fee_map.values())
@@ -179,10 +175,11 @@ def render_annual_cost_table(meta: dict) -> None:
         else " Fake-Jahresrechnungen: Ordner `invoices/` neben dem Log. "
     )
     st.caption(
-        "**Jahres Verbrauch:** Bei „Historisch“ Summe des Ist-Verbrauchs aus "
-        "`cons_data` (Zähler). Bei Referenz- und Optimierungszeilen Summe aus dem "
-        "Hausprofil-Modell bzw. der gelieferten Optimierungsenergie — "
-        "Abweichungen zu Historisch sind erwartbar, wenn Ist ≠ Modell."
+        "**Jahres Verbrauch:** in allen Zeilen der gebuchte Verbrauch der "
+        "Stundenreihe, die auch Kosten, Bezug und Einspeisung trägt (jeder Zeitslot "
+        "einmal). **Speicher-Standby** (Eigenverbrauch der Hausbatterie) steht "
+        "getrennt und ist nicht im Jahres Verbrauch enthalten. Abweichungen zu "
+        "Historisch sind erwartbar, wenn Ist ≠ Hausprofil-Modell."
         + fee_note
         + "Volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die "
         "Kosten ein und erscheint in Fake-Jahresrechnungen getrennt. "
@@ -195,10 +192,11 @@ def render_scenario_consumption_table(meta: dict, hourly_df: pd.DataFrame | None
     period = meta.get("period", {})
     st.subheader(scenario_consumption_subheader(period))
     st.caption(
-        "Summe der gelieferten kWh über alle 24h-Fenster im Lauf "
-        "(Grundlast + flexible Verbraucher). Δ ≈ 0 bei zeitlicher Lastverschiebung mit gleicher Spec-Energie."
+        "Soll Fenster = Summe der Fenster-Sollwerte, Geplant MILP = vom Optimierer "
+        "je Fenster geplant, Optimiert = tatsächlich gebucht (Stundenreihe, ohne "
+        "Speicher-Standby). Geplant ≠ Optimiert zeigt Energie, die beim Zusammensetzen "
+        "der Fenster verloren geht. Δ ≈ 0 bei zeitlicher Lastverschiebung mit gleicher Spec-Energie."
     )
-    ref_kwh = _reference_kwh_for_meta(meta)
     scenarios, scenario_error = try_get_backtesting_scenarios()
     timestamps: list[str] | None = None
     if hourly_df is not None and scenarios and not scenario_error:
@@ -211,7 +209,6 @@ def render_scenario_consumption_table(meta: dict, hourly_df: pd.DataFrame | None
             )
     rows = build_scenario_consumption_rows(
         meta,
-        ref_kwh,
         hourly_df=hourly_df,
         scenarios=scenarios if not scenario_error else None,
         timestamps=timestamps,

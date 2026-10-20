@@ -97,28 +97,29 @@ def test_build_annual_cost_rows_reference_kwh_and_delta():
                 "live": 1000.0,
             },
         },
-        "plausibility": {
-            "live": {
-                "consumption_totals": {
-                    "historical_kwh": 5000.0,
-                    "optimized_kwh": 4800.0,
-                },
-            },
+        "reference_by_scenario": {"live": live_ref_id},
+        "booked_consumption": {
+            HISTORICAL_REFERENCE_ID: {"consumption_kwh": 5000.0, "standby_kwh": 0.0},
+            live_ref_id: {"consumption_kwh": 5050.0, "standby_kwh": 0.0},
+            "live": {"consumption_kwh": 4800.0, "standby_kwh": 227.8},
         },
     }
-    rows = build_annual_cost_rows(meta, ref_kwh=5000.0)
+    rows = build_annual_cost_rows(meta)
     assert len(rows) == 3
     ref_row = rows[0]
     assert ref_row["Szenario"] == "Historisch (ohne Optimierung)"
     assert ref_row["Jahres Verbrauch [kWh]"] == "5000.0"
     assert ref_row["Jahres Kosten [€]"] == "1200.00 €"
     assert ref_row["Δ vs Referenz [€]"] == "—"
+    assert ref_row["Speicher-Standby [kWh]"] == "—"
     live_ref_row = rows[1]
+    assert live_ref_row["Jahres Verbrauch [kWh]"] == "5050.0"
     assert live_ref_row["Szenario"] == live_ref_label
     assert live_ref_row["Δ vs Referenz [€]"] == "—"
     live_row = rows[2]
     assert live_row["Szenario"] == "Live"
     assert live_row["Jahres Verbrauch [kWh]"] == "4800.0"
+    assert live_row["Speicher-Standby [kWh]"] == "227.8"
     assert live_row["Jahres Kosten [€]"] == "1000.00 €"
     assert live_row["Δ vs Referenz [€]"] == "-100.00 €"
     assert live_ref_row["Hinweis"] == "—"
@@ -163,22 +164,15 @@ def test_build_annual_cost_rows_delta_always_vs_live_reference():
                 "fixed_full": 980.0,
             },
         },
-        "plausibility": {
-            "live": {
-                "consumption_totals": {
-                    "historical_kwh": 5000.0,
-                    "optimized_kwh": 4800.0,
-                },
-            },
-            "fixed_full": {
-                "consumption_totals": {
-                    "historical_kwh": 5100.0,
-                    "optimized_kwh": 4950.0,
-                },
-            },
+        "booked_consumption": {
+            HISTORICAL_REFERENCE_ID: {"consumption_kwh": 5000.0, "standby_kwh": 0.0},
+            live_ref_id: {"consumption_kwh": 5000.0, "standby_kwh": 0.0},
+            fixed_ref_id: {"consumption_kwh": 5100.0, "standby_kwh": 0.0},
+            "live": {"consumption_kwh": 4800.0, "standby_kwh": 0.0},
+            "fixed_full": {"consumption_kwh": 4950.0, "standby_kwh": 0.0},
         },
     }
-    rows = build_annual_cost_rows(meta, ref_kwh=None)
+    rows = build_annual_cost_rows(meta)
     by_label = {row["Szenario"]: row for row in rows}
     assert by_label[fixed_ref_label]["Δ vs Referenz [€]"] == "—"
     assert by_label[fixed_ref_label]["Jahres Verbrauch [kWh]"] == "5100.0"
@@ -350,14 +344,16 @@ def test_build_scenario_consumption_rows_optimized_only_with_constant_refs():
             "live": "Live",
             "fixed_full": "Fixed Full",
         },
+        "live_scenario_id": "live",
+        "reference_by_scenario": {"live": ref_live, "fixed_full": ref_live},
         "plausibility": {
             "live": {
                 "ok_count": 29,
                 "total_windows": 31,
                 "consumption_totals": {
                     "historical_kwh": 500.0,
-                    "optimized_kwh": 520.5,
-                    "delta_kwh": 20.5,
+                    "optimized_kwh": 525.0,
+                    "delta_kwh": 25.0,
                 },
             },
             "fixed_full": {
@@ -370,12 +366,20 @@ def test_build_scenario_consumption_rows_optimized_only_with_constant_refs():
                 },
             },
         },
+        "booked_consumption": {
+            HISTORICAL_REFERENCE_ID: {"consumption_kwh": 490.0, "standby_kwh": 0.0},
+            ref_live: {"consumption_kwh": 500.0, "standby_kwh": 0.0},
+            "live": {"consumption_kwh": 520.5, "standby_kwh": 2.0},
+            "fixed_full": {"consumption_kwh": 510.0, "standby_kwh": 2.0},
+        },
     }
-    rows = build_scenario_consumption_rows(meta, ref_kwh=490.0)
+    rows = build_scenario_consumption_rows(meta)
     assert [r["Szenario"] for r in rows] == ["Live", "Fixed Full"]
     live_row = rows[0]
     assert live_row["Ohne PV und Speicher [kWh]"] == "490.0"
     assert live_row["Reference (Live) - ohne Optimierung [kWh]"] == "500.0"
+    assert live_row["Soll Fenster [kWh]"] == "500.0"
+    assert live_row["Geplant MILP [kWh]"] == "525.0"
     assert live_row["Optimiert (kWh)"] == "520.5"
     assert live_row["Δ kWh (Ref. ohne Optimierung)"] == "+20.5"
     assert live_row["Plausibilität"] == "29/31 OK"
@@ -420,22 +424,15 @@ def test_build_annual_cost_rows_deviation_hint():
                 "fixed_full": 980.0,
             },
         },
-        "plausibility": {
-            "live": {
-                "consumption_totals": {
-                    "historical_kwh": 500.0,
-                    "optimized_kwh": 510.0,
-                },
-            },
-            "fixed_full": {
-                "consumption_totals": {
-                    "historical_kwh": 500.0,
-                    "optimized_kwh": 540.0,
-                },
-            },
+        "reference_by_scenario": {"live": live_ref_id, "fixed_full": live_ref_id},
+        "booked_consumption": {
+            HISTORICAL_REFERENCE_ID: {"consumption_kwh": 490.0, "standby_kwh": 0.0},
+            live_ref_id: {"consumption_kwh": 500.0, "standby_kwh": 0.0},
+            "live": {"consumption_kwh": 510.0, "standby_kwh": 0.0},
+            "fixed_full": {"consumption_kwh": 540.0, "standby_kwh": 0.0},
         },
     }
-    rows = build_annual_cost_rows(meta, ref_kwh=490.0)
+    rows = build_annual_cost_rows(meta)
     by_label = {row["Szenario"]: row for row in rows}
     assert by_label[live_ref_label]["Hinweis"] == "—"
     assert by_label["Live"]["Hinweis"] == "—"
@@ -466,16 +463,14 @@ def test_historisch_exempt_from_live_reference_kwh_hint():
                 "live": 1000.0,
             },
         },
-        "plausibility": {
-            "live": {
-                "consumption_totals": {
-                    "historical_kwh": 1111.7,
-                    "optimized_kwh": 1104.0,
-                },
-            },
+        "reference_by_scenario": {"live": live_ref_id},
+        "booked_consumption": {
+            HISTORICAL_REFERENCE_ID: {"consumption_kwh": 1186.4, "standby_kwh": 0.0},
+            live_ref_id: {"consumption_kwh": 1111.7, "standby_kwh": 0.0},
+            "live": {"consumption_kwh": 1104.0, "standby_kwh": 0.0},
         },
     }
-    rows = build_annual_cost_rows(meta, ref_kwh=1186.4)
+    rows = build_annual_cost_rows(meta)
     by_label = {row["Szenario"]: row for row in rows}
     assert by_label["Historisch"]["Jahres Verbrauch [kWh]"] == "1186.4"
     assert by_label[live_ref_label]["Jahres Verbrauch [kWh]"] == "1111.7"
@@ -506,8 +501,11 @@ def test_build_scenario_consumption_rows_timing_shift_note(monkeypatch):
     )
     meta = {
         "reference_id": HISTORICAL_REFERENCE_ID,
+        "live_scenario_id": "live",
+        "reference_by_scenario": {"live": "ref:live"},
         "scenario_ids": ["live"],
         "labels": {"live": "Live"},
+        "booked_consumption": {"live": {"consumption_kwh": 100.0, "standby_kwh": 0.0}, "ref:live": {"consumption_kwh": 100.0, "standby_kwh": 0.0}},
         "plausibility": {
             "live": {
                 "ok_count": 2,
@@ -524,7 +522,6 @@ def test_build_scenario_consumption_rows_timing_shift_note(monkeypatch):
     }
     rows = build_scenario_consumption_rows(
         meta,
-        ref_kwh=100.0,
         hourly_df=pd.DataFrame({"consumption_kw": [1.0], "baseload_kw": [1.0]}),
         scenarios={"live": {"_house_profile": {}}},
         timestamps=["2024-01-01 00:00:00"],
@@ -540,3 +537,87 @@ def test_scenario_consumption_subheader_test_run():
     assert scenario_consumption_subheader(period) == (
         "Verbrauchsvergleich (Debug, Testmonat 01/2025)"
     )
+
+
+def _booked_meta(booked: dict) -> dict:
+    from simulation.engine import scenario_reference_id
+
+    live_ref_id = scenario_reference_id("live")
+    return {
+        "reference_id": HISTORICAL_REFERENCE_ID,
+        "live_scenario_id": "live",
+        "scenario_ids": [HISTORICAL_REFERENCE_ID, live_ref_id, "live"],
+        "reference_by_scenario": {"live": live_ref_id},
+        "labels": {
+            HISTORICAL_REFERENCE_ID: "Historisch",
+            live_ref_id: "Referenz Live",
+            "live": "Live",
+        },
+        "summary": {
+            "total_eur": {HISTORICAL_REFERENCE_ID: 1.0, live_ref_id: 1.0, "live": 1.0}
+        },
+        "booked_consumption": booked,
+    }
+
+
+def test_annual_cost_rows_flag_duplicate_and_reference_slot_differences():
+    booked = {
+        HISTORICAL_REFERENCE_ID: {"consumption_kwh": 1000.0, "standby_kwh": 0.0},
+        "ref:live": {
+            "consumption_kwh": 1000.0,
+            "standby_kwh": 0.0,
+            "duplicate_slots": 8,
+        },
+        "live": {
+            "consumption_kwh": 990.0,
+            "standby_kwh": 5.0,
+            "reference_coverage": {
+                "reference_id": "ref:live",
+                "only_scenario_slots": 20,
+                "only_reference_slots": 4,
+            },
+        },
+    }
+    rows = {row["Szenario"]: row for row in build_annual_cost_rows(_booked_meta(booked))}
+    assert rows["Referenz Live"]["Hinweis"] == "2 h doppelt gebucht (einmal gezählt)"
+    assert rows["Live"]["Hinweis"] == (
+        "Referenz rechnet über andere Zeitslots (5 h nur hier, 1 h nur in der Referenz)"
+    )
+    assert rows["Live"]["Speicher-Standby [kWh]"] == "5.0"
+
+
+def test_annual_cost_rows_booked_loss_triggers_live_reference_hint():
+    """Booked series below the Live reference (>5 %) is no longer hidden behind targets."""
+    booked = {
+        HISTORICAL_REFERENCE_ID: {"consumption_kwh": 12950.2, "standby_kwh": 0.0},
+        "ref:live": {"consumption_kwh": 12950.2, "standby_kwh": 0.0},
+        "live": {"consumption_kwh": 11892.0, "standby_kwh": 227.8},
+    }
+    rows = {row["Szenario"]: row for row in build_annual_cost_rows(_booked_meta(booked))}
+    assert rows["Live"]["Jahres Verbrauch [kWh]"] == "11892.0"
+    assert "Live-Referenz" in rows["Live"]["Hinweis"]
+
+
+def test_annual_cost_rows_old_log_without_booked_consumption_shows_dash():
+    rows = build_annual_cost_rows(_booked_meta({}))
+    assert {row["Jahres Verbrauch [kWh]"] for row in rows} == {"—"}
+    assert {row["Speicher-Standby [kWh]"] for row in rows} == {"—"}
+
+
+def test_consumption_totals_from_report_adds_booked_series():
+    report = PlausibilityReport()
+    report.add(
+        PlausibilityResult(
+            window_end=datetime(2025, 1, 1, 0, 0),
+            historical_kwh=10.0,
+            optimized_kwh=10.0,
+            diff_kwh=0.0,
+            ok=True,
+        )
+    )
+    totals = consumption_totals_from_report(
+        report, {"consumption_kwh": 9.2, "standby_kwh": 0.6}
+    )
+    assert totals["optimized_kwh"] == 10.0
+    assert totals["booked_kwh"] == 9.2
+    assert totals["booked_delta_kwh"] == -0.8

@@ -66,6 +66,29 @@ def _standby_kwh_in_rows(chart_rows: list[dict], meta: dict) -> float:
     return energy_kwh_from_kw(standby_kw for _ in chart_rows)
 
 
+def _native_filter_kwh_in_rows(
+    chart_rows: list[dict],
+    flexible_consumers: list | None,
+) -> float:
+    """Native filter run booked as fixed load inside Verbrauch-Prognose (kWh)."""
+    import config
+    from optimizer.filter_context import logged_native_filter_windows, native_filter_kw_at
+    from optimizer.slot_duration import energy_kwh_from_kw
+
+    consumers = (
+        flexible_consumers
+        if flexible_consumers is not None
+        else config.get_flexible_consumers(optimizer_only=True)
+    )
+    windows = logged_native_filter_windows(consumers)
+    if not windows or not chart_rows:
+        return 0.0
+    return energy_kwh_from_kw(
+        sum(native_filter_kw_at(windows, row["slot_datetime"]).values())
+        for row in chart_rows
+    )
+
+
 def _plausibility_reference_values(
     meta: dict,
     flexible_consumers: list | None,
@@ -114,6 +137,10 @@ def validate_window_consumption(
     standby_kwh = _standby_kwh_in_rows(chart_rows, meta)
     if standby_kwh:
         optimized_baseload = round(max(0.0, optimized_baseload - standby_kwh), 3)
+    # Native filter run: fixed load in Verbrauch-Prognose, counts as filter flex.
+    native_kwh = _native_filter_kwh_in_rows(chart_rows, flexible_consumers)
+    if native_kwh:
+        optimized_baseload = round(optimized_baseload - native_kwh, 3)
     delivered_flex = _delivered_flex_kwh_from_rows(
         chart_rows,
         flexible_consumers=flexible_consumers,
@@ -122,6 +149,7 @@ def validate_window_consumption(
     # Sunrise: deadline-flex often sits in SA₀→SA₁ foresight (book cut drops it).
     if meta.get("plausibility_optimized_flex_kwh") is not None:
         optimized_flex = round(float(meta["plausibility_optimized_flex_kwh"]), 3)
+    optimized_flex = round(optimized_flex + native_kwh, 3)
     optimized_kwh = round(optimized_baseload + optimized_flex, 3)
 
     baseload_ok = _consumption_within_tolerance(

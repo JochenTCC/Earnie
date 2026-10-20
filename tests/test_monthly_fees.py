@@ -329,6 +329,9 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
         },
         historical_params=None,
         historical_id="historical_reference",
+        booked_consumption_by_scenario={
+            "live": {"consumption_kwh": 48.0, "standby_kwh": 0.0}
+        },
     )
     assert len(paths) == 1
     text = (tmp_path / "invoices" / "Live_jahresrechnung.md").read_text(encoding="utf-8")
@@ -356,6 +359,7 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
             "type": "spot_hourly",
             "feed_in_fee_factor": 0.19,
         },
+        booked_consumption={"consumption_kwh": 48.0, "standby_kwh": 0.0},
     )
     assert "Energiebezug" in body
     assert "| Energiebezug |" in body  # no split when AP=0
@@ -363,7 +367,8 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
     assert "Einspeiseerlös" in body
     assert "Verbrauch (Info)" in body
     assert "## Bezug" in body
-    assert "| Verbrauch (Info) | 192.0 kWh |" in body  # 24*8 fallback
+    assert "| Verbrauch (Info) | 48.0 kWh |" in body
+    assert "Speicher-Standby" not in body.split("## Hinweise")[0]
     body_aligned = render_scenario_invoice_markdown(
         scenario_id="live",
         label="Live",
@@ -381,9 +386,10 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
             "type": "spot_hourly",
             "feed_in_fee_factor": 0.19,
         },
-        verbrauch_info_kwh=10680.3,
+        booked_consumption={"consumption_kwh": 10680.3, "standby_kwh": 227.8},
     )
     assert "| Verbrauch (Info) | 10680.3 kWh |" in body_aligned
+    assert "| Speicher-Standby (Info) | 227.8 kWh |" in body_aligned
     assert "## Bezug" in body_aligned
     assert "## Einspeisung" in body
     assert "| Monat | Bezug kWh | Bezug € | Ø Tarif Cent/kWh | Ø Ist Cent/kWh |" in body
@@ -429,6 +435,7 @@ def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
             "vat_percent": 20.0,
         },
         export_spec=None,
+        booked_consumption={"consumption_kwh": 12.5, "standby_kwh": 0.0},
         grid_fee=flat_grid_fee_spec(5.0),
     )
     assert "## Netznutzung" in body
@@ -452,6 +459,7 @@ def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
             "vat_percent": 20.0,
         },
         export_spec=None,
+        booked_consumption={"consumption_kwh": 12.5, "standby_kwh": 0.0},
         grid_fee=flat_grid_fee_spec(5.0),
     )
     assert "| Netznutzung Arbeitspreis | 6.00 € |" in body_vat

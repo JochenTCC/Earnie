@@ -21,8 +21,9 @@ import logger_config
 from data import profile_manager
 from simulation.backtesting_log import save_backtesting_log
 from simulation.backtesting_log import build_critical_cases, summarize_critical_cases
-from simulation.backtesting_log import consumption_totals_from_report
-from simulation.jahres_verbrauch import jahres_verbrauch_map
+from simulation.booked_consumption import booked_consumption_by_result
+from simulation.engine_scenario import scenario_standby_power_kw
+from simulation.period_clip import clip_results_map_to_period
 from simulation.monthly_fees import fee_breakdowns_by_result_id
 from simulation.se_invoice_markdown import write_se_invoices
 from data.data_loader import load_market_prices, resolve_simulation_window
@@ -288,6 +289,7 @@ def _run_reference_worker(
     progress_file: str | None,
     progress_label: str,
     worker_key: str,
+    horizon_mode: str,
 ) -> tuple[str, pd.DataFrame]:
     """Top-Level-Worker für Referenzkosten (ProcessPoolExecutor, Windows spawn)."""
     from simulation.engine import compute_historical_reference_costs, HistoricalDataCache
@@ -322,6 +324,7 @@ def _run_reference_worker(
         ref_settings,
         cache=cache,
         scenario_params=scenario_params,
+        horizon_mode=horizon_mode,
         on_progress=on_progress,
     )
     return ref_id, df_result
@@ -422,6 +425,7 @@ def _run_parallel_backtesting(
                     progress_file,
                     label,
                     worker_key,
+                    horizon_mode,
                 )
             ] = ("ref", ref_id, label)
         for name, params in scenarios.items():
@@ -951,6 +955,7 @@ def main(argv: list[str] | None = None):
             ref_settings,
             cache=cache,
             scenario_params=reference_params,
+            horizon_mode=horizon_mode,
             on_progress=ref_progress,
         )
         extra_refs, _extra_labels, reference_by_scenario = (
@@ -963,6 +968,7 @@ def main(argv: list[str] | None = None):
                 live_scenario_id=live_scenario_id,
                 scenario_labels=scenario_labels,
                 own_reference_by_scenario=config.get_own_reference_flags(),
+                horizon_mode=horizon_mode,
             )
         )
         sim_results.update(extra_refs)
@@ -1065,6 +1071,15 @@ def main(argv: list[str] | None = None):
         sid: breakdown.total_monthly_eur
         for sid, breakdown in fee_breakdown_by_scenario.items()
     }
+    # Optimized series carry battery standby in Verbrauch-Prognose; refs have none.
+    booked_consumption = booked_consumption_by_result(
+        clip_results_map_to_period(sim_results, period_meta["start"], period_meta["end"]),
+        standby_kw_by_result={
+            sid: scenario_standby_power_kw(scenarios[sid]) if sid in scenarios else 0.0
+            for sid in sim_results
+        },
+        reference_by_scenario=dict(period_meta.get("reference_by_scenario") or {}),
+    )
     log_path = save_backtesting_log(
         sim_results,
         labels,
@@ -1079,33 +1094,12 @@ def main(argv: list[str] | None = None):
             for sid, breakdown in fee_breakdown_by_scenario.items()
         },
         prices=prices if sim_cfg.get("export_price_series", False) else None,
+        booked_consumption=booked_consumption,
     )
     from runtime_store.usage_ping import note_scenarios_calculated
 
     if scenarios:
         note_scenarios_calculated(len(scenarios))
-    plausibility_payload = {
-        sid: {"consumption_totals": consumption_totals_from_report(rep)}
-        for sid, rep in plausibility_by_scenario.items()
-        if getattr(rep, "results", None)
-    }
-    ref_kwh = None
-    try:
-        from data import cons_data_store
-        from simulation.jahres_verbrauch import historical_ref_kwh_for_period
-
-        ref_kwh = historical_ref_kwh_for_period(
-            cons_data_store.load_cons_data(),
-            period_meta,
-        )
-    except Exception as exc:
-        logging.warning("Jahres Verbrauch (Historisch) für Invoice nicht berechenbar: %s", exc)
-    verbrauch_info = jahres_verbrauch_map(
-        list(sim_results.keys()),
-        reference_id=HISTORICAL_REFERENCE_ID,
-        ref_kwh=ref_kwh,
-        plausibility=plausibility_payload,
-    )
     invoice_paths = write_se_invoices(
         log_dir=os.path.dirname(log_path) or args.output_dir or ".",
         results=sim_results,
@@ -1117,7 +1111,7 @@ def main(argv: list[str] | None = None):
         extra_ref_specs=extra_ref_specs,
         period_start=start.date().isoformat(),
         period_end=end.date().isoformat(),
-        verbrauch_info_kwh_by_scenario=verbrauch_info,
+        booked_consumption_by_scenario=booked_consumption,
     )
     if progress_file:
         clear_progress_dir(progress_file)
