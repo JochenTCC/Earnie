@@ -259,6 +259,7 @@ Migration (data model stays **4**): `python -m scripts.migrate_topology_once --c
 
 - Plant `sens_ess_power` := Σ over grid-tied house batteries of `ess.{id}.sens_ess_power`. Missing binding/value for any eligible battery → fail loud. Battery-less plants omit ESS → `0`. The key `ess.{id}.sens_ess_power` is therefore a **required signal** for grid-tied house batteries: activated on Hauskonfigurator save, again when an inverter's `ac_connection` changes, and by the migration step `dm4.required_signal_activation` for existing packs.
 - Plant AC PV is always derived as Σ grid-tied inv/pv · η_inv; incomplete `inv.*`/`pv.*` coverage fails loud.
+- **Plausibility of pushed power (HA push):** `inv.{id}.sens_inv_power_pv`, `pv.{id}.sens_pv_production_active` and `ess.{id}.sens_ess_power` are bounded by the configured hardware — 3 × the larger of the inverter's `max_pv_input_kw` / `max_ac_power_kw` / attached kWp, 3 × the PV system's kWp, 3 × the battery's max charge / discharge power. A value beyond the bound (typically kW pushed as W) fails the telemetry read loud (`Implausible value for …`), never clamped. Without a configured reference nothing is checked; grid power has no configured reference and is not checked.
 - Derived load: `plant.balance_tolerance_pct` (default **5**) and `plant.balance_tolerance_w` (default **100**). Raw `PV + grid + ESS` below `−max(w, pct/100 · P_PV)` → telemetry error (not silent `0`); within tolerance → clamp to `0`.
 - Live attribution uses required inverter `efficiency` (η_inv); no soft default.
 

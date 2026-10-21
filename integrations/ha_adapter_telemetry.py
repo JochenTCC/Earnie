@@ -123,15 +123,41 @@ class HaTelemetryMixin:
 
     def _scoped_pv_live(self, components: dict) -> dict:
         """Entity-scoped PV live values via push inbox."""
+        from ehal.inverter_fields import inv_field
+        from ehal.pv_fields import pv_field
         from integrations.ha_push_read import PushReadError, read_push_ehal_value
+        from integrations.power_plausibility import (
+            ImplausiblePowerError,
+            check_power_w,
+            inverter_pv_reference_kw,
+            pv_system_reference_kw,
+        )
         from integrations.pv_attribution import collect_scoped_pv_live_from_bindings
+
+        pv_systems = [
+            pv for pv in (components.get("pv_systems") or []) if isinstance(pv, dict)
+        ]
+        # field → (reference kW, label) for the plausibility bound (F21)
+        references: dict[str, tuple[float | None, str]] = {}
+        for inv in components.get("inverters") or []:
+            if isinstance(inv, dict) and str(inv.get("id") or "").strip():
+                references[inv_field(str(inv["id"]).strip(), "sens_inv_power_pv")] = (
+                    inverter_pv_reference_kw(inv, pv_systems),
+                    "the inverter's PV input / AC rating / attached kWp",
+                )
+        for pv in pv_systems:
+            if str(pv.get("id") or "").strip():
+                references[pv_field(str(pv["id"]).strip(), "sens_pv_production_active")] = (
+                    pv_system_reference_kw(pv),
+                    "the PV system's kWp",
+                )
 
         def _read_push_scoped(field: str) -> float | None:
             qid = self.cfg.push_read_qids.get(field)
             if not qid:
                 return None
             try:
-                return max(
+                value = max(
                     0.0,
                     float(
                         read_push_ehal_value(
@@ -143,6 +169,12 @@ class HaTelemetryMixin:
                 )
             except PushReadError:
                 return None
+            reference_kw, what = references.get(field, (None, ""))
+            try:
+                check_power_w(field, value, reference_kw, what=what)
+            except ImplausiblePowerError as exc:
+                raise HaHttpError(str(exc)) from exc
+            return value
 
         return collect_scoped_pv_live_from_bindings(
             components, read_value=_read_push_scoped
@@ -256,22 +288,37 @@ class HaTelemetryMixin:
         """Read ``ess.{id}.sens_ess_power`` via push; legacy plant-flat for single ESS."""
         from ehal.ess_fields import ess_field
 
+        from integrations.power_plausibility import (
+            ImplausiblePowerError,
+            battery_reference_kw,
+            check_power_w,
+        )
+
         bid = str(battery.get("id") or "").strip()
         if not bid:
             return None
         field = ess_field(bid, "sens_ess_power")
+        value: float | None = None
         try:
             resolved = self._push_qid_for_kind(field)
             if resolved is not None:
-                return float(self._read_mapped_numeric(field))
+                value = float(self._read_mapped_numeric(field))
+            elif eligible_count == 1 and self._push_qid_for_kind("sens_ess_power"):
+                value = float(self._read_mapped_numeric("sens_ess_power"))
         except (HaHttpError, ValueError):
             return None
-        if eligible_count == 1 and self._push_qid_for_kind("sens_ess_power"):
-            try:
-                return float(self._read_mapped_numeric("sens_ess_power"))
-            except (HaHttpError, ValueError):
-                return None
-        return None
+        if value is None:
+            return None
+        try:
+            check_power_w(
+                field,
+                value,
+                battery_reference_kw(battery),
+                what="the battery's max charge / discharge power",
+            )
+        except ImplausiblePowerError as exc:
+            raise HaHttpError(str(exc)) from exc
+        return value
 
     def _read_mapped_numeric(self, field_name: str) -> float:
         from integrations.ha_push_read import PushReadError, read_push_ehal_value
