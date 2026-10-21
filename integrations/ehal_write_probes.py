@@ -45,6 +45,10 @@ def _ha_mapped_targets() -> dict[str, str]:
         addr = str(entities.get(field) or "").strip()
         if addr:
             out[field] = addr
+    # Push transport stores activation keys only (empty values): the target is the
+    # qualified EHAL ID published on ``status.json``.
+    for qid in adapter.cfg.setpoint_qids.values():
+        out.setdefault(qid, qid)
     return out
 
 

@@ -58,7 +58,8 @@ def setpoint_qualified_ids(house: dict, components: dict) -> dict[str, str]:
     """``{binding_field_key: qualified_ehal_id}`` for activated ``set_*`` bindings."""
     out: dict[str, str] = {}
     for kind, eid, ctype, field, _name in binding_entries(house, components):
-        if not str(field).startswith("set_"):
+        # Entity-scoped keys (``ess.<id>.set_*``, ``inv.<id>.set_*``) end in the kind.
+        if not str(field).rsplit(".", 1)[-1].startswith("set_"):
             continue
         qid = pilot_id(kind, eid, field, ctype)
         if qid:
