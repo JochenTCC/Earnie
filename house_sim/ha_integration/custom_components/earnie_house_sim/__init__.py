@@ -11,15 +11,20 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
-from .coordinator import HouseSimCoordinator
+from ._core.archetype import load_archetype
+from .const import CONF_ARCHETYPE, DOMAIN
+from .coordinator import FIXTURES_DIR, HouseSimCoordinator
 from .entity_map import ha_entity_id
 
 PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SELECT, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    coordinator = HouseSimCoordinator(hass, entry)
+    # Fixture JSON is read from disk: not in the event loop (HA warns about blocking I/O).
+    package = await hass.async_add_executor_job(
+        lambda: load_archetype(str(entry.data[CONF_ARCHETYPE]), fixtures_dir=FIXTURES_DIR)
+    )
+    coordinator = HouseSimCoordinator(hass, entry, package)
     await coordinator.async_load()
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator

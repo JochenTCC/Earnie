@@ -15,7 +15,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_ARCHETYPE,
     CONF_PV_KWP,
     CONF_PV_SOURCE,
     CONF_UPDATE_INTERVAL,
@@ -33,7 +32,6 @@ from .entity_map import ha_entity_id
 from ._core.archetype import (
     ArchetypePackage,
     flip_power_reading,
-    load_archetype,
     physics_entity_values,
 )
 from ._core.physics import (
@@ -48,11 +46,18 @@ from ._core.weather_pv import pv_kw_from_weather
 
 _LOGGER = logging.getLogger(__name__)
 
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+
 
 class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
     """Wall-clock stepper with scenario overlays and fault injection."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        package: ArchetypePackage,
+    ) -> None:
         interval_s = int(
             entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_S)
         )
@@ -63,11 +68,7 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
             update_interval=timedelta(seconds=max(1, interval_s)),
         )
         self.entry = entry
-        fixtures_dir = Path(__file__).resolve().parent / "fixtures"
-        self.package: ArchetypePackage = load_archetype(
-            str(entry.data[CONF_ARCHETYPE]),
-            fixtures_dir=fixtures_dir,
-        )
+        self.package: ArchetypePackage = package
         self.overlay = ScenarioOverlay()
         self.setpoints: dict[str, float] = {}
         self.switch_states: dict[str, bool] = {}
