@@ -102,7 +102,7 @@ EHAL base units (adapters normalize hub-native units into these):
 
 **EVCS** (`sens_evcs_active_power`)**:** charge power ≥ `0` (W) when charging; `0` when idle.
 
-**ESS** (`sens_ess_power`, optional)**:** OpenEMS-aligned — `+` = **discharge**, `−` = **charge**. Adapters whose source uses the opposite convention (e.g. Victron: `+` = charge) must invert at the boundary. Loxone battery Merker already use `+` = discharge (no inversion).
+**ESS** (`sens_ess_power`; required per grid-tied house battery as `ess.{id}.sens_ess_power`, optional otherwise)**:** OpenEMS-aligned — `+` = **discharge**, `−` = **charge**. Adapters whose source uses the opposite convention (e.g. Victron: `+` = charge) must invert at the boundary. Loxone battery Merker already use `+` = discharge (no inversion).
 
 **Reference power balance (normative):** all power signs are chosen so that every flow *into the house* is positive. Ignoring inverter losses:
 
@@ -134,7 +134,7 @@ Every adapter, derived value (`sens_power_consumers` when not mapped), and Live 
 | `sens_grid_power_active`      | yes      | W      | PCC active power; sign as above                                                                            |
 | `pv.{id}.sens_pv_production_active` | no | W | ≥ 0; optional per-PV-system DC power. Entity-scoped binding / push key only; **not** a property of the telemetry document |
 | `ess.{id}.sens_ess_soc`       | Live yes | %      | Home battery SoC; **not** on the plant telemetry document (entity-scoped binding / push only)              |
-| `sens_ess_power`              | no       | W      | Optional; sign as above                                                                                    |
+| `sens_ess_power`              | no*      | W      | *Required as `ess.{id}.sens_ess_power` for every grid-tied house battery (plant value is derived from it); sign as above |
 | `sens_evcs_active_power`      | no       | W      | ≥ 0 when present                                                                                           |
 | `sens_power_consumers`        | no       | W      | House load; mapped binding or derive                                                                       |
 | `sens_evcs_connected`         | no       | bool   | EV plugged in                                                                                              |
@@ -257,7 +257,7 @@ Migration (data model stays **4**): `python -m scripts.migrate_topology_once --c
 
 **Config / live balance (P2 — generator-side coverage):**
 
-- Plant `sens_ess_power` := Σ over grid-tied house batteries of `ess.{id}.sens_ess_power`. Missing binding/value for any eligible battery → fail loud. Battery-less plants omit ESS → `0`.
+- Plant `sens_ess_power` := Σ over grid-tied house batteries of `ess.{id}.sens_ess_power`. Missing binding/value for any eligible battery → fail loud. Battery-less plants omit ESS → `0`. The key `ess.{id}.sens_ess_power` is therefore a **required signal** for grid-tied house batteries: activated on Hauskonfigurator save, again when an inverter's `ac_connection` changes, and by the migration step `dm4.required_signal_activation` for existing packs.
 - Plant AC PV is always derived as Σ grid-tied inv/pv · η_inv; incomplete `inv.*`/`pv.*` coverage fails loud.
 - Derived load: `plant.balance_tolerance_pct` (default **5**) and `plant.balance_tolerance_w` (default **100**). Raw `PV + grid + ESS` below `−max(w, pct/100 · P_PV)` → telemetry error (not silent `0`); within tolerance → clamp to `0`.
 - Live attribution uses required inverter `efficiency` (η_inv); no soft default.

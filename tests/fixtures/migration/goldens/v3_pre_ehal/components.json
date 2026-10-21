@@ -21,6 +21,7 @@
             },
             "ehal_bindings": {
                 "ess.5_0_kwh_speicher.sens_ess_soc": "",
+                "ess.5_0_kwh_speicher.sens_ess_power": "",
                 "ess.5_0_kwh_speicher.set_ess_charge_power_limit": "",
                 "ess.5_0_kwh_speicher.set_ess_discharge_power_limit": "",
                 "ess.5_0_kwh_speicher.set_ess_active_power": ""
@@ -46,6 +47,7 @@
             },
             "ehal_bindings": {
                 "ess.10_kwh_speicher.sens_ess_soc": "",
+                "ess.10_kwh_speicher.sens_ess_power": "",
                 "ess.10_kwh_speicher.set_ess_charge_power_limit": "",
                 "ess.10_kwh_speicher.set_ess_discharge_power_limit": "",
                 "ess.10_kwh_speicher.set_ess_active_power": ""
@@ -70,6 +72,7 @@
             },
             "ehal_bindings": {
                 "ess.5_kwh_speicher.sens_ess_soc": "",
+                "ess.5_kwh_speicher.sens_ess_power": "",
                 "ess.5_kwh_speicher.set_ess_charge_power_limit": "",
                 "ess.5_kwh_speicher.set_ess_discharge_power_limit": "",
                 "ess.5_kwh_speicher.set_ess_active_power": ""

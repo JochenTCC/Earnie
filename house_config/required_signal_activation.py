@@ -5,6 +5,7 @@ from typing import Any
 
 from ehal.required_signals import (
     activate_required_keys,
+    grid_tied_house_battery_ids,
     inverter_has_attached_pv,
     missing_required_keys,
     required_binding_keys,
@@ -24,14 +25,22 @@ def activate_plant_required(plant: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def activate_battery_required(battery: dict[str, Any]) -> dict[str, Any]:
+def activate_battery_required(
+    battery: dict[str, Any],
+    *,
+    grid_tied_house: bool = False,
+) -> dict[str, Any]:
+    """``grid_tied_house``: battery is on the grid-tied bus → ``sens_ess_power`` required."""
     out = dict(battery) if isinstance(battery, dict) else {}
     bid = str(out.get("id") or "").strip()
     if not bid:
         return out
     control = control_from_battery_params(out)
     keys = required_binding_keys(
-        component_kind="battery", entity_id=bid, control=control
+        component_kind="battery",
+        entity_id=bid,
+        control=control,
+        grid_tied_house=grid_tied_house,
     )
     out["ehal_bindings"] = activate_required_keys(out.get("ehal_bindings"), keys)
     return out
@@ -85,14 +94,33 @@ def activate_consumer_required(consumer: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def activate_batteries_required(
+    batteries: list[Any] | tuple[Any, ...] | None,
+    inverters: list[Any] | tuple[Any, ...] | None,
+) -> list[Any]:
+    """Required keys on every battery; grid-tied house batteries also need ``sens_ess_power``.
+
+    Call again after an inverter changes (``ac_connection``) — it decides which
+    batteries are grid-tied.
+    """
+    grid_tied = grid_tied_house_battery_ids(batteries, inverters)
+    return [
+        activate_battery_required(
+            b, grid_tied_house=str(b.get("id") or "").strip() in grid_tied
+        )
+        if isinstance(b, dict)
+        else b
+        for b in list(batteries or [])
+    ]
+
+
 def activate_required_in_components(components: dict[str, Any]) -> dict[str, Any]:
     """Activate required keys on all batteries / inverters / PV systems."""
     out = dict(components) if isinstance(components, dict) else {}
     pv_systems = list(out.get("pv_systems") or [])
-    out["batteries"] = [
-        activate_battery_required(b) if isinstance(b, dict) else b
-        for b in list(out.get("batteries") or [])
-    ]
+    out["batteries"] = activate_batteries_required(
+        out.get("batteries"), out.get("inverters")
+    )
     out["inverters"] = [
         activate_inverter_required(i, pv_systems=pv_systems)
         if isinstance(i, dict)
@@ -176,6 +204,9 @@ def pack_missing_required(
                     return True
     if isinstance(components, dict):
         pv_systems = list(components.get("pv_systems") or [])
+        grid_tied = grid_tied_house_battery_ids(
+            components.get("batteries"), components.get("inverters")
+        )
         for battery in components.get("batteries") or []:
             if not isinstance(battery, dict):
                 continue
@@ -184,7 +215,10 @@ def pack_missing_required(
                 continue
             control = control_from_battery_params(battery)
             keys = required_binding_keys(
-                component_kind="battery", entity_id=bid, control=control
+                component_kind="battery",
+                entity_id=bid,
+                control=control,
+                grid_tied_house=bid in grid_tied,
             )
             if missing_required_keys(battery.get("ehal_bindings"), keys):
                 return True

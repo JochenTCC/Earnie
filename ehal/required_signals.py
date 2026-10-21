@@ -31,6 +31,9 @@ PLANT_REQUIRED_KINDS: tuple[str, ...] = (
 )
 
 _BATTERY_TELEMETRY: tuple[str, ...] = ("sens_ess_soc",)
+# Plant ``sens_ess_power`` is the sum of these per grid-tied house battery
+# (``integrations.plant_balance``) — required there, optional elsewhere.
+_BATTERY_GRID_TIED_POWER: tuple[str, ...] = ("sens_ess_power",)
 _BATTERY_LIMITS: tuple[str, ...] = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
@@ -61,10 +64,47 @@ def inverter_has_attached_pv(
     return False
 
 
-def required_kinds_for_battery(control: str | None) -> tuple[str, ...]:
+def grid_tied_house_batteries(
+    batteries: list[Any] | tuple[Any, ...] | None,
+    inverters: list[Any] | tuple[Any, ...] | None,
+) -> list[dict]:
+    """House batteries that participate in the house AC balance (grid-tied bus)."""
+    from house_config.powerstation import BATTERY_TYPE_HOUSE
+    from optimizer.milp_inverter import filter_house_balance_batteries
+
+    house = [
+        b
+        for b in batteries or []
+        if isinstance(b, dict)
+        and str(b.get("type") or BATTERY_TYPE_HOUSE).strip().lower() == BATTERY_TYPE_HOUSE
+    ]
+    return filter_house_balance_batteries(
+        house, [i for i in inverters or [] if isinstance(i, dict)]
+    )
+
+
+def grid_tied_house_battery_ids(
+    batteries: list[Any] | tuple[Any, ...] | None,
+    inverters: list[Any] | tuple[Any, ...] | None,
+) -> frozenset[str]:
+    """Ids of grid-tied house batteries (plant ESS power is the sum of their power)."""
+    return frozenset(
+        str(b.get("id") or "").strip()
+        for b in grid_tied_house_batteries(batteries, inverters)
+        if str(b.get("id") or "").strip()
+    )
+
+
+def required_kinds_for_battery(
+    control: str | None,
+    *,
+    grid_tied_house: bool = False,
+) -> tuple[str, ...]:
     """ESS kinds required for the given ``batteries[].control`` level."""
     level = control_from_battery_params({"control": control})
     kinds = list(_BATTERY_TELEMETRY)
+    if grid_tied_house:
+        kinds.extend(_BATTERY_GRID_TIED_POWER)
     if level in (BATTERY_CONTROL_LIMITS_ONLY, BATTERY_CONTROL_FULL):
         kinds.extend(_BATTERY_LIMITS)
     if level == BATTERY_CONTROL_FULL:
@@ -144,12 +184,13 @@ def required_binding_keys(
     control: str | None = None,
     consumer_type: str = "",
     has_attached_pv: bool = False,
+    grid_tied_house: bool = False,
 ) -> tuple[str, ...]:
     """Required ``ehal_bindings`` keys for one component instance."""
     if component_kind == "plant":
         kinds = required_kinds_for_plant()
     elif component_kind == "battery":
-        kinds = required_kinds_for_battery(control)
+        kinds = required_kinds_for_battery(control, grid_tied_house=grid_tied_house)
     elif component_kind == "inverter":
         kinds = required_kinds_for_inverter(control, has_attached_pv=has_attached_pv)
     elif component_kind == "pv_system":

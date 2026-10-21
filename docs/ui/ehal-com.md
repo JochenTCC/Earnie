@@ -44,7 +44,7 @@ Overview of the **canonical EHAL wire fields** (the per-role matrix is in §C be
 | Envelope                | `adapter_id`                       | yes      | stable adapter ID (e.g. `openems-lab`, `earnie-hems`)                                                             |
 | Telemetry               | `sens_grid_power_active`           | yes      | **W**; `+` = grid **import**, `-` = **export**                                                                 |
 | Live / binding          | `ess.{id}.sens_ess_soc`            | Live yes | **%**; 0…100; not on the plant telemetry document                                                              |
-| Telemetry (optional)    | `sens_ess_power`                   | no       | **W**; ESS sign **OpenEMS-aligned**: `+` = **discharge**, `-` = **charge**                                     |
+| Telemetry               | `sens_ess_power`                   | no*      | **W**; ESS sign **OpenEMS-aligned**: `+` = **discharge**, `-` = **charge**; *required per grid-tied house battery as `ess.{id}.sens_ess_power` (plant value is derived), optional otherwise |
 | Telemetry (optional)    | `sens_evcs_active_power`           | no       | **W**; >= 0 (typically 0 when idle)                                                                            |
 | Telemetry (optional)    | `sens_power_consumers`             | no       | **W**; house load; from a mapped hub channel if present, otherwise derived from grid/PV/ESS                  |
 | Telemetry (optional)    | `get_grid_export_power_limit`      | no       | **W**; inbound max export from grid/HEMS (magnitude ≥ 0; negative/absent or ≥ 1 000 000 W = no cap) |
@@ -398,7 +398,7 @@ Shown for **every** backend. This is the binding UI (replaces the former Loxone 
 | Match | Read = last received in the push inbox (age) / never; write = last hub fetch of `status.json` / never published |
 | Export | Loxone: ZIP of VO + VI pilot templates + README; HA: use the **YAML-Paket** section (activated signals) |
 
-Optional signals default off; toggle them in the Signalliste (on = add activation key, off = remove). Required signals are activated when a component is saved in the Hauskonfigurator.
+Optional signals default off; toggle them in the Signalliste (on = add activation key, off = remove). Required signals are activated when a component is saved in the Hauskonfigurator. For a grid-tied house battery this includes `ess.{id}.sens_ess_power`; changing an inverter's `ac_connection` re-evaluates its batteries. Existing packs get the key through the configuration migration (`dm4.required_signal_activation`); regenerate the HA YAML package afterwards and map the new `ENTITY_ess_<id>_sens_ess_power` placeholder.
 
 Always listed as **Pflicht** (not a binding, not in the optional-signals expander): `heartbeat_smarthome` (read / Hub→Earnie) and `heartbeat_earnie` (write / Earnie→Hub, Unix seconds). Control receipt `request_optimize` (VO cmd `Earnie_Request_Optimize` → daemon POST; age stays OK even when older than five minutes).
 

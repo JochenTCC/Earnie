@@ -282,6 +282,12 @@ def upsert_inverter(
     data["inverters"] = _replace_entity_in_list(
         inverters, save_spec, {entity_id, old_id}
     )
+    # ``ac_connection`` decides which batteries are grid-tied (→ sens_ess_power required).
+    from house_config.required_signal_activation import activate_batteries_required
+
+    data["batteries"] = activate_batteries_required(
+        data.get("batteries"), data["inverters"]
+    )
     _save_components_document(data)
     return entity_id
 

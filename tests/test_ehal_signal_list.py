@@ -118,15 +118,19 @@ def test_build_signal_rows_has_read_and_write() -> None:
 def test_catalog_includes_optional_inactive() -> None:
     house, components = _minimal_docs()
     rows = build_signal_rows(house, components, inbox={}, published={}, fetched_at=None)
-    # Optional ESS power is in the role catalog but not activated in fixtures.
+    # Optional ESS limits are in the role catalog but not activated in fixtures.
     opt = next(
-        (r for r in rows if r.ehal_id.endswith("sens_ess_power")),
+        (r for r in rows if r.ehal_id.endswith("get_ess_soc_max")),
         None,
     )
     assert opt is not None
     assert opt.is_required is False
     assert opt.is_activated is False
     assert opt.match_kind == "inactive"
+    # Grid-tied house battery: plant ESS power is derived from it (HA testbed F14).
+    power = next(r for r in rows if r.ehal_id.endswith("sens_ess_power"))
+    assert power.is_required is True
+    assert power.is_activated is False
     soc = next(r for r in rows if r.ehal_id.endswith("sens_ess_soc"))
     assert soc.is_required is True
     assert soc.is_activated is True

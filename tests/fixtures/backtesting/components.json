@@ -34,7 +34,8 @@
                 "ess.test_battery.sens_ess_soc": "",
                 "ess.test_battery.set_ess_charge_power_limit": "",
                 "ess.test_battery.set_ess_discharge_power_limit": "",
-                "ess.test_battery.set_ess_active_power": ""
+                "ess.test_battery.set_ess_active_power": "",
+                "ess.test_battery.sens_ess_power": ""
             },
             "regulates_on": "grid"
         }

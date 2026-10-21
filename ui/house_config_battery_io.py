@@ -482,9 +482,14 @@ def upsert_battery(
     save_spec = _battery_save_spec(
         normalized, id_locked=id_locked, provisional=provisional
     )
+    from ehal.required_signals import grid_tied_house_battery_ids
     from house_config.required_signal_activation import activate_battery_required
 
-    save_spec = activate_battery_required(save_spec)
+    save_spec = activate_battery_required(
+        save_spec,
+        grid_tied_house=entity_id
+        in grid_tied_house_battery_ids([save_spec], data.get("inverters")),
+    )
     is_powerstation = str(save_spec.get("type") or "") == "powerstation"
     _update_scenarios_for_battery_save(
         entity_id, old_id, is_powerstation=is_powerstation

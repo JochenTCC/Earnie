@@ -5,8 +5,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from ehal.ess_fields import ess_field
-from house_config.powerstation import BATTERY_TYPE_HOUSE
-from optimizer.milp_inverter import filter_house_balance_batteries
+from ehal.required_signals import grid_tied_house_batteries  # noqa: F401  (re-export)
 
 DEFAULT_BALANCE_TOLERANCE_PCT = 5.0
 DEFAULT_BALANCE_TOLERANCE_W = 100.0
@@ -46,21 +45,6 @@ def balance_tolerances_from_plant(
     if w_f < 0.0:
         raise ValueError("plant.balance_tolerance_w muss >= 0 sein.")
     return pct_f, w_f
-
-
-def grid_tied_house_batteries(
-    batteries: list[dict],
-    inverters: list[dict],
-) -> list[dict]:
-    """House batteries that participate in the house AC balance."""
-    house = [
-        bat
-        for bat in batteries
-        if isinstance(bat, dict)
-        and str(bat.get("type") or BATTERY_TYPE_HOUSE).strip().lower()
-        == BATTERY_TYPE_HOUSE
-    ]
-    return filter_house_balance_batteries(house, inverters)
 
 
 def sum_grid_tied_house_ess_power_w(

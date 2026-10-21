@@ -141,3 +141,75 @@ def test_pack_missing_and_migration_step():
         result.docs["house_profiles.json"],
         result.docs["components.json"],
     ) is False
+
+
+def _grid_tied_pack(*, ac_connection: str = "grid_tied") -> tuple[dict, dict]:
+    house = {"plant": {"ehal_bindings": {"sens_grid_power_active": ""}}, "profiles": {}}
+    components = {
+        "batteries": [
+            {
+                "id": "house",
+                "control": "read_only",
+                "inverter_id": "wr",
+                "ehal_bindings": {ess_field("house", "sens_ess_soc"): ""},
+            }
+        ],
+        "inverters": [
+            {"id": "wr", "control": "read_only", "ac_connection": ac_connection,
+             "ehal_bindings": {}}
+        ],
+        "pv_systems": [],
+    }
+    return house, components
+
+
+def test_grid_tied_house_battery_requires_ess_power():
+    # HA testbed F14: plant sens_ess_power is derived from ess.<id>.sens_ess_power.
+    assert "sens_ess_power" not in required_kinds_for_battery("read_only")
+    assert "sens_ess_power" in required_kinds_for_battery(
+        "read_only", grid_tied_house=True
+    )
+    keys = required_binding_keys(
+        component_kind="battery",
+        entity_id="house",
+        control="full",
+        grid_tied_house=True,
+    )
+    assert ess_field("house", "sens_ess_power") in keys
+
+
+def test_grid_tied_battery_ids_follow_inverter_topology():
+    from ehal.required_signals import grid_tied_house_battery_ids
+
+    _, tied = _grid_tied_pack()
+    _, island = _grid_tied_pack(ac_connection="island")
+    assert grid_tied_house_battery_ids(tied["batteries"], tied["inverters"]) == {"house"}
+    assert grid_tied_house_battery_ids(island["batteries"], island["inverters"]) == frozenset()
+
+
+def test_pack_missing_ess_power_and_migration_activates_it():
+    house, components = _grid_tied_pack()
+    assert pack_missing_required(house, components) is True
+    assert detect({"house_profiles.json": house, "components.json": components}) is True
+    result = apply({"house_profiles.json": house, "components.json": components}, {})
+    bindings = result.docs["components.json"]["batteries"][0]["ehal_bindings"]
+    assert ess_field("house", "sens_ess_power") in bindings
+    assert pack_missing_required(
+        result.docs["house_profiles.json"], result.docs["components.json"]
+    ) is False
+
+
+def test_island_battery_does_not_require_ess_power():
+    house, components = _grid_tied_pack(ac_connection="island")
+    components["batteries"][0]["ehal_bindings"] = activate_battery_required(
+        components["batteries"][0]
+    )["ehal_bindings"]
+    assert pack_missing_required(house, components) is False
+
+
+def test_inverter_change_refreshes_battery_requirement():
+    from house_config.required_signal_activation import activate_batteries_required
+
+    _, components = _grid_tied_pack()
+    out = activate_batteries_required(components["batteries"], components["inverters"])
+    assert ess_field("house", "sens_ess_power") in out[0]["ehal_bindings"]

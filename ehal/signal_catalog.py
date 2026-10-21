@@ -190,6 +190,11 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
             )
         )
 
+    from ehal.required_signals import grid_tied_house_battery_ids
+
+    grid_tied = grid_tied_house_battery_ids(
+        components.get("batteries"), components.get("inverters")
+    )
     for battery in components.get("batteries") or []:
         if not isinstance(battery, dict):
             continue
@@ -199,7 +204,10 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
         control = control_from_battery_params(battery)
         required = set(
             required_binding_keys(
-                component_kind="battery", entity_id=bid, control=control
+                component_kind="battery",
+                entity_id=bid,
+                control=control,
+                grid_tied_house=bid in grid_tied,
             )
         )
         bindings = _bindings_of(battery)
