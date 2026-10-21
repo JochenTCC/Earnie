@@ -37,7 +37,7 @@ Für die öffentliche Demo auf Streamlit Community Cloud kommt **`EARNIE_CLOUD_D
 
 - **Eigener Workspace:** Jede Browser-Sitzung erhält einen eigenen temporären Greenfield-Workspace mit leerer Minimal-Config.
 - **Start:** Die Sitzung beginnt im **Hauskonfigurator** und zeigt einen kurzen Willkommenshinweis.
-- **Bewertung:** Wurde im Szenario-Explorer eine Berechnung gestartet, kann beim Verlassen der Seite einmalig ein anonymer Bewertungsdialog mit Sternen erscheinen. **Senden** überträgt die Bewertung an den Earnie-Server (Adresse aus `EARNIE_REVIEW_URL`). **Abbrechen** beendet die Abfrage ebenfalls, ohne etwas zu senden.
+- **Bewertung:** Wurde im Szenario-Explorer eine Berechnung gestartet, kann beim Verlassen der Seite einmalig ein anonymer Bewertungsdialog mit Sternen erscheinen. **Senden** überträgt die Bewertung an den fest hinterlegten Earnie-Server. **Abbrechen** beendet die Abfrage ebenfalls, ohne etwas zu senden.
 - **Kein Offline-Seed:** Der Offline-Demo-Seed der Live-Szenario-IDs entfällt.
 
 Empfohlene Secrets: `EARNIE_CLOUD_DEMO=1`, `EARNIE_OFFLINE=1`, `EARNIE_UI_MODES=scenario_explorer`.

@@ -7,6 +7,7 @@ from datetime import date, datetime
 import pandas as pd
 import pytest
 
+from house_config.entity_resolution import ZERO_BATTERY_FLAT
 from house_config.planning_flex_bridge import (
     PROFILE_SPEC,
     planning_flex_daily_targets,
@@ -433,12 +434,14 @@ def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
 
     scenarios = {
         "live": {
+            **ZERO_BATTERY_FLAT,
             "_import_tariff_spec": {"id": "awattar_at", "type": "spot_hourly", "land": "AT"},
             "_export_tariff_spec": {"id": "fixed_37ct", "type": "fixed", "k_push_cent": 37.0},
             "feed_in_mode": "fixed",
             "k_push_cent": 37.0,
         },
         "fixed_only": {
+            **ZERO_BATTERY_FLAT,
             "_import_tariff_spec": {"id": "fixed_25ct", "type": "fixed_cent", "fix_cent_kwh": 25.0},
             "_export_tariff_spec": {"id": "fixed_37ct", "type": "fixed", "k_push_cent": 37.0},
             "feed_in_mode": "fixed",
@@ -484,6 +487,7 @@ def test_build_per_scenario_reference_costs_pv_variant(
     install_open_meteo_climate_mock(monkeypatch)
 
     tariff_block = {
+        **ZERO_BATTERY_FLAT,
         "_import_tariff_spec": {"id": "fixed_25ct", "type": "fixed_cent", "fix_cent_kwh": 25.0},
         "_export_tariff_spec": {"id": "fixed_37ct", "type": "fixed", "k_push_cent": 37.0},
         "feed_in_mode": "fixed",

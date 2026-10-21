@@ -372,7 +372,7 @@ def _prepare_sankey_data(
 ) -> tuple[list[str], _SankeyLinks, list[str]]:
     """Sankey: Energiebilanz; optional Auflösung Haus → Grundlast + flexible Verbraucher."""
     head = _SankeyHead(
-        lbl_pv=f"☀️ PV-Anlage ({data['pv']:.2f} kW)",
+        lbl_pv=f"☀️ PV-Felder ({data['pv']:.2f} kW)",
         lbl_grid=_grid_label(data["grid"]),
         lbl_bat=_battery_label(current_soc, data["battery"], main_state),
         color_grid=_grid_color(data["grid"]),

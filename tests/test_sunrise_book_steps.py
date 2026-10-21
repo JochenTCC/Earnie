@@ -75,6 +75,45 @@ def test_sa2_is_sunrise_on_ready_by_date():
     assert len(step.milp_slots) > len(step.book_slots)
 
 
+def test_book_period_cuts_chain_edges_to_the_period():
+    """First / last book of the chain keep only the in-period slots; the MILP stays whole."""
+    tz = ZoneInfo(_TZ)
+    full = resolve_ready_by_sunrise_step(
+        datetime(2025, 10, 1, 7, tzinfo=tz), _LAT, _LON, _TZ
+    )
+    period = (datetime(2025, 10, 1), datetime(2026, 10, 1))
+    first = resolve_ready_by_sunrise_step(
+        datetime(2025, 10, 1, 7, tzinfo=tz), _LAT, _LON, _TZ, book_period=period
+    )
+    book = [slot.replace(tzinfo=None) for slot in first.book_slots]
+    assert book[0] == datetime(2025, 10, 1, 0, 0)
+    assert book[-1] == full.book_slots[-1].replace(tzinfo=None)
+    assert first.milp_slots == full.milp_slots
+    assert first.milp_slots[first.sa1_index].replace(tzinfo=None) == book[0]
+    last = resolve_ready_by_sunrise_step(
+        datetime(2026, 10, 1, 7, tzinfo=tz), _LAT, _LON, _TZ, book_period=period
+    )
+    assert last.book_slots[-1].replace(tzinfo=None) == datetime(2026, 9, 30, 23, 45)
+    inner = resolve_ready_by_sunrise_step(
+        datetime(2026, 3, 3, 7, tzinfo=tz), _LAT, _LON, _TZ, book_period=period
+    )
+    assert inner.book_slots == resolve_ready_by_sunrise_step(
+        datetime(2026, 3, 3, 7, tzinfo=tz), _LAT, _LON, _TZ
+    ).book_slots
+
+
+def test_book_period_rejects_step_outside_period():
+    tz = ZoneInfo(_TZ)
+    with pytest.raises(ValueError, match="außerhalb der Buchungsperiode"):
+        resolve_ready_by_sunrise_step(
+            datetime(2025, 6, 1, 7, tzinfo=tz),
+            _LAT,
+            _LON,
+            _TZ,
+            book_period=(datetime(2025, 10, 1), datetime(2026, 10, 1)),
+        )
+
+
 def test_book_contains_charging_night_before_ready_by():
     """Winter weekday: ready_by 07:00 before sunrise — the night 20:00→07:00 is booked."""
     ready = datetime(2025, 12, 9, 7, tzinfo=ZoneInfo(_TZ))

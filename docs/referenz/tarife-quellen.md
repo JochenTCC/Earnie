@@ -172,6 +172,8 @@ Die Formeln zum Nachrechnen stehen auf dieser Seite, das technische Mapping in [
 | ------- | ---------------- | ---------- |
 | Strom Dynamisch | EPEX + 1,20 ct netto | `at_vkw_strom_dynamisch` |
 | Strom Duo | Fixpreis als `monthly_table`: Okt–Mär 9,40 ct netto; Apr–Sep 9,15 ct netto (Mischwert aus Normaltarif 9,40 und Sommerfenster 8,40, 10–16 Uhr) | `at_vkw_strom_duo` |
+| Strom Duo ohne Sonderrabatt | Normalpreis als `monthly_table`: Okt–Mär 12,20 ct netto; Apr–Sep 11,95 ct netto (Mischwert aus 12,20 und Sommerfenster 11,20, 10–16 Uhr) | `at_vkw_strom_duo_normalpreis` |
+| Strom Einfach | Fixpreis rund um die Uhr: 17,20 ct netto (Normalpreis ohne befristeten Sonderrabatt von 7,30 ct bis 31.03.2027) | `at_vkw_strom_einfach` |
 | PV Dynamisch | EPEX − 0,60 ct netto | `at_vkw_pv_dynamisch` |
 | PV Flex | RefMarkt PV − 0,60 ct | `at_vkw_pv_flex` |
 
@@ -190,6 +192,8 @@ Dieser Abschnitt macht die Katalogpflege transparent: Er gleicht öffentliche Qu
 | `awattar_at` | 4,79 | netto | [awattar.at/tariffs/hourly](https://www.awattar.at/tariffs/hourly) |
 | `at_vkw_strom_dynamisch` | 3,00 | netto | [vkw.at Strom Dynamisch](https://www.vkw.at/produkte/strom/strom-dynamisch) (36 €/Jahr netto) |
 | `at_vkw_strom_duo` | 3,00 | netto | [vkw.at Strom Duo](https://www.vkw.at/produkte/strom/strom-duo) (36 €/Jahr netto) |
+| `at_vkw_strom_duo_normalpreis` | 3,00 | netto | [vkw.at Produktblatt Strom Duo](https://www.vkw.at/vkw/dokumente/strom/produktblaetter/produktblatt-strom-duo.pdf) (36 €/Jahr netto, Stand 04/2026) |
+| `at_vkw_strom_einfach` | 1,75 | netto | [vkw.at Produktblatt Strom Einfach](https://www.vkw.at/vkw/dokumente/strom/produktblaetter/produktblatt-strom-einfach.pdf) (21 €/Jahr netto, Stand 01/2026) |
 | `at_smartenergy_smartcontrol` | 2,49 | netto | [smartenergy.at/smartcontrol](https://smartenergy.at/smartcontrol) (2,99 brutto) |
 | `at_spotty_smart_active` | 2,00 | netto | Spotty-Rechnung / Portale (2,40 brutto) |
 | `at_verbund_v_strom_spot` | 3,99 | netto | Selectra / Verbund-Grundpreis (ca. 4,79 brutto) |

@@ -12,16 +12,22 @@ from typing import Any
 import pytest
 
 from runtime_store import usage_ping as up
+from runtime_store.server_endpoints import PATH_PING, url_for
 from version import __version__
+
+# Captured before fixtures stub spawn (HTTPS SERVER_BASE is reachable).
+_REAL_SPAWN_MAYBE_SEND_PING = up.spawn_maybe_send_ping
 
 
 @pytest.fixture
 def runtime_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     monkeypatch.delenv("EARNIE_USAGE_PING", raising=False)
-    monkeypatch.delenv("EARNIE_USAGE_PING_URL", raising=False)
     monkeypatch.delenv("EARNIE_INSTALL_CONTEXT", raising=False)
     monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    # set_consent → refresh_points would otherwise spawn a real POST to SERVER_BASE
+    # (now a live HTTPS host) and race with tests that call maybe_send_ping next.
+    monkeypatch.setattr(up, "spawn_maybe_send_ping", lambda: False)
     up.reset_send_in_flight_for_tests()
     return tmp_path / "runtime"
 
@@ -141,13 +147,11 @@ def test_set_highest_stage_monotonic(runtime_dir: Path) -> None:
     assert payload["stage"] == "live"
 
 
-def test_missing_url_without_transport_warns(
-    runtime_dir: Path, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_default_endpoint_is_composed_base_plus_ping(runtime_dir: Path) -> None:
     up.set_consent("on", now=_now())
-    with caplog.at_level("WARNING", logger="runtime_store.usage_ping"):
-        assert up.maybe_send_ping(_now()) is False
-    assert any("USAGE_PING_URL" in r.message for r in caplog.records)
+    fake = _FakeTransport(204)
+    assert up.maybe_send_ping(_now(), transport=fake) is True
+    assert fake.calls[0][0] == url_for(PATH_PING)
 
 
 def test_fake_transport_records_json_body(runtime_dir: Path) -> None:
@@ -365,9 +369,10 @@ def test_note_live_cycle_success_skips_shadow(
 def test_spawn_maybe_send_ping_single_flight(
     runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Avoid consent-time points refresh spawning a real send before this test.
+    # Avoid consent-time points refresh; restore real spawn (fixture stubs it).
     monkeypatch.setattr("runtime_store.usage_points.refresh_points", lambda: False)
     up.set_consent("on", now=_now())
+    monkeypatch.setattr(up, "spawn_maybe_send_ping", _REAL_SPAWN_MAYBE_SEND_PING)
     up.reset_send_in_flight_for_tests()
     started = threading.Event()
     release = threading.Event()

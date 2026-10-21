@@ -61,7 +61,7 @@ def new_pv_system_template(
     if source is None:
         return {}
 
-    source_label = str(source.get("label") or source.get("id") or "PV-Anlage").strip()
+    source_label = str(source.get("label") or source.get("id") or "PV-Feld").strip()
     return {
         "label": allocate_unique_label(f"{source_label} copy", systems),
         "pv_kwp": float(source.get("pv_kwp", source.get("kwp", 10.0))),
@@ -244,13 +244,13 @@ def _pv_by_id() -> dict[str, dict]:
 def _pv_selectbox(options: list[str], initial_index: int | None) -> str:
     if initial_index is not None:
         return labeled_selectbox(
-            "PV-Anlage",
+            "PV-Feld",
             options=options,
             index=initial_index,
             key="planning_pv_select",
         )
     return labeled_selectbox(
-        "PV-Anlage",
+        "PV-Feld",
         options=options,
         key="planning_pv_select",
     )
@@ -511,7 +511,7 @@ def _render_pv_id_from_label(stable_id: str, fields: dict) -> None:
 
 
 def _render_pv_delete(stable_id: str) -> None:
-    if not st.button("PV-Anlage entfernen", key="planning_pv_delete"):
+    if not st.button("PV-Feld entfernen", key="planning_pv_delete"):
         return
     try:
         delete_pv_system(stable_id)
@@ -529,13 +529,13 @@ def _render_pv_delete(stable_id: str) -> None:
     st.session_state[_SESSION_SYNC_KEY] = None
     if fallback == NEW_OPTION:
         st.session_state[_SESSION_SUPPRESS_AUTOPERSIST_KEY] = True
-    st.success("PV-Anlage entfernt.")
+    st.success("PV-Feld entfernt.")
     st.rerun()
 
 
 def render_pv_planning_tab() -> None:
     st.caption(
-        "Optional — ohne PV-Anlage bleibt die Prognose bei 0 kW (z. B. reine Batterie-Arbitrage)."
+        "Optional — ohne PV-Feld bleibt die Prognose bei 0 kW (z. B. reine Batterie-Arbitrage)."
     )
     ctx = _render_pv_select()
     is_new = ctx["is_new"]

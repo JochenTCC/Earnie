@@ -101,24 +101,29 @@ def _scenarios(**settings: Any) -> dict:
 @pytest.fixture
 def plant(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     env = tmp_path / "earnie_env"
+    runtime = env / "runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
     for name in (
         "EARNIE_CONFIG_PATH",
         "EARNIE_COMPONENTS_PATH",
         "EARNIE_HOUSE_PROFILES_PATH",
         "EARNIE_BACKTESTING_SCENARIOS_PATH",
         "EARNIE_USAGE_PING",
-        "EARNIE_USAGE_PING_URL",
         "EARNIE_SHADOW",
-        "EARNIE_RUNTIME_PATH",
     ):
         monkeypatch.delenv(name, raising=False)
+    # Pin both roots so xdist cannot fall through to the developer's earnie_env
+    # (consent=on there makes test_refresh_requires_consent flake).
     monkeypatch.setenv("EARNIE_ENV_PATH", str(env))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime))
     cfg = env / "config"
     _write(cfg / "config.json", {"live_scenario_id": "live"})
     _write(cfg / "components.json", _components())
     _write(cfg / "house_profiles.json", _profiles())
     _write(cfg / "backtesting_scenarios.json", _scenarios())
     clear_components_doc_cache()
+    # Avoid set_consent → refresh_points POSTing to the live HTTPS SERVER_BASE.
+    monkeypatch.setattr(up, "spawn_maybe_send_ping", lambda: False)
     up.reset_send_in_flight_for_tests()
     return cfg
 

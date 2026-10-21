@@ -102,6 +102,11 @@
             "year": 2026,
             "month": 8,
             "tariff_cent_kwh": 8.997
+        },
+        {
+            "year": 2026,
+            "month": 9,
+            "tariff_cent_kwh": 10.168
         }
     ],
     "monthly_float_reference_cent_kwh": 7.15,
@@ -728,6 +733,172 @@
             ],
             "notes": "Vorarlberg (ohne Kleinwalsertal). Fixpreis Strom Duo inkl. Sonderrabatt bis 31.03.2027. Normaltarif 9,40 ct netto; reduzierter Sommertarif 8,40 ct netto (1.4.–30.9., taeglich 10–16 Uhr). Als monthly_table: Okt–Mar = 9,40; Apr–Sep = 9,15 (75%×9,40 + 25%×8,40; flache Tageslast, Fenster 6/24 h). Offiziell ab 01.04.2026; fruehere Monate mit Normaltarif fuer SE-Kontinuitaet. Grundpreis 36 EUR/Jahr netto (3,00 EUR/Monat). Quelle: vkw.at/produkte/strom/strom-duo, Preisblatt Stand 04/2026.",
             "supplier_id": "vkw"
+        },
+        {
+            "id": "at_vkw_strom_duo_normalpreis",
+            "label": "VKW — Strom Duo (ohne Sonderrabatt)",
+            "type": "monthly_table",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": false,
+            "vat_percent": 20.0,
+            "monthly_fee_eur": 3.0,
+            "monthly_rates": [
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2026,
+                    "month": 8,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 11.95
+                },
+                {
+                    "year": 2026,
+                    "month": 10,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2026,
+                    "month": 11,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2026,
+                    "month": 12,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2027,
+                    "month": 1,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2027,
+                    "month": 2,
+                    "tariff_cent_kwh": 12.2
+                },
+                {
+                    "year": 2027,
+                    "month": 3,
+                    "tariff_cent_kwh": 12.2
+                }
+            ],
+            "notes": "Vorarlberg (ohne Kleinwalsertal). Strom Duo zum Normalpreis ohne befristeten Sonderrabatt (-2,80 ct netto bis 31.03.2027; rabattierte Variante: at_vkw_strom_duo). Normaltarif 12,20 ct netto (14,64 brutto); reduzierter Sommertarif 11,20 ct netto (13,44 brutto; 1.4.–30.9., taeglich 10–16 Uhr). Als monthly_table: Okt–Mar = 12,20; Apr–Sep = 11,95 (75%×12,20 + 25%×11,20; flache Tageslast, Fenster 6/24 h). Offiziell ab 01.04.2026; fruehere Monate mit Normaltarif fuer SE-Kontinuitaet. Grundpreis 36 EUR/Jahr netto (3,00 EUR/Monat). Quelle: vkw.at Produktblatt Strom Duo, Stand 04/2026.",
+            "supplier_id": "vkw"
+        },
+        {
+            "id": "at_vkw_strom_einfach",
+            "label": "VKW — Strom Einfach",
+            "type": "fixed_cent",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": false,
+            "vat_percent": 20.0,
+            "fix_cent_kwh": 17.2,
+            "monthly_fee_eur": 1.75,
+            "notes": "Vorarlberg (ohne Kleinwalsertal), bis 100.000 kWh/Jahr, NE7. Fixpreis rund um die Uhr: Normalpreis 17,20 ct netto (20,64 ct brutto), ohne befristeten Sonderrabatt (-7,30 ct netto bis 31.03.2027). Grundpreis 21,00 EUR/Jahr netto (25,20 brutto). Optional Upgrade Oeko+ +0,84 ct/kWh (nicht enthalten). Quelle: vkw.at Produktblatt Strom Einfach (Stand 01/2026)",
+            "supplier_id": "vkw"
         }
     ],
     "export_tariffs": [
@@ -877,6 +1048,11 @@
                     "year": 2026,
                     "month": 8,
                     "tariff_cent_kwh": 8.997
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 10.168
                 }
             ],
             "supplier_id": "oemag"
@@ -996,6 +1172,11 @@
                     "year": 2026,
                     "month": 8,
                     "tariff_cent_kwh": 5.8612
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 6.8193
                 }
             ],
             "supplier_id": "energie_ag_ober_sterreich"
@@ -1115,6 +1296,11 @@
                     "year": 2026,
                     "month": 8,
                     "tariff_cent_kwh": 8.0533
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 9.1014
                 }
             ],
             "supplier_id": "evn"
@@ -1234,6 +1420,11 @@
                     "year": 2026,
                     "month": 8,
                     "tariff_cent_kwh": 8.7453
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 9.8836
                 }
             ],
             "supplier_id": "wien_energie"
@@ -1381,6 +1572,11 @@
                     "year": 2026,
                     "month": 8,
                     "tariff_cent_kwh": 7.6758
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 8.6748
                 }
             ],
             "supplier_id": "tibber"
@@ -1533,9 +1729,14 @@
                     "year": 2026,
                     "month": 9,
                     "tariff_cent_kwh": 8.989
+                },
+                {
+                    "year": 2026,
+                    "month": 10,
+                    "tariff_cent_kwh": 11.8
                 }
             ],
-            "notes": "Web-Recherche awattar.at/tariffs/sunny + Wayback/Tarifblätter (Cent/kWh netto=brutto). Bekannte Monate: 2024-09..11, 2025-01..04/06/07/10/12, 2026-02..05/07/09. 2026-08 = Platzhalter (Juli-Wert, Tarifblatt nicht mehr abrufbar). Lücken (2024-12, 2025-05/08/09/11, 2026-01/06) geschätzt: monthly_sunny × linear interpoliertes web/sunny-Ratio (Pearson≈0.69). Grundgebühr 4,79 €/Monat netto. Nicht mit SUNNY Spot 60min verwechseln.",
+            "notes": "Web-Recherche awattar.at/tariffs/sunny + Wayback/Tarifblätter (Cent/kWh netto=brutto). Bekannte Monate: 2024-09..11, 2025-01..04/06/07/10/12, 2026-02..05/07/09/10. 2026-08 = Platzhalter (Juli-Wert, Tarifblatt nicht mehr abrufbar). Lücken (2024-12, 2025-05/08/09/11, 2026-01/06) geschätzt: monthly_sunny × linear interpoliertes web/sunny-Ratio (Pearson≈0.69). Grundgebühr 4,79 €/Monat netto. Nicht mit SUNNY Spot 60min verwechseln.",
             "supplier_id": "awattar_at"
         },
         {
@@ -1635,6 +1836,11 @@
                     "year": 2026,
                     "month": 8,
                     "tariff_cent_kwh": 8.82
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 9.93
                 }
             ],
             "notes": "Vorarlberg, bis 100 kWp. RefMarkt PV (§13 EAG) − 0,60 ct, ohne USt. Seed aus econtrol_referenzmarktwert_pv_monthly. Quelle: vkw.at/pv-einspeisetarif-flex",
@@ -1711,6 +1917,11 @@
             "year": 2026,
             "month": 8,
             "tariff_cent_kwh": 9.42
+        },
+        {
+            "year": 2026,
+            "month": 9,
+            "tariff_cent_kwh": 10.53
         }
     ]
 }

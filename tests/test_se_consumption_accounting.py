@@ -225,6 +225,25 @@ def test_scenario_standby_power_sums_all_batteries(monkeypatch):
     assert scenario_standby_power_kw({}) == pytest.approx(0.039)
 
 
+def test_reference_standby_follows_scenario_storage(monkeypatch):
+    from simulation.reference_costs import reference_standby_power_kw
+
+    monkeypatch.setattr(
+        "simulation.engine_scenario._scenario_to_battery_params",
+        lambda _params: {"standby_power_kw": 0.026},
+    )
+    assert reference_standby_power_kw({"battery_ids": ["x"]}) == pytest.approx(0.026)
+    assert reference_standby_power_kw(None) == 0.0
+
+
+def test_reference_standby_zero_for_stripped_historical_params():
+    from house_config.entity_resolution import strip_assets_for_reference
+    from simulation.reference_costs import reference_standby_power_kw
+
+    stripped = strip_assets_for_reference({"standby_power_kw": 0.026})
+    assert reference_standby_power_kw(stripped) == 0.0
+
+
 # --- references evaluate the optimized run's slots -------------------------------------------
 
 

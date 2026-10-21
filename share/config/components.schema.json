@@ -25,7 +25,7 @@
     },
     "pv_systems": {
       "type": "array",
-      "description": "PV-Anlagen (Mehrfach-Definition; Szenario wählt pv_system_ids[]).",
+      "description": "PV-Felder (Mehrfach-Definition; Szenario wählt pv_system_ids[]).",
       "items": {
         "$ref": "#/definitions/pv_system_entity"
       }
@@ -197,7 +197,7 @@
     },
     "pv_system_entity": {
       "type": "object",
-      "description": "PV-Anlage für Prognose und Backtesting.",
+      "description": "PV-Feld für Prognose und Backtesting.",
       "required": [
         "id",
         "kwp"

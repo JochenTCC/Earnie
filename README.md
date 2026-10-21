@@ -16,7 +16,7 @@ GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie).
 
 **Earnie** richtet sich an Hausbesitzer:innen, die ihre Stromkosten minimieren möchten, insbesondere bei [Spot-Tarifen](https://www.epexspot.com/). In einem variablen Zeitfenster von max. 48 h plant Earnie Verbräuche und Erträge so, dass die Kosten minimal sind.
 
-Am besten funktioniert das bei Häusern mit PV-Anlage, Batteriespeicher und Verbrauchern, die sich per Smart-Home steuern lassen: smarter Wechselrichter, smarte Wallbox für das E-Auto, smarte Wärmepumpe und weitere Geräte. Für Geräte ohne smarte Freigabe kann **Earnie** Startempfehlungen geben.
+Am besten funktioniert das bei Häusern mit PV-Feldern, Batteriespeicher und Verbrauchern, die sich per Smart-Home steuern lassen: smarter Wechselrichter, smarte Wallbox für das E-Auto, smarte Wärmepumpe und weitere Geräte. Für Geräte ohne smarte Freigabe kann **Earnie** Startempfehlungen geben.
 
 Die Live-Anbindung läuft über **EHAL**. Das Backend wird per Config umgeschaltet ([Smarthome-Backend wählen](docs/einrichtung/smarthome-backend-wahl.md)):
 

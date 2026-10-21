@@ -494,7 +494,7 @@ def _render_inv_delete(stable_id: str) -> None:
 
 def render_inverter_planning_tab() -> None:
     st.caption(
-        "Wechselrichter verknüpfen PV-Anlagen und Batterien (`inverter_id`). "
+        "Wechselrichter verknüpfen PV-Felder und Batterien (`inverter_id`). "
         "Powerstation-WR mit `owned_by` entstehen mit physischen Powerstations; "
         "EHAL-Namespace später `inv.<Kennung>.*`."
     )

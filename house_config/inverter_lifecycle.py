@@ -140,5 +140,5 @@ def inverter_refs_blocking_delete(
             continue
         pid = str(pv.get("id") or "").strip()
         if str(pv.get("inverter_id") or "").strip() == target:
-            refs.append(f"PV-Anlage '{pid}'")
+            refs.append(f"PV-Feld '{pid}'")
     return refs

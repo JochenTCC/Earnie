@@ -1,8 +1,8 @@
 # Historische Leistungsprofil-CSV (Hausprofil)
 
-Im **Hauskonfigurator** lassen sich Jahres-Leistungsprofile als CSV hinterlegen – für das gesamte Haus und optional je Verbraucher. Gemeint ist die Leistung, die Verbraucher im Haus tatsächlich bezogen haben. Woher sie stammt (Netz, PV-Anlage oder Batterie), spielt keine Rolle. Kennzahlen in **kWh** (z. B. Monatsverbrauch, Jahresverbrauch) bleiben Energiegrößen und heißen weiterhin Verbrauch bzw. Erzeugung.
+Im **Hauskonfigurator** lassen sich Jahres-Leistungsprofile als CSV hinterlegen – für das gesamte Haus und optional je Verbraucher. Gemeint ist die Leistung, die Verbraucher im Haus tatsächlich bezogen haben. Woher sie stammt (Netz, PV-Feld oder Batterie), spielt keine Rolle. Kennzahlen in **kWh** (z. B. Monatsverbrauch, Jahresverbrauch) bleiben Energiegrößen und heißen weiterhin Verbrauch bzw. Erzeugung.
 
-Zusätzlich kann ein **PV-Erzeugungsprofil [kW]** (Summe aller Anlagen) importiert werden. Auch hier zählt die gesamte Leistung der PV-Anlagen, unabhängig davon, ob Verbraucher im Haus sie direkt genutzt haben, ob sie in die Batterie geflossen ist oder ins Netz eingespeist wurde.
+Zusätzlich kann ein **PV-Erzeugungsprofil [kW]** (Summe aller PV-Felder) importiert werden. Auch hier zählt die gesamte Leistung der PV-Felder, unabhängig davon, ob Verbraucher im Haus sie direkt genutzt haben, ob sie in die Batterie geflossen ist oder ins Netz eingespeist wurde.
 
 **Begriffe:**
 
@@ -150,7 +150,7 @@ Die Modell-Basislast im Chart entspricht damit dem gewählten Jahres- oder Monat
 
 ## PV-Erzeugungsprofil (`pv_profile_csv`)
 
-Optionaler Jahresverlauf der PV-Leistung als Summe über alle PV-Anlagen. Im Szenarienkonfigurator lässt sich pro Szenario festlegen, ob der Szenario-Explorer dieses Profil statt der PV aus Wetterdaten (Open-Meteo) für die Berechnung nutzt.
+Optionaler Jahresverlauf der PV-Leistung als Summe über alle PV-Felder. Im Szenarienkonfigurator lässt sich pro Szenario festlegen, ob der Szenario-Explorer dieses Profil statt der PV aus Wetterdaten (Open-Meteo) für die Berechnung nutzt.
 
 - **Mindestlänge:** Die PV-CSV muss dafür mindestens ca. **12 Monate** abdecken.
 - **Kürzere Importe** bleiben im Hauskonfigurator sichtbar, der Szenario-Explorer verwendet sie aber **nicht** und greift auf Open-Meteo zurück.

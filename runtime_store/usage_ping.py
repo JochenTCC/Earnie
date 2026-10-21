@@ -9,15 +9,15 @@ import json
 import logging
 import os
 import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Literal
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 
 from runtime_store.env_vars import read_env
 from runtime_store.install_context import detect_install_context
 from runtime_store.persist_paths import usage_ping_state_file
+from runtime_store.server_endpoints import PATH_PING, post_json, resolve_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +31,13 @@ _STAGE_RANK = {"explorer": 0, "live": 1}
 
 TIMEOUT_SEC = 5.0
 RETRY_AFTER = timedelta(hours=1)
+_STATE_REPLACE_ATTEMPTS = 5
+_STATE_REPLACE_SLEEP_SEC = 0.02
 
 Transport = Callable[[str, bytes, float], int]
 
 _send_lock = threading.Lock()
+_state_lock = threading.Lock()
 _send_in_flight = False
 
 
@@ -72,7 +75,8 @@ def _ensure_parent(path: str) -> None:
 def _atomic_replace_unavailable(exc: OSError) -> bool:
     if getattr(exc, "errno", None) in (13, 16):
         return True
-    return getattr(exc, "winerror", None) == 5
+    # WinError 5 = access denied; 32 = sharing violation (AV / concurrent open).
+    return getattr(exc, "winerror", None) in (5, 32)
 
 
 def _write_json_direct(path: str, data: dict[str, Any]) -> None:
@@ -84,10 +88,21 @@ def _write_json_direct(path: str, data: dict[str, Any]) -> None:
 def load_state() -> dict[str, Any]:
     """Load usage-ping state; missing file means consent ``unset``."""
     path = usage_ping_state_file()
-    if not os.path.isfile(path):
-        return {"consent": "unset"}
-    with open(path, encoding="utf-8") as handle:
-        raw = json.load(handle)
+    with _state_lock:
+        if not os.path.isfile(path):
+            return {"consent": "unset"}
+        last_exc: Exception | None = None
+        for attempt in range(_STATE_REPLACE_ATTEMPTS):
+            try:
+                with open(path, encoding="utf-8") as handle:
+                    raw = json.load(handle)
+                break
+            except (OSError, json.JSONDecodeError) as exc:
+                last_exc = exc
+                time.sleep(_STATE_REPLACE_SLEEP_SEC * (attempt + 1))
+        else:
+            assert last_exc is not None
+            raise last_exc
     if not isinstance(raw, dict):
         raise ValueError(f"{path}: usage_ping state must be a JSON object")
     out = dict(raw)
@@ -100,32 +115,36 @@ def save_state(state: dict[str, Any]) -> None:
     """Atomically write usage-ping state (SMB/Windows fallback)."""
     path = usage_ping_state_file()
     tmp = f"{path}.tmp"
-    try:
-        _write_json_direct(tmp, state)
-        os.replace(tmp, path)
-    except OSError as exc:
-        if not _atomic_replace_unavailable(exc):
-            raise
-        logger.warning(
-            "usage_ping: atomic replace to %s failed (%s), writing directly",
-            path,
-            exc,
-        )
-        _write_json_direct(path, state)
-    finally:
-        if os.path.exists(tmp):
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+    with _state_lock:
+        last_exc: OSError | None = None
+        try:
+            _write_json_direct(tmp, state)
+            for attempt in range(_STATE_REPLACE_ATTEMPTS):
+                try:
+                    os.replace(tmp, path)
+                    return
+                except OSError as exc:
+                    last_exc = exc
+                    if not _atomic_replace_unavailable(exc):
+                        raise
+                    time.sleep(_STATE_REPLACE_SLEEP_SEC * (attempt + 1))
+            assert last_exc is not None
+            logger.warning(
+                "usage_ping: atomic replace to %s failed (%s), writing directly",
+                path,
+                last_exc,
+            )
+            _write_json_direct(path, state)
+        finally:
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
 
 
 def is_kill_switch_off() -> bool:
     return read_env("USAGE_PING").lower() == "off"
-
-
-def endpoint_url_from_env() -> str:
-    return read_env("USAGE_PING_URL")
 
 
 def set_consent(value: Literal["on", "off"], *, now: datetime | None = None) -> dict[str, Any]:
@@ -243,20 +262,7 @@ def preview_payload(state: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 def _default_transport(url: str, body: bytes, timeout: float) -> int:
-    request = urllib_request.Request(
-        url,
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib_request.urlopen(request, timeout=timeout) as response:
-            return int(response.getcode())
-    except urllib_error.HTTPError as exc:
-        return int(exc.code)
-    except (urllib_error.URLError, TimeoutError, OSError, ValueError) as exc:
-        logger.warning("usage_ping: transport failed: %s", exc)
-        return 0
+    return post_json(url, body, timeout, log_name="usage_ping")
 
 
 def _should_attempt(state: dict[str, Any], now: datetime) -> bool:
@@ -292,11 +298,8 @@ def maybe_send_ping(
     if force and (is_kill_switch_off() or str(state.get("consent") or "unset") != "on"):
         return False
 
-    url = (endpoint_url if endpoint_url is not None else endpoint_url_from_env()).strip()
+    url = resolve_endpoint(PATH_PING, endpoint_url)
     send = transport if transport is not None else _default_transport
-    if not url and transport is None:
-        logger.warning("usage_ping: EARNIE_USAGE_PING_URL unset; skip send")
-        return False
 
     try:
         payload = build_payload(state)

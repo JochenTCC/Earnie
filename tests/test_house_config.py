@@ -354,11 +354,13 @@ def test_dach_tariffs_catalog():
     doc = load_tariffs_document(str(root / "share" / "config" / "tariffs.json"))
     # Monatlicher Tarif-Scan setzt das ISO-Datum des Laufs.
     assert re.fullmatch(r"\d{4}(-\d{2}-\d{2})?", doc.get("catalog_as_of", ""))
-    assert len(doc["import_tariffs"]) == 35
+    assert len(doc["import_tariffs"]) == 37
     assert len(doc["export_tariffs"]) == 13
     assert "awattar_at" in doc["import_tariffs"]
     assert "at_vkw_strom_dynamisch" in doc["import_tariffs"]
     assert "at_vkw_strom_duo" in doc["import_tariffs"]
+    assert "at_vkw_strom_duo_normalpreis" in doc["import_tariffs"]
+    assert "at_vkw_strom_einfach" in doc["import_tariffs"]
     assert "dynamic_epex" in doc["export_tariffs"]
     assert "at_vkw_pv_flex" in doc["export_tariffs"]
     assert "de_eeg_staatliche_verguetung_eeg_einspeiseverguetung_10kwp" not in doc[

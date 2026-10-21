@@ -28,9 +28,24 @@ from data.planning_window import (
 from simulation.horizon_mode import BACKTESTING_STEP_HOURS
 
 
+BOOK_PERIOD_KEY = "_book_period"
+"""Scenario-param key ``(start, end_exclusive)`` (naive datetimes): book only slots inside.
+
+The sunrise chain spans ``[SA(start−1), SA(end+1))``, so its first and last book
+reach over the period edges. Booking only the in-period part of those two steps
+(targets, flex window and reference slots all follow ``book_slots``) keeps the
+period exactly ``[start 00:00, end+1 00:00)`` without a clip that would drop
+consumption the optimizer shifted across the edge.
+"""
+
+
 @dataclass(frozen=True)
 class SunriseBookStep:
-    """One SE sunrise_window step keyed by ready_by."""
+    """One SE sunrise_window step keyed by ready_by.
+
+    ``book_slots`` is [SA₁, SA₂), cut to the book period at the chain edges
+    (``BOOK_PERIOD_KEY``); ``sa1_index`` is the MILP index of its first slot.
+    """
 
     ready_by: datetime
     sa0: datetime
@@ -113,6 +128,8 @@ def resolve_ready_by_sunrise_step(
     latitude: float,
     longitude: float,
     timezone_name: str,
+    *,
+    book_period: tuple[datetime, datetime] | None = None,
 ) -> SunriseBookStep:
     """
     Book the sunrise day that ends on ready_by's calendar date; MILP SA₀→SA₂.
@@ -140,12 +157,24 @@ def resolve_ready_by_sunrise_step(
 
     milp_slots = hourly_slots_inclusive(sa0, sa2)
     book_slots = hourly_slots_half_open(sa1, sa2)
-    sa1_slot = normalize_quarter_hour_slot(sa1)
+    if book_period is not None:
+        period_start, period_end = book_period
+        book_slots = tuple(
+            slot
+            for slot in book_slots
+            if period_start <= naive_backtesting_slot(slot) < period_end
+        )
+        if not book_slots:
+            raise ValueError(
+                f"Sunrise-Buchung [{sa1.isoformat()}, {sa2.isoformat()}) liegt "
+                f"außerhalb der Buchungsperiode [{period_start}, {period_end})."
+            )
+    book_start_slot = normalize_quarter_hour_slot(book_slots[0])
     try:
-        sa1_index = milp_slots.index(sa1_slot)
+        sa1_index = milp_slots.index(book_start_slot)
     except ValueError as exc:
         raise ValueError(
-            f"SA₁ {sa1_slot.isoformat()} fehlt in MILP-Slots "
+            f"Buchungsstart {book_start_slot.isoformat()} fehlt in MILP-Slots "
             f"{milp_slots[0].isoformat()}…{milp_slots[-1].isoformat()}."
         ) from exc
     return SunriseBookStep(
@@ -164,7 +193,13 @@ def resolve_sunrise_book_step_for_scenario(
     scenario_params: dict,
 ) -> SunriseBookStep:
     lat, lon, tz_name = geo_params_from_scenario(scenario_params)
-    return resolve_ready_by_sunrise_step(ready_by, lat, lon, tz_name)
+    return resolve_ready_by_sunrise_step(
+        ready_by,
+        lat,
+        lon,
+        tz_name,
+        book_period=scenario_params.get(BOOK_PERIOD_KEY),
+    )
 
 
 def window_start_before_anchor(anchor: datetime, timezone_name: str) -> datetime:

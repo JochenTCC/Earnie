@@ -1,6 +1,6 @@
 # Opt-in usage ping (installation statistics)
 
-**Status:** draft — client P1 + daemon/milestones P2 + consent UI P3 + German docs/privacy P5 implemented in this repo; **receiver** lives in private **`JochenTCC/earnie-server`** (LAN lab compose; VPS/Caddy edge = P4 remainder). Production host: **hosttech** (EU) with AV — see §6 / §9.
+**Status:** draft — client P1 + daemon/milestones P2 + consent UI P3 + German docs/privacy P5 implemented in this repo; **receiver** lives in private **`JochenTCC/earnie-server`** (LAN lab compose; production HTTPS via Caddy at `https://cloudserver.earnie-hems.com`). Production host: **hosttech** (EU) with AV — see §6 / §9.
 
 ## 1. Goal
 
@@ -37,7 +37,7 @@ Module `runtime_store/usage_ping.py` (pure logic + `maybe_send_ping`), state in 
 - `stage`: highest milestone reached (`explorer` → `live`); set on opt-in to `explorer`; raised via `set_highest_stage` / `note_explorer_activated` / `note_live_cycle_success`.
 - `points`, `points_v`, `points_stamp` (optional): Earnie-Points of the live plant, rule version and the config mtime stamp used to skip recomputation (see [`earnie-points.md`](earnie-points.md) §4). Computed on `set_consent("on")` and again after a successful live cycle / config stamp change — no optimiser cycle is required for the first write. Removed again when the calculation fails.
 - `scenarios_calc_count`: local lifetime counter of successfully calculated scenarios (not in wire payload). Bumped by `note_scenarios_calculated(n)` after a successful Scenario Explorer run (`scripts/run_backtesting.py` after log save, `n = len(enabled scenarios)`). When consent is `on`, a bump clears `last_sent_date` and `last_attempt_at` and calls `spawn_maybe_send_ping()` so the client may POST again the same UTC day. Server still daily-dedups by salted install id (first-wins for counters; `points` latest-wins, see §4 schema v2).
-- `maybe_send_ping(now, *, transport=None, endpoint_url=None)`: no-op unless consent is `on`, `EARNIE_USAGE_PING != off`, `last_sent_date != today (UTC)`, and `last_attempt_at` is older than 1 h (or missing). POST JSON with timeout 5 s. `last_sent_date` updates only on HTTP 2xx; every attempt stamps `last_attempt_at`. Endpoint URL from `EARNIE_USAGE_PING_URL` (or `endpoint_url`); if unset and no injected transport → WARNING no-op.
+- `maybe_send_ping(now, *, transport=None, endpoint_url=None)`: no-op unless consent is `on`, `EARNIE_USAGE_PING != off`, `last_sent_date != today (UTC)`, and `last_attempt_at` is older than 1 h (or missing). POST JSON with timeout 5 s. `last_sent_date` updates only on HTTP 2xx; every attempt stamps `last_attempt_at`. Default URL from `runtime_store/server_endpoints.py` (`SERVER_BASE` + `PATH_PING`); tests inject `endpoint_url` / `transport` and stay offline.
 - **P2 wiring:** `spawn_maybe_send_ping()` (daemon thread, at most one in flight) from `main.py` after `after_prod_cycle` and from `_daemon_wait_poll`. Live milestone after `run_state.save_run_state` with `success: true`, skipped in shadow mode. HA add-on optional bool `usage_ping` mirrored by `addon_options._apply_usage_ping_option` → `set_consent` when the key is present (absent = leave state unchanged).
 - Opt-out: set consent `off`, delete `install_id` (keep `consent_at` / `last_sent_date` / `stage` / `scenarios_calc_count` as historical). No DELETE/"bye".
 - **P3 consent UI (German):** `ui/usage_ping_consent.py`. Dialog on first open of **Szenario-Explorer** (`page_backtesting.py` → `maybe_prompt_consent_on_explorer`) when consent is `unset` (Zustimmen / Ablehnen; Abbrechen leaves unset). Stage stays `explorer` until a live cycle. If `scenario_explorer` is **not** in `EARNIE_UI_MODES`, `maybe_prompt_consent_on_editor` on Szenarienkonfigurator is the fallback (same dialog + explorer milestone). Settings on Optimierer-Dienst (`page_daemon.py`): toggle + expander “Was wird gesendet?”. Preview via `preview_payload()` (placeholder `id` until opt-in); live `build_payload()` when consent is `on`. Kill-switch caption when `EARNIE_USAGE_PING=off`. UI state rules: `streamlit-ui-state.mdc`.
@@ -89,7 +89,7 @@ Minimal HTTPS endpoint `POST /ping` on a rented VPS: **Caddy** terminates TLS an
 1. Client module + state + payload + tests — done
 2. Daemon hook + kill-switch + HA add-on option — done
 3. UI consent dialog + settings toggle + "show payload" — done
-4. Server + daily aggregation file + deployment — open (earnie-server; VPS/Caddy remainder)
+4. Server + daily aggregation file + deployment — done (earnie-server; production base `https://cloudserver.earnie-hems.com`)
 5. German docs + privacy text — done
 
 ## 9. Open questions
@@ -112,4 +112,4 @@ Two counters instead of one: a `stage` field in the payload, e.g. `explorer` (fi
 
 ### Still open
 
-- VPS compose with Caddy edge (P4 remainder in `earnie-server`).
+- Behind Caddy the receiver sees all clients as `127.0.0.1`, so the in-memory per-IP rate limit is effectively global; fix in `earnie-server` by reading `X-Forwarded-For`.

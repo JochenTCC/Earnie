@@ -272,7 +272,7 @@ def _render_scenario_entity_picks(ctx: dict) -> dict:
         container=battery_col,
     )
     pv_picks = render_entity_multiselect(
-        "PV-Anlagen",
+        "PV-Felder",
         ctx["pv_systems"],
         key=scoped_widget_key(session_scope, "scenario_pv"),
         container=pv_col,

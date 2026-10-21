@@ -122,7 +122,7 @@ def upsert_pv_system(
     if not inverter_id and isinstance(existing, dict):
         inverter_id = str(existing.get("inverter_id") or "").strip()
     if not inverter_id:
-        raise ValueError("PV-Anlage: inverter_id fehlt.")
+        raise ValueError("PV-Feld: inverter_id fehlt.")
     bindings_src = _pv_bindings_src(
         raw_spec, existing, old_id=old_id, entity_id=entity_id
     )
@@ -336,12 +336,12 @@ def delete_pv_system(entity_id: str) -> None:
 
     target = str(entity_id or "").strip()
     if not target:
-        raise ValueError("PV-Anlagen-ID fehlt.")
+        raise ValueError("PV-Feld-ID fehlt.")
     data = _load_components_document()
     systems = list(data.get("pv_systems") or [])
     remaining = [item for item in systems if str(item.get("id", "")).strip() != target]
     if len(remaining) == len(systems):
-        raise ValueError(f"Unbekannte PV-Anlage '{target}'.")
+        raise ValueError(f"Unbekanntes PV-Feld '{target}'.")
     data["pv_systems"] = remaining
     _save_components_document(data)
 

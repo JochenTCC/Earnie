@@ -10,7 +10,7 @@ from runtime_store.usage_points import compute_live_points
 logger = logging.getLogger(__name__)
 
 PART_LABELS = (
-    ("pv", "PV-Anlage"),
+    ("pv", "PV-Felder"),
     ("storage", "Speicher"),
     ("wallbox", "Wallboxen"),
     ("heat", "Wärmepumpe / Klimaanlage"),

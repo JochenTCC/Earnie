@@ -5,12 +5,12 @@ Diese Parameter beschreiben die physische Anlage. Sie fließen in die MILP-Optim
 - **Live-Szenario:** Es enthält die Entitäts-Referenzen (`backtesting_scenarios.json`, gewählt über `live_scenario_id` in `config.json`).
 - **Technische Werte:** Sie liegen in `earnie_env/config/components.json` (`inverters[]`, `batteries[]`, `pv_systems[]`).
 
-Ein Szenario kann **mehrere PV-Anlagen** (`pv_system_ids`) und **mehrere Batterien** (`battery_ids`) referenzieren. Prognose und Optimierung rechnen mit der **Summe** aller Anlagen bzw. aller gewählten Speicher. Welche Wechselrichter beteiligt sind, ergibt sich aus `inverter_id` an PV-Anlage und Batterie. Im Szenario gibt es dafür kein eigenes `inverter_ids[]`.
+Ein Szenario kann **mehrere PV-Felder** (`pv_system_ids`) und **mehrere Batterien** (`battery_ids`) referenzieren. Prognose und Optimierung rechnen mit der **Summe** aller PV-Felder bzw. aller gewählten Speicher. Welche Wechselrichter beteiligt sind, ergibt sich aus `inverter_id` an PV-Feld und Batterie. Im Szenario gibt es dafür kein eigenes `inverter_ids[]`.
 
 Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 
-- **Monatschart:** Je **eindeutiger PV-Konfiguration** über alle Szenarien erscheint eine Serie (Summe der Anlagen in dieser Konfiguration). Die Legende verbindet die Bezeichnungen mit „ + “, z. B. „Dach Süd“ oder „Dach Nord + Dach Süd“.
-- **Wochenchart:** Je **eindeutiger PV-Anlage** erscheint eine Serie, zusätzlich die Summen der Mehrfach-Konfigurationen wie im Monatschart. Konfigurationen mit nur einer Anlage werden nicht doppelt gezeichnet.
+- **Monatschart:** Je **eindeutiger PV-Konfiguration** über alle Szenarien erscheint eine Serie (Summe der PV-Felder in dieser Konfiguration). Die Legende verbindet die Bezeichnungen mit „ + “, z. B. „Dach Süd“ oder „Dach Nord + Dach Süd“.
+- **Wochenchart:** Je **eindeutigem PV-Feld** erscheint eine Serie, zusätzlich die Summen der Mehrfach-Konfigurationen wie im Monatschart. Konfigurationen mit nur einem PV-Feld werden nicht doppelt gezeichnet.
 - **Farben:** Die PV-Linien nutzen eine gelbliche Palette. Die historische Summe aus `cons_data` („PV Ist“) zeigen diese Charts **nicht** an.
 
 | Parameter | Einheit | Quelle | Bedeutung |
@@ -20,7 +20,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `id` / `id_locked` / `id_provisional_label` | – | `components.json` → `inverters[]` / `batteries[]` / `pv_systems[]` | Interne ID (EHAL-Slug / Kennung). Neue Einträge und Kopien starten mit freigegebener ID (`id_locked: false`, Vorschlag in `id_provisional_label`). Die erste geänderte **Bezeichnung** setzt `id` aus dem Label und sperrt die ID. Bestehende Einträge ohne Flag gelten als gesperrt. Einmalig steht der UI-Button „ID aus Bezeichnung übernehmen“ zur Verfügung. Zum einmaligen Bereinigen unsauberer IDs offline: `python -m scripts.clean_entity_ids_once --config-dir <config>` (Dry-Run; `--apply` schreibt; optional `--only-copy`). |
 | `type` | enum | `components.json` → `batteries[]` | `house` (Default) oder `powerstation` (Reserve; Anbindung über ein manuelles Gerät mit `mode: reserve`) |
 | `backing` / `role` / `attached_consumer_ids` | – | `components.json` → Powerstation | Nur bei `type: powerstation`: `virtual`\|`physical` bzw. `single_use`\|`standby_backup`. `attached_consumer_ids` (Liste) ist optional; die Zuordnung ist auch über manuelle Geräte mit `mode: reserve` + `powerstation_id` möglich. Ältere Konfigurationen: `attached_consumer_id` entspricht dem ersten Listenelement. |
-| `inverter_id` | – | `components.json` → `batteries[]` / `pv_systems[]` | Referenz auf `inverters[].id`. Pflicht für Hausbatterien, physische Powerstations und alle PV-Anlagen. Virtuelle Powerstations haben **keinen** Wechselrichter. |
+| `inverter_id` | – | `components.json` → `batteries[]` / `pv_systems[]` | Referenz auf `inverters[].id`. Pflicht für Hausbatterien, physische Powerstations und alle PV-Felder. Virtuelle Powerstations haben **keinen** Wechselrichter. |
 | `kwp` | kWp | `components.json` → `pv_systems[]` | Installierte PV-Leistung je Anlage; die Summe ergibt `pv_kwp` |
 | `pv_tilt` | ° | `components.json` → `pv_systems[]` | Dachneigung **je Anlage** (bei mehreren Anlagen gibt es keine gemeinsame Neigung) |
 | `pv_azimuth` | ° | `components.json` → `pv_systems[]` | Ausrichtung je Anlage: `0` = Süd, `-90` = Ost, `90` = West |
@@ -81,7 +81,7 @@ Diese Rolle ist für Dauerläufer ohne einzelnen Lauf-Auslöser gedacht (PC, Rou
 
 Die Live-PV-Leistung (AC-Summe der Anlage) leitet Earnie aus den netzgekoppelten Wechselrichtern ab: Σ(`inv.{id}.sens_inv_power_pv` · η_inv).
 
-- **Mapping je Wechselrichter:** Jeder Wechselrichter mit angeschlossenen PV-Anlagen braucht dieses Mapping. Fehlt die PV-Leistung des Wechselrichters, können vollständige String-Mappings `pv.{id}.sens_pv_production_active` die Summe je Wechselrichter ersetzen.
+- **Mapping je Wechselrichter:** Jeder Wechselrichter mit angeschlossenen PV-Feldern braucht dieses Mapping. Fehlt die PV-Leistung des Wechselrichters, können vollständige String-Mappings `pv.{id}.sens_pv_production_active` die Summe je Wechselrichter ersetzen.
 - **Nicht berücksichtigt:** Powerstation- und Insel-Wechselrichter (`ac_connection: island`) zählen nicht mit.
 - **Unvollständige Mappings** führen zu einem Fehler.
 - **Kein flaches Anlagen-Feld mehr:** `plant.ehal_bindings.sens_pv_production_active` gibt es nicht mehr. Die Migration überträgt ein eindeutiges Mapping auf den einzigen Wechselrichter.
@@ -89,7 +89,7 @@ Die Live-PV-Leistung (AC-Summe der Anlage) leitet Earnie aus den netzgekoppelten
 
 ## Wechselrichter (`inverters[]`)
 
-PV-Anlagen und Batterien können über `inverter_id` auf denselben Wechselrichter verweisen (n:1). Im Hauskonfigurator gibt es dafür den Tab **Wechselrichter** und eine Auswahl in den PV- und Batterie-Formularen. Die Geräte-Vorlage **EcoFlow Delta 3** legt eine physische Powerstation samt integriertem Powerstation-Hybrid-Wechselrichter in einem Schritt an.
+PV-Felder und Batterien können über `inverter_id` auf denselben Wechselrichter verweisen (n:1). Im Hauskonfigurator gibt es dafür den Tab **Wechselrichter** und eine Auswahl in den PV- und Batterie-Formularen. Die Geräte-Vorlage **EcoFlow Delta 3** legt eine physische Powerstation samt integriertem Powerstation-Hybrid-Wechselrichter in einem Schritt an.
 
 | Feld | Bedeutung |
 |------|-----------|
@@ -107,9 +107,9 @@ PV-Anlagen und Batterien können über `inverter_id` auf denselben Wechselrichte
 
 - **Batterien:** entity-scoped `ess.{slug}.*` in `batteries[].ehal_bindings`.
 - **Wechselrichter:** `inv.{slug}.*` in `inverters[].ehal_bindings`.
-- **PV-Anlagen:** optional `pv.{slug}.*` in `pv_systems[].ehal_bindings`.
+- **PV-Felder:** optional `pv.{slug}.*` in `pv_systems[].ehal_bindings`.
 
-In [EHAL-Com](../ui/ehal-com.md) erscheinen Hausspeicher, **physische** Powerstations, Wechselrichter und PV-Anlagen als Mapping-Entities. **Virtuelle** Powerstations haben kein eigenes Binding und nutzen die Hausbatterie. Speichern schreibt `components.json`, nicht `house_profiles.json`.
+In [EHAL-Com](../ui/ehal-com.md) erscheinen Hausspeicher, **physische** Powerstations, Wechselrichter und PV-Felder als Mapping-Entities. **Virtuelle** Powerstations haben kein eigenes Binding und nutzen die Hausbatterie. Speichern schreibt `components.json`, nicht `house_profiles.json`.
 
 Die Quellenwahl `ess.{slug}.set_ess_source_select` gibt es nur an physischen `standby_backup`-Batterien, nicht in der Anlagen-Zeile. Die übrigen ESS-Felder gehören zur Batterie-Zeile. Loxone-Merker für mehrere Speicher tragen den Slug als Infix: `Earnie_Batterie_<Slug>_…`. Einmal-Migration von anlagenweiten (plant-flachen) Bindings auf die Batterie, inkl. Quellenwahl → Standby-Backup: `python -m scripts.migrate_ess_bindings_once --config-dir <config>`.
 
@@ -204,4 +204,4 @@ Auf der Seite **Szenarienkonfigurator** erfolgt die Auswahl der Entitäts-Refere
 
 ## Szenarien
 
-Varianten lassen sich mit dem Live-Szenario vergleichen, ohne den Produktivbetrieb zu ändern, etwa ein größerer Speicher, mehrere PV-Anlagen oder ein anderer Strom-Tarif. Dafür weitere Einträge in `backtesting_scenarios.json` anlegen (siehe [Überblick](overview.md)).
+Varianten lassen sich mit dem Live-Szenario vergleichen, ohne den Produktivbetrieb zu ändern, etwa ein größerer Speicher, mehrere PV-Felder oder ein anderer Strom-Tarif. Dafür weitere Einträge in `backtesting_scenarios.json` anlegen (siehe [Überblick](overview.md)).

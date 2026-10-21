@@ -242,7 +242,8 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
         "(jeder Zeitslot einmal, ohne Speicher-Standby) – derselbe Wert wie "
         "„Jahres Verbrauch“ in der SE-Tabelle Gesamtkosten.",
         "- Speicher-Standby (Info) = Eigenverbrauch der Hausbatterie; steckt in "
-        "Bezug/Einspeisung, wird aber nicht als Hausverbrauch gezählt.",
+        "Bezug/Einspeisung (optimierte Szenarien und ihre Referenzen), wird aber "
+        "nicht als Hausverbrauch gezählt.",
         "- Verbrauch und Standby gehen **nicht** direkt in die Rechnungssumme ein.",
         "- Ø Tarif Cent/kWh: arithmetisches Mittel der stündlichen Tarifpreise "
         "über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`); "

@@ -679,13 +679,13 @@
           "type": "number",
           "minimum": 0,
           "maximum": 90,
-          "description": "Vorschlag Dachneigung für neue PV-Anlage (überschreibbar)."
+          "description": "Vorschlag Dachneigung für ein neues PV-Feld (überschreibbar)."
         },
         "default_pv_azimuth": {
           "type": "number",
           "minimum": -180,
           "maximum": 180,
-          "description": "Vorschlag PV-Azimut für neue PV-Anlage (überschreibbar)."
+          "description": "Vorschlag PV-Azimut für ein neues PV-Feld (überschreibbar)."
         },
         "total_profile_csv": {
           "type": "string"

@@ -300,7 +300,7 @@
     },
     "pv_system_entity": {
       "type": "object",
-      "description": "PV-Anlage für Prognose und Backtesting.",
+      "description": "PV-Feld für Prognose und Backtesting.",
       "required": [
         "id",
         "kwp"
