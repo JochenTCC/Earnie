@@ -60,11 +60,16 @@ _EMA_MAX_S = 3600.0
 _EMA_WEIGHT = 0.3
 
 _lock = threading.Lock()
+# Serializes flushes: a second ``flush_inbox_now`` must wait for a write in flight
+# (timer thread) instead of returning before the file exists.
+_flush_lock = threading.Lock()
 # Daemon in-process view (listener + read path). JSON file is for the UI process.
 _memory: dict[str, dict[str, Any]] = {}
 # Last usable numeric value per ID (for the 5-minute hold on required fields).
 _last_known: dict[str, tuple[float, datetime]] = {}
 _dirty = False
+# Target of the unflushed changes, fixed when they were recorded (see ``flush_inbox_now``).
+_dirty_path: str | None = None
 _flush_timer: threading.Timer | None = None
 _last_flush_mono = 0.0
 
@@ -127,33 +132,45 @@ def _schedule_flush_unlocked() -> None:
 
 
 def _mark_dirty_unlocked() -> None:
-    global _dirty
+    global _dirty, _dirty_path
+    if not _dirty:
+        _dirty_path = _inbox_path()
     _dirty = True
     _schedule_flush_unlocked()
 
 
 def flush_inbox_now() -> None:
-    """Write the in-process inbox to disk immediately (tests / shutdown / timer)."""
-    global _dirty, _last_flush_mono
-    with _lock:
-        if not _dirty:
-            return
-        snapshot = {k: dict(v) for k, v in _memory.items()}
-        _dirty = False
-        _cancel_flush_timer_unlocked()
-        _last_flush_mono = time.monotonic()
-    _write_inbox(snapshot)
-    with _lock:
-        if _dirty:
-            _schedule_flush_unlocked()
+    """Write the in-process inbox to disk immediately (tests / shutdown / timer).
+
+    Returns only after everything recorded before the call is on disk, also when a
+    timer flush is already writing.
+    """
+    global _dirty, _dirty_path, _last_flush_mono
+    with _flush_lock:
+        with _lock:
+            if not _dirty:
+                return
+            snapshot = {k: dict(v) for k, v in _memory.items()}
+            # The target was fixed when the data was recorded: a timer that fires late
+            # must not write this snapshot into a different runtime dir (tests, env change).
+            path = _dirty_path or _inbox_path()
+            _dirty = False
+            _dirty_path = None
+            _cancel_flush_timer_unlocked()
+            _last_flush_mono = time.monotonic()
+        _write_inbox(snapshot, path)
+        with _lock:
+            if _dirty:
+                _schedule_flush_unlocked()
 
 
 def clear_inbox() -> None:
     """Delete all stored pushes (pilot button)."""
-    global _dirty, _last_flush_mono
+    global _dirty, _dirty_path, _last_flush_mono
     with _lock:
         _cancel_flush_timer_unlocked()
         _dirty = False
+        _dirty_path = None
         _last_flush_mono = 0.0
         _memory.clear()
         _last_known.clear()
@@ -168,10 +185,11 @@ def clear_inbox() -> None:
 
 def reset_memory_for_tests() -> None:
     """Clear in-process cache and pending flush state (unit tests)."""
-    global _dirty, _last_flush_mono
+    global _dirty, _dirty_path, _last_flush_mono
     with _lock:
         _cancel_flush_timer_unlocked()
         _dirty = False
+        _dirty_path = None
         _last_flush_mono = 0.0
         _memory.clear()
         _last_known.clear()
@@ -190,8 +208,8 @@ def hydrate_memory_from_disk() -> None:
                 _last_known[ehal_id] = (float(row["value"]), ts)
 
 
-def _write_inbox(rows: dict[str, dict[str, Any]]) -> None:
-    path = _inbox_path()
+def _write_inbox(rows: dict[str, dict[str, Any]], path: str | None = None) -> None:
+    path = path or _inbox_path()
     parent = os.path.dirname(path)
     if parent and not os.path.isdir(parent):
         os.makedirs(parent, exist_ok=True)

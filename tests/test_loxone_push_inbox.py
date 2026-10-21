@@ -150,9 +150,9 @@ def test_record_push_debounces_disk_flush(monkeypatch: pytest.MonkeyPatch) -> No
     writes: list[int] = []
     real_write = inbox._write_inbox
 
-    def counting_write(rows: dict) -> None:
+    def counting_write(rows: dict, path: str | None = None) -> None:
         writes.append(len(rows))
-        real_write(rows)
+        real_write(rows, path)
 
     monkeypatch.setattr(inbox, "_write_inbox", counting_write)
     # Prevent the Timer(0) from racing the assert; flush explicitly.
@@ -394,3 +394,19 @@ def test_prefix_endpoint_open_without_token() -> None:
     rows = inbox.load_inbox()
     assert rows["ess.house.sens_ess_soc"]["value"] == 1.0
     assert rows["sens_pv_production_active"]["value"] == 2.0
+
+
+def test_late_flush_writes_to_the_directory_of_the_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A flush that fires after the runtime dir changed must not pollute the new dir."""
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(first))
+    monkeypatch.setattr(inbox, "_schedule_flush_unlocked", lambda: None)
+    inbox.record_push("ess.house.sens_ess_soc", "55")
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(second))
+    inbox.flush_inbox_now()
+    assert (first / inbox.INBOX_FILENAME).is_file()
+    assert not (second / inbox.INBOX_FILENAME).exists()
+
