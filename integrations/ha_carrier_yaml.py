@@ -377,7 +377,12 @@ def _status_sensor(
     return lines
 
 
-def _setpoint_automation(sig: Signal, *, skip_active_power: bool) -> list[str]:
+def _setpoint_automation(
+    sig: Signal,
+    *,
+    skip_active_power: bool,
+    repeat_s: float,
+) -> list[str]:
     if skip_active_power and field_kind(sig.ehal_id) == "set_ess_active_power":
         return []
     entity = entity_placeholder(sig.ehal_id)
@@ -387,15 +392,25 @@ def _setpoint_automation(sig: Signal, *, skip_active_power: bool) -> list[str]:
         f"Earnie setpoint skipped for {sig.ehal_id}: unknown or incompatible "
         f"unit_of_measurement on {entity} (need {unit or 'numeric'})"
     )
-    # Indent under else: of the unknown-unit guard (10 spaces before - action).
+    # Re-assert on every tick, but only write when the target drifted (≈1 %), so
+    # a restart or a manual change is corrected without a write every interval.
+    drift = (
+        f"{{% set cur = states('{entity}') | float(none) %}}"
+        "{{ cur is none or (cur - (hub_value | float)) | abs "
+        "> 0.01 * (hub_value | float | abs) + 0.01 }}"
+    )
+    # Indent under else: of the unknown-unit guard (10 spaces before - if).
     apply = [
-        "          - action: number.set_value",
-        "            target:",
-        f"              entity_id: {entity}",
-        "            data:",
-        f"              value: {_q('{{ hub_value }}')}",
+        "          - if:",
+        "              - condition: template",
+        f"                value_template: {_q(drift)}",
+        "            then:",
+        "              - action: number.set_value",
+        "                target:",
+        f"                  entity_id: {entity}",
+        "                data:",
+        f"                  value: {_q('{{ hub_value }}')}",
     ]
-    # Reuse skip guard shape with hub_value instead of ehal_value.
     guard = [
         "      - if:",
         "          - condition: template",
@@ -409,6 +424,14 @@ def _setpoint_automation(sig: Signal, *, skip_active_power: bool) -> list[str]:
         "        else:",
         *apply,
     ]
+    # Fields Earnie did not publish (e.g. active power in automatic mode) are not an error.
+    nothing_published = [
+        "      - if:",
+        "          - condition: template",
+        f"            value_template: {_q('{{ ehal_raw is none or not (ehal_raw | is_number) }}')}",
+        "        then:",
+        "          - stop: \"Earnie published no value for this field\"",
+    ]
     return [
         f"  - id: {auto_id}",
         f"    alias: {_q(f'Earnie setpoint {sig.ehal_id}')}",
@@ -418,8 +441,12 @@ def _setpoint_automation(sig: Signal, *, skip_active_power: bool) -> list[str]:
         "      - trigger: state",
         f"        entity_id: {STATUS_SENSOR_ENTITY}",
         f"        attribute: {sig.ehal_id}",
+        "      - trigger: homeassistant",
+        "        event: start",
+        *_time_pattern_lines(repeat_s),
         "    actions:",
         *_jinja_from_ehal_vars(sig.ehal_id, entity, unit),
+        *nothing_published,
         *guard,
     ]
 
@@ -493,7 +520,9 @@ def _automations(
     active_ids = _active_power_write_ids(writes) if force else []
     skip_active = bool(force and active_ids)
     for sig in writes:
-        lines += _setpoint_automation(sig, skip_active_power=skip_active)
+        lines += _setpoint_automation(
+            sig, skip_active_power=skip_active, repeat_s=repeat_s
+        )
     if force:
         lines += _ha_ess_force_automations(force, active_ids)
     lines.append("")

@@ -134,3 +134,30 @@ def test_carrier_yaml_ha_ess_force_when_configured():
     assert "dev-luna-1" in text
     # Active power goes via force automation, not ENTITY number.set_value.
     assert "ENTITY_ess_house_set_ess_active_power" not in text
+
+
+def _setpoint_block(text: str) -> str:
+    start = text.index("id: earnie_setpoint_ess_house_set_ess_charge_power_limit")
+    nxt = text.find("\n  - id:", start)
+    return text[start : nxt if nxt != -1 else len(text)]
+
+
+def test_carrier_yaml_setpoints_are_reasserted_on_start_and_periodically():
+    # HA testbed F8/F18: an attribute-change trigger alone never corrects a target
+    # after an HA restart or a manual change while the published value is unchanged.
+    block = _setpoint_block(_build(repeat_s=10.0))
+    assert "trigger: homeassistant" in block
+    assert "event: start" in block
+    assert "trigger: time_pattern" in block
+    assert 'seconds: "/10"' in block
+    assert "attribute: ess.house.set_ess_charge_power_limit" in block
+
+
+def test_carrier_yaml_setpoints_write_only_on_drift_and_ignore_unpublished():
+    block = _setpoint_block(_build())
+    assert "| float(none)" in block and "| abs >" in block
+    # Unpublished field (automatic mode) is not an error and not a warning.
+    assert "stop: Earnie published no value for this field" in block or (
+        'stop: "Earnie published no value for this field"' in block
+    )
+    assert block.index("published no value") < block.index("number.set_value")

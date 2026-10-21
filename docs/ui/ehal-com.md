@@ -374,7 +374,7 @@ After an Auto-Roundtrip, safe setpoints are always written (ESS automatic, EVCS 
 Only with backend **Home Assistant**. Under **HA Push-Carrier**, download a YAML package generated from **activated** signals:
 
 - Per read signal: `rest_command` + automation with **periodic** `time_pattern` (interval = `EARNIE_PILOT_PUSH_REPEAT_S`, default **10 s** — not only on state change).
-- Heartbeat push; REST sensor on Earnie `status.json`; setpoint automations (`status.json` attribute → service on the target entity), including `ha_ess_force` where configured.
+- Heartbeat push; REST sensor on Earnie `status.json`; setpoint automations (`status.json` attribute → `number.set_value` on the target entity; re-applied at HA start and every push interval, but only written when the target differs by more than ~1 %, so a restart or a manual change is corrected without a write every 10 s; fields Earnie did not publish are ignored), including `ha_ess_force` where configured.
 - Placeholders `ENTITY_*` only — replace them in HA with real `entity_id`s. Earnie never stores those names.
 - Jinja converts entity units to canonical EHAL units before the push URL is called.
 
