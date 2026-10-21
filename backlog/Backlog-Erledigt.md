@@ -14,6 +14,14 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Rename "PV-Anlage" and similar namings to "PV-Felder" in UI and docs** `[qual]`: singular **PV-Feld**, catalog/tab/multiselect **PV-Felder**. UI (Hauskonfigurator, PV form, scenario editor, Sankey, Earnie-Points), user-visible errors, schema descriptions, user docs, README, LICENSE. Unchanged: JSON keys (`pv_systems`, `pv_system_ids`), slug `pv_anlage`, Loxone meter titles, tariff-catalog legal wording, historical archive / `docs/dev/done`. Handbook heading keeps `<a id="pv-anlagen"></a>`.
 
+### Bugfix — Delta 3 standby charge exceeds HK / live ESS limits (2026-10-21)
+
+- [x] **Delta 3 standby charge exceeds HK / live ESS limits** (dump `debug_dump_20261015_222809`) — **Verified** (2026-10-21; overnight Chart1 / write acceptance)
+  - Symptom: Chart1 SoC for Ecoflow Delta 3 jumped steeply around 03:00 (implied ~1.5 kW/QH) above the intended HK / Smarthome max-charge ceiling.
+  - Cause: `collect_standby_packs` used raw HK charge power and skipped 2.7.j effective limits; live resolve could also loosen HK.
+  - Fix: standby packs + writes use HK ∩ live; live never loosens HK; PS live gets are entity-scoped only.
+  - Tests: `tests/test_ess_limits_2_7_j.py`, `tests/test_powerstation_2_7_h.py` (`test_collect_standby_packs_applies_hk_and_live_charge_cap`).
+
 ### Bugfix — SE sunrise windows: day gaps / double booking and foresight merge lost flex energy (2026-10-20)
 
 - [x] **SE sunrise book chain + foresight merge** — **Verified** (2026-10-20; greenfield 12-month SE, 3 scenarios)
