@@ -23,6 +23,8 @@ PUBLISH_FILENAME = "ehal_published.json"
 _lock = threading.Lock()
 _published: dict[str, dict[str, Any]] = {}
 _loaded = False
+# mtime of ``ehal_published.json`` as last merged / written by this process.
+_disk_mtime_ns: int | None = None
 
 
 @dataclass(frozen=True)
@@ -78,20 +80,33 @@ def _load_from_disk() -> dict[str, dict[str, Any]]:
     return out
 
 
-def _ensure_loaded() -> None:
-    global _loaded
-    if _loaded:
+def _sync_from_disk_unlocked() -> None:
+    """Merge entries another process wrote (UI Schreibtest vs. daemon ``status.json``)."""
+    global _disk_mtime_ns
+    path = _publish_path()
+    try:
+        mtime_ns = os.stat(path).st_mtime_ns
+    except OSError:
         return
+    if mtime_ns == _disk_mtime_ns:
+        return
+    for qid, entry in _load_from_disk().items():
+        current = _published.get(qid)
+        if current is None or entry["published_at"] > str(current.get("published_at") or ""):
+            _published[qid] = entry
+    _disk_mtime_ns = mtime_ns
+
+
+def _ensure_loaded() -> None:
+    """Load the ledger once and pick up later changes written by other processes."""
+    global _loaded
     with _lock:
-        if _loaded:
-            return
-        disk = _load_from_disk()
-        if disk:
-            _published.update(disk)
+        _sync_from_disk_unlocked()
         _loaded = True
 
 
 def _persist_unlocked() -> None:
+    global _disk_mtime_ns
     path = _publish_path()
     _ensure_parent(path)
     tmp = f"{path}.tmp"
@@ -117,6 +132,10 @@ def _persist_unlocked() -> None:
                 os.remove(tmp)
             except OSError:
                 pass
+        try:
+            _disk_mtime_ns = os.stat(path).st_mtime_ns
+        except OSError:
+            _disk_mtime_ns = None
 
 
 def write_field(qualified_id: str, value: float) -> PublishRecord:
@@ -131,8 +150,8 @@ def write_field(qualified_id: str, value: float) -> PublishRecord:
             published=False,
         )
     entry = {"value": float(value), "published_at": published_at}
-    _ensure_loaded()
     with _lock:
+        _sync_from_disk_unlocked()
         _published[qid] = entry
         _persist_unlocked()
     return PublishRecord(
@@ -176,10 +195,11 @@ def published_fetched_at() -> str | None:
 
 def clear_published_for_tests() -> None:
     """Test helper: empty in-memory ledger and drop the persist file."""
-    global _loaded
+    global _loaded, _disk_mtime_ns
     with _lock:
         _published.clear()
         _loaded = True
+        _disk_mtime_ns = None
         path = _publish_path()
         try:
             if os.path.isfile(path):

@@ -159,3 +159,46 @@ def test_send_huawei_publishes_export_limit_qualified(publish_dir: Path, monkeyp
     published = ew.load_published()
     assert published["grid.meter.set_grid_export_power_limit"] == pytest.approx(2.0)
     assert "set_grid_export_power_limit" not in published
+
+
+def _other_process_writes(publish_dir: Path, qid: str, value: float, ts: str) -> None:
+    import json
+    import os
+
+    path = publish_dir / ew.PUBLISH_FILENAME
+    data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    data[qid] = {"value": value, "published_at": ts}
+    path.write_text(json.dumps(data), encoding="utf-8")
+    # Make sure the mtime differs even on coarse file systems.
+    stat = path.stat()
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 2_000_000_000))
+
+
+def test_ledger_picks_up_values_written_by_another_process(publish_dir: Path) -> None:
+    # HA testbed F17: the UI (Schreibtest) and the daemon (status.json) are two
+    # processes sharing only ehal_published.json.
+    ew.write_field("ess.house.set_ess_charge_power_limit", 0.0)
+    assert ew.load_published()["ess.house.set_ess_charge_power_limit"] == 0.0
+    _other_process_writes(
+        publish_dir, "ess.house.set_ess_charge_power_limit", 1234.0, "2999-01-01T00:00:00+00:00"
+    )
+    assert ew.load_published()["ess.house.set_ess_charge_power_limit"] == 1234.0
+
+
+def test_ledger_write_keeps_other_processes_entries(publish_dir: Path) -> None:
+    ew.write_field("ess.house.set_ess_active_power", 100.0)
+    _other_process_writes(
+        publish_dir, "ess.house.set_ess_discharge_power_limit", 5000.0, "2999-01-01T00:00:00+00:00"
+    )
+    ew.write_field("ess.house.set_ess_active_power", 200.0)
+    on_disk = ew._load_from_disk()
+    assert on_disk["ess.house.set_ess_discharge_power_limit"]["value"] == 5000.0
+    assert on_disk["ess.house.set_ess_active_power"]["value"] == 200.0
+
+
+def test_ledger_ignores_older_disk_entries(publish_dir: Path) -> None:
+    ew.write_field("ess.house.set_ess_active_power", 300.0)
+    _other_process_writes(
+        publish_dir, "ess.house.set_ess_active_power", 999.0, "2000-01-01T00:00:00+00:00"
+    )
+    assert ew.load_published()["ess.house.set_ess_active_power"] == 300.0
