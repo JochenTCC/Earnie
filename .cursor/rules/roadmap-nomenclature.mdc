@@ -53,6 +53,7 @@ alwaysApply: true
 * **Opt-in install counter (`UsagePing`, 2.7):** P1 (client + mock tests), P2 (daemon hook + milestones), P3 (consent UI), P4 (receiver + deployment), P5 (docs + privacy)
 * **Thermal horizon simulation (`ThermalHorizon`, 2.7):** P1 (thermal parameters from one year sim), P2 (Live store context without year profile), P3 (collector irradiance forecast), P4 (house-only horizon without storage), P5 (guard test)
 * **HouseSim exogenous series (`HouseSim Series`):** P1 (series format + driver + synthetic generators), P2 (HA history import / replay)
+* **HA contract testbed (`HA Testbed`, 2.7):** P0 (baseline smoke with `evcc_en`), P1 (archetype generator), P2 (S4 external archetype dir + build/fill), P3 (compose + install script), P4 (automated check), P5 (docs + support playbook)
 
 ## 5. Commit & Chat Syntax
 
