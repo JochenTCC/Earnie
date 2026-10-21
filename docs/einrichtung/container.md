@@ -91,14 +91,16 @@ Auf **Smarthome-Backend** und **EHAL-Com** zeigt Earnie „Letzter Aufruf vom Mi
 
 ## Config-Updates nach Programm-Upgrade
 
-Neue Einträge in `share/config/config.example.json` (Image-Vorlage) übernimmt Earnie **nicht** automatisch in die Anwender-Config. Stattdessen weist Earnie auf fehlende Einträge hin:
+Neue Einträge in `share/config/config.example.json` (Image-Vorlage) übernimmt Earnie in der Regel **nicht** automatisch in die Anwender-Config. Stattdessen weist Earnie auf fehlende Einträge hin:
 
 - **Beim Start von `main.py`:** Hinweis im Log.
 - **In der Streamlit-App:** gelbes Banner mit den fehlenden Pfaden und Beispielwerten.
 
 Die fehlenden Keys manuell in `earnie_env/config/config.json` ergänzen.
 
-Davon zu unterscheiden ist der Migrations-Assistent für das Datenmodell. Zeigt Earnie nach einem Image-Update nur diesen Assistenten (Pack-JSON-Form), beschreibt [Betrieb → Update und Migration](betrieb.md#update-und-migration) das Vorgehen. Backups liegen dann unter `earnie_env/config/backups/pre-migration-…/`.
+> **Ausnahme `scenario_explorer_conf`:** Fehlende Keys unter `scenario_explorer_conf` ergänzt die Config-Migration (Migrations-Assistent oder `python -m scripts.migrate_config`) mit den Standardwerten aus `config.example.json`. Bereits vorhandene Keys bleiben unverändert. Alle anderen fehlenden Keys bleiben wie oben beschrieben Handarbeit.
+
+Der Drift-Hinweis ist vom Migrations-Assistenten für das Datenmodell (Pack-JSON-Form) zu unterscheiden. Zeigt Earnie nach einem Image-Update diesen Assistenten, beschreibt [Betrieb → Update und Migration](betrieb.md#update-und-migration) das Vorgehen, auch für die CLI. Backups liegen dann unter `earnie_env/config/backups/pre-migration-…/`.
 
 
 

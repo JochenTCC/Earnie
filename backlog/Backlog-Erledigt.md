@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Dogfooding 2.7.0-alpha.7 SE modes + SE conf drift (2026-10-21)
+
+- [x] **Dogfooding 2.7.0-alpha.7** (dump `debug-dumps/earnie_config_20261021_151607`) — **Verified** (2026-10-21)
+  - Symptom A: After scenario configuration, Szenario-Explorer did not appear in the nav.
+  - Cause A: Productive/alpha compose set `EARNIE_UI_MODES` to `sunset2sunset,live_environment` (comment already listed `scenario_explorer`).
+  - Fix A: Align compose (and LoxBerry packaging) with `sunset2sunset,scenario_explorer,live_environment`.
+  - Symptom B: Drift banner after migration for `scenario_explorer_conf.season_mirror_to_last_month` (and `export_price_series`).
+  - Cause B: Migration did not fill additive SE conf keys from `config.example.json`.
+  - Fix B: Detect-based step `dm4.se_conf_defaults` fills missing `scenario_explorer_conf` keys only; docs updated.
+
 ### Version 2.7 — earnie-server endpoints hard-coded (2026-10-21)
 
 - [x] **earnie-server endpoints: hard-code in the code instead of `.env`** `[qual]`: production base `http://cloudserver.earnie-hems.com:8787` plus path constants `/ping` and `/review` in `runtime_store/server_endpoints.py`; clients compose via `resolve_endpoint`. Removed `EARNIE_USAGE_PING_URL` / `EARNIE_REVIEW_URL` from env reads and local `.env`. Injectable `endpoint_url` / `transport` kept for offline tests. Opt-out remains consent / `EARNIE_USAGE_PING=off`. Docs: `betrieb.md`, `private-env.md`, `docs/workflow/usage-ping.md`, `docs/workflow/feature-review.md`.

@@ -15,7 +15,9 @@
         "price_source": "csv",
         "path_price": "tests/fixtures/backtesting/prices.csv",
         "price_provider": "awattar",
-        "price_range": "last_12_months"
+        "price_range": "last_12_months",
+        "season_mirror_to_last_month": false,
+        "export_price_series": false
     },
     "flexible_consumers": [
         {

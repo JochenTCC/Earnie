@@ -34,7 +34,9 @@
         "cons_data_write_mode": "hourly",
         "price_source": "api",
         "price_provider": "energy_charts",
-        "price_range": "last_12_months"
+        "price_range": "last_12_months",
+        "season_mirror_to_last_month": false,
+        "export_price_series": false
     },
     "ehal": {
         "backend": "loxone",

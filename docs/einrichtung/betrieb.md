@@ -308,7 +308,7 @@ Das Skript prüft die Pflichtdateien und führt einen Smoke-Pfad aus. Es parst d
 
 ## Update und Migration
 
-Nach einem Image- oder Add-on-Update kann Earnie eine **Anpassung der Config-JSON** verlangen (Datenmodell / strukturelle Schritte). Dabei ändert sich die Form der Pack-Dateien. Davon zu unterscheiden sind fehlende Keys in `config.json` nach einem Upgrade: Dort fehlen nur neue Einstellungsfelder (siehe [Container → Config-Updates](container.md#config-updates-nach-programm-upgrade)).
+Nach einem Image- oder Add-on-Update kann Earnie eine **Anpassung der Config-JSON** verlangen (Datenmodell / strukturelle Schritte). Dabei ändert sich die Form der Pack-Dateien. Davon zu unterscheiden sind fehlende Keys in `config.json` nach einem Upgrade: Dort fehlen nur neue Einstellungsfelder (siehe [Container → Config-Updates](container.md#config-updates-nach-programm-upgrade)). Eine Ausnahme bildet der Block `scenario_explorer_conf`: Fehlende Einträge dort ergänzt die Migration selbst (siehe unten).
 
 ### Ablauf
 
@@ -322,6 +322,8 @@ Bringt eine Version neue Schritte mit, informieren die Release Notes vorab darü
 Ein Schritt schreibt Verbraucher-Bindings von Legacy-`flex.{Kennung}.*` auf die typisierten Schlüssel `consumer.` / `heatpump.` / `pool.` um (gleiche Form wie Signalliste und `status.json`). Bei widersprüchlichen Merkernamen blockiert die Migration mit Hinweis auf den betroffenen Verbraucher.
 
 Ein weiterer Schritt entfernt das flache Anlagen-PV-Mapping (`plant.ehal_bindings.sens_pv_production_active`). Bei genau einem netzgekoppelten Wechselrichter mit PV wird die Merker-/Entity-Adresse auf `inv.{id}.sens_inv_power_pv` übernommen; bei mehreren Wechselrichtern blockiert die Migration mit Hinweis, die WR-PV-Mappings manuell zu setzen.
+
+Ein weiterer Schritt ergänzt fehlende Einträge unter `scenario_explorer_conf` in `config.json` mit den Standardwerten aus der mitgelieferten `config.example.json`, z. B. `season_mirror_to_last_month` oder `export_price_series`. Vorhandene Einträge bleiben unverändert.
 
 ### Loxone: alte Merkernamen behalten oder leeren
 

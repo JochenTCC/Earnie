@@ -32,6 +32,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
+- [ ] Set default "Temperaturabsenkung" in annual-rc to 2.5°C
 - [ ] Review and modify text in SE review pop-up dialogue
 
 
