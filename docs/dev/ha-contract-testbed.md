@@ -1,6 +1,6 @@
 # HA contract testbed — carrier YAML ↔ HouseSim in a real Home Assistant
 
-**Status:** plan — drafted 2026-10-21; P1 (WP1) and P2 (WP2-skipped, WP3, WP4) implemented 2026-10-21, P3–P5 open
+**Status:** plan — drafted 2026-10-21; P1 (WP1), P2 (WP3, WP4) and P3 (WP5) implemented 2026-10-21, P4–P5 open
 **Purpose:** A permanent, reproducible test bench for the Home Assistant push contract (EHAL-Com) without owning a production HA install: generate the carrier YAML from *any* Earnie configuration, derive a matching simulated house from the same configuration, load both into a real HA container and verify the full loop (HA → Earnie telemetry, Earnie → `status.json` → HA setpoints). Secondary use: reproduce customer problems from their configuration pack.
 
 Related: [`house-sim.md`](house-sim.md) (HouseSim S1–S4, contract mode), [`ha-lab-setup.md`](ha-lab-setup.md) (Compose lab), [`../ui/ehal-com.md`](../ui/ehal-com.md) (Signalliste, YAML package), `integrations/ha_carrier_yaml.py`.
@@ -86,7 +86,7 @@ Extend `_entity_id_for_kind` / `ess_setpoints_from_lookup` to resolve qualified 
 ### WP4 — Fill + package output *(done 2026-10-21, § 3c)*
 `python -m scripts.ha_testbed_build --config-dir <cfg> --out <testbed-dir> --earnie-host <host> --token <t>` runs: carrier YAML → fill from `placeholders.json` → `packages/earnie_ha_carrier.yaml`; archetype → `earnie_house_sim/archetypes/<name>/`; a `configuration.yaml` snippet (`homeassistant: packages: !include_dir_named packages`). Fails if any `ENTITY_*` placeholder survives.
 
-### WP5 — Compose + install script
+### WP5 — Compose + install script *(done 2026-10-21 except REST onboarding, § 3d)*
 - `docker/compose/ha-sim-testbed.yml`: `homeassistant` (pinned, same as lab) + optional `earnie` service; **no** evcc/HACS. Ports: HA 8123, Earnie UI 8506, Earnie daemon 8541 published to the host.
 - `scripts/ha_testbed.py` with `up | down | install | status | reset`: copies `custom_components/earnie_house_sim`, writes the WP4 output into the HA config volume, patches `configuration.yaml` idempotently, restarts HA, and (optional, later) completes HA onboarding + creates the config entry via the HA REST API so no UI clicking is needed.
 
@@ -137,6 +137,21 @@ Implemented in `house_sim/archetype_gen.py`, CLI `python -m scripts.house_sim_ar
 - **S4:** the config flow lists shipped plus `<config>/earnie_house_sim/archetypes/*` (`EXTERNAL_ARCHETYPES_PARTS` in `const.py`) and aborts with `archetype_name_collision` on a clash; `async_setup_entry` loads from either root in the executor. Platforms are unchanged. **Not exercised in a running HA yet** (no HA in the test suite) — first real check is P3/P4.
 - **Build:** `python -m scripts.ha_testbed_build --config-dir <cfg> --out <ha-config-dir> --earnie-host <host> --token <t> [--name earnie_pack --earnie-port 8541 --repeat-s … + generator options]`. Writes `packages/earnie_ha_carrier.yaml` (filled from `placeholders.json`, aborts if any `ENTITY_*` survives), `earnie_house_sim/archetypes/<name>/` and `earnie_testbed_configuration.snippet.yaml`. Everything is generated in memory first, so a failure writes nothing. `configuration.yaml` is never modified (P3 patches it). The archetype name must be `[a-z][a-z0-9_]*` and not a shipped name; a real `--token` is required (no placeholder default).
 - Tests: `tests/test_ha_testbed_build.py`.
+
+## 3d. P3 notes (compose + install script, 2026-10-21)
+
+- `docker/compose/ha-sim-testbed.yml`: `homeassistant` (same pinned image as `ha-lab.yml`, a test keeps them equal; container `earnie_testbed_ha`, `host.docker.internal` mapped) and `earnie` behind the profile `earnie` (container `earnie-testbed`, publishes 8506 and 8541). No evcc, no HACS. Container names differ from the lab, so both stacks can coexist (HA port 8123 and the Earnie ports still clash if both run).
+- Work dir `ha_lab/testbed/{homeassistant,config,runtime}` (gitignored; override with `--testbed-dir`). Typical flow:
+
+```powershell
+python -m scripts.ha_testbed_build --config-dir <cfg> --out ha_lab\testbed\homeassistant --earnie-host host.docker.internal --token <t>
+python -m scripts.ha_testbed up            # add --with-earnie to run Earnie in Docker (host earnie-testbed)
+python -m scripts.ha_testbed install       # integration copy + configuration.yaml + HA restart
+python -m scripts.ha_testbed status
+```
+
+- `install` copies `house_sim/ha_integration/custom_components/earnie_house_sim` (the synced copy), patches `configuration.yaml` with `homeassistant: packages: !include_dir_named packages` (idempotent; aborts, before copying anything, when `packages:` is set to something else) and restarts the HA container only if it runs. `reset --yes [--all]` stops the stack and clears the HA dir (`--all`: also Earnie config/runtime); it deletes nothing when `compose down` fails.
+- **Not implemented:** optional HA onboarding / config entry via REST. After the first start, create the HA owner and add *Earnie House Simulator → generated archetype* once in the UI; the volume keeps it. **Not run here:** `up` against a real Docker daemon (image pull); tests mock the Docker calls and `docker compose config` accepts the file.
 
 ## 3a. WP0 findings (2026-10-21, partial run)
 

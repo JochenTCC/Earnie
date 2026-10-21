@@ -106,3 +106,6 @@ ha_lab/runtime/*
 !ha_lab/runtime/.gitkeep
 ha_lab/homeassistant/*
 !ha_lab/homeassistant/.gitkeep
+
+# HA testbed (scripts/ha_testbed.py) working dir
+ha_lab/testbed/

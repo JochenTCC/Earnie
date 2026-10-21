@@ -1,0 +1,54 @@
+# HA contract testbed (HA Testbed P3): Home Assistant + optional Earnie, no evcc / HACS.
+#
+# HA loads custom_components/earnie_house_sim and packages/earnie_ha_carrier.yaml, both
+# written by scripts.ha_testbed_build / scripts.ha_testbed install. Normally driven by:
+#
+#   python -m scripts.ha_testbed up [--with-earnie]
+#   python -m scripts.ha_testbed install
+#
+# Working dir (override with TESTBED_DIR, relative to the repo root):
+#   ha_lab/testbed/homeassistant   HA /config
+#   ha_lab/testbed/config          Earnie /app/config  (only with the earnie profile)
+#   ha_lab/testbed/runtime         Earnie /app/runtime (only with the earnie profile)
+#
+# Ports published on the host: HA 8123, Earnie UI 8506, Earnie daemon (push) 8541.
+# HA reaches Earnie as earnie-testbed:8541 (containerized) or host.docker.internal:8541 (native).
+#
+# Plan: docs/dev/ha-contract-testbed.md
+
+name: earnie-ha-testbed
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2025.7.0
+    container_name: earnie_testbed_ha
+    hostname: homeassistant
+    restart: "no"
+    volumes:
+      - ${TESTBED_DIR:-./ha_lab/testbed}/homeassistant:/config
+    environment:
+      TZ: Europe/Vienna
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8123:8123"
+
+  earnie:
+    profiles: ["earnie"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: earnie-testbed
+    restart: "no"
+    volumes:
+      - ${TESTBED_DIR:-./ha_lab/testbed}/config:/app/config
+      - ${TESTBED_DIR:-./ha_lab/testbed}/runtime:/app/runtime
+    environment:
+      TZ: Europe/Vienna
+      EARNIE_ENV_PATH: .
+      EARNIE_VERIFY_LOXONE_ON_START: "0"
+      EARNIE_AUTO_START_MAIN: "1"
+      EARNIE_UI_MODES: sunset2sunset,live_environment
+    ports:
+      - "8506:8501"
+      - "8541:8541"
