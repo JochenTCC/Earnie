@@ -26,7 +26,7 @@ Earnie lässt sich auf zwei Arten nutzen:
 
 | Nutzung                                    | Zweck                                                                                                                                              |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Was-wäre-wenn (kein Smarthome nötig)**   | Haus und Varianten konfigurieren und einen Jahresvergleich rechnen – z. B. ob sich ein Speicher, eine größere PV-Anlage oder ein Spot-Tarif lohnt. |
+| **Was-wäre-wenn (kein Smarthome nötig)**   | Haus und Varianten konfigurieren und einen Jahresvergleich rechnen – z. B. ob sich ein Speicher, ein größeres PV-Feld oder ein Spot-Tarif lohnt. |
 | **Live-Betrieb (Gekoppelt mit Smarthome)** | Dauerhaft optimieren und Sollwerte an das Smarthome-Backend schreiben. Der Monitor zeigt Plan und Ist-Werte.                                       |
 
 
@@ -197,15 +197,17 @@ Wechselrichter werden im Tab **Wechselrichter** gepflegt (Typ, AC-Anschluss netz
 
 
 
-#### PV-Anlagen
+<a id="pv-anlagen"></a>
 
-Im Komponenten-Katalog unter PV-Anlagen:
+#### PV-Felder
+
+Im Komponenten-Katalog unter PV-Felder:
 
 - **Leistung:** installierte Leistung in **kWp**.
 - **Ausrichtung:** Dachneigung und Azimut (Süd ≈ 0°, Ost negativ, West positiv).
 - **Wechselrichter:** der zugeordnete Wechselrichter (`inverter_id`).
 
-Es können mehrere PV-Anlagen angelegt werden. Szenarien können sie einzeln auswählen und kombinieren – so lässt sich z. B. eine geplante Erweiterung vorab durchrechnen.
+Es können mehrere PV-Felder angelegt werden. Szenarien können sie einzeln auswählen und kombinieren – so lässt sich z. B. eine geplante Erweiterung vorab durchrechnen.
 
 Den Standort übernimmt Earnie aus dem Hausprofil. Für die Ertragsprognose nutzt Earnie frei verfügbare, historische Wetterdaten.
 
@@ -228,13 +230,13 @@ Unter **Konfiguration → Szenarienkonfigurator** entstehen **Varianten** des Ha
 Ein Szenario verknüpft in der Regel:
 
 - ein Hausprofil,
-- Batterie und/oder PV-Anlage(n),
+- Batterie und/oder PV-Feld(er),
 - einen Bezugs- und einen Einspeisetarif.
 
 Typische Vergleiche:
 
 - Ist-Zustand gegenüber einem größeren Speicher
-- eine PV-Anlage gegenüber mehreren
+- ein PV-Feld gegenüber mehreren
 - Fixpreis gegenüber Spot-Tarif
 - ohne Batterie, aber mit PV, oder verschiedene Batteriegrößen
 

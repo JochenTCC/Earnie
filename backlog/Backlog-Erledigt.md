@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.7 — Rename PV-Anlage to PV-Feld / PV-Felder (2026-10-21)
+
+- [x] **Rename "PV-Anlage" and similar namings to "PV-Felder" in UI and docs** `[qual]`: singular **PV-Feld**, catalog/tab/multiselect **PV-Felder**. UI (Hauskonfigurator, PV form, scenario editor, Sankey, Earnie-Points), user-visible errors, schema descriptions, user docs, README, LICENSE. Unchanged: JSON keys (`pv_systems`, `pv_system_ids`), slug `pv_anlage`, Loxone meter titles, tariff-catalog legal wording, historical archive / `docs/dev/done`. Handbook heading keeps `<a id="pv-anlagen"></a>`.
+
 ### Bugfix — SE sunrise windows: day gaps / double booking and foresight merge lost flex energy (2026-10-20)
 
 - [x] **SE sunrise book chain + foresight merge** — **Verified** (2026-10-20; greenfield 12-month SE, 3 scenarios)

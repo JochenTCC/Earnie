@@ -148,10 +148,10 @@ def _pv_id_to_inverter(
             continue
         inv_id = str(pv.get("inverter_id") or "").strip()
         if not inv_id:
-            raise ValueError(f"PV-Anlage '{pv_id}': inverter_id fehlt.")
+            raise ValueError(f"PV-Feld '{pv_id}': inverter_id fehlt.")
         if inv_id not in inv_map:
             raise ValueError(
-                f"PV-Anlage '{pv_id}': unbekannte inverter_id '{inv_id}'."
+                f"PV-Feld '{pv_id}': unbekannte inverter_id '{inv_id}'."
             )
         mapping[pv_id] = inv_id
     return mapping
@@ -184,7 +184,7 @@ def raw_pv_kw_by_inverter(
     if len(inv_with_pv) > 1:
         raise ValueError(
             "expected_p_pv_by_system fehlt, obwohl mehrere Wechselrichter "
-            "PV-Anlagen haben (Inverter P3)."
+            "PV-Felder haben (Inverter P3)."
         )
     if len(inv_with_pv) == 1:
         out[inv_with_pv[0]] = plant_pv

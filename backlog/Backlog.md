@@ -21,7 +21,6 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 - **Note (deferred from 2.7.n):** Plant PV sum stays bare `sens_pv_production_active`; first entity-scoped `pv.{pv_system_id}.sens_pv_production_active` shipped with live attribution (Inverter follow-ups). Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
 
 - [x] Dogfood greenfield Earnie configuration for a Loxone SB
-- [ ] Rename "PV-Anlage" and similar namings to "PV-Felder" in UI and docs - ask if you are not sure
 - [ ] **LoxBerry plugin ZIP — ship Versionsvariante UI strings** `[qual]`: rebuild and publish a new plugin ZIP after the rename Versionskanal → Versionsvariante (`packaging/loxberry/templates/lang/language_{de,en}.ini`, docs). Bump `plugin.cfg` `VERSION` (currently `0.2.0`), package per [`packaging/loxberry/README.md`](../packaging/loxberry/README.md) (7-Zip / `zip` with `/` separators), attach to the GitHub Release / update `release.cfg` as usual. Existing installs only pick up the new labels via this Plugin-ZIP (not via Earnie image pull).
 - [ ] **earnie-server endpoints: hard-code in the code instead of `.env`.** Server is reachable at `cloudserver.earnie-hems.com` (DNS A-record, port 8787, plain HTTP for now).
   - Remove `EARNIE_USAGE_PING_URL` and `EARNIE_REVIEW_URL` from `.env` (`greenfield/config/.env`, example files) and stop reading them in `runtime_store/usage_ping.py` and `runtime_store/feature_review.py`.

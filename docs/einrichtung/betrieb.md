@@ -228,7 +228,7 @@ Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standor
 
 | Bestandteil | Punkte |
 | ----------- | ------ |
-| PV-Generatoren (Summe der kWp der im Live-Szenario gewählten PV-Anlagen) | 1 Punkt bis 6 kWp, danach je angefangene 4 kWp ein weiterer Punkt |
+| PV-Generatoren (Summe der kWp der im Live-Szenario gewählten PV-Felder) | 1 Punkt bis 6 kWp, danach je angefangene 4 kWp ein weiterer Punkt |
 | Speicher (Summe der kWh der im Live-Szenario gewählten Batterien und aller Powerstations) | 1 Punkt bis 5 kWh, danach je angefangene 5 kWh ein weiterer Punkt |
 | Wallbox (ein Verbraucher vom Typ **E-Auto** = eine Wallbox) | einphasig 1 Punkt, dreiphasig 2 Punkte, bidirektional 3 Punkte |
 | Wärmepumpe / Klimaanlage | je Gerät 1 Punkt |

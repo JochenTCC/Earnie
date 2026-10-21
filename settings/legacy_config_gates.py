@@ -43,7 +43,7 @@ def reject_legacy_config_blocks(raw_config: dict) -> None:
     if raw_config.get("pv_systems") is not None:
         raise ValueError(
             "Block 'pv_systems' in config.json ist entfernt (2.0 Components). "
-            "PV-Anlagen gehören in components.json."
+            "PV-Felder gehören in components.json."
         )
     if raw_config.get("eauto_milp") is not None:
         raise ValueError(

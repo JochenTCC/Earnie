@@ -27,7 +27,7 @@ def test_title_and_default_tab():
     assert tabs.options == [
         "Hausprofil",
         "Wechselrichter",
-        "PV-Anlagen",
+        "PV-Felder",
         "Batterien",
     ]
     assert tabs.value == "Hausprofil"
@@ -42,10 +42,10 @@ def test_loxone_import_moved_to_smarthome_backend_page():
 def test_switch_to_pv_tab_renders_without_exception():
     at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     [tabs] = at.segmented_control
-    tabs.set_value("PV-Anlagen").run(timeout=_TIMEOUT_S)
+    tabs.set_value("PV-Felder").run(timeout=_TIMEOUT_S)
     assert not at.exception
     [tabs_after] = at.segmented_control
-    assert tabs_after.value == "PV-Anlagen"
+    assert tabs_after.value == "PV-Felder"
 
 
 def test_switch_to_batterien_tab_renders_without_exception():

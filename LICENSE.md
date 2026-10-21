@@ -11,7 +11,7 @@ Diese Software wird als "Source-Available" (Quelloffen, aber mit Nutzungsbeschr�
 
 ### § 1 Erlaubte Nutzung (Eingeschränkte private Nutzung)
 1. Die Nutzung der Software ist ausschließlich **natürlichen Personen für den privaten, nicht-kommerziellen Gebrauch in Privathaushalten** gestattet.
-2. Der Betrieb ist auf die Steuerung von hauseigenen Komponenten (z. B. PV-Anlage, Heimspeicher, Wärmepumpe, private E-Auto-Ladestation) des eigenen Haushalts beschränkt.
+2. Der Betrieb ist auf die Steuerung von hauseigenen Komponenten (z. B. PV-Feld, Heimspeicher, Wärmepumpe, private E-Auto-Ladestation) des eigenen Haushalts beschränkt.
 3. Die Modifikation des Quellcodes für den eigenen, privaten Gebrauch ist gestattet, solange alle Modifikationen unter derselben Lizenz verbleiben (Copyleft-Prinzip für den privaten Bereich).
 
 ---

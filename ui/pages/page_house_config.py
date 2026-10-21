@@ -11,12 +11,12 @@ from ui.planning_inverter_form import render_inverter_planning_tab
 from ui.planning_pv_form import render_pv_planning_tab
 
 _HOUSE_CONFIG_TAB_KEY = "house_config_active_tab"
-_HOUSE_CONFIG_TABS = ("Hausprofil", "Wechselrichter", "PV-Anlagen", "Batterien")
+_HOUSE_CONFIG_TABS = ("Hausprofil", "Wechselrichter", "PV-Felder", "Batterien")
 
 
 def _help_text() -> str:
     return (
-        "Backtesting-Planung: Hausprofil, Wechselrichter, PV-Anlagen und Batterien. "
+        "Backtesting-Planung: Hausprofil, Wechselrichter, PV-Felder und Batterien. "
         "Szenarien und Live-Zuordnung (Tarife, Entitäts-Referenzen) im Szenarienkonfigurator. "
         "Grundlast = max(2 % Jahresverbrauch, Jahresverbrauch − Summe Verbraucher)."
     )
@@ -53,7 +53,7 @@ def render() -> None:
 
     if active == "Hausprofil":
         render_house_profile_tab()
-    elif active == "PV-Anlagen":
+    elif active == "PV-Felder":
         render_pv_planning_tab()
     elif active == "Batterien":
         render_battery_planning_tab()

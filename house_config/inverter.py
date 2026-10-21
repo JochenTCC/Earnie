@@ -317,15 +317,15 @@ def _validate_pv_inverters(
     for pv_id, pv in pv_systems.items():
         inv_id = str(pv.get("inverter_id") or "").strip()
         if not inv_id:
-            raise ValueError(f"PV-Anlage '{pv_id}': inverter_id fehlt.")
+            raise ValueError(f"PV-Feld '{pv_id}': inverter_id fehlt.")
         if inv_id not in inverters:
             raise ValueError(
-                f"PV-Anlage '{pv_id}': unbekannte inverter_id '{inv_id}'."
+                f"PV-Feld '{pv_id}': unbekannte inverter_id '{inv_id}'."
             )
         inv = inverters[inv_id]
         if inv["type"] == INVERTER_TYPE_BATTERY:
             raise ValueError(
-                f"PV-Anlage '{pv_id}': inverter '{inv_id}' ist type=battery "
+                f"PV-Feld '{pv_id}': inverter '{inv_id}' ist type=battery "
                 "(keine PV-Seite)."
             )
 

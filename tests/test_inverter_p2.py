@@ -234,7 +234,7 @@ def test_ensure_owned_island_and_refs_helper():
         pv_systems=[{"id": "pv1", "inverter_id": "wr_pack_a"}],
         exclude_battery_id="pack_a",
     )
-    assert refs == ["PV-Anlage 'pv1'"]
+    assert refs == ["PV-Feld 'pv1'"]
 
 
 def test_upsert_inverter_entity_id_lock(components_env):
