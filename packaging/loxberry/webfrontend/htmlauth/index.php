@@ -7,6 +7,7 @@
 require_once "loxberry_system.php";
 require_once "loxberry_web.php";
 require_once "loxberry_log.php";
+require_once __DIR__ . "/earnie_ghcr.php";
 
 $version = LBSystem::pluginversion();
 $form = isset($_REQUEST['form']) ? $_REQUEST['form'] : 'main';
@@ -353,17 +354,6 @@ function earnie_fetch_releases()
 	return $out;
 }
 
-function earnie_channel_latest($releases, $channel)
-{
-	foreach ($releases as $rel) {
-		if ($channel === "stable" && !empty($rel["prerelease"])) {
-			continue;
-		}
-		return $rel["version"];
-	}
-	return "";
-}
-
 $settings_error = "";
 $settings_saved = false;
 $pinned_invalid = false;
@@ -462,16 +452,23 @@ $running_ver = earnie_running_version();
 $uiurl = earnie_host_url($streamlit_port);
 $settings_saved = isset($_GET["settings_saved"]) && $_GET["settings_saved"] === "1";
 
+// GitHub Releases only feed the pinned-version list; the update check asks GHCR
+// which version :latest / :next really points at (a release may skip that channel).
 $releases = earnie_fetch_releases();
 $releases_ok = count($releases) > 0;
-$channel_latest = earnie_channel_latest($releases, $earnie_channel);
+$channel_latest = "";
+$channel_latest_error = "";
 $update_available = false;
-if ($earnie_channel !== "pinned"
-	&& $running_ver !== ""
-	&& $channel_latest !== ""
-	&& $running_ver !== $channel_latest
-) {
-	$update_available = true;
+if ($earnie_channel !== "pinned") {
+	$remote = earnie_ghcr_tag_version($image_tag);
+	$channel_latest = $remote["version"];
+	$channel_latest_error = $remote["error"];
+	if ($channel_latest_error !== "") {
+		$log->WARN("update check :$image_tag failed: $channel_latest_error");
+	}
+	$update_available = $running_ver !== ""
+		&& $channel_latest !== ""
+		&& $running_ver !== $channel_latest;
 }
 
 $channel_label = $earnie_channel;

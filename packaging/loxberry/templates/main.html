@@ -28,6 +28,9 @@
         <td><?php
           if ($earnie_channel === "pinned") {
             echo htmlspecialchars($L['MAIN.UPDATE_NA_PINNED']);
+          } elseif ($channel_latest_error !== "") {
+            echo htmlspecialchars($L['MAIN.UPDATE_UNKNOWN']) . " — <code>"
+              . htmlspecialchars($channel_latest_error) . "</code>";
           } elseif ($update_available) {
             echo htmlspecialchars($L['MAIN.UPDATE_YES']) . " — <code>"
               . htmlspecialchars($channel_latest) . "</code>";

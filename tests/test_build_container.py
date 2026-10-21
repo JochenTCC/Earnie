@@ -92,6 +92,16 @@ def test_main_versioned_only_builds_without_floating_tags(monkeypatch):
     assert tagged == bc.versioned_tags()
 
 
+def test_main_labels_image_with_normalized_version(monkeypatch):
+    """LoxBerry plugin reads org.opencontainers.image.version of :latest / :next."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(bc, "run_build", calls.append)
+    monkeypatch.setattr(bc, "__version__", "2.7.0-dev.48D1")
+    assert bc.main(["--target", "synology", "--versioned-only"]) == 0
+    labels = [calls[0][i + 1] for i, arg in enumerate(calls[0]) if arg == "--label"]
+    assert labels == ["org.opencontainers.image.version=2.7.0-dev.48"]
+
+
 def test_build_command_assembles_docker_args(tmp_path):
     dockerfile = tmp_path / "Dockerfile"
     dockerfile.write_text("FROM python:3.14-slim\n", encoding="utf-8")
@@ -151,6 +161,28 @@ def test_build_command_revision_adds_oci_label(tmp_path):
     )
 
     assert cmd[cmd.index("--label") + 1] == "org.opencontainers.image.revision=abc123"
+
+
+def test_build_command_version_adds_oci_label(tmp_path):
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("FROM python:3.14-slim\n", encoding="utf-8")
+
+    cmd = bc.build_command(
+        tags=["ghcr.io/example/earnie:1.0.0"],
+        platform=bc.MULTIARCH_PLATFORM,
+        dockerfile=dockerfile,
+        context=tmp_path,
+        no_cache=False,
+        push=True,
+        revision="abc123",
+        version="1.0.0",
+    )
+
+    labels = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--label"]
+    assert labels == [
+        "org.opencontainers.image.revision=abc123",
+        "org.opencontainers.image.version=1.0.0",
+    ]
 
 
 def test_build_command_without_revision_has_no_label(tmp_path):

@@ -32,7 +32,7 @@ Dieselben Kriterien wie in [Container – Go/No-Go (LoxBerry)](container.md#gono
 
 Die Plugin-UI bietet:
 
-- **Status:** laufende Earnie-Version, Versionsvariante und ob ein Update verfügbar ist.
+- **Status:** laufende Earnie-Version, Versionsvariante und ob ein Update verfügbar ist. Für den Update-Hinweis fragt das Plugin bei GHCR nach, welche Version hinter `:latest` (Stabil) bzw. `:next` (Vorabversion) liegt – also genau das Image, das ein Pull holen würde. Steht dort „Unbekannt“, war GHCR nicht erreichbar oder das Image der Versionsvariante stammt noch aus der Zeit vor dem Versions-Label (Images vor 2.7); das löst sich mit dem nächsten Release.
 - **Steuerung:** Start, Stop, Neustart und Image-Pull.
 - **Link** zur Streamlit-Oberfläche.
 - **Versionsvariante** (siehe [Versionsvarianten](#versionsvarianten-earnie-image)).

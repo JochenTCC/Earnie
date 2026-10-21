@@ -17,7 +17,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from version import __version__
+from version import __version__, normalize_for_image_build
 
 DEFAULT_REGISTRY_IMAGE = "ghcr.io/jochentcc/earnie-energy"
 LEGACY_REGISTRY_IMAGE = "ghcr.io/jochentcc/ernie-energy"
@@ -133,6 +133,7 @@ def build_command(
     push: bool,
     build_date: str | None = None,
     revision: str | None = None,
+    version: str | None = None,
 ) -> list[str]:
     if not tags:
         raise ValueError("Mindestens ein Image-Tag ist erforderlich.")
@@ -151,6 +152,9 @@ def build_command(
     if revision:
         # Read back by scripts.release_image_gate (idempotent release re-runs).
         build_arg.extend(["--label", f"org.opencontainers.image.revision={revision}"])
+    if version:
+        # Read back by the LoxBerry plugin (update check against :latest / :next).
+        build_arg.extend(["--label", f"org.opencontainers.image.version={version}"])
 
     if is_multiarch(platform):
         cmd = ["docker", "buildx", "build", "--platform", platform, "-f", str(dockerfile)]
@@ -271,6 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             no_cache=args.no_cache,
             push=args.push,
             revision=args.revision,
+            version=normalize_for_image_build(__version__),
         )
         run_build(cmd)
         if args.push and not is_multiarch(platform):
