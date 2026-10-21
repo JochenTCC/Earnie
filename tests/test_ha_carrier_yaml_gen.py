@@ -99,6 +99,20 @@ def test_carrier_yaml_setpoint_automations():
     assert "hub_value" in text
 
 
+def test_carrier_yaml_push_skips_non_numeric_state():
+    # HA testbed F7: ``unavailable`` must hit the "push skipped" log, not ``| float``.
+    text = _build()
+    assert "{% if not (raw_state | is_number) %}{{ none }}{% elif u in [" in text
+    assert "{% if u in ['w'" not in text
+
+
+def test_carrier_yaml_status_sensor_has_no_json_attributes_path():
+    # HA's jsonpath("$") returns False for a dict -> sensor without attributes,
+    # so no setpoint automation would ever fire (HA testbed finding F13).
+    text = _build()
+    assert "json_attributes_path" not in text
+
+
 def test_carrier_yaml_ha_ess_force_when_configured():
     house = _minimal_house()
     house["plant"]["ha_ess_force"] = {

@@ -155,7 +155,7 @@ def _jinja_to_ehal_vars(entity: str, ehal_unit: str | None) -> list[str]:
     if ehal_unit == "W":
         conv = (
             "{% set u = entity_unit %}"
-            "{% if u in ['w', 'watt', 'watts'] %}{{ raw_state | float }}"
+            "{% if not (raw_state | is_number) %}{{ none }}{% elif u in ['w', 'watt', 'watts'] %}{{ raw_state | float }}"
             "{% elif u in ['kw', 'kilowatt', 'kilowatts'] %}{{ (raw_state | float) * 1000 }}"
             "{% elif u in ['mw', 'megawatt', 'megawatts'] %}{{ (raw_state | float) * 1000000 }}"
             "{% else %}{{ none }}{% endif %}"
@@ -163,7 +163,7 @@ def _jinja_to_ehal_vars(entity: str, ehal_unit: str | None) -> list[str]:
     elif ehal_unit == "kWh":
         conv = (
             "{% set u = entity_unit %}"
-            "{% if u in ['kwh', 'kilowatt-hour', 'kilowatt-hours'] %}{{ raw_state | float }}"
+            "{% if not (raw_state | is_number) %}{{ none }}{% elif u in ['kwh', 'kilowatt-hour', 'kilowatt-hours'] %}{{ raw_state | float }}"
             "{% elif u in ['wh', 'watt-hour', 'watt-hours', 'watthour', 'watthours'] %}"
             "{{ (raw_state | float) * 0.001 }}"
             "{% elif u in ['mwh', 'megawatt-hour', 'megawatt-hours'] %}"
@@ -173,13 +173,13 @@ def _jinja_to_ehal_vars(entity: str, ehal_unit: str | None) -> list[str]:
     elif ehal_unit == "%":
         conv = (
             "{% set u = entity_unit %}"
-            "{% if u in ['%', 'percent'] %}{{ raw_state | float }}"
+            "{% if not (raw_state | is_number) %}{{ none }}{% elif u in ['%', 'percent'] %}{{ raw_state | float }}"
             "{% else %}{{ none }}{% endif %}"
         )
     elif ehal_unit == "A":
         conv = (
             "{% set u = entity_unit %}"
-            "{% if u in ['a', 'amp', 'amps', 'ampere'] %}{{ raw_state | float }}"
+            "{% if not (raw_state | is_number) %}{{ none }}{% elif u in ['a', 'amp', 'amps', 'ampere'] %}{{ raw_state | float }}"
             "{% elif u in ['ma', 'milliampere'] %}{{ (raw_state | float) * 0.001 }}"
             "{% else %}{{ none }}{% endif %}"
         )
@@ -367,7 +367,8 @@ def _status_sensor(
         f'    resource: "{base}/ehal/status.json{token_q}"',
         f"    scan_interval: {_scan_interval_s(repeat_s)}",
         f'    value_template: {_q("{{ value_json." + HEARTBEAT_WRITE_ID + " | default(0) }}")}',
-        "    json_attributes_path: $",
+        # No ``json_attributes_path``: HA's jsonpath("$") returns False for a dict,
+        # which leaves the sensor without attributes (no setpoint automation fires).
         "    json_attributes:",
     ]
     for attr in attrs:
