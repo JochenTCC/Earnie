@@ -1,7 +1,7 @@
 {
   "core": {
     "__init__.py": "c96561da59a7cb8d13ff2116af79028f72a693e1083c230941a74961d84cf8cc",
-    "archetype.py": "c54e9d87ac3311cfcbe49ce06e516ec959a26ef79cfde4507ee823f8799d058e",
+    "archetype.py": "a88686f5e8f7b1c464affba7fbe4387aed938fed6bb20da07495b030df590daa",
     "physics.py": "c98a1f676af078efbf1b73be10ba7fef5882ce09b146d7f21ac9b6eaa537aa53",
     "thermal.py": "1c6e4f971b8c2f8f1ce500180a523ca22973762341de87104e07b64670a78701",
     "weather_pv.py": "b8e991ac3ec7e986e7789a87b1f34eefcc97ea5524b3bebf9e5a6c0af7937612"

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import voluptuous as vol
 
@@ -11,8 +12,8 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
-from ._core.archetype import load_archetype
-from .const import CONF_ARCHETYPE, DOMAIN
+from ._core.archetype import load_archetype_from_roots
+from .const import CONF_ARCHETYPE, DOMAIN, EXTERNAL_ARCHETYPES_PARTS
 from .coordinator import FIXTURES_DIR, HouseSimCoordinator
 from .entity_map import ha_entity_id
 
@@ -21,8 +22,13 @@ PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SELECT, Platform.SWITCH]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Fixture JSON is read from disk: not in the event loop (HA warns about blocking I/O).
+    external_dir = Path(hass.config.path(*EXTERNAL_ARCHETYPES_PARTS))
     package = await hass.async_add_executor_job(
-        lambda: load_archetype(str(entry.data[CONF_ARCHETYPE]), fixtures_dir=FIXTURES_DIR)
+        lambda: load_archetype_from_roots(
+            str(entry.data[CONF_ARCHETYPE]),
+            fixtures_dir=FIXTURES_DIR,
+            external_dir=external_dir,
+        )
     )
     coordinator = HouseSimCoordinator(hass, entry, package)
     await coordinator.async_load()

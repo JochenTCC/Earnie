@@ -10,6 +10,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
 
+from ._core.archetype import list_archetypes
 from .const import (
     CONF_ARCHETYPE,
     CONF_PV_KWP,
@@ -19,16 +20,16 @@ from .const import (
     DEFAULT_PV_KWP,
     DEFAULT_UPDATE_INTERVAL_S,
     DOMAIN,
+    EXTERNAL_ARCHETYPES_PARTS,
     PV_SOURCE_SYNTHETIC,
     PV_SOURCE_WEATHER,
 )
 
 
-def _list_archetypes() -> list[str]:
+def _list_archetypes(external_dir: Path) -> list[str]:
+    """Shipped + generated archetype names; a name clash raises ``ValueError``."""
     fixtures = Path(__file__).resolve().parent / "fixtures"
-    if not fixtures.is_dir():
-        return []
-    return sorted(p.name for p in fixtures.iterdir() if p.is_dir())
+    return sorted(list_archetypes(fixtures, external_dir))
 
 
 def _weather_has_cloud_coverage(hass: HomeAssistant, entity_id: str) -> bool:
@@ -47,7 +48,13 @@ class EarnieHouseSimConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
-        archetypes = await self.hass.async_add_executor_job(_list_archetypes)
+        external_dir = Path(self.hass.config.path(*EXTERNAL_ARCHETYPES_PARTS))
+        try:
+            archetypes = await self.hass.async_add_executor_job(
+                _list_archetypes, external_dir
+            )
+        except ValueError:
+            return self.async_abort(reason="archetype_name_collision")
         if not archetypes:
             return self.async_abort(reason="no_archetypes")
 

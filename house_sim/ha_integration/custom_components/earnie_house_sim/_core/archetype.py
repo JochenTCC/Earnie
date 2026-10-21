@@ -36,6 +36,41 @@ def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def list_archetypes(
+    fixtures_dir: Path | None = None, external_dir: Path | None = None
+) -> dict[str, Path]:
+    """``{archetype name: directory that holds it}`` for shipped and external archetypes.
+
+    ``external_dir`` is an optional second root (generated archetypes). The same
+    name in both roots is an error: a generated archetype must never shadow a
+    shipped one (or the reverse) silently.
+    """
+    shipped_root = fixtures_dir or FIXTURES_DIR
+    roots: dict[str, Path] = {}
+    for root in (shipped_root, external_dir):
+        if root is None or not root.is_dir():
+            continue
+        for path in sorted(root.iterdir()):
+            if not path.is_dir() or path.name.startswith((".", "_")):
+                continue
+            if path.name in roots:
+                raise ValueError(
+                    f"Archetype name {path.name!r} exists in {roots[path.name]} and {root}; rename one"
+                )
+            roots[path.name] = root
+    return roots
+
+
+def load_archetype_from_roots(
+    name: str, *, fixtures_dir: Path | None = None, external_dir: Path | None = None
+) -> ArchetypePackage:
+    """Load ``name`` from the shipped or the external archetype root."""
+    roots = list_archetypes(fixtures_dir, external_dir)
+    if name not in roots:
+        raise FileNotFoundError(f"Archetype {name!r} not found (known: {', '.join(sorted(roots)) or 'none'})")
+    return load_archetype(name, fixtures_dir=roots[name])
+
+
 def load_archetype(name: str, *, fixtures_dir: Path | None = None) -> ArchetypePackage:
     root = (fixtures_dir or FIXTURES_DIR) / name
     if not root.is_dir():

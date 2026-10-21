@@ -18,7 +18,8 @@
       "weather_no_cloud_coverage": "That weather entity has no cloud_coverage attribute."
     },
     "abort": {
-      "no_archetypes": "No archetype fixtures found under fixtures/.",
+      "no_archetypes": "No archetype fixtures found under fixtures/ or <config>/earnie_house_sim/archetypes/.",
+      "archetype_name_collision": "An archetype name exists both in fixtures/ and in <config>/earnie_house_sim/archetypes/. Rename the generated one.",
       "already_configured": "This archetype is already configured."
     }
   }

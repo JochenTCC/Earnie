@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.7 — earnie-server client HTTPS (2026-10-21)
+
+- [x] **earnie-server: switch the client to HTTPS** `[qual]`: `SERVER_BASE` is `https://cloudserver.earnie-hems.com` (no port) in `runtime_store/server_endpoints.py`; `PATH_PING` / `PATH_REVIEW` unchanged. `post_json` keeps default certificate verification, the 5 s timeout, logs certificate errors at ERROR, and does not fall back to HTTP. Tests: `tests/test_server_endpoints.py`, `tests/test_usage_ping.py`, `tests/test_feature_review.py`. Docs: `docs/einrichtung/betrieb.md`, `docs/workflow/usage-ping.md`, `docs/workflow/feature-review.md`.
+  - **Note:** Behind Caddy every request arrives as `127.0.0.1`, so the receiver's per-IP rate limit (60/min) is global until `earnie-server` reads `X-Forwarded-For`.
+
 ### Bugfix — Dogfooding 2.7.0-alpha.7 SE modes + SE conf drift (2026-10-21)
 
 - [x] **Dogfooding 2.7.0-alpha.7** (dump `debug-dumps/earnie_config_20261021_151607`) — **Verified** (2026-10-21)
@@ -51,7 +56,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Domain: `cloudserver.earnie-hems.com` (DNS A-record on the `earnie-hems.com` subdomain) reaches the server; plain HTTP for now.
   - Data access: Samba share `[earnie]` on `/srv/earnie-data`; port 445 restricted by `ufw` to the maintainer's home IP, 8787 open.
   - Deploy process: tar the `earnie-server` repo (without `.git`), `scp` to the server, unpack to `/opt/earnie-server`, `systemctl restart earnie-server`.
-  - Not done / follow-ups: HTTPS via Caddy (ports 80/443); "Savings KPI" as additional payload (own open item under Version 2.+1 in [Backlog.md](Backlog.md)). Hard-coded client endpoints → done 2026-10-21 (see archive entry above).
+  - Not done / follow-ups: "Savings KPI" as additional payload (own open item under Version 2.+1 in [Backlog.md](Backlog.md)). HTTPS via Caddy + client `SERVER_BASE` → done 2026-10-21 (see archive entry above). Hard-coded client endpoints → done 2026-10-21.
 
 ### Bugfix — SE consumption accounting: native pool filter never booked, Jahres Verbrauch from mixed sources (2026-10-20)
 

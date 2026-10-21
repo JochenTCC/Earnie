@@ -14,6 +14,9 @@ PV_SOURCE_SYNTHETIC = "synthetic"
 DEFAULT_UPDATE_INTERVAL_S = 10
 DEFAULT_PV_KWP = 10.0
 
+# Generated archetypes (HA Testbed): <config>/earnie_house_sim/archetypes/<name>/
+EXTERNAL_ARCHETYPES_PARTS = ("earnie_house_sim", "archetypes")
+
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_physics"
 

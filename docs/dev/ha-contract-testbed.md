@@ -1,6 +1,6 @@
 # HA contract testbed — carrier YAML ↔ HouseSim in a real Home Assistant
 
-**Status:** plan — drafted 2026-10-21; P1 (archetype generator, WP1) implemented 2026-10-21, P2–P5 open
+**Status:** plan — drafted 2026-10-21; P1 (WP1) and P2 (WP2-skipped, WP3, WP4) implemented 2026-10-21, P3–P5 open
 **Purpose:** A permanent, reproducible test bench for the Home Assistant push contract (EHAL-Com) without owning a production HA install: generate the carrier YAML from *any* Earnie configuration, derive a matching simulated house from the same configuration, load both into a real HA container and verify the full loop (HA → Earnie telemetry, Earnie → `status.json` → HA setpoints). Secondary use: reproduce customer problems from their configuration pack.
 
 Related: [`house-sim.md`](house-sim.md) (HouseSim S1–S4, contract mode), [`ha-lab-setup.md`](ha-lab-setup.md) (Compose lab), [`../ui/ehal-com.md`](../ui/ehal-com.md) (Signalliste, YAML package), `integrations/ha_carrier_yaml.py`.
@@ -80,10 +80,10 @@ New `house_sim/archetype_gen.py` + CLI `python -m scripts.house_sim_archetype_ge
 ### WP2 — Core: qualified-id resolution *(skipped: WP1 emits flat keys, § 3b)*
 Extend `_entity_id_for_kind` / `ess_setpoints_from_lookup` to resolve qualified ids (`grid.meter.*`, `ess.<id>.*`). Keep `house_sim/core/` free of `ehal` imports. Run `python -m scripts.sync_house_sim_integration`; `tests/test_house_sim_s4_packaging.py` must stay green. Skip this WP if the generator emits flat keys.
 
-### WP3 — S4: external archetype directory
+### WP3 — S4: external archetype directory *(done 2026-10-21, § 3c)*
 `config_flow.py` / `coordinator.py`: additional archetype root `/config/earnie_house_sim/archetypes/` (listed next to the shipped ones, name collision = error). Platforms (`sensor`/`number`/`switch`/`select`) already build from `package.entities`, so no platform change expected. Resync + packaging test.
 
-### WP4 — Fill + package output
+### WP4 — Fill + package output *(done 2026-10-21, § 3c)*
 `python -m scripts.ha_testbed_build --config-dir <cfg> --out <testbed-dir> --earnie-host <host> --token <t>` runs: carrier YAML → fill from `placeholders.json` → `packages/earnie_ha_carrier.yaml`; archetype → `earnie_house_sim/archetypes/<name>/`; a `configuration.yaml` snippet (`homeassistant: packages: !include_dir_named packages`). Fails if any `ENTITY_*` placeholder survives.
 
 ### WP5 — Compose + install script
@@ -130,6 +130,13 @@ Implemented in `house_sim/archetype_gen.py`, CLI `python -m scripts.house_sim_ar
 4. **Canonical packs only.** Aborts with a pointer to `scripts.migrate_config` when plant `sens_pv_production_active` is bound (retired), when an inverter with attached PV lacks `inv.<id>.sens_inv_power_pv`, or when a grid-tied house battery lacks `ess.<id>.sens_ess_soc` / `sens_ess_power` (F4, F14). Example pack: `ha_lab/config/` (untracked) generates 7 physical signals.
 
 **Limits (P1):** exactly one house battery and at most one inverter PV signal (a second PV source would need a physics key, i.e. a core change); consumer loads are not simulated (base load only); setpoints are numbers only — switch/select setpoints (finding 5) stay undecided and would also need carrier support.
+
+## 3c. P2 notes (S4 external archetype dir, build/fill, 2026-10-21)
+
+- **Core helpers:** `house_sim/core/archetype.py` gained `list_archetypes(fixtures_dir, external_dir)` and `load_archetype_from_roots(...)` (hub-agnostic, synced into the S4 copy). The same name in both roots raises `ValueError`; dot/underscore directories are ignored.
+- **S4:** the config flow lists shipped plus `<config>/earnie_house_sim/archetypes/*` (`EXTERNAL_ARCHETYPES_PARTS` in `const.py`) and aborts with `archetype_name_collision` on a clash; `async_setup_entry` loads from either root in the executor. Platforms are unchanged. **Not exercised in a running HA yet** (no HA in the test suite) — first real check is P3/P4.
+- **Build:** `python -m scripts.ha_testbed_build --config-dir <cfg> --out <ha-config-dir> --earnie-host <host> --token <t> [--name earnie_pack --earnie-port 8541 --repeat-s … + generator options]`. Writes `packages/earnie_ha_carrier.yaml` (filled from `placeholders.json`, aborts if any `ENTITY_*` survives), `earnie_house_sim/archetypes/<name>/` and `earnie_testbed_configuration.snippet.yaml`. Everything is generated in memory first, so a failure writes nothing. `configuration.yaml` is never modified (P3 patches it). The archetype name must be `[a-z][a-z0-9_]*` and not a shipped name; a real `--token` is required (no placeholder default).
+- Tests: `tests/test_ha_testbed_build.py`.
 
 ## 3a. WP0 findings (2026-10-21, partial run)
 
