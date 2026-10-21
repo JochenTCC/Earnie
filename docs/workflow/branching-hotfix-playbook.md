@@ -102,7 +102,7 @@ Rules that matter for branching:
 4. Get approval for the new `version.py` string (**D**).
 5. If pre-release: sync all three `*-alpha.yml` image lines.
 6. Land the same fix on `main` (merge hotfix branch or cherry-pick). Align `version.py` on `main` only when that string is the next intended publish; for official PATCH while `main` is alpha, port **code** only.
-7. Push commits; push annotated tag → CI (`.github/workflows/release-publish.yml`); test the candidate, then approve `promote`.
+7. Push commits; push annotated tag with a `targets: both|docker|ha` line in the message → CI (`.github/workflows/release-publish.yml`); test the candidate, then approve `promote`.
 8. Delete the hotfix branch; move bugfix backlog item to **Verifications Pending** until live OK.
 
 ---

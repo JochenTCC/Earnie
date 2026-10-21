@@ -184,7 +184,7 @@ def test_release_workflow_targets_select_docker_or_ha():
     text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
     assert "      targets:\n" in text.split("\njobs:\n", 1)[0]
     gate = text.split("- name: Version gate", 1)[1].split("- name:", 1)[0]
-    assert 'TARGETS="both"' in gate  # tag push → both
+    assert "scripts.release_targets" in gate  # tag push → targets line of the tag message
     assert 'echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"' in gate
     release_job = text.split("\n  release:\n", 1)[1].split("\n  addon_smoke:\n", 1)[0]
     addon_build = release_job.split("- name: Build and push HA add-on images", 1)[1].split("- name:", 1)[0]

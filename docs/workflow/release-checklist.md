@@ -14,7 +14,7 @@ Background: a tag push builds a **candidate** only; nothing reaches users until 
 
 **Dev builds** (`vX.Y.Z-dev.N`, never released): the run stops after `addon_smoke` / `addon_lint` — only GHCR `:<version>` exists; no release notes, GitHub Release, `promote` or HA pin. Test via the local **Earnie (Dev)** add-on (set its `version:` to the dev version). Skip steps 4–6 below.
 
-**Only one channel** (`targets`): instead of (or after) the tag push, run **Release** via *Run workflow* with `tag` and `targets` = `docker` (LoxBerry/Synology: `:next`/`:latest` only, no HA add-on) or `ha` (HA add-on only, `:next`/`:latest` unchanged). A tag push always means `both`. The GitHub Release is published either way; existing `:<version>` images of the same commit are reused, so the missing channel can be released later with a second run (another approval). Skip the checklist items of the channel you leave out. Details: [DEVELOPER.md](../../DEVELOPER.md) (*Partial release*).
+**Only one channel** (`targets`): put `targets: docker` (LoxBerry/Synology: `:next`/`:latest` only, no HA add-on) or `targets: ha` (HA add-on only, `:next`/`:latest` unchanged) into the tag message, or run **Release** via *Run workflow* with `tag` + `targets` (also the way out when the tag lacks the line — no tag rewrite). The GitHub Release is published either way; existing `:<version>` images of the same commit are reused, so the missing channel can be released later with a second run (another approval). Skip the checklist items of the channel you leave out. Details: [DEVELOPER.md](../../DEVELOPER.md) (*Partial release*).
 
 ---
 
@@ -47,9 +47,11 @@ Re-create the dev add-on after larger wrapper changes (`run.sh`, `config.yaml` o
 
 - [ ] Push the annotated tag:
   ```powershell
-  git tag -a v<version> -m "Pre-release v<version>"   # official: "Release v<version>"
+  # targets: both | docker | ha — required line, no default (run fails in the version gate without it)
+  git tag -a v<version> -m "Pre-release v<version>" -m "targets: both"   # official: "Release v<version>"
   git push origin v<version>
   ```
+- [ ] Run summary shows the intended `targets`
 - [ ] Actions run **Release**: `release` green (fails early if the approval environment is missing)
 - [ ] `addon_smoke` (amd64) and `addon_lint` green — if red: candidate failed → step 5 *Reject path*
 - [ ] `addon_smoke` (aarch64) / `qemu_smoke`: soft — glance at the logs, investigate if red

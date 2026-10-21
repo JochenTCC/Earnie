@@ -85,14 +85,15 @@ Local `build_container` default tags from `version.py`: every version → `:next
 
 ```powershell
 # Official — after version.py == X.Y.Z is on origin/main:
-git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git tag -a vX.Y.Z -m "Release vX.Y.Z" -m "targets: both"
 git push origin vX.Y.Z
 
 # Community pre-release — after version.py == X.Y.Z-alpha.N on origin/main:
-git tag -a vX.Y.Z-alpha.N -m "Pre-release vX.Y.Z-alpha.N"
+git tag -a vX.Y.Z-alpha.N -m "Pre-release vX.Y.Z-alpha.N" -m "targets: both"
 git push origin vX.Y.Z-alpha.N
 ```
 
+- The tag message needs exactly one `targets: both|docker|ha` line (see *Partial release*); there is no default — a missing line or a lightweight tag fails the version gate.
 - Tag must match `version.py` exactly (`v2.0.0` ↔ `__version__ = "2.0.0"`; `v2.2.0-alpha.1` ↔ `2.2.0-alpha.1`); mismatch fails the workflow.
 - **Required** reviewed notes for every non-`-dev` tag: `.github/release-notes/vX.Y.Z.md` (also `-alpha.N` / `-beta.N` / `-rc.N`); CI has no generic fallback (`scripts.release_notes_finalize --check`). **Required care for HA:** the first non-heading prose line plus the compact bullet list directly below it become the add-on CHANGELOG / Änderungsprotokoll entry — write it for end users (German, no pin/`latest` jargon); checklist: [docs/workflow/release-checklist.md](docs/workflow/release-checklist.md) §1.
 - Official (after `promote`): GitHub Latest Release; images `:<version>`, `:next`, and `:latest` (+ legacy aliases).
@@ -101,7 +102,7 @@ git push origin vX.Y.Z-alpha.N
   - Before approving, test the candidate yourself: HA → local add-on on the `:<version>` image (`packaging/homeassistant-addon/README.md`, *Test a release candidate*); LoxBerry / Docker → pin `EARNIE_PINNED_VERSION` / image tag to `<version>`.
   - One-time setup: repo Settings → Environments → `release-approval` → *Required reviewers* = you. The `release` job fails early if the environment or its reviewer rule is missing (an unprotected environment would publish without waiting).
 - **HA Add-on:** every approved release runs job `publish_ha_addon` — official bumps `earnie` + `earnie_prerelease`; pre-release bumps only `earnie_prerelease`. Also pushes prebuilt `ghcr.io/jochentcc/earnie-addon-{arch}:<version>` (H6). Requires repo secret `HA_ADDON_REPO_TOKEN`. Manual retry: workflow **HA Add-on publish**. Details: `packaging/homeassistant-addon/README.md`.
-- **Partial release (`targets`):** a tag push always publishes **both** channels. To publish only one, start **Release** manually (*Run workflow*, input `tag` + `targets`): `docker` = LoxBerry/Synology channel only (`:next`/`:latest`; no add-on images, `addon_smoke`/`addon_lint`/`publish_ha_addon` skipped); `ha` = HA add-on only (`:next`/`:latest` stay put). The base image `earnie-energy:<version>` is always built (the add-on wraps it) and the GitHub Release is always published. Builds are idempotent: `scripts/release_image_gate.py` reuses an existing `:<version>` image whose `org.opencontainers.image.revision` label matches the tag commit, fails loud on a different commit, and warns + reuses images built before the label existed. So the other half can follow later by re-running the same tag with the other target (needs another approval). Because a `targets=ha` release is published on GitHub without moving `:next`/`:latest`, the LoxBerry plugin's update check reads the `org.opencontainers.image.version` label (set by `scripts/build_container.py`) of the channel tag on GHCR instead of GitHub Releases.
+- **Partial release (`targets`):** on a tag push the scope comes from the `targets:` line of the annotated tag message (`scripts/release_targets.py`; skill `session-abschluss` asks for it), on *Run workflow* from input `targets`; the run summary shows it before you approve `promote`: `docker` = LoxBerry/Synology channel only (`:next`/`:latest`; no add-on images, `addon_smoke`/`addon_lint`/`publish_ha_addon` skipped); `ha` = HA add-on only (`:next`/`:latest` stay put). The base image `earnie-energy:<version>` is always built (the add-on wraps it) and the GitHub Release is always published. Builds are idempotent: `scripts/release_image_gate.py` reuses an existing `:<version>` image whose `org.opencontainers.image.revision` label matches the tag commit, fails loud on a different commit, and warns + reuses images built before the label existed. So the other half can follow later by re-running the same tag with the other target (needs another approval). Because a `targets=ha` release is published on GitHub without moving `:next`/`:latest`, the LoxBerry plugin's update check reads the `org.opencontainers.image.version` label (set by `scripts/build_container.py`) of the channel tag on GHCR instead of GitHub Releases.
 - **GHCR tags:** every release gets `:<version>` on build (`build_container --versioned-only`) and `:next` on approval; official also `:latest` (`build_container --promote`, retag via `buildx imagetools`, no rebuild).
 - Publish from `main`; leave the pre-release string on `main` until the next approved bump.
 - Parallel feature work + urgent fix for an already tagged build: [docs/workflow/branching-hotfix-playbook.md](docs/workflow/branching-hotfix-playbook.md) (`main` + tags; short-lived `hotfix/…` only when needed).

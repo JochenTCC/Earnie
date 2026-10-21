@@ -30,6 +30,15 @@ Release notes are always written **for users on the last official / public relea
 
 The collect script’s git ancestor baseline may be older than `:latest` when a hotfix tag is not merged into `HEAD` — that is fine for the evidence pack. The **draft prose** still addresses the last public release the community actually runs. When in doubt, ask which productive version is on `:latest`.
 
+## 1c. Pre-release template (2.7 line)
+
+For further **alpha / beta / rc** notes on the current 2.7 cycle (until the next official `2.7.0` or the maintainer names a new template):
+
+1. **Copy structure and tone** from [`.github/release-notes/v2.7.0-alpha.6.md`](../../../.github/release-notes/v2.7.0-alpha.6.md) — opening sentence, HA summary bullets, pre-release banner (vs last **public** release), section order, platform blocks, Docker boilerplate.
+2. **Update in place:** title/version, banner “folgt auf …” to the previous pre-release tag, image tags, and any new or changed bullets from the evidence pack (still cumulative vs the public baseline, §1b).
+3. **Do not** invent a shorter “delta-only” layout or restart from an older alpha (`alpha.1`…`alpha.5`) as the skeleton.
+4. After an official `2.7.0` (or when the user designates another file), use that release’s notes as the new template instead.
+
 ## 2. Collect
 
 ```powershell
@@ -68,7 +77,7 @@ Write `.github/release-notes/drafts/v<target>.draft.md` (create the folder). Nev
 Use the audience markers of the evidence pack (`backlog.mdc` §7): `feat` -> Highlights / Neue Funktionen; `qual` -> section "Qualität & Stabilität" (1–3 lines, no details); `fix` -> Verbesserungen & Korrekturen; `dev` -> **omit completely** (also in user docs). **`unmarked` entries: ask the maintainer first** (propose a marker per entry, wait for the answer, and offer to write the marker into `Backlog-Erledigt.md`) — never guess. Further internal material (refactors, tests, backlog bookkeeping, sonar, spikes, research) is omitted as well. Archived backlog items are the best wording source; rewrite for end users (no internal backlog version IDs such as 2.7.n / 2.+1 / P5 in visible text — only inside `<!-- src: -->` comments; finalize rejects them — and no real names). Uncertain items → `<!-- REVIEW: … -->`. Add `<!-- src: <sha> -->` comments for traceability (removed on finalize).
 
 - **Summary list:** the contiguous `- ` bullets right below the first prose line (before the banner / first `###`) are copied by `bump_ha_addon` into the HA CHANGELOG as nested bullets — single-line items only, nothing else may sit between sentence and list. Derive the items from Breaking + Highlights (+ the most important Neue Funktionen); each must be backed by a longer entry further down. Omit when there is nothing worth listing.
-- **Pre-release:** keep short; add the "not an official release — use `:next` or pin the tag" banner; **always cumulative since the last public productive release** (§1b) — never a changelog against the previous alpha/beta/rc.
+- **Pre-release:** keep short; add the "not an official release — use `:next` or pin the tag" banner; **always cumulative since the last public productive release** (§1b) — never a changelog against the previous alpha/beta/rc. **Skeleton:** start from `v2.7.0-alpha.6.md` (§1c), then fold in new evidence.
 - **Official:** full set.
 - **Forbidden in drafts:** section comments or headings like `NEW since alpha.N`, `Delta vs beta.1`, or omitting earlier-alpha features because “they were already in alpha.5”.
 

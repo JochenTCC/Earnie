@@ -17,7 +17,9 @@
 # Nothing user-visible happens before step 3. Reject the deployment to drop a bad candidate.
 # Dev builds end after step 2; install them on your own HA via the local add-on (:<version>).
 #
-# Targets (workflow_dispatch input; a tag push always means "both"):
+# Targets — from the workflow_dispatch input, or on a tag push from a "targets: <value>"
+# line in the annotated tag message (scripts/release_targets.py; no default — a missing
+# line fails the run before anything is built; skill session-abschluss asks and sets it):
 #   both    Docker channel (:next/:latest for LoxBerry/Synology) + HA add-on
 #   docker  Docker channel only — no add-on images, add-on smoke/lint or add-on pin
 #   ha      HA add-on only — :next/:latest stay where they are
@@ -93,7 +95,9 @@ jobs:
             TARGETS="${DISPATCH_TARGETS:-both}"
           else
             TAG="${GITHUB_REF_NAME}"
-            TARGETS="both"
+            # actions/checkout stores the tag as lightweight — refetch the annotated tag object.
+            git fetch --force --no-tags origin "refs/tags/${TAG}:refs/tags/${TAG}"
+            TARGETS="$(python -m scripts.release_targets --tag "${TAG}")"
           fi
           case "$TARGETS" in
             both|docker|ha) ;;
@@ -124,6 +128,11 @@ jobs:
           echo "dev=${DEV}" >> "$GITHUB_OUTPUT"
           echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"
           echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE}, dev=${DEV}, targets=${TARGETS})"
+          {
+            echo "### Release ${TAG}"
+            echo ""
+            echo "**targets: \`${TARGETS}\`** (source: ${GITHUB_EVENT_NAME}) — check before approving \`promote\`."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Release notes gate (reviewed notes required, none for -dev)
         if: steps.version.outputs.dev != 'true'

@@ -234,6 +234,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 - [ ] HA Änderungsprotokoll: first prose line of those notes is user-facing (German, no pin/`latest` jargon) — see `docs/workflow/release-checklist.md` §1
 - [ ] Regression suite run (public + private) and report attached; `Earnie-regression-private` clean and pushed, or the user consciously accepted the guide's warning (soft gate — `docs/workflow/release-checklist.md` §1)
 - [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)
+- [ ] **Ask the user for `targets`** — never assume `both`: `both` (HA add-on + LoxBerry/Synology `:next`/`:latest`), `docker` (LoxBerry/Synology only) or `ha` (HA add-on only; `:next`/`:latest` stay put). The answer goes into the tag message (§2); a tag without it fails the release run
 - [ ] GitHub environment `release-approval` exists with the user as *Required reviewer* (otherwise job `release` fails early by design)
 - [ ] **Private earnie-env:** user asked whether to commit/push/tag `Earnie-env-home` (or sibling env packs) with the same tag; done or explicitly skipped
 
@@ -248,16 +249,20 @@ If publishing **B** and alpha compose is out of date: run **Alpha compose sync**
 ### 2. Primary: push version tag (CI)
 
 ```powershell
+# <TARGETS> = the user's answer: both | docker | ha
+
 # B — community pre-release
-git tag -a vX.Y.Z-alpha.N -m "Pre-release vX.Y.Z-alpha.N"
+git tag -a vX.Y.Z-alpha.N -m "Pre-release vX.Y.Z-alpha.N" -m "targets: <TARGETS>"
 git push origin vX.Y.Z-alpha.N
 
 # C — official
-git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git tag -a vX.Y.Z -m "Release vX.Y.Z" -m "targets: <TARGETS>"
 git push origin vX.Y.Z
 ```
 
 - Tag must match `version.py` exactly.
+- The tag message must contain exactly one `targets: both|docker|ha` line (`scripts/release_targets.py`, read in the version gate). Missing line or lightweight tag → the run fails in the version gate before building; do **not** re-create the tag (no tag rewrites, `branching-hotfix-playbook.mdc`) — start **Release** via *Run workflow* with `tag` + `targets` instead. Check: `git for-each-ref --format='%(contents)' refs/tags/<TAG>`.
+- Tell the user the chosen `targets` with the Actions run URL; the run summary repeats it — check it before approving `promote`.
 - The tag builds a **candidate only** (`.github/workflows/release-publish.yml`, job `release`): GHCR `:<version>` (app + `earnie-addon-{arch}`), GitHub Release as **draft**. `:next` / `:latest`, the published release and the HA add-on pin are **not** touched yet — no user sees the candidate.
 - Pre-gate checks run automatically: `addon_smoke` (amd64 blocking), `addon_lint`, `qemu_smoke` (soft). If `addon_smoke` / `addon_lint` fail, `promote` is skipped → treat as a failed candidate (§2b).
 
