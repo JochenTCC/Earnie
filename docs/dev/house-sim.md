@@ -1,7 +1,7 @@
 # House simulator (`house_sim/`) — HouseSim S1–S4
 
 **Status:** current (Energy-Optimizer **2.6.a** / HouseSim S1; bindings **2.6.g** entity-scoped; **HouseSim S4** custom integration; **Binding P5d** contract push harness)  
-**Purpose:** Fixture-based house physics for HA binding tests — as a **mock REST** bench (S1), a **contract push** harness (P5d), and optionally as a real HA custom integration (S4).
+**Purpose:** Fixture-based house physics for HA binding tests — as a **mock REST** bench (S1, retired pull path), a **contract push** harness (P5d), as a real HA custom integration (S4), and as the generated-archetype **HA contract testbed** ([`ha-contract-testbed.md`](ha-contract-testbed.md)).
 
 ## What this is (and is not)
 
@@ -9,7 +9,8 @@
 | --- | --- |
 | **S1 mock** (`python -m house_sim --mode fixture`) | A **mock for Home Assistant REST**, not a running HAOS. Implements the few endpoints `HaAdapter` needs (Mode A goldens). |
 | **Contract push** (`python -m house_sim --mode contract`) | **Binding P5d:** entities from Earnie activated keys; periodic push to `/ehal/telemetry/…` and `status.json` setpoints. No `entity_id` stored in Earnie bindings. |
-| **S4 integration** (`earnie_house_sim`) | A **custom integration** inside a real HAOS (Synology dogfood or `ha_lab/haos-docker`). Native `sensor` / `number` / `switch` entities; Earnie talks plain HA REST. Production Earnie code unchanged. |
+| **S4 integration** (`earnie_house_sim`) | A **custom integration** inside a real HAOS (Synology dogfood or `ha_lab/haos-docker`) or the HA container of the testbed. Native `sensor` / `number` / `switch` entities; Earnie exchanges data with it over the push contract (HA → `:8541`, `status.json` → HA). Production Earnie code unchanged. |
+| **HA contract testbed** (generated archetype) | An archetype **generated from an Earnie configuration pack** (`house_sim/archetype_gen.py`), loaded by S4 from `<config>/earnie_house_sim/archetypes/`, plus the carrier YAML with all `ENTITY_*` filled. Runs in a plain HA container with an automated check. Plan, runbook, support playbook: [`ha-contract-testbed.md`](ha-contract-testbed.md). |
 
 **Not the same as:** [`ha-lab-setup.md`](ha-lab-setup.md) / `ha_lab/` (Compose Earnie+HAOS+evcc = "HA Lab"). Do not put this simulator under `ha_lab/`. Simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4").
 
@@ -160,11 +161,13 @@ Dev/dogfood only — **not** shipped with the Earnie add-on. No PyPI package, no
 
 ### Install on HAOS
 
+For a Docker HA on the dev PC use `python -m scripts.ha_testbed install` (copies the integration, patches `configuration.yaml`, restarts HA); see [`ha-contract-testbed.md`](ha-contract-testbed.md). By hand on a HAOS:
+
 1. Sync (from the Energy-Optimizer repo root): `python -m scripts.sync_house_sim_integration`
 2. Copy `house_sim/ha_integration/custom_components/earnie_house_sim/` to HA `/config/custom_components/earnie_house_sim/` (Samba / SSH add-on).
 3. Restart Home Assistant → Settings → Devices & services → Add integration → **Earnie House Simulator**.
-4. Config flow: archetype (`evcc_en`, `fronius_de`, `huawei_en`, `sma_keba`), PV source **synthetic** (fixture series) or **weather** (existing `weather.*` entity that exposes `cloud_coverage`; scaled by `pv_kwp` and `sun.sun` elevation). Missing `cloud_coverage` is rejected in the flow.
-5. Point Earnie at that HA (`ehal.backend=ha`, URL/token in `config/.env`). Bind entities with the **2.6.h** EHAL-Com UI (acceptance run). Do **not** paste the golden map blindly for ESS setpoints (see below).
+4. Config flow: archetype (shipped: `evcc_en`, `fronius_de`, `huawei_en`, `sma_keba`; generated ones from `/config/earnie_house_sim/archetypes/<name>/`, see `scripts.ha_testbed_build`; a name used by both roots aborts the flow), PV source **synthetic** (fixture series) or **weather** (existing `weather.*` entity that exposes `cloud_coverage`; scaled by `pv_kwp` and `sun.sun` elevation). Missing `cloud_coverage` is rejected in the flow.
+5. Connect Earnie over the push contract: `ehal.backend=ha`, `EARNIE_PILOT_PUSH_TOKEN` in `config/.env`, activate the signals in the Signalliste, generate the carrier YAML (EHAL-Com or `scripts.ha_carrier_yaml_gen`) and map the `ENTITY_*` placeholders to the sim entities — for a generated archetype `placeholders.json` already holds the mapping. There is no pull path and no HA URL / token in Earnie any more; do not merge the golden map into bindings.
 
 ### Entity ID note (`input_number` → `number`)
 

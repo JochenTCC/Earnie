@@ -1,13 +1,18 @@
 # HA + evcc lab stack (2.4.c) — Earnie + Home Assistant + evcc (Separate Works)
 #
-# Earnie talks to Home Assistant over REST only (port 8123). Prefer HA entities
-# that evcc exposes — no direct evcc API from Earnie in this compose.
+# Earnie and Home Assistant exchange data over the push contract only: HA pushes
+# telemetry to Earnie (:8541, GET /ehal/telemetry/...) and polls /ehal/status.json
+# for setpoints (carrier YAML, docs/dev/ha-lab-setup.md). Earnie does not call the
+# HA REST API (no URL / token). Prefer HA entities that evcc exposes — no direct
+# evcc API from Earnie in this compose.
+# Reproducible bench without evcc / HACS: docker/compose/ha-sim-testbed.yml
+# (docs/dev/ha-contract-testbed.md).
 #
 # First start:
 #   mkdir ha_lab\config ha_lab\runtime ha_lab\homeassistant ha_lab\evcc
 #   # copy ha_lab/evcc/evcc.example.yaml → ha_lab/evcc/evcc.yaml and edit
 #   docker compose --project-directory . -f docker/compose/ha-lab.yml up -d --build
-#   # Create HA long-lived token; map entities in Streamlit Loxone-Com expander
+#   # Set EARNIE_PILOT_PUSH_TOKEN, activate signals in EHAL-Com, load the carrier YAML in HA
 #   # HACS files are downloaded by hacs-init into ha_lab/homeassistant/custom_components/hacs
 #   # Then in HA UI: Settings → Devices & services → Add integration → HACS (+ GitHub OAuth)
 #

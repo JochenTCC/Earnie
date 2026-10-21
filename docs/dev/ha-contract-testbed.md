@@ -1,6 +1,6 @@
 # HA contract testbed — carrier YAML ↔ HouseSim in a real Home Assistant
 
-**Status:** plan — drafted 2026-10-21; P1 (WP1), P2 (WP3, WP4), P3 (WP5) and P4 (WP6) implemented 2026-10-21, P5 open
+**Status:** plan — drafted 2026-10-21; P1–P5 (WP1–WP8) implemented 2026-10-21; open: first live run of the check, switch/select setpoints (finding 5)
 **Purpose:** A permanent, reproducible test bench for the Home Assistant push contract (EHAL-Com) without owning a production HA install: generate the carrier YAML from *any* Earnie configuration, derive a matching simulated house from the same configuration, load both into a real HA container and verify the full loop (HA → Earnie telemetry, Earnie → `status.json` → HA setpoints). Secondary use: reproduce customer problems from their configuration pack.
 
 Related: [`house-sim.md`](house-sim.md) (HouseSim S1–S4, contract mode), [`ha-lab-setup.md`](ha-lab-setup.md) (Compose lab), [`../ui/ehal-com.md`](../ui/ehal-com.md) (Signalliste, YAML package), `integrations/ha_carrier_yaml.py`.
@@ -35,7 +35,7 @@ The existing pieces already cover half of it:
 | Real HA entities + physics (`earnie_house_sim`, S4) | exists — but driven by hand-authored **vendor archetypes** (`evcc_en`, …) |
 | HA container stack | exists (`docker/compose/ha-lab.yml`, HA `2025.7.0`) — also carries evcc/HACS that this bench does not need |
 
-**Missing:** (a) archetype generator "activated keys → S4 archetype", (b) S4 loading an archetype from outside its shipped `fixtures/`, (c) the glue (compose, install script, checks), (d) the runbook.
+**Was missing (all built, § 3b–3e):** (a) archetype generator "activated keys → S4 archetype", (b) S4 loading an archetype from outside its shipped `fixtures/`, (c) the glue (compose, install script, checks), (d) the runbook.
 
 ## 2. Findings that shape the design
 
@@ -98,10 +98,10 @@ Extend `_entity_id_for_kind` / `ess_setpoints_from_lookup` to resolve qualified 
 4. Negative: `earnie_house_sim.reject_writes` → write-error document; `set_unavailable` → no crash; stop the carrier automation → Live-Lesen shows `0 angenommen (verstummt)` while energy counters never invent 0.
 Report as pass/fail table; non-zero exit on failure. Optional pytest wrapper marked `ha_container` (skipped by default, runnable on demand/nightly — not part of the default quality gate).
 
-### WP7 — Docs and backlog
+### WP7 — Docs and backlog *(done 2026-10-21)*
 German operator page under `docs/einrichtung/` is **not** needed (dev-only). Update `house-sim.md` (remove the stale "bind with 2.6.h UI / merge golden map" steps), `ha-lab-setup.md` header, and link this page from both. Backlog entries per `backlog.mdc` (IDs per `roadmap-nomenclature.mdc`; anonymize per `backlog-anonymize-users.mdc`).
 
-### WP8 — Support playbook
+### WP8 — Support playbook *(done 2026-10-21, see § 4 › Customer-problem reproduction)*
 Customer sends `house_profiles.json` + `components.json` (contain activation flags only — no entity ids, no tokens; still review before sharing) → `ha_testbed_build` + `ha_testbed up` → run check. Document what that can and cannot reproduce (table in §2) and a template for "what to ask the customer" (HA version, which entities they bound, unit of each, their filled YAML with tokens removed, Earnie `runtime/` state).
 
 ### Risks / open decisions
@@ -309,7 +309,7 @@ docker compose --project-directory . -f docker/compose/ha-lab.yml down
 # factory reset HA: delete contents of ha_lab\homeassistant (keep the folder)
 ```
 
-### Part B — target flow (after WP1–WP6)
+### Part B — testbed flow (P1–P4)
 
 ```powershell
 # 1. Earnie running with the configuration under test (activated signals, push token set)
@@ -322,9 +322,24 @@ docker compose --project-directory . -f docker/compose/ha-lab.yml down
 .venv\Scripts\python.exe -m scripts.ha_testbed_check --config-dir <earnie-config-dir> --ha-token <HA long-lived token>
 ```
 
-Until onboarding/config-entry automation exists (WP5, optional), do HA onboarding and *Add integration → Earnie House Simulator → generated archetype* once in the UI; the volume persists it. **Once per release**, additionally run Part A step 7 by hand with an unfilled YAML to keep the user-facing mapping step honest.
+Onboarding is manual (the optional REST automation is not built): after the first `up`, create the HA owner at http://localhost:8123, set location/timezone `Europe/Vienna`, and create a **long-lived token** (profile page) for the check. After `install`, add *Settings → Devices & services → Add integration → Earnie House Simulator → archetype `earnie_pack`* once; the volume persists it. Earnie itself either runs natively (`--earnie-host host.docker.internal`; allow 8541 in the Windows firewall; use `--runtime-dir` pointing at its runtime dir) or in the bench (`up --with-earnie`, pack in `ha_lab/testbed/config`, `EARNIE_PILOT_PUSH_TOKEN` in `ha_lab/testbed/config/.env`, build with `--earnie-host earnie-testbed`). Details per command: § 3b–3e. `python -m scripts.ha_testbed status` shows what is in place; `reset --yes` is the factory reset. **Once per release**, additionally run Part A step 7 by hand with an unfilled YAML to keep the user-facing mapping step honest.
 
 ### Customer-problem reproduction (WP8)
-1. Get `house_profiles.json` + `components.json` (check: no secrets) and, if available, their Earnie version and `runtime/` push-inbox/status snapshots.
-2. Put them in a scratch config dir; run Part B against that dir.
-3. If `ha_testbed_check` fails: the bug is in Earnie/generator/YAML or the signal set → fix + regression test. If it passes: the problem is likely device/unit/sign specific → ask for the customer's filled YAML (tokens removed) and the `unit_of_measurement` + sign of each bound entity, then add a matching vendor archetype.
+
+What the bench can and cannot reproduce is the table in § 2: it reproduces the customer's **activated signal set** and the Earnie/carrier/contract behaviour, not their devices.
+
+1. **Get the pack.** `house_profiles.json` + `components.json` carry activation flags only (no entity ids, no tokens) — still open them before accepting. Also ask for the Earnie version and, if possible, `runtime/ehal_push_inbox.json`, `runtime/ehal_published.json` and the output of `GET /ehal/status.json`.
+2. **Make it canonical.** Copy the files into a scratch dir and run `python -m scripts.migrate_config --config-dir <scratch>` if the pack is older (the generator aborts with a pointer when it is not canonical). Fill gaps the generator names (`--battery-kwh`, `--load-kw`, `--static <id>=<value>`); note them, they are test inputs, not facts about the customer.
+3. **Build and run** (Part B): `ha_testbed_build` → `ha_testbed up` → `install` → HA onboarding/token/integration once → `ha_testbed_check`.
+4. **Read the result.**
+   - `ha_testbed_check` **fails**: the problem is in Earnie, the generator or the carrier YAML for that signal set → minimise to a test pack, fix, add a regression test (as the WP0 findings F3, F13, F14 were found).
+   - It **passes**: the cause is probably device-, unit- or sign-specific → ask the questions below and add a matching vendor archetype (`house_sim/fixtures/`).
+5. **Never share** the filled `packages/earnie_ha_carrier.yaml` unredacted: it contains the push token (replace it before attaching to a ticket).
+
+**What to ask the customer** (template):
+
+- Home Assistant version and install type (Container/OS/Supervised), Earnie version, `ehal.backend`.
+- For every bound signal: the entity they mapped to `ENTITY_<id>`, its `unit_of_measurement`, its device class and sign convention (grid + = import? battery + = discharge?).
+- Their filled carrier YAML with the token removed, and HA's `home-assistant.log` lines containing `earnie_ha_carrier` or `rest_command`.
+- Which setpoints they expect HA to apply (entity domain: `number` is supported, `switch` / `select` are not — finding 5) and how the target is controlled (integration/service).
+- What Earnie's EHAL-Com *Live-Lesen* / *Live-Schreiben* show (status strings, age column) and the time of the problem.

@@ -15,6 +15,7 @@
 | [`ehal.md`](../referenz/ehal.md) | Frozen EHAL contract + HA push notes |
 | [`ehal-com.md`](../ui/ehal-com.md) | Signalliste + HA YAML download |
 | [`house-sim.md`](house-sim.md) | HouseSim contract / push harness (`house_sim/`, not this Compose stack) |
+| [`ha-contract-testbed.md`](ha-contract-testbed.md) | Reproducible HA bench generated from any Earnie pack (`docker/compose/ha-sim-testbed.yml`, `scripts.ha_testbed*`) — no evcc / HACS; also the customer-problem playbook |
 | [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) | Config fragment to merge into Earnie `config.json` (no `transport`) |
 | [`ha_lab/evcc/evcc.yaml`](../../ha_lab/evcc/evcc.yaml) | Committed lab stub (const meters / demo charger) |
 | [`ha_lab/evcc/evcc.example.yaml`](../../ha_lab/evcc/evcc.example.yaml) | Commented Earnie-mode template |
