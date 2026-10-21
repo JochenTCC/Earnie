@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 from ehal.push_signals import (
+    HUB_WRITE_FAILED_ID,
     Signal,
     heartbeat_signal,
     read_signals_from_docs,
@@ -127,6 +128,10 @@ def _rest_commands(
     lines += [
         "  earnie_push_heartbeat:",
         f'    url: "{base}/ehal/telemetry/{hb.ehal_id}/1{token_q}"',
+        "    method: GET",
+        # Reported while a setpoint automation still sees its target differ after the write.
+        "  earnie_push_hub_write_failed:",
+        f'    url: "{base}/ehal/telemetry/{HUB_WRITE_FAILED_ID}/1{token_q}"',
         "    method: GET",
         "",
     ]
@@ -400,16 +405,34 @@ def _setpoint_automation(
         "> 0.01 * (hub_value | float | abs) + 0.01 }}"
     )
     # Indent under else: of the unknown-unit guard (10 spaces before - if).
+    not_applied_msg = (
+        f"Earnie setpoint {sig.ehal_id} not applied: {entity} still differs after the write"
+    )
+    # ``continue_on_error`` keeps a refusing target from aborting the script (4 nested
+    # ERROR lines per attempt); the check after the delay then reports it to Earnie.
     apply = [
         "          - if:",
         "              - condition: template",
         f"                value_template: {_q(drift)}",
         "            then:",
         "              - action: number.set_value",
+        "                continue_on_error: true",
         "                target:",
         f"                  entity_id: {entity}",
         "                data:",
         f"                  value: {_q('{{ hub_value }}')}",
+        "              - delay:",
+        "                  seconds: 5",
+        "              - if:",
+        "                  - condition: template",
+        f"                    value_template: {_q(drift)}",
+        "                then:",
+        "                  - action: system_log.write",
+        "                    data:",
+        "                      level: warning",
+        f"                      logger: {_LOGGER}",
+        f"                      message: {_q(not_applied_msg)}",
+        "                  - action: rest_command.earnie_push_hub_write_failed",
     ]
     guard = [
         "      - if:",

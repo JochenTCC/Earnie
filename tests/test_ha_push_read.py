@@ -113,3 +113,38 @@ def test_push_write_publishes_no_service():
     assert err is None
     published = load_published()
     assert published["ess.house.set_ess_charge_power_limit"] == pytest.approx(3000.0)
+
+
+def test_write_setpoints_warns_when_hub_reports_unapplied(caplog):
+    # HA testbed F22: "published" is not "applied"; HA pushes hub_write_failed.
+    from ehal.push_signals import HUB_WRITE_FAILED_ID
+    from integrations.ehal_write import clear_published_for_tests
+
+    clear_published_for_tests()
+    cfg = HaConfig(
+        base_url="http://ha:8123",
+        token="t",
+        adapter_id="test",
+        entities={"set_ess_charge_power_limit": "", "set_ess_discharge_power_limit": ""},
+        setpoint_qids={
+            "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
+            "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",
+        },
+    )
+    adapter = HaAdapter(cfg)
+    setpoint = {
+        "schema_version": EHAL_SCHEMA_VERSION,
+        "ts": "2026-01-01T00:00:00Z",
+        "adapter_id": "test",
+        "set_ess_charge_power_limit": 3000.0,
+        "set_ess_discharge_power_limit": 3000.0,
+    }
+    with caplog.at_level("WARNING"):
+        assert adapter.write_setpoints(setpoint) is None
+    assert not any("hub_write_failed" in r.getMessage() for r in caplog.records)
+
+    inbox.record_push(HUB_WRITE_FAILED_ID, "1")
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        assert adapter.write_setpoints(setpoint) is None
+    assert any("hub_write_failed" in r.getMessage() for r in caplog.records)

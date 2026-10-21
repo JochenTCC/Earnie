@@ -170,6 +170,7 @@ class HaWriteMixin:
 
         if not outcome.failed:
             self._last_write_error = None
+            self._warn_if_hub_reports_unapplied()
             return None
 
         return self._record_write_error(
@@ -180,6 +181,18 @@ class HaWriteMixin:
             flip_ess=outcome.flip_ess,
             flip_evcs=outcome.flip_evcs,
         )
+
+    def _warn_if_hub_reports_unapplied(self) -> None:
+        """Setpoints are only *published* here; HA reports back when it could not apply them."""
+        from runtime_store.ehal_push_inbox import hub_write_failure_age_s
+
+        age = hub_write_failure_age_s()
+        if age is not None:
+            logger.warning(
+                "Home Assistant meldet nicht angewendete Sollwerte (hub_write_failed vor "
+                "%.0f s): Ziel-Entity bzw. HA-Log prüfen.",
+                age,
+            )
 
     def write_mapped_fields(
         self, fields: dict[str, float | int | str]

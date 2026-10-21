@@ -22,6 +22,8 @@ from ehal.qualified_ids import (
 HEARTBEAT_ID = "heartbeat_smarthome"
 HEARTBEAT_TITLE = "Push_Earnie_Heartbeat"
 HEARTBEAT_WRITE_ID = "heartbeat_earnie"
+# HA → Earnie: pushed (value 1) while a setpoint automation could not apply a value.
+HUB_WRITE_FAILED_ID = "hub_write_failed"
 HEARTBEAT_READ_MEANING = "Link-Nachweis Smarthome → Earnie"
 HEARTBEAT_WRITE_MEANING = "Lebenszeichen Earnie → Smarthome (Unix-Zeit)"
 # Daemon HTTP control receipt (VO Earnie_Request_Optimize → POST, not telemetry).

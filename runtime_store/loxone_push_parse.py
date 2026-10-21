@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import re
 
-from ehal.push_signals import HEARTBEAT_ID
+from ehal.push_signals import HEARTBEAT_ID, HUB_WRITE_FAILED_ID
 from ehal.qualified_ids import (
     id_namespace_alternation,
 )
@@ -19,10 +19,12 @@ SHADOW_FEED_SOURCE = "shadow_feed"
 
 
 # Loxone pushes measurements (sens_*) and inputs (get_*) only; never setpoints.
-# Plus synthetic control IDs (heartbeat_smarthome, request_optimize).
+# Plus synthetic control IDs (heartbeat_smarthome, request_optimize, hub_write_failed).
 _ID_PATTERN = re.compile(
     r"^(?:"
     + HEARTBEAT_ID
+    + r"|"
+    + HUB_WRITE_FAILED_ID
     + r"|"
     + REQUEST_OPTIMIZE_ID
     + r"|(?:(?:"

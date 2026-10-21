@@ -40,6 +40,7 @@ def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "evcs.garage.sens_evcs_connected",
         "ev.garage.sens_evcs_soc_act",
         "heartbeat_smarthome",
+        "hub_write_failed",
         "request_optimize",
     ],
 )
@@ -410,3 +411,13 @@ def test_late_flush_writes_to_the_directory_of_the_snapshot(
     assert (first / inbox.INBOX_FILENAME).is_file()
     assert not (second / inbox.INBOX_FILENAME).exists()
 
+
+def test_hub_write_failure_age_reports_recent_failures_only() -> None:
+    from ehal.push_signals import HUB_WRITE_FAILED_ID
+
+    t0 = datetime(2026, 10, 21, 12, 0, 0, tzinfo=timezone.utc)
+    assert inbox.hub_write_failure_age_s(now=t0) is None
+    assert inbox.record_push(HUB_WRITE_FAILED_ID, "1", now=t0) in ("ok", "new")
+    assert inbox.hub_write_failure_age_s(now=t0 + timedelta(seconds=12)) == pytest.approx(12.0)
+    # 3 x the default 10 s repeat: older reports no longer count as active
+    assert inbox.hub_write_failure_age_s(now=t0 + timedelta(seconds=31)) is None

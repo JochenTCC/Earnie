@@ -270,6 +270,19 @@ def _render_write_summary(rows: list[dict[str, str]], raw_count: int) -> None:
         st.caption(omitted)
 
 
+def _render_hub_write_failure() -> None:
+    """Home Assistant reports (push ``hub_write_failed``) that a setpoint was not applied."""
+    from runtime_store.ehal_push_inbox import hub_write_failure_age_s
+
+    age = hub_write_failure_age_s()
+    if age is not None:
+        st.error(
+            f"Home Assistant meldet: mindestens ein Sollwert wurde nicht angewendet "
+            f"(zuletzt vor {age:.0f} s). Ziel-Entity und HA-Log prüfen — „Erfolg“ unten "
+            "heißt nur: veröffentlicht."
+        )
+
+
 def _render_ehal_writes(
     main_state: dict | None,
     *,
@@ -278,6 +291,7 @@ def _render_ehal_writes(
     loxone_sent: dict,
     ehal_writes: list | None,
 ) -> None:
+    _render_hub_write_failure()
     if not has_produktiv_run(main_state):
         st.caption("Noch kein Produktiv-Durchlauf — Sollwerte leer, Mapping aus Config.")
         _render_write_table(build_ehal_write_rows([]))

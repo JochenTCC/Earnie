@@ -348,6 +348,31 @@ STATE_LAST_KNOWN = "Zuletzt bekannt (gehalten)"
 STATE_READ_ERROR = "Lesefehler"
 
 
+HUB_WRITE_FAILURE_HOLD_FACTOR = 3.0
+
+
+def hub_write_failure_age_s(*, now: datetime | None = None) -> float | None:
+    """Seconds since Home Assistant last reported an unapplied setpoint, else ``None``.
+
+    HA pushes ``hub_write_failed`` on every interval while a setpoint automation still
+    sees its target differ after the write; the report counts as active for
+    ``HUB_WRITE_FAILURE_HOLD_FACTOR`` push intervals.
+    """
+    from ehal.push_signals import HUB_WRITE_FAILED_ID
+
+    row = memory_snapshot().get(HUB_WRITE_FAILED_ID)
+    if not isinstance(row, dict):
+        return None
+    stamp = _parse_ts(row.get("last_ts"))
+    if stamp is None:
+        return None
+    current = now if now is not None else datetime.now(timezone.utc)
+    age = (current - stamp).total_seconds()
+    if age > HUB_WRITE_FAILURE_HOLD_FACTOR * expected_repeat_s():
+        return None
+    return max(0.0, age)
+
+
 def expected_repeat_s() -> float:
     """Configured push repeat interval in seconds (default 10).
 

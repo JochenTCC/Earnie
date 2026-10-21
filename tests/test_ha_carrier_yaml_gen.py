@@ -161,3 +161,17 @@ def test_carrier_yaml_setpoints_write_only_on_drift_and_ignore_unpublished():
         'stop: "Earnie published no value for this field"' in block
     )
     assert block.index("published no value") < block.index("number.set_value")
+
+
+def test_carrier_yaml_reports_unapplied_setpoints_to_earnie():
+    # HA testbed F22: a refusing target must not abort the script with nested ERROR
+    # lines and Earnie must learn that the value was not applied.
+    text = _build()
+    assert "earnie_push_hub_write_failed:" in text
+    assert "/ehal/telemetry/hub_write_failed/1" in text
+    block = _setpoint_block(text)
+    assert "continue_on_error: true" in block
+    assert "delay:" in block and "seconds: 5" in block
+    assert "rest_command.earnie_push_hub_write_failed" in block
+    # the failure push is only reachable after the delay (verification of the write)
+    assert block.index("delay:") < block.index("rest_command.earnie_push_hub_write_failed")
