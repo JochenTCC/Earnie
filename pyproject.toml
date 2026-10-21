@@ -81,6 +81,7 @@ markers = [
     "slow: Längerer Backtesting- oder MILP-Integrationslauf",
     "test_health_protected: Nie automatisch als Review-Kandidat markieren",
     "apptest: Streamlit-AppTest UI-Smoketest (rendert echte Seiten headless)",
+    "ha_container: Needs a running HA testbed (scripts.ha_testbed); skipped unless HA_TESTBED_TOKEN is set, not part of the quality gate",
     "regression: Release golden-master suite (deselected by default; see docs/workflow/regression-suite.md)",
 ]
 

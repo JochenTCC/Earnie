@@ -1,6 +1,6 @@
 # HA contract testbed — carrier YAML ↔ HouseSim in a real Home Assistant
 
-**Status:** plan — drafted 2026-10-21; P1 (WP1), P2 (WP3, WP4) and P3 (WP5) implemented 2026-10-21, P4–P5 open
+**Status:** plan — drafted 2026-10-21; P1 (WP1), P2 (WP3, WP4), P3 (WP5) and P4 (WP6) implemented 2026-10-21, P5 open
 **Purpose:** A permanent, reproducible test bench for the Home Assistant push contract (EHAL-Com) without owning a production HA install: generate the carrier YAML from *any* Earnie configuration, derive a matching simulated house from the same configuration, load both into a real HA container and verify the full loop (HA → Earnie telemetry, Earnie → `status.json` → HA setpoints). Secondary use: reproduce customer problems from their configuration pack.
 
 Related: [`house-sim.md`](house-sim.md) (HouseSim S1–S4, contract mode), [`ha-lab-setup.md`](ha-lab-setup.md) (Compose lab), [`../ui/ehal-com.md`](../ui/ehal-com.md) (Signalliste, YAML package), `integrations/ha_carrier_yaml.py`.
@@ -90,7 +90,7 @@ Extend `_entity_id_for_kind` / `ess_setpoints_from_lookup` to resolve qualified 
 - `docker/compose/ha-sim-testbed.yml`: `homeassistant` (pinned, same as lab) + optional `earnie` service; **no** evcc/HACS. Ports: HA 8123, Earnie UI 8506, Earnie daemon 8541 published to the host.
 - `scripts/ha_testbed.py` with `up | down | install | status | reset`: copies `custom_components/earnie_house_sim`, writes the WP4 output into the HA config volume, patches `configuration.yaml` idempotently, restarts HA, and (optional, later) completes HA onboarding + creates the config entry via the HA REST API so no UI clicking is needed.
 
-### WP6 — Automated check
+### WP6 — Automated check *(done 2026-10-21, § 3e)*
 `python -m scripts.ha_testbed_check` (against a running bench):
 1. HA reachable; sim entities exist with expected units.
 2. Earnie inbox holds every activated read signal, fresh (< 2× push cadence); heartbeat OK.
@@ -152,6 +152,22 @@ python -m scripts.ha_testbed status
 
 - `install` copies `house_sim/ha_integration/custom_components/earnie_house_sim` (the synced copy), patches `configuration.yaml` with `homeassistant: packages: !include_dir_named packages` (idempotent; aborts, before copying anything, when `packages:` is set to something else) and restarts the HA container only if it runs. `reset --yes [--all]` stops the stack and clears the HA dir (`--all`: also Earnie config/runtime); it deletes nothing when `compose down` fails.
 - **Not implemented:** optional HA onboarding / config entry via REST. After the first start, create the HA owner and add *Earnie House Simulator → generated archetype* once in the UI; the volume keeps it. **Not run here:** `up` against a real Docker daemon (image pull); tests mock the Docker calls and `docker compose config` accepts the file.
+
+## 3e. P4 notes (automated check, 2026-10-21)
+
+`python -m scripts.ha_testbed_check --ha-token <HA long-lived token> [--config-dir <cfg>] [--runtime-dir …] [--repeat-s 10] [--timeout-s 90] [--skip-negative] [--require-all]`. It reads the generated archetype (`placeholders.json`, `entities.json`, `meta.json`) from `<testbed>/homeassistant/earnie_house_sim/archetypes/<name>/`, the Earnie push inbox file from `--runtime-dir` (default `<testbed>/runtime`; it must be the runtime dir of the Earnie that receives the push), and `status.json` from `--earnie-url` (default `http://127.0.0.1:8541`). The HA long-lived token is created once in the HA profile page; onboarding is still manual (P3).
+
+| Check | Pass condition |
+| --- | --- |
+| pack unchanged (`--config-dir`) | pack hash equals `meta.source_pack_sha256` |
+| HA entities | every generated entity exists, is not `unavailable`/`unknown`, unit equals `entities.json` |
+| inbox | every activated read and `heartbeat_smarthome` last pushed within 2 × cadence + 2 s |
+| round trip | publishes a test value (±500 W / ±1 A) for the first ESS limit / EVCS current setpoint via the shared ledger → `status.json` shows it → the HA `number` reaches it; the original value is published back afterwards |
+| `reject_writes` | fresh `hub_write_failed` push in the inbox, number unchanged; after switching off, the value is applied |
+| `set_unavailable` | SoC (or first analog read) entity becomes `unavailable` for 30 s, Earnie keeps `status.json` and heartbeat, the signal resumes |
+| stopped push | HA push automations of one power and one energy signal are turned off (and back on): power derives `0 angenommen (verstummt)`, energy derives no 0 (`Lesefehler`, no value). Power is SKIP when its last pushed value was 0 |
+
+Exit code 1 on any FAIL; SKIP (no token, no suitable setpoint/signal) fails only with `--require-all`. Optional `tests/test_ha_testbed_live.py` (marker `ha_container`) runs the same with `--require-all` and is skipped unless `HA_TESTBED_TOKEN` is set. `tests/test_ha_testbed_check.py` exercises all branches against a simulated bench. **Not run against a real HA + Earnie yet.** Known limits: the round trip assumes the optimizer is not overwriting the chosen setpoint during the test (silent mode / offline planning as in F5); the `set_unavailable` and stopped-push cases take 1–2 minutes at a 10 s cadence.
 
 ## 3a. WP0 findings (2026-10-21, partial run)
 
@@ -298,12 +314,12 @@ docker compose --project-directory . -f docker/compose/ha-lab.yml down
 ```powershell
 # 1. Earnie running with the configuration under test (activated signals, push token set)
 # 2. Build bench inputs from that configuration
-.venv\Scripts\python.exe -m scripts.ha_testbed_build --config-dir <earnie-config-dir> --out ha_lab\homeassistant --earnie-host host.docker.internal --token <token>
+.venv\Scripts\python.exe -m scripts.ha_testbed_build --config-dir <earnie-config-dir> --out ha_lab\testbed\homeassistant --earnie-host host.docker.internal --token <token>
 # 3. Start / install / reset the HA container
 .venv\Scripts\python.exe -m scripts.ha_testbed up
 .venv\Scripts\python.exe -m scripts.ha_testbed install
 # 4. Automated verification
-.venv\Scripts\python.exe -m scripts.ha_testbed_check --config-dir <earnie-config-dir> --token <token>
+.venv\Scripts\python.exe -m scripts.ha_testbed_check --config-dir <earnie-config-dir> --ha-token <HA long-lived token>
 ```
 
 Until onboarding/config-entry automation exists (WP5, optional), do HA onboarding and *Add integration → Earnie House Simulator → generated archetype* once in the UI; the volume persists it. **Once per release**, additionally run Part A step 7 by hand with an unfilled YAML to keep the user-facing mapping step honest.
