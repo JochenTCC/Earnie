@@ -601,3 +601,79 @@ def test_expected_live_read_fields_include_thermal_temps():
     assert fields.index("pool.swimspa.sens_temperature_water") > fields.index(
         "pool.swimspa.sens_power_act"
     )
+
+
+def test_build_telemetry_rows_uses_push_state_for_activated_ha_fields():
+    # HA testbed F23: HA bindings have no entity ids, so an activated, freshly pushed
+    # signal must not read "Kein Mapping"; the inbox state and receipt time are shown.
+    rows = build_telemetry_rows(
+        {"grid.meter.sens_grid_power_active": -874.0, "sens_power_consumers": 1473.0},
+        "t-read",
+        mapping={"sens_power_consumers": "—(abgeleitet)"},
+        expected_fields=[
+            "grid.meter.sens_grid_power_active",
+            "ess.house.sens_ess_soc",
+            "sens_power_consumers",
+        ],
+        push_info={
+            "grid.meter.sens_grid_power_active": ("OK", "t-grid"),
+            "ess.house.sens_ess_soc": ("0 angenommen (verstummt)", "t-soc"),
+        },
+    )
+    by_field = {r["EHAL-Feld"]: r for r in rows}
+    grid = by_field["grid.meter.sens_grid_power_active"]
+    assert grid["Status"] == "OK"
+    assert grid["Zuletzt gelesen"] == "t-grid"
+    assert grid["Wert (EHAL)"] == "-874 W"
+    soc = by_field["ess.house.sens_ess_soc"]
+    assert soc["Status"] == "0 angenommen (verstummt)"
+    assert soc["Zuletzt gelesen"] == "t-soc"
+    derived = by_field["sens_power_consumers"]
+    assert derived["Status"] == "OK"
+    assert derived["Zuletzt gelesen"] == "t-read"
+
+
+def test_build_telemetry_rows_without_push_info_keeps_kein_mapping():
+    rows = build_telemetry_rows(
+        {},
+        "t0",
+        mapping={},
+        expected_fields=["ess.house.sens_ess_soc"],
+    )
+    assert rows[0]["Status"] == "Kein Mapping"
+
+
+
+def test_expand_ha_writes_maps_bare_ess_fields_to_entity_scoped_ids(monkeypatch):
+    # HA testbed F19: the write trace holds bare names, Live-Schreiben lists
+    # ``ess.<id>.set_*``; without the mapping every row showed up twice.
+    from integrations import ehal_debug_ha
+
+    house = {"plant": {"ehal_bindings": {"set_grid_export_power_limit": ""}}, "profiles": {}}
+    components = {
+        "batteries": [
+            {
+                "id": "house",
+                "ehal_bindings": {
+                    "ess.house.set_ess_charge_power_limit": "",
+                    "ess.house.set_ess_active_power": "",
+                },
+            }
+        ]
+    }
+    monkeypatch.setattr(
+        "integrations.ha_push_read.load_house_components_for_ha",
+        lambda: (house, components),
+    )
+    rows = ehal_debug_ha.expand_ha_writes_for_live(
+        [
+            {"field": "set_ess_charge_power_limit", "value": 0.0},
+            {"field": "set_ess_active_power", "value": 100.0},
+            {"field": "set_ess_discharge_power_limit", "value": 5.0},  # not activated
+        ],
+        house,
+    )
+    fields = [r["field"] for r in rows]
+    assert fields[0] == "ess.house.set_ess_charge_power_limit"
+    assert fields[1] == "ess.house.set_ess_active_power"
+    assert fields[2] == "set_ess_discharge_power_limit"

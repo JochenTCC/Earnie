@@ -175,3 +175,9 @@ def test_carrier_yaml_reports_unapplied_setpoints_to_earnie():
     assert "rest_command.earnie_push_hub_write_failed" in block
     # the failure push is only reachable after the delay (verification of the write)
     assert block.index("delay:") < block.index("rest_command.earnie_push_hub_write_failed")
+
+
+def test_carrier_yaml_push_skip_message_names_the_unavailable_state():
+    # HA testbed F24: an unavailable entity has a fine unit; the old text blamed the unit.
+    text = _build()
+    assert "is unavailable/non-numeric" in text

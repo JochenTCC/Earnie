@@ -202,15 +202,26 @@ def expand_ha_writes_for_live(
         if str(consumer.get("id") or "").strip() and _m()._consumer_is_ev(consumer):
             ev_consumer = consumer
             break
+    from integrations.ha_push_read import (
+        load_house_components_for_ha,
+        resolve_setpoint_qid,
+        setpoint_qualified_ids,
+    )
+
+    house_p, components = load_house_components_for_ha()
+    qualified = setpoint_qualified_ids(house_p, components)
     out: list[dict[str, Any]] = []
     for entry in writes:
         row = dict(entry)
         field = str(row.get("field") or "").strip()
         if ev_consumer is not None and field in EV_LIVE_WRITE_FIELDS:
             row["field"] = _m().live_write_consumer_field(ev_consumer, field)
-        else:
-            canon = _m().canonicalize_live_display_field(field)
-            if canon:
-                row["field"] = canon
+            out.append(row)
+            continue
+        # Entity-scoped setpoints (``ess.<id>.set_*``) are recorded under the bare name.
+        qid = resolve_setpoint_qid(field, qualified) if field and "." not in field else ""
+        canon = qid or _m().canonicalize_live_display_field(field)
+        if canon:
+            row["field"] = canon
         out.append(row)
     return out

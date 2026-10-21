@@ -349,3 +349,12 @@ def test_publish_id_for_probe_qualifies_export_limit() -> None:
         == "grid.meter.set_grid_export_power_limit"
     )
     assert ewt._publish_id_for_probe("set_ess_mode") == "set_ess_mode"
+
+
+def test_power_limit_notice_names_the_live_scenario():
+    # HA testbed F20: a 0 W maximum must be explained, not just shown as invalid.
+    from ui.ehal_write_test import power_limit_unknown_notice
+
+    text = power_limit_unknown_notice()
+    assert "Live-Szenario" in text
+    assert "Szenarienkonfigurator" in text

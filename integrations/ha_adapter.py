@@ -96,6 +96,7 @@ class HaAdapter(HaTelemetryMixin, HaWriteMixin):
         )
         self._last_write_error: EhalWriteError | None = None
         self._last_skipped: list[str] = []
+        self._last_unconfigured: list[str] = []
         self._warned_skips: set[str] = set()
 
     def last_write_error(self) -> EhalWriteError | None:
@@ -105,9 +106,15 @@ class HaAdapter(HaTelemetryMixin, HaWriteMixin):
         """Setpoint fields of the last write dropped because a function is incomplete."""
         return list(self._last_skipped)
 
+    def last_unconfigured_fields(self) -> list[str]:
+        """Setpoint fields of the last write that are not activated at all (nothing written)."""
+        return list(self._last_unconfigured)
+
     def _skip(self, field_name: str, outcome: _HaWriteOutcome) -> None:
         if field_name in self._incomplete_fields:
             outcome.skipped.append(field_name)
+        else:
+            outcome.unconfigured.append(field_name)
         if field_name not in self._warned_skips:
             self._warned_skips.add(field_name)
             logger.warning(

@@ -148,3 +148,46 @@ def test_write_setpoints_warns_when_hub_reports_unapplied(caplog):
     with caplog.at_level("WARNING"):
         assert adapter.write_setpoints(setpoint) is None
     assert any("hub_write_failed" in r.getMessage() for r in caplog.records)
+
+
+def test_write_records_omit_never_activated_fields():
+    # HA testbed F19: set_ess_mode is not activated, nothing is written — no "Ja" row.
+    from integrations.ehal_live_records import build_ehal_write_records
+
+    rows = build_ehal_write_records(
+        {"set_ess_charge_power_limit": 0.0, "set_ess_mode": 2.0},
+        written_at="t",
+        error=None,
+        unconfigured=["set_ess_mode"],
+    )
+    assert [r["field"] for r in rows] == ["set_ess_charge_power_limit"]
+
+
+def test_adapter_reports_never_activated_fields_as_unconfigured():
+    from integrations.ehal_write import clear_published_for_tests
+
+    clear_published_for_tests()
+    cfg = HaConfig(
+        base_url="",
+        token="",
+        adapter_id="test",
+        entities={"set_ess_charge_power_limit": "", "set_ess_discharge_power_limit": ""},
+        setpoint_qids={
+            "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
+            "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",
+        },
+    )
+    adapter = HaAdapter(cfg)
+    err = adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-01-01T00:00:00Z",
+            "adapter_id": "test",
+            "set_ess_charge_power_limit": 3000.0,
+            "set_ess_discharge_power_limit": 3000.0,
+            "set_ess_mode": 0,
+        }
+    )
+    assert err is None
+    assert "set_ess_mode" in adapter.last_unconfigured_fields()
+    assert "set_ess_mode" not in adapter.last_skipped_fields()

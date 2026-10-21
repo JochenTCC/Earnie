@@ -38,6 +38,8 @@ class _HaWriteOutcome:
     flip_ess: bool = False
     flip_evcs: bool = False
     skipped: list[str] = field(default_factory=list)
+    # Never activated (not an incomplete mapping): nothing was written, no record.
+    unconfigured: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -280,8 +280,8 @@ def _push_automation_analog(sig: Signal, repeat_s: float) -> list[str]:
     unit = ehal_base_unit(sig.ehal_id)
     auto_id = f"earnie_push_{_sanitize_id(sig.ehal_id)}"
     skip_msg = (
-        f"Earnie push skipped for {sig.ehal_id}: unknown or incompatible "
-        f"unit_of_measurement on {entity} (need {unit or 'numeric'})"
+        f"Earnie push skipped for {sig.ehal_id}: {entity} is unavailable/non-numeric "
+        f"or has an unknown or incompatible unit_of_measurement (need {unit or 'numeric'})"
     )
     return [
         f"  - id: {auto_id}",

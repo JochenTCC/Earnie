@@ -114,6 +114,16 @@ def _render_write_test_buttons(
             st.rerun()
 
 
+def power_limit_unknown_notice() -> str:
+    """Why every power value is rejected: the maximum comes from the live scenario."""
+    return (
+        "Keine Batterie-Maximalleistung bekannt: Die Obergrenze für Leistungs-Sollwerte "
+        "kommt aus der Batterie des Live-Szenarios, und dieses ist unvollständig "
+        "(Batterie, Hausprofil und Tarife im **Szenarienkonfigurator** zuordnen). "
+        "Bis dahin zeigt das Wertfeld „ungültig“ und Leistungswerte lassen sich nicht senden."
+    )
+
+
 def render_write_test_section() -> None:
     """Expander under Live-Schreiben: table of probes, one send / roundtrip."""
     with st.expander("Schreibtest", expanded=False):
@@ -141,10 +151,13 @@ def render_write_test_section() -> None:
             )
             return
 
+        max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
+        if max_power_kw <= 0.0:
+            st.warning(power_limit_unknown_notice())
         selected = _render_probe_table(
             fields,
             targets=targets,
-            max_power_kw=float(config.get_battery_params().get("max_power_kw") or 0.0),
+            max_power_kw=max_power_kw,
             ev_nominal_a=default_ev_nominal_a(),
             force_ess_active=force,
             disabled=silent,

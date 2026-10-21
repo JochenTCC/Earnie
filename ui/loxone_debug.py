@@ -163,6 +163,38 @@ def _render_live_reads_fragment() -> None:
         )
 
 
+def _local_receipt_time(raw: object) -> str:
+    """Inbox ``last_ts`` (UTC ISO) as naive local ISO seconds; empty when unknown."""
+    try:
+        stamp = datetime.fromisoformat(str(raw))
+    except (TypeError, ValueError):
+        return ""
+    if stamp.tzinfo is not None:
+        stamp = stamp.astimezone().replace(tzinfo=None)
+    return stamp.isoformat(timespec="seconds")
+
+
+def _ha_push_read_info() -> dict[str, tuple[str, str]]:
+    """Qualified id → (push state, last receipt) for every activated HA read signal."""
+    from integrations.ha_push_read import (
+        load_house_components_for_ha,
+        push_read_qualified_ids,
+    )
+    from runtime_store.ehal_push_inbox import memory_snapshot, read_push_value
+
+    house, components = load_house_components_for_ha()
+    inbox = memory_snapshot()
+    info: dict[str, tuple[str, str]] = {}
+    for qid in sorted(set(push_read_qualified_ids(house, components).values())):
+        _value, state = read_push_value(qid)
+        row = inbox.get(qid)
+        info[qid] = (
+            state,
+            _local_receipt_time(row.get("last_ts")) if isinstance(row, dict) else "",
+        )
+    return info
+
+
 @st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
 def _render_ehal_telemetry_fragment() -> None:
     reload_runtime_config()
@@ -192,6 +224,9 @@ def _render_ehal_telemetry_fragment() -> None:
         house = load_house_profiles()
         telemetry_payload = expand_ha_telemetry_for_live(telemetry_payload, house)
         expected = expected_live_read_fields(network_backend=False)
+        push_info = _ha_push_read_info()
+    else:
+        push_info = None
     from ui.ehal_live_read_style import style_live_read_rows
 
     st.dataframe(
@@ -201,6 +236,7 @@ def _render_ehal_telemetry_fragment() -> None:
                 read_at,
                 mapping=mapping,
                 expected_fields=expected,
+                push_info=push_info,
             )
         ),
         width="stretch",

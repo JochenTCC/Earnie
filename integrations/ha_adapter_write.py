@@ -167,6 +167,7 @@ class HaWriteMixin:
         self._write_ess_setpoints(doc, outcome)
         self._write_evcs_setpoints(doc, outcome)
         self._last_skipped = list(outcome.skipped)
+        self._last_unconfigured = list(outcome.unconfigured)
 
         if not outcome.failed:
             self._last_write_error = None
@@ -213,6 +214,7 @@ class HaWriteMixin:
                 if "ess" in key or key.startswith("set_ess"):
                     outcome.flip_ess = True
         self._last_skipped = list(outcome.skipped)
+        self._last_unconfigured = list(outcome.unconfigured)
         if not outcome.failed:
             self._last_write_error = None
             return None

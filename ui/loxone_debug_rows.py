@@ -324,7 +324,14 @@ def build_telemetry_rows(
     mapping: dict[str, str] | None = None,
     expected_fields: list[str] | None = None,
     backend: str | None = None,
+    push_info: dict[str, tuple[str, str]] | None = None,
 ) -> list[dict[str, str]]:
+    """Live-Lesen rows. ``push_info``: qualified id → (push state, last receipt) for HA.
+
+    HA bindings carry no entity ids (activation keys only), so "mapped" cannot come
+    from ``mapping``; an activated push signal shows its inbox state and receipt time.
+    """
+    push = push_info or {}
     source: dict[str, str] = {}
     for k, v in (mapping or {}).items():
         key = canonicalize_live_display_field(str(k), has_batteries=False)
@@ -350,7 +357,13 @@ def build_telemetry_rows(
         if not is_live_read_field(field):
             continue
         mapped = mapping_or_dash(source, field)
-        if field in present:
+        seen_at = read_at
+        if field in push:
+            state, last_seen = push[field]
+            wert = str(present[field]) if field in present else ""
+            status = state
+            seen_at = last_seen or read_at
+        elif field in present:
             wert = str(present[field])
             status = "OK" if mapped else "Kein Mapping"
         else:
@@ -363,7 +376,7 @@ def build_telemetry_rows(
                     "Wert": wert,
                     "Status": status,
                     "Detail": "",
-                    "Zuletzt gelesen": read_at,
+                    "Zuletzt gelesen": seen_at,
                 },
                 backend=hub,
                 value_space="ehal",

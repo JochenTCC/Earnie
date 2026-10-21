@@ -28,6 +28,7 @@ from integrations.ehal_live_records import (  # noqa: F401 — façade re-export
     SKIPPED_MESSAGE,
     WRITE_ERROR_FILENAME,
     _last_skipped,
+    _last_unconfigured,
     build_ehal_write_records,
     clear_write_error,
     load_write_error,
@@ -475,6 +476,7 @@ def write_ess_setpoints_from_control(
         written_at=ts,
         error=error,
         skipped=_last_skipped(adapter),
+        unconfigured=_last_unconfigured(adapter),
     )
     return error, records
 
@@ -624,6 +626,7 @@ def write_evcs_max_current_from_consumers(
         written_at=ts,
         error=error,
         skipped=_last_skipped(adapter),
+        unconfigured=_last_unconfigured(adapter),
     )
     return error, records
 

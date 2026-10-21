@@ -146,6 +146,7 @@ def write_inv_ac_limits_from_plan(
             written_at=ts,
             error=error,
             skipped=live._last_skipped(adapter),
+            unconfigured=live._last_unconfigured(adapter),
         )
 
     from integrations.loxone_writes import write_inv_ac_power_limits
