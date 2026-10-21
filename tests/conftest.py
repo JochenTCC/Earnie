@@ -185,6 +185,37 @@ def _restore_default_test_config_after_test():
 
 
 @pytest.fixture(autouse=True)
+def _isolated_runtime_dir(tmp_path_factory):
+    """Give every test its own runtime dir and drop process-wide runtime caches.
+
+    Without it all tests of a worker (and all xdist workers) share the default runtime
+    path: the push inbox, the publish ledger and the state files then leak between
+    tests (intermittent failures that depend on the order). Tests that need a specific
+    runtime dir still set ``EARNIE_RUNTIME_PATH`` themselves — that overrides this.
+    Plain ``os.environ`` (no ``monkeypatch``) for the same teardown-order reason as above.
+    """
+    if os.getenv(_USE_LIVE_CONFIG_ENV) == "1":
+        yield
+        return
+    from integrations import ehal_write
+    from runtime_store import ehal_push_inbox
+
+    previous = os.environ.get("EARNIE_RUNTIME_PATH")
+    os.environ["EARNIE_RUNTIME_PATH"] = str(tmp_path_factory.mktemp("runtime"))
+    ehal_push_inbox.reset_memory_for_tests()
+    ehal_write.clear_published_for_tests()
+    try:
+        yield
+    finally:
+        ehal_push_inbox.reset_memory_for_tests()
+        ehal_write.clear_published_for_tests()
+        if previous is None:
+            os.environ.pop("EARNIE_RUNTIME_PATH", None)
+        else:
+            os.environ["EARNIE_RUNTIME_PATH"] = previous
+
+
+@pytest.fixture(autouse=True)
 def _clear_thermal_year_caches():
     """Year-model memo is process-wide; a monkeypatched loader must not see old hits."""
     from optimizer.thermal_year_cache import clear_year_model_caches
