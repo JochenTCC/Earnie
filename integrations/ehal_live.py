@@ -519,10 +519,16 @@ def push_safe_setpoints_on_startup() -> None:
     if config.is_loxone_silent_mode():
         logger.info("Silent-Modus: Safe setpoint startup push übersprungen.")
         return
-    if is_ehal_network_backend():
-        _push_safe_setpoints_network()
-    else:
-        _push_safe_setpoints_loxone()
+    try:
+        if is_ehal_network_backend():
+            _push_safe_setpoints_network()
+        else:
+            _push_safe_setpoints_loxone()
+    except Exception:
+        # main.py does not log fatal startup errors; without this the daemon dies
+        # with the traceback only on stderr and ``earnie.log`` just stops.
+        logger.exception("Startup: sichere Sollwerte fehlgeschlagen — main.py bricht ab.")
+        raise
 
 
 def _push_safe_setpoints_network() -> None:

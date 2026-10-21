@@ -178,6 +178,26 @@ def test_push_safe_setpoints_on_startup_network(config_mock, ess_mock, evcs_mock
     evcs_mock.assert_called_once_with({})
 
 
+@patch("integrations.ehal_live.write_ess_setpoints_from_control")
+@patch("integrations.ehal_live.config")
+def test_push_safe_setpoints_on_startup_logs_and_reraises(config_mock, ess_mock, caplog):
+    # HA testbed F2: a startup crash must reach earnie.log, not only stderr.
+    ehal_live.reset_adapter_cache()
+    config_mock.is_loxone_silent_mode.return_value = False
+    config_mock.get.side_effect = lambda key, default=None: {
+        "EHAL_BACKEND": "openems",
+    }.get(key, default)
+    ess_mock.side_effect = ValueError("ehal.backend=ha requires EHAL_HA_BASE_URL")
+    _clear_safe_setpoints_skip_env()
+    with caplog.at_level("ERROR", logger=ehal_live.logger.name):
+        with pytest.raises(ValueError, match="EHAL_HA_BASE_URL"):
+            ehal_live.push_safe_setpoints_on_startup()
+    assert any(
+        "sichere Sollwerte fehlgeschlagen" in rec.getMessage() and rec.exc_info
+        for rec in caplog.records
+    )
+
+
 @patch("integrations.ehal_live.write_flexible_consumer_states")
 @patch("integrations.ehal_live.write_huawei_modbus_states")
 @patch("integrations.ehal_live.config")
