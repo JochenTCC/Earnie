@@ -24,6 +24,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
 - [ ] **Live golden dump (private REG):** when the fixed version is running on productive NAS, capture a debug dump (with `recorder/`) around a cheap-slot Delta 3 refill and intake as a private golden case confirming charge ≤ HK ∩ live (Delta 3 standby HK/live limits fix; verified 2026-10-21).
+- [ ] **Close GitHub #42** after the reporter confirms Haus Wärme is selectable on a non–Verbraucher-1 slot (e.g. Verbraucher 7) on a build ≥ `2.7.0-alpha` / next pre-release. Fix already verified in archive (2026-10-18); see [Backlog-Erledigt.md](Backlog-Erledigt.md) „Haus Wärme type after Loxone consumer import“.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
