@@ -22,7 +22,6 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 
 - [x] Dogfood greenfield Earnie configuration for a Loxone SB
 - [ ] Rename "PV-Anlage" and similar namings to "PV-Felder" in UI and docs - ask if you are not sure
-- [ ] **LoxBerry plugin ZIP — ship Versionsvariante UI strings** `[qual]`: rebuild and publish a new plugin ZIP after the rename Versionskanal → Versionsvariante (`packaging/loxberry/templates/lang/language_{de,en}.ini`, docs). Bump `plugin.cfg` `VERSION` (currently `0.2.0`), package per [`packaging/loxberry/README.md`](../packaging/loxberry/README.md) (7-Zip / `zip` with `/` separators), attach to the GitHub Release / update `release.cfg` as usual. Existing installs only pick up the new labels via this Plugin-ZIP (not via Earnie image pull).
 - [ ] **earnie-server endpoints: hard-code in the code instead of `.env`.** Server is reachable at `cloudserver.earnie-hems.com` (DNS A-record, port 8787, plain HTTP for now).
   - Remove `EARNIE_USAGE_PING_URL` and `EARNIE_REVIEW_URL` from `.env` (`greenfield/config/.env`, example files) and stop reading them in `runtime_store/usage_ping.py` and `runtime_store/feature_review.py`.
   - Store the URLs as constants in one central place, split into **server base** (scheme + subdomain + port, e.g. `http://cloudserver.earnie-hems.com:8787`) and **one path constant per area** (`/ping`, `/review`); the full URL is composed from base + path. A new area later means one new path constant only. Switching to HTTPS via Caddy (no port) then changes the base in one place.

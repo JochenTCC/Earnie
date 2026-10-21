@@ -107,7 +107,7 @@ Der Link „Earnie öffnen“ folgt dem konfigurierten Port.
 
 | Aktion                                                                      | Was sich ändert                                                                                                           |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| LoxBerry AutoUpdate / neues Plugin-ZIP (`plugin.cfg` `AUTOMATIC_UPDATES`)   | Verwaltungsskripte, WebUI, Compose-Wrapper (`plugin.cfg` VERSION, z. B. `0.2.0`); das Earnie-Image bleibt **unverändert** |
+| LoxBerry AutoUpdate / neues Plugin-ZIP (`plugin.cfg` `AUTOMATIC_UPDATES`)   | Verwaltungsskripte, WebUI, Compose-Wrapper (`plugin.cfg` VERSION, z. B. `0.2.1`); das Earnie-Image bleibt **unverändert** |
 | Versionsvariante / `EARNIE_AUTO_UPDATE` / „Image aktualisieren“ / `earnie_ctl.sh pull` | lädt `ghcr.io/jochentcc/earnie-energy` gemäß Variante (`:latest` / `:next` / `:Version`) und startet den Container neu |
 
 

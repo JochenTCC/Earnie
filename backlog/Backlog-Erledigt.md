@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### LoxBerry plugin ZIP (2026-10-21)
+
+- [x] **LoxBerry plugin ZIP — ship Versionsvariante UI strings** `[qual]`: rebuild and publish plugin ZIP `0.2.1` after the rename Versionskanal → Versionsvariante (`packaging/loxberry/templates/lang/language_{de,en}.ini`, docs). Bump `plugin.cfg` / `release.cfg` / `prerelease.cfg` `VERSION`, package per [`packaging/loxberry/README.md`](../packaging/loxberry/README.md) (7-Zip / `zip` with `/` separators), GitHub Release `loxberry-plugin-v0.2.1`. Existing installs only pick up the new labels via this Plugin-ZIP (not via Earnie image pull).
+
 ### Bugfix — SE sunrise windows: day gaps / double booking and foresight merge lost flex energy (2026-10-20)
 
 - [x] **SE sunrise book chain + foresight merge** — **Verified** (2026-10-20; greenfield 12-month SE, 3 scenarios)
