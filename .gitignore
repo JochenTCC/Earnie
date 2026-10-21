@@ -98,3 +98,11 @@ modbus_scan.py
 earnie_shadow/
 # Local shadow-feed JSONL dumps under backtesting fixtures (live writer; not golden data)
 tests/fixtures/backtesting/shadow_feed/
+
+# HA lab / HA testbed runtime data (keep only the .gitkeep placeholders)
+ha_lab/config/*
+!ha_lab/config/.gitkeep
+ha_lab/runtime/*
+!ha_lab/runtime/.gitkeep
+ha_lab/homeassistant/*
+!ha_lab/homeassistant/.gitkeep
