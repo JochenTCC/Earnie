@@ -4,13 +4,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from runtime_store.env_vars import read_env
 from runtime_store.persist_paths_base import feature_reviews_state_file
+from runtime_store.server_endpoints import PATH_REVIEW, post_json, resolve_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +26,6 @@ MAX_RATINGS = 3
 TIMEOUT_SEC = 5.0
 
 Transport = Callable[[str, bytes, float], int]
-
-
-def endpoint_url_from_env() -> str:
-    return read_env("REVIEW_URL")
 
 
 def _utc_now(now: datetime | None = None) -> datetime:
@@ -127,20 +121,7 @@ def build_payload(
 
 
 def _default_transport(url: str, body: bytes, timeout: float) -> int:
-    request = urllib.request.Request(
-        url,
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return int(response.getcode())
-    except urllib.error.HTTPError as exc:
-        return int(exc.code)
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
-        logger.warning("feature_review: transport failed: %s", exc)
-        return 0
+    return post_json(url, body, timeout, log_name="feature_review")
 
 
 def send_review(
@@ -152,11 +133,7 @@ def send_review(
     endpoint_url: str | None = None,
 ) -> None:
     """POST review payload. Raises ValueError/RuntimeError on failure (no silent skip)."""
-    url = (endpoint_url if endpoint_url is not None else endpoint_url_from_env()).strip()
-    if not url and transport is None:
-        raise RuntimeError(
-            "EARNIE_REVIEW_URL is unset; cannot send feature review"
-        )
+    url = resolve_endpoint(PATH_REVIEW, endpoint_url)
     payload = build_payload(review_id=review_id, ratings=ratings, comment=comment)
     body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     send = transport if transport is not None else _default_transport

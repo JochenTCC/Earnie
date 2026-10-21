@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from runtime_store import feature_review
+from runtime_store.server_endpoints import PATH_REVIEW, url_for
 
 
 @pytest.fixture
@@ -66,8 +67,26 @@ def test_mark_and_is_review_done(review_state: Path) -> None:
     assert data["scenario_explorer"]["done_at"]
 
 
-def test_send_review_requires_url() -> None:
-    with pytest.raises(RuntimeError, match="EARNIE_REVIEW_URL"):
+def test_send_review_default_endpoint_is_composed_base_plus_review(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(feature_review, "_app_version", lambda: "2.7.0")
+    sent: list[tuple[str, bytes]] = []
+
+    def _transport(url: str, body: bytes, timeout: float) -> int:
+        sent.append((url, body))
+        return 204
+
+    feature_review.send_review(
+        review_id="scenario_explorer",
+        ratings=[5],
+        transport=_transport,
+    )
+    assert sent[0][0] == url_for(PATH_REVIEW)
+
+
+def test_send_review_blank_override_raises() -> None:
+    with pytest.raises(ValueError, match="endpoint_url"):
         feature_review.send_review(
             review_id="scenario_explorer",
             ratings=[5],

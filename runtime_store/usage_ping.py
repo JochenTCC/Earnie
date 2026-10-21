@@ -12,12 +12,11 @@ import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Literal
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 
 from runtime_store.env_vars import read_env
 from runtime_store.install_context import detect_install_context
 from runtime_store.persist_paths import usage_ping_state_file
+from runtime_store.server_endpoints import PATH_PING, post_json, resolve_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -122,10 +121,6 @@ def save_state(state: dict[str, Any]) -> None:
 
 def is_kill_switch_off() -> bool:
     return read_env("USAGE_PING").lower() == "off"
-
-
-def endpoint_url_from_env() -> str:
-    return read_env("USAGE_PING_URL")
 
 
 def set_consent(value: Literal["on", "off"], *, now: datetime | None = None) -> dict[str, Any]:
@@ -243,20 +238,7 @@ def preview_payload(state: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 def _default_transport(url: str, body: bytes, timeout: float) -> int:
-    request = urllib_request.Request(
-        url,
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib_request.urlopen(request, timeout=timeout) as response:
-            return int(response.getcode())
-    except urllib_error.HTTPError as exc:
-        return int(exc.code)
-    except (urllib_error.URLError, TimeoutError, OSError, ValueError) as exc:
-        logger.warning("usage_ping: transport failed: %s", exc)
-        return 0
+    return post_json(url, body, timeout, log_name="usage_ping")
 
 
 def _should_attempt(state: dict[str, Any], now: datetime) -> bool:
@@ -292,11 +274,8 @@ def maybe_send_ping(
     if force and (is_kill_switch_off() or str(state.get("consent") or "unset") != "on"):
         return False
 
-    url = (endpoint_url if endpoint_url is not None else endpoint_url_from_env()).strip()
+    url = resolve_endpoint(PATH_PING, endpoint_url)
     send = transport if transport is not None else _default_transport
-    if not url and transport is None:
-        logger.warning("usage_ping: EARNIE_USAGE_PING_URL unset; skip send")
-        return False
 
     try:
         payload = build_payload(state)

@@ -21,14 +21,14 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 - **Note (deferred from 2.7.n):** Plant PV sum stays bare `sens_pv_production_active`; first entity-scoped `pv.{pv_system_id}.sens_pv_production_active` shipped with live attribution (Inverter follow-ups). Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
 
 - [x] Dogfood greenfield Earnie configuration for a Loxone SB
-- [ ] **LoxBerry plugin ZIP — ship Versionsvariante UI strings** `[qual]`: rebuild and publish a new plugin ZIP after the rename Versionskanal → Versionsvariante (`packaging/loxberry/templates/lang/language_{de,en}.ini`, docs). Bump `plugin.cfg` `VERSION` (currently `0.2.0`), package per [`packaging/loxberry/README.md`](../packaging/loxberry/README.md) (7-Zip / `zip` with `/` separators), attach to the GitHub Release / update `release.cfg` as usual. Existing installs only pick up the new labels via this Plugin-ZIP (not via Earnie image pull).
-- [ ] **earnie-server endpoints: hard-code in the code instead of `.env`.** Server is reachable at `cloudserver.earnie-hems.com` (DNS A-record, port 8787, plain HTTP for now).
-  - Remove `EARNIE_USAGE_PING_URL` and `EARNIE_REVIEW_URL` from `.env` (`greenfield/config/.env`, example files) and stop reading them in `runtime_store/usage_ping.py` and `runtime_store/feature_review.py`.
-  - Store the URLs as constants in one central place, split into **server base** (scheme + subdomain + port, e.g. `http://cloudserver.earnie-hems.com:8787`) and **one path constant per area** (`/ping`, `/review`); the full URL is composed from base + path. A new area later means one new path constant only. Switching to HTTPS via Caddy (no port) then changes the base in one place.
-  - Keep the injectable `endpoint_url` / transport parameters so tests stay offline; adapt `tests/test_usage_ping.py`, `tests/test_usage_points.py`, `tests/test_feature_review.py` (no more env-based URL setup).
-  - Behaviour change to settle: today a missing URL means "no-op with WARNING" (ping) and "error in dialog" (review). With a fixed URL these cases disappear; opt-out stays via consent / `EARNIE_USAGE_PING=off`.
-  - Update docs: `docs/einrichtung/betrieb.md` (env table, feedback section), `docs/einrichtung/private-env.md`, `docs/workflow/usage-ping.md`, `docs/workflow/feature-review.md`.
 
+- [ ] **earnie-server: switch the client to HTTPS** `[qual]` — *before the next release; pings and reviews to the old URL fail.* The server on the easyname VPS (Debian 12) now answers via Caddy at `https://cloudserver.earnie-hems.com` (port 443, Let's Encrypt certificate; verified `POST /ping` → `204`). The receiver listens only on `127.0.0.1:8787` and port 8787 is closed in the firewall, so `http://cloudserver.earnie-hems.com:8787` is **no longer reachable**.
+  - Set `SERVER_BASE = "https://cloudserver.earnie-hems.com"` (no port) in `runtime_store/server_endpoints.py`; keep `PATH_PING` / `PATH_REVIEW` unchanged. Adjust the module docstring (the "switching to HTTPS changes `SERVER_BASE` only" note becomes the current state).
+  - Adapt tests that assert the production URL (`tests/test_usage_ping.py`, `tests/test_feature_review.py`, and a test for `server_endpoints.url_for` if present) to the `https://…/ping` and `https://…/review` URLs.
+  - Docs: `docs/einrichtung/betrieb.md` (lines naming `http://cloudserver.earnie-hems.com:8787/ping` and `/review`), plus `docs/workflow/usage-ping.md` and `docs/workflow/feature-review.md` if they show the old example URL.
+  - Check TLS handling in the HTTP client: certificate verification stays on (no `verify=False`), the 5 s timeout still applies, and a certificate error is logged loud (no silent fallback to HTTP).
+  - Acceptance: with consent on, a real ping and a review from Earnie arrive on the server (`/srv/earnie-data/usage_daily.csv`, `reviews.jsonl`).
+  - Note (server side, separate item if it matters): behind Caddy all requests reach the receiver from `127.0.0.1`, so the per-IP rate limit (60/min) is effectively global; real fix = read `X-Forwarded-For` in `earnie-server`.
 - [ ] Release for Loxone
 - [ ] Dogfood and finalize new HA binding
 - [ ] alpha release for HA

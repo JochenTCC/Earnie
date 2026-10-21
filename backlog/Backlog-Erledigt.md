@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.7 — earnie-server endpoints hard-coded (2026-10-21)
+
+- [x] **earnie-server endpoints: hard-code in the code instead of `.env`** `[qual]`: production base `http://cloudserver.earnie-hems.com:8787` plus path constants `/ping` and `/review` in `runtime_store/server_endpoints.py`; clients compose via `resolve_endpoint`. Removed `EARNIE_USAGE_PING_URL` / `EARNIE_REVIEW_URL` from env reads and local `.env`. Injectable `endpoint_url` / `transport` kept for offline tests. Opt-out remains consent / `EARNIE_USAGE_PING=off`. Docs: `betrieb.md`, `private-env.md`, `docs/workflow/usage-ping.md`, `docs/workflow/feature-review.md`.
+
+### LoxBerry plugin ZIP (2026-10-21)
+
+- [x] **LoxBerry plugin ZIP — ship Versionsvariante UI strings** `[qual]`: rebuild and publish plugin ZIP `0.2.1` after the rename Versionskanal → Versionsvariante (`packaging/loxberry/templates/lang/language_{de,en}.ini`, docs). Bump `plugin.cfg` / `release.cfg` / `prerelease.cfg` `VERSION`, package per [`packaging/loxberry/README.md`](../packaging/loxberry/README.md) (7-Zip / `zip` with `/` separators), GitHub Release `loxberry-plugin-v0.2.1`. Existing installs only pick up the new labels via this Plugin-ZIP (not via Earnie image pull).
+
 ### Version 2.7 — Rename PV-Anlage to PV-Feld / PV-Felder (2026-10-21)
 
 - [x] **Rename "PV-Anlage" and similar namings to "PV-Felder" in UI and docs** `[qual]`: singular **PV-Feld**, catalog/tab/multiselect **PV-Felder**. UI (Hauskonfigurator, PV form, scenario editor, Sankey, Earnie-Points), user-visible errors, schema descriptions, user docs, README, LICENSE. Unchanged: JSON keys (`pv_systems`, `pv_system_ids`), slug `pv_anlage`, Loxone meter titles, tariff-catalog legal wording, historical archive / `docs/dev/done`. Handbook heading keeps `<a id="pv-anlagen"></a>`.
@@ -25,7 +33,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - Domain: `cloudserver.earnie-hems.com` (DNS A-record on the `earnie-hems.com` subdomain) reaches the server; plain HTTP for now.
   - Data access: Samba share `[earnie]` on `/srv/earnie-data`; port 445 restricted by `ufw` to the maintainer's home IP, 8787 open.
   - Deploy process: tar the `earnie-server` repo (without `.git`), `scp` to the server, unpack to `/opt/earnie-server`, `systemctl restart earnie-server`.
-  - Not done / follow-ups: HTTPS via Caddy (ports 80/443), hard-coded endpoints instead of `.env` (open item in [Backlog.md](Backlog.md), Version 2.7), "Savings KPI" as additional payload (own open item under Version 2.+1 in [Backlog.md](Backlog.md)).
+  - Not done / follow-ups: HTTPS via Caddy (ports 80/443); "Savings KPI" as additional payload (own open item under Version 2.+1 in [Backlog.md](Backlog.md)). Hard-coded client endpoints → done 2026-10-21 (see archive entry above).
 
 ### Bugfix — SE consumption accounting: native pool filter never booked, Jahres Verbrauch from mixed sources (2026-10-20)
 

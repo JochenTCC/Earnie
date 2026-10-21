@@ -189,8 +189,6 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_OFFLINE`                        | `1` = keine Loxone-/Live-Verbindung erforderlich. Der Bootstrap füllt leere Entitäts-IDs im Live-Szenario aus den Katalogen. Sinnvoll für die Streamlit Community Cloud. |
 | `EARNIE_CLOUD_DEMO`                     | `1` = Betrieb in der Streamlit Community Cloud. Pro Browser-Sitzung gibt es einen leeren Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator und einen Willkommenshinweis. Einen Offline-Demo-Seed gibt es nicht. Typisch zusammen mit `EARNIE_OFFLINE=1`. |
 | `EARNIE_USAGE_PING`                     | `off` = Kill-Switch: Es wird **nichts** gesendet, auch wenn die Zustimmung in der UI eingeschaltet ist. Andere Werte bzw. nicht gesetzt: Kill-Switch aus, die Zustimmung steuert. Siehe [Nutzungsstatistik](#nutzungsstatistik). |
-| `EARNIE_USAGE_PING_URL`                 | HTTPS-URL des Zähler-Endpunkts (`POST`). Ohne URL und ohne internen Transport wird nichts gesendet (WARNING im Log); die Optimierung bleibt unverändert. |
-| `EARNIE_REVIEW_URL`                     | HTTPS- oder HTTP-URL des anonymen Feedback-Endpunkts (`POST`). Earnie nutzt sie, wenn im Szenario-Explorer-Dialog eine Sternebewertung gesendet wird (siehe [Feedback zum Szenario-Explorer](#feedback-zum-szenario-explorer)). Ohne URL schlägt das Senden mit einer Fehlermeldung im Dialog fehl; die Optimierung bleibt unverändert. |
 
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../dev/streamlit-ports.md).
@@ -204,6 +202,7 @@ Ab Version 2.7 kann Earnie optional und anonym melden, dass eine Installation ak
 - Beim ersten Öffnen des **Szenario-Explorers** erscheint ein Dialog (ohne `scenario_explorer` in `EARNIE_UI_MODES`: beim **Szenarienkonfigurator**).
 - Unter **Daemon Control → Optimierer-Dienst** können Sie die Zustimmung jederzeit umschalten.
 - Unter **Was wird gesendet?** sehen Sie die exakte JSON-Vorschau.
+- Der Endpunkt ist fest in der App hinterlegt (`https://cloudserver.earnie-hems.com/ping`).
 - Ein fehlgeschlagener Ping hat **keinen Einfluss** auf die Optimierung.
 
 **Was wird gesendet** (feste Feldliste, sonst nichts):
@@ -265,7 +264,7 @@ Wurde in einer Sitzung eine Simulation im **Szenario-Explorer** gestartet, kann 
 - **Inhalt:** Drei Fragen mit 1 bis 5 Sternen und ein optionaler Kommentar (max. 500 Zeichen).
 - **Was wird gesendet:** nur die Sternebewertungen, der Kommentar und die Earnie-Version. Konfiguration, Zugangsdaten, Geräte-, Preis- und Standortdaten werden nicht gesendet.
 - **Einmalig:** Nach **Senden** oder **Abbrechen** fragt Earnie auf dieser Installation nicht erneut. Der Zustand liegt in `runtime/feature_reviews.json`.
-- **Endpunkt:** `EARNIE_REVIEW_URL` (siehe [Umgebungsvariablen](#umgebungsvariablen-optional)). Schlägt das Senden fehl, zeigt der Dialog eine Fehlermeldung; die Optimierung ist nicht betroffen.
+- **Endpunkt:** fest in der App hinterlegt (`https://cloudserver.earnie-hems.com/review`). Schlägt das Senden fehl, zeigt der Dialog eine Fehlermeldung; die Optimierung ist nicht betroffen.
 
 ## Debug-Dump
 
