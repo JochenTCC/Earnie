@@ -122,7 +122,7 @@ def _render_lan_subnet_prompt() -> None:
 
 
 def _offer_ha_on_bridge() -> bool:
-    """H8: Docker bridge + not HA add-on → promote HA URL/token without manual pick."""
+    """H8: Docker bridge + not HA add-on → offer Home Assistant without manual pick."""
     if is_homeassistant_addon_context():
         return False
     return is_bridge_network_without_lan_subnet()
@@ -275,10 +275,11 @@ def _render_credentials_step(backend: str) -> None:
 
 
 def _render_bridge_ha_shortcut() -> None:
-    """H8: empty mDNS on Docker bridge → HA URL + token without Manuelle Auswahl."""
+    """H8: empty mDNS on Docker bridge → offer Home Assistant without Manuelle Auswahl."""
     st.info(
-        "Im Docker-Bridge-Netz erreicht mDNS oft kein Home Assistant. "
-        "URL und Long-Lived Token direkt eintragen "
+        "Im Docker-Bridge-Netz erreicht mDNS oft kein Home Assistant. Das ist für Earnie "
+        "unkritisch: Home Assistant ruft Earnie auf, es braucht keine URL und kein Token. "
+        "Home Assistant direkt wählen "
         "(Hinweis in der Doku: *Einrichtung → Container-Betrieb*)."
     )
     render_ha_connection_form(form_key="sb_ha_bridge_form")

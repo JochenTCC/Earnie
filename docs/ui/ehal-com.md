@@ -26,7 +26,7 @@ The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-back
 | Backend        | Storage                                       | Contract UI on this page                                 |
 | -------------- | --------------------------------------------- | ------------------------------------------------------ |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | **Signalliste** (qualified IDs · Pflicht/aktiviert · match · VO/VI export) |
-| Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); optional `sign` / `boolean_invert` in `config.json` → `ehal.ha` (no `transport` — push-only) | **Signalliste** + **HA YAML-Paket** download (`ENTITY_*` · periodic push · `status.json`) |
+| Home Assistant | no credentials in Earnie (HA calls Earnie); optional `sign` / `boolean_invert` in `config.json` → `ehal.ha` (no `transport` — push-only) | **Signalliste** + **HA YAML-Paket** download (`ENTITY_*` · periodic push · `status.json`) |
 | OpenEMS        | `config.json` → `ehal.openems`                | **Signalliste** (credentials on Smarthome-Backend) |
 
 

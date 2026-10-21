@@ -48,7 +48,7 @@ Earnie speichert keine HA-`entity_id`s. Die Komponenten tragen unter `ehal_bindi
 
 **Ablauf:**
 
-1. Auf **Daemon Control → Smarthome-Backend** das Backend **Home Assistant** wählen und URL/Token eintragen. Die Seite setzt `ehal.backend=ha` und schreibt `EHAL_HA_*` in `config/.env`. Alternativ `ehal.backend` aus dem Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) übernehmen und die Zugangsdaten in `.env` setzen. Im Add-on übernimmt der Supervisor-Proxy URL und Token ([Home-Assistant-Add-on](homeassistant-addon.md)).
+1. Auf **Daemon Control → Smarthome-Backend** das Backend **Home Assistant** wählen. Die Seite setzt `ehal.backend=ha`. Earnie braucht **keine** HA-URL und kein Long-Lived Token: Home Assistant ruft Earnie auf (Telemetrie-Push und `status.json`), Earnie ruft die HA-API nie auf. Alternativ `ehal.backend` aus dem Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) übernehmen. Alte `EHAL_HA_*`-Einträge in `config/.env` werden nicht mehr gebraucht.
 2. Haus und Komponenten im **Hauskonfigurator** speichern. Earnie aktiviert dabei die Pflichtsignale als leere Schlüssel in `ehal_bindings`. Für jede netzgekoppelte Hausbatterie gehört dazu auch die **Batterieleistung** (`ess.<id>.sens_ess_power`): Earnie leitet daraus die Anlagen-Batterieleistung ab, ohne sie bricht Live-Lesen ab. Bei einer bestehenden Konfiguration ergänzt die **Konfigurations-Migration** das Signal; danach das YAML-Paket neu herunterladen und den neuen Platzhalter `ENTITY_ess_<id>_sens_ess_power` belegen.
 3. Auf **Daemon Control → EHAL-Com** die **Signalliste** prüfen. Die Liste zeigt den Signalvertrag: Pflicht, optional, aktiviert und Match-Status. Optionale Signale lassen sich dort zu- und abschalten.
 4. Unter **HA Push-Carrier** das **YAML-Paket** herunterladen. Es enthält `ENTITY_*`-Platzhalter, den periodischen Push, den Heartbeat und den Abruf von `status.json`.
@@ -96,7 +96,7 @@ Pro physischem Bus bzw. Gerät gibt es genau **einen** schreibenden Southbound-O
 
 ## Pfad B (bestehendes HA)
 
-1. Earnie so betreiben, dass Home Assistant den Daemon-Port `8541` erreicht und Earnie die HA-URL erreicht (Docker-Netz / Host-IP). Den Push-Token setzen.
+1. Earnie so betreiben, dass Home Assistant den Daemon-Port `8541` erreicht (Docker-Netz / Host-IP). Earnie muss Home Assistant nicht erreichen. Den Push-Token setzen.
 2. Signalliste und YAML-Paket wie oben nutzen: native HA-Entities (Long-Tail) in die `ENTITY_*`-Platzhalter eintragen, evcc optional.
 3. Dieselbe Checkliste zur Optimizer-Exklusivität und die Modbus-Regel anwenden.
 

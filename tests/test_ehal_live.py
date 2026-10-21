@@ -329,3 +329,22 @@ def test_read_absent_mode_unbound():
         value, bound = ehal_live.read_absent_mode()
     assert value is None
     assert bound is False
+
+
+@patch("integrations.ehal_live.config")
+def test_get_ha_adapter_needs_no_url_or_token(config_mock, monkeypatch):
+    # HA testbed F1: push-only HA never calls the HA API; the adapter must build
+    # without EHAL_HA_BASE_URL / EHAL_HA_TOKEN instead of killing main.py at start.
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    monkeypatch.delenv("EARNIE_INSTALL_CONTEXT", raising=False)
+    config_mock.get.side_effect = lambda key, default=None: {
+        "EHAL_BACKEND": "ha",
+        "EHAL_ADAPTER_ID": "earnie-hems",
+        "EHAL_HA_BASE_URL": "",
+        "EHAL_HA_TOKEN": "",
+    }.get(key, default)
+    ehal_live.reset_adapter_cache()
+    adapter = ehal_live.get_ha_adapter()
+    assert adapter.cfg.base_url == ""
+    assert adapter.cfg.token == ""
+    ehal_live.reset_adapter_cache()

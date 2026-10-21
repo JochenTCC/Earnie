@@ -15,7 +15,7 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 1. **Konfiguration anlegen:** Der Bootstrap erzeugt aus `share/config/config.example.json` die Datei `earnie_env/config/config.json` (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime` ausführen. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
 2. **Smarthome-Backend wählen:** Standard ist Loxone, alternativ HA+evcc oder OpenEMS-Lab ([Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md)). Auswahl und Zugangsdaten stehen in der UI unter [Smarthome-Backend](ui/smarthome-backend.md).
    - **Loxone:** `.env.example` nach `earnie_env/config/.env` kopieren und `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` eintragen. Im Docker-Betrieb legt der Entrypoint die `.env` im Config-Volume an.
-   - **Home Assistant:** URL und Token in `config/.env` eintragen (`EHAL_HA_*`).
+   - **Home Assistant:** Backend wählen, dann das YAML-Paket aus EHAL-Com in Home Assistant einbinden. Earnie braucht keine HA-URL und kein Token (Home Assistant ruft Earnie auf).
 3. **Felder zuordnen:**
    - **Loxone:** Merker in `plant.ehal_bindings` bzw. im Hausprofil über **EHAL-Com** zuordnen ([Loxone-Signale und Earnie-Library](referenz/loxone-signals.md)).
    - **Home Assistant:** Entities auf [EHAL-Com](ui/ehal-com.md) den EHAL-Feldern zuordnen, je Entität in `plant` bzw. `consumers[].ehal_bindings`.

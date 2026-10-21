@@ -46,21 +46,15 @@ def get_openems_adapter() -> OpenemsAdapter:
 
 
 def _resolve_ha_credentials() -> tuple[str, str]:
-    """HA base URL and token from config / Supervisor; raises when either is missing."""
+    """HA base URL and token when configured (add-on: Supervisor proxy), else empty.
+
+    HA runs push-only: Home Assistant calls Earnie (``/ehal/telemetry``, ``status.json``)
+    and Earnie never calls the HA API, so neither value is required (HA testbed F1).
+    """
     from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
 
     base_url = resolve_ha_base_url(str(live.config.get("EHAL_HA_BASE_URL") or ""))
     token = resolve_ha_token(str(live.config.get("EHAL_HA_TOKEN") or ""))
-    if not base_url:
-        raise ValueError(
-            "ehal.backend=ha requires EHAL_HA_BASE_URL in config/.env "
-            "(or Supervisor Core URL in the Home Assistant add-on)."
-        )
-    if not token:
-        raise ValueError(
-            "ehal.backend=ha requires EHAL_HA_TOKEN in config/.env, "
-            "or SUPERVISOR_TOKEN when running as the Home Assistant add-on."
-        )
     return base_url, token
 
 

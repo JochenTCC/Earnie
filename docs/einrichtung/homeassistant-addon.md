@@ -66,7 +66,7 @@ Zugangsdaten für Loxone und HA gehören **nicht** in die Supervisor-Optionen. S
 
 ### Home-Assistant-Anbindung im Add-on
 
-Das Manifest setzt `homeassistant_api: true`. Dadurch stellt der Supervisor `SUPERVISOR_TOKEN` bereit und erlaubt den Zugriff auf die Core-API unter `http://supervisor/core`. Die Suche auf der Seite Smarthome-Backend findet diesen lokalen Core ohne mDNS. Für `ehal.backend=ha` reicht die URL `http://supervisor/core`; ein manuelles Long-Lived Access Token ist nicht nötig. Bei leerem Token nutzt Earnie zur Laufzeit `SUPERVISOR_TOKEN`.
+Das Manifest setzt `homeassistant_api: true`. Dadurch stellt der Supervisor `SUPERVISOR_TOKEN` bereit und erlaubt den Zugriff auf die Core-API unter `http://supervisor/core`. Die Suche auf der Seite Smarthome-Backend findet diesen lokalen Core ohne mDNS. Für `ehal.backend=ha` sind weder URL noch Token nötig: Home Assistant ruft Earnie auf, Earnie ruft die HA-API nicht auf. Ein manuelles Long-Lived Access Token wird nicht gebraucht.
 
 Live-Telemetrie und Sollwerte laufen über den **Push-Vertrag** (nicht über REST-Pull von Entity-States):
 

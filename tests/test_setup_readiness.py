@@ -503,9 +503,11 @@ def test_sb_configured_with_ha_backend_credentials(tmp_path, monkeypatch):
     assert setup_readiness.is_sb_configured() is True
 
 
-def test_sb_not_configured_with_ha_backend_missing_token(tmp_path, monkeypatch):
+def test_sb_configured_with_ha_backend_without_url_or_token(tmp_path, monkeypatch):
+    # HA testbed F1: HA is push-only (Home Assistant calls Earnie), so selecting the
+    # backend is enough — no HA URL / token may be required.
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
-    monkeypatch.setenv("EHAL_HA_BASE_URL", "http://homeassistant:8123")
+    monkeypatch.delenv("EHAL_HA_BASE_URL", raising=False)
     monkeypatch.delenv("EHAL_HA_TOKEN", raising=False)
     monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
     _write(
@@ -516,4 +518,4 @@ def test_sb_not_configured_with_ha_backend_missing_token(tmp_path, monkeypatch):
         },
     )
 
-    assert setup_readiness.is_sb_configured() is False
+    assert setup_readiness.is_sb_configured() is True

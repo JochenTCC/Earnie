@@ -38,7 +38,7 @@ Für Home Assistant und OpenEMS liegen passende Snippets unter `share/config/`:
 Die Zugangsdaten für Loxone und HA liegen in `config/.env`:
 
 - **Loxone:** `LOXONE_IP` / `LOXONE_USER` / `LOXONE_PASS`.
-- **HA:** `EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`.
+- **HA:** keine Zugangsdaten in Earnie (Home Assistant ruft Earnie auf; YAML-Paket aus EHAL-Com).
 
 Merker- und Entity-Namen stehen in `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` (Hausprofil bzw. `components.json`). Details: [Loxone-Signale](../referenz/loxone-signals.md), [Home Assistant + evcc](ha-evcc.md).
 

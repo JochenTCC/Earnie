@@ -51,7 +51,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./earnie_env/runtime/`                          | `cons_data.csv`, Zustands-JSONs, Profile, Logs                                                                   |
 | `./earnie_env/runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
-| `./earnie_env/config/.env`                       | Loxone- und HA-Zugangsdaten (`LOXONE_*` / `EHAL_HA_*`); optional `EARNIE_LAN_SUBNET` |
+| `./earnie_env/config/.env`                       | Loxone-Zugangsdaten (`LOXONE_*`); optional `EARNIE_LAN_SUBNET` (für Home Assistant sind keine Zugangsdaten nötig) |
 
 
 Umgebungsvariable in Compose: `EARNIE_ENV_PATH=.`. Daraus leitet Earnie `/app/config` und `/app/runtime` ab; die Host-Mounts lauten `./…/config` → `/app/config` und `./…/runtime` → `/app/runtime`.
@@ -70,7 +70,7 @@ Earnie läuft in Compose **ohne** `network_mode: host`. Die Container-IP liegt t
 
 LoxBerry setzt `EARNIE_LAN_SUBNET` bei Installation und Upgrade aus der Host-IP. Im HA-Add-on ermittelt Earnie die LAN-IP des Hosts über die Supervisor-API (`/network/info`).
 
-**Home Assistant als Backend (nicht Add-on):** Bleibt die Suche leer, auf **Smarthome-Backend** direkt `EHAL_HA_BASE_URL` und Long-Lived Token eintragen, statt auf mDNS zu warten.
+**Home Assistant als Backend (nicht Add-on):** Bleibt die Suche leer, auf **Smarthome-Backend** direkt **Home Assistant** wählen, statt auf mDNS zu warten. URL und Token sind nicht nötig, Home Assistant ruft Earnie auf.
 
 **Miniserver → Earnie (Port 8541):** Der Miniserver muss den Earnie-Host unter einer stabilen Adresse erreichen (`VO_Earnie_Status` / Virtual In → Host:8541). Dazu:
 

@@ -456,7 +456,7 @@ Values in the telemetry URL path must already be in **canonical EHAL units** (§
 
 ### Config and binding UI
 
-- Config: `ehal.backend=ha`; optional `sign` / `boolean_invert` under `ehal.ha` in `config.json`. Snippet: `share/config/ehal.ha.snippet.json` (no `transport`). URL/token in `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`) where the loader / Supervisor proxy still requires them.
+- Config: `ehal.backend=ha`; optional `sign` / `boolean_invert` under `ehal.ha` in `config.json`. Snippet: `share/config/ehal.ha.snippet.json` (no `transport`). No HA URL / token is needed: HA is push-only and Earnie never calls the HA API (legacy `EHAL_HA_*` entries in `config/.env` are ignored, HA testbed F1).
 - Bindings: `plant.ehal_bindings` / `batteries[].ehal_bindings` / `consumers[].ehal_bindings` / `inverters[].ehal_bindings` — **activation keys only** (empty values). Required keys are activated on Hauskonfigurator save (`dm4.required_signal_activation` for existing packs). Earnie stores **no** HA `entity_id`.
 - Contract UI: EHAL-Com **Signalliste** (all backends) + **HA YAML-Paket** download (`ENTITY_*` placeholders, periodic `time_pattern` push, heartbeat, `status.json` REST sensor, setpoint automations including `ha_ess_force`). No HA entity-mapping chapter on EHAL-Com.
 - Live aggregation (`aggregate_ha_entities`): activated keys → push-read / setpoint qualified IDs (plant grid/PV/export, battery `ess.{slug}.*`, inverter `inv.{id}.*`, EV/flex, optional energy counters).

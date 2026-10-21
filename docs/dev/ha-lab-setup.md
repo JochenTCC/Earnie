@@ -154,7 +154,7 @@ Connection refused → HA not ready or wrong port.
 
 ### 2.3 Where Earnie stores the token
 
-- Prefer Streamlit **Daemon Control → Smarthome-Backend** for `ehal.backend=ha` + URL/token (writes `EHAL_HA_*` into `config/.env`; optional `sign` stays in `config.json` → `ehal.ha`). Do **not** set `ehal.ha.transport` (removed).
+- Prefer Streamlit **Daemon Control → Smarthome-Backend** for `ehal.backend=ha` (no URL/token needed — HA is push-only; optional `sign` stays in `config.json` → `ehal.ha`). `EHAL_HA_*` in `.env` is ignored. Do **not** set `ehal.ha.transport` (removed).
 - Activate signals via the Hauskonfigurator (required keys) and the EHAL-Com **Signalliste** (optional toggles). Earnie stores empty activation flags — no HA `entity_id`.
 - Download / generate the **HA YAML package** (§5) and bind real entities in HA by replacing `ENTITY_*`.
 - Or merge [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) for `backend` / `adapter_id` / `sign` only — the snippet has **no** `token` / `base_url` / `transport` keys.
@@ -349,7 +349,7 @@ Either:
 1. **UI (preferred):** **Smarthome-Backend** for `ehal.backend=ha` + URL/token → `config/.env`; optional `ehal.ha.sign`. Activate components in the Hauskonfigurator so required EHAL keys exist.
 2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json` (backend + `sign` only — **no** `transport`). Put URL/token and `EARNIE_PILOT_PUSH_TOKEN` into `ha_lab/config/.env`. Do **not** store HA `entity_id`s in Earnie bindings (activation keys only).
 
-Inside Compose, if `EHAL_HA_*` is set, `EHAL_HA_BASE_URL` is typically:
+Earnie does not need these (HA is push-only). If you still keep `EHAL_HA_BASE_URL` for your own tooling inside Compose, it is typically:
 
 ```text
 http://homeassistant:8123

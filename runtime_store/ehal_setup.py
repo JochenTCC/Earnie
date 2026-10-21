@@ -105,13 +105,9 @@ def active_ehal_backend(raw_config: dict[str, Any] | None = None) -> str:
 
 
 def _ha_credentials_configured(ehal: dict[str, Any]) -> bool:
-    from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
-    from runtime_store.dotenv_io import read_ha_credentials
-
-    base_url_cfg, token_cfg = read_ha_credentials()
-    base_url = resolve_ha_base_url(base_url_cfg)
-    token = resolve_ha_token(token_cfg)
-    return bool(base_url and token)
+    """Home Assistant needs no connection settings in Earnie (push-only, HA calls Earnie)."""
+    del ehal
+    return True
 
 
 def _openems_credentials_configured(ehal: dict[str, Any]) -> bool:

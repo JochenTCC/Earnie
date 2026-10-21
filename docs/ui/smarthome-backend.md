@@ -44,13 +44,13 @@ Speicherorte:
 | Backend        | Ablage                                       |
 | -------------- | ---------------------------------------------- |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) |
-| Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); `sign` in `config.json` → `ehal.ha` |
+| Home Assistant | keine Zugangsdaten (Home Assistant ruft Earnie auf); `sign` in `config.json` → `ehal.ha` |
 | OpenEMS        | `config.json` → `ehal.openems`                |
 
 **Ports:**
 
 - **Loxone:** `LOXONE_IP` darf einen optionalen HTTP-Port enthalten (`192.168.178.1:85`). Ohne Port gilt 80.
-- **Home Assistant und OpenEMS:** Der HTTP-Port steht in der Base-URL (`EHAL_HA_BASE_URL` in `.env` bzw. `ehal.openems.base_url`); ein separates Port-Feld gibt es nicht. Die Defaults enthalten `:8123` (HA) und `:8084` (OpenEMS). Lauscht der Hub auf einem anderen Port, die URL entsprechend anpassen, z. B. `http://homeassistant:8124` oder `http://openems-edge:8085`.
+- **OpenEMS:** Der HTTP-Port steht in der Base-URL (`ehal.openems.base_url`); ein separates Port-Feld gibt es nicht. Der Default enthält `:8084`. Lauscht der Hub auf einem anderen Port, die URL entsprechend anpassen, z. B. `http://openems-edge:8085`. **Home Assistant** braucht keine URL: Home Assistant ruft Earnie auf (Daemon-Port 8541).
 
 Das Speichern der Zugangsdaten setzt `ehal.backend` und schaltet **EHAL-Com** sowie **Optimierer-Dienst** frei.
 
