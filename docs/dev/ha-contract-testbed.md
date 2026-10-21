@@ -1,6 +1,6 @@
 # HA contract testbed — carrier YAML ↔ HouseSim in a real Home Assistant
 
-**Status:** plan (not implemented) — drafted 2026-10-21
+**Status:** plan — drafted 2026-10-21; P1 (archetype generator, WP1) implemented 2026-10-21, P2–P5 open
 **Purpose:** A permanent, reproducible test bench for the Home Assistant push contract (EHAL-Com) without owning a production HA install: generate the carrier YAML from *any* Earnie configuration, derive a matching simulated house from the same configuration, load both into a real HA container and verify the full loop (HA → Earnie telemetry, Earnie → `status.json` → HA setpoints). Secondary use: reproduce customer problems from their configuration pack.
 
 Related: [`house-sim.md`](house-sim.md) (HouseSim S1–S4, contract mode), [`ha-lab-setup.md`](ha-lab-setup.md) (Compose lab), [`../ui/ehal-com.md`](../ui/ehal-com.md) (Signalliste, YAML package), `integrations/ha_carrier_yaml.py`.
@@ -69,7 +69,7 @@ Order matters: WP0 first (cheap, finds product-level gaps), then WP1–WP5, then
 Run the runbook part A below with `evcc_en`. Output: a short findings list (YAML load errors, switch/select gap, `rest` sensor deprecation, host reachability). Decides finding 5 and 6 before any code is written.
 *Done when:* Live-Lesen shows pushed values from HA for the `evcc_en` signal set and a Schreibtest ESS limit changes the sim `number`.
 
-### WP1 — Archetype generator
+### WP1 — Archetype generator *(done 2026-10-21, see § 3b)*
 New `house_sim/archetype_gen.py` + CLI `python -m scripts.house_sim_archetype_gen --config-dir <cfg> --out <dir> [--battery-kwh … --load-kw …]`.
 - Input: `house_profiles.json`, `components.json` (same loader as `ha_carrier_yaml_gen`).
 - Output directory in the existing archetype layout: `entities.json` (typed entities: `sensor`/`number`, later `switch`/`select`, units + device classes from `ehal.ha_units`, deterministic ids via `contract_entity_id`), `ehal.ha.entities.json` (flat keys for the physics-driven subset, see finding 1), `house_params.json`, `pv_series.json`, plus `placeholders.json` (`ehal_id → entity_id`, the single source for the fill step) and `meta.json` (generator version, source pack hash, list of static/non-physical entities).
@@ -77,7 +77,7 @@ New `house_sim/archetype_gen.py` + CLI `python -m scripts.house_sim_archetype_ge
 - Fail loud on: stored `entity_id`s in bindings (already enforced), unit/quantity mismatch, missing battery capacity.
 *Tests:* `tests/test_house_sim_archetype_gen.py` — minimal pack and a full pack (ESS + inverter + EV + heat pump + pool): every activated signal has an entity; ids unique; `load_archetype()` loads the output; `step_physics` runs; no `ENTITY_*` left after fill.
 
-### WP2 — Core: qualified-id resolution (only if WP1 chooses it)
+### WP2 — Core: qualified-id resolution *(skipped: WP1 emits flat keys, § 3b)*
 Extend `_entity_id_for_kind` / `ess_setpoints_from_lookup` to resolve qualified ids (`grid.meter.*`, `ess.<id>.*`). Keep `house_sim/core/` free of `ehal` imports. Run `python -m scripts.sync_house_sim_integration`; `tests/test_house_sim_s4_packaging.py` must stay green. Skip this WP if the generator emits flat keys.
 
 ### WP3 — S4: external archetype directory
@@ -108,13 +108,28 @@ Customer sends `house_profiles.json` + `components.json` (contain activation fla
 | # | Item | Decide by |
 | --- | --- | --- |
 | 1 | switch/select setpoints in carrier (finding 5) | WP0 |
-| 2 | Flat keys vs qualified resolution in core (finding 1) | WP1 start |
-| 3 | Non-physical signals: static values vs small generic models | WP1 |
+| 2 | Flat keys vs qualified resolution in core (finding 1) | **decided:** flat keys (§ 3b) |
+| 3 | Non-physical signals: static values vs small generic models | **decided:** static, as `number` entities (§ 3b) |
 | 4 | Legacy `platform: rest` sensor on current HA (finding 6) | WP0 |
 | 5 | Pinned HA version vs "latest stable" matrix (nightly) | after WP6 |
 | 6 | Docker Desktop on the dev PC; Windows firewall for 8541 when Earnie runs natively | WP0 |
 
 ---
+
+## 3b. P1 decisions (archetype generator, 2026-10-21)
+
+Implemented in `house_sim/archetype_gen.py`, CLI `python -m scripts.house_sim_archetype_gen --config-dir <cfg> --out <dir> [--battery-kwh … --load-kw … --initial-soc … --pv-points … --static KEY=VALUE]`, tests `tests/test_house_sim_archetype_gen.py`. Output: `entities.json`, `ehal.ha.entities.json`, `house_params.json`, `pv_series.json`, `placeholders.json` (`ehal_id → entity_id`, input of the fill step), `meta.json`.
+
+1. **Flat keys, no core change (WP2 skipped).** The generator emits the flat physics names (`sens_grid_power_active`, `set_ess_active_power`, …) in `ehal.ha.entities.json`, mapped to the deterministic qualified-id entities (`contract_entity_id`). `house_sim/core/` and the S4 copy are untouched. Consequence: the physics sees exactly one battery and one PV source (see limits).
+2. **Physical vs static.**
+   - Physical: `grid.meter.sens_grid_power_active|energy_import|energy_export`, plant `sens_pv_energy`, the single `inv.<id>.sens_inv_power_pv` (mapped to physics `sens_pv_production_active`), `ess.<id>.sens_ess_soc|sens_ess_power|set_ess_active_power|set_ess_charge_power_limit|set_ess_discharge_power_limit|sens_ess_energy_charge|sens_ess_energy_discharge` of the one house battery, and the first (sorted) `*.sens_evcs_active_power`.
+   - Everything else is static: reads from a table in the generator (`STATIC_READ_VALUES`), battery `get_ess_*` limits derived from the pack, `set_*` writes start at `0.0`. All of it is listed in `meta.json › static_signals` with value and source. A kind without a table entry aborts; `--static <ehal_id|kind>=<value>` supplies one.
+   - S4 serves static values only from `number` entities (their value is seeded from the fixture state), so static **reads are `number` entities**, not sensors. Their ids still come from `contract_entity_id(..., write=True)`; `placeholders.json` is the only valid source for the fill. Alternative for later: a static-sensor path in the S4 coordinator (needs resync).
+   - Physical limit setpoints start at the battery maximum from the pack (a `0` start would clamp the battery to idle until Earnie writes); `set_ess_active_power` starts at `0`. Without a `set_ess_active_power` binding the battery runs in `self_consumption` with `ess_max_*_w` from the pack.
+3. **Fail loud.** Missing battery capacity (pack or `--battery-kwh`), base load (single profile `annual_kwh / 8760` or `--load-kw`), PV `kwp`, battery power limits where used, unknown static kind, stored `entity_id`s in bindings, slug/placeholder collisions, static unit not matching the field quantity. No other silent defaults; the only generator defaults are `--initial-soc 50`, PV peak = 0.8 × kWp and a 48-point sin² day (recorded in `meta.json`).
+4. **Canonical packs only.** Aborts with a pointer to `scripts.migrate_config` when plant `sens_pv_production_active` is bound (retired), when an inverter with attached PV lacks `inv.<id>.sens_inv_power_pv`, or when a grid-tied house battery lacks `ess.<id>.sens_ess_soc` / `sens_ess_power` (F4, F14). Example pack: `ha_lab/config/` (untracked) generates 7 physical signals.
+
+**Limits (P1):** exactly one house battery and at most one inverter PV signal (a second PV source would need a physics key, i.e. a core change); consumer loads are not simulated (base load only); setpoints are numbers only — switch/select setpoints (finding 5) stay undecided and would also need carrier support.
 
 ## 3a. WP0 findings (2026-10-21, partial run)
 
