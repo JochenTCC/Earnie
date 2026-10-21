@@ -302,7 +302,7 @@ Die erzeugten Verbrauchsverläufe lassen sich im Explorer prüfen (Plausibilitä
 
 Die Auswertung umfasst unter anderem:
 
-- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Speicher-Standby, Jahres Kosten, Δ zur Live-Referenz und Hinweis
+- **Gesamtkosten und -Verbrauch:** Tabelle mit Jahres Verbrauch, Speicher-Standby, Gesamtverbrauch, Jahres Kosten, Δ zur Live-Referenz und Hinweis
 - **Kostenvergleich** je Monat (Referenz und optimierte Szenarien)
 - **Monatsverläufe** und Plausibilitätsansichten
 - Charts zu Leistung, Verbrauch und PV, je nach gewählter Ansicht
@@ -323,7 +323,7 @@ Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zei
 | **Optimiertes Szenario**             | Gebuchte Last aus Grundlast und flexiblen Verbrauchern nach der Optimierung, ohne Speicher-Standby |
 
 
-Die Spalte **Speicher-Standby** zeigt den Eigenverbrauch der Hausbatterie (`standby_power_kw`). Er erhöht Bezug und Kosten der optimierten Szenarien, zählt aber nicht als Hausverbrauch. Der Pool-Filter zählt bei optimierten Szenarien mit seinem nativen Laufzeitfenster als feste Last, so wie in den Referenzen.
+Die Spalte **Speicher-Standby** zeigt den Eigenverbrauch der Hausbatterie (`standby_power_kw`). Er erhöht Bezug und Kosten der optimierten Szenarien und ihrer Referenzen (die den Speicher behalten, nur ohne Optimierung), zählt aber nicht als Hausverbrauch. Die Zeile Historisch (ohne PV und Speicher) hat keinen Standby. Die Spalte **Gesamtverbrauch** ist Jahres Verbrauch plus Speicher-Standby: Bei optimierten Szenarien und Referenzen liegt sie um genau den Standby über Historisch. Der Pool-Filter zählt bei optimierten Szenarien mit seinem nativen Laufzeitfenster als feste Last, so wie in den Referenzen.
 
 **Warum weicht Historisch beim Jahresverbrauch ab?**
 

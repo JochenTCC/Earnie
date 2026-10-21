@@ -56,6 +56,20 @@ def resolve_reference_hourly_load(
     return total_load
 
 
+def reference_standby_power_kw(scenario_params: dict | None) -> float:
+    """Battery AC standby (kW) a reference carries on top of the house load.
+
+    A reference keeps the scenario's installation (storage included) and only
+    skips the optimization, so the storage standby is drawn like in the
+    optimized run. Historisch (assets stripped) and params-less references: 0.
+    """
+    if scenario_params is None:
+        return 0.0
+    from simulation.engine_scenario import scenario_standby_power_kw
+
+    return scenario_standby_power_kw(scenario_params)
+
+
 _REFERENCE_COST_COLUMNS = (
     "sim_cost",
     "import_cost_eur",
@@ -128,6 +142,9 @@ def _reference_window_inputs(
         slot_datetimes,
         scenario_params=scenario_params,
     )
+    standby_kw = reference_standby_power_kw(scenario_params)
+    if standby_kw:
+        total_load = [float(load) + standby_kw for load in total_load]
     pv_profile = cache.get_pv_for_slots(
         slot_datetimes,
         scenario_params=scenario_params,

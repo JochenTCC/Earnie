@@ -145,7 +145,7 @@ Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und fü
 
 ### Gesamtkosten und -Verbrauch
 
-Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
+Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Gesamtverbrauch [kWh]` (= Jahres Verbrauch + Speicher-Standby), `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
 
 Der volumetrische **Netznutzung Arbeitspreis** (je Netzgebiet aus `grid_fees.json`) fließt in die Kosten des Szenario-Explorers ein. Ein **Leistungspreis** wird noch nicht berücksichtigt. Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md).
 
@@ -154,13 +154,15 @@ Der volumetrische **Netznutzung Arbeitspreis** (je Netzgebiet aus `grid_fees.jso
 | Feld | Bedeutung |
 | ---- | --------- |
 | `consumption_kwh` | Σ `consumption_kw` × Slotdauer über den Zeitraum; jeder Zeitslot zählt einmal, ohne Speicher-Standby |
-| `standby_kwh` | Standby-Leistung der Hausbatterie (`standby_power_kw`) über alle gebuchten Slots; nur bei optimierten Szenarien |
+| `standby_kwh` | Standby-Leistung der Hausbatterie (`standby_power_kw`) über alle gebuchten Slots; bei optimierten Szenarien und ihren Referenzen, nicht bei Historisch |
 | `duplicate_slots` | Zeitslots, die mehrere Fenster gebucht haben (einmal gezählt) |
 | `gap_slots` | Zeitslots zwischen erstem und letztem gebuchten Slot, die kein Fenster gebucht hat |
 | `reference_coverage` | Zeitslots, die nur das Szenario bzw. nur seine Referenz rechnet |
 | `components_kwh` | Aufteilung je Verbraucherspalte (Grundlast ohne Standby, `other` = known-Verbraucher) |
 
-Der Speicher-Standby steckt in der Verbrauch-Prognose der Optimierung und damit in Bezug und Kosten. Als Hausverbrauch zählt er nicht, deshalb steht er in einer eigenen Spalte. Die Zeile Historisch rechnet die Last des Live-Hausprofils ohne PV und Batterie; der Ist-Zähler `cons_data` geht nicht mehr direkt in die Spalte ein.
+Der Speicher-Standby steckt in der Verbrauch-Prognose der Optimierung und in der Last der Referenzen (die den Speicher des Szenarios behalten, nur ohne Optimierung) und damit in Bezug und Kosten. Historisch (ohne PV und Speicher) hat keinen. Als Hausverbrauch zählt er nicht, deshalb steht er in einer eigenen Spalte. Die Zeile Historisch rechnet die Last des Live-Hausprofils ohne PV und Batterie; der Ist-Zähler `cons_data` geht nicht mehr direkt in die Spalte ein.
+
+Das erste und das letzte Sonnenaufgangs-Fenster ragen über den Zeitraum hinaus (SA₁ liegt vor dem Starttag, SA₂ nach dem Endtag). Gebucht wird dort nur der Teil **innerhalb** des Zeitraums; Verbraucher-Ziele und Ladefenster der beiden Randfenster folgen diesem Ausschnitt. So verschiebt der Optimierer keine Energie über die Periodengrenze (z. B. E-Auto-Ladung vom Vorabend in die Nacht des Starttags), und der Jahresverbrauch stimmt mit Historisch bis auf den Standby überein.
 
 Referenzen und Historisch rechnen über **dieselben Zeitslots** wie die optimierten Szenarien: bei `sunrise_window` je `ready_by`-Tag das Buchungsfenster [SA₁, SA₂) des Szenarios, bei `fixed_24h` die 24 h vor dem Anker. Der Anwendertext steht im [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).
 

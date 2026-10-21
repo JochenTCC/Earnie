@@ -23,7 +23,9 @@ from simulation.backtesting_log import save_backtesting_log
 from simulation.backtesting_log import build_critical_cases, summarize_critical_cases
 from simulation.booked_consumption import booked_consumption_by_result
 from simulation.engine_scenario import scenario_standby_power_kw
+from simulation.backtesting_horizon import BOOK_PERIOD_KEY
 from simulation.period_clip import clip_results_map_to_period
+from simulation.reference_costs import reference_standby_power_kw
 from simulation.monthly_fees import fee_breakdowns_by_result_id
 from simulation.se_invoice_markdown import write_se_invoices
 from data.data_loader import load_market_prices, resolve_simulation_window
@@ -841,6 +843,17 @@ def main(argv: list[str] | None = None):
     scenario_labels = config.get_scenario_labels()
     labels = _all_labels(scenario_labels)
     scenarios = config.get_backtesting_scenarios()
+    if horizon_mode == SUNRISE_WINDOW:
+        # First / last sunrise book reach over the period edges: book only the
+        # in-period part (see ``BOOK_PERIOD_KEY``), so no clip shifts energy.
+        book_period = (
+            start.normalize().to_pydatetime(),
+            (end.normalize() + pd.Timedelta(days=1)).to_pydatetime(),
+        )
+        scenarios = {
+            scenario_id: {**params, BOOK_PERIOD_KEY: book_period}
+            for scenario_id, params in scenarios.items()
+        }
     from house_config.baseload import (
         BaseloadOverAllocatedError,
         ensure_baseload_not_over_allocated,
@@ -1090,13 +1103,20 @@ def main(argv: list[str] | None = None):
         sid: breakdown.total_monthly_eur
         for sid, breakdown in fee_breakdown_by_scenario.items()
     }
-    # Optimized series carry battery standby in Verbrauch-Prognose; refs have none.
+    # Optimized series and scenario refs carry the battery standby in their load;
+    # only Historisch (assets stripped) has none.
+    standby_kw_by_result = {
+        sid: scenario_standby_power_kw(params) for sid, params in scenarios.items()
+    }
+    standby_kw_by_result.update(
+        {ref_id: reference_standby_power_kw(params) for ref_id, params, _label in extra_ref_specs}
+    )
+    standby_kw_by_result[HISTORICAL_REFERENCE_ID] = reference_standby_power_kw(
+        reference_params
+    )
     booked_consumption = booked_consumption_by_result(
         clip_results_map_to_period(sim_results, period_meta["start"], period_meta["end"]),
-        standby_kw_by_result={
-            sid: scenario_standby_power_kw(scenarios[sid]) if sid in scenarios else 0.0
-            for sid in sim_results
-        },
+        standby_kw_by_result=standby_kw_by_result,
         reference_by_scenario=dict(period_meta.get("reference_by_scenario") or {}),
     )
     log_path = save_backtesting_log(

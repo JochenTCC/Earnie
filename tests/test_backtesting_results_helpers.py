@@ -120,6 +120,8 @@ def test_build_annual_cost_rows_reference_kwh_and_delta():
     assert live_row["Szenario"] == "Live"
     assert live_row["Jahres Verbrauch [kWh]"] == "4800.0"
     assert live_row["Speicher-Standby [kWh]"] == "227.8"
+    assert live_row["Gesamtverbrauch [kWh]"] == "5027.8"
+    assert ref_row["Gesamtverbrauch [kWh]"] == "5000.0"
     assert live_row["Jahres Kosten [€]"] == "1000.00 €"
     assert live_row["Δ vs Referenz [€]"] == "-100.00 €"
     assert live_ref_row["Hinweis"] == "—"

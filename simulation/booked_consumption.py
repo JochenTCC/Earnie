@@ -37,8 +37,8 @@ def _unique_slots(df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
 def booked_consumption_totals(df: pd.DataFrame, *, standby_kw: float) -> dict:
     """Σ booked consumption (kWh) over unique slots; battery standby separately.
 
-    ``standby_kw`` is the AC standby the MILP adds to every slot of an optimized
-    scenario (0 for references / Historisch).
+    ``standby_kw`` is the AC standby added to every slot of an optimized scenario
+    (MILP) and of its reference (``reference_costs``); 0 for Historisch.
     """
     if df is None or df.empty:
         raise ValueError("Gebuchte Verbrauchsreihe ist leer.")

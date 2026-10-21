@@ -178,7 +178,10 @@ def render_annual_cost_table(meta: dict) -> None:
         "**Jahres Verbrauch:** in allen Zeilen der gebuchte Verbrauch der "
         "Stundenreihe, die auch Kosten, Bezug und Einspeisung trägt (jeder Zeitslot "
         "einmal). **Speicher-Standby** (Eigenverbrauch der Hausbatterie) steht "
-        "getrennt und ist nicht im Jahres Verbrauch enthalten. Abweichungen zu "
+        "getrennt und ist nicht im Jahres Verbrauch enthalten; er fällt bei "
+        "optimierten Szenarien und ihren Referenzen an, nicht bei Historisch "
+        "(ohne PV und Speicher). **Gesamtverbrauch** = Jahres Verbrauch + "
+        "Speicher-Standby. Abweichungen zu "
         "Historisch sind erwartbar, wenn Ist ≠ Hausprofil-Modell."
         + fee_note
         + "Volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die "

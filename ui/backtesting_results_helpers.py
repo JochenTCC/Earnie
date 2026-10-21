@@ -392,6 +392,9 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
         kwh_cell = _format_kwh(kwh_value)
         standby = jahres_standby_kwh(scenario_id, booked_consumption=booked)
         standby_cell = _format_kwh(standby) if standby else _DASH
+        total_cell = (
+            _format_kwh(kwh_value + (standby or 0.0)) if kwh_value is not None else _DASH
+        )
         hinweis = _annual_cost_hinweis(
             scenario_id,
             live_id=live_id,
@@ -407,6 +410,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                     "Szenario": label,
                     "Jahres Verbrauch [kWh]": kwh_cell,
                     "Speicher-Standby [kWh]": standby_cell,
+                    "Gesamtverbrauch [kWh]": total_cell,
                     "Jahres Kosten [€]": f"{total_eur:.2f} €",
                     "Δ vs Referenz [€]": _DASH,
                     "Hinweis": hinweis,
@@ -422,6 +426,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                 "Szenario": label,
                 "Jahres Verbrauch [kWh]": kwh_cell,
                 "Speicher-Standby [kWh]": standby_cell,
+                "Gesamtverbrauch [kWh]": total_cell,
                 "Jahres Kosten [€]": f"{total_eur:.2f} €",
                 "Δ vs Referenz [€]": delta_cell,
                 "Hinweis": hinweis,
