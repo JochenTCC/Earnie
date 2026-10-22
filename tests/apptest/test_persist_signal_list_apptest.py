@@ -14,7 +14,9 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from house_config.components_store import clear_components_doc_cache
+from runtime_store.shadow.errors import ConfigReadOnlyError
 from tests.apptest.helpers import assert_clean, file_snapshot, messages
+from ui.auto_persist import SHADOW_READONLY_CAPTION
 
 _SCRIPT = Path(__file__).parent / "scripts" / "run_form_signal_list.py"
 _TIMEOUT_S = 30.0
@@ -229,25 +231,34 @@ def test_page_render_does_not_write_config_files() -> None:
     assert first.dataframe
 
 
-# --- Bekannte Fehler ---------------------------------------------------------------------
+# --- Shadow-Modus und unlesbare Konfiguration -------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="ehal_signal_list._persist_docs: ConfigReadOnlyError im Shadow-Modus wird nicht "
-    "abgefangen (Traceback statt Hinweis; Backlog-Bugfixes)",
-)
-def test_t3_shadow_mode_toggle_shows_hint_and_keeps_files(monkeypatch) -> None:
+def test_t3_shadow_mode_disables_the_switches_and_shows_the_hint(monkeypatch) -> None:
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     hp, cp = _path("house"), _path("comp")
-    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
     before = (file_snapshot(hp), file_snapshot(cp))
+
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
+
+    assert_clean(at)
+    switches = [c for c in at.checkbox if c.key.startswith(_PREFIX)]
+    assert switches and all(c.disabled for c in switches)
+    assert SHADOW_READONLY_CAPTION in messages(at)["caption"]
+    assert (file_snapshot(hp), file_snapshot(cp)) == before
+
+
+def test_t3_read_only_write_error_is_shown_as_hint_not_as_exception(monkeypatch) -> None:
+    def refuse(*_args, **_kwargs):
+        raise ConfigReadOnlyError("config schreibgeschützt")
+
+    monkeypatch.setattr("ui.ehal_signal_list._persist_docs", refuse)
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
 
     at = _toggle(at, "get_grid_export_power_limit", True)
 
     assert_clean(at)
-    assert (file_snapshot(hp), file_snapshot(cp)) == before
-    assert any("Shadow" in text for text in messages(at)["caption"] + messages(at)["warning"])
+    assert SHADOW_READONLY_CAPTION in messages(at)["caption"]
 
 
 @pytest.fixture

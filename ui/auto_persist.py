@@ -9,6 +9,9 @@ from typing import Any
 import streamlit as st
 
 
+SHADOW_READONLY_CAPTION = "Shadow-Modus: Konfiguration schreibgeschützt — nicht gespeichert."
+
+
 class PersistRejected(Exception):
     """Raised by a ``save`` callback that refused the write.
 
@@ -74,17 +77,13 @@ def auto_persist(
 
     if is_shadow_config_readonly():
         st.session_state[last_key] = fingerprint
-        st.caption(
-            "Shadow-Modus: Konfiguration schreibgeschützt — nicht gespeichert."
-        )
+        st.caption(SHADOW_READONLY_CAPTION)
         return False
     try:
         save()
     except ConfigReadOnlyError:
         st.session_state[last_key] = fingerprint
-        st.caption(
-            "Shadow-Modus: Konfiguration schreibgeschützt — nicht gespeichert."
-        )
+        st.caption(SHADOW_READONLY_CAPTION)
         return False
     except PersistRejected:
         return False

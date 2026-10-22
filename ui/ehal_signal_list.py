@@ -9,6 +9,9 @@ from ehal.signal_catalog import set_binding_activation
 from ehal.signal_export import build_export_zip
 from ehal.signal_list import SignalRow, build_signal_rows
 from runtime_store.ehal_setup import BACKEND_LOXONE, active_ehal_backend
+from runtime_store.shadow.errors import ConfigReadOnlyError
+from runtime_store.shadow.mode import is_shadow_config_readonly
+from ui.auto_persist import SHADOW_READONLY_CAPTION
 from ui.ehal_unit_display import units_for_field
 
 _MATCH_SYMBOL = {
@@ -105,6 +108,9 @@ def _render_optional_toggles(
             "Ein = Binding-Schlüssel mit leerem Wert anlegen; "
             "Aus = Schlüssel entfernen. Pflichtsignale sind nicht abschaltbar."
         )
+        readonly = is_shadow_config_readonly()
+        if readonly:
+            st.caption(SHADOW_READONLY_CAPTION)
         changed = False
         house_cur, comp_cur = house, components
         for row in optional:
@@ -114,6 +120,7 @@ def _render_optional_toggles(
                 label,
                 value=row.is_activated,
                 key=key,
+                disabled=readonly,
             )
             if bool(new_val) == bool(row.is_activated):
                 continue
@@ -132,7 +139,11 @@ def _render_optional_toggles(
             except ValueError as exc:
                 st.error(str(exc))
         if changed:
-            _persist_docs(house_cur, comp_cur)
+            try:
+                _persist_docs(house_cur, comp_cur)
+            except ConfigReadOnlyError:
+                st.caption(SHADOW_READONLY_CAPTION)
+                return
             st.rerun()
 
 
