@@ -15,6 +15,7 @@ from ehal import (
     validate_setpoint,
     validate_write_error,
 )
+from ehal.ess_fields import ess_field_kind
 from ehal.field_catalog import SETPOINT_FIELDS
 from ehal.validate import EhalValidationError
 from integrations.loxone_adapter import EVCS_MODE_VALUES
@@ -106,7 +107,11 @@ class HaWriteMixin:
                     outcome, field_name, status, msg, flip_ess=True
                 )
 
-        if "set_ess_mode" in doc and not self.cfg.entities.get("set_ess_mode"):
+        # Push bindings are activation flags with empty values: test the key, not the value.
+        mode_activated = any(
+            ess_field_kind(key) == "set_ess_mode" for key in self.cfg.entities
+        )
+        if "set_ess_mode" in doc and not mode_activated:
             self._skip("set_ess_mode", outcome)
         elif "set_ess_mode" in doc:
             ok, status, msg = self._try_setpoint_write(

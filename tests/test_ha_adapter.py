@@ -180,3 +180,67 @@ def test_export_limit_is_published_when_only_activated():
     assert err is None
     assert load_published()["grid.meter.set_grid_export_power_limit"] == pytest.approx(4000.0)
     assert adapter.last_skipped_fields() == [] and adapter.last_unconfigured_fields() == []
+
+
+def _mode_adapter(entities: dict[str, str], setpoint_qids: dict[str, str]) -> HaAdapter:
+    return HaAdapter(
+        HaConfig(
+            base_url="http://ha:8123",
+            token="t",
+            adapter_id="test",
+            entities=entities,
+            setpoint_qids=setpoint_qids,
+        )
+    )
+
+
+def _write_mode(adapter: HaAdapter, mode: float):
+    return adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-01-01T00:00:00Z",
+            "adapter_id": "test",
+            "set_ess_charge_power_limit": 1000.0,
+            "set_ess_mode": mode,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "key,qid",
+    [
+        ("set_ess_mode", "ess.house.set_ess_mode"),
+        ("ess.house.set_ess_mode", "ess.house.set_ess_mode"),
+    ],
+)
+def test_ess_mode_is_published_when_only_activated(key, qid):
+    # Same family as the export limit: the mode (0 = automatic, releases a sticky force)
+    # was skipped for every push pack because the check tested the empty binding value.
+    from integrations.ehal_write import clear_published_for_tests, load_published
+
+    clear_published_for_tests()
+    adapter = _mode_adapter(
+        {"set_ess_charge_power_limit": "", "set_ess_discharge_power_limit": "", key: ""},
+        {
+            "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
+            "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",
+            key: qid,
+        },
+    )
+    assert _write_mode(adapter, 0.0) is None
+    assert load_published()[qid] == 0.0
+
+
+def test_ess_mode_is_skipped_when_not_activated():
+    from integrations.ehal_write import clear_published_for_tests, load_published
+
+    clear_published_for_tests()
+    adapter = _mode_adapter(
+        {"set_ess_charge_power_limit": "", "set_ess_discharge_power_limit": ""},
+        {
+            "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
+            "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",
+        },
+    )
+    assert _write_mode(adapter, 0.0) is None
+    assert not any("set_ess_mode" in qid for qid in load_published())
