@@ -96,3 +96,96 @@ def _isolated_backtesting_config(tmp_path, monkeypatch):
     _reinit_config_offline()
     yield
     _reinit_config_offline()
+
+
+# --- Fixtures für die Logiktests (Optimierer-Dienst) --------------------------------------
+
+
+@pytest.fixture
+def fake_daemon(monkeypatch, tmp_path):
+    """Ersetzt ``status``/``start``/``stop``/``restart`` der Daemon-Seite durch eine Zustandsmaschine.
+
+    AppTest läuft im Testprozess und das Startskript holt das Seitenmodul aus
+    ``sys.modules``; so sind die Buttons klickbar, ohne dass ``main.py`` startet.
+    """
+    from dataclasses import dataclass, field
+
+    from runtime_store.main_daemon import DaemonError, DaemonStatus
+    from ui.pages import page_daemon
+
+    @dataclass
+    class FakeDaemon:
+        state: str = "stopped"
+        lock_path: str = ""
+        fail_with: str | None = None
+        calls: list[str] = field(default_factory=list)
+
+        def status(self):
+            pid = 4242 if self.state == "running" else None
+            return DaemonStatus(self.state, pid, self.lock_path)
+
+        def _act(self, name, new_state, **_):
+            self.calls.append(name)
+            if self.fail_with:
+                raise DaemonError(self.fail_with)
+            self.state = new_state
+            return self.status()
+
+        def start(self, **kw):
+            return self._act("start", "running", **kw)
+
+        def stop(self, **kw):
+            return self._act("stop", "stopped", **kw)
+
+        def restart(self, **kw):
+            return self._act("restart", "running", **kw)
+
+    fake = FakeDaemon(lock_path=str(tmp_path / "main.lock"))
+    for name in ("status", "start", "stop", "restart"):
+        monkeypatch.setattr(page_daemon, name, getattr(fake, name))
+    return fake
+
+
+@pytest.fixture
+def local_settings(tmp_path, monkeypatch):
+    """Isolierte ``local_settings.json`` (Silent-Schalter); Konfiguration wird neu initialisiert."""
+    path = tmp_path / "local_settings.json"
+    monkeypatch.setenv("EARNIE_LOCAL_SETTINGS_PATH", str(path))
+    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
+    # Die Konfiguration liest den Pfad beim (Re-)Init; ohne Neuinit sieht is_silent_mode()
+    # die Datei nicht und der Schalter würde endlos neu schreiben.
+    _reinit_config_offline()
+    return path
+
+
+@pytest.fixture
+def shadow_mode(monkeypatch, local_settings):
+    """``EARNIE_SHADOW=1`` mit isolierter ``local_settings.json``."""
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    _reinit_config_offline()
+    return local_settings
+
+
+@pytest.fixture
+def log_file():
+    """Fabrik: schreibt ``earnie.log`` in den isolierten Runtime-Pfad und liefert den Pfad.
+
+    ``log_file(text)`` schreibt Text (oder Bytes); ohne Aufruf bleibt die Datei absent.
+    """
+    from pathlib import Path
+
+    from runtime_store.persist_paths import log_file as log_file_path
+
+    path = Path(log_file_path())
+
+    def _write(content: str | bytes = "") -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(content, bytes):
+            path.write_bytes(content)
+        else:
+            path.write_text(content, encoding="utf-8")
+        return path
+
+    _write.path = path  # type: ignore[attr-defined]
+    return _write
+

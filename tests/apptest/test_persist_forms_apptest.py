@@ -196,19 +196,6 @@ def test_devices_stars_t4_changes_without_submit_are_not_persisted() -> None:
 # Muster D: Silent-Schalter (local_settings.json)
 # --------------------------------------------------------------------------
 
-@pytest.fixture
-def local_settings(tmp_path, monkeypatch) -> Path:
-    path = tmp_path / "local_settings.json"
-    monkeypatch.setenv("EARNIE_LOCAL_SETTINGS_PATH", str(path))
-    monkeypatch.delenv("EARNIE_SHADOW", raising=False)
-    # Die Konfiguration liest den Pfad beim (Re-)Init; ohne Neuinit sieht is_silent_mode()
-    # die Datei nicht und der Schalter würde endlos neu schreiben.
-    from tests.conftest import _reinit_config_offline
-
-    _reinit_config_offline()
-    return path
-
-
 @pytest.mark.parametrize("target", [False, True])
 def test_silent_toggle_writes_local_settings_and_new_session_shows_it(
     local_settings: Path, target: bool
