@@ -106,3 +106,64 @@ COMPONENT_FIELDS = [
           boundaries=(1.0, 100.0), to_stored=lambda percent: percent / 100.0),
     _comp(*_BAT, "checkbox", "planning_battery_limits_from_live", "limits_from_live", True),
 ]
+
+
+# --- Verbraucher-Gruppen im Hausprofil -------------------------------------
+# ``entity`` = Verbraucher-id, ``profile_key`` = Pfad im Verbraucher (Punkt-getrennt).
+# Widget-Keys: ``test_home__hc_g0_<suffix>`` (g0 = Widget-Generation, Index = Position
+# in der Verbraucherliste: wp=0, wasch=1, ev1=2, pool=3).
+
+def _cons(entity, kind, suffix, key, valid, boundaries=()):
+    return Field(kind, suffix, key, valid, boundaries=boundaries, entity=entity)
+
+
+CONSUMER_FIELDS = [
+    # Haus Wärme (thermal_annual)
+    _cons("wp", "number_input", "nom_0", "nominal_power_kw", 4.5),
+    _cons("wp", "number_input", "ta_min_qh_0", "min_on_quarterhours", 6),
+    _cons("wp", "number_input", "area_0", "living_area_m2", 150.0),
+    _cons("wp", "number_input", "persons_0", "persons", 4, boundaries=(1,)),
+    _cons("wp", "number_input", "target_temp_0", "target_temp_c", 22.5),
+    _cons("wp", "number_input", "house_tol_0", "house_tolerance_c", 1.5),
+    _cons("wp", "number_input", "house_h_0", "house_heat_loss_kw_per_k", 0.2),
+    _cons("wp", "number_input", "absent_temp_red_0", "absent_temp_reduction_c", 8.0),
+    _cons("wp", "number_input", "solar_area_0", "solar_thermal_area_m2", 5.0),
+    _cons("wp", "number_input", "solar_tilt_0", "solar_thermal_tilt_deg", 30),
+    _cons("wp", "number_input", "solar_azimuth_0", "solar_thermal_azimuth_deg", 15),
+    _cons("wp", "number_input", "storage_vol_0", "heat_storage.volume_liters", 200.0),
+    _cons("wp", "checkbox", "absent_opt_in_0", "absent_mode_enabled", True),
+    # Allgemein (generic) mit Zeitplan
+    _cons("wasch", "number_input", "nom_1", "nominal_power_kw", 3.0),
+    _cons("wasch", "number_input", "runs_1", "schedule.runs_per_week", 4, boundaries=(1, 7)),
+    _cons("wasch", "number_input", "duration_1", "schedule.duration_h", 3.0),
+    _cons("wasch", "number_input", "start_1", "schedule.start_hour", 11, boundaries=(0, 23)),
+    _cons("wasch", "number_input", "shift_1", "schedule.start_shift_h", 2.0),
+    _cons("wasch", "checkbox", "absent_opt_in_1", "absent_mode_enabled", True),
+    # E-Auto (ev)
+    _cons("ev1", "number_input", "nom_2", "nominal_power_kw", 12.0),
+    _cons("ev1", "number_input", "ev_min_2", "min_power_kw", 1.0),
+    _cons("ev1", "number_input", "ev_min_qh_2", "min_on_quarterhours", 5),
+    _cons("ev1", "number_input", "ev_cap_2", "battery_capacity_kwh", 55.0),
+    _cons("ev1", "number_input", "ev_target_soc_2", "charging_schedule.target_soc_percent", 80.0),
+    _cons("ev1", "number_input", "ev_eff_2", "charging_schedule.charging_efficiency", 0.9),
+    _cons("ev1", "number_input", "ev_voltage_2", "charging_schedule.nominal_power_voltage_v", 235.0),
+    _cons("ev1", "number_input", "ev_phases_2", "charging_schedule.nominal_power_phases", 3),
+    _cons("ev1", "number_input", "ev_Werktag_from_2", "charging_schedule.weekday.car_available_from_hour", 16),
+    _cons("ev1", "number_input", "ev_Werktag_ready_2", "charging_schedule.weekday.ready_by_hour", 8),
+    _cons("ev1", "number_input", "ev_Werktag_soc_2", "charging_schedule.weekday.daily_rest_soc", 21.0),
+    _cons("ev1", "number_input", "ev_Wochenende_from_2", "charging_schedule.weekend.car_available_from_hour", 19),
+    _cons("ev1", "number_input", "ev_Wochenende_ready_2", "charging_schedule.weekend.ready_by_hour", 9),
+    _cons("ev1", "number_input", "ev_Wochenende_soc_2", "charging_schedule.weekend.daily_rest_soc", 31.0),
+    _cons("ev1", "checkbox", "ev_forecast_2", "charging_schedule.forecast_when_absent", False),
+    _cons("ev1", "checkbox", "ev_bidirectional_2", "bidirectional", True),
+    _cons("ev1", "checkbox", "absent_opt_in_2", "absent_mode_enabled", True),
+    # Temperatur (thermal_rc)
+    _cons("pool", "number_input", "nom_3", "nominal_power_kw", 3.0),
+    _cons("pool", "number_input", "rc_min_qh_3", "min_on_quarterhours", 9),
+    _cons("pool", "number_input", "rc_vol_3", "thermal_rc.water_volume_liters", 1500.0),
+    _cons("pool", "number_input", "rc_set_3", "thermal_rc.setpoint_c", 26.0),
+    _cons("pool", "number_input", "rc_tol_3", "thermal_rc.tolerance_c", 2.0),
+    _cons("pool", "number_input", "rc_u_3", "thermal_rc.heat_loss_kw_per_k", 0.5),
+    _cons("pool", "number_input", "rc_eff_3", "thermal_rc.heating_efficiency", 0.8),
+    _cons("pool", "checkbox", "absent_opt_in_3", "absent_mode_enabled", True),
+]
