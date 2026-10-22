@@ -13,6 +13,7 @@ from runtime_store.persist_paths import config_schema_file, resolve_config_json_
 from ui.help_hint import render_page_title_with_help
 
 _EDITOR_KEY = "config_json_editor"
+_RELOAD_ERROR_KEY = "config_json_reload_error"
 _CONFIG_HELP = (
     "Roh-JSON-Editor für `config.json`. **Validieren** prüft Syntax und Schema, "
     "**Speichern** schreibt atomar und lädt die Konfiguration neu (`reinit_config`)."
@@ -65,9 +66,20 @@ def _save_text(path: str, text: str) -> None:
     os.replace(tmp, target)
 
 
+def _reload_editor_from_file(path: str) -> None:
+    """on_click: runs before the text_area is instantiated, so its key may be set."""
+    try:
+        st.session_state[_EDITOR_KEY] = _read_config_text(path)
+    except (OSError, ValueError) as exc:
+        st.session_state[_RELOAD_ERROR_KEY] = str(exc)
+
+
 def _render_editor(path: str) -> None:
     if _EDITOR_KEY not in st.session_state:
         st.session_state[_EDITOR_KEY] = _read_config_text(path)
+    reload_error = st.session_state.pop(_RELOAD_ERROR_KEY, None)
+    if reload_error:
+        st.error(f"config.json konnte nicht neu geladen werden: {reload_error}")
     st.text_area("config.json", key=_EDITOR_KEY, height=480)
 
     col_validate, col_save, col_reload = st.columns(3)
@@ -79,9 +91,12 @@ def _render_editor(path: str) -> None:
             st.success("JSON und Schema sind gültig.")
     if col_save.button("Speichern", type="primary"):
         _handle_save(path)
-    if col_reload.button("Neu laden (Datei)"):
-        st.session_state[_EDITOR_KEY] = _read_config_text(path)
-        st.rerun()
+    col_reload.button(
+        "Neu laden (Datei)",
+        key="config_reload",
+        on_click=_reload_editor_from_file,
+        args=(path,),
+    )
 
 
 def _handle_save(path: str) -> None:
