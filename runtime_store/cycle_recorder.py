@@ -175,6 +175,25 @@ def _read_json_file(path: str) -> Any:
         return None
 
 
+def _collect_ev_limit_soc() -> dict[str, float]:
+    """Resolved ``get_evcs_limit_soc`` per consumer bound to that marker.
+
+    ``prepare_optimization_matrix`` reads it live; replay has no live value.
+    Raises when a bound marker is unreadable (same as the live run would).
+    """
+    import config
+    from settings.ehal_marker_resolve import (
+        marker_get_evcs_limit_soc,
+        resolve_get_evcs_limit_soc,
+    )
+
+    out: dict[str, float] = {}
+    for consumer in config.get_flexible_consumers(optimizer_only=True) or []:
+        if marker_get_evcs_limit_soc(consumer):
+            out[str(consumer["id"])] = resolve_get_evcs_limit_soc(consumer)
+    return out
+
+
 def _collect_start_state(
     *,
     soc_percent: float | None,
@@ -193,6 +212,7 @@ def _collect_start_state(
         "run_state": run_state.load_run_state(),
         "charging_contexts": _json_safe(charging_contexts or {}),
         "targets": _json_safe(targets or {}),
+        "ev_limit_soc_percent": _collect_ev_limit_soc(),
     }
 
 

@@ -10,6 +10,7 @@ import logging
 import os
 import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -203,15 +204,55 @@ def _solve_prepared_entry(
     apply_cbc_solver_env(strict=(solver_mode == "strict"))
     os.environ["EARNIE_MILP_SOLVER"] = "highs"
 
-    prepared_ctx = _prepare_replay_inputs(entry, config)
-    begin_cbc_event_collection()
-    t0 = time.perf_counter()
-    result = _run_milp_replay(prepared_ctx, verbose=verbose)
+    with _recorded_ev_limit_soc(entry, config):
+        prepared_ctx = _prepare_replay_inputs(entry, config)
+        begin_cbc_event_collection()
+        t0 = time.perf_counter()
+        result = _run_milp_replay(prepared_ctx, verbose=verbose)
     result.seconds = time.perf_counter() - t0
     result.stage = _stage_from_events(take_cbc_events(), solver_mode)
     result.timestamp = entry.get("timestamp")
     result.config_hash = str(entry.get("config_hash") or "")
     return result
+
+
+@contextmanager
+def _recorded_ev_limit_soc(entry: dict[str, Any], config_module: Any):
+    """Serve the recorded ``get_evcs_limit_soc`` for the EV markers during replay.
+
+    Fails loud when a consumer binds the marker but the entry has no recorded
+    value (cycles recorded before ``ev_limit_soc_percent`` existed).
+    """
+    from integrations import ehal_live
+    from settings.ehal_marker_resolve import marker_get_evcs_limit_soc
+
+    recorded = (entry.get("start_state") or {}).get("ev_limit_soc_percent") or {}
+    by_marker: dict[str, float] = {}
+    for consumer in config_module.get_flexible_consumers(optimizer_only=True) or []:
+        marker = marker_get_evcs_limit_soc(consumer)
+        if not marker:
+            continue
+        cid = str(consumer["id"])
+        if cid not in recorded:
+            raise ValueError(
+                f"entry has no recorded start_state.ev_limit_soc_percent for "
+                f"consumer {cid!r} (marker {marker!r}); cycle was recorded by an "
+                f"older version and cannot be replayed offline"
+            )
+        by_marker[marker] = float(recorded[cid])
+
+    original = ehal_live.read_generic_value
+
+    def _read(address: str):
+        if address in by_marker:
+            return by_marker[address]
+        return original(address)
+
+    ehal_live.read_generic_value = _read
+    try:
+        yield
+    finally:
+        ehal_live.read_generic_value = original
 
 
 @dataclass

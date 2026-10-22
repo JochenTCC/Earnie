@@ -129,3 +129,43 @@ def test_replay_strict_stable_plan_hash(tmp_path, monkeypatch):
     assert second.cost_euro == pytest.approx(first.cost_euro, rel=1e-9)
     assert first.stage == "strict_only"
     assert first.n_slots == 8
+
+
+def _bind_limit_soc_marker(monkeypatch, marker: str = "ev.e_auto.get_evcs_limit_soc"):
+    from settings import ehal_marker_resolve
+
+    consumer = {"id": "e_auto"}
+    monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=True: [consumer])
+    monkeypatch.setattr(ehal_marker_resolve, "marker_get_evcs_limit_soc", lambda c: marker)
+    return consumer, marker
+
+
+def test_replay_serves_recorded_ev_limit_soc(tmp_path, monkeypatch):
+    from integrations import ehal_live
+    from runtime_store.recorder_replay import _recorded_ev_limit_soc
+    from settings.ehal_marker_resolve import resolve_get_evcs_limit_soc
+
+    consumer, marker = _bind_limit_soc_marker(monkeypatch)
+    monkeypatch.setattr(ehal_live, "read_generic_value", lambda address: None)
+    entry = {"start_state": {"ev_limit_soc_percent": {"e_auto": 80.0}}}
+    with _recorded_ev_limit_soc(entry, config):
+        assert resolve_get_evcs_limit_soc(consumer) == 80.0
+    with pytest.raises(ValueError, match="nicht lesbar"):
+        resolve_get_evcs_limit_soc(consumer)
+
+
+def test_replay_fails_loud_without_recorded_ev_limit_soc(monkeypatch):
+    from runtime_store.recorder_replay import _recorded_ev_limit_soc
+
+    _bind_limit_soc_marker(monkeypatch)
+    with pytest.raises(ValueError, match="ev_limit_soc_percent"):
+        with _recorded_ev_limit_soc({"start_state": {}}, config):
+            pass
+
+
+def test_recorder_collects_ev_limit_soc(monkeypatch):
+    from integrations import ehal_live
+
+    _bind_limit_soc_marker(monkeypatch)
+    monkeypatch.setattr(ehal_live, "read_generic_value", lambda address: 75.0)
+    assert cycle_recorder._collect_ev_limit_soc() == {"e_auto": 75.0}
