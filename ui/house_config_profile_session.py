@@ -86,6 +86,8 @@ _SESSION_SELECTED_ID_KEY = "house_profile_selected_id"
 
 _NEW_PROFILE_OPTION = "— neu —"
 
+_NEW_PROFILE_BASELINE_PREFIX = "house_new_profile_baseline::"
+
 _SESSION_FILE_STAMP_KEY = "house_profile_file_stamp"
 
 _SESSION_CONSUMER_WIDGET_GEN_KEY = "house_consumer_widget_gen"
@@ -253,6 +255,7 @@ def _sync_profile_session(
     if scope_changed or file_changed or widget_state_missing:
         _clear_scoped_widget_keys(session_scope)
         _seed_profile_widget_state(session_scope, existing, siblings=siblings)
+        st.session_state.pop(_NEW_PROFILE_BASELINE_PREFIX + session_scope, None)
         st.session_state[_SESSION_SYNC_KEY] = session_scope
         st.session_state[_SESSION_FILE_STAMP_KEY] = file_stamp
         st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(existing)
@@ -315,8 +318,22 @@ def _align_profile_select_session(
     profile_ids: list[str],
     id_by_display: dict[str, str],
 ) -> None:
-    """Rewrite selectbox session value when Bezeichnung/labels change on disk."""
+    """Rewrite selectbox session value when Bezeichnung/labels change on disk.
+
+    A pending select may carry a profile **id** (profile just created / imported);
+    the selectbox only knows display labels, so map it before anything else.
+    """
     current = st.session_state.get("house_profile_select")
+    if (
+        current is not None
+        and str(current) not in id_by_display
+        and str(current) in profile_ids
+    ):
+        st.session_state[_SESSION_SELECTED_ID_KEY] = str(current)
+        st.session_state["house_profile_select"] = _profile_display_label(
+            profile_map, str(current)
+        )
+        return
     if current is not None and str(current) in id_by_display:
         mapped = id_by_display[str(current)]
         if mapped != _NEW_PROFILE_OPTION:

@@ -114,41 +114,51 @@ def test_l8_edit_in_profile_a_does_not_leak_into_b(two_profiles) -> None:
     assert stored[_PROFILE_B]["label"] == _LABEL_B
 
 
-def _new_profile_from_b() -> tuple[AppTest, dict]:
-    """Wählt "— neu —" aus Profil B; das Formular legt das Profil mit Standardwerten sofort an."""
+def _stored_profiles() -> dict:
     path = Path(os.environ["EARNIE_HOUSE_PROFILES_PATH"])
+    with open(path, encoding="utf-8") as handle:
+        return {p["id"]: p for p in json.load(handle)["profiles"]}
+
+
+def _select_new_from_b() -> AppTest:
+    """Wählt "— neu —" aus Profil B."""
     at = _house_session()
     _select_profile(at, _LABEL_B)
     _select_profile(at, _NEW_OPTION)
-    with open(path, encoding="utf-8") as handle:
-        stored = {p["id"]: p for p in json.load(handle)["profiles"]}
-    created = [p for pid, p in stored.items() if pid not in (_PROFILE_A, _PROFILE_B)]
-    assert len(created) == 1, "genau ein neues Profil erwartet"
-    return at, created[0]
+    return at
 
 
 def test_l8_new_profile_starts_from_defaults_not_from_previous_profile(two_profiles) -> None:
-    _at, created = _new_profile_from_b()
+    at = _select_new_from_b()
 
-    assert created["label"] == "Mein Haushalt"
-    assert created["annual_kwh"] == 4500.0
-    assert created["absent_mode"] is False
-    assert created["land"] != "DE" or created["latitude"] != 52.52
-    assert (created["latitude"], created["longitude"]) != (52.52, 13.4)
-    assert created["default_pv_tilt"] != 40
-    assert created["consumers"] == []
+    assert at.selectbox(key="house_profile_select").value == _NEW_OPTION
+    assert at.text_input(key="__new____house_profile_label").value == "Mein Haushalt"
+    assert at.number_input(key="__new____house_annual_kwh").value == 4500.0
+    assert at.checkbox(key="__new____house_absent_mode").value is False
+    assert (
+        at.number_input(key="__new____house_profile_latitude").value,
+        at.number_input(key="__new____house_profile_longitude").value,
+    ) == (48.2, 11.0)
+    assert at.number_input(key="__new____house_profile_default_pv_tilt").value == 25
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="house_config_profile_save._perform_house_profile_save legt das neue Profil sofort an und "
-    "setzt die Auswahl auf die id; _align_profile_select_session erwartet das Anzeige-Label und "
-    "springt auf das vorige Profil zurück (Backlog-Bugfixes)",
-)
-def test_l8_new_profile_selection_does_not_jump_back_to_previous_profile(two_profiles) -> None:
-    at, _created = _new_profile_from_b()
+def test_l8_selecting_new_profile_does_not_create_one_unasked(two_profiles) -> None:
+    _select_new_from_b()
 
-    assert at.selectbox(key="house_profile_select").value in (_NEW_OPTION, "Mein Haushalt")
+    assert set(_stored_profiles()) == {_PROFILE_A, _PROFILE_B}
+
+
+def test_l8_first_edit_of_a_new_profile_creates_it_and_selects_it(two_profiles) -> None:
+    at = _select_new_from_b()
+
+    at.number_input(key="__new____house_annual_kwh").set_value(5321.0).run(timeout=_TIMEOUT_S)
+
+    assert not at.exception
+    created = [p for pid, p in _stored_profiles().items() if pid not in (_PROFILE_A, _PROFILE_B)]
+    assert len(created) == 1
+    assert (created[0]["label"], created[0]["annual_kwh"]) == ("Mein Haushalt", 5321.0)
+    assert at.selectbox(key="house_profile_select").value == "Mein Haushalt"
+    assert at.number_input(key=f"{created[0]['id']}__house_annual_kwh").value == 5321.0
 
 
 # --- Szenarienkonfigurator --------------------------------------------------------------

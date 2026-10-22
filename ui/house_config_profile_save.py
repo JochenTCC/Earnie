@@ -6,6 +6,7 @@ from ui.house_config_profile_session import (
     _SESSION_FILE_STAMP_KEY,
     _SESSION_SELECT_PENDING_KEY,
     _SESSION_SYNC_KEY,
+    _NEW_PROFILE_BASELINE_PREFIX,
     _consumers_from_existing,
     _house_profiles_file_stamp,
     _resolve_profile_id,
@@ -51,7 +52,7 @@ from ui.house_config_io import (
     single_csv_upload,
     upsert_house_profile,
 )
-from ui.auto_persist import auto_persist
+from ui.auto_persist import auto_persist, payload_fingerprint
 from ui.flash import flash
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
@@ -279,6 +280,15 @@ def _render_house_profile_save(
         "historical_csv_source": hist["historical_csv_source"],
         "baseload_distribution": hist.get("baseload_distribution", "equal"),
     }
+
+    if is_new:
+        # "— neu —" shows editable defaults; do not create a profile until the user
+        # changed something relative to them.
+        baseline = st.session_state.setdefault(
+            _NEW_PROFILE_BASELINE_PREFIX + session_scope, payload_fingerprint(payload)
+        )
+        if baseline == payload_fingerprint(payload):
+            return
 
     def _save() -> None:
         saved_id = _perform_house_profile_save(
