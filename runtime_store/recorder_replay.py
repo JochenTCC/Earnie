@@ -220,33 +220,33 @@ def _solve_prepared_entry(
 def _recorded_ev_limit_soc(entry: dict[str, Any], config_module: Any):
     """Serve the recorded ``get_evcs_limit_soc`` for the EV markers during replay.
 
-    Fails loud when a consumer binds the marker but the entry has no recorded
-    value (cycles recorded before ``ev_limit_soc_percent`` existed).
+    Fails loud when the marker is actually read but the entry has no recorded
+    value (cycles recorded before ``ev_limit_soc_percent`` existed). Cycles that
+    never read it replay as before.
     """
     from integrations import ehal_live
     from settings.ehal_marker_resolve import marker_get_evcs_limit_soc
 
     recorded = (entry.get("start_state") or {}).get("ev_limit_soc_percent") or {}
-    by_marker: dict[str, float] = {}
+    cid_by_marker: dict[str, str] = {}
     for consumer in config_module.get_flexible_consumers(optimizer_only=True) or []:
         marker = marker_get_evcs_limit_soc(consumer)
-        if not marker:
-            continue
-        cid = str(consumer["id"])
-        if cid not in recorded:
-            raise ValueError(
-                f"entry has no recorded start_state.ev_limit_soc_percent for "
-                f"consumer {cid!r} (marker {marker!r}); cycle was recorded by an "
-                f"older version and cannot be replayed offline"
-            )
-        by_marker[marker] = float(recorded[cid])
+        if marker:
+            cid_by_marker[marker] = str(consumer["id"])
 
     original = ehal_live.read_generic_value
 
     def _read(address: str):
-        if address in by_marker:
-            return by_marker[address]
-        return original(address)
+        cid = cid_by_marker.get(address)
+        if cid is None:
+            return original(address)
+        if cid not in recorded:
+            raise ValueError(
+                f"entry has no recorded start_state.ev_limit_soc_percent for "
+                f"consumer {cid!r} (marker {address!r}); cycle was recorded by an "
+                f"older version and cannot be replayed offline"
+            )
+        return float(recorded[cid])
 
     ehal_live.read_generic_value = _read
     try:

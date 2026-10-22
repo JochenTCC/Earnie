@@ -156,11 +156,13 @@ def test_replay_serves_recorded_ev_limit_soc(tmp_path, monkeypatch):
 
 def test_replay_fails_loud_without_recorded_ev_limit_soc(monkeypatch):
     from runtime_store.recorder_replay import _recorded_ev_limit_soc
+    from settings.ehal_marker_resolve import resolve_get_evcs_limit_soc
 
-    _bind_limit_soc_marker(monkeypatch)
-    with pytest.raises(ValueError, match="ev_limit_soc_percent"):
-        with _recorded_ev_limit_soc({"start_state": {}}, config):
-            pass
+    consumer, _marker = _bind_limit_soc_marker(monkeypatch)
+    with _recorded_ev_limit_soc({"start_state": {}}, config):
+        # Entering is fine: cycles that never read the marker still replay.
+        with pytest.raises(ValueError, match="ev_limit_soc_percent"):
+            resolve_get_evcs_limit_soc(consumer)
 
 
 def test_recorder_collects_ev_limit_soc(monkeypatch):
