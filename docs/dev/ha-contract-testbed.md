@@ -364,6 +364,15 @@ docker compose --project-directory . -f docker/compose/ha-lab.yml down
 
 Onboarding is manual (the optional REST automation is not built): after the first `up`, create the HA owner at http://localhost:8123, set location/timezone `Europe/Vienna`, and create a **long-lived token** (profile page) for the check. After `install`, add *Settings → Devices & services → Add integration → Earnie House Simulator → archetype `earnie_pack`* once; the volume persists it. Earnie itself either runs natively (`--earnie-host host.docker.internal`; allow 8541 in the Windows firewall; use `--runtime-dir` pointing at its runtime dir) or in the bench (`up --with-earnie`, pack in `ha_lab/testbed/config`, `EARNIE_PILOT_PUSH_TOKEN` in `ha_lab/testbed/config/.env`, build with `--earnie-host earnie-testbed`). Details per command: § 3b–3e. `python -m scripts.ha_testbed status` shows what is in place; `reset --yes` is the factory reset. **Once per release**, additionally run Part A step 7 by hand with an unfilled YAML to keep the user-facing mapping step honest.
 
+**Lessons from the first live runs (§ 3f):**
+
+- Do the HA onboarding in a **private browser window** after every `reset`; check `GET /api/onboarding` (all four steps `done: true`) before creating the token. Set the token from the clipboard: `[Environment]::SetEnvironmentVariable('HA_TESTBED_TOKEN', (Get-Clipboard).Trim(), 'User')`, then open a new terminal.
+- Earnie native: `main.py` must not share port 8541 with Streamlit (L2); start it after the lab's Streamlit is stopped or give Streamlit another port.
+- Start `ha_testbed_check` only after a cycle that wrote setpoints (`cycle_stats` with `Sollwerte +…`, result not `no_writes`); a cycle that aborted for a missing SoC also prints `Durchlauf erfolgreich beendet` (L8, L12).
+- A hand-extended pack must be migrated (`scripts.migrate_config`) before Earnie starts; build the archetype from the migrated pack.
+- `--require-all` cannot pass on a pack without an energy signal (structural SKIP); use the full pack for the release gate.
+- The full pack of the gate is a local, uncommitted directory (`ha_lab/config_full`): the lab pack plus EV, heat pump and pool consumers (`battery_capacity_kwh`, `charging_schedule`, thermal parameters, L3), the energy / limit bindings of `_full_pack()` in `tests/test_house_sim_archetype_gen.py`, then `scripts.migrate_config`.
+
 ### Customer-problem reproduction (WP8)
 
 What the bench can and cannot reproduce is the table in § 2: it reproduces the customer's **activated signal set** and the Earnie/carrier/contract behaviour, not their devices.
