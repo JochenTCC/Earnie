@@ -1,0 +1,82 @@
+name: UI tests
+
+# Persistence and logic tests of the Streamlit UI (concept "Earnie UI-Persistenztests").
+# ui-fast: storage round trips + AppTests (headless, seconds). ui-e2e: a few smoke paths in a
+# real browser against `streamlit run app.py` (marker `e2e`, deselected in the normal suite).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ui-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-fast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --only-binary=:all: -e ".[dev]"
+
+      - name: Run storage and AppTests
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
+        run: >
+          python -m pytest
+          tests/test_storage_roundtrip.py
+          tests/test_navigation_specs.py
+          tests/apptest
+          -m "not e2e" -n auto -q --tb=short
+
+  ui-e2e:
+    needs: ui-fast
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --only-binary=:all: -e ".[dev]"
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
+        run: >
+          python -m pytest tests/apptest/e2e -m e2e -q --tb=short
+          --tracing retain-on-failure --output test-results
+
+      # TODO: pin to a commit SHA like the other actions in this repo.
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/

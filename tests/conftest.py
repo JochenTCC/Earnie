@@ -309,27 +309,44 @@ def pytest_configure(config):
         "markers",
         "regression: Release golden-master suite (deselected by default)",
     )
+    config.addinivalue_line(
+        "markers",
+        "e2e: Playwright-Smoketests gegen einen echten streamlit-Server (deselected by default)",
+    )
 
 
-def _regression_explicitly_selected(config) -> bool:
-    if os.environ.get("EARNIE_RUN_REGRESSION") == "1":
+def _marker_explicitly_selected(config, name: str, env_flag: str) -> bool:
+    if os.environ.get(env_flag) == "1":
         return True
     markexpr = (getattr(config.option, "markexpr", None) or "").strip()
     if not markexpr:
         return False
-    # Plain "-m regression" (or expressions that require regression).
-    if "not regression" in markexpr:
+    # Plain "-m <name>" (or expressions that require the marker).
+    if f"not {name}" in markexpr:
         return False
-    return "regression" in markexpr
+    return name in markexpr
+
+
+def _regression_explicitly_selected(config) -> bool:
+    return _marker_explicitly_selected(config, "regression", "EARNIE_RUN_REGRESSION")
+
+
+def _e2e_explicitly_selected(config) -> bool:
+    return _marker_explicitly_selected(config, "e2e", "EARNIE_RUN_E2E")
 
 
 def pytest_collection_modifyitems(config, items):
-    """Deselect regression by default; keep ``slow`` tests at the end."""
+    """Deselect regression and e2e by default; keep ``slow`` tests at the end."""
+    deselect_names = []
     if not _regression_explicitly_selected(config):
+        deselect_names.append("regression")
+    if not _e2e_explicitly_selected(config):
+        deselect_names.append("e2e")
+    if deselect_names:
         kept: list = []
         deselected: list = []
         for item in items:
-            if item.get_closest_marker("regression") is not None:
+            if any(item.get_closest_marker(name) is not None for name in deselect_names):
                 deselected.append(item)
             else:
                 kept.append(item)
