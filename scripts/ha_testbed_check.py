@@ -169,6 +169,18 @@ def _age_s(row: dict[str, Any] | None, now: datetime) -> float | None:
     return (now - datetime.fromisoformat(str(stamp))).total_seconds()
 
 
+def _last_value(row: dict[str, Any] | None) -> float | None:
+    try:
+        return float((row or {}).get("value"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _prefer_nonzero(rows: dict[str, dict[str, Any]], ids: list[str]) -> str | None:
+    """First id whose last pushed value is not 0, else the first id (None for no ids)."""
+    return next((i for i in ids if _last_value(rows.get(i)) not in (None, 0.0)), None) or (ids[0] if ids else None)
+
+
 def _need_ha(bench: Bench, name: str) -> Result | None:
     if bench.ha is None:
         return Result(name, SKIP, "needs --ha-token")
@@ -466,11 +478,17 @@ def check_stopped_push(bench: Bench) -> list[Result]:
     energy_name = "stopped energy push -> never invented as 0"
     if (skip := _need_ha(bench, power_name)) is not None:
         return [skip, Result(energy_name, SKIP, "needs --ha-token")]
-    power_id = _pick_read(
-        bench,
-        lambda i: field_kind(i).startswith("sens_") and "power" in field_kind(i) and "energy" not in field_kind(i),
-    )
-    energy_id = _pick_read(bench, lambda i: "energy" in field_kind(i))
+    power_ids = [
+        i
+        for i in bench.archetype.reads()
+        if field_kind(i).startswith("sens_") and "power" in field_kind(i) and "energy" not in field_kind(i)
+    ]
+    energy_ids = [i for i in bench.archetype.reads() if "energy" in field_kind(i)]
+    # A stopped push is only visible for a signal whose last value was not 0 (a fresh bench
+    # idles the battery at 0 W / 0 kWh while grid / PV values are live).
+    rows = bench.load_inbox()
+    power_id = _prefer_nonzero(rows, power_ids)
+    energy_id = _prefer_nonzero(rows, energy_ids)
     chosen = {i: _automation_for(bench, i) for i in (power_id, energy_id) if i}
     missing = [i for i, auto in chosen.items() if auto is None]
     if missing:
@@ -502,6 +520,8 @@ def check_stopped_push(bench: Bench) -> list[Result]:
             elif want_zero:
                 ok = state == STATE_ZERO_ASSUMED_SILENT
                 results.append(Result(name, PASS if ok else FAIL, f"{ehal_id}: {state}"))
+            elif state == STATE_ZERO_HELD:
+                results.append(Result(name, SKIP, f"{ehal_id} last pushed 0, a held 0 is a real value here"))
             else:
                 ok = state not in _ZERO_STATES and value is None
                 results.append(Result(name, PASS if ok else FAIL, f"{ehal_id}: {state}, value {value}"))

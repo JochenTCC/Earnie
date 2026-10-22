@@ -361,10 +361,52 @@ def test_stopped_push_skips_when_last_value_was_zero(archetype):
         for i in archetype.reads()
         if field_kind(i).startswith("sens_") and "power" in field_kind(i) and "energy" not in field_kind(i)
     )
-    world.rows[power_id]["value"] = 0.0
+    for other in archetype.reads():
+        if field_kind(other).startswith("sens_") and "power" in field_kind(other) and "energy" not in field_kind(other):
+            world.rows[other]["value"] = 0.0
     results = _by_name(chk.check_stopped_push(world.bench()))
     assert results["stopped power push -> 0 angenommen (verstummt)"].status == chk.SKIP
     assert not world.automations_off  # re-enabled
+
+
+def test_stopped_push_prefers_a_power_signal_that_was_not_zero(archetype):
+    # Regression (bench lab pack): the battery idled at 0 W, so the first power signal made
+    # the case SKIP although grid / PV power were live.
+    world = World(archetype)
+    powers = [
+        i
+        for i in archetype.reads()
+        if field_kind(i).startswith("sens_") and "power" in field_kind(i) and "energy" not in field_kind(i)
+    ]
+    assert len(powers) > 1
+    world.rows[powers[0]]["value"] = 0.0
+    results = _by_name(chk.check_stopped_push(world.bench()))
+    result = results["stopped power push -> 0 angenommen (verstummt)"]
+    assert result.status == chk.PASS and powers[0] not in result.detail
+
+
+def _energy_reads(archetype):
+    return [i for i in archetype.reads() if "energy" in field_kind(i)]
+
+
+def test_stopped_energy_push_skips_when_every_counter_was_zero(archetype):
+    # Regression (bench full pack): a fresh sim has charge counters at 0 kWh; the held 0 is a
+    # real value, not an invented one, so the case is not decidable (SKIP, not FAIL).
+    world = World(archetype)
+    for ehal_id in _energy_reads(archetype):
+        world.rows[ehal_id]["value"] = 0.0
+    result = _by_name(chk.check_stopped_push(world.bench()))["stopped energy push -> never invented as 0"]
+    assert result.status == chk.SKIP and "last pushed 0" in result.detail
+    assert not world.automations_off
+
+
+def test_stopped_energy_push_prefers_a_counter_that_was_not_zero(archetype):
+    world = World(archetype)
+    energy = _energy_reads(archetype)
+    assert len(energy) > 1
+    world.rows[energy[0]]["value"] = 0.0
+    result = _by_name(chk.check_stopped_push(world.bench()))["stopped energy push -> never invented as 0"]
+    assert result.status == chk.PASS and energy[0] not in result.detail
 
 
 def test_stopped_push_without_push_automation_in_ha_fails(archetype):
