@@ -333,3 +333,12 @@ def test_cli_battery_kwh_and_static_arguments(tmp_path):
     args = ["--config-dir", str(cfg), "--out", str(out), "--battery-kwh", "7", "--static", "get_evcs_ready_by_time=07:00"]
     assert cli.main(args) == 0
     assert json.loads((out / "house_params.json").read_text(encoding="utf-8"))["battery_capacity_kwh"] == 7.0
+
+
+def test_flat_and_qualified_consumer_key_generate_one_entity():
+    # Regression: the migrated canonical shape (flat + qualified EVCS key) aborted with "slug clash".
+    house, components = _full_pack()
+    ev = next(c for c in house["profiles"][0]["consumers"] if c["type"] == "ev")
+    ev["ehal_bindings"]["evcs.e_auto.set_evcs_max_current"] = ""
+    arch = generate_archetype(house, components)
+    assert list(arch.placeholders).count("evcs.e_auto.set_evcs_max_current") == 1

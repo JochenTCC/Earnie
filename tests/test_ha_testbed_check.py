@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -36,6 +37,7 @@ class World:
         self.automations_off: set[str] = set()
         self.services: list[tuple[str, str, dict]] = []
         self.failing = False
+        self.overwrite: tuple[float, float] | None = None  # (time, value): Earnie writes its own setpoint
         self.states: dict[str, dict] = {}
         for ehal_id, entity_id in archetype.placeholders.items():
             unit = archetype.units[entity_id]
@@ -70,6 +72,10 @@ class World:
         return next(a["entity_id"] for a in self.automations.values() if a["attributes"]["id"] == wanted)
 
     def _tick(self):
+        if self.overwrite and self.t >= self.overwrite[0]:
+            self.status[SETPOINT] = self.overwrite[1]
+            self.pending.clear()
+            self.overwrite = None
         for due, kind, value in [p for p in self.pending if p[0] <= self.t]:
             self.pending.remove((due, kind, value))
             if kind == "status":
@@ -240,6 +246,49 @@ def test_unreachable_ha_fails(archetype):
     assert result.status == chk.FAIL and "not reachable" in result.detail
 
 
+def _http_error(code: int, reason: str) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError("http://ha.test/api/states/x", code, reason, {}, None)
+
+
+def test_http_401_from_ha_fails_every_ha_check_instead_of_crashing(archetype):
+    # Regression: a rejected token crashed the run with a traceback in the round-trip check.
+    world = World(archetype)
+
+    def unauthorized(*_args, **_kwargs):
+        raise _http_error(401, "Unauthorized")
+
+    world.ping = unauthorized
+    world.get_state = unauthorized
+    world.list_states = unauthorized
+    world.call_service = unauthorized
+    results = chk.run_checks(world.bench())
+    by_name = _by_name(results)
+    for name in (
+        "HA reachable, sim entities exist with expected units",
+        "setpoint round trip",
+        "reject_writes -> hub_write_failed reported to Earnie",
+        "set_unavailable -> no crash, push resumes",
+        "stopped push",
+    ):
+        assert by_name[name].status == chk.FAIL, name
+        assert "401" in by_name[name].detail and "HA_TESTBED_TOKEN" in by_name[name].detail
+    assert by_name["heartbeat from HA"].status == chk.PASS  # inbox checks do not need HA
+    assert chk.exit_code(results) == 1
+
+
+def test_non_auth_http_error_is_reported_without_token_hint(archetype):
+    world = World(archetype)
+
+    def broken(*_args, **_kwargs):
+        raise _http_error(500, "Internal Server Error")
+
+    world.get_state = broken
+    result = _by_name(chk.run_checks(world.bench(), negative=False))["setpoint round trip"]
+    assert result.status == chk.FAIL
+    assert "HTTP 500" in result.detail and "http://ha.test/api/states/x" in result.detail
+    assert "HA_TESTBED_TOKEN" not in result.detail
+
+
 def test_roundtrip_fails_when_ha_never_applies_and_still_restores(archetype):
     world = World(archetype, apply_ha=False)
     results = _by_name(chk.check_setpoint_roundtrip(world.bench(timeout_s=30)))
@@ -247,6 +296,24 @@ def test_roundtrip_fails_when_ha_never_applies_and_still_restores(archetype):
     ha_result = next(r for n, r in results.items() if n.startswith("status.json ->"))
     assert ha_result.status == chk.FAIL
     assert world.publish_log[-1] == (SETPOINT, 5000.0)
+
+
+def test_roundtrip_names_an_optimizer_overwrite_of_the_setpoint(archetype):
+    # Regression (bench L8): the first optimizer cycle after an Earnie start rewrote the
+    # ESS limit while the check waited for HA; the failure said only "did not reach".
+    world = World(archetype)
+    world.overwrite = (5.0, 4321.0)  # after status.json showed the value (t+3), before HA applied it (t+9)
+    results = _by_name(chk.check_setpoint_roundtrip(world.bench(timeout_s=30)))
+    ha_result = next(r for n, r in results.items() if n.startswith("status.json ->"))
+    assert ha_result.status == chk.FAIL
+    assert "status.json now shows 4321" in ha_result.detail and "optimizer cycle" in ha_result.detail
+
+
+def test_failure_without_an_overwrite_does_not_blame_the_optimizer(archetype):
+    world = World(archetype, apply_ha=False)
+    results = _by_name(chk.check_setpoint_roundtrip(world.bench(timeout_s=30)))
+    ha_result = next(r for n, r in results.items() if n.startswith("status.json ->"))
+    assert ha_result.status == chk.FAIL and "optimizer" not in ha_result.detail
 
 
 def test_roundtrip_fails_when_status_never_shows_the_value(archetype):
@@ -294,10 +361,52 @@ def test_stopped_push_skips_when_last_value_was_zero(archetype):
         for i in archetype.reads()
         if field_kind(i).startswith("sens_") and "power" in field_kind(i) and "energy" not in field_kind(i)
     )
-    world.rows[power_id]["value"] = 0.0
+    for other in archetype.reads():
+        if field_kind(other).startswith("sens_") and "power" in field_kind(other) and "energy" not in field_kind(other):
+            world.rows[other]["value"] = 0.0
     results = _by_name(chk.check_stopped_push(world.bench()))
     assert results["stopped power push -> 0 angenommen (verstummt)"].status == chk.SKIP
     assert not world.automations_off  # re-enabled
+
+
+def test_stopped_push_prefers_a_power_signal_that_was_not_zero(archetype):
+    # Regression (bench lab pack): the battery idled at 0 W, so the first power signal made
+    # the case SKIP although grid / PV power were live.
+    world = World(archetype)
+    powers = [
+        i
+        for i in archetype.reads()
+        if field_kind(i).startswith("sens_") and "power" in field_kind(i) and "energy" not in field_kind(i)
+    ]
+    assert len(powers) > 1
+    world.rows[powers[0]]["value"] = 0.0
+    results = _by_name(chk.check_stopped_push(world.bench()))
+    result = results["stopped power push -> 0 angenommen (verstummt)"]
+    assert result.status == chk.PASS and powers[0] not in result.detail
+
+
+def _energy_reads(archetype):
+    return [i for i in archetype.reads() if "energy" in field_kind(i)]
+
+
+def test_stopped_energy_push_skips_when_every_counter_was_zero(archetype):
+    # Regression (bench full pack): a fresh sim has charge counters at 0 kWh; the held 0 is a
+    # real value, not an invented one, so the case is not decidable (SKIP, not FAIL).
+    world = World(archetype)
+    for ehal_id in _energy_reads(archetype):
+        world.rows[ehal_id]["value"] = 0.0
+    result = _by_name(chk.check_stopped_push(world.bench()))["stopped energy push -> never invented as 0"]
+    assert result.status == chk.SKIP and "last pushed 0" in result.detail
+    assert not world.automations_off
+
+
+def test_stopped_energy_push_prefers_a_counter_that_was_not_zero(archetype):
+    world = World(archetype)
+    energy = _energy_reads(archetype)
+    assert len(energy) > 1
+    world.rows[energy[0]]["value"] = 0.0
+    result = _by_name(chk.check_stopped_push(world.bench()))["stopped energy push -> never invented as 0"]
+    assert result.status == chk.PASS and energy[0] not in result.detail
 
 
 def test_stopped_push_without_push_automation_in_ha_fails(archetype):

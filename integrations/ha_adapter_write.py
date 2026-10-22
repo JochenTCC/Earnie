@@ -124,7 +124,7 @@ class HaWriteMixin:
             doc,
             outcome,
             "set_grid_export_power_limit",
-            supported=bool(self.cfg.entities.get("set_grid_export_power_limit")),
+            supported="set_grid_export_power_limit" in self.cfg.entities,
         )
 
     def _write_evcs_setpoints(

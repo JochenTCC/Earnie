@@ -169,6 +169,18 @@ def _age_s(row: dict[str, Any] | None, now: datetime) -> float | None:
     return (now - datetime.fromisoformat(str(stamp))).total_seconds()
 
 
+def _last_value(row: dict[str, Any] | None) -> float | None:
+    try:
+        return float((row or {}).get("value"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _prefer_nonzero(rows: dict[str, dict[str, Any]], ids: list[str]) -> str | None:
+    """First id whose last pushed value is not 0, else the first id (None for no ids)."""
+    return next((i for i in ids if _last_value(rows.get(i)) not in (None, 0.0)), None) or (ids[0] if ids else None)
+
+
 def _need_ha(bench: Bench, name: str) -> Result | None:
     if bench.ha is None:
         return Result(name, SKIP, "needs --ha-token")
@@ -184,8 +196,8 @@ def check_ha_entities(bench: Bench) -> list[Result]:
         return [skip]
     try:
         bench.ha.ping()
-    except (OSError, urllib.error.URLError) as exc:
-        return [Result(name, FAIL, f"HA not reachable: {exc}")]
+    except OSError as exc:
+        return [Result(name, FAIL, f"HA not reachable: {_request_failure(exc)}")]
     problems: list[str] = []
     for entity_id, unit in bench.archetype.units.items():
         state = bench.ha.get_state(entity_id)
@@ -308,6 +320,24 @@ def _restore(bench: Bench, case: SetpointCase, original: float | None) -> None:
     bench.publish(case.ehal_id, case.current_ehal if original is None else original)
 
 
+def _overwrite_note(bench: Bench, case: SetpointCase, expected_ehal: float) -> str:
+    """Explains a miss caused by Earnie itself rewriting the setpoint (optimizer cycle).
+
+    The first optimizer cycle after an Earnie start writes its own limits ~45 s after the
+    daemon answers HTTP; it overwrites the value this check published.
+    """
+    try:
+        got = bench.fetch_status().get(case.ehal_id)
+    except (OSError, ValueError):
+        return ""
+    if got is None or abs(float(got) - expected_ehal) < 0.5:
+        return ""
+    return (
+        f"; status.json now shows {float(got):g} instead of {expected_ehal:g} - Earnie wrote its own "
+        "setpoint (optimizer cycle), rerun after the first cycle or in silent mode"
+    )
+
+
 def check_setpoint_roundtrip(bench: Bench) -> list[Result]:
     name = "setpoint round trip"
     if (skip := _need_ha(bench, name)) is not None:
@@ -333,7 +363,14 @@ def check_setpoint_roundtrip(bench: Bench) -> list[Result]:
             Result(
                 f"status.json -> {case.entity_id}",
                 PASS if in_ha else (FAIL if in_status else SKIP),
-                "" if in_ha else (f"HA number did not reach {case.native(case.value_ehal):g}" if in_status else "no status.json value"),
+                ""
+                if in_ha
+                else (
+                    f"HA number did not reach {case.native(case.value_ehal):g}"
+                    + _overwrite_note(bench, case, case.value_ehal)
+                    if in_status
+                    else "no status.json value"
+                ),
             )
         )
     finally:
@@ -379,7 +416,7 @@ def check_reject_writes(bench: Bench) -> list[Result]:
         Result(
             "value applied after reject_writes is switched off",
             PASS if healed else FAIL,
-            "" if healed else "retry did not apply the setpoint",
+            "" if healed else "retry did not apply the setpoint" + _overwrite_note(bench, case, case.value_ehal),
         )
     )
     _restore(bench, case, original)
@@ -441,11 +478,17 @@ def check_stopped_push(bench: Bench) -> list[Result]:
     energy_name = "stopped energy push -> never invented as 0"
     if (skip := _need_ha(bench, power_name)) is not None:
         return [skip, Result(energy_name, SKIP, "needs --ha-token")]
-    power_id = _pick_read(
-        bench,
-        lambda i: field_kind(i).startswith("sens_") and "power" in field_kind(i) and "energy" not in field_kind(i),
-    )
-    energy_id = _pick_read(bench, lambda i: "energy" in field_kind(i))
+    power_ids = [
+        i
+        for i in bench.archetype.reads()
+        if field_kind(i).startswith("sens_") and "power" in field_kind(i) and "energy" not in field_kind(i)
+    ]
+    energy_ids = [i for i in bench.archetype.reads() if "energy" in field_kind(i)]
+    # A stopped push is only visible for a signal whose last value was not 0 (a fresh bench
+    # idles the battery at 0 W / 0 kWh while grid / PV values are live).
+    rows = bench.load_inbox()
+    power_id = _prefer_nonzero(rows, power_ids)
+    energy_id = _prefer_nonzero(rows, energy_ids)
     chosen = {i: _automation_for(bench, i) for i in (power_id, energy_id) if i}
     missing = [i for i, auto in chosen.items() if auto is None]
     if missing:
@@ -477,6 +520,8 @@ def check_stopped_push(bench: Bench) -> list[Result]:
             elif want_zero:
                 ok = state == STATE_ZERO_ASSUMED_SILENT
                 results.append(Result(name, PASS if ok else FAIL, f"{ehal_id}: {state}"))
+            elif state == STATE_ZERO_HELD:
+                results.append(Result(name, SKIP, f"{ehal_id} last pushed 0, a held 0 is a real value here"))
             else:
                 ok = state not in _ZERO_STATES and value is None
                 results.append(Result(name, PASS if ok else FAIL, f"{ehal_id}: {state}, value {value}"))
@@ -497,12 +542,37 @@ def check_pack_unchanged(archetype: Archetype, config_dir: Path) -> Result:
     return Result(name, PASS if ok else FAIL, "" if ok else "rerun scripts.ha_testbed_build")
 
 
+def _request_failure(exc: OSError) -> str:
+    """Readable detail for a failed HA / Earnie request (``HTTPError`` is an ``OSError``)."""
+    if isinstance(exc, urllib.error.HTTPError):
+        hint = " - check the HA long-lived token (HA_TESTBED_TOKEN)" if exc.code in (401, 403) else ""
+        return f"HTTP {exc.code} {exc.reason} for {exc.url}{hint}"
+    return f"request failed: {exc}"
+
+
+def _guarded(name: str, check: Callable[[Bench], list[Result]], bench: Bench) -> list[Result]:
+    """A failing HA / Earnie request is a FAIL of that check, not a crash of the run."""
+    try:
+        return check(bench)
+    except OSError as exc:
+        return [Result(name, FAIL, _request_failure(exc))]
+
+
 def run_checks(bench: Bench, *, negative: bool = True) -> list[Result]:
-    results = check_ha_entities(bench) + check_inbox(bench) + check_setpoint_roundtrip(bench)
+    checks: list[tuple[str, Callable[[Bench], list[Result]]]] = [
+        ("HA reachable, sim entities exist with expected units", check_ha_entities),
+        ("Earnie inbox", check_inbox),
+        ("setpoint round trip", check_setpoint_roundtrip),
+    ]
     if negative:
-        results += check_reject_writes(bench)
-        results += check_set_unavailable(bench)
-        results += check_stopped_push(bench)
+        checks += [
+            ("reject_writes -> hub_write_failed reported to Earnie", check_reject_writes),
+            ("set_unavailable -> no crash, push resumes", check_set_unavailable),
+            ("stopped push", check_stopped_push),
+        ]
+    results: list[Result] = []
+    for name, check in checks:
+        results += _guarded(name, check, bench)
     return results
 
 

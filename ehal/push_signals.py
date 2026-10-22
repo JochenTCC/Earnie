@@ -7,7 +7,7 @@ derived from the qualified ID (not the Merker name).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from ehal.qualified_ids import (
     field_kind,
@@ -178,6 +178,7 @@ def _signals_from_entries(
     reject_msg: str,
 ) -> list[Signal]:
     signals: list[Signal] = []
+    index_by_id: dict[str, int] = {}
     used_titles: set[str] = set()
     for kind, entity_id, ctype, field, name in entries:
         name = str(name or "").strip()
@@ -189,6 +190,14 @@ def _signals_from_entries(
             continue
         if not validate_id(ehal_id):
             raise ValueError(reject_msg.format(ehal_id=ehal_id, kind=kind, entity_id=entity_id))
+        # A consumer's flat key (``set_evcs_max_current``) and its qualified twin
+        # (``evcs.<id>.set_evcs_max_current``, added by the dm4 migration) are one signal.
+        seen = index_by_id.get(ehal_id)
+        if seen is not None:
+            if name and signals[seen].old_name == ehal_id:
+                signals[seen] = replace(signals[seen], old_name=name)
+            continue
+        index_by_id[ehal_id] = len(signals)
         title = base = title_fn(ehal_id)
         suffix = 2
         while title in used_titles:

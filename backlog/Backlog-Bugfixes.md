@@ -43,6 +43,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 Found by the HA testbed baseline run (2026-10-21; evidence and finding ids F1–F18 in [`docs/dev/ha-contract-testbed.md`](../docs/dev/ha-contract-testbed.md) §3a):
 
 
+Found by the first live run of the bench (2026-10-22; finding ids L1–L13 in the same doc, § 3f):
+
+- [ ] **Live cycle spins without an SoC (L12):** with no `ess.<id>.sens_ess_soc` in the push inbox every cycle aborts (`Optimierung abgebrochen: Kein Zugriff auf EHAL SoC`) and the scheduler plans the next run "in 0 s" again: ~900 cycles and ~950 ERROR lines in 20 minutes until HA pushed the SoC. Add a backoff (no faster than the push interval) and a "waiting for SoC" message instead of an ERROR per cycle; also `Durchlauf erfolgreich beendet` is logged for aborted cycles.
+- [ ] **Carrier skip message names the wrong cause (L13):** `integrations/ha_carrier_yaml.py` logs `unknown or incompatible unit_of_measurement … (need numeric)` when the published setpoint value is not numeric; the generated template never reads the unit for that decision. Fix the wording (+ test on the YAML).
+- [ ] **`set_ess_mode` skipped for activation-only HA bindings (L9, question first):** `HaWriteMixin._write_ess_setpoints` tests `not self.cfg.entities.get("set_ess_mode")` (value), the push bindings are empty activation flags, so the mode is never published. Decide whether the mode belongs to the YAML (`ha_ess_force`) or should be published like the export limit (fixed to a key-presence test in the live run).
+
+
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
