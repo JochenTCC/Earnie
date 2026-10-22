@@ -65,7 +65,8 @@ def _copy_tree(src: Path, dest: Path, *, prepend_py_header: bool) -> dict[str, s
         dest_file.parent.mkdir(parents=True, exist_ok=True)
         raw = src_file.read_bytes()
         if prepend_py_header and src_file.suffix == ".py":
-            text = raw.decode("utf-8")
+            # Windows checkouts (autocrlf) have CRLF sources; the index is LF.
+            text = raw.decode("utf-8").replace("\r\n", "\n")
             if not text.startswith("# GENERATED"):
                 text = GENERATED_HEADER + text
             dest_file.write_text(text, encoding="utf-8", newline="\n")

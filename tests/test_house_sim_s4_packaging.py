@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import importlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -67,7 +68,17 @@ def _forbidden_imports_in_tree(root: Path) -> list[str]:
     return hits
 
 
-def test_sync_keeps_core_and_fixtures_equal():
+@pytest.fixture
+def restore_generated_copy(tmp_path):
+    """sync() rewrites the tracked HA copy; put it back so the tree stays clean."""
+    backup = tmp_path / "ha_integration_backup"
+    shutil.copytree(DEST_ROOT, backup)
+    yield
+    shutil.rmtree(DEST_ROOT)
+    shutil.copytree(backup, DEST_ROOT)
+
+
+def test_sync_keeps_core_and_fixtures_equal(restore_generated_copy):
     sync()
     assert DEST_CORE.is_dir(), SYNC_HINT
     assert DEST_FIXTURES.is_dir(), SYNC_HINT
