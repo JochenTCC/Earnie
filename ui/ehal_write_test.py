@@ -31,7 +31,18 @@ from integrations.ehal_write_test_bounds import (
 
 _SESSION_PENDING = "ehal_write_test_pending"
 _SESSION_RESULT = "ehal_write_test_result"
+_SESSION_OPEN = "ehal_write_test_open"
 _DEFAULT_FORCE_W = 100.0
+
+
+def _keep_open() -> None:
+    """Remember the user is working in the expander (widget callback, runs before the rerun).
+
+    ``st.expander`` has no state of its own: an element that Streamlit remounts (the page
+    above it changed between runs) would come back collapsed. The next run renders it with
+    ``expanded=True`` instead (B2).
+    """
+    st.session_state[_SESSION_OPEN] = True
 
 
 def _render_write_test_intro() -> None:
@@ -54,6 +65,7 @@ def _render_force_checkbox(*, disabled: bool) -> bool:
             f"``set_ess_active_power`` schreiben freigeben (±{ACTIVE_POWER_MAX_ABS_W:g} W)",
             value=False,
             key="ehal_write_test_force",
+            on_change=_keep_open,
             disabled=disabled,
             help=(
                 "Zeilen sind immer sichtbar. Ohne Haken ist Senden für "
@@ -73,6 +85,7 @@ def _render_wait_input(*, disabled: bool) -> float:
             value=float(DEFAULT_ROUNDTRIP_WAIT_S),
             step=0.5,
             key="ehal_write_test_wait",
+            on_change=_keep_open,
             disabled=disabled,
         )
     )
@@ -90,6 +103,7 @@ def _render_write_test_buttons(
         if st.button(
             "Alle schreiben",
             key="ehal_write_test_manual_btn",
+            on_click=_keep_open,
             disabled=silent or not selected,
             type="primary",
         ):
@@ -99,6 +113,7 @@ def _render_write_test_buttons(
         if st.button(
             "Auto-Roundtrip",
             key="ehal_write_test_auto_btn",
+            on_click=_keep_open,
             disabled=silent or not selected,
         ):
             _queue_action("roundtrip", values=selected, force=force, wait_s=wait_s)
@@ -107,6 +122,7 @@ def _render_write_test_buttons(
         if st.button(
             "Sicher wiederherstellen",
             key="ehal_write_test_restore_btn",
+            on_click=_keep_open,
             disabled=silent,
             help="ESS Automatik + EVCS 0 A (wie Startup-Safe-Push).",
         ):
@@ -126,7 +142,9 @@ def power_limit_unknown_notice() -> str:
 
 def render_write_test_section() -> None:
     """Expander under Live-Schreiben: table of probes, one send / roundtrip."""
-    with st.expander("Schreibtest", expanded=False):
+    with st.expander(
+        "Schreibtest", expanded=bool(st.session_state.get(_SESSION_OPEN, False))
+    ):
         _render_write_test_intro()
 
         silent = not writes_allowed()
@@ -204,6 +222,7 @@ def _render_probe_table(
             "Senden",
             value=False,
             key=f"ehal_write_test_incl_{field}",
+            on_change=_keep_open,
             disabled=row_disabled,
             label_visibility="collapsed",
         )
@@ -249,6 +268,7 @@ def _render_row_value(
             options=[0, 1, 2],
             format_func=lambda m: labels[m],
             key=f"ehal_write_test_val_{field}",
+            on_change=_keep_open,
             disabled=disabled,
             label_visibility="collapsed",
         )
@@ -263,6 +283,7 @@ def _render_row_value(
             options=[0, 1],
             format_func=lambda m: labels[int(m)],
             key=f"ehal_write_test_val_{field}",
+            on_change=_keep_open,
             disabled=disabled,
             label_visibility="collapsed",
         )
@@ -271,6 +292,7 @@ def _render_row_value(
             "Wert",
             options=["off", "pv", "now"],
             key=f"ehal_write_test_val_{field}",
+            on_change=_keep_open,
             disabled=disabled,
             label_visibility="collapsed",
         )
@@ -290,6 +312,7 @@ def _render_row_value(
         value=float(default),
         step=float(step),
         key=f"ehal_write_test_val_{field}",
+        on_change=_keep_open,
         disabled=disabled,
         label_visibility="collapsed",
     )
