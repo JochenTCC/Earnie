@@ -113,13 +113,15 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
     - Importer: HA recorder / CSV export → series format. Base load = measured house consumption − separately metered wallbox / heat pump / battery. If a device is not metered separately: mark the case as limited in `meta`, do not guess.
     - Anonymise before anything is committed (location rounding, no entity / user names; aliases per `backlog-anonymize-users.mdc`). Real customer data stays out of the public repo (cf. **Regression** P2 private repo).
     - Use recorded series to calibrate the P1 generators (e.g. H25 scaling vs. real households) and to reproduce field bug reports.
+
+
+
+### Version 2.+1 — Plant topology (epic **Topology** P3–P5, moved from 2.7 on 2026-10-14)
+
 - [ ] **HA-Loxone bridge generator — second device: Roborock mop/vacuum robot** (follow-up of the Bridge-Builder POC with the EcoFlow Delta 3, see [HA-Loxone-Bridge-Builder-Draft.md](HA-Loxone-Bridge-Builder-Draft.md) and [`docs/dev/done/ha-loxone-bridge.md`](../docs/dev/done/ha-loxone-bridge.md))
   - When the Roborock (HA Roborock integration) is wired to Loxone / Earnie, build the HA ↔ Loxone bridge with `tools/ha_loxone_bridge/` instead of hand-written YAML — first test of the generator on a device other than the Delta 3.
   - Check which signals are needed (e.g. battery level, state, start / return-to-dock) and whether the generator covers them: today only `sensor` / `number` / `input_number` (both directions) and `switch` / `input_boolean` (Loxone → HA). A `vacuum` / `button` / `select` domain would be a generator extension — decide per signal, do not bend the mapping.
   - Record findings (missing features, mapping-file friction, Loxone template issues) in the Bridge-Builder draft.
-
-
-### Version 2.+1 — Plant topology (epic **Topology** P3–P5, moved from 2.7 on 2026-10-14)
 
 - **Note:** Continuation of the epic **Topology** (Version 2.7: **P1** + **P2** + Powerstation AC wording → [Erledigt](Backlog-Erledigt.md)). Decision record [`Plant-Topology-Conclusion.md`](Plant-Topology-Conclusion.md); theses/reviews [`Plant-Topology-Theses.md`](Plant-Topology-Theses.md). Order stays P3 → P4 → P5. Until P3 + P4 land, P1 rejects multi-house-ESS and foreign self-consumption loops on the live path (Szenarien-Explorer and backtesting unaffected). Ideally the Regression epic (R-Rec) guards the P4 MILP change. `inverters[].ac_connection: island` = bus participation (not “off the grid”); flag stays until the port model in P5.
   - [ ] **Topology P3 — per-ESS setpoint writes** (closes the **2.7.c** gap: today only the primary house battery receives setpoints): mode/target per house battery from `milp_plan["ess"]`, entity-scoped `ess.{id}.set_*` for every mappable grid-tied house battery (template `write_cycle_powerstation_setpoints`; `write_mapped_fields` on HA/OpenEMS; Loxone exchange IDs exist). Plant `set_grid_export_power_limit` unchanged. Lifts the P1 one-battery rule for `control: full` secondaries with own bindings (together with P4).

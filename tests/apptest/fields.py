@@ -167,3 +167,32 @@ CONSUMER_FIELDS = [
     _cons("pool", "number_input", "rc_eff_3", "thermal_rc.heating_efficiency", 0.8),
     _cons("pool", "checkbox", "absent_opt_in_3", "absent_mode_enabled", True),
 ]
+
+
+# --- Szenarienkonfigurator --------------------------------------------------
+# ``entity`` = Szenario-id (= Key-Präfix ``<id>__``), ``profile_key`` = Pfad im Szenario.
+# ``valid`` ist der Widget-Wert (Anzeige-Label bei Selectbox/Multiselect); ``stored`` der
+# erwartete Dateiwert, ``ABSENT`` wenn der Schlüssel danach fehlen muss.
+# Land- und Typ-Filter sind reine UI-Filter und werden nicht gespeichert.
+
+ABSENT = "<absent>"
+SCENARIO_ID = "entity_test"
+SCENARIO_RADIO_LABEL = "Entitäten-Referenzen Test"
+
+
+def _scen(kind, suffix, key, valid, stored=None, boundaries=()):
+    return Field(kind, suffix, key, valid, boundaries=boundaries, entity=SCENARIO_ID, stored=stored)
+
+
+SCENARIO_FIELDS = [
+    _scen("text_input", "scenario_label", "label", "Neu Ünï – 日本 🏠"),
+    _scen("text_input", "scenario_label", "label", "S"),
+    _scen("checkbox", "scenario_enabled", "enabled", False),
+    _scen("checkbox", "scenario_own_reference", "own_reference", True),
+    _scen("selectbox", "scenario_import", "settings.import_tariff_id",
+          "aWATTar Österreich", stored="awattar_at"),
+    _scen("selectbox", "scenario_profile", "settings.house_profile_id",
+          "— keine —", stored=ABSENT),
+    _scen("multiselect", "scenario_battery", "settings.battery_ids", [], stored=ABSENT),
+    _scen("multiselect", "scenario_pv", "settings.pv_system_ids", [], stored=ABSENT),
+]
