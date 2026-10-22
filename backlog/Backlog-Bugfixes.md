@@ -29,6 +29,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] **Profile geo/PV defaults swallow a legitimate `0`:** `house_config/profiles_store.py::_profile_geo_and_csv_fields` uses `float(raw.get(key, default) or default)`, so `default_pv_tilt = 0` (flat roof) is saved and loaded as `25`, `latitude = 0` as `48`, `longitude = 0` as `10` — silently, no error. Found by the UI persistence tests (level 1, house profile); regression test is `xfail(strict)` in `tests/apptest/test_persist_house_profile_apptest.py` (`_KNOWN_BUGS`). Fix: distinguish missing/`None`/`""` from `0` (fail loud for invalid values, `.cursor/rules/no-implicit-fallbacks.mdc`); remove the `xfail` entry with the fix. Repro: set `Neigung` to 0 in Hauskonfigurator → new session shows 25.
+
 
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
