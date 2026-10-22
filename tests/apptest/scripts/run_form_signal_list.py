@@ -1,0 +1,3 @@
+from ui.ehal_signal_list import render_ehal_signal_list_section
+
+render_ehal_signal_list_section()
