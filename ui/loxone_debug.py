@@ -312,7 +312,7 @@ def _render_hub_write_failure() -> None:
 
     age = hub_write_failure_age_s()
     if age is not None:
-        st.error(
+        st.warning(
             f"Home Assistant meldet: mindestens ein Sollwert wurde nicht angewendet "
             f"(zuletzt vor {age:.0f} s). Ziel-Entity und HA-Log prüfen — „Erfolg“ unten "
             "heißt nur: veröffentlicht."
