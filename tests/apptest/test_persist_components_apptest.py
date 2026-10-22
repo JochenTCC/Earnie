@@ -163,10 +163,6 @@ def test_t3_empty_label_is_not_saved_and_user_is_told(suffix: str) -> None:
     assert _widget(_new_session(spec.tab), spec).value != ""
 
 
-@pytest.mark.xfail(
-    reason="Batterie-Formular akzeptiert max. SoC unter min. SoC ohne Meldung (Backlog-Bugfixes)",
-    strict=True,
-)
 def test_t3_battery_max_soc_below_min_soc_is_rejected() -> None:
     min_spec, max_spec = _field("planning_battery_min_soc"), _field("planning_battery_max_soc")
     path = Path(os.environ[_COMPONENTS_PATH_ENV])

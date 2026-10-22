@@ -200,6 +200,7 @@ def normalize_battery(raw: dict, index: int) -> dict:
     )
     ehal_bindings = _raw_battery_ehal_bindings(raw, battery_id=battery_id, index=index)
     inverter_id = str(raw.get("inverter_id") or "").strip()
+    min_soc, max_soc = _validated_soc_window(raw, battery_id=battery_id, index=index)
     out = {
         "id": battery_id,
         "label": label,
@@ -210,8 +211,8 @@ def normalize_battery(raw: dict, index: int) -> dict:
         # Legacy alias = max(charge, discharge) for threshold / straggler callers.
         "battery_max_power_kw": max(charge_kw, discharge_kw),
         "battery_efficiency": float(raw["battery_efficiency"]),
-        "battery_min_soc": float(raw["battery_min_soc"]),
-        "battery_max_soc": float(raw["battery_max_soc"]),
+        "battery_min_soc": min_soc,
+        "battery_max_soc": max_soc,
         "threshold_power": threshold,
         "standby_power_kw": standby,
         "control": control,
@@ -235,6 +236,19 @@ def normalize_battery(raw: dict, index: int) -> dict:
     _apply_battery_inverter_id(out, inverter_id, battery_id=battery_id, index=index)
     _apply_battery_id_lock_fields(out, raw)
     return out
+
+
+def _validated_soc_window(
+    raw: dict, *, battery_id: str, index: int
+) -> tuple[float, float]:
+    min_soc = float(raw["battery_min_soc"])
+    max_soc = float(raw["battery_max_soc"])
+    if min_soc >= max_soc:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): battery_min_soc ({min_soc:g} %) "
+            f"muss kleiner als battery_max_soc ({max_soc:g} %) sein."
+        )
+    return min_soc, max_soc
 
 
 def _normalize_battery_wear(raw: object, battery_id: str, index: int) -> dict | None:
