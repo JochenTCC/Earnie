@@ -250,38 +250,31 @@ def test_t3_shadow_mode_toggle_shows_hint_and_keeps_files(monkeypatch) -> None:
     assert any("Shadow" in text for text in messages(at)["caption"] + messages(at)["warning"])
 
 
-def _break_components() -> Path:
+@pytest.fixture
+def broken_components():
+    """Eine unlesbare ``components.json``; der Originalinhalt wird nach dem Test wiederhergestellt."""
     path = _path("comp")
+    original = path.read_bytes()
     path.write_text("{ das ist kein json", encoding="utf-8")
     clear_components_doc_cache()
-    return path
+    yield path
+    path.write_bytes(original)
+    clear_components_doc_cache()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="ehal_signal_list._load_docs: `except Exception` ersetzt eine unlesbare components.json "
-    "still durch ein leeres Dokument, die Tabelle zeigt keinen Fehler (Backlog-Bugfixes)",
-)
-def test_t3_unreadable_components_file_is_reported() -> None:
-    _break_components()
-
+def test_t3_unreadable_components_file_is_reported(broken_components) -> None:
     at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
 
-    assert messages(at)["error"] or messages(at)["warning"]
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="ehal_signal_list._load_docs/_persist_docs: nach dem stillen Ersatz wird die unlesbare "
-    "components.json beim Umschalten eines Signals mit einem leeren Dokument überschrieben "
-    "(Datenverlust; Backlog-Bugfixes)",
-)
-def test_t3_toggle_never_overwrites_an_unreadable_components_file() -> None:
-    path = _break_components()
-    before = path.read_bytes()
-    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
-
-    at = _toggle(at, "get_grid_export_power_limit", True)
-
-    assert path.read_bytes() == before
     assert not at.exception
+    assert messages(at)["error"], "unlesbare components.json muss als Fehler sichtbar sein"
+    assert not at.dataframe, "ohne lesbare Konfiguration keine (unvollständige) Tabelle"
+
+
+def test_t3_toggle_never_overwrites_an_unreadable_components_file(broken_components) -> None:
+    before = broken_components.read_bytes()
+
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
+
+    assert not at.exception
+    assert not [c for c in at.checkbox if c.key.startswith(_PREFIX)], "keine Schalter ohne lesbare Konfiguration"
+    assert broken_components.read_bytes() == before

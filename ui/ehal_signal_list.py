@@ -24,7 +24,16 @@ _DASH = "—"
 
 def render_ehal_signal_list_section() -> None:
     """Contract table: qualified ID · meaning · Pflicht/aktiviert · match · export."""
-    house, components = _load_docs()
+    try:
+        house, components = _load_docs()
+    except (ValueError, OSError) as exc:
+        # Fail loud: no table and no switches, so nothing can be saved over a file
+        # that could not be read.
+        st.error(
+            "Signalliste nicht verfügbar: Konfiguration nicht lesbar — "
+            f"{exc} Bitte die Datei im Konfigurationsverzeichnis prüfen."
+        )
+        return
     inbox = _load_inbox()
     published, fetched_at = _load_publish_state()
     backend = active_ehal_backend()
@@ -194,32 +203,19 @@ def _render_export(house: dict, components: dict, *, backend: str) -> None:
 def _load_docs() -> tuple[dict, dict]:
     from ui.house_config_io import _load_components_document, load_house_profiles
 
-    house = load_house_profiles()
-    try:
-        components = _load_components_document()
-    except Exception:  # noqa: BLE001
-        components = {"batteries": [], "pv_systems": []}
-    if not isinstance(components, dict):
-        components = {"batteries": [], "pv_systems": []}
-    return house if isinstance(house, dict) else {}, components
+    return load_house_profiles(), _load_components_document()
 
 
 def _load_inbox() -> dict[str, dict[str, Any]]:
-    try:
-        from runtime_store.loxone_push_inbox import load_inbox
+    from runtime_store.loxone_push_inbox import load_inbox
 
-        return load_inbox()
-    except Exception:  # noqa: BLE001
-        return {}
+    return load_inbox()
 
 
 def _load_publish_state() -> tuple[dict[str, dict[str, Any]], str | None]:
-    try:
-        from integrations.ehal_write import load_published_records, published_fetched_at
+    from integrations.ehal_write import load_published_records, published_fetched_at
 
-        return load_published_records(), published_fetched_at()
-    except Exception:  # noqa: BLE001
-        return {}, None
+    return load_published_records(), published_fetched_at()
 
 
 def _default_host() -> str:
