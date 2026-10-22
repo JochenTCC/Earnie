@@ -197,6 +197,9 @@ def _jinja_to_ehal_vars(entity: str, ehal_unit: str | None) -> list[str]:
     return lines
 
 
+_UNIT_CONVERTED = ("W", "kWh", "%", "A")
+
+
 def _jinja_from_ehal_vars(attr: str, entity: str, ehal_unit: str | None) -> list[str]:
     """Variables: status attribute (EHAL) → ``hub_value`` for the target entity."""
     ehal_expr = f"state_attr('{STATUS_SENSOR_ENTITY}', '{attr}')"
@@ -393,10 +396,15 @@ def _setpoint_automation(
     entity = entity_placeholder(sig.ehal_id)
     unit = ehal_base_unit(sig.ehal_id)
     auto_id = f"earnie_setpoint_{_sanitize_id(sig.ehal_id)}"
-    skip_msg = (
-        f"Earnie setpoint skipped for {sig.ehal_id}: unknown or incompatible "
-        f"unit_of_measurement on {entity} (need {unit or 'numeric'})"
-    )
+    if unit in _UNIT_CONVERTED:
+        # Only these units are read from the target entity (see _jinja_from_ehal_vars).
+        skip_msg = (
+            f"Earnie setpoint skipped for {sig.ehal_id}: unknown or incompatible "
+            f"unit_of_measurement on {entity} (need {unit})"
+        )
+    else:
+        # No unit conversion: hub_value is none only when the published value is not numeric.
+        skip_msg = f"Earnie setpoint skipped for {sig.ehal_id}: published value is not numeric"
     # Re-assert on every tick, but only write when the target drifted (≈1 %), so
     # a restart or a manual change is corrected without a write every interval.
     drift = (

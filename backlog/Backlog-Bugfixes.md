@@ -23,12 +23,12 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **Carrier skip message names the wrong cause (L13):** fixed in `integrations/ha_carrier_yaml.py` (no version bump): the setpoint skip log names the unit only for converted units (W/kWh/%/A), otherwise `published value is not numeric`; test in `tests/test_ha_carrier_yaml_gen.py`. **Pending:** verify live on the bench (2026-10-22).
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
 Found by the first live run of the bench (2026-10-22; finding ids L1–L13 in the same doc, § 3f):
-- [ ] **Carrier skip message names the wrong cause (L13):** `integrations/ha_carrier_yaml.py` logs `unknown or incompatible unit_of_measurement … (need numeric)` when the published setpoint value is not numeric; the generated template never reads the unit for that decision. Fix the wording (+ test on the YAML).
 
 Found while trying to intake a productive-NAS debug dump as a golden case (2026-10-22):
 - [ ] **Recorder replay fails offline for installations with an EV `get_evcs_limit_soc` binding:** `recorder_replay._prepare_replay_inputs` -> `prepare_optimization_matrix` -> `optimizer/charging_resolve.py::_resolve_config_path_charging_context` -> `settings/ehal_marker_resolve.py::resolve_get_evcs_limit_soc` reads the live marker (`ehal_live.read_generic_value`) and raises `Verbraucher 'e_auto': get_evcs_limit_soc Merker 'ev.e_auto.get_evcs_limit_soc' nicht lesbar`, because there is no live value in a replay. The recorder stores `start_state.charging_contexts` as `{}` for these cycles, so nothing recorded can stand in. Effect: no cycle of such an installation can be replayed or used as a golden case (`run_regression` L1 / `--intake`). Decide: record the resolved limit SoC per EV in the cycle (and use it in replay), or fail loud at intake. No silent default. Repro: dump from the productive NAS (7 days of recorder), `--intake ... --cycle-index 658`, then `--update-golden`.

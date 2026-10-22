@@ -181,3 +181,19 @@ def test_carrier_yaml_push_skip_message_names_the_unavailable_state():
     # HA testbed F24: an unavailable entity has a fine unit; the old text blamed the unit.
     text = _build()
     assert "is unavailable/non-numeric" in text
+
+
+def test_carrier_yaml_setpoint_skip_message_names_the_real_cause(monkeypatch):
+    # Bench L13: the unit text was logged for a non-numeric published value; the
+    # template only reads the target unit for converted units (W/kWh/%/A).
+    text = _build()
+    assert "setpoint skipped for ess.house.set_ess_charge_power_limit: unknown or incompatible" in text
+    assert "unit_of_measurement on ENTITY_ess_house_set_ess_charge_power_limit (need W)" in text
+
+    monkeypatch.setattr("integrations.ha_carrier_yaml.ehal_base_unit", lambda _id: None)
+    text = _build()
+    assert (
+        "setpoint skipped for ess.house.set_ess_charge_power_limit: published value is not numeric"
+        in text
+    )
+    assert "setpoint skipped" in text and "unit_of_measurement on ENTITY_ess_house_set" not in text
