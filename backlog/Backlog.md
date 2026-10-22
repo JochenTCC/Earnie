@@ -22,7 +22,8 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 
 - [x] Dogfood greenfield Earnie configuration for a Loxone SB
 - [x] Pre-Release 2.7.0-alpha.7 for Loxone
-- [ ] Dogfood and finalize new HA binding
+- [x] Dogfood and finalize new HA binding
+- [ ] Review HA related docs
 - [ ] beta release for Loxone and HA
 - [ ] Wait for feedback
 - [ ] final release 2.7.0
