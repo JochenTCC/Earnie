@@ -23,18 +23,15 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **Live golden dump (private REG):** when the fixed version is running on productive NAS, capture a debug dump (with `recorder/`) around a cheap-slot Delta 3 refill and intake as a private golden case confirming charge ≤ HK ∩ live (Delta 3 standby HK/live limits fix; verified 2026-10-21).
-- [ ] **F20 (Schreibtest 0 W warning without a complete live scenario) - fixed, verify live:** `ui/ehal_write_test.py::power_limit_unknown_notice` explains why every power value is rejected when the live scenario has no battery maximum (unit tested). The bench scenario is complete (max power > 0), so the warning was **not** exercised live; needs a pack with an incomplete live scenario. (F23 - Live-Lesen value / receipt time - is verified and archived.)
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-Found by the HA testbed baseline run (2026-10-21; evidence and finding ids F1–F18 in [`docs/dev/ha-contract-testbed.md`](../docs/dev/ha-contract-testbed.md) §3a):
-
-
 Found by the first live run of the bench (2026-10-22; finding ids L1–L13 in the same doc, § 3f):
-
 - [ ] **Carrier skip message names the wrong cause (L13):** `integrations/ha_carrier_yaml.py` logs `unknown or incompatible unit_of_measurement … (need numeric)` when the published setpoint value is not numeric; the generated template never reads the unit for that decision. Fix the wording (+ test on the YAML).
+
+Found while trying to intake a productive-NAS debug dump as a golden case (2026-10-22):
+- [ ] **Recorder replay fails offline for installations with an EV `get_evcs_limit_soc` binding:** `recorder_replay._prepare_replay_inputs` -> `prepare_optimization_matrix` -> `optimizer/charging_resolve.py::_resolve_config_path_charging_context` -> `settings/ehal_marker_resolve.py::resolve_get_evcs_limit_soc` reads the live marker (`ehal_live.read_generic_value`) and raises `Verbraucher 'e_auto': get_evcs_limit_soc Merker 'ev.e_auto.get_evcs_limit_soc' nicht lesbar`, because there is no live value in a replay. The recorder stores `start_state.charging_contexts` as `{}` for these cycles, so nothing recorded can stand in. Effect: no cycle of such an installation can be replayed or used as a golden case (`run_regression` L1 / `--intake`). Decide: record the resolved limit SoC per EV in the cycle (and use it in replay), or fail loud at intake. No silent default. Repro: dump from the productive NAS (7 days of recorder), `--intake ... --cycle-index 658`, then `--update-golden`.
 
 
 
