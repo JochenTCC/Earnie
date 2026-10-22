@@ -113,7 +113,7 @@ def _render_thermal_comfort_fields(
     )
     item["persons"] = labeled_number_input(
         "Personen",
-        min_value=0,
+        min_value=1,
         value=int(thermal.get("persons", 2)),
         key=_scoped_key(session_scope, f"hc_persons_{index}"),
     )

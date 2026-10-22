@@ -99,21 +99,10 @@ def test_t1_value_survives_save_and_new_session(spec: Field) -> None:
     assert _widget(_new_session(), spec).value == spec.valid
 
 
-# Bekannte Fehler: Test bleibt stehen, schlägt streng fehl, sobald der Fehler behoben ist.
-_KNOWN_BUGS = {
-    ("wp-persons_0", 0): (
-        "profiles_thermal_annual: `int(persons or 2)` macht 0 Personen (Widget erlaubt min 0) "
-        "still zu 2 (Backlog-Bugfixes)"
-    ),
-}
-
-
 def _boundary_params():
     for spec in CONSUMER_FIELDS:
         for value in spec.boundaries:
-            reason = _KNOWN_BUGS.get((_ids(spec), value))
-            marks = [pytest.mark.xfail(reason=reason, strict=True)] if reason else []
-            yield pytest.param(spec, value, marks=marks, id=f"{_ids(spec)}-{value}")
+            yield pytest.param(spec, value, id=f"{_ids(spec)}-{value}")
 
 
 @pytest.mark.parametrize("spec,value", list(_boundary_params()))

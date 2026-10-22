@@ -11,6 +11,23 @@ def absent_temp_reduction_c(raw: dict, target_temp_c: float) -> float:
     return 6.5
 
 
+def int_or_default(value: object, default: int) -> int:
+    """``int(value)``; only a missing / ``None`` / empty value yields ``default`` (0 is kept)."""
+    if value is None or value == "":
+        return default
+    return int(value)
+
+
+def _persons(raw: dict) -> int:
+    persons = int_or_default(_raw_thermal_field(raw, "persons"), 2)
+    if persons < 1:
+        raise ValueError(
+            f"thermal_annual: persons muss >= 1 sein (ist {persons}). "
+            "Abwesenheit wird über den Abwesenheitsmodus abgebildet, nicht über 0 Personen."
+        )
+    return persons
+
+
 def _raw_thermal_field(raw: dict, key: str):
     if raw.get(key) not in (None, ""):
         return raw.get(key)
@@ -51,7 +68,7 @@ def _build_thermal_block(raw: dict) -> dict:
         )
         .strip()
         .lower(),
-        "persons": int(_raw_thermal_field(raw, "persons") or 2),
+        "persons": _persons(raw),
         "target_temp_c": target_temp_c,
         "absent_temp_reduction_c": absent_temp_reduction_c(raw, target_temp_c),
         "heating_limit_c": float(
@@ -61,7 +78,9 @@ def _build_thermal_block(raw: dict) -> dict:
             _raw_thermal_field(raw, "solar_thermal_area_m2") or 0.0
         ),
         "solar_thermal_tilt_deg": float(
-            _raw_thermal_field(raw, "solar_thermal_tilt_deg") or 18.0
+            18.0
+            if _raw_thermal_field(raw, "solar_thermal_tilt_deg") is None
+            else _raw_thermal_field(raw, "solar_thermal_tilt_deg")
         ),
         "solar_thermal_azimuth_deg": float(
             _raw_thermal_field(raw, "solar_thermal_azimuth_deg") or 0.0
