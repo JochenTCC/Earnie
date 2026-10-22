@@ -268,6 +268,7 @@ def _install_stubs(main_module, capture: dict, traveller) -> None:
     for name in (
         "write_huawei_modbus_states",
         "write_flexible_consumer_states",
+        "write_flex_enables_for_ha",
         "write_inv_ac_limits_from_plan",
         "write_ess_setpoints_from_control",
         "write_evcs_max_current_from_consumers",

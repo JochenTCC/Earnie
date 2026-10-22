@@ -291,9 +291,15 @@ def _flexible_consumer_output_values(
 
 
 def _publish_flexible_consumer_outputs(
-    consumer: dict, values: dict[str, float]
+    consumer: dict,
+    values: dict[str, float],
+    *,
+    kinds: frozenset[str] | None = None,
 ) -> list[LoxoneWriteRecord]:
-    """Publish qualified IDs for flex/EV outputs (2.7.q Q5 push-only)."""
+    """Publish qualified IDs for flex/EV outputs (2.7.q Q5 push-only).
+
+    ``kinds`` restricts the publish to those field kinds (``None`` = all).
+    """
     from ehal.qualified_ids import qualified_consumer_id
     from integrations.ehal_debug_mapping import _consumer_type_for_qualified_id
 
@@ -317,6 +323,8 @@ def _publish_flexible_consumer_outputs(
             kind = "set_enable"
         else:
             continue
+        if kinds is not None and kind not in kinds:
+            continue
         qid = qualified_consumer_id(cid, ctype, kind)
         records.append(
             _publish_setpoint_traced(qid, float(value), io_name=name)
@@ -332,6 +340,7 @@ def _write_flexible_consumer_output(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     send: bool,
+    publish_kinds: frozenset[str] | None = None,
 ) -> list[LoxoneWriteRecord]:
     """Publishes Freigabe/Strom-Sollwert/Modus via status.json and/or snapshot."""
     values = _flexible_consumer_output_values(
@@ -339,7 +348,9 @@ def _write_flexible_consumer_output(
     )
     records: list[LoxoneWriteRecord] = []
     if send:
-        records.extend(_publish_flexible_consumer_outputs(consumer, values))
+        records.extend(
+            _publish_flexible_consumer_outputs(consumer, values, kinds=publish_kinds)
+        )
     if snapshot is not None:
         snapshot.update(values)
     return records
@@ -597,6 +608,34 @@ def send_flexible_consumer_states(
         records.extend(
             _write_flexible_consumer_output(
                 consumer, consumer_powers, contexts, None, consumer_pv_follow, send=True
+            )
+        )
+    return records
+
+
+def send_flexible_consumer_enables(
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict] | None = None,
+    consumer_pv_follow: dict[str, int] | None = None,
+) -> list[LoxoneWriteRecord]:
+    """Publish only the flex ``set_enable`` (heat pump, pool, generic consumers).
+
+    For the HA backend: the EV current is written through the EVCS adapter
+    (``ehal_live.write_evcs_max_current_from_consumers``), so it is not published a
+    second time here.
+    """
+    contexts = charging_contexts or {}
+    records: list[LoxoneWriteRecord] = []
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        records.extend(
+            _write_flexible_consumer_output(
+                consumer,
+                consumer_powers,
+                contexts,
+                None,
+                consumer_pv_follow,
+                send=True,
+                publish_kinds=frozenset({"set_enable"}),
             )
         )
     return records

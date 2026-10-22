@@ -677,3 +677,27 @@ def test_expand_ha_writes_maps_bare_ess_fields_to_entity_scoped_ids(monkeypatch)
     assert fields[0] == "ess.house.set_ess_charge_power_limit"
     assert fields[1] == "ess.house.set_ess_active_power"
     assert fields[2] == "set_ess_discharge_power_limit"
+
+
+def test_hub_write_failure_notice_is_a_warning_not_an_error():
+    # F22: HA reporting an unapplied setpoint is a hint to check the target, not a red error.
+    from ui import loxone_debug
+
+    with patch("runtime_store.ehal_push_inbox.hub_write_failure_age_s", return_value=26.0), patch.object(
+        loxone_debug.st, "warning"
+    ) as warning, patch.object(loxone_debug.st, "error") as error:
+        loxone_debug._render_hub_write_failure()
+    warning.assert_called_once()
+    assert "nicht angewendet" in warning.call_args.args[0] and "vor 26 s" in warning.call_args.args[0]
+    error.assert_not_called()
+
+
+def test_hub_write_failure_notice_is_silent_without_a_report():
+    from ui import loxone_debug
+
+    with patch("runtime_store.ehal_push_inbox.hub_write_failure_age_s", return_value=None), patch.object(
+        loxone_debug.st, "warning"
+    ) as warning, patch.object(loxone_debug.st, "error") as error:
+        loxone_debug._render_hub_write_failure()
+    warning.assert_not_called()
+    error.assert_not_called()

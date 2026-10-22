@@ -131,6 +131,18 @@ def write_flexible_consumer_states(
     )
 
 
+def write_flexible_consumer_enables(
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict] | None = None,
+    consumer_pv_follow: dict[str, int] | None = None,
+) -> list[LoxoneWriteRecord]:
+    from integrations.loxone_writes import send_flexible_consumer_enables
+
+    return send_flexible_consumer_enables(
+        consumer_powers, charging_contexts, consumer_pv_follow
+    )
+
+
 def write_huawei_modbus_states(
     mode: int,
     target_power_kw: float,

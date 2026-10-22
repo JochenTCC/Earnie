@@ -70,6 +70,7 @@ from integrations.ehal_live_ops import (  # noqa: F401 — façade re-exports
     resolve_consumer_live_power_kw,
     resolve_consumer_nominal_power_kw,
     resolve_flexible_consumers_live_power,
+    write_flexible_consumer_enables,
     write_flexible_consumer_states,
     write_huawei_modbus_states,
 )
@@ -581,6 +582,31 @@ def _push_safe_setpoints_loxone() -> None:
         "Startup: sichere Loxone-Sollwerte teilweise fehlgeschlagen (%s Feld(er)).",
         len(failed) + len(failed_inv),
     )
+
+
+def write_flex_enables_for_ha(
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict] | None = None,
+    consumer_pv_follow: dict[str, int] | None = None,
+) -> list[dict[str, Any]]:
+    """Publish the flex ``set_enable`` (heat pump, pool, generic) for the HA backend.
+
+    Returns ``optimizer_run_state.ehal_writes`` rows. The EV current is not part of this
+    (``write_evcs_max_current_from_consumers`` writes it).
+    """
+    records = write_flexible_consumer_enables(
+        consumer_powers, charging_contexts, consumer_pv_follow
+    )
+    return [
+        {
+            "field": record.io_name,
+            "value": record.value,
+            "success": record.success,
+            "written_at": record.written_at,
+            "message": "" if record.success else "EHAL publish rejected",
+        }
+        for record in records
+    ]
 
 
 def write_evcs_max_current_from_consumers(
