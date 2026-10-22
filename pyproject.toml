@@ -35,6 +35,8 @@ dev = [
     "pytest-deadfixtures>=2.2.1",
     # EarlyStart equivalence test: freezes the wall clock globally.
     "time-machine>=3.0",
+    # Property-based storage roundtrip tests (tests/test_storage_roundtrip.py).
+    "hypothesis>=6.100",
 ]
 mutation = [
     "mutmut>=2.4.0,<3",

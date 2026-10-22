@@ -111,3 +111,6 @@ ha_lab/homeassistant/*
 ha_lab/testbed/
 # Local full pack for the testbed gate (copy of ha_lab/config + EV/heat pump/pool; may hold a .env)
 ha_lab/config_full/
+
+# hypothesis example database
+.hypothesis/
