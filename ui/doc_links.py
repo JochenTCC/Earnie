@@ -136,7 +136,7 @@ PAGE_DOCS: dict[str, PageDocs] = {
             DocLink(
                 "Jahres Verbrauch [kWh]",
                 HANDBOOK_REL_PATH,
-                "gesamtkosten-und-verbrauch-jahres-verbrauch-kwh",
+                "gesamtkosten-jahres-verbrauch-kwh",
             ),
             DocLink(
                 "Tarife und Preise nachrechnen",
@@ -152,7 +152,7 @@ PAGE_DOCS: dict[str, PageDocs] = {
         secondaries=(
             _handbook(
                 "Kurz-Checkliste Go-Live (Benutzer-Handbuch)",
-                "kurz-checkliste-vom-initial-zustand-zum-go-live",
+                "kurz-checkliste-go-live",
             ),
         ),
     ),

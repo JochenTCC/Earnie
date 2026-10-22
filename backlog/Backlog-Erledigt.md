@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Document Review — handbook fragments (2026-10-23)
+
+- [x] **Broken handbook fragments in `ui/doc_links.py` / inbound docs:** the handbook now carries explicit anchors (`<a id="analyse-verbrauch-kosten">`, `gesamtkosten-jahres-verbrauch-kwh`, `kurz-checkliste-go-live`, same style as `pv-anlagen`), so the links no longer depend on GitHub slug rules; `ui/doc_links.py` uses `gesamtkosten-jahres-verbrauch-kwh` (as `betriebsmodi.md` / `charts.md` already did) and `kurz-checkliste-go-live`. This also repairs the "Jahres Verbrauch" link in `ui/backtesting_results.py`, whose lookup by fragment never matched the old value. New tests in `tests/test_doc_links.py` check every `DocLink` fragment against the target document and every inbound handbook link in `docs/`.
+
 ### UI persistence bugfixes (2026-10-22)
 
 - [x] **House config (browser only): the first edit after opening lost the input and created a "Mein Haushalt" profile — fixed and verified (Playwright):** cause confirmed as suspected: the profile select got `index=` only on the first run and none afterwards, so the changed widget definition made the browser send its default index 0 ("— neu —") with the user's first edit. `ui/house_config_profile_form.py::_render_profile_selector` now preselects through `st.session_state["house_profile_select"]` (before the widget, `_render_profile_select_row` takes no `index`). Verified with the real browser test `test_house_config_first_edit_after_open_is_kept` (`xfail` removed; 6 open/edit attempts per run, passed in three consecutive runs after failing consistently before) and the whole e2e suite (5 passed); the "— neu —" behaviour was decided in the entry above.

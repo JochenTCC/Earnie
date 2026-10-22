@@ -313,6 +313,8 @@ Die Ergebnisse sind eine **Entscheidungsgrundlage** für Investition und Tarifwa
 
 Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die Kosten ein. Leistungspreis und netzgebietsspezifische Tabellen sind nicht berücksichtigt.
 
+<a id="gesamtkosten-jahres-verbrauch-kwh"></a>
+
 ##### Gesamtkosten und -Verbrauch: Jahres Verbrauch [kWh]
 
 Alle Zeilen zählen dasselbe: den **gebuchten Hausverbrauch** der jeweiligen Zeitreihe. Das ist die Reihe, aus der Earnie auch Kosten, Bezug und Einspeisung berechnet. Jeder Zeitslot zählt dabei einmal. Die Fake-Jahresrechnungen zeigen unter „Verbrauch (Info)“ denselben Wert.
@@ -448,6 +450,8 @@ Die Seite **Live-Cockpit → Manuelle Geräte** zeigt alle Verbraucher mit der R
 - **Start-Empfehlung:** Sterne und optional ein Tagesplan. Geplante Läufe erscheinen in Chart 1.
 - **Energiereserve:** Status der Powerstation und Trigger.
 
+<a id="analyse-verbrauch-kosten"></a>
+
 ### Analyse Verbrauch & Kosten
 
 Die Seite **Live-Cockpit → Analyse Verbrauch & Kosten** gibt es nur im Live-Betrieb mit bestehender Smarthome-Verbindung (UI-Modus `live_environment`). Sie wertet das Produktiv-Log aus:
@@ -472,6 +476,8 @@ Details: [Betrieb](../einrichtung/betrieb.md)
 ---
 
 
+
+<a id="kurz-checkliste-go-live"></a>
 
 ## Kurz-Checkliste: vom ersten Start zum Go-Live
 
