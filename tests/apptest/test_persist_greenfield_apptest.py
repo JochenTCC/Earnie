@@ -216,12 +216,6 @@ def test_t3_unreachable_miniserver_shows_error_and_writes_nothing(
     assert _backend() != "loxone"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="ehal_greenfield_import._run_import: ehal.backend wird vor dem Import auf loxone gesetzt "
-    "und ein Fehler in run_greenfield_import wird nicht abgefangen - halber Zustand und Traceback "
-    "(Backlog-Bugfixes)",
-)
 def test_t5_failing_import_leaves_config_untouched_and_shows_error(
     loxone_credentials, loxapp3, monkeypatch
 ) -> None:

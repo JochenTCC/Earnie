@@ -187,17 +187,22 @@ def _run_import() -> None:
     except LoxoneStructureError as exc:
         st.error(f"LoxAPP3 konnte nicht geladen werden: {exc}")
         return
-    persist_ehal_backend(BACKEND_LOXONE)
     house = load_house_profiles()
-    with st.spinner("Loxone-Import (Probe + Merker + EFM)…"):
-        result = run_greenfield_import(
-            doc,
-            house,
-            probe_host=host,
-            probe_username=user,
-            probe_password=password,
-        )
+    try:
+        with st.spinner("Loxone-Import (Probe + Merker + EFM)…"):
+            result = run_greenfield_import(
+                doc,
+                house,
+                probe_host=host,
+                probe_username=user,
+                probe_password=password,
+            )
+    except (ValueError, OSError) as exc:
+        st.error(f"Loxone-Import fehlgeschlagen — nichts gespeichert: {exc}")
+        return
+    # Only after a successful import: house document and backend are written together.
     save_house_profiles(result["house_doc"])
+    persist_ehal_backend(BACKEND_LOXONE)
     report = result.get("report") or {}
     st.session_state[_SESSION_LAST_REPORT] = report
     st.session_state[_SESSION_FLASH_OK] = True
