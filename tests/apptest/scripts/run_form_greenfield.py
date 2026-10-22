@@ -1,0 +1,3 @@
+from ui.ehal_greenfield_import import render_greenfield_import_section
+
+render_greenfield_import_section()
