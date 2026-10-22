@@ -99,7 +99,7 @@ Adapters must translate hub-specific conventions to EHAL **at the boundary**. Mo
 
 **Loxone live vs. setpoint:** when **reading** `sens_ess_power`, the adapter only converts kW → W; Loxone live already uses `+` = discharge like EHAL. When **writing** `set_ess_active_power`, only **W → kW** is converted; the sign stays EHAL (`+` = discharge). Config must therefore not invert the setpoint again.
 
-Sticky backends: an old setpoint stays in the Merker. Enable/automatic is `set_ess_mode = 0`, not "setpoint power = 0" or an omitted field alone.
+Sticky backends: an old setpoint stays in the Merker. Enable/automatic is `set_ess_mode = 0`, not "setpoint power = 0" or an omitted field alone. On Home Assistant (`control = full`) Earnie additionally publishes `set_ess_active_power = 0` when it returns to automatic, because the HA `number` would otherwise keep the last forced value.
 
 ## C) Combined Field List: EHAL, OpenEMS, evcc, Victron, Loxone
 

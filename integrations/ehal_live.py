@@ -433,6 +433,7 @@ def write_ess_setpoints_from_control(
     discharge kW when unconstrained, see ``live_unconstrained_export_kw``).
     """
     from house_config.battery_control import (
+        BATTERY_CONTROL_FULL,
         BATTERY_CONTROL_READ_ONLY,
         control_from_battery_params,
     )
@@ -461,6 +462,10 @@ def write_ess_setpoints_from_control(
         float(max_charge_power_kw),
         float(max_discharge_power_kw),
     )
+    if active_kw is None and is_ha_backend() and control == BATTERY_CONTROL_FULL:
+        # The HA ``number`` is sticky: omitting the active power would leave the last force
+        # in place (L18). 0 W is the release the HA force automation understands.
+        active_kw = 0.0
     adapter = get_network_adapter()
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     setpoint, record_fields = _build_ess_setpoint_docs(

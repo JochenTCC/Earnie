@@ -18,7 +18,7 @@ from ehal import (
     validate_write_error,
 )
 from ehal.ess_fields import is_plant_flat_ess_field
-from ehal.field_catalog import SETPOINT_FIELDS
+from ehal.field_catalog import EVCS_MODE_VALUES, SETPOINT_FIELDS
 from ehal.field_registry import (
     PLANT_OPTIONAL_READ_FIELDS,
     PLANT_REQUIRED_READ_FIELDS,
@@ -121,10 +121,6 @@ def _inverter_limit_write_map() -> dict[str, str]:
         if addr:
             out[field] = addr
     return out
-
-
-# Numeric encoding of the Loxone Modus Merker (entity-scoped).
-EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
 
 
 @dataclass(frozen=True)

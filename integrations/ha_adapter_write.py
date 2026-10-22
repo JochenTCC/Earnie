@@ -16,9 +16,8 @@ from ehal import (
     validate_write_error,
 )
 from ehal.ess_fields import ess_field_kind
-from ehal.field_catalog import SETPOINT_FIELDS
+from ehal.field_catalog import EVCS_MODE_VALUES, SETPOINT_FIELDS
 from ehal.validate import EhalValidationError
-from integrations.loxone_adapter import EVCS_MODE_VALUES
 from integrations.ha_adapter_core import (
     BOOLEAN_INVERT_FIELDS,
     _HaWriteOutcome,
