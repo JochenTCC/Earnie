@@ -22,7 +22,7 @@ from ui.planning_battery_inverter import (
     persist_builtin_inverter,
     render_ecoflow_preset_button,
 )
-from ui.auto_persist import auto_persist, payload_fingerprint
+from ui.auto_persist import auto_persist, payload_fingerprint, require_saved
 from ui.form_layout import labeled_selectbox
 from ui.label_select import (
     NEW_OPTION,
@@ -254,10 +254,8 @@ def _persist_battery_form(
         wrote = auto_persist(
             state_key=persist_key,
             payload=payload,
-            save=lambda: _save_battery(
-                fields,
-                stable_id=stable_id,
-                is_new=is_new,
+            save=lambda: require_saved(
+                _save_battery(fields, stable_id=stable_id, is_new=is_new)
             ),
             ready=ready,
         )

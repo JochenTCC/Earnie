@@ -76,14 +76,6 @@ def test_t1_value_survives_save_and_new_session(spec: Field) -> None:
     assert _widget(_new_session(reopened), spec).value == spec.valid
 
 
-# Bekannter Fehler: Die Ablehnung greift (Datei bleibt unverändert), aber
-# ``_auto_persist_scenario`` ruft nach dem abgefangenen ValueError trotzdem ``st.rerun()``
-# auf - die ``st.error``-Meldung verschwindet.
-@pytest.mark.xfail(
-    strict=True,
-    reason="scenario_editor_sections._auto_persist_scenario: st.error nach abgelehntem "
-    "Speichern wird vom folgenden st.rerun() verschluckt",
-)
 def test_t3_duplicate_label_is_rejected_and_file_stays_unchanged() -> None:
     label_spec = next(s for s in SCENARIO_FIELDS if s.suffix == "scenario_label")
     at = _new_session()

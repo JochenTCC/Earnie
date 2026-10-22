@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### UI persistence bugfixes (2026-10-22)
+
+- [x] **Autosave hid rejected saves (scenario editor, inverter / PV / battery forms, house profile consumers) — fixed and verified (AppTest):** a `save` callback can now refuse a write by raising `ui/auto_persist.PersistRejected` (helper `require_saved` for store helpers that return `None`); `auto_persist` then records no fingerprint, flashes no `Gespeichert` and returns False, so the callers no longer `st.rerun()` the `st.error` away and the file stays unchanged. Applied in `_auto_persist_scenario`, `_save_inv` / `_save_pv` / `_save_battery` and `_render_house_profile_save`. The `xfail(strict)` markers of `test_t3_duplicate_label_is_rejected_and_file_stays_unchanged`, `test_t3_duplicate_label_shows_error_and_keeps_file` (3 cases) and `test_t3_rejected_value_shows_error_and_keeps_file[ev-min-power-above-nominal]` are removed; `tests/apptest` green (275 passed).
+
 ### HA testbed fixes verified live (2026-10-22)
 
 - [x] **Schreibtest 0 W warning without a complete live scenario (F20) — fixed and verified (AppTest):** `ui/ehal_write_test.py::power_limit_unknown_notice` explains why every power value is rejected when the live scenario has no battery maximum (`render_write_test_section` shows it when `max_power_kw <= 0`). Tests `tests/test_ehal_write_test.py::test_power_limit_notice_names_the_live_scenario` (text) and, rendered through the section, `tests/test_ehal_write_test_ui_state.py::test_incomplete_live_scenario_shows_power_limit_warning` / `test_complete_live_scenario_shows_no_power_limit_warning`. **Verified (2026-10-22):** by the AppTest only; the bench scenario is complete, so the warning was not exercised against a pack with an incomplete live scenario (owner accepted this).

@@ -146,14 +146,7 @@ def _consumer_field(entity: str, suffix: str) -> Field:
     "entity,suffix,value",
     [
         pytest.param("pool", "nom_3", 0.0, id="pool-nominal-power-zero"),
-        pytest.param(
-            "ev1", "ev_min_2", 50.0, id="ev-min-power-above-nominal",
-            marks=pytest.mark.xfail(
-                reason="Autosave: ValueError aus der Normalisierung wird als st.error gezeigt, "
-                "auto_persist meldet 'Gespeichert' und st.rerun() verwirft die Meldung (Backlog-Bugfixes)",
-                strict=True,
-            ),
-        ),
+        pytest.param("ev1", "ev_min_2", 50.0, id="ev-min-power-above-nominal"),
     ],
 )
 def test_t3_rejected_value_shows_error_and_keeps_file(entity: str, suffix: str, value: float) -> None:

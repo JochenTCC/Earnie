@@ -362,14 +362,14 @@ def _auto_persist_scenario(
     payload: dict,
     ready: bool,
 ) -> None:
-    from ui.auto_persist import auto_persist
+    from ui.auto_persist import PersistRejected, auto_persist
 
     def _save_scenario() -> None:
         try:
             upsert_scenario(payload)
         except ValueError as exc:
             st.error(str(exc))
-            return
+            raise PersistRejected() from exc
         if ctx["is_new"]:
             st.session_state[_SESSION_SELECT_PENDING_KEY] = save_id
             st.rerun()

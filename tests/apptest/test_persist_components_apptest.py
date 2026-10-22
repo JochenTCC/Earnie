@@ -120,10 +120,6 @@ def _field(suffix: str) -> Field:
 
 
 # Bekannte Fehler: Test bleibt stehen, schlägt streng fehl, sobald der Fehler behoben ist.
-_DUPLICATE_LABEL_BUG = (
-    "Autosave: upsert_* lehnt ab, _save_* zeigt st.error und liefert None, auto_persist wertet das "
-    "als Erfolg ('Gespeichert') und st.rerun() verwirft die Meldung (Backlog-Bugfixes)"
-)
 _EMPTY_LABEL_SILENT_BUG = (
     "Bei leerer Bezeichnung wird nicht gespeichert, aber (anders als bei der Batterie) "
     "weist keine Meldung darauf hin (Backlog-Bugfixes)"
@@ -133,9 +129,9 @@ _EMPTY_LABEL_SILENT_BUG = (
 @pytest.mark.parametrize(
     "suffix,duplicate",
     [
-        pytest.param("planning_inv_label", "Zweite wr_zweit", marks=pytest.mark.xfail(reason=_DUPLICATE_LABEL_BUG, strict=True)),
-        pytest.param("planning_pv_label", "zweite pv_zweit", marks=pytest.mark.xfail(reason=_DUPLICATE_LABEL_BUG, strict=True)),
-        pytest.param("planning_battery_label", "ZWEITE bat_zweit", marks=pytest.mark.xfail(reason=_DUPLICATE_LABEL_BUG, strict=True)),
+        ("planning_inv_label", "Zweite wr_zweit"),
+        ("planning_pv_label", "zweite pv_zweit"),
+        ("planning_battery_label", "ZWEITE bat_zweit"),
     ],
 )
 def test_t3_duplicate_label_shows_error_and_keeps_file(second_entities, suffix: str, duplicate: str) -> None:

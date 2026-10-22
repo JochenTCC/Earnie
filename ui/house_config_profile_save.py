@@ -246,7 +246,7 @@ def _render_house_profile_save(
     preview_id: str,
     absent_mode: bool = False,
 ) -> None:
-    from ui.auto_persist import auto_persist
+    from ui.auto_persist import auto_persist, require_saved
     from ui.house_config_historical_csv import historical_csv_save_fields
 
     ready = bool(str(label or "").strip()) and location.get("latitude") is not None
@@ -280,7 +280,7 @@ def _render_house_profile_save(
     }
 
     def _save() -> None:
-        _perform_house_profile_save(
+        saved_id = _perform_house_profile_save(
             is_new=is_new,
             stable_profile_id=stable_profile_id,
             label=label,
@@ -293,6 +293,7 @@ def _render_house_profile_save(
             preview_id=preview_id,
             from_auto=True,
         )
+        require_saved(saved_id)
 
     wrote = auto_persist(
         state_key=f"house_profile::{session_scope}::{profile_id}",

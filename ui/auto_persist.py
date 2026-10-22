@@ -9,6 +9,22 @@ from typing import Any
 import streamlit as st
 
 
+class PersistRejected(Exception):
+    """Raised by a ``save`` callback that refused the write.
+
+    The callback has already shown why (``st.error``); ``auto_persist`` then
+    neither records the payload as saved nor flashes ``Gespeichert``, and
+    returns False so callers do not ``st.rerun()`` the message away.
+    """
+
+
+def require_saved(result: Any) -> Any:
+    """Return ``result`` of a store save helper, or raise ``PersistRejected`` on ``None``."""
+    if result is None:
+        raise PersistRejected()
+    return result
+
+
 def payload_fingerprint(payload: Any) -> str:
     raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -18,7 +34,7 @@ def auto_persist(
     *,
     state_key: str,
     payload: Any,
-    save: Callable[[], None],
+    save: Callable[[], Any],
     ready: bool = True,
     success_caption: str = "Gespeichert",
 ) -> bool:
@@ -26,7 +42,8 @@ def auto_persist(
     Persist ``payload`` when it differs from the last saved fingerprint.
 
     Returns True when a write was performed. Skips when ``ready`` is False
-    (incomplete / invalid form). When Shadow shares Prod config (read-only),
+    (incomplete / invalid form). A ``save`` callback that raises
+    ``PersistRejected`` leaves the fingerprint untouched and returns False. When Shadow shares Prod config (read-only),
     skips writes without crashing.
 
     Success captions survive one ``st.rerun()`` via a session flash key so
@@ -59,6 +76,8 @@ def auto_persist(
         st.caption(
             "Shadow-Modus: Konfiguration schreibgeschützt — nicht gespeichert."
         )
+        return False
+    except PersistRejected:
         return False
     st.session_state[last_key] = fingerprint
     # Flash for post-rerun; caption now for callers that do not rerun.

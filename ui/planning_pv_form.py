@@ -22,7 +22,7 @@ from ui.house_config_io import (
     load_house_profiles,
     upsert_pv_system,
 )
-from ui.auto_persist import auto_persist, payload_fingerprint
+from ui.auto_persist import auto_persist, payload_fingerprint, require_saved
 from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
 from ui.label_select import (
     NEW_OPTION,
@@ -473,10 +473,8 @@ def _persist_pv_form(
         wrote = auto_persist(
             state_key=persist_key,
             payload=payload,
-            save=lambda: _save_pv(
-                fields,
-                stable_id=stable_id,
-                is_new=is_new,
+            save=lambda: require_saved(
+                _save_pv(fields, stable_id=stable_id, is_new=is_new)
             ),
             ready=ready,
         )
