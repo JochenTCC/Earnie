@@ -184,8 +184,8 @@ def check_ha_entities(bench: Bench) -> list[Result]:
         return [skip]
     try:
         bench.ha.ping()
-    except (OSError, urllib.error.URLError) as exc:
-        return [Result(name, FAIL, f"HA not reachable: {exc}")]
+    except OSError as exc:
+        return [Result(name, FAIL, f"HA not reachable: {_request_failure(exc)}")]
     problems: list[str] = []
     for entity_id, unit in bench.archetype.units.items():
         state = bench.ha.get_state(entity_id)
@@ -308,6 +308,24 @@ def _restore(bench: Bench, case: SetpointCase, original: float | None) -> None:
     bench.publish(case.ehal_id, case.current_ehal if original is None else original)
 
 
+def _overwrite_note(bench: Bench, case: SetpointCase, expected_ehal: float) -> str:
+    """Explains a miss caused by Earnie itself rewriting the setpoint (optimizer cycle).
+
+    The first optimizer cycle after an Earnie start writes its own limits ~45 s after the
+    daemon answers HTTP; it overwrites the value this check published.
+    """
+    try:
+        got = bench.fetch_status().get(case.ehal_id)
+    except (OSError, ValueError):
+        return ""
+    if got is None or abs(float(got) - expected_ehal) < 0.5:
+        return ""
+    return (
+        f"; status.json now shows {float(got):g} instead of {expected_ehal:g} - Earnie wrote its own "
+        "setpoint (optimizer cycle), rerun after the first cycle or in silent mode"
+    )
+
+
 def check_setpoint_roundtrip(bench: Bench) -> list[Result]:
     name = "setpoint round trip"
     if (skip := _need_ha(bench, name)) is not None:
@@ -333,7 +351,14 @@ def check_setpoint_roundtrip(bench: Bench) -> list[Result]:
             Result(
                 f"status.json -> {case.entity_id}",
                 PASS if in_ha else (FAIL if in_status else SKIP),
-                "" if in_ha else (f"HA number did not reach {case.native(case.value_ehal):g}" if in_status else "no status.json value"),
+                ""
+                if in_ha
+                else (
+                    f"HA number did not reach {case.native(case.value_ehal):g}"
+                    + _overwrite_note(bench, case, case.value_ehal)
+                    if in_status
+                    else "no status.json value"
+                ),
             )
         )
     finally:
@@ -379,7 +404,7 @@ def check_reject_writes(bench: Bench) -> list[Result]:
         Result(
             "value applied after reject_writes is switched off",
             PASS if healed else FAIL,
-            "" if healed else "retry did not apply the setpoint",
+            "" if healed else "retry did not apply the setpoint" + _overwrite_note(bench, case, case.value_ehal),
         )
     )
     _restore(bench, case, original)
@@ -497,12 +522,37 @@ def check_pack_unchanged(archetype: Archetype, config_dir: Path) -> Result:
     return Result(name, PASS if ok else FAIL, "" if ok else "rerun scripts.ha_testbed_build")
 
 
+def _request_failure(exc: OSError) -> str:
+    """Readable detail for a failed HA / Earnie request (``HTTPError`` is an ``OSError``)."""
+    if isinstance(exc, urllib.error.HTTPError):
+        hint = " - check the HA long-lived token (HA_TESTBED_TOKEN)" if exc.code in (401, 403) else ""
+        return f"HTTP {exc.code} {exc.reason} for {exc.url}{hint}"
+    return f"request failed: {exc}"
+
+
+def _guarded(name: str, check: Callable[[Bench], list[Result]], bench: Bench) -> list[Result]:
+    """A failing HA / Earnie request is a FAIL of that check, not a crash of the run."""
+    try:
+        return check(bench)
+    except OSError as exc:
+        return [Result(name, FAIL, _request_failure(exc))]
+
+
 def run_checks(bench: Bench, *, negative: bool = True) -> list[Result]:
-    results = check_ha_entities(bench) + check_inbox(bench) + check_setpoint_roundtrip(bench)
+    checks: list[tuple[str, Callable[[Bench], list[Result]]]] = [
+        ("HA reachable, sim entities exist with expected units", check_ha_entities),
+        ("Earnie inbox", check_inbox),
+        ("setpoint round trip", check_setpoint_roundtrip),
+    ]
     if negative:
-        results += check_reject_writes(bench)
-        results += check_set_unavailable(bench)
-        results += check_stopped_push(bench)
+        checks += [
+            ("reject_writes -> hub_write_failed reported to Earnie", check_reject_writes),
+            ("set_unavailable -> no crash, push resumes", check_set_unavailable),
+            ("stopped push", check_stopped_push),
+        ]
+    results: list[Result] = []
+    for name, check in checks:
+        results += _guarded(name, check, bench)
     return results
 
 

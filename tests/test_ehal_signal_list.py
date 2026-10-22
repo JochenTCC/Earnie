@@ -268,3 +268,35 @@ def test_default_host_skips_docker_bridge_ipv4(monkeypatch) -> None:
         return_value="172.17.0.2",
     ):
         assert _default_host() == ""
+
+
+def _ev_house(bindings: dict[str, str]) -> dict:
+    return {
+        "plant": {"ehal_bindings": {}},
+        "profiles": {
+            "live": {
+                "consumers": [
+                    {"id": "e_auto", "type": "ev", "ehal_bindings": bindings},
+                ]
+            }
+        },
+    }
+
+
+def test_flat_and_qualified_consumer_key_are_one_signal() -> None:
+    # The dm4 migration keeps the flat key and adds the qualified twin next to it.
+    from ehal.push_signals import write_signals_from_docs
+
+    house = _ev_house({"set_evcs_max_current": "", "evcs.e_auto.set_evcs_max_current": ""})
+    ids = [s.ehal_id for s in write_signals_from_docs(house, {})]
+    assert ids == ["evcs.e_auto.set_evcs_max_current"]
+
+
+def test_duplicate_signal_keeps_the_loxone_name_of_either_spelling() -> None:
+    from ehal.push_signals import write_signals_from_docs
+
+    flat_named = _ev_house({"set_evcs_max_current": "EV_A", "evcs.e_auto.set_evcs_max_current": ""})
+    qualified_named = _ev_house({"set_evcs_max_current": "", "evcs.e_auto.set_evcs_max_current": "EV_A"})
+    for house in (flat_named, qualified_named):
+        (signal,) = write_signals_from_docs(house, {})
+        assert signal.old_name == "EV_A"

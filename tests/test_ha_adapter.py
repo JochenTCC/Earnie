@@ -143,3 +143,40 @@ def test_ha_ess_force_enables_capability_without_rest_write():
     assert err is None
     published = load_published()
     assert published["ess.house.set_ess_active_power"] == pytest.approx(-500.0)
+
+
+def test_export_limit_is_published_when_only_activated():
+    # Regression: push bindings are activation flags (empty values); the export limit
+    # was skipped as "function not available" because the check tested the value.
+    from integrations.ehal_write import clear_published_for_tests, load_published
+
+    clear_published_for_tests()
+    cfg = HaConfig(
+        base_url="http://ha:8123",
+        token="t",
+        adapter_id="test",
+        entities={
+            "set_ess_charge_power_limit": "",
+            "set_ess_discharge_power_limit": "",
+            "set_grid_export_power_limit": "",
+        },
+        setpoint_qids={
+            "set_ess_charge_power_limit": "ess.house.set_ess_charge_power_limit",
+            "set_ess_discharge_power_limit": "ess.house.set_ess_discharge_power_limit",
+            "set_grid_export_power_limit": "grid.meter.set_grid_export_power_limit",
+        },
+    )
+    adapter = HaAdapter(cfg)
+    err = adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-01-01T00:00:00Z",
+            "adapter_id": "test",
+            "set_ess_charge_power_limit": 1000.0,
+            "set_ess_discharge_power_limit": 2000.0,
+            "set_grid_export_power_limit": 4000.0,
+        }
+    )
+    assert err is None
+    assert load_published()["grid.meter.set_grid_export_power_limit"] == pytest.approx(4000.0)
+    assert adapter.last_skipped_fields() == [] and adapter.last_unconfigured_fields() == []
