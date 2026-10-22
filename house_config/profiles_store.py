@@ -107,6 +107,20 @@ def _normalize_profile_consumers(
     return consumers
 
 
+def _float_field_or_default(raw: dict, key: str, default: float) -> float:
+    """``raw[key]`` as float; only a missing / ``None`` / empty value yields ``default``.
+
+    A legitimate ``0`` (flat roof, longitude 0) is kept; a non-numeric value fails loud.
+    """
+    value = raw.get(key)
+    if value is None or value == "":
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"profiles: {key} ungültig: {value!r}.") from exc
+
+
 def _profile_geo_and_csv_fields(raw: dict) -> dict:
     annual_kwh = float(raw.get("annual_kwh", 0.0) or 0.0)
     total_profile_csv = str(raw.get("total_profile_csv", "") or "").strip()
@@ -118,8 +132,8 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
         historical_csv_source = "separate"
     land_raw = str(raw.get("land", "") or "").strip().upper()
     land = land_raw if land_raw in {"AT", "DE", "CH"} else "AT"
-    latitude = float(raw.get("latitude", 48.0) or 48.0)
-    longitude = float(raw.get("longitude", 10.0) or 10.0)
+    latitude = _float_field_or_default(raw, "latitude", 48.0)
+    longitude = _float_field_or_default(raw, "longitude", 10.0)
     if "netznutzung_arbeitspreis_cent_kwh" in raw:
         raise ValueError(
             "netznutzung_arbeitspreis_cent_kwh wird nicht mehr unterstützt "
@@ -138,8 +152,8 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
         "latitude": latitude,
         "longitude": longitude,
         "timezone_name": timezone_for_land(land),
-        "default_pv_tilt": float(raw.get("default_pv_tilt", 25.0) or 25.0),
-        "default_pv_azimuth": float(raw.get("default_pv_azimuth", 0.0) or 0.0),
+        "default_pv_tilt": _float_field_or_default(raw, "default_pv_tilt", 25.0),
+        "default_pv_azimuth": _float_field_or_default(raw, "default_pv_azimuth", 0.0),
         "netznutzung": netznutzung,
     }
 

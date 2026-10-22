@@ -59,21 +59,10 @@ def test_t1_value_survives_save_and_new_session(spec: Field) -> None:
     assert type(value) is type(spec.valid) or spec.kind == "number_input"
 
 
-# Bekannte Fehler: Test bleibt stehen, schlägt streng fehl, sobald der Fehler behoben ist.
-_KNOWN_BUGS = {
-    ("house_profile_default_pv_tilt", 0): (
-        "profiles_store._profile_geo_and_csv_fields: `float(x or 25.0)` macht 0 Grad "
-        "(Flachdach) still zu 25 Grad"
-    ),
-}
-
-
 def _boundary_params():
     for spec in HOUSE_PROFILE_FIELDS:
         for value in spec.boundaries:
-            reason = _KNOWN_BUGS.get((spec.suffix, value))
-            marks = [pytest.mark.xfail(reason=reason, strict=True)] if reason else []
-            yield pytest.param(spec, value, marks=marks, id=f"{spec.id}-{value}")
+            yield pytest.param(spec, value, id=f"{spec.id}-{value}")
 
 
 @pytest.mark.parametrize("spec,value", list(_boundary_params()))
