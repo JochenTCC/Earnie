@@ -129,15 +129,11 @@ def test_t9_value_survives_app_restart(page: Page, app_server: AppServer) -> Non
 
 # --- Hauskonfigurator: erste Eingabe nach dem Öffnen -------------------------------------
 
+# Früher Browser-only-Fehler in ca. 60 % der Öffnungen (Auswahl sprang auf "— neu —"),
+# daher mehrere Versuche: Ein Zufallstreffer bei einem Rückfall ist unter 1 %.
 _HOUSE_ATTEMPTS = 6
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Browser-only: Die Profilauswahl springt bei der ersten Eingabe nach dem Öffnen auf "
-    "'— neu —', legt 'Mein Haushalt' an und die Eingabe geht verloren (Backlog-Bugfixes). "
-    "Tritt in ca. 60 % der Öffnungen auf, daher mehrere Versuche.",
-)
 def test_house_config_first_edit_after_open_is_kept(page: Page, app_server: AppServer) -> None:
     path = Path(os.environ["EARNIE_HOUSE_PROFILES_PATH"])
     annual = page.locator(".st-key-test_home__house_annual_kwh input")

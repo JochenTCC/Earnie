@@ -149,10 +149,7 @@ from ui.form_layout import (
 
 
 
-def _render_profile_select_row(
-    profile_options: list[str],
-    initial_index: int | None,
-):
+def _render_profile_select_row(profile_options: list[str]):
     col_label, col_select, col_delete = st.columns(
         [2.0, 3.0, 1.2], vertical_alignment="center"
     )
@@ -163,8 +160,6 @@ def _render_profile_select_row(
         "key": "house_profile_select",
         "label_visibility": "collapsed",
     }
-    if initial_index is not None:
-        kwargs["index"] = initial_index
     selected_display = col_select.selectbox(**kwargs)
     return str(selected_display), col_delete
 
@@ -189,11 +184,15 @@ def _render_profile_selector() -> dict:
     profile_map = profiles_doc.get("profiles", {})
     profile_ids = sorted(profile_map.keys())
     profile_options, id_by_display = _profile_select_choices(profile_map, profile_ids)
-    _align_profile_select_session(profile_map, profile_ids, id_by_display)
+    # Preselect through the session state, never through ``index``: an ``index`` that
+    # is passed only on the first run changes the widget definition afterwards, and
+    # the browser then sends its default (index 0 = "— neu —") with the user's first
+    # edit, which created a "Mein Haushalt" profile and dropped the input.
     initial_index = _initial_profile_index(profile_ids)
-    selected_display, delete_col = _render_profile_select_row(
-        profile_options, initial_index
-    )
+    if initial_index is not None:
+        st.session_state["house_profile_select"] = profile_options[initial_index]
+    _align_profile_select_session(profile_map, profile_ids, id_by_display)
+    selected_display, delete_col = _render_profile_select_row(profile_options)
     selected_id = id_by_display.get(str(selected_display), str(selected_display))
     is_new = selected_id == _NEW_PROFILE_OPTION
     if not is_new:
