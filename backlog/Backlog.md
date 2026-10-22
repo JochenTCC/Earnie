@@ -24,6 +24,7 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 - [x] Pre-Release 2.7.0-alpha.7 for Loxone
 - [x] Dogfood and finalize new HA binding
 - [ ] Review HA related docs
+- [ ] Add message or info pop up (maybe with progress info) in HK when first consummption calculations are made (because this takes quite a while ... was introduced when SE bugs were fixed on 20.10.26)
 - [ ] beta release for Loxone and HA
 - [ ] Wait for feedback
 - [ ] final release 2.7.0
@@ -35,6 +36,10 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 - [ ] **Translate `docs/dev/streamlit-ports.md` to English** `[dev]`: moved from `docs/referenz/` (user docs) to `docs/dev/` and still German; per `german-user-docs.mdc` dev docs are English. Keep paths, ports, env vars and compose names verbatim. Also review user-doc links that point into it (`betrieb.md`, `container.md`, handbook, `docs/README.md`): either keep or move the production-port part into a user doc
 
 - [ ] Make a review for Chart1 implementation on Monitor page and check if code related to simulated trajectories might be substituted by results from main.py (to prevent drift / misalignment / code duplication)
+
+- [ ] Review current chart for Kumulierte Kosten & Verbrauch
+  - I'm not happy with this chart, because it's not really clear in it's message - maybe there are better solutions
+  - The main question is how to calculate the non-optimized cost live when you have moving consumers etc.
 
 - [ ] Enable multiple EV / Wallboxes *(reuse entity-scoped namespacing approach from **2.7.c** multi-ESS)*
 - Parametrize EVs as now (+ sensors)
