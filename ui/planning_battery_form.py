@@ -23,7 +23,12 @@ from ui.planning_battery_inverter import (
     persist_builtin_inverter,
     render_ecoflow_preset_button,
 )
-from ui.auto_persist import auto_persist, payload_fingerprint, require_saved
+from ui.auto_persist import (
+    auto_persist,
+    payload_fingerprint,
+    require_saved,
+    warn_not_saved,
+)
 from ui.form_layout import labeled_selectbox
 from ui.label_select import (
     NEW_OPTION,
@@ -349,11 +354,7 @@ def render_battery_planning_tab() -> None:
             blockers.append("Kapazität > 0")
         if needs_inv and not inv_ok:
             blockers.append("Wechselrichter wählen (Tab Wechselrichter zuerst anlegen)")
-        st.warning(
-            "Batterie noch nicht gespeichert: "
-            + (", ".join(blockers) if blockers else "Formular unvollständig")
-            + ". Beim Verlassen des Tabs geht der Entwurf verloren."
-        )
+        warn_not_saved("Batterie", blockers)
     taken = {bid for bid in ctx["battery_ids"] if bid != stable_id}
     entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
     _persist_battery_form(

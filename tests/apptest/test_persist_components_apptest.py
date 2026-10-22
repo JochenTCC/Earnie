@@ -119,13 +119,6 @@ def _field(suffix: str) -> Field:
     return next(s for s in COMPONENT_FIELDS if s.suffix == suffix)
 
 
-# Bekannte Fehler: Test bleibt stehen, schlägt streng fehl, sobald der Fehler behoben ist.
-_EMPTY_LABEL_SILENT_BUG = (
-    "Bei leerer Bezeichnung wird nicht gespeichert, aber (anders als bei der Batterie) "
-    "weist keine Meldung darauf hin (Backlog-Bugfixes)"
-)
-
-
 @pytest.mark.parametrize(
     "suffix,duplicate",
     [
@@ -151,8 +144,8 @@ def test_t3_duplicate_label_shows_error_and_keeps_file(second_entities, suffix: 
 @pytest.mark.parametrize(
     "suffix",
     [
-        pytest.param("planning_inv_label", marks=pytest.mark.xfail(reason=_EMPTY_LABEL_SILENT_BUG, strict=True)),
-        pytest.param("planning_pv_label", marks=pytest.mark.xfail(reason=_EMPTY_LABEL_SILENT_BUG, strict=True)),
+        "planning_inv_label",
+        "planning_pv_label",
         "planning_battery_label",
     ],
 )

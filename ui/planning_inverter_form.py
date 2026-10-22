@@ -28,7 +28,12 @@ from house_config.inverter import (
 from house_config.label_uniqueness import allocate_unique_label
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.flash import flash
-from ui.auto_persist import auto_persist, payload_fingerprint, require_saved
+from ui.auto_persist import (
+    auto_persist,
+    payload_fingerprint,
+    require_saved,
+    warn_not_saved,
+)
 from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
 from ui.house_config_io import delete_inverter, list_inverters, upsert_inverter
 from ui.label_select import (
@@ -503,6 +508,8 @@ def render_inverter_planning_tab() -> None:
     stable_id = "" if is_new else str(ctx["existing"].get("id", ""))
     label = fields["label"]
     ready = bool(str(label or "").strip())
+    if not ready:
+        warn_not_saved("Wechselrichter", ["Bezeichnung"])
     taken = {iid for iid in ctx["inv_ids"] if iid != stable_id}
     entity_id = stable_id.strip() or slug_id(label or "wechselrichter", existing=taken)
     _persist_inv_form(

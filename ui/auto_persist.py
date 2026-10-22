@@ -25,6 +25,15 @@ def require_saved(result: Any) -> Any:
     return result
 
 
+def warn_not_saved(subject: str, blockers: list[str]) -> None:
+    """Tell the user why an incomplete form is not auto-saved (``ready`` is False)."""
+    st.warning(
+        f"{subject} noch nicht gespeichert: "
+        + (", ".join(blockers) if blockers else "Formular unvollständig")
+        + ". Beim Verlassen des Tabs geht der Entwurf verloren."
+    )
+
+
 def payload_fingerprint(payload: Any) -> str:
     raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()

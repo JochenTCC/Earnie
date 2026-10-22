@@ -23,7 +23,12 @@ from ui.house_config_io import (
     load_house_profiles,
     upsert_pv_system,
 )
-from ui.auto_persist import auto_persist, payload_fingerprint, require_saved
+from ui.auto_persist import (
+    auto_persist,
+    payload_fingerprint,
+    require_saved,
+    warn_not_saved,
+)
 from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
 from ui.label_select import (
     NEW_OPTION,
@@ -541,11 +546,16 @@ def render_pv_planning_tab() -> None:
     fields = _render_pv_fields(ctx)
     stable_id = "" if is_new else str(ctx["existing"].get("id", ""))
     label = fields["label"]
-    ready = (
-        bool(str(label or "").strip())
-        and float(fields["kwp"] or 0) > 0
-        and bool(str(fields.get("inverter_id") or "").strip())
-    )
+    blockers: list[str] = []
+    if not str(label or "").strip():
+        blockers.append("Bezeichnung")
+    if float(fields["kwp"] or 0) <= 0:
+        blockers.append("kWp > 0")
+    if not str(fields.get("inverter_id") or "").strip():
+        blockers.append("Wechselrichter wählen (Tab Wechselrichter zuerst anlegen)")
+    ready = not blockers
+    if not ready:
+        warn_not_saved("PV-Feld", blockers)
     taken = {sid for sid in ctx["system_ids"] if sid != stable_id}
     entity_id = stable_id.strip() or slug_id(label or "pv_anlage", existing=taken)
     _persist_pv_form(
