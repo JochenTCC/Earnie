@@ -93,8 +93,10 @@ def test_start_captures_stdio_not_devnull(
                 "import sys, time",
                 "sys.path.insert(0, r'%s')" % str(root).replace("\\", "\\\\"),
                 "from runtime_store.single_instance import ensure_single_instance",
+                "from runtime_store.daemon_heartbeat import touch_daemon_heartbeat",
                 "print('stub-stdio-ok', flush=True)",
                 "ensure_single_instance('main')",
+                "touch_daemon_heartbeat()",
                 "time.sleep(60)",
             ]
         ),
@@ -114,6 +116,93 @@ def test_start_captures_stdio_not_devnull(
     finally:
         if main_daemon.status().state == "running":
             main_daemon.stop(timeout_sec=5.0)
+
+
+def _stub_main(tmp_path: Path, body: list[str]) -> Path:
+    root = Path(__file__).resolve().parents[1]
+    stub = tmp_path / "main.py"
+    stub.write_text(
+        "\n".join(
+            [
+                "import sys, time",
+                "sys.path.insert(0, r'%s')" % str(root).replace("\\", "\\\\"),
+                "from runtime_store.single_instance import ensure_single_instance",
+                "from runtime_store.daemon_heartbeat import touch_daemon_heartbeat",
+                *body,
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return stub
+
+
+def test_start_reports_a_daemon_that_dies_after_taking_the_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B3: the lock is taken early, a startup crash comes after it (F2) - no OK then."""
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    _stub_main(
+        tmp_path,
+        [
+            "ensure_single_instance('main')",
+            "time.sleep(1.0)",
+            "raise SystemExit('startup crash after the lock')",
+        ],
+    )
+    monkeypatch.setattr(main_daemon, "project_root", lambda: tmp_path)
+    monkeypatch.setattr(main_daemon, "python_executable", lambda: sys.executable)
+
+    with pytest.raises(main_daemon.DaemonError, match="startup crash after the lock"):
+        main_daemon.start(wait_sec=8.0)
+
+
+def test_start_waits_for_the_main_loop_heartbeat(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The daemon counts as started once it reached the main loop (fresh heartbeat)."""
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    _stub_main(
+        tmp_path,
+        [
+            "ensure_single_instance('main')",
+            "time.sleep(1.0)",
+            "touch_daemon_heartbeat()",
+            "time.sleep(60)",
+        ],
+    )
+    monkeypatch.setattr(main_daemon, "project_root", lambda: tmp_path)
+    monkeypatch.setattr(main_daemon, "python_executable", lambda: sys.executable)
+
+    try:
+        started = time.monotonic()
+        st = main_daemon.start(wait_sec=8.0)
+        assert st.state == "running"
+        assert time.monotonic() - started >= 0.9
+    finally:
+        if main_daemon.status().state == "running":
+            main_daemon.stop(timeout_sec=5.0)
+
+
+def test_start_ignores_a_stale_heartbeat_of_an_earlier_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from runtime_store.daemon_heartbeat import touch_daemon_heartbeat
+
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    touch_daemon_heartbeat(now_ts=time.time() - 30)
+    _stub_main(
+        tmp_path,
+        [
+            "ensure_single_instance('main')",
+            "time.sleep(1.0)",
+            "raise SystemExit('crash before the loop')",
+        ],
+    )
+    monkeypatch.setattr(main_daemon, "project_root", lambda: tmp_path)
+    monkeypatch.setattr(main_daemon, "python_executable", lambda: sys.executable)
+
+    with pytest.raises(main_daemon.DaemonError, match="crash before the loop"):
+        main_daemon.start(wait_sec=8.0)
 
 
 def test_start_stop_with_stub_script(

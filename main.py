@@ -54,6 +54,10 @@ from runtime_store.planning_clock import planning_anchor, planning_now
 
 logger = logging.getLogger("main")
 
+# Wait after a cycle that aborted before planning (no SoC / no prices yet). Not shorter than
+# the HA push interval (10 s): a retry cannot see newer inputs earlier.
+ABORTED_CYCLE_RETRY_SEC = 30.0
+
 # Closed interval finalized by the previous regular cycle. An early-started cycle
 # plans before its own interval [T-15, T) is closed, so its SoC plausibility
 # check uses [T-30, T-15) (spec early-start-scheduling.md §4).
@@ -75,6 +79,9 @@ def main(
     quarter-hour boundary, plans for slot ``[tick, tick+15)`` and writes no
     setpoint before ``tick``. ``None``: plan for the current slot, write when
     ready (out-of-band runs, first run after start, ``EARNIE_EARLY_START=off``).
+
+    Returns ``False`` when the cycle aborted before planning (no SoC, no prices): the
+    caller must neither report success nor restart at once (L12).
     """
     if tick is not None and is_out_of_band_trigger(run_trigger):
         raise ValueError("Out-of-band runs are never early-started (tick must be None).")
@@ -91,7 +98,7 @@ def main(
         try:
             # One Live store plan (readings + forecast) per cycle: ThermalHorizon P2.
             with live_cycle_scope():
-                _main_cycle(run_trigger, timing, tick=tick)
+                return _main_cycle(run_trigger, timing, tick=tick)
         finally:
             timing.finish()
 
@@ -117,6 +124,25 @@ def _daemon_wait_poll() -> None:
         from runtime_store.shadow import maybe_flush_after_sampler
 
         maybe_flush_after_sampler()
+
+
+def _wait_after_aborted_cycle() -> str:
+    """Back off after a cycle that aborted before planning; returns the next trigger.
+
+    Without it the scheduler restarts at once inside the lead window (L12). An
+    ``Earnie_Request_Optimize`` wake ends the wait early.
+    """
+    from runtime_store.shadow import resolve_next_trigger
+
+    early = wait_until_next_run(
+        total_wait_sec=ABORTED_CYCLE_RETRY_SEC,
+        on_poll=_daemon_wait_poll,
+    )
+    return resolve_next_trigger(
+        early,
+        TRIGGER_QUARTER_HOUR,
+        optimize_trigger=TRIGGER_REQUEST_OPTIMIZE,
+    )
 
 
 def _hold_until_tick(
@@ -194,7 +220,9 @@ def _read_pv_delta(out_of_band: bool) -> float:
     return pv_delta
 
 
-def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None = None):
+def _main_cycle(
+    run_trigger: str, timing: CycleTimer, *, tick: datetime | None = None
+) -> bool:
     config.reload_config()
     config.require_runtime_params_loaded()
     out_of_band = is_out_of_band_trigger(run_trigger)
@@ -240,10 +268,14 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
         current_soc = ehal_live.read_ess_soc()
         if current_soc is None:
             if ehal_live.is_ehal_network_backend():
-                logger.error("Optimierung abgebrochen: Kein Zugriff auf EHAL SoC.")
+                logger.warning(
+                    "Optimierung wartet auf den EHAL-SoC (noch kein SoC-Wert im "
+                    "Push-Posteingang); neuer Versuch in %.0f s.",
+                    ABORTED_CYCLE_RETRY_SEC,
+                )
             else:
                 logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
-            return
+            return False
         current_soc_by_id = ehal_live.read_ess_soc_by_id()
 
     config.is_sunrise_planning_horizon()
@@ -262,7 +294,7 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
         market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
         if not market_data:
             logger.error("Optimierung abgebrochen: Keine Day-Ahead-Preise empfangen.")
-            return
+            return False
 
         optimization_matrix = profile_manager.build_live_planning_matrix(
             market_data, planning_window
@@ -689,7 +721,7 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
             )
             logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
             err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(
-                consumer_powers, charging_contexts
+                consumer_powers, charging_contexts, consumer_pv_follow
             )
             logger.info("Sende EHAL WR-AC-Limits an %s...", backend)
             err_inv, inv_records = ehal_live.write_inv_ac_limits_from_plan(
@@ -992,6 +1024,8 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
             )
         except Exception as exc:  # noqa: BLE001 — never abort live run
             logger.warning("cycle_recorder: finish_cycle failed: %s", exc)
+    return True
+
 
 if __name__ == "__main__":
     from runtime_store import bootstrap
@@ -1198,13 +1232,17 @@ if __name__ == "__main__":
                 + timedelta(minutes=optimization_schedule.QUARTER_HOUR_MINUTES)
             ):
                 cycle_tick = None
-            main(
+            completed = main(
                 run_trigger=next_trigger,
                 woke_at=cycle_woke_at,
                 cold_start=cycle_cold_start,
                 tick=cycle_tick,
                 lead_sec=pending_lead_sec,
             )
+            if not completed:
+                next_trigger = _wait_after_aborted_cycle()
+                woke_at = datetime.now()
+                continue
             clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
             after_prod_cycle()

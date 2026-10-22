@@ -15,7 +15,8 @@ from ehal import (
     validate_setpoint,
     validate_write_error,
 )
-from ehal.field_catalog import SETPOINT_FIELDS
+from ehal.ess_fields import ess_field_kind
+from ehal.field_catalog import EVCS_MODE_VALUES, SETPOINT_FIELDS
 from ehal.validate import EhalValidationError
 from integrations.ha_adapter_core import (
     BOOLEAN_INVERT_FIELDS,
@@ -105,7 +106,11 @@ class HaWriteMixin:
                     outcome, field_name, status, msg, flip_ess=True
                 )
 
-        if "set_ess_mode" in doc and not self.cfg.entities.get("set_ess_mode"):
+        # Push bindings are activation flags with empty values: test the key, not the value.
+        mode_activated = any(
+            ess_field_kind(key) == "set_ess_mode" for key in self.cfg.entities
+        )
+        if "set_ess_mode" in doc and not mode_activated:
             self._skip("set_ess_mode", outcome)
         elif "set_ess_mode" in doc:
             ok, status, msg = self._try_setpoint_write(
@@ -140,7 +145,12 @@ class HaWriteMixin:
                 self._skip(field_name, outcome)
                 continue
             value = doc[field_name]
-            numeric = float(value) if field_name != "set_evcs_mode" else value
+            # Setpoints are numbers on the HA push contract: mode off=0 / pv=1 / now=2.
+            numeric = (
+                EVCS_MODE_VALUES[str(value)]
+                if field_name == "set_evcs_mode"
+                else float(value)
+            )
             ok, status, msg = self._try_setpoint_write(field_name, numeric)
             if not ok:
                 outcome.failed.append(field_name)
@@ -199,10 +209,34 @@ class HaWriteMixin:
         self, fields: dict[str, float | int | str]
     ) -> EhalWriteError | None:
         """Write activated fields by key (no envelope validation)."""
+        return self._write_bound_fields(fields, bound=set(self.cfg.entities))
+
+    def write_published_fields(
+        self, fields: dict[str, float | int | str]
+    ) -> EhalWriteError | None:
+        """Publish activated qualified setpoints that have no adapter key (flex ``set_enable``).
+
+        Raises ``ValueError`` for a field that is not activated: the write-error document
+        only names the fixed ESS / EVCS setpoint fields.
+        """
+        bound = set(self.cfg.setpoint_qids.values())
+        missing = [key for key in fields if key not in bound]
+        if missing:
+            raise ValueError(
+                "Missing HA push setpoint binding for " + ", ".join(sorted(missing))
+            )
+        return self._write_bound_fields(fields, bound=bound)
+
+    def _write_bound_fields(
+        self,
+        fields: dict[str, float | int | str],
+        *,
+        bound: set[str],
+    ) -> EhalWriteError | None:
         outcome = _HaWriteOutcome()
         for field_name, value in fields.items():
             key = str(field_name or "").strip()
-            if not key or key not in self.cfg.entities:
+            if not key or key not in bound:
                 outcome.failed.append(key or "unknown")
                 outcome.messages.append(f"Missing HA write binding for {key}")
                 continue

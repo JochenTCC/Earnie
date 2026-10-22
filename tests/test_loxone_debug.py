@@ -616,8 +616,8 @@ def test_build_telemetry_rows_uses_push_state_for_activated_ha_fields():
             "sens_power_consumers",
         ],
         push_info={
-            "grid.meter.sens_grid_power_active": ("OK", "t-grid"),
-            "ess.house.sens_ess_soc": ("0 angenommen (verstummt)", "t-soc"),
+            "grid.meter.sens_grid_power_active": ("OK", "t-grid", -874.0),
+            "ess.house.sens_ess_soc": ("0 angenommen (verstummt)", "t-soc", None),
         },
     )
     by_field = {r["EHAL-Feld"]: r for r in rows}
@@ -631,6 +631,24 @@ def test_build_telemetry_rows_uses_push_state_for_activated_ha_fields():
     derived = by_field["sens_power_consumers"]
     assert derived["Status"] == "OK"
     assert derived["Zuletzt gelesen"] == "t-read"
+
+
+def test_build_telemetry_rows_shows_the_pushed_value_of_signals_outside_the_telemetry():
+    # Bench 2026-10-22 (F23): SoC, energy counters, inverter signals are not on the HA
+    # telemetry document; their OK rows showed an empty value although a value was pushed.
+    rows = build_telemetry_rows(
+        {},
+        "t-read",
+        mapping={},
+        expected_fields=["ess.house.sens_ess_soc", "ess.house.sens_ess_energy_charge"],
+        push_info={
+            "ess.house.sens_ess_soc": ("OK", "t-soc", 55.0),
+            "ess.house.sens_ess_energy_charge": ("0 (gehalten)", "t-e", 0.0),
+        },
+    )
+    by_field = {r["EHAL-Feld"]: r for r in rows}
+    assert by_field["ess.house.sens_ess_soc"]["Wert (EHAL)"] == "55 %"
+    assert by_field["ess.house.sens_ess_energy_charge"]["Wert (EHAL)"] != ""
 
 
 def test_build_telemetry_rows_without_push_info_keeps_kein_mapping():

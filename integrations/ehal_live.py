@@ -433,6 +433,7 @@ def write_ess_setpoints_from_control(
     discharge kW when unconstrained, see ``live_unconstrained_export_kw``).
     """
     from house_config.battery_control import (
+        BATTERY_CONTROL_FULL,
         BATTERY_CONTROL_READ_ONLY,
         control_from_battery_params,
     )
@@ -461,6 +462,10 @@ def write_ess_setpoints_from_control(
         float(max_charge_power_kw),
         float(max_discharge_power_kw),
     )
+    if active_kw is None and is_ha_backend() and control == BATTERY_CONTROL_FULL:
+        # The HA ``number`` is sticky: omitting the active power would leave the last force
+        # in place (L18). 0 W is the release the HA force automation understands.
+        active_kw = 0.0
     adapter = get_network_adapter()
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     setpoint, record_fields = _build_ess_setpoint_docs(
@@ -612,8 +617,13 @@ def write_flex_enables_for_ha(
 def write_evcs_max_current_from_consumers(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
+    consumer_pv_follow: dict[str, int] | None = None,
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
-    """Write set_evcs_max_current from first EV consumer planned power (kW→A)."""
+    """Write set_evcs_max_current from first EV consumer planned power (kW→A).
+
+    HA backend: also ``set_evcs_mode`` (skipped by the adapter when not activated). With
+    "Sofort laden" only the mode ``now`` goes out and no current, as on the Loxone path.
+    """
     consumer = _first_ev_consumer()
     if consumer is None:
         logger.info("EHAL: no EV consumer configured — skip EVCS write")
@@ -636,11 +646,19 @@ def write_evcs_max_current_from_consumers(
 
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     amps_out = max(0.0, amps)
+    written: dict[str, Any] = {}
+    immediate = is_ha_backend() and bool((ctx or {}).get("skip_loxone_output"))
+    if not immediate:
+        written["set_evcs_max_current"] = amps_out
+    if is_ha_backend():
+        written["set_evcs_mode"] = _evcs_mode_for_cycle(
+            consumer, planned_kw, amps_out, immediate, consumer_pv_follow
+        )
     setpoint = {
         "schema_version": EHAL_SCHEMA_VERSION,
         "ts": ts,
         "adapter_id": adapter.cfg.adapter_id,
-        "set_evcs_max_current": amps_out,
+        **written,
     }
     error = adapter.write_setpoints(
         setpoint, evcs_voltage_v=voltage_v, evcs_phases=phases
@@ -648,7 +666,7 @@ def write_evcs_max_current_from_consumers(
     if error is not None:
         persist_write_error(error)
     records = build_ehal_write_records(
-        {"set_evcs_max_current": amps_out},
+        written,
         written_at=ts,
         error=error,
         skipped=_last_skipped(adapter),
@@ -657,10 +675,20 @@ def write_evcs_max_current_from_consumers(
     return error, records
 
 
+def _evcs_mode_for_cycle(
+    consumer: dict,
+    planned_kw: float,
+    amps: float,
+    immediate: bool,
+    consumer_pv_follow: dict[str, int] | None,
+) -> str:
+    from optimizer.consumer_power import loxone_control_outputs, set_evcs_mode_for_plan
 
-
-
-
+    plan_pv = int((consumer_pv_follow or {}).get(consumer["id"], 0) or 0)
+    _, pv_out = loxone_control_outputs(consumer, planned_kw, plan_pv)
+    return set_evcs_mode_for_plan(
+        pv_follow=int(pv_out), immediate=immediate, charging=amps > 1e-6
+    )
 
 
 def _first_ev_consumer() -> dict | None:

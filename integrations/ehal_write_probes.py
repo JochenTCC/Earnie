@@ -162,13 +162,14 @@ def clamp_probe_values(
 def _dispatch_probe_writes(clamped: dict[str, Any]) -> EhalWriteError | None:
     from ehal.ess_fields import is_ess_entity_scoped_field
     from ehal.flex_fields import flex_field_kind
+    from ehal.inverter_fields import is_inv_entity_scoped_field
 
     entity_scoped: dict[str, float] = {}
     flex_fields: dict[str, float] = {}
     adapter_values: dict[str, Any] = {}
     for field, value in clamped.items():
         name = canonical_probe_field(field)
-        if is_ess_entity_scoped_field(name):
+        if is_ess_entity_scoped_field(name) or is_inv_entity_scoped_field(name):
             entity_scoped[name] = float(value)
             continue
         if flex_field_kind(name):
@@ -211,6 +212,8 @@ def _write_entity_scoped_probes(fields: dict[str, float]) -> EhalWriteError | No
 
 
 def _write_flex_enable_probes(fields: dict[str, float]) -> EhalWriteError | None:
+    if live.ehal_live.is_ha_backend():
+        return live.ehal_live.get_ha_adapter().write_published_fields(fields)
     if live.ehal_live.is_ehal_network_backend():
         return None
     return _write_loxone_mapped_probes(fields)

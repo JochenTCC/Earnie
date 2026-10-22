@@ -57,6 +57,9 @@ TELEMETRY_ENERGY_OPTIONAL: tuple[str, ...] = (
     "sens_grid_energy_export",
 )
 
+# Numeric encoding of ``set_evcs_mode`` on number-only backends (Loxone Merker, HA ``number``).
+EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
+
 SETPOINT_FIELDS: tuple[str, ...] = (
     "set_ess_active_power",
     "set_ess_charge_power_limit",

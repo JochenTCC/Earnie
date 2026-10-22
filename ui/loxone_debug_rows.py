@@ -324,9 +324,11 @@ def build_telemetry_rows(
     mapping: dict[str, str] | None = None,
     expected_fields: list[str] | None = None,
     backend: str | None = None,
-    push_info: dict[str, tuple[str, str]] | None = None,
+    push_info: dict[str, tuple[str, str, float | None]] | None = None,
 ) -> list[dict[str, str]]:
-    """Live-Lesen rows. ``push_info``: qualified id → (push state, last receipt) for HA.
+    """Live-Lesen rows.
+
+    ``push_info`` (HA): qualified id → (push state, last receipt, last pushed value).
 
     HA bindings carry no entity ids (activation keys only), so "mapped" cannot come
     from ``mapping``; an activated push signal shows its inbox state and receipt time.
@@ -359,8 +361,11 @@ def build_telemetry_rows(
         mapped = mapping_or_dash(source, field)
         seen_at = read_at
         if field in push:
-            state, last_seen = push[field]
-            wert = str(present[field]) if field in present else ""
+            state, last_seen, pushed = push[field]
+            if field in present:
+                wert = str(present[field])
+            else:
+                wert = "" if pushed is None else str(pushed)
             status = state
             seen_at = last_seen or read_at
         elif field in present:

@@ -209,6 +209,7 @@ def start(*, wait_sec: float = _START_WAIT_SEC) -> DaemonStatus:
         popen_kwargs["start_new_session"] = True
 
     logger.info("Starte main.py … (stdio → %s)", _stdio_log_path())
+    spawn_ts = int(time.time())
     try:
         proc = subprocess.Popen(
             [python_executable(), str(main_py)],
@@ -217,25 +218,40 @@ def start(*, wait_sec: float = _START_WAIT_SEC) -> DaemonStatus:
     finally:
         stdio.close()
 
+    # The lock is taken early in main.py; startup can still fail after it (F2, B3).
+    # "Started" means the daemon reached its main loop (fresh heartbeat).
     deadline = time.monotonic() + max(0.5, wait_sec)
     while time.monotonic() < deadline:
         if proc.poll() is not None:
             raise DaemonError(_early_exit_message(proc.returncode))
         current = status()
-        if current.state == "running":
+        if current.state == "running" and _heartbeat_since(spawn_ts):
             logger.info("main.py läuft (PID %s)", current.pid)
             return current
         time.sleep(0.15)
 
-    current = status()
-    if current.state == "running":
-        return current
     if proc.poll() is not None:
         raise DaemonError(_early_exit_message(proc.returncode))
+    current = status()
+    if current.state == "running":
+        logger.warning(
+            "main.py (PID %s) hält die Sperre, hat aber innerhalb von %.0fs noch "
+            "keinen Heartbeat geschrieben (Start dauert noch)",
+            current.pid,
+            wait_sec,
+        )
+        return current
     raise DaemonError(
         "main.py startete, aber die Single-Instance-Sperre wurde nicht "
         f"innerhalb von {wait_sec:.0f}s gesetzt"
     )
+
+
+def _heartbeat_since(spawn_ts: int) -> bool:
+    from runtime_store.daemon_heartbeat import read_heartbeat_ts
+
+    ts = read_heartbeat_ts()
+    return ts is not None and ts >= spawn_ts
 
 
 def _early_exit_message(returncode: int | None) -> str:

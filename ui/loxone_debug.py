@@ -174,8 +174,8 @@ def _local_receipt_time(raw: object) -> str:
     return stamp.isoformat(timespec="seconds")
 
 
-def _ha_push_read_info() -> dict[str, tuple[str, str]]:
-    """Qualified id → (push state, last receipt) for every activated HA read signal."""
+def _ha_push_read_info() -> dict[str, tuple[str, str, float | None]]:
+    """Qualified id → (push state, last receipt, value) for every activated HA read signal."""
     from integrations.ha_push_read import (
         load_house_components_for_ha,
         push_read_qualified_ids,
@@ -184,13 +184,14 @@ def _ha_push_read_info() -> dict[str, tuple[str, str]]:
 
     house, components = load_house_components_for_ha()
     inbox = memory_snapshot()
-    info: dict[str, tuple[str, str]] = {}
+    info: dict[str, tuple[str, str, float | None]] = {}
     for qid in sorted(set(push_read_qualified_ids(house, components).values())):
-        _value, state = read_push_value(qid)
+        value, state = read_push_value(qid)
         row = inbox.get(qid)
         info[qid] = (
             state,
             _local_receipt_time(row.get("last_ts")) if isinstance(row, dict) else "",
+            value,
         )
     return info
 
