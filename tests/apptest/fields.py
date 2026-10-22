@@ -122,7 +122,7 @@ CONSUMER_FIELDS = [
     _cons("wp", "number_input", "nom_0", "nominal_power_kw", 4.5),
     _cons("wp", "number_input", "ta_min_qh_0", "min_on_quarterhours", 6),
     _cons("wp", "number_input", "area_0", "living_area_m2", 150.0),
-    _cons("wp", "number_input", "persons_0", "persons", 4, boundaries=(1,)),
+    _cons("wp", "number_input", "persons_0", "persons", 4, boundaries=(0, 1)),
     _cons("wp", "number_input", "target_temp_0", "target_temp_c", 22.5),
     _cons("wp", "number_input", "house_tol_0", "house_tolerance_c", 1.5),
     _cons("wp", "number_input", "house_h_0", "house_heat_loss_kw_per_k", 0.2),

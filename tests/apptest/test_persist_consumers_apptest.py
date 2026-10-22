@@ -99,10 +99,21 @@ def test_t1_value_survives_save_and_new_session(spec: Field) -> None:
     assert _widget(_new_session(), spec).value == spec.valid
 
 
+# Bekannte Fehler: Test bleibt stehen, schlägt streng fehl, sobald der Fehler behoben ist.
+_KNOWN_BUGS = {
+    ("wp-persons_0", 0): (
+        "profiles_thermal_annual: `int(persons or 2)` macht 0 Personen (Widget erlaubt min 0) "
+        "still zu 2 (Backlog-Bugfixes)"
+    ),
+}
+
+
 def _boundary_params():
     for spec in CONSUMER_FIELDS:
         for value in spec.boundaries:
-            yield pytest.param(spec, value, id=f"{_ids(spec)}-{value}")
+            reason = _KNOWN_BUGS.get((_ids(spec), value))
+            marks = [pytest.mark.xfail(reason=reason, strict=True)] if reason else []
+            yield pytest.param(spec, value, marks=marks, id=f"{_ids(spec)}-{value}")
 
 
 @pytest.mark.parametrize("spec,value", list(_boundary_params()))
@@ -123,3 +134,38 @@ def test_t5_changes_across_consumer_types_are_all_persisted() -> None:
     assert not at.exception
     for pick in picks:
         assert _stored(by_id[pick]) == by_id[pick].valid, pick
+
+
+# --- T3: abgelehnte Eingaben -----------------------------------------------------------
+
+def _consumer_field(entity: str, suffix: str) -> Field:
+    return next(s for s in CONSUMER_FIELDS if s.entity == entity and s.suffix == suffix)
+
+
+@pytest.mark.parametrize(
+    "entity,suffix,value",
+    [
+        pytest.param("pool", "nom_3", 0.0, id="pool-nominal-power-zero"),
+        pytest.param(
+            "ev1", "ev_min_2", 50.0, id="ev-min-power-above-nominal",
+            marks=pytest.mark.xfail(
+                reason="Autosave: ValueError aus der Normalisierung wird als st.error gezeigt, "
+                "auto_persist meldet 'Gespeichert' und st.rerun() verwirft die Meldung (Backlog-Bugfixes)",
+                strict=True,
+            ),
+        ),
+    ],
+)
+def test_t3_rejected_value_shows_error_and_keeps_file(entity: str, suffix: str, value: float) -> None:
+    spec = _consumer_field(entity, suffix)
+    path = Path(os.environ["EARNIE_HOUSE_PROFILES_PATH"])
+    at = _new_session()
+    # Der erste Render normalisiert die Datei per Autosave; erst danach vergleichen.
+    before = path.read_bytes()
+
+    at = _set(at, spec, value)
+
+    assert not at.exception
+    assert path.read_bytes() == before
+    assert at.error, "Ablehnung muss als Fehlermeldung sichtbar sein"
+    assert not any("Gespeichert" in c.value for c in at.caption)
