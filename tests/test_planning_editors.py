@@ -562,6 +562,7 @@ def test_save_planning_tariff_selection(tmp_path, monkeypatch):
                 "import_tariffs": [
                     {
                         "id": "fixed_25ct",
+                        "land": "AT",
                         "label": "Fix 25 ct/kWh",
                         "type": "fixed_cent",
                         "fix_cent_kwh": 25.0,
@@ -570,6 +571,7 @@ def test_save_planning_tariff_selection(tmp_path, monkeypatch):
                 "export_tariffs": [
                     {
                         "id": "fixed_37ct",
+                        "land": "AT",
                         "label": "Fix 3,7 ct/kWh",
                         "type": "fixed",
                         "k_push_cent": 3.7,
@@ -648,7 +650,7 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
                     {"id": "imp", "label": "Import", "type": "spot_hourly", "land": "AT"},
                 ],
                 "export_tariffs": [
-                    {"id": "exp", "label": "Export", "type": "fixed", "k_push_cent": 3.7},
+                    {"id": "exp", "land": "AT", "label": "Export", "type": "fixed", "k_push_cent": 3.7},
                 ],
             }
         ),

@@ -25,6 +25,7 @@ def _minimal_tariffs() -> dict:
         "import_tariffs": {
             "catalog_imp": {
                 "id": "catalog_imp",
+                "land": "AT",
                 "label": "Katalog",
                 "type": "fixed_cent",
                 "fix_cent_kwh": 15.0,
@@ -35,6 +36,7 @@ def _minimal_tariffs() -> dict:
         "export_tariffs": {
             "catalog_exp": {
                 "id": "catalog_exp",
+                "land": "AT",
                 "label": "Katalog",
                 "type": "fixed",
                 "k_push_cent": 4.0,
@@ -111,6 +113,7 @@ def _write_tariffs(path: Path) -> None:
                 "import_tariffs": [
                     {
                         "id": "imp1",
+                        "land": "AT",
                         "label": "Import",
                         "type": "fixed_cent",
                         "fix_cent_kwh": 20.0,
@@ -120,6 +123,7 @@ def _write_tariffs(path: Path) -> None:
                 "export_tariffs": [
                     {
                         "id": "exp1",
+                        "land": "AT",
                         "label": "Export",
                         "type": "fixed",
                         "k_push_cent": 5.0,

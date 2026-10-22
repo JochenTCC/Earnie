@@ -119,6 +119,7 @@
         },
         {
             "id": "fixed_25ct",
+            "land": "AT",
             "label": "Fix 25 ct/kWh Bezug",
             "type": "fixed_cent",
             "fix_cent_kwh": 25.0,
@@ -128,6 +129,7 @@
     "export_tariffs": [
         {
             "id": "fixed_37ct",
+            "land": "AT",
             "label": "Fix 3,7 ct/kWh Einspeise",
             "type": "fixed",
             "k_push_cent": 3.7,
@@ -135,6 +137,7 @@
         },
         {
             "id": "fixed_35ct",
+            "land": "AT",
             "label": "Fix 3,5 ct/kWh",
             "type": "fixed",
             "k_push_cent": 3.5,
@@ -153,6 +156,7 @@
         },
         {
             "id": "monthly_test",
+            "land": "AT",
             "label": "Monatliche Testwerte",
             "type": "monthly_table",
             "monthly_rates": [

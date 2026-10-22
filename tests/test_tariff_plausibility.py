@@ -38,8 +38,8 @@ def test_collect_tariff_plausibility_errors_ok(tmp_path):
     schema = tmp_path / "tariffs.schema.json"
     _write_tariffs(
         tariffs,
-        imports=[{"id": "imp1", "label": "Import", "type": "fixed_cent", "fix_cent_kwh": 20.0}],
-        exports=[{"id": "exp1", "label": "Export", "type": "fixed", "k_push_cent": 5.0}],
+        imports=[{"id": "imp1", "land": "AT", "label": "Import", "type": "fixed_cent", "fix_cent_kwh": 20.0}],
+        exports=[{"id": "exp1", "land": "AT", "label": "Export", "type": "fixed", "k_push_cent": 5.0}],
     )
     _write_scenarios(
         scenarios,
@@ -71,8 +71,8 @@ def test_collect_scenario_tariff_ref_errors_unknown_export(tmp_path):
     scenarios = tmp_path / "backtesting_scenarios.json"
     _write_tariffs(
         tariffs,
-        imports=[{"id": "imp1", "label": "Import", "type": "fixed_cent", "fix_cent_kwh": 20.0}],
-        exports=[{"id": "exp1", "label": "Export", "type": "fixed", "k_push_cent": 5.0}],
+        imports=[{"id": "imp1", "land": "AT", "label": "Import", "type": "fixed_cent", "fix_cent_kwh": 20.0}],
+        exports=[{"id": "exp1", "land": "AT", "label": "Export", "type": "fixed", "k_push_cent": 5.0}],
     )
     _write_scenarios(
         scenarios,

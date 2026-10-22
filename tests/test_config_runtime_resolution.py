@@ -164,6 +164,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                 "import_tariffs": [
                     {
                         "id": "fixed_imp",
+                        "land": "AT",
                         "label": "Fix",
                         "type": "fixed_cent",
                         "fix_cent_kwh": 37.0,
@@ -172,6 +173,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                 "export_tariffs": [
                     {
                         "id": "monthly_exp",
+                        "land": "AT",
                         "label": "Monatlich",
                         "type": "monthly_table",
                         "monthly_rates": [

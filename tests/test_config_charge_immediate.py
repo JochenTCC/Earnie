@@ -79,13 +79,14 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
                 "import_tariffs": [
                     {
                         "id": "fixed_imp",
+                        "land": "AT",
                         "label": "Fix",
                         "type": "fixed_cent",
                         "fix_cent_kwh": 37.0,
                     }
                 ],
                 "export_tariffs": [
-                    {"id": "fixed_exp", "label": "Fix", "type": "fixed", "k_push_cent": 3.5}
+                    {"id": "fixed_exp", "land": "AT", "label": "Fix", "type": "fixed", "k_push_cent": 3.5}
                 ],
             }
         ),

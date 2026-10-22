@@ -376,6 +376,7 @@ def test_import_monthly_table_tariff_normalization():
             "import_tariffs": [
                 {
                     "id": "monthly_import",
+                    "land": "AT",
                     "label": "Monatlich",
                     "type": "monthly_table",
                     "monthly_rates": [
@@ -1633,8 +1634,8 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
     (config_dir / "tariffs.json").write_text(
         """
         {
-            "import_tariffs": [{"id": "fixed_imp", "label": "Fix", "type": "fixed_cent", "fix_cent_kwh": 37}],
-            "export_tariffs": [{"id": "fixed_exp", "label": "Fix", "type": "fixed", "k_push_cent": 3.7}]
+            "import_tariffs": [{"id": "fixed_imp", "land": "AT", "label": "Fix", "type": "fixed_cent", "fix_cent_kwh": 37}],
+            "export_tariffs": [{"id": "fixed_exp", "land": "AT", "label": "Fix", "type": "fixed", "k_push_cent": 3.7}]
         }
         """.strip(),
         encoding="utf-8",

@@ -236,6 +236,15 @@ def _copy_spot_export_fee_fields(raw: dict, spec: dict) -> None:
             spec[key] = float(raw[key])
 
 
+def _require_land(spec: dict, *, kind: str, index: int) -> None:
+    if "land" not in spec:
+        raise ValueError(
+            f"{kind}[{index}] ('{spec['id']}'): land fehlt (AT, DE oder CH). "
+            "Jeder Tarif braucht ein Land, damit der Land-Filter im "
+            "Szenarienkonfigurator ihn nicht ausblendet."
+        )
+
+
 def _import_tariff_spec(raw: dict, index: int) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"import_tariffs[{index}] muss ein Objekt sein.")
@@ -250,6 +259,7 @@ def _import_tariff_spec(raw: dict, index: int) -> dict:
     label = str(raw.get("label", tariff_id)).strip() or tariff_id
     spec: dict = {"id": tariff_id, "label": label, "type": tariff_type}
     _normalize_dach_fields(raw, spec)
+    _require_land(spec, kind="import_tariffs", index=index)
     spec["supplier_id"] = resolve_supplier_id(raw, tariff_id=tariff_id, label=label)
     if tariff_type == "fixed_cent":
         if "fix_cent_kwh" not in raw:
@@ -264,11 +274,6 @@ def _import_tariff_spec(raw: dict, index: int) -> dict:
                 f"import_tariffs[{index}] ('{tariff_id}'): monthly_rates fehlt."
             )
         spec["monthly_rates"] = validate_fixed_monthly_feed_in_rates(rates)
-    elif tariff_type in {"spot_hourly", "ex_post_spot", "monthly_market"}:
-        if "land" not in spec:
-            raise ValueError(
-                f"import_tariffs[{index}] ('{tariff_id}'): land fehlt für {tariff_type}."
-            )
     return spec
 
 
@@ -286,6 +291,7 @@ def _export_tariff_spec(raw: dict, index: int) -> dict:
     label = str(raw.get("label", tariff_id)).strip() or tariff_id
     spec: dict = {"id": tariff_id, "label": label, "type": tariff_type}
     _normalize_dach_fields(raw, spec)
+    _require_land(spec, kind="export_tariffs", index=index)
     spec["supplier_id"] = resolve_supplier_id(raw, tariff_id=tariff_id, label=label)
     if tariff_type == "fixed":
         if "k_push_cent" not in raw:
@@ -301,10 +307,6 @@ def _export_tariff_spec(raw: dict, index: int) -> dict:
             )
         spec["monthly_rates"] = validate_fixed_monthly_feed_in_rates(rates)
     elif tariff_type in {"spot_hourly", "ex_post_spot"}:
-        if "land" not in spec:
-            raise ValueError(
-                f"export_tariffs[{index}] ('{tariff_id}'): land fehlt für {tariff_type}."
-            )
         _copy_spot_export_fee_fields(raw, spec)
     return spec
 

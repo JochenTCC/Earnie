@@ -106,6 +106,7 @@ Details zu Typen und JSON: [Preise und Marktdaten](../konfiguration/preise.md).
 
 - **Katalogfeld:** `monthly_fee_eur` ist optional; fehlt es, gilt 0.
 - **Pflichtfeld `supplier_id`** (Kennung des Stromlieferanten): Ist der Anbieter bei Bezug und Einspeisung derselbe, fällt nur **eine** Gebühr an (der höhere der beiden Werte, `max`). Gebühren unterschiedlicher Anbieter werden **addiert**.
+- **Pflichtfeld `land`** (`AT`, `DE` oder `CH`): Jeder Tarif in `tariffs.json` braucht ein Land, auch Festpreis- und Monatstabellen-Tarife. Earnie lehnt Tarife ohne `land` beim Laden mit einer Fehlermeldung ab; der Land-Filter im Szenarienkonfigurator würde sie sonst stillschweigend ausblenden. (Der „Eigene Festpreis“ ist kein Katalog-Tarif und braucht kein Land.)
 
 ### Hausanschluss-Fixkosten (einmal je Szenario)
 
