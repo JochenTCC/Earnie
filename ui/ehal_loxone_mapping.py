@@ -42,6 +42,7 @@ from integrations.loxone_structure import (
     SOURCE_HTTP_PROBE,
     scan_structure,
 )
+from ui.flash import flash
 from ui.house_config_io import get_live_scenario_refs
 from ui.ehal_loxone_mapping_base import (  # noqa: F401 — re-exports
     _SESSION_MIGRATED,
@@ -641,7 +642,7 @@ def _save_entity_mapping(
         entity_kind=kind,
     )
     st.session_state[_SESSION_MIGRATED] = True
-    st.success(f"Mapping für `{entity_id}` gespeichert — {detail}.")
+    flash("success", f"Mapping für `{entity_id}` gespeichert — {detail}.")
     st.rerun()
 
 from ui.ehal_loxone_mapping_ui import (  # noqa: E402

@@ -16,6 +16,7 @@ from runtime_store.ehal_setup import (
     normalize_backend,
     resolve_adapter_id,
 )
+from ui.flash import flash
 from ui.house_config_io import load_main_config, save_main_config
 
 
@@ -156,7 +157,7 @@ def render_openems_connection_form(*, form_key: str = "ehal_openems_form") -> No
         st.error("Base-URL ist erforderlich.")
         return
     _persist_openems_connection(data, values)
-    st.success("OpenEMS-Zugang gespeichert (`ehal.backend=openems`).")
+    flash("success", "OpenEMS-Zugang gespeichert (`ehal.backend=openems`).")
     st.session_state.pop("sb_chosen_backend", None)
     st.rerun()
 
@@ -205,6 +206,6 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
     if not submitted:
         return
     _persist_ha_connection(data, ha, adapter_id=adapter_id)
-    st.success("Home Assistant gewählt (`ehal.backend=ha`).")
+    flash("success", "Home Assistant gewählt (`ehal.backend=ha`).")
     st.session_state.pop("sb_chosen_backend", None)
     st.rerun()

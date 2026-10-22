@@ -27,6 +27,7 @@ from house_config.inverter import (
 )
 from house_config.label_uniqueness import allocate_unique_label
 from runtime_store.persist_paths import resolve_config_json_path
+from ui.flash import flash
 from ui.auto_persist import auto_persist, payload_fingerprint, require_saved
 from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
 from ui.house_config_io import delete_inverter, list_inverters, upsert_inverter
@@ -463,7 +464,7 @@ def _render_inv_id_from_label(stable_id: str, fields: dict) -> None:
             force_id_from_label=True,
         )
         if persisted:
-            st.success(f"ID gesetzt: `{persisted}`")
+            flash("success", f"ID gesetzt: `{persisted}`")
             st.rerun()
 
 
@@ -486,7 +487,7 @@ def _render_inv_delete(stable_id: str) -> None:
     st.session_state[_SESSION_SYNC_KEY] = None
     if fallback == NEW_OPTION:
         st.session_state[_SESSION_SUPPRESS_AUTOPERSIST_KEY] = True
-    st.success("Wechselrichter entfernt.")
+    flash("success", "Wechselrichter entfernt.")
     st.rerun()
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from ui.flash import flash
 from ui.form_layout import labeled_checkbox
 from ui.house_config_io import (
     delete_scenario,
@@ -402,7 +403,7 @@ def _render_scenario_delete_button(ctx: dict) -> None:
     st.session_state[_SESSION_SELECT_PENDING_KEY] = ctx["live_id"]
     st.session_state[_SESSION_SYNC_KEY] = None
     st.session_state[_SESSION_FILE_STAMP_KEY] = None
-    st.success("Szenario entfernt.")
+    flash("success", "Szenario entfernt.")
     st.rerun()
 
 

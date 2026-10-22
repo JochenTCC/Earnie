@@ -222,22 +222,12 @@ def test_silent_toggle_is_locked_in_shadow_mode_and_writes_nothing(
 
 
 # --------------------------------------------------------------------------
-# L3: Erfolgsmeldung direkt vor st.rerun() (Verdacht aus der Bestandsaufnahme)
+# L3: Erfolgsmeldung direkt vor st.rerun() bleibt über ui/flash.py sichtbar
 # --------------------------------------------------------------------------
-# Bekannter Fehler: ``st.success(...)`` steht unmittelbar vor ``st.rerun()``; der Rerun
-# verwirft die Ausgabe, der Nutzer sieht keine Bestätigung. Die Daten sind gespeichert
-# (Tests oben). Fix: Flash-Meldung über den Rerun hinweg (siehe ``ui/auto_persist.py``).
-_SWALLOWED = pytest.mark.xfail(
-    strict=True,
-    reason="st.success vor st.rerun(): Bestätigung wird verworfen (Backlog-Bugfixes)",
-)
-
-
 def _texts(elements) -> str:
     return " | ".join(e.value for e in elements)
 
 
-@_SWALLOWED
 def test_l3_openems_save_confirmation_is_visible() -> None:
     at = _run("run_form_openems.py")
     _fill_openems(at, _OPENEMS_VALUES)
@@ -245,14 +235,12 @@ def test_l3_openems_save_confirmation_is_visible() -> None:
     assert "OpenEMS-Zugang gespeichert" in _texts(at.success)
 
 
-@_SWALLOWED
 def test_l3_ha_save_confirmation_is_visible() -> None:
     at = _run("run_form_ha.py")
     at.button(key="t_ha_submit").click().run(timeout=_TIMEOUT_S)
     assert "Home Assistant gewählt" in _texts(at.success)
 
 
-@_SWALLOWED
 def test_l3_loxone_save_confirmation_is_visible() -> None:
     at = _run("run_form_loxone.py")
     at.text_input(key="t_loxone_ip").set_value("192.168.178.77")
@@ -262,10 +250,22 @@ def test_l3_loxone_save_confirmation_is_visible() -> None:
     assert "Zugangsdaten gespeichert" in _texts(at.success)
 
 
-@_SWALLOWED
 def test_l3_silent_toggle_confirmation_is_visible(local_settings: Path) -> None:
     at = _run("run_page_daemon.py")
     toggle = at.toggle(key="daemon_silent_mode")
     toggle.set_value(not toggle.value).run(timeout=_TIMEOUT_S)
     shown = _texts(at.success) + " | " + _texts(at.warning)
     assert "Silent-Modus aktiv" in shown or "Loud" in shown
+
+
+def test_l3_lan_subnet_save_confirmation_is_visible(monkeypatch) -> None:
+    from ui.pages import page_smarthome_backend as page
+
+    saved: list[str] = []
+    monkeypatch.setattr(page, "resolve_scan_hosts", lambda: None)
+    monkeypatch.setattr(page, "_persist_lan_subnet", saved.append)
+    at = _run("run_form_lan_subnet.py")
+    at.text_input(key="sb_lan_subnet_input").set_value("192.168.178.0/24")
+    at.button(key="sb_lan_subnet_save").click().run(timeout=_TIMEOUT_S)
+    assert saved == ["192.168.178.0/24"]
+    assert "EARNIE_LAN_SUBNET=192.168.178.0/24 gespeichert" in _texts(at.success)

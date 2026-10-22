@@ -18,6 +18,7 @@ from runtime_store.dotenv_io import (
 )
 from runtime_store.dotenv_loader import load_app_dotenv
 from runtime_store.persist_paths import resolve_dotenv_path
+from ui.flash import flash
 from version import display_version
 
 
@@ -38,7 +39,7 @@ def _save_loxone_credentials(ip: str, user: str, password: str) -> str | None:
 
     load_app_dotenv(override=True)
     config.reinit_config(require_loxone_credentials=True)
-    st.success(f"Zugangsdaten gespeichert in `{path}`.")
+    flash("success", f"Zugangsdaten gespeichert in `{path}`.")
     return None
 
 
@@ -68,7 +69,10 @@ def _render_loxone_dotenv_conflict_hint() -> None:
             from runtime_store.loxone_auth_error import clear_loxone_auth_error
 
             clear_loxone_auth_error()
-            st.success(f"Zugangsdaten aus `{item['path']}` nach `{canonical}` übernommen.")
+            flash(
+                "success",
+                f"Zugangsdaten aus `{item['path']}` nach `{canonical}` übernommen.",
+            )
             st.rerun()
 
 

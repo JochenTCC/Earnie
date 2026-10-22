@@ -83,11 +83,6 @@ def test_d2_action_calls_function_once_and_shows_new_state(
     assert not at.error
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="page_daemon._run_lifecycle_actions: st.success vor st.rerun() wird verworfen "
-    "(Backlog-Bugfixes, Erfolgsmeldungen)",
-)
 @pytest.mark.parametrize("key,before,function,after,label_after", DAEMON_ACTIONS)
 def test_d2_action_confirmation_is_visible(
     fake_daemon, key, before, function, after, label_after

@@ -20,6 +20,7 @@ from runtime_store.main_daemon import (
 from runtime_store.persist_paths import log_file, resolve_local_settings_json_path
 from runtime_store.shadow.mode import is_shadow_mode
 from settings.system_settings import write_silent_mode_to_local_settings
+from ui.flash import flash
 from ui.help_hint import render_page_title_with_help
 from ui.runtime_config import reload_runtime_config
 
@@ -155,10 +156,11 @@ def _render_silent_mode_toggle() -> None:
     write_silent_mode_to_local_settings(resolve_local_settings_json_path(), silent)
     reload_runtime_config()
     if silent:
-        st.success("Silent-Modus aktiv — keine Schreibzugriffe.")
+        flash("success", "Silent-Modus aktiv — keine Schreibzugriffe.")
     else:
-        st.warning(
-            "Loud-Modus: Die Anlage erhält Sollwerte, sobald der Optimierer-Dienst läuft."
+        flash(
+            "warning",
+            "Loud-Modus: Die Anlage erhält Sollwerte, sobald der Optimierer-Dienst läuft.",
         )
     st.rerun()
 
@@ -283,17 +285,17 @@ def _run_lifecycle_actions(*, do_start: bool, do_stop: bool, do_restart: bool) -
         if do_start:
             with st.spinner("Starte main.py …"):
                 start()
-            st.success("main.py gestartet.")
+            flash("success", "main.py gestartet.")
             st.rerun()
         if do_stop:
             with st.spinner("Stoppe main.py …"):
                 stop()
-            st.success("main.py gestoppt.")
+            flash("success", "main.py gestoppt.")
             st.rerun()
         if do_restart:
             with st.spinner("Starte main.py neu …"):
                 restart()
-            st.success("main.py neu gestartet.")
+            flash("success", "main.py neu gestartet.")
             st.rerun()
     except DaemonError as exc:
         st.error(str(exc))

@@ -52,6 +52,7 @@ from ui.house_config_io import (
     upsert_house_profile,
 )
 from ui.auto_persist import auto_persist
+from ui.flash import flash
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_checkbox,
@@ -228,7 +229,7 @@ def _perform_house_profile_save(
         st.session_state[_SESSION_SELECT_PENDING_KEY] = profile_id
         st.session_state[_SESSION_SYNC_KEY] = None
         st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(saved_profile)
-        st.success("Profil gespeichert.")
+        flash("success", "Profil gespeichert.")
         st.rerun()
     return profile_id
 

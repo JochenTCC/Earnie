@@ -12,6 +12,7 @@ from house_config.entity_id_lock import ID_PROVISIONAL_LABEL_KEY
 from house_config.id_slug import slug_id
 from house_config.powerstation import BACKING_VIRTUAL
 from house_config.topology_regulates import REGULATES_ON_GRID
+from ui.flash import flash
 from ui.house_config_io import (
     delete_battery,
     get_live_scenario_refs,
@@ -287,7 +288,7 @@ def _render_battery_id_from_label(stable_id: str, fields: dict) -> None:
             force_id_from_label=True,
         )
         if persisted:
-            st.success(f"ID gesetzt: `{persisted}`")
+            flash("success", f"ID gesetzt: `{persisted}`")
             st.rerun()
 
 
@@ -310,7 +311,7 @@ def _render_battery_delete(stable_id: str) -> None:
     st.session_state[_SESSION_SYNC_KEY] = None
     if fallback == NEW_OPTION:
         st.session_state[_SESSION_SUPPRESS_AUTOPERSIST_KEY] = True
-    st.success("Batterie entfernt.")
+    flash("success", "Batterie entfernt.")
     st.rerun()
 
 

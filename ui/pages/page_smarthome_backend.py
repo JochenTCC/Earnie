@@ -34,6 +34,7 @@ from ui.ehal_connection import (
     render_ha_connection_form,
     render_openems_connection_form,
 )
+from ui.flash import flash
 from ui.help_hint import render_page_title_with_help
 from ui.setup_dotenv import render_loxone_credentials_form, render_loxone_verify_results
 from ui.setup_readiness import is_sb_configured
@@ -117,7 +118,7 @@ def _render_lan_subnet_prompt() -> None:
             return
         st.session_state.pop(_SESSION_RESULTS, None)
         st.session_state.pop(_SESSION_RAN_ACTIVE, None)
-        st.success(f"EARNIE_LAN_SUBNET={cidr.strip()} gespeichert.")
+        flash("success", f"EARNIE_LAN_SUBNET={cidr.strip()} gespeichert.")
         st.rerun()
 
 

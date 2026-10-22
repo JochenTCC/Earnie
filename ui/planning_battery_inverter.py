@@ -14,6 +14,7 @@ from house_config.inverter import (
     INVERTER_TYPE_HYBRID,
 )
 from house_config.inverter_presets import ecoflow_delta_3_seeds
+from ui.flash import flash
 from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
 from ui.house_config_io import list_inverters, upsert_battery, upsert_inverter
 from ui.label_select import label_select_choices, resolve_label_select
@@ -221,6 +222,6 @@ def render_ecoflow_preset_button(*, is_new: bool) -> bool:
         return False
     st.session_state["planning_battery_select_pending"] = bat_id
     st.session_state["planning_battery_sync_id"] = None
-    st.success(f"EcoFlow Delta 3 angelegt (`{bat_id}`).")
+    flash("success", f"EcoFlow Delta 3 angelegt (`{bat_id}`).")
     st.rerun()
     return True
