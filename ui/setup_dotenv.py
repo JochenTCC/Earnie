@@ -96,9 +96,13 @@ def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> No
             "HTTP-Port weicht vom Standard ab? IP mit Port eingeben "
             "(z. B. `192.168.178.1:85`)."
         )
-        user = st.text_input("Benutzername", value=env_user)
-        password = st.text_input("Passwort", value=env_pass, type="password")
-        submitted = st.form_submit_button("Speichern", type="primary")
+        user = st.text_input("Benutzername", value=env_user, key=f"{form_key}_user")
+        password = st.text_input(
+            "Passwort", value=env_pass, type="password", key=f"{form_key}_password"
+        )
+        submitted = st.form_submit_button(
+            "Speichern", type="primary", key=f"{form_key}_submit"
+        )
 
     if not submitted:
         return

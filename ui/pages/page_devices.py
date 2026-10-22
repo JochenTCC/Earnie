@@ -170,6 +170,7 @@ def _render_star_threshold_settings() -> None:
         with st.form(key="appliance_star_thresholds_form"):
             margin = st.number_input(
                 "Absolute Marge (Cent/kWh)",
+                key="devices_star_abs_margin_cent",
                 min_value=0.0,
                 value=float(settings["abs_margin_cent"]),
                 step=0.01,
@@ -177,6 +178,7 @@ def _render_star_threshold_settings() -> None:
             )
             pct_4 = st.number_input(
                 "Bis 4 Sterne (%) Mehrkosten",
+                key="devices_star_pct_stars_4",
                 min_value=0.1,
                 value=float(settings["pct_stars_4"]),
                 step=0.5,
@@ -184,12 +186,15 @@ def _render_star_threshold_settings() -> None:
             )
             pct_1 = st.number_input(
                 "Ab 1 Stern (%) Mehrkosten",
+                key="devices_star_pct_stars_1",
                 min_value=0.1,
                 value=float(settings["pct_stars_1"]),
                 step=0.5,
                 format="%.1f",
             )
-            save = st.form_submit_button("Schwellen in config.json speichern")
+            save = st.form_submit_button(
+                "Schwellen in config.json speichern", key="devices_star_save"
+            )
         if save:
             try:
                 config.update_appliance_recommendation_settings(

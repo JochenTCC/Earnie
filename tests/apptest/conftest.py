@@ -76,6 +76,13 @@ def _isolated_backtesting_config(tmp_path, monkeypatch):
         str(Path(__file__).resolve().parents[2] / "share" / "config" / "grid_fees.json"),
     )
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime_dir))
+    # Formulare, die Zugangsdaten schreiben (Loxone), dürfen nie die echte .env treffen.
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", str(config_dir / ".env"))
+    # AppTest läuft im Testprozess: von der Seite gesetzte LOXONE_*-Variablen werden
+    # nach dem Test wiederhergestellt (monkeypatch merkt sich den Ausgangszustand).
+    for _name in ("LOXONE_IP", "LOXONE_USER", "LOXONE_PASS"):
+        monkeypatch.setenv(_name, "")  # merkt den Ausgangszustand für den Teardown
+        monkeypatch.delenv(_name)
 
     monkeypatch.setattr(backtesting_log, "_DEFAULT_LOG_DIR", str(runtime_dir))
     monkeypatch.setattr(optimization_history, "RUNTIME_DIR", str(runtime_dir))

@@ -71,6 +71,7 @@ def _render_openems_form_inputs(
     with st.form(form_key):
         base_url = st.text_input(
             "OpenEMS Base-URL",
+            key=f"{form_key}_base_url",
             value=str(openems.get("base_url") or "http://openems-edge:8084"),
             help=(
                 "Vollständige Base-URL inkl. Port, z. B. http://openems-edge:8084 "
@@ -83,27 +84,34 @@ def _render_openems_form_inputs(
         )
         username = st.text_input(
             "Benutzername",
+            key=f"{form_key}_username",
             value=str(openems.get("username") or "x"),
         ).strip()
         password = st.text_input(
             "Passwort",
+            key=f"{form_key}_password",
             value=str(openems.get("password") or "admin"),
             type="password",
         )
         ess = st.text_input(
             "ESS-Komponente",
+            key=f"{form_key}_ess_component",
             value=str(openems.get("ess_component") or "ess0"),
         ).strip() or "ess0"
         evcs = st.text_input(
             "EVCS-Komponente",
+            key=f"{form_key}_evcs_component",
             value=str(openems.get("evcs_component") or "evcs0"),
         ).strip() or "evcs0"
         openems_default = default_adapter_id(BACKEND_OPENEMS)
         adapter_id = st.text_input(
             "adapter_id",
+            key=f"{form_key}_adapter_id",
             value=resolve_adapter_id(ehal.get("adapter_id"), BACKEND_OPENEMS),
         ).strip() or openems_default
-        submitted = st.form_submit_button("Speichern", type="primary")
+        submitted = st.form_submit_button(
+            "Speichern", type="primary", key=f"{form_key}_submit"
+        )
 
     values = {
         "base_url": base_url,
@@ -188,9 +196,12 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
     with st.form(form_key):
         adapter_id = st.text_input(
             "adapter_id",
+            key=f"{form_key}_adapter_id",
             value=resolve_adapter_id(ehal.get("adapter_id"), BACKEND_HA),
         ).strip() or default_adapter_id(BACKEND_HA)
-        submitted = st.form_submit_button("Speichern", type="primary")
+        submitted = st.form_submit_button(
+            "Speichern", type="primary", key=f"{form_key}_submit"
+        )
     if not submitted:
         return
     _persist_ha_connection(data, ha, adapter_id=adapter_id)
