@@ -697,9 +697,21 @@ def _main_cycle(run_trigger: str, timing: CycleTimer, *, tick: datetime | None =
                 matrix_row=optimization_matrix[0] if optimization_matrix else None,
                 milp_plan=milp_plan if isinstance(milp_plan, dict) else None,
             )
+            flex_enable_records: list[dict] = []
+            if ehal_live.is_ha_backend():
+                # Heat pump / pool / generic enables; the EV current went out above.
+                logger.info("Sende EHAL Flex-Freigaben an %s...", backend)
+                flex_enable_records = ehal_live.write_flex_enables_for_ha(
+                    consumer_powers, charging_contexts, consumer_pv_follow
+                )
             if err_ess is None and err_evcs is None and err_inv is None:
                 ehal_live.clear_write_error()
-            ehal_writes = list(ess_records) + list(evcs_records) + list(inv_records)
+            ehal_writes = (
+                list(ess_records)
+                + list(evcs_records)
+                + list(inv_records)
+                + list(flex_enable_records)
+            )
             loxone_writes = None
         else:
             logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
