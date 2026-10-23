@@ -1,0 +1,10 @@
+{
+  "source": "https://api.energy-charts.info/price",
+  "zone": "AT",
+  "start": "2025-01-01",
+  "end": "2026-01-04",
+  "rows": 15771,
+  "first_ts": "2024-12-31T23:00:00+00:00",
+  "last_ts": "2026-01-04T22:45:00+00:00",
+  "fetched_on": "2026-10-23"
+}

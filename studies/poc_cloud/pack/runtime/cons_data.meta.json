@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "written_at": "2026-10-23T10:38:07",
+  "written_by_app_version": "2.7.0-alpha.8",
+  "output_file": "C:/Users/joche/Documents/earnie-es/Earnie/studies/poc_cloud/pack\\runtime\\cons_data.csv",
+  "retention_months": 24,
+  "consumer_ids": [
+    "wp_heating",
+    "ev",
+    "waschmaschine",
+    "trockner",
+    "geschirrspueler"
+  ],
+  "house_profile_fingerprint": "60845aed709a8295ffbd3ad7281aeb2e9c9409ffc37ad69dcea89415a05189b7",
+  "date_range": {
+    "min": "2025-01-01 00:00:00",
+    "max": "2025-12-31 23:00:00"
+  },
+  "row_count": 8760,
+  "source_counts": {
+    "synthetic": 8760
+  }
+}
