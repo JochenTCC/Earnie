@@ -23,7 +23,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **Carrier skip message names the wrong cause (L13):** fixed in `integrations/ha_carrier_yaml.py` (no version bump): the setpoint skip log names the unit only for converted units (W/kWh/%/A), otherwise `published value is not numeric`; test in `tests/test_ha_carrier_yaml_gen.py`. **Pending:** verify live on the bench (2026-10-22).
 - [ ] **Recorder replay fails offline for installations with an EV `get_evcs_limit_soc` binding:** fixed in `runtime_store/cycle_recorder.py` + `runtime_store/recorder_replay.py` (no version bump): the recorder now stores the resolved limit SoC per EV in `start_state.ev_limit_soc_percent`; replay serves it for the bound marker and fails loud (`ValueError`) for cycles recorded without it. Tests in `tests/test_recorder_replay.py`. **Pending:** old cycles (e.g. the productive-NAS dump) stay unreplayable — verify with a fresh dump from the NAS (`--intake ... --update-golden`).
 
 
