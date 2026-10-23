@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.7.0-dev.62",
+    "earnie_version": "2.7.0-alpha.8",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -14,8 +14,8 @@
   "metrics": {
     "status_optimal": 1,
     "n_slots": 96,
-    "cost_euro": 5.897061860975445,
-    "objective_raw": 589.7061860975444,
+    "cost_euro": 5.8909009586473235,
+    "objective_raw": 589.0900958647323,
     "mode": 2,
     "target_power_kw": 0.0,
     "battery_plan_kw": 0.0,
@@ -29,8 +29,8 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "ab3fe830f6f4cc3c2bdaa696445c49b1d2a696ab",
-    "recorded_at": "2026-10-19T17:47:42Z",
+    "git_sha": "b07aade118c86da78df9bd3f402709ac2b8225ff",
+    "recorded_at": "2026-10-23T06:35:22Z",
     "source": "update-golden"
   },
   "inputs": {
