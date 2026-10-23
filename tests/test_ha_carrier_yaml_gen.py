@@ -183,17 +183,18 @@ def test_carrier_yaml_push_skip_message_names_the_unavailable_state():
     assert "is unavailable/non-numeric" in text
 
 
-def test_carrier_yaml_setpoint_skip_message_names_the_real_cause(monkeypatch):
-    # Bench L13: the unit text was logged for a non-numeric published value; the
-    # template only reads the target unit for converted units (W/kWh/%/A).
+def test_carrier_yaml_setpoint_skip_message_only_for_converted_units(monkeypatch):
+    # Bench L13: the unit text was logged for a non-numeric published value. The target
+    # unit is only read for converted units (W/kWh/%/A); for those the skip message is
+    # the unit one. Without a unit a non-numeric value is stopped before (no dead guard).
     text = _build()
     assert "setpoint skipped for ess.house.set_ess_charge_power_limit: unknown or incompatible" in text
     assert "unit_of_measurement on ENTITY_ess_house_set_ess_charge_power_limit (need W)" in text
+    assert "{{ hub_value is none }}" in text
 
     monkeypatch.setattr("integrations.ha_carrier_yaml.ehal_base_unit", lambda _id: None)
     text = _build()
-    assert (
-        "setpoint skipped for ess.house.set_ess_charge_power_limit: published value is not numeric"
-        in text
-    )
-    assert "setpoint skipped" in text and "unit_of_measurement on ENTITY_ess_house_set" not in text
+    assert "setpoint skipped" not in text
+    assert "published value is not numeric" not in text
+    assert "{{ hub_value is none }}" not in text
+    assert "number.set_value" in text

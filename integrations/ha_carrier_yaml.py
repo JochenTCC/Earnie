@@ -396,15 +396,14 @@ def _setpoint_automation(
     entity = entity_placeholder(sig.ehal_id)
     unit = ehal_base_unit(sig.ehal_id)
     auto_id = f"earnie_setpoint_{_sanitize_id(sig.ehal_id)}"
-    if unit in _UNIT_CONVERTED:
-        # Only these units are read from the target entity (see _jinja_from_ehal_vars).
-        skip_msg = (
-            f"Earnie setpoint skipped for {sig.ehal_id}: unknown or incompatible "
-            f"unit_of_measurement on {entity} (need {unit})"
-        )
-    else:
-        # No unit conversion: hub_value is none only when the published value is not numeric.
-        skip_msg = f"Earnie setpoint skipped for {sig.ehal_id}: published value is not numeric"
+    # Only these units are read from the target entity (see _jinja_from_ehal_vars); for
+    # all others hub_value is none only for a non-numeric value, which the
+    # ``nothing_published`` stop below already handles, so no guard is generated.
+    unit_guarded = unit in _UNIT_CONVERTED
+    skip_msg = (
+        f"Earnie setpoint skipped for {sig.ehal_id}: unknown or incompatible "
+        f"unit_of_measurement on {entity} (need {unit})"
+    )
     # Re-assert on every tick, but only write when the target drifted (≈1 %), so
     # a restart or a manual change is corrected without a write every interval.
     drift = (
@@ -442,19 +441,23 @@ def _setpoint_automation(
         f"                      message: {_q(not_applied_msg)}",
         "                  - action: rest_command.earnie_push_hub_write_failed",
     ]
-    guard = [
-        "      - if:",
-        "          - condition: template",
-        f"            value_template: {_q('{{ hub_value is none }}')}",
-        "        then:",
-        "          - action: system_log.write",
-        "            data:",
-        "              level: warning",
-        f"              logger: {_LOGGER}",
-        f"              message: {_q(skip_msg)}",
-        "        else:",
-        *apply,
-    ]
+    if unit_guarded:
+        guard = [
+            "      - if:",
+            "          - condition: template",
+            f"            value_template: {_q('{{ hub_value is none }}')}",
+            "        then:",
+            "          - action: system_log.write",
+            "            data:",
+            "              level: warning",
+            f"              logger: {_LOGGER}",
+            f"              message: {_q(skip_msg)}",
+            "        else:",
+            *apply,
+        ]
+    else:
+        # ``apply`` is nested under ``else:`` (4 spaces deeper than the action list).
+        guard = [line[4:] for line in apply]
     # Fields Earnie did not publish (e.g. active power in automatic mode) are not an error.
     nothing_published = [
         "      - if:",

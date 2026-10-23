@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### HA carrier bugfixes (2026-10-23)
+
+- [x] **Carrier skip message names the wrong cause (L13) — fixed and verified live on the bench:** `integrations/ha_carrier_yaml.py` (no version bump): the setpoint skip guard (`hub_value is none` → unit message) is generated only for converted units (W/kWh/%/A); for all other units a non-numeric value is already stopped by `Earnie published no value for this field`, so no dead guard or misleading text is emitted. Test: `test_carrier_yaml_setpoint_skip_message_only_for_converted_units` in `tests/test_ha_carrier_yaml_gen.py`. Bench (HA 2025.7.0, Earnie in the bench, 2026-10-23): `ess.house.set_ess_charge_power_limit` target with a foreign `unit_of_measurement` (`°C` via `customize`) logs `... unknown or incompatible unit_of_measurement on number.earnie_ess_house_set_ess_charge_power_limit (need W)` and does not write; without the override a deviating value is corrected again (W path), as is `heatpump.waermepumpe.set_enable` (no unit, no guard, no skip log); `ha_testbed_check --require-all` 11 PASS / 0 FAIL.
+
 ### Document Review — handbook fragments (2026-10-23)
 
 - [x] **Broken handbook fragments in `ui/doc_links.py` / inbound docs:** the handbook now carries explicit anchors (`<a id="analyse-verbrauch-kosten">`, `gesamtkosten-jahres-verbrauch-kwh`, `kurz-checkliste-go-live`, same style as `pv-anlagen`), so the links no longer depend on GitHub slug rules; `ui/doc_links.py` uses `gesamtkosten-jahres-verbrauch-kwh` (as `betriebsmodi.md` / `charts.md` already did) and `kurz-checkliste-go-live`. This also repairs the "Jahres Verbrauch" link in `ui/backtesting_results.py`, whose lookup by fragment never matched the old value. New tests in `tests/test_doc_links.py` check every `DocLink` fragment against the target document and every inbound handbook link in `docs/`.
