@@ -10,7 +10,7 @@ Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) sind nur hier bes
 - [HA + evcc lab setup](../dev/ha-lab-setup.md) – Compose-Umgebung Earnie ↔ Home Assistant.
 - [House simulator](../dev/house-sim.md) – interne Mock- und Dogfood-Umgebung (`house_sim/`).
 - [OpenEMS lab setup](../dev/openems-lab-setup.md) – Compose-Umgebung Earnie ↔ OpenEMS.
-- [Branching & Hotfix Playbook](../workflow/branching-hotfix-playbook.md) – Tags, Hotfixes und der Umgang mit `main`.
+- [Branching & Hotfix Playbook](../workflow/branching-hotfix-playbook.md) – `main`, `releaseX.Y`, Tags und Hotfixes.
 - [Release Checklist](../workflow/release-checklist.md) – Ablauf vom Kandidaten über den Test auf HA / LoxBerry bis zur Freigabe.
 - [Shadow Mode](../dev/shadow-mode.md) – Prod-Feed-Recorder (S1) und Shadow-Client (S2+S3, **2.7.f**) sind umgesetzt; S4 folgt in **2.+1**.
 - [Regression Suite](../workflow/regression-suite.md) – Golden-Master-Cases vor jedem Release, mit öffentlichen und privaten Daten.

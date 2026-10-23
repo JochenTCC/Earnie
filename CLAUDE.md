@@ -27,7 +27,7 @@ Windows PowerShell 5.x: no `&&` / `||` (`.cursor/rules/powershell-shell.mdc`). I
 - Backlog IDs and hierarchy: `roadmap-nomenclature.mdc`, `backlog.mdc`. Backlog files are **English**; done items go to `backlog/Backlog-Erledigt.md` (newest on top, dated heading).
 - Before committing `Backlog-Bugfixes.md` / `Backlog-Erledigt.md`: scrub real user/customer names with stable aliases (`backlog-anonymize-users.mdc`; local map `.cursor/user-aliases.local.md`, never committed).
 - **Release notes:** `.cursor/rules/release-notes.mdc` + skill `release-notes` — AI writes **drafts only** (`.github/release-notes/drafts/`), the maintainer reviews before they become `v<version>.md`; none for `-dev` versions.
-- Branching / hotfix / tagging: `branching-hotfix-playbook.mdc` — warn before long-lived branches or tag rewrites.
+- Branching / hotfix / tagging: `branching-hotfix-playbook.mdc` — `main` + `releaseX.Y` ship line; warn before `develop`/`alpha`, tagging from the wrong line, or tag rewrites.
 
 ## Chat language
 
