@@ -251,7 +251,7 @@ def _render_thermal_rc_fields(
     item: dict = {
         "min_on_quarterhours": labeled_number_input(
             "Mindestlaufzeit (Viertelstunden)",
-            min_value=0,
+            min_value=1,
             value=int(consumer.get("min_on_quarterhours", 8)),
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_rc_min_qh_{index}"),

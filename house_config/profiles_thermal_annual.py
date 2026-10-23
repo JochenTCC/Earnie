@@ -115,7 +115,7 @@ def normalize_thermal_annual_consumer(
     window = raw.get("thermal_flex_window")
     if isinstance(window, dict) and window:
         spec["thermal_flex_window"] = dict(window)
-    spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 4) or 4))
+    spec["min_on_quarterhours"] = max(1, int(raw.get("min_on_quarterhours", 1) or 1))
     if "max_on_quarterhours" in raw:
         spec["max_on_quarterhours"] = max(4, int(raw.get("max_on_quarterhours", 16) or 16))
     if "max_pulses_per_day" in raw:

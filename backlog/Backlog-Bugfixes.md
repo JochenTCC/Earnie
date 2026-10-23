@@ -28,10 +28,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] **House profile: `min_on_quarterhours = 0` of an EV / Haus Wärme consumer is silently turned into 4 (decide first):** the widgets allow `min_value=0` (`ui/house_config_profile_ev.py`, `ui/house_config_profile_thermal_annual.py`), but `house_config/profiles_consumers.py` (EV) and `house_config/profiles_thermal_annual.py` use `max(0, int(raw.get("min_on_quarterhours", 4) or 4))`, so 0 is saved and shown as 4; `tests/test_house_config.py::test_ev_min_on_quarterhours_defaults_to_four` asserts that 0 falls back to 4, so it may be intended. Found while fixing the `persons = 0` entry. Fix (decide first): either keep 0 ("no minimum run time") and change that test, or raise the widget minimum to 1.
-
-
-
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
 - [ ] Set default "Temperaturabsenkung" in annual-rc to 2.5°C
