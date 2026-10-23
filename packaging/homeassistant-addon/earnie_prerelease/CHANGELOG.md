@@ -2,6 +2,19 @@
 
 Same image family as `earnie/`. Pre-releases and official releases both bump this tree (`version:` = newest including alpha/rc on pre-release tags; matches stable on official tags).
 
+## 2.7.0-alpha.9
+
+- Community-Vorabversion der Linie 2.7: mehrere Speicher und Wechselrichter, Push-only-Anbindung, Migrationsassistent – plus HTTPS für Nutzungsstatistik/Feedback, zuverlässigere Szenario-Explorer-Buchung, die Bezeichnung „PV-Feld“ und ein LoxBerry-Update-Hinweis, der die echte Image-Version auf GHCR liest.
+  - Nach dem Update: Konfigurationsmigration per Assistent, mit automatischem Backup
+  - Alte Konfigurationen (z. B. mit `ehal.ha.transport`) starten jetzt in den Migrationsassistenten statt mit „Abbruch“
+  - Mehrere Batterien / Powerstations und Wechselrichter als eigene Einheit
+  - Home Assistant und Loxone: nur noch Push; Batterieleistung beim Entladen positiv
+  - Nutzungsstatistik und SE-Sterne-Feedback über HTTPS (fester Server, kein Port 8787)
+  - Szenario-Explorer: zusammenhängende Sunrise-Buchung und gebuchter Verbrauch
+  - LoxBerry: Update-Hinweis aus GHCR-Image-Version (`:latest` / `:next`)
+  - UI: „PV-Feld“ / „PV-Felder“ statt „PV-Anlage“
+- Earnie release: [2.7.0-alpha.9](https://github.com/JochenTCC/Earnie/releases/tag/v2.7.0-alpha.9)
+
 ## 2.6.2
 
 - Pins Earnie `2.6.2` (`ghcr.io/jochentcc/earnie-energy:2.6.2`).
