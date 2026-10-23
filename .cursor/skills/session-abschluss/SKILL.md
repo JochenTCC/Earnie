@@ -242,7 +242,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 
 Read `version.py`. **Never change without explicit user approval** (see `versioning.mdc`).
 
-Prefer publishing from `main`. After an alpha/beta/rc tag, leave that pre-release string on `main` until the next approved bump — do **not** bump back to the previous official version.
+Prefer publishing from the ship line: `releaseX.Y` when that MINOR line is open (see `branching-hotfix-playbook.md`), otherwise `main`. After an alpha/beta/rc tag, leave that pre-release string on the ship line until the next approved bump — do **not** bump back to the previous official version.
 
 If publishing **B** and alpha compose is out of date: run **Alpha compose sync**, commit, push, then continue.
 
@@ -281,7 +281,7 @@ Job `promote` (environment `release-approval`) **waits for the user's approval**
 ### 2b. Failed candidate
 
 - User **rejects** `promote` (or pre-gate checks failed) → nothing user-visible happened; the draft release and `:<version>` images stay unpublished.
-- Fix on `main` → **D** (next version, e.g. `alpha.N+1`; approval required) → tag again. **Never** re-tag or force-push the rejected tag (`branching-hotfix-playbook.mdc`).
+- Fix on the ship line (`releaseX.Y` or `main`) → **D** (next version, e.g. `alpha.N+1`; approval required) → tag again. **Never** re-tag or force-push the rejected tag (`branching-hotfix-playbook.mdc`).
 - Optionally delete the draft release of the rejected candidate — only after the user confirms.
 
 ### 3. Reset `streamlitcloud` to the release tag
@@ -329,7 +329,7 @@ Report twice: after the tag push (candidate built, §2a instructions, approval p
   - Prod `*_productive.yml` with `:latest` is unchanged — last official
 - **If C (official):** deploy with usual compose pull of `:latest` or `:<version>`
   - Synology / LoxBerry / Proxmox: `docker compose --project-directory . -f docker/compose/<host>_productive.yml pull` then `up -d`
-- Remind: next session end will ask **A/B/C/D** again; alpha stays on `main` until the next approved bump
+- Remind: next session end will ask **A/B/C/D** again; alpha stays on the ship line until the next approved bump
 
 ---
 
