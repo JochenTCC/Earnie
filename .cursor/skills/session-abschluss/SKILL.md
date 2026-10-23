@@ -242,7 +242,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 
 Read `version.py`. **Never change without explicit user approval** (see `versioning.mdc`).
 
-Prefer publishing from the ship line: `releaseX.Y` when that MINOR line is open (see `branching-hotfix-playbook.md`), otherwise `main`. After an alpha/beta/rc tag, leave that pre-release string on the ship line until the next approved bump — do **not** bump back to the previous official version.
+Prefer publishing from the ship line: `releaseX.Y` once the planned MINOR was moved there (official near + development continues on `main`; see `branching-hotfix-playbook.md`), otherwise `main`. After an alpha/beta/rc tag, leave that pre-release string on the ship line until the next approved bump — do **not** bump back to the previous official version. Port release-line fixes to `main` via PR when appropriate.
 
 If publishing **B** and alpha compose is out of date: run **Alpha compose sync**, commit, push, then continue.
 

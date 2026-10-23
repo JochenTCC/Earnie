@@ -44,7 +44,7 @@ Technischer Einstieg: **[DEVELOPER.md](DEVELOPER.md)** (venv, pytest, Container,
 
 **Pull Requests:** Fork → Branch → PR gegen `main`. Kurze Beschreibung des *Warum*; bei Verhaltensänderungen Tests mitdenken. Große Architektur-Themen bitte vorher kurz absprechen (Issue oder Kontakt).
 
-**Release-Linie und Hotfixes:** Playbook [docs/workflow/branching-hotfix-playbook.md](docs/workflow/branching-hotfix-playbook.md) — bei offener MINOR-Linie Fixes/Beta/Final auf `releaseX.Y` (z. B. `release2.7`); `main` für die nächste Minor; kurzlebige `hotfix/…`-Branches nur bei dringendem Patch vom Tag, wenn selbst die Release-Linie nicht so raus soll.
+**Release-Linie und Hotfixes:** Playbook [docs/workflow/branching-hotfix-playbook.md](docs/workflow/branching-hotfix-playbook.md) — sobald das geplante Official nahe ist und die Entwicklung weiterlaufen soll: Release auf `releaseX.Y` (z. B. `release2.7`) finalisieren und später dort bugfixen/PATCHen; `main` für die nächste Minor; Fixes per PR zurück nach `main`. Kurzlebige `hotfix/…` nur bei dringendem Patch vom Tag.
 
 ### 3. EHAL-Connectoren (Adapter)
 
