@@ -1,0 +1,200 @@
+{
+  "period": {
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "windows": 365,
+    "horizon_mode": "sunrise_window",
+    "start_month": 1,
+    "end_month": 12,
+    "backtesting_year": 2026,
+    "price_source": "csv",
+    "price_strategy": "perfect",
+    "season_mirror_to_last_month": false,
+    "reference_by_scenario": {
+      "live": "ref:live"
+    },
+    "live_scenario_id": "live",
+    "first_ts": "2025-01-01T00:00:00",
+    "last_ts": "2025-12-31T23:45:00",
+    "hours": 35040
+  },
+  "scenario_ids": [
+    "historical_reference",
+    "ref:live",
+    "live"
+  ],
+  "reference_id": "historical_reference",
+  "labels": {
+    "historical_reference": "Historisch (ohne Optimierung, ohne PV/Batterie)",
+    "live": "Live",
+    "ref:live": "Referenz (Live) — ohne Optimierung"
+  },
+  "summary": {
+    "total_eur": {
+      "historical_reference": 3023.1622,
+      "ref:live": 1787.2117,
+      "live": 1412.0149
+    },
+    "monthly_eur": {
+      "2025-01": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 318.5973,
+        "Referenz (Live) — ohne Optimierung": 250.5873,
+        "Live": 205.1911
+      },
+      "2025-02": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 306.1964,
+        "Referenz (Live) — ohne Optimierung": 219.5216,
+        "Live": 187.351
+      },
+      "2025-03": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 274.4898,
+        "Referenz (Live) — ohne Optimierung": 160.1077,
+        "Live": 125.7616
+      },
+      "2025-04": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 225.15,
+        "Referenz (Live) — ohne Optimierung": 93.2635,
+        "Live": 64.2462
+      },
+      "2025-05": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 212.9126,
+        "Referenz (Live) — ohne Optimierung": 91.8222,
+        "Live": 64.253
+      },
+      "2025-06": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 197.8802,
+        "Referenz (Live) — ohne Optimierung": 59.7932,
+        "Live": 31.0166
+      },
+      "2025-07": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 227.2928,
+        "Referenz (Live) — ohne Optimierung": 91.5261,
+        "Live": 69.3118
+      },
+      "2025-08": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 211.6959,
+        "Referenz (Live) — ohne Optimierung": 81.5389,
+        "Live": 57.2689
+      },
+      "2025-09": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 233.6717,
+        "Referenz (Live) — ohne Optimierung": 134.227,
+        "Live": 98.3832
+      },
+      "2025-10": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 266.4275,
+        "Referenz (Live) — ohne Optimierung": 187.7236,
+        "Live": 154.221
+      },
+      "2025-11": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 268.6166,
+        "Referenz (Live) — ohne Optimierung": 196.3086,
+        "Live": 165.122
+      },
+      "2025-12": {
+        "Historisch (ohne Optimierung, ohne PV/Batterie)": 280.2313,
+        "Referenz (Live) — ohne Optimierung": 220.792,
+        "Live": 189.8887
+      }
+    }
+  },
+  "critical_cases_summary": {
+    "total": 87,
+    "distinct_windows": 86,
+    "by_kind": {
+      "consumption_tolerance": 5,
+      "strict_slow": 82
+    },
+    "by_scenario": {
+      "live": 87
+    }
+  },
+  "cbc_events_summary": {
+    "live": {
+      "strict_slow": 82
+    }
+  },
+  "plausibility": {
+    "live": {
+      "total_windows": 366,
+      "ok_count": 361,
+      "failed_count": 5,
+      "tolerance_kwh": 0.5,
+      "tolerance_rel": 0.05,
+      "consumption_totals": {
+        "historical_kwh": 20052.4,
+        "optimized_kwh": 20011.3,
+        "delta_kwh": -41.1,
+        "historical_baseload_kwh": 1322.8,
+        "optimized_baseload_kwh": 1322.8,
+        "historical_flex_kwh": 18729.7,
+        "optimized_flex_kwh": 18688.5,
+        "booked_kwh": 20011.3,
+        "booked_delta_kwh": -41.1
+      },
+      "failures": [
+        {
+          "window_end": "2025-01-04T09:00:00",
+          "historical_kwh": 71.304,
+          "optimized_kwh": 67.804,
+          "diff_kwh": 3.5,
+          "historical_baseload_kwh": 3.624,
+          "optimized_baseload_kwh": 3.624,
+          "historical_flex_kwh": 67.68,
+          "optimized_flex_kwh": 64.18,
+          "baseload_diff_kwh": 0.0,
+          "flex_diff_kwh": 3.5
+        },
+        {
+          "window_end": "2025-01-11T09:00:00",
+          "historical_kwh": 71.304,
+          "optimized_kwh": 67.804,
+          "diff_kwh": 3.5,
+          "historical_baseload_kwh": 3.624,
+          "optimized_baseload_kwh": 3.624,
+          "historical_flex_kwh": 67.68,
+          "optimized_flex_kwh": 64.18,
+          "baseload_diff_kwh": 0.0,
+          "flex_diff_kwh": 3.5
+        },
+        {
+          "window_end": "2025-01-18T09:00:00",
+          "historical_kwh": 70.391,
+          "optimized_kwh": 66.891,
+          "diff_kwh": 3.5,
+          "historical_baseload_kwh": 3.586,
+          "optimized_baseload_kwh": 3.586,
+          "historical_flex_kwh": 66.805,
+          "optimized_flex_kwh": 63.305,
+          "baseload_diff_kwh": 0.0,
+          "flex_diff_kwh": 3.5
+        },
+        {
+          "window_end": "2025-12-20T09:00:00",
+          "historical_kwh": 63.374,
+          "optimized_kwh": 59.874,
+          "diff_kwh": 3.5,
+          "historical_baseload_kwh": 3.624,
+          "optimized_baseload_kwh": 3.624,
+          "historical_flex_kwh": 59.75,
+          "optimized_flex_kwh": 56.25,
+          "baseload_diff_kwh": 0.0,
+          "flex_diff_kwh": 3.5
+        },
+        {
+          "window_end": "2025-12-27T09:00:00",
+          "historical_kwh": 67.804,
+          "optimized_kwh": 64.304,
+          "diff_kwh": 3.5,
+          "historical_baseload_kwh": 3.624,
+          "optimized_baseload_kwh": 3.624,
+          "historical_flex_kwh": 64.18,
+          "optimized_flex_kwh": 60.68,
+          "baseload_diff_kwh": 0.0,
+          "flex_diff_kwh": 3.5
+        }
+      ]
+    }
+  },
+  "written_by_app_version": "2.7.0-alpha.8"
+}
