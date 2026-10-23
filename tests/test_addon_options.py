@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from runtime_store import addon_options
 
 
@@ -71,7 +73,7 @@ def test_port_merge_from_options(tmp_path, monkeypatch):
             "system": {"ehal_http_port": 8541},
         },
     )
-    _write_json(options_path, {"streamlit_port": 8511, "ehal_loxone_http_port": 8551})
+    _write_json(options_path, {"streamlit_port": 8511, "ehal_http_port": 8551})
     monkeypatch.setattr(addon_options, "resolve_config_json_path", lambda: str(config_path))
     monkeypatch.setattr(addon_options, "options_path", lambda: str(options_path))
     assert addon_options.apply_addon_options(config_just_created=False) is True
@@ -80,6 +82,32 @@ def test_port_merge_from_options(tmp_path, monkeypatch):
     assert payload["system"]["ehal_http_port"] == 8551
     assert "ehal_loxone_http_port" not in payload["system"]
     assert payload["ehal"]["backend"] == "ha"
+
+
+@pytest.mark.parametrize(
+    ("options", "expected"),
+    [
+        # Supervisor fills the renamed option with its default; the old custom value wins.
+        ({"ehal_http_port": 8541, "ehal_loxone_http_port": 8551}, 8551),
+        ({"ehal_loxone_http_port": 8551}, 8551),
+        # Once the new option holds a custom value, the legacy one is ignored.
+        ({"ehal_http_port": 8560, "ehal_loxone_http_port": 8551}, 8560),
+        ({"ehal_http_port": 8560}, 8560),
+    ],
+)
+def test_ehal_http_port_option_carries_over_legacy_name(tmp_path, monkeypatch, options, expected):
+    monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+    config_path = tmp_path / "config.json"
+    options_path = tmp_path / "options.json"
+    _write_json(
+        config_path,
+        {"ehal": {"backend": "ha", "adapter_id": "earnie-hems"}, "ui": {}, "system": {}},
+    )
+    _write_json(options_path, options)
+    monkeypatch.setattr(addon_options, "resolve_config_json_path", lambda: str(config_path))
+    monkeypatch.setattr(addon_options, "options_path", lambda: str(options_path))
+    assert addon_options.apply_addon_options(config_just_created=False) is True
+    assert _read_json(config_path)["system"]["ehal_http_port"] == expected
 
 
 def test_usage_ping_option_sets_consent(tmp_path, monkeypatch):

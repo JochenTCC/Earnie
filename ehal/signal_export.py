@@ -6,10 +6,11 @@ import io
 import zipfile
 from typing import Literal
 
-from ehal.push_signals import Signal
+from ehal.push_signals import Signal, request_optimize_signal
 from ehal.signal_list import signals_for_export
 from scripts.pilot_vi_template_gen import render_template as render_vi
 from scripts.pilot_vo_template_gen import TOKEN_PLACEHOLDER
+from scripts.pilot_vo_template_gen import render_status_template
 from scripts.pilot_vo_template_gen import render_template as render_vo
 
 ExportMode = Literal["needed", "all"]
@@ -84,6 +85,11 @@ def _write_vo_group(
                     "digital" if sig.digital else "analog",
                 ]
             )
+    # Optional ad-hoc optimize: a POST control command, not a telemetry push.
+    status = request_optimize_signal()
+    name = f"VO_Earnie_{status.group}.xml"
+    zf.writestr(name, _bom(render_status_template(host=host, port=port)))
+    rows.append([name, status.title, status.ehal_id, status.old_name, "digital"])
     csv_buf = io.StringIO()
     writer = csv.writer(csv_buf, delimiter=";")
     writer.writerow(["Datei", "VO-Cmd-Titel", "EHAL-ID", "Bisheriger Name", "Typ"])

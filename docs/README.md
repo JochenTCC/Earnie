@@ -15,9 +15,9 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 1. **Konfiguration anlegen:** Der Bootstrap erzeugt aus `share/config/config.example.json` die Datei `earnie_env/config/config.json` (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime` ausführen. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
 2. **Smarthome-Backend wählen:** Standard ist Loxone, alternativ HA+evcc oder OpenEMS-Lab ([Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md)). Auswahl und Zugangsdaten stehen in der UI unter [Smarthome-Backend](ui/smarthome-backend.md).
    - **Loxone:** `.env.example` nach `earnie_env/config/.env` kopieren und `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` eintragen. Im Docker-Betrieb legt der Entrypoint die `.env` im Config-Volume an.
-   - **Home Assistant:** Backend wählen, dann das YAML-Paket aus EHAL-Com in Home Assistant einbinden. Earnie braucht keine HA-URL und kein Token (Home Assistant ruft Earnie auf).
+   - **Home Assistant:** Backend wählen, dann das YAML-Paket aus EHAL-Com in Home Assistant einbinden.
 3. **Felder zuordnen:**
-   - **Loxone:** Merker in `plant.ehal_bindings` bzw. im Hausprofil über **EHAL-Com** zuordnen ([Loxone-Signale und Earnie-Library](referenz/loxone-signals.md)).
+   - **Loxone:** Signale auf **EHAL-Com** aktivieren und die VI/VO-Vorlagen aus der Signalliste exportieren ([Loxone-Signale und Vorlagen](referenz/loxone-signals.md)).
    - **Home Assistant:** Entities auf [EHAL-Com](ui/ehal-com.md) den EHAL-Feldern zuordnen, je Entität in `plant` bzw. `consumers[].ehal_bindings`.
 4. **Verbindung prüfen:** über EHAL-Com (Live-Lesen), bei Loxone alternativ mit dem Prüfskript:
   ```powershell
@@ -40,7 +40,7 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 
 - [Smarthome-Backend wählen](einrichtung/smarthome-backend-wahl.md) – Loxone, HA+evcc oder OpenEMS über `ehal.backend`
 - [Loxone-Anbindung](einrichtung/loxone-anbindung.md) – HTTP-Schnittstelle und Prüfskript
-- [Home Assistant + evcc](einrichtung/ha-evcc.md) – DACH-Pfad A2 (Compose) und Pfad B (bestehendes HA) im Vergleich
+- [Home Assistant + evcc](einrichtung/ha-evcc.md) – Anbindung über Home Assistant, optional mit evcc (neues oder bestehendes HA)
 - [Home-Assistant-Add-on](einrichtung/homeassistant-addon.md) – Earnie als Supervisor-Add-on (Ingress, Options)
 - [Betrieb](einrichtung/betrieb.md) – `main.py` und App, Laufzeitdateien, Optimierungs-Takt, [Update und Migration](einrichtung/betrieb.md#update-und-migration)
 - [Container](einrichtung/container.md) – Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, fehlende Config-Keys nach einem Upgrade
@@ -69,7 +69,7 @@ Der Szenario-Explorer lässt sich ohne Installation online ausprobieren:
 
 - [Abkürzungen](referenz/abbreviations.md) – EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
 - [Streamlit-Ports](dev/streamlit-ports.md) – Port je Stack und Plattform
-- [Loxone-Signale und Earnie-Library](referenz/loxone-signals.md) – VI/VO-Vorlagen je Entität, Default-Merker, EFM, Signal-Tabellen
+- [Loxone-Signale und Vorlagen](referenz/loxone-signals.md) – VI/VO-Export aus der Signalliste, Default-Merker, EFM, Signal-Tabellen
 - [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) – OeMAG-Marktpreis und E-Control-RefMarkt PV im Vergleich
 - [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) – Bezugs- und Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung
 

@@ -1,13 +1,18 @@
-"""Repo Virtual Output templates keep the structure Loxone Config exports (2026-10-07)."""
+"""Exported VO / VI templates keep the structure Loxone Config exports (2026-10-07).
+
+The templates are generated per configuration from the Signal list
+(``ehal.signal_export.build_export_zip``); there are no static library templates.
+"""
 from __future__ import annotations
 
+import csv
+import io
 import xml.etree.ElementTree as ET
-from pathlib import Path
+import zipfile
 
 import pytest
 
-_DIR = Path(__file__).resolve().parents[1] / "share" / "loxone" / "templates" / "VirtualOut"
-_FILES = sorted(_DIR.glob("VO_Earnie_*.xml"))
+from ehal.signal_export import build_export_zip
 
 _ROOT_ATTRS = ["HintText", "Title", "Comment", "Address", "CmdInit", "CloseAfterSend", "CmdSep"]
 _ANALOG_ATTRS = [
@@ -18,128 +23,6 @@ _ANALOG_ATTRS = [
 _DIGITAL_ATTRS = [a for a in _ANALOG_ATTRS if not a.startswith(("SourceVal", "DestVal"))]
 _BACKSLASH_V = chr(92) + "v"
 
-
-def _parse(path: Path) -> ET.Element:
-    return ET.fromstring(path.read_bytes().decode("utf-8-sig").encode("utf-8"))
-
-
-def test_templates_found() -> None:
-    assert len(_FILES) == 7
-
-
-@pytest.mark.parametrize("path", _FILES, ids=lambda p: p.name)
-def test_export_structure(path: Path) -> None:
-    assert path.read_bytes().startswith(bytes([0xEF, 0xBB, 0xBF]))  # BOM like Config
-    root = _parse(path)
-    assert root.tag == "VirtualOut"
-    assert list(root.attrib) == _ROOT_ATTRS
-    info, *cmds = list(root)
-    assert info.tag == "Info" and info.attrib == {"templateType": "3", "minVersion": "17010630"}
-    assert cmds
-    for cmd in cmds:
-        assert cmd.tag == "VirtualOutCmd"
-        expected = _DIGITAL_ATTRS if cmd.get("Analog") == "false" else _ANALOG_ATTRS
-        assert list(cmd.attrib) == expected, cmd.get("Title")
-
-
-@pytest.mark.parametrize("path", _FILES, ids=lambda p: p.name)
-def test_value_placeholder_is_not_the_input_style_escape(path: Path) -> None:
-    # In a Virtual Output command the VI-style escape arrives as the control character 0x0B.
-    for cmd in _parse(path):
-        assert _BACKSLASH_V not in (cmd.get("CmdOn") or ""), cmd.get("Title")
-
-
-def test_ev_template_includes_fertigum_ready_by_time() -> None:
-    path = _DIR / "VO_Earnie_EV.xml"
-    cmds = {c.get("Title"): c for c in _parse(path) if c.tag == "VirtualOutCmd"}
-    fertig = cmds["Earnie_EAuto_FertigUm"]
-    assert fertig.get("Analog") == "true"
-    # ElementTree unescapes &lt;v&gt; in the attribute value.
-    assert fertig.get("CmdOn") == (
-        "/ehal/telemetry/ev.{ev_id}.get_evcs_ready_by_time/<v>"
-    )
-
-
-def test_plant_template_includes_energy_counters() -> None:
-    path = _DIR / "VO_Earnie_Plant.xml"
-    cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
-    assert cmds["Push_sens_pv_energy"] == "/ehal/telemetry/sens_pv_energy/<v>"
-    assert cmds["Push_grid_meter_sens_grid_energy_import"] == (
-        "/ehal/telemetry/grid.meter.sens_grid_energy_import/<v>"
-    )
-    assert cmds["Push_grid_meter_sens_grid_energy_export"] == (
-        "/ehal/telemetry/grid.meter.sens_grid_energy_export/<v>"
-    )
-
-
-def test_plant_template_grid_uses_grid_meter_namespace() -> None:
-    path = _DIR / "VO_Earnie_Plant.xml"
-    cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
-    assert cmds["Push_grid_meter_sens_grid_power_active"] == (
-        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v>"
-    )
-    assert cmds["Push_grid_meter_get_grid_export_power_limit"] == (
-        "/ehal/telemetry/grid.meter.get_grid_export_power_limit/<v>"
-    )
-
-
-def test_plant_template_titles_match_push_ehal_ids() -> None:
-    """Library VO Titles = Push_<EHAL-ID> (same rule as pilot_vo_template_gen)."""
-    from ehal.push_signals import title_from_qualified_id
-
-    path = _DIR / "VO_Earnie_Plant.xml"
-    for cmd in _parse(path):
-        if cmd.tag != "VirtualOutCmd":
-            continue
-        cmd_on = cmd.get("CmdOn") or ""
-        # /ehal/telemetry/<ehal_id>/<v|0|1>
-        parts = cmd_on.strip("/").split("/")
-        assert len(parts) >= 3 and parts[0] == "ehal" and parts[1] == "telemetry"
-        ehal_id = parts[2]
-        assert cmd.get("Title") == title_from_qualified_id(ehal_id), cmd.get("Title")
-        assert "ess" not in ehal_id, ehal_id
-
-
-def test_plant_template_has_no_ess_fields() -> None:
-    path = _DIR / "VO_Earnie_Plant.xml"
-    titles = [c.get("Title") or "" for c in _parse(path) if c.tag == "VirtualOutCmd"]
-    assert titles
-    assert not any("ess" in t for t in titles)
-
-
-def test_consumer_template_includes_energy_counter_mono_only() -> None:
-    path = _DIR / "VO_Earnie_Consumer.xml"
-    cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
-    assert cmds["Push_consumer_{hk_id}_sens_energy_total"] == (
-        "/ehal/telemetry/consumer.{hk_id}.sens_energy_total/<v>"
-    )
-    assert "Push_consumer_{hk_id}_sens_energy_export" not in cmds
-
-
-def test_battery_template_full_push_and_bipolar_energy() -> None:
-    path = _DIR / "VO_Earnie_Battery.xml"
-    cmds = {c.get("Title"): c.get("CmdOn") for c in _parse(path) if c.tag == "VirtualOutCmd"}
-    assert cmds["Push_ess_{bat_id}_sens_ess_soc"] == (
-        "/ehal/telemetry/ess.{bat_id}.sens_ess_soc/<v>"
-    )
-    assert cmds["Push_ess_{bat_id}_sens_ess_power"] == (
-        "/ehal/telemetry/ess.{bat_id}.sens_ess_power/<v>"
-    )
-    assert cmds["Push_ess_{bat_id}_sens_ess_energy_charge"] == (
-        "/ehal/telemetry/ess.{bat_id}.sens_ess_energy_charge/<v>"
-    )
-    assert cmds["Push_ess_{bat_id}_sens_ess_energy_discharge"] == (
-        "/ehal/telemetry/ess.{bat_id}.sens_ess_energy_discharge/<v>"
-    )
-    assert cmds["Push_ess_{bat_id}_get_ess_soc_min"] == (
-        "/ehal/telemetry/ess.{bat_id}.get_ess_soc_min/<v>"
-    )
-
-
-# --- Virtual Input templates (structure of VI_Earnie_Plant_Real.xml, exported by Config 2026-10-07) ---
-_VI_DIR = _DIR.parent / "VirtualIn"
-_VI_V2 = sorted(_VI_DIR.glob("VI_Earnie_*_v2.xml"))
-_VI_FILES = _VI_V2
 _VI_ROOT_ATTRS = ["HintText", "Title", "Comment", "Address", "PollingTime"]
 _VI_CMD_ATTRS = [
     "Title", "Comment", "Check", "Signed", "Analog", "SourceValLow", "DestValLow", "SourceValHigh",
@@ -147,48 +30,206 @@ _VI_CMD_ATTRS = [
 ]
 
 
-def test_vi_templates_found() -> None:
-    assert len(_VI_V2) == 5
-    legacy = [p for p in _VI_DIR.glob("VI_Earnie_*.xml") if "_v2" not in p.name]
-    assert legacy == []
+def _docs() -> tuple[dict, dict]:
+    """One entity of every exported group (plant, battery, generic, heat pump, pool, EV)."""
+    house = {
+        "plant": {"ehal_bindings": {"sens_grid_power_active": ""}},
+        "profiles": {
+            "live": {
+                "consumers": [
+                    {"id": "waschmaschine", "type": "generic", "ehal_bindings": {}},
+                    {"id": "waermepumpe", "type": "thermal_annual", "ehal_bindings": {}},
+                    {"id": "pool_filter", "type": "pool_filter", "ehal_bindings": {}},
+                    {"id": "e_auto", "type": "ev", "ehal_bindings": {}},
+                ]
+            }
+        },
+    }
+    components = {"batteries": [{"id": "haus", "control": "full", "ehal_bindings": {}}]}
+    return house, components
 
 
-@pytest.mark.parametrize("path", _VI_FILES, ids=lambda p: p.name)
-def test_vi_export_structure(path: Path) -> None:
-    assert path.read_bytes().startswith(bytes([0xEF, 0xBB, 0xBF]))
-    root = _parse(path)
-    assert root.tag == "VirtualInHttp"
-    assert list(root.attrib) == _VI_ROOT_ATTRS
-    info, *cmds = list(root)
-    assert info.tag == "Info" and info.attrib == {"templateType": "2", "minVersion": "17010630"}
-    assert cmds
-    for cmd in cmds:
-        assert cmd.tag == "VirtualInHttpCmd"
-        assert list(cmd.attrib) == _VI_CMD_ATTRS, cmd.get("Title")
-        # A Virtual Input extracts the value with the escape (unlike a Virtual Output command).
-        assert cmd.get("Check", "").endswith(chr(58) + _BACKSLASH_V), cmd.get("Title")
+@pytest.fixture(scope="module")
+def export() -> dict[str, bytes]:
+    house, components = _docs()
+    payload = build_export_zip(house, components, host="192.168.1.10", port=8541, mode="all")
+    with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+        return {name: zf.read(name) for name in zf.namelist()}
 
 
-def test_vi_v2_checks_use_qualified_keys() -> None:
-    """v2 library templates must not use legacy Merker Check keys."""
-    legacy_check_frags = (
+def _parse(raw: bytes) -> ET.Element:
+    return ET.fromstring(raw.decode("utf-8-sig").encode("utf-8"))
+
+
+def _cmds(export: dict[str, bytes], name: str) -> dict[str, ET.Element]:
+    return {c.get("Title"): c for c in _parse(export[name]) if c.tag != "Info"}
+
+
+def _cmd_on(export: dict[str, bytes], name: str) -> dict[str, str]:
+    # Drop the push token query so assertions read like the wire path.
+    return {t: (c.get("CmdOn") or "").split("?", 1)[0] for t, c in _cmds(export, name).items()}
+
+
+def _names(export: dict[str, bytes], prefix: str) -> list[str]:
+    return sorted(n for n in export if n.startswith(prefix) and n.endswith(".xml"))
+
+
+def test_export_has_one_template_per_group(export: dict[str, bytes]) -> None:
+    groups = ["Batterie_haus", "EV", "Heartbeat", "Plant", "Pool", "Verbraucher", "Waermepumpe"]
+    vo_groups = sorted(groups + ["Status"])
+    assert _names(export, "VO_Earnie_") == [f"VO_Earnie_{g}.xml" for g in vo_groups]
+    assert _names(export, "VI_Earnie_") == [f"VI_Earnie_{g}.xml" for g in groups]
+
+
+def test_vo_export_structure(export: dict[str, bytes]) -> None:
+    for name in _names(export, "VO_Earnie_"):
+        raw = export[name]
+        assert raw.startswith(bytes([0xEF, 0xBB, 0xBF])), name  # BOM like Config
+        root = _parse(raw)
+        assert root.tag == "VirtualOut"
+        assert list(root.attrib) == _ROOT_ATTRS
+        info, *cmds = list(root)
+        assert info.tag == "Info" and info.attrib == {"templateType": "3", "minVersion": "17010630"}
+        assert cmds, name
+        for cmd in cmds:
+            assert cmd.tag == "VirtualOutCmd"
+            expected = _DIGITAL_ATTRS if cmd.get("Analog") == "false" else _ANALOG_ATTRS
+            assert list(cmd.attrib) == expected, (name, cmd.get("Title"))
+            # In a Virtual Output command the VI-style escape arrives as the control character 0x0B.
+            assert _BACKSLASH_V not in (cmd.get("CmdOn") or ""), (name, cmd.get("Title"))
+
+
+def test_vo_titles_match_push_ehal_ids(export: dict[str, bytes]) -> None:
+    from ehal.push_signals import title_from_qualified_id
+
+    for name in _names(export, "VO_Earnie_"):
+        if name == "VO_Earnie_Status.xml":
+            continue  # POST control command, see test_status_template_request_optimize
+        for title, cmd_on in _cmd_on(export, name).items():
+            parts = cmd_on.strip("/").split("/")
+            assert len(parts) >= 3 and parts[:2] == ["ehal", "telemetry"], (name, title)
+            if parts[2] == "heartbeat_smarthome":
+                assert title == "Push_Earnie_Heartbeat"
+            else:
+                assert title == title_from_qualified_id(parts[2]), (name, title)
+
+
+def test_plant_template_grid_uses_grid_meter_namespace_and_no_ess(export: dict[str, bytes]) -> None:
+    cmds = _cmd_on(export, "VO_Earnie_Plant.xml")
+    assert cmds["Push_grid_meter_sens_grid_power_active"] == (
+        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v>"
+    )
+    assert cmds["Push_grid_meter_get_grid_export_power_limit"] == (
+        "/ehal/telemetry/grid.meter.get_grid_export_power_limit/<v>"
+    )
+    assert not any("ess" in title for title in cmds)
+
+
+def test_plant_template_house_wide_reads(export: dict[str, bytes]) -> None:
+    cmds = _cmds(export, "VO_Earnie_Plant.xml")
+    on = _cmd_on(export, "VO_Earnie_Plant.xml")
+    assert on["Push_sens_temperature_outside"] == "/ehal/telemetry/sens_temperature_outside/<v>"
+    absent = cmds["Push_sens_absent_mode"]
+    assert absent.get("Analog") == "false"
+    assert on["Push_sens_absent_mode"] == "/ehal/telemetry/sens_absent_mode/1"
+
+
+def test_status_template_request_optimize(export: dict[str, bytes]) -> None:
+    root = _parse(export["VO_Earnie_Status.xml"])
+    assert root.get("Address") == "http://192.168.1.10:8541"
+    cmds = _cmds(export, "VO_Earnie_Status.xml")
+    assert list(cmds) == ["Earnie_Request_Optimize"]
+    cmd = cmds["Earnie_Request_Optimize"]
+    assert cmd.get("CmdOnMethod") == "POST"
+    assert cmd.get("CmdOn") == "/ehal/loxone/request_optimize"  # no push token on this route
+    assert cmd.get("CmdOnHTTP") == "Content-Type: application/json"
+    assert cmd.get("CmdOnPost") == "{}"
+    assert cmd.get("Repeat") == "0"
+
+
+def test_consumer_template_energy_counter_mono_and_digital_active(export: dict[str, bytes]) -> None:
+    cmds = _cmds(export, "VO_Earnie_Verbraucher.xml")
+    on = _cmd_on(export, "VO_Earnie_Verbraucher.xml")
+    assert on["Push_consumer_waschmaschine_sens_energy_total"] == (
+        "/ehal/telemetry/consumer.waschmaschine.sens_energy_total/<v>"
+    )
+    assert "Push_consumer_waschmaschine_sens_energy_export" not in on
+    active = cmds["Push_consumer_waschmaschine_sens_consumer_active"]
+    assert active.get("Analog") == "false"
+    assert "flex." not in "".join(on.values())
+
+
+def test_battery_template_full_push_and_bipolar_energy(export: dict[str, bytes]) -> None:
+    cmds = _cmd_on(export, "VO_Earnie_Batterie_haus.xml")
+    for field in (
+        "sens_ess_soc",
+        "sens_ess_power",
+        "sens_ess_energy_charge",
+        "sens_ess_energy_discharge",
+        "get_ess_soc_min",
+    ):
+        assert cmds[f"Push_ess_haus_{field}"] == f"/ehal/telemetry/ess.haus.{field}/<v>"
+
+
+def test_ev_template_includes_fertigum_and_soc_min_immediate(export: dict[str, bytes]) -> None:
+    cmds = _cmds(export, "VO_Earnie_EV.xml")
+    fertig = cmds["Push_ev_e_auto_get_evcs_ready_by_time"]
+    assert fertig.get("Analog") == "true"
+    # ElementTree unescapes &lt;v&gt; in the attribute value.
+    assert (fertig.get("CmdOn") or "").split("?", 1)[0] == (
+        "/ehal/telemetry/ev.e_auto.get_evcs_ready_by_time/<v>"
+    )
+    assert "Push_ev_e_auto_get_evcs_soc_min_immediate" in cmds
+
+
+def test_vi_export_structure(export: dict[str, bytes]) -> None:
+    for name in _names(export, "VI_Earnie_"):
+        raw = export[name]
+        assert raw.startswith(bytes([0xEF, 0xBB, 0xBF])), name
+        root = _parse(raw)
+        assert root.tag == "VirtualInHttp"
+        assert list(root.attrib) == _VI_ROOT_ATTRS
+        info, *cmds = list(root)
+        assert info.tag == "Info" and info.attrib == {"templateType": "2", "minVersion": "17010630"}
+        assert cmds, name
+        for cmd in cmds:
+            assert cmd.tag == "VirtualInHttpCmd"
+            assert list(cmd.attrib) == _VI_CMD_ATTRS, (name, cmd.get("Title"))
+            # A Virtual Input extracts the value with the escape (unlike a Virtual Output command).
+            assert cmd.get("Check", "").endswith(chr(58) + _BACKSLASH_V), (name, cmd.get("Title"))
+
+
+def test_vi_checks_use_qualified_keys(export: dict[str, bytes]) -> None:
+    checks = [
+        cmd.get("Check") or ""
+        for name in _names(export, "VI_Earnie_")
+        for cmd in _parse(export[name])
+        if cmd.tag == "VirtualInHttpCmd"
+    ]
+    joined = "\n".join(checks)
+    for frag in (
         "Earnie_Verbraucher_Freigabe",
         "Earnie_Waermepumpe_Freigabe",
         "Earnie_EAuto_Soll_A",
         "Earnie_Pool_Freigabe",
-    )
-    for path in _VI_V2:
-        for cmd in _parse(path):
-            if cmd.tag != "VirtualInHttpCmd":
-                continue
-            check = cmd.get("Check") or ""
-            for frag in legacy_check_frags:
-                assert frag not in check, (path.name, check)
-    consumer = (_VI_DIR / "VI_Earnie_Consumer_v2.xml").read_bytes().decode("utf-8-sig")
-    assert "consumer.{hk_id}.set_enable" in consumer
-    ev = (_VI_DIR / "VI_Earnie_EV_v2.xml").read_bytes().decode("utf-8-sig")
-    assert "evcs.{ev_id}.set_evcs_max_current" in ev
-    assert "evcs.{ev_id}.set_evcs_mode" in ev
-    pool = (_VI_DIR / "VI_Earnie_Pool_v2.xml").read_bytes().decode("utf-8-sig")
-    assert "pool.pool_filter.set_enable" in pool
+    ):
+        assert frag not in joined
+    for key in (
+        "consumer.waschmaschine.set_enable",
+        "heatpump.waermepumpe.set_enable",
+        "pool.pool_filter.set_enable",
+        "evcs.e_auto.set_evcs_max_current",
+        "evcs.e_auto.set_evcs_mode",
+        "heartbeat_earnie",
+    ):
+        assert f'"{key}":{_BACKSLASH_V}' in checks, key
 
+
+def test_signal_list_csv_names_ehal_ids(export: dict[str, bytes]) -> None:
+    rows = list(
+        csv.reader(io.StringIO(export["Earnie-VO-Signalliste.csv"].decode("utf-8-sig")), delimiter=";")
+    )
+    assert rows[0] == ["Datei", "VO-Cmd-Titel", "EHAL-ID", "Bisheriger Name", "Typ"]
+    ids = {row[2] for row in rows[1:]}
+    assert "ev.e_auto.get_evcs_soc_min_immediate" in ids
+    assert {"sens_temperature_outside", "sens_absent_mode", "request_optimize"} <= ids

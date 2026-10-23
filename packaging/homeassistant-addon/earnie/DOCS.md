@@ -23,11 +23,12 @@ Beim **ersten Start** legt Earnie `config.json` an und setzt `ehal.backend=ha`. 
 
 | Option | Beschreibung | Standard |
 |---|---|---|
-| `streamlit_port` | Host/UI-Port `8501`; Streamlit intern `8502` hinter nginx | `8501` |
-| `ehal_loxone_http_port` | EHAL Loxone-HTTP-Port | `8541` |
+| `streamlit_port` | Nur informativ, wird nach `config.json` `ui.streamlit_port` geschrieben. UI-Port bleibt `8501` (nginx), Streamlit intern `8502` | `8501` |
+| `ehal_http_port` | Daemon-HTTP-Port für das Push-Verfahren mit dem HA-YAML-Paket, wird nach `config.json` `system.ehal_http_port` geschrieben. Ein Wert unter dem früheren Namen `ehal_loxone_http_port` wird übernommen, solange `ehal_http_port` auf `8541` steht. | `8541` |
 | `ui_modes` | Aktive UI-Modi, kommagetrennt | `sunset2sunset,scenario_explorer,live_environment` |
 | `auto_start_main` | Startet `main.py` automatisch | `true` |
 | `timezone` | Zeitzone (`TZ`) | `Europe/Vienna` |
+| `usage_ping` | Zustimmung zur optionalen Nutzungsstatistik; ohne Eintrag bleibt der bisherige Zustand | – |
 
 ## Persistenz
 

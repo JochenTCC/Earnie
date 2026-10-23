@@ -1,10 +1,13 @@
 configuration:
   streamlit_port:
     name: Streamlit port
-    description: Streamlit listen port (also written to config.json ui.streamlit_port). Prefer HA Ingress for the UI.
+    description: Informational only, written to config.json ui.streamlit_port. The UI always listens on 8501 (nginx, Streamlit internally on 8502). Prefer HA Ingress for the UI.
+  ehal_http_port:
+    name: EHAL daemon HTTP port
+    description: Port of the daemon HTTP push contract (HA YAML package). Written to config.json system.ehal_http_port on each add-on start (default 8541).
   ehal_loxone_http_port:
-    name: EHAL Loxone HTTP port
-    description: Exported as EARNIE_EHAL_LOXONE_HTTP_PORT and written to config.json system.ehal_loxone_http_port on each add-on start (default 8541).
+    name: EHAL daemon HTTP port (old option)
+    description: Old name of the EHAL daemon HTTP port, only kept so an earlier value is carried over. Used while the EHAL daemon HTTP port is empty or 8541. Remove it once the new option holds your port.
   ui_modes:
     name: UI modes
     description: Comma-separated list of enabled UI modes (e.g. sunset2sunset,scenario_explorer,live_environment).
@@ -16,4 +19,4 @@ configuration:
     description: Timezone used for planning and display (e.g. Europe/Vienna).
 network:
   8501/tcp: Web UI (optional direct; prefer Ingress)
-  8541/tcp: EHAL Loxone-HTTP
+  8541/tcp: EHAL daemon HTTP (push contract for the HA YAML package)

@@ -2,13 +2,13 @@
 
 Die Seite **Smarthome-Backend** unter **Daemon Control** wählt den Hub der Live-Umgebung aus und verbindet ihn: **Loxone**, **Home Assistant** oder **OpenEMS**. Backend-Auswahl und Zugangsdaten liegen gemeinsam auf dieser Seite.
 
-**EHAL-Com** bietet keinen Backend-Wechsel und kein Anbindungsformular mehr. Dort stehen nur Live-Lesen, Live-Schreiben und das Mapping für das hier gewählte Backend.
+Auf **EHAL-Com** stehen Live-Lesen, Live-Schreiben und das Mapping für das hier gewählte Backend.
 
 ## Aufruf
 
 1. Streamlit starten: `python -m scripts.run_streamlit`
 2. In der Navigation **Daemon Control → Smarthome-Backend** öffnen.
-3. Ist die Planung abgeschlossen und noch kein Backend konfiguriert, erscheint dieselbe Seite als blockierender First-Run-Screen vor dem Rest der App. Es handelt sich um dieselbe Implementierung, ein separates Setup-Formular gibt es nicht.
+3. Ist die Planung abgeschlossen und noch kein Backend konfiguriert, erscheint dieselbe Seite als blockierender First-Run-Screen vor dem Rest der App.
 
 ## Erkennung (Discovery)
 
@@ -21,7 +21,7 @@ Die Seite **Smarthome-Backend** unter **Daemon Control** wählt den Hub der Live
    - Der Portscan kann Firewall- oder IDS-Alarme im Heimnetz auslösen (z. B. UniFi).
    - Voraussetzung ist ein bekanntes Heimnetz (`EARNIE_LAN_SUBNET` oder Host-IP über Supervisor).
    - Liegt die Container-IP in `172.16.0.0/12`, fragt die Seite nach dem LAN-CIDR, statt blind zu scannen. Details: [container.md](../einrichtung/container.md) § Netzwerk.
-4. **Keine Treffer:** Die Seite weist darauf hin, dass der automatische Verbraucher-/EHAL-Import und weitere Live-Seiten (EHAL-Com, Optimierer-Dienst) deaktiviert bleiben, bis ein Backend gewählt ist. Im Docker-Bridge-Netz (ohne HA-Add-on) bietet die Seite zusätzlich sofort das Formular für HA-URL und Long-Lived Token an, weil mDNS dort oft leer bleibt.
+4. **Keine Treffer:** Die Seite weist darauf hin, dass der automatische Verbraucher-/EHAL-Import und weitere Live-Seiten (EHAL-Com, Optimierer-Dienst) deaktiviert bleiben, bis ein Backend gewählt ist. Im Docker-Bridge-Netz (ohne HA-Add-on) bietet die Seite zusätzlich sofort die Auswahl **Home Assistant** an, weil mDNS dort oft leer bleibt.
 5. **Mehrere Treffer:** Die Auswahl erfolgt aus einer Liste; keines der Backends verbindet sich automatisch.
 
 Bei verbundenem Loxone zeigen die Seite und EHAL-Com den **letzten Aufruf vom Miniserver** auf Port 8541 (Zeit und Peer-IP).
@@ -44,13 +44,13 @@ Speicherorte:
 | Backend        | Ablage                                       |
 | -------------- | ---------------------------------------------- |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) |
-| Home Assistant | keine Zugangsdaten (Home Assistant ruft Earnie auf); `sign` in `config.json` → `ehal.ha` |
+| Home Assistant | optional `sign` / `boolean_invert` in `config.json` → `ehal.ha` |
 | OpenEMS        | `config.json` → `ehal.openems`                |
 
 **Ports:**
 
 - **Loxone:** `LOXONE_IP` darf einen optionalen HTTP-Port enthalten (`192.168.178.1:85`). Ohne Port gilt 80.
-- **OpenEMS:** Der HTTP-Port steht in der Base-URL (`ehal.openems.base_url`); ein separates Port-Feld gibt es nicht. Der Default enthält `:8084`. Lauscht der Hub auf einem anderen Port, die URL entsprechend anpassen, z. B. `http://openems-edge:8085`. **Home Assistant** braucht keine URL: Home Assistant ruft Earnie auf (Daemon-Port 8541).
+- **OpenEMS:** Der HTTP-Port steht in der Base-URL (`ehal.openems.base_url`); ein separates Port-Feld gibt es nicht. Der Default enthält `:8084`. Lauscht der Hub auf einem anderen Port, die URL entsprechend anpassen, z. B. `http://openems-edge:8085`. **Home Assistant** ruft Earnie über den Daemon-Port 8541 auf.
 
 Das Speichern der Zugangsdaten setzt `ehal.backend` und schaltet **EHAL-Com** sowie **Optimierer-Dienst** frei.
 

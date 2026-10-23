@@ -128,7 +128,7 @@ Ein **Hausprofil** beschreibt den Standort und wer bzw. was im Haus Strom verbra
 - **Standort:** Breite, Länge und Land. Daraus leitet Earnie die Zeitzone ab, die für Sonnenzeiten und PV-Prognose wichtig ist.
 - **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool oder generische Geräte.
 - **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen).
-- **Abwesend / Urlaub:** Schalter für den Abwesenheitsmodus im Live-Betrieb; je Verbraucher optional **„Inaktiv wenn abwesend“**. Der Modus wirkt, sobald der Earnie-Schalter **oder** das Abwesenheitssignal am aktiven Smarthome-Backend eingeschaltet ist (EHAL-Feld `sens_absent_mode`; Loxone: z. B. `Earnie_Abwesend`, HA: Entity, OpenEMS: `component/Channel`). Details: [Flexible Verbraucher – Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
+- **Abwesend / Urlaub:** Schalter für den Abwesenheitsmodus im Live-Betrieb; je Verbraucher optional **„Inaktiv wenn abwesend“**. Der Modus wirkt, sobald der Earnie-Schalter **oder** das Abwesenheitssignal am aktiven Smarthome-Backend eingeschaltet ist (EHAL-Feld `sens_absent_mode`, Zuordnung in der **Signalliste**; Loxone-Namenskatalog: `Earnie_Abwesend`). Details: [Flexible Verbraucher – Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
 Zuerst das Profil anlegen, danach die Geräte ergänzen. Ohne Standort und ein sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig.
 
@@ -150,7 +150,7 @@ Thermischer Verbraucher für Heizung bzw. Wärmepumpe (je nach Modell im Profil)
 - **Solltemperaturen und thermische Parameter** (Wärmeverlust, Volumen bzw. Gebäudekennwerte). Ein Energieausweis des Gebäudes hilft dabei.
 - **Temperaturabsenkung wenn abwesend:** Bei wirksamem Abwesenheitsmodus und aktiver Verbraucher-Option gilt im Live-Betrieb Solltemperatur minus Absenkung. Den Warmwasserbedarf rechnet Earnie dann mit 0 Personen.
 - **Wärmebedarf:** Earnie schätzt ihn aus Wetterdaten und den thermischen Parametern und plant den Strombedarf zeitlich ein.
-- **Live-Betrieb:** Die Anbindung erfolgt später über EHAL-Bindings (Leistung, Freigabe, ggf. Temperaturen).
+- **Live-Betrieb:** Die Anbindung erfolgt später über die **Signalliste** (Leistung, Freigabe, ggf. Temperaturen).
 
 Je genauer die thermischen Angaben, desto realistischer der Jahresvergleich. Für eine erste Orientierung reichen grobe Werte.
 
@@ -191,7 +191,7 @@ Waschmaschine, Trockner, Geschirrspüler und ähnliche Geräte sind **generische
 | **Manuell** (`manual`) | Erscheint auf der Seite *Manuelle Geräte* – entweder mit **Start-Empfehlung** (Sterne) oder als **Energiereserve** (Powerstation). Die Wahl erfolgt im Hauskonfigurator, beides zugleich ist nicht möglich. Bei der Start-Empfehlung rechnen Live-Optimierung und Szenario-Explorer die typische Zeitplan-Last trotzdem wie bei *bekannt* mit. |
 
 
-Anzugeben sind Leistung und typische Laufzeit. Optional lässt sich später ein Loxone-Leistungsmerker zuordnen – für die Ist-Anzeige und zur Kontrolle.
+Anzugeben sind Leistung und typische Laufzeit. Optional lässt sich später in der **Signalliste** ein Leistungssignal des Verbrauchers aktivieren – für die Ist-Anzeige und zur Kontrolle.
 
 Wechselrichter werden im Tab **Wechselrichter** gepflegt (Typ, AC-Anschluss netzgekoppelt oder Insel, optionale Leistungsgrenzen). **Insel** bedeutet hier: Der Wechselrichter versorgt nur angeschlossene Verbraucher, nicht den AC-Bus des Hauses. Sein AC-Eingang kann trotzdem am Netz hängen – „Insel“ heißt also nicht „netzlos“. Technische Details: [PV & Batterie](../konfiguration/batterie-pv.md).
 
@@ -360,7 +360,7 @@ Details, Berechnungsregel der Earnie-Points und Abschalten: [Betrieb – Nutzung
 
 Überzeugt die Was-wäre-wenn-Analyse, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die eigentliche Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend – auch aus Sicherheitsgründen oder bei Ausfall von Earnie.
 
-Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt. Welches Backend zur Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Für Loxone gibt es zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
+Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt. Welches Backend zur Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Für Loxone gibt es zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md).
 
 ### Vorbereitung der Smarthome-Konfiguration
 
@@ -368,7 +368,7 @@ Ausgangspunkt ist ein fertig konfiguriertes Haus: Hauskonfigurator und Live-Szen
 
 1. **Gegebenenfalls Benutzer bzw. Token** am Smarthome-Backend anlegen – mit Rechten zum Lesen und Schreiben der benötigten IOs bzw. Entities.
 2. **Signale aktivieren und Vorlagen exportieren:** Auf **Daemon Control → EHAL-Com** listet die **Signalliste** alle Signale des konfigurierten Hauses. Benötigte optionale Signale dort aktivieren, danach die Vorlagen für das Backend exportieren: bei Loxone eine ZIP mit VO- und VI-Vorlagen, bei Home Assistant ein YAML-Paket (Abschnitt **HA Push-Carrier**).
-3. **Lese- und Schreibweg im Smarthome-Backend einrichten:** Anhand des Exports im Smarthome-Backend die Messwerte an Earnie senden (Lesen) und die Sollwerte von Earnie abholen (Schreiben über `status.json`, z. B. mit Loxone Virtual Inputs oder HA-Automationen). Earnie selbst speichert dabei nur, welche Signale aktiviert sind – ohne Merker-Namen oder Entity-IDs (leere Werte in `plant.ehal_bindings`, `batteries[].ehal_bindings`, `consumers[].ehal_bindings`).
+3. **Lese- und Schreibweg im Smarthome-Backend einrichten:** Anhand des Exports im Smarthome-Backend die Messwerte an Earnie senden (Lesen) und die Sollwerte von Earnie abholen (Schreiben über `status.json`, z. B. mit Loxone Virtual Inputs oder HA-Automationen).
 4. **Verbindung prüfen:** Zurück auf **EHAL-Com** kontrollieren, ob **Live-Lesen** die Werte empfängt und **Live-Schreiben** bzw. die Match-Spalte der Signalliste den Abruf der Sollwerte bestätigt.
 5. **Jahres-Leistungsprofile (optional):** per CSV-Upload hinterlegen ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Die Offline-Daten für den Szenario-Explorer liegen danach in `cons_data.csv`.
 
@@ -397,7 +397,7 @@ Die Schritte 1–2 und 6–8 gelten für alle Backends. Bei Lesen und Schreiben 
 3. **Vorlagen exportieren (Loxone und Home Assistant):** Aus den aktivierten Signalen erzeugt die Seite die Vorlagen für das Smarthome-Backend (Loxone: ZIP mit VO- und VI-Vorlagen; Home Assistant: YAML-Paket unter **HA Push-Carrier**). Nach Änderungen an den aktivierten Signalen den Export erneut erzeugen. OpenEMS hat keinen solchen Export; die Signalliste und die Kanalzuordnung im Lab reichen.
 4. **Lesen einrichten:**
    - **Loxone / Home Assistant:** Das Smarthome-Backend sendet die Messwerte (`sens_*`, `get_*`) regelmäßig an Earnie (Push, standardmäßig alle 10 Sekunden) – bei Loxone über Virtual Outputs, bei Home Assistant über das YAML-Paket.
-   - **OpenEMS:** Earnie liest die Messwerte selbst aus den OpenEMS-Kanälen über den OpenEMS-Adapter (REST-API). Ein Push vom Hub an Earnie ist dafür nicht nötig. Details: [OpenEMS-Lab](../einrichtung/openems-lab.md).
+   - **OpenEMS:** Earnie liest die Messwerte selbst aus den OpenEMS-Kanälen über den OpenEMS-Adapter (REST-API). Details: [OpenEMS-Lab](../einrichtung/openems-lab.md).
 5. **Schreiben einrichten:**
    - **Loxone / Home Assistant:** Earnie veröffentlicht Sollwerte und Freigaben (`set_*`) in `status.json`. Das Smarthome-Backend ruft sie im selben Takt ab und setzt sie auf die Geräte um (Loxone Virtual Inputs bzw. HA-Automationen). Schaltlogik und Schutzfunktionen bleiben dabei im Smarthome-Backend.
    - **OpenEMS:** Earnie schreibt die Sollwerte über denselben Adapter direkt in die OpenEMS-Kanäle (z. B. ESS-Sollleistung). Ein Abruf von `status.json` durch den Hub entfällt. Lab-Pfad: [OpenEMS-Lab](../einrichtung/openems-lab.md).
@@ -408,11 +408,11 @@ Die Schritte 1–2 und 6–8 gelten für alle Backends. Bei Lesen und Schreiben 
 #### Silent / Loud und Abwesenheitsmodus
 
 - **Silent / Loud:** Der Umschalter liegt auf der Seite [Optimierer-Dienst](#optimierer-dienst) (gespeichert in `runtime/local_settings.json`). Sollwerte erreichen das Smarthome-Backend nur im Loud-Modus und bei laufendem Dienst.
-- **Abwesenheitsmodus:** Das Signal ist das EHAL-Feld `sens_absent_mode` in `plant.ehal_bindings` (Loxone-Standardmerker `Earnie_Abwesend`, sonst HA-Entity bzw. OpenEMS `component/Channel`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
+- **Abwesenheitsmodus:** Das Signal ist das EHAL-Feld `sens_absent_mode`; es wird in der **Signalliste** aktiviert (Loxone-Namenskatalog: `Earnie_Abwesend`; siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
 
 #### Backend-spezifische Details
 
-- **Loxone:** [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md). Optional und **nur Loxone:** Loxone-Import auf **Smarthome-Backend** (siehe Hinweis unter [Vorbereitung](#vorbereitung-der-smarthome-konfiguration)); zusätzlich `python -m scripts.verify_loxone_setup`.
+- **Loxone:** [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md). Optional und **nur Loxone:** Loxone-Import auf **Smarthome-Backend** (siehe Hinweis unter [Vorbereitung](#vorbereitung-der-smarthome-konfiguration)); zusätzlich `python -m scripts.verify_loxone_setup`.
 - **Home Assistant:** [Home Assistant + evcc](../einrichtung/ha-evcc.md)
 - **OpenEMS:** [OpenEMS-Lab](../einrichtung/openems-lab.md)
 - **Alle Backends:** Signalnamen, Feldlisten und vollständige Checkliste unter [EHAL-Com](../ui/ehal-com.md).

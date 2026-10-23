@@ -31,7 +31,7 @@ ports:
   8541/tcp: 8541
 ports_description:
   8501/tcp: "Earnie Web-UI (optional direct; prefer Ingress)"
-  8541/tcp: "EHAL Loxone-HTTP (optional, bei Loxone-Backend oder HA-Transport push)"
+  8541/tcp: "EHAL Daemon-HTTP (Push-Verfahren für das HA-YAML-Paket)"
 
 map:
   - type: addon_config
@@ -39,7 +39,7 @@ map:
 
 options:
   streamlit_port: 8501
-  ehal_loxone_http_port: 8541
+  ehal_http_port: 8541
   ui_modes: "sunset2sunset,scenario_explorer,live_environment"
   auto_start_main: true
   timezone: "Europe/Vienna"
@@ -48,6 +48,9 @@ options:
 
 schema:
   streamlit_port: "port?"
+  ehal_http_port: "port?"
+  # Legacy name of ehal_http_port; kept in the schema so Supervisor does not drop
+  # a value saved before the rename (runtime_store/addon_options.py carries it over).
   ehal_loxone_http_port: "port?"
   ui_modes: "str?"
   auto_start_main: "bool?"

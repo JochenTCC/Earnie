@@ -150,9 +150,13 @@ def _entry(
     )
 
 
+# House-wide plant reads outside the grid role (heat pump / pool thermal, absent mode).
+_PLANT_HOUSE_KINDS: tuple[str, ...] = ("sens_temperature_outside", "sens_absent_mode")
+
+
 def _plant_kinds() -> tuple[str, ...]:
-    # Plant wire: grid role only (plant PV retired; PV lives on inv.*/pv.*).
-    return tuple(_role_kinds("grid"))
+    # Plant wire: grid role (plant PV retired; PV lives on inv.*/pv.*) + house-wide reads.
+    return tuple(_role_kinds("grid")) + _PLANT_HOUSE_KINDS
 
 
 def _consumer_role_id(consumer_type: str) -> str:

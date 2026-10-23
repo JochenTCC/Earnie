@@ -88,14 +88,14 @@ Windows / Git Bash: prefix `docker run`/`docker exec` calls that pass `/data`-st
 - `docker build` läuft ohne Fehler durch und erzeugt `earnie-addon-test:local`.
 - `docker ps` zeigt den Container als laufend (keine Restart-Schleife). `docker logs earnie-addon-test` zeigt, wie `run.sh` durchläuft (ohne `/data/options.json` greifen einfach die Defaults: `TZ=Europe/Vienna`, Port `8501`, alle drei UI-Modi, Auto-Start an) und danach an den normalen App-Entrypoint (`docker/entrypoint.sh` → Bootstrap → Streamlit) übergibt.
 - Im Browser unter `http://localhost:18501` (gemappter Host-Port) erscheint die normale Earnie-Streamlit-Oberfläche.
-- In `<host-dir>` tauchen nach dem ersten Start automatisch `earnie_env/config/config.json` und weitere Dateien auf — Beleg dafür, dass `EARNIE_ENV_PATH=/data/earnie_env` korrekt greift und der Bootstrap fehlende Dateien selbst anlegt.
+- In `<host-dir>` taucht nach dem ersten Start `earnie_env/runtime/` auf, `config.json` und die Sidecars legt der Bootstrap unter `/config` an (beim zweiten Aufruf oben in `<host-config>`) — Beleg dafür, dass `EARNIE_CONFIG_PATH` / `EARNIE_RUNTIME_PATH` greifen und der Bootstrap fehlende Dateien selbst anlegt. Ohne `/config`-Mount liegt die Config nur im Container.
 - Bleibt `<host-dir>` leer, ist das meist nicht ein App-Fehler, sondern das MSYS-Pfad-Problem oben (`MSYS_NO_PATHCONV=1` vergessen).
 
 Dieser Test beweist: Image baut, `run.sh`/`jq` funktionieren, Optionen-Defaults greifen korrekt, UI ist erreichbar, Persistenzpfad stimmt — **nicht** Supervisor-Verhalten (Apps-Bereich, Optionen-UI, Backup/Restore), siehe dazu unten.
 
 Für die reguläre Installation des Add-ons in eine echte Home-Assistant-Instanz (Apps-Bereich, Optionen-UI — bis HA 2026.1 „Add-on Store" genannt) siehe [`docs/einrichtung/homeassistant-addon.md`](../../docs/einrichtung/homeassistant-addon.md#installation) — der lokale Docker-Build hier ersetzt das nicht, sondern ergänzt es nur für schnelle Entwicklungs-Iterationen.
 
-Full Supervisor-lifecycle verification (restart/update/backup-restore) needs a real Supervisor (HA OS/Supervised) — a local Docker run only proves the persistence *mechanism* (`EARNIE_ENV_PATH`, bootstrap idempotency), not Supervisor update/backup-restore itself. See [`docs/dev/homeassistant-addon-testumgebung.md`](../../docs/dev/homeassistant-addon-testumgebung.md) for a WSL2-Supervised walkthrough (Option A) and a Raspberry-Pi-4-SD-card walkthrough (Option B).
+Full Supervisor-lifecycle verification (restart/update/backup-restore) needs a real Supervisor (HA OS/Supervised) — a local Docker run only proves the persistence *mechanism* (`EARNIE_CONFIG_PATH` / `EARNIE_RUNTIME_PATH`, bootstrap idempotency), not Supervisor update/backup-restore itself. See [`docs/dev/homeassistant-addon-testumgebung.md`](../../docs/dev/homeassistant-addon-testumgebung.md) for a WSL2-Supervised walkthrough (Option A) and a Raspberry-Pi-4-SD-card walkthrough (Option B).
 
 ## Sync mechanism
 

@@ -16,8 +16,8 @@ arch:
   - aarch64
   - amd64
 
-# Grants SUPERVISOR_TOKEN + Core API via http://supervisor/core (SB self-discovery
-# and EHAL-HA without a manual long-lived access token).
+# Grants SUPERVISOR_TOKEN + Core API via http://supervisor/core (SB self-discovery only;
+# EHAL-HA is push-only, HA calls Earnie on 8541, no HA API access needed).
 homeassistant_api: true
 # Supervisor add-on API (mutual-exclusion with earnie_prerelease; network info later).
 hassio_api: true
@@ -39,7 +39,7 @@ ports:
   8541/tcp: 8541
 ports_description:
   8501/tcp: "Earnie Web-UI (optional direct; prefer Ingress)"
-  8541/tcp: "EHAL Loxone-HTTP (optional, bei Loxone-Backend oder HA-Transport push)"
+  8541/tcp: "EHAL Daemon-HTTP (Push-Verfahren für das HA-YAML-Paket)"
 
 # Config visible under /addon_configs/<hash>_earnie/ (Samba / File Editor).
 # /data is always present for runtime; no explicit map entry needed.
@@ -55,7 +55,7 @@ map:
 # nicht in die Supervisor-Optionen (Add-on impliziert HA als Backend).
 options:
   streamlit_port: 8501
-  ehal_loxone_http_port: 8541
+  ehal_http_port: 8541
   ui_modes: "sunset2sunset,scenario_explorer,live_environment"
   auto_start_main: true
   timezone: "Europe/Vienna"
@@ -64,6 +64,9 @@ options:
 
 schema:
   streamlit_port: "port?"
+  ehal_http_port: "port?"
+  # Legacy name of ehal_http_port; kept in the schema so Supervisor does not drop
+  # a value saved before the rename (runtime_store/addon_options.py carries it over).
   ehal_loxone_http_port: "port?"
   ui_modes: "str?"
   auto_start_main: "bool?"

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -24,13 +23,24 @@ def test_flex_sens_consumer_active_field():
     assert is_flex_live_read_field("flex.waschmaschine.sens_consumer_active")
 
 
-def test_vo_consumer_template_has_aktiv_cmd():
-    xml = Path("share/loxone/templates/VirtualOut/VO_Earnie_Consumer.xml").read_text(
-        encoding="utf-8"
-    )
-    assert "Earnie_Verbraucher_Aktiv" in xml
-    assert "consumer.{hk_id}.sens_consumer_active" in xml
-    assert "flex.{hk_id}.sens_consumer_active" not in xml
+def test_vo_consumer_export_has_aktiv_cmd():
+    import io
+    import zipfile
+
+    from ehal.signal_export import build_export_zip
+
+    house = {
+        "plant": {"ehal_bindings": {}},
+        "profiles": {"live": {"consumers": [
+            {"id": "waschmaschine", "type": "generic", "ehal_bindings": {}},
+        ]}},
+    }
+    payload = build_export_zip(house, {}, host="192.168.1.10", port=8541, mode="all")
+    with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+        xml = zf.read("VO_Earnie_Verbraucher.xml").decode("utf-8-sig")
+    assert "Push_consumer_waschmaschine_sens_consumer_active" in xml
+    assert "consumer.waschmaschine.sens_consumer_active" in xml
+    assert "flex.waschmaschine.sens_consumer_active" not in xml
     assert 'Analog="false"' in xml
 
 

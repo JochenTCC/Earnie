@@ -39,7 +39,7 @@ services:
     restart: on-failure:3
     ports:
       - "${STREAMLIT_PORT:-8501}:8501"
-      # Daemon Earnie_Request_Optimize / telemetry / status.json (VO_Earnie_Status → host:8541).
+      # Daemon Earnie_Request_Optimize / telemetry / status.json (Loxone VI / VO → host:8541).
       - "8541:8541"
     volumes: *persist-volumes
     environment:

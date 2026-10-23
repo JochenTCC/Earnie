@@ -1,21 +1,32 @@
-# Loxone-Signale und Earnie-Library
+# Loxone-Signale und Vorlagen
 
-## Motivation
+> **Wichtig:** Earnie erzeugt die Virtual-In- und Virtual-Out-Vorlagen **individuell aus der aktuellen Konfiguration** (Haus, Komponenten, aktivierte Signale). Die Vorlagen kommen immer aus dem Export auf **Daemon Control → EHAL-Com → Signalliste**. Die allgemeinen Vorlagen früherer Versionen (`VI_Earnie_*_v2.xml` und `VO_Earnie_*.xml` aus `share/loxone/templates/`) nicht mehr verwenden und bereits eingespielte durch den Export ersetzen.
 
-Diese Seite ist die zentrale Referenz für die Loxone-Anbindung von Earnie. Sie behandelt zwei Themen:
+Diese Seite ist die Referenz für die Loxone-Anbindung von Earnie. Sie behandelt zwei Themen:
 
-1. **Library-Einrichtung:** Virtual-HTTP-In/Out-Vorlagen aus `share/loxone/templates/` in Loxone Config einspielen, EFM-Zähler, die Earnie-Dead-Man-Rückfallebene und den Loxone-Import ins Hausprofil.
+1. **Einrichtung:** der [empfohlene Ablauf](#first-connection) bei der ersten Anbindung: EFM-Zähler, Loxone-Import ins Hausprofil, Export der Vorlagen und Einspielen in Loxone Config, dazu die Earnie-Dead-Man-Rückfallebene.
 2. **Signalvertrag:** Welche Merker-**Titel** und EHAL-Rollen (`ehal_bindings`) zusammengehören (Standardnamen aus `greenfield_device_map.json` und den Rezepten).
 
 Ohne stabile Titel und Bindings kann Earnie die Anlage weder zuverlässig lesen noch steuern. Verwandte Seiten:
 
 - HTTP-Zugriff und Betrieb: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md)
-- Signalliste / Export: [EHAL-Com](../ui/ehal-com.md)
-- Vorlagendateien und Generatoren: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md)
+- Signalliste und Export: [EHAL-Com](../ui/ehal-com.md#signalliste-loxone-contract)
 
 **Begriffe (Smarthome-Merker):** Die **Adresse** (ein String, z. B. `Earnie_Waermepumpe_Freigabe`) ist ein *Smarthome-Merker*. Die **Rolle** ist der EHAL-Feldname (`sens_ess_soc`, `flex.{slug}.sens_power_act`, …) in `ehal_bindings`. Ein Merker ist nicht zu verwechseln mit Chart-Markern oder mit `earnie_role` (Bekannt/Gesteuert/Manuell).
 
-Diese Seite nennt den kanonischen Vorlagen- und Importweg **Default** (früher oft „Greenfield“). Die Datei `share/loxone/greenfield_device_map.json` behält ihren Namen.
+Den Import- und Namensweg nennt diese Seite **Default**. Die Datei `share/loxone/greenfield_device_map.json` behält ihren Namen.
+
+---
+
+<a id="first-connection"></a>
+
+## Empfohlener Ablauf bei der ersten Anbindung
+
+Bei der ersten Anbindung von Earnie an Loxone hat sich diese Reihenfolge bewährt:
+
+1. **Zähler in Loxone vorbereiten.** Für alle Verbraucher, die Earnie sehen soll, und für das Netz je einen Zählerbaustein mit eindeutiger, stabiler Bezeichnung anlegen und dem **Energieflussmonitor** (EFM) zuordnen (siehe [Zähler und Energy Flow Monitor](#efm-meters)). Earnie liest diese Zähler bei der Einrichtung ein und gewinnt daraus eine automatische Konfigurationsgrundlage. Die Netzzähler legt der Import nicht als Verbraucher an, sie sind aber die solide Grundlage für die EHAL-Signale, die später angelegt werden.
+2. **Zähler importieren.** Auf **Daemon Control → Smarthome-Backend** den **Loxone-Import** ausführen (siehe [Loxone-Import in Earnie](#loxone-import)). Earnie legt dabei die Verbraucher im Hausprofil an. Anschließend im **Hauskonfigurator** die Parameter ergänzen (kWh, Zeitpläne, Leistungen, …).
+3. **Vorlagen erzeugen und einarbeiten.** Erst wenn das Szenario fertig eingerichtet ist und der Signalvertrag steht (Signalliste auf EHAL-Com: Pflichtsignale aktiviert, optionale Signale gewählt), die VI/VO-Vorlagen exportieren und in Loxone einarbeiten (siehe [Einrichtung, Schritte 3–6](#library-setup)). Ändern sich danach Haus, Komponenten oder aktivierte Signale, die Vorlagen neu exportieren.
 
 ---
 
@@ -25,13 +36,13 @@ Diese Seite nennt den kanonischen Vorlagen- und Importweg **Default** (früher o
 
 | Richtung        | Baustein                                | Aufgabe                                                                                           |
 | --------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Earnie → Loxone | **Virtual HTTP In** (`VI_Earnie_*.xml`) | Loxone fragt `status.json` von Earnie ab; Sollwerte, Freigaben und Heartbeat landen in den benannten VI-Cmds (`Earnie_*`) |
-| Loxone → Earnie | **Virtual Out** (`VO_Earnie_*.xml`)     | Loxone sendet Telemetrie in die Earnie-Inbox (qualifizierte EHAL-ID); kein Merker-Poll für gebundene `sens_*` / `get_*` |
+| Earnie → Loxone | **Virtual HTTP In** (`VI_Earnie_*.xml`) | Loxone fragt `status.json` von Earnie ab; Sollwerte, Freigaben und Heartbeat landen in den benannten VI-Cmds |
+| Loxone → Earnie | **Virtual Out** (`VO_Earnie_*.xml`)     | Loxone sendet Telemetrie in die Earnie-Inbox (qualifizierte EHAL-ID)                              |
 | Zähler          | EFM / Meter                             | **Leistung** von Netz, PV, Batterie und Flex, bevorzugt über die EFM-Bezeichnung                  |
 
-Die Library ergänzt die **Loxone-seitige** HTTP-Spiegelung und eine **Earnie-tot**-Rückfallebene in Config (siehe [Earnie-Dead-Man-Rückfallebene](#earnie-dead-fallback-in-loxone-config)).
+Dazu kommt eine **Earnie-tot**-Rückfallebene in Config (siehe [Earnie-Dead-Man-Rückfallebene](#earnie-dead-fallback-in-loxone-config)).
 
-**Virtual Inputs (Earnie → Loxone):** Sollwerte, Freigaben und Heartbeat liefert der Daemon über `GET http://<Earnie>:8541/ehal/loxone/status.json`. `heartbeat_earnie` ist die aktuelle Unix-Zeit; die Sollwerte stammen aus dem Publish-Ledger (`loxone_sent`). Schreibzugriffe sind **Push-only**: Earnie ruft für Zyklus-Sollwerte nicht `/dev/sps/io/<Merker>/<Wert>` auf. `status.json` veröffentlicht ausschließlich qualifizierte Check-Schlüssel.
+**Virtual Inputs (Earnie → Loxone):** Sollwerte, Freigaben und Heartbeat liefert der Daemon über `GET http://<Earnie>:8541/ehal/loxone/status.json`. `heartbeat_earnie` ist die aktuelle Unix-Zeit; die Sollwerte stammen aus dem Publish-Ledger (`loxone_sent`). `status.json` veröffentlicht ausschließlich qualifizierte Check-Schlüssel.
 
 **Virtual Outputs (Loxone → Earnie):** Loxone sendet `sens_*` / `get_*` / Flex-Leistung unter qualifizierten Pfad-IDs. Der Core liest diese Felder aus der Push-Inbox.
 
@@ -45,78 +56,73 @@ Die Library ergänzt die **Loxone-seitige** HTTP-Spiegelung und eine **Earnie-to
 | **Virtual-Input-Check / Status-JSON**  | Check-Muster am Virtual In | `consumer.{hk_id}.set_enable` (Wärmepumpe/Pool: `heatpump.` / `pool.`) | `evcs.{ev_id}.set_evcs_max_current` / `set_evcs_mode` |
 | **Virtual-Output-Befehl bei Ein**      | Virtual-Out-URL           | `/ehal/telemetry/flex.{hk_id}.sens_power_act/<v>`   | `/ehal/telemetry/ev.{ev_id}.sens_evcs_soc_act/<v>`    |
 
-`{hk_id}` / `{ev_id}` ist die `id` der Entität im Hausprofil (snake_case). Die Vorlagen belassen die Platzhalter; sie werden in Config ersetzt.
+`{hk_id}` / `{ev_id}` ist die `id` der Entität im Hausprofil (snake_case). In den exportierten Vorlagen sind diese Kennungen bereits eingesetzt.
 
-**Nur qualifizierte Checks.** `status.json` veröffentlicht qualifizierte EHAL-IDs:
+**Qualifizierte Checks.** `status.json` veröffentlicht qualifizierte EHAL-IDs:
 
 - `consumer.{slug}.set_enable`, `heatpump.{slug}.set_enable`, `pool.{slug}.set_enable`
 - `evcs.{slug}.set_evcs_max_current` / `set_evcs_mode`
 - Anlagen-ESS-Schlüssel (ohne Präfix) und `grid.meter.*`, darunter der Schreibwert `grid.meter.set_grid_export_power_limit`
 - Powerstation `ess.{id}.set_*`
 
-Die alten Merker-Check-Schlüssel werden nicht mehr zusätzlich zu den qualifizierten ausgegeben. Die VI-Vorlagen müssen daher die qualifizierten Schlüssel verwenden (`VI_Earnie_*_v2.xml` oder generierte `VI_Earnie_*.xml`). Anlagen-Bindings bleiben ohne Präfix (`plant.ehal_bindings.set_grid_export_power_limit`).
-
-**VI-v2- und Export-Vorlagen.** Die Library-Vorlagen `VI_Earnie_*_v2.xml` nutzen die qualifizierten Check-Schlüssel (Titel = ID bzw. Feldname; Platzhalter `{hk_id}` / `{ev_id}`). Für eine Live-Config mit echten Kennungen lassen sich Vorlagen erzeugen:
-
-```powershell
-python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir …   # → VI_Earnie_*.xml
-python -m scripts.pilot_vo_template_gen --config-dir … --host … --out-dir …   # → VO_Earnie_*.xml
-```
-
-VO-Titel leiten sich aus der qualifizierten ID ab (`Push_<id>`, Punkte durch `_` ersetzt). Weitere Optionen: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Schritte zur Umstellung auf Push-only-Schreiben: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
+Anlagen-Bindings bleiben ohne Präfix (`plant.ehal_bindings.set_grid_export_power_limit`).
 
 ---
 
-## Library-Einrichtung
+## Einrichtung
 
 <a id="library-setup"></a>
 
-Sind die Vorlagen in Loxone Config installiert, erzeugt der **Loxone-Import** (siehe [Schritt 6](#6-loxone-import-into-earnie)) typisierte Hausprofil-Entitäten und Merker-Bindings.
+### 1. Zähler und Energy Flow Monitor (EFM)
 
-### 1. Vorlagen in Loxone Config kopieren
+<a id="efm-meters"></a>
 
-Nur die `.xml`-Dateien in die Vorlagenordner kopieren. `README.md` bleibt draußen, und ein ganzer Ordnerbaum wird nicht als Unterordner eingefügt.
+Der Loxone-Import übernimmt die Zählerblöcke, die am Energy Flow Monitor hängen. In Loxone Config:
 
-#### VirtualIn
+1. Für jeden Verbraucher, den Earnie sehen soll, und für das Netz einen Zähler mit **eindeutiger, stabiler Bezeichnung** anlegen bzw. beibehalten.
+2. Den Zähler dem **Energy Flow Monitor** zuordnen (Netz / PV / Batterie / Verbraucher).
+3. Rest-/Differenzknoten nicht als eigenen Flex-Verbraucher verwenden. Der Import überspringt typische Restbezeichnungen.
 
-Quelle: `share/loxone/templates/VirtualIn/`
+Leistungs-Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **können** aus dem EFM stammen. Earnie bevorzugt im Binding die EFM-Bezeichnung, sofern vorhanden.
 
-| Datei | Inhalt (kurz) |
-| ---- | --------------- |
-| `VI_Earnie_Plant_v2.xml` | Heartbeat + ESS (Titel = Feldnamen) |
-| `VI_Earnie_Heatpump_v2.xml` | `heatpump.{hk_id}.set_enable` |
-| `VI_Earnie_EV_v2.xml` | `evcs.*.set_evcs_*` |
-| `VI_Earnie_Consumer_v2.xml` | `consumer.{hk_id}.set_enable` |
-| `VI_Earnie_Pool_v2.xml` | `pool.*.set_enable` |
+**EV-Fertig-bis-Zeit.** Der Loxone-Import bindet **AlarmClock**-Blöcke an `get_evcs_ready_by_time` der EV-Entität, die bereits Zähler-/Leistungs-Bindings hat (gleiche Konvention wie bei der Zählerbezeichnung). Optionaler Analog-VO: `/ehal/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numerischer nächster Eintrag; die Inbox akzeptiert auch kurzen Text im Tna-Stil). Gebundene FertigUm-Felder nutzen immer die Push-Inbox.
 
-Für eine Config mit echten Kennungen stattdessen `VI_Earnie_*.xml` erzeugen (siehe oben).
+### 2. Loxone-Import in Earnie
 
-Zielordner (einen der vorhandenen Config-Pfade verwenden; Ordner bei Bedarf anlegen):
+<a id="loxone-import"></a>
 
-- `%ProgramData%\Loxone\Loxone Config\<Version>\Template\VirtualIn\`
-- oder `Documents\Loxone\Loxone Config\Templates\VirtualIn\`
+Voraussetzungen: Jeder Verbraucher hat einen Zählerblock am EFM (Schritt 1), und die Zugangsdaten sind unter **Smarthome-Backend → Anbindung** eingetragen. Der Import-Button wird erst aktiv, sobald der Miniserver erreichbar ist.
 
-#### VirtualOut
+1. Auf **Daemon Control → Smarthome-Backend** erscheint unterhalb der Verbindungsübersicht der Abschnitt **Loxone-Import**, sobald Loxone verbunden ist. Bei der Ersteinrichtung steht **Nein – manuell weiter** in derselben Zeile wie der Import-Button.
+2. Earnie lädt `LoxAPP3.json`, ordnet `Earnie_*` den LoxAPP3-Control-Namen zu (exakt oder Präfix + Slug, ohne Beachtung der Groß-/Kleinschreibung), legt typisierte Entitäten an und bindet die EFM-Zähler.
+3. Parameter (kWh, Zeitpläne, Wohnfläche, …) anschließend im **Hauskonfigurator** nachpflegen und das Szenario fertig einrichten.
+4. Den Signalvertrag auf **EHAL-Com** prüfen ([Signalliste](../ui/ehal-com.md#signalliste-loxone-contract)): Pflichtsignale aktiviert, optionale Signale gewählt.
 
-Quelle: `share/loxone/templates/VirtualOut/`
+### 3. Vorlagen exportieren
 
-| Datei                     | Inhalt (kurz)                                               |
-| ------------------------- | ------------------------------------------------------------ |
-| `VO_Earnie_Status.xml`    | optional `Earnie_Request_Optimize` (Port **8541**)  |
-| `VO_Earnie_Plant.xml`     | `grid.meter.*` (Leistung, Import-/Export-Energie, Exportgrenze), PV, Außentemperatur, Abwesenheitsmodus |
-| `VO_Earnie_Battery.xml`   | Batterie-/ESS-Telemetrie und Grenzen (`ess.{slug}.*`: SoC, Leistung, Energie, `get_ess_*`) |
-| `VO_Earnie_EV.xml`        | EV-Telemetrie                                                |
-| `VO_Earnie_Heatpump.xml`  | `Earnie_Waermepumpe_Leistung`, `Earnie_Waermespeicher_Temp_eq`, `Earnie_Waermespeicher_Temp_low` |
-| `VO_Earnie_Consumer.xml`  | Flex-Leistung                                                |
-| `VO_Earnie_Pool.xml`      | Pool-Telemetrie                                               |
+1. Auf **Daemon Control → EHAL-Com → Signalliste** den Abschnitt **Export** öffnen (Szenario und Signalvertrag aus Schritt 2 sind fertig).
+2. Den **Umfang** wählen: **nur aktivierte** (Standard) oder **alle (Pflicht + optional)**.
+3. **IP-Adresse des Geräts, auf dem Earnie läuft** und **HTTP-Port** prüfen (Standard **8541**, `system.ehal_http_port`). Beides trägt Earnie direkt in die Vorlagen ein.
+4. **ZIP herunterladen (VO + VI + README)**.
 
-Ziel: der jeweilige `VirtualOut`-Ordner.
+Die ZIP enthält je Gerätegruppe eine Vorlage, z. B. `VO_Earnie_Plant.xml`, `VO_Earnie_Batterie_<id>.xml`, `VO_Earnie_Waermepumpe.xml`, `VO_Earnie_Heartbeat.xml` und die passenden `VI_Earnie_*.xml`. Außerdem liegt immer `VO_Earnie_Status.xml` mit dem optionalen `Earnie_Request_Optimize` bei (siehe [Request Optimize](#request-optimize)). Dazu kommen die Signallisten `Earnie-VO-Signalliste.csv` / `Earnie-VI-Signalliste.csv` (Datei, Cmd-Titel, EHAL-ID, bisheriger Name, Typ) und eine kurze `README.txt`.
 
-Anschließend **Loxone Config neu starten**. Die Vorlagen erscheinen unter Peripherie / Gerätevorlagen (Virtual In / Virtual Out).
+Nach Änderungen an Haus, Komponenten oder aktivierten Signalen den Export erneut herunterladen und die geänderten Vorlagen in Loxone Config ersetzen.
 
-### 2. Earnie-Adresse setzen
+### 4. Vorlagen in Loxone Config kopieren
 
-In jedem eingefügten Virtual In/Out den Platzhalter `EARNIE_HOST` durch die LAN-IP oder den Hostnamen von Earnie ersetzen. Die Streamlit-Oberfläche nutzt typischerweise Port **8501**. Das **Daemon-HTTP** (Virtual-In-Status, `Earnie_Request_Optimize`, Telemetrie-Heartbeat) nutzt Port **8541** (`system.ehal_loxone_http_port`). Siehe [Streamlit-Ports](../dev/streamlit-ports.md).
+Nur die `.xml`-Dateien in die Vorlagenordner kopieren; CSV und `README.txt` bleiben draußen.
+
+- `VI_Earnie_*.xml` nach `%ProgramData%\Loxone\Loxone Config\<Version>\Template\VirtualIn\` oder `Documents\Loxone\Loxone Config\Templates\VirtualIn\`
+- `VO_Earnie_*.xml` in den jeweiligen `VirtualOut`-Ordner
+
+Ordner bei Bedarf anlegen. Anschließend **Loxone Config neu starten**. Die Vorlagen erscheinen unter Peripherie / Gerätevorlagen (Virtual In / Virtual Out).
+
+### 5. Earnie-Adresse und Push-Token
+
+Host und Port stehen bereits in den exportierten Vorlagen. Ändert sich die Adresse von Earnie, die Vorlagen neu exportieren oder die Adresse in Config anpassen. Die Streamlit-Oberfläche nutzt typischerweise Port **8501**, das **Daemon-HTTP** (Virtual-In-Status, Telemetrie, `Earnie_Request_Optimize`) Port **8541**. Siehe [Streamlit-Ports](../dev/streamlit-ports.md).
+
+In den VO-Adressen steht der Platzhalter `PUSH_TOKEN_HIER_ERSETZEN`. Ist `EARNIE_PUSH_TOKEN` gesetzt, den Platzhalter durch diesen Wert ersetzen; sonst den Platzhalter entfernen.
 
 Beispiel einer Virtual-In-Adresse (Status-JSON):
 
@@ -126,10 +132,10 @@ Virtual-Out-Adresse für **Status / Request Optimize**:
 
 `http://192.168.178.10:8541`
 
-Auch Telemetrie-VOs (`VO_Earnie_*` außer `Status`) zielen auf den Daemon-Port **8541**. Der Telemetrie-Push arbeitet so:
+Auch die Telemetrie-VOs (`VO_Earnie_*`) zielen auf den Daemon-Port **8541**. Der Telemetrie-Push arbeitet so:
 
 - **Empfänger:** `/ehal/telemetry/<EHAL-ID>/<Wert>`. Ist `EARNIE_PUSH_TOKEN` (Alias `EARNIE_PILOT_PUSH_TOKEN`) gesetzt, muss der Token mitgeschickt werden; ohne gesetztes Token akzeptiert Earnie Pushes ohne Authentifizierung (offenes LAN).
-- **Inbox-Lesen:** Alle pushbaren `sens_*` / `get_*`-Felder werden aus der Inbox gelesen (kein Merker-Poll). Dazu zählen die **Zähler-Energiestände** `sens_pv_energy`, `sens_grid_energy_import` / `_export` und `consumer.<id>.sens_energy_total`.
+- **Inbox-Lesen:** Alle pushbaren `sens_*` / `get_*`-Felder werden aus der Inbox gelesen (kein Merker-Poll). Dazu zählen die **Zähler-Energiestände** von Verbrauchern (`consumer.<id>.sens_energy_total`) und Batterien (`ess.<id>.sens_ess_energy_charge` / `_discharge`). Die Ist-Werte je Viertelstunde berechnet Earnie aus den Leistungswerten (alle 30 s abgetastet und gemittelt); Zählerstände verfeinern sie, sind aber nicht nötig.
 - **Wiederholintervall / Null-Regel:** siehe [Push-Takt (SB-neutral)](#push-cadence-sb-neutral).
 - **Heartbeat:** Der synthetische Heartbeat-VO ist immer Push.
 - **FertigUm** (`ev.<id>.get_evcs_ready_by_time`): wird als Analog-VO gepusht. Bevorzugt wird ein numerischer Wert für den nächsten Eintrag. Text im Tna-Stil wie `Morgen, 07:00` wird solange er frisch ist akzeptiert und vom Optimierer geparst.
@@ -153,28 +159,14 @@ Dieselbe Inbox-Regel gilt für **Loxone** (VO-Wiederholung) und **Home Assistant
 
 Das Polling bzw. das Cmd-Check-Muster ist an die JSON-Schlüssel anzupassen (Anlage: `set_ess_*` / `heartbeat_earnie`; Flex: `consumer.{hk_id}.…` (Wärmepumpe `heatpump.…`, Pool `pool.…`); EV: `evcs.{ev_id}.…`). Stabile **Titel** bleiben der Vertrag für Core und den Default-Import.
 
-### 3. Geräte einfügen und Merker-Namen beibehalten
+### 6. Geräte einfügen und verdrahten
 
-1. Die passende Vorlage einmal je Rolle einfügen (bei mehreren Flex-Verbrauchern mehrfach).
-2. Cmd-**Titel** nicht beliebig umbenennen. Sie müssen zu [`greenfield_device_map.json`](../../share/loxone/greenfield_device_map.json) und den folgenden Tabellen passen.
-3. **Mehrere Flex-Verbraucher / EVs:** Die Titel folgen einem Schema aus Präfix + Instanz-ID. Das VI-Check-Muster und der VO-Pfad verwenden `{hk_id}` / `{ev_id}` (siehe [Namenskonvention](#multiple-flex-consumers-naming-convention)).
+1. Jede exportierte Vorlage einmal einfügen.
+2. Die Virtual-Output-Cmds mit den echten Messwerten verbinden, die Virtual-Input-Cmds mit den Aktoren bzw. dem Programm.
+3. Cmd-**Titel** und VI-Check / VO-Pfad nicht ändern. Sie sind der Vertrag mit der Signalliste und dem Loxone-Import.
 4. Programm auf dem Miniserver speichern bzw. laden.
 
-### 4. Zähler und Energy Flow Monitor (EFM)
-
-Die Vorlagen enthalten **keine** Zählerhardware, der Import übernimmt aber auch die verwendeten Zählerblöcke. In Loxone Config:
-
-1. Einen Zähler mit **eindeutiger, stabiler Bezeichnung** anlegen bzw. beibehalten.
-2. Den Zähler dem **Energy Flow Monitor** zuordnen (Netz / PV / Batterie / Verbraucher).
-3. Rest-/Differenzknoten nicht als eigenen Flex-Verbraucher verwenden. Der Import überspringt typische Restbezeichnungen.
-
-Leistungs-Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **können** aus dem EFM stammen; die Virtual-Output-Cmds bleiben ein optionaler Namenskatalog. Earnie bevorzugt im Binding die EFM-Bezeichnung, sofern vorhanden.
-
-Nach **Smarthome-Backend → Loxone-Import** das Signal-Mapping auf EHAL-Com prüfen (**Signalliste**).
-
-**EV-Fertig-bis-Zeit.** Der Loxone-Import bindet **AlarmClock**-Blöcke an `get_evcs_ready_by_time` der EV-Entität, die bereits Zähler-/Leistungs-Bindings hat (gleiche Konvention wie bei der Zählerbezeichnung). Optionaler Analog-VO: `/ehal/telemetry/ev.<id>.get_evcs_ready_by_time/<v>` (numerischer nächster Eintrag; die Inbox akzeptiert auch kurzen Text im Tna-Stil). Gebundene FertigUm-Felder nutzen immer die Push-Inbox; der frühere Merker-Poll über SpecialState10 / `/all` entfällt.
-
-### 5. Earnie-Dead-Man-Rückfallebene (in Loxone Config)
+### 7. Earnie-Dead-Man-Rückfallebene (in Loxone Config)
 
 <a id="earnie-dead-fallback-in-loxone-config"></a>
 
@@ -182,7 +174,7 @@ Ziel: Ist Earnie nicht erreichbar oder wird das Virtual In nicht mehr aktualisie
 
 Empfohlenes Vorgehen (Logikbausteine in Config, kein Earnie-Code):
 
-1. **Watchdog** auf dem Heartbeat-Cmd (`heartbeat_earnie` in `VI_Earnie_Plant_v2.xml`, `Earnie_Heartbeat` in der Default-Benennung; Unix-Zeitstempel): Alter = jetzt − Heartbeat, oder „Wert seit x Sekunden unverändert“.
+1. **Watchdog** auf dem Heartbeat-Cmd (`heartbeat_earnie` in `VI_Earnie_Heartbeat.xml`, `Earnie_Heartbeat` in der Default-Benennung; Unix-Zeitstempel): Alter = jetzt − Heartbeat, oder „Wert seit x Sekunden unverändert“.
 2. **Schwelle:** z. B. 2–3 × die Polling-Zeit des Virtual In, bei 10 s Poll typischerweise ≥ 30 s.
 3. **Wenn die Rückfallebene auslöst:**
    - `Earnie_Steuerbefehl` / ESS-Modus lokal auf **Automatik** (`0`) setzen oder die sicheren ESS-Regeln der Anlage anwenden.
@@ -192,31 +184,23 @@ Empfohlenes Vorgehen (Logikbausteine in Config, kein Earnie-Code):
 
 Der Earnie-Core braucht dafür keine Änderung. Die Rückfallebene ist reine Config-Logik rund um die Merker.
 
-### 6. Loxone-Import in Earnie
+### Checkliste
 
-<a id="6-loxone-import-into-earnie"></a>
-
-Voraussetzungen: Die Earnie-Vorlagen sind in Loxone Config installiert, jeder Verbraucher hat einen Zählerblock (EFM), und die Zugangsdaten sind unter **Smarthome-Backend → Anbindung** eingetragen. Der Import-Button wird erst aktiv, sobald der Miniserver erreichbar ist.
-
-1. Auf **Daemon Control → Smarthome-Backend** erscheint unterhalb der Verbindungsübersicht der Abschnitt **Loxone-Import**, sobald Loxone verbunden ist. Bei der Ersteinrichtung steht **Nein – manuell weiter** in derselben Zeile wie der Import-Button.
-2. Earnie lädt `LoxAPP3.json`, ordnet `Earnie_*` den LoxAPP3-Control-Namen zu (exakt oder Präfix + Slug, ohne Beachtung der Groß-/Kleinschreibung), legt typisierte Entitäten an und bindet die EFM-Zähler.
-3. Das Signal-Mapping auf **EHAL-Com** prüfen ([Signalliste](../ui/ehal-com.md#signalliste-loxone-contract)). Parameter (kWh, Zeitpläne, Wohnfläche, …) anschließend im **Hauskonfigurator** nachpflegen.
-
-### Library-Checkliste
-
+- [ ] Zähler für Verbraucher und Netz am EFM mit eindeutigen Bezeichnungen
+- [ ] Smarthome-Backend: Loxone-Import ausgeführt, Parameter im Hauskonfigurator ergänzt
+- [ ] Signalvertrag auf EHAL-Com geprüft (Pflichtsignale aktiviert, optionale gewählt)
+- [ ] Vorlagen auf EHAL-Com exportiert (Host und Port geprüft)
 - [ ] `VI_`- / `VO_`-XMLs in die Config-Vorlagenordner kopiert, Config neu gestartet
-- [ ] `EARNIE_HOST` gesetzt; Geräte eingefügt; Titel stabil
-- [ ] Mehrere Verbraucher / EVs: Slug-Titel + Check/VO `{hk_id}` / `{ev_id}` (falls genutzt)
-- [ ] Zähler am EFM mit eindeutigen Bezeichnungen
+- [ ] Push-Token-Platzhalter ersetzt oder entfernt
+- [ ] Geräte eingefügt und verdrahtet; Titel unverändert
 - [ ] Programm auf dem Miniserver gespeichert
 - [ ] Optional: Heartbeat-Watchdog + Rückfallebene programmiert
-- [ ] Smarthome-Backend: Loxone-Import → Mapping auf EHAL-Com prüfen → Parameter im Hausprofil
 
 ---
 
 ## Präsenzprüfung (für Binding und Import)
 
-Die Cmd-Titel der Vorlagen sind **bekannt** (`greenfield_device_map.json`). Earnie prüft sie gegen die **LoxAPP3-Control-Namen** (`GET /data/LoxAPP3.json`): Ein Signal gilt als vorhanden, wenn sein Name (Bezeichnung) in `controls` auftaucht, sonst als fehlend. Titel, die in der Loxone-App nicht sichtbar und damit in LoxAPP3 nicht enthalten sind, werden nicht erkannt. Eine Discovery-Inbox für unbekannte Push-IDs ist geplant.
+Die Default-Titel sind **bekannt** (`greenfield_device_map.json`). Earnie prüft sie gegen die **LoxAPP3-Control-Namen** (`GET /data/LoxAPP3.json`): Ein Signal gilt als vorhanden, wenn sein Name (Bezeichnung) in `controls` auftaucht, sonst als fehlend. Titel, die in der Loxone-App nicht sichtbar und damit in LoxAPP3 nicht enthalten sind, werden nicht erkannt. Eine Discovery-Inbox für unbekannte Push-IDs ist geplant.
 
 Der Default-Import nutzt die LoxAPP3-Namen. EFM-Zähler stammen ebenfalls aus `LoxAPP3.json`.
 
@@ -224,7 +208,7 @@ Der Default-Import nutzt die LoxAPP3-Namen. EFM-Zähler stammen ebenfalls aus `L
 
 <a id="multiple-flex-consumers-naming-convention"></a>
 
-Eine Vorlage `VI_Earnie_Consumer` / `VO_Earnie_Consumer` deckt **einen** Verbraucher ab. Miniserver-Bezeichnungen müssen eindeutig sein. Die `id` im Hausprofil (Kleinbuchstaben, snake_case, z. B. `waschmaschine`) ist der kanonische **Entity-Slug** (`{hk_id}`).
+Miniserver-Bezeichnungen müssen eindeutig sein. Die `id` im Hausprofil (Kleinbuchstaben, snake_case, z. B. `waschmaschine`) ist der kanonische **Entity-Slug** (`{hk_id}`).
 
 | Signal   | Merker-Titel (erster / weitere)                                       | VI-Check / VO-Pfad                                |
 | -------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
@@ -260,9 +244,7 @@ Analog: Präfix `Earnie_EAuto_`, Entität `id` = `{ev_id}` (z. B. `eauto`, `gara
 
 **Pool:** VO `flex.pool.sens_power_act` (oder `flex.{hk_id}.sens_power_act`), VI-Check `pool.{hk_id}.set_enable`.
 
-**Import:** Der Default-Import ordnet Vorlagennamen **ohne Beachtung der Groß-/Kleinschreibung** zu, entweder exakt oder als **Präfix + Slug**. Beispiele: `Earnie_Verbraucher_Waschmaschine_Leistung` → Verbraucher `waschmaschine`; `Earnie_EAuto_Garage_Soll_A` → EV `garage`. Bindings behalten die Schreibweise des Miniservers.
-
-In Config: Vorlage einfügen, Cmd-Titel sowie VI-Check / VO-Pfad `{id}` setzen und anschließend auf dem Miniserver speichern.
+**Import:** Der Default-Import ordnet Default-Namen **ohne Beachtung der Groß-/Kleinschreibung** zu, entweder exakt oder als **Präfix + Slug**. Beispiele: `Earnie_Verbraucher_Waschmaschine_Leistung` → Verbraucher `waschmaschine`; `Earnie_EAuto_Garage_Soll_A` → EV `garage`. Bindings behalten die Schreibweise des Miniservers.
 
 Alle konfigurierten Signale lassen sich so prüfen:
 
@@ -278,12 +260,12 @@ Alle konfigurierten Signale lassen sich so prüfen:
 | Entität / Bereich                                                      | Speicherort                                   | Typische EHAL-Felder / Rollen                                                                                                                             |
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Anlage (PV, Netz, Hauslast, Außentemp., Abwesenheit; ESS-Leistung/Sollwerte über die primäre Batterie)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers` (SoC: `batteries[].ehal_bindings` → `ess.{slug}.sens_ess_soc`) |
-| Request Optimize (ad hoc)                                               | Loxone-VO → Daemon-HTTP                       | `Earnie_Request_Optimize` auf Port `system.ehal_loxone_http_port` (Standard **8541**)                                                                     |
+| Request Optimize (ad hoc)                                               | Loxone-VO → Daemon-HTTP                       | `Earnie_Request_Optimize` auf Port `system.ehal_http_port` (Standard **8541**)                                                                            |
 | Wärmepumpe / Flex / Thermik                                             | `consumers[].ehal_bindings`                   | `consumer|heatpump|pool.{slug}.sens_power_act`, `….set_enable` (Legacy `flex.*` nur noch lesen)                                                         |
 | EV (`ev`)                                                                | `consumers[].ehal_bindings`                   | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*`                                                                                                                  |
 | Pool / SwimSpa                                                           | `consumers[].ehal_bindings` + Filter-Entität  | siehe Default `Earnie_Pool_*` / EHAL-Com, Abschnitt Pool / SwimSpa                                                                                        |
 
-Bearbeitet wird in der Oberfläche **ausschließlich** unter **Daemon Control → EHAL-Com → Signalliste** (und den zugehörigen Mapping-Abschnitten). Der Hauskonfigurator bearbeitet keine Merker-Adressen mehr.
+Bearbeitet wird in der Oberfläche **ausschließlich** unter **Daemon Control → EHAL-Com → Signalliste** (und den zugehörigen Mapping-Abschnitten).
 
 ## Kernsignale (`plant.ehal_bindings`)
 
@@ -311,7 +293,7 @@ Default-Namen. Netz-/PV-/Batterie-**Leistung** bevorzugt über die EFM-Zählerbe
 | `set_grid_export_power_limit`     | Schreiben | `Earnie_EinspeiseLeistungs-Limit`                | Max. Export kW (Betrag ≥ 0); `0` = kein Export; unbeschränkt = PV-kWp + max. Batterie-Entladung kW |
 | *(Watchdog)*                       | Lesen     | `Earnie_Heartbeat`                               | Entity-bezogen; kein EHAL-Feld                                                              |
 
-Die alten Rollennamen (`soc_name`, `pv_power_name`, …) in `loxone_blocks` sind entfernt. Verwendet werden nur noch `plant.ehal_bindings` mit den obigen EHAL-Feldnamen (siehe [EHAL-Vertrag](ehal.md)).
+Die Bindings stehen in `plant.ehal_bindings` mit den obigen EHAL-Feldnamen (siehe [EHAL-Vertrag](ehal.md)).
 
 **Sticky-Merker.** Loxone behält den zuletzt geschriebenen Wert.
 
@@ -371,17 +353,19 @@ Hinweise:
 - Der **EV-Modus** wird ausschließlich über `set_evcs_mode` (`Earnie_EAuto_Modus`) geschrieben. Earnie schreibt weder `pv_follow` noch Sofortbefehl-Merker.
 - **Poolfilter:** Der Hausprofil-Verbraucher `pool_filter` führt seine EHAL-Rollen (u. a. `get_filter_remaining_hours`) unter `ehal_bindings`. Standardpräfix: `Earnie_Pool_*` / `Earnie_Pool_Filter_*` (siehe [ehal-com.md](../ui/ehal-com.md), Abschnitt Pool / SwimSpa).
 
+<a id="request-optimize"></a>
+
 ## Request Optimize (Ad-hoc-Läufe)
 
 Ad-hoc-Optimierungsläufe in `main.py` (zwischen den Viertelstunden) laufen über HTTP von Loxone zu Earnie.
 
 | Element                          | Bedeutung                                                                                  |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Virtual Out                        | Vorlage `share/loxone/templates/VirtualOut/VO_Earnie_Status.xml`                              |
-| Adresse                            | `http://EARNIE_HOST:8541` (Port = `system.ehal_loxone_http_port`, Standard **8541**)          |
-| Cmd `Earnie_Request_Optimize`      | `POST /ehal/loxone/request_optimize`: weckt den Daemon vor der nächsten Viertelstunde; Empfangs-ID `request_optimize` in EHAL-Com **Signalliste** und **Live-Lesen** |
+| Virtual Out                        | `VO_Earnie_Status.xml` aus dem Export (immer enthalten)                                    |
+| Adresse                            | `http://EARNIE_HOST:8541` (Port = `system.ehal_http_port`, Standard **8541**)                 |
+| Cmd `Earnie_Request_Optimize`      | Befehl bei Ein `/ehal/loxone/request_optimize` (`POST`, ohne Push-Token). Den Ausgang mit dem Auslöser in Loxone verbinden, z. B. einem Taster oder einer Logik bei Tarif- oder Lastwechsel. Weckt den Daemon vor der nächsten Viertelstunde; Empfangs-ID `request_optimize` in EHAL-Com **Signalliste** und **Live-Lesen** |
 
-Der Verbindungsnachweis (Hub → Earnie) ist der sich wiederholende Telemetrie-VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat_smarthome/<v>`, kein Status-Cmd. Bestehende Configs, die noch das veraltete Cmd **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` enthalten, sollten es löschen; der Endpunkt liefert 404.
+Der Verbindungsnachweis (Hub → Earnie) ist der sich wiederholende Telemetrie-VO **`Push_Earnie_Heartbeat`** → `GET /ehal/telemetry/heartbeat_smarthome/<v>` aus `VO_Earnie_Heartbeat.xml`. Ein Cmd **`Earnie_Push_Alive`** / `GET /ehal/loxone/alive` in bestehenden Configs löschen; der Endpunkt liefert 404.
 
 Compose-Produktivstacks veröffentlichen Container-Port **8541** (siehe [Streamlit-Ports](../dev/streamlit-ports.md)).
 

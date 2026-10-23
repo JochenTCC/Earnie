@@ -1,6 +1,74 @@
 # Betrieb
 
-Diese Seite beschreibt, wie Optimierer-Dienst und App zusammenarbeiten, welche Laufzeitdateien entstehen und was nach einem Update zu tun ist.
+Diese Seite beschreibt, was nach einem Update passiert, wie Optimierer-Dienst und App zusammenarbeiten und welche Laufzeitdateien entstehen.
+
+## Update und Migration
+
+Earnie entwickelt sein **Datenmodell** laufend weiter, also die Form, in der Haus, Komponenten, Szenarien und Signale in den Konfigurationsdateien stehen. Damit Ihre individuelle Konfiguration nach einem Update weiter passt, bringt Earnie sie mit dem **Migrations-Assistenten** automatisch auf den neuesten Stand des Datenmodells:
+
+- **Keine Handarbeit:** Sie müssen die Konfigurationsdateien nicht selbst umschreiben. Ihre Einstellungen, Ihr Haus und Ihre Szenarien bleiben erhalten.
+- **Nachvollziehbar:** Der Assistent zeigt vorher, was sich ändert, und fragt nach, wo eine Entscheidung nötig ist.
+- **Sicher:** Vor jeder Änderung legt Earnie ein Backup an.
+
+So läuft die neue Version direkt mit Ihrer bisherigen Konfiguration weiter.
+
+Nach einem Image- oder Add-on-Update startet der Assistent, wenn sich die Form der Pack-Dateien ändert (strukturelle Schritte). Davon zu unterscheiden sind fehlende Keys in `config.json` nach einem Upgrade: Dort fehlen nur neue Einstellungsfelder (siehe [Container → Config-Updates](container.md#config-updates-nach-programm-upgrade)). Eine Ausnahme bildet der Block `scenario_explorer_conf`: Fehlende Einträge dort ergänzt die Migration selbst (siehe unten).
+
+### Ablauf
+
+1. Earnie startet im **Migrationsmodus**. Verfügbar ist nur der Assistent (plus Log/Debug), **kein** normaler Hauskonfigurator und **kein** Auto-Start von `main.py`.
+2. Der Assistent zeigt einen Hinweis (inkl. letzter laufender Version), die ausstehenden Schritte und JSON-Diffs. Ggf. stellt er Fragen und nennt manuelle To-dos außerhalb von Earnie.
+3. **Backup anlegen und migrieren** legt zuerst ein Backup an, schreibt danach die neuen JSON-Dateien und zeigt den Report.
+4. **Weiter zur App** lädt die normale UI. Der Optimierer-Dienst startet nur, wenn der Auto-Start aktiv ist; sonst lässt er sich unter **Optimierer-Dienst** starten.
+
+Bringt eine Version neue Schritte mit, informieren die Release Notes vorab darüber (Abschnitt **Migration**).
+
+Ein Schritt schreibt Verbraucher-Bindings von Legacy-`flex.{Kennung}.*` auf die typisierten Schlüssel `consumer.` / `heatpump.` / `pool.` um (gleiche Form wie Signalliste und `status.json`). Bei widersprüchlichen Merkernamen blockiert die Migration mit Hinweis auf den betroffenen Verbraucher.
+
+Ein weiterer Schritt entfernt das flache Anlagen-PV-Mapping (`plant.ehal_bindings.sens_pv_production_active`). Bei genau einem netzgekoppelten Wechselrichter mit PV wird die Merker-/Entity-Adresse auf `inv.{id}.sens_inv_power_pv` übernommen; bei mehreren Wechselrichtern blockiert die Migration mit Hinweis, die WR-PV-Mappings manuell zu setzen.
+
+Ein weiterer Schritt ergänzt fehlende Einträge unter `scenario_explorer_conf` in `config.json` mit den Standardwerten aus der mitgelieferten `config.example.json`, z. B. `season_mirror_to_last_month` oder `export_price_series`. Vorhandene Einträge bleiben unverändert.
+
+### Loxone: alte Merkernamen behalten oder leeren
+
+Beim Wechsel von Datenmodell 3 (offizielle 2.6) auf 4 fragt der Assistent bei Loxone-Installationen, ob die alten **Merkernamen** in den Bindungen erhalten bleiben sollen. Earnie braucht sie nicht mehr: Lesen läuft per Push mit der EHAL-ID, Schreiben über `status.json` mit der EHAL-ID.
+
+- **Behalten:** Die Namen bleiben stehen. Im VI/VO-Export der Signalliste (**Daemon Control → EHAL-Com → Signalliste**) erscheinen sie in der Spalte **„Bisheriger Name“**. Damit lassen sich die betroffenen Stellen in der Loxone Config leicht finden.
+- **Leeren:** Die Bindungen bleiben aktiv (Schlüssel mit leerem Wert), nur die Namen verschwinden – wie bei einer Neueinrichtung.
+
+Die Frage kommt nur einmal (beim Wechsel 3 → 4). In beiden Fällen müssen die virtuellen Ein-/Ausgänge in der Loxone Config auf die neuen Titel umgestellt werden; der Assistent zeigt das als manuellen Schritt. Home Assistant und OpenEMS sind nicht betroffen, denn dort sind die Werte Entity-IDs.
+
+### Backup
+
+Vor dem Schreiben legt Earnie ein Verzeichnis an:
+
+`{config}/backups/pre-migration-dm<von>-dm<nach>-<UTC-Zeitstempel>/`
+
+Darin liegen die alten Pack-JSON, `manifest.json` (Earnie-Version, from/to, Schritt-IDs) und nach dem Lauf `report.json`. **Alle** Backups bleiben liegen; Earnie löscht sie nicht. Nicht mehr benötigte Ordner unter `backups/` lassen sich manuell entfernen.
+
+| Kanal | Config-Wurzel | Backup-Pfad |
+| --- | --- | --- |
+| **Docker** (Synology, Proxmox, …) | Host `earnie_env/config/` → Container `/app/config` | `earnie_env/config/backups/pre-migration-…/`, siehe [Container](container.md) |
+| **LoxBerry** | `…/data/plugins/earnie/earnie_env/config/` | `…/earnie_env/config/backups/pre-migration-…/`, siehe [LoxBerry-Plugin](loxberry-plugin.md) |
+| **HA-Add-on** | Container `/config/` (= Host `addon_configs/…_earnie/` bzw. `_earnie_prerelease`) | `/config/backups/pre-migration-…/`. Gehört zu den HA-Backups des Add-ons; siehe [Home-Assistant-Add-on](homeassistant-addon.md) |
+
+Es gibt **kein** automatisches Downgrade. Eine ältere Earnie-Version lehnt ein neueres Datenmodell ab. Der Rückweg führt über das manuelle Zurückkopieren des Backup-Ordners.
+
+### Support-CLI
+
+Für Entwicklung und Support gibt es dieselbe Kette wie im Assistenten auch auf der Kommandozeile:
+
+```powershell
+python -m scripts.migrate_config --config-dir PATH --dry-run
+python -m scripts.migrate_config --config-dir PATH
+```
+
+Pflichtfragen (z. B. Loxone-Merkernamen) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`). Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
+
+### Wann die Migration blockiert
+
+- **Datenmodell 1 oder 2:** zu alt. Support kontaktieren oder neu einrichten; eine automatische Kette gibt es nicht.
+- **Earnie-Pack-Datei ohne `earnie_data_model`:** Die Version ist unbekannt. Earnie rät sie nicht und trägt sie auch nicht stillschweigend nach. Ausgenommen ist `grid_fees.json`, bis die Tarifverwaltung mit dem Tarif-Editor kommt.
 
 ## Einstiegspunkte
 
@@ -11,7 +79,7 @@ Diese Seite beschreibt, wie Optimierer-Dienst und App zusammenarbeiten, welche L
 | **Produktiv-Daemon** | `python main.py`                  | Liest Telemetrie über EHAL, optimiert und schreibt Steuerwerte. Läuft dauerhaft, auch als Kindprozess der Streamlit-App. |
 
 
-Nur `main.py` steuert die Anlage im Produktivbetrieb (Loxone-/EHAL-Schreibvorgänge). Die App **zeigt** den berechneten 24–48-Stunden-Horizont (`live_optimization_debug.json`). Unter **Daemon Control → Optimierer-Dienst** kann sie den Daemon starten, stoppen und neu starten. Vor dem Start prüft Earnie `runtime/main.lock`, um eine bereits laufende Instanz zu erkennen.
+Nur `main.py` steuert die Anlage im Produktivbetrieb (Schreibvorgänge über EHAL). Die App **zeigt** den berechneten 24–48-Stunden-Horizont (`live_optimization_debug.json`). Unter **Daemon Control → Optimierer-Dienst** kann sie den Daemon starten, stoppen und neu starten. Vor dem Start prüft Earnie `runtime/main.lock`, um eine bereits laufende Instanz zu erkennen.
 
 ### Sichere Sollwerte und Silent / Loud
 
@@ -43,7 +111,7 @@ Die Konfiguration schreiben die Seiten **Hauskonfigurator**, **Szenarienkonfigur
 
 - **Viertelstunden-Grenzen:** Ein Lauf startet an jeder Viertelstunden-Grenze (`:00`, `:15`, `:30`, `:45`).
 - **Sofort auf Anfrage:** Zusätzlich startet ein Lauf sofort, wenn das Loxone Virtual Out **`Earnie_Request_Optimize`** den HTTP-Dienst des Daemons aufruft (`POST /ehal/loxone/request_optimize`).
-- **Port:** `system.ehal_loxone_http_port` in `config.json` bzw. `EARNIE_EHAL_LOXONE_HTTP_PORT` (Standard **8541**). Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`.
+- **Port:** `system.ehal_http_port` in `config.json` bzw. `EARNIE_EHAL_HTTP_PORT` (Standard **8541**; alte Namen `system.ehal_loxone_http_port` / `EARNIE_EHAL_LOXONE_HTTP_PORT` gelten weiter). Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`.
 - **Link-Nachweis (Hub → Earnie):** Ein wiederholendes Heartbeat-VO `Push_Earnie_Heartbeat` ruft `GET /ehal/telemetry/heartbeat_smarthome/<v>` auf.
 - **Status für Virtual In:** Der Status je Entität liegt am selben Port unter `GET /ehal/loxone/status.json`.
 - **Maximale Wartezeit:** `system.loop_timeout` in `config.json` legt die maximale Wartezeit zwischen Durchläufen in Sekunden fest (Standard 900 = 15 Min.).
@@ -183,7 +251,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_EARLY_START`                    | `on` (Standard, auch wenn nicht gesetzt) oder `off`. Bei `on` starten reguläre Läufe 15–90 s vor dem Viertelstundentakt und schreiben die Sollwerte genau zum Takt. Bei `off` startet der Lauf erst zum Takt und schreibt, sobald er fertig ist. Andere Werte führen zu einem Fehler beim Start. Siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv). |
 | `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Monitor, Manuelle Geräte), `scenario_explorer`, `live_environment` (Smarthome-Backend, EHAL-Com, Optimierer-Dienst, Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable gilt `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Die Compose-Dateien für den Produktivbetrieb setzen oft `sunset2sunset,live_environment`, die Cloud `scenario_explorer`. Siehe [Betriebsmodi](../ui/betriebsmodi.md). |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../dev/streamlit-ports.md)).                                                                                                                  |
-| `EARNIE_EHAL_LOXONE_HTTP_PORT`          | TCP-Port für den Daemon-HTTP (`Earnie_Request_Optimize` / Telemetry inkl. Heartbeat / `status.json`). Überschreibt `system.ehal_loxone_http_port`; Standard **8541**.                                                                |
+| `EARNIE_EHAL_HTTP_PORT`                 | TCP-Port für den Daemon-HTTP (`Earnie_Request_Optimize` / Telemetry inkl. Heartbeat / `status.json`). Überschreibt `system.ehal_http_port`; Standard **8541**. Alter Name `EARNIE_EHAL_LOXONE_HTTP_PORT` gilt weiter.                  |
 | `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls es nicht schon läuft (Docker-Compose setzt das). Ohne Variable bzw. lokal: aus.                                                                     |
 | `EARNIE_OFFLINE`                        | `1` = keine Loxone-/Live-Verbindung erforderlich. Der Bootstrap füllt leere Entitäts-IDs im Live-Szenario aus den Katalogen. Sinnvoll für die Streamlit Community Cloud. |
@@ -223,23 +291,7 @@ Wer bereits zugestimmt hat, wird wegen `points` nicht erneut gefragt. Die exakte
 
 ### Earnie-Points
 
-Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standort). Earnie berechnet sie aus dem **Live-Szenario**, nicht aus Szenarien des Szenarienkonfigurators. Die Seite **Optimierer-Dienst** zeigt sie unter **Earnie-Points dieser Anlage** mit Aufschlüsselung an. Die Berechnung bleibt dauerhaft konstant. Die Zuordnung der Punktebereiche zu Tarifen kann sich dagegen ändern und wird nicht vom Client gesendet.
-
-| Bestandteil | Punkte |
-| ----------- | ------ |
-| PV-Generatoren (Summe der kWp der im Live-Szenario gewählten PV-Felder) | 1 Punkt bis 6 kWp, danach je angefangene 4 kWp ein weiterer Punkt |
-| Speicher (Summe der kWh der im Live-Szenario gewählten Batterien und aller Powerstations) | 1 Punkt bis 5 kWh, danach je angefangene 5 kWh ein weiterer Punkt |
-| Wallbox (ein Verbraucher vom Typ **E-Auto** = eine Wallbox) | einphasig 1 Punkt, dreiphasig 2 Punkte, bidirektional 3 Punkte |
-| Wärmepumpe / Klimaanlage | je Gerät 1 Punkt |
-| Weitere flexible Großverbraucher | je Verbraucher 1 Punkt ab 2,5 kW Nennleistung |
-
-Hinweise:
-
-- **E-Autos und Wallboxen:** Bewertet werden nur die Wallboxen, nicht die Anzahl der E-Autos. Die Phasenzahl der Wallbox stammt aus den Ladeeinstellungen des E-Auto-Verbrauchers (Standard: 1 Phase; gewertet werden nur 1 und 3 Phasen). **Bidirektional** wird im Hauskonfigurator am E-Auto-Verbraucher mit **Wallbox bidirektional (V2G)** gesetzt.
-- **Klimaanlage und Wärmepumpe:** Eine **Klimaanlage** wird im Hauskonfigurator über das Feld **Geräteart** (Klimaanlage) gekennzeichnet, an einem Verbraucher vom Typ **Allgemein** oder **Temperatur (RC)**. Die Wärmepumpe zählt über den Typ **Haus Wärme**.
-- **Nicht gezählt:** **Manuelle** Verbraucher (z. B. Waschmaschine, Backofen) und Verbraucher mit bekanntem Verbrauchsprofil zählen **nicht**, da Earnie sie nicht steuert. Flexible Großverbraucher zählen nur, wenn Earnie sie verschieben darf.
-- **Keine Doppelzählung:** Jeder Verbraucher zählt höchstens einmal. Punkte werden **nicht standortübergreifend** addiert.
-- **Berechnung nicht möglich:** Fehlen z. B. Angaben im Live-Szenario, zeigt Earnie den Grund an und sendet keine Punkte. Die Statistik bleibt gültig.
+Die Earnie-Points sind eine grobe Größenkennzahl **einer Anlage** (ein Standort). Earnie berechnet sie aus dem **Live-Szenario**, nicht aus Szenarien des Szenarienkonfigurators. Die Seite **Optimierer-Dienst** zeigt sie unter **Earnie-Points dieser Anlage** mit Aufschlüsselung an. Zweck der Earnie-Points ist zukünftig die Zuordnung zu möglichen Abo-Tarifen. Derzeit ist das rein informativ und bei selbst verwalteten Installationen fallen auch keine Kosten an. Fehlen Angaben im Live-Szenario, zeigt Earnie den Grund an und sendet keine Punkte.
 
 **Abschalten:**
 
@@ -263,7 +315,7 @@ Wurde in einer Sitzung eine Simulation im **Szenario-Explorer** gestartet, kann 
 
 - **Inhalt:** Drei Fragen mit 1 bis 5 Sternen und ein optionaler Kommentar (max. 500 Zeichen).
 - **Was wird gesendet:** nur die Sternebewertungen, der Kommentar und die Earnie-Version. Konfiguration, Zugangsdaten, Geräte-, Preis- und Standortdaten werden nicht gesendet.
-- **Einmalig:** Nach **Senden** oder **Abbrechen** fragt Earnie auf dieser Installation nicht erneut. Der Zustand liegt in `runtime/feature_reviews.json`.
+- **Einmalig:** Nach **Senden** oder **Abbrechen** fragt Earnie auf dieser Installation nicht erneut. Der Zustand liegt in `runtime/feature_reviews.json`. In der Streamlit Community Cloud (`EARNIE_CLOUD_DEMO=1`) liegt `runtime/` im temporären Workspace der Browser-Sitzung. Dort gilt „einmalig“ deshalb nur pro Sitzung; in einer neuen Sitzung kann der Dialog wieder erscheinen.
 - **Endpunkt:** fest in der App hinterlegt (`https://cloudserver.earnie-hems.com/review`). Schlägt das Senden fehl, zeigt der Dialog eine Fehlermeldung; die Optimierung ist nicht betroffen.
 
 ## Debug-Dump
@@ -305,66 +357,6 @@ python -m scripts.replay_debug_dump path/to/debug_dump_….zip --html-out /tmp/c
 ```
 
 Das Skript prüft die Pflichtdateien und führt einen Smoke-Pfad aus. Es parst die Historie und baut bei vorhandenem `chart.display_rows` zusätzlich Chart 1 neu auf. Akzeptiert werden nur Dumps mit `schema_version: 3` und `dump_type: debug`.
-
-## Update und Migration
-
-Nach einem Image- oder Add-on-Update kann Earnie eine **Anpassung der Config-JSON** verlangen (Datenmodell / strukturelle Schritte). Dabei ändert sich die Form der Pack-Dateien. Davon zu unterscheiden sind fehlende Keys in `config.json` nach einem Upgrade: Dort fehlen nur neue Einstellungsfelder (siehe [Container → Config-Updates](container.md#config-updates-nach-programm-upgrade)). Eine Ausnahme bildet der Block `scenario_explorer_conf`: Fehlende Einträge dort ergänzt die Migration selbst (siehe unten).
-
-### Ablauf
-
-1. Earnie startet im **Migrationsmodus**. Verfügbar ist nur der Assistent (plus Log/Debug), **kein** normaler Hauskonfigurator und **kein** Auto-Start von `main.py`.
-2. Der Assistent zeigt einen Hinweis (inkl. letzter laufender Version), die ausstehenden Schritte und JSON-Diffs. Ggf. stellt er Fragen und nennt manuelle To-dos außerhalb von Earnie.
-3. **Backup anlegen und migrieren** legt zuerst ein Backup an, schreibt danach die neuen JSON-Dateien und zeigt den Report.
-4. **Weiter zur App** lädt die normale UI. Der Optimierer-Dienst startet nur, wenn der Auto-Start aktiv ist; sonst lässt er sich unter **Optimierer-Dienst** starten.
-
-Bringt eine Version neue Schritte mit, informieren die Release Notes vorab darüber (Abschnitt **Migration**).
-
-Ein Schritt schreibt Verbraucher-Bindings von Legacy-`flex.{Kennung}.*` auf die typisierten Schlüssel `consumer.` / `heatpump.` / `pool.` um (gleiche Form wie Signalliste und `status.json`). Bei widersprüchlichen Merkernamen blockiert die Migration mit Hinweis auf den betroffenen Verbraucher.
-
-Ein weiterer Schritt entfernt das flache Anlagen-PV-Mapping (`plant.ehal_bindings.sens_pv_production_active`). Bei genau einem netzgekoppelten Wechselrichter mit PV wird die Merker-/Entity-Adresse auf `inv.{id}.sens_inv_power_pv` übernommen; bei mehreren Wechselrichtern blockiert die Migration mit Hinweis, die WR-PV-Mappings manuell zu setzen.
-
-Ein weiterer Schritt ergänzt fehlende Einträge unter `scenario_explorer_conf` in `config.json` mit den Standardwerten aus der mitgelieferten `config.example.json`, z. B. `season_mirror_to_last_month` oder `export_price_series`. Vorhandene Einträge bleiben unverändert.
-
-### Loxone: alte Merkernamen behalten oder leeren
-
-Beim Wechsel von Datenmodell 3 (offizielle 2.6) auf 4 fragt der Assistent bei Loxone-Installationen, ob die alten **Merkernamen** in den Bindungen erhalten bleiben sollen. Earnie braucht sie nicht mehr: Lesen läuft per Push mit der EHAL-ID, Schreiben über `status.json` mit der EHAL-ID.
-
-- **Behalten:** Die Namen bleiben stehen. Im VI/VO-Export der Signalliste (**Daemon Control → EHAL-Com → Signalliste**) erscheinen sie in der Spalte **„Bisheriger Name“**. Damit lassen sich die betroffenen Stellen in der Loxone Config leicht finden.
-- **Leeren:** Die Bindungen bleiben aktiv (Schlüssel mit leerem Wert), nur die Namen verschwinden – wie bei einer Neueinrichtung.
-
-Die Frage kommt nur einmal (beim Wechsel 3 → 4). In beiden Fällen müssen die virtuellen Ein-/Ausgänge in der Loxone Config auf die neuen Titel umgestellt werden; der Assistent zeigt das als manuellen Schritt. Home Assistant und OpenEMS sind nicht betroffen, denn dort sind die Werte Entity-IDs.
-
-### Backup
-
-Vor dem Schreiben legt Earnie ein Verzeichnis an:
-
-`{config}/backups/pre-migration-dm<von>-dm<nach>-<UTC-Zeitstempel>/`
-
-Darin liegen die alten Pack-JSON, `manifest.json` (Earnie-Version, from/to, Schritt-IDs) und nach dem Lauf `report.json`. **Alle** Backups bleiben liegen; Earnie löscht sie nicht. Nicht mehr benötigte Ordner unter `backups/` lassen sich manuell entfernen.
-
-| Kanal | Config-Wurzel | Backup-Pfad |
-| --- | --- | --- |
-| **Docker** (Synology, Proxmox, …) | Host `earnie_env/config/` → Container `/app/config` | `earnie_env/config/backups/pre-migration-…/`, siehe [Container](container.md) |
-| **LoxBerry** | `…/data/plugins/earnie/earnie_env/config/` | `…/earnie_env/config/backups/pre-migration-…/`, siehe [LoxBerry-Plugin](loxberry-plugin.md) |
-| **HA-Add-on** | Container `/config/` (= Host `addon_configs/…_earnie/` bzw. `_earnie_prerelease`) | `/config/backups/pre-migration-…/`. Gehört zu den HA-Backups des Add-ons; siehe [Home-Assistant-Add-on](homeassistant-addon.md) |
-
-Es gibt **kein** automatisches Downgrade. Eine ältere Earnie-Version lehnt ein neueres Datenmodell ab. Der Rückweg führt über das manuelle Zurückkopieren des Backup-Ordners.
-
-### Support-CLI
-
-Für Entwicklung und Support gibt es dieselbe Kette wie im Assistenten auch auf der Kommandozeile:
-
-```powershell
-python -m scripts.migrate_config --config-dir PATH --dry-run
-python -m scripts.migrate_config --config-dir PATH
-```
-
-Pflichtfragen (z. B. Loxone-Merkernamen) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`). Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
-
-### Wann die Migration blockiert
-
-- **Datenmodell 1 oder 2:** zu alt. Support kontaktieren oder neu einrichten; eine automatische Kette gibt es nicht.
-- **Earnie-Pack-Datei ohne `earnie_data_model`:** Die Version ist unbekannt. Earnie rät sie nicht und trägt sie auch nicht stillschweigend nach. Ausgenommen ist `grid_fees.json`, bis die Tarifverwaltung mit dem Tarif-Editor kommt.
 
 ## Typische Betriebsfehler
 

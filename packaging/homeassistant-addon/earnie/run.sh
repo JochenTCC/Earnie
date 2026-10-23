@@ -169,9 +169,15 @@ else
     export EARNIE_AUTO_START_MAIN=1
 fi
 
-# ehal_loxone_http_port: export for runtime env precedence (config.get_ehal_loxone_http_port)
-# and merge into config.json system.ehal_loxone_http_port (runtime_store/addon_options.py).
-export EARNIE_EHAL_LOXONE_HTTP_PORT="$(_opt '.ehal_loxone_http_port' '8541')"
+# ehal_http_port: export for runtime env precedence (config.get_ehal_http_port); config.json
+# system.ehal_http_port is merged by runtime_store/addon_options.py with the same rule:
+# the legacy option ehal_loxone_http_port wins while ehal_http_port is empty or default 8541.
+EHAL_HTTP_PORT="$(_opt '.ehal_http_port' '')"
+EHAL_HTTP_PORT_LEGACY="$(_opt '.ehal_loxone_http_port' '')"
+if [ -n "$EHAL_HTTP_PORT_LEGACY" ] && { [ -z "$EHAL_HTTP_PORT" ] || [ "$EHAL_HTTP_PORT" = "8541" ]; }; then
+    EHAL_HTTP_PORT="$EHAL_HTTP_PORT_LEGACY"
+fi
+export EARNIE_EHAL_HTTP_PORT="${EHAL_HTTP_PORT:-8541}"
 
 # Mutual exclusion vs. the other channel (derived from self slug via Supervisor).
 _guard_sibling_not_running

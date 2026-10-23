@@ -1,8 +1,10 @@
 """SOC-Min-Immediate (ASAP EV floor via get_evcs_soc_min_immediate)."""
 from __future__ import annotations
 
+import io
 import json
 import os
+import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -252,8 +254,13 @@ class TestMappingCatalog:
             and r.get("ehal_field") == "get_evcs_soc_min_immediate"
         ]
         assert any(r.get("name") == "Earnie_EAuto_SOCMinSofort" for r in rows)
-        vo = (
-            _REPO / "share" / "loxone" / "templates" / "VirtualOut" / "VO_Earnie_EV.xml"
-        ).read_text(encoding="utf-8")
-        assert "Earnie_EAuto_SOCMinSofort" in vo
-        assert "get_evcs_soc_min_immediate" in vo
+        from ehal.signal_export import build_export_zip
+
+        house = {
+            "plant": {"ehal_bindings": {}},
+            "profiles": {"live": {"consumers": [{"id": "e_auto", "type": "ev", "ehal_bindings": {}}]}},
+        }
+        payload = build_export_zip(house, {}, host="192.168.1.10", port=8541, mode="all")
+        with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+            vo = zf.read("VO_Earnie_EV.xml").decode("utf-8-sig")
+        assert "ev.e_auto.get_evcs_soc_min_immediate" in vo

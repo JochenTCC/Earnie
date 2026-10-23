@@ -28,7 +28,7 @@ Meist liegt die Ursache nicht in der Hardware. Häufiger steckt eine **VM mit CP
 
 Proxmox-**LXC** nutzt die CPU des Hosts direkt; dort tritt das Problem nur bei sehr alter Hardware auf. Zur Prüfung muss `grep -o -w -E 'sse4_2|popcnt' /proc/cpuinfo | sort -u` beide Begriffe ausgeben.
 
-## Gesundheitsprüfung (Docker HEALTHCHECK)
+## Healthcheck (Docker `HEALTHCHECK`)
 
 Das Image enthält einen `HEALTHCHECK` auf `http://127.0.0.1:<Streamlit-Port>/_stcore/health` (Standard **8501**; im HA-Add-on intern **8502**). Läuft der Optimierer-Dienst (`main.py`), muss zusätzlich die Datei `runtime/daemon_heartbeat.json` frisch sein, sonst meldet der Container `unhealthy`.
 
@@ -51,7 +51,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./earnie_env/runtime/`                          | `cons_data.csv`, Zustands-JSONs, Profile, Logs                                                                   |
 | `./earnie_env/runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
-| `./earnie_env/config/.env`                       | Loxone-Zugangsdaten (`LOXONE_*`); optional `EARNIE_LAN_SUBNET` (für Home Assistant sind keine Zugangsdaten nötig) |
+| `./earnie_env/config/.env`                       | Loxone-Zugangsdaten (`LOXONE_*`); optional `EARNIE_LAN_SUBNET` |
 
 
 Umgebungsvariable in Compose: `EARNIE_ENV_PATH=.`. Daraus leitet Earnie `/app/config` und `/app/runtime` ab; die Host-Mounts lauten `./…/config` → `/app/config` und `./…/runtime` → `/app/runtime`.
@@ -70,9 +70,9 @@ Earnie läuft in Compose **ohne** `network_mode: host`. Die Container-IP liegt t
 
 LoxBerry setzt `EARNIE_LAN_SUBNET` bei Installation und Upgrade aus der Host-IP. Im HA-Add-on ermittelt Earnie die LAN-IP des Hosts über die Supervisor-API (`/network/info`).
 
-**Home Assistant als Backend (nicht Add-on):** Bleibt die Suche leer, auf **Smarthome-Backend** direkt **Home Assistant** wählen, statt auf mDNS zu warten. URL und Token sind nicht nötig, Home Assistant ruft Earnie auf.
+**Home Assistant als Backend (nicht Add-on):** Bleibt die Suche leer, auf **Smarthome-Backend** direkt **Home Assistant** wählen, statt auf mDNS zu warten.
 
-**Miniserver → Earnie (Port 8541):** Der Miniserver muss den Earnie-Host unter einer stabilen Adresse erreichen (`VO_Earnie_Status` / Virtual In → Host:8541). Dazu:
+**Miniserver → Earnie (Port 8541):** Der Miniserver muss den Earnie-Host unter einer stabilen Adresse erreichen (Virtual Inputs / Outputs → Host:8541). Dazu:
 
 - VM bzw. Container im **Bridged**-LAN betreiben (nicht NAT).
 - Dem Earnie-Host eine **feste IP** oder **DHCP-Reservierung** geben, damit die Adresse in der Loxone Config gültig bleibt.
@@ -122,7 +122,7 @@ Ein Release kann auch nur für einen Kanal erscheinen (manueller Start mit `targ
 
 **Vorabversionen (Community-Test):** Ein Tag `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) durchläuft denselben Ablauf. Zuerst entsteht der Kandidat `:<version>`, nach `promote` zusätzlich `:next` und ein GitHub **Pre-release**, jedoch **kein** `:latest`.
 
-Zum Testen entweder `:next` verwenden (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.7.0-alpha.2`). Der Pin wird erst mit der nächsten Vorabversion aktualisiert und kann daher älter sein als die letzte offizielle Version. Die produktiven Compose-Dateien (`*_productive.yml`) mit `:latest` bleiben auf der letzten offiziellen Version.
+Zum Testen entweder `:next` verwenden (nach Freigabe) oder den Versions-Tag aus der Alpha-Compose pinnen (aktuell in den Dateien: `2.7.0-alpha.8`). Der Pin wird erst mit der nächsten Vorabversion aktualisiert und kann daher älter sein als die letzte offizielle Version. Die produktiven Compose-Dateien (`*_productive.yml`) mit `:latest` bleiben auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
@@ -130,7 +130,7 @@ Für die Alpha gibt es eigene Compose-Dateien, getrennt von der Prod-YAML: `dock
 
 - **Container:** `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`.
 - **Compose-Projektname:** `earnie-alpha`; er kollidiert nicht mit dem Prod-Projekt `earnie-productive`.
-- **Image-Tag:** in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.7.0-alpha.2`).
+- **Image-Tag:** in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.7.0-alpha.8`).
 
 ```powershell
 mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime

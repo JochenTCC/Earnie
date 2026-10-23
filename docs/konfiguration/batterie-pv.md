@@ -160,8 +160,8 @@ Optional lässt sich im Hauskonfigurator eine statische Obergrenze für die Eins
 Gilt keine Begrenzung, schreibt Earnie die maximal mögliche Einspeisung der Anlage auf `set_grid_export_power_limit`. Dafür summiert Earnie über alle netzgekoppelten Wechselrichter `min(max_ac_power_kw, PV-kWp begrenzt durch max_pv_input_kw + Zwangsentlade-kW)`:
 
 - **Insel-Wechselrichter** zählen nicht.
-- **Ohne geplante Wechselrichter** gilt die bisherige Rechnung (Legacy): Summe PV-kWp plus max. Entladeleistung der Batterien mit `control = full` (früher `Batteriesteuerung = voll`). Batterien mit `limits_only` oder `read_only` zählen nicht. Powerstations (`type: powerstation`) zählen nicht mit, da sie nicht ins Hausnetz zurückspeisen.
-- **Sind beide unbekannt,** steht `1000` kW im Status (EHAL: 1 000 000 W).
+- **Ohne Wechselrichter in der Anlagen-Topologie** (keine Wechselrichter angelegt) gilt die bisherige Rechnung (Legacy): Summe PV-kWp plus max. Entladeleistung der Batterien mit `control = full` (früher `Batteriesteuerung = voll`). Batterien mit `limits_only` oder `read_only` zählen nicht. Powerstations (`type: powerstation`) zählen nicht mit, da sie nicht ins Hausnetz zurückspeisen.
+- **Ist das Ergebnis 0 oder unbekannt** (weder PV-kWp noch Zwangsentladeleistung hinterlegt bzw. keine netzgekoppelten Wechselrichter), schreibt Earnie als Obergrenze `1000` kW (EHAL: 1 000 000 W).
 
 Die Umsetzung im Smarthome-System (z. B. Abregelung in Loxone Config) beschreibt die jeweilige Anbindungs-Doku, für Loxone die [Loxone-Anbindung](../einrichtung/loxone-anbindung.md).
 

@@ -1,6 +1,6 @@
 # Betriebsmodi und Navigation
 
-Die Streamlit-App ordnet ihre Seiten über **`st.navigation`** in Abschnitte. Das frühere Sidebar-Radio „Betriebsmodus“ gibt es nicht mehr. Welche Seiten sichtbar sind, steuert die Umgebungsvariable **`EARNIE_UI_MODES`**.
+Die Streamlit-App ordnet ihre Seiten über **`st.navigation`** in Abschnitte. Welche Seiten sichtbar sind, steuert die Umgebungsvariable **`EARNIE_UI_MODES`**.
 
 ```text
 EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment
@@ -59,7 +59,7 @@ Chart- und Panel-Details: [Charts & Panels](charts.md).
 
 **Abwesenheitsmodus:** Ist der wirksame Live-Abwesenheitsmodus aktiv, zeigt die Seite unter dem Titel den Hinweis „Abwesenheitsmodus aktiv“, optional mit der Quelle Earnie, Smarthome oder beide. Auslöser ist der Schalter im Hausprofil **oder** das Anlagen-Feld `sens_absent_mode` am aktiven Backend (Loxone-Merker, HA-Entity oder OpenEMS `component/Channel`). Konfiguration: [Flexible Verbraucher](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
-**Ersetzt:** Der Monitor ersetzt die früheren Modi **Echtzeit** und **Historischer Tag** sowie den Button **Produktiv-Archiv**. Eine **Nachrechnung** beliebiger Kalendertage bietet der Monitor nicht.
+Eine **Nachrechnung** beliebiger Kalendertage bietet der Monitor nicht.
 
 ### Sonnenaufgang-Anker SA₀, SA₁, SA₂
 

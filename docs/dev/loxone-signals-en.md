@@ -1,5 +1,7 @@
 > **Note:** English reference copy. The German user doc [docs/referenz/loxone-signals.md](../referenz/loxone-signals.md) is authoritative for end users; keep both in sync when facts change.
 
+> **Outdated:** this English copy still describes the removed static library templates (`share/loxone/templates/`). Templates are now generated per configuration by the Signal-list export on EHAL-Com; the current German version is [`docs/referenz/loxone-signals.md`](../referenz/loxone-signals.md).
+
 # Loxone Signals and the Earnie Library
 
 ## Motivation
@@ -13,7 +15,7 @@ Without stable titles and bindings, Earnie can neither read nor control the plan
 
 - HTTP access and operation: [Loxone Integration](../einrichtung/loxone-anbindung.md)
 - Mapping UI: [EHAL-Com](../ui/ehal-com.md)
-- Template files and generators: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md)
+- Template generator: [`ehal/signal_export.py`](../../ehal/signal_export.py) (EHAL-Com Signal-list export)
 
 **Terminology (Smarthome Merker):** The **address** (a string, e.g. `Earnie_Waermepumpe_Freigabe`) is a *Smarthome Merker*. The **role** is the EHAL field name (`sens_ess_soc`, `flex.{slug}.sens_power_act`, …) in `ehal_bindings`. Do not confuse a Merker with chart markers or with `earnie_role` (Known/Controlled/Manual).
 
@@ -67,7 +69,7 @@ python -m scripts.pilot_vi_template_gen --config-dir … --host … --out-dir �
 python -m scripts.pilot_vo_template_gen --config-dir … --host … --out-dir …   # → VO_Earnie_*.xml
 ```
 
-VO titles derive from the qualified ID (`Push_<id>`, dots replaced by `_`). Further options: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md). Write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
+VO titles derive from the qualified ID (`Push_<id>`, dots replaced by `_`). Generator: [`ehal/signal_export.py`](../../ehal/signal_export.py). Write cutover steps: [`docs/ui/ehal-com.md`](../ui/ehal-com.md) § Write push-only.
 
 ---
 

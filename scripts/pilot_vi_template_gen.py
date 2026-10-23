@@ -28,7 +28,7 @@ from ehal.qualified_ids import field_kind
 
 INFO_ATTRS = {"templateType": "2", "minVersion": "17010630"}
 
-# Ranges / units aligned with share/loxone/templates/VirtualIn/VI_Earnie_*.xml
+# Ranges / units of the former hand-authored VirtualIn library templates (Config export shape)
 _ENABLE_RANGE = {
     "SourceValLow": "0",
     "DestValLow": "0",

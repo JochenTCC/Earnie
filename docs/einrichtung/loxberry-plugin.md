@@ -100,7 +100,7 @@ Bei „Feste Version“ listet die Plugin-UI die Tags aus der GitHub-Releases-AP
 
 Der Link „Earnie öffnen“ folgt dem konfigurierten Port.
 
-> **Hinweis:** Dieser Host-Port betrifft nur die Streamlit-Oberfläche. Die Kommunikation mit dem Loxone-Miniserver nutzt einen anderen Port (Standard **8541**, konfigurierbar über `system.ehal_loxone_http_port` / `EARNIE_EHAL_LOXONE_HTTP_PORT`). Details: [Betrieb → Optimierungs-Takt](betrieb.md#optimierungs-takt) und [Container → Netzwerk](container.md#netzwerk-docker-bridge-heimnetz-und-miniserver-rückkanal).
+> **Hinweis:** Dieser Host-Port betrifft nur die Streamlit-Oberfläche. Die Kommunikation mit dem Loxone-Miniserver nutzt einen anderen Port (Standard **8541**, konfigurierbar über `system.ehal_http_port` / `EARNIE_EHAL_HTTP_PORT`). Details: [Betrieb → Optimierungs-Takt](betrieb.md#optimierungs-takt) und [Container → Netzwerk](container.md#netzwerk-docker-bridge-heimnetz-und-miniserver-rückkanal).
 
 ## Plugin-Update vs. Image-Update
 

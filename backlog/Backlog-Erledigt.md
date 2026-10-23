@@ -2,6 +2,39 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Document Review — Loxone/Signalliste/Cloud-Demo wording (2026-10-23)
+
+- [x] **Cloud demo vs „einmalig“ for SE star review** (`betrieb.md`, `private-env.md`): docs now say the review state is per browser session on Community Cloud (`EARNIE_CLOUD_DEMO=1`, temp workspace).
+- [x] **`verify_loxone_setup` error wording** (`loxone-anbindung.md`): replaced the stale callback/rights errors with the real push-inbox messages (`[OK]`/`[WARNUNG]`/`[FEHLER]`); write path is not checked by the script.
+- [x] **`Earnie_Batterie_Sollleistung` in Automatik tip** (`loxone-anbindung.md`): now refers to the VI for `set_ess_active_power` with the catalog name as optional.
+- [x] **Einspeisegrenze wording** (`batterie-pv.md`): clarified „Ohne Wechselrichter in der Anlagen-Topologie“ and the 0/unknown case; `1000` kW = 1 000 000 W confirmed against `optimizer/export_power_limit.py`.
+- [x] **Handbook vs activation-flag bindings** (`Benutzer-Handbuch-Earnie.md`): Allgemeine Verbraucher, Abwesenheitsmodus (Hausprofil + Backend section) and Haus-Wärme now point to the Signalliste instead of Merker/Entity/Channel mapping.
+
+### Version 2.7 — Pre-release dogfood + HA docs review (2026-10-23)
+
+- [x] **Dogfood greenfield Earnie configuration for a Loxone SB** `[qual]`
+- [x] **Pre-Release 2.7.0-alpha.7 for Loxone** `[qual]`
+- [x] **Dogfood and finalize new HA binding** `[qual]`
+- [x] **Review HA related docs** `[qual]`: user-facing docs changed in the HA doc review
+  - [x] [docs/einrichtung/homeassistant-addon.md](../docs/einrichtung/homeassistant-addon.md)
+  - [x] [docs/einrichtung/ha-evcc.md](../docs/einrichtung/ha-evcc.md) (rewritten: one guide, two starting points; lab parts → `docs/dev/ha-lab-setup.md`)
+  - [x] [docs/einrichtung/smarthome-backend-wahl.md](../docs/einrichtung/smarthome-backend-wahl.md)
+  - [x] [docs/einrichtung/container.md](../docs/einrichtung/container.md)
+    - [x] Anmerkungen eingefügt
+  - [x] [docs/einrichtung/betrieb.md](../docs/einrichtung/betrieb.md) (port key / env var)
+    - [x] Anmerkungen eingefügt
+  - [x] [docs/einrichtung/loxberry-plugin.md](../docs/einrichtung/loxberry-plugin.md) (port key)
+  - [x] [docs/ui/smarthome-backend.md](../docs/ui/smarthome-backend.md)
+  - [x] [docs/ui/ehal-com.md](../docs/ui/ehal-com.md) (English)
+  - [x] [docs/ui/betriebsmodi.md](../docs/ui/betriebsmodi.md) (history sentences removed)
+  - [x] [docs/referenz/loxone-signals.md](../docs/referenz/loxone-signals.md) (port key)
+  - [x] [docs/referenz/ehal.md](../docs/referenz/ehal.md) (English, rather a spec)
+  - [x] [docs/README.md](../docs/README.md)
+  - [x] [docs/user-manual/Benutzer-Handbuch-Earnie.md](../docs/user-manual/Benutzer-Handbuch-Earnie.md)
+  - [x] Add-on tab "Dokumentation": [earnie/DOCS.md](../packaging/homeassistant-addon/earnie/DOCS.md) + [earnie_prerelease/DOCS.md](../packaging/homeassistant-addon/earnie_prerelease/DOCS.md)
+  - [x] Add-on tab "Konfiguration" (option texts, option rename `ehal_loxone_http_port` → `ehal_http_port`): [earnie/translations/en.yaml](../packaging/homeassistant-addon/earnie/translations/en.yaml) + [earnie_prerelease/translations/en.yaml](../packaging/homeassistant-addon/earnie_prerelease/translations/en.yaml)
+  - [x] Add-on port description (`ports_description` only): [earnie/config.yaml](../packaging/homeassistant-addon/earnie/config.yaml) + [earnie_prerelease/config.yaml](../packaging/homeassistant-addon/earnie_prerelease/config.yaml)
+
 ### Version 2.7 — HK wait UX for first consumption calculations (2026-10-23)
 
 - [x] **HK spinner + session memo for first modeled-year consumption charts** `[feat]`: Gesamt-Lastverhalten (model-only and Ist-vs-Modell probe) shows `Modell-Jahresverbrauch wird berechnet…` on cache miss; `ui/consumption_display/bundle_cache.py` memos bundles in `st.session_state` keyed by profile / CSV fingerprint so widget reruns do not rebuild. Wired in `ui/consumption_display/panel.py` and `ui/house_config_historical_csv.py`. Tests: `tests/test_consumption_bundle_cache.py`.

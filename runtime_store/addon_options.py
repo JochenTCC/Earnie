@@ -2,8 +2,9 @@
 
 On add-on start:
 - Fresh ``config.json`` (just bootstrapped from minimal) → seed ``ehal.backend=ha``
-- Every start → merge ``streamlit_port`` / ``ehal_loxone_http_port`` (→ ``ehal_http_port``) from
-  ``/data/options.json`` into the matching config keys
+- Every start → merge ``streamlit_port`` / ``ehal_http_port`` from ``/data/options.json`` into the
+  matching config keys (legacy option ``ehal_loxone_http_port`` carried over, see
+  :func:`_resolve_ehal_http_port`)
 - Optional ``usage_ping`` bool → ``usage_ping.set_consent`` when the key is present
 
 Non-add-on installs are a no-op. Existing user configs are never force-switched
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_OPTIONS_PATH = "/data/options.json"
 _HA_BACKEND = "ha"
 _HA_ADAPTER_ID = "earnie-hems"
+_DEFAULT_EHAL_HTTP_PORT = 8541
 
 
 def options_path() -> str:
@@ -99,9 +101,7 @@ def _merge_port_options(payload: dict[str, Any], options: dict[str, Any]) -> boo
         if ui.get("streamlit_port") != streamlit_port:
             ui["streamlit_port"] = streamlit_port
             changed = True
-    http_port = _as_port(
-        options.get("ehal_http_port", options.get("ehal_loxone_http_port"))
-    )
+    http_port = _resolve_ehal_http_port(options)
     if http_port is not None:
         system = payload.setdefault("system", {})
         if not isinstance(system, dict):
@@ -114,6 +114,25 @@ def _merge_port_options(payload: dict[str, Any], options: dict[str, Any]) -> boo
             system.pop("ehal_loxone_http_port", None)
             changed = True
     return changed
+
+
+def _resolve_ehal_http_port(options: dict[str, Any]) -> int | None:
+    """Port from ``ehal_http_port``; legacy ``ehal_loxone_http_port`` wins while the new one is unset/default.
+
+    Supervisor fills the renamed option with its default (8541) on update, so a custom value
+    saved under the old name would otherwise be lost. Same rule as ``run.sh``.
+    """
+    port = _as_port(options.get("ehal_http_port"))
+    legacy = _as_port(options.get("ehal_loxone_http_port"))
+    if legacy is None or port not in (None, _DEFAULT_EHAL_HTTP_PORT):
+        return port
+    if legacy != _DEFAULT_EHAL_HTTP_PORT:
+        logger.warning(
+            "addon_options: using legacy option ehal_loxone_http_port=%s; "
+            "set ehal_http_port and remove the old option",
+            legacy,
+        )
+    return legacy
 
 
 def _apply_usage_ping_option(options: dict[str, Any]) -> None:

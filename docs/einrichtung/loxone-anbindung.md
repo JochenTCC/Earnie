@@ -9,10 +9,10 @@ Die eigentliche Schaltlogik (Wechselrichter, Wallbox, Pool, …) ist in Loxone i
 
 Für andere Hubs (HA + evcc, OpenEMS) gilt: [Smarthome-Backend wählen](smarthome-backend-wahl.md).
 
-Die **Standard-Einrichtung mit der Earnie-Library** beschreibt [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md):
+Die **Einrichtung** beschreibt [Loxone-Signale und Vorlagen](../referenz/loxone-signals.md):
 
 - **Zähler:** Zähler am EFM anlegen.
-- **Vorlagen:** Virtual-In/Out-Vorlagen einspielen.
+- **Vorlagen:** Virtual-In/Out-Vorlagen auf EHAL-Com aus der Signalliste exportieren und in Loxone Config einspielen. Earnie erzeugt sie passend zur aktuellen Konfiguration.
 - **Rückfallebene und Import:** Verhalten bei ausgefallenem Earnie und Import der Struktur.
 
 ## Zugangsdaten (`config/.env`)
@@ -64,7 +64,7 @@ Die PV-Energie je Intervall ergibt sich aus dem Integral über `sens_pv_producti
 ### Batteriesteuerung
 
 - **Zwangsladen und -entladen:** Beides läuft über `set_ess_active_power`. Lade- und Entladegrenze sind echte Obergrenzen.
-- **Automatik:** Virtual-In-Werte sind **sticky**, der letzte Wert bleibt am Miniserver stehen. Automatik bedeutet deshalb `set_ess_mode = 0`; eine weggelassene Sollleistung reicht dafür nicht. Loxone Config muss `Steuerbefehl = 0` als Freigabe bzw. Automatik behandeln, auch wenn `Earnie_Batterie_Sollleistung` noch einen alten Wert hält.
+- **Automatik:** Virtual-In-Werte sind **sticky**, der letzte Wert bleibt am Miniserver stehen. Automatik bedeutet deshalb `set_ess_mode = 0`; eine weggelassene Sollleistung reicht dafür nicht. Loxone Config muss `Steuerbefehl = 0` als Freigabe bzw. Automatik behandeln, auch wenn der Virtual Input für `set_ess_active_power` (im optionalen Namenskatalog `Earnie_Batterie_Sollleistung`) noch einen alten Wert hält.
 - **Pro Speicher:** Die ESS-Bindings liegen je Speicher entity-scoped unter `ess.{slug}.*` in `batteries[].ehal_bindings`. Der Steuerbefehl (`set_ess_mode`) gilt pro Batterie und signalisiert keine Einspeisebegrenzung.
 
 ### Einspeisegrenze in Loxone Config
@@ -104,11 +104,13 @@ Historische Verbrauchsdaten kommen über CSV-Upload, Energiemonitor bzw. `cons_d
 python -m scripts.verify_loxone_setup
 ```
 
-Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit EHAL-ID und Detailtext. Typische Fehler:
+Das Skript liest nur die Push-Inbox (Werte, die der Miniserver per Virtual Output an Earnie schickt). Jede Prüfung meldet `[OK]`, `[WARNUNG]` oder `[FEHLER]` mit EHAL-ID und Detailtext. Typische Meldungen:
 
-- Das Signal fehlt in der Push-Inbox.
-- Der Miniserver-Callback auf `status.json` fehlt.
-- Der Benutzer hat nicht die nötigen Rechte.
+- `[WARNUNG]` „Kein frischer Push-Inbox-Wert“: Das Signal ist aktiviert, aber vom Miniserver ist noch nichts angekommen. Prüfen Sie den VO-Export aus der Signalliste (Hinweis „Signalliste → Export“) und ob der Virtual Output sendet.
+- `[FEHLER]` „Kein Push-Inbox-Wert (kein Mapping …)“: Für das Signal gibt es kein gültiges Mapping.
+- `[FEHLER]` „IO-Name fehlt“: In der Konfiguration ist für das Signal kein Name eingetragen.
+
+Warnungen lassen das Gesamtergebnis grün. Die Schreibrichtung (`status.json`, Abruf durch die Virtual Inputs) prüft das Skript nicht. Dafür dient der Schreibtest auf **EHAL-Com**.
 
 Alternativ lässt sich die Verbindung in der Web-Oberfläche prüfen, auf der Seite **Smarthome-Backend** im Bereich Anbindung.
 

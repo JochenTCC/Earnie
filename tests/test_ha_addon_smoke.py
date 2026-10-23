@@ -39,7 +39,7 @@ def test_parse_default_options_matches_shipped_addon_schema():
     schema_block = text.split("\nschema:\n", 1)[1]
     schema_entries = {}
     for line in schema_block.splitlines():
-        if not line.startswith("  "):
+        if not line.startswith("  ") or line.lstrip().startswith("#"):
             continue
         key, _, typ = line.partition(":")
         schema_entries[key.strip()] = typ.strip().strip('"').strip("'")

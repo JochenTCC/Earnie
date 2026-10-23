@@ -28,12 +28,14 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 from ehal.push_signals import (  # noqa: F401 — re-exported for callers and tests
+    REQUEST_OPTIMIZE_TITLE,
     Signal,
     heartbeat_signal,
     pilot_id,
     read_signals_from_docs,
     title_from_qualified_id,
 )
+from integrations.ehal_request_http import REQUEST_OPTIMIZE_PATH
 
 TOKEN_ENV = "EARNIE_PUSH_TOKEN"
 TOKEN_ENV_LEGACY = "EARNIE_PILOT_PUSH_TOKEN"
@@ -114,6 +116,50 @@ def render_template(group: str, signals: list[Signal], *, host: str, port: int, 
     ET.SubElement(root, "Info", INFO_ATTRS)
     for sig in signals:
         ET.SubElement(root, "VirtualOutCmd", _cmd_attrs(sig, token, repeat, repeat_rate, token_in_address))
+    ET.indent(root, space="\t")
+    body = ET.tostring(root, encoding="unicode").replace(" />", "/>")
+    return '<?xml version="1.0" encoding="utf-8"?>\n' + body + "\n"
+
+
+def render_status_template(*, host: str, port: int) -> str:
+    """Status VO with the optional ``Earnie_Request_Optimize`` POST (without the BOM).
+
+    The request-optimize route takes no push token, so the command carries none.
+    """
+    root = ET.Element(
+        "VirtualOut",
+        {
+            "HintText": "",
+            "Title": "Earnie Status Push",
+            "Comment": "Optional Request Optimize to Earnie",
+            "Address": f"http://{host}:{port}",
+            "CmdInit": "",
+            "CloseAfterSend": "true",
+            "CmdSep": "",
+        },
+    )
+    ET.SubElement(root, "Info", INFO_ATTRS)
+    ET.SubElement(
+        root,
+        "VirtualOutCmd",
+        {
+            "Title": REQUEST_OPTIMIZE_TITLE,
+            "Comment": "Optional: request out-of-band optimize",
+            "CmdOnMethod": "POST",
+            "CmdOffMethod": "GET",
+            "CmdOn": REQUEST_OPTIMIZE_PATH,
+            "CmdOnHTTP": "Content-Type: application/json",
+            "CmdOnPost": "{}",
+            "CmdOff": "",
+            "CmdOffHTTP": "",
+            "CmdOffPost": "",
+            "CmdAnswer": "",
+            "Analog": "false",
+            "Repeat": "0",
+            "RepeatRate": "0",
+            "HintText": "",
+        },
+    )
     ET.indent(root, space="\t")
     body = ET.tostring(root, encoding="unicode").replace(" />", "/>")
     return '<?xml version="1.0" encoding="utf-8"?>\n' + body + "\n"

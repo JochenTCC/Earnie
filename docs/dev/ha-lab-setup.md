@@ -412,7 +412,7 @@ enough for this follow-up).
 
 1. Earnie http://localhost:8506 → **EHAL-Com** → activate required signals → download / regenerate YAML.
 2. Host for Compose HA → Earnie: `earnie-ha-lab`, port **8541**, plus the push token.
-3. Replace `ENTITY_*` for at least the required reads (`sens_grid_power_active`, `sens_pv_production_active`, `ess.{id}.sens_ess_soc`).
+3. Replace `ENTITY_*` for at least the required reads (`sens_grid_power_active`, `inv.{id}.sens_inv_power_pv` per inverter with PV, `ess.{id}.sens_ess_soc` and `ess.{id}.sens_ess_power` per grid-tied battery).
 4. Optional: power, EVCS current, ESS limit numbers if present.
 5. Sign: EHAL grid **+** = import, ESS **+** = discharge — pick entities / Jinja so the pushed value matches.
 6. Reload HA package → Live-Lesen shows SoC ~50 and powers ~0 with the lab stub.

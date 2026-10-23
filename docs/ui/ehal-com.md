@@ -4,8 +4,8 @@ The **EHAL-Com** page under **Daemon Control** is the place for live connectivit
 
 - It shows live reads (**Live-Lesen**) and the writes of the last production run of `main.py` (**Live-Schreiben**).
 - The **Signalliste** is the binding UI for **all** backends: qualified EHAL IDs, Pflicht / optional / aktiviert, match status, and SB-specific export (Loxone VO/VI ZIP; HA YAML package). There is no separate HA entity-mapping chapter.
-- Binding keys on `plant` / consumers / batteries / inverters are activation flags (empty values — Earnie stores no Loxone Merker names and no HA `entity_id`s).
-- An ad hoc optimization run is triggered by the Virtual Output `Earnie_Request_Optimize`, which calls `POST /ehal/loxone/request_optimize` on the daemon HTTP listener. The port is `system.ehal_loxone_http_port` (default **8541**; the environment variable `EARNIE_EHAL_LOXONE_HTTP_PORT` takes precedence). The receipt ID `request_optimize` appears on the **Signalliste** and in **Live-Lesen**, so you can verify that the hub reached Earnie.
+- Binding keys on `plant` / consumers / batteries / inverters are activation flags (empty values; the hub-side names live in the Loxone templates or the HA YAML package).
+- An ad hoc optimization run is triggered by the Virtual Output `Earnie_Request_Optimize`, which calls `POST /ehal/loxone/request_optimize` on the daemon HTTP listener. The port is `system.ehal_http_port` (default **8541**; legacy key `system.ehal_loxone_http_port` is migrated; the environment variable `EARNIE_EHAL_HTTP_PORT` or legacy `EARNIE_EHAL_LOXONE_HTTP_PORT` takes precedence). The receipt ID `request_optimize` appears on the **Signalliste** and in **Live-Lesen**, so you can verify that the hub reached Earnie.
 
 Table and button labels on the page are German. This document uses the German label where a UI element is named, with an English gloss on first use.
 
@@ -26,7 +26,7 @@ The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-back
 | Backend        | Storage                                       | Contract UI on this page                                 |
 | -------------- | --------------------------------------------- | ------------------------------------------------------ |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | **Signalliste** (qualified IDs · Pflicht/aktiviert · match · VO/VI export) |
-| Home Assistant | no credentials in Earnie (HA calls Earnie); optional `sign` / `boolean_invert` in `config.json` → `ehal.ha` (no `transport` — push-only) | **Signalliste** + **HA YAML-Paket** download (`ENTITY_*` · periodic push · `status.json`) |
+| Home Assistant | optional `sign` / `boolean_invert` in `config.json` → `ehal.ha` | **Signalliste** + **HA YAML-Paket** download (`ENTITY_*` · periodic push · `status.json`) |
 | OpenEMS        | `config.json` → `ehal.openems`                | **Signalliste** (credentials on Smarthome-Backend) |
 
 
@@ -213,7 +213,7 @@ Role template: `share/ehal/roles/heatpump.json`. Greenfield prefix `Earnie_Waerm
 
 Notes: entity-scoped — VI = enable from Earnie (`flex.{hk_id}.…` in the check); VO = optional push `flex.{hk_id}.sens_power_act` plus store temps. Outside temperature only on the plant (`sens_temperature_outside`, see C.1) — not on the heat-pump VO. There is no target-kW Merker for the heat pump. Recipe: `share/loxone/recipes/heatpump.json`; VO: `VO_Earnie_Heatpump.xml`.
 
-**Heat storage:** stratified tanks must expose energy-equivalent `T_eq` (volume-weighted mean) as `sens_temperature_heat_storage`, plus raw bottom sensor `T_low` as `sens_temperature_heat_storage_low`. Do not bind a single top-layer sensor as the RC state. On HA, map two temperature entities onto those EHAL fields on the `thermal_annual` consumer (same entity-scoped mapping as Loxone). Operator guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md); physics in [thermals-p2.md](../dev/done/thermals-p2.md).
+**Heat storage:** stratified tanks must expose energy-equivalent `T_eq` (volume-weighted mean) as `sens_temperature_heat_storage`, plus raw bottom sensor `T_low` as `sens_temperature_heat_storage_low`. Do not bind a single top-layer sensor as the RC state. On HA, activate both fields on the `thermal_annual` consumer (same entity-scoped activation keys as Loxone) and fill the two temperature entities into the matching `ENTITY_*` placeholders of the YAML package. Operator guide: [waermespeicher-schichtung-teq.md](../konfiguration/waermespeicher-schichtung-teq.md); physics in [thermals-p2.md](../dev/done/thermals-p2.md).
 
 ### C.6 Pool / SwimSpa (Stub)
 
@@ -235,7 +235,7 @@ Covers heating + filter. Two live entities: heat (`daily_target_source: thermal`
 | Native filter duration          | Input value   | `get_filter_native_duration_hours`             |         |      |         | `Earnie_Pool_Filter_NativeDauer`                                    |
 
 
-Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.1). The chart may subtract filter power via `subtract_consumer_ids` (not an EHAL field). entity-scoped: `VI_Earnie_Pool_v2` (enables), `VO_Earnie_Pool` (telemetry). **VI Check / Pilot:** qualified IDs (`pool.{slug}.set_enable`, `pool.pool_filter.set_enable`, …); library `VI_Earnie_*_v2.xml` or `python -m scripts.pilot_vi_template_gen`. `status.json` publishes qualified Check keys only.
+Notes: outside temperature only on the plant (`sens_temperature_outside`, see C.1). The chart may subtract filter power via `subtract_consumer_ids` (not an EHAL field). entity-scoped: `VI_Earnie_Pool` (enables), `VO_Earnie_Pool` (telemetry) from the Signal-list export. **VI Check:** qualified IDs (`pool.{slug}.set_enable`, `pool.pool_filter.set_enable`, …). `status.json` publishes qualified Check keys only.
 
 **EHAL-Com mapping:** filter fields (`get_filter_remaining_hours`, `pool.pool_filter.sens_power_act`, `sens_filter_active`, native start/duration, enable) are mapped on the house-profile consumer `pool_filter` under `ehal_bindings`. Without `pool_filter` there is no filter MILP and no synthetic filter entity. Without a mapping, the filter stays inactive.
 
@@ -308,7 +308,7 @@ Only `sens_*` and `get_*` (measurements / inputs). The table lists **all** expec
 - **`get_evcs_ready_by_time`:** Analog VO numeric next-entry, or fresh Tna text (`Morgen, 07:00`).
 - **Counters:** numeric counters (Loxone epoch since 2009-01-01) are converted to Unix time and shown in readable local form in the `Wert` column (`YYYY-MM-DD HH:MM:SS (unix …)`).
 
-**HA:** Live read/write uses the same push inbox + `GET /ehal/status.json` as Loxone (no REST pull). Telemetry on the wire is canonical EHAL units (carrier converts in HA). Fill `ENTITY_*` in the downloaded YAML and keep the periodic push cadence (default 10 s) — see [push cadence](../referenz/loxone-signals.md#push-cadence-sb-neutral). Derived house load: `—(derived)`. Optional caption for live power in kW.
+**HA:** Live read/write uses the same push inbox + `GET /ehal/status.json` as Loxone. Telemetry on the wire is canonical EHAL units (carrier converts in HA). Fill `ENTITY_*` in the downloaded YAML and keep the periodic push cadence (default 10 s) — see [push cadence](../referenz/loxone-signals.md#push-cadence-sb-neutral). Derived house load: `—(derived)`. Optional caption for live power in kW.
 
 **OpenEMS:** Live-Lesen uses the OpenEMS adapter channels (`sens_*` / `get_*` in the table).
 
@@ -374,8 +374,8 @@ After an Auto-Roundtrip, safe setpoints are always written (ESS automatic, EVCS 
 Only with backend **Home Assistant**. Under **HA Push-Carrier**, download a YAML package generated from **activated** signals:
 
 - Per read signal: `rest_command` + automation with **periodic** `time_pattern` (interval = `EARNIE_PILOT_PUSH_REPEAT_S`, default **10 s** — not only on state change).
-- Heartbeat push; REST sensor on Earnie `status.json`; setpoint automations (`status.json` attribute → `number.set_value` on the target entity; re-applied at HA start and every push interval, but only written when the target differs by more than ~1 %, so a restart or a manual change is corrected without a write every 10 s; fields Earnie did not publish are ignored). After a write the automation re-checks the target after 5 s; if it still differs it logs a warning and pushes `hub_write_failed` (value 1) to Earnie. EHAL-Com then shows a red *Home Assistant meldet: … nicht angewendet* notice under Live-Schreiben (for 3 push intervals after the last report) and the daemon logs a warning at the next write — „Erfolg“ in Live-Schreiben only means *published*, not *applied*. This feedback does not degrade capabilities (the `write_error` schema is unchanged), including `ha_ess_force` where configured.
-- Placeholders `ENTITY_*` only — replace them in HA with real `entity_id`s. Earnie never stores those names.
+- Heartbeat push; REST sensor on Earnie `status.json`; setpoint automations (`status.json` attribute → `number.set_value` on the target entity; re-applied at HA start and every push interval, but only written when the target differs by more than ~1 %, so a restart or a manual change is corrected without a write every 10 s; fields Earnie did not publish are ignored). After a write the automation re-checks the target after 5 s; if it still differs it logs a warning and pushes `hub_write_failed` (value 1) to Earnie. EHAL-Com then shows a yellow *Home Assistant meldet: … nicht angewendet* warning under Live-Schreiben (for 3 push intervals after the last report) and the daemon logs a warning at the next write — „Erfolg“ in Live-Schreiben only means *published*, not *applied*. This feedback does not degrade capabilities (the `write_error` schema is unchanged), including `ha_ess_force` where configured.
+- Placeholders `ENTITY_*` only — replace them in HA with real `entity_id`s.
 - Jinja converts entity units to canonical EHAL units before the push URL is called.
 
 CLI equivalent: `python -m scripts.ha_carrier_yaml_gen --config-dir <config> --host <Earnie-host> --port 8541 --out earnie_ha_carrier.yaml`. Lab checklist: [HA Lab Spec](../dev/ha-lab-setup.md). Cadence / zero rule: [Loxone Signals](../referenz/loxone-signals.md#push-cadence-sb-neutral).
@@ -408,7 +408,7 @@ Always listed as **Pflicht** (not a binding, not in the optional-signals expande
 
 ## Write push-only
 
-Loud writes publish only to `status.json` under qualified EHAL IDs. Loxone VI and HA REST sensors / automations poll on the repeat interval (default **10 s**). Loxone VI templates must use `VI_Earnie_*_v2.xml` or the Pilot VI. The staged Loxone rollout checklist lives in [loxone-write-push-only-cutover](../dev/loxone-write-push-only-cutover.md).
+Loud writes publish only to `status.json` under qualified EHAL IDs. Loxone VI and HA REST sensors / automations poll on the repeat interval (default **10 s**). Loxone VI templates come from the Signal-list export. The staged Loxone rollout checklist lives in [loxone-write-push-only-cutover](../dev/loxone-write-push-only-cutover.md).
 
 ## See Also
 
