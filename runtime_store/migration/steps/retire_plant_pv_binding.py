@@ -16,7 +16,6 @@ from house_config.required_signal_activation import (
     activate_required_in_components,
     activate_required_in_house,
 )
-from integrations.pv_attribution import grid_tied_inverters_with_pv
 from runtime_store.data_model import stamp_data_model
 from runtime_store.migration.types import (
     Answers,
@@ -106,6 +105,10 @@ def _copy_plant_to_sole_inv(
     """Copy plant PV address onto sole eligible inv PV key, or return blocker."""
     inverters = [i for i in (components.get("inverters") or []) if isinstance(i, dict)]
     pv_systems = [p for p in (components.get("pv_systems") or []) if isinstance(p, dict)]
+    # Lazy: integrations.pv_attribution pulls optimizer -> config, which loads the
+    # whole pack and must not run before the migration gate (legacy keys fail loud).
+    from integrations.pv_attribution import grid_tied_inverters_with_pv
+
     eligible = grid_tied_inverters_with_pv(inverters, pv_systems)
     if len(eligible) != 1:
         return components, Blocker(

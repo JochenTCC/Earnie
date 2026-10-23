@@ -9,7 +9,7 @@ from typing import Any
 
 from ehal.inverter_fields import inv_field
 from ehal.pv_fields import pv_field
-from optimizer.milp_inverter import inverter_efficiency, is_grid_tied
+from house_config.inverter import inverter_efficiency, is_grid_tied
 
 
 def _eta_inv(inv: dict) -> float:

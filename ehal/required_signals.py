@@ -70,7 +70,7 @@ def grid_tied_house_batteries(
 ) -> list[dict]:
     """House batteries that participate in the house AC balance (grid-tied bus)."""
     from house_config.powerstation import BATTERY_TYPE_HOUSE
-    from optimizer.milp_inverter import filter_house_balance_batteries
+    from house_config.inverter import filter_house_balance_batteries
 
     house = [
         b

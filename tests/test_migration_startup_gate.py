@@ -262,3 +262,52 @@ def test_run_streamlit_shadow_pending_exits(tmp_path, monkeypatch, capsys):
     assert code == 1
     captured = capsys.readouterr()
     assert "Shadow" in captured.out or "Shadow" in captured.err
+
+
+def test_migration_planner_import_does_not_load_config():
+    """Planner/gate must import without ``config`` (legacy keys would fail loud first)."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys; "
+        "import runtime_store.migration.gate, runtime_store.migration.registry; "
+        "sys.exit(1 if 'config' in sys.modules else 0)"
+    )
+    root = Path(__file__).resolve().parent.parent
+    result = subprocess.run([sys.executable, "-c", code], cwd=root, check=False)
+    assert result.returncode == 0
+
+
+def test_bootstrap_with_legacy_config_reaches_migration_gate(tmp_path):
+    """bootstrap.run() plans migration without loading ``config`` (legacy keys)."""
+    import os
+    import subprocess
+    import sys
+
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_ha_pull")
+    code = (
+        "import sys; from runtime_store import bootstrap; bootstrap.run(); "
+        "sys.exit(1 if 'config' in sys.modules else 0)"
+    )
+    env = {
+        **os.environ,
+        "EARNIE_CONFIG_PATH": str(config_dir / "config.json"),
+        "EARNIE_RUNTIME_PATH": str(tmp_path / "runtime"),
+    }
+    root = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, "-c", code], cwd=root, env=env, check=False,
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_leftover_ha_transport_reaches_migration_gate(tmp_path, monkeypatch, capsys):
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_ha_pull")
+    _point_config(monkeypatch, config_dir)
+    plan = plan_for_active_config()
+    assert "dm4.ha_pull_removal" in plan.pending_step_ids
+    with pytest.raises(SystemExit):
+        load_config_or_exit()
+    assert "migriert" in capsys.readouterr().err.lower()

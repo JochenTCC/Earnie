@@ -12,6 +12,11 @@ import pulp
 from house_config.inverter import (
     AC_GRID_TIED,
     AC_ISLAND,
+    battery_on_grid_tied_bus,
+    filter_house_balance_batteries,
+    inverter_efficiency,
+    inverter_list_by_id as inverters_by_id,
+    is_grid_tied,
     INVERTER_TYPE_BATTERY,
     INVERTER_TYPE_HYBRID,
     INVERTER_TYPE_PV_STRING,
@@ -36,55 +41,10 @@ def coerce_pv_systems_list(pv_systems: list[dict] | None) -> list[dict]:
     return [dict(item) for item in pv_systems if isinstance(item, dict)]
 
 
-def inverters_by_id(inverters: list[dict]) -> dict[str, dict]:
-    out: dict[str, dict] = {}
-    for inv in inverters:
-        inv_id = str(inv.get("id") or "").strip()
-        if inv_id:
-            out[inv_id] = inv
-    return out
-
-
 def optional_positive_kw(inv: dict, field: str) -> float | None:
     if field not in inv or inv[field] is None or inv[field] == "":
         return None
     return float(inv[field])
-
-
-def is_grid_tied(inv: dict) -> bool:
-    return str(inv.get("ac_connection") or AC_GRID_TIED).strip().lower() != AC_ISLAND
-
-
-def battery_on_grid_tied_bus(
-    bat: dict,
-    inv_map: dict[str, dict],
-) -> bool:
-    """True when the battery participates in the house AC balance."""
-    ac = str(bat.get("ac_connection") or "").strip().lower()
-    if ac == AC_ISLAND:
-        return False
-    if ac == AC_GRID_TIED:
-        return True
-    inv_id = str(bat.get("inverter_id") or "").strip()
-    if not inv_id:
-        return True
-    inv = inv_map.get(inv_id)
-    if inv is None:
-        raise ValueError(
-            f"Batterie '{bat.get('id')}': unbekannte inverter_id '{inv_id}'."
-        )
-    return is_grid_tied(inv)
-
-
-def filter_house_balance_batteries(
-    batteries: list[dict],
-    inverters: list[dict],
-) -> list[dict]:
-    """Drop island-bus batteries when inverter topology is active."""
-    if not inverters:
-        return list(batteries)
-    inv_map = inverters_by_id(inverters)
-    return [b for b in batteries if battery_on_grid_tied_bus(b, inv_map)]
 
 
 def apply_dc_pv_cap(pv_kw: float, inv: dict) -> float:
@@ -94,21 +54,6 @@ def apply_dc_pv_cap(pv_kw: float, inv: dict) -> float:
     if cap is None:
         return raw
     return min(raw, cap)
-
-
-def inverter_efficiency(inv: dict) -> float:
-    """One-way DC↔AC factor η_inv; required on normalized inverters."""
-    if "efficiency" not in inv or inv["efficiency"] is None or inv["efficiency"] == "":
-        raise ValueError(
-            f"Inverter '{inv.get('id')}': efficiency (η_inv) fehlt."
-        )
-    eta = float(inv["efficiency"])
-    if not (0.0 < eta <= 1.0):
-        raise ValueError(
-            f"Inverter '{inv.get('id')}': efficiency muss in (0, 1] liegen "
-            f"(got {eta!r})."
-        )
-    return eta
 
 
 def apply_dc_to_ac_efficiency(pv_dc_kw: float, inv: dict) -> float:
