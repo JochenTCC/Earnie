@@ -15,19 +15,20 @@ Before acting on (or recommending) any of: new long-lived branches, hotfixes for
 
 | Line | Role |
 |------|------|
-| **`main`** | Next-MINOR / work that must not ship on the open release line |
-| **`releaseX.Y`** (e.g. `release2.7`) | Long-lived ship line for that MINOR — fixes, beta/rc, official tags |
-| **Tags** | Immutable; for an open MINOR, cut from `releaseX.Y` |
+| **`main`** | Ongoing development / next MINOR once a release is being finalized elsewhere |
+| **`releaseX.Y`** (e.g. `release2.7`) | Opened when the **official is near** and development must continue on `main`. Planned release is **moved** here: finalize (beta/rc/official), then bugfixes and PATCH / minor maintenance releases. Port fixes to `main` via PR |
+| **Tags** | Immutable; for that MINOR after the split, cut from `releaseX.Y` |
 | **Short-lived `hotfix/…`** | Only when even the ship line must not ship as-is |
 
 ## Warn the user (stop and ask) if they are about to
 
 | Violation | Prefer instead |
 |-----------|----------------|
-| Create permanent `develop` or `alpha` | Use `main` + `releaseX.Y`; pre-release = version/tag channel on the ship line |
-| Cut current-MINOR release tags from dirty `main` while `releaseX.Y` exists | Commit and tag on `releaseX.Y` |
-| Urgent patch for a **tagged** build by shipping unfinished ship-line commits | Short-lived `hotfix/…` from that **tag**, then port to `releaseX.Y` and `main` |
-| Hotfix only on the release tip **without** porting to `main` when `main` still has that path | Always port the code fix |
+| Create permanent `develop` or `alpha` | Use `main` + `releaseX.Y` when official is near; pre-release = version/tag on the ship line |
+| Finalize / tag the planned MINOR from dirty `main` while `releaseX.Y` exists | Commit and tag on `releaseX.Y` |
+| Merge next-MINOR features from `main` into `releaseX.Y` | Keep features on `main`; only cherry-pick fixes the release truly needs |
+| Urgent patch for a **tagged** build by shipping unfinished ship-line commits | Short-lived `hotfix/…` from that **tag**, then port to `releaseX.Y` and PR to `main` |
+| Leave a release-line fix **without** a PR/cherry-pick to `main` when `main` still has that path | Always port the code fix |
 | Tag a commit where `version.py` ≠ tag (without `v`) | Bump/align `version.py` first (explicit approval) |
 | Mid-alpha cycle: PATCH the **last official** for a community tester fix | Next `X.Y.Z-alpha.N+1` / `-beta.N+1` (after approval), unless patching prod `:latest` |
 | Rewind a ship line’s `version.py` to an official PATCH while a newer pre-release continues | Port **code** only; leave `version.py` on the ongoing alpha/beta/rc |
@@ -35,10 +36,10 @@ Before acting on (or recommending) any of: new long-lived branches, hotfixes for
 
 ## Default (no warning needed)
 
-- Open/use `releaseX.Y` from a freeze tag for the active MINOR ship line
-- Bugfix on `releaseX.Y` (or `main` if no release branch) → next session publish **D** (if needed) → **B** or **C**
+- When official is near and development continues: open `releaseX.Y` from the freeze tag/commit; finalize and maintain there
+- Bugfix / PATCH on `releaseX.Y` (or `main` if no release branch) → **D** (if needed) → **B** or **C**; PR fix to `main`
 - Short-lived `hotfix/…` from tag only when users need a build **now** and the ship line must not ship yet
 
 ## How to remind
 
-One short warning + point to the playbook path + ask which path they want. Do not silently create `develop`/`alpha`, skip porting to `main`, or rewrite tags.
+One short warning + point to the playbook path + ask which path they want. Do not silently create `develop`/`alpha`, skip PRs to `main`, or rewrite tags.
