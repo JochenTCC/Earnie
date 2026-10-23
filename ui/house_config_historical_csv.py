@@ -323,6 +323,12 @@ def _render_ist_vs_modell(
     from ui.consumption_display.adapters import bundle_from_csv_validation
 
     try:
+        from ui.consumption_display.bundle_cache import (
+            csv_validation_probe_cache_key,
+            fingerprint_ist_series,
+            get_or_build_consumption_bundle,
+        )
+
         modeled_profile = {
             "annual_kwh": annual_kwh,
             "baseload_kwh": preview["baseload_kwh"],
@@ -333,9 +339,15 @@ def _render_ist_vs_modell(
             "pv_profile_csv": pv_path,
         }
         series = _load_ist_series(active_path, csv_series)
-        probe = bundle_from_csv_validation(
-            series,
-            {**modeled_profile, "baseload_kwh": 0.0},
+        probe_profile = {**modeled_profile, "baseload_kwh": 0.0}
+        probe_key = csv_validation_probe_cache_key(
+            probe_profile,
+            active_path=active_path,
+            series_fingerprint=fingerprint_ist_series(series),
+        )
+        probe = get_or_build_consumption_bundle(
+            probe_key,
+            lambda: bundle_from_csv_validation(series, probe_profile),
         )
         dist_mode = _render_baseload_dist_radio(preview_id)
         display_bundle, display_bl_kwh, caption = _resolve_baseload_display(

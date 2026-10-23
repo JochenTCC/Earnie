@@ -24,9 +24,8 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 - [x] Pre-Release 2.7.0-alpha.7 for Loxone
 - [x] Dogfood and finalize new HA binding
 - [ ] Review HA related docs
-- [ ] Add message or info pop up (maybe with progress info) in HK when first consummption calculations are made (because this takes quite a while ... was introduced when SE bugs were fixed on 20.10.26)
 - [ ] beta release for Loxone and HA
-- [ ] Wait for feedback
+- [ ] Wait for feedback (until Nov-02)
 - [ ] final release 2.7.0
 
 ### Version 2.8

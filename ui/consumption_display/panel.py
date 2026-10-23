@@ -15,6 +15,10 @@ from ui.consumption_display.adapters import (
     with_modeled_pv_from_all_scenarios,
 )
 from ui.consumption_display.aggregation import annual_kwh_actual, annual_kwh_from_bundle
+from ui.consumption_display.bundle_cache import (
+    get_or_build_consumption_bundle,
+    modeled_profile_cache_key,
+)
 from ui.consumption_display.charts import (
     csv_validation_monthly_chart,
     stacked_monthly_chart,
@@ -111,7 +115,11 @@ def _build_bundle(
     if mode == ConsumptionDisplayMode.MODELED_PROFILE:
         if profile is None:
             raise ValueError("modeled_profile erfordert profile.")
-        return bundle_from_modeled_profile(profile)
+        key = modeled_profile_cache_key(profile)
+        return get_or_build_consumption_bundle(
+            key,
+            lambda: bundle_from_modeled_profile(profile),
+        )
     raise ValueError(f"Unbekannter Modus: {mode}")
 
 

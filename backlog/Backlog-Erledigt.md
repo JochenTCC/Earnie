@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.7 — HK wait UX for first consumption calculations (2026-10-23)
+
+- [x] **HK spinner + session memo for first modeled-year consumption charts** `[feat]`: Gesamt-Lastverhalten (model-only and Ist-vs-Modell probe) shows `Modell-Jahresverbrauch wird berechnet…` on cache miss; `ui/consumption_display/bundle_cache.py` memos bundles in `st.session_state` keyed by profile / CSV fingerprint so widget reruns do not rebuild. Wired in `ui/consumption_display/panel.py` and `ui/house_config_historical_csv.py`. Tests: `tests/test_consumption_bundle_cache.py`.
+
 ### HA carrier bugfixes (2026-10-23)
 
 - [x] **Carrier skip message names the wrong cause (L13) — fixed and verified live on the bench:** `integrations/ha_carrier_yaml.py` (no version bump): the setpoint skip guard (`hub_value is none` → unit message) is generated only for converted units (W/kWh/%/A); for all other units a non-numeric value is already stopped by `Earnie published no value for this field`, so no dead guard or misleading text is emitted. Test: `test_carrier_yaml_setpoint_skip_message_only_for_converted_units` in `tests/test_ha_carrier_yaml_gen.py`. Bench (HA 2025.7.0, Earnie in the bench, 2026-10-23): `ess.house.set_ess_charge_power_limit` target with a foreign `unit_of_measurement` (`°C` via `customize`) logs `... unknown or incompatible unit_of_measurement on number.earnie_ess_house_set_ess_charge_power_limit (need W)` and does not write; without the override a deviating value is corrected again (W path), as is `heatpump.waermepumpe.set_enable` (no unit, no guard, no skip log); `ha_testbed_check --require-all` 11 PASS / 0 FAIL.
