@@ -236,16 +236,16 @@ def test_ev_min_power_must_not_exceed_nominal():
         )
 
 
-def test_ev_min_on_quarterhours_defaults_to_four():
+def test_ev_min_on_quarterhours_defaults_to_one_and_is_never_zero():
     from house_config.profiles_store import normalize_house_profiles_document
 
     raw = _ev_profile_doc()
     assert "min_on_quarterhours" not in raw["profiles"][0]["consumers"][0]
     doc = normalize_house_profiles_document(raw)
-    assert doc["profiles"]["ev_profile"]["consumers"][0]["min_on_quarterhours"] == 4
+    assert doc["profiles"]["ev_profile"]["consumers"][0]["min_on_quarterhours"] == 1
 
     doc_zero = normalize_house_profiles_document(_ev_profile_doc(min_on_quarterhours=0))
-    assert doc_zero["profiles"]["ev_profile"]["consumers"][0]["min_on_quarterhours"] == 4
+    assert doc_zero["profiles"]["ev_profile"]["consumers"][0]["min_on_quarterhours"] == 1
 
 
 def test_scenario_entity_resolution():

@@ -267,7 +267,7 @@ def _normalize_ev_consumer(raw: dict, spec: dict, *, profile_id: str, index: int
             f"min_power_kw ({spec['min_power_kw']}) darf nicht größer als "
             f"nominal_power_kw ({spec['nominal_power_kw']}) sein."
         )
-    spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 4) or 4))
+    spec["min_on_quarterhours"] = max(1, int(raw.get("min_on_quarterhours", 1) or 1))
     spec["battery_capacity_kwh"] = battery_capacity
     spec["charging_schedule"] = normalize_ev_charging_schedule(raw.get("charging_schedule"))
     _copy_loxone_binding(raw, spec)
@@ -283,7 +283,7 @@ def _normalize_thermal_rc_consumer(
     spec["thermal_rc"] = _normalize_thermal_rc(raw, index, profile_id)
     min_on = raw.get("min_on_quarterhours")
     if min_on is not None:
-        spec["min_on_quarterhours"] = max(0, int(min_on) or 0)
+        spec["min_on_quarterhours"] = max(1, int(min_on))
     if raw.get("heating_power_threshold_kw") is not None:
         spec["heating_power_threshold_kw"] = float(raw["heating_power_threshold_kw"])
     if raw.get("actual_temp_step_c") is not None:
@@ -379,7 +379,7 @@ def _serialize_generic_fields(consumer: dict, out: dict) -> None:
 
 def _serialize_ev_fields(consumer: dict, out: dict) -> None:
     out["min_power_kw"] = consumer.get("min_power_kw", 0.0)
-    out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 4)
+    out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 1)
     out["battery_capacity_kwh"] = consumer["battery_capacity_kwh"]
     out["charging_schedule"] = consumer["charging_schedule"]
     _copy_loxone_io_fields(consumer, out)
@@ -390,7 +390,7 @@ def _serialize_thermal_annual_fields(consumer: dict, out: dict) -> None:
     thermal.pop("latitude", None)
     thermal.pop("longitude", None)
     out.update(thermal)
-    out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 4)
+    out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 1)
     _copy_loxone_io_fields(consumer, out)
 
 

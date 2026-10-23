@@ -19,7 +19,7 @@ from .generic_flex_context import (
 )
 def _min_on_hours(consumer: dict) -> int:
     """Minimum consecutive ON slots (config key remains min_on_quarterhours)."""
-    min_on_qh = int(consumer.get("min_on_quarterhours", 4) or 4)
+    min_on_qh = int(consumer.get("min_on_quarterhours", 1) or 1)
     return max(1, min_on_qh)
 
 

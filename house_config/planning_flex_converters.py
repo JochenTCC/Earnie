@@ -157,7 +157,7 @@ def _house_ev_consumers(house_profile: dict) -> list[dict]:
 def planning_ev_to_milp(consumer: dict) -> dict:
     """Hausprofil-EV → flexible_consumers-Shape für MILP; Live-Loxone aus Profil."""
     sched = consumer["charging_schedule"]
-    min_on = max(1, int(consumer.get("min_on_quarterhours", 4) or 4))
+    min_on = max(1, int(consumer.get("min_on_quarterhours", 1) or 1))
     min_power = float(consumer.get("min_power_kw", 0.0) or 0.0)
     capacity = float(consumer["battery_capacity_kwh"])
     charging_schedule = merge_ev_power_conversion_fields(
@@ -417,7 +417,7 @@ def planning_thermal_to_milp(consumer: dict) -> dict:
     """Hausprofil thermal_annual → MILP-binary mit HDD-Tagesziel (Thermals P1a)."""
     from house_config.thermal_labels import CONSUMER_TYPE_LABELS
 
-    min_on = max(4, int(consumer.get("min_on_quarterhours", 4) or 4))
+    min_on = max(1, int(consumer.get("min_on_quarterhours", 1) or 1))
     nominal = float(consumer["nominal_power_kw"])
     entry: dict = {
         "id": str(consumer["id"]),

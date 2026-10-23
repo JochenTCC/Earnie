@@ -76,7 +76,7 @@ def _default_ev_consumer() -> dict:
         "type": "ev",
         "nominal_power_kw": 3.5,
         "min_power_kw": 1.4,
-        "min_on_quarterhours": 4,
+        "min_on_quarterhours": 1,
         "battery_capacity_kwh": 60.0,
         "charging_schedule": {
             "target_soc_percent": 100.0,
@@ -189,8 +189,8 @@ def _render_ev_power_fields(consumer: dict, index: int, *, session_scope: str) -
         ),
         "min_on_quarterhours": labeled_number_input(
             "Mindest-Ladedauer (Viertelstunden)",
-            min_value=0,
-            value=int(consumer.get("min_on_quarterhours", 4)),
+            min_value=1,
+            value=int(consumer.get("min_on_quarterhours", 1)),
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_ev_min_qh_{index}"),
         ),
