@@ -200,6 +200,12 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
 
 ### Version 2.+1
 
+- [ ] **VAT model: "Vorsteuerabzug berechtigt" per house profile** `[feat]` *(follow-up of the Netznutzung-VAT fix, issue #50)*
+  - Today VAT is always a cost: tariffs carry `prices_include_vat` / `vat_percent`, the net Netznutzung gets VAT on top. Businesses that deduct input VAT see prices ~20 % too high; the only workaround is own tariffs with net prices and `vat_percent: 0`.
+  - New house-profile field (default `false`, name by effect, not by "commercial"). If `true`, compute everything net: gross source prices ÷ (1 + `vat_percent`/100), no VAT step at the end, for import **and** export, plus the monthly fixed costs in the Scenario Explorer. Needs a `vat_percent` on every gross tariff (fail loud when missing).
+  - Keep `prices_include_vat` as the source basis in the catalog (no net rewrite: traceability to price sheets, monthly scans, no migration of user `tariffs.json`). Calculation internally net, VAT once at the end.
+  - Structural house-profile change → migration under `runtime_store/migration/` (rule `config-migration.mdc`); UI must show whether prices are gross or net.
+  - Open: VAT on feed-in for private persons (Kleinunternehmer / Liebhaberei) stays as listed in the tariff.
 - [ ] **HA carrier: switch/select setpoints** `[dev]`: the HA push contract writes `number.set_value` only (decided for 2.7, [`docs/dev/ha-contract-testbed.md`](../docs/dev/ha-contract-testbed.md) § 3g). Add `switch.turn_on/turn_off` and `select.select_option` automations to the carrier for flex `set_enable` (heat pump, pool), `set_evcs_mode`, `set_ess_source_select`; typed `switch` / `select` sim entities in the archetype generator; one bench check case per domain. Start by running the current `set_enable` automations against the `number` sim entities (carrier skips targets without a numeric unit; not verified). Related open question: `set_ess_mode` is skipped for activation-only HA bindings (`ha_adapter_write.py`) - is the mode owned by the YAML `ha_ess_force`?
 - [ ] In case of big diff between PV prognosis and actual PV energy Earnie should use a correction factor for optimization at least for the next QH in order to prevent unneeded forced charging or other actions (has to be specified more concrete how)
 - [ ] Check possibility for automatically learn consumer schedules (for known consumers) and nominal power (for all consumers) from sens_power_act to substitute or improve manual settings
