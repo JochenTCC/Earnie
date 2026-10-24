@@ -63,7 +63,7 @@ python -m scripts.migrate_config --config-dir PATH --dry-run
 python -m scripts.migrate_config --config-dir PATH
 ```
 
-Pflichtfragen (z. B. Loxone-Merkernamen) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`). Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
+Pflichtfragen (z. B. Loxone-Merkernamen, alte HA-Vorzeichen) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`) bzw. `{"ha_sign.remove": "Entfernen"}` (oder `"Behalten"`). Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
 
 ### Wann die Migration blockiert
 

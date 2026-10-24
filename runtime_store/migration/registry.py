@@ -13,6 +13,7 @@ from runtime_store.migration.steps.loxone_binding_names import STEP as LOXONE_NA
 from runtime_store.migration.steps.pool_filter import STEP as POOL_FILTER
 from runtime_store.migration.steps.ehal_http_port import STEP as EHAL_HTTP_PORT
 from runtime_store.migration.steps.ha_pull_removal import STEP as HA_PULL_REMOVAL
+from runtime_store.migration.steps.ha_sign import STEP as HA_SIGN
 from runtime_store.migration.steps.required_signal_activation import (
     STEP as REQUIRED_SIGNALS,
 )
@@ -37,6 +38,7 @@ STEPS: tuple[MigrationStep, ...] = (
     GRID_FEE,
     REQUIRED_SIGNALS,
     HA_PULL_REMOVAL,
+    HA_SIGN,
     EHAL_HTTP_PORT,
     CONSUMER_FLEX,
     RETIRE_PLANT_PV,
