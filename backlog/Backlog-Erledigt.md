@@ -6,6 +6,10 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Translate `docs/dev/streamlit-ports.md` to English** `[dev]`: [docs/dev/streamlit-ports.md](../docs/dev/streamlit-ports.md) translated; paths, ports, env vars, compose names, launch-entry names and link targets unchanged. The inbound user-doc links (`betrieb.md`, `container.md`, handbook, `docs/README.md`, …) stay as they are and point to the English dev doc (decided 2026-10-24: keep the links, do not move the production-port part into a user doc).
 
+### Issue #50 — HA YAML package (2026-10-24)
+
+- [x] **Issue #50 / [#60](https://github.com/JochenTCC/Earnie/issues/60) (a)+(b) — export hint and `input_number` targets — fixed and verified live:** (a) the EHAL-Com export section said "HA-YAML-Paket folgt mit Binding P5c"; it now points to the section "HA Push-Carrier" (`ui/ehal_signal_list.py`, AppTest in `tests/apptest/test_persist_signal_list_apptest.py`). (b) the generated apply step always called `number.set_value`; `integrations/ha_carrier_yaml.py::set_value_action` now emits `{{ 'ENTITY_x'.split('.')[0] }}.set_value`, so the domain follows the entity entered for the placeholder (`tests/test_ha_carrier_yaml_gen.py`). **Live check 2026-10-24 (lab HA 2025.7.0, throw-away package, lab config restored afterwards):** the action blocks were taken from a package generated from the lab pack (`scripts.ha_carrier_yaml_gen`) with the placeholder replaced; run from an HA automation, the templated action set a template `number` to 4242 and an `input_number` to 4243. The old literal `number.set_value` against the same `input_number` left it unchanged (reproduces the reporter's failure). Not run: the full carrier chain with the Earnie push and `ha_testbed_check` (needs onboarding and a token). Open: (c) watchdog, see `Backlog-Bugfixes.md`.
+
 ### Issue #50 — decided not to change (2026-10-24)
 
 - [x] **Tariff preview keeps listing "Abwicklungsgebühr" for `monthly_table`:** the load warning for `settlement_fee_cent_kwh` is enough; `fixed_cent` already hides the row. No change (maintainer decision).
