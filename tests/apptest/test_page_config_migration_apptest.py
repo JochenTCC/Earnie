@@ -212,3 +212,59 @@ def test_required_choice_starts_empty_and_is_passed_on(monkeypatch):
     call = run.call_args
     answers = call.args[1] if len(call.args) > 1 else call.kwargs["answers"]
     assert answers["loxone_binding_names.keep"] == "Leeren"
+
+
+def _open_report(monkeypatch, continue_mock):
+    """Run the mocked migration up to the report view."""
+    report = MigrationReport(
+        backup_dir="/tmp/backups/pre-migration-dm3-dm4-test",
+        applied_step_ids=("dm4.topology",),
+        manual_todos=(),
+        written_files=("house_profiles.json",),
+    )
+    monkeypatch.setattr(
+        "ui.pages.page_config_migration.run_migration",
+        MagicMock(return_value=report),
+    )
+    monkeypatch.setattr(
+        "ui.pages.page_config_migration.continue_after_migration", continue_mock
+    )
+    at = AppTest.from_file(str(_SCRIPT), default_timeout=_TIMEOUT).run()
+    migrate = [b for b in at.button if b.label == "Backup anlegen und migrieren"]
+    return migrate[0].click().run()
+
+
+def _info_texts(at) -> str:
+    return " ".join(i.value for i in at.info)
+
+
+def test_report_tells_that_main_is_not_running_yet_with_auto_start(
+    monkeypatch, _mock_pending_plan
+):
+    """Issue #61: the daemon starts only via "Weiter zur App"; say so on the report."""
+    monkeypatch.setenv("EARNIE_AUTO_START_MAIN", "1")
+    at = _open_report(monkeypatch, MagicMock())
+    assert not at.exception
+    text = _info_texts(at)
+    assert "läuft noch nicht" in text and "Weiter zur App" in text
+    assert "Container neu starten" in text
+
+
+def test_report_tells_to_start_main_manually_without_auto_start(
+    monkeypatch, _mock_pending_plan
+):
+    monkeypatch.setenv("EARNIE_AUTO_START_MAIN", "0")
+    at = _open_report(monkeypatch, MagicMock())
+    assert not at.exception
+    assert "Auto-Start ist aus" in _info_texts(at)
+
+
+def test_continue_failure_shows_error_and_keeps_the_report(monkeypatch, _mock_pending_plan):
+    from runtime_store.main_daemon import DaemonError
+
+    at = _open_report(monkeypatch, MagicMock(side_effect=DaemonError("Lock belegt")))
+    at = next(b for b in at.button if b.label == "Weiter zur App").click().run()
+    assert not at.exception
+    assert any("main.py konnte nicht gestartet werden: Lock belegt" in e.value for e in at.error)
+    assert any("Migration abgeschlossen" in s.value for s in at.success)
+    assert any(b.label == "Weiter zur App" for b in at.button)

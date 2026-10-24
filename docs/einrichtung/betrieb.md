@@ -19,7 +19,7 @@ Nach einem Image- oder Add-on-Update startet der Assistent, wenn sich die Form d
 1. Earnie startet im **Migrationsmodus**. Verfügbar ist nur der Assistent (plus Log/Debug), **kein** normaler Hauskonfigurator und **kein** Auto-Start von `main.py`.
 2. Der Assistent zeigt einen Hinweis (inkl. letzter laufender Version), die ausstehenden Schritte und JSON-Diffs. Ggf. stellt er Fragen und nennt manuelle To-dos außerhalb von Earnie.
 3. **Backup anlegen und migrieren** legt zuerst ein Backup an, schreibt danach die neuen JSON-Dateien und zeigt den Report.
-4. **Weiter zur App** lädt die normale UI. Der Optimierer-Dienst startet nur, wenn der Auto-Start aktiv ist; sonst lässt er sich unter **Optimierer-Dienst** starten.
+4. **Weiter zur App** lädt die normale UI. Der Optimierer-Dienst startet nur, wenn der Auto-Start aktiv ist; sonst lässt er sich unter **Optimierer-Dienst** starten. Der Start passiert erst mit diesem Klick: Wird die Berichtsseite vorher neu geladen oder geschlossen, läuft `main.py` nicht und der EHAL-Port antwortet nicht. Dann den Dienst unter **Optimierer-Dienst** starten oder den Container neu starten. Schlägt der Start fehl, zeigt der Assistent die Meldung und bleibt auf der Berichtsseite.
 
 Bringt eine Version neue Schritte mit, informieren die Release Notes vorab darüber (Abschnitt **Migration**).
 

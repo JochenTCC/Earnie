@@ -79,7 +79,10 @@ def resolve_export_bytes(export_kind: str) -> tuple[bytes, str]:
 
 
 def continue_after_migration() -> None:
-    """Start ``main.py`` when ``EARNIE_AUTO_START_MAIN=1``; caller should ``st.rerun()``."""
+    """Start ``main.py`` when ``EARNIE_AUTO_START_MAIN=1``; caller should ``st.rerun()``.
+
+    Raises ``DaemonError`` when the start fails; the caller keeps the report page.
+    """
     from runtime_store.main_daemon import maybe_auto_start
 
     maybe_auto_start()
@@ -277,13 +280,29 @@ def _render_report_view() -> None:
 
     from runtime_store.env_vars import is_truthy
 
-    if not is_truthy("AUTO_START_MAIN"):
-        st.caption(
-            "Auto-Start ist aus — den Optimierer danach unter "
-            "**Optimierer-Dienst** starten."
+    if is_truthy("AUTO_START_MAIN"):
+        st.info(
+            "Der Optimierer-Dienst (`main.py`) läuft noch nicht. Er startet mit "
+            "**Weiter zur App** automatisch. Wird diese Seite vorher neu geladen oder "
+            "geschlossen, bleibt er aus (der EHAL-Port antwortet dann nicht): dann "
+            "unter **Optimierer-Dienst** starten oder den Container neu starten."
+        )
+    else:
+        st.info(
+            "Auto-Start ist aus — den Optimierer-Dienst (`main.py`) danach unter "
+            "**Optimierer-Dienst** starten. Bis dahin antwortet der EHAL-Port nicht."
         )
     if st.button("Weiter zur App", type="primary", key="cfg_mig_continue"):
-        continue_after_migration()
+        from runtime_store.main_daemon import DaemonError
+
+        try:
+            continue_after_migration()
+        except DaemonError as exc:
+            st.error(
+                f"main.py konnte nicht gestartet werden: {exc} — unter "
+                "**Optimierer-Dienst** erneut starten oder den Container neu starten."
+            )
+            return
         _clear_report_session()
         st.rerun()
 
