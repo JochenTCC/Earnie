@@ -25,6 +25,16 @@ API_PAUSE_SECONDS = 0.75
 ENERGY_CHARTS_TIMEOUT_FLOOR_SEC = 30.0
 
 logger = logging.getLogger(__name__)
+
+
+class ApiUnreachableError(RuntimeError):
+    """Connection-level failure (no route, timeout, DNS): the host is not answering.
+
+    Raised at the first failed attempt and never retried: every further request of
+    the same run would only wait for the next timeout (issue #59).
+    """
+
+
 WIND_PRODUCTION_NAMES = frozenset({"Wind onshore", "Wind offshore"})
 SOLAR_PRODUCTION_NAME = "Solar"
 LOAD_PRODUCTION_NAME = "Load"
@@ -137,6 +147,10 @@ def _http_get_json(
                 time.sleep(API_RETRY_BASE_SECONDS * (2 ** attempt))
                 continue
             raise
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            raise ApiUnreachableError(
+                f"API nicht erreichbar ({url}): {type(exc).__name__}"
+            ) from exc
         except requests.RequestException as exc:
             last_error = exc
             time.sleep(API_RETRY_BASE_SECONDS * (2 ** attempt))
@@ -230,15 +244,19 @@ def fetch_country_renewables_hourly(
 def fetch_eu_power_hourly(start: date, end: date) -> pd.DataFrame:
     """Summierte EU-Wind, Solar, Last und Residuallast (MW) je Stunde.
 
-    Single-country failures (timeout, empty payload) are skipped so the
+    Single-country failures (HTTP error, empty payload) are skipped so the
     remaining countries still feed the live price forecast. Mirror fallback
-    only when every country fails.
+    only when every country fails. An unreachable host
+    (``ApiUnreachableError``) aborts the whole fetch at the first country.
     """
     total: pd.DataFrame | None = None
     failed: list[str] = []
     for country in GENERATION_COUNTRIES:
         try:
             country_frame = fetch_country_power_hourly(country, start, end)
+        except ApiUnreachableError:
+            # The host does not answer: asking the other countries only repeats the wait.
+            raise
         except (
             OSError,
             ValueError,

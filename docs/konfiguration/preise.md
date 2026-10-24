@@ -210,6 +210,7 @@ Wenn keine Preisquelle der Kaskade (ENTSO-E, Energy-Charts, Cache, aWATTar) für
 
 - **`forecast` (Standard):** Ein OLS-Korrelationsmodell extrapoliert die fehlenden Stunden. Als Live-Features dienen die Open-Meteo-Wetterprognose und ein stündlicher EU-Leistungs-Stand-in aus dem letzten Archivtag. Charts zeigen diese Stunden als grünen Bereich (siehe [Charts](../ui/charts.md)). Mit dem Standard `live_bias_enabled` korrigiert Earnie die prognostizierten EPEX-Werte rollierend (Day-Ahead − OLS), begrenzt durch `live_bias_cap_cent_kwh`.
 - **`mirror`:** gleiche Uhrzeit vom Vortag. Earnie nutzt diese Strategie auch automatisch, wenn Modell oder Features nicht geladen werden können.
+  Ist ein Datendienst (z. B. Energy-Charts) nicht erreichbar, bricht Earnie den Abruf beim ersten Verbindungsfehler ab und versucht es erst nach einer Stunde wieder, damit ein Lauf nicht minutenlang wartet. Wer die EU-Abrufe ganz abschalten möchte, setzt `missing_price_strategy` auf `mirror`.
 
 Spec: [Preis-Prognose (Dev)](../dev/done/price-forecast-renewables.md).
 
