@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,9 @@ MIN_LIVE_BIAS_SAMPLES = 6
 DEFAULT_MODEL_PATH = Path("share/data/price_model_coefficients.json")
 LEGACY_MODEL_PATH = Path("data/cache/price_model_coefficients.json")
 LIVE_FEATURE_CACHE_TTL_SEC = 45 * 60
+# After a failed EU feature load the network is not asked again for this long, so an
+# unreachable Energy-Charts costs one timeout per hour instead of one per cycle.
+LIVE_FEATURE_FAILURE_BACKOFF_SEC = 60 * 60
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,10 @@ _model_fallback_warned = False
 # planning window moves every hour, its calendar days do not.
 _feature_input_cache: dict[tuple[str, date, date], tuple[float, pd.DataFrame]] = {}
 _power_day_cache: dict[date, pd.DataFrame] = {}
+# Feature mode ("archive" / "live_forecast") -> monotonic time until which a failed
+# load is not retried.
+_feature_failure_until: dict[str, float] = {}
+_feature_failure_clock = time.monotonic
 
 
 def _feature_load_error_summary(exc: BaseException) -> str:
@@ -318,21 +326,34 @@ def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | N
     hour_slots = sorted({s.replace(minute=0, second=0, microsecond=0) for s in slots})
     use_archive = _archive_covers_slot_range(slot_datetimes)
     mode = "archive" if use_archive else "live_forecast"
+    retry_at = _feature_failure_until.get(mode)
+    if retry_at is not None and _feature_failure_clock() < retry_at:
+        logger.debug(
+            "Preisprognose: EU-Features (mode=%s) nach Fehler pausiert, nächster Versuch in %.0f min.",
+            mode,
+            (retry_at - _feature_failure_clock()) / 60,
+        )
+        return None
     try:
         frame = (
             _build_archive_feature_frame(hour_slots)
             if use_archive
             else _build_forecast_feature_frame(hour_slots)
         )
+        _feature_failure_until.pop(mode, None)
         if frame is None or frame.empty:
             return None
         return frame
     except (OSError, ValueError, requests.HTTPError, RuntimeError) as exc:
+        _feature_failure_until[mode] = (
+            _feature_failure_clock() + LIVE_FEATURE_FAILURE_BACKOFF_SEC
+        )
         logger.warning(
             "Preisprognose: EU-Features nicht ladbar (%s, mode=%s) — "
-            "Spiegelung als Fallback für fehlende Slots.",
+            "Spiegelung als Fallback für fehlende Slots; nächster Versuch in %d min.",
             _feature_load_error_summary(exc),
             mode,
+            LIVE_FEATURE_FAILURE_BACKOFF_SEC // 60,
         )
         return None
 
