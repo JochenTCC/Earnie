@@ -314,3 +314,26 @@ def test_continue_failure_shows_error_and_keeps_the_report(monkeypatch, _mock_pe
     assert any("main.py konnte nicht gestartet werden: Lock belegt" in e.value for e in at.error)
     assert any("Migration abgeschlossen" in s.value for s in at.success)
     assert any(b.label == "Weiter zur App" for b in at.button)
+
+
+def test_app_keeps_showing_the_report_after_a_finished_run():
+    """Issue #61: the plan is empty after the run, app.py must still show the report once.
+
+    Live finding 2026-10-24: the run jumped straight to the Monitor; backup, to-dos and
+    the daemon state of the report were never shown.
+    """
+    app = Path(__file__).resolve().parents[2] / "app.py"
+    at = AppTest.from_file(str(app), default_timeout=_TIMEOUT)
+    at.session_state["cfg_mig_phase"] = "report"
+    at.session_state["cfg_mig_report"] = {
+        "daemon": {"state": "off", "detail": ""},
+        "backup_dir": "/tmp/backups/pre-migration-dm3-dm4-test",
+        "applied_step_ids": ["dm4.v3_to_v4"],
+        "written_files": ["config.json"],
+        "manual_todos": [{"step_id": "dm4.topology", "text_de": "Zähler prüfen.", "export_kind": None}],
+    }
+    at.run()
+    assert not at.exception
+    assert any("Migration abgeschlossen" in s.value for s in at.success)
+    assert any("pre-migration-dm3-dm4-test" in md.value for md in at.markdown)
+    assert any(b.label == "Weiter zur App" for b in at.button)
