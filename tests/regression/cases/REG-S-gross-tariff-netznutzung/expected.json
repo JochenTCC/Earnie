@@ -1,0 +1,59 @@
+{
+  "engine": {
+    "earnie_version": "2.7.0-alpha.9",
+    "solver": "highs",
+    "solver_mode": "strict",
+    "highspy": "1.15.1",
+    "EARNIE_CBC_STRICT": "1"
+  },
+  "tolerances": {
+    "default_pct": 0.05,
+    "per_metric_pct": {}
+  },
+  "invariants": [],
+  "metrics": {
+    "status_optimal": 1,
+    "n_slots": 192,
+    "cost_euro": -0.15166249999999992,
+    "import_kwh": 5.3675,
+    "export_kwh": 31.9375,
+    "battery_throughput_kwh": 22.105,
+    "plausibility_failures": 0.0
+  },
+  "plan": {
+    "plan_hash": null,
+    "diff_slots": null
+  },
+  "baseline": {
+    "git_sha": "0b464c38cc6feb072302edf29905c18ffec84031",
+    "recorded_at": "2026-10-24T16:08:51Z",
+    "source": "update-golden"
+  },
+  "inputs": {
+    "files": {
+      "fixtures/backtesting_scenarios.json": "fa30790f3ccba557",
+      "fixtures/components.json": "8b0b8a2e17422255",
+      "fixtures/config.json": "0b98d7b44af5fd57",
+      "fixtures/cons_data.csv": "9dcccd6817385b2e",
+      "fixtures/house_profiles.json": "b7a432b1bcc12805",
+      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_18.0_0.0.json": "77f0a9e08afd1d08",
+      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "b8bb3205806bb411",
+      "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "457bbdacb5e87ead",
+      "fixtures/prices.csv": "57885d9ae16e27b0",
+      "fixtures/tariffs.json": "7885e56a4c22592a",
+      "case.inputs": "bbb1d79301023441"
+    },
+    "series": {
+      "pv_kw": "ae5d19a0becd6a5b",
+      "baseload_kw": "df8e28c2e88ac8c4",
+      "k_act": "7752c40225537ca4",
+      "k_push_act": "8ead31b0410d1073"
+    },
+    "sums": {
+      "n_slots": 192.0,
+      "pv_kwh": 93.883,
+      "baseload_kwh": 34.5857,
+      "k_act_mean": 18.0
+    }
+  }
+}
