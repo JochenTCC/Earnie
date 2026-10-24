@@ -6,6 +6,16 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Translate `docs/dev/streamlit-ports.md` to English** `[dev]`: [docs/dev/streamlit-ports.md](../docs/dev/streamlit-ports.md) translated; paths, ports, env vars, compose names, launch-entry names and link targets unchanged. The inbound user-doc links (`betrieb.md`, `container.md`, handbook, `docs/README.md`, …) stay as they are and point to the English dev doc (decided 2026-10-24: keep the links, do not move the production-port part into a user doc).
 
+### Issue #50 — verified by UI tests (2026-10-24)
+
+- [x] **`settlement_fee_cent_kwh` on `fixed_cent` / `monthly_table`: load warning — implemented (`3517ccbe`) and verified (AppTest):** the scenario editor loads the tariff catalog; with a fixed tariff carrying a 9.08 ct fee the page renders without exception, the tariff stays selectable, and exactly one warning naming the tariff and `netznutzung` is logged, also over a second run (`tests/apptest/test_issue50_ui_apptest.py`, plus `tests/test_tariff_settlement_fee_warning.py`). A spot tariff with a fee does not warn. Mutation check: with the warning call removed the test is red. The tariff preview still lists the field, see the minor item in `Backlog-Bugfixes.md`.
+- [x] **"Jetzt neu berechnen" on the Optimierer-Dienst page — implemented (`e3933822`) and verified (AppTest + HTTP):** the button is disabled while the daemon is stopped or no plan input is newer than the last run, and enabled otherwise (real mtime logic with probe files); a click calls the request once and shows "Neuberechnung angefordert."; an unreachable daemon shows an error instead of an exception; an end-to-end click sends a real `POST` to `/ehal/loxone/request_optimize` on a throw-away listener. Tests `tests/apptest/test_issue50_ui_apptest.py` (9 tests, `apptest` suite 338 passed); mutation check: with the disable logic removed four tests are red. Not run against a real `main.py` daemon.
+
+### Document Review — Issue #50 tariff and daemon docs (2026-10-24)
+
+- [x] **`settlement_fee_cent_kwh` description misled:** `docs/konfiguration/preise.md` and `docs/referenz/tarife-quellen.md` now state that the field is a supplier surcharge on the exchange price, spot types only, without effect on `fixed_cent` / `monthly_table` (Earnie warns at load); grid costs belong to `netznutzung` in the house profile and apply to all import types (0 = off). Corrected in `3517ccbe`. The 2.6.2 docs keep the old wording (no backport planned).
+- [x] **User manual: "Optimierer-Dienst" explains the quarter-hour cycle and "Jetzt neu berechnen":** `docs/user-manual/Benutzer-Handbuch-Earnie.md` (config changes act from the next run, the button starts a run at once, a daemon restart does not speed it up). Added in `e3933822`.
+
 ### Issue #50 — grid fee default (2026-10-24)
 
 - [x] **12.0 ct/kWh grid fee in a live setup:** not a code default (0 in `v2.6.2` and `release/2.7`). The reporter confirmed having pasted the fixed energy price (`fix_cent_kwh` 12.0) into `netznutzung_arbeitspreis_cent_kwh`; corrected to 9.08 ct, import price now 25.30 ct. No change; the new load warning for `settlement_fee_cent_kwh` on fixed tariffs covers the related misconfiguration (the reporter first entered the grid cost there).
