@@ -55,7 +55,7 @@ Then **move** that planned release onto the branch:
 1. Choose the freeze commit (usually the latest community tag on `main`, e.g. `v2.7.0-alpha.9`, or an agreed `main` tip).
 2. Create and push the correctly named release branch from that commit on **every** participating repo for that product (Earnie + its side repos; same for edbert when applicable).
 3. From then on, **finalize** on that branch only: remaining pre-releases, official `X.Y.Z`, then bugfixes and PATCH releases.
-4. Keep `main` free for the next MINOR. Bring release-line fixes into `main` via **PR** (preferred) or cherry-pick so bugs do not return. Do **not** rewind `main`’s `version.py` to an older PATCH while `main` already targets a newer pre-release / next MINOR.
+4. Keep `main` free for the next MINOR. Bring single release-line fixes into `main` by **cherry-pick** (`git cherry-pick -x <sha>` on a branch from `main`, then PR) so bugs do not return. The release branch itself **never** merges back into `main` as a whole (see [Release branch never merges back](#release-branch-never-merges-back)). Do **not** rewind `main`’s `version.py` to an older PATCH while `main` already targets a newer pre-release / next MINOR.
 
 `main` alone is enough **before** this split (early alphas while everyone still ships from `main`). After the split, do not cut that MINOR’s release tags from dirty `main`.
 
@@ -71,9 +71,26 @@ Keep the release branch for as long as you still ship PATCH / maintenance for th
 | **Maintain** | Bugfixes; PATCH bumps (`X.Y.Z+1`, …) after approval |
 | **Back to `main`** | PR (or cherry-pick) of fixes that `main` still needs |
 
-Do **not** merge unfinished next-MINOR features from `main` into the release branch. Flow is release → main for fixes, not main → release for features (unless you explicitly cherry-pick a needed fix the other way).
+Do **not** merge unfinished next-MINOR features from `main` into the release branch. Flow is release → main for single cherry-picked fixes, not main → release for features (unless you explicitly cherry-pick a needed fix the other way).
 
 ---
+
+## Release branch never merges back
+
+`release/…` is the ship line of a MINOR: finalize, tag, maintain. It is **not** merged into `main` — neither by PR nor locally. Only single bugfixes travel to `main`, as cherry-picks (new SHAs):
+
+```text
+git switch -c fix/<name> origin/main
+git cherry-pick -x <sha-on-release>      # -x records the source commit
+# push, PR to main
+```
+
+Enforced in Earnie by [`scripts/check_no_release_merge.sh`](../../scripts/check_no_release_merge.sh):
+
+- `.githooks/pre-push` rejects a push to `main` that brings in commits living on a `release/*` branch.
+- Workflow `Release branch guard` fails a PR from `release/**` (or a branch cut from it) and a push to `main` containing release commits. Make it a required check if direct pushes to `main` are ever disabled.
+
+Docs that exist only on a release branch reach `main` the same way (cherry-pick).
 
 ## Decision tree
 
@@ -82,7 +99,7 @@ Do **not** merge unfinished next-MINOR features from `main` into the release bra
 ```text
 freeze → branch release/x.y (or release/<product>/x.y) → finalize & tag there
 main continues next MINOR
-PRs: release fixes → main
+cherry-pick single fixes → PR to main (never merge release/…)
 ```
 
 ### 2. Default while the release branch is open — fix and release there
@@ -112,7 +129,7 @@ Use when both are true:
 git checkout -b hotfix/<short-name> <base-tag>
 # fix + tests only; D: bump version.py; sync *-alpha.yml if pre-release
 # tag from hotfix tip → B or C
-# merge/cherry-pick into release/… and PR to main
+# cherry-pick into release/… and (as a separate cherry-pick) onto a branch from main → PR
 ```
 
 After tagging, delete the hotfix branch.
@@ -181,7 +198,8 @@ Branching does not replace this lifecycle.
 - Force-push or rewrite published tags
 - Finalize the planned MINOR on dirty `main` after its release branch exists
 - Merge next-MINOR feature work from `main` into the release branch
-- Leave a release-line fix only on the release branch when `main` still has that code path (use a PR)
+- Leave a release-line fix only on the release branch when `main` still has that code path (cherry-pick it to `main`)
+- Merge `release/…` (or a branch cut from it) into `main`, by PR or locally; only cherry-pick single fixes
 - Use a flat `release2.7`-style name (legacy); use `release/x.y` or `release/<product>/x.y`
 
 ---

@@ -1,0 +1,41 @@
+name: Release branch guard
+
+# release/* is the ship line of a MINOR and never flows back into main as a whole.
+# Single fixes reach main by cherry-pick (new SHAs). See docs/workflow/branching-hotfix-playbook.md.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  no-release-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject a pull request from a release branch
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "::error::PR from $HEAD_REF to main: release/* never merges back as a whole. Cherry-pick single fixes onto a branch from main."
+          exit 1
+
+      - name: Reject commits that live on a release branch
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          for ref in $(git for-each-ref --format='%(refname:strip=3)' 'refs/remotes/origin/release/*'); do
+            git branch --track "$ref" "origin/$ref" 2>/dev/null || true
+          done
+          sh scripts/check_no_release_merge.sh "$BASE_SHA" "$HEAD_SHA"

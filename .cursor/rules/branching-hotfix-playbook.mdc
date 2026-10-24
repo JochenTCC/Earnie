@@ -29,8 +29,9 @@ Before acting on (or recommending) any of: new long-lived branches, hotfixes for
 | Create legacy flat names (`release2.7`) | Use `release/x.y` or `release/<product>/x.y` |
 | Finalize / tag the planned MINOR from dirty `main` while its release branch exists | Commit and tag on `release/…` |
 | Merge next-MINOR features from `main` into the release branch | Keep features on `main`; only cherry-pick fixes the release truly needs |
-| Urgent patch for a **tagged** build by shipping unfinished ship-line commits | Short-lived `hotfix/…` from that **tag**, then port to `release/…` and PR to `main` |
-| Leave a release-line fix **without** a PR/cherry-pick to `main` when `main` still has that path | Always port the code fix |
+| Urgent patch for a **tagged** build by shipping unfinished ship-line commits | Short-lived `hotfix/…` from that **tag**, then cherry-pick to `release/…` and to `main` (PR) |
+| Leave a release-line fix **without** a cherry-pick to `main` when `main` still has that path | Always port the code fix |
+| Merge `release/…` (or a branch cut from it) into `main`, locally or by PR | Never. Cherry-pick single fixes (`git cherry-pick -x`) onto a branch from `main`; guard: `scripts/check_no_release_merge.sh` |
 | Tag a commit where `version.py` ≠ tag (without `v`) | Bump/align `version.py` first (explicit approval) |
 | Mid-alpha cycle: PATCH the **last official** for a community tester fix | Next `X.Y.Z-alpha.N+1` / `-beta.N+1` (after approval), unless patching prod `:latest` |
 | Rewind a ship line’s `version.py` to an official PATCH while a newer pre-release continues | Port **code** only; leave `version.py` on the ongoing alpha/beta/rc |
@@ -39,7 +40,7 @@ Before acting on (or recommending) any of: new long-lived branches, hotfixes for
 ## Default (no warning needed)
 
 - When official is near and development continues: open `release/x.y` (or `release/<product>/x.y` on side repos) from the freeze tag; finalize and maintain there
-- Bugfix / PATCH on that branch (or `main` if none) → **D** (if needed) → **B** or **C**; PR fix to `main`
+- Bugfix / PATCH on that branch (or `main` if none) → **D** (if needed) → **B** or **C**; cherry-pick the fix to `main` (PR), never merge the release branch
 - Short-lived `hotfix/…` from tag only when users need a build **now** and the ship line must not ship yet
 
 ## How to remind
