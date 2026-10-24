@@ -55,6 +55,25 @@ def activate_backtesting_fixture_env() -> Iterator[Any]:
         config_module.reinit_config()
 
 
+def _apply_case_pricing(scenario: dict, case_inputs: dict[str, Any]) -> dict:
+    """Optional pricing overrides: ``import_tariff`` (spec) and ``grid_fee_base_cent_kwh``.
+
+    Without them the fixture scenario keeps the synthetic price series as is.
+    """
+    tariff = case_inputs.get("import_tariff")
+    fee = case_inputs.get("grid_fee_base_cent_kwh")
+    if tariff is None and fee is None:
+        return scenario
+    out = dict(scenario)
+    if tariff is not None:
+        out["_import_tariff_spec"] = dict(tariff)
+    if fee is not None:
+        from data.grid_fees import flat_grid_fee_spec
+
+        out["_grid_fee_spec"] = flat_grid_fee_spec(float(fee))
+    return out
+
+
 def run_l2(case: RegressionCase) -> dict[str, Any]:
     from simulation.engine import run_simulation
 
@@ -66,7 +85,9 @@ def run_l2(case: RegressionCase) -> dict[str, Any]:
 
     with activate_backtesting_fixture_env():
         cache = load_fixture_cache()
-        scenario = fixture_scenario_params()
+        scenario = _apply_case_pricing(
+            fixture_scenario_params(), dict(case.meta.get("inputs") or {})
+        )
         prices = build_synthetic_prices_df(
             start - pd.Timedelta(days=1),
             end + pd.Timedelta(days=1),
