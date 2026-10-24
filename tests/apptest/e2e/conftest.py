@@ -109,6 +109,29 @@ def _print_log_if_failed(request, server: AppServer) -> None:
     print(f"\n----- Streamlit-Server-Log ({server.log_path}) -----\n{log}\n----- Ende Server-Log -----")
 
 
+@pytest.fixture(autouse=True)
+def _browser_diagnostics(request):
+    """Sammelt Browser-Console, Seitenfehler und fehlgeschlagene Requests; Ausgabe nur bei Fehlschlag."""
+    if "page" not in request.fixturenames:
+        yield
+        return
+    page = request.getfixturevalue("page")
+    events: list[str] = []
+    page.on("console", lambda m: events.append(f"console.{m.type}: {m.text}"))
+    page.on("pageerror", lambda e: events.append(f"pageerror: {e}"))
+    page.on("requestfailed", lambda r: events.append(f"requestfailed: {r.url} ({r.failure})"))
+    page.on("response", lambda r: events.append(f"http {r.status}: {r.url}") if r.status >= 400 else None)
+    page.on("websocket", lambda ws: (
+        events.append(f"websocket open: {ws.url}"),
+        ws.on("close", lambda *_: events.append(f"websocket closed: {ws.url}")),
+        ws.on("socketerror", lambda err: events.append(f"websocket error: {err}")),
+    ))
+    yield
+    report = getattr(request.node, "rep_call", None)
+    if report is not None and report.failed:
+        print("\n----- Browser-Diagnose -----\n" + "\n".join(events) + "\n----- Ende Browser-Diagnose -----")
+
+
 @pytest.fixture
 def hub_configured() -> None:
     """Trägt einen OpenEMS-Hub ein, damit Smarthome-Backend, EHAL-Com und Optimierer-Dienst erscheinen."""
