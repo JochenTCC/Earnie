@@ -576,3 +576,14 @@ def test_inverters_todo_absent_when_every_pv_system_has_an_inverter(tmp_path):
     path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     plan = plan_migration(config_dir)
     assert not any(t.step_id == "dm4.inverters" for t in plan.manual_todos)
+
+
+def test_v3_path_lists_pv_systems_put_on_wr_main(tmp_path):
+    """The 2.6 path assigns the PV systems inside dm4.v3_to_v4, not in dm4.inverters."""
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    plan = plan_migration(config_dir)
+    todo = next(t for t in plan.manual_todos if t.step_id == "dm4.v3_to_v4")
+    assert "`dach_nord`" in todo.text_de and "`dach_sued`" in todo.text_de
+    assert "wr_main" in todo.text_de
+    report = run_migration(config_dir, KEEP_NAMES)
+    assert any(t.step_id == "dm4.v3_to_v4" for t in report.manual_todos)

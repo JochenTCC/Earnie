@@ -109,6 +109,11 @@ def _start_daemon_after_migration() -> dict[str, str]:
     return {"state": "started", "detail": f"PID {started.pid}"}
 
 
+def report_pending() -> bool:
+    """True after a finished run until "Weiter zur App" (app.py keeps showing the report)."""
+    return st.session_state.get(_SESSION_PHASE) == "report"
+
+
 def _store_report(report: MigrationReport, daemon: dict[str, str]) -> None:
     st.session_state[_SESSION_PHASE] = "report"
     st.session_state[_SESSION_REPORT] = {

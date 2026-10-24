@@ -41,7 +41,7 @@ QUESTIONS = (
             "gepushten Werte an. Liefert HA die Werte bereits im EHAL-Vorzeichen "
             "(Netz + = Bezug, Batterie + = Entladen), werden sie doppelt gedreht "
             "(Live-Lesen zeigt +1130 W, die Live-Leistungszeile −1,13 kW). "
-            "„Entfernen“ leert `ehal.ha.sign`. „Behalten“ ist nur richtig, wenn Ihre "
+            "„Entfernen“ leert `ehal.ha.sign`. „Behalten“ ist nur richtig, wenn deine "
             "gepushten Werte noch das Hersteller-Vorzeichen tragen."
         ),
         kind="choice",

@@ -96,9 +96,11 @@ def _render_loxone_auth_warning() -> None:
 
 
 def main() -> None:
-    if _migration_mode:
-        from ui.pages.page_config_migration import render as render_migration
+    from ui.pages.page_config_migration import render as render_migration, report_pending
 
+    # After a successful run the plan is empty, so ``_migration_mode`` is already
+    # False; the report (backup, to-dos, daemon state) still has to be shown once.
+    if _migration_mode or report_pending():
         # No full sidebar (config pack export would touch live files).
         render_migration(_migration_plan)
         st.stop()
