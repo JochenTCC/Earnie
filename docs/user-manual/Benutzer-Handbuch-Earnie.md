@@ -468,6 +468,7 @@ Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 Die Seite **Daemon Control → Optimierer-Dienst** steuert den Dienst, der im Hintergrund die Anlage regelt:
 
 - **Dienst:** Start, Stopp und Neustart.
+- **Jetzt neu berechnen:** Der Dienst rechnet nur im Viertelstunden-Takt (:00 / :15 / :30 / :45) neu. Konfigurationsänderungen, z. B. an Tarifen, Hausprofil oder Szenario, wirken deshalb erst im nächsten Lauf. Die Schaltfläche stößt sofort einen Lauf an. Sie ist nur aktiv, wenn der Dienst läuft und eine Konfigurationsdatei seit dem letzten Lauf geändert wurde. Ein Neustart des Dienstes beschleunigt nichts.
 - **Silent / Loud:** Im Silent-Modus schreibt der Dienst keine Sollwerte an das Smarthome-Backend, im Loud-Modus schon (siehe [EHAL-Com](#ehal-com)).
 - **Dienst-Log:** `earnie.log` mit Level-Filter (Standard: INFO und höher), automatischer Aktualisierung alle 10 Sekunden und der Schaltfläche **Gehe nach Oben**.
 
