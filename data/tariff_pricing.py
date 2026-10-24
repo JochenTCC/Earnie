@@ -237,9 +237,27 @@ def missing_next_month_tariff_hints(
     return hints
 
 
+# Standard consumer VAT rates; used where a tariff carries none (user-fixed price).
+STANDARD_VAT_PERCENT_BY_LAND: dict[str, float] = {"AT": 20.0, "DE": 19.0, "CH": 8.1}
+
+
+def grid_fee_on_tariff_basis(grid_net_cent: float, tariff: dict[str, Any]) -> float:
+    """Bring the net Netznutzung Arbeitspreis onto the price basis of ``tariff``.
+
+    The grid fee is always a net price (VAT is due on top). A tariff whose prices
+    already include VAT is summed gross, so the fee gets the VAT here; a net tariff
+    receives it later in :func:`_apply_vat` together with the supplier price.
+    """
+    if not bool(tariff.get("prices_include_vat", True)):
+        return float(grid_net_cent)
+    vat_percent = float(tariff.get("vat_percent", 0.0) or 0.0)
+    return float(grid_net_cent) * (1.0 + vat_percent / 100.0)
+
+
 def _add_netzentgelt(
     work_price: float,
     *,
+    tariff: dict[str, Any],
     grid_fee: dict[str, Any] | None,
     slot_datetime: datetime | None,
 ) -> float:
@@ -251,7 +269,9 @@ def _add_netzentgelt(
         return float(work_price)
     from data.grid_fees import grid_fee_work_cent
 
-    return float(work_price) + grid_fee_work_cent(grid_fee, slot_datetime)
+    return float(work_price) + grid_fee_on_tariff_basis(
+        grid_fee_work_cent(grid_fee, slot_datetime), tariff
+    )
 
 
 def _spot_import_cent(
@@ -265,7 +285,7 @@ def _spot_import_cent(
     markup = float(tariff.get("markup_percent", 0.0) or 0.0)
     work_price = (float(epex_cent) * (1.0 + markup / 100.0)) + settlement
     work_price = _add_netzentgelt(
-        work_price, grid_fee=grid_fee, slot_datetime=slot_datetime
+        work_price, tariff=tariff, grid_fee=grid_fee, slot_datetime=slot_datetime
     )
     return _apply_vat(
         work_price,
@@ -298,7 +318,9 @@ def import_cent_kwh(
             slot_datetime.month,
             label="Import-Tarif",
         )
-        work = _add_netzentgelt(price, grid_fee=grid_fee, slot_datetime=slot_datetime)
+        work = _add_netzentgelt(
+            price, tariff=tariff, grid_fee=grid_fee, slot_datetime=slot_datetime
+        )
         return round(
             _apply_vat(
                 work,
@@ -321,7 +343,9 @@ def import_cent_kwh(
         if "fix_cent_kwh" not in tariff:
             raise ValueError("Import-Tarif type 'fixed_cent' erfordert fix_cent_kwh.")
         fixed = float(tariff["fix_cent_kwh"])
-        work = _add_netzentgelt(fixed, grid_fee=grid_fee, slot_datetime=slot_datetime)
+        work = _add_netzentgelt(
+            fixed, tariff=tariff, grid_fee=grid_fee, slot_datetime=slot_datetime
+        )
         return round(
             _apply_vat(
                 work,

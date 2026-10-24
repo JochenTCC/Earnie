@@ -99,13 +99,15 @@ Der **Bezugspreis in Cent/kWh** ergibt sich so:
   × (1 + vat_percent/100)   falls prices_include_vat = false
 ```
 
+Die Netznutzung ist immer ein Nettopreis. Bei `prices_include_vat = true` addiert Earnie sie deshalb mit USt auf den Brutto-Preis des Lieferanten: `Preis + Netznutzung × (1 + vat_percent/100)`. Dafür braucht der Tarif einen `vat_percent` (z. B. 20); fehlt er, warnt Earnie beim Laden und addiert die Netznutzung ohne USt.
+
 | Feld (Spot-Import in tariffs.json) | Bedeutung |
 | --- | --- |
-| `settlement_fee_cent_kwh` | Fixer Aufschlag Netz/Gebühren in Cent/kWh |
+| `settlement_fee_cent_kwh` | Fixer Aufschlag des Lieferanten auf den Börsenpreis in Cent/kWh (**nur Spot-Typen**; bei `fixed_cent` und `monthly_table` wirkungslos). Netzkosten gehören nicht hierher, sondern in `netznutzung` am Hausprofil. |
 | `markup_percent` | Prozentualer Aufschlag (z. B. 3 ≈ Netzverlust) |
 | `vat_percent` / `prices_include_vat` | USt (z. B. 20 % bei `prices_include_vat=false`) |
 
-Das Hausprofil-Objekt `netznutzung` (siehe oben) gilt zusätzlich für **alle** Import-Typen.
+Das Hausprofil-Objekt `netznutzung` (siehe oben) gilt zusätzlich für **alle** Import-Typen, auch für Fixtarife. Der Wert 0 bedeutet, dass keine Netzkosten angesetzt werden. Bei `fixed_cent` und `monthly_table` ist `settlement_fee_cent_kwh` ohne Wirkung; Earnie warnt beim Laden, wenn dort ein Wert ungleich 0 steht.
 
 ## Einspeisevergütung (Live)
 
@@ -113,7 +115,7 @@ Die Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Ty
 
 **Eigener Festpreis:** Die Dropdowns Bezug und Einspeise im Szenarienkonfigurator enthalten den Eintrag **Eigener Festpreis**. Earnie speichert die Cent/kWh-Werte am Szenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, Tarif-ID `__user_fixed__`), also nicht in `tariffs.json`.
 
-- **Bezug:** Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`). Der Netznutzungs-Arbeitspreis aus dem Hausprofil wird weiterhin addiert.
+- **Bezug:** Lieferanten-Arbeitspreis inkl. USt (wie Katalog-`fixed_cent`). Der Netznutzungs-Arbeitspreis aus dem Hausprofil wird weiterhin addiert, mit der Standard-USt des Hausprofil-Landes (AT 20 %, DE 19 %, CH 8,1 %).
 - **Einspeise:** eingegebene Vergütung ohne weitere Aufschläge.
 
 > **Hinweis:** Die Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. die gewählte `export_tariff_id` aktuell halten.
