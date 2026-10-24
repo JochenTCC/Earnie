@@ -44,14 +44,17 @@ def _pv_ids_without_inverter(docs: Docs) -> list[str]:
     ]
 
 
-def manual_todos(before: Docs, after: Docs) -> list[ManualTodo]:
-    """The migration cannot know which inverter a PV system feeds (issue #61)."""
+def pv_on_main_inverter_todos(before: Docs, after: Docs, step_id: str) -> list[ManualTodo]:
+    """The migration cannot know which inverter a PV system feeds (issue #61).
+
+    Shared with ``dm4.v3_to_v4``: the 2.6 path assigns the PV systems inside that step.
+    """
     assigned = _pv_ids_without_inverter(before)
     if not assigned or _pv_ids_without_inverter(after):
         return []
     return [
         ManualTodo(
-            step_id=STEP_ID,
+            step_id=step_id,
             text_de=(
                 "PV-Anlagen " + ", ".join(f"`{pv_id}`" for pv_id in assigned)
                 + " wurden dem Haupt-Wechselrichter `wr_main` zugeordnet (Vorgabe der "
@@ -63,6 +66,10 @@ def manual_todos(before: Docs, after: Docs) -> list[ManualTodo]:
             ),
         )
     ]
+
+
+def manual_todos(before: Docs, after: Docs) -> list[ManualTodo]:
+    return pv_on_main_inverter_todos(before, after, STEP_ID)
 
 
 STEP = MigrationStep(
