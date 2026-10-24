@@ -6,6 +6,10 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Translate `docs/dev/streamlit-ports.md` to English** `[dev]`: [docs/dev/streamlit-ports.md](../docs/dev/streamlit-ports.md) translated; paths, ports, env vars, compose names, launch-entry names and link targets unchanged. The inbound user-doc links (`betrieb.md`, `container.md`, handbook, `docs/README.md`, …) stay as they are and point to the English dev doc (decided 2026-10-24: keep the links, do not move the production-port part into a user doc).
 
+### Issue #50 — grid fee default (2026-10-24)
+
+- [x] **12.0 ct/kWh grid fee in a live setup:** not a code default (0 in `v2.6.2` and `release/2.7`). The reporter confirmed having pasted the fixed energy price (`fix_cent_kwh` 12.0) into `netznutzung_arbeitspreis_cent_kwh`; corrected to 9.08 ct, import price now 25.30 ct. No change; the new load warning for `settlement_fee_cent_kwh` on fixed tariffs covers the related misconfiguration (the reporter first entered the grid cost there).
+
 ### Document Review — Loxone/Signalliste/Cloud-Demo wording (2026-10-23)
 
 - [x] **Cloud demo vs „einmalig“ for SE star review** (`betrieb.md`, `private-env.md`): docs now say the review state is per browser session on Community Cloud (`EARNIE_CLOUD_DEMO=1`, temp workspace).
