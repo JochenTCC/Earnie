@@ -22,6 +22,8 @@ from ui.house_config_profile_points import _render_points_fields
 
 import streamlit as st
 
+from ui.ui_trace import trace
+
 from house_config.entity_id_lock import (
     FORCE_ID_FROM_LABEL_KEY,
     ID_PROVISIONAL_LABEL_KEY,
@@ -126,9 +128,11 @@ def _render_consumer_form(
     default_pv_tilt: float = 18.0,
     default_pv_azimuth: float = 0.0,
 ) -> dict:
+    trace(f"consumer[{index}]: form start type={consumer.get('type')}")
     expander_title, annual, c_type = _consumer_expander_title(
         consumer, index, session_scope=session_scope
     )
+    trace(f"consumer[{index}]: title done")
     # Expand first consumer only when it has no saved id yet (new/empty form).
     has_saved_data = bool(str(consumer.get("id") or "").strip())
     default_expanded = index == 0 and not has_saved_data
@@ -282,9 +286,11 @@ def _render_consumer_form_body(
     default_pv_tilt: float = 18.0,
     default_pv_azimuth: float = 0.0,
 ) -> dict:
+    trace(f"consumer[{index}]: body start")
     consumer = _seed_ev_defaults_on_type_switch(
         consumer, index, session_scope=session_scope
     )
+    trace(f"consumer[{index}]: ev seed done")
     # Seed Bezeichnung for deferred id lock (new / unlocked entities).
     if not str(consumer.get("id") or "").strip() or not is_id_locked(consumer):
         seed = str(
@@ -295,6 +301,7 @@ def _render_consumer_form_body(
     c_type, c_label, nominal, force_id = _render_consumer_identity_fields(
         consumer, index, consumers=consumers, session_scope=session_scope
     )
+    trace(f"consumer[{index}]: identity done")
     item: dict = {
         "label": c_label,
         "type": c_type,
@@ -332,7 +339,9 @@ def _render_consumer_form_body(
             },
         )
     )
+    trace(f"consumer[{index}]: type fields done")
     item.update(_render_points_fields(consumer, index, c_type, session_scope=session_scope))
+    trace(f"consumer[{index}]: points done")
     item.update(
         _render_consumer_profile_csv_fields(
             consumer,
@@ -341,4 +350,5 @@ def _render_consumer_form_body(
             nominal_power_kw=float(nominal),
         )
     )
+    trace(f"consumer[{index}]: csv fields done")
     return item
