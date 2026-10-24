@@ -44,6 +44,10 @@ class AppServer:
         self._log_path = log_path
         self._proc: subprocess.Popen | None = None
 
+    @property
+    def log_path(self) -> Path:
+        return self._log_path
+
     def start(self) -> None:
         env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
         log = open(self._log_path, "ab")
@@ -90,6 +94,21 @@ class AppServer:
         self.start()
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    setattr(item, f"rep_{report.when}", report)
+
+
+def _print_log_if_failed(request, server: AppServer) -> None:
+    report = getattr(request.node, "rep_call", None)
+    if report is None or not report.failed:
+        return
+    log = server.log_path.read_text(encoding="utf-8", errors="replace") if server.log_path.exists() else ""
+    print(f"\n----- Streamlit-Server-Log ({server.log_path}) -----\n{log}\n----- Ende Server-Log -----")
+
+
 @pytest.fixture
 def hub_configured() -> None:
     """Trägt einen OpenEMS-Hub ein, damit Smarthome-Backend, EHAL-Com und Optimierer-Dienst erscheinen."""
@@ -104,18 +123,20 @@ def hub_configured() -> None:
 
 
 @pytest.fixture
-def app_server(tmp_path):
-    """Laufender Server auf einem freien Port; Log unter ``tmp_path``."""
+def app_server(request, tmp_path):
+    """Laufender Server auf einem freien Port; Log unter ``tmp_path`` (bei Fehlschlag ausgegeben)."""
     server = AppServer(tmp_path / "server.log")
     server.start()
     yield server
     server.stop()
+    _print_log_if_failed(request, server)
 
 
 @pytest.fixture
-def app_server_with_hub(hub_configured, tmp_path):
+def app_server_with_hub(request, hub_configured, tmp_path):
     """Wie ``app_server``, aber mit konfiguriertem Hub (Optimierer-Dienst in der Navigation)."""
     server = AppServer(tmp_path / "server.log")
     server.start()
     yield server
     server.stop()
+    _print_log_if_failed(request, server)
