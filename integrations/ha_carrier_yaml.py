@@ -26,6 +26,9 @@ from scripts.pilot_vo_template_gen import TOKEN_PLACEHOLDER
 STATUS_SENSOR_ENTITY = "sensor.earnie_ehal_status"
 STATUS_SENSOR_NAME = "earnie_ehal_status"
 _LOGGER = "earnie_ha_carrier"
+# status.json unreachable for this long -> a forced active power is released (issue #60).
+DEFAULT_WATCHDOG_TIMEOUT_S = 300.0
+WATCHDOG_AUTOMATION_ID = "earnie_watchdog_release_force"
 
 
 def entity_placeholder(ehal_id: str) -> str:
@@ -94,8 +97,18 @@ def _active_power_write_ids(writes: list[Signal]) -> list[str]:
     return [s.ehal_id for s in writes if field_kind(s.ehal_id) == "set_ess_active_power"]
 
 
-def _header(repeat_s: float) -> list[str]:
+def _header(repeat_s: float, watchdog_s: float = 0.0) -> list[str]:
+    watchdog = (
+        [
+            f"# Watchdog: automation {WATCHDOG_AUTOMATION_ID} releases a forced ESS active "
+            f"power when status.json is unreachable for {watchdog_s:g}s.",
+            "# Disable: delete that automation or generate with --watchdog-s 0.",
+        ]
+        if watchdog_s > 0
+        else []
+    )
     return [
+        *watchdog,
         "# Earnie HA push carrier package (Binding P5c)",
         "# Merge into configuration.yaml or an HA package.",
         "# Replace every ENTITY_* placeholder with the mapped HA entity_id in HA.",
@@ -546,12 +559,71 @@ def _ha_ess_force_automations(
     return lines
 
 
+def _watchdog_automation(
+    writes: list[Signal],
+    force: dict[str, Any] | None,
+    *,
+    timeout_s: float,
+) -> list[str]:
+    """Release a forced active power while Earnie is unreachable (issue #60 c).
+
+    Only the sticky force: caps and modes stay as they are. The trigger is the REST
+    status sensor going ``unavailable`` / ``unknown`` for ``timeout_s``; HA then has no
+    attributes, so the periodic setpoint automations stop re-asserting the old force.
+    """
+    active_ids = _active_power_write_ids(writes)
+    if timeout_s <= 0 or not (active_ids or force):
+        return []
+    lines = [
+        f"  - id: {WATCHDOG_AUTOMATION_ID}",
+        f"    alias: {_q('Earnie watchdog: release forced power when Earnie is unreachable')}",
+        "    mode: single",
+        "    triggers:",
+        "      - trigger: state",
+        f"        entity_id: {STATUS_SENSOR_ENTITY}",
+        "        to:",
+        "          - unavailable",
+        "          - unknown",
+        "        for:",
+        f"          seconds: {int(timeout_s)}",
+        "    actions:",
+    ]
+    if force:
+        device_id = str(force.get("device_id") or "").strip()
+        lines += [
+            "      - action: huawei_solar.stop_forcible_charge",
+            "        continue_on_error: true",
+            "        data:",
+            f"          device_id: {_q(device_id)}",
+        ]
+    else:
+        for qid in active_ids:
+            entity = entity_placeholder(qid)
+            lines += [
+                f"      - action: {_q(set_value_action(entity))}",
+                "        continue_on_error: true",
+                "        target:",
+                f"          entity_id: {entity}",
+                "        data:",
+                "          value: 0",
+            ]
+    lines += [
+        "      - action: system_log.write",
+        "        data:",
+        "          level: warning",
+        f"          logger: {_LOGGER}",
+        f"          message: {_q(f'Earnie unreachable for {int(timeout_s)}s: forced active power released')}",
+    ]
+    return lines
+
+
 def _automations(
     reads: list[Signal],
     writes: list[Signal],
     *,
     repeat_s: float,
     force: dict[str, Any] | None,
+    watchdog_s: float = 0.0,
 ) -> list[str]:
     lines = ["automation:"]
     for sig in reads:
@@ -568,6 +640,7 @@ def _automations(
         )
     if force:
         lines += _ha_ess_force_automations(force, active_ids)
+    lines += _watchdog_automation(writes, force, timeout_s=watchdog_s)
     lines.append("")
     return lines
 
@@ -580,8 +653,13 @@ def build_carrier_yaml(
     earnie_port: int,
     token: str = TOKEN_PLACEHOLDER,
     repeat_s: float | None = None,
+    watchdog_s: float = DEFAULT_WATCHDOG_TIMEOUT_S,
 ) -> str:
-    """Return a full HA YAML package for activated push signals."""
+    """Return a full HA YAML package for activated push signals.
+
+    ``watchdog_s``: seconds of an unreachable ``status.json`` after which a forced ESS
+    active power is released (0 = no watchdog automation).
+    """
     cadence = _repeat_s(repeat_s)
     base = f"http://{earnie_host}:{earnie_port}"
     token_q = f"?t={token}"
@@ -593,12 +671,13 @@ def build_carrier_yaml(
         force_attrs = ["ess.house.set_ess_active_power"]
 
     parts: list[str] = []
-    parts.extend(_header(cadence))
+    has_watchdog = bool(_watchdog_automation(writes, force, timeout_s=watchdog_s))
+    parts.extend(_header(cadence, watchdog_s if has_watchdog else 0.0))
     parts.extend(_rest_commands(reads, base=base, token_q=token_q))
     parts.extend(
         _status_sensor(base, token_q, writes, cadence, extra_attrs=force_attrs)
     )
     parts.extend(
-        _automations(reads, writes, repeat_s=cadence, force=force)
+        _automations(reads, writes, repeat_s=cadence, force=force, watchdog_s=watchdog_s)
     )
     return "\n".join(parts)

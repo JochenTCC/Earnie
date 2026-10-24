@@ -33,7 +33,9 @@ Die Komponenten tragen unter `ehal_bindings` nur **Aktivierungsschlüssel** ohne
 5. In Home Assistant unter **Entwicklerwerkzeuge → Zustände** die passenden `entity_id`s heraussuchen. Das Paket als Package einbinden und jeden `ENTITY_*`-Platzhalter durch die passende `entity_id` ersetzen (siehe [Mindestsignale](#mindestsignale)). Der Push läuft periodisch (Standard 10 s), nicht nur bei Wertänderung.
 6. Auf EHAL-Com mit **Live-Lesen** und **Live-Schreiben** prüfen, dass Werte ankommen und Sollwerte abgerufen werden. Die Einrichtung ist abgeschlossen, wenn die Signalliste die Pflichtsignale als aktiviert meldet und der Live-Betrieb ohne die Meldung „Kein Zugriff auf EHAL SoC“ läuft.
 
-Die Werte im Push sind bereits in EHAL-Einheiten (z. B. W, kWh, %). Die Umrechnung aus den HA-Einheiten übernimmt das YAML-Paket. In `config.json` stehen unter `ehal.ha` nur die optionalen Einstellungen `sign` und `boolean_invert`.
+Die Werte im Push sind bereits in EHAL-Einheiten (z. B. W, kWh, %). Die Umrechnung aus den HA-Einheiten übernimmt das YAML-Paket.
+
+**Watchdog bei Ausfall von Earnie:** Ein Zwangs-Sollwert für die Batterieleistung (`set_ess_active_power`) bleibt in Home Assistant stehen, wenn Earnie ausfällt. Das Paket enthält deshalb die Automation `earnie_watchdog_release_force`: Ist `status.json` länger als 300 s nicht erreichbar (der Sensor `sensor.earnie_ehal_status` steht auf `unavailable` oder `unknown`), setzt sie die Batterieleistung auf 0 und gibt den Zwang damit frei. Bei `ha_ess_force` (Huawei) ruft sie stattdessen `huawei_solar.stop_forcible_charge` auf. Lade- und Entladegrenzen, Modus und EV-Strom bleiben unverändert. Sobald Earnie wieder antwortet, setzen die Sollwert-Automationen den Wert neu. Abschalten: die Automation im Paket löschen oder das Paket mit `python -m scripts.ha_carrier_yaml_gen --watchdog-s 0` erzeugen; die Zeit lässt sich mit `--watchdog-s <Sekunden>` ändern. Viele Wechselrichter haben zusätzlich einen eigenen Timeout für Zwangsladen. In `config.json` stehen unter `ehal.ha` nur die optionalen Einstellungen `sign` und `boolean_invert`.
 
 ### Mindestsignale
 
