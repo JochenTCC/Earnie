@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.8 — streamlit-ports translation (2026-10-24)
+
+- [x] **Translate `docs/dev/streamlit-ports.md` to English** `[dev]`: [docs/dev/streamlit-ports.md](../docs/dev/streamlit-ports.md) translated; paths, ports, env vars, compose names, launch-entry names and link targets unchanged. The inbound user-doc links (`betrieb.md`, `container.md`, handbook, `docs/README.md`, …) stay as they are and point to the English dev doc (decided 2026-10-24: keep the links, do not move the production-port part into a user doc).
+
 ### Document Review — Loxone/Signalliste/Cloud-Demo wording (2026-10-23)
 
 - [x] **Cloud demo vs „einmalig“ for SE star review** (`betrieb.md`, `private-env.md`): docs now say the review state is per browser session on Community Cloud (`EARNIE_CLOUD_DEMO=1`, temp workspace).
