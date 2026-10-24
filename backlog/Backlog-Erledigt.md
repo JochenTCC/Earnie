@@ -6,6 +6,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **Translate `docs/dev/streamlit-ports.md` to English** `[dev]`: [docs/dev/streamlit-ports.md](../docs/dev/streamlit-ports.md) translated; paths, ports, env vars, compose names, launch-entry names and link targets unchanged. The inbound user-doc links (`betrieb.md`, `container.md`, handbook, `docs/README.md`, …) stay as they are and point to the English dev doc (decided 2026-10-24: keep the links, do not move the production-port part into a user doc).
 
+### Issue #50 — decided not to change (2026-10-24)
+
+- [x] **Tariff preview keeps listing "Abwicklungsgebühr" for `monthly_table`:** the load warning for `settlement_fee_cent_kwh` is enough; `fixed_cent` already hides the row. No change (maintainer decision).
+- [x] **No extra hint "0 = no grid costs" in the house profile (Netznutzung):** not wanted; the docs state it (`docs/konfiguration/preise.md`). No change (maintainer decision).
+
 ### Issue #50 — verified by UI tests (2026-10-24)
 
 - [x] **`settlement_fee_cent_kwh` on `fixed_cent` / `monthly_table`: load warning — implemented (`3517ccbe`) and verified (AppTest):** the scenario editor loads the tariff catalog; with a fixed tariff carrying a 9.08 ct fee the page renders without exception, the tariff stays selectable, and exactly one warning naming the tariff and `netznutzung` is logged, also over a second run (`tests/apptest/test_issue50_ui_apptest.py`, plus `tests/test_tariff_settlement_fee_warning.py`). A spot tariff with a fee does not warn. Mutation check: with the warning call removed the test is red. The tariff preview still lists the field, see the minor item in `Backlog-Bugfixes.md`.
