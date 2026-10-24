@@ -225,6 +225,16 @@ def _clear_thermal_year_caches():
     clear_year_model_caches()
 
 
+@pytest.fixture(autouse=True)
+def _clear_live_feature_failure_backoff():
+    """The EU feature failure backoff is process-wide; one failing test must not skip the next."""
+    from data import price_forecast_live
+
+    price_forecast_live._feature_failure_until.clear()
+    yield
+    price_forecast_live._feature_failure_until.clear()
+
+
 class NetworkBlockedError(AssertionError):
     """Raised when a test tries a real (non-loopback) HTTP request."""
 
