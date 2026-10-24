@@ -14,6 +14,7 @@ Site history (Earnie-env-home) + code dependencies:
 2. `dm4.v3_to_v4` (model stamp + scenarios `battery_id` + plant ESS phase-1 + embedded inverter migrate)
 3. `dm4.ess_bindings` (residual plant-flat ESS + Quellenwahl phase-2; often partly done inside v3→v4)
 3a. `dm4.loxone_binding_names` (2.7.q Q8; added 2026-10-16 — missed in the first inventory): only when the chain starts at dm3, Loxone backend, non-empty binding values; required question keep / clear; one-shot `scripts.clear_loxone_binding_names_once`
+3b. `dm4.ha_sign` (issue #56; added 2026-10-24): only when the chain starts at dm3, HA backend, non-empty `ehal.ha.sign`; required question keep / remove (`ha_sign.remove`); no one-shot script
 4. `dm4.inverters` (detect-based if still needed after v3→v4)
 5. `dm4.conversion_efficiency` (needs `inverters[]`)
 6. `dm4.topology` (`regulates_on` + `plant.grid_meter`)
