@@ -1,0 +1,20 @@
+{
+  "4000": {
+    "living_area_m2": 139.4,
+    "building_class": 3,
+    "nominal_power_kw": 3.6,
+    "annual_kwh": 3996.6
+  },
+  "6000": {
+    "living_area_m2": 133.5,
+    "building_class": 4,
+    "nominal_power_kw": 5.5,
+    "annual_kwh": 5998.4
+  },
+  "7000": {
+    "living_area_m2": 159.2,
+    "building_class": 4,
+    "nominal_power_kw": 6.0,
+    "annual_kwh": 7003.6
+  }
+}

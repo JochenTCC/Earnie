@@ -1,0 +1,64 @@
+{
+  "_hinweis": "Parameter des Haeuser-Generators der Wirtschaftlichkeitsstudie (oeffentlich). Schluessel mit Unterstrich sind Kommentare. Anleitung: studies/viability/anleitung-parameter.md. Abo-Stufen und Preise gehoeren nicht in diese Datei.",
+  "annahmen": {
+    "_ev": "Verbrauch aus VCOe/UBA (undatiert); Akku, Wallbox sind Annahmen. Wallbox 11 kW dreiphasig = 2 Punkte.",
+    "ev_kwh_pro_100km": 21.0,
+    "ev_akku_kwh": 60.0,
+    "wallbox_kw": 11.0,
+    "_heizstab": "Annahme: elektrische Warmwasserbereitung, kein oesterreichischer Wert gefunden.",
+    "heizstab_kw": 3.0,
+    "heizstab_kwh_jahr": 2000.0,
+    "pv_neigung_grad": 30,
+    "pv_azimut_sued_grad": 0,
+    "_standort": "Breite, Laenge; Feldkirch, oeffentlich gerundet. Neuer Standort verlangt neue Waermepumpen-Kalibrierung und Wetter-Cache.",
+    "standort": [47.24, 9.6],
+    "_haushalte": "Haushaltsstrom ohne Waermepumpe, E-Auto, Heizstab in kWh/Jahr. Haeuser ohne E-Auto laufen mit allen Haushalten, Haeuser mit E-Auto nur mit dem Standard-Haushalt.",
+    "haushalte": {"k": 2500, "m": 3500, "g": 4500},
+    "standard_haushalt": "m"
+  },
+  "umsetzung": {
+    "netzbereich": "AT-VBG",
+    "akku_leistung_kw_pro_kwh": 0.5,
+    "akku_verschleiss_eur_pro_kwh": 300,
+    "heizstab_startstunde": 11,
+    "heizstab_spielraum_h": 6.0,
+    "ev_ziel_soc_prozent": 80.0
+  },
+  "waermepumpe": {
+    "_stufen": "Ziel-Jahresverbrauch in kWh -> Gebaeudeklasse (3 Bestand, 4 Altbau). Die Wohnflaeche wird mit calibrate_wp berechnet.",
+    "stufen": {"4000": 3, "6000": 4, "7000": 4},
+    "basis": {"heat_pump_type": "luft", "persons": 3, "target_temp_c": 21.5, "absent_temp_reduction_c": 6.5, "heating_limit_c": 15.0},
+    "flaeche_bereich_m2": [60.0, 400.0]
+  },
+  "szenarien": {
+    "_hinweis": "Tarif-IDs aus share/config/tariffs.json. Schluessel muessen duo und dynamisch heissen (evaluate.py).",
+    "duo": {"import_tariff_id": "at_vkw_strom_duo", "export_tariff_id": "at_verbund_v_strom_sonneneinspeisung_fix"},
+    "dynamisch": {"import_tariff_id": "at_vkw_strom_dynamisch", "export_tariff_id": "at_vkw_pv_dynamisch"}
+  },
+  "haeuser": [
+    {"id": "A01", "name": "Nur Haushalt", "pv_kwp": 0.0, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A02", "name": "E-Auto ohne PV", "pv_kwp": 0.0, "pv_layout": "south", "battery_kwh": 0.0, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A03", "name": "Waermepumpe ohne PV", "pv_kwp": 0.0, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 4000, "heating_rod": false},
+    {"id": "A04", "name": "PV 5 kWp", "pv_kwp": 5, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A05", "name": "PV 8 kWp", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A06", "name": "PV 12 kWp", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A07", "name": "PV 20 kWp", "pv_kwp": 20, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A08", "name": "PV 5 kWp + 5 kWh", "pv_kwp": 5, "pv_layout": "south", "battery_kwh": 5, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A09", "name": "PV 8 kWp + 10 kWh", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 10, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A10", "name": "PV 12 kWp + 14 kWh", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A11", "name": "PV 20 kWp + 20 kWh", "pv_kwp": 20, "pv_layout": "south", "battery_kwh": 20, "evs": [], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A12", "name": "PV 8 kWp ohne Speicher + E-Auto", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 0.0, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A13", "name": "PV 8 kWp + 10 kWh + E-Auto", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 10, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A14", "name": "PV 12 kWp + 14 kWh + E-Auto", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A15", "name": "wie A14, Vielfahrer 18.000 km", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [18000], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A16", "name": "wie A14, Ost/West", "pv_kwp": 12, "pv_layout": "east_west", "battery_kwh": 14, "evs": [12000], "heat_pump_kwh": 0, "heating_rod": false},
+    {"id": "A17", "name": "PV 8 kWp ohne Speicher + WP 4.000 kWh", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 0.0, "evs": [], "heat_pump_kwh": 4000, "heating_rod": false},
+    {"id": "A18", "name": "PV 8 kWp + 10 kWh + WP 4.000 kWh", "pv_kwp": 8, "pv_layout": "south", "battery_kwh": 10, "evs": [], "heat_pump_kwh": 4000, "heating_rod": false},
+    {"id": "A19", "name": "PV 12 kWp + 14 kWh + WP 6.000 kWh", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [], "heat_pump_kwh": 6000, "heating_rod": false},
+    {"id": "A20", "name": "A19 mit E-Auto", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [12000], "heat_pump_kwh": 6000, "heating_rod": false},
+    {"id": "A21", "name": "PV 12 kWp + 14 kWh + Heizstab", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [], "heat_pump_kwh": 0, "heating_rod": true},
+    {"id": "A22", "name": "A20 mit Heizstab", "pv_kwp": 12, "pv_layout": "south", "battery_kwh": 14, "evs": [12000], "heat_pump_kwh": 6000, "heating_rod": true},
+    {"id": "A23", "name": "Grosshaus: 20 kWp, 20 kWh, WP 7.000, 2 E-Autos", "pv_kwp": 20, "pv_layout": "south", "battery_kwh": 20, "evs": [12000, 12000], "heat_pump_kwh": 7000, "heating_rod": false},
+    {"id": "A24", "name": "Grosshaus: 20 kWp, 20 kWh, WP 7.000, 1 E-Auto, Heizstab", "pv_kwp": 20, "pv_layout": "south", "battery_kwh": 20, "evs": [12000], "heat_pump_kwh": 7000, "heating_rod": true}
+  ]
+}

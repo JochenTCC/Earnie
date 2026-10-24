@@ -1,0 +1,258 @@
+{
+  "_hinweis": "Variante des Haeuser-Generators (Speicher im Verhaeltnis zur PV-Leistung). Abo-Stufen und Preise gehoeren nicht in diese Datei. Anleitung: studies/viability/anleitung-parameter.md.",
+  "annahmen": {
+    "_ev": "Verbrauch aus VCOe/UBA (undatiert); Akku, Wallbox sind Annahmen. Wallbox 11 kW dreiphasig = 2 Punkte.",
+    "ev_kwh_pro_100km": 21.0,
+    "ev_akku_kwh": 60.0,
+    "wallbox_kw": 11.0,
+    "_heizstab": "Annahme: elektrische Warmwasserbereitung, kein oesterreichischer Wert gefunden.",
+    "heizstab_kw": 3.0,
+    "heizstab_kwh_jahr": 2000.0,
+    "pv_neigung_grad": 30,
+    "pv_azimut_sued_grad": 0,
+    "_standort": "Breite, Laenge; Feldkirch, oeffentlich gerundet. Neuer Standort verlangt neue Waermepumpen-Kalibrierung und Wetter-Cache.",
+    "standort": [
+      47.24,
+      9.6
+    ],
+    "_haushalte": "Haushaltsstrom ohne Waermepumpe, E-Auto, Heizstab in kWh/Jahr. Haeuser ohne E-Auto laufen mit allen Haushalten, Haeuser mit E-Auto nur mit dem Standard-Haushalt.",
+    "haushalte": {
+      "k": 2500,
+      "m": 3500,
+      "g": 4500
+    },
+    "standard_haushalt": "m"
+  },
+  "umsetzung": {
+    "netzbereich": "AT-VBG",
+    "akku_leistung_kw_pro_kwh": 0.5,
+    "akku_verschleiss_eur_pro_kwh": 300,
+    "heizstab_startstunde": 11,
+    "heizstab_spielraum_h": 6.0,
+    "ev_ziel_soc_prozent": 80.0
+  },
+  "waermepumpe": {
+    "_stufen": "Ziel-Jahresverbrauch in kWh -> Gebaeudeklasse (3 Bestand, 4 Altbau). Die Wohnflaeche wird mit calibrate_wp berechnet.",
+    "stufen": {
+      "4000": 3,
+      "6000": 4,
+      "7000": 4
+    },
+    "basis": {
+      "heat_pump_type": "luft",
+      "persons": 3,
+      "target_temp_c": 21.5,
+      "absent_temp_reduction_c": 6.5,
+      "heating_limit_c": 15.0
+    },
+    "flaeche_bereich_m2": [
+      60.0,
+      400.0
+    ]
+  },
+  "szenarien": {
+    "_hinweis": "Tarif-IDs aus share/config/tariffs.json. Schluessel muessen duo und dynamisch heissen (evaluate.py).",
+    "duo": {
+      "import_tariff_id": "at_vkw_strom_duo",
+      "export_tariff_id": "at_verbund_v_strom_sonneneinspeisung_fix"
+    },
+    "dynamisch": {
+      "import_tariff_id": "at_vkw_strom_dynamisch",
+      "export_tariff_id": "at_vkw_pv_dynamisch"
+    }
+  },
+  "haeuser": [
+    {
+      "id": "V05F05",
+      "name": "A20-Basis, PV 5 kWp, Speicher 2.5 kWh (0.5 x kWp)",
+      "pv_kwp": 5,
+      "pv_layout": "south",
+      "battery_kwh": 2.5,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V05F10",
+      "name": "A20-Basis, PV 5 kWp, Speicher 5 kWh (1 x kWp)",
+      "pv_kwp": 5,
+      "pv_layout": "south",
+      "battery_kwh": 5.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V05F15",
+      "name": "A20-Basis, PV 5 kWp, Speicher 7.5 kWh (1.5 x kWp)",
+      "pv_kwp": 5,
+      "pv_layout": "south",
+      "battery_kwh": 7.5,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V05F20",
+      "name": "A20-Basis, PV 5 kWp, Speicher 10 kWh (2 x kWp)",
+      "pv_kwp": 5,
+      "pv_layout": "south",
+      "battery_kwh": 10.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V08F05",
+      "name": "A20-Basis, PV 8 kWp, Speicher 4 kWh (0.5 x kWp)",
+      "pv_kwp": 8,
+      "pv_layout": "south",
+      "battery_kwh": 4.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V08F10",
+      "name": "A20-Basis, PV 8 kWp, Speicher 8 kWh (1 x kWp)",
+      "pv_kwp": 8,
+      "pv_layout": "south",
+      "battery_kwh": 8.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V08F15",
+      "name": "A20-Basis, PV 8 kWp, Speicher 12 kWh (1.5 x kWp)",
+      "pv_kwp": 8,
+      "pv_layout": "south",
+      "battery_kwh": 12.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V08F20",
+      "name": "A20-Basis, PV 8 kWp, Speicher 16 kWh (2 x kWp)",
+      "pv_kwp": 8,
+      "pv_layout": "south",
+      "battery_kwh": 16.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V12F05",
+      "name": "A20-Basis, PV 12 kWp, Speicher 6 kWh (0.5 x kWp)",
+      "pv_kwp": 12,
+      "pv_layout": "south",
+      "battery_kwh": 6.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V12F10",
+      "name": "A20-Basis, PV 12 kWp, Speicher 12 kWh (1 x kWp)",
+      "pv_kwp": 12,
+      "pv_layout": "south",
+      "battery_kwh": 12.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V12F15",
+      "name": "A20-Basis, PV 12 kWp, Speicher 18 kWh (1.5 x kWp)",
+      "pv_kwp": 12,
+      "pv_layout": "south",
+      "battery_kwh": 18.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V12F20",
+      "name": "A20-Basis, PV 12 kWp, Speicher 24 kWh (2 x kWp)",
+      "pv_kwp": 12,
+      "pv_layout": "south",
+      "battery_kwh": 24.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V20F05",
+      "name": "A20-Basis, PV 20 kWp, Speicher 10 kWh (0.5 x kWp)",
+      "pv_kwp": 20,
+      "pv_layout": "south",
+      "battery_kwh": 10.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V20F10",
+      "name": "A20-Basis, PV 20 kWp, Speicher 20 kWh (1 x kWp)",
+      "pv_kwp": 20,
+      "pv_layout": "south",
+      "battery_kwh": 20.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V20F15",
+      "name": "A20-Basis, PV 20 kWp, Speicher 30 kWh (1.5 x kWp)",
+      "pv_kwp": 20,
+      "pv_layout": "south",
+      "battery_kwh": 30.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    },
+    {
+      "id": "V20F20",
+      "name": "A20-Basis, PV 20 kWp, Speicher 40 kWh (2 x kWp)",
+      "pv_kwp": 20,
+      "pv_layout": "south",
+      "battery_kwh": 40.0,
+      "evs": [
+        12000
+      ],
+      "heat_pump_kwh": 6000,
+      "heating_rod": false
+    }
+  ]
+}
