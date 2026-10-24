@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix House config blocked while Open-Meteo is slow (2026-10-24)
+
+- [x] **Hauskonfigurator blocked the page for minutes on a slow/rate-limited Open-Meteo — fixed, CI verification pending in the next run:** `data/open_meteo_solar_archive.py` gets `climate_fetch_budget(seconds)` / `ClimateFetchBudgetExceeded` (total budget over all attempts, per-request timeout capped to the remaining time, no sleep past the budget). `ui/pages/page_house_config.py` renders inside a 30 s budget with a spinner and shows an error on overrun (no silent fallback; the next open retries). Tests: `tests/test_open_meteo_solar_archive.py`, `tests/apptest/test_page_house_config_apptest.py`; docs `docs/konfiguration/flexible-verbraucher.md`. Note: a download that needs more than 30 s never completes and is not cached partially.
+
 ### Bugfix CI `ui-e2e` (2026-10-24)
 
 - [x] **CI job `ui-e2e` red on every run — fixed (`0a752d99`), verified (green CI run `40135303075`):** `test_house_config_first_edit_after_open_is_kept` hung at the first `_wait_until_idle`: the e2e server (own process, no climate mock) downloaded Open-Meteo climate data for the `thermal_annual` consumer of `test_home` when the house config opened; with a cold cache that exceeded the 60 s wait (local runs had a warm gitignored `data/cache/open_meteo`). New env var `EARNIE_OPEN_METEO_CACHE_PATH` (`data/open_meteo_solar_archive.py`, documented in `docs/einrichtung/betrieb.md`); the e2e conftest seeds that cache from an AppTest run of the page with the mock. On failure the e2e run prints the Streamlit server log and a browser diagnosis; the opt-in `EARNIE_UI_TRACE=1` step traces (`ui/ui_trace.py`) remain. Remaining product issue (page blocks while Open-Meteo is slow): see `Backlog-Bugfixes.md`.

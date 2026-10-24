@@ -23,7 +23,25 @@ def _help_text() -> str:
     )
 
 
+_CLIMATE_FETCH_BUDGET_S = 30.0
+
+
 def render() -> None:
+    from data.open_meteo_solar_archive import (
+        ClimateFetchBudgetExceeded,
+        climate_fetch_budget,
+    )
+
+    try:
+        with st.spinner(
+            "Klimadaten werden ggf. von Open-Meteo geladen (beim ersten Öffnen bis zu 30 s) …"
+        ), climate_fetch_budget(_CLIMATE_FETCH_BUDGET_S):
+            _render_body()
+    except ClimateFetchBudgetExceeded as exc:
+        st.error(str(exc))
+
+
+def _render_body() -> None:
     from runtime_store.shadow.mode import is_shadow_config_readonly
 
     trace("house_config render")
