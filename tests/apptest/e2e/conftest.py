@@ -49,7 +49,7 @@ class AppServer:
         return self._log_path
 
     def start(self) -> None:
-        env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+        env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "EARNIE_UI_TRACE": "1"}
         log = open(self._log_path, "ab")
         self._proc = subprocess.Popen(
             [
