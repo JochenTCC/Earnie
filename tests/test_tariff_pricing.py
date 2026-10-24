@@ -55,7 +55,10 @@ def test_spot_import_netznutzung_arbeitspreis():
         "prices_include_vat": True,
         "vat_percent": 19.0,
     }
-    assert import_cent_kwh(10.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(16.0)
+    # Supplier price is gross (10 + 1); the net grid fee gets 19 % VAT: 5 * 1.19
+    assert import_cent_kwh(10.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(
+        10.0 + 1.0 + 5.0 * 1.19
+    )
 
 
 def test_fixed_import_adds_netznutzung_before_vat():
@@ -382,3 +385,49 @@ def test_is_within_days_of_next_month():
     assert is_within_days_of_next_month(date(2024, 2, 27), days=2) is False
     assert is_within_days_of_next_month(date(2024, 2, 28), days=2) is True
     assert is_within_days_of_next_month(date(2024, 2, 29), days=2) is True
+
+
+def test_gross_fixed_import_adds_netznutzung_with_vat():
+    tariff = {
+        "type": "fixed_cent",
+        "fix_cent_kwh": 11.4,
+        "prices_include_vat": True,
+        "vat_percent": 20.0,
+    }
+    # 11.4 gross + 5.0 net * 1.2
+    assert import_cent_kwh(0.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(17.4)
+
+
+def test_gross_and_net_fixed_tariff_agree():
+    """Same supplier price quoted net or gross must give the same final price."""
+    gross = {
+        "type": "fixed_cent",
+        "fix_cent_kwh": 12.0,
+        "prices_include_vat": True,
+        "vat_percent": 20.0,
+    }
+    net = {**gross, "fix_cent_kwh": 10.0, "prices_include_vat": False}
+    grid = flat_grid_fee_spec(5.0)
+    assert import_cent_kwh(0.0, gross, grid_fee=grid) == pytest.approx(
+        import_cent_kwh(0.0, net, grid_fee=grid)
+    )
+
+
+def test_gross_monthly_import_adds_netznutzung_with_vat():
+    from datetime import datetime
+
+    tariff = {
+        "type": "monthly_table",
+        "prices_include_vat": True,
+        "vat_percent": 20.0,
+        "monthly_rates": [{"year": 2026, "month": 8, "tariff_cent_kwh": 12.0}],
+    }
+    slot = datetime(2026, 8, 10, 12, 0)
+    assert import_cent_kwh(
+        0.0, tariff, grid_fee=flat_grid_fee_spec(3.0), slot_datetime=slot
+    ) == pytest.approx(12.0 + 3.0 * 1.2)
+
+
+def test_gross_tariff_without_vat_percent_adds_netznutzung_unchanged():
+    tariff = {"type": "fixed_cent", "fix_cent_kwh": 10.0, "prices_include_vat": True}
+    assert import_cent_kwh(0.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(15.0)

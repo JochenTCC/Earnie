@@ -13,6 +13,7 @@ from house_config.tariffs_store import (
     USER_EXPORT_CENT_KEY,
     USER_FIXED_TARIFF_ID,
     USER_IMPORT_CENT_KEY,
+    apply_land_vat_to_user_fixed_import,
     resolve_export_tariff_into_settings,
     resolve_import_tariff_into_settings,
 )
@@ -58,8 +59,40 @@ def test_resolve_user_fixed_import_adds_netznutzung_no_extra_vat():
     assert USER_IMPORT_CENT_KEY not in resolved
     tariff = resolved["_import_tariff_spec"]
     assert tariff["prices_include_vat"] is True
-    # Gross supplier price + Netznutzung; no second VAT.
+    # The synthetic tariff has no VAT rate yet (set per land at scenario resolution).
     assert import_cent_kwh(0.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(16.4)
+
+
+@pytest.mark.parametrize(
+    ("land", "vat", "expected"),
+    [("AT", 20.0, 11.4 + 5.0 * 1.2), ("DE", 19.0, 11.4 + 5.0 * 1.19), ("CH", 8.1, 11.4 + 5.0 * 1.081)],
+)
+def test_user_fixed_import_gets_land_vat_on_netznutzung(land, vat, expected):
+    resolved = resolve_import_tariff_into_settings(
+        {"import_tariff_id": USER_FIXED_TARIFF_ID, USER_IMPORT_CENT_KEY: 11.4},
+        _minimal_tariffs(),
+    )
+    resolved = apply_land_vat_to_user_fixed_import(resolved, land)
+    tariff = resolved["_import_tariff_spec"]
+    assert tariff["vat_percent"] == vat
+    assert tariff["prices_include_vat"] is True
+    assert import_cent_kwh(0.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(expected)
+
+
+def test_land_vat_leaves_catalog_tariff_untouched():
+    resolved = resolve_import_tariff_into_settings(
+        {"import_tariff_id": "catalog_imp"}, _minimal_tariffs()
+    )
+    assert apply_land_vat_to_user_fixed_import(resolved, "AT") == resolved
+
+
+def test_land_vat_rejects_unknown_land():
+    resolved = resolve_import_tariff_into_settings(
+        {"import_tariff_id": USER_FIXED_TARIFF_ID, USER_IMPORT_CENT_KEY: 11.4},
+        _minimal_tariffs(),
+    )
+    with pytest.raises(ValueError, match="USt"):
+        apply_land_vat_to_user_fixed_import(resolved, "FR")
 
 
 def test_resolve_user_fixed_export_sets_k_push():

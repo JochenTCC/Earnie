@@ -7,6 +7,7 @@ from house_config.geo_timezone import timezone_for_land
 from house_config.planning_flex_bridge import collect_planning_flex_consumers
 from house_config.profiles_store import load_house_profiles_document
 from house_config.tariffs_store import (
+    apply_land_vat_to_user_fixed_import,
     load_tariffs_document,
     resolve_export_tariff_into_settings,
     resolve_import_tariff_into_settings,
@@ -106,6 +107,7 @@ def resolve_scenario_settings(
             raise ValueError(f"Unbekannte house_profile_id '{profile_id}'.")
         profile = profiles[profile_id]
         out["_house_profile"] = profile
+        out = apply_land_vat_to_user_fixed_import(out, profile.get("land", "AT"))
         _apply_profile_geo(out, profile)
         out["_grid_fee_spec"] = _resolve_profile_grid_fee(
             profile, out["timezone_name"], grid_fees_path
