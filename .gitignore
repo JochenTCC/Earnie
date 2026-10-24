@@ -114,3 +114,11 @@ ha_lab/config_full/
 
 # hypothesis example database
 .hypothesis/
+
+# Study runs (studies/): generated packs, results and logs. Code, inputs and frozen caches stay tracked.
+studies/**/packs/
+studies/**/packs_*/
+studies/**/results/
+studies/**/*.log
+studies/**/pack/runtime/usage_ping.json
+studies/**/*.local-backup
