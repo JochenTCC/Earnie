@@ -13,6 +13,7 @@ import requests
 
 import config
 from data.eu_market_features import month_ranges
+from runtime_store.env_vars import read_env
 
 OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
 OPEN_METEO_CACHE_DIR = Path("data/cache/open_meteo")
@@ -388,6 +389,12 @@ def _surface_cache_token(surfaces: list[TiltedSurface]) -> str:
     return "-".join(parts) if parts else "none"
 
 
+def _default_cache_dir() -> Path:
+    """``EARNIE_OPEN_METEO_CACHE_PATH`` if set, else ``OPEN_METEO_CACHE_DIR``."""
+    override = read_env("OPEN_METEO_CACHE_PATH")
+    return Path(override) if override else OPEN_METEO_CACHE_DIR
+
+
 def open_meteo_cache_path(
     lat: float,
     lon: float,
@@ -404,7 +411,7 @@ def open_meteo_cache_path(
         f"{lat:.4f}_{lon:.4f}_{start.isoformat()}_{end.isoformat()}_"
         f"{tz_token}_{token}.json"
     )
-    return (cache_dir or OPEN_METEO_CACHE_DIR) / name
+    return (cache_dir or _default_cache_dir()) / name
 
 
 def _bundle_to_frame(bundle: OpenMeteoClimateBundle) -> pd.DataFrame:

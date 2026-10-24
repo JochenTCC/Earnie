@@ -110,6 +110,35 @@ def _print_log_if_failed(request, server: AppServer) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _seeded_climate_cache(_isolated_backtesting_config, tmp_path, monkeypatch):
+    """Befüllt den Open-Meteo-Klimacache des Servers, damit kein Live-Abruf nötig ist.
+
+    Der Server ist ein eigener Prozess ohne den Klima-Mock. Ohne Cache lädt der Hauskonfigurator
+    beim Öffnen die Klimadaten des thermal_annual-Verbrauchers von Open-Meteo (in CI > 60 s).
+    Ein AppTest-Lauf der Seite mit dem Mock legt genau die Cache-Dateien an, die der Server liest;
+    die dabei auto-gespeicherte Konfiguration wird danach zurückgesetzt.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    from data import open_meteo_solar_archive as archive
+
+    cache_dir = tmp_path / "open_meteo_cache"
+    config_dir = Path(os.environ["EARNIE_CONFIG_PATH"]).parent
+    snapshot = {p: p.read_bytes() for p in config_dir.rglob("*") if p.is_file()}
+    monkeypatch.setattr(archive, "OPEN_METEO_CACHE_DIR", cache_dir)
+    archive.clear_open_meteo_bundle_mem_cache()
+    script = Path(__file__).resolve().parents[1] / "scripts" / "run_page_house_config.py"
+    AppTest.from_file(str(script)).run(timeout=60)
+    for path in config_dir.rglob("*"):
+        if path.is_file() and path not in snapshot:
+            path.unlink()
+    for path, content in snapshot.items():
+        path.write_bytes(content)
+    assert any(cache_dir.glob("*.json")), "Klimacache wurde nicht befüllt"
+    monkeypatch.setenv("EARNIE_OPEN_METEO_CACHE_PATH", str(cache_dir))
+
+
+@pytest.fixture(autouse=True)
 def _browser_diagnostics(request):
     """Sammelt Browser-Console, Seitenfehler und fehlgeschlagene Requests; Ausgabe nur bei Fehlschlag."""
     if "page" not in request.fixturenames:
