@@ -378,7 +378,7 @@ Only with backend **Home Assistant**. Under **HA Push-Carrier**, download a YAML
 - Placeholders `ENTITY_*` only — replace them in HA with real `entity_id`s.
 - Jinja converts entity units to canonical EHAL units before the push URL is called.
 
-CLI equivalent: `python -m scripts.ha_carrier_yaml_gen --config-dir <config> --host <Earnie-host> --port 8541 --out earnie_ha_carrier.yaml`. Lab checklist: [HA Lab Spec](../dev/ha-lab-setup.md). Cadence / zero rule: [Loxone Signals](../referenz/loxone-signals.md#push-cadence-sb-neutral).
+CLI equivalent: `python -m scripts.ha_carrier_yaml_gen --config-dir <config> --host <Earnie-host> --port 8541 --out earnie_ha_carrier.yaml` (`--watchdog-s <seconds>`, default 300, `0` = no watchdog: the package releases a forced ESS active power when `status.json` stays unreachable that long). Lab checklist: [HA Lab Spec](../dev/ha-lab-setup.md). Cadence / zero rule: [Loxone Signals](../referenz/loxone-signals.md#push-cadence-sb-neutral).
 
 <a id="signalliste-loxone-contract"></a>
 

@@ -225,3 +225,75 @@ def test_carrier_yaml_uses_the_templated_set_value_action():
     placeholder = "ENTITY_ess_house_set_ess_charge_power_limit"
     assert f"{{{{ '{placeholder}'.split('.')[0] }}}}.set_value" in text
     assert "action: number.set_value" not in text
+
+
+# --- Watchdog (issue #60 c): release a forced active power while Earnie is unreachable ---
+
+
+def _watchdog(text: str) -> dict:
+    import yaml
+
+    doc = yaml.safe_load(text)
+    found = [a for a in doc["automation"] if a["id"] == "earnie_watchdog_release_force"]
+    assert len(found) == 1
+    return found[0]
+
+
+def test_watchdog_releases_the_active_power_after_the_default_timeout():
+    auto = _watchdog(_build())
+    trigger = auto["triggers"][0]
+    assert trigger["entity_id"] == "sensor.earnie_ehal_status"
+    assert trigger["to"] == ["unavailable", "unknown"]
+    assert trigger["for"] == {"seconds": 300}
+    release = auto["actions"][0]
+    assert release["target"]["entity_id"] == "ENTITY_ess_house_set_ess_active_power"
+    assert release["data"]["value"] == 0
+    assert release["continue_on_error"] is True
+    assert release["action"].endswith(".set_value")
+    assert auto["actions"][-1]["action"] == "system_log.write"
+
+
+def test_watchdog_timeout_is_configurable_and_zero_disables_it():
+    assert _watchdog(_build(watchdog_s=120))["triggers"][0]["for"] == {"seconds": 120}
+    off = _build(watchdog_s=0)
+    assert "earnie_watchdog_release_force" not in off
+    assert "Watchdog" not in off
+
+
+def test_watchdog_is_documented_in_the_header_and_only_touches_the_force():
+    text = _build()
+    assert "# Watchdog:" in text and "--watchdog-s 0" in text
+    auto = _watchdog(text)
+    # Caps (charge / discharge limit), mode and EV current are left alone.
+    assert all("charge_power_limit" not in str(action) for action in auto["actions"])
+
+
+def test_watchdog_uses_the_vendor_stop_service_with_ha_ess_force():
+    house = _minimal_house()
+    house["plant"]["ha_ess_force"] = {"driver": "huawei_solar", "device_id": "dev-luna-1"}
+    text = build_carrier_yaml(
+        house,
+        _minimal_components(),
+        earnie_host="earnie-ha-lab",
+        earnie_port=8541,
+        token="TEST_TOKEN_12345678",
+        repeat_s=10.0,
+    )
+    auto = _watchdog(text)
+    assert auto["actions"][0]["action"] == "huawei_solar.stop_forcible_charge"
+    assert auto["actions"][0]["data"]["device_id"] == "dev-luna-1"
+    assert "ENTITY_ess_house_set_ess_active_power" not in text
+
+
+def test_no_watchdog_without_an_active_power_signal():
+    components = _minimal_components()
+    del components["batteries"][0]["ehal_bindings"]["ess.house.set_ess_active_power"]
+    text = build_carrier_yaml(
+        _minimal_house(),
+        components,
+        earnie_host="earnie-ha-lab",
+        earnie_port=8541,
+        token="TEST_TOKEN_12345678",
+        repeat_s=10.0,
+    )
+    assert "earnie_watchdog_release_force" not in text
