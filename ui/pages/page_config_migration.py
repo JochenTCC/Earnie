@@ -88,9 +88,31 @@ def continue_after_migration() -> None:
     maybe_auto_start()
 
 
-def _store_report(report: MigrationReport) -> None:
+def _start_daemon_after_migration() -> dict[str, str]:
+    """Start ``main.py`` right after a successful run (``EARNIE_AUTO_START_MAIN=1``).
+
+    The Streamlit process stays in migration mode until "Weiter zur App", so nothing
+    else would start the daemon (issue #61). Result: ``state`` is ``started``,
+    ``running`` (already up), ``off`` (auto start disabled) or ``error``.
+    """
+    from runtime_store.env_vars import is_truthy
+    from runtime_store.main_daemon import DaemonError, maybe_auto_start
+
+    if not is_truthy("AUTO_START_MAIN"):
+        return {"state": "off", "detail": ""}
+    try:
+        started = maybe_auto_start()
+    except DaemonError as exc:
+        return {"state": "error", "detail": str(exc)}
+    if started is None:
+        return {"state": "running", "detail": ""}
+    return {"state": "started", "detail": f"PID {started.pid}"}
+
+
+def _store_report(report: MigrationReport, daemon: dict[str, str]) -> None:
     st.session_state[_SESSION_PHASE] = "report"
     st.session_state[_SESSION_REPORT] = {
+        "daemon": daemon,
         "backup_dir": report.backup_dir,
         "applied_step_ids": list(report.applied_step_ids),
         "written_files": list(report.written_files),
@@ -250,8 +272,26 @@ def _render_migrate_button(plan: MigrationPlan, answers: Answers) -> None:
     except MigrationError as exc:
         st.error(str(exc))
         return
-    _store_report(report)
+    _store_report(report, _start_daemon_after_migration())
     st.rerun()
+
+
+def _render_daemon_state(daemon: dict[str, Any]) -> None:
+    state = daemon.get("state")
+    if state == "started":
+        st.success(f"Optimierer-Dienst (`main.py`) gestartet ({daemon.get('detail')}).")
+    elif state == "running":
+        st.info("Der Optimierer-Dienst (`main.py`) läuft bereits.")
+    elif state == "error":
+        st.error(
+            f"main.py konnte nicht gestartet werden: {daemon.get('detail')} — unter "
+            "**Optimierer-Dienst** erneut starten oder den Container neu starten."
+        )
+    else:
+        st.info(
+            "Auto-Start ist aus — den Optimierer-Dienst (`main.py`) danach unter "
+            "**Optimierer-Dienst** starten. Bis dahin antwortet der EHAL-Port nicht."
+        )
 
 
 def _render_report_view() -> None:
@@ -278,20 +318,7 @@ def _render_report_view() -> None:
     todos = payload.get("manual_todos") or []
     _render_manual_todos(todos, as_checklist=True)
 
-    from runtime_store.env_vars import is_truthy
-
-    if is_truthy("AUTO_START_MAIN"):
-        st.info(
-            "Der Optimierer-Dienst (`main.py`) läuft noch nicht. Er startet mit "
-            "**Weiter zur App** automatisch. Wird diese Seite vorher neu geladen oder "
-            "geschlossen, bleibt er aus (der EHAL-Port antwortet dann nicht): dann "
-            "unter **Optimierer-Dienst** starten oder den Container neu starten."
-        )
-    else:
-        st.info(
-            "Auto-Start ist aus — den Optimierer-Dienst (`main.py`) danach unter "
-            "**Optimierer-Dienst** starten. Bis dahin antwortet der EHAL-Port nicht."
-        )
+    _render_daemon_state(payload.get("daemon") or {})
     if st.button("Weiter zur App", type="primary", key="cfg_mig_continue"):
         from runtime_store.main_daemon import DaemonError
 
