@@ -9,6 +9,11 @@ import streamlit as st
 
 import config
 from runtime_store import run_state
+from runtime_store.optimize_request import (
+    OptimizeRequestError,
+    plan_inputs_changed_since_last_run,
+    request_optimize,
+)
 from runtime_store.main_daemon import (
     DaemonError,
     DaemonStatus,
@@ -301,6 +306,29 @@ def _run_lifecycle_actions(*, do_start: bool, do_stop: bool, do_restart: bool) -
         st.error(str(exc))
 
 
+def _render_recompute_button(*, running: bool) -> None:
+    """Ad-hoc run; enabled only when a plan input changed since the last run."""
+    changed = running and plan_inputs_changed_since_last_run()
+    if st.button(
+        "Jetzt neu berechnen",
+        disabled=not changed,
+        width="stretch",
+        key="daemon_recompute",
+        help=(
+            "Startet sofort einen Optimierungslauf, statt auf den nächsten "
+            "Viertelstunden-Takt zu warten. Aktiv, sobald eine Konfigurationsdatei "
+            "seit dem letzten Lauf geändert wurde und der Dienst läuft."
+        ),
+    ):
+        try:
+            request_optimize()
+        except OptimizeRequestError as exc:
+            st.error(str(exc))
+        else:
+            flash("success", "Neuberechnung angefordert.")
+            st.rerun()
+
+
 def render() -> None:
     reload_runtime_config()
     render_page_title_with_help(
@@ -320,6 +348,7 @@ def render() -> None:
         stopped=daemon.state == "stopped",
     )
     _run_lifecycle_actions(do_start=do_start, do_stop=do_stop, do_restart=do_restart)
+    _render_recompute_button(running=daemon.state == "running")
     st.divider()
     _render_log_section()
     st.divider()
