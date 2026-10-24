@@ -289,3 +289,17 @@ def test_t3_toggle_never_overwrites_an_unreadable_components_file(broken_compone
     assert not at.exception
     assert not [c for c in at.checkbox if c.key.startswith(_PREFIX)], "keine Schalter ohne lesbare Konfiguration"
     assert broken_components.read_bytes() == before
+
+
+def test_export_caption_points_to_the_ha_yaml_package_on_the_ha_backend(
+    export_spy, monkeypatch
+) -> None:
+    """Issue #60: the export section said the HA package was still to come."""
+    monkeypatch.setattr("ui.ehal_signal_list.active_ehal_backend", lambda: "ha")
+
+    at = _run()
+
+    captions = " ".join(messages(at)["caption"])
+    assert "HA Push-Carrier" in captions
+    assert "folgt" not in captions
+    assert "P5c" not in captions

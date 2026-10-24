@@ -34,6 +34,15 @@ def entity_placeholder(ehal_id: str) -> str:
     return f"ENTITY_{text}" if text else "ENTITY_unknown"
 
 
+def set_value_action(entity: str) -> str:
+    """Templated HA action: ``number`` and ``input_number`` targets need their own domain.
+
+    The real entity_id is only entered in Home Assistant (``ENTITY_*`` placeholder), so
+    the domain is taken from it at run time instead of being fixed when generating.
+    """
+    return "{{ " + repr(entity) + ".split('.')[0] }}.set_value"
+
+
 def rest_command_name(sig: Signal) -> str:
     """HA ``rest_command`` key for a read / heartbeat signal."""
     return sig.title.replace("Push_", "earnie_push_").lower()
@@ -422,7 +431,7 @@ def _setpoint_automation(
         "              - condition: template",
         f"                value_template: {_q(drift)}",
         "            then:",
-        "              - action: number.set_value",
+        f"              - action: {_q(set_value_action(entity))}",
         "                continue_on_error: true",
         "                target:",
         f"                  entity_id: {entity}",
