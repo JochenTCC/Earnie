@@ -19,6 +19,10 @@ while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
   # Branch / tag deletion: nothing to test.
   [ "$LOCAL_SHA" = "$ZERO" ] && continue
   COMMIT="$(git rev-parse "$LOCAL_SHA^{commit}")"
+  # release/* darf nie als Ganzes nach main (nur Cherry-Picks einzelner Fixes).
+  if [ "$REMOTE_REF" = "refs/heads/main" ]; then
+    sh scripts/check_no_release_merge.sh "$REMOTE_SHA" "$COMMIT" || exit 1
+  fi
   if [ "$REMOTE_SHA" != "$ZERO" ] && git cat-file -e "$REMOTE_SHA^{commit}" 2>/dev/null; then
     CHANGED="$(git diff --name-only "$REMOTE_SHA" "$COMMIT" | tr -d '\r')"
     if [ -z "$CHANGED" ] || ! echo "$CHANGED" | grep -qvE "$SKIP_RE"; then

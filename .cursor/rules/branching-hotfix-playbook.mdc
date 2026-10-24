@@ -1,5 +1,5 @@
 ---
-description: Warn before branching/publish steps that violate the hotfix playbook (main+tags, no long-lived alpha/develop)
+description: Warn before branching/publish steps that violate the hotfix playbook (main + release/… + tags; no develop/alpha)
 alwaysApply: true
 ---
 
@@ -11,23 +11,38 @@ Canonical playbook: `docs/workflow/branching-hotfix-playbook.md`.
 
 Before acting on (or recommending) any of: new long-lived branches, hotfixes for a tagged build, tagging/publishing while feature work is open, PATCH vs alpha bumps for bugfixes, or “fix prod only on main and ship later.”
 
+## Model (allowed)
+
+| Line | Role |
+|------|------|
+| **`main`** | Ongoing development / next MINOR once a release is being finalized elsewhere |
+| **`release/x.y`** | Single-product repos (Earnie, edbert, earnie-server). Opened when the **official is near** and development continues on `main` |
+| **`release/<product>/x.y`** | Multi-product side repos (e.g. Earnie-Projekt, Earnie-env-home); products: `earnie`, `edbert`, private `earnie-server` |
+| **Tags** | Immutable; for that MINOR after the split, cut from the release branch |
+| **Short-lived `hotfix/…`** | Only when even the ship line must not ship as-is |
+
 ## Warn the user (stop and ask) if they are about to
 
 | Violation | Prefer instead |
 |-----------|----------------|
-| Create permanent `develop`, `alpha`, or long-lived `release/*` | Stay on `main`; pre-release = version/tag channel only |
-| Urgent patch for a **tagged** build by shipping dirty unfinished `main` | Short-lived `hotfix/…` from that **tag**, then port fix to `main` |
-| Hotfix only on the release tip **without** merging/cherry-picking to `main` | Always port the code fix to `main` |
+| Create permanent `develop` or `alpha` | Use `main` + `release/…` when official is near |
+| Create legacy flat names (`release2.7`) | Use `release/x.y` or `release/<product>/x.y` |
+| Finalize / tag the planned MINOR from dirty `main` while its release branch exists | Commit and tag on `release/…` |
+| Merge next-MINOR features from `main` into the release branch | Keep features on `main`; only cherry-pick fixes the release truly needs |
+| Urgent patch for a **tagged** build by shipping unfinished ship-line commits | Short-lived `hotfix/…` from that **tag**, then cherry-pick to `release/…` and to `main` (PR) |
+| Leave a release-line fix **without** a cherry-pick to `main` when `main` still has that path | Always port the code fix |
+| Merge `release/…` (or a branch cut from it) into `main`, locally or by PR | Never. Cherry-pick single fixes (`git cherry-pick -x`) onto a branch from `main`; guard: `scripts/check_no_release_merge.sh` |
 | Tag a commit where `version.py` ≠ tag (without `v`) | Bump/align `version.py` first (explicit approval) |
 | Mid-alpha cycle: PATCH the **last official** for a community tester fix | Next `X.Y.Z-alpha.N+1` / `-beta.N+1` (after approval), unless patching prod `:latest` |
-| Rewind `main`’s `version.py` to an official PATCH while alpha continues | Port **code** only; leave `main` on the ongoing alpha/beta/rc |
+| Rewind a ship line’s `version.py` to an official PATCH while a newer pre-release continues | Port **code** only; leave `version.py` on the ongoing alpha/beta/rc |
 | Rewrite / force-push a published tag | New tag with a new approved version string |
 
 ## Default (no warning needed)
 
-- Bugfix on `main` → next session publish **D** (if needed) → **B** or **C**
-- Short-lived `hotfix/…` from tag only when users need a build **now** and `main` must not ship yet
+- When official is near and development continues: open `release/x.y` (or `release/<product>/x.y` on side repos) from the freeze tag; finalize and maintain there
+- Bugfix / PATCH on that branch (or `main` if none) → **D** (if needed) → **B** or **C**; cherry-pick the fix to `main` (PR), never merge the release branch
+- Short-lived `hotfix/…` from tag only when users need a build **now** and the ship line must not ship yet
 
 ## How to remind
 
-One short warning + point to the playbook path + ask which path they want (default on `main` vs hotfix-from-tag). Do not silently create forbidden branches or skip porting to `main`.
+One short warning + point to the playbook path + ask which path they want. Do not silently create `develop`/`alpha`, skip PRs to `main`, or rewrite tags.
