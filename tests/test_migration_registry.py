@@ -556,3 +556,23 @@ def test_ha_sign_not_asked_for_loxone_or_empty_sign(tmp_path):
     doc["ehal"]["ha"]["sign"] = {}
     path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     assert "dm4.ha_sign" not in plan_migration(empty_dir).pending_step_ids
+
+
+def test_inverters_step_lists_pv_systems_put_on_wr_main(tmp_path):
+    """Issue #61: the migration cannot know the PV wiring; the report says what it assumed."""
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_inverter_gridfee")
+    plan = plan_migration(config_dir)
+    todo = next(t for t in plan.manual_todos if t.step_id == "dm4.inverters")
+    assert "`dach_nord`" in todo.text_de and "`dach_sued`" in todo.text_de
+    assert "wr_main" in todo.text_de and "PV-Felder" in todo.text_de
+
+
+def test_inverters_todo_absent_when_every_pv_system_has_an_inverter(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_inverter_gridfee")
+    path = config_dir / "components.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    for pv in doc["pv_systems"]:
+        pv["inverter_id"] = "wr_main"
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    plan = plan_migration(config_dir)
+    assert not any(t.step_id == "dm4.inverters" for t in plan.manual_todos)

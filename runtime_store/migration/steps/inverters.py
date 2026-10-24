@@ -5,7 +5,13 @@ import copy
 
 from house_config.inverter import needs_inverter_migration
 from house_config.migrate_inverters import migrate_components_inverters
-from runtime_store.migration.types import Answers, Docs, MigrationStep, StepResult
+from runtime_store.migration.types import (
+    Answers,
+    Docs,
+    ManualTodo,
+    MigrationStep,
+    StepResult,
+)
 
 STEP_ID = "dm4.inverters"
 
@@ -28,6 +34,37 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
     return StepResult(docs=out, changed_files=())
 
 
+def _pv_ids_without_inverter(docs: Docs) -> list[str]:
+    components = docs.get("components.json")
+    pv_systems = components.get("pv_systems") if isinstance(components, dict) else None
+    return [
+        str(pv.get("id") or "?")
+        for pv in pv_systems or []
+        if isinstance(pv, dict) and not str(pv.get("inverter_id") or "").strip()
+    ]
+
+
+def manual_todos(before: Docs, after: Docs) -> list[ManualTodo]:
+    """The migration cannot know which inverter a PV system feeds (issue #61)."""
+    assigned = _pv_ids_without_inverter(before)
+    if not assigned or _pv_ids_without_inverter(after):
+        return []
+    return [
+        ManualTodo(
+            step_id=STEP_ID,
+            text_de=(
+                "PV-Anlagen " + ", ".join(f"`{pv_id}`" for pv_id in assigned)
+                + " wurden dem Haupt-Wechselrichter `wr_main` zugeordnet (Vorgabe der "
+                "Migration, Earnie kennt die Verschaltung nicht). Speist eine Anlage "
+                "über einen eigenen Wechselrichter ein (z. B. Volleinspeiser mit "
+                "eigenem Zähler oder eine Anlage, die direkt ins Haus einspeist), im "
+                "Hauskonfigurator unter „Wechselrichter“ den Wechselrichter anlegen "
+                "und die Anlage unter „PV-Felder“ zuordnen."
+            ),
+        )
+    ]
+
+
 STEP = MigrationStep(
     id=STEP_ID,
     data_model=4,
@@ -35,4 +72,5 @@ STEP = MigrationStep(
     files=("components.json",),
     detect=detect,
     apply=apply,
+    manual_todos=manual_todos,
 )
