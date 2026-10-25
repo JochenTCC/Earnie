@@ -6,6 +6,7 @@ from typing import Any
 
 from runtime_store.cycle_recorder import read_segment_cycles
 from runtime_store.recorder_replay import ReplayResult, replay_recorded_cycle
+from tests.regression.climate_fixture import L1_CLIMATE_FIXTURE_DIR, frozen_climate_fixture
 from tests.regression.fingerprint import l1_input_fingerprint
 from tests.regression.loader import RegressionCase, resolve_recorder_root
 
@@ -37,14 +38,18 @@ def select_cycle_entry(case: RegressionCase) -> tuple[dict[str, Any], Path]:
 
 def run_l1(case: RegressionCase) -> dict[str, Any]:
     entry, recorder_root = select_cycle_entry(case)
-    result = replay_recorded_cycle(
-        entry,
-        recorder_root=recorder_root,
-        solver_mode="strict",
-        verbose=False,
-    )
+    # The thermal flex context reads Open-Meteo climate the cycle does not record.
+    with frozen_climate_fixture(L1_CLIMATE_FIXTURE_DIR) as climate_files:
+        result = replay_recorded_cycle(
+            entry,
+            recorder_root=recorder_root,
+            solver_mode="strict",
+            verbose=False,
+        )
     metrics = metrics_from_replay(result)
-    metrics["inputs"] = l1_input_fingerprint(entry=entry, recorder_root=recorder_root)
+    metrics["inputs"] = l1_input_fingerprint(
+        entry=entry, recorder_root=recorder_root, climate_files=climate_files
+    )
     return metrics
 
 
