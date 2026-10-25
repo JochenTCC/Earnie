@@ -274,6 +274,59 @@ def _block_real_http(request):
         requests.adapters.HTTPAdapter.send = original
 
 
+_EARNIE_SERVER_POST_MODULES = ("runtime_store.usage_ping", "runtime_store.feature_review")
+_blocked_earnie_server_posts: list[str] = []
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _block_earnie_server_posts():
+    """Never POST to the production earnie-server (ping / review) from tests.
+
+    ``post_json`` uses urllib, so ``_block_real_http`` does not see it; unmocked
+    consent / points paths minted a fresh install id per test and counted as real
+    installs. Session scope: a ping thread finishing after its test must still hit
+    the stub. No marker opts out. Loopback test servers (``endpoint_url``) pass.
+    """
+    import importlib
+
+    from runtime_store.server_endpoints import SERVER_BASE
+
+    patched = []
+    for name in _EARNIE_SERVER_POST_MODULES:
+        module = importlib.import_module(name)
+        original = module.post_json
+
+        def _post_json(url, body, timeout, *, log_name, _original=original):
+            if url.startswith(SERVER_BASE):
+                _blocked_earnie_server_posts.append(f"{log_name}: POST {url}")
+                raise NetworkBlockedError(f"earnie-server POST blocked in tests: {url}")
+            return _original(url, body, timeout, log_name=log_name)
+
+        module.post_json = _post_json
+        patched.append((module, original))
+    try:
+        yield
+    finally:
+        for module, original in patched:
+            module.post_json = original
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_blocked_earnie_server_post():
+    """Fail the test whose code tried to reach the production earnie-server."""
+    from runtime_store import usage_ping
+
+    _blocked_earnie_server_posts.clear()
+    yield
+    deadline = time.monotonic() + 2.0
+    while usage_ping._send_in_flight and time.monotonic() < deadline:  # noqa: SLF001
+        time.sleep(0.01)
+    if _blocked_earnie_server_posts:
+        hits = list(_blocked_earnie_server_posts)
+        _blocked_earnie_server_posts.clear()
+        pytest.fail("test tried to POST to the production earnie-server:\n" + "\n".join(hits))
+
+
 def _loxone_integration_enabled() -> bool:
     if os.getenv("EARNIE_SKIP_LOXONE_INTEGRATION") == "1":
         return False

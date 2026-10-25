@@ -13,6 +13,8 @@ from runtime_store import usage_ping as up
 def runtime_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     monkeypatch.delenv("EARNIE_USAGE_PING", raising=False)
+    # set_consent("on") → refresh_points may spawn a real ping; not under test here.
+    monkeypatch.setattr(up, "spawn_maybe_send_ping", lambda: False)
     return tmp_path / "runtime"
 
 
