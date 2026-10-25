@@ -20,13 +20,12 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 STUDY_DIR = Path(__file__).resolve().parent
 REPO_ROOT = STUDY_DIR.parents[1]
 WEATHER_DST = REPO_ROOT / "data" / "cache" / "open_meteo"
+WEATHER_AS_OF = "2026-10-22"
 REF_JOBS = 2  # historical + Live reference (see backtesting-max-workers rule)
 
 
@@ -55,20 +54,11 @@ def _install_weather_cache(weather_src: Path) -> int:
         raise SystemExit(f"Weather cache missing: {weather_src}")
     WEATHER_DST.mkdir(parents=True, exist_ok=True)
     copied = 0
-    # The current calendar year is requested as 01-01..(yesterday); alias the frozen
-    # partial-year file to that name. Only its January days are used by the study.
-    cap = (datetime.now(ZoneInfo("Europe/Vienna")).date() - timedelta(days=1)).isoformat()
-    current_year = f"_{cap[:4]}-01-01_"
     for src in sorted(weather_src.glob("*.json")):
-        names = [src.name]
-        if current_year in src.name:
-            head, _, tail = src.name.partition(current_year)
-            names.append(f"{head}{current_year}{cap}_{tail.split('_', 1)[1]}")
-        for name in names:
-            dst = WEATHER_DST / name
-            if not dst.exists():
-                shutil.copy2(src, dst)
-                copied += 1
+        dst = WEATHER_DST / src.name
+        if not dst.exists():
+            shutil.copy2(src, dst)
+            copied += 1
     return copied
 
 

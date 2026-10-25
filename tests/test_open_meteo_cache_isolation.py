@@ -52,3 +52,25 @@ def test_cache_path_env_override_wins_over_module_default(monkeypatch, tmp_path)
     overridden = archive.open_meteo_cache_path(*args)
     assert overridden.parent == tmp_path
     assert overridden.name == default_path.name
+
+
+def test_archive_latest_complete_date_honours_pinned_as_of(monkeypatch):
+    import data.price_forecast_live as live
+
+    monkeypatch.setattr(live, "_archive_latest_complete_day", lambda: date(2026, 10, 24))
+    monkeypatch.setenv("EARNIE_OPEN_METEO_AS_OF", "2026-10-22")
+    assert archive.archive_latest_complete_date() == date(2026, 10, 22)
+    assert archive._cap_inclusive_end(date(2026, 12, 31)) == date(2026, 10, 22)
+
+
+def test_archive_latest_complete_date_pin_after_latest_fails_loud(monkeypatch):
+    import data.price_forecast_live as live
+    import pytest
+
+    monkeypatch.setattr(live, "_archive_latest_complete_day", lambda: date(2026, 10, 24))
+    monkeypatch.setenv("EARNIE_OPEN_METEO_AS_OF", "2026-10-25")
+    with pytest.raises(ValueError, match="nach dem letzten Archivtag"):
+        archive.archive_latest_complete_date()
+    monkeypatch.setenv("EARNIE_OPEN_METEO_AS_OF", "gestern")
+    with pytest.raises(ValueError, match="kein ISO-Datum"):
+        archive.archive_latest_complete_date()

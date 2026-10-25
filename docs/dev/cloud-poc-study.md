@@ -23,7 +23,7 @@ PYTHONUTF8=1 python -m studies.poc_cloud.run_poc --out studies/poc_cloud/results
 | House | Synthetic, from public example data (`example_efh`, `awattar_at`, 5 kWh battery, 10 kWp PV, consumers heat pump / EV / washer / dryer / dishwasher); `annual_kwh` raised to 20040 so the consumers fit |
 | Scenarios | `live` plus the two automatic references `historical_reference` and `ref:live` |
 | Period | 2025-01-01 … 2025-12-31, 365 daily windows, `horizon_mode=sunrise_window`, `price_strategy=perfect` |
-| Prices | Frozen day-ahead CSV, zone AT (`cache/prices_AT_2025.csv` + manifest). The column keeps the loader's hard-coded name `Day Ahead Auktion (DE-LU)` |
+| Prices | Frozen day-ahead CSV, zone AT (`cache/prices_AT_2025.csv` + manifest). The column is `Day Ahead Auktion (AT)` (named after the zone) |
 | Weather | Frozen Open-Meteo archive bundles (`cache/open_meteo/`), copied to `data/cache/open_meteo` by the runner |
 | Consumption | Synthetic `cons_data.csv` (`scripts.generate_cons_data --source synthetic`, 8760 rows) |
 | Network | Blocked via dead proxy (`127.0.0.1:9`) + `EARNIE_OFFLINE=1`; a cache miss fails loudly (ProxyError) instead of fetching live data |

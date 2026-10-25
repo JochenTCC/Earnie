@@ -213,12 +213,24 @@ def _energy_charts_http(
     return _prices_to_dataframe(timestamps, pd.Series(payload['price']))
 
 
-def _prepare_energy_charts_prices(price_csv_path: str) -> pd.DataFrame:
-    """Lädt Preise aus einer Energy-Charts-CSV-Datei."""
+def energy_charts_price_column(zone: str) -> str:
+    """Spaltenname der Energy-Charts-CSV für eine Marktzone (z. B. ``Day Ahead Auktion (AT)``)."""
+    return f"Day Ahead Auktion ({zone})"
+
+
+def _prepare_energy_charts_prices(
+    price_csv_path: str, zone: str = DEFAULT_ENERGY_CHARTS_BZN
+) -> pd.DataFrame:
+    """Lädt Preise der Marktzone ``zone`` aus einer Energy-Charts-CSV-Datei."""
     _ensure_csv_exists(price_csv_path)
 
     df_prices = pd.read_csv(price_csv_path, sep=',', skiprows=[1])
-    price_col = 'Day Ahead Auktion (DE-LU)'
+    price_col = energy_charts_price_column(zone)
+    if price_col not in df_prices.columns:
+        raise ValueError(
+            f"{price_csv_path}: Spalte '{price_col}' für Marktzone {zone} fehlt "
+            f"(vorhanden: {', '.join(map(str, df_prices.columns))})."
+        )
 
     df_prices['ts_price'] = pd.to_datetime(df_prices['Datum (MEZ)'], utc=True)
     df_prices['ts_price'] = df_prices['ts_price'].dt.tz_convert('Europe/Vienna').dt.tz_localize(None)
@@ -289,7 +301,7 @@ def load_market_prices(
         path_price = sim_cfg.get('path_price')
         if not path_price:
             raise ValueError("price_source='csv' erfordert 'path_price' in der Konfiguration.")
-        df_prices = _prepare_energy_charts_prices(path_price)
+        df_prices = _prepare_energy_charts_prices(path_price, zone)
 
     mask = (df_prices.index >= start) & (df_prices.index < end + pd.Timedelta(days=1))
     df_prices = df_prices.loc[mask]

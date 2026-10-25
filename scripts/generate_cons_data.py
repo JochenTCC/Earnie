@@ -146,7 +146,7 @@ def build_synthetic(
 
     kwp = float(config.get("PV_KWP", cast=float) or 6.0)
     house_profile = resolve_runtime_house_profile()
-    if house_profile and house_profile.get("consumers"):
+    if house_profile:
         from house_config.baseload import ensure_baseload_not_over_allocated
 
         ensure_baseload_not_over_allocated(

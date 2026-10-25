@@ -147,6 +147,41 @@ def test_load_market_prices_csv_file(tmp_path):
     assert float(out.iloc[0]["price_cent_kwh"]) == pytest.approx(10.0)
 
 
+def _write_zone_csv(path, zone):
+    path.write_text(
+        f"Datum (MEZ),Day Ahead Auktion ({zone})\n"
+        "unit,EUR/MWh\n"
+        "2024-06-01T00:00:00Z,100.0\n",
+        encoding="utf-8",
+    )
+
+
+def test_load_market_prices_csv_reads_column_of_market_zone(tmp_path):
+    csv_path = tmp_path / "prices.csv"
+    _write_zone_csv(csv_path, "AT")
+    out = dl.load_market_prices(
+        pd.Timestamp("2024-06-01"),
+        pd.Timestamp("2024-06-01"),
+        {"price_source": "csv", "path_price": str(csv_path)},
+        awattar_url="https://example.test/awattar",
+        market_zone="AT",
+    )
+    assert float(out.iloc[0]["price_cent_kwh"]) == pytest.approx(10.0)
+
+
+def test_load_market_prices_csv_zone_column_missing_fails_loud(tmp_path):
+    csv_path = tmp_path / "prices.csv"
+    _write_zone_csv(csv_path, "DE-LU")
+    with pytest.raises(ValueError, match=r"Day Ahead Auktion \(AT\)"):
+        dl.load_market_prices(
+            pd.Timestamp("2024-06-01"),
+            pd.Timestamp("2024-06-01"),
+            {"price_source": "csv", "path_price": str(csv_path)},
+            awattar_url="https://example.test/awattar",
+            market_zone="AT",
+        )
+
+
 def test_load_market_prices_for_scenario_uses_zone():
     frame = _price_frame()
     with patch.object(dl, "load_market_prices", return_value=frame) as loaded:

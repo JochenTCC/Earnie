@@ -27,12 +27,12 @@ fetching live data. `--allow-network` disables that guard (cache building only).
 
 ## Known constraints
 
-- **Price CSV column name:** the CSV loader hard-codes `Day Ahead Auktion (DE-LU)`. The
-  values in the column are zone AT; the name is a loader constraint.
+- **Price CSV column name:** the CSV loader reads the column of the scenario's market zone
+  (`Day Ahead Auktion (AT)` for zone AT) and fails loud when it is missing.
 - **Weather cache keys:** Open-Meteo bundles are keyed by exact date range. The current
-  calendar year is capped at "yesterday", so its cache file name changes daily; the
-  runner aliases the frozen file to today's name (only January 2026 is used by the
-  last window).
+  calendar year is capped at the last archive day, so its file name would change daily; the
+  runner pins that day with `EARNIE_OPEN_METEO_AS_OF=2026-10-22` (the end date of the frozen
+  2026 file). Re-harvesting needs a new pin.
 - **Solver timing:** `cbc_strict_time_limit_sec` is wall-clock. A slower machine can
   hit more `strict_slow` events and produce slightly different plans.
 - **Synthetic house:** `annual_kwh` was raised to 20040 because the example's consumers

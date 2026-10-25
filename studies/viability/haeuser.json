@@ -32,7 +32,7 @@
   },
   "szenarien": {
     "_hinweis": "Tarif-IDs aus share/config/tariffs.json. Schluessel muessen duo und dynamisch heissen (evaluate.py).",
-    "duo": {"import_tariff_id": "at_vkw_strom_duo", "export_tariff_id": "at_verbund_v_strom_sonneneinspeisung_fix"},
+    "duo": {"import_tariff_id": "at_vkw_strom_duo_normalpreis", "export_tariff_id": "at_verbund_v_strom_sonneneinspeisung_fix"},
     "dynamisch": {"import_tariff_id": "at_vkw_strom_dynamisch", "export_tariff_id": "at_vkw_pv_dynamisch"}
   },
   "haeuser": [

@@ -289,6 +289,7 @@ def test_note_explorer_activated(runtime_dir: Path) -> None:
 def test_note_scenarios_calculated_forces_same_day_send(
     runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     up.set_consent("on", now=_now())
     fake = _FakeTransport(204)
     assert up.maybe_send_ping(_now(), transport=fake, endpoint_url="http://x/ping") is True
@@ -316,6 +317,7 @@ def test_note_scenarios_calculated_forces_same_day_send(
 def test_note_scenarios_calculated_bypasses_retry_gate(
     runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     up.set_consent("on", now=_now())
     fake = _FakeTransport(500)
     t0 = _now(hour=10)
@@ -351,6 +353,18 @@ def test_note_scenarios_calculated_no_send_without_consent(
     monkeypatch.setattr(up, "spawn_maybe_send_ping", lambda: spawns.append(1) or True)
     up.note_scenarios_calculated(3)
     assert up.load_state()["scenarios_calc_count"] == 3
+    assert spawns == []
+
+
+def test_note_scenarios_calculated_no_send_when_offline(
+    runtime_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    up.set_consent("on", now=_now())
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    spawns: list[int] = []
+    monkeypatch.setattr(up, "spawn_maybe_send_ping", lambda: spawns.append(1) or True)
+    up.note_scenarios_calculated(2)
+    assert up.load_state()["scenarios_calc_count"] == 2
     assert spawns == []
 
 

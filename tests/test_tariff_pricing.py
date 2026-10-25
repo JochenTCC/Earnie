@@ -431,3 +431,23 @@ def test_gross_monthly_import_adds_netznutzung_with_vat():
 def test_gross_tariff_without_vat_percent_adds_netznutzung_unchanged():
     tariff = {"type": "fixed_cent", "fix_cent_kwh": 10.0, "prices_include_vat": True}
     assert import_cent_kwh(0.0, tariff, grid_fee=flat_grid_fee_spec(5.0)) == pytest.approx(15.0)
+
+
+@pytest.mark.parametrize("tariff_id", ["at_vkw_strom_duo", "at_vkw_strom_duo_normalpreis"])
+def test_catalog_duo_covers_day_before_2025_run_start(tariff_id):
+    """The sunrise window of a run from 2025-01-01 books 2024-12-31 (exact month, no fallback)."""
+    import json
+    from pathlib import Path
+
+    from data.tariff_pricing import _monthly_table_lookup, lookup_monthly_cent
+
+    catalog = json.loads(
+        (Path(__file__).resolve().parents[1] / "share" / "config" / "tariffs.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    tariff = next(t for t in catalog["import_tariffs"] if t["id"] == tariff_id)
+    lookup = _monthly_table_lookup(tariff)
+    cent, source = lookup_monthly_cent(lookup, 2024, 12)
+    assert source is None
+    assert cent == lookup[(2025, 1)]

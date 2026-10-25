@@ -89,10 +89,28 @@ def tariff_reference_fingerprint(scenario_params: dict | None) -> tuple:
 
 
 def hardware_reference_fingerprint(scenario_params: dict | None) -> tuple:
-    """Vergleichsschlüssel für Referenz-PV (Batterie spielt in Referenz-€ keine Rolle)."""
+    """Vergleichsschlüssel für Referenz-PV: kWp und Anlagenlayout (Batterie spielt in Referenz-€ keine Rolle).
+
+    Gleiche kWp mit anderer Ausrichtung/Neigung (z. B. Ost/West statt Süd) oder anderer
+    Importquelle liefert ein anderes PV-Profil und braucht eine eigene Referenz.
+    """
     if not scenario_params:
         return ()
-    return (float(scenario_params.get("pv_kwp", 0.0) or 0.0),)
+    from data.modeled_climate import _planning_systems_from_scenario
+
+    layout = tuple(
+        sorted(
+            (round(system.kwp, 3), round(system.surface.tilt_deg, 1), round(system.surface.azimuth_deg, 1))
+            for system in _planning_systems_from_scenario(scenario_params)
+        )
+    )
+    profile = scenario_params.get("_house_profile")
+    imported_csv = (
+        str(profile.get("pv_profile_csv", "") or "").strip()
+        if isinstance(profile, dict) and scenario_params.get("use_imported_pv")
+        else ""
+    )
+    return (float(scenario_params.get("pv_kwp", 0.0) or 0.0), layout, imported_csv)
 
 
 def reference_fingerprint(scenario_params: dict | None) -> tuple:

@@ -121,10 +121,30 @@ def last_full_archive_year(*, reference: date | None = None) -> int:
 
 
 def archive_latest_complete_date() -> date:
-    """Letzter Kalendertag mit vollständigen Open-Meteo-Archivdaten."""
+    """Letzter Kalendertag mit vollständigen Open-Meteo-Archivdaten.
+
+    ``EARNIE_OPEN_METEO_AS_OF`` (ISO-Datum) pinnt den Tag: Der Cache-Schlüssel des
+    laufenden Jahres bleibt dann stabil (eingefrorene Offline-Läufe). Ein Datum nach
+    dem tatsächlich letzten Archivtag ist ein Fehler.
+    """
     from data.price_forecast_live import _archive_latest_complete_day
 
-    return _archive_latest_complete_day()
+    latest = _archive_latest_complete_day()
+    raw = read_env("OPEN_METEO_AS_OF")
+    if not raw:
+        return latest
+    try:
+        pinned = date.fromisoformat(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"EARNIE_OPEN_METEO_AS_OF={raw!r} ist kein ISO-Datum (JJJJ-MM-TT)."
+        ) from exc
+    if pinned > latest:
+        raise ValueError(
+            f"EARNIE_OPEN_METEO_AS_OF={raw} liegt nach dem letzten Archivtag "
+            f"{latest.isoformat()}."
+        )
+    return pinned
 
 
 def _cap_inclusive_end(end: date) -> date:

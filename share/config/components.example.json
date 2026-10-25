@@ -8,7 +8,10 @@
             "type": "hybrid",
             "ac_connection": "grid_tied",
             "control": "full",
-            "ehal_bindings": {},
+            "ehal_bindings": {
+                "inv.wr_main.sens_inv_power_pv": "",
+                "inv.wr_main.set_inv_ac_power_limit": ""
+            },
             "efficiency": 0.97
         }
     ],
@@ -27,7 +30,13 @@
             "limits_from_live": false,
             "control": "full",
             "regulates_on": "grid",
-            "ehal_bindings": {},
+            "ehal_bindings": {
+                "ess.default_5kwh.sens_ess_soc": "",
+                "ess.default_5kwh.sens_ess_power": "",
+                "ess.default_5kwh.set_ess_charge_power_limit": "",
+                "ess.default_5kwh.set_ess_discharge_power_limit": "",
+                "ess.default_5kwh.set_ess_active_power": ""
+            },
             "battery_wear": {
                 "enabled": true,
                 "replacement_cost_euro": 1500,
@@ -49,7 +58,13 @@
             "limits_from_live": false,
             "control": "full",
             "regulates_on": "grid",
-            "ehal_bindings": {},
+            "ehal_bindings": {
+                "ess.upgrade_10kwh.sens_ess_soc": "",
+                "ess.upgrade_10kwh.sens_ess_power": "",
+                "ess.upgrade_10kwh.set_ess_charge_power_limit": "",
+                "ess.upgrade_10kwh.set_ess_discharge_power_limit": "",
+                "ess.upgrade_10kwh.set_ess_active_power": ""
+            },
             "battery_wear": {
                 "enabled": true,
                 "replacement_cost_euro": 3000,

@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Literal
 
-from runtime_store.env_vars import read_env
+from runtime_store.env_vars import is_explicit_offline, read_env
 from runtime_store.install_context import detect_install_context
 from runtime_store.persist_paths import usage_ping_state_file
 from runtime_store.server_endpoints import PATH_PING, post_json, resolve_endpoint
@@ -344,7 +344,8 @@ def note_scenarios_calculated(n: int) -> None:
 
     Requires ``n > 0``. Clears ``last_sent_date`` and ``last_attempt_at`` so a
     successful calc can POST again the same UTC day (and bypass the 1 h retry
-    gate). Wire payload stays unchanged (counter is local only).
+    gate). Wire payload stays unchanged (counter is local only). Nothing is sent
+    under ``EARNIE_OFFLINE=1`` (the counter is still bumped).
     """
     if int(n) <= 0:
         raise ValueError(f"usage_ping: scenarios calculated count must be > 0, got {n!r}")
@@ -356,7 +357,11 @@ def note_scenarios_calculated(n: int) -> None:
             state.pop("last_sent_date", None)
             state.pop("last_attempt_at", None)
         save_state(state)
-        if str(state.get("consent") or "unset") == "on" and not is_kill_switch_off():
+        if (
+            str(state.get("consent") or "unset") == "on"
+            and not is_kill_switch_off()
+            and not is_explicit_offline()
+        ):
             spawn_maybe_send_ping()
     except Exception as exc:
         logger.warning("usage_ping: scenarios_calc_count bump failed: %s", exc)

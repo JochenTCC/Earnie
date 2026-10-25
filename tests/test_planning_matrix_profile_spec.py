@@ -624,3 +624,41 @@ def test_plan_per_scenario_reference_tasks_force_off_shares_live_ref():
     assert ref_by["live"] == live_ref_id
     assert ref_by["big_pv"] == live_ref_id
     assert [spec[0] for spec in extra_specs] == [live_ref_id]
+
+
+def _pv_scenario(systems: list[tuple[float, float, float]]) -> dict:
+    return {
+        "pv_kwp": sum(kwp for kwp, _tilt, _az in systems),
+        "_planning_pv_systems": [
+            {"id": f"pv{i}", "pv_kwp": kwp, "pv_tilt": tilt, "pv_azimuth": az}
+            for i, (kwp, tilt, az) in enumerate(systems)
+        ],
+    }
+
+
+def test_reference_not_shared_for_same_kwp_but_other_pv_layout():
+    from simulation.reference_costs import plan_per_scenario_reference_tasks
+
+    scenarios = {
+        "live": _pv_scenario([(10.0, 25.0, 0.0)]),
+        "pv_east_west": _pv_scenario([(5.0, 25.0, -90.0), (5.0, 25.0, 90.0)]),
+    }
+    reference_by_scenario, _labels, extra_specs = plan_per_scenario_reference_tasks(
+        scenarios, live_scenario_id="live"
+    )
+    assert reference_by_scenario["live"] != reference_by_scenario["pv_east_west"]
+    assert {ref_id for ref_id, _p, _l in extra_specs} == {
+        reference_by_scenario["live"],
+        reference_by_scenario["pv_east_west"],
+    }
+
+
+def test_reference_shared_for_same_pv_layout_with_other_battery():
+    from simulation.reference_costs import plan_per_scenario_reference_tasks
+
+    live = _pv_scenario([(10.0, 25.0, 0.0)])
+    scenarios = {"live": live, "battery_10kwh": {**live, "battery_kwh": 10.0}}
+    reference_by_scenario, _labels, _specs = plan_per_scenario_reference_tasks(
+        scenarios, live_scenario_id="live"
+    )
+    assert reference_by_scenario["live"] == reference_by_scenario["battery_10kwh"]

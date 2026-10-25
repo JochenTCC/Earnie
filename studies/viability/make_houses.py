@@ -2,7 +2,7 @@
 
 For every house this writes ``<out>/<id>/pack/config`` and migrates it with Earnie's own
 ``scripts.migrate_config``. Parameters come from parameters.json (``--params FILE`` selects another). Two scenarios per house, both with ``own_reference``:
-  duo        VKW Strom Duo + fixed feed-in        -> reference = B0, optimised = E0
+  duo        VKW Strom Duo (Normalpreis) + fixed feed-in        -> reference = B0, optimised = E0
   dynamisch  VKW Strom Dynamisch + PV-Dynamisch   -> reference = B1, optimised = E1
 
   python -m studies.viability.make_houses --ids A09-m,A18-m --out studies/viability/packs
@@ -165,19 +165,6 @@ def _components(house: cat.Archetype, pv_pr: float):
     return example, [b["id"] for b in batteries], [p["id"] for p in pv_systems]
 
 
-def _extend_duo_to_2024_12(tariffs_path: Path) -> None:
-    """ASSUMPTION: the catalogue's Duo table starts 2025-01, but the first simulation window
-    starts on 2024-12-31. Add 2024-12 with the 2025-12 value (marked in ``notes``)."""
-    doc = _load(tariffs_path)
-    duo = next(t for t in doc["import_tariffs"] if t["id"] == "at_vkw_strom_duo")
-    rates = duo["monthly_rates"]
-    if not any(r["year"] == 2024 and r["month"] == 12 for r in rates):
-        dec_2025 = next(r["tariff_cent_kwh"] for r in rates if r["year"] == 2025 and r["month"] == 12)
-        rates.insert(0, {"year": 2024, "month": 12, "tariff_cent_kwh": dec_2025})
-        duo["notes"] = (duo.get("notes", "") + " [Studie: 2024-12 = Wert 2025-12, Annahme]").strip()
-    _dump(tariffs_path, doc)
-
-
 def build_house(house: cat.Archetype, out_dir: Path, pv_pr: float = 1.0) -> Path:
     root = out_dir / house.id
     config_dir = root / "pack" / "config"
@@ -188,7 +175,6 @@ def build_house(house: cat.Archetype, out_dir: Path, pv_pr: float = 1.0) -> Path
 
     for name in ("tariffs.json", "grid_fees.json"):
         shutil.copy2(SHARE / name, config_dir / name)
-    _extend_duo_to_2024_12(config_dir / "tariffs.json")
     shutil.copy2(SHARE / "deviation_rules.example.json", config_dir / "deviation_rules.json")
 
     config = _load(POC_PACK_CONFIG / "config.json")

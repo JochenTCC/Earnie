@@ -1,9 +1,9 @@
 """Fetch day-ahead prices once (online) and freeze them as a CSV for offline runs.
 
 Writes the Energy-Charts CSV layout that ``data.data_loader._prepare_energy_charts_prices``
-reads (``price_source: csv``). The loader hard-codes the column name
-``Day Ahead Auktion (DE-LU)``; the values written here are the zone passed via
-``--zone`` (default AT), so the column name is a loader constraint, not the zone.
+reads (``price_source: csv``). The price column is named after the zone passed via
+``--zone`` (default AT), e.g. ``Day Ahead Auktion (AT)``; the loader picks the column
+of the scenario's market zone.
 
   python -m studies.poc_cloud.fetch_prices --start 2025-01-01 --end 2026-01-04
 """
@@ -19,11 +19,12 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from data.data_loader import energy_charts_price_column
+
 STUDY_DIR = Path(__file__).resolve().parent
 CACHE_DIR = STUDY_DIR / "cache"
 URL = "https://api.energy-charts.info/price"
 HEADERS = {"User-Agent": "Earnie-SE/2.5 (study cache)", "Accept": "application/json"}
-LOADER_PRICE_COLUMN = "Day Ahead Auktion (DE-LU)"
 
 
 def _month_chunks(start: date, end: date) -> list[tuple[date, date]]:

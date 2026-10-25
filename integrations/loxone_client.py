@@ -264,11 +264,12 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
         from ehal.loxone_push_source import is_pushable_kind, resolve_push_binding
         from ehal.qualified_ids import field_kind
         from runtime_store.ehal_push_inbox import read_push_value
+        from runtime_store.env_vars import is_explicit_offline
 
         binding = resolve_push_binding(name)
         if binding is not None:
             value, state = read_push_value(binding.ehal_id)
-            if value is None:
+            if value is None and not is_explicit_offline():
                 logger.warning(
                     "EHAL push: no value for '%s' (%s, state=%s)",
                     name,
@@ -279,7 +280,7 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
         if _looks_like_ehal_id(name):
             if is_pushable_kind(field_kind(name)):
                 value, state = read_push_value(name)
-                if value is None:
+                if value is None and not is_explicit_offline():
                     logger.warning(
                         "EHAL push: no value for unbound '%s' (state=%s)",
                         name,
