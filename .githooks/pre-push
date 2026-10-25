@@ -23,12 +23,20 @@ while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
   if [ "$REMOTE_REF" = "refs/heads/main" ]; then
     sh scripts/check_no_release_merge.sh "$REMOTE_SHA" "$COMMIT" || exit 1
   fi
+  CHANGED=""
+  KNOWN_RANGE=""
   if [ "$REMOTE_SHA" != "$ZERO" ] && git cat-file -e "$REMOTE_SHA^{commit}" 2>/dev/null; then
     CHANGED="$(git diff --name-only "$REMOTE_SHA" "$COMMIT" | tr -d '\r')"
-    if [ -z "$CHANGED" ] || ! echo "$CHANGED" | grep -qvE "$SKIP_RE"; then
-      echo "pre-push: $REMOTE_REF — nur Doku/PNG/YAML/Workspace/Workflow/Hooks geändert, Regression übersprungen."
-      continue
-    fi
+    KNOWN_RANGE=1
+  elif git rev-parse -q --verify refs/remotes/origin/HEAD >/dev/null; then
+    # New branch: only the commits that are not on any origin branch yet
+    # (merges count with their first-parent diff, so merged-in code still runs).
+    CHANGED="$(git log --format= --name-only --diff-merges=first-parent "$COMMIT" --not --remotes=origin | tr -d '\r' | sed '/^$/d' | sort -u)"
+    KNOWN_RANGE=1
+  fi
+  if [ -n "$KNOWN_RANGE" ] && { [ -z "$CHANGED" ] || ! echo "$CHANGED" | grep -qvE "$SKIP_RE"; }; then
+    echo "pre-push: $REMOTE_REF — nur Doku/PNG/YAML/Workspace/Workflow/Hooks geändert, Regression übersprungen."
+    continue
   fi
   if [ "$COMMIT" != "$HEAD_SHA" ]; then
     echo "pre-push: $LOCAL_REF ($COMMIT) ist nicht HEAD ($HEAD_SHA)." >&2
