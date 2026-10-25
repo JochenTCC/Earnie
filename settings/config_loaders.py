@@ -237,7 +237,7 @@ def should_defer_runtime_params(
     from runtime_store.offline_demo_seed import live_scenario_refs_incomplete
     from ui.setup_readiness import (
         is_planning_ready_for,
-        needs_planning_onboarding_from_raw,
+        needs_planning_onboarding_from_profiles,
     )
 
     # Empty live entity refs must not abort config load (cloud demo skips seed;
@@ -249,7 +249,7 @@ def should_defer_runtime_params(
     ):
         return True
 
-    if not needs_planning_onboarding_from_raw(raw_config):
+    if not needs_planning_onboarding_from_profiles():
         return False
     return not is_planning_ready_for(
         raw_config,

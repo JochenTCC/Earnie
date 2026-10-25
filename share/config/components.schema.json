@@ -68,7 +68,7 @@
     },
     "battery_entity": {
       "type": "object",
-      "description": "Hausbatterie oder Powerstation (2.7.g/h); nicht E-Auto — siehe flexible_consumers.",
+      "description": "Hausbatterie oder Powerstation (2.7.g/h); nicht E-Auto — siehe Hausprofil-Verbraucher.",
       "required": [
         "id",
         "battery_capacity_kwh",

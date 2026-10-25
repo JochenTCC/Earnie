@@ -88,7 +88,6 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
         json.dumps(
             {
                 "live_scenario_id": "live",
-                "flexible_consumers": [],
                 "system": {"global_timeout": 10, "loop_timeout": 900},
                 "loxone_blocks": {
                     "soc_name": "Battery_SOC",
@@ -598,7 +597,6 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
         json.dumps(
             {
                 "live_scenario_id": "live",
-                "flexible_consumers": [],
             }
         ),
         encoding="utf-8",

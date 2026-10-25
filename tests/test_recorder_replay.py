@@ -37,7 +37,7 @@ def _cfg_with_battery(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
-        config_payload=minimal_config_payload(extra={"flexible_consumers": []}),
+        config_payload=minimal_config_payload(),
         components_payload=minimal_components_payload(
             extra={
                 "inverters": [main_hybrid_inverter()],

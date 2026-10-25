@@ -1,0 +1,120 @@
+[
+    {
+        "id": "swimspa",
+        "name": "SwimSpa",
+        "chart_color_index": 0,
+        "nominal_power_kw": 2.8,
+        "min_power_kw": null,
+        "daily_target_kwh": 8.0,
+        "daily_target_source": "historical",
+        "loxone_target_kwh_name": "",
+        "loxone_target_hours_name": "",
+        "min_on_quarterhours": 1,
+        "path_historical_log": "tests/fixtures/backtesting/swimspa.csv",
+        "signal_type": "power",
+        "log_signal_type": "power",
+        "optimizer_enabled": true,
+        "loxone_outputs": {
+            "enable_name": "SwimSpa_Enable"
+        },
+        "loxone_inputs": {
+            "power_name": "SwimSpa_Power"
+        },
+        "charging_schedule": null,
+        "thermal_control": null,
+        "filter_schedule": null,
+        "ehal_bindings": {
+            "flex.swimspa.set_enable": "SwimSpa_Enable",
+            "flex.swimspa.sens_power_act": "SwimSpa_Power"
+        }
+    },
+    {
+        "id": "eauto",
+        "name": "E-Auto",
+        "chart_color_index": 2,
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "daily_target_kwh": 0.0,
+        "daily_target_source": "loxone",
+        "loxone_target_kwh_name": "",
+        "loxone_target_hours_name": "",
+        "min_on_quarterhours": 1,
+        "path_historical_log": "tests/fixtures/backtesting/eauto.csv",
+        "signal_type": "power",
+        "log_signal_type": "power",
+        "optimizer_enabled": true,
+        "loxone_outputs": {
+            "power_setpoint_name": "EAuto_Target_kW"
+        },
+        "loxone_inputs": {
+            "power_name": "EAuto_Power"
+        },
+        "charging_schedule": {
+            "enabled": true,
+            "forecast_when_absent": true,
+            "target_soc_percent": 100.0,
+            "charging_efficiency": 0.9,
+            "weekday": {
+                "car_available_from_hour": 15,
+                "ready_by_hour": 7,
+                "daily_rest_soc": 20.0
+            },
+            "weekend": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 10,
+                "daily_rest_soc": 40.0
+            },
+            "loxone": {
+                "plugged_in_name": "EAuto_Plugged",
+                "ready_by_time_name": "EAuto_ReadyBy",
+                "soc_at_plug_in_name": "EAuto_RestSOC",
+                "nominal_power_kw_name": "EAuto_Max_kW",
+                "battery_capacity_kwh_name": "EAuto_Battery_kWh",
+                "charge_immediate_remaining_name": "EAuto_ChargeNowRemaining",
+                "charge_immediate_name": "EAuto_ChargeNow"
+            }
+        },
+        "thermal_control": null,
+        "filter_schedule": null,
+        "ehal_bindings": {
+            "set_evcs_max_current": "EAuto_Target_kW",
+            "set_evcs_mode": "EAuto_Mode",
+            "flex.eauto.sens_power_act": "EAuto_Power",
+            "sens_evcs_connected": "EAuto_Plugged",
+            "get_evcs_ready_by_time": "EAuto_ReadyBy",
+            "sens_evcs_soc_act": "EAuto_RestSOC",
+            "charge_immediate_name": "EAuto_ChargeNow",
+            "sens_evcs_bat_capacity": "EAuto_Battery_kWh",
+            "get_evcs_nominal_current": "EAuto_Max_kW"
+        }
+    },
+    {
+        "id": "waermepumpe",
+        "name": "Wärmepumpe",
+        "chart_color_index": 7,
+        "nominal_power_kw": 1.6,
+        "min_power_kw": null,
+        "daily_target_kwh": 4.0,
+        "daily_target_source": "historical",
+        "loxone_target_kwh_name": "",
+        "loxone_target_hours_name": "",
+        "min_on_quarterhours": 2,
+        "path_historical_log": "tests/fixtures/backtesting/waermepumpe.csv",
+        "signal_type": "power",
+        "log_signal_type": "binary",
+        "optimizer_enabled": true,
+        "loxone_outputs": {
+            "enable_name": "WP_Enable"
+        },
+        "loxone_inputs": {
+            "power_name": "WP_Power"
+        },
+        "charging_schedule": null,
+        "thermal_control": null,
+        "filter_schedule": null,
+        "ehal_bindings": {
+            "flex.waermepumpe.set_enable": "WP_Enable",
+            "flex.waermepumpe.sens_power_act": "WP_Power"
+        }
+    }
+]

@@ -54,7 +54,6 @@ def _prepare_cloud_like(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
         _with_model(
             {
                 "live_scenario_id": "live",
-                "flexible_consumers": [],
                 "planning_horizon": {"mode": "sunrise_window"},
                 "loxone_blocks": {
                     "soc_name": "Battery_SOC",

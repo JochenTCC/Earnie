@@ -51,6 +51,12 @@ def reject_legacy_config_blocks(raw_config: dict) -> None:
             "MILP-Parameter gehören in charging_schedule.milp am E-Auto-Verbraucher "
             "(Hausprofil / bridged flexible_consumers)."
         )
+    if "flexible_consumers" in raw_config:
+        raise ValueError(
+            "Block 'flexible_consumers' in config.json ist entfernt. "
+            "Verbraucher gehören ins Hausprofil (house_profiles.json); "
+            "Migration: python -m scripts.migrate_config."
+        )
     appliance_settings.reject_legacy_appliances_block(raw_config)
 
 

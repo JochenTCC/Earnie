@@ -5,12 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
 
 from runtime_store.config_load import load_config_or_exit
 
 config = load_config_or_exit()
-from config import CONFIG_JSON_PATH
 from data.thermal_backtest import backtest_heat_loss_kw_per_k, load_merged_history
 from data.thermal_calibration import estimate_heat_loss_kw_per_k
 
@@ -53,19 +51,27 @@ def _load_consumer(consumer_id: str) -> dict:
 
 
 def _write_u_to_config(consumer_id: str, u_value: float) -> None:
-    path = Path(CONFIG_JSON_PATH)
-    data = config.Config._read_json_dict(str(path))
-    for entry in data.get("flexible_consumers", []):
-        if entry.get("id") != consumer_id:
-            continue
-        block = entry.setdefault("thermal_control", {})
-        block["heat_loss_kw_per_k"] = round(float(u_value), 5)
-        break
-    else:
-        raise ValueError(f"Verbraucher '{consumer_id}' nicht in config.json.")
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(data, handle, indent=4, ensure_ascii=False)
-        handle.write("\n")
+    """Schreibt ``heat_loss_kw_per_k`` in den thermal_rc-Verbraucher des Hausprofils."""
+    from ui.house_config_io import load_house_profiles, save_house_profiles
+
+    doc = load_house_profiles()
+    profiles = doc.get("profiles", [])
+    if isinstance(profiles, dict):
+        profiles = list(profiles.values())
+    for profile in profiles:
+        for consumer in profile.get("consumers", []):
+            if consumer.get("id") != consumer_id:
+                continue
+            if consumer.get("type") != "thermal_rc":
+                raise ValueError(
+                    f"Verbraucher '{consumer_id}' ist kein thermal_rc-Verbraucher."
+                )
+            nested = consumer.get("thermal_rc")
+            target = nested if isinstance(nested, dict) else consumer
+            target["heat_loss_kw_per_k"] = round(float(u_value), 5)
+            save_house_profiles(doc)
+            return
+    raise ValueError(f"Verbraucher '{consumer_id}' nicht in house_profiles.json.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -141,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"config.json konnte nicht aktualisiert werden: {exc}", file=sys.stderr)
             return 1
         print(
-            f"\nconfig.json aktualisiert: thermal_control.heat_loss_kw_per_k = "
+            f"\nhouse_profiles.json aktualisiert: heat_loss_kw_per_k = "
             f"{round(u_calibrated, 5)}"
         )
     else:

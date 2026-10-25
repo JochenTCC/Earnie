@@ -11,6 +11,9 @@ from runtime_store.migration.steps.grid_fee_profile import STEP as GRID_FEE
 from runtime_store.migration.steps.inverters import STEP as INVERTERS
 from runtime_store.migration.steps.loxone_binding_names import STEP as LOXONE_NAMES
 from runtime_store.migration.steps.pool_filter import STEP as POOL_FILTER
+from runtime_store.migration.steps.flexible_consumers_overlay import (
+    STEP as FLEX_OVERLAY,
+)
 from runtime_store.migration.steps.ehal_http_port import STEP as EHAL_HTTP_PORT
 from runtime_store.migration.steps.ha_pull_removal import STEP as HA_PULL_REMOVAL
 from runtime_store.migration.steps.ha_sign import STEP as HA_SIGN
@@ -43,6 +46,7 @@ STEPS: tuple[MigrationStep, ...] = (
     CONSUMER_FLEX,
     RETIRE_PLANT_PV,
     SE_CONF_DEFAULTS,
+    FLEX_OVERLAY,
 )
 
 STEP_BY_ID: dict[str, MigrationStep] = {step.id: step for step in STEPS}

@@ -73,6 +73,10 @@ def _apply_default_test_config_env() -> None:
 
 _apply_default_test_config_env()
 
+from tests.fixtures.backtesting_fixtures import install_fixture_flex_consumers  # noqa: E402
+
+install_fixture_flex_consumers()
+
 
 def _has_runtime_cons_data() -> bool:
     return (ROOT / "cons_data.csv").is_file() or (

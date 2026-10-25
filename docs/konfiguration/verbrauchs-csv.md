@@ -213,7 +213,7 @@ Kurzanleitung für die Einrichtung. Details und Rollen-Tabelle stehen in der [EF
 | ---------------- | ---------------------------------------------------------------------- | -------------------------------- |
 | Runtime          | `scenario_explorer_conf.path_cons_data` → `cons_data.csv`       | Live + Szenario-Explorer         |
 | Hausmodell       | `house_profiles`: `total_profile_csv`, `pv_profile_csv`, `profile_csv` | Planung, Ist-vs-Modell, Synthese |
-| Offline-Flex-Log | `path_historical_log` am Verbraucher (Legacy-Overlay / Profil)         | Einzelserie → cons_data          |
+| Offline-Flex-Log | `path_historical_log` am Hausprofil-Verbraucher (nur Pool-Filter)      | Einzelserie → cons_data          |
 
 
-Das Feld `path_historical_log` (flexible Verbraucher, Hausprofil) gehört zum Offline-Weg Loxone-Log → `cons_data.csv`. Es ist unabhängig von den Jahres-CSVs im Hausprofil. Die früheren Keys `path_consumption` / `path_production` in `config.json` sind entfernt (data-model v3).
+Das Feld `path_historical_log` (Hausprofil-Verbraucher, derzeit nur Pool-Filter) gehört zum Offline-Weg Loxone-Log → `cons_data.csv`. Es ist unabhängig von den Jahres-CSVs im Hausprofil. Die früheren Keys `path_consumption` / `path_production` in `config.json` sind entfernt (data-model v3).

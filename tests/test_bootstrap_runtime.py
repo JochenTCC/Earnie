@@ -25,8 +25,7 @@ def test_bootstrap_creates_missing_files_without_overwriting(tmp_path, monkeypat
             {
                 "batteries": [],
                 "pv_systems": [],
-                "flexible_consumers": [],
-            }
+                    }
         ),
         encoding="utf-8",
     )

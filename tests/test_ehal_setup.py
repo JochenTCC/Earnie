@@ -196,7 +196,6 @@ def test_deferred_loxone_does_not_block_live_for_ha(tmp_path, monkeypatch):
     config_path.write_text(
         json.dumps(
             {
-                "flexible_consumers": [],
                 "ehal": {
                     "backend": "ha",
                     "ha": {},

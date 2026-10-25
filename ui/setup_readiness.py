@@ -28,11 +28,6 @@ def _read_json_document(path: str) -> dict:
     return {}
 
 
-def _config_has_legacy_flex_entries(raw: dict) -> bool:
-    flex = raw.get("flexible_consumers")
-    return isinstance(flex, list) and len(flex) > 0
-
-
 def _consumer_has_live_wiring(consumer: dict) -> bool:
     """True when a profile consumer is wired for live control (legacy or EHAL)."""
     if consumer.get("loxone_inputs") or consumer.get("loxone_outputs"):
@@ -62,27 +57,17 @@ def _house_profile_has_live_loxone_consumers(profiles_doc: dict) -> bool:
                 return True
     return False
 
-def needs_planning_onboarding_from_raw(
-    raw: dict,
-    *,
-    profiles_doc: dict | None = None,
-) -> bool:
-    """True nach Minimal-Bootstrap (keine Live-Verbraucher in config.json)."""
-    if _config_has_legacy_flex_entries(raw):
-        return False
-    if profiles_doc is not None and _house_profile_has_live_loxone_consumers(profiles_doc):
-        return False
-    flex = raw.get("flexible_consumers")
-    if isinstance(flex, list):
-        return len(flex) == 0
-    return not flex
+def needs_planning_onboarding_from_profiles(profiles_doc: dict | None = None) -> bool:
+    """True nach Minimal-Bootstrap (keine Live-Verbraucher im Hausprofil)."""
+    if profiles_doc is None:
+        return True
+    return not _house_profile_has_live_loxone_consumers(profiles_doc)
 
 
 def needs_planning_onboarding() -> bool:
-    """True nach Minimal-Bootstrap (keine Live-Verbraucher in config.json)."""
-    raw = _read_json_document(resolve_config_json_path())
+    """True nach Minimal-Bootstrap (keine Live-Verbraucher im Hausprofil)."""
     profiles_doc = _read_json_document(resolve_house_profiles_json_path())
-    return needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc)
+    return needs_planning_onboarding_from_profiles(profiles_doc)
 
 def _iter_profiles_from_doc(doc: dict):
     profiles = doc.get("profiles", [])
@@ -134,7 +119,7 @@ def missing_house_config_items_for(
 ) -> list[str]:
     """Fehlende Schritte im Hauskonfigurator (Hausprofil, Batterie)."""
     profiles_doc = _read_json_document(house_profiles_path)
-    if not needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc):
+    if not needs_planning_onboarding_from_profiles(profiles_doc):
         return []
 
     missing: list[str] = []
@@ -231,7 +216,7 @@ def missing_runtime_scenario_items_for(
 ) -> list[str]:
     """Fehlende Schritte für Live-Szenario und Echtzeit-Umgebung."""
     profiles_doc = _read_json_document(house_profiles_path)
-    if not needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc):
+    if not needs_planning_onboarding_from_profiles(profiles_doc):
         return []
 
     from house_config.scenario_resolution import (
@@ -288,7 +273,7 @@ def is_planning_ready_for(
 ) -> bool:
     """Alle Mindestanforderungen für Szenario-Explorer erfüllt (explizite Pfade)."""
     profiles_doc = _read_json_document(house_profiles_path)
-    if not needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc):
+    if not needs_planning_onboarding_from_profiles(profiles_doc):
         return True
     return not missing_planning_setup_items_for(
         raw,

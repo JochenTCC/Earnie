@@ -56,7 +56,7 @@ def test_needs_loxone_setup_deferred_during_planning_onboarding(tmp_path, monkey
     monkeypatch.delenv("LOXONE_USER", raising=False)
     monkeypatch.delenv("LOXONE_PASS", raising=False)
     (config_dir / "config.json").write_text(
-        '{"flexible_consumers": [], "live_scenario_id": "live"}',
+        '{"live_scenario_id": "live"}',
         encoding="utf-8",
     )
     (config_dir / "components.json").write_text('{"batteries": [], "pv_systems": []}', encoding="utf-8")
@@ -87,8 +87,14 @@ def test_require_loxone_credentials_for_prod_without_onboarding(tmp_path, monkey
     monkeypatch.delenv("LOXONE_IP", raising=False)
     monkeypatch.delenv("LOXONE_USER", raising=False)
     monkeypatch.delenv("LOXONE_PASS", raising=False)
-    (config_dir / "config.json").write_text(
-        '{"flexible_consumers": [{"id": "swimspa"}]}',
+    (config_dir / "config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv(
+        "EARNIE_HOUSE_PROFILES_PATH",
+        str(config_dir / "house_profiles.json"),
+    )
+    (config_dir / "house_profiles.json").write_text(
+        '{"profiles": [{"id": "p", "consumers": '
+        '[{"id": "swimspa", "loxone_inputs": {"power_name": "Swimspa_P"}}]}]}',
         encoding="utf-8",
     )
 
@@ -102,8 +108,14 @@ def test_loxone_setup_not_deferred_when_betrieb_unlocked(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
-    (config_dir / "config.json").write_text(
-        '{"flexible_consumers": [{"id": "swimspa"}]}',
+    (config_dir / "config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv(
+        "EARNIE_HOUSE_PROFILES_PATH",
+        str(config_dir / "house_profiles.json"),
+    )
+    (config_dir / "house_profiles.json").write_text(
+        '{"profiles": [{"id": "p", "consumers": '
+        '[{"id": "swimspa", "loxone_inputs": {"power_name": "Swimspa_P"}}]}]}',
         encoding="utf-8",
     )
     monkeypatch.setattr("ui.setup_readiness._loxone_markers_complete", lambda: True)

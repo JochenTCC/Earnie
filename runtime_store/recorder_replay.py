@@ -82,6 +82,20 @@ def load_config_snapshot(recorder_root: Path | str, config_hash: str) -> dict[st
     return payload
 
 
+def _drop_removed_empty_overlay(content: str) -> str:
+    """Recordings made before ``flexible_consumers`` was removed carry ``[]``; a filled block is an error."""
+    doc = json.loads(content)
+    if not isinstance(doc, dict) or "flexible_consumers" not in doc:
+        return content
+    if doc["flexible_consumers"]:
+        raise ValueError(
+            "recorded config.json uses the removed 'flexible_consumers' overlay; "
+            "replay needs a recording made after consumers moved to the house profile."
+        )
+    del doc["flexible_consumers"]
+    return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
+
+
 def materialize_config_snapshot(
     snapshot: dict[str, Any],
     dest_env: Path | str,
@@ -103,6 +117,8 @@ def materialize_config_snapshot(
             raise TypeError(
                 f"snapshot file {archive_name!r} must be text, got {type(content)!r}"
             )
+        if rel == "config/config.json":
+            content = _drop_removed_empty_overlay(content)
         target = env_root / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")

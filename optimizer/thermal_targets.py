@@ -51,7 +51,7 @@ def _resolve_heat_loss(thermal: dict) -> float:
     if configured is None:
         raise ValueError(
             "heat_loss_kw_per_k fehlt – zuerst "
-            "'python -m scripts.tune_thermal_model' ausführen und Wert in config.json eintragen."
+            "'python -m scripts.tune_thermal_model' ausführen und Wert im Hausprofil eintragen."
         )
     configured = float(configured)
     if configured < 0:

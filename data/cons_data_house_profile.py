@@ -18,7 +18,7 @@ from data.consumption_profiles import (
 from house_config.baseload import profile_baseload_kwh
 from house_config.profiles_store import load_house_profiles_document
 from runtime_store.persist_paths import resolve_house_profiles_json_path
-from settings.flexible_consumers import normalize_consumer, runtime_consumer_id
+from settings.flexible_consumers import runtime_consumer_id
 
 if TYPE_CHECKING:
     from data.modeled_climate import ModeledClimateContext
@@ -92,17 +92,6 @@ def resolve_runtime_house_profile() -> dict | None:
     return None
 
 
-def _configured_flexible_consumer_ids() -> list[str]:
-    """IDs aus config.flexible_consumers (ohne Planungs-Merge) für cons_data-Spalten."""
-    raw = config.CONFIG._raw_config.get("flexible_consumers", [])
-    consumers = [
-        normalize_consumer(entry)
-        for entry in raw
-        if isinstance(entry, dict) and entry.get("id")
-    ]
-    return [runtime_consumer_id(c) for c in consumers]
-
-
 def _house_profile_consumer_ids(profile: dict) -> list[str]:
     """Alle modellierten Verbraucher-IDs — identisch zur Synthese."""
     from data.consumption_profiles import _consumer_id as cid_fn
@@ -164,10 +153,7 @@ def current_cons_data_synthesis_fingerprint() -> str | None:
 
 
 def expected_cons_data_consumer_ids() -> list[str]:
-    """Verbraucher-IDs für cons_data: config.flexible_consumers oder Hausprofil."""
-    flex_ids = _configured_flexible_consumer_ids()
-    if flex_ids:
-        return flex_ids
+    """Verbraucher-IDs für cons_data: aktives Hausprofil."""
     profile = resolve_runtime_house_profile()
     if not profile:
         return []

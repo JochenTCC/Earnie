@@ -40,7 +40,7 @@ Nach `up` und vor der manuellen Ersteinrichtung sollten u. a. diese Dateien vorh
 
 | Pfad | Erwartung |
 |------|-----------|
-| `greenfield/config/config.json` | Aus `config.minimal.json`: leere `flexible_consumers`, `live_scenario_id: live`, Platzhalter-Loxone |
+| `greenfield/config/config.json` | Aus `config.minimal.json`: `live_scenario_id: live`, Platzhalter-Loxone |
 | `greenfield/config/components.json` | Aus `components.minimal.json`: leere `batteries`/`pv_systems` |
 | `greenfield/config/config.example.json` | Vollständiges Referenzbeispiel (Earnie), nur zum Nachschlagen |
 | `greenfield/config/.env` | Aus `.env.example` (Platzhalter → Setup-Seite) |

@@ -36,17 +36,9 @@ def test_is_cons_data_populated_false_when_header_only(tmp_path):
 
 
 def _patch_config_flex_ids(monkeypatch, ids: list[str]) -> None:
-    import config
-
     monkeypatch.setattr(
-        config.CONFIG,
-        "_raw_config",
-        {
-            "flexible_consumers": [
-                {"id": consumer_id, "chart_color_index": index % 8}
-                for index, consumer_id in enumerate(ids)
-            ]
-        },
+        "data.cons_data_house_profile.expected_cons_data_consumer_ids",
+        lambda: list(ids),
     )
 
 
@@ -118,16 +110,13 @@ def test_expected_ids_match_house_profile_synthesis(tmp_path, monkeypatch):
             },
         ],
     }
-    import config
-
-    monkeypatch.setattr(
-        config.CONFIG,
-        "_raw_config",
-        {"flexible_consumers": []},
-    )
     monkeypatch.setattr(
         "data.cons_data_house_profile.resolve_runtime_house_profile",
         lambda: profile,
+    )
+
+    monkeypatch.setattr(
+        "tests.fixtures.backtesting_fixtures._fixture_config_bound", lambda: False
     )
 
     expected = sorted(expected_cons_data_consumer_ids())

@@ -31,7 +31,6 @@ def minimal_config_payload(
         "scenario_explorer_conf": {
             "path_cons_data": "runtime/cons_data.csv",
         },
-        "flexible_consumers": [],
     }
     if extra:
         payload.update(extra)

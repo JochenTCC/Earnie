@@ -41,7 +41,6 @@ def _minimal_system_config(**extra) -> dict:
     """Enough keys for config.reinit_config if a code path reloads mid-test."""
     payload = {
         "system": {"global_timeout": 10, "loop_timeout": 900},
-        "flexible_consumers": [],
     }
     payload.update(extra)
     return payload
@@ -185,12 +184,22 @@ def test_general_nav_hides_daemon_pages_for_mature_config_without_backend(
     monkeypatch.delenv("LOXONE_PASS", raising=False)
     _write(
         config_dir / "config.json",
-        _minimal_system_config(
-            flexible_consumers=[{"id": "swimspa", "name": "SwimSpa"}]
-        ),
+        _minimal_system_config(),
     )
     _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
-    _write(config_dir / "house_profiles.json", {"profiles": []})
+    _write(
+        config_dir / "house_profiles.json",
+        {
+            "profiles": [
+                {
+                    "id": "p",
+                    "consumers": [
+                        {"id": "swimspa", "loxone_inputs": {"power_name": "Swimspa_P"}}
+                    ],
+                }
+            ]
+        },
+    )
     _write(
         config_dir / "tariffs.json",
         {"import_tariffs": [], "export_tariffs": []},
@@ -218,12 +227,22 @@ def test_general_nav_shows_daemon_pages_for_mature_config_once_sb_configured(
     monkeypatch.setenv("LOXONE_PASS", "secret")
     _write(
         config_dir / "config.json",
-        _minimal_system_config(
-            flexible_consumers=[{"id": "swimspa", "name": "SwimSpa"}]
-        ),
+        _minimal_system_config(),
     )
     _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
-    _write(config_dir / "house_profiles.json", {"profiles": []})
+    _write(
+        config_dir / "house_profiles.json",
+        {
+            "profiles": [
+                {
+                    "id": "p",
+                    "consumers": [
+                        {"id": "swimspa", "loxone_inputs": {"power_name": "Swimspa_P"}}
+                    ],
+                }
+            ]
+        },
+    )
     _write(
         config_dir / "tariffs.json",
         {"import_tariffs": [], "export_tariffs": []},
@@ -246,7 +265,6 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
         config_dir / "config.json",
         _minimal_system_config(
             live_scenario_id=DEFAULT_LIVE_SCENARIO_ID,
-            flexible_consumers=[],
         ),
     )
     _write(
@@ -299,7 +317,6 @@ def test_scenario_explorer_visible_when_planning_ready(tmp_path, monkeypatch):
         config_dir / "config.json",
         _minimal_system_config(
             live_scenario_id=DEFAULT_LIVE_SCENARIO_ID,
-            flexible_consumers=[],
         ),
     )
     _write(

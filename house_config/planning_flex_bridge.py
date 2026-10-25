@@ -193,7 +193,7 @@ def _used_chart_color_indices(consumers: list[dict]) -> set[int]:
 
 
 # Historical Chart-1 / Sankey indices (Consumer colors P1): violet→…→orange palette.
-# Used when config.json has no flexible_consumers row to overlay from.
+# Used to assign a chart color when the profile consumer carries none.
 _DEFAULT_CHART_COLOR_INDEX_BY_ID: dict[str, int] = {
     "swimspa": 0,
     "pool_filter": 1,
@@ -219,7 +219,7 @@ def merge_flexible_consumers(
     base_consumers: list[dict],
     planning_consumers: list[dict],
 ) -> list[dict]:
-    """Config-Verbraucher + Planungs-Verbraucher, zusammengeführt über die kanonische id."""
+    """Basis- + Planungs-Verbraucher über die kanonische id; bei gleicher id gewinnt die Basis."""
     merged_map: dict[str, dict] = {c["id"]: dict(c) for c in base_consumers}
     used_indices = _used_chart_color_indices(list(merged_map.values()))
     for consumer in planning_consumers:

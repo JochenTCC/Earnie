@@ -63,7 +63,6 @@ def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     minimal_config = {
         "batteries": [],
         "pv_systems": [],
-        "flexible_consumers": [],
     }
     (share_dir / "config.minimal.json").write_text(
         json.dumps(minimal_config),
@@ -123,7 +122,7 @@ def test_greenfield_bootstrap_creates_expected_files(tmp_path, monkeypatch):
     config_payload = json.loads(config_json.read_text(encoding="utf-8"))
     assert config_payload["batteries"] == []
     assert config_payload["pv_systems"] == []
-    assert config_payload["flexible_consumers"] == []
+    assert "flexible_consumers" not in config_payload
     assert json.loads((root / "config" / "house_profiles.json").read_text(encoding="utf-8"))["profiles"] == []
     tariffs_payload = json.loads((root / "config" / "tariffs.json").read_text(encoding="utf-8"))
     assert len(tariffs_payload["import_tariffs"]) >= 1

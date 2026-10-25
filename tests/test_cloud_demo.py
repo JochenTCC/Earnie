@@ -38,7 +38,7 @@ def _minimal_share(tmp_path: Path) -> Path:
         "LOXONE_IP=192.168.178.1\n",
         encoding="utf-8",
     )
-    _write_json(share_dir / "config.minimal.json", {"flexible_consumers": []})
+    _write_json(share_dir / "config.minimal.json", {})
     _write_json(share_dir / "config.example.json", {"system": {"global_timeout": 10}})
     _write_json(share_dir / "house_profiles.minimal.json", {"profiles": []})
     _write_json(
@@ -258,7 +258,7 @@ def test_cloud_restricted_nav_hauskonfigurator_only(tmp_path, monkeypatch):
         "EARNIE_COMPONENTS_PATH",
         str(config_dir / "components.json"),
     )
-    _write_json(config_dir / "config.json", {"flexible_consumers": []})
+    _write_json(config_dir / "config.json", {})
     _write_json(config_dir / "components.json", {"batteries": [], "pv_systems": []})
     _write_json(config_dir / "house_profiles.json", {"profiles": []})
     _write_json(

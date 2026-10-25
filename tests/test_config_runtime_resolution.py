@@ -101,7 +101,6 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                 "scenario_explorer_conf": {
                     "path_cons_data": "runtime/cons_data.csv"
                 },
-                "flexible_consumers": [],
             }
         ),
         encoding="utf-8",

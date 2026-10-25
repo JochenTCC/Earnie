@@ -12,7 +12,6 @@ from typing import Any
 from .persist_paths import config_example_file, resolve_config_json_path
 
 _SKIP_KEYS = frozenset({"$schema"})
-_FLEXIBLE_CONSUMERS_KEY = "flexible_consumers"
 
 # In 2.0 these live in sidecars (components.json, house_profiles.json, local_settings.json).
 _LEGACY_ROOT_KEYS_RELOCATED_2_0 = frozenset({
@@ -64,41 +63,8 @@ def _find_missing_in_object(
             missing.append(ConfigDriftItem(path=path, example_value=example_value))
             continue
         actual_value = actual[key]
-        if key == _FLEXIBLE_CONSUMERS_KEY:
-            missing.extend(_find_missing_flexible_consumers(example_value, actual_value))
-            continue
         if isinstance(example_value, dict) and isinstance(actual_value, dict):
             missing.extend(_find_missing_in_object(example_value, actual_value, path))
-    return missing
-
-
-def _find_missing_flexible_consumers(
-    example_list: Any,
-    actual_list: Any,
-) -> list[ConfigDriftItem]:
-    if not isinstance(example_list, list):
-        return []
-    if isinstance(actual_list, list) and not actual_list:
-        return []
-    actual_by_id: dict[str, dict[str, Any]] = {}
-    if isinstance(actual_list, list):
-        for item in actual_list:
-            if isinstance(item, dict) and item.get("id"):
-                actual_by_id[str(item["id"])] = item
-
-    missing: list[ConfigDriftItem] = []
-    for example_item in example_list:
-        if not isinstance(example_item, dict) or not example_item.get("id"):
-            continue
-        consumer_id = str(example_item["id"])
-        prefix = f"{_FLEXIBLE_CONSUMERS_KEY}[id={consumer_id}]"
-        actual_item = actual_by_id.get(consumer_id)
-        if actual_item is None:
-            missing.append(
-                ConfigDriftItem(path=prefix, example_value=example_item)
-            )
-            continue
-        missing.extend(_find_missing_in_object(example_item, actual_item, prefix))
     return missing
 
 

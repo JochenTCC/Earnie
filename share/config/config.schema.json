@@ -37,13 +37,6 @@
       "$ref": "#/definitions/ehal",
       "description": "Optional southbound backend. Missing/loxone/none = Loxone-EHAL (M1 plant via loxone_adapter); openems = OpenEMS REST; ha = Home Assistant REST."
     },
-    "flexible_consumers": {
-      "type": "array",
-      "description": "Legacy-Overlay für steuerbare Verbraucher; ab 2.0 normalerweise leer — Live-Verbraucher liegen im Hausprofil (house_profiles.json).",
-      "items": {
-        "$ref": "#/definitions/flexible_consumer"
-      }
-    },
     "appliance_recommendation": {
       "$ref": "#/definitions/appliance_recommendation",
       "description": "Globale Sterne-/Schwellen-Parameter für Manuelle Geräte (keine Geräte-Definitionen)."
@@ -241,7 +234,7 @@
     },
     "battery_entity": {
       "type": "object",
-      "description": "Hausbatterie (nicht E-Auto — siehe flexible_consumers).",
+      "description": "Hausbatterie (nicht E-Auto — siehe Hausprofil-Verbraucher).",
       "required": [
         "id",
         "battery_capacity_kwh",
@@ -612,134 +605,6 @@
               "description": "Binärer Heiz-Indikator (0/1), z. B. homie_bwa_spa_heating — Fall B: Heizleistung nur wenn aktiv."
             }
           }
-        }
-      }
-    },
-    "flexible_consumer": {
-      "type": "object",
-      "required": [
-        "id",
-        "name",
-        "nominal_power_kw",
-        "chart_color_index"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Eindeutige interne Kennung (z. B. eauto, swimspa)."
-        },
-        "name": {
-          "type": "string",
-          "description": "Anzeigename in der UI."
-        },
-        "chart_color_index": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 7,
-          "description": "Index 0–7 in der festen Verbraucher-Palette (ui/chart_colors.py, H=260→40). Chart 1 und Sankey nutzen dieselbe Farbe."
-        },
-        "nominal_power_kw": {
-          "type": "number",
-          "description": "Maximale Leistung in kW für die Optimierung (P_max; live überschreibbar via charging_schedule.loxone.nominal_power_kw_name)."
-        },
-        "min_power_kw": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Minimale Soll-Leistung in kW (P_min), Pflicht wenn loxone_outputs.power_setpoint_name gesetzt ist."
-        },
-        "daily_target_kwh": {
-          "type": "number",
-          "description": "Festes 24h-Ziel in kWh. Für Verbraucher ohne charging_schedule, wenn daily_target_source=config."
-        },
-        "daily_target_source": {
-          "type": "string",
-          "enum": [
-            "config",
-            "historical",
-            "loxone",
-            "loxone_remaining_hours",
-            "thermal"
-          ],
-          "description": "Quelle des 24h-Ziels (kWh): config = daily_target_kwh bzw. bei charging_schedule daily_rest_soc; historical = in Echtzeit Summe aus flexible_consumer_profiles.csv über den 24h-Horizont (wie Baseline), bei historischer Tages-Simulation geloggte CSV-Summen; loxone = Live-Merker in kWh (bei E-Auto: charging_schedule.loxone); loxone_remaining_hours = Live-Schulden in Stunden × nominal_power_kw (z. B. SwimSpa-Filter); thermal = RC-Modell (thermal_control.mode=active, Live-Loxone)."
-        },
-        "loxone_target_kwh_name": {
-          "type": "string",
-          "description": "Loxone-Merkername für kWh-Ziel (nur bei daily_target_source=loxone ohne charging_schedule)."
-        },
-        "loxone_target_hours_name": {
-          "type": "string",
-          "description": "Loxone-Merkername für verbleibende Stunden (Schuldenstand). Nur bei daily_target_source=loxone_remaining_hours; Ziel_kWh = Wert × nominal_power_kw."
-        },
-        "min_on_quarterhours": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Mindestlaufzeit pro Einschaltung in 15-Minuten-Slots."
-        },
-        "path_historical_log": {
-          "type": "string",
-          "description": "CSV-Pfad zum historischen Loxone-Verbrauchslog (Offline/cons_data, Backtesting)."
-        },
-        "signal_type": {
-          "type": "string",
-          "enum": [
-            "power",
-            "binary"
-          ],
-          "description": "power = Leistungsprofil in kW; binary = Ein/Aus-Signal (Live und Logs, sofern log_signal_type nicht gesetzt)."
-        },
-        "log_signal_type": {
-          "type": "string",
-          "enum": [
-            "power",
-            "binary"
-          ],
-          "description": "Optional: Interpretation von path_historical_log (z. B. binary für altes Loxone-Log, während signal_type=power für Live-Messung)."
-        },
-        "optimizer_enabled": {
-          "type": "boolean",
-          "description": "false = Verbraucher von der Optimierung ausschließen."
-        },
-        "loxone_outputs": {
-          "$ref": "#/definitions/loxone_outputs",
-          "description": "Freigabe-Merker für die aktive Ansteuerung durch die Optimierung."
-        },
-        "loxone_inputs": {
-          "type": "object",
-          "description": "Live-Messwerte aus Loxone für cons_data (main.py).",
-          "properties": {
-            "power_name": {
-              "type": "string",
-              "description": "Merkername: bei signal_type=power (oder loxone_inputs.signal_type=power) kW-Leistung; bei binary Ein/Aus (0/1), wird mit nominal_power_kw multipliziert."
-            },
-            "signal_type": {
-              "type": "string",
-              "enum": [
-                "power",
-                "binary"
-              ],
-              "description": "Optional: überschreibt signal_type nur für die Live-Abfrage in main.py."
-            },
-            "alternate_binary_power_name": {
-              "type": "string",
-              "description": "Optional bei signal_type=binary: zweiter Ein/Aus-Merker (z. B. natives Filter-Relais). Läuft, wenn power_name oder dieser Merker ≥ 0,5 ist."
-            },
-            "subtract_consumer_ids": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional: Misst power_name die Gesamtleistung mehrerer Lasten am selben Zähler (z. B. SwimSpa-Heizung inkl. Filter), werden die hier gelisteten consumer_ids vom Live-Ist abgezogen — nur wenn der Wert wirklich vom Zähler stammt (nicht Fallback)."
-            }
-          }
-        },
-        "charging_schedule": {
-          "$ref": "#/definitions/charging_schedule"
-        },
-        "thermal_control": {
-          "$ref": "#/definitions/thermal_control"
-        },
-        "filter_schedule": {
-          "$ref": "#/definitions/filter_schedule"
         }
       }
     },

@@ -43,7 +43,6 @@ def _default_require_loxone_credentials() -> bool:
 class Config:
     # --- Delegation an settings/* (API-Stabilität für Tests und Caller) ---
     _read_json_dict = staticmethod(read_json_dict)
-    _normalize_consumer = staticmethod(fc_settings.normalize_consumer)
     _consumer_has_daily_target = staticmethod(fc_settings.consumer_has_daily_target)
     _charging_efficiency = staticmethod(fc_settings.charging_efficiency)
     target_kwh_from_rest_soc = staticmethod(fc_settings.target_kwh_from_rest_soc)
@@ -234,7 +233,6 @@ class Config:
     def get_flexible_consumers(self, optimizer_only: bool = False) -> list:
         """Lädt alle konfigurierten flexiblen Verbraucher."""
         return fc_settings.load_flexible_consumers(
-            self._raw_config,
             self.get_resolved_runtime_settings(),
             optimizer_only=optimizer_only,
         )

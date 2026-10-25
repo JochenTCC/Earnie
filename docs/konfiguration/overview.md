@@ -26,7 +26,6 @@ Damit zeigen Cursor und VS Code für viele Felder **Hover-Beschreibungen** aus [
 | `earnie_env/config/house_profiles.json` | Standort (Geo/Zeitzone), Arbeitspreis der Netznutzung, Planungs-Verbraucher (EV, WP, Waschmaschine, …); Referenz über `house_profile_id` |
 | `earnie_env/config/backtesting_scenarios.json` | **Alle** Szenarien (Live und Varianten) im einheitlichen `settings`-Format |
 | `scenario_explorer_conf` | Szenario-Explorer / Backtesting: `cons_data.csv` und Preisquelle; der Zeitraum ergibt sich aus den Monaten in `cons_data` |
-| `flexible_consumers` | Legacy-Overlay (meist leer); die Live-Verbraucher liegen in `house_profiles.json` |
 | `appliance_recommendation` | Globale Sterne und Schwellen für manuelle Geräte (keine Geräte-Definitionen) |
 | `planning_horizon` | MILP-Horizont (`sunrise_window` für Live) |
 

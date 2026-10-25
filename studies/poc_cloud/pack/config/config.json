@@ -22,7 +22,6 @@
     "planning_horizon": {
         "mode": "sunrise_window"
     },
-    "flexible_consumers": [],
     "appliance_recommendation": {
         "abs_margin_cent": 0.05,
         "pct_stars_4": 10.0,

@@ -68,7 +68,6 @@ def components_path(tmp_path, monkeypatch):
                 "live_scenario_id": "live",
                 "system": {"global_timeout": 10, "loop_timeout": 900},
                 "planning_horizon": {"mode": "sunrise_window"},
-                "flexible_consumers": [],
             }
         ),
         encoding="utf-8",

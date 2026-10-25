@@ -8,33 +8,13 @@ def test_find_config_drift_reports_missing_top_level_and_nested_keys():
     example = {
         "market_prices": {"missing_price_strategy": "forecast"},
         "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data.csv"},
-        "flexible_consumers": [
-            {
-                "id": "eauto",
-                "charging_schedule": {"forecast_when_absent": True},
-            }
-        ],
+        "system": {"global_timeout": 10, "loop_timeout": 900},
     }
-    actual = {
-        "flexible_consumers": [{"id": "eauto", "name": "E-Auto"}],
-    }
+    actual = {"system": {"global_timeout": 10}}
 
-    items = find_config_drift(example, actual)
-    paths = {item.path for item in items}
+    paths = {item.path for item in find_config_drift(example, actual)}
 
-    assert "market_prices" in paths
-    assert "scenario_explorer_conf" in paths
-    assert "flexible_consumers[id=eauto].charging_schedule" in paths
-
-
-def test_find_config_drift_ignores_missing_consumers_when_actual_list_empty():
-    example = {
-        "flexible_consumers": [{"id": "swimspa", "name": "SwimSpa", "nominal_power_kw": 2.8}],
-    }
-    actual = {"flexible_consumers": []}
-
-    items = find_config_drift(example, actual)
-    assert items == []
+    assert paths == {"market_prices", "scenario_explorer_conf", "system.loop_timeout"}
 
 
 def test_should_show_config_drift_false_during_planning_onboarding(monkeypatch):
@@ -58,7 +38,6 @@ def test_find_config_drift_no_legacy_blocks_for_2_0_migrated_config():
     example = {
         "market_prices": {"missing_price_strategy": "forecast"},
         "system": {"global_timeout": 10, "ehal_loxone_http_port": 8541},
-        "flexible_consumers": [],
         "live_scenario_id": "live",
     }
     actual = {
@@ -67,7 +46,6 @@ def test_find_config_drift_no_legacy_blocks_for_2_0_migrated_config():
             "global_timeout": 10,
             "ehal_loxone_http_port": 8541,
         },
-        "flexible_consumers": [],
         "live_scenario_id": "live",
     }
 
@@ -83,12 +61,10 @@ def test_find_config_drift_ignores_legacy_blocks_when_example_stale_2_0_actual()
         "pv_systems": [{"id": "roof_south"}],
         "appliances": [{"id": "waschmaschine"}],
         "system": {"global_timeout": 10, "loxone_silent_mode": True},
-        "flexible_consumers": [],
         "live_scenario_id": "live",
     }
     actual = {
         "system": {"global_timeout": 10},
-        "flexible_consumers": [],
         "live_scenario_id": "live",
     }
 

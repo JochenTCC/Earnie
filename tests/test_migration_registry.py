@@ -141,6 +141,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm4.consumer_flex_bindings": "v4_pre_quellenwahl",
         "dm4.retire_plant_pv_binding": "v4_pre_ha_pull",
         "dm4.se_conf_defaults": "v4_pre_se_conf_defaults",
+        "dm4.flexible_consumers_overlay": "v4_pre_se_conf_defaults",
     }
     for step in STEPS:
         docs = load_pack_docs(_copy_snapshot(tmp_path / step.id, mapping[step.id]))

@@ -1573,8 +1573,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
             "system": {"global_timeout": 10, "loop_timeout": 900},
             "loxone_blocks": {"soc_name": "Battery_SOC"},
             "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data.csv"},
-            "planning_horizon": {"mode": "sunrise_window"},
-            "flexible_consumers": []
+            "planning_horizon": {"mode": "sunrise_window"}
         }
         """.strip(),
         encoding="utf-8",

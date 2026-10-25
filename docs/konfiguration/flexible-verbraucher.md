@@ -1,6 +1,6 @@
 # Flexible Verbraucher
 
-Ab Version **2.0** liegen steuerbare Verbraucher (SwimSpa, E-Auto, Wärmepumpe, Filter, Generics) primär im **Hausprofil** (`earnie_env/config/house_profiles.json`). Live-Parameter und Bindings stehen dort je Verbraucher unter `consumers[].ehal_bindings`. Der Block `flexible_consumers[]` in `config.json` ist **Legacy** (meist leer). Er wird weiterhin geladen und mit den Verbrauchern aus dem Hausprofil zusammengeführt; bei gleicher `id` hat der Eintrag in `flexible_consumers[]` Vorrang vor dem Hausprofil. Neue Verbraucher werden im Hausprofil angelegt.
+Ab Version **2.0** liegen steuerbare Verbraucher (SwimSpa, E-Auto, Wärmepumpe, Filter, Generics) primär im **Hausprofil** (`earnie_env/config/house_profiles.json`). Live-Parameter und Bindings stehen dort je Verbraucher unter `consumers[].ehal_bindings`. Der frühere Block `flexible_consumers[]` in `config.json` ist **entfernt**. Ein verbliebener Block (auch `[]`) bricht den Start mit einer Fehlermeldung ab; der Migrations-Assistent (`python -m scripts.migrate_config`) löscht einen leeren Block. Enthält er noch Einträge, bricht die Migration ab: Verbraucher dann zuerst im Hausprofil anlegen und den Block danach löschen. Eine doppelte `id` im Hausprofil ist ein Konfigurationsfehler.
 
 Die Optimierung legt fest, **wann** die Verbraucher laufen. Ob die Anlage technisch laufen kann, entscheidet sie nicht. Die Freigabe an das Smarthome ist ein 0/1-Signal (E-Auto: Leistungs-Sollwert + PV-Follow). Die Feldnamen unten gelten für die aufgelöste Flex-Struktur im Hausprofil.
 
@@ -38,7 +38,7 @@ Der Modus ist wirksam, sobald der Schalter im Hauskonfigurator **oder** das EHAL
 | `daily_target_kwh` | Festes 24-h-Ziel in kWh (bei `daily_target_source: config`) |
 | `daily_target_source` | `config` = fester Wert / `charging_schedule`; `historical` = Profil aus der Vergangenheit; `loxone` = Live-EHAL-Wert in kWh (Config-Enum-Name historisch); `loxone_remaining_hours` = Live-Schulden in Stunden × `nominal_power_kw` (SwimSpa-Filter); `thermal` = RC-Modell (SwimSpa-Heizung) |
 | `min_on_quarterhours` | Mindestlaufzeit pro Einschaltung in 15-Minuten-Slots |
-| `path_historical_log` | Historische Leistungs-CSV für Profile und Backtesting (Offline → `cons_data`; typisch ein Loxone-Export) |
+| `path_historical_log` | Historische Leistungs-CSV (Offline → `cons_data`; typisch ein Loxone-Export). Wird aus dem Hausprofil nur für den Pool-Filter übernommen; der Loxone-Log-Import (`integrations/loxone_log_import.py`) dient nur noch Migration und Tests |
 | `signal_type` | `power` (kW) oder `binary` (Ein/Aus × `nominal_power_kw`) |
 | `log_signal_type` | Optional: abweichendes Format nur für `path_historical_log` |
 

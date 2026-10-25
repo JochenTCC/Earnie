@@ -39,7 +39,6 @@ def _write(path, payload):
 
 def _minimal_config():
     return {
-        "flexible_consumers": [],
     }
 
 
@@ -57,10 +56,18 @@ def test_needs_planning_onboarding_after_minimal_bootstrap(tmp_path, monkeypatch
 
 def test_prod_config_skips_onboarding(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(config_dir / "config.json", {})
     _write(
-        config_dir / "config.json",
+        config_dir / "house_profiles.json",
         {
-            "flexible_consumers": [{"id": "swimspa"}],
+            "profiles": [
+                {
+                    "id": "p",
+                    "consumers": [
+                        {"id": "swimspa", "loxone_inputs": {"power_name": "Swimspa_P"}}
+                    ],
+                }
+            ]
         },
     )
     _write(
@@ -158,7 +165,6 @@ def test_planning_ready_unlocks_scenario_explorer(tmp_path, monkeypatch):
         config_dir / "config.json",
         {
             "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
-            "flexible_consumers": [],
         },
     )
     _write(
@@ -226,7 +232,6 @@ def test_loxone_sidebar_deferred_after_planning_unlock(tmp_path, monkeypatch):
         config_dir / "config.json",
         {
             "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
-            "flexible_consumers": [],
         },
     )
     _write(
@@ -310,15 +315,9 @@ def test_loxone_sidebar_deferred_after_planning_unlock(tmp_path, monkeypatch):
     assert dotenv_io.loxone_setup_deferred() is False
 
 
-def test_needs_planning_onboarding_true_for_empty_flex_list():
-    assert setup_readiness.needs_planning_onboarding_from_raw({"flexible_consumers": []}) is True
-    assert setup_readiness.needs_planning_onboarding_from_raw({}) is True
-    assert (
-        setup_readiness.needs_planning_onboarding_from_raw(
-            {"flexible_consumers": [{"id": "swimspa"}]}
-        )
-        is False
-    )
+def test_needs_planning_onboarding_true_without_live_profile_consumers():
+    assert setup_readiness.needs_planning_onboarding_from_profiles() is True
+    assert setup_readiness.needs_planning_onboarding_from_profiles({"profiles": []}) is True
 
 
 def test_needs_planning_onboarding_false_for_migrated_profile_loxone():
@@ -336,10 +335,7 @@ def test_needs_planning_onboarding_false_for_migrated_profile_loxone():
         ]
     }
     assert (
-        setup_readiness.needs_planning_onboarding_from_raw(
-            {"flexible_consumers": [], "live_scenario_id": "live"},
-            profiles_doc=profiles_doc,
-        )
+        setup_readiness.needs_planning_onboarding_from_profiles(profiles_doc)
         is False
     )
 
@@ -361,20 +357,25 @@ def test_needs_planning_onboarding_false_for_ehal_bindings_consumers():
         ]
     }
     assert (
-        setup_readiness.needs_planning_onboarding_from_raw(
-            {"flexible_consumers": [], "live_scenario_id": "live"},
-            profiles_doc=profiles_doc,
-        )
+        setup_readiness.needs_planning_onboarding_from_profiles(profiles_doc)
         is False
     )
 
 
 def test_betrieb_unlocked_after_live_config(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(config_dir / "config.json", {})
     _write(
-        config_dir / "config.json",
+        config_dir / "house_profiles.json",
         {
-            "flexible_consumers": [{"id": "swimspa"}],
+            "profiles": [
+                {
+                    "id": "p",
+                    "consumers": [
+                        {"id": "swimspa", "loxone_inputs": {"power_name": "Swimspa_P"}}
+                    ],
+                }
+            ]
         },
     )
     _write(
@@ -392,7 +393,7 @@ def test_betrieb_unlocked_with_ehal_consumers_without_plant_pv(
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(
         config_dir / "config.json",
-        {"flexible_consumers": [], "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID},
+        {"live_scenario_id": DEFAULT_LIVE_SCENARIO_ID},
     )
     _write(
         config_dir / "components.json",
@@ -492,7 +493,6 @@ def test_sb_configured_with_ha_backend_credentials(tmp_path, monkeypatch):
     _write(
         config_dir / "config.json",
         {
-            "flexible_consumers": [],
             "ehal": {
                 "backend": "ha",
                 "ha": {},
@@ -513,7 +513,6 @@ def test_sb_configured_with_ha_backend_without_url_or_token(tmp_path, monkeypatc
     _write(
         config_dir / "config.json",
         {
-            "flexible_consumers": [],
             "ehal": {"backend": "ha", "ha": {}},
         },
     )

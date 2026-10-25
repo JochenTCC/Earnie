@@ -1,6 +1,7 @@
 """Hilfen für Backtesting-Tests mit versionierten Offline-Fixtures."""
 from __future__ import annotations
 
+import json
 import os
 from contextlib import contextmanager
 from datetime import date
@@ -16,6 +17,58 @@ HIGH_EAUTO_DAY = date(2026, 6, 23)
 BASELOAD_EDGE_DAY = date(2024, 7, 4)
 SOC_CHAIN_START_DAY = date(2026, 6, 24)
 SOC_CHAIN_END_DAY = date(2026, 6, 25)
+
+
+_FLEX_CONSUMERS_INSTALLED = False
+
+
+def _fixture_config_bound() -> bool:
+    bound = os.environ.get("EARNIE_CONFIG_PATH", "")
+    return bool(bound) and Path(bound).resolve() == (FIXTURES_ROOT / "config.json").resolve()
+
+
+def install_fixture_flex_consumers() -> None:
+    """Hängt die Fixture-Verbraucher (``flex_consumers.json``) an die Flex-Liste.
+
+    Die Fixture-Config hat keinen ``flexible_consumers``-Block mehr (Overlay
+    entfernt); die Historical-/Loxone-Zielquellen dieser Verbraucher gibt es im
+    Hausprofil nicht. Nur aktiv, solange ``EARNIE_CONFIG_PATH`` auf die Fixture-Config zeigt.
+    """
+    global _FLEX_CONSUMERS_INSTALLED
+    if _FLEX_CONSUMERS_INSTALLED:
+        return
+    from settings import flexible_consumers as fc_settings
+
+    original = fc_settings.load_flexible_consumers
+
+    def load_with_fixture_consumers(resolved, *, optimizer_only=False):
+        if _fixture_config_bound():
+            extra = json.loads(
+                (FIXTURES_ROOT / "flex_consumers.json").read_text(encoding="utf-8")
+            )
+            resolved = {
+                **resolved,
+                "_planning_flex_consumers": extra
+                + list(resolved.get("_planning_flex_consumers") or []),
+            }
+        return original(resolved, optimizer_only=optimizer_only)
+
+    fc_settings.load_flexible_consumers = load_with_fixture_consumers
+
+    from data import cons_data_house_profile as cons_profile
+
+    original_ids = cons_profile.expected_cons_data_consumer_ids
+
+    def expected_ids_with_fixture_consumers():
+        if _fixture_config_bound():
+            extra = json.loads(
+                (FIXTURES_ROOT / "flex_consumers.json").read_text(encoding="utf-8")
+            )
+            return [str(item["id"]) for item in extra]
+        return original_ids()
+
+    cons_profile.expected_cons_data_consumer_ids = expected_ids_with_fixture_consumers
+    _FLEX_CONSUMERS_INSTALLED = True
 
 
 def fixture_path(name: str) -> Path:

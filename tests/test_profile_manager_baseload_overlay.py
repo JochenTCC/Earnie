@@ -47,7 +47,7 @@ def test_fixed_generic_overlay_with_flexible_consumers_present():
     target_hours = [datetime(2026, 7, 15, h, 0) for h in range(24)]
     base = [0.5] * 24
     profile = _house_profile_with_fixed_kochen()
-    raw_config = {"flexible_consumers": [{"id": "ev"}]}
+    raw_config = {}
 
     with patch.object(pm.config.CONFIG, "_raw_config", raw_config):
         with patch.object(
@@ -66,7 +66,7 @@ def test_flexible_generic_not_added_to_grundlast_overlay():
     target_hours = [datetime(2026, 7, 15, h, 0) for h in range(24)]
     base = [0.5] * 24
     profile = _house_profile_with_fixed_kochen()
-    raw_config = {"flexible_consumers": [{"id": "ev"}]}
+    raw_config = {}
 
     with patch.object(pm.config.CONFIG, "_raw_config", raw_config):
         with patch.object(
@@ -80,8 +80,8 @@ def test_flexible_generic_not_added_to_grundlast_overlay():
     assert result[20] == 0.5
 
 
-def test_milp_thermal_annual_not_added_to_live_grundlast_when_raw_flex_empty():
-    """Empty config flexible_consumers must not bake Haus Wärme into Grundlast."""
+def test_milp_thermal_annual_not_added_to_live_grundlast_when_profile_has_only_thermal_annual():
+    """Thermal-annual consumers must not bake Haus Wärme into Grundlast."""
     target_hours = [datetime(2026, 9, 15, h, 0) for h in range(16, 20)]
     base = [0.5] * len(target_hours)
     profile = {
@@ -116,7 +116,7 @@ def test_milp_thermal_annual_not_added_to_live_grundlast_when_raw_flex_empty():
             },
         ],
     }
-    raw_config = {"flexible_consumers": []}
+    raw_config = {}
     milp_flex = [
         {
             "id": "waermepumpe",

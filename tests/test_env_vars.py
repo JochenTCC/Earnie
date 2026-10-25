@@ -51,7 +51,7 @@ def test_is_effective_offline_greenfield_gate(tmp_path, monkeypatch):
     monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
 
     (config_dir / "config.json").write_text(
-        '{"flexible_consumers": [], "live_scenario_id": "live"}',
+        '{"live_scenario_id": "live"}',
         encoding="utf-8",
     )
     (config_dir / "components.json").write_text(

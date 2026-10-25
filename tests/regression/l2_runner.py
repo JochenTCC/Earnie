@@ -8,6 +8,7 @@ from typing import Any, Iterator
 import pandas as pd
 
 from tests.fixtures.backtesting_fixtures import (
+    install_fixture_flex_consumers,
     FIXTURES_ROOT,
     build_synthetic_prices_df,
     fixture_path,
@@ -33,6 +34,7 @@ def activate_backtesting_fixture_env() -> Iterator[Any]:
     """Bind config to ``tests/fixtures/backtesting/`` without pytest monkeypatch."""
     import config as config_module
 
+    install_fixture_flex_consumers()
     previous = {key: os.environ.get(key) for key in _ENV_KEYS}
     os.environ["EARNIE_CONFIG_PATH"] = str(fixture_path("config.json"))
     os.environ["EARNIE_BACKTESTING_SCENARIOS_PATH"] = str(
