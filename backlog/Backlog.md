@@ -15,20 +15,16 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
-### Version 2.7 — Multiple storages and export power limitation
-
-Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalHorizon, EarlyStart, ConfigMigration, UsagePing/EarniePoints, Inverter P1–P5, Shadow R1–R4, Binding path work, HA Testbed P0–P5, …) → [Backlog-Erledigt.md](Backlog-Erledigt.md). Do not bump `version.py` to a publishable 2.7 without approval. Remaining open work below; Topology P3–P5 and Inverter follow-ups → **Version 2.+1**; Regression L3+P3 → **Version 2.8**.
-- **Note (deferred from 2.7.n):** Plant PV sum stays bare `sens_pv_production_active`; first entity-scoped `pv.{pv_system_id}.sens_pv_production_active` shipped with live attribution (Inverter follow-ups). Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
-
-- [ ] beta release for Loxone and HA
-- [ ] Wait for feedback (until Nov-02)
-- [ ] final release 2.7.0
-
 ### Version 2.8
 
 - **Order (decided 2026-10-24):** Edbert is part of 2.8 and the **max-power dependent tariff** is the target feature at the end of the Edbert chain; the Edbert releases (`0.1.a` → `0.1.b` → `0.+1` capacity → `0.1.c` → `0.1.d`) set the rhythm, and Earnie work alternates with Edbert work in the gaps. User-value ranking for the Earnie items: Heizspirale > Multi-EV / Wallboxes > PV forecast from HA (little value). Items below are in the planned working order; sub-items inside an epic keep their own order. Live recorder cycles are expected to be scarce, so **Regression L3** loses its early slot (MILP changes are guarded by the existing R0 / P1 goldens + SE SNAP comparison; **P3** soft gate stays cheap and early). The tail items (PV forecast from HA, HouseSim S3 / Series / scenario import, Regression L3) are candidates for **Version 2.+1** if capacity runs out; they stay here until that is decided.
   - **Schedule sketch:** (1) 2.7 feedback window: streamlit-ports translation · overlay review decision · Edbert packaging/license decision · capacity interface agreed (Edbert spec 5b ↔ Leistungstarif development document) · Multi-EV / Wallbox schema decision so it lands in the same data-model migration step. (2) Edbert `0.1.a` → Earnie Data + Netznutzung split + migration (bundled with the overlay migration, if any) → **Heizspirale**. (3) Edbert `0.1.b` → Earnie Engine (SNAP guard) → Market prices → Forecast / Weather → **Leistungstarif part 1** (Edbert-independent: state, SE monthly peaks, MILP peak variable against a stub ladder, budget-loop draft). (4) Edbert `0.+1` capacity → **Leistungstarif part 2** → **HouseSim wallbox write-back** (test bench) → **Multi-EV / Wallboxes**. (5) Edbert `0.1.c` / `0.1.d` → Editor embed, Catalog decision → Chart1 review → Kumulierte Kosten → pan-to-load spike → Regression P3 soft gate. (6) Tail, only with spare capacity.
   - **Recommendation to the Edbert backlog:** pull the capacity block (`0.+1`) forward to directly after the engine (`0.1.b`), ahead of Editor (`0.1.c`) and Catalog (`0.1.d`), because the max-power tariff is core function and the editor / catalog are comfort.
+
+- [ ] Adjust SE for Energie Berater in Energieinstitut Vorarlberg
+  - Look for existing standards on their website
+  - Assess if standards can be integrated into SE / SK
+  - Contact Martin ? for feedback
 
 - [ ] **Review the legacy `flexible_consumers[]` overlay in `config.json`** `[qual]`: today it is still loaded (`settings/flexible_consumers.py` `load_flexible_consumers`) and merged with the house-profile consumers (`house_config/planning_flex_bridge.py` `merge_flexible_consumers`); on equal `id` the overlay entry silently wins over the profile. Decide: keep (documented), warn on conflicting `id`, or reject/remove the overlay (incl. `path_historical_log` use via `consumer_path`, migration of existing configs, tests that still use the overlay). Docs (`docs/konfiguration/flexible-verbraucher.md`, `overview.md`, `verbrauchs-csv.md`) follow the decision. **Order note:** decide before the Edbert data migration (one wizard run per release) and before Heizspirale (same consumer-config area)
 
