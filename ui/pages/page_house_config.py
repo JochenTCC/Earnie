@@ -9,7 +9,6 @@ from ui.house_config_profile_form import render_house_profile_tab
 from ui.planning_battery_form import render_battery_planning_tab
 from ui.planning_inverter_form import render_inverter_planning_tab
 from ui.planning_pv_form import render_pv_planning_tab
-from ui.ui_trace import trace
 
 _HOUSE_CONFIG_TAB_KEY = "house_config_active_tab"
 _HOUSE_CONFIG_TABS = ("Hausprofil", "Wechselrichter", "PV-Felder", "Batterien")
@@ -44,7 +43,6 @@ def render() -> None:
 def _render_body() -> None:
     from runtime_store.shadow.mode import is_shadow_config_readonly
 
-    trace("house_config render")
 
     render_page_title_with_help(
         "🏠 Hauskonfigurator",

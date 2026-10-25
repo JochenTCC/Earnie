@@ -38,7 +38,6 @@ from ui.house_config_io import (
     upsert_house_profile,
 )
 from ui.auto_persist import auto_persist
-from ui.ui_trace import trace
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_checkbox,
@@ -357,20 +356,15 @@ def render_house_profile_tab() -> None:
     )
 
     ctx = _render_profile_selector()
-    trace("profile_tab: selector done")
     render_plant_export_limit()
     render_plant_grid_meter_assertions()
-    trace("profile_tab: plant sections done")
     label, preview_id, annual_kwh, location, absent_mode = _render_profile_identity(ctx)
-    trace("profile_tab: identity done")
     resolved, resolved_for_preview = _edit_and_sync_consumers(
         ctx["session_scope"], location
     )
-    trace("profile_tab: consumers done")
     preview = _render_baseload_preview(
         annual_kwh, resolved_for_preview, ctx["existing"], preview_id
     )
-    trace("profile_tab: baseload preview done")
     save_kwargs = {
         "session_scope": ctx["session_scope"],
         "is_new": ctx["is_new"],

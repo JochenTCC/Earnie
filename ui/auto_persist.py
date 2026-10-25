@@ -8,7 +8,6 @@ from typing import Any
 
 import streamlit as st
 
-from ui.ui_trace import trace
 
 
 SHADOW_READONLY_CAPTION = "Shadow-Modus: Konfiguration schreibgeschützt — nicht gespeichert."
@@ -71,7 +70,6 @@ def auto_persist(
     if not ready:
         return False
     fingerprint = payload_fingerprint(payload)
-    trace(f"auto_persist {state_key} fp={fingerprint[:12]} known={st.session_state.get(f'_auto_persist_fp::{state_key}', '')[:12]}")
     last_key = f"_auto_persist_fp::{state_key}"
     if st.session_state.get(last_key) == fingerprint:
         return False
@@ -82,7 +80,6 @@ def auto_persist(
         st.session_state[last_key] = fingerprint
         st.caption(SHADOW_READONLY_CAPTION)
         return False
-    trace(f"auto_persist WRITE {state_key} payload={json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)[:2000]}")
     try:
         save()
     except ConfigReadOnlyError:
