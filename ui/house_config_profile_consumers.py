@@ -22,7 +22,6 @@ from ui.house_config_profile_points import _render_points_fields
 
 import streamlit as st
 
-
 from house_config.entity_id_lock import (
     FORCE_ID_FROM_LABEL_KEY,
     ID_PROVISIONAL_LABEL_KEY,

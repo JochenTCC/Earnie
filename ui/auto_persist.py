@@ -9,7 +9,6 @@ from typing import Any
 import streamlit as st
 
 
-
 SHADOW_READONLY_CAPTION = "Shadow-Modus: Konfiguration schreibgeschützt — nicht gespeichert."
 
 
