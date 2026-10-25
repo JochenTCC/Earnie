@@ -123,7 +123,7 @@ def _isolate_open_meteo_disk_cache() -> Path:
     """Point the Open-Meteo archive cache at a per-process temp dir.
 
     The climate mock patches only the HTTP fetch; ``build_open_meteo_climate_bundle``
-    still writes its result to ``data/cache/open_meteo`` (relative to the repo).
+    still writes its result to ``data/cache/open_meteo_utc`` (relative to the repo).
     Without this, every pytest run poisons the real cache with mock irradiance
     (constant 500 W/m², day and night), which ``scripts.run_regression`` and the
     app then read back as real PV input.

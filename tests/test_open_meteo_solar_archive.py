@@ -52,7 +52,7 @@ def test_fetch_hourly_pv_kw_series_parses_archive_payload(monkeypatch):
             def json(self):
                 return {
                     "hourly": {
-                        "time": ["2024-07-13T09:00", "2024-07-13T13:00"],
+                        "time": ["2024-07-13T07:00", "2024-07-13T11:00"],
                         "global_tilted_irradiance": [333.8, 666.8],
                     }
                 }
@@ -82,14 +82,14 @@ def test_build_open_meteo_climate_bundle_parses_payload(monkeypatch):
         if hourly_var == archive.HOURLY_TEMP_VAR:
             payload = {
                 "hourly": {
-                    "time": ["2024-07-13T09:00", "2024-07-13T13:00"],
+                    "time": ["2024-07-13T07:00", "2024-07-13T11:00"],
                     "temperature_2m": [18.0, 24.0],
                 }
             }
         else:
             payload = {
                 "hourly": {
-                    "time": ["2024-07-13T09:00", "2024-07-13T13:00"],
+                    "time": ["2024-07-13T07:00", "2024-07-13T11:00"],
                     "global_tilted_irradiance": [400.0, 800.0],
                 }
             }
@@ -115,6 +115,65 @@ def test_build_open_meteo_climate_bundle_parses_payload(monkeypatch):
     assert dates == [date(2024, 7, 13)]
     assert temps[0] == pytest.approx(21.0)
     assert bundle.pv_kw_at(surface, 10.0, datetime(2024, 7, 13, 13, 0)) == pytest.approx(8.0)
+
+
+def test_archive_payload_is_requested_in_utc_and_converted_per_date():
+    """One fixed offset per response is wrong: summer is UTC+2, winter UTC+1, DST days differ."""
+    payload = {
+        "hourly": {
+            "time": [
+                "2025-01-15T07:00",  # CET   -> 08:00
+                "2025-07-15T07:00",  # CEST  -> 09:00
+                "2025-10-26T00:00",  # CEST  -> 02:00 (first)
+                "2025-10-26T01:00",  # CET   -> 02:00 (repeated hour, averaged)
+                "2025-10-26T02:00",  # CET   -> 03:00
+            ],
+            "temperature_2m": [1.0, 2.0, 10.0, 20.0, 3.0],
+        }
+    }
+    series = archive._hourly_series_from_payload(
+        payload,
+        hourly_vars="temperature_2m",
+        start=date(2025, 1, 15),
+        end=date(2025, 10, 27),
+        timezone="Europe/Vienna",
+    )["temperature_2m"]
+    assert series[datetime(2025, 1, 15, 8)] == pytest.approx(1.0)
+    assert series[datetime(2025, 7, 15, 9)] == pytest.approx(2.0)
+    assert series[datetime(2025, 10, 26, 2)] == pytest.approx(15.0)
+    assert series[datetime(2025, 10, 26, 3)] == pytest.approx(3.0)
+    assert not series.index.has_duplicates
+
+
+def test_fetch_chunk_requests_utc_and_one_day_earlier(monkeypatch):
+    seen = {}
+
+    def _fake_get(url, params, timeout):
+        seen.update(params)
+        response = requests.Response()
+        response.status_code = 200
+        response.url = url
+        response._content = (
+            b'{"hourly":{"time":["2025-06-30T23:00","2025-07-01T00:00"],'
+            b'"temperature_2m":[1.0,2.0]}}'
+        )
+        return response
+
+    monkeypatch.setattr(archive.requests, "get", _fake_get)
+    payload = archive._fetch_hourly_archive_chunk(
+        lat=48.0,
+        lon=10.0,
+        timezone="Europe/Vienna",
+        start=date(2025, 7, 1),
+        end=date(2025, 7, 2),
+        hourly_vars=archive.HOURLY_TEMP_VAR,
+    )
+    assert seen["timezone"] == "UTC"
+    assert seen["start_date"] == "2025-06-30"
+    assert seen["end_date"] == "2025-07-01"
+    # 23:00 UTC = 01:00 local on 07-01 stays, nothing before 07-01 00:00 local survives
+    series = payload[archive.HOURLY_TEMP_VAR]
+    assert list(series.index) == [pd.Timestamp("2025-07-01 01:00"), pd.Timestamp("2025-07-01 02:00")]
 
 
 def test_build_open_meteo_climate_bundle_raises_on_api_error(monkeypatch):

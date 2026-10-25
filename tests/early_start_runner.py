@@ -60,7 +60,7 @@ def _configure_env(runtime: Path) -> None:
     os.environ["EARNIE_RUNTIME_PATH"] = str(runtime)
     os.environ.pop("EARNIE_CYCLE_TIMING", None)
     os.environ.pop("EARNIE_CYCLE_PROFILE", None)
-    # Fake Open-Meteo payloads must not land in the repo's data/cache/open_meteo
+    # Fake Open-Meteo payloads must not land in the repo's data/cache/open_meteo_utc
     # (cwd = repo root): scripts.run_regression reads the same cache keys.
     from data import open_meteo_solar_archive as archive
 
@@ -196,9 +196,15 @@ def _open_meteo_payload(params: dict, lat: float) -> dict:
     """Like Open-Meteo /v1/forecast: hourly from real today 00:00 for forecast_days."""
     from datetime import timedelta
 
-    days = int(params.get("forecast_days") or 1)
-    start = datetime.combine(datetime.now().date(), datetime.min.time())
-    times = [start + timedelta(hours=h) for h in range(days * 24)]
+    if params.get("start_date"):
+        # Archive request: hourly for start_date..end_date (UTC), like the real endpoint.
+        first = datetime.fromisoformat(str(params["start_date"]))
+        last = datetime.fromisoformat(str(params["end_date"]))
+        times = [first + timedelta(hours=h) for h in range(int((last - first).days + 1) * 24)]
+    else:
+        days = int(params.get("forecast_days") or 1)
+        start = datetime.combine(datetime.now().date(), datetime.min.time())
+        times = [start + timedelta(hours=h) for h in range(days * 24)]
     hourly: dict[str, list] = {"time": [t.strftime("%Y-%m-%dT%H:%M") for t in times]}
     for var in str(params.get("hourly") or "").split(","):
         if var:
