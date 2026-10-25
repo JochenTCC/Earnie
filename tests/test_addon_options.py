@@ -110,9 +110,17 @@ def test_ehal_http_port_option_carries_over_legacy_name(tmp_path, monkeypatch, o
     assert _read_json(config_path)["system"]["ehal_http_port"] == expected
 
 
+def _no_ping_spawn(monkeypatch) -> None:
+    """set_consent("on") → refresh_points may spawn a real ping; not under test here."""
+    from runtime_store import usage_ping as up
+
+    monkeypatch.setattr(up, "spawn_maybe_send_ping", lambda: False)
+
+
 def test_usage_ping_option_sets_consent(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    _no_ping_spawn(monkeypatch)
     config_path = tmp_path / "config.json"
     options_path = tmp_path / "options.json"
     _write_json(
@@ -137,6 +145,7 @@ def test_usage_ping_option_sets_consent(tmp_path, monkeypatch):
 def test_usage_ping_option_absent_leaves_consent(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    _no_ping_spawn(monkeypatch)
     config_path = tmp_path / "config.json"
     options_path = tmp_path / "options.json"
     _write_json(
