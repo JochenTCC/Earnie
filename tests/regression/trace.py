@@ -121,12 +121,17 @@ def _trace_l1(case: Any, fp: Any) -> dict[str, Any]:
 
     entry, recorder_root = select_cycle_entry(case)
     metrics = run_l1(case)
-    metrics.pop("inputs", None)
+    tree_inputs = metrics.pop("inputs", None) or {}
     plan_hash = metrics.pop("plan_hash", None)
+    inputs = fp.l1_input_fingerprint(entry=entry, recorder_root=recorder_root)
+    # Climate digests come from the tree's runner (the files it actually read).
+    inputs["files"].update(
+        {k: v for k, v in (tree_inputs.get("files") or {}).items() if k.startswith("open_meteo/")}
+    )
     return {
         "metrics": metrics,
         "plan_hash": plan_hash,
-        "inputs": fp.l1_input_fingerprint(entry=entry, recorder_root=recorder_root),
+        "inputs": inputs,
         "pv_shape_error": None,
         "slots": False,
     }
