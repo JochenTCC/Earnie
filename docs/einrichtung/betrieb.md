@@ -19,7 +19,7 @@ Nach einem Image- oder Add-on-Update startet der Assistent, wenn sich die Form d
 1. Earnie startet im **Migrationsmodus**. Verfügbar ist nur der Assistent (plus Log/Debug), **kein** normaler Hauskonfigurator und **kein** Auto-Start von `main.py`.
 2. Der Assistent zeigt einen Hinweis (inkl. letzter laufender Version), die ausstehenden Schritte und JSON-Diffs. Ggf. stellt er Fragen und nennt manuelle To-dos außerhalb von Earnie.
 3. **Backup anlegen und migrieren** legt zuerst ein Backup an, schreibt danach die neuen JSON-Dateien und zeigt den Report.
-4. **Weiter zur App** lädt die normale UI. Der Optimierer-Dienst startet nur, wenn der Auto-Start aktiv ist; sonst lässt er sich unter **Optimierer-Dienst** starten.
+4. **Weiter zur App** lädt die normale UI. Der Optimierer-Dienst startet nur, wenn der Auto-Start aktiv ist, und zwar sofort nach erfolgreicher Migration (die Berichtsseite zeigt PID oder Fehler); sonst lässt er sich unter **Optimierer-Dienst** starten. Schlägt der Start fehl, bleibt die Migration gültig: Dienst unter **Optimierer-Dienst** starten oder den Container neu starten, bis dahin antwortet der EHAL-Port nicht.
 
 Bringt eine Version neue Schritte mit, informieren die Release Notes vorab darüber (Abschnitt **Migration**).
 
@@ -63,7 +63,7 @@ python -m scripts.migrate_config --config-dir PATH --dry-run
 python -m scripts.migrate_config --config-dir PATH
 ```
 
-Pflichtfragen (z. B. Loxone-Merkernamen) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`). Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
+Pflichtfragen (z. B. Loxone-Merkernamen, alte HA-Vorzeichen) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`) bzw. `{"ha_sign.remove": "Entfernen"}` (oder `"Behalten"`). Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
 
 ### Wann die Migration blockiert
 
@@ -255,6 +255,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls es nicht schon läuft (Docker-Compose setzt das). Ohne Variable bzw. lokal: aus.                                                                     |
 | `EARNIE_OFFLINE`                        | `1` = keine Loxone-/Live-Verbindung erforderlich. Der Bootstrap füllt leere Entitäts-IDs im Live-Szenario aus den Katalogen. Sinnvoll für die Streamlit Community Cloud. |
+| `EARNIE_OPEN_METEO_CACHE_PATH`          | Verzeichnis für den Open-Meteo-Klimacache (Standard: `data/cache/open_meteo`). Vor allem für Tests und Container mit eigenem Cache-Volume. |
 | `EARNIE_CLOUD_DEMO`                     | `1` = Betrieb in der Streamlit Community Cloud. Pro Browser-Sitzung gibt es einen leeren Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator und einen Willkommenshinweis. Einen Offline-Demo-Seed gibt es nicht. Typisch zusammen mit `EARNIE_OFFLINE=1`. |
 | `EARNIE_USAGE_PING`                     | `off` = Kill-Switch: Es wird **nichts** gesendet, auch wenn die Zustimmung in der UI eingeschaltet ist. Andere Werte bzw. nicht gesetzt: Kill-Switch aus, die Zustimmung steuert. Siehe [Nutzungsstatistik](#nutzungsstatistik). |
 

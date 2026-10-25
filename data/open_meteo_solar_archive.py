@@ -7,12 +7,16 @@ from pathlib import Path
 from typing import Any
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 import pandas as pd
 import requests
 
 import config
 from data.eu_market_features import month_ranges
+from runtime_store.env_vars import read_env
 
 OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
 OPEN_METEO_CACHE_DIR = Path("data/cache/open_meteo")
@@ -23,6 +27,52 @@ DEFAULT_THERMAL_EFFICIENCY = 0.40
 _ARCHIVE_RETRY_ATTEMPTS = 5
 _ARCHIVE_RETRY_BASE_SECONDS = 2.0
 _ARCHIVE_RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
+
+
+class ClimateFetchBudgetExceeded(RuntimeError):
+    """The Open-Meteo download did not finish within the budget of ``climate_fetch_budget``."""
+
+
+_fetch_deadline: ContextVar[tuple[float, float] | None] = ContextVar(
+    "open_meteo_fetch_deadline", default=None
+)
+
+
+@contextmanager
+def climate_fetch_budget(seconds: float) -> Iterator[None]:
+    """Cap all archive downloads inside the block (retries and sleeps included) at ``seconds``.
+
+    Interactive pages use this so a slow or rate-limited Open-Meteo ends in a visible error
+    instead of minutes of retries. Cache hits are unaffected.
+    """
+    token = _fetch_deadline.set((time.monotonic() + seconds, seconds))
+    try:
+        yield
+    finally:
+        _fetch_deadline.reset(token)
+
+
+def _remaining_budget_s() -> float | None:
+    state = _fetch_deadline.get()
+    return None if state is None else state[0] - time.monotonic()
+
+
+def _budget_exceeded(last_error: Exception | None) -> ClimateFetchBudgetExceeded:
+    state = _fetch_deadline.get()
+    seconds = state[1] if state is not None else 0.0
+    detail = f" Letzter Fehler: {last_error}" if last_error is not None else ""
+    return ClimateFetchBudgetExceeded(
+        f"Open-Meteo-Klimadaten konnten nicht innerhalb von {seconds:.0f} s geladen werden "
+        f"(langsames Netz oder Ratenlimit).{detail} Bitte später erneut versuchen."
+    )
+
+
+def _sleep_within_budget(seconds: float, last_error: Exception | None) -> None:
+    remaining = _remaining_budget_s()
+    if remaining is not None and seconds >= remaining:
+        raise _budget_exceeded(last_error)
+    time.sleep(seconds)
+
 
 # Process-wide mem-cache: disk JSON → bundle; invalidate on file mtime change.
 _bundle_mem_cache: dict[str, tuple[int, "OpenMeteoClimateBundle"]] = {}
@@ -105,11 +155,17 @@ def _archive_http_get(params: dict[str, Any]) -> Any:
     response: requests.Response | None = None
     last_error: Exception | None = None
     for attempt in range(_ARCHIVE_RETRY_ATTEMPTS):
+        timeout_s: float = config.get_global_timeout()
+        remaining = _remaining_budget_s()
+        if remaining is not None:
+            if remaining <= 0:
+                raise _budget_exceeded(last_error)
+            timeout_s = min(timeout_s, remaining)
         try:
             response = requests.get(
                 OPEN_METEO_ARCHIVE,
                 params=params,
-                timeout=config.get_global_timeout(),
+                timeout=timeout_s,
             )
             status = getattr(response, "status_code", None)
             if status in _ARCHIVE_RETRYABLE_STATUS:
@@ -117,7 +173,7 @@ def _archive_http_get(params: dict[str, Any]) -> Any:
                     f"{status} for url: {getattr(response, 'url', OPEN_METEO_ARCHIVE)}",
                     response=response,
                 )
-                time.sleep(_ARCHIVE_RETRY_BASE_SECONDS * (2 ** attempt))
+                _sleep_within_budget(_ARCHIVE_RETRY_BASE_SECONDS * (2 ** attempt), last_error)
                 continue
             if hasattr(response, "raise_for_status"):
                 response.raise_for_status()
@@ -128,7 +184,7 @@ def _archive_http_get(params: dict[str, Any]) -> Any:
                 status = exc.response.status_code if exc.response is not None else None
                 if status not in _ARCHIVE_RETRYABLE_STATUS:
                     raise
-            time.sleep(_ARCHIVE_RETRY_BASE_SECONDS * (2 ** attempt))
+            _sleep_within_budget(_ARCHIVE_RETRY_BASE_SECONDS * (2 ** attempt), last_error)
     else:
         if last_error is not None:
             raise last_error
@@ -388,6 +444,12 @@ def _surface_cache_token(surfaces: list[TiltedSurface]) -> str:
     return "-".join(parts) if parts else "none"
 
 
+def _default_cache_dir() -> Path:
+    """``EARNIE_OPEN_METEO_CACHE_PATH`` if set, else ``OPEN_METEO_CACHE_DIR``."""
+    override = read_env("OPEN_METEO_CACHE_PATH")
+    return Path(override) if override else OPEN_METEO_CACHE_DIR
+
+
 def open_meteo_cache_path(
     lat: float,
     lon: float,
@@ -404,7 +466,7 @@ def open_meteo_cache_path(
         f"{lat:.4f}_{lon:.4f}_{start.isoformat()}_{end.isoformat()}_"
         f"{tz_token}_{token}.json"
     )
-    return (cache_dir or OPEN_METEO_CACHE_DIR) / name
+    return (cache_dir or _default_cache_dir()) / name
 
 
 def _bundle_to_frame(bundle: OpenMeteoClimateBundle) -> pd.DataFrame:
