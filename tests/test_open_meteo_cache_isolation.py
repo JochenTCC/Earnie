@@ -42,3 +42,13 @@ def test_mocked_climate_bundle_does_not_touch_repo_cache(monkeypatch):
     assert _repo_cache_files() == before
     written = list(Path(archive.OPEN_METEO_CACHE_DIR).glob("12.3456_65.4321_*.json"))
     assert len(written) == 1
+
+
+def test_cache_path_env_override_wins_over_module_default(monkeypatch, tmp_path):
+    surfaces = [TiltedSurface(tilt_deg=18.0, azimuth_deg=0.0)]
+    args = (47.4, 9.7, "Europe/Vienna", date(2025, 1, 1), date(2025, 12, 31), surfaces)
+    default_path = archive.open_meteo_cache_path(*args)
+    monkeypatch.setenv("EARNIE_OPEN_METEO_CACHE_PATH", str(tmp_path))
+    overridden = archive.open_meteo_cache_path(*args)
+    assert overridden.parent == tmp_path
+    assert overridden.name == default_path.name
