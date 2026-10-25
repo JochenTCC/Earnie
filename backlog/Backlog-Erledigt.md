@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SUSI / Energieinstitut standards research (2026-10-25)
+
+- [x] **Adjust SE for Energieberater — standards research and assessment** `[dev]`: tools of the Energieinstitut Vorarlberg analysed (SUSI, Heizrechner v5.0, Hexit/Replace, econ calc V3.1); methods and standards identified (annuity method VDI 2067, cost breakdown ÖNORM B 1801-1, CO2 factors OIB-RL 6, Hexit price escalation per carrier); integration assessed and turned into epic **SUSI** (Version 2.8 production phases P1 / P2 / P6 / P3a + Version 2.+1 prototype P3b / P4 / P5 / P7). Documents in `Earnie-Projekt/Entwicklungsplan/Offen/` (`SUSI_Heizrechner_Rechenlogik.md`, `Earnie-SUSI-Epic-Entwurf.md`, `econ-calc_Rechenlogik_und_Normbezug.md`). The remaining sub-item (contact the Energieinstitut) stays open as *SUSI — Energieinstitut meeting* in Version 2.8.
+
 ### Bugfix CI `ui-e2e` and blocking climate fetch in the house config (2026-10-25)
 
 - [x] **CI job `ui-e2e` red on every run — fixed:** `test_house_config_first_edit_after_open_is_kept` hung at the first `_wait_until_idle`: the e2e server (own process, no climate mock) downloaded Open-Meteo climate data for the `thermal_annual` consumer of `test_home` when the house config opened; with a cold cache that exceeded the 60 s wait (local runs had a warm gitignored `data/cache/open_meteo`). New env var `EARNIE_OPEN_METEO_CACHE_PATH` (`data/open_meteo_solar_archive.py`, documented in `docs/einrichtung/betrieb.md`); the e2e conftest seeds that cache from an AppTest run of the page with the mock. On failure the e2e run prints the Streamlit server log and a browser diagnosis.
