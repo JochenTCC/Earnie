@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Open-Meteo archive shifted by one hour (2026-10-25)
+
+- [x] **Open-Meteo archive series shifted by 1 h since the switch to winter time — cause found and fixed:** with `timezone=Europe/Vienna` the archive API applies ONE fixed UTC offset to the whole response, the offset valid on the request day (checked 2026-10-25: summer and winter dates both come back with `utc_offset_seconds=3600`, a 144 h range across the 2025 clock change has no gap, sunrise on 21 June 2025 shows 05:00 instead of 06:00 CEST). Caches written in summer time (UTC+2) were therefore right for summer and 1 h late for winter, caches written since 2026-10-25 (UTC+1) the other way round. Fix: `data/open_meteo_solar_archive.py` requests `timezone=UTC` (starting one UTC day earlier) and converts to local wall-clock with `utc_hourly_index_to_local_naive` (repeated autumn hour averaged, skipped spring hour absent); the same in `data/eu_market_features.py::_fetch_open_meteo_archive_month`. The default cache directory is now `data/cache/open_meteo_utc`, so shifted caches are not reused (the old `data/cache/open_meteo` can be deleted). Check: first PV hour on 2025-06-21 is 06:00, on 2025-12-21 09:00. Tests in `tests/test_open_meteo_solar_archive.py`, `tests/test_eu_market_features.py`.
+
 ### Issue #50 — grid fee default (2026-10-24)
 
 - [x] **12.0 ct/kWh grid fee in a live setup:** not a code default (0 in `v2.6.2` and `release/2.7`). The reporter confirmed having pasted the fixed energy price (`fix_cent_kwh` 12.0) into `netznutzung_arbeitspreis_cent_kwh`; corrected to 9.08 ct, import price now 25.30 ct. No change; the new load warning for `settlement_fee_cent_kwh` on fixed tariffs covers the related misconfiguration (the reporter first entered the grid cost there).

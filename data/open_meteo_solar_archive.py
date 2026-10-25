@@ -19,7 +19,9 @@ from data.eu_market_features import month_ranges
 from runtime_store.env_vars import read_env
 
 OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
-OPEN_METEO_CACHE_DIR = Path("data/cache/open_meteo")
+# "_utc": files written before the UTC-request fix hold timestamps shifted by the UTC offset
+# of the fetch day (Open-Meteo applies one fixed offset per response), so they are not reused.
+OPEN_METEO_CACHE_DIR = Path("data/cache/open_meteo_utc")
 HOURLY_VAR = "global_tilted_irradiance"
 HOURLY_TEMP_VAR = "temperature_2m"
 REFERENCE_WM2 = 1000.0
@@ -132,6 +134,21 @@ def _cap_inclusive_end(end: date) -> date:
     return min(end, latest)
 
 
+def utc_hourly_index_to_local_naive(
+    utc_times: pd.DatetimeIndex, timezone: str
+) -> pd.DatetimeIndex:
+    """UTC timestamps (naive or aware) -> local wall-clock stamps of ``timezone`` (naive).
+
+    The archive is requested with ``timezone=UTC`` because with a zone name Open-Meteo
+    applies ONE fixed UTC offset to the whole response (the offset valid on the request
+    day, not per date), which shifts summer or winter hours by 1 h depending on when the
+    data was fetched.
+    """
+    if utc_times.tz is None:
+        utc_times = utc_times.tz_localize("UTC")
+    return utc_times.tz_convert(timezone).tz_localize(None)
+
+
 def _parse_hourly_times(times: list[str]) -> list[datetime]:
     parsed: list[datetime] = []
     for raw in times:
@@ -199,7 +216,12 @@ def _hourly_series_from_payload(
     hourly_vars: str,
     start: date,
     end: date,
+    timezone: str,
 ) -> dict[str, pd.Series]:
+    """Parse a UTC archive payload into local wall-clock series of ``timezone``.
+
+    The repeated hour of the autumn DST change is averaged; the skipped spring hour is absent.
+    """
     hourly = payload.get("hourly") or {}
     times = hourly.get("time") or []
     if not times:
@@ -207,7 +229,9 @@ def _hourly_series_from_payload(
             f"Open-Meteo archive unvollständig ({start}..{end - timedelta(days=1)}): "
             "keine Zeitstempel."
         )
-    index = pd.DatetimeIndex(_parse_hourly_times(times))
+    index = utc_hourly_index_to_local_naive(
+        pd.DatetimeIndex(_parse_hourly_times(times)), timezone
+    )
     var_names = [name.strip() for name in hourly_vars.split(",")]
     result: dict[str, pd.Series] = {}
     for var_name in var_names:
@@ -217,7 +241,8 @@ def _hourly_series_from_payload(
                 f"Open-Meteo archive unvollständig ({start}..{end - timedelta(days=1)}): "
                 f"{var_name} hat {len(values)} Werte für {len(times)} Zeitstempel."
             )
-        result[var_name] = pd.Series(values, index=index, dtype=float)
+        series = pd.Series(values, index=index, dtype=float)
+        result[var_name] = series.groupby(level=0).mean() if series.index.has_duplicates else series
     return result
 
 
@@ -231,23 +256,30 @@ def _fetch_hourly_archive_chunk(
     hourly_vars: str,
     extra_params: dict[str, Any] | None = None,
 ) -> dict[str, pd.Series]:
+    # One UTC day earlier: the first local hours of ``start`` belong to the previous UTC day.
     params: dict[str, Any] = {
         "latitude": lat,
         "longitude": lon,
-        "start_date": start.isoformat(),
+        "start_date": (start - timedelta(days=1)).isoformat(),
         "end_date": (end - timedelta(days=1)).isoformat(),
         "hourly": hourly_vars,
-        "timezone": timezone,
+        "timezone": "UTC",
     }
     if extra_params:
         params.update(extra_params)
     response = _archive_http_get(params)
-    return _hourly_series_from_payload(
+    series_by_var = _hourly_series_from_payload(
         response.json(),
         hourly_vars=hourly_vars,
         start=start,
         end=end,
+        timezone=timezone,
     )
+    first, stop = pd.Timestamp(start), pd.Timestamp(end)
+    return {
+        name: series.loc[(series.index >= first) & (series.index < stop)]
+        for name, series in series_by_var.items()
+    }
 
 
 def fetch_hourly_temperature_c_series(

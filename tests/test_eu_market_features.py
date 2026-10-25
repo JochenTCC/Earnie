@@ -389,3 +389,30 @@ def test_fetch_eu_power_hourly_unreachable_host_makes_one_request_in_total():
                     fetch_eu_power_hourly(start, start + timedelta(days=1))
 
     assert get_mock.call_count == 1
+
+
+def test_open_meteo_archive_month_requests_utc_and_converts_to_planning_tz():
+    import data.eu_market_features as emf
+
+    seen: dict = {}
+
+    def _fake_get_json(url, params):
+        seen.update(params)
+        return {
+            "hourly": {
+                "time": ["2025-06-30T22:00", "2025-06-30T23:00", "2025-12-31T22:00", "2025-12-31T23:00"],
+                "wind_speed_10m": [1.0, 2.0, 3.0, 4.0],
+                "shortwave_radiation": [0.0, 0.0, 0.0, 0.0],
+            }
+        }
+
+    point = emf.WEATHER_GRID[0]
+    with patch.object(emf, "_http_get_json", _fake_get_json), patch.object(
+        emf.config, "get_planning_timezone", return_value="Europe/Vienna"
+    ):
+        frame = emf._fetch_open_meteo_archive_month(point, date(2025, 7, 1), date(2025, 12, 31))
+    assert seen["timezone"] == "UTC"
+    assert seen["start_date"] == "2025-06-30"
+    # 22:00 UTC on 06-30 = 00:00 CEST on 07-01; 22:00 UTC on 12-31 is past the chunk end
+    assert [ts.hour for ts in frame.index] == [0, 1]
+    assert list(frame["wind_speed_kmh"]) == [1.0, 2.0]

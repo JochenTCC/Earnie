@@ -8,7 +8,7 @@ from data import open_meteo_solar_archive as archive
 from data.open_meteo_solar_archive import TiltedSurface
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REPO_CACHE_DIR = (REPO_ROOT / "data" / "cache" / "open_meteo").resolve()
+REPO_CACHE_DIR = (REPO_ROOT / "data" / "cache" / "open_meteo_utc").resolve()
 
 
 def _repo_cache_files() -> set[str]:
