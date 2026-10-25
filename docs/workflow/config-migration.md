@@ -40,6 +40,8 @@ Ordered `MigrationStep` list in [`runtime_store/migration/registry.py`](../../ru
 
 Optional `detect_on_start` gates a step on the docs the chain **started** from (`types.step_is_pending`): `dm4.loxone_binding_names` (2.7.q Q8 Merker names) only runs when the chain starts at model 3, so the required question (`loxone_binding_names.keep`: `Behalten` / `Leeren`) is asked once and never again on model 4 — also when the user keeps the names. It runs after `dm4.ess_bindings` (names first move onto the batteries), only for `ehal.backend` Loxone, and clears plant, consumer, battery, inverter and PV values (keys stay as activation flags). Rationale: names are functionally tolerated (writes publish qualified IDs, reads map Merker → ID via the binding index) and kept names show up as „Bisheriger Name“ in the Loxone signal-list export.
 
+`dm4.ha_sign` (issue #56) works the same way for a leftover `ehal.ha.sign` on the HA backend (`ha_sign.remove`: `Behalten` / `Entfernen`): in 2.7 `sign` is applied on top of the HA push, so a 2.6 entry flips already EHAL-signed values twice. `Entfernen` empties `ehal.ha.sign` and leaves a manual to-do to check Live-Lesen against the live power line.
+
 Required `choice` questions start empty in the wizard (no implicit default); the runner rejects missing answers before any write.
 
 ### 3.2 Planner and runner

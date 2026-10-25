@@ -112,6 +112,8 @@
             "label": "Fix 25 ct/kWh Bezug",
             "type": "fixed_cent",
             "fix_cent_kwh": 25.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
             "supplier_id": "fix_25_ct_kwh_bezug"
         },
         {
@@ -136,6 +138,8 @@
                     "tariff_cent_kwh": 24.0
                 }
             ],
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
             "supplier_id": "monatliche_bezugspreise_beispiel"
         }
     ],

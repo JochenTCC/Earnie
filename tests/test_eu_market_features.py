@@ -338,3 +338,54 @@ def test_default_training_range_length():
 
     start, end = default_training_range()
     assert (end - start).days == 365
+
+
+def test_http_get_json_connection_error_is_not_retried():
+    """An unreachable host fails at the first attempt (2.6.2 behaviour), no 5x backoff."""
+    import requests
+
+    from data import eu_market_features as emf
+
+    with patch.object(emf.time, "sleep") as sleep_mock:
+        with patch.object(emf.config, "get_global_timeout", return_value=5):
+            with patch.object(
+                emf.requests, "get", side_effect=requests.ConnectTimeout("no route")
+            ) as get_mock:
+                with pytest.raises(emf.ApiUnreachableError, match="nicht erreichbar"):
+                    emf._http_get_json("https://example.test/x", {})
+
+    assert get_mock.call_count == 1
+    sleep_mock.assert_not_called()
+
+
+def test_fetch_eu_power_hourly_aborts_at_first_unreachable_country():
+    """12 countries x full retry loop kept the daemon busy for 12+ min (issue #59)."""
+    from data import eu_market_features as emf
+
+    start = date(2025, 7, 1)
+    with patch.object(
+        emf,
+        "fetch_country_power_hourly",
+        side_effect=emf.ApiUnreachableError("nicht erreichbar"),
+    ) as country_mock:
+        with pytest.raises(emf.ApiUnreachableError):
+            fetch_eu_power_hourly(start, start + timedelta(days=1))
+
+    assert country_mock.call_count == 1
+
+
+def test_fetch_eu_power_hourly_unreachable_host_makes_one_request_in_total():
+    import requests
+
+    from data import eu_market_features as emf
+
+    start = date(2025, 7, 1)
+    with patch.object(emf.time, "sleep"):
+        with patch.object(emf.config, "get_global_timeout", return_value=5):
+            with patch.object(
+                emf.requests, "get", side_effect=requests.ConnectionError("down")
+            ) as get_mock:
+                with pytest.raises(emf.ApiUnreachableError):
+                    fetch_eu_power_hourly(start, start + timedelta(days=1))
+
+    assert get_mock.call_count == 1

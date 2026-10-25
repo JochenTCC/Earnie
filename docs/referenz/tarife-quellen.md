@@ -43,9 +43,9 @@ Für Spot- und aWATTar-Tarife gilt folgende Reihenfolge (Cent/kWh), wie im Katal
 
 1. **Börsenpreis** der Stunde (Day-Ahead, EPEX-Zone zum Land des Tarifs).
 2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
-3. **Fixer Aufschlag** (`settlement_fee_cent_kwh`) in Cent/kWh.
+3. **Fixer Aufschlag des Lieferanten** (`settlement_fee_cent_kwh`) in Cent/kWh. Das Feld gilt nur für Spot-Typen; Netzkosten gehören nicht hierher, sondern in `netznutzung` (Schritt 4).
 4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto, je Slot, mit Zeitregeln wie SNAP).
-5. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100).
+5. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100). Bei `prices_include_vat` = ja ist der Lieferantenpreis schon brutto; die Netznutzung aus Schritt 4 erhält dann in Schritt 4 selbst die USt (`vat_percent`), weil sie ein Nettopreis ist.
 
 Formel:
 
@@ -54,7 +54,7 @@ Formel:
   × (1 + vat_percent/100)   falls prices_include_vat = false
 ```
 
-Bei Festpreis-Tarifen (`fixed_cent`) ist der Arbeitspreis `fix_cent_kwh`. Auch hier gilt die USt-Regel.
+Bei Festpreis-Tarifen (`fixed_cent`) ist der Arbeitspreis `fix_cent_kwh`; `settlement_fee_cent_kwh` hat dort keine Wirkung (Earnie warnt beim Laden). Die Netznutzung aus dem Hausprofil kommt auch hier dazu. Auch hier gilt die USt-Regel.
 
 ### Eigener Festpreis (szenario-lokal)
 

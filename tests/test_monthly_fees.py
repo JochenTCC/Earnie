@@ -432,7 +432,7 @@ def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
         index=idx,
     )
     fees = ScenarioFeeBreakdown(supplier_monthly_eur=0.0, grid_monthly_eur=2.0)
-    # 5 ct/kWh net, prices_include_vat true → 5 € on 100 kWh
+    # 5 ct/kWh net grid fee, 20 % VAT on top even though the supplier price is gross
     body = render_scenario_invoice_markdown(
         scenario_id="live",
         label="Live",
@@ -450,11 +450,11 @@ def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
         grid_fee=flat_grid_fee_spec(5.0),
     )
     assert "## Netznutzung" in body
-    assert "| Energiebezug (Lieferant) | 7.00 € (100.0 kWh) |" in body
-    assert "| Netznutzung Arbeitspreis | 5.00 € |" in body
+    assert "| Energiebezug (Lieferant) | 6.00 € (100.0 kWh) |" in body
+    assert "| Netznutzung Arbeitspreis | 6.00 € |" in body
     # 12 import - 0 export + 2 grid = 14
     assert "| **Gesamt** | **14.00 €** |" in body
-    assert "| Arbeitspreis (Jahr) | 5.00 € |" in body
+    assert "| Arbeitspreis (Jahr) | 6.00 € |" in body
 
     # With VAT on net AP: 5 * 1.2 = 6 ct → 6 €
     body_vat = render_scenario_invoice_markdown(

@@ -23,12 +23,14 @@ def _netznutzung_ap_gross_cent(
     ap_net_cent: float,
     import_spec: dict | None,
 ) -> float:
-    """Arbeitspreis Cent/kWh wie in k_act (USt laut Bezugstarif)."""
+    """Arbeitspreis Cent/kWh wie in k_act: netto plus USt laut Bezugstarif.
+
+    The grid fee is always net, so VAT applies whether the supplier price is
+    quoted gross (``prices_include_vat``) or net.
+    """
     if ap_net_cent <= 0.0:
         return 0.0
     spec = import_spec if isinstance(import_spec, dict) else {}
-    if bool(spec.get("prices_include_vat", True)):
-        return float(ap_net_cent)
     vat = float(spec.get("vat_percent", 0.0) or 0.0)
     return float(ap_net_cent) * (1.0 + vat / 100.0)
 

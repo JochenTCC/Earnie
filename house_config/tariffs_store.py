@@ -2,11 +2,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 
 from data.feed_in_prices import validate_fixed_monthly_feed_in_rates
-from data.tariff_pricing import market_zone_for_land
+from data.tariff_pricing import STANDARD_VAT_PERCENT_BY_LAND, market_zone_for_land
+
+logger = logging.getLogger(__name__)
+
+_warned_ignored_settlement_fee: set[str] = set()
+_warned_gross_without_vat: set[str] = set()
 
 IMPORT_TYPES = frozenset(
     {
@@ -111,6 +117,26 @@ def _synthetic_user_import_tariff(cent: float) -> dict:
         "vat_percent": 0.0,
         "supplier_id": "user",
     }
+
+
+def apply_land_vat_to_user_fixed_import(settings: dict, land: str) -> dict:
+    """Give the user-fixed import price the VAT rate of the house profile's land.
+
+    The price is entered gross, but the net Netznutzung must get VAT on top, so the
+    tariff needs a rate. Other tariffs carry their own ``vat_percent``.
+    """
+    spec = settings.get("_import_tariff_spec")
+    if not isinstance(spec, dict) or not is_user_fixed_tariff_id(spec.get("id")):
+        return settings
+    land_key = str(land or "").strip().upper()
+    if land_key not in STANDARD_VAT_PERCENT_BY_LAND:
+        raise ValueError(f"Keine Standard-USt für Land {land!r} (AT, DE oder CH).")
+    out = dict(settings)
+    out["_import_tariff_spec"] = {
+        **spec,
+        "vat_percent": STANDARD_VAT_PERCENT_BY_LAND[land_key],
+    }
+    return out
 
 
 def _synthetic_user_export_tariff(cent: float) -> dict:
@@ -245,6 +271,39 @@ def _require_land(spec: dict, *, kind: str, index: int) -> None:
         )
 
 
+def _warn_ignored_settlement_fee(spec: dict) -> None:
+    """Warn once per tariff: the fee only applies to spot import types."""
+    fee = spec.get("settlement_fee_cent_kwh")
+    if not fee or spec["type"] not in ("fixed_cent", "monthly_table"):
+        return
+    tariff_id = spec["id"]
+    if tariff_id in _warned_ignored_settlement_fee:
+        return
+    _warned_ignored_settlement_fee.add(tariff_id)
+    logger.warning(
+        "Tarif '%s' (%s): settlement_fee_cent_kwh=%s hat bei diesem Typ keine Wirkung "
+        "(nur Spot-Tarife). Netzkosten gehören in 'netznutzung' am Hausprofil.",
+        tariff_id,
+        spec["type"],
+        fee,
+    )
+
+
+def _warn_gross_import_without_vat(spec: dict) -> None:
+    """Warn once per tariff: Netznutzung (net) gets no VAT without a rate."""
+    if not spec.get("prices_include_vat", True) or spec.get("vat_percent"):
+        return
+    tariff_id = spec["id"]
+    if tariff_id in _warned_gross_without_vat:
+        return
+    _warned_gross_without_vat.add(tariff_id)
+    logger.warning(
+        "Tarif '%s': prices_include_vat ist wahr, aber vat_percent fehlt oder ist 0 — "
+        "die Netznutzung (netto) wird ohne USt addiert. vat_percent setzen (z. B. 20).",
+        tariff_id,
+    )
+
+
 def _import_tariff_spec(raw: dict, index: int) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"import_tariffs[{index}] muss ein Objekt sein.")
@@ -274,6 +333,8 @@ def _import_tariff_spec(raw: dict, index: int) -> dict:
                 f"import_tariffs[{index}] ('{tariff_id}'): monthly_rates fehlt."
             )
         spec["monthly_rates"] = validate_fixed_monthly_feed_in_rates(rates)
+    _warn_ignored_settlement_fee(spec)
+    _warn_gross_import_without_vat(spec)
     return spec
 
 
