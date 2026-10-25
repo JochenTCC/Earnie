@@ -36,7 +36,8 @@
   "inputs": {
     "files": {
       "recorder_cycle": "050b6c460cbf29d6",
-      "config_snapshot": "247777f49ba6e559"
+      "config_snapshot": "247777f49ba6e559",
+      "open_meteo/47.5000_9.5000_2026-01-01_2026-10-17_Europe-Vienna_18.0_-154.0-18.0_26.0.json": "1138400f62000f91"
     },
     "series": {},
     "sums": {}

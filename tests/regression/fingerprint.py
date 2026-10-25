@@ -82,13 +82,24 @@ def l2_input_fingerprint(
     return {"files": files, "series": series, "sums": sums}
 
 
-def l1_input_fingerprint(*, entry: dict[str, Any], recorder_root: Path) -> dict[str, Any]:
-    """L1 replays recorded inputs; the matrix preparation runs inside the replay."""
+def l1_input_fingerprint(
+    *,
+    entry: dict[str, Any],
+    recorder_root: Path,
+    climate_files: Iterable[Path] = (),
+) -> dict[str, Any]:
+    """L1 replays recorded inputs; the matrix preparation runs inside the replay.
+
+    ``climate_files`` are the frozen Open-Meteo files the replay read (thermal flex
+    context); they are inputs the recorded cycle does not carry.
+    """
     files = {"recorder_cycle": canonical_json_digest(entry)}
     config_hash = str(entry.get("config_hash") or "")
     if not config_hash:
         raise ValueError("recorder cycle entry missing config_hash")
     files["config_snapshot"] = file_digest(recorder_root / "configs" / f"{config_hash}.json")
+    for path in sorted(climate_files, key=lambda item: item.name):
+        files[f"open_meteo/{path.name}"] = file_digest(path)
     return {"files": files, "series": {}, "sums": {}}
 
 
