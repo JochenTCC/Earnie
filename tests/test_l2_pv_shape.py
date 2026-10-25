@@ -89,3 +89,31 @@ def test_climate_fixture_refuses_network_for_missing_key(monkeypatch):
             )
     assert archive.OPEN_METEO_CACHE_DIR == previous_dir
     assert list(CLIMATE_FIXTURE_DIR.glob("1.0000_2.0000_*")) == []
+
+
+def test_climate_fixture_ignores_cache_env_and_tracks_reads(monkeypatch, tmp_path):
+    from data import open_meteo_solar_archive as archive
+    from data.open_meteo_solar_archive import TiltedSurface
+    from tests.regression.climate_fixture import L1_CLIMATE_FIXTURE_DIR
+    from tests.regression.fingerprint import file_digest, l1_input_fingerprint
+    from tests.regression.l1_runner import select_cycle_entry
+
+    monkeypatch.delenv("EARNIE_REGRESSION_RECORD_CLIMATE", raising=False)
+    monkeypatch.setenv("EARNIE_OPEN_METEO_CACHE_PATH", str(tmp_path))
+    surfaces = [TiltedSurface(18.0, 26.0), TiltedSurface(18.0, -154.0)]
+    with frozen_climate_fixture(L1_CLIMATE_FIXTURE_DIR) as used:
+        archive.build_open_meteo_climate_bundle_for_year(
+            2025, lat=47.5, lon=9.5, timezone="Europe/Vienna", surfaces=surfaces
+        )
+    assert os.environ["EARNIE_OPEN_METEO_CACHE_PATH"] == str(tmp_path)
+    assert list(tmp_path.iterdir()) == []
+    (path,) = used
+    assert path.parent == L1_CLIMATE_FIXTURE_DIR
+
+    entry, recorder_root = select_cycle_entry(
+        load_case(DEFAULT_CASES_DIR / "REG-S-negative-prices")
+    )
+    files = l1_input_fingerprint(
+        entry=entry, recorder_root=recorder_root, climate_files=used
+    )["files"]
+    assert files[f"open_meteo/{path.name}"] == file_digest(path)
