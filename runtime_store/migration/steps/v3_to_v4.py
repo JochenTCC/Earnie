@@ -4,10 +4,12 @@ from __future__ import annotations
 import copy
 
 from runtime_store.migrate_v4 import MigrateV4Error, migrate_pack_docs, needs_v4_migration
+from runtime_store.migration.steps.inverters import pv_on_main_inverter_todos
 from runtime_store.migration.types import (
     Answers,
     Blocker,
     Docs,
+    ManualTodo,
     MigrationStep,
     StepResult,
 )
@@ -44,6 +46,10 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
     return StepResult(docs=out, changed_files=changed)
 
 
+def manual_todos(before: Docs, after: Docs) -> list[ManualTodo]:
+    return pv_on_main_inverter_todos(before, after, STEP_ID)
+
+
 STEP = MigrationStep(
     id=STEP_ID,
     data_model=4,
@@ -59,4 +65,5 @@ STEP = MigrationStep(
     ),
     detect=detect,
     apply=apply,
+    manual_todos=manual_todos,
 )

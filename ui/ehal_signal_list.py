@@ -174,7 +174,9 @@ def _render_export(house: dict, components: dict, *, backend: str) -> None:
         st.caption("Loxone: ZIP mit VO-/VI-Vorlagen und Signallisten-CSV.")
     else:
         st.caption(
-            "Loxone-VO/VI-Export (ZIP). HA-YAML-Paket folgt mit Binding P5c."
+            "Home Assistant: das YAML-Paket (Push-Carrier) steht weiter oben im "
+            "Abschnitt **HA Push-Carrier** zum Download bereit. Dieser Export "
+            "liefert nur die Loxone-VO/VI-Vorlagen (ZIP)."
         )
     host = st.text_input(
         "IP-Adresse des Geräts, auf dem Earnie läuft",

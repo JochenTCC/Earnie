@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-from integrations.ha_carrier_yaml import build_carrier_yaml
+from integrations.ha_carrier_yaml import DEFAULT_WATCHDOG_TIMEOUT_S, build_carrier_yaml
 from scripts.pilot_vo_template_gen import TOKEN_PLACEHOLDER
 
 
@@ -29,6 +29,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Push time_pattern interval seconds (default: EARNIE_PUSH_REPEAT_S or 10)",
     )
+    parser.add_argument(
+        "--watchdog-s",
+        type=float,
+        default=DEFAULT_WATCHDOG_TIMEOUT_S,
+        help="Release a forced ESS active power when status.json is unreachable this "
+        f"long (default {DEFAULT_WATCHDOG_TIMEOUT_S:g}; 0 = no watchdog)",
+    )
     args = parser.parse_args(argv)
     config_dir = args.config_dir
     house = json.loads((config_dir / "house_profiles.json").read_text(encoding="utf-8"))
@@ -40,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
         earnie_port=args.port,
         token=args.token,
         repeat_s=args.repeat_s,
+        watchdog_s=args.watchdog_s,
     )
     if args.out:
         args.out.write_text(text, encoding="utf-8")

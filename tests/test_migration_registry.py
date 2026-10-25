@@ -21,6 +21,11 @@ from runtime_store.migration import (
     run_migration,
 )
 from runtime_store.migration.io_util import load_pack_docs
+from runtime_store.migration.steps.ha_sign import (
+    CHOICE_KEEP as SIGN_KEEP,
+    CHOICE_REMOVE as SIGN_REMOVE,
+    Q_SIGN,
+)
 from runtime_store.migration.steps.loxone_binding_names import (
     CHOICE_CLEAR,
     CHOICE_KEEP,
@@ -109,7 +114,7 @@ def test_v3_last_multi_battery_blocker(tmp_path):
 
 def test_meta_every_step_covered_by_fixture_detect(tmp_path):
     covered: set[str] = set()
-    for name in (*HAPPY_SNAPSHOTS, "v3_last", "v4_pre_ha_pull", "v4_pre_se_conf_defaults"):
+    for name in (*HAPPY_SNAPSHOTS, "v3_last", "v3_ha_sign", "v4_pre_ha_pull", "v4_pre_se_conf_defaults"):
         docs = load_pack_docs(_copy_snapshot(tmp_path / "meta", name))
         for step in STEPS:
             if step.detect(docs):
@@ -131,6 +136,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm4.grid_fee_profile": "v4_pre_inverter_gridfee",
         "dm4.required_signal_activation": "v4_pre_ha_pull",
         "dm4.ha_pull_removal": "v4_pre_ha_pull",
+        "dm4.ha_sign": "v3_ha_sign",
         "dm4.ehal_http_port": "v4_pre_ha_pull",
         "dm4.consumer_flex_bindings": "v4_pre_quellenwahl",
         "dm4.retire_plant_pv_binding": "v4_pre_ha_pull",
@@ -474,3 +480,110 @@ def test_loxone_names_unknown_answer_blocks(tmp_path):
     with pytest.raises(MigrationError, match="Unbekannte Antwort"):
         run_migration(config_dir, {Q_NAMES: "vielleicht"})
     assert not (config_dir / "backups").exists()
+
+
+# --- dm4.ha_sign (issue #56): leftover ehal.ha.sign after 2.6 -> 2.7 -------------------
+
+
+def _read_config(config_dir: Path) -> dict:
+    return json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+
+
+def test_ha_sign_question_is_required(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v3_ha_sign")
+    plan = plan_migration(config_dir)
+    assert "dm4.ha_sign" in plan.pending_step_ids
+    question = next(q for q in plan.questions if q.id == Q_SIGN)
+    assert question.required
+    assert question.choices == (SIGN_KEEP, SIGN_REMOVE)
+    with pytest.raises(MigrationError, match=Q_SIGN):
+        run_migration(config_dir, {})
+    assert not (config_dir / "backups").exists()
+
+
+def test_ha_sign_remove_clears_sign_and_leaves_a_todo(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v3_ha_sign")
+    assert _read_config(config_dir)["ehal"]["ha"]["sign"]
+    report = run_migration(config_dir, {Q_SIGN: SIGN_REMOVE})
+    assert "dm4.ha_sign" in report.applied_step_ids
+    assert any(t.step_id == "dm4.ha_sign" for t in report.manual_todos)
+    assert _read_config(config_dir)["ehal"]["ha"]["sign"] == {}
+    validate_migrated_docs(load_pack_docs(config_dir))
+    assert plan_migration(config_dir).pending_step_ids == ()
+
+
+def test_ha_sign_keep_leaves_the_entry_and_is_not_asked_again(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v3_ha_sign")
+    before = _read_config(config_dir)["ehal"]["ha"]["sign"]
+    report = run_migration(config_dir, {Q_SIGN: SIGN_KEEP})
+    assert not any(t.step_id == "dm4.ha_sign" for t in report.manual_todos)
+    assert _read_config(config_dir)["ehal"]["ha"]["sign"] == before
+    plan = plan_migration(config_dir)
+    assert plan.pending_step_ids == ()
+    assert all(q.id != Q_SIGN for q in plan.questions)
+
+
+def test_ha_sign_unknown_answer_blocks(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v3_ha_sign")
+    with pytest.raises(MigrationError, match="Unbekannte Antwort"):
+        run_migration(config_dir, {Q_SIGN: "vielleicht"})
+    assert not (config_dir / "backups").exists()
+
+
+def test_ha_sign_not_asked_on_v4_packs(tmp_path):
+    """Packs already on model 4 (e.g. installs that migrated earlier) are never asked."""
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_ha_pull")
+    path = config_dir / "config.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["ehal"] = {
+        "backend": "ha",
+        "adapter_id": "earnie-hems",
+        "ha": {"sign": {"sens_ess_power": "negate"}},
+    }
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    plan = plan_migration(config_dir)
+    assert "dm4.ha_sign" not in plan.pending_step_ids
+    assert all(q.id != Q_SIGN for q in plan.questions)
+
+
+def test_ha_sign_not_asked_for_loxone_or_empty_sign(tmp_path):
+    loxone_dir = _copy_snapshot(tmp_path / "lox", "v3_single_battery")
+    assert "dm4.ha_sign" not in plan_migration(loxone_dir).pending_step_ids
+
+    empty_dir = _copy_snapshot(tmp_path / "empty", "v3_ha_sign")
+    path = empty_dir / "config.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["ehal"]["ha"]["sign"] = {}
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    assert "dm4.ha_sign" not in plan_migration(empty_dir).pending_step_ids
+
+
+def test_inverters_step_lists_pv_systems_put_on_wr_main(tmp_path):
+    """Issue #61: the migration cannot know the PV wiring; the report says what it assumed."""
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_inverter_gridfee")
+    plan = plan_migration(config_dir)
+    todo = next(t for t in plan.manual_todos if t.step_id == "dm4.inverters")
+    assert "`dach_nord`" in todo.text_de and "`dach_sued`" in todo.text_de
+    assert "wr_main" in todo.text_de and "PV-Felder" in todo.text_de
+
+
+def test_inverters_todo_absent_when_every_pv_system_has_an_inverter(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_inverter_gridfee")
+    path = config_dir / "components.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    for pv in doc["pv_systems"]:
+        pv["inverter_id"] = "wr_main"
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    plan = plan_migration(config_dir)
+    assert not any(t.step_id == "dm4.inverters" for t in plan.manual_todos)
+
+
+def test_v3_path_lists_pv_systems_put_on_wr_main(tmp_path):
+    """The 2.6 path assigns the PV systems inside dm4.v3_to_v4, not in dm4.inverters."""
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    plan = plan_migration(config_dir)
+    todo = next(t for t in plan.manual_todos if t.step_id == "dm4.v3_to_v4")
+    assert "`dach_nord`" in todo.text_de and "`dach_sued`" in todo.text_de
+    assert "wr_main" in todo.text_de
+    report = run_migration(config_dir, KEEP_NAMES)
+    assert any(t.step_id == "dm4.v3_to_v4" for t in report.manual_todos)

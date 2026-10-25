@@ -269,3 +269,47 @@ def test_compute_rolling_epex_bias_respects_cap():
             min_samples=6,
         )
     assert bias == pytest.approx(5.0)
+
+
+def test_failed_feature_load_is_not_retried_within_the_backoff(caplog):
+    """An unreachable the API host must not be asked again in every cycle (issue #59)."""
+    from data import price_forecast_live as pfl
+
+    pfl._feature_input_cache.clear()
+    pfl._power_day_cache.clear()
+    pfl._feature_failure_until.clear()
+    now = [1000.0]
+    tz = ZoneInfo("Europe/Vienna")
+    future_slot = datetime(2099, 1, 1, 12, tzinfo=tz)
+    with patch.object(pfl, "_feature_failure_clock", lambda: now[0]):
+        with patch(
+            "data.price_forecast_live._build_forecast_feature_frame",
+            side_effect=RuntimeError("API-Abruf fehlgeschlagen"),
+        ) as build_mock:
+            assert build_live_feature_frame_for_slots([future_slot]) is None
+            now[0] += 15 * 60
+            assert build_live_feature_frame_for_slots([future_slot]) is None
+            assert build_mock.call_count == 1
+
+            now[0] += pfl.LIVE_FEATURE_FAILURE_BACKOFF_SEC
+            assert build_live_feature_frame_for_slots([future_slot]) is None
+            assert build_mock.call_count == 2
+
+
+def test_successful_feature_load_clears_the_failure_backoff():
+    from data import price_forecast_live as pfl
+
+    pfl._feature_input_cache.clear()
+    pfl._power_day_cache.clear()
+    pfl._feature_failure_until.clear()
+    tz = ZoneInfo("Europe/Vienna")
+    future_slot = datetime(2099, 1, 1, 12, tzinfo=tz)
+    fake = pd.DataFrame({"eu_wind_mw": [1.0]}, index=pd.DatetimeIndex([future_slot.replace(tzinfo=None)]))
+    with patch(
+        "data.price_forecast_live._build_forecast_feature_frame",
+        side_effect=[ValueError("boom"), fake],
+    ):
+        assert build_live_feature_frame_for_slots([future_slot]) is None
+        pfl._feature_failure_until.clear()  # backoff elapsed
+        assert build_live_feature_frame_for_slots([future_slot]) is not None
+    assert pfl._feature_failure_until == {}
