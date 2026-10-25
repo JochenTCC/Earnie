@@ -44,6 +44,10 @@ class AppServer:
         self._log_path = log_path
         self._proc: subprocess.Popen | None = None
 
+    @property
+    def log_path(self) -> Path:
+        return self._log_path
+
     def start(self) -> None:
         env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
         log = open(self._log_path, "ab")
@@ -90,6 +94,73 @@ class AppServer:
         self.start()
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    setattr(item, f"rep_{report.when}", report)
+
+
+def _print_log_if_failed(request, server: AppServer) -> None:
+    report = getattr(request.node, "rep_call", None)
+    if report is None or not report.failed:
+        return
+    log = server.log_path.read_text(encoding="utf-8", errors="replace") if server.log_path.exists() else ""
+    print(f"\n----- Streamlit-Server-Log ({server.log_path}) -----\n{log}\n----- Ende Server-Log -----")
+
+
+@pytest.fixture(autouse=True)
+def _seeded_climate_cache(_isolated_backtesting_config, tmp_path, monkeypatch):
+    """Befüllt den Open-Meteo-Klimacache des Servers, damit kein Live-Abruf nötig ist.
+
+    Der Server ist ein eigener Prozess ohne den Klima-Mock. Ohne Cache lädt der Hauskonfigurator
+    beim Öffnen die Klimadaten des thermal_annual-Verbrauchers von Open-Meteo (in CI > 60 s).
+    Ein AppTest-Lauf der Seite mit dem Mock legt genau die Cache-Dateien an, die der Server liest;
+    die dabei auto-gespeicherte Konfiguration wird danach zurückgesetzt.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    from data import open_meteo_solar_archive as archive
+
+    cache_dir = tmp_path / "open_meteo_cache"
+    config_dir = Path(os.environ["EARNIE_CONFIG_PATH"]).parent
+    snapshot = {p: p.read_bytes() for p in config_dir.rglob("*") if p.is_file()}
+    monkeypatch.setattr(archive, "OPEN_METEO_CACHE_DIR", cache_dir)
+    archive.clear_open_meteo_bundle_mem_cache()
+    script = Path(__file__).resolve().parents[1] / "scripts" / "run_page_house_config.py"
+    AppTest.from_file(str(script)).run(timeout=60)
+    for path in config_dir.rglob("*"):
+        if path.is_file() and path not in snapshot:
+            path.unlink()
+    for path, content in snapshot.items():
+        path.write_bytes(content)
+    assert any(cache_dir.glob("*.json")), "Klimacache wurde nicht befüllt"
+    monkeypatch.setenv("EARNIE_OPEN_METEO_CACHE_PATH", str(cache_dir))
+
+
+@pytest.fixture(autouse=True)
+def _browser_diagnostics(request):
+    """Sammelt Browser-Console, Seitenfehler und fehlgeschlagene Requests; Ausgabe nur bei Fehlschlag."""
+    if "page" not in request.fixturenames:
+        yield
+        return
+    page = request.getfixturevalue("page")
+    events: list[str] = []
+    page.on("console", lambda m: events.append(f"console.{m.type}: {m.text}"))
+    page.on("pageerror", lambda e: events.append(f"pageerror: {e}"))
+    page.on("requestfailed", lambda r: events.append(f"requestfailed: {r.url} ({r.failure})"))
+    page.on("response", lambda r: events.append(f"http {r.status}: {r.url}") if r.status >= 400 else None)
+    page.on("websocket", lambda ws: (
+        events.append(f"websocket open: {ws.url}"),
+        ws.on("close", lambda *_: events.append(f"websocket closed: {ws.url}")),
+        ws.on("socketerror", lambda err: events.append(f"websocket error: {err}")),
+    ))
+    yield
+    report = getattr(request.node, "rep_call", None)
+    if report is not None and report.failed:
+        print("\n----- Browser-Diagnose -----\n" + "\n".join(events) + "\n----- Ende Browser-Diagnose -----")
+
+
 @pytest.fixture
 def hub_configured() -> None:
     """Trägt einen OpenEMS-Hub ein, damit Smarthome-Backend, EHAL-Com und Optimierer-Dienst erscheinen."""
@@ -104,18 +175,20 @@ def hub_configured() -> None:
 
 
 @pytest.fixture
-def app_server(tmp_path):
-    """Laufender Server auf einem freien Port; Log unter ``tmp_path``."""
+def app_server(request, tmp_path):
+    """Laufender Server auf einem freien Port; Log unter ``tmp_path`` (bei Fehlschlag ausgegeben)."""
     server = AppServer(tmp_path / "server.log")
     server.start()
     yield server
     server.stop()
+    _print_log_if_failed(request, server)
 
 
 @pytest.fixture
-def app_server_with_hub(hub_configured, tmp_path):
+def app_server_with_hub(request, hub_configured, tmp_path):
     """Wie ``app_server``, aber mit konfiguriertem Hub (Optimierer-Dienst in der Navigation)."""
     server = AppServer(tmp_path / "server.log")
     server.start()
     yield server
     server.stop()
+    _print_log_if_failed(request, server)
