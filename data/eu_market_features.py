@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -359,10 +359,12 @@ def _fetch_open_meteo_archive_month(
         {
             "latitude": point.latitude,
             "longitude": point.longitude,
-            "start_date": start.isoformat(),
+            # One UTC day earlier: the first local hours of ``start`` belong to the previous UTC day.
+            "start_date": (start - timedelta(days=1)).isoformat(),
             "end_date": (end - timedelta(days=1)).isoformat(),
             "hourly": "wind_speed_10m,shortwave_radiation",
-            "timezone": config.get_planning_timezone(),
+            # UTC: with a zone name the archive applies one fixed offset to the whole response.
+            "timezone": "UTC",
         },
     )
     hourly = payload.get("hourly") or {}
@@ -373,15 +375,21 @@ def _fetch_open_meteo_archive_month(
         raise ValueError(f"Open-Meteo unvollständig für {point.name}.")
     tz = planning_timezone()
     index = pd.DatetimeIndex(
-        [normalize_hour_slot(datetime.fromisoformat(str(ts)).replace(tzinfo=tz)) for ts in times]
+        [
+            normalize_hour_slot(datetime.fromisoformat(str(ts)).replace(tzinfo=timezone.utc).astimezone(tz))
+            for ts in times
+        ]
     )
-    return pd.DataFrame(
+    frame = pd.DataFrame(
         {
             "wind_speed_kmh": wind,
             "shortwave_radiation_wm2": radiation,
         },
         index=index,
     )
+    first = datetime.combine(start, datetime.min.time(), tzinfo=tz)
+    stop = datetime.combine(end, datetime.min.time(), tzinfo=tz)
+    return frame.loc[(frame.index >= first) & (frame.index < stop)]
 
 
 def _weighted_eu_weather_from_points(

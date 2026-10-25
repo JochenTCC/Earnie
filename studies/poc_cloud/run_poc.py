@@ -3,7 +3,7 @@
 A study directory holds:
   pack/config/        house + scenario configuration
   pack/runtime/       synthetic cons_data.csv (generated when missing)
-  cache/open_meteo/   Open-Meteo archive bundles (copied into data/cache/open_meteo)
+  cache/open_meteo/   Open-Meteo archive bundles (copied into data/cache/open_meteo_utc)
 The price CSV is referenced from ``pack/config/config.json`` (``path_price``).
 
   python -m studies.poc_cloud.run_poc [--study-dir studies/poc_cloud] [--start-month 1 --end-month 12]
@@ -24,7 +24,7 @@ from pathlib import Path
 
 STUDY_DIR = Path(__file__).resolve().parent
 REPO_ROOT = STUDY_DIR.parents[1]
-WEATHER_DST = REPO_ROOT / "data" / "cache" / "open_meteo"
+WEATHER_DST = REPO_ROOT / "data" / "cache" / "open_meteo_utc"
 WEATHER_AS_OF = "2026-10-22"
 REF_JOBS = 2  # historical + Live reference (see backtesting-max-workers rule)
 

@@ -24,7 +24,7 @@ PYTHONUTF8=1 python -m studies.poc_cloud.run_poc --out studies/poc_cloud/results
 | Scenarios | `live` plus the two automatic references `historical_reference` and `ref:live` |
 | Period | 2025-01-01 … 2025-12-31, 365 daily windows, `horizon_mode=sunrise_window`, `price_strategy=perfect` |
 | Prices | Frozen day-ahead CSV, zone AT (`cache/prices_AT_2025.csv` + manifest). The column is `Day Ahead Auktion (AT)` (named after the zone) |
-| Weather | Frozen Open-Meteo archive bundles (`cache/open_meteo/`), copied to `data/cache/open_meteo` by the runner |
+| Weather | Frozen Open-Meteo archive bundles (`cache/open_meteo/`), copied to `data/cache/open_meteo_utc` by the runner |
 | Consumption | Synthetic `cons_data.csv` (`scripts.generate_cons_data --source synthetic`, 8760 rows) |
 | Network | Blocked via dead proxy (`127.0.0.1:9`) + `EARNIE_OFFLINE=1`; a cache miss fails loudly (ProxyError) instead of fetching live data |
 | Parallelism | 3 workers (historical, reference, live) |

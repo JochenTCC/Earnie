@@ -96,7 +96,7 @@ Das Szenario-Schema ist fest: genau `duo` und `dynamisch`.
 ## 6. Stolperstellen aus dem Pilot
 
 - **Wetterdateien aus anderen Läufen:** `--harvest` kopiert nur Dateien, die während dieses Laufs entstanden sind.
-  Entstanden sie vorher (z. B. durch `calibrate_wp`), liegen sie nur in `data/cache/open_meteo` und müssen von Hand nach
+  Entstanden sie vorher (z. B. durch `calibrate_wp`), liegen sie nur in `data/cache/open_meteo_utc` und müssen von Hand nach
   `studies/viability/cache/open_meteo` kopiert werden (Dateien mit dem Präfix `<Breite>_<Länge>_`).
 - **Jahresränder:** Ein Jahreslauf braucht auch die Wetterdateien für 2024 und 2026; erst ein Jahreslauf mit Netz
   erzeugt sie vollständig.

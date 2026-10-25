@@ -11,7 +11,7 @@ cloud sandbox from frozen inputs, before building the automated multi-scenario s
 | `pack/config/` | House pack: public example data (`example_efh`, `awattar_at`, 5 kWh battery, 10 kWp PV), migrated to the current data model |
 | `pack/runtime/cons_data.csv` | Synthetic hourly consumption for 2025 (`scripts.generate_cons_data --source synthetic`) |
 | `cache/prices_AT_2025.csv` | Frozen day-ahead prices, zone AT (see `.manifest.json`) |
-| `cache/open_meteo/` | Frozen Open-Meteo archive bundles (copied into `data/cache/open_meteo` by the runner) |
+| `cache/open_meteo/` | Frozen Open-Meteo archive bundles (copied into `data/cache/open_meteo_utc` by the runner) |
 | `fetch_prices.py` | One-off online step that writes the price CSV |
 | `run_poc.py` | Offline runner: installs the weather cache, runs the backtest, writes `summary.json` |
 
