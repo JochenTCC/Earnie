@@ -20,6 +20,7 @@ When a document becomes a maintained reference again, move it to the matching us
 | [house-sim.md](house-sim.md) | House simulator HouseSim S1–S4 (`house_sim/`) |
 | [shadow-mode.md](shadow-mode.md) | Shadow Mode: dev instance fed by production data |
 | [cloud-poc-study.md](cloud-poc-study.md) | In progress (2026-10-23) — offline cloud POC study: what it does, verification, next steps |
+| [data-model-stability-decisions.md](data-model-stability-decisions.md) | Decided (2026-10-25) — D1–D3 before the 2.8 migration steps |
 | [done/backtesting-deviation-calendar.md](done/backtesting-deviation-calendar.md) | Feature spec, implemented |
 | [done/backtesting-horizon-fixed24h-vs-sunrise.md](done/backtesting-horizon-fixed24h-vs-sunrise.md) | Experiment report (2026-07) |
 | [done/backtesting-plausibility-s2-kein-pv-jan-2-7.md](done/backtesting-plausibility-s2-kein-pv-jan-2-7.md) | Research note (2026-07) |
