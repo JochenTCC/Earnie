@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix forecast.solar vs. η_inv (2026-10-25)
+
+- [x] **forecast.solar estimate possibly double-counted with η_inv — no bug, `loss=0` and η_inv stay:** the live PV forecast (`expected_p_pv`, `data/pv_forecast.py`) is multiplied by `inverters[].efficiency` in `optimizer/milp_inverter.py` (`apply_dc_to_ac_efficiency`). A/B call against `api.forecast.solar/estimate` for the same site (2026-10-25): without `loss` and with `loss=0` the `watts` are identical; `loss=10` gives exactly 0.9 × on every value. So the API's default loss is 0 and the `loss` parameter models a possible system loss (1 − loss ≈ η). Decision: Earnie accounts for that loss **separately** (η_inv in the MILP, further losses via the calibration factor, see *Adaptation P3*), therefore the request keeps the default (= `loss=0`, URL unchanged: cache key, shadow feed hash and recorded replays stay valid) and η_inv stays as is. No code change. The docs of forecast.solar do not state whether `watts` is DC or AC and name no PV model or losses (read: `doc.forecast.solar` start, `api`, `api:estimate`, `used_sources`, `damping`, `faq`). Follow-up as a feature: *PV forecast calibration factor* in `Backlog.md` (Adaptation P3).
+
 ### SUSI / Energieinstitut standards research (2026-10-25)
 
 - [x] **Adjust SE for Energieberater — standards research and assessment** `[dev]`: tools of the Energieinstitut Vorarlberg analysed (SUSI, Heizrechner v5.0, Hexit/Replace, econ calc V3.1); methods and standards identified (annuity method VDI 2067, cost breakdown ÖNORM B 1801-1, CO2 factors OIB-RL 6, Hexit price escalation per carrier); integration assessed and turned into epic **SUSI** (Version 2.8 production phases P1 / P2 / P6 / P3a + Version 2.+1 prototype P3b / P4 / P5 / P7). Documents in `Earnie-Projekt/Entwicklungsplan/Offen/` (`SUSI_Heizrechner_Rechenlogik.md`, `Earnie-SUSI-Epic-Entwurf.md`, `econ-calc_Rechenlogik_und_Normbezug.md`). The remaining sub-item (contact the Energieinstitut) stays open as *SUSI — Energieinstitut meeting* in Version 2.8.
