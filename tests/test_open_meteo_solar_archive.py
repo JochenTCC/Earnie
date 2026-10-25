@@ -318,3 +318,34 @@ def test_open_meteo_cache_read_failure_raises(tmp_path):
             surfaces=[surface],
             cache_dir=tmp_path,
         )
+
+
+def test_fetch_budget_stops_retries_instead_of_sleeping(monkeypatch):
+    calls: list[float] = []
+
+    def failing_get(url, params=None, timeout=None):
+        calls.append(timeout)
+        raise requests.ConnectionError("down")
+
+    def no_sleep(seconds):
+        raise AssertionError(f"must not sleep {seconds}s past the budget")
+
+    monkeypatch.setattr(archive.requests, "get", failing_get)
+    monkeypatch.setattr(archive.time, "sleep", no_sleep)
+    with archive.climate_fetch_budget(1.0):
+        with pytest.raises(archive.ClimateFetchBudgetExceeded, match="down"):
+            archive._archive_http_get({"latitude": 47.4})
+    assert len(calls) == 1
+    assert calls[0] <= 1.0
+
+
+def test_fetch_without_budget_keeps_retrying(monkeypatch):
+    sleeps: list[float] = []
+    monkeypatch.setattr(
+        archive.requests, "get",
+        lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("down")),
+    )
+    monkeypatch.setattr(archive.time, "sleep", sleeps.append)
+    with pytest.raises(requests.ConnectionError):
+        archive._archive_http_get({"latitude": 47.4})
+    assert sleeps == [2.0, 4.0, 8.0, 16.0, 32.0]

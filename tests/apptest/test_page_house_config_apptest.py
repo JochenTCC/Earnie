@@ -62,3 +62,19 @@ def test_switch_to_wechselrichter_tab_renders_without_exception():
     assert not at.exception
     [tabs_after] = at.segmented_control
     assert tabs_after.value == "Wechselrichter"
+
+
+def test_climate_fetch_over_budget_shows_error_instead_of_hanging(monkeypatch, tmp_path):
+    from data import open_meteo_solar_archive as archive
+    from optimizer.thermal_year_cache import clear_year_model_caches
+
+    def too_slow(**_kwargs):
+        raise archive.ClimateFetchBudgetExceeded("Open-Meteo-Klimadaten: Budget überschritten.")
+
+    monkeypatch.setattr(archive, "_fetch_hourly_archive_chunk", too_slow)
+    monkeypatch.setattr(archive, "OPEN_METEO_CACHE_DIR", tmp_path / "cold_cache")
+    archive.clear_open_meteo_bundle_mem_cache()
+    clear_year_model_caches()
+    at = AppTest.from_file(str(_SCRIPT)).run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert any("Budget überschritten" in err.value for err in at.error)
