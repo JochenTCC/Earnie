@@ -66,7 +66,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] **HouseSim wallbox write-back** — Wallbox setpoints act on the simulated physics instead of only the scenario override: `set_evcs_max_current` / mode writes (go-e / Wattpilot `amp` + `frc`, evcc `max_current` + enable) → charge power = current × voltage × phases while an EV is connected (`car_arrives` / `car_leaves`), capped by the EV's acceptance. Mock REST (S1–S3) and S4 integration; tests on `evcc_en`, `fronius_de`, `huawei_en` (`sma_keba` stays the read-only wallbox case). Prerequisite for **HouseSim scenario import**. **Order note:** pulled directly before Multi-EV / Wallboxes as its test bench (assignment by test charging, re-bind after shutdown)
 
-- [ ] Enable multiple EV / Wallboxes *(reuse entity-scoped namespacing approach from **2.7.c** multi-ESS; schema decision early — together with **Edibert P2** — implementation after HouseSim wallbox write-back)*
+- [ ] Enable multiple EV / Wallboxes *(reuse entity-scoped namespacing approach from **2.7.c** multi-ESS; schema decision early — together with **Edibert P2** — implementation after HouseSim wallbox write-back)* [feat]
 - Parametrize EVs as now (+ sensors)
 - Parametrize Wallboxes 
   - Max power
