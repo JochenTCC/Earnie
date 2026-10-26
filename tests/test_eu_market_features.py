@@ -416,3 +416,59 @@ def test_open_meteo_archive_month_requests_utc_and_converts_to_planning_tz():
     # 22:00 UTC on 06-30 = 00:00 CEST on 07-01; 22:00 UTC on 12-31 is past the chunk end
     assert [ts.hour for ts in frame.index] == [0, 1]
     assert list(frame["wind_speed_kmh"]) == [1.0, 2.0]
+
+
+def test_hourly_frame_from_open_meteo_payload_reads_utc_stamps_as_planning_wall_clock():
+    from data.eu_market_features import _hourly_frame_from_open_meteo_payload
+
+    payload = {
+        "hourly": {
+            # 22:00 UTC: 00:00 CEST in summer, 23:00 CET in winter.
+            "time": ["2025-06-30T22:00", "2025-12-31T22:00"],
+            "wind_speed_10m": [1.0, 2.0],
+            "shortwave_radiation": [0.0, 0.0],
+        }
+    }
+    with patch("data.eu_market_features.config.get_planning_timezone", return_value="Europe/Vienna"):
+        frame = _hourly_frame_from_open_meteo_payload(payload)
+    assert [(ts.month, ts.day, ts.hour) for ts in frame.index] == [(7, 1, 0), (12, 31, 23)]
+
+
+def test_open_meteo_forecast_requests_utc_for_point_and_grid():
+    import data.eu_market_features as emf
+
+    seen: list[dict] = []
+    payload = {
+        "hourly": {
+            "time": ["2026-10-25T00:00"],
+            "wind_speed_10m": [1.0],
+            "shortwave_radiation": [0.0],
+        }
+    }
+
+    def _fake_get_json(url, params):
+        seen.append(dict(params))
+        return payload
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return [payload] * len(emf.WEATHER_GRID)
+
+    def _fake_requests_get(url, params=None, **_kw):
+        seen.append(dict(params))
+        return _Resp()
+
+    with patch.object(emf, "_http_get_json", _fake_get_json), patch.object(
+        emf.requests, "get", _fake_requests_get
+    ), patch.object(emf.config, "get_planning_timezone", return_value="Europe/Vienna"):
+        emf._fetch_open_meteo_forecast_point(emf.WEATHER_GRID[0], forecast_days=2)
+        emf._fetch_open_meteo_forecast_grid(forecast_days=2)
+
+    assert len(seen) == 2
+    for params in seen:
+        assert params["timezone"] == "UTC"
+        assert params["past_days"] == 1
+        assert params["forecast_days"] == 3

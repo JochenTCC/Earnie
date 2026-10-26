@@ -201,6 +201,15 @@ def _open_meteo_payload(params: dict, lat: float) -> dict:
         first = datetime.fromisoformat(str(params["start_date"]))
         last = datetime.fromisoformat(str(params["end_date"]))
         times = [first + timedelta(hours=h) for h in range(int((last - first).days + 1) * 24)]
+    elif params.get("timezone") == "UTC":
+        # Forecast in UTC: ``past_days`` + ``forecast_days`` whole UTC days from the real UTC today.
+        from datetime import timezone
+
+        past = int(params.get("past_days") or 0)
+        days = int(params.get("forecast_days") or 1)
+        today = datetime.now(timezone.utc).date()
+        start = datetime.combine(today - timedelta(days=past), datetime.min.time())
+        times = [start + timedelta(hours=h) for h in range((past + days) * 24)]
     else:
         days = int(params.get("forecast_days") or 1)
         start = datetime.combine(datetime.now().date(), datetime.min.time())
