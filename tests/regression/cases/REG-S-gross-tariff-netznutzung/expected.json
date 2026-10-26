@@ -25,21 +25,23 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "0b464c38cc6feb072302edf29905c18ffec84031",
-    "recorded_at": "2026-10-24T16:08:51Z",
+    "git_sha": "de3583c945b9a3394f8e8242c54a5ff3dad2ebd4",
+    "recorded_at": "2026-10-26T07:50:01Z",
     "source": "update-golden"
   },
   "inputs": {
     "files": {
       "fixtures/backtesting_scenarios.json": "fa30790f3ccba557",
       "fixtures/components.json": "8b0b8a2e17422255",
-      "fixtures/config.json": "0b98d7b44af5fd57",
+      "fixtures/config.json": "77e7a6b56f40038f",
       "fixtures/cons_data.csv": "9dcccd6817385b2e",
+      "fixtures/flex_consumers.json": "21be86172fc50e43",
       "fixtures/house_profiles.json": "b7a432b1bcc12805",
-      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_18.0_0.0.json": "77f0a9e08afd1d08",
-      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "b8bb3205806bb411",
-      "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "457bbdacb5e87ead",
+      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "cced3026b26261c3",
+      "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ba5564dba8d71740",
       "fixtures/prices.csv": "57885d9ae16e27b0",
+      "fixtures/shadow_feed/feed-2026-10-20.jsonl": "f2c66efda10c1e14",
+      "fixtures/shadow_feed/feed-2026-10-21.jsonl": "4ee4e41d51a2ed6c",
       "fixtures/tariffs.json": "7885e56a4c22592a",
       "case.inputs": "bbb1d79301023441"
     },

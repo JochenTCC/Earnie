@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.7.0-alpha.2",
+    "earnie_version": "2.7.0-alpha.9",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -14,8 +14,8 @@
   "metrics": {
     "status_optimal": 1,
     "n_slots": 96,
-    "cost_euro": 2.8943109377556824,
-    "objective_raw": 289.43109377556823,
+    "cost_euro": 2.894310937755682,
+    "objective_raw": 289.4310937755682,
     "mode": 0,
     "target_power_kw": 0.0,
     "battery_plan_kw": -0.151,
@@ -29,16 +29,16 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "f43e8bec3b877106b9fd75d3ee8501b3789e3f88",
-    "recorded_at": "2026-10-18T15:45:54Z",
+    "git_sha": "de3583c945b9a3394f8e8242c54a5ff3dad2ebd4",
+    "recorded_at": "2026-10-26T07:50:01Z",
     "source": "update-golden"
   },
   "inputs": {
     "files": {
       "recorder_cycle": "68230f038b054f16",
       "config_snapshot": "247777f49ba6e559",
-      "open_meteo/47.5000_9.5000_2025-01-01_2025-12-31_Europe-Vienna_18.0_-154.0-18.0_26.0.json": "883835c876ebd77f",
-      "open_meteo/47.5000_9.5000_2025-01-01_2025-12-31_Europe-Vienna_18.0_26.0.json": "c76d4f6a12194ff8"
+      "open_meteo/47.5000_9.5000_2025-01-01_2025-12-31_Europe-Vienna_18.0_-154.0-18.0_26.0.json": "0b15ae9f070014c5",
+      "open_meteo/47.5000_9.5000_2025-01-01_2025-12-31_Europe-Vienna_18.0_26.0.json": "7aa78b13f2a5891d"
     },
     "series": {},
     "sums": {}
