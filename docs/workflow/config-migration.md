@@ -15,12 +15,12 @@ Earnie’s config pack JSON can change shape across releases. Operators on Docke
 
 ## 2. Scope and tracks
 
-**Pack files (Earnie track, 2.7):** `config.json`, `components.json`, `house_profiles.json`, `backtesting_scenarios.json`, `deviation_rules.json`, and currently `tariffs.json` (until the Edbert integration moves it).
+**Pack files (Earnie track, 2.7):** `config.json`, `components.json`, `house_profiles.json`, `backtesting_scenarios.json`, `deviation_rules.json`, and currently `tariffs.json` (until the Edibert integration moves it).
 
 | Track | Key | Owner | 2.7 status |
 |-------|-----|-------|------------|
 | Earnie data model | `earnie_data_model` (int, today 4) | Earnie registry | Active |
-| Tariff format | `tariff_format` (int) | Edbert | **Deferred to Version 2.8** |
+| Tariff format | `tariff_format` (int) | Edibert | **Deferred to Version 2.8** |
 
 Until 2.8, `grid_fees.json` stays untagged and is **exempt** from the untagged blocker; do not stamp it with `earnie_data_model`.
 
@@ -94,4 +94,4 @@ Any structural pack JSON change → bump the owning track + register a step + fi
 
 ## 7. Out of scope (Version 2.8)
 
-- Tariff track key `tariff_format`, `grid_fees.json` versioning, Netznutzung split — with Edbert integration (draft §3.7 / §8).
+- Tariff track key `tariff_format`, `grid_fees.json` versioning, Netznutzung split — with Edibert integration (draft §3.7 / §8).

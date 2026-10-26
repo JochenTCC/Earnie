@@ -3,7 +3,7 @@
 Status: **decided (2026-10-25)** — D1 decided (option B), D2 decided (option C), D3 decided (recommendation accepted). Backlog notes written 2026-10-25.
 Backlog entry: *Data-model stability decisions D1–D3* (Version 2.8).
 
-Goal: a stable data model after 2.8, so fields added in the 2.8 migration steps (Edbert data migration, SUSI P1 / P2 / P6) are not migrated again in 2.+1. Each decision is a memo here plus a note on the owning 2.+1 item; implementation stays in 2.+1 unless stated.
+Goal: a stable data model after 2.8, so fields added in the 2.8 migration steps (Edibert data migration, SUSI P1 / P2 / P6) are not migrated again in 2.+1. Each decision is a memo here plus a note on the owning 2.+1 item; implementation stays in 2.+1 unless stated.
 
 ## D1 — Consumer inner parts (nesting shape)
 
@@ -114,16 +114,16 @@ Status: **decided (2026-10-25).**
 
 **(b) `vat_percent` mandatory on every gross tariff**
 
-1. Rule: `prices_include_vat: true` requires `vat_percent` (a number, `0` is allowed and explicit). Net tariffs may omit it only when no VAT step applies to them; for the VAT item (`vat_deductible: true`) the gross → net conversion needs the rate, so the Edbert format should simply require it on every tariff that has `prices_include_vat: true`.
-2. Owner: the tariff format belongs to Edbert from 2.8 on, so this is agreed in the tariff-format alignment (*Versioning + Netznutzung split*) and ships as an Edbert format-version rule, not as an Earnie change. Earnie's loader then fails loud on a missing rate instead of the warn-and-continue path; the six silent defaults in `data/tariff_pricing.py` go away with the Edbert engine replacement.
+1. Rule: `prices_include_vat: true` requires `vat_percent` (a number, `0` is allowed and explicit). Net tariffs may omit it only when no VAT step applies to them; for the VAT item (`vat_deductible: true`) the gross → net conversion needs the rate, so the Edibert format should simply require it on every tariff that has `prices_include_vat: true`.
+2. Owner: the tariff format belongs to Edibert from 2.8 on, so this is agreed in the tariff-format alignment (*Versioning + Netznutzung split*) and ships as an Edibert format-version rule, not as an Earnie change. Earnie's loader then fails loud on a missing rate instead of the warn-and-continue path; the six silent defaults in `data/tariff_pricing.py` go away with the Edibert engine replacement.
 3. Migration: the tariff-format step (same wizard run as the data-model step) must give user tariffs a rate or stop with a clear message. For existing gross user tariffs without a rate, the wizard asks (default 20 % AT / 19 % DE / 8.1 % CH from `STANDARD_VAT_PERCENT_BY_LAND`) instead of guessing.
 
-### Text for the Edbert backlog
+### Text for the Edibert backlog
 
 > Tariff format: `vat_percent` becomes mandatory whenever `prices_include_vat` is true (value `0` allowed). The loader rejects a gross tariff without a rate; no default. The shipped catalog already satisfies this (50 of 50 entries carry the field).
 
 ### Notes to add on completion
 
 - *VAT model* (2.+1): flag name `vat_deductible`, already in the profile since 2.8, link to this memo.
-- *Edbert integration* sub-item *Versioning + Netznutzung split*: the rule above (D3b), with the Edbert text.
+- *Edibert integration* sub-item *Versioning + Netznutzung split*: the rule above (D3b), with the Edibert text.
 - SUSI P6 / migration step: add `vat_deductible: false`.

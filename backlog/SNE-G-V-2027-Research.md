@@ -1,8 +1,8 @@
 # SNE-G-V 2027 — research note (capacity-based grid fee, Austria)
 
-Research date: 2026-10-24. Backlog context: **Edbert integration → Capacity charge AT 2027** and **Implement max-power dependent tariff** (Version 2.8). Companion drafts: [Capacity-Peak-Budget-Draft.md](Capacity-Peak-Budget-Draft.md); external development document `Earnie-Projekt\Entwicklungsplan\Offen\Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md`.
+Research date: 2026-10-24. Backlog context: **Edibert integration → Capacity charge AT 2027** and **Implement max-power dependent tariff** (Version 2.8). Companion drafts: [Capacity-Peak-Budget-Draft.md](Capacity-Peak-Budget-Draft.md); external development document `Earnie-Projekt\Entwicklungsplan\Offen\Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md`.
 
-Purpose: record what is **final** in the ordinance text, what is still **open**, and where each statement comes from, so the Earnie/Edbert design can cite it instead of secondary articles.
+Purpose: record what is **final** in the ordinance text, what is still **open**, and where each statement comes from, so the Earnie/Edibert design can cite it instead of secondary articles.
 
 ## 1. Legal status
 
@@ -22,10 +22,10 @@ Purpose: record what is **final** in the ordinance text, what is still **open**,
 - **Ratio capacity : energy price:** to be raised stepwise in favour of the capacity price (§ 5 Abs. 1); **no quota and no year steps in the text**. E-Control communicates a 50:50 target [S2]; the presentation [S3] quotes end-state values.
 - **Transition 2027:** § 6 Abs. 3a covers 2027-01-01 → 2027-11-30, including a flat EUR amount per Zählpunkt for customers without measured 15-min values (§ 6 Abs. 3a Z 1, referring to § 5 Abs. 1 Z 6 SNE-V 2018).
 - **Introduction per Netzbereich:** operators report their expected readiness to the regulator by 2026-11-11 (§ 6 Abs. 3b); the dates can be modified per Netzbereich within 2027-01-01 → 2028-06-30 by a further ordinance under § 135 Abs. 1 ElWG. Secondary sources phrase this as "between 1 January 2027 and 1 July 2028, depending on the grid area" [S7].
-- **Existing Netzebene-7 connections (§ 34 Abs. 1):** for connections built or contracted before 2027-01-01 the highest of (1) 10 kW, (2) the contracted netzwirksame Leistung as of 2026-12-31, (3) the mean of the two highest monthly 15-min peaks of 2026 (or 2027 if 2026 is missing) is "maßgeblich". Exceptions: Kleinstanschlüsse and connections that were interruptible per § 2 Abs. 1 Z 13 SNE-V 2018 on 2026-12-31 (§ 34 Abs. 2). **Reading:** this fixes the contracted power for grid-fee purposes (Netzbereitstellung / contracted capacity), not the monthly billing base of the capacity price (which is the measured peak with the 2 kW floor). **To verify against the Erläuterungen** before Edbert hardcodes anything.
+- **Existing Netzebene-7 connections (§ 34 Abs. 1):** for connections built or contracted before 2027-01-01 the highest of (1) 10 kW, (2) the contracted netzwirksame Leistung as of 2026-12-31, (3) the mean of the two highest monthly 15-min peaks of 2026 (or 2027 if 2026 is missing) is "maßgeblich". Exceptions: Kleinstanschlüsse and connections that were interruptible per § 2 Abs. 1 Z 13 SNE-V 2018 on 2026-12-31 (§ 34 Abs. 2). **Reading:** this fixes the contracted power for grid-fee purposes (Netzbereitstellung / contracted capacity), not the monthly billing base of the capacity price (which is the measured peak with the 2 kW floor). **To verify against the Erläuterungen** before Edibert hardcodes anything.
 - **No 15-min values:** SNAP and WiNAP do not apply to connections without measured 15-min values (§ 7 Abs. 5). A smart-meter opt-out is not regulated in the text.
 - **Rounding:** commercially to two decimals (§ 28 Abs. 2).
-- **SNAP / WiNAP windows (§ 7 Abs. 3, 4):** SNAP 1 April → 30 September, 10:00–16:00; WiNAP 1 October → 31 March, 23:00–05:00, first WiNAP from 2027-10-01 (§ 32 Abs. 4). Relevant for the existing SNAP regression case in Edbert/Earnie.
+- **SNAP / WiNAP windows (§ 7 Abs. 3, 4):** SNAP 1 April → 30 September, 10:00–16:00; WiNAP 1 October → 31 March, 23:00–05:00, first WiNAP from 2027-10-01 (§ 32 Abs. 4). Relevant for the existing SNAP regression case in Edibert/Earnie.
 
 ## 3. Still open (as of 2026-10-24)
 
@@ -38,7 +38,7 @@ Purpose: record what is **final** in the ordinance text, what is still **open**,
 ## 4. Consequences for the backlog items
 
 - The MILP design (peak variable, convex two-segment ladder, 2 kW minimum, monthly reset) matches the final text. No model change needed.
-- Prices, start date, minimum and segment slopes are **parameters per grid area supplied by Edbert**, never hardcoded in Earnie; this lets *Leistungstarif part 2* ship before the SNE-T-V values are published.
+- Prices, start date, minimum and segment slopes are **parameters per grid area supplied by Edibert**, never hardcoded in Earnie; this lets *Leistungstarif part 2* ship before the SNE-T-V values are published.
 - The 2 kW floor means a household peak budget below 2 kW buys nothing; the budget loop should treat 2 kW as the lower bound.
 - The 10 kW split applies to the **measured** peak on Netzebene 7 regardless of § 34; the § 34 value only matters if a Netzbereich bills a contracted-power component — keep a hook, do not model it until the SNE-T-V shows such a line.
 

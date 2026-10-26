@@ -136,7 +136,7 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 ## Roadmap (Kurz)
 
 - **2.7:** Mehrspeicher, Exportbegrenzung, Binding-Komfort; erste Alpha-Qualitätsprüfung (siehe Backlog).
-- **2.8:** Edbert-Tarife, Regression-Gate, Monitor-Charts (siehe Backlog).
+- **2.8:** Edibert-Tarife, Regression-Gate, Monitor-Charts (siehe Backlog).
 - **Parameter-Anpassung:** PV- und thermische Parameter passen sich über die Zeit an.
 - **Gekoppelte thermische Modelle:** Haus-, Speicher- und Solar-Modelle werden miteinander gekoppelt.
 - **Smartere Geräte-Empfehlungen:** adaptive Leistung und Laufzeit für Haushaltsgeräte.

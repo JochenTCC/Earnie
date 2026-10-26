@@ -16,8 +16,8 @@ Before acting on (or recommending) any of: new long-lived branches, hotfixes for
 | Line | Role |
 |------|------|
 | **`main`** | Ongoing development / next MINOR once a release is being finalized elsewhere |
-| **`release/x.y`** | Single-product repos (Earnie, edbert, earnie-server). Opened when the **official is near** and development continues on `main` |
-| **`release/<product>/x.y`** | Multi-product side repos (e.g. Earnie-Projekt, Earnie-env-home); products: `earnie`, `edbert`, private `earnie-server` |
+| **`release/x.y`** | Single-product repos (Earnie, edibert, earnie-server). Opened when the **official is near** and development continues on `main` |
+| **`release/<product>/x.y`** | Multi-product side repos (e.g. Earnie-Projekt, Earnie-env-home); products: `earnie`, `edibert`, private `earnie-server` |
 | **Tags** | Immutable; for that MINOR after the split, cut from the release branch |
 | **Short-lived `hotfix/…`** | Only when even the ship line must not ship as-is |
 

@@ -34,7 +34,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: 'pip install --only-binary=:all: --no-binary=edbert -e ".[dev]"'
+        run: 'pip install --only-binary=:all: --no-binary=edibert -e ".[dev]"'
 
       - name: Run storage and AppTests
         env:
@@ -60,7 +60,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: 'pip install --only-binary=:all: --no-binary=edbert -e ".[dev]"'
+        run: 'pip install --only-binary=:all: --no-binary=edibert -e ".[dev]"'
 
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium

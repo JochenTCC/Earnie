@@ -18,7 +18,7 @@ Status: implemented P0–P4 (2026-10-16); living contract [`docs/workflow/config
 | 9 | Rule | New `.cursor/rules/` rule + pointer in `CLAUDE.md`. |
 | 10 | `grid_fees.json` | **Own format version**, independent of `earnie_data_model` (§3.7). |
 | 11 | Chain start | **Data model 3.** Model 1 (and 2) = blocker "zu alt". |
-| 12 | Edbert | Versioning of the tariff files is aligned with Edbert **now**, before the integration (next version); `user_tariffs.json` is coming as an additional tariff file (§3.7). |
+| 12 | Edibert | Versioning of the tariff files is aligned with Edibert **now**, before the integration (next version); `user_tariffs.json` is coming as an additional tariff file (§3.7). |
 
 ## 2. Today (inventory)
 
@@ -30,14 +30,14 @@ P0 table (order, detect, files, idempotency, loader rejections, fixture map): [`
   `migrate_ehal_bindings`, `migrate_ess_bindings_once`, `migrate_inverters_once`, `migrate_conversion_efficiency_once`, `migrate_topology_once`, `migrate_pool_filter_milp`, `migrate_grid_fee_profile` (needs user input: `--area-id`, `--quarter-hour-meter`).
 - **Silent migration in bootstrap (conflicts with the target):** `bootstrap._stamp_pack_jsons_to_current_data_model()` stamps every pack JSON `< 4` (and untagged ones, read as `1`) to 4 **without** migrating content; `_migrate_pack_legacy_keys()` runs parts of v3→v4 on every start. This bypasses `ensure_compatible` and the "ask first" target.
 - **Startup path (all channels):** `docker/entrypoint.sh` → `scripts.bootstrap_runtime` → `scripts.run_streamlit` (`bootstrap.run()` → `load_config_or_exit()` → auto-start `main.py` when `EARNIE_AUTO_START_MAIN=1` → Streamlit). HA add-on `run.sh` and LoxBerry compose end in the same entrypoint. **Consequence:** an incompatible config aborts *before* Streamlit is up — there is no UI to guide the user.
-- **Finding — `grid_fees.json` gets `earnie_data_model` by side effect** (bug entry in [Backlog-Bugfixes.md](Backlog-Bugfixes.md)): the seed `share/config/grid_fees.json` and the bootstrap copy carry no version key, but `build_config_pack_bytes()` stamps `earnie_data_model` on every pack file (`runtime_store/config_pack.py:60`), and the import stamps again via `stamp_data_model` + `write_json_dict` (`settings/json_io.py:56`, stamps every file it writes). After an export / import round trip the site copy carries `earnie_data_model: 4`; without one it carries nothing. Earnie's own loader (`data/grid_fees.py` `normalize_grid_fee_catalog`) ignores unknown root keys, so nothing breaks in Earnie — but Edbert's strict loader rejects the stamped file, and the file has two possible states. Target (§3.7): stamping is track-aware, tariff files never get `earnie_data_model`.
+- **Finding — `grid_fees.json` gets `earnie_data_model` by side effect** (bug entry in [Backlog-Bugfixes.md](Backlog-Bugfixes.md)): the seed `share/config/grid_fees.json` and the bootstrap copy carry no version key, but `build_config_pack_bytes()` stamps `earnie_data_model` on every pack file (`runtime_store/config_pack.py:60`), and the import stamps again via `stamp_data_model` + `write_json_dict` (`settings/json_io.py:56`, stamps every file it writes). After an export / import round trip the site copy carries `earnie_data_model: 4`; without one it carries nothing. Earnie's own loader (`data/grid_fees.py` `normalize_grid_fee_catalog`) ignores unknown root keys, so nothing breaks in Earnie — but Edibert's strict loader rejects the stamped file, and the file has two possible states. Target (§3.7): stamping is track-aware, tariff files never get `earnie_data_model`.
 - **Version tracking:** `runtime_store/version_track.py` (`last_run_version`, downgrade warning).
 - **Release notes:** `.github/release-notes/v<version>.md` per `docs/workflow/release-checklist.md`.
 
-- **Edbert** (`C:\Users\Test\Documents\Smarthome\edbert`, spec `docs/spec/tariff-format.md`, `docs/spec/architecture.md`), checked 2026-10-16:
-  - reads `tariffs.json` (catalog) and `user_tariffs.json` (user file, editor-written, IDs `user_…`) — `src/edbert/store.py`; root keys are checked strictly (`ROOT_FIELDS`), `earnie_data_model`, `catalog_as_of`, `user_tariffs_as_of` are tolerated and ignored. Edbert has **no format version of its own**.
-  - reads `grid_fees.json` (Earnie shape) — `src/edbert/gridfee.py` `parse_grid_fee_catalog`: `check_known(data, ("description", "rule_sets", "areas"))`. **A new version key in `grid_fees.json` is rejected by Edbert today.**
-  - reads the `netznutzung` field of `house_profiles.json` strictly (`parse_grid_fee_config`, `CONFIG_FIELDS`) — an Earnie-model file, parsed by Edbert.
+- **Edibert** (`C:\Users\Test\Documents\Smarthome\edibert`, spec `docs/spec/tariff-format.md`, `docs/spec/architecture.md`), checked 2026-10-16:
+  - reads `tariffs.json` (catalog) and `user_tariffs.json` (user file, editor-written, IDs `user_…`) — `src/edibert/store.py`; root keys are checked strictly (`ROOT_FIELDS`), `earnie_data_model`, `catalog_as_of`, `user_tariffs_as_of` are tolerated and ignored. Edibert has **no format version of its own**.
+  - reads `grid_fees.json` (Earnie shape) — `src/edibert/gridfee.py` `parse_grid_fee_catalog`: `check_known(data, ("description", "rule_sets", "areas"))`. **A new version key in `grid_fees.json` is rejected by Edibert today.**
+  - reads the `netznutzung` field of `house_profiles.json` strictly (`parse_grid_fee_config`, `CONFIG_FIELDS`) — an Earnie-model file, parsed by Edibert.
   - `catalog_as_of` / `user_tariffs_as_of` are **content dates** (data freshness), not format versions.
 
 The backlog problem in one line: the integer data model does not capture the real structural changes (seven in-model steps), and add-on / LoxBerry users cannot run a CLI.
@@ -109,32 +109,32 @@ All three channels share the entrypoint, so one implementation covers them. Per 
 - Helper: `python -m scripts.migration_release_notes --since <tag>` prints the section draft from the registry (titles, questions, manual to-do texts).
 - Downgrade: `version_track` warning stays; an older Earnie rejects the newer data model with its existing error. Restoring the backup by hand is documented, not automated.
 
-### 3.7 Version tracks and Edbert alignment
+### 3.7 Version tracks and Edibert alignment
 
 Two independent **version tracks**; each file belongs to exactly one:
 
 | Track | Key | Files | Owner of the format | Migration steps live in |
 |-------|-----|-------|---------------------|-------------------------|
 | Earnie data model | `earnie_data_model` (int, today 4) | `config`, `components`, `house_profiles`, `backtesting_scenarios`, `deviation_rules` | Earnie | Earnie registry |
-| Tariff format | `tariff_format` (int, starts at 1) | `grid_fees.json` now; `tariffs.json` + `user_tariffs.json` with the Edbert integration | Edbert (`docs/spec/tariff-format.md`) | Edbert library (`edbert.api`), called by the Earnie registry |
+| Tariff format | `tariff_format` (int, starts at 1) | `grid_fees.json` now; `tariffs.json` + `user_tariffs.json` with the Edibert integration | Edibert (`docs/spec/tariff-format.md`) | Edibert library (`edibert.api`), called by the Earnie registry |
 
-- **Why one tariff track instead of one version per file:** all three files follow the same Edbert spec and are read by the same library; a format change usually touches catalog and user file together. `grid_fees.json` is the first file on the track, the others join at integration time. (Key name `tariff_format` is a proposal — neutral, no product name in the data, so the Edbert product without Earnie uses the same files.)
+- **Why one tariff track instead of one version per file:** all three files follow the same Edibert spec and are read by the same library; a format change usually touches catalog and user file together. `grid_fees.json` is the first file on the track, the others join at integration time. (Key name `tariff_format` is a proposal — neutral, no product name in the data, so the Edibert product without Earnie uses the same files.)
 - **Asynchronous:** a tariff-format bump never bumps `earnie_data_model` and vice versa. The registry holds steps per track; the planner runs Earnie-track steps first, then tariff-track steps (tariff files do not depend on Earnie files; if that ever changes, the step declares it).
-- **Steps owned by Edbert:** tariff-track steps are pure functions in the Edbert library (`edbert.api.plan_migration` / `migrate`), so the Edbert product can migrate its files without Earnie. Earnie's registry wraps them as `MigrationStep`s (same wizard, same backup). Until the integration, the only tariff-track step (`grid_fees.json` untagged → `tariff_format: 1`) lives in Earnie and moves to Edbert with the integration.
+- **Steps owned by Edibert:** tariff-track steps are pure functions in the Edibert library (`edibert.api.plan_migration` / `migrate`), so the Edibert product can migrate its files without Earnie. Earnie's registry wraps them as `MigrationStep`s (same wizard, same backup). Until the integration, the only tariff-track step (`grid_fees.json` untagged → `tariff_format: 1`) lives in Earnie and moves to Edibert with the integration.
 - **Content dates stay separate:** `catalog_as_of` / `user_tariffs_as_of` keep meaning "data as of"; they are never used for format decisions.
-- **`tariffs.json` today** carries `earnie_data_model: 4`. It stays on the Earnie track until the integration; the integration release then has one step that removes `earnie_data_model` from `tariffs.json` and sets `tariff_format`. After that, Edbert accepts only `tariff_format` on normal load; the old `earnie_data_model` key is read only by that migration step (no dual-read).
+- **`tariffs.json` today** carries `earnie_data_model: 4`. It stays on the Earnie track until the integration; the integration release then has one step that removes `earnie_data_model` from `tariffs.json` and sets `tariff_format`. After that, Edibert accepts only `tariff_format` on normal load; the old `earnie_data_model` key is read only by that migration step (no dual-read).
 - **`user_tariffs.json`** is born with `tariff_format` from its first write (editor), joins `PACK_JSON_FILES`, backup and the planner at the same time — no untagged phase.
-- **`netznutzung` in `house_profiles.json`** stays on the Earnie track (it is a house-profile field). Today it holds more than the grid selection: with `area_id: null` it carries own grid-fee definitions (`base_cent_kwh`, `rules`, `holidays`, `extra_holiday_dates`, later `capacity_charges`) — tariff format inside an Earnie file, parsed strictly by Edbert. Until the split below, a shape change needs an Earnie data-model bump **and** a matching Edbert release; the rule (§6) says so.
+- **`netznutzung` in `house_profiles.json`** stays on the Earnie track (it is a house-profile field). Today it holds more than the grid selection: with `area_id: null` it carries own grid-fee definitions (`base_cent_kwh`, `rules`, `holidays`, `extra_holiday_dates`, later `capacity_charges`) — tariff format inside an Earnie file, parsed strictly by Edibert. Until the split below, a shape change needs an Earnie data-model bump **and** a matching Edibert release; the rule (§6) says so.
 - **Target: grid selection in Earnie, grid definitions in the tariff files** (owner decision 2026-10-16, variant 2). The tariff files may hold grid areas for many grids; Earnie's config only says which grid the house uses.
-  - `netznutzung` keeps only the selection (`area_id`) and the house-side metering facts (`power_metering`, `quarter_hour_meter`, `include_status` — exact split decided with Edbert).
-  - Own grid fees (today `area_id: null` + own values) become a **user grid area** in a tariff-track file (analogous to `user_tariffs.json`: IDs `user_…`, written by the editor; file name / whether it is a section of an existing file decided with Edbert); `netznutzung.area_id` then points to it.
-  - **Timing:** with the Edbert integration in **Version 2.8**. Requires a **migration** in that release, two coordinated steps in one run: Earnie track (`house_profiles.json`: move own values out, set `area_id` to the new user area; data-model bump) and tariff track (create the user area in the tariff file). Both run in the same wizard and backup; the Earnie step is planned before the tariff step and passes the extracted values on (declared dependency, §3.7 "Asynchronous").
+  - `netznutzung` keeps only the selection (`area_id`) and the house-side metering facts (`power_metering`, `quarter_hour_meter`, `include_status` — exact split decided with Edibert).
+  - Own grid fees (today `area_id: null` + own values) become a **user grid area** in a tariff-track file (analogous to `user_tariffs.json`: IDs `user_…`, written by the editor; file name / whether it is a section of an existing file decided with Edibert); `netznutzung.area_id` then points to it.
+  - **Timing:** with the Edibert integration in **Version 2.8**. Requires a **migration** in that release, two coordinated steps in one run: Earnie track (`house_profiles.json`: move own values out, set `area_id` to the new user area; data-model bump) and tariff track (create the user area in the tariff file). Both run in the same wizard and backup; the Earnie step is planned before the tariff step and passes the extracted values on (declared dependency, §3.7 "Asynchronous").
   - Until 2.8 nothing changes in the data; the framework from this item must already support a step that writes to both tracks (P1 test with a synthetic `area_id: null` profile).
-- **Required Edbert changes (Edbert backlog, before this item's P1 lands in a release):**
+- **Required Edibert changes (Edibert backlog, before this item's P1 lands in a release):**
   1. `parse_grid_fee_catalog`: accept `tariff_format` in the root; reject unknown versions with a coded error (`FORMAT_UNSUPPORTED`).
   2. `store.py` `ROOT_FIELDS`: add `tariff_format` (for the integration); spec section "2. Files" documents the key and the track.
-  3. `edbert.api`: `plan_migration` / `migrate` for tariff-track files (pure, docs in → docs out, questions / blockers like §3.1).
-  4. Edbert `docs/spec/tariff-format.md`: version track section (key, current value, compatibility rule).
+  3. `edibert.api`: `plan_migration` / `migrate` for tariff-track files (pure, docs in → docs out, questions / blockers like §3.1).
+  4. Edibert `docs/spec/tariff-format.md`: version track section (key, current value, compatibility rule).
 
 ## 4. Regression data set (v3 → current)
 
@@ -165,7 +165,7 @@ Two independent **version tracks**; each file belongs to exactly one:
 
 ## 5. Phases (epic **ConfigMigration**, Version 2.7)
 
-Registered in `roadmap-nomenclature.mdc` (2026-10-16; the name `Migration` is taken by the file-structure plan `docs/dev/done/MIGRATION.md`). **2.7 scope:** v3 → v4 + legacy in-model steps on the Earnie track only. The tariff track (§3.7: `tariff_format`, `grid_fees.json` step, Netznutzung split) moves to the Edbert integration in **Version 2.8**; until then `grid_fees.json` stays untagged and is exempt from the untagged blocker (§7.1), and the stamping bug ([Backlog-Bugfixes.md](Backlog-Bugfixes.md)) is fixed first.
+Registered in `roadmap-nomenclature.mdc` (2026-10-16; the name `Migration` is taken by the file-structure plan `docs/dev/done/MIGRATION.md`). **2.7 scope:** v3 → v4 + legacy in-model steps on the Earnie track only. The tariff track (§3.7: `tariff_format`, `grid_fees.json` step, Netznutzung split) moves to the Edibert integration in **Version 2.8**; until then `grid_fees.json` stays untagged and is exempt from the untagged blocker (§7.1), and the stamping bug ([Backlog-Bugfixes.md](Backlog-Bugfixes.md)) is fixed first.
 
 | Phase | Content | Depends on |
 |-------|---------|------------|
@@ -178,7 +178,7 @@ Registered in `roadmap-nomenclature.mdc` (2026-10-16; the name `Migration` is ta
 ## 6. Rule content (for P4)
 
 - Any structural change of a persisted config JSON → bump the version of **its track** (`earnie_data_model` or `tariff_format`, §3.7) + register a `MigrationStep` + fixture + release-notes "Migration" section + user docs.
-- Tariff-track formats are owned by Edbert: change the Edbert spec and library first; Earnie only wraps the step.
+- Tariff-track formats are owned by Edibert: change the Edibert spec and library first; Earnie only wraps the step.
 - A change of a file that the other side parses strictly (`netznutzung` in `house_profiles.json`, `grid_fees.json`) needs a matching release on both sides.
 - No silent migration on load or in bootstrap; loaders fail loud and point to the wizard.
 - No new standalone `migrate_*_once` scripts.
@@ -190,14 +190,14 @@ Registered in `roadmap-nomenclature.mdc` (2026-10-16; the name `Migration` is ta
 2. **Legacy in-model steps:** **stay detect-based under data model 4** — no bump to 5 when the framework lands. Data-model bumps start with the next structural change (rule §6).
 3. **Backup retention:** keep all, no automatic deletion; docs explain how to remove old backups.
 4. **Migration mode UI:** only the wizard (plus log / debug dump), no other pages.
-5. **`grid_fees.json`:** own format version on the tariff track (§3.7), independent of `earnie_data_model`. The untagged file is migrated by a tariff-track step to version 1 (Version 2.8, with Edbert); so §7.1 (untagged = blocker) applies to `grid_fees.json` only after that step exists — in 2.7 it is exempt.
+5. **`grid_fees.json`:** own format version on the tariff track (§3.7), independent of `earnie_data_model`. The untagged file is migrated by a tariff-track step to version 1 (Version 2.8, with Edibert); so §7.1 (untagged = blocker) applies to `grid_fees.json` only after that step exists — in 2.7 it is exempt.
 6. **Chain start:** data model 3. Models 1 and 2 are a blocker ("Konfiguration zu alt — bitte Support kontaktieren / neu einrichten"); the July 2026 v1 snapshots in Earnie-env-home are not used as fixtures.
-7. **Netznutzung split (variant 2):** grid selection stays in Earnie's `house_profiles.json`, grid definitions (incl. own grid fees) move to the tariff files; done with the Edbert integration in Version 2.8 with a migration step pair (§3.7).
+7. **Netznutzung split (variant 2):** grid selection stays in Earnie's `house_profiles.json`, grid definitions (incl. own grid fees) move to the tariff files; done with the Edibert integration in Version 2.8 with a migration step pair (§3.7).
 
-8. **Epic + 2.7 scope:** epic `ConfigMigration` P0–P4 in Version 2.7 (Earnie track only); tariff track with the Edbert integration in Version 2.8 (§5).
+8. **Epic + 2.7 scope:** epic `ConfigMigration` P0–P4 in Version 2.7 (Earnie track only); tariff track with the Edibert integration in Version 2.8 (§5).
 
 ## 8. Open points (for Version 2.8 — not blocking 2.7)
 
-1. **Key name** `tariff_format` (proposal, §3.7) — confirm or rename; it must be fixed in Edbert's spec before the first file carries it.
+1. **Key name** `tariff_format` (proposal, §3.7) — confirm or rename; it must be fixed in Edibert's spec before the first file carries it.
 2. **One tariff track for all three tariff files** (proposal) vs. one version per file.
-3. **Order with Edbert:** `tariff_format` is written in two places — by the maintainer into the seed `share/config/grid_fees.json` (repo), and by the migration step into the site copy of existing installs (`earnie_env/config/grid_fees.json`, add-on `/config/grid_fees.json`; bootstrap never overwrites it). There is no runtime coupling to Edbert yet (only the Edbert CLI `--grid-catalog` and the coming integration), so the risk is small: Edbert's loader must accept `tariff_format` no later than the Earnie release that ships the seed with the key and the migration step — simplest in the same period. Add the Edbert items (§3.7) to the Edbert backlog now?
+3. **Order with Edibert:** `tariff_format` is written in two places — by the maintainer into the seed `share/config/grid_fees.json` (repo), and by the migration step into the site copy of existing installs (`earnie_env/config/grid_fees.json`, add-on `/config/grid_fees.json`; bootstrap never overwrites it). There is no runtime coupling to Edibert yet (only the Edibert CLI `--grid-catalog` and the coming integration), so the risk is small: Edibert's loader must accept `tariff_format` no later than the Earnie release that ships the seed with the key and the migration step — simplest in the same period. Add the Edibert items (§3.7) to the Edibert backlog now?

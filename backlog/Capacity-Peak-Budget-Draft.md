@@ -1,7 +1,7 @@
 # Capacity charge AT 2027 — monthly peak budget: algorithm draft
 
-**Status:** draft (2026-10-14), nothing implemented. Backlog: [Backlog.md](Backlog.md) → **Edbert integration** → **Capacity charge AT 2027** → *Planning loop* and *Expected PV for the rest of the month*.
-**Related:** Leistungstarif development document (L1→L5, outside this repo: `Earnie-Projekt/Entwicklungsplan/Offen/Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md`), sections 1.4 (ratchet), 4.3 (SE formula), 5.2 (import cap with slack), 5.5 (cap sweep). Tariff model and ladder: Edbert spec section 5b.
+**Status:** draft (2026-10-14), nothing implemented. Backlog: [Backlog.md](Backlog.md) → **Edibert integration** → **Capacity charge AT 2027** → *Planning loop* and *Expected PV for the rest of the month*.
+**Related:** Leistungstarif development document (L1→L5, outside this repo: `Earnie-Projekt/Entwicklungsplan/Offen/Earnie-Leistungstarif-AT-2027-Entwicklungsdokument.md`), sections 1.4 (ratchet), 4.3 (SE formula), 5.2 (import cap with slack), 5.5 (cap sweep). Tariff model and ladder: Edibert spec section 5b.
 
 ---
 
@@ -17,7 +17,7 @@ The capacity charge bills the highest clock-aligned 15-min import power of the c
 | `R` | remaining days of the month incl. today; `R_after` = remaining days after the MILP horizon |
 | `P_m0` | measured month-to-date peak (state, never assumed `0`) |
 | `P_min` | minimum billing power (`max(2 kW, 0.2 · P_contracted)`); below it nothing is saved |
-| `C(P)` | monthly capacity cost of billed peak `max(P, P_min)`: `c1 · min(P, 10) + c2 · max(P − 10, 0)`, `c1 < c2` (from Edbert) |
+| `C(P)` | monthly capacity cost of billed peak `max(P, P_min)`: `c1 · min(P, 10) + c2 · max(P − 10, 0)`, `c1 < c2` (from Edibert) |
 | `c(P)` | marginal capacity price at `P` in €/kW·month (`c1` or `c2`) |
 | `b` | peak budget: import cap the plan respects |
 | `E_d(b)` | energy cost of day `d` under cap `b`: import cost − feed-in revenue + wear (MILP objective, with slack per dev doc 5.2) |
@@ -110,4 +110,4 @@ The backlog's MILP bullet uses a peak variable with ladder cost, the dev doc (5.
 - Price normalisation across years (crisis years, rising grid fees): exclude years or rescale the level while keeping the shape.
 - How many forecast days are reliable enough (Open-Meteo offers up to 16)?
 - SE runtime of the sweep and cache key.
-- Final SNE-T-V prices and minimum billing rules (Edbert research item).
+- Final SNE-T-V prices and minimum billing rules (Edibert research item).

@@ -23,10 +23,10 @@ There is **no** permanent `develop` or `alpha` branch. Pre-release is a **versio
 
 | Repo kind | Pattern | Example |
 |-----------|---------|---------|
-| **Single-product** repo (Earnie, edbert, earnie-server) | `release/x.y` | `release/2.7`, `release/0.1` |
-| **Multi-product** side repo (shared by several products) | `release/<product>/x.y` | `release/earnie/2.7`, `release/edbert/0.1` |
+| **Single-product** repo (Earnie, edibert, earnie-server) | `release/x.y` | `release/2.7`, `release/0.1` |
+| **Multi-product** side repo (shared by several products) | `release/<product>/x.y` | `release/earnie/2.7`, `release/edibert/0.1` |
 
-**Products so far:** `earnie`, `edbert`, and private `earnie-server` (slug = lowercase product id in the path).
+**Products so far:** `earnie`, `edibert`, and private `earnie-server` (slug = lowercase product id in the path).
 
 **Multi-product side repos** (use the product prefix when that product’s release line lives there): e.g. Earnie-Projekt, Earnie-env-home. Until a side repo actually hosts more than one product’s lines, `release/x.y` is acceptable; prefer `release/<product>/x.y` as soon as a second product appears (or immediately for clarity).
 
@@ -53,7 +53,7 @@ Open when **both** are true:
 Then **move** that planned release onto the branch:
 
 1. Choose the freeze commit (usually the latest community tag on `main`, e.g. `v2.7.0-alpha.9`, or an agreed `main` tip).
-2. Create and push the correctly named release branch from that commit on **every** participating repo for that product (Earnie + its side repos; same for edbert when applicable).
+2. Create and push the correctly named release branch from that commit on **every** participating repo for that product (Earnie + its side repos; same for edibert when applicable).
 3. From then on, **finalize** on that branch only: remaining pre-releases, official `X.Y.Z`, then bugfixes and PATCH releases.
 4. Keep `main` free for the next MINOR. Bring single release-line fixes into `main` by **cherry-pick** (`git cherry-pick -x <sha>` on a branch from `main`, then PR) so bugs do not return. The release branch itself **never** merges back into `main` as a whole (see [Release branch never merges back](#release-branch-never-merges-back)). Do **not** rewind `main`’s `version.py` to an older PATCH while `main` already targets a newer pre-release / next MINOR.
 
@@ -206,4 +206,4 @@ Branching does not replace this lifecycle.
 
 ## Satellite / side repos
 
-When opening a release line for a product, create the matching branch from the freeze tag on every participating repo. For multi-product side repos, use `release/<product>/x.y` so Earnie and edbert (and later others) can coexist. Keep tips aligned for that cycle’s tags.
+When opening a release line for a product, create the matching branch from the freeze tag on every participating repo. For multi-product side repos, use `release/<product>/x.y` so Earnie and edibert (and later others) can coexist. Keep tips aligned for that cycle’s tags.

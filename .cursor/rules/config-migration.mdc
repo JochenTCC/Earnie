@@ -12,10 +12,10 @@ Persisted config pack JSON must not be reshaped silently. Spec: [`docs/workflow/
 
 | Track | Key | Files (2.7) | Owner |
 |---|---|---|---|
-| Earnie data model | `earnie_data_model` (int) | `config`, `components`, `house_profiles`, `backtesting_scenarios`, `deviation_rules` (+ `tariffs.json` until Edbert) | Earnie registry |
-| Tariff format | `tariff_format` (int, **2.8**) | `grid_fees.json` now untagged/exempt; later + `tariffs` / `user_tariffs` | Edbert; Earnie wraps steps |
+| Earnie data model | `earnie_data_model` (int) | `config`, `components`, `house_profiles`, `backtesting_scenarios`, `deviation_rules` (+ `tariffs.json` until Edibert) | Earnie registry |
+| Tariff format | `tariff_format` (int, **2.8**) | `grid_fees.json` now untagged/exempt; later + `tariffs` / `user_tariffs` | Edibert; Earnie wraps steps |
 
-Until the Edbert integration, `grid_fees.json` stays untagged and is exempt from the untagged blocker. Do not stamp it with `earnie_data_model`.
+Until the Edibert integration, `grid_fees.json` stays untagged and is exempt from the untagged blocker. Do not stamp it with `earnie_data_model`.
 
 ## Do
 
@@ -37,7 +37,7 @@ Until the Edbert integration, `grid_fees.json` stays untagged and is exempt from
 ✅ Release-notes ## Migration + betrieb.md Update und Migration
 ```
 
-- Tariff-track format changes: change the Edbert spec/library first; Earnie only wraps the step.
+- Tariff-track format changes: change the Edibert spec/library first; Earnie only wraps the step.
 - A change of a file that the other side parses strictly (`netznutzung` in `house_profiles.json`, `grid_fees.json`) needs a matching release on both sides.
 
 ## Checklist (new or changed pack shape)
