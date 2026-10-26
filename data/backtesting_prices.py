@@ -228,10 +228,15 @@ def pricing_kwargs_from_resolved(resolved: dict | None) -> dict:
     """Import-Tarif-Kwargs aus aufgelöstem Runtime-Szenario (Live + Backtesting)."""
     if not resolved:
         return {}
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY
+
+    kwargs: dict = {}
+    if resolved.get(EDIBERT_PRICING_KEY) is not None:
+        kwargs["edibert_pricing"] = resolved[EDIBERT_PRICING_KEY]
     spec = resolved.get("_import_tariff_spec")
     if spec is None:
-        return {}
-    kwargs: dict = {"import_tariff_spec": spec}
+        return kwargs
+    kwargs["import_tariff_spec"] = spec
     grid_fee = resolved.get("_grid_fee_spec")
     if grid_fee is not None:
         kwargs["grid_fee"] = grid_fee
@@ -244,8 +249,30 @@ def import_brutto_cent_for_slots(
     *,
     import_tariff_spec: dict | None = None,
     grid_fee: dict | None = None,
+    edibert_pricing: dict | None = None,
 ) -> list[float]:
-    """EPEX Cent/kWh → Bezugspreis je Slot (Tarif-Spec oder Legacy-Brutto)."""
+    """EPEX Cent/kWh → Bezugspreis je Slot (Tarif-Spec oder Legacy-Brutto).
+
+    With ``EARNIE_PRICING_ENGINE=edibert`` the prices come from Edibert
+    (``edibert_pricing`` reference required, no Earnie engine involved).
+    """
+    from settings.pricing_engine import uses_edibert_pricing
+
+    if uses_edibert_pricing():
+        from data.edibert_slot_prices import EDIBERT_PRICING_KEY, import_cents, require_pricing_reference
+
+        if import_tariff_spec is None:
+            # Same rule as the Earnie path below (epex_to_brutto_cent): a scenario without
+            # import tariff is priced with the live scenario's tariff.
+            ref = require_pricing_reference(
+                config.get_resolved_runtime_settings(), where="Live-Bezugspreis"
+            )
+        else:
+            ref = require_pricing_reference(
+                {EDIBERT_PRICING_KEY: edibert_pricing}, where="Bezugspreis je Slot"
+            )
+        return import_cents(slot_datetimes, epex_values, ref)
+
     from data.market_prices import hourly_settlement_epex_values
     from data.tariff_pricing import SETTLEMENT_MTU_HOURLY, import_cent_kwh, tariff_settlement_mtu
 
@@ -274,6 +301,7 @@ def enrich_slots_import_prices(
     *,
     import_tariff_spec: dict | None = None,
     grid_fee: dict | None = None,
+    edibert_pricing: dict | None = None,
 ) -> None:
     """Setzt k_act in resolve_market_slots-Ergebnissen aus Tarif-Spec."""
     epex_values = [float(slot["price_buy"]) for slot in slots]
@@ -282,6 +310,7 @@ def enrich_slots_import_prices(
         slot_datetimes,
         import_tariff_spec=import_tariff_spec,
         grid_fee=grid_fee,
+        edibert_pricing=edibert_pricing,
     )
     for slot, price in zip(slots, brutto):
         slot["k_act"] = price
@@ -295,6 +324,7 @@ def matrix_prices_from_context(
     planning_moment: datetime | None = None,
     import_tariff_spec: dict | None = None,
     grid_fee: dict | None = None,
+    edibert_pricing: dict | None = None,
 ) -> tuple[list[float], list[float], list[str]]:
     """EPEX- und Brutto-Preise je Slot; bei ctx=None Perfect-Foresight aus CSV."""
 
@@ -304,6 +334,7 @@ def matrix_prices_from_context(
             slot_datetimes,
             import_tariff_spec=import_tariff_spec,
             grid_fee=grid_fee,
+            edibert_pricing=edibert_pricing,
         )
 
     if ctx is None:

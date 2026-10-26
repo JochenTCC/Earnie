@@ -44,8 +44,16 @@ def epex_to_brutto_cent(
     """
     from data.backtesting_prices import pricing_kwargs_from_resolved
     from data.tariff_pricing import import_cent_kwh
+    from settings.pricing_engine import uses_edibert_pricing
 
     resolved = config.get_resolved_runtime_settings()
+    if uses_edibert_pricing():
+        from data.edibert_slot_prices import import_cents, require_pricing_reference
+
+        if slot_datetime is None:
+            raise ValueError("EARNIE_PRICING_ENGINE=edibert: Bezugspreis erfordert slot_datetime.")
+        ref = require_pricing_reference(resolved, where="Live-Bezugspreis")
+        return import_cents([slot_datetime], [float(epex_price_cent)], ref)[0]
     kwargs = pricing_kwargs_from_resolved(resolved)
     spec = kwargs.get("import_tariff_spec")
     if spec is None:

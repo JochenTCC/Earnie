@@ -146,7 +146,7 @@ Part A (Edibert repo) → B1 → B2 → B7 → B3 / B4 → B5 → B6 → B8 → 
 
 ## P3a — Engine parity harness (plan 2026-10-26)
 
-Status: **planned, decisions taken** (see *Decisions*). Backlog item *Edibert P3a* (Version 2.8). Goal: prove that Edibert prices every slot exactly like Earnie's own engine before P3b deletes `data/tariff_pricing.py` / `data/grid_fees.py`. No MILP change, no user-visible change.
+Status: **P3a-1 implemented 2026-10-26** (see *Implementation notes*, *Results*, *Triage*); open: T3 (`__user_fixed__`), P3a-2 after Edibert `0.1.g`. Backlog item *Edibert P3a* (Version 2.8). Goal: prove that Edibert prices every slot exactly like Earnie's own engine before P3b deletes `data/tariff_pricing.py` / `data/grid_fees.py`. No MILP change, no user-visible change.
 
 ### Findings (2026-10-26)
 
@@ -189,9 +189,37 @@ Status: **planned, decisions taken** (see *Decisions*). Backlog item *Edibert P3
 
 P3a-1: B1 → B2 → B3 → B4 → first full run → B6 triage → B5 → B7. P3a-2 (after `0.1.g`): pin → fallback months in B4 / B5 → triage → done check.
 
+### Implementation notes (P3a-1, 2026-10-26)
+
+- **Correction to decision 4:** the catalog's SNAP rule is `valid_from: 2026-04-01`, so 2025 has no SNAP season. The comparison period is **2025-01-01 → 2026-10-01** (both DST changes of 2025, SNAP April–September 2026, all monthly tables covered). Prices come from the Energy-Charts API (`--fetch-prices`, cached per quarter under `runtime/edibert_parity/`, waits on HTTP 429), not from `data/data_loader.py`: that loader returns naive house time and averages the repeated autumn hour away.
+- **Pricing reference instead of Edibert objects in the settings:** with the flag, `resolve_scenario_settings` stores `_edibert_pricing` (plain dict: tariff and grid file paths, tariff IDs, time zone, `land`, `region`, `netznutzung`). Edibert objects would not survive SE worker pickling, fingerprints and debug dumps. `pricing_kwargs_from_resolved` and `FeedInSettings` carry the reference to the seams; a seam that runs with the flag but without a reference fails (`Edibert-Preisreferenz`), it never prices with Earnie.
+- **One path in the adapter:** every seam (live single slot included) goes through `tariff_price_series` per run of consecutive 15-min slots. Hourly settled spot tariffs therefore need the whole hour in the input; a partial hour is Edibert `PRICE_MISSING` (Earnie averages the slots present). Live horizons start at the current quarter-hour, so the live path with an hourly settled tariff will hit this — to be decided in P3b (see triage).
+- **`__user_fixed__` is not on Edibert yet:** `edibert.api` has no public way to build a tariff from a dict (`parse_tariff` is internal; `load_tariffs` needs files and the `user_` prefix). With the flag a scenario with *Eigener Festpreis* fails at resolution. Needs an additive Edibert API function (`api.parse_tariff(raw, direction)`) — open, see triage.
+- **Metering variants dropped from the matrix:** Earnie always assumes an unmetered household with quarter-hour meter (`normalize_netznutzung_config` forces both), so only that variant is comparable. Both engines get the `netznutzung` object Earnie writes (`default_netznutzung_config()` + `area_id`); with only `area_id`, Edibert defaults to no quarter-hour meter and skips SNAP.
+- **Invoice line not switched in P3a-1:** the harness compares the net grid fee per slot (`grid_fee_work_cent` vs. `PricePoint.grid_cent`), which is what the invoice line sums; switching `simulation/se_invoice_netznutzung.py` (it groups by rule ID) moves to P3b together with the deletion of `data/grid_fees.py`.
+- **Harness without site config:** Earnie's price helpers read the planning time zone from `config`; the harness points `config` at the test fixture config unless `--site-config` (the maintainer site is not migrated to `tariff_format` yet).
+- **CI fixture:** `tests/fixtures/edibert_parity/expected_prices.json`, 9 catalog tariffs × 4 windows (spring DST 2026, month boundary + SNAP start 2026-03-31/04-01, SNAP day 2026-07-01, autumn DST 2025), deterministic EPEX with negative values. `tests/test_edibert_p3a.py` checks Earnie still produces it (dropped in P3b) and Edibert matches it.
+- **Scenarios without a tariff keep Earnie's existing rules** (not new fallbacks): no import tariff → the live scenario's tariff, as Earnie's `epex_to_brutto_cent` does (now with the live scenario's Edibert reference); no export tariff → the constant `k_push_cent`, which is no tariff pricing at all. P3b decides whether such scenarios stay valid.
+- **Regression L2 inline pricing:** `REG-S-gross-tariff-netznutzung` defines its tariff and flat grid fee as Earnie-internal specs (`_import_tariff_spec`, `_grid_fee_spec`). With the flag, `tests/regression/l2_runner.py` writes them as tariff-track files (catalog tariff + user grid area in a temporary directory) and attaches a pricing reference, so both engines price the same inputs.
+
+### Results (P3a-1, 2026-10-26)
+
+- **Full matrix** (`python -m scripts.edibert_parity --fetch-prices --workers 8`, 2025-01-01 → 2026-10-01): 470 cases (30 AT import tariffs × 14 areas + no grid fee, 7 DE / CH import tariffs without area, 13 export tariffs), 28,767,308 slots, 307 s. **0 untriaged deviations**; outside T1 the final cent differs by exactly `0`, the net grid fee by at most `1.8e-15`. T1: 880 slots (110 cases = all 12 hourly settled spot tariffs × their areas, 8 slots each, max 0.003 ct). 6 months both engines refuse (`at_vkw_pv_flex` before its table starts 2025-07); no month only one engine can price.
+- **Regression with `EARNIE_PRICING_ENGINE=edibert`:** all 11 cases green, metrics unchanged. Coverage is limited: the three L2 cases with a tariff (`REG-O-summer-june`, `REG-O-ev-deadline` via the live scenario's `fixed_25ct`, `REG-S-gross-tariff-netznutzung` via the case's gross tariff + user grid area) price through the adapter; the L1 cases replay recorded cycles and never price, so they do not test the engine. Spot tariffs are covered by the harness, not by the regression gate.
+
+### Triage
+
+| # | Case | Finding | Verdict | Action |
+| --- | --- | --- | --- | --- |
+| T1 | hourly settled spot tariffs (import and export), autumn DST night | Earnie groups the hourly mean by wall-clock hour (`normalize_price_slot` → `floor_to_hour_slot`), so both 02:00 hours (CEST, CET) share one mean of eight quarter-hours; Edibert prices each real hour | **Earnie bug**, Edibert correct; one night a year | none in Earnie (engine removed in P3b); pinned in the CI fixture test (`DST_REPEATED_HOUR`); P3b release-notes draft mentions the changed prices for that hour |
+| T2 | hourly settled spot tariffs, horizon starting mid-hour | Earnie averages the quarter-hours present; Edibert needs the whole hour (`PRICE_MISSING`) | **intended** (no invented data) | decide in P3b: Earnie's live path passes the full hour of market prices (they are known day-ahead) |
+| T3 | `__user_fixed__` | no public Edibert constructor for a synthetic tariff | **gap in Edibert API** | Edibert: additive `api.parse_tariff`; then synthetic tariff in `pricing_reference` (P3a-1 follow-up) |
+| T4 | `at_vkw_pv_flex`, 2025-01 … 2025-06 | both engines refuse (table starts 2025-07) | **test data** (expected) | none |
+
 ### Done check
 
-- [ ] Harness runs the full matrix over the comparison period with `--workers N`; report with zero deviations above `1e-4` ct, or every deviation triaged in this section.
+- [x] Harness runs the full matrix over the comparison period with `--workers N`; report with zero deviations above `1e-4` ct, or every deviation triaged in this section (2026-10-26: 0 untriaged, T1 triaged).
 - [ ] `MONTH_RATE_FALLBACK` surfaced on the edge months and equal in value to Earnie's prior-year / prior-month result (P3a-2).
-- [ ] Parity fixture committed, `tests/test_edibert_p3a.py` green; full suite green with the default flag.
-- [ ] All 11 regression cases green with `EARNIE_PRICING_ENGINE=edibert`.
+- [x] Parity fixture committed, `tests/test_edibert_p3a.py` green; full suite green with the default flag.
+- [x] All 11 regression cases green with `EARNIE_PRICING_ENGINE=edibert` (L2 cases with a tariff price through Edibert; L1 cases do not price, see *Results*).
+- [ ] `__user_fixed__` on Edibert (T3, needs `api.parse_tariff` in Edibert).

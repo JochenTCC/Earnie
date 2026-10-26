@@ -18,6 +18,8 @@ class FeedInSettings:
     fix_cent: float
     monthly_fixed_tariffs: tuple[tuple[int, int, float], ...] | None = None
     export_tariff_spec: dict | None = None
+    # Edibert pricing reference (``_edibert_pricing``); only set with EARNIE_PRICING_ENGINE=edibert.
+    edibert_pricing: dict | None = None
 
 
 def validate_feed_in_mode(mode: str) -> str:
@@ -122,6 +124,11 @@ def resolve_k_push_act(
     *,
     slot_datetime: datetime | None = None,
 ) -> float:
+    from settings.pricing_engine import uses_edibert_pricing
+
+    # Without an export tariff there is nothing to price: the constant k_push_cent stays.
+    if uses_edibert_pricing() and settings.export_tariff_spec is not None:
+        return _edibert_k_push([slot_datetime], [epex_cent], settings)[0]
     if settings.export_tariff_spec is not None:
         from data.tariff_pricing import export_cent_kwh
 
@@ -143,6 +150,21 @@ def resolve_k_push_act(
             "feed_in_mode 'dynamic_epex' erfordert price_buy (EPEX Cent/kWh) pro Matrix-Zeile."
         )
     return epex_to_feed_in_cent(epex_cent, settings.fee_factor, settings.fix_cent)
+
+
+def _edibert_k_push(
+    slot_datetimes: list[datetime | None],
+    epex_values: list[float | None],
+    settings: FeedInSettings,
+) -> list[float]:
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, export_cents, require_pricing_reference
+
+    if any(slot is None for slot in slot_datetimes):
+        raise ValueError("EARNIE_PRICING_ENGINE=edibert: Einspeisepreis erfordert slot_datetime.")
+    ref = require_pricing_reference(
+        {EDIBERT_PRICING_KEY: settings.edibert_pricing}, where="Einspeisepreis"
+    )
+    return export_cents(slot_datetimes, epex_values, ref)  # type: ignore[arg-type]
 
 
 def _export_fee_fields(export_spec: dict | None) -> tuple[float, float]:
@@ -171,6 +193,7 @@ def feed_in_settings_from_dict(
     if spec is None and runtime.get("_export_tariff_spec") is not None:
         spec = dict(runtime["_export_tariff_spec"])
     fee_factor, fix_cent = _export_fee_fields(spec)
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY
 
     return FeedInSettings(
         mode=mode,
@@ -179,12 +202,24 @@ def feed_in_settings_from_dict(
         fix_cent=fix_cent,
         monthly_fixed_tariffs=monthly_fixed_tariffs,
         export_tariff_spec=spec,
+        edibert_pricing=runtime.get(EDIBERT_PRICING_KEY),
     )
 
 
 def enrich_matrix_feed_in_prices(matrix: list[dict[str, Any]], settings: FeedInSettings) -> None:
     """Setzt k_push_act je Matrix-Zeile (in-place)."""
     from data.tariff_pricing import SETTLEMENT_MTU_HOURLY, tariff_settlement_mtu
+    from settings.pricing_engine import uses_edibert_pricing
+
+    if uses_edibert_pricing() and settings.export_tariff_spec is not None:
+        prices = _edibert_k_push(
+            [row.get("slot_datetime") for row in matrix],
+            [row.get("price_buy") for row in matrix],
+            settings,
+        )
+        for row, price in zip(matrix, prices):
+            row["k_push_act"] = price
+        return
 
     epex_for_export = [row.get("price_buy") for row in matrix]
     if tariff_settlement_mtu(settings.export_tariff_spec) == SETTLEMENT_MTU_HOURLY:

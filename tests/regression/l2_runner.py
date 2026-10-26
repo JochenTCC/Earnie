@@ -1,8 +1,11 @@
 """L2 backtest window via simulation engine + offline fixtures."""
 from __future__ import annotations
 
+import json
 import os
+import tempfile
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterator
 
 import pandas as pd
@@ -57,11 +60,58 @@ def activate_backtesting_fixture_env() -> Iterator[Any]:
         config_module.reinit_config()
 
 
-def _apply_case_pricing(scenario: dict, case_inputs: dict[str, Any]) -> dict:
+_CASE_GRID_AREA = "user_regression_case"
+
+
+def _edibert_case_pricing(
+    out: dict, tariff: dict | None, fee: float | None, work_dir: Path
+) -> None:
+    """``EARNIE_PRICING_ENGINE=edibert`` (Edibert P3a): the case's inline tariff and flat grid
+    fee as tariff-track files, so Edibert prices the same inputs as Earnie's inline specs."""
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, pricing_reference
+    from house_config.edibert_tariffs import EDIBERT_TARIFF_FORMAT, flat_user_grid_area
+
+    ref = dict(out.get(EDIBERT_PRICING_KEY) or {})
+    tariffs_path = work_dir / "tariffs.json"
+    grid_path = work_dir / "grid_fees.json"
+    import_id = ref.get("import_tariff_id")
+    if tariff is not None:
+        entry = {"supplier_id": "regression", "land": "AT", **tariff}
+        tariffs_path.write_text(
+            json.dumps({"tariff_format": EDIBERT_TARIFF_FORMAT, "import_tariffs": [entry],
+                        "export_tariffs": []}),
+            encoding="utf-8",
+        )
+        import_id = entry["id"]
+    grid_path.write_text(
+        json.dumps({"tariff_format": EDIBERT_TARIFF_FORMAT, "rule_sets": {}, "areas": []}),
+        encoding="utf-8",
+    )
+    profile: dict[str, Any] = {"land": "AT"}
+    if fee is not None:
+        area = flat_user_grid_area(_CASE_GRID_AREA, float(fee), label="Regression", land="AT")
+        (work_dir / "user_grid_fees.json").write_text(
+            json.dumps({"tariff_format": EDIBERT_TARIFF_FORMAT, "rule_sets": {}, "areas": [area]}),
+            encoding="utf-8",
+        )
+        profile["netznutzung"] = {"area_id": _CASE_GRID_AREA, "quarter_hour_meter": True}
+    out[EDIBERT_PRICING_KEY] = pricing_reference(
+        tariffs_path=str(tariffs_path) if tariff is not None else ref["tariffs_path"],
+        grid_fees_path=str(grid_path),
+        import_tariff_id=import_id,
+        export_tariff_id=ref.get("export_tariff_id"),
+        timezone_name=str(out.get("timezone_name") or "Europe/Vienna"),
+        profile=profile,
+    )
+
+
+def _apply_case_pricing(scenario: dict, case_inputs: dict[str, Any], work_dir: Path) -> dict:
     """Optional pricing overrides: ``import_tariff`` (spec) and ``grid_fee_base_cent_kwh``.
 
     Without them the fixture scenario keeps the synthetic price series as is.
     """
+    from settings.pricing_engine import uses_edibert_pricing
+
     tariff = case_inputs.get("import_tariff")
     fee = case_inputs.get("grid_fee_base_cent_kwh")
     if tariff is None and fee is None:
@@ -73,6 +123,8 @@ def _apply_case_pricing(scenario: dict, case_inputs: dict[str, Any]) -> dict:
         from data.grid_fees import flat_grid_fee_spec
 
         out["_grid_fee_spec"] = flat_grid_fee_spec(float(fee))
+    if uses_edibert_pricing():
+        _edibert_case_pricing(out, tariff, fee, work_dir)
     return out
 
 
@@ -85,10 +137,10 @@ def run_l2(case: RegressionCase) -> dict[str, Any]:
     if end < start:
         raise ValueError(f"case {case.id}: window.end before start")
 
-    with activate_backtesting_fixture_env():
+    with activate_backtesting_fixture_env(), tempfile.TemporaryDirectory() as work_dir:
         cache = load_fixture_cache()
         scenario = _apply_case_pricing(
-            fixture_scenario_params(), dict(case.meta.get("inputs") or {})
+            fixture_scenario_params(), dict(case.meta.get("inputs") or {}), Path(work_dir)
         )
         prices = build_synthetic_prices_df(
             start - pd.Timedelta(days=1),

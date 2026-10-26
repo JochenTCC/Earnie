@@ -1,4 +1,5 @@
-"""Edibert library access (epic Edibert, P1: load and check; P2: user grid areas, migration).
+"""Edibert library access (epic Edibert, P1: load and check; P2: user grid areas, migration;
+P3a: slot prices for the parity harness and ``EARNIE_PRICING_ENGINE=edibert``).
 
 The only module that calls ``edibert.api``. Earnie still prices with its own engine
 (``data/tariff_pricing.py``, ``data/grid_fees.py``) until Edibert P3b; here the tariff
@@ -9,6 +10,9 @@ through Edibert so format problems surface now. Every ``EdibertError`` becomes a
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
+from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +57,8 @@ _MESSAGES_DE: dict[str, str] = {
     ),
     "FORMAT_UNSUPPORTED": "tariff_format={value!r} wird nicht unterstützt (unterstützt: {supported})",
     "MIGRATION_ANSWER_MISSING": "Migrationsfrage '{question_id}' ist nicht beantwortet",
+    "PRICE_MISSING": "Tarif '{tariff_id}': kein Preis für Slot {slot}",
+    "MARKET_PRICE_REQUIRED": "Tarif '{tariff_id}': Börsenpreis für Slot {slot} erforderlich",
 }
 
 
@@ -237,3 +243,98 @@ def profile_grid_fee(profile_id: str, profile: dict, catalog: api.GridFeeCatalog
         return api.resolve_grid_fee(config, catalog)
     except api.EdibertError as exc:
         raise EdibertLoadError(f"Hausprofil '{profile_id}' (netznutzung)", exc) from exc
+
+
+# --- Slot prices (Edibert P3a) --------------------------------------------------------
+
+IMPORT = api.IMPORT
+EXPORT = api.EXPORT
+PricePoint = api.PricePoint
+PriceResult = api.PriceResult
+
+
+def _mtime_ns(path: str | None) -> int | None:
+    if not path or not os.path.isfile(path):
+        return None
+    return os.stat(path).st_mtime_ns
+
+
+@lru_cache(maxsize=8)
+def _tariff_set_cached(
+    tariffs_path: str, user_path: str, _mtime: int | None, _user_mtime: int | None
+) -> api.TariffSet:
+    return load_tariff_set(tariffs_path, user_path if _user_mtime is not None else None)
+
+
+@lru_cache(maxsize=8)
+def _grid_fees_cached(
+    grid_fees_path: str, user_path: str, _mtime: int | None, _user_mtime: int | None
+) -> api.GridFeeCatalog:
+    return load_grid_fees(grid_fees_path, user_path if _user_mtime is not None else None)
+
+
+def cached_tariff_set(tariffs_path: str) -> api.TariffSet:
+    """Catalog plus ``user_tariffs.json`` next to it; reloaded when either file changes."""
+    from runtime_store.persist_paths import user_tariffs_path_for
+
+    user_path = user_tariffs_path_for(tariffs_path)
+    return _tariff_set_cached(
+        tariffs_path, user_path, _mtime_ns(tariffs_path), _mtime_ns(user_path)
+    )
+
+
+def cached_grid_fees(grid_fees_path: str) -> api.GridFeeCatalog:
+    """Grid catalog plus ``user_grid_fees.json`` next to it; reloaded when either file changes."""
+    from runtime_store.persist_paths import user_grid_fees_path_for
+
+    user_path = user_grid_fees_path_for(grid_fees_path)
+    return _grid_fees_cached(
+        grid_fees_path, user_path, _mtime_ns(grid_fees_path), _mtime_ns(user_path)
+    )
+
+
+def tariff_by_id(tariff_set: api.TariffSet, direction: str, tariff_id: str) -> api.Tariff:
+    """One tariff of the set; an unknown ID is an error."""
+    try:
+        return tariff_set.get(direction, tariff_id)
+    except api.EdibertError as exc:
+        raise EdibertLoadError(f"Tarif '{tariff_id}' ({direction})", exc) from exc
+
+
+def price_series(
+    tariff: api.Tariff,
+    ctx: api.PricingContext,
+    start: datetime,
+    end: datetime,
+    *,
+    market: Mapping[datetime, float] | None,
+    grid_fee: api.GridFee | None,
+) -> api.PriceSeries:
+    """15-min prices for ``[start, end)``; a missing market or month price is an error."""
+    try:
+        return api.tariff_price_series(
+            tariff, ctx, start, end, resolution_min=15, market=market, grid_fee=grid_fee
+        )
+    except api.EdibertError as exc:
+        raise EdibertLoadError(f"Preisreihe Tarif '{tariff.id}'", exc) from exc
+
+
+def evaluate_slot(
+    tariff: api.Tariff,
+    slot: datetime,
+    ctx: api.PricingContext,
+    *,
+    epex_cent: float | None,
+    grid_fee: api.GridFee | None,
+) -> api.PriceResult:
+    """One slot with the intermediate steps (no hourly averaging; used for diff reports)."""
+    try:
+        return api.evaluate(tariff, slot, ctx, epex_cent, grid_fee)
+    except api.EdibertError as exc:
+        raise EdibertLoadError(f"Preis Tarif '{tariff.id}'", exc) from exc
+
+
+def warning_text(warning: api.EdibertWarning) -> str:
+    """Code plus params of one Edibert warning, for logs and reports."""
+    params = ", ".join(f"{key}={value}" for key, value in sorted(dict(warning.params).items()))
+    return f"{warning.code}({params})" if params else str(warning.code)

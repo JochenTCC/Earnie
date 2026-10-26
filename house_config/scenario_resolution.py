@@ -12,6 +12,7 @@ from house_config.tariffs_store import (
     resolve_export_tariff_into_settings,
     resolve_import_tariff_into_settings,
 )
+from settings.pricing_engine import uses_edibert_pricing
 from settings.scenarios import load_backtesting_scenarios_document
 
 DEFAULT_LIVE_SCENARIO_ID = "live"
@@ -91,6 +92,8 @@ def resolve_scenario_settings(
         components = load_components_document(components_path)
     out = resolve_components_into_settings(out, components)
 
+    import_tariff_id = out.get("import_tariff_id")
+    export_tariff_id = out.get("export_tariff_id")
     tariffs_doc = load_tariffs_document(tariffs_path)
     holder = monthly_rates_holder if monthly_rates_holder is not None else {}
     out = resolve_import_tariff_into_settings(out, tariffs_doc)
@@ -116,7 +119,37 @@ def resolve_scenario_settings(
         if flex_consumers:
             out["_planning_flex_consumers"] = flex_consumers
     _ensure_geo_defaults(out)
+    if uses_edibert_pricing():
+        _attach_edibert_pricing(
+            out,
+            tariffs_path=tariffs_path,
+            grid_fees_path=grid_fees_path,
+            import_tariff_id=import_tariff_id,
+            export_tariff_id=export_tariff_id,
+        )
     return out
+
+
+def _attach_edibert_pricing(
+    out: dict,
+    *,
+    tariffs_path: str,
+    grid_fees_path: str | None,
+    import_tariff_id: str | None,
+    export_tariff_id: str | None,
+) -> None:
+    """Pricing reference for ``EARNIE_PRICING_ENGINE=edibert`` (Edibert P3a)."""
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, pricing_reference
+    from runtime_store.persist_paths import resolve_grid_fees_json_path
+
+    out[EDIBERT_PRICING_KEY] = pricing_reference(
+        tariffs_path=tariffs_path,
+        grid_fees_path=grid_fees_path or resolve_grid_fees_json_path(),
+        import_tariff_id=import_tariff_id,
+        export_tariff_id=export_tariff_id,
+        timezone_name=out["timezone_name"],
+        profile=out.get("_house_profile"),
+    )
 
 
 def _ensure_geo_defaults(out: dict) -> None:
