@@ -24,6 +24,9 @@ dependencies = [
     "cryptography>=42.0.0",
     "zeroconf>=0.130.0",
     "PyYAML>=6.0",
+    # Tariff library (separate repo, PolyForm Noncommercial); pinned git tag, decision: docs/dev/edbert-integration.md.
+    # Source archive, so wheel-only installs need --no-binary=edbert.
+    "edbert @ https://github.com/JochenTCC/edbert/archive/refs/tags/v0.1.0.zip",
 ]
 
 [project.optional-dependencies]

@@ -43,7 +43,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --only-binary=:all: -e ".[dev]"
+          pip install --only-binary=:all: --no-binary=edbert -e ".[dev]"
           pip install --only-binary=:all: pytest-cov
 
       - name: Run tests with coverage

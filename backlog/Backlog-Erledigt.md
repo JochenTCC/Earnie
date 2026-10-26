@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Edbert P0 — Packaging and license decision (2026-10-26)
+
+- [x] **Edbert P0 — Packaging and license decision** `[dev]`: Earnie pins the Edbert library to the git tag archive `edbert @ https://github.com/JochenTCC/edbert/archive/refs/tags/v0.1.0.zip` in `pyproject.toml` (single source; `requirements.txt` is `.`, the Docker deps stage reads `pyproject.toml`, the Home Assistant add-on wraps the release image, so neither needs a change). PyPI release and vendored copy rejected for now. Edbert's first tag `v0.1.0` cut after Edbert `0.1.f`. Wheel-only installs (devcontainer, SonarCloud, UI tests) add `--no-binary=edbert`; local side-by-side development via `pip install -e ..\edbert` (`DEVELOPER.md`). License: both non-commercial, same holder, no conflict; Edbert's LICENSE / NOTICE travel in `dist-info`; commercial Earnie licenses need a matching Edbert grant. Open: naming Edbert as a bundled component in `LICENSE.md` / `README.md`. Decision record: [edbert-integration.md](../docs/dev/edbert-integration.md); smoke test `tests/test_edbert_dependency.py`; Docker build green with `edbert` 0.1.0 and `edbert.api` in the image.
+
 ### Bugfix frozen climate fixtures UTC alignment (2026-10-26)
 
 - [x] **Frozen climate test fixtures carried the old fixed-offset alignment (found 2026-10-25) — re-recorded and goldens refreshed (2026-10-26):** `tests/fixtures/backtesting/open_meteo/` and `tests/regression/fixtures/open_meteo/` were recorded before the UTC fix; the 2026 ranges were exactly 1 h late, the 2025 ranges a summer/winter mix. Re-recorded with `EARNIE_REGRESSION_RECORD_CLIMATE=1` (`CLIMATE_FIXTURE_NOW` unchanged, same file names; 8759 / 6959 rows because of the skipped spring hour); the unused `47.4000_9.7000_2025-…_18.0_0.0.json` is dropped. Goldens of 7 cases refreshed with `--update-golden` (`REG-O-autumn-nov`, `-ev-deadline`, `-heat-swimspa`, `-summer-june`, `-winter-jan`, `REG-S-gross-tariff-netznutzung`, `-negative-prices`): metrics and plan hashes unchanged, only input digests (and last-digit float formatting) moved.

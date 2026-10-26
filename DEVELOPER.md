@@ -43,6 +43,8 @@ python -m scripts.run_streamlit
 
 `requirements-dev.txt` installs the project from `pyproject.toml` (incl. `python-dotenv`, Streamlit, …) plus pytest. Use `python -m pip` so install always targets the active venv. If you see `No module named 'dotenv'`, the venv is missing deps or you are not using `.\.venv\Scripts\python.exe`.
 
+The tariff library `edbert` is pinned to a git tag of [`JochenTCC/edbert`](https://github.com/JochenTCC/edbert) in `pyproject.toml` (decision: `docs/dev/edbert-integration.md`). To develop both side by side, install the sibling checkout editable over the pin: `python -m pip install -e ..\edbert`. A wheel-only install (`--only-binary=:all:`) needs `--no-binary=edbert`, because the tag archive is a source distribution.
+
 House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `house_config/geo_timezone.py` — no `timezonefinder`/`h3`. Run tests with `python -m pytest` or `python -m scripts.run_pytest` (thin wrapper used by pre-commit). With `pytest-xdist` (dev extra), `run_pytest` defaults to `-n auto` (multi-CPU); use `-n 0` for sequential debugging.
 
 ### Dev Container (optional)
@@ -50,7 +52,7 @@ House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `hous
 For a Linux-aligned editor/runtime (Docker Desktop required):
 
 1. Command Palette → **Dev Containers: Reopen in Container**
-2. Wait for `post-create` (`pip install --only-binary=:all: -e ".[dev]"`, bootstrap `earnie_env/`; remote user `vscode`)
+2. Wait for `post-create` (`pip install --only-binary=:all: --no-binary=edbert -e ".[dev]"`, bootstrap `earnie_env/`; remote user `vscode`)
 3. F5 with a **Streamlit app.py … (earnie_env)** launch configuration (launch configs live in the gitignored, machine-specific `.vscode/launch.json`)
 
 Config: `.devcontainer/` (Python 3.14-slim). The Dev Container sets `EARNIE_UI_STREAMLIT_PORT=8531` and forwards ports 8531 and 8541. Outside the container the UI port defaults to `8501` (`ui.streamlit_port` / `EARNIE_UI_STREAMLIT_PORT`), so a plain local run opens `http://localhost:8501`.
