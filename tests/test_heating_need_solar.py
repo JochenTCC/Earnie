@@ -127,6 +127,7 @@ def test_profiles_store_geo_and_solar_roundtrip(tmp_path: Path, monkeypatch):
                 "longitude": 9.7,
                 "default_pv_tilt": 30.0,
                 "default_pv_azimuth": -10.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [
                     {
                         "id": "wp",
@@ -171,6 +172,7 @@ def test_profiles_store_requires_geo_for_thermal(tmp_path: Path):
                         "id": "missing_geo",
                         "label": "Ohne Geo",
                         "annual_kwh": 4000.0,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "wp",

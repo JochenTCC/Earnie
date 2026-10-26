@@ -1,8 +1,8 @@
-"""Edibert library access (epic Edibert, P1: load and check only).
+"""Edibert library access (epic Edibert, P1: load and check; P2: user grid areas, migration).
 
 The only module that calls ``edibert.api``. Earnie still prices with its own engine
 (``data/tariff_pricing.py``, ``data/grid_fees.py``) until Edibert P3b; here the tariff
-files, the grid-fee catalog and the pricing context of each house profile are loaded
+files, the grid-fee files and the pricing context of each house profile are loaded
 through Edibert so format problems surface now. Every ``EdibertError`` becomes an
 :class:`EdibertLoadError` with a German message; nothing is skipped silently.
 """
@@ -43,6 +43,16 @@ _MESSAGES_DE: dict[str, str] = {
     "ID_PREFIX_RESERVED": "Katalogtarif '{tariff_id}' darf nicht mit 'user_' beginnen",
     "HOLIDAY_REGION_MISSING": "Region (Bundesland/Kanton) fehlt",
     "HOLIDAY_REGION_UNKNOWN": "unbekannte Region '{region}' für Land {land}",
+    "VAT_PERCENT_MISSING": "Tarif '{tariff_id}': USt-Satz (vat_percent) fehlt",
+    "GRID_ID_COLLISION": "Netzbereich-ID '{grid_id}' ist doppelt (Katalog und Benutzer-Netzbereiche?)",
+    "GRID_ID_PREFIX_MISSING": "Benutzer-Netzbereich '{grid_id}' muss mit 'user_' beginnen",
+    "GRID_ID_PREFIX_RESERVED": "Katalog-Netzbereich '{grid_id}' darf nicht mit 'user_' beginnen",
+    "FORMAT_MISSING": (
+        "tariff_format fehlt — Konfiguration zuerst migrieren (Streamlit-Seite "
+        "„Konfigurations-Migration“ oder python -m scripts.migrate_config)"
+    ),
+    "FORMAT_UNSUPPORTED": "tariff_format={value!r} wird nicht unterstützt (unterstützt: {supported})",
+    "MIGRATION_ANSWER_MISSING": "Migrationsfrage '{question_id}' ist nicht beantwortet",
 }
 
 
@@ -79,11 +89,72 @@ def load_user_tariff_set(user_path: str) -> api.TariffSet:
         raise EdibertLoadError(f"user_tariffs.json ({user_path})", exc) from exc
 
 
-def load_grid_fee_catalog(grid_fees_path: str) -> api.GridFeeCatalog:
+def load_grid_fees(grid_fees_path: str, user_path: str | None = None) -> api.GridFeeCatalog:
+    """Catalog and optional user grid areas as one view (missing user file = no user areas)."""
+    source = "grid_fees.json" if user_path is None else "grid_fees.json / user_grid_fees.json"
     try:
-        return api.load_grid_fee_catalog(Path(grid_fees_path))
+        return api.load_grid_fees(Path(grid_fees_path), Path(user_path) if user_path else None)
     except api.EdibertError as exc:
-        raise EdibertLoadError(f"grid_fees.json ({grid_fees_path})", exc) from exc
+        raise EdibertLoadError(f"{source} ({grid_fees_path})", exc) from exc
+
+
+def flat_user_grid_area(
+    area_id: str, base_cent_kwh: float, *, label: str, land: str | None
+) -> dict:
+    """One own work price for both metering types, no rules (Edibert shape)."""
+    return api.flat_user_grid_area(area_id, float(base_cent_kwh), label=label, land=land or None)
+
+
+def save_user_grid_area(user_path: str, area: dict) -> None:
+    """Add or replace one area in ``user_grid_fees.json``; the file stays unchanged on error."""
+    try:
+        api.save_user_grid_area(Path(user_path), area)
+    except api.EdibertError as exc:
+        raise EdibertLoadError(f"user_grid_fees.json ({user_path})", exc) from exc
+
+
+def user_grid_area_id(profile_id: str) -> str:
+    """ID of the own grid area of one house profile (*Eigener Arbeitspreis*)."""
+    return f"{api.USER_PREFIX}{profile_id}"
+
+
+# --- Tariff-track migration (Edibert P2, wrapped by tf1.tariff_format) -------------
+
+EDIBERT_TARIFF_FORMAT = api.TARIFF_FORMAT
+EDIBERT_TARIFF_TRACK_FILES = tuple(api.TARIFF_TRACK_FILES)
+STANDARD_VAT_PERCENT = dict(api.STANDARD_VAT_PERCENT)
+
+
+def plan_tariff_migration(
+    docs: dict[str, dict], *, user_grid_areas: tuple[dict, ...] = ()
+) -> api.MigrationPlan:
+    """Pure: what Edibert's migration would change, its questions and blockers."""
+    return api.plan_migration(docs, user_grid_areas=user_grid_areas)
+
+
+def migrate_tariff_files(
+    docs: dict[str, dict],
+    answers: dict[str, Any],
+    *,
+    user_grid_areas: tuple[dict, ...] = (),
+) -> api.MigrationResult:
+    """Pure: tariff-track files brought to the current ``tariff_format``."""
+    try:
+        return api.migrate(docs, answers, user_grid_areas=user_grid_areas)
+    except api.EdibertError as exc:
+        raise EdibertLoadError("Tarif-Migration", exc) from exc
+
+
+def migration_blocker_de(blocker: api.MigrationBlocker) -> str:
+    """German text of one Edibert migration blocker (file + coded message)."""
+    code = str(blocker.code)
+    template = _MESSAGES_DE.get(code)
+    try:
+        detail = template.format(**dict(blocker.params)) if template else blocker.message
+    except (KeyError, IndexError):
+        detail = blocker.message
+    source = blocker.file or "Tarifdateien"
+    return f"{source}: {detail} (Edibert {code})."
 
 
 def profile_timezone(profile: dict) -> str:
@@ -123,6 +194,7 @@ def collect_edibert_load_errors(
     tariffs_path: str,
     user_tariffs_path: str | None = None,
     grid_fees_path: str | None = None,
+    user_grid_fees_path: str | None = None,
     profiles: dict[str, dict] | None = None,
 ) -> list[str]:
     """All files and profile contexts through Edibert; one German message per problem."""
@@ -132,9 +204,15 @@ def collect_edibert_load_errors(
         load_tariff_set(tariffs_path, user)
     except EdibertLoadError as exc:
         errors.append(str(exc))
+    grid_catalog: api.GridFeeCatalog | None = None
     if grid_fees_path and os.path.isfile(grid_fees_path):
+        user_grid = (
+            user_grid_fees_path
+            if user_grid_fees_path and os.path.isfile(user_grid_fees_path)
+            else None
+        )
         try:
-            load_grid_fee_catalog(grid_fees_path)
+            grid_catalog = load_grid_fees(grid_fees_path, user_grid)
         except EdibertLoadError as exc:
             errors.append(str(exc))
     for profile_id, profile in (profiles or {}).items():
@@ -144,4 +222,18 @@ def collect_edibert_load_errors(
             pricing_context_for_profile(str(profile_id), profile)
         except EdibertLoadError as exc:
             errors.append(str(exc))
+        if grid_catalog is not None:
+            try:
+                profile_grid_fee(str(profile_id), profile, grid_catalog)
+            except EdibertLoadError as exc:
+                errors.append(str(exc))
     return errors
+
+
+def profile_grid_fee(profile_id: str, profile: dict, catalog: api.GridFeeCatalog) -> api.GridFee:
+    """``netznutzung`` of one house profile resolved against catalog plus user areas."""
+    try:
+        config = api.parse_grid_fee_config(profile.get("netznutzung"))
+        return api.resolve_grid_fee(config, catalog)
+    except api.EdibertError as exc:
+        raise EdibertLoadError(f"Hausprofil '{profile_id}' (netznutzung)", exc) from exc

@@ -6,6 +6,7 @@
   "latitude": 48.2,
   "longitude": 11.0,
   "timezone_name": "Europe/Berlin",
+  "netznutzung": {"area_id": "user_no_grid_fee"},
   "consumers": [
     {
       "id": "ev",

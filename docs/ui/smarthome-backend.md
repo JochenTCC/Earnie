@@ -58,6 +58,8 @@ Das Speichern der Zugangsdaten setzt `ehal.backend` und schaltet **EHAL-Com** so
 
 Der Import von Loxone ins Hausprofil läuft von dieser Seite aus, sobald Loxone verbunden ist. Danach die Verbraucherliste im Hauskonfigurator und das Signal-Mapping auf EHAL-Com prüfen.
 
+Gibt es noch kein Hausprofil, legt der Import das Profil `live` an. Dafür ist vorher die Auswahl **Netzbereich (Netznutzung) für das neue Hausprofil** Pflicht; ohne Auswahl bleibt der Import-Knopf gesperrt. Einen eigenen Arbeitspreis danach im Hauskonfigurator unter Standort eintragen ([Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich)).
+
 ## Siehe auch
 
 - [EHAL-Com](ehal-com.md)

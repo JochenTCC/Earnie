@@ -42,14 +42,15 @@ def test_user_tariffs_appear_in_selection():
     user_file.write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "user_my_fixed", "label": "Mein Fixtarif", "type": "fixed_cent",
-                        "land": "AT", "supplier_id": "user_me", "fix_cent_kwh": 24.5,
+                        "land": "AT", "supplier_id": "user_me", "fix_cent_kwh": 24.5, "vat_percent": 20,
                     },
                     {
                         "id": "user_day_night", "label": "Tag/Nacht", "type": "fixed_cent",
-                        "land": "AT", "supplier_id": "user_me", "fix_cent_kwh": 30.0,
+                        "land": "AT", "supplier_id": "user_me", "fix_cent_kwh": 30.0, "vat_percent": 20,
                         "rules": [{
                             "id": "night", "time": {"from": "22:00", "to": "06:00"},
                             "effect": {"mode": "absolute_cent", "value": 22.0},

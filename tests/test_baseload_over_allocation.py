@@ -119,6 +119,7 @@ def _profile(annual_kwh: float) -> dict:
         "id": "home",
         "label": "Home",
         "annual_kwh": annual_kwh,
+        "netznutzung": {"area_id": "user_no_grid_fee"},
         "consumers": [
             {
                 "id": "pool",
@@ -164,6 +165,7 @@ def _thermal_profile_raw() -> dict:
         "latitude": 47.4,
         "longitude": 9.7,
         "timezone_name": "Europe/Vienna",
+        "netznutzung": {"area_id": "user_no_grid_fee"},
         "consumers": [
             {
                 "id": "waermepumpe",
@@ -261,6 +263,7 @@ def test_fingerprint_ignores_derived_baseload_fields():
     base = {
         "id": "home",
         "annual_kwh": 9000.0,
+        "netznutzung": {"area_id": "user_no_grid_fee"},
         "consumers": [{"id": "x", "type": "generic", "annual_kwh": 100.0}],
     }
     with_derived = {
@@ -278,7 +281,7 @@ def test_fingerprint_changes_with_inputs_and_climate_reference_year(monkeypatch)
     from data import open_meteo_solar_archive as archive
     from data.cons_data_house_profile import house_profile_cons_data_fingerprint
 
-    profile = {"id": "home", "annual_kwh": 9000.0, "consumers": []}
+    profile = {"id": "home", "annual_kwh": 9000.0, "netznutzung": {"area_id": "user_no_grid_fee"}, "consumers": []}
     monkeypatch.setattr(archive, "last_full_archive_year", lambda **_kw: 2025)
     fp_2025 = house_profile_cons_data_fingerprint(profile, pv_kwp=5.0)
     assert fp_2025 != house_profile_cons_data_fingerprint(
@@ -291,7 +294,7 @@ def test_fingerprint_changes_with_inputs_and_climate_reference_year(monkeypatch)
 def test_fingerprint_changes_with_synthesis_version(monkeypatch):
     from data import cons_data_house_profile as module
 
-    profile = {"id": "home", "annual_kwh": 9000.0, "consumers": []}
+    profile = {"id": "home", "annual_kwh": 9000.0, "netznutzung": {"area_id": "user_no_grid_fee"}, "consumers": []}
     before = module.house_profile_cons_data_fingerprint(profile, pv_kwp=5.0)
     monkeypatch.setattr(module, "CONS_DATA_SYNTHESIS_VERSION", module.CONS_DATA_SYNTHESIS_VERSION + 1)
     assert module.house_profile_cons_data_fingerprint(profile, pv_kwp=5.0) != before

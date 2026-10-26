@@ -184,6 +184,7 @@ def test_house_profile_without_consumers():
                     "annual_kwh": 3000.0,
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [],
                 }
             ]
@@ -221,6 +222,7 @@ def _ev_profile_doc(**ev_overrides):
                 "annual_kwh": 3000.0,
                 "latitude": 48.2,
                 "longitude": 11.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [consumer],
             }
         ]
@@ -373,6 +375,7 @@ def test_import_monthly_table_tariff_normalization():
 
     doc = normalize_tariffs_document(
         {
+            "tariff_format": 1,
             "import_tariffs": [
                 {
                     "id": "monthly_import",
@@ -423,6 +426,7 @@ def test_legacy_awattar_and_dynamic_epex_types_rejected():
     with pytest.raises(ValueError, match="spot_hourly"):
         normalize_tariffs_document(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "awattar_at",
@@ -441,6 +445,7 @@ def test_legacy_awattar_and_dynamic_epex_types_rejected():
     with pytest.raises(ValueError, match="spot_hourly"):
         normalize_tariffs_document(
             {
+                "tariff_format": 1,
                 "import_tariffs": [],
                 "export_tariffs": [
                     {
@@ -481,6 +486,7 @@ def test_settlement_mtu_survives_normalization_round_trip():
 
     doc = normalize_tariffs_document(
         {
+            "tariff_format": 1,
             "import_tariffs": [
                 {
                     "id": "hourly_import",
@@ -505,6 +511,7 @@ def test_settlement_mtu_defaults_when_absent():
 
     doc = normalize_tariffs_document(
         {
+            "tariff_format": 1,
             "import_tariffs": [
                 {
                     "id": "qh_import",
@@ -529,6 +536,7 @@ def test_settlement_mtu_rejects_unknown_value():
     with pytest.raises(ValueError, match="settlement_mtu"):
         normalize_tariffs_document(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "bad_mtu",
@@ -597,7 +605,7 @@ def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
                         "annual_kwh": 4000,
                         "latitude": 48.2,
                         "longitude": 16.3,
-                        "netznutzung": {"base_cent_kwh": 5.353},
+                        "netznutzung": {"area_id": "user_home"},
                         "consumers": [],
                     }
                 ]
@@ -613,6 +621,7 @@ def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
     tariffs_path.write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "fix",
@@ -629,12 +638,26 @@ def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
         ),
         encoding="utf-8",
     )
+    # Own work price = user grid area next to grid_fees.json (data model 5)
+    from house_config.edibert_tariffs import flat_user_grid_area, save_user_grid_area
+
+    import shutil
+
+    shutil.copy(
+        Path(__file__).resolve().parents[1] / "share" / "config" / "grid_fees.json",
+        tmp_path / "grid_fees.json",
+    )
+    save_user_grid_area(
+        str(tmp_path / "user_grid_fees.json"),
+        flat_user_grid_area("user_home", 5.353, label="Eigener Arbeitspreis", land="AT"),
+    )
     resolved = resolve_scenario_settings(
         {"house_profile_id": "home", "import_tariff_id": "fix"},
         raw_config={},
         components_path=str(components_path),
         tariffs_path=str(tariffs_path),
         house_profiles_path=str(profiles_path),
+        grid_fees_path=str(tmp_path / "grid_fees.json"),
     )
     assert resolved["_grid_fee_spec"]["base_cent_kwh"] == pytest.approx(5.353)
     from data.backtesting_prices import pricing_kwargs_from_resolved
@@ -665,6 +688,7 @@ def test_ev_consumer_normalization(tmp_path):
                     {
                         "id": "home",
                         "annual_kwh": 5000,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "ev",
@@ -804,6 +828,7 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path, monkeypatch):
                     "annual_kwh": 11000.0,
                     "latitude": 47.404,
                     "longitude": 9.743,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": merged,
                 }
             ]
@@ -886,6 +911,7 @@ def test_build_hourly_kw_profile_with_ev_consumer(tmp_path):
                     {
                         "id": "home",
                         "annual_kwh": 15000,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "ev",
@@ -963,6 +989,7 @@ def test_normalize_generic_schedule_rejects_legacy_flexibility(tmp_path):
                     {
                         "id": "home",
                         "annual_kwh": 5000,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "washer",
@@ -1041,6 +1068,7 @@ def test_build_hourly_kw_profile_generic_blocks(tmp_path):
                     {
                         "id": "home",
                         "annual_kwh": 5000,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "washer",
@@ -1413,6 +1441,7 @@ def test_scenario_resolution_includes_planning_flex(tmp_path):
                     {
                         "id": "home",
                         "annual_kwh": 5000,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "washer",
@@ -1460,6 +1489,7 @@ def test_scenario_resolution_ignores_geo_override(tmp_path):
                         "latitude": 47.404,
                         "longitude": 9.743,
                         "timezone_name": "Europe/Vienna",
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [],
                     }
                 ]
@@ -1497,6 +1527,7 @@ def test_scenario_resolution_includes_ev_planning_flex(tmp_path):
                     {
                         "id": "home_ev",
                         "annual_kwh": 6000,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "ev",
@@ -1550,6 +1581,9 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()
+    from tests.config_fixtures import copy_fixture_grid_fees
+
+    copy_fixture_grid_fees(config_dir)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv(
@@ -1624,6 +1658,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "land": "DE",
                 "latitude": 48.2,
                 "longitude": 11.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [{"id": "heat", "type": "thermal_annual", "nominal_power_kw": 3.0}]
             }]
         }
@@ -1633,6 +1668,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
     (config_dir / "tariffs.json").write_text(
         """
         {
+            "tariff_format": 1,
             "import_tariffs": [{"id": "fixed_imp", "land": "AT", "label": "Fix", "type": "fixed_cent", "fix_cent_kwh": 37}],
             "export_tariffs": [{"id": "fixed_exp", "land": "AT", "label": "Fix", "type": "fixed", "k_push_cent": 3.7}]
         }

@@ -26,12 +26,12 @@ def read_json_dict(path: str) -> dict:
 
 
 def _is_tariff_track_path(path: str) -> bool:
-    """True when ``path`` is a tariff-track file (no earnie_data_model stamp)."""
+    """True when ``path`` is a tariff-track file or template (no earnie_data_model stamp)."""
     from pathlib import Path
 
-    from runtime_store.data_model import TARIFF_TRACK_FILES
+    from runtime_store.data_model import is_tariff_track_file
 
-    return Path(path).name in TARIFF_TRACK_FILES
+    return is_tariff_track_file(Path(path).name)
 
 
 def write_json_dict(path: str, data: dict) -> None:

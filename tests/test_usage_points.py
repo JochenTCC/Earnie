@@ -66,6 +66,7 @@ def _profiles(phases: int = 3) -> dict:
                 "annual_kwh": 4000,
                 "latitude": 48.0,
                 "longitude": 14.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [
                     {
                         "id": "wallbox",

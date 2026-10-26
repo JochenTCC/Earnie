@@ -114,7 +114,10 @@ def test_v3_last_multi_battery_blocker(tmp_path):
 
 def test_meta_every_step_covered_by_fixture_detect(tmp_path):
     covered: set[str] = set()
-    for name in (*HAPPY_SNAPSHOTS, "v3_last", "v3_ha_sign", "v4_pre_ha_pull", "v4_pre_se_conf_defaults"):
+    for name in (
+        *HAPPY_SNAPSHOTS, "v3_last", "v3_ha_sign", "v4_pre_ha_pull", "v4_pre_se_conf_defaults",
+        "v4_pre_tariff_track",
+    ):
         docs = load_pack_docs(_copy_snapshot(tmp_path / "meta", name))
         for step in STEPS:
             if step.detect(docs):
@@ -142,6 +145,8 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm4.retire_plant_pv_binding": "v4_pre_ha_pull",
         "dm4.se_conf_defaults": "v4_pre_se_conf_defaults",
         "dm4.flexible_consumers_overlay": "v4_pre_se_conf_defaults",
+        "dm5.netznutzung_split": "v4_pre_tariff_track",
+        "tf1.tariff_format": "v4_pre_tariff_track",
     }
     for step in STEPS:
         docs = load_pack_docs(_copy_snapshot(tmp_path / step.id, mapping[step.id]))
@@ -249,7 +254,7 @@ def test_dual_track_synthetic_step(tmp_path):
         encoding="utf-8",
     )
     (config_dir / "grid_fees.json").write_text(
-        json.dumps({"description": "t", "rule_sets": {}, "areas": []}),
+        json.dumps({"tariff_format": 1, "description": "t", "rule_sets": {}, "areas": []}),
         encoding="utf-8",
     )
 
@@ -259,9 +264,7 @@ def test_dual_track_synthetic_step(tmp_path):
         if not profiles:
             return False
         nz = profiles[0].get("netznutzung") or {}
-        return nz.get("area_id") is None and "user_area_id" not in (
-            docs.get("grid_fees.json") or {}
-        )
+        return nz.get("area_id") is None
 
     def apply(docs, _answers):
         out = {k: dict(v) for k, v in docs.items()}
@@ -269,11 +272,14 @@ def test_dual_track_synthetic_step(tmp_path):
         profiles = [dict(p) for p in house["profiles"]]
         nz = dict(profiles[0]["netznutzung"])
         nz["area_id"] = "user_test"
+        base = nz.pop("base_cent_kwh")
         profiles[0]["netznutzung"] = nz
         house["profiles"] = profiles
         out["house_profiles.json"] = house
         fees = dict(out["grid_fees.json"])
-        fees["user_area_id"] = "user_test"
+        fees["areas"] = [
+            {"id": "user_test", "base_cent_kwh": {"unmetered_power": base, "metered_power": base}}
+        ]
         out["grid_fees.json"] = fees
         return StepResult(
             docs=out,
@@ -293,7 +299,7 @@ def test_dual_track_synthetic_step(tmp_path):
     assert "test.dual_track" in report.applied_step_ids
     fees = json.loads((config_dir / "grid_fees.json").read_text(encoding="utf-8"))
     house = json.loads((config_dir / "house_profiles.json").read_text(encoding="utf-8"))
-    assert fees["user_area_id"] == "user_test"
+    assert fees["areas"][0]["id"] == "user_test"
     assert house["profiles"][0]["netznutzung"]["area_id"] == "user_test"
     assert DATA_MODEL_KEY not in fees
 

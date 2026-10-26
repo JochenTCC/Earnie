@@ -1,0 +1,24 @@
+{
+    "import_tariffs": [
+        {
+            "id": "user_my_fixed",
+            "label": "Mein Fixtarif",
+            "type": "fixed_cent",
+            "land": "AT",
+            "supplier_id": "user_my_supplier",
+            "fix_cent_kwh": 24.5,
+            "prices_include_vat": true
+        }
+    ],
+    "export_tariffs": [
+        {
+            "id": "user_my_feed_in",
+            "label": "Meine Einspeisung",
+            "type": "fixed",
+            "land": "AT",
+            "supplier_id": "user_my_supplier",
+            "k_push_cent": 7.5,
+            "prices_include_vat": false
+        }
+    ]
+}

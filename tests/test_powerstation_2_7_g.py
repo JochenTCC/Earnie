@@ -508,6 +508,7 @@ def test_sync_consumers_from_powerstation_attached_detach(monkeypatch, tmp_path)
                     "id": "home",
                     "label": "Home",
                     "annual_consumption_kwh": 1000.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [
                         {
                             "id": "wm",

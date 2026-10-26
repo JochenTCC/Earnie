@@ -28,6 +28,7 @@ Enthaltene Dateien:
 | `tariffs.json` | Tarifkatalog |
 | `user_tariffs.json` | Benutzertarife aus Edibert (nur wenn vorhanden) |
 | `grid_fees.json` | Netzentgeltkatalog |
+| `user_grid_fees.json` | Benutzer-Netzbereiche, z. B. eigener Arbeitspreis eines Hausprofils (nur wenn vorhanden) |
 | `deviation_rules.json` | Soll/Ist-Regeln |
 | `uploads/*` | Profil-CSVs |
 
@@ -35,11 +36,16 @@ Enthaltene Dateien:
 
 ### Datenmodell-Version
 
-Das Manifest des ZIP (`earnie_config_pack.json`) und die JSON-Dateien tragen das Feld `earnie_data_model` (aktuell `4`). Ausgenommen sind `grid_fees.json` und `user_tariffs.json`: Earnie schreibt das Feld dort weder beim Export noch beim Import. Beim Import prüft Earnie Manifest und jede Earnie-Track-Datei:
+Die Dateien gehören zu einem von zwei Versions-Tracks:
 
-- **Version `4`:** Earnie übernimmt die Dateien. Beim Schreiben setzt Earnie das Feld in den Dateien auf `4`.
-- **Version `3`:** Earnie hebt die Dateien automatisch auf Version `4` an. Dieselbe Migrationskette läuft auch im [Migrations-Assistenten](../einrichtung/betrieb.md#update-und-migration) für die Konfiguration im Betrieb.
-- **Ältere oder fehlende Versionen** (`1`, `2`, fehlendes Feld) in Manifest oder Mitgliedsdatei: Earnie lehnt den Import ab und ändert die Version nicht stillschweigend. `grid_fees.json` bleibt von dieser Prüfung ausgenommen.
+- **Earnie-Datenmodell** (`earnie_data_model`, aktuell `5`): Manifest (`earnie_config_pack.json`), `config.json`, `backtesting_scenarios.json`, `components.json`, `house_profiles.json`, `deviation_rules.json`.
+- **Tarifformat** (`tariff_format`, aktuell `1`, Format des Tarif-Editors Edibert): `tariffs.json`, `user_tariffs.json`, `grid_fees.json`, `user_grid_fees.json`. Diese Dateien tragen nie `earnie_data_model`.
+
+Beim Import prüft Earnie Manifest und jede Datei:
+
+- **Datenmodell `5` und Tarifformat `1`:** Earnie übernimmt die Dateien. Beim Schreiben setzt Earnie `earnie_data_model` in den Earnie-Track-Dateien auf `5`.
+- **Datenmodell `3` oder `4`, Tarifdateien ohne `tariff_format`:** Earnie hebt die Dateien mit derselben Migrationskette wie der [Migrations-Assistent](../einrichtung/betrieb.md#update-und-migration) an. Braucht die Kette eine Antwort (z. B. Netzbereich eines Hausprofils ohne Netzentgelt, USt-Satz eines Benutzertarifs), lehnt Earnie den Import mit Hinweis ab; dann die Dateien zuerst im Assistenten migrieren.
+- **Ältere oder fehlende Versionen** (`1`, `2`, fehlendes `earnie_data_model`) in Manifest oder Earnie-Track-Datei, oder ein unbekanntes `tariff_format`: Earnie lehnt den Import ab und ändert die Version nicht stillschweigend.
 
 **Hintergrund zu früheren Umstellungen:**
 

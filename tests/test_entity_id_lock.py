@@ -334,6 +334,7 @@ def test_resolve_consumer_locks_after_bezeichnung_change(profiles_env):
             "annual_kwh": 5000.0,
             "latitude": 47.4,
             "longitude": 9.7,
+            "netznutzung": {"area_id": "user_no_grid_fee"},
             "consumers": first,
         }
     )
@@ -356,6 +357,7 @@ def test_resolve_consumer_locks_after_bezeichnung_change(profiles_env):
             "annual_kwh": 5000.0,
             "latitude": 47.4,
             "longitude": 9.7,
+            "netznutzung": {"area_id": "user_no_grid_fee"},
             "consumers": second,
         }
     )

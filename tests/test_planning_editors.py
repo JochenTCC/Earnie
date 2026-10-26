@@ -558,6 +558,7 @@ def test_save_planning_tariff_selection(tmp_path, monkeypatch):
     config_dir.joinpath("tariffs.json").write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "fixed_25ct",
@@ -634,6 +635,7 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
                         "annual_kwh": 4000,
                         "latitude": 48.2,
                         "longitude": 11.0,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [{"id": "wp", "type": "thermal_annual", "living_area_m2": 100}],
                     }
                 ]
@@ -644,6 +646,7 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
     config_dir.joinpath("tariffs.json").write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {"id": "imp", "label": "Import", "type": "spot_hourly", "land": "AT"},
                 ],
@@ -672,6 +675,7 @@ def test_house_profile_hwb_normalization(tmp_path, monkeypatch):
                         "annual_kwh": 5000,
                         "latitude": 48.2,
                         "longitude": 11.0,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "heat",
@@ -922,6 +926,7 @@ def test_profile_accepts_thermal_on_second_consumer(tmp_path):
                         "annual_kwh": 5000,
                         "latitude": 48.2,
                         "longitude": 11.0,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {"id": "heat", "type": "generic", "annual_kwh": 1000},
                             {
@@ -954,6 +959,7 @@ def test_profile_rejects_two_thermal_annual_consumers(tmp_path):
                         "annual_kwh": 5000,
                         "latitude": 48.2,
                         "longitude": 11.0,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "heat",
@@ -1027,7 +1033,10 @@ def test_seed_profile_widget_state_uses_existing_annual_kwh():
         pass
 
     session = _Session()
-    existing = {"label": "EFH", "annual_kwh": 11500.0, "latitude": 47.8, "longitude": 12.1}
+    existing = {
+        "label": "EFH", "annual_kwh": 11500.0, "latitude": 47.8, "longitude": 12.1,
+        "netznutzung": {"area_id": "AT-VBG"},
+    }
     import ui.house_config_profile_form as form
 
     original = form.st.session_state
@@ -1052,7 +1061,7 @@ def test_sync_profile_session_reseeds_when_widget_keys_missing():
             "house_profile_consumers": [],
         }
     )
-    existing = {"label": "EFH", "annual_kwh": 4500.0}
+    existing = {"label": "EFH", "annual_kwh": 4500.0, "netznutzung": {"area_id": "AT-VBG"}}
     import ui.house_config_profile_form as form
 
     original = form.st.session_state
@@ -1697,6 +1706,7 @@ def test_upsert_thermal_profile_roundtrip(tmp_path, monkeypatch):
                     "longitude": 12.1,
                     "default_pv_tilt": 28.0,
                     "default_pv_azimuth": -10.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [
                         {
                             "id": "heat",
@@ -1738,6 +1748,7 @@ def test_upsert_two_consumers_roundtrip(tmp_path, monkeypatch):
             # Σ consumers ≈ 14.5 MWh (EV dominates); must stay below annual_kwh
             # since over-allocation now fails loud on save.
             "annual_kwh": 20000.0,
+            "netznutzung": {"area_id": "user_no_grid_fee"},
             "consumers": [
                 {
                     "id": "pool",
@@ -1791,6 +1802,9 @@ def test_schedule_defaults_preserves_zero_start_shift_h():
     assert defaults["start_shift_h"] == 0.0
 
 
+_NN = {"area_id": "user_no_grid_fee"}
+
+
 def _write_house_profile_delete_tree(
     config_dir,
     *,
@@ -1829,8 +1843,8 @@ def _write_house_profile_delete_tree(
         json.dumps(
             {
                 "profiles": [
-                    {"id": live_house_id, "label": "Home", "annual_kwh": 4000.0},
-                    {"id": extra_house_id, "label": "Extra", "annual_kwh": 3000.0},
+                    {"id": live_house_id, "label": "Home", "annual_kwh": 4000.0, "netznutzung": _NN},
+                    {"id": extra_house_id, "label": "Extra", "annual_kwh": 3000.0, "netznutzung": _NN},
                 ]
             }
         ),

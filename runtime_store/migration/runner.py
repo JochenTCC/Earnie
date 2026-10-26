@@ -17,7 +17,9 @@ from runtime_store.migration.io_util import (
 from runtime_store.migration.planner import plan_level_blockers, plan_migration
 from runtime_store.migration.registry import STEPS
 from runtime_store.migration.types import (
+    HANDOFF_DOCS,
     Answers,
+    Docs,
     MigrationReport,
     MigrationStep,
 )
@@ -58,6 +60,73 @@ def _require_answers(plan_questions, answers: Answers) -> None:
         raise MigrationError(
             "Fehlende Antworten für: " + ", ".join(missing)
         )
+
+
+def migrate_docs_unattended(
+    docs: Docs,
+    *,
+    label: str,
+    steps: Iterable[MigrationStep] | None = None,
+    validate_unchanged: bool = True,
+) -> Docs:
+    """Pure: archived pack docs through the full chain without answers (replay, pack import).
+
+    Fails loud when a step blocks or needs an answer — an archived config is never guessed.
+    Exception: dm4 questions keep their 2.7 unattended meaning (no answer = keep as is, e.g.
+    Loxone Merker names); from data model 5 on a missing answer stops the run.
+    Returns the migrated docs (new files such as ``user_grid_fees.json`` included).
+    """
+    registry = tuple(steps) if steps is not None else STEPS
+    data_model_by_step = {step.id: step.data_model for step in registry}
+    level = plan_level_blockers(docs)
+    if level:
+        raise MigrationError(f"{label}: {level[0].message_de}")
+    chain = apply_chain(docs, {}, registry, stop_on_blocker=True)
+    if chain.blockers:
+        raise MigrationError(f"{label}: Migration blockiert: {chain.blockers[0].message_de}")
+    open_questions = [
+        q.id
+        for q in chain.questions
+        if q.required and data_model_by_step.get(q.step_id, CURRENT_DATA_MODEL) >= 5
+    ]
+    if open_questions:
+        raise MigrationError(
+            f"{label}: Migration braucht Antworten ({', '.join(open_questions)}) — "
+            "archivierte Konfiguration kann nicht ohne Rückfrage migriert werden."
+        )
+    out = {name: doc for name, doc in chain.docs.items() if name not in HANDOFF_DOCS}
+    if chain.applied_step_ids or validate_unchanged:
+        validate_migrated_docs(out)
+    return out
+
+
+def migrate_config_dir_unattended(
+    config_dir: str | Path,
+    *,
+    label: str,
+    model_bump_only: bool = False,
+) -> tuple[str, ...]:
+    """Migrate a throw-away config dir in place (no backup); returns written file names.
+
+    ``model_bump_only``: run only the steps of later data models than the docs carry
+    (recorder snapshots were loadable when recorded, so same-model detect steps are skipped).
+    """
+    root = Path(config_dir)
+    docs = load_pack_docs(root)
+    steps: tuple[MigrationStep, ...] | None = None
+    from_model = _from_model(docs)
+    if model_bump_only and from_model is not None:
+        steps = tuple(step for step in STEPS if step.data_model > from_model)
+    # Nothing to migrate: the docs stay as recorded, the real loaders judge them.
+    migrated = migrate_docs_unattended(
+        docs, label=label, steps=steps, validate_unchanged=False
+    )
+    written: list[str] = []
+    for name, doc in migrated.items():
+        if docs.get(name) != doc:
+            write_json_atomic(root / name, doc)
+            written.append(name)
+    return tuple(written)
 
 
 def run_migration(

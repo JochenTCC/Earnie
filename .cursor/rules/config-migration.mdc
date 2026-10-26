@@ -10,12 +10,12 @@ Persisted config pack JSON must not be reshaped silently. Spec: [`docs/workflow/
 
 ## Tracks
 
-| Track | Key | Files (2.7) | Owner |
+| Track | Key | Files | Owner |
 |---|---|---|---|
-| Earnie data model | `earnie_data_model` (int) | `config`, `components`, `house_profiles`, `backtesting_scenarios`, `deviation_rules` (+ `tariffs.json` until Edibert) | Earnie registry |
-| Tariff format | `tariff_format` (int, **2.8**) | `grid_fees.json`, `user_tariffs.json` now untagged/exempt (`TARIFF_TRACK_FILES`); P2 tags them + `tariffs` | Edibert; Earnie wraps steps |
+| Earnie data model | `earnie_data_model` (int, 5) | `config`, `components`, `house_profiles`, `backtesting_scenarios`, `deviation_rules` | Earnie registry |
+| Tariff format | `tariff_format` (int, 1, since 2.8) | `tariffs`, `user_tariffs`, `grid_fees`, `user_grid_fees` (`TARIFF_TRACK_FILES`) | Edibert (`edibert.api.migrate`); Earnie wraps it in `tf1.tariff_format` |
 
-Until Edibert P2, `grid_fees.json` and `user_tariffs.json` (`runtime_store.data_model.TARIFF_TRACK_FILES`) stay untagged and are exempt from the untagged blocker. Do not stamp them with `earnie_data_model`.
+Tariff-track files never carry `earnie_data_model`. Untagged ones are migrated by `tf1.tariff_format` (registered last); loaders require `tariff_format` (`ensure_tariff_format`).
 
 ## Do
 
@@ -31,7 +31,8 @@ Until Edibert P2, `grid_fees.json` and `user_tariffs.json` (`runtime_store.data_
 ❌ New standalone migrate_*_once scripts for structural changes
 ❌ Guess untagged files as data model 1 / stamp them to current
 ❌ Dual-read old + new shapes "just so it keeps working"
-❌ Stamp earnie_data_model onto tariff-track files (grid_fees.json, user_tariffs.json)
+❌ Stamp earnie_data_model onto tariff-track files (tariffs, user_tariffs, grid_fees, user_grid_fees)
+❌ Reshape tariff-track files in Earnie code — the step only calls edibert.api
 ✅ MigrationStep.detect / apply (pure, in-memory docs)
 ✅ Planner blocker or Question when ambiguous
 ✅ Release-notes ## Migration + betrieb.md Update und Migration

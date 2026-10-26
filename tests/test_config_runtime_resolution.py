@@ -47,7 +47,7 @@ def _write_minimal_greenfield_config(config_dir) -> None:
         encoding="utf-8",
     )
     (config_dir / "tariffs.json").write_text(
-        json.dumps({"import_tariffs": [], "export_tariffs": []}),
+        json.dumps({"tariff_format": 1, "import_tariffs": [], "export_tariffs": []}),
         encoding="utf-8",
     )
     (config_dir / "components.json").write_text(
@@ -144,6 +144,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "land": "DE",
                         "latitude": 48.2,
                         "longitude": 11.0,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "heat",
@@ -160,6 +161,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
     (config_dir / "tariffs.json").write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "fixed_imp",

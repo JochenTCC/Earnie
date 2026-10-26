@@ -1,0 +1,24 @@
+{
+    "tariff_format": 1,
+    "rule_sets": {},
+    "areas": [
+        {
+            "id": "user_test_home",
+            "label": "Eigener Arbeitspreis – test_home (kein Netzentgelt)",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 0.0,
+                "metered_power": 0.0
+            }
+        },
+        {
+            "id": "user_no_grid_fee",
+            "label": "Kein Netzentgelt (Tests)",
+            "land": "AT",
+            "base_cent_kwh": {
+                "unmetered_power": 0.0,
+                "metered_power": 0.0
+            }
+        }
+    ]
+}

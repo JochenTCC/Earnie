@@ -30,10 +30,10 @@
       "exclusiveMinimum": 0,
       "description": "Historischer OeMAG-Nenner fuer Katalog-Seeds (z. B. 7.15). Runtime nutzt owned monthly_rates."
     },
-    "earnie_data_model": {
+    "tariff_format": {
       "type": "integer",
-      "const": 4,
-      "description": "Earnie data-model version for config pack import/export."
+      "const": 1,
+      "description": "Edibert tariff-format version (tariff track, independent of earnie_data_model)."
     },
     "econtrol_referenzmarktwert_pv_monthly": {
       "$ref": "#/definitions/monthly_rates",

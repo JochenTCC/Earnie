@@ -9,6 +9,8 @@ Versionierte Mini-Daten für Backtesting-Tests **ohne** lokale `cons_data.csv`.
 | `cons_data.csv` | Auszug aus Produktiv-Logs (158 Stunden) |
 | `config.json` | Minimale Config mit Pfad auf diese CSV |
 | `backtesting_scenarios.json` | Ein schnelles 5-kWh-Szenario |
+| `grid_fees.json` | Kopie des Netzentgelt-Katalogs `share/config/grid_fees.json` (Tarifformat 1) |
+| `user_grid_fees.json` | Benutzer-Netzbereich `user_test_home` mit 0 Cent/kWh (Hausprofil `test_home` ohne Netzentgelt, wie vor Datenmodell 5) |
 | `open_meteo/` | Eingefrorene Open-Meteo-Archivantworten (Einstrahlung, Temperatur) für L2-Regression; Neuaufnahme siehe `tests/regression/climate_fixture.py` |
 
 ## Testfälle in den Daten

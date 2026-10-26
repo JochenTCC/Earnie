@@ -21,8 +21,10 @@ from runtime_store.migration.types import (
     FileDiff,
     MigrationPlan,
     MigrationStep,
+    HANDOFF_DOCS,
     Question,
     step_is_pending,
+    step_questions,
 )
 
 
@@ -40,7 +42,7 @@ def _min_model(docs: Docs) -> int | None:
 
 
 def plan_level_blockers(docs: Docs) -> list[Blocker]:
-    """dm1/2 and untagged Earnie-track files (grid_fees exempt in 2.7)."""
+    """dm1/2 and untagged Earnie-track files (tariff-track files: see tf1.tariff_format)."""
     blockers: list[Blocker] = []
     for name, doc in docs.items():
         if name not in EARNIE_TRACK_FILES:
@@ -72,7 +74,7 @@ def plan_level_blockers(docs: Docs) -> list[Blocker]:
 
 
 def _file_diffs(before: Docs, after: Docs) -> tuple[FileDiff, ...]:
-    names = sorted(set(before) | set(after))
+    names = sorted((set(before) | set(after)) - HANDOFF_DOCS)
     diffs: list[FileDiff] = []
     for name in names:
         old = before.get(name)
@@ -105,7 +107,7 @@ def _pending_and_questions(
         if not step_is_pending(step, start, current):
             continue
         pending.append(step.id)
-        questions.extend(step.questions)
+        questions.extend(step_questions(step, current))
         result = step.apply(current, {})
         if result.blockers:
             break

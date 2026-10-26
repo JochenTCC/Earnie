@@ -106,6 +106,7 @@ def test_missing_house_config_items_lists_battery_gap(tmp_path, monkeypatch):
                     "id": "efh",
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [{"id": "wp", "type": "thermal_annual"}],
                 }
             ]
@@ -129,6 +130,7 @@ def test_missing_runtime_scenario_items_lists_gaps(tmp_path, monkeypatch):
                     "id": "efh",
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [{"id": "wp", "type": "thermal_annual"}],
                 }
             ]
@@ -181,6 +183,7 @@ def test_planning_ready_unlocks_scenario_explorer(tmp_path, monkeypatch):
                     "annual_kwh": 4000.0,
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [],
                 }
             ]
@@ -248,6 +251,7 @@ def test_loxone_sidebar_deferred_after_planning_unlock(tmp_path, monkeypatch):
                     "annual_kwh": 4000.0,
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [],
                 }
             ]
@@ -454,6 +458,7 @@ def test_scenario_editor_unlocked_after_house_config(tmp_path, monkeypatch):
                     "annual_kwh": 4000.0,
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [],
                 }
             ]

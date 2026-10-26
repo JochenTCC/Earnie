@@ -71,6 +71,10 @@ def main(argv: list[str] | None = None) -> int:
         for question in plan.questions:
             req = "required" if question.required else "optional"
             print(f"  - {question.id} ({req}): {question.prompt_de}")
+            if question.choices:
+                print(f"      Auswahl: {', '.join(question.choices)}")
+            if question.default is not None:
+                print(f"      Vorschlag (nur nach Bestätigung in --answers): {question.default}")
     if plan.blockers:
         print("Blocker:")
         for blocker in plan.blockers:

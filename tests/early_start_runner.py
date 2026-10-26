@@ -46,6 +46,8 @@ def _private_config(runtime: Path) -> Path:
         doc["scenario_explorer_conf"]["path_cons_data"] = "runtime/cons_data.csv"
         config_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
         shutil.copyfile(_BT / "cons_data.csv", runtime / "cons_data.csv")
+        for name in ("grid_fees.json", "user_grid_fees.json"):
+            shutil.copyfile(_BT / name, config_dir / name)
     return config_path
 
 

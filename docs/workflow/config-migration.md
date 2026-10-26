@@ -15,14 +15,16 @@ Earnie’s config pack JSON can change shape across releases. Operators on Docke
 
 ## 2. Scope and tracks
 
-**Pack files (Earnie track, 2.7):** `config.json`, `components.json`, `house_profiles.json`, `backtesting_scenarios.json`, `deviation_rules.json`, and currently `tariffs.json` (until the Edibert integration moves it).
+**Pack files (Earnie track):** `config.json`, `components.json`, `house_profiles.json`, `backtesting_scenarios.json`, `deviation_rules.json`.
 
-| Track | Key | Owner | 2.7 status |
+**Pack files (tariff track, Edibert P2, 2.8):** `tariffs.json`, `user_tariffs.json`, `grid_fees.json`, `user_grid_fees.json` (`runtime_store.data_model.TARIFF_TRACK_FILES`, equal to `edibert.api.TARIFF_TRACK_FILES`; shipped templates `tariffs.example.json` / `tariffs.minimal.json` belong to the same track).
+
+| Track | Key | Owner | Status |
 |-------|-----|-------|------------|
-| Earnie data model | `earnie_data_model` (int, today 4) | Earnie registry | Active |
-| Tariff format | `tariff_format` (int) | Edibert | **Deferred to Version 2.8** |
+| Earnie data model | `earnie_data_model` (int, today 5) | Earnie registry | Active |
+| Tariff format | `tariff_format` (int, today 1) | Edibert (`edibert.api.plan_migration` / `migrate`); Earnie wraps the step | Active since 2.8 |
 
-Until Edibert P2, the tariff-track files `grid_fees.json` and `user_tariffs.json` (Edibert P1, next to `tariffs.json`) stay untagged and are **exempt** from the untagged blocker; do not stamp them with `earnie_data_model`. The set lives in `runtime_store.data_model.TARIFF_TRACK_FILES`.
+Tariff-track files are never stamped with `earnie_data_model` (`settings/json_io.py`, `config_pack.py`, bootstrap template stamping skip them). An untagged tariff-track file is the pre-format-1 state: it is not a level blocker, `tf1.tariff_format` migrates it, and the startup gate stays closed until it ran. Loaders require the current `tariff_format` (`runtime_store.data_model.ensure_tariff_format`, Edibert `FORMAT_MISSING` / `FORMAT_UNSUPPORTED`).
 
 Chain start: data model **3**. Models **1** and **2** are blockers (“Konfiguration zu alt”). Untagged Earnie-track files are blockers (“Version unbekannt”) — no guessing, no silent stamp.
 
@@ -43,6 +45,12 @@ Optional `detect_on_start` gates a step on the docs the chain **started** from (
 `dm4.ha_sign` (issue #56) works the same way for a leftover `ehal.ha.sign` on the HA backend (`ha_sign.remove`: `Behalten` / `Entfernen`): in 2.7 `sign` is applied on top of the HA push, so a 2.6 entry flips already EHAL-signed values twice. `Entfernen` empties `ehal.ha.sign` and leaves a manual to-do to check Live-Lesen against the live power line.
 
 Required `choice` questions start empty in the wizard (no implicit default); the runner rejects missing answers before any write.
+
+Questions that depend on the docs (one per house profile or tariff) come from `MigrationStep.questions_for(docs)` and are collected along the dry-run chain (`types.step_questions`). `kind="number"` questions carry an optional `default` (suggestion): the wizard shows it as placeholder plus a **Vorschlag übernehmen** button and never writes it unasked; the CLI prints it.
+
+**Data model 5 (Edibert P2):** `dm5.netznutzung_split` (after every dm4 step) reduces the house-profile `netznutzung` to `area_id` (required) and the metering facts, turns an own base price into the user grid area `user_<profile_id>`, asks (`dm5.netznutzung_split.area_id:<profile_id>`, choice of catalog / user areas or `user_<profile_id>` with 0 ct) when a profile has neither, and stamps every Earnie-track file to 5. It hands the new areas to `tf1.tariff_format` through the in-memory key `types.HANDOFF_USER_GRID_AREAS` (never written; excluded from diffs). `tf1.tariff_format` runs last: a thin wrapper around `edibert.api.migrate` (tag the four files, drop `earnie_data_model` from `tariffs.json`, write the handed areas into `user_grid_fees.json`, VAT question `vat_percent:<import|export>:<tariff_id>` for every user tariff without a rate). Both steps run in the same wizard run with one backup.
+
+**Archived configs:** recorder replay (`runtime_store.recorder_replay`) and config-pack import run the full chain in memory without answers (`runner.migrate_docs_unattended`); a snapshot that needs an answer or hits a blocker fails with the reason. Regression goldens therefore keep their recorded snapshots unchanged.
 
 ### 3.2 Planner and runner
 
@@ -92,6 +100,6 @@ Diffs step ids at `--since` (git) against the current registry; prints boilerpla
 
 Any structural pack JSON change → bump the owning track + register a step + fixture + Migration release-notes section + user docs. See `.cursor/rules/config-migration.mdc` and `CLAUDE.md` Area notes.
 
-## 7. Out of scope (Version 2.8)
+## 7. Out of scope
 
-- Tariff track key `tariff_format`, `grid_fees.json` versioning, Netznutzung split — with Edibert integration (draft §3.7 / §8).
+- Later tariff-format versions (`tariff_format` 2+): Edibert adds the step to its migration API first, Earnie's `tf1.tariff_format` wrapper picks it up.

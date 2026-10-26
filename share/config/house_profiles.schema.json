@@ -15,7 +15,7 @@
     },
     "earnie_data_model": {
       "type": "integer",
-      "const": 4,
+      "const": 5,
       "description": "Earnie data-model version for config pack import/export."
     }
   },
@@ -640,11 +640,13 @@
         },
         "netznutzung": {
           "type": "object",
-          "description": "Netznutzung Arbeitspreis (netto, ohne USt), unabhängig vom Lieferantentarif; wird zum Bezugspreis addiert. Mit area_id aus share/config/grid_fees.json (inkl. Zeitregeln wie SNAP/WiNAP), sonst manueller Basiswert.",
+          "description": "Netznutzung Arbeitspreis (netto, ohne USt), unabhängig vom Lieferantentarif; wird zum Bezugspreis addiert. area_id wählt einen Netzbereich aus grid_fees.json (inkl. Zeitregeln wie SNAP/WiNAP) oder einen Benutzer-Netzbereich aus user_grid_fees.json (eigener Arbeitspreis, ID user_…).",
+          "required": ["area_id"],
           "properties": {
             "area_id": {
-              "type": ["string", "null"],
-              "description": "Netzbereich-ID aus grid_fees.json; null = manueller Basiswert ohne Zeitregeln."
+              "type": "string",
+              "minLength": 1,
+              "description": "Netzbereich-ID aus grid_fees.json oder user_grid_fees.json (Pflicht seit Datenmodell 5)."
             },
             "power_metering": {
               "type": "string",
@@ -654,11 +656,6 @@
             "quarter_hour_meter": {
               "type": "boolean",
               "description": "Persisted for pack shape; Earnie always treats as true (QH smart meter assumed, not user-configurable)."
-            },
-            "base_cent_kwh": {
-              "type": "number",
-              "minimum": 0,
-              "description": "Manueller Basis-Arbeitspreis (Cent/kWh netto); nur ohne area_id wirksam."
             },
             "include_status": {
               "type": "array",

@@ -7,15 +7,22 @@ from typing import Any, Callable
 Docs = dict[str, dict[str, Any]]
 Answers = dict[str, Any]
 
+# In-memory hand-over between steps of one chain run (never a pack file, never written):
+# dm5.netznutzung_split puts the own grid areas here, tf1.tariff_format consumes them.
+HANDOFF_USER_GRID_AREAS = "__handoff__/user_grid_areas"
+HANDOFF_DOCS: frozenset[str] = frozenset({HANDOFF_USER_GRID_AREAS})
+
 
 @dataclass(frozen=True)
 class Question:
     id: str
     step_id: str
     prompt_de: str
-    kind: str  # "str" | "bool" | "choice"
+    kind: str  # "str" | "bool" | "choice" | "number"
     required: bool
     choices: tuple[str, ...] = ()
+    # Suggestion shown to the user (e.g. standard VAT rate); never written unless answered.
+    default: Any = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +98,15 @@ class MigrationStep:
     manual_todos: Callable[[Docs, Docs], list[ManualTodo]] = _empty_manual_todos
     # Optional gate on the docs the chain started from (e.g. "only from model 3").
     detect_on_start: Callable[[Docs], bool] | None = None
+    # Questions that depend on the docs (one per profile / tariff); added to ``questions``.
+    questions_for: Callable[[Docs], tuple[Question, ...]] | None = None
+
+
+def step_questions(step: MigrationStep, docs: Docs) -> tuple[Question, ...]:
+    """Static plus doc-dependent questions of ``step`` for the docs it will run on."""
+    if step.questions_for is None:
+        return step.questions
+    return (*step.questions, *step.questions_for(docs))
 
 
 def step_is_pending(step: MigrationStep, start: Docs, current: Docs) -> bool:

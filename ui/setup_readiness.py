@@ -210,6 +210,13 @@ def _missing_live_profile_items(live_settings: dict, profiles_doc: dict) -> list
         profile_id = _default_house_profile_id_from_doc(profiles_doc)
     if not profile_id:
         return ["Hausprofil zuordnen (Echtzeit-Umgebung)"]
+    for candidate_id, profile in _iter_profiles_from_doc(profiles_doc):
+        if candidate_id != profile_id:
+            continue
+        netznutzung = profile.get("netznutzung")
+        if not isinstance(netznutzung, dict) or not netznutzung.get("area_id"):
+            # Data model 5: the grid area is required (catalog area or own price).
+            return ["Netzbereich (Netznutzung) im Hausprofil wählen"]
     return []
 
 

@@ -1,6 +1,6 @@
 {
     "$schema": "./backtesting_scenarios.schema.json",
-    "earnie_data_model": 4,
+    "earnie_data_model": 5,
     "cbc_gap_rel": 0.2,
     "commit_hours": 24,
     "cbc_strict_time_limit_sec": 2,

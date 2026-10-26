@@ -158,6 +158,7 @@ def test_normalize_absent_fields_roundtrip(tmp_path, monkeypatch):
                 "absent_mode": True,
                 "latitude": 48.0,
                 "longitude": 11.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [
                     {
                         "id": "haus",
@@ -210,6 +211,7 @@ def test_normalize_migrates_legacy_absent_temp_c(tmp_path, monkeypatch):
                 "annual_kwh": 4000,
                 "latitude": 48.0,
                 "longitude": 11.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [
                     {
                         "id": "haus",

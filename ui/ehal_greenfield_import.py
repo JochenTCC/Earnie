@@ -20,6 +20,7 @@ _SESSION_DISMISSED = "greenfield_loxone_dismissed"
 _SESSION_LAST_REPORT = "greenfield_loxone_last_report"
 _SESSION_FLASH_OK = "greenfield_loxone_flash_ok"
 _SESSION_ACCESS = "greenfield_loxone_access"
+_GRID_AREA_KEY = "hk_loxone_import_grid_area"
 
 _SIGNALE_URL = docs_blob_url(
     "docs/referenz/loxone-signals.md",
@@ -141,6 +142,8 @@ def render_greenfield_import_section() -> None:
     st.info(_IMPORT_HINT)
     if not access_ok and access_hint:
         st.warning(access_hint)
+    grid_area_id, area_ok = _render_new_profile_grid_area()
+    access_ok = access_ok and area_ok
 
     if show_onboarding:
         import_col, dismiss_col = st.columns(2)
@@ -169,10 +172,36 @@ def render_greenfield_import_section() -> None:
         if isinstance(report, dict):
             _show_report(report)
         return
-    _run_import()
+    _run_import(grid_area_id)
 
 
-def _run_import() -> None:
+def _render_new_profile_grid_area() -> tuple[str | None, bool]:
+    """No house profile yet: the import creates one and needs its grid area (no default)."""
+    if (load_house_profiles().get("profiles") or {}):
+        return None, True
+    from data.grid_fees import load_grid_fee_catalog
+    from runtime_store.persist_paths import resolve_grid_fees_json_path
+
+    areas = load_grid_fee_catalog(resolve_grid_fees_json_path())["areas"]
+    area_id = st.selectbox(
+        "Netzbereich (Netznutzung) für das neue Hausprofil",
+        options=list(areas),
+        index=None,
+        placeholder="Netzbereich wählen …",
+        format_func=lambda key: areas[key]["label"],
+        help=(
+            "Der Import legt ein neues Hausprofil an; der Netzbereich ist Pflicht. "
+            "Einen eigenen Arbeitspreis danach im Hauskonfigurator unter Standort eintragen."
+        ),
+        key=_GRID_AREA_KEY,
+    )
+    if area_id is None:
+        st.warning("Netzbereich wählen — erst dann ist der Import möglich.")
+        return None, False
+    return str(area_id), True
+
+
+def _run_import(grid_area_id: str | None) -> None:
     from runtime_store.ehal_setup import BACKEND_LOXONE
     from ui.ehal_connection import persist_ehal_backend
 
@@ -196,6 +225,7 @@ def _run_import() -> None:
                 probe_host=host,
                 probe_username=user,
                 probe_password=password,
+                grid_area_id=grid_area_id,
             )
     except (ValueError, OSError) as exc:
         st.error(f"Loxone-Import fehlgeschlagen — nichts gespeichert: {exc}")

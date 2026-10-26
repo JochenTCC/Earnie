@@ -17,6 +17,7 @@ def _write_tariffs(path: Path, *, imports: list | None = None, exports: list | N
     path.write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": imports or [],
                 "export_tariffs": exports or [],
             }
@@ -88,7 +89,7 @@ def test_validate_tariffs_against_schema_rejects_invalid_structure(tmp_path):
     tariffs = tmp_path / "tariffs.json"
     schema = tmp_path / "tariffs.schema.json"
     tariffs.write_text(
-        json.dumps({"import_tariffs": {}, "export_tariffs": []}),
+        json.dumps({"tariff_format": 1, "import_tariffs": {}, "export_tariffs": []}),
         encoding="utf-8",
     )
     schema.write_text(

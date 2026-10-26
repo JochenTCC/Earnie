@@ -19,7 +19,7 @@ Verwandt: [Preise und Marktdaten](../konfiguration/preise.md) (Konfiguration und
 | **Netznutzung Leistungspreis** / netzgebietsspezifische Tabellen | **nein** | **nein** |
 | PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
 
-> **Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Er kann zeitabhängig sein (SNAP, vorbereitet WiNAP). Die Werte stammen aus dem Laufzeitkatalog `earnie_env/config/grid_fees.json`; die Vorlage dafür liegt in `share/config/grid_fees.json`. Der Leistungspreis fehlt weiterhin. Das optionale Katalogfeld `grid_monthly_fee_eur` dient nur als monatliche Fixgebühr im Szenario-Explorer.
+> **Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Er kann zeitabhängig sein (SNAP, vorbereitet WiNAP). Die Werte stammen aus dem Laufzeitkatalog `earnie_env/config/grid_fees.json`; die Vorlage dafür liegt in `share/config/grid_fees.json`. Ein eigener Arbeitspreis ist ein Benutzer-Netzbereich in `user_grid_fees.json` (siehe [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich)). Alle vier Tarifdateien tragen das Tarifformat `tariff_format: 1`; jeder Tarif braucht einen `vat_percent`. Der Leistungspreis fehlt weiterhin. Das optionale Katalogfeld `grid_monthly_fee_eur` dient nur als monatliche Fixgebühr im Szenario-Explorer.
 
 Earnie liefert **ausreichend genaue Eurobeträge** für Vergleiche und Demos. Eine Abrechnung gegen echte Stromrechnungen ist damit **nicht** möglich. Katalogwerte können unvollständig oder veraltet sein; die Parameter im Szenarienkonfigurator daher prüfen.
 

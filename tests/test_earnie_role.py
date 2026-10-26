@@ -57,6 +57,7 @@ def test_normalize_assigns_earnie_role_known():
                 {
                     "id": "p1",
                     "annual_kwh": 1000,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [
                         {
                             "id": "kochen",
@@ -86,6 +87,7 @@ def test_normalize_manual_is_milp_flex():
                 {
                     "id": "p1",
                     "annual_kwh": 1000,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [
                         {
                             "id": "wm",
@@ -135,6 +137,7 @@ def test_normalize_flex_requires_positive_shift():
                     {
                         "id": "p1",
                         "annual_kwh": 1000,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "x",
@@ -205,6 +208,7 @@ def test_normalize_migrates_legacy_loxone_power_name_to_inputs():
                 {
                     "id": "p1",
                     "annual_kwh": 1000,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [
                         {
                             "id": "wm",
@@ -241,6 +245,7 @@ def test_normalize_known_preserves_loxone_inputs():
                 {
                     "id": "p1",
                     "annual_kwh": 1000,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [
                         {
                             "id": "pool",
@@ -273,6 +278,7 @@ def test_normalize_manual_loxone_requires_power_name():
                     {
                         "id": "p1",
                         "annual_kwh": 1000,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [
                             {
                                 "id": "wm",

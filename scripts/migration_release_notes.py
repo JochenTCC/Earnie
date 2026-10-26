@@ -162,7 +162,12 @@ def format_migration_section(steps: tuple[MigrationStep, ...]) -> str:
                 lines.append(
                     f"  - Frage ({req}): {question.prompt_de} (`{question.id}`)"
                 )
-        else:
+        if step.questions_for is not None:
+            lines.append(
+                "  - Weitere Fragen je nach Konfiguration (pro Hausprofil / Tarif, "
+                "werden beim Migrieren aus der Config berechnet)."
+            )
+        if not step.questions and step.questions_for is None:
             lines.append("  - Keine Wizard-Fragen (nur Erkennung / Apply).")
         lines.append(
             "  - Manuelle To-dos: werden beim Migrieren aus der Config berechnet "

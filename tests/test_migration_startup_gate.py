@@ -116,17 +116,18 @@ def test_untagged_earnie_file_blocks_grid_fees_exempt(tmp_path, monkeypatch, cap
     assert "Version unbekannt" in err or "fehlt" in err
 
 
-def test_grid_fees_untagged_alone_does_not_block(tmp_path, monkeypatch):
-    """Fully migrated Earnie-track + untagged grid_fees → gate open (2.7 exempt)."""
+def test_untagged_grid_fees_is_a_pending_tariff_step(tmp_path, monkeypatch):
+    """Fully migrated Earnie track + untagged grid_fees → tf1.tariff_format pending, no level blocker."""
     config_dir = _copy_snapshot(tmp_path, "v4_pre_topology", from_goldens=True)
     _point_config(monkeypatch, config_dir)
     fees_path = config_dir / "grid_fees.json"
-    fees_path.write_text(
-        json.dumps({"rule_sets": {}, "areas": []}),
-        encoding="utf-8",
-    )
+    doc = json.loads(fees_path.read_text(encoding="utf-8"))
+    doc.pop("tariff_format")
+    fees_path.write_text(json.dumps(doc), encoding="utf-8")
     plan = plan_migration(config_dir)
-    assert not migration_blocks_normal_startup(plan)
+    assert migration_blocks_normal_startup(plan)
+    assert plan.pending_step_ids == ("tf1.tariff_format",)
+    assert not plan.blockers
     assert DATA_MODEL_KEY not in json.loads(fees_path.read_text(encoding="utf-8"))
 
 

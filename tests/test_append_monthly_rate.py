@@ -13,6 +13,7 @@ from house_config.tariffs_store import append_monthly_rate, load_tariffs_documen
 
 def _minimal_monthly_export_doc() -> dict:
     return {
+        "tariff_format": 1,
         "import_tariffs": [
             {
                 "id": "fixed_imp",
@@ -110,6 +111,7 @@ def _write_live_pack(config_dir: Path, tariffs: dict) -> None:
                         "annual_kwh": 4000,
                         "latitude": 48.2,
                         "longitude": 16.3,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [],
                     }
                 ]

@@ -160,8 +160,9 @@ def collect_tariff_plausibility_errors(
 ) -> list[str]:
     """Sammelt alle Plausibilitätsfehler (leer = ok).
 
-    ``with_edibert``: zusätzlich lädt Edibert Katalog, Benutzertarife, ``grid_fees.json``
-    und den Preis-Kontext jedes Hausprofils (Edibert P1, nur Prüfung — bepreist wird
+    ``with_edibert``: zusätzlich lädt Edibert Katalog, Benutzertarife, ``grid_fees.json`` mit
+    ``user_grid_fees.json``, den Netzbereich (``netznutzung``) und den Preis-Kontext jedes
+    Hausprofils (Edibert P1, nur Prüfung — bepreist wird
     weiter mit Earnies eigener Engine). Start-Check und ``scripts.validate_tariffs``.
     """
     errors: list[str] = []
@@ -201,7 +202,7 @@ def _collect_edibert_errors(
     house_profiles_path: str | None,
 ) -> list[str]:
     from house_config.edibert_tariffs import collect_edibert_load_errors
-    from runtime_store.persist_paths import user_tariffs_path_for
+    from runtime_store.persist_paths import user_grid_fees_path_for, user_tariffs_path_for
 
     profiles: dict = {}
     if house_profiles_path and os.path.isfile(house_profiles_path):
@@ -215,6 +216,7 @@ def _collect_edibert_errors(
         tariffs_path=tariffs_path,
         user_tariffs_path=user_tariffs_path_for(tariffs_path),
         grid_fees_path=grid_fees_path,
+        user_grid_fees_path=user_grid_fees_path_for(grid_fees_path) if grid_fees_path else None,
         profiles=profiles,
     )
 

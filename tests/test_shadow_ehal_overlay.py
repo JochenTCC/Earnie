@@ -43,6 +43,7 @@ def _base_house() -> dict:
                 "id": "live",
                 "label": "Live",
                 "annual_kwh": 1000.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [
                     {
                         "id": "heatpump",
@@ -94,6 +95,7 @@ def test_load_house_profiles_merges_overlay(tmp_path, monkeypatch):
                 "id": "live",
                 "label": "Live",
                 "annual_kwh": 1000.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [
                     {
                         "id": "heatpump",
@@ -144,6 +146,7 @@ def test_save_house_profiles_allowed_with_external_feed(tmp_path, monkeypatch):
                 "id": "live",
                 "label": "Live",
                 "annual_kwh": 1000.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [],
             }
         ],

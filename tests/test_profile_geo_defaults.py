@@ -3,7 +3,13 @@ from __future__ import annotations
 
 import pytest
 
-from house_config.profiles_store import _profile_geo_and_csv_fields
+from house_config.profiles_store import _profile_geo_and_csv_fields as _geo_fields
+
+_NETZ = {"netznutzung": {"area_id": "AT-VBG"}}
+
+
+def _profile_geo_and_csv_fields(raw: dict) -> dict:
+    return _geo_fields({**_NETZ, **raw})
 
 
 @pytest.mark.parametrize(

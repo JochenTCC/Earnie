@@ -295,10 +295,9 @@
             "default_pv_tilt": 18.0,
             "default_pv_azimuth": 26.0,
             "netznutzung": {
-                "area_id": null,
+                "area_id": "user_profile_a",
                 "power_metering": "unmetered_power",
                 "quarter_hour_meter": true,
-                "base_cent_kwh": 5.353,
                 "include_status": [
                     "verordnet"
                 ]
@@ -319,5 +318,5 @@
             "single_tariff": true
         }
     },
-    "earnie_data_model": 4
+    "earnie_data_model": 5
 }

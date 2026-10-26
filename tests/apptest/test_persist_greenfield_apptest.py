@@ -265,3 +265,51 @@ def test_first_setup_import_completes_the_wizard(onboarding, loxone_credentials,
     assert any(_FLASH_FRAGMENT in text for text in messages(at)["success"])
     assert _DISMISS not in {b.key for b in at.button}
     assert at.button(key=_BUTTON).proto.type == "secondary"
+
+
+# --- Import ohne Hausprofil: Netzbereich ist Pflicht (Datenmodell 5) ---------------------
+
+_GRID_AREA = "hk_loxone_import_grid_area"
+
+
+@pytest.fixture
+def no_house_profile():
+    """Leeres house_profiles.json wie bei einer Neuinstallation: der Import legt ``live`` an."""
+    house, _config = _paths()
+    scenarios = Path(os.environ["EARNIE_BACKTESTING_SCENARIOS_PATH"])
+    originals = {path: path.read_bytes() for path in (house, scenarios)}
+    doc = json.loads(scenarios.read_text(encoding="utf-8"))
+    for scenario in doc["scenarios"]:
+        scenario["settings"]["house_profile_id"] = ""
+    scenarios.write_text(json.dumps(doc), encoding="utf-8")
+    house.write_text(json.dumps({"earnie_data_model": 5, "profiles": []}), encoding="utf-8")
+    yield
+    for path, data in originals.items():
+        path.write_bytes(data)
+
+
+def test_new_profile_needs_grid_area_before_import(
+    no_house_profile, loxone_credentials, loxapp3
+) -> None:
+    at = _run()
+
+    assert at.selectbox(key=_GRID_AREA).value is None
+    assert at.button(key=_BUTTON).disabled
+    assert any("Netzbereich wählen" in w for w in messages(at)["warning"])
+
+    at.selectbox(key=_GRID_AREA).set_value("AT-VBG").run(timeout=_TIMEOUT_S)
+    assert not at.button(key=_BUTTON).disabled
+    at = _click(at)
+
+    assert_clean(at)
+    house, _config = _paths()
+    profiles = json.loads(house.read_text(encoding="utf-8"))["profiles"]
+    assert [p["id"] for p in profiles] == ["live"]
+    assert profiles[0]["netznutzung"]["area_id"] == "AT-VBG"
+
+
+def test_grid_area_select_hidden_when_a_profile_exists(loxone_credentials, loxapp3) -> None:
+    at = _run()
+
+    assert not [sb for sb in at.selectbox if sb.key == _GRID_AREA]
+    assert not at.button(key=_BUTTON).disabled

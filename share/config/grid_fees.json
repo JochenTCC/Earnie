@@ -1,4 +1,5 @@
 {
+  "tariff_format": 1,
   "description": "Netznutzungsentgelt-Arbeitspreis je Netzbereich (Netzebene 7) und zeitgebundene Regeln. Preise netto, Cent/kWh. Modell: docs/konfiguration/preise.md.",
   "rule_sets": {
     "AT_NE7": [

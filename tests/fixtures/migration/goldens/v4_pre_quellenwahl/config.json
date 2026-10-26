@@ -1,6 +1,6 @@
 {
     "$schema": "./config.schema.json",
-    "earnie_data_model": 4,
+    "earnie_data_model": 5,
     "market_prices": {
         "missing_price_strategy": "forecast",
         "live_bias_enabled": true,

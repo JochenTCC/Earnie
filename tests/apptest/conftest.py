@@ -71,10 +71,8 @@ def _isolated_backtesting_config(tmp_path, monkeypatch):
         str(config_dir / "backtesting_scenarios.json"),
     )
     monkeypatch.setenv("EARNIE_COMPONENTS_PATH", str(config_dir / "components.json"))
-    monkeypatch.setenv(
-        "EARNIE_GRID_FEES_PATH",
-        str(Path(__file__).resolve().parents[2] / "share" / "config" / "grid_fees.json"),
-    )
+    # Fixture copy of the public catalog plus user_grid_fees.json (user_test_home).
+    monkeypatch.setenv("EARNIE_GRID_FEES_PATH", str(config_dir / "grid_fees.json"))
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime_dir))
     # Formulare, die Zugangsdaten schreiben (Loxone), dürfen nie die echte .env treffen.
     monkeypatch.setenv("EARNIE_DOTENV_PATH", str(config_dir / ".env"))

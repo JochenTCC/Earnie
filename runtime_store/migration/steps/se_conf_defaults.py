@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from runtime_store.data_model import CURRENT_DATA_MODEL, read_data_model, stamp_data_model
+from runtime_store.data_model import read_data_model, stamp_data_model
 from runtime_store.migration.types import (
     Answers,
     Docs,
@@ -57,8 +57,9 @@ def detect(docs: Docs) -> bool:
     config = docs.get("config.json")
     if not isinstance(config, dict):
         return False
-    # Only after structural dm4 migration — never stamp v1/v2 packs via this fill.
-    if read_data_model(config) != CURRENT_DATA_MODEL:
+    # Only after structural dm4 migration — never stamp v1/v2/v3 packs via this fill.
+    version = read_data_model(config)
+    if version is None or version < 4:
         return False
     block = config.get(_BLOCK)
     return bool(_missing_keys(block if isinstance(block, dict) else None))

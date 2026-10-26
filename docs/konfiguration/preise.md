@@ -41,10 +41,9 @@ Der Arbeitspreis für die Netznutzung steht am Hausprofil unter Standort im Obje
 
 | Feld | Bedeutung |
 | --- | --- |
-| `area_id` | Netzbereich aus dem Katalog `earnie_env/config/grid_fees.json` (Seed aus öffentlichem [`share/config/grid_fees.json`](../../share/config/grid_fees.json); z. B. `AT-VBG`). `null` = eigener Wert ohne Zeitregeln. |
+| `area_id` | **Pflicht.** Netzbereich aus dem Katalog `earnie_env/config/grid_fees.json` (Seed aus öffentlichem [`share/config/grid_fees.json`](../../share/config/grid_fees.json); z. B. `AT-VBG`) oder ein Benutzer-Netzbereich aus `user_grid_fees.json` (eigener Arbeitspreis, siehe unten). Es gibt kein stillschweigendes „kein Netzentgelt“. |
 | `power_metering` | Immer `unmetered_power` (nicht gemessene Leistung / Standard Haushalt). Wählt den Basis-Arbeitspreis im Katalog; keine UI-Einstellung. |
 | `quarter_hour_meter` | Immer `true`. Earnie setzt voraus, dass ein Viertelstunden-Smart-Meter vorhanden ist (Voraussetzung der Katalogregeln SNAP/WiNAP); keine UI-Einstellung. |
-| `base_cent_kwh` | Eigener Basis-Arbeitspreis (Cent/kWh netto); nur ohne `area_id` wirksam. |
 | `include_status` | Welche Regel-Stati gelten. Standard ist nur `verordnet`; `entwurf` und `illustrativ` müssen bewusst aktiviert werden. |
 
 **Zeitregeln** liegen im Katalog je Regelsatz (`rule_sets`). Eine Regel besteht aus:
@@ -64,13 +63,20 @@ Passt mehr als eine Regel, gewinnt die erste. Eine einbezogene Regel ohne Wert i
 
 Die Katalogwerte stammen aus einer Recherche (SNE-V 2018, Fassung 01.04.2026; SNAP-Abschlag laut Netzbetreibern). Sie sind nicht gegen die jeweiligen Preisblätter geprüft. Netzbetreiber können Voraussetzungen (z. B. Opt-in) unterschiedlich handhaben. Der Netzverlust-Anteil ist nicht enthalten.
 
-**Migration:** Das frühere Feld `netznutzung_arbeitspreis_cent_kwh` wird nicht mehr gelesen; beim Laden erscheint eine Fehlermeldung. Einmalig umstellen mit:
+### Eigener Arbeitspreis (Benutzer-Netzbereich)
 
-```powershell
-python -m scripts.migrate_grid_fee_profile --path earnie_env/config/house_profiles.json
-```
+Im Hauskonfigurator (Standort → **Netzbereich (Netznutzung)**) gibt es neben den Katalog-Netzbereichen die Auswahl **Eigener Arbeitspreis**. Earnie speichert den Wert als eigenen Netzbereich `user_<Hausprofil-ID>` in `user_grid_fees.json` (neben `grid_fees.json`) und trägt diese ID als `area_id` im Hausprofil ein.
 
-Der Preis bleibt dabei gleich. Danach den Netzbereich im Hausprofil wählen oder `--area-id AT-VBG` übergeben.
+- Ein eigener Arbeitspreis gilt für beide Messarten und hat keine Zeitregeln.
+- `0` Cent/kWh heißt bewusst „kein Netzentgelt“.
+- IDs in `user_grid_fees.json` beginnen mit `user_`. Dieselbe ID in `grid_fees.json` und `user_grid_fees.json` ist ein Ladefehler.
+- Ein neues Hausprofil hat keinen vorausgewählten Netzbereich; ohne Auswahl speichert der Hauskonfigurator das Profil nicht.
+
+Beide Netzentgelt-Dateien gehören wie die Tarifdateien zum **Tarif-Track** (Feld `tariff_format`, siehe [speichern-laden.md](speichern-laden.md)).
+
+**Migration (Datenmodell 5):** Hausprofile aus Datenmodell 4 mit `area_id: null` und eigenem Wert `base_cent_kwh` stellt der Migrations-Wizard um: der Wert wandert unverändert in den Benutzer-Netzbereich `user_<Hausprofil-ID>`. Hat ein Profil keinen Netzbereich und keinen Wert (oder `0`), fragt der Wizard nach: Katalog-Netzbereich wählen oder `user_<Hausprofil-ID>` mit 0 Cent/kWh anlegen. Ein Hausprofil mit `base_cent_kwh` oder ohne `area_id` lädt Earnie nicht mehr; die Fehlermeldung verweist auf den Wizard bzw. `python -m scripts.migrate_config`.
+
+Das noch ältere Feld `netznutzung_arbeitspreis_cent_kwh` stellt derselbe Wizard-Lauf zuerst auf das Objekt `netznutzung` um.
 
 ### Land am Hausprofil
 
@@ -101,7 +107,7 @@ Der **Bezugspreis in Cent/kWh** ergibt sich so:
   × (1 + vat_percent/100)   falls prices_include_vat = false
 ```
 
-Die Netznutzung ist immer ein Nettopreis. Bei `prices_include_vat = true` addiert Earnie sie deshalb mit USt auf den Brutto-Preis des Lieferanten: `Preis + Netznutzung × (1 + vat_percent/100)`. Dafür braucht der Tarif einen `vat_percent` (z. B. 20); fehlt er, warnt Earnie beim Laden und addiert die Netznutzung ohne USt.
+Die Netznutzung ist immer ein Nettopreis. Bei `prices_include_vat = true` addiert Earnie sie deshalb mit USt auf den Brutto-Preis des Lieferanten: `Preis + Netznutzung × (1 + vat_percent/100)`. Seit Tarifformat 1 ist `vat_percent` an **jedem** Tarif Pflicht (brutto und netto, `0` ist erlaubt); ein Tarif ohne `vat_percent` ist ein Ladefehler. Steht `vat_percent: 0` an einem Brutto-Tarif, warnt Earnie beim Laden und addiert die Netznutzung ohne USt.
 
 | Feld (Spot-Import in tariffs.json) | Bedeutung |
 | --- | --- |
@@ -109,7 +115,7 @@ Die Netznutzung ist immer ein Nettopreis. Bei `prices_include_vat = true` addier
 | `markup_percent` | Prozentualer Aufschlag (z. B. 3 ≈ Netzverlust) |
 | `vat_percent` / `prices_include_vat` | USt (z. B. 20 % bei `prices_include_vat=false`) |
 
-Das Hausprofil-Objekt `netznutzung` (siehe oben) gilt zusätzlich für **alle** Import-Typen, auch für Fixtarife. Der Wert 0 bedeutet, dass keine Netzkosten angesetzt werden. Bei `fixed_cent` und `monthly_table` ist `settlement_fee_cent_kwh` ohne Wirkung; Earnie warnt beim Laden, wenn dort ein Wert ungleich 0 steht.
+Das Hausprofil-Objekt `netznutzung` (siehe oben) gilt zusätzlich für **alle** Import-Typen, auch für Fixtarife. Ein Netzbereich mit 0 Cent/kWh (eigener Arbeitspreis `0`) bedeutet, dass keine Netzkosten angesetzt werden. Bei `fixed_cent` und `monthly_table` ist `settlement_fee_cent_kwh` ohne Wirkung; Earnie warnt beim Laden, wenn dort ein Wert ungleich 0 steht.
 
 ## Einspeisevergütung (Live)
 
@@ -128,7 +134,8 @@ Eigene Tarife aus dem Tarif-Editor [Edibert](https://github.com/JochenTCC/Ediber
 
 - Im Szenarienkonfigurator erscheinen Benutzertarife mit dem Zusatz **· Benutzertarif** in den Dropdowns Bezug und Einspeise.
 - Benutzertarife mit Zeitregeln (`rules`), Preisunter- oder -obergrenze (`price_floor_cent_kwh` / `price_cap_cent_kwh`) kann Earnie noch nicht berechnen. Sie tragen den Zusatz **· Benutzertarif, erst ab Engine-Umstellung**. Wählt ein Szenario so einen Tarif, bricht die Berechnung mit einer Meldung ab, und der Start-Check meldet das Szenario. Earnie rechnet die Regeln nie still weg.
-- Edibert prüft die Datei streng: ein falsches ID-Präfix, ein unbekanntes Feld oder eine doppelte ID ist ein Ladefehler mit Hinweis auf `user_tariffs.json`. Jeder Benutzertarif braucht wie Katalog-Tarife ein `land`.
+- Edibert prüft die Datei streng: ein falsches ID-Präfix, ein unbekanntes Feld oder eine doppelte ID ist ein Ladefehler mit Hinweis auf `user_tariffs.json`. Jeder Benutzertarif braucht wie Katalog-Tarife ein `land` und einen `vat_percent` (`0` erlaubt).
+- **Migration (Tarifformat 1):** Für Benutzertarife ohne `vat_percent` fragt der Migrations-Wizard den USt-Satz ab. Er schlägt den Standardsatz des Landes vor (AT 20 %, DE 19 %, CH 8,1 %), übernimmt ihn aber nur nach Bestätigung (Schaltfläche **Vorschlag übernehmen** oder eigener Wert).
 
 ## Planung & Backtesting
 

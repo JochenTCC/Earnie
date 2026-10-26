@@ -1,6 +1,6 @@
 {
   "$schema": "./house_profiles.schema.json",
-  "earnie_data_model": 4,
+  "earnie_data_model": 5,
   "profiles": [
     {
       "id": "example_efh",
@@ -12,6 +12,14 @@
       "longitude": 11.0,
       "default_pv_tilt": 25,
       "default_pv_azimuth": 0,
+      "netznutzung": {
+        "area_id": "AT-VBG",
+        "power_metering": "unmetered_power",
+        "quarter_hour_meter": true,
+        "include_status": [
+          "verordnet"
+        ]
+      },
       "consumers": [
         {
           "id": "wp_heating",

@@ -191,7 +191,15 @@ def _perform_house_profile_save(
     try:
         from ui.house_config_historical_csv import historical_csv_save_fields
 
+        from house_config.own_grid_fee import persist_own_grid_fee
+
         hist = historical_csv_save_fields(preview_id, existing)
+        netznutzung = persist_own_grid_fee(
+            location["netznutzung"],
+            profile_id=profile_id,
+            profile_label=label.strip() or profile_id,
+            land=location.get("land"),
+        )
         upsert_house_profile(
             {
                 "id": profile_id,
@@ -204,7 +212,7 @@ def _perform_house_profile_save(
                 "longitude": location["longitude"],
                 "default_pv_tilt": location["default_pv_tilt"],
                 "default_pv_azimuth": location["default_pv_azimuth"],
-                "netznutzung": location["netznutzung"],
+                "netznutzung": netznutzung,
                 "consumers": resolved,
                 "total_profile_csv": hist["total_profile_csv"],
                 "pv_profile_csv": hist["pv_profile_csv"],
@@ -291,6 +299,9 @@ def _render_house_profile_save(
         )
         if baseline == payload_fingerprint(payload):
             return
+    if not (location.get("netznutzung") or {}).get("area_id"):
+        # Data model 5: no implicit "no grid fee" — the form shows a warning until chosen.
+        return
 
     def _save() -> None:
         saved_id = _perform_house_profile_save(

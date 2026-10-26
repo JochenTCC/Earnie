@@ -28,6 +28,7 @@ from runtime_store.persist_paths import (
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
     resolve_uploads_dir,
+    resolve_user_grid_fees_json_path,
     resolve_user_tariffs_json_path,
 )
 from settings.json_io import read_json_dict, write_json_dict
@@ -38,6 +39,7 @@ PACK_JSON_FILES: tuple[tuple[str, Any], ...] = (
     ("components.json", resolve_components_json_path),
     ("deviation_rules.json", resolve_deviation_rules_json_path),
     ("grid_fees.json", resolve_grid_fees_json_path),
+    ("user_grid_fees.json", resolve_user_grid_fees_json_path),
     ("house_profiles.json", resolve_house_profiles_json_path),
     ("tariffs.json", resolve_tariffs_json_path),
     ("user_tariffs.json", resolve_user_tariffs_json_path),
@@ -93,15 +95,12 @@ def _migrate_and_validate_pack_docs(
     json_payloads: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     """Run the ConfigMigration registry chain, then ensure members are compatible."""
-    from runtime_store.migration.chain import apply_chain
-    from runtime_store.migration.registry import STEPS
-    from runtime_store.migration.validate import validate_migrated_docs
+    from runtime_store.migration.runner import MigrationError, migrate_docs_unattended
 
-    chain = apply_chain(json_payloads, {}, STEPS, stop_on_blocker=True)
-    if chain.blockers:
-        raise DataModelError(chain.blockers[0].message_de)
-    json_payloads = chain.docs
-    validate_migrated_docs(json_payloads)
+    try:
+        json_payloads = migrate_docs_unattended(json_payloads, label="Config-Paket")
+    except MigrationError as exc:
+        raise DataModelError(str(exc)) from exc
     for name, doc in json_payloads.items():
         if name in TARIFF_TRACK_FILES:
             continue

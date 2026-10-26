@@ -29,6 +29,15 @@ Ein weiterer Schritt entfernt das flache Anlagen-PV-Mapping (`plant.ehal_binding
 
 Ein weiterer Schritt ergänzt fehlende Einträge unter `scenario_explorer_conf` in `config.json` mit den Standardwerten aus der mitgelieferten `config.example.json`, z. B. `season_mirror_to_last_month` oder `export_price_series`. Vorhandene Einträge bleiben unverändert.
 
+### Datenmodell 5: Netznutzung und Tarifformat
+
+Beim Wechsel auf Datenmodell 5 laufen in **einem** Assistenten-Lauf (ein Backup) zwei Schritte:
+
+- **`dm5.netznutzung_split`:** Das Hausprofil-Objekt `netznutzung` enthält nur noch den Netzbereich (`area_id`, Pflicht) und die Messart. Ein eigener Arbeitspreis (`area_id: null` mit `base_cent_kwh`) wird unverändert zum Benutzer-Netzbereich `user_<Hausprofil-ID>` in `user_grid_fees.json`. Hat ein Hausprofil weder Netzbereich noch eigenen Wert (oder `0`), fragt der Assistent: Katalog-Netzbereich wählen oder `user_<Hausprofil-ID>` (eigener Netzbereich mit 0 Cent/kWh, bewusst kein Netzentgelt). Details: [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich).
+- **`tf1.tariff_format`:** `tariffs.json`, `user_tariffs.json`, `grid_fees.json` und `user_grid_fees.json` erhalten `tariff_format: 1`; `earnie_data_model` verschwindet aus `tariffs.json`. Für jeden Benutzertarif ohne `vat_percent` fragt der Assistent den USt-Satz ab (Pflicht, `0` erlaubt). Der Standardsatz des Landes (AT 20 %, DE 19 %, CH 8,1 %) steht als Vorschlag daneben und wird nur nach Klick auf **Vorschlag übernehmen** eingetragen.
+
+Ohne diese Migration lädt Earnie Hausprofile mit `base_cent_kwh` oder ohne `area_id` und Tarifdateien ohne `tariff_format` nicht; die Meldung verweist auf den Assistenten.
+
 ### Loxone: alte Merkernamen behalten oder leeren
 
 Beim Wechsel von Datenmodell 3 (offizielle 2.6) auf 4 fragt der Assistent bei Loxone-Installationen, ob die alten **Merkernamen** in den Bindungen erhalten bleiben sollen. Earnie braucht sie nicht mehr: Lesen läuft per Push mit der EHAL-ID, Schreiben über `status.json` mit der EHAL-ID.
@@ -63,12 +72,14 @@ python -m scripts.migrate_config --config-dir PATH --dry-run
 python -m scripts.migrate_config --config-dir PATH
 ```
 
-Pflichtfragen (z. B. Loxone-Merkernamen, alte HA-Vorzeichen) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`) bzw. `{"ha_sign.remove": "Entfernen"}` (oder `"Behalten"`). Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
+Pflichtfragen (z. B. Loxone-Merkernamen, alte HA-Vorzeichen, Netzbereich, USt-Satz) beantwortet die CLI über eine JSON-Datei: `--answers answers.json` mit z. B. `{"loxone_binding_names.keep": "Behalten"}` (oder `"Leeren"`), `{"ha_sign.remove": "Entfernen"}` (oder `"Behalten"`), `{"dm5.netznutzung_split.area_id:<Hausprofil-ID>": "AT-VBG"}` bzw. `{"vat_percent:import:<Tarif-ID>": 20}`. `--dry-run` listet alle Fragen mit Auswahl und Vorschlag. Ohne Antwort bricht der Lauf ab, bevor etwas geschrieben wird.
 
 ### Wann die Migration blockiert
 
 - **Datenmodell 1 oder 2:** zu alt. Support kontaktieren oder neu einrichten; eine automatische Kette gibt es nicht.
-- **Earnie-Pack-Datei ohne `earnie_data_model`:** Die Version ist unbekannt. Earnie rät sie nicht und trägt sie auch nicht stillschweigend nach. Ausgenommen ist `grid_fees.json`, bis die Tarifverwaltung mit dem Tarif-Editor kommt.
+- **Earnie-Pack-Datei ohne `earnie_data_model`:** Die Version ist unbekannt. Earnie rät sie nicht und trägt sie auch nicht stillschweigend nach. Tarifdateien (`tariffs.json`, `user_tariffs.json`, `grid_fees.json`, `user_grid_fees.json`) gehören nicht dazu: ohne `tariff_format` sind sie im alten Format und werden von `tf1.tariff_format` migriert.
+- **Unbekanntes `tariff_format`** (z. B. aus einer neueren Version): Earnie lehnt die Datei ab.
+- **Benutzer-Netzbereich mit gleicher ID, aber anderem Preis** (`user_<Hausprofil-ID>` existiert schon in `user_grid_fees.json`): Earnie überschreibt ihn nicht; den Eintrag prüfen und korrigieren, dann erneut migrieren.
 
 ## Einstiegspunkte
 

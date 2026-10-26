@@ -7,6 +7,14 @@
             "land": "AT",
             "latitude": 47.4,
             "longitude": 9.7,
+            "netznutzung": {
+                "area_id": "user_test_home",
+                "power_metering": "unmetered_power",
+                "quarter_hour_meter": true,
+                "include_status": [
+                    "verordnet"
+                ]
+            },
             "default_pv_tilt": 25,
             "default_pv_azimuth": 0,
             "consumers": [
@@ -26,7 +34,7 @@
             ]
         }
     ],
-    "earnie_data_model": 4,
+    "earnie_data_model": 5,
     "plant": {
         "grid_meter": {
             "at_house_connection": true,

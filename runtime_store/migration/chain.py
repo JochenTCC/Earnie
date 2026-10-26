@@ -14,6 +14,7 @@ from runtime_store.migration.types import (
     Question,
     StepResult,
     step_is_pending,
+    step_questions,
 )
 
 
@@ -35,7 +36,7 @@ def apply_chain(
     for step in steps:
         if not step_is_pending(step, start, current):
             continue
-        questions.extend(step.questions)
+        questions.extend(step_questions(step, current))
         before = copy.deepcopy(current)
         try:
             result: StepResult = step.apply(current, answers)

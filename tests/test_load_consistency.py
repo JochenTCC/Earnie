@@ -10,7 +10,7 @@ _ANCHORS = [datetime(2025, 10, 1, 7) + timedelta(days=i) for i in range(7)]
 
 
 def _profile(consumers: list[dict]) -> dict:
-    raw = {"id": "home", "label": "Home", "annual_kwh": 20000.0, "consumers": consumers}
+    raw = {"id": "home", "label": "Home", "annual_kwh": 20000.0, "netznutzung": {"area_id": "user_no_grid_fee"}, "consumers": consumers}
     return normalize_house_profiles_document({"profiles": [raw]})["profiles"]["home"]
 
 

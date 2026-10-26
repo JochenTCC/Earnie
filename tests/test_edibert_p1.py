@@ -13,7 +13,7 @@ from house_config.edibert_tariffs import (
     EdibertLoadError,
     collect_edibert_load_errors,
     holiday_regions,
-    load_grid_fee_catalog,
+    load_grid_fees,
     load_tariff_set,
     pricing_context_for_profile,
     region_label,
@@ -82,6 +82,7 @@ USER_EXPORT = {
     "land": "AT",
     "supplier_id": "user_my_supplier",
     "k_push_cent": 7.5,
+    "vat_percent": 0,
 }
 
 
@@ -94,7 +95,7 @@ def catalog_dir(tmp_path: Path) -> Path:
 def _write_user(directory: Path, imports: list[dict], exports: list[dict] | None = None) -> Path:
     path = directory / "user_tariffs.json"
     path.write_text(
-        json.dumps({"import_tariffs": imports, "export_tariffs": exports or []}),
+        json.dumps({"tariff_format": 1, "import_tariffs": imports, "export_tariffs": exports or []}),
         encoding="utf-8",
     )
     return path
@@ -106,7 +107,7 @@ def _write_user(directory: Path, imports: list[dict], exports: list[dict] | None
 def test_catalog_counts_through_edibert() -> None:
     tariffs = load_tariff_set(str(CATALOG))
     assert (len(tariffs.imports), len(tariffs.exports)) == (37, 13)
-    assert len(load_grid_fee_catalog(str(GRID_FEES)).areas) == 14
+    assert len(load_grid_fees(str(GRID_FEES)).areas) == 14
 
 
 @pytest.mark.parametrize("tariff_id", _catalog_ids("import_tariffs"))
@@ -123,7 +124,7 @@ def test_catalog_export_tariff_loads_through_edibert(tariff_id: str) -> None:
 
 @pytest.mark.parametrize("area_id", _grid_area_ids())
 def test_grid_area_loads_through_edibert(area_id: str) -> None:
-    assert area_id in load_grid_fee_catalog(str(GRID_FEES)).areas
+    assert area_id in load_grid_fees(str(GRID_FEES)).areas
 
 
 def test_edibert_and_earnie_see_the_same_catalog_ids() -> None:
@@ -226,7 +227,7 @@ def _scenarios(path: Path, import_id: str, export_id: str = "") -> Path:
     path.write_text(
         json.dumps(
             {
-                "earnie_data_model": 4,
+                "earnie_data_model": 5,
                 "scenarios": [
                     {"id": "s1", "settings": {"import_tariff_id": import_id, "export_tariff_id": export_id}}
                 ],
@@ -292,7 +293,10 @@ def test_holiday_regions_and_labels() -> None:
 
 
 def _profile(**extra) -> dict:
-    return {"id": "h", "label": "Haus", "land": "AT", "latitude": 47.4, "longitude": 9.7, "consumers": [], **extra}
+    return {
+        "id": "h", "label": "Haus", "land": "AT", "latitude": 47.4, "longitude": 9.7,
+        "netznutzung": {"area_id": "AT-VBG"}, "consumers": [], **extra,
+    }
 
 
 def test_profile_region_is_optional_and_round_trips() -> None:
@@ -336,7 +340,7 @@ def test_write_json_dict_never_stamps_user_tariffs(tmp_path: Path) -> None:
     from settings.json_io import write_json_dict
 
     path = tmp_path / "user_tariffs.json"
-    write_json_dict(str(path), {"import_tariffs": [], "export_tariffs": []})
+    write_json_dict(str(path), {"tariff_format": 1, "import_tariffs": [], "export_tariffs": []})
     assert "earnie_data_model" not in json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -349,13 +353,16 @@ def test_config_pack_carries_user_tariffs_unstamped(monkeypatch, tmp_path: Path)
         "EARNIE_DEVIATION_RULES_PATH",
     ):  # fmt: skip
         monkeypatch.delenv(key, raising=False)
+    # Default sidecar paths are relative to the cwd (earnie_env/config): keep them in tmp_path,
+    # never on the developer's real site config.
+    monkeypatch.chdir(tmp_path)
     src = tmp_path / "src"
     src.mkdir()
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(src))
-    (src / "config.json").write_text(json.dumps({"earnie_data_model": 4}), encoding="utf-8")
+    (src / "config.json").write_text(json.dumps({"earnie_data_model": 5}), encoding="utf-8")
     # user_tariffs.json follows tariffs.json, so the config dir has both (as every install does).
     shutil.copy(CATALOG, src / "tariffs.json")
-    user_doc = {"import_tariffs": [USER_FIXED], "export_tariffs": []}
+    user_doc = {"tariff_format": 1, "import_tariffs": [USER_FIXED], "export_tariffs": []}
     (src / "user_tariffs.json").write_text(json.dumps(user_doc), encoding="utf-8")
 
     payload = build_config_pack_bytes()

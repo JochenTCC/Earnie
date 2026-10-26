@@ -244,11 +244,23 @@ def _profiles_as_dict(house_doc: dict) -> dict[str, dict]:
     return {}
 
 
-def ensure_live_profile(house_doc: dict) -> tuple[dict, str]:
-    """Ensure a usable profile exists; return (house, profile_id)."""
+def ensure_live_profile(
+    house_doc: dict, *, grid_area_id: str | None = None
+) -> tuple[dict, str]:
+    """Ensure a usable profile exists; return (house, profile_id).
+
+    A new profile needs ``grid_area_id`` (data model 5: the grid area is required, there is
+    no implicit "no grid fee"); the import UI asks for it when no profile exists yet.
+    """
     house = dict(house_doc)
     profiles = _profiles_as_dict(house)
     if not profiles:
+        area_id = str(grid_area_id or "").strip()
+        if not area_id:
+            raise ValueError(
+                "Netzbereich (Netznutzung) für das neue Hausprofil fehlt — "
+                "bitte vor dem Import wählen."
+            )
         profiles = {
             "live": {
                 "id": "live",
@@ -257,6 +269,12 @@ def ensure_live_profile(house_doc: dict) -> tuple[dict, str]:
                 "latitude": 48.0,
                 "longitude": 16.0,
                 "land": "AT",
+                "netznutzung": {
+                    "area_id": area_id,
+                    "power_metering": "unmetered_power",
+                    "quarter_hour_meter": True,
+                    "include_status": ["verordnet"],
+                },
                 "consumers": [],
             }
         }
@@ -606,8 +624,11 @@ def run_greenfield_import(
     probe_username: str | None = None,
     probe_password: str | None = None,
     probe_timeout_sec: float = 5.0,
+    grid_area_id: str | None = None,
 ) -> dict[str, Any]:
     """Orchestrate Merker match + EFM merge; return house_doc + report.
+
+    ``grid_area_id`` is required when ``house_doc`` has no profile yet (new profile ``live``).
 
     Device-map / Earnie_* candidates are classified against the given LoxAPP3
     ``doc`` (control-name presence). ``probe_host`` / credentials are unused
@@ -618,7 +639,9 @@ def run_greenfield_import(
     assert_not_shadow_backend("loxone_greenfield_import.run_greenfield_import")
     del probe_host, probe_username, probe_password, probe_timeout_sec
     dmap = device_map if device_map is not None else load_device_map()
-    house, resolved_id = ensure_live_profile(house_doc or {"profiles": []})
+    house, resolved_id = ensure_live_profile(
+        house_doc or {"profiles": []}, grid_area_id=grid_area_id
+    )
     if profile_id:
         profiles = _profiles_as_dict(house)
         if profile_id not in profiles:
@@ -652,10 +675,13 @@ def apply_and_save(
     house_doc: dict | None = None,
     *,
     profile_id: str | None = None,
+    grid_area_id: str | None = None,
 ) -> dict[str, Any]:
     """Run import and persist via ui.house_config_io.save_house_profiles."""
     from ui.house_config_io import save_house_profiles
 
-    result = run_greenfield_import(doc, house_doc, profile_id=profile_id)
+    result = run_greenfield_import(
+        doc, house_doc, profile_id=profile_id, grid_area_id=grid_area_id
+    )
     save_house_profiles(result["house_doc"])
     return result

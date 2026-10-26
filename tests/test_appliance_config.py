@@ -7,6 +7,7 @@ import pytest
 
 import config
 from config import Config, reinit_config
+from tests.config_fixtures import copy_fixture_grid_fees
 
 
 def test_get_appliances_empty_without_block():
@@ -194,12 +195,14 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
     base = json.loads(open(config.CONFIG_JSON_PATH, encoding="utf-8").read())
     cfg_path = config_dir / "config.json"
     cfg_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
+    copy_fixture_grid_fees(config_dir)
     profiles = {
         "profiles": [
             {
                 "id": "example_efh",
                 "label": "EFH",
                 "annual_kwh": 4000.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [
                     {
                         "id": "waschmaschine",
@@ -228,6 +231,7 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
     (config_dir / "tariffs.json").write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "fixed_imp",
@@ -340,6 +344,7 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
     base = json.loads(open(config.CONFIG_JSON_PATH, encoding="utf-8").read())
     cfg_path = config_dir / "config.json"
     cfg_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
+    copy_fixture_grid_fees(config_dir)
     (config_dir / "house_profiles.json").write_text(
         json.dumps(
             {
@@ -348,6 +353,7 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
                         "id": "example_efh",
                         "label": "EFH",
                         "annual_kwh": 4000.0,
+                        "netznutzung": {"area_id": "user_no_grid_fee"},
                         "consumers": [],
                     }
                 ]
@@ -358,6 +364,7 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
     (config_dir / "tariffs.json").write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "fixed_imp",

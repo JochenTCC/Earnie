@@ -12,6 +12,8 @@ from runtime_store.data_model import (
 )
 
 LEGACY_DATA_MODEL = 3
+# Target of this module; later models (dm5+) are reached by registry steps that run after it.
+V4_DATA_MODEL = 4
 
 
 class MigrateV4Error(ValueError):
@@ -310,7 +312,7 @@ def needs_ess_bindings_migration(
 def migrate_document(doc: dict[str, Any], *, kind: str) -> dict[str, Any]:
     """Migrate a single document by kind: scenarios|components|generic."""
     version = read_data_model(doc)
-    if version is not None and version >= CURRENT_DATA_MODEL:
+    if version is not None and version >= V4_DATA_MODEL:
         if kind == "scenarios":
             # Still normalize battery_id if a v4 doc was hand-edited wrongly
             out = migrate_scenarios_doc(dict(doc))
@@ -320,9 +322,9 @@ def migrate_document(doc: dict[str, Any], *, kind: str) -> dict[str, Any]:
         out = dict(doc)
         stamp_data_model(out)
         return out
-    if version is not None and version not in (LEGACY_DATA_MODEL, CURRENT_DATA_MODEL):
+    if version is not None and version != LEGACY_DATA_MODEL:
         raise MigrateV4Error(
-            f"earnie_data_model={version} cannot be migrated to {CURRENT_DATA_MODEL}."
+            f"earnie_data_model={version} cannot be migrated to {V4_DATA_MODEL}."
         )
     if kind == "scenarios":
         return migrate_scenarios_doc(dict(doc))

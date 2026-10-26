@@ -164,6 +164,19 @@ def resolve_grid_fees_json_path() -> str:
     )
 
 
+USER_GRID_FEES_JSON = "user_grid_fees.json"
+
+
+def user_grid_fees_path_for(grid_fees_path: str) -> str:
+    """Edibert user grid areas (``user_grid_fees.json``) next to the given ``grid_fees.json``."""
+    return os.path.join(os.path.dirname(grid_fees_path), USER_GRID_FEES_JSON)
+
+
+def resolve_user_grid_fees_json_path() -> str:
+    """Pfad zu user_grid_fees.json: immer neben grid_fees.json (kein eigener ENV-Override)."""
+    return user_grid_fees_path_for(resolve_grid_fees_json_path())
+
+
 def bundled_config_example_file() -> str:
     return os.path.join(bundled_config_dir(), "config.example.json")
 

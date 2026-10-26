@@ -2,9 +2,29 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 from house_config.scenario_resolution import DEFAULT_LIVE_SCENARIO_ID
+
+_BACKTESTING_FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "backtesting"
+GRID_FEE_FILES = ("grid_fees.json", "user_grid_fees.json")
+
+
+def copy_fixture_grid_fees(config_dir: Path) -> None:
+    """Grid catalog + user areas (``user_test_home``, ``user_no_grid_fee``) next to config.json.
+
+    Data model 5: every house profile resolves its ``netznutzung.area_id`` against these files.
+    """
+    for name in GRID_FEE_FILES:
+        shutil.copy(_BACKTESTING_FIXTURE_DIR / name, config_dir / name)
+
+
+def tariff_doc(doc: dict) -> dict:
+    """A tariffs.json / user_tariffs.json payload on the current tariff format."""
+    from runtime_store.data_model import CURRENT_TARIFF_FORMAT, TARIFF_FORMAT_KEY
+
+    return {TARIFF_FORMAT_KEY: CURRENT_TARIFF_FORMAT, **doc}
 
 
 def minimal_config_payload(
@@ -101,20 +121,38 @@ def write_minimal_config_tree(
     live_settings: dict | None = None,
 ) -> tuple[str, str]:
     """Schreibt config.json, components.json und backtesting_scenarios.json."""
+    from runtime_store.data_model import CURRENT_DATA_MODEL, DATA_MODEL_KEY
+
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     payload = config_payload or minimal_config_payload()
     config_path = config_dir / "config.json"
-    config_path.write_text(json.dumps(payload), encoding="utf-8")
+    # Tagged like real pack files: recorder replay migrates archived snapshots and rejects
+    # untagged Earnie-track files (data model 5).
+    config_path.write_text(
+        json.dumps({DATA_MODEL_KEY: CURRENT_DATA_MODEL, **payload}), encoding="utf-8"
+    )
+    copy_fixture_grid_fees(config_dir)
+    # Own deviation rules next to config.json: the default path would be the developer's site.
+    shutil.copy(
+        _BACKTESTING_FIXTURE_DIR.parents[2] / "share" / "config" / "deviation_rules.example.json",
+        config_dir / "deviation_rules.json",
+    )
     components_path = config_dir / "components.json"
     components_path.write_text(
-        json.dumps(components_payload or minimal_components_payload()),
+        json.dumps(
+            {
+                DATA_MODEL_KEY: CURRENT_DATA_MODEL,
+                **(components_payload or minimal_components_payload()),
+            }
+        ),
         encoding="utf-8",
     )
     scenarios_path = config_dir / "backtesting_scenarios.json"
     scenarios_path.write_text(
         json.dumps(
             {
+                DATA_MODEL_KEY: CURRENT_DATA_MODEL,
                 "scenarios": [
                     {
                         "id": payload.get("live_scenario_id", DEFAULT_LIVE_SCENARIO_ID),

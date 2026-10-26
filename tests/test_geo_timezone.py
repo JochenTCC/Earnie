@@ -32,6 +32,7 @@ def test_profile_normalization_derives_timezone_from_land():
                     "land": "DE",
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [],
                 }
             ]

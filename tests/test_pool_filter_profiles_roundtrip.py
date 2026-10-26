@@ -45,7 +45,7 @@ def _pre_migration_pool_filter() -> dict:
 def test_serialize_keeps_milp_pool_filter_fields():
     raw = _pre_migration_pool_filter()
     promoted, _, _ = promote_pool_filter_milp(
-        {"profiles": [{"id": "home", "label": "Home", "consumers": [raw]}]}
+        {"profiles": [{"id": "home", "label": "Home", "netznutzung": {"area_id": "user_no_grid_fee"}, "consumers": [raw]}]}
     )
     consumer = promoted["profiles"][0]["consumers"][0]
     assert consumer.get("daily_target_source") == "loxone_remaining_hours"
@@ -71,6 +71,7 @@ def test_save_document_does_not_reopen_pool_filter_migration(tmp_path: Path):
                 "id": "home",
                 "label": "Home",
                 "annual_kwh": 10000.0,
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [_pre_migration_pool_filter()],
             }
         ],

@@ -5,7 +5,7 @@ import os
 
 import streamlit as st
 
-from data.grid_fees import normalize_netznutzung_config
+from data.grid_fees import default_netznutzung_config, normalize_netznutzung_config
 from house_config.earnie_role import (
     DEFAULT_MANUAL_HORIZON_H,
     EARNIE_ROLE_FLEX,
@@ -215,6 +215,7 @@ def _seed_profile_widget_state(
         default_pv_tilt = int(existing.get("default_pv_tilt", 25))
         default_pv_azimuth = int(existing.get("default_pv_azimuth", 0))
         netznutzung = normalize_netznutzung_config(existing.get("netznutzung"))
+        profile_id = str(existing.get("id") or "").strip()
         absent_mode = bool(existing.get("absent_mode", False))
     else:
         label = allocate_unique_label("Mein Haushalt", siblings or [])
@@ -225,7 +226,9 @@ def _seed_profile_widget_state(
         longitude = 11.0
         default_pv_tilt = 25
         default_pv_azimuth = 0
-        netznutzung = normalize_netznutzung_config(None)
+        # No grid area preselected: the user picks one (no implicit "no grid fee").
+        netznutzung = default_netznutzung_config()
+        profile_id = ""
         absent_mode = False
     st.session_state[_scoped_key(session_scope, "house_profile_label")] = label
     st.session_state[_scoped_key(session_scope, "house_annual_kwh")] = annual_kwh
@@ -235,16 +238,35 @@ def _seed_profile_widget_state(
     st.session_state[_scoped_key(session_scope, "house_profile_longitude")] = longitude
     st.session_state[_scoped_key(session_scope, "house_profile_default_pv_tilt")] = default_pv_tilt
     st.session_state[_scoped_key(session_scope, "house_profile_default_pv_azimuth")] = default_pv_azimuth
-    st.session_state[_scoped_key(session_scope, "house_profile_nne_area")] = (
-        netznutzung["area_id"] or "__manual__"
-    )
-    st.session_state[_scoped_key(session_scope, "house_profile_nne_ap")] = netznutzung[
-        "base_cent_kwh"
-    ]
+    _seed_nne_session(session_scope, netznutzung, profile_id)
     st.session_state[_scoped_key(session_scope, "house_profile_nne_include_draft")] = (
         "entwurf" in netznutzung["include_status"]
     )
     st.session_state[_scoped_key(session_scope, "house_absent_mode")] = absent_mode
+
+def _seed_nne_session(session_scope: str, netznutzung: dict, profile_id: str) -> None:
+    """Area select + own price; the profile's own user area shows as *Eigener Arbeitspreis*."""
+    from house_config.own_grid_fee import (
+        OWN_AREA,
+        form_area_value,
+        own_area_id,
+        own_base_cent_kwh,
+    )
+
+    area_value = form_area_value(netznutzung, profile_id)
+    own_base = 0.0
+    if area_value == OWN_AREA:
+        from data.grid_fees import load_grid_fee_catalog
+        from runtime_store.persist_paths import resolve_grid_fees_json_path
+
+        catalog = load_grid_fee_catalog(resolve_grid_fees_json_path())
+        own_base = own_base_cent_kwh(catalog, profile_id) or 0.0
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_own_id")] = (
+        own_area_id(profile_id) if profile_id else ""
+    )
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_area")] = area_value
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_ap")] = own_base
+
 
 def _profile_widget_state_missing(session_scope: str) -> bool:
     """True when sync metadata exists but scoped widget keys were dropped (e.g. page navigation)."""

@@ -12,8 +12,11 @@ from ui.navigation import build_page_specs
 
 
 def _bind_config_paths(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    from tests.config_fixtures import copy_fixture_grid_fees
+
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
+    copy_fixture_grid_fees(config_dir)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv(
@@ -71,7 +74,7 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
     _write(config_dir / "house_profiles.json", {"profiles": []})
     _write(
         config_dir / "tariffs.json",
-        {"import_tariffs": [], "export_tariffs": []},
+        {"tariff_format": 1, "import_tariffs": [], "export_tariffs": []},
     )
     _write_live_scenario(
         config_dir,
@@ -112,7 +115,7 @@ def test_restricted_navigation_defaults_to_smarthome_backend_when_live_environme
     _write(config_dir / "house_profiles.json", {"profiles": []})
     _write(
         config_dir / "tariffs.json",
-        {"import_tariffs": [], "export_tariffs": []},
+        {"tariff_format": 1, "import_tariffs": [], "export_tariffs": []},
     )
     _write_live_scenario(
         config_dir,
@@ -142,7 +145,7 @@ def test_restricted_navigation_shows_daemon_pages_once_sb_configured(tmp_path, m
     _write(config_dir / "house_profiles.json", {"profiles": []})
     _write(
         config_dir / "tariffs.json",
-        {"import_tariffs": [], "export_tariffs": []},
+        {"tariff_format": 1, "import_tariffs": [], "export_tariffs": []},
     )
     _write_live_scenario(
         config_dir,
@@ -202,7 +205,7 @@ def test_general_nav_hides_daemon_pages_for_mature_config_without_backend(
     )
     _write(
         config_dir / "tariffs.json",
-        {"import_tariffs": [], "export_tariffs": []},
+        {"tariff_format": 1, "import_tariffs": [], "export_tariffs": []},
     )
 
     from ui.setup_readiness import is_setup_navigation_restricted, needs_planning_onboarding
@@ -245,7 +248,7 @@ def test_general_nav_shows_daemon_pages_for_mature_config_once_sb_configured(
     )
     _write(
         config_dir / "tariffs.json",
-        {"import_tariffs": [], "export_tariffs": []},
+        {"tariff_format": 1, "import_tariffs": [], "export_tariffs": []},
     )
 
     specs = build_page_specs(["live_environment"])
@@ -282,12 +285,13 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
                     "id": "efh",
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [{"id": "wp", "type": "thermal_annual"}],
                 }
             ]
         },
     )
-    _write(config_dir / "tariffs.json", {"import_tariffs": [], "export_tariffs": []})
+    _write(config_dir / "tariffs.json", {"tariff_format": 1, "import_tariffs": [], "export_tariffs": []})
     _write_live_scenario(
         config_dir,
         {
@@ -335,6 +339,7 @@ def test_scenario_explorer_visible_when_planning_ready(tmp_path, monkeypatch):
                     "annual_kwh": 4000,
                     "latitude": 48.2,
                     "longitude": 11.0,
+                    "netznutzung": {"area_id": "user_no_grid_fee"},
                     "consumers": [{"id": "wp", "type": "thermal_annual", "living_area_m2": 100}],
                 }
             ]
@@ -343,6 +348,7 @@ def test_scenario_explorer_visible_when_planning_ready(tmp_path, monkeypatch):
     _write(
         config_dir / "tariffs.json",
         {
+            "tariff_format": 1,
             "import_tariffs": [{"id": "imp", "label": "Import", "type": "spot_hourly", "land": "AT"}],
             "export_tariffs": [
                 {"id": "exp", "label": "Export", "type": "fixed", "k_push_cent": 3.7}

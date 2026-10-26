@@ -29,6 +29,9 @@ def _empty_house() -> dict:
     return {"profiles": [], "plant": {}}
 
 
+_AREA = "AT-VBG"
+
+
 def test_load_device_map_has_markers():
     dmap = load_device_map()
     assert dmap["version"] == 1
@@ -93,7 +96,7 @@ def test_alarm_clock_tna_merges_onto_ev_with_power():
     )
 
     assert extract_alarm_clocks(_doc()) == ["Ladewecker"]
-    result = run_greenfield_import(_doc(), _empty_house())
+    result = run_greenfield_import(_doc(), _empty_house(), grid_area_id=_AREA)
     house = result["house_doc"]
     pid = result["report"]["profile_id"]
     consumers = house["profiles"][pid]["consumers"]
@@ -123,7 +126,7 @@ def test_match_merges_legacy_wp_alias_into_waermepumpe(monkeypatch):
     assert wp_matches[0].group_key == "Earnie_Waermepumpe_"
     assert wp_matches[0].bindings["heatpump.waermepumpe.sens_power_act"] == ''
     assert wp_matches[0].bindings["heatpump.waermepumpe.set_enable"] == ''
-    house, pid = ensure_live_profile(_empty_house())
+    house, pid = ensure_live_profile(_empty_house(), grid_area_id=_AREA)
     house = apply_typed_matches(house, matches, profile_id=pid)
     consumers = house["profiles"][pid]["consumers"]
     thermals = [c for c in consumers if c["type"] == "thermal_annual"]
@@ -136,10 +139,29 @@ def test_match_merges_legacy_wp_alias_into_waermepumpe(monkeypatch):
 
 
 def test_ensure_live_profile_bootstraps_empty():
-    house, pid = ensure_live_profile({"profiles": []})
+    house, pid = ensure_live_profile({"profiles": []}, grid_area_id=_AREA)
     assert pid == "live"
     assert "live" in house["profiles"]
     assert house["profiles"]["live"]["consumers"] == []
+    assert house["profiles"]["live"]["netznutzung"]["area_id"] == _AREA
+
+
+def test_ensure_live_profile_requires_grid_area_for_a_new_profile():
+    """Data model 5: no implicit "no grid fee" for the profile the import creates."""
+    import pytest
+
+    with pytest.raises(ValueError, match="Netzbereich"):
+        ensure_live_profile({"profiles": []})
+    with pytest.raises(ValueError, match="Netzbereich"):
+        run_greenfield_import(_doc(), {"profiles": []})
+
+
+def test_ensure_live_profile_keeps_existing_profile_without_grid_area_arg():
+    house, pid = ensure_live_profile(
+        {"profiles": [{"id": "home", "netznutzung": {"area_id": "AT-WIEN"}, "consumers": []}]}
+    )
+    assert pid == "home"
+    assert house["profiles"]["home"]["netznutzung"]["area_id"] == "AT-WIEN"
 
 
 def test_match_controls_unions_http_probe_extra_names():
@@ -193,7 +215,7 @@ def test_slug_match_waschmaschine_creates_generic_consumer():
     assert wm.bindings["consumer.waschmaschine.sens_power_act"] == ''
     assert wm.bindings["consumer.waschmaschine.set_enable"] == ''
     assert "consumer.waschmaschine.set_power_setpoint" not in wm.bindings
-    house, pid = ensure_live_profile(_empty_house())
+    house, pid = ensure_live_profile(_empty_house(), grid_area_id=_AREA)
     house = apply_typed_matches(house, matches, profile_id=pid)
     by_id = {c["id"]: c for c in house["profiles"][pid]["consumers"]}
     assert "waschmaschine" in by_id
@@ -214,7 +236,7 @@ def test_slug_match_ev_creates_ev_consumer():
     assert evs[0].label == "Garage"
     assert evs[0].bindings["set_evcs_max_current"] == ''
     assert evs[0].bindings["sens_evcs_active_power"] == ''
-    house, pid = ensure_live_profile(_empty_house())
+    house, pid = ensure_live_profile(_empty_house(), grid_area_id=_AREA)
     house = apply_typed_matches(house, matches, profile_id=pid)
     by_id = {c["id"]: c for c in house["profiles"][pid]["consumers"]}
     assert "garage" in by_id
@@ -279,7 +301,7 @@ def test_probe_marker_names_uses_loxapp3_control_names():
 
 
 def test_run_import_creates_typed_and_efm_consumers():
-    result = run_greenfield_import(_doc(), _empty_house())
+    result = run_greenfield_import(_doc(), _empty_house(), grid_area_id=_AREA)
     house = result["house_doc"]
     report = result["report"]
     assert report["profile_id"] == "live"
@@ -322,7 +344,7 @@ def test_efm_merges_swimspa_and_wallbox_onto_typed():
     """Zähler Swimspa / Wallbox merge into typed pool / EV (no duplicate generics)."""
     from ehal.flex_fields import KIND_SENS_POWER_ACT, consumer_storage_field
 
-    result = run_greenfield_import(_doc(), _empty_house())
+    result = run_greenfield_import(_doc(), _empty_house(), grid_area_id=_AREA)
     consumers = result["house_doc"]["profiles"]["live"]["consumers"]
     by_id = {c["id"]: c for c in consumers}
     pool = next(c for c in consumers if c["type"] == "thermal_rc")
@@ -347,7 +369,7 @@ def test_apply_typed_merges_same_id_ev():
         "Earnie_EAuto_Garage_Leistung",
     }
     matches, _ = match_controls(empty_doc, load_device_map(), extra_names=first)
-    house, pid = ensure_live_profile(_empty_house())
+    house, pid = ensure_live_profile(_empty_house(), grid_area_id=_AREA)
     house = apply_typed_matches(house, matches, profile_id=pid)
     second = {"Earnie_EAuto_Garage_Modus", "Earnie_EAuto_Garage_Angeschlossen"}
     matches2, _ = match_controls(empty_doc, load_device_map(), extra_names=second)
@@ -369,7 +391,7 @@ def test_efm_duplicate_power_skips_create():
 
     dmap = load_device_map()
     matches, report = match_controls(_doc(), dmap)
-    house, pid = ensure_live_profile(_empty_house())
+    house, pid = ensure_live_profile(_empty_house(), grid_area_id=_AREA)
     house = apply_typed_matches(house, matches, profile_id=pid, report=report)
     # Force typed power name to equal an EFM load Bezeichnung
     consumers = house["profiles"][pid]["consumers"]
@@ -419,7 +441,7 @@ def test_efm_fills_plant_when_earnie_grid_absent():
             },
         },
     }
-    result = run_greenfield_import(mini, _empty_house())
+    result = run_greenfield_import(mini, _empty_house(), grid_area_id=_AREA)
     plant = result["house_doc"]["plant"]["ehal_bindings"]
     assert plant["sens_ess_soc"] == ""
     assert plant["sens_grid_power_active"] == ""
@@ -430,7 +452,7 @@ def test_normalize_and_save_round_trip(tmp_path, monkeypatch):
     from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
     install_open_meteo_climate_mock(monkeypatch)
-    result = run_greenfield_import(_doc(), _empty_house())
+    result = run_greenfield_import(_doc(), _empty_house(), grid_area_id=_AREA)
     house = result["house_doc"]
     path = tmp_path / "house_profiles.json"
     save_house_profiles_document(

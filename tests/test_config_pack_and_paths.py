@@ -262,7 +262,7 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
     loaded = json.loads((other / "config.json").read_text(encoding="utf-8"))
     assert loaded["live_scenario_id"] == "live"
     assert loaded[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
-    assert CURRENT_DATA_MODEL == 4
+    assert CURRENT_DATA_MODEL == 5
     assert (other / "uploads" / "sample.csv").is_file()
     imported_fees = json.loads((other / "grid_fees.json").read_text(encoding="utf-8"))
     assert imported_fees["areas"] == []
@@ -316,7 +316,7 @@ def test_config_pack_rejects_v2_member_with_v4_manifest(
             "config.json",
             json.dumps({DATA_MODEL_KEY: 2, "live_scenario_id": "live"}),
         )
-    with pytest.raises(DataModelError, match=r"config\.json.*nicht kompatibel"):
+    with pytest.raises(DataModelError, match=r"config\.json.*zu alt"):
         import_config_pack_bytes(buf.getvalue())
 
 

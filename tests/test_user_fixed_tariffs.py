@@ -23,6 +23,7 @@ from ui.setup_readiness import missing_runtime_scenario_items_for
 
 def _minimal_tariffs() -> dict:
     return {
+        "tariff_format": 1,
         "import_tariffs": {
             "catalog_imp": {
                 "id": "catalog_imp",
@@ -143,6 +144,7 @@ def _write_tariffs(path: Path) -> None:
     path.write_text(
         json.dumps(
             {
+                "tariff_format": 1,
                 "import_tariffs": [
                     {
                         "id": "imp1",
@@ -229,7 +231,9 @@ def test_setup_readiness_accepts_user_fixed(tmp_path: Path):
         encoding="utf-8",
     )
     profiles.write_text(
-        json.dumps({"profiles": {"home": {"id": "home", "label": "Home"}}}),
+        json.dumps(
+            {"profiles": {"home": {"id": "home", "label": "Home", "netznutzung": {"area_id": "AT-VBG"}}}}
+        ),
         encoding="utf-8",
     )
     scenarios.write_text(
@@ -274,7 +278,9 @@ def test_setup_readiness_rejects_user_fixed_without_import_cent(tmp_path: Path):
         encoding="utf-8",
     )
     profiles.write_text(
-        json.dumps({"profiles": {"home": {"id": "home", "label": "Home"}}}),
+        json.dumps(
+            {"profiles": {"home": {"id": "home", "label": "Home", "netznutzung": {"area_id": "AT-VBG"}}}}
+        ),
         encoding="utf-8",
     )
     scenarios.write_text(

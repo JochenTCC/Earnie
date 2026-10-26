@@ -152,10 +152,14 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
     if "netznutzung_arbeitspreis_cent_kwh" in raw:
         raise ValueError(
             "netznutzung_arbeitspreis_cent_kwh wird nicht mehr unterstützt "
-            "(ersetzt durch das Objekt 'netznutzung'). Einmalig migrieren: "
-            "python -m scripts.migrate_grid_fee_profile --path <house_profiles.json>"
+            "(ersetzt durch das Objekt 'netznutzung'). Konfiguration migrieren: "
+            "Streamlit-Seite „Konfigurations-Migration“ oder "
+            "python -m scripts.migrate_config --config-dir <config>"
         )
-    netznutzung = normalize_netznutzung_config(raw.get("netznutzung"))
+    profile_id = str(raw.get("id", "") or "").strip() or "?"
+    netznutzung = normalize_netznutzung_config(
+        raw.get("netznutzung"), label=f"profiles '{profile_id}': netznutzung"
+    )
     region = _normalize_region(raw, land)
     return {
         "region": region,

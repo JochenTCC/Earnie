@@ -53,6 +53,7 @@ def _profile() -> dict:
         "annual_kwh": 20000.0,
         "latitude": 47.4,
         "longitude": 9.7,
+        "netznutzung": {"area_id": "user_no_grid_fee"},
         "consumers": [
             _manual("filter", 0.18, 7, 4.0, 12, 0.0),
             _manual("trockner", 1.0, 3, 2.0, 16, 4.0),

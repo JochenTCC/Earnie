@@ -19,6 +19,7 @@ def _minimal_house_profiles() -> dict:
                 "latitude": 47.0,
                 "longitude": 15.0,
                 "timezone_name": "Europe/Vienna",
+                "netznutzung": {"area_id": "user_no_grid_fee"},
                 "consumers": [],
             }
         ]

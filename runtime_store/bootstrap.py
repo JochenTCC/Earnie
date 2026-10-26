@@ -109,7 +109,7 @@ def _ensure_directory(path: str) -> None:
     logger.info("bootstrap: Verzeichnis bereit: %s", path)
 
 
-# Live Earnie-track pack files (not grid_fees): stamp CURRENT only when newly created.
+# Live Earnie-track pack files (not the tariff track): stamp CURRENT only when newly created.
 _EARNIE_TRACK_LIVE_BASENAMES = frozenset(
     {
         "config.json",
@@ -117,7 +117,6 @@ _EARNIE_TRACK_LIVE_BASENAMES = frozenset(
         "components.json",
         "deviation_rules.json",
         "house_profiles.json",
-        "tariffs.json",
     }
 )
 
@@ -293,8 +292,6 @@ def _template_stamp_candidates() -> list[str]:
         "deviation_rules.example.json",
         "house_profiles.example.json",
         "house_profiles.minimal.json",
-        "tariffs.example.json",
-        "tariffs.minimal.json",
     ):
         paths.append(config_path(basename))
     return paths

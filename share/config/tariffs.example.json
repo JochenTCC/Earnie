@@ -1,6 +1,6 @@
 {
     "$schema": "./tariffs.schema.json",
-    "earnie_data_model": 4,
+    "tariff_format": 1,
     "oemag_monthly_feed_in_rates": [
         {
             "year": 2025,
@@ -147,6 +147,7 @@
         {
             "id": "fixed_37ct",
             "land": "AT",
+            "vat_percent": 0.0,
             "label": "Fix 3,7 ct/kWh Einspeise",
             "type": "fixed",
             "k_push_cent": 3.7,
@@ -168,6 +169,7 @@
         {
             "id": "monthly_sunny",
             "land": "AT",
+            "vat_percent": 0.0,
             "label": "aWATTar - SUNNY (Monatlich)",
             "type": "monthly_table",
             "monthly_rates": [

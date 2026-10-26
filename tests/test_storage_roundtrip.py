@@ -207,6 +207,12 @@ def _profile(**overrides) -> dict:
         "absent_mode": False,
         "historical_csv_source": "separate",
         "baseload_distribution": "equal",
+        "netznutzung": {
+            "area_id": "user_no_grid_fee",
+            "power_metering": "unmetered_power",
+            "quarter_hour_meter": True,
+            "include_status": ["verordnet"],
+        },
         "consumers": [],
     }
     base.update(overrides)

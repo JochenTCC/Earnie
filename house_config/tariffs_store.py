@@ -462,10 +462,18 @@ def normalize_tariffs_document(doc: dict) -> dict:
 
 
 def load_tariffs_document(path: str) -> dict:
-    """``tariffs.json`` plus the Edibert user file ``user_tariffs.json`` next to it (if present)."""
+    """``tariffs.json`` plus the Edibert user file ``user_tariffs.json`` next to it (if present).
+
+    Both are tariff-track files: an existing file without the current ``tariff_format`` is
+    rejected with the migration hint (Edibert P2).
+    """
+    from runtime_store.data_model import ensure_tariff_format
     from runtime_store.persist_paths import user_tariffs_path_for
 
-    normalized = normalize_tariffs_document(_read_json(path))
+    doc = _read_json(path)
+    if os.path.isfile(path):
+        ensure_tariff_format(doc, label=f"tariffs.json ({path})")
+    normalized = normalize_tariffs_document(doc)
     user_path = user_tariffs_path_for(path)
     if os.path.isfile(user_path):
         merge_user_tariffs(normalized, user_path)

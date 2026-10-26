@@ -26,6 +26,7 @@ _ARCHIVE_TO_ENV: dict[str, str] = {
     "inputs/tariffs.json": "config/tariffs.json",
     "inputs/user_tariffs.json": "config/user_tariffs.json",
     "inputs/grid_fees.json": "config/grid_fees.json",
+    "inputs/user_grid_fees.json": "config/user_grid_fees.json",
     "inputs/house_profiles.json": "config/house_profiles.json",
     "inputs/backtesting_scenarios.json": "config/backtesting_scenarios.json",
     "inputs/deviation_rules.json": "config/deviation_rules.json",
@@ -127,7 +128,24 @@ def materialize_config_snapshot(
     if written == 0:
         raise ValueError("config snapshot wrote zero files")
     (env_root / "runtime").mkdir(parents=True, exist_ok=True)
+    _migrate_snapshot_config(env_root / "config")
     return env_root
+
+
+def _migrate_snapshot_config(config_dir: Path) -> None:
+    """Archived configs may predate the current data model / tariff format: migrate in memory.
+
+    Same registry steps as the wizard from the recorded data model on, without answers; a
+    snapshot that needs an answer or hits a blocker stops the replay with the reason (never
+    guessed). Steps of the recorded model itself are skipped: the config ran when recorded.
+    """
+    from runtime_store.migration.runner import migrate_config_dir_unattended
+
+    written = migrate_config_dir_unattended(
+        config_dir, label="recorder config snapshot", model_bump_only=True
+    )
+    if written:
+        logger.debug("replay: migrated snapshot config files %s", ", ".join(written))
 
 
 def restore_matrix_from_entry(entry: dict[str, Any]) -> list[dict[str, Any]]:

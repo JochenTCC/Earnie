@@ -145,11 +145,8 @@ def _resolve_profile_grid_fee(
     from data.grid_fees import load_grid_fee_catalog, resolve_grid_fee_spec
     from runtime_store.persist_paths import resolve_grid_fees_json_path
 
-    netznutzung = profile.get("netznutzung")
-    catalog = None
-    if isinstance(netznutzung, dict) and netznutzung.get("area_id"):
-        catalog = load_grid_fee_catalog(grid_fees_path or resolve_grid_fees_json_path())
-    return resolve_grid_fee_spec(netznutzung, catalog, timezone_name=timezone_name)
+    catalog = load_grid_fee_catalog(grid_fees_path or resolve_grid_fees_json_path())
+    return resolve_grid_fee_spec(profile.get("netznutzung"), catalog, timezone_name=timezone_name)
 
 
 def _prepare_live_scenario_settings(

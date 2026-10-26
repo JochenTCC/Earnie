@@ -152,11 +152,17 @@ def test_l8_first_edit_of_a_new_profile_creates_it_and_selects_it(two_profiles) 
     at = _select_new_from_b()
 
     at.number_input(key="__new____house_annual_kwh").set_value(5321.0).run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    # Data model 5: no grid area preselected, nothing is created until one is chosen.
+    assert set(_stored_profiles()) == {_PROFILE_A, _PROFILE_B}
+
+    at.selectbox(key="__new____house_profile_nne_area").set_value("AT-VBG").run(timeout=_TIMEOUT_S)
 
     assert not at.exception
     created = [p for pid, p in _stored_profiles().items() if pid not in (_PROFILE_A, _PROFILE_B)]
     assert len(created) == 1
     assert (created[0]["label"], created[0]["annual_kwh"]) == ("Mein Haushalt", 5321.0)
+    assert created[0]["netznutzung"]["area_id"] == "AT-VBG"
     assert at.selectbox(key="house_profile_select").value == "Mein Haushalt"
     assert at.number_input(key=f"{created[0]['id']}__house_annual_kwh").value == 5321.0
 

@@ -23,12 +23,15 @@ from runtime_store.migration.steps.required_signal_activation import (
 from runtime_store.migration.steps.retire_plant_pv_binding import (
     STEP as RETIRE_PLANT_PV,
 )
+from runtime_store.migration.steps.netznutzung_split import STEP as NETZNUTZUNG_SPLIT
 from runtime_store.migration.steps.se_conf_defaults import STEP as SE_CONF_DEFAULTS
+from runtime_store.migration.steps.tariff_format import STEP as TARIFF_FORMAT
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
 from runtime_store.migration.steps.v3_to_v4 import STEP as V3_TO_V4
 from runtime_store.migration.types import MigrationStep
 
-# Inventory order (Earnie-env-home chronology + code dependencies)
+# Inventory order (Earnie-env-home chronology + code dependencies). Data model 5 comes after
+# every dm4 step; the tariff-track step runs last, it consumes the dm5 grid-area hand-over.
 STEPS: tuple[MigrationStep, ...] = (
     EHAL,
     V3_TO_V4,
@@ -47,6 +50,8 @@ STEPS: tuple[MigrationStep, ...] = (
     RETIRE_PLANT_PV,
     SE_CONF_DEFAULTS,
     FLEX_OVERLAY,
+    NETZNUTZUNG_SPLIT,
+    TARIFF_FORMAT,
 )
 
 STEP_BY_ID: dict[str, MigrationStep] = {step.id: step for step in STEPS}

@@ -7,8 +7,10 @@ Modell (siehe ``docs/konfiguration/preise.md``):
 * Regelsatz: Liste zeitgebundener Regeln (z. B. SNAP, WiNAP). Eine Regel ändert den
   Basis-Arbeitspreis in einem Zeitfenster (``percent_off``, ``absolute_cent``,
   ``add_cent``).
-* Hausprofil (``netznutzung``): wählt Netzbereich und optional eigenen Basiswert.
-  Messart is always unmetered household (``unmetered_power``). :func:`resolve_grid_fee_spec`
+* Benutzer-Netzbereiche ``user_grid_fees.json`` (neben ``grid_fees.json``, IDs ``user_…``):
+  eigener Arbeitspreis eines Hausprofils (Edibert P2).
+* Hausprofil (``netznutzung``): wählt den Netzbereich (``area_id``, Pflicht). Messart is
+  always unmetered household (``unmetered_power``). :func:`resolve_grid_fee_spec`
   erzeugt daraus die aufgelöste Spec, die :func:`grid_fee_work_cent` pro Slot auswertet.
 
 Alle Preise netto (ohne USt), Cent/kWh. Fehlkonfiguration schlägt laut fehl.
@@ -16,6 +18,7 @@ Alle Preise netto (ohne USt), Cent/kWh. Fehlkonfiguration schlägt laut fehl.
 from __future__ import annotations
 
 import json
+import os
 from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -218,40 +221,88 @@ def normalize_grid_fee_catalog(doc: Any) -> dict[str, Any]:
     return {"rule_sets": rule_sets, "areas": areas}
 
 
+def _read_tariff_track_doc(path: str, label: str) -> dict[str, Any]:
+    from runtime_store.data_model import ensure_tariff_format
+
+    with open(path, encoding="utf-8-sig") as handle:
+        doc = json.load(handle)
+    ensure_tariff_format(doc, label=f"{label} ({path})")
+    return doc
+
+
 def load_grid_fee_catalog(path: str) -> dict[str, Any]:
-    with open(path, encoding="utf-8") as handle:
-        return normalize_grid_fee_catalog(json.load(handle))
+    """``grid_fees.json`` plus the user grid areas ``user_grid_fees.json`` next to it (if present)."""
+    from runtime_store.persist_paths import user_grid_fees_path_for
+
+    catalog = normalize_grid_fee_catalog(_read_tariff_track_doc(path, "grid_fees.json"))
+    user_path = user_grid_fees_path_for(path)
+    if os.path.isfile(user_path):
+        user = normalize_grid_fee_catalog(
+            _read_tariff_track_doc(user_path, "user_grid_fees.json")
+        )
+        _merge_user_grid_areas(catalog, user)
+    return catalog
+
+
+def _merge_user_grid_areas(catalog: dict[str, Any], user: dict[str, Any]) -> None:
+    """Same split as tariffs.json / user_tariffs.json: an ID in both files is an error."""
+    for set_id, rules in user["rule_sets"].items():
+        if set_id in catalog["rule_sets"]:
+            raise ValueError(
+                f"user_grid_fees.json: Regelsatz '{set_id}' gibt es schon in grid_fees.json."
+            )
+        catalog["rule_sets"][set_id] = rules
+    for area_id, area in user["areas"].items():
+        if area_id in catalog["areas"]:
+            raise ValueError(
+                f"user_grid_fees.json: Netzbereich '{area_id}' gibt es schon in grid_fees.json."
+            )
+        catalog["areas"][area_id] = area
 
 
 # --------------------------------------------------------------------------- #
 # Profil-Konfiguration (Hausprofil-Feld ``netznutzung``)
 # --------------------------------------------------------------------------- #
 
+_MIGRATE_HINT = (
+    "Konfiguration migrieren: Streamlit-Seite „Konfigurations-Migration“ oder "
+    "python -m scripts.migrate_config --config-dir <config> (Datenmodell 5)"
+)
+
+
 def default_netznutzung_config() -> dict[str, Any]:
+    """Form default for a new house profile; ``area_id`` must still be chosen."""
     return {
         "area_id": None,
         "power_metering": METERING_UNMETERED,
         # Assumed present — not an Earnie configuration (SNAP/WiNAP catalog requires).
         "quarter_hour_meter": True,
-        "base_cent_kwh": 0.0,
         "include_status": list(DEFAULT_INCLUDE_STATUS),
     }
 
 
 def normalize_netznutzung_config(raw: Any, *, label: str = "netznutzung") -> dict[str, Any]:
-    """Validiert das Profilfeld ``netznutzung`` (kein Legacy-Skalar)."""
+    """Validiert das Profilfeld ``netznutzung``: Netzbereich Pflicht, kein eigener Basiswert.
+
+    Ein eigener Arbeitspreis ist seit Datenmodell 5 ein Benutzer-Netzbereich
+    (``user_grid_fees.json``); alte Profile (``area_id: null`` / ``base_cent_kwh``) brechen
+    mit Migrationshinweis ab.
+    """
     if raw is None:
-        return default_netznutzung_config()
+        raise ValueError(f"{label} fehlt (Netzbereich ist Pflicht) — {_MIGRATE_HINT}.")
     if not isinstance(raw, dict):
         raise ValueError(f"{label} muss ein Objekt sein.")
+    if "base_cent_kwh" in raw:
+        raise ValueError(
+            f"{label}.base_cent_kwh wird nicht mehr unterstützt (eigener Arbeitspreis ist "
+            f"ein Benutzer-Netzbereich) — {_MIGRATE_HINT}."
+        )
     area_raw = raw.get("area_id")
     area_id = str(area_raw).strip() if area_raw not in (None, "") else None
+    if area_id is None:
+        raise ValueError(f"{label}.area_id fehlt (Netzbereich ist Pflicht) — {_MIGRATE_HINT}.")
     # Assumed household unmetered — not an Earnie configuration.
     metering = METERING_UNMETERED
-    base_raw = raw.get("base_cent_kwh")
-    base = float(base_raw) if base_raw is not None else 0.0
-    if base < 0.0:
-        raise ValueError(f"{label}.base_cent_kwh muss >= 0 sein.")
     include_raw = raw.get("include_status", list(DEFAULT_INCLUDE_STATUS))
     if not isinstance(include_raw, list):
         raise ValueError(f"{label}.include_status muss eine Liste sein.")
@@ -266,7 +317,6 @@ def normalize_netznutzung_config(raw: Any, *, label: str = "netznutzung") -> dic
         "area_id": area_id,
         "power_metering": metering,
         "quarter_hour_meter": True,
-        "base_cent_kwh": base,
         "include_status": include,
     }
 
@@ -281,47 +331,42 @@ def resolve_grid_fee_spec(
     *,
     timezone_name: str,
 ) -> dict[str, Any]:
-    """Löst Profilfeld + Katalog zur auswertbaren Spec auf.
+    """Löst Profilfeld + Katalog (inkl. Benutzer-Netzbereiche) zur auswertbaren Spec auf.
 
-    Ist ein Netzbereich gewählt, kommt der Basiswert aus dem Katalog
-    (``unmetered_power``); ``base_cent_kwh`` am Profil wird dann ignoriert. Ohne
-    Netzbereich gilt der Profilwert ohne Regeln. Regeln mit ``status`` außerhalb
-    ``include_status`` werden mit Grund in ``skipped`` vermerkt. Eine einbezogene
-    Regel ohne Wert (``effect.value`` null) ist ein Fehler.
+    Der Basiswert kommt aus dem gewählten Netzbereich (``unmetered_power``). Regeln mit
+    ``status`` außerhalb ``include_status`` werden mit Grund in ``skipped`` vermerkt. Eine
+    einbezogene Regel ohne Wert (``effect.value`` null) ist ein Fehler.
     """
     cfg = normalize_netznutzung_config(netznutzung)
     area_id = cfg["area_id"]
     rules: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
-    if area_id is None:
-        base = cfg["base_cent_kwh"]
-        area_label = None
-    else:
-        if catalog is None:
+    if catalog is None:
+        raise ValueError(
+            f"Netzbereich '{area_id}' gewählt, aber kein Netzentgelt-Katalog geladen."
+        )
+    areas = catalog["areas"]
+    if area_id not in areas:
+        raise ValueError(
+            f"Unbekannter Netzbereich '{area_id}' (weder in grid_fees.json noch in "
+            "user_grid_fees.json)."
+        )
+    area = areas[area_id]
+    base = area["base_cent_kwh"][cfg["power_metering"]]
+    area_label = area["label"]
+    set_id = area["rule_set"]
+    for rule in catalog["rule_sets"].get(set_id, []) if set_id else []:
+        if rule["status"] not in cfg["include_status"]:
+            skipped.append({"id": rule["id"], "reason": f"status={rule['status']}"})
+            continue
+        # Catalog may list REQUIRES_QUARTER_HOUR_METER; Earnie assumes it exists.
+        if rule["effect"]["value"] is None:
             raise ValueError(
-                f"Netzbereich '{area_id}' gewählt, aber kein Netzentgelt-Katalog geladen."
+                f"Regel '{rule['id']}' (status={rule['status']}) ist einbezogen, "
+                "hat aber keinen Wert (effect.value). Status aus include_status "
+                "entfernen oder Wert im Katalog ergänzen."
             )
-        areas = catalog["areas"]
-        if area_id not in areas:
-            raise ValueError(
-                f"Unbekannter Netzbereich '{area_id}' im Netzentgelt-Katalog."
-            )
-        area = areas[area_id]
-        base = area["base_cent_kwh"][cfg["power_metering"]]
-        area_label = area["label"]
-        set_id = area["rule_set"]
-        for rule in catalog["rule_sets"].get(set_id, []) if set_id else []:
-            if rule["status"] not in cfg["include_status"]:
-                skipped.append({"id": rule["id"], "reason": f"status={rule['status']}"})
-                continue
-            # Catalog may list REQUIRES_QUARTER_HOUR_METER; Earnie assumes it exists.
-            if rule["effect"]["value"] is None:
-                raise ValueError(
-                    f"Regel '{rule['id']}' (status={rule['status']}) ist einbezogen, "
-                    "hat aber keinen Wert (effect.value). Status aus include_status "
-                    "entfernen oder Wert im Katalog ergänzen."
-                )
-            rules.append(rule)
+        rules.append(rule)
     return {
         "area_id": area_id,
         "area_label": area_label,

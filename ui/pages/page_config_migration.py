@@ -205,11 +205,35 @@ def _render_questions(questions: tuple[Question, ...]) -> Answers:
             )
         elif question.kind == "str":
             answers[question.id] = st.text_input(label, key=key)
+        elif question.kind == "number":
+            answers[question.id] = _render_number_question(question, label, key)
         else:
             st.error(
                 f"Unbekannter Fragetyp `{question.kind}` für `{question.id}`."
             )
     return answers
+
+
+def _take_suggestion(key: str, value: float) -> None:
+    st.session_state[key] = float(value)
+
+
+def _render_number_question(question: Question, label: str, key: str) -> float | None:
+    """Starts empty; a suggestion (``default``) is only taken on an explicit click."""
+    placeholder = (
+        f"Vorschlag: {question.default:g}" if question.default is not None else "Bitte eingeben"
+    )
+    value = st.number_input(
+        label, min_value=0.0, value=None, step=0.1, placeholder=placeholder, key=key
+    )
+    if question.default is not None and value is None:
+        st.button(
+            f"Vorschlag übernehmen ({question.default:g})",
+            key=f"{key}__take_default",
+            on_click=_take_suggestion,
+            args=(key, question.default),
+        )
+    return value
 
 
 def _render_blockers(plan: MigrationPlan) -> None:

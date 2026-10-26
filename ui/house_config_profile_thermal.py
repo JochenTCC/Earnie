@@ -149,9 +149,6 @@ def _render_pv_default_row(*, session_scope: str) -> tuple[float, float]:
         )
     return float(default_pv_tilt), float(default_pv_azimuth)
 
-NNE_AREA_MANUAL = "__manual__"
-
-
 def _load_grid_fee_catalog_for_ui() -> dict:
     from data.grid_fees import load_grid_fee_catalog
     from runtime_store.persist_paths import resolve_grid_fees_json_path
@@ -161,32 +158,40 @@ def _load_grid_fee_catalog_for_ui() -> dict:
 
 def _render_nne_area_fields(
     catalog: dict, *, session_scope: str
-) -> tuple[str, float]:
-    """Netzbereich select plus manual Arbeitspreis when no catalog area is chosen."""
+) -> tuple[str | None, float]:
+    """Netzbereich select plus own Arbeitspreis (user grid area) when chosen."""
+    from house_config.own_grid_fee import OWN_AREA
+
     areas = catalog["areas"]
     area_key = _scoped_key(session_scope, "house_profile_nne_area")
-    options = [NNE_AREA_MANUAL, *areas.keys()]
+    own_id = st.session_state.get(_scoped_key(session_scope, "house_profile_nne_own_id"))
+    options = [OWN_AREA, *(area_id for area_id in areas if area_id != own_id)]
     area_choice = labeled_selectbox(
         "Netzbereich (Netznutzung)",
         options=options,
         format_func=lambda key: (
-            "Eigener Wert (manuell)" if key == NNE_AREA_MANUAL else areas[key]["label"]
+            "Eigener Arbeitspreis" if key == OWN_AREA else areas[key]["label"]
         ),
+        placeholder="Netzbereich wählen …",
         help=(
             "Katalog Netznutzungs-Arbeitspreis (Netzebene 7) inkl. Zeitregeln wie "
-            "SNAP/WiNAP. Netto (ohne USt), unabhängig vom Lieferantentarif."
+            "SNAP/WiNAP, oder ein eigener Arbeitspreis (wird als Benutzer-Netzbereich "
+            "gespeichert). Netto (ohne USt), unabhängig vom Lieferantentarif."
         ),
         ratios=WIDE_LABEL_RATIOS,
         key=area_key,
     )
     base_manual = 0.0
-    if area_choice == NNE_AREA_MANUAL:
+    if area_choice == OWN_AREA:
         base_manual = float(
             labeled_number_input(
                 "Netznutzung Arbeitspreis (Cent/kWh)",
                 min_value=0.0,
                 step=0.001,
-                help="Konstanter Netznutzungs-Arbeitspreis netto (ohne USt), ohne Zeitregeln.",
+                help=(
+                    "Konstanter Netznutzungs-Arbeitspreis netto (ohne USt), ohne Zeitregeln. "
+                    "0 = bewusst kein Netzentgelt."
+                ),
                 ratios=WIDE_LABEL_RATIOS,
                 key=_scoped_key(session_scope, "house_profile_nne_ap"),
             )
@@ -216,8 +221,9 @@ def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
 
 
 def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
-    """Netznutzung: Netzbereich aus Katalog oder eigener Wert; Zeitregeln."""
+    """Netznutzung: Netzbereich aus Katalog oder eigener Arbeitspreis; Zeitregeln."""
     from data.grid_fees import METERING_UNMETERED
+    from house_config.own_grid_fee import OWN_AREA, OWN_BASE_KEY
 
     catalog = _load_grid_fee_catalog_for_ui()
     area_choice, base_manual = _render_nne_area_fields(
@@ -230,14 +236,17 @@ def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
         )
     )
     config = {
-        "area_id": None if area_choice == NNE_AREA_MANUAL else area_choice,
+        "area_id": area_choice,
         "power_metering": METERING_UNMETERED,
         "quarter_hour_meter": True,
-        "base_cent_kwh": base_manual,
         "include_status": ["verordnet", "entwurf"] if include_draft else ["verordnet"],
     }
-    if config["area_id"] is not None:
+    if area_choice == OWN_AREA:
+        config[OWN_BASE_KEY] = base_manual
+    elif area_choice is not None:
         _show_nne_spec_caption(config, catalog)
+    else:
+        st.warning("Netzbereich wählen — ohne Netzbereich wird das Profil nicht gespeichert.")
     return config
 
 

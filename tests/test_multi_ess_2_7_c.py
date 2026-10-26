@@ -23,8 +23,8 @@ from runtime_store.migrate_v4 import (
 )
 
 
-def test_current_data_model_is_4():
-    assert CURRENT_DATA_MODEL == 4
+def test_current_data_model_is_5():
+    assert CURRENT_DATA_MODEL == 5
 
 
 def test_normalize_battery_ids_rejects_singular():
@@ -128,7 +128,7 @@ def test_migrate_scenarios_battery_id_to_ids():
         ],
     }
     out = migrate_scenarios_doc(doc)
-    assert out["earnie_data_model"] == 4
+    assert out["earnie_data_model"] == CURRENT_DATA_MODEL
     assert out["scenarios"][0]["settings"]["battery_ids"] == ["default_5kwh"]
     assert "battery_id" not in out["scenarios"][0]["settings"]
 
@@ -151,7 +151,7 @@ def test_migrate_components_adds_inverters():
         "pv_systems": [],
     }
     out = migrate_components_doc(doc)
-    assert out["earnie_data_model"] == 4
+    assert out["earnie_data_model"] == CURRENT_DATA_MODEL
     assert "kind" not in out["batteries"][0]
     assert out["batteries"][0]["inverter_id"] == "wr_main"
     assert any(i["id"] == "wr_main" for i in out["inverters"])

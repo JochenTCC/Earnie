@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/user_grid_fees.schema.json",
+  "title": "Earnie Benutzer-Netzbereiche (user_grid_fees.json)",
+  "description": "Eigene Netzbereiche neben grid_fees.json (Tarif-Track, Edibert-Format; Spezifikation: Edibert docs/spec/tariff-format.md §5a). Ein eigener Arbeitspreis eines Hausprofils ist ein Netzbereich user_<profil_id> mit gleichem Preis für beide Messarten und ohne Regelsatz. IDs beginnen mit user_; eine ID in beiden Dateien ist ein Fehler.",
+  "type": "object",
+  "required": ["tariff_format", "areas"],
+  "properties": {
+    "tariff_format": {
+      "type": "integer",
+      "const": 1,
+      "description": "Edibert tariff-format version (tariff track, independent of earnie_data_model)."
+    },
+    "description": {
+      "type": "string"
+    },
+    "rule_sets": {
+      "type": "object",
+      "description": "Regelsatz-ID (user_…) → Liste zeitgebundener Regeln (Felder wie in grid_fees.json; status optional).",
+      "propertyNames": {"pattern": "^user_"},
+      "additionalProperties": {"type": "array", "items": {"type": "object"}}
+    },
+    "areas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "base_cent_kwh"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^user_"},
+          "label": {"type": "string"},
+          "land": {"type": "string"},
+          "base_cent_kwh": {
+            "type": "object",
+            "required": ["unmetered_power", "metered_power"],
+            "properties": {
+              "unmetered_power": {"type": "number", "minimum": 0},
+              "metered_power": {"type": "number", "minimum": 0}
+            },
+            "additionalProperties": false
+          },
+          "rule_set": {"type": ["string", "null"], "pattern": "^user_"},
+          "source": {"type": "string"}
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

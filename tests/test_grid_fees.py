@@ -107,12 +107,63 @@ def test_time_rules_require_slot_datetime():
         grid_fee_work_cent(_spec(), None)
 
 
-def test_manual_base_without_area_has_no_rules():
-    spec = resolve_grid_fee_spec(
-        {"base_cent_kwh": 5.0}, None, timezone_name="Europe/Vienna"
+def test_own_base_price_is_rejected_with_migrate_hint():
+    """Data model 5: an own price is a user grid area, not a profile field."""
+    with pytest.raises(ValueError, match="base_cent_kwh.*migrate_config"):
+        resolve_grid_fee_spec({"base_cent_kwh": 5.0}, None, timezone_name="Europe/Vienna")
+    with pytest.raises(ValueError, match="area_id fehlt.*migrate_config"):
+        resolve_grid_fee_spec({"area_id": None}, _catalog(), timezone_name="Europe/Vienna")
+
+
+def test_user_grid_area_resolves_flat(tmp_path):
+    """user_grid_fees.json next to grid_fees.json: own flat price, no rules."""
+    import shutil
+
+    shutil.copy(CATALOG_PATH, tmp_path / "grid_fees.json")
+    (tmp_path / "user_grid_fees.json").write_text(
+        json.dumps(
+            {
+                "tariff_format": 1,
+                "rule_sets": {},
+                "areas": [
+                    {
+                        "id": "user_home",
+                        "label": "Eigener Arbeitspreis",
+                        "land": "AT",
+                        "base_cent_kwh": {"unmetered_power": 5.0, "metered_power": 5.0},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
     )
+    catalog = load_grid_fee_catalog(str(tmp_path / "grid_fees.json"))
+    spec = resolve_grid_fee_spec({"area_id": "user_home"}, catalog, timezone_name="Europe/Vienna")
     assert spec["rules"] == []
     assert grid_fee_work_cent(spec, None) == pytest.approx(5.0)
+    assert "AT-VBG" in catalog["areas"]
+
+
+def test_user_grid_area_id_twice_fails_loud(tmp_path):
+    import shutil
+
+    shutil.copy(CATALOG_PATH, tmp_path / "grid_fees.json")
+    doc = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+    area = {k: v for k, v in doc["areas"][0].items() if k != "rule_set"}
+    (tmp_path / "user_grid_fees.json").write_text(
+        json.dumps({"tariff_format": 1, "rule_sets": {}, "areas": [area]}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="gibt es schon in grid_fees.json"):
+        load_grid_fee_catalog(str(tmp_path / "grid_fees.json"))
+
+
+def test_untagged_catalog_fails_loud(tmp_path):
+    doc = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+    doc.pop("tariff_format")
+    (tmp_path / "grid_fees.json").write_text(json.dumps(doc), encoding="utf-8")
+    with pytest.raises(ValueError, match="tariff_format fehlt.*migrate_config"):
+        load_grid_fee_catalog(str(tmp_path / "grid_fees.json"))
 
 
 def test_unknown_area_fails_loud():
@@ -141,13 +192,15 @@ def test_catalog_validation_rejects_bad_input(mutate, message):
 
 
 def test_netznutzung_config_validation():
-    assert normalize_netznutzung_config(None)["include_status"] == ["verordnet"]
+    assert normalize_netznutzung_config({"area_id": "AT-VBG"})["include_status"] == ["verordnet"]
+    with pytest.raises(ValueError, match="netznutzung fehlt"):
+        normalize_netznutzung_config(None)
     with pytest.raises(ValueError):
-        normalize_netznutzung_config({"include_status": "not-a-list"})
+        normalize_netznutzung_config({"area_id": "AT-VBG", "include_status": "not-a-list"})
+    with pytest.raises(ValueError, match="base_cent_kwh"):
+        normalize_netznutzung_config({"area_id": "AT-VBG", "base_cent_kwh": 1.0})
     with pytest.raises(ValueError):
-        normalize_netznutzung_config({"base_cent_kwh": -1})
-    with pytest.raises(ValueError):
-        normalize_netznutzung_config({"include_status": ["foo"]})
+        normalize_netznutzung_config({"area_id": "AT-VBG", "include_status": ["foo"]})
 
 
 def test_import_price_follows_time_window_and_vat_applies_after():
@@ -185,15 +238,15 @@ def test_legacy_profile_scalar_is_rejected_and_migrated():
         "netznutzung_arbeitspreis_cent_kwh": 5.353,
         "consumers": [],
     }
-    with pytest.raises(ValueError, match="migrate_grid_fee_profile"):
+    with pytest.raises(ValueError, match="migrate_config"):
         _normalize_profile(copy.deepcopy(legacy), 0)
+    # dm4.grid_fee_profile helper; dm5.netznutzung_split then drops the ignored base price.
     doc = {"profiles": [copy.deepcopy(legacy)]}
     assert migrate_document(doc, area_id="AT-VBG") == 1
-    profile = _normalize_profile(doc["profiles"][0], 0)
-    assert profile["netznutzung"]["area_id"] == "AT-VBG"
-    assert profile["netznutzung"]["base_cent_kwh"] == pytest.approx(5.353)
-    assert profile["netznutzung"]["quarter_hour_meter"] is True
-    assert "netznutzung_arbeitspreis_cent_kwh" not in profile
+    netznutzung = doc["profiles"][0]["netznutzung"]
+    assert netznutzung["area_id"] == "AT-VBG"
+    assert netznutzung["base_cent_kwh"] == pytest.approx(5.353)
+    assert "netznutzung_arbeitspreis_cent_kwh" not in doc["profiles"][0]
 
 
 def test_invoice_splits_arbeitspreis_by_time_window():

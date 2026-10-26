@@ -14,7 +14,7 @@ from runtime_store.migration.types import Docs
 
 PACK_FILENAMES: tuple[str, ...] = tuple(name for name, _ in PACK_JSON_FILES)
 
-# Earnie data-model track (tariff track files exempt from untagged blocker in 2.7)
+# Earnie data-model track; tariff-track files (TARIFF_TRACK_FILES) carry tariff_format.
 EARNIE_TRACK_FILES: frozenset[str] = frozenset(
     {
         "config.json",
@@ -22,7 +22,6 @@ EARNIE_TRACK_FILES: frozenset[str] = frozenset(
         "components.json",
         "deviation_rules.json",
         "house_profiles.json",
-        "tariffs.json",
     }
 )
 GRID_FEES_FILE = "grid_fees.json"

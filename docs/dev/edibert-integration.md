@@ -71,19 +71,21 @@ Earnie **loads** the tariff files through `edibert.api` but **still prices with 
 | 3 | `user_` prefix | no rule | user IDs must start with `user_`, catalog IDs must not (`ID_PREFIX_*`) | none; enforced since P1 |
 | 4 | Edited site copy of the catalog | `earnie_env/config/tariffs.json` is seeded from `share/` and may be edited (`append_monthly_rate`) | treated as catalog; every entry gets origin `catalog` | P8 decides whether new entries may still land there |
 | 5 | `__user_fixed__` (*Eigener Festpreis*) | pseudo tariff, cent values on the scenario | no equivalent | P3a: synthetic Edibert `fixed_cent` / `fixed` tariff at resolution time; not migrated (decided 2026-10-26, § P2 decision 4) |
-| 6 | `tariff_format` root key | none | not in `ROOT_FIELDS` (would be an unknown root field) | P2: add to Edibert first, then tag all tariff-track files (§ P2 Part A1, B2) |
+| 6 | `tariff_format` root key | none | required (`FORMAT_MISSING` / `FORMAT_UNSUPPORTED`) | done in P2: all four tariff-track files carry `tariff_format: 1` (Edibert `v0.1.2`, `tf1.tariff_format`) |
+| 9 | VAT on the net grid fee for gross tariffs | `grid_fee_on_tariff_basis`: `supplier + grid × (1 + vat/100)` | same since Edibert `v0.1.2` (`evaluate`) | P3a: accept with a gross tariff plus grid fee in the comparison run |
+| 10 | Missing `vat_percent` | read as `0` | `VAT_PERCENT_MISSING` on every tariff (gross and net) | done in P2: catalog, templates and fixtures carry it; `tf1.tariff_format` asks for user tariffs |
 | 7 | `land` | required per tariff (country filter) | optional | keep required (decided 2026-10-26, § P2 decision 7); P3b decides again |
 | 8 | Root maintenance keys (`earnie_data_model`, `oemag_monthly_feed_in_rates`, …) | read by Earnie | tolerated and ignored (`ROOT_FIELDS`) | none |
 
 Row 1, measured on the catalog (2026-10-26): there are no gaps inside any table; the differences are at the edges. Six export tables end at 2026-09 and `monthly_sunny_web_recherche` at 2026-10, so Earnie prices the following months with the prior-year month (`at_oemag_gesetzlicher_marktpreis` 2026-10: Earnie 9.008 ct from 2025-10, Edibert `PRICE_MISSING`); `at_vkw_strom_duo` ends at 2027-03. Before a table starts, both fail (`at_vkw_pv_flex` 2025-03: Earnie error, Edibert `PRICE_MISSING`). The SNAP comparison in P3a must therefore run over months that every table covers, or after `0.1.g`.
 
-## P2 — Netznutzung split and migration (plan, 2026-10-26)
+## P2 — Netznutzung split and migration (implemented 2026-10-26)
 
-Status: **planned**, nothing implemented. Backlog item *Edibert P2* (Version 2.8). Design sources: [Config-Migration-Draft.md](../../backlog/Config-Migration-Draft.md) §3.7 and §8, [data-model-stability-decisions.md](data-model-stability-decisions.md) § D3.
+Status: **implemented** (see *Implementation notes* and *Done check* below). Backlog item *Edibert P2* (Version 2.8). Design sources: [Config-Migration-Draft.md](../../backlog/Config-Migration-Draft.md) §3.7 and §8, [data-model-stability-decisions.md](data-model-stability-decisions.md) § D3.
 
 ### Findings (2026-10-26)
 
-- **Edibert is not ready yet.** `tariff_format` is neither in `store.py` `ROOT_FIELDS` nor accepted by `gridfee.py` `parse_grid_fee_catalog`; `edibert.api` has no `plan_migration` / `migrate` (Edibert `docs/spec/api.md` "Not yet in the API"); there are no user grid areas; `vat_percent` silently becomes `0` (`tariff.py`). The Edibert backlog has no item for this. **Earnie P2 is blocked until an Edibert release ships Part A.**
+- **Edibert was not ready (resolved by Edibert `0.1.i`, tag `v0.1.2`).** `tariff_format` is neither in `store.py` `ROOT_FIELDS` nor accepted by `gridfee.py` `parse_grid_fee_catalog`; `edibert.api` has no `plan_migration` / `migrate` (Edibert `docs/spec/api.md` "Not yet in the API"); there are no user grid areas; `vat_percent` silently becomes `0` (`tariff.py`). The Edibert backlog has no item for this. **Earnie P2 is blocked until an Edibert release ships Part A.**
 - **Earnie's own grid fees are a flat base price only.** `data/grid_fees.py` `normalize_netznutzung_config` reads `area_id`, `base_cent_kwh` and `include_status`; `power_metering` and `quarter_hour_meter` are fixed constants, own `rules` / holidays are not read. The split therefore maps `area_id: null` + `base_cent_kwh: X` to one user grid area with `X` for both metering keys; no rule or holiday data has to move.
 - **Real case:** the maintainer site (`earnie_env/config/house_profiles.json`) uses `area_id: null` with 5.353 ct.
 - **First data-model bump since the Regression suite exists.** The frozen configs in recorder snapshots and `tests/regression/fixtures/*/configs/` carry `earnie_data_model: 4`; after the bump the loaders reject all 11 regression cases unless replay migrates them. SUSI P1 / P2 / P6 needs the same.
@@ -94,7 +96,7 @@ Status: **planned**, nothing implemented. Backlog item *Edibert P2* (Version 2.8
 2. **User grid areas** live in their own file `user_grid_fees.json` next to `grid_fees.json`, same shape (`rule_sets`, `areas`), IDs start with `user_`, an ID in both files is a load error — the same split as `tariffs.json` / `user_tariffs.json`.
 3. **No implicit "no grid fee":** after P2 `netznutzung.area_id` is required. A profile with `area_id: null` and `base_cent_kwh` missing or `0`, or without `netznutzung`, gets a required wizard question: pick a catalog area, or create a user area with an explicit `0` ct. Never a silent default.
 4. **`__user_fixed__` (*Eigener Festpreis*) is not migrated.** It stays a scenario shortcut; P3a builds a synthetic Edibert fixed-price tariff at resolution time (format difference row 5).
-5. **VAT question (D3b):** gross user tariffs without `vat_percent` get a required question, prefilled from `STANDARD_VAT_PERCENT_BY_LAND` (AT 20, DE 19, CH 8.1); the user confirms the value, the step never writes it unasked.
+5. **VAT question (D3b), widened during Edibert 0.1.i:** `vat_percent` is mandatory on **every** tariff (gross and net, `0` allowed, Edibert `VAT_PERCENT_MISSING`). Every user tariff without a rate gets the required question `vat_percent:<import|export>:<tariff_id>` (code `VAT_PERCENT`, `kind="number"`, country rate AT 20 / DE 19 / CH 8.1 as `default`, param `prices` gross/net); the user confirms the value, the step never writes it unasked. Earnie's `Question` gained `kind="number"` and `default`; the wizard shows the default as placeholder plus a *Vorschlag übernehmen* button.
 6. **Bundling with SUSI:** data model 5 is opened by P2 and shared with the SUSI P1 / P2 / P6 steps **only if no release or pre-release (HA add-on pre-release channel included) ships between them**. If one does, SUSI gets data model 6.
 7. **`land` on user tariffs** stays required in Earnie; P3b decides again (format difference row 7).
 
@@ -123,10 +125,21 @@ Status: **planned**, nothing implemented. Backlog item *Edibert P2* (Version 2.8
 
 Part A (Edibert repo) → B1 → B2 → B7 → B3 / B4 → B5 → B6 → B8 → B9.
 
+### Implementation notes (2026-10-26)
+
+- **Edibert `v0.1.2` adds VAT on the net grid fee for gross tariffs** (same rule as Earnie's `grid_fee_on_tariff_basis`); acceptance is part of P3a (format difference row 9).
+- **Tracks:** `runtime_store.data_model`: `CURRENT_DATA_MODEL = 5`, `COMPATIBLE = {5}`, `MIGRATABLE = {3, 4}`; `TARIFF_TRACK_FILES` = the four tariff files (equal to `edibert.api.TARIFF_TRACK_FILES`, test), `TARIFF_TRACK_TEMPLATES` (`tariffs.example.json`, `tariffs.minimal.json`) never stamped; `ensure_tariff_format` in the Earnie loaders (`load_tariffs_document`, `data.grid_fees.load_grid_fee_catalog`) and in `validate_migrated_docs`. Untagged tariff files are no level blocker; `tf1.tariff_format` is pending, so the startup gate stays closed until it ran.
+- **Doc-dependent questions:** `MigrationStep.questions_for(docs)` (per profile / tariff), collected along the dry-run chain (`types.step_questions`).
+- **Hand-over dm5 → tf1:** in-memory key `types.HANDOFF_USER_GRID_AREAS` (never written, excluded from diffs); tf1 passes the areas as `user_grid_areas` to `edibert.api.migrate`. An existing user area with the same ID and another price is the Edibert blocker `GRID_ID_COLLISION`.
+- **Registry order:** dm5 after every dm4 step, tf1 last. `migrate_v4` keeps stamping the current model (never downgrades a doc); `dm4.se_conf_defaults` now runs on model 4 and 5.
+- **Unattended migration** (`runner.migrate_docs_unattended`): config-pack import and recorder replay. A required question of a data-model ≥ 5 step stops the run with the question IDs (dm4 questions keep their 2.7 unattended meaning, *keep as is*). Recorder replay runs only the steps of later data models than the snapshot (`model_bump_only`) and validates only what it changed: a snapshot was loadable when recorded.
+- **UI:** `house_config/own_grid_fee.py` (`OWN_AREA`, `persist_own_grid_fee`) writes `user_<profile_id>` through `edibert.api.save_user_grid_area` before the profile; a new profile has no preselected area and is not saved until one is chosen; `ui/setup_readiness.py` reports a live profile without area. The Loxone greenfield import (`ensure_live_profile`, Smarthome-Backend) asks for the grid area as a required select when no house profile exists yet (decided 2026-10-26, no default).
+- **Seeds and fixtures:** `share/config` grid catalog and tariff templates tagged, `vat_percent: 0` on the two template / fixture export and fixture import tariffs that had none (Earnie read a missing rate as 0, so prices are unchanged); `house_profiles.example.json` and the cloud POC pack select `AT-VBG` (before: no grid fee); the backtesting fixture keeps no grid fee via `user_test_home` (0 ct) plus `user_no_grid_fee` for test profiles; schemas `house_profiles` (`area_id` required, `base_cent_kwh` removed), `tariffs` (`tariff_format`), new `user_grid_fees.schema.json`.
+
 ### Done check
 
-- [ ] Edibert `v0.1.2` tagged with A1–A6; Earnie pin raised.
-- [ ] `dm5.netznutzung_split` and `tf1.tariff_format` registered, both run in one wizard run with one backup.
-- [ ] Migration fixture and golden green; loaders fail fast on the old format with the migrate hint.
-- [ ] All 11 regression cases green (metrics unchanged) through in-memory replay migration.
-- [ ] Full suite green; the maintainer site `earnie_env` migrates cleanly (dry run first).
+- [x] Edibert `v0.1.2` tagged with A1–A6; Earnie pin raised.
+- [x] `dm5.netznutzung_split` and `tf1.tariff_format` registered, both run in one wizard run with one backup (`tests/test_edibert_p2.py`).
+- [x] Migration fixture `v4_pre_tariff_track` and golden green; loaders fail fast on the old format with the migrate hint; the six existing migration goldens moved to data model 5.
+- [x] All 11 regression cases green (metrics unchanged, no golden update) through in-memory replay migration.
+- [x] Full suite green; the maintainer site `earnie_env` migrates cleanly in the dry run (2026-10-26; the real run is the maintainer's).
