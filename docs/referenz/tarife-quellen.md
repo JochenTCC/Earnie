@@ -56,6 +56,10 @@ Formel:
 
 Bei Festpreis-Tarifen (`fixed_cent`) ist der Arbeitspreis `fix_cent_kwh`; `settlement_fee_cent_kwh` hat dort keine Wirkung (Earnie warnt beim Laden). Die Netznutzung aus dem Hausprofil kommt auch hier dazu. Auch hier gilt die USt-Regel.
 
+### Benutzertarife aus Edibert
+
+Tarife aus `user_tariffs.json` (neben `tariffs.json`, IDs `user_…`) rechnet Earnie mit denselben Schritten wie Katalog-Tarife. Ausnahme: Zeitregeln (`rules`) und Preisgrenzen (`price_floor_cent_kwh`, `price_cap_cent_kwh`) kann Earnie erst nach der Umstellung der Preisberechnung auf Edibert. Bis dahin lässt sich ein solcher Tarif zwar auswählen, aber nicht berechnen (siehe [Preise und Marktdaten](../konfiguration/preise.md#benutzertarife-user_tariffsjson)).
+
 ### Eigener Festpreis (szenario-lokal)
 
 Im Szenarienkonfigurator enthalten die Dropdowns für Bezug und Einspeisung den Eintrag **Eigener Festpreis**. Earnie speichert den Cent/kWh-Wert am Szenario in `backtesting_scenarios.json` (`user_import_cent_kwh` / `user_export_cent_kwh`, Tarif-ID `__user_fixed__`). In `tariffs.json` landet er **nicht**.

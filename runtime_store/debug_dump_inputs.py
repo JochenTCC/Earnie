@@ -16,6 +16,7 @@ from runtime_store.persist_paths import (
     resolve_local_settings_json_path,
     resolve_runtime_prefixed_path,
     resolve_tariffs_json_path,
+    resolve_user_tariffs_json_path,
     runtime_dir,
 )
 
@@ -48,6 +49,7 @@ def collect_dump_context() -> dict[str, object]:
             "config_json": resolve_config_json_path(),
             "components_json": resolve_components_json_path(),
             "tariffs_json": resolve_tariffs_json_path(),
+            "user_tariffs_json": resolve_user_tariffs_json_path(),
             "grid_fees_json": resolve_grid_fees_json_path(),
             "house_profiles_json": resolve_house_profiles_json_path(),
             "backtesting_scenarios_json": resolve_backtesting_scenarios_json_path(),
@@ -67,6 +69,7 @@ def iter_input_files() -> list[tuple[str, str]]:
         ("inputs/config.json", resolved["config_json"]),
         ("inputs/components.json", resolved["components_json"]),
         ("inputs/tariffs.json", resolved["tariffs_json"]),
+        ("inputs/user_tariffs.json", resolved["user_tariffs_json"]),
         ("inputs/grid_fees.json", resolved["grid_fees_json"]),
         ("inputs/house_profiles.json", resolved["house_profiles_json"]),
         ("inputs/backtesting_scenarios.json", resolved["backtesting_scenarios_json"]),

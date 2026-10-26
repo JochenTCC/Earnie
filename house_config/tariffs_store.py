@@ -462,7 +462,135 @@ def normalize_tariffs_document(doc: dict) -> dict:
 
 
 def load_tariffs_document(path: str) -> dict:
-    return normalize_tariffs_document(_read_json(path))
+    """``tariffs.json`` plus the Edibert user file ``user_tariffs.json`` next to it (if present)."""
+    from runtime_store.persist_paths import user_tariffs_path_for
+
+    normalized = normalize_tariffs_document(_read_json(path))
+    user_path = user_tariffs_path_for(path)
+    if os.path.isfile(user_path):
+        merge_user_tariffs(normalized, user_path)
+    return normalized
+
+
+# --- Edibert user tariffs (user_tariffs.json, Edibert P1) ---------------------------
+
+ORIGIN_KEY = "origin"
+ORIGIN_USER = "user"
+ENGINE_PENDING_KEY = "engine_pending_fields"
+# Fields Earnie's own engine prices with or carries as metadata.
+_EARNIE_ENGINE_FIELDS = frozenset(
+    {
+        "id", "label", "type", "land", "currency", "supplier_id", "notes",
+        "settlement_fee_cent_kwh", "markup_percent", "prices_include_vat", "vat_percent",
+        "settlement_mtu", "fix_cent_kwh", "k_push_cent", "monthly_rates", "monthly_seed",
+        "feed_in_fee_factor", "feed_in_fix_cent", "monthly_fee_eur", "grid_monthly_fee_eur",
+        "metering_monthly_fee_eur", "other_monthly_fee_eur",
+    }
+)  # fmt: skip
+# Edibert fields without price effect (display / metadata only).
+_EDIBERT_DISPLAY_FIELDS = frozenset(
+    {"$comment", "requires", "behavior_notes", "source", "last_verified", "individual", "applies_to"}
+)
+# Only change a price through rules; without rules they have no effect.
+_RULE_MODIFIER_FIELDS = frozenset({"holidays", "extra_holiday_dates"})
+
+
+def engine_pending_fields(raw: dict) -> tuple[str, ...]:
+    """Fields of a user tariff that Earnie's engine cannot price yet (until Edibert P3b).
+
+    Allowlist: every field that is neither priced by Earnie nor display-only counts, so a
+    field added to Edibert later is never ignored silently.
+    """
+    pending: list[str] = []
+    for key, value in raw.items():
+        if key in _EARNIE_ENGINE_FIELDS or key in _EDIBERT_DISPLAY_FIELDS:
+            continue
+        if key == "rules" and not value:
+            continue
+        if key in _RULE_MODIFIER_FIELDS and not raw.get("rules"):
+            continue
+        pending.append(key)
+    return tuple(sorted(pending))
+
+
+def is_engine_pending(tariff: dict) -> bool:
+    return bool(tariff.get(ENGINE_PENDING_KEY))
+
+
+def tariff_display_label(tariff: dict) -> str:
+    """Selection label: user tariffs are marked, unpriceable ones say so."""
+    label = str(tariff.get("label") or tariff.get("id") or "").strip()
+    if tariff.get(ORIGIN_KEY) != ORIGIN_USER:
+        return label
+    if is_engine_pending(tariff):
+        return f"{label} · Benutzertarif, erst ab Engine-Umstellung"
+    return f"{label} · Benutzertarif"
+
+
+def _pending_user_spec(raw: dict, kind: str, index: int, pending: tuple[str, ...]) -> dict:
+    """Selection entry for a user tariff Earnie cannot price yet (no engine fields)."""
+    tariff_id = str(raw.get("id", "")).strip()
+    tariff_type = str(raw.get("type", "")).strip().lower()
+    label = str(raw.get("label", tariff_id)).strip() or tariff_id
+    spec: dict = {"id": tariff_id, "label": label, "type": tariff_type}
+    _normalize_dach_fields(raw, spec)
+    _require_land(spec, kind=kind, index=index)
+    spec["supplier_id"] = resolve_supplier_id(raw, tariff_id=tariff_id, label=label)
+    spec[ENGINE_PENDING_KEY] = pending
+    return spec
+
+
+def _merge_user_section(
+    target: dict[str, dict], items: object, *, kind: str, user_path: str
+) -> None:
+    if items is None:
+        return
+    if not isinstance(items, list):
+        raise ValueError(f"user_tariffs.json: {kind} muss ein Array sein.")
+    build = _import_tariff_spec if kind == "import_tariffs" else _export_tariff_spec
+    for index, raw in enumerate(items):
+        pending = engine_pending_fields(raw)
+        try:
+            spec = (
+                _pending_user_spec(raw, kind, index, pending)
+                if pending
+                else build(raw, index)
+            )
+        except ValueError as exc:
+            raise ValueError(f"user_tariffs.json ({user_path}): {exc}") from exc
+        if spec["id"] in target:
+            raise ValueError(
+                f"user_tariffs.json: {kind} '{spec['id']}' gibt es schon in tariffs.json."
+            )
+        spec[ORIGIN_KEY] = ORIGIN_USER
+        target[spec["id"]] = spec
+
+
+def merge_user_tariffs(normalized: dict, user_path: str) -> None:
+    """Add the user tariffs to a normalized catalog; Edibert checks the file first (fail loud)."""
+    from house_config.edibert_tariffs import load_user_tariff_set
+
+    load_user_tariff_set(user_path)
+    doc = _read_json(user_path)
+    _merge_user_section(
+        normalized["import_tariffs"], doc.get("import_tariffs"),
+        kind="import_tariffs", user_path=user_path,
+    )  # fmt: skip
+    _merge_user_section(
+        normalized["export_tariffs"], doc.get("export_tariffs"),
+        kind="export_tariffs", user_path=user_path,
+    )  # fmt: skip
+
+
+def _reject_engine_pending(tariff: dict, *, side: str) -> None:
+    if not is_engine_pending(tariff):
+        return
+    fields = ", ".join(tariff[ENGINE_PENDING_KEY])
+    raise ValueError(
+        f"{side} '{tariff['id']}' ist ein Benutzertarif mit {fields} — Earnie kann ihn erst "
+        "nach der Engine-Umstellung auf Edibert bepreisen. Bitte vorerst einen anderen "
+        "Tarif wählen."
+    )
 
 
 def resolve_import_tariff_into_settings(settings: dict, tariffs: dict) -> dict:
@@ -485,6 +613,7 @@ def resolve_import_tariff_into_settings(settings: dict, tariffs: dict) -> dict:
     if tariff_id not in import_map:
         raise ValueError(f"Unbekannte import_tariff_id '{tariff_id}'.")
     tariff = dict(import_map[tariff_id])
+    _reject_engine_pending(tariff, side="Bezugstarif")
     out["_import_tariff_spec"] = tariff
     out["import_tariff_type"] = tariff["type"]
     if tariff["type"] == "fixed_cent":
@@ -520,6 +649,7 @@ def resolve_export_tariff_into_settings(
     if tariff_id not in export_map:
         raise ValueError(f"Unbekannte export_tariff_id '{tariff_id}'.")
     tariff = dict(export_map[tariff_id])
+    _reject_engine_pending(tariff, side="Einspeisetarif")
     out["_export_tariff_spec"] = tariff
     if tariff["type"] == "fixed":
         out["feed_in_mode"] = "fixed"

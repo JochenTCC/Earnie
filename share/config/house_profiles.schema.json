@@ -633,6 +633,11 @@
           ],
           "description": "Land für Tariffilter (Szenarienkonfigurator). Soft-Default AT wenn fehlend."
         },
+        "region": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional: Bundesland/Kanton für den Feiertagskalender (Edibert, Paket holidays): AT 1–9 (1 Burgenland … 9 Wien), DE z. B. BY, CH z. B. ZH. Fehlt = kein Feiertagskalender; Tarife mit Wochentag-/Feiertagsregeln brauchen sie."
+        },
         "netznutzung": {
           "type": "object",
           "description": "Netznutzung Arbeitspreis (netto, ohne USt), unabhängig vom Lieferantentarif; wird zum Bezugspreis addiert. Mit area_id aus share/config/grid_fees.json (inkl. Zeitregeln wie SNAP/WiNAP), sonst manueller Basiswert.",

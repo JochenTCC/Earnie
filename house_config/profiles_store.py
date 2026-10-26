@@ -121,6 +121,21 @@ def _float_field_or_default(raw: dict, key: str, default: float) -> float:
         raise ValueError(f"profiles: {key} ungültig: {value!r}.") from exc
 
 
+def _normalize_region(raw: dict, land: str) -> str:
+    """Optional holiday region (Bundesland/Kanton) for Edibert; empty = none. Unknown = error."""
+    region = str(raw.get("region", "") or "").strip()
+    if not region:
+        return ""
+    from house_config.edibert_tariffs import holiday_regions
+
+    if region not in holiday_regions(land):
+        raise ValueError(
+            f"profiles: region {region!r} ist für Land {land} unbekannt "
+            "(Feiertagskalender, Bundesland/Kanton)."
+        )
+    return region
+
+
 def _profile_geo_and_csv_fields(raw: dict) -> dict:
     annual_kwh = float(raw.get("annual_kwh", 0.0) or 0.0)
     total_profile_csv = str(raw.get("total_profile_csv", "") or "").strip()
@@ -141,7 +156,9 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
             "python -m scripts.migrate_grid_fee_profile --path <house_profiles.json>"
         )
     netznutzung = normalize_netznutzung_config(raw.get("netznutzung"))
+    region = _normalize_region(raw, land)
     return {
+        "region": region,
         "annual_kwh": annual_kwh,
         "total_profile_csv": total_profile_csv,
         "pv_profile_csv": pv_profile_csv,
@@ -179,6 +196,7 @@ def _normalize_profile(raw: dict, index: int) -> dict:
             "thermal_annual-Verbraucher erforderlich."
         )
     fields = _profile_geo_and_csv_fields(raw)
+    region = fields.pop("region")
     consumers = _normalize_profile_consumers(
         consumers_raw,
         profile_id=profile_id,
@@ -189,7 +207,7 @@ def _normalize_profile(raw: dict, index: int) -> dict:
     # Grundlast (baseload_kwh / consumer_kwh / baseload_min_kwh) is NOT derived here:
     # it needs Open-Meteo weather and thus a built Config. Resolve at the point of use
     # via house_config.baseload.resolve_profile_baseload / profile_baseload_kwh.
-    return {
+    spec = {
         "id": profile_id,
         "label": label,
         "annual_kwh": fields["annual_kwh"],
@@ -211,6 +229,10 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         ),
         "consumers": consumers,
     }
+    # Only when set, so profiles without a region keep their exact normalized shape.
+    if region:
+        spec["region"] = region
+    return spec
 
 
 def _plant_max_export_kw(raw: dict) -> float | None:
@@ -399,6 +421,8 @@ def _serialize_profile(profile: dict) -> dict:
     }
     land = str(profile.get("land") or "AT").strip().upper()
     out["land"] = land if land in {"AT", "DE", "CH"} else "AT"
+    if profile.get("region"):
+        out["region"] = profile["region"]
     if profile.get("latitude") is not None:
         out["latitude"] = profile["latitude"]
     if profile.get("longitude") is not None:

@@ -4,14 +4,14 @@ from __future__ import annotations
 from typing import Any
 
 from runtime_store.data_model import ensure_compatible
-from runtime_store.migration.io_util import EARNIE_TRACK_FILES, GRID_FEES_FILE
+from runtime_store.migration.io_util import EARNIE_TRACK_FILES, TARIFF_TRACK_FILES
 from runtime_store.migration.types import Docs
 
 
 def validate_migrated_docs(docs: Docs) -> None:
     """Raise if migrated pack docs are not loadable under the current model."""
     for name, doc in docs.items():
-        if name == GRID_FEES_FILE:
+        if name in TARIFF_TRACK_FILES:
             continue
         if name in EARNIE_TRACK_FILES:
             ensure_compatible(doc, label=name)

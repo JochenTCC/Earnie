@@ -17,6 +17,8 @@ from house_config.tariff_plausibility import (
 from house_config.tariffs_store import load_tariffs_document
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
+    resolve_grid_fees_json_path,
+    resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
     resolve_tariffs_schema_template_path,
 )
@@ -62,11 +64,16 @@ def run_validation(
     check_catalog: bool,
     import_json: str,
     export_json: str,
+    grid_fees_path: str | None = None,
+    house_profiles_path: str | None = None,
 ) -> list[str]:
     errors = collect_tariff_plausibility_errors(
         tariffs_path=tariffs_path,
         scenarios_path=scenarios_path,
         schema_path=schema_path,
+        with_edibert=True,
+        grid_fees_path=grid_fees_path,
+        house_profiles_path=house_profiles_path,
     )
     if check_catalog:
         errors.extend(
@@ -109,6 +116,21 @@ def main(argv: list[str] | None = None) -> int:
         help="JSON-Schema-Prüfung überspringen",
     )
     parser.add_argument(
+        "--grid-fees",
+        default=None,
+        help="Pfad zu grid_fees.json (Standard: neben config.json); Prüfung über Edibert",
+    )
+    parser.add_argument(
+        "--house-profiles",
+        default=None,
+        help="Pfad zu house_profiles.json (Standard: neben config.json); Region/Land über Edibert",
+    )
+    parser.add_argument(
+        "--skip-profiles",
+        action="store_true",
+        help="Preis-Kontext der Hausprofile nicht prüfen",
+    )
+    parser.add_argument(
         "--check-catalog",
         action="store_true",
         help="Vollständigkeit gegen stromtarife/einspeisetarife DACH-JSONs prüfen",
@@ -140,6 +162,10 @@ def main(argv: list[str] | None = None) -> int:
         check_catalog=args.check_catalog,
         import_json=args.import_json,
         export_json=args.export_json,
+        grid_fees_path=args.grid_fees or resolve_grid_fees_json_path(),
+        house_profiles_path=None if args.skip_profiles else (
+            args.house_profiles or resolve_house_profiles_json_path()
+        ),
     )
     if errors:
         print(format_tariff_plausibility_errors(errors), file=sys.stderr)

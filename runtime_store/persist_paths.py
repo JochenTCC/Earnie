@@ -540,6 +540,19 @@ def resolve_tariffs_json_path() -> str:
     )
 
 
+USER_TARIFFS_JSON = "user_tariffs.json"
+
+
+def user_tariffs_path_for(tariffs_path: str) -> str:
+    """Edibert user file (``user_tariffs.json``) next to the given ``tariffs.json``."""
+    return os.path.join(os.path.dirname(tariffs_path), USER_TARIFFS_JSON)
+
+
+def resolve_user_tariffs_json_path() -> str:
+    """Pfad zu user_tariffs.json: immer neben tariffs.json (kein eigener ENV-Override)."""
+    return user_tariffs_path_for(resolve_tariffs_json_path())
+
+
 def bundled_house_profiles_example_file() -> str:
     return os.path.join(bundled_config_dir(), "house_profiles.example.json")
 

@@ -1,7 +1,11 @@
 """Location / thermal consumer fields for Hausprofil form."""
 from __future__ import annotations
 
-from ui.house_config_profile_session import _live_markers_enabled, _scoped_key
+from ui.house_config_profile_session import (
+    _live_markers_enabled,
+    _scoped_key,
+    region_widget_key,
+)
 
 
 import streamlit as st
@@ -81,6 +85,26 @@ def _seed_land_widget_key(session_scope: str) -> str:
     elif st.session_state[land_key] not in {"AT", "DE", "CH"}:
         st.session_state[land_key] = "AT"
     return land_key
+
+def _render_region_select(*, session_scope: str, land: str) -> str:
+    from house_config.edibert_tariffs import holiday_regions, region_label
+
+    options = ["", *holiday_regions(land)]
+    key = region_widget_key(session_scope, land)
+    if st.session_state.get(key) not in options:
+        st.session_state[key] = ""
+    region = st.selectbox(
+        "Region (Feiertage)",
+        options=options,
+        key=key,
+        format_func=lambda code: region_label(land, code),
+        help=(
+            "Bundesland bzw. Kanton für den Feiertagskalender. Nur nötig für Tarife "
+            "mit Zeitregeln nach Wochentag/Feiertag (Benutzertarife aus Edibert)."
+        ),
+    )
+    return str(region or "")
+
 
 def _render_geo_row(*, session_scope: str, land_key: str) -> tuple[float, float, str]:
     col_lat, col_lon, col_land = st.columns(3)
@@ -227,12 +251,14 @@ def _render_location_fields(*, session_scope: str) -> dict:
 
     timezone_name = timezone_for_land(land)
     st.caption(f"Zeitzone (aus Land): **{timezone_name}**")
+    region = _render_region_select(session_scope=session_scope, land=land)
     default_pv_tilt, default_pv_azimuth = _render_pv_default_row(
         session_scope=session_scope
     )
     netznutzung = _render_nne_arbeitspreis(session_scope=session_scope)
     return {
         "land": land,
+        "region": region,
         "latitude": latitude,
         "longitude": longitude,
         "timezone_name": timezone_name,

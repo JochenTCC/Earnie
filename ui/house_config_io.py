@@ -114,13 +114,19 @@ def list_pv_systems() -> list[dict]:
 def list_inverters() -> list[dict]:
     return config.get_inverters()
 
+def _selection_entries(tariffs: dict) -> list[dict]:
+    """Tariffs for the selects; user tariffs (Edibert) carry a marker in the label."""
+    from house_config.tariffs_store import tariff_display_label
+
+    return [{**t, "label": tariff_display_label(t)} for t in tariffs.values()]
+
 def list_import_tariffs() -> list[dict]:
     doc = load_tariffs()
-    return list(doc.get("import_tariffs", {}).values())
+    return _selection_entries(doc.get("import_tariffs", {}))
 
 def list_export_tariffs() -> list[dict]:
     doc = load_tariffs()
-    return list(doc.get("export_tariffs", {}).values())
+    return _selection_entries(doc.get("export_tariffs", {}))
 
 def load_tariffs_catalog_meta() -> dict:
     doc = load_tariffs()
@@ -139,6 +145,8 @@ def upsert_house_profile(profile: dict) -> None:
         profiles = list(raw.get("profiles", []))
     else:
         profiles = []
+    # Optional holiday region: absent rather than "" when not chosen.
+    profile = {k: v for k, v in profile.items() if not (k == "region" and not v)}
     profile_id = str(profile.get("id", "")).strip()
     assert_unique_label(profile.get("label"), profiles, exclude_id=profile_id)
     consumers = list(profile.get("consumers") or [])

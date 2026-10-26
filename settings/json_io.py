@@ -25,11 +25,13 @@ def read_json_dict(path: str) -> dict:
     ) from last_decode_error
 
 
-def _is_grid_fees_path(path: str) -> bool:
-    """True when ``path`` is the tariff-track catalog (no earnie_data_model stamp)."""
+def _is_tariff_track_path(path: str) -> bool:
+    """True when ``path`` is a tariff-track file (no earnie_data_model stamp)."""
     from pathlib import Path
 
-    return Path(path).name == "grid_fees.json"
+    from runtime_store.data_model import TARIFF_TRACK_FILES
+
+    return Path(path).name in TARIFF_TRACK_FILES
 
 
 def write_json_dict(path: str, data: dict) -> None:
@@ -60,7 +62,7 @@ def write_json_dict(path: str, data: dict) -> None:
                     f"Shadow Mode: Konfiguration schreibgeschützt ({path})"
                 )
 
-    if not _is_grid_fees_path(path):
+    if not _is_tariff_track_path(path):
         stamp_data_model(data)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)

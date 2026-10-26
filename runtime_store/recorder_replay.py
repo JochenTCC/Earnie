@@ -24,6 +24,7 @@ _ARCHIVE_TO_ENV: dict[str, str] = {
     "inputs/config.json": "config/config.json",
     "inputs/components.json": "config/components.json",
     "inputs/tariffs.json": "config/tariffs.json",
+    "inputs/user_tariffs.json": "config/user_tariffs.json",
     "inputs/grid_fees.json": "config/grid_fees.json",
     "inputs/house_profiles.json": "config/house_profiles.json",
     "inputs/backtesting_scenarios.json": "config/backtesting_scenarios.json",

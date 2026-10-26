@@ -9,7 +9,7 @@ from typing import Any, Iterable
 from runtime_store.data_model import CURRENT_DATA_MODEL, read_data_model
 from runtime_store.migration.chain import apply_chain
 from runtime_store.migration.io_util import (
-    GRID_FEES_FILE,
+    TARIFF_TRACK_FILES,
     load_pack_docs,
     replace_pack_docs,
     write_json_atomic,
@@ -40,7 +40,7 @@ def _earnie_version() -> str:
 def _from_model(docs: dict[str, dict[str, Any]]) -> int | None:
     versions: list[int] = []
     for name, doc in docs.items():
-        if name == GRID_FEES_FILE:
+        if name in TARIFF_TRACK_FILES:
             continue
         version = read_data_model(doc)
         if version is not None:

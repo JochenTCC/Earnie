@@ -14,6 +14,8 @@ from integrations.loxone_connectivity import loxone_env_configured, verify_loxon
 from runtime_store.env_vars import read_env
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
+    resolve_grid_fees_json_path,
+    resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
     resolve_tariffs_schema_template_path,
 )
@@ -240,6 +242,9 @@ def run_tariff_plausibility_on_startup() -> None:
         tariffs_path=resolve_tariffs_json_path(),
         scenarios_path=resolve_backtesting_scenarios_json_path(),
         schema_path=resolve_tariffs_schema_template_path(),
+        with_edibert=True,
+        grid_fees_path=resolve_grid_fees_json_path(),
+        house_profiles_path=resolve_house_profiles_json_path(),
     )
     if not errors:
         logger.info("Tarif-Startup-Prüfung: tariffs.json plausibel.")

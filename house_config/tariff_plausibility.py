@@ -7,8 +7,10 @@ import os
 import jsonschema
 
 from house_config.tariffs_store import (
+    ENGINE_PENDING_KEY,
     USER_EXPORT_CENT_KEY,
     USER_IMPORT_CENT_KEY,
+    is_engine_pending,
     is_user_fixed_tariff_id,
     load_tariffs_document,
     resolve_export_tariff_id,
@@ -78,6 +80,14 @@ def validate_tariffs_against_schema(
         ) from exc
 
 
+def _engine_pending_ref_error(scenario_id: str, tariff: dict) -> str:
+    fields = ", ".join(tariff[ENGINE_PENDING_KEY])
+    return (
+        f"Szenario '{scenario_id}': Benutzertarif '{tariff['id']}' nutzt {fields} und ist "
+        "erst nach der Engine-Umstellung auf Edibert bepreisbar."
+    )
+
+
 def collect_scenario_tariff_ref_errors(
     scenarios_path: str,
     tariffs_path: str,
@@ -95,8 +105,8 @@ def collect_scenario_tariff_ref_errors(
     except ValueError as exc:
         return [str(exc)]
 
-    import_ids = set(tariffs.get("import_tariffs", {}))
-    export_ids = set(tariffs.get("export_tariffs", {}))
+    import_map = tariffs.get("import_tariffs", {})
+    export_map = tariffs.get("export_tariffs", {})
     errors: list[str] = []
 
     for index, entry in enumerate(scenarios):
@@ -117,10 +127,12 @@ def collect_scenario_tariff_ref_errors(
                 )
                 if err:
                     errors.append(err)
-            elif import_id not in import_ids:
+            elif import_id not in import_map:
                 errors.append(
                     f"Szenario '{scenario_id}': unbekannte import_tariff_id '{import_id}'."
                 )
+            elif is_engine_pending(import_map[import_id]):
+                errors.append(_engine_pending_ref_error(scenario_id, import_map[import_id]))
         if export_id:
             if is_user_fixed_tariff_id(export_id):
                 err = _user_fixed_cent_error(
@@ -128,10 +140,12 @@ def collect_scenario_tariff_ref_errors(
                 )
                 if err:
                     errors.append(err)
-            elif export_id not in export_ids:
+            elif export_id not in export_map:
                 errors.append(
                     f"Szenario '{scenario_id}': unbekannte export_tariff_id '{export_id}'."
                 )
+            elif is_engine_pending(export_map[export_id]):
+                errors.append(_engine_pending_ref_error(scenario_id, export_map[export_id]))
     return errors
 
 
@@ -140,8 +154,16 @@ def collect_tariff_plausibility_errors(
     tariffs_path: str,
     scenarios_path: str | None = None,
     schema_path: str | None = None,
+    with_edibert: bool = False,
+    grid_fees_path: str | None = None,
+    house_profiles_path: str | None = None,
 ) -> list[str]:
-    """Sammelt alle Plausibilitätsfehler (leer = ok)."""
+    """Sammelt alle Plausibilitätsfehler (leer = ok).
+
+    ``with_edibert``: zusätzlich lädt Edibert Katalog, Benutzertarife, ``grid_fees.json``
+    und den Preis-Kontext jedes Hausprofils (Edibert P1, nur Prüfung — bepreist wird
+    weiter mit Earnies eigener Engine). Start-Check und ``scripts.validate_tariffs``.
+    """
     errors: list[str] = []
     if not os.path.isfile(tariffs_path):
         return [f"tariffs.json nicht gefunden: {tariffs_path!r}."]
@@ -158,9 +180,43 @@ def collect_tariff_plausibility_errors(
         except ValueError as exc:
             errors.append(str(exc))
 
+    if with_edibert:
+        errors.extend(
+            _collect_edibert_errors(
+                tariffs_path=tariffs_path,
+                grid_fees_path=grid_fees_path,
+                house_profiles_path=house_profiles_path,
+            )
+        )
+
     if scenarios_path and os.path.isfile(scenarios_path):
         errors.extend(collect_scenario_tariff_ref_errors(scenarios_path, tariffs_path))
     return errors
+
+
+def _collect_edibert_errors(
+    *,
+    tariffs_path: str,
+    grid_fees_path: str | None,
+    house_profiles_path: str | None,
+) -> list[str]:
+    from house_config.edibert_tariffs import collect_edibert_load_errors
+    from runtime_store.persist_paths import user_tariffs_path_for
+
+    profiles: dict = {}
+    if house_profiles_path and os.path.isfile(house_profiles_path):
+        from house_config.profiles_store import load_house_profiles_document
+
+        try:
+            profiles = load_house_profiles_document(house_profiles_path).get("profiles", {})
+        except ValueError as exc:
+            return [f"house_profiles.json: {exc}"]
+    return collect_edibert_load_errors(
+        tariffs_path=tariffs_path,
+        user_tariffs_path=user_tariffs_path_for(tariffs_path),
+        grid_fees_path=grid_fees_path,
+        profiles=profiles,
+    )
 
 
 def format_tariff_plausibility_errors(errors: list[str]) -> str:

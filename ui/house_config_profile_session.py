@@ -111,6 +111,11 @@ def _bump_consumer_widget_gen(session_scope: str) -> int:
     return nxt
 
 
+def region_widget_key(session_scope: str, land: str) -> str:
+    """One key per country, so a country switch never keeps a foreign region."""
+    return _scoped_key(session_scope, f"house_profile_region_{land}")
+
+
 def _scoped_key(session_scope: str, base: str) -> str:
     # Index-keyed consumer widgets (hc_*) include a generation so Entfernen cannot
     # leave Streamlit frontend state on reused indices (label/id shift bug).
@@ -204,6 +209,7 @@ def _seed_profile_widget_state(
         land = str(existing.get("land") or "AT").strip().upper()
         if land not in {"AT", "DE", "CH"}:
             land = "AT"
+        region = str(existing.get("region") or "").strip()
         latitude = float(existing.get("latitude", 48.2))
         longitude = float(existing.get("longitude", 11.0))
         default_pv_tilt = int(existing.get("default_pv_tilt", 25))
@@ -214,6 +220,7 @@ def _seed_profile_widget_state(
         label = allocate_unique_label("Mein Haushalt", siblings or [])
         annual_kwh = 4500.0
         land = "AT"
+        region = ""
         latitude = 48.2
         longitude = 11.0
         default_pv_tilt = 25
@@ -223,6 +230,7 @@ def _seed_profile_widget_state(
     st.session_state[_scoped_key(session_scope, "house_profile_label")] = label
     st.session_state[_scoped_key(session_scope, "house_annual_kwh")] = annual_kwh
     st.session_state[_scoped_key(session_scope, "house_profile_land")] = land
+    st.session_state[region_widget_key(session_scope, land)] = region
     st.session_state[_scoped_key(session_scope, "house_profile_latitude")] = latitude
     st.session_state[_scoped_key(session_scope, "house_profile_longitude")] = longitude
     st.session_state[_scoped_key(session_scope, "house_profile_default_pv_tilt")] = default_pv_tilt

@@ -21,6 +21,7 @@ from runtime_store.persist_paths import (
     resolve_grid_fees_json_path,
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
+    resolve_user_tariffs_json_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ REQUEST_TIMEOUT_SEC = 3.0
 _PLAN_INPUT_RESOLVERS: tuple[Callable[[], str], ...] = (
     resolve_config_json_path,
     resolve_tariffs_json_path,
+    resolve_user_tariffs_json_path,
     resolve_house_profiles_json_path,
     resolve_backtesting_scenarios_json_path,
     resolve_components_json_path,

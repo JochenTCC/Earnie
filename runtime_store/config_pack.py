@@ -14,6 +14,7 @@ from typing import Any
 from runtime_store.data_model import (
     CURRENT_DATA_MODEL,
     DATA_MODEL_KEY,
+    TARIFF_TRACK_FILES,
     DataModelError,
     ensure_compatible,
     stamp_data_model,
@@ -27,6 +28,7 @@ from runtime_store.persist_paths import (
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
     resolve_uploads_dir,
+    resolve_user_tariffs_json_path,
 )
 from settings.json_io import read_json_dict, write_json_dict
 
@@ -38,6 +40,7 @@ PACK_JSON_FILES: tuple[tuple[str, Any], ...] = (
     ("grid_fees.json", resolve_grid_fees_json_path),
     ("house_profiles.json", resolve_house_profiles_json_path),
     ("tariffs.json", resolve_tariffs_json_path),
+    ("user_tariffs.json", resolve_user_tariffs_json_path),
 )
 
 MANIFEST_NAME = "earnie_config_pack.json"
@@ -58,7 +61,7 @@ def build_config_pack_bytes() -> bytes:
                 continue
             doc = read_json_dict(path)
             # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
-            if arcname != "grid_fees.json":
+            if arcname not in TARIFF_TRACK_FILES:
                 stamp_data_model(doc)
             archive.writestr(
                 arcname,
@@ -100,7 +103,7 @@ def _migrate_and_validate_pack_docs(
     json_payloads = chain.docs
     validate_migrated_docs(json_payloads)
     for name, doc in json_payloads.items():
-        if name == "grid_fees.json":
+        if name in TARIFF_TRACK_FILES:
             continue
         # Compatibility first — never stamp before ensure (would whitewash v1/v2/untagged).
         ensure_compatible(doc, label=name)
@@ -192,7 +195,7 @@ def _write_pack_to_config_dir(
                 continue
             dest = Path(resolver())
             dest.parent.mkdir(parents=True, exist_ok=True)
-            if arcname == "grid_fees.json":
+            if arcname in TARIFF_TRACK_FILES:
                 # Tariff-track file: never stamp earnie_data_model (ConfigMigration).
                 dest.write_text(
                     json.dumps(json_payloads[arcname], indent=4, ensure_ascii=False)

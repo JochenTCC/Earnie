@@ -167,6 +167,13 @@ def _missing_live_tariff_items(live_settings: dict, tariffs_path: str) -> list[s
     export_id = str(live_settings.get("export_tariff_id", "") or "").strip()
     tariffs_doc = _read_json_document(tariffs_path)
     import_map, export_map = _tariff_id_maps_from_doc(tariffs_doc)
+    from runtime_store.persist_paths import user_tariffs_path_for
+
+    user_import, user_export = _tariff_id_maps_from_doc(
+        _read_json_document(user_tariffs_path_for(tariffs_path))
+    )
+    import_map |= user_import
+    export_map |= user_export
     from house_config.tariffs_store import (
         USER_EXPORT_CENT_KEY,
         USER_IMPORT_CENT_KEY,

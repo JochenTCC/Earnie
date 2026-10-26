@@ -26,6 +26,7 @@ Enthaltene Dateien:
 | `components.json` | PV / Batterie |
 | `house_profiles.json` | Hausprofile |
 | `tariffs.json` | Tarifkatalog |
+| `user_tariffs.json` | Benutzertarife aus Edibert (nur wenn vorhanden) |
 | `grid_fees.json` | Netzentgeltkatalog |
 | `deviation_rules.json` | Soll/Ist-Regeln |
 | `uploads/*` | Profil-CSVs |
@@ -34,7 +35,7 @@ Enthaltene Dateien:
 
 ### Datenmodell-Version
 
-Das Manifest des ZIP (`earnie_config_pack.json`) und die JSON-Dateien tragen das Feld `earnie_data_model` (aktuell `4`). Ausgenommen ist `grid_fees.json`: Earnie schreibt das Feld dort weder beim Export noch beim Import. Beim Import prüft Earnie Manifest und jede Earnie-Track-Datei:
+Das Manifest des ZIP (`earnie_config_pack.json`) und die JSON-Dateien tragen das Feld `earnie_data_model` (aktuell `4`). Ausgenommen sind `grid_fees.json` und `user_tariffs.json`: Earnie schreibt das Feld dort weder beim Export noch beim Import. Beim Import prüft Earnie Manifest und jede Earnie-Track-Datei:
 
 - **Version `4`:** Earnie übernimmt die Dateien. Beim Schreiben setzt Earnie das Feld in den Dateien auf `4`.
 - **Version `3`:** Earnie hebt die Dateien automatisch auf Version `4` an. Dieselbe Migrationskette läuft auch im [Migrations-Assistenten](../einrichtung/betrieb.md#update-und-migration) für die Konfiguration im Betrieb.

@@ -18,7 +18,7 @@ from house_config.clear_loxone_binding_names import (
 from runtime_store.data_model import read_data_model
 from runtime_store.ehal_setup import BACKEND_LOXONE, normalize_backend
 from runtime_store.migrate_v4 import LEGACY_DATA_MODEL
-from runtime_store.migration.io_util import GRID_FEES_FILE
+from runtime_store.migration.io_util import TARIFF_TRACK_FILES
 from runtime_store.migration.types import (
     Answers,
     Blocker,
@@ -99,7 +99,7 @@ def detect_on_start(docs: Docs) -> bool:
     return any(
         read_data_model(doc) == LEGACY_DATA_MODEL
         for name, doc in docs.items()
-        if name != GRID_FEES_FILE
+        if name not in TARIFF_TRACK_FILES
     )
 
 

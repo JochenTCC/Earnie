@@ -22,7 +22,7 @@ Earnie’s config pack JSON can change shape across releases. Operators on Docke
 | Earnie data model | `earnie_data_model` (int, today 4) | Earnie registry | Active |
 | Tariff format | `tariff_format` (int) | Edibert | **Deferred to Version 2.8** |
 
-Until 2.8, `grid_fees.json` stays untagged and is **exempt** from the untagged blocker; do not stamp it with `earnie_data_model`.
+Until Edibert P2, the tariff-track files `grid_fees.json` and `user_tariffs.json` (Edibert P1, next to `tariffs.json`) stay untagged and are **exempt** from the untagged blocker; do not stamp them with `earnie_data_model`. The set lives in `runtime_store.data_model.TARIFF_TRACK_FILES`.
 
 Chain start: data model **3**. Models **1** and **2** are blockers (“Konfiguration zu alt”). Untagged Earnie-track files are blockers (“Version unbekannt”) — no guessing, no silent stamp.
 

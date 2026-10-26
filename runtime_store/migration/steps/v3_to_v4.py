@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 
+from runtime_store.data_model import TARIFF_TRACK_FILES
 from runtime_store.migrate_v4 import MigrateV4Error, migrate_pack_docs, needs_v4_migration
 from runtime_store.migration.steps.inverters import pv_on_main_inverter_todos
 from runtime_store.migration.types import (
@@ -23,13 +24,13 @@ def detect(docs: Docs) -> bool:
 
 def apply(docs: Docs, answers: Answers) -> StepResult:
     del answers
-    # Do not stamp grid_fees.json onto earnie_data_model (tariff track / 2.7 exempt).
+    # Do not stamp tariff-track files onto earnie_data_model (grid_fees, user_tariffs).
     work = {
         name: copy.deepcopy(doc)
         for name, doc in docs.items()
-        if name != "grid_fees.json"
+        if name not in TARIFF_TRACK_FILES
     }
-    held_grid = docs.get("grid_fees.json")
+    held = {name: docs[name] for name in TARIFF_TRACK_FILES if name in docs}
     try:
         out = migrate_pack_docs(work)
     except MigrateV4Error as exc:
@@ -38,10 +39,13 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
             changed_files=(),
             blockers=(Blocker(step_id=STEP_ID, message_de=str(exc)),),
         )
-    if isinstance(held_grid, dict):
-        out["grid_fees.json"] = copy.deepcopy(held_grid)
+    for name, doc in held.items():
+        if isinstance(doc, dict):
+            out[name] = copy.deepcopy(doc)
     changed = tuple(
-        name for name in out if name != "grid_fees.json" and docs.get(name) != out.get(name)
+        name
+        for name in out
+        if name not in TARIFF_TRACK_FILES and docs.get(name) != out.get(name)
     )
     return StepResult(docs=out, changed_files=changed)
 

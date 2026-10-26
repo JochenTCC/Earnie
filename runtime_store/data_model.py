@@ -10,6 +10,10 @@ MIGRATABLE_DATA_MODELS: frozenset[int] = frozenset({3})
 
 DATA_MODEL_KEY = "earnie_data_model"
 
+# Tariff-track pack files (Edibert format, own version from Edibert P2): never
+# stamped with earnie_data_model and exempt from the untagged blocker.
+TARIFF_TRACK_FILES: frozenset[str] = frozenset({"grid_fees.json", "user_tariffs.json"})
+
 _LEGACY_SIM_BLOCK = "file_paths_battery_simulation"
 _SIM_BLOCK = "scenario_explorer_conf"
 _REMOVED_PATH_KEYS = ("path_consumption", "path_production")

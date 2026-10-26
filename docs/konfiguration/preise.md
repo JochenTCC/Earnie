@@ -76,6 +76,8 @@ Der Preis bleibt dabei gleich. Danach den Netzbereich im Hausprofil wählen oder
 
 Der Hauskonfigurator speichert unter Standort das Feld `land` (`AT`/`DE`/`CH`). Im Szenarienkonfigurator ist der Filter **Land** Pflicht (kein „Alle“); er wird aus dem gewählten Hausprofil vorbelegt.
 
+Optional speichert er daneben die **Region (Feiertage)** als Feld `region`: Bundesland bzw. Kanton für den Feiertagskalender (AT `1` Burgenland … `9` Wien, DE z. B. `BY`, CH z. B. `ZH`). Earnie braucht sie heute noch nicht zum Rechnen. Tarife mit Zeitregeln nach Wochentag oder Feiertag (Benutzertarife aus Edibert, siehe unten) brauchen sie, sobald Earnie mit Edibert rechnet. Ohne Region gibt es keinen Feiertagskalender. Eine unbekannte Region lehnt Earnie beim Speichern ab.
+
 ## Bezugspreis (Live)
 
 Die Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `earnie_env/config/tariffs.json` auf (Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json)). Aufschläge stehen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).
@@ -119,6 +121,14 @@ Die Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Ty
 - **Einspeise:** eingegebene Vergütung ohne weitere Aufschläge.
 
 > **Hinweis:** Die Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. die gewählte `export_tariff_id` aktuell halten.
+
+### Benutzertarife (`user_tariffs.json`)
+
+Eigene Tarife aus dem Tarif-Editor [Edibert](https://github.com/JochenTCC/Edibert) liegen in `user_tariffs.json` **neben** `tariffs.json` (gleiches Verzeichnis, gleiche Struktur, IDs beginnen mit `user_`). Earnie liest die Datei, wenn sie existiert; fehlt sie, gibt es einfach keine Benutzertarife. Die Datei gehört zum Config-Paket (Export/Import).
+
+- Im Szenarienkonfigurator erscheinen Benutzertarife mit dem Zusatz **· Benutzertarif** in den Dropdowns Bezug und Einspeise.
+- Benutzertarife mit Zeitregeln (`rules`), Preisunter- oder -obergrenze (`price_floor_cent_kwh` / `price_cap_cent_kwh`) kann Earnie noch nicht berechnen. Sie tragen den Zusatz **· Benutzertarif, erst ab Engine-Umstellung**. Wählt ein Szenario so einen Tarif, bricht die Berechnung mit einer Meldung ab, und der Start-Check meldet das Szenario. Earnie rechnet die Regeln nie still weg.
+- Edibert prüft die Datei streng: ein falsches ID-Präfix, ein unbekanntes Feld oder eine doppelte ID ist ein Ladefehler mit Hinweis auf `user_tariffs.json`. Jeder Benutzertarif braucht wie Katalog-Tarife ein `land`.
 
 ## Planung & Backtesting
 

@@ -10,7 +10,7 @@ from runtime_store.data_model import CURRENT_DATA_MODEL, read_data_model
 from runtime_store.migration.chain import apply_chain
 from runtime_store.migration.io_util import (
     EARNIE_TRACK_FILES,
-    GRID_FEES_FILE,
+    TARIFF_TRACK_FILES,
     load_pack_docs,
     stable_json_text,
 )
@@ -29,7 +29,7 @@ from runtime_store.migration.types import (
 def _min_model(docs: Docs) -> int | None:
     versions: list[int] = []
     for name, doc in docs.items():
-        if name == GRID_FEES_FILE:
+        if name in TARIFF_TRACK_FILES:
             continue
         version = read_data_model(doc)
         if version is not None:
