@@ -37,19 +37,25 @@ def pricing_reference(
     export_tariff_id: str | None,
     timezone_name: str,
     profile: dict | None,
+    user_fixed: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, Any]:
     """What Edibert needs to price a scenario: file paths, tariff IDs, profile location.
 
-    ``__user_fixed__`` (*Eigener Festpreis*) has no Edibert tariff yet and fails loud.
+    ``__user_fixed__`` (*Eigener Festpreis*) is no file tariff: ``user_fixed[direction]`` holds
+    its ``cent`` and ``vat_percent`` from the resolved scenario; missing values are an error.
     """
     from house_config.tariffs_store import is_user_fixed_tariff_id
 
-    for side, tariff_id in (("import", import_tariff_id), ("export", export_tariff_id)):
-        if is_user_fixed_tariff_id(tariff_id):
+    fixed: dict[str, dict[str, float]] = {}
+    for direction, tariff_id in ((eb.IMPORT, import_tariff_id), (eb.EXPORT, export_tariff_id)):
+        if not is_user_fixed_tariff_id(tariff_id):
+            continue
+        values = (user_fixed or {}).get(direction)
+        if not values or "cent" not in values or "vat_percent" not in values:
             raise ValueError(
-                f"EARNIE_PRICING_ENGINE=edibert: {side}_tariff_id 'Eigener Festpreis' wird "
-                "noch nicht über Edibert bepreist (Edibert P3a, offen)."
+                f"Edibert-Preisreferenz: Eigener Festpreis ({direction}) ohne cent/vat_percent."
             )
+        fixed[direction] = {"cent": float(values["cent"]), "vat_percent": float(values["vat_percent"])}
     profile = profile if isinstance(profile, dict) else {}
     netznutzung = profile.get("netznutzung")
     return {
@@ -61,6 +67,7 @@ def pricing_reference(
         "land": str(profile.get("land", "") or "").strip() or None,
         "region": str(profile.get("region", "") or "").strip() or None,
         "netznutzung": dict(netznutzung) if isinstance(netznutzung, dict) else None,
+        "user_fixed": fixed,
     }
 
 
@@ -96,6 +103,11 @@ def _tariff(ref: dict[str, Any], direction: str) -> Any:
     tariff_id = ref.get(key)
     if not tariff_id:
         raise ValueError(f"Edibert-Preisreferenz: {key} fehlt.")
+    if tariff_id == eb.USER_FIXED_ID:
+        values = ref["user_fixed"][direction]
+        return eb.synthetic_fixed_tariff(
+            direction, values["cent"], vat_percent=values["vat_percent"], land=ref["land"]
+        )
     return eb.tariff_by_id(eb.cached_tariff_set(ref["tariffs_path"]), direction, tariff_id)
 
 

@@ -220,10 +220,49 @@ def test_edibert_engine_needs_reference(monkeypatch):
         require_pricing_reference({}, where="Test")
 
 
-def test_user_fixed_price_not_yet_on_edibert(monkeypatch, scenario):
+USER_FIXED = {
+    "import_id": "__user_fixed__",
+    "export_id": "__user_fixed__",
+    "user_import_cent_kwh": 30.0,
+    "user_export_cent_kwh": 8.0,
+}
+
+
+def test_user_fixed_price_same_with_both_engines(monkeypatch, scenario):
+    """T3: Eigener Festpreis, gross with the land's VAT on the net grid fee (AT-VBG, SNAP day)."""
+    slots, epex = _snap_day_slots()
+
+    def prices(resolved: dict) -> tuple[list[float], list[float]]:
+        k_act = import_brutto_cent_for_slots(epex, slots, **pricing_kwargs_from_resolved(resolved))
+        matrix = [{"slot_datetime": s, "price_buy": e} for s, e in zip(slots, epex)]
+        enrich_matrix_feed_in_prices(matrix, feed_in_settings_from_dict(resolved))
+        return k_act, [row["k_push_act"] for row in matrix]
+
+    monkeypatch.delenv(PRICING_ENGINE_ENV, raising=False)
+    earnie_import, earnie_export = prices(scenario(**USER_FIXED))
     monkeypatch.setenv(PRICING_ENGINE_ENV, "edibert")
+    resolved = scenario(**USER_FIXED)
+    assert resolved[EDIBERT_PRICING_KEY]["user_fixed"] == {
+        "import": {"cent": 30.0, "vat_percent": 20.0},
+        "export": {"cent": 8.0, "vat_percent": 0.0},
+    }
+    edibert_import, edibert_export = prices(resolved)
+    assert edibert_import == pytest.approx(earnie_import, abs=TOLERANCE)
+    assert edibert_export == pytest.approx(earnie_export, abs=TOLERANCE)
+    assert len(set(edibert_import)) == 2  # SNAP lowers the grid fee inside 10–16 h
+    assert set(edibert_export) == {8.0}
+
+
+def test_user_fixed_reference_needs_values():
     with pytest.raises(ValueError, match="Eigener Festpreis"):
-        scenario(import_id="__user_fixed__", user_import_cent_kwh=30.0)
+        pricing_reference(
+            tariffs_path=CATALOG,
+            grid_fees_path=GRID_FEES,
+            import_tariff_id="__user_fixed__",
+            export_tariff_id=None,
+            timezone_name="Europe/Vienna",
+            profile={"land": "AT"},
+        )
 
 
 def test_unknown_tariff_is_edibert_error():

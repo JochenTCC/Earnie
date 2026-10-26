@@ -293,6 +293,36 @@ def cached_grid_fees(grid_fees_path: str) -> api.GridFeeCatalog:
     )
 
 
+USER_FIXED_ID = "__user_fixed__"
+
+
+def synthetic_fixed_tariff(
+    direction: str, cent: float, *, vat_percent: float, land: str | None
+) -> api.Tariff:
+    """*Eigener Festpreis* (scenario shortcut, no tariff file) as an Edibert tariff.
+
+    Gross price as entered; import carries the land's VAT rate (VAT on the net grid fee),
+    export ``vat_percent`` 0 — the same values Earnie's own synthetic specs use.
+    """
+    raw: dict[str, Any] = {
+        "id": USER_FIXED_ID,
+        "label": "Eigener Festpreis",
+        "supplier_id": "user",
+        "prices_include_vat": True,
+        "vat_percent": float(vat_percent),
+    }
+    if land:
+        raw["land"] = land
+    if direction == IMPORT:
+        raw.update(type="fixed_cent", fix_cent_kwh=float(cent))
+    else:
+        raw.update(type="fixed", k_push_cent=float(cent))
+    try:
+        return api.parse_tariff(raw, direction)
+    except api.EdibertError as exc:
+        raise EdibertLoadError("Eigener Festpreis", exc) from exc
+
+
 def tariff_by_id(tariff_set: api.TariffSet, direction: str, tariff_id: str) -> api.Tariff:
     """One tariff of the set; an unknown ID is an error."""
     try:

@@ -140,8 +140,18 @@ def _attach_edibert_pricing(
 ) -> None:
     """Pricing reference for ``EARNIE_PRICING_ENGINE=edibert`` (Edibert P3a)."""
     from data.edibert_slot_prices import EDIBERT_PRICING_KEY, pricing_reference
+    from house_config.edibert_tariffs import EXPORT, IMPORT
+    from house_config.tariffs_store import is_user_fixed_tariff_id
     from runtime_store.persist_paths import resolve_grid_fees_json_path
 
+    # Eigener Festpreis: cent and VAT rate exactly as the resolution set them on the scenario.
+    user_fixed: dict[str, dict[str, float]] = {}
+    if is_user_fixed_tariff_id(import_tariff_id):
+        spec = out["_import_tariff_spec"]
+        user_fixed[IMPORT] = {"cent": spec["fix_cent_kwh"], "vat_percent": spec["vat_percent"]}
+    if is_user_fixed_tariff_id(export_tariff_id):
+        spec = out["_export_tariff_spec"]
+        user_fixed[EXPORT] = {"cent": spec["k_push_cent"], "vat_percent": spec["vat_percent"]}
     out[EDIBERT_PRICING_KEY] = pricing_reference(
         tariffs_path=tariffs_path,
         grid_fees_path=grid_fees_path or resolve_grid_fees_json_path(),
@@ -149,6 +159,7 @@ def _attach_edibert_pricing(
         export_tariff_id=export_tariff_id,
         timezone_name=out["timezone_name"],
         profile=out.get("_house_profile"),
+        user_fixed=user_fixed,
     )
 
 
