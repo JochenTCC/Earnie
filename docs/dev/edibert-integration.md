@@ -143,3 +143,55 @@ Part A (Edibert repo) → B1 → B2 → B7 → B3 / B4 → B5 → B6 → B8 → 
 - [x] Migration fixture `v4_pre_tariff_track` and golden green; loaders fail fast on the old format with the migrate hint; the six existing migration goldens moved to data model 5.
 - [x] All 11 regression cases green (metrics unchanged, no golden update) through in-memory replay migration.
 - [x] Full suite green; the maintainer site `earnie_env` migrates cleanly in the dry run (2026-10-26; the real run is the maintainer's).
+
+## P3a — Engine parity harness (plan 2026-10-26)
+
+Status: **planned, decisions taken** (see *Decisions*). Backlog item *Edibert P3a* (Version 2.8). Goal: prove that Edibert prices every slot exactly like Earnie's own engine before P3b deletes `data/tariff_pricing.py` / `data/grid_fees.py`. No MILP change, no user-visible change.
+
+### Findings (2026-10-26)
+
+- **Edibert `v0.1.2` already has what a parity run needs:** `edibert.api.tariff_price_series` (15/30/60 min, hourly settlement = mean of the four slots as in Earnie's `hourly_settlement_epex_values`), `evaluate` per slot, `PricePoint` with `supplier_cent` / `grid_cent` / `vat_cent`, grid fee on import only (same as Earnie), VAT on the net grid fee for gross tariffs (format difference row 9). Missing until `0.1.g`: the monthly-table fallback with `MONTH_RATE_FALLBACK` (row 1); Edibert raises `PRICE_MISSING` instead.
+- **Three seams compute slot prices in Earnie** (everything else consumes `k_act` / `k_push_act`):
+  - live import: `data/market_prices.py` `epex_to_brutto_cent` (per slot) → `import_cent_kwh`;
+  - SE / backtesting import: `data/backtesting_prices.py` `import_brutto_cent_for_slots` / `enrich_slots_import_prices` (lists, hourly settlement applied before);
+  - export (live and SE): `data/feed_in_prices.py` `resolve_k_push_act` → `export_cent_kwh` (monthly lookup from the resolved settings).
+  - Plus the SE invoice line `simulation/se_invoice_netznutzung.py` (`grid_fee_work_cent`, `matching_rule`): compared through `PricePoint.grid_cent` so P3b can switch it too.
+- **Rounding:** both engines round the final cent to 4 decimals per slot; Edibert additionally rounds the 15-min means of a coarser resolution. At 15 min the expected difference is `0` or one unit in the 4th decimal.
+- **Earnie has no feature-flag mechanism** today (no `FEATURE_*` setting, no env switch for engines).
+- **Matrix size:** 37 import × 14 grid areas × 2 metering variants (`quarter_hour_meter` on / off; SNAP rules need it) + 13 export tariffs, over 35,040 slots per year. Restricted to `land` of tariff = `land` of area this is a few hundred combinations, i.e. tens of millions of slot evaluations per engine → needs parallel workers (same rule as backtesting: `--workers N`, largest useful N).
+- **`__user_fixed__`** (*Eigener Festpreis*) has no Edibert equivalent; P3a builds the synthetic tariff (decided in P2, decision 4).
+- **Overlap with Edibert `0.1.g`:** its item "committed compatibility tests against Earnie results" needs exactly the reference data this harness produces. One fixture set serves both repos.
+
+### Decisions (2026-10-26, recommendations accepted by the maintainer)
+
+1. **Start before `0.1.g` in two steps.** **P3a-1** now: adapter, flag, harness, comparison over the months every monthly table covers (P1 row 1: through 2026-09 for the six export tables, 2026-10 for `monthly_sunny_web_recherche`). **P3a-2** after `0.1.g`: raise the pin, add the edge months, check `MONTH_RATE_FALLBACK` against Earnie's prior-year / prior-month result and its log warning. Rejected: waiting for `0.1.g` and doing it in one go (blocks the epic until then).
+2. **Flag:** environment variable `EARNIE_PRICING_ENGINE` = `earnie` (default) | `edibert`; an unknown value is a startup error. Dev / CI only, no UI, no settings key, removed in P3b. No settings key, because it would need a migration step for a switch that lives one phase.
+3. **Tolerance:** absolute `1e-4` ct per slot on `cent`, and separately on the grid part (`grid_cent` vs. `grid_fee_work_cent`). Anything above is a deviation that gets triaged; no relative tolerance.
+4. **Comparison period:** calendar year 2025 in full (both SNAP seasons, both DST changes), plus 2026-01 through the last covered month (P3a-1) / through today + 2 days (P3a-2). Market prices: the archived day-ahead series the SE already loads (`data/data_loader.py`), same values for both engines, negative prices included (they matter for `feed_in_fee_factor × |EPEX|`).
+5. **Report and fixtures:** the harness writes a full diff report (JSON + Markdown summary) to `runtime/` (not committed); a small committed fixture (a few days around the DST changes, a SNAP summer day, a month boundary, one hourly-settled tariff, `__user_fixed__`, one user grid area) with the expected Earnie prices becomes the CI parity test, and is offered to Edibert for `0.1.g`.
+
+### Part A — Edibert
+
+- **P3a-1:** none (`v0.1.2` is enough).
+- **P3a-2:** `0.1.g` (fallback with `MONTH_RATE_FALLBACK`, `market_cent` + method per point; the range queries are needed only from P4b). Ask the Edibert side to take the committed fixture from decision 5 into its compatibility tests.
+
+### Part B — Earnie
+
+1. **Access module:** `house_config/edibert_tariffs.py` stays the only caller of `edibert.api`. New functions: Edibert `Tariff` by direction + ID (from the loaded `TariffSet`, cached by file mtime like the loaders), `GridFee` from the profile's `netznutzung` (`parse_grid_fee_config` + `resolve_grid_fee` on the catalog + user view), `PricingContext` from the profile (`timezone`, `land`, `region`), the synthetic `__user_fixed__` tariff (`fixed_cent` / `fixed` with the scenario's cent value, `prices_include_vat` and `vat_percent` as Earnie resolves them today), and series / slot evaluation. `EdibertError` → `EdibertLoadError` as in P1; every `EdibertWarning` is returned to the caller, never dropped.
+2. **Adapter `data/edibert_slot_prices.py`:** `import_cents(slot_datetimes, epex_values, …)` / `export_cents(…)` returning lists aligned to Earnie's slot datetimes (local → Edibert UTC keys, one `tariff_price_series` call per contiguous range at 15 min; per-slot `evaluate` for the live single-slot path), plus `grid_net_cents` for the invoice line. Hourly settlement is left to Edibert (Earnie's pre-averaging is not applied on this path, to avoid averaging twice). Warnings are logged once per tariff and returned.
+3. **Flag `EARNIE_PRICING_ENGINE`:** read once in one place (e.g. `settings/pricing_engine.py`); the three seams and the invoice line branch on it. With `edibert`, the Earnie functions are not called at all (no mixed result, no fallback to Earnie on an Edibert error).
+4. **Harness `python -m scripts.edibert_parity`:** `--year`, `--from` / `--to`, `--tariffs`, `--areas`, `--workers N`; builds the matrix (tariff × area × metering variant, land-matched; export tariffs without area; `__user_fixed__` and one flat user area as extra cases), prices every slot with both engines and writes the report: per combination max / count of deviations, first deviating slots with the intermediate steps of both sides (Edibert `PriceResult` vs. Earnie's base, grid, VAT), warnings seen. Exit code ≠ 0 when a deviation exceeds the tolerance.
+5. **Tests:** committed parity fixture (decision 5) in `tests/test_edibert_p3a.py`; DST days (23 and 25 hours), SNAP window edges, month boundary, hourly-settled tariff, gross tariff + grid fee (row 9), net tariff; flag parsing (default, unknown value fails); seams with `edibert` produce the same `k_act` / `k_push_act` lists as with `earnie` on a short SE window. End-to-end: the 11 regression cases with `EARNIE_PRICING_ENGINE=edibert` unchanged (metrics within the goldens' tolerance) — the gate P3b relies on.
+6. **Triage:** every deviation goes into a table in this section (bug in Earnie / bug in Edibert / intended / test data), with the fix in the owning repo. Intended differences are documented here and in P3b's release-notes draft; nothing is "fixed" by loosening the tolerance.
+7. **Docs:** this section (findings → implementation notes, format-differences table updated for rows 1, 5, 9); `DEVELOPER.md` (flag + harness call). No German user docs (no user-visible change until P3b).
+
+### Order
+
+P3a-1: B1 → B2 → B3 → B4 → first full run → B6 triage → B5 → B7. P3a-2 (after `0.1.g`): pin → fallback months in B4 / B5 → triage → done check.
+
+### Done check
+
+- [ ] Harness runs the full matrix over the comparison period with `--workers N`; report with zero deviations above `1e-4` ct, or every deviation triaged in this section.
+- [ ] `MONTH_RATE_FALLBACK` surfaced on the edge months and equal in value to Earnie's prior-year / prior-month result (P3a-2).
+- [ ] Parity fixture committed, `tests/test_edibert_p3a.py` green; full suite green with the default flag.
+- [ ] All 11 regression cases green with `EARNIE_PRICING_ENGINE=edibert`.
