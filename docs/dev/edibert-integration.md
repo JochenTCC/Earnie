@@ -66,7 +66,7 @@ Earnie **loads** the tariff files through `edibert.api` but **still prices with 
 
 | # | Topic | Earnie today | Edibert | P3a action |
 | --- | --- | --- | --- | --- |
-| 1 | Missing month in `monthly_table` | exact → same month prior year → prior month, logged once as a warning; error only if none exists | `PRICE_MISSING` (error) | needs Edibert `0.1.g` (`MONTH_RATE_FALLBACK` as coded warning); surface it, never swallow |
+| 1 | Missing month in `monthly_table` | exact → same month prior year → prior month, logged once as a warning; error only if none exists | same order since Edibert `v0.1.4` (`0.1.g`), coded warning `MONTH_RATE_FALLBACK` (`rule`, `used_month`); `PRICE_MISSING` only when none of the three exists | done in P3a-2: the adapter logs the warning once per tariff and month and returns it to reports; harness and test check rule, month and price against Earnie |
 | 2 | Unknown tariff fields | ignored silently by the normalizer | `TARIFF_UNKNOWN_FIELD` (error) | none for the catalog (loads clean); user files are already checked strictly |
 | 3 | `user_` prefix | no rule | user IDs must start with `user_`, catalog IDs must not (`ID_PREFIX_*`) | none; enforced since P1 |
 | 4 | Edited site copy of the catalog | `earnie_env/config/tariffs.json` is seeded from `share/` and may be edited (`append_monthly_rate`) | treated as catalog; every entry gets origin `catalog` | P8 decides whether new entries may still land there |
@@ -146,7 +146,7 @@ Part A (Edibert repo) → B1 → B2 → B7 → B3 / B4 → B5 → B6 → B8 → 
 
 ## P3a — Engine parity harness (plan 2026-10-26)
 
-Status: **P3a-1 implemented 2026-10-26** incl. T3 (see *Implementation notes*, *Results*, *Triage*, *T3*); open: P3a-2 after Edibert `0.1.g`. Backlog item *Edibert P3a* (Version 2.8). Goal: prove that Edibert prices every slot exactly like Earnie's own engine before P3b deletes `data/tariff_pricing.py` / `data/grid_fees.py`. No MILP change, no user-visible change.
+Status: **done 2026-10-26** — P3a-1 incl. T3 and P3a-2 (see *Implementation notes*, *Results*, *Triage*, *T3*, *P3a-2*). Backlog item *Edibert P3a* (Version 2.8). Goal: prove that Edibert prices every slot exactly like Earnie's own engine before P3b deletes `data/tariff_pricing.py` / `data/grid_fees.py`. No MILP change, no user-visible change.
 
 ### Findings (2026-10-26)
 
@@ -216,6 +216,14 @@ P3a-1: B1 → B2 → B3 → B4 → first full run → B6 triage → B5 → B7. P
 | T3 | `__user_fixed__` | no public Edibert constructor for a synthetic tariff | **gap in Edibert API** | **done:** Edibert `0.1.j` `api.parse_tariff` (`v0.1.3`) + Earnie `synthetic_fixed_tariff` (§ T3) |
 | T4 | `at_vkw_pv_flex`, 2025-01 … 2025-06 | both engines refuse (table starts 2025-07) | **test data** (expected) | none |
 
+### P3a-2 — Monthly-table edge months (2026-10-26)
+
+- **Edibert `0.1.g` released as `v0.1.4`** (approved by the maintainer); pin raised. New in the API (additive, `API_VERSION` 2): monthly-table fallback in Earnie's order with `MONTH_RATE_FALLBACK` (`tariff_id`, `direction`, `month`, `used_month`, `rule` = `prior_year` / `prior_month`) in `PriceSeries.warnings` and `PriceResult.warnings`; `PricePoint.market_cent` and `PricePoint.method`; `market_range` / `MarketArchive` for arbitrary ranges (UTC, monthly cache, needed from P4b). Edibert also took Earnie's CI fixture and Earnie's edge-month values into its own tests.
+- **Adapter:** no change needed — `price_points` already logs every series warning once per tariff and text (so once per fallback month) and collects them for reports (`warnings_out`); a month without any of the three rates stays `PRICE_MISSING`, an error.
+- **Harness:** for `monthly_table` tariffs every month compares the source of the rate (Earnie `lookup_monthly_cent` → `exact` / `prior_year YYYY-MM` / `prior_month YYYY-MM` vs. Edibert's `MONTH_RATE_FALLBACK`); a different source is a failure (exit code 1). Tariffs without market prices need no price data, so months after the last day-ahead price can be checked.
+- **Edge-month run** (`--from 2026-10-01 --to 2027-05-01`, the 9 `monthly_table` tariffs, 37 cases): 78 fallback months (six AT/DE export tables from 2026-10, `monthly_sunny_web_recherche` from 2026-11, `at_vkw_strom_duo` / `at_vkw_strom_duo_normalpreis` 2027-04 with all grid areas), all `prior_year`, source and price equal on both sides, 0 deviations. No catalog tariff reaches `prior_month`; `tests/test_edibert_p3a.py` covers both rules with a gap table through the adapter.
+- **Full run again with `v0.1.4`** (2025-01 → 2026-10): unchanged — 0 untriaged deviations, 880 T1 slots, 6 months both engines refuse (`at_vkw_pv_flex` before 2025-07). Regression with the flag green.
+
 ### T3 — *Eigener Festpreis* on Edibert (plan 2026-10-26)
 
 **Problem:** `__user_fixed__` is a scenario shortcut (cent values on the scenario, not in a tariff file; not migrated, § P2 decision 4). Edibert can only build tariffs from files (`load_tariffs`, with the `user_` prefix rule), and `parse_tariff` is internal.
@@ -238,7 +246,7 @@ P3a-1: B1 → B2 → B3 → B4 → first full run → B6 triage → B5 → B7. P
 ### Done check
 
 - [x] Harness runs the full matrix over the comparison period with `--workers N`; report with zero deviations above `1e-4` ct, or every deviation triaged in this section (2026-10-26: 0 untriaged, T1 triaged).
-- [ ] `MONTH_RATE_FALLBACK` surfaced on the edge months and equal in value to Earnie's prior-year / prior-month result (P3a-2).
+- [x] `MONTH_RATE_FALLBACK` surfaced on the edge months and equal in value to Earnie's prior-year / prior-month result (P3a-2, 2026-10-26: 78 fallback months, 0 differences).
 - [x] Parity fixture committed, `tests/test_edibert_p3a.py` green; full suite green with the default flag.
 - [x] All 11 regression cases green with `EARNIE_PRICING_ENGINE=edibert` (L2 cases with a tariff price through Edibert; L1 cases do not price, see *Results*).
 - [x] `__user_fixed__` on Edibert (T3, Edibert `v0.1.3`, pin raised).

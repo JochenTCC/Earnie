@@ -16,7 +16,12 @@ A month that only one engine can price is reported with both outcomes (e.g. Earn
 monthly-table fallback vs. Edibert ``PRICE_MISSING`` until Edibert ``0.1.g``); it is not a
 price deviation. Deviations of a triaged kind (``docs/dev/edibert-integration.md`` § P3a,
 *Triage*) are counted apart: T1 = hourly settled spot tariff in the repeated autumn DST hour.
-Exit code 1 when an untriaged price deviation exceeds the tolerance.
+For ``monthly_table`` tariffs every month also compares where the rate came from: Earnie's
+``lookup_monthly_cent`` (exact / ``prior_year`` / ``prior_month``) against Edibert's
+``MONTH_RATE_FALLBACK`` (``rule``, ``used_month``). Tariffs that do not use market prices
+need no price data, so edge months beyond the last day-ahead price can be checked, e.g.
+``--from 2026-10-01 --to 2027-05-01`` (P3a-2).
+Exit code 1 when an untriaged price deviation exceeds the tolerance or a fallback differs.
 
 Earnie's price helpers read the planning time zone from ``config``; without
 ``--site-config`` the harness points ``config`` at the test fixture config (as pytest does),
@@ -84,6 +89,8 @@ class CaseResult:
     max_diff_grid: float = 0.0
     over_tol_grid: int = 0
     triaged_t1: int = 0
+    fallback_months: int = 0
+    fallback_mismatches: int = 0
     samples: list[dict[str, Any]] = field(default_factory=list)
     month_outcomes: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -104,6 +111,8 @@ class CaseResult:
             "max_diff_grid": self.max_diff_grid,
             "over_tol_grid": self.over_tol_grid,
             "triaged_t1": self.triaged_t1,
+            "fallback_months": self.fallback_months,
+            "fallback_mismatches": self.fallback_mismatches,
             "samples": self.samples,
             "month_outcomes": self.month_outcomes,
             "warnings": sorted(set(self.warnings)),
@@ -380,14 +389,15 @@ def run_case(
 
     os.environ.pop("EARNIE_PRICING_ENGINE", None)  # Earnie side must run its own engine
     result = CaseResult(case)
-    spot = case.tariff_type in {"spot_hourly", "ex_post_spot", "monthly_market"}
     tariff = eb.tariff_by_id(eb.cached_tariff_set(tariffs_path), case.direction, case.tariff_id)
     hourly_spot = tariff.is_spot and tariff.settlement_mtu == "60min"
     zone = market_zone_for_land(case.land) if case.land else None
     prices: dict[datetime, float] | None = None
-    if zone in price_paths:
+    if not tariff.uses_market_price:
+        pass  # priced without market data (fixed, monthly table)
+    elif zone in price_paths:
         prices = _load_prices(price_paths[zone])
-    elif spot:
+    else:
         result.skipped = f"keine Marktpreise für Zone {zone} (--prices {zone}=CSV)"
         return result
     for month in _month_starts(start, end):
@@ -415,6 +425,13 @@ def run_case(
             outcome["edibert"] = "ok"
         except EdibertLoadError as exc:
             outcome["edibert"] = f"error {exc.code}: {exc}"
+        if case.tariff_type == "monthly_table" and earnie is not None and points is not None:
+            outcome["source_earnie"] = _earnie_month_source(case, month, tariffs_path)
+            outcome["source_edibert"] = _edibert_month_source(tariff, slots[0])
+            if outcome["source_earnie"] != "exact":
+                result.fallback_months += 1
+            if outcome["source_earnie"] != outcome["source_edibert"]:
+                result.fallback_mismatches += 1
         if earnie is None or points is None:
             result.month_outcomes.append(outcome)
             continue
@@ -516,6 +533,40 @@ def build_fixture(tariffs_path: str, grid_fees_path: str) -> dict[str, Any]:
     }
 
 
+def _earnie_month_source(case: Case, month: date, tariffs_path: str) -> str:
+    """Where Earnie takes the monthly rate from: ``exact`` or ``<rule> <YYYY-MM>``."""
+    from data.tariff_pricing import (
+        FALLBACK_PRIOR_YEAR,
+        _monthly_table_lookup,
+        lookup_monthly_cent,
+        previous_calendar_month,
+    )
+    from house_config.tariffs_store import load_tariffs_document
+
+    section = "import_tariffs" if case.direction == "import" else "export_tariffs"
+    spec = load_tariffs_document(tariffs_path)[section][case.tariff_id]
+    _cent, source = lookup_monthly_cent(_monthly_table_lookup(spec), month.year, month.month)
+    if source is None:
+        return "exact"
+    used = (month.year - 1, month.month) if source == FALLBACK_PRIOR_YEAR else (
+        previous_calendar_month(month.year, month.month)
+    )
+    return f"{source} {used[0]}-{used[1]:02d}"
+
+
+def _edibert_month_source(tariff: Any, slot: datetime) -> str:
+    """Where Edibert takes the monthly rate from, from ``MONTH_RATE_FALLBACK``."""
+    from house_config import edibert_tariffs as eb
+
+    ctx = eb.pricing_context_for_profile("parity", {"timezone_name": TIMEZONE, "land": tariff.land})
+    result = eb.evaluate_slot(tariff, slot, ctx, epex_cent=None, grid_fee=None)
+    fallbacks = [w for w in result.warnings if str(w.code) == "MONTH_RATE_FALLBACK"]
+    if not fallbacks:
+        return "exact"
+    params = dict(fallbacks[0].params)
+    return f"{params['rule']} {params['used_month']}"
+
+
 def _repeated_hour(slot: datetime) -> bool:
     """Wall-clock time that exists twice (autumn DST change)."""
     return slot.replace(fold=1 - slot.fold).utcoffset() != slot.utcoffset()
@@ -546,6 +597,8 @@ def _markdown(report: dict[str, Any]) -> str:
         f"(untriaged); triaged T1 slots (autumn DST hour, hourly settled): {meta['triaged_t1_slots']}",
         f"- Months only one engine could price: {meta['one_sided_months']}; "
         f"months both engines refused: {meta['both_failed_months']}",
+        f"- Monthly-table fallback months: {meta['fallback_months']}, "
+        f"source differs (Earnie vs. Edibert): **{meta['fallback_mismatches']}**",
         "",
     ]
     deviating = [c for c in report["cases"] if c["over_tol_cent"] or c["over_tol_grid"]]
@@ -571,6 +624,21 @@ def _markdown(report: dict[str, Any]) -> str:
             earnie = str(outcome.get("earnie", "")).replace("|", "/")[:120]
             edibert = str(outcome.get("edibert", "")).replace("|", "/")[:120]
             lines.append(f"| `{key}` | {outcome['month']} | {earnie} | {edibert} |")
+        lines.append("")
+    fallbacks = [
+        (item["case"], outcome)
+        for item in report["cases"]
+        for outcome in item["month_outcomes"]
+        if outcome.get("source_earnie", "exact") != "exact" or outcome.get("source_edibert", "exact") != "exact"
+    ]
+    if fallbacks:
+        lines += ["## Monthly-table fallbacks", "", "| Case | Month | Earnie | Edibert |",
+                  "| --- | --- | --- | --- |"]
+        for key, outcome in fallbacks:
+            lines.append(
+                f"| `{key}` | {outcome['month']} | {outcome.get('source_earnie')} | "
+                f"{outcome.get('source_edibert')} |"
+            )
         lines.append("")
     skipped = [item for item in report["cases"] if item["skipped"]]
     if skipped:
@@ -678,6 +746,8 @@ def main(argv: list[str] | None = None) -> int:
                 if o.get("earnie") != "ok" and o.get("edibert") != "ok"
             ),
             "triaged_t1_slots": sum(r["triaged_t1"] for r in results),
+            "fallback_months": sum(r["fallback_months"] for r in results),
+            "fallback_mismatches": sum(r["fallback_mismatches"] for r in results),
             "workers": workers,
             "seconds": time.monotonic() - began,
         },
@@ -693,7 +763,7 @@ def main(argv: list[str] | None = None) -> int:
         f"{len(deviating)} deviating (untriaged), {report['meta']['triaged_t1_slots']} T1 slots, "
         f"{report['meta']['one_sided_months']} one-sided months"
     )
-    return 1 if deviating else 0
+    return 1 if deviating or report["meta"]["fallback_mismatches"] else 0
 
 
 if __name__ == "__main__":

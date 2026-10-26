@@ -265,6 +265,45 @@ def test_user_fixed_reference_needs_values():
         )
 
 
+@pytest.mark.parametrize(
+    ("month", "rule", "used"),
+    [((2026, 6), "prior_year", "2025-06"), ((2026, 8), "prior_month", "2026-07")],
+)
+def test_monthly_fallback_surfaced_and_equal_to_earnie(tmp_path, month, rule, used):
+    """P3a-2: Edibert's MONTH_RATE_FALLBACK picks the same month and price as Earnie."""
+    from data.edibert_slot_prices import price_points
+    from data.tariff_pricing import _monthly_table_lookup, lookup_monthly_cent
+
+    rates = [
+        {"year": 2025, "month": 6, "tariff_cent_kwh": 7.5},
+        {"year": 2026, "month": 7, "tariff_cent_kwh": 9.25},
+    ]
+    tariff = {
+        "id": "gap_table", "label": "Gap", "type": "monthly_table", "land": "AT",
+        "supplier_id": "test", "prices_include_vat": False, "vat_percent": 0.0,
+        "monthly_rates": rates,
+    }
+    tariffs_path = tmp_path / "tariffs.json"
+    tariffs_path.write_text(
+        json.dumps({"tariff_format": 1, "import_tariffs": [], "export_tariffs": [tariff]}),
+        encoding="utf-8",
+    )
+    ref = pricing_reference(
+        tariffs_path=str(tariffs_path), grid_fees_path=None, import_tariff_id=None,
+        export_tariff_id="gap_table", timezone_name="Europe/Vienna", profile={"land": "AT"},
+    )
+    warnings: list[str] = []
+    slot = datetime(month[0], month[1], 15, 12)
+    points = price_points("export", [slot], [None], ref, warnings_out=warnings)
+    earnie_cent, earnie_rule = lookup_monthly_cent(_monthly_table_lookup(tariff), *month)
+    assert points[0].cent == pytest.approx(earnie_cent)
+    assert earnie_rule == rule
+    assert any(
+        w.startswith("MONTH_RATE_FALLBACK(") and f"rule={rule}" in w and f"used_month={used}" in w
+        for w in warnings
+    )
+
+
 def test_unknown_tariff_is_edibert_error():
     ref = pricing_reference(
         tariffs_path=CATALOG,
