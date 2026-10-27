@@ -7,7 +7,9 @@ from io import BytesIO
 from unittest.mock import patch
 
 from ehal.signal_catalog import set_binding_activation
-from ehal.signal_export import build_export_zip
+import pytest
+
+from ehal.signal_export import build_export_zip, normalize_export_host
 from ehal.signal_list import build_signal_rows, signals_for_export
 from ui.ehal_signal_list import _default_host, _table_records
 from ui.ehal_unit_display import units_for_field
@@ -300,3 +302,34 @@ def test_duplicate_signal_keeps_the_loxone_name_of_either_spelling() -> None:
     for house in (flat_named, qualified_named):
         (signal,) = write_signals_from_docs(house, {})
         assert signal.old_name == "EV_A"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("192.168.1.10", "192.168.1.10"),
+        (" http://192.168.1.10/ ", "192.168.1.10"),
+        ("HTTPS://earnie.local", "earnie.local"),
+    ],
+)
+def test_normalize_export_host_strips_pasted_scheme(raw: str, expected: str) -> None:
+    # Reporter pasted the browser address; the VO/VI Address got the scheme twice.
+    assert normalize_export_host(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["http://192.168.1.10:8541", "192.168.1.10/ehal"])
+def test_normalize_export_host_rejects_port_or_path(raw: str) -> None:
+    with pytest.raises(ValueError, match="ohne Port"):
+        normalize_export_host(raw)
+
+
+def test_export_zip_address_has_one_scheme_after_normalizing() -> None:
+    house, components = _minimal_docs()
+    payload = build_export_zip(
+        house, components, host=normalize_export_host("http://192.168.1.10"), port=8541
+    )
+    with zipfile.ZipFile(BytesIO(payload)) as zf:
+        xml = [zf.read(n).decode("utf-8-sig") for n in zf.namelist() if n.endswith(".xml")]
+    assert xml
+    assert all("http://http" not in text for text in xml)
+    assert any('Address="http://192.168.1.10:8541' in text for text in xml)
