@@ -54,7 +54,7 @@ alwaysApply: true
 * **Thermal horizon simulation (`ThermalHorizon`, 2.7):** P1 (thermal parameters from one year sim), P2 (Live store context without year profile), P3 (collector irradiance forecast), P4 (house-only horizon without storage), P5 (guard test)
 * **HouseSim exogenous series (`HouseSim Series`):** P1 (series format + driver + synthetic generators), P2 (HA history import / replay)
 * **HA contract testbed (`HA Testbed`, 2.7):** P0 (baseline smoke with `evcc_en`), P1 (archetype generator), P2 (S4 external archetype dir + build/fill), P3 (compose + install script), P4 (automated check), P5 (docs + support playbook)
-* **Planning calculator (`SUSI`, 2.8 + 2.+1):** P1 (heat sources + heating rod), P2 (solar + internal gains), P3a (horizon), P3b (PV temperature model), P4 (annuity), P5 (battery SOH), P6 (consumption reference values), P7 (COP curve); prototype steps Proto 1–7 on `feature/susi-prototyp`
+* **Planning calculator (`SUSI`, 2.8 + 2.+1):** P1 (heat sources + heating rod), P2 (solar + internal gains), P3a (horizon), P3b (PV temperature model), P4 (annuity), P5 (battery SOH), P6 (consumption reference values), P7 (COP curve); prototype steps Proto 1, 1b (sensitivity study), 2–7 on `feature/susi-prototyp`
 * **Edibert integration (`Edibert`, 2.8):** P0 (packaging + license decision), P1 (data files + read-only coexistence), P2 (Netznutzung split + migration), P3a (engine parity harness), P3b (engine switch), P4a (market prices live), P4b (market prices SE / backtesting), P5 (forecast handover), P6 (shared weather access), P7 (editor embed), P8 (catalog decision)
 
 ## 5. Commit & Chat Syntax
