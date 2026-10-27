@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 
 from data import consumer_targets, live_consumption, profile_manager
-from data.live_market_prices import fetch_live_day_ahead_prices
+from data.edibert_live_market import fetch_live_day_ahead_prices
 from runtime_store import main_daemon, run_state
 from runtime_store.live_display_loader import (
     load_live_display_snapshot,

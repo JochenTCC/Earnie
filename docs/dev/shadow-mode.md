@@ -83,7 +83,7 @@ Record **raw backend responses** at the transport primitives, not parsed values.
 | HA | `HaAdapter._get_json(path)` | `ha:get:<path>` (e.g. `ha:get:/api/states/sensor.x`) |
 | OpenEMS | `OpenemsAdapter` GET | `openems:get:<path>` |
 | forecast.solar | `data.pv_forecast` fetch | `ext:pv_forecast:<url-hash>` |
-| Day-ahead prices | `data.live_market_prices` fetch (ENTSO-E / Energy-Charts / aWATTar) | `ext:prices:<source>` (`entsoe`, `energy_charts`, `awattar`) |
+| Day-ahead prices | `data.edibert_live_market._shadow_get` (Edibert `market_live` transport: ENTSO-E / Energy-Charts / aWATTar; raw response text, records before P4a hold JSON objects and are replayed as text) | `ext:prices:<source>` (`entsoe`, `energy_charts`, `awattar`) |
 | Outdoor forecast | `data.outdoor_forecast` fetch | `ext:outdoor:<url-hash>` |
 | Inbound trigger | `loxone_request_http` optimize request | event `trigger:request_optimize` |
 

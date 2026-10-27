@@ -143,24 +143,28 @@ def _price_cent(slot: datetime) -> float:
     return round(12.0 + 9.0 * math.sin((hour - 7.0) / 24.0 * 2 * math.pi) + (slot.day % 5) * 0.7, 4)
 
 
-def _fake_energy_charts(start_ts, end_ts, bzn="AT"):
-    """Like Energy-Charts: QH series up to the last published day as of the real clock."""
-    from datetime import timedelta
+def _energy_charts_payload(params: dict) -> dict:
+    """Like Energy-Charts ``/price``: QH series up to the last published day as of the (frozen) clock."""
+    from datetime import UTC, timedelta
+    from zoneinfo import ZoneInfo
 
-    import pandas as pd
-
+    vienna = ZoneInfo("Europe/Vienna")
     now = datetime.now()
     last_day = now.date() + timedelta(days=1)
     if (now.hour, now.minute) < (_PUBLISH_HOUR, _PUBLISH_MINUTE):
         last_day = now.date()
-    end = min(
-        pd.Timestamp(end_ts).to_pydatetime(),
-        datetime.combine(last_day, datetime.min.time()).replace(hour=23, minute=45),
+    first = datetime.fromisoformat(params["start"]).replace(tzinfo=UTC)
+    stop = min(
+        datetime.fromisoformat(params["end"]).replace(tzinfo=UTC) + timedelta(days=1),
+        datetime.combine(last_day + timedelta(days=1), datetime.min.time(), tzinfo=vienna),
     )
-    index = pd.date_range(pd.Timestamp(start_ts), end, freq="15min")
-    return pd.DataFrame(
-        {"price_cent_kwh": [_price_cent(ts.to_pydatetime()) for ts in index]}, index=index
-    )
+    stamps, prices = [], []
+    slot = first
+    while slot < stop:
+        stamps.append(int(slot.timestamp()))
+        prices.append(_price_cent(slot.astimezone(vienna).replace(tzinfo=None)) * 10)
+        slot += timedelta(minutes=15)
+    return {"unix_seconds": stamps, "price": prices}
 
 
 class _FakeResponse:
@@ -254,6 +258,8 @@ def _fake_requests_get(url, params=None, **_kwargs):
         return _FakeResponse(payloads if len(payloads) > 1 else payloads[0])
     if "api.forecast.solar" in url:
         return _FakeResponse(_forecast_solar_payload())
+    if "api.energy-charts.info" in url:
+        return _FakeResponse(_energy_charts_payload(params))
     raise requests.ConnectionError(f"early_start_runner: no fake for {url}")
 
 
@@ -262,11 +268,8 @@ def _install_stubs(main_module, capture: dict, traveller) -> None:
 
     import requests
 
-    import data.live_market_prices as lmp
-
     requests.get = _fake_requests_get
     time.sleep = lambda _s: None
-    lmp.fetch_energy_charts_prices = _fake_energy_charts
     ehal = main_module.ehal_live
     ehal.read_ess_soc = lambda: 50.0
     ehal.read_ess_soc_by_id = lambda: {"test_battery": 50.0}

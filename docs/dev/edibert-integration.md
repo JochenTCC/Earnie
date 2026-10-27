@@ -303,9 +303,9 @@ SNAP baseline with the old engine → B1 → B2 → B3 → B4 → B5 → B7 (gat
 - [x] A horizon with an hourly settled tariff starting mid-hour prices without `PRICE_MISSING` (live and SE; `tests/test_edibert_p3b.py`).
 - [ ] A live cycle on the maintainer site (needs the site migrated to data model 5 first; quarter-hour tariff there).
 
-## P4a — Market prices, live chain (plan 2026-10-27)
+## P4a — Market prices, live chain (2026-10-27)
 
-Status: **planned**. Backlog item *Edibert P4a* (Version 2.8). Goal: `data/live_market_prices.py`, `integrations/entsoe_client.py` and `integrations/awattar_client.py` are replaced by Edibert's market module; `price_source` per slot comes from Edibert's forecast method. **Done:** a live cycle runs on Edibert prices, recorder-format regression goldens green.
+Status: **implemented** (see *Implementation notes*, *Results*, *Done check*). Backlog item *Edibert P4a* (Version 2.8). Goal: `data/live_market_prices.py`, `integrations/entsoe_client.py` and `integrations/awattar_client.py` are replaced by Edibert's market module; `price_source` per slot comes from Edibert's forecast method. **Done:** a live cycle runs on Edibert prices, recorder-format regression goldens green.
 
 ### Findings (2026-10-27)
 
@@ -325,6 +325,11 @@ Status: **planned**. Backlog item *Edibert P4a* (Version 2.8). Goal: `data/live_
 4. **D4 — `price_source`:** slot labels stay `day_ahead` / `mirrored` / `predicted`. Mirror comes from Edibert (`MirrorForecaster`, same wall-clock rule, 7 days); OLS stays in Earnie until P5 but is passed as `forecast_method` to `tariff_price_series`. Mapping `exact` → `day_ahead`, `mirror` → `mirrored`, OLS → `predicted` in one helper.
 5. **D5 — replays:** an Earnie transport adapter maps each request URL to its feed key and records the raw text; old aWATTar recordings (dict payload) are turned into text with `json.dumps` on replay. No converter for old recordings.
 
+**Amendments during implementation (2026-10-27, maintainer):**
+
+- **D1b — `MarketSourceError`:** Edibert's chain only falls through to the next source on its internal `SourceError`; an injected `get` raising anything else ends the call. New Edibert phase `0.1.l` exports it as `api.MarketSourceError` and documents the `get` contract; released as `v0.1.6` (after `0.1.k` as `v0.1.5`), Earnie pins `v0.1.6`.
+- **D4 moved to P4b:** `resolve_market_slots` (and its mirror) also serves the SE / backtesting, partly with hourly history (mirror via the parent hour). Switching the mirror to Edibert's `MirrorForecaster` therefore moves to P4b, where the SE chain switches too. P4a keeps Earnie's `find_mirror_slot` and the `price_source` labels unchanged; nothing maps Edibert `method` yet.
+
 ### Part A — Edibert (`0.1.k`)
 
 - Public live function + `MarketData` in `api`; `history_days` in `expected_window` / `load` (fetch window starts `history_days` before today 00:00; completeness check stays today / tomorrow).
@@ -339,14 +344,29 @@ Status: **planned**. Backlog item *Edibert P4a* (Version 2.8). Goal: `data/live_
 - **B4** Tests: zone mapping, shadow record / replay per source, mirror parity (Edibert vs. the old `find_mirror_slot` on the same data), CH path, empty answer fails loud.
 - **B5** Docs: German user docs on price sources (`docs/referenz/tarife-quellen.md`, possibly `docs/konfiguration/preise.md`: source order, CH, cache location); this section (implementation notes, results); shadow-mode workflow doc if it lists feed keys.
 
+### Implementation notes (2026-10-27)
+
+- **Edibert:** `0.1.k` (`api.market_live`, `MarketData`, `history_days` 0–7 in `MarketService`) and `0.1.l` (`api.MarketSourceError`); tags `v0.1.5`, `v0.1.6`; Earnie pin `v0.1.6`.
+- **New module** `data/edibert_live_market.py`: `fetch_live_day_ahead_prices(planning_end)` with the old signature (callers `main.py`, `ui/live_mode.py`, `data/live_prefetch.py` only swap the import). `market_live(zone, runtime/edibert_market, tz, history_days=MAX_MIRROR_LOOKBACK_DAYS, now=planning_now(tz))`; zone from the house-profile `land` via `market_zone` (missing land: `ValueError`, unknown land: `EdibertLoadError`; the silent AT default is gone); `MARKET_DATA_UNAVAILABLE` → error log + `None` (the callers' existing "no prices" path), every other `EdibertError` propagates; Edibert notes are logged as warnings; `record_cycle_event(EVENT_DAY_AHEAD_FETCH)` once per call that sends a request. `planning_end` only gives the time zone now (the window is Edibert's).
+- **Shadow transport** `_shadow_get`: URL host → feed key (`ext:prices:entsoe|energy_charts|awattar`, an unknown host fails), `requests.get` with a 30 s timeout; Prod records the raw text (ok and HTTP ≥ 400; connection errors with the ENTSO-E token redacted); Shadow replays first (old dict records → `json.dumps`) and falls back to an unrecorded live request; failures raise `api.MarketSourceError`. `read_entsoe_api_token` moved here.
+- **Deleted:** `data/live_market_prices.py`, `data/live_price_cache.py` (its only user was the old orchestrator, so it goes now, not in P4b), `integrations/entsoe_client.py`, `integrations/awattar_client.py`, `tests/test_entsoe_client.py`, `tests/test_live_market_prices_regression.py`, `tests/test_live_price_cache.py`, `tests/fixtures/entsoe/`. `AWATTAR_URL` stays (SE and analysis scripts read it).
+- **Behaviour changes (release notes):** CH has no aWATTar AT substitute (D3); the cache `runtime/edibert_market/market_<zone>.json` replaces `runtime/live_day_ahead_<zone>.json` (the old file is ignored); the expected window ends with today / tomorrow instead of the planning end, and a partial answer is asked again at most every 10 minutes; a missing or unknown `land` fails instead of using AT.
+- **Tests:** `tests/test_edibert_live_market.py` (feed keys, rows with 7 lead days, cache hit without request, ENTSO-E failure recorded redacted with fall-through, HTTP error → `MarketSourceError`, Shadow replay of old dict records without network, unrecorded Shadow live fallback, CH without aWATTar → `None`, missing / unknown land); `tests/main_run_harness.py` patches the new module; `tests/early_start_runner.py` fakes the Energy-Charts HTTP answer instead of patching the old orchestrator.
+- **Docs:** `docs/konfiguration/preise.md`, `docs/einrichtung/betrieb.md` (German), `docs/dev/shadow-mode.md`.
+
+### Results (2026-10-27)
+
+- **Full suite:** 4798 passed, 19 skipped, run with `-p no:hypothesispytest` and without `tests/test_storage_roundtrip.py`: Windows application control currently blocks the `hypothesis` native extension on this machine (`ImportError: DLL load failed`, file unchanged since 2026-10-23), so the plugin cannot load. `tests/test_early_start_equivalence.py` (4 cases) green.
+- **Regression:** all 11 cases green, metrics unchanged, no `--update-golden`. Run with `EARNIE_CONFIG_PATH=tests/fixtures/backtesting/config.json`: without it, the runner's import-time config load reads the maintainer site (`earnie_env/config`), which is not migrated to data model 5 yet, and fails before any case.
+
 ### Order
 
 Part A (release, pin) → B1 → B2 → B3 → B4 → B5 → gate: full suite (`scripts.run_pytest`), `scripts.run_regression` without `--update-golden`, live cycle on the maintainer site (the site needs the data-model-5 migration first, see P3b). The pandas-free chain (`fetch_energy_charts_prices` in `data/data_loader.py`) is P4b.
 
 ### Done check
 
-- [ ] Edibert `0.1.k` released, Earnie pin raised.
-- [ ] The three old modules are gone; live callers use Edibert.
-- [ ] Shadow record / replay works for all three sources.
-- [ ] Full suite and all regression cases green, goldens unchanged.
-- [ ] A live cycle on the maintainer site runs on Edibert prices.
+- [x] Edibert `0.1.k` (and `0.1.l`) released, Earnie pin raised to `v0.1.6`.
+- [x] The three old modules are gone; live callers use Edibert.
+- [x] Shadow record / replay works for all three sources (unit tests; no Shadow run against a real feed yet).
+- [x] Full suite (see *Results* for the hypothesis exclusion) and all regression cases green, goldens unchanged.
+- [ ] A live cycle on the maintainer site runs on Edibert prices (needs the data-model-5 migration of the site first).

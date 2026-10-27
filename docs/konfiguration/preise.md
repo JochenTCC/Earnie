@@ -6,12 +6,12 @@ Diese Seite beschreibt die Konfiguration: Tariftypen, JSON-Felder und Datenquell
 
 ## Überblick: Woher kommen die Preise?
 
-Live-Bezugspreise entstehen aus Spot-Tarifen (`spot_hourly` u. a.) und dem Day-Ahead-Marktpreis. Earnie fragt die Quellen in dieser Reihenfolge ab:
+Live-Bezugspreise entstehen aus Spot-Tarifen (`spot_hourly` u. a.) und dem Day-Ahead-Marktpreis. Den Marktpreis holt Earnie über die Edibert-Bibliothek, in dieser Reihenfolge:
 
-1. **ENTSO-E**, wenn `ENTSOE_API_TOKEN` in `config/.env` gesetzt ist,
-2. **Energy-Charts** (Fraunhofer),
-3. Cache,
-4. **aWATTar**.
+1. Cache, solange er das erwartete Fenster abdeckt,
+2. **ENTSO-E**, wenn `ENTSOE_API_TOKEN` in `config/.env` gesetzt ist,
+3. **Energy-Charts** (Fraunhofer),
+4. **aWATTar** (nur AT und DE).
 
 Providerunabhängige EPEX-Daten für Planung und Backtesting kommen weiterhin von **Energy-Charts** (AT/DE/CH); aWATTar bleibt dort API-Fallback. Die aWATTar-API-URL leitet Earnie aus `import_tariff_id` → `land` ab, nicht aus dem Tarif-`type`.
 
@@ -94,10 +94,13 @@ Die Preise je Slot berechnet die Tarif-Bibliothek [Edibert](https://github.com/J
 
 Die Marktpreise (Live) kommen aus der Gebotszone des Hausprofil-`land` (AT / DE-LU / CH).
 
-- **ENTSO-E:** Mit `ENTSOE_API_TOKEN` in `config/.env` fragt Earnie zuerst die **ENTSO-E Transparency Platform** ab (A44 Day-Ahead). AT/DE-LU liefern meist PT15M, CH derzeit PT60M; Earnie expandiert stündliche Werte auf QH.
-- **Energy-Charts:** Ohne Token oder bei ENTSO-E-Ausfall folgt **Energy-Charts** (Fraunhofer).
-- **Cache:** Erfolgreiche Abrufe speichert Earnie unter `runtime/live_day_ahead_<zone>.json` (Feld `source`: `entsoe` / `energy_charts`). Earnie verwendet sie wieder, solange die Serie das Planungsfenster abdeckt und seit dem letzten Day-Ahead-Publish (~12:00 Ortszeit) frisch ist. Ist ein Refresh nötig und liegt der Spiegel-Lookback (7 Tage) schon im Cache, fragt Earnie nur ab **heute 00:00** bis Planungsende ab und füllt die Historie aus dem Cache.
-- **Ausfall beider Netzquellen:** Earnie nutzt zuerst diesen QH-Cache. Erst wenn der Cache fehlt oder das Fenster nicht abdeckt, folgt der Fallback **aWATTar** (stündlich, auf 15-Min-Slots expandiert). Die aWATTar-URL ergibt sich aus `land` (AT → `api.awattar.at`, DE → `api.awattar.de`).
+- **Erwartetes Fenster:** die letzten 7 Tage (Quellen für die Spiegelung) bis heute 24:00, ab 12:00 Ortszeit (Day-Ahead-Veröffentlichung) bis morgen 24:00. Spätere Stunden des Planungshorizonts füllt die Strategie unter [Fehlende Zukunftspreise](#fehlende-zukunftspreise-live) auf.
+- **ENTSO-E:** Mit `ENTSOE_API_TOKEN` in `config/.env` fragt Earnie zuerst die **ENTSO-E Transparency Platform** ab (A44 Day-Ahead). AT/DE-LU liefern meist PT15M, CH derzeit PT60M; stündliche Werte gelten für alle vier Viertelstunden.
+- **Energy-Charts:** Ohne Token oder wenn ENTSO-E nicht das ganze Fenster liefert, folgt **Energy-Charts** (Fraunhofer).
+- **aWATTar:** Danach **aWATTar** (stündlich, auf 15-Min-Slots aufgeteilt), nur für AT (`api.awattar.at`) und DE (`api.awattar.de`). **CH hat keine dritte Quelle**; früher nahm Earnie für CH ersatzweise die aWATTar-Reihe von AT, das entfällt.
+- **Cache:** Der letzte Abruf liegt unter `runtime/edibert_market/market_<zone>.json`. Deckt er das Fenster ab, fragt Earnie keine Quelle. Fehlt etwas, fragt Earnie höchstens alle 10 Minuten erneut nach.
+- **Ausfall aller Quellen:** Earnie nimmt die beste Teilantwort (auch aus dem Cache) und meldet die fehlenden Viertelstunden im Log; die Lücke füllt die Strategie für fehlende Preise. Ohne jeden Preis bricht der Lauf mit „Keine Day-Ahead-Preise“ ab.
+- **Land:** Fehlt `land` im Hausprofil oder ist es unbekannt, bricht der Abruf mit einer Fehlermeldung ab (früher galt still AT).
 
 ### Berechnung
 
@@ -177,8 +180,8 @@ Die Berechnung macht Edibert (Anbindung in [`data/edibert_slot_prices.py`](../..
 
 | Land (`land`) | Zone | Datenquelle (API) |
 | --- | --- | --- |
-| AT | AT | Energy-Charts (`bzn=AT`); Fallback aWATTar AT |
-| DE | DE-LU | Energy-Charts (`bzn=DE-LU`); Fallback aWATTar DE |
+| AT | AT | Energy-Charts (`bzn=AT`) |
+| DE | DE-LU | Energy-Charts (`bzn=DE-LU`) |
 | CH | CH | Energy-Charts |
 
 `simulation/engine.py` und `data/backtesting_prices.py` bepreisen über die Edibert-Preisreferenz der Szenario-Auflösung (`_edibert_pricing`); `_import_tariff_spec` / `_export_tariff_spec` tragen nur noch die Katalogparameter für Anzeige, Fixkosten und Rechnung. Day-Ahead-Daten: [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
@@ -225,7 +228,7 @@ Block `market_prices` in `config.json`:
 | `live_bias_lookback_hours` | Lookback-Fenster in Stunden (Standard: `48`) |
 | `live_bias_cap_cent_kwh` | Absolute Kappe ±Cent/kWh (Standard: `12.0`) |
 
-Wenn keine Preisquelle der Kaskade (ENTSO-E, Energy-Charts, Cache, aWATTar) für späte Stunden des Horizonts schon Preise liefert, gilt die gewählte Strategie:
+Wenn keine Preisquelle der Kaskade (Cache, ENTSO-E, Energy-Charts, aWATTar) für späte Stunden des Horizonts schon Preise liefert, gilt die gewählte Strategie:
 
 - **`forecast` (Standard):** Ein OLS-Korrelationsmodell extrapoliert die fehlenden Stunden. Als Live-Features dienen die Open-Meteo-Wetterprognose und ein stündlicher EU-Leistungs-Stand-in aus dem letzten Archivtag. Charts zeigen diese Stunden als grünen Bereich (siehe [Charts](../ui/charts.md)). Mit dem Standard `live_bias_enabled` korrigiert Earnie die prognostizierten EPEX-Werte rollierend (Day-Ahead − OLS), begrenzt durch `live_bias_cap_cent_kwh`.
 - **`mirror`:** gleiche Uhrzeit vom Vortag. Earnie nutzt diese Strategie auch automatisch, wenn Modell oder Features nicht geladen werden können.

@@ -9,8 +9,7 @@ Patched (non-exhaustive of all main imports, but enough for a silent/full run):
   profile_manager (month check, planning window, matrix)
   loxone_client (flex kw, resolve live power, snapshot, consumers)
   ehal_live.read_ess_soc / read_live_power_kw
-  awattar_client.fetch_awattar_prices
-  data.live_market_prices.fetch_live_day_ahead_prices
+  data.edibert_live_market.fetch_live_day_ahead_prices
   consumer_targets.resolve_consumer_daily_targets
   optimizer.prepare_optimization_matrix / get_consumer_remaining_kwh /
   milp_optimizer / battery_plan_kw_from_control / register_consumer_delivery /
@@ -86,7 +85,7 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
         lambda params, _soc: params,
     )
     monkeypatch.setattr(
-        "data.live_market_prices.fetch_live_day_ahead_prices",
+        "data.edibert_live_market.fetch_live_day_ahead_prices",
         lambda planning_end=None: [
             {"timestamp": datetime(2026, 6, 15, 10, 0), "price_buy": 10.0}
         ],

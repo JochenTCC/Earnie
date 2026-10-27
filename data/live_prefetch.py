@@ -48,7 +48,7 @@ def _step(name: str, errors: list[str], fn) -> None:
 
 def _prefetch_prices(window) -> None:
     from data import market_prices
-    from data.live_market_prices import fetch_live_day_ahead_prices
+    from data.edibert_live_market import fetch_live_day_ahead_prices
     from data.price_forecast_live import resolve_market_slots_kwargs
 
     market_data = fetch_live_day_ahead_prices(planning_end=window.end)
