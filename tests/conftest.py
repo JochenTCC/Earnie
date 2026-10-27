@@ -1,8 +1,12 @@
 # tests/conftest.py
 from __future__ import annotations
 
+import atexit
+import itertools
 import os
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -217,6 +221,32 @@ def _isolated_runtime_dir(tmp_path_factory):
             os.environ.pop("EARNIE_RUNTIME_PATH", None)
         else:
             os.environ["EARNIE_RUNTIME_PATH"] = previous
+
+
+_OPENDATA_CACHE_ROOT = Path(tempfile.mkdtemp(prefix="earnie-opendata-test-"))
+atexit.register(shutil.rmtree, _OPENDATA_CACHE_ROOT, ignore_errors=True)
+_opendata_cache_ids = itertools.count()
+# Module- and session-scoped fixtures run before the per-test dir below is set.
+os.environ["EARNIE_ENERGY_CHARTS_CACHE_PATH"] = str(_OPENDATA_CACHE_ROOT / "process")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_opendata_cache():
+    """Every test gets its own (not yet created) Energy-Charts / EU archive cache dir.
+
+    Tests serve fake payloads for settled days; in a shared dir one test would read another
+    test's payload, and in the repo dir the app would read it as real data. Plain
+    ``os.environ`` for the same teardown-order reason as ``_isolated_runtime_dir``.
+    """
+    previous = os.environ.get("EARNIE_ENERGY_CHARTS_CACHE_PATH")
+    os.environ["EARNIE_ENERGY_CHARTS_CACHE_PATH"] = str(_OPENDATA_CACHE_ROOT / str(next(_opendata_cache_ids)))
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("EARNIE_ENERGY_CHARTS_CACHE_PATH", None)
+        else:
+            os.environ["EARNIE_ENERGY_CHARTS_CACHE_PATH"] = previous
 
 
 @pytest.fixture(autouse=True)

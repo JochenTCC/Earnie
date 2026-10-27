@@ -8,7 +8,9 @@ import pandas as pd
 import pytest
 import requests
 
+import opendata
 from data import open_meteo_solar_archive as archive
+from opendata import ApiUnreachableError
 
 
 def test_irradiance_wm2_to_pv_kw_scales_with_kwp():
@@ -59,7 +61,7 @@ def test_fetch_hourly_pv_kw_series_parses_archive_payload(monkeypatch):
 
         return Resp()
 
-    monkeypatch.setattr(archive.requests, "get", _fake_get)
+    monkeypatch.setattr(requests, "get", _fake_get)
     series = archive.fetch_hourly_pv_kw_series(
         date(2024, 7, 13),
         date(2024, 7, 13),
@@ -94,6 +96,8 @@ def test_build_open_meteo_climate_bundle_parses_payload(monkeypatch):
                 }
             }
         class Resp:
+            status_code = 200
+
             def raise_for_status(self):
                 return None
 
@@ -102,7 +106,7 @@ def test_build_open_meteo_climate_bundle_parses_payload(monkeypatch):
 
         return Resp()
 
-    monkeypatch.setattr(archive.requests, "get", _fake_get)
+    monkeypatch.setattr(requests, "get", _fake_get)
     bundle = archive.build_open_meteo_climate_bundle(
         date(2024, 7, 13),
         date(2024, 7, 13),
@@ -159,7 +163,7 @@ def test_fetch_chunk_requests_utc_and_one_day_earlier(monkeypatch):
         )
         return response
 
-    monkeypatch.setattr(archive.requests, "get", _fake_get)
+    monkeypatch.setattr(requests, "get", _fake_get)
     payload = archive._fetch_hourly_archive_chunk(
         lat=48.0,
         lon=10.0,
@@ -180,9 +184,10 @@ def test_build_open_meteo_climate_bundle_raises_on_api_error(monkeypatch):
     def _fake_get(url, params, timeout):
         raise requests.ConnectionError("offline")
 
-    monkeypatch.setattr(archive.requests, "get", _fake_get)
-    monkeypatch.setattr(archive.time, "sleep", lambda *_args, **_kwargs: None)
-    with pytest.raises(requests.ConnectionError, match="offline"):
+    monkeypatch.setattr(requests, "get", _fake_get)
+    monkeypatch.setattr("opendata.http.time.sleep", lambda *_args, **_kwargs: None)
+    # A connection error is not retried (opendata, Edibert P6 D3).
+    with pytest.raises(ApiUnreachableError, match="nicht erreichbar"):
         archive.build_open_meteo_climate_bundle(
             date(2024, 7, 13),
             date(2024, 7, 13),
@@ -209,8 +214,8 @@ def test_fetch_hourly_archive_chunk_retries_502(monkeypatch):
         )
         return response
 
-    monkeypatch.setattr(archive.requests, "get", _fake_get)
-    monkeypatch.setattr(archive.time, "sleep", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(requests, "get", _fake_get)
+    monkeypatch.setattr("opendata.http.time.sleep", lambda *_args, **_kwargs: None)
     payload = archive._fetch_hourly_archive_chunk(
         lat=48.0,
         lon=10.0,
@@ -379,32 +384,35 @@ def test_open_meteo_cache_read_failure_raises(tmp_path):
         )
 
 
+def test_climate_fetch_budget_is_the_opendata_budget():
+    assert archive.climate_fetch_budget is opendata.fetch_budget
+    assert archive.ClimateFetchBudgetExceeded is opendata.FetchBudgetExceeded
+
+
 def test_fetch_budget_stops_retries_instead_of_sleeping(monkeypatch):
     calls: list[float] = []
 
-    def failing_get(url, params=None, timeout=None):
+    def throttled_get(url, params=None, timeout=None):
         calls.append(timeout)
-        raise requests.ConnectionError("down")
+        response = requests.Response()
+        response.status_code = 429
+        response.url = url
+        return response
 
     def no_sleep(seconds):
         raise AssertionError(f"must not sleep {seconds}s past the budget")
 
-    monkeypatch.setattr(archive.requests, "get", failing_get)
-    monkeypatch.setattr(archive.time, "sleep", no_sleep)
+    monkeypatch.setattr(requests, "get", throttled_get)
+    monkeypatch.setattr("opendata.http.time.sleep", no_sleep)
     with archive.climate_fetch_budget(1.0):
-        with pytest.raises(archive.ClimateFetchBudgetExceeded, match="down"):
-            archive._archive_http_get({"latitude": 47.4})
+        with pytest.raises(archive.ClimateFetchBudgetExceeded, match="429"):
+            archive._fetch_hourly_archive_chunk(
+                lat=47.4,
+                lon=9.7,
+                timezone="Europe/Vienna",
+                start=date(2024, 7, 13),
+                end=date(2024, 7, 14),
+                hourly_vars=archive.HOURLY_TEMP_VAR,
+            )
     assert len(calls) == 1
     assert calls[0] <= 1.0
-
-
-def test_fetch_without_budget_keeps_retrying(monkeypatch):
-    sleeps: list[float] = []
-    monkeypatch.setattr(
-        archive.requests, "get",
-        lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("down")),
-    )
-    monkeypatch.setattr(archive.time, "sleep", sleeps.append)
-    with pytest.raises(requests.ConnectionError):
-        archive._archive_http_get({"latitude": 47.4})
-    assert sleeps == [2.0, 4.0, 8.0, 16.0, 32.0]

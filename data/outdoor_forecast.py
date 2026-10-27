@@ -6,9 +6,11 @@ from datetime import datetime, timedelta, timezone as _timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-import requests
-
 import config
+from data import opendata_session
+from opendata import open_meteo
+from opendata.http import requests_transport
+from opendata.open_meteo import utc_forecast_params  # noqa: F401  (re-export, used by eu_market_features)
 from runtime_store.cycle_duration_stats import (
     EVENT_WEATHER_FETCH,
     record_event as record_cycle_event,
@@ -66,39 +68,37 @@ def _fetch_open_meteo_hourly_vars(
     hourly_vars: tuple[str, ...],
     extra_params: dict | None = None,
 ) -> dict[str, list[tuple[datetime, float]]]:
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "hourly": ",".join(hourly_vars),
-        **utc_forecast_params(forecast_days),
-    }
-    if extra_params:
-        params.update(extra_params)
-    payload = _open_meteo_payload(url, params)
+    payload = open_meteo.forecast(
+        opendata_session.session(transport=_shadow_transport),
+        latitude=lat,
+        longitude=lon,
+        forecast_days=forecast_days,
+        hourly=hourly_vars,
+        extra_params=extra_params,
+    )
     return _parse_open_meteo_hourly(
         payload, hourly_vars, timezone=config.get_planning_timezone()
     )
 
 
-def utc_forecast_params(forecast_days: int) -> dict:
-    """Open-Meteo forecast window requested in UTC.
+class _ReplayedResponse:
+    """A recorded Open-Meteo payload served in shadow mode."""
 
-    With a zone name (or ``auto``) Open-Meteo applies ONE fixed UTC offset to the whole
-    response (the offset valid on the request day), so hours on the other side of a clock
-    change are 1 h off. UTC stamps are converted per timestamp instead. The first local
-    hours of a day belong to the previous UTC day and the last ones may fall behind the
-    UTC-day count, hence one past day and one extra forecast day.
-    """
-    return {
-        "timezone": "UTC",
-        "past_days": 1,
-        "forecast_days": min(_OPEN_METEO_MAX_FORECAST_DAYS, forecast_days + 1),
-    }
+    status_code = 200
+    headers: dict[str, str] = {}
+
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+
+    def json(self) -> dict:
+        return self._payload
+
+    def raise_for_status(self) -> None:
+        return None
 
 
-def _open_meteo_payload(url: str, params: dict):
-    """Open-Meteo JSON via the shadow-aware transport (replay in shadow, record in prod)."""
+def _shadow_transport(url: str, params: dict, timeout_s: float):
+    """``opendata`` transport for Open-Meteo: replay in shadow mode, record in prod."""
     from runtime_store.shadow.feed import url_hash
     from runtime_store.shadow.mode import is_shadow_mode
     from runtime_store.shadow.replay import replay_ext_payload
@@ -108,43 +108,29 @@ def _open_meteo_payload(url: str, params: dict):
     param_key = "&".join(f"{k}={params[k]}" for k in sorted(params))
     feed_key = f"ext:outdoor:{url_hash(url + '?' + param_key)}"
 
-    def _replay() -> dict | None:
+    def _replay() -> _ReplayedResponse | None:
         payload = replay_ext_payload(feed_key)
-        return payload if isinstance(payload, dict) else None
+        return _ReplayedResponse(payload) if isinstance(payload, dict) else None
 
-    def _live() -> dict | object:
+    def _live():
         # Family B: Shadow fallback must not record; Prod records.
         if is_shadow_mode():
-            response = requests.get(
-                url, params=params, timeout=config.get_global_timeout()
-            )
-            payload = response.json()
-            response.raise_for_status()
-            return payload
+            return requests_transport(url, params, timeout_s)
         try:
-            response = requests.get(
-                url, params=params, timeout=config.get_global_timeout()
-            )
-            try:
-                payload = response.json()
-            except ValueError:
-                payload = response.text
-            if response.status_code >= 400:
-                safe_record(
-                    feed_key,
-                    ok=False,
-                    status=int(response.status_code),
-                    payload=payload,
-                    error=f"HTTP {response.status_code}",
-                )
-                response.raise_for_status()
-            safe_record(
-                feed_key, ok=True, payload=payload, status=int(response.status_code)
-            )
-            return payload
+            response = requests_transport(url, params, timeout_s)
         except Exception as exc:
             safe_record(feed_key, ok=False, error=str(exc))
             raise
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = response.text
+        status = int(response.status_code)
+        if status >= 400:
+            safe_record(feed_key, ok=False, status=status, payload=payload, error=f"HTTP {status}")
+        else:
+            safe_record(feed_key, ok=True, payload=payload, status=status)
+        return response
 
     return ext_get(replay=_replay, live=_live, allow_live_fallback=True)
 

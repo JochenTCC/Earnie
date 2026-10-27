@@ -2,40 +2,30 @@
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-import requests
 
 import config
-from data.outdoor_forecast import utc_forecast_params
+from data import opendata_session
+from opendata import ApiUnreachableError, energy_charts, open_meteo  # noqa: F401  (ApiUnreachableError re-exported)
 
-ENERGY_CHARTS_BASE = "https://api.energy-charts.info"
-OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
-OPEN_METEO_FORECAST = "https://api.open-meteo.com/v1/forecast"
 AT_BIDDING_ZONE = "AT"
-API_RETRY_ATTEMPTS = 5
-API_RETRY_BASE_SECONDS = 2.0
-API_PAUSE_SECONDS = 0.75
-# Energy-Charts often needs longer than GLOBAL_TIMEOUT (default 5s), especially
-# when 12 countries are fetched sequentially on a slow NAS uplink.
-ENERGY_CHARTS_TIMEOUT_FLOOR_SEC = 30.0
 
 logger = logging.getLogger(__name__)
 
+class EuPowerIncompleteError(RuntimeError):
+    """EU power data of at least one country could not be loaded.
 
-class ApiUnreachableError(RuntimeError):
-    """Connection-level failure (no route, timeout, DNS): the host is not answering.
-
-    Raised at the first failed attempt and never retried: every further request of
-    the same run would only wait for the next timeout (issue #59).
+    The OLS model was trained on the sum of all :data:`GENERATION_COUNTRIES`; a sum without
+    one country would shift the features without any label on the forecast.
     """
 
 
+EU_WEATHER_VARS = ("wind_speed_10m", "shortwave_radiation")
 WIND_PRODUCTION_NAMES = frozenset({"Wind onshore", "Wind offshore"})
 SOLAR_PRODUCTION_NAME = "Solar"
 LOAD_PRODUCTION_NAME = "Load"
@@ -113,51 +103,6 @@ def month_ranges(start: date, end: date) -> list[tuple[date, date]]:
     return ranges
 
 
-def _energy_charts_timeout_sec() -> float:
-    return max(float(config.get_global_timeout()), ENERGY_CHARTS_TIMEOUT_FLOOR_SEC)
-
-
-def _http_get_json(
-    url: str,
-    params: dict[str, Any],
-    *,
-    timeout_sec: float | None = None,
-) -> dict[str, Any]:
-    last_error: Exception | None = None
-    timeout = float(config.get_global_timeout() if timeout_sec is None else timeout_sec)
-    for attempt in range(API_RETRY_ATTEMPTS):
-        try:
-            response = requests.get(
-                url,
-                params=params,
-                timeout=timeout,
-            )
-            if response.status_code == 429:
-                wait = API_RETRY_BASE_SECONDS * (2 ** attempt)
-                time.sleep(wait)
-                continue
-            response.raise_for_status()
-            payload = response.json()
-            if not isinstance(payload, dict):
-                raise ValueError(f"Unerwartete API-Antwort von {url}")
-            time.sleep(API_PAUSE_SECONDS)
-            return payload
-        except requests.HTTPError as exc:
-            last_error = exc
-            if exc.response is not None and exc.response.status_code == 429:
-                time.sleep(API_RETRY_BASE_SECONDS * (2 ** attempt))
-                continue
-            raise
-        except (requests.ConnectionError, requests.Timeout) as exc:
-            raise ApiUnreachableError(
-                f"API nicht erreichbar ({url}): {type(exc).__name__}"
-            ) from exc
-        except requests.RequestException as exc:
-            last_error = exc
-            time.sleep(API_RETRY_BASE_SECONDS * (2 ** attempt))
-    raise RuntimeError(f"API-Abruf fehlgeschlagen ({url}): {last_error}")
-
-
 def _dedupe_hourly_mean(frame: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series:
     """Mittelt doppelte Stunden-Slots."""
     if frame.index.has_duplicates:
@@ -213,16 +158,11 @@ def fetch_country_power_hourly(
     """Stündliche Wind/Solar/Last/Residuallast je Land (Energy-Charts)."""
     frames: list[pd.DataFrame] = []
     for chunk_start, chunk_end in month_ranges(start, end):
-        payload = _http_get_json(
-            f"{ENERGY_CHARTS_BASE}/public_power",
-            {
-                "country": country,
-                "start": chunk_start.isoformat(),
-                "end": (chunk_end - timedelta(days=1)).isoformat()
-                if chunk_end > chunk_start
-                else chunk_start.isoformat(),
-            },
-            timeout_sec=_energy_charts_timeout_sec(),
+        payload = energy_charts.public_power(
+            opendata_session.session(),
+            country=country,
+            start=chunk_start,
+            end=chunk_end - timedelta(days=1),
         )
         frames.append(_public_power_hourly(payload))
     if not frames:
@@ -245,57 +185,27 @@ def fetch_country_renewables_hourly(
 def fetch_eu_power_hourly(start: date, end: date) -> pd.DataFrame:
     """Summierte EU-Wind, Solar, Last und Residuallast (MW) je Stunde.
 
-    Single-country failures (HTTP error, empty payload) are skipped so the
-    remaining countries still feed the live price forecast. Mirror fallback
-    only when every country fails. An unreachable host
-    (``ApiUnreachableError``) aborts the whole fetch at the first country.
+    Every country of :data:`GENERATION_COUNTRIES` must load: a failed country raises
+    :class:`EuPowerIncompleteError` naming it (live then falls back to the mirror). An
+    unreachable host (``ApiUnreachableError``) aborts at the first country.
     """
     total: pd.DataFrame | None = None
-    failed: list[str] = []
     for country in GENERATION_COUNTRIES:
         try:
             country_frame = fetch_country_power_hourly(country, start, end)
         except ApiUnreachableError:
             # The host does not answer: asking the other countries only repeats the wait.
             raise
-        except (
-            OSError,
-            ValueError,
-            requests.HTTPError,
-            RuntimeError,
-            requests.RequestException,
-        ) as exc:
-            failed.append(country)
-            logger.warning(
-                "EU-Leistungsdaten: Land %s übersprungen (%s: %s).",
-                country,
-                type(exc).__name__,
-                str(exc).split("?")[0][:180],
-            )
-            continue
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise EuPowerIncompleteError(
+                f"EU-Leistungsdaten für {start.isoformat()} bis {end.isoformat()} unvollständig: "
+                f"Land {country} fehlt ({type(exc).__name__}: {str(exc).split('?')[0][:180]})."
+            ) from exc
         country_frame = country_frame.rename(
             columns={col: f"{col}_{country}" for col in country_frame.columns}
         )
-        if total is None:
-            total = country_frame
-        else:
-            total = total.join(country_frame, how="outer")
-    if total is None:
-        raise ValueError(
-            "EU-Leistungsdaten konnten nicht geladen werden"
-            + (
-                f" (alle Länder fehlgeschlagen: {', '.join(failed)})."
-                if failed
-                else "."
-            )
-        )
-    if failed:
-        logger.warning(
-            "EU-Leistungsdaten: Summe ohne %s (%d/%d Länder ok).",
-            ", ".join(failed),
-            len(GENERATION_COUNTRIES) - len(failed),
-            len(GENERATION_COUNTRIES),
-        )
+        total = country_frame if total is None else total.join(country_frame, how="outer")
+    assert total is not None  # GENERATION_COUNTRIES is not empty
     result = pd.DataFrame(index=total.index)
     for base, eu_name in (
         ("wind_mw", "eu_wind_mw"),
@@ -319,16 +229,11 @@ def fetch_at_day_ahead_hourly(start: date, end: date) -> pd.Series:
     """AT Day-Ahead EPEX in Cent/kWh (stündlich)."""
     frames: list[pd.Series] = []
     for chunk_start, chunk_end in month_ranges(start, end):
-        payload = _http_get_json(
-            f"{ENERGY_CHARTS_BASE}/price",
-            {
-                "bzn": AT_BIDDING_ZONE,
-                "start": chunk_start.isoformat(),
-                "end": (chunk_end - timedelta(days=1)).isoformat()
-                if chunk_end > chunk_start
-                else chunk_start.isoformat(),
-            },
-            timeout_sec=_energy_charts_timeout_sec(),
+        payload = energy_charts.price(
+            opendata_session.session(),
+            bzn=AT_BIDDING_ZONE,
+            start=chunk_start,
+            end=chunk_end - timedelta(days=1),
         )
         seconds = payload.get("unix_seconds") or []
         prices = payload.get("price") or []
@@ -355,18 +260,15 @@ def _fetch_open_meteo_archive_month(
     start: date,
     end: date,
 ) -> pd.DataFrame:
-    payload = _http_get_json(
-        OPEN_METEO_ARCHIVE,
-        {
-            "latitude": point.latitude,
-            "longitude": point.longitude,
-            # One UTC day earlier: the first local hours of ``start`` belong to the previous UTC day.
-            "start_date": (start - timedelta(days=1)).isoformat(),
-            "end_date": (end - timedelta(days=1)).isoformat(),
-            "hourly": "wind_speed_10m,shortwave_radiation",
-            # UTC: with a zone name the archive applies one fixed offset to the whole response.
-            "timezone": "UTC",
-        },
+    # One UTC day earlier: the first local hours of ``start`` belong to the previous UTC day.
+    payload = open_meteo.archive(
+        opendata_session.session(),
+        latitude=point.latitude,
+        longitude=point.longitude,
+        start_date=start - timedelta(days=1),
+        end_date=end - timedelta(days=1),
+        hourly=EU_WEATHER_VARS,
+        cached=True,
     )
     hourly = payload.get("hourly") or {}
     times = hourly.get("time") or []
@@ -473,14 +375,12 @@ def _fetch_open_meteo_forecast_point(
     *,
     forecast_days: int,
 ) -> pd.DataFrame:
-    payload = _http_get_json(
-        OPEN_METEO_FORECAST,
-        {
-            "latitude": point.latitude,
-            "longitude": point.longitude,
-            "hourly": "wind_speed_10m,shortwave_radiation",
-            **utc_forecast_params(forecast_days),
-        },
+    payload = open_meteo.forecast(
+        opendata_session.session(),
+        latitude=point.latitude,
+        longitude=point.longitude,
+        forecast_days=forecast_days,
+        hourly=EU_WEATHER_VARS,
     )
     try:
         return _hourly_frame_from_open_meteo_payload(payload)
@@ -490,20 +390,13 @@ def _fetch_open_meteo_forecast_point(
 
 def _fetch_open_meteo_forecast_grid(*, forecast_days: int) -> dict[str, pd.DataFrame]:
     """One multi-location Open-Meteo call for the full EU weather grid."""
-    lats = ",".join(str(p.latitude) for p in WEATHER_GRID)
-    lons = ",".join(str(p.longitude) for p in WEATHER_GRID)
-    raw = requests.get(
-        OPEN_METEO_FORECAST,
-        params={
-            "latitude": lats,
-            "longitude": lons,
-            "hourly": "wind_speed_10m,shortwave_radiation",
-            **utc_forecast_params(forecast_days),
-        },
-        timeout=config.get_global_timeout(),
+    payload = open_meteo.forecast(
+        opendata_session.session(),
+        latitude=[p.latitude for p in WEATHER_GRID],
+        longitude=[p.longitude for p in WEATHER_GRID],
+        forecast_days=forecast_days,
+        hourly=EU_WEATHER_VARS,
     )
-    raw.raise_for_status()
-    payload = raw.json()
     locations = payload if isinstance(payload, list) else [payload]
     if len(locations) != len(WEATHER_GRID):
         raise ValueError(
@@ -521,7 +414,7 @@ def fetch_eu_weather_forecast_hourly(start: date, end: date) -> pd.DataFrame:
     forecast_days = _forecast_days_for_range(start, end)
     try:
         point_frames = _fetch_open_meteo_forecast_grid(forecast_days=forecast_days)
-    except (OSError, ValueError, requests.HTTPError, requests.RequestException):
+    except (OSError, ValueError):  # requests errors are OSError
         point_frames = {
             point.name: _fetch_open_meteo_forecast_point(
                 point, forecast_days=forecast_days

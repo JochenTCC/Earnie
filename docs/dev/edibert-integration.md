@@ -489,3 +489,154 @@ S0 (commit golden on old code) → S1 → S2 → S3 → S4 → S5 → gate: full
 - [x] Parity test on recorded inputs green (golden recorded with the pre-P5 code).
 - [x] Forecast span capped at 72 h (error beyond).
 - [x] Full suite and all regression cases green, goldens unchanged; SE before / after with `forecast` identical (fixed tariffs only, see *Results*).
+
+## P6 — Shared weather and power-data access (plan 2026-10-27)
+
+Status: **done 2026-10-27** (D1–D8 accepted 2026-10-27; S0–S7 and the gate done; see *Implementation notes*, *Done check*). Backlog item *Edibert P6* (Version 2.8), extended by the P5 findings on Energy-Charts. Goal: one standalone, caching package without Earnie imports for the public data feeds Earnie fetches itself (Open-Meteo archive and forecast, Energy-Charts EU power), so that SUSI P3a can add `direct_normal_irradiance` in one place and the SE stops hammering Energy-Charts. **Done:** one access path, cache test, import-isolation test, and (new) fail-loud on a missing country instead of a shrunken EU sum.
+
+### Findings (2026-10-27)
+
+- **Five HTTP paths, three retry loops:**
+  - `data/eu_market_features.py` `_http_get_json`: Energy-Charts `public_power` per country and month, AT Day-Ahead `price` (training set only), Open-Meteo archive per EU grid point and month, Open-Meteo forecast per point. Retries only 429 (2–32 s, 5 attempts); after five 429s the error reads `… fehlgeschlagen (…): None` because `last_error` is not set on the status-code path.
+  - `eu_market_features._fetch_open_meteo_forecast_grid`: one multi-location forecast call with plain `requests.get` and no retry; on any error it falls back to one call per grid point.
+  - `data/open_meteo_solar_archive.py` `_archive_http_get`: Open-Meteo archive for the house site (temperature, tilted irradiance), retries 429 / 502 / 503 / 504 within an optional `climate_fetch_budget`.
+  - `data/outdoor_forecast.py` `_open_meteo_payload`: Open-Meteo forecast for the house site through the shadow transport (replay in shadow mode, record in prod).
+  - Out of scope: `data/pv_forecast.py` (forecast.solar) and `data/edibert_live_market.py` (Day-Ahead prices, Edibert P4a).
+- **Caches today:**
+  - The house-site archive has a disk cache (`data/cache/open_meteo_utc/`, one JSON per lat / lon / tz / start / end / surfaces, env `EARNIE_OPEN_METEO_CACHE_PATH`) plus an mtime-checked memory cache. Regression cases ship these files as frozen fixtures (`tests/regression/climate_fixture.py` patches `_load_bundle_from_cache` / `_save_bundle_to_cache` / `_fetch_hourly_archive_chunk`).
+  - Energy-Charts power and the EU grid weather (archive) have **no disk cache**, only process-local memory caches in `data/price_forecast_live.py` (45 min TTL, 1 h back-off after a failure). The house-site forecast has a 30 min memory cache keyed on the planning clock.
+- **Earnie imports in the access code:** `config.get_global_timeout`, `runtime_store.planning_clock` (`planning_now`, `cache_entry_fresh`), `runtime_store.env_vars.read_env`, `runtime_store.shadow.*`, `runtime_store.cycle_duration_stats`, and `archive_latest_complete_date` reaching back into `data.price_forecast_live`. These must become parameters or stay in Earnie-side adapters.
+- **Silent shrink:** `fetch_eu_power_hourly` skips a country after an error and sums the rest; the OLS model was trained on all 12 countries, so a missing Germany lowers `eu_wind_mw` / `eu_load_mw` by a third without any label on the forecast. In the P5 SE runs 43–45 countries were skipped per run (HTTP 429 under 20 workers), so the bias was not reproducible. The EU weather grid already fails loud on a missing point.
+- **Who pays for the 429s:** live fetches a few days per cycle and is rarely throttled. The SE fetches the same days from every worker, but only because of the live-bias bug (*Backlog-Bugfixes*, item from P5): SE features otherwise come from the training CSV. Training (`scripts.build_price_training_dataset`) fetches months × 12 countries once.
+- **Edibert:** its `MarketArchive` already caches Day-Ahead prices per month on disk and waits out 429, so the Edibert repo is not touched. Its research item *Shared library (weather)* says "no shared cache building block in advance"; P6 is the moment that note was waiting for.
+
+### Decisions (open, recommendations marked)
+
+1. **D1 — package and scope:** *(recommended)* new top-level package `opendata/` in Earnie (working name; checked for a free PyPI name before the own repo), added to `[tool.setuptools.packages.find]`. Scope: an HTTP layer, a disk cache, an Open-Meteo client (archive and forecast, single and multi-location, any hourly variables) and an Energy-Charts client (`public_power`, `price`). Feature logic stays in Earnie: grid-point weights, the country list, the EU sum, PV / thermal conversion, planning-time conversion. *Alternative:* weather only (as the backlog text says), Energy-Charts stays in `eu_market_features`; then the cache and fail-loud work is done twice or not at all.
+2. **D2 — no Earnie imports through injection:** the package exposes a `Session(cache_dir, timeout_s, transport=None)`. The default transport is `requests` with the shared retry policy. Earnie builds the session in one place (`data/opendata_session.py`): timeout from `config`, cache dir from `EARNIE_OPEN_METEO_CACHE_PATH` / a new `EARNIE_ENERGY_CHARTS_CACHE_PATH`, the shadow-aware transport for the house-site forecast. Planning clock, "last complete archive day", memory TTL caches and `climate_fetch_budget` stay Earnie-side; the package only gets explicit dates.
+3. **D3 — one retry policy:** retry 429 / 502 / 503 / 504 with exponential backoff (2–32 s, 5 attempts), honour `Retry-After` when present, keep a per-host pause (Energy-Charts 0.75 s as today), raise the last HTTP error (not `None`), keep `ApiUnreachableError` for connection errors and timeouts. The multi-location forecast call gets the same retries; its per-point fallback stays (same data, not a silent change of meaning).
+4. **D4 — Energy-Charts disk cache:** one file per country and calendar month (parsed hourly frame, JSON `orient="split"` like the Open-Meteo cache), under `data/cache/energy_charts/`. Only **settled** days are written: days older than 2 days at fetch time (Energy-Charts revises the most recent load and generation values); younger hours are always fetched and never stored. A month file records the last settled day it covers; a request beyond it fetches the month again and rewrites the file. Writes are atomic (temp file + `os.replace`) so parallel SE workers can share the directory. The same cache serves the EU grid weather archive (one file per grid point and month). Tests never write the repo cache (same conftest guard as Open-Meteo).
+5. **D5 — house-site Open-Meteo cache unchanged:** file names, format and the regression patch points (`_load_bundle_from_cache`, `_save_bundle_to_cache`, `_fetch_hourly_archive_chunk`, `open_meteo_cache_path`) stay as they are; only the HTTP call underneath moves into the package. Otherwise every regression climate fixture would have to be re-recorded (needs network, changes the input fingerprints). A unified per-month cache for the house site is a later step.
+6. **D6 — fail-loud on a missing country:** *(recommended)* `fetch_eu_power_hourly` raises when any country fails (error names the countries and the cause). Consequences, all visible:
+   - Live: `build_live_feature_frame_for_slots` already catches the error, so the whole call falls back to the mirror (P5 D5, label `mirrored`, warning, 1 h back-off). OLS on a distorted feature is replaced by the mirror.
+   - Training: the dataset build stops instead of training on a shrunken sum.
+   - SE: no effect once the live-bias bugfix (D7) is in; before that, an SE run fails instead of producing a non-reproducible bias.
+
+   German user doc `docs/konfiguration/preise.md`: one sentence that missing EU power data leads to the mirror. *Alternative:* keep the skip but label the slots and log an error; the forecast stays distorted.
+7. **D7 — SE live bias first:** fix the bugfix item before P6 (own commit, small), so P6 is measured on an SE that does not fetch EU power. Variants:
+   - *(recommended)* bias from the training CSV: the same rolling Day-Ahead minus OLS over the 48 h before each anchor, computed from the CSV features and the SE's own Day-Ahead prices. Mirrors live behaviour without network.
+   - Bias off in the SE (`live_bias_enabled=False`): simplest, but the SE then underestimates what live achieves.
+   - The values from `config.json`: same as live configuration, but still needs a feature source, so it is the first variant plus a config switch.
+
+   Either way the default `live_bias_enabled=True` of `resolve_market_slots` goes (callers pass it explicitly).
+8. **D8 — SE prewarm:** not needed once D7 is in (the SE fetches nothing). If the SE ever needs archive power again, the parent process fills the cache for the window's months before starting the workers. Not built in P6.
+
+### Steps
+
+- **S0** Bugfix SE live bias (D7), separate commit and backlog item; SE before / after on the fixture config (expect identical totals with fixed tariffs, run time down from ~28 min).
+- **S1** Parity recording on the old code: a fake transport records every request and response of the public entry points (`fetch_eu_power_hourly`, `fetch_eu_weather_hourly`, `fetch_eu_weather_forecast_hourly`, `fetch_at_day_ahead_hourly`, `build_open_meteo_climate_bundle`, `get_hourly_outdoor_forecast_c`, `get_hourly_tilted_irradiance_forecast_wm2`) for a short window incl. a DST change, plus their outputs. Stored in `tests/fixtures/opendata/` (public data: Open-Meteo CC BY 4.0, Energy-Charts CC BY 4.0, attribution in the fixture README). Committed before the refactor.
+- **S2** `opendata/` skeleton: `http.py` (D3), `cache.py` (D4), `open_meteo.py`, `energy_charts.py`; import-isolation test (AST scan of `opendata/**`: only stdlib, `requests`, `pandas`, `numpy`; no Earnie top-level package).
+- **S3** Open-Meteo moved: house-site archive (`_archive_http_get` → package; D5 keeps the cache layer), house-site forecast (shadow transport injected), EU grid archive and forecast.
+- **S4** Energy-Charts moved: `public_power` and `price` through the package with the monthly disk cache (D4); `fetch_eu_power_hourly` fail-loud (D6). `eu_market_features` keeps the country list, grid, weights and EU sum.
+- **S5** Earnie adapters: `data/opendata_session.py` (D2); the old retry loops and `requests` imports in the four modules go.
+- **S6** Tests: parity against S1 (same outputs, same request list minus cache hits); cache test (second call: no HTTP; unsettled days never written; month file extended past its last settled day; atomic write under two concurrent writers; env override; repo cache untouched); fail-loud test (one country 429 five times → error naming it; live falls back to `mirrored`); retry test (`Retry-After`, last error in the message).
+- **S7** Docs: this section (implementation notes, results); `docs/konfiguration/preise.md` (D6); env var in the configuration reference if `EARNIE_OPEN_METEO_CACHE_PATH` is documented there; backlog (P6 → Erledigt, SUSI P3a points at `opendata`); Edibert backlog research item *Shared library (weather)*: built in Earnie as `opendata`.
+
+### Implementation notes (2026-10-27)
+
+- **S0 (SE live bias):**
+  - `resolve_market_slots` now defaults to `live_bias_enabled=False` and takes `live_bias_feature_frame`; `compute_rolling_epex_bias_cent` takes `feature_frame`. Without one, it fetches live as before.
+  - `resolve_backtesting_slot_prices` passes `live_bias_enabled=(strategy == forecast)` and the training frame.
+  - `resolve_market_slots_kwargs` passes the config switch explicitly. Before, `live_bias_enabled: false` in `config.json` was overridden by the default `True`.
+  - Tests: `test_se_forecast_live_bias_reads_training_frame_not_network` and `test_resolve_market_slots_kwargs_passes_live_bias_switch`.
+  - SE June 2026 (fixture config with `price_source: api`, `--workers 20`): `backtesting.csv` byte-identical to the P5 run, 5 s instead of about 28 min. Full suite 4922 passed, 26 skipped.
+  - Bugfix item moved to Erledigt; `docs/konfiguration/preise.md` updated.
+- **S1 (golden):**
+  - `scripts/opendata_golden.py` records with the clock frozen at 2026-10-27 18:00 Vienna, `requests.get` wrapped, shadow-feed writes patched out.
+  - Nine entry points, 33 responses, 34 requests. The cases cover EU power, one country across a month edge, AT price, EU grid archive and forecast, site climate bundle (two surfaces, `use_cache=False`), site PV, and site outdoor and tilted forecast.
+  - Archive window: 2025-10-24 → 28, across the DST change. Responses that needed 429 retries are kept only when the last attempt was 200.
+  - Fixture `tests/fixtures/opendata/` (`responses.json.gz`, `expected.json`, README with CC BY attribution).
+  - Test `tests/test_opendata_parity.py`: outputs and request list per case. It was green on the old code before any change.
+- **S2 (package):**
+  - `opendata/http.py`:
+    - `Session(timeout_s, transport, pause_after_s)` with `get_json`;
+    - retry on 429 / 502 / 503 / 504, `Retry-After` honoured, the last error re-raised;
+    - `ApiUnreachableError` at the first connection error or timeout;
+    - `fetch_budget` / `FetchBudgetExceeded`, moved from the archive module.
+  - `opendata/open_meteo.py`: `archive`, `forecast` (single and multi-location), `utc_forecast_params`.
+  - `opendata/energy_charts.py`: raw `public_power` and `price`, with a 30 s timeout floor. Not used yet; S4 wires them.
+  - Packaging: `opendata*` in `pyproject.toml`, `COPY opendata/` in `docker/Dockerfile`.
+  - Tests: `tests/test_opendata_package.py` (AST import isolation; retry, `Retry-After`, no retry on 400, unreachable, pause per host, budget).
+- **S3 (Open-Meteo moved):**
+  - `data/opendata_session.py` builds the session: global timeout, 0.75 s pause for the Energy-Charts host only.
+  - Site archive `_fetch_hourly_archive_chunk` goes through `open_meteo.archive`. `_archive_http_get` and the local retry and budget code are gone; `climate_fetch_budget` / `ClimateFetchBudgetExceeded` are aliases of the `opendata` ones.
+  - D5 held: the cache layer and the regression patch points are unchanged.
+  - Site forecast goes through `open_meteo.forecast` with `_shadow_transport` (replay in shadow mode, record in prod), which replaces `_open_meteo_payload`. `utc_forecast_params` is re-exported from `opendata.open_meteo`.
+  - EU grid archive, forecast per point and multi-location forecast go through `opendata`.
+  - Behaviour changes (D3):
+    - a connection error on the site archive is no longer retried (`ApiUnreachableError`);
+    - the site forecast and the multi-location forecast now retry 429 / 5xx;
+    - the EU grid archive no longer pauses 0.75 s per point.
+  - Tests patching removed internals now patch `requests.get` / `opendata.http.time.sleep` / `_shadow_transport`. `test_fetch_without_budget_keeps_retrying` (connection-error retries) is gone by D3.
+- **S4 (Energy-Charts moved, disk cache, fail-loud):**
+  - `fetch_country_power_hourly` and `fetch_at_day_ahead_hourly` go through `opendata.energy_charts` (`public_power`, `price`). `_http_get_json`, `API_*`, `ENERGY_CHARTS_TIMEOUT_FLOOR_SEC` and `_energy_charts_timeout_sec` are gone; `ApiUnreachableError` is re-exported from `opendata`.
+  - `opendata/cache.py` `ResponseCache` + `Session.get_json_cached(url, params, last_day, settle_days)`.
+    - **Deviation from D4:** one file per request (URL and parameters, raw payload as the service sent it) instead of one parsed frame per country and month. Reasons:
+      - Energy-Charts cuts days in the country's own zone (PT ends at 23:00 UTC, the others at 22:00 UTC).
+      - Hourly countries add the first point of the next day.
+      - A larger cached range therefore cannot be sliced into the exact response of a smaller one.
+      - Per-request files also avoid read-modify-write races between SE workers.
+    - Same effect for the cases that matter. Training rebuilt for the same window: whole months hit, and only the partial first month and the unsettled last one are fetched. The SE fetches nothing (S0). Live asks for unsettled days, which are never stored.
+    - A request is stored only when its last day is settled: Energy-Charts 2 days (`SETTLE_DAYS`), Open-Meteo archive 7 days (`ARCHIVE_SETTLE_DAYS`, ERA5 replaces the model values after about five days). D4 had one rule for both; 2 days would freeze model values in the weather archive.
+    - Atomic writes (temp file + `os.replace`). Windows refuses a replace or open while another process holds the file: a refused write is logged and skipped, a refused read is retried for up to 1 s.
+    - A cache file of another request fails loud.
+  - `data/opendata_session.py`: cache dir `data/cache/energy_charts/` or `EARNIE_ENERGY_CHARTS_CACHE_PATH`; also holds the EU grid archive (`open_meteo.archive(..., cached=True)`). The site archive keeps its own cache (D5) and does not use this one.
+  - D6: `fetch_eu_power_hourly` raises `EuPowerIncompleteError` (a `RuntimeError`) naming the country and the cause. `ApiUnreachableError` still aborts at the first country. Live catches `RuntimeError` in `build_live_feature_frame_for_slots`, so it falls back to the mirror.
+  - Tests:
+    - `tests/conftest.py` gives every test its own, not yet created cache dir. Module and session fixtures get a per-process dir. In a shared dir one test would read another test's fake payload.
+    - Parity runs on its own cold cache (same request list as before P6). A second run on the warm cache gives the same outputs with no Energy-Charts or EU-archive request.
+    - Package tests: settled hit, unsettled never stored, foreign file, Earnie tests never on the repo cache.
+    - `tests/test_eu_market_features.py`: skip tests replaced by the fail-loud test; retry and unreachable tests go through `requests.get`.
+  - The first test run wrote the repo cache: the parity module fixture ran before the per-test env, and two xdist workers raced on one file. The directory was deleted; the per-process default and the explicit cache dir in `scripts.opendata_golden` prevent it.
+  - Full suite 4953 passed, 26 skipped; regression all 11 PASS; no `data/cache/energy_charts` after the runs.
+- **S5 (Earnie adapters):**
+  - `data/opendata_session.py` is the one place that builds sessions (timeout, Energy-Charts pause, cache dir).
+  - `data/outdoor_forecast.py`: the shadow transport fetches through `opendata.http.requests_transport`; no `requests` import left. The replay / record wrapper stays Earnie-side (D2).
+  - `data/heating_need.py`: unused `fetch_climate` removed. It was the last Open-Meteo call outside `opendata`, used `urllib` with `timezone=auto`, and had no caller.
+  - No `requests` import and no retry loop is left in `eu_market_features`, `open_meteo_solar_archive` or `outdoor_forecast`.
+  - `data/price_forecast_live.py` keeps `requests.HTTPError` only to put the status code into the log line of a failed feature load; that is error reporting, not access code.
+  - Test `test_only_opendata_talks_to_open_meteo_and_energy_charts`: no product module (pyproject packages, repo root) names either host, except `data/edibert_live_market.py` (Edibert's Day-Ahead feed key, P4a) and the golden script. Out of scope: `share/config/prognosis-heating-need.py` (standalone prototype) and `studies/`.
+  - Full suite 4953 passed, 26 skipped, 1 failed: `test_main_daemon.py::test_start_captures_stdio_not_devnull`, a process start under load (the run took 167 s instead of about 90 s); it passes when run alone (18/18). Regression all 11 PASS; no `data/cache/energy_charts` after the runs.
+- **S6 (tests):** the S6 list mapped to tests:
+  - Parity against S1 and the second run without network: `tests/test_opendata_parity.py` (from S4).
+  - Cache, in `tests/test_opendata_package.py`:
+    - second call without HTTP, and unsettled requests never stored (from S4);
+    - eight threads storing and reading one request leave exactly one valid file and no temp file;
+    - `EARNIE_ENERGY_CHARTS_CACHE_PATH` override and the default;
+    - the repo cache stays untouched (from S4).
+    - "Month file extended past its last settled day" does not apply under per-request files (S4 deviation). A rolling window asks for a new last request, which is stored once it is settled.
+  - Fail-loud: `tests/test_eu_market_features.py` (error names the country, from S4) and `tests/test_price_forecast_live.py::test_live_missing_country_falls_back_to_mirror`. In that test Energy-Charts answers 429 for every request: five attempts at the first country, no further country, the log names `Land de fehlt`, and every missing slot gets `mirrored`, none `predicted`.
+  - Retry through Energy-Charts: `Retry-After` wins and the 30 s timeout floor applies; after five 429 the last `HTTPError` names the URL.
+  - Full suite 4959 passed, 26 skipped; regression all 11 PASS; no `data/cache/energy_charts` after the runs.
+
+- **S7 (docs):**
+  - `docs/konfiguration/preise.md`: a missing country leads to the mirror, with the reason.
+  - `docs/einrichtung/betrieb.md`: `EARNIE_ENERGY_CHARTS_CACHE_PATH`, what is stored and when.
+  - Backlog: P6 → Erledigt; SUSI P3a points at `opendata/open_meteo.py`; the Edibert research item *Shared library (weather)* names `opendata`. Still open there: own repository and PyPI name, and whether Edibert's `MarketArchive` moves onto it.
+- **Gate (2026-10-27):**
+  - Full suite 4959 passed, 26 skipped; `scripts.run_regression` all 11 PASS without `--update-golden`.
+  - Training set 2025-09 (`build_training_dataset`, fixture config, cache dir in a temp folder). The first build made 27 requests (25 files plus 429 retries) in 66 s. The second build, with `requests.get` raising, took 0.3 s; the 720 rows were identical.
+  - SE June 2026, `price_strategy=forecast`, `--workers 20`, run twice: each run 14–19 s, both `backtesting.csv` byte-identical to each other, to S0 and to P5. The cache dir was not even created, so the SE fetches nothing.
+  - The local house config needs the data-model-5 migration (`netznutzung.base_cent_kwh`). This is unrelated to P6; the gate used the fixture config.
+
+### Order
+
+S0 → S1 (commit golden on old code) → S2 → S3 → S4 → S5 → S6 → S7 → gate: full suite, `scripts.run_regression` without `--update-golden` (D5 keeps the climate fixtures valid), training dataset rebuilt for one month twice (second run without network), SE twice on the same window with `price_strategy=forecast` (identical `backtesting.csv`).
+
+### Done check
+
+- [x] One access path: every Open-Meteo and Energy-Charts call in Earnie goes through `opendata`.
+- [x] Cache test green; second training-set build for the same month needs no network.
+- [x] Import-isolation test green (no Earnie imports in `opendata`).
+- [x] Missing country fails loud; live falls back to the mirror with label `mirrored`.
+- [x] Full suite and all regression cases green, goldens and climate fixtures unchanged; two SE runs identical.

@@ -332,3 +332,42 @@ def test_successful_feature_load_clears_the_failure_backoff():
         pfl._feature_failure_until.clear()  # backoff elapsed
         assert build_live_feature_frame_for_slots([future_slot]) is not None
     assert pfl._feature_failure_until == {}
+
+
+def test_live_missing_country_falls_back_to_mirror(caplog):
+    """P6 D6: Energy-Charts keeps answering 429 for one country → no OLS on a shrunken EU sum."""
+    from data import price_forecast_live as pfl
+    from data.market_prices import PRICE_SOURCE_MIRRORED, PRICE_SOURCE_PREDICTED, resolve_market_slots
+
+    class _Status429:
+        status_code = 429
+        headers: dict[str, str] = {}
+
+    pfl._feature_input_cache.clear()
+    pfl._power_day_cache.clear()
+    tz = ZoneInfo("Europe/Vienna")
+    start = datetime(2025, 7, 1, 0, tzinfo=tz)
+    market_data = [
+        {"timestamp": start - timedelta(hours=24 - i), "hour": (start - timedelta(hours=24 - i)).hour, "price_buy": 10.0}
+        for i in range(24 + 12)
+    ]
+    target_hours = [start + timedelta(hours=i) for i in range(24)]
+    weather = pd.DataFrame(
+        {"eu_wind_speed_kmh": 5.0, "eu_shortwave_radiation_wm2": 6.0},
+        index=pd.DatetimeIndex(target_hours),
+    )
+    with patch(
+        "data.price_forecast_live.get_missing_price_strategy",
+        return_value=MISSING_PRICE_STRATEGY_FORECAST,
+    ), patch("data.price_forecast_live.load_configured_model", return_value=object()), patch(
+        "data.eu_market_features.fetch_eu_weather_hourly", return_value=weather
+    ), patch("requests.get", return_value=_Status429()) as get_mock, patch("opendata.http.time.sleep"):
+        with caplog.at_level("WARNING", logger="data.price_forecast_live"):
+            kwargs = resolve_market_slots_kwargs(target_hours)
+    assert get_mock.call_count == 5  # the first country, five attempts; no other country asked
+    assert kwargs["missing_price_strategy"] == MISSING_PRICE_STRATEGY_MIRROR
+    assert any("Land de fehlt" in r.getMessage() for r in caplog.records)
+    resolved = resolve_market_slots(market_data, target_hours, **kwargs)
+    sources = {slot["price_source"] for slot in resolved[12:]}
+    assert sources == {PRICE_SOURCE_MIRRORED}
+    assert PRICE_SOURCE_PREDICTED not in {slot["price_source"] for slot in resolved}

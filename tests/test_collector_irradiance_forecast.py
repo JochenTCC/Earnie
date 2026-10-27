@@ -82,9 +82,7 @@ def test_fetch_vars_rejects_missing_irradiance(monkeypatch):
             "global_tilted_irradiance": [120.0, None],
         }
     }
-    monkeypatch.setattr(
-        "runtime_store.shadow.transport.ext_get", lambda **_k: payload
-    )
+    monkeypatch.setattr(of, "_shadow_transport", lambda *_a: of._ReplayedResponse(payload))
     with pytest.raises(ValueError, match="global_tilted_irradiance"):
         of._fetch_open_meteo_hourly_vars(
             47.4,

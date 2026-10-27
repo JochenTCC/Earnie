@@ -40,6 +40,7 @@ COPY docker/ docker/
 COPY house_config/ house_config/
 COPY settings/ settings/
 COPY ehal/ ehal/
+COPY opendata/ opendata/
 # Full share/ tree (ehal schemas, loxone templates, hardware_profiles, registry) —
 # not only share/config/. Omitting share/ehal breaks live EHAL JSON Schema validation.
 COPY share/ share/

@@ -10,7 +10,7 @@ import pytest
 
 from data.eu_market_features import (
     GENERATION_COUNTRIES,
-    _energy_charts_timeout_sec,
+    EuPowerIncompleteError,
     _public_power_hourly,
     _renewable_series_from_public_power,
     fetch_eu_power_hourly,
@@ -92,44 +92,25 @@ def _stub_country_power(country: str, start: date, end: date) -> pd.DataFrame:
     )
 
 
-def test_fetch_eu_power_hourly_skips_failed_country():
-    """One flaky Energy-Charts country must not abort the EU sum (NAS regression)."""
+def test_fetch_eu_power_hourly_fails_loud_on_missing_country():
+    """The OLS model was trained on all 12 countries: no EU sum without one of them (P6 D6)."""
 
     def _fetch(country: str, start: date, end: date) -> pd.DataFrame:
         if country == "it":
-            raise RuntimeError("API-Abruf fehlgeschlagen (timeout)")
+            raise RuntimeError("429 for url: https://api.energy-charts.info/public_power?country=it")
         return _stub_country_power(country, start, end)
 
     start = date(2025, 7, 1)
-    with patch(
-        "data.eu_market_features.fetch_country_power_hourly",
-        side_effect=_fetch,
-    ):
-        frame = fetch_eu_power_hourly(start, start + timedelta(days=1))
-
-    assert not frame.empty
-    assert "eu_wind_mw" in frame.columns
-    # 11 successful countries × 100 MW wind (Italy skipped)
-    assert float(frame["eu_wind_mw"].iloc[0]) == pytest.approx(
-        100.0 * (len(GENERATION_COUNTRIES) - 1)
-    )
-
-
-def test_fetch_eu_power_hourly_raises_when_all_countries_fail():
-    start = date(2025, 7, 1)
-    with patch(
-        "data.eu_market_features.fetch_country_power_hourly",
-        side_effect=ValueError("Energy-Charts public_power: unix_seconds fehlt."),
-    ):
-        with pytest.raises(ValueError, match="alle Länder fehlgeschlagen"):
+    with patch("data.eu_market_features.fetch_country_power_hourly", side_effect=_fetch):
+        with pytest.raises(EuPowerIncompleteError, match=r"Land it fehlt \(RuntimeError: 429 for url"):
             fetch_eu_power_hourly(start, start + timedelta(days=1))
 
 
 def test_energy_charts_timeout_floors_at_30():
-    with patch("data.eu_market_features.config.get_global_timeout", return_value=5):
-        assert _energy_charts_timeout_sec() == pytest.approx(30.0)
-    with patch("data.eu_market_features.config.get_global_timeout", return_value=60):
-        assert _energy_charts_timeout_sec() == pytest.approx(60.0)
+    from opendata import Session, energy_charts
+
+    assert energy_charts._timeout(Session(timeout_s=5)) == pytest.approx(30.0)
+    assert energy_charts._timeout(Session(timeout_s=60)) == pytest.approx(60.0)
 
 
 def test_month_ranges_rejects_empty_span():
@@ -143,26 +124,18 @@ def test_normalize_hour_slot_naive_gets_planning_tz():
     assert out == datetime(2025, 7, 1, 10, 0, tzinfo=VIENNA)
 
 
-def test_http_get_json_retries_on_429_then_succeeds():
+def test_at_day_ahead_retries_429_then_succeeds():
     from data import eu_market_features as emf
 
-    bad = type("R", (), {"status_code": 429, "raise_for_status": lambda self: None})()
-    good_payload = {"ok": True}
-    good = type(
-        "R",
-        (),
-        {
-            "status_code": 200,
-            "raise_for_status": lambda self: None,
-            "json": lambda self: good_payload,
-        },
-    )()
-    with patch.object(emf, "API_PAUSE_SECONDS", 0):
-        with patch.object(emf, "API_RETRY_BASE_SECONDS", 0):
-            with patch.object(emf.time, "sleep", return_value=None):
-                with patch.object(emf.config, "get_global_timeout", return_value=5):
-                    with patch.object(emf.requests, "get", side_effect=[bad, good]):
-                        assert emf._http_get_json("https://example.test", {}) == good_payload
+    slot = datetime(2025, 7, 1, 10, tzinfo=VIENNA)
+    good = _JsonResponse({"unix_seconds": [int(slot.timestamp())], "price": [150.0]})
+    bad = _JsonResponse({}, status_code=429)
+    with patch("opendata.http.time.sleep") as sleep_mock:
+        with patch("requests.get", side_effect=[bad, good]) as get_mock:
+            series = emf.fetch_at_day_ahead_hourly(date(2025, 7, 1), date(2025, 7, 2))
+    assert float(series.iloc[0]) == pytest.approx(15.0)
+    assert get_mock.call_count == 2
+    assert sleep_mock.call_args_list[0].args == (2.0,)  # backoff, then the Energy-Charts pause
 
 
 def test_dedupe_hourly_mean_averages_duplicates():
@@ -186,13 +159,16 @@ def test_fetch_country_power_hourly_uses_month_chunks():
         {"wind_mw": [1.0], "solar_mw": [2.0], "load_mw": [3.0], "residual_load_mw": [4.0]},
         index=pd.DatetimeIndex([hour], name="slot_datetime"),
     )
-    with patch.object(emf, "API_PAUSE_SECONDS", 0):
-        with patch.object(
-            emf, "_http_get_json", return_value={"unix_seconds": [], "production_types": []}
-        ):
-            with patch.object(emf, "_public_power_hourly", return_value=stub):
-                frame = emf.fetch_country_power_hourly("at", start, end)
+    with patch.object(
+        emf.energy_charts, "public_power", return_value={"unix_seconds": [], "production_types": []}
+    ) as power_mock:
+        with patch.object(emf, "_public_power_hourly", return_value=stub):
+            frame = emf.fetch_country_power_hourly("at", start, end)
     assert not frame.empty
+    assert [(c.kwargs["start"], c.kwargs["end"]) for c in power_mock.call_args_list] == [
+        (date(2025, 6, 15), date(2025, 6, 30)),
+        (date(2025, 7, 1), date(2025, 7, 9)),
+    ]
     assert list(frame.columns) == ["wind_mw", "solar_mw", "load_mw", "residual_load_mw"]
 
 
@@ -217,9 +193,8 @@ def test_fetch_at_day_ahead_hourly_parses_price():
         "unix_seconds": [int(slot.timestamp())],
         "price": [150.0],  # EUR/MWh → 15.0 ct/kWh
     }
-    with patch.object(emf, "_http_get_json", return_value=payload):
-        with patch.object(emf, "API_PAUSE_SECONDS", 0):
-            series = emf.fetch_at_day_ahead_hourly(date(2025, 7, 1), date(2025, 7, 2))
+    with patch.object(emf.energy_charts, "price", return_value=payload):
+        series = emf.fetch_at_day_ahead_hourly(date(2025, 7, 1), date(2025, 7, 2))
     assert float(series.iloc[0]) == pytest.approx(15.0)
 
 
@@ -340,19 +315,16 @@ def test_default_training_range_length():
     assert (end - start).days == 365
 
 
-def test_http_get_json_connection_error_is_not_retried():
+def test_energy_charts_connection_error_is_not_retried():
     """An unreachable host fails at the first attempt (2.6.2 behaviour), no 5x backoff."""
     import requests
 
     from data import eu_market_features as emf
 
-    with patch.object(emf.time, "sleep") as sleep_mock:
-        with patch.object(emf.config, "get_global_timeout", return_value=5):
-            with patch.object(
-                emf.requests, "get", side_effect=requests.ConnectTimeout("no route")
-            ) as get_mock:
-                with pytest.raises(emf.ApiUnreachableError, match="nicht erreichbar"):
-                    emf._http_get_json("https://example.test/x", {})
+    with patch("opendata.http.time.sleep") as sleep_mock:
+        with patch("requests.get", side_effect=requests.ConnectTimeout("no route")) as get_mock:
+            with pytest.raises(emf.ApiUnreachableError, match="nicht erreichbar"):
+                emf.fetch_at_day_ahead_hourly(date(2025, 7, 1), date(2025, 7, 2))
 
     assert get_mock.call_count == 1
     sleep_mock.assert_not_called()
@@ -380,15 +352,26 @@ def test_fetch_eu_power_hourly_unreachable_host_makes_one_request_in_total():
     from data import eu_market_features as emf
 
     start = date(2025, 7, 1)
-    with patch.object(emf.time, "sleep"):
-        with patch.object(emf.config, "get_global_timeout", return_value=5):
-            with patch.object(
-                emf.requests, "get", side_effect=requests.ConnectionError("down")
-            ) as get_mock:
-                with pytest.raises(emf.ApiUnreachableError):
-                    fetch_eu_power_hourly(start, start + timedelta(days=1))
+    with patch("opendata.http.time.sleep"):
+        with patch("requests.get", side_effect=requests.ConnectionError("down")) as get_mock:
+            with pytest.raises(emf.ApiUnreachableError):
+                fetch_eu_power_hourly(start, start + timedelta(days=1))
 
     assert get_mock.call_count == 1
+
+
+class _JsonResponse:
+    headers: dict[str, str] = {}
+
+    def __init__(self, body, *, status_code: int = 200) -> None:
+        self._body = body
+        self.status_code = status_code
+
+    def json(self):
+        return self._body
+
+    def raise_for_status(self) -> None:
+        return None
 
 
 def test_open_meteo_archive_month_requests_utc_and_converts_to_planning_tz():
@@ -396,18 +379,18 @@ def test_open_meteo_archive_month_requests_utc_and_converts_to_planning_tz():
 
     seen: dict = {}
 
-    def _fake_get_json(url, params):
+    def _fake_get(url, params=None, **_kw):
         seen.update(params)
-        return {
+        return _JsonResponse({
             "hourly": {
                 "time": ["2025-06-30T22:00", "2025-06-30T23:00", "2025-12-31T22:00", "2025-12-31T23:00"],
                 "wind_speed_10m": [1.0, 2.0, 3.0, 4.0],
                 "shortwave_radiation": [0.0, 0.0, 0.0, 0.0],
             }
-        }
+        })
 
     point = emf.WEATHER_GRID[0]
-    with patch.object(emf, "_http_get_json", _fake_get_json), patch.object(
+    with patch("requests.get", _fake_get), patch.object(
         emf.config, "get_planning_timezone", return_value="Europe/Vienna"
     ):
         frame = emf._fetch_open_meteo_archive_month(point, date(2025, 7, 1), date(2025, 12, 31))
@@ -446,23 +429,13 @@ def test_open_meteo_forecast_requests_utc_for_point_and_grid():
         }
     }
 
-    def _fake_get_json(url, params):
-        seen.append(dict(params))
-        return payload
-
-    class _Resp:
-        def raise_for_status(self):
-            pass
-
-        def json(self):
-            return [payload] * len(emf.WEATHER_GRID)
-
     def _fake_requests_get(url, params=None, **_kw):
         seen.append(dict(params))
-        return _Resp()
+        multi = "," in str(params["latitude"])
+        return _JsonResponse([payload] * len(emf.WEATHER_GRID) if multi else payload)
 
-    with patch.object(emf, "_http_get_json", _fake_get_json), patch.object(
-        emf.requests, "get", _fake_requests_get
+    with patch(
+        "requests.get", _fake_requests_get
     ), patch.object(emf.config, "get_planning_timezone", return_value="Europe/Vienna"):
         emf._fetch_open_meteo_forecast_point(emf.WEATHER_GRID[0], forecast_days=2)
         emf._fetch_open_meteo_forecast_grid(forecast_days=2)

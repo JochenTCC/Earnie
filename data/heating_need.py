@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import math
-import urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -152,16 +151,6 @@ def weekly_solar_thermal_kwh(
             azimuth,
         )
     return week_yield
-
-
-def fetch_climate(lat: float, lon: float, year: int = 2025) -> dict:
-    url = (
-        f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}"
-        f"&start_date={year}-01-01&end_date={year}-12-31"
-        f"&daily=temperature_2m_mean,shortwave_radiation_sum&timezone=auto"
-    )
-    with urllib.request.urlopen(url, timeout=10) as response:
-        return json.loads(response.read().decode())
 
 
 def _parse_climate_daily(data: dict) -> tuple[list[float], list[float]]:

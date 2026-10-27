@@ -125,11 +125,11 @@ def _utc_payload(first_utc: str, values: list[float]) -> dict:
 def test_fetch_requests_utc_with_one_past_day_and_one_extra_forecast_day():
     seen: dict = {}
 
-    def _payload(_url, params):
+    def _transport(_url, params, _timeout_s):
         seen.update(params)
-        return _utc_payload("2026-10-24T00:00", [1.0, 2.0])
+        return of._ReplayedResponse(_utc_payload("2026-10-24T00:00", [1.0, 2.0]))
 
-    with patch.object(of, "_open_meteo_payload", _payload), patch.object(
+    with patch.object(of, "_shadow_transport", _transport), patch.object(
         of.config, "get_planning_timezone", return_value=VIENNA
     ):
         of._fetch_open_meteo_hourly_vars(

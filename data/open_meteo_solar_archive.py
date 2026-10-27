@@ -6,19 +6,15 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 import threading
-import time
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
 
 import pandas as pd
-import requests
 
-import config
+from data import opendata_session
 from data.eu_market_features import month_ranges
+from opendata import FetchBudgetExceeded, fetch_budget, open_meteo
 from runtime_store.env_vars import read_env
 
-OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
+OPEN_METEO_ARCHIVE = open_meteo.ARCHIVE_URL
 # "_utc": files written before the UTC-request fix hold timestamps shifted by the UTC offset
 # of the fetch day (Open-Meteo applies one fixed offset per response), so they are not reused.
 OPEN_METEO_CACHE_DIR = Path("data/cache/open_meteo_utc")
@@ -26,54 +22,9 @@ HOURLY_VAR = "global_tilted_irradiance"
 HOURLY_TEMP_VAR = "temperature_2m"
 REFERENCE_WM2 = 1000.0
 DEFAULT_THERMAL_EFFICIENCY = 0.40
-_ARCHIVE_RETRY_ATTEMPTS = 5
-_ARCHIVE_RETRY_BASE_SECONDS = 2.0
-_ARCHIVE_RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
-
-
-class ClimateFetchBudgetExceeded(RuntimeError):
-    """The Open-Meteo download did not finish within the budget of ``climate_fetch_budget``."""
-
-
-_fetch_deadline: ContextVar[tuple[float, float] | None] = ContextVar(
-    "open_meteo_fetch_deadline", default=None
-)
-
-
-@contextmanager
-def climate_fetch_budget(seconds: float) -> Iterator[None]:
-    """Cap all archive downloads inside the block (retries and sleeps included) at ``seconds``.
-
-    Interactive pages use this so a slow or rate-limited Open-Meteo ends in a visible error
-    instead of minutes of retries. Cache hits are unaffected.
-    """
-    token = _fetch_deadline.set((time.monotonic() + seconds, seconds))
-    try:
-        yield
-    finally:
-        _fetch_deadline.reset(token)
-
-
-def _remaining_budget_s() -> float | None:
-    state = _fetch_deadline.get()
-    return None if state is None else state[0] - time.monotonic()
-
-
-def _budget_exceeded(last_error: Exception | None) -> ClimateFetchBudgetExceeded:
-    state = _fetch_deadline.get()
-    seconds = state[1] if state is not None else 0.0
-    detail = f" Letzter Fehler: {last_error}" if last_error is not None else ""
-    return ClimateFetchBudgetExceeded(
-        f"Open-Meteo-Klimadaten konnten nicht innerhalb von {seconds:.0f} s geladen werden "
-        f"(langsames Netz oder Ratenlimit).{detail} Bitte später erneut versuchen."
-    )
-
-
-def _sleep_within_budget(seconds: float, last_error: Exception | None) -> None:
-    remaining = _remaining_budget_s()
-    if remaining is not None and seconds >= remaining:
-        raise _budget_exceeded(last_error)
-    time.sleep(seconds)
+# The download budget is the shared one of ``opendata`` (all requests inside the block).
+ClimateFetchBudgetExceeded = FetchBudgetExceeded
+climate_fetch_budget = fetch_budget
 
 
 # Process-wide mem-cache: disk JSON → bundle; invalidate on file mtime change.
@@ -187,49 +138,6 @@ def _concat_hourly_chunks(chunks: list[pd.Series]) -> pd.Series:
     return series[~series.index.duplicated(keep="last")].sort_index()
 
 
-def _archive_http_get(params: dict[str, Any]) -> Any:
-    """GET Open-Meteo archive with retries; returns response with JSON body."""
-    response: requests.Response | None = None
-    last_error: Exception | None = None
-    for attempt in range(_ARCHIVE_RETRY_ATTEMPTS):
-        timeout_s: float = config.get_global_timeout()
-        remaining = _remaining_budget_s()
-        if remaining is not None:
-            if remaining <= 0:
-                raise _budget_exceeded(last_error)
-            timeout_s = min(timeout_s, remaining)
-        try:
-            response = requests.get(
-                OPEN_METEO_ARCHIVE,
-                params=params,
-                timeout=timeout_s,
-            )
-            status = getattr(response, "status_code", None)
-            if status in _ARCHIVE_RETRYABLE_STATUS:
-                last_error = requests.HTTPError(
-                    f"{status} for url: {getattr(response, 'url', OPEN_METEO_ARCHIVE)}",
-                    response=response,
-                )
-                _sleep_within_budget(_ARCHIVE_RETRY_BASE_SECONDS * (2 ** attempt), last_error)
-                continue
-            if hasattr(response, "raise_for_status"):
-                response.raise_for_status()
-            break
-        except requests.RequestException as exc:
-            last_error = exc
-            if isinstance(exc, requests.HTTPError):
-                status = exc.response.status_code if exc.response is not None else None
-                if status not in _ARCHIVE_RETRYABLE_STATUS:
-                    raise
-            _sleep_within_budget(_ARCHIVE_RETRY_BASE_SECONDS * (2 ** attempt), last_error)
-    else:
-        if last_error is not None:
-            raise last_error
-        raise RuntimeError("Open-Meteo archive: Abruf ohne Antwort fehlgeschlagen.")
-    assert response is not None
-    return response
-
-
 def _hourly_series_from_payload(
     payload: dict[str, Any],
     *,
@@ -277,19 +185,17 @@ def _fetch_hourly_archive_chunk(
     extra_params: dict[str, Any] | None = None,
 ) -> dict[str, pd.Series]:
     # One UTC day earlier: the first local hours of ``start`` belong to the previous UTC day.
-    params: dict[str, Any] = {
-        "latitude": lat,
-        "longitude": lon,
-        "start_date": (start - timedelta(days=1)).isoformat(),
-        "end_date": (end - timedelta(days=1)).isoformat(),
-        "hourly": hourly_vars,
-        "timezone": "UTC",
-    }
-    if extra_params:
-        params.update(extra_params)
-    response = _archive_http_get(params)
+    payload = open_meteo.archive(
+        opendata_session.session(),
+        latitude=lat,
+        longitude=lon,
+        start_date=start - timedelta(days=1),
+        end_date=end - timedelta(days=1),
+        hourly=hourly_vars,
+        extra_params=extra_params,
+    )
     series_by_var = _hourly_series_from_payload(
-        response.json(),
+        payload,
         hourly_vars=hourly_vars,
         start=start,
         end=end,

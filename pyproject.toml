@@ -79,6 +79,7 @@ include = [
     "simulation*",
     "scripts*",
     "ehal*",
+    "opendata*",
 ]
 
 [tool.pytest.ini_options]
