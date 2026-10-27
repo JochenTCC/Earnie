@@ -243,7 +243,7 @@ def classify_paths(paths: list[str]) -> dict:
 
 def verifications_pending(text: str) -> str:
     match = re.search(
-        r"^## Bugfix Verifications Pending\s*\n(.*?)(?=^## |\Z)", text, re.S | re.M
+        r"^## Bugfix Verifications Pending\s*\n(.*?)(?=(?:^## )|\Z)", text, re.S | re.M
     )
     return match.group(1).strip() if match else ""
 

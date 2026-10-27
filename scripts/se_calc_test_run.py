@@ -47,10 +47,7 @@ def _child_env(cell_meta: dict) -> dict[str, str]:
     env = os.environ.copy()
     env["EARNIE_OFFLINE"] = "1"
     env["EARNIE_ENV_PATH"] = cell_meta["env_root"]
-    env["EARNIE_ENV_PATH"] = cell_meta["env_root"]
     env["EARNIE_HOUSE_PROFILES_PATH"] = cell_meta["house_profiles_path"]
-    env["EARNIE_HOUSE_PROFILES_PATH"] = cell_meta["house_profiles_path"]
-    env["EARNIE_BACKTESTING_SCENARIOS_PATH"] = cell_meta["scenarios_path"]
     env["EARNIE_BACKTESTING_SCENARIOS_PATH"] = cell_meta["scenarios_path"]
     existing = env.get("PYTHONPATH", "").strip()
     env["PYTHONPATH"] = f"{ROOT}{os.pathsep}{existing}" if existing else str(ROOT)

@@ -185,7 +185,7 @@ def apply_loxone_write(value_ehal: float, spec: LoxoneConversionSpec) -> float:
     ``omit_if`` and ``read_required``.
     """
     scale = float(spec.sign) * float(spec.factor)
-    if scale == 0.0:
+    if not scale:
         raise ValueError(f"loxone write factor/sign is zero for {spec.field}")
     ehal = _clamp_ehal(float(value_ehal), spec.clamp_min, spec.clamp_max)
     return ehal / scale
@@ -201,7 +201,7 @@ def apply_openems_read(raw: Any, spec: OpenemsConversionSpec) -> float:
 def apply_openems_write(value_ehal: float, spec: OpenemsConversionSpec) -> float:
     """Convert an EHAL value to OpenEMS channel units (inverse of hub → EHAL)."""
     scale = float(spec.sign) * float(spec.factor)
-    if scale == 0.0:
+    if not scale:
         raise ValueError(f"openems write factor/sign is zero for {spec.field}")
     ehal = _clamp_ehal(float(value_ehal), spec.clamp_min, spec.clamp_max)
     return ehal / scale

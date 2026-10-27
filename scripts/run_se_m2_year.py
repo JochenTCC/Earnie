@@ -68,10 +68,8 @@ def main(argv: list[str] | None = None) -> int:
 
     env_root = Path(
         os.environ.get("EARNIE_ENV_PATH")
-        or os.environ.get("EARNIE_ENV_PATH")
         or (ROOT / "earnie_env_se_m2")
     )
-    os.environ["EARNIE_ENV_PATH"] = str(env_root)
     os.environ["EARNIE_ENV_PATH"] = str(env_root)
     os.environ.setdefault("EARNIE_OFFLINE", "1")
 

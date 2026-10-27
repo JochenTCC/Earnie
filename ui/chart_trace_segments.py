@@ -371,7 +371,7 @@ def _add_segmented_hv_line(
         trace_kwargs: dict = dict(
             x=line_x,
             y=line_y,
-            name=name if index == 0 else name,
+            name=name,
             showlegend=index == 0,
             mode="lines",
             line=dict(line_kwargs),

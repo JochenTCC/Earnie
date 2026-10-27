@@ -686,7 +686,7 @@ def _normalize_power_unit(series: pd.Series, *, source: str) -> pd.Series:
 
 def _normalize_consumption_sign(series: pd.Series, *, source: str) -> pd.Series:
     """Earnie convention: consumption is positive kW."""
-    nonzero = series[series != 0.0]
+    nonzero = series[series.ne(0.0)]
     if nonzero.empty:
         return series
     negative_share = float((nonzero < 0).mean())

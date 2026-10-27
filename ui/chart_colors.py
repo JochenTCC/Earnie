@@ -21,7 +21,7 @@ def hsl(h: float, s: float, l: float) -> str:
     sat = max(0.0, min(100.0, s)) / 100.0
     lig = max(0.0, min(100.0, l)) / 100.0
 
-    if sat == 0.0:
+    if sat <= 0.0:
         channel = round(lig * 255)
         return f"#{channel:02x}{channel:02x}{channel:02x}"
 

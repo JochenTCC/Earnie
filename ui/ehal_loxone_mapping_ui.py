@@ -157,7 +157,7 @@ def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]
         if len(rows) > 40:
             st.caption(f"... und {len(rows) - 40} weitere.")
         errors = st.session_state.get("ehal_lox_scan_errors") or []
-        for err in errors[:8]:
+        for err in errors[:8]:  # NOSONAR pythonbugs:S6466 (slice, cannot raise)
             st.caption(err)
     return rows
 

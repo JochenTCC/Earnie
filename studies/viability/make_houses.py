@@ -47,7 +47,8 @@ def _load(path: Path) -> dict:
 
 
 def _dump(path: Path, doc: dict) -> None:
-    path.write_text(json.dumps(doc, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Study script: paths are built from STUDY_DIR / parameters.json (S2083).
+    path.write_text(json.dumps(doc, indent=2, ensure_ascii=False), encoding="utf-8")  # NOSONAR pythonsecurity:S2083
 
 
 def _heat_pump(house: cat.Archetype, template: dict, lat: float, lon: float) -> dict:

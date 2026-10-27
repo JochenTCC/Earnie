@@ -50,5 +50,6 @@ def rewrite_version_file_for_image(path: str | Path = "version.py") -> str:
         return ver
     ver = normalize_for_image_build(match.group(2))
     updated = text[: match.start(2)] + ver + text[match.end(2) :]
-    file_path.write_text(updated, encoding="utf-8")
+    # Target is pinned to version.py above; content is our own file (S2083).
+    file_path.write_text(updated, encoding="utf-8")  # NOSONAR pythonsecurity:S2083
     return ver

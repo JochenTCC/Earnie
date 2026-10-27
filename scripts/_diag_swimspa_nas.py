@@ -1,6 +1,7 @@
 """Diagnose SwimSpa Soll: Chart vs Tabelle (nur NAS-Produktiv-Log)."""
 from __future__ import annotations
 
+import math
 import os
 import sys
 from datetime import datetime
@@ -99,7 +100,7 @@ def _swimspa_chart_bars(
             label = str(custom[0])
             if label not in history_labels:
                 continue
-            y = None if y_val is None or (isinstance(y_val, float) and y_val != y_val) else float(y_val)
+            y = None if y_val is None or (isinstance(y_val, float) and math.isnan(y_val)) else float(y_val)
             bars[label] = y
     return bars
 

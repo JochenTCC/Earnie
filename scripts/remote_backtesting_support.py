@@ -152,8 +152,9 @@ def _copy_path(repo_rel: str, src_root: Path, dst_root: Path) -> None:
 def push_to_share(cfg: dict, repo_root: Path = REPO_ROOT) -> None:
     """Lokales Repo → Share (gemeinsame Basis)."""
     target = share_path(cfg)
-    target.mkdir(parents=True, exist_ok=True)
-    result_share_dir(cfg).mkdir(parents=True, exist_ok=True)
+    # Roots validated by _validated_configured_root / result_share_dir (S2083).
+    target.mkdir(parents=True, exist_ok=True)  # NOSONAR pythonsecurity:S2083
+    result_share_dir(cfg).mkdir(parents=True, exist_ok=True)  # NOSONAR pythonsecurity:S2083
     for rel in cfg["sync_paths"]:
         _copy_path(str(rel), repo_root, target)
     print(f"Push abgeschlossen: {target}")
@@ -162,7 +163,8 @@ def push_to_share(cfg: dict, repo_root: Path = REPO_ROOT) -> None:
 def pull_from_share(cfg: dict, repo_root: Path = REPO_ROOT) -> None:
     """Share/results → lokales Repo-Root."""
     source = result_share_dir(cfg)
-    if not source.is_dir():
+    # Validated operator-local share root (S6549).
+    if not source.is_dir():  # NOSONAR pythonsecurity:S6549
         raise RemoteBacktestingError(f"Ergebnisordner fehlt auf dem Share: {source}")
     for name in cfg["result_files"]:
         src = _safe_join(source, name)

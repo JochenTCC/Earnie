@@ -279,17 +279,11 @@ def _coerce_flag_maps(
     raw: dict[str, Any],
 ) -> tuple[dict[str, dict], dict[str, bool], dict[str, str]]:
     sessions = dict(raw.get("charging_sessions") or {})
-    if not isinstance(sessions, dict):
-        sessions = {}
 
     fulfilled_raw = dict(raw.get("plug_cycle_fulfilled") or {})
-    if not isinstance(fulfilled_raw, dict):
-        fulfilled_raw = {}
     fulfilled = {str(cid): True for cid, flag in fulfilled_raw.items() if flag}
 
     open_raw = dict(raw.get("open_charging_deadlines") or {})
-    if not isinstance(open_raw, dict):
-        open_raw = {}
     open_deadlines = {
         str(cid): str(dl)
         for cid, dl in open_raw.items()
@@ -342,11 +336,7 @@ def _sync_session_flags(
 
 def _daily_maps_for_today(raw: dict[str, Any], today: str) -> tuple[dict, dict]:
     delivered = dict(raw.get("delivered") or {})
-    if not isinstance(delivered, dict):
-        delivered = {}
     generic_flex_run = dict(raw.get("generic_flex_run") or {})
-    if not isinstance(generic_flex_run, dict):
-        generic_flex_run = {}
     if raw.get("date") != today:
         delivered = {}
         generic_flex_run = {}

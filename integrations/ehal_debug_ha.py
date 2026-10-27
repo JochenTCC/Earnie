@@ -138,10 +138,7 @@ def ha_entity_scoped_live_mapping(house_doc: dict | None = None) -> dict[str, st
     out: dict[str, str] = {}
     plant = house_doc.get("plant") if isinstance(house_doc.get("plant"), dict) else {}
     for field, entity_id in _binding_map(plant.get("ehal_bindings")).items():
-        if _m().is_live_read_field(field):
-            out[qualified_plant_id(field)] = entity_id
-        else:
-            out[qualified_plant_id(field)] = entity_id
+        out[qualified_plant_id(field)] = entity_id
     for consumer in _ha_live_consumers(house_doc):
         if not str(consumer.get("id") or "").strip():
             continue

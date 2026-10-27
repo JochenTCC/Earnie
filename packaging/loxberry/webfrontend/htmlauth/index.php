@@ -486,6 +486,6 @@ LBWeb::lbheader(
 	"",
 	true
 );
-include "$lbptemplatedir/main.html";
+include_once "$lbptemplatedir/main.html";
 LBWeb::lbfooter();
 exit;

@@ -11,7 +11,7 @@ from pathlib import Path
 from scripts._migrate_cli_common import configure_console_utf8, run_config_migration
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> int:
     configure_console_utf8()
     parser = argparse.ArgumentParser(
         description=(
