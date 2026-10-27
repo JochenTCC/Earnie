@@ -3,6 +3,7 @@
 !tests/fixtures/backtesting/prices.csv
 !tests/fixtures/historical/cons_data.csv
 !tests/fixtures/thermal/*.csv
+!tests/fixtures/edibert_forecast/*.csv
 !docs/referenz/Netznutzungsentgelte-Austria-2026.csv
 config.py
 config.json
