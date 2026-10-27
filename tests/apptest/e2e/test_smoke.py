@@ -1,4 +1,4 @@
-"""Ebene 2 (Playwright): kritische Pfade im echten Browser - T6, T7, T9, D9.
+"""Ebene 2 (Playwright): kritische Pfade im echten Browser - T6, T7, T9, D9, Tarife (P7).
 
 Die Persistenzpfade laufen über das Bezeichnungsfeld des Szenarienkonfigurators; der
 Hauskonfigurator ist wegen eines Browser-Fehlers (siehe
@@ -125,6 +125,50 @@ def test_t9_value_survives_app_restart(page: Page, app_server: AppServer) -> Non
     _reopen_scenario_editor_with_new_label(page, f"{app_server.url}/scenario-editor")
 
     expect(_label_input(page)).to_have_value(_NEW_LABEL)
+
+
+# --- Tarife: Benutzertarif anlegen und im Szenario wählen (Edibert P7) ------------------
+
+_USER_TARIFF_LABEL = "Browser Fixtarif"
+_USER_TARIFF_ID = "user_browser_fixtarif"
+
+
+def _stored_import_tariff_id() -> str:
+    path = Path(os.environ["EARNIE_BACKTESTING_SCENARIOS_PATH"])
+    scenarios = json.loads(path.read_text(encoding="utf-8"))["scenarios"]
+    return next(s for s in scenarios if s["id"] == _SCENARIO_ID)["settings"]["import_tariff_id"]
+
+
+def test_tariffs_user_tariff_created_and_selected_in_a_scenario(page: Page, app_server: AppServer) -> None:
+    page.goto(f"{app_server.url}/tariffs")
+    new_import = page.get_by_role("button", name="Neuer Bezugstarif")
+    expect(new_import).to_be_visible(timeout=_TIMEOUT_MS)
+    _wait_until_idle(page)
+    new_import.click()
+    _wait_until_idle(page)
+    _type_and_commit(page, page.get_by_label("Name des Tarifs"), _USER_TARIFF_LABEL)
+    _type_and_commit(page, page.get_by_label("Preis (ct/kWh)"), "24.5")
+    page.get_by_role("button", name="Tarif speichern").click()
+    expect(page.get_by_text(f"Gespeichert als „{_USER_TARIFF_ID}“.")).to_be_visible(timeout=_TIMEOUT_MS)
+    user_file = Path(os.environ["EARNIE_TARIFFS_PATH"]).with_name("user_tariffs.json")
+    (saved,) = json.loads(user_file.read_text(encoding="utf-8"))["import_tariffs"]
+    assert (saved["id"], saved["fix_cent_kwh"], saved["land"]) == (_USER_TARIFF_ID, 24.5, "AT")
+
+    _go_to(page, "Szenarienkonfigurator")
+    expect(page.locator(".st-key-scenario_select")).to_be_visible(timeout=_TIMEOUT_MS)
+    _wait_until_idle(page)
+    _select_scenario(page, _SCENARIO_RADIO_LABEL)
+    page.locator(f".st-key-{_SCENARIO_ID}__scenario_import").get_by_role("combobox").click()
+    page.keyboard.type(_USER_TARIFF_LABEL)  # filter the list; the option was not found without typing
+    page.get_by_role("option").filter(has_text=f"{_USER_TARIFF_LABEL} · Benutzertarif").click()
+    _wait_until_idle(page)
+    waited = 0.0
+    while _stored_import_tariff_id() != _USER_TARIFF_ID:
+        assert waited < 30.0, f"Tarif nicht gespeichert (aktuell {_stored_import_tariff_id()!r})"
+        page.wait_for_timeout(250)
+        waited += 0.25
+    expect(page.get_by_text("Bezugstarif-Vorschau")).to_be_visible(timeout=_TIMEOUT_MS)
+    expect(page.get_by_role("button", name="Benutzertarif bearbeiten")).to_be_visible()
 
 
 # --- Hauskonfigurator: erste Eingabe nach dem Öffnen -------------------------------------

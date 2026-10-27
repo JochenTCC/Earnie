@@ -729,7 +729,18 @@ Status: **in progress** (D1–D8 accepted 2026-10-27, all as recommended; Part A
   - After a write: `on_change` sets a session flag, the next render of the Tarife page runs `collect_tariff_plausibility_errors(..., with_edibert=True)` once (catalog + user file, `grid_fees.json`, house profiles, scenario references) and shows the findings as `st.error`; nothing when clean. A scenario whose user tariff was deleted is reported (*unbekannte import_tariff_id*), never reset.
   - Tests: `tests/apptest/test_page_tariffs_apptest.py` (+4: unused delete without asking, used delete names the scenario and waits / cancel keeps, confirmed delete reported by the check once, save runs the check without findings) and `tests/test_tariff_plausibility.py` (+1).
   - Full suite 4974 passed, 26 skipped; `tests/fixtures/` unchanged by the run. A mixed explicit invocation (AppTests plus `tests/test_tariff_plausibility.py`) hit the known fixture leak again; restored.
-  - Next: S5.
+- **S5 (tests):**
+  - Gap check against the TE cases (Edibert `0.1.h` text): TE1 had only helper tests and L7 (filter not stored, saved tariff selectable in a new session); TE2 one session-sync test; TE3 none in the UI; TE5 none; TE6 none for tariffs.
+  - `tests/apptest/test_scenario_tariff_selection_apptest.py` (8):
+    - TE1: land filter DE and a type filter keep the saved AT tariff selected, nothing is stored over it;
+    - TE2: a second profile (DE, added to the test's config copy) switches the land filter, a manual filter stays while the profile stays;
+    - TE3: *Eigener Festpreis* shows 20.0, stores the edited cent value, deselecting hides the input and drops `user_import_cent_kwh`; a new session shows the saved value;
+    - TE6: switching to another scenario after changing land filter and import shows exactly that scenario's own selects;
+    - D6: a user monthly table without November, planning clock 31 Oct (`page_scenario_editor._planning_now` patched) → warning, no inline cent form, *Im Tarif-Editor öffnen* requests the editor with that tariff.
+  - `tests/test_scenario_editor_next_month.py` (TE5, 3 cases, `time_machine`, planning zone Europe/Vienna): 23:30 local on 31 Oct → November; 00:30 local on 1 Nov (still October in UTC) → December; 00:30 local on 1 Jan → February of the new year.
+  - Playwright (`tests/apptest/e2e/test_smoke.py::test_tariffs_user_tariff_created_and_selected_in_a_scenario`): open *Tarife*, *Neuer Bezugstarif*, name and price, save (file: `user_` ID, price, `land` AT), Szenarienkonfigurator → pick *· Benutzertarif* (the option is found only after typing into the select) → stored in the scenario, Edibert preview and *Benutzertarif bearbeiten* visible. All 6 e2e tests green locally (124 s).
+  - Full suite 4985 passed, 26 skipped; `tests/fixtures/` unchanged.
+  - Next: S6.
 
 ### Order
 
