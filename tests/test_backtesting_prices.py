@@ -47,6 +47,17 @@ def test_build_market_data_excludes_unpublished_future_day_ahead():
     assert datetime(2025, 7, 6).date() in slots
 
 
+def test_build_market_data_not_before_drops_only_older_rows():
+    planning = datetime(2025, 7, 10, 8, 0)
+    index = pd.date_range("2025-06-20", "2025-07-12 23:45", freq="15min")
+    prices = pd.DataFrame({"price_cent_kwh": range(len(index))}, index=index)
+    full = build_market_data_as_of(prices, planning)
+    not_before = datetime(2025, 7, 1, 6, 0, tzinfo=VIENNA)
+    sliced = build_market_data_as_of(prices, planning, not_before=not_before)
+    assert sliced == [row for row in full if row["timestamp"] >= not_before - timedelta(hours=1)]
+    assert sliced[0]["timestamp"] == datetime(2025, 7, 1, 5, 0, tzinfo=VIENNA)
+
+
 def test_resolve_market_slots_forecast_uses_model():
     frame = _synthetic_frame(hours=96)
     model = fit_price_model(frame.iloc[:72])

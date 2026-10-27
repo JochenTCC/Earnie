@@ -131,7 +131,7 @@ def _seed_recorder(
     import pandas as pd
     import shutil
 
-    from data.data_loader import load_market_prices
+    from data.edibert_market_range import load_market_prices
     from runtime_store.config_load import load_config_or_exit
     from runtime_store import cycle_recorder
     from scripts.run_backtesting import resolve_backtesting_window
@@ -162,7 +162,6 @@ def _seed_recorder(
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
     cache = HistoricalDataCache()

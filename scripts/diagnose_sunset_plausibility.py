@@ -19,7 +19,7 @@ if str(ROOT) not in sys.path:
 from runtime_store.config_load import load_config_or_exit
 
 config = load_config_or_exit()
-from data.data_loader import load_market_prices
+from data.edibert_market_range import load_market_prices
 from scripts.run_backtesting import resolve_backtesting_window
 from simulation.backtesting_horizon import (
     compute_sunrise_planning_at_anchor,
@@ -110,7 +110,6 @@ def _setup_cache_prices_scenario():
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
     scenario = config.get_backtesting_scenarios()["battery_10kwh_dynamic"]

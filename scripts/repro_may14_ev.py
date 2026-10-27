@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT))
 
 import pandas as pd
 
-from data.data_loader import load_market_prices
+from data.edibert_market_range import load_market_prices
 from optimizer.simulation import delivered_flex_kwh_from_rows, simulate_horizon
 from runtime_store.config_load import load_config_or_exit
 from scripts.run_backtesting import resolve_backtesting_window
@@ -71,7 +71,6 @@ def main() -> None:
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
     battery = _scenario_to_battery_params(params)

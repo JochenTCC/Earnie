@@ -31,7 +31,7 @@ sys.path.insert(0, str(ROOT))
 from runtime_store.config_load import load_config_or_exit  # noqa: E402
 
 config = load_config_or_exit()
-from data.data_loader import load_market_prices  # noqa: E402
+from data.edibert_market_range import load_market_prices  # noqa: E402
 from optimizer.simulation import delivered_flex_kwh_from_rows, simulate_horizon  # noqa: E402
 from scripts.run_backtesting import resolve_backtesting_window  # noqa: E402
 from simulation.backtesting_log import load_backtesting_log  # noqa: E402
@@ -73,7 +73,6 @@ prices_df = load_market_prices(
     start,
     end,
     sim_cfg,
-    awattar_url=config.get("AWATTAR_URL"),
     timeout=config.get_global_timeout(default=30),
 )
 feed_in = config.get_backtesting_feed_in_settings(runtime_override=scenario_params)

@@ -1,21 +1,28 @@
 """Day-Ahead-Preise für das rollierende 24h-Fenster inkl. Spiegel-Extrapolation."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
+from edibert import api
 
 import config
-from runtime_store.planning_clock import planning_now
 
 PRICE_SOURCE_DAY_AHEAD = "day_ahead"
 PRICE_SOURCE_MIRRORED = "mirrored"
 PRICE_SOURCE_PREDICTED = "predicted"
-MAX_MIRROR_LOOKBACK_DAYS = 7
+MAX_MIRROR_LOOKBACK_DAYS = 7  # as far back as Edibert's MirrorForecaster looks
+METHOD_OLS = "ols"
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
 MISSING_PRICE_STRATEGY_FORECAST = "forecast"
+_PRICE_SOURCE_BY_METHOD = {
+    api.METHOD_EXACT: PRICE_SOURCE_DAY_AHEAD,
+    api.METHOD_MIRROR: PRICE_SOURCE_MIRRORED,
+    METHOD_OLS: PRICE_SOURCE_PREDICTED,
+}
 
 
 def normalize_price_slot(dt: datetime) -> datetime:
@@ -57,56 +64,40 @@ def index_market_data_by_slot(market_data: list[dict[str, Any]]) -> dict[datetim
     return indexed
 
 
-def _price_from_indexed_slot(
-    slot: datetime,
+def price_source_for_method(method: str) -> str:
+    """Slot label (``price_source``) for an Edibert price method; an unknown method is an error."""
+    try:
+        return _PRICE_SOURCE_BY_METHOD[method]
+    except KeyError:
+        raise ValueError(f"Unbekannte Preismethode {method!r}.") from None
+
+
+def _known_quarter_hours(
     by_slot: dict[datetime, dict[str, Any]],
-) -> float | None:
-    """Exact QH match, else expand from parent clock-hour sample."""
+) -> dict[datetime, float]:
+    """Known prices per quarter-hour (UTC keys); an hourly sample fills its missing quarter-hours."""
     from optimizer.slot_duration import floor_to_hour_slot
 
-    if slot in by_slot:
-        return float(by_slot[slot]["price_buy"])
-    parent = floor_to_hour_slot(slot)
-    if parent in by_slot:
-        return float(by_slot[parent]["price_buy"])
-    return None
-
-
-def find_mirror_slot(
-    slot: datetime,
-    by_slot: dict[datetime, dict[str, Any]],
-    *,
-    max_lookback_days: int,
-) -> datetime | None:
-    """Sucht Spiegelquelle: gleiche Uhrzeit an vorherigen Tagen (QH oder Stunden-Expand)."""
-    from optimizer.slot_duration import floor_to_hour_slot
-
-    if max_lookback_days < 1:
-        raise ValueError("max_lookback_days muss mindestens 1 sein.")
-    for days_back in range(1, max_lookback_days + 1):
-        candidate = slot - timedelta(days=days_back)
-        if candidate in by_slot:
-            return candidate
-        parent = floor_to_hour_slot(candidate)
-        if parent in by_slot:
-            return parent
-    return None
+    known = {slot: float(row["price_buy"]) for slot, row in by_slot.items()}
+    for slot, price in list(known.items()):
+        if floor_to_hour_slot(slot) != slot:
+            continue
+        for minutes in (15, 30, 45):
+            known.setdefault(slot + timedelta(minutes=minutes), price)
+    return {slot.astimezone(UTC): price for slot, price in known.items()}
 
 
 def _append_mirrored_slot(
     resolved: list[dict[str, Any]],
     slot: datetime,
-    mirror_slot: datetime,
-    by_slot: dict[datetime, dict[str, Any]],
+    epex: float,
 ) -> None:
-    epex = float(by_slot[mirror_slot]["price_buy"])
     resolved.append(
         {
             "slot_datetime": slot,
             "hour": slot.hour,
             "price_buy": epex,
-            "price_source": PRICE_SOURCE_MIRRORED,
-            "mirrored_from": mirror_slot,
+            "price_source": price_source_for_method(api.METHOD_MIRROR),
         }
     )
 
@@ -124,7 +115,7 @@ def _append_predicted_slot(
         "slot_datetime": slot,
         "hour": slot.hour,
         "price_buy": round(float(epex_cent), 4),
-        "price_source": PRICE_SOURCE_PREDICTED,
+        "price_source": price_source_for_method(METHOD_OLS),
     }
     if forecast_model_path is not None:
         row["forecast_model_path"] = str(forecast_model_path)
@@ -192,13 +183,13 @@ def _resolve_live_bias_cent(
 def _resolve_missing_slot(
     resolved: list[dict[str, Any]],
     slot: datetime,
-    by_slot: dict[datetime, dict[str, Any]],
+    known: dict[datetime, float],
+    mirror: Any,
     *,
     missing_price_strategy: str,
     forecast_model: Any | None,
     forecast_feature_frame: pd.DataFrame | None,
     forecast_model_path: Path | None,
-    max_lookback_days: int,
     eu_power_live_source: str | None = None,
     live_bias_cent_kwh: float | None = None,
 ) -> None:
@@ -225,18 +216,15 @@ def _resolve_missing_slot(
             )
             return
 
-    mirror_slot = find_mirror_slot(
-        slot,
-        by_slot,
-        max_lookback_days=max_lookback_days,
-    )
-    if mirror_slot is None:
+    slot_utc = slot.astimezone(UTC)
+    mirrored = mirror.forecast(known, slot_utc, slot_utc + timedelta(minutes=15))
+    if slot_utc not in mirrored:
         raise ValueError(
             f"Kein Day-Ahead-Preis für {slot:%Y-%m-%d %H:%M} und keine Spiegelquelle "
-            f"innerhalb von {max_lookback_days} Tagen verfügbar. "
-            "aWATTar-Zeitraum erweitern oder später erneut versuchen."
+            f"innerhalb von {MAX_MIRROR_LOOKBACK_DAYS} Tagen verfügbar. "
+            "Abrufzeitraum erweitern oder später erneut versuchen."
         )
-    _append_mirrored_slot(resolved, slot, mirror_slot, by_slot)
+    _append_mirrored_slot(resolved, slot, float(mirrored[slot_utc]))
 
 
 def resolve_market_slots(
@@ -258,8 +246,9 @@ def resolve_market_slots(
     Endkundenpreise (``k_act``) kommen danach für die ganze Liste aus dem Tarif
     (``data.backtesting_prices.enrich_slots_import_prices``, Edibert).
 
-    Fehlende Day-Ahead-Stunden: Spiegelung (Standard) oder OLS-Prognose bei
-    missing_price_strategy='forecast' (Fallback: Spiegelung).
+    Fehlende Day-Ahead-Stunden: Spiegelung (Standard, Edibert ``MirrorForecaster``) oder
+    OLS-Prognose bei missing_price_strategy='forecast' (Fallback: Spiegelung). Stündliche
+    Werte gelten für alle vier Viertelstunden ihrer Stunde.
 
     Live bias (default on): rolling Day-Ahead−OLS residual on predicted slots,
     capped by ``live_bias_cap_cent_kwh`` (default ±12 Cent/kWh).
@@ -283,18 +272,22 @@ def resolve_market_slots(
         live_bias_lookback_hours=live_bias_lookback_hours,
         live_bias_cap_cent_kwh=live_bias_cap_cent_kwh,
     )
+    known = _known_quarter_hours(by_slot)
+    mirror = api.builtin_forecaster(
+        api.METHOD_MIRROR, ZoneInfo(config.get_planning_timezone())
+    )
     resolved: list[dict[str, Any]] = []
 
     for target_dt in target_hours:
         slot = normalize_price_slot(target_dt)
-        epex = _price_from_indexed_slot(slot, by_slot)
+        epex = known.get(slot.astimezone(UTC))
         if epex is not None:
             resolved.append(
                 {
                     "slot_datetime": slot,
                     "hour": slot.hour,
                     "price_buy": epex,
-                    "price_source": PRICE_SOURCE_DAY_AHEAD,
+                    "price_source": price_source_for_method(api.METHOD_EXACT),
                 }
             )
             continue
@@ -302,12 +295,12 @@ def resolve_market_slots(
         _resolve_missing_slot(
             resolved,
             slot,
-            by_slot,
+            known,
+            mirror,
             missing_price_strategy=missing_price_strategy,
             forecast_model=forecast_model,
             forecast_feature_frame=forecast_feature_frame,
             forecast_model_path=forecast_model_path,
-            max_lookback_days=MAX_MIRROR_LOOKBACK_DAYS,
             eu_power_live_source=eu_power_live_source,
             live_bias_cent_kwh=live_bias,
         )
@@ -331,37 +324,6 @@ def mirrored_price_share(resolved_slots: list[dict[str, Any]]) -> float:
         1 for slot in resolved_slots if slot.get("price_source") == PRICE_SOURCE_MIRRORED
     )
     return mirrored / len(resolved_slots)
-
-
-def awattar_fetch_window(planning_end: datetime | None = None) -> tuple[datetime, datetime]:
-    """
-    Start und Ende für den aWATTar-Abruf.
-
-    Start: Mitternacht heute minus MAX_MIRROR_LOOKBACK_DAYS (Spiegelquellen).
-    planning_end: optionales Fensterende (z. B. SA₂); sonst jetzt + 24 h.
-    Zeitzone von planning_end wird übernommen (typisch Europe/Vienna).
-    """
-    from optimizer.slot_duration import normalize_quarter_hour_slot
-
-    tz = planning_end.tzinfo if planning_end is not None and planning_end.tzinfo else None
-    if tz is not None:
-        now = normalize_quarter_hour_slot(planning_now(tz))
-    else:
-        now = normalize_quarter_hour_slot(planning_now())
-    start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
-        days=MAX_MIRROR_LOOKBACK_DAYS
-    )
-    if planning_end is not None:
-        end = normalize_price_slot(planning_end)
-        if end.tzinfo is None and tz is not None:
-            end = end.replace(tzinfo=tz)
-        if end < now:
-            raise ValueError(
-                f"planning_end ({planning_end}) liegt vor dem aktuellen Slot ({now})."
-            )
-        return start, end
-    end = now + timedelta(hours=24)
-    return start, end
 
 
 def epex_prices_for_slots(

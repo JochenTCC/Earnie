@@ -380,11 +380,8 @@ def load_dynamic_params(
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
     )
-    from house_config.awattar_api import resolve_awattar_api_url
-
     attrs: dict[str, Any] = {
         "_resolved_runtime_settings": resolved,
-        "AWATTAR_URL": resolve_awattar_api_url(resolved),
     }
     deferred = should_defer_runtime_params(
         raw_config,

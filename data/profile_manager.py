@@ -350,8 +350,6 @@ def _build_optimization_matrix(
             "expected_p_pv": forecast_pv[i],
             "consumption_mode": "forecast",
         }
-        if price_slot.get("mirrored_from") is not None:
-            row["mirrored_from"] = price_slot["mirrored_from"]
         if forecast_total_consumption is not None:
             row["expected_p_total"] = forecast_total_consumption[i]
         optimization_matrix.append(row)

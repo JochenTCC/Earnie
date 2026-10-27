@@ -231,7 +231,7 @@ Block `market_prices` in `config.json`:
 Wenn keine Preisquelle der Kaskade (Cache, ENTSO-E, Energy-Charts, aWATTar) für späte Stunden des Horizonts schon Preise liefert, gilt die gewählte Strategie:
 
 - **`forecast` (Standard):** Ein OLS-Korrelationsmodell extrapoliert die fehlenden Stunden. Als Live-Features dienen die Open-Meteo-Wetterprognose und ein stündlicher EU-Leistungs-Stand-in aus dem letzten Archivtag. Charts zeigen diese Stunden als grünen Bereich (siehe [Charts](../ui/charts.md)). Mit dem Standard `live_bias_enabled` korrigiert Earnie die prognostizierten EPEX-Werte rollierend (Day-Ahead − OLS), begrenzt durch `live_bias_cap_cent_kwh`.
-- **`mirror`:** gleiche Uhrzeit vom Vortag. Earnie nutzt diese Strategie auch automatisch, wenn Modell oder Features nicht geladen werden können.
+- **`mirror`:** gleiche Uhrzeit am nächsten früheren Tag mit Preis (bis 7 Tage zurück; über die Zeitumstellung hinweg gilt die Uhrzeit, nicht der Abstand in Stunden). Ein Stundenwert gilt für alle vier Viertelstunden seiner Stunde. Earnie nutzt diese Strategie auch automatisch, wenn Modell oder Features nicht geladen werden können.
   Ist ein Datendienst (z. B. Energy-Charts) nicht erreichbar, bricht Earnie den Abruf beim ersten Verbindungsfehler ab und versucht es erst nach einer Stunde wieder, damit ein Lauf nicht minutenlang wartet. Wer die EU-Abrufe ganz abschalten möchte, setzt `missing_price_strategy` auf `mirror`.
 
 Spec: [Preis-Prognose (Dev)](../dev/done/price-forecast-renewables.md).
@@ -240,9 +240,11 @@ Spec: [Preis-Prognose (Dev)](../dev/done/price-forecast-renewables.md).
 
 Für das **Backtesting** (Szenario-Explorer) legt `scenario_explorer_conf.price_source` die Quelle fest: `api` oder CSV über `path_price`.
 
-- Die API lädt **Energy-Charts** (natives EPEX-Viertelstundenraster, gleiche Quelle wie Live). Nur bei einem Fehler fällt sie auf aWATTar (stündlich) zurück.
+- Die API lädt **Energy-Charts** (natives EPEX-Viertelstundenraster) über Edibert. Es gibt **keinen aWATTar-Fallback** mehr: Antwortet Energy-Charts nicht und liegt nichts im Cache, bricht der Lauf mit einer Fehlermeldung ab.
+- **Cache:** ein Monat pro Datei unter `runtime/edibert_market/market_archive/<Zone>/JJJJ-MM.json`. Ein abgeschlossener Monat wird nicht erneut abgefragt; wiederholte Backtests laufen damit ohne Netz. Fehlende Viertelstunden meldet das Log als Warnung.
+- **CSV** (`price_source` ≠ `api`): eine Energy-Charts-CSV unter `path_price`, Spalte `Day Ahead Auktion (<Zone>)`.
 - `price_provider` ist ein Legacy-Feld und steuert die Reihenfolge nicht mehr.
-- Die Bidding-Zone kommt aus dem Live-Importtarif (`market_zone` / `land`), nicht aus dem Default `DE-LU`.
+- Die Bidding-Zone kommt aus dem Live-Importtarif (`market_zone` / `land`), sonst aus `energy_charts_bzn`. Fehlen beide, bricht der Lauf ab.
 - `price_range` und der Simulations-Gesamtzeitraum kommen aus `cons_data` (12 Kalendermonate bis zum letzten vollständigen Monat).
 
 ### Monatliche Fixtarife (Backtesting)
@@ -256,4 +258,4 @@ Der Export-Tarif-Typ `monthly_table` in `tariffs.json` liefert die Monatswerte (
 - **Inhalt:** die **tarifunabhängige** EPEX-Preisreihe, wie `scripts/run_backtesting.py` sie geladen hat (netto Cent/kWh, QH-Auflösung, vor Markup, Netznutzung und USt).
 - **Ablage:** `backtesting_prices.csv` im Log-Zielordner (`--output-dir`, Standard `.`), referenziert in `backtesting_log.json` als `price_series_file`.
 - **Unterschied zu `backtesting.csv`:** Diese Datei gilt pro Szenario und enthält bereits verrechnete `k_act`/`k_push_act`. Die Preisreihe ist dagegen die rohe Marktpreisserie, gemeinsam für **alle** Szenarien eines Laufs.
-- **Zweck:** Weiterverwendung ohne erneuten Energy-Charts- oder aWATTar-Abruf, z. B. für externe Einsparpotenzial-Rechnungen.
+- **Zweck:** Weiterverwendung ohne erneuten Energy-Charts-Abruf, z. B. für externe Einsparpotenzial-Rechnungen.

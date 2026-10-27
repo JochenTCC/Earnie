@@ -10,6 +10,7 @@ import pandas as pd
 
 import config
 from data.market_prices import (
+    MAX_MIRROR_LOOKBACK_DAYS,
     normalize_price_slot,
     resolve_market_slots,
 )
@@ -80,10 +81,30 @@ def _slot_from_prices_index(ts: pd.Timestamp) -> datetime:
 def build_market_data_as_of(
     prices_df: pd.DataFrame,
     planning_moment: datetime,
+    *,
+    not_before: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """Marktdaten wie zum Planungszeitpunkt (ohne noch unveröffentlichte Day-Ahead-Stunden)."""
+    """Marktdaten wie zum Planungszeitpunkt (ohne noch unveröffentlichte Day-Ahead-Stunden).
+
+    ``not_before`` (naive Planungszeit) lässt ältere Zeilen weg; die Reihe wird vor der
+    Schleife per Index zugeschnitten, damit nicht jeder Anker das ganze Jahr durchläuft.
+    """
+    cutoff = last_day_ahead_calendar_date(planning_moment)
+    index = prices_df.index
+
+    def _bound(moment: datetime) -> pd.Timestamp:
+        bound = pd.Timestamp(moment.replace(tzinfo=None))
+        if index.tz is None:
+            return bound
+        return bound.tz_localize(config.get_planning_timezone(), ambiguous=True, nonexistent="shift_forward")
+
+    # Grob vorfiltern (eine Stunde Spielraum je Seite); die genaue Prüfung macht die Schleife.
+    mask = index < _bound(datetime.combine(cutoff, datetime.min.time()) + timedelta(days=1, hours=1))
+    if not_before is not None:
+        mask &= index >= _bound(not_before - timedelta(hours=1))
+    window = prices_df.loc[mask, "price_cent_kwh"]
     entries: list[dict[str, Any]] = []
-    for ts, row in prices_df.iterrows():
+    for ts, price in zip(window.index, window.to_numpy()):
         slot = _slot_from_prices_index(ts)
         if not slot_in_market_data_as_of(slot, planning_moment):
             continue
@@ -91,7 +112,7 @@ def build_market_data_as_of(
             {
                 "timestamp": slot,
                 "hour": slot.hour,
-                "price_buy": round(float(row["price_cent_kwh"]), 4),
+                "price_buy": round(float(price), 4),
             }
         )
     return entries
@@ -211,8 +232,12 @@ def resolve_backtesting_slot_prices(
     ctx: BacktestingPriceContext,
 ) -> list[dict[str, Any]]:
     """Preis-Slots mit Day-Ahead-Cutoff; fehlende Stunden per Spiegelung oder Prognose."""
-    market_data = build_market_data_as_of(prices_df, ctx.planning_moment)
     target_hours = [_target_hour(slot) for slot in slot_datetimes]
+    # Mirror (7 Tage) und Live-Bias (48 h) lesen nie weiter zurück als 8 Tage vor dem ersten Slot.
+    not_before = min(target_hours) - timedelta(days=MAX_MIRROR_LOOKBACK_DAYS + 1)
+    market_data = build_market_data_as_of(
+        prices_df, ctx.planning_moment, not_before=not_before
+    )
     resolved = resolve_market_slots(
         market_data,
         target_hours,

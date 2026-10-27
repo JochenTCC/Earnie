@@ -46,10 +46,10 @@ Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../share/confi
 | `path_price` | Optional: historische Börsenpreise (Energy-Charts-CSV) |
 | `cons_data_retention_months` | Aufbewahrungsdauer der Stundenwerte |
 | `cons_data_write_mode` | Schreibmodus (`hourly`) |
-| `price_source` | `api` = Live-Preise; andere Werte für historische Preise aus CSV |
-| `price_provider` | Legacy; die API nutzt zuerst Energy-Charts (Fallback auf aWATTar-Stundenpreise) |
+| `price_source` | `api` = Energy-Charts über Edibert (mit Monats-Cache); `csv` = historische Preise aus `path_price` |
+| `price_provider` | Legacy; ohne Wirkung (die API nutzt nur Energy-Charts) |
 | `price_range` | `last_12_months`: 12 Kalendermonate bis zum letzten **vollständigen** Monat in `cons_data` (rückwärts definiert, Tage chronologisch) |
-| `energy_charts_bzn` | Bidding Zone für die Energy-Charts-CSV (z. B. `DE-LU`) |
+| `energy_charts_bzn` | Bidding Zone (z. B. `DE-LU`), wenn das Live-Szenario keine `market_zone` hat; wählt auch die Spalte der Energy-Charts-CSV |
 
 **Drei CSV-Ebenen**, die getrennt bleiben:
 

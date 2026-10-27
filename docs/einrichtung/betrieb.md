@@ -150,6 +150,7 @@ Standardverzeichnis: `earnie_env/runtime/`. Es lässt sich mit `EARNIE_RUNTIME_P
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe, eine Zeile JSON pro Lauf. Monatlich rotiert, max. 12 Archive. Enthält u. a. `consumption_snapshot`, optional `closed_interval`. |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen). |
 | `edibert_market/market_<zone>.json` | Cache der Live-Day-Ahead-Preise (QH, letzte 7 Tage bis morgen; Zone z. B. `AT`; Quelle ENTSO-E, Energy-Charts oder aWATTar). Deckt er das erwartete Fenster ab, fragt Earnie keine Quelle. Die alte Datei `live_day_ahead_<zone>.json` wird nicht mehr gelesen und kann gelöscht werden. |
+| `edibert_market/market_archive/<zone>/` | Monats-Cache der Börsenpreise für Szenario-Explorer und Backtesting (`JJJJ-MM.json`, Quelle Energy-Charts). Abgeschlossene Monate werden nicht erneut abgefragt; löschen erzwingt einen neuen Abruf. |
 | `local_settings.json`           | Lokale Betriebseinstellungen, z. B. `silent_mode` (auch über die Seite **Optimierer-Dienst**), `chart_debug_capture_enabled` und die Cycle-Recorder-Schlüssel `recorder_enabled` / `recorder_retention_days`. |
 | `recorder/`                     | Cycle-Recorder-Ringpuffer (`cycles_YYYY-MM-DD.jsonl.gz`, Config-Snapshots unter `configs/`). Enthält Lastprofile für die Regression; bleibt lokal und ist standardmäßig an. |
 | `timing/`                       | Optional: Phasen-Zeiten des Live-Zyklus (`cycles.jsonl`). Nur bei `EARNIE_CYCLE_TIMING=1`. |

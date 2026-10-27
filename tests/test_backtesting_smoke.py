@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 import config
-from data.data_loader import load_market_prices
+from data.edibert_market_range import load_market_prices
 from optimizer.charging_context import resolve_charging_context
 from simulation.backtesting_log import (
     BACKTESTING_PRICE_SERIES_CSV,
@@ -81,7 +81,6 @@ def smoke_prices_df(smoke_anchor: pd.Timestamp) -> pd.DataFrame:
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
 

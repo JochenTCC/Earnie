@@ -426,7 +426,7 @@ def main() -> None:
     from runtime_store.config_load import load_config_or_exit
 
     config = load_config_or_exit()
-    from data.data_loader import load_market_prices
+    from data.edibert_market_range import load_market_prices
     from scripts.run_backtesting import BACKTESTING_YEAR, resolve_backtesting_window
     from simulation.engine import (
         HistoricalDataCache,
@@ -474,7 +474,6 @@ def main() -> None:
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
 

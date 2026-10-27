@@ -365,7 +365,7 @@
         },
         "price_provider": {
           "type": "string",
-          "description": "Legacy label. SE/Live API fetch always prefers Energy-Charts (native 15-min EPEX); aWATTar hourly is fallback only."
+          "description": "Legacy label without effect. The SE API fetch uses Energy-Charts through Edibert (monthly cache, no aWATTar fallback)."
         },
         "price_range": {
           "type": "string",
@@ -377,7 +377,7 @@
         },
         "energy_charts_bzn": {
           "type": "string",
-          "description": "Bidding Zone für Energy-Charts-CSV (z. B. DE-LU)."
+          "description": "Bidding Zone (z. B. DE-LU), wenn das Live-Szenario keine market_zone hat; wählt auch die Spalte der Energy-Charts-CSV."
         },
         "export_price_series": {
           "type": "boolean",

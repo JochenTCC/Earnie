@@ -12,7 +12,7 @@ os.environ.setdefault("EARNIE_OFFLINE", "1")
 from runtime_store.config_load import load_config_or_exit
 
 config = load_config_or_exit()
-from data.data_loader import load_market_prices
+from data.edibert_market_range import load_market_prices
 from optimizer.charging_context import (
     consumer_charging_eligible_indices,
     resolve_charging_context,
@@ -47,7 +47,6 @@ def _load_window(hour_offset: int = 1392):
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
     matrix, meta = build_historical_window_matrix(anchor, cache, prices)

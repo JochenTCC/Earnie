@@ -371,9 +371,9 @@ Part A (release, pin) → B1 → B2 → B3 → B4 → B5 → gate: full suite (`
 - [x] Full suite (see *Results* for the hypothesis exclusion) and all regression cases green, goldens unchanged.
 - [ ] A live cycle on the maintainer site runs on Edibert prices (needs the data-model-5 migration of the site first).
 
-## P4b — Market prices, SE and backtesting (plan 2026-10-27)
+## P4b — Market prices, SE and backtesting (2026-10-27)
 
-Status: **planned**. Backlog item *Edibert P4b* (Version 2.8). Goal: the SE and backtesting load market prices through Edibert's long-range archive (`api.MarketArchive`), the mirror of `resolve_market_slots` comes from Edibert's `MirrorForecaster` (live and SE), `price_source` follows from Edibert's method names, and the Energy-Charts / aWATTar part of `data/data_loader.py` is gone. **Done:** SE and backtesting run on Edibert prices, SNAP unchanged, the removed modules are gone, chain pandas-free.
+Status: **implemented** (see *Implementation notes*, *Results*, *Done check*). Backlog item *Edibert P4b* (Version 2.8). Goal: the SE and backtesting load market prices through Edibert's long-range archive (`api.MarketArchive`), the mirror of `resolve_market_slots` comes from Edibert's `MirrorForecaster` (live and SE), `price_source` follows from Edibert's method names, and the Energy-Charts / aWATTar part of `data/data_loader.py` is gone. **Done:** SE and backtesting run on Edibert prices, SNAP unchanged, the removed modules are gone, chain pandas-free.
 
 ### Findings (2026-10-27)
 
@@ -400,13 +400,34 @@ Status: **planned**. Backlog item *Edibert P4b* (Version 2.8). Goal: the SE and 
 - **B4** Tests: `MarketRange` → DataFrame, autumn hour, missing zone, mirror parity (DST, hourly history), method mapping.
 - **B5** Docs: `docs/konfiguration/preise.md` (German), this section (implementation notes, results), backlog.
 
+### Implementation notes (2026-10-27)
+
+- **New module** `data/edibert_market_range.py`: `load_market_prices(start, end, sim_cfg, timeout=30, *, market_zone=None)`. `price_source: api` → `api.MarketArchive(zone, runtime/edibert_market, timeout)` with Edibert's own `http_get` (D1); the `MarketRange` (UTC keys) becomes the old frame (naive `Europe/Vienna` index, `price_cent_kwh`, the repeated autumn hour averaged); Edibert notes (`MARKET_RANGE_INCOMPLETE`, `MARKET_SOURCE_FAILED`, …) are logged as warnings; `MARKET_DATA_UNAVAILABLE` propagates. Any other `price_source` reads the Energy-Charts CSV of `path_price` as before (the schema documents "other values = CSV", so no new error there). Zone: `market_zone`, else `energy_charts_bzn`, else `ValueError` (the loader's own `DE-LU` default is gone; `config_loaders` still defaults `energy_charts_bzn` to `DE-LU`, unchanged). The request window is `[start 00:00, end + 1 day 00:00)` local, fetched as whole UTC months.
+- **Callers:** `scripts/run_backtesting.py`, `simulation/backtesting_single_window.py`, the diagnosis scripts and two tests import from the new module and no longer pass `awattar_url`; `load_market_prices_for_scenario` (only its own test used it) is gone.
+- **Deleted:** in `data/data_loader.py` everything from `_ensure_csv_exists` to `load_market_prices_for_scenario` (Energy-Charts HTTP with its shadow recording, aWATTar, the CSV reader, zone constants) — the module keeps only the simulation-window helpers; `house_config/awattar_api.py`, `AWATTAR_URL` in `settings/config_loaders.py`, `awattar_fetch_window` in `data/market_prices.py`; `tests/test_data_loader_market_prices.py` → `tests/test_data_loader_window.py` (window tests only).
+- **Mirror (D4):** `resolve_market_slots` builds `known` once per call (`_known_quarter_hours`: an `:00` sample fills its missing `:15/:30/:45`, keys UTC), takes the Day-Ahead price from it and fills a missing slot with `api.builtin_forecaster(METHOD_MIRROR, planning tz)`; no source within 7 days keeps the old `ValueError` ("Spiegelquelle"). `find_mirror_slot`, `_price_from_indexed_slot` and `mirrored_from` (also in the profile rows of `data/profile_manager.py`) are gone. `MAX_MIRROR_LOOKBACK_DAYS` stays an Earnie constant (7, as Edibert's): `edibert.api` does not export Edibert's.
+- **`price_source` (D5):** `price_source_for_method` (`exact` / `mirror` / `ols`, `METHOD_OLS = "ols"`) sets the label of every resolved slot; an unknown method raises.
+- **Speed-up (maintainer request during P4b):** `build_market_data_as_of` ran `iterrows` over the whole price series per call (0.66 s for a year of quarter-hours), once per anchor and scenario with `mirror` / `forecast` and per `market_for` call. It now cuts the series by index first (`not_before`, plus the Day-Ahead cutoff, one hour of margin each side, aware or naive index) and loops over the slice only; `resolve_backtesting_slot_prices` passes `not_before` = first target slot − 8 days (mirror 7 days, live bias 48 h never read further back).
+- **Tests:** `tests/test_backtesting_prices.py` (slice equals the full scan from `not_before` on); `tests/test_edibert_market_range.py` (real `MarketArchive` with a fake `http_get`: Vienna index and autumn hour, month cache without a second request, zone from `energy_charts_bzn`, no zone, no answer without cache → `MARKET_DATA_UNAVAILABLE`, CSV column / missing column / missing path / missing file); `tests/test_market_prices.py` (mirror from an hourly sample, wall clock across the spring DST change, method mapping; `mirrored_from` asserts and the `awattar_fetch_window` test removed).
+- **Docs:** `docs/konfiguration/preise.md`, `docs/konfiguration/overview.md`, `docs/referenz/tarife-quellen.md`, `docs/einrichtung/betrieb.md` (German); `share/config/config.schema.json` descriptions of `price_provider` / `energy_charts_bzn`.
+- **Behaviour changes (release notes):** no aWATTar fallback in the SE / backtesting; new monthly price cache `runtime/edibert_market/market_archive/<zone>/`; a missing market zone fails; `mirrored_from` is no longer in the profile rows.
+
+### Results (2026-10-27)
+
+- **Full suite:** 4798 passed, 19 skipped (same hypothesis exclusion as P4a: `-p no:hypothesispytest`, without `tests/test_storage_roundtrip.py`).
+- **Regression:** all 11 cases green, metrics unchanged, no `--update-golden` (run with `EARNIE_CONFIG_PATH=tests/fixtures/backtesting/config.json`, see P4a).
+- **Price comparison 2025** (old `fetch_energy_charts_prices` in one request vs. `MarketArchive`, AT / DE-LU / CH): every slot both deliver is equal (max |diff| 0.000000 ct). The new loader has more rows: Edibert asks month by month and gets quarter-hours, the old one-year request came back hourly for AT / DE-LU up to 2025-09 and for CH all year (same values; the SE expanded them anyway). The autumn hour 2025-10-26 / 2026-10-25 is averaged as before. Edibert waited out several HTTP 429 answers on the CH months.
+- **Mirror comparison 2025** (old `resolve_market_slots` vs. Edibert mirror, planning moments daily 10:00 and 13:00, 144 slots each, 102,528 slots per zone, a third mirrored): 12 slots per zone differ, all 2025-03-30 02:00–02:45, a wall time that does not exist (spring DST change). The old code treated the non-existent wall time as its own slot and mirrored 02:xx of the day before; Edibert works on the real instant (01:xx UTC = 03:xx CEST) and takes that slot's Day-Ahead price or mirrors 03:xx. Intended: the new value belongs to the instant that the slot really is.
+- **Slice of `build_market_data_as_of`:** resolved slots with the slice equal those of a full scan in all 1,420 calls (AT, CH, 2025, daily 10:00 and 13:00); 11.3 s vs. 185.8 s (AT) and 7.3 s vs. 129.4 s (CH).
+- **SE comparison (SNAP):** maintainer site, copied outside the repo and migrated to data model 5 there, September–October 2026, `--workers 20`, `HEAD` before P4b vs. P4b. `k_act` / `k_push_act` identical in all 16,417 rows (`perfect` and `mirror`); totals differ by 1–6 cent in the Live scenario, all other scenarios equal. Two baseline runs without any code change differ by 4 cent and 200 rows (CBC `strict_slow` windows), so the difference is solver noise, not prices. Run time with `mirror`: 98–113 s before, 61 s with the slice (`perfect`: 69–70 s).
+
 ### Order
 
 B1 → B2 → B3 → B4 → B5 → gate: full suite (`scripts.run_pytest`), `scripts.run_regression` without `--update-golden`, a script comparing old and new prices for 2025 (AT, DE-LU, CH), an SE before / after comparison on the fixture config. An SE run on the maintainer site needs its data-model-5 migration first.
 
 ### Done check
 
-- [ ] SE and backtesting load prices through `MarketArchive`; the Energy-Charts / aWATTar code of `data/data_loader.py` is gone.
-- [ ] Mirror from Edibert for live and SE, `price_source` through the method mapping.
-- [ ] Full suite and all regression cases green, goldens unchanged; price comparison 2025 and SE comparison documented.
-- [ ] An SE run on the maintainer site (needs the data-model-5 migration of the site first).
+- [x] SE and backtesting load prices through `MarketArchive`; the Energy-Charts / aWATTar code of `data/data_loader.py` is gone.
+- [x] Mirror from Edibert for live and SE, `price_source` through the method mapping.
+- [x] Full suite and all regression cases green, goldens unchanged; price comparison 2025 and SE comparison documented.
+- [x] An SE run on the maintainer site: done on a migrated copy outside the repo (see *Results*); the site itself still needs its data-model-5 migration.

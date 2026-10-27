@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 
 import config
-from data.data_loader import load_market_prices
+from data.edibert_market_range import load_market_prices
 from scripts.run_backtesting import resolve_backtesting_window
 from simulation.backtesting_snapshots import build_window_snapshot, normalize_window_anchor_key
 from simulation.engine import (
@@ -87,7 +87,6 @@ def _load_prices_for_anchor(
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
         market_zone=market_zone,
     )

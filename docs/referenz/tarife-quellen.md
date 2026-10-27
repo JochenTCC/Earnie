@@ -158,7 +158,7 @@ Die Formeln zum Nachrechnen stehen auf dieser Seite, das technische Mapping in [
 | **Offizielle EPEX** SFTP / MATS API | Kostenpflichtig ([Market Data Services](https://www.epexspot.com/en/marketdataservices), [EEX Webshop](https://webshop.eex-group.com/epex-spot-public-market-data)) | **Nicht** angebunden |
 | **ENTSO-E Transparency** `documentType=A44` | Persönlicher API-Token (`ENTSOE_API_TOKEN` in `config/.env`); [transparency.entsoe.eu](https://transparency.entsoe.eu/) | **Primäre** Live-Day-Ahead-Quelle, wenn ein Token gesetzt ist (AT / DE-LU / CH) |
 | **Energy-Charts** `GET /price?bzn=…` | Kostenlos; Fraunhofer ISE, CC BY 4.0 ([api.energy-charts.info](https://api.energy-charts.info/)) | Live-Fallback ohne ENTSO-E oder bei dessen Ausfall; **primäre** SE-/Backtesting-Quelle für AT, DE-LU, CH |
-| **aWATTar** `api.awattar.at` / `.de` | Kostenlos, Fair Use | Letzter Live-Fallback (AT) bzw. optional (DE); Katalog-Tarife als `spot_hourly` (API-URL aus `land`) |
+| **aWATTar** `api.awattar.at` / `.de` | Kostenlos, Fair Use | Letzter Live-Fallback (AT, DE-LU); im SE / Backtesting nicht mehr genutzt |
 | **APG** markt.apg.at | Öffentliche Charts | Nur manuelle Referenz |
 
 ### OeMAG Marktpreis

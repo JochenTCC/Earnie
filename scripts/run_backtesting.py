@@ -28,7 +28,8 @@ from simulation.period_clip import clip_results_map_to_period
 from simulation.reference_costs import reference_standby_power_kw
 from simulation.monthly_fees import fee_breakdowns_by_result_id
 from simulation.se_invoice_markdown import write_se_invoices
-from data.data_loader import load_market_prices, resolve_simulation_window
+from data.data_loader import resolve_simulation_window
+from data.edibert_market_range import load_market_prices
 from data.backtesting_prices import (
     MISSING_PRICE_STRATEGY_FORECAST,
     PRICE_STRATEGY_PERFECT,
@@ -883,7 +884,6 @@ def main(argv: list[str] | None = None):
         price_load_start,
         price_load_end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
         market_zone=market_zone,
     )

@@ -11,7 +11,7 @@ from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
 import config
 from data import cons_data_store
-from data.data_loader import load_market_prices
+from data.edibert_market_range import load_market_prices
 from optimizer.consistency import assert_24h_optimization_consistent, validate_24h_optimization_run
 from optimizer import simulate_horizon
 from simulation.engine import (
@@ -93,7 +93,6 @@ def prices_df(historical_cons_data) -> pd.DataFrame:
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
 

@@ -310,7 +310,7 @@ def main(argv: list[str] | None = None) -> None:
         log_path=args.log,
     )
 
-    from data.data_loader import load_market_prices
+    from data.edibert_market_range import load_market_prices
     from scripts.run_backtesting import resolve_backtesting_window
     from simulation.backtesting_log import load_backtesting_log
     from simulation.engine import HistoricalDataCache, list_simulation_anchors
@@ -340,7 +340,6 @@ def main(argv: list[str] | None = None) -> None:
         start,
         end,
         sim_cfg,
-        awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
     scenario_params = _scenario_params(config, args.scenario)
