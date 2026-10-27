@@ -71,7 +71,7 @@ def test_resolve_market_slots_forecast_uses_model():
     assert resolved[0]["price_source"] == PRICE_SOURCE_PREDICTED
 
 
-def test_matrix_prices_mirror_marks_extrapolated_slots():
+def test_matrix_prices_mirror_marks_extrapolated_slots(tmp_path):
     planning = datetime(2025, 7, 6, 8, 0, tzinfo=VIENNA)
     index = pd.date_range("2025-07-01", periods=240, freq="h", tz=VIENNA)
     prices = pd.DataFrame(
@@ -83,40 +83,48 @@ def test_matrix_prices_mirror_marks_extrapolated_slots():
         strategy="mirror",
         planning_moment=planning,
     )
-    _, _, sources = matrix_prices_from_context(prices, slots, ctx)
+    _, _, sources = matrix_prices_from_context(
+        prices, slots, ctx, edibert_pricing=_spot_ref(tmp_path, {})
+    )
     assert sources == [PRICE_SOURCE_MIRRORED] * 3
 
 
-def test_import_brutto_cent_hourly_settlement_averages_quarters():
+def _spot_ref(tmp_path, extra: dict) -> dict:
+    """Pricing reference of a net spot import tariff without fees (Edibert format)."""
+    import json
+
+    from data.edibert_slot_prices import pricing_reference
+
+    tariff = {
+        "id": "spot", "label": "Spot", "type": "spot_hourly", "land": "AT", "supplier_id": "test",
+        "settlement_fee_cent_kwh": 0.0, "markup_percent": 0.0,
+        "prices_include_vat": False, "vat_percent": 0.0, **extra,
+    }
+    path = tmp_path / "tariffs.json"
+    path.write_text(
+        json.dumps({"tariff_format": 1, "import_tariffs": [tariff], "export_tariffs": []}),
+        encoding="utf-8",
+    )
+    return pricing_reference(
+        tariffs_path=str(path), grid_fees_path=None, import_tariff_id="spot",
+        export_tariff_id=None, timezone_name="Europe/Vienna", profile={"land": "AT"},
+    )
+
+
+def test_import_brutto_cent_hourly_settlement_averages_quarters(tmp_path):
     """Tariffs with settlement_mtu='60min' bill the hour's EPEX mean, not each QH price."""
     hour = datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA)
     slots = [hour + timedelta(minutes=15 * i) for i in range(4)]
     epex_values = [10.0, 20.0, 30.0, 40.0]  # mean = 25.0
-    tariff = {
-        "type": "spot_hourly",
-        "land": "AT",
-        "settlement_fee_cent_kwh": 0.0,
-        "markup_percent": 0.0,
-        "prices_include_vat": False,
-        "vat_percent": 0.0,
-        "settlement_mtu": "60min",
-    }
-    brutto = import_brutto_cent_for_slots(epex_values, slots, import_tariff_spec=tariff)
+    ref = _spot_ref(tmp_path, {"settlement_mtu": "60min"})
+    brutto = import_brutto_cent_for_slots(epex_values, slots, edibert_pricing=ref)
     assert brutto == [pytest.approx(25.0)] * 4
 
 
-def test_import_brutto_cent_quarter_hour_settlement_keeps_per_slot_prices():
-    """No settlement_mtu (or '15min') keeps today's per-QH behaviour — regression guard."""
+def test_import_brutto_cent_quarter_hour_settlement_keeps_per_slot_prices(tmp_path):
+    """No settlement_mtu (or '15min') keeps per-QH prices — regression guard."""
     hour = datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA)
     slots = [hour + timedelta(minutes=15 * i) for i in range(4)]
     epex_values = [10.0, 20.0, 30.0, 40.0]
-    tariff = {
-        "type": "spot_hourly",
-        "land": "AT",
-        "settlement_fee_cent_kwh": 0.0,
-        "markup_percent": 0.0,
-        "prices_include_vat": False,
-        "vat_percent": 0.0,
-    }
-    brutto = import_brutto_cent_for_slots(epex_values, slots, import_tariff_spec=tariff)
+    brutto = import_brutto_cent_for_slots(epex_values, slots, edibert_pricing=_spot_ref(tmp_path, {}))
     assert brutto == [pytest.approx(v) for v in epex_values]

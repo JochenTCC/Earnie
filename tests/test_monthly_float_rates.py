@@ -1,7 +1,6 @@
 """Tests für monthly_float Einspeisetarife (Version 1.24.g)."""
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -13,7 +12,6 @@ from data.monthly_float_rates import (
     load_monthly_float_reference_cent,
     load_oemag_monthly_reference_rates,
 )
-from data.tariff_pricing import export_cent_kwh
 
 
 OEMAG_RATES = (
@@ -79,7 +77,7 @@ def test_energie_ag_scaling_with_settlement():
     assert june_2026 == (2026, 6, pytest.approx(expected, rel=1e-4))
 
 
-def test_export_cent_kwh_monthly_table_from_seed_lookup():
+def test_monthly_table_seed_lookup_scales_reference():
     tariff = {
         "type": "monthly_table",
         "arbeitspreis_kwh_cent": 7.15,
@@ -90,13 +88,7 @@ def test_export_cent_kwh_monthly_table_from_seed_lookup():
         (year, month): cent
         for year, month, cent in build_monthly_float_lookup(OEMAG_RATES, 7.15, tariff)
     }
-    slot = datetime(2026, 6, 15, 12, 0)
-    assert export_cent_kwh(
-        None,
-        tariff,
-        slot_datetime=slot,
-        monthly_lookup=lookup,
-    ) == pytest.approx(6.772)
+    assert lookup[(2026, 6)] == pytest.approx(6.772)
 
 
 def test_load_econtrol_referenzmarktwert_pv():

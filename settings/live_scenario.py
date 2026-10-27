@@ -46,18 +46,13 @@ def resolve_scenario_settings_dict(
 ) -> dict:
     from house_config.scenario_resolution import resolve_scenario_settings
 
-    holder: dict = {}
-    resolved = resolve_scenario_settings(
+    return resolve_scenario_settings(
         settings,
         raw_config=raw_config,
         components_path=components_path,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
-        monthly_rates_holder=holder,
     )
-    if holder.get("_monthly_fixed_tariffs") is not None:
-        resolved["_monthly_fixed_tariffs"] = holder["_monthly_fixed_tariffs"]
-    return resolved
 
 
 def get_battery_wear_cent_per_kwh(
@@ -100,11 +95,7 @@ def get_battery_wear_cent_per_kwh(
 def get_feed_in_settings(runtime: dict):
     from data.feed_in_prices import feed_in_settings_from_dict
 
-    monthly = runtime.get("_monthly_fixed_tariffs")
-    return feed_in_settings_from_dict(
-        runtime,
-        monthly_fixed_tariffs=monthly,
-    )
+    return feed_in_settings_from_dict(runtime)
 
 
 def get_backtesting_feed_in_settings(
@@ -113,17 +104,11 @@ def get_backtesting_feed_in_settings(
     load_scenarios_document: Callable[[], dict],
     load_tariffs_document: Callable[[], dict],
 ):
-    """Einspeise-Settings für Backtesting inkl. monatlicher Fixtarife."""
+    """Einspeise-Settings für Backtesting (Preise aus dem Einspeisetarif über Edibert)."""
     from data.feed_in_prices import feed_in_settings_from_dict
 
     _ = (load_scenarios_document, load_tariffs_document)
-    monthly = None
-    if runtime.get("_monthly_fixed_tariffs") is not None:
-        monthly = runtime["_monthly_fixed_tariffs"]
-    return feed_in_settings_from_dict(
-        runtime,
-        monthly_fixed_tariffs=monthly,
-    )
+    return feed_in_settings_from_dict(runtime)
 
 
 def _find_live_scenario_entry(scenarios: list, live_id: str, scenarios_path: str) -> dict:

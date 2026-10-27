@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
-from data.feed_in_prices import FEED_IN_MODE_FIXED, FeedInSettings
+from data.feed_in_prices import feed_in_settings_from_dict
 from optimizer.simulation import _flex_indices_for_book_hours
 from simulation.backtesting_horizon import (
     hourly_slots_half_open,
@@ -239,12 +239,7 @@ def test_simulate_anchor_step_books_sa1_sa2_and_holds_soc(monkeypatch):
             )
         return rows
 
-    feed_in = FeedInSettings(
-        mode=FEED_IN_MODE_FIXED,
-        k_push_cent=5.0,
-        fee_factor=0.0,
-        fix_cent=5.0,
-    )
+    feed_in = feed_in_settings_from_dict(scenario)
     with patch("simulation.engine.simulate_horizon", side_effect=_fake_simulate):
         chart_rows, matrix_out, meta2, new_soc, *_rest = _simulate_anchor_step(
             anchor,

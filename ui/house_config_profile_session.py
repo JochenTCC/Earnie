@@ -5,7 +5,7 @@ import os
 
 import streamlit as st
 
-from data.grid_fees import default_netznutzung_config, normalize_netznutzung_config
+from house_config.netznutzung import default_netznutzung_config, normalize_netznutzung_config
 from house_config.earnie_role import (
     DEFAULT_MANUAL_HORIZON_H,
     EARNIE_ROLE_FLEX,
@@ -256,10 +256,10 @@ def _seed_nne_session(session_scope: str, netznutzung: dict, profile_id: str) ->
     area_value = form_area_value(netznutzung, profile_id)
     own_base = 0.0
     if area_value == OWN_AREA:
-        from data.grid_fees import load_grid_fee_catalog
+        from house_config.edibert_tariffs import grid_area_view
         from runtime_store.persist_paths import resolve_grid_fees_json_path
 
-        catalog = load_grid_fee_catalog(resolve_grid_fees_json_path())
+        catalog = grid_area_view(resolve_grid_fees_json_path())
         own_base = own_base_cent_kwh(catalog, profile_id) or 0.0
     st.session_state[_scoped_key(session_scope, "house_profile_nne_own_id")] = (
         own_area_id(profile_id) if profile_id else ""

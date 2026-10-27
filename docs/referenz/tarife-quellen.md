@@ -41,7 +41,7 @@ Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschn
 
 Für Spot- und aWATTar-Tarife gilt folgende Reihenfolge (Cent/kWh), wie im Katalog und in der Vorschau:
 
-1. **Börsenpreis** der Stunde (Day-Ahead, EPEX-Zone zum Land des Tarifs).
+1. **Börsenpreis** des Slots (Day-Ahead, EPEX-Zone zum Land des Tarifs); bei `settlement_mtu: 60min` das Mittel der vier Viertelstunden der Stunde.
 2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
 3. **Fixer Aufschlag des Lieferanten** (`settlement_fee_cent_kwh`) in Cent/kWh. Das Feld gilt nur für Spot-Typen; Netzkosten gehören nicht hierher, sondern in `netznutzung` (Schritt 4).
 4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung`, netto, je Slot, mit Zeitregeln wie SNAP).
@@ -58,7 +58,7 @@ Bei Festpreis-Tarifen (`fixed_cent`) ist der Arbeitspreis `fix_cent_kwh`; `settl
 
 ### Benutzertarife aus Edibert
 
-Tarife aus `user_tariffs.json` (neben `tariffs.json`, IDs `user_…`) rechnet Earnie mit denselben Schritten wie Katalog-Tarife. Ausnahme: Zeitregeln (`rules`) und Preisgrenzen (`price_floor_cent_kwh`, `price_cap_cent_kwh`) kann Earnie erst nach der Umstellung der Preisberechnung auf Edibert. Bis dahin lässt sich ein solcher Tarif zwar auswählen, aber nicht berechnen (siehe [Preise und Marktdaten](../konfiguration/preise.md#benutzertarife-user_tariffsjson)).
+Tarife aus `user_tariffs.json` (neben `tariffs.json`, IDs `user_…`) rechnet Earnie mit denselben Schritten wie Katalog-Tarife, über die Tarif-Bibliothek Edibert. Zeitregeln (`rules`) und Preisgrenzen (`price_floor_cent_kwh`, `price_cap_cent_kwh`) wirken je Slot (siehe [Preise und Marktdaten](../konfiguration/preise.md#benutzertarife-user_tariffsjson)).
 
 ### Eigener Festpreis (szenario-lokal)
 

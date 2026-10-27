@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import pandas as pd
 import config
 from data import feed_in_prices
-from data.backtesting_prices import BacktestingPriceResources, matrix_prices_from_context
+from data.backtesting_prices import (
+    BacktestingPriceResources,
+    market_for_prices,
+    matrix_prices_from_context,
+)
 from optimizer.slot_duration import DEFAULT_DT_H
 from simulation.baseload_validation import resolve_hourly_baseload_kw
 from simulation.backtesting_horizon import (
@@ -74,10 +78,11 @@ def collect_imported_pv_scenario_meta(
 
 
 def _pricing_kwargs_from_scenario(scenario_params: dict | None) -> dict:
-    if not scenario_params:
-        return {}
     from data.backtesting_prices import pricing_kwargs_from_resolved
 
+    # No scenario = the live scenario (as for the feed-in settings below).
+    if not scenario_params:
+        return pricing_kwargs_from_resolved(config.get_resolved_runtime_settings())
     return pricing_kwargs_from_resolved(scenario_params)
 
 
@@ -303,8 +308,9 @@ def _matrix_price_inputs(
     scenario_params: dict | None,
     price_resources: BacktestingPriceResources | None,
     planning_moment: datetime | None,
-) -> tuple[list[float], list[float], list[float], list[str]]:
-    """PV-Profil sowie EPEX-/Brutto-Preise und Preisquellen für die Slots."""
+) -> tuple[list[float], list[float], list[float], list[str], Any]:
+    """PV-Profil, EPEX-/Brutto-Preise, Preisquellen und die Börsenpreis-Quelle für Teilstunden
+    (``market_for``, auch für den Einspeisetarif)."""
     pv_profile = cache.get_pv_for_slots(
         slot_datetimes,
         scenario_params=scenario_params,
@@ -321,7 +327,8 @@ def _matrix_price_inputs(
         planning_moment=planning_moment,
         **_pricing_kwargs_from_scenario(scenario_params),
     )
-    return pv_profile, epex_prices, brutto_prices, price_sources
+    market_for = market_for_prices(prices_df, price_ctx, planning_moment=planning_moment)
+    return pv_profile, epex_prices, brutto_prices, price_sources, market_for
 
 
 def native_filter_kw_by_slot(
@@ -488,7 +495,7 @@ def build_historical_matrix_for_slots(
         total_load=total_load,
         hourly_flex=hourly_flex,
     )
-    pv_profile, epex_prices, brutto_prices, price_sources = _matrix_price_inputs(
+    pv_profile, epex_prices, brutto_prices, price_sources, market_for = _matrix_price_inputs(
         slot_datetimes,
         cache,
         prices_df,
@@ -507,7 +514,7 @@ def build_historical_matrix_for_slots(
         native_filter_kw=native_filter_kw,
     )
     settings = feed_in_settings or config.get_feed_in_settings()
-    feed_in_prices.enrich_matrix_feed_in_prices(matrix, settings)
+    feed_in_prices.enrich_matrix_feed_in_prices(matrix, settings, market_for=market_for)
     meta = _matrix_meta_block(
         consumption,
         consumption_source=consumption_source,

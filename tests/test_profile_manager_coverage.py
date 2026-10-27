@@ -203,17 +203,6 @@ def test_get_historical_day_data_from_frame(monkeypatch):
     assert total == [2.0] * 24
 
 
-def test_reindex_hourly_series_fills_gaps():
-    series = pd.Series(
-        [1.0],
-        index=pd.DatetimeIndex([pd.Timestamp("2024-06-01 12:00:00")]),
-    )
-    values = pm._reindex_hourly_series(series, date(2024, 6, 1))
-    assert len(values) == 24
-    assert values[12] == pytest.approx(1.0)
-    assert values[0] == pytest.approx(0.0)
-
-
 def test_compute_live_planning_window_requires_aware_now():
     with pytest.raises(ValueError, match="timezone-aware"):
         pm.compute_live_planning_window(datetime(2024, 6, 1, 12))
@@ -488,75 +477,3 @@ def test_get_historical_date_picker_bounds_intersects(monkeypatch):
     assert hi == cons_max
 
 
-def test_get_historical_pv_for_day(monkeypatch):
-    series = pd.Series(
-        [0.5, 1.5],
-        index=pd.DatetimeIndex(
-            [pd.Timestamp("2024-06-01 10:00:00"), pd.Timestamp("2024-06-01 11:00:00")]
-        ),
-    )
-    monkeypatch.setattr(pm, "load_cons_data_pv_series", lambda: series)
-    values = pm._get_historical_pv_for_day(date(2024, 6, 1))
-    assert values[10] == pytest.approx(0.5)
-    assert values[11] == pytest.approx(1.5)
-    assert values[0] == pytest.approx(0.0)
-
-
-def test_get_historical_epex_and_brutto_prices(monkeypatch):
-    idx = pd.date_range("2024-06-01", periods=24, freq="h")
-    prices = pd.DataFrame({"price_cent_kwh": list(range(24))}, index=idx)
-    monkeypatch.setattr(
-        pm.config, "get_scenario_explorer_conf", lambda: {"price_source": "api"}
-    )
-    monkeypatch.setattr(pm.config, "get", lambda *_a, **_k: "https://example.test")
-    monkeypatch.setattr(pm.config, "get_global_timeout", lambda: 5)
-    monkeypatch.setattr(
-        pm.config, "get_resolved_runtime_settings", lambda: {"market_zone": "AT"}
-    )
-    monkeypatch.setattr(pm.data_loader, "load_market_prices", lambda *_a, **_k: prices)
-    monkeypatch.setattr(
-        pm.market_prices,
-        "epex_prices_for_slots",
-        lambda _df, slots: [float(i) for i in range(len(slots))],
-    )
-    monkeypatch.setattr(pm, "_import_pricing_kwargs", lambda: {})
-    monkeypatch.setattr(
-        "data.backtesting_prices.import_brutto_cent_for_slots",
-        lambda epex, *_a, **_k: [x + 1.0 for x in epex],
-    )
-    epex, brutto = pm._get_historical_epex_and_brutto_prices_for_day(date(2024, 6, 1))
-    assert epex[3] == pytest.approx(3.0)
-    assert brutto[3] == pytest.approx(4.0)
-    assert pm._get_historical_brutto_prices_for_day(date(2024, 6, 1))[3] == pytest.approx(
-        4.0
-    )
-
-
-def test_build_historical_optimization_matrix(monkeypatch):
-    monkeypatch.setattr(
-        pm,
-        "get_historical_day_data",
-        lambda _d: ([0.5] * 24, {"ev": 2.0}, [1.0] * 24),
-    )
-    monkeypatch.setattr(pm, "_get_historical_pv_for_day", lambda _d: [0.1] * 24)
-    monkeypatch.setattr(
-        pm,
-        "_get_historical_epex_and_brutto_prices_for_day",
-        lambda _d: ([5.0] * 24, [6.0] * 24),
-    )
-    monkeypatch.setattr(pm.config, "get_feed_in_settings", lambda: {})
-    monkeypatch.setattr(
-        pm.feed_in_prices, "enrich_matrix_feed_in_prices", lambda *_a, **_k: None
-    )
-    monkeypatch.setattr(
-        "data.consumer_targets.resolve_historical_consumer_daily_targets",
-        lambda _d: {"ev": 2.0},
-    )
-    matrix, meta = pm.build_historical_optimization_matrix("2024-06-01")
-    assert len(matrix) == 24
-    assert matrix[0]["k_act"] == 6.0
-    assert matrix[0]["price_buy"] == 5.0
-    assert matrix[0]["consumption_mode"] == "logged_day"
-    assert meta["historical_totals"] == {"ev": 2.0}
-    assert meta["consumer_daily_targets_kwh"] == {"ev": 2.0}
-    assert meta["pv_kwh"] == pytest.approx(2.4)

@@ -4,7 +4,6 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from data.grid_fees import flat_grid_fee_spec
 from house_config.tariffs_store import _normalize_dach_fields, resolve_supplier_id
 from optimizer.simulation import calculate_step_cost_parts_from_row
 from simulation.backtesting_log import _build_summary
@@ -19,7 +18,18 @@ from simulation.se_invoice_markdown import (
     render_scenario_invoice_markdown,
     write_se_invoices,
 )
+from simulation.se_invoice_netznutzung import InvoiceGridFee
 from ui.tariff_filter_helpers import tariff_parameter_rows
+
+
+def flat_grid_fee_spec(base_cent_kwh: float) -> InvoiceGridFee:
+    """Flat grid fee without time rules, as the invoice receives it from Edibert."""
+    return InvoiceGridFee(
+        base_cent_kwh=base_cent_kwh,
+        rule_labels={},
+        skipped=[],
+        work=lambda _slot: (base_cent_kwh, None),
+    )
 
 
 def test_monthly_fee_same_supplier_uses_max() -> None:

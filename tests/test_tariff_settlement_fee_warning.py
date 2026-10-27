@@ -30,7 +30,6 @@ _SPOT = {
 @pytest.fixture(autouse=True)
 def _reset_warned() -> None:
     tariffs_store._warned_ignored_settlement_fee.clear()
-    tariffs_store._warned_gross_without_vat.clear()
 
 
 def _load(tariff: dict, caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
@@ -82,26 +81,3 @@ def test_shipped_catalog_loads_without_warning(caplog) -> None:
     with caplog.at_level(logging.WARNING, logger=tariffs_store.logger.name):
         normalize_tariffs_document(doc)
     assert [r for r in caplog.records if "settlement_fee_cent_kwh" in r.getMessage()] == []
-
-
-def _vat_records(caplog) -> list[logging.LogRecord]:
-    return [r for r in caplog.records if "vat_percent fehlt" in r.getMessage()]
-
-
-def test_gross_import_without_vat_percent_warns(caplog) -> None:
-    with caplog.at_level(logging.WARNING, logger=tariffs_store.logger.name):
-        normalize_tariffs_document({"import_tariffs": [{**_FIXED, "prices_include_vat": True}]})
-    assert len(_vat_records(caplog)) == 1
-
-
-@pytest.mark.parametrize(
-    "extra",
-    [
-        {"prices_include_vat": True, "vat_percent": 20.0},
-        {"prices_include_vat": False},
-    ],
-)
-def test_import_with_vat_rate_or_net_prices_does_not_warn(caplog, extra) -> None:
-    with caplog.at_level(logging.WARNING, logger=tariffs_store.logger.name):
-        normalize_tariffs_document({"import_tariffs": [{**_FIXED, **extra}]})
-    assert _vat_records(caplog) == []

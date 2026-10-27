@@ -126,16 +126,6 @@
               "type": "boolean",
               "description": "Wenn true: Szenario-Explorer nutzt Hausprofil-pv_profile_csv statt PV aus Wetterdaten (Open-Meteo)."
             },
-            "k_push_cent": {
-              "type": "number"
-            },
-            "feed_in_mode": {
-              "type": "string",
-              "enum": [
-                "fixed",
-                "dynamic_epex"
-              ]
-            },
             "pv_tilt": {
               "type": "number"
             },

@@ -168,7 +168,7 @@ def render_missing_next_month_tariff_sidebar() -> None:
     from zoneinfo import ZoneInfo
 
     import config
-    from data.tariff_pricing import (
+    from house_config.tariff_month_hints import (
         is_within_days_of_next_month,
         missing_next_month_tariff_hints,
         next_calendar_month,

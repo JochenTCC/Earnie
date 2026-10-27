@@ -88,7 +88,7 @@ python -m scripts.update_tariff_curves --check   # must report no drift before w
    python -m scripts.update_tariff_curves --check
    python -m scripts.validate_tariffs --tariffs share/config/tariffs.json --skip-scenarios
    python -m scripts.run_pytest tests/test_update_tariff_curves.py tests/test_monthly_float_rates.py \
-       tests/test_tariff_plausibility.py tests/test_validate_tariffs_cli.py tests/test_tariff_pricing.py -q
+       tests/test_tariff_plausibility.py tests/test_validate_tariffs_cli.py tests/test_edibert_slot_prices.py -q
    ```
 
 ## Stage B — price-sheet review (reported only)

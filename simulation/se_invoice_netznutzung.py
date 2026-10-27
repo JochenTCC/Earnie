@@ -1,7 +1,10 @@
 """Netznutzung section of the SE invoice markdown (split from se_invoice_markdown)."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
+
 import pandas as pd
 from simulation.monthly_fees import ScenarioFeeBreakdown
 from simulation.se_invoice_format import (
@@ -11,12 +14,45 @@ from simulation.se_invoice_format import (
 )
 
 
-def _grid_fee_from_params(params: dict | None) -> dict | None:
-    """Aufgelöste Netzentgelt-Spec (``_grid_fee_spec``) aus SE-Params."""
+@dataclass(frozen=True)
+class InvoiceGridFee:
+    """Grid fee of a scenario as the invoice needs it, resolved by Edibert (since P3b)."""
+
+    base_cent_kwh: float
+    rule_labels: dict[str, str]  # rule ID → label, in catalog order
+    skipped: list[dict[str, str]]  # {"id", "reason"} of rules not applied
+    work: Callable[[datetime], tuple[float, str | None]]  # net cent and rule ID per slot
+
+
+def _skipped_reason(skipped) -> str:
+    if skipped.reason == "status":
+        return f"status={skipped.detail}"
+    return "kein Viertelstundenzähler"
+
+
+def _grid_fee_from_params(params: dict | None) -> InvoiceGridFee | None:
+    """Grid fee of the scenario's Edibert pricing reference (``None`` without ``netznutzung``)."""
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, grid_fee, pricing_context
+
     if not isinstance(params, dict):
         return None
-    spec = params.get("_grid_fee_spec")
-    return spec if isinstance(spec, dict) else None
+    ref = params.get(EDIBERT_PRICING_KEY)
+    if not isinstance(ref, dict):
+        return None
+    fee = grid_fee(ref)
+    if fee is None:
+        return None
+    ctx = pricing_context(ref)
+
+    def _work(slot: datetime) -> tuple[float, str | None]:
+        return fee.work_cent(ctx.to_local(slot), ctx)
+
+    return InvoiceGridFee(
+        base_cent_kwh=float(fee.base_cent_kwh),
+        rule_labels={rule.id: rule.label for rule in fee.rules},
+        skipped=[{"id": item.rule_id, "reason": _skipped_reason(item)} for item in fee.skipped],
+        work=_work,
+    )
 
 
 def _netznutzung_ap_gross_cent(
@@ -48,30 +84,27 @@ class _NetznutzungComponent:
 def _netznutzung_components(
     df: pd.DataFrame,
     *,
-    grid_fee: dict | None,
+    grid_fee: InvoiceGridFee | None,
     import_spec: dict | None,
 ) -> list[_NetznutzungComponent]:
     """Netzbezug je Slot × (zeitabhängiger) brutto-Arbeitspreis, gruppiert je Regel."""
     if grid_fee is None or df.empty or "import_kwh" not in df.columns:
         return []
-    from data.grid_fees import grid_fee_work_cent, matching_rule
-
     kwh_by_key: dict[str, float] = {}
     eur_by_key: dict[str, float] = {}
     net_by_key: dict[str, float] = {}
     labels: dict[str, str] = {"": "Basis"}
     order: list[str] = [""]
-    for rule in grid_fee["rules"]:
-        labels[rule["id"]] = f"{rule['id']} ({rule['label']})"
-        order.append(rule["id"])
+    for rule_id, rule_label in grid_fee.rule_labels.items():
+        labels[rule_id] = f"{rule_id} ({rule_label})"
+        order.append(rule_id)
     for ts, kwh in df["import_kwh"].fillna(0.0).items():
         kwh = float(kwh)
         if kwh <= 0.0:
             continue
         slot = pd.Timestamp(ts).to_pydatetime()
-        rule = matching_rule(grid_fee, slot)
-        key = rule["id"] if rule else ""
-        net = grid_fee_work_cent(grid_fee, slot)
+        net, rule_id = grid_fee.work(slot)
+        key = rule_id or ""
         gross = _netznutzung_ap_gross_cent(net, import_spec)
         kwh_by_key[key] = kwh_by_key.get(key, 0.0) + kwh
         eur_by_key[key] = eur_by_key.get(key, 0.0) + kwh * gross / 100.0

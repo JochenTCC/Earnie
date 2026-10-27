@@ -1,4 +1,4 @@
-"""Edibert P3a: Earnie's pricing engine and the Edibert adapter give the same slot prices."""
+"""Slot prices through Edibert (P3a parity fixture, P3b only engine): adapter and seams."""
 from __future__ import annotations
 
 import json
@@ -12,20 +12,14 @@ from data.backtesting_prices import import_brutto_cent_for_slots, pricing_kwargs
 from data.edibert_slot_prices import (
     EDIBERT_PRICING_KEY,
     import_cents,
+    price_points,
     pricing_reference,
     require_pricing_reference,
 )
 from data.feed_in_prices import enrich_matrix_feed_in_prices, feed_in_settings_from_dict
 from house_config.edibert_tariffs import EdibertLoadError
+from house_config.netznutzung import default_netznutzung_config
 from house_config.scenario_resolution import resolve_scenario_settings
-from scripts.edibert_parity import (
-    FIXTURE_CASES,
-    Case,
-    build_fixture,
-    earnie_prices,
-    edibert_points,
-)
-from settings.pricing_engine import PRICING_ENGINE_ENV, pricing_engine, uses_edibert_pricing
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CATALOG = str(REPO_ROOT / "share" / "config" / "tariffs.json")
@@ -47,49 +41,28 @@ def _fixture_params() -> list:
     return params
 
 
-def _case(expected: dict) -> Case:
-    return next(
-        case
-        for case in FIXTURE_CASES
-        if case.direction == expected["direction"]
-        and case.tariff_id == expected["tariff_id"]
-        and case.area_id == expected["area_id"]
+def _fixture_points(expected: dict, slots: list[datetime], epex: list[float]) -> list:
+    """The adapter for one fixture case, ``netznutzung`` as the house profile writes it."""
+    profile: dict = {"land": expected["land"]}
+    if expected["area_id"]:
+        profile["netznutzung"] = {**default_netznutzung_config(), "area_id": expected["area_id"]}
+    direction = expected["direction"]
+    ref = pricing_reference(
+        tariffs_path=CATALOG,
+        grid_fees_path=GRID_FEES,
+        import_tariff_id=expected["tariff_id"] if direction == "import" else None,
+        export_tariff_id=expected["tariff_id"] if direction == "export" else None,
+        timezone_name=_fixture()["timezone"],
+        profile=profile,
     )
+    return price_points(direction, slots, epex, ref)
 
 
-# --- Flag -----------------------------------------------------------------------------
-
-
-def test_engine_defaults_to_earnie(monkeypatch):
-    monkeypatch.delenv(PRICING_ENGINE_ENV, raising=False)
-    assert pricing_engine() == "earnie"
-    assert not uses_edibert_pricing()
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "  ")
-    assert pricing_engine() == "earnie"
-
-
-def test_engine_edibert(monkeypatch):
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "Edibert")
-    assert uses_edibert_pricing()
-
-
-def test_unknown_engine_fails(monkeypatch):
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "edbert")
-    with pytest.raises(ValueError, match="EARNIE_PRICING_ENGINE"):
-        pricing_engine()
-
-
-# --- Committed fixture ----------------------------------------------------------------
-
-
-def test_fixture_is_current():
-    """Earnie still yields the committed prices (drops out with Earnie's engine in P3b)."""
-    assert build_fixture(CATALOG, GRID_FEES) == _fixture()
-
+# --- Committed fixture (Earnie's prices before P3b; also Edibert's compatibility data) ---
 
 # Triaged deviations (docs/dev/edibert-integration.md § P3a, triage table): Earnie bug, Edibert
-# correct. Hourly settlement groups by wall-clock hour, so on the autumn DST night Earnie
-# averages both 02:00 hours (CEST and CET, eight quarter-hours); Edibert per real hour.
+# correct. Hourly settlement grouped by wall-clock hour, so on the autumn DST night Earnie
+# averaged both 02:00 hours (CEST and CET, eight quarter-hours); Edibert per real hour.
 DST_REPEATED_HOUR = {
     ("dst_autumn_2025", "import", "awattar_at"),
     ("dst_autumn_2025", "export", "dynamic_epex"),
@@ -99,8 +72,7 @@ DST_REPEATED_HOUR = {
 @pytest.mark.parametrize(("window", "expected"), _fixture_params())
 def test_edibert_matches_fixture(window, expected):
     slots = [datetime.fromisoformat(slot) for slot in window["slots"]]
-    warnings: list[str] = []
-    points = edibert_points(_case(expected), slots, window["epex_cent"], CATALOG, GRID_FEES, warnings)
+    points = _fixture_points(expected, slots, window["epex_cent"])
     cents = [p.cent for p in points]
     if (window["name"], expected["direction"], expected["tariff_id"]) in DST_REPEATED_HOUR:
         repeated = [slot.hour == 2 for slot in slots]  # 02:00 CEST and 02:00 CET
@@ -126,7 +98,7 @@ def test_fixture_covers_dst_and_snap():
     assert len(set(awattar["grid_net_cent"])) == 2  # base price outside, SNAP inside 10–16 h
 
 
-# --- Seams with the flag --------------------------------------------------------------
+# --- Seams ------------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -169,42 +141,35 @@ def _snap_day_slots() -> tuple[list[datetime], list[float]]:
     return slots, epex
 
 
-def test_reference_only_with_edibert_engine(monkeypatch, scenario):
-    monkeypatch.delenv(PRICING_ENGINE_ENV, raising=False)
-    assert EDIBERT_PRICING_KEY not in scenario()
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "edibert")
+def test_resolution_attaches_plain_reference(scenario):
     ref = scenario()[EDIBERT_PRICING_KEY]
     assert ref["import_tariff_id"] == "awattar_at"
     assert ref["netznutzung"]["area_id"] == "AT-VBG"
     json.dumps(ref)  # plain data: travels through SE workers and debug dumps
 
 
-def test_import_seam_same_with_both_engines(monkeypatch, scenario):
+def test_import_seam_prices_snap_window(scenario):
     slots, epex = _snap_day_slots()
-    monkeypatch.delenv(PRICING_ENGINE_ENV, raising=False)
-    earnie = import_brutto_cent_for_slots(epex, slots, **pricing_kwargs_from_resolved(scenario()))
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "edibert")
-    edibert = import_brutto_cent_for_slots(epex, slots, **pricing_kwargs_from_resolved(scenario()))
-    assert edibert == pytest.approx(earnie, abs=TOLERANCE)
+    kwargs = pricing_kwargs_from_resolved(scenario())
+    k_act = import_brutto_cent_for_slots(epex, slots, **kwargs)
+    points = price_points("import", slots, epex, kwargs["edibert_pricing"])
+    assert k_act == [p.cent for p in points]
+    grid = {round(p.grid_cent, 4) for p in points}
+    assert grid == {4.96, 3.968}  # base price outside, SNAP (−20 %) inside 10–16 h
 
 
-def test_export_seam_same_with_both_engines(monkeypatch, scenario):
+def test_export_seam_fills_every_row(scenario):
     slots, epex = _snap_day_slots()
-
-    def k_push(resolved: dict) -> list[float]:
-        matrix = [{"slot_datetime": s, "price_buy": e} for s, e in zip(slots, epex)]
-        enrich_matrix_feed_in_prices(matrix, feed_in_settings_from_dict(resolved))
-        return [row["k_push_act"] for row in matrix]
-
-    monkeypatch.delenv(PRICING_ENGINE_ENV, raising=False)
-    earnie = k_push(scenario())
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "edibert")
-    assert k_push(scenario()) == pytest.approx(earnie, abs=TOLERANCE)
+    matrix = [{"slot_datetime": s, "price_buy": e} for s, e in zip(slots, epex)]
+    enrich_matrix_feed_in_prices(matrix, feed_in_settings_from_dict(scenario()))
+    ref = scenario()[EDIBERT_PRICING_KEY]
+    assert [row["k_push_act"] for row in matrix] == [
+        p.cent for p in price_points("export", slots, epex, ref)
+    ]
 
 
-def test_edibert_engine_never_falls_back_to_earnie(monkeypatch, scenario):
-    """An hour the input covers only partly is Edibert's error, not Earnie's partial mean."""
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "edibert")
+def test_partial_hour_without_market_source_is_an_error(scenario):
+    """An hour the input covers only partly is Edibert's error, never a partial mean."""
     kwargs = pricing_kwargs_from_resolved(scenario())
     slots = [datetime(2026, 7, 1, 10, 30), datetime(2026, 7, 1, 10, 45)]
     with pytest.raises(EdibertLoadError) as info:
@@ -212,8 +177,7 @@ def test_edibert_engine_never_falls_back_to_earnie(monkeypatch, scenario):
     assert info.value.code == "PRICE_MISSING"
 
 
-def test_edibert_engine_needs_reference(monkeypatch):
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "edibert")
+def test_pricing_needs_reference():
     with pytest.raises(ValueError, match="Edibert-Preisreferenz"):
         import_brutto_cent_for_slots([5.0], [datetime(2026, 7, 1, 10)])
     with pytest.raises(ValueError, match="Edibert-Preisreferenz"):
@@ -228,29 +192,19 @@ USER_FIXED = {
 }
 
 
-def test_user_fixed_price_same_with_both_engines(monkeypatch, scenario):
+def test_user_fixed_price_with_land_vat_on_grid_fee(scenario):
     """T3: Eigener Festpreis, gross with the land's VAT on the net grid fee (AT-VBG, SNAP day)."""
     slots, epex = _snap_day_slots()
-
-    def prices(resolved: dict) -> tuple[list[float], list[float]]:
-        k_act = import_brutto_cent_for_slots(epex, slots, **pricing_kwargs_from_resolved(resolved))
-        matrix = [{"slot_datetime": s, "price_buy": e} for s, e in zip(slots, epex)]
-        enrich_matrix_feed_in_prices(matrix, feed_in_settings_from_dict(resolved))
-        return k_act, [row["k_push_act"] for row in matrix]
-
-    monkeypatch.delenv(PRICING_ENGINE_ENV, raising=False)
-    earnie_import, earnie_export = prices(scenario(**USER_FIXED))
-    monkeypatch.setenv(PRICING_ENGINE_ENV, "edibert")
     resolved = scenario(**USER_FIXED)
     assert resolved[EDIBERT_PRICING_KEY]["user_fixed"] == {
         "import": {"cent": 30.0, "vat_percent": 20.0},
         "export": {"cent": 8.0, "vat_percent": 0.0},
     }
-    edibert_import, edibert_export = prices(resolved)
-    assert edibert_import == pytest.approx(earnie_import, abs=TOLERANCE)
-    assert edibert_export == pytest.approx(earnie_export, abs=TOLERANCE)
-    assert len(set(edibert_import)) == 2  # SNAP lowers the grid fee inside 10–16 h
-    assert set(edibert_export) == {8.0}
+    k_act = import_brutto_cent_for_slots(epex, slots, **pricing_kwargs_from_resolved(resolved))
+    matrix = [{"slot_datetime": s, "price_buy": e} for s, e in zip(slots, epex)]
+    enrich_matrix_feed_in_prices(matrix, feed_in_settings_from_dict(resolved))
+    assert sorted(set(k_act)) == pytest.approx([30.0 + 3.968 * 1.2, 30.0 + 4.96 * 1.2])
+    assert {row["k_push_act"] for row in matrix} == {8.0}
 
 
 def test_user_fixed_reference_needs_values():
@@ -266,14 +220,11 @@ def test_user_fixed_reference_needs_values():
 
 
 @pytest.mark.parametrize(
-    ("month", "rule", "used"),
-    [((2026, 6), "prior_year", "2025-06"), ((2026, 8), "prior_month", "2026-07")],
+    ("month", "rule", "used", "cent"),
+    [((2026, 6), "prior_year", "2025-06", 7.5), ((2026, 8), "prior_month", "2026-07", 9.25)],
 )
-def test_monthly_fallback_surfaced_and_equal_to_earnie(tmp_path, month, rule, used):
-    """P3a-2: Edibert's MONTH_RATE_FALLBACK picks the same month and price as Earnie."""
-    from data.edibert_slot_prices import price_points
-    from data.tariff_pricing import _monthly_table_lookup, lookup_monthly_cent
-
+def test_monthly_fallback_surfaced(tmp_path, month, rule, used, cent):
+    """Edibert's MONTH_RATE_FALLBACK (Earnie's former order): prior year, then prior month."""
     rates = [
         {"year": 2025, "month": 6, "tariff_cent_kwh": 7.5},
         {"year": 2026, "month": 7, "tariff_cent_kwh": 9.25},
@@ -295,9 +246,7 @@ def test_monthly_fallback_surfaced_and_equal_to_earnie(tmp_path, month, rule, us
     warnings: list[str] = []
     slot = datetime(month[0], month[1], 15, 12)
     points = price_points("export", [slot], [None], ref, warnings_out=warnings)
-    earnie_cent, earnie_rule = lookup_monthly_cent(_monthly_table_lookup(tariff), *month)
-    assert points[0].cent == pytest.approx(earnie_cent)
-    assert earnie_rule == rule
+    assert points[0].cent == pytest.approx(cent)
     assert any(
         w.startswith("MONTH_RATE_FALLBACK(") and f"rule={rule}" in w and f"used_month={used}" in w
         for w in warnings
@@ -315,11 +264,3 @@ def test_unknown_tariff_is_edibert_error():
     )
     with pytest.raises(EdibertLoadError):
         import_cents([datetime(2026, 7, 1, 10)], [5.0], ref)
-
-
-def test_harness_case_runs_on_aware_slots():
-    case = Case("import", "awattar_at", "spot_hourly", "AT", "AT-VBG")
-    slots = [datetime.fromisoformat(s) for s in _fixture()["windows"][2]["slots"]]
-    epex = _fixture()["windows"][2]["epex_cent"]
-    cents, grid = earnie_prices(case, slots, epex, CATALOG, GRID_FEES)
-    assert len(cents) == len(slots) and grid is not None

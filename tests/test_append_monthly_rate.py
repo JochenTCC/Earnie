@@ -211,7 +211,8 @@ def test_reload_config_picks_up_appended_monthly_rate(tmp_path, monkeypatch):
         require_loxone_credentials=False,
     )
     before = {
-        (y, m): c for y, m, c in cfg.get_resolved_runtime_settings()["_monthly_fixed_tariffs"]
+        (y, m): c
+        for y, m, c in cfg.get_resolved_runtime_settings()["_export_tariff_spec"]["monthly_rates"]
     }
     assert (2026, 7) not in before
 
@@ -225,6 +226,7 @@ def test_reload_config_picks_up_appended_monthly_rate(tmp_path, monkeypatch):
     )
     cfg.reload()
     after = {
-        (y, m): c for y, m, c in cfg.get_resolved_runtime_settings()["_monthly_fixed_tariffs"]
+        (y, m): c
+        for y, m, c in cfg.get_resolved_runtime_settings()["_export_tariff_spec"]["monthly_rates"]
     }
     assert after[(2026, 7)] == pytest.approx(6.4)

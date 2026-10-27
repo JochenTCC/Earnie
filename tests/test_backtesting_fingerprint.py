@@ -48,17 +48,11 @@ def test_fingerprint_includes_import_tariff_spec():
     assert fp_a != fp_b
 
 
-def test_fingerprint_includes_monthly_fixed_tariffs():
-    rates_a = [{"year": 2025, "month": 6, "tariff_cent_kwh": 5.86}]
-    rates_b = [{"year": 2025, "month": 6, "tariff_cent_kwh": 7.10}]
-    scenario_a = {
-        "feed_in_mode": "fixed",
-        "_monthly_fixed_tariffs": rates_a,
-    }
-    scenario_b = {
-        "feed_in_mode": "fixed",
-        "_monthly_fixed_tariffs": rates_b,
-    }
+def test_fingerprint_includes_monthly_rates_of_export_tariff():
+    rates_a = ((2025, 6, 5.86),)
+    rates_b = ((2025, 6, 7.10),)
+    scenario_a = {"_export_tariff_spec": {"id": "monthly", "monthly_rates": rates_a}}
+    scenario_b = {"_export_tariff_spec": {"id": "monthly", "monthly_rates": rates_b}}
     fp_a = compute_backtesting_fingerprint(["live"], {"live": scenario_a})
     fp_b = compute_backtesting_fingerprint(["live"], {"live": scenario_b})
     assert fp_a != fp_b

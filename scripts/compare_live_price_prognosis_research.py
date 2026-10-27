@@ -23,7 +23,6 @@ from data.price_forecast_live import (
     build_live_feature_frame_for_slots,
     load_configured_model,
 )
-from data.tariff_pricing import import_cent_kwh
 
 
 def _parse_args() -> argparse.Namespace:
@@ -66,24 +65,6 @@ def _future_hour_slots(hours: int, tz_name: str) -> list[datetime]:
     return [start + timedelta(hours=i) for i in range(hours)]
 
 
-def _tariff_parity_check(epex: float = 10.0) -> dict:
-    """Sanity: same EPEX → same k_act for day_ahead vs predicted formula."""
-    spec = {
-        "type": "spot_hourly",
-        "settlement_fee_cent_kwh": 1.5,
-        "markup_percent": 3.0,
-        "prices_include_vat": False,
-        "vat_percent": 20.0,
-    }
-    nne = flat_grid_fee_spec(2.0)
-    k = import_cent_kwh(epex, spec, grid_fee=nne)
-    return {
-        "epex": epex,
-        "k_act": round(k, 4),
-        "note": "import_cent_kwh is shared by day_ahead and predicted paths",
-    }
-
-
 def main() -> int:
     args = _parse_args()
     model = load_configured_model()
@@ -92,7 +73,6 @@ def main() -> int:
         return 1
 
     targets = _future_hour_slots(args.hours, args.tz)
-    print(json.dumps({"tariff_parity": _tariff_parity_check()}, indent=2))
 
     variants = [("archive_hod", False)]
     if args.with_live_bias:

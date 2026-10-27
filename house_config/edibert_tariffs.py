@@ -1,11 +1,10 @@
-"""Edibert library access (epic Edibert, P1: load and check; P2: user grid areas, migration;
-P3a: slot prices for the parity harness and ``EARNIE_PRICING_ENGINE=edibert``).
+"""Edibert library access (epic Edibert: P1 load and check, P2 user grid areas and migration,
+P3a/P3b slot prices — since P3b the only pricing engine).
 
-The only module that calls ``edibert.api``. Earnie still prices with its own engine
-(``data/tariff_pricing.py``, ``data/grid_fees.py``) until Edibert P3b; here the tariff
-files, the grid-fee files and the pricing context of each house profile are loaded
-through Edibert so format problems surface now. Every ``EdibertError`` becomes an
-:class:`EdibertLoadError` with a German message; nothing is skipped silently.
+The only module that calls ``edibert.api``. Tariff files, grid-fee files and the pricing
+context of each house profile are loaded here; slot prices are computed through
+``data/edibert_slot_prices.py``. Every ``EdibertError`` becomes an :class:`EdibertLoadError`
+with a German message; nothing is skipped silently.
 """
 from __future__ import annotations
 
@@ -236,6 +235,25 @@ def collect_edibert_load_errors(
     return errors
 
 
+def grid_area_view(grid_fees_path: str) -> dict[str, Any]:
+    """Grid areas of catalog plus user file for selection lists: ``{"areas": {id: {...}}}``.
+
+    Each area carries ``label``, ``land``, ``base_cent_kwh`` (by metering) and ``rule_set``.
+    """
+    catalog = cached_grid_fees(grid_fees_path)
+    return {
+        "areas": {
+            area_id: {
+                "label": area.label,
+                "land": area.land,
+                "base_cent_kwh": dict(area.base_cent_kwh),
+                "rule_set": area.rule_set,
+            }
+            for area_id, area in catalog.areas.items()
+        }
+    }
+
+
 def profile_grid_fee(profile_id: str, profile: dict, catalog: api.GridFeeCatalog) -> api.GridFee:
     """``netznutzung`` of one house profile resolved against catalog plus user areas."""
     try:
@@ -362,6 +380,54 @@ def evaluate_slot(
         return api.evaluate(tariff, slot, ctx, epex_cent, grid_fee)
     except api.EdibertError as exc:
         raise EdibertLoadError(f"Preis Tarif '{tariff.id}'", exc) from exc
+
+
+def market_zone(land: str) -> str:
+    """Bidding zone of a country (``AT``, ``DE-LU``, ``CH``); an unknown country is an error."""
+    try:
+        return api.market_zone(str(land or "").strip().upper())
+    except api.EdibertError as exc:
+        raise EdibertLoadError(f"Marktgebiet für Land {land!r}", exc) from exc
+
+
+def tariff_info(tariff: api.Tariff) -> dict[str, Any]:
+    """Catalog parameters of one Edibert tariff as a plain dict (``_import_tariff_spec`` /
+    ``_export_tariff_spec`` since P3b).
+
+    For display, monthly fees and fingerprints only; no Earnie code prices from it (prices
+    come from :mod:`data.edibert_slot_prices`). Optional fields appear only when the tariff
+    has them, as in the tariff file.
+    """
+    info: dict[str, Any] = {
+        "id": tariff.id,
+        "label": tariff.label,
+        "type": tariff.type,
+        "supplier_id": tariff.supplier_id,
+        "settlement_fee_cent_kwh": tariff.settlement_fee_cent_kwh,
+        "markup_percent": tariff.markup_percent,
+        "prices_include_vat": tariff.prices_include_vat,
+        "vat_percent": tariff.vat_percent,
+        "settlement_mtu": tariff.settlement_mtu,
+    }
+    if tariff.land:
+        info["land"] = tariff.land
+    if tariff.currency:
+        info["currency"] = tariff.currency
+    if tariff.fix_cent_kwh is not None:
+        info["fix_cent_kwh"] = tariff.fix_cent_kwh
+    if tariff.k_push_cent is not None:
+        info["k_push_cent"] = tariff.k_push_cent
+    if tariff.is_spot and tariff.direction == EXPORT:
+        info["feed_in_fee_factor"] = tariff.feed_in_fee_factor
+        info["feed_in_fix_cent"] = tariff.feed_in_fix_cent
+    if tariff.monthly_rates:
+        info["monthly_rates"] = tuple(
+            (year, month, cent) for (year, month), cent in sorted(tariff.monthly_rates.items())
+        )
+    if tariff.rules:
+        info["rules"] = tuple(rule.id for rule in tariff.rules)
+    info.update(tariff.fees)
+    return info
 
 
 def warning_text(warning: api.EdibertWarning) -> str:

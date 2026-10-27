@@ -1,4 +1,9 @@
-"""Laden und Validieren von config/tariffs.json."""
+"""Laden und Validieren von config/tariffs.json (Auswahl und Anzeige im UI).
+
+Seit Edibert P3b bepreist und löst Edibert die Tarife auf (``house_config/scenario_resolution``,
+``data/edibert_slot_prices``); dieses Modul liefert nur noch die Tarifliste für die Auswahl
+(bis Edibert P7) und pflegt Monatszeilen der Katalogkopie (bis Edibert P8).
+"""
 from __future__ import annotations
 
 import json
@@ -7,12 +12,10 @@ import os
 import re
 
 from data.feed_in_prices import validate_fixed_monthly_feed_in_rates
-from data.tariff_pricing import STANDARD_VAT_PERCENT_BY_LAND, market_zone_for_land
 
 logger = logging.getLogger(__name__)
 
 _warned_ignored_settlement_fee: set[str] = set()
-_warned_gross_without_vat: set[str] = set()
 
 IMPORT_TYPES = frozenset(
     {
@@ -85,7 +88,8 @@ def ensure_user_fixed_option(tariffs: list[dict]) -> list[dict]:
     return [*tariffs, user_fixed_pseudo_tariff()]
 
 
-def _parse_user_import_cent(settings: dict) -> float:
+def parse_user_import_cent(settings: dict) -> float:
+    """Cent value of *Eigener Festpreis* (import) from scenario settings; > 0 required."""
     if USER_IMPORT_CENT_KEY not in settings or settings[USER_IMPORT_CENT_KEY] is None:
         raise ValueError(
             f"import_tariff_id '{USER_FIXED_TARIFF_ID}' erfordert {USER_IMPORT_CENT_KEY}."
@@ -96,7 +100,8 @@ def _parse_user_import_cent(settings: dict) -> float:
     return value
 
 
-def _parse_user_export_cent(settings: dict) -> float:
+def parse_user_export_cent(settings: dict) -> float:
+    """Cent value of *Eigener Festpreis* (export) from scenario settings; >= 0 required."""
     if USER_EXPORT_CENT_KEY not in settings or settings[USER_EXPORT_CENT_KEY] is None:
         raise ValueError(
             f"export_tariff_id '{USER_FIXED_TARIFF_ID}' erfordert {USER_EXPORT_CENT_KEY}."
@@ -105,50 +110,6 @@ def _parse_user_export_cent(settings: dict) -> float:
     if value < 0.0:
         raise ValueError(f"{USER_EXPORT_CENT_KEY} muss >= 0 sein.")
     return value
-
-
-def _synthetic_user_import_tariff(cent: float) -> dict:
-    return {
-        "id": USER_FIXED_TARIFF_ID,
-        "label": USER_FIXED_TARIFF_LABEL,
-        "type": "fixed_cent",
-        "fix_cent_kwh": float(cent),
-        "prices_include_vat": True,
-        "vat_percent": 0.0,
-        "supplier_id": "user",
-    }
-
-
-def apply_land_vat_to_user_fixed_import(settings: dict, land: str) -> dict:
-    """Give the user-fixed import price the VAT rate of the house profile's land.
-
-    The price is entered gross, but the net Netznutzung must get VAT on top, so the
-    tariff needs a rate. Other tariffs carry their own ``vat_percent``.
-    """
-    spec = settings.get("_import_tariff_spec")
-    if not isinstance(spec, dict) or not is_user_fixed_tariff_id(spec.get("id")):
-        return settings
-    land_key = str(land or "").strip().upper()
-    if land_key not in STANDARD_VAT_PERCENT_BY_LAND:
-        raise ValueError(f"Keine Standard-USt für Land {land!r} (AT, DE oder CH).")
-    out = dict(settings)
-    out["_import_tariff_spec"] = {
-        **spec,
-        "vat_percent": STANDARD_VAT_PERCENT_BY_LAND[land_key],
-    }
-    return out
-
-
-def _synthetic_user_export_tariff(cent: float) -> dict:
-    return {
-        "id": USER_FIXED_TARIFF_ID,
-        "label": USER_FIXED_TARIFF_LABEL,
-        "type": "fixed",
-        "k_push_cent": float(cent),
-        "prices_include_vat": True,
-        "vat_percent": 0.0,
-        "supplier_id": "user",
-    }
 
 
 def resolve_export_tariff_id(tariff_id: str) -> str:
@@ -289,21 +250,6 @@ def _warn_ignored_settlement_fee(spec: dict) -> None:
     )
 
 
-def _warn_gross_import_without_vat(spec: dict) -> None:
-    """Warn once per tariff: Netznutzung (net) gets no VAT without a rate."""
-    if not spec.get("prices_include_vat", True) or spec.get("vat_percent"):
-        return
-    tariff_id = spec["id"]
-    if tariff_id in _warned_gross_without_vat:
-        return
-    _warned_gross_without_vat.add(tariff_id)
-    logger.warning(
-        "Tarif '%s': prices_include_vat ist wahr, aber vat_percent fehlt oder ist 0 — "
-        "die Netznutzung (netto) wird ohne USt addiert. vat_percent setzen (z. B. 20).",
-        tariff_id,
-    )
-
-
 def _import_tariff_spec(raw: dict, index: int) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"import_tariffs[{index}] muss ein Objekt sein.")
@@ -334,7 +280,6 @@ def _import_tariff_spec(raw: dict, index: int) -> dict:
             )
         spec["monthly_rates"] = validate_fixed_monthly_feed_in_rates(rates)
     _warn_ignored_settlement_fee(spec)
-    _warn_gross_import_without_vat(spec)
     return spec
 
 
@@ -484,68 +429,14 @@ def load_tariffs_document(path: str) -> dict:
 
 ORIGIN_KEY = "origin"
 ORIGIN_USER = "user"
-ENGINE_PENDING_KEY = "engine_pending_fields"
-# Fields Earnie's own engine prices with or carries as metadata.
-_EARNIE_ENGINE_FIELDS = frozenset(
-    {
-        "id", "label", "type", "land", "currency", "supplier_id", "notes",
-        "settlement_fee_cent_kwh", "markup_percent", "prices_include_vat", "vat_percent",
-        "settlement_mtu", "fix_cent_kwh", "k_push_cent", "monthly_rates", "monthly_seed",
-        "feed_in_fee_factor", "feed_in_fix_cent", "monthly_fee_eur", "grid_monthly_fee_eur",
-        "metering_monthly_fee_eur", "other_monthly_fee_eur",
-    }
-)  # fmt: skip
-# Edibert fields without price effect (display / metadata only).
-_EDIBERT_DISPLAY_FIELDS = frozenset(
-    {"$comment", "requires", "behavior_notes", "source", "last_verified", "individual", "applies_to"}
-)
-# Only change a price through rules; without rules they have no effect.
-_RULE_MODIFIER_FIELDS = frozenset({"holidays", "extra_holiday_dates"})
-
-
-def engine_pending_fields(raw: dict) -> tuple[str, ...]:
-    """Fields of a user tariff that Earnie's engine cannot price yet (until Edibert P3b).
-
-    Allowlist: every field that is neither priced by Earnie nor display-only counts, so a
-    field added to Edibert later is never ignored silently.
-    """
-    pending: list[str] = []
-    for key, value in raw.items():
-        if key in _EARNIE_ENGINE_FIELDS or key in _EDIBERT_DISPLAY_FIELDS:
-            continue
-        if key == "rules" and not value:
-            continue
-        if key in _RULE_MODIFIER_FIELDS and not raw.get("rules"):
-            continue
-        pending.append(key)
-    return tuple(sorted(pending))
-
-
-def is_engine_pending(tariff: dict) -> bool:
-    return bool(tariff.get(ENGINE_PENDING_KEY))
 
 
 def tariff_display_label(tariff: dict) -> str:
-    """Selection label: user tariffs are marked, unpriceable ones say so."""
+    """Selection label: user tariffs are marked."""
     label = str(tariff.get("label") or tariff.get("id") or "").strip()
     if tariff.get(ORIGIN_KEY) != ORIGIN_USER:
         return label
-    if is_engine_pending(tariff):
-        return f"{label} · Benutzertarif, erst ab Engine-Umstellung"
     return f"{label} · Benutzertarif"
-
-
-def _pending_user_spec(raw: dict, kind: str, index: int, pending: tuple[str, ...]) -> dict:
-    """Selection entry for a user tariff Earnie cannot price yet (no engine fields)."""
-    tariff_id = str(raw.get("id", "")).strip()
-    tariff_type = str(raw.get("type", "")).strip().lower()
-    label = str(raw.get("label", tariff_id)).strip() or tariff_id
-    spec: dict = {"id": tariff_id, "label": label, "type": tariff_type}
-    _normalize_dach_fields(raw, spec)
-    _require_land(spec, kind=kind, index=index)
-    spec["supplier_id"] = resolve_supplier_id(raw, tariff_id=tariff_id, label=label)
-    spec[ENGINE_PENDING_KEY] = pending
-    return spec
 
 
 def _merge_user_section(
@@ -557,13 +448,8 @@ def _merge_user_section(
         raise ValueError(f"user_tariffs.json: {kind} muss ein Array sein.")
     build = _import_tariff_spec if kind == "import_tariffs" else _export_tariff_spec
     for index, raw in enumerate(items):
-        pending = engine_pending_fields(raw)
         try:
-            spec = (
-                _pending_user_spec(raw, kind, index, pending)
-                if pending
-                else build(raw, index)
-            )
+            spec = build(raw, index)
         except ValueError as exc:
             raise ValueError(f"user_tariffs.json ({user_path}): {exc}") from exc
         if spec["id"] in target:
@@ -588,97 +474,6 @@ def merge_user_tariffs(normalized: dict, user_path: str) -> None:
         normalized["export_tariffs"], doc.get("export_tariffs"),
         kind="export_tariffs", user_path=user_path,
     )  # fmt: skip
-
-
-def _reject_engine_pending(tariff: dict, *, side: str) -> None:
-    if not is_engine_pending(tariff):
-        return
-    fields = ", ".join(tariff[ENGINE_PENDING_KEY])
-    raise ValueError(
-        f"{side} '{tariff['id']}' ist ein Benutzertarif mit {fields} — Earnie kann ihn erst "
-        "nach der Engine-Umstellung auf Edibert bepreisen. Bitte vorerst einen anderen "
-        "Tarif wählen."
-    )
-
-
-def resolve_import_tariff_into_settings(settings: dict, tariffs: dict) -> dict:
-    out = dict(settings)
-    tariff_id = out.pop("import_tariff_id", None)
-    if not tariff_id:
-        out.pop(USER_IMPORT_CENT_KEY, None)
-        return out
-    tariff_id = str(tariff_id).strip()
-    if is_user_fixed_tariff_id(tariff_id):
-        cent = _parse_user_import_cent(out)
-        out.pop(USER_IMPORT_CENT_KEY, None)
-        tariff = _synthetic_user_import_tariff(cent)
-        out["_import_tariff_spec"] = tariff
-        out["import_tariff_type"] = tariff["type"]
-        out["import_fixed_cent_kwh"] = tariff["fix_cent_kwh"]
-        return out
-    out.pop(USER_IMPORT_CENT_KEY, None)
-    import_map = tariffs.get("import_tariffs", {})
-    if tariff_id not in import_map:
-        raise ValueError(f"Unbekannte import_tariff_id '{tariff_id}'.")
-    tariff = dict(import_map[tariff_id])
-    _reject_engine_pending(tariff, side="Bezugstarif")
-    out["_import_tariff_spec"] = tariff
-    out["import_tariff_type"] = tariff["type"]
-    if tariff["type"] == "fixed_cent":
-        out["import_fixed_cent_kwh"] = tariff["fix_cent_kwh"]
-    if "land" in tariff:
-        out["market_zone"] = market_zone_for_land(tariff["land"])
-    return out
-
-
-def resolve_export_tariff_into_settings(
-    settings: dict,
-    tariffs: dict,
-    *,
-    monthly_rates_holder: dict | None = None,
-) -> dict:
-    """Setzt feed_in_mode/k_push_cent; monthly_table → holder['_monthly_fixed_tariffs']."""
-    out = dict(settings)
-    tariff_id = out.pop("export_tariff_id", None)
-    if not tariff_id:
-        out.pop(USER_EXPORT_CENT_KEY, None)
-        return out
-    tariff_id = resolve_export_tariff_id(str(tariff_id).strip())
-    if is_user_fixed_tariff_id(tariff_id):
-        cent = _parse_user_export_cent(out)
-        out.pop(USER_EXPORT_CENT_KEY, None)
-        tariff = _synthetic_user_export_tariff(cent)
-        out["_export_tariff_spec"] = tariff
-        out["feed_in_mode"] = "fixed"
-        out["k_push_cent"] = tariff["k_push_cent"]
-        return out
-    out.pop(USER_EXPORT_CENT_KEY, None)
-    export_map = tariffs.get("export_tariffs", {})
-    if tariff_id not in export_map:
-        raise ValueError(f"Unbekannte export_tariff_id '{tariff_id}'.")
-    tariff = dict(export_map[tariff_id])
-    _reject_engine_pending(tariff, side="Einspeisetarif")
-    out["_export_tariff_spec"] = tariff
-    if tariff["type"] == "fixed":
-        out["feed_in_mode"] = "fixed"
-        out["k_push_cent"] = tariff["k_push_cent"]
-    elif tariff["type"] in {"spot_hourly", "ex_post_spot"}:
-        out["feed_in_mode"] = "dynamic_epex"
-        out["k_push_cent"] = float(out.get("k_push_cent", 0.0) or 0.0)
-    elif tariff["type"] == "monthly_table":
-        out["feed_in_mode"] = "fixed"
-        out["k_push_cent"] = float(out.get("k_push_cent", 0.0) or 0.0)
-        if monthly_rates_holder is not None:
-            rates = tariff["monthly_rates"]
-            # Normalized catalog: tuple[(y,m,cent),...]; raw JSON: list[dict].
-            if isinstance(rates, tuple) and (
-                not rates or isinstance(rates[0], tuple)
-            ):
-                validated = rates
-            else:
-                validated = validate_fixed_monthly_feed_in_rates(rates)
-            monthly_rates_holder["_monthly_fixed_tariffs"] = validated
-    return out
 
 
 def _validate_monthly_rate_args(

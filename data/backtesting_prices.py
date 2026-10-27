@@ -4,13 +4,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 import config
 from data.market_prices import (
-    epex_to_brutto_cent,
     normalize_price_slot,
     resolve_market_slots,
 )
@@ -25,6 +24,9 @@ from data.price_forecast_model import (
     load_training_dataset,
     resolve_feature_variant,
 )
+
+if TYPE_CHECKING:
+    from data.edibert_slot_prices import MarketFor
 
 EPEX_DAY_AHEAD_PUBLISH_HOUR = 12
 PRICE_STRATEGY_PERFECT = "perfect"
@@ -225,95 +227,78 @@ def resolve_backtesting_slot_prices(
 
 
 def pricing_kwargs_from_resolved(resolved: dict | None) -> dict:
-    """Import-Tarif-Kwargs aus aufgelöstem Runtime-Szenario (Live + Backtesting)."""
-    if not resolved:
-        return {}
+    """Pricing kwargs (Edibert reference) of a resolved runtime scenario (live + backtesting)."""
     from data.edibert_slot_prices import EDIBERT_PRICING_KEY
 
-    kwargs: dict = {}
-    if resolved.get(EDIBERT_PRICING_KEY) is not None:
-        kwargs["edibert_pricing"] = resolved[EDIBERT_PRICING_KEY]
-    spec = resolved.get("_import_tariff_spec")
-    if spec is None:
-        return kwargs
-    kwargs["import_tariff_spec"] = spec
-    grid_fee = resolved.get("_grid_fee_spec")
-    if grid_fee is not None:
-        kwargs["grid_fee"] = grid_fee
-    return kwargs
+    if not resolved or resolved.get(EDIBERT_PRICING_KEY) is None:
+        return {}
+    return {"edibert_pricing": resolved[EDIBERT_PRICING_KEY]}
 
 
 def import_brutto_cent_for_slots(
     epex_values: list[float],
     slot_datetimes: list[datetime],
     *,
-    import_tariff_spec: dict | None = None,
-    grid_fee: dict | None = None,
     edibert_pricing: dict | None = None,
+    market_for: MarketFor | None = None,
 ) -> list[float]:
-    """EPEX Cent/kWh → Bezugspreis je Slot (Tarif-Spec oder Legacy-Brutto).
+    """EPEX Cent/kWh → Bezugspreis je Slot aus dem Bezugstarif (Edibert).
 
-    With ``EARNIE_PRICING_ENGINE=edibert`` the prices come from Edibert
-    (``edibert_pricing`` reference required, no Earnie engine involved).
+    ``market_for`` liefert Börsenpreise für Viertelstunden außerhalb der Liste, die ein
+    stündlich abgerechneter Tarif für das Stundenmittel braucht (Edibert P3b, D1).
     """
-    from settings.pricing_engine import uses_edibert_pricing
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, import_cents, require_pricing_reference
 
-    if uses_edibert_pricing():
-        from data.edibert_slot_prices import EDIBERT_PRICING_KEY, import_cents, require_pricing_reference
-
-        if import_tariff_spec is None:
-            # Same rule as the Earnie path below (epex_to_brutto_cent): a scenario without
-            # import tariff is priced with the live scenario's tariff.
-            ref = require_pricing_reference(
-                config.get_resolved_runtime_settings(), where="Live-Bezugspreis"
-            )
-        else:
-            ref = require_pricing_reference(
-                {EDIBERT_PRICING_KEY: edibert_pricing}, where="Bezugspreis je Slot"
-            )
-        return import_cents(slot_datetimes, epex_values, ref)
-
-    from data.market_prices import hourly_settlement_epex_values
-    from data.tariff_pricing import SETTLEMENT_MTU_HOURLY, import_cent_kwh, tariff_settlement_mtu
-
-    if import_tariff_spec is None:
-        return [
-            epex_to_brutto_cent(float(p), slot_datetime=slot)
-            for p, slot in zip(epex_values, slot_datetimes)
-        ]
-    _mtu = tariff_settlement_mtu(import_tariff_spec)
-    if _mtu == SETTLEMENT_MTU_HOURLY:
-        epex_values = hourly_settlement_epex_values(epex_values, slot_datetimes)
-    return [
-        import_cent_kwh(
-            float(p),
-            import_tariff_spec,
-            grid_fee=grid_fee,
-            slot_datetime=slot,
-        )
-        for p, slot in zip(epex_values, slot_datetimes)
-    ]
+    ref = require_pricing_reference(
+        {EDIBERT_PRICING_KEY: edibert_pricing}, where="Bezugspreis je Slot"
+    )
+    return import_cents(slot_datetimes, epex_values, ref, market_for=market_for)
 
 
 def enrich_slots_import_prices(
     slots: list[dict[str, Any]],
     slot_datetimes: list[datetime],
     *,
-    import_tariff_spec: dict | None = None,
-    grid_fee: dict | None = None,
     edibert_pricing: dict | None = None,
+    market_for: MarketFor | None = None,
 ) -> None:
-    """Setzt k_act in resolve_market_slots-Ergebnissen aus Tarif-Spec."""
+    """Setzt k_act in resolve_market_slots-Ergebnissen aus dem Bezugstarif."""
     epex_values = [float(slot["price_buy"]) for slot in slots]
     brutto = import_brutto_cent_for_slots(
         epex_values,
         slot_datetimes,
-        import_tariff_spec=import_tariff_spec,
-        grid_fee=grid_fee,
         edibert_pricing=edibert_pricing,
+        market_for=market_for,
     )
     for slot, price in zip(slots, brutto):
         slot["k_act"] = price
+
+
+def market_for_prices(
+    prices_df: pd.DataFrame,
+    ctx: BacktestingPriceContext | None,
+    *,
+    planning_moment: datetime | None = None,
+) -> MarketFor:
+    """Börsenpreise für zusätzliche Viertelstunden, genauso beschafft wie die des Horizonts."""
+
+    def _market(slots: list[datetime]) -> list[float | None]:
+        naive = [slot.replace(tzinfo=None) for slot in slots]
+        if ctx is None:
+            from data.market_prices import epex_prices_for_slots
+
+            return list(epex_prices_for_slots(prices_df, naive))
+        moment = planning_moment if planning_moment is not None else ctx.planning_moment
+        price_ctx = BacktestingPriceContext(
+            strategy=ctx.strategy,
+            planning_moment=moment,
+            feature_frame=ctx.feature_frame,
+            forecast_model=ctx.forecast_model,
+            forecast_model_path=ctx.forecast_model_path,
+        )
+        return [float(row["price_buy"]) for row in resolve_backtesting_slot_prices(prices_df, naive, price_ctx)]
+
+    return _market
 
 
 def matrix_prices_from_context(
@@ -322,19 +307,17 @@ def matrix_prices_from_context(
     ctx: BacktestingPriceContext | None,
     *,
     planning_moment: datetime | None = None,
-    import_tariff_spec: dict | None = None,
-    grid_fee: dict | None = None,
     edibert_pricing: dict | None = None,
 ) -> tuple[list[float], list[float], list[str]]:
     """EPEX- und Brutto-Preise je Slot; bei ctx=None Perfect-Foresight aus CSV."""
+    market_for = market_for_prices(prices_df, ctx, planning_moment=planning_moment)
 
     def _brutto_list(epex_values: list[float]) -> list[float]:
         return import_brutto_cent_for_slots(
             epex_values,
             slot_datetimes,
-            import_tariff_spec=import_tariff_spec,
-            grid_fee=grid_fee,
             edibert_pricing=edibert_pricing,
+            market_for=market_for,
         )
 
     if ctx is None:

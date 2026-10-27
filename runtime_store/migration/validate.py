@@ -77,7 +77,7 @@ def _grid_area_ids(docs: Docs) -> set[str]:
 
 def _reject_unresolved_netznutzung(house: dict[str, Any], docs: Docs) -> None:
     """Data model 5: every profile names a grid area that the pack (catalog or user) has."""
-    from data.grid_fees import normalize_netznutzung_config
+    from house_config.netznutzung import normalize_netznutzung_config
 
     profiles = house.get("profiles")
     items = list(profiles.values()) if isinstance(profiles, dict) else profiles

@@ -125,6 +125,15 @@
             "type": "fixed_cent",
             "fix_cent_kwh": 25.0,
             "supplier_id": "fix_25_ct_kwh_bezug"
+        },
+        {
+            "id": "fixed_25ct_de",
+            "land": "DE",
+            "vat_percent": 0.0,
+            "label": "Fix 25 ct/kWh Bezug (DE, Marktzone der Fixture-Preise)",
+            "type": "fixed_cent",
+            "fix_cent_kwh": 25.0,
+            "supplier_id": "fix_25_ct_kwh_bezug"
         }
     ],
     "export_tariffs": [

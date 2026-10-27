@@ -179,10 +179,10 @@ def _render_new_profile_grid_area() -> tuple[str | None, bool]:
     """No house profile yet: the import creates one and needs its grid area (no default)."""
     if (load_house_profiles().get("profiles") or {}):
         return None, True
-    from data.grid_fees import load_grid_fee_catalog
+    from house_config.edibert_tariffs import grid_area_view
     from runtime_store.persist_paths import resolve_grid_fees_json_path
 
-    areas = load_grid_fee_catalog(resolve_grid_fees_json_path())["areas"]
+    areas = grid_area_view(resolve_grid_fees_json_path())["areas"]
     area_id = st.selectbox(
         "Netzbereich (Netznutzung) für das neue Hausprofil",
         options=list(areas),

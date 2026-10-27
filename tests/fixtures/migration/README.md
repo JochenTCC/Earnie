@@ -25,6 +25,7 @@ Goldens of migrated results: [`goldens/<snapshot>/`](goldens/) (ConfigMigration 
 | `v4_pre_conversion/` | `49fc6a2` | `migrate_conversion_efficiency_once` |
 | `v4_pre_topology/` | `c0cd597` | `migrate_topology_once` |
 | `v4_pre_tariff_track/` | synthetic, from the `v4_pre_topology` golden (2026-10-26) | `dm5.netznutzung_split` + `tf1.tariff_format`: own base price (`profile_a`), base `0` (`profile_b`), no `netznutzung` (`profile_c`), untagged `grid_fees.json` / `user_tariffs.json`, `tariffs.json` on `earnie_data_model: 4`, gross import and net export user tariff without `vat_percent` |
+| `v5_pre_scenario_feed_in/` | synthetic, from the `v4_pre_tariff_track` golden (2026-10-27) | `dm5.scenario_feed_in` (Edibert P3b, D2): flat `k_push_cent` + `feed_in_mode` `fixed` / `dynamic_epex` without tariffs, and a scenario with tariffs plus a leftover `feed_in_mode` |
 
 Pack files included when present: `config.json`, `house_profiles.json`, `components.json`, `deviation_rules.json`, `backtesting_scenarios.json`, `grid_fees.json`. No `uploads/`, schemas, examples, or private `tariffs.json`.
 

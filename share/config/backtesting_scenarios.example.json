@@ -24,8 +24,8 @@
             "id": "battery_5kwh_dynamic",
             "label": "5 kWh, dynamische Einspeise",
             "settings": {
-                "k_push_cent": 3.7,
-                "feed_in_mode": "dynamic_epex",
+                "import_tariff_id": "awattar_at",
+                "export_tariff_id": "dynamic_epex",
                 "pv_tilt": 25,
                 "pv_azimuth": 0,
                 "pv_kwp": 10,
@@ -44,8 +44,9 @@
             "id": "battery_10kwh_fixed",
             "label": "10 kWh, fixe Einspeise",
             "settings": {
-                "k_push_cent": 3.7,
-                "feed_in_mode": "fixed",
+                "import_tariff_id": "awattar_at",
+                "export_tariff_id": "__user_fixed__",
+                "user_export_cent_kwh": 3.7,
                 "pv_tilt": 25,
                 "pv_azimuth": 0,
                 "pv_kwp": 10,
@@ -64,8 +65,8 @@
             "id": "battery_10kwh_dynamic",
             "label": "10 kWh, dynamische Einspeise",
             "settings": {
-                "k_push_cent": 3.7,
-                "feed_in_mode": "dynamic_epex",
+                "import_tariff_id": "awattar_at",
+                "export_tariff_id": "dynamic_epex",
                 "pv_tilt": 25,
                 "pv_azimuth": 0,
                 "pv_kwp": 10,

@@ -7,12 +7,13 @@ from house_config.geo_timezone import timezone_for_land
 from house_config.planning_flex_bridge import collect_planning_flex_consumers
 from house_config.profiles_store import load_house_profiles_document
 from house_config.tariffs_store import (
-    apply_land_vat_to_user_fixed_import,
-    load_tariffs_document,
-    resolve_export_tariff_into_settings,
-    resolve_import_tariff_into_settings,
+    USER_EXPORT_CENT_KEY,
+    USER_IMPORT_CENT_KEY,
+    is_user_fixed_tariff_id,
+    parse_user_export_cent,
+    parse_user_import_cent,
+    resolve_export_tariff_id,
 )
-from settings.pricing_engine import uses_edibert_pricing
 from settings.scenarios import load_backtesting_scenarios_document
 
 DEFAULT_LIVE_SCENARIO_ID = "live"
@@ -71,7 +72,6 @@ def resolve_scenario_settings(
     components: dict | None = None,
     tariffs_path: str,
     house_profiles_path: str,
-    monthly_rates_holder: dict | None = None,
     grid_fees_path: str | None = None,
 ) -> dict:
     """
@@ -92,16 +92,15 @@ def resolve_scenario_settings(
         components = load_components_document(components_path)
     out = resolve_components_into_settings(out, components)
 
-    import_tariff_id = out.get("import_tariff_id")
-    export_tariff_id = out.get("export_tariff_id")
-    tariffs_doc = load_tariffs_document(tariffs_path)
-    holder = monthly_rates_holder if monthly_rates_holder is not None else {}
-    out = resolve_import_tariff_into_settings(out, tariffs_doc)
-    out = resolve_export_tariff_into_settings(
-        out, tariffs_doc, monthly_rates_holder=holder
-    )
+    import_tariff_id = _pop_tariff_id(out, "import_tariff_id")
+    export_tariff_id = _pop_tariff_id(out, "export_tariff_id")
+    if export_tariff_id:
+        export_tariff_id = resolve_export_tariff_id(export_tariff_id)
+    _reject_legacy_feed_in_keys(out)
+    user_cents = _pop_user_fixed_cents(out, import_tariff_id, export_tariff_id)
 
     profile_id = out.pop("house_profile_id", None)
+    profile: dict | None = None
     if profile_id:
         profiles_doc = load_house_profiles_document(house_profiles_path)
         profiles = profiles_doc.get("profiles", {})
@@ -110,57 +109,118 @@ def resolve_scenario_settings(
             raise ValueError(f"Unbekannte house_profile_id '{profile_id}'.")
         profile = profiles[profile_id]
         out["_house_profile"] = profile
-        out = apply_land_vat_to_user_fixed_import(out, profile.get("land", "AT"))
         _apply_profile_geo(out, profile)
-        out["_grid_fee_spec"] = _resolve_profile_grid_fee(
-            profile, out["timezone_name"], grid_fees_path
-        )
         flex_consumers = collect_planning_flex_consumers(profile)
         if flex_consumers:
             out["_planning_flex_consumers"] = flex_consumers
     _ensure_geo_defaults(out)
-    if uses_edibert_pricing():
-        _attach_edibert_pricing(
-            out,
-            tariffs_path=tariffs_path,
-            grid_fees_path=grid_fees_path,
-            import_tariff_id=import_tariff_id,
-            export_tariff_id=export_tariff_id,
-        )
+    _attach_tariffs(
+        out,
+        tariffs_path=tariffs_path,
+        grid_fees_path=grid_fees_path,
+        import_tariff_id=import_tariff_id,
+        export_tariff_id=export_tariff_id,
+        user_cents=user_cents,
+        profile=profile,
+    )
     return out
 
 
-def _attach_edibert_pricing(
+def _pop_tariff_id(out: dict, key: str) -> str | None:
+    tariff_id = str(out.pop(key, None) or "").strip()
+    return tariff_id or None
+
+
+# Flat feed-in keys of the pre-tariff era; the export tariff prices every slot (Edibert P3b).
+_LEGACY_FEED_IN_KEYS = ("k_push_cent", "feed_in_mode", "monthly_fixed_feed_in_rates")
+
+
+def _reject_legacy_feed_in_keys(out: dict) -> None:
+    present = [key for key in _LEGACY_FEED_IN_KEYS if key in out]
+    if present:
+        raise ValueError(
+            f"Szenario-Einstellungen {', '.join(present)} werden nicht mehr unterstützt — "
+            "Einspeisetarif über export_tariff_id wählen (z. B. Eigener Festpreis); "
+            "Konfiguration migrieren: Streamlit-Seite „Konfigurations-Migration“ oder "
+            "python -m scripts.migrate_config --config-dir <config>."
+        )
+
+
+def _pop_user_fixed_cents(
+    out: dict, import_tariff_id: str | None, export_tariff_id: str | None
+) -> dict[str, float]:
+    """Cent values of *Eigener Festpreis*; the keys leave the settings in every case."""
+    cents: dict[str, float] = {}
+    if is_user_fixed_tariff_id(import_tariff_id):
+        cents["import"] = parse_user_import_cent(out)
+    if is_user_fixed_tariff_id(export_tariff_id):
+        cents["export"] = parse_user_export_cent(out)
+    out.pop(USER_IMPORT_CENT_KEY, None)
+    out.pop(USER_EXPORT_CENT_KEY, None)
+    return cents
+
+
+def _user_fixed_vat(profile: dict | None) -> float:
+    """VAT of *Eigener Festpreis* import: the profile country's rate (VAT on the net grid fee).
+
+    Without a house profile there is no grid fee, so the gross price needs no rate.
+    """
+    from house_config.edibert_tariffs import STANDARD_VAT_PERCENT
+
+    if profile is None:
+        return 0.0
+    land = str(profile.get("land", "AT") or "AT").strip().upper()
+    if land not in STANDARD_VAT_PERCENT:
+        raise ValueError(f"Keine Standard-USt für Land {land!r} (AT, DE oder CH).")
+    return float(STANDARD_VAT_PERCENT[land])
+
+
+def _attach_tariffs(
     out: dict,
     *,
     tariffs_path: str,
     grid_fees_path: str | None,
     import_tariff_id: str | None,
     export_tariff_id: str | None,
+    user_cents: dict[str, float],
+    profile: dict | None,
 ) -> None:
-    """Pricing reference for ``EARNIE_PRICING_ENGINE=edibert`` (Edibert P3a)."""
-    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, pricing_reference
-    from house_config.edibert_tariffs import EXPORT, IMPORT
-    from house_config.tariffs_store import is_user_fixed_tariff_id
+    """Pricing reference (``_edibert_pricing``) plus the tariff parameters for display.
+
+    Prices come only from Edibert through the reference (Edibert P3b). A scenario without a
+    tariff keeps no price source: pricing it fails with ``import_tariff_id fehlt`` /
+    ``export_tariff_id fehlt`` (decision D2, no live-tariff or constant fallback).
+    """
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, pricing_reference, tariff
+    from house_config.edibert_tariffs import EXPORT, IMPORT, market_zone, tariff_info
     from runtime_store.persist_paths import resolve_grid_fees_json_path
 
-    # Eigener Festpreis: cent and VAT rate exactly as the resolution set them on the scenario.
     user_fixed: dict[str, dict[str, float]] = {}
-    if is_user_fixed_tariff_id(import_tariff_id):
-        spec = out["_import_tariff_spec"]
-        user_fixed[IMPORT] = {"cent": spec["fix_cent_kwh"], "vat_percent": spec["vat_percent"]}
-    if is_user_fixed_tariff_id(export_tariff_id):
-        spec = out["_export_tariff_spec"]
-        user_fixed[EXPORT] = {"cent": spec["k_push_cent"], "vat_percent": spec["vat_percent"]}
-    out[EDIBERT_PRICING_KEY] = pricing_reference(
+    if "import" in user_cents:
+        user_fixed[IMPORT] = {"cent": user_cents["import"], "vat_percent": _user_fixed_vat(profile)}
+    if "export" in user_cents:
+        user_fixed[EXPORT] = {"cent": user_cents["export"], "vat_percent": 0.0}
+    ref = pricing_reference(
         tariffs_path=tariffs_path,
         grid_fees_path=grid_fees_path or resolve_grid_fees_json_path(),
         import_tariff_id=import_tariff_id,
         export_tariff_id=export_tariff_id,
         timezone_name=out["timezone_name"],
-        profile=out.get("_house_profile"),
+        profile=profile,
         user_fixed=user_fixed,
     )
+    out[EDIBERT_PRICING_KEY] = ref
+    if import_tariff_id:
+        info = tariff_info(tariff(ref, IMPORT))
+        out["_import_tariff_spec"] = info
+        if "land" in info:
+            out["market_zone"] = market_zone(info["land"])
+    if export_tariff_id:
+        info = tariff_info(tariff(ref, EXPORT))
+        out["_export_tariff_spec"] = info
+        # Constant of a fixed export tariff for history fallbacks (``K_PUSH_CENT``);
+        # slot prices always come from the tariff.
+        out["k_push_cent"] = float(info.get("k_push_cent", 0.0) or 0.0)
 
 
 def _ensure_geo_defaults(out: dict) -> None:
@@ -180,17 +240,6 @@ def _apply_profile_geo(out: dict, profile: dict) -> None:
     out["timezone_name"] = str(profile.get("timezone_name", "") or "").strip()
     if not out["timezone_name"]:
         out["timezone_name"] = timezone_for_land(profile.get("land", "AT"))
-
-
-def _resolve_profile_grid_fee(
-    profile: dict, timezone_name: str, grid_fees_path: str | None
-) -> dict:
-    """Netzentgelt-Spec (Basis + Zeitregeln) aus Hausprofil und Katalog."""
-    from data.grid_fees import load_grid_fee_catalog, resolve_grid_fee_spec
-    from runtime_store.persist_paths import resolve_grid_fees_json_path
-
-    catalog = load_grid_fee_catalog(grid_fees_path or resolve_grid_fees_json_path())
-    return resolve_grid_fee_spec(profile.get("netznutzung"), catalog, timezone_name=timezone_name)
 
 
 def _prepare_live_scenario_settings(
@@ -222,7 +271,6 @@ def resolve_live_scenario_settings(
     components_path: str,
     tariffs_path: str,
     house_profiles_path: str,
-    monthly_rates_holder: dict | None = None,
 ) -> dict:
     """
     Löst das Live-Szenario (live_scenario_id) für Echtzeit und Szenario-Explorer auf.
@@ -240,5 +288,4 @@ def resolve_live_scenario_settings(
         components_path=components_path,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
-        monthly_rates_holder=monthly_rates_holder,
     )

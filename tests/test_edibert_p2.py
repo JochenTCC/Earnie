@@ -188,7 +188,7 @@ def test_tariff_loader_fails_fast_on_untagged_file() -> None:
 
 
 def test_own_grid_fee_writes_user_area(tmp_path: Path) -> None:
-    from data.grid_fees import load_grid_fee_catalog, resolve_grid_fee_spec
+    from house_config.edibert_tariffs import load_grid_fees, profile_grid_fee
     from house_config.own_grid_fee import OWN_AREA, OWN_BASE_KEY, persist_own_grid_fee
 
     shutil.copy(Path("share/config/grid_fees.json"), tmp_path / "grid_fees.json")
@@ -207,9 +207,9 @@ def test_own_grid_fee_writes_user_area(tmp_path: Path) -> None:
         grid_fees_path=str(tmp_path / "grid_fees.json"),
     )
     assert out["area_id"] == "user_home" and OWN_BASE_KEY not in out
-    catalog = load_grid_fee_catalog(str(tmp_path / "grid_fees.json"))
-    spec = resolve_grid_fee_spec(out, catalog, timezone_name="Europe/Vienna")
-    assert spec["base_cent_kwh"] == pytest.approx(4.2)
+    catalog = load_grid_fees(str(tmp_path / "grid_fees.json"), str(tmp_path / "user_grid_fees.json"))
+    fee = profile_grid_fee("home", {"netznutzung": out}, catalog)
+    assert fee.base_cent_kwh == pytest.approx(4.2)
     # Saving again replaces the same area
     persist_own_grid_fee(
         {**netznutzung, OWN_BASE_KEY: 0.0},

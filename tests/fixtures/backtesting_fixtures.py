@@ -169,3 +169,31 @@ def fixture_scenario_params() -> dict:
             "Fixture-Szenario 'fixture_5kwh_fixed' fehlt in backtesting_scenarios.json"
         )
     return dict(scenarios["fixture_5kwh_fixed"])
+
+
+def fixture_tariff_params(
+    import_tariff_id: str,
+    export_tariff_id: str,
+    *,
+    timezone_name: str = "Europe/Vienna",
+) -> dict:
+    """Tariff part of resolved scenario params for hand-built scenarios (Edibert P3b).
+
+    ``_edibert_pricing`` plus ``_import_tariff_spec`` / ``_export_tariff_spec`` / ``k_push_cent``
+    from the fixture ``tariffs.json``, exactly as the scenario resolution attaches them (no house
+    profile, so no grid fee).
+    """
+    from house_config.scenario_resolution import _attach_tariffs
+
+    out: dict = {"timezone_name": timezone_name}
+    _attach_tariffs(
+        out,
+        tariffs_path=str(fixture_path("tariffs.json")),
+        grid_fees_path=str(fixture_path("grid_fees.json")),
+        import_tariff_id=import_tariff_id,
+        export_tariff_id=export_tariff_id,
+        user_cents={},
+        profile=None,
+    )
+    out.pop("timezone_name")
+    return out

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -256,8 +256,8 @@ def test_scenario_entity_resolution():
     entity = scenarios["entity_test"]
     assert entity["battery_capacity_kwh"] == 8.0
     assert entity["pv_kwp"] == 6.0
-    assert entity["feed_in_mode"] == "fixed"
-    assert entity.get("_monthly_fixed_tariffs") is not None
+    assert entity["_export_tariff_spec"]["type"] == "monthly_table"
+    assert entity["_export_tariff_spec"]["monthly_rates"]
     assert entity.get("_house_profile") is not None
 
 
@@ -556,24 +556,10 @@ def test_settlement_mtu_rejects_unknown_value():
 
 
 def test_export_tariff_id_alias_awattar_sunny_float_rejected():
-    from house_config.tariffs_store import resolve_export_tariff_into_settings
+    from house_config.tariffs_store import resolve_export_tariff_id
 
-    tariffs = {
-        "export_tariffs": {
-            "dynamic_epex": {
-                "id": "dynamic_epex",
-                "label": "aWATTar SUNNY SPOT",
-                "type": "spot_hourly",
-                "land": "AT",
-                "feed_in_fee_factor": 0.19,
-            }
-        }
-    }
     with pytest.raises(ValueError, match="dynamic_epex"):
-        resolve_export_tariff_into_settings(
-            {"export_tariff_id": "awattar_sunny_float"},
-            tariffs,
-        )
+        resolve_export_tariff_id("awattar_sunny_float")
 
 
 def test_tariff_spec_resolution_de_spot_ch_fix():
@@ -631,6 +617,7 @@ def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
                         "land": "AT",
                         "fix_cent_kwh": 20.0,
                         "prices_include_vat": True,
+                        "vat_percent": 20.0,
                     }
                 ],
                 "export_tariffs": [],
@@ -659,11 +646,15 @@ def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
         house_profiles_path=str(profiles_path),
         grid_fees_path=str(tmp_path / "grid_fees.json"),
     )
-    assert resolved["_grid_fee_spec"]["base_cent_kwh"] == pytest.approx(5.353)
-    from data.backtesting_prices import pricing_kwargs_from_resolved
+    from data.backtesting_prices import import_brutto_cent_for_slots, pricing_kwargs_from_resolved
+    from data.edibert_slot_prices import grid_fee
 
+    assert grid_fee(resolved["_edibert_pricing"]).base_cent_kwh == pytest.approx(5.353)
     kwargs = pricing_kwargs_from_resolved(resolved)
-    assert kwargs["grid_fee"]["base_cent_kwh"] == pytest.approx(5.353)
+    # Gross tariff: the net own work price gets the tariff's VAT on top.
+    assert import_brutto_cent_for_slots([0.0], [datetime(2026, 1, 15, 12)], **kwargs) == [
+        pytest.approx(20.0 + 5.353 * 1.2)
+    ]
 
 
 def test_monthly_table_export_tariff_resolution():
@@ -1669,8 +1660,8 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
         """
         {
             "tariff_format": 1,
-            "import_tariffs": [{"id": "fixed_imp", "land": "AT", "label": "Fix", "type": "fixed_cent", "fix_cent_kwh": 37}],
-            "export_tariffs": [{"id": "fixed_exp", "land": "AT", "label": "Fix", "type": "fixed", "k_push_cent": 3.7}]
+            "import_tariffs": [{"id": "fixed_imp", "land": "AT", "label": "Fix", "type": "fixed_cent", "fix_cent_kwh": 37, "supplier_id": "fix", "vat_percent": 0.0}],
+            "export_tariffs": [{"id": "fixed_exp", "land": "AT", "label": "Fix", "type": "fixed", "k_push_cent": 3.7, "supplier_id": "fix", "vat_percent": 0.0}]
         }
         """.strip(),
         encoding="utf-8",
@@ -1707,7 +1698,6 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
     )
     assert resolved["battery_capacity_kwh"] == 5.0
     assert resolved["pv_kwp"] == 10.0
-    assert resolved["feed_in_mode"] == "fixed"
     assert resolved.get("_house_profile") is not None
     assert resolved["latitude"] == pytest.approx(48.2)
     assert resolved["timezone_name"] == "Europe/Berlin"

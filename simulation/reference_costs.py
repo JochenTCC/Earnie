@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 import config
 from data import feed_in_prices
+from data.backtesting_prices import market_for_prices
 from data.market_prices import epex_prices_for_slots
 from optimizer.slot_duration import wall_hours_from_slots
 from simulation.historical_cache import HistoricalDataCache
@@ -54,20 +55,6 @@ def resolve_reference_hourly_load(
         )
     _, _, total_load, _ = cache.get_window_consumption(slot_datetimes)
     return total_load
-
-
-def reference_standby_power_kw(scenario_params: dict | None) -> float:
-    """Battery AC standby (kW) a reference carries on top of the house load.
-
-    A reference keeps the scenario's installation (storage included) and only
-    skips the optimization, so the storage standby is drawn like in the
-    optimized run. Historisch (assets stripped) and params-less references: 0.
-    """
-    if scenario_params is None:
-        return 0.0
-    from simulation.engine_scenario import scenario_standby_power_kw
-
-    return scenario_standby_power_kw(scenario_params)
 
 
 def reference_standby_power_kw(scenario_params: dict | None) -> float:
@@ -156,9 +143,6 @@ def _reference_window_inputs(
         slot_datetimes,
         scenario_params=scenario_params,
     )
-    standby_kw = reference_standby_power_kw(scenario_params)
-    if standby_kw:
-        total_load = [float(load) + standby_kw for load in total_load]
     standby_kw = reference_standby_power_kw(scenario_params)
     if standby_kw:
         total_load = [float(load) + standby_kw for load in total_load]
@@ -259,13 +243,16 @@ def compute_historical_reference_costs(
                 anchor, cache, prices_df, scenario_params, horizon_mode
             )
         )
-        for slot_dt, load, pv, price, epex in zip(
-            slot_datetimes, total_load, pv_profile, brutto_prices, epex_prices
+        k_push_prices = feed_in_prices.export_cents_for_slots(
+            slot_datetimes,
+            epex_prices,
+            ref_settings,
+            market_for=market_for_prices(prices_df, None),
+        )
+        for slot_dt, load, pv, price, k_push in zip(
+            slot_datetimes, total_load, pv_profile, brutto_prices, k_push_prices
         ):
             timestamps.append(slot_dt)
-            k_push = feed_in_prices.resolve_k_push_act(
-                epex, ref_settings, slot_datetime=slot_dt
-            )
             _append_reference_slot(
                 series,
                 _hour_cost_parts_without_optimization(load, pv, price, k_push),

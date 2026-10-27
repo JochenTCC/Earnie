@@ -250,3 +250,55 @@ P3a-1: B1 → B2 → B3 → B4 → first full run → B6 triage → B5 → B7. P
 - [x] Parity fixture committed, `tests/test_edibert_p3a.py` green; full suite green with the default flag.
 - [x] All 11 regression cases green with `EARNIE_PRICING_ENGINE=edibert` (L2 cases with a tariff price through Edibert; L1 cases do not price, see *Results*).
 - [x] `__user_fixed__` on Edibert (T3, Edibert `v0.1.3`, pin raised).
+
+## P3b — Engine switch (2026-10-27)
+
+Status: **implemented** (see *Implementation notes*, *Results*, *Done check*). Backlog item *Edibert P3b* (Version 2.8). Goal: live **and** SE prices come only from Edibert; Earnie's own pricing code is deleted; the MILP keeps receiving `k_act` / `k_push_act` per slot.
+
+### Findings (2026-10-27)
+
+- **No Edibert release needed.** `v0.1.4` has everything: `tariff_price_series` for the slot lists, `GridFee.work_cent(local, ctx)` returns the net grid fee **and** the matching rule ID (SE invoice line), `GridFee.skipped` (rules not applied), `Tariff.fees` (monthly fees), `api.market_zone`, `api.STANDARD_VAT_PERCENT`.
+- **The resolved tariff specs are more than prices.** `_import_tariff_spec` / `_export_tariff_spec` also feed the monthly fees (`simulation/monthly_fees.py`), land / market zone and the aWATTar URL (`house_config/awattar_api.py`), the SE fingerprint (`simulation/backtesting_fingerprint.py`), the reference fingerprint (`house_config/planning_flex_bridge.py`), the info sidebar hints and the VAT of the invoice line.
+- **Live prices twice:** `resolve_market_slots` priced every slot on its own (`epex_to_brutto_cent`), then `enrich_slots_import_prices` priced the whole list again and overwrote `k_act`. On Edibert the single-slot call fails for hourly settled tariffs (T2).
+- **Partial hours also in the SE:** sunrise windows start and end at quarter-hours, so an SE run with an hourly settled tariff hits T2 as well (P3a never ran the SE with such a tariff under the flag).
+- **Single-slot callers besides live:** `runtime_store/history_chart_rows.py` (market price back-inference of legacy log entries) and `simulation/reference_costs.py` (`resolve_k_push_act` per slot).
+- **Dead code:** `data/profile_manager.build_historical_optimization_matrix` / `_get_historical_*` (hourly slots) had no production caller.
+- **Usage:** 12 catalog tariffs are hourly settled (`settlement_mtu: 60min`); the maintainer's live tariff is quarter-hourly.
+
+### Decisions (2026-10-27, recommendations accepted by the maintainer)
+
+1. **D1 — partial hour of hourly settled tariffs (T2):** the caller supplies the market prices of the quarter-hours an hourly settled tariff needs outside the input (`market_for`), obtained the same way as the horizon (day-ahead, else mirror / forecast); prices stay per input slot. No averaging of a partial hour, no `PRICE_MISSING` in live or SE.
+2. **D2 — scenarios without a tariff:** import and export tariff are **required** for pricing. The rules "no import tariff → the live scenario's tariff" and "no export tariff → constant `k_push_cent`" and the legacy `feed_in_mode` / `dynamic_epex` / monthly path are deleted; a scenario without a tariff fails loud when priced (`import_tariff_id fehlt` / `export_tariff_id fehlt`), the flat keys fail loud on resolution. Data model 5 (not shipped yet) gets the step `dm5.scenario_feed_in` with required questions for scenarios with the flat keys. A scenario that is simply incomplete (no tariff, no flat keys; e.g. during onboarding) is no migration case.
+3. **D3 — VKW Strom Duo summer window:** **dropped** (maintainer, 2026-10-27; not needed any more). The catalog stays as it is.
+4. **D4 — tariff metadata:** the keys `_import_tariff_spec` / `_export_tariff_spec` stay, filled from the Edibert `Tariff` (`house_config.edibert_tariffs.tariff_info`: metadata and catalog parameters for display, fees and fingerprints; no Earnie code prices from them). The SE fingerprint hashes the content of the tariff entries, the grid area and its rule set (`pricing_digest`), so a catalog edit invalidates cached SE results.
+5. **D5 — `house_config/tariffs_store.py`:** the whole resolution goes (`resolve_*_tariff_into_settings`, synthetic `__user_fixed__` specs, `engine_pending_fields` / E1, `monthly_rates_holder`). Document loading for the UI selects stays until P7, `append_monthly_rate` until P8.
+6. **D6 — `land` on user tariffs** (format difference row 7): stays required (the market zone is derived from it).
+
+### Implementation notes (2026-10-27)
+
+- **Deleted:** `data/tariff_pricing.py`, `data/grid_fees.py`, `settings/pricing_engine.py` (flag), `scripts/edibert_parity.py` (needs the old engine), the resolution part of `tariffs_store`, the dead historical matrix code, `tests/test_tariff_pricing.py`, `tests/test_grid_fees.py`. Moved: `netznutzung` profile helpers → `house_config/netznutzung.py`; month hints for the UI → `house_config/tariff_month_hints.py`; market zone → `house_config.edibert_tariffs.market_zone`; UI area lists and the grid-fee preview → `grid_area_view` / `profile_grid_fee` (Edibert).
+- **Resolution** (`house_config/scenario_resolution.py`): always attaches `_edibert_pricing`; the tariff IDs and the *Eigener Festpreis* cents leave the settings; `_import_tariff_spec` / `_export_tariff_spec` / `market_zone` come from the Edibert tariff; `k_push_cent` stays only as the constant of a fixed export tariff (0 otherwise) for the history / log fallbacks (`K_PUSH_CENT`, MILP `fallback_k_push`); `_grid_fee_spec` and `FEED_IN_MODE` are gone. *Eigener Festpreis* import carries the profile country's VAT (no profile → no grid fee → rate 0, as before).
+- **Adapter** (`data/edibert_slot_prices.py`): `market_for` (D1) fills the market dict with the missing quarter-hours of every hour an hourly settled spot tariff touches; the price series still covers only the input slots. `single_slot_cent` (`api.evaluate`, no hourly mean) is used only for legacy history log entries that stored one EPEX value per slot. `pricing_digest` for the fingerprint (file paths left out).
+- **Seams:** live `_build_optimization_matrix` passes one `market_for` (via `resolve_market_slots`) to import and export; SE `matrix_builder` / `engine_scenario` / `reference_costs` pass `market_for_prices(prices_df, ctx)`; `reference_costs` prices export per window as a list. A missing scenario (`scenario_params=None`) means the live scenario, as for the feed-in settings before.
+- **SE invoice:** `InvoiceGridFee` (`simulation/se_invoice_netznutzung.py`) from the reference: base price, rule labels, skipped rules (`status=<status>`), and `work(slot)` = `GridFee.work_cent` (net cent + rule ID).
+- **Tests and fixtures:** the parity fixture stays as the Edibert golden (`tests/test_edibert_slot_prices.py`, T1 pinned); new `tests/test_edibert_p3b.py` (D1, D2, invoice, digest, `netznutzung`, Duo 2024-12 coverage, migration); migration fixture `v5_pre_scenario_feed_in`; backtesting fixture: the scenario `fixture_5kwh_fixed` gets `fixed_25ct_de` (new, DE so the fixture's DE-LU price CSV stays the market zone) and `fixed_35ct` instead of `k_push_cent: 3.5` (same prices), `entity_test` gets `fixed_25ct`; tests that wrote tariff files without `supplier_id` / `vat_percent` were fixed; `tests/fixtures/backtesting_fixtures.fixture_tariff_params` for hand-built SE scenarios; `tests/regression/l2_runner.py` always writes inline case pricing as tariff files.
+- **Removed warning:** the loader warning "gross tariff without `vat_percent`" is gone; `vat_percent` is mandatory since P2 (`0` is an explicit choice).
+- **Examples:** `share/config/backtesting_scenarios.example.json` uses tariffs (`dynamic_epex`, `__user_fixed__` 3.7 ct) instead of `k_push_cent` / `feed_in_mode`; both keys left the scenario schema.
+
+### Results (2026-10-27)
+
+- **SNAP comparison** (fixture pack with grid area AT-VBG, 2026-06-23 … 25, quarter-hour EPEX with negative midday prices; baseline with the old engine before the switch): quarter-hour spot (`at_vkw_strom_dynamisch` / `at_oemag_gesetzlicher_marktpreis`) and gross fixed (`at_verbund_v_strom_sterreich` / `…_sonneneinspeisung_fix`): every slot price, cost, flow and the invoice grid line (base + SNAP group) **identical**. Hourly settled (`awattar_at` / `at_smartenergy_smartsun_spot`): invoice identical; `k_act` / `k_push_act` differ in the 4 slots where a sunrise window ends mid-hour (05:00, now the full-hour mean, D1), and the MILP books 9 slots differently as a consequence.
+- **Regression:** all 11 cases green, metrics equal to the goldens (input digests of the backtesting fixture changed).
+- **Full suite:** 4865 passed, 30 skipped.
+
+### Order
+
+SNAP baseline with the old engine → B1 → B2 → B3 → B4 → B5 → B7 (gate: suite, regression, SNAP comparison) → B8 → B9. (B6, the Duo window, dropped with D3.)
+
+### Done check
+
+- [x] SE run with a SNAP grid area gives identical results before and after the switch for quarter-hour and fixed tariffs; hourly settled tariffs differ only at partial hours (D1, intended).
+- [x] All 11 regression cases green, metrics unchanged; full suite green.
+- [x] `data/tariff_pricing.py`, `data/grid_fees.py`, `settings/pricing_engine.py` and the resolution in `tariffs_store` are gone.
+- [x] A horizon with an hourly settled tariff starting mid-hour prices without `PRICE_MISSING` (live and SE; `tests/test_edibert_p3b.py`).
+- [ ] A live cycle on the maintainer site (needs the site migrated to data model 5 first; quarter-hour tariff there).

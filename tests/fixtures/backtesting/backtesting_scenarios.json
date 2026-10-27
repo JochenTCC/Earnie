@@ -22,8 +22,8 @@
             "id": "fixture_5kwh_fixed",
             "label": "Fixture 5 kWh fixe Einspeise",
             "settings": {
-                "k_push_cent": 3.5,
-                "feed_in_mode": "fixed",
+                "import_tariff_id": "fixed_25ct_de",
+                "export_tariff_id": "fixed_35ct",
                 "pv_tilt": 18,
                 "pv_azimuth": 28,
                 "pv_kwp": 6.0,
@@ -48,6 +48,7 @@
                 "pv_system_ids": [
                     "test_pv"
                 ],
+                "import_tariff_id": "fixed_25ct",
                 "export_tariff_id": "monthly_test",
                 "house_profile_id": "test_home"
             }

@@ -1,0 +1,57 @@
+{
+    "$schema": "./backtesting_scenarios.schema.json",
+    "earnie_data_model": 5,
+    "cbc_gap_rel": 0.2,
+    "commit_hours": 24,
+    "cbc_strict_time_limit_sec": 2,
+    "scenarios": [
+        {
+            "id": "live",
+            "label": "Live",
+            "enabled": true,
+            "own_reference": true,
+            "settings": {
+                "battery_ids": [
+                    "15_kwh_speicher"
+                ],
+                "pv_system_ids": [
+                    "dach_sued",
+                    "dach_nord"
+                ],
+                "import_tariff_id": "at_tiwag_flex_privat",
+                "export_tariff_id": "dynamic_epex",
+                "house_profile_id": "profile_a"
+            }
+        },
+        {
+            "id": "flat_fixed",
+            "label": "Flach, fixe Einspeise",
+            "settings": {
+                "k_push_cent": 3.7,
+                "feed_in_mode": "fixed",
+                "pv_kwp": 10,
+                "battery_capacity_kwh": 5.0
+            }
+        },
+        {
+            "id": "flat_dynamic",
+            "label": "Flach, dynamische Einspeise",
+            "settings": {
+                "k_push_cent": 3.7,
+                "feed_in_mode": "dynamic_epex",
+                "pv_kwp": 10,
+                "battery_capacity_kwh": 5.0
+            }
+        },
+        {
+            "id": "tariff_with_leftover",
+            "label": "Tarif plus Altfeld",
+            "settings": {
+                "import_tariff_id": "at_tiwag_flex_privat",
+                "export_tariff_id": "dynamic_epex",
+                "feed_in_mode": "fixed",
+                "house_profile_id": "profile_a"
+            }
+        }
+    ]
+}

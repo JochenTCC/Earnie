@@ -12,7 +12,6 @@ from data.market_prices import (
     PRICE_SOURCE_DAY_AHEAD,
     PRICE_SOURCE_MIRRORED,
     PRICE_SOURCE_PREDICTED,
-    hourly_settlement_epex_values,
     index_market_data_by_slot,
     normalize_price_slot,
     resolve_24h_market_slots,
@@ -176,117 +175,41 @@ def test_hourly_market_expands_onto_quarter_hour_targets():
     assert all(slot["price_source"] == PRICE_SOURCE_DAY_AHEAD for slot in resolved)
 
 
-def test_hourly_settlement_epex_values_averages_per_clock_hour():
-    """EPEX SDAC 'average rule': all 4 QH quarters get the hour's arithmetic mean."""
-    hour = datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA)
-    slots = [hour + timedelta(minutes=15 * i) for i in range(4)]
-    values = [10.0, 20.0, 30.0, 40.0]
-
-    averaged = hourly_settlement_epex_values(values, slots)
-
-    assert averaged == [25.0, 25.0, 25.0, 25.0]
-
-
-def test_hourly_settlement_epex_values_keeps_hours_independent():
-    slots = [
-        datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA),
-        datetime(2026, 7, 4, 9, 30, tzinfo=VIENNA),
-        datetime(2026, 7, 4, 10, 0, tzinfo=VIENNA),
-        datetime(2026, 7, 4, 10, 30, tzinfo=VIENNA),
-    ]
-    values = [10.0, 30.0, 100.0, 200.0]
-
-    averaged = hourly_settlement_epex_values(values, slots)
-
-    assert averaged == [20.0, 20.0, 150.0, 150.0]
-
-
-def test_hourly_settlement_epex_values_passes_through_none():
-    hour = datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA)
-    slots = [hour, hour + timedelta(minutes=15)]
-
-    averaged = hourly_settlement_epex_values([10.0, None], slots)
-
-    assert averaged == [10.0, None]
-
-
-def test_resolve_market_slots_monthly_table_passes_slot_datetime():
-    from unittest.mock import patch
-
-    from data.tariff_pricing import import_cent_kwh
-
+def test_resolve_market_slots_leaves_retail_price_to_the_tariff():
+    """Since Edibert P3b the slots carry only market prices; k_act is priced per list."""
     slot = normalize_price_slot(datetime(2026, 9, 29, 10, 0, tzinfo=VIENNA))
-    market = [{"timestamp": slot, "price_buy": 12.5}]
-    monthly_spec = {
-        "type": "monthly_table",
-        "id": "debug_monthly",
-        "prices_include_vat": True,
-        "vat_percent": 20.0,
-        "monthly_rates": [[2026, 9, 25.0]],
-    }
-    resolved_settings = {
-        "_import_tariff_spec": monthly_spec,
-        "import_tariff_id": "debug_monthly",
-    }
-    expected = import_cent_kwh(12.5, monthly_spec, slot_datetime=slot)
-    with patch("config.get_resolved_runtime_settings", return_value=resolved_settings):
-        out = resolve_market_slots(market, [slot])
-    assert out[0]["k_act"] == expected
+    out = resolve_market_slots([{"timestamp": slot, "price_buy": 12.5}], [slot])
+    assert out[0]["price_buy"] == 12.5
+    assert "k_act" not in out[0]
 
 
-def test_predicted_and_day_ahead_same_tariff_extras_for_equal_epex():
-    """Regression: predicted k_act uses same import formula as day_ahead."""
+def test_predicted_and_day_ahead_slots_carry_same_fields():
+    """Predicted slots look like day-ahead slots (price_buy, no k_act) for the tariff step."""
     from unittest.mock import MagicMock, patch
-
-    from data.grid_fees import flat_grid_fee_spec
-    from data.tariff_pricing import import_cent_kwh
 
     da_slot = normalize_price_slot(datetime(2025, 7, 1, 10, 0, tzinfo=VIENNA))
     pred_slot = normalize_price_slot(datetime(2025, 7, 2, 18, 0, tzinfo=VIENNA))
     epex = 8.0
     market = [{"timestamp": da_slot, "price_buy": epex}]
-    spot_spec = {
-        "type": "spot_hourly",
-        "id": "debug_spot",
-        "settlement_fee_cent_kwh": 1.5,
-        "markup_percent": 3.0,
-        "prices_include_vat": False,
-        "vat_percent": 20.0,
-    }
-    resolved_settings = {
-        "_import_tariff_spec": spot_spec,
-        "import_tariff_id": "debug_spot",
-        "_grid_fee_spec": flat_grid_fee_spec(2.0),
-    }
-    expected = import_cent_kwh(
-        epex,
-        spot_spec,
-        grid_fee=flat_grid_fee_spec(2.0),
-        slot_datetime=pred_slot,
-    )
     feature_frame = pd.DataFrame(
         {"intercept": [1.0]},
         index=pd.DatetimeIndex([pred_slot.replace(tzinfo=None)]),
     )
     model = MagicMock()
-    with patch("config.get_resolved_runtime_settings", return_value=resolved_settings):
-        with patch(
-            "data.market_prices._lookup_forecast_epex",
-            return_value=epex,
-        ):
-            out = resolve_market_slots(
-                market,
-                [da_slot, pred_slot],
-                missing_price_strategy="forecast",
-                forecast_model=model,
-                forecast_feature_frame=feature_frame,
-                # Live bias fetches Open-Meteo archive weather (network, minutes).
-                live_bias_enabled=False,
-            )
+    with patch("data.market_prices._lookup_forecast_epex", return_value=epex):
+        out = resolve_market_slots(
+            market,
+            [da_slot, pred_slot],
+            missing_price_strategy="forecast",
+            forecast_model=model,
+            forecast_feature_frame=feature_frame,
+            # Live bias fetches Open-Meteo archive weather (network, minutes).
+            live_bias_enabled=False,
+        )
     by_src = {row["price_source"]: row for row in out}
-    assert by_src[PRICE_SOURCE_DAY_AHEAD]["k_act"] == pytest.approx(expected)
-    assert by_src[PRICE_SOURCE_PREDICTED]["k_act"] == pytest.approx(expected)
+    assert by_src[PRICE_SOURCE_DAY_AHEAD]["price_buy"] == pytest.approx(epex)
     assert by_src[PRICE_SOURCE_PREDICTED]["price_buy"] == pytest.approx(epex)
+    assert all("k_act" not in row for row in out)
 
 
 def test_resolve_market_slots_applies_live_bias_to_predicted_only():

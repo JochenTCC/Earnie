@@ -82,11 +82,13 @@ Das noch ältere Feld `netznutzung_arbeitspreis_cent_kwh` stellt derselbe Wizard
 
 Der Hauskonfigurator speichert unter Standort das Feld `land` (`AT`/`DE`/`CH`). Im Szenarienkonfigurator ist der Filter **Land** Pflicht (kein „Alle“); er wird aus dem gewählten Hausprofil vorbelegt.
 
-Optional speichert er daneben die **Region (Feiertage)** als Feld `region`: Bundesland bzw. Kanton für den Feiertagskalender (AT `1` Burgenland … `9` Wien, DE z. B. `BY`, CH z. B. `ZH`). Earnie braucht sie heute noch nicht zum Rechnen. Tarife mit Zeitregeln nach Wochentag oder Feiertag (Benutzertarife aus Edibert, siehe unten) brauchen sie, sobald Earnie mit Edibert rechnet. Ohne Region gibt es keinen Feiertagskalender. Eine unbekannte Region lehnt Earnie beim Speichern ab.
+Optional speichert er daneben die **Region (Feiertage)** als Feld `region`: Bundesland bzw. Kanton für den Feiertagskalender (AT `1` Burgenland … `9` Wien, DE z. B. `BY`, CH z. B. `ZH`). Tarife mit Zeitregeln nach Wochentag oder Feiertag (z. B. Benutzertarife aus Edibert, siehe unten) brauchen sie zum Rechnen. Ohne Region gibt es keinen Feiertagskalender. Eine unbekannte Region lehnt Earnie beim Speichern ab.
 
 ## Bezugspreis (Live)
 
 Die Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `earnie_env/config/tariffs.json` auf (Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json)). Aufschläge stehen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).
+
+Die Preise je Slot berechnet die Tarif-Bibliothek [Edibert](https://github.com/JochenTCC/Edibert) – für Live und für den Szenario-Explorer dieselbe Rechnung. Jedes Szenario braucht dafür einen **Bezugs- und einen Einspeisetarif** (Katalog, Benutzertarif oder **Eigener Festpreis**). Ohne Tarif bricht die Berechnung mit einer Meldung ab; Earnie nimmt weder den Tarif des Live-Szenarios noch einen festen Ersatzwert. Ältere Szenarien mit `k_push_cent` / `feed_in_mode` ohne Einspeisetarif stellt der **Migrations-Wizard** um (Frage je Szenario).
 
 ### Marktpreise abrufen
 
@@ -133,7 +135,7 @@ Die Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Ty
 Eigene Tarife aus dem Tarif-Editor [Edibert](https://github.com/JochenTCC/Edibert) liegen in `user_tariffs.json` **neben** `tariffs.json` (gleiches Verzeichnis, gleiche Struktur, IDs beginnen mit `user_`). Earnie liest die Datei, wenn sie existiert; fehlt sie, gibt es einfach keine Benutzertarife. Die Datei gehört zum Config-Paket (Export/Import).
 
 - Im Szenarienkonfigurator erscheinen Benutzertarife mit dem Zusatz **· Benutzertarif** in den Dropdowns Bezug und Einspeise.
-- Benutzertarife mit Zeitregeln (`rules`), Preisunter- oder -obergrenze (`price_floor_cent_kwh` / `price_cap_cent_kwh`) kann Earnie noch nicht berechnen. Sie tragen den Zusatz **· Benutzertarif, erst ab Engine-Umstellung**. Wählt ein Szenario so einen Tarif, bricht die Berechnung mit einer Meldung ab, und der Start-Check meldet das Szenario. Earnie rechnet die Regeln nie still weg.
+- Benutzertarife mit Zeitregeln (`rules`), Preisunter- oder -obergrenze (`price_floor_cent_kwh` / `price_cap_cent_kwh`) berechnet Earnie über Edibert wie jeden anderen Tarif.
 - Edibert prüft die Datei streng: ein falsches ID-Präfix, ein unbekanntes Feld oder eine doppelte ID ist ein Ladefehler mit Hinweis auf `user_tariffs.json`. Jeder Benutzertarif braucht wie Katalog-Tarife ein `land` und einen `vat_percent` (`0` erlaubt).
 - **Migration (Tarifformat 1):** Für Benutzertarife ohne `vat_percent` fragt der Migrations-Wizard den USt-Satz ab. Er schlägt den Standardsatz des Landes vor (AT 20 %, DE 19 %, CH 8,1 %), übernimmt ihn aber nur nach Bestätigung (Schaltfläche **Vorschlag übernehmen** oder eigener Wert).
 
@@ -159,11 +161,11 @@ Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/
 | `spot_hourly` / `ex_post_spot` | EPEX − `feed_in_fee_factor` × \|EPEX\| − `settlement_fee_cent_kwh` + `feed_in_fix_cent` (Faktor/Fix optional, Standard 0) |
 | `monthly_table` | Monatskonstante Vergütung (`monthly_rates` am Tarif) |
 
-Der interne Runtime-`feed_in_mode` für stündliche EPEX-Einspeisung bleibt `dynamic_epex`. Er ist nicht mit dem entfernten Katalog-`type` gleichen Namens zu verwechseln. Beispiel mit Prozentabschlag: Katalog-id `dynamic_epex` (aWATTar SUNNY SPOT) als `spot_hourly` mit `feed_in_fee_factor: 0.19`.
+Beispiel mit Prozentabschlag: Katalog-id `dynamic_epex` (aWATTar SUNNY SPOT) als `spot_hourly` mit `feed_in_fee_factor: 0.19`.
 
-Die Berechnung steht in [`data/tariff_pricing.py`](../../data/tariff_pricing.py) (`import_cent_kwh`, `export_cent_kwh`). Die MILP-Matrix nutzt `k_act` (Bezug) und `k_push_act` (Einspeisung) je **15-Min-Slot** (`dt_h = 0.25`).
+Die Berechnung macht Edibert (Anbindung in [`data/edibert_slot_prices.py`](../../data/edibert_slot_prices.py)). Die MILP-Matrix nutzt `k_act` (Bezug) und `k_push_act` (Einspeisung) je **15-Min-Slot** (`dt_h = 0.25`).
 
-**Abrechnung vs. Plan:** Earnie plant alle Lieferanten auf derselben QH-Matrix, sowohl solche mit Viertelstunden-EPEX (z. B. VKW, Tibber) als auch solche mit Stundenprodukt (z. B. aWATTar HOURLY). Stündliche Marktdaten (CH auf Energy-Charts, aWATTar-Fallback, Historie vor ~2025-10) expandiert Earnie auf vier gleiche QH-Preise. Die Rechnung kann dann weiterhin stündlich mitteln, während der Plan QH-fähig ist.
+**Abrechnung vs. Plan:** Earnie plant alle Lieferanten auf derselben QH-Matrix, sowohl solche mit Viertelstunden-EPEX (z. B. VKW, Tibber) als auch solche mit Stundenprodukt (z. B. aWATTar HOURLY). Stündliche Marktdaten (CH auf Energy-Charts, aWATTar-Fallback, Historie vor ~2025-10) expandiert Earnie auf vier gleiche QH-Preise. Tarife mit `settlement_mtu: 60min` rechnen mit dem Mittel der vier Viertelstunden **der echten Stunde**. Beginnt oder endet der Planungshorizont mitten in einer Stunde, holt Earnie die fehlenden Viertelstunden-Börsenpreise dieser Stunde dazu (Day-Ahead, sonst Spiegelung bzw. Prognose wie im Horizont), statt nur die vorhandenen zu mitteln. In der Herbst-Zeitumstellung zählen die beiden 02:00-Stunden getrennt.
 
 **Fehlender Folgemonat:** Fehlt in `monthly_rates` der Monat eines Planungsslots (typisch der **nächste Kalendermonat**), nutzt Earnie vorübergehend denselben Monat im Vorjahr, sonst den Vormonat, und schreibt eine Warnung ins Log.
 
@@ -179,7 +181,7 @@ Die Berechnung steht in [`data/tariff_pricing.py`](../../data/tariff_pricing.py)
 | DE | DE-LU | Energy-Charts (`bzn=DE-LU`); Fallback aWATTar DE |
 | CH | CH | Energy-Charts |
 
-`simulation/engine.py` und `data/backtesting_prices.py` werten `_import_tariff_spec` / `_export_tariff_spec` aus der Szenario-Auflösung aus. Day-Ahead-Daten: [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+`simulation/engine.py` und `data/backtesting_prices.py` bepreisen über die Edibert-Preisreferenz der Szenario-Auflösung (`_edibert_pricing`); `_import_tariff_spec` / `_export_tariff_spec` tragen nur noch die Katalogparameter für Anzeige, Fixkosten und Rechnung. Day-Ahead-Daten: [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 **DACH-Katalog importieren:** `tools/convert_dach_tariffs.py` aus `stromtarife_dach_kombiniert.json` + `einspeisetarife_dach_erweitert.json`.
 

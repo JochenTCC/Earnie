@@ -26,7 +26,7 @@ from data.live_price_cache import (
     trim_live_price_series,
 )
 from data.market_prices import awattar_fetch_window, normalize_price_slot
-from data.tariff_pricing import market_zone_for_land
+from house_config.edibert_tariffs import market_zone
 from optimizer.slot_duration import normalize_quarter_hour_slot
 from runtime_store.cycle_duration_stats import (
     EVENT_DAY_AHEAD_FETCH,
@@ -42,7 +42,7 @@ def _runtime_market_zone() -> str:
     profile = resolved.get("_house_profile") or {}
     land = str(profile.get("land") or resolved.get("land") or "AT")
     try:
-        return market_zone_for_land(land)
+        return market_zone(land)
     except ValueError:
         logger.warning("Unknown land %r for live prices; using AT", land)
         return MARKET_ZONE_AT

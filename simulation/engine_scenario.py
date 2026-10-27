@@ -121,13 +121,20 @@ def _brutto_prices_for_slots(
     *,
     scenario_params: dict | None = None,
 ) -> list[float]:
-    from data.backtesting_prices import import_brutto_cent_for_slots, pricing_kwargs_from_resolved
+    from data.backtesting_prices import (
+        import_brutto_cent_for_slots,
+        market_for_prices,
+        pricing_kwargs_from_resolved,
+    )
 
+    # No scenario = the live scenario (as for the feed-in settings of a reference run).
+    resolved = scenario_params if scenario_params else config.get_resolved_runtime_settings()
     epex = epex_prices_for_slots(prices_df, slot_datetimes)
     return import_brutto_cent_for_slots(
         [float(p) for p in epex],
         slot_datetimes,
-        **pricing_kwargs_from_resolved(scenario_params),
+        market_for=market_for_prices(prices_df, None),
+        **pricing_kwargs_from_resolved(resolved),
     )
 
 

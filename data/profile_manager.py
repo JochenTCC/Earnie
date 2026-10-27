@@ -2,11 +2,10 @@
 import logging
 import os
 import pandas as pd
-from datetime import datetime, timedelta, date, time
+from datetime import datetime, timedelta, date
 from typing import List, Tuple, Optional
 from . import pv_forecast
 import config
-from . import data_loader
 from . import market_prices
 from . import feed_in_prices
 from . import cons_data_store
@@ -312,19 +311,27 @@ def _build_optimization_matrix(
             "forecast_consumption, forecast_pv und target_hours müssen gleiche Länge haben."
         )
 
+    slot_kwargs = resolve_market_slots_kwargs(target_hours)
     price_slots = market_prices.resolve_market_slots(
         market_data,
         target_hours,
-        **resolve_market_slots_kwargs(target_hours),
+        **slot_kwargs,
     )
     from data.backtesting_prices import (
         enrich_slots_import_prices,
         pricing_kwargs_from_resolved,
     )
 
+    def _market_for(slots: list) -> list[float]:
+        # Quarter-hours outside the horizon that an hourly settled tariff needs (D1):
+        # same source as the horizon (day-ahead, else mirror / forecast).
+        resolved = market_prices.resolve_market_slots(market_data, slots, **slot_kwargs)
+        return [float(row["price_buy"]) for row in resolved]
+
     enrich_slots_import_prices(
         price_slots,
         target_hours,
+        market_for=_market_for,
         **pricing_kwargs_from_resolved(
             config.get_resolved_runtime_settings(),
         ),
@@ -352,6 +359,7 @@ def _build_optimization_matrix(
     feed_in_prices.enrich_matrix_feed_in_prices(
         optimization_matrix,
         config.get_feed_in_settings(),
+        market_for=_market_for,
     )
     return optimization_matrix
 
@@ -547,114 +555,3 @@ def get_historical_date_picker_bounds(months_back: int = 12) -> Tuple[date, date
     if min_date > max_date:
         max_date = lox_max
     return min_date, max_date
-
-
-def _reindex_hourly_series(series: pd.Series, target_date: date) -> List[float]:
-    """Filtert eine stündliche Serie auf einen Tag und liefert exakt 24 Werte (00–23 Uhr)."""
-    full_day_range = pd.date_range(
-        start=f"{target_date} 00:00:00",
-        end=f"{target_date} 23:00:00",
-        freq='1h',
-    )
-    if series.empty:
-        return [0.0] * 24
-
-    day_series = series[series.index.date == target_date]
-    day_series = day_series.reindex(full_day_range, fill_value=0.0)
-    return day_series.round(3).tolist()
-
-
-def _get_historical_pv_for_day(target_date: date) -> List[float]:
-    """Liest den PV-Ertrag eines Tages aus cons_data.csv."""
-    return _reindex_hourly_series(load_cons_data_pv_series(), target_date)
-
-
-def _import_pricing_kwargs() -> dict:
-    from data.backtesting_prices import pricing_kwargs_from_resolved
-
-    return pricing_kwargs_from_resolved(
-        config.get_resolved_runtime_settings(),
-    )
-
-
-def _get_historical_epex_and_brutto_prices_for_day(target_date: date) -> tuple[list[float], list[float]]:
-    """Lädt EPEX- und Brutto-Bezugspreise (Cent/kWh) für 24 Stunden eines Tages."""
-    sim_cfg = config.get_scenario_explorer_conf()
-    start = pd.Timestamp(target_date)
-    end = start
-
-    df_prices = data_loader.load_market_prices(
-        start,
-        end,
-        sim_cfg,
-        awattar_url=config.get('AWATTAR_URL'),
-        timeout=config.get_global_timeout(),
-        market_zone=(config.get_resolved_runtime_settings() or {}).get("market_zone"),
-    )
-
-    full_day_range = pd.date_range(
-        start=f"{target_date} 00:00:00",
-        end=f"{target_date} 23:00:00",
-        freq='1h',
-    )
-    slot_datetimes = [ts.to_pydatetime() for ts in full_day_range]
-    epex_prices = market_prices.epex_prices_for_slots(df_prices, slot_datetimes)
-    from data.backtesting_prices import import_brutto_cent_for_slots
-
-    brutto_prices = import_brutto_cent_for_slots(
-        [float(p) for p in epex_prices],
-        slot_datetimes,
-        **_import_pricing_kwargs(),
-    )
-    return epex_prices, brutto_prices
-
-
-def _get_historical_brutto_prices_for_day(target_date: date) -> List[float]:
-    """Lädt die historischen Börsenpreise für einen Tag und rechnet sie in Brutto-Cent/kWh um."""
-    _, brutto_prices = _get_historical_epex_and_brutto_prices_for_day(target_date)
-    return brutto_prices
-
-
-def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]:
-    """
-    Baut eine 24-Stunden-Optimierungsmatrix aus cons_data und historischen Preisen.
-    """
-    if isinstance(target_date, str):
-        target_date = pd.to_datetime(target_date).date()
-    elif isinstance(target_date, datetime):
-        target_date = target_date.date()
-
-    baseload, historical_totals, total_load = get_historical_day_data(target_date)
-    pv_profile = _get_historical_pv_for_day(target_date)
-    epex_prices, brutto_prices = _get_historical_epex_and_brutto_prices_for_day(target_date)
-
-    matrix = []
-    for hour in range(24):
-        slot_dt = datetime.combine(target_date, time(hour=hour))
-        matrix.append({
-            "hour": hour,
-            "date": target_date,
-            "slot_datetime": slot_dt,
-            "k_act": brutto_prices[hour],
-            "price_buy": epex_prices[hour],
-            "expected_p_act": baseload[hour],
-            "expected_p_total": total_load[hour],
-            "expected_p_pv": pv_profile[hour],
-            "consumption_mode": "logged_day",
-        })
-
-    feed_in_prices.enrich_matrix_feed_in_prices(matrix, config.get_feed_in_settings())
-
-    meta = {
-        'target_date': target_date,
-        'historical_totals': historical_totals,
-        'baseload_kwh': round(sum(baseload), 3),
-        'total_kwh': round(sum(total_load), 3),
-        'pv_kwh': round(sum(pv_profile), 3),
-    }
-    from . import consumer_targets
-
-    meta['consumer_daily_targets_kwh'] = consumer_targets.resolve_historical_consumer_daily_targets(
-        target_date
-    )
-    return matrix, meta

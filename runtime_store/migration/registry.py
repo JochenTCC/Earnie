@@ -24,6 +24,7 @@ from runtime_store.migration.steps.retire_plant_pv_binding import (
     STEP as RETIRE_PLANT_PV,
 )
 from runtime_store.migration.steps.netznutzung_split import STEP as NETZNUTZUNG_SPLIT
+from runtime_store.migration.steps.scenario_feed_in import STEP as SCENARIO_FEED_IN
 from runtime_store.migration.steps.se_conf_defaults import STEP as SE_CONF_DEFAULTS
 from runtime_store.migration.steps.tariff_format import STEP as TARIFF_FORMAT
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
@@ -51,6 +52,7 @@ STEPS: tuple[MigrationStep, ...] = (
     SE_CONF_DEFAULTS,
     FLEX_OVERLAY,
     NETZNUTZUNG_SPLIT,
+    SCENARIO_FEED_IN,
     TARIFF_FORMAT,
 )
 

@@ -75,16 +75,17 @@ def tariff_reference_fingerprint(scenario_params: dict | None) -> tuple:
     """Vergleichsschlüssel für Referenz-Tarife (Import/Export)."""
     if not scenario_params:
         return ()
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY
+
     import_spec = scenario_params.get("_import_tariff_spec")
     export_spec = scenario_params.get("_export_tariff_spec")
+    ref = scenario_params.get(EDIBERT_PRICING_KEY) or {}
+    user_fixed = ref.get("user_fixed") or {}
     return (
         import_spec.get("id") if isinstance(import_spec, dict) else None,
         export_spec.get("id") if isinstance(export_spec, dict) else None,
-        scenario_params.get("import_tariff_type"),
-        scenario_params.get("import_fixed_cent_kwh"),
-        scenario_params.get("feed_in_mode"),
-        scenario_params.get("k_push_cent"),
-        scenario_params.get("monthly_fixed_feed_in_rates"),
+        # Eigener Festpreis: same ID, different cent values → different references.
+        tuple(sorted((side, values["cent"]) for side, values in user_fixed.items())),
     )
 
 

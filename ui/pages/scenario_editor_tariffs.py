@@ -25,7 +25,7 @@ def _planning_now_for_tariffs():
 
 
 def _next_month_in_planning_tz() -> tuple[int, int]:
-    from data.tariff_pricing import next_calendar_month
+    from house_config.tariff_month_hints import next_calendar_month
 
     now = _planning_now_for_tariffs()
     return next_calendar_month(now.year, now.month)
@@ -40,7 +40,7 @@ def _render_next_month_rate_entry(
     session_scope: str,
 ) -> None:
     """Warn + form when next calendar month is missing on a monthly_table tariff."""
-    from data.tariff_pricing import monthly_rates_cover_month
+    from house_config.tariff_month_hints import monthly_rates_cover_month
 
     if str(tariff.get("type", "")).strip().lower() != "monthly_table":
         return
@@ -295,7 +295,7 @@ def _render_scenario_next_month_rates(
     import_tariff: dict | None,
     export_tariff: dict | None,
 ) -> None:
-    from data.tariff_pricing import is_within_days_of_next_month
+    from house_config.tariff_month_hints import is_within_days_of_next_month
 
     if not is_within_days_of_next_month(_planning_now_for_tariffs(), days=2):
         return

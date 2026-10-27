@@ -169,6 +169,8 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "label": "Fix",
                         "type": "fixed_cent",
                         "fix_cent_kwh": 37.0,
+                        "supplier_id": "fix",
+                        "vat_percent": 0.0,
                     }
                 ],
                 "export_tariffs": [
@@ -177,6 +179,8 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "land": "AT",
                         "label": "Monatlich",
                         "type": "monthly_table",
+                        "supplier_id": "monatlich",
+                        "vat_percent": 0.0,
                         "monthly_rates": [
                             {"year": 2025, "month": 6, "tariff_cent_kwh": 5.5},
                         ],
@@ -207,7 +211,6 @@ def test_config_loads_id_only_live_scenario(tmp_path, monkeypatch):
 
     assert cfg.PV_KWP == pytest.approx(10.0)
     assert cfg.BATTERY_CAPACITY_KWH == pytest.approx(5.0)
-    assert cfg.FEED_IN_MODE == "fixed"
 
     resolved = cfg.get_resolved_runtime_settings()
     assert resolved["battery_capacity_kwh"] == pytest.approx(5.0)
@@ -215,7 +218,8 @@ def test_config_loads_id_only_live_scenario(tmp_path, monkeypatch):
     assert resolved["longitude"] == pytest.approx(11.0)
     assert resolved["timezone_name"] == "Europe/Berlin"
     assert resolved.get("_house_profile") is not None
-    assert resolved.get("_monthly_fixed_tariffs") is not None
+    assert resolved["_export_tariff_spec"]["monthly_rates"] == ((2025, 6, 5.5),)
+    assert resolved["_edibert_pricing"]["export_tariff_id"] == "monthly_exp"
     assert cfg.get_battery_wear_cent_per_kwh(5.0) == pytest.approx(2.5, rel=1e-3)
 
 
@@ -258,8 +262,7 @@ def test_backtesting_feed_in_settings_uses_resolved_baseline(tmp_path, monkeypat
     )
 
     settings = cfg.get_backtesting_feed_in_settings()
-    assert settings.mode == "fixed"
-    assert settings.monthly_fixed_tariffs is not None
+    assert settings.edibert_pricing["export_tariff_id"] == "monthly_exp"
     assert settings.k_push_cent == pytest.approx(0.0)
 
 

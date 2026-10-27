@@ -8,7 +8,6 @@ from typing import Any
 _FINGERPRINT_TARIFF_KEYS = frozenset({
     "_import_tariff_spec",
     "_export_tariff_spec",
-    "_monthly_fixed_tariffs",
 })
 _SPOT_EXPORT_FEE_KEYS = (
     "feed_in_fee_factor",
@@ -27,11 +26,18 @@ def _json_safe(value: Any) -> Any:
 
 
 def _canonical_scenario_settings(settings: dict) -> dict:
-    return _json_safe({
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, pricing_digest
+
+    canonical = {
         key: value
         for key, value in settings.items()
         if not str(key).startswith("_") or key in _FINGERPRINT_TARIFF_KEYS
-    })
+    }
+    ref = settings.get(EDIBERT_PRICING_KEY)
+    if isinstance(ref, dict):
+        # Tariff and grid-fee file content (Edibert P3b, D4): a catalog edit changes prices.
+        canonical["_pricing_digest"] = pricing_digest(ref)
+    return _json_safe(canonical)
 
 
 def _spot_export_fee_from_specs(settings: dict) -> dict:

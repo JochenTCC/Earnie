@@ -33,39 +33,55 @@ _AWATTAR_SURCHARGES = {
 }
 
 
-def _resolved_awattar() -> dict:
+def _write_pack(tmp_path, *, grid_fee_cent: float | None = None) -> dict[str, str]:
+    """Tariff files in Edibert format: a quarter-hour spot tariff with aWATTar surcharges and a
+    fixed import tariff; optionally a flat user grid area."""
+    import json
+
+    from house_config.edibert_tariffs import flat_user_grid_area
+
+    tariffs = {
+        "tariff_format": 1,
+        "import_tariffs": [
+            {"id": "spot_qh", "label": "Spot", "type": "spot_hourly", "land": "AT",
+             "supplier_id": "awattar_at", **_AWATTAR_SURCHARGES},
+            {"id": "fixed_imp", "label": "Fix", "type": "fixed_cent", "land": "AT",
+             "supplier_id": "fix", "fix_cent_kwh": 37.0, "prices_include_vat": True,
+             "vat_percent": 0.0},
+        ],
+        "export_tariffs": [],
+    }
+    (tmp_path / "tariffs.json").write_text(json.dumps(tariffs), encoding="utf-8")
+    (tmp_path / "grid_fees.json").write_text(
+        json.dumps({"tariff_format": 1, "rule_sets": {}, "areas": []}), encoding="utf-8"
+    )
+    if grid_fee_cent is not None:
+        area = flat_user_grid_area("user_home", grid_fee_cent, label="Home", land="AT")
+        (tmp_path / "user_grid_fees.json").write_text(
+            json.dumps({"tariff_format": 1, "rule_sets": {}, "areas": [area]}), encoding="utf-8"
+        )
+    return {"tariffs": str(tmp_path / "tariffs.json"), "grid": str(tmp_path / "grid_fees.json")}
+
+
+def _resolved(tmp_path, import_id: str, *, grid_fee_cent: float | None = None) -> dict:
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, pricing_reference
+
+    paths = _write_pack(tmp_path, grid_fee_cent=grid_fee_cent)
+    profile: dict = {"land": "AT"}
+    if grid_fee_cent is not None:
+        profile["netznutzung"] = {"area_id": "user_home", "quarter_hour_meter": True}
     return {
-        "_import_tariff_spec": {
-            "id": "awattar_at",
-            "type": "spot_hourly",
-            **_AWATTAR_SURCHARGES,
-        },
-        "_export_tariff_spec": {
-            "id": "dynamic_epex",
-            "type": "spot_hourly",
-            "feed_in_fee_factor": 0.19,
-            "feed_in_fix_cent": 0.0,
-        },
+        EDIBERT_PRICING_KEY: pricing_reference(
+            tariffs_path=paths["tariffs"], grid_fees_path=paths["grid"],
+            import_tariff_id=import_id, export_tariff_id=None,
+            timezone_name="Europe/Vienna", profile=profile,
+        )
     }
 
 
-def _resolved_fixed_import() -> dict:
-    return {
-        "_import_tariff_spec": {
-            "id": "fixed_imp",
-            "type": "fixed_cent",
-            "fix_cent_kwh": 37.0,
-            "prices_include_vat": True,
-            "vat_percent": 0.0,
-        },
-    }
-
-
-@pytest.mark.parametrize(
-    "resolved",
-    [_resolved_awattar(), _resolved_fixed_import()],
-)
-def test_live_and_backtesting_import_prices_match(resolved):
+@pytest.mark.parametrize("import_id", ["spot_qh", "fixed_imp"])
+def test_live_and_backtesting_import_prices_match(tmp_path, import_id):
+    resolved = _resolved(tmp_path, import_id)
     slots = [datetime(2025, 6, 10, h, 0) for h in range(6)]
     epex = [4.2, 5.1, 6.0, 7.3, 8.0, 3.9]
     kwargs = pricing_kwargs_from_resolved(resolved)
@@ -82,9 +98,8 @@ def test_live_and_backtesting_import_prices_match(resolved):
     assert live_brutto == pytest.approx(bt_brutto)
 
 
-def test_enrich_slots_import_prices_matches_matrix():
-    resolved = _resolved_awattar()
-    kwargs = pricing_kwargs_from_resolved(resolved)
+def test_enrich_slots_import_prices_matches_matrix(tmp_path):
+    kwargs = pricing_kwargs_from_resolved(_resolved(tmp_path, "spot_qh"))
     slots_dt = [datetime(2025, 7, 1, h, 0) for h in (0, 1, 2)]
     market = [
         {"timestamp": slots_dt[0], "price_buy": 10.0},
@@ -101,26 +116,23 @@ def test_enrich_slots_import_prices_matches_matrix():
     assert [slot["k_act"] for slot in resolved_slots] == pytest.approx(expected)
 
 
-def test_se_chart_strompreis_includes_netznutzung():
+def test_se_chart_strompreis_includes_netznutzung(tmp_path):
     """SE Chart 1 Preis is k_act; k_act already includes house-profile NNE AP."""
-    from data.grid_fees import flat_grid_fee_spec
     from optimizer.sim_chart_rows import _chart_price_fields
 
-    resolved = {
-        **_resolved_awattar(),
-        "_grid_fee_spec": flat_grid_fee_spec(5.0),
-    }
     slots = [datetime(2025, 6, 10, 12, 0)]
     epex = [10.0]
     with_nne = import_brutto_cent_for_slots(
-        epex, slots, **pricing_kwargs_from_resolved(resolved)
+        epex, slots, **pricing_kwargs_from_resolved(_resolved(tmp_path, "spot_qh", grid_fee_cent=5.0))
     )[0]
+    other = tmp_path / "plain"
+    other.mkdir()
     without_nne = import_brutto_cent_for_slots(
-        epex, slots, **pricing_kwargs_from_resolved(_resolved_awattar())
+        epex, slots, **pricing_kwargs_from_resolved(_resolved(other, "spot_qh"))
     )[0]
     fields = _chart_price_fields({"k_act": with_nne, "price_source": "day_ahead"})
     assert fields["Strompreis (Cent/kWh)"] == pytest.approx(with_nne)
-    assert with_nne > without_nne
+    assert with_nne == pytest.approx(without_nne + 5.0 * 1.2)
 
 
 def test_monday_of_week_snaps_to_monday():

@@ -7,10 +7,8 @@ import os
 import jsonschema
 
 from house_config.tariffs_store import (
-    ENGINE_PENDING_KEY,
     USER_EXPORT_CENT_KEY,
     USER_IMPORT_CENT_KEY,
-    is_engine_pending,
     is_user_fixed_tariff_id,
     load_tariffs_document,
     resolve_export_tariff_id,
@@ -80,14 +78,6 @@ def validate_tariffs_against_schema(
         ) from exc
 
 
-def _engine_pending_ref_error(scenario_id: str, tariff: dict) -> str:
-    fields = ", ".join(tariff[ENGINE_PENDING_KEY])
-    return (
-        f"Szenario '{scenario_id}': Benutzertarif '{tariff['id']}' nutzt {fields} und ist "
-        "erst nach der Engine-Umstellung auf Edibert bepreisbar."
-    )
-
-
 def collect_scenario_tariff_ref_errors(
     scenarios_path: str,
     tariffs_path: str,
@@ -131,8 +121,6 @@ def collect_scenario_tariff_ref_errors(
                 errors.append(
                     f"Szenario '{scenario_id}': unbekannte import_tariff_id '{import_id}'."
                 )
-            elif is_engine_pending(import_map[import_id]):
-                errors.append(_engine_pending_ref_error(scenario_id, import_map[import_id]))
         if export_id:
             if is_user_fixed_tariff_id(export_id):
                 err = _user_fixed_cent_error(
@@ -144,8 +132,6 @@ def collect_scenario_tariff_ref_errors(
                 errors.append(
                     f"Szenario '{scenario_id}': unbekannte export_tariff_id '{export_id}'."
                 )
-            elif is_engine_pending(export_map[export_id]):
-                errors.append(_engine_pending_ref_error(scenario_id, export_map[export_id]))
     return errors
 
 
@@ -162,8 +148,8 @@ def collect_tariff_plausibility_errors(
 
     ``with_edibert``: zusätzlich lädt Edibert Katalog, Benutzertarife, ``grid_fees.json`` mit
     ``user_grid_fees.json``, den Netzbereich (``netznutzung``) und den Preis-Kontext jedes
-    Hausprofils (Edibert P1, nur Prüfung — bepreist wird
-    weiter mit Earnies eigener Engine). Start-Check und ``scripts.validate_tariffs``.
+    Hausprofils (dieselben Dateien, mit denen Edibert bepreist). Start-Check und
+    ``scripts.validate_tariffs``.
     """
     errors: list[str] = []
     if not os.path.isfile(tariffs_path):

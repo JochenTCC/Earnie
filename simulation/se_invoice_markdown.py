@@ -23,6 +23,7 @@ from simulation.se_invoice_format import (  # noqa: F401  (re-exported)
 )
 from simulation.se_invoice_netznutzung import (  # noqa: F401  (re-exported)
     _NetznutzungComponent,
+    InvoiceGridFee,
     _grid_fee_from_params,
     _netznutzung_ap_gross_cent,
     _netznutzung_components,
@@ -294,7 +295,7 @@ def _build_invoice_year_context(
     fees: ScenarioFeeBreakdown,
     import_spec: dict | None,
     booked_consumption: dict,
-    grid_fee: dict | None,
+    grid_fee: InvoiceGridFee | None,
 ) -> _InvoiceYearContext:
     """Monatsreihen plus Jahressummen, Netznutzungs-AP und Gesamtbetrag."""
     (
@@ -317,7 +318,7 @@ def _build_invoice_year_context(
     components = _netznutzung_components(
         df, grid_fee=grid_fee, import_spec=import_spec
     )
-    ap_net = float(grid_fee["base_cent_kwh"]) if grid_fee else 0.0
+    ap_net = float(grid_fee.base_cent_kwh) if grid_fee else 0.0
     ap_gross = _netznutzung_ap_gross_cent(ap_net, import_spec)
     nne_eur = sum(comp.eur for comp in components)
     if nne_eur > import_year:
@@ -341,7 +342,7 @@ def _build_invoice_year_context(
         ap_gross_cent=ap_gross,
         netznutzung_ap_eur=nne_eur,
         netznutzung_components=components,
-        netznutzung_skipped=list(grid_fee["skipped"]) if grid_fee else [],
+        netznutzung_skipped=list(grid_fee.skipped) if grid_fee else [],
     )
 
 
@@ -441,14 +442,14 @@ def render_scenario_invoice_markdown(
     import_spec: dict | None,
     export_spec: dict | None,
     booked_consumption: dict,
-    grid_fee: dict | None = None,
+    grid_fee: InvoiceGridFee | None = None,
 ) -> str:
     """Build one German fake-Jahresrechnung markdown body.
 
     ``booked_consumption`` is this result's ``booked_consumption_totals`` entry —
     the same source as SE Gesamtkosten Jahres Verbrauch / Speicher-Standby.
 
-    ``grid_fee`` is the resolved house-profile grid-fee spec (``data.grid_fees``).
+    ``grid_fee`` is the house-profile grid fee resolved by Edibert (``InvoiceGridFee``).
     When set, Jahr splits Lieferant vs Netznutzung (same Gesamt; AP already in k_act).
     """
     ctx = _build_invoice_year_context(

@@ -212,18 +212,13 @@ def resolve_live_scenario_settings_dict(
 ) -> dict:
     from house_config.scenario_resolution import resolve_live_scenario_settings
 
-    holder: dict = {}
-    resolved = resolve_live_scenario_settings(
+    return resolve_live_scenario_settings(
         raw_config,
         backtesting_scenarios_path=backtesting_scenarios_path,
         components_path=components_path,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
-        monthly_rates_holder=holder,
     )
-    if holder.get("_monthly_fixed_tariffs") is not None:
-        resolved["_monthly_fixed_tariffs"] = holder["_monthly_fixed_tariffs"]
-    return resolved
 
 
 def should_defer_runtime_params(
@@ -295,7 +290,6 @@ def load_deferred_runtime_params(
     config_path: str,
 ) -> dict[str, Any]:
     attrs = {
-        "FEED_IN_MODE": "fixed",
         "_planning_pv_systems": [],
     }
     attrs.update(load_geo_timezone_params(resolved, raw_config, config_path))
@@ -314,16 +308,7 @@ def load_full_runtime_params(
     raw_config: dict,
     config_path: str,
 ) -> dict[str, Any]:
-    feed_in_mode_raw = resolved.get("feed_in_mode")
-    if feed_in_mode_raw is None:
-        feed_in_mode = "fixed"
-    else:
-        from data.feed_in_prices import validate_feed_in_mode
-
-        feed_in_mode = validate_feed_in_mode(feed_in_mode_raw)
-
     attrs: dict[str, Any] = {
-        "FEED_IN_MODE": feed_in_mode,
         "K_PUSH_CENT": float(lookup_runtime_value(resolved, "k_push_cent", config_path)),
         "PV_TILT": float(resolved.get("pv_tilt", 0.0) or 0.0),
         "PV_AZIMUTH": float(resolved.get("pv_azimuth", 0.0) or 0.0),

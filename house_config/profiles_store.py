@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 
-from data.grid_fees import normalize_netznutzung_config
+from house_config.netznutzung import normalize_netznutzung_config
 from house_config.baseload import normalize_baseload_distribution
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.geo_timezone import timezone_for_land

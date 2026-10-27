@@ -68,27 +68,9 @@ def test_history_window_bounds_rejects_live_offset():
 
 def test_entry_to_chart_row_strompreis_uses_logged_market_price_cent():
     """History Strompreis must be retail k_act (logged as market_price_cent), not EPEX."""
-    from data.tariff_pricing import export_cent_kwh, import_cent_kwh
-
     epex = 20.9
-    import_tariff = {
-        "type": "spot_hourly",
-        "settlement_fee_cent_kwh": 1.2,
-        "markup_percent": 0.0,
-        "prices_include_vat": False,
-        "vat_percent": 20.0,
-    }
-    export_tariff = {
-        "type": "spot_hourly",
-        "settlement_fee_cent_kwh": 0.6,
-        "markup_percent": 0.0,
-        "prices_include_vat": False,
-        "vat_percent": 0.0,
-        "feed_in_fee_factor": 0.0,
-        "feed_in_fix_cent": 0.0,
-    }
-    k_act = import_cent_kwh(epex, import_tariff)
-    k_push = export_cent_kwh(epex, export_tariff)
+    k_act = (epex + 1.2) * 1.2  # spot + settlement fee, net + 20 % VAT
+    k_push = epex - 0.6
     entry = _entry(
         datetime(2026, 8, 6, 18, 0, 0),
         market_price_cent=k_act,
@@ -102,53 +84,31 @@ def test_entry_to_chart_row_strompreis_uses_logged_market_price_cent():
 
 
 def test_entry_to_chart_row_converts_legacy_epex_market_price(monkeypatch):
-    """Legacy logs stored EPEX in market_price_cent — chart must show retail k_act."""
-    from data.feed_in_prices import FeedInSettings
-    from data.tariff_pricing import export_cent_kwh, import_cent_kwh
+    """Legacy logs stored EPEX in market_price_cent — chart must show retail k_act (Edibert)."""
+    from pathlib import Path
 
+    from data.edibert_slot_prices import EDIBERT_PRICING_KEY, price_points, pricing_reference
+
+    catalog = Path(__file__).resolve().parents[1] / "share" / "config" / "tariffs.json"
+    ref = pricing_reference(
+        tariffs_path=str(catalog),
+        grid_fees_path=None,
+        import_tariff_id="at_vkw_strom_dynamisch",
+        export_tariff_id="at_vkw_pv_dynamisch",
+        timezone_name="Europe/Vienna",
+        profile={"land": "AT"},
+    )
+    slot = datetime(2026, 8, 6, 18, 0, 0)
     epex = 20.9
-    import_tariff = {
-        "id": "at_vkw_strom_dynamisch",
-        "type": "spot_hourly",
-        "settlement_fee_cent_kwh": 1.2,
-        "markup_percent": 0.0,
-        "prices_include_vat": False,
-        "vat_percent": 20.0,
-    }
-    export_tariff = {
-        "id": "at_vkw_pv_dynamisch",
-        "type": "spot_hourly",
-        "settlement_fee_cent_kwh": 0.6,
-        "markup_percent": 0.0,
-        "prices_include_vat": False,
-        "vat_percent": 0.0,
-        "feed_in_fee_factor": 0.0,
-        "feed_in_fix_cent": 0.0,
-    }
-    k_push = export_cent_kwh(epex, export_tariff)
+    k_act = price_points("import", [slot], [epex], ref)[0].cent
+    k_push = price_points("export", [slot], [epex], ref)[0].cent
     monkeypatch.setattr(
-        config,
-        "get_feed_in_settings",
-        lambda: FeedInSettings(
-            mode="dynamic_epex",
-            k_push_cent=0.0,
-            fee_factor=0.0,
-            fix_cent=0.0,
-            export_tariff_spec=export_tariff,
-        ),
+        config, "get_resolved_runtime_settings", lambda: {EDIBERT_PRICING_KEY: ref}
     )
-    monkeypatch.setattr(
-        config,
-        "get_resolved_runtime_settings",
-        lambda: {"_import_tariff_spec": import_tariff},
-    )
-    entry = _entry(
-        datetime(2026, 8, 6, 18, 0, 0),
-        market_price_cent=epex,
-        k_push_act=k_push,
-    )
-    row = history_timeline.entry_to_chart_row(entry, datetime(2026, 8, 6, 18, 0, 0))
-    assert row["Strompreis (Cent/kWh)"] == pytest.approx(import_cent_kwh(epex, import_tariff))
+    entry = _entry(slot, market_price_cent=epex, k_push_act=k_push)
+    row = history_timeline.entry_to_chart_row(entry, slot)
+    assert row["Strompreis (Cent/kWh)"] == pytest.approx(k_act, abs=1e-4)
+    assert row["Strompreis (Cent/kWh)"] != pytest.approx(epex)
     assert row["Einspeisevergütung (Cent/kWh)"] == pytest.approx(k_push)
 
 

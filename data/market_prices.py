@@ -32,67 +32,6 @@ def normalize_price_slot(dt: datetime) -> datetime:
     return normalize_quarter_hour_slot(aligned)
 
 
-def epex_to_brutto_cent(
-    epex_price_cent: float,
-    *,
-    slot_datetime: datetime | None = None,
-) -> float:
-    """EPEX Cent/kWh → Endkunden-Bruttopreis laut aufgelöstem Import-Tarif.
-
-    ``slot_datetime`` is required when the resolved import tariff is
-    ``monthly_table`` (month lookup).
-    """
-    from data.backtesting_prices import pricing_kwargs_from_resolved
-    from data.tariff_pricing import import_cent_kwh
-    from settings.pricing_engine import uses_edibert_pricing
-
-    resolved = config.get_resolved_runtime_settings()
-    if uses_edibert_pricing():
-        from data.edibert_slot_prices import import_cents, require_pricing_reference
-
-        if slot_datetime is None:
-            raise ValueError("EARNIE_PRICING_ENGINE=edibert: Bezugspreis erfordert slot_datetime.")
-        ref = require_pricing_reference(resolved, where="Live-Bezugspreis")
-        return import_cents([slot_datetime], [float(epex_price_cent)], ref)[0]
-    kwargs = pricing_kwargs_from_resolved(resolved)
-    spec = kwargs.get("import_tariff_spec")
-    if spec is None:
-        raise ValueError(
-            "import_tariff_id erforderlich für Bezugspreis-Berechnung "
-            "(kein Legacy-awattar-Block mehr in config.json)."
-        )
-    return import_cent_kwh(
-        float(epex_price_cent),
-        spec,
-        grid_fee=kwargs.get("grid_fee"),
-        slot_datetime=slot_datetime,
-    )
-
-
-def hourly_settlement_epex_values(
-    epex_values: list[float | None],
-    slot_datetimes: list[datetime],
-) -> list[float | None]:
-    """EPEX SDAC "average rule": Stundenpreis = striktes arithmetisches Mittel der 4 QH-Preise.
-
-    Fuer echt stuendlich abgerechnete Tarife (settlement_mtu='60min'); ersetzt jeden
-    QH-Wert durch den Mittelwert seiner Stunde. None-Werte bleiben unveraendert.
-    """
-    from optimizer.slot_duration import floor_to_hour_slot
-
-    parents = [floor_to_hour_slot(normalize_price_slot(s)) for s in slot_datetimes]
-    buckets: dict[datetime, list[float]] = {}
-    for value, parent in zip(epex_values, parents):
-        if value is None:
-            continue
-        buckets.setdefault(parent, []).append(float(value))
-    means = {parent: sum(vals) / len(vals) for parent, vals in buckets.items()}
-    return [
-        means[parent] if value is not None and parent in means else value
-        for value, parent in zip(epex_values, parents)
-    ]
-
-
 def index_market_data_by_slot(market_data: list[dict[str, Any]]) -> dict[datetime, dict[str, Any]]:
     """Index raw market data by quarter-hour slot (mean on true duplicates)."""
     buckets: dict[datetime, list[float]] = {}
@@ -168,7 +107,6 @@ def _append_mirrored_slot(
             "price_buy": epex,
             "price_source": PRICE_SOURCE_MIRRORED,
             "mirrored_from": mirror_slot,
-            "k_act": epex_to_brutto_cent(epex, slot_datetime=slot),
         }
     )
 
@@ -187,7 +125,6 @@ def _append_predicted_slot(
         "hour": slot.hour,
         "price_buy": round(float(epex_cent), 4),
         "price_source": PRICE_SOURCE_PREDICTED,
-        "k_act": epex_to_brutto_cent(float(epex_cent), slot_datetime=slot),
     }
     if forecast_model_path is not None:
         row["forecast_model_path"] = str(forecast_model_path)
@@ -316,7 +253,10 @@ def resolve_market_slots(
     live_bias_cap_cent_kwh: float = 12.0,
 ) -> list[dict[str, Any]]:
     """
-    Liefert Preis-Slots für target_hours (beliebige Länge >= 1).
+    Liefert Börsenpreis-Slots (``price_buy``) für target_hours (beliebige Länge >= 1).
+
+    Endkundenpreise (``k_act``) kommen danach für die ganze Liste aus dem Tarif
+    (``data.backtesting_prices.enrich_slots_import_prices``, Edibert).
 
     Fehlende Day-Ahead-Stunden: Spiegelung (Standard) oder OLS-Prognose bei
     missing_price_strategy='forecast' (Fallback: Spiegelung).
@@ -355,7 +295,6 @@ def resolve_market_slots(
                     "hour": slot.hour,
                     "price_buy": epex,
                     "price_source": PRICE_SOURCE_DAY_AHEAD,
-                    "k_act": epex_to_brutto_cent(epex, slot_datetime=slot),
                 }
             )
             continue

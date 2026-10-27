@@ -276,16 +276,19 @@ def _import_price_cent_from_entry(
     if k_push is None:
         return round(raw, 4)
 
-    from data.feed_in_prices import resolve_k_push_act
-    from data.market_prices import epex_to_brutto_cent
+    from data.edibert_slot_prices import require_pricing_reference, single_slot_cent
+    from house_config.edibert_tariffs import EXPORT, IMPORT
 
-    expected_push = resolve_k_push_act(
-        raw,
-        config.get_feed_in_settings(),
-        slot_datetime=slot_start,
+    if slot_start is None:
+        raise ValueError("Legacy-Logeintrag ohne epex_price_cent erfordert slot_start.")
+    # Legacy entries stored one EPEX value per slot: price that quarter-hour on its own,
+    # as the log did (no hourly mean, which would need the neighbouring slots).
+    ref = require_pricing_reference(
+        config.get_resolved_runtime_settings(), where="Verlauf (Legacy-Strompreis)"
     )
+    expected_push = single_slot_cent(EXPORT, slot_start, raw, ref)
     if abs(float(expected_push) - float(k_push)) <= 0.05:
-        return round(float(epex_to_brutto_cent(raw, slot_datetime=slot_start)), 4)
+        return round(single_slot_cent(IMPORT, slot_start, raw, ref), 4)
     return round(raw, 4)
 
 

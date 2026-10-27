@@ -116,7 +116,7 @@ def test_meta_every_step_covered_by_fixture_detect(tmp_path):
     covered: set[str] = set()
     for name in (
         *HAPPY_SNAPSHOTS, "v3_last", "v3_ha_sign", "v4_pre_ha_pull", "v4_pre_se_conf_defaults",
-        "v4_pre_tariff_track",
+        "v4_pre_tariff_track", "v5_pre_scenario_feed_in",
     ):
         docs = load_pack_docs(_copy_snapshot(tmp_path / "meta", name))
         for step in STEPS:
@@ -146,6 +146,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm4.se_conf_defaults": "v4_pre_se_conf_defaults",
         "dm4.flexible_consumers_overlay": "v4_pre_se_conf_defaults",
         "dm5.netznutzung_split": "v4_pre_tariff_track",
+        "dm5.scenario_feed_in": "v5_pre_scenario_feed_in",
         "tf1.tariff_format": "v4_pre_tariff_track",
     }
     for step in STEPS:

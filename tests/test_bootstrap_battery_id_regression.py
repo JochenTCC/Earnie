@@ -97,18 +97,7 @@ def test_resolve_scenario_settings_coerces_legacy_battery_id(monkeypatch):
         "efficiency": 0.97,
         "ehal_bindings": {},
     }
-    monkeypatch.setattr(
-        "house_config.scenario_resolution.load_tariffs_document",
-        lambda _path: {"import_tariffs": [], "export_tariffs": []},
-    )
-    monkeypatch.setattr(
-        "house_config.scenario_resolution.resolve_import_tariff_into_settings",
-        lambda settings, _doc: settings,
-    )
-    monkeypatch.setattr(
-        "house_config.scenario_resolution.resolve_export_tariff_into_settings",
-        lambda settings, _doc, monthly_rates_holder=None: settings,
-    )
+    # No tariff IDs: resolution reads no tariff file.
     resolved = resolve_scenario_settings(
         {"battery_id": "10_kwh_speicher"},
         raw_config={"live_scenario_id": "live"},

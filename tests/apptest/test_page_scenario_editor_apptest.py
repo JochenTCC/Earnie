@@ -66,4 +66,4 @@ def test_user_tariffs_appear_in_selection():
     assert not at.exception
     options = next(sb for sb in at.selectbox if sb.label == "Bezugstarif").options
     assert "Mein Fixtarif · Benutzertarif" in options
-    assert "Tag/Nacht · Benutzertarif, erst ab Engine-Umstellung" in options
+    assert "Tag/Nacht · Benutzertarif" in options  # Edibert prices rules since P3b

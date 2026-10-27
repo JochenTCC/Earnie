@@ -150,10 +150,10 @@ def _render_pv_default_row(*, session_scope: str) -> tuple[float, float]:
     return float(default_pv_tilt), float(default_pv_azimuth)
 
 def _load_grid_fee_catalog_for_ui() -> dict:
-    from data.grid_fees import load_grid_fee_catalog
+    from house_config.edibert_tariffs import grid_area_view
     from runtime_store.persist_paths import resolve_grid_fees_json_path
 
-    return load_grid_fee_catalog(resolve_grid_fees_json_path())
+    return grid_area_view(resolve_grid_fees_json_path())
 
 
 def _render_nne_area_fields(
@@ -201,20 +201,26 @@ def _render_nne_area_fields(
 
 
 def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
-    """Resolved base price and active time rules of the chosen Netzbereich."""
-    from data.grid_fees import resolve_grid_fee_spec
+    """Resolved base price and active time rules of the chosen Netzbereich (via Edibert)."""
+    from house_config.edibert_tariffs import cached_grid_fees, profile_grid_fee
+    from runtime_store.persist_paths import resolve_grid_fees_json_path
 
+    _ = catalog  # the selection list; Edibert resolves from the same files
     try:
-        spec = resolve_grid_fee_spec(config, catalog, timezone_name="Europe/Vienna")
+        fee = profile_grid_fee(
+            "Formular", {"netznutzung": config}, cached_grid_fees(resolve_grid_fees_json_path())
+        )
     except ValueError as exc:
         st.error(str(exc))
         return
-    active = ", ".join(rule["id"] for rule in spec["rules"]) or "keine"
+    active = ", ".join(rule.id for rule in fee.rules) or "keine"
     skipped = ", ".join(
-        f"{item['id']} ({item['reason']})" for item in spec["skipped"]
+        f"{item.rule_id} (status={item.detail})" if item.reason == "status"
+        else f"{item.rule_id} ({item.reason})"
+        for item in fee.skipped
     )
     st.caption(
-        f"Basis-Arbeitspreis: **{spec['base_cent_kwh']:.2f} Cent/kWh** netto · "
+        f"Basis-Arbeitspreis: **{fee.base_cent_kwh:.2f} Cent/kWh** netto · "
         f"aktive Zeitregeln: **{active}**"
         + (f" · übersprungen: {skipped}" if skipped else "")
     )
@@ -222,7 +228,7 @@ def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
 
 def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
     """Netznutzung: Netzbereich aus Katalog oder eigener Arbeitspreis; Zeitregeln."""
-    from data.grid_fees import METERING_UNMETERED
+    from house_config.netznutzung import METERING_UNMETERED
     from house_config.own_grid_fee import OWN_AREA, OWN_BASE_KEY
 
     catalog = _load_grid_fee_catalog_for_ui()

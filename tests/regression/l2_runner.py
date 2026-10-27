@@ -66,8 +66,8 @@ _CASE_GRID_AREA = "user_regression_case"
 def _edibert_case_pricing(
     out: dict, tariff: dict | None, fee: float | None, work_dir: Path
 ) -> None:
-    """``EARNIE_PRICING_ENGINE=edibert`` (Edibert P3a): the case's inline tariff and flat grid
-    fee as tariff-track files, so Edibert prices the same inputs as Earnie's inline specs."""
+    """The case's inline tariff and flat grid fee as tariff-track files plus a pricing
+    reference, so Edibert prices exactly these inputs."""
     from data.edibert_slot_prices import EDIBERT_PRICING_KEY, pricing_reference
     from house_config.edibert_tariffs import EDIBERT_TARIFF_FORMAT, flat_user_grid_area
 
@@ -95,6 +95,16 @@ def _edibert_case_pricing(
             encoding="utf-8",
         )
         profile["netznutzung"] = {"area_id": _CASE_GRID_AREA, "quarter_hour_meter": True}
+    if tariff is not None:
+        # The case tariff lives in its own file; the export tariff stays the scenario's.
+        export_id = ref.get("export_tariff_id")
+        if export_id:
+            source = json.loads(Path(ref["tariffs_path"]).read_text(encoding="utf-8"))
+            doc = json.loads(tariffs_path.read_text(encoding="utf-8"))
+            doc["export_tariffs"] = [
+                t for t in source.get("export_tariffs", []) if t.get("id") == export_id
+            ]
+            tariffs_path.write_text(json.dumps(doc), encoding="utf-8")
     out[EDIBERT_PRICING_KEY] = pricing_reference(
         tariffs_path=str(tariffs_path) if tariff is not None else ref["tariffs_path"],
         grid_fees_path=str(grid_path),
@@ -102,16 +112,15 @@ def _edibert_case_pricing(
         export_tariff_id=ref.get("export_tariff_id"),
         timezone_name=str(out.get("timezone_name") or "Europe/Vienna"),
         profile=profile,
+        user_fixed=ref.get("user_fixed") or None,
     )
 
 
 def _apply_case_pricing(scenario: dict, case_inputs: dict[str, Any], work_dir: Path) -> dict:
     """Optional pricing overrides: ``import_tariff`` (spec) and ``grid_fee_base_cent_kwh``.
 
-    Without them the fixture scenario keeps the synthetic price series as is.
+    Without them the fixture scenario keeps its own tariffs.
     """
-    from settings.pricing_engine import uses_edibert_pricing
-
     tariff = case_inputs.get("import_tariff")
     fee = case_inputs.get("grid_fee_base_cent_kwh")
     if tariff is None and fee is None:
@@ -119,12 +128,7 @@ def _apply_case_pricing(scenario: dict, case_inputs: dict[str, Any], work_dir: P
     out = dict(scenario)
     if tariff is not None:
         out["_import_tariff_spec"] = dict(tariff)
-    if fee is not None:
-        from data.grid_fees import flat_grid_fee_spec
-
-        out["_grid_fee_spec"] = flat_grid_fee_spec(float(fee))
-    if uses_edibert_pricing():
-        _edibert_case_pricing(out, tariff, fee, work_dir)
+    _edibert_case_pricing(out, tariff, fee, work_dir)
     return out
 
 

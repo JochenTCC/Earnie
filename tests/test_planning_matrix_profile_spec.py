@@ -23,7 +23,7 @@ from simulation.engine import (
     window_slot_datetimes,
 )
 from simulation.horizon_mode import FIXED_24H
-from tests.fixtures.backtesting_fixtures import build_synthetic_prices_df
+from tests.fixtures.backtesting_fixtures import build_synthetic_prices_df, fixture_tariff_params
 from tests.fixtures.historical_fixtures import CONS_DATA_FILE
 
 os.environ.setdefault("EARNIE_OFFLINE", "1")
@@ -118,6 +118,7 @@ def test_profile_spec_matrix_uses_profile_baseload_not_cons_data_total(
         "latitude": 48.0,
         "longitude": 10.0,
         "timezone_name": "Europe/Berlin",
+        **fixture_tariff_params("fixed_25ct", "fixed_37ct", timezone_name="Europe/Berlin"),
     }
     prices_df = build_synthetic_prices_df(
         pd.Timestamp(anchor) - pd.Timedelta(days=1),
@@ -435,19 +436,11 @@ def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
     scenarios = {
         "live": {
             **ZERO_BATTERY_FLAT,
-            "_import_tariff_spec": {"id": "awattar_at", "type": "spot_hourly", "land": "AT"},
-            "_export_tariff_spec": {"id": "fixed_37ct", "type": "fixed", "k_push_cent": 37.0},
-            "feed_in_mode": "fixed",
-            "k_push_cent": 37.0,
+            **fixture_tariff_params("awattar_at", "fixed_37ct"),
         },
         "fixed_only": {
             **ZERO_BATTERY_FLAT,
-            "_import_tariff_spec": {"id": "fixed_25ct", "type": "fixed_cent", "fix_cent_kwh": 25.0},
-            "_export_tariff_spec": {"id": "fixed_37ct", "type": "fixed", "k_push_cent": 37.0},
-            "feed_in_mode": "fixed",
-            "k_push_cent": 37.0,
-            "import_tariff_type": "fixed_cent",
-            "import_fixed_cent_kwh": 25.0,
+            **fixture_tariff_params("fixed_25ct", "fixed_37ct"),
         },
     }
     anchor = window_anchor_for_date(date(2025, 6, 14))
@@ -488,12 +481,7 @@ def test_build_per_scenario_reference_costs_pv_variant(
 
     tariff_block = {
         **ZERO_BATTERY_FLAT,
-        "_import_tariff_spec": {"id": "fixed_25ct", "type": "fixed_cent", "fix_cent_kwh": 25.0},
-        "_export_tariff_spec": {"id": "fixed_37ct", "type": "fixed", "k_push_cent": 37.0},
-        "feed_in_mode": "fixed",
-        "k_push_cent": 37.0,
-        "import_tariff_type": "fixed_cent",
-        "import_fixed_cent_kwh": 25.0,
+        **fixture_tariff_params("fixed_25ct", "fixed_37ct"),
     }
     scenarios = {
         "live": {**tariff_block, "pv_kwp": 8.0},
