@@ -6,7 +6,7 @@ from typing import Any
 import streamlit as st
 
 from ehal.signal_catalog import set_binding_activation
-from ehal.signal_export import build_export_zip
+from ehal.signal_export import build_export_zip, normalize_export_host
 from ehal.signal_list import SignalRow, build_signal_rows
 from runtime_store.ehal_setup import BACKEND_LOXONE, active_ehal_backend
 from runtime_store.shadow.errors import ConfigReadOnlyError
@@ -194,10 +194,17 @@ def _render_export(house: dict, components: dict, *, backend: str) -> None:
         st.caption("Host eingeben, um den ZIP-Download freizuschalten.")
         return
     try:
+        export_host = normalize_export_host(host)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    if export_host != str(host).strip():
+        st.caption(f"Adresse ohne Schema übernommen: `{export_host}`")
+    try:
         payload = build_export_zip(
             house,
             components,
-            host=str(host).strip(),
+            host=export_host,
             port=int(port),
             mode=mode,  # type: ignore[arg-type]
         )

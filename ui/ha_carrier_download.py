@@ -5,6 +5,7 @@ import os
 
 import streamlit as st
 
+from ehal.signal_export import normalize_export_host
 from integrations.ha_carrier_yaml import build_carrier_yaml
 from scripts.pilot_vo_template_gen import TOKEN_PLACEHOLDER
 
@@ -40,10 +41,17 @@ def render_ha_carrier_yaml_download() -> None:
         st.caption("Host eingeben, um den YAML-Download freizuschalten.")
         return
     try:
+        export_host = normalize_export_host(host)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    if export_host != str(host).strip():
+        st.caption(f"Adresse ohne Schema übernommen: `{export_host}`")
+    try:
         text = build_carrier_yaml(
             house,
             components,
-            earnie_host=str(host).strip(),
+            earnie_host=export_host,
             earnie_port=int(port),
             token=str(token or "").strip() or TOKEN_PLACEHOLDER,
         )

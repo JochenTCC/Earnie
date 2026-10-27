@@ -27,6 +27,27 @@ Host: {host}:{port}
 """
 
 
+def normalize_export_host(raw: str) -> str:
+    """Host for template addresses: strip a pasted ``http(s)://`` and trailing ``/``.
+
+    The templates add scheme and port themselves; a port or path left in the field
+    would end up twice in the address, so it fails loud instead.
+    """
+    host = str(raw or "").strip()
+    lowered = host.lower()
+    for scheme in ("http://", "https://"):
+        if lowered.startswith(scheme):
+            host = host[len(scheme):]
+            break
+    host = host.rstrip("/")
+    if ":" in host or "/" in host:
+        raise ValueError(
+            f"Host {raw!r}: nur IP-Adresse oder Hostnamen eintragen, ohne Port und "
+            "Pfad – den Port im Feld „HTTP-Port“ setzen."
+        )
+    return host
+
+
 def build_export_zip(
     house: dict,
     components: dict,
