@@ -302,3 +302,51 @@ SNAP baseline with the old engine → B1 → B2 → B3 → B4 → B5 → B7 (gat
 - [x] `data/tariff_pricing.py`, `data/grid_fees.py`, `settings/pricing_engine.py` and the resolution in `tariffs_store` are gone.
 - [x] A horizon with an hourly settled tariff starting mid-hour prices without `PRICE_MISSING` (live and SE; `tests/test_edibert_p3b.py`).
 - [ ] A live cycle on the maintainer site (needs the site migrated to data model 5 first; quarter-hour tariff there).
+
+## P4a — Market prices, live chain (plan 2026-10-27)
+
+Status: **planned**. Backlog item *Edibert P4a* (Version 2.8). Goal: `data/live_market_prices.py`, `integrations/entsoe_client.py` and `integrations/awattar_client.py` are replaced by Edibert's market module; `price_source` per slot comes from Edibert's forecast method. **Done:** a live cycle runs on Edibert prices, recorder-format regression goldens green.
+
+### Findings (2026-10-27)
+
+- **The live chain is not public.** `MarketService` (cache → ENTSO-E → Energy-Charts → aWATTar, `edibert.market.service`) is used only by the publish product; `api.__all__` exports only `MarketArchive` / `market_range` (ranges, Energy-Charts only). An Edibert release is needed.
+- **Window:** Earnie fetches from today 00:00 minus `MAX_MIRROR_LOOKBACK_DAYS` (7) for the mirror sources (`awattar_fetch_window`). `MarketService.load` fetches today and, after 12:00, tomorrow; earlier days come only from its cache (`HISTORY_DAYS = 7`), so a fresh install has no mirror sources.
+- **Shadow mode:** all three Earnie fetchers go through `ext_get` / `safe_record` / `replay_ext_payload` with the feed keys `ext:prices:entsoe`, `ext:prices:energy_charts`, `ext:prices:awattar`. Edibert takes an injectable `HttpGet` (`get(url, params, timeout) -> str`), so Earnie can pass its shadow-aware transport. aWATTar is recorded today as parsed JSON, Edibert expects text.
+- **CH:** Earnie falls back to the aWATTar AT series for CH; Edibert has deliberately no third source for CH.
+- **`price_source`:** `tariff_price_series` runs no forecaster; the caller passes `forecast_from` / `forecast_method`, every `PricePoint` carries `market_cent` and `method`. Earnie's `resolve_market_slots` produces `day_ahead` / `mirrored` / `predicted` (OLS); OLS moves to Edibert only in P5.
+- **Cache:** Earnie keeps `runtime/live_day_ahead_<zone>.json` (freshness logic in `data/live_price_cache.py`), Edibert its own cache file. `live_price_cache.py` is removed in P4b (SE side); the live path stops using it here.
+- **Callers:** `main.py`, `ui/live_mode.py`, `data/live_prefetch.py` (all `fetch_live_day_ahead_prices(planning_end)`); tests `tests/main_run_harness.py`, `tests/early_start_runner.py`, `tests/test_entsoe_client.py`, `tests/test_live_market_prices_regression.py`, `tests/test_live_price_cache.py`.
+
+### Decisions (2026-10-27, recommendations accepted by the maintainer)
+
+1. **D1 — Edibert API:** new Edibert phase **`0.1.k`** makes the live chain public: a function in `edibert.api` (e.g. `market_live(zone, data_dir, tz, *, entsoe_token, get, history_days, now=None) -> MarketData`) plus `MarketData` in `__all__`. Additive, `API_VERSION` unchanged. Earnie raises the pin afterwards (tag proposal `v0.1.5`, version bump only with maintainer approval).
+2. **D2 — mirror lead time:** the live call takes `history_days`; Edibert fetches the window from today minus `history_days` (like Earnie today), not only from its cache. No second chain via `market_range` in Earnie.
+3. **D3 — CH:** Edibert's behaviour: no aWATTar AT substitute for CH. Missing slots → `MARKET_DATA_INCOMPLETE` → mirror. Behaviour change for CH sites, noted in the release notes.
+4. **D4 — `price_source`:** slot labels stay `day_ahead` / `mirrored` / `predicted`. Mirror comes from Edibert (`MirrorForecaster`, same wall-clock rule, 7 days); OLS stays in Earnie until P5 but is passed as `forecast_method` to `tariff_price_series`. Mapping `exact` → `day_ahead`, `mirror` → `mirrored`, OLS → `predicted` in one helper.
+5. **D5 — replays:** an Earnie transport adapter maps each request URL to its feed key and records the raw text; old aWATTar recordings (dict payload) are turned into text with `json.dumps` on replay. No converter for old recordings.
+
+### Part A — Edibert (`0.1.k`)
+
+- Public live function + `MarketData` in `api`; `history_days` in `expected_window` / `load` (fetch window starts `history_days` before today 00:00; completeness check stays today / tomorrow).
+- Tests: window with lead time, fresh install without cache, injected `get` is used for every source, CH without aWATTar, partial result reported.
+- `docs/spec/api.md`, backlog, tag after approval.
+
+### Part B — Earnie
+
+- **B1** New module `data/edibert_live_market.py` with the same signature as `fetch_live_day_ahead_prices(planning_end)`, so the three callers only swap the import: zone from `land` via `eb.market_zone` (no silent "AT" for an unknown land), ENTSO-E token (`read_entsoe_api_token` moves here), `data_dir` under `runtime/`, shadow-aware `get` adapter (D5), `record_cycle_event(EVENT_DAY_AHEAD_FETCH)` only on a real fetch, Edibert warnings logged. Returns the same `timestamp` / `hour` / `price_buy` list as today.
+- **B2** Mirror in `resolve_market_slots` from Edibert, `method` → `price_source` mapping (D4).
+- **B3** Delete the three old modules, `tests/test_entsoe_client.py`, `tests/test_live_market_prices_regression.py` and the live parts of `tests/test_live_price_cache.py`; repoint `tests/main_run_harness.py` and `tests/early_start_runner.py`; remove `AWATTAR_URL` from the config if nothing else reads it.
+- **B4** Tests: zone mapping, shadow record / replay per source, mirror parity (Edibert vs. the old `find_mirror_slot` on the same data), CH path, empty answer fails loud.
+- **B5** Docs: German user docs on price sources (`docs/referenz/tarife-quellen.md`, possibly `docs/konfiguration/preise.md`: source order, CH, cache location); this section (implementation notes, results); shadow-mode workflow doc if it lists feed keys.
+
+### Order
+
+Part A (release, pin) → B1 → B2 → B3 → B4 → B5 → gate: full suite (`scripts.run_pytest`), `scripts.run_regression` without `--update-golden`, live cycle on the maintainer site (the site needs the data-model-5 migration first, see P3b). The pandas-free chain (`fetch_energy_charts_prices` in `data/data_loader.py`) is P4b.
+
+### Done check
+
+- [ ] Edibert `0.1.k` released, Earnie pin raised.
+- [ ] The three old modules are gone; live callers use Edibert.
+- [ ] Shadow record / replay works for all three sources.
+- [ ] Full suite and all regression cases green, goldens unchanged.
+- [ ] A live cycle on the maintainer site runs on Edibert prices.
