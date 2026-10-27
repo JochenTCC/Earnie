@@ -142,6 +142,7 @@ def _resolve_live_bias_cent(
     live_bias_enabled: bool,
     live_bias_lookback_hours: int,
     live_bias_cap_cent_kwh: float,
+    live_bias_feature_frame: pd.DataFrame | None,
 ) -> float | None:
     if not live_bias_enabled or forecast_model is None or not target_hours:
         return None
@@ -154,6 +155,7 @@ def _resolve_live_bias_cent(
         reference_slot=ref,
         lookback_hours=live_bias_lookback_hours,
         cap_cent_kwh=live_bias_cap_cent_kwh,
+        feature_frame=live_bias_feature_frame,
     )
     return bias
 
@@ -208,9 +210,10 @@ def resolve_market_slots(
     forecast_feature_frame: pd.DataFrame | None = None,
     forecast_model_path: Path | None = None,
     eu_power_live_source: str | None = None,
-    live_bias_enabled: bool = True,
+    live_bias_enabled: bool = False,
     live_bias_lookback_hours: int = 48,
     live_bias_cap_cent_kwh: float = 12.0,
+    live_bias_feature_frame: pd.DataFrame | None = None,
 ) -> list[dict[str, Any]]:
     """
     Liefert Börsenpreis-Slots (``price_buy``) für target_hours (beliebige Länge >= 1).
@@ -224,8 +227,10 @@ def resolve_market_slots(
     Stunde. Der Prognosezeitraum (erster bis letzter fehlender Slot) ist höchstens
     ``MAX_FORECAST_HOURS`` lang, sonst ``ValueError``.
 
-    Live bias (default on): rolling Day-Ahead−OLS residual on predicted slots,
-    capped by ``live_bias_cap_cent_kwh`` (default ±12 Cent/kWh).
+    Live bias (only with ``live_bias_enabled``): rolling Day-Ahead−OLS residual on predicted
+    slots, capped by ``live_bias_cap_cent_kwh`` (default ±12 Cent/kWh). Its lookback features
+    come from ``live_bias_feature_frame`` (SE: the training CSV), else from the live
+    Energy-Charts / Open-Meteo fetch.
     """
     if not target_hours:
         raise ValueError("resolve_market_slots erfordert mindestens eine Zielstunde.")
@@ -245,6 +250,7 @@ def resolve_market_slots(
         live_bias_enabled=live_bias_enabled,
         live_bias_lookback_hours=live_bias_lookback_hours,
         live_bias_cap_cent_kwh=live_bias_cap_cent_kwh,
+        live_bias_feature_frame=live_bias_feature_frame,
     )
     known = _known_quarter_hours(by_slot)
     tz = ZoneInfo(config.get_planning_timezone())

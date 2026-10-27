@@ -234,6 +234,8 @@ Wenn keine Preisquelle der Kaskade (Cache, ENTSO-E, Energy-Charts, aWATTar) für
 - **`mirror`:** gleiche Uhrzeit am nächsten früheren Tag mit Preis (bis 7 Tage zurück; über die Zeitumstellung hinweg gilt die Uhrzeit, nicht der Abstand in Stunden). Ein Stundenwert gilt für alle vier Viertelstunden seiner Stunde. Earnie nutzt diese Strategie auch automatisch, wenn Modell oder Features nicht geladen werden können, und für einzelne Stunden ohne Features.
   Ist ein Datendienst (z. B. Energy-Charts) nicht erreichbar, bricht Earnie den Abruf beim ersten Verbindungsfehler ab und versucht es erst nach einer Stunde wieder, damit ein Lauf nicht minutenlang wartet. Wer die EU-Abrufe ganz abschalten möchte, setzt `missing_price_strategy` auf `mirror`.
 
+Im Backtesting mit `price_strategy=forecast` berechnet Earnie den Bias aus denselben Trainings-Features wie die Prognose (48 Stunden, ±12 Cent/kWh) und ruft dafür keine Daten bei Energy-Charts ab.
+
 Prognose und Spiegelung füllen höchstens 72 Stunden ab dem ersten fehlenden Börsenpreis. Fehlen mehr, bricht die Preisberechnung mit einer Fehlermeldung ab, statt weiter in die Zukunft zu raten.
 
 Spec: [Preis-Prognose (Dev)](../dev/done/price-forecast-renewables.md).

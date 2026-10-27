@@ -245,6 +245,10 @@ def resolve_backtesting_slot_prices(
         forecast_model=ctx.forecast_model,
         forecast_feature_frame=ctx.feature_frame,
         forecast_model_path=ctx.forecast_model_path,
+        # As live (default 48 h, ±12 ct), but the lookback features come from the training
+        # CSV: the SE must not fetch EU power from Energy-Charts per window.
+        live_bias_enabled=ctx.strategy == MISSING_PRICE_STRATEGY_FORECAST,
+        live_bias_feature_frame=ctx.feature_frame,
     )
     for row, slot in zip(resolved, slot_datetimes):
         row["slot_datetime"] = slot

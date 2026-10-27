@@ -158,6 +158,25 @@ def test_resolve_market_slots_kwargs_forecast_without_features_uses_mirror():
     assert "forecast_model" not in kwargs
 
 
+@pytest.mark.parametrize("enabled", [True, False])
+def test_resolve_market_slots_kwargs_passes_live_bias_switch(enabled):
+    """``live_bias_enabled: false`` in config.json switches the bias off (no implicit default)."""
+    frame = pd.DataFrame({"x": [1.0]}, index=pd.DatetimeIndex([datetime(2025, 7, 1, 10)]))
+    with patch(
+        "data.price_forecast_live.get_missing_price_strategy",
+        return_value=MISSING_PRICE_STRATEGY_FORECAST,
+    ):
+        with patch("data.price_forecast_live.load_configured_model", return_value=object()):
+            with patch(
+                "data.price_forecast_live.build_live_feature_frame_for_slots",
+                return_value=frame,
+            ):
+                with patch("data.price_forecast_live.get_live_bias_enabled", return_value=enabled):
+                    kwargs = resolve_market_slots_kwargs([])
+    assert kwargs["live_bias_enabled"] is enabled
+    assert ("live_bias_lookback_hours" in kwargs) is enabled
+
+
 def test_build_live_feature_frame_logs_error_on_forecast_failure(caplog):
     from data import price_forecast_live as pfl
 

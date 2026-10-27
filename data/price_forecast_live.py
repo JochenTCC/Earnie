@@ -365,8 +365,12 @@ def compute_rolling_epex_bias_cent(
     lookback_hours: int,
     cap_cent_kwh: float = DEFAULT_LIVE_BIAS_CAP_CENT,
     min_samples: int = MIN_LIVE_BIAS_SAMPLES,
+    feature_frame: pd.DataFrame | None = None,
 ) -> tuple[float | None, int]:
     """Mean (actual − model) over recent Day-Ahead hours; capped.
+
+    ``feature_frame`` holds the lookback features (SE: training CSV); without it they are
+    fetched live (``build_live_feature_frame_for_slots``).
 
     Returns (bias_cent_or_None, sample_count).
     """
@@ -378,7 +382,8 @@ def compute_rolling_epex_bias_cent(
     for hours_back in range(1, lookback_hours + 1):
         lookback_slots.append(ref - timedelta(hours=hours_back))
 
-    feature_frame = build_live_feature_frame_for_slots(lookback_slots)
+    if feature_frame is None:
+        feature_frame = build_live_feature_frame_for_slots(lookback_slots)
     if feature_frame is None or feature_frame.empty:
         logger.warning(
             "Preisprognose: live bias — keine Features für Lookback."
@@ -444,8 +449,8 @@ def resolve_market_slots_kwargs(target_hours: list) -> dict:
     feature_frame = build_live_feature_frame_for_slots(target_hours)
     if feature_frame is not None and not feature_frame.empty:
         kwargs["forecast_feature_frame"] = feature_frame
-        if get_live_bias_enabled():
-            kwargs["live_bias_enabled"] = True
+        kwargs["live_bias_enabled"] = get_live_bias_enabled()
+        if kwargs["live_bias_enabled"]:
             kwargs["live_bias_lookback_hours"] = get_live_bias_lookback_hours()
             kwargs["live_bias_cap_cent_kwh"] = get_live_bias_cap_cent_kwh()
         return kwargs

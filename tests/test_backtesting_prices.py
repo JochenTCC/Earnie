@@ -13,6 +13,7 @@ from data.backtesting_prices import (
     import_brutto_cent_for_slots,
     last_day_ahead_calendar_date,
     matrix_prices_from_context,
+    resolve_backtesting_slot_prices,
     slot_in_market_data_as_of,
 )
 from data.market_prices import (
@@ -80,6 +81,47 @@ def test_resolve_market_slots_forecast_uses_model():
     )
     assert len(resolved) == 1
     assert resolved[0]["price_source"] == PRICE_SOURCE_PREDICTED
+
+
+def test_se_forecast_live_bias_reads_training_frame_not_network():
+    """The SE takes the bias lookback features from its training frame (no Energy-Charts fetch)."""
+    from unittest.mock import patch
+
+    from data.price_forecast_live import compute_rolling_epex_bias_cent
+
+    frame = _synthetic_frame(hours=96)
+    model = fit_price_model(frame.iloc[:72])
+    planning = datetime(2025, 7, 3, 8, 0, tzinfo=VIENNA)
+    prices = frame.rename(columns={"price_epex_cent_kwh": "price_cent_kwh"})
+    feature_frame = frame.copy()
+    feature_frame.index = feature_frame.index.tz_convert(VIENNA).tz_localize(None)
+    ctx = BacktestingPriceContext(
+        strategy="forecast",
+        planning_moment=planning,
+        feature_frame=feature_frame,
+        forecast_model=model,
+    )
+    target = datetime(2025, 7, 4, 18, 0, tzinfo=VIENNA)
+    with patch(
+        "data.price_forecast_live.build_live_feature_frame_for_slots",
+        side_effect=AssertionError("SE must not fetch live features"),
+    ):
+        rows = resolve_backtesting_slot_prices(prices, [target], ctx)
+        market = {
+            row["timestamp"]: row["price_buy"]
+            for row in build_market_data_as_of(prices, planning)
+        }
+        want, samples = compute_rolling_epex_bias_cent(
+            market,
+            forecast_model=model,
+            reference_slot=target,
+            lookback_hours=48,
+            cap_cent_kwh=12.0,
+            feature_frame=feature_frame,
+        )
+    assert samples >= 6 and want is not None
+    assert rows[0]["price_source"] == PRICE_SOURCE_PREDICTED
+    assert rows[0]["live_bias_cent_kwh"] == pytest.approx(want)
 
 
 def test_matrix_prices_mirror_marks_extrapolated_slots(tmp_path):
