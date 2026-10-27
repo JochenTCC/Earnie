@@ -325,15 +325,18 @@ def build_telemetry_rows(
     expected_fields: list[str] | None = None,
     backend: str | None = None,
     push_info: dict[str, tuple[str, str, float | None]] | None = None,
+    push_details: dict[str, str] | None = None,
 ) -> list[dict[str, str]]:
     """Live-Lesen rows.
 
-    ``push_info`` (HA): qualified id → (push state, last receipt, last pushed value).
+    ``push_info`` (HA): qualified id → (push state, last receipt, last pushed value
+    with ``ehal.ha.sign`` applied). ``push_details``: qualified id → Detail note.
 
     HA bindings carry no entity ids (activation keys only), so "mapped" cannot come
     from ``mapping``; an activated push signal shows its inbox state and receipt time.
     """
     push = push_info or {}
+    details = push_details or {}
     source: dict[str, str] = {}
     for k, v in (mapping or {}).items():
         key = canonicalize_live_display_field(str(k), has_batteries=False)
@@ -380,7 +383,7 @@ def build_telemetry_rows(
                     "EHAL-Feld": field,
                     "Wert": wert,
                     "Status": status,
-                    "Detail": "",
+                    "Detail": details.get(field, ""),
                     "Zuletzt gelesen": seen_at,
                 },
                 backend=hub,

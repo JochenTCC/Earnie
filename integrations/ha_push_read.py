@@ -99,6 +99,11 @@ def read_push_ehal_value(
         raise PushReadError(
             f"HA push read failed for {qualified_id!r} (field={adapter_field!r}, state={state})"
         )
+    return apply_push_sign(float(value), sign=sign, adapter_field=adapter_field)
+
+
+def push_sign_mode(sign: dict[str, str], adapter_field: str) -> str | None:
+    """``ehal.ha.sign`` mode for a push field (entity-scoped key or bare kind); SoC never."""
     kind = (
         ess_field_kind(adapter_field)
         or inv_field_kind(adapter_field)
@@ -106,11 +111,15 @@ def read_push_ehal_value(
         or adapter_field
     )
     if kind == "sens_ess_soc" or adapter_field == "sens_ess_soc":
-        return float(value)
-    mode = sign.get(adapter_field) or sign.get(kind)
+        return None
+    return sign.get(adapter_field) or sign.get(kind)
+
+
+def apply_push_sign(value: float, *, sign: dict[str, str], adapter_field: str) -> float:
+    """Apply ``ehal.ha.sign`` to one pushed value (same rule as the live read path)."""
     from integrations.ha_adapter import apply_sign
 
-    return apply_sign(float(value), mode)
+    return apply_sign(float(value), push_sign_mode(sign, adapter_field))
 
 
 def read_push_energy_kwh(qualified_id: str) -> float | None:

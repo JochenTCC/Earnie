@@ -45,7 +45,7 @@ Die Werte im Push sind bereits in EHAL-Einheiten (z. B. W, kWh, %). Die Umrechnu
 
 Optional: Ladeleistung der Wallbox und Maxstrom (`number`-Entity) als Schreibweg.
 
-**Vorzeichen:** Im EHAL bedeutet Netz **+** Bezug und ESS **+** Entladen. Weicht die Integration davon ab, **negate** setzen (unter `ehal.ha.sign`).
+**Vorzeichen:** Im EHAL bedeutet Netz **+** Bezug und ESS **+** Entladen. Weicht die Integration davon ab, **negate** setzen (unter `ehal.ha.sign`). Das YAML-Paket rechnet nur Einheiten um, kein Vorzeichen. **Live-Lesen** zeigt den Wert nach `ehal.ha.sign`, also so, wie Earnie damit rechnet; gedrehte Felder tragen in der Spalte Detail den Hinweis „Vorzeichen gedreht“. Beim Umstieg von 2.6 fragt der Migrationsassistent, ob ein altes `ehal.ha.sign` erhalten bleiben soll. Liefert die neu gebundene Entity das EHAL-Vorzeichen bereits, den Eintrag entfernen, sonst wird der Wert doppelt gedreht.
 
 **Ist-Werte je Slot:** Die Ist-Werte je Viertelstunde (z. B. für die [Charts](../ui/charts.md)) berechnet Earnie aus den gepushten Leistungswerten. Sie werden alle 30 s abgetastet und über die Viertelstunde gemittelt. Zusätzliche Energiezähler sind dafür nicht nötig.
 

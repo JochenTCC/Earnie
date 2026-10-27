@@ -174,26 +174,42 @@ def _local_receipt_time(raw: object) -> str:
     return stamp.isoformat(timespec="seconds")
 
 
-def _ha_push_read_info() -> dict[str, tuple[str, str, float | None]]:
-    """Qualified id → (push state, last receipt, value) for every activated HA read signal."""
+def _ha_push_read_info(
+    sign: dict[str, str],
+) -> tuple[dict[str, tuple[str, str, float | None]], dict[str, str]]:
+    """Qualified id → (push state, last receipt, value) for every activated HA read signal.
+
+    The value carries ``ehal.ha.sign`` like the live read path, so Live-Lesen shows
+    what Earnie computes with. Second map: qualified id → Detail note for signed fields.
+    """
     from integrations.ha_push_read import (
+        apply_push_sign,
         load_house_components_for_ha,
         push_read_qualified_ids,
+        push_sign_mode,
     )
     from runtime_store.ehal_push_inbox import memory_snapshot, read_push_value
 
     house, components = load_house_components_for_ha()
     inbox = memory_snapshot()
     info: dict[str, tuple[str, str, float | None]] = {}
-    for qid in sorted(set(push_read_qualified_ids(house, components).values())):
+    details: dict[str, str] = {}
+    for field, qid in sorted(push_read_qualified_ids(house, components).items()):
+        if qid in info:
+            continue
         value, state = read_push_value(qid)
+        mode = push_sign_mode(sign, field)
+        if mode == "negate":
+            details[qid] = "Vorzeichen gedreht (ehal.ha.sign: negate)"
+        if value is not None:
+            value = apply_push_sign(value, sign=sign, adapter_field=field)
         row = inbox.get(qid)
         info[qid] = (
             state,
             _local_receipt_time(row.get("last_ts")) if isinstance(row, dict) else "",
             value,
         )
-    return info
+    return info, details
 
 
 @st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
@@ -225,9 +241,10 @@ def _render_ehal_telemetry_fragment() -> None:
         house = load_house_profiles()
         telemetry_payload = expand_ha_telemetry_for_live(telemetry_payload, house)
         expected = expected_live_read_fields(network_backend=False)
-        push_info = _ha_push_read_info()
+        push_info, push_details = _ha_push_read_info(dict(adapter.cfg.sign))
     else:
         push_info = None
+        push_details = None
     from ui.ehal_live_read_style import style_live_read_rows
 
     st.dataframe(
@@ -238,6 +255,7 @@ def _render_ehal_telemetry_fragment() -> None:
                 mapping=mapping,
                 expected_fields=expected,
                 push_info=push_info,
+                push_details=push_details,
             )
         ),
         width="stretch",
