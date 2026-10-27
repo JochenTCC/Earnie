@@ -8,6 +8,9 @@ from __future__ import annotations
 from streamlit.testing.v1 import AppTest
 
 _FIELD = "ess.house.set_ess_charge_power_limit"
+# AppTest defaults to 3 s per run. The first run in a worker imports ``ui.ehal_write_test``
+# cold, which took longer than that under full-suite xdist load and failed spuriously.
+_TIMEOUT = 30
 
 
 def _script() -> None:
@@ -49,13 +52,13 @@ def _script_incomplete_scenario() -> None:
 
 
 def test_incomplete_live_scenario_shows_power_limit_warning() -> None:
-    at = AppTest.from_function(_script_incomplete_scenario).run()
+    at = AppTest.from_function(_script_incomplete_scenario, default_timeout=_TIMEOUT).run()
     assert not at.exception
     assert any("Keine Batterie-Maximalleistung" in w.value for w in at.warning)
 
 
 def test_complete_live_scenario_shows_no_power_limit_warning() -> None:
-    at = AppTest.from_function(_script).run()
+    at = AppTest.from_function(_script, default_timeout=_TIMEOUT).run()
     assert not at.exception
     assert not any("Keine Batterie-Maximalleistung" in w.value for w in at.warning)
 
@@ -65,13 +68,13 @@ def _expanded(at: AppTest) -> bool:
 
 
 def test_expander_starts_collapsed() -> None:
-    at = AppTest.from_function(_script).run()
+    at = AppTest.from_function(_script, default_timeout=_TIMEOUT).run()
     assert not at.exception
     assert not _expanded(at)
 
 
 def test_working_in_the_expander_keeps_it_open_on_later_runs() -> None:
-    at = AppTest.from_function(_script).run()
+    at = AppTest.from_function(_script, default_timeout=_TIMEOUT).run()
     at.checkbox(key=f"ehal_write_test_incl_{_FIELD}").check().run()
     assert _expanded(at)
     at.run()  # a refresh / rerun without interaction
@@ -79,7 +82,7 @@ def test_working_in_the_expander_keeps_it_open_on_later_runs() -> None:
 
 
 def test_ticked_row_survives_reruns() -> None:
-    at = AppTest.from_function(_script).run()
+    at = AppTest.from_function(_script, default_timeout=_TIMEOUT).run()
     at.checkbox(key=f"ehal_write_test_incl_{_FIELD}").check().run()
     at.run()
     assert at.checkbox(key=f"ehal_write_test_incl_{_FIELD}").value is True
