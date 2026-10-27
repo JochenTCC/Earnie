@@ -231,8 +231,10 @@ Block `market_prices` in `config.json`:
 Wenn keine Preisquelle der Kaskade (Cache, ENTSO-E, Energy-Charts, aWATTar) für späte Stunden des Horizonts schon Preise liefert, gilt die gewählte Strategie:
 
 - **`forecast` (Standard):** Ein OLS-Korrelationsmodell extrapoliert die fehlenden Stunden. Als Live-Features dienen die Open-Meteo-Wetterprognose und ein stündlicher EU-Leistungs-Stand-in aus dem letzten Archivtag. Charts zeigen diese Stunden als grünen Bereich (siehe [Charts](../ui/charts.md)). Mit dem Standard `live_bias_enabled` korrigiert Earnie die prognostizierten EPEX-Werte rollierend (Day-Ahead − OLS), begrenzt durch `live_bias_cap_cent_kwh`.
-- **`mirror`:** gleiche Uhrzeit am nächsten früheren Tag mit Preis (bis 7 Tage zurück; über die Zeitumstellung hinweg gilt die Uhrzeit, nicht der Abstand in Stunden). Ein Stundenwert gilt für alle vier Viertelstunden seiner Stunde. Earnie nutzt diese Strategie auch automatisch, wenn Modell oder Features nicht geladen werden können.
+- **`mirror`:** gleiche Uhrzeit am nächsten früheren Tag mit Preis (bis 7 Tage zurück; über die Zeitumstellung hinweg gilt die Uhrzeit, nicht der Abstand in Stunden). Ein Stundenwert gilt für alle vier Viertelstunden seiner Stunde. Earnie nutzt diese Strategie auch automatisch, wenn Modell oder Features nicht geladen werden können, und für einzelne Stunden ohne Features.
   Ist ein Datendienst (z. B. Energy-Charts) nicht erreichbar, bricht Earnie den Abruf beim ersten Verbindungsfehler ab und versucht es erst nach einer Stunde wieder, damit ein Lauf nicht minutenlang wartet. Wer die EU-Abrufe ganz abschalten möchte, setzt `missing_price_strategy` auf `mirror`.
+
+Prognose und Spiegelung füllen höchstens 72 Stunden ab dem ersten fehlenden Börsenpreis. Fehlen mehr, bricht die Preisberechnung mit einer Fehlermeldung ab, statt weiter in die Zukunft zu raten.
 
 Spec: [Preis-Prognose (Dev)](../dev/done/price-forecast-renewables.md).
 

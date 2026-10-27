@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "feature_names": [
+    "intercept",
+    "eu_wind_mw",
+    "eu_solar_mw",
+    "eu_wind_speed_kmh",
+    "eu_shortwave_radiation_wm2",
+    "eu_load_mw",
+    "eu_residual_load_mw",
+    "hour_sin",
+    "hour_cos",
+    "weekday",
+    "month"
+  ],
+  "coefficients": [
+    -1.6488478278131933,
+    -0.00016953561960552507,
+    -0.00026046610520727735,
+    -0.01860726788204366,
+    0.001812770028072688,
+    0.00018065103175370924,
+    -0.00010434508913774659,
+    -0.9045346097647351,
+    -2.146639174843278,
+    -0.15248566601107647,
+    0.18091738907510369
+  ],
+  "trained_range_start": "2024-12-31T23:00:00+00:00",
+  "trained_range_end": "2025-10-19T21:00:00+00:00",
+  "training_rows": 7007,
+  "feature_variant": "extended",
+  "bias_correction_cent_kwh": -0.1514300442218253,
+  "bias_correction_peak_percentile": 90.0,
+  "bias_correction_peak_threshold_cent_kwh": 14.906600000000003,
+  "bias_correction_non_peak_hours": 6306
+}

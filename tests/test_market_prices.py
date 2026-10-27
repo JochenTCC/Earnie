@@ -211,7 +211,7 @@ def test_predicted_and_day_ahead_slots_carry_same_fields():
         index=pd.DatetimeIndex([pred_slot.replace(tzinfo=None)]),
     )
     model = MagicMock()
-    with patch("data.market_prices._lookup_forecast_epex", return_value=epex):
+    with patch("data.ols_forecaster.OlsForecaster._predict", return_value=epex):
         out = resolve_market_slots(
             market,
             [da_slot, pred_slot],
@@ -251,7 +251,7 @@ def test_resolve_market_slots_applies_live_bias_to_predicted_only():
     }
     with patch("config.get_resolved_runtime_settings", return_value=resolved_settings):
         with patch(
-            "data.market_prices._lookup_forecast_epex",
+            "data.ols_forecaster.OlsForecaster._predict",
             return_value=5.0,
         ):
             with patch(

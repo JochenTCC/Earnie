@@ -5,7 +5,6 @@ import logging
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import requests
@@ -455,38 +454,6 @@ def resolve_market_slots_kwargs(target_hours: list) -> dict:
     kwargs.pop("forecast_model", None)
     kwargs.pop("forecast_model_path", None)
     return kwargs
-
-
-def predict_epex_cent_for_features(frame: pd.DataFrame, model: PriceForecastModel) -> list[float]:
-    return [float(v) for v in predict_prices(model, frame)]
-
-
-def build_predicted_slot(
-    slot_datetime,
-    epex_cent: float,
-    *,
-    model_path: Path | None = None,
-    import_pricing_kwargs: dict | None = None,
-) -> dict[str, Any]:
-    """Erzeugt einen resolve_market_slots-kompatiblen Preis-Slot."""
-    from data.backtesting_prices import import_brutto_cent_for_slots
-
-    pricing = import_pricing_kwargs or {}
-    k_act = import_brutto_cent_for_slots(
-        [float(epex_cent)],
-        [slot_datetime],
-        **pricing,
-    )[0]
-    row: dict[str, Any] = {
-        "slot_datetime": slot_datetime,
-        "hour": slot_datetime.hour,
-        "price_buy": round(float(epex_cent), 4),
-        "price_source": PRICE_SOURCE_PREDICTED,
-        "k_act": k_act,
-    }
-    if model_path is not None:
-        row["forecast_model_path"] = str(model_path)
-    return row
 
 
 def is_extrapolated_source(price_source: str | None) -> bool:

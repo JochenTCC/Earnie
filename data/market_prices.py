@@ -10,12 +10,14 @@ import pandas as pd
 from edibert import api
 
 import config
+from data.ols_forecaster import METHOD_OLS, OlsForecaster
 
 PRICE_SOURCE_DAY_AHEAD = "day_ahead"
 PRICE_SOURCE_MIRRORED = "mirrored"
 PRICE_SOURCE_PREDICTED = "predicted"
 MAX_MIRROR_LOOKBACK_DAYS = 7  # as far back as Edibert's MirrorForecaster looks
-METHOD_OLS = "ols"
+MAX_FORECAST_HOURS = 72  # as Edibert's publisher; edibert.api does not export it
+_SLOT = timedelta(minutes=15)
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
 MISSING_PRICE_STRATEGY_FORECAST = "forecast"
 _PRICE_SOURCE_BY_METHOD = {
@@ -126,30 +128,6 @@ def _append_predicted_slot(
     resolved.append(row)
 
 
-def _lookup_forecast_epex(
-    slot: datetime,
-    *,
-    forecast_model: Any,
-    forecast_feature_frame: pd.DataFrame,
-) -> float | None:
-    from data.price_forecast_model import predict_prices
-    from optimizer.slot_duration import floor_to_hour_slot
-
-    key = normalize_price_slot(slot)
-    idx = forecast_feature_frame.index
-    if idx.tz is None and key.tzinfo is not None:
-        lookup_key = key.replace(tzinfo=None)
-    else:
-        lookup_key = key
-    if lookup_key not in forecast_feature_frame.index:
-        parent = floor_to_hour_slot(lookup_key)
-        if parent not in forecast_feature_frame.index:
-            return None
-        lookup_key = parent
-    frame = forecast_feature_frame.loc[[lookup_key]]
-    return float(predict_prices(forecast_model, frame)[0])
-
-
 def _day_ahead_epex_by_slot(
     by_slot: dict[datetime, dict[str, Any]],
 ) -> dict[datetime, float]:
@@ -180,51 +158,45 @@ def _resolve_live_bias_cent(
     return bias
 
 
-def _resolve_missing_slot(
-    resolved: list[dict[str, Any]],
-    slot: datetime,
-    known: dict[datetime, float],
-    mirror: Any,
-    *,
-    missing_price_strategy: str,
-    forecast_model: Any | None,
-    forecast_feature_frame: pd.DataFrame | None,
-    forecast_model_path: Path | None,
-    eu_power_live_source: str | None = None,
-    live_bias_cent_kwh: float | None = None,
-) -> None:
-    if (
-        missing_price_strategy == MISSING_PRICE_STRATEGY_FORECAST
-        and forecast_model is not None
-        and forecast_feature_frame is not None
-    ):
-        epex = _lookup_forecast_epex(
-            slot,
-            forecast_model=forecast_model,
-            forecast_feature_frame=forecast_feature_frame,
-        )
-        if epex is not None:
-            if live_bias_cent_kwh is not None:
-                epex = float(epex) + float(live_bias_cent_kwh)
-            _append_predicted_slot(
-                resolved,
-                slot,
-                epex,
-                forecast_model_path=forecast_model_path,
-                eu_power_live_source=eu_power_live_source,
-                live_bias_cent_kwh=live_bias_cent_kwh,
-            )
-            return
-
-    slot_utc = slot.astimezone(UTC)
-    mirrored = mirror.forecast(known, slot_utc, slot_utc + timedelta(minutes=15))
-    if slot_utc not in mirrored:
+def _check_forecast_span(start: datetime, end: datetime) -> None:
+    if end - start > timedelta(hours=MAX_FORECAST_HOURS):
         raise ValueError(
-            f"Kein Day-Ahead-Preis für {slot:%Y-%m-%d %H:%M} und keine Spiegelquelle "
-            f"innerhalb von {MAX_MIRROR_LOOKBACK_DAYS} Tagen verfügbar. "
-            "Abrufzeitraum erweitern oder später erneut versuchen."
+            f"Prognosezeitraum {start.astimezone(UTC):%Y-%m-%d %H:%M} bis "
+            f"{end.astimezone(UTC):%Y-%m-%d %H:%M} UTC ist länger als {MAX_FORECAST_HOURS} h."
         )
-    _append_mirrored_slot(resolved, slot, float(mirrored[slot_utc]))
+
+
+def _forecast_missing_slots(
+    missing: list[datetime],
+    known: dict[datetime, float],
+    tz: ZoneInfo,
+    *,
+    ols: OlsForecaster | None,
+) -> dict[datetime, tuple[float, str]]:
+    """Price and method per missing UTC slot: OLS where it has features, else Edibert's mirror."""
+    if not missing:
+        return {}
+    start, end = min(missing), max(missing) + _SLOT
+    _check_forecast_span(start, end)
+    filled: dict[datetime, tuple[float, str]] = {}
+    if ols is not None:
+        predicted = ols.forecast(known, start, end)
+        filled = {slot: (predicted[slot], METHOD_OLS) for slot in missing if slot in predicted}
+    rest = [slot for slot in missing if slot not in filled]
+    if not rest:
+        return filled
+    mirror = api.builtin_forecaster(api.METHOD_MIRROR, tz)
+    mirrored = mirror.forecast(known, min(rest), max(rest) + _SLOT)
+    for slot in rest:
+        if slot not in mirrored:
+            local = slot.astimezone(tz)
+            raise ValueError(
+                f"Kein Day-Ahead-Preis für {local:%Y-%m-%d %H:%M} und keine Spiegelquelle "
+                f"innerhalb von {MAX_MIRROR_LOOKBACK_DAYS} Tagen verfügbar. "
+                "Abrufzeitraum erweitern oder später erneut versuchen."
+            )
+        filled[slot] = (float(mirrored[slot]), api.METHOD_MIRROR)
+    return filled
 
 
 def resolve_market_slots(
@@ -247,8 +219,10 @@ def resolve_market_slots(
     (``data.backtesting_prices.enrich_slots_import_prices``, Edibert).
 
     Fehlende Day-Ahead-Stunden: Spiegelung (Standard, Edibert ``MirrorForecaster``) oder
-    OLS-Prognose bei missing_price_strategy='forecast' (Fallback: Spiegelung). Stündliche
-    Werte gelten für alle vier Viertelstunden ihrer Stunde.
+    OLS-Prognose bei missing_price_strategy='forecast' (``OlsForecaster``, ein Edibert-Forecaster;
+    Slots ohne Features: Spiegelung). Stündliche Werte gelten für alle vier Viertelstunden ihrer
+    Stunde. Der Prognosezeitraum (erster bis letzter fehlender Slot) ist höchstens
+    ``MAX_FORECAST_HOURS`` lang, sonst ``ValueError``.
 
     Live bias (default on): rolling Day-Ahead−OLS residual on predicted slots,
     capped by ``live_bias_cap_cent_kwh`` (default ±12 Cent/kWh).
@@ -273,14 +247,22 @@ def resolve_market_slots(
         live_bias_cap_cent_kwh=live_bias_cap_cent_kwh,
     )
     known = _known_quarter_hours(by_slot)
-    mirror = api.builtin_forecaster(
-        api.METHOD_MIRROR, ZoneInfo(config.get_planning_timezone())
+    tz = ZoneInfo(config.get_planning_timezone())
+    ols = (
+        OlsForecaster(forecast_model, forecast_feature_frame, tz=tz, bias_cent=live_bias)
+        if missing_price_strategy == MISSING_PRICE_STRATEGY_FORECAST
+        and forecast_model is not None
+        and forecast_feature_frame is not None
+        else None
     )
+    slots = [normalize_price_slot(target_dt) for target_dt in target_hours]
+    missing = sorted({slot.astimezone(UTC) for slot in slots} - known.keys())
+    forecast = _forecast_missing_slots(missing, known, tz, ols=ols)
     resolved: list[dict[str, Any]] = []
 
-    for target_dt in target_hours:
-        slot = normalize_price_slot(target_dt)
-        epex = known.get(slot.astimezone(UTC))
+    for slot in slots:
+        slot_utc = slot.astimezone(UTC)
+        epex = known.get(slot_utc)
         if epex is not None:
             resolved.append(
                 {
@@ -291,19 +273,18 @@ def resolve_market_slots(
                 }
             )
             continue
-
-        _resolve_missing_slot(
-            resolved,
-            slot,
-            known,
-            mirror,
-            missing_price_strategy=missing_price_strategy,
-            forecast_model=forecast_model,
-            forecast_feature_frame=forecast_feature_frame,
-            forecast_model_path=forecast_model_path,
-            eu_power_live_source=eu_power_live_source,
-            live_bias_cent_kwh=live_bias,
-        )
+        epex, method = forecast[slot_utc]
+        if method == METHOD_OLS:
+            _append_predicted_slot(
+                resolved,
+                slot,
+                epex,
+                forecast_model_path=forecast_model_path,
+                eu_power_live_source=eu_power_live_source,
+                live_bias_cent_kwh=live_bias,
+            )
+        else:
+            _append_mirrored_slot(resolved, slot, epex)
 
     return resolved
 
