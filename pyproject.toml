@@ -36,7 +36,9 @@ dev = [
     # EarlyStart equivalence test: freezes the wall clock globally.
     "time-machine>=3.0",
     # Property-based storage roundtrip tests (tests/test_storage_roundtrip.py).
-    "hypothesis>=6.100",
+    # <6.156: later releases ship only an unsigned native extension (_native.pyd)
+    # that Windows Smart App Control blocks; 6.155.7 is the last pure-Python wheel.
+    "hypothesis>=6.100,<6.156",
     # End-to-end UI smoke tests (tests/apptest/e2e); browser: `playwright install chromium`.
     "pytest-playwright>=0.5",
 ]
