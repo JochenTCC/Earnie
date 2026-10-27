@@ -263,6 +263,21 @@ def profile_grid_fee(profile_id: str, profile: dict, catalog: api.GridFeeCatalog
         raise EdibertLoadError(f"Hausprofil '{profile_id}' (netznutzung)", exc) from exc
 
 
+def host_house_for_profile(profile_id: str, profile: dict, grid_fees_path: str):
+    """House facts of one profile for the embedded Edibert editor (P7 D4); read-only there."""
+    from edibert.ui.config import HostHouse
+
+    from house_config.netznutzung import ASSUMED_METER_CAPABILITIES
+
+    label = str(profile.get("label") or profile_id)
+    return HostHouse(
+        context=pricing_context_for_profile(profile_id, profile),
+        grid_fee=profile_grid_fee(profile_id, profile, cached_grid_fees(grid_fees_path)),
+        capabilities=ASSUMED_METER_CAPABILITIES,
+        description=f"Hausprofil „{label}“",
+    )
+
+
 # --- Slot prices (Edibert P3a) --------------------------------------------------------
 
 IMPORT = api.IMPORT

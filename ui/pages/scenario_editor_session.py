@@ -29,7 +29,6 @@ from ui.house_config_io import (
 )
 from ui.tariff_filter_helpers import (
     render_shared_land_filter,
-    render_tariff_parameter_preview,
     render_tariff_type_filter,
 )
 from ui.label_select import (

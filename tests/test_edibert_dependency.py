@@ -13,7 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def _pinned_tag() -> str:
     deps = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["dependencies"]
-    edibert = [d for d in deps if d.startswith("edibert ")]
+    edibert = [d for d in deps if re.match(r"edibert(\[[^\]]*\])? @", d)]
     assert len(edibert) == 1, f"expected one edibert pin in pyproject.toml, got {edibert}"
     match = re.search(r"/archive/refs/tags/v(?P<version>[^/]+)\.zip$", edibert[0])
     assert match, f"edibert must be pinned to a tag archive: {edibert[0]}"

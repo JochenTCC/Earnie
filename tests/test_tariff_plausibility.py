@@ -120,3 +120,26 @@ def test_repo_tariffs_pass_plausibility_and_schema():
         schema_path=str(schema_path),
     )
     assert errors == []
+
+
+def test_scenarios_using_tariff_lists_import_and_export_users(tmp_path):
+    from house_config.tariff_plausibility import scenarios_using_tariff
+
+    path = tmp_path / "backtesting_scenarios.json"
+    path.write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {"id": "a", "settings": {"import_tariff_id": "user_x", "export_tariff_id": "user_y"}},
+                    {"id": "b", "settings": {"import_tariff_id": "fixed_25ct", "export_tariff_id": "user_x"}},
+                    {"id": "c", "settings": {"import_tariff_id": "user_x"}},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert scenarios_using_tariff(str(path), "import", "user_x") == ["a", "c"]
+    assert scenarios_using_tariff(str(path), "export", "user_x") == ["b"]
+    assert scenarios_using_tariff(str(tmp_path / "fehlt.json"), "import", "user_x") == []
+    with pytest.raises(ValueError, match="direction"):
+        scenarios_using_tariff(str(path), "both", "user_x")

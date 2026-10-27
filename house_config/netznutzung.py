@@ -15,6 +15,11 @@ VALID_STATUS = frozenset({STATUS_VERORDNET, STATUS_ENTWURF, STATUS_ILLUSTRATIV})
 
 METERING_UNMETERED = "unmetered_power"
 
+# Edibert ``requires`` vocabulary met by the same assumption as ``quarter_hour_meter: True``
+# below (QH smart meter, not an Earnie configuration). ``separate_meter`` and
+# ``controllable_device`` have no Earnie field and are never claimed.
+ASSUMED_METER_CAPABILITIES = ("smart_meter", "quarter_hour_meter")
+
 DEFAULT_INCLUDE_STATUS = (STATUS_VERORDNET,)
 
 _MIGRATE_HINT = (

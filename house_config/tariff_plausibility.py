@@ -135,6 +135,26 @@ def collect_scenario_tariff_ref_errors(
     return errors
 
 
+def scenarios_using_tariff(scenarios_path: str, direction: str, tariff_id: str) -> list[str]:
+    """IDs der Szenarien, die ``tariff_id`` als Bezugs- (``import``) bzw. Einspeisetarif nutzen."""
+    if direction not in ("import", "export"):
+        raise ValueError(f"direction muss 'import' oder 'export' sein, nicht {direction!r}.")
+    if not os.path.isfile(scenarios_path):
+        return []
+    scenarios = load_backtesting_scenarios_document(scenarios_path).get("scenarios") or []
+    users: list[str] = []
+    for index, entry in enumerate(scenarios):
+        settings = entry.get("settings") if isinstance(entry, dict) else None
+        if not isinstance(settings, dict):
+            continue
+        used = str(settings.get(f"{direction}_tariff_id", "") or "").strip()
+        if direction == "export":
+            used = resolve_export_tariff_id(used)
+        if used == tariff_id:
+            users.append(str(entry.get("id", "") or "").strip() or f"index_{index}")
+    return users
+
+
 def collect_tariff_plausibility_errors(
     *,
     tariffs_path: str,

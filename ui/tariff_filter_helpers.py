@@ -29,7 +29,6 @@ __all__ = [
     "lands_present",
     "lands_union",
     "render_shared_land_filter",
-    "render_tariff_parameter_preview",
     "tariff_meta_caption",
     "tariff_parameter_rows",
     "type_caption",
@@ -62,23 +61,6 @@ def tariff_meta_caption(tariff: dict) -> str:
     if notes:
         parts.append(str(notes))
     return " · ".join(parts)
-
-
-def render_tariff_parameter_preview(
-    tariff: dict,
-    *,
-    title: str,
-    kind: Literal["import", "export"],
-    container=None,
-) -> None:
-    """Show compact read-only tariff parameters under a Szenarienkonfigurator select."""
-    root = container if container is not None else st
-    rows = tariff_parameter_rows(tariff, kind=kind)
-    if not rows:
-        return
-    root.caption(title)
-    for label, value in rows:
-        root.caption(f"{label}: {value}")
 
 
 def lands_present(tariffs: list[dict]) -> list[str]:

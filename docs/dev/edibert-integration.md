@@ -26,7 +26,7 @@ Decision record for the Earnie epic *Edibert* (backlog `backlog/Backlog.md`, Ver
 - Home Assistant add-on: wraps the release image (`packaging/homeassistant-addon/*/Dockerfile`), so it gets Edibert through the image. No add-on change.
 - Wheel-only installs (`--only-binary=:all:` in `.devcontainer/post-create.sh`, `.github/workflows/sonarcloud.yml`, `ui-tests.yml`) add `--no-binary=edibert`, because the tag archive is a source distribution.
 - Local side-by-side development: `python -m pip install -e ..\edibert` over the pin (`DEVELOPER.md`).
-- Edibert brings `holidays` and `jsonschema` (already an Earnie dependency). The `mqtt` and `ui` extras are not installed; Earnie uses only the library.
+- Edibert brings `holidays` and `jsonschema` (already an Earnie dependency). The `mqtt` extra is not installed; the `ui` extra is pinned since P7 (D8, the embedded editor; it adds only `streamlit`, which Earnie pins anyway).
 
 ### License
 
@@ -640,3 +640,105 @@ S0 → S1 (commit golden on old code) → S2 → S3 → S4 → S5 → S6 → S7 
 - [x] Import-isolation test green (no Earnie imports in `opendata`).
 - [x] Missing country fails loud; live falls back to the mirror with label `mirrored`.
 - [x] Full suite and all regression cases green, goldens and climate fixtures unchanged; two SE runs identical.
+
+## P7 — Editor embed (plan 2026-10-27)
+
+Status: **in progress** (D1–D8 accepted 2026-10-27, all as recommended; Part A done, Edibert `0.1.7` released). Backlog item *Edibert P7* (Version 2.8): embed Edibert's editor in the Szenarienkonfigurator and remove the old tariff selects (`ui/pages/scenario_editor_tariffs.py`); UI language German. **Done (backlog):** cases TE1–TE6 green in Edibert, AppTest smoke test in Earnie, Playwright tariff path adapted.
+
+### Findings (2026-10-27)
+
+- **Edibert's UI is a standalone page, not a component.** `edibert.ui.main.main()` calls `st.set_page_config`, draws its own sidebar (language, house settings, my tariffs, new / copy / import) and reads its configuration from env vars (`EDIBERT_DATA_DIR`, `EDIBERT_CATALOG`, `EDIBERT_LANG`). Session keys are global and unprefixed (`ui.*`, `house.*`, `open.*`, `new.*`, `copy.*`, `import.*`, `delete`). Inside Earnie this would collide with Earnie's own page config, sidebar and keys. An embed API is Edibert work.
+- **Edibert keeps its own house:** `editor/house.py` saves time zone, land, region, capabilities and an own grid fee (`user_house`) in `house.json` next to the user tariffs. Earnie has all of this in the house profile already (`region` since P1, grid area since P2, `user_grid_fees.json`). A second house in the config pack would drift.
+- **Editor ≠ selection.** Edibert's editor authors tariffs (create, edit, copy a catalog tariff, import JSON, delete) in `user_tariffs.json`. Earnie's `scenario_editor_tariffs.py` *selects* tariffs per scenario: land and type filters, import / export pick, *Eigener Festpreis* (`__user_fixed__`, Earnie scenario shortcut, § P2 decision 4), parameter preview, next-month rate for `monthly_table` (writes into the site catalog copy, format difference row 4 → P8), catalog notice. Edibert has no picker.
+- **Edibert `0.1.h` assumes the opposite:** its TE1–TE6 describe the *selection* (filters, profile switch, own fixed price, next-month rate, month boundary, scenario switch) and say "Edibert owns the editor, so the cases belong into Edibert". Only TE4 (next month written to the tariff file) and the save-path checks touch the editor itself.
+- **Reload is free:** `house_config/edibert_tariffs.py` caches the tariff set and grid fees keyed on the mtimes of `tariffs.json` and `user_tariffs.json`, so a tariff saved by the editor shows in the selection on the next rerun.
+- **Dependencies:** Edibert's `ui` extra is only `streamlit`; its UI also imports `pandas` and `holidays`. Earnie has all three. P0 installs Edibert without extras.
+- **Tests today:** AppTest covers the tariff selection (`tests/apptest/test_page_scenario_editor_apptest.py`, `test_issue50_ui_apptest.py`, `test_persist_scenarios_apptest.py`, P1 `test_user_tariffs_appear_in_selection`). The Playwright smoke test (`tests/apptest/e2e/test_smoke.py`) has no tariff path yet; "adapted" therefore means "added".
+
+### Decisions (2026-10-27, recommendations accepted by the maintainer)
+
+1. **D1 — split between editor and selection:** *(recommended)* Edibert supplies the **editor** as an embeddable component; the per-scenario **selection** stays in Earnie, because its parts are Earnie concepts (scenario settings, `__user_fixed__`, house-profile land, planning clock). "Remove the old tariff selects" becomes: remove what duplicates Edibert (D5, D6), not the pick itself. TE1–TE3, TE5, TE6 stay Earnie AppTests (most exist; gaps filled in S5); Edibert `0.1.h` keeps the editor cases (TE4 save path, rejected input leaves the file unchanged, flash message, stable keys) and its backlog text is corrected. *Alternative:* Edibert also ships a picker component (filters, pick, preview); Earnie keeps only `__user_fixed__`. More Edibert work, and the picker needs Earnie's scenario state injected anyway.
+2. **D2 — where the editor lives:** *(recommended)* own page **Tarife** (wide layout, editor and preview side by side as in Edibert), linked from the tariff block in the Szenarienkonfigurator ("Benutzertarif anlegen / bearbeiten", with the selected user tariff opened). *Alternative:* an expander inside the Szenarienkonfigurator, as the backlog text says; cramped (two-column editor in a three-column form) and mixes the scenario's unsaved state with the editor's.
+3. **D3 — embed API (Edibert, new phase `0.1.m`):** `edibert.ui.embed.render_editor(EmbedConfig)` with `user_file`, `catalog_file` (copy-as-template source), `context` (`PricingContext` for preview and plausibility, supplied by the host), `language`, `key_prefix`, `container` for the tariff list (instead of `st.sidebar`). No `set_page_config`, no language selector, no house expander when a context is given. All session keys go through the prefix. The standalone `main()` uses the same component with `house.json` and the sidebar, so Edibert's own page and the embed share one code path. Additive: `API_VERSION` unchanged; release `v0.1.7` only with the maintainer's approval.
+4. **D4 — house context:** *(recommended)* the Tarife page picks a house profile (default: the profile of the live scenario; deep link from the Szenarienkonfigurator passes the scenario's profile) and builds the `PricingContext` through `house_config/edibert_tariffs.py` (land, region, time zone, grid area incl. `user_grid_fees.json`). No `house.json` in Earnie's config dir; the editor shows the context read-only with a link to the house profile. Capabilities (`requires`): map from house-profile components where a mapping exists (check in S1), otherwise not set and the plausibility hint stays visible; no silent "has everything".
+5. **D5 — parameter preview:** *(recommended)* replace Earnie's `render_tariff_parameter_preview` (`ui/tariff_filter_helpers.py`) in the selection with Edibert's preview (typical days, price at a time; exported from the embed module as `render_preview(tariff, context)`), so a tariff's curve is drawn by one engine. *Alternative:* keep Earnie's table preview; two views of the same tariff can disagree.
+6. **D6 — next-month rate:** *(recommended)* a `monthly_table` **user** tariff without the next month gets a warning with a link that opens it in the editor (the rate table lives there); the inline Earnie form stays for **catalog** tariffs only, until P8 decides the fate of the site catalog copy. *Alternative:* the inline form writes user tariffs through Edibert's `userstore`; two edit paths for one file.
+7. **D7 — writes and the config pack:** the editor writes `user_tariffs.json` through Edibert's atomic `userstore` (tagged `tariff_format`), next to `tariffs.json` (`user_tariffs_path_for`). After a save the plausibility check runs once (`collect_tariff_plausibility_errors(..., with_edibert=True)`) and a scenario referencing a deleted user tariff is reported, never silently reset. Deleting a user tariff that a scenario uses asks first and names the scenarios.
+8. **D8 — pin:** `edibert[ui] @ …/v0.1.7.zip`, so the dependency states that Earnie uses the UI part; no new package (streamlit is already pinned by Earnie).
+
+### Part A — Edibert (`0.1.m`, tag `v0.1.7`)
+
+1. `edibert/ui/embed.py` (D3): `EmbedConfig`, `render_editor`, `render_preview`; `state.py` keys through a prefix; sidebar parts take a container; house expander only without a context.
+2. `main()` rebuilt on the embed (standalone behaviour unchanged; existing 11 AppTest flows green).
+3. Tests: AppTest of the embed with a prefix (no unprefixed key in `st.session_state`, two embeds on one page do not share state), host context shown read-only, no `house.json` written; editor save-path cases from `0.1.h` (TE4 save path, rejected input leaves the file unchanged, flash notice after `st.rerun()`).
+4. Spec `docs/spec/api.md` (UI embed section), backlog: new item `0.1.m`, `0.1.h` text corrected per D1.
+
+### Part B — Earnie (after the pin is raised)
+
+- **S1** Findings check: capability mapping (D4), which German Edibert texts are missing or read oddly in Earnie's context.
+- **S2** Page `ui/pages/page_tariffs.py` *Tarife* (navigation, German), house-profile select, `PricingContext` from `edibert_tariffs`, `render_editor` with prefix `earnie.tariffs` (rule `streamlit-ui-state.mdc`: `session_scope` per profile).
+- **S3** Szenarienkonfigurator: link to the Tarife page (selected user tariff opened, scenario profile passed); preview through `render_preview` (D5); next-month warning for user tariffs links to the editor (D6); `render_tariff_parameter_preview` and its helpers go if no other caller is left.
+- **S4** Writes (D7): plausibility after save, delete guard naming the scenarios.
+- **S5** Tests: AppTest smoke for the Tarife page (create a fixed user tariff → file written with `user_` prefix and `tariff_format` → appears as *· Benutzertarif* in the Szenarienkonfigurator); fill TE1–TE3, TE5, TE6 gaps in the existing selection tests; Playwright path in `tests/apptest/e2e/` (open Tarife, create, select in a scenario, save).
+- **S6** Docs: German user docs `docs/konfiguration/preise.md` § Benutzertarife (editor in Earnie instead of "aus dem Tarif-Editor Edibert"), `docs/ui/` page description of *Tarife*; this section (implementation notes, results); backlog (P7 → Erledigt).
+
+### Implementation notes (2026-10-27)
+
+- **Part A (Edibert `0.1.m`, released as `v0.1.7`, commit `d1958ec`, approved 2026-10-27):**
+  - `edibert/ui/embed.py`: `render_editor(UiConfig, list_container=..., open_tariff=...)` and `render_preview(tariff, HostHouse, language=..., key_prefix=...)`. `UiConfig` gains `key_prefix` and `host_house`; `HostHouse` carries `PricingContext`, resolved `GridFee` (or `None`), capabilities and a description.
+  - Key prefix: `state.scope(prefix)` wraps each render, fixed keys go through `state.k(name)`, `on_click` callbacks through `state.bound(...)` (Streamlit runs callbacks before the render, outside the scope). The standalone page uses the empty prefix, so its keys and tests are unchanged.
+  - With a host house the editor shows time zone, land, region and grid area read-only and touches no `house.json`. The embed sets the language from `config` on every run.
+  - `open_tariff=(direction, id)` opens a user tariff once per distinct request (later reruns keep the edits); an unknown ID shows the new error `TARIFF_NOT_FOUND`.
+  - Deviation from D3: `render_preview` takes a `HostHouse` instead of separate context / grid fee / capabilities.
+  - Tests `tests/test_ui_embed.py` (11 cases, incl. the editor cases of `0.1.h`: rejected input leaves the file unchanged, notice after `st.rerun()`, TE4 file side at model level because AppTest cannot drive `st.data_editor`). Full Edibert suite 434 passed, ruff and vulture clean.
+  - Edibert backlog: `0.1.m` archived, `0.1.h` rewritten per D1 (TE1–TE3, TE5, TE6 → Earnie).
+- **Pin (D8):** `edibert[ui] @ …/v0.1.7.zip` in `pyproject.toml`; `tests/test_edibert_dependency.py` accepts the extra in the pin. All `tests/test_edibert*.py` and the Szenarienkonfigurator AppTests green (259 passed) on `0.1.7`.
+- **S1 (findings check):**
+  - **Capabilities (D4):** Edibert's vocabulary is `smart_meter`, `quarter_hour_meter`, `separate_meter`, `controllable_device`. Earnie has a source for two of them: `netznutzung` always treats the household as having a quarter-hour smart meter (`house_config/netznutzung.py`, schema: "QH smart meter assumed, not user-configurable"), so the host house gets `smart_meter` + `quarter_hour_meter` from that same documented assumption (one constant next to `METERING_UNMETERED`, not a second assumption). `separate_meter` and `controllable_device` (§14a) have no Earnie field: not set, so a tariff or rule that requires them keeps Edibert's unmet-requirement warning. Earnie's pricing ignores `requires` (display-only since P1), so this changes no price.
+  - **German texts in Earnie's context:**
+    - `ui.monthly_hint` ("Fehlt ein Monat, bricht die Berechnung ab, statt zu raten", EN the same) is stale since Edibert `0.1.g`: a missing month uses the prior-year / prior-month rate with the warning `MONTH_RATE_FALLBACK`. Edibert bugfix item, both catalogs; ships with the next Edibert release, not a blocker for S2.
+    - Term: Edibert says *Netzentgelt* (`ui.host_grid`, `ui.invoice_off`), Earnie's UI and docs say *Netznutzung (Arbeitspreis)* for the same thing. Acceptable for now (the Tarife page caption names it once); align when Edibert's texts are touched again.
+    - Address: Edibert uses *du* (`ui.start_hint`, `ui.invoice_hint`), Earnie's UI mostly avoids a direct address and uses *Sie* where it does (tariff catalog notice). Minor; no change in P7.
+    - `ui.no_catalog` points at the CLI (`--catalog DATEI`); never shown in Earnie because the Tarife page always passes `tariffs.json` as catalog.
+    - `ui.invoice_hint` names *Edibert*; fine (Edibert is named as the tariff library in `preise.md`).
+    - `ui.start_hint` says "öffne links", which holds with the embed's default layout (list column left); S2 keeps that layout.
+- **Edibert `0.1.n` (released as `v0.1.8`, approved 2026-10-27):** found in S2: the editor wrote no `land`, Earnie requires it on every user tariff (§ P2 decision 7), so the first tariff saved on the Tarife page broke the tariff load of the Szenarienkonfigurator (`land fehlt`). Step 1 now has a visible select *Land des Tarifs*, prefilled with the land of the host house (or the editor's own house settings), clearable (then no `land`). Earnie stays strict. Remaining case: a JSON import without `land` still fails Earnie's load with that message; the import keeps the tariff as given.
+- **Pin:** raised to `edibert[ui] @ …/v0.1.8.zip`.
+- **S2 (Tarife page):**
+  - `ui/pages/page_tariffs.py` *💶 Tarife* (navigation *Konfiguration*, after the Szenarienkonfigurator, same unlock; url `tariffs`, doc link `preise.md#benutzertarife-usertariffsjson` until S6 adds the handbook section).
+  - House-profile select (label select; default = profile of the live scenario via `resolve_live_profile_id`); `host_house_for_profile` in `house_config/edibert_tariffs.py` builds `HostHouse` (context, resolved grid area incl. `user_grid_fees.json`, `ASSUMED_METER_CAPABILITIES` from `house_config/netznutzung.py`, description *Hausprofil „…“*). A profile Edibert cannot resolve shows the German load error and no editor.
+  - `render_editor` with `data_dir` = directory of `user_tariffs_path_for(tariffs.json)`, catalog = `tariffs.json` (copy as template), language `de`, prefix `earnie.tariffs.`.
+  - **Deviation from the plan:** one prefix for all profiles instead of a `session_scope` per profile. The profile only changes the preview context; the open tariff stays open on a profile switch.
+  - Shadow mode (`is_shadow_config_readonly`): info, no editor — Edibert's `userstore` writes the file directly and would bypass the read-only guard.
+  - Deep link for S3: `request_tariff_page(profile_id, open_tariff)` stores the request in `st.session_state`; the profile part is used once, the `open` part stays so the editor opens the tariff once per distinct request.
+  - Tests: `tests/apptest/test_page_tariffs_apptest.py` (title, profile select, read-only house and no `house.json`; all widget keys behind the prefix; create → `user_tariffs.json` with `tariff_format`, `user_` ID → *· Benutzertarif* in the Szenarienkonfigurator; request opens a tariff; unknown request → error); navigation matrix (`tests/apptest/states.py`, `test_navigation_setup.py`) and `NAV_DOC_PAGE_KEYS` extended.
+  - Full suite 4965 passed, 26 skipped; `tests/fixtures/` unchanged after the run.
+  - **Found, not fixed (pre-existing, also on `HEAD`):** when pytest is called with explicit files from `tests/apptest/` and `tests/` mixed (e.g. `tests/apptest/test_page_scenario_editor_apptest.py::… tests/test_doc_links.py tests/apptest/…`), the later AppTests run without `tests/apptest/conftest.py`'s `_isolated_backtesting_config` (missing from `request.fixturenames`), so they write into `tests/fixtures/backtesting/` (`backtesting_scenarios.json`, `user_tariffs.json`). The full-suite run is not affected. Own follow-up.
+  - Not done: browser check of the page (planned for the P7 gate).
+- **S3 (Szenarienkonfigurator):**
+  - Preview (D5): under each tariff pick, Edibert's `render_preview` (hints, price curves, month select) for the scenario's house profile (`host_house_for_profile`), prefix `<session_scope>__tariff_preview_<direction>.`; without a profile a caption, an unresolvable profile or tariff the German load error. `render_tariff_parameter_preview` (`ui/tariff_filter_helpers.py`) and its unused re-imports are gone; `data/tariff_parameter_preview.py` stays (SE invoice markdown, monthly fees).
+  - Links: *Benutzertarife verwalten* (Tarife page with the scenario's profile) and, when the selected import or export tariff is a user tariff, *Benutzertarif bearbeiten* (opens it). Both via `request_tariff_page` + `ui.navigation.switch_to_page("tariffs")`; disabled with a hint while the scenario form is dirty (`_active_scenario_form_is_dirty`), because a page switch drops unsaved widget state.
+  - Next-month rate (D6): a user `monthly_table` without the next month gets the warning plus *Im Tarif-Editor öffnen*; catalog tariffs keep the inline form (site copy of `tariffs.json`, until P8).
+  - Fixture: `monthly_test` (`tests/fixtures/backtesting/tariffs.json`) had three months of 2025 only, so Edibert's preview (current year) correctly reported *Kein Preis* in the AppTests of the scenario `entity_test`. Filled with all months of 2025 and 2026 (the three old values kept); the preview needs a rate for the current month or its prior-year / prior-month fallback, so the fixture lasts until 2027-12. Only UI tests use it.
+  - Cost: the page renders about 0.1 s slower per run in AppTest (two previews).
+  - Tests: `tests/apptest/test_scenario_tariff_editor_links_apptest.py` (previews drawn without error; manage button stores the profile request and switches; edit button opens the selected user tariff; no edit button for a catalog tariff). Not covered by AppTest: the next-month editor button (needs a planning clock within two days of a month end with a user monthly table) — S5.
+  - Full suite 4969 passed, 26 skipped; `tests/fixtures/` unchanged by the run.
+- **Edibert `0.1.o` (released as `v0.1.9`, approved 2026-10-27):** found in S4: the embed deleted a user tariff on the first click and told the host neither about saves nor deletes, so D7 could not be built on the Earnie side. `UiConfig` gains `delete_guard(direction, id) -> str | None` (a text holds the delete behind *Trotzdem löschen* / *Nicht löschen*) and `on_change(action, direction, id)` (after save, each imported tariff, delete). Without them the editor behaves as before. Edibert suite 440 passed. Pin raised to `edibert[ui] @ …/v0.1.9.zip`.
+- **S4 (writes, D7):**
+  - Delete guard: `house_config/tariff_plausibility.scenarios_using_tariff(scenarios_path, direction, id)` (export IDs through `resolve_export_tariff_id`); the Tarife page's guard names the scenarios (*„…“ ist Bezugstarif in Szenario …*) and says the check will report them. An unused tariff is deleted without asking.
+  - After a write: `on_change` sets a session flag, the next render of the Tarife page runs `collect_tariff_plausibility_errors(..., with_edibert=True)` once (catalog + user file, `grid_fees.json`, house profiles, scenario references) and shows the findings as `st.error`; nothing when clean. A scenario whose user tariff was deleted is reported (*unbekannte import_tariff_id*), never reset.
+  - Tests: `tests/apptest/test_page_tariffs_apptest.py` (+4: unused delete without asking, used delete names the scenario and waits / cancel keeps, confirmed delete reported by the check once, save runs the check without findings) and `tests/test_tariff_plausibility.py` (+1).
+  - Full suite 4974 passed, 26 skipped; `tests/fixtures/` unchanged by the run. A mixed explicit invocation (AppTests plus `tests/test_tariff_plausibility.py`) hit the known fixture leak again; restored.
+  - Next: S5.
+
+### Order
+
+Part A (Edibert `0.1.m`, release `v0.1.7` with approval) → pin → S1 → S2 → S3 → S4 → S5 → S6 → gate: full suite, `scripts.run_regression` without `--update-golden` (no pricing change expected), Playwright UI job, manual browser check of the Tarife page (desktop and phone width).
+
+### Done check
+
+- [ ] Edibert editor runs embedded on the Earnie page *Tarife*, German, no key collision with Earnie (prefix test).
+- [ ] No `house.json` in Earnie; the editor's context comes from the house profile.
+- [ ] Szenarienkonfigurator: selection unchanged in behaviour, preview from Edibert, link to the editor.
+- [ ] TE1–TE6 green (editor cases in Edibert, selection cases in Earnie per D1); AppTest smoke and Playwright tariff path green.
+- [ ] Full suite and all regression cases green, goldens unchanged.

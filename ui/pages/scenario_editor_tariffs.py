@@ -1,4 +1,8 @@
-"""Scenario editor tariff filters, picks, previews, and next-month rates."""
+"""Scenario editor tariff filters, picks, previews, and next-month rates.
+
+Since Edibert P7 the preview of a selected tariff is Edibert's (``render_preview``) and user
+tariffs are edited on the Tarife page (embedded Edibert editor), linked from here.
+"""
 from __future__ import annotations
 
 import streamlit as st
@@ -12,9 +16,10 @@ from ui.scenario_form_helpers import (
 )
 from ui.tariff_filter_helpers import (
     render_shared_land_filter,
-    render_tariff_parameter_preview,
     render_tariff_type_filter,
 )
+
+_TARIFFS_PAGE_URL = "tariffs"
 
 
 def _planning_now_for_tariffs():
@@ -22,6 +27,21 @@ def _planning_now_for_tariffs():
     from ui.pages.page_scenario_editor import _planning_now
 
     return _planning_now()
+
+
+def _is_user_tariff(tariff: dict | None) -> bool:
+    from house_config.tariffs_store import ORIGIN_KEY, ORIGIN_USER
+
+    return tariff is not None and tariff.get(ORIGIN_KEY) == ORIGIN_USER
+
+
+def _open_tariff_editor(profile_id: str | None, open_tariff: tuple[str, str] | None) -> None:
+    """Switch to the Tarife page with this profile and (optionally) a user tariff opened."""
+    from ui.navigation import switch_to_page
+    from ui.pages.page_tariffs import request_tariff_page
+
+    request_tariff_page(profile_id, open_tariff)
+    switch_to_page(_TARIFFS_PAGE_URL)
 
 
 def _next_month_in_planning_tz() -> tuple[int, int]:
@@ -38,8 +58,13 @@ def _render_next_month_rate_entry(
     year: int,
     month: int,
     session_scope: str,
+    profile_id: str | None,
 ) -> None:
-    """Warn + form when next calendar month is missing on a monthly_table tariff."""
+    """Warn when the next calendar month is missing on a monthly_table tariff.
+
+    Catalog tariffs get the inline form (writes the site copy of tariffs.json, until P8);
+    user tariffs are edited in the Tarife page's editor (P7 D6), where their rate table lives.
+    """
     from house_config.tariff_month_hints import monthly_rates_cover_month
 
     if str(tariff.get("type", "")).strip().lower() != "monthly_table":
@@ -49,6 +74,19 @@ def _render_next_month_rate_entry(
 
     side_label = "Bezug" if side == "import" else "Einspeise"
     tariff_label = str(tariff.get("label") or tariff.get("id") or side)
+    if _is_user_tariff(tariff):
+        st.warning(
+            f"Benutzertarif „{tariff_label}“ ({side_label}) hat keinen Eintrag für "
+            f"{year}-{month:02d} (nächster Monat). Bis zur Aktualisierung wird temporär "
+            "der Vorjahres- bzw. Vormonatswert verwendet. Den Monatspreis im "
+            "Tarif-Editor eintragen."
+        )
+        if st.button(
+            "Im Tarif-Editor öffnen",
+            key=scoped_widget_key(session_scope, f"next_month_editor_{side}"),
+        ):
+            _open_tariff_editor(profile_id, (side, str(tariff["id"])))
+        return
     st.warning(
         f"{side_label}tarif „{tariff_label}“ hat keinen Eintrag für "
         f"{year}-{month:02d} (nächster Monat). Bis zur Aktualisierung "
@@ -261,8 +299,49 @@ def _render_scenario_tariff_picks(
     return imp_pick, exp_pick
 
 
+def _render_edibert_preview(
+    ctx: dict,
+    picks: dict,
+    tariff: dict,
+    *,
+    direction: str,
+    title: str,
+) -> None:
+    """Edibert's hints and price curves of the selected tariff for the scenario's house profile."""
+    from edibert.ui.embed import render_preview
+
+    from house_config.edibert_tariffs import (
+        cached_tariff_set,
+        host_house_for_profile,
+        tariff_by_id,
+    )
+    from runtime_store.persist_paths import (
+        resolve_grid_fees_json_path,
+        resolve_tariffs_json_path,
+    )
+
+    st.caption(title)
+    profile_id = picks["selected_profile_id"]
+    if not profile_id:
+        st.caption("Vorschau erst mit gewähltem Hausprofil (Land, Region, Netzbereich).")
+        return
+    try:
+        house = host_house_for_profile(
+            profile_id, picks["selected_profile"], resolve_grid_fees_json_path()
+        )
+        edibert_tariff = tariff_by_id(
+            cached_tariff_set(resolve_tariffs_json_path()), direction, str(tariff["id"])
+        )
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    prefix = scoped_widget_key(ctx["session_scope"], f"tariff_preview_{direction}") + "."
+    render_preview(edibert_tariff, house, language="de", key_prefix=prefix)
+
+
 def _render_scenario_tariff_previews(
     ctx: dict,
+    picks: dict,
     selected_import: str | None,
     selected_export: str | None,
 ) -> tuple[dict | None, dict | None]:
@@ -273,25 +352,73 @@ def _render_scenario_tariff_previews(
     _, import_param_col, export_param_col = st.columns(3)
     if selected_import and not is_user_fixed_tariff_id(selected_import):
         import_tariff = next(t for t in ctx["import_tariffs"] if t["id"] == selected_import)
-        render_tariff_parameter_preview(
-            import_tariff,
-            title="Bezugstarif-Parameter",
-            kind="import",
-            container=import_param_col,
-        )
+        with import_param_col:
+            _render_edibert_preview(
+                ctx, picks, import_tariff, direction="import", title="Bezugstarif-Vorschau"
+            )
     if selected_export and not is_user_fixed_tariff_id(selected_export):
         export_tariff = next(t for t in ctx["export_tariffs"] if t["id"] == selected_export)
-        render_tariff_parameter_preview(
-            export_tariff,
-            title="Einspeisetarif-Parameter",
-            kind="export",
-            container=export_param_col,
-        )
+        with export_param_col:
+            _render_edibert_preview(
+                ctx, picks, export_tariff, direction="export", title="Einspeisetarif-Vorschau"
+            )
     return import_tariff, export_tariff
+
+
+def _scenario_form_dirty(ctx: dict) -> bool:
+    from ui.pages.scenario_editor_session import _active_scenario_form_is_dirty
+
+    return _active_scenario_form_is_dirty(
+        ctx["selected"],
+        profiles=ctx["profiles"],
+        batteries=ctx["batteries"],
+        pv_systems=ctx["pv_systems"],
+        import_tariffs=ctx["import_tariffs"],
+        export_tariffs=ctx["export_tariffs"],
+    )
+
+
+def _render_tariff_editor_links(
+    ctx: dict,
+    picks: dict,
+    import_tariff: dict | None,
+    export_tariff: dict | None,
+) -> None:
+    """Buttons to the Tarife page: manage user tariffs, or edit the selected user tariff."""
+    session_scope = ctx["session_scope"]
+    profile_id = picks["selected_profile_id"]
+    dirty = _scenario_form_dirty(ctx)
+    help_text = (
+        "Zuerst das Szenario speichern; ungespeicherte Änderungen gingen beim Seitenwechsel verloren."
+        if dirty
+        else "Öffnet die Seite Tarife (eingebetteter Tarif-Editor) mit dem Hausprofil dieses Szenarios."
+    )
+    manage_col, import_col, export_col = st.columns(3)
+    if manage_col.button(
+        "Benutzertarife verwalten",
+        key=scoped_widget_key(session_scope, "tariff_editor_manage"),
+        disabled=dirty,
+        help=help_text,
+    ):
+        _open_tariff_editor(profile_id, None)
+    for tariff, direction, col in (
+        (import_tariff, "import", import_col),
+        (export_tariff, "export", export_col),
+    ):
+        if not _is_user_tariff(tariff):
+            continue
+        if col.button(
+            "Benutzertarif bearbeiten",
+            key=scoped_widget_key(session_scope, f"tariff_editor_edit_{direction}"),
+            disabled=dirty,
+            help=help_text,
+        ):
+            _open_tariff_editor(profile_id, (direction, str(tariff["id"])))
 
 
 def _render_scenario_next_month_rates(
     ctx: dict,
+    picks: dict,
     import_tariff: dict | None,
     export_tariff: dict | None,
 ) -> None:
@@ -307,6 +434,7 @@ def _render_scenario_next_month_rates(
             year=next_y,
             month=next_m,
             session_scope=ctx["session_scope"],
+            profile_id=picks["selected_profile_id"],
         )
     if export_tariff is not None:
         _render_next_month_rate_entry(
@@ -315,6 +443,7 @@ def _render_scenario_next_month_rates(
             year=next_y,
             month=next_m,
             session_scope=ctx["session_scope"],
+            profile_id=picks["selected_profile_id"],
         )
 
 
@@ -371,8 +500,9 @@ def _render_scenario_tariff_block(ctx: dict, picks: dict) -> dict:
     selected_import = lookup_entity_id(ctx["imp_map"], imp_pick)
     selected_export = lookup_entity_id(ctx["exp_map"], exp_pick)
     import_tariff, export_tariff = _render_scenario_tariff_previews(
-        ctx, selected_import, selected_export
+        ctx, picks, selected_import, selected_export
     )
-    _render_scenario_next_month_rates(ctx, import_tariff, export_tariff)
+    _render_tariff_editor_links(ctx, picks, import_tariff, export_tariff)
+    _render_scenario_next_month_rates(ctx, picks, import_tariff, export_tariff)
     _render_tariff_catalog_notice(selected_import, selected_export)
     return {"imp_pick": imp_pick, "exp_pick": exp_pick}

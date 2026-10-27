@@ -72,7 +72,7 @@ def wrap_offline_stub(
 
 
 def _konfiguration_core_specs(*, house_config_default: bool) -> list[PageSpec]:
-    from ui.pages import page_house_config, page_scenario_editor
+    from ui.pages import page_house_config, page_scenario_editor, page_tariffs
 
     specs = [
         PageSpec(
@@ -92,6 +92,15 @@ def _konfiguration_core_specs(*, house_config_default: bool) -> list[PageSpec]:
                 "🧪",
                 SECTION_KONFIGURATION,
                 "scenario-editor",
+            )
+        )
+        specs.append(
+            PageSpec(
+                page_tariffs.render,
+                "Tarife",
+                "💶",
+                SECTION_KONFIGURATION,
+                "tariffs",
             )
         )
     return specs

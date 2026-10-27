@@ -180,13 +180,118 @@
                 },
                 {
                     "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
                     "month": 6,
                     "tariff_cent_kwh": 5.0
                 },
                 {
                     "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2025,
                     "month": 12,
                     "tariff_cent_kwh": 8.0
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 8,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 10,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 11,
+                    "tariff_cent_kwh": 7.0
+                },
+                {
+                    "year": 2026,
+                    "month": 12,
+                    "tariff_cent_kwh": 7.0
                 }
             ],
             "supplier_id": "monatliche_testwerte"

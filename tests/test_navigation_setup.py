@@ -309,6 +309,7 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     assert titles == [
         "Hauskonfigurator",
         "Szenarienkonfigurator",
+        "Tarife",
         "Smarthome-Backend",
     ]
     assert "Szenario-Explorer" not in titles

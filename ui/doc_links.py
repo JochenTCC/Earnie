@@ -22,6 +22,7 @@ NAV_DOC_PAGE_KEYS: frozenset[str] = frozenset(
         "price-forecast",
         "house-config",
         "scenario-editor",
+        "tariffs",
         "scenario-explorer",
         "optimizer-daemon",
         "ehal-com",
@@ -120,6 +121,13 @@ PAGE_DOCS: dict[str, PageDocs] = {
                 "docs/referenz/tarife-quellen.md",
             ),
             DocLink("Preise und Marktdaten", "docs/konfiguration/preise.md"),
+        ),
+    ),
+    "tariffs": PageDocs(
+        primary=DocLink(
+            "Benutzertarife (Preise und Marktdaten)",
+            "docs/konfiguration/preise.md",
+            "benutzertarife-usertariffsjson",
         ),
     ),
     "scenario-explorer": PageDocs(
