@@ -244,6 +244,43 @@ def test_reference_standby_zero_for_stripped_historical_params():
     assert reference_standby_power_kw(stripped) == 0.0
 
 
+def test_reference_window_load_adds_standby_once(monkeypatch):
+    """Reference load = logged load + battery standby, booked once like the MILP does."""
+    from simulation import reference_costs
+
+    slots = [datetime(2025, 6, 1, 0, 0), datetime(2025, 6, 1, 1, 0)]
+    monkeypatch.setattr(
+        reference_costs, "reference_slot_datetimes", lambda *_args: slots
+    )
+    monkeypatch.setattr(
+        reference_costs,
+        "resolve_reference_hourly_load",
+        lambda _cache, _slots, scenario_params=None: [0.5, 1.25],
+    )
+    monkeypatch.setattr(
+        "simulation.engine_scenario._scenario_to_battery_params",
+        lambda _params: {"standby_power_kw": 0.026},
+    )
+    monkeypatch.setattr(
+        "simulation.engine._brutto_prices_for_slots",
+        lambda _df, slot_dts, scenario_params=None: [30.0] * len(slot_dts),
+    )
+    monkeypatch.setattr(
+        reference_costs,
+        "epex_prices_for_slots",
+        lambda _df, slot_dts: [10.0] * len(slot_dts),
+    )
+
+    class _Cache:
+        def get_pv_for_slots(self, slot_dts, scenario_params=None):
+            return [0.0] * len(slot_dts)
+
+    _, total_load, _, _, _ = reference_costs._reference_window_inputs(
+        slots[0], _Cache(), pd.DataFrame(), {"battery_ids": ["x"]}, "fixed_24h"
+    )
+    assert total_load == pytest.approx([0.526, 1.276])
+
+
 # --- references evaluate the optimized run's slots -------------------------------------------
 
 
