@@ -740,7 +740,16 @@ Status: **in progress** (D1–D8 accepted 2026-10-27, all as recommended; Part A
   - `tests/test_scenario_editor_next_month.py` (TE5, 3 cases, `time_machine`, planning zone Europe/Vienna): 23:30 local on 31 Oct → November; 00:30 local on 1 Nov (still October in UTC) → December; 00:30 local on 1 Jan → February of the new year.
   - Playwright (`tests/apptest/e2e/test_smoke.py::test_tariffs_user_tariff_created_and_selected_in_a_scenario`): open *Tarife*, *Neuer Bezugstarif*, name and price, save (file: `user_` ID, price, `land` AT), Szenarienkonfigurator → pick *· Benutzertarif* (the option is found only after typing into the select) → stored in the scenario, Edibert preview and *Benutzertarif bearbeiten* visible. All 6 e2e tests green locally (124 s).
   - Full suite 4985 passed, 26 skipped; `tests/fixtures/` unchanged.
-  - Next: S6.
+- **S6 (German user docs):**
+  - `docs/konfiguration/preise.md` § Benutzertarife: tariffs are made on *Konfiguration → Tarife* (embedded editor) instead of "aus dem Tarif-Editor Edibert"; check after every write, delete guard, no silent reset.
+  - Handbook (`docs/user-manual/Benutzer-Handbuch-Earnie.md`): new section *Tarife (Benutzertarife)* after the Szenarienkonfigurator (house profile read-only, new / copy / import, four steps with land, save, check, delete guard). The Szenarienkonfigurator's tariff bullets now describe the Edibert preview instead of the read-only catalog parameters, the two editor links (disabled while unsaved), filters that keep the saved tariff, and the next-month warning (inline for catalog tariffs, *Im Tarif-Editor öffnen* for user tariffs).
+  - **Deviation from the plan:** no separate `docs/ui/` page. `docs/ui/` describes operating pages (Betriebsmodi, Charts, EHAL-Com, Smarthome-Backend); the configuration pages are described in the handbook, so *Tarife* is a handbook section like the Szenarienkonfigurator.
+  - Doc link of the page: primary *Tarife (Benutzer-Handbuch)* (`#tarife-benutzertarife`), secondary *Benutzertarife (Preise und Marktdaten)*.
+  - Shadow mode is not mentioned: `tests/test_user_docs_audience.py` counts it as a developer term; the page shows its own notice.
+  - Text without direct address, as in the rest of both documents.
+  - `tests/test_doc_links.py` and `tests/test_user_docs_audience.py` green.
+  - Backlog P7 → Erledigt waits for the gate (done check below still open).
+  - Next: gate (full suite, `scripts.run_regression` without `--update-golden`, Playwright UI job, browser check of the Tarife page on desktop and phone width).
 
 ### Order
 

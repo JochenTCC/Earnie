@@ -124,10 +124,13 @@ PAGE_DOCS: dict[str, PageDocs] = {
         ),
     ),
     "tariffs": PageDocs(
-        primary=DocLink(
-            "Benutzertarife (Preise und Marktdaten)",
-            "docs/konfiguration/preise.md",
-            "benutzertarife-usertariffsjson",
+        primary=_handbook("Tarife (Benutzer-Handbuch)", "tarife-benutzertarife"),
+        secondaries=(
+            DocLink(
+                "Benutzertarife (Preise und Marktdaten)",
+                "docs/konfiguration/preise.md",
+                "benutzertarife-usertariffsjson",
+            ),
         ),
     ),
     "scenario-explorer": PageDocs(

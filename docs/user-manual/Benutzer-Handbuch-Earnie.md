@@ -251,12 +251,28 @@ Typische Vergleiche:
 
 **Tarife:** Bezugs- und Einspeisetarif kommen aus dem Tarifkatalog oder werden als **Eigener Festpreis** mit eigenem Wert in Cent/kWh eingetragen (der Wert gehört dann zum Szenario, nicht zum Katalog).
 
-- Nach der Auswahl aus dem Katalog zeigt der Editor dessen **Katalogparameter** (nur lesend). Bitte diese Werte auf Richtigkeit prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
+- Unter jedem gewählten Tarif steht eine **Vorschau**: Hinweise und Preiskurven, gerechnet mit Land, Region und Netzbereich des Hausprofils dieses Szenarios. Bitte die Werte auf Richtigkeit prüfen – für Vollständigkeit und Aktualität gibt es keine Garantie.
+- Eigene Tarife (**· Benutzertarif** in den Listen) entstehen auf der Seite [Tarife](#tarife-benutzertarife). **Benutzertarife verwalten** öffnet sie mit dem Hausprofil des Szenarios; ist ein Benutzertarif gewählt, öffnet **Benutzertarif bearbeiten** genau diesen. Beide Knöpfe sind gesperrt, solange das Szenario ungespeicherte Änderungen hat.
+- Land- und Tariftyp-Filter schränken nur die Liste ein. Ein gespeicherter Tarif bleibt gewählt, auch wenn er nicht zum Filter passt.
+- Kurz vor Monatsende warnt der Editor, wenn einem Monatstarif (`monthly_table`) der Preis des nächsten Monats fehlt. Bei Katalogtarifen wird er direkt dort eingetragen; bei einem Benutzertarif führt **Im Tarif-Editor öffnen** auf die Seite Tarife.
 - **Monatliche Fixkosten** (Grundpreis des Lieferanten, optional Netz-, Messstellen- und sonstige Kosten) fließen als Näherung in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung.
 - Der volumetrische **Netznutzung-Arbeitspreis** wird im Hausprofil (Standort) gepflegt. Er fließt in Live-Betrieb und Szenario-Explorer ein und steht in den Fake-Jahresrechnungen getrennt vom Lieferantenanteil.
 - Nach jedem Lauf des Szenario-Explorers liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/`: Bezug und Einspeisung mit Ø Tarif- und Ø Ist-Preis, die Katalogparameter stehen am Ende.
 
 Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) · Technik: [Preise und Marktdaten](../konfiguration/preise.md)
+
+### Tarife (Benutzertarife)
+
+Unter **Konfiguration → Tarife** entstehen eigene Tarife, wenn der eigene Tarif nicht im Katalog steht: fester Preis, Spot-Tarif mit Aufschlag, Monatspreise oder Zeitfenster (zum Beispiel Nacht- oder Wochenendpreise). Die Seite erscheint zusammen mit dem Szenarienkonfigurator.
+
+- **Hausprofil:** Oben wird das Hausprofil gewählt. Land, Region, Zeitzone und Netzbereich kommen von dort und werden nur angezeigt; ändern lassen sie sich im Hauskonfigurator. Vorschau und Prüfungen rechnen mit diesen Werten.
+- **Neu, kopieren, importieren:** Links stehen die eigenen Tarife sowie **Neuer Bezugstarif** und **Neuer Einspeisetarif**. Ein Katalogtarif lässt sich als Vorlage kopieren, Tarife im JSON-Format lassen sich importieren.
+- **Eingabe in vier Schritten:** Name, Anbieter, **Land des Tarifs** (vorbelegt mit dem Land des Hausprofils), Tarifart und Preis; danach Zeitfenster, Kosten und erweiterte Einstellungen. Rechts zeigt die Vorschau Hinweise, Preiskurven und einen Rechnungsvergleich.
+- **Speichern:** **Tarif speichern** erscheint, sobald der Tarif gültig ist, und schreibt ihn nach `user_tariffs.json`. Im Szenarienkonfigurator steht er danach mit dem Zusatz **· Benutzertarif** zur Auswahl.
+- **Prüfung:** Nach jedem Speichern oder Löschen prüft Earnie alle Tarife und die Szenarien, die sie verwenden, und zeigt Befunde als Fehlermeldung.
+- **Löschen:** **Diesen Tarif löschen** entfernt einen ungenutzten Tarif sofort. Wird er in einem Szenario verwendet, nennt Earnie die Szenarien und löscht erst nach **Trotzdem löschen**. Diese Szenarien meldet die Prüfung danach, bis dort ein anderer Tarif gewählt ist.
+
+Technik: [Benutzertarife](../konfiguration/preise.md#benutzertarife-usertariffsjson)
 
 ### Szenario-Explorer (Was-wäre-wenn-Analyse)
 

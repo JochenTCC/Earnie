@@ -135,7 +135,10 @@ Die Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Ty
 
 ### Benutzertarife (`user_tariffs.json`)
 
-Eigene Tarife aus dem Tarif-Editor [Edibert](https://github.com/JochenTCC/Edibert) liegen in `user_tariffs.json` **neben** `tariffs.json` (gleiches Verzeichnis, gleiche Struktur, IDs beginnen mit `user_`). Earnie liest die Datei, wenn sie existiert; fehlt sie, gibt es einfach keine Benutzertarife. Die Datei gehört zum Config-Paket (Export/Import).
+Eigene Tarife entstehen auf der Seite **Konfiguration → Tarife** (Tarif-Editor von [Edibert](https://github.com/JochenTCC/Edibert), eingebettet in Earnie; Beschreibung im [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#tarife-benutzertarife)). Sie liegen in `user_tariffs.json` **neben** `tariffs.json` (gleiches Verzeichnis, gleiche Struktur, IDs beginnen mit `user_`). Earnie liest die Datei, wenn sie existiert; fehlt sie, gibt es einfach keine Benutzertarife. Die Datei gehört zum Config-Paket (Export/Import).
+
+- Nach jedem Speichern oder Löschen auf der Seite Tarife prüft Earnie die Tarife einmal (Katalog, Benutzertarife, Netzbereiche, Hausprofile und die Tarif-Verweise der Szenarien) und zeigt Befunde als Fehlermeldung.
+- Nutzt ein Szenario einen Benutzertarif, fragt der Editor vor dem Löschen nach und nennt die Szenarien. Nach dem Löschen meldet die Prüfung diese Szenarien, bis dort ein anderer Tarif gewählt ist; Earnie setzt die Auswahl nicht von sich aus zurück.
 
 - Im Szenarienkonfigurator erscheinen Benutzertarife mit dem Zusatz **· Benutzertarif** in den Dropdowns Bezug und Einspeise.
 - Benutzertarife mit Zeitregeln (`rules`), Preisunter- oder -obergrenze (`price_floor_cent_kwh` / `price_cap_cent_kwh`) berechnet Earnie über Edibert wie jeden anderen Tarif.
