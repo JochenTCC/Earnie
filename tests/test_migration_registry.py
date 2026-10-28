@@ -595,3 +595,25 @@ def test_v3_path_lists_pv_systems_put_on_wr_main(tmp_path):
     assert "wr_main" in todo.text_de
     report = run_migration(config_dir, KEEP_NAMES)
     assert any(t.step_id == "dm4.v3_to_v4" for t in report.manual_todos)
+
+
+def test_v3_path_splits_lumped_battery_efficiency(tmp_path):
+    """2.6 packs: η_inv was set while creating inverters[], so dm4.conversion_efficiency
+    never ran and the storage path got η_inv twice (0.97 · 0.97 instead of 0.97)."""
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    plan = plan_migration(config_dir)
+    assert "dm4.conversion_efficiency" in plan.pending_step_ids
+    todo = next(t for t in plan.manual_todos if t.step_id == "dm4.conversion_efficiency")
+    assert "`10_kwh_speicher`: 0,940 → η_inv 0,970 (`wr_main`) × η_batt 0,969" in todo.text_de
+    assert "„Wechselrichter“" in todo.text_de
+    run_migration(config_dir, KEEP_NAMES)
+    components = json.loads((config_dir / "components.json").read_text(encoding="utf-8"))
+    eta_inv = next(i["efficiency"] for i in components["inverters"] if i["id"] == "wr_main")
+    eta_batt = components["batteries"][0]["battery_efficiency"]
+    assert eta_inv * eta_batt == pytest.approx(0.94)
+
+
+def test_conversion_todo_absent_when_nothing_was_split(tmp_path):
+    config_dir = _copy_snapshot(tmp_path, "v4_pre_topology")
+    plan = plan_migration(config_dir)
+    assert not any(t.step_id == "dm4.conversion_efficiency" for t in plan.manual_todos)
