@@ -91,7 +91,7 @@ Neue Profile bitte als JSON gegen die jeweiligen Schemas validieren (siehe Tests
 
 ### 5. Tarifbeiträge
 
-Der Basis-Tarifkatalog `share/config/tariffs.json` (und `share/config/grid_fees.json`) bekommt **keine neuen Einträge** mehr; Pull Requests dafür werden nicht angenommen. Korrekturen bestehender Einträge und die monatlichen Referenzkurven werden weiter gepflegt. Neue Tarife entstehen als eigene Tarife auf der Seite *Tarife* und kommen über den Beitragsweg von [Edibert](https://github.com/JochenTCC/Edibert/blob/main/CONTRIBUTING.md) in den Community-Katalog. Umfang, Nutzungsrecht und Anreiz regelt `LICENSE.md` § 3 Abs. 4–9 (Entwurf, Rechtsprüfung offen); Tarifbeiträge werden erst angenommen, wenn die geprüften Bedingungen veröffentlicht sind.
+Der Basis-Tarifkatalog `share/config/tariffs.json` (und `share/config/grid_fees.json`) bekommt **keine neuen Einträge** mehr; Pull Requests dafür werden nicht angenommen. Korrekturen bestehender Einträge und die monatlichen Referenzkurven werden weiter gepflegt. Neue Tarife entstehen als eigene Tarife auf der Seite *Tarife* und kommen über den Beitragsweg von [Edibert](https://github.com/JochenTCC/Edibert/blob/main/CONTRIBUTING.md) in den Community-Katalog. Für Beiträge aus Earnie heraus regelt `LICENSE.md` § 3 Abs. 4–8 Umfang, Nutzungsrecht und Aufnahme (Entwurf, Rechtsprüfung offen); die geprüften Beitragsbedingungen von Edibert gehen nach ihrer Veröffentlichung vor. Tarifbeiträge werden erst angenommen, wenn die geprüften Bedingungen veröffentlicht sind.
 
 Profile und Hinweise zu neuen Geräten gern über Info / About (GitHub-Issue) oder direkt als Issue einreichen.
 
