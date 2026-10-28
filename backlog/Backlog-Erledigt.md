@@ -2,6 +2,19 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix sync with `main` — Open-Meteo forecast UTC, climate fixtures, issue #50 verifications (2026-10-28)
+
+Aligned with `backlog/Backlog-Erledigt.md` on `main`: these items were fixed or verified there, but `release/2.7` still listed them as open or pending.
+
+- [x] **Open-Meteo forecast calls got one fixed UTC offset (found 2026-10-25):** fixed on `main` (`6ae6878b`, verified by the maintainer 2026-10-26), cherry-picked to `release/2.7` (`91babcd1`): both forecast paths request `timezone=UTC` (`utc_forecast_params` in `data/outdoor_forecast.py`) and convert per timestamp to the planning timezone (`data/outdoor_forecast.py`, `data/eu_market_features.py`). Tests `tests/test_outdoor_forecast.py`, `tests/test_eu_market_features.py`. The `ext:outdoor:<hash>` shadow feed keys change with the params, so a shadow instance and its prod should run the same build.
+- [x] **Frozen climate test fixtures carried the old fixed-offset alignment (found 2026-10-25):** re-recorded on `main` (`de3583c9`), cherry-picked to `release/2.7` (`edd7eb1a`); goldens of the same 7 cases refreshed on `release/2.7` (`1075fd5e`): metrics and plan hashes unchanged, only input digests and last-digit float formatting moved.
+- [x] **`tests/test_ha_testbed_live.py` failed instead of skipping without a running testbed:** testbed part of `e449271a` on `main` applied to `release/2.7` (`98b11d6b`).
+- [x] **Issue #50 / 1 — `settlement_fee_cent_kwh` load warning on `fixed_cent` / `monthly_table`:** verified on `main` on 2026-10-24 by AppTest (exactly one warning naming the tariff and `netznutzung`, also over a second run; `tests/apptest/test_issue50_ui_apptest.py`). Not checked in a real daemon log.
+- [x] **Issue #50 / 1b — VAT on the net `netznutzung` for gross import tariffs:** closed on `main` on 2026-10-24 on the maintainer's decision, without private golden-master cases (none exist yet) and without the reporter's acceptance. Recomputed on `release/2.7` on 2026-10-28: `import_cent_kwh` gives 22.896 ct for 12 ct gross + 9.08 ct net at 20 % VAT, 35.896 ct for `fixed_25ct`.
+- [x] **Issue #50 / 3 — "Jetzt neu berechnen" button:** verified on `main` on 2026-10-24 by AppTest and a real `POST` to `/ehal/loxone/request_optimize` on a throw-away listener. Not run against a real `main.py` daemon.
+- [x] **[GitHub #59](https://github.com/JochenTCC/Earnie/issues/59) — EU power data retry loop without failure cache:** closed on `main` on 2026-10-24, incl. a local run against an unreachable host. The open decision on a switch-off option stays in `Backlog-Bugfixes.md` (minor changes).
+- [x] **[GitHub #60](https://github.com/JochenTCC/Earnie/issues/60) — HA YAML package (export hint, `input_number` targets, watchdog):** verified live on `main` on 2026-10-24 (lab HA 2025.7.0).
+
 ### Document Review — issue #50 settlement fee + Optimierer-Dienst cycle (2026-10-27)
 
 - [x] **Issue #50 / 1 — `settlement_fee_cent_kwh` description misleads:** `docs/konfiguration/preise.md` and `docs/referenz/tarife-quellen.md` now state supplier surcharge on the exchange price, spot types only, no effect on `fixed_cent` / `monthly_table` (load warning), grid costs belong to `netznutzung` in the house profile (committed in `3acd09ac`). 2.6.2 docs keep the old wording (no backport).
