@@ -26,6 +26,12 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 
 ### Version 2.8
 
+- [ ] **HA carrier: fail-safe values for every written signal** `[feat]` *(follow-up of GitHub #60, decided 2026-10-28; not in 2.7)*
+  - Today the watchdog in the YAML package (`integrations/ha_carrier_yaml.py::_watchdog_automation`) only releases a forced `set_ess_active_power` (or Huawei `stop_forcible_charge`); caps and modes stay. Reported case: a discharge lock (`set_ess_discharge_power_limit` = 0) stays active while Earnie is down, so the battery stays locked.
+  - Principle: fallback behaviour is device-specific and belongs to the smarthome, not to Earnie. Earnie only lets the user define a **fail-safe value per written signal** (e.g. charge/discharge limit = max, active power = 0, mode = self-use), and the generated HA package applies them when `status.json` is unreachable.
+  - HA only: the carrier already runs logic outside Earnie, which fits the plan to make HA the standard backend of the complete solution. Loxone and others keep their own fallback logic.
+  - Open: where the values live (signal list / `ehal_bindings` metadata), required vs optional per signal, defaults derived from the house configuration (e.g. max power) vs explicit entry, docs for the user.
+
 - [ ] **Review the legacy `flexible_consumers[]` overlay in `config.json`** `[qual]`: today it is still loaded (`settings/flexible_consumers.py` `load_flexible_consumers`) and merged with the house-profile consumers (`house_config/planning_flex_bridge.py` `merge_flexible_consumers`); on equal `id` the overlay entry silently wins over the profile. Decide: keep (documented), warn on conflicting `id`, or reject/remove the overlay (incl. `path_historical_log` use via `consumer_path`, migration of existing configs, tests that still use the overlay). Docs (`docs/konfiguration/flexible-verbraucher.md`, `overview.md`, `verbrauchs-csv.md`) follow the decision
 
 - [ ] **Translate `docs/dev/streamlit-ports.md` to English** `[dev]`: moved from `docs/referenz/` (user docs) to `docs/dev/` and still German; per `german-user-docs.mdc` dev docs are English. Keep paths, ports, env vars and compose names verbatim. Also review user-doc links that point into it (`betrieb.md`, `container.md`, handbook, `docs/README.md`): either keep or move the production-port part into a user doc
