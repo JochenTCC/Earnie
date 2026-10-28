@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.7.0-alpha.8",
+    "earnie_version": "2.7.0-beta.1",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -29,15 +29,16 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "b07aade118c86da78df9bd3f402709ac2b8225ff",
-    "recorded_at": "2026-10-23T06:35:22Z",
+    "git_sha": "98b11d6b12a91c11fc5f31c9f696b3a71046dcba",
+    "recorded_at": "2026-10-28T05:33:35Z",
     "source": "update-golden"
   },
   "inputs": {
     "files": {
       "recorder_cycle": "a67fc3e494cb8a04",
       "config_snapshot": "247777f49ba6e559",
-      "open_meteo/47.5000_9.5000_2025-01-01_2025-12-31_Europe-Vienna_18.0_-154.0-18.0_26.0.json": "883835c876ebd77f"
+      "open_meteo/47.5000_9.5000_2025-01-01_2025-12-31_Europe-Vienna_18.0_-154.0-18.0_26.0.json": "0b15ae9f070014c5",
+      "open_meteo/47.5000_9.5000_2025-01-01_2025-12-31_Europe-Vienna_18.0_26.0.json": "7aa78b13f2a5891d"
     },
     "series": {},
     "sums": {}

@@ -1,6 +1,6 @@
 {
   "engine": {
-    "earnie_version": "2.7.0-dev.62",
+    "earnie_version": "2.7.0-beta.1",
     "solver": "highs",
     "solver_mode": "strict",
     "highspy": "1.15.1",
@@ -25,23 +25,21 @@
     "diff_slots": null
   },
   "baseline": {
-    "git_sha": "6aa10992e9401feffbe01b7b04b7253ec1a363cd",
-    "recorded_at": "2026-10-20T17:02:54Z",
+    "git_sha": "98b11d6b12a91c11fc5f31c9f696b3a71046dcba",
+    "recorded_at": "2026-10-28T05:33:35Z",
     "source": "update-golden"
   },
   "inputs": {
     "files": {
       "fixtures/backtesting_scenarios.json": "fa30790f3ccba557",
-      "fixtures/components.json": "da8d61bd10fa8cc8",
-      "fixtures/config.json": "7cc3425b8a1d31ab",
+      "fixtures/components.json": "8b0b8a2e17422255",
+      "fixtures/config.json": "0b98d7b44af5fd57",
       "fixtures/cons_data.csv": "9dcccd6817385b2e",
       "fixtures/house_profiles.json": "b7a432b1bcc12805",
-      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_18.0_0.0.json": "77f0a9e08afd1d08",
-      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "b8bb3205806bb411",
-      "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "457bbdacb5e87ead",
+      "fixtures/open_meteo/47.4000_9.7000_2025-01-01_2025-12-31_Europe-Vienna_none.json": "cced3026b26261c3",
+      "fixtures/open_meteo/47.4040_9.7430_2026-01-01_2026-10-17_Europe-Vienna_18.0_28.0.json": "ba5564dba8d71740",
       "fixtures/prices.csv": "57885d9ae16e27b0",
-      "fixtures/shadow_feed/feed-2026-10-20.jsonl": "c3117dd3d5d762cc",
-      "fixtures/tariffs.json": "e7e44bae2c61aecd",
+      "fixtures/tariffs.json": "7885e56a4c22592a",
       "case.inputs": "30dae7c03dfb4cab"
     },
     "series": {
