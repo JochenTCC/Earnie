@@ -71,6 +71,27 @@ def install_fixture_flex_consumers() -> None:
     _FLEX_CONSUMERS_INSTALLED = True
 
 
+# Config and sidecar paths bound to the committed fixtures (pytest, regression runner).
+FIXTURE_CONFIG_ENV = {
+    "EARNIE_CONFIG_PATH": "config.json",
+    "EARNIE_TARIFFS_PATH": "tariffs.json",
+    "EARNIE_HOUSE_PROFILES_PATH": "house_profiles.json",
+    "EARNIE_BACKTESTING_SCENARIOS_PATH": "backtesting_scenarios.json",
+    "EARNIE_COMPONENTS_PATH": "components.json",
+}
+
+
+def pin_fixture_config_env() -> None:
+    """Bind config and sidecars to ``FIXTURES_ROOT``, overriding any local site config.
+
+    Force-overwrite (not setdefault): a shell, ``.env`` or a previous test must not leave
+    a sidecar path behind.
+    """
+    for key, name in FIXTURE_CONFIG_ENV.items():
+        os.environ[key] = str(FIXTURES_ROOT / name)
+    os.environ.pop("EARNIE_DEVIATION_RULES_PATH", None)
+
+
 def fixture_path(name: str) -> Path:
     path = FIXTURES_ROOT / name
     if not path.is_file():

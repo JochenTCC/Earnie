@@ -29,6 +29,22 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+def _isolate_from_site_config() -> None:
+    """Cases never read the local site config (``earnie_env/config``).
+
+    ``import config`` loads the bound config at import time; an unmigrated or broken
+    house config would abort the suite before any case runs. L1 replays bind their
+    recorded env themselves, L2 binds the backtesting fixtures.
+    """
+    from tests.fixtures.backtesting_fixtures import pin_fixture_config_env
+
+    os.environ.pop("EARNIE_ENV_PATH", None)
+    pin_fixture_config_env()
+
+
+_isolate_from_site_config()
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Earnie release regression suite (golden-master cases).",
@@ -187,6 +203,7 @@ def _run_one_case_payload(payload: dict[str, Any]) -> dict[str, Any]:
     os.environ.setdefault("EARNIE_OFFLINE", "1")
     os.environ["EARNIE_CBC_STRICT"] = "1"
     os.environ.setdefault("EARNIE_MILP_SOLVER", "highs")
+    _isolate_from_site_config()
 
     from tests.regression.compare import build_expected_payload, compare_case
     from tests.regression.engine_info import engine_fingerprint

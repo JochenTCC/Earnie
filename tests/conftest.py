@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from dotenv import load_dotenv
 
+from tests.fixtures.backtesting_fixtures import pin_fixture_config_env
 from tests.fixtures.historical_fixtures import CONS_DATA_FILE, fixture_available
 from tests.regression.baseline import GIT_LOCATION_ENV
 
@@ -59,18 +60,8 @@ def _apply_default_test_config_env() -> None:
     """Fixture-Config erzwingen — unabhängig von lokaler .env/NAS-Pfad."""
     if os.getenv(_USE_LIVE_CONFIG_ENV) == "1":
         return
-    os.environ["EARNIE_CONFIG_PATH"] = str(DEFAULT_TEST_CONFIG_PATH)
     os.environ.setdefault("EARNIE_OFFLINE", "1")
-    bt_dir = DEFAULT_TEST_CONFIG_PATH.parent
-    # Force-overwrite (not setdefault): after monkeypatch undo / xdist workers,
-    # leftover sidecar paths must not stick to a previous test's tmp_path.
-    os.environ["EARNIE_TARIFFS_PATH"] = str(bt_dir / "tariffs.json")
-    os.environ["EARNIE_HOUSE_PROFILES_PATH"] = str(bt_dir / "house_profiles.json")
-    os.environ["EARNIE_BACKTESTING_SCENARIOS_PATH"] = str(
-        bt_dir / "backtesting_scenarios.json"
-    )
-    os.environ["EARNIE_COMPONENTS_PATH"] = str(bt_dir / "components.json")
-    os.environ.pop("EARNIE_DEVIATION_RULES_PATH", None)
+    pin_fixture_config_env()
     # Do not force EARNIE_GRID_FEES_PATH here — bootstrap tests must seed
     # config/grid_fees.json from share/. AppTest sets the public catalog path.
 
