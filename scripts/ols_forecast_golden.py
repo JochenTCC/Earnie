@@ -17,7 +17,7 @@ import shutil
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -43,7 +43,8 @@ BIAS_VARIANTS: dict[str, dict[str, Any]] = {
     "on": {"live_bias_enabled": True, "live_bias_lookback_hours": 48, "live_bias_cap_cent_kwh": 12.0},
     "capped": {"live_bias_enabled": True, "live_bias_lookback_hours": 48, "live_bias_cap_cent_kwh": 0.3},
 }
-MODEL_PATH_LABEL = Path("share/data/price_model_coefficients.json")
+# POSIX form: the label lands in the rows as str(), so the golden must not depend on the recording OS.
+MODEL_PATH_LABEL = PurePosixPath("share/data/price_model_coefficients.json")
 
 
 @dataclass(frozen=True)
