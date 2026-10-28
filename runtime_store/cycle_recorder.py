@@ -194,6 +194,24 @@ def _collect_ev_limit_soc() -> dict[str, float]:
     return out
 
 
+def _collect_thermal_readings() -> dict[str, dict]:
+    """Live thermal readings per consumer with an enabled ``thermal_control``.
+
+    The thermal daily target reads them live (``fetch_thermal_readings``);
+    replay has no live value.
+    """
+    import config
+    from integrations import ehal_live
+
+    out: dict[str, dict] = {}
+    for consumer in config.get_flexible_consumers(optimizer_only=True) or []:
+        if (consumer.get("thermal_control") or {}).get("enabled"):
+            out[str(consumer["id"])] = _json_safe(
+                ehal_live.fetch_thermal_readings(consumer)
+            )
+    return out
+
+
 def _collect_start_state(
     *,
     soc_percent: float | None,
@@ -213,6 +231,7 @@ def _collect_start_state(
         "charging_contexts": _json_safe(charging_contexts or {}),
         "targets": _json_safe(targets or {}),
         "ev_limit_soc_percent": _collect_ev_limit_soc(),
+        "thermal_readings": _collect_thermal_readings(),
     }
 
 
