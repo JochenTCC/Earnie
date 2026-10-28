@@ -33,10 +33,22 @@ def test_golden_covers_every_case(expected):
     assert sorted(golden.cases()) == sorted(expected["outputs"])
 
 
+def _approx_floats(value):
+    """Floats under a relative tolerance: the hourly mean of quarter slots may differ in the last ulp
+    between pandas builds (summation order), which is not a P6 regression."""
+    if isinstance(value, float):
+        return pytest.approx(value, rel=1e-12, abs=1e-12)
+    if isinstance(value, list):
+        return [_approx_floats(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _approx_floats(item) for key, item in value.items()}
+    return value
+
+
 @pytest.mark.parametrize("name", sorted(golden.cases()))
 def test_output_matches_pre_p6(name, expected, replayed):
     outputs, _calls = replayed
-    assert outputs[name] == expected["outputs"][name]
+    assert outputs[name] == _approx_floats(expected["outputs"][name])
 
 
 @pytest.mark.parametrize("name", sorted(golden.cases()))
