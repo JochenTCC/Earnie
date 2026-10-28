@@ -89,6 +89,10 @@ Laut `LICENSE.md` § 3: Bei Hardware ohne offizielles Profil bist du freiwillig 
 
 Neue Profile bitte als JSON gegen die jeweiligen Schemas validieren (siehe Tests `tests/test_ehal_profiles.py`). Spec: [docs/referenz/ehal.md](docs/referenz/ehal.md) Abschnitt *Device roles and hardware profiles*.
 
+### 5. Tarifbeiträge
+
+Der Basis-Tarifkatalog `share/config/tariffs.json` (und `share/config/grid_fees.json`) bekommt **keine neuen Einträge** mehr; Pull Requests dafür werden nicht angenommen. Korrekturen bestehender Einträge und die monatlichen Referenzkurven werden weiter gepflegt. Neue Tarife entstehen als eigene Tarife auf der Seite *Tarife* und kommen über den Beitragsweg von [Edibert](https://github.com/JochenTCC/Edibert/blob/main/CONTRIBUTING.md) in den Community-Katalog. Umfang, Nutzungsrecht und Anreiz regelt `LICENSE.md` § 3 Abs. 4–9 (Entwurf, Rechtsprüfung offen); Tarifbeiträge werden erst angenommen, wenn die geprüften Bedingungen veröffentlicht sind.
+
 Profile und Hinweise zu neuen Geräten gern über Info / About (GitHub-Issue) oder direkt als Issue einreichen.
 
 ---

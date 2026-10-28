@@ -149,6 +149,8 @@ Eigene Tarife entstehen auf der Seite **Konfiguration → Tarife** (Tarif-Editor
 
 Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/config/tariffs.json) mit dem Root-Feld `catalog_as_of`. Zur Laufzeit nutzt Earnie `earnie_env/config/tariffs.json`; beim Bootstrap kopiert Earnie den Katalog bei Bedarf aus `share`. Szenarien in `backtesting_scenarios.json` verweisen auf `import_tariff_id` und `export_tariff_id` (oder auf `__user_fixed__` mit szenario-lokalen Cent-Feldern, siehe oben).
 
+**Basiskatalog ohne neue Einträge (ab 2.8):** `share/config/tariffs.json` und `share/config/grid_fees.json` bekommen nur noch Korrekturen bestehender Einträge und die neuen Monatswerte der Referenzkurven, aber keine neuen Tarife oder Netzbereiche. Ein Tarif, der im Katalog fehlt, wird als Benutzertarif auf der Seite *Tarife* angelegt (siehe [Benutzertarife](#benutzertarife-usertariffsjson)). Neue Katalogtarife kommen künftig über den Community-Katalog von Edibert.
+
 ### Import-Typen
 
 | Typ | Bedeutung |
@@ -189,7 +191,7 @@ Die Berechnung macht Edibert (Anbindung in [`data/edibert_slot_prices.py`](../..
 
 `simulation/engine.py` und `data/backtesting_prices.py` bepreisen über die Edibert-Preisreferenz der Szenario-Auflösung (`_edibert_pricing`); `_import_tariff_spec` / `_export_tariff_spec` tragen nur noch die Katalogparameter für Anzeige, Fixkosten und Rechnung. Day-Ahead-Daten: [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
-**DACH-Katalog importieren:** `tools/convert_dach_tariffs.py` aus `stromtarife_dach_kombiniert.json` + `einspeisetarife_dach_erweitert.json`.
+**DACH-Katalog importieren:** `tools/convert_dach_tariffs.py` aus `stromtarife_dach_kombiniert.json` + `einspeisetarife_dach_erweitert.json` – seit 2.8 nur noch für Korrekturen bestehender Einträge (siehe *Basiskatalog ohne neue Einträge*).
 
 **Plausibilität prüfen** (vor dem Produktivstart oder dem Umzug auf das NAS):
 

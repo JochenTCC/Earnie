@@ -69,7 +69,7 @@ Earnie **loads** the tariff files through `edibert.api` but **still prices with 
 | 1 | Missing month in `monthly_table` | exact → same month prior year → prior month, logged once as a warning; error only if none exists | same order since Edibert `v0.1.4` (`0.1.g`), coded warning `MONTH_RATE_FALLBACK` (`rule`, `used_month`); `PRICE_MISSING` only when none of the three exists | done in P3a-2: the adapter logs the warning once per tariff and month and returns it to reports; harness and test check rule, month and price against Earnie |
 | 2 | Unknown tariff fields | ignored silently by the normalizer | `TARIFF_UNKNOWN_FIELD` (error) | none for the catalog (loads clean); user files are already checked strictly |
 | 3 | `user_` prefix | no rule | user IDs must start with `user_`, catalog IDs must not (`ID_PREFIX_*`) | none; enforced since P1 |
-| 4 | Edited site copy of the catalog | `earnie_env/config/tariffs.json` is seeded from `share/` and may be edited (`append_monthly_rate`) | treated as catalog; every entry gets origin `catalog` | P8 decides whether new entries may still land there |
+| 4 | Edited site copy of the catalog | `earnie_env/config/tariffs.json` is seeded from `share/` and may be edited (`append_monthly_rate`) | treated as catalog; every entry gets origin `catalog` | decided in P8 (D1, D3): no new entries; the site copy keeps its seeded entries and the inline next-month form until catalog packages bring the monthly rates |
 | 5 | `__user_fixed__` (*Eigener Festpreis*) | pseudo tariff, cent values on the scenario | no equivalent | P3a T3: synthetic Edibert `fixed_cent` / `fixed` tariff built with `api.parse_tariff` (Edibert `0.1.j`) from the resolved cent and VAT values; not migrated (decided 2026-10-26, § P2 decision 4) |
 | 6 | `tariff_format` root key | none | required (`FORMAT_MISSING` / `FORMAT_UNSUPPORTED`) | done in P2: all four tariff-track files carry `tariff_format: 1` (Edibert `v0.1.2`, `tf1.tariff_format`) |
 | 9 | VAT on the net grid fee for gross tariffs | `grid_fee_on_tariff_basis`: `supplier + grid × (1 + vat/100)` | same since Edibert `v0.1.2` (`evaluate`) | P3a: accept with a gross tariff plus grid fee in the comparison run |
@@ -766,3 +766,40 @@ Part A (Edibert `0.1.m`, release `v0.1.7` with approval) → pin → S1 → S2 �
 - [x] Szenarienkonfigurator: selection unchanged in behaviour, preview from Edibert, link to the editor.
 - [x] TE1–TE6 green (editor cases in Edibert, selection cases in Earnie per D1); AppTest smoke and Playwright tariff path green.
 - [x] Full suite and all regression cases green, goldens unchanged.
+
+## P8 — Catalog decision (2026-10-28)
+
+Status: **decided** (2026-10-28; D1–D6 accepted as recommended, D5 extended by the maintainer, D6 changed while writing it). Backlog item *Edibert P8* (Version 2.8): fate of the public `share/config/tariffs.json` and contributions in `LICENSE.md` § 3.
+
+### Findings (2026-10-28)
+
+- `share/config/tariffs.json` is public (37 import, 13 export tariffs; AT, CH, DE). `runtime_store/bootstrap.py` copies it into the site config only on first start (`_copy_template_if_missing`), so existing installations never see catalog changes; only new installations do.
+- Nine tariffs are monthly tables. Seven carry `monthly_seed` and get their monthly rates from the maintained reference curves (`scripts.update_tariff_curves`, OeMAG market price, E-Control reference market value PV). A site copy gets the next month only through the inline form of the Szenarienkonfigurator (`append_monthly_rate`, P7 D6) or the prior-year fallback (`MONTH_RATE_FALLBACK`).
+- `share/config/grid_fees.json` is a catalog and seed of the same kind (Edibert spec § 2: both are written by "catalog package / seed").
+- Edibert already reserves `catalog/` for a signed catalog package and describes the contribution path in `CONTRIBUTING.md`; its `catalog/README.md` lists this decision as open. Edibert's conventions keep legal texts out of the repository until they are legally reviewed.
+- `LICENSE.md` § 3 covers voluntary data for unknown hardware only.
+- The backlog put P8 after Edibert `0.1.d`, but `0.1.d` (contribution path, signed catalog access) needs this decision and the contribution terms first.
+
+### Decisions (2026-10-28)
+
+1. **D1 — public catalog:** `share/config/tariffs.json` stays as a **frozen seed**. It gets **no new tariffs**; new tariffs reach the catalog only through Edibert's catalog channel (`0.1.d`). Allowed changes: corrections of existing entries (wrong price, wrong rule, ended product) and the monthly rows of the reference curves, so new installations do not start with stale feed-in rates. This holds until catalog packages deliver the monthly rates. Enforced by `tests/test_catalog_frozen.py` (fixed ID set per side).
+2. **D2 — order:** P8 before Edibert `0.1.d`; `0.1.d` builds on D1 and D5.
+3. **D3 — site copy:** new entries never land in the site copy; users create user tariffs (Tarife page, P7). The inline next-month form stays for catalog monthly tables until the catalog packages of `0.1.d` bring the monthly rates; then `append_monthly_rate` goes. Note for `0.1.d`: a package import must not overwrite monthly rows the user entered in the site copy without telling.
+4. **D4 — grid areas:** `share/config/grid_fees.json` follows D1 and D3 (frozen seed, corrections only, new areas through the catalog channel; own values in `user_grid_fees.json`).
+5. **D5 — contribution terms:** `LICENSE.md` § 3 gets paragraphs 4–9 on tariff contributions (draft, legal review open): voluntary, non-individualized tariffs without personal data only, preview and opt-in per tariff, a simple, free, non-exclusive and perpetual right of use for the catalog bound to that purpose, deletion on request where the contribution can be attributed, no liability for tariff data, use of the software never depends on a contribution. **Added by the maintainer:** as an incentive, every verified tariff whose price varies over time (spot, monthly table or time-window rules) is rewarded with one month of free access to the community catalog and its updates. Terms of use for the catalog itself (redistribution, database right) are not part of § 3; they come with `0.1.d`.
+6. **D6 — Edibert:** *(changed while writing it)* no terms file in Edibert, because Edibert keeps legal texts out of the repository until they are reviewed. Instead `CONTRIBUTING.md` names the reward (one month of free catalog access per accepted, verified, time-varying tariff) and `catalog/README.md` records D1 as decided. The binding text is Earnie's `LICENSE.md` § 3 until the reviewed terms are published.
+
+### Legal review (open)
+
+Not done here; the § 3 text is a draft. Points for the review:
+
+- **Public promise of a reward:** a reward publicly announced for an act can be binding under German law (*Auslobung*, § 657 BGB); a "no legal claim" sentence may not hold. Either state the reward as a binding promise with precise conditions, or phrase it as a discretionary goodwill gesture and check that wording.
+- Terms of contribution (purpose, scope, deletion), the privacy notice for the upload, liability for tariff data.
+- Paid access (VAT, withdrawal right for digital content, payment handling) — only once a fee or subscription is offered.
+
+### Done check
+
+- [x] Decision record (this section).
+- [x] `LICENSE.md` § 3 extended for tariff contributions (draft, legal review open).
+- [x] Guard test for D1 (`tests/test_catalog_frozen.py`).
+- [x] Edibert `CONTRIBUTING.md` and `catalog/README.md` aligned (D6); backlogs on both sides corrected (D2).
