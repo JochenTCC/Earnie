@@ -661,6 +661,59 @@ def test_build_telemetry_rows_without_push_info_keeps_kein_mapping():
     assert rows[0]["Status"] == "Kein Mapping"
 
 
+def test_build_telemetry_rows_shows_push_detail_note():
+    rows = build_telemetry_rows(
+        {},
+        "t-read",
+        mapping={},
+        expected_fields=["ess.house.sens_ess_power"],
+        push_info={"ess.house.sens_ess_power": ("OK", "t-p", -1130.0)},
+        push_details={"ess.house.sens_ess_power": "Vorzeichen gedreht (ehal.ha.sign: negate)"},
+    )
+    assert rows[0]["Wert (EHAL)"] == "-1130 W"
+    assert rows[0]["Detail"] == "Vorzeichen gedreht (ehal.ha.sign: negate)"
+
+
+def test_ha_push_read_info_applies_sign_like_the_live_read_path():
+    # Issue #56: Live-Lesen showed the raw push (+1130 W) while the live power line
+    # used the negated value (-1.13 kW) from a leftover 2.6 ``ehal.ha.sign``.
+    from ui.loxone_debug import _ha_push_read_info
+
+    qids = {
+        "sens_grid_power_active": "grid.meter.sens_grid_power_active",
+        "ess.house.sens_ess_power": "ess.house.sens_ess_power",
+        "ess.house.sens_ess_soc": "ess.house.sens_ess_soc",
+    }
+    values = {
+        "grid.meter.sens_grid_power_active": 500.0,
+        "ess.house.sens_ess_power": 1130.0,
+        "ess.house.sens_ess_soc": 40.0,
+    }
+    with patch(
+        "integrations.ha_push_read.load_house_components_for_ha",
+        return_value=({}, {}),
+    ), patch(
+        "integrations.ha_push_read.push_read_qualified_ids",
+        return_value=qids,
+    ), patch(
+        "runtime_store.ehal_push_inbox.memory_snapshot",
+        return_value={},
+    ), patch(
+        "runtime_store.ehal_push_inbox.read_push_value",
+        side_effect=lambda qid: (values[qid], "OK"),
+    ):
+        info, details = _ha_push_read_info(
+            {"sens_ess_power": "negate", "sens_ess_soc": "negate"}
+        )
+
+    assert info["ess.house.sens_ess_power"][2] == -1130.0
+    assert info["grid.meter.sens_grid_power_active"][2] == 500.0
+    assert info["ess.house.sens_ess_soc"][2] == 40.0
+    assert details == {
+        "ess.house.sens_ess_power": "Vorzeichen gedreht (ehal.ha.sign: negate)"
+    }
+
+
 
 def test_expand_ha_writes_maps_bare_ess_fields_to_entity_scoped_ids(monkeypatch):
     # HA testbed F19: the write trace holds bare names, Live-Schreiben lists

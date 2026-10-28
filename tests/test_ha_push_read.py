@@ -191,3 +191,15 @@ def test_adapter_reports_never_activated_fields_as_unconfigured():
     assert err is None
     assert "set_ess_mode" in adapter.last_unconfigured_fields()
     assert "set_ess_mode" not in adapter.last_skipped_fields()
+
+
+def test_push_sign_mode_resolves_scoped_key_bare_kind_and_never_soc():
+    from integrations.ha_push_read import apply_push_sign, push_sign_mode
+
+    sign = {"sens_ess_power": "negate", "sens_ess_soc": "negate"}
+    assert push_sign_mode(sign, "ess.house.sens_ess_power") == "negate"
+    assert push_sign_mode(sign, "sens_ess_power") == "negate"
+    assert push_sign_mode(sign, "ess.house.sens_ess_soc") is None
+    assert push_sign_mode(sign, "sens_grid_power_active") is None
+    assert apply_push_sign(1130.0, sign=sign, adapter_field="ess.house.sens_ess_power") == -1130.0
+    assert apply_push_sign(500.0, sign=sign, adapter_field="sens_grid_power_active") == 500.0

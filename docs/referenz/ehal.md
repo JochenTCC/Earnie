@@ -446,7 +446,7 @@ Home Assistant uses the **same Earnie↔SB HTTP contract as Loxone**. There is *
 | **Listener** | `integrations/loxone_request_http.py` on `system.ehal_http_port` (default **8541**). |
 | **Token** | Optional `EARNIE_PUSH_TOKEN` (alias `EARNIE_PILOT_PUSH_TOKEN`): when set, required via header `X-Earnie-Token`, `/t/<token>/…`, or `?t=`; when unset, open LAN push (same as Loxone). |
 | **Cadence** | Every read signal at least every `EARNIE_PUSH_REPEAT_S` (alias `EARNIE_PILOT_PUSH_REPEAT_S`; default **10 s**). Silent power while the heartbeat link is fresh → assumed **0** (`STATE_ZERO_ASSUMED_SILENT`); **energy counters are never assumed 0**. See [Loxone Signals — push cadence](loxone-signals.md#push-cadence-sb-neutral). |
-| **Migration** | Leftover `ehal.ha.transport` is removed by `dm4.ha_pull_removal`; a leftover key afterwards fails loud with a migration hint. Stored HA `entity_id` values are discarded (activation keys kept). |
+| **Migration** | Leftover `ehal.ha.transport` is removed by `dm4.ha_pull_removal`; a leftover key afterwards fails loud with a migration hint. Stored HA `entity_id` values are discarded (activation keys kept). From model 3 (2.6) `dm4.ha_sign` asks whether a leftover `ehal.ha.sign` is kept or removed (the carrier YAML converts units, not signs); Live-Lesen shows pushed values after `sign`. |
 
 Adapter: `integrations/ha_adapter.py` (push inbox + `status.json` only). Carrier YAML: `integrations/ha_carrier_yaml.py` / `python -m scripts.ha_carrier_yaml_gen` / EHAL-Com download.
 
