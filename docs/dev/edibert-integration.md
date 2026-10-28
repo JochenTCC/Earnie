@@ -643,7 +643,7 @@ S0 → S1 (commit golden on old code) → S2 → S3 → S4 → S5 → S6 → S7 
 
 ## P7 — Editor embed (plan 2026-10-27)
 
-Status: **in progress** (D1–D8 accepted 2026-10-27, all as recommended; Part A done, Edibert `0.1.7` released). Backlog item *Edibert P7* (Version 2.8): embed Edibert's editor in the Szenarienkonfigurator and remove the old tariff selects (`ui/pages/scenario_editor_tariffs.py`); UI language German. **Done (backlog):** cases TE1–TE6 green in Edibert, AppTest smoke test in Earnie, Playwright tariff path adapted.
+Status: **done** (2026-10-27; D1–D8 accepted, all as recommended; Edibert `0.1.7`, `0.1.8`, `0.1.9` released). Backlog item *Edibert P7* (Version 2.8): embed Edibert's editor in the Szenarienkonfigurator and remove the old tariff selects (`ui/pages/scenario_editor_tariffs.py`); UI language German. **Done (backlog):** cases TE1–TE6 green in Edibert, AppTest smoke test in Earnie, Playwright tariff path adapted.
 
 ### Findings (2026-10-27)
 
@@ -749,7 +749,11 @@ Status: **in progress** (D1–D8 accepted 2026-10-27, all as recommended; Part A
   - Text without direct address, as in the rest of both documents.
   - `tests/test_doc_links.py` and `tests/test_user_docs_audience.py` green.
   - Backlog P7 → Erledigt waits for the gate (done check below still open).
-  - Next: gate (full suite, `scripts.run_regression` without `--update-golden`, Playwright UI job, browser check of the Tarife page on desktop and phone width).
+- **Gate (2026-10-27):**
+  - Full suite 4993 passed, 19 skipped (commit hook of S6).
+  - `scripts.run_regression` without `--update-golden`: all 11 cases PASS. **Found:** the plain run aborts on this machine before comparing: a worker process imports `config` (via `data/opendata_session.py`, since P6), which loads the local site config (`earnie_env/config`); that site config is not on data model 5 yet (`netznutzung.base_cent_kwh`, see P3b), so loading fails. Not caused by P7 (`REG-O-autumn-nov` identical at `d0fd970a` and `HEAD` via `--compare-at`). Run green with the `EARNIE_*_PATH` variables on a copy of `tests/fixtures/backtesting/`. The cases replay their own recorded configs, so the runner should not depend on the site config; own follow-up.
+  - Playwright: all 6 e2e tests green locally (incl. the new tariff path); the CI job runs on the next push.
+  - Browser check (fixture config copy): Tarife page at 1440×900 and 375×812: create, save (notice, no check finding), open; on the phone the list stacks above the form, no horizontal page scroll. Minor: Edibert's `ui.start_hint` says "öffne links", while on the phone the list is above; Edibert text, not changed here.
 
 ### Order
 
@@ -757,8 +761,8 @@ Part A (Edibert `0.1.m`, release `v0.1.7` with approval) → pin → S1 → S2 �
 
 ### Done check
 
-- [ ] Edibert editor runs embedded on the Earnie page *Tarife*, German, no key collision with Earnie (prefix test).
-- [ ] No `house.json` in Earnie; the editor's context comes from the house profile.
-- [ ] Szenarienkonfigurator: selection unchanged in behaviour, preview from Edibert, link to the editor.
-- [ ] TE1–TE6 green (editor cases in Edibert, selection cases in Earnie per D1); AppTest smoke and Playwright tariff path green.
-- [ ] Full suite and all regression cases green, goldens unchanged.
+- [x] Edibert editor runs embedded on the Earnie page *Tarife*, German, no key collision with Earnie (prefix test).
+- [x] No `house.json` in Earnie; the editor's context comes from the house profile.
+- [x] Szenarienkonfigurator: selection unchanged in behaviour, preview from Edibert, link to the editor.
+- [x] TE1–TE6 green (editor cases in Edibert, selection cases in Earnie per D1); AppTest smoke and Playwright tariff path green.
+- [x] Full suite and all regression cases green, goldens unchanged.
