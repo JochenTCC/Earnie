@@ -63,15 +63,6 @@ def entity_human_label(item: dict) -> str:
     return str(item.get("label") or item.get("id") or "").strip() or str(item.get("id", ""))
 
 
-def format_entity_option(option: str) -> str:
-    """Strip trailing `` (id)`` from entity option keys for display."""
-    if option == NONE_LABEL or option.startswith(EMPTY_PLACEHOLDER_PREFIX):
-        return option
-    if option.endswith(")") and " (" in option:
-        return option[: option.rfind(" (")]
-    return option
-
-
 def options_for_entities(
     items: list[dict],
     *,
