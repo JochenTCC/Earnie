@@ -1,10 +1,12 @@
-"""Structural migrate: batteries[].kind → inverters[] (2.7.l)."""
+"""Structural migrate: batteries[].kind → inverters[] (2.7.l).
+
+New inverters get no ``efficiency``: the follow-up conversion migrate sets η_inv and
+splits the lumped ``battery_efficiency`` in one go. Setting η_inv here would hide that
+step and apply η_inv twice on the storage path.
+"""
 from __future__ import annotations
 
-from house_config.inverter import (
-    DEFAULT_INVERTER_EFFICIENCY,
-    needs_inverter_migration,
-)
+from house_config.inverter import needs_inverter_migration
 from runtime_store.data_model import stamp_data_model
 
 
@@ -37,7 +39,6 @@ def migrate_components_inverters(doc: dict) -> tuple[dict, bool]:
                 "type": "hybrid",
                 "ac_connection": "grid_tied",
                 "control": "full",
-                "efficiency": DEFAULT_INVERTER_EFFICIENCY,
                 "ehal_bindings": {},
             }
         )
@@ -87,7 +88,6 @@ def _migrate_battery(
                     "type": "hybrid",
                     "ac_connection": "island",
                     "control": "full",
-                    "efficiency": DEFAULT_INVERTER_EFFICIENCY,
                     "owned_by": bat_id,
                     "ehal_bindings": {},
                 }
