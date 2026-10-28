@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Loxone export strip scheme from Earnie host (2026-10-28)
+
+- [x] **Loxone export: strip scheme from the Earnie host field:** committed in `ee27503e` (no version bump): `normalize_export_host` (`ehal/signal_export.py`) strips a pasted `http(s)://` and trailing `/` and fails loud on a port or path; used by the Loxone VO/VI export (`ui/ehal_signal_list.py`) and the HA YAML download (`ui/ha_carrier_download.py`), with a caption when the address was shortened. Tests in `tests/test_ehal_signal_list.py`. Verified by the maintainer on 2026-10-28 (export form in the UI with a pasted browser address).
+
+### Bugfix Config migration assistant hints — GitHub #61 (2026-10-28)
+
+- [x] **[GitHub #61](https://github.com/JochenTCC/Earnie/issues/61) — Config migration assistant hints:** committed in `ac21bdc6`, `611ed38c`, `7f31aed7` (PR #65): the wizard says how it assigned the PV systems (also on the 2.6 path) and when `main.py` starts, starts `main.py` right after a successful migration when auto start is on, and shows the migration report after the run. Tests: `tests/apptest/test_page_config_migration_apptest.py`. On `main` the missing report page was reproduced and fixed in a local live run on 2026-10-24 (isolated pack, Streamlit, browser). Verified by the maintainer on 2026-10-28 (wizard on a 2.6 pack with standalone inverters, Docker, auto start on).
+
 ### Bugfix sync with `main` — Open-Meteo forecast UTC, climate fixtures, issue #50 verifications (2026-10-28)
 
 Aligned with `backlog/Backlog-Erledigt.md` on `main`: these items were fixed or verified there, but `release/2.7` still listed them as open or pending.
