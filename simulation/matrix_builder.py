@@ -331,30 +331,31 @@ def _matrix_price_inputs(
     return pv_profile, epex_prices, brutto_prices, price_sources, market_for
 
 
-def native_filter_kw_by_slot(
+def fixed_load_kw_by_slot(
     slot_datetimes: list[datetime],
     flexible_consumers: list | None,
 ) -> list[dict[str, float]]:
-    """Native filter duty cycle (kW per consumer) per slot — fixed load in SE.
+    """Fixed load (kW per consumer) per slot — booked in SE, not planned by the MILP.
 
-    The MILP blocks these slots and credits their energy against the filter
-    target (``adjust_targets_for_native_filter``), so SE must book the run as
-    fixed load or the energy is lost.
+    Native filter duty cycle: the MILP blocks these slots and credits their energy
+    against the filter target (``adjust_targets_for_native_filter``). Continuous
+    loads (``continuous_load``): their target is credited by
+    ``adjust_targets_for_continuous_load``. Without booking, the energy is lost.
     """
-    from optimizer.filter_context import logged_native_filter_windows, native_filter_kw_at
+    from optimizer.fixed_load import fixed_load_kw_at, resolve_fixed_load_windows
 
     consumers = (
         flexible_consumers
         if flexible_consumers is not None
         else config.get_flexible_consumers(optimizer_only=True)
     )
-    windows = logged_native_filter_windows(consumers)
+    windows = resolve_fixed_load_windows(consumers)
     if not windows:
         return [{} for _ in slot_datetimes]
-    return [native_filter_kw_at(windows, slot_dt) for slot_dt in slot_datetimes]
+    return [fixed_load_kw_at(windows, slot_dt) for slot_dt in slot_datetimes]
 
 
-def _native_filter_kwh_totals(native_kw: list[dict[str, float]]) -> dict[str, float]:
+def _fixed_load_kwh_totals(native_kw: list[dict[str, float]]) -> dict[str, float]:
     totals: dict[str, float] = {}
     for by_id in native_kw:
         for cid, kw in by_id.items():
@@ -374,8 +375,8 @@ def _matrix_rows_from_slots(
 ) -> list[dict]:
     """Baut die Matrix-Zeilen aus Slots, Preisen, PV-Profil und Verbrauchsreihen.
 
-    ``expected_p_act`` includes the native filter run (fixed load in the energy
-    balance); the series split re-derives it per slot from the same window.
+    ``expected_p_act`` includes the fixed load (native filter run, continuous
+    loads); the series split re-derives it per slot from the same windows.
     """
     epex_prices, brutto_prices, price_sources = prices
     matrix = []
@@ -503,7 +504,7 @@ def build_historical_matrix_for_slots(
         price_resources=price_resources,
         planning_moment=planning_moment,
     )
-    native_filter_kw = native_filter_kw_by_slot(slot_datetimes, flexible_consumers)
+    native_filter_kw = fixed_load_kw_by_slot(slot_datetimes, flexible_consumers)
     matrix = _matrix_rows_from_slots(
         slot_datetimes,
         consumption,
@@ -524,7 +525,7 @@ def build_historical_matrix_for_slots(
         reference_total_kwh=round(sum(reference_total_load), 3),
         baseload_stored=baseload_stored,
     )
-    meta["native_filter_kwh"] = _native_filter_kwh_totals(native_filter_kw)
+    meta["fixed_load_kwh"] = _fixed_load_kwh_totals(native_filter_kw)
     if flexible_consumers:
         meta["_flexible_consumers"] = flexible_consumers
     return matrix, meta

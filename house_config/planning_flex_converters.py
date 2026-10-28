@@ -8,6 +8,7 @@ from settings.ev_power import merge_ev_power_conversion_fields
 from settings.flexible_consumers import reject_legacy_id
 from house_config.consumption_csv import consumer_uses_profile_csv
 from house_config.earnie_role import is_earnie_flex, is_earnie_known, is_earnie_manual
+from house_config.generic_schedule import is_continuous_schedule
 
 if TYPE_CHECKING:
     from data.modeled_climate import ModeledClimateContext
@@ -135,6 +136,9 @@ def planning_consumer_to_milp(consumer: dict) -> dict:
         "loxone_outputs": {},
         "loxone_inputs": {},
     }
+    if is_continuous_schedule(consumer):
+        # SE books the run as fixed load (optimizer.fixed_load); Live ignores the flag.
+        result["continuous_load"] = True
     loxone_inputs = consumer.get("loxone_inputs")
     if isinstance(loxone_inputs, dict) and loxone_inputs:
         result["loxone_inputs"] = dict(loxone_inputs)

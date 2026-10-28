@@ -20,6 +20,7 @@ from .charging_context import (  # noqa: F401  (consumer_charging_eligible_indic
 )
 from .generic_flex_run import continue_on_from_state, update_generic_flex_run_state
 from .filter_context import adjust_targets_for_native_filter, resolve_filter_contexts
+from .fixed_load import adjust_targets_for_continuous_load
 from .milp import milp_horizon_schedule, milp_optimizer
 from .targets import (
     consumer_column_name,
@@ -239,6 +240,13 @@ def _prepare_horizon_state(
     )
     horizon_limits = adjust_targets_for_native_filter(
         horizon_limits, consumers_cfg, optimization_matrix, filters, credit_indices
+    )
+    # Continuous loads are booked as fixed load over the same slots (SE matrix);
+    # Live targets of such consumers are 0, so nothing changes there.
+    horizon_limits = adjust_targets_for_continuous_load(
+        horizon_limits,
+        consumers_cfg,
+        len(credit_indices) if credit_indices is not None else len(optimization_matrix),
     )
     if disable_horizon_soc_anchor:
         horizon_terminal_soc = None

@@ -344,8 +344,10 @@ def planning_flex_daily_targets(
     if not flex_consumers:
         return {}
     from house_config.generic_schedule import (
+        continuous_window_kwh,
         generic_daily_target_kwh_for_day,
         generic_flex_target_kwh_for_window,
+        is_continuous_schedule,
     )
 
     by_id = {consumer["id"]: consumer for consumer in _house_generic_consumers(house_profile)}
@@ -362,6 +364,10 @@ def planning_flex_daily_targets(
             continue
         if consumer_uses_profile_csv(source):
             targets[milp_consumer["id"]] = _consumer_window_kwh(source, slot_datetimes)
+            continue
+        if is_continuous_schedule(source):
+            # Fixed load in every slot (see optimizer.fixed_load), not per calendar day.
+            targets[milp_consumer["id"]] = continuous_window_kwh(source, slot_datetimes)
             continue
         if anchor is not None:
             total = generic_flex_target_kwh_for_window(source, slot_datetimes, anchor)

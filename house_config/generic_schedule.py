@@ -92,6 +92,32 @@ def normalize_generic_schedule(raw: dict | None) -> dict | None:
     return schedule
 
 
+def is_continuous_schedule(consumer: dict) -> bool:
+    """Dauerlast: generic mit Lauf >= 24 h an jedem Wochentag (z. B. Server, Dev-PC).
+
+    Such a run never ends inside one book window, so it is no flex run: SE books it
+    as fixed load in every slot (``optimizer.fixed_load``), the reference model
+    already does (constant ``nominal_power_kw``).
+    """
+    if consumer.get("type") != "generic":
+        return False
+    schedule = consumer.get("schedule")
+    if not isinstance(schedule, dict):
+        return False
+    duration_h = float(schedule.get("duration_h", 0.0) or 0.0)
+    runs = int(schedule.get("runs_per_week", 0) or 0)
+    nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+    return duration_h >= 24.0 - _EPS and runs >= 7 and nominal > 0.0
+
+
+def continuous_window_kwh(consumer: dict, slot_datetimes: list[datetime]) -> float:
+    """Energie einer Dauerlast über die Slots (nominal × Slotdauer × Anzahl Slots)."""
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+    return round(nominal * float(DEFAULT_DT_H) * len(slot_datetimes), 3)
+
+
 def generic_annual_kwh(consumer: dict) -> float:
     from house_config.consumption_csv import consumer_uses_profile_csv
 
@@ -223,9 +249,15 @@ def generic_flex_target_kwh_for_window(
     slot_datetimes: list[datetime],
     window_end: datetime,
 ) -> float:
-    """Summiert lieferbare Generic-Flex-kWh über alle Kalendertage im Fenster."""
+    """Summiert lieferbare Generic-Flex-kWh über alle Kalendertage im Fenster.
+
+    A continuous load (``is_continuous_schedule``) is slot-aligned instead: its run
+    never ends before ``window_end``, the energy is nominal × hours in the window.
+    """
     if not slot_datetimes:
         return 0.0
+    if is_continuous_schedule(consumer):
+        return continuous_window_kwh(consumer, slot_datetimes)
     dates = {slot_dt.date() for slot_dt in slot_datetimes}
     total = sum(
         generic_daily_target_kwh_for_window_day(consumer, day, slot_datetimes, window_end)

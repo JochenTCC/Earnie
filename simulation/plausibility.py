@@ -66,13 +66,13 @@ def _standby_kwh_in_rows(chart_rows: list[dict], meta: dict) -> float:
     return energy_kwh_from_kw(standby_kw for _ in chart_rows)
 
 
-def _native_filter_kwh_in_rows(
+def _fixed_load_kwh_in_rows(
     chart_rows: list[dict],
     flexible_consumers: list | None,
 ) -> float:
-    """Native filter run booked as fixed load inside Verbrauch-Prognose (kWh)."""
+    """Fixed load (native filter run, continuous loads) inside Verbrauch-Prognose (kWh)."""
     import config
-    from optimizer.filter_context import logged_native_filter_windows, native_filter_kw_at
+    from optimizer.fixed_load import fixed_load_kw_at, resolve_fixed_load_windows
     from optimizer.slot_duration import energy_kwh_from_kw
 
     consumers = (
@@ -80,11 +80,11 @@ def _native_filter_kwh_in_rows(
         if flexible_consumers is not None
         else config.get_flexible_consumers(optimizer_only=True)
     )
-    windows = logged_native_filter_windows(consumers)
+    windows = resolve_fixed_load_windows(consumers)
     if not windows or not chart_rows:
         return 0.0
     return energy_kwh_from_kw(
-        sum(native_filter_kw_at(windows, row["slot_datetime"]).values())
+        sum(fixed_load_kw_at(windows, row["slot_datetime"]).values())
         for row in chart_rows
     )
 
@@ -137,8 +137,9 @@ def validate_window_consumption(
     standby_kwh = _standby_kwh_in_rows(chart_rows, meta)
     if standby_kwh:
         optimized_baseload = round(max(0.0, optimized_baseload - standby_kwh), 3)
-    # Native filter run: fixed load in Verbrauch-Prognose, counts as filter flex.
-    native_kwh = _native_filter_kwh_in_rows(chart_rows, flexible_consumers)
+    # Fixed load (native filter run, continuous loads): booked in Verbrauch-Prognose,
+    # counts as the consumer's flex.
+    native_kwh = _fixed_load_kwh_in_rows(chart_rows, flexible_consumers)
     if native_kwh:
         optimized_baseload = round(optimized_baseload - native_kwh, 3)
     delivered_flex = _delivered_flex_kwh_from_rows(
