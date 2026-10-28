@@ -6,7 +6,7 @@
             "battery_capacity_kwh": 15.0,
             "battery_max_charge_power_kw": 5.0,
             "battery_max_discharge_power_kw": 5.0,
-            "battery_efficiency": 0.94,
+            "battery_efficiency": 0.9690721649484536,
             "battery_min_soc": 5.0,
             "battery_max_soc": 100.0,
             "threshold_power": 0.03,
@@ -56,11 +56,11 @@
             "type": "hybrid",
             "ac_connection": "grid_tied",
             "control": "full",
-            "efficiency": 0.97,
             "ehal_bindings": {
                 "inv.wr_main.sens_inv_power_pv": "",
                 "inv.wr_main.set_inv_ac_power_limit": ""
-            }
+            },
+            "efficiency": 0.97
         }
     ]
 }
