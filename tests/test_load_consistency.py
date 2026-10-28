@@ -14,7 +14,14 @@ def _profile(consumers: list[dict]) -> dict:
     return normalize_house_profiles_document({"profiles": [raw]})["profiles"]["home"]
 
 
-def _manual(cid: str, nominal: float, duration_h: float, start_hour: int, shift_h: float) -> dict:
+def _manual(
+    cid: str,
+    nominal: float,
+    duration_h: float,
+    start_hour: int,
+    shift_h: float,
+    runs_per_week: int = 7,
+) -> dict:
     return {
         "id": cid,
         "label": cid,
@@ -22,7 +29,7 @@ def _manual(cid: str, nominal: float, duration_h: float, start_hour: int, shift_
         "nominal_power_kw": nominal,
         "earnie_role": "manual",
         "schedule": {
-            "runs_per_week": 7,
+            "runs_per_week": runs_per_week,
             "duration_h": duration_h,
             "start_hour": start_hour,
             "start_shift_h": shift_h,
@@ -39,14 +46,26 @@ def test_deliverable_schedule_is_consistent():
 
 
 def test_run_that_does_not_fit_into_the_day_is_named():
-    # 24 h run starting at 12:00 (+6 h shift) cannot finish on the same day.
-    profile = _profile([_manual("dev-pc", 0.12, 24.0, 12, 6.0), _manual("trockner", 1.0, 2.0, 16, 4.0)])
+    # 24 h run on 5 of 7 days starting at 12:00 (+6 h shift) cannot finish on the same
+    # day and is no continuous load (not every weekday) → named as deviation.
+    profile = _profile(
+        [_manual("server", 0.12, 24.0, 12, 6.0, runs_per_week=5), _manual("trockner", 1.0, 2.0, 16, 4.0)]
+    )
     report = profile_spec_vs_reference(profile, _ANCHORS, tolerance=0.001)
     assert report["status"] == "deviation"
-    assert "dev-pc" in report["message"]
+    assert "server" in report["message"]
     assert "trockner" not in report["message"]
     rows = {cid: (ref, spec) for cid, ref, spec in report["consumers"]}
-    assert rows["dev-pc"][1] < rows["dev-pc"][0] * 0.6
+    assert rows["server"][1] < rows["server"][0] * 0.6
+
+
+def test_continuous_load_is_consistent_with_the_reference():
+    # 24 h on every weekday = continuous load: booked as fixed load, same as the reference.
+    profile = _profile([_manual("dev-pc", 0.12, 24.0, 12, 6.0), _manual("trockner", 1.0, 2.0, 16, 4.0)])
+    report = profile_spec_vs_reference(profile, _ANCHORS, tolerance=0.001)
+    assert report["status"] == "ok", report["message"]
+    rows = {cid: (ref, spec) for cid, ref, spec in report["consumers"]}
+    assert abs(rows["dev-pc"][1] - rows["dev-pc"][0]) < 0.01
 
 
 def test_cli_gate_aborts_on_stale_cons_data_and_can_be_overridden(monkeypatch, caplog):

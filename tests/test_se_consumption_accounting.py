@@ -1,4 +1,4 @@
-"""SE consumption accounting: native pool-filter booking and booked series totals."""
+"""SE consumption accounting: fixed-load booking (native pool filter) and booked series totals."""
 from __future__ import annotations
 
 import os
@@ -20,7 +20,7 @@ from simulation.engine_scenario import (
     _consumption_kw_columns_from_chart_rows,
     scenario_standby_power_kw,
 )
-from simulation.matrix_builder import native_filter_kw_by_slot
+from simulation.matrix_builder import fixed_load_kw_by_slot
 from simulation.plausibility import validate_window_consumption
 
 
@@ -62,9 +62,9 @@ def _matrix(start: datetime, hours: int) -> list[dict]:
 # --- native filter booked as fixed load -------------------------------------------------
 
 
-def test_native_filter_kw_by_slot_books_daily_duty_cycle():
+def test_fixed_load_kw_by_slot_books_daily_duty_cycle():
     slots = _slots(datetime(2026, 5, 2, 7, 0), 24)
-    native = native_filter_kw_by_slot(slots, [_pool_filter()])
+    native = fixed_load_kw_by_slot(slots, [_pool_filter()])
     running = [slot for slot, by_id in zip(slots, native) if by_id]
     assert running[0] == datetime(2026, 5, 2, 12, 0)
     assert running[-1] == datetime(2026, 5, 2, 15, 45)
@@ -72,11 +72,11 @@ def test_native_filter_kw_by_slot_books_daily_duty_cycle():
     assert energy == pytest.approx(0.72)
 
 
-def test_native_filter_kw_by_slot_without_fallback_window_books_nothing():
+def test_fixed_load_kw_by_slot_without_fallback_window_books_nothing():
     consumer = _pool_filter()
     consumer["filter_schedule"]["config_fallback"] = {}
     slots = _slots(datetime(2026, 5, 2, 0, 0), 24)
-    assert all(not by_id for by_id in native_filter_kw_by_slot(slots, [consumer]))
+    assert all(not by_id for by_id in fixed_load_kw_by_slot(slots, [consumer]))
 
 
 def test_native_credit_limited_to_book_window():
@@ -110,7 +110,7 @@ def _chart_row(slot: datetime, prognose_kw: float, filter_kw: float = 0.0) -> di
 
 def test_series_books_native_run_on_filter_column_not_baseload():
     slots = _slots(datetime(2026, 5, 2, 7, 0), 24)
-    native = native_filter_kw_by_slot(slots, [_pool_filter()])
+    native = fixed_load_kw_by_slot(slots, [_pool_filter()])
     rows = [
         _chart_row(slot, 0.3 + sum(by_id.values()))
         for slot, by_id in zip(slots, native)
@@ -125,13 +125,13 @@ def test_series_books_native_run_on_filter_column_not_baseload():
 
 def test_series_split_fails_loud_when_native_run_missing_from_prognose():
     rows = [_chart_row(datetime(2026, 5, 2, 13, 0), 0.05)]
-    with pytest.raises(ValueError, match="nativen Filterlauf"):
+    with pytest.raises(ValueError, match="nativer Filterlauf"):
         _consumption_kw_columns_from_chart_rows(rows, [_pool_filter()])
 
 
 def test_plausibility_counts_native_run_as_filter_flex():
     slots = _slots(datetime(2026, 5, 2, 7, 0), 24)
-    native = native_filter_kw_by_slot(slots, [_pool_filter()])
+    native = fixed_load_kw_by_slot(slots, [_pool_filter()])
     rows = [
         _chart_row(slot, 0.3 + sum(by_id.values()))
         for slot, by_id in zip(slots, native)

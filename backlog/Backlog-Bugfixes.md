@@ -26,8 +26,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 - [ ] **Regression: possible private case from the issue #50 reporter:** the reporter's configuration (HA backend, fixed import tariff + spot-indexed export, Netznutzung) is a typical constellation that the public cases did not cover. Ask for an anonymised config/debug dump (question list in the private business backlog); if it arrives, intake it as a private L1 case (`python -m scripts.run_regression --intake DUMP.zip --id REG-50-<slug> --private`, repo `Earnie-regression-private`). Meanwhile public L2 case `REG-S-gross-tariff-netznutzung` pins the VAT-on-Netznutzung rule (k_act 18 ct = 12 + 5 × 1.2).
 
-- [ ] **SE reference (non-optimized) run booked the battery standby twice:** `simulation/reference_costs.py::_reference_window_inputs` added `reference_standby_power_kw` to the reference load twice (and the function was defined twice), while the MILP adds the standby once per slot. Szenario-Explorer references with storage showed one standby too much in import cost and Jahres Verbrauch (e.g. 26 W ≈ 228 kWh/a). Cause: duplicated by the release commit `28f756e9` (v2.7.0-alpha.8). Fix `f3b752cc` (PR #73, closed unmerged on 2026-10-27; on `main` via #74) cherry-picked to `release/2.7` on 2026-10-28 (`c8b365da`, no version bump); test `tests/test_se_consumption_accounting.py::test_reference_window_load_adds_standby_once`. Golden-master regression unchanged. **Pending:** SE run with a storage scenario: reference Gesamtverbrauch drops by exactly the standby kWh, optimized side unchanged.
-
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
