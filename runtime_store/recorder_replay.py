@@ -204,7 +204,7 @@ def _solve_prepared_entry(
     apply_cbc_solver_env(strict=(solver_mode == "strict"))
     os.environ["EARNIE_MILP_SOLVER"] = "highs"
 
-    with _recorded_ev_limit_soc(entry, config):
+    with _recorded_ev_limit_soc(entry, config), _recorded_thermal_readings(entry):
         prepared_ctx = _prepare_replay_inputs(entry, config)
         begin_cbc_event_collection()
         t0 = time.perf_counter()
@@ -253,6 +253,35 @@ def _recorded_ev_limit_soc(entry: dict[str, Any], config_module: Any):
         yield
     finally:
         ehal_live.read_generic_value = original
+
+
+@contextmanager
+def _recorded_thermal_readings(entry: dict[str, Any]):
+    """Serve the recorded ``fetch_thermal_readings`` per consumer during replay.
+
+    Fails loud when a consumer's readings are actually fetched but the entry has
+    none (cycles recorded before ``thermal_readings`` existed).
+    """
+    from integrations import ehal_live
+
+    recorded = (entry.get("start_state") or {}).get("thermal_readings") or {}
+    original = ehal_live.fetch_thermal_readings
+
+    def _fetch(consumer: dict, **_kwargs):
+        cid = str(consumer.get("id"))
+        if cid not in recorded:
+            raise ValueError(
+                f"entry has no recorded start_state.thermal_readings for consumer "
+                f"{cid!r}; cycle was recorded by an older version and cannot be "
+                f"replayed offline"
+            )
+        return dict(recorded[cid])
+
+    ehal_live.fetch_thermal_readings = _fetch
+    try:
+        yield
+    finally:
+        ehal_live.fetch_thermal_readings = original
 
 
 @dataclass
@@ -501,12 +530,12 @@ def _stage_from_events(events: list[dict[str, Any]], solver_mode: SolverMode) ->
 def _coerce_matrix_datetimes(matrix: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for row in matrix:
         raw = row.get("slot_datetime")
+        # Keep the recorded offset: the live matrix is tz-aware and so are the
+        # recorded deadlines it is compared with (open_charging_deadlines).
         if isinstance(raw, datetime):
-            slot = raw.replace(tzinfo=None) if raw.tzinfo else raw
+            slot = raw
         elif isinstance(raw, str):
             slot = datetime.fromisoformat(raw)
-            if slot.tzinfo is not None:
-                slot = slot.replace(tzinfo=None)
         else:
             raise TypeError(
                 f"slot_datetime must be str or datetime, got {type(raw)!r}"

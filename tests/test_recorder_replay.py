@@ -171,3 +171,57 @@ def test_recorder_collects_ev_limit_soc(monkeypatch):
     _bind_limit_soc_marker(monkeypatch)
     monkeypatch.setattr(ehal_live, "read_generic_value", lambda address: 75.0)
     assert cycle_recorder._collect_ev_limit_soc() == {"e_auto": 75.0}
+
+
+_THERMAL_READINGS = {
+    "actual_c": 36.5,
+    "setpoint_c": 38.0,
+    "ambient_c": 7.0,
+    "tolerance_c": None,
+    "heating_active": False,
+    "missing_signals": ["get_temperature_tolerance_c"],
+}
+
+
+def test_replay_serves_recorded_thermal_readings():
+    from integrations import ehal_live
+    from runtime_store.recorder_replay import _recorded_thermal_readings
+
+    original = ehal_live.fetch_thermal_readings
+    entry = {"start_state": {"thermal_readings": {"pool": _THERMAL_READINGS}}}
+    with _recorded_thermal_readings(entry):
+        assert ehal_live.fetch_thermal_readings({"id": "pool"}) == _THERMAL_READINGS
+        with pytest.raises(ValueError, match="thermal_readings"):
+            ehal_live.fetch_thermal_readings({"id": "other"})
+    assert ehal_live.fetch_thermal_readings is original
+
+
+def test_recorder_collects_thermal_readings_for_enabled_thermal_control(monkeypatch):
+    from integrations import ehal_live
+
+    consumers = [
+        {"id": "pool", "thermal_control": {"enabled": True}},
+        {"id": "boiler", "thermal_control": {"enabled": False}},
+        {"id": "dishwasher"},
+    ]
+    monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=True: consumers)
+    fetched: list[str] = []
+
+    def _fetch(consumer, **_kwargs):
+        fetched.append(consumer["id"])
+        return dict(_THERMAL_READINGS)
+
+    monkeypatch.setattr(ehal_live, "fetch_thermal_readings", _fetch)
+    assert cycle_recorder._collect_thermal_readings() == {"pool": _THERMAL_READINGS}
+    assert fetched == ["pool"]
+
+
+def test_restored_matrix_keeps_recorded_utc_offset():
+    from runtime_store.recorder_replay import _coerce_matrix_datetimes
+
+    rows = _coerce_matrix_datetimes(
+        [{"slot_datetime": "2026-10-28T00:15:00+01:00"}, {"slot_datetime": "2026-10-28T00:30:00"}]
+    )
+    assert rows[0]["slot_datetime"].utcoffset() == timedelta(hours=1)
+    assert rows[0]["hour"] == 0
+    assert rows[1]["slot_datetime"].tzinfo is None
