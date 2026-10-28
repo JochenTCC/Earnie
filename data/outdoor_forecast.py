@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as _timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -15,6 +16,8 @@ from runtime_store.cycle_duration_stats import (
 from runtime_store.planning_clock import cache_entry_fresh, planning_now
 
 logger = logging.getLogger(__name__)
+
+_UTC = _timezone.utc
 
 HOURLY_TEMP_VAR = "temperature_2m"
 HOURLY_TILTED_VAR = "global_tilted_irradiance"
@@ -68,13 +71,30 @@ def _fetch_open_meteo_hourly_vars(
         "latitude": lat,
         "longitude": lon,
         "hourly": ",".join(hourly_vars),
-        "forecast_days": forecast_days,
-        "timezone": "auto",
+        **utc_forecast_params(forecast_days),
     }
     if extra_params:
         params.update(extra_params)
     payload = _open_meteo_payload(url, params)
-    return _parse_open_meteo_hourly(payload, hourly_vars)
+    return _parse_open_meteo_hourly(
+        payload, hourly_vars, timezone=config.get_planning_timezone()
+    )
+
+
+def utc_forecast_params(forecast_days: int) -> dict:
+    """Open-Meteo forecast window requested in UTC.
+
+    With a zone name (or ``auto``) Open-Meteo applies ONE fixed UTC offset to the whole
+    response (the offset valid on the request day), so hours on the other side of a clock
+    change are 1 h off. UTC stamps are converted per timestamp instead. The first local
+    hours of a day belong to the previous UTC day and the last ones may fall behind the
+    UTC-day count, hence one past day and one extra forecast day.
+    """
+    return {
+        "timezone": "UTC",
+        "past_days": 1,
+        "forecast_days": min(_OPEN_METEO_MAX_FORECAST_DAYS, forecast_days + 1),
+    }
 
 
 def _open_meteo_payload(url: str, params: dict):
@@ -129,19 +149,45 @@ def _open_meteo_payload(url: str, params: dict):
     return ext_get(replay=_replay, live=_live, allow_live_fallback=True)
 
 
+def _utc_stamps_to_local_naive(times: list, timezone: str) -> list[datetime]:
+    """UTC stamps of a ``timezone=UTC`` response -> naive local wall-clock of ``timezone``."""
+    tz = ZoneInfo(timezone)
+    return [
+        datetime.fromisoformat(str(ts_text))
+        .replace(tzinfo=_UTC)
+        .astimezone(tz)
+        .replace(tzinfo=None)
+        for ts_text in times
+    ]
+
+
 def _parse_open_meteo_hourly(
-    payload, hourly_vars: tuple[str, ...]
+    payload, hourly_vars: tuple[str, ...], *, timezone: str
 ) -> dict[str, list[tuple[datetime, float]]]:
+    """Hourly series of a UTC response as local wall-clock of ``timezone``.
+
+    The repeated hour of the autumn clock change is averaged; the skipped spring hour is absent.
+    """
     hourly = payload.get("hourly", {}) if isinstance(payload, dict) else {}
     times = hourly.get("time", [])
-    parsed_times = [datetime.fromisoformat(str(ts_text)) for ts_text in times]
+    parsed_times = _utc_stamps_to_local_naive(times, timezone)
     out: dict[str, list[tuple[datetime, float]]] = {}
     for var in hourly_vars:
         values = hourly.get(var, [])
         if not times or not values or len(times) != len(values) or None in values:
             raise ValueError(f"Open-Meteo: hourly {var} unvollständig")
-        out[var] = [(ts, float(value)) for ts, value in zip(parsed_times, values)]
+        grouped: dict[datetime, list[float]] = {}
+        for ts, value in zip(parsed_times, values):
+            grouped.setdefault(ts, []).append(float(value))
+        out[var] = [(ts, sum(vals) / len(vals)) for ts, vals in grouped.items()]
     return out
+
+
+def _is_skipped_local_hour(moment: datetime) -> bool:
+    """True for a wall-clock time that does not exist (spring clock change gap)."""
+    tz = ZoneInfo(config.get_planning_timezone())
+    round_trip = moment.replace(tzinfo=tz).astimezone(_UTC).astimezone(tz)
+    return round_trip.replace(tzinfo=None) != moment
 
 
 def _map_to_horizon(
@@ -153,6 +199,10 @@ def _map_to_horizon(
     vector: list[float] = []
     for offset in range(horizon):
         key = (start + timedelta(hours=offset)).replace(minute=0, second=0, microsecond=0)
+        if key not in by_hour and _is_skipped_local_hour(key):
+            # The clock jumps over this hour: the planning grid is hour-indexed wall clock,
+            # so the position carries the value of the hour the clock lands on.
+            key += timedelta(hours=1)
         if key not in by_hour:
             raise ValueError(f"Open-Meteo: keine Temperatur für {key.isoformat()}")
         vector.append(round(by_hour[key], 3))

@@ -12,6 +12,7 @@ import pandas as pd
 import requests
 
 import config
+from data.outdoor_forecast import utc_forecast_params
 
 ENERGY_CHARTS_BASE = "https://api.energy-charts.info"
 OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
@@ -454,7 +455,7 @@ def _hourly_frame_from_open_meteo_payload(payload: dict[str, Any]) -> pd.DataFra
     tz = planning_timezone()
     index = pd.DatetimeIndex(
         [
-            normalize_hour_slot(datetime.fromisoformat(str(ts)).replace(tzinfo=tz))
+            normalize_hour_slot(datetime.fromisoformat(str(ts)).replace(tzinfo=timezone.utc).astimezone(tz))
             for ts in times
         ]
     )
@@ -478,8 +479,7 @@ def _fetch_open_meteo_forecast_point(
             "latitude": point.latitude,
             "longitude": point.longitude,
             "hourly": "wind_speed_10m,shortwave_radiation",
-            "forecast_days": forecast_days,
-            "timezone": config.get_planning_timezone(),
+            **utc_forecast_params(forecast_days),
         },
     )
     try:
@@ -498,8 +498,7 @@ def _fetch_open_meteo_forecast_grid(*, forecast_days: int) -> dict[str, pd.DataF
             "latitude": lats,
             "longitude": lons,
             "hourly": "wind_speed_10m,shortwave_radiation",
-            "forecast_days": forecast_days,
-            "timezone": config.get_planning_timezone(),
+            **utc_forecast_params(forecast_days),
         },
         timeout=config.get_global_timeout(),
     )
