@@ -41,11 +41,6 @@ def _import_type(entry: dict) -> str:
         return legacy[1]
     if entry["tarif_typ"] == "fix":
         return "fixed_cent"
-    hint = str(entry.get("hinweis", "")).lower()
-    if "ex-post" in hint or "ex post" in hint:
-        return "ex_post_spot"
-    if "marktwert" in hint or "monatlich" in hint:
-        return "monthly_market"
     return "spot_hourly"
 
 
@@ -56,9 +51,6 @@ def _export_type(entry: dict) -> str:
         return "monthly_table"
     if entry["tarif_typ"] == "fix":
         return "fixed"
-    hint = str(entry.get("hinweis", "")).lower()
-    if "ex-post" in hint or "ex post" in hint:
-        return "ex_post_spot"
     return "spot_hourly"
 
 

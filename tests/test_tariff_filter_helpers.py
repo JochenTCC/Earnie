@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ui.tariff_filter_helpers import (
     EXPORT_TYPE_LABELS,
+    IMPORT_TYPE_LABELS,
     filter_tariffs,
     lands_present,
     lands_union,
@@ -83,8 +84,33 @@ def test_export_filter_monthly_table() -> None:
 
 
 def test_export_monthly_ui_label() -> None:
-    assert type_caption({"type": "monthly_table"}, EXPORT_TYPE_LABELS) == "Monatspreis"
-    assert EXPORT_TYPE_LABELS["monthly_table"] == "Monatspreis"
+    assert (
+        type_caption({"type": "monthly_table"}, EXPORT_TYPE_LABELS)
+        == "Monatspreise – Einspeisung"
+    )
+
+
+def test_labels_follow_edibert_editor_wording() -> None:
+    assert IMPORT_TYPE_LABELS == {
+        "fixed_cent": "Festpreis – Bezug",
+        "spot_hourly": "Börsenpreis + Aufschlag – Bezug",
+        "monthly_table": "Monatspreise – Bezug",
+    }
+    assert EXPORT_TYPE_LABELS == {
+        "fixed": "Festpreis – Einspeisung",
+        "monthly_table": "Monatspreise – Einspeisung",
+        "spot_hourly": "Börsenpreis + Aufschlag – Einspeisung",
+    }
+
+
+def test_spot_filter_option_covers_both_settlement_intervals() -> None:
+    tariffs = [
+        {"id": "qh", "type": "spot_hourly", "settlement_mtu": "15min"},
+        {"id": "h", "type": "spot_hourly", "settlement_mtu": "60min"},
+    ]
+    assert types_present(tariffs) == ["spot_hourly"]
+    result = filter_tariffs(tariffs, tariff_type="spot_hourly")
+    assert [item["id"] for item in result] == ["qh", "h"]
 
 
 def test_with_current_inside_filters() -> None:
@@ -121,7 +147,7 @@ def test_parameter_rows_fixed_cent() -> None:
             kind="import",
         )
     )
-    assert rows["Typ"] == "Fixpreis Bezug"
+    assert rows["Typ"] == "Festpreis – Bezug"
     assert rows["Land"] == "AT"
     assert rows["Währung"] == "EUR"
     assert rows["Arbeitspreis"] == "28.500 Cent/kWh"
@@ -143,7 +169,7 @@ def test_parameter_rows_spot_hourly_import() -> None:
             kind="import",
         )
     )
-    assert rows["Typ"] == "Spot stündlich"
+    assert rows["Typ"] == "Börsenpreis + Aufschlag – Bezug"
     assert rows["Abwicklungsgebühr"] == "1.500 Cent/kWh"
     assert rows["Aufschlag"] == "3 %"
     assert rows["Preise inkl. USt"] == "ja"
@@ -165,7 +191,7 @@ def test_parameter_rows_spot_export_with_fee_factor() -> None:
             kind="export",
         )
     )
-    assert rows["Typ"] == "Spot stündlich"
+    assert rows["Typ"] == "Börsenpreis + Aufschlag – Einspeisung"
     assert rows["Einspeise-Gebührenfaktor"] == "0.190"
     assert rows["Einspeise-Fix"] == "0 Cent/kWh"
 
@@ -177,7 +203,7 @@ def test_parameter_rows_export_fixed() -> None:
             kind="export",
         )
     )
-    assert rows["Typ"] == "Fixpreis Einspeise"
+    assert rows["Typ"] == "Festpreis – Einspeisung"
     assert rows["Einspeisevergütung"] == "8.200 Cent/kWh"
 
 
@@ -195,14 +221,14 @@ def test_parameter_rows_monthly_table_summary() -> None:
             kind="export",
         )
     )
-    assert rows["Typ"] == "Monatspreis"
+    assert rows["Typ"] == "Monatspreise – Einspeisung"
     assert rows["Monatsraten"] == "2"
     assert rows["Monatsraten Min–Max (Cent/kWh)"] == "5.000 – 7.500"
 
 
 def test_parameter_rows_omits_missing_optional() -> None:
     rows = dict(tariff_parameter_rows({"type": "spot_hourly"}, kind="import"))
-    assert rows["Typ"] == "Spot stündlich"
+    assert rows["Typ"] == "Börsenpreis + Aufschlag – Bezug"
     assert set(rows) == {"Typ"}
 
 

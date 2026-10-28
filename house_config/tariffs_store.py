@@ -21,8 +21,6 @@ IMPORT_TYPES = frozenset(
     {
         "fixed_cent",
         "spot_hourly",
-        "ex_post_spot",
-        "monthly_market",
         "monthly_table",
     }
 )
@@ -31,7 +29,6 @@ EXPORT_TYPES = frozenset(
         "fixed",
         "monthly_table",
         "spot_hourly",
-        "ex_post_spot",
     }
 )
 VALID_LANDS = frozenset({"AT", "DE", "CH"})
@@ -312,7 +309,7 @@ def _export_tariff_spec(raw: dict, index: int) -> dict:
                 f"export_tariffs[{index}] ('{tariff_id}'): monthly_rates fehlt."
             )
         spec["monthly_rates"] = validate_fixed_monthly_feed_in_rates(rates)
-    elif tariff_type in {"spot_hourly", "ex_post_spot"}:
+    elif tariff_type == "spot_hourly":
         _copy_spot_export_fee_fields(raw, spec)
     return spec
 

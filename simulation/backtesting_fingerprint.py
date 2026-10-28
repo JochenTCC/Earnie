@@ -51,7 +51,7 @@ def _spot_export_fee_from_specs(settings: dict) -> dict:
 
 def _scenario_needs_spot_export_fees(settings: dict) -> bool:
     export_spec = settings.get("_export_tariff_spec") or {}
-    if str(export_spec.get("type", "")).lower() not in {"spot_hourly", "ex_post_spot"}:
+    if str(export_spec.get("type", "")).lower() != "spot_hourly":
         return False
     return any(key in export_spec for key in _SPOT_EXPORT_FEE_KEYS)
 

@@ -58,7 +58,7 @@ def test_te1_type_filter_keeps_the_saved_tariff_selected():
     type_filter = next(
         sb for sb in at.selectbox if sb.key and sb.key.startswith(_P + "scenario_import_filter")
     )
-    other = next(o for o in type_filter.options if "Spot" in o or "spot" in o)
+    other = next(o for o in type_filter.options if "Börsenpreis" in o)
     type_filter.set_value(other).run()
     assert not at.exception
     assert at.selectbox(key=_P + "scenario_import").value == before

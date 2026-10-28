@@ -3,20 +3,28 @@ from __future__ import annotations
 
 from typing import Literal
 
-IMPORT_TYPE_LABELS = {
-    "fixed_cent": "Fixpreis Bezug",
-    "spot_hourly": "Spot stündlich",
-    "ex_post_spot": "Spot ex-post",
-    "monthly_market": "Monatsmarkt",
-    "monthly_table": "Monatstabelle Bezug",
+# Wording follows the Edibert editor (price kind, then direction).
+_PRICE_KIND_LABELS = {
+    "fixed_cent": "Festpreis",
+    "fixed": "Festpreis",
+    "spot_hourly": "Börsenpreis + Aufschlag",
+    "monthly_table": "Monatspreise",
 }
 
-EXPORT_TYPE_LABELS = {
-    "fixed": "Fixpreis Einspeise",
-    "monthly_table": "Monatspreis",
-    "spot_hourly": "Spot stündlich",
-    "ex_post_spot": "Spot ex-post",
-}
+
+def _build_type_labels(types: tuple[str, ...], direction: str) -> dict[str, str]:
+    return {t: f"{_PRICE_KIND_LABELS[t]} – {direction}" for t in types}
+
+
+IMPORT_TYPE_LABELS = _build_type_labels(
+    ("fixed_cent", "spot_hourly", "monthly_table"),
+    "Bezug",
+)
+
+EXPORT_TYPE_LABELS = _build_type_labels(
+    ("fixed", "monthly_table", "spot_hourly"),
+    "Einspeisung",
+)
 
 
 def type_caption(tariff: dict, labels: dict[str, str]) -> str:
@@ -136,11 +144,7 @@ def _append_type_specific_rows(
         _append_if_present(
             rows, tariff, "price_cent_kwh", "Arbeitspreis", suffix=" Cent/kWh"
         )
-    elif tariff_type in {
-        "spot_hourly",
-        "ex_post_spot",
-        "monthly_market",
-    }:
+    elif tariff_type == "spot_hourly":
         _append_fee_vat_fields(rows, tariff)
         _append_if_present(
             rows, tariff, "feed_in_fee_factor", "Einspeise-Gebührenfaktor"

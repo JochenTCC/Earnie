@@ -157,8 +157,6 @@ Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/
 | --- | --- |
 | `fixed_cent` | Fixer Arbeitspreis (`fix_cent_kwh`) + optional Hausprofil-Netznutzung AP |
 | `spot_hourly` | EPEX × (1 + `markup_percent`%) + `settlement_fee_cent_kwh` + optional Hausprofil-Netznutzung AP |
-| `ex_post_spot` | Wie Spot; Kennzeichnung ex-post-Abrechnung |
-| `monthly_market` | Wie Spot; Kennzeichnung Monatsmarkt |
 | `monthly_table` | Monatstabelle Bezug (`monthly_rates`) + optional Hausprofil-Netznutzung AP |
 
 ### Export-Typen
@@ -166,7 +164,7 @@ Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/
 | Typ | Bedeutung |
 | --- | --- |
 | `fixed` | Konstante Vergütung (`k_push_cent`) |
-| `spot_hourly` / `ex_post_spot` | EPEX − `feed_in_fee_factor` × \|EPEX\| − `settlement_fee_cent_kwh` + `feed_in_fix_cent` (Faktor/Fix optional, Standard 0) |
+| `spot_hourly` | EPEX − `feed_in_fee_factor` × \|EPEX\| − `settlement_fee_cent_kwh` + `feed_in_fix_cent` (Faktor/Fix optional, Standard 0) |
 | `monthly_table` | Monatskonstante Vergütung (`monthly_rates` am Tarif) |
 
 Beispiel mit Prozentabschlag: Katalog-id `dynamic_epex` (aWATTar SUNNY SPOT) als `spot_hourly` mit `feed_in_fee_factor: 0.19`.
