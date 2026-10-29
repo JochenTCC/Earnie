@@ -117,10 +117,10 @@ def test_vo_titles_match_push_ehal_ids(export: dict[str, bytes]) -> None:
 def test_plant_template_grid_uses_grid_meter_namespace_and_no_ess(export: dict[str, bytes]) -> None:
     cmds = _cmd_on(export, "VO_Earnie_Plant.xml")
     assert cmds["Push_grid_meter_sens_grid_power_active"] == (
-        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v>"
+        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v.3>"
     )
     assert cmds["Push_grid_meter_get_grid_export_power_limit"] == (
-        "/ehal/telemetry/grid.meter.get_grid_export_power_limit/<v>"
+        "/ehal/telemetry/grid.meter.get_grid_export_power_limit/<v.3>"
     )
     assert not any("ess" in title for title in cmds)
 
@@ -128,7 +128,7 @@ def test_plant_template_grid_uses_grid_meter_namespace_and_no_ess(export: dict[s
 def test_plant_template_house_wide_reads(export: dict[str, bytes]) -> None:
     cmds = _cmds(export, "VO_Earnie_Plant.xml")
     on = _cmd_on(export, "VO_Earnie_Plant.xml")
-    assert on["Push_sens_temperature_outside"] == "/ehal/telemetry/sens_temperature_outside/<v>"
+    assert on["Push_sens_temperature_outside"] == "/ehal/telemetry/sens_temperature_outside/<v.1>"
     absent = cmds["Push_sens_absent_mode"]
     assert absent.get("Analog") == "false"
     assert on["Push_sens_absent_mode"] == "/ehal/telemetry/sens_absent_mode/1"
@@ -151,7 +151,7 @@ def test_consumer_template_energy_counter_mono_and_digital_active(export: dict[s
     cmds = _cmds(export, "VO_Earnie_Verbraucher.xml")
     on = _cmd_on(export, "VO_Earnie_Verbraucher.xml")
     assert on["Push_consumer_waschmaschine_sens_energy_total"] == (
-        "/ehal/telemetry/consumer.waschmaschine.sens_energy_total/<v>"
+        "/ehal/telemetry/consumer.waschmaschine.sens_energy_total/<v.3>"
     )
     assert "Push_consumer_waschmaschine_sens_energy_export" not in on
     active = cmds["Push_consumer_waschmaschine_sens_consumer_active"]
@@ -161,14 +161,14 @@ def test_consumer_template_energy_counter_mono_and_digital_active(export: dict[s
 
 def test_battery_template_full_push_and_bipolar_energy(export: dict[str, bytes]) -> None:
     cmds = _cmd_on(export, "VO_Earnie_Batterie_haus.xml")
-    for field in (
-        "sens_ess_soc",
-        "sens_ess_power",
-        "sens_ess_energy_charge",
-        "sens_ess_energy_discharge",
-        "get_ess_soc_min",
+    for field, placeholder in (
+        ("sens_ess_soc", "<v.1>"),
+        ("sens_ess_power", "<v.3>"),
+        ("sens_ess_energy_charge", "<v.3>"),
+        ("sens_ess_energy_discharge", "<v.3>"),
+        ("get_ess_soc_min", "<v.1>"),
     ):
-        assert cmds[f"Push_ess_haus_{field}"] == f"/ehal/telemetry/ess.haus.{field}/<v>"
+        assert cmds[f"Push_ess_haus_{field}"] == f"/ehal/telemetry/ess.haus.{field}/{placeholder}"
 
 
 def test_ev_template_includes_fertigum_and_soc_min_immediate(export: dict[str, bytes]) -> None:

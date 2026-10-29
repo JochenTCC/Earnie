@@ -149,11 +149,11 @@ def test_template_matches_the_loxone_config_export_shape(tmp_path: Path) -> None
 
 def test_template_values_placeholder_repeat_and_digital(tmp_path: Path) -> None:
     text, root = _render_plant(tmp_path)
-    assert "&lt;v&gt;" in text and "<v>" not in text
+    assert "&lt;v.3&gt;" in text and "<v" not in text
     cmds = {c.get("Title"): c for c in root if c.tag == "VirtualOutCmd"}
     analog = cmds["Push_grid_meter_sens_grid_power_active"]
     assert analog.get("CmdOn") == (
-        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v>?t=abcd1234efgh"
+        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v.3>?t=abcd1234efgh"
     )
     assert (analog.get("Analog"), analog.get("Repeat"), analog.get("RepeatRate")) == ("true", "10", "10")
     digital = cmds["Push_sens_absent_mode"]
@@ -162,6 +162,33 @@ def test_template_values_placeholder_repeat_and_digital(tmp_path: Path) -> None:
     assert digital.get("Analog") == "false"
     _text, root0 = _render_plant(tmp_path, repeat="0", repeat_rate="0")
     assert {c.get("Repeat") for c in root0 if c.tag == "VirtualOutCmd"} == {"0"}
+
+
+@pytest.mark.parametrize(
+    ("ehal_id", "placeholder"),
+    [
+        ("grid.meter.sens_grid_power_active_l2", "<v.3>"),
+        ("grid.meter.sens_grid_power_factor", "<v.3>"),
+        ("grid.meter.sens_grid_current_l1", "<v.2>"),
+        ("grid.meter.sens_grid_voltage_l3", "<v.1>"),
+        ("ess.haus.sens_ess_soc", "<v.1>"),
+        ("consumer.trockner.sens_power_act", "<v.3>"),
+        ("sens_temperature_outside", "<v.1>"),
+        ("ev.e_auto.get_evcs_ready_by_time", "<v>"),  # text
+        ("heartbeat_smarthome", "<v>"),  # counter
+    ],
+)
+def test_value_placeholder_decimals_per_field(ehal_id: str, placeholder: str) -> None:
+    assert gen.value_placeholder(ehal_id) == placeholder
+
+
+def test_every_loxone_unit_has_decimals_and_loxone_substitutes_them() -> None:
+    from ehal.field_registry import _loxone_specs
+
+    units = {spec.unit for spec in _loxone_specs().values()}
+    assert units <= set(gen._DECIMALS_BY_UNIT), units - set(gen._DECIMALS_BY_UNIT)
+    digits = list(gen._DECIMALS_BY_UNIT.values()) + list(gen._DECIMALS_BY_KIND.values())
+    assert all(1 <= n <= 3 for n in digits)  # Loxone leaves <v.4> unsubstituted
 
 
 def test_write_template_has_bom(tmp_path: Path) -> None:
@@ -217,7 +244,7 @@ def test_token_in_address_moves_the_token_out_of_the_commands(tmp_path: Path) ->
         assert "?t=" not in (cmd.get("CmdOn") or "")
     by_title = {c.get("Title"): c for c in cmds}
     assert by_title["Push_grid_meter_sens_grid_power_active"].get("CmdOn") == (
-        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v>"
+        "/ehal/telemetry/grid.meter.sens_grid_power_active/<v.3>"
     )
     assert by_title["Push_sens_absent_mode"].get("CmdOn") == "/ehal/telemetry/sens_absent_mode/1"
     assert by_title["Push_sens_absent_mode"].get("CmdOff") == "/ehal/telemetry/sens_absent_mode/0"

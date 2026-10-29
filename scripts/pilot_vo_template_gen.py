@@ -2,7 +2,8 @@
 
 Reads the *read* bindings (``sens_*`` / ``get_*``) of an Earnie config dir and writes
 one ``VO_Earnie_*.xml`` per entity group plus ``Earnie-VO-Signalliste.csv``. Every new VO
-Cmd pushes its value to ``/ehal/telemetry/<EHAL-ID>/<v>?t=<token>`` (digital signals: fixed 1 for On, 0 for Off; analog outputs have no Off command) and is
+Cmd pushes its value to ``/ehal/telemetry/<EHAL-ID>/<v.N>?t=<token>`` (decimals per field, see
+``value_placeholder``; digital signals: fixed 1 for On, 0 for Off; analog outputs have no Off command) and is
 titled ``Push_<qualified-id>`` (dots → ``_``) so it can run in parallel to Merker Cmds.
 
 Without ``--env-file`` the XML carries the placeholder ``PUSH_TOKEN_HIER_ERSETZEN`` — replace it
@@ -33,6 +34,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
+from ehal.field_registry import loxone_spec
 from ehal.grid_phase_fields import GRID_PHASE_KINDS
 from ehal.qualified_ids import qualified_grid_id
 from ehal.push_signals import (  # noqa: F401 — re-exported for callers and tests
@@ -94,6 +96,41 @@ def grid_phase_signals() -> list[Signal]:
 # attributes (CmdAnswer, Source/DestVal*, HintText), UTF-8 with BOM, tab indent.
 INFO_ATTRS = {"templateType": "3", "minVersion": "17010630"}
 
+# Loxone sends ``<v>`` rounded to an integer; ``<v.N>`` keeps N decimals. N > 3 is not
+# substituted (``<v.4>`` arrived as literal text, Prod feed 2026-10-29).
+_DECIMALS_BY_UNIT = {"kW": 3, "kvar": 3, "-": 3, "A": 2, "V": 1, "%": 1}
+# Fields without a ``loxone`` block in the role files (consumer, EV, pool, heat pump, energy counters).
+_DECIMALS_BY_KIND = {
+    "sens_energy_total": 3,
+    "sens_ess_energy_charge": 3,
+    "sens_ess_energy_discharge": 3,
+    "sens_grid_energy_import": 3,
+    "sens_grid_energy_export": 3,
+    "sens_power_act": 3,
+    "sens_evcs_active_power": 3,
+    "sens_evcs_bat_capacity": 1,
+    "sens_evcs_soc_act": 1,
+    "get_evcs_limit_soc": 1,
+    "get_evcs_soc_min_immediate": 1,
+    "get_evcs_nominal_current": 1,
+    "get_filter_native_duration_hours": 1,
+    "get_filter_remaining_hours": 2,
+    "get_temperature_tolerance_c": 1,
+    "get_temperature_water_setpoint": 1,
+    "sens_temperature_outside": 1,
+    "sens_temperature_water": 1,
+    "sens_temperature_heat_storage": 1,
+    "sens_temperature_heat_storage_low": 1,
+}
+
+
+def value_placeholder(ehal_id: str) -> str:
+    """Loxone value placeholder of an analog push: ``<v.N>``, or ``<v>`` for integers / text."""
+    kind = ehal_id.rsplit(".", 1)[-1]
+    spec = loxone_spec(kind)
+    decimals = _DECIMALS_BY_UNIT.get(spec.unit) if spec else _DECIMALS_BY_KIND.get(kind)
+    return f"<v.{decimals}>" if decimals else "<v>"
+
 
 def _cmd_attrs(
     sig: Signal, token: str, repeat: str, repeat_rate: str, token_in_address: bool = False
@@ -106,7 +143,7 @@ def _cmd_attrs(
         on_cmd, off_cmd = f"{base}1{query}", f"{base}0{query}"
         comment = f"{sig.ehal_id} 0/1; parallel to {sig.old_name}"
     else:
-        on_cmd, off_cmd = f"{base}<v>{query}", ""
+        on_cmd, off_cmd = f"{base}{value_placeholder(sig.ehal_id)}{query}", ""
         comment = f"{sig.ehal_id}; parallel to {sig.old_name}"
     attrs = {
         "Title": sig.title,
@@ -266,6 +303,9 @@ def main() -> int:
                 writer.writerow([f"VO_Earnie_{group}.xml", sig.title, sig.ehal_id, sig.old_name,
                                  "digital" if sig.digital else "analog"])
     print(f"{len(signals)} signals in {len(groups)} files -> {args.out_dir}")
+    plain = [s.ehal_id for s in signals if not s.digital and value_placeholder(s.ehal_id) == "<v>"]
+    if plain:
+        print("Sent without decimals (<v>, integer or text): " + ", ".join(plain))
     if token == TOKEN_PLACEHOLDER:
         print(f"Token placeholder in the XML: replace {TOKEN_PLACEHOLDER} with your token before use.")
     return 0

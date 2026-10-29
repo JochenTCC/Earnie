@@ -115,6 +115,8 @@ def test_vo_template_has_one_analog_push_per_phase_kind() -> None:
     assert [s.ehal_id for s in signals] == list(grid_phase_ids())
     assert not any(s.digital for s in signals)
     xml = render_template("Netz_Phasen", signals, host="10.0.0.5", port=8542, token="tok_12345678")
+    decimals = {"voltage": 1, "current": 2, "power": 3}
     for ehal_id in grid_phase_ids():
-        assert f'CmdOn="/ehal/telemetry/{ehal_id}/&lt;v&gt;?t=tok_12345678"' in xml
+        n = next(d for word, d in decimals.items() if word in ehal_id)
+        assert f'CmdOn="/ehal/telemetry/{ehal_id}/&lt;v.{n}&gt;?t=tok_12345678"' in xml
     assert 'Address="http://10.0.0.5:8542"' in xml

@@ -139,7 +139,7 @@ Auch die Telemetrie-VOs (`VO_Earnie_*`) zielen auf den Daemon-Port **8541**. Der
 - **Wiederholintervall / Null-Regel:** siehe [Push-Takt (SB-neutral)](#push-cadence-sb-neutral).
 - **Heartbeat:** Der synthetische Heartbeat-VO ist immer Push.
 - **FertigUm** (`ev.<id>.get_evcs_ready_by_time`): wird als Analog-VO gepusht. Bevorzugt wird ein numerischer Wert für den nächsten Eintrag. Text im Tna-Stil wie `Morgen, 07:00` wird solange er frisch ist akzeptiert und vom Optimierer geparst.
-- **Wert-Platzhalter:** Ein Virtual-Output-Befehl verwendet `<v>` (im XML als `&lt;v&gt;`). `\v` ist der Platzhalter für den Virtual-**Input**-Check und kommt in einem Output als Steuerzeichen 0x0B an.
+- **Wert-Platzhalter:** Ein Virtual-Output-Befehl verwendet `<v>` (im XML als `&lt;v&gt;`). `<v>` sendet den Wert auf eine ganze Zahl gerundet, `<v.1>` bis `<v.3>` senden ihn mit 1 bis 3 Nachkommastellen. Die Vorlagen setzen die Nachkommastellen passend zum Signal: Leistung, Energie und Leistungsfaktor `<v.3>`, Strom `<v.2>`, Spannung, Ladestand und Temperatur `<v.1>`. Mehr als 3 Nachkommastellen ersetzt Loxone nicht: `<v.4>` kommt als Text an und Earnie kann den Wert nicht lesen. `\v` ist der Platzhalter für den Virtual-**Input**-Check und kommt in einem Output als Steuerzeichen 0x0B an.
 
 <a id="push-cadence-sb-neutral"></a>
 
