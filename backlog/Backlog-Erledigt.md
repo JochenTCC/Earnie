@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.0-beta.1 pre-release (2026-10-29)
+
+- [x] **2.7.0-beta.1 pre-release** `[dev]`: `version.py` **2.7.0-beta.1**, alpha compose pins and release notes [`.github/release-notes/v2.7.0-beta.1.md`](../.github/release-notes/v2.7.0-beta.1.md) (baseline public 2.6.2, plus a short section on changes since alpha.9) in `ffec2e74` on `release/2.7`; regression 12/12 and full suite green locally before the tag. Candidate tag `v2.7.0-beta.1` (`targets: both`), all Release jobs green, `promote` approved by the maintainer: GitHub pre-release published, GHCR `:next` = `:2.7.0-beta.1` (`:latest` stays on 2.6.2), HA `earnie_prerelease` on 2.7.0-beta.1, `streamlitcloud` fast-forwarded to the tag.
+
 ### GitHub #59 decision: no switch-off option for the EU features (2026-10-29)
 
 - [x] **[GitHub #59](https://github.com/JochenTCC/Earnie/issues/59) — decide on a config option to switch the EU features off:** decided by the maintainer on 2026-10-29: no extra option. With the one-hour failure cache an unreachable host is queried at most once per hour, and `missing_price_strategy: mirror` already switches the EU requests off. Issue closed with a comment; the fix ships with 2.7.0-beta.1.
