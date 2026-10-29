@@ -293,9 +293,17 @@ def record_push(
             _last_known[ehal_id] = (float(value), stamp)
         _mark_dirty_unlocked()
     _record_push_to_shadow_feed(ehal_id, text, parse_ok=value is not None)
+    _record_grid_phase_log(ehal_id, value, text, stamp)
     if is_new:
         logger.info("loxone push inbox: new signal %s (peer %s)", ehal_id, row["peer"])
     return "new" if is_new else "ok"
+
+
+def _record_grid_phase_log(ehal_id: str, value: float | None, text: str, stamp: datetime) -> None:
+    """Dev: device-detection time series (only with EARNIE_UI_MODES device_detection)."""
+    from runtime_store.grid_phase_log import record
+
+    record(ehal_id, value, text, stamp)
 
 
 def memory_snapshot() -> dict[str, dict[str, Any]]:

@@ -51,6 +51,18 @@ GRID_KINDS: frozenset[str] = frozenset(
         "sens_grid_energy_export",
         "get_grid_export_power_limit",
         "set_grid_export_power_limit",
+        # Per-phase meter values (device detection, dev only; ehal.grid_phase_fields).
+        "sens_grid_voltage_l1",
+        "sens_grid_voltage_l2",
+        "sens_grid_voltage_l3",
+        "sens_grid_current_l1",
+        "sens_grid_current_l2",
+        "sens_grid_current_l3",
+        "sens_grid_power_active_l1",
+        "sens_grid_power_active_l2",
+        "sens_grid_power_active_l3",
+        "sens_grid_power_reactive",
+        "sens_grid_power_factor",
     }
 )
 

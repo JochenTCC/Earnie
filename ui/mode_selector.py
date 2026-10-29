@@ -3,24 +3,29 @@ from __future__ import annotations
 
 import config
 import streamlit as st
-from runtime_store.env_vars import read_env
+from runtime_store.env_vars import DEVICE_DETECTION_MODE, read_env
 
 UI_MODE_KEYS = (
     "sunset2sunset",
     "scenario_explorer",
     "live_environment",
     "price_forecast",
+    DEVICE_DETECTION_MODE,
 )
 UI_MODE_LABELS = {
     "sunset2sunset": "Sunset-2-Sunset",
     "scenario_explorer": "Szenario-Explorer",
     "live_environment": "Daemon Control",
     "price_forecast": "Preis-Prognose (Dev)",
+    DEVICE_DETECTION_MODE: "Geräteerkennung (Dev)",
 }
 
 
 def _mode_keys_from_env(raw: str) -> list[str]:
     requested = {part.strip().lower() for part in raw.split(",") if part.strip()}
+    # device_detection has no page of its own; alone it must not empty the menu.
+    if not requested - {DEVICE_DETECTION_MODE}:
+        return ["sunset2sunset"] + ([DEVICE_DETECTION_MODE] if requested else [])
     enabled = [k for k in UI_MODE_KEYS if k in requested]
     return enabled or ["sunset2sunset"]
 
@@ -29,6 +34,8 @@ def get_enabled_ui_mode_keys() -> list[str]:
     """
     Aktivierte UI-Modus-Schlüssel aus EARNIE_UI_MODES
     (kommagetrennt: sunset2sunset,scenario_explorer,live_environment,price_forecast).
+    ``device_detection`` (Dev) hat keine eigene Seite; es schaltet das Phasen-Log
+    der Geräteerkennung im Daemon frei (``runtime_store.env_vars``).
 
     Ohne Env-Variable: Sunset-2-Sunset, Szenario-Explorer und Daemon Control;
     Preis-Prognose nur wenn ui.price_forecast_page_enabled in config.json true ist

@@ -1,0 +1,20 @@
+{
+  "role_id": "grid_phases",
+  "label": "Netz (PCC) – Phasenwerte",
+  "description": "Grid meter per-phase values for device detection (NILM stage 0). Dev only: logged, not used by the optimizer, not offered in the mapping catalog. Gated by EARNIE_UI_MODES key device_detection.",
+  "status": "dev",
+  "ehal_fields": [
+    {"field": "sens_grid_voltage_l1", "required": false, "kind": "telemetry", "notes": "V, L1-N.", "loxone": {"unit": "V", "ehal_unit": "V", "factor": 1, "sign": 1}},
+    {"field": "sens_grid_voltage_l2", "required": false, "kind": "telemetry", "notes": "V, L2-N.", "loxone": {"unit": "V", "ehal_unit": "V", "factor": 1, "sign": 1}},
+    {"field": "sens_grid_voltage_l3", "required": false, "kind": "telemetry", "notes": "V, L3-N.", "loxone": {"unit": "V", "ehal_unit": "V", "factor": 1, "sign": 1}},
+    {"field": "sens_grid_current_l1", "required": false, "kind": "telemetry", "notes": "A, L1; sign as delivered by the meter (Huawei sign not yet verified).", "loxone": {"unit": "A", "ehal_unit": "A", "factor": 1, "sign": 1}},
+    {"field": "sens_grid_current_l2", "required": false, "kind": "telemetry", "notes": "A, L2; sign as delivered by the meter (Huawei sign not yet verified).", "loxone": {"unit": "A", "ehal_unit": "A", "factor": 1, "sign": 1}},
+    {"field": "sens_grid_current_l3", "required": false, "kind": "telemetry", "notes": "A, L3; sign as delivered by the meter (Huawei sign not yet verified).", "loxone": {"unit": "A", "ehal_unit": "A", "factor": 1, "sign": 1}},
+    {"field": "sens_grid_power_active_l1", "required": false, "kind": "telemetry", "notes": "W, L1; + = import (Bezug), like sens_grid_power_active. Huawei 37132 is + = export: invert in the Loxone VI.", "loxone": {"unit": "kW", "ehal_unit": "W", "factor": 1000, "sign": 1}},
+    {"field": "sens_grid_power_active_l2", "required": false, "kind": "telemetry", "notes": "W, L2; + = import (Bezug). Huawei 37134 is + = export: invert in the Loxone VI.", "loxone": {"unit": "kW", "ehal_unit": "W", "factor": 1000, "sign": 1}},
+    {"field": "sens_grid_power_active_l3", "required": false, "kind": "telemetry", "notes": "W, L3; + = import (Bezug). Huawei 37136 is + = export: invert in the Loxone VI.", "loxone": {"unit": "kW", "ehal_unit": "W", "factor": 1000, "sign": 1}},
+    {"field": "sens_grid_power_reactive", "required": false, "kind": "telemetry", "notes": "var, total over all phases; sign as delivered by the meter (not yet verified).", "loxone": {"unit": "kvar", "ehal_unit": "var", "factor": 1000, "sign": 1}},
+    {"field": "sens_grid_power_factor", "required": false, "kind": "telemetry", "notes": "Dimensionless, total; sign as delivered by the meter (not yet verified).", "loxone": {"unit": "-", "ehal_unit": "-", "factor": 1, "sign": 1}}
+  ],
+  "unit_sign_notes": "See docs/dev/nilm-grid-phase-logging.md."
+}

@@ -12,6 +12,25 @@ def read_env(suffix: str) -> str:
     return ""
 
 
+# Dev-only UI mode key: grid per-phase push logging for device detection (NILM).
+DEVICE_DETECTION_MODE = "device_detection"
+
+
+def requested_ui_mode_keys() -> frozenset[str]:
+    """Lower-case keys listed in ``EARNIE_UI_MODES`` (empty when unset)."""
+    raw = read_env("UI_MODES")
+    return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
+
+
+def is_device_detection_enabled() -> bool:
+    """True when ``EARNIE_UI_MODES`` lists ``device_detection``.
+
+    Read by UI and daemon (both load ``config/.env``). Off unless listed explicitly;
+    the default mode set without the variable never includes it.
+    """
+    return DEVICE_DETECTION_MODE in requested_ui_mode_keys()
+
+
 def read_env_or(suffix: str, default: str) -> str:
     value = read_env(suffix)
     return value if value else default

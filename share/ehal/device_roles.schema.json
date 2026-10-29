@@ -8,7 +8,7 @@
   "properties": {
     "role_id": {
       "type": "string",
-      "enum": ["grid", "pv", "ess", "inverter", "evcs", "consumer", "heatpump"]
+      "enum": ["grid", "grid_phases", "pv", "ess", "inverter", "evcs", "consumer", "heatpump"]
     },
     "label": {
       "type": "string",
@@ -20,9 +20,9 @@
     },
     "status": {
       "type": "string",
-      "enum": ["m1", "stub"],
+      "enum": ["m1", "stub", "dev"],
       "default": "m1",
-      "description": "m1 = maps Live EHAL fields; stub = forward-looking (no first-class M1 wire fields yet)."
+      "description": "m1 = maps Live EHAL fields; stub = forward-looking (no first-class M1 wire fields yet); dev = non-public fields behind a UI mode key (logged only, not in the mapping catalog)."
     },
     "ehal_fields": {
       "type": "array",
