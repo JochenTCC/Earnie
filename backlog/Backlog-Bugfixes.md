@@ -35,7 +35,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 - [ ] Set default "Temperaturabsenkung" in annual-rc to 2.5°C
 - [ ] Review and modify text in SE review pop-up dialogue
-- [ ] **[GitHub #59](https://github.com/JochenTCC/Earnie/issues/59) — decide on a config option to switch the EU features off** (reporter's request), now that failures are cached for one hour; `missing_price_strategy: mirror` already switches the EU requests off. Close #59 after the decision.
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
