@@ -144,7 +144,7 @@ Proxmox: LXC with `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh`
 
 ## Shadow Mode (Dev client)
 
-Run a development build in parallel to Prod on the same live inputs without touching the smarthome backend. Spec: [`docs/dev/shadow-mode.md`](docs/dev/shadow-mode.md) (§6.4 shared vs private config, §6.6 silent relation). User-facing German notes: [`docs/einrichtung/betrieb.md`](docs/einrichtung/betrieb.md) (Shadow-Feed + Shadow-Modus). Architecture / refactor phases: [`backlog/Shadow-Architecture-Review.md`](backlog/Shadow-Architecture-Review.md).
+Run a development build in parallel to Prod on the same live inputs without touching the smarthome backend. Spec: private repo Earnie-Projekt, `Betrieb/Shadow-Mode-Spec.md` (§6.4 shared vs private config, §6.6 silent relation). German operations guide: private repo Earnie-Projekt, `Betrieb/Shadow-Betrieb.md`. Architecture / refactor phases: private repo Earnie-Projekt, `Betrieb/Shadow-Architecture-Review.md`.
 
 - Activate **only** with `EARNIE_SHADOW=1` (never a config key). Implies silent mode.
 - Requires an explicit `EARNIE_RUNTIME_PATH` or `EARNIE_ENV_PATH`. Classic: shares Prod’s config (read-only) and feed under `{config}/shadow_feed/`. Private Dev: local `EARNIE_ENV_PATH` + `EARNIE_SHADOW_FEED_PATH` → Prod feed; local config is writable (`is_shadow_config_readonly()`).

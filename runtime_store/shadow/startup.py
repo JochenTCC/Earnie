@@ -83,9 +83,21 @@ def _check_feed_schema(meta: dict) -> None:
 
 
 def _check_data_model(meta: dict) -> None:
+    """Prod's data model must be ours only when Shadow loads Prod's (shared) config.
+
+    A private Shadow config is checked by the migration gate instead; the feed carries raw
+    transport payloads, whose format ``feed_schema`` covers.
+    """
     from runtime_store.data_model import COMPATIBLE_DATA_MODELS
+    from runtime_store.shadow.mode import is_shadow_config_readonly
 
     raw = meta.get("earnie_data_model")
+    if not is_shadow_config_readonly():
+        logger.info(
+            "shadow: private config, Prod earnie_data_model=%r not checked (own config: migration gate)",
+            raw,
+        )
+        return
     try:
         model = int(raw)
     except (TypeError, ValueError):
@@ -158,13 +170,22 @@ def ensure_shadow_startup() -> dict:
         plan_for_active_config,
     )
 
+    from runtime_store.shadow.mode import is_shadow_config_readonly
+
     plan = plan_for_active_config()
     if migration_blocks_normal_startup(plan):
-        raise ShadowStartupError(
-            "Shadow startet nicht, solange die geteilte Prod-Konfiguration "
-            "migriert werden muss (Shadow migriert nie).\n"
-            + abort_message_de(plan)
-        )
+        if is_shadow_config_readonly():
+            reason = (
+                "Shadow startet nicht, solange die geteilte Prod-Konfiguration "
+                "migriert werden muss (Shadow migriert nie).\n"
+            )
+        else:
+            reason = (
+                "Shadow startet nicht, solange die private Shadow-Konfiguration "
+                "migriert werden muss (vorher python -m scripts.migrate_config "
+                "--config-dir <Shadow-Config>).\n"
+            )
+        raise ShadowStartupError(reason + abort_message_de(plan))
     meta = _load_meta()
     _check_feed_schema(meta)
     _check_data_model(meta)

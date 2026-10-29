@@ -352,7 +352,7 @@ Status: **implemented** (see *Implementation notes*, *Results*, *Done check*). B
 - **Deleted:** `data/live_market_prices.py`, `data/live_price_cache.py` (its only user was the old orchestrator, so it goes now, not in P4b), `integrations/entsoe_client.py`, `integrations/awattar_client.py`, `tests/test_entsoe_client.py`, `tests/test_live_market_prices_regression.py`, `tests/test_live_price_cache.py`, `tests/fixtures/entsoe/`. `AWATTAR_URL` stays (SE and analysis scripts read it).
 - **Behaviour changes (release notes):** CH has no aWATTar AT substitute (D3); the cache `runtime/edibert_market/market_<zone>.json` replaces `runtime/live_day_ahead_<zone>.json` (the old file is ignored); the expected window ends with today / tomorrow instead of the planning end, and a partial answer is asked again at most every 10 minutes; a missing or unknown `land` fails instead of using AT.
 - **Tests:** `tests/test_edibert_live_market.py` (feed keys, rows with 7 lead days, cache hit without request, ENTSO-E failure recorded redacted with fall-through, HTTP error → `MarketSourceError`, Shadow replay of old dict records without network, unrecorded Shadow live fallback, CH without aWATTar → `None`, missing / unknown land); `tests/main_run_harness.py` patches the new module; `tests/early_start_runner.py` fakes the Energy-Charts HTTP answer instead of patching the old orchestrator.
-- **Docs:** `docs/konfiguration/preise.md`, `docs/einrichtung/betrieb.md` (German), `docs/dev/shadow-mode.md`.
+- **Docs:** `docs/konfiguration/preise.md`, `docs/einrichtung/betrieb.md` (German), Shadow spec (private repo Earnie-Projekt, `Betrieb/Shadow-Mode-Spec.md`).
 
 ### Results (2026-10-27)
 

@@ -240,7 +240,7 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
   - Spec: `[docs/workflow/hardware-registry-layer-c.md](../docs/workflow/hardware-registry-layer-c.md)`
 - [ ] **Simple "Savings KPI" as additional payload of the UsagePing** *(moved from the earnie-server install item, 2026-10-20)* — think through a simple savings figure to send with the ping; needs a schema bump (v3) on both sides (Earnie client contract `docs/workflow/usage-ping.md` and `earnie-server` receiver) and a privacy review (opt-in, anonymous, aggregates only).
 - [ ] Make also an EHAL adaption for MQTT
-- [ ] **Shadow Mode S4** *(after **2.7.f**)* — Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input. Spec [`docs/dev/shadow-mode.md`](../docs/dev/shadow-mode.md) §11 S4
+- [ ] **Shadow Mode S4** *(after **2.7.f**)* — Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input. Spec: private repo Earnie-Projekt, `Betrieb/Shadow-Mode-Spec.md` §11 S4
 - [ ] **Data & tariff fidelity - Part 2**
   - Keep official EPEX unconnected unless a paid/internal use case appears
   - Check possibilities to automatic tariffs.json update to existing installations

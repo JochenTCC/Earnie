@@ -12,7 +12,6 @@ Lab- und Simulationsumgebungen (HA Lab Compose, HouseSim-Mock) sind nur hier bes
 - [OpenEMS lab setup](../dev/openems-lab-setup.md) – Compose-Umgebung Earnie ↔ OpenEMS.
 - [Branching & Hotfix Playbook](../workflow/branching-hotfix-playbook.md) – `main`, `release/x.y`, Tags und Hotfixes.
 - [Release Checklist](../workflow/release-checklist.md) – Ablauf vom Kandidaten über den Test auf HA / LoxBerry bis zur Freigabe.
-- [Shadow Mode](../dev/shadow-mode.md) – Prod-Feed-Recorder (S1) und Shadow-Client (S2+S3, **2.7.f**) sind umgesetzt; S4 folgt in **2.+1**.
 - [Regression Suite](../workflow/regression-suite.md) – Golden-Master-Cases vor jedem Release, mit öffentlichen und privaten Daten.
 - [EV return prognosis](../dev/done/ev-return-prognosis.md) – Connect-Phasen bei abwesendem E-Auto (`forecast_when_absent`).
 
@@ -24,4 +23,4 @@ Arbeitsnotizen, Entwürfe und abgeschlossene Epics liegen unter [`docs/dev/`](..
 - [OpenEMS-Lab](../einrichtung/openems-lab.md) – Earnie mit OpenEMS Edge/UI; der Kommunikationscheck steht in der Spezifikation.
 - [HA ↔ Loxone Bridge-Generator](../dev/done/ha-loxone-bridge.md) – Prototyp (POC): erzeugt die Brücke für die Delta 3 aus einer Mapping-Datei, Loxone → HA per Webhook.
 
-- [Shadow-Betrieb](shadow-betrieb.md) – Prod-Feed-Recorder und Shadow-Client einrichten.
+- Shadow-Betrieb (Prod-Feed-Recorder, Shadow-Client, Dev und Prod parallel auf der NAS): Anleitung und Spezifikation stehen im privaten Repo Earnie-Projekt unter `Betrieb/Shadow-Betrieb.md` und `Betrieb/Shadow-Mode-Spec.md`.

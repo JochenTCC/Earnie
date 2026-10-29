@@ -83,14 +83,48 @@ def test_startup_refuses_missing_meta(monkeypatch, tmp_path):
         ensure_shadow_startup()
 
 
-def test_startup_refuses_incompatible_data_model(monkeypatch, tmp_path):
+def test_startup_refuses_incompatible_data_model_with_shared_config(monkeypatch, tmp_path):
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     shadow_rt = tmp_path / "shadow_rt"
-    feed = tmp_path / "feed"
+    config = tmp_path / "prod_config"
+    feed = config / "shadow_feed"  # feed under the config → shared Prod config
     _write_meta(feed, prod_runtime=str(tmp_path / "prod_rt"), data_model=99)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config))
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(shadow_rt))
     monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
     with pytest.raises(ShadowStartupError, match="earnie_data_model"):
+        ensure_shadow_startup()
+
+
+def test_startup_private_config_ignores_prod_data_model(monkeypatch, tmp_path):
+    """Prod on an older data model, Shadow on its own migrated config (NAS dev + prod)."""
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    shadow_rt = tmp_path / "shadow_rt"
+    config = tmp_path / "shadow_config"
+    config.mkdir()
+    feed = tmp_path / "prod_feed"  # outside the Shadow config → private config
+    _write_meta(feed, prod_runtime=str(tmp_path / "prod_rt"), data_model=99)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(shadow_rt))
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    meta = ensure_shadow_startup()
+    assert meta["earnie_data_model"] == 99
+    assert (shadow_rt / ".shadow_runtime").is_file()
+
+
+def test_startup_private_config_still_checks_feed_schema(monkeypatch, tmp_path):
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    config = tmp_path / "shadow_config"
+    config.mkdir()
+    feed = tmp_path / "prod_feed"
+    _write_meta(feed, prod_runtime=str(tmp_path / "prod_rt"))
+    meta = json.loads((feed / "meta.json").read_text(encoding="utf-8"))
+    meta["feed_schema"] = FEED_SCHEMA + 1
+    (feed / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "shadow_rt"))
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    with pytest.raises(ShadowStartupError, match="feed_schema"):
         ensure_shadow_startup()
 
 

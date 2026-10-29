@@ -63,4 +63,3 @@ Status: `x` done · `~` partial · blank open. **Check** = content vs code; **St
 | `docs/einrichtung/private-env.md` | x | x |
 | `docs/einrichtung/homeassistant-addon-testumgebung.md` | x | x |
 | `docs/entwicklung/README.md` | x | x |
-| `docs/entwicklung/shadow-betrieb.md` | x | x |

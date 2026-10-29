@@ -129,7 +129,6 @@ Check pass 2026-10-17 (parent, todos 1–2): full read vs code; clear fact fixes
 | `docs/workflow/hardware-registry-layer-c.md` | ~ | |
 | `docs/workflow/tariff-monthly-scan.md` | ~ | |
 | `docs/entwicklung/README.md` | ~ | |
-| `docs/entwicklung/shadow-betrieb.md` | | |
 
 ### Excluded — `docs/dev/` (moved 2026-10-17)
 

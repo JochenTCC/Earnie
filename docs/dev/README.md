@@ -18,7 +18,6 @@ When a document becomes a maintained reference again, move it to the matching us
 | [ha-lab-setup.md](ha-lab-setup.md) | Lab stack Earnie + Home Assistant + evcc (`docker/compose/ha-lab.yml`) |
 | [openems-lab-setup.md](openems-lab-setup.md) | Lab stack Earnie + OpenEMS (`docker/compose/openems-lab.yml`) |
 | [house-sim.md](house-sim.md) | House simulator HouseSim S1–S4 (`house_sim/`) |
-| [shadow-mode.md](shadow-mode.md) | Shadow Mode: dev instance fed by production data |
 | [cloud-poc-study.md](cloud-poc-study.md) | In progress (2026-10-23) — offline cloud POC study: what it does, verification, next steps |
 | [data-model-stability-decisions.md](data-model-stability-decisions.md) | Decided (2026-10-25) — D1–D3 before the 2.8 migration steps |
 | [done/backtesting-deviation-calendar.md](done/backtesting-deviation-calendar.md) | Feature spec, implemented |
