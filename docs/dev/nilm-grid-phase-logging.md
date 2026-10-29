@@ -52,11 +52,30 @@ is written with `"v": null` and the `"raw"` text. No retention: files stay until
 by hand (roughly 10–20 MB per day at a 5 s poll). Write errors are logged and never reach
 the push listener.
 
+## Shadow: export from the Prod feed
+
+A Shadow client has no live push listener, so it never writes this log, even with
+`device_detection` set. The Prod feed recorder keeps every VO push anyway
+(`shadow_feed/feed-YYYY-MM-DD.jsonl`, key `loxone:io:<id>`, retention
+`shadow_feed_retention_days`, default 14). Convert it into the log format:
+
+```text
+python -m scripts.export_grid_phase_log --feed-dir <prod config>/shadow_feed \
+    --out-dir <runtime>/grid_phase_log [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--overwrite]
+```
+
+Differences to the live log: `ts` has second resolution. Once per cycle, the recorder also
+mirrors the whole push inbox into the feed. The export drops a row as such a snapshot when
+it repeats the previous raw value of that ID less than half the ID's median push interval
+later (`--keep-snapshots` keeps all rows; the dropped count is printed per day). Existing
+day files are only replaced with `--overwrite`; today's feed file is still growing, so
+re-run with `--overwrite` later.
+
 ## Loxone
 
 VO template: `python -m scripts.pilot_vo_template_gen --grid-phases --host <earnie-ip>
 --out-dir <dir> [--env-file <config/.env>]` writes `VO_Earnie_Netz_Phasen.xml` (one analog
-`Push_grid_meter_<kind>` command per field, repeat 10 s). Connect each VI to its VO
+`Push_grid_meter_<kind>` command per field, repeat 10 s; the own setup runs 5 s). Connect each VI to its VO
 command. The VI must already deliver the Loxone units in the table above.
 
 ## Open
