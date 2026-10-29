@@ -144,11 +144,11 @@ def _consumption_kw_columns_from_chart_rows(
 ) -> dict[str, list[float]]:
     """Extrahiert optimierte Stundenleistungen (Basislast + Flex je ID) aus Chart-Zeilen.
 
-    The native filter run is fixed load inside ``Verbrauch-Prognose`` (see
-    ``simulation.matrix_builder.native_filter_kw_by_slot``); it is booked on
-    the filter consumer's column, not as Grundlast.
+    Fixed load (native filter run, continuous loads) sits inside
+    ``Verbrauch-Prognose`` (see ``simulation.matrix_builder.fixed_load_kw_by_slot``);
+    it is booked on the consumer's column, not as Grundlast.
     """
-    from optimizer.filter_context import logged_native_filter_windows, native_filter_kw_at
+    from optimizer.fixed_load import fixed_load_kw_at, resolve_fixed_load_windows
     from optimizer.simulation import flexible_consumer_power_kw
     from optimizer.targets import consumer_column_name
 
@@ -158,11 +158,11 @@ def _consumption_kw_columns_from_chart_rows(
         "baseload_kw": [],
         **{key: [] for key in flex_keys},
     }
-    native_windows = logged_native_filter_windows(flexible_consumers)
+    native_windows = resolve_fixed_load_windows(flexible_consumers)
     for row in chart_rows:
         prognose = float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
         native = (
-            native_filter_kw_at(native_windows, row["slot_datetime"])
+            fixed_load_kw_at(native_windows, row["slot_datetime"])
             if native_windows
             else {}
         )
@@ -170,7 +170,8 @@ def _consumption_kw_columns_from_chart_rows(
         if native_sum > prognose + 1e-6:
             raise ValueError(
                 f"Slot {row.get('slot_datetime')}: Verbrauch-Prognose {prognose:.3f} kW "
-                f"enthält den nativen Filterlauf ({native_sum:.3f} kW) nicht."
+                f"enthält die feste Last ({native_sum:.3f} kW: nativer Filterlauf / "
+                "Dauerlast) nicht."
             )
         baseload = prognose - native_sum
         columns["baseload_kw"].append(round(baseload, 4))
