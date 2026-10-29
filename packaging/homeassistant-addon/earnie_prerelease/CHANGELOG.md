@@ -2,6 +2,11 @@
 
 Same image family as `earnie/`. Pre-releases and official releases both bump this tree (`version:` = newest including alpha/rc on pre-release tags; matches stable on official tags).
 
+## 2.7.0-beta.1
+
+- Pins Earnie `2.7.0-beta.1` (`ghcr.io/jochentcc/earnie-energy:2.7.0-beta.1`).
+- Earnie release: [2.7.0-beta.1](https://github.com/JochenTCC/Earnie/releases/tag/v2.7.0-beta.1)
+
 ## 2.7.0-alpha.9
 
 - Community-Vorabversion der Linie 2.7: mehrere Speicher und Wechselrichter, Push-only-Anbindung, Migrationsassistent – plus HTTPS für Nutzungsstatistik/Feedback, zuverlässigere Szenario-Explorer-Buchung, die Bezeichnung „PV-Feld“ und ein LoxBerry-Update-Hinweis, der die echte Image-Version auf GHCR liest.

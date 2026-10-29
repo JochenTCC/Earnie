@@ -2,7 +2,7 @@
 # Same prebuilt image family as earnie/; only version:/name/slug differ.
 # Entwicklungsquelle im Hauptrepo; Sync nach ha-addon-earnie bei Releases.
 name: "Earnie (Vorabversion)"
-version: "2.7.0-alpha.9"
+version: "2.7.0-beta.1"
 slug: earnie_prerelease
 # Supervisor shows the "Experimental" label for this stage
 stage: experimental
