@@ -29,6 +29,17 @@ def rules_doc() -> dict:
     return load_deviation_rules(str(RULES_PATH))
 
 
+def _closed_battery_mean(slot: datetime, battery_kw: float) -> dict:
+    from optimizer.schedule import quarter_hour_slot_start
+
+    return {
+        quarter_hour_slot_start(slot): {
+            "sample_count": 10,
+            "battery_kw": battery_kw,
+        }
+    }
+
+
 def _entry(**extra) -> dict:
     base = {
         "completed_at": "2026-07-05T10:00:00",
@@ -139,6 +150,47 @@ class TestScenarioCatalog:
         )
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
         assert events == []
+
+    def test_forced_charge_reaction_without_target_is_yellow_warning(self, rules_doc):
+        """Slot mean moved toward charge but delivered none of the target energy."""
+        slot = datetime(2026, 10, 30, 1, 15)
+        entry = _entry(
+            mode=bat.MODE_ZWANGS_LADEN,
+            target_power_kw=0.213,
+            battery_plan_kw=0.213,
+            consumption_snapshot={"flex_kw": {}, "battery_kw": 2.25},
+            completed_at="2026-10-30T01:15:02",
+        )
+        events = evaluate_entry_deviations(
+            entry,
+            rules_doc=rules_doc,
+            slot_start=slot,
+            closed_by_interval=_closed_battery_mean(slot, 0.266),
+        )
+        assert len(events) == 1
+        assert events[0].category == "warning"
+        assert events[0].rule_id == "battery_forced_charge_target_missed"
+        assert events[0].color == "#f1c40f"
+        assert "0.21" in events[0].message
+        assert "0.00" in events[0].message
+
+    def test_forced_charge_without_movement_stays_error(self, rules_doc):
+        slot = datetime(2026, 10, 30, 1, 15)
+        entry = _entry(
+            mode=bat.MODE_ZWANGS_LADEN,
+            target_power_kw=2.5,
+            battery_plan_kw=2.5,
+            consumption_snapshot={"flex_kw": {}, "battery_kw": 0.0},
+        )
+        events = evaluate_entry_deviations(
+            entry,
+            rules_doc=rules_doc,
+            slot_start=slot,
+            closed_by_interval=_closed_battery_mean(slot, 0.0),
+        )
+        assert len(events) == 1
+        assert events[0].category == "error"
+        assert events[0].rule_id == "battery_forced_charge_missing"
 
     def test_forced_charge_partial_delivery_not_missing(self, rules_doc):
         entry = _entry(

@@ -43,6 +43,8 @@ class BatteryFacts:
     soll_plan_kw: float
     ist_power_kw: float
     control: str = "full"
+    # Decision-time Loxone power. None = same reading as ist (no separate sample).
+    decision_power_kw: float | None = None
 
 
 @dataclass(frozen=True)
@@ -210,6 +212,7 @@ def _battery_facts(
     )
 
     snapshot = ist_snapshot if ist_snapshot is not None else (entry.get("consumption_snapshot") or {})
+    decision = entry.get("consumption_snapshot") or {}
     control_raw = entry.get("battery_control")
     if control_raw is None:
         try:
@@ -222,6 +225,7 @@ def _battery_facts(
         soll_plan_kw=_battery_plan_kw(entry),
         ist_power_kw=_float_or_zero(snapshot.get("battery_kw")),
         control=control_from_battery_params({"control": control_raw}),
+        decision_power_kw=_float_or_zero(decision.get("battery_kw")),
     )
 
 

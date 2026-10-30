@@ -191,6 +191,37 @@ def test_map_to_horizon_skipped_spring_hour_takes_the_next_existing_hour():
     assert vector == [1.0, 2.0, 2.0, 3.0]
 
 
+def test_replay_serves_recorded_forecast_and_skips_the_network():
+    recorded = {"values_c": [1.0, 2.0, 3.0, 4.0], "source": "open_meteo"}
+    with of.replay_outdoor_forecast(recorded):
+        with patch.object(of, "get_hourly_outdoor_forecast_c") as fetch:
+            series, source = of.get_outdoor_forecast_with_fallback(
+                horizon=2, fallback_ambient_c=9.0
+            )
+    fetch.assert_not_called()
+    assert series == [1.0, 2.0]
+    assert source == "open_meteo"
+
+
+def test_replay_without_recorded_forecast_fails_loud():
+    with of.replay_outdoor_forecast(None):
+        with pytest.raises(ValueError, match="outdoor_forecast"):
+            of.get_outdoor_forecast_with_fallback(horizon=2, fallback_ambient_c=9.0)
+
+
+def test_open_cycle_keeps_the_longest_fetched_series():
+    of.close_forecast_capture()
+    of.open_forecast_capture()
+    try:
+        with patch.object(of, "get_hourly_outdoor_forecast_c", side_effect=[[8.0, 9.0], [8.0, 9.0, 10.0]]):
+            of.get_outdoor_forecast_with_fallback(horizon=2, fallback_ambient_c=9.0)
+            of.get_outdoor_forecast_with_fallback(horizon=3, fallback_ambient_c=9.0)
+        bucket = of.close_forecast_capture()
+    finally:
+        of.close_forecast_capture()
+    assert bucket == {"values_c": [8.0, 9.0, 10.0], "source": "open_meteo"}
+
+
 def test_map_to_horizon_still_rejects_a_genuinely_missing_hour():
     hourly = [(datetime(2026, 7, 6, 10), 1.0), (datetime(2026, 7, 6, 12), 2.0)]
     with patch.object(of.config, "get_planning_timezone", return_value=VIENNA):

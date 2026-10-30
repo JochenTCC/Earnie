@@ -86,12 +86,16 @@ def test_replay_strict_stable_plan_hash(tmp_path, monkeypatch):
     _cfg_with_battery(tmp_path, monkeypatch)
     # Use "today" so prune_old_segments does not delete the fresh segment.
     now = datetime.now().replace(microsecond=0)
+    matrix = _sample_matrix(8, base=now.replace(minute=0, second=0, microsecond=0))
+    slot_times = [row["slot_datetime"].isoformat() for row in matrix]
     token = cycle_recorder.begin_cycle(
-        optimization_matrix=_sample_matrix(8, base=now.replace(minute=0, second=0)),
+        optimization_matrix=matrix,
         planning_window={
             "start": now.isoformat(timespec="seconds"),
             "end": (now + timedelta(hours=24)).isoformat(timespec="seconds"),
             "horizon_hours": 24,
+            "sunrise_anchor": slot_times[-1],
+            "slot_datetimes": slot_times,
         },
         soc_percent=55.0,
         soc_percent_by_ess={"home": 55.0},
@@ -214,6 +218,43 @@ def test_recorder_collects_thermal_readings_for_enabled_thermal_control(monkeypa
     monkeypatch.setattr(ehal_live, "fetch_thermal_readings", _fetch)
     assert cycle_recorder._collect_thermal_readings() == {"pool": _THERMAL_READINGS}
     assert fetched == ["pool"]
+
+
+def test_sunrise_index_none_without_recorded_anchor():
+    from runtime_store.recorder_replay import _recorded_sunrise_soc_min_index
+
+    entry = {
+        "planning_window": {
+            "slot_datetimes": ["2026-10-28T10:00:00+01:00", "2026-10-28T10:15:00+01:00"],
+            "seed_anchor": "2026-10-28T10:00:00+01:00",
+        }
+    }
+    assert _recorded_sunrise_soc_min_index(entry) is None
+
+
+def test_sunrise_index_from_recorded_window():
+    from runtime_store.recorder_replay import _recorded_sunrise_soc_min_index
+
+    entry = {
+        "planning_window": {
+            "sunrise_anchor": "2026-10-29T07:03:11+01:00",
+            "slot_datetimes": [
+                "2026-10-28T10:00:00+01:00",
+                "2026-10-29T07:00:00+01:00",
+                "2026-10-29T07:15:00+01:00",
+            ],
+        }
+    }
+    assert _recorded_sunrise_soc_min_index(entry) == 1
+
+
+def test_sunrise_index_fails_loud_without_slots():
+    from runtime_store.recorder_replay import _recorded_sunrise_soc_min_index
+
+    with pytest.raises(ValueError, match="slot_datetimes"):
+        _recorded_sunrise_soc_min_index(
+            {"planning_window": {"sunrise_anchor": "2026-10-29T07:00:00+01:00"}}
+        )
 
 
 def test_restored_matrix_keeps_recorded_utc_offset():
