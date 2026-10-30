@@ -10,6 +10,7 @@ import pytest
 from optimizer import deviation_facts as facts_mod
 from optimizer.deviation_eval import evaluate_entry_deviations
 from optimizer.deviation_rules import load_deviation_rules
+from runtime_store.slot_ist_powers import index_closed_intervals_by_start
 from scripts.seed_deviation_test_log import build_deviation_test_entries, seed_deviation_test_log
 
 TZ = ZoneInfo("Europe/Vienna")
@@ -73,8 +74,15 @@ def test_seed_deviation_test_log_writes_expected_events(tmp_path):
         None,
         ("hint", "wp_heating_enable_no_start"),
     ]
+    # Evaluate like the chart: slot from completed_at, slot means from the log.
+    closed_by = index_closed_intervals_by_start(rows)
     for row, exp in zip(scenarios, expected):
-        events = evaluate_entry_deviations(row, rules_doc=rules_doc)
+        events = evaluate_entry_deviations(
+            row,
+            rules_doc=rules_doc,
+            slot_start=datetime.fromisoformat(row["completed_at"]),
+            closed_by_interval=closed_by,
+        )
         if exp is None:
             assert events == []
         else:

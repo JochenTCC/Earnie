@@ -179,7 +179,7 @@
         "message": {
           "type": "string",
           "minLength": 1,
-          "description": "Tooltip-Text; Platzhalter {soll_kw}, {ist_kw}, {consumer_name}, {scope}."
+          "description": "Tooltip-Text; Platzhalter {soll_kw}, {ist_kw}, {consumer_name}, {scope}; scope battery zusätzlich {soll_kwh}, {ist_kwh}, {ratio_pct}."
         }
       },
       "additionalProperties": false

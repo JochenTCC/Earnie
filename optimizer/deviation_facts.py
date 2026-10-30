@@ -43,8 +43,9 @@ class BatteryFacts:
     soll_plan_kw: float
     ist_power_kw: float
     control: str = "full"
-    # Decision-time Loxone power. None = same reading as ist (no separate sample).
-    decision_power_kw: float | None = None
+    # True when ist_power_kw is the closed-interval slot mean (energy / slot
+    # length); False for a decision-time sample, which says nothing about energy.
+    ist_is_slot_mean: bool = False
 
 
 @dataclass(frozen=True)
@@ -205,6 +206,7 @@ def _battery_facts(
     entry: dict[str, Any],
     *,
     ist_snapshot: dict[str, Any] | None = None,
+    ist_is_slot_mean: bool = False,
 ) -> BatteryFacts:
     from house_config.battery_control import (
         DEFAULT_BATTERY_CONTROL,
@@ -212,7 +214,6 @@ def _battery_facts(
     )
 
     snapshot = ist_snapshot if ist_snapshot is not None else (entry.get("consumption_snapshot") or {})
-    decision = entry.get("consumption_snapshot") or {}
     control_raw = entry.get("battery_control")
     if control_raw is None:
         try:
@@ -225,7 +226,7 @@ def _battery_facts(
         soll_plan_kw=_battery_plan_kw(entry),
         ist_power_kw=_float_or_zero(snapshot.get("battery_kw")),
         control=control_from_battery_params({"control": control_raw}),
-        decision_power_kw=_float_or_zero(decision.get("battery_kw")),
+        ist_is_slot_mean=ist_is_slot_mean,
     )
 
 
@@ -237,11 +238,12 @@ def build_slot_deviation_facts(
     closed_by_interval: dict | None = None,
 ) -> SlotDeviationFacts:
     """Extrahiert Vergleichsfakten aus einem Produktiv-Log-Eintrag."""
-    from runtime_store.slot_ist_powers import resolve_ist_snapshot
+    from runtime_store.slot_ist_powers import IST_SOURCE_MEAN, resolve_ist_snapshot
 
     ist_snap: dict[str, Any] | None = None
+    ist_source: str | None = None
     if slot_start is not None or closed_by_interval:
-        resolved, _source = resolve_ist_snapshot(
+        resolved, ist_source = resolve_ist_snapshot(
             slot_start or datetime.now(),
             entry,
             closed_by_interval,
@@ -277,7 +279,11 @@ def build_slot_deviation_facts(
     return SlotDeviationFacts(
         slot_quality=slot_quality,
         consumers=consumers,
-        battery=_battery_facts(entry, ist_snapshot=ist_snap),
+        battery=_battery_facts(
+            entry,
+            ist_snapshot=ist_snap,
+            ist_is_slot_mean=ist_source == IST_SOURCE_MEAN,
+        ),
         thermal=thermal,
         charging_contexts=contexts,
         consumer_remaining_kwh=remaining,

@@ -85,9 +85,12 @@
             "scope": "battery",
             "when": [
                 "mode_is_forced_charge",
-                "battery_power_below_tolerance"
+                "battery_charge_energy_below_ratio"
             ],
-            "message": "Zwangs-Laden nicht ausgeführt"
+            "params": {
+                "max_ratio": 0.6
+            },
+            "message": "Zwangs-Laden: Zielenergie deutlich verfehlt ({ratio_pct:.0f} %, Soll {soll_kwh:.2f} kWh, Ist {ist_kwh:.2f} kWh)"
         },
         {
             "id": "battery_forced_charge_target_missed",
@@ -97,9 +100,12 @@
             "scope": "battery",
             "when": [
                 "mode_is_forced_charge",
-                "battery_charge_target_missed"
+                "battery_charge_energy_below_ratio"
             ],
-            "message": "Zwangs-Laden: Zielenergie nicht erreicht (Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW)"
+            "params": {
+                "max_ratio": 0.8
+            },
+            "message": "Zwangs-Laden: Zielenergie nicht erreicht ({ratio_pct:.0f} %, Soll {soll_kwh:.2f} kWh, Ist {ist_kwh:.2f} kWh)"
         },
         {
             "id": "wp_heating_enable_no_start",
