@@ -351,7 +351,11 @@ def close_forecast_capture() -> dict | None:
 
 @contextmanager
 def replay_outdoor_forecast(recorded: dict | None) -> Iterator[None]:
-    """Serve ``recorded`` during replay. ``None`` fails on the next forecast read."""
+    """Serve ``recorded`` during replay. ``None`` fails on the next forecast read.
+
+    Callers that replay cycles recorded before ``outdoor_forecast`` existed should
+    not enter this context at all, so the live fetch / ambient fallback stays.
+    """
     token = _serve.set(recorded if recorded else _REPLAY_MISSING)
     try:
         yield

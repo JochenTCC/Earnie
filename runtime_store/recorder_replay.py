@@ -206,20 +206,26 @@ def _solve_prepared_entry(
     apply_cbc_solver_env(strict=(solver_mode == "strict"))
     os.environ["EARNIE_MILP_SOLVER"] = "highs"
 
+    from contextlib import ExitStack
+
     from data.outdoor_forecast import replay_outdoor_forecast
     from runtime_store.planning_clock import planning_freeze
 
-    recorded_forecast = (entry.get("start_state") or {}).get("outdoor_forecast")
+    start_state = entry.get("start_state") or {}
+    # Only enter fail-loud serve mode when the key was recorded. Older cycles
+    # omit it and still fetch (or use ambient fallback) as before.
+    has_outdoor_forecast = "outdoor_forecast" in start_state
+    recorded_forecast = start_state.get("outdoor_forecast") if has_outdoor_forecast else None
     if recorded_forecast is not None and not isinstance(recorded_forecast, dict):
         raise TypeError("start_state.outdoor_forecast must be a dict when present")
     moment = datetime.fromisoformat(str(entry.get("timestamp") or ""))
     _rebind_consumer_state_path()
-    with (
-        planning_freeze(moment),
-        replay_outdoor_forecast(recorded_forecast),
-        _recorded_ev_limit_soc(entry, config),
-        _recorded_thermal_readings(entry),
-    ):
+    with ExitStack() as stack:
+        stack.enter_context(planning_freeze(moment))
+        if has_outdoor_forecast:
+            stack.enter_context(replay_outdoor_forecast(recorded_forecast))
+        stack.enter_context(_recorded_ev_limit_soc(entry, config))
+        stack.enter_context(_recorded_thermal_readings(entry))
         prepared_ctx = _prepare_replay_inputs(entry, config)
         begin_cbc_event_collection()
         t0 = time.perf_counter()
