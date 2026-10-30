@@ -377,10 +377,16 @@ def begin_cycle(
 
 
 def _attach_recorded_outdoor_forecast(token: CycleToken) -> None:
-    """Copy the series fetched after begin_cycle into the entry, then stop capture."""
+    """Copy the series fetched after begin_cycle into the entry, then stop capture.
+
+    The key is always written. ``None`` means no forecast was read during the
+    cycle, so replay fails loud if it reads one. A missing key marks cycles
+    recorded before this field existed (replay may fetch live).
+    """
     from data.outdoor_forecast import close_forecast_capture
 
     bucket = close_forecast_capture()
+    token.start_state["outdoor_forecast"] = None
     if not bucket:
         return
     values = bucket.get("values_c")
