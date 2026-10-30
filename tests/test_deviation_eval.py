@@ -115,17 +115,25 @@ class TestScenarioCatalog:
         assert "3.50" in events[0].message
 
     def test_s3_forced_charge_error(self, rules_doc):
+        slot = datetime(2026, 10, 30, 1, 15)
         entry = _entry(
             mode=bat.MODE_ZWANGS_LADEN,
             target_power_kw=2.5,
             battery_plan_kw=2.5,
             consumption_snapshot={"flex_kw": {}, "battery_kw": 0.0},
         )
-        events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
+        events = evaluate_entry_deviations(
+            entry,
+            rules_doc=rules_doc,
+            slot_start=slot,
+            closed_by_interval=_closed_battery_mean(slot, 0.0),
+        )
         assert len(events) == 1
         assert events[0].category == "error"
         assert events[0].scope == "battery"
         assert events[0].rule_id == "battery_forced_charge_missing"
+        assert "0 %" in events[0].message
+        assert "0.62 kWh" in events[0].message
 
     def test_s3b_forced_discharge_error(self, rules_doc):
         entry = _entry(
@@ -151,57 +159,69 @@ class TestScenarioCatalog:
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
         assert events == []
 
-    def test_forced_charge_reaction_without_target_is_yellow_warning(self, rules_doc):
-        """Slot mean moved toward charge but delivered none of the target energy."""
+    @staticmethod
+    def _forced_charge_events(rules_doc, mean_battery_kw, *, soll_kw=2.0):
         slot = datetime(2026, 10, 30, 1, 15)
         entry = _entry(
             mode=bat.MODE_ZWANGS_LADEN,
-            target_power_kw=0.213,
-            battery_plan_kw=0.213,
+            target_power_kw=soll_kw,
+            battery_plan_kw=soll_kw,
             consumption_snapshot={"flex_kw": {}, "battery_kw": 2.25},
             completed_at="2026-10-30T01:15:02",
         )
-        events = evaluate_entry_deviations(
+        return evaluate_entry_deviations(
             entry,
             rules_doc=rules_doc,
             slot_start=slot,
-            closed_by_interval=_closed_battery_mean(slot, 0.266),
+            closed_by_interval=_closed_battery_mean(slot, mean_battery_kw),
         )
+
+    def test_forced_charge_energy_below_80_percent_is_yellow_warning(self, rules_doc):
+        # Loxone: negative = charge; 1.4 of 2.0 kW over the slot = 70 % energy.
+        events = self._forced_charge_events(rules_doc, -1.4)
         assert len(events) == 1
         assert events[0].category == "warning"
         assert events[0].rule_id == "battery_forced_charge_target_missed"
         assert events[0].color == "#f1c40f"
-        assert "0.21" in events[0].message
-        assert "0.00" in events[0].message
+        assert "70 %" in events[0].message
+        assert "Soll 0.50 kWh" in events[0].message
+        assert "Ist 0.35 kWh" in events[0].message
 
-    def test_forced_charge_without_movement_stays_error(self, rules_doc):
-        slot = datetime(2026, 10, 30, 1, 15)
+    def test_forced_charge_energy_at_80_percent_is_ok(self, rules_doc):
+        assert self._forced_charge_events(rules_doc, -1.6) == []
+
+    def test_forced_charge_energy_at_60_percent_is_warning(self, rules_doc):
+        events = self._forced_charge_events(rules_doc, -1.2)
+        assert [e.rule_id for e in events] == ["battery_forced_charge_target_missed"]
+
+    def test_forced_charge_energy_below_60_percent_is_error(self, rules_doc):
+        events = self._forced_charge_events(rules_doc, -1.0)
+        assert [e.category for e in events] == ["error"]
+        assert events[0].rule_id == "battery_forced_charge_missing"
+        assert "50 %" in events[0].message
+
+    def test_forced_charge_discharging_slot_mean_is_error(self, rules_doc):
+        """Dump 30.10. 01:15: forced charge 0.213 kW, slot mean still discharging."""
+        events = self._forced_charge_events(rules_doc, 0.266, soll_kw=0.213)
+        assert [e.rule_id for e in events] == ["battery_forced_charge_missing"]
+
+    def test_forced_charge_without_slot_mean_has_no_energy_verdict(self, rules_doc):
+        """A decision-time sample is not slot energy — no forced-charge marker."""
         entry = _entry(
             mode=bat.MODE_ZWANGS_LADEN,
             target_power_kw=2.5,
             battery_plan_kw=2.5,
             consumption_snapshot={"flex_kw": {}, "battery_kw": 0.0},
         )
-        events = evaluate_entry_deviations(
-            entry,
-            rules_doc=rules_doc,
-            slot_start=slot,
-            closed_by_interval=_closed_battery_mean(slot, 0.0),
-        )
-        assert len(events) == 1
-        assert events[0].category == "error"
-        assert events[0].rule_id == "battery_forced_charge_missing"
+        assert evaluate_entry_deviations(entry, rules_doc=rules_doc) == []
 
-    def test_forced_charge_partial_delivery_not_missing(self, rules_doc):
-        entry = _entry(
-            mode=bat.MODE_ZWANGS_LADEN,
-            target_power_kw=2.5,
-            battery_plan_kw=2.5,
-            # Loxone: negative = charge
-            consumption_snapshot={"flex_kw": {}, "battery_kw": -2.0},
-        )
-        events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
-        assert events == []
+    def test_energy_ratio_predicate_requires_max_ratio(self, rules_doc):
+        doc = json.loads(json.dumps(rules_doc))
+        for rule in doc["rules"]:
+            if rule["id"] == "battery_forced_charge_missing":
+                del rule["params"]
+        with pytest.raises(ValueError, match="max_ratio"):
+            self._forced_charge_events(doc, 0.0)
 
     def test_s2b_ev_pv_follow_error(self, rules_doc, monkeypatch):
         ev_consumer = {

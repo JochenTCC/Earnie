@@ -164,21 +164,6 @@ def _ist_discharge_kw(battery_kw: float) -> float:
     return max(0.0, float(battery_kw))
 
 
-def _decision_battery_kw(battery: Any) -> float:
-    """Decision-time power, or the slot mean when no separate sample exists."""
-    if battery.decision_power_kw is None:
-        return float(battery.ist_power_kw)
-    return float(battery.decision_power_kw)
-
-
-def _moved_toward_charge_kw(battery: Any) -> float:
-    """Positive when the slot mean charges more than the decision snapshot.
-
-    Loxone sign: negative = charge, so decision minus mean is the move.
-    """
-    return _decision_battery_kw(battery) - float(battery.ist_power_kw)
-
-
 def _battery_power_below_tolerance(
     facts: SlotDeviationFacts,
     _scope: str,
@@ -190,17 +175,15 @@ def _battery_power_below_tolerance(
 
     Catalog S3/S6 and rule messages say \"nicht ausgeführt\" — not slight
     underdelivery vs. setpoint (mean Ist can be a few 100 W short of Soll).
-    Forced charge that moved toward charging but missed the slot energy is
-    ``battery_charge_target_missed`` (yellow warning), not this error.
+    The shipped forced-charge rules grade by energy instead
+    (``battery_charge_energy_below_ratio``).
     """
     tol = _power_tolerance(tolerances, params)
     battery = facts.battery
     if battery.soll_mode == bat.MODE_ZWANGS_LADEN:
         soll = max(0.0, battery.soll_plan_kw)
         ist = _ist_charge_kw(battery.ist_power_kw)
-        if not (soll > tol and ist <= tol):
-            return False
-        return _moved_toward_charge_kw(battery) <= tol
+        return soll > tol and ist <= tol
     if battery.soll_mode == bat.MODE_ZWANGS_ENTLADEN:
         soll = max(0.0, -battery.soll_plan_kw)
         ist = _ist_discharge_kw(battery.ist_power_kw)
@@ -208,32 +191,32 @@ def _battery_power_below_tolerance(
     return False
 
 
-def _battery_charge_target_missed(
+def _battery_charge_energy_below_ratio(
     facts: SlotDeviationFacts,
     _scope: str,
-    _rule: dict[str, Any],
+    rule: dict[str, Any],
     tolerances: dict[str, float],
     params: dict[str, Any],
 ) -> bool:
-    """Forced charge moved toward charging, but slot-mean charge missed Soll.
+    """Forced charge: slot charge energy below ``max_ratio`` × target energy.
 
-    The decision snapshot is the power at the command. A move larger than the
-    power tolerance counts as a reaction. The red \"nicht ausgeführt\" rule
-    stays for a mean that never leaves the zero band.
+    Energy is the slot-mean power times the slot length, so the ratio equals
+    mean Ist / Soll. A decision-time sample is not energy: without the
+    closed-interval mean there is no verdict.
     """
-    from house_config.battery_control import BATTERY_CONTROL_FULL
-
+    if "max_ratio" not in params:
+        raise ValueError(
+            f"Regel '{rule['id']}': battery_charge_energy_below_ratio braucht "
+            "params.max_ratio."
+        )
     battery = facts.battery
-    if battery.control != BATTERY_CONTROL_FULL:
-        return False
-    if battery.soll_mode != bat.MODE_ZWANGS_LADEN:
+    if battery.soll_mode != bat.MODE_ZWANGS_LADEN or not battery.ist_is_slot_mean:
         return False
     tol = _power_tolerance(tolerances, params)
     soll = max(0.0, battery.soll_plan_kw)
-    ist = _ist_charge_kw(battery.ist_power_kw)
-    if soll <= tol or ist >= soll - tol:
+    if soll <= tol:
         return False
-    return _moved_toward_charge_kw(battery) > tol
+    return _ist_charge_kw(battery.ist_power_kw) < float(params["max_ratio"]) * soll
 
 
 def _pv_follow_setpoint_kw(flex: FlexPowerFacts) -> float:
@@ -343,7 +326,7 @@ PREDICATES: dict[str, Predicate] = {
     "mode_is_forced_charge": _mode_is_forced_charge,
     "mode_is_forced_discharge": _mode_is_forced_discharge,
     "battery_power_below_tolerance": _battery_power_below_tolerance,
-    "battery_charge_target_missed": _battery_charge_target_missed,
+    "battery_charge_energy_below_ratio": _battery_charge_energy_below_ratio,
     "pv_follow_scheduled": _pv_follow_scheduled,
     "pv_follow_power_below_tolerance": _pv_follow_power_below_tolerance,
     "slot_quality_present": _slot_quality_present,
@@ -374,6 +357,8 @@ def _battery_message_kw(battery: Any) -> tuple[float, float]:
 
 def _message_context(facts: SlotDeviationFacts, scope: str) -> dict[str, Any]:
     if scope == "battery":
+        from optimizer.slot_duration import DEFAULT_DT_H
+
         soll_kw, ist_kw = _battery_message_kw(facts.battery)
         return {
             "scope": scope,
@@ -381,6 +366,9 @@ def _message_context(facts: SlotDeviationFacts, scope: str) -> dict[str, Any]:
             "soll_kw": soll_kw,
             "ist_kw": ist_kw,
             "mismatch_kw": soll_kw - ist_kw,
+            "soll_kwh": soll_kw * DEFAULT_DT_H,
+            "ist_kwh": ist_kw * DEFAULT_DT_H,
+            "ratio_pct": 100.0 * ist_kw / soll_kw if soll_kw > 0 else 0.0,
         }
     flex = facts.consumers.get(scope)
     soll_kw = 0.0 if flex is None else flex.soll_kw

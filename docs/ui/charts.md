@@ -110,12 +110,12 @@ Soll/Ist-Icons erscheinen im grauen Log-Bereich, und zwar nur für Slots mit ech
 | Symbol | Kategorie | Farbe | Bedeutung |
 |--------|-----------|-------|-----------|
 | ▲ | Hinweis | grün | Unkritische Abweichung (z. B. Wärmepumpe: Freigabe ohne Anlauf) |
-| ◆ | Warnung | gelb | Erwartete Abweichung (z. B. SwimSpa im Sollband, Zwangs-Laden verfehlt die Zielenergie) |
+| ◆ | Warnung | gelb | Erwartete Abweichung (z. B. SwimSpa im Sollband, Zwangs-Laden lädt 60–80 % der Zielenergie) |
 | ⬡ | Fehler | rot | Anweisung von Earnie nicht befolgt |
 
 Die Marker liegen oberhalb der Chart-Fläche; beim **Hover** erscheinen Kategorie-Label und Regeltext. Pro Slot sind mehrere Icons möglich (verschiedene Scopes, z. B. Batterie und E-Auto).
 
-Bewegt sich die Batterie beim Zwangs-Laden in Richtung Laden, ohne die Zielenergie des Slots zu erreichen, zeigt Earnie eine gelbe Warnung. Bleibt die Leistung innerhalb der Toleranz unverändert, bleibt der rote Fehler „Zwangs-Laden nicht ausgeführt“.
+Beim Zwangs-Laden vergleicht Earnie die im Slot tatsächlich geladene Energie (mittlere Ladeleistung × Slotdauer) mit der Zielenergie (Soll-Leistung × Slotdauer). Ab 80 % gilt der Slot als erfüllt. Zwischen 60 % und 80 % erscheint eine gelbe Warnung, darunter ein roter Fehler. Der Tooltip nennt den erreichten Anteil sowie Soll und Ist in kWh. Die Schwellen stehen als `params.max_ratio` in den beiden Zwangs-Laden-Regeln. Fehlt für den Slot der gemessene Mittelwert, bewertet Earnie die Zwangsladung nicht, weil ein Momentanwert keine Energie ergibt.
 
 **Regelwerk:** `config/deviation_rules.json` (Schema: `deviation_rules.schema.json`). Pflegehinweis: [Spec Soll-Ist §5.3](../dev/done/soll-ist-abweichung.md).
 
