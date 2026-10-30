@@ -12,7 +12,7 @@ from data import pv_forecast as pf
 
 @pytest.fixture(autouse=True)
 def reset_pv_forecast_state():
-    pf._LAST_API_CALL = None
+    pf._LAST_API_CALL_BY_URL = {}
     pf._CACHED_HOURLY_WATTS_BY_URL = {}
     pf._RATE_LIMIT_RETRY_AT = None
     pf._LAST_FETCH_SOURCE = "api"
@@ -30,6 +30,11 @@ def _config_get_side_effect(key, *, cast=None):
     }
     value = values[key]
     return cast(value) if cast else value
+
+
+def _age_last_api_calls(age: timedelta) -> None:
+    for url in pf._LAST_API_CALL_BY_URL:
+        pf._LAST_API_CALL_BY_URL[url] = datetime.now() - age
 
 
 def _target_hours() -> list[datetime]:
@@ -143,8 +148,8 @@ def test_200_after_429_clears_retry_at_and_updates_last_api_call(
 
     assert pf.get_api_status()["retry_at"] is None
     assert pf.get_api_status()["source"] == "api"
-    assert pf._LAST_API_CALL is not None
-    assert pf._LAST_API_CALL >= before
+    assert len(pf._LAST_API_CALL_BY_URL) == 1
+    assert next(iter(pf._LAST_API_CALL_BY_URL.values())) >= before
     assert result == [1.0, 2.0, 3.0]
 
 
@@ -156,7 +161,7 @@ def test_429_does_not_update_last_api_call(get_mock, _config_mock, _timeout_mock
 
     pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
-    assert pf._LAST_API_CALL is None
+    assert pf._LAST_API_CALL_BY_URL == {}
 
 
 @patch("data.pv_forecast.config.get_global_timeout", return_value=10)
@@ -185,7 +190,7 @@ def test_http_error_does_not_update_last_api_call(get_mock, _config_mock, _timeo
 
     pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
-    assert pf._LAST_API_CALL is None
+    assert pf._LAST_API_CALL_BY_URL == {}
     assert pf.get_api_status()["using_synthetic_fallback"] is True
 
 
@@ -199,7 +204,7 @@ def test_timeout_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeo
     assert first == [1.0, 2.0, 3.0]
     assert pf.get_api_status()["using_synthetic_fallback"] is False
 
-    pf._LAST_API_CALL = datetime.now() - timedelta(minutes=20)
+    _age_last_api_calls(timedelta(minutes=20))
     get_mock.side_effect = requests.exceptions.Timeout()
 
     second = pf.get_hourly_pv_forecast_for_hours(_target_hours())
@@ -216,7 +221,7 @@ def test_429_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeout_m
     get_mock.return_value = _ok_response()
     pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
-    pf._LAST_API_CALL = datetime.now() - timedelta(minutes=20)
+    _age_last_api_calls(timedelta(minutes=20))
     retry_at = datetime.now() + timedelta(hours=1)
     get_mock.return_value = _429_response(header=retry_at.isoformat())
 
@@ -239,3 +244,38 @@ def test_parse_retry_at_prefers_header():
     aware = datetime.fromisoformat("2026-07-15T14:00:00+02:00")
     assert parsed == pf._as_naive_local(aware)
     assert parsed.tzinfo is None
+
+
+@patch("data.pv_forecast.config.get_global_timeout", return_value=10)
+@patch("data.pv_forecast.config.get", side_effect=_config_get_side_effect)
+@patch("data.pv_forecast.config.get_planning_pv_systems")
+@patch("data.pv_forecast.requests.get")
+def test_cooldown_is_per_system_so_every_system_refreshes(
+    get_mock, systems_mock, _config_mock, _timeout_mock
+):
+    """Regression: a shared cooldown stamp let only one PV system refresh per cycle.
+
+    The other system kept its stale cache (missing the next day) for hours.
+    """
+    systems_mock.return_value = [
+        {"id": "south", "pv_kwp": 5.7, "pv_tilt": 18.0, "pv_azimuth": 26.0},
+        {"id": "north", "pv_kwp": 6.8, "pv_tilt": 18.0, "pv_azimuth": -154.0},
+    ]
+    get_mock.return_value = _ok_response()
+    pf.get_hourly_pv_forecast_by_system_for_hours(_target_hours())
+    assert get_mock.call_count == 2
+
+    # Next cycle 15+ min later: both systems must hit the API again.
+    _age_last_api_calls(timedelta(minutes=16))
+    get_mock.reset_mock()
+    get_mock.return_value = _ok_response(
+        {
+            "2026-07-15 10:00:00": 500,
+            "2026-07-15 11:00:00": 600,
+            "2026-07-15 12:00:00": 700,
+        }
+    )
+    by_system = pf.get_hourly_pv_forecast_by_system_for_hours(_target_hours())
+
+    assert get_mock.call_count == 2
+    assert by_system == {"south": [0.5, 0.6, 0.7], "north": [0.5, 0.6, 0.7]}

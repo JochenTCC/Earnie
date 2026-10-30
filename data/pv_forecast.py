@@ -12,7 +12,8 @@ from runtime_store.planning_clock import planning_now
 # =========================================================================
 # GLOBALE CACHE-VARIABLEN (Für Rate-Limiting & API-Schonung)
 # =========================================================================
-_LAST_API_CALL: Optional[datetime] = None
+# Per URL (one per PV system): a shared stamp let the first fetched system starve the others.
+_LAST_API_CALL_BY_URL: dict[str, datetime] = {}
 _CACHED_HOURLY_WATTS_BY_URL: dict[str, dict] = {}
 _RATE_LIMIT_RETRY_AT: Optional[datetime] = None
 _LAST_FETCH_SOURCE: str = "api"
@@ -89,10 +90,11 @@ def _return_cached_or_none(
 
 
 def _pre_fetch_cached_or_none(
+    url: str,
     now_time: datetime,
     cached: Optional[dict],
 ) -> tuple[bool, Optional[dict]]:
-    """Rate-limit / 15-min cooldown. Returns (should_return, value)."""
+    """Rate-limit (per IP) / 15-min cooldown (per URL). Returns (should_return, value)."""
     global _RATE_LIMIT_RETRY_AT
 
     now_cmp = _as_naive_local(now_time)
@@ -112,9 +114,8 @@ def _pre_fetch_cached_or_none(
     if retry_at and now_cmp >= retry_at:
         _RATE_LIMIT_RETRY_AT = None
 
-    if _LAST_API_CALL and (now_cmp - _as_naive_local(_LAST_API_CALL)) < timedelta(
-        minutes=15
-    ):
+    last_call = _LAST_API_CALL_BY_URL.get(url)
+    if last_call and (now_cmp - _as_naive_local(last_call)) < timedelta(minutes=15):
         if cached is not None:
             _set_fetch_source("cache")
             print(
@@ -132,7 +133,7 @@ def _store_hourly_watts_from_response(
     now_time: datetime,
 ) -> Optional[dict]:
     """Parse API response, update URL cache on success, else fall back to cache."""
-    global _LAST_API_CALL, _RATE_LIMIT_RETRY_AT
+    global _RATE_LIMIT_RETRY_AT
 
     feed_key = f"ext:pv_forecast:{_shadow_url_hash(url)}"
     if response.status_code == 429:
@@ -176,7 +177,7 @@ def _store_hourly_watts_from_response(
         print("[FEHLER] forecast.solar: leeres watts-Ergebnis.")
         return _return_cached_or_none(cached, reason="leeres watts")
     _CACHED_HOURLY_WATTS_BY_URL[url] = hourly_watts
-    _LAST_API_CALL = now_time
+    _LAST_API_CALL_BY_URL[url] = now_time
     _RATE_LIMIT_RETRY_AT = None
     _set_fetch_source("api")
     return hourly_watts
@@ -221,7 +222,7 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
         return None
 
     def _live() -> Optional[dict]:
-        should_return, early = _pre_fetch_cached_or_none(now_time, cached)
+        should_return, early = _pre_fetch_cached_or_none(url, now_time, cached)
         if should_return:
             return early
         record_cycle_event(EVENT_PV_FORECAST_FETCH)
