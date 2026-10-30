@@ -1,4 +1,4 @@
-# Open Bugs
+﻿# Open Bugs
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md) (sections `### Bugfix …` / `### Document Review …` / regressions)
 
@@ -31,7 +31,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] **Synthetic PV fallback ignores orientation and is silent in Shadow mode (found 2026-10-30):** when no forecast.solar data is available (Shadow with a stale feed record, or no cache after restart), `_generate_seasonal_fallback` plans a parabola with 40 % of kWp in October, independent of azimuth/tilt and weather (a north roof got 2.72 kW peak, the same curve on both days). Only a WARNING line in the log shows it. Decide: louder signal (UI/health), a better substitute (e.g. Open-Meteo irradiance with orientation), or no plan with that system (`no-implicit-fallbacks.mdc`).
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
