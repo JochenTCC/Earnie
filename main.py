@@ -296,11 +296,16 @@ def _main_cycle(
             logger.error("Optimierung abgebrochen: Keine Day-Ahead-Preise empfangen.")
             return False
 
-        optimization_matrix = profile_manager.build_live_planning_matrix(
-            market_data, planning_window
-        )
+        try:
+            optimization_matrix = profile_manager.build_live_planning_matrix(
+                market_data, planning_window
+            )
+        except pv_forecast.PvForecastUnavailableError as exc:
+            logger.error("Optimierung abgebrochen: %s", exc)
+            return False
         cycle_duration_stats.set_horizon_slots(len(optimization_matrix))
         pv_api_status = pv_forecast.get_api_status()
+        pv_forecast_sources = pv_api_status["source_by_system"]
         if pv_api_status["retry_at"]:
             logger.warning(
                 "forecast.solar Rate-Limit (HTTP 429): Nächster API-Aufruf erlaubt ab %s "
@@ -309,9 +314,12 @@ def _main_cycle(
                 pv_api_status["source"],
                 "ja" if pv_api_status["cache_available"] else "nein",
             )
-        elif pv_api_status["using_synthetic_fallback"]:
+        if pv_api_status["open_meteo_systems"]:
             logger.warning(
-                "forecast.solar: Synthetischer PV-Fallback aktiv (keine API-Daten)."
+                "PV-Prognose aus Open-Meteo statt forecast.solar für: %s "
+                "(keine forecast.solar-Daten, PV-Quelle: %s).",
+                ", ".join(pv_api_status["open_meteo_systems"]),
+                pv_api_status["source"],
             )
         from data.planning_window import sunrise_anchor_slot_index
 
@@ -919,6 +927,7 @@ def _main_cycle(
                     4,
                 ),
                 "forecast_pv_kw": round(pv_forecast_kw_for_log, 3),
+                "pv_forecast_sources": pv_forecast_sources,
                 "forecast_consumption_kw": round(
                     float(optimization_matrix[0]["expected_p_act"]), 3
                 ),

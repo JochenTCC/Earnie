@@ -110,6 +110,20 @@ def _render_main_down_notice(snapshot: dict | None, *, persisted_fresh: bool) ->
         )
 
 
+def _render_pv_source_notice(main_state: dict | None) -> None:
+    """Warn when the last main.py cycle planned a PV system without forecast.solar."""
+    sources = (main_state or {}).get("pv_forecast_sources") or {}
+    substituted = sorted(sid for sid, src in sources.items() if src == "open_meteo")
+    if not substituted:
+        return
+    st.warning(
+        "PV-Prognose ohne forecast.solar: Für **"
+        + ", ".join(substituted)
+        + "** hat main.py mit der Open-Meteo-Einstrahlung geplant "
+        "(forecast.solar lieferte keine Daten)."
+    )
+
+
 def _render_opt_in_simulation_prompt() -> None:
     st.caption(
         "Ohne aktuellen main.py-Lauf kann eine **einmalige** UI-Simulation "
@@ -306,6 +320,7 @@ def _live_optimization_prepare_fragment(current_soc: float) -> None:
     reload_runtime_config()
     current_slot = optimization_schedule.quarter_hour_slot_key()
     main_state = run_state.load_run_state()
+    _render_pv_source_notice(main_state)
     snapshot = load_live_display_snapshot()
     persisted_at = snapshot_completed_at(snapshot)
     poll_sec = main_sync_poll_interval_sec()
