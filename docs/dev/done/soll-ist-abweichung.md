@@ -119,8 +119,8 @@ Siehe `config/deviation_rules.schema.json` und `config/deviation_rules.example.j
     "soc_percent": 0.1
   },
   "categories": {
-    "hint":    { "label": "Hinweis",  "symbol": "triangle-up", "color": "#f1c40f" },
-    "warning": { "label": "Warnung",  "symbol": "diamond",     "color": "#e67e22" },
+    "hint":    { "label": "Hinweis",  "symbol": "triangle-up", "color": "#27ae60" },
+    "warning": { "label": "Warnung",  "symbol": "diamond",     "color": "#f1c40f" },
     "error":   { "label": "Fehler",   "symbol": "octagon",     "color": "#c0392b" }
   },
   "rules": [
@@ -161,7 +161,8 @@ Siehe `config/deviation_rules.schema.json` und `config/deviation_rules.example.j
 | `heating_was_scheduled` | Thermik-Schedule sieht Heizen für Slot vor |
 | `mode_is_forced_charge` | `mode == 1` (Zwangs-Laden) |
 | `mode_is_forced_discharge` | `mode == 3` |
-| `battery_power_below_tolerance` | Zwangs-Modus: Soll > Toleranz, Ist-Lade-/Entladeleistung ≤ Toleranz (nicht ausgeführt; kein reines Unterschreiten des Sollwerts) |
+| `battery_power_below_tolerance` | Zwangs-Modus: Soll > Toleranz, Ist-Lade-/Entladeleistung ≤ Toleranz, und beim Zwangs-Laden keine Bewegung in Richtung Laden über die Toleranz (nicht ausgeführt; kein reines Unterschreiten des Sollwerts) |
+| `battery_charge_target_missed` | Zwangs-Laden: Slot-Mittel hat sich gegenüber dem Entscheidungszeitpunkt in Richtung Laden bewegt, die Ladeenergie liegt aber unter Soll − Toleranz (gelbe Warnung) |
 | `pv_follow_scheduled` | `consumer_pv_follow.{scope} == 1` und Loxone-Setpoint > Toleranz |
 | `pv_follow_power_below_tolerance` | pv_follow aktiv, Setpoint − Ist > Toleranz |
 | `slot_quality_present` | Slot hat echten Log-Eintrag |
@@ -179,7 +180,8 @@ Abgedeckt durch `tests/test_deviation_eval.py`, `tests/test_deviation_scenario_c
 |----|-----------|------------|-----------|
 | S1 | SwimSpa Soll > 0, Ist ≈ 0, Temp im Band | `swimspa_thermal_band_ok` | Warnung |
 | S2 | E-Auto Soll > 0, angesteckt, Rest > Schwelle, Ist ≈ 0 | `eauto_should_charge` | Fehler |
-| S3 | Modus Zwangs-Laden, Batterie lädt nicht | `battery_forced_charge_missing` | Fehler |
+| S3 | Modus Zwangs-Laden, Batterie lädt nicht und bewegt sich nicht | `battery_forced_charge_missing` | Fehler |
+| S3b | Modus Zwangs-Laden, Leistung bewegt sich Richtung Laden, Zielenergie des Slots fehlt | `battery_forced_charge_target_missed` | Warnung |
 | S4 | Soll ≈ Ist (innerhalb Toleranz) | — | kein Icon |
 | S5 | Wärmepumpe Soll > 0, Ist ≈ 0 | `waermepumpe_enable_no_start` | Hinweis |
 | S6 | Modus Zwangs-Entladen, Batterie entlädt nicht | `battery_forced_discharge_missing` | Fehler |

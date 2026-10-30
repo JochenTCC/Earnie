@@ -1,4 +1,4 @@
-﻿# Open Bugs
+# Open Bugs
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md) (sections `### Bugfix …` / `### Document Review …` / regressions)
 
@@ -23,6 +23,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **Dump `debug_dump_20261030_055437` — „Zwangs-Laden nicht ausgeführt“ at 30.10. 01:15 and 02:15 (2.7.0-beta.1, Loxone):** rule `battery_forced_charge_missing` (tolerance 0.1 kW). Both slots are Zwangsladen 0.213 kW (SoC 12 % → target SoC 12.3 %). Earnie wrote `set_ess_mode=1`, `set_ess_active_power=-0.213`, discharge limit 0, and the writes succeeded. Slot-mean Ist was discharge (+0.266 / +0.240 kW, Loxone sign), so the marker matches the quarter-hour mean. At the decision instant the battery was still discharging ~2 kW (previous slot Automatik); by the next cycle the snapshot had flipped to about −0.21 kW charge, after the 15-min mean was already closed. The same 0.213 kW command at 02:30, issued while already charging, held (mean −0.21 kW). Larger commands in between (1.489 kW, 3.766 kW) did charge inside the slot. Same class as the closed #50 / #57 case for a mean that never moves. Chosen follow-up, implemented: yellow Warnung `battery_forced_charge_target_missed` when the slot mean moves toward charge by more than `tolerances.power_kw` but delivered charge stays below Soll; the red error stays when the mean does not move. Existing packs pick the rule up via migration step `dm4.forced_charge_hint`. Live check still open.
 
 - [ ] **Regression: possible private case from the issue #50 reporter:** the reporter's configuration (HA backend, fixed import tariff + spot-indexed export, Netznutzung) is a typical constellation that the public cases did not cover. Ask for an anonymised config/debug dump (question list in the private business backlog); if it arrives, intake it as a private L1 case (`python -m scripts.run_regression --intake DUMP.zip --id REG-50-<slug> --private`, repo `Earnie-regression-private`). Meanwhile public L2 case `REG-S-gross-tariff-netznutzung` pins the VAT-on-Netznutzung rule (k_act 18 ct = 12 + 5 × 1.2).
 
@@ -32,8 +33,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
 - [ ] Set default "Temperaturabsenkung" in annual-rc to 2.5°C
+  - [ ] Review all default values for HK
 - [ ] Review and modify text in SE review pop-up dialogue
+- [ ] Add a sand-watch or similar after "ZIP erstellen" or "ZIP erstellen und herunterladen" was pressed in Debug-Dump pop up, so user can see that the program is not frozen
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
-
