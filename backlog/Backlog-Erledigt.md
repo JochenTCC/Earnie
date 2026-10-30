@@ -3,6 +3,10 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Regression: issue #50 private case closed (2026-10-30)
+
+- [x] **Regression: possible private case from the issue #50 reporter:** the reporter's configuration (HA backend, fixed import tariff + spot-indexed export, Netznutzung) is a typical constellation that the public cases did not cover. Ask for an anonymised config/debug dump (question list in the private business backlog); if it arrives, intake it as a private L1 case (`python -m scripts.run_regression --intake DUMP.zip --id REG-50-<slug> --private`, repo `Earnie-regression-private`). Meanwhile public L2 case `REG-S-gross-tariff-netznutzung` pins the VAT-on-Netznutzung rule (k_act 18 ct = 12 + 5 × 1.2). Closed 2026-10-30 without a private case: issue #50 is closed, no dump requested; the public L2 case stays.
+
 ### Bugfix forecast.solar per PV system (2026-10-30)
 
 - [x] **Bugfix — forecast.solar refreshes only one PV system per cycle (found 2026-10-30):** `data/pv_forecast.py` kept one global 15-min cooldown stamp (`_LAST_API_CALL`) for all forecast.solar URLs. After the first system was fetched, every other system in the same cycle returned its old cache. On the NAS (2.7.0-beta.1, two roofs) the second roof was last refreshed the evening before, so its cached forecast ended with today and the next day planned 0 kW for it (36 vs. 72 kWh PV in the horizon). Fix: cooldown per URL (`_LAST_API_CALL_BY_URL`); the 429 retry-at block stays global (the limit is per IP). Test: `tests/test_pv_forecast.py::test_cooldown_is_per_system_so_every_system_refreshes`. Verified on the NAS (2026-10-30): both `ext:pv_forecast:*` keys in the shadow feed get a fresh 200 record every 15–30 min, and the second roof shows values for the next day.
