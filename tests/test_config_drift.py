@@ -72,6 +72,29 @@ def test_find_config_drift_ignores_legacy_blocks_when_example_stale_2_0_actual()
     assert items == []
 
 
+def test_load_config_drift_items_ignores_stale_pack_example(tmp_path, monkeypatch):
+    """A stale config.example.json next to config.json must not drive the drift check."""
+    import json
+
+    from runtime_store import config_drift
+    from runtime_store.persist_paths import bundled_config_example_file
+    from settings.json_io import read_json_dict
+
+    bundled = read_json_dict(bundled_config_example_file())
+    assert "flexible_consumers" not in bundled
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "config.json").write_text(json.dumps(bundled), encoding="utf-8")
+    (config_dir / "config.example.json").write_text(
+        json.dumps({**bundled, "flexible_consumers": []}), encoding="utf-8"
+    )
+    monkeypatch.delenv("EARNIE_CONFIG_PATH", raising=False)
+    monkeypatch.setenv("EARNIE_ENV_PATH", str(tmp_path))
+
+    assert config_drift.resolve_config_json_path() == str(config_dir / "config.json")
+    assert config_drift.load_config_drift_items() == []
+
+
 def test_repo_example_matches_earnie_env_config_shape():
     """Regression: live earnie_env config must not drift against config.example.json."""
     from pathlib import Path
