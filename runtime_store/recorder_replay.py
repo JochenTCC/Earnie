@@ -410,26 +410,32 @@ def _apply_recorded_standby_relief(ctx: _PreparedReplay) -> None:
     ctx.prepared = apply_standby_load_relief(ctx.prepared, plans)
 
 
-def _recorded_sunrise_soc_min_index(entry: dict[str, Any]) -> int:
-    """Index of the live PV-only charge limit in the recorded planning window."""
+def _recorded_sunrise_soc_min_index(entry: dict[str, Any]) -> int | None:
+    """Index of the live PV-only charge limit, or None when the cycle had none.
+
+    Seed / historical fixtures omit ``sunrise_anchor``; those replays keep the
+    previous unconstrained charge path. A live window that records the anchor
+    without ``slot_datetimes`` fails loud.
+    """
     window = entry.get("planning_window")
     if not isinstance(window, dict):
         raise ValueError("entry missing planning_window")
     anchor_raw = window.get("sunrise_anchor")
+    if not anchor_raw:
+        return None
     slots = window.get("slot_datetimes")
-    if not anchor_raw or not isinstance(slots, list) or not slots:
+    if not isinstance(slots, list) or not slots:
         raise ValueError(
-            "planning_window missing sunrise_anchor or slot_datetimes; "
+            "planning_window has sunrise_anchor but no slot_datetimes; "
             "replay cannot apply the live PV-only charge limit"
         )
     anchor = _normalize_slot(anchor_raw)
     try:
-        index = [_normalize_slot(raw) for raw in slots].index(anchor)
+        return [_normalize_slot(raw) for raw in slots].index(anchor)
     except ValueError as exc:
         raise ValueError(
             f"sunrise anchor {anchor.isoformat()} is not in the recorded planning window"
         ) from exc
-    return index
 
 
 def _normalize_slot(raw: Any) -> datetime:
@@ -443,7 +449,7 @@ def _run_milp_replay(
     ctx: _PreparedReplay,
     *,
     verbose: bool,
-    sunrise_soc_min_index: int,
+    sunrise_soc_min_index: int | None,
 ) -> ReplayResult:
     from optimizer.milp import (
         _extract_optimizer_controls_from_model,
@@ -533,7 +539,7 @@ def _replay_from_optimizer_fallback(
     primary: dict,
     *,
     verbose: bool,
-    sunrise_soc_min_index: int,
+    sunrise_soc_min_index: int | None,
 ) -> ReplayResult:
     from optimizer import battery_plan_kw_from_control, milp_optimizer
     from runtime_store.cycle_recorder import compute_plan_hash
