@@ -3,6 +3,10 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix forecast.solar per PV system (2026-10-30)
+
+- [x] **Bugfix — forecast.solar refreshes only one PV system per cycle (found 2026-10-30):** `data/pv_forecast.py` kept one global 15-min cooldown stamp (`_LAST_API_CALL`) for all forecast.solar URLs. After the first system was fetched, every other system in the same cycle returned its old cache. On the NAS (2.7.0-beta.1, two roofs) the second roof was last refreshed the evening before, so its cached forecast ended with today and the next day planned 0 kW for it (36 vs. 72 kWh PV in the horizon). Fix: cooldown per URL (`_LAST_API_CALL_BY_URL`); the 429 retry-at block stays global (the limit is per IP). Test: `tests/test_pv_forecast.py::test_cooldown_is_per_system_so_every_system_refreshes`. Verified on the NAS (2026-10-30): both `ext:pv_forecast:*` keys in the shadow feed get a fresh 200 record every 15–30 min, and the second roof shows values for the next day.
+
 ### HA-Loxone-Bridge-Builder — POC EcoFlow Delta 3 (2026-10-29)
 
 - [x] **HA-Loxone-Bridge-Builder — POC with the EcoFlow Delta 3** `[dev]`: bridge in both directions, Loxone → HA via webhook (no PyLoxone). Generator `tools/ha_loxone_bridge/` (fixed JSON mapping, no scan / matching yet); tests `tests/test_ha_loxone_bridge.py`; doc `docs/dev/done/ha-loxone-bridge.md`. Live acceptance passed (maintainer, 2026-10-29). Open in the research item *HA-Loxone-Bridge-Builder* in [Backlog.md](Backlog.md): scan / matching; second device (Roborock) in Version 2.+1.
