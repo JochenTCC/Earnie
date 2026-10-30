@@ -210,6 +210,7 @@ def _solve_prepared_entry(
 
     from data.outdoor_forecast import replay_outdoor_forecast
     from runtime_store.planning_clock import planning_freeze
+    from runtime_store.push_read_replay import replay_push_reads
 
     start_state = entry.get("start_state") or {}
     # Only enter fail-loud serve mode when the key was recorded. Older cycles
@@ -225,6 +226,9 @@ def _solve_prepared_entry(
         stack.enter_context(planning_freeze(moment))
         if has_outdoor_forecast:
             stack.enter_context(replay_outdoor_forecast(recorded_forecast))
+        # Cycles recorded before push_reads existed read the local inbox as before.
+        if "push_reads" in start_state:
+            stack.enter_context(replay_push_reads(start_state["push_reads"]))
         stack.enter_context(_recorded_ev_limit_soc(entry, config))
         stack.enter_context(_recorded_thermal_readings(entry))
         prepared_ctx = _prepare_replay_inputs(entry, config)
@@ -369,7 +373,10 @@ def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _Prepar
         filter_contexts=filter_contexts,
         remaining=remaining,
         consumers=consumers,
-        battery_params=_battery_params_from_config(config_module),
+        battery_params=_battery_params_with_recorded_reserves(
+            _battery_params_from_config(config_module),
+            start_state,
+        ),
         soc=float(soc),
         soc_by_id=soc_by_id,
         current_hour=int(
@@ -601,6 +608,24 @@ def _battery_params_from_config(config_module: Any) -> dict | list[dict]:
         if batteries:
             return batteries
     return config_module.get_battery_params()
+
+
+def _battery_params_with_recorded_reserves(
+    battery_params: dict | list[dict],
+    start_state: dict[str, Any],
+) -> dict | list[dict]:
+    """Apply the reserves the live cycle planned with (virtual refill carve-out).
+
+    Cycles recorded before ``active_reserves`` existed keep plain config params.
+    """
+    if "active_reserves" not in start_state:
+        return battery_params
+    reserves = start_state["active_reserves"]
+    if not isinstance(reserves, list):
+        raise TypeError("start_state.active_reserves must be a list when present")
+    from optimizer.powerstation_live import apply_reserves_to_battery_params
+
+    return apply_reserves_to_battery_params(battery_params, reserves)
 
 
 def _inverter_params_from_config(config_module: Any) -> list[dict] | None:

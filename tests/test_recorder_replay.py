@@ -317,3 +317,36 @@ def test_restored_matrix_keeps_recorded_utc_offset():
     assert rows[0]["slot_datetime"].utcoffset() == timedelta(hours=1)
     assert rows[0]["hour"] == 0
     assert rows[1]["slot_datetime"].tzinfo is None
+
+
+def test_recorded_reserves_shape_battery_params(monkeypatch):
+    from optimizer import powerstation_live
+    from runtime_store import recorder_replay as rr
+
+    seen = {}
+
+    def _apply(params, reserves=None):
+        seen["reserves"] = reserves
+        return {**params, "_virtual_reserve_asap_kwh": 0.38}
+
+    monkeypatch.setattr(powerstation_live, "apply_reserves_to_battery_params", _apply)
+    reserves = [{"powerstation_id": "virtual_gs", "asap_charge_kwh": 0.38}]
+    out = rr._battery_params_with_recorded_reserves(
+        {"capacity_kwh": 15.0}, {"active_reserves": reserves}
+    )
+    assert seen["reserves"] == reserves
+    assert out["_virtual_reserve_asap_kwh"] == 0.38
+
+
+def test_cycles_without_recorded_reserves_keep_config_params():
+    from runtime_store import recorder_replay as rr
+
+    params = {"capacity_kwh": 15.0}
+    assert rr._battery_params_with_recorded_reserves(params, {}) is params
+
+
+def test_recorded_reserves_must_be_a_list():
+    from runtime_store import recorder_replay as rr
+
+    with pytest.raises(TypeError, match="active_reserves"):
+        rr._battery_params_with_recorded_reserves({}, {"active_reserves": {}})

@@ -585,6 +585,7 @@ def _main_cycle(
         sync_triggers_from_telemetry(telemetry_for_export, active_reserves)
         # Re-load after trigger updates so MILP sees discharging state.
         active_reserves = load_active_reserves()
+        cycle_recorder.record_active_reserves(recorder_token, active_reserves)
         battery_params = apply_reserves_to_battery_params(
             battery_params, active_reserves
         )

@@ -343,3 +343,30 @@ def test_capture_point_record_replay_prepare_equal(tmp_path, monkeypatch):
         assert left["expected_p_act"] == pytest.approx(float(right["expected_p_act"]))
         assert left["k_act"] == pytest.approx(float(right["k_act"]))
     assert recorded["outputs"]["plan_hash"] == plan_live
+
+
+def test_finish_stores_push_reads_and_active_reserves(tmp_path, monkeypatch):
+    from runtime_store import ehal_push_inbox as inbox
+
+    _cfg(tmp_path, monkeypatch)
+    inbox.reset_memory_for_tests()
+    token = cycle_recorder.begin_cycle(
+        optimization_matrix=_sample_matrix(),
+        planning_window=_sample_window(),
+        soc_percent=50.0,
+        timestamp=datetime(2026, 10, 30, 12, 55, 9),
+    )
+    inbox.read_push_value("evcs.e_auto.sens_evcs_connected")
+    reserves = [{"powerstation_id": "virtual_gs", "state": "charging", "refill_kwh": 0.38}]
+    cycle_recorder.record_active_reserves(token, reserves)
+    cycle_recorder.finish_cycle(token, mode=1, target_power_kw=4.979, battery_plan_kw=4.979)
+    entry = cycle_recorder.read_segment_cycles(
+        cycle_recorder.segment_path_for_day(datetime(2026, 10, 30).date())
+    )[0]
+    push_reads = entry["start_state"]["push_reads"]
+    assert "evcs.e_auto.sens_evcs_connected" in push_reads["value"]
+    assert entry["start_state"]["active_reserves"] == reserves
+
+
+def test_record_active_reserves_ignores_missing_token():
+    cycle_recorder.record_active_reserves(None, [{"powerstation_id": "x"}])

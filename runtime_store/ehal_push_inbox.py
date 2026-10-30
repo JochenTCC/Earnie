@@ -28,6 +28,13 @@ from ehal.qualified_ids import (
     is_digital_id,
 )
 from runtime_store.persist_paths import runtime_path
+from runtime_store.push_read_replay import (
+    KIND_COUNTER,
+    KIND_READY_BY_TIME,
+    KIND_VALUE,
+    note_push_read,
+    served_push_read,
+)
 from runtime_store.loxone_push_parse import (  # noqa: F401  (re-exported)
     HEARTBEAT_ID,
     REQUEST_OPTIMIZE_ID,
@@ -593,6 +600,9 @@ def read_push_value(
     eid = str(ehal_id or "").strip()
     if not eid or not is_valid_ehal_id(eid):
         return None, STATE_READ_ERROR
+    replayed, served = served_push_read(KIND_VALUE, eid)
+    if replayed:
+        return served[0], served[1]
     ref = now if now is not None else datetime.now(timezone.utc)
     feed_overlay = _shadow_feed_overlay_if_active(eid)
     with _lock:
@@ -618,6 +628,7 @@ def read_push_value(
             STATE_DIGITAL_HELD,
         ):
             _last_known[eid] = (float(value), ref)
+    note_push_read(KIND_VALUE, eid, [value, state])
     return value, state
 
 
@@ -635,6 +646,20 @@ def read_push_counter(
     eid = str(ehal_id or "").strip()
     if not eid or not is_valid_ehal_id(eid):
         return None
+    replayed, served = served_push_read(KIND_COUNTER, eid)
+    if replayed:
+        return served
+    value = _read_push_counter_live(eid, now=now, repeat_s=repeat_s)
+    note_push_read(KIND_COUNTER, eid, value)
+    return value
+
+
+def _read_push_counter_live(
+    eid: str,
+    *,
+    now: datetime | None,
+    repeat_s: float | None,
+) -> float | None:
     ref = now if now is not None else datetime.now(timezone.utc)
     feed_overlay = _shadow_feed_overlay_if_active(eid)
     with _lock:
@@ -666,6 +691,23 @@ def read_push_ready_by_time(
     eid = str(ehal_id or "").strip()
     if not eid or not is_valid_ehal_id(eid):
         return None
+    replayed, served = served_push_read(KIND_READY_BY_TIME, eid)
+    if replayed:
+        return served
+    value = _read_push_ready_by_time_live(
+        eid, now=now, repeat_s=repeat_s, last_known_max_s=last_known_max_s
+    )
+    note_push_read(KIND_READY_BY_TIME, eid, value)
+    return value
+
+
+def _read_push_ready_by_time_live(
+    eid: str,
+    *,
+    now: datetime | None,
+    repeat_s: float | None,
+    last_known_max_s: float,
+) -> str | float | None:
     ref = now if now is not None else datetime.now(timezone.utc)
     feed_overlay = _shadow_feed_overlay_if_active(eid)
     with _lock:
