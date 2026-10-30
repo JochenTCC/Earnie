@@ -48,7 +48,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
 | `./earnie_env/config/components.json`            | Gerätekomponenten (`batteries[]`, `pv_systems`, `inverters[]` inkl. `ehal_bindings`)                                    |
 | `./earnie_env/config/deviation_rules.json`       | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an)                                                                    |
-| `./earnie_env/config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
+| `./earnie_env/config/config.example.json`        | Nur zum Nachschlagen; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`). Nach Updates wird sie nicht aufgefrischt |
 | `./earnie_env/runtime/`                          | `cons_data.csv`, Zustands-JSONs, Profile, Logs                                                                   |
 | `./earnie_env/runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
 | `./earnie_env/config/.env`                       | Loxone-Zugangsdaten (`LOXONE_*`); optional `EARNIE_LAN_SUBNET` |
@@ -97,6 +97,8 @@ Neue Einträge in `share/config/config.example.json` (Image-Vorlage) übernimmt 
 - **In der Streamlit-App:** gelbes Banner mit den fehlenden Pfaden und Beispielwerten.
 
 Die fehlenden Keys manuell in `earnie_env/config/config.json` ergänzen.
+
+Earnie vergleicht immer mit der Vorlage im Image, nicht mit der Kopie `earnie_env/config/config.example.json`. Diese Kopie kann nach einem Update veraltet sein, etwa wenn eine Migration einen Key entfernt hat. Sie löst dann keinen Hinweis aus.
 
 > **Ausnahme `scenario_explorer_conf`:** Fehlende Keys unter `scenario_explorer_conf` ergänzt die Config-Migration (Migrations-Assistent oder `python -m scripts.migrate_config`) mit den Standardwerten aus `config.example.json`. Bereits vorhandene Keys bleiben unverändert. Alle anderen fehlenden Keys bleiben wie oben beschrieben Handarbeit.
 

@@ -214,20 +214,6 @@ def resolve_config_minimal_template_path() -> str:
     return preferred
 
 
-def config_example_file() -> str:
-    """Pfad zur Config-Vorlage im Persistenz-Ordner (für Drift-Vergleich)."""
-    preferred = _preferred_or_legacy_file("config.example.json")
-    legacy = "config.example.json"
-    if os.path.isfile(preferred):
-        return preferred
-    if os.path.isfile(legacy):
-        return legacy
-    bundled = bundled_config_example_file()
-    if os.path.isfile(bundled):
-        return bundled
-    return preferred
-
-
 def config_schema_file() -> str:
     """Pfad zum JSON-Schema im Persistenz-Ordner."""
     preferred = _preferred_or_legacy_file("config.schema.json")

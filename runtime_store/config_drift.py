@@ -1,5 +1,10 @@
 """
-config_drift.py – Vergleich der Anwender-config.json mit config/config.example.json (nur Hinweise, kein Auto-Merge).
+config_drift.py – Vergleich der Anwender-config.json mit der Image-Vorlage share/config/config.example.json
+(nur Hinweise, kein Auto-Merge).
+
+Die Kopie von config.example.json im Config-Ordner wird nicht verglichen: Der Bootstrap legt sie nur an,
+wenn sie fehlt, und frischt sie nach Updates nicht auf. Nach einer Migration, die einen Key entfernt,
+würde sie diesen Key sonst weiter als fehlend melden.
 """
 from __future__ import annotations
 
@@ -9,7 +14,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from .persist_paths import config_example_file, resolve_config_json_path
+from .persist_paths import bundled_config_example_file, resolve_config_json_path
 
 _SKIP_KEYS = frozenset({"$schema"})
 
@@ -115,7 +120,7 @@ def load_config_drift_items(
     template_path: str | None = None,
     config_path: str | None = None,
 ) -> list[ConfigDriftItem]:
-    template = template_path or config_example_file()
+    template = template_path or bundled_config_example_file()
     config_file = config_path or resolve_config_json_path()
     if not os.path.isfile(template):
         raise FileNotFoundError(
@@ -154,7 +159,7 @@ def log_config_drift(
     logger.warning(
         "config: %s neue Einträge in %s – bitte manuell in %s ergänzen:",
         len(items),
-        template_path or config_example_file(),
+        template_path or bundled_config_example_file(),
         config_path or resolve_config_json_path(),
     )
     for item in items:
@@ -168,7 +173,7 @@ def log_config_drift(
 
 def format_drift_message(items: list[ConfigDriftItem]) -> str:
     lines = [
-        f"**{len(items)} neue Config-Einträge** in `config/config.example.json` – bitte manuell in "
+        f"**{len(items)} neue Config-Einträge** in `{bundled_config_example_file()}` – bitte manuell in "
         f"`{resolve_config_json_path()}` ergänzen (kein automatisches Überschreiben):"
     ]
     for item in items:
