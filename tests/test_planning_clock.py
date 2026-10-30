@@ -5,7 +5,12 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from optimizer import schedule
-from runtime_store.planning_clock import anchored_tick, planning_anchor, planning_now
+from runtime_store.planning_clock import (
+    anchored_tick,
+    planning_anchor,
+    planning_freeze,
+    planning_now,
+)
 
 
 def _next_tick() -> datetime:
@@ -35,6 +40,14 @@ def test_anchor_respects_requested_timezone():
         aware = planning_now(tz)
     assert aware.tzinfo is not None
     assert aware == tick.astimezone(tz)
+
+
+def test_freeze_returns_a_past_instant():
+    moment = datetime(2026, 10, 28, 9, 44, 52)
+    with planning_freeze(moment):
+        assert planning_now() == moment
+        assert planning_now().date().isoformat() == "2026-10-28"
+    assert planning_now() > moment
 
 
 def test_anchor_in_past_returns_real_time():

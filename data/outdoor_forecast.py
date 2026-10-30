@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone as _timezone
-from typing import Optional
+from typing import Iterator, Optional
 from zoneinfo import ZoneInfo
 
 import requests
@@ -28,6 +30,12 @@ _TILTED_CACHE: dict[
     tuple[float, float, int, int, int], tuple[datetime, list[tuple[datetime, float]]]
 ] = {}
 _CACHE_TTL = timedelta(minutes=30)
+# Longest series fetched while a cycle is open (recorder). None outside a cycle.
+_capture: ContextVar[dict | None] = ContextVar("earnie_outdoor_forecast_capture", default=None)
+# Recorded series while replaying. ``_REPLAY_MISSING`` forbids a live fetch.
+_serve: ContextVar[dict | None] = ContextVar("earnie_outdoor_forecast_serve", default=None)
+_REPLAY_MISSING: dict = {"missing": True}
+_capture_token = None
 _OPEN_METEO_MAX_FORECAST_DAYS = 16
 _OPEN_METEO_MIN_FORECAST_DAYS = 2
 
@@ -322,6 +330,82 @@ def get_hourly_tilted_irradiance_forecast_wm2(
     return _map_to_horizon(hourly, start_dt, horizon)
 
 
+def open_forecast_capture() -> dict:
+    """Start storing the longest outdoor series fetched until :func:`close_forecast_capture`."""
+    global _capture_token
+    bucket: dict = {}
+    _capture_token = _capture.set(bucket)
+    return bucket
+
+
+def close_forecast_capture() -> dict | None:
+    """Stop capture and return the bucket, or None when capture was not open."""
+    global _capture_token
+    if _capture_token is None:
+        return None
+    bucket = _capture.get()
+    _capture.reset(_capture_token)
+    _capture_token = None
+    return bucket
+
+
+@contextmanager
+def replay_outdoor_forecast(recorded: dict | None) -> Iterator[None]:
+    """Serve ``recorded`` during replay. ``None`` fails on the next forecast read."""
+    token = _serve.set(recorded if recorded else _REPLAY_MISSING)
+    try:
+        yield
+    finally:
+        _serve.reset(token)
+
+
+def _note_captured_forecast(series: list[float], source: str) -> None:
+    bucket = _capture.get()
+    if bucket is None:
+        return
+    previous = bucket.get("values_c")
+    if isinstance(previous, list) and len(previous) > len(series):
+        return
+    bucket["values_c"] = [float(value) for value in series]
+    bucket["source"] = source
+
+
+def _fetch_outdoor_forecast_or_fallback(
+    *,
+    horizon: int,
+    fallback_ambient_c: float,
+    start: datetime | None,
+) -> tuple[list[float], str]:
+    try:
+        return get_hourly_outdoor_forecast_c(horizon=horizon, start=start), "open_meteo"
+    except Exception as exc:
+        logger.warning(
+            "Außentemperatur-Prognose fehlgeschlagen (%s) – konstante Fallback-Temperatur %.2f °C",
+            exc,
+            fallback_ambient_c,
+        )
+        return [round(float(fallback_ambient_c), 3)] * horizon, "fallback_constant"
+
+
+def _series_from_recording(recorded: dict, horizon: int) -> tuple[list[float], str]:
+    if recorded.get("missing"):
+        raise ValueError(
+            "entry has no recorded start_state.outdoor_forecast; cycle was "
+            "recorded by an older version and cannot be replayed offline"
+        )
+    values = recorded.get("values_c")
+    source = recorded.get("source")
+    if not isinstance(values, list) or not values or not isinstance(source, str):
+        raise ValueError(
+            "start_state.outdoor_forecast must be {values_c: [float, ...], source: str}"
+        )
+    if horizon > len(values):
+        raise ValueError(
+            f"recorded outdoor forecast has {len(values)} hours, replay asked for {horizon}"
+        )
+    return [float(value) for value in values[:horizon]], source
+
+
 def get_outdoor_forecast_with_fallback(
     *,
     horizon: int = 24,
@@ -333,12 +417,14 @@ def get_outdoor_forecast_with_fallback(
         raise ValueError(
             "fallback_ambient_c fehlt – für Open-Meteo-Fallback eine gemessene Außentemperatur angeben."
         )
-    try:
-        return get_hourly_outdoor_forecast_c(horizon=horizon, start=start), "open_meteo"
-    except Exception as exc:
-        logger.warning(
-            "Außentemperatur-Prognose fehlgeschlagen (%s) – konstante Fallback-Temperatur %.2f °C",
-            exc,
-            fallback_ambient_c,
+    recorded = _serve.get()
+    if recorded is not None:
+        series, source = _series_from_recording(recorded, horizon)
+    else:
+        series, source = _fetch_outdoor_forecast_or_fallback(
+            horizon=horizon,
+            fallback_ambient_c=float(fallback_ambient_c),
+            start=start,
         )
-        return [round(float(fallback_ambient_c), 3)] * horizon, "fallback_constant"
+        _note_captured_forecast(series, source)
+    return series, source

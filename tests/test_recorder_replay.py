@@ -86,12 +86,16 @@ def test_replay_strict_stable_plan_hash(tmp_path, monkeypatch):
     _cfg_with_battery(tmp_path, monkeypatch)
     # Use "today" so prune_old_segments does not delete the fresh segment.
     now = datetime.now().replace(microsecond=0)
+    matrix = _sample_matrix(8, base=now.replace(minute=0, second=0, microsecond=0))
+    slot_times = [row["slot_datetime"].isoformat() for row in matrix]
     token = cycle_recorder.begin_cycle(
-        optimization_matrix=_sample_matrix(8, base=now.replace(minute=0, second=0)),
+        optimization_matrix=matrix,
         planning_window={
             "start": now.isoformat(timespec="seconds"),
             "end": (now + timedelta(hours=24)).isoformat(timespec="seconds"),
             "horizon_hours": 24,
+            "sunrise_anchor": slot_times[-1],
+            "slot_datetimes": slot_times,
         },
         soc_percent=55.0,
         soc_percent_by_ess={"home": 55.0},
