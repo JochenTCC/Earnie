@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 
@@ -112,6 +113,9 @@ def test_replay_strict_stable_plan_hash(tmp_path, monkeypatch):
     )
     segment = cycle_recorder.segment_path_for_day(now.date())
     entry = cycle_recorder.read_segment_cycles(segment)[0]
+    # No thermal consumer reads the forecast, so the empty marker must not
+    # break the replay.
+    assert entry["start_state"]["outdoor_forecast"] is None
     recorder_root = cycle_recorder.recorder_dir()
 
     first = replay_recorded_cycle(
@@ -133,6 +137,53 @@ def test_replay_strict_stable_plan_hash(tmp_path, monkeypatch):
     assert second.cost_euro == pytest.approx(first.cost_euro, rel=1e-9)
     assert first.stage == "strict_only"
     assert first.n_slots == 8
+
+
+class _StopAfterPrepare(Exception):
+    pass
+
+
+def _replay_reading_outdoor_forecast(monkeypatch, start_state: dict):
+    """Run _solve_prepared_entry up to input prep, reading the forecast like a thermal consumer.
+
+    Returns the series read and the mock that stands in for the live fetch.
+    """
+    from data import outdoor_forecast as of
+    from runtime_store import recorder_replay
+
+    read: list[tuple[list[float], str]] = []
+
+    def _prepare(entry, cfg):
+        read.append(of.get_outdoor_forecast_with_fallback(horizon=2, fallback_ambient_c=9.0))
+        raise _StopAfterPrepare
+
+    monkeypatch.setattr(recorder_replay, "_prepare_replay_inputs", _prepare)
+    entry = {"timestamp": "2026-10-28T09:44:52", "start_state": start_state}
+    with patch.object(of, "get_hourly_outdoor_forecast_c", return_value=[3.0, 4.0]) as fetch:
+        with pytest.raises(_StopAfterPrepare):
+            recorder_replay._solve_prepared_entry(entry, solver_mode="strict", verbose=False)
+    return read, fetch
+
+
+def test_replay_fails_loud_when_recorded_forecast_is_empty(tmp_path, monkeypatch):
+    _cfg_with_battery(tmp_path, monkeypatch)
+    with pytest.raises(ValueError, match="outdoor_forecast"):
+        _replay_reading_outdoor_forecast(monkeypatch, {"outdoor_forecast": None})
+
+
+def test_replay_fetches_live_forecast_for_cycles_without_the_key(tmp_path, monkeypatch):
+    _cfg_with_battery(tmp_path, monkeypatch)
+    read, fetch = _replay_reading_outdoor_forecast(monkeypatch, {})
+    fetch.assert_called_once()
+    assert read == [([3.0, 4.0], "open_meteo")]
+
+
+def test_replay_serves_recorded_forecast(tmp_path, monkeypatch):
+    _cfg_with_battery(tmp_path, monkeypatch)
+    recorded = {"values_c": [1.5, 2.5, 3.5], "source": "open_meteo"}
+    read, fetch = _replay_reading_outdoor_forecast(monkeypatch, {"outdoor_forecast": recorded})
+    fetch.assert_not_called()
+    assert read == [([1.5, 2.5], "open_meteo")]
 
 
 def _bind_limit_soc_marker(monkeypatch, marker: str = "ev.e_auto.get_evcs_limit_soc"):
