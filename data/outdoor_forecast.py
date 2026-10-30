@@ -380,8 +380,8 @@ def _fetch_outdoor_forecast_or_fallback(
 def _series_from_recording(recorded: dict, horizon: int) -> tuple[list[float], str]:
     if recorded.get("missing"):
         raise ValueError(
-            "entry has no recorded start_state.outdoor_forecast; cycle was "
-            "recorded by an older version and cannot be replayed offline"
+            "entry recorded start_state.outdoor_forecast as empty (no forecast "
+            "was read during the live cycle); replay must not fetch one"
         )
     values = recorded.get("values_c")
     source = recorded.get("source")

@@ -248,7 +248,8 @@ def _solve_prepared_entry(
 
     start_state = entry.get("start_state") or {}
     # Only enter fail-loud serve mode when the key was recorded. Older cycles
-    # omit it and still fetch (or use ambient fallback) as before.
+    # omit it and still fetch (or use ambient fallback) as before. A recorded
+    # ``None`` means the live cycle read no forecast: any read now fails loud.
     has_outdoor_forecast = "outdoor_forecast" in start_state
     recorded_forecast = start_state.get("outdoor_forecast") if has_outdoor_forecast else None
     if recorded_forecast is not None and not isinstance(recorded_forecast, dict):

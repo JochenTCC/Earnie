@@ -97,6 +97,44 @@ def test_finish_stores_outdoor_forecast_fetched_during_the_cycle(tmp_path, monke
     }
 
 
+def test_finish_marks_outdoor_forecast_empty_when_none_was_read(tmp_path, monkeypatch):
+    _cfg(tmp_path, monkeypatch)
+    token = cycle_recorder.begin_cycle(
+        optimization_matrix=_sample_matrix(),
+        planning_window=_sample_window(),
+        soc_percent=50.0,
+        timestamp=datetime(2026, 10, 28, 9, 44, 52),
+    )
+    cycle_recorder.finish_cycle(token, mode=2, target_power_kw=0.0, battery_plan_kw=0.0)
+    entry = cycle_recorder.read_segment_cycles(
+        cycle_recorder.segment_path_for_day(datetime(2026, 10, 28).date())
+    )[0]
+    assert "outdoor_forecast" in entry["start_state"]
+    assert entry["start_state"]["outdoor_forecast"] is None
+
+
+def test_finish_stores_fallback_forecast_when_fetch_failed(tmp_path, monkeypatch):
+    from data import outdoor_forecast as of
+
+    _cfg(tmp_path, monkeypatch)
+    token = cycle_recorder.begin_cycle(
+        optimization_matrix=_sample_matrix(),
+        planning_window=_sample_window(),
+        soc_percent=50.0,
+        timestamp=datetime(2026, 10, 28, 9, 44, 52),
+    )
+    with patch.object(of, "get_hourly_outdoor_forecast_c", side_effect=RuntimeError("down")):
+        of.get_outdoor_forecast_with_fallback(horizon=2, fallback_ambient_c=7.5)
+    cycle_recorder.finish_cycle(token, mode=2, target_power_kw=0.0, battery_plan_kw=0.0)
+    entry = cycle_recorder.read_segment_cycles(
+        cycle_recorder.segment_path_for_day(datetime(2026, 10, 28).date())
+    )[0]
+    assert entry["start_state"]["outdoor_forecast"] == {
+        "values_c": [7.5, 7.5],
+        "source": "fallback_constant",
+    }
+
+
 def test_begin_finish_writes_gzip_jsonl(tmp_path, monkeypatch):
     _cfg(tmp_path, monkeypatch)
     matrix = _sample_matrix()
