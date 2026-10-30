@@ -87,6 +87,16 @@ Die Live-PV-Leistung (AC-Summe der Anlage) leitet Earnie aus den netzgekoppelten
 - **Kein flaches Anlagen-Feld mehr:** `plant.ehal_bindings.sens_pv_production_active` gibt es nicht mehr. Die Migration überträgt ein eindeutiges Mapping auf den einzigen Wechselrichter.
 - **Intervallenergie:** Die Intervallenergie für `cons_data` (`pv_kwh_interval`) integriert Earnie aus der abgeleiteten Anlagen-Leistung.
 
+### PV-Prognose im Live-Betrieb
+
+Earnie holt die PV-Prognose je PV-Feld in dieser Reihenfolge:
+
+1. **forecast.solar** mit Neigung, Ausrichtung und kWp des Felds. Earnie fragt höchstens alle 15 min neu ab und hält ein Rate-Limit (HTTP 429) ein. Dazwischen nutzt es die letzte Antwort. Diese liegt auch in `runtime/pv_forecast_cache.json` und überbrückt so einen Neustart, solange sie höchstens 6 h alt ist.
+2. **Open-Meteo-Einstrahlung** (`global_tilted_irradiance`) für Neigung und Ausrichtung des Felds, wenn forecast.solar keine Daten liefert. Die Leistung ist Einstrahlung / 1000 W/m² × kWp, wie im Backtesting. Das Log meldet das als WARNING, und das Cockpit zeigt einen Hinweis mit den betroffenen PV-Feldern.
+3. **Abbruch des Zyklus**, wenn auch Open-Meteo nicht antwortet. Earnie plant dann nicht mit erfundenen PV-Werten, sondern meldet einen Fehler und versucht es im nächsten Zyklus erneut, wie bei fehlenden Day-Ahead-Preisen.
+
+Die Quelle je PV-Feld steht im Laufzustand (`optimizer_run_state.json`, Feld `pv_forecast_sources`: `forecast_solar`, `open_meteo` oder `none` bei 0 kWp).
+
 ## Wechselrichter (`inverters[]`)
 
 PV-Felder und Batterien können über `inverter_id` auf denselben Wechselrichter verweisen (n:1). Im Hauskonfigurator gibt es dafür den Tab **Wechselrichter** und eine Auswahl in den PV- und Batterie-Formularen. Die Geräte-Vorlage **EcoFlow Delta 3** legt eine physische Powerstation samt integriertem Powerstation-Hybrid-Wechselrichter in einem Schritt an.

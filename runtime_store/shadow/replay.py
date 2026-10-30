@@ -59,20 +59,27 @@ def _log_missing(key: str, reason: str) -> None:
     logger.warning("shadow: no feed value for %s (%s)", key, reason)
 
 
-def is_record_stale(record: dict[str, Any], *, ref_ts: str | None) -> bool:
+def is_record_stale(
+    record: dict[str, Any],
+    *,
+    ref_ts: str | None,
+    max_age_s: int | None = None,
+) -> bool:
     """Stale when record is older than *ref_ts* (or wall clock) by more than max age.
 
     Prefer ``latest.json`` ``cycle_ts`` as *ref_ts*: Prod sampler flushes advance
     ``heartbeat_ts`` without refreshing IO timestamps, which falsely stale'd
     cycle-fresh values when age was measured vs heartbeat.
     Records newer than the ref (e.g. mid-wait sampler updates) stay fresh.
+    ``max_age_s`` overrides :func:`max_age_sec` for feeds that Prod refreshes
+    less often than once per cycle (e.g. forecast.solar, 15-min API guard).
     """
     rec_ts = _parse_utc(record.get("ts") if isinstance(record, dict) else None)
     if rec_ts is None:
         return True
     ref = _parse_utc(ref_ts) or datetime.now(timezone.utc)
     age = (ref - rec_ts).total_seconds()
-    return age > max_age_sec()
+    return age > (max_age_s if max_age_s is not None else max_age_sec())
 
 
 def _staleness_ref_ts(latest: dict[str, Any] | None, meta: dict[str, Any] | None) -> str | None:
@@ -88,11 +95,17 @@ def _staleness_ref_ts(latest: dict[str, Any] | None, meta: dict[str, Any] | None
     return None
 
 
-def lookup_record(key: str, *, log_missing: bool = True) -> dict[str, Any] | None:
+def lookup_record(
+    key: str,
+    *,
+    log_missing: bool = True,
+    max_age_s: int | None = None,
+) -> dict[str, Any] | None:
     """Return fresh ok/error record for *key*, or None if missing/stale.
 
     Set ``log_missing=False`` when a caller will try another source (e.g. Prod
     inbox fallback) and only wants a warning if that also fails.
+    ``max_age_s``: per-feed staleness limit (see :func:`is_record_stale`).
     """
     if not is_shadow_mode():
         return None
@@ -108,7 +121,7 @@ def lookup_record(key: str, *, log_missing: bool = True) -> dict[str, Any] | Non
         latest if isinstance(latest, dict) else None,
         meta if isinstance(meta, dict) else None,
     )
-    if is_record_stale(record, ref_ts=ref_ts):
+    if is_record_stale(record, ref_ts=ref_ts, max_age_s=max_age_s):
         if log_missing:
             _log_missing(key, "stale")
         return None
@@ -178,9 +191,9 @@ def replay_openems_get(key: str) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def replay_ext_payload(key: str) -> Any | None:
+def replay_ext_payload(key: str, *, max_age_s: int | None = None) -> Any | None:
     """Return ext:* payload if fresh and ok; else None (caller may fall back)."""
-    record = lookup_record(key)
+    record = lookup_record(key, max_age_s=max_age_s)
     if record is None or not record.get("ok"):
         return None
     return record.get("payload")

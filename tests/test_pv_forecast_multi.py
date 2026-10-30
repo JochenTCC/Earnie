@@ -32,7 +32,7 @@ def test_get_hourly_pv_forecast_sums_systems(monkeypatch):
 
     def fake_forecast_one(*, lat, lon, tilt, azimuth, kwp, target_hours):
         calls.append((float(tilt), float(azimuth), float(kwp)))
-        return [float(kwp), float(kwp) * 0.5], True
+        return [float(kwp), float(kwp) * 0.5], pv_forecast.SOURCE_FORECAST_SOLAR
 
     monkeypatch.setattr(pv_forecast, "_forecast_one_system", fake_forecast_one)
 
