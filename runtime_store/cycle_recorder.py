@@ -47,6 +47,9 @@ class CycleToken:
 def reset_for_tests() -> None:
     """Clear in-memory recorder state (unit tests only)."""
     global _lost_cycles, _next_token_id
+    from data.outdoor_forecast import close_forecast_capture
+
+    close_forecast_capture()
     with _lock:
         _pending.clear()
         _lost_cycles = 0
@@ -361,10 +364,33 @@ def begin_cycle(
                 ),
             )
             _pending[token_id] = token
+        from data.outdoor_forecast import open_forecast_capture
+
+        open_forecast_capture()
         return token
     except Exception as exc:  # noqa: BLE001
+        from data.outdoor_forecast import close_forecast_capture
+
+        close_forecast_capture()
         _note_lost("begin_cycle", exc)
         return None
+
+
+def _attach_recorded_outdoor_forecast(token: CycleToken) -> None:
+    """Copy the series fetched after begin_cycle into the entry, then stop capture."""
+    from data.outdoor_forecast import close_forecast_capture
+
+    bucket = close_forecast_capture()
+    if not bucket:
+        return
+    values = bucket.get("values_c")
+    source = bucket.get("source")
+    if not isinstance(values, list) or not values or not isinstance(source, str):
+        return
+    token.start_state["outdoor_forecast"] = {
+        "values_c": values,
+        "source": source,
+    }
 
 
 def _default_flags() -> dict[str, bool]:
@@ -436,6 +462,7 @@ def finish_cycle(
     """Append one cycle line with outputs. Soft-fails; never raises to caller."""
     if token is None:
         return False
+    _attach_recorded_outdoor_forecast(token)
     if not is_recorder_enabled():
         with _lock:
             _pending.pop(token.token_id, None)

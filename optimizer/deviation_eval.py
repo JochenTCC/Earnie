@@ -164,6 +164,21 @@ def _ist_discharge_kw(battery_kw: float) -> float:
     return max(0.0, float(battery_kw))
 
 
+def _decision_battery_kw(battery: Any) -> float:
+    """Decision-time power, or the slot mean when no separate sample exists."""
+    if battery.decision_power_kw is None:
+        return float(battery.ist_power_kw)
+    return float(battery.decision_power_kw)
+
+
+def _moved_toward_charge_kw(battery: Any) -> float:
+    """Positive when the slot mean charges more than the decision snapshot.
+
+    Loxone sign: negative = charge, so decision minus mean is the move.
+    """
+    return _decision_battery_kw(battery) - float(battery.ist_power_kw)
+
+
 def _battery_power_below_tolerance(
     facts: SlotDeviationFacts,
     _scope: str,
@@ -175,18 +190,50 @@ def _battery_power_below_tolerance(
 
     Catalog S3/S6 and rule messages say \"nicht ausgeführt\" — not slight
     underdelivery vs. setpoint (mean Ist can be a few 100 W short of Soll).
+    Forced charge that moved toward charging but missed the slot energy is
+    ``battery_charge_target_missed`` (yellow warning), not this error.
     """
     tol = _power_tolerance(tolerances, params)
     battery = facts.battery
     if battery.soll_mode == bat.MODE_ZWANGS_LADEN:
         soll = max(0.0, battery.soll_plan_kw)
         ist = _ist_charge_kw(battery.ist_power_kw)
-        return soll > tol and ist <= tol
+        if not (soll > tol and ist <= tol):
+            return False
+        return _moved_toward_charge_kw(battery) <= tol
     if battery.soll_mode == bat.MODE_ZWANGS_ENTLADEN:
         soll = max(0.0, -battery.soll_plan_kw)
         ist = _ist_discharge_kw(battery.ist_power_kw)
         return soll > tol and ist <= tol
     return False
+
+
+def _battery_charge_target_missed(
+    facts: SlotDeviationFacts,
+    _scope: str,
+    _rule: dict[str, Any],
+    tolerances: dict[str, float],
+    params: dict[str, Any],
+) -> bool:
+    """Forced charge moved toward charging, but slot-mean charge missed Soll.
+
+    The decision snapshot is the power at the command. A move larger than the
+    power tolerance counts as a reaction. The red \"nicht ausgeführt\" rule
+    stays for a mean that never leaves the zero band.
+    """
+    from house_config.battery_control import BATTERY_CONTROL_FULL
+
+    battery = facts.battery
+    if battery.control != BATTERY_CONTROL_FULL:
+        return False
+    if battery.soll_mode != bat.MODE_ZWANGS_LADEN:
+        return False
+    tol = _power_tolerance(tolerances, params)
+    soll = max(0.0, battery.soll_plan_kw)
+    ist = _ist_charge_kw(battery.ist_power_kw)
+    if soll <= tol or ist >= soll - tol:
+        return False
+    return _moved_toward_charge_kw(battery) > tol
 
 
 def _pv_follow_setpoint_kw(flex: FlexPowerFacts) -> float:
@@ -296,6 +343,7 @@ PREDICATES: dict[str, Predicate] = {
     "mode_is_forced_charge": _mode_is_forced_charge,
     "mode_is_forced_discharge": _mode_is_forced_discharge,
     "battery_power_below_tolerance": _battery_power_below_tolerance,
+    "battery_charge_target_missed": _battery_charge_target_missed,
     "pv_follow_scheduled": _pv_follow_scheduled,
     "pv_follow_power_below_tolerance": _pv_follow_power_below_tolerance,
     "slot_quality_present": _slot_quality_present,
@@ -312,7 +360,28 @@ def _consumer_display_name(scope: str) -> str:
     return scope
 
 
+def _battery_message_kw(battery: Any) -> tuple[float, float]:
+    """Soll/Ist charge or discharge kW (both >= 0) for battery tooltips."""
+    if battery.soll_mode == bat.MODE_ZWANGS_LADEN:
+        return max(0.0, battery.soll_plan_kw), _ist_charge_kw(battery.ist_power_kw)
+    if battery.soll_mode == bat.MODE_ZWANGS_ENTLADEN:
+        return (
+            max(0.0, -battery.soll_plan_kw),
+            _ist_discharge_kw(battery.ist_power_kw),
+        )
+    return abs(float(battery.soll_plan_kw)), float(battery.ist_power_kw)
+
+
 def _message_context(facts: SlotDeviationFacts, scope: str) -> dict[str, Any]:
+    if scope == "battery":
+        soll_kw, ist_kw = _battery_message_kw(facts.battery)
+        return {
+            "scope": scope,
+            "consumer_name": scope,
+            "soll_kw": soll_kw,
+            "ist_kw": ist_kw,
+            "mismatch_kw": soll_kw - ist_kw,
+        }
     flex = facts.consumers.get(scope)
     soll_kw = 0.0 if flex is None else flex.soll_kw
     if flex is not None and flex.pv_follow_soll == 1:

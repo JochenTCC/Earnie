@@ -181,8 +181,14 @@ def _align_live_feature_index(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _archive_latest_complete_day() -> date:
-    """Letzter Kalendertag mit vollständigen Open-Meteo/Energy-Charts-Archivdaten."""
+    """Letzter Kalendertag mit vollständigen Open-Meteo/Energy-Charts-Archivdaten.
+
+    Uses the wall clock (and test ``time_machine``), not :func:`planning_now`.
+    Offline replay freezes the planning clock to the cycle timestamp; the archive
+    cut-off is a property of available data at run time, not of that cycle.
+    """
     import sys
+    from datetime import datetime
     from zoneinfo import ZoneInfo
 
     tz_name = "UTC"
@@ -197,7 +203,7 @@ def _archive_latest_complete_day() -> date:
         except Exception:
             tz_name = "UTC"
     tz = ZoneInfo(tz_name)
-    return planning_now(tz).date() - timedelta(days=1)
+    return datetime.now(tz).date() - timedelta(days=1)
 
 
 def _archive_covers_slot_range(slot_datetimes: list) -> bool:

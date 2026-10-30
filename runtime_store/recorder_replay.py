@@ -1,7 +1,9 @@
 """Offline MILP replay from cycle-recorder entries (Regression R0 / P1/L3).
 
-Replays **replay-vs-replay** from frozen pre-prepare inputs. Live post-capture
-mutations (standby relief, EHAL telemetry) are intentionally omitted.
+Replays from frozen pre-prepare inputs. The standby-backup load relief is
+recomputed from the snapshot (pack, SoC, matrix) and applied before the solve,
+as the live cycle does after the recorder snapshot. The sunrise PV-only charge
+limit uses the recorded planning window. EHAL telemetry is not read.
 """
 from __future__ import annotations
 
@@ -204,11 +206,34 @@ def _solve_prepared_entry(
     apply_cbc_solver_env(strict=(solver_mode == "strict"))
     os.environ["EARNIE_MILP_SOLVER"] = "highs"
 
-    with _recorded_ev_limit_soc(entry, config), _recorded_thermal_readings(entry):
+    from contextlib import ExitStack
+
+    from data.outdoor_forecast import replay_outdoor_forecast
+    from runtime_store.planning_clock import planning_freeze
+
+    start_state = entry.get("start_state") or {}
+    # Only enter fail-loud serve mode when the key was recorded. Older cycles
+    # omit it and still fetch (or use ambient fallback) as before.
+    has_outdoor_forecast = "outdoor_forecast" in start_state
+    recorded_forecast = start_state.get("outdoor_forecast") if has_outdoor_forecast else None
+    if recorded_forecast is not None and not isinstance(recorded_forecast, dict):
+        raise TypeError("start_state.outdoor_forecast must be a dict when present")
+    moment = datetime.fromisoformat(str(entry.get("timestamp") or ""))
+    _rebind_consumer_state_path()
+    with ExitStack() as stack:
+        stack.enter_context(planning_freeze(moment))
+        if has_outdoor_forecast:
+            stack.enter_context(replay_outdoor_forecast(recorded_forecast))
+        stack.enter_context(_recorded_ev_limit_soc(entry, config))
+        stack.enter_context(_recorded_thermal_readings(entry))
         prepared_ctx = _prepare_replay_inputs(entry, config)
         begin_cbc_event_collection()
         t0 = time.perf_counter()
-        result = _run_milp_replay(prepared_ctx, verbose=verbose)
+        result = _run_milp_replay(
+            prepared_ctx,
+            verbose=verbose,
+            sunrise_soc_min_index=_recorded_sunrise_soc_min_index(entry),
+        )
     result.seconds = time.perf_counter() - t0
     result.stage = _stage_from_events(take_cbc_events(), solver_mode)
     result.timestamp = entry.get("timestamp")
@@ -366,13 +391,79 @@ def _require_push_price_cent(config_module: Any) -> float:
     return float(raw)
 
 
-def _run_milp_replay(ctx: _PreparedReplay, *, verbose: bool) -> ReplayResult:
+def _apply_recorded_standby_relief(ctx: _PreparedReplay) -> None:
+    """Relieve house load the way the live cycle does after ``begin_cycle``.
+
+    The recorder snapshots the matrix before this step. The pack, its SoC and
+    the matrix determine the island schedule, so replay can rebuild it.
+    """
+    from optimizer.powerstation_live import load_standby_packs
+    from optimizer.powerstation_standby import (
+        apply_standby_load_relief,
+        plan_standby_horizon,
+    )
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    packs = load_standby_packs(telemetry=None)
+    plans = plan_standby_horizon(
+        ctx.prepared,
+        packs,
+        current_soc_by_id=ctx.soc_by_id,
+        dt_h=DEFAULT_DT_H,
+    )
+    if not plans:
+        return
+    ctx.prepared = apply_standby_load_relief(ctx.prepared, plans)
+
+
+def _recorded_sunrise_soc_min_index(entry: dict[str, Any]) -> int | None:
+    """Index of the live PV-only charge limit, or None when the cycle had none.
+
+    Seed / historical fixtures omit ``sunrise_anchor``; those replays keep the
+    previous unconstrained charge path. A live window that records the anchor
+    without ``slot_datetimes`` fails loud.
+    """
+    window = entry.get("planning_window")
+    if not isinstance(window, dict):
+        raise ValueError("entry missing planning_window")
+    anchor_raw = window.get("sunrise_anchor")
+    if not anchor_raw:
+        return None
+    slots = window.get("slot_datetimes")
+    if not isinstance(slots, list) or not slots:
+        raise ValueError(
+            "planning_window has sunrise_anchor but no slot_datetimes; "
+            "replay cannot apply the live PV-only charge limit"
+        )
+    anchor = _normalize_slot(anchor_raw)
+    try:
+        return [_normalize_slot(raw) for raw in slots].index(anchor)
+    except ValueError as exc:
+        raise ValueError(
+            f"sunrise anchor {anchor.isoformat()} is not in the recorded planning window"
+        ) from exc
+
+
+def _normalize_slot(raw: Any) -> datetime:
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
+    moment = raw if isinstance(raw, datetime) else datetime.fromisoformat(str(raw))
+    return normalize_quarter_hour_slot(moment)
+
+
+def _run_milp_replay(
+    ctx: _PreparedReplay,
+    *,
+    verbose: bool,
+    sunrise_soc_min_index: int | None,
+) -> ReplayResult:
     from optimizer.milp import (
         _extract_optimizer_controls_from_model,
         _primary_battery_params,
         _solve_milp_to_model,
     )
 
+    _apply_recorded_standby_relief(ctx)
     solved = _solve_milp_to_model(
         ctx.prepared,
         ctx.soc,
@@ -386,7 +477,7 @@ def _run_milp_replay(ctx: _PreparedReplay, *, verbose: bool) -> ReplayResult:
         ctx.contexts,
         ctx.filter_contexts,
         None,
-        None,
+        sunrise_soc_min_index,
         ctx.continue_on,
         None,
         current_soc_by_id=ctx.soc_by_id,
@@ -395,7 +486,12 @@ def _run_milp_replay(ctx: _PreparedReplay, *, verbose: bool) -> ReplayResult:
     )
     primary = _primary_battery_params(ctx.battery_params)
     if solved is None:
-        return _replay_from_optimizer_fallback(ctx, primary, verbose=verbose)
+        return _replay_from_optimizer_fallback(
+            ctx,
+            primary,
+            verbose=verbose,
+            sunrise_soc_min_index=sunrise_soc_min_index,
+        )
 
     model, preset_by_slot, _rem, _idx, _c, _f = solved
     controls = _extract_optimizer_controls_from_model(
@@ -449,6 +545,7 @@ def _replay_from_optimizer_fallback(
     primary: dict,
     *,
     verbose: bool,
+    sunrise_soc_min_index: int | None,
 ) -> ReplayResult:
     from optimizer import battery_plan_kw_from_control, milp_optimizer
     from runtime_store.cycle_recorder import compute_plan_hash
@@ -462,6 +559,7 @@ def _replay_from_optimizer_fallback(
         consumer_remaining_kwh=ctx.remaining,
         charging_contexts=ctx.contexts,
         filter_contexts=ctx.filter_contexts,
+        sunrise_soc_min_index=sunrise_soc_min_index,
         consumer_continue_on=ctx.continue_on,
         verbose=verbose,
         current_soc_by_id=ctx.soc_by_id,
@@ -563,6 +661,23 @@ def _write_start_state_files(env_root: Path, start_state: dict[str, Any]) -> Non
             json.dumps(payload, ensure_ascii=False, default=str),
             encoding="utf-8",
         )
+
+
+def _rebind_consumer_state_path() -> None:
+    """Point an already-imported optimizer at the env activated for this replay.
+
+    ``CONSUMER_STATE_FILE`` is captured when ``optimizer`` is first imported.
+    Replay deletes that temp env afterwards, so the next cycle in the same
+    process would load a missing file and drop the recorded delivered kWh.
+    """
+    import sys
+
+    optimizer = sys.modules.get("optimizer")
+    if optimizer is None or not hasattr(optimizer, "CONSUMER_STATE_FILE"):
+        return
+    from runtime_store.persist_paths import consumer_state_file
+
+    optimizer.CONSUMER_STATE_FILE = consumer_state_file()
 
 
 def _activate_env(env_root: Path) -> dict[str, str | None]:

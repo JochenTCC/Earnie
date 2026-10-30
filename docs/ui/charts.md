@@ -109,11 +109,13 @@ Soll/Ist-Icons erscheinen im grauen Log-Bereich, und zwar nur für Slots mit ech
 
 | Symbol | Kategorie | Farbe | Bedeutung |
 |--------|-----------|-------|-----------|
-| ▲ | Hinweis | gelb | Unkritische Abweichung (z. B. Wärmepumpe: Freigabe ohne Anlauf) |
-| ◆ | Warnung | orange | Erwartete Abweichung – Loxone handelt bewusst anders |
+| ▲ | Hinweis | grün | Unkritische Abweichung (z. B. Wärmepumpe: Freigabe ohne Anlauf) |
+| ◆ | Warnung | gelb | Erwartete Abweichung (z. B. SwimSpa im Sollband, Zwangs-Laden verfehlt die Zielenergie) |
 | ⬡ | Fehler | rot | Anweisung von Earnie nicht befolgt |
 
 Die Marker liegen oberhalb der Chart-Fläche; beim **Hover** erscheinen Kategorie-Label und Regeltext. Pro Slot sind mehrere Icons möglich (verschiedene Scopes, z. B. Batterie und E-Auto).
+
+Bewegt sich die Batterie beim Zwangs-Laden in Richtung Laden, ohne die Zielenergie des Slots zu erreichen, zeigt Earnie eine gelbe Warnung. Bleibt die Leistung innerhalb der Toleranz unverändert, bleibt der rote Fehler „Zwangs-Laden nicht ausgeführt“.
 
 **Regelwerk:** `config/deviation_rules.json` (Schema: `deviation_rules.schema.json`). Pflegehinweis: [Spec Soll-Ist §5.3](../dev/done/soll-ist-abweichung.md).
 
@@ -126,6 +128,7 @@ Die Marker liegen oberhalb der Chart-Fläche; beim **Hover** erscheinen Kategori
 | `eauto_should_charge` | eauto | Fehler |
 | `battery_forced_discharge_missing` | battery | Fehler |
 | `battery_forced_charge_missing` | battery | Fehler |
+| `battery_forced_charge_target_missed` | battery | Warnung |
 | `waermepumpe_enable_no_start` | waermepumpe | Hinweis |
 | `swimspa_filter_should_run_missing` | pool_filter | Fehler |
 | `swimspa_filter_runs_unexpectedly` | pool_filter | Fehler |
