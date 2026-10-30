@@ -174,13 +174,14 @@ def _debug_dump_meta_dialog(
     title = str(st.session_state.get("debug_dump_title") or "")
     symptom = str(st.session_state.get("debug_dump_symptom") or "")
     try:
-        zip_path = _save_debug_dump(
-            bundle,
-            current_soc,
-            live_power,
-            title=title,
-            symptom=symptom,
-        )
+        with st.spinner("ZIP wird erstellt …"):
+            zip_path = _save_debug_dump(
+                bundle,
+                current_soc,
+                live_power,
+                title=title,
+                symptom=symptom,
+            )
         _finish_save(zip_path, start_download=bool(create_and_download))
     except (OSError, FileNotFoundError, ValueError) as exc:
         logger.exception("Debug-Dump-Speichern fehlgeschlagen")
