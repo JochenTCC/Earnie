@@ -35,10 +35,5 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Minor changes (no bugs but still not worth to put it in backlog.md - do not remove this chapter - even if empty)
 
-- [ ] Set default "Temperaturabsenkung" in annual-rc to 2.5°C
-  - [ ] Review all default values for HK
-- [ ] Review and modify text in SE review pop-up dialogue
-- [ ] Add a sand-watch or similar after "ZIP erstellen" or "ZIP erstellen und herunterladen" was pressed in Debug-Dump pop up, so user can see that the program is not frozen
-
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

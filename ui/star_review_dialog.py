@@ -136,7 +136,7 @@ def maybe_prompt_scenario_explorer_review() -> None:
         return
     open_star_review_dialog(
         REVIEW_ID_SCENARIO_EXPLORER,
-        "Wie war die Simulation?",
+        "Wie war die Simulation? Mit der Beantwortung der Fragen helfen Sie uns, Earnie zu verbessern.",
         (
             "Die Konfiguration der Szenarios war einfach",
             "Die Ergebnisdarstellung ist verständlich",
