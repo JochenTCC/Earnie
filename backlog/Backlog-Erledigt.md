@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix forecast.solar per-system cooldown (2026-10-30)
+
+- [x] **Bugfix — forecast.solar refreshes only one PV system per cycle (found 2026-10-30):** `data/pv_forecast.py` kept one global 15-min cooldown stamp (`_LAST_API_CALL`) for all forecast.solar URLs. After the first system was fetched, every other system in the same cycle returned its old cache. On the NAS (2.7.0-beta.1, two roofs) the second roof was last refreshed the evening before, so its cached forecast ended with today and the next day planned 0 kW for it (36 vs. 72 kWh PV in the horizon). Fix: cooldown per URL (`_LAST_API_CALL_BY_URL`); the 429 retry-at block stays global (the limit is per IP). Test: `tests/test_pv_forecast.py::test_cooldown_is_per_system_so_every_system_refreshes`. Fixed in `37275695` (PR #84), shipped in 2.7.0-beta.2. **Verified 2026-10-30** on the NAS (2.7.0-beta.2 since 12:25): both `ext:pv_forecast:*` keys in the shadow feed got a fresh 200 record at 11:25, 11:44 and 11:59/12:14 UTC (15–30 min apart; the second roof had no refresh since 2026-10-28 22:44 UTC before); both forecasts reach 2026-10-31, and the live plan puts 11.4 kWh (dach_sued) + 6.9 kWh (dach_nord) on the next day.
+
 ### Minor change Debug-Dump ZIP busy indicator (2026-10-30)
 
 - [x] Add a sand-watch or similar after "ZIP erstellen" or "ZIP erstellen und herunterladen" was pressed in Debug-Dump pop up, so user can see that the program is not frozen (`ui/chart_debug_capture.py`: `st.spinner("ZIP wird erstellt …")` around `_save_debug_dump`).
