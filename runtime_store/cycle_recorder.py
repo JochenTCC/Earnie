@@ -48,8 +48,10 @@ def reset_for_tests() -> None:
     """Clear in-memory recorder state (unit tests only)."""
     global _lost_cycles, _next_token_id
     from data.outdoor_forecast import close_forecast_capture
+    from runtime_store.push_read_replay import close_push_read_capture
 
     close_forecast_capture()
+    close_push_read_capture()
     with _lock:
         _pending.clear()
         _lost_cycles = 0
@@ -365,13 +367,17 @@ def begin_cycle(
             )
             _pending[token_id] = token
         from data.outdoor_forecast import open_forecast_capture
+        from runtime_store.push_read_replay import open_push_read_capture
 
         open_forecast_capture()
+        open_push_read_capture()
         return token
     except Exception as exc:  # noqa: BLE001
         from data.outdoor_forecast import close_forecast_capture
+        from runtime_store.push_read_replay import close_push_read_capture
 
         close_forecast_capture()
+        close_push_read_capture()
         _note_lost("begin_cycle", exc)
         return None
 
@@ -397,6 +403,36 @@ def _attach_recorded_outdoor_forecast(token: CycleToken) -> None:
         "values_c": values,
         "source": source,
     }
+
+
+def _attach_recorded_push_reads(token: CycleToken) -> None:
+    """Copy the inbox reads made after begin_cycle into the entry, then stop capture.
+
+    The live EV charging context (plugged in, SoC, ready time, limits) is built
+    from these reads after ``begin_cycle``; replay serves them back.
+    """
+    from runtime_store.push_read_replay import close_push_read_capture
+
+    bucket = close_push_read_capture()
+    if bucket is not None:
+        token.start_state["push_reads"] = _json_safe(bucket)
+
+
+def record_active_reserves(
+    token: CycleToken | None,
+    reserves: list[dict[str, Any]] | None,
+) -> None:
+    """Store the powerstation reserves the live MILP planned with.
+
+    They come from ``powerstation_reserves.json`` after the telemetry trigger
+    sync, and shape the battery params (virtual refill carve-out).
+    """
+    if token is None:
+        return
+    try:
+        token.start_state["active_reserves"] = _json_safe(list(reserves or []))
+    except Exception as exc:  # noqa: BLE001 — never abort the live run
+        logger.warning("cycle_recorder: record_active_reserves failed: %s", exc)
 
 
 def _default_flags() -> dict[str, bool]:
@@ -469,6 +505,7 @@ def finish_cycle(
     if token is None:
         return False
     _attach_recorded_outdoor_forecast(token)
+    _attach_recorded_push_reads(token)
     if not is_recorder_enabled():
         with _lock:
             _pending.pop(token.token_id, None)
