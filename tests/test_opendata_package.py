@@ -165,7 +165,11 @@ def test_earnie_tests_never_use_the_repo_cache():
 # Product packages (pyproject ``packages.find``) plus the entry points in the repo root.
 PRODUCT_DIRS = ("optimizer", "data", "integrations", "runtime_store", "ui", "simulation", "scripts", "ehal")
 # Day-Ahead prices come from Edibert's market module (Edibert P4a); the host only names the shadow feed.
-HOST_NAMED_OUTSIDE_OPENDATA = {"data/edibert_live_market.py"}
+HOST_NAMED_OUTSIDE_OPENDATA = {
+    "data/edibert_live_market.py",
+    # Standalone dev logger: compares raw provider forecasts, not part of the daemon.
+    "scripts/pv_forecast_compare.py",
+}
 # Records the pre-P6 behaviour on purpose (parity golden).
 GOLDEN_SCRIPT = "scripts/opendata_golden.py"
 
