@@ -60,7 +60,7 @@ Questions that depend on the docs (one per house profile or tariff) come from `M
 
 ### 3.3 Startup gate
 
-[`runtime_store/migration/gate.py`](../../runtime_store/migration/gate.py): pending plan or level blockers → Streamlit **migration mode** (skip `load_config_or_exit`, no daemon auto-start); `main_daemon` / Shadow refuse with German messages. Bootstrap does **not** silently migrate or stamp live pack files (templates / greenfield create only).
+[`runtime_store/migration/gate.py`](../../runtime_store/migration/gate.py): pending plan or level blockers → Streamlit **migration mode** (skip `load_config_or_exit`, no daemon auto-start); `main_daemon` / Shadow refuse with German messages. Exception: a Shadow with a **private** config (feed outside its config dir, `is_shadow_config_readonly()` false) opens migration mode like any install; only a shared Prod config is refused (`shadow_migration_mode_refusal`). Bootstrap does **not** silently migrate or stamp live pack files (templates / greenfield create only).
 
 ### 3.4 Wizard
 

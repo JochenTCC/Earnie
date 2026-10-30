@@ -263,6 +263,34 @@ def test_run_streamlit_shadow_pending_exits(tmp_path, monkeypatch, capsys):
     assert code == 1
     captured = capsys.readouterr()
     assert "Shadow" in captured.out or "Shadow" in captured.err
+    assert "geteilte Prod-Konfiguration" in captured.out
+
+
+def test_run_streamlit_private_shadow_pending_opens_migration_mode(
+    tmp_path, monkeypatch, capsys
+):
+    """Private Shadow config (feed outside it) migrates like any install: wizard, no abort."""
+    config_dir = _copy_snapshot(tmp_path, "v3_single_battery")
+    _point_config(monkeypatch, config_dir)
+    feed = tmp_path / "prod_feed"
+    feed.mkdir()
+    monkeypatch.setenv("EARNIE_SHADOW", "1")
+    monkeypatch.setenv("EARNIE_SHADOW_FEED_PATH", str(feed))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "shadow_runtime"))
+    (tmp_path / "shadow_runtime").mkdir(parents=True)
+
+    calls: list[str] = []
+    import scripts.run_streamlit as rs
+
+    monkeypatch.setattr(rs, "_maybe_auto_start_main", lambda: calls.append("auto"))
+    monkeypatch.setattr(rs, "_run_streamlit_cli", lambda _argv: calls.append("streamlit") or 0)
+
+    code = rs.main([])
+    assert code == 0
+    assert calls == ["streamlit"]
+    out = capsys.readouterr().out
+    assert "Migrationsmodus" in out
+    assert "Abbruch (Shadow)" not in out
 
 
 def test_migration_planner_import_does_not_load_config():

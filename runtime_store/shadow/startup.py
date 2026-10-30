@@ -150,6 +150,32 @@ def _check_loxone_feed_capability(meta: dict) -> None:
     )
 
 
+_SHARED_CONFIG_MIGRATION_REASON = (
+    "Shadow startet nicht, solange die geteilte Prod-Konfiguration "
+    "migriert werden muss (Shadow migriert nie).\n"
+)
+
+
+def shadow_migration_mode_refusal(plan) -> str | None:
+    """
+    German refuse message when Shadow must not open the migration wizard, else None.
+
+    Only a shared Prod config is refused (Shadow never migrates it). A private Shadow
+    config migrates like any install: Streamlit wizard or ``scripts.migrate_config``.
+    """
+    from runtime_store.migration.gate import (
+        abort_message_de,
+        migration_blocks_normal_startup,
+    )
+    from runtime_store.shadow.mode import is_shadow_config_readonly
+
+    if not is_shadow_mode() or not is_shadow_config_readonly():
+        return None
+    if not migration_blocks_normal_startup(plan):
+        return None
+    return _SHARED_CONFIG_MIGRATION_REASON + abort_message_de(plan)
+
+
 def ensure_shadow_startup() -> dict:
     """
     Run §4.2 checks when Shadow is active.
@@ -175,10 +201,7 @@ def ensure_shadow_startup() -> dict:
     plan = plan_for_active_config()
     if migration_blocks_normal_startup(plan):
         if is_shadow_config_readonly():
-            reason = (
-                "Shadow startet nicht, solange die geteilte Prod-Konfiguration "
-                "migriert werden muss (Shadow migriert nie).\n"
-            )
+            reason = _SHARED_CONFIG_MIGRATION_REASON
         else:
             reason = (
                 "Shadow startet nicht, solange die private Shadow-Konfiguration "

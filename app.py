@@ -21,22 +21,17 @@ from runtime_store import bootstrap
 bootstrap.run()
 
 from runtime_store.migration.gate import (
-    abort_message_de,
     migration_blocks_normal_startup,
     plan_for_active_config,
 )
-from runtime_store.shadow.mode import is_shadow_mode
+from runtime_store.shadow.startup import shadow_migration_mode_refusal
 
 _migration_plan = plan_for_active_config()
 _migration_mode = migration_blocks_normal_startup(_migration_plan)
 
-if _migration_mode and is_shadow_mode():
-    print(abort_message_de(_migration_plan), file=sys.stderr)
-    print(
-        "Abbruch (Shadow): geteilte Konfiguration muss zuerst auf Prod "
-        "migriert werden (Shadow migriert nie).",
-        file=sys.stderr,
-    )
+_shadow_refusal = shadow_migration_mode_refusal(_migration_plan)
+if _shadow_refusal:
+    print(f"Abbruch (Shadow): {_shadow_refusal}", file=sys.stderr)
     raise SystemExit(1)
 
 config = None
