@@ -23,6 +23,10 @@ from runtime_store.migration.steps.required_signal_activation import (
 from runtime_store.migration.steps.retire_plant_pv_binding import (
     STEP as RETIRE_PLANT_PV,
 )
+from runtime_store.migration.steps.deviation_marker_colors import (
+    STEP as DEVIATION_MARKER_COLORS,
+)
+from runtime_store.migration.steps.forced_charge_hint import STEP as FORCED_CHARGE_HINT
 from runtime_store.migration.steps.netznutzung_split import STEP as NETZNUTZUNG_SPLIT
 from runtime_store.migration.steps.scenario_feed_in import STEP as SCENARIO_FEED_IN
 from runtime_store.migration.steps.se_conf_defaults import STEP as SE_CONF_DEFAULTS
@@ -50,6 +54,8 @@ STEPS: tuple[MigrationStep, ...] = (
     CONSUMER_FLEX,
     RETIRE_PLANT_PV,
     SE_CONF_DEFAULTS,
+    FORCED_CHARGE_HINT,
+    DEVIATION_MARKER_COLORS,
     FLEX_OVERLAY,
     NETZNUTZUNG_SPLIT,
     SCENARIO_FEED_IN,
