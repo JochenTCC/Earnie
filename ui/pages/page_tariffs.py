@@ -108,6 +108,7 @@ def _render_pending_check() -> None:
 
 
 def render() -> None:
+    from edibert.contribution import ShareDefault
     from edibert.ui.config import UiConfig
     from edibert.ui.embed import render_editor
 
@@ -156,5 +157,7 @@ def render() -> None:
             delete_guard=_delete_guard,
             on_change=_on_change,
         ),
+        # No contribution_transport until the user consents in Earnie: sharing stays off.
+        share_default=ShareDefault.OPT_IN,
         open_tariff=(request or {}).get("open"),
     )

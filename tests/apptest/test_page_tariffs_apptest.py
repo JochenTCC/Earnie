@@ -148,6 +148,16 @@ def _user_ids() -> list[str]:
     return [t["id"] for t in doc["import_tariffs"]]
 
 
+def test_share_section_is_off_and_opt_in_without_consent():
+    _write_user_tariff()
+    at = _start()
+    captions = " ".join(c.value for c in at.caption)
+    assert "Es wird nichts geteilt, bevor du einen Tarif auswählst." in captions
+    assert "Teilen ist aus:" in captions
+    assert at.checkbox(key=_PREFIX + "share.import.user_offen").value is False
+    assert at.button(key=_PREFIX + "share.send").disabled
+
+
 def test_unused_user_tariff_is_deleted_without_asking():
     _write_user_tariff()
     at = _open()

@@ -26,7 +26,7 @@ dependencies = [
     "PyYAML>=6.0",
     # Tariff library (separate repo, PolyForm Noncommercial); pinned git tag, decision: docs/dev/edibert-integration.md.
     # Source archive, so wheel-only installs need --no-binary=edibert.
-    "edibert[ui] @ https://github.com/JochenTCC/Edibert/archive/refs/tags/v0.1.9.zip",
+    "edibert[ui] @ https://github.com/JochenTCC/Edibert/archive/refs/tags/v0.1.10.zip",
     # Holiday regions for the house profile (same calendar Edibert prices with; Edibert P1).
     "holidays>=0.90",
 ]
