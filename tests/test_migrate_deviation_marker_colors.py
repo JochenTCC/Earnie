@@ -57,6 +57,12 @@ def test_detect_false_without_the_rule_once_colors_match():
     assert detect(_docs(hint=HINT_COLOR, warning=WARNING_COLOR, rule=None)) is False
 
 
+def test_detect_false_when_categories_are_absent():
+    docs = _docs(rule="warning")
+    del docs["deviation_rules.json"]["categories"]
+    assert detect(docs) is False
+
+
 def test_detect_false_before_data_model_4():
     assert detect(_docs(model=3)) is False
 

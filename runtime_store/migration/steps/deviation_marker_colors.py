@@ -31,16 +31,13 @@ def _doc(docs: Docs) -> dict[str, Any] | None:
     return None
 
 
-def _category_color(doc: dict[str, Any], name: str) -> str | None:
+def _category_block(doc: dict[str, Any], name: str) -> dict[str, Any] | None:
     categories = doc.get("categories")
     if not isinstance(categories, dict):
         return None
     block = categories.get(name)
-    if not isinstance(block, dict):
-        return None
-    color = block.get("color")
-    if isinstance(color, str):
-        return color
+    if isinstance(block, dict):
+        return block
     return None
 
 
@@ -58,20 +55,20 @@ def detect(docs: Docs) -> bool:
     doc = _doc(docs)
     if doc is None or read_data_model(doc) != CURRENT_DATA_MODEL:
         return False
-    if _category_color(doc, "hint") != HINT_COLOR:
+    hint = _category_block(doc, "hint")
+    if hint is not None and hint.get("color") != HINT_COLOR:
         return True
-    if _category_color(doc, "warning") != WARNING_COLOR:
+    warning = _category_block(doc, "warning")
+    if warning is not None and warning.get("color") != WARNING_COLOR:
         return True
     rule = _target_rule(doc)
     return rule is not None and rule.get("category") != RULE_CATEGORY
 
 
-def _require_category(doc: dict[str, Any], name: str) -> dict[str, Any]:
-    categories = doc.get("categories")
-    block = categories.get(name) if isinstance(categories, dict) else None
-    if not isinstance(block, dict):
-        raise ValueError(f"deviation_rules.json: categories.{name} fehlt.")
-    return block
+def _set_color(doc: dict[str, Any], name: str, color: str) -> None:
+    block = _category_block(doc, name)
+    if block is not None:
+        block["color"] = color
 
 
 def apply(docs: Docs, answers: Answers) -> StepResult:
@@ -82,8 +79,8 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
     doc = _doc(out)
     if doc is None:
         return StepResult(docs=out, changed_files=())
-    _require_category(doc, "hint")["color"] = HINT_COLOR
-    _require_category(doc, "warning")["color"] = WARNING_COLOR
+    _set_color(doc, "hint", HINT_COLOR)
+    _set_color(doc, "warning", WARNING_COLOR)
     rule = _target_rule(doc)
     if rule is not None:
         rule["category"] = RULE_CATEGORY
