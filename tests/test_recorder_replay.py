@@ -220,6 +220,43 @@ def test_recorder_collects_thermal_readings_for_enabled_thermal_control(monkeypa
     assert fetched == ["pool"]
 
 
+def test_sunrise_index_none_without_recorded_anchor():
+    from runtime_store.recorder_replay import _recorded_sunrise_soc_min_index
+
+    entry = {
+        "planning_window": {
+            "slot_datetimes": ["2026-10-28T10:00:00+01:00", "2026-10-28T10:15:00+01:00"],
+            "seed_anchor": "2026-10-28T10:00:00+01:00",
+        }
+    }
+    assert _recorded_sunrise_soc_min_index(entry) is None
+
+
+def test_sunrise_index_from_recorded_window():
+    from runtime_store.recorder_replay import _recorded_sunrise_soc_min_index
+
+    entry = {
+        "planning_window": {
+            "sunrise_anchor": "2026-10-29T07:03:11+01:00",
+            "slot_datetimes": [
+                "2026-10-28T10:00:00+01:00",
+                "2026-10-29T07:00:00+01:00",
+                "2026-10-29T07:15:00+01:00",
+            ],
+        }
+    }
+    assert _recorded_sunrise_soc_min_index(entry) == 1
+
+
+def test_sunrise_index_fails_loud_without_slots():
+    from runtime_store.recorder_replay import _recorded_sunrise_soc_min_index
+
+    with pytest.raises(ValueError, match="slot_datetimes"):
+        _recorded_sunrise_soc_min_index(
+            {"planning_window": {"sunrise_anchor": "2026-10-29T07:00:00+01:00"}}
+        )
+
+
 def test_restored_matrix_keeps_recorded_utc_offset():
     from runtime_store.recorder_replay import _coerce_matrix_datetimes
 
