@@ -23,6 +23,8 @@ from typing import Iterator
 
 # Aware UTC instant of the tick the running cycle plans for, or None.
 _anchor: ContextVar[datetime | None] = ContextVar("earnie_planning_anchor", default=None)
+# Exact instant for offline replay. Unlike the anchor, this may lie in the past.
+_frozen: ContextVar[datetime | None] = ContextVar("earnie_planning_frozen", default=None)
 
 
 def _to_utc(moment: datetime) -> datetime:
@@ -48,8 +50,40 @@ def anchored_tick() -> datetime | None:
     return anchor.astimezone().replace(tzinfo=None)
 
 
+@contextmanager
+def planning_freeze(moment: datetime | None) -> Iterator[None]:
+    """Make :func:`planning_now` return ``moment``, including when it is in the past.
+
+    Offline replay uses this so a recorded cycle still counts as "today" for
+    delivered energy and forecast alignment. ``None`` keeps the real clock.
+    """
+    token = _frozen.set(None if moment is None else moment)
+    try:
+        yield
+    finally:
+        _frozen.reset(token)
+
+
+def _frozen_now(moment: datetime, tz: tzinfo | None) -> datetime:
+    if tz is None:
+        if moment.tzinfo is None:
+            return moment
+        return moment.astimezone().replace(tzinfo=None)
+    if moment.tzinfo is None:
+        local = moment.replace(tzinfo=datetime.now().astimezone().tzinfo)
+        return local.astimezone(tz)
+    return moment.astimezone(tz)
+
+
 def planning_now(tz: tzinfo | None = None) -> datetime:
-    """``datetime.now(tz)``, but never before the anchored tick."""
+    """``datetime.now(tz)``, but never before the anchored tick.
+
+    A :func:`planning_freeze` wins over the anchor so replay stays on the
+    recorded instant.
+    """
+    frozen = _frozen.get()
+    if frozen is not None:
+        return _frozen_now(frozen, tz)
     real = datetime.now(tz)
     anchor = _anchor.get()
     if anchor is None:
