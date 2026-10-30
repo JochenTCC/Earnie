@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 
 import pytest
 
@@ -11,6 +12,7 @@ from optimizer import battery as bat
 from optimizer import deviation_facts as facts_mod
 from optimizer.deviation_eval import evaluate_entry_deviations
 from optimizer.deviation_rules import load_deviation_rules
+from runtime_store.slot_ist_powers import slot_key
 
 RULES_PATH = "share/config/deviation_rules.example.json"
 
@@ -98,6 +100,8 @@ SCENARIOS = [
             target_power_kw=2.5,
             battery_plan_kw=2.5,
             consumption_snapshot={"flex_kw": {}, "battery_kw": 0.0},
+            # Forced charge is graded by slot energy, which needs the slot mean.
+            closed_interval={"sample_count": 10, "battery_kw": 0.0},
         ),
         "error",
         "battery_forced_charge_missing",
@@ -177,7 +181,17 @@ def test_scenario_catalog(
     expected_category: str | None,
     expected_rule_id: str | None,
 ) -> None:
-    events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
+    closed = entry.get("closed_interval")
+    if closed is None:
+        events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
+    else:
+        slot = slot_key(datetime.fromisoformat(entry["completed_at"]))
+        events = evaluate_entry_deviations(
+            entry,
+            rules_doc=rules_doc,
+            slot_start=slot,
+            closed_by_interval={slot: closed},
+        )
     if expected_category is None:
         assert events == [], f"{scenario_id}: erwartet kein Icon"
         return

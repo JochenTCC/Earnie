@@ -23,6 +23,7 @@ from optimizer import battery as bat
 from optimizer.deviation_eval import evaluate_entry_deviations
 from optimizer.deviation_rules import load_deviation_rules
 from optimizer.schedule import QUARTER_HOUR_MINUTES, quarter_hour_slot_start
+from runtime_store.slot_ist_powers import slot_key
 from scripts.seed_history_test_logs import _remap_entries, _write_jsonl
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -160,6 +161,8 @@ def _scenario_s3_battery_forced_charge() -> dict:
         "consumer_powers_kw": {},
         "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
         "consumption_snapshot": _flex_snapshot(battery_kw=0.0),
+        # Forced charge is graded by slot energy, which needs the slot mean.
+        "closed_interval": {"sample_count": 10, "battery_kw": 0.0},
         "thermal_observability": [],
         "scenario": SCENARIO_LABELS[2],
     }
@@ -274,6 +277,20 @@ def build_deviation_test_entries(*, baseline_count: int) -> list[dict]:
     return entries
 
 
+def _evaluate(row: dict, rules_doc: dict) -> list:
+    """Evaluate like the chart: a row's own ``closed_interval`` is its slot mean."""
+    closed = row.get("closed_interval")
+    if closed is None:
+        return evaluate_entry_deviations(row, rules_doc=rules_doc)
+    slot = slot_key(datetime.fromisoformat(row.get("completed_at") or "2026-07-05T10:00:00"))
+    return evaluate_entry_deviations(
+        row,
+        rules_doc=rules_doc,
+        slot_start=slot,
+        closed_by_interval={slot: closed},
+    )
+
+
 def _validate_scenarios(entries: list[dict], rules_doc: dict) -> None:
     scenarios = entries[-7:]
     expectations = [
@@ -286,7 +303,7 @@ def _validate_scenarios(entries: list[dict], rules_doc: dict) -> None:
         (1, "hint", "wp_heating_enable_no_start"),
     ]
     for entry, (expected_count, category, rule_id) in zip(scenarios, expectations):
-        events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
+        events = _evaluate(entry, rules_doc)
         if len(events) != expected_count:
             label = entry.get("scenario", "?")
             raise ValueError(
@@ -312,6 +329,11 @@ def seed_deviation_test_log(
     remapped = _remap_entries(entries, anchor_slot)
     for row in remapped:
         row["source"] = "seed_deviation_test_log.py"
+        if "closed_interval" in row:
+            row["closed_interval"] = {
+                **row["closed_interval"],
+                "interval_start": row["completed_at"],
+            }
     _write_jsonl(target, remapped)
     scenario_slots = [
         {
@@ -323,7 +345,7 @@ def seed_deviation_test_log(
                     "rule_id": event.rule_id,
                     "message": event.message,
                 }
-                for event in evaluate_entry_deviations(row, rules_doc=rules_doc)
+                for event in _evaluate(row, rules_doc)
             ],
         }
         for row in remapped[-7:]
