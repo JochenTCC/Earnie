@@ -22,6 +22,9 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 
 - [ ] beta release for Loxone and HA
 - [ ] Wait for feedback (until Nov-02)
+- [ ] **Keep dev-only replay and Shadow code out of the release image** `[chore]` *(decided 2026-10-30)* — implement on `release/2.7`, then cherry-pick the result to `main` (batch PR). The cycle recorder stays in the image: it fills the `recorder/*` part of debug dumps, which become private regression cases (e.g. REG-76). The Shadow feed writer (`runtime_store/shadow/feed.py`, Prod side, off unless `shadow_feed_enabled`) also stays.
+  - [ ] **Exclude offline replay and regression tools via `.dockerignore`:** `runtime_store/recorder_replay.py`, `scripts/run_regression.py`, `scripts/run_regression_r0_study.py`, `scripts/replay_debug_dump.py` (leaf modules, only imported by scripts and tests; the Dockerfile copies `runtime_store/` and `scripts/` whole). Check that nothing in the image imports them (a container smoke start), and keep `runtime_store/push_read_replay.py`: the live push inbox uses its capture. Small, can go into 2.7.0.
+  - [ ] **Make the Shadow runtime omittable** (`EARNIE_SHADOW=1`: `runtime_store/shadow/` without `feed.py`, about 1,000 lines): `is_shadow_mode()` / feed checks sit in 24 modules outside the package (`main.py`, `config.py`, `app.py`, push inbox, ENTSO-E / aWATTar clients, PV forecast, …). Gather them behind one interface (extend `runtime_store/shadow/hooks.py`) with a no-op stub when the package is absent, then exclude the package from the image and add a smoke test for the stripped image, so the shipped artifact is tested too. Larger; does not block 2.7.0 (target 2.8).
 - [ ] final release 2.7.0
 
 ### Version 2.8
