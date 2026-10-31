@@ -234,6 +234,10 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX is usable (**2.6.h**). Not the separate item “EHAL adaptation for MQTT” below.
 
 - [ ] **Add-on Version 1.0.** From the [add-on plan](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie_HomeAssistant_Addon_Dokumentation.md): MQTT Discovery, native Home Assistant entities for Earnie state, HA Energy-dashboard integration, Supervisor health check. Earnie publishing its own state. Checked on the existing Synology HAOS. Stable vs pre-release install is the [add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md), not this item.
+- [ ] **Earnie as MQTT tariff publisher** `[feat]` *(added 2026-10-31; together with the MQTT interface of Add-on Version 1.0)*: Earnie also publishes the prices of its tariffs (import and export) over the MQTT connection it opens for its own state, so Home Assistant or evcc get them without a separate Edibert publisher. Reuse Edibert's publisher format, not one of its own (`edibert.publish.payloads`, Edibert `docs/spec/publishing.md`: retained state / attributes / availability, HA discovery, EUR/kWh, `raw_today` / `raw_tomorrow` / `forecast`, attribute `catalog`). Prices are the slot prices Earnie already gets from Edibert, never a second calculation.
+  - Decide: Earnie runs Edibert's `Publisher` with its own MQTT link and market data, or uses only the payload functions; topic prefix and HA device (one Earnie device or Edibert's own)
+  - Edibert's catalog exchange jobs (`exchange` in `publish.json`: report use, status, package import) only with Earnie's own consent, the same consent as for sharing at the Edibert pin bump
+  - Needs: Edibert pin with `0.1.d` S2 (exchange in the publisher loop)
 
 
 ### Version 2.+1
