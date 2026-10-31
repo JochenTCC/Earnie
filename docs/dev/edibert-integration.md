@@ -797,6 +797,8 @@ Not done here; the § 3 text is a draft. Points for the review:
 - Terms of contribution (purpose, scope, deletion), the privacy notice for the upload, liability for tariff data.
 - Paid access (VAT, withdrawal right for digital content, payment handling) — only once a fee or subscription is offered.
 
+**Update 2026-10-31:** § 3 paragraphs 4–8 now follow the two-database model (free database without review, verified database with own terms): opt-in per tariff stays for contributions from Earnie, also after Edibert's terms take precedence; transferred fields are tariff ID and version instead of the check-calculation result; "reliable" by active use of two installations instead of "verified"; the usage report from Earnie needs its own consent.
+
 ### Done check
 
 - [x] Decision record (this section).
