@@ -148,7 +148,7 @@ def window_usage_vs_price_pv_chart(
         x=x_values,
         y=[slot.price_cent for slot in slots],
         mode="lines",
-        line=dict(color="red", width=2.5, shape="hv"),
+        line=dict(color="red", width=1.5, shape="hv"),
         yaxis="y2",
     )
     fig.update_layout(
