@@ -155,7 +155,7 @@ def test_recompute_click_posts_to_the_daemon_listener(fake_daemon, monkeypatch) 
 
 
 @pytest.fixture
-def fixed_tariff_with_fee() -> str:
+def fixed_tariff_with_fee(_isolated_backtesting_config) -> str:
     """Hängt einen Fixtarif mit Abwicklungsgebühr an den isolierten Katalog; liefert dessen Label."""
     path = Path(os.environ["EARNIE_TARIFFS_PATH"])
     doc = json.loads(path.read_text(encoding="utf-8"))

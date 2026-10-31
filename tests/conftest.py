@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from dotenv import load_dotenv
 
-from tests.fixtures.backtesting_fixtures import pin_fixture_config_env
+from tests.fixtures.backtesting_fixtures import FIXTURES_ROOT, pin_fixture_config_env
 from tests.fixtures.historical_fixtures import CONS_DATA_FILE, fixture_available
 from tests.regression.baseline import GIT_LOCATION_ENV
 
@@ -380,6 +380,35 @@ def _fail_on_blocked_earnie_server_post():
         pytest.fail("test tried to POST to the production earnie-server:\n" + "\n".join(hits))
 
 
+def _committed_fixture_state() -> dict[str, tuple[int, int]]:
+    """(mtime_ns, size) of each file under the env-pinned config fixtures."""
+    state = {}
+    for path in FIXTURES_ROOT.rglob("*"):
+        if path.is_file() and "__pycache__" not in path.parts:
+            stat = path.stat()
+            state[path.relative_to(FIXTURES_ROOT).as_posix()] = (stat.st_mtime_ns, stat.st_size)
+    return state
+
+
+@pytest.fixture(autouse=True)
+def _guard_committed_backtesting_fixtures():
+    """Fail the test that wrote into ``tests/fixtures/backtesting/``.
+
+    The default env points config and sidecars at these committed files, so a save
+    path without a tmp_path copy changes the repo and breaks later tests.
+    """
+    before = _committed_fixture_state()
+    yield
+    after = _committed_fixture_state()
+    if after != before:
+        changed = sorted(name for name in before.keys() | after.keys() if before.get(name) != after.get(name))
+        pytest.fail(
+            "tests/fixtures/backtesting/ changed during this test (or a test running in "
+            f"parallel on another xdist worker): {', '.join(changed)}. Tests must write to a "
+            "tmp_path copy. Restore with: git checkout -- tests/fixtures/backtesting"
+        )
+
+
 def _loxone_integration_enabled() -> bool:
     if os.getenv("EARNIE_SKIP_LOXONE_INTEGRATION") == "1":
         return False
@@ -451,8 +480,46 @@ def _e2e_explicitly_selected(config) -> bool:
     return _marker_explicitly_selected(config, "e2e", "EARNIE_RUN_E2E")
 
 
+_MISSING_CONFTEST_KEY = pytest.StashKey[str]()
+
+
+def _flag_items_in_duplicate_conftest_directories(items) -> None:
+    """Flag tests whose directory pytest collected a second time.
+
+    pytest 9 binds conftest fixtures to the first ``Dir`` node of their directory.
+    When paths of one directory are not adjacent on the command line
+    (``tests/apptest/a.py tests/b.py tests/apptest/c.py``), the directory is
+    collected again and its tests silently lose that conftest's autouse fixtures —
+    for AppTests the tmp_path copy of the config fixtures, so they wrote into
+    ``tests/fixtures/backtesting/``. ``pytest_runtest_setup`` fails flagged tests
+    before any fixture runs (a collection error would crash xdist workers).
+    """
+    seen: dict[str, pytest.Directory] = {}
+    for item in items:
+        for node in item.listchain():
+            if not isinstance(node, pytest.Directory):
+                continue
+            if not (node.path / "conftest.py").is_file():
+                continue
+            if seen.setdefault(node.nodeid, node) is not node:
+                item.stash[_MISSING_CONFTEST_KEY] = node.nodeid
+                break
+
+
+def pytest_runtest_setup(item):
+    directory = item.stash.get(_MISSING_CONFTEST_KEY, None)
+    if directory is not None:
+        pytest.fail(
+            f"pytest collected '{directory}' twice, so its conftest.py fixtures are missing "
+            "for this test. Put all paths from that directory next to each other on the "
+            "command line.",
+            pytrace=False,
+        )
+
+
 def pytest_collection_modifyitems(config, items):
     """Deselect regression and e2e by default; keep ``slow`` tests at the end."""
+    _flag_items_in_duplicate_conftest_directories(items)
     deselect_names = []
     if not _regression_explicitly_selected(config):
         deselect_names.append("regression")

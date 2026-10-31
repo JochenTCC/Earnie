@@ -44,7 +44,8 @@ _EXTRA_CONSUMERS = [
 
 
 @pytest.fixture(autouse=True)
-def _profile_with_all_consumer_types():
+def _profile_with_all_consumer_types(_isolated_backtesting_config):
+    # Explicit dependency: writes only after the conftest bound the env to the tmp_path copy.
     path = os.environ["EARNIE_HOUSE_PROFILES_PATH"]
     with open(path, encoding="utf-8") as handle:
         doc = json.load(handle)
