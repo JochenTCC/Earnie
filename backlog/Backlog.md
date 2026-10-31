@@ -29,15 +29,14 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - HA only: the carrier already runs logic outside Earnie, which fits the plan to make HA the standard backend of the complete solution. Loxone and others keep their own fallback logic.
   - Open: where the values live (signal list / `ehal_bindings` metadata), required vs optional per signal, defaults derived from the house configuration (e.g. max power) vs explicit entry, docs for the user.
 
-- [ ] **PV forecast comparison logger** `[dev]` *(2026-10-29; in autumn the forecast.solar quality varies strongly, e.g. on fog / inversion days)*: standalone script `scripts/pv_forecast_compare.py`, no change to the daemon. `fetch` (hourly via Task Scheduler / cron) stores hourly energy forecasts per PV system of the live scenario under `runtime/pv_forecast_compare/`: forecast.solar (period energy, and as `data/pv_forecast.py` maps it today: `watts` at the slot start), Solcast (hobbyist rooftop sites, per-source minimum interval + daily call budget), Open-Meteo `global_tilted_irradiance` per model (`icon_d2`, `icon_seamless`, `ecmwf_ifs025`). `evaluate` compares them with the measured PV energy (`closed_interval.pv_energy_kwh` from `optimization_history.jsonl`) per lead-time bucket (intraday 0–6 h, 6–24 h, day-ahead): daily energy error, hourly MAE / bias, and MAE after a per-source linear scale (separates a constant bias, which the **PV forecast calibration factor** absorbs, from weather skill). Run 3–4 weeks in autumn; the result decides the default source (see **Solcast as PV forecast source**) and feeds the calibration factor (**Adaptation P3**). Optional later: DWD MOSMIX `Rad1h` as a further source.
-  - **Note:** the free forecast.solar API allows 12 calls per hour per public IP, shared with the production daemon (2 systems every 15 min = 8 calls/h); the logger fetches forecast.solar at most hourly (2 calls/h).
+- [ ] **PV forecast comparison run** `[dev]` *(logger done 2026-10-30, [Erledigt](Backlog-Erledigt.md); in autumn the forecast.solar quality varies strongly, e.g. on fog / inversion days)*: run `scripts/pv_forecast_compare.py fetch` hourly for 3–4 weeks in autumn, then `evaluate`. The result decides the default source (see **Solcast as PV forecast source**) and feeds the **PV forecast calibration factor** (**Adaptation P3**): the MAE after the per-source linear scale separates a constant bias, which the calibration factor absorbs, from weather skill. Optional later: DWD MOSMIX `Rad1h` as a further source in the logger.
 
 - [ ] **Solcast as PV forecast source** `[feat]` *(2026-10-29)*: second provider next to forecast.solar in `data/pv_forecast.py`, selected per site (`pv_forecast.source`: `forecast_solar` | `solcast`; explicit, no silent fallback to the other provider). Solcast rooftop sites (configured at solcast.com with capacity, tilt, azimuth) mapped to `pv_systems[]` via `solcast_resource_id`; API key in `.env` (`SOLCAST_API_KEY`).
   - [ ] **Call budget:** the hobbyist plan allows 2 sites and 10 calls per day; spread the calls over daylight (2 sites × 5 calls) and persist the cache in `runtime/` so daemon restarts do not burn calls. The 15-min cache guard of forecast.solar does not fit.
   - [ ] **Slot mapping:** `period_end` + `PT30M` mean power → QH slots (each 30-min value covers two QH slots), no clock-hour inheritance; keep `pv_estimate10` / `pv_estimate90` for later use (robust planning, Leistungstarif peak budget).
   - [ ] **AC vs. DC:** Solcast models its own losses from the site parameters; check whether `pv_estimate` is AC so the DC→AC step in `optimizer/milp_inverter.py` does not apply η_inv twice.
   - [ ] **Integration:** shadow feed record / replay like forecast.solar (`ext:pv_forecast:*`); SE unchanged (archive weather); schema change of `pv_systems[]` / site → migration (`config-migration.mdc`); house configurator fields; user docs (`docs/konfiguration/`).
-  - **Note:** the hobbyist plan is for non-commercial use: fine for a private install with the user's own key ("bring your own key"), not as a default for all Earnie installs. Related: **PV forecast from HA** (the HA Solcast integration is another route to the same data) and **PV forecast calibration factor**; decide the default source after the **PV forecast comparison logger** run.
+  - **Note:** the hobbyist plan is for non-commercial use: fine for a private install with the user's own key ("bring your own key"), not as a default for all Earnie installs. Related: **PV forecast from HA** (the HA Solcast integration is another route to the same data) and **PV forecast calibration factor**; decide the default source after the **PV forecast comparison run**.
 
 - [ ] **Edibert share consent — release gate** `[dev]` *(code done 2026-10-31 with the pin v0.1.12, [Erledigt](Backlog-Erledigt.md))*: the consent toggle on the Tarife page is in the code; the first Earnie release that ships it waits for the legal review of the contribution terms and privacy notice (Edibert backlog, Research Items). Before that release: decide whether the consent text links the reviewed terms, then release. Until then do not cut a release from `main` with the toggle, or hide it first
   - **Tracker:** release decision after the legal review.
@@ -117,6 +116,14 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 
 ### Version 2.+1 - Useability Improvements
+
+- [ ] Improvements for configuration - yet unsorted
+  - [ ] Instead of detailed devices just ask for existing ones and efficiency class - then take specified consumptions and usage dependent on persons in house.
+    - Specify typical schedules time-wise (starting statistics)
+  - [ ] Change way of specifying EV:
+    - Ask for typical distances instead of Rest-SOC + for nominal consumption --> calculate Rest-SOC for weekend and non-weekend separately
+  - [ ] Add possibility to define absences with defaults (summer holiday (2 weeks), easter holiday(2 weeks), skiing holiday (one week))
+  - [ ] Check coupling with automatic device activation (see research)
 
 - [ ] Review current chart for Kumulierte Kosten & Verbrauch *(after Chart1 review and after **Edibert P3b**, so slot prices come from one source)*
   - I'm not happy with this chart, because it's not really clear in it's message - maybe there are better solutions
