@@ -69,6 +69,7 @@ class CostAnalysisSlot:
     charge_from_grid_kwh: float
     discharge_to_load_kwh: float
     export_from_battery_kwh: float
+    export_from_pv_kwh: float
     house_grid_cost_euro: float
 
 
@@ -187,6 +188,7 @@ def build_slot_from_powers(
         charge_from_grid_kwh=round(flows.charge_from_grid * dt_hours, 6),
         discharge_to_load_kwh=round(flows.discharge_to_load * dt_hours, 6),
         export_from_battery_kwh=round(flows.export_from_battery * dt_hours, 6),
+        export_from_pv_kwh=round(flows.export_from_pv * dt_hours, 6),
         house_grid_cost_euro=round(house_grid_cost, 6),
     )
 

@@ -118,6 +118,54 @@ def test_build_slot_discharge_export_split() -> None:
     assert slot.discharge_to_load_kwh == pytest.approx(0.25)
     assert slot.export_from_battery_kwh == pytest.approx(0.5)
     assert slot.battery_discharge_kwh == pytest.approx(0.75)
+    assert slot.export_from_pv_kwh == pytest.approx(0.0)
+
+
+def test_usage_vs_price_pv_chart_monitor_colors_and_export() -> None:
+    from ui.chart_colors import (
+        CHART_PV_FILL_COLOR,
+        CHART_PV_LINE_COLOR,
+        COLOR_BASELOAD,
+        MUTED_BATTERY_EXPORT,
+        MUTED_EXPORT_PV,
+    )
+    from ui.consumer_cost_analysis_charts import window_usage_vs_price_pv_chart
+
+    pv_export = build_slot_from_powers(
+        slot_start=datetime(2026, 7, 20, 12, 0),
+        price_cent=20.0,
+        pv_kw=5.0,
+        load_by_id={BASELOAD_ID: 1.0},
+        battery_charge_kw=0.0,
+        battery_discharge_kw=0.0,
+        grid_import_kw=0.0,
+        grid_export_kw=4.0,
+    )
+    batt_export = build_slot_from_powers(
+        slot_start=datetime(2026, 7, 20, 20, 0),
+        price_cent=40.0,
+        pv_kw=0.0,
+        load_by_id={BASELOAD_ID: 1.0},
+        battery_charge_kw=0.0,
+        battery_discharge_kw=3.0,
+        grid_import_kw=0.0,
+        grid_export_kw=2.0,
+    )
+    assert pv_export.export_from_pv_kwh == pytest.approx(1.0)
+    window = resolve_rolling_window(datetime(2026, 7, 21, 0, 0), days=7)
+    fig = window_usage_vs_price_pv_chart(
+        (pv_export, batt_export), labels={BASELOAD_ID: "Grundlast"}, window=window
+    )
+    traces = {t.name: t for t in fig.data}
+    assert fig.layout.barmode == "relative"
+    assert traces["Grundlast"].marker.color == COLOR_BASELOAD
+    assert list(traces["Einspeisung (PV)"].y) == pytest.approx([-1.0, 0.0])
+    assert traces["Einspeisung (PV)"].marker.color == MUTED_EXPORT_PV
+    assert list(traces["Einspeisung (Batterie)"].y) == pytest.approx([0.0, -0.5])
+    assert traces["Einspeisung (Batterie)"].marker.color == MUTED_BATTERY_EXPORT
+    assert traces["PV (kW)"].line.color == CHART_PV_LINE_COLOR
+    assert traces["PV (kW)"].fillcolor == CHART_PV_FILL_COLOR
+    assert traces["Importpreis"].line.color == "red"
 
 
 def test_battery_flow_chart_stacked_totals() -> None:

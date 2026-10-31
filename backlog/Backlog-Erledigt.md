@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Minor change cost analysis chart colors and export (2026-10-31)
+
+- [x] **[release/2.7] Chart „Verbrauch vs. Preis & PV“ (Analyse Verbrauch & Kosten): Monitor Chart-1 colors and exported energy.** Consumer bars keep the Chart-1 consumer colors and now use the Chart-1 bar opacity (0.75). PV is drawn as line with yellow fill (`CHART_PV_LINE_COLOR` / `CHART_PV_FILL_COLOR`), the import price as red step line like in Monitor. New: export below zero as „Einspeisung (PV)“ (`MUTED_EXPORT_PV`) and „Einspeisung (Batterie)“ (`MUTED_BATTERY_EXPORT`), muted opacity 0.5, barmode `relative`; slots carry `export_from_pv_kwh` from `allocate_slot_flows`. Needs a pick to `main`.
+
+### Bugfix forced-charge absolute shortfall threshold (2026-10-31)
+
+- [x] **[release/2.7] Forced-charge deviation (`battery_charge_energy_below_ratio`): absolute shortfall threshold.** The rule fired on the ratio alone (delivered slot energy < `params.max_ratio` × target energy), so small Soll amounts raised false alarms when only a few Wh were missing. Fix: both forced-charge rules fire only when the ratio is violated **and** the shortfall (target − delivered energy per slot) exceeds `params.min_shortfall_kwh` (shipped 0.1, per rule in the pack); a rule using the predicate without either parameter fails loud. Migration step `dm4.deviation_energy_shortfall` adds `min_shortfall_kwh` (0.1) where missing and keeps custom values. Needs a pick to `main`. **Verified 2026-10-31** by the maintainer (forced-charge markers over a day with small Soll amounts).
+
+### Bugfix heat-pump deviation energy grading (2026-10-31)
+
+- [x] **[release/2.7] Heat-pump deviation („Freigabe, aber nicht angesprungen“): grade like forced charging.** The rule had only `power_mismatch_positive` with the global `tolerances.power_kw` (0.05 kW), so any shortfall above 50 W raised the hint, even when the heat pump ran and only drew a bit less. Fix: new consumer predicate `power_energy_below_ratio`: slot energy < `params.max_ratio` × Soll energy **and** shortfall > `params.min_shortfall_kwh` (shipped 0.5 / 0.1 kWh, per rule, separate from the forced-charge rules). No verdict without the consumer's closed-interval slot mean (`closed_interval.flex_kw`); the tooltip shows % and kWh. `dm4.deviation_energy_shortfall` rewrites the rule while it has the shipped form (ids `wp_heating_enable_no_start` / `waermepumpe_enable_no_start`) and keeps a custom message. Needs a pick to `main`. **Verified 2026-10-31** by the maintainer (heat-pump hints over a day).
+
 ### Bugfix regression coverage issue #50 reporter constellation (2026-10-31)
 
 - [x] **Regression: possible private case from the issue #50 reporter:** the reporter's configuration (HA backend, fixed import tariff + spot-indexed export, Netznutzung) is a typical constellation that the public cases did not cover. Ask for an anonymised config/debug dump (question list in the private business backlog); if it arrives, intake it as a private L1 case (`python -m scripts.run_regression --intake DUMP.zip --id REG-50-<slug> --private`, repo `Earnie-regression-private`). Meanwhile public L2 case `REG-S-gross-tariff-netznutzung` pins the VAT-on-Netznutzung rule (k_act 18 ct = 12 + 5 × 1.2). **Verified 2026-10-31** by the maintainer.
