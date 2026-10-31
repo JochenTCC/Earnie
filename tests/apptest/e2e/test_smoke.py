@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -169,6 +170,72 @@ def test_tariffs_user_tariff_created_and_selected_in_a_scenario(page: Page, app_
         waited += 0.25
     expect(page.get_by_text("Bezugstarif-Vorschau")).to_be_visible(timeout=_TIMEOUT_MS)
     expect(page.get_by_role("button", name="Benutzertarif bearbeiten")).to_be_visible()
+
+
+# --- Tarife: Monatstabelle im Browser (Edibert 0.1.h, TE4) -------------------------------
+# AppTest kann ``st.data_editor`` nicht bedienen; Edibert prüft TE4 deshalb nur auf
+# Modellebene. Hier wird die Tabelle (Glide-Grid, Canvas) über die Zell-Editoren befüllt.
+
+_MONTHLY_LABEL = "Browser Monatstarif"
+_MONTHLY_ID = "user_browser_monatstarif"
+_GRID_HEADER_PX = 35  # Kopfzeile und Zeilenhöhe des Streamlit-Daten-Editors
+_GRID_ROW_PX = 35
+_GRID_MARKER_PX = 35  # Auswahlspalte (Checkbox) bei num_rows="dynamic"
+
+
+def _edit_cell(page: Page, grid: Locator, row: int, column: str, text: str) -> None:
+    """Doppelklick öffnet den Zell-Editor (Overlay im ``#portal``); Enter übernimmt.
+
+    Die Lage wird jedes Mal neu gemessen: Vorschau und Reruns verschieben das Grid.
+    """
+    grid.scroll_into_view_if_needed()
+    box = grid.bounding_box()
+    assert box is not None
+    left, right = box["x"] + _GRID_MARKER_PX + 30, box["x"] + box["width"] - 30
+    x = {"year": left, "month": (left + right) / 2, "cent": right}[column]
+    page.mouse.dblclick(x, box["y"] + _GRID_HEADER_PX + _GRID_ROW_PX * (row + 0.5))
+    editor = page.locator("#portal input, #portal textarea").first
+    expect(editor).to_be_visible(timeout=_TIMEOUT_MS)
+    editor.fill(text)
+    editor.press("Enter")
+    _wait_until_idle(page)
+
+
+@pytest.mark.browser_context_args(locale="de-AT")  # Zahlen-Editor folgt der Locale: Dezimalkomma
+def test_tariffs_monthly_rates_entered_in_the_table_are_saved(page: Page, app_server: AppServer) -> None:
+    page.goto(f"{app_server.url}/tariffs")
+    new_import = page.get_by_role("button", name="Neuer Bezugstarif")
+    expect(new_import).to_be_visible(timeout=_TIMEOUT_MS)
+    _wait_until_idle(page)
+    new_import.click()
+    _wait_until_idle(page)
+    _type_and_commit(page, page.get_by_label("Name des Tarifs"), _MONTHLY_LABEL)
+    page.get_by_text("Monatspreise", exact=True).click()
+    _wait_until_idle(page)
+
+    grid = page.get_by_test_id("stDataFrame")
+    expect(grid).to_have_count(1, timeout=_TIMEOUT_MS)
+    # Erste Zeile (Vorbelegung: aktueller Monat, 0.0 ct): Preis überschreiben.
+    _edit_cell(page, grid, 0, "cent", "12,5")
+
+    today = date.today()
+    nxt = date(today.year + today.month // 12, today.month % 12 + 1, 1)
+    grid.hover()  # die Werkzeugleiste erscheint erst beim Überfahren
+    page.get_by_role("button", name="Add row").click()
+    _wait_until_idle(page)
+    _edit_cell(page, grid, 1, "year", str(nxt.year))
+    _edit_cell(page, grid, 1, "month", str(nxt.month))
+    _edit_cell(page, grid, 1, "cent", "13,5")
+
+    page.get_by_role("button", name="Tarif speichern").click()
+    expect(page.get_by_text(f"Gespeichert als „{_MONTHLY_ID}“.")).to_be_visible(timeout=_TIMEOUT_MS)
+    user_file = Path(os.environ["EARNIE_TARIFFS_PATH"]).with_name("user_tariffs.json")
+    (saved,) = json.loads(user_file.read_text(encoding="utf-8"))["import_tariffs"]
+    assert (saved["id"], saved["type"]) == (_MONTHLY_ID, "monthly_table")
+    assert sorted((r["year"], r["month"], r["tariff_cent_kwh"]) for r in saved["monthly_rates"]) == [
+        (today.year, today.month, 12.5),
+        (nxt.year, nxt.month, 13.5),
+    ]
 
 
 # --- Hauskonfigurator: erste Eingabe nach dem Öffnen -------------------------------------
