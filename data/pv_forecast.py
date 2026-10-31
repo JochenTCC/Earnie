@@ -390,22 +390,57 @@ def _shadow_ext_record(
     safe_record(key, ok=ok, payload=payload, status=status, error=error)
 
 
-def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[list, bool]:
-    """Map API hourly watts onto target slots (QH inherits parent clock hour)."""
-    from optimizer.slot_duration import floor_to_hour_slot
+def _forecast_solar_curve(hourly_watts: dict) -> list[tuple[datetime, float]]:
+    """forecast.solar ``watts`` as (local time, W) points, sorted by time."""
+    return sorted(
+        (datetime.strptime(key, "%Y-%m-%d %H:%M:%S"), float(watts))
+        for key, watts in hourly_watts.items()
+    )
 
-    pv_vector = [0.0] * len(target_hours)
+
+def _curve_mean_kw(
+    curve: list[tuple[datetime, float]], start: datetime, end: datetime
+) -> float:
+    """Mean kW over [start, end) of the piecewise linear curve (0 outside its points)."""
+    area_wh = 0.0
+    for (t0, w0), (t1, w1) in zip(curve, curve[1:]):
+        lo, hi = max(t0, start), min(t1, end)
+        if hi <= lo:
+            continue
+        span_s = (t1 - t0).total_seconds()
+        w_lo = w0 + (w1 - w0) * (lo - t0).total_seconds() / span_s
+        w_hi = w0 + (w1 - w0) * (hi - t0).total_seconds() / span_s
+        area_wh += (w_lo + w_hi) / 2.0 * (hi - lo).total_seconds() / 3600.0
+    return area_wh / ((end - start).total_seconds() / 3600.0) / 1000.0
+
+
+def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[list, bool]:
+    """Mean kW per target slot from forecast.solar ``watts``.
+
+    ``watts`` is the power **at** each timestamp (hours plus sunrise / sunset points);
+    forecast.solar's ``watt_hours_period`` is the trapezoid of these points. A slot gets
+    the trapezoid mean over its own interval, so hourly slots match the period energy
+    and QH slots follow the curve. Slots outside the points (night, beyond the data) get 0.
+    """
+    from optimizer.slot_duration import slot_step
+
+    curve = _forecast_solar_curve(hourly_watts)
+    first, last = curve[0][0], curve[-1][0]
+    starts = [dt.replace(tzinfo=None) for dt in target_hours]
+    pv_vector = [0.0] * len(starts)
     success_count = 0
 
-    for idx, target_dt in enumerate(target_hours):
-        key_str = target_dt.strftime("%Y-%m-%d %H:%M:%S")
-        if key_str not in hourly_watts:
-            parent = floor_to_hour_slot(target_dt)
-            key_str = parent.strftime("%Y-%m-%d %H:%M:%S")
-        if key_str in hourly_watts:
-            watts = hourly_watts[key_str]
-            pv_vector[idx] = round(watts / 1000.0, 3)
-            success_count += 1
+    for idx, start in enumerate(starts):
+        if idx + 1 < len(starts):
+            end = starts[idx + 1]
+        elif idx > 0:
+            end = start + (start - starts[idx - 1])
+        else:
+            end = start + slot_step()
+        if end <= first or start >= last:
+            continue
+        pv_vector[idx] = round(_curve_mean_kw(curve, start, end), 3)
+        success_count += 1
 
     if success_count > 0:
         print(
