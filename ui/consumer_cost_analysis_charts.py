@@ -10,6 +10,8 @@ import streamlit as st
 
 import config
 from ui.chart_colors import (
+    CHART_PV_FILL_COLOR,
+    CHART_PV_LINE_COLOR,
     COLOR_BASELOAD,
     COLOR_GRID_IMPORT,
     COLOR_PV,
@@ -18,8 +20,10 @@ from ui.chart_colors import (
     MUTED_BATTERY_EXPORT,
     MUTED_BATTERY_LOAD,
     MUTED_BATTERY_STANDBY,
+    MUTED_EXPORT_PV,
     flex_bar_chart_color,
 )
+from ui.chart_flow_segments import _BRIGHT_BAR_OPACITY, _MUTED_BAR_OPACITY
 from ui.consumer_cost_analysis_data import (
     BASELOAD_ID,
     CostAnalysisSeries,
@@ -75,7 +79,10 @@ def window_usage_vs_price_pv_chart(
     labels: Mapping[str, str],
     window: TimeWindow,
 ) -> go.Figure:
-    """Stacked consumer kWh bars with PV (kW) and price overlays."""
+    """Stacked consumer kWh bars, export below zero, PV (kW) and price overlays.
+
+    Colors follow Monitor Chart 1 (history zone).
+    """
     fig = go.Figure()
     if not slots:
         fig.update_layout(title="Keine Daten")
@@ -102,6 +109,27 @@ def window_usage_vs_price_pv_chart(
             x=x_values,
             y=energy_by_id[cid],
             marker_color=_consumer_color(cid, by_id),
+            opacity=_BRIGHT_BAR_OPACITY,
+            yaxis="y",
+        )
+
+    # Export below zero, styled like the muted Chart-1 export segments.
+    for name, values, color in (
+        ("Einspeisung (PV)", [slot.export_from_pv_kwh for slot in slots], MUTED_EXPORT_PV),
+        (
+            "Einspeisung (Batterie)",
+            [slot.export_from_battery_kwh for slot in slots],
+            MUTED_BATTERY_EXPORT,
+        ),
+    ):
+        if not any(v > 1e-9 for v in values):
+            continue
+        fig.add_bar(
+            name=name,
+            x=x_values,
+            y=[-v for v in values],
+            marker_color=color,
+            opacity=_MUTED_BAR_OPACITY,
             yaxis="y",
         )
 
@@ -110,7 +138,9 @@ def window_usage_vs_price_pv_chart(
         x=x_values,
         y=[slot.pv_kw for slot in slots],
         mode="lines",
-        line=dict(color=COLOR_PV, width=2),
+        line=dict(color=CHART_PV_LINE_COLOR, width=2),
+        fill="tozeroy",
+        fillcolor=CHART_PV_FILL_COLOR,
         yaxis="y",
     )
     fig.add_scatter(
@@ -118,12 +148,12 @@ def window_usage_vs_price_pv_chart(
         x=x_values,
         y=[slot.price_cent for slot in slots],
         mode="lines",
-        line=dict(color=COLOR_GRID_IMPORT, width=2, dash="dot"),
+        line=dict(color="red", width=2.5, shape="hv"),
         yaxis="y2",
     )
     fig.update_layout(
         title=f"Verbrauch vs. Preis & PV — {format_window_label(window)}",
-        barmode="stack",
+        barmode="relative",
         height=380,
         margin=dict(l=40, r=50, t=50, b=40),
         yaxis=dict(title="kWh / kW", side="left"),
