@@ -24,6 +24,34 @@ for _key in GIT_LOCATION_ENV:
     os.environ.pop(_key, None)
 
 
+# Streamlit AppTest defaults to a 3 s script timeout. Under the full xdist run
+# (``-n auto``, all cores busy, MILP tests in parallel) a cold script run regularly
+# exceeds it and fails with "AppTest script run timed out after 3(s)" in a random
+# test. The timeout only decides how long a hung script may take before it fails,
+# so raise the floor for every AppTest; larger explicit values stay unchanged.
+APPTEST_MIN_TIMEOUT_S = 30.0
+
+
+def _raise_apptest_default_timeout() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    original_init = AppTest.__init__
+
+    def _init(self, script_path, *, default_timeout, args=None, kwargs=None):
+        original_init(
+            self,
+            script_path,
+            default_timeout=max(default_timeout, APPTEST_MIN_TIMEOUT_S),
+            args=args,
+            kwargs=kwargs,
+        )
+
+    AppTest.__init__ = _init
+
+
+_raise_apptest_default_timeout()
+
+
 def _configure_console_utf8() -> None:
     """Windows cp1252 stdout cannot encode repo Unicode (→, ₀, umlauts)."""
     if hasattr(sys.stdout, "reconfigure"):
