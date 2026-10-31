@@ -269,6 +269,7 @@ def test_build_heat_storage_observability_includes_q(mock_readings):
     consumer = {
         "id": "wp_heating",
         "type": "thermal_annual",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
         "nominal_power_kw": 3.0,
         "thermal": {
             "living_area_m2": 0.0,
@@ -335,6 +336,7 @@ def test_live_horizon_need_uses_floor_not_hdd(monkeypatch):
             {
                 "id": "waermepumpe",
                 "type": "thermal_annual",
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                 "nominal_power_kw": 1.9,
                 "thermal": {
                     "living_area_m2": 157.0,

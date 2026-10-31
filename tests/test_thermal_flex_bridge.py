@@ -26,7 +26,7 @@ def _wp_consumer() -> dict:
         "nominal_power_kw": 1.6,
         "living_area_m2": 157.0,
         "building_class": 2,
-        "heat_pump_type": "erde",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
         "persons": 2,
         "target_temp_c": 21.5,
         "heating_limit_c": 15.0,
@@ -624,7 +624,7 @@ def test_resolve_thermal_flex_se_has_no_forced_indices(monkeypatch):
     profile["consumers"][0]["thermal"] = {
         "living_area_m2": 157.0,
         "building_class": 2,
-        "heat_pump_type": "erde",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
         "persons": 2,
         "target_temp_c": 21.5,
         "heating_limit_c": 15.0,

@@ -151,6 +151,7 @@ def test_ev_and_thermal_targets_use_csv_window(tmp_path: Path) -> None:
             {
                 "id": "wp_heating",
                 "type": "thermal_annual",
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                 "nominal_power_kw": 5.0,
                 "profile_csv": str(wp_csv),
                 "use_profile_csv": True,

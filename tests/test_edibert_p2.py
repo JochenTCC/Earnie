@@ -51,7 +51,7 @@ def test_tracks_match_edibert() -> None:
 def test_plan_lists_both_steps_and_all_questions(tmp_path: Path) -> None:
     plan = plan_migration(_copy(tmp_path))
     assert plan.can_run, plan.blockers
-    assert plan.pending_step_ids == ("dm5.netznutzung_split", "tf1.tariff_format")
+    assert plan.pending_step_ids == ("dm5.netznutzung_split", "dm5.heat_source", "tf1.tariff_format")
     by_id = {q.id: q for q in plan.questions}
     assert set(by_id) == set(ANSWERS)
     assert all(q.required for q in by_id.values())
@@ -68,7 +68,7 @@ def test_plan_lists_both_steps_and_all_questions(tmp_path: Path) -> None:
 def test_one_run_one_backup_matches_golden_and_is_idempotent(tmp_path: Path) -> None:
     config_dir = _copy(tmp_path)
     report = run_migration(config_dir, ANSWERS)
-    assert report.applied_step_ids == ("dm5.netznutzung_split", "tf1.tariff_format")
+    assert report.applied_step_ids == ("dm5.netznutzung_split", "dm5.heat_source", "tf1.tariff_format")
     backups = list((config_dir / "backups").iterdir())
     assert len(backups) == 1 and backups[0].name.startswith("pre-migration-dm4-dm5-")
     golden = FIXTURES / "goldens" / NAME

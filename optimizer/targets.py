@@ -222,6 +222,48 @@ def resolve_thermal_annual_horizon_kwh(
     return float(total)
 
 
+def resolve_heating_rod_horizon_kwh(
+    consumer: dict,
+    optimization_matrix: list | None,
+) -> float:
+    """Upper bound [kWh] for a heating rod: the parent's heat demand over the matrix days.
+
+    The rod has no delivery target; this only lets the MILP plan it (caps per day in
+    ``thermal_flex_context``). Live: 0 until an EHAL binding for the rod exists.
+    """
+    if not optimization_matrix:
+        return 0.0
+    from optimizer.live_cycle_scope import is_live_thermal_planning
+
+    if is_live_thermal_planning(optimization_matrix):
+        return 0.0
+    profile = config.get_resolved_runtime_settings().get("_house_profile")
+    if not profile:
+        return 0.0
+    from house_config.planning_flex_bridge import _house_thermal_consumers
+    from optimizer.thermal_flex_context import thermal_daily_heat_kwh_for_date
+
+    parent = next(
+        (
+            item
+            for item in _house_thermal_consumers(profile)
+            if str(item["id"]) == str(consumer["parent_id"])
+        ),
+        None,
+    )
+    if parent is None:
+        raise ValueError(
+            f"Heizstab '{consumer['id']}': thermal_annual '{consumer['parent_id']}' fehlt "
+            "im Hausprofil."
+        )
+    dates = sorted(
+        {row.get("date") for row in optimization_matrix if isinstance(row.get("date"), date)}
+    )
+    return float(
+        sum(thermal_daily_heat_kwh_for_date(parent, profile, day) for day in dates)
+    )
+
+
 def resolve_horizon_target_kwh(
     consumer: dict,
     consumer_daily_targets_kwh: dict | None,
@@ -242,6 +284,8 @@ def resolve_horizon_target_kwh(
         return float(resolve_thermal_daily_target_kwh(consumer, horizon=horizon))
     if source == "thermal_annual" and not logged_targets_only:
         return resolve_thermal_annual_horizon_kwh(consumer, optimization_matrix)
+    if source == "heating_rod" and not logged_targets_only:
+        return resolve_heating_rod_horizon_kwh(consumer, optimization_matrix)
     return resolve_daily_target_kwh(
         consumer,
         consumer_daily_targets_kwh,

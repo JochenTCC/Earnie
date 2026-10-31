@@ -112,6 +112,135 @@ def _render_thermal_annual_building_fields(
     return item
 
 
+_HEAT_SOURCE_LABELS = {
+    "heat_pump": "Wärmepumpe",
+    "oil": "Öl",
+    "gas": "Gas",
+    "pellets": "Pellets",
+    "district_heat": "Fernwärme",
+    "wood": "Stückholz",
+    "electric_direct": "Stromheizung (direkt)",
+}
+_HEAT_PUMP_LABELS = {"luft": "Luft", "erde": "Erde (Sole)", "grundwasser": "Grundwasser"}
+_FUEL_UNIT_LABELS = {
+    "ct_per_liter": "ct/l",
+    "ct_per_kwh": "ct/kWh",
+    "eur_per_ton": "€/t",
+    "eur_per_rm": "€/rm",
+}
+
+
+def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str) -> dict:
+    """Heat source (SUSI P1): type, heat-pump kind, optional efficiency / fuel price."""
+    from house_config.heat_source import (
+        HEAT_PUMP_TYPES,
+        HEAT_SOURCE_TYPES,
+        default_efficiency,
+        fuel_price_in_unit,
+        fuel_unit,
+        heat_source_defaults,
+        heat_source_is_electric,
+    )
+
+    existing = thermal.get("heat_source") if isinstance(thermal.get("heat_source"), dict) else {}
+    current_type = str(existing.get("type") or "heat_pump")
+    source_type = labeled_selectbox(
+        "Wärmequelle",
+        options=list(HEAT_SOURCE_TYPES),
+        index=list(HEAT_SOURCE_TYPES).index(current_type)
+        if current_type in HEAT_SOURCE_TYPES
+        else 0,
+        format_func=lambda key: _HEAT_SOURCE_LABELS.get(key, key),
+        key=_scoped_key(session_scope, f"hc_heat_source_{index}"),
+    )
+    heat_source: dict = {"type": source_type}
+    if source_type == "heat_pump":
+        current_hp = str(existing.get("heat_pump_type") or "luft")
+        heat_source["heat_pump_type"] = labeled_selectbox(
+            "WP-Typ",
+            options=list(HEAT_PUMP_TYPES),
+            index=list(HEAT_PUMP_TYPES).index(current_hp)
+            if current_hp in HEAT_PUMP_TYPES
+            else 0,
+            format_func=lambda key: _HEAT_PUMP_LABELS.get(key, key),
+            key=_scoped_key(session_scope, f"hc_wp_{index}"),
+        )
+    same_type = existing.get("type") == source_type
+    default_eff = default_efficiency(heat_source)
+    eff_label = "JAZ" if source_type == "heat_pump" else "Nutzungsgrad"
+    own_eff = labeled_checkbox(
+        f"Eigene {eff_label} (Standard {default_eff:.2f})",
+        value=same_type and existing.get("efficiency") not in (None, ""),
+        key=_scoped_key(session_scope, f"hc_heat_eff_use_{index}"),
+    )
+    if own_eff:
+        heat_source["efficiency"] = labeled_number_input(
+            eff_label,
+            min_value=0.05,
+            value=float((existing.get("efficiency") if same_type else None) or default_eff),
+            step=0.05,
+            key=_scoped_key(session_scope, f"hc_heat_eff_{index}"),
+        )
+    if not heat_source_is_electric(heat_source):
+        unit = _FUEL_UNIT_LABELS[str(fuel_unit(heat_source))]
+        default_price = fuel_price_in_unit({"type": source_type})
+        as_of = heat_source_defaults()["fuel_price_as_of"]
+        own_price = labeled_checkbox(
+            f"Eigener Brennstoffpreis (Standard {default_price:g} {unit}, Stand {as_of})",
+            value=same_type and existing.get("fuel_price") not in (None, ""),
+            key=_scoped_key(session_scope, f"hc_fuel_price_use_{index}"),
+        )
+        if own_price:
+            heat_source["fuel_price"] = labeled_number_input(
+                f"Brennstoffpreis ({unit})",
+                min_value=0.01,
+                value=float((existing.get("fuel_price") if same_type else None) or default_price),
+                step=0.5,
+                key=_scoped_key(session_scope, f"hc_fuel_price_{index}"),
+            )
+    return heat_source
+
+
+def _render_heating_rod_fields(
+    consumer: dict, index: int, *, session_scope: str
+) -> list[dict]:
+    """Heating rod part (only with heat storage); η = 1 into the store, planned by the MILP."""
+    from house_config.heat_source import (
+        HEATING_ROD_PART_ID,
+        HEATING_ROD_PART_TYPE,
+        heating_rod_part,
+    )
+
+    existing = heating_rod_part(consumer)
+    enabled = labeled_checkbox(
+        "Heizstab im Wärmespeicher",
+        value=existing is not None,
+        key=_scoped_key(session_scope, f"hc_rod_use_{index}"),
+    )
+    if not enabled:
+        return []
+    power = labeled_number_input(
+        "Heizstab Leistung (kW)",
+        min_value=0.1,
+        value=float((existing or {}).get("nominal_power_kw") or 3.0),
+        step=0.5,
+        help=(
+            "Lädt den Wärmespeicher mit Wirkungsgrad 1. Der Optimierer setzt ihn ein, "
+            "wenn Strom günstiger ist als Wärme aus der Hauptquelle (Planung im "
+            "Szenarien-Explorer; Live-Steuerung folgt mit eigenem EHAL-Binding)."
+        ),
+        ratios=WIDE_LABEL_RATIOS,
+        key=_scoped_key(session_scope, f"hc_rod_kw_{index}"),
+    )
+    return [
+        {
+            "id": HEATING_ROD_PART_ID,
+            "type": HEATING_ROD_PART_TYPE,
+            "nominal_power_kw": float(power),
+        }
+    ]
+
+
 def _render_thermal_comfort_fields(
     item: dict,
     thermal: dict,
@@ -119,14 +248,8 @@ def _render_thermal_comfort_fields(
     *,
     session_scope: str,
 ) -> None:
-    item["heat_pump_type"] = labeled_selectbox(
-        "WP-Typ",
-        options=["luft", "erde"],
-        index=1
-        if str(thermal.get("heat_pump_type") or consumer_default("heat_pump_type"))
-        == "erde"
-        else 0,
-        key=_scoped_key(session_scope, f"hc_wp_{index}"),
+    item["heat_source"] = _render_heat_source_fields(
+        thermal, index, session_scope=session_scope
     )
     item["persons"] = labeled_number_input(
         "Personen",
@@ -185,17 +308,26 @@ def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
 
     latitude = location["latitude"]
     longitude = location["longitude"]
+    from data.modeled_climate import thermal_annual_fuel_kwh_from_archive
+    from house_config.heat_source import heat_source_is_electric
+
     thermal_preview = {**item, "latitude": latitude, "longitude": longitude}
-    wp_annual, ref_year = thermal_annual_kwh_from_archive(
-        thermal_preview,
-        house_profile={
-            "latitude": latitude,
-            "longitude": longitude,
-            "default_pv_tilt": location["default_pv_tilt"],
-            "default_pv_azimuth": location["default_pv_azimuth"],
-        },
-    )
-    st.metric("Geschätzter WP-Jahresbedarf (kWh/a)", f"{wp_annual:.0f}")
+    house_profile = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "default_pv_tilt": location["default_pv_tilt"],
+        "default_pv_azimuth": location["default_pv_azimuth"],
+    }
+    if heat_source_is_electric(item["heat_source"]):
+        wp_annual, ref_year = thermal_annual_kwh_from_archive(
+            thermal_preview, house_profile=house_profile
+        )
+        st.metric("Geschätzter Strombedarf Heizung (kWh/a)", f"{wp_annual:.0f}")
+    else:
+        fuel_annual, ref_year = thermal_annual_fuel_kwh_from_archive(
+            thermal_preview, house_profile=house_profile
+        )
+        st.metric("Geschätzter Brennstoffbedarf (kWh/a Endenergie)", f"{fuel_annual:.0f}")
     st.caption(
         f"Basis: Open-Meteo-Archiv {ref_year} "
         f"({latitude:.4f}°N, {longitude:.4f}°E)"
@@ -269,6 +401,7 @@ def _render_thermal_storage_fields(
 
 def _render_thermal_annual_wp_preview(
     item: dict,
+    consumer: dict,
     thermal: dict,
     index: int,
     *,
@@ -292,6 +425,9 @@ def _render_thermal_annual_wp_preview(
     )
     if storage is not None:
         item["heat_storage"] = storage
+        parts = _render_heating_rod_fields(consumer, index, session_scope=session_scope)
+        if parts:
+            item["parts"] = parts
     if _live_markers_enabled():
         st.caption(
             "WP-Bindings unter **Daemon Control → EHAL-Com** "
@@ -313,6 +449,7 @@ def _render_thermal_annual_fields(
     )
     _render_thermal_annual_wp_preview(
         item,
+        consumer,
         thermal,
         index,
         session_scope=session_scope,
@@ -462,12 +599,29 @@ def _overlay_thermal_annual_fields(
             ("building_class", f"hc_class_{index}", int),
             ("building_mass", f"hc_building_mass_{index}", str),
             ("persons", f"hc_persons_{index}", int),
-            ("heat_pump_type", f"hc_wp_{index}", str),
             ("hwb_kwh_m2", f"hc_hwb_{index}", float),
             ("house_tolerance_c", f"hc_house_tol_{index}", float),
             ("house_heat_loss_kw_per_k", f"hc_house_h_{index}", float),
         ),
     )
+    stored = preview.get("heat_source") if isinstance(preview.get("heat_source"), dict) else {}
+    heat_source = dict(stored)
+    _overlay_session_fields(
+        heat_source,
+        session_scope,
+        (
+            ("type", f"hc_heat_source_{index}", str),
+            ("heat_pump_type", f"hc_wp_{index}", str),
+        ),
+    )
+    if heat_source.get("type") != stored.get("type"):
+        heat_source.pop("efficiency", None)
+        heat_source.pop("fuel_price", None)
+    if heat_source.get("type") != "heat_pump":
+        heat_source.pop("heat_pump_type", None)
+    elif not heat_source.get("heat_pump_type"):
+        heat_source["heat_pump_type"] = "luft"
+    preview["heat_source"] = heat_source
     _overlay_profile_geo(preview, session_scope)
 
 

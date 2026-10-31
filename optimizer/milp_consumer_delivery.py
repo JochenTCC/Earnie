@@ -28,7 +28,7 @@ from .milp_consumer_vars import (
     _min_on_hours,
     _planned_consumer_kwh_in_slots,
 )
-from .thermal_flex_context import is_thermal_flex_consumer
+from .thermal_flex_context import is_heating_rod_consumer, is_thermal_flex_consumer
 from .slot_duration import DEFAULT_DT_H
 
 if TYPE_CHECKING:
@@ -413,7 +413,8 @@ def _add_consumer_delivery_constraints(
 ) -> None:
     filters = filter_contexts or {}
     for consumer in model.planned_consumers:
-        if is_thermal_flex_consumer(consumer):
+        # Thermal day targets and the heating rod's caps live in thermal_flex_context.
+        if is_thermal_flex_consumer(consumer) or is_heating_rod_consumer(consumer):
             continue
         _add_one_consumer_delivery_constraints(
             model,

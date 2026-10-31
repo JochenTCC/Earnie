@@ -193,7 +193,7 @@ def test_thermal_daily_pwm_preserves_daily_kwh():
     params = {
         "living_area_m2": 120.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_efficiency": 3.5,
         "persons": 2,
         "latitude": 48.2,
         "longitude": 11.0,
@@ -254,7 +254,7 @@ def test_thermal_on_off_preserves_weekly_kwh():
     params = {
         "living_area_m2": 120.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_efficiency": 3.5,
         "persons": 2,
         "latitude": 48.2,
         "longitude": 11.0,
@@ -287,7 +287,7 @@ def test_thermal_hourly_overlay_maps_slots(monkeypatch):
                 "nominal_power_kw": 3.0,
                 "living_area_m2": 100.0,
                 "building_class": 3,
-                "heat_pump_type": "luft",
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                 "persons": 2,
                 "latitude": 48.2,
                 "longitude": 11.0,

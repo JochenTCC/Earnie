@@ -24,7 +24,7 @@ def _base_thermal() -> dict:
     return {
         "living_area_m2": 120.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
         "persons": 2,
         "latitude": 48.2,
         "longitude": 11.0,
@@ -103,7 +103,7 @@ def test_consumer_annual_kwh_reflects_solar_thermal(monkeypatch):
         "longitude": 11.0,
         "living_area_m2": 120.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
         "persons": 2,
         "heat_storage": _heat_storage(),
     }
@@ -136,7 +136,7 @@ def test_profiles_store_geo_and_solar_roundtrip(tmp_path: Path, monkeypatch):
                         "nominal_power_kw": 3.0,
                         "living_area_m2": 100.0,
                         "building_class": 3,
-                        "heat_pump_type": "luft",
+                        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                         "persons": 2,
                         "solar_thermal_area_m2": 4.0,
                         "solar_thermal_tilt_deg": 20.0,

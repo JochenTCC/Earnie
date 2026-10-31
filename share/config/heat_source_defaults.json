@@ -1,0 +1,60 @@
+{
+  "description": "Standard values per heat source type (SUSI P1). Used when a house profile's heat_source sets no efficiency / fuel_price. Efficiency = seasonal performance factor (JAZ) for heat pumps, annual efficiency (Nutzungsgrad) otherwise; no age dependency.",
+  "sources": {
+    "efficiency": "Heat pumps luft / erde: Earnie defaults before SUSI P1 (unchanged); grundwasser and boilers: SUSI hinterlegteWerte.json, new device (Energieinstitut Vorarlberg); electric_direct: Heizrechner v5.0 Stromheizung.",
+    "energy_content": "SUSI hinterlegteWerte.json (oil 10 kWh/l, pellets 4,900 kWh/t, wood 1,800 kWh/rm).",
+    "fuel_price": "Heizrechner v5.0 defaults (Energieinstitut Vorarlberg), as of 2022 — outdated, refresh before release.",
+    "co2_g_per_kwh": "Hexit / Replace data.js (Energieinstitut Vorarlberg); wood: Heizrechner v5.0 Stückholz."
+  },
+  "fuel_price_as_of": "2022",
+  "electricity_co2_g_per_kwh": 226,
+  "heat_pump_types": {
+    "luft": {"efficiency": 3.5},
+    "erde": {"efficiency": 4.3},
+    "grundwasser": {"efficiency": 4.2}
+  },
+  "types": {
+    "heat_pump": {"electric": true},
+    "electric_direct": {"electric": true, "efficiency": 0.99},
+    "oil": {
+      "electric": false,
+      "efficiency": 0.90,
+      "fuel_unit": "ct_per_liter",
+      "kwh_per_unit": 10.0,
+      "fuel_price": 104.8,
+      "co2_g_per_kwh": 344
+    },
+    "gas": {
+      "electric": false,
+      "efficiency": 0.95,
+      "fuel_unit": "ct_per_kwh",
+      "kwh_per_unit": 1.0,
+      "fuel_price": 10.43,
+      "co2_g_per_kwh": 249
+    },
+    "pellets": {
+      "electric": false,
+      "efficiency": 0.85,
+      "fuel_unit": "eur_per_ton",
+      "kwh_per_unit": 4900.0,
+      "fuel_price": 322.0,
+      "co2_g_per_kwh": 26
+    },
+    "district_heat": {
+      "electric": false,
+      "efficiency": 0.95,
+      "fuel_unit": "ct_per_kwh",
+      "kwh_per_unit": 1.0,
+      "fuel_price": 10.5,
+      "co2_g_per_kwh": 42
+    },
+    "wood": {
+      "electric": false,
+      "efficiency": 0.80,
+      "fuel_unit": "eur_per_rm",
+      "kwh_per_unit": 1800.0,
+      "fuel_price": 50.0,
+      "co2_g_per_kwh": 25
+    }
+  }
+}

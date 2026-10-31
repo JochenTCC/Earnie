@@ -145,7 +145,9 @@ Der Szenario-Explorer hat keine Sonnenaufgang-Navigation wie der Monitor und fü
 
 ### Gesamtkosten und -Verbrauch
 
-Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Gesamtverbrauch [kWh]` (= Jahres Verbrauch + Speicher-Standby), `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
+Die Tabelle **Gesamtkosten und -Verbrauch** hat die Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Speicher-Standby [kWh]`, `Gesamtverbrauch [kWh]` (= Jahres Verbrauch + Speicher-Standby), `CO2 [kg]`, `Jahres Kosten [€]`, `Δ vs Referenz [€]` und `Hinweis`. Das Delta bezieht sich immer auf die Zeile der Live-Referenz.
+
+Heizt ein Hausprofil mit einem Brennstoff (Öl, Gas, Pellets, Fernwärme, Stückholz, siehe [Wärmequelle](../konfiguration/flexible-verbraucher.md#haus-wärme-wärmequelle-heat_source)), kommen die Spalten `Brennstoff [kWh]` und `Brennstoffkosten [€]` dazu. `Jahres Kosten [€]` enthält dann Strom **und** Brennstoff. Den Brennstoff rechnet Earnie aus der Jahressimulation über die gebuchten Tage; die Wärme eines Heizstabs zieht er davon ab. `CO2 [kg]` = Netzbezug × 226 g/kWh plus Brennstoff × Faktor des Energieträgers.
 
 Der volumetrische **Netznutzung Arbeitspreis** (je Netzgebiet aus `grid_fees.json`) fließt in die Kosten des Szenario-Explorers ein. Ein **Leistungspreis** wird noch nicht berücksichtigt. Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md).
 

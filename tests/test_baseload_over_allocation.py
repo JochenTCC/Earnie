@@ -174,7 +174,7 @@ def _thermal_profile_raw() -> dict:
                 "nominal_power_kw": 1.9,
                 "living_area_m2": 150.0,
                 "building_class": 2,
-                "heat_pump_type": "erde",
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
                 "persons": 2,
                 "hwb_kwh_m2": 40.0,
             },

@@ -1,6 +1,11 @@
 """Normalize thermal_annual consumer fields for house profiles."""
 from __future__ import annotations
 
+from house_config.heat_source import (
+    normalize_heat_source,
+    normalize_parts,
+    reject_legacy_heat_pump_type,
+)
 from house_config.profile_schema_defaults import consumer_default
 
 
@@ -41,11 +46,16 @@ def _raw_thermal_field(raw: dict, key: str):
     return None
 
 
+def _label(raw: dict) -> str:
+    return f"thermal_annual '{raw.get('id') or '?'}'"
+
+
 def _build_thermal_block(raw: dict) -> dict:
     """``spec['thermal']`` dict of a thermal_annual consumer (defaults for missing fields)."""
     from optimizer.thermal_coupled import normalize_heat_storage
     from optimizer.thermal_house import normalize_building_mass
 
+    reject_legacy_heat_pump_type(raw, label=_label(raw))
     hwb_raw = _raw_thermal_field(raw, "hwb_kwh_m2")
     hwb_value = float(hwb_raw) if hwb_raw not in (None, "") else 0.0
     target_temp_c = float(
@@ -69,12 +79,9 @@ def _build_thermal_block(raw: dict) -> dict:
             _raw_thermal_field(raw, "building_class")
             or consumer_default("building_class")
         ),
-        "heat_pump_type": str(
-            _raw_thermal_field(raw, "heat_pump_type")
-            or consumer_default("heat_pump_type")
-        )
-        .strip()
-        .lower(),
+        "heat_source": normalize_heat_source(
+            _raw_thermal_field(raw, "heat_source"), label=_label(raw)
+        ),
         "persons": _persons(raw),
         "target_temp_c": target_temp_c,
         "absent_temp_reduction_c": absent_temp_reduction_c(raw, target_temp_c),
@@ -120,6 +127,11 @@ def normalize_thermal_annual_consumer(
 ) -> None:
     """Fill ``spec['thermal']`` and related flex fields for thermal_annual."""
     spec["thermal"] = _build_thermal_block(raw)
+    spec["parts"] = normalize_parts(
+        raw.get("parts"),
+        label=_label(raw),
+        has_heat_storage="heat_storage" in spec["thermal"],
+    )
     if "optimizer_flex" in raw:
         spec["optimizer_flex"] = bool(raw["optimizer_flex"])
     window = raw.get("thermal_flex_window")

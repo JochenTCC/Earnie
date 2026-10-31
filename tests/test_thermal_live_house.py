@@ -18,7 +18,7 @@ def _source(**thermal_overrides) -> dict:
     thermal = {
         "living_area_m2": 157.0,
         "building_class": 2,
-        "heat_pump_type": "erde",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
         "persons": 2,
         "target_temp_c": 21.5,
         "heating_limit_c": 15.0,
@@ -59,7 +59,7 @@ def test_house_horizon_matches_year_sim_day(fixed_h):
     year = house_year_result(
         living_area_m2=157.0,
         building_class=2,
-        heat_pump_type="erde",
+        heat_efficiency=4.3,
         persons=2,
         latitude=47.4,
         longitude=9.7,

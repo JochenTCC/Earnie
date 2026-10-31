@@ -415,8 +415,15 @@ def _house_thermal_consumers(house_profile: dict) -> list[dict]:
 
 
 def thermal_optimizer_flex_enabled(consumer: dict) -> bool:
-    """True wenn thermal_annual über MILP statt PWM-Overlay laufen soll."""
+    """True wenn thermal_annual über MILP statt PWM-Overlay laufen soll.
+
+    A fuel heat source (gas, oil, …) draws no power, so it is never an electric flex.
+    """
+    from house_config.heat_source import consumer_heat_source, heat_source_is_electric
+
     if consumer.get("type") != "thermal_annual":
+        return False
+    if not heat_source_is_electric(consumer_heat_source(consumer)):
         return False
     nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     if nominal <= 0.0:
@@ -473,6 +480,70 @@ def planning_thermal_consumers(house_profile: dict) -> list[dict]:
     ]
 
 
+def planning_heating_rod_to_milp(consumer: dict, part: dict) -> dict:
+    """Heating rod part (D1) → flat binary MILP entry with ``parent_id`` (SUSI P1).
+
+    The rod has no target of its own: with an electric parent it shares the parent's day
+    heat target (rod kWh count as heat, the heat pump's as kWh × JAZ); with a fuel parent
+    it earns the avoided fuel cost per kWh, capped at the day's heat demand
+    (``optimizer.thermal_flex_context``). Live plans it only once an EHAL binding exists
+    (follow-up item), so its Live target is 0.
+    """
+    from house_config.heat_source import (
+        consumer_heat_source,
+        heat_source_efficiency,
+        heat_source_is_electric,
+        heating_rod_fuel_credit_cent_per_kwh,
+        part_kennung,
+    )
+
+    parent_id = str(consumer["id"])
+    heat_source = consumer_heat_source(consumer)
+    electric_parent = heat_source_is_electric(heat_source)
+    if electric_parent and not thermal_optimizer_flex_enabled(consumer):
+        raise ValueError(
+            f"thermal_annual '{parent_id}': Heizstab braucht die MILP-Planung der "
+            "Wärmequelle (nominal_power_kw > 0, optimizer_flex nicht false)."
+        )
+    nominal = float(part["nominal_power_kw"])
+    entry: dict = {
+        "id": part_kennung(parent_id, str(part["id"])),
+        "name": "Heizstab",
+        "type": "heating_rod",
+        "parent_id": parent_id,
+        "nominal_power_kw": nominal,
+        "min_power_kw": nominal,
+        "min_on_quarterhours": 1,
+        "daily_target_kwh": 0.0,
+        "daily_target_source": "heating_rod",
+        "signal_type": "binary",
+        "log_signal_type": "binary",
+        "optimizer_enabled": True,
+        "path_historical_log": "",
+        "loxone_outputs": {},
+        "loxone_inputs": {},
+        "parent_heat_electric": electric_parent,
+        "parent_heat_efficiency": heat_source_efficiency(heat_source),
+    }
+    if not electric_parent:
+        entry["fuel_credit_cent_per_kwh"] = heating_rod_fuel_credit_cent_per_kwh(heat_source)
+    window = consumer.get("thermal_flex_window")
+    if isinstance(window, dict) and window:
+        entry["thermal_flex_window"] = dict(window)
+    return entry
+
+
+def planning_heating_rod_consumers(house_profile: dict) -> list[dict]:
+    from house_config.heat_source import heating_rod_part
+
+    rods: list[dict] = []
+    for consumer in _house_thermal_consumers(house_profile):
+        part = heating_rod_part(consumer)
+        if part is not None:
+            rods.append(planning_heating_rod_to_milp(consumer, part))
+    return rods
+
+
 def collect_planning_flex_consumers(house_profile: dict) -> list[dict]:
     """Generic MILP-flex + EV + thermal_annual + thermal_rc + optional pool_filter.
 
@@ -496,6 +567,7 @@ def collect_planning_flex_consumers(house_profile: dict) -> list[dict]:
         flex_generic
         + planning_ev_consumers(house_profile)
         + planning_thermal_consumers(house_profile)
+        + planning_heating_rod_consumers(house_profile)
         + thermal_rc_flex
         + filters
     )

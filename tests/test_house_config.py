@@ -327,7 +327,7 @@ def test_consumer_annual_kwh_flat_thermal():
         "type": "thermal_annual",
         "living_area_m2": 120.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
         "persons": 2,
     }
     assert consumer_annual_kwh(consumer) > 0.0
@@ -770,7 +770,7 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path, monkeypatch):
         "nominal_power_kw": 1.6,
         "living_area_m2": 157.0,
         "building_class": 2,
-        "heat_pump_type": "erde",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
         "persons": 2,
         "loxone_inputs": {"power_name": "Ernie_WP_P_act"},
         "loxone_outputs": {"enable_name": "Ernie_WP_Freigabe"},
@@ -801,7 +801,7 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path, monkeypatch):
         "nominal_power_kw": 1.6,
         "living_area_m2": 157.0,
         "building_class": 2,
-        "heat_pump_type": "erde",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
         "persons": 2,
     }
     merged = [
@@ -1136,7 +1136,7 @@ def test_merge_empty_base_uses_historical_chart_color_indices():
                 "nominal_power_kw": 1.6,
                 "living_area_m2": 120.0,
                 "building_class": 2,
-                "heat_pump_type": "erde",
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
                 "persons": 2,
                 "target_temp_c": 21.5,
                 "heating_limit_c": 15.0,
@@ -1650,7 +1650,14 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "latitude": 48.2,
                 "longitude": 11.0,
                 "netznutzung": {"area_id": "user_no_grid_fee"},
-                "consumers": [{"id": "heat", "type": "thermal_annual", "nominal_power_kw": 3.0}]
+                "consumers": [
+                    {
+                        "id": "heat",
+                        "type": "thermal_annual",
+                        "nominal_power_kw": 3.0,
+                        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"}
+                    }
+                ]
             }]
         }
         """.strip(),

@@ -132,7 +132,7 @@ def _default_consumer() -> dict:
         "nominal_power_kw": 3.5,
         "living_area_m2": consumer_default("living_area_m2"),
         "building_class": consumer_default("building_class"),
-        "heat_pump_type": consumer_default("heat_pump_type"),
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
         "persons": consumer_default("persons"),
     }
 

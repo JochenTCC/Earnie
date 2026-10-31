@@ -36,7 +36,9 @@ Beim Wechsel auf Datenmodell 5 laufen in **einem** Assistenten-Lauf (ein Backup)
 - **`dm5.netznutzung_split`:** Das Hausprofil-Objekt `netznutzung` enthält nur noch den Netzbereich (`area_id`, Pflicht) und die Messart. Ein eigener Arbeitspreis (`area_id: null` mit `base_cent_kwh`) wird unverändert zum Benutzer-Netzbereich `user_<Hausprofil-ID>` in `user_grid_fees.json`. Hat ein Hausprofil weder Netzbereich noch eigenen Wert (oder `0`), fragt der Assistent: Katalog-Netzbereich wählen oder `user_<Hausprofil-ID>` (eigener Netzbereich mit 0 Cent/kWh, bewusst kein Netzentgelt). Details: [Preise](../konfiguration/preise.md#eigener-arbeitspreis-benutzer-netzbereich).
 - **`tf1.tariff_format`:** `tariffs.json`, `user_tariffs.json`, `grid_fees.json` und `user_grid_fees.json` erhalten `tariff_format: 1`; `earnie_data_model` verschwindet aus `tariffs.json`. Für jeden Benutzertarif ohne `vat_percent` fragt der Assistent den USt-Satz ab (Pflicht, `0` erlaubt). Der Standardsatz des Landes (AT 20 %, DE 19 %, CH 8,1 %) steht als Vorschlag daneben und wird nur nach Klick auf **Vorschlag übernehmen** eingetragen.
 
-Ohne diese Migration lädt Earnie Hausprofile mit `base_cent_kwh` oder ohne `area_id` und Tarifdateien ohne `tariff_format` nicht; die Meldung verweist auf den Assistenten.
+Im selben Lauf ersetzt **`dm5.heat_source`** das Feld `heat_pump_type` der Haus-Wärme durch die Wärmequelle `heat_source` (`{"type": "heat_pump", "heat_pump_type": …}`). Fehlte `heat_pump_type`, schreibt der Schritt `luft`; das war bisher der Standardwert. Ein unbekannter Wert stoppt die Migration mit Hinweis. Details: [Wärmequelle](../konfiguration/flexible-verbraucher.md#haus-wärme-wärmequelle-heat_source).
+
+Ohne diese Migration lädt Earnie Hausprofile mit `base_cent_kwh`, ohne `area_id` oder mit `heat_pump_type` und Tarifdateien ohne `tariff_format` nicht; die Meldung verweist auf den Assistenten.
 
 ### Loxone: alte Merkernamen behalten oder leeren
 

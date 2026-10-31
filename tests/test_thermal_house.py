@@ -65,7 +65,7 @@ def test_house_year_winter_keeps_band_without_store():
     result = house_year_result(
         living_area_m2=120.0,
         building_class=3,
-        heat_pump_type="luft",
+        heat_efficiency=3.5,
         persons=2,
         latitude=48.2,
         longitude=11.0,
@@ -93,7 +93,7 @@ def test_house_year_with_store_returns_both_temps():
     result = house_year_result(
         living_area_m2=100.0,
         building_class=3,
-        heat_pump_type="luft",
+        heat_efficiency=3.5,
         persons=2,
         latitude=48.2,
         longitude=11.0,

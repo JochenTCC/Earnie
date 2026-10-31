@@ -34,7 +34,7 @@ def _thermal_annual(cid: str, **thermal) -> dict:
             **_GEO,
             "living_area_m2": 157.0,
             "building_class": 2,
-            "heat_pump_type": "erde",
+            "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
             "persons": 2,
             "target_temp_c": 21.5,
             "heating_limit_c": 15.0,

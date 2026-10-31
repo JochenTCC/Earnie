@@ -22,7 +22,6 @@ from data.heating_need_pwm import (  # noqa: F401  (re-exported)
 )
 
 _BUILDING_KWH_M2 = {1: 15.0, 2: 45.0, 3: 80.0, 4: 130.0}
-_JAZ = {"luft": 3.5, "erde": 4.3}
 _SOLAR_THERMAL_EFFICIENCY = 0.40
 SOLAR_THERMAL_EFFICIENCY = _SOLAR_THERMAL_EFFICIENCY
 _CLIMATE_CACHE_CANDIDATES = (
@@ -39,10 +38,6 @@ def specific_heating_kwh_m2(
     if hwb_kwh_m2 is not None and float(hwb_kwh_m2) > 0:
         return float(hwb_kwh_m2)
     return _BUILDING_KWH_M2.get(int(building_class), 80.0)
-
-
-def heat_pump_jaz(heat_pump_type: str) -> float:
-    return _JAZ.get(str(heat_pump_type).lower().strip(), 3.5)
 
 
 def warm_water_kwh_week(persons: int) -> float:
@@ -271,11 +266,24 @@ def _resolve_climate_series(
     return daily_temps, daily_radiation_mj, calendar_dates
 
 
-def daily_electric_kwh(
+def daily_electric_kwh(**kwargs) -> list[float]:
+    """Elektrischer Bedarf der Wärmequelle pro Kalendertag (kWh); 0 bei Brennstoffen."""
+    daily, fuel = _daily_input_kwh(**kwargs)
+    return daily if not fuel else [0.0] * len(daily)
+
+
+def daily_fuel_kwh(**kwargs) -> list[float]:
+    """Brennstoffbedarf (Endenergie, kWh) pro Kalendertag; 0 bei elektrischer Wärmequelle."""
+    daily, fuel = _daily_input_kwh(**kwargs)
+    return daily if fuel else [0.0] * len(daily)
+
+
+def _daily_input_kwh(
     *,
     living_area_m2: float,
     building_class: int,
-    heat_pump_type: str,
+    heat_efficiency: float,
+    heat_electric: bool = True,
     persons: int,
     latitude: float,
     longitude: float,
@@ -294,15 +302,16 @@ def daily_electric_kwh(
     building_mass: str | None = None,
     house_tolerance_c: float | None = None,
     house_heat_loss_kw_per_k: float | None = None,
-) -> list[float]:
-    """Elektrischer WP-Bedarf pro Kalendertag (kWh)."""
+) -> tuple[list[float], bool]:
+    """Eingangsenergie der Wärmequelle pro Tag (Wärme / Nutzungsgrad) und ob sie Brennstoff ist."""
     if float(living_area_m2) > 0.0:
         from optimizer.thermal_house import house_year_result
 
-        return house_year_result(
+        result = house_year_result(
             living_area_m2=living_area_m2,
             building_class=building_class,
-            heat_pump_type=heat_pump_type,
+            heat_efficiency=heat_efficiency,
+            heat_electric=heat_electric,
             persons=persons,
             latitude=latitude,
             longitude=longitude,
@@ -321,13 +330,16 @@ def daily_electric_kwh(
             building_mass=building_mass,
             house_tolerance_c=house_tolerance_c,
             house_heat_loss_kw_per_k=house_heat_loss_kw_per_k,
-        ).daily_electric_kwh
+        )
+        if heat_electric:
+            return result.daily_electric_kwh, False
+        return result.daily_fuel_kwh, True
 
     # Fallback without Wohnfläche: legacy open-loop HDD path (no house RC).
-    return _daily_electric_kwh_hdd(
+    hdd = _daily_electric_kwh_hdd(
         living_area_m2=living_area_m2,
         building_class=building_class,
-        heat_pump_type=heat_pump_type,
+        heat_efficiency=heat_efficiency,
         persons=persons,
         latitude=latitude,
         longitude=longitude,
@@ -342,13 +354,14 @@ def daily_electric_kwh(
         solar_thermal_tilt_deg=solar_thermal_tilt_deg,
         solar_thermal_azimuth_deg=solar_thermal_azimuth_deg,
     )
+    return hdd, not heat_electric
 
 
 def _daily_electric_kwh_hdd(
     *,
     living_area_m2: float,
     building_class: int,
-    heat_pump_type: str,
+    heat_efficiency: float,
     persons: int,
     latitude: float,
     longitude: float,
@@ -363,7 +376,7 @@ def _daily_electric_kwh_hdd(
     solar_thermal_tilt_deg: float,
     solar_thermal_azimuth_deg: float,
 ) -> list[float]:
-    """Legacy open-loop HDD path of ``daily_electric_kwh`` (no house RC)."""
+    """Legacy open-loop HDD path of ``_daily_input_kwh`` (no house RC)."""
     area_m2 = float(solar_thermal_area_m2)
     daily_temps, daily_radiation_mj, calendar_dates = _resolve_climate_series(
         latitude=latitude,
@@ -386,7 +399,7 @@ def _daily_electric_kwh_hdd(
     )
     factors = daily_heating_factors(daily_temps, target_temp_c, heating_limit_c)
     ww_day = warm_water_kwh_week(persons) / 7.0
-    jaz = heat_pump_jaz(heat_pump_type)
+    jaz = float(heat_efficiency)
     daily: list[float] = []
     for day_idx, factor in enumerate(factors):
         heat_day = annual_heat * factor
@@ -413,7 +426,8 @@ def weekly_electric_kwh(
     *,
     living_area_m2: float,
     building_class: int,
-    heat_pump_type: str,
+    heat_efficiency: float,
+    heat_electric: bool = True,
     persons: int,
     latitude: float,
     longitude: float,
@@ -437,7 +451,8 @@ def weekly_electric_kwh(
     daily = daily_electric_kwh(
         living_area_m2=living_area_m2,
         building_class=building_class,
-        heat_pump_type=heat_pump_type,
+        heat_efficiency=heat_efficiency,
+        heat_electric=heat_electric,
         persons=persons,
         latitude=latitude,
         longitude=longitude,
@@ -472,6 +487,7 @@ def _thermal_hwb_value(thermal: dict) -> float | None:
 
 def heating_params_from_thermal(thermal: dict) -> dict:
     """Gemeinsame Parameter für estimate_annual_kwh / weekly_electric_kwh."""
+    from house_config.heat_source import heat_source_efficiency, heat_source_is_electric
     from optimizer.thermal_coupled import normalize_heat_storage
     from optimizer.thermal_house import (
         DEFAULT_HOUSE_TOLERANCE_C,
@@ -481,7 +497,8 @@ def heating_params_from_thermal(thermal: dict) -> dict:
     params = {
         "living_area_m2": float(thermal.get("living_area_m2", 0.0)),
         "building_class": int(thermal.get("building_class", 3)),
-        "heat_pump_type": str(thermal.get("heat_pump_type", "luft")),
+        "heat_efficiency": heat_source_efficiency(thermal["heat_source"]),
+        "heat_electric": heat_source_is_electric(thermal["heat_source"]),
         "persons": int(thermal.get("persons", 2)),
         "latitude": float(thermal.get("latitude", 48.0)),
         "longitude": float(thermal.get("longitude", 10.0)),
@@ -513,7 +530,8 @@ def estimate_annual_kwh(
     *,
     living_area_m2: float,
     building_class: int,
-    heat_pump_type: str,
+    heat_efficiency: float,
+    heat_electric: bool = True,
     persons: int,
     latitude: float,
     longitude: float,
@@ -534,7 +552,8 @@ def estimate_annual_kwh(
     weekly = weekly_electric_kwh(
         living_area_m2=living_area_m2,
         building_class=building_class,
-        heat_pump_type=heat_pump_type,
+        heat_efficiency=heat_efficiency,
+        heat_electric=heat_electric,
         persons=persons,
         latitude=latitude,
         longitude=longitude,

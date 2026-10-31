@@ -373,10 +373,39 @@ def _annual_cost_hinweis(
     return " · ".join(hints) if hints else _DASH
 
 
+def _heat_fuel_cells(meta: dict, scenario_id: str, *, show_fuel: bool) -> dict:
+    """Brennstoff / CO2 cells (SUSI P1); empty when the log has no ``heat_fuel`` block."""
+    block = (meta.get("heat_fuel") or {}).get(scenario_id)
+    if not meta.get("heat_fuel"):
+        return {}
+    cells: dict = {}
+    if show_fuel:
+        fuel_kwh = float((block or {}).get("fuel_kwh") or 0.0)
+        cells["Brennstoff [kWh]"] = _format_kwh(fuel_kwh) if fuel_kwh else _DASH
+        cells["Brennstoffkosten [€]"] = (
+            f"{float(block['fuel_eur']):.2f} €" if fuel_kwh else _DASH
+        )
+    cells["CO2 [kg]"] = f"{float(block['co2_kg']):.0f}" if block else _DASH
+    return cells
+
+
+def _totals_with_fuel(meta: dict, totals: dict) -> dict:
+    """Jahres Kosten = Strom (``summary.total_eur``) + Brennstoff (``heat_fuel``)."""
+    fuel = meta.get("heat_fuel") or {}
+    return {
+        sid: float(total) + float((fuel.get(sid) or {}).get("fuel_eur") or 0.0)
+        for sid, total in totals.items()
+    }
+
+
 def build_annual_cost_rows(meta: dict) -> list[dict]:
     """Gesamtkosten rows; Jahres Verbrauch / Standby from the booked series of every row."""
     summary = meta.get("summary", {})
-    totals = summary.get("total_eur", {})
+    totals = _totals_with_fuel(meta, summary.get("total_eur", {}))
+    show_fuel = any(
+        float((block or {}).get("fuel_kwh") or 0.0) > 0.0
+        for block in (meta.get("heat_fuel") or {}).values()
+    )
     labels = meta.get("labels", {})
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
     booked = _booked(meta)
@@ -411,6 +440,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                     "Jahres Verbrauch [kWh]": kwh_cell,
                     "Speicher-Standby [kWh]": standby_cell,
                     "Gesamtverbrauch [kWh]": total_cell,
+                    **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
                     "Jahres Kosten [€]": f"{total_eur:.2f} €",
                     "Δ vs Referenz [€]": _DASH,
                     "Hinweis": hinweis,
@@ -427,6 +457,7 @@ def build_annual_cost_rows(meta: dict) -> list[dict]:
                 "Jahres Verbrauch [kWh]": kwh_cell,
                 "Speicher-Standby [kWh]": standby_cell,
                 "Gesamtverbrauch [kWh]": total_cell,
+                **_heat_fuel_cells(meta, scenario_id, show_fuel=show_fuel),
                 "Jahres Kosten [€]": f"{total_eur:.2f} €",
                 "Δ vs Referenz [€]": delta_cell,
                 "Hinweis": hinweis,

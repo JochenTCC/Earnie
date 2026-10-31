@@ -78,7 +78,7 @@ def test_modeled_thermal_annual_prefers_open_meteo_collector(monkeypatch):
         "thermal": {
             "living_area_m2": 100.0,
             "building_class": 3,
-            "heat_pump_type": "erde",
+            "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
             "persons": 2,
             "latitude": 47.4,
             "longitude": 9.7,
@@ -131,7 +131,7 @@ def test_modeled_thermal_annual_archive_requests_collector(monkeypatch):
         "thermal": {
             "living_area_m2": 157.0,
             "building_class": 3,
-            "heat_pump_type": "erde",
+            "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
             "persons": 2,
             "latitude": 47.4,
             "longitude": 9.74,
@@ -677,7 +677,7 @@ def test_modeled_temperature_series_passes_collector_irradiance(monkeypatch):
                 "thermal": {
                     "living_area_m2": 100.0,
                     "building_class": 3,
-                    "heat_pump_type": "luft",
+                    "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                     "persons": 2,
                     "latitude": 48.2,
                     "longitude": 11.0,

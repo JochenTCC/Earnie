@@ -3,7 +3,14 @@ from __future__ import annotations
 
 import pytest
 
-from house_config.profiles_thermal_annual import _build_thermal_block, int_or_default
+from house_config.profiles_thermal_annual import _build_thermal_block as _build_raw
+from house_config.profiles_thermal_annual import int_or_default
+
+_HEAT_SOURCE = {"heat_source": {"type": "heat_pump", "heat_pump_type": "luft"}}
+
+
+def _build_thermal_block(raw: dict) -> dict:
+    return _build_raw({**_HEAT_SOURCE, **raw})
 
 
 def test_int_or_default_keeps_zero() -> None:

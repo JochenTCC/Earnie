@@ -18,7 +18,7 @@
       "min_on_quarterhours": 4,
       "living_area_m2": 120.0,
       "building_class": 3,
-      "heat_pump_type": "luft",
+      "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
       "persons": 2,
       "target_temp_c": 21.5,
       "heating_limit_c": 15.0,

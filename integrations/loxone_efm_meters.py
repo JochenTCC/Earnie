@@ -499,7 +499,7 @@ def _new_efm_consumer(*, consumer_id: str, label: str) -> dict[str, Any]:
     elif hk_type == "thermal_annual":
         consumer["living_area_m2"] = 0.0
         consumer["building_class"] = 3
-        consumer["heat_pump_type"] = "luft"
+        consumer["heat_source"] = {"type": "heat_pump", "heat_pump_type": "luft"}
         consumer["persons"] = 2
     return consumer
 

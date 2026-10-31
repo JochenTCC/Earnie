@@ -21,7 +21,7 @@ def _house_kwargs(**overrides) -> dict:
     kwargs = {
         "living_area_m2": 100.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_efficiency": 3.5,
         "persons": 2,
         "latitude": 48.2,
         "longitude": 11.0,
@@ -90,6 +90,8 @@ def test_house_hit_returns_isolated_copies():
     "overrides",
     [
         {"hp_electric_kw": 4.0},
+        {"heat_efficiency": 4.3},
+        {"heat_electric": False},
         {"daily_temps": [2.0, 5.0, -1.0, 8.5]},
         {"heat_storage": None},
         {

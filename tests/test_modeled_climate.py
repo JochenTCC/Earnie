@@ -25,7 +25,7 @@ def _profile() -> dict:
                 "nominal_power_kw": 2.0,
                 "living_area_m2": 120.0,
                 "building_class": 3,
-                "heat_pump_type": "luft",
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                 "persons": 2,
                 "solar_thermal_area_m2": 0.0,
             }
@@ -112,7 +112,7 @@ def test_thermal_annual_kwh_from_archive(monkeypatch):
         "longitude": 10.0,
         "living_area_m2": 120.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
         "persons": 2,
         "heat_storage": {
             "volume_liters": 800.0,
@@ -188,7 +188,7 @@ def _heat_pump_consumer() -> dict:
         "timezone_name": "Europe/Vienna",
         "living_area_m2": 150.0,
         "building_class": 2,
-        "heat_pump_type": "erde",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
         "persons": 2,
         "target_temp_c": 21.5,
         "heating_limit_c": 15.0,

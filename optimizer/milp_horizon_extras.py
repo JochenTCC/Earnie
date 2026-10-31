@@ -175,4 +175,20 @@ def _add_milp_objective(
         tie_break += eps_on * pulp.lpSum(on_vars) + eps_time * pulp.lpSum(
             t * on_vars[t] for t in range(len(on_vars))
         )
-    model.prob += energy_cost + wear_cost + curtail_cost + tie_break
+    model.prob += (
+        energy_cost + wear_cost + curtail_cost + tie_break - _heating_rod_fuel_credit(model)
+    )
+
+
+def _heating_rod_fuel_credit(model: MilpHorizonModel):
+    """Avoided fuel cost [cent] of heating rods beside a fuel heat source (SUSI P1)."""
+    credit = 0.0
+    dt_h = float(model.dt_h)
+    for consumer in model.planned_consumers:
+        cent = consumer.get("fuel_credit_cent_per_kwh")
+        if cent is None:
+            continue
+        cid = consumer["id"]
+        charge_kw = float(model.consumer_milp_charge_kw[cid])
+        credit += float(cent) * charge_kw * dt_h * pulp.lpSum(model.consumer_on[cid])
+    return credit

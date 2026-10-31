@@ -43,7 +43,9 @@ def test_unknown_field_fails_loud():
 def test_thermal_annual_missing_keys_use_schema_defaults():
     from house_config.profiles_thermal_annual import _build_thermal_block
 
-    thermal = _build_thermal_block({"type": "thermal_annual"})
+    thermal = _build_thermal_block(
+        {"type": "thermal_annual", "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"}}
+    )
     assert thermal["absent_temp_reduction_c"] == 2.5
     assert thermal["living_area_m2"] == 120.0
     assert thermal["target_temp_c"] == 21.5
@@ -54,7 +56,8 @@ def test_thermal_annual_missing_keys_use_schema_defaults():
 def test_thermal_annual_explicit_zero_area_is_kept():
     from house_config.profiles_thermal_annual import _build_thermal_block
 
-    assert _build_thermal_block({"living_area_m2": 0})["living_area_m2"] == 0.0
+    raw = {"living_area_m2": 0, "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"}}
+    assert _build_thermal_block(raw)["living_area_m2"] == 0.0
 
 
 def test_saved_absent_reduction_is_kept():

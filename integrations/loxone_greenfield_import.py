@@ -313,7 +313,7 @@ def _stub_consumer(*, consumer_id: str, label: str, hk_type: str, bindings: dict
     elif hk_type == "thermal_annual":
         consumer["living_area_m2"] = 0.0
         consumer["building_class"] = 3
-        consumer["heat_pump_type"] = "luft"
+        consumer["heat_source"] = {"type": "heat_pump", "heat_pump_type": "luft"}
         consumer["persons"] = 2
     elif hk_type == "thermal_rc":
         consumer["thermal_rc"] = dict(_DEFAULT_THERMAL_RC)

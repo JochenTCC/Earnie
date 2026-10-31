@@ -159,6 +159,7 @@ def test_observability_reports_collector_source(mock_readings, monkeypatch):
     consumer = {
         "id": "wp",
         "type": "thermal_annual",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
         "nominal_power_kw": 1.9,
         "thermal": {
             "living_area_m2": 0.0,

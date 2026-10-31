@@ -685,7 +685,7 @@ def test_house_profile_hwb_normalization(tmp_path, monkeypatch):
                                 "living_area_m2": 120,
                                 "building_class": 3,
                                 "hwb_kwh_m2": 62.0,
-                                "heat_pump_type": "luft",
+                                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                                 "persons": 2,
                             }
                         ],
@@ -745,7 +745,7 @@ def test_consumer_expander_title_includes_type_label():
         "living_area_m2": 120.0,
         "building_class": 3,
         "persons": 2,
-        "heat_pump_type": "luft",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
     }
     import ui.house_config_profile_form as form
 
@@ -932,6 +932,7 @@ def test_profile_accepts_thermal_on_second_consumer(tmp_path):
                             {
                                 "id": "heat2",
                                 "type": "thermal_annual",
+                                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                                 "living_area_m2": 100,
                             },
                         ],
@@ -964,11 +965,13 @@ def test_profile_rejects_two_thermal_annual_consumers(tmp_path):
                             {
                                 "id": "heat",
                                 "type": "thermal_annual",
+                                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                                 "living_area_m2": 100,
                             },
                             {
                                 "id": "heat2",
                                 "type": "thermal_annual",
+                                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                                 "living_area_m2": 80,
                             },
                         ],
@@ -1012,6 +1015,7 @@ def test_flatten_consumer_for_edit_merges_thermal():
         {
             "id": "heat",
             "type": "thermal_annual",
+            "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
             "thermal": {
                 "living_area_m2": 150.0,
                 "building_class": 2,
@@ -1715,7 +1719,7 @@ def test_upsert_thermal_profile_roundtrip(tmp_path, monkeypatch):
                             "nominal_power_kw": 6.0,
                             "living_area_m2": 165.0,
                             "building_class": 2,
-                            "heat_pump_type": "erde",
+                            "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
                             "persons": 3,
                             "hwb_kwh_m2": 58.0,
                             "solar_thermal_area_m2": 8.0,
@@ -1734,7 +1738,7 @@ def test_upsert_thermal_profile_roundtrip(tmp_path, monkeypatch):
     assert thermal["living_area_m2"] == 165.0
     assert thermal["building_class"] == 2
     assert thermal["hwb_kwh_m2"] == 58.0
-    assert thermal["heat_pump_type"] == "erde"
+    assert thermal["heat_source"] == {"type": "heat_pump", "heat_pump_type": "erde"}
     assert thermal["latitude"] == pytest.approx(47.8)
 
 

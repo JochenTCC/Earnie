@@ -95,7 +95,12 @@ def test_expected_ids_match_house_profile_synthesis(tmp_path, monkeypatch):
         "latitude": 47.4,
         "longitude": 9.7,
         "consumers": [
-            {"id": "wp_heating", "type": "thermal_annual", "nominal_power_kw": 1.6},
+            {
+                "id": "wp_heating",
+                "type": "thermal_annual",
+                "nominal_power_kw": 1.6,
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
+            },
             {"id": "ev", "type": "ev", "nominal_power_kw": 3.5},
             {
                 "id": "herd_kochen",

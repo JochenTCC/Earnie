@@ -153,7 +153,7 @@ def test_no_storage_uses_house_rc_not_legacy_open_loop():
         {
             "living_area_m2": 120.0,
             "building_class": 3,
-            "heat_pump_type": "luft",
+            "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
             "persons": 2,
             "latitude": 48.2,
             "longitude": 11.0,
@@ -174,7 +174,7 @@ def test_coupled_solar_reduces_summer_wp_vs_no_solar():
     base = {
         "living_area_m2": 120.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_efficiency": 3.5,
         "persons": 2,
         "latitude": 48.2,
         "longitude": 11.0,
@@ -206,7 +206,7 @@ def test_coupled_winter_demand_needs_wp():
     daily = daily_electric_kwh(
         living_area_m2=120.0,
         building_class=3,
-        heat_pump_type="luft",
+        heat_efficiency=3.5,
         persons=2,
         latitude=48.2,
         longitude=11.0,
@@ -228,7 +228,7 @@ def test_coupled_hourly_climate_path():
     daily = daily_electric_kwh(
         living_area_m2=100.0,
         building_class=3,
-        heat_pump_type="luft",
+        heat_efficiency=3.5,
         persons=2,
         latitude=48.2,
         longitude=11.0,
@@ -252,7 +252,7 @@ def test_coupled_hourly_store_temps_match_day_count():
     kwargs = dict(
         living_area_m2=100.0,
         building_class=3,
-        heat_pump_type="luft",
+        heat_efficiency=3.5,
         persons=2,
         latitude=48.2,
         longitude=11.0,
@@ -287,7 +287,7 @@ def test_coupled_hourly_solar_can_raise_store_above_setpoint():
     result = coupled_year_result(
         living_area_m2=100.0,
         building_class=3,
-        heat_pump_type="luft",
+        heat_efficiency=3.5,
         persons=2,
         latitude=48.2,
         longitude=11.0,
@@ -312,6 +312,7 @@ def test_profiles_normalize_heat_storage():
         {
             "living_area_m2": 100.0,
             "building_class": 2,
+            "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
             "heat_storage": _storage(volume_liters=1000.0),
         },
         spec,

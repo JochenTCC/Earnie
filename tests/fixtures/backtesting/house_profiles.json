@@ -25,7 +25,7 @@
                     "nominal_power_kw": 3.0,
                     "living_area_m2": 100,
                     "building_class": 3,
-                    "heat_pump_type": "luft",
+                    "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
                     "persons": 2,
                     "ehal_bindings": {
                         "heatpump.wp.set_enable": ""

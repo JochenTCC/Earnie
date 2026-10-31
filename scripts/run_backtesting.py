@@ -1114,10 +1114,23 @@ def main(argv: list[str] | None = None):
     standby_kw_by_result[HISTORICAL_REFERENCE_ID] = reference_standby_power_kw(
         reference_params
     )
+    clipped_results = clip_results_map_to_period(
+        sim_results, period_meta["start"], period_meta["end"]
+    )
     booked_consumption = booked_consumption_by_result(
-        clip_results_map_to_period(sim_results, period_meta["start"], period_meta["end"]),
+        clipped_results,
         standby_kw_by_result=standby_kw_by_result,
         reference_by_scenario=dict(period_meta.get("reference_by_scenario") or {}),
+    )
+    from simulation.heat_fuel import heat_fuel_by_result
+
+    heat_fuel = heat_fuel_by_result(
+        clipped_results,
+        {
+            **scenarios,
+            **{ref_id: params for ref_id, params, _label in extra_ref_specs},
+            HISTORICAL_REFERENCE_ID: reference_params,
+        },
     )
     log_path = save_backtesting_log(
         sim_results,
@@ -1134,6 +1147,7 @@ def main(argv: list[str] | None = None):
         },
         prices=prices if sim_cfg.get("export_price_series", False) else None,
         booked_consumption=booked_consumption,
+        heat_fuel=heat_fuel,
     )
     from runtime_store.usage_ping import note_scenarios_calculated
 

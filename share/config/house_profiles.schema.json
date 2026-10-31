@@ -449,6 +449,69 @@
         }
       }
     },
+    "heat_source": {
+      "type": "object",
+      "description": "Hauptwärmequelle des thermal_annual-Verbrauchers (SUSI P1). efficiency = JAZ (Wärmepumpe) bzw. Nutzungsgrad; ohne Angabe gilt der Standardwert aus share/config/heat_source_defaults.json. fuel_price nur bei Brennstoffen, in der Einheit des Energieträgers (Öl ct/l, Gas und Fernwärme ct/kWh, Pellets €/t, Holz €/rm).",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "heat_pump",
+            "oil",
+            "gas",
+            "pellets",
+            "district_heat",
+            "wood",
+            "electric_direct"
+          ]
+        },
+        "heat_pump_type": {
+          "enum": [
+            "luft",
+            "erde",
+            "grundwasser"
+          ],
+          "description": "Nur bei type heat_pump (Pflicht)."
+        },
+        "efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fuel_price": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "consumer_part": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "nominal_power_kw"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "enum": [
+            "heating_rod"
+          ]
+        },
+        "type": {
+          "enum": [
+            "heating_rod"
+          ]
+        },
+        "nominal_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Elektrische Leistung des Heizstabs (η = 1 in den Wärmespeicher)."
+        }
+      }
+    },
     "consumer": {
       "type": "object",
       "required": [
@@ -583,12 +646,15 @@
           "exclusiveMinimum": 0,
           "description": "Optional: genauer Heizwärmebedarf HWB in kWh/m²a (überschreibt Gebäudeklasse)."
         },
-        "heat_pump_type": {
-          "default": "luft",
-          "enum": [
-            "luft",
-            "erde"
-          ]
+        "heat_source": {
+          "$ref": "#/definitions/heat_source"
+        },
+        "parts": {
+          "type": "array",
+          "description": "Innere Teile des Verbrauchers (D1). 2.8: nur der Heizstab (id/type heating_rod) am thermal_annual-Verbraucher, nur mit heat_storage. Wire-Kennung = <consumer_id>_<part_id>.",
+          "items": {
+            "$ref": "#/definitions/consumer_part"
+          }
         },
         "persons": {
           "default": 2,

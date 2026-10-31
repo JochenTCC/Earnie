@@ -94,7 +94,7 @@ def test_milp_thermal_annual_not_added_to_live_grundlast_when_profile_has_only_t
                 "nominal_power_kw": 1.6,
                 "living_area_m2": 157.0,
                 "building_class": 2,
-                "heat_pump_type": "erde",
+                "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
                 "persons": 2,
                 "target_temp_c": 21.5,
                 "heating_limit_c": 15.0,

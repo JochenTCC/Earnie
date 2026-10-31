@@ -21,22 +21,22 @@ from simulation.baseload_validation import resolve_hourly_baseload_kw
 from simulation.engine import HistoricalDataCache, window_slot_datetimes
 
 
+_PROFILE_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "se_consumption" / "greenfield_like.json"
+)
+
+
 def _greenfield_profile() -> dict:
-    path = Path("greenfield/config/house_profiles.json")
-    if not path.is_file():
-        pytest.skip("greenfield house_profiles.json not available")
-    profiles = json.loads(path.read_text(encoding="utf-8"))["profiles"]
-    match = next((item for item in profiles if item["id"] == "mein_haushalt"), None)
-    if match is None:
-        pytest.skip("greenfield profile mein_haushalt not available")
-    return match
+    """Checked-in greenfield-like profile (never the local, ignored ``greenfield/`` pack)."""
+    return json.loads(_PROFILE_FIXTURE.read_text(encoding="utf-8"))
 
 
 def _thermal_consumer_id(profile: dict) -> str:
-    for consumer in profile.get("consumers") or []:
-        if consumer.get("type") == "thermal_annual":
-            return str(consumer["id"])
-    pytest.skip("greenfield profile missing thermal_annual consumer")
+    return next(
+        str(consumer["id"])
+        for consumer in profile["consumers"]
+        if consumer.get("type") == "thermal_annual"
+    )
 
 
 def _profile_consumer_ids(profile: dict) -> list[str]:

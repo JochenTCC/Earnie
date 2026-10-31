@@ -217,7 +217,7 @@ def plan_live_store_for_thermal_consumer(
     house_doc: dict | None = None,
 ) -> LiveStorePlan | None:
     """Build Live store plan from a thermal_annual house consumer; None if no store."""
-    from data.heating_need import heat_pump_jaz
+    from house_config.heat_source import consumer_heat_source, heat_source_efficiency
 
     thermal = consumer.get("thermal") or consumer
     storage_raw = thermal.get("heat_storage")
@@ -257,7 +257,7 @@ def plan_live_store_for_thermal_consumer(
         capacity_kwh_per_k=capacity,
         heat_loss_kw_per_k=float(storage["heat_loss_kw_per_k"]),
         wp_electric_kw=wp_kw,
-        jaz=heat_pump_jaz(str(thermal.get("heat_pump_type", "luft"))),
+        jaz=heat_source_efficiency(consumer_heat_source(consumer)),
         temp_low_c=readings.temp_low_c,
         solar_forecast_kw=resolved_solar,
         living_area_m2=living,

@@ -1,7 +1,7 @@
 """Thermals P2 — house indoor single-node RC (DIN V 18599 Bauweise)."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from house_config.profile_schema_defaults import consumer_default
 
@@ -105,11 +105,16 @@ def house_requests_heat(
 
 @dataclass(frozen=True)
 class HouseYearResult:
-    """Daily WP electric plus hourly house (and optional store) temperatures."""
+    """Daily heat-source input energy plus hourly house (and optional store) temperatures.
+
+    Input energy = delivered heat / efficiency; it is electric for a heat pump or
+    ``electric_direct`` and fuel (final energy, kWh) for every other heat source.
+    """
 
     daily_electric_kwh: list[float]
     hourly_house_temp_c: list[float]
     hourly_store_temp_c: list[float]
+    daily_fuel_kwh: list[float] = field(default_factory=list)
 
 
 def _flat_ambient_from_daily(daily_temps: list[float]) -> list[float]:
@@ -230,6 +235,7 @@ def _copy_house_year_result(result: HouseYearResult) -> HouseYearResult:
         daily_electric_kwh=list(result.daily_electric_kwh),
         hourly_house_temp_c=list(result.hourly_house_temp_c),
         hourly_store_temp_c=list(result.hourly_store_temp_c),
+        daily_fuel_kwh=list(result.daily_fuel_kwh),
     )
 
 
@@ -248,7 +254,8 @@ def _simulate_house_year(
     *,
     living_area_m2: float,
     building_class: int,
-    heat_pump_type: str,
+    heat_efficiency: float,
+    heat_electric: bool = True,
     persons: int,
     latitude: float,
     longitude: float,
@@ -290,7 +297,7 @@ def _simulate_house_year(
     sim_common = _house_year_shared_params(
         living_area_m2=living_area_m2,
         building_class=building_class,
-        heat_pump_type=heat_pump_type,
+        heat_efficiency=heat_efficiency,
         persons=persons,
         hp_electric_kw=hp_electric_kw,
         target_temp_c=target_temp_c,
@@ -317,14 +324,15 @@ def _simulate_house_year(
         house_h = resolve_house_heat_loss_kw_per_k(
             ambient_c=_flat_ambient_from_day_rows(day_rows), **house_h_args
         )
-        return _simulate_house_hourly_rows(
-            day_rows=day_rows, house_h=house_h, **sim_common
+        return _split_input_energy(
+            _simulate_house_hourly_rows(day_rows=day_rows, house_h=house_h, **sim_common),
+            heat_electric=heat_electric,
         )
 
     house_h = resolve_house_heat_loss_kw_per_k(
         ambient_c=_flat_ambient_from_daily(daily_temps), **house_h_args
     )
-    return _simulate_house_daily_climate(
+    result = _simulate_house_daily_climate(
         daily_temps=daily_temps,
         daily_radiation_mj=daily_radiation_mj,
         area_m2=area_m2,
@@ -336,13 +344,31 @@ def _simulate_house_year(
         hourly_solar_from_daily=_hourly_solar_from_daily,
         **sim_common,
     )
+    return _split_input_energy(result, heat_electric=heat_electric)
+
+
+def _split_input_energy(result: HouseYearResult, *, heat_electric: bool) -> HouseYearResult:
+    """The simulation books input energy (heat / efficiency); a fuel source draws no power."""
+    if heat_electric:
+        return HouseYearResult(
+            daily_electric_kwh=result.daily_electric_kwh,
+            hourly_house_temp_c=result.hourly_house_temp_c,
+            hourly_store_temp_c=result.hourly_store_temp_c,
+            daily_fuel_kwh=[0.0] * len(result.daily_electric_kwh),
+        )
+    return HouseYearResult(
+        daily_electric_kwh=[0.0] * len(result.daily_electric_kwh),
+        hourly_house_temp_c=result.hourly_house_temp_c,
+        hourly_store_temp_c=result.hourly_store_temp_c,
+        daily_fuel_kwh=list(result.daily_electric_kwh),
+    )
 
 
 def _house_year_shared_params(
     *,
     living_area_m2: float,
     building_class: int,
-    heat_pump_type: str,
+    heat_efficiency: float,
     persons: int,
     hp_electric_kw: float,
     target_temp_c: float,
@@ -352,11 +378,7 @@ def _house_year_shared_params(
     heat_storage: dict | None,
 ) -> dict:
     """Heat-demand, heat-pump and house-RC inputs shared by both year simulations."""
-    from data.heating_need import (
-        heat_pump_jaz,
-        specific_heating_kwh_m2,
-        warm_water_kwh_week,
-    )
+    from data.heating_need import specific_heating_kwh_m2, warm_water_kwh_week
     from optimizer.thermal_coupled import (
         heat_storage_enabled,
         normalize_heat_storage,
@@ -366,7 +388,9 @@ def _house_year_shared_params(
         building_class, hwb_kwh_m2=hwb_kwh_m2
     )
     ww_day = warm_water_kwh_week(persons) / 7.0
-    jaz = heat_pump_jaz(heat_pump_type)
+    if float(heat_efficiency) <= 0.0:
+        raise ValueError(f"heat_efficiency muss > 0 sein (ist {heat_efficiency}).")
+    jaz = float(heat_efficiency)
     wp_kw = max(0.1, float(hp_electric_kw))
     tol = (
         DEFAULT_HOUSE_TOLERANCE_C

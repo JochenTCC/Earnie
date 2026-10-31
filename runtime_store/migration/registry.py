@@ -17,6 +17,7 @@ from runtime_store.migration.steps.flexible_consumers_overlay import (
 from runtime_store.migration.steps.ehal_http_port import STEP as EHAL_HTTP_PORT
 from runtime_store.migration.steps.ha_pull_removal import STEP as HA_PULL_REMOVAL
 from runtime_store.migration.steps.ha_sign import STEP as HA_SIGN
+from runtime_store.migration.steps.heat_source import STEP as HEAT_SOURCE
 from runtime_store.migration.steps.required_signal_activation import (
     STEP as REQUIRED_SIGNALS,
 )
@@ -59,6 +60,7 @@ STEPS: tuple[MigrationStep, ...] = (
     FLEX_OVERLAY,
     NETZNUTZUNG_SPLIT,
     SCENARIO_FEED_IN,
+    HEAT_SOURCE,
     TARIFF_FORMAT,
 )
 

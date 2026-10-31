@@ -184,7 +184,7 @@ def test_efm_only_waermepumpe_create_is_thermal_and_unlocked():
     assert cons["type"] == "thermal_annual"
     assert cons["id_locked"] is False
     assert cons["id_provisional_label"] == "Wärmepumpe"
-    assert cons.get("heat_pump_type") == "luft"
+    assert cons.get("heat_source") == {"type": "heat_pump", "heat_pump_type": "luft"}
 
 
 def test_apply_consumer_imports_sets_flex_power_only():

@@ -26,7 +26,7 @@ def _thermal(**overrides) -> dict:
         "longitude": 10.0,
         "living_area_m2": 120.0,
         "building_class": 3,
-        "heat_pump_type": "luft",
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "luft"},
         "persons": 2,
         "nominal_power_kw": 2.0,
         "heat_storage": {

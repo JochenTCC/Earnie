@@ -68,6 +68,52 @@ Bei `daily_target_source: thermal` leitet das RC-Modell das Tagesenergie-Ziel au
 
 Details: [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md) (Loxone-Defaults), [SwimSpa Filter](../dev/done/swimspa-filter.md).
 
+## Haus Wärme: Wärmequelle (`heat_source`)
+
+Jeder Verbraucher `type: thermal_annual` hat eine Hauptwärmequelle `heat_source` (Pflicht). Im Hauskonfigurator heißt das Feld **Wärmequelle**.
+
+| Feld | Bedeutung |
+| ---- | --------- |
+| `heat_source.type` | `heat_pump` (Wärmepumpe), `oil` (Öl), `gas` (Gas), `pellets` (Pellets), `district_heat` (Fernwärme), `wood` (Stückholz) oder `electric_direct` (Stromheizung ohne Wärmepumpe) |
+| `heat_source.heat_pump_type` | Nur bei `heat_pump`, Pflicht: `luft`, `erde` (Sole) oder `grundwasser` |
+| `heat_source.efficiency` | Optional. Jahresarbeitszahl (JAZ) der Wärmepumpe bzw. Jahresnutzungsgrad der übrigen Quellen. Ohne Angabe gilt der Standardwert der Tabelle unten. |
+| `heat_source.fuel_price` | Optional, nur bei Brennstoffen. Preis in der Einheit des Energieträgers. Ohne Angabe gilt der Standardpreis der Tabelle unten. |
+
+**Standardwerte** (Datei `share/config/heat_source_defaults.json`, mit Quellenangabe je Wert):
+
+| Wärmequelle | JAZ / Nutzungsgrad | Energieinhalt | Standardpreis | CO2 (g/kWh) |
+| ----------- | ------------------ | ------------- | ------------- | ----------- |
+| Wärmepumpe Luft / Erde / Grundwasser | 3,5 / 4,3 / 4,2 | – | Stromtarif | 226 (Strom) |
+| Stromheizung | 0,99 | – | Stromtarif | 226 (Strom) |
+| Öl | 0,90 | 10 kWh/l | 104,8 ct/l | 344 |
+| Gas | 0,95 | 1 kWh/kWh | 10,43 ct/kWh | 249 |
+| Pellets | 0,85 | 4.900 kWh/t | 322 €/t | 26 |
+| Fernwärme | 0,95 | 1 kWh/kWh | 10,5 ct/kWh | 42 |
+| Stückholz | 0,80 | 1.800 kWh/rm | 50 €/rm | 25 |
+
+Quellen: Nutzungsgrade und Energieinhalte aus SUSI, Brennstoffpreise aus dem Heizrechner, CO2-Faktoren aus Hexit (alle Energieinstitut Vorarlberg). Die Brennstoffpreise sind Stand 2022. Für eine belastbare Rechnung den aktuellen Preis in `fuel_price` eintragen.
+
+**Wie rechnet Earnie mit der Wärmequelle?** Die Jahressimulation des Hauses bleibt gleich: Wärmebedarf, Warmwasser und Wärmespeicher laufen unverändert. Die Wärmequelle bestimmt nur, welche Energie dafür nötig ist:
+
+- **Wärmepumpe und Stromheizung:** Strombedarf = gelieferte Wärme / JAZ bzw. Nutzungsgrad. `nominal_power_kw` ist die elektrische Leistung.
+- **Brennstoffe:** Brennstoffbedarf (Endenergie) = gelieferte Wärme / Nutzungsgrad. Die Heizung bezieht keinen Strom und ist kein flexibler Verbraucher in der Optimierung. `nominal_power_kw` ist die Brennstoffleistung des Kessels.
+
+Verteilverluste rechnet Earnie nicht zusätzlich ein. Der Wärmeverlust des Gebäudes ist auf den HWB kalibriert, der Speicherverlust ist eigens modelliert.
+
+## Haus Wärme: Heizstab im Wärmespeicher (`parts`)
+
+Ein Heizstab lädt den Wärmespeicher elektrisch mit Wirkungsgrad 1. Er ist ein Teil des Verbrauchers `thermal_annual` und kein eigener Verbraucher:
+
+```json
+"parts": [{"id": "heating_rod", "type": "heating_rod", "nominal_power_kw": 3.0}]
+```
+
+- **Nur mit Wärmespeicher:** Ohne `heat_storage` lehnt Earnie den Heizstab beim Laden ab. Eine reine Elektroheizung ohne Speicher ist die Wärmequelle `electric_direct`.
+- **Kennung:** In Signalen und Ergebnissen heißt der Heizstab `<Kennung des Verbrauchers>_heating_rod`, z. B. `waermepumpe_heating_rod`.
+- **Neben einer Wärmepumpe:** Der Optimierer verteilt die Tageswärme auf Wärmepumpe und Heizstab. Der Heizstab lohnt sich, wenn Strom in einem Zeitfenster weniger kostet als der Strompreis der Wärmepumpe geteilt durch ihre JAZ, z. B. bei negativen Preisen. Die Wärmepumpe braucht dafür die Planung durch den Optimierer (`nominal_power_kw` > 0, `optimizer_flex` nicht `false`).
+- **Neben einem Brennstoff:** Jede kWh Heizstab-Wärme spart Brennstoff im Wert von Brennstoffpreis / Nutzungsgrad. Der Optimierer setzt den Heizstab ein, wenn Strom günstiger ist, z. B. bei PV-Überschuss mit niedriger Einspeisevergütung. Höchstens so viel Wärme, wie das Haus am Tag braucht.
+- **Grenzen:** Der Optimierer rechnet mit der Tageswärme des Hauses, nicht mit der freien Kapazität des Speichers. Der Heizstab plant derzeit nur im Szenarien-Explorer. Im Live-Betrieb bleibt er aus, eine Steuerung über ein eigenes Binding folgt später.
+
 ## Haus Wärme: optionaler Wärmespeicher (`heat_storage`)
 
 Bei `type: thermal_annual` lässt sich unter `thermal.heat_storage` ein **Pufferspeicher** modellieren. Solarthermie und Wärmepumpe speisen den Speicher; Raumheizung und Warmwasser entnehmen Wärme nur aus dem Speicher. Ohne Speicher bzw. bei `volume_liters = 0` gilt das bisherige Modell: Solarthermie wirkt als Tages-Gutschrift auf den WP-Bedarf.

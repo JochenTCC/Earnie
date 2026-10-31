@@ -46,13 +46,14 @@ def plan_live_house_horizon(
     from ``ThermalParameters``. Without Wohnfläche: legacy warm-water need minus
     a per-day collector credit (forecast irradiance, P3).
     """
-    from data.heating_need import heat_pump_jaz, warm_water_kwh_week
+    from data.heating_need import warm_water_kwh_week
+    from house_config.heat_source import consumer_heat_source, heat_source_efficiency
     from optimizer.thermal_house import _step_hour_direct_wp
 
     if not ambient_forecast_c:
         raise ValueError("ambient_forecast_c darf nicht leer sein")
     thermal = consumer.get("thermal") or consumer
-    jaz = heat_pump_jaz(str(thermal.get("heat_pump_type", "luft")))
+    jaz = heat_source_efficiency(consumer_heat_source(consumer))
     ww_kw = warm_water_kwh_week(int(thermal.get("persons", 2) or 2)) / 7.0 / 24.0
     living = float(thermal.get("living_area_m2", 0.0) or 0.0)
     if living <= 0.0:

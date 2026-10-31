@@ -9,6 +9,7 @@ import pandas as pd
 import config
 from data.heating_need import (
     daily_electric_kwh,
+    daily_fuel_kwh,
     heating_params_from_thermal,
     hourly_profile_for_year,
     thermal_daily_pwm_hourly_profile,
@@ -502,6 +503,36 @@ def thermal_annual_kwh_from_archive(
 
     Returns (annual_kwh, reference_year).
     """
+    return _thermal_annual_from_archive(
+        thermal,
+        house_profile=house_profile,
+        reference_year=reference_year,
+        daily_fn=daily_electric_kwh,
+    )
+
+
+def thermal_annual_fuel_kwh_from_archive(
+    thermal: dict,
+    *,
+    house_profile: dict | None = None,
+    reference_year: int | None = None,
+) -> tuple[float, int]:
+    """Brennstoffbedarf (kWh/a Endenergie) aus dem Open-Meteo-Archiv; 0 bei elektrischer Quelle."""
+    return _thermal_annual_from_archive(
+        thermal,
+        house_profile=house_profile,
+        reference_year=reference_year,
+        daily_fn=daily_fuel_kwh,
+    )
+
+
+def _thermal_annual_from_archive(
+    thermal: dict,
+    *,
+    house_profile: dict | None,
+    reference_year: int | None,
+    daily_fn,
+) -> tuple[float, int]:
     year = reference_year if reference_year is not None else last_full_archive_year()
     bundle, collector = reference_climate_for_thermal(
         thermal, house_profile=house_profile, year=year
@@ -509,7 +540,7 @@ def thermal_annual_kwh_from_archive(
     params = heating_params_from_thermal(thermal)
     area_m2 = float(params.get("solar_thermal_area_m2", 0.0) or 0.0)
     hourly_wm2 = bundle.collector_surface_series(collector) if area_m2 > 0.0 else None
-    daily = daily_electric_kwh(
+    daily = daily_fn(
         **params,
         hourly_temperature_c=bundle.temperature_c,
         hourly_collector_wm2=hourly_wm2,

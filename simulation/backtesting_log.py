@@ -29,6 +29,7 @@ from .backtesting_snapshots import (
     write_window_snapshots_jsonl,
 )
 from .booked_consumption import BOOKED_CONSUMPTION_KEY
+from .heat_fuel import HEAT_FUEL_KEY
 from .period_clip import clip_results_map_to_period
 
 logger = logging.getLogger(__name__)
@@ -585,6 +586,7 @@ def save_backtesting_log(
     prices: pd.DataFrame | None = None,
     *,
     booked_consumption: dict[str, dict],
+    heat_fuel: dict[str, dict] | None = None,
 ) -> str:
     """Schreibt Metadaten (JSON) und Stundenwerte (CSV). Gibt den JSON-Pfad zurück.
 
@@ -621,6 +623,8 @@ def save_backtesting_log(
     _attach_window_snapshots(payload, target_dir, period, window_snapshots)
     _attach_price_series(payload, target_dir, prices)
     _attach_period_bounds(payload, period, all_ts, len(results))
+    if heat_fuel:
+        payload[HEAT_FUEL_KEY] = heat_fuel
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)

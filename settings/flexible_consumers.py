@@ -130,7 +130,7 @@ def consumer_has_daily_target(consumer: dict) -> bool:
     if consumer.get("generic_flex_window"):
         return True
     target_source = consumer.get("daily_target_source", "config")
-    if target_source == "thermal_annual":
+    if target_source in ("thermal_annual", "heating_rod"):
         return True
     sched = consumer.get("charging_schedule")
     if sched and sched.get("enabled"):
