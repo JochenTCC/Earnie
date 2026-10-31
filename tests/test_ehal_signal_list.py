@@ -317,7 +317,9 @@ def test_normalize_export_host_strips_pasted_scheme(raw: str, expected: str) -> 
     assert normalize_export_host(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["http://192.168.1.10:8541", "192.168.1.10/ehal"])
+@pytest.mark.parametrize(
+    "raw", ["http://192.168.1.10:8541", "192.168.1.10/ehal", "ftp://192.168.1.10"]
+)
 def test_normalize_export_host_rejects_port_or_path(raw: str) -> None:
     with pytest.raises(ValueError, match="ohne Port"):
         normalize_export_host(raw)
