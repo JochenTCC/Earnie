@@ -242,7 +242,9 @@ def test_start_stop_with_stub_script(
             if proc.poll() is not None:
                 pytest.fail(f"stub exited early: {proc.returncode}")
             st = main_daemon.status()
-            if st.state == "running":
+            # The lock is taken before the PID is written into it; under load
+            # status() briefly reports "running" with pid=None.
+            if st.state == "running" and st.pid is not None:
                 break
             time.sleep(0.1)
         assert st is not None and st.state == "running"
