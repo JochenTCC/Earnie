@@ -19,6 +19,18 @@ VIRTUAL_SOC_LINE_WIDTH = 1.0
 HOUSE_SOC_LINE_WIDTH = 2.5
 
 
+def soc_line_width_for_capacity_kwh(capacity_kwh: float) -> float:
+    """Plotly SoC line width (px) stepped by usable battery capacity."""
+    c = float(capacity_kwh)
+    if c <= 5.0:
+        return 1.0
+    if c <= 10.0:
+        return 1.5
+    if c <= 15.0:
+        return 2.0
+    return 2.5
+
+
 def virtual_soc_percent(stored_kwh: float, capacity_kwh: float) -> float:
     """Reserve fill as SoC % of the virtual carve-out capacity (0–100)."""
     cap = float(capacity_kwh or 0.0)

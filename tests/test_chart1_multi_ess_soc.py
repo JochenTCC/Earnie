@@ -81,11 +81,8 @@ def test_build_power_soc_chart_figure_multi_ess_soc_lines():
     assert names == {"SoC · Haus", "SoC · Garage"}
 
 
-def test_add_optimized_soc_traces_virtual_ps_uses_slim_line():
-    from optimizer.powerstation_soc_chart import (
-        HOUSE_SOC_LINE_WIDTH,
-        VIRTUAL_SOC_LINE_WIDTH,
-    )
+def test_add_optimized_soc_traces_virtual_ps_uses_capacity_width_and_dash():
+    from optimizer.powerstation_soc_chart import soc_line_width_for_capacity_kwh
 
     start = datetime(2025, 3, 15, 12, 0, tzinfo=_TZ)
     rows = []
@@ -111,16 +108,100 @@ def test_add_optimized_soc_traces_virtual_ps_uses_slim_line():
     axis = ChartSlotAxis.from_dataframe(df)
     fig = go.Figure()
     entities = [
-        {"id": "house", "label": "Haus", "virtual": False},
-        {"id": "virt", "label": "VirtPS", "virtual": True},
+        {
+            "id": "house",
+            "label": "Haus",
+            "battery_capacity_kwh": 20.0,
+            "virtual": False,
+        },
+        {
+            "id": "virt",
+            "label": "VirtPS",
+            "battery_capacity_kwh": 3.0,
+            "virtual": True,
+        },
     ]
     add_optimized_soc_traces(fig, df, axis, chart_soc_entities=entities)
     by_name = {t.name: t for t in fig.data if str(t.name).startswith("SoC")}
-    assert by_name["SoC · Haus"].line.width == HOUSE_SOC_LINE_WIDTH
-    assert by_name["SoC · VirtPS"].line.width == VIRTUAL_SOC_LINE_WIDTH
+    assert by_name["SoC · Haus"].line.width == soc_line_width_for_capacity_kwh(
+        20.0
+    )
+    assert by_name["SoC · VirtPS"].line.width == soc_line_width_for_capacity_kwh(
+        3.0
+    )
     assert by_name["SoC · Haus"].line.color == soc_color_for_index(0)
     assert by_name["SoC · VirtPS"].line.color == soc_color_for_index(1)
     assert by_name["SoC · VirtPS"].line.dash not in (None, "solid")
+
+
+def test_add_optimized_soc_traces_line_width_follows_capacity_tiers():
+    from optimizer.powerstation_soc_chart import soc_line_width_for_capacity_kwh
+
+    start = datetime(2025, 3, 15, 12, 0, tzinfo=_TZ)
+    rows = []
+    for index in range(2):
+        slot = start + timedelta(minutes=15 * index)
+        rows.append(
+            {
+                "slot_datetime": slot,
+                "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
+                "Strompreis (Cent/kWh)": 20.0,
+                "Preis extrapoliert": False,
+                "PV-Prognose (kW)": 2.0,
+                "Verbrauch-Prognose (kW)": 1.0,
+                "Geplante Batterie-Aktion (kW)": 0.0,
+                "Netzbezug (kW)": -1.0,
+                "Simulierter SoC (%)": 50.0,
+                "Simulierter SoC Tiny (%)": 40.0,
+                "Simulierter SoC Mid (%)": 50.0,
+                "Simulierter SoC Large (%)": 60.0,
+                "Simulierter SoC XL (%)": 70.0,
+                "Steuerbefehl": "Automatik",
+            }
+        )
+    df = pd.DataFrame(rows)
+    capacities = {
+        "Tiny": 5.0,
+        "Mid": 10.0,
+        "Large": 15.0,
+        "XL": 20.0,
+    }
+    entities = [
+        {
+            "id": key.lower(),
+            "label": key,
+            "battery_capacity_kwh": cap,
+            "virtual": False,
+        }
+        for key, cap in capacities.items()
+    ]
+    fig = go.Figure()
+    add_optimized_soc_traces(
+        fig, df, ChartSlotAxis.from_dataframe(df), chart_soc_entities=entities
+    )
+    by_name = {t.name: t for t in fig.data if str(t.name).startswith("SoC")}
+    for label, capacity in capacities.items():
+        assert by_name[f"SoC · {label}"].line.width == (
+            soc_line_width_for_capacity_kwh(capacity)
+        )
+
+
+def test_add_optimized_soc_traces_legacy_uses_primary_capacity():
+    from optimizer.powerstation_soc_chart import soc_line_width_for_capacity_kwh
+
+    df = _base_df(multi=False)
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    entities = [
+        {
+            "id": "house",
+            "label": "Haus",
+            "battery_capacity_kwh": 8.0,
+            "virtual": False,
+        },
+    ]
+    add_optimized_soc_traces(fig, df, axis, chart_soc_entities=entities)
+    assert fig.data[0].line.width == soc_line_width_for_capacity_kwh(8.0)
 
 
 def _y_at(trace, needle: str) -> float | None:

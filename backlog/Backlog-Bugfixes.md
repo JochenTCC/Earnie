@@ -44,6 +44,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - **Note:** `scripts/pv_forecast_compare.py` logs both mappings (`forecast_solar` vs. `forecast_solar_earnie`); its `evaluate` quantifies the error against measured PV before / after the fix.
   - **Verify:** live PV forecast in the cockpit / `forecast_pv_kw` against measured PV around sunrise and sunset (or `scripts/pv_forecast_compare.py evaluate` on `main`); pick to `main` afterwards.
 
+- [ ] Chart1 SoC line thickness by battery capacity (≤5 kWh: 1 px / ≤10: 1.5 / ≤15: 2 / >15: 2.5); virtual PS keep dash styling. Visual check: multi-ESS + small virtual carve-out.
+
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] **Dog-fooding: „Haus Wärme“ editor and heating rod** *(found 2026-11-01)*
