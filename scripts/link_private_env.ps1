@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Links Earnie earnie_env/config to a private sibling site-pack repo via directory junction.

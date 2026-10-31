@@ -1,4 +1,4 @@
-# Wrapper für Remote-Backtesting (Windows).
+﻿# Wrapper für Remote-Backtesting (Windows).
 # Aufruf: .\scripts\remote_backtesting.ps1 sync-run -- --start-month 6 --end-month 7
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot

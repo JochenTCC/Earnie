@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Baut das Docker-Image für Synology (amd64), LoxBerry (arm64) oder beide (Multi-Arch).

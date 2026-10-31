@@ -1,4 +1,4 @@
-﻿# Open Bugs
+# Open Bugs
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md) (sections `### Bugfix …` / `### Document Review …` / regressions)
 

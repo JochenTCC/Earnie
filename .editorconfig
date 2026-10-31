@@ -1,0 +1,15 @@
+# Earnie ecosystem rule (earnie-workspace/ai/ECOSYSTEM.md): LF and UTF-8 without BOM;
+# PowerShell scripts CRLF with BOM (Windows PowerShell 5.1 reads BOM-less files as ANSI), cmd/bat CRLF.
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+insert_final_newline = true
+
+[*.{ps1,psm1,psd1}]
+end_of_line = crlf
+charset = utf-8-bom
+
+[*.{cmd,bat}]
+end_of_line = crlf

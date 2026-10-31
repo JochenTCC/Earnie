@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Start the Cursor Agent worker (My Machines / Remote Control) and register logon auto-start.

@@ -1,4 +1,4 @@
-# Aktiviert versionierte Git-Hooks aus .githooks/ für dieses Repository.
+﻿# Aktiviert versionierte Git-Hooks aus .githooks/ für dieses Repository.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root

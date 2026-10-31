@@ -1,3 +1,12 @@
-# Shell-Skripte immer mit LF (Synology/Linux-Container)
+# Line endings (Earnie ecosystem rule, earnie-workspace/ai/ECOSYSTEM.md): the repository stores LF;
+# the work tree is LF as well, on every machine (independent of core.autocrlf). Windows scripts keep CRLF.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
 *.sh text eol=lf
+
+# Repo-specific
 docker/entrypoint.sh text eol=lf

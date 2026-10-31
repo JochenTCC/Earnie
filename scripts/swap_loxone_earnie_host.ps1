@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Toggle Earnie HTTP host in a Loxone Config project (NAS <-> Dev-PC).

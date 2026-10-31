@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Start, stop, update Earnie via VMware Workstation vctl (no Docker Compose).

@@ -1,4 +1,4 @@
-﻿# Cursor-Index: sensible und lokal-produktive Dateien ausschließen.
+# Cursor-Index: sensible und lokal-produktive Dateien ausschließen.
 # Syntax wie .gitignore. Beispiel-/Schema-Dateien bleiben indexierbar.
 
 # --- Zugangsdaten & Umgebung ---
