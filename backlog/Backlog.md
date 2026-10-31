@@ -263,6 +263,12 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
   - Keep official EPEX unconnected unless a paid/internal use case appears
   - Check possibilities to automatic tariffs.json update to existing installations
   - Own / time-variable tariffs: see the epic **`Edibert`** (Version 2.8)
+- [ ] **Tariff comparison with the own load profile** `[feat]` *(decided 2026-10-31; the paid part of the tariff offer, product tier open; the verified Edibert database is free and a by-product of keeping this comparison current)*
+  - Candidates: tariffs of the verified Edibert catalog for the house's land and grid area; community entries of the free database only opt-in, marked "unchecked" (proposal: only versions with status `reliable`).
+  - Cost per candidate from the house's own data: measured load profile (history / recorder) or the scenario's simulated profile, with PV, battery, EV and §14a Modul 3, and with Earnie's optimization run per tariff (SE), not only a fixed profile.
+  - Result: annual cost per tariff, saving against the tariff in use, switch recommendation; hint when a tariff in use gets a newer database version (Edibert status query). The recommendation is non-binding; source and check date shown per tariff, the supplier's price sheet prevails.
+  - Lead-in: Edibert offers a simple free comparison (tariff × standard load profile or annual consumption), Edibert backlog `0.1.d` "Model change 2026-10-31".
+  - Open: product tier and entitlement; runtime of one SE run per candidate (limit the candidates); test the willingness to pay first (e.g. a question in the feature review).
 - [ ] Check possibilities to show decimal numbers according to regional settings (e.g. use "," as decimal sign for Germany)
 - [ ] Simulate restrictions for energy export dependent on current grid situation in SE (and maybe Live) — **after 2.7.a** (consumes Live/MILP/EHAL export-cap model; do not redefine caps here)
 - [ ] **Dependency reduction — MILP solver stack** `[qual]` *(library review 2026-10-29; decide before implementing)*
