@@ -8,6 +8,7 @@ from optimizer.powerstation_soc_chart import (
     chart_soc_entities,
     initial_virtual_sim_entries,
     simulate_virtual_reserve_soc_after_slot,
+    soc_line_width_for_capacity_kwh,
     virtual_soc_by_id_from_states,
     virtual_soc_percent,
 )
@@ -23,6 +24,17 @@ def test_virtual_soc_percent_clamps_and_scales():
     assert virtual_soc_percent(3.0, 2.0) == 100.0
     assert virtual_soc_percent(-1.0, 2.0) == 0.0
     assert virtual_soc_percent(1.0, 0.0) == 0.0
+
+
+def test_soc_line_width_for_capacity_kwh_tiers():
+    assert soc_line_width_for_capacity_kwh(0.0) == 1.0
+    assert soc_line_width_for_capacity_kwh(5.0) == 1.0
+    assert soc_line_width_for_capacity_kwh(5.01) == 1.5
+    assert soc_line_width_for_capacity_kwh(10.0) == 1.5
+    assert soc_line_width_for_capacity_kwh(10.01) == 2.0
+    assert soc_line_width_for_capacity_kwh(15.0) == 2.0
+    assert soc_line_width_for_capacity_kwh(15.01) == 2.5
+    assert soc_line_width_for_capacity_kwh(20.0) == 2.5
 
 
 def test_chart_soc_entities_orders_house_then_powerstations():

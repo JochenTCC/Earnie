@@ -152,11 +152,18 @@ def _add_soc_price_layer(
         chart_now=options.chart_now,
         battery_params=options.battery_params,
     )
+    from optimizer.powerstation_soc_chart import load_chart_soc_entities
+
+    try:
+        chart_soc_entities = load_chart_soc_entities()
+    except Exception:  # noqa: BLE001
+        chart_soc_entities = []
     add_optimized_soc_traces(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
         history_slot_count=options.history_slot_count,
         chart_now=options.chart_now,
         battery_params=options.battery_params,
+        chart_soc_entities=chart_soc_entities,
     )
     if options.show_baseline_soc:
         soc_at_now = _soc_at_chart_now(

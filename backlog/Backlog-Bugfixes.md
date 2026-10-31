@@ -23,6 +23,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] Chart1 SoC line thickness by battery capacity (≤5 kWh: 1 px / ≤10: 1.5 / ≤15: 2 / >15: 2.5); virtual PS keep dash styling. Visual check: multi-ESS + small virtual carve-out.
+
 ## New Bugs (Do not remove this chapter — even if empty)
 
 
