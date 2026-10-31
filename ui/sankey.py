@@ -438,9 +438,34 @@ def _create_live_flow_sankey(
     return fig
 
 
+def dead_telemetry_warning_text() -> str:
+    """Warning when PV, grid, battery and house all read exactly 0 kW."""
+    label = backend_label(active_ehal_backend())
+    text = (
+        f"⚠️ Alle Live-Leistungswerte von {label} sind 0 kW (PV, Netz, Batterie, Haus) "
+        "– der Energiefluss kann nicht gezeichnet werden."
+    )
+    if not (ehal_live.is_loxone_backend() or ehal_live.is_ha_backend()):
+        return text
+    from runtime_store.ehal_push_inbox import expected_repeat_s
+
+    repeat_s = expected_repeat_s()
+    return (
+        f"{text} Earnie nimmt für einen Leistungswert 0 an, wenn er länger als "
+        f"{3 * repeat_s:.0f} s nicht neu gesendet wurde (Status „0 angenommen "
+        f"(verstummt)“). Bitte prüfen, ob {label} die Leistungswerte mindestens "
+        f"alle {repeat_s:.0f} s sendet – den Push-Status je Signal zeigt "
+        "EHAL-Com → Live-Lesen."
+    )
+
+
 @st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
 def render_live_power_flow(current_soc: float | None) -> None:
     """Rendert die Live-Leistungsfluss-Ansicht mit CSS-Fix gegen den Text-Glow."""
+    _render_live_power_flow_body(current_soc)
+
+
+def _render_live_power_flow_body(current_soc: float | None) -> None:
     reload_runtime_config()
     st.write("### ⚡ Energiefluss (Live)")
 
@@ -472,6 +497,10 @@ def render_live_power_flow(current_soc: float | None) -> None:
     # fresh optimizer snapshot that still omits house-profile known loads.
     flex_kw = live_consumption.fetch_live_flex_kw_for_ui(main_state)
     snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
+    if live_consumption.is_dead_telemetry_snapshot(snapshot):
+        # All meters 0 → no Sankey link; warn instead of drawing an empty figure (#89).
+        st.warning(dead_telemetry_warning_text())
+        return
 
     fig = _create_live_flow_sankey(
         data,
