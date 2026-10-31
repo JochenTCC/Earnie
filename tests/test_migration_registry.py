@@ -142,6 +142,7 @@ def test_per_step_detect_apply_smoke(tmp_path):
         "dm4.retire_plant_pv_binding": "v4_pre_ha_pull",
         "dm4.se_conf_defaults": "v4_pre_se_conf_defaults",
         "dm4.forced_charge_hint": "v4_pre_se_conf_defaults",
+        "dm4.deviation_energy_shortfall": "v4_pre_se_conf_defaults",
         "dm4.deviation_marker_colors": "v4_pre_se_conf_defaults",
     }
     for step in STEPS:

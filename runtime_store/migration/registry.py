@@ -23,6 +23,9 @@ from runtime_store.migration.steps.retire_plant_pv_binding import (
 from runtime_store.migration.steps.deviation_marker_colors import (
     STEP as DEVIATION_MARKER_COLORS,
 )
+from runtime_store.migration.steps.deviation_energy_shortfall import (
+    STEP as DEVIATION_ENERGY_SHORTFALL,
+)
 from runtime_store.migration.steps.forced_charge_hint import STEP as FORCED_CHARGE_HINT
 from runtime_store.migration.steps.se_conf_defaults import STEP as SE_CONF_DEFAULTS
 from runtime_store.migration.steps.topology import STEP as TOPOLOGY
@@ -48,6 +51,7 @@ STEPS: tuple[MigrationStep, ...] = (
     RETIRE_PLANT_PV,
     SE_CONF_DEFAULTS,
     FORCED_CHARGE_HINT,
+    DEVIATION_ENERGY_SHORTFALL,
     DEVIATION_MARKER_COLORS,
 )
 

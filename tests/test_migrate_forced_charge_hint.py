@@ -104,11 +104,11 @@ def test_apply_inserts_energy_rules_after_forced_charge_error():
     assert [rule["id"] for rule in rules] == [ERROR_RULE_ID, RULE_ID]
     error, warning = rules
     assert error["when"] == _ENERGY_WHEN
-    assert error["params"] == {"max_ratio": 0.6}
+    assert error["params"] == {"max_ratio": 0.6, "min_shortfall_kwh": 0.1}
     assert "Zielenergie" in error["message"] and "kWh" in error["message"]
     assert warning["category"] == "warning"
     assert warning["when"] == _ENERGY_WHEN
-    assert warning["params"] == {"max_ratio": 0.8}
+    assert warning["params"] == {"max_ratio": 0.8, "min_shortfall_kwh": 0.1}
     assert "{ratio_pct" in warning["message"] and "kWh" in warning["message"]
     assert detect(result.docs) is False
 
@@ -118,9 +118,9 @@ def test_apply_migrates_beta2_pack():
         result = apply(_beta2_docs(message), {})
         rules = _by_id(result)
         assert rules[RULE_ID]["when"] == _ENERGY_WHEN
-        assert rules[RULE_ID]["params"] == {"max_ratio": 0.8}
+        assert rules[RULE_ID]["params"] == {"max_ratio": 0.8, "min_shortfall_kwh": 0.1}
         assert "kWh" in rules[RULE_ID]["message"]
-        assert rules[ERROR_RULE_ID]["params"] == {"max_ratio": 0.6}
+        assert rules[ERROR_RULE_ID]["params"] == {"max_ratio": 0.6, "min_shortfall_kwh": 0.1}
         assert detect(result.docs) is False
 
 
