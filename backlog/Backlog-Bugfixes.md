@@ -23,6 +23,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **PV forecast comparison run** `[dev]` *(logger done 2026-10-30, [Erledigt](Backlog-Erledigt.md); in autumn the forecast.solar quality varies strongly, e.g. on fog / inversion days)*: run `scripts/pv_forecast_compare.py fetch` hourly for 3–4 weeks in autumn, then `evaluate`. The result decides the default source (see **Solcast as PV forecast source**) and feeds the **PV forecast calibration factor** (**Adaptation P3**): the MAE after the per-source linear scale separates a constant bias, which the calibration factor absorbs, from weather skill. Optional later: DWD MOSMIX `Rad1h` as a further source in the logger.
+
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
