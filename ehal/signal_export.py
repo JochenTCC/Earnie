@@ -34,11 +34,9 @@ def normalize_export_host(raw: str) -> str:
     would end up twice in the address, so it fails loud instead.
     """
     host = str(raw or "").strip()
-    lowered = host.lower()
-    for scheme in ("http://", "https://"):
-        if lowered.startswith(scheme):
-            host = host[len(scheme):]
-            break
+    scheme, sep, rest = host.partition("://")
+    if sep and scheme.lower() in ("http", "https"):
+        host = rest
     host = host.rstrip("/")
     if ":" in host or "/" in host:
         raise ValueError(
