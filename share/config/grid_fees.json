@@ -68,6 +68,7 @@
       "id": "AT-BGLD",
       "label": "Burgenland",
       "land": "AT",
+      "regions": ["1"],
       "base_cent_kwh": {
         "unmetered_power": 8.46,
         "metered_power": 5.83
@@ -79,6 +80,7 @@
       "id": "AT-KTN",
       "label": "Kärnten",
       "land": "AT",
+      "regions": ["2"],
       "base_cent_kwh": {
         "unmetered_power": 9.67,
         "metered_power": 5.47
@@ -90,6 +92,7 @@
       "id": "AT-KLGF",
       "label": "Klagenfurt",
       "land": "AT",
+      "regions": ["2"],
       "base_cent_kwh": {
         "unmetered_power": 6.9,
         "metered_power": 4.36
@@ -101,6 +104,7 @@
       "id": "AT-NOE",
       "label": "Niederösterreich",
       "land": "AT",
+      "regions": ["3"],
       "base_cent_kwh": {
         "unmetered_power": 8.79,
         "metered_power": 6.65
@@ -112,6 +116,7 @@
       "id": "AT-OOE",
       "label": "Oberösterreich",
       "land": "AT",
+      "regions": ["4"],
       "base_cent_kwh": {
         "unmetered_power": 6.29,
         "metered_power": 4.68
@@ -123,6 +128,7 @@
       "id": "AT-LINZ",
       "label": "Linz",
       "land": "AT",
+      "regions": ["4"],
       "base_cent_kwh": {
         "unmetered_power": 5.57,
         "metered_power": 3.26
@@ -134,6 +140,7 @@
       "id": "AT-SBG",
       "label": "Salzburg",
       "land": "AT",
+      "regions": ["5"],
       "base_cent_kwh": {
         "unmetered_power": 6.59,
         "metered_power": 3.91
@@ -145,6 +152,7 @@
       "id": "AT-STMK",
       "label": "Steiermark",
       "land": "AT",
+      "regions": ["6"],
       "base_cent_kwh": {
         "unmetered_power": 8.82,
         "metered_power": 6.78
@@ -156,6 +164,7 @@
       "id": "AT-GRAZ",
       "label": "Graz",
       "land": "AT",
+      "regions": ["6"],
       "base_cent_kwh": {
         "unmetered_power": 5.17,
         "metered_power": 4.23
@@ -167,6 +176,7 @@
       "id": "AT-TIROL",
       "label": "Tirol",
       "land": "AT",
+      "regions": ["7"],
       "base_cent_kwh": {
         "unmetered_power": 6.81,
         "metered_power": 3.66
@@ -178,6 +188,7 @@
       "id": "AT-IBK",
       "label": "Innsbruck",
       "land": "AT",
+      "regions": ["7"],
       "base_cent_kwh": {
         "unmetered_power": 8.03,
         "metered_power": 5.72
@@ -189,6 +200,7 @@
       "id": "AT-VBG",
       "label": "Vorarlberg",
       "land": "AT",
+      "regions": ["8"],
       "base_cent_kwh": {
         "unmetered_power": 4.96,
         "metered_power": 2.84
@@ -200,6 +212,7 @@
       "id": "AT-WIEN",
       "label": "Wien",
       "land": "AT",
+      "regions": ["9"],
       "base_cent_kwh": {
         "unmetered_power": 6.98,
         "metered_power": 4.21
@@ -211,6 +224,7 @@
       "id": "AT-KLWT",
       "label": "Kleinwalsertal",
       "land": "AT",
+      "regions": ["8"],
       "base_cent_kwh": {
         "unmetered_power": 17.73,
         "metered_power": 11.4

@@ -262,7 +262,8 @@ def collect_edibert_load_errors(
 def grid_area_view(grid_fees_path: str) -> dict[str, Any]:
     """Grid areas of catalog plus user file for selection lists: ``{"areas": {id: {...}}}``.
 
-    Each area carries ``label``, ``land``, ``base_cent_kwh`` (by metering) and ``rule_set``.
+    Each area carries ``label``, ``land``, ``regions`` (empty = whole land),
+    ``base_cent_kwh`` (by metering) and ``rule_set``.
     """
     catalog = cached_grid_fees(grid_fees_path)
     return {
@@ -270,12 +271,32 @@ def grid_area_view(grid_fees_path: str) -> dict[str, Any]:
             area_id: {
                 "label": area.label,
                 "land": area.land,
+                "regions": list(area.regions),
                 "base_cent_kwh": dict(area.base_cent_kwh),
                 "rule_set": area.rule_set,
             }
             for area_id, area in catalog.areas.items()
         }
     }
+
+
+def area_in_region(area: dict, land: str, region: str) -> bool:
+    """Area (from ``grid_area_view``) lies in ``region`` of ``land``; without ``regions`` it covers the whole land."""
+    return area["land"] == land and (not area["regions"] or region in area["regions"])
+
+
+def region_grid_area(areas: dict[str, dict], land: str, region: str) -> str | None:
+    """The one area whose ``regions`` name ``region`` of ``land``; ``None`` for zero or several.
+
+    Areas without ``regions`` (user areas, unnarrowed catalog areas) do not count: they are
+    not tied to the region, so they never make a region unambiguous.
+    """
+    matches = [
+        area_id
+        for area_id, area in areas.items()
+        if area["land"] == land and region in area["regions"]
+    ]
+    return matches[0] if len(matches) == 1 else None
 
 
 def profile_grid_fee(profile_id: str, profile: dict, catalog: api.GridFeeCatalog) -> api.GridFee:

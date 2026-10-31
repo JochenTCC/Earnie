@@ -84,6 +84,13 @@ Der Hauskonfigurator speichert unter Standort das Feld `land` (`AT`/`DE`/`CH`). 
 
 Optional speichert er daneben die **Region (Feiertage)** als Feld `region`: Bundesland bzw. Kanton für den Feiertagskalender (AT `1` Burgenland … `9` Wien, DE z. B. `BY`, CH z. B. `ZH`). Tarife mit Zeitregeln nach Wochentag oder Feiertag (z. B. Benutzertarife aus Edibert, siehe unten) brauchen sie zum Rechnen. Ohne Region gibt es keinen Feiertagskalender. Eine unbekannte Region lehnt Earnie beim Speichern ab.
 
+Die Region schlägt auch den **Netzbereich** vor. Jeder österreichische Katalog-Netzbereich nennt in `grid_fees.json` sein Bundesland (Feld `regions`). Liegt in der gewählten Region genau ein Netzbereich, setzt der Hauskonfigurator ihn beim Wählen der Region; eine Zeile unter dem Netzbereich sagt das. In Österreich gilt das für Burgenland, Niederösterreich, Salzburg und Wien. In Kärnten, Oberösterreich, Steiermark, Tirol und Vorarlberg gibt es zusätzlich ein Stadt- bzw. Talnetz (Klagenfurt, Linz, Graz, Innsbruck, Kleinwalsertal); dort wählt der Benutzer selbst.
+
+- Ein gewählter Netzbereich, der in der Region liegt, bleibt stehen, ebenso **Eigener Arbeitspreis**.
+- Ein Netzbereich einer anderen Region wird ersetzt, wenn die neue Region eindeutig ist; sonst bleibt er stehen.
+- Benutzer-Netzbereiche (`user_grid_fees.json`) haben keine Region und werden nie automatisch gesetzt.
+- Eine `grid_fees.json`, die vor dieser Änderung angelegt wurde, hat noch kein Feld `regions`. Dann setzt Earnie keinen Netzbereich; der Benutzer wählt ihn wie bisher.
+
 ## Bezugspreis (Live)
 
 Die Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `earnie_env/config/tariffs.json` auf (Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json)). Aufschläge stehen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).

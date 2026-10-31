@@ -87,6 +87,29 @@ def _seed_land_widget_key(session_scope: str) -> str:
         st.session_state[land_key] = "AT"
     return land_key
 
+def _autoselect_grid_area(session_scope: str, land: str, region_key: str) -> None:
+    """Region ``on_change``: set the Netzbereich when exactly one catalog area lies in the region.
+
+    Keeps *Eigener Arbeitspreis* and a chosen area that lies in the new region; with zero or
+    several areas in the region the user picks. The caption under the Netzbereich says why.
+    """
+    from house_config.edibert_tariffs import area_in_region, region_grid_area
+    from house_config.own_grid_fee import OWN_AREA
+
+    region = str(st.session_state.get(region_key) or "")
+    area_key = _scoped_key(session_scope, "house_profile_nne_area")
+    current = st.session_state.get(area_key)
+    if not region or current == OWN_AREA:
+        return
+    areas = _load_grid_fee_catalog_for_ui()["areas"]
+    if current in areas and area_in_region(areas[current], land, region):
+        return
+    match = region_grid_area(areas, land, region)
+    if match is None:
+        return
+    st.session_state[area_key] = match
+
+
 def _render_region_select(*, session_scope: str, land: str) -> str:
     from house_config.edibert_tariffs import holiday_regions, region_label
 
@@ -99,8 +122,11 @@ def _render_region_select(*, session_scope: str, land: str) -> str:
         options=options,
         key=key,
         format_func=lambda code: region_label(land, code),
+        on_change=_autoselect_grid_area,
+        args=(session_scope, land, key),
         help=(
-            "Bundesland bzw. Kanton für den Feiertagskalender. Nur nötig für Tarife "
+            "Bundesland bzw. Kanton für den Feiertagskalender und den Netzbereich: "
+            "liegt in der Region genau ein Netzbereich, wird er gesetzt. Nötig für Tarife "
             "mit Zeitregeln nach Wochentag/Feiertag (Benutzertarife aus Edibert)."
         ),
     )
@@ -158,9 +184,10 @@ def _load_grid_fee_catalog_for_ui() -> dict:
 
 
 def _render_nne_area_fields(
-    catalog: dict, *, session_scope: str
+    catalog: dict, *, session_scope: str, land: str, region: str
 ) -> tuple[str | None, float]:
     """Netzbereich select plus own Arbeitspreis (user grid area) when chosen."""
+    from house_config.edibert_tariffs import region_grid_area, region_label
     from house_config.own_grid_fee import OWN_AREA
 
     areas = catalog["areas"]
@@ -182,6 +209,11 @@ def _render_nne_area_fields(
         ratios=WIDE_LABEL_RATIOS,
         key=area_key,
     )
+    if region and area_choice is not None and area_choice == region_grid_area(areas, land, region):
+        st.caption(
+            f"Einziger Netzbereich in Region {region_label(land, region)} — "
+            "wird beim Wählen der Region gesetzt."
+        )
     base_manual = 0.0
     if area_choice == OWN_AREA:
         base_manual = float(
@@ -227,14 +259,14 @@ def _show_nne_spec_caption(config: dict, catalog: dict) -> None:
     )
 
 
-def _render_nne_arbeitspreis(*, session_scope: str) -> dict:
+def _render_nne_arbeitspreis(*, session_scope: str, land: str, region: str) -> dict:
     """Netznutzung: Netzbereich aus Katalog oder eigener Arbeitspreis; Zeitregeln."""
     from house_config.netznutzung import METERING_UNMETERED
     from house_config.own_grid_fee import OWN_AREA, OWN_BASE_KEY
 
     catalog = _load_grid_fee_catalog_for_ui()
     area_choice, base_manual = _render_nne_area_fields(
-        catalog, session_scope=session_scope
+        catalog, session_scope=session_scope, land=land, region=region
     )
     include_draft = bool(
         labeled_checkbox(
@@ -271,7 +303,9 @@ def _render_location_fields(*, session_scope: str) -> dict:
     default_pv_tilt, default_pv_azimuth = _render_pv_default_row(
         session_scope=session_scope
     )
-    netznutzung = _render_nne_arbeitspreis(session_scope=session_scope)
+    netznutzung = _render_nne_arbeitspreis(
+        session_scope=session_scope, land=land, region=region
+    )
     return {
         "land": land,
         "region": region,
