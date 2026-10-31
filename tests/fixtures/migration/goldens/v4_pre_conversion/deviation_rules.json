@@ -89,7 +89,8 @@
             ],
             "message": "Zwangs-Laden: Zielenergie deutlich verfehlt ({ratio_pct:.0f} %, Soll {soll_kwh:.2f} kWh, Ist {ist_kwh:.2f} kWh)",
             "params": {
-                "max_ratio": 0.6
+                "max_ratio": 0.6,
+                "min_shortfall_kwh": 0.1
             }
         },
         {
@@ -103,7 +104,8 @@
                 "battery_charge_energy_below_ratio"
             ],
             "params": {
-                "max_ratio": 0.8
+                "max_ratio": 0.8,
+                "min_shortfall_kwh": 0.1
             },
             "message": "Zwangs-Laden: Zielenergie nicht erreicht ({ratio_pct:.0f} %, Soll {soll_kwh:.2f} kWh, Ist {ist_kwh:.2f} kWh)"
         },
@@ -114,9 +116,13 @@
             "priority": 40,
             "scope": "waermepumpe",
             "when": [
-                "power_mismatch_positive"
+                "power_energy_below_ratio"
             ],
-            "message": "Wärmepumpe: Freigabe, aber nicht angesprungen (Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW)"
+            "message": "Wärmepumpe: Freigabe, aber nicht angesprungen ({ratio_pct:.0f} %, Soll {soll_kwh:.2f} kWh, Ist {ist_kwh:.2f} kWh)",
+            "params": {
+                "max_ratio": 0.5,
+                "min_shortfall_kwh": 0.1
+            }
         },
         {
             "id": "swimspa_filter_should_run_missing",

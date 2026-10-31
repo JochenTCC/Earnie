@@ -191,6 +191,32 @@ def _battery_power_below_tolerance(
     return False
 
 
+_ENERGY_PARAMS = ("max_ratio", "min_shortfall_kwh")
+
+
+def _require_energy_params(
+    rule: dict[str, Any], predicate: str, params: dict[str, Any]
+) -> None:
+    for name in _ENERGY_PARAMS:
+        if name not in params:
+            raise ValueError(
+                f"Regel '{rule['id']}': {predicate} braucht params.{name}."
+            )
+
+
+def _energy_below_target(soll_kw: float, ist_kw: float, params: dict[str, Any]) -> bool:
+    """Slot energy misses the target: ratio violated AND shortfall above the limit.
+
+    Both energies are slot-mean power × slot length, so the ratio equals
+    mean Ist / Soll and the shortfall is (Soll − Ist) × slot length.
+    """
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    if ist_kw >= float(params["max_ratio"]) * soll_kw:
+        return False
+    return (soll_kw - ist_kw) * DEFAULT_DT_H > float(params["min_shortfall_kwh"])
+
+
 def _battery_charge_energy_below_ratio(
     facts: SlotDeviationFacts,
     _scope: str,
@@ -198,17 +224,13 @@ def _battery_charge_energy_below_ratio(
     tolerances: dict[str, float],
     params: dict[str, Any],
 ) -> bool:
-    """Forced charge: slot charge energy below ``max_ratio`` × target energy.
+    """Forced charge: slot charge energy below ``max_ratio`` × target energy
+    and more than ``min_shortfall_kwh`` short.
 
-    Energy is the slot-mean power times the slot length, so the ratio equals
-    mean Ist / Soll. A decision-time sample is not energy: without the
-    closed-interval mean there is no verdict.
+    A decision-time sample is not energy: without the closed-interval mean
+    there is no verdict.
     """
-    if "max_ratio" not in params:
-        raise ValueError(
-            f"Regel '{rule['id']}': battery_charge_energy_below_ratio braucht "
-            "params.max_ratio."
-        )
+    _require_energy_params(rule, "battery_charge_energy_below_ratio", params)
     battery = facts.battery
     if battery.soll_mode != bat.MODE_ZWANGS_LADEN or not battery.ist_is_slot_mean:
         return False
@@ -216,7 +238,30 @@ def _battery_charge_energy_below_ratio(
     soll = max(0.0, battery.soll_plan_kw)
     if soll <= tol:
         return False
-    return _ist_charge_kw(battery.ist_power_kw) < float(params["max_ratio"]) * soll
+    return _energy_below_target(soll, _ist_charge_kw(battery.ist_power_kw), params)
+
+
+def _power_energy_below_ratio(
+    facts: SlotDeviationFacts,
+    scope: str,
+    rule: dict[str, Any],
+    tolerances: dict[str, float],
+    params: dict[str, Any],
+) -> bool:
+    """Consumer: slot energy below ``max_ratio`` × target energy and more than
+    ``min_shortfall_kwh`` short.
+
+    Same grading as the forced-charge rules; without the consumer's
+    closed-interval mean there is no verdict.
+    """
+    _require_energy_params(rule, "power_energy_below_ratio", params)
+    flex = _flex_for_scope(facts, scope)
+    if flex is None or not flex.ist_is_slot_mean:
+        return False
+    tol = _power_tolerance(tolerances, params)
+    if flex.soll_kw <= tol:
+        return False
+    return _energy_below_target(flex.soll_kw, max(0.0, flex.ist_kw), params)
 
 
 def _pv_follow_setpoint_kw(flex: FlexPowerFacts) -> float:
@@ -327,6 +372,7 @@ PREDICATES: dict[str, Predicate] = {
     "mode_is_forced_discharge": _mode_is_forced_discharge,
     "battery_power_below_tolerance": _battery_power_below_tolerance,
     "battery_charge_energy_below_ratio": _battery_charge_energy_below_ratio,
+    "power_energy_below_ratio": _power_energy_below_ratio,
     "pv_follow_scheduled": _pv_follow_scheduled,
     "pv_follow_power_below_tolerance": _pv_follow_power_below_tolerance,
     "slot_quality_present": _slot_quality_present,
@@ -355,10 +401,18 @@ def _battery_message_kw(battery: Any) -> tuple[float, float]:
     return abs(float(battery.soll_plan_kw)), float(battery.ist_power_kw)
 
 
+def _energy_message_values(soll_kw: float, ist_kw: float) -> dict[str, float]:
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    return {
+        "soll_kwh": soll_kw * DEFAULT_DT_H,
+        "ist_kwh": ist_kw * DEFAULT_DT_H,
+        "ratio_pct": 100.0 * ist_kw / soll_kw if soll_kw > 0 else 0.0,
+    }
+
+
 def _message_context(facts: SlotDeviationFacts, scope: str) -> dict[str, Any]:
     if scope == "battery":
-        from optimizer.slot_duration import DEFAULT_DT_H
-
         soll_kw, ist_kw = _battery_message_kw(facts.battery)
         return {
             "scope": scope,
@@ -366,20 +420,20 @@ def _message_context(facts: SlotDeviationFacts, scope: str) -> dict[str, Any]:
             "soll_kw": soll_kw,
             "ist_kw": ist_kw,
             "mismatch_kw": soll_kw - ist_kw,
-            "soll_kwh": soll_kw * DEFAULT_DT_H,
-            "ist_kwh": ist_kw * DEFAULT_DT_H,
-            "ratio_pct": 100.0 * ist_kw / soll_kw if soll_kw > 0 else 0.0,
+            **_energy_message_values(soll_kw, ist_kw),
         }
     flex = facts.consumers.get(scope)
     soll_kw = 0.0 if flex is None else flex.soll_kw
     if flex is not None and flex.pv_follow_soll == 1:
         soll_kw = _pv_follow_setpoint_kw(flex)
+    ist_kw = 0.0 if flex is None else flex.ist_kw
     return {
         "scope": scope,
         "consumer_name": _consumer_display_name(scope),
         "soll_kw": soll_kw,
-        "ist_kw": 0.0 if flex is None else flex.ist_kw,
+        "ist_kw": ist_kw,
         "mismatch_kw": 0.0 if flex is None else flex.mismatch_kw,
+        **_energy_message_values(soll_kw, max(0.0, ist_kw)),
     }
 
 

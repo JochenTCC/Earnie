@@ -19,6 +19,9 @@ class FlexPowerFacts:
     pv_follow_soll: int | None = None
     loxone_setpoint_kw: float | None = None
     nominal_power_kw: float | None = None
+    # True when ist_kw is this consumer's closed-interval slot mean; False for a
+    # decision-time sample or a live fallback, which say nothing about energy.
+    ist_is_slot_mean: bool = False
 
 
 @dataclass(frozen=True)
@@ -249,6 +252,9 @@ def build_slot_deviation_facts(
             closed_by_interval,
         )
         ist_snap = resolved or None
+    mean_flex_kw = (
+        (ist_snap or {}).get("flex_kw") or {} if ist_source == IST_SOURCE_MEAN else {}
+    )
     consumers: dict[str, FlexPowerFacts] = {}
     for consumer_id in sorted(_consumer_ids_from_entry(entry)):
         consumer = _consumer_config(consumer_id)
@@ -261,6 +267,7 @@ def build_slot_deviation_facts(
             pv_follow_soll=_pv_follow_soll(entry, consumer_id, consumer),
             loxone_setpoint_kw=_loxone_setpoint_kw(entry, consumer_id, consumer),
             nominal_power_kw=_nominal_power_kw(consumer),
+            ist_is_slot_mean=consumer_id in mean_flex_kw,
         )
     thermal_index = _thermal_by_consumer(entry)
     thermal = {

@@ -254,6 +254,12 @@ def _scenario_s5_wp_heating_hint() -> dict:
         "consumer_powers_kw": {"wp_heating": 1.5},
         "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
         "consumption_snapshot": _flex_snapshot(wp_heating=0.0),
+        # The heat-pump rule grades slot energy, which needs the slot mean.
+        "closed_interval": {
+            "sample_count": 10,
+            "battery_kw": 0.0,
+            "flex_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
+        },
         "thermal_observability": [],
         "scenario": SCENARIO_LABELS[6],
     }

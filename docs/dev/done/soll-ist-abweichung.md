@@ -139,8 +139,9 @@ Siehe `config/deviation_rules.schema.json` und `config/deviation_rules.example.j
       "category": "hint",
       "priority": 40,
       "scope": "waermepumpe",
-      "when": ["power_mismatch_positive"],
-      "message": "Wärmepumpe: Freigabe, aber nicht angesprungen (Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW)"
+      "when": ["power_energy_below_ratio"],
+      "params": {"max_ratio": 0.5, "min_shortfall_kwh": 0.1},
+      "message": "Wärmepumpe: Freigabe, aber nicht angesprungen ({ratio_pct:.0f} %, Soll {soll_kwh:.2f} kWh, Ist {ist_kwh:.2f} kWh)"
     }
   ],
   "fallback": {
@@ -162,7 +163,8 @@ Siehe `config/deviation_rules.schema.json` und `config/deviation_rules.example.j
 | `mode_is_forced_charge` | `mode == 1` (Zwangs-Laden) |
 | `mode_is_forced_discharge` | `mode == 3` |
 | `battery_power_below_tolerance` | Zwangs-Modus: Soll > Toleranz, Ist-Lade-/Entladeleistung ≤ Toleranz (nicht ausgeführt; kein reines Unterschreiten des Sollwerts). Die ausgelieferten Regeln nutzen es nur noch für Zwangs-Entladen |
-| `battery_charge_energy_below_ratio` | Zwangs-Laden, Soll > Toleranz: geladene Slot-Energie (Slot-Mittel × Slotdauer) < `params.max_ratio` × Zielenergie. Nur mit Slot-Mittel (`closed_interval`), sonst kein Urteil. Ausgeliefert: Fehler < 0.6, Warnung < 0.8 |
+| `battery_charge_energy_below_ratio` | Zwangs-Laden, Soll > Toleranz: geladene Slot-Energie (Slot-Mittel × Slotdauer) < `params.max_ratio` × Zielenergie **und** Fehlmenge (Ziel − geladen) > `params.min_shortfall_kwh`. Nur mit Slot-Mittel (`closed_interval`), sonst kein Urteil. Ausgeliefert: Fehler < 0.6, Warnung < 0.8, beide Fehlmenge > 0.1 kWh |
+| `power_energy_below_ratio` | Verbraucher, Soll > Toleranz: Slot-Energie < `params.max_ratio` × Soll-Energie **und** Fehlmenge > `params.min_shortfall_kwh`. Nur wenn der Verbraucher im Slot-Mittel (`closed_interval.flex_kw`) steht, sonst kein Urteil. Ausgeliefert für die Wärmepumpe: < 0.5, Fehlmenge > 0.1 kWh |
 | `pv_follow_scheduled` | `consumer_pv_follow.{scope} == 1` und Loxone-Setpoint > Toleranz |
 | `pv_follow_power_below_tolerance` | pv_follow aktiv, Setpoint − Ist > Toleranz |
 | `slot_quality_present` | Slot hat echten Log-Eintrag |
@@ -183,7 +185,7 @@ Abgedeckt durch `tests/test_deviation_eval.py`, `tests/test_deviation_scenario_c
 | S3 | Modus Zwangs-Laden, geladene Slot-Energie < 60 % der Zielenergie | `battery_forced_charge_missing` | Fehler |
 | S3b | Modus Zwangs-Laden, geladene Slot-Energie 60–80 % der Zielenergie | `battery_forced_charge_target_missed` | Warnung |
 | S4 | Soll ≈ Ist (innerhalb Toleranz) | — | kein Icon |
-| S5 | Wärmepumpe Soll > 0, Ist ≈ 0 | `waermepumpe_enable_no_start` | Hinweis |
+| S5 | Wärmepumpe Slot-Energie < 50 % der Soll-Energie, Fehlmenge > 0,1 kWh | `waermepumpe_enable_no_start` | Hinweis |
 | S6 | Modus Zwangs-Entladen, Batterie entlädt nicht | `battery_forced_discharge_missing` | Fehler |
 | S7 | pv_follow = 1, Loxone-Setpoint (P_max) nicht erreicht | `eauto_pv_follow_missing` | Fehler |
 | S8 | SwimSpa-Filter Soll > 0, Ist ≈ 0 | `swimspa_filter_should_run_missing` | Fehler |

@@ -340,7 +340,11 @@ def test_feed_in_migration_asks_per_flat_scenario(tmp_path):
     from runtime_store.migration import plan_migration
 
     plan = plan_migration(_migration_copy(tmp_path))
-    assert plan.pending_step_ids == ("dm5.scenario_feed_in", "dm5.heat_source")
+    assert plan.pending_step_ids == (
+        "dm4.deviation_energy_shortfall",
+        "dm5.scenario_feed_in",
+        "dm5.heat_source",
+    )
     by_id = {q.id: q for q in plan.questions}
     assert set(by_id) == set(FEED_IN_ANSWERS)  # tariff_with_leftover needs no answer
     assert all(q.required and q.kind == "choice" for q in by_id.values())
@@ -358,7 +362,11 @@ def test_feed_in_migration_writes_tariffs_and_drops_flat_keys(tmp_path):
 
     config_dir = _migration_copy(tmp_path)
     report = run_migration(config_dir, FEED_IN_ANSWERS)
-    assert report.applied_step_ids == ("dm5.scenario_feed_in", "dm5.heat_source")
+    assert report.applied_step_ids == (
+        "dm4.deviation_energy_shortfall",
+        "dm5.scenario_feed_in",
+        "dm5.heat_source",
+    )
     doc = json.loads((config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8"))
     settings = {s["id"]: s["settings"] for s in doc["scenarios"]}
     assert settings["flat_fixed"]["export_tariff_id"] == "__user_fixed__"

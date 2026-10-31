@@ -167,7 +167,7 @@
         },
         "params": {
           "type": "object",
-          "description": "Optionale Prädikat-Parameter (z. B. remaining_kwh_threshold, power_kw für Regel-Toleranz).",
+          "description": "Optionale Prädikat-Parameter (z. B. remaining_kwh_threshold, power_kw für Regel-Toleranz; battery_charge_energy_below_ratio und power_energy_below_ratio brauchen max_ratio und min_shortfall_kwh).",
           "additionalProperties": {
             "type": [
               "number",
@@ -179,7 +179,7 @@
         "message": {
           "type": "string",
           "minLength": 1,
-          "description": "Tooltip-Text; Platzhalter {soll_kw}, {ist_kw}, {consumer_name}, {scope}; scope battery zusätzlich {soll_kwh}, {ist_kwh}, {ratio_pct}."
+          "description": "Tooltip-Text; Platzhalter {soll_kw}, {ist_kw}, {consumer_name}, {scope}, {soll_kwh}, {ist_kwh}, {ratio_pct}."
         }
       },
       "additionalProperties": false

@@ -122,6 +122,12 @@ SCENARIOS = [
         _entry(
             consumer_powers_kw={"wp_heating": 1.5},
             consumption_snapshot={"flex_kw": {"wp_heating": 0.0}, "battery_kw": 0.0},
+            # The heat-pump rule grades slot energy, which needs the slot mean.
+            closed_interval={
+                "sample_count": 10,
+                "battery_kw": 0.0,
+                "flex_kw": {"wp_heating": 0.0},
+            },
         ),
         "hint",
         "wp_heating_enable_no_start",
