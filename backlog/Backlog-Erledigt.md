@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Minor change Chart1 SoC line thickness by capacity (2026-10-31)
+
+- [x] **[release/2.7] Chart1 SoC line thickness by battery capacity.** Optimized SoC traces use stepped line width from `battery_capacity_kwh` (≤5 kWh: 1 px / ≤10: 1.5 / ≤15: 2 / >15: 2.5); virtual powerstations keep dash styling. Helper `soc_line_width_for_capacity_kwh` in `optimizer/powerstation_soc_chart.py`; wired in `ui/chart_soc.py` / `ui/charts.py`. Docs: `docs/ui/charts.md`. **Verified 2026-10-31** by the maintainer (multi-ESS + small virtual carve-out).
+
 ### Minor change cost analysis chart colors and export (2026-10-31)
 
 - [x] **[release/2.7] Chart „Verbrauch vs. Preis & PV“ (Analyse Verbrauch & Kosten): Monitor Chart-1 colors and exported energy.** Consumer bars keep the Chart-1 consumer colors and now use the Chart-1 bar opacity (0.75). PV is drawn as line with yellow fill (`CHART_PV_LINE_COLOR` / `CHART_PV_FILL_COLOR`), the import price as red step line like in Monitor. New: export below zero as „Einspeisung (PV)“ (`MUTED_EXPORT_PV`) and „Einspeisung (Batterie)“ (`MUTED_BATTERY_EXPORT`), muted opacity 0.5, barmode `relative`; slots carry `export_from_pv_kwh` from `allocate_slot_flows`. Needs a pick to `main`.
