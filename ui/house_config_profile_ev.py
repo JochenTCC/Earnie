@@ -23,6 +23,7 @@ from house_config.generic_schedule import (
     reject_legacy_start_flexibility,
 )
 from house_config.id_slug import slug_id
+from house_config.profile_schema_defaults import consumer_default, ev_schedule_default
 from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
     building_class_option_label,
@@ -76,12 +77,12 @@ def _default_ev_consumer() -> dict:
         "type": "ev",
         "nominal_power_kw": 3.5,
         "min_power_kw": 1.4,
-        "min_on_quarterhours": 1,
+        "min_on_quarterhours": consumer_default("min_on_quarterhours", consumer_type="ev"),
         "battery_capacity_kwh": 60.0,
         "charging_schedule": {
-            "target_soc_percent": 100.0,
-            "charging_efficiency": 0.95,
-            "forecast_when_absent": True,
+            "target_soc_percent": ev_schedule_default("target_soc_percent"),
+            "charging_efficiency": ev_schedule_default("charging_efficiency"),
+            "forecast_when_absent": ev_schedule_default("forecast_when_absent"),
             "weekday": {
                 "car_available_from_hour": 18,
                 "ready_by_hour": 7,
@@ -131,9 +132,9 @@ def _apply_ev_default_widget_keys(
         f"hc_ev_min_{index}": float(seeded["min_power_kw"]),
         f"hc_ev_min_qh_{index}": int(seeded["min_on_quarterhours"]),
         f"hc_ev_cap_{index}": float(seeded["battery_capacity_kwh"]),
-        f"hc_ev_target_soc_{index}": float(sched.get("target_soc_percent", 100.0)),
-        f"hc_ev_eff_{index}": float(sched.get("charging_efficiency", 0.95)),
-        f"hc_ev_forecast_{index}": bool(sched.get("forecast_when_absent", True)),
+        f"hc_ev_target_soc_{index}": float(sched.get("target_soc_percent", ev_schedule_default("target_soc_percent"))),
+        f"hc_ev_eff_{index}": float(sched.get("charging_efficiency", ev_schedule_default("charging_efficiency"))),
+        f"hc_ev_forecast_{index}": bool(sched.get("forecast_when_absent", ev_schedule_default("forecast_when_absent"))),
         f"hc_ev_Werktag_from_{index}": int(weekday.get("car_available_from_hour", 18)),
         f"hc_ev_Werktag_ready_{index}": int(weekday.get("ready_by_hour", 7)),
         f"hc_ev_Werktag_soc_{index}": float(weekday.get("daily_rest_soc", 40.0)),
@@ -212,7 +213,7 @@ def _render_ev_amp_conversion_fields(
             "Nennspannung (V) für A→kW",
             min_value=100.0,
             max_value=500.0,
-            value=float(sched.get("nominal_power_voltage_v", 230.0)),
+            value=float(sched.get("nominal_power_voltage_v", ev_schedule_default("nominal_power_voltage_v"))),
             step=1.0,
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_ev_voltage_{index}"),
@@ -222,7 +223,7 @@ def _render_ev_amp_conversion_fields(
             "Phasen für A→kW",
             min_value=1,
             max_value=3,
-            value=int(sched.get("nominal_power_phases", 1)),
+            value=int(sched.get("nominal_power_phases", ev_schedule_default("nominal_power_phases"))),
             step=1,
             key=_scoped_key(session_scope, f"hc_ev_phases_{index}"),
             help="Standard: 1 Phase.",
@@ -237,20 +238,20 @@ def _render_ev_charging_schedule(
             "Ziel-SOC (%)",
             min_value=0.0,
             max_value=100.0,
-            value=float(sched.get("target_soc_percent", 100.0)),
+            value=float(sched.get("target_soc_percent", ev_schedule_default("target_soc_percent"))),
             key=_scoped_key(session_scope, f"hc_ev_target_soc_{index}"),
         ),
         "charging_efficiency": labeled_number_input(
             "Lade-Wirkungsgrad",
             min_value=0.01,
             max_value=1.0,
-            value=float(sched.get("charging_efficiency", 0.95)),
+            value=float(sched.get("charging_efficiency", ev_schedule_default("charging_efficiency"))),
             step=0.01,
             key=_scoped_key(session_scope, f"hc_ev_eff_{index}"),
         ),
         "forecast_when_absent": labeled_checkbox(
             "Prognose, wenn nicht angeschlossen",
-            value=bool(sched.get("forecast_when_absent", True)),
+            value=bool(sched.get("forecast_when_absent", ev_schedule_default("forecast_when_absent"))),
             key=_scoped_key(session_scope, f"hc_ev_forecast_{index}"),
             help=(
                 "Lade-Prognose ohne Wallbox-Anschluss (charging_schedule). "

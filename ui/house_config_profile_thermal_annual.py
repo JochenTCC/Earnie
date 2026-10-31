@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from ui.house_config_profile_session import _live_markers_enabled, _scoped_key
 import streamlit as st
+from house_config.profile_schema_defaults import (
+    consumer_default,
+    heat_storage_default,
+)
 from house_config.thermal_labels import (
     building_class_option_label,
 )
@@ -19,7 +23,6 @@ def _render_building_mass_select(
 ) -> str:
     from optimizer.thermal_house import (
         BUILDING_MASS_C_WH_PER_M2K,
-        DEFAULT_BUILDING_MASS,
         normalize_building_mass,
     )
 
@@ -30,7 +33,7 @@ def _render_building_mass_select(
         options=mass_options,
         index=mass_options.index(mass_current)
         if mass_current in mass_options
-        else mass_options.index(DEFAULT_BUILDING_MASS),
+        else mass_options.index(consumer_default("building_mass")),
         format_func=lambda key: {
             "leicht": "Leicht (50 Wh/m²K)",
             "mittel": "Mittel (90 Wh/m²K)",
@@ -51,18 +54,29 @@ def _render_thermal_annual_building_fields(
         "min_on_quarterhours": labeled_number_input(
             "Mindestlaufzeit (Viertelstunden)",
             min_value=1,
-            value=int(consumer.get("min_on_quarterhours", 1)),
+            value=int(
+                consumer.get(
+                    "min_on_quarterhours",
+                    consumer_default(
+                        "min_on_quarterhours", consumer_type="thermal_annual"
+                    ),
+                )
+            ),
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_ta_min_qh_{index}"),
         ),
         "living_area_m2": labeled_number_input(
             "Wohnfläche (m²)",
             min_value=0.0,
-            value=float(thermal.get("living_area_m2", 120.0)),
+            value=float(
+                thermal.get("living_area_m2", consumer_default("living_area_m2"))
+            ),
             key=_scoped_key(session_scope, f"hc_area_{index}"),
         ),
     }
-    building_class = int(thermal.get("building_class", 3))
+    building_class = int(
+        thermal.get("building_class", consumer_default("building_class"))
+    )
     item["building_class"] = labeled_selectbox(
         "Gebäudeklasse",
         options=[1, 2, 3, 4],
@@ -108,27 +122,32 @@ def _render_thermal_comfort_fields(
     item["heat_pump_type"] = labeled_selectbox(
         "WP-Typ",
         options=["luft", "erde"],
-        index=0 if thermal.get("heat_pump_type") != "erde" else 1,
+        index=1
+        if str(thermal.get("heat_pump_type") or consumer_default("heat_pump_type"))
+        == "erde"
+        else 0,
         key=_scoped_key(session_scope, f"hc_wp_{index}"),
     )
     item["persons"] = labeled_number_input(
         "Personen",
         min_value=1,
-        value=int(thermal.get("persons", 2)),
+        value=int(thermal.get("persons", consumer_default("persons"))),
         key=_scoped_key(session_scope, f"hc_persons_{index}"),
     )
     item["target_temp_c"] = labeled_number_input(
         "Solltemperatur (°C)",
-        value=float(thermal.get("target_temp_c", 21.5)),
+        value=float(
+            thermal.get("target_temp_c", consumer_default("target_temp_c"))
+        ),
         step=0.5,
         key=_scoped_key(session_scope, f"hc_target_temp_{index}"),
     )
-    from optimizer.thermal_house import DEFAULT_HOUSE_TOLERANCE_C
-
     item["house_tolerance_c"] = labeled_number_input(
         "Heizband Toleranz (K)",
         min_value=0.05,
-        value=float(thermal.get("house_tolerance_c", DEFAULT_HOUSE_TOLERANCE_C)),
+        value=float(
+            thermal.get("house_tolerance_c", consumer_default("house_tolerance_c"))
+        ),
         step=0.1,
         key=_scoped_key(session_scope, f"hc_house_tol_{index}"),
     )
@@ -147,7 +166,11 @@ def _render_thermal_comfort_fields(
     item["absent_temp_reduction_c"] = labeled_number_input(
         "Temperaturabsenkung wenn abwesend",
         min_value=0.0,
-        value=float(thermal.get("absent_temp_reduction_c", 6.5)),
+        value=float(
+            thermal.get(
+                "absent_temp_reduction_c", consumer_default("absent_temp_reduction_c")
+            )
+        ),
         step=0.5,
         key=_scoped_key(session_scope, f"hc_absent_temp_red_{index}"),
         help=(
@@ -190,7 +213,9 @@ def _render_thermal_storage_fields(
     volume = labeled_number_input(
         "Wärmespeicher Volumen (Liter)",
         min_value=0.0,
-        value=float(existing.get("volume_liters", 0.0) or 0.0),
+        value=float(
+            existing.get("volume_liters") or heat_storage_default("volume_liters")
+        ),
         step=50.0,
         help=(
             "0 = bisheriges Modell (Solar als Tages-Gutschrift). "
@@ -206,7 +231,10 @@ def _render_thermal_storage_fields(
         "heat_loss_kw_per_k": labeled_number_input(
             "Wärmespeicher Verlust (kW/K)",
             min_value=0.0,
-            value=float(existing.get("heat_loss_kw_per_k", 0.02) or 0.02),
+            value=float(
+                existing.get("heat_loss_kw_per_k")
+                or heat_storage_default("heat_loss_kw_per_k")
+            ),
             step=0.005,
             format="%.3f",
             help=(
@@ -219,7 +247,9 @@ def _render_thermal_storage_fields(
         ),
         "setpoint_c": labeled_number_input(
             "Wärmespeicher Soll (°C)",
-            value=float(existing.get("setpoint_c", 45.0)),
+            value=float(
+                existing.get("setpoint_c", heat_storage_default("setpoint_c"))
+            ),
             step=1.0,
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_storage_set_{index}"),
@@ -227,7 +257,9 @@ def _render_thermal_storage_fields(
         "tolerance_c": labeled_number_input(
             "Wärmespeicher Toleranz (K)",
             min_value=0.1,
-            value=float(existing.get("tolerance_c", 5.0) or 5.0),
+            value=float(
+                existing.get("tolerance_c") or heat_storage_default("tolerance_c")
+            ),
             step=0.5,
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_storage_tol_{index}"),
@@ -294,16 +326,23 @@ def _render_thermal_solar_fields(
     index: int,
     *,
     session_scope: str,
-    default_tilt: float = 18.0,
-    default_azimuth: float = 0.0,
+    default_tilt: float | None = None,
+    default_azimuth: float | None = None,
 ) -> dict:
+    if default_tilt is None:
+        default_tilt = consumer_default("solar_thermal_tilt_deg")
+    if default_azimuth is None:
+        default_azimuth = consumer_default("solar_thermal_azimuth_deg")
     tilt_fallback = int(thermal.get("solar_thermal_tilt_deg", default_tilt))
     azimuth_fallback = int(thermal.get("solar_thermal_azimuth_deg", default_azimuth))
     return {
         "solar_thermal_area_m2": labeled_number_input(
             "Solar-Kollektor Fläche (m²)",
             min_value=0.0,
-            value=float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0),
+            value=float(
+                thermal.get("solar_thermal_area_m2")
+                or consumer_default("solar_thermal_area_m2")
+            ),
             step=1.0,
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_solar_area_{index}"),

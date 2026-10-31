@@ -10,6 +10,7 @@ from ui.house_config_profile_session import (
 
 import streamlit as st
 
+from house_config.profile_schema_defaults import consumer_default, thermal_rc_default
 from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
 )
@@ -293,7 +294,12 @@ def _render_thermal_rc_fields(
         "min_on_quarterhours": labeled_number_input(
             "Mindestlaufzeit (Viertelstunden)",
             min_value=1,
-            value=int(consumer.get("min_on_quarterhours", 8)),
+            value=int(
+                consumer.get(
+                    "min_on_quarterhours",
+                    consumer_default("min_on_quarterhours", consumer_type="thermal_rc"),
+                )
+            ),
             ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_rc_min_qh_{index}"),
         ),
@@ -301,28 +307,36 @@ def _render_thermal_rc_fields(
             "water_volume_liters": labeled_number_input(
                 "Thermisches Volumen (Liter)",
                 min_value=1.0,
-                value=float(rc.get("water_volume_liters", 6000.0) or 6000.0),
+                value=float(
+                    rc.get("water_volume_liters")
+                    or thermal_rc_default("water_volume_liters")
+                ),
                 step=100.0,
                 ratios=WIDE_LABEL_RATIOS,
                 key=_scoped_key(session_scope, f"hc_rc_vol_{index}"),
             ),
             "setpoint_c": labeled_number_input(
                 "Solltemperatur (°C)",
-                value=float(rc.get("setpoint_c", 36.5)),
+                value=float(rc.get("setpoint_c", thermal_rc_default("setpoint_c"))),
                 step=0.5,
                 key=_scoped_key(session_scope, f"hc_rc_set_{index}"),
             ),
             "tolerance_c": labeled_number_input(
                 "Toleranz (± °C)",
                 min_value=0.0,
-                value=float(rc.get("tolerance_c", 1.0) or 1.0),
+                value=float(
+                    rc.get("tolerance_c") or thermal_rc_default("tolerance_c")
+                ),
                 step=0.1,
                 key=_scoped_key(session_scope, f"hc_rc_tol_{index}"),
             ),
             "heat_loss_kw_per_k": labeled_number_input(
                 "Wärmeverlust U (kW/K)",
                 min_value=0.0,
-                value=float(rc.get("heat_loss_kw_per_k", 0.1) or 0.1),
+                value=float(
+                    rc.get("heat_loss_kw_per_k")
+                    or thermal_rc_default("heat_loss_kw_per_k")
+                ),
                 format="%.4f",
                 step=0.001,
                 key=_scoped_key(session_scope, f"hc_rc_u_{index}"),
@@ -331,7 +345,10 @@ def _render_thermal_rc_fields(
                 "Heizwirkungsgrad",
                 min_value=0.01,
                 max_value=1.0,
-                value=float(rc.get("heating_efficiency", 0.95) or 0.95),
+                value=float(
+                    rc.get("heating_efficiency")
+                    or thermal_rc_default("heating_efficiency")
+                ),
                 step=0.01,
                 key=_scoped_key(session_scope, f"hc_rc_eff_{index}"),
             ),

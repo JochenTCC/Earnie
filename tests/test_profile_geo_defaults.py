@@ -15,8 +15,8 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
 @pytest.mark.parametrize(
     "key,default",
     [
-        ("latitude", 48.0),
-        ("longitude", 10.0),
+        ("latitude", 48.2),
+        ("longitude", 11.0),
         ("default_pv_tilt", 25.0),
         ("default_pv_azimuth", 0.0),
     ],

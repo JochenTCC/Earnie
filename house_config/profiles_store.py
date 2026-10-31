@@ -8,6 +8,7 @@ from house_config.netznutzung import normalize_netznutzung_config
 from house_config.baseload import normalize_baseload_distribution
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.geo_timezone import timezone_for_land
+from house_config.profile_schema_defaults import profile_default
 from house_config.profiles_consumers import (  # noqa: F401  (re-exported)
     CONSUMER_TYPES,
     _attach_ehal_entity_fields,
@@ -147,8 +148,8 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
         historical_csv_source = "separate"
     land_raw = str(raw.get("land", "") or "").strip().upper()
     land = land_raw if land_raw in {"AT", "DE", "CH"} else "AT"
-    latitude = _float_field_or_default(raw, "latitude", 48.0)
-    longitude = _float_field_or_default(raw, "longitude", 10.0)
+    latitude = _float_field_or_default(raw, "latitude", profile_default("latitude"))
+    longitude = _float_field_or_default(raw, "longitude", profile_default("longitude"))
     if "netznutzung_arbeitspreis_cent_kwh" in raw:
         raise ValueError(
             "netznutzung_arbeitspreis_cent_kwh wird nicht mehr unterstützt "
@@ -173,8 +174,12 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
         "latitude": latitude,
         "longitude": longitude,
         "timezone_name": timezone_for_land(land),
-        "default_pv_tilt": _float_field_or_default(raw, "default_pv_tilt", 25.0),
-        "default_pv_azimuth": _float_field_or_default(raw, "default_pv_azimuth", 0.0),
+        "default_pv_tilt": _float_field_or_default(
+            raw, "default_pv_tilt", profile_default("default_pv_tilt")
+        ),
+        "default_pv_azimuth": _float_field_or_default(
+            raw, "default_pv_azimuth", profile_default("default_pv_azimuth")
+        ),
         "netznutzung": netznutzung,
     }
 

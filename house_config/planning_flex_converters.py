@@ -9,6 +9,7 @@ from settings.flexible_consumers import reject_legacy_id
 from house_config.consumption_csv import consumer_uses_profile_csv
 from house_config.earnie_role import is_earnie_flex, is_earnie_known, is_earnie_manual
 from house_config.generic_schedule import is_continuous_schedule
+from house_config.profile_schema_defaults import consumer_default, ev_schedule_default
 
 if TYPE_CHECKING:
     from data.modeled_climate import ModeledClimateContext
@@ -161,15 +162,22 @@ def _house_ev_consumers(house_profile: dict) -> list[dict]:
 def planning_ev_to_milp(consumer: dict) -> dict:
     """Hausprofil-EV → flexible_consumers-Shape für MILP; Live-Loxone aus Profil."""
     sched = consumer["charging_schedule"]
-    min_on = max(1, int(consumer.get("min_on_quarterhours", 1) or 1))
+    min_on_default = int(consumer_default("min_on_quarterhours", consumer_type="ev"))
+    min_on = max(1, int(consumer.get("min_on_quarterhours", min_on_default) or min_on_default))
     min_power = float(consumer.get("min_power_kw", 0.0) or 0.0)
     capacity = float(consumer["battery_capacity_kwh"])
     charging_schedule = merge_ev_power_conversion_fields(
         {
             "enabled": True,
-            "forecast_when_absent": bool(sched.get("forecast_when_absent", True)),
-            "target_soc_percent": float(sched.get("target_soc_percent", 100.0)),
-            "charging_efficiency": float(sched.get("charging_efficiency", 0.95)),
+            "forecast_when_absent": bool(
+                sched.get("forecast_when_absent", ev_schedule_default("forecast_when_absent"))
+            ),
+            "target_soc_percent": float(
+                sched.get("target_soc_percent", ev_schedule_default("target_soc_percent"))
+            ),
+            "charging_efficiency": float(
+                sched.get("charging_efficiency", ev_schedule_default("charging_efficiency"))
+            ),
             "weekday": dict(sched.get("weekday") or {}),
             "weekend": dict(sched.get("weekend") or {}),
             "battery_capacity_kwh": capacity,
@@ -243,7 +251,8 @@ def _thermal_rc_params(consumer: dict) -> dict:
 def planning_thermal_rc_to_milp(consumer: dict) -> dict:
     """Hausprofil thermal_rc → MILP-flex mit thermal_control (Loxone via legacy overlay)."""
     rc = _thermal_rc_params(consumer)
-    min_on = max(4, int(consumer.get("min_on_quarterhours", 8) or 8))
+    min_on_default = int(consumer_default("min_on_quarterhours", consumer_type="thermal_rc"))
+    min_on = max(4, int(consumer.get("min_on_quarterhours", min_on_default) or min_on_default))
     reject_legacy_id(consumer, str(consumer["id"]))
     entry = {
         "id": str(consumer["id"]),

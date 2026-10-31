@@ -30,11 +30,17 @@ def normalize_heat_storage(raw: dict | None) -> dict | None:
     volume = float(raw.get("volume_liters", 0.0) or 0.0)
     if volume <= 0.0:
         return None
+    from house_config.profile_schema_defaults import heat_storage_default
+
+    loss_default = float(heat_storage_default("heat_loss_kw_per_k"))
+    tol_default = float(heat_storage_default("tolerance_c"))
     return {
         "volume_liters": volume,
-        "heat_loss_kw_per_k": max(0.0, float(raw.get("heat_loss_kw_per_k", 0.02) or 0.02)),
-        "setpoint_c": float(raw.get("setpoint_c", 45.0)),
-        "tolerance_c": max(0.1, float(raw.get("tolerance_c", 5.0) or 5.0)),
+        "heat_loss_kw_per_k": max(
+            0.0, float(raw.get("heat_loss_kw_per_k", loss_default) or loss_default)
+        ),
+        "setpoint_c": float(raw.get("setpoint_c", heat_storage_default("setpoint_c"))),
+        "tolerance_c": max(0.1, float(raw.get("tolerance_c", tol_default) or tol_default)),
     }
 
 

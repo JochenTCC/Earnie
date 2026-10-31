@@ -33,7 +33,7 @@
                     "heat_pump_type": "erde",
                     "persons": 2,
                     "target_temp_c": 21.5,
-                    "absent_temp_reduction_c": 6.5,
+                    "absent_temp_reduction_c": 2.5,
                     "heating_limit_c": 15.0,
                     "ehal_bindings": {
                         "heatpump.wp_heating.set_enable": "",

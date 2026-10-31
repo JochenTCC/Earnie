@@ -21,6 +21,7 @@ from house_config.generic_schedule import (
     reject_legacy_start_flexibility,
 )
 from house_config.id_slug import slug_id
+from house_config.profile_schema_defaults import consumer_default, profile_default
 from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
     building_class_option_label,
@@ -129,10 +130,10 @@ def _default_consumer() -> dict:
         "label": "Haus Wärme",
         "type": "thermal_annual",
         "nominal_power_kw": 3.5,
-        "living_area_m2": 120.0,
-        "building_class": 3,
-        "heat_pump_type": "luft",
-        "persons": 2,
+        "living_area_m2": consumer_default("living_area_m2"),
+        "building_class": consumer_default("building_class"),
+        "heat_pump_type": consumer_default("heat_pump_type"),
+        "persons": consumer_default("persons"),
     }
 
 def _default_additional_consumer() -> dict:
@@ -205,27 +206,29 @@ def _seed_profile_widget_state(
 
     if existing:
         label = str(existing.get("label", "Mein Haushalt"))
-        annual_kwh = float(existing.get("annual_kwh", 4500.0))
-        land = str(existing.get("land") or "AT").strip().upper()
+        annual_kwh = float(existing.get("annual_kwh", profile_default("annual_kwh")))
+        land = str(existing.get("land") or profile_default("land")).strip().upper()
         if land not in {"AT", "DE", "CH"}:
-            land = "AT"
+            land = profile_default("land")
         region = str(existing.get("region") or "").strip()
-        latitude = float(existing.get("latitude", 48.2))
-        longitude = float(existing.get("longitude", 11.0))
-        default_pv_tilt = int(existing.get("default_pv_tilt", 25))
-        default_pv_azimuth = int(existing.get("default_pv_azimuth", 0))
+        latitude = float(existing.get("latitude", profile_default("latitude")))
+        longitude = float(existing.get("longitude", profile_default("longitude")))
+        default_pv_tilt = int(existing.get("default_pv_tilt", profile_default("default_pv_tilt")))
+        default_pv_azimuth = int(
+            existing.get("default_pv_azimuth", profile_default("default_pv_azimuth"))
+        )
         netznutzung = normalize_netznutzung_config(existing.get("netznutzung"))
         profile_id = str(existing.get("id") or "").strip()
         absent_mode = bool(existing.get("absent_mode", False))
     else:
         label = allocate_unique_label("Mein Haushalt", siblings or [])
-        annual_kwh = 4500.0
-        land = "AT"
+        annual_kwh = float(profile_default("annual_kwh"))
+        land = profile_default("land")
         region = ""
-        latitude = 48.2
-        longitude = 11.0
-        default_pv_tilt = 25
-        default_pv_azimuth = 0
+        latitude = float(profile_default("latitude"))
+        longitude = float(profile_default("longitude"))
+        default_pv_tilt = int(profile_default("default_pv_tilt"))
+        default_pv_azimuth = int(profile_default("default_pv_azimuth"))
         # No grid area preselected: the user picks one (no implicit "no grid fee").
         netznutzung = default_netznutzung_config()
         profile_id = ""
