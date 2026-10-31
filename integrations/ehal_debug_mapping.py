@@ -340,6 +340,13 @@ def _plant_entity_live_read_fields(batteries: list[dict]) -> list[str]:
     return fields
 
 
+def consumer_live_read_kinds(consumer: dict) -> tuple[str, ...]:
+    """Field kinds Live-Lesen expects for one consumer; the Signal-list export uses the same set."""
+    from ehal.qualified_ids import field_kind
+
+    return tuple(dict.fromkeys(field_kind(f) for f in _consumer_live_read_fields(consumer)))
+
+
 def _consumer_live_read_fields(consumer: dict) -> list[str]:
     """Live-Lesen ids of one flexible consumer (EV / filter / generic / thermal)."""
     cid = str(consumer.get("id") or "").strip()

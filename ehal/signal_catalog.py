@@ -150,13 +150,25 @@ def _entry(
     )
 
 
-# House-wide plant reads outside the grid role (heat pump / pool thermal, absent mode).
-_PLANT_HOUSE_KINDS: tuple[str, ...] = ("sens_temperature_outside", "sens_absent_mode")
+def _with_live_reads(role_kinds: tuple[str, ...], live_kinds: tuple[str, ...]) -> tuple[str, ...]:
+    """Role kinds plus every kind Live-Lesen reads, so the export covers the same signals."""
+    return tuple(dict.fromkeys(role_kinds + live_kinds))
 
 
 def _plant_kinds() -> tuple[str, ...]:
-    # Plant wire: grid role (plant PV retired; PV lives on inv.*/pv.*) + house-wide reads.
-    return tuple(_role_kinds("grid")) + _PLANT_HOUSE_KINDS
+    # Plant wire: grid role (plant PV retired; PV lives on inv.*/pv.*) + house-wide reads
+    # (outside temperature, absent mode, slot-Ist energy counters) from the Live-Lesen table.
+    from integrations.ehal_debug_fields import PLANT_HOUSE_LIVE_READ_FIELDS
+
+    return _with_live_reads(_role_kinds("grid"), PLANT_HOUSE_LIVE_READ_FIELDS)
+
+
+def _consumer_kinds(consumer: dict[str, Any], consumer_type: str) -> tuple[str, ...]:
+    from integrations.ehal_debug_mapping import consumer_live_read_kinds
+
+    return _with_live_reads(
+        _role_kinds(_consumer_role_id(consumer_type)), consumer_live_read_kinds(consumer)
+    )
 
 
 def _consumer_role_id(consumer_type: str) -> str:
@@ -302,7 +314,7 @@ def iter_catalog_entries(house: dict, components: dict) -> list[CatalogEntry]:
                 )
             )
             bindings = _bindings_of(consumer)
-            for kind in _role_kinds(_consumer_role_id(ctype)):
+            for kind in _consumer_kinds(consumer, ctype):
                 _add(
                     _entry(
                         component_kind="consumer",
