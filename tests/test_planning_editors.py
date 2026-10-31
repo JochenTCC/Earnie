@@ -786,6 +786,25 @@ def test_consumer_expander_title_uses_live_type_from_session():
     assert title.startswith("Verbraucher 2 (E-Auto): Garage — ")
 
 
+def test_live_consumer_for_annual_type_switch_takes_heat_source_select_start():
+    """Switch to Haus Wärme: preview runs before the heat-source selectboxes exist."""
+    class _Session(dict):
+        pass
+
+    session = _Session({"home__hc_g0_type_0": "thermal_annual"})
+    consumer = {"label": "Wasch", "type": "generic", "nominal_power_kw": 2.0}
+    import ui.house_config_profile_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        preview = form._live_consumer_for_annual(consumer, 0, session_scope="home")
+    finally:
+        form.st.session_state = original
+
+    assert preview["heat_source"] == {"type": "heat_pump", "heat_pump_type": "luft"}
+
+
 def test_live_consumer_for_annual_injects_thermal_rc_geo_from_profile():
     """Form sync drops thermal_rc lat/lon; expander preview must re-inject Standort."""
     class _Session(dict):

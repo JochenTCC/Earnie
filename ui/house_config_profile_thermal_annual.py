@@ -130,6 +130,23 @@ _FUEL_UNIT_LABELS = {
 }
 
 
+def _heat_source_select_start(existing: dict) -> tuple[str, str]:
+    """Start values ``(type, heat_pump_type)`` of the heat-source selectboxes.
+
+    The expander preview uses the same values: on the switch to "Haus Wärme" it runs
+    before the selectboxes exist and must compute with what the form is about to show.
+    """
+    from house_config.heat_source import HEAT_PUMP_TYPES, HEAT_SOURCE_TYPES
+
+    source_type = str(existing.get("type") or "heat_pump")
+    if source_type not in HEAT_SOURCE_TYPES:
+        source_type = HEAT_SOURCE_TYPES[0]
+    hp_type = str(existing.get("heat_pump_type") or "luft")
+    if hp_type not in HEAT_PUMP_TYPES:
+        hp_type = HEAT_PUMP_TYPES[0]
+    return source_type, hp_type
+
+
 def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str) -> dict:
     """Heat source (SUSI P1): type, heat-pump kind, optional efficiency / fuel price."""
     from house_config.heat_source import (
@@ -143,25 +160,20 @@ def _render_heat_source_fields(thermal: dict, index: int, *, session_scope: str)
     )
 
     existing = thermal.get("heat_source") if isinstance(thermal.get("heat_source"), dict) else {}
-    current_type = str(existing.get("type") or "heat_pump")
+    start_type, start_hp = _heat_source_select_start(existing)
     source_type = labeled_selectbox(
         "Wärmequelle",
         options=list(HEAT_SOURCE_TYPES),
-        index=list(HEAT_SOURCE_TYPES).index(current_type)
-        if current_type in HEAT_SOURCE_TYPES
-        else 0,
+        index=list(HEAT_SOURCE_TYPES).index(start_type),
         format_func=lambda key: _HEAT_SOURCE_LABELS.get(key, key),
         key=_scoped_key(session_scope, f"hc_heat_source_{index}"),
     )
     heat_source: dict = {"type": source_type}
     if source_type == "heat_pump":
-        current_hp = str(existing.get("heat_pump_type") or "luft")
         heat_source["heat_pump_type"] = labeled_selectbox(
             "WP-Typ",
             options=list(HEAT_PUMP_TYPES),
-            index=list(HEAT_PUMP_TYPES).index(current_hp)
-            if current_hp in HEAT_PUMP_TYPES
-            else 0,
+            index=list(HEAT_PUMP_TYPES).index(start_hp),
             format_func=lambda key: _HEAT_PUMP_LABELS.get(key, key),
             key=_scoped_key(session_scope, f"hc_wp_{index}"),
         )
@@ -605,7 +617,8 @@ def _overlay_thermal_annual_fields(
         ),
     )
     stored = preview.get("heat_source") if isinstance(preview.get("heat_source"), dict) else {}
-    heat_source = dict(stored)
+    start_type, start_hp = _heat_source_select_start(stored)
+    heat_source = {**stored, "type": start_type, "heat_pump_type": start_hp}
     _overlay_session_fields(
         heat_source,
         session_scope,
@@ -619,8 +632,6 @@ def _overlay_thermal_annual_fields(
         heat_source.pop("fuel_price", None)
     if heat_source.get("type") != "heat_pump":
         heat_source.pop("heat_pump_type", None)
-    elif not heat_source.get("heat_pump_type"):
-        heat_source["heat_pump_type"] = "luft"
     preview["heat_source"] = heat_source
     _overlay_profile_geo(preview, session_scope)
 
