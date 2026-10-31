@@ -3,7 +3,9 @@
 The editor writes ``user_tariffs.json`` next to ``tariffs.json``; the house context (land,
 region, time zone, grid area) comes from a house profile and is shown read-only. Deleting a
 user tariff that a scenario uses asks first and names the scenarios; after every write the
-tariff plausibility check runs once (P7 D7).
+tariff plausibility check runs once (P7 D7). Sharing with the Edibert tariff database needs
+Earnie's own consent (``runtime_store.tariff_share_consent``); without it the editor gets no
+exchange client and no contribution transport.
 """
 from __future__ import annotations
 
@@ -30,6 +32,25 @@ REQUEST_KEY = "tariffs_page_request"
 # Set by the editor's on_change; the next render runs the plausibility check once.
 _CHECK_KEY = "tariffs_page_check_pending"
 _SIDE_LABELS = {"import": "Bezugstarif", "export": "Einspeisetarif"}
+SHARE_CONSENT_KEY = "tariffs_page_share_consent"
+
+_SHARE_TEXT = (
+    "Benutzertarife können freiwillig an die kostenlose Edibert-Tarifdatenbank gesendet "
+    "werden, damit andere Earnie- und Edibert-Nutzer sie als Vorlage verwenden können. "
+    "Gesendet wird nur der Tarif selbst (Typ, Produktname, Anbieter, Land, Preise, Gebühren, "
+    "Regeln) — **keine** Installations-ID, keine Adresse, keine Verbrauchsdaten und keine "
+    "Notizen. Welche Tarife gesendet werden, wählst du danach einzeln im Abschnitt *Teilen* "
+    "des Editors; dort steht vor dem Senden das genaue Paket. Mit der Zustimmung fragt der "
+    "Editor außerdem beim Server den Prüfstatus von Tarifen aus der Datenbank ab und kann "
+    "Vorlagen laden. Die Zustimmung ist freiwillig, getrennt von der Nutzungsstatistik und "
+    "jederzeit widerrufbar; ein Widerruf löscht bereits gesendete Tarife nicht."
+)
+_SHARE_OFF_TEXT = {
+    "earnie_offline": "`EARNIE_OFFLINE=1` ist gesetzt — trotz Zustimmung wird nichts gesendet.",
+    "edibert_exchange_off": (
+        "`EDIBERT_EXCHANGE_OFF=1` ist gesetzt — trotz Zustimmung wird nichts gesendet."
+    ),
+}
 
 
 def request_tariff_page(profile_id: str, open_tariff: tuple[str, str] | None = None) -> None:
@@ -107,6 +128,34 @@ def _render_pending_check() -> None:
         st.error(format_tariff_plausibility_errors(errors))
 
 
+def _render_share_consent():
+    """Consent toggle for the tariff database; returns the exchange the editor may use."""
+    from runtime_store.tariff_share_consent import (
+        OFF_NO_CONSENT,
+        exchange_for_editor,
+        load_consent,
+        set_consent,
+    )
+
+    consent = load_consent()
+    with st.expander("Teilen mit der Tarifdatenbank", expanded=consent == "unset"):
+        st.markdown(_SHARE_TEXT)
+        agreed = st.toggle(
+            "Teilen mit der Edibert-Tarifdatenbank erlauben",
+            value=consent == "on",
+            key=SHARE_CONSENT_KEY,
+        )
+        if agreed != (consent == "on"):
+            set_consent("on" if agreed else "off")
+            st.rerun()
+        exchange = exchange_for_editor()
+        if exchange.off_reason in _SHARE_OFF_TEXT:
+            st.caption(_SHARE_OFF_TEXT[exchange.off_reason])
+        elif exchange.off_reason == OFF_NO_CONSENT:
+            st.caption("Ohne Zustimmung sendet und fragt der Editor nichts beim Server an.")
+    return exchange
+
+
 def render() -> None:
     from edibert.contribution import ShareDefault
     from edibert.ui.config import UiConfig
@@ -145,6 +194,7 @@ def render() -> None:
         st.error(str(exc))
         return
     _render_pending_check()
+    exchange = _render_share_consent()
     tariffs_path = Path(resolve_tariffs_json_path())
     data_dir = Path(user_tariffs_path_for(str(tariffs_path))).parent
     render_editor(
@@ -156,8 +206,10 @@ def render() -> None:
             host_house=host,
             delete_guard=_delete_guard,
             on_change=_on_change,
+            contribution_transport=exchange.transport,
+            exchange=exchange.client,
         ),
-        # No contribution_transport until the user consents in Earnie: sharing stays off.
+        # Earnie: nothing is selected for sharing until the user ticks it, even with consent.
         share_default=ShareDefault.OPT_IN,
         open_tariff=(request or {}).get("open"),
     )

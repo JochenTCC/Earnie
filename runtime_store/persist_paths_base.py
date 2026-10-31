@@ -214,6 +214,10 @@ def usage_ping_state_file() -> str:
     return runtime_path("usage_ping.json")
 
 
+def tariff_share_state_file() -> str:
+    return runtime_path("tariff_share.json")
+
+
 def feature_reviews_state_file() -> str:
     return runtime_path("feature_reviews.json")
 

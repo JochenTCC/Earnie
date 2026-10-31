@@ -148,14 +148,60 @@ def _user_ids() -> list[str]:
     return [t["id"] for t in doc["import_tariffs"]]
 
 
+def _consent_file() -> Path:
+    from runtime_store.persist_paths import tariff_share_state_file
+
+    return Path(tariff_share_state_file())
+
+
 def test_share_section_is_off_and_opt_in_without_consent():
     _write_user_tariff()
     at = _start()
+    assert at.toggle(key="tariffs_page_share_consent").value is False
+    assert not _consent_file().exists()
     captions = " ".join(c.value for c in at.caption)
     assert "Es wird nichts geteilt, bevor du einen Tarif auswählst." in captions
     assert "Teilen ist aus:" in captions
+    assert "Ohne Zustimmung sendet und fragt der Editor nichts" in captions
     assert at.checkbox(key=_PREFIX + "share.import.user_offen").value is False
     assert at.button(key=_PREFIX + "share.send").disabled
+
+
+def test_consent_turns_the_transport_on_and_revoking_turns_it_off(monkeypatch):
+    # A closed local port: nothing in this test may reach the real tariff database.
+    monkeypatch.setenv("EDIBERT_EXCHANGE_URL", "http://127.0.0.1:9")
+    monkeypatch.delenv("EDIBERT_EXCHANGE_OFF", raising=False)
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
+    _write_user_tariff()
+    at = _start()
+    at.toggle(key="tariffs_page_share_consent").set_value(True).run()
+    assert not at.exception
+    assert json.loads(_consent_file().read_text(encoding="utf-8"))["consent"] == "on"
+    captions = " ".join(c.value for c in at.caption)
+    assert "Teilen ist aus:" not in captions
+    # Still opt-in: consent alone selects nothing.
+    assert at.checkbox(key=_PREFIX + "share.import.user_offen").value is False
+    at.checkbox(key=_PREFIX + "share.import.user_offen").check().run()
+    assert not at.button(key=_PREFIX + "share.send").disabled
+
+    at.toggle(key="tariffs_page_share_consent").set_value(False).run()
+    assert not at.exception
+    assert json.loads(_consent_file().read_text(encoding="utf-8"))["consent"] == "off"
+    assert "Teilen ist aus:" in " ".join(c.value for c in at.caption)
+    assert at.button(key=_PREFIX + "share.send").disabled
+
+
+def test_edibert_off_switch_wins_over_consent(monkeypatch):
+    from runtime_store.tariff_share_consent import set_consent
+
+    monkeypatch.setenv("EDIBERT_EXCHANGE_OFF", "1")
+    set_consent("on")
+    _write_user_tariff()
+    at = _start()
+    assert at.toggle(key="tariffs_page_share_consent").value is True
+    captions = " ".join(c.value for c in at.caption)
+    assert "EDIBERT_EXCHANGE_OFF=1" in captions
+    assert "Teilen ist aus:" in captions
 
 
 def test_unused_user_tariff_is_deleted_without_asking():

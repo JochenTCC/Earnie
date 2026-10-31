@@ -5,6 +5,10 @@ through ``house_config.edibert_tariffs``): tags ``tariffs.json``, ``user_tariffs
 ``grid_fees.json`` and ``user_grid_fees.json``, drops ``earnie_data_model`` from them, writes
 the user grid areas handed over by ``dm5.netznutzung_split`` and asks for the VAT rate of
 every user tariff without one (required, the country rate is only a suggestion).
+Since the Edibert pin ``v0.1.12`` it also moves a ``grid_monthly_fee_eur`` of the user tariffs
+into the grid area the house profiles use (``grid_fee_area``): only when every profile names the
+same area; Edibert blocks a catalog area, an area missing from ``user_grid_fees.json`` and
+differing values, so nothing is guessed.
 Runs after the Earnie-track steps in the same wizard run and backup.
 """
 from __future__ import annotations
@@ -32,6 +36,7 @@ from runtime_store.migration.types import (
 
 STEP_ID = "tf1.tariff_format"
 USER_TARIFFS = "user_tariffs.json"
+HOUSE_PROFILES = "house_profiles.json"
 _DIRECTION_DE = {"import": "Bezug", "export": "Einspeisung"}
 _PRICES_DE = {"gross": "Preise brutto", "net": "Preise netto"}
 
@@ -51,8 +56,28 @@ def _handed_areas(docs: Docs) -> tuple[dict[str, Any], ...]:
     return tuple(handoff.get("areas") or ())
 
 
+def _grid_fee_area(docs: Docs) -> str | None:
+    """The grid area every house profile uses; ``None`` when they differ or none is named."""
+    house = docs.get(HOUSE_PROFILES)
+    if not isinstance(house, dict):
+        return None
+    areas = {
+        (profile.get("netznutzung") or {}).get("area_id")
+        for profile in house.get("profiles") or ()
+        if isinstance(profile, dict)
+    }
+    if len(areas) != 1:
+        return None
+    (area,) = areas
+    return area if isinstance(area, str) and area else None
+
+
 def _plan(docs: Docs):
-    return plan_tariff_migration(_tariff_docs(docs), user_grid_areas=_handed_areas(docs))
+    return plan_tariff_migration(
+        _tariff_docs(docs),
+        user_grid_areas=_handed_areas(docs),
+        grid_fee_area=_grid_fee_area(docs),
+    )
 
 
 def detect(docs: Docs) -> bool:
@@ -116,7 +141,8 @@ def _blocked(docs: Docs, messages: list[str]) -> StepResult:
 def apply(docs: Docs, answers: Answers) -> StepResult:
     tariff_docs = _tariff_docs(docs)
     areas = _handed_areas(docs)
-    plan = plan_tariff_migration(tariff_docs, user_grid_areas=areas)
+    target = _grid_fee_area(docs)
+    plan = plan_tariff_migration(tariff_docs, user_grid_areas=areas, grid_fee_area=target)
     if plan.blockers:
         return _blocked(docs, [migration_blocker_de(b) for b in plan.blockers])
     vat: dict[str, float] = {}
@@ -131,7 +157,9 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
         # are, migrate the other files so the preview shows them.
         tariff_docs = {k: v for k, v in tariff_docs.items() if k != USER_TARIFFS}
     try:
-        result = migrate_tariff_files(tariff_docs, vat, user_grid_areas=areas)
+        result = migrate_tariff_files(
+            tariff_docs, vat, user_grid_areas=areas, grid_fee_area=target
+        )
     except EdibertLoadError as exc:
         return _blocked(docs, [str(exc)])
     if result.blockers:
@@ -147,7 +175,10 @@ def apply(docs: Docs, answers: Answers) -> StepResult:
 STEP = MigrationStep(
     id=STEP_ID,
     data_model=5,
-    title_de="Tarifformat 1 (Tarif- und Netzentgeltdateien, Benutzer-Netzbereiche, USt-Satz)",
+    title_de=(
+        "Tarifformat 1 (Tarif- und Netzentgeltdateien, Benutzer-Netzbereiche, USt-Satz, "
+        "Netz-Grundgebühr in den Netzbereich)"
+    ),
     files=tuple(sorted(TARIFF_TRACK_FILES)),
     detect=detect,
     apply=apply,

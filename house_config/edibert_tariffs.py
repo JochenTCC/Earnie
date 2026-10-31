@@ -58,6 +58,22 @@ _MESSAGES_DE: dict[str, str] = {
     "MIGRATION_ANSWER_MISSING": "Migrationsfrage '{question_id}' ist nicht beantwortet",
     "PRICE_MISSING": "Tarif '{tariff_id}': kein Preis für Slot {slot}",
     "MARKET_PRICE_REQUIRED": "Tarif '{tariff_id}': Börsenpreis für Slot {slot} erforderlich",
+    "GRID_MONTHLY_FEE_LEGACY": (
+        "Tarif '{tariff_id}': grid_monthly_fee_eur gehört seit Edibert 0.1.12 zum Netzbereich — "
+        "Konfiguration migrieren (Streamlit-Seite „Konfigurations-Migration“ oder "
+        "python -m scripts.migrate_config)"
+    ),
+    "GRID_MONTHLY_FEE_NO_TARGET": (
+        "grid_monthly_fee_eur der Tarife {tariff_ids} kann nicht verschoben werden: kein "
+        "eigener Netzbereich als Ziel (Netzbereich {area_id!r}; alle Hausprofile brauchen "
+        "denselben Benutzer-Netzbereich). Feld im Tarif entfernen und die Grundgebühr im "
+        "Netzbereich eintragen"
+    ),
+    "GRID_MONTHLY_FEE_AMBIGUOUS": (
+        "grid_monthly_fee_eur der Tarife {tariff_ids} hat verschiedene Werte {values} — "
+        "auf einen Wert angleichen oder aus den Tarifen entfernen"
+    ),
+    "DB_REF_LEGACY": "veraltetes db_ref mit 'database' ({path}) — Konfiguration migrieren",
 }
 
 
@@ -131,10 +147,15 @@ STANDARD_VAT_PERCENT = dict(api.STANDARD_VAT_PERCENT)
 
 
 def plan_tariff_migration(
-    docs: dict[str, dict], *, user_grid_areas: tuple[dict, ...] = ()
+    docs: dict[str, dict],
+    *,
+    user_grid_areas: tuple[dict, ...] = (),
+    grid_fee_area: str | None = None,
 ) -> api.MigrationPlan:
     """Pure: what Edibert's migration would change, its questions and blockers."""
-    return api.plan_migration(docs, user_grid_areas=user_grid_areas)
+    return api.plan_migration(
+        docs, user_grid_areas=user_grid_areas, grid_fee_area=grid_fee_area
+    )
 
 
 def migrate_tariff_files(
@@ -142,10 +163,13 @@ def migrate_tariff_files(
     answers: dict[str, Any],
     *,
     user_grid_areas: tuple[dict, ...] = (),
+    grid_fee_area: str | None = None,
 ) -> api.MigrationResult:
     """Pure: tariff-track files brought to the current ``tariff_format``."""
     try:
-        return api.migrate(docs, answers, user_grid_areas=user_grid_areas)
+        return api.migrate(
+            docs, answers, user_grid_areas=user_grid_areas, grid_fee_area=grid_fee_area
+        )
     except api.EdibertError as exc:
         raise EdibertLoadError("Tarif-Migration", exc) from exc
 

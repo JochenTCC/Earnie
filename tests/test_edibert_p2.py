@@ -232,3 +232,43 @@ def test_catalog_area_is_passed_through_unchanged(tmp_path: Path) -> None:
         grid_fees_path=str(tmp_path / "grid_fees.json"),
     ) == netznutzung  # fmt: skip
     assert not (tmp_path / "user_grid_fees.json").exists()
+
+
+def _migrated_with_monthly_fee(tmp_path: Path, area_ids: dict[str, str]) -> Path:
+    """Migrated golden config, one user tariff with the pre-v0.1.12 ``grid_monthly_fee_eur``."""
+    config_dir = tmp_path / NAME
+    shutil.copytree(FIXTURES / "goldens" / NAME, config_dir)
+    house_path = config_dir / "house_profiles.json"
+    house = _json(house_path)
+    for profile in house["profiles"]:
+        profile["netznutzung"]["area_id"] = area_ids[profile["id"]]
+    house_path.write_text(json.dumps(house), encoding="utf-8")
+    user_path = config_dir / "user_tariffs.json"
+    user = _json(user_path)
+    user["import_tariffs"][0]["grid_monthly_fee_eur"] = 3.0
+    user_path.write_text(json.dumps(user), encoding="utf-8")
+    return config_dir
+
+
+def test_monthly_grid_fee_moves_into_the_shared_user_area(tmp_path: Path) -> None:
+    """Edibert v0.1.12 pin: the fee becomes the fixed amount of the area all profiles use."""
+    same = {"profile_a": "user_profile_a", "profile_b": "user_profile_a", "profile_c": "user_profile_a"}
+    config_dir = _migrated_with_monthly_fee(tmp_path, same)
+    plan = plan_migration(config_dir)
+    assert plan.pending_step_ids == ("tf1.tariff_format",) and plan.can_run, plan.blockers
+    run_migration(config_dir, {})
+    tariff = _json(config_dir / "user_tariffs.json")["import_tariffs"][0]
+    assert "grid_monthly_fee_eur" not in tariff
+    areas = {a["id"]: a for a in _json(config_dir / "user_grid_fees.json")["areas"]}
+    assert "grid_base_fee" in json.dumps(areas["user_profile_a"])
+    assert plan_migration(config_dir).pending_step_ids == ()
+
+
+def test_monthly_grid_fee_without_one_shared_area_blocks(tmp_path: Path) -> None:
+    """Profiles on different areas: no target is guessed, the gate shows the blocker."""
+    mixed = {"profile_a": "user_profile_a", "profile_b": "AT-VBG", "profile_c": "user_profile_c"}
+    config_dir = _migrated_with_monthly_fee(tmp_path, mixed)
+    plan = plan_migration(config_dir)
+    assert not plan.can_run
+    assert any("GRID_MONTHLY_FEE_NO_TARGET" in b.message_de for b in plan.blockers)
+    assert any("kein eigener Netzbereich" in b.message_de for b in plan.blockers)
