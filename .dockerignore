@@ -42,6 +42,7 @@ docs/
 Communication/
 *.md
 !README.md
+!LICENSE.md
 house_sim/
 packaging/
 se_calc_test/
