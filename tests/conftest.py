@@ -82,6 +82,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DOTENV_PATHS = (ROOT / "earnie_env" / "config" / ".env", ROOT / ".env")
 DEFAULT_TEST_CONFIG_PATH = ROOT / "tests" / "fixtures" / "backtesting" / "config.json"
 _USE_LIVE_CONFIG_ENV = "EARNIE_TEST_USE_LIVE_CONFIG"
+_IMPORT_RUNTIME_DIR = tempfile.mkdtemp(prefix="earnie-runtime-import-")
+atexit.register(shutil.rmtree, _IMPORT_RUNTIME_DIR, ignore_errors=True)
 
 
 def _apply_default_test_config_env() -> None:
@@ -90,6 +92,11 @@ def _apply_default_test_config_env() -> None:
         return
     os.environ.setdefault("EARNIE_OFFLINE", "1")
     pin_fixture_config_env()
+    # config is imported below, before the per-test runtime dir exists; without this
+    # it reads the developer's earnie_env/runtime/local_settings.json (e.g.
+    # shadow_feed_enabled → main.main() tests wrote feeds into the fixtures).
+    os.environ["EARNIE_RUNTIME_PATH"] = _IMPORT_RUNTIME_DIR
+    os.environ.pop("EARNIE_LOCAL_SETTINGS_PATH", None)
     # Do not force EARNIE_GRID_FEES_PATH here — bootstrap tests must seed
     # config/grid_fees.json from share/. AppTest sets the public catalog path.
 

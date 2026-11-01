@@ -64,7 +64,10 @@ def test_hold_after_tick_returns_at_once_and_warns_beyond_90s(caplog):
 
 def test_early_cycle_plans_for_tick_and_writes_only_after_hold(monkeypatch):
     patch_main_run(monkeypatch, silent=False)
-    tick = _next_tick()
+    # One slot further out: the real clock must stay before the tick for the
+    # whole cycle (planning_now() is max(real, tick)); the next tick can be
+    # seconds away, and a slow run under xdist load would pass it.
+    tick = _next_tick() + timedelta(minutes=15)
     events: list[str] = []
     seen: dict = {}
 
