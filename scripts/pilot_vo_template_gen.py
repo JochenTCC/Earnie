@@ -102,6 +102,7 @@ _DECIMALS_BY_UNIT = {"kW": 3, "kvar": 3, "-": 3, "A": 2, "V": 1, "%": 1}
 # Fields without a ``loxone`` block in the role files (consumer, EV, pool, heat pump, energy counters).
 _DECIMALS_BY_KIND = {
     "sens_energy_total": 3,
+    "sens_pv_energy": 3,
     "sens_ess_energy_charge": 3,
     "sens_ess_energy_discharge": 3,
     "sens_grid_energy_import": 3,

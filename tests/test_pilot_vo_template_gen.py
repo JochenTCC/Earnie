@@ -270,3 +270,7 @@ def test_empty_token_omits_query_and_address_prefix(tmp_path: Path) -> None:
     root_addr = ET.fromstring(text_addr.encode("utf-8"))
     assert root_addr.get("Address") == "http://h:1"
     assert "/t/" not in (root_addr.get("Address") or "")
+
+
+def test_pv_energy_counter_keeps_decimals() -> None:
+    assert gen.value_placeholder("sens_pv_energy") == "<v.3>"

@@ -570,6 +570,7 @@ def _main_cycle(
             battery_params = apply_effective_ess_limits(
                 config.get_battery_params(), telemetry=telemetry_for_export
             )
+        cycle_recorder.record_ess_limits(recorder_token, battery_params)
         from optimizer.powerstation_live import (
             advance_virtual_reserves_from_plan,
             apply_reserves_to_battery_params,
@@ -626,6 +627,7 @@ def _main_cycle(
             matrix_row=optimization_matrix[0] if optimization_matrix else None,
             telemetry=telemetry_for_export,
         )
+        cycle_recorder.record_export_limits(recorder_token, export_ctx)
     with timing.phase("milp_live"):
         mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan, urgent_obs = optimizer.milp_optimizer(
             optimization_matrix,

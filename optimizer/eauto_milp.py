@@ -62,6 +62,34 @@ def validate_eauto_milp_params(raw: dict) -> dict[str, float]:
     }
 
 
+# Prefill of the Hauskonfigurator fields (shown and saved explicitly, never applied silently).
+SUGGESTED_TIE_BREAK_ON_EPSILON = 0.001
+SUGGESTED_TIE_BREAK_TIME_EPSILON = 0.0001
+
+
+# Smallest usual charging power (6 A, one phase); basis of the suggestion without own P_min.
+SUGGESTION_MIN_POWER_KW = 1.4
+
+
+def suggested_min_remaining_kwh(min_power_kw: float) -> float:
+    """Schema suggestion for ``live_modus_a_min_remaining_kwh``: 2 × P_min.
+
+    Without a positive ``min_power_kw`` the suggestion uses 1.4 kW (6 A, one phase).
+    """
+    base = float(min_power_kw) if float(min_power_kw) > 0 else SUGGESTION_MIN_POWER_KW
+    return round(2.0 * base, 3)
+
+
+def missing_live_params_error(consumer: dict) -> ValueError:
+    name = str(consumer.get("name") or consumer.get("label") or consumer.get("id") or "?")
+    return ValueError(
+        f"E-Auto '{name}': charging_schedule.milp fehlt (live_modus_a_min_remaining_kwh, "
+        "tie_break_on_epsilon, tie_break_time_epsilon) – Pflicht für die Live-Optimierung "
+        "mit Ladestrom-Sollwert. Im Hauskonfigurator beim E-Auto unter „MILP-Feintuning“ "
+        "setzen und speichern."
+    )
+
+
 def is_ev_milp_consumer(consumer: dict) -> bool:
     """EV mit power_setpoint und aktivem charging_schedule."""
     return uses_power_setpoint(consumer) and charging_schedule_enabled(consumer)
@@ -111,10 +139,7 @@ def ev_in_modus_b(
     if is_logged_day_matrix(matrix):
         return True
     if params is None:
-        raise ValueError(
-            "eauto_milp-Konfiguration fehlt für Live E-Auto-Optimierung "
-            "(live_modus_a_min_remaining_kwh, tie_break_*_epsilon)."
-        )
+        raise missing_live_params_error(consumer)
     if remaining_kwh <= 1e-9:
         return False
     return not ev_modus_a_active(consumer, matrix, remaining_kwh, params)
@@ -134,9 +159,7 @@ def milp_uses_power_setpoint(
     if is_logged_day_matrix(matrix):
         return False
     if params is None:
-        raise ValueError(
-            "eauto_milp-Konfiguration fehlt für Live E-Auto-Optimierung."
-        )
+        raise missing_live_params_error(consumer)
     return ev_modus_a_active(consumer, matrix, remaining_kwh, params)
 
 

@@ -152,3 +152,31 @@ def test_t3_rejected_value_shows_error_and_keeps_file(entity: str, suffix: str, 
     assert path.read_bytes() == before
     assert at.error, "Ablehnung muss als Fehlermeldung sichtbar sein"
     assert not any("Gespeichert" in c.value for c in at.caption)
+
+
+def test_ev_without_milp_block_shows_and_saves_the_suggested_values() -> None:
+    """Fixture EV has no charging_schedule.milp: the form prefills 2 × P_min and the epsilons."""
+    from optimizer.eauto_milp import (
+        SUGGESTED_TIE_BREAK_ON_EPSILON,
+        SUGGESTED_TIE_BREAK_TIME_EPSILON,
+    )
+
+    from optimizer.eauto_milp import suggested_min_remaining_kwh
+
+    at = _new_session()
+    min_power = float(at.number_input(key=_KEY_PREFIX + "ev_min_2").value)
+    suggested = suggested_min_remaining_kwh(min_power)
+    assert at.number_input(key=_KEY_PREFIX + "ev_milp_rem_2").value == pytest.approx(suggested)
+    assert at.number_input(key=_KEY_PREFIX + "ev_milp_eps_on_2").value == pytest.approx(
+        SUGGESTED_TIE_BREAK_ON_EPSILON
+    )
+    at = _set(at, _consumer_field("ev1", "ev_cap_2"), 56.0)
+    assert not at.exception
+    milp = _stored(Field(
+        kind="number_input", suffix="", profile_key="charging_schedule.milp", valid=None, entity="ev1"
+    ))
+    assert milp == {
+        "live_modus_a_min_remaining_kwh": pytest.approx(suggested),
+        "tie_break_on_epsilon": pytest.approx(SUGGESTED_TIE_BREAK_ON_EPSILON),
+        "tie_break_time_epsilon": pytest.approx(SUGGESTED_TIE_BREAK_TIME_EPSILON),
+    }

@@ -317,7 +317,9 @@ def test_normalize_export_host_strips_pasted_scheme(raw: str, expected: str) -> 
     assert normalize_export_host(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["http://192.168.1.10:8541", "192.168.1.10/ehal"])
+@pytest.mark.parametrize(
+    "raw", ["http://192.168.1.10:8541", "192.168.1.10/ehal", "ftp://192.168.1.10"]
+)
 def test_normalize_export_host_rejects_port_or_path(raw: str) -> None:
     with pytest.raises(ValueError, match="ohne Port"):
         normalize_export_host(raw)
@@ -333,3 +335,113 @@ def test_export_zip_address_has_one_scheme_after_normalizing() -> None:
     assert xml
     assert all("http://http" not in text for text in xml)
     assert any('Address="http://192.168.1.10:8541' in text for text in xml)
+
+
+def test_export_includes_the_plant_energy_counters_live_read_expects() -> None:
+    house, components = _minimal_docs()
+    house["plant"]["ehal_bindings"]["sens_pv_energy"] = ""
+    reads, _writes = signals_for_export(house, components, mode="needed")
+    needed = {s.ehal_id for s in reads}
+    assert "sens_pv_energy" in needed
+    assert "grid.meter.sens_grid_energy_import" not in needed  # optional, not activated
+    reads_all, _ = signals_for_export(house, components, mode="all")
+    assert {
+        "sens_pv_energy",
+        "grid.meter.sens_grid_energy_import",
+        "grid.meter.sens_grid_energy_export",
+    } <= {s.ehal_id for s in reads_all}
+
+
+def test_every_plant_live_read_field_is_in_the_export() -> None:
+    """Live-Lesen and the export must cover the same plant reads (regression: energy counters)."""
+    from ehal.qualified_ids import field_kind
+    from integrations.ehal_debug_fields import PLANT_HOUSE_LIVE_READ_FIELDS
+
+    house, components = _minimal_docs()
+    reads_all, _ = signals_for_export(house, components, mode="all")
+    exported_kinds = {field_kind(s.ehal_id) for s in reads_all if s.group == "Plant"}
+    assert set(PLANT_HOUSE_LIVE_READ_FIELDS) <= exported_kinds
+
+
+# Signal list of a real setup (Live-Lesen, 2026-10-31); IDs depend on the entity ids.
+_SETUP_LIVE_READ_IDS = {
+    "grid.meter.sens_grid_power_active",
+    "sens_power_consumers",
+    "sens_temperature_outside",
+    "sens_absent_mode",
+    "grid.meter.get_grid_export_power_limit",
+    "sens_pv_energy",
+    "grid.meter.sens_grid_energy_import",
+    "grid.meter.sens_grid_energy_export",
+    "ess.5_kwh_speicher.sens_ess_soc",
+    "ess.5_kwh_speicher.sens_ess_power",
+    "ess.5_kwh_speicher.sens_ess_energy_charge",
+    "ess.5_kwh_speicher.sens_ess_energy_discharge",
+    "ess.5_kwh_speicher.get_ess_soc_min",
+    "ess.5_kwh_speicher.get_ess_soc_max",
+    "ess.5_kwh_speicher.get_ess_max_charge_power",
+    "ess.5_kwh_speicher.get_ess_max_discharge_power",
+    "inv.wr_main.sens_inv_power_ac",
+    "inv.wr_main.sens_inv_power_pv",
+    "inv.wr_main.get_inv_max_ac_power",
+    "inv.wr_main.get_inv_max_pv_power",
+    "pv.dach_sued.sens_pv_production_active",
+    "heatpump.waermepumpe.sens_power_act",
+    "heatpump.waermepumpe.sens_consumer_active",
+    "heatpump.waermepumpe.sens_energy_total",
+    "heatpump.waermepumpe.sens_temperature_heat_storage",
+    "heatpump.waermepumpe.sens_temperature_heat_storage_low",
+    "evcs.e_auto.sens_evcs_active_power",
+    "evcs.e_auto.sens_evcs_connected",
+    "ev.e_auto.sens_evcs_soc_act",
+    "evcs.e_auto.get_evcs_nominal_current",
+    "ev.e_auto.sens_evcs_bat_capacity",
+    "ev.e_auto.get_evcs_ready_by_time",
+    "ev.e_auto.get_evcs_limit_soc",
+    "ev.e_auto.get_evcs_soc_min_immediate",
+    "ev.e_auto.sens_energy_total",
+    "consumer.verbraucher.sens_power_act",
+    "consumer.verbraucher.sens_consumer_active",
+    "consumer.verbraucher.sens_energy_total",
+}
+
+
+def _setup_docs() -> tuple[dict, dict]:
+    consumers = [
+        {"id": "waermepumpe", "type": "thermal_annual", "ehal_bindings": {}},
+        {"id": "e_auto", "type": "ev", "ehal_bindings": {}},
+        {"id": "verbraucher", "type": "generic", "ehal_bindings": {}},
+    ]
+    house = {"plant": {"ehal_bindings": {}}, "profiles": {"live": {"consumers": consumers}}}
+    components = {
+        "batteries": [{"id": "5_kwh_speicher", "control": "limits_only", "ehal_bindings": {}}],
+        "inverters": [{"id": "wr_main", "ehal_bindings": {}}],
+        "pv_systems": [{"id": "dach_sued", "inverter_id": "wr_main", "ehal_bindings": {}}],
+    }
+    return house, components
+
+
+def test_export_covers_every_live_read_signal_of_a_real_setup() -> None:
+    house, components = _setup_docs()
+    reads, _writes = signals_for_export(house, components, mode="all")
+    exported = {s.ehal_id for s in reads}
+    assert _SETUP_LIVE_READ_IDS <= exported, sorted(_SETUP_LIVE_READ_IDS - exported)
+
+
+def test_export_reads_match_live_read_fields(monkeypatch) -> None:
+    """Export and Live-Lesen derive from the same entities, so they list the same reads."""
+    from ehal.push_signals import HEARTBEAT_ID, REQUEST_OPTIMIZE_ID
+    from integrations import ehal_debug_mapping as m
+
+    house, components = _setup_docs()
+    monkeypatch.setattr(m, "_all_live_batteries", lambda: components["batteries"])
+    monkeypatch.setattr(m, "_all_live_inverters", lambda: components["inverters"])
+    monkeypatch.setattr(m, "_all_live_pv_systems", lambda: components["pv_systems"])
+    monkeypatch.setattr(
+        m, "_all_live_consumers", lambda: house["profiles"]["live"]["consumers"]
+    )
+    live = set(m.expected_live_read_fields()) - {REQUEST_OPTIMIZE_ID}
+    reads, _writes = signals_for_export(house, components, mode="all")
+    exported = {s.ehal_id for s in reads} - {HEARTBEAT_ID}
+    assert live == _SETUP_LIVE_READ_IDS
+    assert exported == live, (sorted(live - exported), sorted(exported - live))
