@@ -16,7 +16,15 @@ Vollständige Bedingungen: **[LICENSE.md](LICENSE.md)**.
 
 - Öffentliche Forks müssen unter denselben Bedingungen bleiben (Source-Available, Non-Commercial).
 - Das sichtbare Attributions-Banner („**Banner der Wahrheit**“) muss erhalten bleiben und darf in der Aussage nicht entstellt oder entfernt werden (`LICENSE.md` § 4).
+- Der Lizenztext muss bei jeder Weitergabe mitgehen, auch in selbst gebauten Container-Images.
+- Builds aus Ständen, die kein Release sind (z. B. `main`), dürfen weitergegeben werden, aber nur deutlich als inoffizieller Entwicklungsstand gekennzeichnet und ohne Support durch das Projekt (`LICENSE.md` § 4 Abs. 5).
 - Unofficial Builds können einen Warnhinweis zeigen; das Banner ist bewusst sichtbar, aber nicht technisch fälschungssicher.
+
+### Rechte an Beiträgen
+
+Mit einem Pull Request oder Patch räumst du dem Rechteinhaber ein einfaches, unentgeltliches, übertragbares Nutzungsrecht an deinem Beitrag ein, auch für kommerzielle Nutzung und eine spätere Änderung der Lizenz (`LICENSE.md` § 6). Du bleibst Urheber und darfst deinen Beitrag weiter selbst nutzen. Code von Dritten oder unter anderen Lizenzen bitte im PR mit Quelle und Lizenz angeben.
+
+Änderungen, die nur in deinem Fork liegen, bleiben deine. Sie werden ins offizielle Repository nur übernommen, wenn du sie als PR einreichst oder ausdrücklich zustimmst.
 
 ---
 
