@@ -92,7 +92,22 @@ def _default_ev_consumer() -> dict:
                 "ready_by_hour": 9,
                 "daily_rest_soc": 30.0,
             },
+            "milp": _suggested_ev_milp(1.4),
         },
+    }
+
+
+def _suggested_ev_milp(min_power_kw: float) -> dict:
+    from optimizer.eauto_milp import (
+        SUGGESTED_TIE_BREAK_ON_EPSILON,
+        SUGGESTED_TIE_BREAK_TIME_EPSILON,
+        suggested_min_remaining_kwh,
+    )
+
+    return {
+        "live_modus_a_min_remaining_kwh": suggested_min_remaining_kwh(min_power_kw),
+        "tie_break_on_epsilon": SUGGESTED_TIE_BREAK_ON_EPSILON,
+        "tie_break_time_epsilon": SUGGESTED_TIE_BREAK_TIME_EPSILON,
     }
 
 def _seed_ev_defaults_on_type_switch(
@@ -141,6 +156,14 @@ def _apply_ev_default_widget_keys(
         f"hc_ev_Wochenende_ready_{index}": int(weekend.get("ready_by_hour", 9)),
         f"hc_ev_Wochenende_soc_{index}": float(weekend.get("daily_rest_soc", 30.0)),
     }
+    milp = sched.get("milp") or {}
+    values.update(
+        {
+            f"hc_ev_milp_rem_{index}": float(milp["live_modus_a_min_remaining_kwh"]),
+            f"hc_ev_milp_eps_on_{index}": float(milp["tie_break_on_epsilon"]),
+            f"hc_ev_milp_eps_time_{index}": float(milp["tie_break_time_epsilon"]),
+        }
+    )
     for suffix, value in values.items():
         st.session_state[_scoped_key(session_scope, suffix)] = value
 
@@ -280,9 +303,70 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
     item["charging_schedule"] = _render_ev_charging_schedule(
         sched, index, session_scope=session_scope
     )
+    item["charging_schedule"]["milp"] = _render_ev_milp_fields(
+        sched.get("milp") or {},
+        float(item["min_power_kw"]),
+        index,
+        session_scope=session_scope,
+    )
     if _live_markers_enabled():
         st.caption(
             "E-Auto-Bindings unter **Daemon Control → EHAL-Com** "
             "(Entity-Mapping) pflegen."
         )
     return item
+
+
+def _render_ev_milp_fields(
+    milp: dict, min_power_kw: float, index: int, *, session_scope: str
+) -> dict:
+    """``charging_schedule.milp`` — required for live charging with a current setpoint."""
+    suggested = _suggested_ev_milp(min_power_kw)
+    st.markdown("**MILP-Feintuning**")
+    st.caption(
+        "Pflicht für die Live-Optimierung, wenn Earnie den Ladestrom vorgibt. "
+        "Ohne gespeicherte Werte sind die Vorschläge eingetragen "
+        "(Restmenge 2 × Mindestleistung); mit **Speichern** gelten sie."
+    )
+    return {
+        "live_modus_a_min_remaining_kwh": labeled_number_input(
+            "Kontinuierlich laden ab Restmenge (kWh)",
+            min_value=0.001,
+            value=float(
+                milp.get(
+                    "live_modus_a_min_remaining_kwh",
+                    suggested["live_modus_a_min_remaining_kwh"],
+                )
+            ),
+            step=0.1,
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_ev_milp_rem_{index}"),
+            help=(
+                "Liegt die noch zu ladende Energie darüber, gibt Earnie eine stetige "
+                "Ladeleistung vor; darunter schaltet es in ganzen Viertelstunden "
+                "(live_modus_a_min_remaining_kwh)."
+            ),
+        ),
+        "tie_break_on_epsilon": labeled_number_input(
+            "Tie-Break Einschalten (ε₁)",
+            min_value=0.0,
+            value=float(milp.get("tie_break_on_epsilon", suggested["tie_break_on_epsilon"])),
+            step=0.0001,
+            format="%.5f",
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_ev_milp_eps_on_{index}"),
+            help="Kleine Strafe je Lade-Viertelstunde; soll weit unter dem kleinsten Bezugspreis liegen.",
+        ),
+        "tie_break_time_epsilon": labeled_number_input(
+            "Tie-Break Zeitpunkt (ε₂)",
+            min_value=0.0,
+            value=float(
+                milp.get("tie_break_time_epsilon", suggested["tie_break_time_epsilon"])
+            ),
+            step=0.0001,
+            format="%.5f",
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_ev_milp_eps_time_{index}"),
+            help="Kleine Strafe für spätes Laden; bei gleichen Kosten lädt Earnie früher.",
+        ),
+    }

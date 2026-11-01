@@ -400,3 +400,17 @@ class TestEautoTieBreak:
         assert pulp.LpStatus[model.prob.status] == "Optimal"
         on = model.consumer_on["eauto"]
         assert on[0].varValue is not None and on[0].varValue > 0.5
+
+
+def test_suggested_min_remaining_is_twice_the_minimum_power():
+    from optimizer.eauto_milp import suggested_min_remaining_kwh
+
+    assert suggested_min_remaining_kwh(4.14) == pytest.approx(8.28)
+    assert suggested_min_remaining_kwh(0.0) == pytest.approx(2.8)
+
+
+def test_missing_live_params_error_names_the_ev_and_the_form():
+    from optimizer.eauto_milp import missing_live_params_error
+
+    text = str(missing_live_params_error({"id": "wallbox", "name": "Wallbox"}))
+    assert "E-Auto 'Wallbox'" in text and "MILP-Feintuning" in text

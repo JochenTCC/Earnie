@@ -155,6 +155,9 @@ CONSUMER_FIELDS = [
     _cons("ev1", "number_input", "ev_Wochenende_ready_2", "charging_schedule.weekend.ready_by_hour", 9),
     _cons("ev1", "number_input", "ev_Wochenende_soc_2", "charging_schedule.weekend.daily_rest_soc", 31.0),
     _cons("ev1", "checkbox", "ev_forecast_2", "charging_schedule.forecast_when_absent", False),
+    _cons("ev1", "number_input", "ev_milp_rem_2", "charging_schedule.milp.live_modus_a_min_remaining_kwh", 4.2),
+    _cons("ev1", "number_input", "ev_milp_eps_on_2", "charging_schedule.milp.tie_break_on_epsilon", 0.002),
+    _cons("ev1", "number_input", "ev_milp_eps_time_2", "charging_schedule.milp.tie_break_time_epsilon", 0.0002),
     _cons("ev1", "checkbox", "ev_bidirectional_2", "bidirectional", True),
     _cons("ev1", "checkbox", "absent_opt_in_2", "absent_mode_enabled", True),
     # Temperatur (thermal_rc)

@@ -134,7 +134,15 @@ Ladeziel in kWh (vereinfacht; die Akkukapazität stammt aus Live-EHAL, wenn gebu
 | SOC-Min Sofort | `get_evcs_soc_min_immediate` / `Earnie_EAuto_SOCMinSofort` | Sofort-Boden: Earnie erzwingt bis zu diesem SOC eine Lieferung so schnell wie möglich (MILP) und plant danach normal bis zum Limit. Ein Wert ≤ 0 oder ein fehlendes Binding = inaktiv; ein Wert über dem Limit wird auf das Limit begrenzt. |
 | Sofortladen | `set_evcs_mode=now` / Legacy-Sofortsignal | Volllast bis zum Limit, **außerhalb** der MILP-Planung (das Smarthome steuert). Unterscheidet sich von SOC-Min Sofort. |
 
-Der Block `charging_schedule.milp` am EV-Verbraucher in `house_profiles.json` dient dem Feintuning der MILP-Heuristik (`live_modus_a_min_remaining_kwh`, Tie-Break-Parameter). Details stehen im Schema.
+Der Block `charging_schedule.milp` am EV-Verbraucher ist **Pflicht**, sobald Earnie den Ladestrom vorgibt (`set_evcs_max_current` gebunden). Ohne ihn bricht die Live-Optimierung mit einer Meldung ab, die das E-Auto nennt. Der Szenario-Explorer braucht ihn nicht. Die Werte stehen im Hauskonfigurator beim E-Auto unter **MILP-Feintuning**:
+
+| Feld (UI) | Schlüssel | Bedeutung | Vorschlag |
+| --- | --- | --- | --- |
+| Kontinuierlich laden ab Restmenge (kWh) | `live_modus_a_min_remaining_kwh` | Liegt die noch zu ladende Energie darüber, gibt Earnie eine stetige Ladeleistung vor; darunter schaltet es in ganzen Viertelstunden. Muss > 0 sein. | 2 × Mindestleistung (ohne Mindestleistung 2 × 1,4 kW) |
+| Tie-Break Einschalten (ε₁) | `tie_break_on_epsilon` | Kleine Strafe je Lade-Viertelstunde; weit unter dem kleinsten Bezugspreis. | 0,001 |
+| Tie-Break Zeitpunkt (ε₂) | `tie_break_time_epsilon` | Kleine Strafe für spätes Laden; bei gleichen Kosten lädt Earnie früher. | 0,0001 |
+
+Fehlt der Block, trägt das Formular die Vorschläge ein. Sie gelten erst nach dem Speichern.
 
 ## Pool-Filter: `filter_schedule` und `loxone_remaining_hours`
 
