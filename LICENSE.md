@@ -39,6 +39,12 @@ Diese Software wird als "Source-Available" (Quelloffen, aber mit Nutzungsbeschr�
 1. Bei der Weitergabe des Quellcodes oder von Modifikationen, auch als Container-Image, Installationspaket oder in anderer gebauter Form, muss dieser Lizenztext zwingend und unverändert mitgeführt werden.
 2. Abspaltungen (Forks) im öffentlichen Raum (z. B. auf GitHub) müssen unter exakt denselben Bedingungen (Source-Available, Non-Commercial) geführt werden. Es ist untersagt, die Lizenz bei einem Fork zu ändern.
 3. Öffentliche Forks und Weitergaben müssen das in der Anwendung sichtbare Attributions-Banner („Banner der Wahrheit“) beibehalten und dürfen dessen Inhalt in der Aussage nicht entstellen oder entfernen.
+5. **Entwicklungsstände.** Ein **Release** ist ein Stand, den der Rechteinhaber im offiziellen Repository mit Versionsnummer als Release veröffentlicht hat, einschließlich als Vorabversion gekennzeichneter Releases (z. B. Beta). Andere Stände (z. B. der Hauptzweig oder Entwicklungszweige) sind **Entwicklungsstände**; sie sind nicht ausgiebig getestet und können Konfigurationsdaten so migrieren, dass ein Release sie nicht mehr lesen kann. Entwicklungsstände dürfen privat genutzt, getestet und für Beiträge nach § 6 weiterentwickelt werden. Wer aus einem Entwicklungsstand gebaute Fassungen (z. B. Container-Images oder Installationspakete) an Dritte weitergibt oder öffentlich bereitstellt, muss
+   a) sie in Versionsbezeichnung und Beschreibung deutlich als inoffiziellen Entwicklungsstand kennzeichnen, mit dem Hinweis, dass dieser nicht ausgiebig getestet ist und Konfigurationsdaten unumkehrbar migrieren kann;
+   b) darauf verzichten, sie als Release oder als offizielle Version des Rechteinhabers zu bezeichnen;
+   c) den in der Anwendung eingebauten Hinweis auf inoffizielle Fassungen erhalten.
+
+   Für solche Fassungen leistet der Rechteinhaber keine Unterstützung; Fehlermeldungen richten sich an den Anbieter der Fassung.
 
 ---
 
