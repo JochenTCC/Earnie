@@ -17,6 +17,7 @@ from ui.chart_flow_balance import (
     FLOW_BALANCE_TRACE_ORDER,
     KIND_BATTERY_CHARGE_GRID,
     KIND_BATTERY_CHARGE_PV,
+    KIND_BATTERY_DISCHARGE_EXPORT,
     KIND_BATTERY_DISCHARGE_LOAD,
     KIND_EXPORT_BATTERY,
     KIND_BASELOAD,
@@ -135,7 +136,7 @@ def test_muted_balance_traces_use_lower_opacity(flow_balance_df) -> None:
 
 def test_slots_from_dataframe_length(flow_balance_df) -> None:
     slots = build_flow_balance_slots_from_df(flow_balance_df, flex_consumers=_flex_pairs())
-    assert len(slots) == len(flow_balance_df) == 9
+    assert len(slots) == len(flow_balance_df) == 10
 
 
 def test_full_battery_pv_surplus_skips_charge_segment() -> None:
@@ -274,8 +275,32 @@ def test_battery_export_and_discharge_use_distinct_colors() -> None:
     assert MUTED_EXPORT_PV != COLOR_PV
 
 
+def test_forced_discharge_export_has_matching_up_segment() -> None:
+    """Zwangsentladen (Ist aus Log): Einspeisung (Batterie) ↓ hat Gegenstück ↑."""
+    from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN
+
+    row = {
+        "PV-Prognose (kW)": 0.0,
+        "Verbrauch-Prognose (kW)": 0.39,
+        "SwimSpa (kW)": 0.0,
+        "Geplante Batterie-Aktion (kW)": -5.0,
+        "Netzbezug (kW)": -3.81,
+        CHART_IST_BATTERY_KW_COLUMN: -4.2,
+    }
+    slot = build_flow_balance_segments(row, flex_consumers=_flex_pairs())
+    up = {segment.kind: segment for segment in slot.up}
+    down = {segment.kind: segment for segment in slot.down}
+    assert tuple(up) == (KIND_BATTERY_DISCHARGE_LOAD, KIND_BATTERY_DISCHARGE_EXPORT)
+    assert up[KIND_BATTERY_DISCHARGE_LOAD].kw == pytest.approx(0.39)
+    assert up[KIND_BATTERY_DISCHARGE_EXPORT].kw == pytest.approx(3.81)
+    assert down[KIND_EXPORT_BATTERY].kw == pytest.approx(3.81)
+    assert up[KIND_BATTERY_DISCHARGE_EXPORT].color == MUTED_BATTERY_EXPORT
+    assert slot.is_visually_balanced
+
+
 def test_trace_order_constant_covers_all_kinds() -> None:
     assert KIND_BATTERY_DISCHARGE_LOAD in FLOW_BALANCE_TRACE_ORDER
+    assert KIND_BATTERY_DISCHARGE_EXPORT in FLOW_BALANCE_TRACE_ORDER
     assert FLOW_BALANCE_TRACE_ORDER.index(KIND_BASELOAD) < FLOW_BALANCE_TRACE_ORDER.index(KIND_PV)
 
 

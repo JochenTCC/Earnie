@@ -55,6 +55,8 @@ KIND_BATTERY_CHARGE_PV = "battery_charge_pv"
 
 KIND_BATTERY_DISCHARGE_LOAD = "battery_discharge_load"
 
+KIND_BATTERY_DISCHARGE_EXPORT = "battery_discharge_export"
+
 KIND_EXPORT_BATTERY = "export_battery"
 
 KIND_EXPORT_PV = "export_pv"
@@ -326,6 +328,14 @@ def _segments_from_allocation(
             kw=flows.discharge_to_load,
             direction="up",
             color=MUTED_BATTERY_LOAD,
+        ),
+        # Source side of „Einspeisung (Batterie)“: same kW, keeps up == down.
+        _muted_segment(
+            kind=KIND_BATTERY_DISCHARGE_EXPORT,
+            label="Batterie entladen (Einspeisung)",
+            kw=flows.export_from_battery,
+            direction="up",
+            color=MUTED_BATTERY_EXPORT,
         ),
     ):
         if segment is None:

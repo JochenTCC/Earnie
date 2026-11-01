@@ -24,7 +24,7 @@ Wartet die Seite auf **main.py**, erscheint **über** den Charts ein blauer Sync
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
 | PV | Gelbe Linie | PV-Prognose (durchgängig über grau, neutral und grün) |
-| Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig:** PV (gelb), Netzbezug (blau). **↓ kräftig:** Grundlast (braun), Flex. **Gedämpft:** Batterie→Last grün, Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz blassgelb. Rauf- und Runter-Säule sind gleich hoch. |
+| Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig:** PV (gelb), Netzbezug (blau). **↓ kräftig:** Grundlast (braun), Flex. **Gedämpft:** Batterie→Last grün, Batterie→Netz cyan (↑ als Entladung, ↓ als Einspeisung), Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz blassgelb. Rauf- und Runter-Säule sind gleich hoch. |
 
 ### Rauf/Runter-Algorithmus (Wasserfall)
 
@@ -50,6 +50,7 @@ Die gedämpften Segmente im Chart:
 | `export_pv` | Blassgelb | PV direkt ins Netz |
 | `export_battery` | Cyan | Einspeisung aus Entladung (Batterie→Netz) |
 | `battery_discharge_load` | Grün | Entladen in die Last (0-Bilanz) |
+| `battery_discharge_export` | Cyan | Entladen ins Netz (↑, gleiche kW wie `export_battery` ↓), z. B. bei Zwangsentladen |
 
 Dieselbe Slot-Zuordnung nutzt auch die Auswertung [Analyse Verbrauch & Kosten](#analyse-verbrauch--kosten-live-cockpit).
 

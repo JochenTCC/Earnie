@@ -11,8 +11,10 @@ import pandas as pd
 from ui.chart_flow_balance import (
     KIND_BATTERY_CHARGE_GRID,
     KIND_BATTERY_CHARGE_PV,
+    KIND_BATTERY_DISCHARGE_EXPORT,
     KIND_BATTERY_DISCHARGE_LOAD,
     KIND_BASELOAD,
+    KIND_EXPORT_BATTERY,
     KIND_EXPORT_PV,
     KIND_FLEX,
     KIND_GRID_IMPORT,
@@ -68,7 +70,7 @@ class FlowBalanceScenario:
 
 
 def flow_balance_scenario_rows() -> tuple[FlowBalanceScenario, ...]:
-    """Acht fiktive Slots — fünf Kernfälle plus Randvarianten."""
+    """Zehn fiktive Slots — fünf Kernfälle plus Randvarianten."""
     return (
         FlowBalanceScenario(
             scenario_id="A",
@@ -164,6 +166,15 @@ def flow_balance_scenario_rows() -> tuple[FlowBalanceScenario, ...]:
             kinds_up=(KIND_PV,),
             kinds_down=(KIND_BASELOAD, KIND_EXPORT_PV),
             balanced=False,
+        ),
+        FlowBalanceScenario(
+            scenario_id="J",
+            title="Zwangsentladen ins Netz: Entladung deckt Last und Einspeisung",
+            row=balanced_chart_row(pv=0, baseload=0.5, battery=-5),
+            offset_kw=-0.5,
+            kinds_up=(KIND_BATTERY_DISCHARGE_LOAD, KIND_BATTERY_DISCHARGE_EXPORT),
+            kinds_down=(KIND_BASELOAD, KIND_EXPORT_BATTERY),
+            balanced=True,
         ),
     )
 
