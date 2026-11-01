@@ -325,8 +325,8 @@ def _render_ev_milp_fields(
     st.markdown("**MILP-Feintuning**")
     st.caption(
         "Pflicht für die Live-Optimierung, wenn Earnie den Ladestrom vorgibt. "
-        "Ohne gespeicherte Werte sind die Vorschläge eingetragen "
-        "(Restmenge 2 × Mindestleistung); mit **Speichern** gelten sie."
+        "Ohne gespeicherte Werte trägt das Formular die Vorschläge ein "
+        "(Restmenge 2 × Mindestleistung) und speichert sie automatisch mit dem Hausprofil."
     )
     return {
         "live_modus_a_min_remaining_kwh": labeled_number_input(
