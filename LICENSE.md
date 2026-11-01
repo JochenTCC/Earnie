@@ -31,7 +31,7 @@ Diese Software wird als "Source-Available" (Quelloffen, aber mit Nutzungsbeschr�
 ---
 
 ### § 4 Weitergabe und Abspaltungen (Forks)
-1. Bei der Weitergabe des Quellcodes oder von Modifikationen muss dieser Lizenztext zwingend und unverändert mitgeführt werden.
+1. Bei der Weitergabe des Quellcodes oder von Modifikationen, auch als Container-Image, Installationspaket oder in anderer gebauter Form, muss dieser Lizenztext zwingend und unverändert mitgeführt werden.
 2. Abspaltungen (Forks) im öffentlichen Raum (z. B. auf GitHub) müssen unter exakt denselben Bedingungen (Source-Available, Non-Commercial) geführt werden. Es ist untersagt, die Lizenz bei einem Fork zu ändern.
 3. Öffentliche Forks und Weitergaben müssen das in der Anwendung sichtbare Attributions-Banner („Banner der Wahrheit“) beibehalten und dürfen dessen Inhalt in der Aussage nicht entstellen oder entfernen.
 
@@ -40,3 +40,12 @@ Diese Software wird als "Source-Available" (Quelloffen, aber mit Nutzungsbeschr�
 ### § 5 Gewährleistungsausschluss und Haftungsbeschränkung
 1. Die Software wird "wie besehen" (AS IS) und ohne jegliche ausdrückliche oder implizite Gewährleistung zur Verfügung gestellt.
 2. Da die Software direkt in die Steuerung von elektrischen Großverbrauchern und Speichersystemen eingreift, liegt das Risiko der Nutzung vollständig beim Anwender. Der Urheber haftet nicht für Schäden an der Hardware (z. B. Batterieverschleiß, Fehlsteuerungen von Wärmepumpen), entgangene Einsparungen oder Strafen durch Netzbetreiber/Energieversorger.
+
+---
+
+### § 6 Beiträge zum Projekt
+1. **Beiträge** sind Quellcode, Tests, Dokumentation, Konfigurationsprofile und sonstige Inhalte, die der Beitragende dem Rechteinhaber zur Aufnahme in das offizielle Repository übermittelt, insbesondere als Pull Request oder Patch. Für freiwillige Datenbeiträge gilt § 3.
+2. **Nutzungsrecht.** Mit der Übermittlung räumt der Beitragende dem Rechteinhaber an dem Beitrag ein einfaches, unentgeltliches, zeitlich und räumlich unbeschränktes, übertragbares und unterlizenzierbares Recht zur Nutzung in allen Nutzungsarten ein. Das umfasst insbesondere, den Beitrag zu ändern, mit der Software zu verbinden, zu vervielfältigen, zu verbreiten, öffentlich zugänglich zu machen und kommerziell zu nutzen sowie die Software einschließlich des Beitrags unter anderen Lizenzbedingungen zu veröffentlichen. Die Urheberschaft des Beitragenden bleibt unberührt; er darf seinen Beitrag weiterhin selbst nutzen.
+3. **Zusicherung.** Der Beitragende sichert zu, dass er berechtigt ist, diese Rechte einzuräumen, und dass der Beitrag keine Rechte Dritter verletzt. Teile, die von Dritten stammen oder unter anderen Lizenzen stehen, kennzeichnet er bei der Übermittlung mit Quelle und Lizenz.
+4. **Keine Pflicht zur Aufnahme, keine Vergütung.** Der Rechteinhaber entscheidet frei, ob und in welcher Form er einen Beitrag übernimmt. Eine Vergütung wird nicht gewährt. Der Beitragende wird über die Versionsgeschichte des Repositorys (z. B. als Autor eines Commits) genannt; ein Anspruch auf weitere Nennung besteht nicht.
+5. **Änderungen in Forks.** Änderungen, die nicht nach Absatz 1 übermittelt werden, stehen nach § 1 Abs. 3 und § 4 Abs. 2 unter dieser Lizenz; die Rechte daran bleiben beim jeweiligen Urheber. Der Rechteinhaber übernimmt solche Änderungen in das offizielle Repository nur als Beitrag nach Absatz 1 oder mit gesonderter Zustimmung des Urhebers.

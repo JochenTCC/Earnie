@@ -21,7 +21,7 @@ COPY --from=deps-list /tmp/deps.txt /tmp/deps.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r /tmp/deps.txt
 
-COPY pyproject.toml version.py README.md requirements.txt ./
+COPY pyproject.toml version.py README.md LICENSE.md requirements.txt ./
 COPY optimizer/ optimizer/
 COPY data/ data/
 COPY integrations/ integrations/
