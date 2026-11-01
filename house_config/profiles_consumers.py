@@ -391,6 +391,14 @@ def _serialize_thermal_annual_fields(consumer: dict, out: dict) -> None:
     thermal.pop("longitude", None)
     out.update(thermal)
     out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 1)
+    # Optional fields the normalizer reads (normalize_thermal_annual_consumer); a save must keep them.
+    if consumer.get("parts"):
+        out["parts"] = [dict(part) for part in consumer["parts"]]
+    for key in ("optimizer_flex", "max_on_quarterhours", "max_pulses_per_day"):
+        if key in consumer:
+            out[key] = consumer[key]
+    if consumer.get("thermal_flex_window"):
+        out["thermal_flex_window"] = dict(consumer["thermal_flex_window"])
     _copy_loxone_io_fields(consumer, out)
 
 

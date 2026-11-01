@@ -100,6 +100,50 @@ def test_profile_normalizes_parts_next_to_thermal():
     assert "parts" not in spec["thermal"]
 
 
+def test_profile_save_keeps_heating_rod_and_flex_fields():
+    """Regression: saving the house profile dropped ``parts`` (the rod vanished after reload)."""
+    from house_config.profiles_store import _normalize_consumer, _serialize_consumer
+
+    raw = {
+        "id": "wp",
+        "label": "Wärmepumpe",
+        "type": "thermal_annual",
+        "nominal_power_kw": 1.9,
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
+        "heat_storage": _STORAGE,
+        "parts": [_ROD],
+        "optimizer_flex": True,
+        "max_on_quarterhours": 12,
+        "max_pulses_per_day": 3,
+        "thermal_flex_window": {"start_hour": 10, "end_hour": 16},
+    }
+    spec = _normalize_consumer(raw, 0, "home")
+    out = _serialize_consumer(spec)
+    assert out["parts"] == [_ROD]
+    assert out["optimizer_flex"] is True
+    assert out["max_on_quarterhours"] == 12
+    assert out["max_pulses_per_day"] == 3
+    assert out["thermal_flex_window"] == {"start_hour": 10, "end_hour": 16}
+    again = _normalize_consumer(out, 0, "home")
+    assert again["parts"] == spec["parts"]
+    assert again["thermal"] == spec["thermal"]
+
+
+def test_profile_save_without_rod_writes_no_parts():
+    from house_config.profiles_store import _normalize_consumer, _serialize_consumer
+
+    raw = {
+        "id": "wp",
+        "label": "Wärmepumpe",
+        "type": "thermal_annual",
+        "nominal_power_kw": 1.9,
+        "heat_source": {"type": "heat_pump", "heat_pump_type": "erde"},
+    }
+    out = _serialize_consumer(_normalize_consumer(raw, 0, "home"))
+    assert "parts" not in out
+    assert "optimizer_flex" not in out
+
+
 # --- year simulation: fuel path ----------------------------------------------------------
 
 
