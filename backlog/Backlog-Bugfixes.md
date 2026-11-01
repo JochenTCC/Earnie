@@ -29,6 +29,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - **Impact:** changes the PV input of every live plan and of replays → golden-master triage (`regression-triage`, expected: intended), release note; check whether the **PV forecast calibration factor** analysis (2026-10-25) and SE paths that read recorded forecast.solar feeds assumed the old mapping.
   - **Note:** `scripts/pv_forecast_compare.py` logs both mappings (`forecast_solar` vs. `forecast_solar_earnie`); its `evaluate` quantifies the error against measured PV before / after the fix.
   - **Verify:** live PV forecast in the cockpit / `forecast_pv_kw` against measured PV around sunrise and sunset (or `scripts/pv_forecast_compare.py evaluate` on `main`); pick to `main` afterwards.
+- [ ] **[release/2.7] House profile save dropped the thermal_annual flex fields (found 2026-11-01 via the heating rod fix on `main`):** `house_config/profiles_consumers.py::_serialize_thermal_annual_fields` wrote only the thermal block and `min_on_quarterhours`, so every save in the Hauskonfigurator removed `optimizer_flex`, `max_on_quarterhours`, `max_pulses_per_day` and `thermal_flex_window` from `house_profiles.json`, although `normalize_thermal_annual_consumer` reads them. Only hand-edited profiles are affected; no form writes these fields.
+  - **Fix (2026-11-01, 0f771fbe on `release/2.7`):** the four fields are serialized when set; partial port of `main` 9f325194 without the heating-rod `parts` (main only). Tests in `tests/test_thermal_annual_profiles_roundtrip.py` (fail without the fix).
+  - **Verify:** add `max_on_quarterhours` to a thermal_annual consumer in `house_profiles.json`, save the house profile in the Hauskonfigurator, reload: the field is still there. No pick to `main` needed (the full fix is there already).
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
