@@ -17,6 +17,7 @@ Vollständige Bedingungen: **[LICENSE.md](LICENSE.md)**.
 - Öffentliche Forks müssen unter denselben Bedingungen bleiben (Source-Available, Non-Commercial).
 - Das sichtbare Attributions-Banner („**Banner der Wahrheit**“) muss erhalten bleiben und darf in der Aussage nicht entstellt oder entfernt werden (`LICENSE.md` § 4).
 - Der Lizenztext muss bei jeder Weitergabe mitgehen, auch in selbst gebauten Container-Images.
+- Builds aus Ständen, die kein Release sind (z. B. `main`), dürfen weitergegeben werden, aber nur deutlich als inoffizieller Entwicklungsstand gekennzeichnet und ohne Support durch das Projekt (`LICENSE.md` § 4 Abs. 5).
 - Unofficial Builds können einen Warnhinweis zeigen; das Banner ist bewusst sichtbar, aber nicht technisch fälschungssicher.
 
 ### Rechte an Beiträgen
