@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix issue #89 empty live energy flow (2026-11-01)
+
+- [x] **[release/2.7] Issue #89: live energy flow (Sankey) showed an empty area (Loxone push):** some power Virtual Outputs on the reporter's Miniserver had repeat 0 instead of 10 s, so PV, grid and battery went silent for > 30 s while the heartbeat kept arriving; Earnie assumed 0 kW („0 angenommen (verstummt)“) and the Sankey had no link to draw. Cause was configuration, confirmed by the reporter on 2026-10-31 after setting the repeat to 10 s. Earnie change (e6fc3e9d): `ui/sankey.py` shows a warning instead of the empty figure when all live meters read 0, explaining the push zero rule and pointing to EHAL-Com → Live-Lesen; user doc `docs/ui/charts.md`; tests `tests/test_sankey_dead_telemetry.py`. Open idea from triage (not planned): show the push status per signal in the warning.
+
 ### Minor change Chart1 SoC line thickness by capacity (2026-10-31)
 
 - [x] **[release/2.7] Chart1 SoC line thickness by battery capacity.** Optimized SoC traces use stepped line width from `battery_capacity_kwh` (≤5 kWh: 1 px / ≤10: 1.5 / ≤15: 2 / >15: 2.5); virtual powerstations keep dash styling. Helper `soc_line_width_for_capacity_kwh` in `optimizer/powerstation_soc_chart.py`; wired in `ui/chart_soc.py` / `ui/charts.py`. Docs: `docs/ui/charts.md`. **Verified 2026-10-31** by the maintainer (multi-ESS + small virtual carve-out).

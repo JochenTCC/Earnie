@@ -215,6 +215,11 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
   - Spec: `[docs/workflow/hardware-registry-layer-c.md](../docs/workflow/hardware-registry-layer-c.md)`
 - [ ] **Simple "Savings KPI" as additional payload of the UsagePing** *(moved from the earnie-server install item, 2026-10-20)* — think through a simple savings figure to send with the ping; needs a schema bump (v3) on both sides (Earnie client contract `docs/workflow/usage-ping.md` and `earnie-server` receiver) and a privacy review (opt-in, anonymous, aggregates only).
 - [ ] Make also an EHAL adaption for MQTT
+- [ ] **External import price series (Swiss special case, e.g. EKZ dynamic tariff)** `[feat]` *(idea from a community fork, 2026-11-01; after the EHAL MQTT adaption above)*
+  - Some Swiss utilities (EKZ) publish their own dynamic 15-min import price, grid usage and levies already included, which is not an EPEX price plus markup. A LoxBerry plugin publishes it via MQTT (`chf_per_kwh_sum`, Rp/kWh without VAT).
+  - Goal: a spot user tariff can take an external price series as its market input instead of EPEX; the house-profile grid fee is then not added (already in the price); markup and VAT stay in the tariff.
+  - Where: price source in Edibert (generic external series: MQTT topic or URL, format adapter per source), not hardwired in Earnie's pricing seam; Earnie only selects it per tariff.
+  - Open decisions: handling of slots the utility has not published yet (fail loud vs. an explicit, visible estimate such as a fit against EPEX, marked per slot as `price_source`); storage and retention of received series for the SE; a plugin that fills future slots with the last value must not pass as real prices.
 - [ ] **Shadow Mode S4** *(after **2.7.f**)* — Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input. Spec [`docs/dev/shadow-mode.md`](../docs/dev/shadow-mode.md) §11 S4
 - [ ] **Data & tariff fidelity - Part 2**
   - Keep official EPEX unconnected unless a paid/internal use case appears
