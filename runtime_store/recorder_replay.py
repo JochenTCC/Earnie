@@ -220,7 +220,7 @@ def _solve_prepared_entry(
     recorded_forecast = start_state.get("outdoor_forecast") if has_outdoor_forecast else None
     if recorded_forecast is not None and not isinstance(recorded_forecast, dict):
         raise TypeError("start_state.outdoor_forecast must be a dict when present")
-    moment = datetime.fromisoformat(str(entry.get("timestamp") or ""))
+    moment = _recorded_planning_moment(entry)
     _rebind_consumer_state_path()
     with ExitStack() as stack:
         stack.enter_context(planning_freeze(moment))
@@ -244,6 +244,29 @@ def _solve_prepared_entry(
     result.timestamp = entry.get("timestamp")
     result.config_hash = str(entry.get("config_hash") or "")
     return result
+
+
+def _recorded_planning_moment(entry: dict[str, Any]) -> datetime:
+    """The instant ``planning_now()`` returned in the live cycle.
+
+    An early-start cycle begins a few seconds before its quarter-hour tick and
+    plans for it: ``planning_now() = max(real now, tick)``. The recorded
+    ``timestamp`` is the real clock, ``planning_window.start`` is that tick
+    (a late or out-of-band cycle has a start before its timestamp). Freezing at
+    the timestamp put 23:59:57 on the previous day and 08:59:53 in the hour
+    before the plan, so day/hour-bound consumer state differed from live.
+    """
+    recorded = datetime.fromisoformat(str(entry.get("timestamp") or ""))
+    window = entry.get("planning_window")
+    if not isinstance(window, dict) or not window.get("start"):
+        raise ValueError("entry missing planning_window.start")
+    start = datetime.fromisoformat(str(window["start"]))
+    # Naive values are system-local, like the recorder's ``datetime.now()`` stamp.
+    return max(_aware_local(recorded), _aware_local(start))
+
+
+def _aware_local(moment: datetime) -> datetime:
+    return moment.astimezone() if moment.tzinfo is None else moment
 
 
 @contextmanager
@@ -329,6 +352,8 @@ class _PreparedReplay:
     inverter_params: list[dict] | None
     pv_systems: list[dict] | None
     k_push: float
+    hk_max_export_kw: float | None = None
+    inbound_export_limit_kw: float | None = None
 
 
 def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _PreparedReplay:
@@ -373,8 +398,15 @@ def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _Prepar
         filter_contexts=filter_contexts,
         remaining=remaining,
         consumers=consumers,
-        battery_params=_battery_params_with_recorded_reserves(
-            _battery_params_from_config(config_module),
+        battery_params=_filter_batteries_with_soc(
+            _battery_params_with_recorded_reserves(
+                _battery_params_with_recorded_ess_limits(
+                    _battery_params_from_config(config_module),
+                    start_state,
+                ),
+                start_state,
+            ),
+            soc_by_id,
             start_state,
         ),
         soc=float(soc),
@@ -386,6 +418,7 @@ def _prepare_replay_inputs(entry: dict[str, Any], config_module: Any) -> _Prepar
         inverter_params=_inverter_params_from_config(config_module),
         pv_systems=_pv_systems_from_config(config_module),
         k_push=_require_push_price_cent(config_module),
+        **_recorded_export_limits(start_state),
     )
 
 
@@ -488,6 +521,8 @@ def _run_milp_replay(
         sunrise_soc_min_index,
         ctx.continue_on,
         None,
+        hk_max_export_kw=ctx.hk_max_export_kw,
+        inbound_export_limit_kw=ctx.inbound_export_limit_kw,
         current_soc_by_id=ctx.soc_by_id,
         inverter_params=ctx.inverter_params,
         pv_systems=ctx.pv_systems,
@@ -569,6 +604,8 @@ def _replay_from_optimizer_fallback(
         filter_contexts=ctx.filter_contexts,
         sunrise_soc_min_index=sunrise_soc_min_index,
         consumer_continue_on=ctx.continue_on,
+        hk_max_export_kw=ctx.hk_max_export_kw,
+        inbound_export_limit_kw=ctx.inbound_export_limit_kw,
         verbose=verbose,
         current_soc_by_id=ctx.soc_by_id,
     )
@@ -626,6 +663,75 @@ def _battery_params_with_recorded_reserves(
     from optimizer.powerstation_live import apply_reserves_to_battery_params
 
     return apply_reserves_to_battery_params(battery_params, reserves)
+
+
+def _battery_params_with_recorded_ess_limits(
+    battery_params: dict | list[dict],
+    start_state: dict[str, Any],
+) -> dict | list[dict]:
+    """Apply the effective SOC / power limits the live cycle planned with.
+
+    Live tightens the HK limits with ``get_ess_*`` telemetry. Cycles recorded
+    before ``ess_limits`` existed keep plain config params.
+    """
+    if "ess_limits" not in start_state:
+        return battery_params
+    recorded = start_state["ess_limits"]
+    if not isinstance(recorded, dict):
+        raise TypeError("start_state.ess_limits must be a dict when present")
+
+    def _apply(bat: dict) -> dict:
+        ess_id = str(bat.get("id") or "")
+        if ess_id not in recorded:
+            raise ValueError(
+                f"start_state.ess_limits has no entry for ESS {ess_id!r}; "
+                f"recorded: {sorted(recorded)}"
+            )
+        return {**bat, **{k: float(v) for k, v in recorded[ess_id].items()}}
+
+    if isinstance(battery_params, list):
+        return [_apply(bat) for bat in battery_params]
+    return _apply(battery_params)
+
+
+def _filter_batteries_with_soc(
+    battery_params: dict | list[dict],
+    soc_by_id: dict[str, float] | None,
+    start_state: dict[str, Any],
+) -> dict | list[dict]:
+    """Drop multi-ESS batteries without an own SoC, as the live cycle does.
+
+    Only for cycles that recorded ``ess_limits`` (same version as the live
+    filter); older cycles replay as before.
+    """
+    if "ess_limits" not in start_state:
+        return battery_params
+    from integrations.ehal_live_soc import filter_planning_batteries_with_soc
+
+    return filter_planning_batteries_with_soc(battery_params, soc_by_id)
+
+
+def _recorded_export_limits(start_state: dict[str, Any]) -> dict[str, float | None]:
+    """Export ceilings of the live cycle (HK + inbound telemetry limit).
+
+    Cycles recorded before ``export_limits`` existed replay without them, as before.
+    """
+    if "export_limits" not in start_state:
+        return {"hk_max_export_kw": None, "inbound_export_limit_kw": None}
+    recorded = start_state["export_limits"]
+    if not isinstance(recorded, dict):
+        raise TypeError("start_state.export_limits must be a dict when present")
+
+    def _kw(key: str) -> float | None:
+        if key not in recorded:
+            raise ValueError(f"start_state.export_limits missing {key!r}")
+        value = recorded[key]
+        return None if value is None else float(value)
+
+    return {
+        "hk_max_export_kw": _kw("hk_max_export_kw"),
+        "inbound_export_limit_kw": _kw("inbound_export_limit_kw"),
+    }
 
 
 def _inverter_params_from_config(config_module: Any) -> list[dict] | None:

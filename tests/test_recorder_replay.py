@@ -158,7 +158,11 @@ def _replay_reading_outdoor_forecast(monkeypatch, start_state: dict):
         raise _StopAfterPrepare
 
     monkeypatch.setattr(recorder_replay, "_prepare_replay_inputs", _prepare)
-    entry = {"timestamp": "2026-10-28T09:44:52", "start_state": start_state}
+    entry = {
+        "timestamp": "2026-10-28T09:44:52",
+        "planning_window": {"start": "2026-10-28T09:45:00+01:00"},
+        "start_state": start_state,
+    }
     with patch.object(of, "get_hourly_outdoor_forecast_c", return_value=[3.0, 4.0]) as fetch:
         with pytest.raises(_StopAfterPrepare):
             recorder_replay._solve_prepared_entry(entry, solver_mode="strict", verbose=False)
@@ -350,3 +354,99 @@ def test_recorded_reserves_must_be_a_list():
 
     with pytest.raises(TypeError, match="active_reserves"):
         rr._battery_params_with_recorded_reserves({}, {"active_reserves": {}})
+
+
+def test_early_start_cycle_replays_at_its_tick_not_the_recording_time():
+    """Live plans an early-start cycle for its tick: 23:59:57 belongs to the next day."""
+    from runtime_store import recorder_replay as rr
+
+    moment = rr._recorded_planning_moment(
+        {
+            "timestamp": "2026-10-30T23:59:57",
+            "planning_window": {"start": "2026-10-31T00:00:00+01:00"},
+        }
+    )
+    assert moment == datetime.fromisoformat("2026-10-31T00:00:00+01:00")
+    assert moment.date().isoformat() == "2026-10-31"
+
+
+def test_late_cycle_replays_at_its_recording_time():
+    from runtime_store import recorder_replay as rr
+
+    moment = rr._recorded_planning_moment(
+        {
+            "timestamp": "2026-10-30T05:24:04",
+            "planning_window": {"start": "2026-10-30T05:15:00+01:00"},
+        }
+    )
+    assert moment == datetime(2026, 10, 30, 5, 24, 4).astimezone()
+
+
+def test_planning_moment_needs_the_window_start():
+    from runtime_store import recorder_replay as rr
+
+    with pytest.raises(ValueError, match="planning_window.start"):
+        rr._recorded_planning_moment({"timestamp": "2026-10-30T05:24:04"})
+
+
+def test_naive_window_start_counts_as_system_local():
+    from runtime_store import recorder_replay as rr
+
+    moment = rr._recorded_planning_moment(
+        {
+            "timestamp": "2026-10-30T08:59:53",
+            "planning_window": {"start": "2026-10-30T09:00:00"},
+        }
+    )
+    assert moment == datetime(2026, 10, 30, 9, 0, 0).astimezone()
+
+
+def test_recorded_ess_limits_replace_config_limits_per_ess():
+    from runtime_store import recorder_replay as rr
+
+    params = [{"id": "home", "min_soc": 10.0, "max_charge_power_kw": 5.0, "capacity_kwh": 15.0}]
+    limits = {
+        "home": {
+            "min_soc": 12.0,
+            "max_soc": 95.0,
+            "max_charge_power_kw": 3.0,
+            "max_discharge_power_kw": 5.0,
+            "max_power_kw": 5.0,
+        }
+    }
+    out = rr._battery_params_with_recorded_ess_limits(params, {"ess_limits": limits})
+    assert out[0]["min_soc"] == 12.0
+    assert out[0]["max_charge_power_kw"] == 3.0
+    assert out[0]["capacity_kwh"] == 15.0
+    assert params[0]["min_soc"] == 10.0
+
+
+def test_recorded_ess_limits_fail_loud_for_an_unrecorded_ess():
+    from runtime_store import recorder_replay as rr
+
+    with pytest.raises(ValueError, match="'other'"):
+        rr._battery_params_with_recorded_ess_limits(
+            {"id": "other", "min_soc": 10.0}, {"ess_limits": {"home": {"min_soc": 5.0}}}
+        )
+
+
+def test_cycles_without_recorded_ess_limits_keep_config_params():
+    from runtime_store import recorder_replay as rr
+
+    params = [{"id": "home", "min_soc": 10.0}]
+    assert rr._battery_params_with_recorded_ess_limits(params, {}) is params
+    assert rr._filter_batteries_with_soc(params, None, {}) is params
+
+
+def test_recorded_export_limits_reach_the_milp():
+    from runtime_store import recorder_replay as rr
+
+    assert rr._recorded_export_limits(
+        {"export_limits": {"hk_max_export_kw": 11.0, "inbound_export_limit_kw": None}}
+    ) == {"hk_max_export_kw": 11.0, "inbound_export_limit_kw": None}
+    assert rr._recorded_export_limits({}) == {
+        "hk_max_export_kw": None,
+        "inbound_export_limit_kw": None,
+    }
+    with pytest.raises(ValueError, match="inbound_export_limit_kw"):
+        rr._recorded_export_limits({"export_limits": {"hk_max_export_kw": 11.0}})
