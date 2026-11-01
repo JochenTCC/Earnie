@@ -435,6 +435,55 @@ def record_active_reserves(
         logger.warning("cycle_recorder: record_active_reserves failed: %s", exc)
 
 
+_ESS_LIMIT_KEYS = (
+    "min_soc",
+    "max_soc",
+    "max_charge_power_kw",
+    "max_discharge_power_kw",
+    "max_power_kw",
+)
+
+
+def record_ess_limits(
+    token: CycleToken | None,
+    battery_params: dict[str, Any] | list[dict[str, Any]],
+) -> None:
+    """Store the effective SOC / power limits per ESS (HK ∩ live ``get_ess_*``).
+
+    Live telemetry tightens them when ``limits_from_live`` is set; replay has no
+    telemetry. Taken before the reserves are applied (replay applies those itself).
+    """
+    if token is None:
+        return
+    try:
+        batteries = battery_params if isinstance(battery_params, list) else [battery_params]
+        token.start_state["ess_limits"] = {
+            str(bat["id"]): {key: float(bat[key]) for key in _ESS_LIMIT_KEYS}
+            for bat in batteries
+        }
+    except Exception as exc:  # noqa: BLE001 — never abort the live run
+        logger.warning("cycle_recorder: record_ess_limits failed: %s", exc)
+
+
+def record_export_limits(
+    token: CycleToken | None,
+    export_ctx: dict[str, Any],
+) -> None:
+    """Store the export ceilings the live MILP planned with (HK + inbound EHAL limit).
+
+    The inbound limit comes from live telemetry; replay has none.
+    """
+    if token is None:
+        return
+    try:
+        token.start_state["export_limits"] = {
+            "hk_max_export_kw": _json_safe(export_ctx["hk_max_export_kw"]),
+            "inbound_export_limit_kw": _json_safe(export_ctx["inbound_export_limit_kw"]),
+        }
+    except Exception as exc:  # noqa: BLE001 — never abort the live run
+        logger.warning("cycle_recorder: record_export_limits failed: %s", exc)
+
+
 def _default_flags() -> dict[str, bool]:
     return {
         "override": False,

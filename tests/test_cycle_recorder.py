@@ -370,3 +370,51 @@ def test_finish_stores_push_reads_and_active_reserves(tmp_path, monkeypatch):
 
 def test_record_active_reserves_ignores_missing_token():
     cycle_recorder.record_active_reserves(None, [{"powerstation_id": "x"}])
+
+
+def test_finish_stores_export_and_ess_limits(tmp_path, monkeypatch):
+    _cfg(tmp_path, monkeypatch)
+    token = cycle_recorder.begin_cycle(
+        optimization_matrix=_sample_matrix(),
+        planning_window=_sample_window(),
+        soc_percent=50.0,
+        timestamp=datetime(2026, 10, 31, 14, 14, 52),
+    )
+    cycle_recorder.record_ess_limits(
+        token,
+        {
+            "id": "home",
+            "min_soc": 5.0,
+            "max_soc": 100.0,
+            "max_charge_power_kw": 3.0,
+            "max_discharge_power_kw": 5.0,
+            "max_power_kw": 5.0,
+            "ehal_bindings": {"ignored": ""},
+        },
+    )
+    cycle_recorder.record_export_limits(
+        token,
+        {"hk_max_export_kw": 11.0, "inbound_export_limit_kw": 8.5, "effective_export_cap_kw": 8.5},
+    )
+    cycle_recorder.finish_cycle(token, mode=2, target_power_kw=0.0, battery_plan_kw=0.0)
+    entry = cycle_recorder.read_segment_cycles(
+        cycle_recorder.segment_path_for_day(datetime(2026, 10, 31).date())
+    )[0]
+    assert entry["start_state"]["ess_limits"] == {
+        "home": {
+            "min_soc": 5.0,
+            "max_soc": 100.0,
+            "max_charge_power_kw": 3.0,
+            "max_discharge_power_kw": 5.0,
+            "max_power_kw": 5.0,
+        }
+    }
+    assert entry["start_state"]["export_limits"] == {
+        "hk_max_export_kw": 11.0,
+        "inbound_export_limit_kw": 8.5,
+    }
+
+
+def test_record_limits_ignore_missing_token():
+    cycle_recorder.record_ess_limits(None, {"id": "home"})
+    cycle_recorder.record_export_limits(None, {})

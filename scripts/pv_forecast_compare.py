@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
 import os
 import sys
 from collections import defaultdict
@@ -457,7 +458,7 @@ def _is_daylight_hour(key: str, tz: ZoneInfo) -> bool:
 
 
 def _fmt(value: float, digits: int = 2) -> str:
-    return "—" if value != value else f"{value:.{digits}f}"
+    return "—" if math.isnan(value) else f"{value:.{digits}f}"
 
 
 def cmd_evaluate(args: argparse.Namespace) -> int:

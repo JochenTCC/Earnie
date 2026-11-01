@@ -70,6 +70,7 @@ def _ok_response(watts: dict | None = None) -> MagicMock:
                 "2026-07-15 10:00:00": 1000,
                 "2026-07-15 11:00:00": 2000,
                 "2026-07-15 12:00:00": 3000,
+                "2026-07-15 13:00:00": 4000,
             }
         }
     }
@@ -167,7 +168,7 @@ def test_200_after_429_clears_retry_at_and_updates_last_api_call(
     assert pf.get_api_status()["source"] == "api"
     assert len(pf._LAST_API_CALL_BY_URL) == 1
     assert next(iter(pf._LAST_API_CALL_BY_URL.values())) >= before
-    assert result == [1.0, 2.0, 3.0]
+    assert result == [1.5, 2.5, 3.5]
 
 
 @patch("data.pv_forecast.config.get_global_timeout", return_value=10)
@@ -223,7 +224,7 @@ def test_timeout_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeo
     """Nach erfolgreichem Abruf darf Timeout nicht in saisonalen Fallback kippen."""
     get_mock.return_value = _ok_response()
     first = pf.get_hourly_pv_forecast_for_hours(_target_hours())
-    assert first == [1.0, 2.0, 3.0]
+    assert first == [1.5, 2.5, 3.5]
     assert pf.get_api_status()["open_meteo_systems"] == []
 
     _age_last_api_calls(timedelta(minutes=20))
@@ -231,7 +232,7 @@ def test_timeout_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeo
 
     second = pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
-    assert second == [1.0, 2.0, 3.0]
+    assert second == [1.5, 2.5, 3.5]
     assert pf.get_api_status()["open_meteo_systems"] == []
     assert pf.get_api_status()["source"] == "cache_after_error"
 
@@ -249,7 +250,7 @@ def test_429_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeout_m
 
     result = pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
-    assert result == [1.0, 2.0, 3.0]
+    assert result == [1.5, 2.5, 3.5]
     assert pf.get_api_status()["source_by_system"] == {"pv": pf.SOURCE_FORECAST_SOLAR}
     assert pf.get_api_status()["source"] == "cache_after_error"
 
@@ -295,12 +296,72 @@ def test_cooldown_is_per_system_so_every_system_refreshes(
             "2026-07-15 10:00:00": 500,
             "2026-07-15 11:00:00": 600,
             "2026-07-15 12:00:00": 700,
+            "2026-07-15 13:00:00": 800,
         }
     )
     by_system = pf.get_hourly_pv_forecast_by_system_for_hours(_target_hours())
 
     assert get_mock.call_count == 2
-    assert by_system == {"south": [0.5, 0.6, 0.7], "north": [0.5, 0.6, 0.7]}
+    assert by_system == {"south": [0.55, 0.65, 0.75], "north": [0.55, 0.65, 0.75]}
+
+
+# ---------------------------------------------------------------------------
+# Slot mapping: forecast.solar ``watts`` is the power at the timestamp
+# ---------------------------------------------------------------------------
+
+
+def test_hourly_slot_energy_equals_watt_hours_period():
+    """Trapezoid of ``watts`` over the slot = forecast.solar ``watt_hours_period``."""
+    watts = {"2026-10-30 12:00:00": 1595, "2026-10-30 13:00:00": 1773}
+    hours = [datetime(2026, 10, 30, 12, 0), datetime(2026, 10, 30, 13, 0)]
+    vector, ok = pf._map_hourly_data_to_vector(watts, hours)
+
+    assert ok
+    assert vector == [1.684, 0.0]
+
+
+def test_sunrise_and_sunset_points_split_their_hour():
+    """Sunrise 07:01 and sunset 17:08 points (0 W) bound the first / last hour."""
+    watts = {
+        "2026-10-30 07:01:00": 0,
+        "2026-10-30 08:00:00": 590,
+        "2026-10-30 16:00:00": 1290,
+        "2026-10-30 17:00:00": 790,
+        "2026-10-30 17:08:00": 0,
+    }
+    hours = [datetime(2026, 10, 30, 7, 0) + timedelta(hours=i) for i in range(2)]
+    hours += [datetime(2026, 10, 30, 16, 0), datetime(2026, 10, 30, 17, 0)]
+
+    vector, ok = pf._map_hourly_data_to_vector(watts, hours[:2])
+    assert ok
+    # 07–08: 0 → 590 W over 59 min; 08–09 lies on the 08:00 → 16:00 line.
+    assert vector[0] == round(590 / 2 * 59 / 60 / 1000, 3)
+    assert vector[1] == round((590 + (590 + 700 / 8)) / 2 / 1000, 3)
+
+    vector, ok = pf._map_hourly_data_to_vector(watts, hours[2:])
+    assert ok
+    # 16–17: mean of 1290 and 790 W; 17–18: 790 → 0 W within 8 min.
+    assert vector == [1.04, round(790 / 2 * 8 / 60 / 1000, 3)]
+
+
+def test_quarter_hour_slots_follow_the_curve():
+    watts = {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000}
+    slots = [datetime(2026, 7, 15, 10, 0) + timedelta(minutes=15 * i) for i in range(4)]
+
+    vector, ok = pf._map_hourly_data_to_vector(watts, slots)
+
+    assert ok
+    assert vector == [1.125, 1.375, 1.625, 1.875]
+
+
+def test_slots_outside_the_points_are_zero_and_not_counted():
+    watts = {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 2000}
+    slots = [datetime(2026, 7, 15, 8, 0), datetime(2026, 7, 15, 9, 0)]
+
+    vector, ok = pf._map_hourly_data_to_vector(watts, slots)
+
+    assert not ok
+    assert vector == [0.0, 0.0]
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +379,7 @@ def test_disk_cache_bridges_restart_during_rate_limit(get_mock, _config_mock, _t
     _restart_process()
     # Restored guard stamp: no forecast.solar call within 15 min after the restart.
     get_mock.reset_mock()
-    assert pf.get_hourly_pv_forecast_for_hours(_target_hours()) == [1.0, 2.0, 3.0]
+    assert pf.get_hourly_pv_forecast_for_hours(_target_hours()) == [1.5, 2.5, 3.5]
     assert get_mock.call_count == 0
 
     # Restart 20 min after the last call while forecast.solar answers 429.
@@ -331,7 +392,7 @@ def test_disk_cache_bridges_restart_during_rate_limit(get_mock, _config_mock, _t
     result = pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
     assert get_mock.call_count == 1
-    assert result == [1.0, 2.0, 3.0]
+    assert result == [1.5, 2.5, 3.5]
     assert pf.get_api_status()["source"] == "cache_after_error"
     assert pf.get_api_status()["source_by_system"] == {"pv": pf.SOURCE_FORECAST_SOLAR}
 
@@ -376,14 +437,20 @@ def test_disk_cache_older_than_limit_is_not_used(get_mock, _config_mock, _timeou
 @patch("data.pv_forecast.requests.get")
 def test_fresh_disk_cache_is_used_after_api_error(get_mock, _config_mock, _timeout_mock):
     _write_disk_cache(
-        {_default_url(): {"2026-07-15 10:00:00": 4000, "2026-07-15 11:00:00": 5000}},
+        {
+            _default_url(): {
+                "2026-07-15 10:00:00": 4000,
+                "2026-07-15 11:00:00": 5000,
+                "2026-07-15 12:00:00": 6000,
+            }
+        },
         datetime.now() - timedelta(hours=2),
     )
     get_mock.return_value = _http_500_response()
 
     result = pf.get_hourly_pv_forecast_for_hours(_target_hours())
 
-    assert result == [4.0, 5.0, 0.0]
+    assert result == [4.5, 5.5, 0.0]
     assert pf.get_api_status()["source"] == "cache_after_error"
     assert pf.get_api_status()["source_by_system"] == {"pv": pf.SOURCE_FORECAST_SOLAR}
 
@@ -448,7 +515,12 @@ def test_open_meteo_only_for_system_without_forecast_solar(systems_mock, _config
 
     def fake_fetch(url, kwp):
         if "/26.0/" in url:
-            return {"2026-07-15 10:00:00": 1000, "2026-07-15 11:00:00": 1000, "2026-07-15 12:00:00": 1000}
+            return {
+                "2026-07-15 10:00:00": 1000,
+                "2026-07-15 11:00:00": 1000,
+                "2026-07-15 12:00:00": 1000,
+                "2026-07-15 13:00:00": 1000,
+            }
         return None
 
     with patch.object(pf, "_check_and_fetch_api_data", side_effect=fake_fetch), patch.object(
