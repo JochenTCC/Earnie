@@ -30,9 +30,10 @@ Einige Seiten hängen nicht von `EARNIE_UI_MODES` ab:
 
 Die Sidebar enthält oben Setup-Hinweise und **„Sichern & Übertragen“**. Dort liegen der Export und Import der Config-Sidecars und `uploads/` als ZIP (siehe [Speichern / Laden](../konfiguration/speichern-laden.md)) und das Support-Paket (siehe [Betrieb → Support-Paket](../einrichtung/betrieb.md#support-paket-debug-dump)).
 
-Unten in der Sidebar liegt der Abschnitt **Info / About** mit folgenden Inhalten:
+Unten in der Sidebar liegen der Knopf **Earnie unterstützen** (freiwillige Unterstützung über GitHub Sponsors, siehe [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#earnie-unterstützen)) und der Abschnitt **Info / About** mit folgenden Inhalten:
 
 - Banner der Wahrheit und Version.
+- Häkchen **Unterstützen-Knopf ausblenden** (blendet den Knopf aus, jederzeit umkehrbar).
 - Kontakt über ein **GitHub-Issue** mit Art, Thema und Beschreibung; ein lokales ZIP für den Support erstellt **Sichern & Übertragen → Support-Paket**.
 - Privater Ausnahmekanal `support@earnie-hems.com` für Registry-Anfragen und vertrauliche Inhalte.
 

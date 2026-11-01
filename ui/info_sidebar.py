@@ -8,6 +8,10 @@ import streamlit as st
 
 from ui.doc_links import MANUAL_URL
 from ui.github_issue_url import ISSUE_KIND_LABELS, build_github_issue_url
+from ui.sponsor_button import (
+    render_sponsor_opt_out_checkbox,
+    render_sponsor_sidebar_button,
+)
 from ui.truth_banner import (
     OFFICIAL_REPO_URL,
     SITE_URL,
@@ -86,11 +90,13 @@ def _render_private_support_expander(topic: str, description: str) -> None:
 
 
 def render_info_sidebar() -> None:
-    """Info / About expander: attribution banner, version, contact form."""
+    """Sponsor button, then Info / About expander: attribution banner, version, contact form."""
+    render_sponsor_sidebar_button()
     with st.sidebar.expander("Info / About", expanded=False):
         render_truth_banner(where="inline")
         render_registry_status_caption()
         _render_info_links()
+        render_sponsor_opt_out_checkbox()
         kind, topic, description = _render_contact_inputs()
         issue_url = build_github_issue_url(
             kind,
