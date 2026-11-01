@@ -19,7 +19,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] **"Earnie unterstützen" sidebar button** `[feat]` *(decided 2026-11-01; deliberate exception to `branching-hotfix-playbook.mdc`: small, no effect on optimisation or control, no migration)*: a button in the sidebar on every page opens the GitHub Sponsors profile in a new tab. Always shown unless the user opted out. Opt-out: checkbox "Unterstützen-Knopf ausblenden" in Info/About, reversible, stored in a small state file under `runtime/` (like `runtime/feature_reviews.json`), not in the config pack, so no migration. Nothing is sent, not even a click. Wording promises nothing in return (voluntary sponsoring).
   - **Preconditions:** the GitHub Sponsors profile is published (otherwise the button leads nowhere and the item moves to 2.8); `.github/FUNDING.yml` and one sentence in `README.md` with the same wording; German user manual and release notes 2.7 in the same change; no `version.py` change without approval.
-  - **Branching:** implement on `main`, then `git cherry-pick -x` onto `release/2.7`.
+  - **Branching:** implement directly on `release/2.7`, then `git cherry-pick -x` onto a branch from `main` (PR), so `main` has the same code; never merge the release branch.
   - **Tests:** button shown by default, hidden after opt-out, shown again after undo; state file missing or unreadable → button shown (opt-out is the user's explicit choice, absence means none).
   - **Tracker:** publish the Sponsors profile before the 2.7 cherry-pick.
 
