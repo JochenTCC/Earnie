@@ -188,7 +188,7 @@ Der Block `charging_schedule.milp` am EV-Verbraucher ist **Pflicht**, sobald Ear
 | Tie-Break Einschalten (ε₁) | `tie_break_on_epsilon` | Kleine Strafe je Lade-Viertelstunde; weit unter dem kleinsten Bezugspreis. | 0,001 |
 | Tie-Break Zeitpunkt (ε₂) | `tie_break_time_epsilon` | Kleine Strafe für spätes Laden; bei gleichen Kosten lädt Earnie früher. | 0,0001 |
 
-Fehlt der Block, trägt das Formular die Vorschläge ein. Sie gelten erst nach dem Speichern.
+Fehlt der Block, trägt das Formular die Vorschläge ein. Der Hauskonfigurator speichert automatisch: Schon das Öffnen der Seite schreibt die Vorschläge in `house_profiles.json`, danach läuft die Live-Optimierung.
 
 ## Pool-Filter: `filter_schedule` und `loxone_remaining_hours`
 
