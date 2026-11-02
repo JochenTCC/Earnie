@@ -79,9 +79,11 @@ def _stash_sunrise_full_horizon_flex(
     ``flex_indices``), so the SA₀→SA₁ part and the trailing SA₂ slot carry no
     flex. Energy there would never reach the booked series.
     """
-    delivered = _delivered_flex_kwh_from_rows(
-        full_chart_rows,
-        flexible_consumers=flexible_consumers,
+    from simulation.plausibility import plausibility_flex_kwh
+
+    delivered = plausibility_flex_kwh(
+        _delivered_flex_kwh_from_rows(full_chart_rows, flexible_consumers=flexible_consumers),
+        flexible_consumers,
     )
     meta["plausibility_optimized_flex_kwh"] = round(
         sum(float(v) for v in delivered.values()), 3

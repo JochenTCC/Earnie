@@ -16,6 +16,34 @@ CONSUMPTION_TOLERANCE_KWH = 0.5
 CONSUMPTION_TOLERANCE_REL = 0.05
 
 
+def plausibility_flex_kwh(
+    delivered: dict[str, float],
+    flexible_consumers: list | None,
+) -> dict[str, float]:
+    """Delivered flex in book terms: a heating rod counts as the energy of its parent.
+
+    The rod has no booked demand; it replaces parent heat. Beside a heat pump its kWh
+    stand for rod kWh / JAZ of heat-pump power, beside a fuel source for no power at all.
+    """
+    from optimizer.thermal_flex_context import is_heating_rod_consumer
+
+    rods = {
+        str(consumer["id"]): consumer
+        for consumer in flexible_consumers or []
+        if is_heating_rod_consumer(consumer)
+    }
+    out: dict[str, float] = {}
+    for cid, kwh in delivered.items():
+        rod = rods.get(cid)
+        if rod is None:
+            out[cid] = float(kwh)
+        elif rod["parent_heat_electric"]:
+            out[cid] = float(kwh) / float(rod["parent_heat_efficiency"])
+        else:
+            out[cid] = 0.0
+    return out
+
+
 @dataclass
 class PlausibilityResult:
     window_end: datetime
@@ -142,9 +170,9 @@ def validate_window_consumption(
     native_kwh = _fixed_load_kwh_in_rows(chart_rows, flexible_consumers)
     if native_kwh:
         optimized_baseload = round(optimized_baseload - native_kwh, 3)
-    delivered_flex = _delivered_flex_kwh_from_rows(
-        chart_rows,
-        flexible_consumers=flexible_consumers,
+    delivered_flex = plausibility_flex_kwh(
+        _delivered_flex_kwh_from_rows(chart_rows, flexible_consumers=flexible_consumers),
+        flexible_consumers,
     )
     optimized_flex = round(sum(delivered_flex.values()), 3)
     # Sunrise: flex of the whole MILP horizon; the stash fails loud on flex outside the book.

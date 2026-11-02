@@ -284,7 +284,8 @@ def resolve_horizon_target_kwh(
         return float(resolve_thermal_daily_target_kwh(consumer, horizon=horizon))
     if source == "thermal_annual" and not logged_targets_only:
         return resolve_thermal_annual_horizon_kwh(consumer, optimization_matrix)
-    if source == "heating_rod" and not logged_targets_only:
+    if source == "heating_rod":
+        # No logged or booked target exists for the rod (it only replaces heat).
         return resolve_heating_rod_horizon_kwh(consumer, optimization_matrix)
     return resolve_daily_target_kwh(
         consumer,
@@ -331,8 +332,14 @@ def resolve_horizon_consumer_targets_kwh(
             else planning_now()
         )
     if is_flat_target_override(consumer_daily_targets_kwh) and logged_targets_only:
+        # The book has no rod entry: its bound is the parent's heat demand, not a target.
         return {
-            c["id"]: round(float(consumer_daily_targets_kwh.get(c["id"], 0.0)), 3)
+            c["id"]: round(
+                resolve_heating_rod_horizon_kwh(c, optimization_matrix)
+                if c.get("daily_target_source") == "heating_rod"
+                else float(consumer_daily_targets_kwh.get(c["id"], 0.0)),
+                3,
+            )
             for c in consumers_cfg
         }
     horizon_flex_targets = None

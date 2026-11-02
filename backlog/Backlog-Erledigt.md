@@ -2,6 +2,17 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix — Heating rod lost on save (2026-11-02)
+
+- [x] **Heating rod was lost on save when „Heizstab im Wärmespeicher“ is checked** *(dog-fooding, found and fixed 2026-11-01 on `main`)*: the checkbox writes a `heating_rod` part and `normalize_thermal_annual_consumer()` keeps it, but `_serialize_thermal_annual_fields()` (`house_config/profiles_consumers.py`) wrote only the `thermal` block and `min_on_quarterhours`. `house_profiles.json` never got `parts`, so after reload the rod was gone and never planned. The same save also dropped `optimizer_flex`, `max_on_quarterhours`, `max_pulses_per_day` and `thermal_flex_window`.
+  - **Fix:** `_serialize_thermal_annual_fields()` writes `parts` (when non-empty) and those four fields (when set). Tests: `tests/test_heat_source.py::test_profile_save_keeps_heating_rod_and_flex_fields` (normalize → serialize → normalize), `::test_profile_save_without_rod_writes_no_parts`.
+  - **By design, not part of this fix:**
+    - **Live:** `resolve_heating_rod_horizon_kwh()` (`optimizer/targets.py`) returns 0 in live planning until the rod has its own EHAL binding, so live the rod never runs (the field help says so).
+    - **Planning beside a heat pump:** the rod only replaces heat-pump heat inside the day's heat target (`_add_one_thermal_flex_consumer()` in `optimizer/thermal_flex_context.py`: rod kWh count 1/JAZ toward the heat-pump target, no extra storage charge beyond it). At JAZ > 1 it runs only when the heat pump hits its run-time / pulse limits or prices are negative.
+    - **Planning beside a fuel source (gas, oil, …):** the rod heat (η = 1) replaces fuel heat, capped at the day's heat demand (`_add_fuel_parent_rod_caps()`), and earns the avoided fuel cost (`fuel_credit_cent_per_kwh`).
+    - **Not in the consumption data, no annual estimate in the Hauskonfigurator** (dog-fooding greenfield 2026-11-02): the rod has no demand of its own; only the MILP decides when it runs. `cons_data` is the house's reference consumption without Earnie, so it gets no rod column, and a fuel-heated consumer has 0 kWh electricity there (the Hauskonfigurator shows its fuel demand instead). Putting the rod into `cons_data` would count it twice (baseload and MILP, see `docs/dev/heating-system-variants.md` § Heating rod with measured data). Display follow-up: **Heating rod hint in the Hauskonfigurator** in [Backlog](Backlog.md).
+  - **Verify:** Hauskonfigurator → „Heizstab im Wärmespeicher“ on → save → reload: checkbox still on, `house_profiles.json` has `parts`; checkbox part verified on greenfield 2026-11-02; the SE part moved to **Heating rod never ran in the Szenarien-Explorer** in [Bugfixes](Backlog-Bugfixes.md) (the rod is not in Verbrauchsdaten / `cons_data`).
+
 ### 2.7.0 official release (2026-11-02)
 
 - [x] **2.7.0 official release** `[dev]`: `version.py` **2.7.0** and release notes [`.github/release-notes/v2.7.0.md`](../.github/release-notes/v2.7.0.md) (baseline public 2.6.2, maintainer-approved; `UNRELEASED.md` reset; doc review checklist moved to `docs/dev/done/doc-review-checklist-2.7.0.md`) in `fcab2d7d` on `release/2.7`; full suite and regression 12/12 green before the tag. Candidate tag `v2.7.0` (`targets: both`).

@@ -363,6 +363,50 @@ def test_rod_beside_gas_runs_when_power_is_cheaper_than_gas_heat():
     assert rod_kwh <= cap + 1e-6
 
 
+@pytest.mark.parametrize("mode", ["profile_spec", "logged_day"])
+def test_se_book_without_rod_entry_still_plans_the_rod(monkeypatch, mode):
+    """SE path: the book holds no rod target, the rod still gets its heat bound and runs."""
+    from house_config.planning_flex_bridge import collect_planning_flex_consumers
+    from optimizer.milp_inputs import _resolve_thermal_flex_contexts
+    from optimizer.targets import resolve_horizon_consumer_targets_kwh
+
+    consumer = _thermal_consumer({"type": "gas"})
+    profile = _profile(consumer)
+    monkeypatch.setattr(
+        "config.get_resolved_runtime_settings", lambda: {"_house_profile": profile}
+    )
+    monkeypatch.setattr(
+        "optimizer.thermal_flex_context.thermal_daily_heat_kwh_for_date",
+        lambda *_args, **_kwargs: 30.0,
+    )
+    flex = collect_planning_flex_consumers(profile)
+    matrix = _matrix([40.0] * 10 + [2.0] * 4 + [40.0] * 10)
+    for row in matrix:
+        row["consumption_mode"] = mode
+    book = {"wp_heating_heating_rod": 0.0}  # what resolve_profile_spec_flex_targets books
+    targets = resolve_horizon_consumer_targets_kwh(matrix, book, flexible_consumers=flex)
+    assert targets["wp_heating_heating_rod"] == pytest.approx(30.0)
+    # The MILP entry builds the rod caps although a gas house has no thermal flex consumer.
+    contexts = _resolve_thermal_flex_contexts(matrix, flex, None)
+    assert contexts["wp_heating_heating_rod"]["daily_heat_cap_kwh"]
+    model, _contexts = _solve(matrix, flex, profile, targets)
+    rod_hours = _on_hours(model, "wp_heating_heating_rod")
+    assert rod_hours and all(10 <= hour < 14 for hour in rod_hours)
+
+
+def test_plausibility_counts_rod_as_parent_energy():
+    from simulation.plausibility import plausibility_flex_kwh
+
+    gas_rod = {"id": "a_heating_rod", "daily_target_source": "heating_rod",
+               "parent_heat_electric": False, "parent_heat_efficiency": 0.95}
+    hp_rod = {"id": "b_heating_rod", "daily_target_source": "heating_rod",
+              "parent_heat_electric": True, "parent_heat_efficiency": 4.0}
+    hp = {"id": "b", "daily_target_source": "thermal_annual"}
+    delivered = {"a_heating_rod": 6.0, "b_heating_rod": 8.0, "b": 3.0}
+    out = plausibility_flex_kwh(delivered, [gas_rod, hp_rod, hp])
+    assert out == {"a_heating_rod": 0.0, "b_heating_rod": pytest.approx(2.0), "b": 3.0}
+
+
 def test_rod_is_not_planned_in_live(monkeypatch):
     from optimizer.targets import resolve_heating_rod_horizon_kwh
 
