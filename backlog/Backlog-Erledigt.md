@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P4 — Day close, state and ledger file (2026-11-02)
+
+- [x] **Ledger P4 — Day close, state and ledger file** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 3, § 4.
+  - `runtime_store/savings_ledger.py` (pure): `LedgerInput`, `LedgerState` (JSON round trip, strict `from_dict`), `start_chain`, `advance` → `(state, closed_day_row | None)`, `close_day`, `lifetime_summary`. A slot belongs to the SA-day its start lies in (as Chart 2 books it); days without any slot get no row; a replayed slot is ignored. SoC correction with `p_ref` import-weighted over the counted slots (actual import), time mean on days without import; a day without counted slot or actual SoC carries the previous correction (`p_ref_basis: carried`), so the telescoping sum holds. Rows carry `slots_skipped` per reason, `flex_planned_kwh` (slot-0 `delivery_compliance.planned_kw`) and `flex_delivered_kwh` (`closed_interval.flex_kw`), `chain_start`, and `chain_start_reason` on the first row of a chain.
+  - New skip reasons: `no_price` (slot without its own log entry or `k_push_act`) and `dead_telemetry` (all plant powers exactly 0, same check as the history chart).
+  - `runtime_store/savings_ledger_store.py`: `savings_ledger.jsonl` (append, strict read), `savings_ledger_state.json` (atomic write), `load_state` with restart reasons, `ledger_input` / `ledger_inputs_from_entries` (prices and plan from the slot's own entry), `sunrise_day_bounds`. Paths in `runtime_store/persist_paths_base.py`.
+  - Tests `tests/test_savings_ledger_day.py`. Dump `debug_dump_20261102_062129` replay over all closed slots (45 SA-days from 2026-09-16): lifetime −2.18 € with `η_path` 0.94, +1.21 € with 0.917; 10 days incomplete (restarts, a four-day meter outage in September).
+
 ### Ledger P3 — Shadow plant slot engine (2026-11-02)
 
 - [x] **Ledger P3 — Shadow plant slot engine** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 3.

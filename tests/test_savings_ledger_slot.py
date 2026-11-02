@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from runtime_store.savings_ledger import (
+    SKIP_DEAD_TELEMETRY,
     SKIP_FEW_SAMPLES,
     SKIP_MISSING,
     SKIP_NO_POWER,
@@ -99,12 +100,13 @@ def test_max_power_limits_the_charge():
 def test_standby_loss_drains_the_shadow_battery_and_is_imported_at_min_soc():
     battery = {**BATTERY, "standby_power_kw": 0.04}
 
-    draining = _step(_closed(pv=0.0, house=0.0, grid=0.0), 50.0, battery=battery)
+    # PV covers the house exactly; only the standby is left
+    draining = _step(_closed(pv=0.5, house=0.5, grid=0.0), 50.0, battery=battery)
     assert draining.shadow_battery_kw == pytest.approx(-0.04)
     assert draining.shadow_soc_next < 50.0
     assert draining.cost_without_eur == pytest.approx(0.0)
 
-    empty = _step(_closed(pv=0.0, house=0.0, grid=0.0), 10.0, battery=battery)
+    empty = _step(_closed(pv=0.5, house=0.5, grid=0.0), 10.0, battery=battery)
     assert empty.shadow_soc_next == pytest.approx(10.0)
     assert empty.import_kwh_without == pytest.approx(0.04 * 0.25)
     assert empty.cost_without_eur == pytest.approx(0.01 * BUY / 100)
@@ -150,6 +152,7 @@ def test_slot_length_scales_the_soc_step():
         ),
         (_closed(1.0, 1.0, 0.0, ist_power_source=None), SKIP_NOT_MEAN),
         (_closed(1.0, None, 0.0), SKIP_NO_POWER),
+        (_closed(0.0, 0.0, 0.0), SKIP_DEAD_TELEMETRY),
     ],
 )
 def test_invalid_slot_is_skipped_on_both_sides(closed, reason):

@@ -2,7 +2,7 @@
 
 **Status:** design proposal, not implemented (2026-11-02). Language: English (docs/dev).
 **Fixed 2026-11-02:** D2 (Ledger P1) and D3 (Ledger P2); D1 is replaced by the ledger.
-**Implemented 2026-11-02:** slot engine `runtime_store/savings_ledger.py` (Ledger P3); day close, files and daemon hook follow (P4, P5).
+**Implemented 2026-11-02:** slot engine and day close `runtime_store/savings_ledger.py` (Ledger P3, P4), files `runtime_store/savings_ledger_store.py` (P4); the daemon hook follows (P5).
 **Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
 **Decision 2026-11-02:** not in 2.7 — Chart 2 is hidden for the 2.7 release (`ui/live_mode.py::chart2_enabled()`, shown only with `EARNIE_UI_CHART2=1`) (known limitation in the release notes); the corrected chart ships with 2.8 (`backlog/Backlog.md` Version 2.7 / 2.8).
 **Trigger:** debug dump `debug_dump_20261102_062129` ("Kumulierte Kosten - Anzeige unplausibel"), analysed on `release/2.7` (2.7.0-beta.3).
@@ -113,9 +113,10 @@ Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load
 
 Rules:
 
-- A slot counts when its `closed_interval` is present, has at least `MIN_SAMPLE_COUNT_FOR_MEAN` samples (the bar "Ist bisher" uses) and `ist_power_source` is `mean` for pv, grid, battery and house. Missing slots are skipped on both sides (same slots, same prices), so a gap only understates the saving, it never distorts it. `coverage` is stored per row.
+- A slot counts when its `closed_interval` is present, has at least `MIN_SAMPLE_COUNT_FOR_MEAN` samples (the bar "Ist bisher" uses) and `ist_power_source` is `mean` for pv, grid, battery and house. A slot whose plant powers all read exactly 0 (meter outage) and a slot without its own log entry or `k_push_act` (no price) are skipped too. Missing slots are skipped on both sides (same slots, same prices), so a gap only understates the saving, it never distorts it. `coverage` and the skipped slots per reason (`slots_skipped`) are stored per row.
 - **Every closed day counts in the lifetime total**, whatever its coverage *(decided 2026-11-02, Ledger P0)*. Dropping a day would also drop its SoC corrections and break the telescoping sum of § 3. Days with `coverage < 0.8` are flagged `"incomplete": true` and shown as "unvollständig" in the UI. On 43 days of the maintainer's plant 37 reach 0.8; the others are restart or gap days.
-- Shadow SoC is **never** reset from the live SoC. It starts once (first ledger run) at the live SoC of that moment and then only follows the shadow rule. If the ledger state is missing or `savings_v` changes, a new chain starts and the UI shows the start date.
+- Shadow SoC is **never** reset from the live SoC. It starts once (first ledger run) at the live SoC of that moment and then only follows the shadow rule. If the ledger state is missing or `savings_v` changes, a new chain starts and the UI shows the start date. An unreadable state file is moved aside (`savings_ledger_state.json.broken-<timestamp>`) with a warning; the new chain's first row names the reason (`chain_start_reason`: `first_run`, `savings_v_changed`, `state_unreadable`).
+- A day with no counted slot (or no actual SoC) carries the previous day's SoC correction unchanged (`p_ref_basis: "carried"`), so its correction terms cancel and the telescoping sum stays intact. Calendar days without any closed slot get no row.
 - Lifetime total = Σ `saving_adjusted_eur` over all closed days of the chain. Shown together with its start date, the day count and the number of incomplete days.
 - **Backfill:** `optimization_history.jsonl` (and rotated files) already hold every `closed_interval` with prices; a one-off CLI (`python -m scripts.build_savings_ledger --since <date>`) can build the ledger retroactively. The dump's log reaches back to July.
 
