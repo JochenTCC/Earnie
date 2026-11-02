@@ -17,6 +17,7 @@ from data.edibert_live_market import fetch_live_day_ahead_prices
 from data.feed_in_prices import k_push_act_for_matrix_row
 from runtime_store import run_state, optimization_history
 from runtime_store import cycle_recorder
+from runtime_store import savings_ledger_daemon
 from runtime_store.soc_plausibility import (
     closed_interval_confirms_reported,
     count_consecutive_reported_soc,
@@ -1010,6 +1011,8 @@ def _main_cycle(
                 optimization_history.append_production_run(run_payload)
             except OSError as exc:
                 logger.warning("optimization_history: Anhängen fehlgeschlagen: %s", exc)
+            # Savings ledger (Ledger P5): books the slot closed by this cycle; never raises.
+            savings_ledger_daemon.on_cycle(closed_interval, run_payload)
             logger.info("run_state: Durchlauf in optimizer_run_state.json gespeichert.")
         except Exception as e:
             logger.warning("run_state: Zustand konnte nicht gespeichert werden: %s", e)

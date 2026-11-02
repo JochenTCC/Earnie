@@ -150,6 +150,41 @@ def _planned_flex_kw(entry: dict[str, Any]) -> dict[str, float]:
     return planned
 
 
+def pending_slot_from_entry(
+    slot_start: datetime,
+    slot_entry: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Prices and slot-0 plan a log entry gives its own slot, or ``None`` without ``k_push_act``."""
+    if slot_start.tzinfo is None:
+        raise ValueError("savings ledger: slot_start must be timezone-aware")
+    if slot_entry is None or slot_entry.get("k_push_act") is None:
+        return None
+    naive = slot_start.replace(tzinfo=None)
+    return {
+        "slot_start": slot_start.isoformat(),
+        "k_act_cent": _import_price_cent_from_entry(slot_entry, slot_start=naive),
+        "k_push_cent": float(slot_entry["k_push_act"]),
+        "planned_flex_kw": _planned_flex_kw(slot_entry),
+    }
+
+
+def ledger_input_from_pending(
+    slot_start: datetime,
+    closed: dict[str, Any] | None,
+    pending: dict[str, Any] | None,
+) -> LedgerInput:
+    """``LedgerInput`` for a closed slot; prices only when ``pending`` belongs to that slot."""
+    if pending is None or pending.get("slot_start") != slot_start.isoformat():
+        return LedgerInput(slot_start, closed, None, None)
+    return LedgerInput(
+        slot_start=slot_start,
+        closed=closed,
+        k_act_cent=float(pending["k_act_cent"]),
+        k_push_cent=float(pending["k_push_cent"]),
+        planned_flex_kw=dict(pending.get("planned_flex_kw") or {}),
+    )
+
+
 def ledger_input(
     slot_start: datetime,
     closed: dict[str, Any] | None,
@@ -162,17 +197,8 @@ def ledger_input(
     chart pairs them). Without that entry, or without ``k_push_act`` in it, the
     prices are ``None`` and the ledger skips the slot (``no_price``).
     """
-    if slot_start.tzinfo is None:
-        raise ValueError("savings ledger: slot_start must be timezone-aware")
-    if slot_entry is None or slot_entry.get("k_push_act") is None:
-        return LedgerInput(slot_start, closed, None, None)
-    naive = slot_start.replace(tzinfo=None)
-    return LedgerInput(
-        slot_start=slot_start,
-        closed=closed,
-        k_act_cent=_import_price_cent_from_entry(slot_entry, slot_start=naive),
-        k_push_cent=float(slot_entry["k_push_act"]),
-        planned_flex_kw=_planned_flex_kw(slot_entry),
+    return ledger_input_from_pending(
+        slot_start, closed, pending_slot_from_entry(slot_start, slot_entry)
     )
 
 

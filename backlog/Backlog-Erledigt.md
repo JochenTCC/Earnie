@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P5 — Daemon hook (2026-11-02)
+
+- [x] **Ledger P5 — Daemon hook** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 4 "Where it runs".
+  - `runtime_store/savings_ledger_daemon.py::on_cycle(closed_interval, run_payload)`, called by `main.py` right after `append_production_run`. Per cycle: book the slot whose `closed_interval` the cycle finalised, append the row of a closed SA-day, store this cycle's prices and slot-0 plan for its own slot (`LedgerState.pending_slot`, so the log is never re-read), save the state. Out-of-band runs only update the stored prices (latest entry of a slot wins, as in the history chart).
+  - The chain starts once at the SoC of the first booked slot and then resumes from the state file; a restart never re-seeds from the live SoC. A slot whose cycle did not run (downtime) has no stored prices and is skipped (`no_price`).
+  - Errors never stop the cycle: a warning is logged and the slot is booked as skipped `error`; the day row counts them in `errors`. A row is appended before the state moves on, so a failed write is retried at the next slot. Without a house battery the ledger stays inactive (one info log).
+  - The shadow battery uses the configured values (`config.get_battery_params_list()`, path efficiency `η_inv · battery_efficiency`); the calibration item decides whether that stays. Energy-counter slots stay skipped (spec § 9 item 6).
+  - `docs/einrichtung/betrieb.md` § Log- und Historiendateien lists both files. Tests `tests/test_savings_ledger_daemon.py`.
+  - **Open:** "Done" needs the home plant to write ledger rows live for one full SA-day after deploy.
+
 ### Ledger P4 — Day close, state and ledger file (2026-11-02)
 
 - [x] **Ledger P4 — Day close, state and ledger file** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 3, § 4.

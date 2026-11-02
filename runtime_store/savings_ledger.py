@@ -38,6 +38,7 @@ SKIP_NOT_MEAN = "not_mean"
 SKIP_NO_POWER = "no_power"
 SKIP_NO_PRICE = "no_price"
 SKIP_DEAD_TELEMETRY = "dead_telemetry"
+SKIP_ERROR = "error"
 
 
 @dataclass(frozen=True)
@@ -217,6 +218,9 @@ class LedgerState:
     prev_correction_eur: float | None
     slots: tuple[dict[str, Any], ...]
     days_closed: int = 0
+    # Prices and slot-0 plan of the newest cycle, kept until its slot is closed
+    # (the daemon hook; see ``savings_ledger_store.pending_slot_from_entry``).
+    pending_slot: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -231,6 +235,7 @@ class LedgerState:
             "prev_correction_eur": self.prev_correction_eur,
             "slots": [dict(s) for s in self.slots],
             "days_closed": self.days_closed,
+            "pending_slot": dict(self.pending_slot) if self.pending_slot else None,
         }
 
     @classmethod
@@ -242,6 +247,9 @@ class LedgerState:
         slots = raw["slots"]
         if not isinstance(slots, list) or not all(isinstance(s, dict) for s in slots):
             raise ValueError("savings ledger state: slots must be a list of objects")
+        pending = raw.get("pending_slot")
+        if pending is not None and not isinstance(pending, dict):
+            raise ValueError("savings ledger state: pending_slot must be an object")
         return cls(
             savings_v=int(raw["savings_v"]),
             chain_start=_aware(raw["chain_start"]),
@@ -254,6 +262,7 @@ class LedgerState:
             prev_correction_eur=float(prev) if prev is not None else None,
             slots=tuple(dict(s) for s in slots),
             days_closed=int(raw["days_closed"]),
+            pending_slot=dict(pending) if pending else None,
         )
 
 
@@ -365,6 +374,32 @@ def advance(
     return state, row
 
 
+def record_error_slot(state: LedgerState, slot_start: datetime) -> LedgerState:
+    """Book a slot the hook could not process as skipped (``error``); the day row counts it in ``errors``.
+
+    The shadow SoC stays; a slot of a later day than the open one is left out (the
+    next regular slot closes the day).
+    """
+    if state.last_slot_start is not None and slot_start <= state.last_slot_start:
+        return state
+    if not (state.day_start <= slot_start < state.day_end):
+        return state
+    row = {
+        "slot_start": slot_start.isoformat(),
+        "counted": False,
+        "skip_reason": SKIP_ERROR,
+        "cost_with_eur": 0.0,
+        "cost_without_eur": 0.0,
+        "import_kwh_with": 0.0,
+        "import_kwh_without": 0.0,
+        "export_kwh_with": 0.0,
+        "export_kwh_without": 0.0,
+        "k_act_cent": None,
+        "shadow_soc_end": state.shadow_soc,
+    }
+    return replace(state, last_slot_start=slot_start, slots=state.slots + (row,))
+
+
 def _slot_row(inp: LedgerInput, slot: LedgerSlot, dt_h: float) -> dict[str, Any]:
     row: dict[str, Any] = {
         "slot_start": inp.slot_start.isoformat(),
@@ -467,6 +502,7 @@ def close_day(
         "slots_total": slots_total,
         "slots_present": len(counted),
         "slots_skipped": dict(sorted(skipped.items())),
+        "errors": skipped.get(SKIP_ERROR, 0),
         "coverage": round(coverage, 3),
         "incomplete": coverage < INCOMPLETE_COVERAGE,
         "cost_with_eur": round(cost_with, 4),

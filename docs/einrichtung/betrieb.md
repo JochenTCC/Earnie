@@ -251,6 +251,8 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf.                    |
 | `live_optimization_debug.json`       | **aktiv**                      | Anzeige-Snapshot des Optimierungs-Horizonts für die Streamlit-App. |
 | `cycle_stats.jsonl`                  | **aktiv**                      | Dauer, Vorlauf und Pünktlichkeit je Optimierungslauf (rollierend 7 Tage), siehe [Zyklus-Pünktlichkeit und Vorlauf](#zyklus-pünktlichkeit-und-vorlauf-immer-aktiv). |
+| `savings_ledger.jsonl`               | **aktiv** (ab 2.8)             | Ersparnis-Buch: eine JSON-Zeile je abgeschlossenem Tag von Sonnenaufgang zu Sonnenaufgang. Vergleicht die gemessenen Kosten mit einer Schattenanlage ohne Earnie (gleicher Verbrauch, gleiche PV, gleiche Preise, Batterie im Herstellermodus). Wird nur angehängt, nicht rotiert. Ohne Hausbatterie inaktiv. |
+| `savings_ledger_state.json`          | **aktiv** (ab 2.8)             | Zustand des Ersparnis-Buchs: SoC der Schattenbatterie, der laufende Tag und die Preise der letzten Viertelstunde. Nicht löschen: Ohne diese Datei beginnt eine neue Zählung. Eine unlesbare Datei wird als `savings_ledger_state.json.broken-<Zeitstempel>` beiseitegelegt. |
 | `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis des Szenario-Explorers; nicht für die Produktiv-NAS gedacht. |
 
 
