@@ -1,6 +1,7 @@
 # Savings ledger — realised savings from logged actuals
 
 **Status:** design proposal, not implemented (2026-11-02). Language: English (docs/dev).
+**Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
 **Decision 2026-11-02:** not in 2.7 — Chart 2 is hidden for the 2.7 release (`ui/live_mode.py::chart2_enabled()`, shown only with `EARNIE_UI_CHART2=1`) (known limitation in the release notes); the corrected chart ships with 2.8 (`backlog/Backlog.md` Version 2.7 / 2.8).
 **Trigger:** debug dump `debug_dump_20261102_062129` ("Kumulierte Kosten - Anzeige unplausibel"), analysed on `release/2.7` (2.7.0-beta.3).
 **Related:** [`../ui/charts.md`](../ui/charts.md) § Chart 2, [`done/ui-sunset2sunset.md`](done/ui-sunset2sunset.md), [`done/planning-horizon-sunset.md`](done/planning-horizon-sunset.md), [`../workflow/usage-ping.md`](../workflow/usage-ping.md), [`../workflow/earnie-points.md`](../workflow/earnie-points.md), backlog item "Simple Savings KPI as additional payload of the UsagePing" (`backlog/Backlog.md`, Version 2.+1).
@@ -59,11 +60,21 @@ saving_slot  = cost_without − cost_with
 soc_correction = (soc_actual_end − soc_shadow_end) / 100 · capacity_kwh · efficiency · p_ref
 ```
 
-with `p_ref` = energy-weighted mean buy price of that SA-day. It is booked as its own column and reversed at the next day close (the next day's correction is computed from scratch against the new end SoC, so the series telescopes). Without it, a reserve built in the evening shows as a loss on day N and a gain on day N+1; on the dump the open-loop plan ends 2 kWh above the same-flex baseline, which is almost exactly the 0.77 € it looks more expensive.
+with `p_ref` = energy-weighted mean buy price of that SA-day (Σ import kWh · `market_price_cent` / Σ import kWh over the counted slots). A day without grid import has no weighted mean; it takes the time mean of the day's buy price instead, as an explicit rule recorded in the row (`p_ref_basis: "import_weighted" | "time_mean"`), not as a silent fallback. *(Decided 2026-11-02, Ledger P0.)*
+
+The correction is booked as its own column and **reversed with the same euro amount** at the next day close:
+
+```text
+saving_adjusted_N = saving_N + soc_correction_N − soc_correction_(N−1)
+```
+
+The lifetime sum therefore telescopes to Σ `saving_eur` + the correction of the latest closed day (the first day of a chain has no predecessor term, because the shadow chain starts at the actual SoC). `p_ref` only moves amounts between days; it never changes the long-run total. On 43 days of the maintainer's plant the candidate prices (import-weighted mean, time mean, night hours of the next day) differ by about 1 ct in the median. Without the correction, a reserve built in the evening shows as a loss on day N and a gain on day N+1; on the dump the open-loop plan ends 2 kWh above the same-flex baseline, which is almost exactly the 0.77 € it looks more expensive.
 
 The shadow battery is the existing baseline step `optimizer/sim_baseline.py::_simulate_single_hour_baseline` (`baseload_kw_override` path) fed with actuals instead of forecasts. No new battery model.
 
-Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load` (as the baseline does today). Powerstations and virtual reserves are not part of the shadow plant; the actual side includes whatever they did. This slightly favours Earnie when a powerstation covers load and is stated in the method note.
+Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load` (as the baseline does today).
+
+**Powerstations and virtual reserves are not part of the shadow plant** *(decided 2026-11-02, Ledger P0)*. The logged `house_kw` is the balance `pv + grid + battery` (`integrations/ehal_live.py::read_live_power_kw`); on 43 days of the maintainer's plant the residual `house − (pv + grid + battery)` is 0.00 kWh. Load a powerstation supplies from its own storage therefore appears on neither side, and its charging sits in the house load with its logged timing on both sides. The comparison stays neutral; the method note says that powerstation supply is not valued and their charging counts at its actual time.
 
 ## 4. Ledger
 
@@ -77,13 +88,17 @@ Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load
   "slots_total": 96,
   "slots_present": 93,
   "coverage": 0.969,
+  "incomplete": false,
   "cost_with_eur": 2.539,
   "cost_without_eur": 2.871,
   "saving_eur": 0.332,
   "soc_actual_end_pct": 19.0,
   "soc_shadow_end_pct": 5.0,
+  "p_ref_cent": 31.0,
+  "p_ref_basis": "import_weighted",
   "soc_correction_eur": 0.743,
-  "saving_adjusted_eur": 1.075,
+  "soc_correction_prev_eur": 0.512,
+  "saving_adjusted_eur": 0.563,
   "import_kwh_with": 6.21,
   "import_kwh_without": 7.02,
   "export_kwh_with": 0.0,
@@ -96,9 +111,10 @@ Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load
 
 Rules:
 
-- A slot counts when its `closed_interval` is present and `ist_power_source` is `mean` for pv, grid, battery and house. Missing slots are skipped on both sides (same slots, same prices), so partial days stay comparable; `coverage` is stored and days below a threshold (proposal: 0.8) are shown but not added to the lifetime total.
+- A slot counts when its `closed_interval` is present and `ist_power_source` is `mean` for pv, grid, battery and house. Missing slots are skipped on both sides (same slots, same prices), so a gap only understates the saving, it never distorts it. `coverage` is stored per row.
+- **Every closed day counts in the lifetime total**, whatever its coverage *(decided 2026-11-02, Ledger P0)*. Dropping a day would also drop its SoC corrections and break the telescoping sum of § 3. Days with `coverage < 0.8` are flagged `"incomplete": true` and shown as "unvollständig" in the UI. On 43 days of the maintainer's plant 37 reach 0.8; the others are restart or gap days.
 - Shadow SoC is **never** reset from the live SoC. It starts once (first ledger run) at the live SoC of that moment and then only follows the shadow rule. If the ledger state is missing or `savings_v` changes, a new chain starts and the UI shows the start date.
-- Lifetime total = Σ `saving_adjusted_eur` over counted days. Shown together with its start date and the day count.
+- Lifetime total = Σ `saving_adjusted_eur` over all closed days of the chain. Shown together with its start date, the day count and the number of incomplete days.
 - **Backfill:** `optimization_history.jsonl` (and rotated files) already hold every `closed_interval` with prices; a one-off CLI (`python -m scripts.build_savings_ledger --since <date>`) can build the ledger retroactively. The dump's log reaches back to July.
 
 Where it runs: in `main.py` after the cycle's `closed_interval` is written (one shadow step per cycle, O(1)); SA-day close when the first slot after SA₂ is closed. Failure is loud (logged warning, ledger row flagged), never a silent zero.
@@ -122,7 +138,7 @@ Schema v3 adds to the existing v2 payload:
 {"v": 3, "...": "...", "savings_v": 1, "savings_eur": 184.2, "savings_days": 97}
 ```
 
-- `savings_eur` = lifetime `saving_adjusted_eur` of counted days, rounded to 0.1 €; `savings_days` = counted days. Both from the ledger, latest-wins per install id on the server (as `points`).
+- `savings_eur` = lifetime `saving_adjusted_eur` of all closed days of the chain, rounded to 0.1 €; `savings_days` = closed days. Both from the ledger, latest-wins per install id on the server (as `points`).
 - **Decision needed (privacy):** `usage-ping.md` § 2 excludes prices and costs from the payload. A lifetime euro aggregate is a new data category. It needs: an updated consent text and "Was wird gesendet?" preview, a note in `docs/einrichtung/betrieb.md` § Nutzungsstatistik, and a server-side schema bump (`earnie-server`, separate repo → tracker row).
 - Server KPI: Σ `savings_eur` and median per install, by `savings_v`; histogram of `savings_eur / savings_days`. Marketing wording always carries the counterfactual and the method version; the figure is as fakeable as the points.
 
@@ -153,12 +169,12 @@ Open: EV sessions (deadline-bound; counterfactual = "charge immediately on plug-
 
 WP 1–2 are independent bug fixes and can ship on `release/2.7`. WP 3–5 are one feature; WP 6–7 wait for the privacy decision; WP 8 is optional.
 
-**Backlog phases:** `backlog/Backlog.md` Version 2.8 splits these into epic **Ledger** P0–P10, one chat session each: P0 decisions (§ 9 items 1–3), P1 = WP 1, P2 = WP 2, P3–P5 = WP 3 (slot engine, day close + files, daemon hook), P6 = WP 4, P7–P8 = WP 5 (chart, cockpit KPI), P9–P10 = WP 8. WP 6–7 stay under Version 2.+1 "Simple Savings KPI".
+**Backlog phases:** `backlog/Backlog.md` Version 2.8 splits these into epic **Ledger** P0–P10, one chat session each: P0 decisions (§ 9 items 1–3, done 2026-11-02), P1 = WP 1, P2 = WP 2, P3–P5 = WP 3 (slot engine, day close + files, daemon hook), P6 = WP 4, P7–P8 = WP 5 (chart, cockpit KPI), P9–P10 = WP 8. WP 6–7 stay under Version 2.+1 "Simple Savings KPI".
 
 ## 9. Open decisions
 
-1. `p_ref` for the SoC correction: day's energy-weighted mean buy price (proposal) vs. next day's first-hours price vs. flat tariff component.
-2. Coverage threshold for counting a day (proposal 0.8) and how partial days appear in the UI.
-3. Whether the shadow plant includes powerstations (v1: no).
+1. ~~`p_ref`~~ **Decided 2026-11-02 (Ledger P0):** energy-weighted mean buy price of the SA-day; time mean on days without import (§ 3).
+2. ~~Coverage threshold~~ **Decided 2026-11-02 (Ledger P0):** every closed day counts; `coverage < 0.8` only flags the day as incomplete in the UI (§ 4).
+3. ~~Powerstations~~ **Decided 2026-11-02 (Ledger P0):** not part of the shadow plant in v1; neutral because `house_kw` is the pv + grid + battery balance (§ 3).
 4. Privacy: ship `savings_eur` in the ping at all; if yes, rounding granularity (0.1 € vs 1 €) and whether `savings_days` is needed.
 5. Does D1's "Ersparnis bisher" disappear before the ledger exists (hide the trace), or stay with a warning label until WP 5 lands? Proposal: hide; a wrong number is worse than none.

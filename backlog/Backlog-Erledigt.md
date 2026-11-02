@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P0 — savings ledger method decisions (2026-11-02)
+
+- [x] **Ledger P0 — Open method decisions** `[dev]` *(decided 2026-11-02)*: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 9 items 1–3, checked against 43 days of the maintainer's plant history.
+  - `p_ref` of the SoC correction = import-weighted mean buy price of the SA-day; days without import take the time mean (`p_ref_basis` in the row). The correction is reversed with the same amount at the next day close, so the lifetime total telescopes and `p_ref` only moves amounts between days (candidates differ by about 1 ct in the median).
+  - Every closed day counts in the lifetime total; `coverage < 0.8` only flags the day as incomplete in the UI (dropping a day would break the telescoping correction). 37 of 43 days reach 0.8.
+  - Powerstations stay out of the shadow plant in v1: the logged `house_kw` is the pv + grid + battery balance (residual 0.00 kWh), so their supply is on neither side and their charging is in the house load on both sides.
+
 ### Chart 2 hidden for the 2.7 release (2026-11-02)
 
 - [x] **Deactivate Chart 2 "Kumulierte Kosten & Verbrauch" on the Monitor page for the 2.7 release** `[chore]` *(decided 2026-11-02 after debug dump `debug_dump_20261102_062129`)* — the savings figures are wrong independent of the optimizer: the baseline restarts from the live SoC every cycle (reserve cost counted, its use credited to the baseline), hourly spreading on the quarter-hour matrix shows about a quarter of the planned € in both zones, and BL Ziel costs profile energy the optimizer never plans. The optimizer itself behaved correctly in the dump (night→morning arbitrage, no hoarding); the Scenario Explorer is not affected. Analysis with verified numbers: [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 1.
