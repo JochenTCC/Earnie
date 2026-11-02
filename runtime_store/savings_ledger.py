@@ -182,6 +182,7 @@ P_REF_CARRIED = "carried"
 CHAIN_FIRST_RUN = "first_run"
 CHAIN_STATE_UNREADABLE = "state_unreadable"
 CHAIN_SAVINGS_V_CHANGED = "savings_v_changed"
+CHAIN_BACKFILL = "backfill"
 
 DayBounds = Callable[[datetime], tuple[datetime, datetime]]
 
