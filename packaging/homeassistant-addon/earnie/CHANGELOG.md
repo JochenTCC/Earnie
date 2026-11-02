@@ -2,6 +2,11 @@
 
 Add-on `version:` mirrors the Earnie app release. Official tags bump `earnie` + `earnie_prerelease`; pre-releases bump only `earnie_prerelease`. Prebuilt: `ghcr.io/jochentcc/earnie-addon-{arch}`.
 
+## 2.7.0
+
+- Pins Earnie `2.7.0` (`ghcr.io/jochentcc/earnie-energy:2.7.0`).
+- Earnie release: [2.7.0](https://github.com/JochenTCC/Earnie/releases/tag/v2.7.0)
+
 ## 2.6.2
 
 - Pins Earnie `2.6.2` (`ghcr.io/jochentcc/earnie-energy:2.6.2`).
