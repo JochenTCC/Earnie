@@ -154,12 +154,21 @@ def test_release_workflow_gates_user_visible_steps():
     assert "scripts.ha_addon_smoke" in text
 
 
-def test_release_workflow_addon_lint_checks_out_tag():
-    """addon_lint must lint the tagged candidate, not a main that moved on since the tag."""
+def test_release_workflow_addon_lint_checks_out_publish_source():
+    """addon_lint must lint the source publish_ha_addon publishes (main), not the tag."""
     text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
     job = text.split("\n  addon_lint:\n", 1)[1].split("\n  promote:\n", 1)[0]
-    assert "ref: ${{ needs.release.outputs.tag }}" in job
-    assert "ref: main" not in job
+    publish = text.split("\n  publish_ha_addon:\n", 1)[1].split("\n  qemu_smoke:\n", 1)[0]
+    assert "ref: main" in job
+    assert "ref: main" in publish
+    assert "ref: ${{ needs.release.outputs.tag }}" not in job
+
+
+def test_official_addon_manifest_omits_default_stage():
+    """The add-on linter rejects default values; ``stage: stable`` failed the 2.7.0 lint."""
+    manifest = REPO_ROOT / "packaging" / "homeassistant-addon" / "earnie" / "config.yaml"
+    keys = [line.split(":", 1)[0] for line in manifest.read_text(encoding="utf-8").splitlines()]
+    assert "stage" not in keys
 
 
 def test_release_workflow_dev_builds_stop_before_publish():
