@@ -25,6 +25,7 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 - [ ] **Keep dev-only replay and Shadow code out of the release image** `[chore]` *(decided 2026-10-30)* — implement on `release/2.7`, then cherry-pick the result to `main` (batch PR). The cycle recorder stays in the image: it fills the `recorder/*` part of debug dumps, which become private regression cases (e.g. REG-76). The Shadow feed writer (`runtime_store/shadow/feed.py`, Prod side, off unless `shadow_feed_enabled`) also stays.
   - [ ] **Exclude offline replay and regression tools via `.dockerignore`:** `runtime_store/recorder_replay.py`, `scripts/run_regression.py`, `scripts/run_regression_r0_study.py`, `scripts/replay_debug_dump.py` (leaf modules, only imported by scripts and tests; the Dockerfile copies `runtime_store/` and `scripts/` whole). Check that nothing in the image imports them (a container smoke start), and keep `runtime_store/push_read_replay.py`: the live push inbox uses its capture. Small, can go into 2.7.0.
   - [ ] **Make the Shadow runtime omittable** (`EARNIE_SHADOW=1`: `runtime_store/shadow/` without `feed.py`, about 1,000 lines): `is_shadow_mode()` / feed checks sit in 24 modules outside the package (`main.py`, `config.py`, `app.py`, push inbox, ENTSO-E / aWATTar clients, PV forecast, …). Gather them behind one interface (extend `runtime_store/shadow/hooks.py`) with a no-op stub when the package is absent, then exclude the package from the image and add a smoke test for the stripped image, so the shipped artifact is tested too. Larger; does not block 2.7.0 (target 2.8).
+- **Note (2026-11-02):** Chart 2 "Kumulierte Kosten & Verbrauch" is hidden in the Monitor for 2.7 (`EARNIE_UI_CHART2=1` shows it, dev only); release notes carry a "Bekannte Einschränkungen" entry. The corrected chart is the savings-ledger item under **Version 2.8**; archive: [Backlog-Erledigt.md](Backlog-Erledigt.md) "Chart 2 hidden for the 2.7 release".
 - [ ] final release 2.7.0
 
 ### Version 2.8
@@ -41,9 +42,14 @@ Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalH
 
 - [ ] Make a review for Chart1 implementation on Monitor page and check if code related to simulated trajectories might be substituted by results from main.py (to prevent drift / misalignment / code duplication)
 
-- [ ] Review current chart for Kumulierte Kosten & Verbrauch
-  - I'm not happy with this chart, because it's not really clear in it's message - maybe there are better solutions
-  - The main question is how to calculate the non-optimized cost live when you have moving consumers etc.
+- [ ] **Chart 2 "Kumulierte Kosten & Verbrauch": realised savings from logged actuals (savings ledger)** `[feat]` *(design 2026-11-02; chart hidden in 2.7, see Version 2.7)* — spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md). Replaces the plan-vs-plan "Ersparnis bisher" with a per-SA-day ledger built from `closed_interval` actuals: shadow plant with the same load, PV and prices and a vendor-default battery on **one continuous SoC chain**; SoC value correction at day close; coverage rule; backfill CLI from `optimization_history.jsonl`; lifetime counter "Mit Earnie gespart" in the cockpit. Work packages (spec § 8):
+  - [ ] WP1 quarter-hour alignment in `ui/chart_context.py::align_hourly_increments_to_display_slots` and `runtime_store/history_timeline.py::_slot_plan_increments_from_snapshots` (Σ chart = Σ snapshot test)
+  - [ ] WP2 BL Ziel € without the profile-fallback energy of consumers with optimizer target 0 (`optimizer/targets.py::resolve_matched_baseline_horizon_targets`)
+  - [ ] WP3 ledger core in `main.py` (shadow step per cycle, SA-day close, SoC correction, `runtime_store/savings_ledger.jsonl`, loud failure)
+  - [ ] WP4 backfill CLI `scripts.build_savings_ledger` and hand check against the 2026-11-02 dump day
+  - [ ] WP5 Chart 2 grey zone and cockpit KPI from the ledger; re-enable the chart; `charts.md` + handbook method note (gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise)
+  - [ ] WP8 (optional) `savings_v: 2` flex re-timing with the plan-vs-actual flex energy reconciliation
+  - **Note:** WP6/WP7 (usage-ping schema v3 + `earnie-server` KPI) stay under **Version 2.+1** "Simple Savings KPI" until the privacy decision (spec § 6, § 9).
 
 - [ ] Enable multiple EV / Wallboxes *(reuse entity-scoped namespacing approach from **2.7.c** multi-ESS)*
 - Parametrize EVs as now (+ sensors)
@@ -213,7 +219,7 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
   - Cosign/Sigstore in release CI + startup verifier + production signing keys
   - Watermark vs refuse-to-start decision; offline public-key path
   - Spec: `[docs/workflow/hardware-registry-layer-c.md](../docs/workflow/hardware-registry-layer-c.md)`
-- [ ] **Simple "Savings KPI" as additional payload of the UsagePing** *(moved from the earnie-server install item, 2026-10-20)* — think through a simple savings figure to send with the ping; needs a schema bump (v3) on both sides (Earnie client contract `docs/workflow/usage-ping.md` and `earnie-server` receiver) and a privacy review (opt-in, anonymous, aggregates only).
+- [ ] **Simple "Savings KPI" as additional payload of the UsagePing** *(moved from the earnie-server install item, 2026-10-20)* — think through a simple savings figure to send with the ping; needs a schema bump (v3) on both sides (Earnie client contract `docs/workflow/usage-ping.md` and `earnie-server` receiver) and a privacy review (opt-in, anonymous, aggregates only). Source figure and open decisions: [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 6, § 9 (lifetime `saving_adjusted_eur` + counted days, `savings_v`).
 - [ ] Make also an EHAL adaption for MQTT
 - [ ] **External import price series (Swiss special case, e.g. EKZ dynamic tariff)** `[feat]` *(idea from a community fork, 2026-11-01; after the EHAL MQTT adaption above)*
   - Some Swiss utilities (EKZ) publish their own dynamic 15-min import price, grid usage and levies already included, which is not an EPEX price plus markup. A LoxBerry plugin publishes it via MQTT (`chf_per_kwh_sum`, Rp/kWh without VAT).

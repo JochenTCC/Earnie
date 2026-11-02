@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Chart 2 hidden for the 2.7 release (2026-11-02)
+
+- [x] **Deactivate Chart 2 "Kumulierte Kosten & Verbrauch" on the Monitor page for the 2.7 release** `[chore]` *(decided 2026-11-02 after debug dump `debug_dump_20261102_062129`)* — the savings figures are wrong independent of the optimizer: the baseline restarts from the live SoC every cycle (reserve cost counted, its use credited to the baseline), hourly spreading on the quarter-hour matrix shows about a quarter of the planned € in both zones, and BL Ziel costs profile energy the optimizer never plans. The optimizer itself behaved correctly in the dump (night→morning arbitrage, no hoarding); the Scenario Explorer is not affected. Analysis with verified numbers: [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 1.
+  - `ui/live_mode.py::chart2_enabled()`: the Monitor renders the Chart 2 fragment only with `EARNIE_UI_CHART2=1` (`runtime_store.env_vars.is_truthy`); data paths, `savings_snapshot` persistence and the SE chart (`ui/backtesting_deviation_list.py`) are unchanged. Test `tests/test_live_mode_chart2_gate.py`.
+  - Docs: `docs/ui/charts.md` § Chart 2 (note), `docs/einrichtung/betrieb.md` env table; release notes hint in `.github/release-notes/UNRELEASED.md` § Bekannte Einschränkungen.
+  - Corrected chart (realised savings from logged actuals): **Version 2.8** savings-ledger item in [Backlog.md](Backlog.md).
+
 ### Bugfix recorder replay early-start tick and live limits (2026-11-01)
 
 - [x] **Recorder replay misses the live plan for some SwimSpa and heat pump cycles** *(found 2026-10-31)*: follow-up of the archived push-reads fix. Replay of all 112 NAS cycles with `start_state.push_reads` (30.10. 15:49 – 31.10. 17:59, 2.7.0-beta.2, `release/2.7` @ `10491702`, `solver_mode="production"`): 108 replay hashes equal live. Reserve refill and plugged-in EV are covered now (EV connected 105/107, `e_auto` in live setpoints 17/19, reserve-refill cycles 4/6; all four misses are explained by the consumers below). The four misses:

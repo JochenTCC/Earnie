@@ -147,6 +147,8 @@ Die kompakten Buttons stehen in einer Zeile **ohne** Fließtext dazwischen (mobi
 
 ## Chart 2: Kumulierte Kosten & Verbrauch
 
+> **In Version 2.7 ausgeblendet.** Die Ersparniswerte dieses Charts sind nicht belastbar (Vergleichslauf startet je Zyklus vom Ist-SoC, Stundenraster auf Viertelstunden-Matrix). Im Monitor erscheint das Chart nur mit `EARNIE_UI_CHART2=1` (Entwicklung). Der Szenario-Explorer ist nicht betroffen. Korrigierte Fassung mit realisierter Ersparnis aus Ist-Daten: Version 2.8, Entwurf `docs/dev/savings-ledger.md`.
+
 **Überschrift** mit **?** (Ist vs. Prognose, orange Lücken). Im Sunset-2-Sunset-Fenster sind Ist und Prognose getrennte Kurven:
 
 | Bereich | Kurven |
