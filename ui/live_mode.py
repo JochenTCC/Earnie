@@ -7,6 +7,7 @@ import pandas as pd
 from data import consumer_targets, live_consumption, profile_manager
 from data.edibert_live_market import fetch_live_day_ahead_prices
 from runtime_store import main_daemon, run_state
+from runtime_store.env_vars import is_truthy
 from runtime_store.live_display_loader import (
     load_live_display_snapshot,
     snapshot_completed_at,
@@ -38,6 +39,17 @@ from ui.simulation_results import (
 
 SESSION_OPT_IN_SIMULATION = "live_opt_in_simulation_confirmed"
 SESSION_SNAPSHOT_CACHE_KEY = "live_display_snapshot_cache_key"
+
+
+def chart2_enabled() -> bool:
+    """Chart 2 (Kumulierte Kosten & Verbrauch) im Monitor nur mit ``EARNIE_UI_CHART2=1``.
+
+    Hidden for the 2.7 release: the savings figures are not reliable (baseline
+    restarts from the live SoC every cycle, hourly spreading on the quarter-hour
+    matrix). Spec and fix plan: ``docs/dev/savings-ledger.md``. The Scenario
+    Explorer chart is unaffected and stays visible.
+    """
+    return is_truthy("UI_CHART2")
 
 
 def _render_main_py_sync_notice(
@@ -141,7 +153,8 @@ def render_optimization_savings_and_chart(current_soc: float) -> None:
     _live_optimization_chart1_fragment(current_soc)
     render_s2_nav_buttons(now=live_now())
     render_live_power_flow(current_soc)
-    _live_optimization_chart2_fragment()
+    if chart2_enabled():
+        _live_optimization_chart2_fragment()
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
     if bundle is not None:
         render_optimization_results_tail(bundle)

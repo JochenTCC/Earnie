@@ -22,6 +22,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Branching:** implement directly on `release/2.7`, then `git cherry-pick -x` onto a branch from `main` (PR), so `main` has the same code; never merge the release branch.
   - **Tests:** button shown by default, hidden after opt-out, shown again after undo; state file missing or unreadable → button shown (opt-out is the user's explicit choice, absence means none).
   - **Tracker:** publish the Sponsors profile before the 2.7 cherry-pick.
+- **Note (2026-11-02):** Chart 2 "Kumulierte Kosten & Verbrauch" is hidden in the Monitor for 2.7 (`EARNIE_UI_CHART2=1` shows it, dev only); release notes carry a "Bekannte Einschränkungen" entry. The corrected chart is the savings-ledger item under **Version 2.8**; archive: [Backlog-Erledigt.md](Backlog-Erledigt.md) "Chart 2 hidden for the 2.7 release".
 
 ### Version 2.8
 
@@ -161,6 +162,15 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] Make a review for Chart1 implementation on Monitor page and check if code related to simulated trajectories might be substituted by results from main.py (to prevent drift / misalignment / code duplication). **Order note:** before the Kumulierte-Kosten review and the pan-to-load spike (both depend on how the charts get their data)
 
+- [ ] **Chart 2 "Kumulierte Kosten & Verbrauch": realised savings from logged actuals (savings ledger)** `[feat]` *(design 2026-11-02; chart hidden in 2.7, see Version 2.7)* — spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md). Replaces the plan-vs-plan "Ersparnis bisher" with a per-SA-day ledger built from `closed_interval` actuals: shadow plant with the same load, PV and prices and a vendor-default battery on **one continuous SoC chain**; SoC value correction at day close; coverage rule; backfill CLI from `optimization_history.jsonl`; lifetime counter "Mit Earnie gespart" in the cockpit. Work packages (spec § 8):
+  - [ ] WP1 quarter-hour alignment in `ui/chart_context.py::align_hourly_increments_to_display_slots` and `runtime_store/history_timeline.py::_slot_plan_increments_from_snapshots` (Σ chart = Σ snapshot test)
+  - [ ] WP2 BL Ziel € without the profile-fallback energy of consumers with optimizer target 0 (`optimizer/targets.py::resolve_matched_baseline_horizon_targets`)
+  - [ ] WP3 ledger core in `main.py` (shadow step per cycle, SA-day close, SoC correction, `runtime_store/savings_ledger.jsonl`, loud failure)
+  - [ ] WP4 backfill CLI `scripts.build_savings_ledger` and hand check against the 2026-11-02 dump day
+  - [ ] WP5 Chart 2 grey zone and cockpit KPI from the ledger; re-enable the chart; `charts.md` + handbook method note (gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise)
+  - [ ] WP8 (optional) `savings_v: 2` flex re-timing with the plan-vs-actual flex energy reconciliation
+  - **Note:** WP6/WP7 (usage-ping schema v3 + `earnie-server` KPI) stay under **Version 2.+1** "Simple Savings KPI" until the privacy decision (spec § 6, § 9).
+
 - [ ] **Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–c** / **2.7.g–h**; after the Chart1 review)
   - **Today:** display range depends on device (`ui/s2_viewport.py`: phone = 24 h segments, desktop/tablet = SA₀→SA₂). Charts get only the data of that default range. Panning with the Plotly drag/pan tool beyond it shows an empty chart. Navigation is via buttons / date picker (`ui/history_navigation.py`, `ui/s2_navigation.py`).
   - **Option A — pan-driven lazy loading:** panning replaces the nav buttons. Data for newly visible ranges is fetched step by step and appended to the charts.
@@ -297,7 +307,7 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
   - Cosign/Sigstore in release CI + startup verifier + production signing keys
   - Watermark vs refuse-to-start decision; offline public-key path
   - Spec: `[docs/workflow/hardware-registry-layer-c.md](../docs/workflow/hardware-registry-layer-c.md)`
-- [ ] **Simple "Savings KPI" as additional payload of the UsagePing** *(moved from the earnie-server install item, 2026-10-20)* — think through a simple savings figure to send with the ping; needs a schema bump (v3) on both sides (Earnie client contract `docs/workflow/usage-ping.md` and `earnie-server` receiver) and a privacy review (opt-in, anonymous, aggregates only).
+- [ ] **Simple "Savings KPI" as additional payload of the UsagePing** *(moved from the earnie-server install item, 2026-10-20)* — think through a simple savings figure to send with the ping; needs a schema bump (v3) on both sides (Earnie client contract `docs/workflow/usage-ping.md` and `earnie-server` receiver) and a privacy review (opt-in, anonymous, aggregates only). Source figure and open decisions: [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 6, § 9 (lifetime `saving_adjusted_eur` + counted days, `savings_v`).
 - [ ] Make also an EHAL adaption for MQTT
 - [ ] **Shadow Mode S4** *(after **2.7.f**)* — Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input. Spec: private repo Earnie-Projekt, `Betrieb/Shadow-Mode-Spec.md` §11 S4
 - [ ] **Data & tariff fidelity - Part 2**
