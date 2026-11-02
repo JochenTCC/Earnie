@@ -109,7 +109,7 @@ def _shadow_transport(url: str, params: dict, timeout_s: float):
     """``opendata`` transport for Open-Meteo: replay in shadow mode, record in prod."""
     from runtime_store.shadow.feed import url_hash
     from runtime_store.shadow.mode import is_shadow_mode
-    from runtime_store.shadow.replay import replay_ext_payload
+    from runtime_store.shadow.hooks import replay_ext_payload
     from runtime_store.shadow.transport import ext_get, safe_record
 
     # Hash path+params only (no secrets).

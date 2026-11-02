@@ -416,7 +416,7 @@ def test_ha_charge_does_not_remap_to_house_battery():
     with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
         "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
     ), patch(
-        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+        "runtime_store.shadow.hooks.should_invoke_setpoint_writes", return_value=True
     ), patch(
         "integrations.ehal_live.is_ha_backend", return_value=True
     ), patch(
@@ -449,7 +449,7 @@ def test_loxone_charge_does_not_use_plant_merker():
     with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
         "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
     ), patch(
-        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+        "runtime_store.shadow.hooks.should_invoke_setpoint_writes", return_value=True
     ), patch(
         "integrations.ehal_live.is_ha_backend", return_value=False
     ), patch(
@@ -493,7 +493,7 @@ def test_loxone_charge_only_when_discharge_unmapped():
     with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
         "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
     ), patch(
-        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+        "runtime_store.shadow.hooks.should_invoke_setpoint_writes", return_value=True
     ), patch(
         "integrations.ehal_live.is_ha_backend", return_value=False
     ), patch(
@@ -531,7 +531,7 @@ def test_ha_source_select_uses_entity_scoped_only():
     with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
         "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
     ), patch(
-        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+        "runtime_store.shadow.hooks.should_invoke_setpoint_writes", return_value=True
     ), patch(
         "integrations.ehal_live.is_ha_backend", return_value=True
     ), patch(
@@ -557,7 +557,7 @@ def test_ha_source_select_no_plant_flat_fallback():
     with patch.object(psl, "_planning_powerstations", return_value=[]), patch(
         "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
     ), patch(
-        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+        "runtime_store.shadow.hooks.should_invoke_setpoint_writes", return_value=True
     ), patch(
         "integrations.ehal_live.is_ha_backend", return_value=True
     ), patch(
@@ -634,7 +634,7 @@ def test_cycle_writes_idle_zero_charge_to_loxone():
     with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
         "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
     ), patch(
-        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+        "runtime_store.shadow.hooks.should_invoke_setpoint_writes", return_value=True
     ), patch(
         "integrations.ehal_live.is_ha_backend", return_value=False
     ), patch(
@@ -737,7 +737,7 @@ def test_write_cycle_powerstation_setpoints_returns_records():
     with patch.object(psl, "_planning_powerstations", return_value=planning), patch(
         "optimizer.powerstation_live.config.is_loxone_silent_mode", return_value=False
     ), patch(
-        "runtime_store.shadow.writes.should_invoke_setpoint_writes", return_value=True
+        "runtime_store.shadow.hooks.should_invoke_setpoint_writes", return_value=True
     ), patch(
         "integrations.ehal_live.is_ha_backend", return_value=False
     ), patch(

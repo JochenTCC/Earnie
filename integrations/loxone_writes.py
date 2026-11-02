@@ -32,7 +32,7 @@ def _publish_setpoint_traced(
 ) -> LoxoneWriteRecord:
     """Publish a setpoint into the status.json ledger (2.7.q Q5; no Merker HTTP)."""
     from integrations.ehal_write import write_field
-    from runtime_store.shadow.writes import block_write_if_shadow
+    from runtime_store.shadow.hooks import block_write_if_shadow
 
     written_at = datetime.now().isoformat(timespec="seconds")
     qid = str(qualified_id or "").strip()

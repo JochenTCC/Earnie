@@ -109,7 +109,7 @@ def probe_loxone_http_access(
 
     Returns ``(ok, detail)``. Does not download the full structure JSON.
     """
-    from runtime_store.shadow.replay import assert_not_shadow_backend
+    from runtime_store.shadow.hooks import assert_not_shadow_backend
 
     assert_not_shadow_backend("loxone_connectivity.probe_loxone_http_access")
     import requests

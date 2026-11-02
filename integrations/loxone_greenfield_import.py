@@ -634,7 +634,7 @@ def run_greenfield_import(
     ``doc`` (control-name presence). ``probe_host`` / credentials are unused
     when ``doc`` is already loaded (kept for call-site compatibility).
     """
-    from runtime_store.shadow.replay import assert_not_shadow_backend
+    from runtime_store.shadow.hooks import assert_not_shadow_backend
 
     assert_not_shadow_backend("loxone_greenfield_import.run_greenfield_import")
     del probe_host, probe_username, probe_password, probe_timeout_sec

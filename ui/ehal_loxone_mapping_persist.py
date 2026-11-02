@@ -230,7 +230,7 @@ def persist_loxone_entity_mapping(
 
     Returns a short success detail (where data was written).
     """
-    from runtime_store.shadow.ehal_overlay import upsert_entity_bindings
+    from runtime_store.shadow.hooks import upsert_entity_bindings
     from runtime_store.shadow.mode import is_shadow_config_readonly
     from ui.house_config_io import _load_components_document, _save_components_document
 

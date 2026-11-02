@@ -160,7 +160,7 @@ def _qualified_id_for_watchdog_key(io_name: str) -> str:
 
 def run_watchdog_cycle() -> list[LoxoneMismatch]:
     """Ein Prüfdurchlauf: run_state laden, vergleichen, ggf. korrigieren."""
-    from runtime_store.shadow.replay import assert_not_shadow_backend
+    from runtime_store.shadow.hooks import assert_not_shadow_backend
 
     assert_not_shadow_backend("loxone_watchdog")
     config.reload_config()

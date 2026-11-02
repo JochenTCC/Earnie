@@ -101,7 +101,7 @@ def _components_stamp(path: str, *, shadow: bool) -> tuple[int, bool, int]:
     overlay_mtime = -1
     if shadow:
         try:
-            from runtime_store.shadow.ehal_overlay import overlay_path
+            from runtime_store.shadow.hooks import overlay_path
 
             overlay_mtime = _file_mtime_ns(overlay_path())
         except Exception:  # noqa: BLE001 — overlay optional on load path
@@ -143,7 +143,7 @@ def load_components_document(path: str) -> dict:
     }
     if shadow:
         try:
-            from runtime_store.shadow.ehal_overlay import apply_overlay_to_components
+            from runtime_store.shadow.hooks import apply_overlay_to_components
 
             out = apply_overlay_to_components(out)
         except Exception:

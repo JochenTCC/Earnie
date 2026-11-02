@@ -89,7 +89,7 @@ def _redact(text: str) -> str:
 
 def _replay_text(feed_key: str) -> str | None:
     """Recorded payload as text; records before P4a stored Energy-Charts / aWATTar as JSON objects."""
-    from runtime_store.shadow.replay import replay_ext_payload
+    from runtime_store.shadow.hooks import replay_ext_payload
 
     payload = replay_ext_payload(feed_key)
     if payload is None:

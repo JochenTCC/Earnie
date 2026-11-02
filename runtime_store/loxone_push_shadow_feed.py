@@ -36,7 +36,7 @@ def _inbox_row_from_shadow_feed(ehal_id: str) -> dict[str, Any] | None:
     """
     try:
         from runtime_store.shadow.mode import is_shadow_mode
-        from runtime_store.shadow.replay import lookup_record
+        from runtime_store.shadow.hooks import lookup_record
 
         if not is_shadow_mode():
             return None
@@ -83,7 +83,7 @@ def _shadow_feed_signals_for_read(ehal_id: str) -> dict[str, dict[str, Any]]:
             out[key_id] = row
     if ehal_id not in out:
         try:
-            from runtime_store.shadow.replay import warn_missing_feed_key
+            from runtime_store.shadow.hooks import warn_missing_feed_key
 
             warn_missing_feed_key(_shadow_feed_key(ehal_id), "missing")
         except Exception:  # noqa: BLE001

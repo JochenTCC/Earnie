@@ -337,9 +337,10 @@ def render() -> None:
         page_docs_key="smarthome-backend",
     )
     from runtime_store.shadow.mode import is_shadow_config_readonly, is_shadow_mode
-    from ui.shadow_banner import render_shadow_feed_connection_note
 
     if is_shadow_mode():
+        from ui.shadow_banner import render_shadow_feed_connection_note
+
         render_shadow_feed_connection_note()
         if is_shadow_config_readonly():
             st.caption(

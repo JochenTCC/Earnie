@@ -122,7 +122,7 @@ def _daemon_wait_poll() -> None:
     touch_daemon_heartbeat()
     spawn_maybe_send_ping()
     if power_interval_sampler.tick():
-        from runtime_store.shadow import maybe_flush_after_sampler
+        from runtime_store.shadow.hooks import maybe_flush_after_sampler
 
         maybe_flush_after_sampler()
 
@@ -133,7 +133,7 @@ def _wait_after_aborted_cycle() -> str:
     Without it the scheduler restarts at once inside the lead window (L12). An
     ``Earnie_Request_Optimize`` wake ends the wait early.
     """
-    from runtime_store.shadow import resolve_next_trigger
+    from runtime_store.shadow.hooks import resolve_next_trigger
 
     early = wait_until_next_run(
         total_wait_sec=ABORTED_CYCLE_RETRY_SEC,
@@ -709,7 +709,7 @@ def _main_cycle(
         current_market_item = optimization_matrix[0]
 
         ehal_writes: list[dict] | None = None
-        from runtime_store.shadow.writes import should_invoke_setpoint_writes
+        from runtime_store.shadow.hooks import should_invoke_setpoint_writes
 
         if not should_invoke_setpoint_writes(silent=config.is_loxone_silent_mode()):
             if ehal_live.is_ehal_network_backend():
@@ -1051,7 +1051,7 @@ if __name__ == "__main__":
     reinit_config_or_exit(config)
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
     log_config_drift(logging.getLogger("main"))
-    from runtime_store.shadow import refuse_shadow_startup_or_exit
+    from runtime_store.shadow.hooks import refuse_shadow_startup_or_exit
 
     refuse_shadow_startup_or_exit()
     try:
@@ -1184,7 +1184,7 @@ if __name__ == "__main__":
         )
 
         if needs_loxone_auth_recovery():
-            from runtime_store.shadow import maybe_clear_auth_gate
+            from runtime_store.shadow.hooks import maybe_clear_auth_gate
 
             if not maybe_clear_auth_gate():
                 ok, detail = probe_current_loxone_credentials()
@@ -1215,7 +1215,7 @@ if __name__ == "__main__":
 
         _setup_gate_state.clear()
         try:
-            from runtime_store.shadow import (
+            from runtime_store.shadow.hooks import (
                 after_prod_cycle,
                 prepare_shadow_cycle,
                 resolve_next_trigger,

@@ -163,7 +163,7 @@ Use exactly one of these — do not invent a fourth gate or mix them up:
 |---------|------|
 | Backend replay / write block / banner / cycle wait / startup refuse / feed recorder off in Shadow | `runtime_store.shadow.is_shadow_mode()` |
 | Config writers, load-time migration skip, EHAL overlay use (shared feed under `config_dir()` only) | `runtime_store.shadow.is_shadow_config_readonly()` |
-| Setpoint helper invocation so `shadow_writes.jsonl` fills (Shadow ≠ plain silent) | `runtime_store.shadow.writes.should_invoke_setpoint_writes()` |
+| Setpoint helper invocation so `shadow_writes.jsonl` fills (Shadow ≠ plain silent) | `runtime_store.shadow.hooks.should_invoke_setpoint_writes()` |
 
 Wrong gate examples: using `is_shadow_mode()` for config saves breaks private-env dogfood; collapsing Shadow into plain silent empties would-write logs.
 
@@ -177,7 +177,16 @@ New live HTTP clients that feed the optimizer cycle (hub GET or `ext:*`) must go
 | `ext_get(replay=…, live=…, allow_live_fallback=…)` | External APIs — Soft fallback (prices/outdoor) may live-fetch in Shadow **without** recording; PV uses `allow_live_fallback=False` |
 | `safe_record(...)` | Replace ad-hoc try/except wrappers around `record_transport` |
 
-Structure / setup probes (MCP, greenfield, EHAL mapping scan, credential probe) must call `assert_not_shadow_backend` — UI disable alone is not enough. Daemon loop glue lives in `runtime_store.shadow.daemon` (not `runtime_store/main_daemon.py`).
+Structure / setup probes (MCP, greenfield, EHAL mapping scan, credential probe) must call `assert_not_shadow_backend` — UI disable alone is not enough. Daemon loop glue lives in `runtime_store.shadow.hooks` (not `runtime_store/main_daemon.py`).
+
+### Shadow client is not in the release image
+
+The release image ships only the Shadow core that Prod needs to record the feed: `mode`, `feed`, `hooks`, `transport`, `errors`, `superset`. The client modules (`cycle`, `ehal_overlay`, `reader`, `replay`, `startup`, `writes`, plus `ui/shadow_banner.py`) are left out via `.dockerignore`; the list is `CLIENT_FILES` in [`runtime_store/shadow/hooks.py`](runtime_store/shadow/hooks.py).
+
+- Code outside `runtime_store/shadow/` reaches client functions **only** through `runtime_store.shadow.hooks` (`mode`, `errors`, `transport`, `feed` may be imported directly). `ui.shadow_banner` is imported lazily inside an `is_shadow_mode()` branch.
+- `EARNIE_SHADOW=1` on an image without the client refuses to start (`refuse_shadow_startup_or_exit`, `shadow_migration_mode_refusal`); it never runs as Prod.
+- [`tests/test_stripped_release_image.py`](tests/test_stripped_release_image.py) checks `.dockerignore` against the list, scans shipped code for imports of left-out modules, and imports the Prod packages in a subprocess where those modules cannot be imported.
+- The offline replay and regression tools (`runtime_store/recorder_replay.py`, `scripts/run_regression.py`, `scripts/run_regression_r0_study.py`, `scripts/replay_debug_dump.py`) are left out the same way; the cycle recorder and `runtime_store/push_read_replay.py` stay.
 
 ## Roadmap
 

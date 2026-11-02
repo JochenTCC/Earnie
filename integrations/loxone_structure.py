@@ -175,7 +175,7 @@ def fetch_loxapp3_json(
     timeout_sec: float = 15.0,
 ) -> dict[str, Any]:
     """GET http://{host}/data/LoxAPP3.json with HTTP Basic Auth."""
-    from runtime_store.shadow.replay import assert_not_shadow_backend
+    from runtime_store.shadow.hooks import assert_not_shadow_backend
 
     assert_not_shadow_backend("loxone_structure.fetch_loxapp3")
     ip = str(host or "").strip().removeprefix("http://").removeprefix("https://")
@@ -456,7 +456,7 @@ def scan_structure(
     (source id ``http_probe``), and optional MCP 17.1. ``selected_source`` only
     affects which item set feeds mapping dropdowns (``union`` = merge all names).
     """
-    from runtime_store.shadow.replay import assert_not_shadow_backend
+    from runtime_store.shadow.hooks import assert_not_shadow_backend
 
     assert_not_shadow_backend("loxone_structure.scan_structure")
     wanted = tuple(sources) if sources is not None else ALL_SOURCES

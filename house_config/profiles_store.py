@@ -370,7 +370,7 @@ def _house_profiles_stamp(path: str, *, shadow: bool) -> tuple[int, bool, int]:
     overlay_mtime = -1
     if shadow:
         try:
-            from runtime_store.shadow.ehal_overlay import overlay_path
+            from runtime_store.shadow.hooks import overlay_path
 
             overlay_mtime = _file_mtime_ns(overlay_path())
         except Exception:  # noqa: BLE001 — overlay optional on load path
@@ -389,7 +389,7 @@ def load_house_profiles_document(path: str) -> dict:
         return cached[3]
     doc = normalize_house_profiles_document(_read_json(path))
     if shadow:
-        from runtime_store.shadow.ehal_overlay import apply_overlay_to_house
+        from runtime_store.shadow.hooks import apply_overlay_to_house
 
         doc = apply_overlay_to_house(doc)
     _house_profiles_doc_cache[abs_path] = (*stamp, doc)

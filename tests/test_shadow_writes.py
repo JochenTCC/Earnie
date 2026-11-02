@@ -98,21 +98,21 @@ def test_silent_implied_by_shadow(monkeypatch, tmp_path):
 
 
 def test_should_invoke_setpoint_writes_shadow_despite_silent(monkeypatch):
-    from runtime_store.shadow.writes import should_invoke_setpoint_writes
+    from runtime_store.shadow.hooks import should_invoke_setpoint_writes
 
     monkeypatch.setenv("EARNIE_SHADOW", "1")
     assert should_invoke_setpoint_writes(silent=True) is True
 
 
 def test_should_invoke_setpoint_writes_plain_silent(monkeypatch):
-    from runtime_store.shadow.writes import should_invoke_setpoint_writes
+    from runtime_store.shadow.hooks import should_invoke_setpoint_writes
 
     monkeypatch.delenv("EARNIE_SHADOW", raising=False)
     assert should_invoke_setpoint_writes(silent=True) is False
 
 
 def test_should_invoke_setpoint_writes_live(monkeypatch):
-    from runtime_store.shadow.writes import should_invoke_setpoint_writes
+    from runtime_store.shadow.hooks import should_invoke_setpoint_writes
 
     monkeypatch.delenv("EARNIE_SHADOW", raising=False)
     assert should_invoke_setpoint_writes(silent=False) is True

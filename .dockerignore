@@ -48,3 +48,18 @@ packaging/
 se_calc_test/
 chart_debug_review/
 debug-dumps/
+# Dev-only offline replay / regression tools (only scripts and tests import them).
+# Keep runtime_store/push_read_replay.py: the live push inbox uses its capture.
+runtime_store/recorder_replay.py
+scripts/run_regression.py
+scripts/run_regression_r0_study.py
+scripts/replay_debug_dump.py
+# Shadow client (EARNIE_SHADOW=1); the Prod feed writer (mode, feed, hooks, transport,
+# errors, superset) stays. Keep in sync with runtime_store/shadow/hooks.py CLIENT_FILES.
+runtime_store/shadow/cycle.py
+runtime_store/shadow/ehal_overlay.py
+runtime_store/shadow/reader.py
+runtime_store/shadow/replay.py
+runtime_store/shadow/startup.py
+runtime_store/shadow/writes.py
+ui/shadow_banner.py

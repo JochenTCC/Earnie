@@ -1,7 +1,7 @@
-"""Shadow R3 daemon orchestration helpers (callable without full main)."""
+"""Shadow R3 daemon orchestration helpers in hooks (callable without full main)."""
 from __future__ import annotations
 
-from runtime_store.shadow.daemon import (
+from runtime_store.shadow.hooks import (
     after_prod_cycle,
     maybe_clear_auth_gate,
     maybe_flush_after_sampler,

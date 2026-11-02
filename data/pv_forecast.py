@@ -294,7 +294,7 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
     now_time = datetime.now()
 
     from runtime_store.shadow.mode import is_shadow_mode
-    from runtime_store.shadow.replay import replay_ext_payload
+    from runtime_store.shadow.hooks import replay_ext_payload
     from runtime_store.shadow.transport import ext_get
 
     cached = _CACHED_HOURLY_WATTS_BY_URL.get(url)

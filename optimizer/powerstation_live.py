@@ -547,7 +547,7 @@ def _write_powerstation_fields(fields: dict[str, float]) -> list:
         return []
     try:
         from integrations import ehal_live
-        from runtime_store.shadow.writes import should_invoke_setpoint_writes
+        from runtime_store.shadow.hooks import should_invoke_setpoint_writes
     except Exception as exc:  # noqa: BLE001
         logger.warning("powerstation write skipped: %s", exc)
         return []

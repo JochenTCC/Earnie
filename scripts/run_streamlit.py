@@ -105,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         migration_blocks_normal_startup,
         plan_for_active_config,
     )
-    from runtime_store.shadow.startup import shadow_migration_mode_refusal
+    from runtime_store.shadow.hooks import shadow_migration_mode_refusal
 
     load_app_dotenv(override=True)
     bootstrap.run()

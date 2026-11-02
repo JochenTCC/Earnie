@@ -163,7 +163,7 @@ class OpenemsAdapter:
     def read_channel(self, component: str, channel: str) -> float | None:
         path = f"/rest/channel/{component}/{channel}"
         feed_key = f"openems:get:{path}"
-        from runtime_store.shadow.replay import replay_openems_get
+        from runtime_store.shadow.hooks import replay_openems_get
         from runtime_store.shadow.transport import hub_get, safe_record
 
         def _value_from_payload(payload: dict | None) -> float | None:
@@ -211,7 +211,7 @@ class OpenemsAdapter:
         )
 
     def write_channel(self, component: str, channel: str, value: float) -> None:
-        from runtime_store.shadow.writes import block_write_if_shadow
+        from runtime_store.shadow.hooks import block_write_if_shadow
 
         target = f"{component}/{channel}"
         if block_write_if_shadow(

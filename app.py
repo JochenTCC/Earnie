@@ -24,7 +24,7 @@ from runtime_store.migration.gate import (
     migration_blocks_normal_startup,
     plan_for_active_config,
 )
-from runtime_store.shadow.startup import shadow_migration_mode_refusal
+from runtime_store.shadow.hooks import shadow_migration_mode_refusal
 
 _migration_plan = plan_for_active_config()
 _migration_mode = migration_blocks_normal_startup(_migration_plan)
@@ -37,14 +37,14 @@ if _shadow_refusal:
 config = None
 if not _migration_mode:
     from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
-    from runtime_store.shadow import refuse_shadow_startup_or_exit
+    from runtime_store.shadow.hooks import refuse_shadow_startup_or_exit
 
     config = load_config_or_exit()
     reinit_config_or_exit(config)
     refuse_shadow_startup_or_exit()
 
 from ui.branding import render_app_logo
-from ui.shadow_banner import render_shadow_banner
+from runtime_store.shadow.mode import is_shadow_mode
 
 logger = logging.getLogger("app")
 
@@ -55,7 +55,9 @@ st.set_page_config(
     layout="wide",
 )
 render_app_logo()
-if not _migration_mode:
+if not _migration_mode and is_shadow_mode():
+    from ui.shadow_banner import render_shadow_banner
+
     render_shadow_banner()
 
 

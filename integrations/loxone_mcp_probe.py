@@ -400,7 +400,7 @@ def probe_mcp17(
     marker names, then falls back to broad ``control_find`` queries. Tool-call
     payloads unwrap MCP ``content`` / ``structuredContent``.
     """
-    from runtime_store.shadow.replay import assert_not_shadow_backend
+    from runtime_store.shadow.hooks import assert_not_shadow_backend
 
     assert_not_shadow_backend("loxone_mcp_probe.probe_mcp17")
     endpoint, bearer_token, error_result = _resolve_mcp_endpoint_and_token(

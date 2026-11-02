@@ -1,20 +1,11 @@
-"""Shadow Mode helpers (S1 recorder + S2/S3 client)."""
+"""Shadow Mode (S1 recorder + S2/S3 client).
+
+Re-exports the core only (always shipped). Client functions are reached through
+:mod:`runtime_store.shadow.hooks`, which the release image needs without the
+client modules; see its docstring.
+"""
 from __future__ import annotations
 
-from runtime_store.shadow.cycle import (
-    consume_optimize_trigger,
-    feed_health,
-    feed_lag,
-    wait_for_prod_cycle,
-)
-from runtime_store.shadow.daemon import (
-    ShadowCyclePrep,
-    after_prod_cycle,
-    maybe_clear_auth_gate,
-    maybe_flush_after_sampler,
-    prepare_shadow_cycle,
-    resolve_next_trigger,
-)
 from runtime_store.shadow.errors import (
     ConfigReadOnlyError,
     ShadowBackendAccessError,
@@ -26,40 +17,14 @@ from runtime_store.shadow.feed import (
     is_feed_recording_enabled,
 )
 from runtime_store.shadow.mode import is_shadow_config_readonly, is_shadow_mode
-from runtime_store.shadow.startup import (
-    ensure_shadow_startup,
-    refuse_shadow_startup_or_exit,
-)
-from runtime_store.shadow.superset import run_after_cycle as run_superset_after_cycle
-from runtime_store.shadow.writes import (
-    block_write_if_shadow,
-    log_would_write,
-    read_shadow_writes,
-)
 
 __all__ = [
     "ConfigReadOnlyError",
     "ShadowBackendAccessError",
-    "ShadowCyclePrep",
     "ShadowStartupError",
-    "after_prod_cycle",
-    "block_write_if_shadow",
-    "consume_optimize_trigger",
-    "ensure_shadow_startup",
-    "feed_health",
-    "feed_lag",
     "flush_after_cycle",
     "flush_after_sampler",
     "is_feed_recording_enabled",
     "is_shadow_config_readonly",
     "is_shadow_mode",
-    "log_would_write",
-    "maybe_clear_auth_gate",
-    "maybe_flush_after_sampler",
-    "prepare_shadow_cycle",
-    "read_shadow_writes",
-    "refuse_shadow_startup_or_exit",
-    "resolve_next_trigger",
-    "run_superset_after_cycle",
-    "wait_for_prod_cycle",
 ]
