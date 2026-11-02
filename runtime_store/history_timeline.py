@@ -197,29 +197,67 @@ def _snapshot_entry_for_hour(
     return entry
 
 
+# First release whose MILP matrix (and so every savings_snapshot list) is quarter-hourly.
+# Logs from 1.98–2.4 hold hourly lists (≤ 50 entries), 2.5.0+ quarter-hour lists (≥ 97).
+_QUARTER_HOUR_SNAPSHOT_SINCE = (2, 5)
+
+
+def _snapshot_is_hourly(entry: dict[str, Any]) -> bool:
+    """True for log entries written by an app version with an hourly MILP matrix.
+
+    Entries without ``written_by_app_version`` come from the current writer (every
+    production entry since 1.98 carries the field) and are quarter-hourly.
+    """
+    version = str(entry.get("written_by_app_version") or "").strip()
+    if not version:
+        return False
+    head = version.split("-", 1)[0].split(".")
+    try:
+        major_minor = (int(head[0]), int(head[1]))
+    except (IndexError, ValueError) as exc:
+        raise ValueError(
+            f"optimization_history: unreadable written_by_app_version {version!r}"
+        ) from exc
+    return major_minor < _QUARTER_HOUR_SNAPSHOT_SINCE
+
+
+def _snapshot_first_value(entry: dict[str, Any], snapshot_key: str) -> float:
+    snapshot = _entry_savings_snapshot(entry)
+    assert snapshot is not None
+    values = snapshot.get(snapshot_key) or []
+    return float(values[0]) if values else 0.0
+
+
 def _slot_plan_increments_from_snapshots(
     by_slot: dict[datetime, dict[str, Any]],
     slot_starts: list[datetime] | tuple[datetime, ...],
     snapshot_key: str,
 ) -> tuple[float, ...]:
-    """Spread savings_snapshot[key][0] of each clock-hour across that hour's slots."""
+    """Planned slot-0 value of the cycle that ran in each quarter-hour slot.
+
+    Quarter-hour snapshots (2.5.0+): slot ``i`` takes ``savings_snapshot[key][0]`` of the
+    log entry of exactly that slot, so the sum over the slots equals the sum over the
+    cycles. Hourly snapshots (before 2.5.0): ``[key][0]`` covers a whole clock hour; the
+    last entry of the hour is spread evenly over that hour's slots.
+    """
     from collections import defaultdict
 
     from data.planning_window import normalize_hour_slot
 
+    out = [0.0] * len(slot_starts)
     hour_indices: dict[datetime, list[int]] = defaultdict(list)
     for index, slot in enumerate(slot_starts):
         hour_indices[normalize_hour_slot(slot)].append(index)
-    out = [0.0] * len(slot_starts)
+        entry = by_slot.get(_coerce_slot_start(slot))
+        if entry is None or _entry_savings_snapshot(entry) is None:
+            continue
+        if not _snapshot_is_hourly(entry):
+            out[index] = _snapshot_first_value(entry, snapshot_key)
     for hour_start, indices in hour_indices.items():
         entry = _snapshot_entry_for_hour(by_slot, hour_start)
-        if entry is None:
+        if entry is None or not _snapshot_is_hourly(entry):
             continue
-        snapshot = _entry_savings_snapshot(entry)
-        assert snapshot is not None
-        values = snapshot.get(snapshot_key) or []
-        hourly = float(values[0]) if values else 0.0
-        share = hourly / len(indices)
+        share = _snapshot_first_value(entry, snapshot_key) / len(indices)
         for index in indices:
             out[index] = share
     return tuple(out)

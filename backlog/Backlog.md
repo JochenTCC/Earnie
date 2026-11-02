@@ -27,12 +27,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ### Version 2.8
 
 - **Epic Ledger — realised savings from logged actuals (savings ledger)** *(design 2026-11-02; Chart 2 hidden in 2.7, see Version 2.7)*: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md). Replaces the plan-vs-plan "Ersparnis bisher" of Chart 2 with a per-SA-day ledger built from `closed_interval` actuals: shadow plant with the same load, PV and prices, battery in vendor mode on one continuous SoC chain, SoC value correction at every day close. Each phase below is sized for **one chat session** and ends with green tests and a commit.
-  - **Order:** P1 and P2 are independent fixes and can start any time. P3 → P4 → P5 / P6 → P7 → P8 is the feature chain; P7 also needs P1 and P2. P0 (method decisions) is done, see the spec § 9. P9–P10 (`savings_v: 2`) are optional and start only after P8 has run live for a while.
+  - **Order:** P1 is done (archive). P2 is an independent fix and can start any time. P3 → P4 → P5 / P6 → P7 → P8 is the feature chain; P7 also needs P2. P0 (method decisions) is done, see the spec § 9. P9–P10 (`savings_v: 2`) are optional and start only after P8 has run live for a while.
   - **Note:** usage-ping schema v3 and the `earnie-server` KPI (spec § 6, WP 6–7) stay under **Version 2.+1** "Simple Savings KPI" until the privacy decision; they read the lifetime figure that P4 writes.
-
-- [ ] **Ledger P1 — Chart 2 quarter-hour alignment (D2)** `[qual]` *(1 session, independent)*: `ui/chart_context.py::align_hourly_increments_to_display_slots` and `runtime_store/history_timeline.py::_slot_plan_increments_from_snapshots` map values per exact quarter-hour slot (or sum the four cycles of an hour) instead of spreading the `:00` value over four slots.
-  - **Tests:** quarter-hour matrix fixture with Σ chart = Σ snapshot for the forecast part and the history overlay; the hourly-spread assumption is gone from both functions.
-  - **Done:** with `EARNIE_UI_CHART2=1`, the forecast totals of the 2026-11-02 dump day match the snapshot (optimized 5.46 €, BL Ziel 11.46 € instead of 1.06 € / 2.56 €).
 
 - [ ] **Ledger P2 — BL Ziel € without profile-fallback energy (D3)** `[qual]` *(1 session, independent)*: consumers with `daily_target_source=config` and optimizer target 0 keep their profile energy in the matched baseline only for SoC realism (`optimizer/targets.py::resolve_matched_baseline_horizon_targets`); their slots are excluded from BL Ziel € (`optimizer/sim_costs.py`). `energy_comparison` shows the fallback energy as its own column so the difference stays visible.
   - **Tests:** a consumer with target 0 and a profile adds 0 € to BL Ziel but still drains the baseline battery; existing savings tests stay green or get a stated reason for their new values.
@@ -55,7 +51,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Tests:** CLI on a small fixture history with a month rotation; refusal without `--rebuild`.
   - **Done:** run on the home plant since July; the 2026-11-01 SA-day is checked by hand against the dump (the battery arbitrage 35 ct → 48 ct shows as a saving, not a loss). Results and notes stay in the private repo.
 
-- [ ] **Ledger P7 — Chart 2 grey zone from the ledger, chart back on** `[feat]` *(1 session, after P1, P2 and P5)*: "Ersparnis bisher" = cumulated `cost_without − cost_with` of the open SA-day's ledger slots, SoC correction as the last point or a label; the slot-0 plan-difference path (`_overlay_history_plan_costs`, savings use of `_slot_plan_increments_from_snapshots`) is removed. Chart 2 is shown again by default: remove `ui/live_mode.py::chart2_enabled()`, the `EARNIE_UI_CHART2` flag and its test, and the env row in `betrieb.md`.
+- [ ] **Ledger P7 — Chart 2 grey zone from the ledger, chart back on** `[feat]` *(1 session, after P2 and P5)*: "Ersparnis bisher" = cumulated `cost_without − cost_with` of the open SA-day's ledger slots, SoC correction as the last point or a label; the slot-0 plan-difference path (`_overlay_history_plan_costs`, savings use of `_slot_plan_increments_from_snapshots`) is removed. Chart 2 is shown again by default: remove `ui/live_mode.py::chart2_enabled()`, the `EARNIE_UI_CHART2` flag and its test, and the env row in `betrieb.md`.
   - **Tests:** AppTest of the Monitor with a ledger state fixture; without ledger state the chart shows "Ist bisher" without a savings trace and a short hint instead of a zero line.
   - **Docs:** `docs/ui/charts.md` § Chart 2 (German) describes the new grey zone and drops the "ausgeblendet" note.
 

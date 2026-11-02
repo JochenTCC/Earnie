@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P1 — Chart 2 quarter-hour alignment (2026-11-02)
+
+- [x] **Ledger P1 — Chart 2 quarter-hour alignment (D2)** `[qual]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 1 D2.
+  - `ui/chart_context.py::align_hourly_increments_to_display_slots` maps each matrix row onto the display slots it covers (split when the display is finer, summed when it is coarser), so Σ chart = Σ rows on the axis for quarter-hour and legacy hourly matrices.
+  - `runtime_store/history_timeline.py::_slot_plan_increments_from_snapshots` takes slot 0 of the cycle logged in each quarter-hour slot; snapshots written before 2.5.0 (hourly lists) keep the per-hour spread, decided by `written_by_app_version`; an unreadable version fails loud.
+  - Test `tests/test_chart2_quarter_hour_alignment.py`. Dump `debug_dump_20261102_062129`: forecast part optimized 5.46 € / BL Ziel 11.46 € (was 1.06 € / 2.56 €); SA-day 2026-11-01 history overlay −6.36 € = Σ cycles (was −2.08 €).
+
 ### Ledger P0 — savings ledger method decisions (2026-11-02)
 
 - [x] **Ledger P0 — Open method decisions** `[dev]` *(decided 2026-11-02)*: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 9 items 1–3, checked against 43 days of the maintainer's plant history.

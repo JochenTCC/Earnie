@@ -482,12 +482,17 @@ def align_rows_to_display_slots(
     return aligned
 
 
-def _slots_per_hour(slot_datetimes: tuple[datetime, ...]) -> dict[datetime, int]:
-    counts: dict[datetime, int] = {}
-    for slot in slot_datetimes:
-        hour = normalize_hour_slot(slot)
-        counts[hour] = counts.get(hour, 0) + 1
-    return counts
+def _slot_durations(starts: list[datetime]) -> list[timedelta]:
+    """Length of each slot = gap to the next start; the last one repeats the previous gap.
+
+    A single slot is one quarter-hour (the MILP matrix and the log are quarter-hourly).
+    """
+    if not starts:
+        return []
+    if len(starts) == 1:
+        return [timedelta(minutes=15)]
+    gaps = [later - earlier for earlier, later in zip(starts, starts[1:])]
+    return gaps + [gaps[-1]]
 
 
 def align_hourly_increments_to_display_slots(
@@ -496,21 +501,43 @@ def align_hourly_increments_to_display_slots(
     chart: UiChartWindow,
     slot_datetimes: tuple[datetime, ...],
 ) -> list[float]:
-    """Stunden-Inkremente gleichmäßig auf Display-Slots der jeweiligen Stunde verteilen."""
-    by_hour: dict[datetime, float] = {}
+    """Map per-row matrix increments (€ / kWh) onto the display slots, keeping the sum.
+
+    Each matrix row covers ``[slot, next row slot)``. Its value is split evenly over the
+    display slots that start inside that interval (display finer than the matrix, e.g. a
+    legacy hourly matrix on quarter-hour slots); a row with no display slot starting
+    inside it goes whole to the display slot that contains its start (display coarser
+    than the matrix, e.g. four quarter-hour rows on one hourly slot). Rows outside the
+    display axis are dropped, so Σ result = Σ of the rows that lie on the axis.
+    """
+    rows: list[tuple[datetime, float]] = []
     for index, row in enumerate(matrix):
         slot = _row_slot(row)
         if slot is None or not (chart.start <= slot <= chart.end):
             continue
         if index < len(hourly_values):
-            by_hour[slot] = float(hourly_values[index])
-    per_hour = _slots_per_hour(slot_datetimes)
-    increments: list[float] = []
-    for slot in slot_datetimes:
-        hour = normalize_hour_slot(slot)
-        hourly = by_hour.get(hour, 0.0)
-        count = per_hour.get(hour, 1)
-        increments.append(hourly / count if count else 0.0)
+            rows.append((slot, float(hourly_values[index])))
+    rows.sort(key=lambda item: item[0])
+    display = list(slot_datetimes)
+    display_ends = [
+        start + length for start, length in zip(display, _slot_durations(display))
+    ]
+    row_lengths = _slot_durations([start for start, _ in rows])
+    increments = [0.0] * len(display)
+    for (row_start, value), length in zip(rows, row_lengths):
+        row_end = row_start + length
+        inside = [
+            index for index, start in enumerate(display) if row_start <= start < row_end
+        ]
+        if inside:
+            share = value / len(inside)
+            for index in inside:
+                increments[index] += share
+            continue
+        for index, start in enumerate(display):
+            if start <= row_start < display_ends[index]:
+                increments[index] += value
+                break
     return increments
 
 
