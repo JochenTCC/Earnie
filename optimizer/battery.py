@@ -106,6 +106,32 @@ def apply_soc_change(
     return new_soc, batt_action
 
 
+def vendor_mode_step(
+    sim_soc: float,
+    net_pv_surplus_kw: float,
+    battery_params: dict,
+    *,
+    dt_h: float,
+) -> tuple[float, float]:
+    """One slot of the battery in vendor mode (self-consumption, no grid charging).
+
+    Charges the PV surplus and discharges on deficit, clamped to ``max_power_kw``
+    and to ``min_soc`` / ``max_soc``. ``net_pv_surplus_kw`` is PV minus the load the
+    battery sees (standby included by the caller). Returns ``(soc_next, batt_kw)``
+    with ``batt_kw`` positive while charging.
+    """
+    batt_action = clamp_power(net_pv_surplus_kw, battery_params["max_power_kw"])
+    return apply_soc_change(
+        sim_soc,
+        batt_action,
+        battery_params["battery_capacity_kwh"],
+        battery_params["efficiency"],
+        battery_params["min_soc"],
+        battery_params["max_soc"],
+        dt_h=dt_h,
+    )
+
+
 def charge_kw_for_hourly_soc(
     current_soc: float,
     planned_soc: float,

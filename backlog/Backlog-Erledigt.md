@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P3 — Shadow plant slot engine (2026-11-02)
+
+- [x] **Ledger P3 — Shadow plant slot engine** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 3.
+  - New pure module `runtime_store/savings_ledger.py`: `slot_skip_reason` (present, at least `MIN_SAMPLE_COUNT_FOR_MEAN` samples, pv / grid / battery / house all `mean`, powers present), `shadow_battery_params` (one ESS as is, several via `aggregate_battery_params_for_load`, none → `ValueError`), `advance_slot` → `LedgerSlot` with `cost_with_eur`, `cost_without_eur`, `shadow_soc_next`, import / export kWh of both sides. A skipped slot leaves both sides and the shadow SoC unchanged and carries its `skip_reason`.
+  - The vendor-mode battery step is now `optimizer/battery.py::vendor_mode_step` with an explicit `dt_h`; the baseline step `_simulate_single_hour_baseline` calls it (unchanged behaviour, it already used `DEFAULT_DT_H = 0.25`). The ledger uses the step directly because the baseline step reads the house config for its chart row.
+  - Test `tests/test_savings_ledger_slot.py`. Dump `debug_dump_20261102_062129`, SA-day from 2026-11-01 07:00: 93 of 96 slots, cost with 10.15 €, without 8.77 €; actual SoC end 19 %, shadow 5 % (the day-close correction of P4 is still missing).
+
 ### Ledger P2 — BL Ziel € without profile-fallback energy (2026-11-02)
 
 - [x] **Ledger P2 — BL Ziel € without profile-fallback energy (D3)** `[qual]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 1 D3.

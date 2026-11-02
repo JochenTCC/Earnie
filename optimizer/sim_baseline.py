@@ -135,16 +135,9 @@ def _simulate_single_hour_baseline(
         con = bat.effective_p_act(row, battery_params)
         total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
     net_pv_surplus = pv - con - total_flex_power
-    batt_action = bat.clamp_power(net_pv_surplus, battery_params["max_power_kw"])
     old_soc = sim_soc
-    sim_soc, batt_action = bat.apply_soc_change(
-        old_soc,
-        batt_action,
-        battery_params["battery_capacity_kwh"],
-        battery_params["efficiency"],
-        battery_params["min_soc"],
-        battery_params["max_soc"],
-        dt_h=DEFAULT_DT_H,
+    sim_soc, batt_action = bat.vendor_mode_step(
+        old_soc, net_pv_surplus, battery_params, dt_h=DEFAULT_DT_H
     )
     p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {

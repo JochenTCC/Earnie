@@ -2,6 +2,7 @@
 
 **Status:** design proposal, not implemented (2026-11-02). Language: English (docs/dev).
 **Fixed 2026-11-02:** D2 (Ledger P1) and D3 (Ledger P2); D1 is replaced by the ledger.
+**Implemented 2026-11-02:** slot engine `runtime_store/savings_ledger.py` (Ledger P3); day close, files and daemon hook follow (P4, P5).
 **Decision 2026-11-02 (Ledger P0):** `p_ref`, partial days and powerstations are decided (§ 3, § 4, § 9).
 **Decision 2026-11-02:** not in 2.7 — Chart 2 is hidden for the 2.7 release (`ui/live_mode.py::chart2_enabled()`, shown only with `EARNIE_UI_CHART2=1`) (known limitation in the release notes); the corrected chart ships with 2.8 (`backlog/Backlog.md` Version 2.7 / 2.8).
 **Trigger:** debug dump `debug_dump_20261102_062129` ("Kumulierte Kosten - Anzeige unplausibel"), analysed on `release/2.7` (2.7.0-beta.3).
@@ -71,7 +72,7 @@ saving_adjusted_N = saving_N + soc_correction_N − soc_correction_(N−1)
 
 The lifetime sum therefore telescopes to Σ `saving_eur` + the correction of the latest closed day (the first day of a chain has no predecessor term, because the shadow chain starts at the actual SoC). `p_ref` only moves amounts between days; it never changes the long-run total. On 43 days of the maintainer's plant the candidate prices (import-weighted mean, time mean, night hours of the next day) differ by about 1 ct in the median. Without the correction, a reserve built in the evening shows as a loss on day N and a gain on day N+1; on the dump the open-loop plan ends 2 kWh above the same-flex baseline, which is almost exactly the 0.77 € it looks more expensive.
 
-The shadow battery is the existing baseline step `optimizer/sim_baseline.py::_simulate_single_hour_baseline` (`baseload_kw_override` path) fed with actuals instead of forecasts. No new battery model.
+The shadow battery is the existing baseline battery step fed with actuals instead of forecasts: `optimizer/battery.py::vendor_mode_step`, which `optimizer/sim_baseline.py::_simulate_single_hour_baseline` also calls. No new battery model. The shadow load is the logged `house_kw` plus the battery's `standby_power_kw`, as in the baseline.
 
 Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load` (as the baseline does today).
 
@@ -112,7 +113,7 @@ Multi-ESS: v1 aggregates house batteries with `aggregate_battery_params_for_load
 
 Rules:
 
-- A slot counts when its `closed_interval` is present and `ist_power_source` is `mean` for pv, grid, battery and house. Missing slots are skipped on both sides (same slots, same prices), so a gap only understates the saving, it never distorts it. `coverage` is stored per row.
+- A slot counts when its `closed_interval` is present, has at least `MIN_SAMPLE_COUNT_FOR_MEAN` samples (the bar "Ist bisher" uses) and `ist_power_source` is `mean` for pv, grid, battery and house. Missing slots are skipped on both sides (same slots, same prices), so a gap only understates the saving, it never distorts it. `coverage` is stored per row.
 - **Every closed day counts in the lifetime total**, whatever its coverage *(decided 2026-11-02, Ledger P0)*. Dropping a day would also drop its SoC corrections and break the telescoping sum of § 3. Days with `coverage < 0.8` are flagged `"incomplete": true` and shown as "unvollständig" in the UI. On 43 days of the maintainer's plant 37 reach 0.8; the others are restart or gap days.
 - Shadow SoC is **never** reset from the live SoC. It starts once (first ledger run) at the live SoC of that moment and then only follows the shadow rule. If the ledger state is missing or `savings_v` changes, a new chain starts and the UI shows the start date.
 - Lifetime total = Σ `saving_adjusted_eur` over all closed days of the chain. Shown together with its start date, the day count and the number of incomplete days.
@@ -179,3 +180,4 @@ WP 1–2 are independent bug fixes and can ship on `release/2.7`. WP 3–5 are o
 3. ~~Powerstations~~ **Decided 2026-11-02 (Ledger P0):** not part of the shadow plant in v1; neutral because `house_kw` is the pv + grid + battery balance (§ 3).
 4. Privacy: ship `savings_eur` in the ping at all; if yes, rounding granularity (0.1 € vs 1 €) and whether `savings_days` is needed.
 5. Does D1's "Ersparnis bisher" disappear before the ledger exists (hide the trace), or stay with a warning label until WP 5 lands? Proposal: hide; a wrong number is worse than none.
+6. Energy counters: when the Loxone energy counters are configured, pv and grid of a slot come from the counters (`ist_power_source` = `counter`) while battery and house stay means, so `house = pv + grid + battery` no longer holds exactly. v1 skips those slots, which means such a plant never gets ledger rows. Options: accept counter slots and recompute `house_kw` from the balance, or keep v1 as is. Decide before P5 goes live.
