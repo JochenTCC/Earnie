@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P2 — BL Ziel € without profile-fallback energy (2026-11-02)
+
+- [x] **Ledger P2 — BL Ziel € without profile-fallback energy (D3)** `[qual]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 1 D3.
+  - `optimizer/sim_costs.py::_run_savings_horizons` runs the matched baseline a second time on the optimizer's own targets when the profile fallback adds energy (config consumers with target 0); BL Ziel €, kWh, the hourly cost / consumption lists and `hourly_savings_euro` come from that costed run. The fallback run stays for SoC BL Ziel and the ghost flex bars in Chart 1; without fallback the run is reused.
+  - `energy_comparison` rows carry `profile_fallback_kwh`; the "Energievergleich" expander shows it as column "Profil ohne Ziel" (`ui/simulation_results.py`, `docs/ui/charts.md`). Savings payload key `matched_baseline_profile_fallback_kwh`.
+  - Test `tests/test_matched_baseline_costed.py`. Dump `debug_dump_20261102_062129` replay: BL Ziel 11.46 € (40.45 kWh) → 6.41 € (29.05 kWh) without dishwasher, dryer and washing machine (11.4 kWh); "Ersparnis erwartet" 6.00 € → 0.95 €.
+
 ### Ledger P1 — Chart 2 quarter-hour alignment (2026-11-02)
 
 - [x] **Ledger P1 — Chart 2 quarter-hour alignment (D2)** `[qual]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 1 D2.

@@ -544,9 +544,14 @@ def build_energy_comparison_detail(
     consumer_daily_targets_kwh: dict | None = None,
     matched_flex_kwh: dict[str, float] | None = None,
     *,
+    profile_fallback_kwh: dict[str, float] | None = None,
     consumers: list | None = None,
 ) -> list[dict]:
-    """Kombiniert Profil-Baseline, Ziel-Baseline und Optimierung je Verbraucher inkl. Grundlast."""
+    """Kombiniert Profil-Baseline, Ziel-Baseline und Optimierung je Verbraucher inkl. Grundlast.
+
+    ``profile_fallback_kwh``: BL Ziel energy of config consumers with target 0 that the
+    matched baseline simulates for the SoC only; it is not part of BL Ziel € / kWh.
+    """
     baseload_kwh = resolve_baseload_kwh(optimization_matrix)
     consumption_mode = (
         optimization_matrix[0].get("consumption_mode") if optimization_matrix else None
@@ -573,10 +578,12 @@ def build_energy_comparison_detail(
         )
     }
     matched_flex = matched_flex_kwh or {}
+    fallback = profile_fallback_kwh or {}
     rows = [{
         "name": "Grundlast",
         "baseline_kwh": baseload_kwh,
         "matched_baseline_kwh": baseload_kwh,
+        "profile_fallback_kwh": 0.0,
         "optimization_kwh": baseload_kwh,
         "optimization_source": baseload_source,
     }]
@@ -588,6 +595,7 @@ def build_energy_comparison_detail(
             "name": consumer["name"],
             "baseline_kwh": base.get("target_kwh", 0.0),
             "matched_baseline_kwh": matched_flex.get(cid, opt.get("target_kwh", 0.0)),
+            "profile_fallback_kwh": float(fallback.get(cid, 0.0)),
             "optimization_kwh": opt.get("target_kwh", 0.0),
             "optimization_source": opt.get("source", ""),
         })

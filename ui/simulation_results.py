@@ -145,7 +145,9 @@ def render_applied_targets(savings: dict) -> None:
     with st.expander("⚡ Energievergleich Baseline vs. Optimierung"):
         st.caption(
             "Horizont SA_0-->SA_2 (voller MILP-Plan). BL Profil: historisches Flex-Profil. "
-            "BL Ziel: gleiche Energie wie die Optimierung (Profil skaliert), ohne Lastverschiebung."
+            "BL Ziel: gleiche Energie wie die Optimierung (Profil skaliert), ohne Lastverschiebung. "
+            "Profil ohne Ziel: Energie von Verbrauchern mit Tagesziel 0, die BL Ziel nur für den "
+            "Speicherverlauf mitsimuliert; sie zählt nicht zu den BL-Ziel-Kosten."
         )
 
         def _format_kwh_cell(kwh: float) -> str:
@@ -163,6 +165,9 @@ def render_applied_targets(savings: dict) -> None:
                     "Verbraucher": row["name"],
                     "BL Profil (kWh)": _format_kwh_cell(row["baseline_kwh"]),
                     "BL Ziel (kWh)": _format_kwh_cell(row.get("matched_baseline_kwh", 0.0)),
+                    "Profil ohne Ziel (kWh)": _format_kwh_cell(
+                        row.get("profile_fallback_kwh", 0.0)
+                    ),
                     "Optimierung": _format_optimization_cell(
                         row["optimization_kwh"],
                         row.get("optimization_source", ""),

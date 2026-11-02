@@ -165,7 +165,9 @@ Rohdaten-Tabelle aller Slots im sichtbaren Sunset-2-Sunset-Fenster (15-min-Log u
 
 ## Expander: Energievergleich Baseline vs. Optimierung
 
-Tabelle je flexiblem Verbraucher über den Horizont SA₀→SA₂ mit den Spalten **BL Profil**, **BL Ziel** und **Optimierung** (kWh).
+Tabelle je flexiblem Verbraucher über den Horizont SA₀→SA₂ mit den Spalten **BL Profil**, **BL Ziel**, **Profil ohne Ziel** und **Optimierung** (kWh).
+
+**Profil ohne Ziel:** Verbraucher mit Tagesziel 0 aus `config.json` und Energie im Flex-Profil plant der Optimierer nicht. BL Ziel simuliert ihre Profil-Energie trotzdem mit, damit **SoC BL Ziel** in Chart 1 die Konkurrenz um den Speicher zeigt. In die BL-Ziel-Kosten und den BL-Ziel-Verbrauch in Chart 2 geht diese Energie nicht ein. Dafür rechnet Earnie BL Ziel ein zweites Mal, nur mit den Zielen der Optimierung. So vergleicht **Ersparnis erwartet** gleiche Energie mit gleicher Energie.
 
 ## Energiefluss (Live-Sankey)
 
