@@ -22,9 +22,54 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Branching:** implement directly on `release/2.7`, then `git cherry-pick -x` onto a branch from `main` (PR), so `main` has the same code; never merge the release branch.
   - **Tests:** button shown by default, hidden after opt-out, shown again after undo; state file missing or unreadable → button shown (opt-out is the user's explicit choice, absence means none).
   - **Tracker:** publish the Sponsors profile before the 2.7 cherry-pick.
-- **Note (2026-11-02):** Chart 2 "Kumulierte Kosten & Verbrauch" is hidden in the Monitor for 2.7 (`EARNIE_UI_CHART2=1` shows it, dev only); release notes carry a "Bekannte Einschränkungen" entry. The corrected chart is the savings-ledger item under **Version 2.8**; archive: [Backlog-Erledigt.md](Backlog-Erledigt.md) "Chart 2 hidden for the 2.7 release".
+- **Note (2026-11-02):** Chart 2 "Kumulierte Kosten & Verbrauch" is hidden in the Monitor for 2.7 (`EARNIE_UI_CHART2=1` shows it, dev only); release notes carry a "Bekannte Einschränkungen" entry. The corrected chart is the epic **Ledger** (P0–P10) at the top of **Version 2.8**; archive: [Backlog-Erledigt.md](Backlog-Erledigt.md) "Chart 2 hidden for the 2.7 release".
 
 ### Version 2.8
+
+- **Epic Ledger — realised savings from logged actuals (savings ledger)** *(design 2026-11-02; Chart 2 hidden in 2.7, see Version 2.7)*: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md). Replaces the plan-vs-plan "Ersparnis bisher" of Chart 2 with a per-SA-day ledger built from `closed_interval` actuals: shadow plant with the same load, PV and prices, battery in vendor mode on one continuous SoC chain, SoC value correction at every day close. Each phase below is sized for **one chat session** and ends with green tests and a commit.
+  - **Order:** P1 and P2 are independent fixes and can start any time. P3 → P4 → P5 / P6 → P7 → P8 is the feature chain; P7 also needs P1 and P2. P0 must be decided before P4. P9–P10 (`savings_v: 2`) are optional and start only after P8 has run live for a while.
+  - **Note:** usage-ping schema v3 and the `earnie-server` KPI (spec § 6, WP 6–7) stay under **Version 2.+1** "Simple Savings KPI" until the privacy decision; they read the lifetime figure that P4 writes.
+
+- [ ] **Ledger P0 — Open method decisions** `[dev]` *(user decision, before P4)*: spec § 9 items 1–3. (1) `p_ref` of the SoC correction: energy-weighted mean buy price of the SA-day (proposal) vs. the next day's first hours vs. the flat tariff component. (2) Coverage threshold for counting a day in the lifetime total (proposal 0.8) and how partial days show in the UI. (3) Powerstations in the shadow plant (v1 proposal: no, stated in the method note). The answers go into spec § 3 / § 4 as decided values; item 5 of § 9 is settled (chart hidden in 2.7).
+  - **Tracker:** decide `p_ref`, coverage threshold and powerstations for the savings ledger (spec § 9).
+
+- [ ] **Ledger P1 — Chart 2 quarter-hour alignment (D2)** `[qual]` *(1 session, independent)*: `ui/chart_context.py::align_hourly_increments_to_display_slots` and `runtime_store/history_timeline.py::_slot_plan_increments_from_snapshots` map values per exact quarter-hour slot (or sum the four cycles of an hour) instead of spreading the `:00` value over four slots.
+  - **Tests:** quarter-hour matrix fixture with Σ chart = Σ snapshot for the forecast part and the history overlay; the hourly-spread assumption is gone from both functions.
+  - **Done:** with `EARNIE_UI_CHART2=1`, the forecast totals of the 2026-11-02 dump day match the snapshot (optimized 5.46 €, BL Ziel 11.46 € instead of 1.06 € / 2.56 €).
+
+- [ ] **Ledger P2 — BL Ziel € without profile-fallback energy (D3)** `[qual]` *(1 session, independent)*: consumers with `daily_target_source=config` and optimizer target 0 keep their profile energy in the matched baseline only for SoC realism (`optimizer/targets.py::resolve_matched_baseline_horizon_targets`); their slots are excluded from BL Ziel € (`optimizer/sim_costs.py`). `energy_comparison` shows the fallback energy as its own column so the difference stays visible.
+  - **Tests:** a consumer with target 0 and a profile adds 0 € to BL Ziel but still drains the baseline battery; existing savings tests stay green or get a stated reason for their new values.
+  - **Done:** "Ersparnis erwartet" of the dump day drops by the fallback share (about 4.5 € of 6.0 €).
+
+- [ ] **Ledger P3 — Shadow plant slot engine** `[feat]` *(1 session)*: new pure module `runtime_store/savings_ledger.py` (no file I/O): slot validity (`closed_interval` present, `ist_power_source == "mean"` for pv, grid, battery and house), one quarter-hour shadow battery step from logged `house_kw` / `pv_kw` via `optimizer/sim_baseline.py::_simulate_single_hour_baseline` (`baseload_kw_override` path; check that the SoC step scales with the 0.25 h slot length, add an explicit duration argument if it assumes 1 h), `cost_with` / `cost_without` with `k_act` / `k_push_act` of the cycle, multi-ESS aggregation with `optimizer/milp_horizon.py::aggregate_battery_params_for_load`.
+  - **Tests:** synthetic slots for charge from PV surplus, discharge on deficit, `min_soc` / `max_soc` / `max_power_kw` limits, standby loss, export pricing, invalid slot skipped on both sides.
+  - **Done:** a slot function returns `(cost_with, cost_without, shadow_soc_next)` and is covered for the cases above; nothing calls it yet.
+
+- [ ] **Ledger P4 — Day close, state and ledger file** `[feat]` *(1 session, after P0 and P3)*: SA-day boundaries exactly as the UI books them (SA₁→SA₂, same helper as Chart 2), SoC correction with the `p_ref` from P0 (booked per day, telescoping), coverage, `flex_planned_kwh` / `flex_delivered_kwh`, `savings_v: 1`. Files `runtime_store/savings_ledger.jsonl` (append-only, one row per closed SA-day, schema of spec § 4) and `savings_ledger_state.json` (shadow SoC, open-day slot rows for the Chart 2 grey zone, chain start date), written atomically. A missing state or a changed `savings_v` starts a new chain with a visible start date; a broken state file fails loud (warning + flagged row), never a silent zero.
+  - **Tests:** synthetic two-day log: day rows, correction reversed on day 2 (Σ over both days independent of the evening SoC), partial day below the threshold kept but not counted, chain restart on a `savings_v` change.
+  - **Done:** a function `advance(state, closed_slot) -> (state, closed_day_row | None)` plus file read/write helpers; lifetime total = Σ `saving_adjusted_eur` over counted days.
+
+- [ ] **Ledger P5 — Daemon hook** `[feat]` *(1 session, after P4)*: `main.py` calls the ledger once per cycle after the `closed_interval` is finalised (`_finalize_previous_interval`), O(1). The first run starts the shadow chain at the live SoC of that moment; a daemon restart resumes from the state file and never re-seeds from the live SoC. Ledger errors log a warning and flag the row; the cycle itself continues.
+  - **Tests:** cycle-level test with two closed slots and an SA-day change; restart test (state reloaded, no re-seed); error path logs and flags.
+  - **Docs:** `docs/einrichtung/betrieb.md` § Log- und Historiendateien lists both ledger files (German).
+  - **Done:** the home plant writes ledger rows live for at least one full SA-day.
+
+- [ ] **Ledger P6 — Backfill CLI and hand check** `[feat]` *(1 session, after P4; may run in parallel with P5)*: `python -m scripts.build_savings_ledger --since <date>` replays `optimization_history.jsonl` and its rotated month files through the P4 engine. It refuses to write when a ledger already exists unless `--rebuild` is given (no silent merge with live rows) and prints a per-day table (cost with / without, correction, coverage).
+  - **Tests:** CLI on a small fixture history with a month rotation; refusal without `--rebuild`.
+  - **Done:** run on the home plant since July; the 2026-11-01 SA-day is checked by hand against the dump (the battery arbitrage 35 ct → 48 ct shows as a saving, not a loss). Results and notes stay in the private repo.
+
+- [ ] **Ledger P7 — Chart 2 grey zone from the ledger, chart back on** `[feat]` *(1 session, after P1, P2 and P5)*: "Ersparnis bisher" = cumulated `cost_without − cost_with` of the open SA-day's ledger slots, SoC correction as the last point or a label; the slot-0 plan-difference path (`_overlay_history_plan_costs`, savings use of `_slot_plan_increments_from_snapshots`) is removed. Chart 2 is shown again by default: remove `ui/live_mode.py::chart2_enabled()`, the `EARNIE_UI_CHART2` flag and its test, and the env row in `betrieb.md`.
+  - **Tests:** AppTest of the Monitor with a ledger state fixture; without ledger state the chart shows "Ist bisher" without a savings trace and a short hint instead of a zero line.
+  - **Docs:** `docs/ui/charts.md` § Chart 2 (German) describes the new grey zone and drops the "ausgeblendet" note.
+
+- [ ] **Ledger P8 — Cockpit KPI and method note** `[feat]` *(1 session, after P5; best after P6)*: cockpit tile "Mit Earnie gespart: X € seit <date> (<n> Tage)" from the ledger lifetime total, help text with the counterfactual of spec § 3; partial and uncounted days as decided in P0.
+  - **Docs:** German method note in the user manual (one sentence: gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise; plus the v1 limits: flex timing as logged, powerstations), `.github/release-notes/UNRELEASED.md` entry (Chart 2 is back with realised savings).
+  - **Done:** tile and Chart 2 agree on the current SA-day; spec status set to "implemented (v1)".
+
+- [ ] **Ledger P9 — `savings_v: 2` flex re-timing for profile and window consumers** `[feat]` *(optional, 1 session, after P8 has run live)*: per SA-day `flex_delivered_kwh` from the logged `flex_kw`, counterfactual shape = matched-baseline profile of the consumer (`build_matched_flex_kw_per_hour`) scaled to the delivered energy; thermal consumers without a profile use their native window. `house_without = baseload_actual + Σ flex_retimed`; the shadow battery runs on that. New chain with `savings_v: 2`; v1 rows keep theirs.
+  - **Tests:** energy parity per day and consumer; the v1 → v2 chain switch is visible in the UI.
+
+- [ ] **Ledger P10 — `savings_v: 2` for EV sessions and consumers without own meter** `[feat]` *(optional, 1 session, after P9; needs a decision first)*: counterfactual "charge immediately on plug-in" for EV sessions (deadline-bound), and a rule for consumers whose Ist comes from `live_snapshot` without a per-consumer meter (spec § 7 "Open").
 
 - [ ] **Sponsoring prompts on milestones** `[feat]` *(decided 2026-11-01; follows the sidebar button above)*: one-time dialog per milestone, reusing the feature-review mechanics ([`docs/workflow/feature-review.md`](../docs/workflow/feature-review.md)): local state in `runtime/`, never again for the same milestone after closing. Nothing is sent.
   - **Milestones:** `live_14d`, `live_3m`, `live_1y` (calendar days with at least one successful live cycle, counted at `note_live_cycle_success()`; Shadow does not count), `se_5_runs` (5 executed Scenario Explorer simulations across all sessions; new persistent counter in `runtime/`).
@@ -162,15 +207,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] Make a review for Chart1 implementation on Monitor page and check if code related to simulated trajectories might be substituted by results from main.py (to prevent drift / misalignment / code duplication). **Order note:** before the Kumulierte-Kosten review and the pan-to-load spike (both depend on how the charts get their data)
 
-- [ ] **Chart 2 "Kumulierte Kosten & Verbrauch": realised savings from logged actuals (savings ledger)** `[feat]` *(design 2026-11-02; chart hidden in 2.7, see Version 2.7)* — spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md). Replaces the plan-vs-plan "Ersparnis bisher" with a per-SA-day ledger built from `closed_interval` actuals: shadow plant with the same load, PV and prices and a vendor-default battery on **one continuous SoC chain**; SoC value correction at day close; coverage rule; backfill CLI from `optimization_history.jsonl`; lifetime counter "Mit Earnie gespart" in the cockpit. Work packages (spec § 8):
-  - [ ] WP1 quarter-hour alignment in `ui/chart_context.py::align_hourly_increments_to_display_slots` and `runtime_store/history_timeline.py::_slot_plan_increments_from_snapshots` (Σ chart = Σ snapshot test)
-  - [ ] WP2 BL Ziel € without the profile-fallback energy of consumers with optimizer target 0 (`optimizer/targets.py::resolve_matched_baseline_horizon_targets`)
-  - [ ] WP3 ledger core in `main.py` (shadow step per cycle, SA-day close, SoC correction, `runtime_store/savings_ledger.jsonl`, loud failure)
-  - [ ] WP4 backfill CLI `scripts.build_savings_ledger` and hand check against the 2026-11-02 dump day
-  - [ ] WP5 Chart 2 grey zone and cockpit KPI from the ledger; re-enable the chart; `charts.md` + handbook method note (gleicher Verbrauch, gleiche PV, Batterie im Herstellermodus, gleiche Preise)
-  - [ ] WP8 (optional) `savings_v: 2` flex re-timing with the plan-vs-actual flex energy reconciliation
-  - **Note:** WP6/WP7 (usage-ping schema v3 + `earnie-server` KPI) stay under **Version 2.+1** "Simple Savings KPI" until the privacy decision (spec § 6, § 9).
-
 - [ ] **Monitor charts — pan-to-load spike** (feasibility + usability → go/no-go; independent of **2.7.a–c** / **2.7.g–h**; after the Chart1 review)
   - **Today:** display range depends on device (`ui/s2_viewport.py`: phone = 24 h segments, desktop/tablet = SA₀→SA₂). Charts get only the data of that default range. Panning with the Plotly drag/pan tool beyond it shows an empty chart. Navigation is via buttons / date picker (`ui/history_navigation.py`, `ui/s2_navigation.py`).
   - **Option A — pan-driven lazy loading:** panning replaces the nav buttons. Data for newly visible ranges is fetched step by step and appended to the charts.
@@ -307,7 +343,7 @@ Deferred from the **2.6** HA-coupling cycle. Prefer after southbound mapping UX 
   - Cosign/Sigstore in release CI + startup verifier + production signing keys
   - Watermark vs refuse-to-start decision; offline public-key path
   - Spec: `[docs/workflow/hardware-registry-layer-c.md](../docs/workflow/hardware-registry-layer-c.md)`
-- [ ] **Simple "Savings KPI" as additional payload of the UsagePing** *(moved from the earnie-server install item, 2026-10-20)* — think through a simple savings figure to send with the ping; needs a schema bump (v3) on both sides (Earnie client contract `docs/workflow/usage-ping.md` and `earnie-server` receiver) and a privacy review (opt-in, anonymous, aggregates only). Source figure and open decisions: [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 6, § 9 (lifetime `saving_adjusted_eur` + counted days, `savings_v`).
+- [ ] **Simple "Savings KPI" as additional payload of the UsagePing** *(moved from the earnie-server install item, 2026-10-20)* — think through a simple savings figure to send with the ping; needs a schema bump (v3) on both sides (Earnie client contract `docs/workflow/usage-ping.md` and `earnie-server` receiver) and a privacy review (opt-in, anonymous, aggregates only). Source figure and open decisions: [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 6, § 9 (lifetime `saving_adjusted_eur` + counted days, `savings_v`); the figure comes from **Ledger P4** (Version 2.8).
 - [ ] Make also an EHAL adaption for MQTT
 - [ ] **Shadow Mode S4** *(after **2.7.f**)* — Prod-vs-Shadow decision diff per slot; offline replay of `feed-*.jsonl` as backtest input. Spec: private repo Earnie-Projekt, `Betrieb/Shadow-Mode-Spec.md` §11 S4
 - [ ] **Data & tariff fidelity - Part 2**

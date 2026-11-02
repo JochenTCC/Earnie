@@ -153,6 +153,8 @@ Open: EV sessions (deadline-bound; counterfactual = "charge immediately on plug-
 
 WP 1–2 are independent bug fixes and can ship on `release/2.7`. WP 3–5 are one feature; WP 6–7 wait for the privacy decision; WP 8 is optional.
 
+**Backlog phases:** `backlog/Backlog.md` Version 2.8 splits these into epic **Ledger** P0–P10, one chat session each: P0 decisions (§ 9 items 1–3), P1 = WP 1, P2 = WP 2, P3–P5 = WP 3 (slot engine, day close + files, daemon hook), P6 = WP 4, P7–P8 = WP 5 (chart, cockpit KPI), P9–P10 = WP 8. WP 6–7 stay under Version 2.+1 "Simple Savings KPI".
+
 ## 9. Open decisions
 
 1. `p_ref` for the SoC correction: day's energy-weighted mean buy price (proposal) vs. next day's first-hours price vs. flat tariff component.
