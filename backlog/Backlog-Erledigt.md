@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Release image without dev-only replay and Shadow code (2026-11-02)
+
+- [x] **Keep dev-only replay and Shadow code out of the release image** `[chore]` *(decided 2026-10-30; done on `main` for 2.8, `e809a0cb`)*: the cycle recorder (fills `recorder/*` of debug dumps → private regression cases) and the Prod-side Shadow feed writer stay in the image.
+  - [x] **Offline replay and regression tools excluded via `.dockerignore`:** `runtime_store/recorder_replay.py`, `scripts/run_regression.py`, `scripts/run_regression_r0_study.py`, `scripts/replay_debug_dump.py`; `runtime_store/push_read_replay.py` stays (live push inbox).
+  - [x] **Shadow runtime omittable:** the image keeps the Shadow core Prod needs to record the feed (`mode`, `feed`, `hooks`, `transport`, `errors`, `superset`; the planned "package without `feed.py`" was too narrow) and leaves out the client (`cycle`, `ehal_overlay`, `reader`, `replay`, `startup`, `writes`, `ui/shadow_banner.py`; list `CLIENT_FILES` in `runtime_store/shadow/hooks.py`). Code outside the package reaches client functions only through `hooks.py`; `daemon.py` and `should_invoke_setpoint_writes` moved there, the package `__init__` re-exports the core only. `EARNIE_SHADOW=1` on an image without the client refuses to start.
+  - **Tests:** `tests/test_stripped_release_image.py` (`.dockerignore` vs `CLIENT_FILES`, AST scan of shipped code, Prod package imports with the left-out modules blocked, Shadow refusal). Local image build smoke-tested: left-out files absent, 355 Prod modules import, Shadow exits 1, Streamlit setup page renders.
+  - **Not picked to `release/2.7`** (maintainer decision 2026-11-02): no user-facing effect in 2.7 (the tools are never loaded at runtime, Shadow is off unless the env var is set); the hotfix playbook keeps chores off the release line.
+  - Docs: `DEVELOPER.md` § "Shadow client is not in the release image", `docker/README.md`.
+
 ### Bugfix — Heating rod lost on save (2026-11-02)
 
 - [x] **Heating rod was lost on save when „Heizstab im Wärmespeicher“ is checked** *(dog-fooding, found and fixed 2026-11-01 on `main`)*: the checkbox writes a `heating_rod` part and `normalize_thermal_annual_consumer()` keeps it, but `_serialize_thermal_annual_fields()` (`house_config/profiles_consumers.py`) wrote only the `thermal` block and `min_on_quarterhours`. `house_profiles.json` never got `parts`, so after reload the rod was gone and never planned. The same save also dropped `optimizer_flex`, `max_on_quarterhours`, `max_pulses_per_day` and `thermal_flex_window`.
