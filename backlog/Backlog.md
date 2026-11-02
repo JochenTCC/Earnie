@@ -15,21 +15,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
-### Version 2.7 — Multiple storages and export power limitation
+### Version 2.8
 
-Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalHorizon, EarlyStart, ConfigMigration, UsagePing/EarniePoints, Inverter P1–P5, Shadow R1–R4, Binding path work, HA Testbed P0–P5, …) → [Backlog-Erledigt.md](Backlog-Erledigt.md). Do not bump `version.py` to a publishable 2.7 without approval. Remaining open work below; Topology P3–P5 and Inverter follow-ups → **Version 2.+1**; Regression L3+P3 → **Version 2.8**.
 - **Note (deferred from 2.7.n):** Plant PV sum stays bare `sens_pv_production_active`; first entity-scoped `pv.{pv_system_id}.sens_pv_production_active` shipped with live attribution (Inverter follow-ups). Prefer `grid.meter.get_export_power_limit` / `set_export_power_limit` over today’s `*_grid_export_power_limit` (explicit rename + alias-on-load). Binding walkthroughs marked STALE (historical).
-
-- [ ] beta release for Loxone and HA
-- [ ] Wait for feedback (until Nov-02)
 - [ ] **Keep dev-only replay and Shadow code out of the release image** `[chore]` *(decided 2026-10-30)* — implement on `release/2.7`, then cherry-pick the result to `main` (batch PR). The cycle recorder stays in the image: it fills the `recorder/*` part of debug dumps, which become private regression cases (e.g. REG-76). The Shadow feed writer (`runtime_store/shadow/feed.py`, Prod side, off unless `shadow_feed_enabled`) also stays.
   - [ ] **Exclude offline replay and regression tools via `.dockerignore`:** `runtime_store/recorder_replay.py`, `scripts/run_regression.py`, `scripts/run_regression_r0_study.py`, `scripts/replay_debug_dump.py` (leaf modules, only imported by scripts and tests; the Dockerfile copies `runtime_store/` and `scripts/` whole). Check that nothing in the image imports them (a container smoke start), and keep `runtime_store/push_read_replay.py`: the live push inbox uses its capture. Small, can go into 2.7.0.
   - [ ] **Make the Shadow runtime omittable** (`EARNIE_SHADOW=1`: `runtime_store/shadow/` without `feed.py`, about 1,000 lines): `is_shadow_mode()` / feed checks sit in 24 modules outside the package (`main.py`, `config.py`, `app.py`, push inbox, ENTSO-E / aWATTar clients, PV forecast, …). Gather them behind one interface (extend `runtime_store/shadow/hooks.py`) with a no-op stub when the package is absent, then exclude the package from the image and add a smoke test for the stripped image, so the shipped artifact is tested too. Larger; does not block 2.7.0 (target 2.8).
-- **Note (2026-11-02):** Chart 2 "Kumulierte Kosten & Verbrauch" is hidden in the Monitor for 2.7 (`EARNIE_UI_CHART2=1` shows it, dev only); release notes carry a "Bekannte Einschränkungen" entry. The corrected chart is the savings-ledger item under **Version 2.8**; archive: [Backlog-Erledigt.md](Backlog-Erledigt.md) "Chart 2 hidden for the 2.7 release".
-- [ ] final release 2.7.0
-
-### Version 2.8
-
+  - **Note (2026-11-02):** not done for 2.7.0; moved from Version 2.7 when the chapter was closed with the official release.
 - [ ] **HA carrier: fail-safe values for every written signal** `[feat]` *(follow-up of GitHub #60, decided 2026-10-28; not in 2.7)*
   - Today the watchdog in the YAML package (`integrations/ha_carrier_yaml.py::_watchdog_automation`) only releases a forced `set_ess_active_power` (or Huawei `stop_forcible_charge`); caps and modes stay. Reported case: a discharge lock (`set_ess_discharge_power_limit` = 0) stays active while Earnie is down, so the battery stays locked.
   - Principle: fallback behaviour is device-specific and belongs to the smarthome, not to Earnie. Earnie only lets the user define a **fail-safe value per written signal** (e.g. charge/discharge limit = max, active power = 0, mode = self-use), and the generated HA package applies them when `status.json` is unreachable.

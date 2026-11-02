@@ -2,6 +2,19 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.7.0 official release (2026-11-02)
+
+- [x] **2.7.0 official release** `[dev]`: `version.py` **2.7.0** and release notes [`.github/release-notes/v2.7.0.md`](../.github/release-notes/v2.7.0.md) (baseline public 2.6.2, maintainer-approved; `UNRELEASED.md` reset; doc review checklist moved to `docs/dev/done/doc-review-checklist-2.7.0.md`) in `fcab2d7d` on `release/2.7`; full suite and regression 12/12 green before the tag. Candidate tag `v2.7.0` (`targets: both`).
+  - First run: `addon_lint` failed on `stage: stable` in `packaging/homeassistant-addon/earnie/config.yaml` (default value, rejected by the add-on linter; added in `ee0ef8c8` after 2.6.2 and never linted because only pre-releases were tagged since), so `promote` was skipped. No tag rewrite (`scripts/release_image_gate.py` refuses a moved tag).
+  - Fix `db8a61f8` on `release/2.7`: `stage` removed, `addon_lint` now checks out `main` like `publish_ha_addon` (the tag's add-on manifests are never published), tests pin both. Picked to `main` as `7e3d18d6`.
+  - Release in two runs of the same tag: *Run workflow* `targets: docker` → `promote` approved, GitHub Release published as Latest, GHCR `:2.7.0` / `:latest` / `:next` = `fcab2d7d`; then `targets: ha` → all jobs green, `promote` approved, official add-on `earnie` and `earnie_prerelease` on 2.7.0. `streamlitcloud` fast-forwarded to the tag.
+  - Release notes: a Chart 1 known-limitation hint (battery export share during forced discharge, fixed on `main` for 2.8) was not in `UNRELEASED.md` at finalize and stays out of the 2.7.0 notes (maintainer decision).
+- [x] **Version 2.7 — Multiple storages and export power limitation** `[dev]`: chapter closed in `Backlog.md` with the official release. Completed 2.7 letters / epics (Regression R-Rec→P2, Topology P1–P2, ThermalHorizon, EarlyStart, ConfigMigration, UsagePing/EarniePoints, Inverter P1–P5, Shadow R1–R4, Binding path work, HA Testbed P0–P5, …) are archived in this file. Topology P3–P5 and Inverter follow-ups → **Version 2.+1**; Regression L3+P3, the open "Keep dev-only replay and Shadow code out of the release image" item and the 2.7.n naming note → **Version 2.8**.
+  - [x] Beta release for Loxone and HA (`v2.7.0-beta.1`, 2026-10-29)
+  - [x] Wait for feedback (until 2026-11-02)
+  - [x] Chart 2 "Kumulierte Kosten & Verbrauch" hidden in the Monitor for 2.7, with a "Bekannte Einschränkungen" entry in the release notes (see "Chart 2 hidden for the 2.7 release"); corrected chart = savings-ledger item under **Version 2.8**
+  - [x] Final release 2.7.0 (this entry)
+
 ### Chart 2 hidden for the 2.7 release (2026-11-02)
 
 - [x] **Deactivate Chart 2 "Kumulierte Kosten & Verbrauch" on the Monitor page for the 2.7 release** `[chore]` *(decided 2026-11-02 after debug dump `debug_dump_20261102_062129`)* — the savings figures are wrong independent of the optimizer: the baseline restarts from the live SoC every cycle (reserve cost counted, its use credited to the baseline), hourly spreading on the quarter-hour matrix shows about a quarter of the planned € in both zones, and BL Ziel costs profile energy the optimizer never plans. The optimizer itself behaved correctly in the dump (night→morning arbitrage, no hoarding); the Scenario Explorer is not affected. Analysis with verified numbers: [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 1.
