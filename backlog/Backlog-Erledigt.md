@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Ledger P6 — Backfill CLI and hand check (2026-11-02)
+
+- [x] **Ledger P6 — Backfill CLI and hand check** `[feat]`: spec [`docs/dev/savings-ledger.md`](../docs/dev/savings-ledger.md) § 4. `python -m scripts.build_savings_ledger --since <date>` replays `optimization_history.jsonl` and its rotated month files through the P4 engine and prints a per-day table (cost with / without, correction, coverage).
+  - CLI `scripts/build_savings_ledger.py` (`--since`, `--runtime-dir`, `--rebuild`, `--dry-run`): chain reason `backfill`, state with the open day and the newest entry's prices so the daemon continues; refuses to write over an existing ledger without `--rebuild` (no silent merge with live rows) and while the local daemon runs. Tests `tests/test_build_savings_ledger.py` (fixture history with a month rotation, refusal without `--rebuild`).
+  - **Done run (dry run) on the maintainer's plant:** `--since 2026-07-01` finds no log data before 2026-09-16 (one rotated month file); 46 SA-days to 2026-11-01, 10 incomplete, lifetime −2.63 € at path efficiency 0.94. Results and notes in the private repo.
+  - **Hand check of the 2026-11-01 SA-day** (full coverage): the row is consistent with its slots: saving −0.60 €, SoC correction +0.15 € (actual 15 % vs shadow 5 % at the day end), adjusted −0.45 €. The loss comes from two grid-charging cycles of the real battery (08–15 h at 37.5–40.8 ct → discharge 16–20 h at 42–44 ct; 23–05 h at ~36 ct → discharge 06–07 h at 44–48 ct) while the shadow battery sat at its minimum; spreads of 5–8 ct do not cover the round-trip loss at ~37 ct. The earlier expectation "35 ct → 48 ct shows as a saving" was wrong: 48 ct only occurred in the last hour with 0.2 kWh discharged. Follow-up in "Battery efficiency calibration from the log".
+  - **Not written yet:** production runs 2.7.0 without ledger code; the live ledger is kept by the 2.8 Shadow instance (P5). Its own history gives the same chain start and the same 2026-11-01 row (46 SA-days, 11 incomplete, −3.02 €). `--rebuild` into the Shadow runtime runs after the P5 live check with the Shadow container stopped, and again into production at the 2.8 deploy (tracker). The CLI's daemon guard only checks this machine's own runtime folder, not a `--runtime-dir` on a share.
+
 ### Release image without dev-only replay and Shadow code (2026-11-02)
 
 - [x] **Keep dev-only replay and Shadow code out of the release image** `[chore]` *(decided 2026-10-30; done on `main` for 2.8, `e809a0cb`)*: the cycle recorder (fills `recorder/*` of debug dumps → private regression cases) and the Prod-side Shadow feed writer stay in the image.
