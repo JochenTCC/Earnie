@@ -558,7 +558,7 @@ Aligned with `backlog/Backlog-Erledigt.md` on `main`: these items were fixed or 
   - [x] Dead-code / obsolete-test audit — vulture `--min-confidence 80`: **0** hits; `--dead-fixtures`: all fixtures used; health-report flags are expected mock-heavy / always-skipped (no removals).
   - [x] Simplify redundant / complex / unneeded — no behavior-changing removals this pass (no `_backup` / `_tmp` leftovers; comment-block scan clean); triage deferred.
   - [x] KPI refactor — all core/UI files ≤ 600 code LOC (mega-file sibling splits + facades/re-exports; `optimizer/milp.py` → `milp_defaults.py`); functions > 60 LOC cleared except exempt MILP constraint blocks `_create_grid_battery_vars` / `_add_slot_power_balance_and_soc` in `milp_horizon.py`.
-  - [x] Official docs review (thin) — prior [`docs/dev/doc-review-checklist.md`](../docs/dev/doc-review-checklist.md) P1/P2 Check+Style complete; `## Document Review Findings` empty; no docs-editor rewalk (KPI splits did not change user-facing behavior).
+  - [x] Official docs review (thin) — prior [`docs/dev/done/doc-review-checklist-2.7.0.md`](../docs/dev/done/doc-review-checklist-2.7.0.md) P1/P2 Check+Style complete; `## Document Review Findings` empty; no docs-editor rewalk (KPI splits did not change user-facing behavior).
   - [x] Fix last failed sonarcloud Action — [run 39016600274](https://github.com/JochenTCC/Earnie/actions/runs/39016600274): `test_thermal_hourly_overlay_maps_slots` Open-Meteo `ReadTimeout`; offline mock via `install_open_meteo_climate_mock` in `tests/test_price_pipeline_p3.py`.
 
 ### Semi-automatic docs / manuals review (2026-10-17)
