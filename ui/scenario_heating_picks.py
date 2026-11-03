@@ -99,6 +99,33 @@ def seed_heating_picks(session_scope: str, settings: dict, profiles: dict[str, d
         )
 
 
+def heating_picks_from_session(session_state, session_scope: str, profile: dict) -> dict[str, str]:
+    """The form's picks as stored in ``settings.heating_system_ids`` (unsaved-edit check).
+
+    Same rule as ``render_heating_picks``: only picks that differ from the reference system.
+    A select box not seeded yet shows the reference system, so it adds no pick.
+    """
+    consumers = thermal_consumers(profile)
+    if not consumers:
+        return {}
+    catalog = list_heating_systems()
+    house_raw = _house_raw()
+    profile_id = str(profile.get("id") or "")
+    picks: dict[str, str] = {}
+    for consumer in consumers:
+        cid = str(consumer["id"])
+        reference_id = consumer[HEATING_SYSTEM_ID_KEY]
+        _labels, mapping = options_for_entities(
+            _choices(catalog, house_raw, profile_id, consumer)
+        )
+        system_id = lookup_entity_id(
+            mapping, session_state.get(scoped_widget_key(session_scope, _widget_base(cid)))
+        )
+        if system_id and system_id != reference_id:
+            picks[cid] = system_id
+    return picks
+
+
 def render_heating_picks(
     session_scope: str,
     profile: dict,

@@ -449,6 +449,7 @@ def _scenario_settings_from_session(
     session_state,
     session_scope: str,
     *,
+    profiles: dict[str, dict],
     prof_map: dict,
     bat_map: dict,
     pv_map: dict,
@@ -475,12 +476,20 @@ def _scenario_settings_from_session(
     ]
     import_tariff_id = lookup_entity_id(imp_map, import_pick)
     export_tariff_id = lookup_entity_id(exp_map, export_pick)
+    house_profile_id = lookup_entity_id(prof_map, profile_pick)
+    from ui.scenario_heating_picks import heating_picks_from_session
+
+    # The baseline carries settings.heating_system_ids; without the picks every scenario
+    # with a variant looked edited and blocked switching to another scenario.
+    heating_system_ids = heating_picks_from_session(
+        session_state, session_scope, profiles.get(str(house_profile_id or "")) or {}
+    )
     return build_scenario_settings(
         battery_ids=battery_ids,
         pv_system_ids=pv_system_ids,
         import_tariff_id=import_tariff_id,
         export_tariff_id=export_tariff_id,
-        house_profile_id=lookup_entity_id(prof_map, profile_pick),
+        house_profile_id=house_profile_id,
         use_imported_pv=bool(
             session_state.get(scoped_widget_key(session_scope, "scenario_use_imported_pv"), False)
         ),
@@ -496,6 +505,7 @@ def _scenario_settings_from_session(
             tariff_id=export_tariff_id,
             widget_suffix="scenario_user_export_cent",
         ),
+        heating_system_ids=heating_system_ids or None,
     )
 
 
@@ -515,6 +525,7 @@ def read_scenario_form_snapshot(
     settings = _scenario_settings_from_session(
         session_state,
         session_scope,
+        profiles=profiles,
         prof_map=prof_map,
         bat_map=bat_map,
         pv_map=pv_map,

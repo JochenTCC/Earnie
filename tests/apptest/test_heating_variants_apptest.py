@@ -92,6 +92,23 @@ def test_scenario_variant_pick_is_saved_and_reseeded() -> None:
     assert "heating_system_ids" not in _scenario()["settings"]
 
 
+def test_scenario_with_variant_switches_to_other_scenarios() -> None:
+    """A saved variant pick is no unsaved edit: switching to Live and to „— neu —“ works."""
+    at = _session()
+    at.selectbox(key=_PICK_KEY).set_value("Gas-Variante").run(timeout=_TIMEOUT_S)
+    assert _scenario()["settings"]["heating_system_ids"] == {"wp": "gas_variante"}
+
+    at = _session()
+    at.radio(key="scenario_select").set_value("Live").run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert at.radio(key="scenario_select").value == "Live"
+
+    at = _session()
+    at.radio(key="scenario_select").set_value("— neu —").run(timeout=_TIMEOUT_S)
+    assert not at.exception
+    assert at.radio(key="scenario_select").value not in ("— neu —", SCENARIO_RADIO_LABEL)
+
+
 def test_live_scenario_names_the_reference_system_without_select() -> None:
     at = _session("Live")
     assert not [sb for sb in at.selectbox if "scenario_heating_wp" in str(sb.key)]
